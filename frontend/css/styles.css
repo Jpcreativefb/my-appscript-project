@@ -1,0 +1,380 @@
+*{
+    box-sizing:border-box;
+  }
+  
+  html{
+    font-size:16px;
+    -webkit-text-size-adjust:100%;
+  }
+  
+  body{
+    margin:0;
+    padding: 0;
+    width: 100%;
+    min-height: 100vh;
+    overflow-x: hidden;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      sans-serif;
+  
+    background:#0f172a;
+    color:white;
+  
+  }
+
+  .page-enter {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  .page-enter-active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  
+  /* ======================
+     LOGIN
+  ====================== */
+  
+  .login-page{
+    min-height:100vh;
+  
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  
+    padding:20px;
+  }
+  
+  .login-card{
+  
+    width:100%;
+    max-width:420px;
+  
+    background:#111827;
+  
+    border-radius:20px;
+  
+    padding:28px;
+  
+    box-shadow:
+      0 10px 30px rgba(0,0,0,.3);
+  }
+  
+  .login-title{
+    font-size:32px;
+    font-weight:700;
+  
+    text-align:center;
+  
+    margin-bottom:10px;
+  }
+  
+  .login-sub{
+    text-align:center;
+    opacity:.7;
+  
+    margin-bottom:28px;
+  }
+  
+  .input{
+    width:100%;
+  
+    height:56px;
+  
+    border:none;
+    border-radius:14px;
+  
+    padding:0 16px;
+  
+    font-size:18px;
+  
+    margin-bottom:16px;
+  }
+  
+  .button{
+  
+    width:100%;
+    height:56px;
+    min-height: 44px;
+    min-width: 44px;
+  
+    border:none;
+    border-radius:14px;
+  
+    background:#facc15;
+    color:black;
+  
+    font-size:18px;
+    font-weight:700;
+  
+    cursor:pointer;
+  }
+  
+  .button:active{
+    transform:scale(.98);
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+
+    font-size: 16px;
+
+    -webkit-tap-highlight-color:
+      transparent;
+  }
+  
+  .error{
+    color:#f87171;
+    text-align:center;
+    margin-top:16px;
+  }
+  
+  .hidden{
+    display:none !important;
+  }
+  
+  /* ======================
+     APP
+  ====================== */
+  
+  .app-header{
+  
+    position:sticky;
+    top:0;
+  
+    background:#111827;
+  
+    padding:16px;
+  
+    text-align:center;
+  
+    font-size:22px;
+    font-weight:700;
+  
+    z-index:100;
+  }
+  
+  .app-content{
+    padding:20px;
+  }
+  
+  .card{
+  
+    background:#1e293b;
+  
+    border-radius:18px;
+  
+    padding:20px;
+  
+    margin-bottom:16px;
+  }
+
+  /* ======================
+   APP LAYOUT
+====================== */
+
+.app-header{
+
+    position:sticky;
+    top:0;
+  
+    height:64px;
+  
+    background:#111827;
+  
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  
+    padding:0 20px;
+  
+    z-index:1000;
+  
+    border-bottom:
+      1px solid rgba(255,255,255,.08);
+  }
+  
+  .header-user{
+    opacity:.8;
+    font-size:14px;
+  }
+  
+  #app {
+    width: 100%;
+    max-width: 100%;
+    min-height: calc(100vh - 120px);
+
+    padding:
+      clamp(12px, 3vw, 24px);
+
+    padding-bottom: 90px;
+
+    opacity: 1;
+    transform: translateY(0);
+
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
+  }
+  
+  /* ======================
+     BOTTOM NAV
+  ====================== */
+  
+  .bottom-nav{
+  
+    position:fixed;
+  
+    bottom:0;
+    left:0;
+  
+    width:100%;
+    height:72px;
+  
+    background:#111827;
+  
+    display:flex;
+  
+    border-top:
+      1px solid rgba(255,255,255,.08);
+  
+    z-index:1000;
+  }
+  
+  .bottom-nav button{
+  
+    flex:1;
+  
+    border:none;
+  
+    background:none;
+  
+    color:white;
+  
+    font-size:15px;
+  
+    font-weight:600;
+  
+    cursor:pointer;
+  }
+  
+  .bottom-nav button:active{
+    background:
+      rgba(255,255,255,.08);
+  }
+  
+  /* ======================
+     PAGE
+  ====================== */
+  
+  .page{
+  
+    width:100%;
+    max-width:1000px;
+  
+    margin:0 auto;
+  }
+  
+  /* ======================
+     LOADER
+  ====================== */
+  
+  .loader{
+  
+    position:fixed;
+    inset:0;
+  
+    background:
+      rgba(255,255,255,0.65);
+  
+    display:flex;
+    align-items:center;
+    justify-content:center;
+  
+    font-size:22px;
+    font-weight:700;
+  
+    z-index:9999;
+  }
+
+  .loader.hidden {
+    display: none !important;
+  }
+
+  .spinner {
+
+  width: 34px;
+  height: 34px;
+
+  border-radius: 50%;
+
+  border:
+    3px solid rgba(0,0,0,0.15);
+
+  border-top:
+    3px solid #111;
+
+  animation:
+    spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+  
+  /* ======================
+     RESPONSIVE
+  ====================== */
+  
+  @media (min-width:900px){
+  
+    .bottom-nav{
+  
+      width:320px;
+  
+      left:50%;
+      transform:translateX(-50%);
+  
+      border-radius:
+        18px 18px 0 0;
+    }
+  
+    #app{
+      padding-bottom:120px;
+    }
+  }
+
+  /* =========================
+   MOBILE PORTRAIT FIX
+========================= */
+  @media (max-width: 768px) and (orientation: portrait) {
+
+    .bottom-nav {
+      height: 60px;
+    }
+
+    .bottom-nav button {
+      font-size: 14px;
+      padding: 10px 4px;
+    }
+
+    #app {
+      padding: 12px;
+    }
+
+    h1, h2 {
+      font-size: 1.2rem;
+    }
+  }
+
+  @supports (-webkit-touch-callout: none) {
+    body {
+      min-height: -webkit-fill-available;
+    }
+  }

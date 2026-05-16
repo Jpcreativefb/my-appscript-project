@@ -1,0 +1,22 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+
+# Build folders
+dist/
+build/
+
+# Logs
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+
+# Clasp auth token
+.clasprc.json
+
+# VS Code local settings
+.vscode/settings.json

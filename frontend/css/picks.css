@@ -1,0 +1,26 @@
+.category-card {
+  margin-bottom: 24px;
+  padding: 16px;
+  background: #b88c09;
+  border-radius: 16px;
+}
+
+.nominee-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.nominee-card {
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #f9f9f9;
+  cursor: pointer;
+}
+
+.nominee-card.selected {
+  background: #111;
+  color: #fff;
+  border-color: #111;
+}
