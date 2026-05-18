@@ -42,3 +42,13 @@ function updatePickCell_(
 
 }
 
+function getAllPicksData_() {
+
+  const sh =
+    getPicksSheet_();
+
+  return sh
+    .getDataRange()
+    .getValues();
+
+}

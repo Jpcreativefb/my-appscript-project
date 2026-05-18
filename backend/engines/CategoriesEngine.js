@@ -22,27 +22,6 @@
    HELPERS
 ========================================================= */
 
-function getCategoriesSheet_(){
-
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        CATEGORIES_SHEET
-      );
-
-  if (!sh) {
-
-    throw new Error(
-      "Categories sheet not found"
-    );
-
-  }
-
-  return sh;
-
-}
-
 function normalizeCategoryId_(value){
 
   return String(value || "")
@@ -180,12 +159,8 @@ function getCategories(gameId){
 
   validateGameId(gameId);
 
-  const sh =
-    getCategoriesSheet_();
-
   const data =
-    sh.getDataRange()
-      .getValues();
+     getAllCategoriesData_();
 
   if (data.length <= 1) {
     return [];
@@ -602,11 +577,8 @@ function getNomineesForCategory(
      LOAD CATEGORIES
   ========================= */
 
-  const sh =
-    getCategoriesSheet_();
-
   const data =
-    sh.getDataRange().getValues();
+     getAllCategoriesData_();
 
   if (data.length <= 1) {
 
@@ -720,28 +692,8 @@ function getNomineesForCategory(
      PICKS
   ========================= */
 
-  const picksSheet =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        PICKS_SHEET
-      );
-
-  if (!picksSheet) {
-
-    return {
-      locked,
-      winnerNomineeId,
-      totalUsers: 0,
-      nominees
-    };
-
-  }
-
   const pData =
-    picksSheet
-      .getDataRange()
-      .getValues();
+      getAllPicksData_();
 
   if (pData.length <= 1) {
 
@@ -1006,10 +958,10 @@ function autoLockCategories(
 
     if (lockDate <= now) {
 
-      sh.getRange(
+      updateCategoryLockedState_(
         i + 1,
-        col.locked + 1
-      ).setValue(true);
+        true
+      );
 
       changed = true;
 
@@ -1106,12 +1058,10 @@ function generateNomineeIds(){
     const nomineeId =
       slugify_(nominee);
 
-    sh.getRange(
-      i + 1,
-      col.nomineeId + 1
-    ).setValue(
-      nomineeId
-    );
+      updateNomineeId_(
+        i + 1,
+        nomineeId
+      );
 
     updated++;
 

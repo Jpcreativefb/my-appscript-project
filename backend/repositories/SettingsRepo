@@ -73,3 +73,31 @@ function appendCategorySettingsRow_(
   sh.appendRow(row);
 
 }
+
+function updateCategoryLockedState_(
+  rowIndex,
+  locked
+){
+
+  const sh =
+    getCategorySettingsSheet_();
+
+  const headers =
+    sh.getRange(
+      1,
+      1,
+      1,
+      sh.getLastColumn()
+    ).getValues()[0];
+
+  const col =
+    getCategorySettingsColumnMap_(
+      headers
+    );
+
+  sh.getRange(
+    rowIndex,
+    col.locked + 1
+  ).setValue(locked);
+
+}
