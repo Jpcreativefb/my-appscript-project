@@ -1,0 +1,75 @@
+function getCategorySettingsSheet_(){
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        CATEGORY_SETTINGS_SHEET
+      );
+
+  if (!sh) {
+
+    throw new Error(
+      "CategorySettings sheet not found"
+    );
+
+  }
+
+  return sh;
+
+}
+
+function getAllCategorySettingsData_() {
+
+  const sh =
+    getCategorySettingsSheet_();
+
+  return sh
+    .getDataRange()
+    .getValues();
+
+}
+
+function rewriteCategorySettings_(
+  rows,
+  headersLength
+) {
+
+  const sh =
+    getCategorySettingsSheet_();
+
+  sh.clearContents();
+
+  sh.getRange(
+    1,
+    1,
+    rows.length,
+    headersLength
+  ).setValues(rows);
+
+}
+
+function updateCategorySettingsCell_(
+  row,
+  col,
+  value
+) {
+
+  const sh =
+    getCategorySettingsSheet_();
+
+  sh.getRange(row, col)
+    .setValue(value);
+
+}
+
+function appendCategorySettingsRow_(
+  row
+) {
+
+  const sh =
+    getCategorySettingsSheet_();
+
+  sh.appendRow(row);
+
+}

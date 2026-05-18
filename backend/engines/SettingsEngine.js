@@ -28,27 +28,6 @@
    HELPERS
 ========================================================= */
 
-function getCategorySettingsSheet_(){
-
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        CATEGORY_SETTINGS_SHEET
-      );
-
-  if (!sh) {
-
-    throw new Error(
-      "CategorySettings sheet not found"
-    );
-
-  }
-
-  return sh;
-
-}
-
 function normalizeCategoryId_(value){
 
   return String(value || "")
@@ -165,11 +144,8 @@ function getCategorySettings(gameId){
 
   validateGameId(gameId);
 
-  const sh =
-    getCategorySettingsSheet_();
-
   const values =
-    sh.getDataRange().getValues();
+    getAllCategorySettingsData_();
 
   if (values.length <= 1) {
     return {};
@@ -504,14 +480,10 @@ function saveCategorySettings(
        REWRITE SHEET
     ========================= */
 
-    sh.clearContents();
-
-    sh.getRange(
-      1,
-      1,
-      keepRows.length,
+    rewriteCategorySettings_(
+      keepRows,
       headers.length
-    ).setValues(keepRows);
+    );
 
     SpreadsheetApp.flush();
 
@@ -573,11 +545,8 @@ function updateCategorySetting(
 
   try {
 
-    const sh =
-      getCategorySettingsSheet_();
-
     const data =
-      sh.getDataRange().getValues();
+      getAllCategorySettingsData_();
 
     if (data.length === 0) {
 
@@ -654,7 +623,7 @@ function updateCategorySetting(
       row[col.winnerNomineeId] =
         patch.winnerNomineeId || "";
 
-      sh.appendRow(row);
+      appendCategorySettingsRow_(row);
 
     }
 
@@ -666,10 +635,9 @@ function updateCategorySetting(
 
       if ("points" in patch) {
 
-        sh.getRange(
+        updateCategorySettingsCell_(
           rowIndex,
-          col.points + 1
-        ).setValue(
+          col.points + 1,
           Number(patch.points) || 0
         );
 
@@ -677,10 +645,9 @@ function updateCategorySetting(
 
       if ("locked" in patch) {
 
-        sh.getRange(
+        updateCategorySettingsCell_(
           rowIndex,
-          col.locked + 1
-        ).setValue(
+          col.locked + 1,
           patch.locked === true
         );
 
@@ -690,10 +657,9 @@ function updateCategorySetting(
         "winnerNomineeId" in patch
       ) {
 
-        sh.getRange(
+        updateCategorySettingsCell_(
           rowIndex,
-          col.winnerNomineeId + 1
-        ).setValue(
+          col.winnerNomineeId + 1,
           patch.winnerNomineeId || ""
         );
 
@@ -703,10 +669,9 @@ function updateCategorySetting(
         "maxChanges" in patch
       ) {
 
-        sh.getRange(
+        updateCategorySettingsCell_(
           rowIndex,
-          col.maxChanges + 1
-        ).setValue(
+          col.maxChanges + 1,
           Number(patch.maxChanges) || 0
         );
 
@@ -716,10 +681,9 @@ function updateCategorySetting(
         "lockDateTime" in patch
       ) {
 
-        sh.getRange(
+        updateCategorySettingsCell_(
           rowIndex,
-          col.lockDateTime + 1
-        ).setValue(
+          col.lockDateTime + 1,
           patch.lockDateTime || ""
         );
 

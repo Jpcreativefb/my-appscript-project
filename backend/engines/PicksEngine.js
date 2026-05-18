@@ -7,21 +7,6 @@
    HELPERS
 ========================================================= */
 
-function getPicksSheet_(){
-
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(PICKS_SHEET);
-
-  if (!sh) {
-    throw new Error("Picks sheet not found");
-  }
-
-  return sh;
-
-}
-
 function getPicksColumnMap_(headers){
 
   return {
@@ -82,10 +67,8 @@ function getUserPicks(username, gameId){
     gameId ||
     getDefaultGameId();
 
-  const sh = getPicksSheet_();
-
   const data =
-    sh.getDataRange().getValues();
+    getAllPicksData_();
 
   if (data.length <= 1) {
     return [];
@@ -401,11 +384,8 @@ function savePick(payload){
        PICKS SHEET
     ========================= */
 
-    const sh =
-      getPicksSheet_();
-
     const data =
-      sh.getDataRange().getValues();
+      getAllPicksData_();
 
     if (data.length === 0) {
       throw new Error(
@@ -524,24 +504,27 @@ function savePick(payload){
 
     if (existingRow > -1) {
 
-      sh.getRange(
+      updatePickCell_(
         existingRow,
-        col.nominee + 1
-      ).setValue(nomineeId);
+        col.nominee + 1,
+        nomineeId
+      );
 
-      sh.getRange(
+      updatePickCell_(
         existingRow,
-        col.lastUpdated + 1
-      ).setValue(now);
+        col.lastUpdated + 1,
+        now
+      );
 
       if (isChange) {
 
-        sh.getRange(
+        updatePickCell_(
           existingRow,
-          col.changes + 1
-        ).setValue(changeCount + 1);
+          col.changes + 1,
+          changeCount + 1
+        );
 
-      }
+      }  
 
     }
 
@@ -565,7 +548,7 @@ function savePick(payload){
       row[col.changes] = 0;
       row[col.lastUpdated] = now;
 
-      sh.appendRow(row);
+      appendPickRow_(row);
 
     }
 
