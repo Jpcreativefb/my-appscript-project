@@ -1,73 +1,84 @@
-function loginUser(username, pin) {
+function loginUser(
+  username,
+  pin
+){
+
+  /* =========================
+     VALIDATION
+  ========================= */
+
+  username =
+    String(username || "")
+      .trim();
+
+  pin =
+    String(pin || "")
+      .trim();
 
   if (!username || !pin) {
 
     return {
+
       success: false,
-      message: "Missing username or PIN"
+
+      message:
+        "Missing username or PIN"
+
     };
 
   }
 
-  const sheet =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName("Users");
+  /* =========================
+     LOAD USER
+  ========================= */
 
-  if (!sheet) {
-
-    throw new Error(
-      "Users sheet not found"
+  const user =
+    findUserByUsername_(
+      username
     );
-
-  }
-
-  const data =
-    sheet.getDataRange().getValues();
-
-  const headers =
-    data.shift().map(h =>
-      String(h).trim()
-    );
-
-  const users = data.map(row => {
-
-    const obj = {};
-
-    headers.forEach((h, i) => {
-      obj[h] = row[i];
-    });
-
-    return obj;
-
-  });
-
-  const user = users.find(u =>
-
-    String(u["Username"])
-      .trim()
-      .toLowerCase() ===
-    String(username)
-      .trim()
-      .toLowerCase()
-
-    &&
-
-    String(u["PIN"])
-      .trim() ===
-    String(pin)
-      .trim()
-
-  );
 
   if (!user) {
 
     return {
+
       success: false,
-      message: "Invalid login"
+
+      message:
+        "Invalid login"
+
     };
 
   }
+
+  /* =========================
+     PIN VALIDATION
+  ========================= */
+
+  const storedPin =
+    String(
+      user["PIN"] || ""
+    )
+    .replace(/^'/, "")
+    .trim();
+
+  if (
+    storedPin !== pin
+  ) {
+
+    return {
+
+      success: false,
+
+      message:
+        "Invalid login"
+
+    };
+
+  }
+
+  /* =========================
+     SESSION TOKEN
+  ========================= */
 
   const token =
     Utilities.getUuid();
@@ -75,31 +86,48 @@ function loginUser(username, pin) {
   CacheService
     .getScriptCache()
     .put(
+
       token,
+
       user["Username"],
+
       60 * 60 * 6
+
     );
+
+  /* =========================
+     RESPONSE
+  ========================= */
 
   return {
 
     success: true,
 
-    token,
+    token:
+      token,
 
     username:
       user["Username"],
 
     isAdmin:
-      String(user["IsAdmin"])
-        .toLowerCase() === "true"
+
+      String(
+        user["IsAdmin"]
+      ).toLowerCase() ===
+        "true"
+
       ||
-      user["IsAdmin"] === "Yes",
+
+      user["IsAdmin"] ===
+        "Yes",
 
     avatar:
-      user["Avatar"] || "default",
+      user["Avatar"] ||
+      "default",
 
     themeColor:
-      user["ThemeColor"] || "#000000"
+      user["ThemeColor"] ||
+      "#000000"
 
   };
 
