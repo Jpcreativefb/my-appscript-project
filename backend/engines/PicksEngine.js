@@ -68,7 +68,7 @@ function getUserPicks(username, gameId){
     getDefaultGameId();
 
   const data =
-    getAllPicksData_();
+     PicksRepo.getAllPicks();
 
   if (data.length <= 1) {
     return [];
@@ -385,7 +385,7 @@ function savePick(payload){
     ========================= */
 
     const data =
-      getAllPicksData_();
+      PicksRepo.getAllPicks();
 
     if (data.length === 0) {
       throw new Error(
@@ -504,28 +504,22 @@ function savePick(payload){
 
     if (existingRow > -1) {
 
-      updatePickCell_(
+      PicksRepo.updatePick(
         existingRow,
-        col.nominee + 1,
-        nomineeId
+        {
+          [col.nominee + 1]:
+            nomineeId,
+    
+          [col.lastUpdated + 1]:
+            now,
+    
+          ...(isChange && {
+            [col.changes + 1]:
+              changeCount + 1
+          })
+        }
       );
-
-      updatePickCell_(
-        existingRow,
-        col.lastUpdated + 1,
-        now
-      );
-
-      if (isChange) {
-
-        updatePickCell_(
-          existingRow,
-          col.changes + 1,
-          changeCount + 1
-        );
-
-      }  
-
+    
     }
 
     /* =========================
@@ -548,18 +542,14 @@ function savePick(payload){
       row[col.changes] = 0;
       row[col.lastUpdated] = now;
 
-      appendPickRow_(row);
+      PicksRepo.insertPick(row);
 
     }
 
-    SpreadsheetApp.flush();
+    PicksRepo.flush();
 
-    if (
-      typeof clearAppCaches ===
-      "function"
-    ) {
-      clearAppCaches();
-    }
+    CacheService.clearPicksCaches();
+    
 
     return {
       success:true,

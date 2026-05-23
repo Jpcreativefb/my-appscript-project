@@ -335,3 +335,21 @@ function clearAppCaches(){
 
 }
 
+function clearPicksCaches(){
+
+  if (
+    typeof clearAppCaches ===
+    "function"
+  ) {
+
+    clearAppCaches();
+
+  }
+
+}
+
+const CacheService = {
+
+  clearPicksCaches
+
+};

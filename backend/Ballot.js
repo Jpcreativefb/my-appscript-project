@@ -55,7 +55,7 @@ function getStats(){
    SHARED CATEGORY RENDERER
 ========================= */
 
-function renderCategoriesShared(container, categories, picks){
+/* function renderCategoriesShared(container, categories, picks){
 
   container.innerHTML = "";
 
@@ -85,4 +85,4 @@ function renderCategoriesShared(container, categories, picks){
 
   });
 
-}
+} */

@@ -8,3 +8,5 @@ const APP_STATE = {
 
   currentPage: "dashboard"
 };
+
+console.log("STATE LOADED", APP_STATE);

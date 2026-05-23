@@ -3,9 +3,29 @@ async function renderPicksPage() {
   const session = getSession();
 
   // later we replace this with API call
-  const categories = getMockCategories();
+  const gameId = "oscars-2026";
 
+  const res =
+    await apiGetCategories(gameId);
+
+  console.log("CATEGORIES API", res);
+
+  const categories =
+    res.categories || [];
+
+
+  if (!categories.length) {
+
+      return `
+        <div class="page">
+          <h1>Make Your Picks</h1>
+          <p>No categories found.</p>
+        </div>
+      `;
+  }   
+  
   return `
+
     <div class="page">
 
       <h1>Make Your Picks</h1>

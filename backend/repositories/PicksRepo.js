@@ -6,43 +6,22 @@ function getPicksSheet_(){
       .getSheetByName(PICKS_SHEET);
 
   if (!sh) {
-    throw new Error("Picks sheet not found");
+    throw new Error(
+      "Picks sheet not found"
+    );
   }
 
   return sh;
 
 }
 
-function getAllPicksData_() {
+function getAllPicks(){
 
-  const sh = getPicksSheet_();
-
-  return sh.getDataRange().getValues();
+  return getAllPicksData_();
 
 }
 
-function appendPickRow_(row) {
-
-  const sh = getPicksSheet_();
-
-  sh.appendRow(row);
-
-}
-
-function updatePickCell_(
-  row,
-  col,
-  value
-) {
-
-  const sh = getPicksSheet_();
-
-  sh.getRange(row, col)
-    .setValue(value);
-
-}
-
-function getAllPicksData_() {
+function getAllPicksData_(){
 
   const sh =
     getPicksSheet_();
@@ -52,3 +31,27 @@ function getAllPicksData_() {
     .getValues();
 
 }
+
+function appendPickRow_(row){
+
+  const sh =
+    getPicksSheet_();
+
+  sh.appendRow(row);
+
+}
+
+function updatePickCell_(
+  row,
+  col,
+  value
+){
+
+  const sh =
+    getPicksSheet_();
+
+  sh.getRange(row, col)
+    .setValue(value);
+
+}
+

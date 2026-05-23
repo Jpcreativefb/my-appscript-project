@@ -69,3 +69,59 @@ async function getPicks(username, token) {
     token
   });
 }
+
+/* ======================
+   GET CATEGORIES
+====================== */
+
+async function apiGetCategories(gameId) {
+
+  return api("getCategories", {
+    gameId
+  });
+}
+
+/* ======================
+   SAVE PICK
+====================== */
+
+async function apiSavePick(
+  username,
+  categoryId,
+  nomineeId,
+  gameId
+) {
+
+  return api("savePick", {
+    username,
+    categoryId,
+    nomineeId,
+    gameId
+  });
+}
+
+/* ======================
+   GET MY PICKS
+====================== */
+
+async function apiGetMyPicks(
+  username,
+  gameId
+) {
+
+  return api("getMyPicks", {
+    username,
+    gameId
+  });
+}
+
+/* ======================
+   LEADERBOARD
+====================== */
+
+async function apiLeaderboard(gameId) {
+
+  return api("leaderboard", {
+    gameId
+  });
+}
