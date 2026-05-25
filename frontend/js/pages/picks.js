@@ -1,118 +1,274 @@
+/* ======================
+   PICKS PAGE
+====================== */
+
 async function renderPicksPage() {
 
-  const session = getSession();
+  const session =
+    getSession();
 
-  // later we replace this with API call
-  const gameId = "oscars-2026";
+  if (
+    !session ||
+    !session.username
+  ) {
 
-  const res =
-    await apiGetCategories(gameId);
+    return `
+      <div class="page">
+        <h1>Make Your Picks</h1>
+        <p>You must be logged in to make picks.</p>
+      </div>
+    `;
 
-  console.log("CATEGORIES API", res);
+  }
+
+  const gameId =
+    getFrontendGameId();
+
+  const username =
+    session.username;
+
+  const categoriesRes =
+    await apiGetCategories(
+      gameId
+    );
+
+  console.log(
+    "CATEGORIES API",
+    categoriesRes
+  );
+
+  const picksRes =
+    await apiGetMyPicks(
+      username,
+      gameId
+    );
+
+  console.log(
+    "MY PICKS API",
+    picksRes
+  );
 
   const categories =
-    res.categories || [];
+    Array.isArray(categoriesRes)
+      ? categoriesRes
+      : categoriesRes.categories || [];
 
+  const picks =
+    picksRes.picks || {};
+
+  APP_STATE.picks =
+    picks;
 
   if (!categories.length) {
 
-      return `
-        <div class="page">
-          <h1>Make Your Picks</h1>
-          <p>No categories found.</p>
-        </div>
-      `;
-  }   
-  
-  return `
+    return `
+      <div class="page">
+        <h1>Make Your Picks</h1>
+        <p>No categories found.</p>
+      </div>
+    `;
 
+  }
+
+  return `
     <div class="page">
 
       <h1>Make Your Picks</h1>
 
       <div class="category-list">
 
-        ${categories.map(cat => `
-          
-          <div class="category-card">
+        ${categories.map(cat => {
 
-            <h2>${cat.name}</h2>
+          const locked =
+            cat.locked === true;
 
-            <div class="nominee-grid">
+          return `
+            <div class="category-card">
 
-              ${cat.nominees.map(n => `
-                
-                <button class="nominee-card"
-                  onclick="selectNominee('${cat.id}', '${n.id}')">
+              <h2>${escapeHtml(cat.name)}</h2>
 
-                  ${n.name}
+              ${
+                locked
+                  ? `<p class="locked-label">Locked</p>`
+                  : ``
+              }
 
-                </button>
+              <div class="nominee-grid">
 
-              `).join("")}
+                ${(cat.nominees || []).map(n => {
+
+                  const selected =
+                    picks[cat.id] === n.id;
+
+                  return `
+                    <button
+                      class="nominee-card ${selected ? "selected" : ""}"
+                      data-category-id="${escapeAttr(cat.id)}"
+                      data-nominee-id="${escapeAttr(n.id)}"
+                      onclick="selectNominee('${escapeJs(cat.id)}', '${escapeJs(n.id)}')"
+                      ${locked ? "disabled" : ""}
+                    >
+
+                      ${
+                        n.image
+                          ? `<img src="${escapeAttr(n.image)}" alt="">`
+                          : ``
+                      }
+
+                      <span>${escapeHtml(n.name)}</span>
+
+                      ${
+                        selected
+                          ? `<strong>✓</strong>`
+                          : ``
+                      }
+
+                    </button>
+                  `;
+
+                }).join("")}
+
+              </div>
 
             </div>
+          `;
 
-          </div>
-
-        `).join("")}
+        }).join("")}
 
       </div>
 
     </div>
   `;
+
 }
 
-function getMockCategories() {
+/* ======================
+   SELECT NOMINEE
+====================== */
 
-  return [
-    {
-      id: "best-film",
-      name: "Best Film",
-      nominees: [
-        { id: "f1", name: "Movie A" },
-        { id: "f2", name: "Movie B" },
-        { id: "f3", name: "Movie C" }
-      ]
-    },
-    {
-      id: "best-actor",
-      name: "Best Actor",
-      nominees: [
-        { id: "a1", name: "Actor A" },
-        { id: "a2", name: "Actor B" }
-      ]
-    }
-  ];
-}
+async function selectNominee(
+  categoryId,
+  nomineeId
+) {
 
-const USER_PICKS = {};
+  const session =
+    getSession();
 
-function selectNominee(categoryId, nomineeId) {
+  if (
+    !session ||
+    !session.username
+  ) {
 
-  USER_PICKS[categoryId] = nomineeId;
+    alert(
+      "You must be logged in."
+    );
 
-  console.log("Picks updated:", USER_PICKS);
+    return;
+
+  }
+
+  const gameId =
+    getFrontendGameId();
+
+  const username =
+    session.username;
+
+  APP_STATE.picks[categoryId] =
+    nomineeId;
 
   highlightSelections();
+
+  const res =
+    await apiSavePick(
+      username,
+      categoryId,
+      nomineeId,
+      gameId
+    );
+
+  console.log(
+    "SAVE PICK API",
+    res
+  );
+
+  if (!res.success) {
+
+    alert(
+      res.message ||
+      "Could not save pick"
+    );
+
+    return;
+
+  }
+
+  APP_STATE.picks[categoryId] =
+    res.nomineeId || nomineeId;
+
+  highlightSelections();
+
 }
+
+/* ======================
+   HIGHLIGHT SELECTIONS
+====================== */
 
 function highlightSelections() {
 
-  document.querySelectorAll(".nominee-card")
+  document
+    .querySelectorAll(".nominee-card")
     .forEach(btn => {
-      btn.classList.remove("selected");
+
+      btn.classList.remove(
+        "selected"
+      );
+
+      const categoryId =
+        btn.dataset.categoryId;
+
+      const nomineeId =
+        btn.dataset.nomineeId;
+
+      if (
+        APP_STATE.picks[categoryId] ===
+        nomineeId
+      ) {
+
+        btn.classList.add(
+          "selected"
+        );
+
+      }
+
     });
 
-  Object.entries(USER_PICKS).forEach(([cat, nominee]) => {
+}
 
-    const el = document.querySelector(
-      `[onclick*="${nominee}"]`
-    );
+/* ======================
+   ESCAPE HELPERS
+====================== */
 
-    if (el) {
-      el.classList.add("selected");
-    }
+function escapeHtml(value) {
 
-  });
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+function escapeAttr(value) {
+
+  return escapeHtml(value);
+
+}
+
+function escapeJs(value) {
+
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'");
+
 }

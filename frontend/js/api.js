@@ -1,6 +1,37 @@
-const API_BASE =
-  "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
-  
+/* ======================
+   API BASE
+====================== */
+
+function getApiBase() {
+
+  if (
+    typeof CONFIG === "undefined" ||
+    !CONFIG.API_URL
+  ) {
+
+    throw new Error(
+      "CONFIG.API_URL is missing"
+    );
+
+  }
+
+  return CONFIG.API_URL;
+
+}
+
+/* ======================
+   DEFAULT GAME ID
+====================== */
+
+function getFrontendGameId() {
+
+  return (
+    CONFIG.DEFAULT_GAME_ID ||
+    "oscars-2026"
+  );
+
+}
+
 /* ======================
    GENERIC API FETCH
 ====================== */
@@ -8,7 +39,9 @@ const API_BASE =
 async function api(action, params = {}) {
 
   const url =
-    new URL(API_BASE);
+    new URL(
+      getApiBase()
+    );
 
   url.searchParams.set(
     "action",
@@ -18,32 +51,72 @@ async function api(action, params = {}) {
   Object.entries(params)
     .forEach(([key, value]) => {
 
-      url.searchParams.set(
-        key,
-        value
-      );
+      if (
+        value !== undefined &&
+        value !== null &&
+        value !== ""
+      ) {
+
+        url.searchParams.set(
+          key,
+          value
+        );
+
+      }
 
     });
 
   try {
 
+    console.log(
+      "API REQUEST",
+      action,
+      Object.fromEntries(
+        url.searchParams.entries()
+      )
+    );
+
     const response =
       await fetch(url);
 
-    return await response.json();
+    const text =
+      await response.text();
+
+    try {
+
+      return JSON.parse(text);
+
+    } catch (jsonErr) {
+
+      console.error(
+        "API NON-JSON RESPONSE",
+        text
+      );
+
+      return {
+        success: false,
+        message: "Invalid API response",
+        raw: text
+      };
+
+    }
 
   } catch (err) {
 
     console.error(
       "API ERROR",
+      action,
       err
     );
 
     return {
       success: false,
-      message: "Network error"
+      message: "Network error",
+      error: String(err)
     };
+
   }
+
 }
 
 /* ======================
@@ -56,29 +129,37 @@ async function apiLogin(username, pin) {
     username,
     pin
   });
-}
 
-/* ======================
-   GET PICKS
-====================== */
-
-async function getPicks(username, token) {
-
-  return api("getPicks", {
-    username,
-    token
-  });
 }
 
 /* ======================
    GET CATEGORIES
 ====================== */
 
-async function apiGetCategories(gameId) {
+async function apiGetCategories(
+  gameId = getFrontendGameId()
+) {
 
   return api("getCategories", {
     gameId
   });
+
+}
+
+/* ======================
+   GET MY PICKS
+====================== */
+
+async function apiGetMyPicks(
+  username,
+  gameId = getFrontendGameId()
+) {
+
+  return api("getMyPicks", {
+    username,
+    gameId
+  });
+
 }
 
 /* ======================
@@ -89,7 +170,7 @@ async function apiSavePick(
   username,
   categoryId,
   nomineeId,
-  gameId
+  gameId = getFrontendGameId()
 ) {
 
   return api("savePick", {
@@ -98,30 +179,33 @@ async function apiSavePick(
     nomineeId,
     gameId
   });
-}
 
-/* ======================
-   GET MY PICKS
-====================== */
-
-async function apiGetMyPicks(
-  username,
-  gameId
-) {
-
-  return api("getMyPicks", {
-    username,
-    gameId
-  });
 }
 
 /* ======================
    LEADERBOARD
 ====================== */
 
-async function apiLeaderboard(gameId) {
+async function apiLeaderboard(
+  gameId = getFrontendGameId()
+) {
 
   return api("leaderboard", {
     gameId
   });
+
+}
+
+/* ======================
+   LEGACY ALIAS
+   Temporary compatibility only
+====================== */
+
+async function getPicks(username) {
+
+  return apiGetMyPicks(
+    username,
+    getFrontendGameId()
+  );
+
 }
