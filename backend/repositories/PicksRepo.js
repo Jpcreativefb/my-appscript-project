@@ -67,13 +67,36 @@ var PicksRepo = {
 
   },
 
-  updatePick: function(rowNumber, colNumber, value){
+  updatePick: function(rowNumber, updates){
 
-    return updatePickCell_(
-      rowNumber,
-      colNumber,
-      value
-    );
+    if (!rowNumber || rowNumber < 1) {
+
+      throw new Error(
+        "Invalid pick row number"
+      );
+
+    }
+
+    if (!updates || typeof updates !== "object") {
+
+      throw new Error(
+        "Invalid pick update payload"
+      );
+
+    }
+
+    Object.entries(updates)
+      .forEach(([colNumber, value]) => {
+
+        updatePickCell_(
+          rowNumber,
+          Number(colNumber),
+          value
+        );
+
+      });
+
+    return true;
 
   },
 
