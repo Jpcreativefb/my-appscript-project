@@ -171,7 +171,7 @@ async function renderPage(page) {
     case "leaderboard":
 
       app.innerHTML =
-         renderLeaderboardPage();
+        await renderLeaderboardPage();
 
       break;
 
