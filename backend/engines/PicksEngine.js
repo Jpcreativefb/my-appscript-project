@@ -548,7 +548,7 @@ function savePick(payload){
 
     PicksRepo.flush();
 
-    CacheService.clearPicksCaches();
+    AppCache.clearPicksCaches();
     
 
     return {

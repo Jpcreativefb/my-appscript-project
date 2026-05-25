@@ -38,6 +38,14 @@ function normalizeNomineeId_(value){
 
 }
 
+function normalizeMovieId_(value){
+
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+
+}
+
 function normalizeGameId_(value){
 
   return String(value || "")

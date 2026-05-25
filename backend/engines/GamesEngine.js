@@ -236,6 +236,8 @@ JSON.stringify(games),
 300
 );
 
+Logger.log(JSON.stringify(games));
+
 return games;
 
 }

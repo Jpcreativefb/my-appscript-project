@@ -1,5 +1,5 @@
 /* =========================
-   CACHE HELPERS
+   APP CACHE HELPERS
 ========================= */
 
 const CACHE_TTL = 120;
@@ -348,8 +348,14 @@ function clearPicksCaches(){
 
 }
 
-const CacheService = {
+/* =========================
+   APP CACHE API
+========================= */
 
-  clearPicksCaches
+var AppCache = {
+
+  clearPicksCaches,
+  clearAppCaches,
+  clearGameCaches
 
 };

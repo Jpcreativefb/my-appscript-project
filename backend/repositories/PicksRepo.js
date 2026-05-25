@@ -55,3 +55,40 @@ function updatePickCell_(
 
 }
 
+/* =========================
+   PICKS REPOSITORY API
+========================= */
+
+var PicksRepo = {
+
+  getAllPicks: function(){
+
+    return getAllPicks();
+
+  },
+
+  updatePick: function(rowNumber, colNumber, value){
+
+    return updatePickCell_(
+      rowNumber,
+      colNumber,
+      value
+    );
+
+  },
+
+  insertPick: function(row){
+
+    return appendPickRow_(row);
+
+  },
+
+  flush: function(){
+
+    SpreadsheetApp.flush();
+
+    return true;
+
+  }
+
+};
