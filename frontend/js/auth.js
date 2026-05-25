@@ -44,10 +44,7 @@ async function login(){
         return;
       }
   
-      localStorage.setItem(
-        "session",
-        JSON.stringify(res)
-      );
+    setSession(res);
   
       window.location.href =
         "./app.html";

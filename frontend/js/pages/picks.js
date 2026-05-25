@@ -5,7 +5,7 @@
 async function renderPicksPage() {
 
   const session =
-    getSession();
+    getCurrentSession();
 
   if (
     !session ||
@@ -25,7 +25,7 @@ async function renderPicksPage() {
     getFrontendGameId();
 
   const username =
-    session.username;
+    getCurrentUsername();
 
   const categoriesRes =
     await apiGetCategories(
@@ -152,7 +152,7 @@ async function selectNominee(
 ) {
 
   const session =
-    getSession();
+    getCurrentSession();
 
   if (
     !session ||
@@ -171,7 +171,7 @@ async function selectNominee(
     getFrontendGameId();
 
   const username =
-    session.username;
+    getCurrentUsername();
 
   APP_STATE.picks[categoryId] =
     nomineeId;

@@ -1,37 +1,42 @@
 /* ======================
-   SESSION BOOTSTRAP
-====================== */
-
-function getSession() {
-  try {
-    return JSON.parse(localStorage.getItem("session"));
-  } catch (e) {
-    return null;
-  }
-}
-
-/* ======================
    START APP
 ====================== */
 
 document.addEventListener("DOMContentLoaded", () => {
 
-  const session = getSession();
+  const session =
+    getSession();
 
   // 🔒 AUTH GUARD
-  if (!session || !session.username) {
-    window.location.href = "./index.html";
+  if (
+    !session ||
+    !session.username
+  ) {
+
+    window.location.href =
+      "./index.html";
+
     return;
+
   }
 
+  setSession(session);
+
   // 👤 HEADER USER
-  const headerUser = document.getElementById("headerUser");
+  const headerUser =
+    document.getElementById(
+      "headerUser"
+    );
+
   if (headerUser) {
-    headerUser.innerText = session.username;
+
+    headerUser.innerText =
+      getCurrentUsername();
+
   }
 
   // 🚀 INIT APP
-  initApp(session);
+  initApp();
 
 });
 
@@ -40,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
    INIT APP
 ====================== */
 
-function initApp(session) {
+function initApp() {
 
   console.log("🚀 App initialized");
 
@@ -48,9 +53,16 @@ function initApp(session) {
 
   bindGlobalEvents();
 
-  // initial route
-  const hash = window.location.hash.replace("#", "");
-  navigate(hash || "dashboard");
+  const hash =
+    window.location.hash.replace(
+      "#",
+      ""
+    );
+
+  navigate(
+    hash || "dashboard"
+  );
+
 }
 
 
@@ -78,8 +90,12 @@ function showLoader() {
 ====================== */
 
 function logout() {
-  localStorage.removeItem("session");
-  window.location.href = "./index.html";
+
+  clearSession();
+
+  window.location.href =
+    "./index.html";
+
 }
 
 
