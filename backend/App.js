@@ -7,7 +7,7 @@ const PICKS_SHEET = 'Picks';
 const CATEGORY_SETTINGS_SHEET = 'CategorySettings';
 
 // Fallback image for nominees/movies // Used when poster/image is unavailable 
-const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/120x180?text=No+Image';
+const PLACEHOLDER_IMAGE = "";
 
 const CONFIG = {
   // 🌐 Base Web App URL (IMPORTANT)

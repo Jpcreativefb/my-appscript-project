@@ -140,3 +140,34 @@
   font-size: 0.8rem;
   font-weight: 700;
 }
+
+/* ======================
+   MISSING NOMINEE IMAGE
+====================== */
+
+.nominee-card:not(:has(img))::before {
+  content: "No Image";
+
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  max-height: 210px;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 10px;
+
+  background: rgba(0, 0, 0, 0.08);
+  color: rgba(0, 0, 0, 0.55);
+
+  font-size: 0.85rem;
+  font-weight: 700;
+
+  box-sizing: border-box;
+}
+
+.nominee-card.selected:not(:has(img))::before {
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.85);
+}
