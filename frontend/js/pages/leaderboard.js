@@ -12,7 +12,7 @@ async function renderLeaderboardPage() {
       gameId
     );
 
-  console.log(
+  debugLog(
     "LEADERBOARD API",
     res
   );

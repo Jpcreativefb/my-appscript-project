@@ -32,7 +32,7 @@ async function renderPicksPage() {
       gameId
     );
 
-  console.log(
+  debugLog(
     "CATEGORIES API",
     categoriesRes
   );
@@ -43,7 +43,7 @@ async function renderPicksPage() {
       gameId
     );
 
-  console.log(
+  debugLog(
     "MY PICKS API",
     picksRes
   );
@@ -186,7 +186,7 @@ async function selectNominee(
       gameId
     );
 
-  console.log(
+  debugLog(
     "SAVE PICK API",
     res
   );

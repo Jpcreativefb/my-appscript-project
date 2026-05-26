@@ -39,17 +39,17 @@ async function renderDashboardPage() {
       gameId
     );
 
-  console.log(
+  debugLog(
     "DASHBOARD CATEGORIES API",
     categoriesRes
   );
 
-  console.log(
+  debugLog(
     "DASHBOARD PICKS API",
     picksRes
   );
 
-  console.log(
+  debugLog(
     "DASHBOARD LEADERBOARD API",
     leaderboardRes
   );

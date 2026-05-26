@@ -47,7 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 function initApp() {
 
-  console.log("🚀 App initialized");
+  debugLog("🚀 App initialized");
 
   hideLoader();
 
@@ -224,12 +224,12 @@ function renderPicks() {
 
 function bindGlobalEvents() {
 
-  console.log("🔗 Binding navigation");
+  debugLog("🔗 Binding navigation");
 
   // Example: safe nav binding if needed later
   document.querySelectorAll("button").forEach(btn => {
     btn.addEventListener("click", () => {
-      console.log("Button clicked:", btn.innerText);
+      debugLog("Button clicked:", btn.innerText);
     });
   });
 

@@ -68,7 +68,7 @@ async function api(action, params = {}) {
 
   try {
 
-    console.log(
+    debugLog(
       "API REQUEST",
       action,
       Object.fromEntries(

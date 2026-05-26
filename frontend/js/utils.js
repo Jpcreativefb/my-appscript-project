@@ -53,3 +53,42 @@ function escapeJs(value) {
     .replace(/'/g, "\\'");
 
 }
+
+/* ======================
+   DEBUG HELPERS
+====================== */
+
+function isDebugMode() {
+
+  return Boolean(
+    typeof CONFIG !== "undefined" &&
+    CONFIG.DEBUG === true
+  );
+
+}
+
+function debugLog() {
+
+  if (!isDebugMode()) {
+    return;
+  }
+
+  console.log.apply(
+    console,
+    arguments
+  );
+
+}
+
+function debugWarn() {
+
+  if (!isDebugMode()) {
+    return;
+  }
+
+  console.warn.apply(
+    console,
+    arguments
+  );
+
+}
