@@ -20,3 +20,7 @@ npm-debug.log*
 
 # VS Code local settings
 .vscode/settings.json
+
+# macOS
+.DS_Store
+**/.DS_Store

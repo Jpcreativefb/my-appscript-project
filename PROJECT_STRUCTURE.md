@@ -3,18 +3,18 @@
 This project is split into two separate application layers:
 
 1. Backend: Google Sheets + Google Apps Script API
-2. Frontend: Cloudflare-hosted browser application
+2. Frontend: Cloudflare Pages browser application
 
-The goal is to keep backend and frontend code separated, tested, committed, and deployable from GitHub across two Mac workstations.
+The goal is to keep backend and frontend code separated, tested, committed, documented, and deployable from GitHub across two Mac workstations.
 
 ---
 
 ## Final Architecture
 
+Current working architecture:
+
 ```txt
-Cloudflare Frontend
-        ↓
-Cloudflare Pages
+Cloudflare Pages Frontend
         ↓
 Apps Script API
         ↓
@@ -24,7 +24,7 @@ Google Sheets data
 Future production hardening may add a Cloudflare Worker API proxy:
 
 ```txt
-Cloudflare Frontend
+Cloudflare Pages Frontend
         ↓
 Cloudflare Worker API Proxy
         ↓
@@ -45,33 +45,73 @@ my-appscript-project/
 ├── backend/
 │   ├── Api.js
 │   ├── App.js
+│   ├── AuthEngine.js
+│   ├── Ballot.js
+│   ├── CommunityGames.js
+│   ├── CommunityResults.js
+│   ├── Compare.js
+│   ├── Movies.js
+│   ├── Schema.js
+│   ├── VotingUtils.js
+│   ├── VotingValidation.js
 │   ├── appsscript.json
-│   ├── core/
+│   ├── imageUtils.js
+│   │
 │   ├── admin/
-│   ├── repositories/
+│   │   ├── AdminTools.js
+│   │   └── BackendTests.js
+│   │
+│   ├── core/
+│   │   ├── AppConfig.js
+│   │   ├── Helpers.js
+│   │   └── SheetHelpers.js
+│   │
 │   ├── engines/
+│   │   ├── CategoriesEngine.js
+│   │   ├── GamesEngine.js
+│   │   ├── MovieEngine.js
+│   │   ├── PicksEngine.js
+│   │   ├── ProfileEngine.js
+│   │   ├── ResultsEngine.js
+│   │   ├── ScoringEngine.js
+│   │   ├── SettingsEngine.js
+│   │   ├── UsersEngine.js
+│   │   └── VotingEngine.js
+│   │
+│   ├── repositories/
+│   │   ├── CategoriesRepo.js
+│   │   ├── PicksRepo.js
+│   │   ├── SettingsRepo.js
+│   │   ├── UsersRepo.js
+│   │   └── VotesRepo.js
+│   │
 │   └── services/
+│       └── AppCache.js
 │
 ├── frontend/
 │   ├── index.html
 │   ├── app.html
+│   │
 │   ├── css/
 │   │   ├── styles.css
 │   │   ├── components.css
 │   │   ├── pages.css
 │   │   └── picks.css
-│   ├── js/
-│   │   ├── config.js
-│   │   ├── api.js
-│   │   ├── state.js
-│   │   ├── utils.js
-│   │   ├── app.js
-│   │   └── pages/
-│   │       ├── dashboard.js
-│   │       ├── picks.js
-│   │       └── leaderboard.js
-│   └── pages/
+│   │
+│   └── js/
+│       ├── config.js
+│       ├── api.js
+│       ├── state.js
+│       ├── utils.js
+│       ├── app.js
+│       │
+│       └── pages/
+│           ├── dashboard.js
+│           ├── picks.js
+│           └── leaderboard.js
 │
+├── API_CONTRACT.md
+├── DEPLOYMENT_CHECKLIST.md
 ├── PROJECT_STRUCTURE.md
 └── README.md
 ```
@@ -102,6 +142,8 @@ leaderboard data
 scoring/results logic
 Google Sheets reads/writes
 cache management
+manual admin/test tools
+future community/voting/compare features
 ```
 
 The main backend API entry point is:
@@ -110,7 +152,7 @@ The main backend API entry point is:
 backend/Api.js
 ```
 
-The active API entry point should be:
+The active Apps Script API entry point should be:
 
 ```js
 function doGet(e)
@@ -167,8 +209,10 @@ The frontend is responsible for:
 login screen
 app shell
 navigation
+session state
 page rendering
 calling backend API
+displaying dashboard/profile summary
 displaying categories
 displaying picks
 saving picks from UI
@@ -230,7 +274,7 @@ CacheService
 
 ## Cloudflare Deployment
 
-The active frontend deployment is now Git-connected through Cloudflare Pages.
+The active frontend deployment is Git-connected through Cloudflare Pages.
 
 Cloudflare Pages should deploy from:
 
@@ -240,19 +284,24 @@ Branch: architecture-cleanup
 Build output directory: frontend
 ```
 
-The old drag-and-drop Cloudflare Pages deployment should be considered obsolete once the Git-connected deployment is fully verified.
+The old drag-and-drop Cloudflare Pages deployment should be considered obsolete.
 
 The deployed Cloudflare frontend has been verified to:
 
 ```txt
+load index.html
 load app.html
 load config.js
+load utils.js
 load api.js
+load state.js
 run getFrontendGameId()
 call apiGetCategories()
+render Dashboard
 render Picks
 save Picks
 render Leaderboard
+handle Logout
 ```
 
 ---
@@ -279,6 +328,122 @@ If not using clasp, backend file changes must be copied manually into the Apps S
 
 ---
 
+## Frontend Session Behavior
+
+Frontend session state is managed in:
+
+```txt
+frontend/js/state.js
+```
+
+The active in-memory session is stored in:
+
+```js
+APP_STATE.session
+```
+
+The persistent browser session is stored in:
+
+```txt
+localStorage["session"]
+```
+
+Sessions include:
+
+```js
+{
+  username: "User",
+  createdAt: 1234567890000
+}
+```
+
+Session expiration is controlled by:
+
+```js
+CONFIG.SESSION_TTL_HOURS
+```
+
+Current value:
+
+```txt
+168 hours
+```
+
+This equals:
+
+```txt
+7 days
+```
+
+Expired sessions are automatically cleared and redirected to the login page.
+
+Login flow:
+
+```txt
+auth.js
+→ apiLogin()
+→ setSession()
+→ app.html
+```
+
+App startup flow:
+
+```txt
+app.js
+→ getSession()
+→ isSessionValid()
+→ setSession()
+→ initApp()
+```
+
+Logout flow:
+
+```txt
+logout()
+→ clearSession()
+→ index.html
+```
+
+---
+
+## Frontend Debug Logging
+
+Debug logging is controlled by:
+
+```txt
+frontend/js/config.js
+```
+
+Current production/default value:
+
+```js
+DEBUG: false
+```
+
+Debug helper functions live in:
+
+```txt
+frontend/js/utils.js
+```
+
+Important helpers:
+
+```js
+debugLog()
+debugWarn()
+isDebugMode()
+```
+
+Expected behavior:
+
+```txt
+DEBUG false → normal console is quiet
+DEBUG true  → API/page logs appear
+console.error remains visible for real errors
+```
+
+---
+
 ## Verified Backend Endpoints
 
 The following Apps Script API endpoints have been tested:
@@ -296,7 +461,7 @@ Verified backend behavior:
 ```txt
 getCategories returns category array
 leaderboard returns leaderboard array
-login returns success response
+login returns success response with username
 getMyPicks returns saved picks
 savePick saves new picks
 savePick updates existing picks
@@ -311,12 +476,19 @@ savePick respects change validation
 The following frontend flows have been tested locally and/or on Cloudflare:
 
 ```txt
+index.html loads correctly
 app.html loads correctly
 config.js loads correctly
-api.js loads correctly
 utils.js loads correctly
+api.js loads correctly
+state.js loads correctly
 getFrontendGameId() returns oscars-2026
 apiGetCategories() returns live backend categories
+Login works
+Session persists across refresh
+Expired session redirects to login
+Logout clears session
+Dashboard page renders live profile summary
 Picks page renders live categories
 Picks page loads saved user picks
 Clicking nominee saves pick through backend
@@ -325,7 +497,10 @@ Changing an existing pick updates the same Picks sheet row
 Changing an existing pick does not append duplicate rows
 Leaderboard page renders live backend leaderboard data
 Picks card images are normalized and do not overflow
+Missing nominee images use local CSS placeholder
 Leaderboard cards are styled and readable
+Error/empty states exist for API failures
+Navigation loader works during page transitions
 ```
 
 ---
@@ -417,12 +592,61 @@ because `CacheService` is Google’s built-in Apps Script cache service and does
 
 ---
 
-## Current Important Files
+## Legacy / Future Feature Modules
+
+These files contain older or work-in-progress feature logic that should not be deleted:
+
+```txt
+backend/CommunityGames.js
+backend/CommunityResults.js
+backend/Compare.js
+backend/VotingUtils.js
+backend/VotingValidation.js
+backend/engines/VotingEngine.js
+backend/repositories/VotesRepo.js
+```
+
+Status:
+
+```txt
+Keep for future review.
+Do not assume production-ready.
+Do not wire into frontend/API without testing and updating to current architecture.
+```
+
+Future feature areas:
+
+```txt
+community games
+community results
+compare tools
+voting/ranking
+```
+
+---
+
+## Backend Manual Test Tools
+
+Manual backend test functions live in:
+
+```txt
+backend/admin/BackendTests.js
+```
+
+These functions are intended to be run manually from the Apps Script editor.
+
+They should not be called from production API routes.
+
+---
+
+## Important Current Files
 
 Backend:
 
 ```txt
 backend/Api.js
+backend/core/AppConfig.js
+backend/core/SheetHelpers.js
 backend/engines/PicksEngine.js
 backend/repositories/PicksRepo.js
 backend/services/AppCache.js
@@ -431,22 +655,34 @@ backend/engines/GamesEngine.js
 backend/engines/SettingsEngine.js
 backend/engines/ScoringEngine.js
 backend/engines/ResultsEngine.js
+backend/engines/ProfileEngine.js
 ```
 
 Frontend:
 
 ```txt
-frontend/app.html
 frontend/index.html
+frontend/app.html
 frontend/js/config.js
+frontend/js/utils.js
 frontend/js/api.js
 frontend/js/state.js
-frontend/js/utils.js
 frontend/js/app.js
+frontend/js/pages/dashboard.js
 frontend/js/pages/picks.js
 frontend/js/pages/leaderboard.js
-frontend/css/picks.css
+frontend/css/styles.css
+frontend/css/components.css
 frontend/css/pages.css
+frontend/css/picks.css
+```
+
+Documentation:
+
+```txt
+PROJECT_STRUCTURE.md
+API_CONTRACT.md
+DEPLOYMENT_CHECKLIST.md
 ```
 
 ---
@@ -502,8 +738,11 @@ No frontend/browser API errors
 After frontend changes, test:
 
 ```txt
+index.html loads
 app.html loads
 Login works
+Dashboard loads
+Dashboard stats load
 Picks page loads
 Categories render
 Saved picks appear selected
@@ -511,7 +750,10 @@ Changing a pick saves successfully
 Changing a pick updates existing sheet row
 Refreshing keeps saved selection
 Leaderboard loads
+Logout works
+Expired session redirects to login
 No [object Promise] appears
+No debugLog is not defined error
 No escapeHtml is not defined error
 No major layout overflow
 ```
@@ -588,10 +830,14 @@ Good commit examples:
 Stabilize picks repository and cache integration
 Wire picks page to backend API
 Wire leaderboard page to backend API
+Wire dashboard profile summary
 Polish picks layout
 Move frontend escape helpers to shared utils
 Fix existing pick row updates
-Document project architecture and workflow
+Document current API contract
+Add frontend debug logging flag
+Add frontend session expiration
+Add deployment verification checklist
 ```
 
 Avoid giant mixed commits that include unrelated backend, frontend, and deployment changes.
@@ -606,13 +852,15 @@ Do not copy browser JavaScript files into backend.
 
 Do not use `document`, `window`, or `localStorage` in backend files.
 
-Do not reintroduce Apps Script HTML Service routing unless the architecture decision changes.
+Do not reintroduce Apps Script server-rendered frontend routing unless the architecture decision changes.
 
 Do not rely on drag-and-drop Cloudflare deployments for ongoing development.
 
 Do not start work on the second Mac before pulling latest GitHub changes.
 
 Do not change frontend and backend contracts at the same time without testing each layer separately.
+
+Do not append duplicate rows for changed picks.
 
 ---
 
@@ -646,10 +894,34 @@ Current verified app loop:
 
 ```txt
 Login
+→ Session saved with createdAt
+→ Dashboard
 → Load categories
 → Load saved picks
 → Save/change picks
 → Update existing Picks sheet row
 → Refresh and reload saved picks
 → View leaderboard
+→ Logout
+```
+
+---
+
+## Future Production Hardening
+
+Possible future improvements:
+
+```txt
+Cloudflare Worker API proxy
+Move write operations to POST
+Standardize API responses to { success, data, error }
+Stronger backend-issued auth/session token validation
+Profile endpoint
+Dashboard summary endpoint
+Admin endpoints
+API versioning
+Community games frontend
+Community results frontend
+Compare frontend
+Voting/ranking frontend
 ```
