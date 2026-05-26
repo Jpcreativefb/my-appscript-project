@@ -279,30 +279,48 @@ function getLeaderboardData(
 
         });
 
-      results.push({
+      const profile =
+  getUserProfile(
+    username,
+    gameId
+  ) || {};
 
-        user:
-          username,
+  results.push({
 
-        total:
-          total,
+    user:
+      username,
 
-        remaining:
-          remaining,
+    displayName:
+      profile.displayName ||
+      username,
 
-        max:
-          total + remaining,
+    avatar:
+      profile.avatar ||
+      "default",
 
-        statues:
-          statues,
+    themeColor:
+      profile.themeColor ||
+      "#354785",
 
-        eliminated:
-          false,
+    total:
+      total,
 
-        winChance:
-          0
+    remaining:
+      remaining,
 
-      });
+    max:
+      total + remaining,
+
+    statues:
+      statues,
+
+    eliminated:
+      false,
+
+    winChance:
+      0
+
+  });
 
     });
 

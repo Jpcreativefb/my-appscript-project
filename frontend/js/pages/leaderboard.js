@@ -72,7 +72,11 @@ const rows =
 
             <div class="leaderboard-main">
 
-              <h2>${escapeHtml(row.user)}</h2>
+              <h2>${escapeHtml(row.displayName || row.user)}</h2>
+
+              <p class="leaderboard-username">
+                 @${escapeHtml(row.user)}
+              </p>
 
               <p>
                 Total: <strong>${Number(row.total) || 0}</strong>

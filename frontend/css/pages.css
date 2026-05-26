@@ -36,6 +36,15 @@
     0 10px 25px rgba(0, 0, 0, 0.18);
 }
 
+.leaderboard-username {
+  margin: -4px 0 8px;
+
+  color: rgba(255, 255, 255, 0.68);
+
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
 .leaderboard-rank {
   min-width: 52px;
   height: 52px;
