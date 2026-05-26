@@ -446,3 +446,107 @@ function saveUserProfile(
   };
 
 }
+
+/* =========================
+   GET USER PROFILE HISTORY
+========================= */
+
+function getUserProfileHistory(
+  username
+){
+
+  if (!username) {
+    return [];
+  }
+
+  const sh =
+    getProfilesSheet_();
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (data.length <= 1) {
+    return [];
+  }
+
+  const headers =
+    data[0].map(h =>
+      String(h).trim()
+    );
+
+  const col =
+    getProfilesColumnMap_(
+      headers
+    );
+
+  validateProfilesColumns_(
+    col
+  );
+
+  const targetUsername =
+    normalizeProfileUsername_(
+      username
+    );
+
+  const rows = [];
+
+  for (let i = 1; i < data.length; i++) {
+
+    const row =
+      data[i];
+
+    const rowUsername =
+      normalizeProfileUsername_(
+        row[col.username]
+      );
+
+    if (rowUsername !== targetUsername) {
+      continue;
+    }
+
+    rows.push({
+
+      username:
+        row[col.username] ||
+        username,
+
+      gameId:
+        row[col.gameId] ||
+        "",
+
+      displayName:
+        row[col.displayName] ||
+        row[col.username] ||
+        username,
+
+      avatar:
+        row[col.avatar] ||
+        "default",
+
+      themeColor:
+        row[col.themeColor] ||
+        "#354785",
+
+      createdAt:
+        row[col.createdAt] || "",
+
+      updatedAt:
+        row[col.updatedAt] || ""
+
+    });
+
+  }
+
+  rows.sort((a, b) => {
+
+    return String(b.gameId || "")
+      .localeCompare(
+        String(a.gameId || "")
+      );
+
+  });
+
+  return rows;
+
+}

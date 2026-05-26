@@ -171,6 +171,20 @@ function doGet(e) {
     }
 
     // =========================
+    // USER PROFILE HISTORY
+    // =========================
+
+    if (action === "getUserProfileHistory") {
+
+        return json(
+          getUserProfileHistory(
+            e.parameter.username
+          )
+        );
+
+    }
+
+    // =========================
     // DEFAULT
     // =========================
 
