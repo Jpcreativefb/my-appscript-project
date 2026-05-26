@@ -141,6 +141,32 @@ function doGet(e) {
     }
 
     // =========================
+    // SAVE USER PROFILE
+    // =========================
+
+    if (action === "saveUserProfile") {
+
+      return json(
+        saveUserProfile({
+
+          username:
+            e.parameter.username,
+
+          displayName:
+            e.parameter.displayName,
+
+          avatar:
+            e.parameter.avatar,
+
+          themeColor:
+            e.parameter.themeColor
+
+        })
+      );
+
+    }
+
+    // =========================
     // DEFAULT
     // =========================
 

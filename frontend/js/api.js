@@ -177,6 +177,30 @@ async function apiGetUserProfile(
 }
 
 /* ======================
+   SAVE USER PROFILE
+====================== */
+
+async function apiSaveUserProfile(
+  profile
+) {
+
+  return api("saveUserProfile", {
+    username:
+      profile.username,
+
+    displayName:
+      profile.displayName,
+
+    avatar:
+      profile.avatar,
+
+    themeColor:
+      profile.themeColor
+  });
+
+}
+
+/* ======================
    SAVE PICK
 ====================== */
 

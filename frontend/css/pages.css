@@ -233,3 +233,64 @@
 .dashboard-action-button:hover {
   transform: translateY(-1px);
 }
+
+/* ======================
+   DASHBOARD PROFILE FORM
+====================== */
+
+.dashboard-profile-card {
+  margin-bottom: 18px;
+  padding: 18px;
+
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-profile-card h2 {
+  margin: 0 0 14px;
+
+  font-size: 1.15rem;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+
+  gap: 6px;
+
+  margin-bottom: 12px;
+}
+
+.profile-field span {
+  color: #555555;
+
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.profile-field input {
+  width: 100%;
+
+  padding: 11px 12px;
+
+  border: 1px solid #dddddd;
+  border-radius: 12px;
+
+  font-size: 1rem;
+
+  box-sizing: border-box;
+}
+
+.profile-save-status {
+  min-height: 20px;
+
+  margin: 10px 0 0;
+
+  color: #354785;
+
+  font-weight: 700;
+}

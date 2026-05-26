@@ -44,47 +44,52 @@ async function renderDashboardPage() {
       gameId
     );
 
-debugLog(
-  "DASHBOARD CATEGORIES API",
-  categoriesRes
-);
+  debugLog(
+    "DASHBOARD PROFILE API",
+    profileRes
+  );
 
-debugLog(
-  "DASHBOARD PICKS API",
-  picksRes
-);
+  debugLog(
+    "DASHBOARD CATEGORIES API",
+    categoriesRes
+  );
 
-debugLog(
-  "DASHBOARD LEADERBOARD API",
-  leaderboardRes
-);
+  debugLog(
+    "DASHBOARD PICKS API",
+    picksRes
+  );
 
-if (
-  isApiError(profileRes) ||
-  isApiError(categoriesRes) ||
-  isApiError(picksRes) ||
-  isApiError(leaderboardRes)
-) {
+  debugLog(
+    "DASHBOARD LEADERBOARD API",
+    leaderboardRes
+  );
 
-  return `
-    <div class="page dashboard-page">
+  if (
+    isApiError(profileRes) ||
+    isApiError(categoriesRes) ||
+    isApiError(picksRes) ||
+    isApiError(leaderboardRes)
+  ) {
 
-      <h1>Dashboard</h1>
+    return `
+      <div class="page dashboard-page">
 
-      ${renderErrorCard(
-        "Could not load dashboard",
-        "One or more dashboard requests failed. Please refresh and try again."
-      )}
+        <h1>Dashboard</h1>
 
-    </div>
-  `;
+        ${renderErrorCard(
+          "Could not load dashboard",
+          "One or more dashboard requests failed. Please refresh and try again."
+        )}
 
-}
+      </div>
+    `;
 
-const categories =
-  Array.isArray(categoriesRes)
-    ? categoriesRes
-    : categoriesRes.categories || [];
+  }
+
+  const categories =
+    Array.isArray(categoriesRes)
+      ? categoriesRes
+      : categoriesRes.categories || [];
 
   const picks =
     picksRes.picks || {};
@@ -147,9 +152,9 @@ const categories =
     userLeaderboard
       ? Number(userLeaderboard.statues) || 0
       : 0;
-  
+
   const profile =
-     profileRes || {};
+    profileRes || {};
 
   const displayName =
     profile.displayName ||
@@ -163,8 +168,7 @@ const categories =
     profile.avatar ||
     "default";
 
-  return `    
-
+  return `
     <div class="page dashboard-page">
 
       <section
@@ -187,11 +191,10 @@ const categories =
           </p>
 
           <p class="dashboard-profile-meta">
-             @${escapeHtml(username)}
-             ·
-             Avatar: ${escapeHtml(avatar)}
+            @${escapeHtml(username)}
+            ·
+            Avatar: ${escapeHtml(avatar)}
           </p>
-
         </div>
 
       </section>
@@ -248,6 +251,51 @@ const categories =
 
       </section>
 
+      <section class="dashboard-profile-card card">
+
+        <h2>Edit Profile</h2>
+
+        <label class="profile-field">
+          <span>Display Name</span>
+          <input
+            id="profileDisplayName"
+            type="text"
+            value="${escapeAttr(displayName)}"
+          >
+        </label>
+
+        <label class="profile-field">
+          <span>Avatar</span>
+          <input
+            id="profileAvatar"
+            type="text"
+            value="${escapeAttr(avatar)}"
+          >
+        </label>
+
+        <label class="profile-field">
+          <span>Theme Color</span>
+          <input
+            id="profileThemeColor"
+            type="color"
+            value="${escapeAttr(themeColor)}"
+          >
+        </label>
+
+        <button
+          class="dashboard-action-button"
+          onclick="saveDashboardProfile()"
+        >
+          Save Profile
+        </button>
+
+        <p
+          id="profileSaveStatus"
+          class="profile-save-status"
+        ></p>
+
+      </section>
+
       <section class="dashboard-actions">
 
         <button
@@ -268,5 +316,102 @@ const categories =
 
     </div>
   `;
+
+}
+
+/* ======================
+   SAVE DASHBOARD PROFILE
+====================== */
+
+async function saveDashboardProfile() {
+
+  const username =
+    getCurrentUsername();
+
+  if (!username) {
+    return;
+  }
+
+  const displayNameEl =
+    document.getElementById(
+      "profileDisplayName"
+    );
+
+  const avatarEl =
+    document.getElementById(
+      "profileAvatar"
+    );
+
+  const themeColorEl =
+    document.getElementById(
+      "profileThemeColor"
+    );
+
+  const statusEl =
+    document.getElementById(
+      "profileSaveStatus"
+    );
+
+  const profile = {
+    username:
+      username,
+
+    displayName:
+      displayNameEl
+        ? displayNameEl.value.trim()
+        : username,
+
+    avatar:
+      avatarEl
+        ? avatarEl.value.trim()
+        : "default",
+
+    themeColor:
+      themeColorEl
+        ? themeColorEl.value
+        : "#354785"
+  };
+
+  if (statusEl) {
+    statusEl.innerText =
+      "Saving...";
+  }
+
+  const res =
+    await apiSaveUserProfile(
+      profile
+    );
+
+  if (!res.success) {
+
+    if (statusEl) {
+      statusEl.innerText =
+        res.message ||
+        "Could not save profile.";
+    }
+
+    return;
+
+  }
+
+  if (APP_STATE.user) {
+
+    APP_STATE.user.displayName =
+      profile.displayName;
+
+  }
+
+  if (statusEl) {
+
+    statusEl.innerText =
+      "Profile saved.";
+
+  }
+
+  setTimeout(() => {
+
+    navigate("dashboard");
+
+  }, 500);
 
 }
