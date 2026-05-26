@@ -50,39 +50,3 @@ function getStats(){
   });
 
 }
-
-/* =========================
-   SHARED CATEGORY RENDERER
-========================= */
-
-/* function renderCategoriesShared(container, categories, picks){
-
-  container.innerHTML = "";
-
-  categories.forEach(cat => {
-
-    const card = document.createElement("div");
-    card.className = "categoryCard";
-
-    let html = `<div class="catTitle">${cat.name}</div>`;
-
-    cat.nominees.forEach(n => {
-
-      const selected = picks?.[cat.id] === n.id;
-
-      html += `
-        <div class="nominee ${selected ? 'selected' : ''}">
-          ${n.name}
-          ${selected ? '✓' : ''}
-        </div>
-      `;
-
-    });
-
-    card.innerHTML = html;
-
-    container.appendChild(card);
-
-  });
-
-} */
