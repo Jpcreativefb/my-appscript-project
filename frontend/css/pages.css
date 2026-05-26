@@ -303,3 +303,75 @@
 
   font-weight: 700;
 }
+
+/* ======================
+   DASHBOARD PROFILE HISTORY
+====================== */
+
+.dashboard-history-card {
+  margin-bottom: 18px;
+  padding: 18px;
+
+  border-radius: 18px;
+
+  background: #ffffff;
+
+  box-shadow:
+    0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.dashboard-history-card h2 {
+  margin: 0 0 14px;
+
+  font-size: 1.15rem;
+}
+
+.profile-history-list {
+  display: flex;
+  flex-direction: column;
+
+  gap: 10px;
+}
+
+.profile-history-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding: 12px;
+
+  border-radius: 14px;
+
+  background: #f7f7f7;
+}
+
+.profile-history-row strong {
+  display: block;
+
+  color: #111111;
+}
+
+.profile-history-row p {
+  margin: 4px 0 0;
+
+  color: #666666;
+
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.profile-history-row span {
+  flex-shrink: 0;
+
+  padding: 5px 9px;
+
+  border-radius: 999px;
+
+  background: #354785;
+  color: #ffffff;
+
+  font-size: 0.8rem;
+  font-weight: 800;
+}
