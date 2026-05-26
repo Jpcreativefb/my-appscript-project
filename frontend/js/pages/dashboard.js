@@ -29,6 +29,11 @@ async function renderDashboardPage() {
       gameId
     );
 
+    const profileHistoryRes =
+      await apiGetUserProfileHistory(
+        username
+      );  
+
   const categoriesRes =
     await apiGetCategories(
       gameId
@@ -51,6 +56,11 @@ async function renderDashboardPage() {
   );
 
   debugLog(
+    "DASHBOARD PROFILE HISTORY API",
+    profileHistoryRes
+  );
+
+  debugLog(
     "DASHBOARD CATEGORIES API",
     categoriesRes
   );
@@ -67,6 +77,7 @@ async function renderDashboardPage() {
 
   if (
     isApiError(profileRes) ||
+    isApiError(profileHistoryRes) ||
     isApiError(categoriesRes) ||
     isApiError(picksRes) ||
     isApiError(leaderboardRes)
@@ -153,6 +164,11 @@ async function renderDashboardPage() {
     userLeaderboard
       ? Number(userLeaderboard.statues) || 0
       : 0;
+
+  const profileHistory =
+     Array.isArray(profileHistoryRes)
+       ? profileHistoryRes
+       : [];
 
   const profile =
     profileRes || {};
@@ -295,9 +311,41 @@ async function renderDashboardPage() {
           class="profile-save-status"
         ></p>
 
-      </section>
+        <section class="dashboard-history-card card">
 
-      <section class="dashboard-actions">
+        <h2>Profile History</h2>
+
+        ${
+          profileHistory.length
+            ? `
+              <div class="profile-history-list">
+
+                ${profileHistory.map(item => `
+                  <div class="profile-history-row">
+
+                    <div>
+                      <strong>
+                        ${escapeHtml(item.displayName || item.username)}
+                      </strong>
+
+                      <p>
+                        @${escapeHtml(item.username)}
+                      </p>
+                    </div>
+
+                    <span>
+                      ${escapeHtml(item.gameId)}
+                    </span>
+
+                  </div>
+                `).join("")}
+
+              </div>
+            `
+            : renderEmptyCard("No profile history found yet.")
+        }
+
+      </section>
 
         <button
           class="dashboard-action-button"

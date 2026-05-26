@@ -207,6 +207,20 @@ async function apiSaveUserProfile(
 }
 
 /* ======================
+   GET USER PROFILE HISTORY
+====================== */
+
+async function apiGetUserProfileHistory(
+  username
+) {
+
+  return api("getUserProfileHistory", {
+    username
+  });
+
+}
+
+/* ======================
    SAVE PICK
 ====================== */
 
