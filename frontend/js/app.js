@@ -103,36 +103,73 @@ function logout() {
    NAVIGATION CORE
 ====================== */
 
-function navigate(page) {
+async function navigate(page) {
 
-  if (!page) page = "dashboard";
+  if (!page) {
+    page = "dashboard";
+  }
 
   const app =
     document.getElementById("app");
 
-  app.classList.add("page-enter");
+  if (!app) {
+    return;
+  }
 
   showLoader();
 
-  window.location.hash = page;
+  app.classList.add(
+    "page-enter"
+  );
 
-  setTimeout(() => {
+  app.classList.remove(
+    "page-enter-active"
+  );
 
-    renderPage(page);
+  window.location.hash =
+    page;
+
+  try {
+
+    await renderPage(page);
 
     requestAnimationFrame(() => {
 
-      app.classList.remove("page-enter");
+      app.classList.remove(
+        "page-enter"
+      );
 
-      app.classList.add("page-enter-active");
-
-      hideLoader();
+      app.classList.add(
+        "page-enter-active"
+      );
 
       setActiveNav(page);
 
     });
 
-  }, 120);
+  } catch (err) {
+
+    console.error(
+      "PAGE RENDER ERROR",
+      page,
+      err
+    );
+
+    app.innerHTML = `
+      <div class="page">
+        ${renderErrorCard(
+          "Could not load page",
+          "Please refresh and try again."
+        )}
+      </div>
+    `;
+
+  } finally {
+
+    hideLoader();
+
+  }
+
 }
 
 /* ======================
