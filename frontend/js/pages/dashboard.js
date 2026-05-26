@@ -23,6 +23,11 @@ async function renderDashboardPage() {
   const gameId =
     getFrontendGameId();
 
+  const profileRes =
+    await apiGetUserProfile(
+      username
+    );
+
   const categoriesRes =
     await apiGetCategories(
       gameId
@@ -35,9 +40,9 @@ async function renderDashboardPage() {
     );
 
   const leaderboardRes =
-  await apiLeaderboard(
-    gameId
-  );
+    await apiLeaderboard(
+      gameId
+    );
 
 debugLog(
   "DASHBOARD CATEGORIES API",
@@ -55,6 +60,7 @@ debugLog(
 );
 
 if (
+  isApiError(profileRes) ||
   isApiError(categoriesRes) ||
   isApiError(picksRes) ||
   isApiError(leaderboardRes)
@@ -141,11 +147,30 @@ const categories =
     userLeaderboard
       ? Number(userLeaderboard.statues) || 0
       : 0;
+  
+  const profile =
+     profileRes || {};
 
-  return `
+  const displayName =
+    profile.displayName ||
+    username;
+
+  const themeColor =
+    profile.themeColor ||
+    "#354785";
+
+  const avatar =
+    profile.avatar ||
+    "default";
+
+  return `    
+
     <div class="page dashboard-page">
 
-      <section class="dashboard-hero">
+      <section
+        class="dashboard-hero"
+        style="--profile-theme-color: ${escapeAttr(themeColor)};"
+      >
 
         <div>
           <p class="dashboard-kicker">
@@ -153,13 +178,20 @@ const categories =
           </p>
 
           <h1>
-            ${escapeHtml(username)}
+            ${escapeHtml(displayName)}
           </h1>
 
           <p class="dashboard-subtitle">
             Game:
             <strong>${escapeHtml(gameId)}</strong>
           </p>
+
+          <p class="dashboard-profile-meta">
+             @${escapeHtml(username)}
+             ·
+             Avatar: ${escapeHtml(avatar)}
+          </p>
+
         </div>
 
       </section>

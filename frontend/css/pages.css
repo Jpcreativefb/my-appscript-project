@@ -103,7 +103,7 @@
   background: linear-gradient(
     135deg,
     #20284a,
-    #354785
+    var(--profile-theme-color, #354785)
   );
 
   color: #ffffff;
@@ -135,6 +135,15 @@
 
   color: rgba(255, 255, 255, 0.85);
 }
+
+.dashboard-profile-meta {
+  margin: 6px 0 0;
+
+  color: rgba(255, 255, 255, 0.72);
+
+  font-size: 0.9rem;
+}
+
 
 .dashboard-grid {
   display: grid;

@@ -163,6 +163,20 @@ async function apiGetMyPicks(
 }
 
 /* ======================
+   GET USER PROFILE
+====================== */
+
+async function apiGetUserProfile(
+  username
+) {
+
+  return api("getUserProfile", {
+    username
+  });
+
+}
+
+/* ======================
    SAVE PICK
 ====================== */
 

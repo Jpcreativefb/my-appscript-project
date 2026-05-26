@@ -127,6 +127,20 @@ function doGet(e) {
     }
 
     // =========================
+    // USER PROFILE
+    // =========================
+
+    if (action === "getUserProfile") {
+
+      return json(
+        getUserProfile(
+          e.parameter.username
+        )
+      );
+
+    }
+
+    // =========================
     // DEFAULT
     // =========================
 
