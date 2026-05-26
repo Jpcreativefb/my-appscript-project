@@ -15,6 +15,26 @@ const APP_STATE = {
 };
 
 /* ======================
+   SESSION CONFIG
+====================== */
+
+function getSessionTtlMs() {
+
+  const hours =
+    Number(
+      CONFIG.SESSION_TTL_HOURS
+    ) || 168;
+
+  return (
+    hours *
+    60 *
+    60 *
+    1000
+  );
+
+}
+
+/* ======================
    SESSION STORAGE
 ====================== */
 
@@ -22,11 +42,60 @@ function getSession() {
 
   try {
 
-    return JSON.parse(
-      localStorage.getItem("session")
-    );
+    const raw =
+      localStorage.getItem(
+        "session"
+      );
+
+    if (!raw) {
+      return null;
+    }
+
+    const session =
+      JSON.parse(raw);
+
+    if (
+      !session ||
+      !session.username
+    ) {
+
+      clearSession();
+
+      return null;
+
+    }
+
+    /*
+      Upgrade older stored sessions that
+      existed before createdAt was added.
+    */
+    if (!session.createdAt) {
+
+      session.createdAt =
+        Date.now();
+
+      localStorage.setItem(
+        "session",
+        JSON.stringify(session)
+      );
+
+    }
+
+    if (
+      !isSessionValid(session)
+    ) {
+
+      clearSession();
+
+      return null;
+
+    }
+
+    return session;
 
   } catch (e) {
+
+    clearSession();
 
     return null;
 
@@ -36,27 +105,45 @@ function getSession() {
 
 function setSession(session) {
 
-  APP_STATE.session =
-    session || null;
+  if (
+    !session ||
+    !session.username
+  ) {
 
-  APP_STATE.user =
-    session && session.username
-      ? {
-          username: session.username,
-          displayName:
-            session.displayName ||
-            session.username
-        }
-      : null;
+    clearSession();
 
-  if (session) {
-
-    localStorage.setItem(
-      "session",
-      JSON.stringify(session)
-    );
+    return null;
 
   }
+
+  const normalizedSession = {
+    ...session,
+
+    createdAt:
+      session.createdAt ||
+      Date.now()
+  };
+
+  APP_STATE.session =
+    normalizedSession;
+
+  APP_STATE.user = {
+    username:
+      normalizedSession.username,
+
+    displayName:
+      normalizedSession.displayName ||
+      normalizedSession.username
+  };
+
+  localStorage.setItem(
+    "session",
+    JSON.stringify(
+      normalizedSession
+    )
+  );
+
+  return normalizedSession;
 
 }
 
@@ -73,13 +160,73 @@ function clearSession() {
 }
 
 /* ======================
+   SESSION VALIDATION
+====================== */
+
+function isSessionValid(session) {
+
+  if (
+    !session ||
+    !session.username
+  ) {
+
+    return false;
+
+  }
+
+  const createdAt =
+    Number(session.createdAt);
+
+  if (!createdAt) {
+
+    return false;
+
+  }
+
+  const age =
+    Date.now() - createdAt;
+
+  return age <= getSessionTtlMs();
+
+}
+
+function isSessionExpired(session) {
+
+  return Boolean(
+    session &&
+    session.createdAt &&
+    !isSessionValid(session)
+  );
+
+}
+
+/* ======================
    SESSION HELPERS
 ====================== */
 
 function getCurrentSession() {
 
-  return APP_STATE.session ||
+  if (
+    APP_STATE.session &&
+    isSessionValid(
+      APP_STATE.session
+    )
+  ) {
+
+    return APP_STATE.session;
+
+  }
+
+  const session =
     getSession();
+
+  if (session) {
+
+    setSession(session);
+
+  }
+
+  return session;
 
 }
 

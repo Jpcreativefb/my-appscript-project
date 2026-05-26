@@ -5,18 +5,21 @@
 document.addEventListener("DOMContentLoaded", () => {
 
   const session =
-    getSession();
+     getSession();
 
   // 🔒 AUTH GUARD
-  if (
-    !session ||
-    !session.username
-  ) {
+   if (
+     !session ||
+     !session.username ||
+     !isSessionValid(session)
+    ) {
 
-    window.location.href =
-      "./index.html";
+     clearSession();
 
-    return;
+     window.location.href =
+        "./index.html";
+
+     return;
 
   }
 

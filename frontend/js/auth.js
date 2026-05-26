@@ -44,10 +44,14 @@ async function login(){
         return;
       }
   
-    setSession(res);
-  
-      window.location.href =
-        "./app.html";
+    setSession({
+      ...res,
+      createdAt:
+         Date.now()
+    });
+
+    window.location.href =
+       "./app.html";
   
     }catch(err){
   
