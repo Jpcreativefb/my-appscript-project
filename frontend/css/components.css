@@ -31,3 +31,29 @@
   box-shadow:
     0 10px 24px rgba(0,0,0,0.12);
 }
+
+/* ======================
+   EMPTY / ERROR STATES
+====================== */
+
+.error-card {
+  border-left: 5px solid #b42318;
+  background: #fff4f2;
+}
+
+.error-card h2 {
+  margin: 0 0 8px;
+  color: #7a271a;
+  font-size: 1.1rem;
+}
+
+.error-card p {
+  margin: 0;
+  color: #7a271a;
+}
+
+.empty-card {
+  background: #f7f7f7;
+  color: #555555;
+  text-align: center;
+}

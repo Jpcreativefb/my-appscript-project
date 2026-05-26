@@ -35,29 +35,50 @@ async function renderDashboardPage() {
     );
 
   const leaderboardRes =
-    await apiLeaderboard(
-      gameId
-    );
-
-  debugLog(
-    "DASHBOARD CATEGORIES API",
-    categoriesRes
+  await apiLeaderboard(
+    gameId
   );
 
-  debugLog(
-    "DASHBOARD PICKS API",
-    picksRes
-  );
+debugLog(
+  "DASHBOARD CATEGORIES API",
+  categoriesRes
+);
 
-  debugLog(
-    "DASHBOARD LEADERBOARD API",
-    leaderboardRes
-  );
+debugLog(
+  "DASHBOARD PICKS API",
+  picksRes
+);
 
-  const categories =
-    Array.isArray(categoriesRes)
-      ? categoriesRes
-      : categoriesRes.categories || [];
+debugLog(
+  "DASHBOARD LEADERBOARD API",
+  leaderboardRes
+);
+
+if (
+  isApiError(categoriesRes) ||
+  isApiError(picksRes) ||
+  isApiError(leaderboardRes)
+) {
+
+  return `
+    <div class="page dashboard-page">
+
+      <h1>Dashboard</h1>
+
+      ${renderErrorCard(
+        "Could not load dashboard",
+        "One or more dashboard requests failed. Please refresh and try again."
+      )}
+
+    </div>
+  `;
+
+}
+
+const categories =
+  Array.isArray(categoriesRes)
+    ? categoriesRes
+    : categoriesRes.categories || [];
 
   const picks =
     picksRes.picks || {};

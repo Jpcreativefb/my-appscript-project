@@ -17,10 +17,30 @@ async function renderLeaderboardPage() {
     res
   );
 
-  const rows =
-    Array.isArray(res)
-      ? res
-      : res.leaderboard || [];
+  if (isApiError(res)) {
+
+  return `
+    <div class="page">
+
+      <h1>Leaderboard</h1>
+
+      ${renderErrorCard(
+        "Could not load leaderboard",
+        getApiErrorMessage(
+          res,
+          "Please refresh and try again."
+        )
+      )}
+
+    </div>
+  `;
+
+}
+
+const rows =
+  Array.isArray(res)
+    ? res
+    : res.leaderboard || [];
 
   if (!rows.length) {
 
@@ -29,9 +49,7 @@ async function renderLeaderboardPage() {
 
         <h1>Leaderboard</h1>
 
-        <div class="card">
-          No leaderboard data found.
-        </div>
+          ${renderEmptyCard("No leaderboard data found.")}
 
       </div>
     `;

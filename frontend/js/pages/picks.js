@@ -48,13 +48,47 @@ async function renderPicksPage() {
     picksRes
   );
 
-  const categories =
-    Array.isArray(categoriesRes)
-      ? categoriesRes
-      : categoriesRes.categories || [];
+  if (isApiError(categoriesRes)) {
 
-  const picks =
-    picksRes.picks || {};
+  return `
+    <div class="page">
+      <h1>Make Your Picks</h1>
+      ${renderErrorCard(
+        "Could not load categories",
+        getApiErrorMessage(
+          categoriesRes,
+          "Please refresh and try again."
+        )
+      )}
+    </div>
+  `;
+
+}
+
+if (isApiError(picksRes)) {
+
+  return `
+    <div class="page">
+      <h1>Make Your Picks</h1>
+      ${renderErrorCard(
+        "Could not load your picks",
+        getApiErrorMessage(
+          picksRes,
+          "Please refresh and try again."
+        )
+      )}
+    </div>
+  `;
+
+}
+
+const categories =
+  Array.isArray(categoriesRes)
+    ? categoriesRes
+    : categoriesRes.categories || [];
+
+const picks =
+  picksRes.picks || {};
 
   APP_STATE.picks =
     picks;
@@ -62,10 +96,10 @@ async function renderPicksPage() {
   if (!categories.length) {
 
     return `
-      <div class="page">
-        <h1>Make Your Picks</h1>
-        <p>No categories found.</p>
-      </div>
+        <div class="page">
+          <h1>Make Your Picks</h1>
+          ${renderEmptyCard("No categories found.")}
+         </div>
     `;
 
   }

@@ -92,3 +92,62 @@ function debugWarn() {
   );
 
 }
+
+/* ======================
+   UI STATE HELPERS
+====================== */
+
+function renderErrorCard(
+  title,
+  message
+) {
+
+  return `
+    <div class="card error-card">
+      <h2>${escapeHtml(title || "Something went wrong")}</h2>
+      <p>${escapeHtml(message || "Please try again.")}</p>
+    </div>
+  `;
+
+}
+
+function renderEmptyCard(
+  message
+) {
+
+  return `
+    <div class="card empty-card">
+      <p>${escapeHtml(message || "Nothing found.")}</p>
+    </div>
+  `;
+
+}
+
+function isApiError(
+  res
+) {
+
+  return Boolean(
+    res &&
+    (
+      res.success === false ||
+      res.error === true
+    )
+  );
+
+}
+
+function getApiErrorMessage(
+  res,
+  fallback
+) {
+
+  return (
+    res &&
+    (
+      res.message ||
+      res.error
+    )
+  ) || fallback || "Request failed.";
+
+}
