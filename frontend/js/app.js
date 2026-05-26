@@ -173,7 +173,7 @@ async function renderPage(page) {
     case "dashboard":
 
       app.innerHTML =
-        renderDashboardPage();
+        await renderDashboardPage();
 
       break;
 
