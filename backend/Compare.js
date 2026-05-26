@@ -1,4 +1,18 @@
 /* =========================
+   LEGACY / FUTURE FEATURE MODULE
+
+   Status:
+   Work in progress from older system.
+
+   Do not delete.
+   Do not wire into production API until reviewed,
+   tested, and updated to the current architecture.
+
+   Future feature area:
+   Community games / community results / compare.
+========================= */
+
+/* =========================
    COMPARE ENGINE (FINAL CLEAN)
 ========================= */
 

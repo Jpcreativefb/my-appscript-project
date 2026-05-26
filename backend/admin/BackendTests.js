@@ -1,3 +1,12 @@
+/* =========================
+   BACKEND MANUAL TESTS
+
+   These functions are intended to be run
+   manually from the Apps Script editor.
+
+   Do not call these from production API routes.
+========================= */
+
 function testSchema(){
 
 const picks = readSheet("Picks");
