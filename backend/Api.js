@@ -134,7 +134,8 @@ function doGet(e) {
 
       return json(
         getUserProfile(
-          e.parameter.username
+          e.parameter.username,
+          gameId
         )
       );
 
@@ -151,6 +152,9 @@ function doGet(e) {
 
           username:
             e.parameter.username,
+
+          gameId:
+            gameId,  
 
           displayName:
             e.parameter.displayName,

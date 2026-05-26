@@ -25,7 +25,8 @@ async function renderDashboardPage() {
 
   const profileRes =
     await apiGetUserProfile(
-      username
+      username,
+      gameId
     );
 
   const categoriesRes =
@@ -351,6 +352,9 @@ async function saveDashboardProfile() {
     document.getElementById(
       "profileSaveStatus"
     );
+
+  const gameId =
+    getFrontendGameId();  
 
   const profile = {
     username:

@@ -167,11 +167,13 @@ async function apiGetMyPicks(
 ====================== */
 
 async function apiGetUserProfile(
-  username
+  username,
+  gameId = getFrontendGameId()
 ) {
 
   return api("getUserProfile", {
-    username
+    username,
+    gameId
   });
 
 }
@@ -187,6 +189,10 @@ async function apiSaveUserProfile(
   return api("saveUserProfile", {
     username:
       profile.username,
+
+    gameId:
+      profile.gameId ||
+      getFrontendGameId(),
 
     displayName:
       profile.displayName,
