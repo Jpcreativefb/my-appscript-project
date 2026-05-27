@@ -178,7 +178,7 @@ function doGet(e) {
 
         return json(
           getUserProfileHistory(
-            e.parameter.username
+            e.parameter.username,
             gameId
           )
         );
