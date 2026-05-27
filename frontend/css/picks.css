@@ -1,173 +1,396 @@
-/* ======================
-   PICKS
-====================== */
-
-.category-card {
-  margin-bottom: 24px;
-  padding: 16px;
-
-  background: #b88c09;
-
-  border-radius: 16px;
-
-  overflow: hidden;
+.picks-page {
+  padding-bottom: 96px;
 }
 
-.category-card h2 {
-  margin: 0 0 14px;
-
-  color: #ffffff;
-
-  font-size: 1.25rem;
+.picks-page-header {
+  margin-bottom: 18px;
 }
 
-/* ======================
-   NOMINEE GRID
-====================== */
-
-.nominee-grid {
-  display: grid;
-
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(150px, 1fr)
-  );
-
-  gap: 14px;
+.picks-page-header h1 {
+  margin-bottom: 6px;
 }
 
-/* ======================
-   NOMINEE CARD
-====================== */
+.picks-page-header p {
+  opacity: 0.75;
+  line-height: 1.4;
+}
 
-.nominee-card {
-  width: 100%;
-  min-height: 260px;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-
-  gap: 10px;
-
-  padding: 10px;
-
+.picks-message {
+  margin-bottom: 16px;
+  padding: 12px 14px;
   border-radius: 14px;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-
-  background: #f9f9f9;
-  color: #111111;
-
-  cursor: pointer;
-
-  box-sizing: border-box;
-
-  overflow: hidden;
+  font-weight: 700;
 }
 
-.nominee-card img {
-  width: 100%;
+.picks-message.success {
+  background: #e8f8ed;
+  color: #145c2c;
+}
 
-  aspect-ratio: 2 / 3;
+.picks-message.error {
+  background: #ffe9e9;
+  color: #7b1111;
+}
 
-  max-height: 210px;
+.picks-message.hidden {
+  display: none;
+}
 
+.picks-category-list {
+  display: grid;
+  gap: 18px;
+}
+
+.picks-parent-block {
+  display: grid;
+  gap: 10px;
+}
+
+.pick-category-card {
+  background: #fff;
+  border-radius: 22px;
+  overflow: hidden;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+  border: 2px solid transparent;
+}
+
+.pick-category-card.correct {
+  border-color: #d7ad2f;
+}
+
+.pick-category-card.wrong {
+  border-color: #d94b4b;
+}
+
+.pick-category-card.pending {
+  border-color: rgba(0,0,0,0.06);
+}
+
+.child-category-wrapper {
+  margin-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.child-category-card {
+  border-left: 5px solid #d7ad2f;
+}
+
+.child-label {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #d7ad2f;
+  font-weight: 800;
+}
+
+.selected-pick-summary img {
+  width: 34px;
+  height: 48px;
   object-fit: cover;
-  object-position: center;
+  border-radius: 8px;
+  background: #333;
+}
 
-  display: block;
+.selected-pick-summary span {
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
-  border-radius: 10px;
+.pick-subtitle {
+  margin-top: 7px;
+  opacity: 0.75;
+  font-size: 0.88rem;
+}
 
+.pick-card-header {
+  width: 100%;
+  border: 0;
+  background: #111;
+  color: #fff;
+  padding: 13px 15px 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pick-header-main {
+  width: 100%;
+  display: grid;
+  gap: 7px;
+}
+
+.pick-header-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pick-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.pick-title-wrap h2 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.18;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-category-card.correct .pick-title-wrap h2 {
+  color: #d7ad2f;
+}
+
+.pick-category-card.correct .selected-pick-summary span {
+  color: #d7ad2f;
+}
+
+.pick-category-card.wrong .pick-title-wrap h2 {
+  color: #fff;
+}
+
+.pick-category-card.wrong .selected-pick-summary span {
+  color: #8b1a1a;
+}
+
+.pick-category-card.pending .pick-title-wrap h2 {
+  color: #fff;
+}
+
+.pick-status-icon {
+  font-size: 1rem;
+  line-height: 1;
   flex-shrink: 0;
 }
 
-.nominee-card span {
-  width: 100%;
-
-  display: block;
-
-  text-align: center;
-
-  font-size: 0.92rem;
-  font-weight: 700;
-  line-height: 1.2;
-
-  overflow-wrap: break-word;
+.points-pill {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  font-size: 0.82rem;
+  font-weight: 900;
+  white-space: nowrap;
+  color: #fff;
 }
 
-.nominee-card strong {
-  margin-top: auto;
-
-  font-size: 1.1rem;
+.selected-pick-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
-/* ======================
-   SELECTED STATE
-====================== */
-
-.nominee-card.selected {
-  background: #111111;
-  color: #ffffff;
-  border-color: #111111;
+.selected-pick-summary img {
+  width: 28px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: #333;
+  flex-shrink: 0;
 }
 
-.nominee-card.selected img {
-  opacity: 0.88;
+.selected-pick-summary span {
+  font-size: 0.84rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* ======================
-   DISABLED / LOCKED
-====================== */
-
-.nominee-card:disabled {
+.selected-pick-summary.empty span {
   opacity: 0.65;
+  font-weight: 700;
+}
+
+.pick-third-line {
+  text-align: center;
+  font-size: 0.74rem;
+  line-height: 1.15;
+  color: #f3d46b;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.pick-rules-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.penalty-note {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: #fff5d8;
+  color: #6b4a00;
+  font-weight: 900;
+  font-size: 0.78rem;
+}
+
+.changes-pill.body-pill {
+  background: #f3f3f3;
+  color: #222;
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 10px;
+  font-size: 0.78rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.original-pick-note {
+  margin-bottom: 12px;
+  padding: 9px 11px;
+  border-radius: 12px;
+  background: #f4f4f4;
+  color: #333;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.original-pick-note strong {
+  font-weight: 900;
+}
+
+
+.pick-card-body {
+  padding: 16px;
+}
+
+.pick-category-card.collapsed .pick-card-body {
+  display: none;
+}
+
+.nominee-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.nominee-layout-image {
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+}
+
+.nominee-layout-list {
+  grid-template-columns: 1fr;
+}
+
+.nominee-layout-text {
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.nominee-choice {
+  border: 2px solid rgba(0,0,0,0.08);
+  background: #fafafa;
+  border-radius: 16px;
+  cursor: pointer;
+  font-weight: 800;
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.nominee-choice:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: #111;
+}
+
+.nominee-choice:disabled {
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
-.locked-label {
-  display: inline-block;
-
-  margin: 0 0 12px;
-  padding: 4px 10px;
-
-  border-radius: 999px;
-
-  background: rgba(255, 255, 255, 0.2);
-  color: #ffffff;
-
-  font-size: 0.8rem;
-  font-weight: 700;
+.nominee-choice.selected {
+  background: #111;
+  color: #fff;
+  border-color: #d7ad2f;
 }
 
-/* ======================
-   MISSING NOMINEE IMAGE
-====================== */
+.image-choice {
+  padding: 10px;
+  text-align: center;
+}
 
-.nominee-card:not(:has(img))::before {
-  content: "No Image";
-
+.image-choice img {
   width: 100%;
   aspect-ratio: 2 / 3;
-  max-height: 210px;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 10px;
-
-  background: rgba(0, 0, 0, 0.08);
-  color: rgba(0, 0, 0, 0.55);
-
-  font-size: 0.85rem;
-  font-weight: 700;
-
-  box-sizing: border-box;
+  object-fit: cover;
+  border-radius: 12px;
+  background: #ddd;
+  margin-bottom: 8px;
 }
 
-.nominee-card.selected:not(:has(img))::before {
-  background: rgba(255, 255, 255, 0.14);
-  color: rgba(255, 255, 255, 0.85);
+.image-choice span {
+  display: block;
+  line-height: 1.2;
+  font-size: 0.88rem;
+}
+
+.list-choice {
+  padding: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+}
+
+.list-choice img {
+  width: 44px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 10px;
+  background: #ddd;
+}
+
+.text-choice {
+  padding: 16px;
+  min-height: 58px;
+}
+
+@media (max-width: 520px) {
+
+  .pick-card-header {
+    padding: 12px 13px 10px;
+  }
+
+  .pick-title-wrap h2 {
+    font-size: 0.95rem;
+  }
+
+  .points-pill {
+    font-size: 0.76rem;
+  }
+
+  .selected-pick-summary img {
+    width: 24px;
+    height: 36px;
+  }
+
+  .selected-pick-summary span {
+    font-size: 0.8rem;
+  }
+
+  .pick-third-line {
+    font-size: 0.7rem;
+  }
+
+  .pick-rules-row {
+    align-items: flex-start;
+  }
+
+  .child-category-wrapper {
+    margin-left: 8px;
+  }
+
 }

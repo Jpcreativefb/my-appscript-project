@@ -1,36 +1,5 @@
-/* ======================
-   API BASE
-====================== */
-
-function getApiBase() {
-
-  if (
-    typeof CONFIG === "undefined" ||
-    !CONFIG.API_URL
-  ) {
-
-    throw new Error(
-      "CONFIG.API_URL is missing"
-    );
-
-  }
-
-  return CONFIG.API_URL;
-
-}
-
-/* ======================
-   DEFAULT GAME ID
-====================== */
-
-function getFrontendGameId() {
-
-  return (
-    CONFIG.DEFAULT_GAME_ID ||
-    "oscars-2026"
-  );
-
-}
+const API_BASE =
+  "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
 /* ======================
    GENERIC API FETCH
@@ -39,9 +8,7 @@ function getFrontendGameId() {
 async function api(action, params = {}) {
 
   const url =
-    new URL(
-      getApiBase()
-    );
+    new URL(API_BASE);
 
   url.searchParams.set(
     "action",
@@ -53,66 +20,33 @@ async function api(action, params = {}) {
 
       if (
         value !== undefined &&
-        value !== null &&
-        value !== ""
+        value !== null
       ) {
-
         url.searchParams.set(
           key,
           value
         );
-
       }
 
     });
 
   try {
 
-    debugLog(
-      "API REQUEST",
-      action,
-      Object.fromEntries(
-        url.searchParams.entries()
-      )
-    );
-
     const response =
       await fetch(url);
 
-    const text =
-      await response.text();
-
-    try {
-
-      return JSON.parse(text);
-
-    } catch (jsonErr) {
-
-      console.error(
-        "API NON-JSON RESPONSE",
-        text
-      );
-
-      return {
-        success: false,
-        message: "Invalid API response",
-        raw: text
-      };
-
-    }
+    return await response.json();
 
   } catch (err) {
 
     console.error(
       "API ERROR",
-      action,
       err
     );
 
     return {
       success: false,
-      message: "Network error",
-      error: String(err)
+      message: "Network error"
     };
 
   }
@@ -133,12 +67,10 @@ async function apiLogin(username, pin) {
 }
 
 /* ======================
-   GET CATEGORIES
+   CATEGORIES
 ====================== */
 
-async function apiGetCategories(
-  gameId = getFrontendGameId()
-) {
+async function apiGetCategories(gameId) {
 
   return api("getCategories", {
     gameId
@@ -147,13 +79,10 @@ async function apiGetCategories(
 }
 
 /* ======================
-   GET MY PICKS
+   PICKS
 ====================== */
 
-async function apiGetMyPicks(
-  username,
-  gameId = getFrontendGameId()
-) {
+async function apiGetMyPicks(username, gameId) {
 
   return api("getMyPicks", {
     username,
@@ -162,80 +91,13 @@ async function apiGetMyPicks(
 
 }
 
-/* ======================
-   GET USER PROFILE
-====================== */
-
-async function apiGetUserProfile(
-  username,
-  gameId = getFrontendGameId()
-) {
-
-  return api("getUserProfile", {
-    username,
-    gameId
-  });
-
-}
-
-/* ======================
-   SAVE USER PROFILE
-====================== */
-
-async function apiSaveUserProfile(
-  profile
-) {
-
-  return api("saveUserProfile", {
-    username:
-      profile.username,
-
-    gameId:
-      profile.gameId ||
-      getFrontendGameId(),
-
-    displayName:
-      profile.displayName,
-
-    avatar:
-      profile.avatar,
-
-    themeColor:
-      profile.themeColor
-  });
-
-}
-
-/* ======================
-   GET USER PROFILE HISTORY
-====================== */
-
-async function apiGetUserProfileHistory(
-  username
-) {
-
-  return api("getUserProfileHistory", {
-    username
-  });
-
-}
-
-/* ======================
-   SAVE PICK
-====================== */
-
-async function apiSavePick(
-  username,
-  categoryId,
-  nomineeId,
-  gameId = getFrontendGameId()
-) {
+async function apiSavePick(payload) {
 
   return api("savePick", {
-    username,
-    categoryId,
-    nomineeId,
-    gameId
+    username: payload.username,
+    gameId: payload.gameId,
+    categoryId: payload.categoryId,
+    nomineeId: payload.nomineeId
   });
 
 }
@@ -244,9 +106,7 @@ async function apiSavePick(
    LEADERBOARD
 ====================== */
 
-async function apiLeaderboard(
-  gameId = getFrontendGameId()
-) {
+async function apiGetLeaderboard(gameId) {
 
   return api("leaderboard", {
     gameId
@@ -255,15 +115,45 @@ async function apiLeaderboard(
 }
 
 /* ======================
-   LEGACY ALIAS
-   Temporary compatibility only
+   USER BREAKDOWN
 ====================== */
 
-async function getPicks(username) {
+async function apiGetUserBreakdown(username, gameId) {
 
-  return apiGetMyPicks(
+  return api("userBreakdown", {
     username,
-    getFrontendGameId()
+    gameId
+  });
+
+}
+
+/* ======================
+   COMPATIBILITY WRAPPERS
+   Old page names -> cleaned API names
+====================== */
+
+async function apiLeaderboard(gameId) {
+
+  return apiGetLeaderboard(
+    gameId
   );
+
+}
+
+async function apiGetUserProfile(username, gameId) {
+
+  return api("getUserProfile", {
+    username,
+    gameId
+  });
+
+}
+
+async function apiGetUserProfileHistory(username, gameId) {
+
+  return api("getUserProfileHistory", {
+    username,
+    gameId
+  });
 
 }

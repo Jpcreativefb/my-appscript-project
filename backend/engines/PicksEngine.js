@@ -56,6 +56,173 @@ function normalizeLower_(value){
 }
 
 /* =========================================================
+   PICK META HELPERS
+========================================================= */
+
+function isCategoryConfigLocked_(config) {
+
+  if (!config) {
+    return false;
+  }
+
+  const manualLocked =
+    config.locked === true ||
+    String(config.locked)
+      .toLowerCase() === "true";
+
+  if (manualLocked) {
+    return true;
+  }
+
+  if (!config.lockDateTime) {
+    return false;
+  }
+
+  const lockDate =
+    new Date(config.lockDateTime);
+
+  if (isNaN(lockDate.getTime())) {
+    return false;
+  }
+
+  return new Date().getTime() >= lockDate.getTime();
+
+}
+
+function getMaxChanges_(config) {
+
+  const raw =
+    Number(config.maxChanges);
+
+  return isNaN(raw)
+    ? 3
+    : raw;
+
+}
+
+function getAdjustedPickPoints_(
+  config,
+  changeCount
+) {
+
+  const basePoints =
+    Number(config.points) || 0;
+
+  const penalty =
+    Number(config.changePenalty) || 0;
+
+  return Math.max(
+    basePoints -
+    (
+      Number(changeCount || 0) *
+      penalty
+    ),
+    0
+  );
+
+}
+
+function getPickResultStatus_(
+  config,
+  nomineeId
+) {
+
+  const winner =
+    normalizeLower_(
+      config.winnerNomineeId || ""
+    );
+
+  const pick =
+    normalizeLower_(
+      nomineeId || ""
+    );
+
+  if (!winner || !pick) {
+    return "pending";
+  }
+
+  return winner === pick
+    ? "correct"
+    : "wrong";
+
+}
+
+function buildPickMeta_(
+  categoryId,
+  nomineeId,
+  config,
+  changeCount,
+  originalNomineeId
+) {
+
+  config =
+    config || {};
+
+  const maxChanges =
+    getMaxChanges_(config);
+
+  const safeChangeCount =
+    Number(changeCount) || 0;
+
+  const basePoints =
+    Number(config.points) || 0;
+
+  const penalty =
+    Number(config.changePenalty) || 0;
+
+  const adjustedPoints =
+    getAdjustedPickPoints_(
+      config,
+      safeChangeCount
+    );
+
+  return {
+    categoryId:
+      categoryId,
+
+    nomineeId:
+      nomineeId || "",
+
+    originalNomineeId:
+      originalNomineeId || "",
+
+    changeCount:
+      safeChangeCount,
+
+    maxChanges:
+      maxChanges,
+
+    changesLeft:
+      Math.max(
+        maxChanges - safeChangeCount,
+        0
+      ),
+
+    basePoints:
+      basePoints,
+
+    adjustedPoints:
+      adjustedPoints,
+
+    changePenalty:
+      penalty,
+
+    locked:
+      isCategoryConfigLocked_(config),
+
+    winnerNomineeId:
+      config.winnerNomineeId || "",
+
+    status:
+      getPickResultStatus_(
+        config,
+        nomineeId
+      )
+  };
+
+}
+
+/* =========================================================
    GET USER PICKS
 ========================================================= */
 
@@ -141,9 +308,12 @@ function apiGetMyPicks(username, gameId){
     if (!username) {
 
       return {
+        success: false,
+        message: "Missing username",
         picks: {},
         changeCounts: {},
-        originalPicks: {}
+        originalPicks: {},
+        pickMeta: {}
       };
 
     }
@@ -155,13 +325,21 @@ function apiGetMyPicks(username, gameId){
     const picksData =
       getUserPicks(username, gameId);
 
+    const settings =
+      getCategorySettings(gameId);
+
     const picks = {};
     const changeCounts = {};
     const originalPicks = {};
+    const pickMeta = {};
 
     picksData.forEach(p => {
 
-      picks[p.categoryId] = p.nomineeId;
+      const config =
+        settings[p.categoryId] || {};
+
+      picks[p.categoryId] =
+        p.nomineeId;
 
       changeCounts[p.categoryId] =
         p.changeCount || 0;
@@ -169,12 +347,25 @@ function apiGetMyPicks(username, gameId){
       originalPicks[p.categoryId] =
         p.originalNomineeId || "";
 
+      pickMeta[p.categoryId] =
+        buildPickMeta_(
+          p.categoryId,
+          p.nomineeId,
+          config,
+          p.changeCount,
+          p.originalNomineeId
+        );
+
     });
 
     return {
-      picks,
-      changeCounts,
-      originalPicks
+      success: true,
+      gameId: gameId,
+      username: username,
+      picks: picks,
+      changeCounts: changeCounts,
+      originalPicks: originalPicks,
+      pickMeta: pickMeta
     };
 
   } catch (err) {
@@ -185,8 +376,13 @@ function apiGetMyPicks(username, gameId){
     );
 
     return {
+      success: false,
       error: true,
-      message: err.message
+      message: err.message,
+      picks: {},
+      changeCounts: {},
+      originalPicks: {},
+      pickMeta: {}
     };
 
   }
@@ -199,7 +395,9 @@ function apiGetMyPicks(username, gameId){
 
 function getUserBreakdown(username, gameId){
 
-  if (!username) return [];
+  if (!username) {
+    return [];
+  }
 
   gameId =
     gameId ||
@@ -216,25 +414,51 @@ function getUserBreakdown(username, gameId){
     const config =
       settings[p.categoryId] || {};
 
+    const meta =
+      buildPickMeta_(
+        p.categoryId,
+        p.nomineeId,
+        config,
+        p.changeCount,
+        p.originalNomineeId
+      );
+
     return {
-      category: p.categoryId,
-      pick: p.nomineeId,
+      category:
+        p.categoryId,
+
+      pick:
+        p.nomineeId,
+
       winner:
         config.winnerNomineeId || "",
+
       status:
-        config.winnerNomineeId
-          ? (
-              config.winnerNomineeId === p.nomineeId
-                ? "correct"
-                : "incorrect"
-            )
-          : "pending",
+        meta.status,
+
       points:
-        Number(config.points) || 0,
+        meta.basePoints,
+
+      adjustedPoints:
+        meta.adjustedPoints,
+
+      changePenalty:
+        meta.changePenalty,
+
+      maxChanges:
+        meta.maxChanges,
+
+      changesLeft:
+        meta.changesLeft,
+
       originalNomineeId:
         p.originalNomineeId || "",
+
       changeCount:
-        p.changeCount || 0
+        p.changeCount || 0,
+
+      locked:
+        meta.locked
     };
 
   });
@@ -359,13 +583,12 @@ function savePick(payload){
     }
 
     /* =========================
-       LOCK CHECK
+    LOCK CHECK
     ========================= */
 
-    const isLocked = (
-      categoryConfig.locked === true ||
-      String(categoryConfig.locked)
-        .toLowerCase() === "true"
+    const isLocked =
+      isCategoryConfigLocked_(
+        categoryConfig
     );
 
     if (isLocked) {
@@ -378,7 +601,10 @@ function savePick(payload){
     }
 
     const MAX_CHANGES =
-      Number(categoryConfig.maxChanges) || 3;
+      getMaxChanges_(
+        categoryConfig
+    );
+    
 
     /* =========================
        PICKS SHEET
@@ -470,19 +696,29 @@ function savePick(payload){
     const isSamePick =
       previousNominee === nomineeId;
 
-    if (isSamePick) {
+      if (isSamePick) {
 
-      return {
-        success:true,
-        message:"Pick already saved",
-        gameId:gameId,
-        categoryId:categoryId,
-        nomineeId:nomineeId,
-        originalNomineeId:originalNominee,
-        changeCount:changeCount
-      };
-
-    }
+        const meta =
+          buildPickMeta_(
+            categoryId,
+            nomineeId,
+            categoryConfig,
+            changeCount,
+            originalNominee
+          );
+      
+        return {
+          success:true,
+          message:"Pick already saved",
+          gameId:gameId,
+          categoryId:categoryId,
+          nomineeId:nomineeId,
+          originalNomineeId:originalNominee,
+          changeCount:changeCount,
+          pickMeta:meta
+        };
+      
+      }
 
     if (
       isChange &&
@@ -551,6 +787,20 @@ function savePick(payload){
     AppCache.clearPicksCaches();
     
 
+    const finalChangeCount =
+       isChange
+        ? changeCount + 1
+        : changeCount;
+
+    const meta =
+      buildPickMeta_(
+        categoryId,
+        nomineeId,
+        categoryConfig,
+        finalChangeCount,
+        originalNominee
+      );
+
     return {
       success:true,
       gameId:gameId,
@@ -558,9 +808,9 @@ function savePick(payload){
       nomineeId:nomineeId,
       originalNomineeId:originalNominee,
       changeCount:
-        isChange
-          ? changeCount + 1
-          : changeCount
+        finalChangeCount,
+      pickMeta:
+        meta
     };
 
   } catch (err) {

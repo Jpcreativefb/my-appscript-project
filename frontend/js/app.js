@@ -274,3 +274,34 @@ function bindGlobalEvents() {
   });
 
 }
+
+/* =========================
+   FRONTEND GAME ID
+========================= */
+
+function getFrontendGameId() {
+
+  let session = {};
+
+  try {
+
+    session =
+      getSession
+        ? getSession()
+        : JSON.parse(
+            localStorage.getItem("session") || "{}"
+          );
+
+  } catch (err) {
+
+    session = {};
+
+  }
+
+  return String(
+    session.gameId ||
+    localStorage.getItem("gameId") ||
+    ""
+  ).trim();
+
+}
