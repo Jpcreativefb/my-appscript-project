@@ -394,3 +394,112 @@
   }
 
 }
+
+/* ======================
+   PICKS PAGE CARD POLISH
+====================== */
+
+.picks-page .card,
+.picks-section .card,
+.pick-category-card,
+.category-card {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(30, 41, 59, 0.96),
+      rgba(15, 23, 42, 0.96)
+    ) !important;
+
+  color: #ffffff !important;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.12) !important;
+
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.28);
+
+  border-radius: 18px;
+}
+
+.picks-page h1,
+.picks-page h2,
+.picks-page h3,
+.picks-page strong,
+.picks-page div {
+  color: inherit;
+}
+
+.nominee-card,
+.nominee,
+.pick-option {
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  color: #ffffff;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+
+  border-radius: 14px;
+
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.12);
+
+  transition:
+    transform 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.nominee-card:hover,
+.nominee:hover,
+.pick-option:hover {
+  background:
+    rgba(255, 255, 255, 0.10);
+
+  transform:
+    translateY(-1px);
+
+  border-color:
+    rgba(250, 204, 21, 0.32);
+
+  box-shadow:
+    0 8px 18px rgba(0, 0, 0, 0.18);
+}
+
+.nominee-card.selected,
+.nominee.selected,
+.pick-option.selected {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(250, 204, 21, 0.24),
+      rgba(245, 158, 11, 0.16)
+    ) !important;
+
+  color: #fde68a !important;
+
+  border:
+    1px solid rgba(250, 204, 21, 0.55) !important;
+
+  box-shadow:
+    0 0 0 2px rgba(250, 204, 21, 0.14),
+    0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+.nominee-card.correct,
+.nominee.correct,
+.pick-option.correct {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(250, 204, 21, 0.34),
+      rgba(245, 158, 11, 0.22)
+    ) !important;
+
+  color: #fef3c7 !important;
+
+  border-color:
+    rgba(250, 204, 21, 0.75) !important;
+}

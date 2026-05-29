@@ -4,43 +4,70 @@
 
 async function renderLeaderboardPage() {
 
-  const gameId =
-    getFrontendGameId();
+  let payload;
 
-  const res =
-    await apiLeaderboard(
-      gameId
+  try {
+
+    payload =
+      await loadStartupPayload();
+
+  } catch (err) {
+
+    console.error(
+      "LEADERBOARD STARTUP PAYLOAD ERROR",
+      err
     );
 
+    return `
+      <div class="page">
+
+        <h1>Leaderboard</h1>
+
+        ${renderErrorCard(
+          "Could not load leaderboard",
+          err.message ||
+          "Please refresh and try again."
+        )}
+
+      </div>
+    `;
+
+  }
+
   debugLog(
-    "LEADERBOARD API",
-    res
+    "LEADERBOARD STARTUP PAYLOAD",
+    payload
   );
 
-  if (isApiError(res)) {
+  if (
+    !payload ||
+    payload.success === false
+  ) {
 
-  return `
-    <div class="page">
+    return `
+      <div class="page">
 
-      <h1>Leaderboard</h1>
+        <h1>Leaderboard</h1>
 
-      ${renderErrorCard(
-        "Could not load leaderboard",
-        getApiErrorMessage(
-          res,
-          "Please refresh and try again."
-        )
-      )}
+        ${renderErrorCard(
+          "Could not load leaderboard",
+          payload && (payload.error || payload.message)
+            ? payload.error || payload.message
+            : "Please refresh and try again."
+        )}
 
-    </div>
-  `;
+      </div>
+    `;
 
-}
+  }
 
-const rows =
-  Array.isArray(res)
-    ? res
-    : res.leaderboard || [];
+  const res =
+    payload.leaderboard || [];
+
+  const rows =
+    Array.isArray(res)
+      ? res
+      : res.leaderboard || [];
 
   if (!rows.length) {
 
@@ -49,7 +76,7 @@ const rows =
 
         <h1>Leaderboard</h1>
 
-          ${renderEmptyCard("No leaderboard data found.")}
+        ${renderEmptyCard("No leaderboard data found.")}
 
       </div>
     `;
@@ -72,24 +99,31 @@ const rows =
 
             <div class="leaderboard-main">
 
-              <h2>${escapeHtml(row.displayName || row.user)}</h2>
+              <h2>
+                ${escapeHtml(row.displayName || row.user || row.username || "Player")}
+              </h2>
 
               <p class="leaderboard-username">
-                 @${escapeHtml(row.user)}
+                @${escapeHtml(row.user || row.username || "")}
               </p>
 
               <p>
-                Total: <strong>${Number(row.total) || 0}</strong>
+                Total:
+                <strong>
+                  ${Number(row.total || row.totalScore || row.score) || 0}
+                </strong>
               </p>
 
               <p>
-                Remaining: ${Number(row.remaining) || 0}
+                Remaining:
+                ${Number(row.remaining) || 0}
                 /
                 ${Number(row.max) || 0}
               </p>
 
               <p>
-                Statues: ${Number(row.statues) || 0}
+                Statues:
+                ${Number(row.statues) || 0}
               </p>
 
               <p>

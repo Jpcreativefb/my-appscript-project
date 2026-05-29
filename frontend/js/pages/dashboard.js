@@ -20,67 +20,44 @@ async function renderDashboardPage() {
 
   }
 
-  const gameId =
-    getFrontendGameId();
+  let payload;
 
-  const profileRes =
-    await apiGetUserProfile(
-      username,
-      gameId
+  try {
+
+    payload =
+      await loadStartupPayload();
+
+  } catch (err) {
+
+    console.error(
+      "DASHBOARD STARTUP PAYLOAD ERROR",
+      err
     );
 
-    const profileHistoryRes =
-      await apiGetUserProfileHistory(
-        username
-      );  
+    return `
+      <div class="page dashboard-page">
 
-  const categoriesRes =
-    await apiGetCategories(
-      gameId
-    );
+        <h1>Dashboard</h1>
 
-  const picksRes =
-    await apiGetMyPicks(
-      username,
-      gameId
-    );
+        ${renderErrorCard(
+          "Could not load dashboard",
+          err.message ||
+          "The dashboard startup payload failed. Please refresh and try again."
+        )}
 
-  const leaderboardRes =
-    await apiLeaderboard(
-      gameId
-    );
+      </div>
+    `;
+
+  }
 
   debugLog(
-    "DASHBOARD PROFILE API",
-    profileRes
-  );
-
-  debugLog(
-    "DASHBOARD PROFILE HISTORY API",
-    profileHistoryRes
-  );
-
-  debugLog(
-    "DASHBOARD CATEGORIES API",
-    categoriesRes
-  );
-
-  debugLog(
-    "DASHBOARD PICKS API",
-    picksRes
-  );
-
-  debugLog(
-    "DASHBOARD LEADERBOARD API",
-    leaderboardRes
+    "DASHBOARD STARTUP PAYLOAD",
+    payload
   );
 
   if (
-    isApiError(profileRes) ||
-    isApiError(profileHistoryRes) ||
-    isApiError(categoriesRes) ||
-    isApiError(picksRes) ||
-    isApiError(leaderboardRes)
+    !payload ||
+    payload.success === false
   ) {
 
     return `
@@ -90,7 +67,9 @@ async function renderDashboardPage() {
 
         ${renderErrorCard(
           "Could not load dashboard",
-          "One or more dashboard requests failed. Please refresh and try again."
+          payload && (payload.error || payload.message)
+            ? payload.error || payload.message
+            : "Dashboard data was not available."
         )}
 
       </div>
@@ -98,18 +77,46 @@ async function renderDashboardPage() {
 
   }
 
+  const gameId =
+    payload.gameId ||
+    getFrontendGameId();
+
   const categories =
-    Array.isArray(categoriesRes)
-      ? categoriesRes
-      : categoriesRes.categories || [];
+    Array.isArray(payload.categories)
+      ? payload.categories
+      : [];
+
+  const picksRaw =
+    payload.picks || {};
 
   const picks =
-    picksRes.picks || {};
+    picksRaw.picks ||
+    picksRaw ||
+    {};
+
+  const leaderboardRaw =
+    payload.leaderboard || [];
 
   const leaderboard =
-    Array.isArray(leaderboardRes)
-      ? leaderboardRes
-      : leaderboardRes.leaderboard || [];
+    Array.isArray(leaderboardRaw)
+      ? leaderboardRaw
+      : leaderboardRaw.leaderboard || [];
+
+  const profileRaw =
+    payload.profile || {};
+
+  const profile =
+    profileRaw.profile ||
+    profileRaw ||
+    {};
+
+  const profileHistoryRaw =
+    payload.profileHistory || [];
+
+  const profileHistory =
+    Array.isArray(profileHistoryRaw)
+      ? profileHistoryRaw
+      : profileHistoryRaw.history || [];
 
   const totalCategories =
     categories.length;
@@ -128,17 +135,24 @@ async function renderDashboardPage() {
     );
 
   const userRankIndex =
-    leaderboard.findIndex(row =>
+    leaderboard.findIndex(row => {
 
-      String(row.user || "")
-        .trim()
-        .toLowerCase() ===
+      const rowUsername =
+        row.user ||
+        row.username ||
+        row.displayName ||
+        "";
 
-      String(username || "")
-        .trim()
-        .toLowerCase()
+      return (
+        String(rowUsername)
+          .trim()
+          .toLowerCase() ===
+        String(username || "")
+          .trim()
+          .toLowerCase()
+      );
 
-    );
+    });
 
   const userRank =
     userRankIndex >= 0
@@ -152,37 +166,47 @@ async function renderDashboardPage() {
 
   const totalScore =
     userLeaderboard
-      ? Number(userLeaderboard.total) || 0
-      : 0;
+      ? Number(
+          userLeaderboard.total ||
+          userLeaderboard.totalScore ||
+          userLeaderboard.score ||
+          0
+        ) || 0
+      : Number(
+          profile.totalScore ||
+          profile.score ||
+          0
+        ) || 0;
 
   const winChance =
     userLeaderboard
-      ? Number(userLeaderboard.winChance) || 0
+      ? Number(
+          userLeaderboard.winChance ||
+          0
+        ) || 0
       : 0;
 
   const statues =
     userLeaderboard
-      ? Number(userLeaderboard.statues) || 0
+      ? Number(
+          userLeaderboard.statues ||
+          0
+        ) || 0
       : 0;
-
-  const profileHistory =
-     Array.isArray(profileHistoryRes)
-       ? profileHistoryRes
-       : [];
-
-  const profile =
-    profileRes || {};
 
   const displayName =
     profile.displayName ||
+    profile.DisplayName ||
     username;
 
   const themeColor =
     profile.themeColor ||
+    profile.ThemeColor ||
     "#354785";
 
   const avatar =
     profile.avatar ||
+    profile.Avatar ||
     "default";
 
   return `
@@ -313,39 +337,39 @@ async function renderDashboardPage() {
 
         <section class="dashboard-history-card card">
 
-        <h2>Profile History</h2>
+          <h2>Profile History</h2>
 
-        ${
-          profileHistory.length
-            ? `
-              <div class="profile-history-list">
+          ${
+            profileHistory.length
+              ? `
+                <div class="profile-history-list">
 
-                ${profileHistory.map(item => `
-                  <div class="profile-history-row">
+                  ${profileHistory.map(item => `
+                    <div class="profile-history-row">
 
-                    <div>
-                      <strong>
-                        ${escapeHtml(item.displayName || item.username)}
-                      </strong>
+                      <div>
+                        <strong>
+                          ${escapeHtml(item.displayName || item.username || username)}
+                        </strong>
 
-                      <p>
-                        @${escapeHtml(item.username)}
-                      </p>
+                        <p>
+                          @${escapeHtml(item.username || username)}
+                        </p>
+                      </div>
+
+                      <span>
+                        ${escapeHtml(item.gameId || gameId)}
+                      </span>
+
                     </div>
+                  `).join("")}
 
-                    <span>
-                      ${escapeHtml(item.gameId)}
-                    </span>
+                </div>
+              `
+              : renderEmptyCard("No profile history found yet.")
+          }
 
-                  </div>
-                `).join("")}
-
-              </div>
-            `
-            : renderEmptyCard("No profile history found yet.")
-        }
-
-      </section>
+        </section>
 
         <button
           class="dashboard-action-button"
@@ -401,9 +425,6 @@ async function saveDashboardProfile() {
       "profileSaveStatus"
     );
 
-  const gameId =
-    getFrontendGameId();  
-
   const profile = {
     username:
       username,
@@ -439,6 +460,7 @@ async function saveDashboardProfile() {
     if (statusEl) {
       statusEl.innerText =
         res.message ||
+        res.error ||
         "Could not save profile.";
     }
 
@@ -451,7 +473,15 @@ async function saveDashboardProfile() {
     APP_STATE.user.displayName =
       profile.displayName;
 
+    APP_STATE.user.avatar =
+      profile.avatar;
+
+    APP_STATE.user.themeColor =
+      profile.themeColor;
+
   }
+
+  clearStartupPayload();
 
   if (statusEl) {
 

@@ -48,25 +48,104 @@ document.addEventListener("DOMContentLoaded", () => {
    INIT APP
 ====================== */
 
-function initApp() {
+function initApp(session) {
 
-  debugLog("🚀 App initialized");
+  console.log("🚀 App initialized");
+
+  const activeSession =
+    session ||
+    getSession();
+
+  console.log(
+    "INIT SESSION:",
+    activeSession
+  );
 
   hideLoader();
 
   bindGlobalEvents();
 
-  const hash =
-    window.location.hash.replace(
-      "#",
-      ""
-    );
+  setupAdminNav(activeSession);
 
-  navigate(
-    hash || "dashboard"
+  setTimeout(function() {
+    setupAdminNav(getSession());
+  }, 250);
+
+  const hash =
+    window.location.hash
+      .replace("#", "");
+
+  navigate(hash || "dashboard");
+
+}
+
+/* ======================
+   ADMIN SESSION CHECK
+====================== */
+
+function isAdminSession(session) {
+
+  if (!session) {
+    return false;
+  }
+
+  const value =
+    session.isAdmin !== undefined
+      ? session.isAdmin
+      : session.user && session.user.isAdmin !== undefined
+        ? session.user.isAdmin
+        : false;
+
+  return (
+    value === true ||
+    value === 1 ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "admin"
   );
 
 }
+
+/* ======================
+   ADMIN NAV
+====================== */
+
+function setupAdminNav(session) {
+
+  const adminButton =
+    document.getElementById("adminNavButton");
+
+  if (!adminButton) {
+    console.warn("Admin nav button missing");
+    return;
+  }
+
+  const activeSession =
+    session ||
+    getSession();
+
+  const isAdmin =
+    isAdminSession(activeSession);
+
+  console.log(
+    "ADMIN NAV CHECK:",
+    isAdmin,
+    activeSession
+  );
+
+  adminButton.style.display =
+    isAdmin
+      ? ""
+      : "none";
+
+}
+
 
 
 /* ======================
@@ -87,6 +166,53 @@ function showLoader() {
   }
 }
 
+/* ======================
+   STARTUP PAYLOAD CACHE
+====================== */
+
+async function loadStartupPayload(forceRefresh) {
+
+  if (
+    APP_STATE.startupPayload &&
+    forceRefresh !== true
+  ) {
+    return APP_STATE.startupPayload;
+  }
+
+  const res =
+    await apiGetStartupPayload();
+
+  if (!res.success) {
+    throw new Error(
+      res.error ||
+      res.message ||
+      "Failed to load startup payload"
+    );
+  }
+
+  APP_STATE.startupPayload =
+    res;
+
+  APP_STATE.gameId =
+    res.gameId ||
+    APP_STATE.gameId;
+
+  return res;
+
+}
+
+function getStartupPayload() {
+
+  return APP_STATE.startupPayload || null;
+
+}
+
+function clearStartupPayload() {
+
+  APP_STATE.startupPayload =
+    null;
+
+}
 
 /* ======================
    LOGOUT
@@ -116,39 +242,19 @@ async function navigate(page) {
     document.getElementById("app");
 
   if (!app) {
+    console.error("App container missing");
     return;
   }
 
+  app.classList.add("page-enter");
+
   showLoader();
 
-  app.classList.add(
-    "page-enter"
-  );
-
-  app.classList.remove(
-    "page-enter-active"
-  );
-
-  window.location.hash =
-    page;
+  window.location.hash = page;
 
   try {
 
     await renderPage(page);
-
-    requestAnimationFrame(() => {
-
-      app.classList.remove(
-        "page-enter"
-      );
-
-      app.classList.add(
-        "page-enter-active"
-      );
-
-      setActiveNav(page);
-
-    });
 
   } catch (err) {
 
@@ -160,16 +266,27 @@ async function navigate(page) {
 
     app.innerHTML = `
       <div class="page">
-        ${renderErrorCard(
-          "Could not load page",
-          "Please refresh and try again."
-        )}
+        <div class="card error-card">
+          Page failed to load.
+          <br>
+          ${err.message || err}
+        </div>
       </div>
     `;
 
   } finally {
 
-    hideLoader();
+    requestAnimationFrame(() => {
+
+      app.classList.remove("page-enter");
+
+      app.classList.add("page-enter-active");
+
+      hideLoader();
+
+      setActiveNav(page);
+
+    });
 
   }
 
@@ -206,7 +323,12 @@ async function renderPage(page) {
   const app =
     document.getElementById("app");
 
-  APP_STATE.currentPage = page;
+  if (!app) {
+    throw new Error("App container missing");
+  }
+
+  APP_STATE.currentPage =
+    page;
 
   switch (page) {
 
@@ -231,11 +353,26 @@ async function renderPage(page) {
 
       break;
 
+    case "admin":
+
+      app.innerHTML =
+        await renderAdminPage();
+
+      break;
+
     default:
 
       app.innerHTML =
-        "<h2>Page Not Found</h2>";
+        `
+          <div class="page">
+            <div class="card">
+              Page Not Found
+            </div>
+          </div>
+        `;
+
   }
+
 }
 
 

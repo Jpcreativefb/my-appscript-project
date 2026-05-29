@@ -51,6 +51,41 @@ function loginUser(
   }
 
   /* =========================
+     ACTIVE VALIDATION
+  ========================= */
+
+  const activeValue =
+    user["Active"];
+
+  const isActive =
+    activeValue === undefined ||
+    activeValue === "" ||
+    activeValue === true ||
+    activeValue === 1 ||
+    String(activeValue || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(activeValue || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(activeValue || "")
+      .trim()
+      .toLowerCase() === "active";
+
+  if (!isActive) {
+
+    return {
+
+      success: false,
+
+      message:
+        "This account is inactive. Please contact the admin."
+
+    };
+
+  }
+
+  /* =========================
      PIN VALIDATION
   ========================= */
 
@@ -110,16 +145,12 @@ function loginUser(
       user["Username"],
 
     isAdmin:
-
-      String(
+      authBoolean_(
         user["IsAdmin"]
-      ).toLowerCase() ===
-        "true"
+      ),
 
-      ||
-
-      user["IsAdmin"] ===
-        "Yes",
+    active:
+      true,
 
     avatar:
       user["Avatar"] ||
@@ -130,5 +161,23 @@ function loginUser(
       "#000000"
 
   };
+
+}
+
+function authBoolean_(value) {
+
+  return (
+    value === true ||
+    value === 1 ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "admin"
+  );
 
 }

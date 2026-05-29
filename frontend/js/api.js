@@ -157,3 +157,144 @@ async function apiGetUserProfileHistory(username, gameId) {
   });
 
 }
+
+async function apiGetStartupPayload() {
+
+  const session =
+    getSession();
+
+  return api("getStartupPayload", {
+    username: session.username,
+    token: session.token,
+    gameId: APP_STATE.gameId || ""
+  });
+
+}
+
+/* ======================
+   ADMIN
+====================== */
+
+async function apiAdminSummary() {
+
+  const session =
+    getSession();
+
+  return api("adminSummary", {
+    username: session.username,
+    token: session.token,
+    gameId: APP_STATE.gameId || ""
+  });
+
+}
+
+async function apiAdminClearCaches() {
+
+  const session =
+    getSession();
+
+  return api("adminClearCaches", {
+    username: session.username,
+    token: session.token
+  });
+
+}
+
+async function apiAdminUpdateCategorySetting(categoryId, patch) {
+
+  const session =
+    getSession();
+
+  return api("adminUpdateCategorySetting", {
+    username: session.username,
+    token: session.token,
+    gameId: APP_STATE.gameId || "",
+    categoryId: categoryId,
+    locked:
+      patch.locked !== undefined
+        ? patch.locked
+        : "",
+    points:
+      patch.points !== undefined
+        ? patch.points
+        : "",
+    winnerNomineeId:
+      patch.winnerNomineeId !== undefined
+        ? patch.winnerNomineeId
+        : ""
+  });
+
+}
+
+async function apiAdminClearCategoryWinner(categoryId) {
+
+  const session =
+    getSession();
+
+  return api("adminClearCategoryWinner", {
+    username: session.username,
+    token: session.token,
+    gameId: APP_STATE.gameId || "",
+    categoryId: categoryId
+  });
+
+}
+
+async function apiAdminCreateUser(payload) {
+
+  const session =
+    getSession();
+
+  return api("adminCreateUser", {
+    username: session.username,
+    token: session.token,
+    newUsername: payload.username,
+    pin: payload.pin,
+    isAdmin: payload.isAdmin || false,
+    avatar: payload.avatar || "avatar1",
+    themeColor: payload.themeColor || "#ffcc00"
+  });
+
+}
+
+async function apiAdminResetUserPin(targetUsername, pin) {
+
+  const session =
+    getSession();
+
+  return api("adminResetUserPin", {
+    username: session.username,
+    token: session.token,
+    targetUsername: targetUsername,
+    pin: pin
+  });
+
+}
+
+async function apiAdminToggleUserAdmin(targetUsername, isAdmin) {
+
+  const session =
+    getSession();
+
+  return api("adminToggleUserAdmin", {
+    username: session.username,
+    token: session.token,
+    targetUsername: targetUsername,
+    isAdmin: isAdmin
+  });
+
+}
+
+async function apiAdminToggleUserActive(targetUsername, active) {
+
+  const session =
+    getSession();
+
+  return api("adminToggleUserActive", {
+    username: session.username,
+    token: session.token,
+    targetUsername: targetUsername,
+    active: active
+  });
+
+}

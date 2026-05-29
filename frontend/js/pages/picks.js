@@ -23,8 +23,50 @@ async function renderPicksPage() {
   const session =
     getSession();
 
+  if (!session || !session.username) {
+    return `
+      <div class="page picks-page">
+        <h1>Make Your Picks</h1>
+
+        <div class="card">
+          You must be logged in.
+        </div>
+      </div>
+    `;
+  }
+
+  let payload;
+
+  try {
+
+    payload =
+      await loadStartupPayload();
+
+  } catch (err) {
+
+    console.error(
+      "PICKS STARTUP PAYLOAD ERROR",
+      err
+    );
+
+    return `
+      <div class="page picks-page">
+        <h1>Make Your Picks</h1>
+
+        ${renderErrorCard(
+          "Could not load picks",
+          err.message ||
+          "The picks data failed to load. Please refresh and try again."
+        )}
+      </div>
+    `;
+
+  }
+
   const gameId =
-    session.gameId || "";
+    payload.gameId ||
+    session.gameId ||
+    "";
 
   PICKS_PAGE_DATA.session =
     session;
@@ -33,13 +75,10 @@ async function renderPicksPage() {
     gameId;
 
   const categories =
-    await apiGetCategories(gameId);
+    payload.categories || [];
 
   const picksResponse =
-    await apiGetMyPicks(
-      session.username,
-      gameId
-    );
+    payload.picks || {};
 
   PICKS_PAGE_DATA.categories =
     Array.isArray(categories)
@@ -56,7 +95,7 @@ async function renderPicksPage() {
     picksResponse.originalPicks || {};
 
   PICKS_PAGE_DATA.pickMeta =
-    picksResponse.pickMeta || {};  
+    picksResponse.pickMeta || {};
 
   setTimeout(
     mountPicksPage,
@@ -541,6 +580,8 @@ async function selectNominee(categoryId, nomineeId) {
     );
     return;
   }
+
+  clearStartupPayload();
 
   PICKS_PAGE_DATA.picks[categoryId] =
     nomineeId;

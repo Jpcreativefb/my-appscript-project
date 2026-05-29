@@ -378,3 +378,494 @@
       min-height: -webkit-fill-available;
     }
   }
+
+  /* ======================
+   ADMIN
+====================== */
+
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-card {
+  border:
+    1px solid rgba(250, 204, 21, 0.25);
+}
+
+.admin-label {
+  opacity: 0.7;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.admin-value {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.admin-number {
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.admin-sub {
+  opacity: 0.6;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.admin-button {
+  margin-top: 8px;
+}
+
+.admin-message {
+  margin-top: 12px;
+  opacity: 0.8;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 12px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  border-radius: 14px;
+}
+
+.admin-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  background:
+    rgba(255, 255, 255, 0.08);
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-pill.locked {
+  background:
+    rgba(248, 113, 113, 0.25);
+
+  color: #fecaca;
+}
+
+.admin-pill.admin {
+  background:
+    rgba(250, 204, 21, 0.2);
+
+  color: #fde68a;
+}
+
+.error-card {
+  color: #fecaca;
+}
+
+/* ======================
+   ADMIN DARK OVERRIDES
+====================== */
+
+.admin-page {
+  color: #ffffff;
+}
+
+.admin-page .card,
+.admin-section .card,
+.admin-card,
+.admin-stat {
+  background:
+    linear-gradient(
+      180deg,
+      rgba(30, 41, 59, 0.96),
+      rgba(15, 23, 42, 0.96)
+    ) !important;
+
+  color: #ffffff !important;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.12) !important;
+
+  box-shadow:
+    0 12px 30px rgba(0, 0, 0, 0.28);
+
+  border-radius: 18px;
+}
+
+.admin-page h1,
+.admin-page h2,
+.admin-page strong,
+.admin-page div {
+  color: inherit;
+}
+
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-card {
+  border:
+    1px solid rgba(250, 204, 21, 0.28) !important;
+}
+
+.admin-label {
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.admin-value {
+  color: #ffffff !important;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.admin-number {
+  color: #facc15 !important;
+  font-size: 34px;
+  font-weight: 900;
+}
+
+.admin-sub {
+  color: rgba(255, 255, 255, 0.58) !important;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.admin-button {
+  margin-top: 8px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #facc15,
+      #f59e0b
+    ) !important;
+
+  color: #111827 !important;
+
+  border: none !important;
+  border-radius: 999px;
+
+  padding: 12px 18px;
+
+  font-weight: 800;
+}
+
+.admin-message {
+  margin-top: 12px;
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 12px;
+
+  background:
+    rgba(255, 255, 255, 0.06) !important;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 14px;
+
+  color: #ffffff !important;
+}
+
+.admin-pill {
+  padding: 6px 10px;
+  border-radius: 999px;
+
+  background:
+    rgba(255, 255, 255, 0.12) !important;
+
+  color: #ffffff !important;
+
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.admin-pill.locked {
+  background:
+    rgba(248, 113, 113, 0.26) !important;
+
+  color: #fecaca !important;
+}
+
+.admin-pill.admin {
+  background:
+    rgba(250, 204, 21, 0.22) !important;
+
+  color: #fde68a !important;
+}
+
+.error-card {
+  color: #fecaca !important;
+}
+
+/* ======================
+   ADMIN CATEGORY CONTROLS
+====================== */
+
+.admin-category-card {
+  padding: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-control-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.admin-field input,
+.admin-field select {
+  width: 100%;
+
+  padding: 10px 12px;
+
+  border-radius: 12px;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.16);
+
+  background:
+    rgba(15, 23, 42, 0.95);
+
+  color: #ffffff;
+
+  outline: none;
+}
+
+.admin-field input:focus,
+.admin-field select:focus {
+  border-color:
+    rgba(250, 204, 21, 0.8);
+}
+
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-small-button {
+  padding: 9px 13px;
+
+  border-radius: 999px;
+
+  border: none;
+
+  background:
+    linear-gradient(
+      135deg,
+      #facc15,
+      #f59e0b
+    );
+
+  color: #111827;
+
+  font-weight: 800;
+
+  cursor: pointer;
+}
+
+.admin-small-button.secondary {
+  background:
+    rgba(255, 255, 255, 0.14);
+
+  color: #ffffff;
+}
+
+.admin-small-button.danger {
+  background:
+    rgba(248, 113, 113, 0.25);
+
+  color: #fecaca;
+}
+
+@media (max-width: 720px) {
+
+  .admin-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+.admin-field select {
+  appearance: none;
+  -webkit-appearance: none;
+
+  background-image:
+    linear-gradient(
+      45deg,
+      transparent 50%,
+      rgba(255, 255, 255, 0.8) 50%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.8) 50%,
+      transparent 50%
+    );
+
+  background-position:
+    calc(100% - 18px) 50%,
+    calc(100% - 13px) 50%;
+
+  background-size:
+    5px 5px,
+    5px 5px;
+
+  background-repeat: no-repeat;
+
+  padding-right: 36px;
+}
+
+/* ======================
+   ADMIN USER CONTROLS
+====================== */
+
+.admin-user-create {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  padding: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.05);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 16px;
+}
+
+.admin-user-create h3 {
+  margin: 0;
+}
+
+.admin-divider {
+  margin: 20px 0;
+
+  border: none;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: rgba(255, 255, 255, 0.82);
+
+  font-weight: 700;
+}
+
+.admin-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-user-card {
+  padding: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 16px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-pill.inactive {
+  background:
+    rgba(148, 163, 184, 0.22) !important;
+
+  color: #cbd5e1 !important;
+}
+
+.admin-user-card:has(.admin-pill.inactive) {
+  opacity: 0.72;
+}
