@@ -942,3 +942,63 @@
 .admin-message.is-error {
   color: #fca5a5;
 }
+
+/* ======================
+   ADMIN SETUP EDIT CONTROLS
+====================== */
+
+.admin-edit-panel {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-setup-nominee-edit-row {
+  margin-top: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.nominee-grid {
+  grid-template-columns: 1.3fr 1fr 1fr;
+}
+
+.admin-nominee-edit-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.admin-check-row.compact {
+  margin: 0;
+}
+
+.admin-danger-button {
+  min-height: 38px;
+  padding: 0 13px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.18);
+  color: #fecaca;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+@media (max-width: 760px) {
+
+  .nominee-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-nominee-edit-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+}

@@ -408,6 +408,16 @@ function renderAdminSetupCategoryCard(category) {
       ? category.nominees
       : [];
 
+  const gameId =
+    adminSetupEscapeHtml(
+      category.gameId
+    );
+
+  const categoryId =
+    adminSetupEscapeHtml(
+      category.categoryId
+    );
+
   return `
     <div class="admin-category-card">
 
@@ -422,7 +432,7 @@ function renderAdminSetupCategoryCard(category) {
           </strong>
 
           <div class="admin-sub">
-            ${adminSetupEscapeHtml(category.categoryId)}
+            ${categoryId}
             ·
             ${adminSetupEscapeHtml(category.section || "Other")}
             ·
@@ -436,27 +446,136 @@ function renderAdminSetupCategoryCard(category) {
 
       </div>
 
-      <div class="admin-setup-meta">
+      <div class="admin-edit-panel">
 
-        <div>
-          <span>Points</span>
-          <strong>${Number(settings.points) || 0}</strong>
+        <div class="admin-control-grid">
+
+          <label class="admin-field">
+            <span>Category / Question</span>
+
+            <input
+              type="text"
+              id="editCategoryName_${categoryId}"
+              value="${adminSetupEscapeHtml(category.category)}"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Section</span>
+
+            <input
+              type="text"
+              id="editCategorySection_${categoryId}"
+              value="${adminSetupEscapeHtml(category.section || "Other")}"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Points</span>
+
+            <input
+              type="number"
+              id="editCategoryPoints_${categoryId}"
+              value="${Number(settings.points) || 0}"
+              min="0"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Display Order</span>
+
+            <input
+              type="number"
+              id="editCategoryOrder_${categoryId}"
+              value="${Number(settings.displayOrder) || 999}"
+              min="0"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Layout Type</span>
+
+            <select id="editCategoryLayout_${categoryId}">
+              <option
+                value="image"
+                ${settings.layoutType === "image" ? "selected" : ""}
+              >
+                Image
+              </option>
+
+              <option
+                value="text"
+                ${settings.layoutType === "text" ? "selected" : ""}
+              >
+                Text
+              </option>
+            </select>
+          </label>
+
         </div>
 
-        <div>
-          <span>Order</span>
-          <strong>${Number(settings.displayOrder) || 999}</strong>
+        <div class="admin-checkbox-row">
+
+          <label>
+            <input
+              type="checkbox"
+              id="editCategoryLocked_${categoryId}"
+              ${settings.locked ? "checked" : ""}
+            >
+            Locked
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              id="editCategoryActive_${categoryId}"
+              ${category.active !== false ? "checked" : ""}
+            >
+            Active
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              id="editCategoryPrediction_${categoryId}"
+              ${category.predictionGame !== false ? "checked" : ""}
+            >
+            Prediction Game
+          </label>
+
+          <label>
+            <input
+              type="checkbox"
+              id="editCategoryStatue_${categoryId}"
+              ${settings.countsAsStatue ? "checked" : ""}
+            >
+            Counts as Statue
+          </label>
+
         </div>
 
-        <div>
-          <span>Layout</span>
-          <strong>${adminSetupEscapeHtml(settings.layoutType || "image")}</strong>
+        <div class="admin-card-actions">
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupUpdateCategory('${gameId}', '${categoryId}')"
+          >
+            Save Category
+          </button>
+
+          <button
+            class="admin-danger-button"
+            onclick="adminSetupArchiveCategory('${gameId}', '${categoryId}')"
+          >
+            Archive Category
+          </button>
+
         </div>
 
-        <div>
-          <span>Statue</span>
-          <strong>${adminSetupBoolText(settings.countsAsStatue)}</strong>
-        </div>
+        <div
+          id="editCategoryMessage_${categoryId}"
+          class="admin-message"
+        ></div>
 
       </div>
 
@@ -467,25 +586,12 @@ function renderAdminSetupCategoryCard(category) {
         ${
           nominees.length
             ? nominees
-              .map(nominee => `
-                <div class="admin-setup-nominee-row">
-
-                  <div>
-                    <strong>
-                      ${adminSetupEscapeHtml(nominee.nominee)}
-                    </strong>
-
-                    <div class="admin-sub">
-                      ${adminSetupEscapeHtml(nominee.nomineeId)}
-                    </div>
-                  </div>
-
-                  <div class="admin-pill ${nominee.active === false ? "inactive" : ""}">
-                    ${nominee.active === false ? "Inactive" : "Active"}
-                  </div>
-
-                </div>
-              `)
+              .map(nominee =>
+                renderAdminSetupNomineeRow(
+                  category,
+                  nominee
+                )
+              )
               .join("")
             : `
               <div class="admin-sub">
@@ -548,6 +654,107 @@ function adminSetupGetCategoryNameById(categoryId) {
   return option
     ? option.textContent.trim()
     : "";
+
+}
+
+function renderAdminSetupNomineeRow(
+  category,
+  nominee
+) {
+
+  const gameId =
+    adminSetupEscapeHtml(
+      category.gameId
+    );
+
+  const categoryId =
+    adminSetupEscapeHtml(
+      category.categoryId
+    );
+
+  const nomineeId =
+    adminSetupEscapeHtml(
+      nominee.nomineeId
+    );
+
+  return `
+    <div class="admin-setup-nominee-edit-row">
+
+      <div class="admin-control-grid nominee-grid">
+
+        <label class="admin-field">
+          <span>Nominee / Answer</span>
+
+          <input
+            type="text"
+            id="editNomineeName_${categoryId}_${nomineeId}"
+            value="${adminSetupEscapeHtml(nominee.nominee)}"
+          >
+        </label>
+
+        <label class="admin-field">
+          <span>Short Answer</span>
+
+          <input
+            type="text"
+            id="editNomineeShort_${categoryId}_${nomineeId}"
+            value="${adminSetupEscapeHtml(nominee.shortAnswer || nominee.nominee)}"
+          >
+        </label>
+
+        <label class="admin-field">
+          <span>File ID</span>
+
+          <input
+            type="text"
+            id="editNomineeFileId_${categoryId}_${nomineeId}"
+            value="${adminSetupEscapeHtml(nominee.fileId || "")}"
+          >
+        </label>
+
+      </div>
+
+      <div class="admin-nominee-edit-footer">
+
+        <label class="admin-check-row compact">
+          <input
+            type="checkbox"
+            id="editNomineeActive_${categoryId}_${nomineeId}"
+            ${nominee.active !== false ? "checked" : ""}
+          >
+
+          <span>
+            Active
+          </span>
+        </label>
+
+        <div class="admin-card-actions">
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupUpdateNominee('${gameId}', '${categoryId}', '${nomineeId}')"
+          >
+            Save Nominee
+          </button>
+
+          <button
+            class="admin-danger-button"
+            onclick="adminSetupArchiveNominee('${gameId}', '${categoryId}', '${nomineeId}')"
+          >
+            Archive
+          </button>
+
+        </div>
+
+      </div>
+
+      <div
+        id="editNomineeMessage_${categoryId}_${nomineeId}"
+        class="admin-message"
+      ></div>
+
+    </div>
+  `;
 
 }
 
@@ -816,6 +1023,391 @@ async function adminSetupCreateNominee(gameId) {
     "Nominee added.",
     false
   );
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   UPDATE CATEGORY
+====================== */
+
+async function adminSetupUpdateCategory(
+  gameId,
+  categoryId
+) {
+
+  const nameInput =
+    document.getElementById(
+      "editCategoryName_" + categoryId
+    );
+
+  const sectionInput =
+    document.getElementById(
+      "editCategorySection_" + categoryId
+    );
+
+  const pointsInput =
+    document.getElementById(
+      "editCategoryPoints_" + categoryId
+    );
+
+  const orderInput =
+    document.getElementById(
+      "editCategoryOrder_" + categoryId
+    );
+
+  const layoutInput =
+    document.getElementById(
+      "editCategoryLayout_" + categoryId
+    );
+
+  const lockedInput =
+    document.getElementById(
+      "editCategoryLocked_" + categoryId
+    );
+
+  const activeInput =
+    document.getElementById(
+      "editCategoryActive_" + categoryId
+    );
+
+  const predictionInput =
+    document.getElementById(
+      "editCategoryPrediction_" + categoryId
+    );
+
+  const statueInput =
+    document.getElementById(
+      "editCategoryStatue_" + categoryId
+    );
+
+  const categoryName =
+    nameInput
+      ? nameInput.value.trim()
+      : "";
+
+  if (!categoryName) {
+
+    adminSetupSetMessage(
+      "editCategoryMessage_" + categoryId,
+      "Category name is required.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "editCategoryMessage_" + categoryId,
+    "Saving category...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateCategory({
+      gameId: gameId,
+      categoryId: categoryId,
+      category: categoryName,
+      section:
+        sectionInput
+          ? sectionInput.value.trim()
+          : "",
+      points:
+        pointsInput
+          ? pointsInput.value
+          : 0,
+      displayOrder:
+        orderInput
+          ? orderInput.value
+          : 999,
+      layoutType:
+        layoutInput
+          ? layoutInput.value
+          : "image",
+      locked:
+        lockedInput
+          ? lockedInput.checked
+          : false,
+      active:
+        activeInput
+          ? activeInput.checked
+          : true,
+      predictionGame:
+        predictionInput
+          ? predictionInput.checked
+          : true,
+      countsAsStatue:
+        statueInput
+          ? statueInput.checked
+          : false
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "editCategoryMessage_" + categoryId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not save category.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "editCategoryMessage_" + categoryId,
+    "Category saved.",
+    false
+  );
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   ARCHIVE CATEGORY
+====================== */
+
+async function adminSetupArchiveCategory(
+  gameId,
+  categoryId
+) {
+
+  const ok =
+    confirm(
+      "Archive this category? It will be marked inactive and locked."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "editCategoryMessage_" + categoryId,
+    "Archiving category...",
+    false
+  );
+
+  const res =
+    await apiAdminArchiveCategory(
+      gameId,
+      categoryId
+    );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "editCategoryMessage_" + categoryId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not archive category.",
+      true
+    );
+
+    return;
+
+  }
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   UPDATE NOMINEE
+====================== */
+
+async function adminSetupUpdateNominee(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  const nameInput =
+    document.getElementById(
+      "editNomineeName_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const shortInput =
+    document.getElementById(
+      "editNomineeShort_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const activeInput =
+    document.getElementById(
+      "editNomineeActive_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const nomineeName =
+    nameInput
+      ? nameInput.value.trim()
+      : "";
+
+  if (!nomineeName) {
+
+    adminSetupSetMessage(
+      "editNomineeMessage_" +
+      categoryId +
+      "_" +
+      nomineeId,
+      "Nominee name is required.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId,
+    "Saving nominee...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateNominee({
+      gameId: gameId,
+      categoryId: categoryId,
+      nomineeId: nomineeId,
+      nominee: nomineeName,
+      shortAnswer:
+        shortInput && shortInput.value.trim()
+          ? shortInput.value.trim()
+          : nomineeName,
+      fileId:
+        fileIdInput
+          ? fileIdInput.value.trim()
+          : "",
+      active:
+        activeInput
+          ? activeInput.checked
+          : true
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "editNomineeMessage_" +
+      categoryId +
+      "_" +
+      nomineeId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not save nominee.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId,
+    "Nominee saved.",
+    false
+  );
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   ARCHIVE NOMINEE
+====================== */
+
+async function adminSetupArchiveNominee(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  const ok =
+    confirm(
+      "Archive this nominee? It will be marked inactive."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId,
+    "Archiving nominee...",
+    false
+  );
+
+  const res =
+    await apiAdminArchiveNominee(
+      gameId,
+      categoryId,
+      nomineeId
+    );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "editNomineeMessage_" +
+      categoryId +
+      "_" +
+      nomineeId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not archive nominee.",
+      true
+    );
+
+    return;
+
+  }
 
   navigate(
     "admin-game-setup:" + gameId
