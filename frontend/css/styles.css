@@ -869,3 +869,76 @@
 .admin-user-card:has(.admin-pill.inactive) {
   opacity: 0.72;
 }
+
+/* ======================
+   ADMIN GAME SETUP
+====================== */
+
+.admin-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.admin-game-setup-page {
+  padding-bottom: 96px;
+}
+
+.admin-setup-meta {
+  display: grid;
+  grid-template-columns: repeat(
+    auto-fit,
+    minmax(120px, 1fr)
+  );
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.admin-setup-meta div {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.admin-setup-meta span {
+  display: block;
+  margin-bottom: 5px;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-setup-meta strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.admin-setup-nominees {
+  margin-top: 14px;
+}
+
+.admin-setup-nominees h3 {
+  margin: 0 0 10px;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.admin-setup-nominee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  padding: 11px 12px;
+  margin-top: 8px;
+
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-message.is-error {
+  color: #fca5a5;
+}

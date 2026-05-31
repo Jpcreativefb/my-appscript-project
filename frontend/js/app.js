@@ -146,8 +146,6 @@ function setupAdminNav(session) {
 
 }
 
-
-
 /* ======================
    LOADER CONTROL
 ====================== */
@@ -298,6 +296,12 @@ async function navigate(page) {
 
 function setActiveNav(page) {
 
+  const navPage =
+    page === "admin-games" ||
+    page.indexOf("admin-game-setup:") === 0
+      ? "admin"
+      : page;
+
   document
     .querySelectorAll(".bottom-nav button")
     .forEach(btn => {
@@ -305,12 +309,13 @@ function setActiveNav(page) {
       btn.classList.remove("active");
 
       if (
-        btn.dataset.page === page
+        btn.dataset.page === navPage
       ) {
         btn.classList.add("active");
       }
 
     });
+
 }
 
 
@@ -329,6 +334,22 @@ async function renderPage(page) {
 
   APP_STATE.currentPage =
     page;
+
+  if (
+    page.indexOf("admin-game-setup:") === 0
+  ) {
+
+    const gameId =
+      page.split(":")[1];
+
+    app.innerHTML =
+      await renderAdminGameSetupPage(
+        gameId
+      );
+
+    return;
+
+  }
 
   switch (page) {
 
@@ -359,6 +380,13 @@ async function renderPage(page) {
         await renderAdminPage();
 
       break;
+ 
+    case "admin-games":
+
+      app.innerHTML =
+        await renderAdminGamesPage();
+
+      break; 
 
     default:
 
