@@ -19,14 +19,16 @@ async function api(action, params = {}) {
     .forEach(([key, value]) => {
 
       if (
-        value !== undefined &&
-        value !== null
+        value === undefined ||
+        value === null
       ) {
-        url.searchParams.set(
-          key,
-          value
-        );
+        return;
       }
+
+      url.searchParams.set(
+        key,
+        value
+      );
 
     });
 
@@ -296,5 +298,149 @@ async function apiAdminToggleUserActive(targetUsername, active) {
     targetUsername: targetUsername,
     active: active
   });
+
+}
+
+/* ======================
+   ADMIN: GAMES
+====================== */
+
+async function apiAdminGetGames() {
+
+  return api(
+    "adminGetGames"
+  );
+
+}
+
+async function apiAdminCreateGame(payload) {
+
+  return api(
+    "adminCreateGame",
+    payload
+  );
+
+}
+
+async function apiAdminUpdateGame(payload) {
+
+  return api(
+    "adminUpdateGame",
+    payload
+  );
+
+}
+
+async function apiAdminArchiveGame(gameId) {
+
+  return api(
+    "adminArchiveGame",
+    {
+      gameId: gameId
+    }
+  );
+
+}
+
+async function apiAdminCloneGame(payload) {
+
+  return api(
+    "adminCloneGame",
+    payload
+  );
+
+}
+
+async function apiAdminCloneGameSetup(payload) {
+
+  return api(
+    "adminCloneGameSetup",
+    payload
+  );
+
+}
+
+/* ======================
+   ADMIN: GAME SETUP
+   Categories / Questions
+====================== */
+
+async function apiAdminGetGameSetup(gameId) {
+
+  return api(
+    "adminGetGameSetup",
+    {
+      gameId: gameId
+    }
+  );
+
+}
+
+async function apiAdminCreateCategory(payload) {
+
+  return api(
+    "adminCreateCategory",
+    payload
+  );
+
+}
+
+async function apiAdminUpdateCategory(payload) {
+
+  return api(
+    "adminUpdateCategory",
+    payload
+  );
+
+}
+
+async function apiAdminArchiveCategory(gameId, categoryId) {
+
+  return api(
+    "adminArchiveCategory",
+    {
+      gameId: gameId,
+      categoryId: categoryId
+    }
+  );
+
+}
+
+/* ======================
+   ADMIN: NOMINEES / ANSWERS
+====================== */
+
+async function apiAdminCreateNominee(payload) {
+
+  return api(
+    "adminCreateNominee",
+    payload
+  );
+
+}
+
+async function apiAdminUpdateNominee(payload) {
+
+  return api(
+    "adminUpdateNominee",
+    payload
+  );
+
+}
+
+async function apiAdminArchiveNominee(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  return api(
+    "adminArchiveNominee",
+    {
+      gameId: gameId,
+      categoryId: categoryId,
+      nomineeId: nomineeId
+    }
+  );
 
 }
