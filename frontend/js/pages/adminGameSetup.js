@@ -104,12 +104,30 @@ async function renderAdminGameSetupPage(gameId) {
           </div>
         </div>
 
-        <button
-          class="admin-small-button secondary"
-          onclick="navigate('admin-games')"
-        >
-          Back to Manage Games
-        </button>
+        <div class="admin-header-actions">
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(safeGameId)}', true)"
+          >
+            Mark Results Finalized
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(safeGameId)}', false)"
+          >
+            Reopen Results
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="navigate('admin-games')"
+          >
+            Back to Manage Games
+          </button>
+
+        </div>
 
       </div>
 
@@ -579,6 +597,12 @@ function renderAdminSetupCategoryCard(category) {
 
       </div>
 
+      ${renderAdminResultsPanel(
+        category,
+        nominees,
+        settings
+      )}
+
       <div class="admin-setup-nominees">
 
         <h3>Nominees / Answers</h3>
@@ -601,6 +625,163 @@ function renderAdminSetupCategoryCard(category) {
         }
 
       </div>
+
+    </div>
+  `;
+
+}
+
+/* ======================
+   RESULTS / WINNERS PANEL
+====================== */
+
+function renderAdminResultsPanel(
+  category,
+  nominees,
+  settings
+) {
+
+  const gameId =
+    adminSetupEscapeHtml(
+      category.gameId
+    );
+
+  const categoryId =
+    adminSetupEscapeHtml(
+      category.categoryId
+    );
+
+  const winnerNomineeId =
+    String(settings.winnerNomineeId || "")
+      .trim();
+
+  const favoriteNomineeId =
+    String(settings.favoriteNomineeId || "")
+      .trim();
+
+  const nomineeOptions =
+    nominees
+      .filter(nominee =>
+        nominee.active !== false
+      )
+      .map(nominee => {
+
+        const nomineeId =
+          String(nominee.nomineeId || "")
+            .trim();
+
+        const nomineeName =
+          nominee.nominee ||
+          nominee.nomineeId;
+
+        return `
+          <option
+            value="${adminSetupEscapeHtml(nomineeId)}"
+            ${nomineeId === winnerNomineeId ? "selected" : ""}
+          >
+            ${adminSetupEscapeHtml(nomineeName)}
+          </option>
+        `;
+
+      })
+      .join("");
+
+  const favoriteOptions =
+    nominees
+      .filter(nominee =>
+        nominee.active !== false
+      )
+      .map(nominee => {
+
+        const nomineeId =
+          String(nominee.nomineeId || "")
+            .trim();
+
+        const nomineeName =
+          nominee.nominee ||
+          nominee.nomineeId;
+
+        return `
+          <option
+            value="${adminSetupEscapeHtml(nomineeId)}"
+            ${nomineeId === favoriteNomineeId ? "selected" : ""}
+          >
+            ${adminSetupEscapeHtml(nomineeName)}
+          </option>
+        `;
+
+      })
+      .join("");
+
+  return `
+    <div class="admin-results-panel">
+
+      <div class="admin-results-head">
+
+        <div>
+          <h3>Results / Winners</h3>
+
+          <div class="admin-sub">
+            Select the actual winner and optional favorite/projection.
+          </div>
+        </div>
+
+      </div>
+
+      ${
+        nominees.length
+          ? `
+            <div class="admin-control-grid">
+
+              <label class="admin-field">
+                <span>Winner Nominee</span>
+
+                <select id="resultWinner_${categoryId}">
+                  <option value="">Not selected</option>
+                  ${nomineeOptions}
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>Favorite Nominee</span>
+
+                <select id="resultFavorite_${categoryId}">
+                  <option value="">Not selected</option>
+                  ${favoriteOptions}
+                </select>
+              </label>
+
+            </div>
+
+            <div class="admin-card-actions">
+
+              <button
+                class="admin-small-button"
+                onclick="adminSetupSaveResults('${gameId}', '${categoryId}')"
+              >
+                Save Results
+              </button>
+
+              <button
+                class="admin-danger-button"
+                onclick="adminSetupClearResults('${gameId}', '${categoryId}')"
+              >
+                Clear Results
+              </button>
+
+            </div>
+          `
+          : `
+            <div class="admin-sub">
+              Add nominees before setting results.
+            </div>
+          `
+      }
+
+      <div
+        id="resultMessage_${categoryId}"
+        class="admin-message"
+      ></div>
 
     </div>
   `;
@@ -1408,6 +1589,192 @@ async function adminSetupArchiveNominee(
     return;
 
   }
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   SAVE RESULTS / WINNERS
+====================== */
+
+async function adminSetupSaveResults(
+  gameId,
+  categoryId
+) {
+
+  const winnerInput =
+    document.getElementById(
+      "resultWinner_" + categoryId
+    );
+
+  const favoriteInput =
+    document.getElementById(
+      "resultFavorite_" + categoryId
+    );
+
+  const winnerNomineeId =
+    winnerInput
+      ? winnerInput.value.trim()
+      : "";
+
+  const favoriteNomineeId =
+    favoriteInput
+      ? favoriteInput.value.trim()
+      : "";
+
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Saving results...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateCategory({
+      gameId: gameId,
+      categoryId: categoryId,
+      winnerNomineeId: winnerNomineeId,
+      favoriteNomineeId: favoriteNomineeId
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "resultMessage_" + categoryId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not save results.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Results saved. Refreshing scoring...",
+    false
+  );
+
+  await apiAdminRefreshResultsCaches(
+    gameId
+  );
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   CLEAR RESULTS / WINNERS
+====================== */
+
+async function adminSetupClearResults(
+  gameId,
+  categoryId
+) {
+
+  const ok =
+    confirm(
+      "Clear winner and favorite for this category?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Clearing results...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateCategory({
+      gameId: gameId,
+      categoryId: categoryId,
+      winnerNomineeId: "",
+      favoriteNomineeId: ""
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      "resultMessage_" + categoryId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not clear results.",
+      true
+    );
+
+    return;
+
+  }
+
+    await apiAdminRefreshResultsCaches(
+       gameId
+    );
+
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
+}
+
+/* ======================
+   FINALIZE / REOPEN RESULTS
+====================== */
+
+async function adminSetupFinalizeResults(
+  gameId,
+  finalized
+) {
+
+  const ok =
+    confirm(
+      finalized
+        ? "Mark results finalized for this game?"
+        : "Reopen results for this game?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  const res =
+    await apiAdminSetResultsFinalized(
+      gameId,
+      finalized
+    );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    alert(
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not update results finalized state."
+    );
+
+    return;
+
+  }
+
+  await apiAdminRefreshResultsCaches(
+      gameId
+  );
 
   navigate(
     "admin-game-setup:" + gameId

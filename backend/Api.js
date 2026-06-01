@@ -25,7 +25,8 @@ function doGet(e) {
       "adminUpdateNominee",
       "adminArchiveNominee",
 
-      "adminRunGamePreflight"
+      "adminRunGamePreflight",
+      "adminRefreshResultsCaches"
     ];
     
     const isAdminGameAction =
@@ -105,6 +106,16 @@ if (action === "adminRunGamePreflight") {
 
   return json(
     adminRunGamePreflight(
+      e.parameter
+    )
+  );
+
+}
+
+if (action === "adminRefreshResultsCaches") {
+
+  return json(
+    adminRefreshResultsCaches(
       e.parameter
     )
   );

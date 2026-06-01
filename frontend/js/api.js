@@ -459,3 +459,34 @@ async function apiAdminRunGamePreflight(gameId) {
   );
 
 }
+
+/* ======================
+   ADMIN: RESULTS
+====================== */
+
+async function apiAdminSetResultsFinalized(
+  gameId,
+  finalized
+) {
+
+  return apiAdminUpdateGame({
+    gameId: gameId,
+    resultsFinalized: finalized
+  });
+
+}
+
+/* ======================
+   ADMIN: RESULTS REFRESH
+====================== */
+
+async function apiAdminRefreshResultsCaches(gameId) {
+
+  return api(
+    "adminRefreshResultsCaches",
+    {
+      gameId: gameId
+    }
+  );
+
+}
