@@ -107,6 +107,23 @@ async function renderAdminPage() {
 
         </div>
 
+        <div class="card admin-card">
+
+         <h2>Manage Games</h2>
+
+         <div class="admin-sub">
+            Create draft games, clone previous games, archive games, and open game setup.
+         </div>
+
+         <button
+            class="button admin-button"
+            onclick="navigate('admin-games')"
+         >
+             Open Manage Games
+         </button>
+
+        </div>
+
         <div class="card">
 
           <h2>Category Controls</h2>

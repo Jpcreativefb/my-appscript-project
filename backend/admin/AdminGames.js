@@ -642,6 +642,32 @@ function adminNormalizeGameId_(value) {
         );
   
       }
+
+      if ("resultsFinalized" in payload) {
+
+  adminSetIfColumnExists_(
+    row,
+    col,
+    "resultsFinalized",
+    adminToBoolean_(
+      payload.resultsFinalized
+    )
+  );
+
+}
+
+if ("votingLocked" in payload) {
+
+  adminSetIfColumnExists_(
+    row,
+    col,
+    "votingLocked",
+    adminToBoolean_(
+      payload.votingLocked
+    )
+  );
+
+}
   
       if ("defaultGame" in payload) {
   

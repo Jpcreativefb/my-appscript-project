@@ -69,7 +69,15 @@ return {
     headers.indexOf("Status"),
 
   lockAllPicks:
-    headers.indexOf("LockAllPicks")
+    headers.indexOf("LockAllPicks") !== -1
+      ? headers.indexOf("LockAllPicks")
+      : headers.indexOf("VotingLocked"),
+
+  votingLocked:
+    headers.indexOf("VotingLocked"),
+
+  resultsFinalized:
+    headers.indexOf("ResultsFinalized")
 };
 
 }
@@ -220,6 +228,16 @@ games.push({
   lockAllPicks:
     normalizeGameBoolean_(
       row[col.lockAllPicks]
+    ),
+
+  votingLocked:
+    normalizeGameBoolean_(
+     row[col.votingLocked]
+    ),
+
+  resultsFinalized:
+    normalizeGameBoolean_(
+      row[col.resultsFinalized]
     )
 
 });
