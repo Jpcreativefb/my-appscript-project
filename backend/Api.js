@@ -23,7 +23,9 @@ function doGet(e) {
       "adminArchiveCategory",
       "adminCreateNominee",
       "adminUpdateNominee",
-      "adminArchiveNominee"
+      "adminArchiveNominee",
+
+      "adminRunGamePreflight"
     ];
     
     const isAdminGameAction =
@@ -93,6 +95,16 @@ if (action === "adminCloneGameSetup") {
 
   return json(
     adminCloneGameSetup(
+      e.parameter
+    )
+  );
+
+}
+
+if (action === "adminRunGamePreflight") {
+
+  return json(
+    adminRunGamePreflight(
       e.parameter
     )
   );

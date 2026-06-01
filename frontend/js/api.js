@@ -444,3 +444,18 @@ async function apiAdminArchiveNominee(
   );
 
 }
+
+/* ======================
+   ADMIN: PREFLIGHT
+====================== */
+
+async function apiAdminRunGamePreflight(gameId) {
+
+  return api(
+    "adminRunGamePreflight",
+    {
+      gameId: gameId
+    }
+  );
+
+}
