@@ -858,6 +858,83 @@ async function adminArchiveGameConfirm(gameId) {
    PUBLISH ACTIONS
 ====================== */
 
+async function adminRequirePreflightBeforePublish(
+  gameId,
+  actionLabel
+) {
+
+  const target =
+    document.getElementById(
+      "adminPreflightResult_" + gameId
+    );
+
+  if (target) {
+
+    target.innerHTML = `
+      <div class="admin-preflight-card">
+        Running preflight before ${adminGamesEscapeHtml(actionLabel)}...
+      </div>
+    `;
+
+  }
+
+  const res =
+    await apiAdminRunGamePreflight(
+      gameId
+    );
+
+  if (target) {
+
+    target.innerHTML =
+      adminRenderPreflightResult(
+        res
+      );
+
+  }
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    alert(
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not run preflight check."
+    );
+
+    return false;
+
+  }
+
+  if (
+    Number(res.errorCount) > 0
+  ) {
+
+    alert(
+      "This game has preflight errors. Fix them before publishing."
+    );
+
+    return false;
+
+  }
+
+  if (
+    Number(res.warningCount) > 0
+  ) {
+
+    return confirm(
+      "This game has " +
+      res.warningCount +
+      " preflight warning(s). Continue anyway?"
+    );
+
+  }
+
+  return true;
+
+}
+
 function adminPublishMessage(
   gameId,
   message,
@@ -1015,6 +1092,16 @@ async function adminSetGamePreview(gameId) {
 
 async function adminSetGameActive(gameId) {
 
+  const preflightOk =
+    await adminRequirePreflightBeforePublish(
+      gameId,
+      "activation"
+    );
+
+  if (!preflightOk) {
+    return;
+  }
+
   const ok =
     confirm(
       "Activate this game? It will become active with predictions and rankings enabled, but it will not become the default game yet."
@@ -1064,6 +1151,16 @@ async function adminSetGameActive(gameId) {
 }
 
 async function adminSetGameDefault(gameId) {
+
+  const preflightOk =
+    await adminRequirePreflightBeforePublish(
+      gameId,
+      "making default"
+    );
+
+  if (!preflightOk) {
+    return;
+  }
 
   const ok =
     confirm(
