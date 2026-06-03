@@ -1,84 +1,227 @@
 /* =========================
-GAMES ENGINE
+   GAMES ENGINE
+   MULTIGAME PRODUCTION VERSION
 ========================= */
 
-const GAMES_SHEET = "Games";
-const GAMES_CACHE_KEY = "games_v1";
+const GAMES_SHEET =
+  "Games";
+
+const GAMES_CACHE_KEY =
+  "games_v2";
+
+const DEFAULT_GAME_TYPE =
+  "prediction";
 
 /* =========================
-HELPERS
+   SUPPORTED GAME TYPES
+========================= */
+
+function getSupportedGameTypes() {
+
+  return [
+    {
+      id: "prediction",
+      label: "Prediction Game",
+      description: "Users pick one nominee or answer per category.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false
+    },
+    {
+      id: "confidence",
+      label: "Confidence Pool",
+      description: "Users make picks and assign confidence points.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: true,
+      wagerEnabled: false
+    },
+    {
+      id: "wager",
+      label: "Wager / Chips Game",
+      description: "Users make picks and wager chips.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: true
+    },
+    {
+      id: "ranking",
+      label: "Ranking Game",
+      description: "Users rank nominees or answers in order.",
+      predictionEnabled: false,
+      rankingEnabled: true,
+      confidenceEnabled: false,
+      wagerEnabled: false
+    }
+  ];
+
+}
+
+/* =========================
+   SHEET HELPERS
 ========================= */
 
 function getGamesSheet_() {
 
-const sh = SpreadsheetApp
-.getActive()
-.getSheetByName(GAMES_SHEET);
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        GAMES_SHEET
+      );
 
-if (!sh) {
-throw new Error("Games sheet missing");
-}
+  if (!sh) {
 
-return sh;
+    throw new Error(
+      "Games sheet missing"
+    );
+
+  }
+
+  return sh;
 
 }
 
 function normalizeGameValue_(value) {
 
-return String(value || "").trim();
+  return String(value || "")
+    .trim();
+
+}
+
+function normalizeGameId_(value) {
+
+  return String(value || "")
+    .trim();
+
+}
+
+function normalizeGameType_(value) {
+
+  const type =
+    String(value || DEFAULT_GAME_TYPE)
+      .trim()
+      .toLowerCase();
+
+  const allowed =
+    getSupportedGameTypes()
+      .map(t => t.id);
+
+  if (allowed.indexOf(type) === -1) {
+
+    return DEFAULT_GAME_TYPE;
+
+  }
+
+  return type;
 
 }
 
 function normalizeGameBoolean_(value) {
 
-return (
-value === true ||
-String(value).toLowerCase() === "true"
-);
+  return (
+    value === true ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(value || "")
+      .trim() === "1"
+  );
+
+}
+
+function normalizeGameNumber_(value, fallback) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+
+    return fallback;
+
+  }
+
+  const num =
+    Number(value);
+
+  return isNaN(num)
+    ? fallback
+    : num;
 
 }
 
 function getGamesColumnMap_(headers) {
 
-return {
-  gameId: headers.indexOf("GameId"),
-  name: headers.indexOf("Name"),
-  year: headers.indexOf("Year"),
-  type: headers.indexOf("Type"),
-  active: headers.indexOf("Active"),
-  archived: headers.indexOf("Archived"),
+  return {
+    gameId:
+      headers.indexOf("GameId"),
 
-  defaultGame: headers.indexOf("DefaultGame"),
+    name:
+      headers.indexOf("Name"),
 
-  predictionEnabled:
-    headers.indexOf("PredictionEnabled"),
+    year:
+      headers.indexOf("Year"),
 
-  rankingEnabled:
-    headers.indexOf("RankingEnabled"),
+    type:
+      headers.indexOf("Type"),
 
-  themeColor:
-    headers.indexOf("ThemeColor"),
+    active:
+      headers.indexOf("Active"),
 
-  icon:
-    headers.indexOf("Icon"),
+    archived:
+      headers.indexOf("Archived"),
 
-  sortOrder:
-    headers.indexOf("SortOrder"),
+    defaultGame:
+      headers.indexOf("DefaultGame"),
 
-  status:
-    headers.indexOf("Status"),
+    predictionEnabled:
+      headers.indexOf("PredictionEnabled"),
 
-  lockAllPicks:
-    headers.indexOf("LockAllPicks") !== -1
-      ? headers.indexOf("LockAllPicks")
-      : headers.indexOf("VotingLocked"),
+    rankingEnabled:
+      headers.indexOf("RankingEnabled"),
 
-  votingLocked:
-    headers.indexOf("VotingLocked"),
+    confidenceEnabled:
+      headers.indexOf("ConfidenceEnabled"),
 
-  resultsFinalized:
-    headers.indexOf("ResultsFinalized")
-};
+    wagerEnabled:
+      headers.indexOf("WagerEnabled"),
+
+    startingBankroll:
+      headers.indexOf("StartingBankroll"),
+
+    minWager:
+      headers.indexOf("MinWager"),
+
+    maxWager:
+      headers.indexOf("MaxWager"),
+
+    themeColor:
+      headers.indexOf("ThemeColor"),
+
+    icon:
+      headers.indexOf("Icon"),
+
+    sortOrder:
+      headers.indexOf("SortOrder"),
+
+    status:
+      headers.indexOf("Status"),
+
+    lockAllPicks:
+      headers.indexOf("LockAllPicks"),
+
+    showLeaderboard:
+      headers.indexOf("ShowLeaderboard"),
+
+    showResultsBeforeLock:
+      headers.indexOf("ShowResultsBeforeLock")
+  };
 
 }
 
@@ -106,208 +249,438 @@ function validateGamesColumns_(col) {
 
 }
 
-/* =========================
-GET ALL GAMES
-========================= */
+function getGameCell_(row, colIndex, fallback) {
 
-function getGames() {
+  if (colIndex === -1) {
+    return fallback;
+  }
 
-const cache = CacheService.getScriptCache();
+  const value =
+    row[colIndex];
 
-const cached = cache.get(GAMES_CACHE_KEY);
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
 
-if (cached) {
+    return fallback;
 
+  }
 
-try {
-
-  return JSON.parse(cached);
-
-} catch (err) {
-
-  Logger.log("Games cache parse failed");
-
-}
-
-
-}
-
-const sh = getGamesSheet_();
-
-const data = sh.getDataRange().getValues();
-
-if (data.length <= 1) {
-return [];
-}
-
-const headers = data[0];
-
-const col = getGamesColumnMap_(headers);
-
-validateGamesColumns_(col);
-
-const games = [];
-
-for (let i = 1; i < data.length; i++) {
-
-const row = data[i];
-
-const gameId = normalizeGameValue_(
-  row[col.gameId]
-);
-
-if (!gameId) {
-  continue;
-}
-
-games.push({
-
-  gameId:
-    gameId,
-
-  name:
-    normalizeGameValue_(
-      row[col.name]
-    ),
-
-  year:
-    row[col.year]
-      ? Number(row[col.year])
-      : null,
-
-  type:
-    normalizeGameValue_(
-      row[col.type]
-    ),
-
-  active:
-    normalizeGameBoolean_(
-      row[col.active]
-    ),
-
-  archived:
-    normalizeGameBoolean_(
-      row[col.archived]
-    ),
-
-  defaultGame:
-    normalizeGameBoolean_(
-      row[col.defaultGame]
-    ),
-
-  predictionEnabled:
-    normalizeGameBoolean_(
-      row[col.predictionEnabled]
-    ),
-
-  rankingEnabled:
-    normalizeGameBoolean_(
-      row[col.rankingEnabled]
-    ),
-
-  themeColor:
-    normalizeGameValue_(
-      row[col.themeColor]
-    ),
-
-  icon:
-    normalizeGameValue_(
-      row[col.icon]
-    ),
-
-  sortOrder:
-    Number(
-      row[col.sortOrder]
-    ) || 999,
-
-  status:
-    normalizeGameValue_(
-      row[col.status]
-    ),
-
-  lockAllPicks:
-    normalizeGameBoolean_(
-      row[col.lockAllPicks]
-    ),
-
-  votingLocked:
-    normalizeGameBoolean_(
-     row[col.votingLocked]
-    ),
-
-  resultsFinalized:
-    normalizeGameBoolean_(
-      row[col.resultsFinalized]
-    )
-
-});
-
-}
-
-games.sort((a,b)=>
-  a.sortOrder - b.sortOrder
-);
-
-cache.put(
-GAMES_CACHE_KEY,
-JSON.stringify(games),
-300
-);
-
-Logger.log(JSON.stringify(games));
-
-return games;
+  return value;
 
 }
 
 /* =========================
-GET GAME
+   TYPE CONFIG
 ========================= */
 
-function getGame(gameId) {
+function getGameTypeConfig(type) {
 
-  gameId =
-    normalizeGameValue_(gameId);
+  type =
+    normalizeGameType_(
+      type
+    );
+
+  const types =
+    getSupportedGameTypes();
+
+  const config =
+    types.find(t =>
+      t.id === type
+    );
+
+  if (!config) {
+
+    throw new Error(
+      "Unsupported game type: " + type
+    );
+
+  }
+
+  return config;
+
+}
+
+/* =========================
+   BUILD GAME OBJECT
+========================= */
+
+function buildGameObjectFromRow_(
+  row,
+  col
+) {
+
+  const gameId =
+    normalizeGameId_(
+      getGameCell_(
+        row,
+        col.gameId,
+        ""
+      )
+    );
 
   if (!gameId) {
     return null;
   }
 
-  const games = getGames();
+  const type =
+    normalizeGameType_(
+      getGameCell_(
+        row,
+        col.type,
+        DEFAULT_GAME_TYPE
+      )
+    );
 
-  for (let i = 0; i < games.length; i++) {
+  const typeConfig =
+    getGameTypeConfig(
+      type
+    );
 
-    if (games[i].gameId === gameId) {
-      return games[i];
+  const explicitPrediction =
+    col.predictionEnabled !== -1;
+
+  const explicitRanking =
+    col.rankingEnabled !== -1;
+
+  const explicitConfidence =
+    col.confidenceEnabled !== -1;
+
+  const explicitWager =
+    col.wagerEnabled !== -1;
+
+  return {
+    gameId:
+      gameId,
+
+    name:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.name,
+          gameId
+        )
+      ),
+
+    year:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.year,
+          null
+        ),
+        null
+      ),
+
+    type:
+      type,
+
+    typeLabel:
+      typeConfig.label,
+
+    active:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.active,
+          false
+        )
+      ),
+
+    archived:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.archived,
+          false
+        )
+      ),
+
+    defaultGame:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.defaultGame,
+          false
+        )
+      ),
+
+    predictionEnabled:
+      explicitPrediction
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.predictionEnabled,
+              typeConfig.predictionEnabled
+            )
+          )
+        : typeConfig.predictionEnabled,
+
+    rankingEnabled:
+      explicitRanking
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.rankingEnabled,
+              typeConfig.rankingEnabled
+            )
+          )
+        : typeConfig.rankingEnabled,
+
+    confidenceEnabled:
+      explicitConfidence
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.confidenceEnabled,
+              typeConfig.confidenceEnabled
+            )
+          )
+        : typeConfig.confidenceEnabled,
+
+    wagerEnabled:
+      explicitWager
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.wagerEnabled,
+              typeConfig.wagerEnabled
+            )
+          )
+        : typeConfig.wagerEnabled,
+
+    startingBankroll:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.startingBankroll,
+          100
+        ),
+        100
+      ),
+
+    minWager:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.minWager,
+          1
+        ),
+        1
+      ),
+
+    maxWager:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.maxWager,
+          100
+        ),
+        100
+      ),
+
+    themeColor:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.themeColor,
+          ""
+        )
+      ),
+
+    icon:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.icon,
+          ""
+        )
+      ),
+
+    sortOrder:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.sortOrder,
+          999
+        ),
+        999
+      ),
+
+    status:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.status,
+          ""
+        )
+      ),
+
+    lockAllPicks:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.lockAllPicks,
+          false
+        )
+      ),
+
+    showLeaderboard:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.showLeaderboard,
+          true
+        )
+      ),
+
+    showResultsBeforeLock:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.showResultsBeforeLock,
+          false
+        )
+      )
+  };
+
+}
+
+/* =========================
+   GET ALL GAMES
+========================= */
+
+function getGames() {
+
+  const cache =
+    CacheService
+      .getScriptCache();
+
+  const cached =
+    cache.get(
+      GAMES_CACHE_KEY
+    );
+
+  if (cached) {
+
+    try {
+
+      return JSON.parse(
+        cached
+      );
+
+    } catch (err) {
+
+      Logger.log(
+        "Games cache parse failed: " +
+        err.message
+      );
+
     }
 
   }
 
-  return null;
+  const sh =
+    getGamesSheet_();
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (data.length <= 1) {
+    return [];
+  }
+
+  const headers =
+    data[0].map(h =>
+      String(h || "").trim()
+    );
+
+  const col =
+    getGamesColumnMap_(
+      headers
+    );
+
+  validateGamesColumns_(
+    col
+  );
+
+  const games = [];
+
+  for (
+    let i = 1;
+    i < data.length;
+    i++
+  ) {
+
+    const game =
+      buildGameObjectFromRow_(
+        data[i],
+        col
+      );
+
+    if (game) {
+      games.push(game);
+    }
+
+  }
+
+  games.sort((a, b) =>
+    a.sortOrder - b.sortOrder
+  );
+
+  cache.put(
+    GAMES_CACHE_KEY,
+    JSON.stringify(games),
+    300
+  );
+
+  return games;
 
 }
 
 /* =========================
-ACTIVE GAMES
+   GET ONE GAME
+========================= */
+
+function getGame(gameId) {
+
+  gameId =
+    normalizeGameId_(
+      gameId
+    );
+
+  if (!gameId) {
+    return null;
+  }
+
+  const games =
+    getGames();
+
+  return games.find(game =>
+    game.gameId === gameId
+  ) || null;
+
+}
+
+/* =========================
+   ACTIVE GAMES
 ========================= */
 
 function getActiveGames() {
 
-const games = getGames();
-
-return games.filter(function(game){
-
-return (
-game.active === true &&
-game.archived !== true
-);
-
-});
+  return getGames()
+    .filter(game =>
+      game.active === true &&
+      game.archived !== true
+    );
 
 }
 
 /* =========================
-DEFAULT GAME
+   DEFAULT GAME
 ========================= */
 
 function getDefaultGameId() {
@@ -316,32 +689,24 @@ function getDefaultGameId() {
     getGames();
 
   const explicitDefault =
-    games.find(g =>
-
-      g.defaultGame === true &&
-      g.active === true &&
-      g.archived !== true
-
+    games.find(game =>
+      game.defaultGame === true &&
+      game.active === true &&
+      game.archived !== true
     );
 
   if (explicitDefault) {
-
     return explicitDefault.gameId;
-
   }
 
   const activeGame =
-    games.find(g =>
-
-      g.active === true &&
-      g.archived !== true
-
+    games.find(game =>
+      game.active === true &&
+      game.archived !== true
     );
 
   if (activeGame) {
-
     return activeGame.gameId;
-
   }
 
   throw new Error(
@@ -350,43 +715,198 @@ function getDefaultGameId() {
 
 }
 
+function getDefaultGame() {
+
+  return getGame(
+    getDefaultGameId()
+  );
+
+}
+
 /* =========================
-VALIDATE GAME
+   VALIDATE GAME
 ========================= */
 
 function validateGameId(gameId) {
 
-if (!gameId) {
+  gameId =
+    normalizeGameId_(
+      gameId
+    );
 
-throw new Error(
-  "Missing gameId"
-);
+  if (!gameId) {
+
+    throw new Error(
+      "Missing gameId"
+    );
+
+  }
+
+  const game =
+    getGame(
+      gameId
+    );
+
+  if (!game) {
+
+    throw new Error(
+      "Invalid gameId: " + gameId
+    );
+
+  }
+
+  return true;
 
 }
 
-const game = getGame(gameId);
+function validateGameType(type) {
 
-if (!game) {
+  const normalized =
+    normalizeGameType_(
+      type
+    );
 
-throw new Error(
-  "Invalid gameId: " + gameId
-);
+  const allowed =
+    getSupportedGameTypes()
+      .map(t => t.id);
 
+  if (allowed.indexOf(normalized) === -1) {
 
-}
+    throw new Error(
+      "Invalid game type: " + type
+    );
 
-return true;
+  }
+
+  return true;
 
 }
 
 /* =========================
-CACHE
+   FEATURE HELPERS
+========================= */
+
+function gameSupportsFeature(
+  gameId,
+  feature
+) {
+
+  const game =
+    getGame(
+      gameId
+    );
+
+  if (!game) {
+    return false;
+  }
+
+  if (feature === "prediction") {
+    return game.predictionEnabled === true;
+  }
+
+  if (feature === "ranking") {
+    return game.rankingEnabled === true;
+  }
+
+  if (feature === "confidence") {
+    return game.confidenceEnabled === true;
+  }
+
+  if (feature === "wager") {
+    return game.wagerEnabled === true;
+  }
+
+  if (feature === "leaderboard") {
+    return game.showLeaderboard !== false;
+  }
+
+  return false;
+
+}
+
+function getGameRuntimeConfig(gameId) {
+
+  const game =
+    getGame(
+      gameId
+    );
+
+  if (!game) {
+
+    throw new Error(
+      "Invalid gameId: " + gameId
+    );
+
+  }
+
+  return {
+    gameId:
+      game.gameId,
+
+    name:
+      game.name,
+
+    type:
+      game.type,
+
+    typeLabel:
+      game.typeLabel,
+
+    active:
+      game.active,
+
+    archived:
+      game.archived,
+
+    lockAllPicks:
+      game.lockAllPicks,
+
+    predictionEnabled:
+      game.predictionEnabled,
+
+    rankingEnabled:
+      game.rankingEnabled,
+
+    confidenceEnabled:
+      game.confidenceEnabled,
+
+    wagerEnabled:
+      game.wagerEnabled,
+
+    startingBankroll:
+      game.startingBankroll,
+
+    minWager:
+      game.minWager,
+
+    maxWager:
+      game.maxWager,
+
+    showLeaderboard:
+      game.showLeaderboard,
+
+    showResultsBeforeLock:
+      game.showResultsBeforeLock,
+
+    themeColor:
+      game.themeColor,
+
+    icon:
+      game.icon
+  };
+
+}
+
+/* =========================
+   CACHE
 ========================= */
 
 function clearGamesCache() {
 
-CacheService
-.getScriptCache()
-.remove(GAMES_CACHE_KEY);
+  CacheService
+    .getScriptCache()
+    .remove(
+      GAMES_CACHE_KEY
+    );
 
 }

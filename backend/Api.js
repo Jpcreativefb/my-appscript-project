@@ -11,12 +11,15 @@ function doGet(e) {
 
     const adminActions = [
       "adminGetGames",
+      "adminGetGameTypes",
+      "adminGetGameConfig",
+      "adminSaveGame",
       "adminCreateGame",
       "adminUpdateGame",
       "adminArchiveGame",
       "adminCloneGame",
       "adminCloneGameSetup",
-
+    
       "adminGetGameSetup",
       "adminCreateCategory",
       "adminUpdateCategory",
@@ -24,7 +27,7 @@ function doGet(e) {
       "adminCreateNominee",
       "adminUpdateNominee",
       "adminArchiveNominee",
-
+    
       "adminRunGamePreflight",
       "adminRefreshResultsCaches"
     ];
@@ -48,6 +51,35 @@ if (action === "adminGetGames") {
 
   return json(
     adminGetGames()
+  );
+
+}
+
+if (action === "adminGetGameTypes") {
+
+  return json(
+    adminGetGameTypes()
+  );
+
+}
+
+if (action === "adminGetGameConfig") {
+
+  return json({
+    success: true,
+    game: getGameRuntimeConfig(
+      e.parameter.gameId || gameId
+    )
+  });
+
+}
+
+if (action === "adminSaveGame") {
+
+  return json(
+    adminSaveGame(
+      e.parameter
+    )
   );
 
 }
@@ -262,22 +294,25 @@ if (action === "adminArchiveNominee") {
 
       return json(
         savePick({
-
+    
           username:
             e.parameter.username,
-
+    
           categoryId:
             e.parameter.categoryId,
-
+    
           nomineeId:
             e.parameter.nomineeId,
-
+    
+          confidencePoints:
+            e.parameter.confidencePoints,
+    
           gameId:
             gameId
-
+    
         })
       );
-
+    
     }
 
     // =========================

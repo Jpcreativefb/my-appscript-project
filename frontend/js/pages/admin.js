@@ -367,7 +367,653 @@ async function renderAdminPage() {
   `;
 
 }
-  
+
+/* =========================
+   ADMIN GAMES PANEL
+========================= */
+
+async function renderAdminGamesPanel() {
+
+  const res =
+    await apiAdminGetGames();
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    return `
+      <div class="page admin-page">
+        <h1>Manage Games</h1>
+
+        <div class="card admin-card error-card">
+          Could not load games.
+          <div class="admin-sub">
+            ${res && res.error ? escapeHtml_(res.error) : ""}
+          </div>
+        </div>
+      </div>
+    `;
+
+  }
+
+  const games =
+    res.games || [];
+
+  const gameTypes =
+    res.gameTypes || [];
+
+  return `
+    <div class="page admin-page">
+
+      <h1>Manage Games</h1>
+
+      <div class="admin-section">
+
+        <div class="admin-section-header">
+          <div>
+            <h2>Games Panel</h2>
+            <p class="admin-sub">
+              Create and configure prediction, confidence, wager, and ranking games.
+            </p>
+          </div>
+
+          <button
+            class="button admin-button secondary"
+            onclick="navigate('admin')"
+          >
+            Back to Admin
+          </button>
+        </div>
+
+        ${renderAdminGameForm(
+          null,
+          gameTypes
+        )}
+
+        <div class="admin-games-list">
+          ${games.map(game =>
+            renderAdminGameForm(
+              game,
+              gameTypes
+            )
+          ).join("")}
+        </div>
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+function renderAdminGameForm(
+  game,
+  gameTypes
+) {
+
+  const isNew =
+    !game;
+
+    game =
+    game || {
+      gameId: "",
+      name: "",
+      year: "",
+      type: "prediction",
+      active: true,
+      archived: false,
+      defaultGame: false,
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      startingBankroll: 100,
+      minWager: 1,
+      maxWager: 100,
+      themeColor: "",
+      icon: "",
+      sortOrder: 999,
+      status: "",
+      lockAllPicks: false,
+      showLeaderboard: true,
+      showResultsBeforeLock: false,
+      resultsFinalized: false,
+      votingLocked: false
+    };
+
+  return `
+    <form
+      class="card admin-card admin-game-card"
+      onsubmit="adminSaveGameFromForm(event, this)"
+    >
+
+      <div class="admin-card-header">
+        <div>
+          <h3>
+            ${isNew ? "Create New Game" : escapeHtml_(game.name || game.gameId)}
+          </h3>
+          <p class="muted">
+            ${isNew ? "Add a new game shell." : escapeHtml_(game.gameId)}
+          </p>
+        </div>
+
+        <button
+          type="button"
+          class="secondary-btn"
+          onclick="adminToggleGameAdvanced(this)"
+        >
+          Advanced
+        </button>
+      </div>
+
+      <div class="form-grid">
+
+        <label>
+          Game Name
+          <input
+            name="name"
+            value="${escapeHtml_(game.name)}"
+            placeholder="Oscars 2026"
+            required
+          />
+        </label>
+
+        <label>
+          Game ID
+          <input
+            name="gameId"
+            value="${escapeHtml_(game.gameId)}"
+            placeholder="oscars-2026"
+            ${isNew ? "" : "readonly"}
+            required
+          />
+        </label>
+
+        <label>
+          Year
+          <input
+            name="year"
+            type="number"
+            value="${escapeHtml_(game.year || "")}"
+            placeholder="2026"
+          />
+        </label>
+
+        <label>
+          Game Type
+          <select
+            name="type"
+            onchange="adminApplyGameTypeDefaults(this.form)"
+          >
+            ${renderGameTypeOptions_(
+              game.type,
+              gameTypes
+            )}
+          </select>
+        </label>
+
+      </div>
+
+      <div class="admin-checkbox-row">
+
+        ${renderAdminCheckbox_(
+          "active",
+          "Active",
+          game.active
+        )}
+
+        ${renderAdminCheckbox_(
+          "defaultGame",
+          "Default Game",
+          game.defaultGame
+        )}
+
+        ${renderAdminCheckbox_(
+          "archived",
+          "Archived",
+          game.archived
+        )}
+
+        ${renderAdminCheckbox_(
+          "lockAllPicks",
+          "Lock All Picks",
+          game.lockAllPicks
+        )}
+
+      </div>
+
+      <div class="admin-game-advanced hidden">
+
+        <h4>Game Behavior</h4>
+
+        <div class="admin-checkbox-row">
+
+          ${renderAdminCheckbox_(
+            "predictionEnabled",
+            "Prediction Enabled",
+            game.predictionEnabled
+          )}
+
+          ${renderAdminCheckbox_(
+            "rankingEnabled",
+            "Ranking Enabled",
+            game.rankingEnabled
+          )}
+
+          ${renderAdminCheckbox_(
+            "confidenceEnabled",
+            "Confidence Enabled",
+            game.confidenceEnabled
+          )}
+
+          ${renderAdminCheckbox_(
+            "wagerEnabled",
+            "Wager Enabled",
+            game.wagerEnabled
+          )}
+
+          ${renderAdminCheckbox_(
+            "showLeaderboard",
+            "Show Leaderboard",
+            game.showLeaderboard
+          )}
+
+          ${renderAdminCheckbox_(
+            "showResultsBeforeLock",
+            "Show Results Before Lock",
+            game.showResultsBeforeLock
+          )}
+
+          ${renderAdminCheckbox_(
+            "resultsFinalized",
+            "Results Finalized",
+            game.resultsFinalized
+          )}
+          
+          ${renderAdminCheckbox_(
+            "votingLocked",
+            "Voting Locked",
+            game.votingLocked
+          )}
+
+        </div>
+
+        <h4>Wager Settings</h4>
+
+        <div class="form-grid">
+
+          <label>
+            Starting Bankroll
+            <input
+              name="startingBankroll"
+              type="number"
+              value="${escapeHtml_(game.startingBankroll || 100)}"
+            />
+          </label>
+
+          <label>
+            Min Wager
+            <input
+              name="minWager"
+              type="number"
+              value="${escapeHtml_(game.minWager || 1)}"
+            />
+          </label>
+
+          <label>
+            Max Wager
+            <input
+              name="maxWager"
+              type="number"
+              value="${escapeHtml_(game.maxWager || 100)}"
+            />
+          </label>
+
+        </div>
+
+        <h4>Display</h4>
+
+        <div class="form-grid">
+
+          <label>
+            Theme Color
+            <input
+              name="themeColor"
+              value="${escapeHtml_(game.themeColor || "")}"
+              placeholder="#c8a24a"
+            />
+          </label>
+
+          <label>
+            Icon
+            <input
+              name="icon"
+              value="${escapeHtml_(game.icon || "")}"
+              placeholder="🏆"
+            />
+          </label>
+
+          <label>
+            Sort Order
+            <input
+              name="sortOrder"
+              type="number"
+              value="${escapeHtml_(game.sortOrder || 999)}"
+            />
+          </label>
+
+          <label>
+            Status
+            <input
+              name="status"
+              value="${escapeHtml_(game.status || "")}"
+              placeholder="Open, Locked, Complete"
+            />
+          </label>
+
+        </div>
+
+      </div>
+
+      <div class="admin-card-actions">
+        <button type="submit">
+          ${isNew ? "Create Game" : "Save Game"}
+        </button>
+      </div>
+
+    </form>
+  `;
+
+}
+
+function renderGameTypeOptions_(
+  selectedType,
+  gameTypes
+) {
+
+  gameTypes =
+    gameTypes || [];
+
+  if (!gameTypes.length) {
+
+    gameTypes = [
+      {
+        id: "prediction",
+        label: "Prediction Game"
+      },
+      {
+        id: "confidence",
+        label: "Confidence Pool"
+      },
+      {
+        id: "wager",
+        label: "Wager / Chips Game"
+      },
+      {
+        id: "ranking",
+        label: "Ranking Game"
+      }
+    ];
+
+  }
+
+  return gameTypes.map(type => `
+    <option
+      value="${escapeHtml_(type.id)}"
+      ${type.id === selectedType ? "selected" : ""}
+    >
+      ${escapeHtml_(type.label)}
+    </option>
+  `).join("");
+
+}
+
+function renderAdminCheckbox_(
+  name,
+  label,
+  checked
+) {
+
+  return `
+    <label class="admin-checkbox">
+      <input
+        type="checkbox"
+        name="${escapeHtml_(name)}"
+        ${checked ? "checked" : ""}
+      />
+      <span>${escapeHtml_(label)}</span>
+    </label>
+  `;
+
+}
+
+function escapeHtml_(
+  value
+) {
+
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+async function adminSaveGameFromForm(
+  event,
+  form
+) {
+
+  event.preventDefault();
+
+  const game =
+    adminGetGamePayloadFromForm_(
+      form
+    );
+
+  if (!game.gameId) {
+    alert("Game ID is required.");
+    return;
+  }
+
+  if (!game.name) {
+    alert("Game name is required.");
+    return;
+  }
+
+  const res =
+    await apiAdminSaveGame(
+      game
+    );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    alert(
+      "Could not save game: " +
+      (
+        res && res.error
+          ? res.error
+          : res && res.message
+            ? res.message
+            : "Unknown error"
+      )
+    );
+
+    return;
+
+  }
+
+  alert(
+    "Game saved."
+  );
+
+  await navigate(
+    "admin-games"
+  );
+
+}
+
+function adminGetGamePayloadFromForm_(
+  form
+) {
+
+  return {
+    gameId:
+      form.gameId.value.trim(),
+
+    name:
+      form.name.value.trim(),
+
+    year:
+      form.year.value.trim(),
+
+    type:
+      form.type.value,
+
+    active:
+      form.active.checked,
+
+    archived:
+      form.archived.checked,
+
+    defaultGame:
+      form.defaultGame.checked,
+
+    predictionEnabled:
+      form.predictionEnabled.checked,
+
+    rankingEnabled:
+      form.rankingEnabled.checked,
+
+    confidenceEnabled:
+      form.confidenceEnabled.checked,
+
+    wagerEnabled:
+      form.wagerEnabled.checked,
+
+    startingBankroll:
+      form.startingBankroll.value,
+
+    minWager:
+      form.minWager.value,
+
+    maxWager:
+      form.maxWager.value,
+
+    themeColor:
+      form.themeColor.value.trim(),
+
+    icon:
+      form.icon.value.trim(),
+
+    sortOrder:
+      form.sortOrder.value,
+
+    status:
+      form.status.value.trim(),
+
+    lockAllPicks:
+      form.lockAllPicks.checked,
+
+    showLeaderboard:
+      form.showLeaderboard.checked,
+
+      showResultsBeforeLock:
+      form.showResultsBeforeLock.checked,
+    
+    resultsFinalized:
+      form.resultsFinalized
+        ? form.resultsFinalized.checked
+        : false,
+    
+    votingLocked:
+      form.votingLocked
+        ? form.votingLocked.checked
+        : false
+  };
+
+}
+
+
+function adminToggleGameAdvanced(
+  button
+) {
+
+  const card =
+    button.closest(
+      ".admin-game-card"
+    );
+
+  if (!card) {
+    return;
+  }
+
+  const advanced =
+    card.querySelector(
+      ".admin-game-advanced"
+    );
+
+  if (!advanced) {
+    return;
+  }
+
+  advanced.classList.toggle(
+    "hidden"
+  );
+
+}
+
+function adminApplyGameTypeDefaults(
+  form
+) {
+
+  const type =
+    form.type.value;
+
+  if (type === "prediction") {
+
+    form.predictionEnabled.checked = true;
+    form.rankingEnabled.checked = false;
+    form.confidenceEnabled.checked = false;
+    form.wagerEnabled.checked = false;
+
+  }
+
+  if (type === "confidence") {
+
+    form.predictionEnabled.checked = true;
+    form.rankingEnabled.checked = false;
+    form.confidenceEnabled.checked = true;
+    form.wagerEnabled.checked = false;
+
+  }
+
+  if (type === "wager") {
+
+    form.predictionEnabled.checked = true;
+    form.rankingEnabled.checked = false;
+    form.confidenceEnabled.checked = false;
+    form.wagerEnabled.checked = true;
+
+  }
+
+  if (type === "ranking") {
+
+    form.predictionEnabled.checked = false;
+    form.rankingEnabled.checked = true;
+    form.confidenceEnabled.checked = false;
+    form.wagerEnabled.checked = false;
+
+  }
+
+}
+
+
   async function adminClearCaches() {
   
     const message =

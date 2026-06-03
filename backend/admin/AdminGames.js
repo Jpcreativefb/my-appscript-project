@@ -24,13 +24,42 @@ function adminNormalizeGameId_(value) {
   }
   
   function adminToBoolean_(value) {
-  
+
     return (
       value === true ||
-      String(value)
+      String(value || "")
         .trim()
-        .toLowerCase() === "true"
+        .toLowerCase() === "true" ||
+      String(value || "")
+        .trim()
+        .toLowerCase() === "yes" ||
+      String(value || "")
+        .trim() === "1"
     );
+  
+  }
+
+  function adminToNumber_(
+    value,
+    fallback
+  ) {
+  
+    if (
+      value === "" ||
+      value === null ||
+      value === undefined
+    ) {
+  
+      return fallback;
+  
+    }
+  
+    const num =
+      Number(value);
+  
+    return isNaN(num)
+      ? fallback
+      : num;
   
   }
   
@@ -133,6 +162,25 @@ function adminNormalizeGameId_(value) {
   
     }
   
+    const type =
+      typeof normalizeGameType_ === "function"
+        ? normalizeGameType_(
+            payload.type || "prediction"
+          )
+        : adminNormalizeValue_(
+            payload.type || "prediction"
+          );
+  
+    const typeConfig =
+      typeof getGameTypeConfig === "function"
+        ? getGameTypeConfig(type)
+        : {
+            predictionEnabled: true,
+            rankingEnabled: false,
+            confidenceEnabled: false,
+            wagerEnabled: false
+          };
+  
     adminSetIfColumnExists_(
       row,
       col,
@@ -151,18 +199,17 @@ function adminNormalizeGameId_(value) {
       row,
       col,
       "year",
-      payload.year
-        ? Number(payload.year)
-        : ""
+      adminToNumber_(
+        payload.year,
+        ""
+      )
     );
   
     adminSetIfColumnExists_(
       row,
       col,
       "type",
-      adminNormalizeValue_(
-        payload.type
-      )
+      type
     );
   
     adminSetIfColumnExists_(
@@ -196,17 +243,73 @@ function adminNormalizeGameId_(value) {
       row,
       col,
       "predictionEnabled",
-      adminToBoolean_(
-        payload.predictionEnabled
-      )
+      payload.predictionEnabled === undefined
+        ? typeConfig.predictionEnabled
+        : adminToBoolean_(
+            payload.predictionEnabled
+          )
     );
   
     adminSetIfColumnExists_(
       row,
       col,
       "rankingEnabled",
-      adminToBoolean_(
-        payload.rankingEnabled
+      payload.rankingEnabled === undefined
+        ? typeConfig.rankingEnabled
+        : adminToBoolean_(
+            payload.rankingEnabled
+          )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "confidenceEnabled",
+      payload.confidenceEnabled === undefined
+        ? typeConfig.confidenceEnabled
+        : adminToBoolean_(
+            payload.confidenceEnabled
+          )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "wagerEnabled",
+      payload.wagerEnabled === undefined
+        ? typeConfig.wagerEnabled
+        : adminToBoolean_(
+            payload.wagerEnabled
+          )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "startingBankroll",
+      adminToNumber_(
+        payload.startingBankroll,
+        100
+      )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "minWager",
+      adminToNumber_(
+        payload.minWager,
+        1
+      )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "maxWager",
+      adminToNumber_(
+        payload.maxWager,
+        100
       )
     );
   
@@ -232,9 +335,10 @@ function adminNormalizeGameId_(value) {
       row,
       col,
       "sortOrder",
-      payload.sortOrder
-        ? Number(payload.sortOrder)
-        : 999
+      adminToNumber_(
+        payload.sortOrder,
+        999
+      )
     );
   
     adminSetIfColumnExists_(
@@ -252,6 +356,44 @@ function adminNormalizeGameId_(value) {
       "lockAllPicks",
       adminToBoolean_(
         payload.lockAllPicks
+      )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "showLeaderboard",
+      payload.showLeaderboard === undefined
+        ? true
+        : adminToBoolean_(
+            payload.showLeaderboard
+          )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "showResultsBeforeLock",
+      adminToBoolean_(
+        payload.showResultsBeforeLock
+      )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "resultsFinalized",
+      adminToBoolean_(
+        payload.resultsFinalized
+      )
+    );
+  
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "votingLocked",
+      adminToBoolean_(
+        payload.votingLocked
       )
     );
   
@@ -278,18 +420,38 @@ function adminNormalizeGameId_(value) {
   
   }
   
-  /* =========================================================
-     GET ADMIN GAMES
-  ========================================================= */
-  
-  function adminGetGames() {
-  
-    return {
-      success: true,
-      games: getGames()
-    };
-  
-  }
+ /* =========================================================
+   GET ADMIN GAMES
+========================================================= */
+
+function adminGetGames() {
+
+  return {
+    success: true,
+    games: getGames(),
+    gameTypes:
+      typeof getSupportedGameTypes === "function"
+        ? getSupportedGameTypes()
+        : []
+  };
+
+}
+
+/* =========================================================
+   GET ADMIN GAME TYPES
+========================================================= */
+
+function adminGetGameTypes() {
+
+  return {
+    success: true,
+    gameTypes:
+      typeof getSupportedGameTypes === "function"
+        ? getSupportedGameTypes()
+        : []
+  };
+
+}
   
   /* =========================================================
      CREATE GAME
@@ -418,6 +580,110 @@ function adminNormalizeGameId_(value) {
     }
   
   }
+
+  /* =========================================================
+   SAVE GAME
+   Creates if missing, updates if existing.
+========================================================= */
+
+function adminSaveGame(payload) {
+
+  if (!payload) {
+
+    return {
+      success: false,
+      error: "Game payload missing"
+    };
+
+  }
+
+  const gameId =
+    adminNormalizeGameId_(
+      payload.gameId
+    );
+
+  if (!gameId) {
+
+    return {
+      success: false,
+      error: "GameId is required"
+    };
+
+  }
+
+  try {
+
+    const sh =
+      getGamesSheet_();
+
+    const data =
+      sh.getDataRange()
+        .getValues();
+
+    const headers =
+      adminGetGamesHeaders_();
+
+    const col =
+      getGamesColumnMap_(
+        headers
+      );
+
+    validateGamesColumns_(
+      col
+    );
+
+    const rowIndex =
+      adminFindGameRow_(
+        data,
+        col,
+        gameId
+      );
+
+    const result =
+      rowIndex === -1
+        ? adminCreateGame(
+            Object.assign(
+              {},
+              payload,
+              {
+                gameId: gameId
+              }
+            )
+          )
+        : adminUpdateGame(
+            Object.assign(
+              {},
+              payload,
+              {
+                gameId: gameId
+              }
+            )
+          );
+
+    return {
+      success: true,
+      message:
+        rowIndex === -1
+          ? "Game created"
+          : "Game updated",
+      gameId: gameId,
+      game:
+        typeof getGame === "function"
+          ? getGame(gameId)
+          : null,
+      result: result
+    };
+
+  } catch (err) {
+
+    return {
+      success: false,
+      error: err.message
+    };
+
+  }
+
+}
   
   /* =========================================================
      UPDATE GAME
@@ -579,6 +845,74 @@ function adminNormalizeGameId_(value) {
         );
   
       }
+
+      if ("confidenceEnabled" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "confidenceEnabled",
+          adminToBoolean_(
+            payload.confidenceEnabled
+          )
+        );
+      
+      }
+      
+      if ("wagerEnabled" in payload) {
+      
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "wagerEnabled",
+          adminToBoolean_(
+            payload.wagerEnabled
+          )
+        );
+      
+      }
+      
+      if ("startingBankroll" in payload) {
+      
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "startingBankroll",
+          adminToNumber_(
+            payload.startingBankroll,
+            100
+          )
+        );
+      
+      }
+      
+      if ("minWager" in payload) {
+      
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "minWager",
+          adminToNumber_(
+            payload.minWager,
+            1
+          )
+        );
+      
+      }
+      
+      if ("maxWager" in payload) {
+      
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "maxWager",
+          adminToNumber_(
+            payload.maxWager,
+            100
+          )
+        );
+      
+      }
   
       if ("themeColor" in payload) {
   
@@ -642,6 +976,33 @@ function adminNormalizeGameId_(value) {
         );
   
       }
+
+      if ("showLeaderboard" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "showLeaderboard",
+          adminToBoolean_(
+            payload.showLeaderboard
+          )
+        );
+      
+      }
+      
+      if ("showResultsBeforeLock" in payload) {
+      
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "showResultsBeforeLock",
+          adminToBoolean_(
+            payload.showResultsBeforeLock
+          )
+        );
+      
+      }
+
 
       if ("resultsFinalized" in payload) {
 
@@ -1329,9 +1690,30 @@ function adminCloneGame(payload) {
       false,
 
     predictionEnabled:
-      false,
-
+      sourceGame.predictionEnabled === true,
+    
     rankingEnabled:
+      sourceGame.rankingEnabled === true,
+    
+    confidenceEnabled:
+      sourceGame.confidenceEnabled === true,
+    
+    wagerEnabled:
+      sourceGame.wagerEnabled === true,
+    
+    startingBankroll:
+      sourceGame.startingBankroll || 100,
+    
+    minWager:
+      sourceGame.minWager || 1,
+    
+    maxWager:
+      sourceGame.maxWager || 100,
+    
+    showLeaderboard:
+      sourceGame.showLeaderboard !== false,
+    
+    showResultsBeforeLock:
       false,
 
     themeColor:

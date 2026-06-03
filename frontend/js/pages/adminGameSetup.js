@@ -1,44 +1,110 @@
 /* ======================
    ADMIN GAME SETUP PAGE
 ====================== */
+let adminSetupCategoryIdTouched = false;
+let adminSetupNomineeIdTouched = false;
+let adminSetupShortAnswerTouched = false;
 
 function adminSetupEscapeHtml(value) {
-
   return String(value || "")
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
-
 }
 
 function adminSetupSlugify(value) {
-
   return String(value || "")
     .toLowerCase()
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "");
+}
+
+function adminSetupAutoFillCategoryId() {
+
+  const nameInput =
+    document.getElementById(
+      "setupNewCategoryName"
+    );
+
+  const idInput =
+    document.getElementById(
+      "setupNewCategoryId"
+    );
+
+  if (
+    !nameInput ||
+    !idInput ||
+    adminSetupCategoryIdTouched
+  ) {
+    return;
+  }
+
+  idInput.value =
+    adminSetupSlugify(
+      nameInput.value
+    );
+
+}
+
+function adminSetupAutoFillNomineeFields() {
+
+  const nomineeInput =
+    document.getElementById(
+      "setupNewNomineeName"
+    );
+
+  const nomineeIdInput =
+    document.getElementById(
+      "setupNewNomineeId"
+    );
+
+  const shortAnswerInput =
+    document.getElementById(
+      "setupNewNomineeShortAnswer"
+    );
+
+  if (!nomineeInput) {
+    return;
+  }
+
+  const nomineeName =
+    nomineeInput.value.trim();
+
+  if (
+    nomineeIdInput &&
+    !adminSetupNomineeIdTouched
+  ) {
+
+    nomineeIdInput.value =
+      adminSetupSlugify(
+        nomineeName
+      );
+
+  }
+
+  if (
+    shortAnswerInput &&
+    !adminSetupShortAnswerTouched
+  ) {
+
+    shortAnswerInput.value =
+      nomineeName;
+
+  }
 
 }
 
 function adminSetupBoolText(value) {
-
-  return value
-    ? "Yes"
-    : "No";
-
+  return value ? "Yes" : "No";
 }
 
 async function renderAdminGameSetupPage(gameId) {
-
-  const safeGameId =
-    String(gameId || "")
-      .trim();
+  const safeGameId = String(gameId || "").trim();
 
   if (!safeGameId) {
-
     return `
       <div class="page admin-page">
         <h1>Game Setup</h1>
@@ -48,19 +114,11 @@ async function renderAdminGameSetupPage(gameId) {
         </div>
       </div>
     `;
-
   }
 
-  const res =
-    await apiAdminGetGameSetup(
-      safeGameId
-    );
+  const res = await apiAdminGetGameSetup(safeGameId);
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     return `
       <div class="page admin-page">
         <h1>Game Setup</h1>
@@ -83,13 +141,9 @@ async function renderAdminGameSetupPage(gameId) {
         </button>
       </div>
     `;
-
   }
 
-  const categories =
-    Array.isArray(res.categories)
-      ? res.categories
-      : [];
+  const categories = Array.isArray(res.categories) ? res.categories : [];
 
   return `
     <div class="page admin-page admin-game-setup-page">
@@ -108,14 +162,18 @@ async function renderAdminGameSetupPage(gameId) {
 
           <button
             class="admin-small-button"
-            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(safeGameId)}', true)"
+            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(
+              safeGameId
+            )}', true)"
           >
             Mark Results Finalized
           </button>
 
           <button
             class="admin-small-button secondary"
-            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(safeGameId)}', false)"
+            onclick="adminSetupFinalizeResults('${adminSetupEscapeHtml(
+              safeGameId
+            )}', false)"
           >
             Reopen Results
           </button>
@@ -135,44 +193,68 @@ async function renderAdminGameSetupPage(gameId) {
 
         ${renderAdminSetupAddCategoryCard(safeGameId)}
 
-        ${renderAdminSetupAddNomineeCard(
-          safeGameId,
-          categories
-        )}
+        ${renderAdminSetupAddNomineeCard(safeGameId, categories)}
 
-        <div class="card admin-card">
+        <details
+  class="card admin-card admin-collapsible-card"
+  open
+>
 
-          <h2>Categories / Questions</h2>
+  <summary class="admin-card-summary">
 
-          <div
-            id="adminSetupMessage"
-            class="admin-message"
-          ></div>
+    <div>
+      <h2>Categories / Questions</h2>
 
-          ${
-            categories.length
-              ? `
-                <div class="admin-list">
-                  ${categories
-                    .map(renderAdminSetupCategoryCard)
-                    .join("")}
-                </div>
-              `
-              : `
-                <div class="admin-sub">
-                  No categories found yet. Add your first category above.
-                </div>
-              `
-          }
+      <div class="admin-sub">
+        ${categories.length} categories/questions configured.
+      </div>
+    </div>
 
-        </div>
+    <span class="admin-collapse-icon">
+      ▾
+    </span>
+
+  </summary>
+
+  <div class="admin-collapsible-body">
+
+    <div
+      id="adminSetupMessage"
+      class="admin-message"
+    ></div>
+
+    ${
+      categories.length
+        ? `
+          <div class="admin-list">
+            ${categories.map(renderAdminSetupCategoryCard).join("")}
+          </div>
+        `
+        : `
+          <div class="admin-sub">
+            No categories found yet. Add your first category above.
+          </div>
+        `
+    }
+
+  </div>
+
+</details>
 
       </div>
 
     </div>
   `;
+}
+
+function adminSetupOpenAttr(defaultOpen) {
+
+  return defaultOpen
+    ? "open"
+    : "";
 
 }
+
 
 /* ======================
    ADD CATEGORY CARD
@@ -181,116 +263,147 @@ async function renderAdminGameSetupPage(gameId) {
 function renderAdminSetupAddCategoryCard(gameId) {
 
   return `
-    <div class="card admin-card">
+    <details
+      class="card admin-card admin-collapsible-card"
+      open
+    >
 
-      <h2>Add Category / Question</h2>
+      <summary class="admin-card-summary">
 
-      <div class="admin-sub">
-        This creates the category settings row first. Nominees can be added after.
+        <div>
+          <h2>Add Category / Question</h2>
+
+          <div class="admin-sub">
+            Enter the category/question name. The ID and section are handled automatically.
+          </div>
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <div class="admin-control-grid">
+
+          <label class="admin-field">
+            <span>Category / Question</span>
+
+            <input
+              type="text"
+              id="setupNewCategoryName"
+              placeholder="Best Picture"
+              oninput="adminSetupAutoFillCategoryId()"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Points</span>
+
+            <input
+              type="number"
+              id="setupNewCategoryPoints"
+              value="1"
+              min="0"
+            >
+          </label>
+
+        </div>
+
+        <details class="admin-advanced-details">
+
+          <summary>
+            Advanced fields
+          </summary>
+
+          <div class="admin-control-grid">
+
+            <label class="admin-field">
+              <span>Category ID</span>
+
+              <input
+                type="text"
+                id="setupNewCategoryId"
+                placeholder="auto-generated"
+                oninput="adminSetupCategoryIdTouched = true"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Section</span>
+
+              <input
+                type="text"
+                id="setupNewCategorySection"
+                placeholder="Main"
+                value="Main"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Display Order</span>
+
+              <input
+                type="number"
+                id="setupNewCategoryDisplayOrder"
+                value="999"
+                min="0"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Layout Type</span>
+
+              <select id="setupNewCategoryLayoutType">
+                <option value="image">Image</option>
+                <option value="text">Text</option>
+              </select>
+            </label>
+
+          </div>
+
+          <label class="admin-check-row">
+            <input
+              type="checkbox"
+              id="setupNewCategoryCountsAsStatue"
+              checked
+            >
+
+            <span>
+              Counts as statue
+            </span>
+          </label>
+
+          <label class="admin-check-row">
+            <input
+              type="checkbox"
+              id="setupNewCategoryLocked"
+            >
+
+            <span>
+              Start locked
+            </span>
+          </label>
+
+        </details>
+
+        <button
+          class="admin-small-button"
+          onclick="adminSetupCreateCategory('${adminSetupEscapeHtml(gameId)}')"
+        >
+          Add Category
+        </button>
+
+        <div
+          id="setupAddCategoryMessage"
+          class="admin-message"
+        ></div>
+
       </div>
 
-      <div class="admin-control-grid">
-
-        <label class="admin-field">
-          <span>Category / Question</span>
-
-          <input
-            type="text"
-            id="setupNewCategoryName"
-            placeholder="Best Picture"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Category ID</span>
-
-          <input
-            type="text"
-            id="setupNewCategoryId"
-            placeholder="best-picture"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Section</span>
-
-          <input
-            type="text"
-            id="setupNewCategorySection"
-            placeholder="Main"
-            value="Main"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Points</span>
-
-          <input
-            type="number"
-            id="setupNewCategoryPoints"
-            value="1"
-            min="0"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Display Order</span>
-
-          <input
-            type="number"
-            id="setupNewCategoryDisplayOrder"
-            value="999"
-            min="0"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Layout Type</span>
-
-          <select id="setupNewCategoryLayoutType">
-            <option value="image">Image</option>
-            <option value="text">Text</option>
-          </select>
-        </label>
-
-      </div>
-
-      <label class="admin-check-row">
-        <input
-          type="checkbox"
-          id="setupNewCategoryCountsAsStatue"
-          checked
-        >
-
-        <span>
-          Counts as statue
-        </span>
-      </label>
-
-      <label class="admin-check-row">
-        <input
-          type="checkbox"
-          id="setupNewCategoryLocked"
-        >
-
-        <span>
-          Start locked
-        </span>
-      </label>
-
-      <button
-        class="admin-small-button"
-        onclick="adminSetupCreateCategory('${adminSetupEscapeHtml(gameId)}')"
-      >
-        Add Category
-      </button>
-
-      <div
-        id="setupAddCategoryMessage"
-        class="admin-message"
-      ></div>
-
-    </div>
+    </details>
   `;
 
 }
@@ -314,100 +427,132 @@ function renderAdminSetupAddNomineeCard(
       .join("");
 
   return `
-    <div class="card admin-card">
+    <details
+      class="card admin-card admin-collapsible-card"
+      open
+    >
 
-      <h2>Add Nominee / Answer</h2>
+      <summary class="admin-card-summary">
 
-      <div class="admin-sub">
-        Add nominees or answer choices to an existing category.
+        <div>
+          <h2>Add Nominee / Answer</h2>
+
+          <div class="admin-sub">
+            Choose a category and enter the nominee/answer. ID and short answer are auto-filled.
+          </div>
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        ${
+          categories.length
+            ? `
+              <div class="admin-control-grid">
+
+                <label class="admin-field">
+                  <span>Category</span>
+
+                  <select id="setupNomineeCategoryId">
+                    ${options}
+                  </select>
+                </label>
+
+                <label class="admin-field">
+                  <span>Nominee / Answer</span>
+
+                  <input
+                    type="text"
+                    id="setupNewNomineeName"
+                    placeholder="Movie Title"
+                    oninput="adminSetupAutoFillNomineeFields()"
+                  >
+                </label>
+
+              </div>
+
+              <details class="admin-advanced-details">
+
+                <summary>
+                  Advanced fields
+                </summary>
+
+                <div class="admin-control-grid">
+
+                  <label class="admin-field">
+                    <span>Nominee ID</span>
+
+                    <input
+                      type="text"
+                      id="setupNewNomineeId"
+                      placeholder="auto-generated"
+                      oninput="adminSetupNomineeIdTouched = true"
+                    >
+                  </label>
+
+                  <label class="admin-field">
+                    <span>Short Answer</span>
+
+                    <input
+                      type="text"
+                      id="setupNewNomineeShortAnswer"
+                      placeholder="auto-filled"
+                      oninput="adminSetupShortAnswerTouched = true"
+                    >
+                  </label>
+
+                  <label class="admin-field">
+                    <span>File ID</span>
+
+                    <input
+                      type="text"
+                      id="setupNewNomineeFileId"
+                      placeholder="Optional Google Drive file ID"
+                    >
+                  </label>
+
+                  <label class="admin-field">
+                    <span>Section</span>
+
+                    <input
+                      type="text"
+                      id="setupNewNomineeSection"
+                      placeholder="Main"
+                      value="Main"
+                    >
+                  </label>
+
+                </div>
+
+              </details>
+
+              <button
+                class="admin-small-button"
+                onclick="adminSetupCreateNominee('${adminSetupEscapeHtml(gameId)}')"
+              >
+                Add Nominee
+              </button>
+            `
+            : `
+              <div class="admin-sub">
+                Add a category first before adding nominees.
+              </div>
+            `
+        }
+
+        <div
+          id="setupAddNomineeMessage"
+          class="admin-message"
+        ></div>
+
       </div>
 
-      ${
-        categories.length
-          ? `
-            <div class="admin-control-grid">
-
-              <label class="admin-field">
-                <span>Category</span>
-
-                <select id="setupNomineeCategoryId">
-                  ${options}
-                </select>
-              </label>
-
-              <label class="admin-field">
-                <span>Nominee / Answer</span>
-
-                <input
-                  type="text"
-                  id="setupNewNomineeName"
-                  placeholder="Movie Title"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>Nominee ID</span>
-
-                <input
-                  type="text"
-                  id="setupNewNomineeId"
-                  placeholder="movie-title"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>Short Answer</span>
-
-                <input
-                  type="text"
-                  id="setupNewNomineeShortAnswer"
-                  placeholder="Movie Title"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>File ID</span>
-
-                <input
-                  type="text"
-                  id="setupNewNomineeFileId"
-                  placeholder="Optional Google Drive file ID"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>Section</span>
-
-                <input
-                  type="text"
-                  id="setupNewNomineeSection"
-                  placeholder="Main"
-                  value="Main"
-                >
-              </label>
-
-            </div>
-
-            <button
-              class="admin-small-button"
-              onclick="adminSetupCreateNominee('${adminSetupEscapeHtml(gameId)}')"
-            >
-              Add Nominee
-            </button>
-          `
-          : `
-            <div class="admin-sub">
-              Add a category first before adding nominees.
-            </div>
-          `
-      }
-
-      <div
-        id="setupAddNomineeMessage"
-        class="admin-message"
-      ></div>
-
-    </div>
+    </details>
   `;
 
 }
@@ -417,36 +562,26 @@ function renderAdminSetupAddNomineeCard(
 ====================== */
 
 function renderAdminSetupCategoryCard(category) {
+  const settings = category.settings || {};
 
-  const settings =
-    category.settings || {};
+  const nominees = Array.isArray(category.nominees) ? category.nominees : [];
 
-  const nominees =
-    Array.isArray(category.nominees)
-      ? category.nominees
-      : [];
+  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const gameId =
-    adminSetupEscapeHtml(
-      category.gameId
-    );
-
-  const categoryId =
-    adminSetupEscapeHtml(
-      category.categoryId
-    );
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
 
   return `
-    <div class="admin-category-card">
+  <details
+    class="admin-category-card admin-collapsible-category"
+  >
+
+    <summary class="admin-category-summary">
 
       <div class="admin-category-header">
 
         <div>
           <strong>
-            ${adminSetupEscapeHtml(
-              category.category ||
-              category.categoryId
-            )}
+            ${adminSetupEscapeHtml(category.category || category.categoryId)}
           </strong>
 
           <div class="admin-sub">
@@ -462,9 +597,17 @@ function renderAdminSetupCategoryCard(category) {
           ${settings.locked ? "Locked" : "Open"}
         </div>
 
-      </div>
+        </div>
 
-      <div class="admin-edit-panel">
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+  
+      </summary>
+  
+      <div class="admin-collapsible-body">
+  
+        <div class="admin-edit-panel">
 
         <div class="admin-control-grid">
 
@@ -597,26 +740,31 @@ function renderAdminSetupCategoryCard(category) {
 
       </div>
 
-      ${renderAdminResultsPanel(
-        category,
-        nominees,
-        settings
-      )}
+      ${renderAdminResultsPanel(category, nominees, settings)}
 
-      <div class="admin-setup-nominees">
+      <details class="admin-setup-nominees">
 
+      <summary class="admin-nominee-summary">
+    
         <h3>Nominees / Answers</h3>
-
-        ${
-          nominees.length
-            ? nominees
-              .map(nominee =>
-                renderAdminSetupNomineeRow(
-                  category,
-                  nominee
-                )
-              )
-              .join("")
+    
+        <span class="admin-sub">
+          ${nominees.length} total
+        </span>
+    
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+    
+      </summary>
+    
+      <div class="admin-collapsible-body">
+    
+      ${
+        nominees.length
+          ? nominees
+                .map((nominee) => renderAdminSetupNomineeRow(category, nominee))
+                .join("")
             : `
               <div class="admin-sub">
                 No nominees added yet.
@@ -627,54 +775,31 @@ function renderAdminSetupCategoryCard(category) {
       </div>
 
     </div>
+    </details>
   `;
-
 }
 
 /* ======================
    RESULTS / WINNERS PANEL
 ====================== */
 
-function renderAdminResultsPanel(
-  category,
-  nominees,
-  settings
-) {
+function renderAdminResultsPanel(category, nominees, settings) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const gameId =
-    adminSetupEscapeHtml(
-      category.gameId
-    );
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
 
-  const categoryId =
-    adminSetupEscapeHtml(
-      category.categoryId
-    );
+  const winnerNomineeId = String(settings.winnerNomineeId || "").trim();
 
-  const winnerNomineeId =
-    String(settings.winnerNomineeId || "")
-      .trim();
+  const favoriteNomineeId = String(settings.favoriteNomineeId || "").trim();
 
-  const favoriteNomineeId =
-    String(settings.favoriteNomineeId || "")
-      .trim();
+  const nomineeOptions = nominees
+    .filter((nominee) => nominee.active !== false)
+    .map((nominee) => {
+      const nomineeId = String(nominee.nomineeId || "").trim();
 
-  const nomineeOptions =
-    nominees
-      .filter(nominee =>
-        nominee.active !== false
-      )
-      .map(nominee => {
+      const nomineeName = nominee.nominee || nominee.nomineeId;
 
-        const nomineeId =
-          String(nominee.nomineeId || "")
-            .trim();
-
-        const nomineeName =
-          nominee.nominee ||
-          nominee.nomineeId;
-
-        return `
+      return `
           <option
             value="${adminSetupEscapeHtml(nomineeId)}"
             ${nomineeId === winnerNomineeId ? "selected" : ""}
@@ -682,26 +807,17 @@ function renderAdminResultsPanel(
             ${adminSetupEscapeHtml(nomineeName)}
           </option>
         `;
+    })
+    .join("");
 
-      })
-      .join("");
+  const favoriteOptions = nominees
+    .filter((nominee) => nominee.active !== false)
+    .map((nominee) => {
+      const nomineeId = String(nominee.nomineeId || "").trim();
 
-  const favoriteOptions =
-    nominees
-      .filter(nominee =>
-        nominee.active !== false
-      )
-      .map(nominee => {
+      const nomineeName = nominee.nominee || nominee.nomineeId;
 
-        const nomineeId =
-          String(nominee.nomineeId || "")
-            .trim();
-
-        const nomineeName =
-          nominee.nominee ||
-          nominee.nomineeId;
-
-        return `
+      return `
           <option
             value="${adminSetupEscapeHtml(nomineeId)}"
             ${nomineeId === favoriteNomineeId ? "selected" : ""}
@@ -709,14 +825,15 @@ function renderAdminResultsPanel(
             ${adminSetupEscapeHtml(nomineeName)}
           </option>
         `;
+    })
+    .join("");
 
-      })
-      .join("");
-
-  return `
-    <div class="admin-results-panel">
-
-      <div class="admin-results-head">
+    return `
+    <details class="admin-results-panel">
+  
+      <summary class="admin-results-summary">
+  
+        <div class="admin-results-head">
 
         <div>
           <h3>Results / Winners</h3>
@@ -727,6 +844,16 @@ function renderAdminResultsPanel(
         </div>
 
       </div>
+
+      </div>
+
+      <span class="admin-collapse-icon">
+        ▾
+      </span>
+
+    </summary>
+
+    <div class="admin-collapsible-body">
 
       ${
         nominees.length
@@ -784,79 +911,47 @@ function renderAdminResultsPanel(
       ></div>
 
     </div>
-  `;
 
+    </details>
+  `;
 }
 
 /* ======================
    ACTION HELPERS
 ====================== */
 
-function adminSetupSetMessage(
-  id,
-  message,
-  isError
-) {
-
-  const el =
-    document.getElementById(id);
+function adminSetupSetMessage(id, message, isError) {
+  const el = document.getElementById(id);
 
   if (!el) {
     return;
   }
 
-  el.classList.toggle(
-    "is-error",
-    Boolean(isError)
-  );
+  el.classList.toggle("is-error", Boolean(isError));
 
-  el.innerText =
-    message || "";
-
+  el.innerText = message || "";
 }
 
 function adminSetupGetCategoryNameById(categoryId) {
-
-  const select =
-    document.getElementById(
-      "setupNomineeCategoryId"
-    );
+  const select = document.getElementById("setupNomineeCategoryId");
 
   if (!select) {
     return "";
   }
 
-  const option =
-    Array.from(select.options)
-      .find(opt =>
-        opt.value === categoryId
-      );
+  const option = Array.from(select.options).find(
+    (opt) => opt.value === categoryId
+  );
 
-  return option
-    ? option.textContent.trim()
-    : "";
-
+  return option ? option.textContent.trim() : "";
 }
 
-function renderAdminSetupNomineeRow(
-  category,
-  nominee
-) {
+function renderAdminSetupNomineeRow(category, nominee) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const gameId =
-    adminSetupEscapeHtml(
-      category.gameId
-    );
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
 
-  const categoryId =
-    adminSetupEscapeHtml(
-      category.categoryId
-    );
-
-  const nomineeId =
-    adminSetupEscapeHtml(
-      nominee.nomineeId
-    );
+  const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
 
   return `
     <div class="admin-setup-nominee-edit-row">
@@ -879,7 +974,9 @@ function renderAdminSetupNomineeRow(
           <input
             type="text"
             id="editNomineeShort_${categoryId}_${nomineeId}"
-            value="${adminSetupEscapeHtml(nominee.shortAnswer || nominee.nominee)}"
+            value="${adminSetupEscapeHtml(
+              nominee.shortAnswer || nominee.nominee
+            )}"
           >
         </label>
 
@@ -936,7 +1033,6 @@ function renderAdminSetupNomineeRow(
 
     </div>
   `;
-
 }
 
 /* ======================
@@ -944,64 +1040,33 @@ function renderAdminSetupNomineeRow(
 ====================== */
 
 async function adminSetupCreateCategory(gameId) {
+  const nameInput = document.getElementById("setupNewCategoryName");
 
-  const nameInput =
-    document.getElementById(
-      "setupNewCategoryName"
-    );
+  const idInput = document.getElementById("setupNewCategoryId");
 
-  const idInput =
-    document.getElementById(
-      "setupNewCategoryId"
-    );
+  const sectionInput = document.getElementById("setupNewCategorySection");
 
-  const sectionInput =
-    document.getElementById(
-      "setupNewCategorySection"
-    );
+  const pointsInput = document.getElementById("setupNewCategoryPoints");
 
-  const pointsInput =
-    document.getElementById(
-      "setupNewCategoryPoints"
-    );
+  const displayOrderInput = document.getElementById(
+    "setupNewCategoryDisplayOrder"
+  );
 
-  const displayOrderInput =
-    document.getElementById(
-      "setupNewCategoryDisplayOrder"
-    );
+  const layoutTypeInput = document.getElementById("setupNewCategoryLayoutType");
 
-  const layoutTypeInput =
-    document.getElementById(
-      "setupNewCategoryLayoutType"
-    );
+  const countsAsStatueInput = document.getElementById(
+    "setupNewCategoryCountsAsStatue"
+  );
 
-  const countsAsStatueInput =
-    document.getElementById(
-      "setupNewCategoryCountsAsStatue"
-    );
+  const lockedInput = document.getElementById("setupNewCategoryLocked");
 
-  const lockedInput =
-    document.getElementById(
-      "setupNewCategoryLocked"
-    );
+  const categoryName = nameInput ? nameInput.value.trim() : "";
 
-  const categoryName =
-    nameInput
-      ? nameInput.value.trim()
-      : "";
+  const categoryId = adminSetupSlugify(
+    idInput && idInput.value.trim() ? idInput.value.trim() : categoryName
+  );
 
-  const categoryId =
-    adminSetupSlugify(
-      idInput && idInput.value.trim()
-        ? idInput.value.trim()
-        : categoryName
-    );
-
-  if (
-    !categoryName ||
-    !categoryId
-  ) {
-
+  if (!categoryName || !categoryId) {
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       "Category name is required.",
@@ -1009,51 +1074,23 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
-
   }
 
-  adminSetupSetMessage(
-    "setupAddCategoryMessage",
-    "Adding category...",
-    false
-  );
+  adminSetupSetMessage("setupAddCategoryMessage", "Adding category...", false);
 
-  const res =
-    await apiAdminCreateCategory({
-      gameId: gameId,
-      category: categoryName,
-      categoryId: categoryId,
-      section:
-        sectionInput
-          ? sectionInput.value.trim()
-          : "Main",
-      points:
-        pointsInput
-          ? pointsInput.value
-          : 1,
-      displayOrder:
-        displayOrderInput
-          ? displayOrderInput.value
-          : 999,
-      layoutType:
-        layoutTypeInput
-          ? layoutTypeInput.value
-          : "image",
-      countsAsStatue:
-        countsAsStatueInput
-          ? countsAsStatueInput.checked
-          : true,
-      locked:
-        lockedInput
-          ? lockedInput.checked
-          : false
-    });
+  const res = await apiAdminCreateCategory({
+    gameId: gameId,
+    category: categoryName,
+    categoryId: categoryId,
+    section: sectionInput ? sectionInput.value.trim() : "Main",
+    points: pointsInput ? pointsInput.value : 1,
+    displayOrder: displayOrderInput ? displayOrderInput.value : 999,
+    layoutType: layoutTypeInput ? layoutTypeInput.value : "image",
+    countsAsStatue: countsAsStatueInput ? countsAsStatueInput.checked : true,
+    locked: lockedInput ? lockedInput.checked : false,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       res && (res.message || res.error)
@@ -1063,7 +1100,6 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -1071,11 +1107,12 @@ async function adminSetupCreateCategory(gameId) {
     "Category added.",
     false
   );
-
+  
+  adminSetupCategoryIdTouched = false;
+  
   navigate(
     "admin-game-setup:" + gameId
   );
-
 }
 
 /* ======================
@@ -1083,66 +1120,33 @@ async function adminSetupCreateCategory(gameId) {
 ====================== */
 
 async function adminSetupCreateNominee(gameId) {
+  const categoryInput = document.getElementById("setupNomineeCategoryId");
 
-  const categoryInput =
-    document.getElementById(
-      "setupNomineeCategoryId"
-    );
+  const nomineeInput = document.getElementById("setupNewNomineeName");
 
-  const nomineeInput =
-    document.getElementById(
-      "setupNewNomineeName"
-    );
+  const nomineeIdInput = document.getElementById("setupNewNomineeId");
 
-  const nomineeIdInput =
-    document.getElementById(
-      "setupNewNomineeId"
-    );
+  const shortAnswerInput = document.getElementById(
+    "setupNewNomineeShortAnswer"
+  );
 
-  const shortAnswerInput =
-    document.getElementById(
-      "setupNewNomineeShortAnswer"
-    );
+  const fileIdInput = document.getElementById("setupNewNomineeFileId");
 
-  const fileIdInput =
-    document.getElementById(
-      "setupNewNomineeFileId"
-    );
+  const sectionInput = document.getElementById("setupNewNomineeSection");
 
-  const sectionInput =
-    document.getElementById(
-      "setupNewNomineeSection"
-    );
+  const categoryId = categoryInput ? categoryInput.value.trim() : "";
 
-  const categoryId =
-    categoryInput
-      ? categoryInput.value.trim()
-      : "";
+  const categoryName = adminSetupGetCategoryNameById(categoryId);
 
-  const categoryName =
-    adminSetupGetCategoryNameById(
-      categoryId
-    );
+  const nomineeName = nomineeInput ? nomineeInput.value.trim() : "";
 
-  const nomineeName =
-    nomineeInput
-      ? nomineeInput.value.trim()
-      : "";
+  const nomineeId = adminSetupSlugify(
+    nomineeIdInput && nomineeIdInput.value.trim()
+      ? nomineeIdInput.value.trim()
+      : nomineeName
+  );
 
-  const nomineeId =
-    adminSetupSlugify(
-      nomineeIdInput &&
-      nomineeIdInput.value.trim()
-        ? nomineeIdInput.value.trim()
-        : nomineeName
-    );
-
-  if (
-    !categoryId ||
-    !nomineeName ||
-    !nomineeId
-  ) {
-
+  if (!categoryId || !nomineeName || !nomineeId) {
     adminSetupSetMessage(
       "setupAddNomineeMessage",
       "Category and nominee name are required.",
@@ -1150,43 +1154,26 @@ async function adminSetupCreateNominee(gameId) {
     );
 
     return;
-
   }
 
-  adminSetupSetMessage(
-    "setupAddNomineeMessage",
-    "Adding nominee...",
-    false
-  );
+  adminSetupSetMessage("setupAddNomineeMessage", "Adding nominee...", false);
 
-  const res =
-    await apiAdminCreateNominee({
-      gameId: gameId,
-      categoryId: categoryId,
-      category: categoryName,
-      nominee: nomineeName,
-      nomineeId: nomineeId,
-      shortAnswer:
-        shortAnswerInput &&
-        shortAnswerInput.value.trim()
-          ? shortAnswerInput.value.trim()
-          : nomineeName,
-      fileId:
-        fileIdInput
-          ? fileIdInput.value.trim()
-          : "",
-      section:
-        sectionInput
-          ? sectionInput.value.trim()
-          : "Main",
-      active: true
-    });
+  const res = await apiAdminCreateNominee({
+    gameId: gameId,
+    categoryId: categoryId,
+    category: categoryName,
+    nominee: nomineeName,
+    nomineeId: nomineeId,
+    shortAnswer:
+      shortAnswerInput && shortAnswerInput.value.trim()
+        ? shortAnswerInput.value.trim()
+        : nomineeName,
+    fileId: fileIdInput ? fileIdInput.value.trim() : "",
+    section: sectionInput ? sectionInput.value.trim() : "Main",
+    active: true,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "setupAddNomineeMessage",
       res && (res.message || res.error)
@@ -1196,7 +1183,6 @@ async function adminSetupCreateNominee(gameId) {
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -1204,74 +1190,55 @@ async function adminSetupCreateNominee(gameId) {
     "Nominee added.",
     false
   );
-
+  
+  adminSetupNomineeIdTouched = false;
+  adminSetupShortAnswerTouched = false;
+  
   navigate(
     "admin-game-setup:" + gameId
   );
-
 }
 
 /* ======================
    UPDATE CATEGORY
 ====================== */
 
-async function adminSetupUpdateCategory(
-  gameId,
-  categoryId
-) {
+async function adminSetupUpdateCategory(gameId, categoryId) {
+  const nameInput = document.getElementById("editCategoryName_" + categoryId);
 
-  const nameInput =
-    document.getElementById(
-      "editCategoryName_" + categoryId
-    );
+  const sectionInput = document.getElementById(
+    "editCategorySection_" + categoryId
+  );
 
-  const sectionInput =
-    document.getElementById(
-      "editCategorySection_" + categoryId
-    );
+  const pointsInput = document.getElementById(
+    "editCategoryPoints_" + categoryId
+  );
 
-  const pointsInput =
-    document.getElementById(
-      "editCategoryPoints_" + categoryId
-    );
+  const orderInput = document.getElementById("editCategoryOrder_" + categoryId);
 
-  const orderInput =
-    document.getElementById(
-      "editCategoryOrder_" + categoryId
-    );
+  const layoutInput = document.getElementById(
+    "editCategoryLayout_" + categoryId
+  );
 
-  const layoutInput =
-    document.getElementById(
-      "editCategoryLayout_" + categoryId
-    );
+  const lockedInput = document.getElementById(
+    "editCategoryLocked_" + categoryId
+  );
 
-  const lockedInput =
-    document.getElementById(
-      "editCategoryLocked_" + categoryId
-    );
+  const activeInput = document.getElementById(
+    "editCategoryActive_" + categoryId
+  );
 
-  const activeInput =
-    document.getElementById(
-      "editCategoryActive_" + categoryId
-    );
+  const predictionInput = document.getElementById(
+    "editCategoryPrediction_" + categoryId
+  );
 
-  const predictionInput =
-    document.getElementById(
-      "editCategoryPrediction_" + categoryId
-    );
+  const statueInput = document.getElementById(
+    "editCategoryStatue_" + categoryId
+  );
 
-  const statueInput =
-    document.getElementById(
-      "editCategoryStatue_" + categoryId
-    );
-
-  const categoryName =
-    nameInput
-      ? nameInput.value.trim()
-      : "";
+  const categoryName = nameInput ? nameInput.value.trim() : "";
 
   if (!categoryName) {
-
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       "Category name is required.",
@@ -1279,7 +1246,6 @@ async function adminSetupUpdateCategory(
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -1288,50 +1254,21 @@ async function adminSetupUpdateCategory(
     false
   );
 
-  const res =
-    await apiAdminUpdateCategory({
-      gameId: gameId,
-      categoryId: categoryId,
-      category: categoryName,
-      section:
-        sectionInput
-          ? sectionInput.value.trim()
-          : "",
-      points:
-        pointsInput
-          ? pointsInput.value
-          : 0,
-      displayOrder:
-        orderInput
-          ? orderInput.value
-          : 999,
-      layoutType:
-        layoutInput
-          ? layoutInput.value
-          : "image",
-      locked:
-        lockedInput
-          ? lockedInput.checked
-          : false,
-      active:
-        activeInput
-          ? activeInput.checked
-          : true,
-      predictionGame:
-        predictionInput
-          ? predictionInput.checked
-          : true,
-      countsAsStatue:
-        statueInput
-          ? statueInput.checked
-          : false
-    });
+  const res = await apiAdminUpdateCategory({
+    gameId: gameId,
+    categoryId: categoryId,
+    category: categoryName,
+    section: sectionInput ? sectionInput.value.trim() : "",
+    points: pointsInput ? pointsInput.value : 0,
+    displayOrder: orderInput ? orderInput.value : 999,
+    layoutType: layoutInput ? layoutInput.value : "image",
+    locked: lockedInput ? lockedInput.checked : false,
+    active: activeInput ? activeInput.checked : true,
+    predictionGame: predictionInput ? predictionInput.checked : true,
+    countsAsStatue: statueInput ? statueInput.checked : false,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       res && (res.message || res.error)
@@ -1341,7 +1278,6 @@ async function adminSetupUpdateCategory(
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -1350,25 +1286,17 @@ async function adminSetupUpdateCategory(
     false
   );
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    ARCHIVE CATEGORY
 ====================== */
 
-async function adminSetupArchiveCategory(
-  gameId,
-  categoryId
-) {
-
-  const ok =
-    confirm(
-      "Archive this category? It will be marked inactive and locked."
-    );
+async function adminSetupArchiveCategory(gameId, categoryId) {
+  const ok = confirm(
+    "Archive this category? It will be marked inactive and locked."
+  );
 
   if (!ok) {
     return;
@@ -1380,17 +1308,9 @@ async function adminSetupArchiveCategory(
     false
   );
 
-  const res =
-    await apiAdminArchiveCategory(
-      gameId,
-      categoryId
-    );
+  const res = await apiAdminArchiveCategory(gameId, categoryId);
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       res && (res.message || res.error)
@@ -1400,116 +1320,66 @@ async function adminSetupArchiveCategory(
     );
 
     return;
-
   }
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    UPDATE NOMINEE
 ====================== */
 
-async function adminSetupUpdateNominee(
-  gameId,
-  categoryId,
-  nomineeId
-) {
+async function adminSetupUpdateNominee(gameId, categoryId, nomineeId) {
+  const nameInput = document.getElementById(
+    "editNomineeName_" + categoryId + "_" + nomineeId
+  );
 
-  const nameInput =
-    document.getElementById(
-      "editNomineeName_" +
-      categoryId +
-      "_" +
-      nomineeId
-    );
+  const shortInput = document.getElementById(
+    "editNomineeShort_" + categoryId + "_" + nomineeId
+  );
 
-  const shortInput =
-    document.getElementById(
-      "editNomineeShort_" +
-      categoryId +
-      "_" +
-      nomineeId
-    );
+  const fileIdInput = document.getElementById(
+    "editNomineeFileId_" + categoryId + "_" + nomineeId
+  );
 
-  const fileIdInput =
-    document.getElementById(
-      "editNomineeFileId_" +
-      categoryId +
-      "_" +
-      nomineeId
-    );
+  const activeInput = document.getElementById(
+    "editNomineeActive_" + categoryId + "_" + nomineeId
+  );
 
-  const activeInput =
-    document.getElementById(
-      "editNomineeActive_" +
-      categoryId +
-      "_" +
-      nomineeId
-    );
-
-  const nomineeName =
-    nameInput
-      ? nameInput.value.trim()
-      : "";
+  const nomineeName = nameInput ? nameInput.value.trim() : "";
 
   if (!nomineeName) {
-
     adminSetupSetMessage(
-      "editNomineeMessage_" +
-      categoryId +
-      "_" +
-      nomineeId,
+      "editNomineeMessage_" + categoryId + "_" + nomineeId,
       "Nominee name is required.",
       true
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
-    "editNomineeMessage_" +
-    categoryId +
-    "_" +
-    nomineeId,
+    "editNomineeMessage_" + categoryId + "_" + nomineeId,
     "Saving nominee...",
     false
   );
 
-  const res =
-    await apiAdminUpdateNominee({
-      gameId: gameId,
-      categoryId: categoryId,
-      nomineeId: nomineeId,
-      nominee: nomineeName,
-      shortAnswer:
-        shortInput && shortInput.value.trim()
-          ? shortInput.value.trim()
-          : nomineeName,
-      fileId:
-        fileIdInput
-          ? fileIdInput.value.trim()
-          : "",
-      active:
-        activeInput
-          ? activeInput.checked
-          : true
-    });
+  const res = await apiAdminUpdateNominee({
+    gameId: gameId,
+    categoryId: categoryId,
+    nomineeId: nomineeId,
+    nominee: nomineeName,
+    shortAnswer:
+      shortInput && shortInput.value.trim()
+        ? shortInput.value.trim()
+        : nomineeName,
+    fileId: fileIdInput ? fileIdInput.value.trim() : "",
+    active: activeInput ? activeInput.checked : true,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
-      "editNomineeMessage_" +
-      categoryId +
-      "_" +
-      nomineeId,
+      "editNomineeMessage_" + categoryId + "_" + nomineeId,
       res && (res.message || res.error)
         ? res.message || res.error
         : "Could not save nominee.",
@@ -1517,69 +1387,39 @@ async function adminSetupUpdateNominee(
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
-    "editNomineeMessage_" +
-    categoryId +
-    "_" +
-    nomineeId,
+    "editNomineeMessage_" + categoryId + "_" + nomineeId,
     "Nominee saved.",
     false
   );
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    ARCHIVE NOMINEE
 ====================== */
 
-async function adminSetupArchiveNominee(
-  gameId,
-  categoryId,
-  nomineeId
-) {
-
-  const ok =
-    confirm(
-      "Archive this nominee? It will be marked inactive."
-    );
+async function adminSetupArchiveNominee(gameId, categoryId, nomineeId) {
+  const ok = confirm("Archive this nominee? It will be marked inactive.");
 
   if (!ok) {
     return;
   }
 
   adminSetupSetMessage(
-    "editNomineeMessage_" +
-    categoryId +
-    "_" +
-    nomineeId,
+    "editNomineeMessage_" + categoryId + "_" + nomineeId,
     "Archiving nominee...",
     false
   );
 
-  const res =
-    await apiAdminArchiveNominee(
-      gameId,
-      categoryId,
-      nomineeId
-    );
+  const res = await apiAdminArchiveNominee(gameId, categoryId, nomineeId);
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
-      "editNomineeMessage_" +
-      categoryId +
-      "_" +
-      nomineeId,
+      "editNomineeMessage_" + categoryId + "_" + nomineeId,
       res && (res.message || res.error)
         ? res.message || res.error
         : "Could not archive nominee.",
@@ -1587,43 +1427,23 @@ async function adminSetupArchiveNominee(
     );
 
     return;
-
   }
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    SAVE RESULTS / WINNERS
 ====================== */
 
-async function adminSetupSaveResults(
-  gameId,
-  categoryId
-) {
+async function adminSetupSaveResults(gameId, categoryId) {
+  const winnerInput = document.getElementById("resultWinner_" + categoryId);
 
-  const winnerInput =
-    document.getElementById(
-      "resultWinner_" + categoryId
-    );
+  const favoriteInput = document.getElementById("resultFavorite_" + categoryId);
 
-  const favoriteInput =
-    document.getElementById(
-      "resultFavorite_" + categoryId
-    );
+  const winnerNomineeId = winnerInput ? winnerInput.value.trim() : "";
 
-  const winnerNomineeId =
-    winnerInput
-      ? winnerInput.value.trim()
-      : "";
-
-  const favoriteNomineeId =
-    favoriteInput
-      ? favoriteInput.value.trim()
-      : "";
+  const favoriteNomineeId = favoriteInput ? favoriteInput.value.trim() : "";
 
   adminSetupSetMessage(
     "resultMessage_" + categoryId,
@@ -1631,19 +1451,14 @@ async function adminSetupSaveResults(
     false
   );
 
-  const res =
-    await apiAdminUpdateCategory({
-      gameId: gameId,
-      categoryId: categoryId,
-      winnerNomineeId: winnerNomineeId,
-      favoriteNomineeId: favoriteNomineeId
-    });
+  const res = await apiAdminUpdateCategory({
+    gameId: gameId,
+    categoryId: categoryId,
+    winnerNomineeId: winnerNomineeId,
+    favoriteNomineeId: favoriteNomineeId,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "resultMessage_" + categoryId,
       res && (res.message || res.error)
@@ -1653,7 +1468,6 @@ async function adminSetupSaveResults(
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -1662,29 +1476,17 @@ async function adminSetupSaveResults(
     false
   );
 
-  await apiAdminRefreshResultsCaches(
-    gameId
-  );
+  await apiAdminRefreshResultsCaches(gameId);
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    CLEAR RESULTS / WINNERS
 ====================== */
 
-async function adminSetupClearResults(
-  gameId,
-  categoryId
-) {
-
-  const ok =
-    confirm(
-      "Clear winner and favorite for this category?"
-    );
+async function adminSetupClearResults(gameId, categoryId) {
+  const ok = confirm("Clear winner and favorite for this category?");
 
   if (!ok) {
     return;
@@ -1696,19 +1498,14 @@ async function adminSetupClearResults(
     false
   );
 
-  const res =
-    await apiAdminUpdateCategory({
-      gameId: gameId,
-      categoryId: categoryId,
-      winnerNomineeId: "",
-      favoriteNomineeId: ""
-    });
+  const res = await apiAdminUpdateCategory({
+    gameId: gameId,
+    categoryId: categoryId,
+    winnerNomineeId: "",
+    favoriteNomineeId: "",
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "resultMessage_" + categoryId,
       res && (res.message || res.error)
@@ -1718,50 +1515,31 @@ async function adminSetupClearResults(
     );
 
     return;
-
   }
 
-    await apiAdminRefreshResultsCaches(
-       gameId
-    );
+  await apiAdminRefreshResultsCaches(gameId);
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
    FINALIZE / REOPEN RESULTS
 ====================== */
 
-async function adminSetupFinalizeResults(
-  gameId,
-  finalized
-) {
-
-  const ok =
-    confirm(
-      finalized
-        ? "Mark results finalized for this game?"
-        : "Reopen results for this game?"
-    );
+async function adminSetupFinalizeResults(gameId, finalized) {
+  const ok = confirm(
+    finalized
+      ? "Mark results finalized for this game?"
+      : "Reopen results for this game?"
+  );
 
   if (!ok) {
     return;
   }
 
-  const res =
-    await apiAdminSetResultsFinalized(
-      gameId,
-      finalized
-    );
+  const res = await apiAdminSetResultsFinalized(gameId, finalized);
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     alert(
       res && (res.message || res.error)
         ? res.message || res.error
@@ -1769,15 +1547,9 @@ async function adminSetupFinalizeResults(
     );
 
     return;
-
   }
 
-  await apiAdminRefreshResultsCaches(
-      gameId
-  );
+  await apiAdminRefreshResultsCaches(gameId);
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }

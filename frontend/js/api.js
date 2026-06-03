@@ -313,6 +313,80 @@ async function apiAdminGetGames() {
 
 }
 
+async function apiAdminGetGameTypes() {
+
+  return api(
+    "adminGetGameTypes"
+  );
+
+}
+
+async function apiAdminGetGameConfig(gameId) {
+
+  return api(
+    "adminGetGameConfig",
+    {
+      gameId: gameId || APP_STATE.gameId || ""
+    }
+  );
+
+}
+
+async function apiAdminSaveGame(payload) {
+
+  return api(
+    "adminSaveGame",
+    {
+      gameId: payload.gameId,
+
+      name: payload.name,
+
+      year: payload.year,
+
+      type: payload.type,
+
+      active: payload.active,
+
+      archived: payload.archived,
+
+      defaultGame: payload.defaultGame,
+
+      predictionEnabled: payload.predictionEnabled,
+
+      rankingEnabled: payload.rankingEnabled,
+
+      confidenceEnabled: payload.confidenceEnabled,
+
+      wagerEnabled: payload.wagerEnabled,
+
+      startingBankroll: payload.startingBankroll,
+
+      minWager: payload.minWager,
+
+      maxWager: payload.maxWager,
+
+      themeColor: payload.themeColor,
+
+      icon: payload.icon,
+
+      sortOrder: payload.sortOrder,
+
+      status: payload.status,
+
+      lockAllPicks: payload.lockAllPicks,
+
+      showLeaderboard: payload.showLeaderboard,
+
+      showResultsBeforeLock: payload.showResultsBeforeLock,
+
+      resultsFinalized: payload.resultsFinalized,
+
+      votingLocked: payload.votingLocked
+    }
+  );
+
+}
+
 async function apiAdminCreateGame(payload) {
 
   return api(

@@ -22,6 +22,72 @@ function normalizeScoreGameId_(value){
 
 }
 
+function normalizeScoreNumber_(
+  value,
+  fallback
+) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+
+    return fallback;
+
+  }
+
+  const num =
+    Number(value);
+
+  return isNaN(num)
+    ? fallback
+    : num;
+
+}
+
+function isConfidenceScoringGame_(
+  gameId
+) {
+
+  const game =
+    typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
+  return !!(
+    game &&
+    (
+      game.type === "confidence" ||
+      game.confidenceEnabled === true
+    )
+  );
+
+}
+
+function getScoringBasePoints_(
+  config,
+  pick,
+  isConfidenceGame
+) {
+
+  if (isConfidenceGame) {
+
+    return normalizeScoreNumber_(
+      pick.confidencePoints,
+      0
+    );
+
+  }
+
+  return normalizeScoreNumber_(
+    config.points,
+    0
+  );
+
+}
+
+
 /* =====================================================
    BUILD USER PICKS MAP
 ===================================================== */
@@ -67,7 +133,10 @@ function buildUserPicksMap_(gameId){
       headers.indexOf("ChangeCount"),
 
     originalNomineeId:
-      headers.indexOf("OriginalNomineeId")
+      headers.indexOf("OriginalNomineeId"),
+
+    confidencePoints:
+      headers.indexOf("ConfidencePoints")  
 
   };
 
@@ -115,17 +184,25 @@ function buildUserPicksMap_(gameId){
         normalizeScoreString_(
           row[col.nomineeId]
         ),
-
+    
       originalNomineeId:
         normalizeScoreString_(
           row[col.originalNomineeId]
         ),
-
+    
       changeCount:
         Number(
           row[col.changeCount]
-        ) || 0
-
+        ) || 0,
+    
+      confidencePoints:
+        col.confidencePoints !== -1
+          ? normalizeScoreNumber_(
+              row[col.confidencePoints],
+              0
+            )
+          : 0
+    
     };
 
   }
@@ -156,6 +233,11 @@ function getLeaderboardData(
 
   const projected =
     options.projected === true;
+
+  const isConfidenceGame =
+     isConfidenceScoringGame_(
+       gameId
+     );  
 
   /* =====================================================
      CATEGORY SETTINGS
@@ -201,7 +283,11 @@ function getLeaderboardData(
             picks[categoryId];
 
           const basePoints =
-            Number(config.points) || 0;
+            getScoringBasePoints_(
+              config,
+              pick,
+              isConfidenceGame
+            );
 
           const penalty =
             Number(config.changePenalty) || 0;
@@ -460,11 +546,20 @@ function getUserScoring(
     return {};
   }
 
+  const isConfidenceGame =
+    isConfidenceScoringGame_(
+      gameId
+    );
+
   const settings =
-    getCategorySettings(gameId);
+    getCategorySettings(
+      gameId
+    );
 
   const categories =
-    getCategories(gameId);
+    getCategories(
+      gameId
+    );
 
   const picksData =
     apiGetMyPicks(
@@ -476,19 +571,57 @@ function getUserScoring(
 
   categories.forEach(cat => {
 
+    const categoryId =
+      normalizeScoreString_(
+        cat.id
+      );
+
     const config =
-      settings[cat.id] || {};
+      settings[categoryId] ||
+      settings[cat.id] ||
+      {};
 
     const nomineeId =
-      picksData.picks[cat.id];
+      picksData.picks &&
+      picksData.picks[categoryId]
+        ? picksData.picks[categoryId]
+        : picksData.picks &&
+          picksData.picks[cat.id]
+          ? picksData.picks[cat.id]
+          : "";
 
     const changes =
-      picksData.changeCounts[
-        cat.id
-      ] || 0;
+      picksData.changeCounts &&
+      picksData.changeCounts[categoryId]
+        ? Number(
+            picksData.changeCounts[categoryId]
+          ) || 0
+        : picksData.changeCounts &&
+          picksData.changeCounts[cat.id]
+          ? Number(
+              picksData.changeCounts[cat.id]
+            ) || 0
+          : 0;
+
+    const confidencePoints =
+      picksData.confidencePoints &&
+      picksData.confidencePoints[categoryId]
+        ? Number(
+            picksData.confidencePoints[categoryId]
+          ) || 0
+        : picksData.confidencePoints &&
+          picksData.confidencePoints[cat.id]
+          ? Number(
+              picksData.confidencePoints[cat.id]
+            ) || 0
+          : 0;
 
     const basePoints =
-      Number(config.points) || 0;
+      isConfidenceGame
+        ? confidencePoints
+        : Number(
+            config.points
+          ) || 0;
 
     const penalty =
       Number(
@@ -505,7 +638,7 @@ function getUserScoring(
         0
       );
 
-    scoring[cat.id] = {
+    scoring[categoryId] = {
 
       shortName:
         config.shortName ||
@@ -520,14 +653,26 @@ function getUserScoring(
       basePoints:
         basePoints,
 
+      confidencePoints:
+        isConfidenceGame
+          ? confidencePoints
+          : 0,
+
       finalPointsAvailable:
         finalPoints,
 
       displayPoints:
-        `${finalPoints}/${basePoints}`,
+        isConfidenceGame
+          ? `${finalPoints}/${confidencePoints || 0}`
+          : `${finalPoints}/${basePoints}`,
 
       locked:
-        config.locked === true
+        config.locked === true,
+
+      scoringMode:
+        isConfidenceGame
+          ? "confidence"
+          : "standard"
 
     };
 

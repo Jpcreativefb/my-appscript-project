@@ -384,7 +384,7 @@ async function renderPage(page) {
     case "admin-games":
 
       app.innerHTML =
-        await renderAdminGamesPage();
+        await renderAdminGamesPanel();
 
       break; 
 

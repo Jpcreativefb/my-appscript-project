@@ -1178,3 +1178,180 @@
   }
 
 }
+
+/* ======================
+   ADMIN ADVANCED FIELDS
+====================== */
+
+.admin-advanced-details {
+  margin: 14px 0;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-advanced-details summary {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.78);
+  font-weight: 800;
+  user-select: none;
+}
+
+.admin-advanced-details[open] summary {
+  margin-bottom: 12px;
+}
+
+.admin-advanced-details .admin-field span::after {
+  content: " · advanced";
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.42);
+}
+
+/* ======================
+   ADMIN COLLAPSIBLE SECTIONS
+====================== */
+
+.admin-collapsible-card,
+.admin-collapsible-category,
+.admin-results-panel,
+.admin-setup-nominees {
+  overflow: hidden;
+}
+
+.admin-card-summary,
+.admin-category-summary,
+.admin-results-summary,
+.admin-nominee-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-card-summary::-webkit-details-marker,
+.admin-category-summary::-webkit-details-marker,
+.admin-results-summary::-webkit-details-marker,
+.admin-nominee-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-card-summary h2,
+.admin-nominee-summary h3 {
+  margin: 0;
+}
+
+.admin-collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  color: rgba(255, 255, 255, 0.78);
+
+  font-size: 14px;
+  font-weight: 900;
+
+  transition: transform 0.18s ease;
+}
+
+details[open] > summary .admin-collapse-icon {
+  transform: rotate(180deg);
+}
+
+.admin-collapsible-body {
+  margin-top: 14px;
+}
+
+.admin-category-summary {
+  width: 100%;
+}
+
+.admin-results-summary,
+.admin-nominee-summary {
+  width: 100%;
+}
+
+.admin-results-summary .admin-results-head {
+  margin-bottom: 0;
+}
+
+.admin-nominee-summary {
+  align-items: center;
+}
+
+.admin-nominee-summary h3 {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+.admin-collapsible-category:not([open]) {
+  padding-bottom: 16px;
+}
+
+.admin-games-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.admin-game-card {
+  border-radius: 18px;
+}
+
+.admin-card-header,
+.admin-section-header,
+.admin-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+}
+
+.admin-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 16px;
+}
+
+.admin-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-game-advanced {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.12);
+}
+
+.hidden {
+  display: none !important;
+}

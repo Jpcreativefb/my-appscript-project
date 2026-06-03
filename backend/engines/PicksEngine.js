@@ -18,17 +18,31 @@ function getPicksColumnMap_(headers){
     points: headers.indexOf("Points"),
     original: headers.indexOf("OriginalNomineeId"),
     changes: headers.indexOf("ChangeCount"),
-    lastUpdated: headers.indexOf("LastUpdated")
+    lastUpdated: headers.indexOf("LastUpdated"),
+    confidencePoints: headers.indexOf("ConfidencePoints")
   };
 
 }
 
 function validatePickColumns_(col){
 
+  const required = [
+    "gameId",
+    "timestamp",
+    "username",
+    "category",
+    "nominee",
+    "points",
+    "original",
+    "changes",
+    "lastUpdated"
+  ];
+
   const missing =
-    Object.entries(col)
-      .filter(([k,v]) => v === -1)
-      .map(([k]) => k);
+    required
+      .filter(key =>
+        col[key] === -1
+      );
 
   if (missing.length) {
 
@@ -52,6 +66,69 @@ function normalizeLower_(value){
 
   return normalizeString_(value)
     .toLowerCase();
+
+}
+
+function normalizePickNumber_(
+  value,
+  fallback
+) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+
+    return fallback;
+
+  }
+
+  const num =
+    Number(value);
+
+  return isNaN(num)
+    ? fallback
+    : num;
+
+}
+
+function getPickConfidencePoints_(
+  row,
+  col
+) {
+
+  if (
+    !col ||
+    col.confidencePoints === -1
+  ) {
+    return 0;
+  }
+
+  return normalizePickNumber_(
+    row[col.confidencePoints],
+    0
+  );
+
+}
+
+function normalizeConfidencePoints_(
+  value
+) {
+
+  const points =
+    normalizePickNumber_(
+      value,
+      0
+    );
+
+  if (points < 0) {
+    return 0;
+  }
+
+  return Math.floor(
+    points
+  );
 
 }
 
@@ -279,14 +356,37 @@ function getUserPicks(username, gameId){
     ) {
 
       latest[categoryId] = {
-        categoryId: categoryId,
-        nomineeId: normalizeString_(row[col.nominee]),
-        points: Number(row[col.points]) || 0,
+        categoryId:
+          categoryId,
+      
+        nomineeId:
+          normalizeString_(
+            row[col.nominee]
+          ),
+      
+        points:
+          Number(
+            row[col.points]
+          ) || 0,
+      
+        confidencePoints:
+          getPickConfidencePoints_(
+            row,
+            col
+          ),
+      
         originalNomineeId:
-          normalizeString_(row[col.original]),
+          normalizeString_(
+            row[col.original]
+          ),
+      
         changeCount:
-          Number(row[col.changes]) || 0,
-        timestamp: ts
+          Number(
+            row[col.changes]
+          ) || 0,
+      
+        timestamp:
+          ts
       };
 
     }
@@ -301,7 +401,7 @@ function getUserPicks(username, gameId){
    API GET PICKS
 ========================================================= */
 
-function apiGetMyPicks(username, gameId){
+function apiGetMyPicks(username, gameId) {
 
   try {
 
@@ -313,6 +413,7 @@ function apiGetMyPicks(username, gameId){
         picks: {},
         changeCounts: {},
         originalPicks: {},
+        confidencePoints: {},
         pickMeta: {}
       };
 
@@ -323,14 +424,20 @@ function apiGetMyPicks(username, gameId){
       getDefaultGameId();
 
     const picksData =
-      getUserPicks(username, gameId);
+      getUserPicks(
+        username,
+        gameId
+      );
 
     const settings =
-      getCategorySettings(gameId);
+      getCategorySettings(
+        gameId
+      );
 
     const picks = {};
     const changeCounts = {};
     const originalPicks = {};
+    const confidencePoints = {};
     const pickMeta = {};
 
     picksData.forEach(p => {
@@ -346,6 +453,9 @@ function apiGetMyPicks(username, gameId){
 
       originalPicks[p.categoryId] =
         p.originalNomineeId || "";
+
+      confidencePoints[p.categoryId] =
+        p.confidencePoints || 0;
 
       pickMeta[p.categoryId] =
         buildPickMeta_(
@@ -365,6 +475,7 @@ function apiGetMyPicks(username, gameId){
       picks: picks,
       changeCounts: changeCounts,
       originalPicks: originalPicks,
+      confidencePoints: confidencePoints,
       pickMeta: pickMeta
     };
 
@@ -382,6 +493,7 @@ function apiGetMyPicks(username, gameId){
       picks: {},
       changeCounts: {},
       originalPicks: {},
+      confidencePoints: {},
       pickMeta: {}
     };
 
@@ -492,13 +604,24 @@ function savePick(payload){
     }
 
     const username =
-      normalizeString_(payload.username);
+      normalizeString_(
+        payload.username
+      );
 
     const categoryId =
-      normalizeLower_(payload.categoryId);
+      normalizeLower_(
+        payload.categoryId
+      );
 
     const nomineeId =
-      normalizeLower_(payload.nomineeId);
+      normalizeLower_(
+        payload.nomineeId
+      );
+
+    const confidencePoints =
+      normalizeConfidencePoints_(
+        payload.confidencePoints
+      );
 
     const gameId =
       normalizeString_(
@@ -506,7 +629,27 @@ function savePick(payload){
         getDefaultGameId()
       );
 
-    validateGameId(gameId);
+    validateGameId(
+      gameId
+    );
+
+    const gameConfig =
+      typeof getGameRuntimeConfig === "function"
+        ? getGameRuntimeConfig(
+            gameId
+          )
+        : getGame(
+            gameId
+          );
+
+    const isConfidenceGame =
+      !!(
+        gameConfig &&
+        (
+          gameConfig.type === "confidence" ||
+          gameConfig.confidenceEnabled === true
+        )
+      );
 
     if (
       !username ||
@@ -522,12 +665,26 @@ function savePick(payload){
 
     }
 
+    if (
+      isConfidenceGame &&
+      confidencePoints <= 0
+    ) {
+
+      return {
+        success:false,
+        message:"Confidence points are required for this game"
+      };
+
+    }
+
     /* =========================
        CATEGORY SETTINGS
     ========================= */
 
     const settings =
-      getCategorySettings(gameId);
+      getCategorySettings(
+        gameId
+      );
 
     if (!settings[categoryId]) {
 
@@ -541,7 +698,9 @@ function savePick(payload){
     const categoryConfig =
       settings[categoryId] ||
       settings[
-        normalizeLower_(categoryId)
+        normalizeLower_(
+          categoryId
+        )
       ] ||
       {};
 
@@ -550,12 +709,15 @@ function savePick(payload){
     ========================= */
 
     const categories =
-      getCategories(gameId);
+      getCategories(
+        gameId
+      );
 
     const category =
       categories.find(c =>
-        normalizeLower_(c.id) ===
-        categoryId
+        normalizeLower_(
+          c.id
+        ) === categoryId
       );
 
     if (!category) {
@@ -569,8 +731,9 @@ function savePick(payload){
 
     const nomineeExists =
       category.nominees.some(n =>
-        normalizeLower_(n.id) ===
-        nomineeId
+        normalizeLower_(
+          n.id
+        ) === nomineeId
       );
 
     if (!nomineeExists) {
@@ -583,13 +746,13 @@ function savePick(payload){
     }
 
     /* =========================
-    LOCK CHECK
+       LOCK CHECK
     ========================= */
 
     const isLocked =
       isCategoryConfigLocked_(
         categoryConfig
-    );
+      );
 
     if (isLocked) {
 
@@ -603,8 +766,7 @@ function savePick(payload){
     const MAX_CHANGES =
       getMaxChanges_(
         categoryConfig
-    );
-    
+      );
 
     /* =========================
        PICKS SHEET
@@ -614,55 +776,78 @@ function savePick(payload){
       PicksRepo.getAllPicks();
 
     if (data.length === 0) {
+
       throw new Error(
         "Picks sheet empty"
       );
+
     }
 
-    const headers = data[0];
+    const headers =
+      data[0];
 
     const col =
-      getPicksColumnMap_(headers);
+      getPicksColumnMap_(
+        headers
+      );
 
-    validatePickColumns_(col);
+    validatePickColumns_(
+      col
+    );
 
-    const now = new Date();
+    const now =
+      new Date();
 
     let existingRow = -1;
     let previousNominee = "";
     let originalNominee = nomineeId;
     let changeCount = 0;
+    let previousConfidencePoints = 0;
 
     const userSearch =
-      normalizeLower_(username);
+      normalizeLower_(
+        username
+      );
 
     /* =========================
        FIND EXISTING PICK
     ========================= */
 
-    for (let i = 1; i < data.length; i++) {
+    for (
+      let i = 1;
+      i < data.length;
+      i++
+    ) {
 
-      const row = data[i];
+      const row =
+        data[i];
 
       const rowGameId =
-        normalizeString_(row[col.gameId]);
+        normalizeString_(
+          row[col.gameId]
+        );
 
       if (rowGameId !== gameId) {
         continue;
       }
 
       const rowUser =
-        normalizeLower_(row[col.username]);
+        normalizeLower_(
+          row[col.username]
+        );
 
       const rowCategory =
-        normalizeLower_(row[col.category]);
+        normalizeLower_(
+          row[col.category]
+        );
 
       if (
         rowUser === userSearch &&
         rowCategory === categoryId
       ) {
 
-        existingRow = i + 1;
+        existingRow =
+          i + 1;
 
         previousNominee =
           normalizeLower_(
@@ -677,7 +862,16 @@ function savePick(payload){
           nomineeId;
 
         changeCount =
-          Number(row[col.changes]) || 0;
+          Number(
+            row[col.changes]
+          ) || 0;
+
+        previousConfidencePoints =
+          col.confidencePoints !== -1
+            ? normalizeConfidencePoints_(
+                row[col.confidencePoints]
+              )
+            : 0;
 
         break;
 
@@ -696,29 +890,40 @@ function savePick(payload){
     const isSamePick =
       previousNominee === nomineeId;
 
-      if (isSamePick) {
+    const isConfidenceChange =
+      isConfidenceGame &&
+      previousConfidencePoints !== confidencePoints;
 
-        const meta =
-          buildPickMeta_(
-            categoryId,
-            nomineeId,
-            categoryConfig,
-            changeCount,
-            originalNominee
-          );
-      
-        return {
-          success:true,
-          message:"Pick already saved",
-          gameId:gameId,
-          categoryId:categoryId,
-          nomineeId:nomineeId,
-          originalNomineeId:originalNominee,
-          changeCount:changeCount,
-          pickMeta:meta
-        };
-      
-      }
+    if (
+      isSamePick &&
+      !isConfidenceChange
+    ) {
+
+      const meta =
+        buildPickMeta_(
+          categoryId,
+          nomineeId,
+          categoryConfig,
+          changeCount,
+          originalNominee
+        );
+
+      return {
+        success:true,
+        message:"Pick already saved",
+        gameId:gameId,
+        categoryId:categoryId,
+        nomineeId:nomineeId,
+        confidencePoints:
+          isConfidenceGame
+            ? confidencePoints
+            : 0,
+        originalNomineeId:originalNominee,
+        changeCount:changeCount,
+        pickMeta:meta
+      };
+
+    }
 
     if (
       isChange &&
@@ -740,22 +945,33 @@ function savePick(payload){
 
     if (existingRow > -1) {
 
+      const patch = {
+        [col.nominee + 1]:
+          nomineeId,
+
+        [col.lastUpdated + 1]:
+          now,
+
+        ...(isChange && {
+          [col.changes + 1]:
+            changeCount + 1
+        })
+      };
+
+      if (col.confidencePoints !== -1) {
+
+        patch[col.confidencePoints + 1] =
+          isConfidenceGame
+            ? confidencePoints
+            : 0;
+
+      }
+
       PicksRepo.updatePick(
         existingRow,
-        {
-          [col.nominee + 1]:
-            nomineeId,
-    
-          [col.lastUpdated + 1]:
-            now,
-    
-          ...(isChange && {
-            [col.changes + 1]:
-              changeCount + 1
-          })
-        }
+        patch
       );
-    
+
     }
 
     /* =========================
@@ -765,8 +981,9 @@ function savePick(payload){
     else {
 
       const row =
-        new Array(headers.length)
-          .fill("");
+        new Array(
+          headers.length
+        ).fill("");
 
       row[col.gameId] = gameId;
       row[col.timestamp] = now;
@@ -778,17 +995,41 @@ function savePick(payload){
       row[col.changes] = 0;
       row[col.lastUpdated] = now;
 
-      PicksRepo.insertPick(row);
+      if (col.confidencePoints !== -1) {
+
+        row[col.confidencePoints] =
+          isConfidenceGame
+            ? confidencePoints
+            : 0;
+
+      }
+
+      PicksRepo.insertPick(
+        row
+      );
 
     }
 
     PicksRepo.flush();
 
-    AppCache.clearPicksCaches();
-    
+    if (
+      typeof AppCache !== "undefined" &&
+      AppCache &&
+      typeof AppCache.clearPicksCaches === "function"
+    ) {
+
+      AppCache.clearPicksCaches();
+
+    } else if (
+      typeof clearAppCaches === "function"
+    ) {
+
+      clearAppCaches();
+
+    }
 
     const finalChangeCount =
-       isChange
+      isChange
         ? changeCount + 1
         : changeCount;
 
@@ -806,6 +1047,10 @@ function savePick(payload){
       gameId:gameId,
       categoryId:categoryId,
       nomineeId:nomineeId,
+      confidencePoints:
+        isConfidenceGame
+          ? confidencePoints
+          : 0,
       originalNomineeId:originalNominee,
       changeCount:
         finalChangeCount,
