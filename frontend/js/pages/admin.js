@@ -467,6 +467,7 @@ function renderAdminGameForm(
       predictionEnabled: true,
       rankingEnabled: false,
       confidenceEnabled: false,
+      confidenceScoringMode: "win_only",
       wagerEnabled: false,
       startingBankroll: 100,
       minWager: 1,
@@ -554,6 +555,29 @@ function renderAdminGameForm(
         </label>
 
       </div>
+
+      <div class="form-grid">
+
+  <label>
+    Confidence Scoring
+    <select name="confidenceScoringMode">
+      <option
+        value="win_only"
+        ${game.confidenceScoringMode === "risk_penalty" ? "" : "selected"}
+      >
+        Win only — wrong picks get 0
+      </option>
+
+      <option
+        value="risk_penalty"
+        ${game.confidenceScoringMode === "risk_penalty" ? "selected" : ""}
+      >
+        Risk penalty — wrong picks lose confidence points
+      </option>
+    </select>
+  </label>
+
+</div>
 
       <div class="admin-checkbox-row">
 
@@ -717,9 +741,21 @@ function renderAdminGameForm(
       </div>
 
       <div class="admin-card-actions">
-        <button type="submit">
+
+         <button type="submit">
           ${isNew ? "Create Game" : "Save Game"}
-        </button>
+         </button>
+    
+         ${!isNew ? `
+         <button
+           type="button"
+           class="admin-small-button secondary"
+           onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')"
+         >
+            Categories / Questions / Nominees
+         </button>
+         ` : ""}
+
       </div>
 
     </form>
@@ -892,6 +928,11 @@ function adminGetGamePayloadFromForm_(
 
     confidenceEnabled:
       form.confidenceEnabled.checked,
+
+    confidenceScoringMode:
+      form.confidenceScoringMode
+        ? form.confidenceScoringMode.value
+        : "win_only",  
 
     wagerEnabled:
       form.wagerEnabled.checked,

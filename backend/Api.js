@@ -43,6 +43,21 @@ function doGet(e) {
           : getDefaultGameId()
       );
 
+      // =========================
+// PUBLIC GAMES
+// =========================
+
+if (action === "getActiveGames") {
+
+  return json({
+    success: true,
+    games: getPublicActiveGames(),
+    defaultGameId: getDefaultGameId(),
+    currentGameId: gameId
+  });
+
+}
+
     // =========================
 // ADMIN GAMES
 // =========================

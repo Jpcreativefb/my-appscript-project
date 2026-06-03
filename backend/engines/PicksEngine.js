@@ -132,6 +132,114 @@ function normalizeConfidencePoints_(
 
 }
 
+function hasDuplicateConfidencePoints_(
+  gameId,
+  username,
+  categoryId,
+  confidencePoints
+) {
+
+  confidencePoints =
+    normalizeConfidencePoints_(
+      confidencePoints
+    );
+
+  if (confidencePoints <= 0) {
+    return false;
+  }
+
+  const data =
+    PicksRepo.getAllPicks();
+
+  if (!data || data.length <= 1) {
+    return false;
+  }
+
+  const headers =
+    data[0];
+
+  const col =
+    getPicksColumnMap_(
+      headers
+    );
+
+  if (
+    !col ||
+    col.confidencePoints === -1
+  ) {
+    return false;
+  }
+
+  const targetGameId =
+    normalizeString_(
+      gameId
+    );
+
+  const targetUsername =
+    normalizeLower_(
+      username
+    );
+
+  const targetCategoryId =
+    normalizeLower_(
+      categoryId
+    );
+
+  for (
+    let i = 1;
+    i < data.length;
+    i++
+  ) {
+
+    const row =
+      data[i];
+
+    const rowGameId =
+      normalizeString_(
+        row[col.gameId]
+      );
+
+    if (rowGameId !== targetGameId) {
+      continue;
+    }
+
+    const rowUsername =
+      normalizeLower_(
+        row[col.username]
+      );
+
+    if (rowUsername !== targetUsername) {
+      continue;
+    }
+
+    const rowCategoryId =
+      normalizeLower_(
+        row[col.category]
+      );
+
+    if (rowCategoryId === targetCategoryId) {
+      continue;
+    }
+
+    const rowConfidencePoints =
+      normalizeConfidencePoints_(
+        row[col.confidencePoints]
+      );
+
+    if (
+      rowConfidencePoints === confidencePoints
+    ) {
+
+      return true;
+
+    }
+
+  }
+
+  return false;
+
+}
+
 /* =========================================================
    PICK META HELPERS
 ========================================================= */
@@ -298,6 +406,7 @@ function buildPickMeta_(
   };
 
 }
+
 
 /* =========================================================
    GET USER PICKS
@@ -675,6 +784,28 @@ function savePick(payload){
         message:"Confidence points are required for this game"
       };
 
+    }
+
+    if (
+      isConfidenceGame &&
+      hasDuplicateConfidencePoints_(
+        gameId,
+        username,
+        categoryId,
+        confidencePoints
+      )
+    ) {
+    
+      return {
+        success:false,
+        message:
+          "You already used " +
+          confidencePoints +
+          " confidence point" +
+          (confidencePoints === 1 ? "" : "s") +
+          ". Each confidence number can only be used once."
+      };
+    
     }
 
     /* =========================

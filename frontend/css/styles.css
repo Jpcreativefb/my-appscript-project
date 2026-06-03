@@ -1355,3 +1355,63 @@ details[open] > summary .admin-collapse-icon {
 .hidden {
   display: none !important;
 }
+
+.game-switcher-wrap {
+  margin-top: 6px;
+}
+
+.game-switcher,
+.game-switcher-single {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.game-switcher-label {
+  opacity: 0.75;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.game-switcher select {
+  border: 1px solid rgba(255,255,255,0.18);
+  border-radius: 999px;
+  padding: 6px 28px 6px 10px;
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+  font: inherit;
+}
+
+.game-switcher-single strong {
+  font-weight: 700;
+}
+
+.confidence-control {
+  margin: 12px 0 14px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+}
+
+.confidence-control label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.confidence-control span {
+  font-size: 0.85rem;
+  opacity: 0.82;
+}
+
+.confidence-control select {
+  min-width: 130px;
+  border-radius: 999px;
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+}

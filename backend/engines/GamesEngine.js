@@ -119,6 +119,25 @@ function normalizeGameType_(value) {
 
 }
 
+function normalizeConfidenceScoringMode_(value) {
+
+  const mode =
+    String(value || "win_only")
+      .trim()
+      .toLowerCase();
+
+  if (
+    mode === "risk_penalty" ||
+    mode === "penalty" ||
+    mode === "negative"
+  ) {
+    return "risk_penalty";
+  }
+
+  return "win_only";
+
+}
+
 function normalizeGameBoolean_(value) {
 
   return (
@@ -188,6 +207,9 @@ function getGamesColumnMap_(headers) {
 
     confidenceEnabled:
       headers.indexOf("ConfidenceEnabled"),
+
+    confidenceScoringMode:
+      headers.indexOf("ConfidenceScoringMode"),  
 
     wagerEnabled:
       headers.indexOf("WagerEnabled"),
@@ -440,6 +462,15 @@ function buildGameObjectFromRow_(
           )
         : typeConfig.confidenceEnabled,
 
+    confidenceScoringMode:
+        normalizeConfidenceScoringMode_(
+          getGameCell_(
+            row,
+            col.confidenceScoringMode,
+            "win_only"
+          )
+        ),    
+
     wagerEnabled:
       explicitWager
         ? normalizeGameBoolean_(
@@ -680,6 +711,62 @@ function getActiveGames() {
 }
 
 /* =========================
+   PUBLIC ACTIVE GAMES
+========================= */
+
+function getPublicActiveGames() {
+
+  return getActiveGames()
+    .map(game => ({
+      gameId:
+        game.gameId,
+
+      name:
+        game.name,
+
+      year:
+        game.year,
+
+      type:
+        game.type,
+
+      typeLabel:
+        game.typeLabel,
+
+      defaultGame:
+        game.defaultGame === true,
+
+      predictionEnabled:
+        game.predictionEnabled === true,
+
+      rankingEnabled:
+        game.rankingEnabled === true,
+
+      confidenceEnabled:
+        game.confidenceEnabled === true,
+      
+      confidenceScoringMode:
+        game.confidenceScoringMode || "win_only",
+
+      wagerEnabled:
+        game.wagerEnabled === true,
+
+      themeColor:
+        game.themeColor || "",
+
+      icon:
+        game.icon || "",
+
+      status:
+        game.status || "",
+
+      lockAllPicks:
+        game.lockAllPicks === true
+    }));
+
+}
+
+/* =========================
    DEFAULT GAME
 ========================= */
 
@@ -869,6 +956,9 @@ function getGameRuntimeConfig(gameId) {
 
     confidenceEnabled:
       game.confidenceEnabled,
+
+    confidenceScoringMode:
+      game.confidenceScoringMode || "win_only",  
 
     wagerEnabled:
       game.wagerEnabled,

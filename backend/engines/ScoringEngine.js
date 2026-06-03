@@ -65,6 +65,26 @@ function isConfidenceScoringGame_(
 
 }
 
+function getConfidenceScoringMode_(
+  gameId
+) {
+
+  const game =
+    typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
+  if (
+    game &&
+    game.confidenceScoringMode === "risk_penalty"
+  ) {
+    return "risk_penalty";
+  }
+
+  return "win_only";
+
+}
+
 function getScoringBasePoints_(
   config,
   pick,
@@ -237,7 +257,12 @@ function getLeaderboardData(
   const isConfidenceGame =
      isConfidenceScoringGame_(
        gameId
-     );  
+     ); 
+     
+  const confidenceScoringMode =
+     getConfidenceScoringMode_(
+       gameId
+     );   
 
   /* =====================================================
      CATEGORY SETTINGS
@@ -332,25 +357,33 @@ function getLeaderboardData(
 
           if (winnerNomineeId) {
 
-            if (
+            const isCorrect =
               normalizeScoreString_(
                 pick.nomineeId
-              ) === winnerNomineeId
-            ) {
-
+              ) === winnerNomineeId;
+          
+            if (isCorrect) {
+          
               total += adjustedPoints;
-
+          
               if (
                 config.countsAsStatue ===
                 true
               ) {
-
+          
                 statues++;
-
+          
               }
-
+          
+            } else if (
+              isConfidenceGame &&
+              confidenceScoringMode === "risk_penalty"
+            ) {
+          
+              total -= adjustedPoints;
+          
             }
-
+          
           }
 
           /* =====================================================
@@ -551,6 +584,13 @@ function getUserScoring(
       gameId
     );
 
+  const confidenceScoringMode =
+    typeof getConfidenceScoringMode_ === "function"
+      ? getConfidenceScoringMode_(
+          gameId
+        )
+      : "win_only";
+
   const settings =
     getCategorySettings(
       gameId
@@ -628,7 +668,7 @@ function getUserScoring(
         config.changePenalty
       ) || 0;
 
-    const finalPoints =
+    const finalPointsAvailable =
       Math.max(
         basePoints -
         (
@@ -638,6 +678,69 @@ function getUserScoring(
         0
       );
 
+    const winnerNomineeId =
+      normalizeScoreString_(
+        config.winnerNomineeId || ""
+      );
+
+    const normalizedPick =
+      normalizeScoreString_(
+        nomineeId
+      );
+
+    const hasWinner =
+      Boolean(
+        winnerNomineeId
+      );
+
+    const hasPick =
+      Boolean(
+        normalizedPick
+      );
+
+    const isCorrect =
+      hasWinner &&
+      hasPick &&
+      normalizedPick === winnerNomineeId;
+
+    const isWrong =
+      hasWinner &&
+      hasPick &&
+      normalizedPick !== winnerNomineeId;
+
+    let earnedPoints = 0;
+    let remainingPoints = 0;
+
+    if (hasWinner) {
+
+      if (isCorrect) {
+
+        earnedPoints =
+          finalPointsAvailable;
+
+      } else if (
+        isWrong &&
+        isConfidenceGame &&
+        confidenceScoringMode === "risk_penalty"
+      ) {
+
+        earnedPoints =
+          -finalPointsAvailable;
+
+      } else {
+
+        earnedPoints =
+          0;
+
+      }
+
+    } else {
+
+      remainingPoints =
+        finalPointsAvailable;
+
+    }
+
     scoring[categoryId] = {
 
       shortName:
@@ -646,6 +749,9 @@ function getUserScoring(
 
       nomineeId:
         nomineeId || "",
+
+      winnerNomineeId:
+        winnerNomineeId || "",
 
       changes:
         changes,
@@ -659,20 +765,40 @@ function getUserScoring(
           : 0,
 
       finalPointsAvailable:
-        finalPoints,
+        finalPointsAvailable,
+
+      earnedPoints:
+        earnedPoints,
+
+      remainingPoints:
+        remainingPoints,
 
       displayPoints:
-        isConfidenceGame
-          ? `${finalPoints}/${confidencePoints || 0}`
-          : `${finalPoints}/${basePoints}`,
+        hasWinner
+          ? String(earnedPoints)
+          : `${remainingPoints}/${basePoints}`,
 
       locked:
         config.locked === true,
 
+      resolved:
+        hasWinner,
+
+      correct:
+        isCorrect,
+
+      wrong:
+        isWrong,
+
       scoringMode:
         isConfidenceGame
           ? "confidence"
-          : "standard"
+          : "standard",
+
+      confidenceScoringMode:
+        isConfidenceGame
+          ? confidenceScoringMode
+          : ""
 
     };
 

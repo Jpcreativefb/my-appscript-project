@@ -271,6 +271,19 @@ function adminNormalizeGameId_(value) {
             payload.confidenceEnabled
           )
     );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "confidenceScoringMode",
+      typeof normalizeConfidenceScoringMode_ === "function"
+        ? normalizeConfidenceScoringMode_(
+            payload.confidenceScoringMode
+          )
+        : adminNormalizeValue_(
+            payload.confidenceScoringMode || "win_only"
+          )
+    );
   
     adminSetIfColumnExists_(
       row,
@@ -855,6 +868,23 @@ function adminSaveGame(payload) {
           adminToBoolean_(
             payload.confidenceEnabled
           )
+        );
+      
+      }
+
+      if ("confidenceScoringMode" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "confidenceScoringMode",
+          typeof normalizeConfidenceScoringMode_ === "function"
+            ? normalizeConfidenceScoringMode_(
+                payload.confidenceScoringMode
+              )
+            : adminNormalizeValue_(
+                payload.confidenceScoringMode || "win_only"
+              )
         );
       
       }
@@ -1697,6 +1727,9 @@ function adminCloneGame(payload) {
     
     confidenceEnabled:
       sourceGame.confidenceEnabled === true,
+
+    confidenceScoringMode:
+      sourceGame.confidenceScoringMode || "win_only",
     
     wagerEnabled:
       sourceGame.wagerEnabled === true,

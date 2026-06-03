@@ -96,10 +96,20 @@ async function apiGetMyPicks(username, gameId) {
 async function apiSavePick(payload) {
 
   return api("savePick", {
-    username: payload.username,
-    gameId: payload.gameId,
-    categoryId: payload.categoryId,
-    nomineeId: payload.nomineeId
+    username:
+      payload.username,
+
+    gameId:
+      payload.gameId,
+
+    categoryId:
+      payload.categoryId,
+
+    nomineeId:
+      payload.nomineeId,
+
+    confidencePoints:
+      payload.confidencePoints
   });
 
 }
@@ -170,6 +180,18 @@ async function apiGetStartupPayload() {
     token: session.token,
     gameId: APP_STATE.gameId || ""
   });
+
+}
+
+/* ======================
+   ACTIVE GAMES
+====================== */
+
+async function apiGetActiveGames() {
+
+  return api(
+    "getActiveGames"
+  );
 
 }
 
@@ -356,6 +378,8 @@ async function apiAdminSaveGame(payload) {
       rankingEnabled: payload.rankingEnabled,
 
       confidenceEnabled: payload.confidenceEnabled,
+
+      confidenceScoringMode: payload.confidenceScoringMode,
 
       wagerEnabled: payload.wagerEnabled,
 

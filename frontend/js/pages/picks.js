@@ -5,10 +5,13 @@
 let PICKS_PAGE_DATA = {
   session: null,
   gameId: "",
+  game: null,
+  isConfidenceGame: false,
   categories: [],
   picks: {},
   changeCounts: {},
   originalPicks: {},
+  confidencePoints: {},
   pickMeta: {}
 };
 
@@ -64,15 +67,36 @@ async function renderPicksPage() {
   }
 
   const gameId =
-    payload.gameId ||
-    session.gameId ||
-    "";
+  payload.gameId ||
+  session.gameId ||
+  getFrontendGameId() ||
+  "";
 
-  PICKS_PAGE_DATA.session =
-    session;
+const game =
+  payload.game ||
+  payload.gameConfig ||
+  null;
 
-  PICKS_PAGE_DATA.gameId =
-    gameId;
+const isConfidenceGame =
+  !!(
+    game &&
+    (
+      game.type === "confidence" ||
+      game.confidenceEnabled === true
+    )
+  );
+
+PICKS_PAGE_DATA.session =
+  session;
+
+PICKS_PAGE_DATA.gameId =
+  gameId;
+
+PICKS_PAGE_DATA.game =
+  game;
+
+PICKS_PAGE_DATA.isConfidenceGame =
+  isConfidenceGame;
 
   const categories =
     payload.categories || [];
@@ -93,7 +117,10 @@ async function renderPicksPage() {
 
   PICKS_PAGE_DATA.originalPicks =
     picksResponse.originalPicks || {};
-
+  
+  PICKS_PAGE_DATA.confidencePoints =
+    picksResponse.confidencePoints || {};
+  
   PICKS_PAGE_DATA.pickMeta =
     picksResponse.pickMeta || {};
 
@@ -108,9 +135,13 @@ async function renderPicksPage() {
       <div class="picks-page-header">
         <h1>Make Your Picks</h1>
         <p>
-          Pick changes may reduce available points.
-          Locked categories cannot be changed.
+           ${
+              PICKS_PAGE_DATA.isConfidenceGame
+               ? "Choose a pick and assign confidence points. Locked categories cannot be changed."
+               : "Pick changes may reduce available points. Locked categories cannot be changed."
+           }
         </p>
+
       </div>
 
       <div id="picksPageMessage" class="picks-message hidden"></div>
@@ -244,7 +275,6 @@ function parseFollowUpMap(value) {
 /* =========================
    CATEGORY CARD
 ========================= */
-
 function renderCategoryCard(category, isChild, parent) {
 
   const selectedNomineeId =
@@ -252,6 +282,11 @@ function renderCategoryCard(category, isChild, parent) {
 
   const selectedNominee =
     getSelectedNominee(category);
+
+  const confidencePoints =
+    Number(
+      PICKS_PAGE_DATA.confidencePoints[category.id]
+    ) || 0;  
 
   const hasPick =
     Boolean(selectedNominee);
@@ -343,7 +378,7 @@ function renderCategoryCard(category, isChild, parent) {
      </div>
 
      ${selectedNominee ? `
-       <div class="selected-pick-summary">
+        <div class="selected-pick-summary">
 
         <img
           src="${escapeAttr(selectedNominee.image)}"
@@ -352,14 +387,19 @@ function renderCategoryCard(category, isChild, parent) {
 
         <span>
           ${escapeHtml(selectedNominee.name)}
+          ${
+             PICKS_PAGE_DATA.isConfidenceGame
+               ? ` · ${confidencePoints || "No"} confidence`
+               : ""
+          }
         </span>
 
-       </div>
-     ` : `
-       <div class="selected-pick-summary empty">
-          <span>No pick selected</span>
-       </div>
-     `}
+      </div>
+    ` : `
+      <div class="selected-pick-summary empty">
+         <span>No pick selected</span>
+      </div>
+    `}
 
       <div
         class="pick-third-line"
@@ -391,12 +431,18 @@ function renderCategoryCard(category, isChild, parent) {
     
     ${originalNominee ? `
       <div class="original-pick-note">
-        Original Pick:
-        <strong>${escapeHtml(originalNominee.name)}</strong>
+         Original Pick:
+         <strong>${escapeHtml(originalNominee.name)}</strong>
       </div>
     ` : ""}
 
-        <div class="${getLayoutClass(category)}">
+    ${renderConfidenceControl(
+      category,
+      locked
+    )}
+
+    <div class="${getLayoutClass(category)}">
+
           ${category.nominees.map(nominee =>
             renderNomineeButton(
               category,
@@ -411,6 +457,231 @@ function renderCategoryCard(category, isChild, parent) {
 
     </section>
   `;
+
+}
+
+/* =========================
+   CONFIDENCE CONTROL
+========================= */
+
+function renderConfidenceControl(
+  category,
+  locked
+) {
+
+  if (!PICKS_PAGE_DATA.isConfidenceGame) {
+    return "";
+  }
+
+  const currentValue =
+    Number(
+      PICKS_PAGE_DATA.confidencePoints[category.id]
+    ) || "";
+
+  const maxConfidence =
+    getMaxConfidencePoints();
+
+  return `
+    <div class="confidence-control">
+
+      <label>
+        <span>Confidence Points</span>
+
+        <select
+          id="confidence-${escapeAttr(category.id)}"
+          ${locked ? "disabled" : ""}
+          onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
+        >
+          <option value="">
+            Choose confidence
+          </option>
+
+          ${Array.from(
+            { length: maxConfidence },
+            (_, index) => index + 1
+          ).map(value => `
+            <option
+              value="${value}"
+              ${Number(currentValue) === value ? "selected" : ""}
+            >
+              ${value}
+            </option>
+          `).join("")}
+
+        </select>
+      </label>
+
+    </div>
+  `;
+
+}
+
+function getMaxConfidencePoints() {
+
+  const categories =
+    PICKS_PAGE_DATA.categories || [];
+
+  const count =
+    categories.filter(cat =>
+      !cat.parentCategoryId
+    ).length;
+
+  return Math.max(
+    count,
+    1
+  );
+
+}
+
+function updateConfidenceForCategory(
+  categoryId,
+  value
+) {
+
+  const points =
+    Number(value) || 0;
+
+  PICKS_PAGE_DATA.confidencePoints[categoryId] =
+    points;
+
+}
+
+/* =========================
+   CONFIDENCE CONTROL
+========================= */
+
+function renderConfidenceControl(
+  category,
+  locked
+) {
+
+  if (!PICKS_PAGE_DATA.isConfidenceGame) {
+    return "";
+  }
+
+  const currentValue =
+    Number(
+      PICKS_PAGE_DATA.confidencePoints[category.id]
+    ) || "";
+
+  const usedValues =
+    getUsedConfidencePointsForOtherCategories(
+      category.id
+    );
+
+  const maxConfidence =
+    getMaxConfidencePoints();
+
+  return `
+    <div class="confidence-control">
+
+      <label>
+        <span>Confidence Points</span>
+
+        <select
+          id="confidence-${escapeAttr(category.id)}"
+          ${locked ? "disabled" : ""}
+          onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
+        >
+          <option value="">
+            Choose confidence
+          </option>
+
+          ${Array.from(
+            { length: maxConfidence },
+            (_, index) => index + 1
+          ).map(value => {
+
+            const used =
+              usedValues.includes(value);
+
+            return `
+              <option
+                value="${value}"
+                ${
+                  Number(currentValue) === value
+                    ? "selected"
+                    : ""
+                }
+                ${
+                  used
+                    ? "disabled"
+                    : ""
+                }
+              >
+                ${value}${used ? " — used" : ""}
+              </option>
+            `;
+
+          }).join("")}
+
+        </select>
+      </label>
+
+    </div>
+  `;
+
+}
+
+function getMaxConfidencePoints() {
+
+  const categories =
+    PICKS_PAGE_DATA.categories || [];
+
+  const count =
+    categories.filter(cat =>
+      !cat.parentCategoryId
+    ).length;
+
+  return Math.max(
+    count,
+    1
+  );
+
+}
+
+function getUsedConfidencePointsForOtherCategories(
+  categoryId
+) {
+
+  const used = [];
+
+  Object.keys(
+    PICKS_PAGE_DATA.confidencePoints || {}
+  ).forEach(otherCategoryId => {
+
+    if (
+      normalizeId(otherCategoryId) ===
+      normalizeId(categoryId)
+    ) {
+      return;
+    }
+
+    const value =
+      Number(
+        PICKS_PAGE_DATA.confidencePoints[otherCategoryId]
+      ) || 0;
+
+    if (value > 0) {
+      used.push(value);
+    }
+
+  });
+
+  return used;
+
+}
+
+function updateConfidenceForCategory(
+  categoryId,
+  value
+) {
+
+  const points =
+    Number(value) || 0;
+
+  PICKS_PAGE_DATA.confidencePoints[categoryId] =
+    points;
 
 }
 
@@ -560,6 +831,65 @@ async function selectNominee(categoryId, nomineeId) {
     return;
   }
 
+  let confidencePoints = 0;
+
+  if (PICKS_PAGE_DATA.isConfidenceGame) {
+
+    const confidenceInput =
+      document.getElementById(
+        "confidence-" + categoryId
+      );
+
+    confidencePoints =
+      confidenceInput
+        ? Number(confidenceInput.value) || 0
+        : Number(
+            PICKS_PAGE_DATA.confidencePoints[categoryId]
+          ) || 0;
+
+    console.log(
+      "CONFIDENCE SAVE CHECK",
+      {
+        categoryId: categoryId,
+        nomineeId: nomineeId,
+        confidencePoints: confidencePoints,
+        inputFound: Boolean(confidenceInput),
+        inputValue: confidenceInput ? confidenceInput.value : null
+      }
+    );
+
+    if (confidencePoints <= 0) {
+
+      showPicksMessage(
+        "Choose confidence points before saving this pick.",
+        true
+      );
+
+      return;
+
+    }
+
+    if (
+      getUsedConfidencePointsForOtherCategories(
+        categoryId
+      ).includes(confidencePoints)
+    ) {
+    
+      showPicksMessage(
+        "You already used " +
+        confidencePoints +
+        " confidence point" +
+        (confidencePoints === 1 ? "" : "s") +
+        ". Choose a different number.",
+        true
+      );
+    
+      return;
+    
+    }
+
+  }
+
   showPicksMessage(
     "Saving pick...",
     false
@@ -567,11 +897,26 @@ async function selectNominee(categoryId, nomineeId) {
 
   const result =
     await apiSavePick({
-      username: session.username,
-      gameId: PICKS_PAGE_DATA.gameId,
-      categoryId,
-      nomineeId
+      username:
+        session.username,
+
+      gameId:
+        PICKS_PAGE_DATA.gameId,
+
+      categoryId:
+        categoryId,
+
+      nomineeId:
+        nomineeId,
+
+      confidencePoints:
+        confidencePoints
     });
+
+  console.log(
+    "SAVE PICK RESULT",
+    result
+  );
 
   if (!result.success) {
     showPicksMessage(
@@ -591,13 +936,22 @@ async function selectNominee(categoryId, nomineeId) {
 
   PICKS_PAGE_DATA.originalPicks[categoryId] =
     result.originalNomineeId || nomineeId;
-  
+
+  if (PICKS_PAGE_DATA.isConfidenceGame) {
+
+    PICKS_PAGE_DATA.confidencePoints[categoryId] =
+      Number(
+        result.confidencePoints
+      ) || confidencePoints;
+
+  }
+
   if (result.pickMeta) {
 
     PICKS_PAGE_DATA.pickMeta[categoryId] =
-        result.pickMeta;
-    
-  }  
+      result.pickMeta;
+
+  }
 
   refreshPicksPage();
 

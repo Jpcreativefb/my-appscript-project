@@ -71,6 +71,8 @@ function initApp(session) {
     setupAdminNav(getSession());
   }, 250);
 
+  renderGameSwitcher();
+
   const hash =
     window.location.hash
       .replace("#", "");
@@ -284,6 +286,8 @@ async function navigate(page) {
 
       setActiveNav(page);
 
+      renderGameSwitcher();
+
     });
 
   }
@@ -317,6 +321,101 @@ function setActiveNav(page) {
     });
 
 }
+
+/* ======================
+   GAME SWITCHER
+====================== */
+
+async function renderGameSwitcher() {
+
+  const target =
+    document.getElementById(
+      "gameSwitcher"
+    );
+
+  if (!target) {
+    return;
+  }
+
+  const res =
+    await apiGetActiveGames();
+
+  if (
+    !res ||
+    res.success === false ||
+    !Array.isArray(res.games) ||
+    !res.games.length
+  ) {
+
+    target.innerHTML = "";
+    return;
+
+  }
+
+  const selectedGameId =
+    getFrontendGameId() ||
+    res.currentGameId ||
+    res.defaultGameId ||
+    (
+      res.games[0] &&
+      res.games[0].gameId
+    );
+
+  if (
+    selectedGameId &&
+    selectedGameId !== APP_STATE.gameId
+  ) {
+
+    setFrontendGameId(
+      selectedGameId
+    );
+
+  }
+
+  if (res.games.length <= 1) {
+
+    const game =
+      res.games[0];
+
+    target.innerHTML = `
+      <div class="game-switcher-single">
+        <span class="game-switcher-label">
+          Game
+        </span>
+        <strong>
+          ${escapeHtmlForApp_(game.name || game.gameId)}
+        </strong>
+      </div>
+    `;
+
+    return;
+
+  }
+
+  target.innerHTML = `
+    <label class="game-switcher">
+      <span class="game-switcher-label">
+        Game
+      </span>
+
+      <select
+        id="gameSwitcherSelect"
+        onchange="handleGameSwitch(this.value)"
+      >
+        ${res.games.map(game => `
+          <option
+            value="${escapeHtmlForApp_(game.gameId)}"
+            ${game.gameId === selectedGameId ? "selected" : ""}
+          >
+            ${escapeHtmlForApp_(game.icon ? game.icon + " " : "")}${escapeHtmlForApp_(game.name || game.gameId)}
+          </option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+
+}
+
 
 
 /* ======================
@@ -403,6 +502,30 @@ async function renderPage(page) {
 
 }
 
+async function handleGameSwitch(gameId) {
+
+  setFrontendGameId(
+    gameId
+  );
+
+  clearStartupPayload();
+
+  await navigate(
+    APP_STATE.currentPage || "dashboard"
+  );
+
+}
+
+function escapeHtmlForApp_(value) {
+
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
 
 /* ======================
    SAMPLE PAGES (TEMP PLACEHOLDERS)
@@ -464,9 +587,44 @@ function getFrontendGameId() {
   }
 
   return String(
-    session.gameId ||
+    APP_STATE.gameId ||
     localStorage.getItem("gameId") ||
+    session.gameId ||
     ""
   ).trim();
+
+}
+
+function setFrontendGameId(gameId) {
+
+  gameId =
+    String(gameId || "")
+      .trim();
+
+  if (!gameId) {
+    return;
+  }
+
+  APP_STATE.gameId =
+    gameId;
+
+  localStorage.setItem(
+    "gameId",
+    gameId
+  );
+
+  const session =
+    getSession();
+
+  if (session) {
+
+    session.gameId =
+      gameId;
+
+    setSession(
+      session
+    );
+
+  }
 
 }
