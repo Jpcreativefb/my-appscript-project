@@ -7,6 +7,7 @@ let PICKS_PAGE_DATA = {
   gameId: "",
   game: null,
   isConfidenceGame: false,
+  confidenceScoringMode: "win_only",
   categories: [],
   picks: {},
   changeCounts: {},
@@ -86,6 +87,12 @@ const isConfidenceGame =
     )
   );
 
+const confidenceScoringMode =
+  game && game.confidenceScoringMode
+    ? game.confidenceScoringMode
+    : "win_only";  
+
+
 PICKS_PAGE_DATA.session =
   session;
 
@@ -97,6 +104,9 @@ PICKS_PAGE_DATA.game =
 
 PICKS_PAGE_DATA.isConfidenceGame =
   isConfidenceGame;
+
+PICKS_PAGE_DATA.confidenceScoringMode =
+  confidenceScoringMode;  
 
   const categories =
     payload.categories || [];
@@ -135,12 +145,14 @@ PICKS_PAGE_DATA.isConfidenceGame =
       <div class="picks-page-header">
         <h1>Make Your Picks</h1>
         <p>
-           ${
-              PICKS_PAGE_DATA.isConfidenceGame
-               ? "Choose a pick and assign confidence points. Locked categories cannot be changed."
+          ${
+            PICKS_PAGE_DATA.isConfidenceGame
+               ? getConfidenceGameInstructions()
                : "Pick changes may reduce available points. Locked categories cannot be changed."
-           }
+          }
         </p>
+
+        ${PICKS_PAGE_DATA.isConfidenceGame ? renderConfidenceSummaryBar() : ""}
 
       </div>
 
@@ -148,6 +160,80 @@ PICKS_PAGE_DATA.isConfidenceGame =
 
       <div id="picksCategoryList" class="picks-category-list">
         ${renderPicksCategoryList()}
+      </div>
+
+    </div>
+  `;
+
+}
+
+function getConfidenceGameInstructions() {
+
+  if (
+    PICKS_PAGE_DATA.confidenceScoringMode ===
+    "risk_penalty"
+  ) {
+
+    return "Choose a pick and assign each confidence number once. Correct picks gain points; wrong picks lose the points assigned.";
+
+  }
+
+  return "Choose a pick and assign each confidence number once. Correct picks gain points; wrong picks receive zero.";
+
+}
+
+function renderConfidenceSummaryBar() {
+
+  const used =
+    getUsedConfidencePoints();
+
+  const max =
+    getMaxConfidencePoints();
+
+  const remaining =
+    [];
+
+  for (
+    let i = 1;
+    i <= max;
+    i++
+  ) {
+
+    if (
+      used.indexOf(i) === -1
+    ) {
+      remaining.push(i);
+    }
+
+  }
+
+  return `
+    <div class="confidence-summary-bar">
+
+      <div>
+        <strong>
+          Confidence Pool
+        </strong>
+
+        <span>
+          ${
+            PICKS_PAGE_DATA.confidenceScoringMode === "risk_penalty"
+              ? "Risk Penalty Mode"
+              : "Win Only Mode"
+          }
+        </span>
+      </div>
+
+      <div class="confidence-number-list">
+        <span>
+          Used:
+          ${used.length ? used.join(", ") : "none"}
+        </span>
+
+        <span>
+          Remaining:
+          ${remaining.length ? remaining.join(", ") : "none"}
+        </span>
       </div>
 
     </div>
@@ -366,14 +452,20 @@ function renderCategoryCard(category, isChild, parent) {
            ` : ""}
 
         <h2>
-          ${escapeHtml(category.name)}
+           ${escapeHtml(getCategoryDisplayTitle(category))}
         </h2>
 
       </div>
 
-      <div class="points-pill">
-        ${adjustedPoints}/${totalPoints} pts
-      </div>
+      ${
+        !PICKS_PAGE_DATA.isConfidenceGame
+          ? `
+            <div class="points-pill">
+              ${adjustedPoints}/${totalPoints} pts
+            </div>
+          `
+          : ""
+      }
 
      </div>
 
@@ -388,9 +480,13 @@ function renderCategoryCard(category, isChild, parent) {
         <span>
           ${escapeHtml(selectedNominee.name)}
           ${
-             PICKS_PAGE_DATA.isConfidenceGame
-               ? ` · ${confidencePoints || "No"} confidence`
-               : ""
+            PICKS_PAGE_DATA.isConfidenceGame
+              ? `
+                <span class="selected-confidence-pill">
+                  Confidence ${confidencePoints || "not set"} 
+                </span>
+              `
+              : ""
           }
         </span>
 
@@ -414,103 +510,106 @@ function renderCategoryCard(category, isChild, parent) {
 
     </button>  
     
-
-      <div class="pick-card-body">
-
-      <div class="pick-rules-row">
-
-      <div class="penalty-note">
-        Penalty: ${penalty} point${penalty === 1 ? "" : "s"}
-      </div>
+    ${
+      !PICKS_PAGE_DATA.isConfidenceGame
+        ? `
+          <div class="pick-rules-row">
     
-      <div class="changes-pill body-pill">
-        ${changesLeft} changes left
-      </div>
+            <div class="penalty-note">
+              Penalty: ${penalty} point${penalty === 1 ? "" : "s"}
+            </div>
     
-    </div>
+            <div class="changes-pill body-pill">
+              ${changesLeft} changes left
+            </div>
+    
+          </div>
+        `
+        : ""
+    }
+    
     
     ${originalNominee ? `
       <div class="original-pick-note">
-         Original Pick:
-         <strong>${escapeHtml(originalNominee.name)}</strong>
+        Original Pick:
+        <strong>${escapeHtml(originalNominee.name)}</strong>
       </div>
     ` : ""}
 
-    ${renderConfidenceControl(
-      category,
-      locked
-    )}
-
     <div class="${getLayoutClass(category)}">
 
-          ${category.nominees.map(nominee =>
-            renderNomineeButton(
-              category,
-              nominee,
-              selectedNomineeId,
-              locked
-            )
-          ).join("")}
-        </div>
+  ${category.nominees.map(nominee =>
+    renderNomineeButton(
+      category,
+      nominee,
+      selectedNomineeId,
+      locked
+    )
+  ).join("")}
 
+</div>
+
+${renderConfidenceControl(
+  category,
+  locked
+)}
+
+</section>
+  `;
+
+}
+
+/* =========================
+   CONFIDENCE CONTROL
+========================= */
+
+function renderConfidenceControl(
+  category,
+  locked
+) {
+
+  if (!PICKS_PAGE_DATA.isConfidenceGame) {
+    return "";
+  }
+
+  const currentValue =
+    Number(
+      PICKS_PAGE_DATA.confidencePoints[category.id]
+    ) || "";
+
+  return `
+    <div class="confidence-control after-nominees">
+
+      <label>
+        <span>
+          Confidence Points
+        </span>
+
+        <select
+          id="confidence-${escapeAttr(category.id)}"
+          ${locked ? "disabled" : ""}
+          onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
+        >
+          <option value="">
+            Choose confidence
+          </option>
+
+          ${renderConfidenceOptionsForCategory(
+            category.id,
+            currentValue
+          )}
+
+        </select>
+      </label>
+
+      <div class="confidence-help">
+        ${
+          PICKS_PAGE_DATA.confidenceScoringMode === "risk_penalty"
+            ? "Correct picks gain this amount. Wrong picks lose this amount."
+            : "Correct picks gain this amount. Wrong picks score zero."
+        }
       </div>
 
-    </section>
-  `;
-
-}
-
-/* =========================
-   CONFIDENCE CONTROL
-========================= */
-
-function renderConfidenceControl(
-  category,
-  locked
-) {
-
-  if (!PICKS_PAGE_DATA.isConfidenceGame) {
-    return "";
-  }
-
-  const currentValue =
-    Number(
-      PICKS_PAGE_DATA.confidencePoints[category.id]
-    ) || "";
-
-  const maxConfidence =
-    getMaxConfidencePoints();
-
-  return `
-    <div class="confidence-control">
-
-      <label>
-        <span>Confidence Points</span>
-
-        <select
-          id="confidence-${escapeAttr(category.id)}"
-          ${locked ? "disabled" : ""}
-          onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
-        >
-          <option value="">
-            Choose confidence
-          </option>
-
-          ${Array.from(
-            { length: maxConfidence },
-            (_, index) => index + 1
-          ).map(value => `
-            <option
-              value="${value}"
-              ${Number(currentValue) === value ? "selected" : ""}
-            >
-              ${value}
-            </option>
-          `).join("")}
-
-        </select>
-      </label>
-
     </div>
   `;
 
@@ -518,125 +617,7 @@ function renderConfidenceControl(
 
 function getMaxConfidencePoints() {
 
-  const categories =
-    PICKS_PAGE_DATA.categories || [];
-
-  const count =
-    categories.filter(cat =>
-      !cat.parentCategoryId
-    ).length;
-
-  return Math.max(
-    count,
-    1
-  );
-
-}
-
-function updateConfidenceForCategory(
-  categoryId,
-  value
-) {
-
-  const points =
-    Number(value) || 0;
-
-  PICKS_PAGE_DATA.confidencePoints[categoryId] =
-    points;
-
-}
-
-/* =========================
-   CONFIDENCE CONTROL
-========================= */
-
-function renderConfidenceControl(
-  category,
-  locked
-) {
-
-  if (!PICKS_PAGE_DATA.isConfidenceGame) {
-    return "";
-  }
-
-  const currentValue =
-    Number(
-      PICKS_PAGE_DATA.confidencePoints[category.id]
-    ) || "";
-
-  const usedValues =
-    getUsedConfidencePointsForOtherCategories(
-      category.id
-    );
-
-  const maxConfidence =
-    getMaxConfidencePoints();
-
-  return `
-    <div class="confidence-control">
-
-      <label>
-        <span>Confidence Points</span>
-
-        <select
-          id="confidence-${escapeAttr(category.id)}"
-          ${locked ? "disabled" : ""}
-          onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
-        >
-          <option value="">
-            Choose confidence
-          </option>
-
-          ${Array.from(
-            { length: maxConfidence },
-            (_, index) => index + 1
-          ).map(value => {
-
-            const used =
-              usedValues.includes(value);
-
-            return `
-              <option
-                value="${value}"
-                ${
-                  Number(currentValue) === value
-                    ? "selected"
-                    : ""
-                }
-                ${
-                  used
-                    ? "disabled"
-                    : ""
-                }
-              >
-                ${value}${used ? " — used" : ""}
-              </option>
-            `;
-
-          }).join("")}
-
-        </select>
-      </label>
-
-    </div>
-  `;
-
-}
-
-function getMaxConfidencePoints() {
-
-  const categories =
-    PICKS_PAGE_DATA.categories || [];
-
-  const count =
-    categories.filter(cat =>
-      !cat.parentCategoryId
-    ).length;
-
-  return Math.max(
-    count,
-    1
-  );
+  return getMaxAvailableConfidencePoints();
 
 }
 
@@ -657,16 +638,69 @@ function getUsedConfidencePointsForOtherCategories(
       return;
     }
 
+    const otherHasPick =
+      Boolean(
+        PICKS_PAGE_DATA.picks[otherCategoryId]
+      );
+
+    if (!otherHasPick) {
+      return;
+    }
+
     const value =
       Number(
         PICKS_PAGE_DATA.confidencePoints[otherCategoryId]
       ) || 0;
 
-    if (value > 0) {
+    if (
+      value > 0 &&
+      used.indexOf(value) === -1
+    ) {
       used.push(value);
     }
 
   });
+
+  return used;
+
+}
+
+function getUsedConfidencePoints() {
+
+  const used = [];
+
+  Object.keys(
+    PICKS_PAGE_DATA.confidencePoints || {}
+  ).forEach(categoryId => {
+
+    const hasPick =
+      Boolean(
+        PICKS_PAGE_DATA.picks[categoryId]
+      );
+
+    if (!hasPick) {
+      return;
+    }
+
+    const value =
+      Number(
+        PICKS_PAGE_DATA.confidencePoints[categoryId]
+      ) || 0;
+
+    if (
+      value > 0 &&
+      used.indexOf(value) === -1
+    ) {
+
+      used.push(value);
+
+    }
+
+  });
+
+  used.sort((a, b) =>
+    b - a
+  );
 
   return used;
 
@@ -677,11 +711,8 @@ function updateConfidenceForCategory(
   value
 ) {
 
-  const points =
-    Number(value) || 0;
-
   PICKS_PAGE_DATA.confidencePoints[categoryId] =
-    points;
+    Number(value) || 0;
 
 }
 
@@ -837,8 +868,8 @@ async function selectNominee(categoryId, nomineeId) {
 
     const confidenceInput =
       document.getElementById(
-        "confidence-" + categoryId
-      );
+       "confidence-" + categoryId
+    );
 
     confidencePoints =
       confidenceInput
@@ -1165,6 +1196,21 @@ function getCategoryTitle(category, status) {
 
 }
 
+function getCategoryDisplayTitle(category) {
+
+  return (
+    category.question ||
+    category.Question ||
+    category.category ||
+    category.Category ||
+    category.name ||
+    category.displayName ||
+    category.id ||
+    "Category"
+  );
+
+}
+
 function getSelectedNominee(category) {
 
   const selectedId =
@@ -1303,6 +1349,112 @@ function getLayoutClass(category) {
   }
 
   return "nominee-layout nominee-layout-image";
+
+}
+
+function getConfidenceEligibleCategories() {
+
+  const categories =
+    PICKS_PAGE_DATA.categories || [];
+
+  return categories.filter(cat =>
+    !cat.parentCategoryId
+  );
+
+}
+
+function getLockedUnpickedConfidenceCount() {
+
+  const categories =
+    getConfidenceEligibleCategories();
+
+  return categories.filter(cat => {
+
+    const categoryId =
+      cat.id;
+
+    const hasPick =
+      Boolean(
+        PICKS_PAGE_DATA.picks[categoryId]
+      );
+
+    return (
+      isCategoryLocked(cat) &&
+      !hasPick
+    );
+
+  }).length;
+
+}
+
+function getMaxAvailableConfidencePoints() {
+
+  const total =
+    getConfidenceEligibleCategories()
+      .length;
+
+  const lockedUnpicked =
+    getLockedUnpickedConfidenceCount();
+
+  return Math.max(
+    total - lockedUnpicked,
+    1
+  );
+
+}
+
+function renderConfidenceOptionsForCategory(
+  categoryId,
+  currentValue
+) {
+
+  const maxConfidence =
+    getMaxAvailableConfidencePoints();
+
+  const usedValues =
+    getUsedConfidencePointsForOtherCategories(
+      categoryId
+    );
+
+  const current =
+    Number(currentValue) || 0;
+
+  const values = [];
+
+  for (
+    let value = maxConfidence;
+    value >= 1;
+    value--
+  ) {
+
+    if (
+      usedValues.indexOf(value) !== -1 &&
+      value !== current
+    ) {
+      continue;
+    }
+
+    values.push(value);
+
+  }
+
+  if (
+    current > maxConfidence &&
+    values.indexOf(current) === -1
+  ) {
+
+    values.unshift(current);
+
+  }
+
+  return values.map(value => `
+    <option
+      value="${value}"
+      ${value === current ? "selected" : ""}
+    >
+      ${value}
+    </option>
+  `).join("");
 
 }
 
