@@ -76,7 +76,9 @@ function getConfidenceScoringMode_(
 
   if (
     game &&
-    game.confidenceScoringMode === "risk_penalty"
+    String(game.confidenceScoringMode || "")
+      .trim()
+      .toLowerCase() === "risk_penalty"
   ) {
     return "risk_penalty";
   }
@@ -255,28 +257,32 @@ function getLeaderboardData(
     options.projected === true;
 
   const isConfidenceGame =
-     isConfidenceScoringGame_(
-       gameId
-     ); 
-     
+    isConfidenceScoringGame_(
+      gameId
+    );
+
   const confidenceScoringMode =
-     getConfidenceScoringMode_(
-       gameId
-     );   
+    getConfidenceScoringMode_(
+      gameId
+    );
 
   /* =====================================================
      CATEGORY SETTINGS
   ===================================================== */
 
   const settings =
-    getCategorySettings(gameId);
+    getCategorySettings(
+      gameId
+    );
 
   /* =====================================================
      PICKS
   ===================================================== */
 
   const userPicks =
-    buildUserPicksMap_(gameId);
+    buildUserPicksMap_(
+      gameId
+    );
 
   const results = [];
 
@@ -300,12 +306,12 @@ function getLeaderboardData(
           const config =
             settings[categoryId] || {};
 
-          if (!config) {
-            return;
-          }
-
           const pick =
             picks[categoryId];
+
+          if (!pick) {
+            return;
+          }
 
           const basePoints =
             getScoringBasePoints_(
@@ -315,7 +321,9 @@ function getLeaderboardData(
             );
 
           const penalty =
-            Number(config.changePenalty) || 0;
+            Number(
+              config.changePenalty
+            ) || 0;
 
           const changeCount =
             Number(
@@ -361,29 +369,28 @@ function getLeaderboardData(
               normalizeScoreString_(
                 pick.nomineeId
               ) === winnerNomineeId;
-          
+
             if (isCorrect) {
-          
+
               total += adjustedPoints;
-          
+
               if (
-                config.countsAsStatue ===
-                true
+                config.countsAsStatue === true
               ) {
-          
+
                 statues++;
-          
+
               }
-          
+
             } else if (
               isConfidenceGame &&
               confidenceScoringMode === "risk_penalty"
             ) {
-          
+
               total -= adjustedPoints;
-          
+
             }
-          
+
           }
 
           /* =====================================================
@@ -399,47 +406,57 @@ function getLeaderboardData(
         });
 
       const profile =
-  getUserProfile(
-    username,
-    gameId
-  ) || {};
+        getUserProfile(
+          username,
+          gameId
+        ) || {};
 
-  results.push({
+      results.push({
 
-    user:
-      username,
+        user:
+          username,
 
-    displayName:
-      profile.displayName ||
-      username,
+        displayName:
+          profile.displayName ||
+          username,
 
-    avatar:
-      profile.avatar ||
-      "default",
+        avatar:
+          profile.avatar ||
+          "default",
 
-    themeColor:
-      profile.themeColor ||
-      "#354785",
+        themeColor:
+          profile.themeColor ||
+          "#354785",
 
-    total:
-      total,
+        total:
+          total,
 
-    remaining:
-      remaining,
+        remaining:
+          remaining,
 
-    max:
-      total + remaining,
+        max:
+          total + remaining,
 
-    statues:
-      statues,
+        statues:
+          statues,
 
-    eliminated:
-      false,
+        eliminated:
+          false,
 
-    winChance:
-      0
+        winChance:
+          0,
 
-  });
+        scoringMode:
+          isConfidenceGame
+            ? "confidence"
+            : "standard",
+
+        confidenceScoringMode:
+          isConfidenceGame
+            ? confidenceScoringMode
+            : ""
+
+      });
 
     });
 
@@ -504,10 +521,6 @@ function getLeaderboardData(
 
       }
 
-      /* =====================================================
-         FINALIZED GAME
-      ===================================================== */
-
       if (
         totalRemaining === 0
       ) {
@@ -520,10 +533,6 @@ function getLeaderboardData(
         return;
 
       }
-
-      /* =====================================================
-         SIMPLE MODEL
-      ===================================================== */
 
       r.winChance =
         Math.round(
