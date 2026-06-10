@@ -22,6 +22,31 @@ function adminSetupSlugify(value) {
     .replace(/^-|-$/g, "");
 }
 
+function adminSetupFormatDateTimeLocal(value) {
+
+  const text =
+    String(value || "").trim();
+
+  if (!text) {
+    return "";
+  }
+
+  // Already valid for datetime-local:
+  // yyyy-MM-ddThh:mm
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) {
+    return text;
+  }
+
+  // Convert ISO string:
+  // 2026-06-11T19:00:00.000Z
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    return text.substring(0, 16);
+  }
+
+  return "";
+
+}
+
 function adminSetupAutoFillCategoryId() {
   const nameInput = document.getElementById("setupNewCategoryName");
 
@@ -1649,7 +1674,9 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="datetime-local"
                   id="editCategoryLockDateTime_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.lockDateTime || "")}"
+                  value="${adminSetupEscapeHtml(
+                    adminSetupFormatDateTimeLocal(settings.lockDateTime)
+                  )}"
                 >
               </label>
 
