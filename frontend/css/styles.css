@@ -1634,3 +1634,40 @@ details[open] > summary .admin-collapse-icon {
 .hidden {
   display: none !important;
 }
+
+/* ======================
+   ADMIN GAMES COLLAPSIBLE
+====================== */
+
+.admin-games-panel {
+  overflow: hidden;
+}
+
+.admin-games-panel .admin-collapsible-body {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-games-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 0;
+}
+
+.admin-game-card {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.admin-game-card-summary {
+  align-items: center;
+}
+
+.admin-game-card-summary .admin-game-card-head {
+  flex: 1;
+}
+
+.admin-games-create-card,
+.admin-games-clone-card {
+  overflow: hidden;
+}

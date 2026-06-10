@@ -13,6 +13,16 @@ function adminGamesEscapeHtml(value) {
 
 }
 
+function adminGamesEscapeJs(value) {
+
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\n/g, "\\n")
+    .replace(/\r/g, "");
+
+}
+
 function adminGamesBoolBadge(value, trueText, falseText) {
 
   return `
@@ -84,7 +94,8 @@ async function renderAdminGamesPage() {
 
         <div>
           <h1>Manage Games</h1>
-          <p>
+
+          <p class="admin-sub">
             Create, clone, archive, and open game setup.
           </p>
         </div>
@@ -102,25 +113,48 @@ async function renderAdminGamesPage() {
 
       ${renderAdminCloneGameCard(games)}
 
-      <div class="admin-section-title">
-        Existing Games
-      </div>
+      <details
+        class="card admin-card admin-collapsible-card admin-games-panel"
+        open
+      >
 
-      ${
-        games.length
-          ? `
-            <div class="admin-game-list">
-              ${games
-                .map(renderAdminGameCard)
-                .join("")}
+        <summary class="admin-card-summary">
+
+          <div>
+            <h2>Existing Games</h2>
+
+            <div class="admin-sub">
+              ${games.length} games configured.
             </div>
-          `
-          : `
-            <div class="card">
-              No games found.
-            </div>
-          `
-      }
+          </div>
+
+          <span class="admin-collapse-icon">
+            ▾
+          </span>
+
+        </summary>
+
+        <div class="admin-collapsible-body">
+
+          ${
+            games.length
+              ? `
+                <div class="admin-games-list">
+                  ${games
+                    .map(renderAdminGameCard)
+                    .join("")}
+                </div>
+              `
+              : `
+                <div class="admin-sub">
+                  No games found.
+                </div>
+              `
+          }
+
+        </div>
+
+      </details>
 
     </div>
   `;
@@ -131,80 +165,152 @@ async function renderAdminGamesPage() {
    NEW GAME CARD
 ====================== */
 
-function renderAdminNewGameCard() {
+function renderAdminGameCard(game) {
+
+  const gameId =
+    adminGamesEscapeHtml(game.gameId);
+
+  const name =
+    adminGamesEscapeHtml(
+      game.name || game.gameId
+    );
+
+  const openAttr =
+    game.defaultGame || game.active
+      ? "open"
+      : "";
 
   return `
-    <div class="card admin-card">
+    <details
+      class="card admin-game-card admin-collapsible-card"
+      ${openAttr}
+    >
 
-      <h2>New Game</h2>
+      <summary class="admin-card-summary admin-game-card-summary">
 
-      <p class="admin-muted">
-        New games are created as draft/inactive by default.
-      </p>
+        <div class="admin-game-card-head">
 
-      <div class="admin-form-grid">
+          <div>
+            <h2>${name}</h2>
 
-        <label>
-          Game Name
-          <input
-            id="adminNewGameName"
-            class="input admin-input"
-            placeholder="Oscars 2027"
+            <div class="admin-game-id">
+              ${gameId}
+            </div>
+          </div>
+
+          <div class="admin-status-stack">
+            ${adminGamesStatusBadge(game)}
+            ${
+              game.defaultGame
+                ? adminGamesBoolBadge(true, "Default", "")
+                : ""
+            }
+          </div>
+
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <div class="admin-game-meta">
+
+          <div>
+            <strong>Year</strong>
+            <span>${adminGamesEscapeHtml(game.year || "")}</span>
+          </div>
+
+          <div>
+            <strong>Type</strong>
+            <span>${adminGamesEscapeHtml(game.type || "")}</span>
+          </div>
+
+          <div>
+            <strong>Predictions</strong>
+            ${adminGamesBoolBadge(
+              game.predictionEnabled,
+              "On",
+              "Off"
+            )}
+          </div>
+
+          <div>
+            <strong>Ranking</strong>
+            ${adminGamesBoolBadge(
+              game.rankingEnabled,
+              "On",
+              "Off"
+            )}
+          </div>
+
+          <div>
+            <strong>Active</strong>
+            ${adminGamesBoolBadge(
+              game.active,
+              "Yes",
+              "No"
+            )}
+          </div>
+
+          <div>
+            <strong>Archived</strong>
+            ${adminGamesBoolBadge(
+              game.archived,
+              "Yes",
+              "No"
+            )}
+          </div>
+
+        </div>
+
+        <div class="admin-card-actions">
+
+          <button
+            class="admin-secondary-button"
+            onclick="navigate('admin-game-setup:${gameId}')"
           >
-        </label>
+            Open Setup
+          </button>
 
-        <label>
-          Game ID
-          <input
-            id="adminNewGameId"
-            class="input admin-input"
-            placeholder="oscars-2027"
+          <button
+            class="admin-secondary-button"
+            onclick="adminRunPreflightCheck('${gameId}')"
           >
-        </label>
+            Run Check
+          </button>
 
-        <label>
-          Year
-          <input
-            id="adminNewGameYear"
-            class="input admin-input"
-            placeholder="2027"
-            inputmode="numeric"
+          <button
+            class="admin-secondary-button"
+            onclick="adminPrefillCloneGame('${adminGamesEscapeJs(
+              game.gameId
+            )}', '${adminGamesEscapeJs(game.name || game.gameId)}')"
           >
-        </label>
+            Clone
+          </button>
 
-        <label>
-          Type
-          <input
-            id="adminNewGameType"
-            class="input admin-input"
-            placeholder="oscars"
+          <button
+            class="admin-danger-button"
+            onclick="adminArchiveGameConfirm('${gameId}')"
           >
-        </label>
+            Archive
+          </button>
 
-        <label>
-          Theme Color
-          <input
-            id="adminNewThemeColor"
-            class="input admin-input"
-            placeholder="#d4af37"
-          >
-        </label>
+        </div>
+
+        ${renderAdminPublishControls(game)}
+
+        <div
+          id="adminPreflightResult_${gameId}"
+          class="admin-preflight-result"
+        ></div>
 
       </div>
 
-      <button
-        class="button admin-action-button"
-        onclick="adminCreateGameFromForm()"
-      >
-        Create Draft Game
-      </button>
-
-      <div
-        id="adminNewGameMessage"
-        class="admin-message"
-      ></div>
-
-    </div>
+    </details>
   `;
 
 }
@@ -225,100 +331,125 @@ function renderAdminCloneGameCard(games) {
       .join("");
 
   return `
-    <div class="card admin-card">
+    <details
+      id="adminCloneGameCard"
+      class="card admin-card admin-collapsible-card admin-games-clone-card"
+    >
 
-      <h2>Clone Game Setup</h2>
+      <summary class="admin-card-summary">
 
-      <p class="admin-muted">
-        Clone a previous game into a new draft game. Winners and favorites are cleared.
-      </p>
+        <div>
+          <h2>Clone Game Setup</h2>
 
-      <div class="admin-form-grid">
+          <div class="admin-sub">
+            Clone a previous game into a new draft game.
+          </div>
+        </div>
 
-        <label>
-          Source Game
-          <select
-            id="adminCloneSourceGameId"
-            class="input admin-input"
-          >
-            ${options}
-          </select>
-        </label>
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
 
-        <label>
-          New Game Name
-          <input
-            id="adminCloneNewName"
-            class="input admin-input"
-            placeholder="Oscars 2028"
-          >
-        </label>
+      </summary>
 
-        <label>
-          New Game ID
-          <input
-            id="adminCloneNewGameId"
-            class="input admin-input"
-            placeholder="oscars-2028"
-          >
-        </label>
+      <div class="admin-collapsible-body">
 
-        <label>
-          New Year
-          <input
-            id="adminCloneNewYear"
-            class="input admin-input"
-            placeholder="2028"
-            inputmode="numeric"
-          >
-        </label>
+        <p class="admin-muted">
+          Winners and favorites are cleared when cloning.
+        </p>
+
+        <div class="admin-form-grid">
+
+          <label>
+            Source Game
+
+            <select
+              id="adminCloneSourceGameId"
+              class="input admin-input"
+            >
+              ${options}
+            </select>
+          </label>
+
+          <label>
+            New Game Name
+
+            <input
+              id="adminCloneNewName"
+              class="input admin-input"
+              placeholder="Oscars 2028"
+            >
+          </label>
+
+          <label>
+            New Game ID
+
+            <input
+              id="adminCloneNewGameId"
+              class="input admin-input"
+              placeholder="oscars-2028"
+            >
+          </label>
+
+          <label>
+            New Year
+
+            <input
+              id="adminCloneNewYear"
+              class="input admin-input"
+              placeholder="2028"
+              inputmode="numeric"
+            >
+          </label>
+
+        </div>
+
+        <div class="admin-checkbox-row">
+
+          <label>
+            <input
+              id="adminCloneSettings"
+              type="checkbox"
+              checked
+            >
+            Clone settings
+          </label>
+
+          <label>
+            <input
+              id="adminCloneNominees"
+              type="checkbox"
+              checked
+            >
+            Clone nominees
+          </label>
+
+          <label>
+            <input
+              id="adminCloneLocked"
+              type="checkbox"
+              checked
+            >
+            Lock cloned categories
+          </label>
+
+        </div>
+
+        <button
+          class="button admin-action-button"
+          onclick="adminCloneGameFromForm()"
+        >
+          Clone Game
+        </button>
+
+        <div
+          id="adminCloneGameMessage"
+          class="admin-message"
+        ></div>
 
       </div>
 
-      <div class="admin-checkbox-row">
-
-        <label>
-          <input
-            id="adminCloneSettings"
-            type="checkbox"
-            checked
-          >
-          Clone settings
-        </label>
-
-        <label>
-          <input
-            id="adminCloneNominees"
-            type="checkbox"
-            checked
-          >
-          Clone nominees
-        </label>
-
-        <label>
-          <input
-            id="adminCloneLocked"
-            type="checkbox"
-            checked
-          >
-          Lock cloned categories
-        </label>
-
-      </div>
-
-      <button
-        class="button admin-action-button"
-        onclick="adminCloneGameFromForm()"
-      >
-        Clone Game
-      </button>
-
-      <div
-        id="adminCloneGameMessage"
-        class="admin-message"
-      ></div>
-
-    </div>
+    </details>
   `;
 
 }
@@ -675,6 +806,11 @@ async function adminCreateGameFromForm() {
 
 function adminPrefillCloneGame(gameId, name) {
 
+  const cloneCard =
+    document.getElementById(
+      "adminCloneGameCard"
+    );
+
   const source =
     document.getElementById(
       "adminCloneSourceGameId"
@@ -690,8 +826,14 @@ function adminPrefillCloneGame(gameId, name) {
       "adminCloneNewGameId"
     );
 
+  if (cloneCard) {
+    cloneCard.open =
+      true;
+  }
+
   if (source) {
-    source.value = gameId;
+    source.value =
+      gameId;
   }
 
   if (newName) {
@@ -706,10 +848,27 @@ function adminPrefillCloneGame(gameId, name) {
       );
   }
 
-  window.scrollTo({
-    top: 0,
-    behavior: "smooth"
-  });
+  if (cloneCard) {
+
+    cloneCard.scrollIntoView({
+      behavior:
+        "smooth",
+
+      block:
+        "start"
+    });
+
+  } else {
+
+    window.scrollTo({
+      top:
+        0,
+
+      behavior:
+        "smooth"
+    });
+
+  }
 
 }
 
