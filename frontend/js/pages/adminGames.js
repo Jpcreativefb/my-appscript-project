@@ -66,7 +66,7 @@ async function renderAdminGamesPage() {
     return `
       <div class="page">
 
-        <h1>Manage Games</h1>
+        <h1>Manage Games TEST</h1>
 
         <div class="card">
           Could not load games.
@@ -115,7 +115,6 @@ async function renderAdminGamesPage() {
 
       <details
         class="card admin-card admin-collapsible-card admin-games-panel"
-        open
       >
 
         <summary class="admin-card-summary">
@@ -162,7 +161,7 @@ async function renderAdminGamesPage() {
 }
 
 /* ======================
-   NEW GAME CARD
+   GAME CARD
 ====================== */
 
 function renderAdminGameCard(game) {
@@ -176,9 +175,7 @@ function renderAdminGameCard(game) {
     );
 
   const openAttr =
-    game.defaultGame || game.active
-      ? "open"
-      : "";
+    "";
 
   return `
     <details
@@ -306,6 +303,113 @@ function renderAdminGameCard(game) {
         <div
           id="adminPreflightResult_${gameId}"
           class="admin-preflight-result"
+        ></div>
+
+      </div>
+
+    </details>
+  `;
+
+}
+
+/* ======================
+   NEW GAME CARD
+====================== */
+
+function renderAdminNewGameCard() {
+
+  return `
+    <details
+      class="card admin-card admin-collapsible-card admin-games-create-card"
+    >
+
+      <summary class="admin-card-summary">
+
+        <div>
+          <h2>New Game</h2>
+
+          <div class="admin-sub">
+            Create a new draft/inactive game.
+          </div>
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <p class="admin-muted">
+          New games are created as draft/inactive by default.
+        </p>
+
+        <div class="admin-form-grid">
+
+          <label>
+            Game Name
+
+            <input
+              id="adminNewGameName"
+              class="input admin-input"
+              placeholder="Oscars 2027"
+            >
+          </label>
+
+          <label>
+            Game ID
+
+            <input
+              id="adminNewGameId"
+              class="input admin-input"
+              placeholder="oscars-2027"
+            >
+          </label>
+
+          <label>
+            Year
+
+            <input
+              id="adminNewGameYear"
+              class="input admin-input"
+              placeholder="2027"
+              inputmode="numeric"
+            >
+          </label>
+
+          <label>
+            Type
+
+            <input
+              id="adminNewGameType"
+              class="input admin-input"
+              placeholder="oscars"
+            >
+          </label>
+
+          <label>
+            Theme Color
+
+            <input
+              id="adminNewThemeColor"
+              class="input admin-input"
+              placeholder="#d4af37"
+            >
+          </label>
+
+        </div>
+
+        <button
+          class="button admin-action-button"
+          onclick="adminCreateGameFromForm()"
+        >
+          Create Draft Game
+        </button>
+
+        <div
+          id="adminNewGameMessage"
+          class="admin-message"
         ></div>
 
       </div>
@@ -450,136 +554,6 @@ function renderAdminCloneGameCard(games) {
       </div>
 
     </details>
-  `;
-
-}
-
-/* ======================
-   GAME CARD
-====================== */
-
-function renderAdminGameCard(game) {
-
-  const gameId =
-    adminGamesEscapeHtml(game.gameId);
-
-  const name =
-    adminGamesEscapeHtml(
-      game.name || game.gameId
-    );
-
-  return `
-    <div class="card admin-game-card">
-
-      <div class="admin-game-card-head">
-
-        <div>
-          <h2>${name}</h2>
-
-          <div class="admin-game-id">
-            ${gameId}
-          </div>
-        </div>
-
-        <div class="admin-status-stack">
-          ${adminGamesStatusBadge(game)}
-          ${game.defaultGame
-            ? adminGamesBoolBadge(true, "Default", "")
-            : ""}
-        </div>
-
-      </div>
-
-      <div class="admin-game-meta">
-
-        <div>
-          <strong>Year</strong>
-          <span>${adminGamesEscapeHtml(game.year || "")}</span>
-        </div>
-
-        <div>
-          <strong>Type</strong>
-          <span>${adminGamesEscapeHtml(game.type || "")}</span>
-        </div>
-
-        <div>
-          <strong>Predictions</strong>
-          ${adminGamesBoolBadge(
-            game.predictionEnabled,
-            "On",
-            "Off"
-          )}
-        </div>
-
-        <div>
-          <strong>Ranking</strong>
-          ${adminGamesBoolBadge(
-            game.rankingEnabled,
-            "On",
-            "Off"
-          )}
-        </div>
-
-        <div>
-          <strong>Active</strong>
-          ${adminGamesBoolBadge(
-            game.active,
-            "Yes",
-            "No"
-          )}
-        </div>
-
-        <div>
-          <strong>Archived</strong>
-          ${adminGamesBoolBadge(
-            game.archived,
-            "Yes",
-            "No"
-          )}
-        </div>
-
-      </div>
-
-           <div class="admin-card-actions">
-
-        <button
-          class="admin-secondary-button"
-          onclick="navigate('admin-game-setup:${gameId}')"
-        >
-          Open Setup
-        </button>
-
-        <button
-           class="admin-secondary-button"
-           onclick="adminRunPreflightCheck('${gameId}')"
-        >
-          Run Check
-        </button>
-
-        <button
-          class="admin-secondary-button"
-          onclick="adminPrefillCloneGame('${gameId}', '${name}')"
-        >
-          Clone
-        </button>
-
-        <button
-          class="admin-danger-button"
-          onclick="adminArchiveGameConfirm('${gameId}')"
-        >
-          Archive
-        </button>
-
-      </div>
-
-      ${renderAdminPublishControls(game)}
-
-      <div
-        id="adminPreflightResult_${gameId}"
-        class="admin-preflight-result"
-      ></div>
-
-    </div>
   `;
 
 }
