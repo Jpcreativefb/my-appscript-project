@@ -23,78 +23,39 @@ function adminSetupSlugify(value) {
 }
 
 function adminSetupAutoFillCategoryId() {
+  const nameInput = document.getElementById("setupNewCategoryName");
 
-  const nameInput =
-    document.getElementById(
-      "setupNewCategoryName"
-    );
+  const idInput = document.getElementById("setupNewCategoryId");
 
-  const idInput =
-    document.getElementById(
-      "setupNewCategoryId"
-    );
-
-  if (
-    !nameInput ||
-    !idInput ||
-    adminSetupCategoryIdTouched
-  ) {
+  if (!nameInput || !idInput || adminSetupCategoryIdTouched) {
     return;
   }
 
-  idInput.value =
-    adminSetupSlugify(
-      nameInput.value
-    );
-
+  idInput.value = adminSetupSlugify(nameInput.value);
 }
 
 function adminSetupAutoFillNomineeFields() {
+  const nomineeInput = document.getElementById("setupNewNomineeName");
 
-  const nomineeInput =
-    document.getElementById(
-      "setupNewNomineeName"
-    );
+  const nomineeIdInput = document.getElementById("setupNewNomineeId");
 
-  const nomineeIdInput =
-    document.getElementById(
-      "setupNewNomineeId"
-    );
-
-  const shortAnswerInput =
-    document.getElementById(
-      "setupNewNomineeShortAnswer"
-    );
+  const shortAnswerInput = document.getElementById(
+    "setupNewNomineeShortAnswer"
+  );
 
   if (!nomineeInput) {
     return;
   }
 
-  const nomineeName =
-    nomineeInput.value.trim();
+  const nomineeName = nomineeInput.value.trim();
 
-  if (
-    nomineeIdInput &&
-    !adminSetupNomineeIdTouched
-  ) {
-
-    nomineeIdInput.value =
-      adminSetupSlugify(
-        nomineeName
-      );
-
+  if (nomineeIdInput && !adminSetupNomineeIdTouched) {
+    nomineeIdInput.value = adminSetupSlugify(nomineeName);
   }
 
-  if (
-    shortAnswerInput &&
-    !adminSetupShortAnswerTouched
-  ) {
-
-    shortAnswerInput.value =
-      nomineeName;
-
+  if (shortAnswerInput && !adminSetupShortAnswerTouched) {
+    shortAnswerInput.value = nomineeName;
   }
-
 }
 
 function adminSetupBoolText(value) {
@@ -102,18 +63,11 @@ function adminSetupBoolText(value) {
 }
 
 function adminSetupCleanFileId(value) {
-
-  return String(value || "")
-    .trim();
-
+  return String(value || "").trim();
 }
 
 function adminSetupDriveThumbnailUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
@@ -124,34 +78,22 @@ function adminSetupDriveThumbnailUrl(fileId) {
     encodeURIComponent(fileId) +
     "&sz=w240-h360"
   );
-
 }
 
 function adminSetupDriveViewUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
   }
 
   return (
-    "https://drive.google.com/file/d/" +
-    encodeURIComponent(fileId) +
-    "/view"
+    "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/view"
   );
-
 }
 
 function adminSetupDriveDownloadUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
@@ -161,40 +103,24 @@ function adminSetupDriveDownloadUrl(fileId) {
     "https://drive.google.com/uc?export=download&id=" +
     encodeURIComponent(fileId)
   );
-
 }
 
 function renderAdminSetupFileTools(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
-
     return `
       <div class="admin-file-tools empty">
         No File ID set.
       </div>
     `;
-
   }
 
-  const thumbnailUrl =
-    adminSetupDriveThumbnailUrl(
-      fileId
-    );
+  const thumbnailUrl = adminSetupDriveThumbnailUrl(fileId);
 
-  const viewUrl =
-    adminSetupDriveViewUrl(
-      fileId
-    );
+  const viewUrl = adminSetupDriveViewUrl(fileId);
 
-  const downloadUrl =
-    adminSetupDriveDownloadUrl(
-      fileId
-    );
+  const downloadUrl = adminSetupDriveDownloadUrl(fileId);
 
   return `
     <div class="admin-file-tools">
@@ -230,7 +156,9 @@ function renderAdminSetupFileTools(fileId) {
         <button
           type="button"
           class="admin-small-button secondary"
-          onclick="navigator.clipboard.writeText('${adminSetupEscapeHtml(fileId)}')"
+          onclick="navigator.clipboard.writeText('${adminSetupEscapeHtml(
+            fileId
+          )}')"
         >
           Copy File ID
         </button>
@@ -239,11 +167,9 @@ function renderAdminSetupFileTools(fileId) {
 
     </div>
   `;
-
 }
 
 function renderAdminSetupAddCategoryCard(gameId) {
-
   return `
     <details
       class="card admin-card admin-collapsible-card"
@@ -439,7 +365,6 @@ function renderAdminSetupAddCategoryCard(gameId) {
 
     </details>
   `;
-
 }
 
 async function renderAdminGameSetupPage(gameId) {
@@ -589,11 +514,7 @@ async function renderAdminGameSetupPage(gameId) {
 }
 
 function adminSetupOpenAttr(defaultOpen) {
-
-  return defaultOpen
-    ? "open"
-    : "";
-
+  return defaultOpen ? "open" : "";
 }
 
 /* ======================
@@ -601,65 +522,43 @@ function adminSetupOpenAttr(defaultOpen) {
 ====================== */
 
 function adminSetupCleanFileId(value) {
-
-  return String(value || "")
-    .trim();
-
+  return String(value || "").trim();
 }
 
 function adminSetupExtractDriveFileId(value) {
-
-  const text =
-    String(value || "")
-      .trim();
+  const text = String(value || "").trim();
 
   if (!text) {
     return "";
   }
 
   // Already looks like a plain Drive file ID
-  if (
-    /^[a-zA-Z0-9_-]{20,}$/.test(text) &&
-    text.indexOf("/") === -1
-  ) {
+  if (/^[a-zA-Z0-9_-]{20,}$/.test(text) && text.indexOf("/") === -1) {
     return text;
   }
 
   // Format:
   // https://drive.google.com/file/d/FILE_ID/view
-  const fileMatch =
-    text.match(/\/file\/d\/([^/]+)/);
+  const fileMatch = text.match(/\/file\/d\/([^/]+)/);
 
-  if (
-    fileMatch &&
-    fileMatch[1]
-  ) {
+  if (fileMatch && fileMatch[1]) {
     return fileMatch[1];
   }
 
   // Format:
   // https://drive.google.com/open?id=FILE_ID
   // https://drive.google.com/uc?id=FILE_ID
-  const idMatch =
-    text.match(/[?&]id=([^&]+)/);
+  const idMatch = text.match(/[?&]id=([^&]+)/);
 
-  if (
-    idMatch &&
-    idMatch[1]
-  ) {
+  if (idMatch && idMatch[1]) {
     return idMatch[1];
   }
 
   return text;
-
 }
 
 function adminSetupDriveThumbnailUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
@@ -670,34 +569,22 @@ function adminSetupDriveThumbnailUrl(fileId) {
     encodeURIComponent(fileId) +
     "&sz=w240-h360"
   );
-
 }
 
 function adminSetupDriveViewUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
   }
 
   return (
-    "https://drive.google.com/file/d/" +
-    encodeURIComponent(fileId) +
-    "/view"
+    "https://drive.google.com/file/d/" + encodeURIComponent(fileId) + "/view"
   );
-
 }
 
 function adminSetupDriveDownloadUrl(fileId) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
     return "";
@@ -707,69 +594,43 @@ function adminSetupDriveDownloadUrl(fileId) {
     "https://drive.google.com/uc?export=download&id=" +
     encodeURIComponent(fileId)
   );
-
 }
 
 function adminSetupCopyText(value) {
-
-  const text =
-    String(value || "")
-      .trim();
+  const text = String(value || "").trim();
 
   if (!text) {
     return;
   }
 
-  if (
-    navigator.clipboard &&
-    navigator.clipboard.writeText
-  ) {
-
-    navigator.clipboard.writeText(
-      text
-    );
-
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text);
   }
-
 }
 
 function adminSetupNormalizeFileInput(inputId) {
-
-  const input =
-    document.getElementById(
-      inputId
-    );
+  const input = document.getElementById(inputId);
 
   if (!input) {
     return;
   }
 
-  input.value =
-    adminSetupExtractDriveFileId(
-      input.value
-    );
-
+  input.value = adminSetupExtractDriveFileId(input.value);
 }
 
-function renderAdminSetupFileTools(
-  fileId,
-  inputId
-) {
-
-  fileId =
-    adminSetupCleanFileId(
-      fileId
-    );
+function renderAdminSetupFileTools(fileId, inputId) {
+  fileId = adminSetupCleanFileId(fileId);
 
   if (!fileId) {
-
     return `
       <div class="admin-file-tools empty">
 
         <button
           type="button"
           class="admin-small-button secondary"
-          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(inputId)}')"
+          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(
+            inputId
+          )}')"
         >
           Extract ID from pasted Drive link
         </button>
@@ -780,23 +641,13 @@ function renderAdminSetupFileTools(
 
       </div>
     `;
-
   }
 
-  const thumbnailUrl =
-    adminSetupDriveThumbnailUrl(
-      fileId
-    );
+  const thumbnailUrl = adminSetupDriveThumbnailUrl(fileId);
 
-  const viewUrl =
-    adminSetupDriveViewUrl(
-      fileId
-    );
+  const viewUrl = adminSetupDriveViewUrl(fileId);
 
-  const downloadUrl =
-    adminSetupDriveDownloadUrl(
-      fileId
-    );
+  const downloadUrl = adminSetupDriveDownloadUrl(fileId);
 
   return `
     <div class="admin-file-tools">
@@ -840,7 +691,9 @@ function renderAdminSetupFileTools(
         <button
           type="button"
           class="admin-small-button secondary"
-          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(inputId)}')"
+          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(
+            inputId
+          )}')"
         >
           Extract ID
         </button>
@@ -849,7 +702,6 @@ function renderAdminSetupFileTools(
 
     </div>
   `;
-
 }
 
 /* ======================
@@ -857,268 +709,143 @@ function renderAdminSetupFileTools(
 ====================== */
 
 function adminSetupFileToBase64(file) {
-
   return new Promise((resolve, reject) => {
-
-    const reader =
-      new FileReader();
+    const reader = new FileReader();
 
     reader.onload = () => {
+      const result = String(reader.result || "");
 
-      const result =
-        String(reader.result || "");
-
-      const base64 =
-        result.indexOf(",") !== -1
-          ? result.split(",")[1]
-          : result;
+      const base64 = result.indexOf(",") !== -1 ? result.split(",")[1] : result;
 
       resolve(base64);
-
     };
 
     reader.onerror = () => {
-
-      reject(
-        new Error("Could not read image file.")
-      );
-
+      reject(new Error("Could not read image file."));
     };
 
     reader.readAsDataURL(file);
-
   });
-
 }
 
 function adminSetupValidateImageFile(file) {
-
   if (!file) {
-
     return "Choose an image file first.";
-
   }
 
-  const allowedTypes = [
-    "image/jpeg",
-    "image/png",
-    "image/webp",
-    "image/gif"
-  ];
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-  if (
-    allowedTypes.indexOf(file.type) === -1
-  ) {
-
+  if (allowedTypes.indexOf(file.type) === -1) {
     return "Image must be JPG, PNG, WEBP, or GIF.";
-
   }
 
-  const maxBytes =
-    1 * 1024 * 1024;
+  const maxBytes = 1 * 1024 * 1024;
 
   if (file.size > maxBytes) {
-
     return "Image must be 5MB or smaller.";
-
   }
 
   return "";
-
 }
 
-async function adminSetupUploadNomineeImage(
-  gameId,
-  categoryId,
-  nomineeId
-) {
+async function adminSetupUploadNomineeImage(gameId, categoryId, nomineeId) {
+  console.log("UPLOAD START", {
+    gameId: gameId,
+    categoryId: categoryId,
+    nomineeId: nomineeId,
+  });
 
-  console.log(
-    "UPLOAD START",
-    {
-      gameId:
-        gameId,
-      categoryId:
-        categoryId,
-      nomineeId:
-        nomineeId
-    }
+  const inputId = "uploadNomineeImage_" + categoryId + "_" + nomineeId;
+
+  const fileInput = document.getElementById(inputId);
+
+  const fileIdInput = document.getElementById(
+    "editNomineeFileId_" + categoryId + "_" + nomineeId
   );
 
-  const inputId =
-    "uploadNomineeImage_" +
-    categoryId +
-    "_" +
-    nomineeId;
+  const messageId = "editNomineeMessage_" + categoryId + "_" + nomineeId;
 
-  const fileInput =
-    document.getElementById(
-      inputId
-    );
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    adminSetupSetMessage(messageId, "Choose an image file first.", true);
 
-  const fileIdInput =
-    document.getElementById(
-      "editNomineeFileId_" +
-      categoryId +
-      "_" +
-      nomineeId
-    );
-
-  const messageId =
-    "editNomineeMessage_" +
-    categoryId +
-    "_" +
-    nomineeId;
-
-  if (
-    !fileInput ||
-    !fileInput.files ||
-    !fileInput.files[0]
-  ) {
-
-    adminSetupSetMessage(
-      messageId,
-      "Choose an image file first.",
-      true
-    );
-
-    console.log(
-      "UPLOAD STOP: no file selected"
-    );
+    console.log("UPLOAD STOP: no file selected");
 
     return;
-
   }
 
-  const file =
-    fileInput.files[0];
+  const file = fileInput.files[0];
 
-  console.log(
-    "UPLOAD FILE",
-    {
-      name:
-        file.name,
-      type:
-        file.type,
-      size:
-        file.size
-    }
-  );
+  console.log("UPLOAD FILE", {
+    name: file.name,
+    type: file.type,
+    size: file.size,
+  });
 
-  const validationError =
-    adminSetupValidateImageFile(
-      file
-    );
+  const validationError = adminSetupValidateImageFile(file);
 
   if (validationError) {
+    adminSetupSetMessage(messageId, validationError, true);
 
-    adminSetupSetMessage(
-      messageId,
-      validationError,
-      true
-    );
-
-    console.log(
-      "UPLOAD STOP: validation error",
-      validationError
-    );
+    console.log("UPLOAD STOP: validation error", validationError);
 
     return;
-
   }
 
-  adminSetupSetMessage(
-    messageId,
-    "Reading image file...",
-    false
-  );
+  adminSetupSetMessage(messageId, "Reading image file...", false);
 
   let base64 = "";
 
   try {
+    base64 = await adminSetupFileToBase64(file);
 
-    base64 =
-      await adminSetupFileToBase64(
-        file
-      );
-
-    console.log(
-      "UPLOAD BASE64 READY",
-      {
-        length:
-          base64.length
-      }
-    );
-
+    console.log("UPLOAD BASE64 READY", {
+      length: base64.length,
+    });
   } catch (err) {
-
     adminSetupSetMessage(
       messageId,
       err.message || "Could not read image file.",
       true
     );
 
-    console.error(
-      "UPLOAD READ ERROR",
-      err
-    );
+    console.error("UPLOAD READ ERROR", err);
 
     return;
-
   }
 
-  adminSetupSetMessage(
-    messageId,
-    "Uploading image to Drive...",
-    false
-  );
+  adminSetupSetMessage(messageId, "Uploading image to Drive...", false);
 
   let res;
 
   try {
+    res = await Promise.race([
+      apiAdminUploadImage({
+        gameId: gameId,
 
-    res =
-      await Promise.race([
-        apiAdminUploadImage({
-          gameId:
-            gameId,
+        categoryId: categoryId,
 
-          categoryId:
-            categoryId,
+        nomineeId: nomineeId,
 
-          nomineeId:
-            nomineeId,
+        fileName: file.name,
 
-          fileName:
-            file.name,
+        mimeType: file.type,
 
-          mimeType:
-            file.type,
+        base64: base64,
+      }),
 
-          base64:
-            base64
-        }),
-
-        new Promise(resolve =>
-          setTimeout(
-            () =>
-              resolve({
-                success:
-                  false,
-                error:
-                  "Upload timed out after 45 seconds."
-              }),
-            45000
-          )
+      new Promise((resolve) =>
+        setTimeout(
+          () =>
+            resolve({
+              success: false,
+              error: "Upload timed out after 45 seconds.",
+            }),
+          45000
         )
-      ]);
-
+      ),
+    ]);
   } catch (err) {
-
-    console.error(
-      "UPLOAD API ERROR",
-      err
-    );
+    console.error("UPLOAD API ERROR", err);
 
     adminSetupSetMessage(
       messageId,
@@ -1127,19 +854,11 @@ async function adminSetupUploadNomineeImage(
     );
 
     return;
-
   }
 
-  console.log(
-    "UPLOAD RESPONSE",
-    res
-  );
+  console.log("UPLOAD RESPONSE", res);
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       messageId,
       res && (res.message || res.error)
@@ -1149,14 +868,10 @@ async function adminSetupUploadNomineeImage(
     );
 
     return;
-
   }
 
   if (fileIdInput) {
-
-    fileIdInput.value =
-      res.fileId || "";
-
+    fileIdInput.value = res.fileId || "";
   }
 
   adminSetupSetMessage(
@@ -1164,7 +879,6 @@ async function adminSetupUploadNomineeImage(
     "Image uploaded. Click Save Nominee to keep this File ID.",
     false
   );
-
 }
 
 /* ======================
@@ -1172,24 +886,13 @@ async function adminSetupUploadNomineeImage(
 ====================== */
 
 function renderAdminSetupCategoryCard(category) {
+  const settings = category.settings || {};
 
-  const settings =
-    category.settings || {};
+  const nominees = Array.isArray(category.nominees) ? category.nominees : [];
 
-  const nominees =
-    Array.isArray(category.nominees)
-      ? category.nominees
-      : [];
+  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const gameId =
-    adminSetupEscapeHtml(
-      category.gameId
-    );
-
-  const categoryId =
-    adminSetupEscapeHtml(
-      category.categoryId
-    );
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
 
   return `
     <details
@@ -1389,7 +1092,9 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="text"
                   id="editCategoryParentCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.parentCategoryId || "")}"
+                  value="${adminSetupEscapeHtml(
+                    settings.parentCategoryId || ""
+                  )}"
                   placeholder="Optional parent category"
                 >
               </label>
@@ -1400,7 +1105,9 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="text"
                   id="editCategoryFollowUpCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.followUpCategoryId || "")}"
+                  value="${adminSetupEscapeHtml(
+                    settings.followUpCategoryId || ""
+                  )}"
                   placeholder="Optional follow-up category"
                 >
               </label>
@@ -1414,7 +1121,9 @@ function renderAdminSetupCategoryCard(category) {
                 id="editCategoryFollowUpMapJSON_${categoryId}"
                 rows="4"
                 placeholder='{"winner-id":"follow-up-category-id"}'
-              >${adminSetupEscapeHtml(settings.followUpMapJSON || "")}</textarea>
+              >${adminSetupEscapeHtml(
+                settings.followUpMapJSON || ""
+              )}</textarea>
             </label>
 
           </details>
@@ -1468,10 +1177,7 @@ function renderAdminSetupCategoryCard(category) {
               nominees.length
                 ? nominees
                     .map((nominee) =>
-                      renderAdminSetupNomineeRow(
-                        category,
-                        nominee
-                      )
+                      renderAdminSetupNomineeRow(category, nominee)
                     )
                     .join("")
                 : `
@@ -1489,26 +1195,22 @@ function renderAdminSetupCategoryCard(category) {
 
     </details>
   `;
-
 }
 
 /* ======================
    ADD NOMINEE CARD
 ====================== */
 
-function renderAdminSetupAddNomineeCard(
-  gameId,
-  categories
-) {
-
-  const options =
-    categories
-      .map(cat => `
+function renderAdminSetupAddNomineeCard(gameId, categories) {
+  const options = categories
+    .map(
+      (cat) => `
         <option value="${adminSetupEscapeHtml(cat.categoryId)}">
           ${adminSetupEscapeHtml(cat.category || cat.categoryId)}
         </option>
-      `)
-      .join("");
+      `
+    )
+    .join("");
 
   return `
     <details
@@ -1617,7 +1319,9 @@ function renderAdminSetupAddNomineeCard(
 
               <button
                 class="admin-small-button"
-                onclick="adminSetupCreateNominee('${adminSetupEscapeHtml(gameId)}')"
+                onclick="adminSetupCreateNominee('${adminSetupEscapeHtml(
+                  gameId
+                )}')"
               >
                 Add Nominee
               </button>
@@ -1638,7 +1342,6 @@ function renderAdminSetupAddNomineeCard(
 
     </details>
   `;
-
 }
 
 /* ======================
@@ -1847,14 +1550,14 @@ function renderAdminSetupCategoryCard(category) {
       ${
         nominees.length
           ? nominees
-                .map((nominee) => renderAdminSetupNomineeRow(category, nominee))
-                .join("")
-            : `
+              .map((nominee) => renderAdminSetupNomineeRow(category, nominee))
+              .join("")
+          : `
               <div class="admin-sub">
                 No nominees added yet.
               </div>
             `
-        }
+      }
 
       </div>
 
@@ -1912,7 +1615,7 @@ function renderAdminResultsPanel(category, nominees, settings) {
     })
     .join("");
 
-    return `
+  return `
     <details class="admin-results-panel">
   
       <summary class="admin-results-summary">
@@ -2031,21 +1734,13 @@ function adminSetupGetCategoryNameById(categoryId) {
 }
 
 function renderAdminSetupNomineeRow(category, nominee) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const gameId =
-    adminSetupEscapeHtml(category.gameId);
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
 
-  const categoryId =
-    adminSetupEscapeHtml(category.categoryId);
+  const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
 
-  const nomineeId =
-    adminSetupEscapeHtml(nominee.nomineeId);
-
-  const fileInputId =
-    "editNomineeFileId_" +
-    categoryId +
-    "_" +
-    nomineeId;
+  const fileInputId = "editNomineeFileId_" + categoryId + "_" + nomineeId;
 
   return `
     <div class="admin-setup-nominee-edit-row">
@@ -2087,30 +1782,38 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
           <div class="admin-upload-tools">
 
-           <label class="admin-field">
-             <span>Upload Image</span>
+  <label class="admin-field">
+    <span>Choose Image</span>
 
-           <input
-             type="file"
-             id="uploadNomineeImage_${categoryId}_${nomineeId}"
-             accept="image/jpeg,image/png,image/webp,image/gif"
-           >
-        </label>
+    <input
+      type="file"
+      id="uploadNomineeImage_${categoryId}_${nomineeId}"
+      accept="image/jpeg,image/png,image/webp,image/gif,image/*"
+    >
+  </label>
 
-        <button
-            type="button"
-            class="admin-small-button secondary"
-            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}')"
-        >
-          Upload to Drive
-        </button>
+  <label class="admin-field">
+    <span>Take Photo</span>
 
-      </div>
+    <input
+      type="file"
+      id="captureNomineeImage_${categoryId}_${nomineeId}"
+      accept="image/*"
+      capture="environment"
+    >
+  </label>
 
-      ${renderAdminSetupFileTools(
-          nominee.fileId || "",
-          fileInputId
-      )}
+  <button
+    type="button"
+    class="admin-small-button secondary"
+    onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}')"
+  >
+    Upload to Drive
+  </button>
+
+</div>
+
+      ${renderAdminSetupFileTools(nominee.fileId || "", fileInputId)}
 
       </div>
 
@@ -2155,7 +1858,6 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
     </div>
   `;
-
 }
 
 /* ======================
@@ -2163,89 +1865,51 @@ function renderAdminSetupNomineeRow(category, nominee) {
 ====================== */
 
 async function adminSetupCreateCategory(gameId) {
+  const nameInput = document.getElementById("setupNewCategoryName");
 
-  const nameInput =
-    document.getElementById(
-      "setupNewCategoryName"
-    );
+  const idInput = document.getElementById("setupNewCategoryId");
 
-  const idInput =
-    document.getElementById(
-      "setupNewCategoryId"
-    );
+  const sectionInput = document.getElementById("setupNewCategorySection");
 
-  const sectionInput =
-    document.getElementById(
-      "setupNewCategorySection"
-    );
+  const pointsInput = document.getElementById("setupNewCategoryPoints");
 
-  const pointsInput =
-    document.getElementById(
-      "setupNewCategoryPoints"
-    );
+  const lockDateTimeInput = document.getElementById(
+    "setupNewCategoryLockDateTime"
+  );
 
-  const lockDateTimeInput =
-    document.getElementById(
-      "setupNewCategoryLockDateTime"
-    );
+  const groupIdInput = document.getElementById("setupNewCategoryGroupId");
 
-  const groupIdInput =
-    document.getElementById(
-      "setupNewCategoryGroupId"
-    );
+  const parentCategoryIdInput = document.getElementById(
+    "setupNewCategoryParentCategoryId"
+  );
 
-  const parentCategoryIdInput =
-    document.getElementById(
-      "setupNewCategoryParentCategoryId"
-    );
+  const followUpCategoryIdInput = document.getElementById(
+    "setupNewCategoryFollowUpCategoryId"
+  );
 
-  const followUpCategoryIdInput =
-    document.getElementById(
-      "setupNewCategoryFollowUpCategoryId"
-    );
+  const followUpMapJSONInput = document.getElementById(
+    "setupNewCategoryFollowUpMapJSON"
+  );
 
-  const followUpMapJSONInput =
-    document.getElementById(
-      "setupNewCategoryFollowUpMapJSON"
-    );
+  const displayOrderInput = document.getElementById(
+    "setupNewCategoryDisplayOrder"
+  );
 
-  const displayOrderInput =
-    document.getElementById(
-      "setupNewCategoryDisplayOrder"
-    );
+  const layoutTypeInput = document.getElementById("setupNewCategoryLayoutType");
 
-  const layoutTypeInput =
-    document.getElementById(
-      "setupNewCategoryLayoutType"
-    );
+  const countsAsStatueInput = document.getElementById(
+    "setupNewCategoryCountsAsStatue"
+  );
 
-  const countsAsStatueInput =
-    document.getElementById(
-      "setupNewCategoryCountsAsStatue"
-    );
+  const lockedInput = document.getElementById("setupNewCategoryLocked");
 
-  const lockedInput =
-    document.getElementById(
-      "setupNewCategoryLocked"
-    );
+  const categoryName = nameInput ? nameInput.value.trim() : "";
 
-  const categoryName =
-    nameInput
-      ? nameInput.value.trim()
-      : "";
+  const categoryId = adminSetupSlugify(
+    idInput && idInput.value.trim() ? idInput.value.trim() : categoryName
+  );
 
-  const categoryId =
-    adminSetupSlugify(
-      idInput && idInput.value.trim()
-        ? idInput.value.trim()
-        : categoryName
-    );
-
-  if (
-    !categoryName ||
-    !categoryId
-  ) {
-
+  if (!categoryName || !categoryId) {
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       "Category name is required.",
@@ -2253,24 +1917,16 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
-
   }
 
-  const followUpMapJSON =
-    followUpMapJSONInput
-      ? followUpMapJSONInput.value.trim()
-      : "";
+  const followUpMapJSON = followUpMapJSONInput
+    ? followUpMapJSONInput.value.trim()
+    : "";
 
   if (followUpMapJSON) {
-
     try {
-
-      JSON.parse(
-        followUpMapJSON
-      );
-
+      JSON.parse(followUpMapJSON);
     } catch (err) {
-
       adminSetupSetMessage(
         "setupAddCategoryMessage",
         "Follow-Up Map JSON is not valid JSON.",
@@ -2278,91 +1934,49 @@ async function adminSetupCreateCategory(gameId) {
       );
 
       return;
-
     }
-
   }
 
-  adminSetupSetMessage(
-    "setupAddCategoryMessage",
-    "Adding category...",
-    false
-  );
+  adminSetupSetMessage("setupAddCategoryMessage", "Adding category...", false);
 
-  const res =
-    await apiAdminCreateCategory({
-      gameId:
-        gameId,
+  const res = await apiAdminCreateCategory({
+    gameId: gameId,
 
-      category:
-        categoryName,
+    category: categoryName,
 
-      categoryId:
-        categoryId,
+    categoryId: categoryId,
 
-      section:
-        sectionInput
-          ? sectionInput.value.trim()
-          : "Main",
+    section: sectionInput ? sectionInput.value.trim() : "Main",
 
-      points:
-        pointsInput
-          ? pointsInput.value
-          : 1,
+    points: pointsInput ? pointsInput.value : 1,
 
-      lockDateTime:
-        lockDateTimeInput
-          ? lockDateTimeInput.value
-          : "",
+    lockDateTime: lockDateTimeInput ? lockDateTimeInput.value : "",
 
-      groupId:
-        groupIdInput && groupIdInput.value.trim()
-          ? groupIdInput.value.trim()
-          : "default",
+    groupId:
+      groupIdInput && groupIdInput.value.trim()
+        ? groupIdInput.value.trim()
+        : "default",
 
-      parentCategoryId:
-        parentCategoryIdInput
-          ? adminSetupSlugify(
-              parentCategoryIdInput.value.trim()
-            )
-          : "",
+    parentCategoryId: parentCategoryIdInput
+      ? adminSetupSlugify(parentCategoryIdInput.value.trim())
+      : "",
 
-      followUpCategoryId:
-        followUpCategoryIdInput
-          ? adminSetupSlugify(
-              followUpCategoryIdInput.value.trim()
-            )
-          : "",
+    followUpCategoryId: followUpCategoryIdInput
+      ? adminSetupSlugify(followUpCategoryIdInput.value.trim())
+      : "",
 
-      followUpMapJSON:
-        followUpMapJSON,
+    followUpMapJSON: followUpMapJSON,
 
-      displayOrder:
-        displayOrderInput
-          ? displayOrderInput.value
-          : 999,
+    displayOrder: displayOrderInput ? displayOrderInput.value : 999,
 
-      layoutType:
-        layoutTypeInput
-          ? layoutTypeInput.value
-          : "image",
+    layoutType: layoutTypeInput ? layoutTypeInput.value : "image",
 
-      countsAsStatue:
-        countsAsStatueInput
-          ? countsAsStatueInput.checked
-          : true,
+    countsAsStatue: countsAsStatueInput ? countsAsStatueInput.checked : true,
 
-      locked:
-        lockedInput
-          ? lockedInput.checked
-          : false
-    });
+    locked: lockedInput ? lockedInput.checked : false,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       res && (res.message || res.error)
@@ -2372,22 +1986,13 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
-
   }
 
-  adminSetupSetMessage(
-    "setupAddCategoryMessage",
-    "Category added.",
-    false
-  );
+  adminSetupSetMessage("setupAddCategoryMessage", "Category added.", false);
 
-  adminSetupCategoryIdTouched =
-    false;
+  adminSetupCategoryIdTouched = false;
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
@@ -2460,18 +2065,12 @@ async function adminSetupCreateNominee(gameId) {
     return;
   }
 
-  adminSetupSetMessage(
-    "setupAddNomineeMessage",
-    "Nominee added.",
-    false
-  );
-  
+  adminSetupSetMessage("setupAddNomineeMessage", "Nominee added.", false);
+
   adminSetupNomineeIdTouched = false;
   adminSetupShortAnswerTouched = false;
-  
-  navigate(
-    "admin-game-setup:" + gameId
-  );
+
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
@@ -2479,84 +2078,61 @@ async function adminSetupCreateNominee(gameId) {
 ====================== */
 
 async function adminSetupUpdateCategory(gameId, categoryId) {
+  const nameInput = document.getElementById("editCategoryName_" + categoryId);
 
-  const nameInput =
-    document.getElementById(
-      "editCategoryName_" + categoryId
-    );
+  const sectionInput = document.getElementById(
+    "editCategorySection_" + categoryId
+  );
 
-  const sectionInput =
-    document.getElementById(
-      "editCategorySection_" + categoryId
-    );
+  const pointsInput = document.getElementById(
+    "editCategoryPoints_" + categoryId
+  );
 
-  const pointsInput =
-    document.getElementById(
-      "editCategoryPoints_" + categoryId
-    );
+  const orderInput = document.getElementById("editCategoryOrder_" + categoryId);
 
-  const orderInput =
-    document.getElementById(
-      "editCategoryOrder_" + categoryId
-    );
+  const layoutInput = document.getElementById(
+    "editCategoryLayout_" + categoryId
+  );
 
-  const layoutInput =
-    document.getElementById(
-      "editCategoryLayout_" + categoryId
-    );
+  const lockDateTimeInput = document.getElementById(
+    "editCategoryLockDateTime_" + categoryId
+  );
 
-  const lockDateTimeInput =
-    document.getElementById(
-      "editCategoryLockDateTime_" + categoryId
-    );
+  const groupIdInput = document.getElementById(
+    "editCategoryGroupId_" + categoryId
+  );
 
-  const groupIdInput =
-    document.getElementById(
-      "editCategoryGroupId_" + categoryId
-    );
+  const parentCategoryIdInput = document.getElementById(
+    "editCategoryParentCategoryId_" + categoryId
+  );
 
-  const parentCategoryIdInput =
-    document.getElementById(
-      "editCategoryParentCategoryId_" + categoryId
-    );
+  const followUpCategoryIdInput = document.getElementById(
+    "editCategoryFollowUpCategoryId_" + categoryId
+  );
 
-  const followUpCategoryIdInput =
-    document.getElementById(
-      "editCategoryFollowUpCategoryId_" + categoryId
-    );
+  const followUpMapJSONInput = document.getElementById(
+    "editCategoryFollowUpMapJSON_" + categoryId
+  );
 
-  const followUpMapJSONInput =
-    document.getElementById(
-      "editCategoryFollowUpMapJSON_" + categoryId
-    );
+  const lockedInput = document.getElementById(
+    "editCategoryLocked_" + categoryId
+  );
 
-  const lockedInput =
-    document.getElementById(
-      "editCategoryLocked_" + categoryId
-    );
+  const activeInput = document.getElementById(
+    "editCategoryActive_" + categoryId
+  );
 
-  const activeInput =
-    document.getElementById(
-      "editCategoryActive_" + categoryId
-    );
+  const predictionInput = document.getElementById(
+    "editCategoryPrediction_" + categoryId
+  );
 
-  const predictionInput =
-    document.getElementById(
-      "editCategoryPrediction_" + categoryId
-    );
+  const statueInput = document.getElementById(
+    "editCategoryStatue_" + categoryId
+  );
 
-  const statueInput =
-    document.getElementById(
-      "editCategoryStatue_" + categoryId
-    );
-
-  const categoryName =
-    nameInput
-      ? nameInput.value.trim()
-      : "";
+  const categoryName = nameInput ? nameInput.value.trim() : "";
 
   if (!categoryName) {
-
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       "Category name is required.",
@@ -2564,24 +2140,16 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     );
 
     return;
-
   }
 
-  const followUpMapJSON =
-    followUpMapJSONInput
-      ? followUpMapJSONInput.value.trim()
-      : "";
+  const followUpMapJSON = followUpMapJSONInput
+    ? followUpMapJSONInput.value.trim()
+    : "";
 
   if (followUpMapJSON) {
-
     try {
-
-      JSON.parse(
-        followUpMapJSON
-      );
-
+      JSON.parse(followUpMapJSON);
     } catch (err) {
-
       adminSetupSetMessage(
         "editCategoryMessage_" + categoryId,
         "Follow-Up Map JSON is not valid JSON.",
@@ -2589,9 +2157,7 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
       );
 
       return;
-
     }
-
   }
 
   adminSetupSetMessage(
@@ -2600,90 +2166,48 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     false
   );
 
-  const res =
-    await apiAdminUpdateCategory({
-      gameId:
-        gameId,
+  const res = await apiAdminUpdateCategory({
+    gameId: gameId,
 
-      categoryId:
-        categoryId,
+    categoryId: categoryId,
 
-      category:
-        categoryName,
+    category: categoryName,
 
-      section:
-        sectionInput
-          ? sectionInput.value.trim()
-          : "",
+    section: sectionInput ? sectionInput.value.trim() : "",
 
-      points:
-        pointsInput
-          ? pointsInput.value
-          : 0,
+    points: pointsInput ? pointsInput.value : 0,
 
-      displayOrder:
-        orderInput
-          ? orderInput.value
-          : 999,
+    displayOrder: orderInput ? orderInput.value : 999,
 
-      layoutType:
-        layoutInput
-          ? layoutInput.value
-          : "image",
+    layoutType: layoutInput ? layoutInput.value : "image",
 
-      lockDateTime:
-        lockDateTimeInput
-          ? lockDateTimeInput.value
-          : "",
+    lockDateTime: lockDateTimeInput ? lockDateTimeInput.value : "",
 
-      groupId:
-        groupIdInput && groupIdInput.value.trim()
-          ? groupIdInput.value.trim()
-          : "default",
+    groupId:
+      groupIdInput && groupIdInput.value.trim()
+        ? groupIdInput.value.trim()
+        : "default",
 
-      parentCategoryId:
-        parentCategoryIdInput
-          ? adminSetupSlugify(
-              parentCategoryIdInput.value.trim()
-            )
-          : "",
+    parentCategoryId: parentCategoryIdInput
+      ? adminSetupSlugify(parentCategoryIdInput.value.trim())
+      : "",
 
-      followUpCategoryId:
-        followUpCategoryIdInput
-          ? adminSetupSlugify(
-              followUpCategoryIdInput.value.trim()
-            )
-          : "",
+    followUpCategoryId: followUpCategoryIdInput
+      ? adminSetupSlugify(followUpCategoryIdInput.value.trim())
+      : "",
 
-      followUpMapJSON:
-        followUpMapJSON,
+    followUpMapJSON: followUpMapJSON,
 
-      locked:
-        lockedInput
-          ? lockedInput.checked
-          : false,
+    locked: lockedInput ? lockedInput.checked : false,
 
-      active:
-        activeInput
-          ? activeInput.checked
-          : true,
+    active: activeInput ? activeInput.checked : true,
 
-      predictionGame:
-        predictionInput
-          ? predictionInput.checked
-          : true,
+    predictionGame: predictionInput ? predictionInput.checked : true,
 
-      countsAsStatue:
-        statueInput
-          ? statueInput.checked
-          : false
-    });
+    countsAsStatue: statueInput ? statueInput.checked : false,
+  });
 
-  if (
-    !res ||
-    res.success === false
-  ) {
-
+  if (!res || res.success === false) {
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       res && (res.message || res.error)
@@ -2693,7 +2217,6 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     );
 
     return;
-
   }
 
   adminSetupSetMessage(
@@ -2702,10 +2225,7 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     false
   );
 
-  navigate(
-    "admin-game-setup:" + gameId
-  );
-
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
