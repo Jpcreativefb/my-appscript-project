@@ -649,6 +649,27 @@ async function apiAdminUploadImage(payload) {
 
 }
 
+async function apiAdminImportImageFromUrl(payload) {
+
+  return apiPost(
+    "adminImportImageFromUrl",
+    {
+      gameId:
+        payload.gameId,
+
+      categoryId:
+        payload.categoryId,
+
+      nomineeId:
+        payload.nomineeId,
+
+      imageUrl:
+        payload.imageUrl
+    }
+  );
+
+}
+
 async function apiAdminArchiveNominee(
   gameId,
   categoryId,

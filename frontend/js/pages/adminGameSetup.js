@@ -1134,6 +1134,160 @@ async function adminSetupUploadNomineeImage(
 
 }
 
+async function adminSetupImportNomineeImageFromUrl(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  const urlInput =
+    document.getElementById(
+      "importNomineeImageUrl_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  const imageUrl =
+    urlInput
+      ? urlInput.value.trim()
+      : "";
+
+  if (!imageUrl) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Paste an image URL first.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (
+    imageUrl.indexOf("http://") !== 0 &&
+    imageUrl.indexOf("https://") !== 0
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Image URL must start with http:// or https://",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Importing image from URL...",
+    false
+  );
+
+  let res;
+
+  try {
+
+    res =
+      await Promise.race([
+        apiAdminImportImageFromUrl({
+          gameId:
+            gameId,
+
+          categoryId:
+            categoryId,
+
+          nomineeId:
+            nomineeId,
+
+          imageUrl:
+            imageUrl
+        }),
+
+        new Promise(resolve =>
+          setTimeout(
+            () =>
+              resolve({
+                success:
+                  false,
+                error:
+                  "Import timed out after 45 seconds."
+              }),
+            45000
+          )
+        )
+      ]);
+
+  } catch (err) {
+
+    console.error(
+      "IMPORT URL ERROR",
+      err
+    );
+
+    adminSetupSetMessage(
+      messageId,
+      err.message ||
+      "Image import failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  console.log(
+    "IMPORT URL RESPONSE",
+    res
+  );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Image import failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (fileIdInput) {
+
+    fileIdInput.value =
+      res.fileId || "";
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Image imported. Click Save Nominee to keep this File ID.",
+    false
+  );
+
+}
 /* ======================
    CATEGORY CARD
 ====================== */
@@ -1850,6 +2004,28 @@ function renderAdminSetupNomineeRow(category, nominee) {
             Upload Photo
           </button>
         
+        </div>
+
+        <div class="admin-url-import-tools">
+
+            <label class="admin-field">
+              <span>Import Image from URL</span>
+
+              <input
+                 type="url"
+                 id="importNomineeImageUrl_${categoryId}_${nomineeId}"
+                 placeholder="https://example.com/image.jpg"
+              >
+            </label>
+
+            <button
+                 type="button"
+                 class="admin-small-button secondary"
+                 onclick="adminSetupImportNomineeImageFromUrl('${gameId}', '${categoryId}', '${nomineeId}')"
+            >
+                 Import URL
+            </button>
+
         </div>
 
       ${renderAdminSetupFileTools(nominee.fileId || "", fileInputId)}

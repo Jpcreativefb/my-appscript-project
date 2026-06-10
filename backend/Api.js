@@ -41,6 +41,16 @@ function doPost(e) {
 
     }
 
+    if (action === "adminImportImageFromUrl") {
+
+      return json(
+        adminImportImageFromUrl(
+          body
+        )
+      );
+    
+    }
+
     return json({
       success:
         false,

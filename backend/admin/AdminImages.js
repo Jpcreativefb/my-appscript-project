@@ -279,3 +279,252 @@ function testAdminImageFolderAccess() {
   );
 
 }
+
+/* =========================
+   ADMIN IMAGE URL IMPORT
+========================= */
+
+function adminImageGetExtensionFromUrl_(url) {
+
+  const cleanUrl =
+    String(url || "")
+      .split("?")[0]
+      .split("#")[0]
+      .toLowerCase();
+
+  const match =
+    cleanUrl.match(/\.(jpg|jpeg|png|webp|gif)$/);
+
+  if (!match) {
+    return "";
+  }
+
+  return match[1] === "jpeg"
+    ? "jpg"
+    : match[1];
+
+}
+
+function adminImageGetMimeFromExtension_(extension) {
+
+  extension =
+    String(extension || "")
+      .trim()
+      .toLowerCase();
+
+  if (extension === "jpg" || extension === "jpeg") {
+    return "image/jpeg";
+  }
+
+  if (extension === "png") {
+    return "image/png";
+  }
+
+  if (extension === "webp") {
+    return "image/webp";
+  }
+
+  if (extension === "gif") {
+    return "image/gif";
+  }
+
+  return "";
+
+}
+
+function adminImageNormalizeImageUrl_(url) {
+
+  url =
+    String(url || "")
+      .trim();
+
+  if (!url) {
+    throw new Error("Image URL is required.");
+  }
+
+  if (
+    url.indexOf("http://") !== 0 &&
+    url.indexOf("https://") !== 0
+  ) {
+    throw new Error("Image URL must start with http:// or https://");
+  }
+
+  return url;
+
+}
+
+function adminImportImageFromUrl(payload) {
+
+  if (!payload) {
+    throw new Error("Import payload missing.");
+  }
+
+  const imageUrl =
+    adminImageNormalizeImageUrl_(
+      payload.imageUrl
+    );
+
+  const folder =
+    adminImageGetUploadFolder_();
+
+  const gameId =
+    adminImageSafeFileName_(
+      payload.gameId || "game"
+    );
+
+  const categoryId =
+    adminImageSafeFileName_(
+      payload.categoryId || "category"
+    );
+
+  const nomineeId =
+    adminImageSafeFileName_(
+      payload.nomineeId || "nominee"
+    );
+
+  const response =
+    UrlFetchApp.fetch(
+      imageUrl,
+      {
+        muteHttpExceptions:
+          true,
+
+        followRedirects:
+          true,
+
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 AwardsAppImageImporter"
+        }
+      }
+    );
+
+  const status =
+    response.getResponseCode();
+
+  if (status < 200 || status >= 300) {
+    throw new Error(
+      "Could not fetch image URL. Status: " + status
+    );
+  }
+
+  const headers =
+    response.getHeaders();
+
+  let mimeType =
+    String(
+      headers["Content-Type"] ||
+      headers["content-type"] ||
+      ""
+    )
+      .split(";")[0]
+      .trim()
+      .toLowerCase();
+
+  let extension =
+    adminImageGetExtensionFromUrl_(
+      imageUrl
+    );
+
+  if (!mimeType && extension) {
+    mimeType =
+      adminImageGetMimeFromExtension_(
+        extension
+      );
+  }
+
+  const allowedMimeTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif"
+  ];
+
+  if (
+    allowedMimeTypes.indexOf(mimeType) === -1
+  ) {
+    throw new Error(
+      "URL did not return a supported image type. Found: " +
+      (mimeType || "unknown")
+    );
+  }
+
+  if (!extension) {
+    extension =
+      adminImageMimeToExtension_(
+        mimeType
+      );
+  }
+
+  const blob =
+    response
+      .getBlob()
+      .setContentType(
+        mimeType
+      );
+
+  const maxBytes =
+    5 * 1024 * 1024;
+
+  if (blob.getBytes().length > maxBytes) {
+    throw new Error(
+      "Imported image is too large. Use an image under 5MB."
+    );
+  }
+
+  const fileName =
+    [
+      gameId,
+      categoryId,
+      nomineeId,
+      Date.now(),
+      "url-import"
+    ].join("-") +
+    (
+      extension
+        ? "." + extension
+        : ""
+    );
+
+  blob.setName(
+    fileName
+  );
+
+  const file =
+    folder.createFile(
+      blob
+    );
+
+  file.setSharing(
+    DriveApp.Access.ANYONE_WITH_LINK,
+    DriveApp.Permission.VIEW
+  );
+
+  return {
+    success:
+      true,
+
+    message:
+      "Image imported",
+
+    fileId:
+      file.getId(),
+
+    fileName:
+      file.getName(),
+
+    sourceUrl:
+      imageUrl,
+
+    viewUrl:
+      "https://drive.google.com/file/d/" +
+      file.getId() +
+      "/view",
+
+    thumbnailUrl:
+      "https://drive.google.com/thumbnail?id=" +
+      file.getId() +
+      "&sz=w240-h360"
+  };
+
+}
