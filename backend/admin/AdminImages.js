@@ -528,3 +528,132 @@ function adminImportImageFromUrl(payload) {
   };
 
 }
+
+/* =========================
+   ADMIN TMDB IMAGE SEARCH
+========================= */
+
+function adminImageGetTmdbApiKey_() {
+
+  const key =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty("TMDB_API_KEY");
+
+  if (!key) {
+    throw new Error("TMDb API key is not configured.");
+  }
+
+  return key;
+
+}
+
+function adminTmdbFetchJson_(url) {
+
+  const response =
+    UrlFetchApp.fetch(
+      url,
+      {
+        muteHttpExceptions: true,
+        headers: {
+          "accept": "application/json"
+        }
+      }
+    );
+
+  const status =
+    response.getResponseCode();
+
+  const text =
+    response.getContentText();
+
+  if (status < 200 || status >= 300) {
+    throw new Error(
+      "TMDb request failed. Status: " +
+      status +
+      " " +
+      text.substring(0, 200)
+    );
+  }
+
+  return JSON.parse(text);
+
+}
+
+function adminSearchTmdbMoviePosters(payload) {
+
+  if (!payload) {
+    throw new Error("TMDb search payload missing.");
+  }
+
+  const query =
+    String(payload.query || "")
+      .trim();
+
+  if (!query) {
+    throw new Error("Movie search term is required.");
+  }
+
+  const key =
+    adminImageGetTmdbApiKey_();
+
+  const searchUrl =
+    "https://api.themoviedb.org/3/search/movie" +
+    "?api_key=" +
+    encodeURIComponent(key) +
+    "&query=" +
+    encodeURIComponent(query) +
+    "&include_adult=false" +
+    "&language=en-US" +
+    "&page=1";
+
+  const data =
+    adminTmdbFetchJson_(
+      searchUrl
+    );
+
+  const results =
+    Array.isArray(data.results)
+      ? data.results
+      : [];
+
+  const imageBase =
+    "https://image.tmdb.org/t/p/w500";
+
+  return {
+    success: true,
+    results:
+      results
+        .filter(movie => movie.poster_path)
+        .slice(0, 8)
+        .map(movie => {
+
+          const year =
+            movie.release_date
+              ? String(movie.release_date).slice(0, 4)
+              : "";
+
+          return {
+            tmdbId:
+              movie.id,
+
+            title:
+              movie.title || movie.original_title || "",
+
+            year:
+              year,
+
+            overview:
+              movie.overview || "",
+
+            posterPath:
+              movie.poster_path,
+
+            posterUrl:
+              imageBase + movie.poster_path
+          };
+
+        })
+  };
+
+}

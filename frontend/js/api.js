@@ -670,6 +670,18 @@ async function apiAdminImportImageFromUrl(payload) {
 
 }
 
+async function apiAdminSearchTmdbMoviePosters(payload) {
+
+  return apiPost(
+    "adminSearchTmdbMoviePosters",
+    {
+      query:
+        payload.query
+    }
+  );
+
+}
+
 async function apiAdminArchiveNominee(
   gameId,
   categoryId,

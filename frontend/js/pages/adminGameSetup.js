@@ -1288,6 +1288,177 @@ async function adminSetupImportNomineeImageFromUrl(
   );
 
 }
+
+async function adminSetupSearchTmdbPosters(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  const searchInput =
+    document.getElementById(
+      "tmdbPosterSearch_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const resultsEl =
+    document.getElementById(
+      "tmdbPosterResults_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  const query =
+    searchInput
+      ? searchInput.value.trim()
+      : "";
+
+  if (!query) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Enter a movie title to search TMDb.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (resultsEl) {
+    resultsEl.innerHTML = "";
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Searching TMDb...",
+    false
+  );
+
+  const res =
+    await apiAdminSearchTmdbMoviePosters({
+      query:
+        query
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "TMDb search failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  const results =
+    Array.isArray(res.results)
+      ? res.results
+      : [];
+
+  if (!results.length) {
+
+    adminSetupSetMessage(
+      messageId,
+      "No TMDb posters found.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Choose a TMDb poster to import.",
+    false
+  );
+
+  if (resultsEl) {
+
+    resultsEl.innerHTML =
+      results
+        .map(item => `
+          <div class="admin-tmdb-result">
+
+            <img
+              src="${adminSetupEscapeHtml(item.posterUrl)}"
+              alt="${adminSetupEscapeHtml(item.title)} poster"
+              loading="lazy"
+            >
+
+            <div class="admin-tmdb-result-body">
+
+              <strong>
+                ${adminSetupEscapeHtml(item.title)}
+              </strong>
+
+              <div class="admin-sub">
+                ${adminSetupEscapeHtml(item.year || "Unknown year")}
+              </div>
+
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="adminSetupImportTmdbPoster('${gameId}', '${categoryId}', '${nomineeId}', '${adminSetupEscapeHtml(item.posterUrl)}')"
+              >
+                Import Poster
+              </button>
+
+            </div>
+
+          </div>
+        `)
+        .join("");
+
+  }
+
+}
+
+async function adminSetupImportTmdbPoster(
+  gameId,
+  categoryId,
+  nomineeId,
+  posterUrl
+) {
+
+  const urlInput =
+    document.getElementById(
+      "importNomineeImageUrl_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  if (urlInput) {
+    urlInput.value =
+      posterUrl;
+  }
+
+  await adminSetupImportNomineeImageFromUrl(
+    gameId,
+    categoryId,
+    nomineeId
+  );
+
+}
+
 /* ======================
    CATEGORY CARD
 ====================== */
@@ -2026,6 +2197,38 @@ function renderAdminSetupNomineeRow(category, nominee) {
                  Import URL
             </button>
 
+        </div>
+
+        <div class="admin-tmdb-tools">
+
+            <label class="admin-field">
+              <span>Search TMDb Movie Poster</span>
+      
+              <input
+                 type="text"
+                 id="tmdbPosterSearch_${categoryId}_${nomineeId}"
+                 value="${adminSetupEscapeHtml(nominee.nominee || "")}"
+                 placeholder="Movie title"
+              >
+            </label>
+      
+            <button
+                 type="button"
+                 class="admin-small-button secondary"
+                 onclick="adminSetupSearchTmdbPosters('${gameId}', '${categoryId}', '${nomineeId}')"
+            >
+               Search TMDb
+            </button>
+      
+        </div>
+      
+        <div
+           id="tmdbPosterResults_${categoryId}_${nomineeId}"
+           class="admin-tmdb-results"
+        ></div>  
+         
+        <div class="admin-sub">
+            This product uses the TMDb API but is not endorsed or certified by TMDb.
         </div>
 
       ${renderAdminSetupFileTools(nominee.fileId || "", fileInputId)}

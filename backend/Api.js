@@ -51,6 +51,16 @@ function doPost(e) {
     
     }
 
+    if (action === "adminSearchTmdbMoviePosters") {
+
+      return json(
+        adminSearchTmdbMoviePosters(
+          body
+        )
+      );
+    
+    }
+
     return json({
       success:
         false,
