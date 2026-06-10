@@ -729,23 +729,39 @@ function adminSetupFileToBase64(file) {
 }
 
 function adminSetupValidateImageFile(file) {
+
   if (!file) {
+
     return "Choose an image file first.";
+
   }
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif"
+  ];
 
-  if (allowedTypes.indexOf(file.type) === -1) {
+  if (
+    allowedTypes.indexOf(file.type) === -1
+  ) {
+
     return "Image must be JPG, PNG, WEBP, or GIF.";
+
   }
 
-  const maxBytes = 1 * 1024 * 1024;
+  const maxBytes =
+    2 * 1024 * 1024;
 
   if (file.size > maxBytes) {
-    return "Image must be 5MB or smaller.";
+
+    return "Image must be 2MB or smaller.";
+
   }
 
   return "";
+
 }
 
 async function adminSetupUploadNomineeImage(gameId, categoryId, nomineeId) {
@@ -755,9 +771,27 @@ async function adminSetupUploadNomineeImage(gameId, categoryId, nomineeId) {
     nomineeId: nomineeId,
   });
 
-  const inputId = "uploadNomineeImage_" + categoryId + "_" + nomineeId;
+  const chooseInputId =
+  "uploadNomineeImage_" +
+  categoryId +
+  "_" +
+  nomineeId;
 
-  const fileInput = document.getElementById(inputId);
+const captureInputId =
+  "captureNomineeImage_" +
+  categoryId +
+  "_" +
+  nomineeId;
+
+const chooseInput =
+  document.getElementById(
+    chooseInputId
+  );
+
+const captureInput =
+  document.getElementById(
+    captureInputId
+  );
 
   const fileIdInput = document.getElementById(
     "editNomineeFileId_" + categoryId + "_" + nomineeId
@@ -765,15 +799,32 @@ async function adminSetupUploadNomineeImage(gameId, categoryId, nomineeId) {
 
   const messageId = "editNomineeMessage_" + categoryId + "_" + nomineeId;
 
-  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
-    adminSetupSetMessage(messageId, "Choose an image file first.", true);
+  const file =
+  chooseInput &&
+  chooseInput.files &&
+  chooseInput.files[0]
+    ? chooseInput.files[0]
+    : captureInput &&
+      captureInput.files &&
+      captureInput.files[0]
+      ? captureInput.files[0]
+      : null;
 
-    console.log("UPLOAD STOP: no file selected");
+if (!file) {
 
-    return;
-  }
+  adminSetupSetMessage(
+    messageId,
+    "Choose an image or take a photo first.",
+    true
+  );
 
-  const file = fileInput.files[0];
+  console.log(
+    "UPLOAD STOP: no file selected"
+  );
+
+  return;
+
+}
 
   console.log("UPLOAD FILE", {
     name: file.name,
