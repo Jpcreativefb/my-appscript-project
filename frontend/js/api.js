@@ -1,6 +1,9 @@
 const API_BASE =
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
+const API_UPLOAD_PROXY =
+  "https://awards-upload-proxy.jpcreativefb.workers.dev";  
+
 /* ======================
    GENERIC API FETCH
 ====================== */
@@ -49,6 +52,57 @@ async function api(action, params = {}) {
     return {
       success: false,
       message: "Network error"
+    };
+
+  }
+
+}
+
+/* ======================
+   GENERIC API POST
+====================== */
+
+async function apiPost(action, payload = {}) {
+
+  try {
+
+    const response =
+      await fetch(
+        API_UPLOAD_PROXY,
+        {
+          method:
+            "POST",
+
+          headers: {
+            "Content-Type":
+              "text/plain;charset=utf-8"
+          },
+
+          body:
+            JSON.stringify({
+              action:
+                action,
+
+              ...payload
+            })
+        }
+      );
+
+    return await response.json();
+
+  } catch (err) {
+
+    console.error(
+      "API POST ERROR",
+      err
+    );
+
+    return {
+      success:
+        false,
+
+      message:
+        "Network error"
     };
 
   }
@@ -564,6 +618,33 @@ async function apiAdminUpdateNominee(payload) {
   return api(
     "adminUpdateNominee",
     payload
+  );
+
+}
+
+async function apiAdminUploadImage(payload) {
+
+  return apiPost(
+    "adminUploadImage",
+    {
+      gameId:
+        payload.gameId,
+
+      categoryId:
+        payload.categoryId,
+
+      nomineeId:
+        payload.nomineeId,
+
+      fileName:
+        payload.fileName,
+
+      mimeType:
+        payload.mimeType,
+
+      base64:
+        payload.base64
+    }
   );
 
 }

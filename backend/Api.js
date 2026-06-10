@@ -1,4 +1,80 @@
 /* =========================
+   API POST
+========================= */
+
+function doPost(e) {
+
+  try {
+
+    const params =
+      e && e.parameter
+        ? e.parameter
+        : {};
+
+    let body = {};
+
+    if (
+      e &&
+      e.postData &&
+      e.postData.contents
+    ) {
+
+      body =
+        JSON.parse(
+          e.postData.contents
+        );
+
+    }
+
+    const action =
+      body.action ||
+      params.action ||
+      "";
+
+    if (action === "adminUploadImage") {
+
+      return json(
+        adminUploadImage(
+          body
+        )
+      );
+
+    }
+
+    return json({
+      success:
+        false,
+
+      error:
+        "Unknown POST action: " + action
+    });
+
+  } catch (err) {
+
+    Logger.log(
+      "API POST ERROR: " +
+      (
+        err && err.stack
+          ? err.stack
+          : err.message
+      )
+    );
+
+    return json({
+      success:
+        false,
+
+      error:
+        err && err.message
+          ? err.message
+          : String(err)
+    });
+
+  }
+
+}
+
+/* =========================
    API
 ========================= */
 
@@ -39,6 +115,8 @@ function doGet(e) {
       "adminCreateNominee",
       "adminUpdateNominee",
       "adminArchiveNominee",
+
+      "adminUploadImage",
 
       "adminRunGamePreflight",
       "adminRefreshResultsCaches",
@@ -264,6 +342,16 @@ function doGet(e) {
 
       return json(
         adminArchiveNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminUploadImage") {
+
+      return json(
+        adminUploadImage(
           params
         )
       );

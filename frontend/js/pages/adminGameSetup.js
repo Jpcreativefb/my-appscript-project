@@ -853,6 +853,321 @@ function renderAdminSetupFileTools(
 }
 
 /* ======================
+   ADMIN IMAGE UPLOAD HELPERS
+====================== */
+
+function adminSetupFileToBase64(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader =
+      new FileReader();
+
+    reader.onload = () => {
+
+      const result =
+        String(reader.result || "");
+
+      const base64 =
+        result.indexOf(",") !== -1
+          ? result.split(",")[1]
+          : result;
+
+      resolve(base64);
+
+    };
+
+    reader.onerror = () => {
+
+      reject(
+        new Error("Could not read image file.")
+      );
+
+    };
+
+    reader.readAsDataURL(file);
+
+  });
+
+}
+
+function adminSetupValidateImageFile(file) {
+
+  if (!file) {
+
+    return "Choose an image file first.";
+
+  }
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+    "image/gif"
+  ];
+
+  if (
+    allowedTypes.indexOf(file.type) === -1
+  ) {
+
+    return "Image must be JPG, PNG, WEBP, or GIF.";
+
+  }
+
+  const maxBytes =
+    1 * 1024 * 1024;
+
+  if (file.size > maxBytes) {
+
+    return "Image must be 5MB or smaller.";
+
+  }
+
+  return "";
+
+}
+
+async function adminSetupUploadNomineeImage(
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  console.log(
+    "UPLOAD START",
+    {
+      gameId:
+        gameId,
+      categoryId:
+        categoryId,
+      nomineeId:
+        nomineeId
+    }
+  );
+
+  const inputId =
+    "uploadNomineeImage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  const fileInput =
+    document.getElementById(
+      inputId
+    );
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  if (
+    !fileInput ||
+    !fileInput.files ||
+    !fileInput.files[0]
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Choose an image file first.",
+      true
+    );
+
+    console.log(
+      "UPLOAD STOP: no file selected"
+    );
+
+    return;
+
+  }
+
+  const file =
+    fileInput.files[0];
+
+  console.log(
+    "UPLOAD FILE",
+    {
+      name:
+        file.name,
+      type:
+        file.type,
+      size:
+        file.size
+    }
+  );
+
+  const validationError =
+    adminSetupValidateImageFile(
+      file
+    );
+
+  if (validationError) {
+
+    adminSetupSetMessage(
+      messageId,
+      validationError,
+      true
+    );
+
+    console.log(
+      "UPLOAD STOP: validation error",
+      validationError
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Reading image file...",
+    false
+  );
+
+  let base64 = "";
+
+  try {
+
+    base64 =
+      await adminSetupFileToBase64(
+        file
+      );
+
+    console.log(
+      "UPLOAD BASE64 READY",
+      {
+        length:
+          base64.length
+      }
+    );
+
+  } catch (err) {
+
+    adminSetupSetMessage(
+      messageId,
+      err.message || "Could not read image file.",
+      true
+    );
+
+    console.error(
+      "UPLOAD READ ERROR",
+      err
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Uploading image to Drive...",
+    false
+  );
+
+  let res;
+
+  try {
+
+    res =
+      await Promise.race([
+        apiAdminUploadImage({
+          gameId:
+            gameId,
+
+          categoryId:
+            categoryId,
+
+          nomineeId:
+            nomineeId,
+
+          fileName:
+            file.name,
+
+          mimeType:
+            file.type,
+
+          base64:
+            base64
+        }),
+
+        new Promise(resolve =>
+          setTimeout(
+            () =>
+              resolve({
+                success:
+                  false,
+                error:
+                  "Upload timed out after 45 seconds."
+              }),
+            45000
+          )
+        )
+      ]);
+
+  } catch (err) {
+
+    console.error(
+      "UPLOAD API ERROR",
+      err
+    );
+
+    adminSetupSetMessage(
+      messageId,
+      err.message || "Image upload failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  console.log(
+    "UPLOAD RESPONSE",
+    res
+  );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Image upload failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (fileIdInput) {
+
+    fileIdInput.value =
+      res.fileId || "";
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Image uploaded. Click Save Nominee to keep this File ID.",
+    false
+  );
+
+}
+
+/* ======================
    ADD CATEGORY CARD
 ====================== */
 
@@ -1759,21 +2074,43 @@ function renderAdminSetupNomineeRow(category, nominee) {
           >
         </label>
 
-        <label class="admin-field">
-          <span>File ID</span>
+          <label class="admin-field">
+              <span>File ID</span>
 
-          <input
-            type="text"
-            id="${fileInputId}"
-            value="${adminSetupEscapeHtml(nominee.fileId || "")}"
-            placeholder="Paste Drive File ID or Drive link"
-          >
+            <input
+              type="text"
+              id="${fileInputId}"
+              value="${adminSetupEscapeHtml(nominee.fileId || "")}"
+              placeholder="Paste Drive File ID or Drive link"
+            >
+          </label>
+
+          <div class="admin-upload-tools">
+
+           <label class="admin-field">
+             <span>Upload Image</span>
+
+           <input
+             type="file"
+             id="uploadNomineeImage_${categoryId}_${nomineeId}"
+             accept="image/jpeg,image/png,image/webp,image/gif"
+           >
         </label>
 
-        ${renderAdminSetupFileTools(
+        <button
+            type="button"
+            class="admin-small-button secondary"
+            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}')"
+        >
+          Upload to Drive
+        </button>
+
+      </div>
+
+      ${renderAdminSetupFileTools(
           nominee.fileId || "",
           fileInputId
-        )}
+      )}
 
       </div>
 
