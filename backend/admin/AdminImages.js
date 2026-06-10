@@ -157,6 +157,38 @@ function adminImageValidateUpload_(
 
 }
 
+function adminImageBuildUploadFileName_(
+  payload,
+  fallbackLabel,
+  extension
+) {
+
+  const nomineeId =
+    adminImageSafeFileName_(
+      payload.nomineeId ||
+      fallbackLabel ||
+      "image"
+    );
+
+  const cleanExtension =
+    String(extension || "")
+      .trim()
+      .replace(/^\./, "")
+      .toLowerCase();
+
+  return (
+    nomineeId +
+    "-" +
+    Date.now() +
+    (
+      cleanExtension
+        ? "." + cleanExtension
+        : ""
+    )
+  );
+
+}
+
 /* =========================================================
    PUBLIC ADMIN IMAGE UPLOAD
 ========================================================= */
@@ -200,21 +232,11 @@ function adminUploadImage(payload) {
       mimeType
     );
 
-  const fileName =
-    [
-      gameId,
-      categoryId,
-      nomineeId,
-      Date.now(),
-      originalFileName
-    ].join("-") +
-    (
-      extension &&
-      originalFileName
-        .toLowerCase()
-        .indexOf("." + extension) === -1
-        ? "." + extension
-        : ""
+    const fileName =
+    adminImageBuildUploadFileName_(
+      payload,
+      originalFileName,
+      extension
     );
 
   const bytes =
@@ -473,17 +495,10 @@ function adminImportImageFromUrl(payload) {
   }
 
   const fileName =
-    [
-      gameId,
-      categoryId,
-      nomineeId,
-      Date.now(),
-      "url-import"
-    ].join("-") +
-    (
+    adminImageBuildUploadFileName_(
+      payload,
+      "url-import",
       extension
-        ? "." + extension
-        : ""
     );
 
   blob.setName(
@@ -654,6 +669,46 @@ function adminSearchTmdbMoviePosters(payload) {
           };
 
         })
+  };
+
+}
+
+/* =========================
+   ADMIN IMAGE DELETE
+========================= */
+
+function adminDeleteImageFromDrive(payload) {
+
+  if (!payload) {
+    throw new Error("Delete payload missing.");
+  }
+
+  const fileId =
+    String(payload.fileId || "")
+      .trim();
+
+  if (!fileId) {
+    throw new Error("File ID is required.");
+  }
+
+  const file =
+    DriveApp.getFileById(
+      fileId
+    );
+
+  file.setTrashed(
+    true
+  );
+
+  return {
+    success:
+      true,
+
+    message:
+      "Image moved to Drive trash.",
+
+    fileId:
+      fileId
   };
 
 }
