@@ -709,23 +709,38 @@ function renderAdminSetupFileTools(fileId, inputId) {
 ====================== */
 
 function adminSetupFileToBase64(file) {
+
   return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+
+    const reader =
+      new FileReader();
 
     reader.onload = () => {
-      const result = String(reader.result || "");
 
-      const base64 = result.indexOf(",") !== -1 ? result.split(",")[1] : result;
+      const result =
+        String(reader.result || "");
+
+      const base64 =
+        result.indexOf(",") !== -1
+          ? result.split(",")[1]
+          : result;
 
       resolve(base64);
+
     };
 
     reader.onerror = () => {
-      reject(new Error("Could not read image file."));
+
+      reject(
+        new Error("Could not read image file.")
+      );
+
     };
 
     reader.readAsDataURL(file);
+
   });
+
 }
 
 function adminSetupValidateImageFile(file) {
@@ -740,23 +755,26 @@ function adminSetupValidateImageFile(file) {
     "image/jpeg",
     "image/png",
     "image/webp",
-    "image/gif"
+    "image/gif",
+    "image/heic",
+    "image/heif"
   ];
 
   if (
-    allowedTypes.indexOf(file.type) === -1
+    allowedTypes.indexOf(file.type) === -1 &&
+    file.type
   ) {
 
-    return "Image must be JPG, PNG, WEBP, or GIF.";
+    return "Image must be JPG, PNG, WEBP, GIF, HEIC, or HEIF.";
 
   }
 
-  const maxBytes =
-    2 * 1024 * 1024;
+  const maxOriginalBytes =
+    15 * 1024 * 1024;
 
-  if (file.size > maxBytes) {
+  if (file.size > maxOriginalBytes) {
 
-    return "Image must be 2MB or smaller.";
+    return "Image must be 15MB or smaller before resizing.";
 
   }
 
@@ -764,152 +782,438 @@ function adminSetupValidateImageFile(file) {
 
 }
 
-async function adminSetupUploadNomineeImage(gameId, categoryId, nomineeId) {
-  console.log("UPLOAD START", {
-    gameId: gameId,
-    categoryId: categoryId,
-    nomineeId: nomineeId,
+function adminSetupResizeImageFile(file) {
+
+  return new Promise((resolve, reject) => {
+
+    if (!file) {
+
+      reject(
+        new Error("No image file selected.")
+      );
+
+      return;
+
+    }
+
+    const image =
+      new Image();
+
+    const objectUrl =
+      URL.createObjectURL(file);
+
+    image.onload = () => {
+
+      URL.revokeObjectURL(
+        objectUrl
+      );
+
+      const maxWidth =
+        900;
+
+      const maxHeight =
+        1350;
+
+      let width =
+        image.width;
+
+      let height =
+        image.height;
+
+      const ratio =
+        Math.min(
+          maxWidth / width,
+          maxHeight / height,
+          1
+        );
+
+      width =
+        Math.round(
+          width * ratio
+        );
+
+      height =
+        Math.round(
+          height * ratio
+        );
+
+      const canvas =
+        document.createElement("canvas");
+
+      canvas.width =
+        width;
+
+      canvas.height =
+        height;
+
+      const ctx =
+        canvas.getContext("2d");
+
+      ctx.drawImage(
+        image,
+        0,
+        0,
+        width,
+        height
+      );
+
+      canvas.toBlob(
+        blob => {
+
+          if (!blob) {
+
+            reject(
+              new Error("Could not resize image.")
+            );
+
+            return;
+
+          }
+
+          const safeName =
+            String(file.name || "image")
+              .replace(/\.[^/.]+$/, "") +
+            ".jpg";
+
+          const resizedFile =
+            new File(
+              [blob],
+              safeName,
+              {
+                type:
+                  "image/jpeg"
+              }
+            );
+
+          resolve(
+            resizedFile
+          );
+
+        },
+        "image/jpeg",
+        0.82
+      );
+
+    };
+
+    image.onerror = () => {
+
+      URL.revokeObjectURL(
+        objectUrl
+      );
+
+      reject(
+        new Error(
+          "Could not load image. Try choosing a JPG or PNG instead."
+        )
+      );
+
+    };
+
+    image.src =
+      objectUrl;
+
   });
-
-  const chooseInputId =
-  "uploadNomineeImage_" +
-  categoryId +
-  "_" +
-  nomineeId;
-
-const captureInputId =
-  "captureNomineeImage_" +
-  categoryId +
-  "_" +
-  nomineeId;
-
-const chooseInput =
-  document.getElementById(
-    chooseInputId
-  );
-
-const captureInput =
-  document.getElementById(
-    captureInputId
-  );
-
-  const fileIdInput = document.getElementById(
-    "editNomineeFileId_" + categoryId + "_" + nomineeId
-  );
-
-  const messageId = "editNomineeMessage_" + categoryId + "_" + nomineeId;
-
-  const file =
-  chooseInput &&
-  chooseInput.files &&
-  chooseInput.files[0]
-    ? chooseInput.files[0]
-    : captureInput &&
-      captureInput.files &&
-      captureInput.files[0]
-      ? captureInput.files[0]
-      : null;
-
-if (!file) {
-
-  adminSetupSetMessage(
-    messageId,
-    "Choose an image or take a photo first.",
-    true
-  );
-
-  console.log(
-    "UPLOAD STOP: no file selected"
-  );
-
-  return;
 
 }
 
-  console.log("UPLOAD FILE", {
-    name: file.name,
-    type: file.type,
-    size: file.size,
-  });
+async function adminSetupUploadNomineeImage(
+  gameId,
+  categoryId,
+  nomineeId,
+  source
+) {
 
-  const validationError = adminSetupValidateImageFile(file);
+  console.log(
+    "UPLOAD START",
+    {
+      gameId:
+        gameId,
+      categoryId:
+        categoryId,
+      nomineeId:
+        nomineeId,
+      source:
+        source
+    }
+  );
 
-  if (validationError) {
-    adminSetupSetMessage(messageId, validationError, true);
+  const chooseInputId =
+    "uploadNomineeImage_" +
+    categoryId +
+    "_" +
+    nomineeId;
 
-    console.log("UPLOAD STOP: validation error", validationError);
+  const captureInputId =
+    "captureNomineeImage_" +
+    categoryId +
+    "_" +
+    nomineeId;
 
-    return;
-  }
+  const selectedInputId =
+    source === "capture"
+      ? captureInputId
+      : chooseInputId;
 
-  adminSetupSetMessage(messageId, "Reading image file...", false);
+  const selectedInput =
+    document.getElementById(
+      selectedInputId
+    );
 
-  let base64 = "";
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
 
-  try {
-    base64 = await adminSetupFileToBase64(file);
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
 
-    console.log("UPLOAD BASE64 READY", {
-      length: base64.length,
-    });
-  } catch (err) {
+  const file =
+    selectedInput &&
+    selectedInput.files &&
+    selectedInput.files[0]
+      ? selectedInput.files[0]
+      : null;
+
+  if (!file) {
+
     adminSetupSetMessage(
       messageId,
-      err.message || "Could not read image file.",
+      source === "capture"
+        ? "Take a photo first, then tap Upload Photo."
+        : "Choose an image first, then tap Upload Chosen Image.",
       true
     );
 
-    console.error("UPLOAD READ ERROR", err);
+    console.log(
+      "UPLOAD STOP: no file selected",
+      {
+        selectedInputId:
+          selectedInputId
+      }
+    );
 
     return;
+
   }
 
-  adminSetupSetMessage(messageId, "Uploading image to Drive...", false);
+  console.log(
+    "UPLOAD ORIGINAL FILE",
+    {
+      name:
+        file.name,
+      type:
+        file.type,
+      size:
+        file.size
+    }
+  );
+
+  const validationError =
+    adminSetupValidateImageFile(
+      file
+    );
+
+  if (validationError) {
+
+    adminSetupSetMessage(
+      messageId,
+      validationError,
+      true
+    );
+
+    console.log(
+      "UPLOAD STOP: validation error",
+      validationError
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Resizing image...",
+    false
+  );
+
+  let uploadFile =
+    file;
+
+  try {
+
+    uploadFile =
+      await adminSetupResizeImageFile(
+        file
+      );
+
+    console.log(
+      "UPLOAD RESIZED FILE",
+      {
+        name:
+          uploadFile.name,
+        type:
+          uploadFile.type,
+        size:
+          uploadFile.size
+      }
+    );
+
+  } catch (err) {
+
+    console.error(
+      "UPLOAD RESIZE ERROR",
+      err
+    );
+
+    adminSetupSetMessage(
+      messageId,
+      err.message ||
+      "Could not resize image.",
+      true
+    );
+
+    return;
+
+  }
+
+  const maxUploadBytes =
+    2 * 1024 * 1024;
+
+  if (uploadFile.size > maxUploadBytes) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Image is still larger than 2MB after resizing. Try a smaller photo.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Reading resized image...",
+    false
+  );
+
+  let base64 =
+    "";
+
+  try {
+
+    base64 =
+      await adminSetupFileToBase64(
+        uploadFile
+      );
+
+    console.log(
+      "UPLOAD BASE64 READY",
+      {
+        length:
+          base64.length
+      }
+    );
+
+  } catch (err) {
+
+    adminSetupSetMessage(
+      messageId,
+      err.message ||
+      "Could not read image file.",
+      true
+    );
+
+    console.error(
+      "UPLOAD READ ERROR",
+      err
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Uploading image to Drive...",
+    false
+  );
 
   let res;
 
   try {
-    res = await Promise.race([
-      apiAdminUploadImage({
-        gameId: gameId,
 
-        categoryId: categoryId,
+    res =
+      await Promise.race([
+        apiAdminUploadImage({
+          gameId:
+            gameId,
 
-        nomineeId: nomineeId,
+          categoryId:
+            categoryId,
 
-        fileName: file.name,
+          nomineeId:
+            nomineeId,
 
-        mimeType: file.type,
+          fileName:
+            uploadFile.name,
 
-        base64: base64,
-      }),
+          mimeType:
+            uploadFile.type,
 
-      new Promise((resolve) =>
-        setTimeout(
-          () =>
-            resolve({
-              success: false,
-              error: "Upload timed out after 45 seconds.",
-            }),
-          45000
+          base64:
+            base64
+        }),
+
+        new Promise(resolve =>
+          setTimeout(
+            () =>
+              resolve({
+                success:
+                  false,
+                error:
+                  "Upload timed out after 45 seconds."
+              }),
+            45000
+          )
         )
-      ),
-    ]);
+      ]);
+
   } catch (err) {
-    console.error("UPLOAD API ERROR", err);
+
+    console.error(
+      "UPLOAD API ERROR",
+      err
+    );
 
     adminSetupSetMessage(
       messageId,
-      err.message || "Image upload failed.",
+      err.message ||
+      "Image upload failed.",
       true
     );
 
     return;
+
   }
 
-  console.log("UPLOAD RESPONSE", res);
+  console.log(
+    "UPLOAD RESPONSE",
+    res
+  );
 
-  if (!res || res.success === false) {
+  if (
+    !res ||
+    res.success === false
+  ) {
+
     adminSetupSetMessage(
       messageId,
       res && (res.message || res.error)
@@ -919,10 +1223,14 @@ if (!file) {
     );
 
     return;
+
   }
 
   if (fileIdInput) {
-    fileIdInput.value = res.fileId || "";
+
+    fileIdInput.value =
+      res.fileId || "";
+
   }
 
   adminSetupSetMessage(
@@ -930,6 +1238,7 @@ if (!file) {
     "Image uploaded. Click Save Nominee to keep this File ID.",
     false
   );
+
 }
 
 /* ======================
@@ -1833,36 +2142,44 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
           <div class="admin-upload-tools">
 
-  <label class="admin-field">
-    <span>Choose Image</span>
-
-    <input
-      type="file"
-      id="uploadNomineeImage_${categoryId}_${nomineeId}"
-      accept="image/jpeg,image/png,image/webp,image/gif,image/*"
-    >
-  </label>
-
-  <label class="admin-field">
-    <span>Take Photo</span>
-
-    <input
-      type="file"
-      id="captureNomineeImage_${categoryId}_${nomineeId}"
-      accept="image/*"
-      capture="environment"
-    >
-  </label>
-
-  <button
-    type="button"
-    class="admin-small-button secondary"
-    onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}')"
-  >
-    Upload to Drive
-  </button>
-
-</div>
+          <label class="admin-field">
+            <span>Choose Image / Camera Roll</span>
+        
+            <input
+              type="file"
+              id="uploadNomineeImage_${categoryId}_${nomineeId}"
+              accept="image/*"
+            >
+          </label>
+        
+          <button
+            type="button"
+            class="admin-small-button secondary"
+            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'choose')"
+          >
+            Upload Chosen Image
+          </button>
+        
+          <label class="admin-field">
+            <span>Take Photo</span>
+        
+            <input
+              type="file"
+              id="captureNomineeImage_${categoryId}_${nomineeId}"
+              accept="image/*"
+              capture="environment"
+            >
+          </label>
+        
+          <button
+            type="button"
+            class="admin-small-button secondary"
+            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'capture')"
+          >
+            Upload Photo
+          </button>
+        
+        </div>
 
       ${renderAdminSetupFileTools(nominee.fileId || "", fileInputId)}
 
