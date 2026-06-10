@@ -61,6 +61,16 @@ function doPost(e) {
     
     }
 
+    if (action === "adminDeleteImageFromDrive") {
+
+      return json(
+        adminDeleteImageFromDrive(
+          body
+        )
+      );
+    
+    }
+
     return json({
       success:
         false,

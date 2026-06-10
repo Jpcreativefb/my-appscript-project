@@ -379,114 +379,18 @@
     }
   }
 
-  /* ======================
-   ADMIN
+ /* ======================
+   ADMIN BASE
 ====================== */
+
+.admin-page {
+  color: #ffffff;
+}
 
 .admin-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
-}
-
-.admin-grid {
-  display: grid;
-  grid-template-columns:
-    repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.admin-card {
-  border:
-    1px solid rgba(250, 204, 21, 0.25);
-}
-
-.admin-label {
-  opacity: 0.7;
-  font-size: 14px;
-  margin-bottom: 6px;
-}
-
-.admin-value {
-  font-size: 24px;
-  font-weight: 800;
-}
-
-.admin-number {
-  font-size: 34px;
-  font-weight: 900;
-}
-
-.admin-sub {
-  opacity: 0.6;
-  font-size: 13px;
-  margin-top: 4px;
-}
-
-.admin-button {
-  margin-top: 8px;
-}
-
-.admin-message {
-  margin-top: 12px;
-  opacity: 0.8;
-}
-
-.admin-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.admin-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-
-  padding: 12px;
-
-  background:
-    rgba(255, 255, 255, 0.04);
-
-  border-radius: 14px;
-}
-
-.admin-pill {
-  padding: 6px 10px;
-  border-radius: 999px;
-
-  background:
-    rgba(255, 255, 255, 0.08);
-
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.admin-pill.locked {
-  background:
-    rgba(248, 113, 113, 0.25);
-
-  color: #fecaca;
-}
-
-.admin-pill.admin {
-  background:
-    rgba(250, 204, 21, 0.2);
-
-  color: #fde68a;
-}
-
-.error-card {
-  color: #fecaca;
-}
-
-/* ======================
-   ADMIN DARK OVERRIDES
-====================== */
-
-.admin-page {
-  color: #ffffff;
 }
 
 .admin-page .card,
@@ -513,15 +417,9 @@
 
 .admin-page h1,
 .admin-page h2,
-.admin-page strong,
-.admin-page div {
+.admin-page h3,
+.admin-page strong {
   color: inherit;
-}
-
-.admin-section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
 }
 
 .admin-grid {
@@ -529,11 +427,6 @@
   grid-template-columns:
     repeat(2, minmax(0, 1fr));
   gap: 12px;
-}
-
-.admin-card {
-  border:
-    1px solid rgba(250, 204, 21, 0.28) !important;
 }
 
 .admin-label {
@@ -560,29 +453,18 @@
   margin-top: 4px;
 }
 
-.admin-button {
-  margin-top: 8px;
-
-  background:
-    linear-gradient(
-      135deg,
-      #facc15,
-      #f59e0b
-    ) !important;
-
-  color: #111827 !important;
-
-  border: none !important;
-  border-radius: 999px;
-
-  padding: 12px 18px;
-
-  font-weight: 800;
-}
-
 .admin-message {
   margin-top: 12px;
   color: rgba(255, 255, 255, 0.8) !important;
+  opacity: 0.9;
+}
+
+.admin-message.is-error {
+  color: #fca5a5 !important;
+}
+
+.error-card {
+  color: #fecaca !important;
 }
 
 .admin-list {
@@ -621,6 +503,7 @@
 
   font-size: 12px;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .admin-pill.locked {
@@ -637,36 +520,52 @@
   color: #fde68a !important;
 }
 
-.error-card {
-  color: #fecaca !important;
+.admin-pill.inactive {
+  background:
+    rgba(148, 163, 184, 0.22) !important;
+
+  color: #cbd5e1 !important;
 }
 
 /* ======================
-   ADMIN CATEGORY CONTROLS
+   ADMIN PAGE HEADER
 ====================== */
 
-.admin-category-card {
-  padding: 14px;
-
-  background:
-    rgba(255, 255, 255, 0.06);
-
-  border:
-    1px solid rgba(255, 255, 255, 0.08);
-
-  border-radius: 16px;
-
+.admin-page-header {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.admin-category-header {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 16px;
 }
+
+.admin-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.admin-game-setup-page {
+  padding-bottom: 96px;
+}
+
+@media (max-width: 760px) {
+
+  .admin-page-header {
+    flex-direction: column;
+  }
+
+  .admin-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+}
+
+/* ======================
+   ADMIN FORMS / CONTROLS
+====================== */
 
 .admin-control-grid {
   display: grid;
@@ -686,7 +585,8 @@
 }
 
 .admin-field input,
-.admin-field select {
+.admin-field select,
+.admin-field textarea {
   width: 100%;
 
   padding: 10px 12px;
@@ -702,61 +602,20 @@
   color: #ffffff;
 
   outline: none;
+
+  font-family: inherit;
+}
+
+.admin-field textarea {
+  min-height: 92px;
+  resize: vertical;
 }
 
 .admin-field input:focus,
-.admin-field select:focus {
+.admin-field select:focus,
+.admin-field textarea:focus {
   border-color:
     rgba(250, 204, 21, 0.8);
-}
-
-.admin-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-small-button {
-  padding: 9px 13px;
-
-  border-radius: 999px;
-
-  border: none;
-
-  background:
-    linear-gradient(
-      135deg,
-      #facc15,
-      #f59e0b
-    );
-
-  color: #111827;
-
-  font-weight: 800;
-
-  cursor: pointer;
-}
-
-.admin-small-button.secondary {
-  background:
-    rgba(255, 255, 255, 0.14);
-
-  color: #ffffff;
-}
-
-.admin-small-button.danger {
-  background:
-    rgba(248, 113, 113, 0.25);
-
-  color: #fecaca;
-}
-
-@media (max-width: 720px) {
-
-  .admin-control-grid {
-    grid-template-columns: 1fr;
-  }
-
 }
 
 .admin-field select {
@@ -788,11 +647,694 @@
   padding-right: 36px;
 }
 
+.admin-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  color: rgba(255, 255, 255, 0.82);
+
+  font-weight: 700;
+}
+
+.admin-check-row input {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-check-row.compact {
+  margin: 0;
+}
+
+.admin-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin-top: 16px;
+}
+
+.admin-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 720px) {
+
+  .admin-control-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
+
 /* ======================
-   ADMIN USER CONTROLS
+   ADMIN BUTTONS
 ====================== */
 
-.admin-user-create {
+.admin-button,
+.admin-small-button {
+  border: none;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.admin-button {
+  margin-top: 8px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #facc15,
+      #f59e0b
+    ) !important;
+
+  color: #111827 !important;
+
+  border-radius: 999px;
+
+  padding: 12px 18px;
+}
+
+.admin-small-button {
+  min-height: 38px;
+
+  padding: 9px 13px;
+
+  border-radius: 999px;
+
+  background:
+    linear-gradient(
+      135deg,
+      #facc15,
+      #f59e0b
+    );
+
+  color: #111827;
+}
+
+.admin-small-button.secondary {
+  background:
+    rgba(255, 255, 255, 0.10);
+
+  color: #ffffff;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.14);
+}
+
+.admin-small-button.secondary:hover {
+  background:
+    rgba(255, 255, 255, 0.16);
+}
+
+.admin-small-button.danger,
+.admin-danger-button {
+  min-height: 38px;
+
+  padding: 0 13px;
+
+  border: none;
+  border-radius: 12px;
+
+  background:
+    rgba(239, 68, 68, 0.18);
+
+  color: #fecaca;
+
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-publish-button:hover,
+.admin-small-button:hover,
+.admin-danger-button:hover {
+  transform:
+    translateY(-1px);
+}
+
+.admin-card-actions,
+.admin-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* ======================
+   ADMIN GAME SETUP / CATEGORY LAYOUT
+====================== */
+
+.admin-categories-main-card .admin-collapsible-body {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-category-list {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-category-card {
+  width: 100%;
+  box-sizing: border-box;
+
+  padding: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  border-radius: 16px;
+
+  display: block;
+}
+
+.admin-category-card > .admin-collapsible-body {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.admin-edit-panel {
+  padding: 14px;
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.045);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-setup-meta {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.admin-setup-meta div {
+  padding: 12px;
+  border-radius: 14px;
+  background:
+    rgba(15, 23, 42, 0.55);
+}
+
+.admin-setup-meta span {
+  display: block;
+  margin-bottom: 5px;
+
+  color:
+    rgba(255, 255, 255, 0.58);
+
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.admin-setup-meta strong {
+  color: #ffffff;
+  font-size: 15px;
+}
+
+/* ======================
+   ADMIN COLLAPSIBLE SECTIONS
+====================== */
+
+.admin-collapsible-card,
+.admin-collapsible-category,
+.admin-results-panel,
+.admin-setup-nominees,
+.admin-image-details,
+.admin-image-source-details,
+.admin-inline-add-answer {
+  overflow: hidden;
+}
+
+.admin-card-summary,
+.admin-category-summary,
+.admin-results-summary,
+.admin-nominee-summary,
+.admin-image-summary,
+.admin-inline-add-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.admin-card-summary::-webkit-details-marker,
+.admin-category-summary::-webkit-details-marker,
+.admin-results-summary::-webkit-details-marker,
+.admin-nominee-summary::-webkit-details-marker,
+.admin-image-summary::-webkit-details-marker,
+.admin-inline-add-summary::-webkit-details-marker {
+  display: none;
+}
+
+.admin-card-summary h2,
+.admin-nominee-summary h3 {
+  margin: 0;
+}
+
+.admin-collapse-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+
+  border-radius: 999px;
+
+  background:
+    rgba(255, 255, 255, 0.09);
+
+  color:
+    rgba(255, 255, 255, 0.78);
+
+  font-size: 14px;
+  font-weight: 900;
+
+  transition:
+    transform 0.18s ease;
+}
+
+details[open] > summary .admin-collapse-icon {
+  transform:
+    rotate(180deg);
+}
+
+.admin-collapsible-body {
+  margin-top: 14px;
+}
+
+.admin-category-summary,
+.admin-results-summary,
+.admin-nominee-summary {
+  width: 100%;
+}
+
+.admin-results-summary,
+.admin-nominee-summary,
+.admin-image-summary,
+.admin-inline-add-summary {
+  align-items: center;
+}
+
+.admin-results-summary .admin-results-head {
+  margin-bottom: 0;
+}
+
+.admin-collapsible-category:not([open]) {
+  padding-bottom: 16px;
+}
+
+/* ======================
+   ADMIN ADVANCED FIELDS
+====================== */
+
+.admin-advanced-details {
+  margin: 14px 0;
+  padding: 12px;
+
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.045);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-advanced-details summary {
+  cursor: pointer;
+  color:
+    rgba(255, 255, 255, 0.78);
+
+  font-weight: 800;
+  user-select: none;
+}
+
+.admin-advanced-details[open] summary {
+  margin-bottom: 12px;
+}
+
+.admin-advanced-details .admin-field span::after {
+  content: " · advanced";
+  font-weight: 600;
+  color:
+    rgba(255, 255, 255, 0.42);
+}
+
+/* ======================
+   ADMIN RESULTS / WINNERS
+====================== */
+
+.admin-results-panel {
+  margin-top: 14px;
+  padding: 14px;
+
+  border-radius: 16px;
+
+  background:
+    rgba(250, 204, 21, 0.08);
+
+  border:
+    1px solid rgba(250, 204, 21, 0.18);
+}
+
+.admin-results-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.admin-results-head h3 {
+  margin: 0 0 4px;
+  color: #ffffff;
+  font-size: 15px;
+}
+
+/* ======================
+   ADMIN NOMINEES / ANSWERS
+====================== */
+
+.admin-setup-nominees {
+  margin-top: 14px;
+
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.03);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-nominee-summary {
+  padding: 12px 14px;
+}
+
+.admin-nominee-summary h3 {
+  color: #ffffff;
+  font-size: 15px;
+  margin: 0;
+}
+
+.admin-setup-nominee-edit-row {
+  margin-top: 10px;
+  padding: 12px;
+
+  border-radius: 16px;
+
+  background:
+    rgba(15, 23, 42, 0.55);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.07);
+}
+
+.admin-setup-nominee-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  padding: 11px 12px;
+  margin-top: 8px;
+
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+}
+
+.nominee-grid {
+  grid-template-columns:
+    1.3fr 1fr;
+}
+
+.admin-nominee-edit-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+
+  margin-top: 10px;
+}
+
+@media (max-width: 760px) {
+
+  .nominee-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-nominee-edit-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+}
+
+/* ======================
+   ADMIN INLINE ADD ANSWER
+====================== */
+
+.admin-inline-add-answer {
+  margin-top: 12px;
+
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  border:
+    1px dashed rgba(255, 255, 255, 0.14);
+}
+
+.admin-inline-add-summary {
+  padding: 12px 14px;
+}
+
+.admin-inline-add-body {
+  display: grid;
+  gap: 12px;
+
+  padding: 12px 14px 14px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* ======================
+   ADMIN FILE / IMAGE TOOLS
+====================== */
+
+.admin-file-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  padding: 10px;
+
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-file-tools.empty {
+  align-items: flex-start;
+  flex-direction: column;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.admin-file-preview {
+  flex-shrink: 0;
+}
+
+.admin-file-preview img {
+  width: 58px;
+  height: 82px;
+
+  object-fit: cover;
+
+  border-radius: 8px;
+
+  background: #222;
+
+  border:
+    1px solid rgba(255, 255, 255, 0.12);
+}
+
+.admin-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-live-image-preview {
+  display: block;
+}
+
+.admin-image-details {
+  grid-column: 1 / -1;
+
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.10);
+}
+
+.admin-image-summary {
+  padding: 12px 14px;
+}
+
+.admin-image-body {
+  display: grid;
+  gap: 12px;
+
+  padding: 12px 14px 14px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-image-source-details {
+  border-radius: 14px;
+
+  padding: 10px;
+
+  background:
+    rgba(0, 0, 0, 0.16);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-image-source-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.admin-image-details .admin-card-actions {
+  justify-content: flex-start;
+}
+
+/* ======================
+   ADMIN IMAGE SOURCE TOOLS
+====================== */
+
+.admin-upload-tools,
+.admin-url-import-tools,
+.admin-tmdb-tools {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  flex-wrap: wrap;
+
+  padding: 10px;
+
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.04);
+
+  border:
+    1px dashed rgba(255, 255, 255, 0.12);
+}
+
+.admin-upload-tools .admin-field,
+.admin-url-import-tools .admin-field,
+.admin-tmdb-tools .admin-field {
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+}
+
+.admin-url-import-tools .admin-field,
+.admin-tmdb-tools .admin-field {
+  min-width: 260px;
+}
+
+.admin-upload-tools input[type="file"] {
+  width: 100%;
+  font-size: 0.85rem;
+}
+
+/* ======================
+   ADMIN TMDB POSTER SEARCH
+====================== */
+
+.admin-tmdb-results {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.admin-tmdb-result {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+
+  padding: 10px;
+
+  border-radius: 14px;
+
+  background:
+    rgba(255, 255, 255, 0.06);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-tmdb-result img {
+  width: 54px;
+  height: 82px;
+
+  object-fit: cover;
+
+  border-radius: 8px;
+
+  background: #222;
+}
+
+.admin-tmdb-result-body {
+  display: grid;
+  gap: 6px;
+}
+
+/* ======================
+   ADMIN USERS
+====================== */
+
+.admin-user-create,
+.admin-user-card {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -812,6 +1354,17 @@
   margin: 0;
 }
 
+.admin-user-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-user-card:has(.admin-pill.inactive) {
+  opacity: 0.72;
+}
+
 .admin-divider {
   margin: 20px 0;
 
@@ -821,198 +1374,71 @@
     1px solid rgba(255, 255, 255, 0.12);
 }
 
-.admin-check-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  color: rgba(255, 255, 255, 0.82);
-
-  font-weight: 700;
-}
-
-.admin-check-row input {
-  width: 18px;
-  height: 18px;
-}
-
-.admin-user-card {
-  padding: 14px;
-
-  background:
-    rgba(255, 255, 255, 0.06);
-
-  border:
-    1px solid rgba(255, 255, 255, 0.08);
-
-  border-radius: 16px;
-
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.admin-user-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.admin-pill.inactive {
-  background:
-    rgba(148, 163, 184, 0.22) !important;
-
-  color: #cbd5e1 !important;
-}
-
-.admin-user-card:has(.admin-pill.inactive) {
-  opacity: 0.72;
-}
-
 /* ======================
-   ADMIN GAME SETUP
+   ADMIN GAMES / FORMS
 ====================== */
 
-.admin-page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.admin-game-setup-page {
-  padding-bottom: 96px;
-}
-
-.admin-setup-meta {
+.admin-games-list {
   display: grid;
-  grid-template-columns: repeat(
-    auto-fit,
-    minmax(120px, 1fr)
-  );
-  gap: 10px;
-  margin: 14px 0;
+  gap: 16px;
+  margin-top: 18px;
 }
 
-.admin-setup-meta div {
-  padding: 12px;
-  border-radius: 14px;
-  background: rgba(15, 23, 42, 0.55);
+.admin-game-card {
+  border-radius: 18px;
 }
 
-.admin-setup-meta span {
-  display: block;
-  margin-bottom: 5px;
-  color: rgba(255, 255, 255, 0.58);
-  font-size: 12px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.admin-setup-meta strong {
-  color: #ffffff;
-  font-size: 15px;
-}
-
-.admin-setup-nominees {
-  margin-top: 14px;
-}
-
-.admin-setup-nominees h3 {
-  margin: 0 0 10px;
-  color: #ffffff;
-  font-size: 15px;
-}
-
-.admin-setup-nominee-row {
+.admin-card-header,
+.admin-section-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 12px;
-
-  padding: 11px 12px;
-  margin-top: 8px;
-
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06);
+  justify-content: space-between;
+  gap: 16px;
 }
 
-.admin-message.is-error {
-  color: #fca5a5;
+.form-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+
+  margin-top: 16px;
+}
+
+.form-grid label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.form-grid input,
+.form-grid select {
+  width: 100%;
+}
+
+.admin-game-advanced {
+  margin-top: 18px;
+  padding-top: 16px;
+
+  border-top:
+    1px solid rgba(255, 255, 255, 0.12);
 }
 
 /* ======================
-   ADMIN SETUP EDIT CONTROLS
-====================== */
-
-.admin-edit-panel {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.admin-setup-nominee-edit-row {
-  margin-top: 10px;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.nominee-grid {
-  grid-template-columns: 1.3fr 1fr 1fr;
-}
-
-.admin-nominee-edit-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.admin-check-row.compact {
-  margin: 0;
-}
-
-.admin-danger-button {
-  min-height: 38px;
-  padding: 0 13px;
-  border: none;
-  border-radius: 12px;
-  background: rgba(239, 68, 68, 0.18);
-  color: #fecaca;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-@media (max-width: 760px) {
-
-  .nominee-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .admin-nominee-edit-footer {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-}
-
-/* ======================
-   ADMIN PUBLISH CONTROLS
+   ADMIN PUBLISH / PREFLIGHT
 ====================== */
 
 .admin-publish-panel {
   margin-top: 16px;
   padding: 14px;
+
   border-radius: 18px;
-  background: rgba(15, 23, 42, 0.58);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+
+  background:
+    rgba(15, 23, 42, 0.58);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
 }
 
 .admin-publish-head {
@@ -1020,6 +1446,7 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
+
   margin-bottom: 12px;
 }
 
@@ -1030,10 +1457,8 @@
 
 .admin-publish-grid {
   display: grid;
-  grid-template-columns: repeat(
-    5,
-    minmax(0, 1fr)
-  );
+  grid-template-columns:
+    repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1044,8 +1469,11 @@
   border: none;
   border-radius: 12px;
 
-  background: rgba(255, 255, 255, 0.10);
-  color: rgba(255, 255, 255, 0.88);
+  background:
+    rgba(255, 255, 255, 0.10);
+
+  color:
+    rgba(255, 255, 255, 0.88);
 
   font-size: 13px;
   font-weight: 800;
@@ -1053,36 +1481,18 @@
 }
 
 .admin-publish-button.active {
-  background: rgba(34, 197, 94, 0.22);
+  background:
+    rgba(34, 197, 94, 0.22);
+
   color: #bbf7d0;
 }
 
 .admin-publish-button.default {
-  background: rgba(250, 204, 21, 0.92);
+  background:
+    rgba(250, 204, 21, 0.92);
+
   color: #111827;
 }
-
-.admin-publish-button:hover,
-.admin-secondary-button:hover,
-.admin-danger-button:hover {
-  transform: translateY(-1px);
-}
-
-@media (max-width: 760px) {
-
-  .admin-publish-head {
-    flex-direction: column;
-  }
-
-  .admin-publish-grid {
-    grid-template-columns: 1fr 1fr;
-  }
-
-}
-
-/* ======================
-   ADMIN PREFLIGHT
-====================== */
 
 .admin-preflight-result {
   margin-top: 14px;
@@ -1090,28 +1500,46 @@
 
 .admin-preflight-card {
   padding: 14px;
+
   border-radius: 16px;
-  background: rgba(15, 23, 42, 0.62);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: rgba(255, 255, 255, 0.88);
+
+  background:
+    rgba(15, 23, 42, 0.62);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+
+  color:
+    rgba(255, 255, 255, 0.88);
+
   font-size: 14px;
 }
 
 .admin-preflight-card.is-ready {
-  background: rgba(34, 197, 94, 0.14);
-  border-color: rgba(34, 197, 94, 0.35);
+  background:
+    rgba(34, 197, 94, 0.14);
+
+  border-color:
+    rgba(34, 197, 94, 0.35);
+
   color: #bbf7d0;
   font-weight: 800;
 }
 
 .admin-preflight-card.is-warning {
-  background: rgba(250, 204, 21, 0.13);
-  border-color: rgba(250, 204, 21, 0.35);
+  background:
+    rgba(250, 204, 21, 0.13);
+
+  border-color:
+    rgba(250, 204, 21, 0.35);
 }
 
 .admin-preflight-card.is-error {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.35);
+  background:
+    rgba(239, 68, 68, 0.12);
+
+  border-color:
+    rgba(239, 68, 68, 0.35);
 }
 
 .admin-preflight-summary {
@@ -1137,224 +1565,21 @@
   color: #fde68a;
 }
 
-/* ======================
-   ADMIN RESULTS / WINNERS
-====================== */
-
-.admin-header-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-.admin-results-panel {
-  margin-top: 14px;
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(250, 204, 21, 0.08);
-  border: 1px solid rgba(250, 204, 21, 0.18);
-}
-
-.admin-results-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.admin-results-head h3 {
-  margin: 0 0 4px;
-  color: #ffffff;
-  font-size: 15px;
-}
-
 @media (max-width: 760px) {
 
-  .admin-header-actions {
-    justify-content: flex-start;
-    width: 100%;
+  .admin-publish-head {
+    flex-direction: column;
+  }
+
+  .admin-publish-grid {
+    grid-template-columns: 1fr 1fr;
   }
 
 }
 
 /* ======================
-   ADMIN ADVANCED FIELDS
+   GAME SWITCHER / LEADERBOARD
 ====================== */
-
-.admin-advanced-details {
-  margin: 14px 0;
-  padding: 12px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.045);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-}
-
-.admin-advanced-details summary {
-  cursor: pointer;
-  color: rgba(255, 255, 255, 0.78);
-  font-weight: 800;
-  user-select: none;
-}
-
-.admin-advanced-details[open] summary {
-  margin-bottom: 12px;
-}
-
-.admin-advanced-details .admin-field span::after {
-  content: " · advanced";
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.42);
-}
-
-/* ======================
-   ADMIN COLLAPSIBLE SECTIONS
-====================== */
-
-.admin-collapsible-card,
-.admin-collapsible-category,
-.admin-results-panel,
-.admin-setup-nominees {
-  overflow: hidden;
-}
-
-.admin-card-summary,
-.admin-category-summary,
-.admin-results-summary,
-.admin-nominee-summary {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
-  cursor: pointer;
-  list-style: none;
-}
-
-.admin-card-summary::-webkit-details-marker,
-.admin-category-summary::-webkit-details-marker,
-.admin-results-summary::-webkit-details-marker,
-.admin-nominee-summary::-webkit-details-marker {
-  display: none;
-}
-
-.admin-card-summary h2,
-.admin-nominee-summary h3 {
-  margin: 0;
-}
-
-.admin-collapse-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.09);
-  color: rgba(255, 255, 255, 0.78);
-
-  font-size: 14px;
-  font-weight: 900;
-
-  transition: transform 0.18s ease;
-}
-
-details[open] > summary .admin-collapse-icon {
-  transform: rotate(180deg);
-}
-
-.admin-collapsible-body {
-  margin-top: 14px;
-}
-
-.admin-category-summary {
-  width: 100%;
-}
-
-.admin-results-summary,
-.admin-nominee-summary {
-  width: 100%;
-}
-
-.admin-results-summary .admin-results-head {
-  margin-bottom: 0;
-}
-
-.admin-nominee-summary {
-  align-items: center;
-}
-
-.admin-nominee-summary h3 {
-  color: #ffffff;
-  font-size: 15px;
-}
-
-.admin-collapsible-category:not([open]) {
-  padding-bottom: 16px;
-}
-
-.admin-games-list {
-  display: grid;
-  gap: 16px;
-  margin-top: 18px;
-}
-
-.admin-game-card {
-  border-radius: 18px;
-}
-
-.admin-card-header,
-.admin-section-header,
-.admin-card-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.form-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 14px;
-  margin-top: 16px;
-}
-
-.form-grid label {
-  display: grid;
-  gap: 6px;
-  font-size: 0.9rem;
-}
-
-.form-grid input,
-.form-grid select {
-  width: 100%;
-}
-
-.admin-checkbox-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 18px;
-  margin-top: 16px;
-}
-
-.admin-checkbox {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.admin-game-advanced {
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid rgba(255,255,255,0.12);
-}
-
-.hidden {
-  display: none !important;
-}
 
 .game-switcher-wrap {
   margin-top: 6px;
@@ -1365,6 +1590,7 @@ details[open] > summary .admin-collapse-icon {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+
   font-size: 0.82rem;
 }
 
@@ -1376,10 +1602,17 @@ details[open] > summary .admin-collapse-icon {
 }
 
 .game-switcher select {
-  border: 1px solid rgba(255,255,255,0.18);
+  border:
+    1px solid rgba(255, 255, 255, 0.18);
+
   border-radius: 999px;
-  padding: 6px 28px 6px 10px;
-  background: rgba(255,255,255,0.08);
+
+  padding:
+    6px 28px 6px 10px;
+
+  background:
+    rgba(255, 255, 255, 0.08);
+
   color: inherit;
   font: inherit;
 }
@@ -1398,158 +1631,6 @@ details[open] > summary .admin-collapse-icon {
   margin-top: 2px;
 }
 
-/* ======================
-   ADMIN FILE TOOLS
-====================== */
-
-.admin-file-tools {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.admin-file-tools.empty {
-  align-items: flex-start;
-  flex-direction: column;
-  opacity: 0.75;
-  font-size: 0.85rem;
-}
-
-.admin-file-preview {
-  flex-shrink: 0;
-}
-
-.admin-file-preview img {
-  width: 58px;
-  height: 82px;
-  object-fit: cover;
-  border-radius: 8px;
-  background: #222;
-  border: 1px solid rgba(255,255,255,0.12);
-}
-
-.admin-file-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.admin-small-button.secondary {
-  background: rgba(255,255,255,0.10);
-  color: inherit;
-  border: 1px solid rgba(255,255,255,0.14);
-}
-
-.admin-small-button.secondary:hover {
-  background: rgba(255,255,255,0.16);
-}
-
-.admin-field textarea {
-  width: 100%;
-  min-height: 92px;
-  resize: vertical;
-  border-radius: 10px;
-  padding: 10px;
-  font-family: inherit;
-}
-
-/* ======================
-   ADMIN IMAGE UPLOAD TOOLS
-====================== */
-
-.admin-upload-tools {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.04);
-  border: 1px dashed rgba(255,255,255,0.12);
-}
-
-.admin-upload-tools .admin-field {
-  margin: 0;
-  flex: 1;
-  min-width: 220px;
-}
-
-.admin-upload-tools input[type="file"] {
-  width: 100%;
-  font-size: 0.85rem;
-}
-
-/* ======================
-   ADMIN URL IMAGE IMPORT
-====================== */
-
-.admin-url-import-tools {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.04);
-  border: 1px dashed rgba(255,255,255,0.12);
-}
-
-.admin-url-import-tools .admin-field {
-  margin: 0;
-  flex: 1;
-  min-width: 260px;
-}
-
-/* ======================
-   ADMIN TMDB POSTER SEARCH
-====================== */
-
-.admin-tmdb-tools {
-  display: flex;
-  align-items: end;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.04);
-  border: 1px dashed rgba(255,255,255,0.12);
-}
-
-.admin-tmdb-tools .admin-field {
-  margin: 0;
-  flex: 1;
-  min-width: 260px;
-}
-
-.admin-tmdb-results {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.admin-tmdb-result {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  padding: 10px;
-  border-radius: 14px;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.08);
-}
-
-.admin-tmdb-result img {
-  width: 54px;
-  height: 82px;
-  object-fit: cover;
-  border-radius: 8px;
-  background: #222;
-}
-
-.admin-tmdb-result-body {
-  display: grid;
-  gap: 6px;
+.hidden {
+  display: none !important;
 }

@@ -670,6 +670,18 @@ async function apiAdminImportImageFromUrl(payload) {
 
 }
 
+async function apiAdminDeleteImageFromDrive(payload) {
+
+  return apiPost(
+    "adminDeleteImageFromDrive",
+    {
+      fileId:
+        payload.fileId
+    }
+  );
+
+}
+
 async function apiAdminSearchTmdbMoviePosters(payload) {
 
   return apiPost(

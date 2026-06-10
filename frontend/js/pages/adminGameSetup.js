@@ -286,25 +286,32 @@ function renderAdminSetupAddCategoryCard(gameId) {
 }
 
 async function renderAdminGameSetupPage(gameId) {
-  const safeGameId = String(gameId || "").trim();
+  const safeGameId =
+    String(gameId || "").trim();
 
   if (!safeGameId) {
     return `
       <div class="page admin-page">
+
         <h1>Game Setup</h1>
 
         <div class="card admin-card error-card">
           Missing game ID.
         </div>
+
       </div>
     `;
   }
 
-  const res = await apiAdminGetGameSetup(safeGameId);
+  const res =
+    await apiAdminGetGameSetup(
+      safeGameId
+    );
 
   if (!res || res.success === false) {
     return `
       <div class="page admin-page">
+
         <h1>Game Setup</h1>
 
         <div class="card admin-card error-card">
@@ -323,11 +330,15 @@ async function renderAdminGameSetupPage(gameId) {
         >
           Back to Manage Games
         </button>
+
       </div>
     `;
   }
 
-  const categories = Array.isArray(res.categories) ? res.categories : [];
+  const categories =
+    Array.isArray(res.categories)
+      ? res.categories
+      : [];
 
   return `
     <div class="page admin-page admin-game-setup-page">
@@ -377,53 +388,55 @@ async function renderAdminGameSetupPage(gameId) {
 
         ${renderAdminSetupAddCategoryCard(safeGameId)}
 
-        ${renderAdminSetupAddNomineeCard(safeGameId, categories)}
-
         <details
-  class="card admin-card admin-collapsible-card"
-  open
->
+          class="card admin-card admin-collapsible-card admin-categories-main-card"
+          open
+        >
 
-  <summary class="admin-card-summary">
+          <summary class="admin-card-summary">
 
-    <div>
-      <h2>Categories / Questions</h2>
+            <div>
+              <h2>Categories / Questions</h2>
 
-      <div class="admin-sub">
-        ${categories.length} categories/questions configured.
-      </div>
-    </div>
+              <div class="admin-sub">
+                ${categories.length} categories/questions configured.
+              </div>
+            </div>
 
-    <span class="admin-collapse-icon">
-      ▾
-    </span>
+            <span class="admin-collapse-icon">
+              ▾
+            </span>
 
-  </summary>
+          </summary>
 
-  <div class="admin-collapsible-body">
+          <div class="admin-collapsible-body">
 
-    <div
-      id="adminSetupMessage"
-      class="admin-message"
-    ></div>
+            <div
+              id="adminSetupMessage"
+              class="admin-message"
+            ></div>
 
-    ${
-      categories.length
-        ? `
-          <div class="admin-list">
-            ${categories.map(renderAdminSetupCategoryCard).join("")}
+            ${
+              categories.length
+                ? `
+                  <div class="admin-list admin-category-list">
+                    ${categories
+                      .map(category =>
+                        renderAdminSetupCategoryCard(category)
+                      )
+                      .join("")}
+                  </div>
+                `
+                : `
+                  <div class="admin-sub">
+                    No categories found yet. Add your first category above.
+                  </div>
+                `
+            }
+
           </div>
-        `
-        : `
-          <div class="admin-sub">
-            No categories found yet. Add your first category above.
-          </div>
-        `
-    }
 
-  </div>
-
-</details>
+        </details>
 
       </div>
 
@@ -1148,7 +1161,12 @@ async function adminSetupUploadNomineeImage(
 
     fileIdInput.value =
       res.fileId || "";
-
+  
+    adminSetupRefreshImagePreview(
+      categoryId,
+      nomineeId
+    );
+  
   }
 
   adminSetupSetMessage(
@@ -1303,7 +1321,12 @@ async function adminSetupImportNomineeImageFromUrl(
 
     fileIdInput.value =
       res.fileId || "";
-
+  
+    adminSetupRefreshImagePreview(
+      categoryId,
+      nomineeId
+    );
+  
   }
 
   adminSetupSetMessage(
@@ -1484,23 +1507,215 @@ async function adminSetupImportTmdbPoster(
 
 }
 
+function adminSetupRefreshImagePreview(
+  categoryId,
+  nomineeId
+) {
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const previewEl =
+    document.getElementById(
+      "imagePreviewTools_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  if (!fileIdInput || !previewEl) {
+    return;
+  }
+
+  const fileId =
+    adminSetupExtractDriveFileId(
+      fileIdInput.value
+    );
+
+  fileIdInput.value =
+    fileId;
+
+  previewEl.innerHTML =
+    renderAdminSetupFileTools(
+      fileId,
+      fileIdInput.id
+    );
+
+}
+
+function adminSetupClearNomineeImage(
+  categoryId,
+  nomineeId
+) {
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  if (fileIdInput) {
+
+    fileIdInput.value =
+      "";
+      adminSetupRefreshImagePreview(
+        categoryId,
+        nomineeId
+      );
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Image cleared. Click Save Nominee to keep this change.",
+    false
+  );
+
+}
+
+async function adminSetupDeleteNomineeImageFromDrive(
+  categoryId,
+  nomineeId
+) {
+
+  const fileIdInput =
+    document.getElementById(
+      "editNomineeFileId_" +
+      categoryId +
+      "_" +
+      nomineeId
+    );
+
+  const messageId =
+    "editNomineeMessage_" +
+    categoryId +
+    "_" +
+    nomineeId;
+
+  const fileId =
+    fileIdInput
+      ? fileIdInput.value.trim()
+      : "";
+
+  if (!fileId) {
+
+    adminSetupSetMessage(
+      messageId,
+      "No File ID to delete.",
+      true
+    );
+
+    return;
+
+  }
+
+  const ok =
+    confirm(
+      "Move this image to Google Drive trash and clear it from this nominee?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Deleting image from Drive...",
+    false
+  );
+
+  const res =
+    await apiAdminDeleteImageFromDrive({
+      fileId:
+        fileId
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not delete image from Drive.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (fileIdInput) {
+
+    fileIdInput.value =
+      "";
+
+    adminSetupRefreshImagePreview(
+      categoryId,
+      nomineeId
+    );
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Image moved to Drive trash. Click Save Nominee to remove the File ID.",
+    false
+  );
+
+}
+
 /* ======================
    CATEGORY CARD
 ====================== */
 
 function renderAdminSetupCategoryCard(category) {
-  const settings = category.settings || {};
+  const settings =
+    category.settings || {};
 
-  const nominees = Array.isArray(category.nominees) ? category.nominees : [];
+  const nominees =
+    Array.isArray(category.nominees)
+      ? category.nominees
+      : [];
 
-  const gameId = adminSetupEscapeHtml(category.gameId);
+  const gameId =
+    adminSetupEscapeHtml(category.gameId);
 
-  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const categoryId =
+    adminSetupEscapeHtml(category.categoryId);
+
+  const categoryTitle =
+    adminSetupEscapeHtml(
+      category.category || category.categoryId
+    );
+
+  const section =
+    adminSetupEscapeHtml(
+      category.section || "Other"
+    );
+
+  const groupId =
+    adminSetupEscapeHtml(
+      settings.groupId || "default"
+    );
 
   return `
-    <details
-      class="admin-category-card admin-collapsible-category"
-    >
+    <details class="admin-category-card admin-collapsible-category">
 
       <summary class="admin-category-summary">
 
@@ -1508,15 +1723,15 @@ function renderAdminSetupCategoryCard(category) {
 
           <div>
             <strong>
-              ${adminSetupEscapeHtml(category.category || category.categoryId)}
+              ${categoryTitle}
             </strong>
 
             <div class="admin-sub">
               ${categoryId}
               ·
-              ${adminSetupEscapeHtml(category.section || "Other")}
+              ${section}
               ·
-              ${adminSetupEscapeHtml(settings.groupId || "default")}
+              ${groupId}
               ·
               ${nominees.length} nominees
             </div>
@@ -1556,7 +1771,7 @@ function renderAdminSetupCategoryCard(category) {
               <input
                 type="text"
                 id="editCategorySection_${categoryId}"
-                value="${adminSetupEscapeHtml(category.section || "Other")}"
+                value="${section}"
               >
             </label>
 
@@ -1686,7 +1901,7 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="text"
                   id="editCategoryGroupId_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.groupId || "default")}"
+                  value="${groupId}"
                   placeholder="default"
                 >
               </label>
@@ -1697,9 +1912,7 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="text"
                   id="editCategoryParentCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(
-                    settings.parentCategoryId || ""
-                  )}"
+                  value="${adminSetupEscapeHtml(settings.parentCategoryId || "")}"
                   placeholder="Optional parent category"
                 >
               </label>
@@ -1710,9 +1923,7 @@ function renderAdminSetupCategoryCard(category) {
                 <input
                   type="text"
                   id="editCategoryFollowUpCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(
-                    settings.followUpCategoryId || ""
-                  )}"
+                  value="${adminSetupEscapeHtml(settings.followUpCategoryId || "")}"
                   placeholder="Optional follow-up category"
                 >
               </label>
@@ -1726,9 +1937,7 @@ function renderAdminSetupCategoryCard(category) {
                 id="editCategoryFollowUpMapJSON_${categoryId}"
                 rows="4"
                 placeholder='{"winner-id":"follow-up-category-id"}'
-              >${adminSetupEscapeHtml(
-                settings.followUpMapJSON || ""
-              )}</textarea>
+              >${adminSetupEscapeHtml(settings.followUpMapJSON || "")}</textarea>
             </label>
 
           </details>
@@ -1764,7 +1973,9 @@ function renderAdminSetupCategoryCard(category) {
 
           <summary class="admin-nominee-summary">
 
-            <h3>Nominees / Answers</h3>
+            <h3>
+              Nominees / Answers
+            </h3>
 
             <span class="admin-sub">
               ${nominees.length} total
@@ -1781,7 +1992,7 @@ function renderAdminSetupCategoryCard(category) {
             ${
               nominees.length
                 ? nominees
-                    .map((nominee) =>
+                    .map(nominee =>
                       renderAdminSetupNomineeRow(category, nominee)
                     )
                     .join("")
@@ -1791,6 +2002,8 @@ function renderAdminSetupCategoryCard(category) {
                   </div>
                 `
             }
+
+            ${renderAdminSetupInlineAddNomineeCard(category)}
 
           </div>
 
@@ -1803,34 +2016,79 @@ function renderAdminSetupCategoryCard(category) {
 }
 
 /* ======================
-   ADD NOMINEE CARD
+   RESULTS / WINNERS PANEL
 ====================== */
 
-function renderAdminSetupAddNomineeCard(gameId, categories) {
-  const options = categories
-    .map(
-      (cat) => `
-        <option value="${adminSetupEscapeHtml(cat.categoryId)}">
-          ${adminSetupEscapeHtml(cat.category || cat.categoryId)}
-        </option>
-      `
-    )
-    .join("");
+function renderAdminResultsPanel(category, nominees, settings) {
+  const gameId =
+    adminSetupEscapeHtml(category.gameId);
+
+  const categoryId =
+    adminSetupEscapeHtml(category.categoryId);
+
+  const winnerNomineeId =
+    String(settings.winnerNomineeId || "").trim();
+
+  const favoriteNomineeId =
+    String(settings.favoriteNomineeId || "").trim();
+
+  const nomineeOptions =
+    nominees
+      .filter(nominee => nominee.active !== false)
+      .map(nominee => {
+        const nomineeId =
+          String(nominee.nomineeId || "").trim();
+
+        const nomineeName =
+          nominee.nominee || nominee.nomineeId;
+
+        return `
+          <option
+            value="${adminSetupEscapeHtml(nomineeId)}"
+            ${nomineeId === winnerNomineeId ? "selected" : ""}
+          >
+            ${adminSetupEscapeHtml(nomineeName)}
+          </option>
+        `;
+      })
+      .join("");
+
+  const favoriteOptions =
+    nominees
+      .filter(nominee => nominee.active !== false)
+      .map(nominee => {
+        const nomineeId =
+          String(nominee.nomineeId || "").trim();
+
+        const nomineeName =
+          nominee.nominee || nominee.nomineeId;
+
+        return `
+          <option
+            value="${adminSetupEscapeHtml(nomineeId)}"
+            ${nomineeId === favoriteNomineeId ? "selected" : ""}
+          >
+            ${adminSetupEscapeHtml(nomineeName)}
+          </option>
+        `;
+      })
+      .join("");
 
   return `
-    <details
-      class="card admin-card admin-collapsible-card"
-      open
-    >
+    <details class="admin-results-panel">
 
-      <summary class="admin-card-summary">
+      <summary class="admin-results-summary">
 
-        <div>
-          <h2>Add Nominee / Answer</h2>
+        <div class="admin-results-head">
 
-          <div class="admin-sub">
-            Choose a category and enter the nominee/answer. ID and short answer are auto-filled.
+          <div>
+            <h3>Results / Winners</h3>
+
+            <div class="admin-sub">
+              Select the actual winner and optional favorite/projection.
+            </div>
           </div>
+
         </div>
 
         <span class="admin-collapse-icon">
@@ -1842,245 +2100,61 @@ function renderAdminSetupAddNomineeCard(gameId, categories) {
       <div class="admin-collapsible-body">
 
         ${
-          categories.length
+          nominees.length
             ? `
               <div class="admin-control-grid">
 
                 <label class="admin-field">
-                  <span>Category</span>
+                  <span>Winner Nominee</span>
 
-                  <select id="setupNomineeCategoryId">
-                    ${options}
+                  <select id="resultWinner_${categoryId}">
+                    <option value="">Not selected</option>
+                    ${nomineeOptions}
                   </select>
                 </label>
 
                 <label class="admin-field">
-                  <span>Nominee / Answer</span>
+                  <span>Favorite Nominee</span>
 
-                  <input
-                    type="text"
-                    id="setupNewNomineeName"
-                    placeholder="Movie Title"
-                    oninput="adminSetupAutoFillNomineeFields()"
-                  >
+                  <select id="resultFavorite_${categoryId}">
+                    <option value="">Not selected</option>
+                    ${favoriteOptions}
+                  </select>
                 </label>
 
               </div>
 
-              <details class="admin-advanced-details">
+              <div class="admin-card-actions">
 
-                <summary>
-                  Advanced fields
-                </summary>
+                <button
+                  class="admin-small-button"
+                  onclick="adminSetupSaveResults('${gameId}', '${categoryId}')"
+                >
+                  Save Results
+                </button>
 
-                <div class="admin-control-grid">
+                <button
+                  class="admin-danger-button"
+                  onclick="adminSetupClearResults('${gameId}', '${categoryId}')"
+                >
+                  Clear Results
+                </button>
 
-                  <label class="admin-field">
-                    <span>Nominee ID</span>
-
-                    <input
-                      type="text"
-                      id="setupNewNomineeId"
-                      placeholder="auto-generated"
-                      oninput="adminSetupNomineeIdTouched = true"
-                    >
-                  </label>
-
-                  <label class="admin-field">
-                    <span>Short Answer</span>
-
-                    <input
-                      type="text"
-                      id="setupNewNomineeShortAnswer"
-                      placeholder="auto-filled"
-                      oninput="adminSetupShortAnswerTouched = true"
-                    >
-                  </label>
-
-                  <label class="admin-field">
-                    <span>File ID</span>
-
-                    <input
-                      type="text"
-                      id="setupNewNomineeFileId"
-                      placeholder="Optional Google Drive file ID"
-                    >
-                  </label>
-
-                  <label class="admin-field">
-                    <span>Section</span>
-
-                    <input
-                      type="text"
-                      id="setupNewNomineeSection"
-                      placeholder="Main"
-                      value="Main"
-                    >
-                  </label>
-
-                </div>
-
-              </details>
-
-              <button
-                class="admin-small-button"
-                onclick="adminSetupCreateNominee('${adminSetupEscapeHtml(
-                  gameId
-                )}')"
-              >
-                Add Nominee
-              </button>
+              </div>
             `
             : `
               <div class="admin-sub">
-                Add a category first before adding nominees.
+                Add nominees before setting results.
               </div>
             `
         }
 
         <div
-          id="setupAddNomineeMessage"
+          id="resultMessage_${categoryId}"
           class="admin-message"
         ></div>
 
       </div>
-
-    </details>
-  `;
-}
-
-/* ======================
-   RESULTS / WINNERS PANEL
-====================== */
-
-function renderAdminResultsPanel(category, nominees, settings) {
-  const gameId = adminSetupEscapeHtml(category.gameId);
-
-  const categoryId = adminSetupEscapeHtml(category.categoryId);
-
-  const winnerNomineeId = String(settings.winnerNomineeId || "").trim();
-
-  const favoriteNomineeId = String(settings.favoriteNomineeId || "").trim();
-
-  const nomineeOptions = nominees
-    .filter((nominee) => nominee.active !== false)
-    .map((nominee) => {
-      const nomineeId = String(nominee.nomineeId || "").trim();
-
-      const nomineeName = nominee.nominee || nominee.nomineeId;
-
-      return `
-          <option
-            value="${adminSetupEscapeHtml(nomineeId)}"
-            ${nomineeId === winnerNomineeId ? "selected" : ""}
-          >
-            ${adminSetupEscapeHtml(nomineeName)}
-          </option>
-        `;
-    })
-    .join("");
-
-  const favoriteOptions = nominees
-    .filter((nominee) => nominee.active !== false)
-    .map((nominee) => {
-      const nomineeId = String(nominee.nomineeId || "").trim();
-
-      const nomineeName = nominee.nominee || nominee.nomineeId;
-
-      return `
-          <option
-            value="${adminSetupEscapeHtml(nomineeId)}"
-            ${nomineeId === favoriteNomineeId ? "selected" : ""}
-          >
-            ${adminSetupEscapeHtml(nomineeName)}
-          </option>
-        `;
-    })
-    .join("");
-
-  return `
-    <details class="admin-results-panel">
-  
-      <summary class="admin-results-summary">
-  
-        <div class="admin-results-head">
-
-        <div>
-          <h3>Results / Winners</h3>
-
-          <div class="admin-sub">
-            Select the actual winner and optional favorite/projection.
-          </div>
-        </div>
-
-      </div>
-
-      </div>
-
-      <span class="admin-collapse-icon">
-        ▾
-      </span>
-
-    </summary>
-
-    <div class="admin-collapsible-body">
-
-      ${
-        nominees.length
-          ? `
-            <div class="admin-control-grid">
-
-              <label class="admin-field">
-                <span>Winner Nominee</span>
-
-                <select id="resultWinner_${categoryId}">
-                  <option value="">Not selected</option>
-                  ${nomineeOptions}
-                </select>
-              </label>
-
-              <label class="admin-field">
-                <span>Favorite Nominee</span>
-
-                <select id="resultFavorite_${categoryId}">
-                  <option value="">Not selected</option>
-                  ${favoriteOptions}
-                </select>
-              </label>
-
-            </div>
-
-            <div class="admin-card-actions">
-
-              <button
-                class="admin-small-button"
-                onclick="adminSetupSaveResults('${gameId}', '${categoryId}')"
-              >
-                Save Results
-              </button>
-
-              <button
-                class="admin-danger-button"
-                onclick="adminSetupClearResults('${gameId}', '${categoryId}')"
-              >
-                Clear Results
-              </button>
-
-            </div>
-          `
-          : `
-            <div class="admin-sub">
-              Add nominees before setting results.
-            </div>
-          `
-      }
-
-      <div
-        id="resultMessage_${categoryId}"
-        class="admin-message"
-      ></div>
-
-    </div>
 
     </details>
   `;
@@ -2117,13 +2191,23 @@ function adminSetupGetCategoryNameById(categoryId) {
 }
 
 function renderAdminSetupNomineeRow(category, nominee) {
-  const gameId = adminSetupEscapeHtml(category.gameId);
+  const gameId =
+    adminSetupEscapeHtml(category.gameId);
 
-  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const categoryId =
+    adminSetupEscapeHtml(category.categoryId);
 
-  const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
+  const nomineeId =
+    adminSetupEscapeHtml(nominee.nomineeId);
 
-  const fileInputId = "editNomineeFileId_" + categoryId + "_" + nomineeId;
+  const fileId =
+    String(nominee.fileId || "").trim();
+
+  const fileInputId =
+    "editNomineeFileId_" +
+    categoryId +
+    "_" +
+    nomineeId;
 
   return `
     <div class="admin-setup-nominee-edit-row">
@@ -2152,113 +2236,178 @@ function renderAdminSetupNomineeRow(category, nominee) {
           >
         </label>
 
-          <label class="admin-field">
-              <span>File ID</span>
+        <details class="admin-image-details">
 
-            <input
-              type="text"
-              id="${fileInputId}"
-              value="${adminSetupEscapeHtml(nominee.fileId || "")}"
-              placeholder="Paste Drive File ID or Drive link"
-            >
-          </label>
+          <summary class="admin-image-summary">
 
-          <div class="admin-upload-tools">
+            <div>
+              <strong>
+                Image / File ID
+              </strong>
 
-          <label class="admin-field">
-            <span>Choose Image / Camera Roll</span>
-        
-            <input
-              type="file"
-              id="uploadNomineeImage_${categoryId}_${nomineeId}"
-              accept="image/*"
-            >
-          </label>
-        
-          <button
-            type="button"
-            class="admin-small-button secondary"
-            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'choose')"
-          >
-            Upload Chosen Image
-          </button>
-        
-          <label class="admin-field">
-            <span>Take Photo</span>
-        
-            <input
-              type="file"
-              id="captureNomineeImage_${categoryId}_${nomineeId}"
-              accept="image/*"
-              capture="environment"
-            >
-          </label>
-        
-          <button
-            type="button"
-            class="admin-small-button secondary"
-            onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'capture')"
-          >
-            Upload Photo
-          </button>
-        
-        </div>
+              <div class="admin-sub">
+                ${
+                  fileId
+                    ? "Current File ID: " + adminSetupEscapeHtml(fileId)
+                    : "No image set"
+                }
+              </div>
+            </div>
 
-        <div class="admin-url-import-tools">
+            <span class="admin-collapse-icon">
+              ▾
+            </span>
+
+          </summary>
+
+          <div class="admin-image-body">
 
             <label class="admin-field">
-              <span>Import Image from URL</span>
+              <span>Current File ID</span>
 
               <input
-                 type="url"
-                 id="importNomineeImageUrl_${categoryId}_${nomineeId}"
-                 placeholder="https://example.com/image.jpg"
+                type="text"
+                id="${fileInputId}"
+                value="${adminSetupEscapeHtml(fileId)}"
+                placeholder="Paste Drive File ID or Drive link"
+                oninput="adminSetupRefreshImagePreview('${categoryId}', '${nomineeId}')"
+                onchange="adminSetupRefreshImagePreview('${categoryId}', '${nomineeId}')"
               >
             </label>
 
-            <button
-                 type="button"
-                 class="admin-small-button secondary"
-                 onclick="adminSetupImportNomineeImageFromUrl('${gameId}', '${categoryId}', '${nomineeId}')"
+            <div
+                id="imagePreviewTools_${categoryId}_${nomineeId}"
+                class="admin-live-image-preview"
             >
-                 Import URL
-            </button>
+                ${renderAdminSetupFileTools(fileId, fileInputId)}
+            </div>
 
-        </div>
+            <div class="admin-card-actions">
 
-        <div class="admin-tmdb-tools">
-
-            <label class="admin-field">
-              <span>Search TMDb Movie Poster</span>
-      
-              <input
-                 type="text"
-                 id="tmdbPosterSearch_${categoryId}_${nomineeId}"
-                 value="${adminSetupEscapeHtml(nominee.nominee || "")}"
-                 placeholder="Movie title"
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="adminSetupClearNomineeImage('${categoryId}', '${nomineeId}')"
               >
-            </label>
-      
-            <button
-                 type="button"
-                 class="admin-small-button secondary"
-                 onclick="adminSetupSearchTmdbPosters('${gameId}', '${categoryId}', '${nomineeId}')"
-            >
-               Search TMDb
-            </button>
-      
-        </div>
-      
-        <div
-           id="tmdbPosterResults_${categoryId}_${nomineeId}"
-           class="admin-tmdb-results"
-        ></div>  
-         
-        <div class="admin-sub">
-            This product uses the TMDb API but is not endorsed or certified by TMDb.
-        </div>
+                Clear Current Image
+              </button>
 
-      ${renderAdminSetupFileTools(nominee.fileId || "", fileInputId)}
+              <button
+                type="button"
+                class="admin-danger-button"
+                onclick="adminSetupDeleteNomineeImageFromDrive('${categoryId}', '${nomineeId}')"
+              >
+                Delete from Drive
+              </button>
+
+            </div>
+
+            <details class="admin-image-source-details">
+
+              <summary>
+                Change / Upload Image
+              </summary>
+
+              <div class="admin-upload-tools">
+
+                <label class="admin-field">
+                  <span>Choose Image / Camera Roll</span>
+
+                  <input
+                    type="file"
+                    id="uploadNomineeImage_${categoryId}_${nomineeId}"
+                    accept="image/*"
+                  >
+                </label>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'choose')"
+                >
+                  Upload Chosen Image
+                </button>
+
+                <label class="admin-field">
+                  <span>Take Photo</span>
+
+                  <input
+                    type="file"
+                    id="captureNomineeImage_${categoryId}_${nomineeId}"
+                    accept="image/*"
+                    capture="environment"
+                  >
+                </label>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminSetupUploadNomineeImage('${gameId}', '${categoryId}', '${nomineeId}', 'capture')"
+                >
+                  Upload Photo
+                </button>
+
+              </div>
+
+              <div class="admin-url-import-tools">
+
+                <label class="admin-field">
+                  <span>Import Image from URL</span>
+
+                  <input
+                    type="url"
+                    id="importNomineeImageUrl_${categoryId}_${nomineeId}"
+                    placeholder="https://example.com/image.jpg"
+                  >
+                </label>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminSetupImportNomineeImageFromUrl('${gameId}', '${categoryId}', '${nomineeId}')"
+                >
+                  Import URL
+                </button>
+
+              </div>
+
+              <div class="admin-tmdb-tools">
+
+                <label class="admin-field">
+                  <span>Search TMDb Movie Poster</span>
+
+                  <input
+                    type="text"
+                    id="tmdbPosterSearch_${categoryId}_${nomineeId}"
+                    value="${adminSetupEscapeHtml(nominee.nominee || "")}"
+                    placeholder="Movie title"
+                  >
+                </label>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminSetupSearchTmdbPosters('${gameId}', '${categoryId}', '${nomineeId}')"
+                >
+                  Search TMDb
+                </button>
+
+              </div>
+
+              <div class="admin-sub">
+                This product uses the TMDb API but is not endorsed or certified by TMDb.
+              </div>
+
+              <div
+                id="tmdbPosterResults_${categoryId}_${nomineeId}"
+                class="admin-tmdb-results"
+              ></div>
+
+            </details>
+
+          </div>
+
+        </details>
 
       </div>
 
@@ -2305,6 +2454,118 @@ function renderAdminSetupNomineeRow(category, nominee) {
   `;
 }
 
+function renderAdminSetupInlineAddNomineeCard(category) {
+
+  const gameId =
+    adminSetupEscapeHtml(
+      category.gameId
+    );
+
+  const categoryId =
+    adminSetupEscapeHtml(
+      category.categoryId
+    );
+
+  const categoryName =
+    adminSetupEscapeHtml(
+      category.category || category.categoryId
+    );
+
+  return `
+    <details class="admin-inline-add-answer">
+
+      <summary class="admin-inline-add-summary">
+
+        <strong>
+          + Add Answer
+        </strong>
+
+        <span class="admin-sub">
+          Add another nominee/answer to this question.
+        </span>
+
+      </summary>
+
+      <div class="admin-inline-add-body">
+
+        <div class="admin-control-grid nominee-grid">
+
+          <label class="admin-field">
+            <span>Nominee / Answer</span>
+
+            <input
+              type="text"
+              id="inlineNewNomineeName_${categoryId}"
+              placeholder="New answer"
+              oninput="adminSetupAutoFillInlineNomineeFields('${categoryId}')"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Short Answer</span>
+
+            <input
+              type="text"
+              id="inlineNewNomineeShortAnswer_${categoryId}"
+              placeholder="Auto-filled"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Nominee ID</span>
+
+            <input
+              type="text"
+              id="inlineNewNomineeId_${categoryId}"
+              placeholder="auto-generated"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>File ID</span>
+
+            <input
+              type="text"
+              id="inlineNewNomineeFileId_${categoryId}"
+              placeholder="Optional Google Drive File ID"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Section</span>
+
+            <input
+              type="text"
+              id="inlineNewNomineeSection_${categoryId}"
+              value="Main"
+            >
+          </label>
+
+        </div>
+
+        <div class="admin-card-actions">
+
+          <button
+            type="button"
+            class="admin-small-button"
+            onclick="adminSetupCreateInlineNominee('${gameId}', '${categoryId}', '${categoryName}')"
+          >
+            Add Answer
+          </button>
+
+        </div>
+
+        <div
+          id="inlineNewNomineeMessage_${categoryId}"
+          class="admin-message"
+        ></div>
+
+      </div>
+
+    </details>
+  `;
+
+}
 /* ======================
    CREATE CATEGORY
 ====================== */
@@ -2516,6 +2777,186 @@ async function adminSetupCreateNominee(gameId) {
   adminSetupShortAnswerTouched = false;
 
   navigate("admin-game-setup:" + gameId);
+}
+
+function adminSetupAutoFillInlineNomineeFields(categoryId) {
+
+  const nomineeInput =
+    document.getElementById(
+      "inlineNewNomineeName_" +
+      categoryId
+    );
+
+  const nomineeIdInput =
+    document.getElementById(
+      "inlineNewNomineeId_" +
+      categoryId
+    );
+
+  const shortAnswerInput =
+    document.getElementById(
+      "inlineNewNomineeShortAnswer_" +
+      categoryId
+    );
+
+  if (!nomineeInput) {
+    return;
+  }
+
+  const nomineeName =
+    nomineeInput.value.trim();
+
+  if (nomineeIdInput) {
+    nomineeIdInput.value =
+      adminSetupSlugify(
+        nomineeName
+      );
+  }
+
+  if (shortAnswerInput) {
+    shortAnswerInput.value =
+      nomineeName;
+  }
+
+}
+
+async function adminSetupCreateInlineNominee(
+  gameId,
+  categoryId,
+  categoryName
+) {
+
+  const nomineeInput =
+    document.getElementById(
+      "inlineNewNomineeName_" +
+      categoryId
+    );
+
+  const nomineeIdInput =
+    document.getElementById(
+      "inlineNewNomineeId_" +
+      categoryId
+    );
+
+  const shortAnswerInput =
+    document.getElementById(
+      "inlineNewNomineeShortAnswer_" +
+      categoryId
+    );
+
+  const fileIdInput =
+    document.getElementById(
+      "inlineNewNomineeFileId_" +
+      categoryId
+    );
+
+  const sectionInput =
+    document.getElementById(
+      "inlineNewNomineeSection_" +
+      categoryId
+    );
+
+  const messageId =
+    "inlineNewNomineeMessage_" +
+    categoryId;
+
+  const nomineeName =
+    nomineeInput
+      ? nomineeInput.value.trim()
+      : "";
+
+  const nomineeId =
+    adminSetupSlugify(
+      nomineeIdInput && nomineeIdInput.value.trim()
+        ? nomineeIdInput.value.trim()
+        : nomineeName
+    );
+
+  if (
+    !nomineeName ||
+    !nomineeId
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      "Answer name is required.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Adding answer...",
+    false
+  );
+
+  const res =
+    await apiAdminCreateNominee({
+      gameId:
+        gameId,
+
+      categoryId:
+        categoryId,
+
+      category:
+        categoryName,
+
+      nominee:
+        nomineeName,
+
+      nomineeId:
+        nomineeId,
+
+      shortAnswer:
+        shortAnswerInput && shortAnswerInput.value.trim()
+          ? shortAnswerInput.value.trim()
+          : nomineeName,
+
+      fileId:
+        fileIdInput
+          ? fileIdInput.value.trim()
+          : "",
+
+      section:
+        sectionInput && sectionInput.value.trim()
+          ? sectionInput.value.trim()
+          : "Main",
+
+      active:
+        true
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetupSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Unable to add answer.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    messageId,
+    "Answer added.",
+    false
+  );
+
+  navigate(
+    "admin-game-setup:" +
+    gameId
+  );
+
 }
 
 /* ======================
