@@ -1397,3 +1397,62 @@ details[open] > summary .admin-collapse-icon {
   font-size: 0.85rem;
   margin-top: 2px;
 }
+
+/* ======================
+   ADMIN FILE TOOLS
+====================== */
+
+.admin-file-tools {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.admin-file-tools.empty {
+  align-items: flex-start;
+  flex-direction: column;
+  opacity: 0.75;
+  font-size: 0.85rem;
+}
+
+.admin-file-preview {
+  flex-shrink: 0;
+}
+
+.admin-file-preview img {
+  width: 58px;
+  height: 82px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #222;
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.admin-file-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-small-button.secondary {
+  background: rgba(255,255,255,0.10);
+  color: inherit;
+  border: 1px solid rgba(255,255,255,0.14);
+}
+
+.admin-small-button.secondary:hover {
+  background: rgba(255,255,255,0.16);
+}
+
+.admin-field textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  border-radius: 10px;
+  padding: 10px;
+  font-family: inherit;
+}

@@ -504,7 +504,22 @@ async function apiAdminCreateCategory(payload) {
         payload.countsAsStatue,
 
       locked:
-        payload.locked
+        payload.locked,
+
+      lockDateTime:
+        payload.lockDateTime,
+
+      groupId:
+        payload.groupId,
+
+      parentCategoryId:
+        payload.parentCategoryId,
+
+      followUpCategoryId:
+        payload.followUpCategoryId,
+
+      followUpMapJSON:
+        payload.followUpMapJSON
     }
   );
 

@@ -101,6 +101,347 @@ function adminSetupBoolText(value) {
   return value ? "Yes" : "No";
 }
 
+function adminSetupCleanFileId(value) {
+
+  return String(value || "")
+    .trim();
+
+}
+
+function adminSetupDriveThumbnailUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/thumbnail?id=" +
+    encodeURIComponent(fileId) +
+    "&sz=w240-h360"
+  );
+
+}
+
+function adminSetupDriveViewUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/file/d/" +
+    encodeURIComponent(fileId) +
+    "/view"
+  );
+
+}
+
+function adminSetupDriveDownloadUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/uc?export=download&id=" +
+    encodeURIComponent(fileId)
+  );
+
+}
+
+function renderAdminSetupFileTools(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+
+    return `
+      <div class="admin-file-tools empty">
+        No File ID set.
+      </div>
+    `;
+
+  }
+
+  const thumbnailUrl =
+    adminSetupDriveThumbnailUrl(
+      fileId
+    );
+
+  const viewUrl =
+    adminSetupDriveViewUrl(
+      fileId
+    );
+
+  const downloadUrl =
+    adminSetupDriveDownloadUrl(
+      fileId
+    );
+
+  return `
+    <div class="admin-file-tools">
+
+      <div class="admin-file-preview">
+        <img
+          src="${adminSetupEscapeHtml(thumbnailUrl)}"
+          alt="Image preview"
+          loading="lazy"
+        >
+      </div>
+
+      <div class="admin-file-actions">
+
+        <a
+          class="admin-small-button secondary"
+          href="${adminSetupEscapeHtml(viewUrl)}"
+          target="_blank"
+          rel="noopener"
+        >
+          View Image
+        </a>
+
+        <a
+          class="admin-small-button secondary"
+          href="${adminSetupEscapeHtml(downloadUrl)}"
+          target="_blank"
+          rel="noopener"
+        >
+          Download
+        </a>
+
+        <button
+          type="button"
+          class="admin-small-button secondary"
+          onclick="navigator.clipboard.writeText('${adminSetupEscapeHtml(fileId)}')"
+        >
+          Copy File ID
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+function renderAdminSetupAddCategoryCard(gameId) {
+
+  return `
+    <details
+      class="card admin-card admin-collapsible-card"
+      open
+    >
+
+      <summary class="admin-card-summary">
+
+        <div>
+          <h2>Add Category / Question</h2>
+
+          <div class="admin-sub">
+            Enter the category/question name. The Category ID auto-generates.
+          </div>
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <div class="admin-control-grid">
+
+          <label class="admin-field">
+            <span>Category / Question</span>
+
+            <input
+              type="text"
+              id="setupNewCategoryName"
+              placeholder="Best Picture"
+              oninput="adminSetupAutoFillCategoryId()"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Points</span>
+
+            <input
+              type="number"
+              id="setupNewCategoryPoints"
+              value="1"
+              min="0"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Lock Date / Time</span>
+
+            <input
+              type="datetime-local"
+              id="setupNewCategoryLockDateTime"
+            >
+          </label>
+
+        </div>
+
+        <details class="admin-advanced-details">
+
+          <summary>
+            Advanced category settings
+          </summary>
+
+          <div class="admin-control-grid">
+
+            <label class="admin-field">
+              <span>Category ID</span>
+
+              <input
+                type="text"
+                id="setupNewCategoryId"
+                placeholder="auto-generated"
+                oninput="adminSetupCategoryIdTouched = true"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Section</span>
+
+              <input
+                type="text"
+                id="setupNewCategorySection"
+                placeholder="Main"
+                value="Main"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Group ID</span>
+
+              <input
+                type="text"
+                id="setupNewCategoryGroupId"
+                placeholder="default"
+                value="default"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Display Order</span>
+
+              <input
+                type="number"
+                id="setupNewCategoryDisplayOrder"
+                value="999"
+                min="0"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Layout Type</span>
+
+              <select id="setupNewCategoryLayoutType">
+                <option value="image">Image</option>
+                <option value="text">Text</option>
+                <option value="compact">Compact</option>
+                <option value="list">List</option>
+              </select>
+            </label>
+
+            <label class="admin-field">
+              <span>Parent Category ID</span>
+
+              <input
+                type="text"
+                id="setupNewCategoryParentCategoryId"
+                placeholder="Optional parent category"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Follow-Up Category ID</span>
+
+              <input
+                type="text"
+                id="setupNewCategoryFollowUpCategoryId"
+                placeholder="Optional follow-up category"
+              >
+            </label>
+
+          </div>
+
+          <label class="admin-field">
+            <span>Follow-Up Map JSON</span>
+
+            <textarea
+              id="setupNewCategoryFollowUpMapJSON"
+              rows="4"
+              placeholder='{"winner-id":"follow-up-category-id"}'
+            ></textarea>
+          </label>
+
+          <label class="admin-check-row">
+            <input
+              type="checkbox"
+              id="setupNewCategoryCountsAsStatue"
+              checked
+            >
+
+            <span>
+              Counts as statue
+            </span>
+          </label>
+
+          <label class="admin-check-row">
+            <input
+              type="checkbox"
+              id="setupNewCategoryLocked"
+            >
+
+            <span>
+              Start locked
+            </span>
+          </label>
+
+        </details>
+
+        <button
+          class="admin-small-button"
+          onclick="adminSetupCreateCategory('${adminSetupEscapeHtml(gameId)}')"
+        >
+          Add Category
+        </button>
+
+        <div
+          id="setupAddCategoryMessage"
+          class="admin-message"
+        ></div>
+
+      </div>
+
+    </details>
+  `;
+
+}
+
 async function renderAdminGameSetupPage(gameId) {
   const safeGameId = String(gameId || "").trim();
 
@@ -255,27 +596,315 @@ function adminSetupOpenAttr(defaultOpen) {
 
 }
 
+/* ======================
+   ADMIN FILE ID HELPERS
+====================== */
+
+function adminSetupCleanFileId(value) {
+
+  return String(value || "")
+    .trim();
+
+}
+
+function adminSetupExtractDriveFileId(value) {
+
+  const text =
+    String(value || "")
+      .trim();
+
+  if (!text) {
+    return "";
+  }
+
+  // Already looks like a plain Drive file ID
+  if (
+    /^[a-zA-Z0-9_-]{20,}$/.test(text) &&
+    text.indexOf("/") === -1
+  ) {
+    return text;
+  }
+
+  // Format:
+  // https://drive.google.com/file/d/FILE_ID/view
+  const fileMatch =
+    text.match(/\/file\/d\/([^/]+)/);
+
+  if (
+    fileMatch &&
+    fileMatch[1]
+  ) {
+    return fileMatch[1];
+  }
+
+  // Format:
+  // https://drive.google.com/open?id=FILE_ID
+  // https://drive.google.com/uc?id=FILE_ID
+  const idMatch =
+    text.match(/[?&]id=([^&]+)/);
+
+  if (
+    idMatch &&
+    idMatch[1]
+  ) {
+    return idMatch[1];
+  }
+
+  return text;
+
+}
+
+function adminSetupDriveThumbnailUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/thumbnail?id=" +
+    encodeURIComponent(fileId) +
+    "&sz=w240-h360"
+  );
+
+}
+
+function adminSetupDriveViewUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/file/d/" +
+    encodeURIComponent(fileId) +
+    "/view"
+  );
+
+}
+
+function adminSetupDriveDownloadUrl(fileId) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/uc?export=download&id=" +
+    encodeURIComponent(fileId)
+  );
+
+}
+
+function adminSetupCopyText(value) {
+
+  const text =
+    String(value || "")
+      .trim();
+
+  if (!text) {
+    return;
+  }
+
+  if (
+    navigator.clipboard &&
+    navigator.clipboard.writeText
+  ) {
+
+    navigator.clipboard.writeText(
+      text
+    );
+
+  }
+
+}
+
+function adminSetupNormalizeFileInput(inputId) {
+
+  const input =
+    document.getElementById(
+      inputId
+    );
+
+  if (!input) {
+    return;
+  }
+
+  input.value =
+    adminSetupExtractDriveFileId(
+      input.value
+    );
+
+}
+
+function renderAdminSetupFileTools(
+  fileId,
+  inputId
+) {
+
+  fileId =
+    adminSetupCleanFileId(
+      fileId
+    );
+
+  if (!fileId) {
+
+    return `
+      <div class="admin-file-tools empty">
+
+        <button
+          type="button"
+          class="admin-small-button secondary"
+          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(inputId)}')"
+        >
+          Extract ID from pasted Drive link
+        </button>
+
+        <span class="admin-sub">
+          No File ID set yet.
+        </span>
+
+      </div>
+    `;
+
+  }
+
+  const thumbnailUrl =
+    adminSetupDriveThumbnailUrl(
+      fileId
+    );
+
+  const viewUrl =
+    adminSetupDriveViewUrl(
+      fileId
+    );
+
+  const downloadUrl =
+    adminSetupDriveDownloadUrl(
+      fileId
+    );
+
+  return `
+    <div class="admin-file-tools">
+
+      <div class="admin-file-preview">
+        <img
+          src="${adminSetupEscapeHtml(thumbnailUrl)}"
+          alt="Image preview"
+          loading="lazy"
+        >
+      </div>
+
+      <div class="admin-file-actions">
+
+        <a
+          class="admin-small-button secondary"
+          href="${adminSetupEscapeHtml(viewUrl)}"
+          target="_blank"
+          rel="noopener"
+        >
+          View
+        </a>
+
+        <a
+          class="admin-small-button secondary"
+          href="${adminSetupEscapeHtml(downloadUrl)}"
+          target="_blank"
+          rel="noopener"
+        >
+          Download
+        </a>
+
+        <button
+          type="button"
+          class="admin-small-button secondary"
+          onclick="adminSetupCopyText('${adminSetupEscapeHtml(fileId)}')"
+        >
+          Copy ID
+        </button>
+
+        <button
+          type="button"
+          class="admin-small-button secondary"
+          onclick="adminSetupNormalizeFileInput('${adminSetupEscapeHtml(inputId)}')"
+        >
+          Extract ID
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+}
 
 /* ======================
    ADD CATEGORY CARD
 ====================== */
 
-function renderAdminSetupAddCategoryCard(gameId) {
+function renderAdminSetupCategoryCard(category) {
+
+  const settings =
+    category.settings || {};
+
+  const nominees =
+    Array.isArray(category.nominees)
+      ? category.nominees
+      : [];
+
+  const gameId =
+    adminSetupEscapeHtml(
+      category.gameId
+    );
+
+  const categoryId =
+    adminSetupEscapeHtml(
+      category.categoryId
+    );
 
   return `
     <details
-      class="card admin-card admin-collapsible-card"
-      open
+      class="admin-category-card admin-collapsible-category"
     >
 
-      <summary class="admin-card-summary">
+      <summary class="admin-category-summary">
 
-        <div>
-          <h2>Add Category / Question</h2>
+        <div class="admin-category-header">
 
-          <div class="admin-sub">
-            Enter the category/question name. The ID and section are handled automatically.
+          <div>
+            <strong>
+              ${adminSetupEscapeHtml(category.category || category.categoryId)}
+            </strong>
+
+            <div class="admin-sub">
+              ${categoryId}
+              ·
+              ${adminSetupEscapeHtml(category.section || "Other")}
+              ·
+              ${adminSetupEscapeHtml(settings.groupId || "default")}
+              ·
+              ${nominees.length} nominees
+            </div>
           </div>
+
+          <div class="admin-pill ${settings.locked ? "locked" : ""}">
+            ${settings.locked ? "Locked" : "Open"}
+          </div>
+
         </div>
 
         <span class="admin-collapse-icon">
@@ -286,48 +915,17 @@ function renderAdminSetupAddCategoryCard(gameId) {
 
       <div class="admin-collapsible-body">
 
-        <div class="admin-control-grid">
-
-          <label class="admin-field">
-            <span>Category / Question</span>
-
-            <input
-              type="text"
-              id="setupNewCategoryName"
-              placeholder="Best Picture"
-              oninput="adminSetupAutoFillCategoryId()"
-            >
-          </label>
-
-          <label class="admin-field">
-            <span>Points</span>
-
-            <input
-              type="number"
-              id="setupNewCategoryPoints"
-              value="1"
-              min="0"
-            >
-          </label>
-
-        </div>
-
-        <details class="admin-advanced-details">
-
-          <summary>
-            Advanced fields
-          </summary>
+        <div class="admin-edit-panel">
 
           <div class="admin-control-grid">
 
             <label class="admin-field">
-              <span>Category ID</span>
+              <span>Category / Question</span>
 
               <input
                 type="text"
-                id="setupNewCategoryId"
-                placeholder="auto-generated"
-                oninput="adminSetupCategoryIdTouched = true"
+                id="editCategoryName_${categoryId}"
+                value="${adminSetupEscapeHtml(category.category)}"
               >
             </label>
 
@@ -336,9 +934,19 @@ function renderAdminSetupAddCategoryCard(gameId) {
 
               <input
                 type="text"
-                id="setupNewCategorySection"
-                placeholder="Main"
-                value="Main"
+                id="editCategorySection_${categoryId}"
+                value="${adminSetupEscapeHtml(category.section || "Other")}"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Points</span>
+
+              <input
+                type="number"
+                id="editCategoryPoints_${categoryId}"
+                value="${Number(settings.points) || 0}"
+                min="0"
               >
             </label>
 
@@ -347,8 +955,8 @@ function renderAdminSetupAddCategoryCard(gameId) {
 
               <input
                 type="number"
-                id="setupNewCategoryDisplayOrder"
-                value="999"
+                id="editCategoryOrder_${categoryId}"
+                value="${Number(settings.displayOrder) || 999}"
                 min="0"
               >
             </label>
@@ -356,50 +964,211 @@ function renderAdminSetupAddCategoryCard(gameId) {
             <label class="admin-field">
               <span>Layout Type</span>
 
-              <select id="setupNewCategoryLayoutType">
-                <option value="image">Image</option>
-                <option value="text">Text</option>
+              <select id="editCategoryLayout_${categoryId}">
+
+                <option
+                  value="image"
+                  ${settings.layoutType === "image" ? "selected" : ""}
+                >
+                  Image
+                </option>
+
+                <option
+                  value="text"
+                  ${settings.layoutType === "text" ? "selected" : ""}
+                >
+                  Text
+                </option>
+
+                <option
+                  value="compact"
+                  ${settings.layoutType === "compact" ? "selected" : ""}
+                >
+                  Compact
+                </option>
+
+                <option
+                  value="list"
+                  ${settings.layoutType === "list" ? "selected" : ""}
+                >
+                  List
+                </option>
+
               </select>
             </label>
 
           </div>
 
-          <label class="admin-check-row">
-            <input
-              type="checkbox"
-              id="setupNewCategoryCountsAsStatue"
-              checked
+          <div class="admin-checkbox-row">
+
+            <label>
+              <input
+                type="checkbox"
+                id="editCategoryLocked_${categoryId}"
+                ${settings.locked ? "checked" : ""}
+              >
+              Locked
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                id="editCategoryActive_${categoryId}"
+                ${category.active !== false ? "checked" : ""}
+              >
+              Active
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                id="editCategoryPrediction_${categoryId}"
+                ${category.predictionGame !== false ? "checked" : ""}
+              >
+              Prediction Game
+            </label>
+
+            <label>
+              <input
+                type="checkbox"
+                id="editCategoryStatue_${categoryId}"
+                ${settings.countsAsStatue ? "checked" : ""}
+              >
+              Counts as Statue
+            </label>
+
+          </div>
+
+          <details class="admin-advanced-details">
+
+            <summary>
+              Advanced category settings
+            </summary>
+
+            <div class="admin-control-grid">
+
+              <label class="admin-field">
+                <span>Lock Date / Time</span>
+
+                <input
+                  type="datetime-local"
+                  id="editCategoryLockDateTime_${categoryId}"
+                  value="${adminSetupEscapeHtml(settings.lockDateTime || "")}"
+                >
+              </label>
+
+              <label class="admin-field">
+                <span>Group ID</span>
+
+                <input
+                  type="text"
+                  id="editCategoryGroupId_${categoryId}"
+                  value="${adminSetupEscapeHtml(settings.groupId || "default")}"
+                  placeholder="default"
+                >
+              </label>
+
+              <label class="admin-field">
+                <span>Parent Category ID</span>
+
+                <input
+                  type="text"
+                  id="editCategoryParentCategoryId_${categoryId}"
+                  value="${adminSetupEscapeHtml(settings.parentCategoryId || "")}"
+                  placeholder="Optional parent category"
+                >
+              </label>
+
+              <label class="admin-field">
+                <span>Follow-Up Category ID</span>
+
+                <input
+                  type="text"
+                  id="editCategoryFollowUpCategoryId_${categoryId}"
+                  value="${adminSetupEscapeHtml(settings.followUpCategoryId || "")}"
+                  placeholder="Optional follow-up category"
+                >
+              </label>
+
+            </div>
+
+            <label class="admin-field">
+              <span>Follow-Up Map JSON</span>
+
+              <textarea
+                id="editCategoryFollowUpMapJSON_${categoryId}"
+                rows="4"
+                placeholder='{"winner-id":"follow-up-category-id"}'
+              >${adminSetupEscapeHtml(settings.followUpMapJSON || "")}</textarea>
+            </label>
+
+          </details>
+
+          <div class="admin-card-actions">
+
+            <button
+              class="admin-small-button"
+              onclick="adminSetupUpdateCategory('${gameId}', '${categoryId}')"
             >
+              Save Category
+            </button>
 
-            <span>
-              Counts as statue
-            </span>
-          </label>
-
-          <label class="admin-check-row">
-            <input
-              type="checkbox"
-              id="setupNewCategoryLocked"
+            <button
+              class="admin-danger-button"
+              onclick="adminSetupArchiveCategory('${gameId}', '${categoryId}')"
             >
+              Archive Category
+            </button>
 
-            <span>
-              Start locked
+          </div>
+
+          <div
+            id="editCategoryMessage_${categoryId}"
+            class="admin-message"
+          ></div>
+
+        </div>
+
+        ${renderAdminResultsPanel(category, nominees, settings)}
+
+        <details class="admin-setup-nominees">
+
+          <summary class="admin-nominee-summary">
+
+            <h3>Nominees / Answers</h3>
+
+            <span class="admin-sub">
+              ${nominees.length} total
             </span>
-          </label>
+
+            <span class="admin-collapse-icon">
+              ▾
+            </span>
+
+          </summary>
+
+          <div class="admin-collapsible-body">
+
+            ${
+              nominees.length
+                ? nominees
+                    .map((nominee) =>
+                      renderAdminSetupNomineeRow(
+                        category,
+                        nominee
+                      )
+                    )
+                    .join("")
+                : `
+                  <div class="admin-sub">
+                    No nominees added yet.
+                  </div>
+                `
+            }
+
+          </div>
 
         </details>
-
-        <button
-          class="admin-small-button"
-          onclick="adminSetupCreateCategory('${adminSetupEscapeHtml(gameId)}')"
-        >
-          Add Category
-        </button>
-
-        <div
-          id="setupAddCategoryMessage"
-          class="admin-message"
-        ></div>
 
       </div>
 
@@ -947,11 +1716,21 @@ function adminSetupGetCategoryNameById(categoryId) {
 }
 
 function renderAdminSetupNomineeRow(category, nominee) {
-  const gameId = adminSetupEscapeHtml(category.gameId);
 
-  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const gameId =
+    adminSetupEscapeHtml(category.gameId);
 
-  const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
+  const categoryId =
+    adminSetupEscapeHtml(category.categoryId);
+
+  const nomineeId =
+    adminSetupEscapeHtml(nominee.nomineeId);
+
+  const fileInputId =
+    "editNomineeFileId_" +
+    categoryId +
+    "_" +
+    nomineeId;
 
   return `
     <div class="admin-setup-nominee-edit-row">
@@ -985,10 +1764,16 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
           <input
             type="text"
-            id="editNomineeFileId_${categoryId}_${nomineeId}"
+            id="${fileInputId}"
             value="${adminSetupEscapeHtml(nominee.fileId || "")}"
+            placeholder="Paste Drive File ID or Drive link"
           >
         </label>
+
+        ${renderAdminSetupFileTools(
+          nominee.fileId || "",
+          fileInputId
+        )}
 
       </div>
 
@@ -1033,6 +1818,7 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
     </div>
   `;
+
 }
 
 /* ======================
@@ -1040,33 +1826,89 @@ function renderAdminSetupNomineeRow(category, nominee) {
 ====================== */
 
 async function adminSetupCreateCategory(gameId) {
-  const nameInput = document.getElementById("setupNewCategoryName");
 
-  const idInput = document.getElementById("setupNewCategoryId");
+  const nameInput =
+    document.getElementById(
+      "setupNewCategoryName"
+    );
 
-  const sectionInput = document.getElementById("setupNewCategorySection");
+  const idInput =
+    document.getElementById(
+      "setupNewCategoryId"
+    );
 
-  const pointsInput = document.getElementById("setupNewCategoryPoints");
+  const sectionInput =
+    document.getElementById(
+      "setupNewCategorySection"
+    );
 
-  const displayOrderInput = document.getElementById(
-    "setupNewCategoryDisplayOrder"
-  );
+  const pointsInput =
+    document.getElementById(
+      "setupNewCategoryPoints"
+    );
 
-  const layoutTypeInput = document.getElementById("setupNewCategoryLayoutType");
+  const lockDateTimeInput =
+    document.getElementById(
+      "setupNewCategoryLockDateTime"
+    );
 
-  const countsAsStatueInput = document.getElementById(
-    "setupNewCategoryCountsAsStatue"
-  );
+  const groupIdInput =
+    document.getElementById(
+      "setupNewCategoryGroupId"
+    );
 
-  const lockedInput = document.getElementById("setupNewCategoryLocked");
+  const parentCategoryIdInput =
+    document.getElementById(
+      "setupNewCategoryParentCategoryId"
+    );
 
-  const categoryName = nameInput ? nameInput.value.trim() : "";
+  const followUpCategoryIdInput =
+    document.getElementById(
+      "setupNewCategoryFollowUpCategoryId"
+    );
 
-  const categoryId = adminSetupSlugify(
-    idInput && idInput.value.trim() ? idInput.value.trim() : categoryName
-  );
+  const followUpMapJSONInput =
+    document.getElementById(
+      "setupNewCategoryFollowUpMapJSON"
+    );
 
-  if (!categoryName || !categoryId) {
+  const displayOrderInput =
+    document.getElementById(
+      "setupNewCategoryDisplayOrder"
+    );
+
+  const layoutTypeInput =
+    document.getElementById(
+      "setupNewCategoryLayoutType"
+    );
+
+  const countsAsStatueInput =
+    document.getElementById(
+      "setupNewCategoryCountsAsStatue"
+    );
+
+  const lockedInput =
+    document.getElementById(
+      "setupNewCategoryLocked"
+    );
+
+  const categoryName =
+    nameInput
+      ? nameInput.value.trim()
+      : "";
+
+  const categoryId =
+    adminSetupSlugify(
+      idInput && idInput.value.trim()
+        ? idInput.value.trim()
+        : categoryName
+    );
+
+  if (
+    !categoryName ||
+    !categoryId
+  ) {
+
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       "Category name is required.",
@@ -1074,23 +1916,116 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
+
   }
 
-  adminSetupSetMessage("setupAddCategoryMessage", "Adding category...", false);
+  const followUpMapJSON =
+    followUpMapJSONInput
+      ? followUpMapJSONInput.value.trim()
+      : "";
 
-  const res = await apiAdminCreateCategory({
-    gameId: gameId,
-    category: categoryName,
-    categoryId: categoryId,
-    section: sectionInput ? sectionInput.value.trim() : "Main",
-    points: pointsInput ? pointsInput.value : 1,
-    displayOrder: displayOrderInput ? displayOrderInput.value : 999,
-    layoutType: layoutTypeInput ? layoutTypeInput.value : "image",
-    countsAsStatue: countsAsStatueInput ? countsAsStatueInput.checked : true,
-    locked: lockedInput ? lockedInput.checked : false,
-  });
+  if (followUpMapJSON) {
 
-  if (!res || res.success === false) {
+    try {
+
+      JSON.parse(
+        followUpMapJSON
+      );
+
+    } catch (err) {
+
+      adminSetupSetMessage(
+        "setupAddCategoryMessage",
+        "Follow-Up Map JSON is not valid JSON.",
+        true
+      );
+
+      return;
+
+    }
+
+  }
+
+  adminSetupSetMessage(
+    "setupAddCategoryMessage",
+    "Adding category...",
+    false
+  );
+
+  const res =
+    await apiAdminCreateCategory({
+      gameId:
+        gameId,
+
+      category:
+        categoryName,
+
+      categoryId:
+        categoryId,
+
+      section:
+        sectionInput
+          ? sectionInput.value.trim()
+          : "Main",
+
+      points:
+        pointsInput
+          ? pointsInput.value
+          : 1,
+
+      lockDateTime:
+        lockDateTimeInput
+          ? lockDateTimeInput.value
+          : "",
+
+      groupId:
+        groupIdInput && groupIdInput.value.trim()
+          ? groupIdInput.value.trim()
+          : "default",
+
+      parentCategoryId:
+        parentCategoryIdInput
+          ? adminSetupSlugify(
+              parentCategoryIdInput.value.trim()
+            )
+          : "",
+
+      followUpCategoryId:
+        followUpCategoryIdInput
+          ? adminSetupSlugify(
+              followUpCategoryIdInput.value.trim()
+            )
+          : "",
+
+      followUpMapJSON:
+        followUpMapJSON,
+
+      displayOrder:
+        displayOrderInput
+          ? displayOrderInput.value
+          : 999,
+
+      layoutType:
+        layoutTypeInput
+          ? layoutTypeInput.value
+          : "image",
+
+      countsAsStatue:
+        countsAsStatueInput
+          ? countsAsStatueInput.checked
+          : true,
+
+      locked:
+        lockedInput
+          ? lockedInput.checked
+          : false
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
     adminSetupSetMessage(
       "setupAddCategoryMessage",
       res && (res.message || res.error)
@@ -1100,6 +2035,7 @@ async function adminSetupCreateCategory(gameId) {
     );
 
     return;
+
   }
 
   adminSetupSetMessage(
@@ -1107,12 +2043,14 @@ async function adminSetupCreateCategory(gameId) {
     "Category added.",
     false
   );
-  
-  adminSetupCategoryIdTouched = false;
-  
+
+  adminSetupCategoryIdTouched =
+    false;
+
   navigate(
     "admin-game-setup:" + gameId
   );
+
 }
 
 /* ======================
@@ -1204,41 +2142,84 @@ async function adminSetupCreateNominee(gameId) {
 ====================== */
 
 async function adminSetupUpdateCategory(gameId, categoryId) {
-  const nameInput = document.getElementById("editCategoryName_" + categoryId);
 
-  const sectionInput = document.getElementById(
-    "editCategorySection_" + categoryId
-  );
+  const nameInput =
+    document.getElementById(
+      "editCategoryName_" + categoryId
+    );
 
-  const pointsInput = document.getElementById(
-    "editCategoryPoints_" + categoryId
-  );
+  const sectionInput =
+    document.getElementById(
+      "editCategorySection_" + categoryId
+    );
 
-  const orderInput = document.getElementById("editCategoryOrder_" + categoryId);
+  const pointsInput =
+    document.getElementById(
+      "editCategoryPoints_" + categoryId
+    );
 
-  const layoutInput = document.getElementById(
-    "editCategoryLayout_" + categoryId
-  );
+  const orderInput =
+    document.getElementById(
+      "editCategoryOrder_" + categoryId
+    );
 
-  const lockedInput = document.getElementById(
-    "editCategoryLocked_" + categoryId
-  );
+  const layoutInput =
+    document.getElementById(
+      "editCategoryLayout_" + categoryId
+    );
 
-  const activeInput = document.getElementById(
-    "editCategoryActive_" + categoryId
-  );
+  const lockDateTimeInput =
+    document.getElementById(
+      "editCategoryLockDateTime_" + categoryId
+    );
 
-  const predictionInput = document.getElementById(
-    "editCategoryPrediction_" + categoryId
-  );
+  const groupIdInput =
+    document.getElementById(
+      "editCategoryGroupId_" + categoryId
+    );
 
-  const statueInput = document.getElementById(
-    "editCategoryStatue_" + categoryId
-  );
+  const parentCategoryIdInput =
+    document.getElementById(
+      "editCategoryParentCategoryId_" + categoryId
+    );
 
-  const categoryName = nameInput ? nameInput.value.trim() : "";
+  const followUpCategoryIdInput =
+    document.getElementById(
+      "editCategoryFollowUpCategoryId_" + categoryId
+    );
+
+  const followUpMapJSONInput =
+    document.getElementById(
+      "editCategoryFollowUpMapJSON_" + categoryId
+    );
+
+  const lockedInput =
+    document.getElementById(
+      "editCategoryLocked_" + categoryId
+    );
+
+  const activeInput =
+    document.getElementById(
+      "editCategoryActive_" + categoryId
+    );
+
+  const predictionInput =
+    document.getElementById(
+      "editCategoryPrediction_" + categoryId
+    );
+
+  const statueInput =
+    document.getElementById(
+      "editCategoryStatue_" + categoryId
+    );
+
+  const categoryName =
+    nameInput
+      ? nameInput.value.trim()
+      : "";
 
   if (!categoryName) {
+
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       "Category name is required.",
@@ -1246,6 +2227,34 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     );
 
     return;
+
+  }
+
+  const followUpMapJSON =
+    followUpMapJSONInput
+      ? followUpMapJSONInput.value.trim()
+      : "";
+
+  if (followUpMapJSON) {
+
+    try {
+
+      JSON.parse(
+        followUpMapJSON
+      );
+
+    } catch (err) {
+
+      adminSetupSetMessage(
+        "editCategoryMessage_" + categoryId,
+        "Follow-Up Map JSON is not valid JSON.",
+        true
+      );
+
+      return;
+
+    }
+
   }
 
   adminSetupSetMessage(
@@ -1254,21 +2263,90 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     false
   );
 
-  const res = await apiAdminUpdateCategory({
-    gameId: gameId,
-    categoryId: categoryId,
-    category: categoryName,
-    section: sectionInput ? sectionInput.value.trim() : "",
-    points: pointsInput ? pointsInput.value : 0,
-    displayOrder: orderInput ? orderInput.value : 999,
-    layoutType: layoutInput ? layoutInput.value : "image",
-    locked: lockedInput ? lockedInput.checked : false,
-    active: activeInput ? activeInput.checked : true,
-    predictionGame: predictionInput ? predictionInput.checked : true,
-    countsAsStatue: statueInput ? statueInput.checked : false,
-  });
+  const res =
+    await apiAdminUpdateCategory({
+      gameId:
+        gameId,
 
-  if (!res || res.success === false) {
+      categoryId:
+        categoryId,
+
+      category:
+        categoryName,
+
+      section:
+        sectionInput
+          ? sectionInput.value.trim()
+          : "",
+
+      points:
+        pointsInput
+          ? pointsInput.value
+          : 0,
+
+      displayOrder:
+        orderInput
+          ? orderInput.value
+          : 999,
+
+      layoutType:
+        layoutInput
+          ? layoutInput.value
+          : "image",
+
+      lockDateTime:
+        lockDateTimeInput
+          ? lockDateTimeInput.value
+          : "",
+
+      groupId:
+        groupIdInput && groupIdInput.value.trim()
+          ? groupIdInput.value.trim()
+          : "default",
+
+      parentCategoryId:
+        parentCategoryIdInput
+          ? adminSetupSlugify(
+              parentCategoryIdInput.value.trim()
+            )
+          : "",
+
+      followUpCategoryId:
+        followUpCategoryIdInput
+          ? adminSetupSlugify(
+              followUpCategoryIdInput.value.trim()
+            )
+          : "",
+
+      followUpMapJSON:
+        followUpMapJSON,
+
+      locked:
+        lockedInput
+          ? lockedInput.checked
+          : false,
+
+      active:
+        activeInput
+          ? activeInput.checked
+          : true,
+
+      predictionGame:
+        predictionInput
+          ? predictionInput.checked
+          : true,
+
+      countsAsStatue:
+        statueInput
+          ? statueInput.checked
+          : false
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       res && (res.message || res.error)
@@ -1278,6 +2356,7 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     );
 
     return;
+
   }
 
   adminSetupSetMessage(
@@ -1286,7 +2365,10 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     false
   );
 
-  navigate("admin-game-setup:" + gameId);
+  navigate(
+    "admin-game-setup:" + gameId
+  );
+
 }
 
 /* ======================
