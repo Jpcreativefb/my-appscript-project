@@ -478,7 +478,34 @@ async function apiAdminCreateCategory(payload) {
 
   return api(
     "adminCreateCategory",
-    payload
+    {
+      gameId:
+        payload.gameId,
+
+      category:
+        payload.category,
+
+      categoryId:
+        payload.categoryId,
+
+      section:
+        payload.section,
+
+      points:
+        payload.points,
+
+      displayOrder:
+        payload.displayOrder,
+
+      layoutType:
+        payload.layoutType,
+
+      countsAsStatue:
+        payload.countsAsStatue,
+
+      locked:
+        payload.locked
+    }
   );
 
 }

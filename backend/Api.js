@@ -1,13 +1,25 @@
+/* =========================
+   API
+========================= */
+
 function doGet(e) {
 
   try {
 
     const action =
-      e.parameter.action;
+      e &&
+      e.parameter
+        ? e.parameter.action
+        : "";
 
-    // =========================
-    // GAME ID
-    // =========================
+    const params =
+      e && e.parameter
+        ? e.parameter
+        : {};
+
+    /* =========================
+       ADMIN ACTIONS
+    ========================= */
 
     const adminActions = [
       "adminGetGames",
@@ -19,7 +31,7 @@ function doGet(e) {
       "adminArchiveGame",
       "adminCloneGame",
       "adminCloneGameSetup",
-    
+
       "adminGetGameSetup",
       "adminCreateCategory",
       "adminUpdateCategory",
@@ -27,240 +39,294 @@ function doGet(e) {
       "adminCreateNominee",
       "adminUpdateNominee",
       "adminArchiveNominee",
-    
+
       "adminRunGamePreflight",
-      "adminRefreshResultsCaches"
+      "adminRefreshResultsCaches",
+
+      "adminSummary",
+      "adminClearCaches",
+      "adminUpdateCategorySetting",
+      "adminClearCategoryWinner",
+      "adminCreateUser",
+      "adminResetUserPin",
+      "adminToggleUserAdmin",
+      "adminToggleUserActive"
     ];
-    
-    const isAdminGameAction =
+
+    const isAdminAction =
       adminActions.indexOf(action) !== -1;
-    
+
+    /* =========================
+       GAME ID
+    ========================= */
+
     const gameId =
-      e.parameter.gameId ||
+      params.gameId ||
       (
-        isAdminGameAction
+        isAdminAction
           ? ""
           : getDefaultGameId()
       );
 
-      // =========================
-// PUBLIC GAMES
-// =========================
+    /* =========================
+       HEALTH / DEFAULT
+    ========================= */
 
-if (action === "getActiveGames") {
+    if (
+      !action ||
+      action === "health"
+    ) {
 
-  return json({
-    success: true,
-    games: getPublicActiveGames(),
-    defaultGameId: getDefaultGameId(),
-    currentGameId: gameId
-  });
+      return json({
+        success: true,
+        message: "API running",
+        gameId: gameId
+      });
 
-}
+    }
 
-    // =========================
-// ADMIN GAMES
-// =========================
+    /* =========================
+       PUBLIC GAMES
+    ========================= */
 
-if (action === "adminGetGames") {
+    if (action === "getActiveGames") {
 
-  return json(
-    adminGetGames()
-  );
+      return json({
+        success: true,
+        games:
+          getPublicActiveGames(),
+        defaultGameId:
+          getDefaultGameId(),
+        currentGameId:
+          gameId
+      });
 
-}
+    }
 
-if (action === "adminGetGameTypes") {
+    /* =========================
+       ADMIN: GAMES
+    ========================= */
 
-  return json(
-    adminGetGameTypes()
-  );
-
-}
-
-if (action === "adminGetGameConfig") {
-
-  return json({
-    success: true,
-    game: getGameRuntimeConfig(
-      e.parameter.gameId || gameId
-    )
-  });
-
-}
-
-if (action === "adminSaveGame") {
-
-  return json(
-    adminSaveGame(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminCreateGame") {
-
-  return json(
-    adminCreateGame(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminUpdateGame") {
-
-  return json(
-    adminUpdateGame(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminArchiveGame") {
-
-  return json(
-    adminArchiveGame(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminCloneGame") {
-
-  return json(
-    adminCloneGame(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminCloneGameSetup") {
-
-  return json(
-    adminCloneGameSetup(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminRunGamePreflight") {
-
-  return json(
-    adminRunGamePreflight(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminRefreshResultsCaches") {
-
-  return json(
-    adminRefreshResultsCaches(
-      e.parameter
-    )
-  );
-
-}
-
-   // =========================
-// ADMIN CATEGORY / QUESTION SETUP
-// =========================
-
-if (action === "adminGetGameSetup") {
-
-  return json(
-    adminGetGameSetup(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminCreateCategory") {
-
-  return json(
-    adminCreateCategory(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminUpdateCategory") {
-
-  return json(
-    adminUpdateCategory(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminArchiveCategory") {
-
-  return json(
-    adminArchiveCategory(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminCreateNominee") {
-
-  return json(
-    adminCreateNominee(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminUpdateNominee") {
-
-  return json(
-    adminUpdateNominee(
-      e.parameter
-    )
-  );
-
-}
-
-if (action === "adminArchiveNominee") {
-
-  return json(
-    adminArchiveNominee(
-      e.parameter
-    )
-  );
-
-}
-
-    // =========================
-    // PICKS
-    // =========================
-
-    if (action === "getMyPicks") {
+    if (action === "adminGetGames") {
 
       return json(
-        apiGetMyPicks(
-          e.parameter.username,
-          gameId
+        adminGetGames()
+      );
+
+    }
+
+    if (action === "adminGetGameTypes") {
+
+      return json(
+        adminGetGameTypes()
+      );
+
+    }
+
+    if (action === "adminGetGameConfig") {
+
+      return json({
+        success: true,
+        game:
+          getGameRuntimeConfig(
+            params.gameId || gameId
+          )
+      });
+
+    }
+
+    if (action === "adminSaveGame") {
+
+      return json(
+        adminSaveGame(
+          params
         )
       );
 
     }
 
-    // =========================
-    // CATEGORIES
-    // =========================
+    if (action === "adminCreateGame") {
+
+      return json(
+        adminCreateGame(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminUpdateGame") {
+
+      return json(
+        adminUpdateGame(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminArchiveGame") {
+
+      return json(
+        adminArchiveGame(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminCloneGame") {
+
+      return json(
+        adminCloneGame(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminCloneGameSetup") {
+
+      return json(
+        adminCloneGameSetup(
+          params
+        )
+      );
+
+    }
+
+    /* =========================
+       ADMIN: GAME SETUP
+       Categories / Questions
+    ========================= */
+
+    if (action === "adminGetGameSetup") {
+
+      return json(
+        adminGetGameSetup(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminCreateCategory") {
+
+      return json(
+        adminCreateCategory(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminUpdateCategory") {
+
+      return json(
+        adminUpdateCategory(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminArchiveCategory") {
+
+      return json(
+        adminArchiveCategory(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminCreateNominee") {
+
+      return json(
+        adminCreateNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminUpdateNominee") {
+
+      return json(
+        adminUpdateNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminArchiveNominee") {
+
+      return json(
+        adminArchiveNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminRunGamePreflight") {
+
+      return json(
+        adminRunGamePreflight(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminRefreshResultsCaches") {
+
+      return json(
+        adminRefreshResultsCaches(
+          params
+        )
+      );
+
+    }
+
+    /* =========================
+       LOGIN
+    ========================= */
+
+    if (action === "login") {
+
+      return json(
+        loginUser(
+          params.username,
+          params.pin
+        )
+      );
+
+    }
+
+    /* =========================
+       STARTUP PAYLOAD
+    ========================= */
+
+    if (action === "getStartupPayload") {
+
+      return json(
+        apiGetStartupPayload({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    /* =========================
+       CATEGORIES
+    ========================= */
 
     if (action === "getCategories") {
 
@@ -272,10 +338,6 @@ if (action === "adminArchiveNominee") {
 
     }
 
-    // =========================
-    // CATEGORY SETTINGS
-    // =========================
-
     if (action === "getCategorySettings") {
 
       return json(
@@ -286,53 +348,47 @@ if (action === "adminArchiveNominee") {
 
     }
 
-    // =========================
-    // LOGIN
-    // =========================
+    /* =========================
+       PICKS
+    ========================= */
 
-    if (action === "login") {
+    if (action === "getMyPicks") {
 
       return json(
-        loginUser(
-          e.parameter.username,
-          e.parameter.pin
+        apiGetMyPicks(
+          params.username,
+          gameId
         )
       );
 
     }
 
-    // =========================
-    // SAVE PICK
-    // =========================
-
     if (action === "savePick") {
 
       return json(
         savePick({
-    
           username:
-            e.parameter.username,
-    
-          categoryId:
-            e.parameter.categoryId,
-    
-          nomineeId:
-            e.parameter.nomineeId,
-    
-          confidencePoints:
-            e.parameter.confidencePoints,
-    
+            params.username,
+
           gameId:
-            gameId
-    
+            gameId,
+
+          categoryId:
+            params.categoryId,
+
+          nomineeId:
+            params.nomineeId,
+
+          confidencePoints:
+            params.confidencePoints
         })
       );
-    
+
     }
 
-    // =========================
-    // LEADERBOARD
-    // =========================
+    /* =========================
+       LEADERBOARD
+    ========================= */
 
     if (action === "leaderboard") {
 
@@ -344,259 +400,262 @@ if (action === "adminArchiveNominee") {
 
     }
 
-    // =========================
-    // USER BREAKDOWN
-    // =========================
+    /* =========================
+       USER BREAKDOWN
+    ========================= */
 
     if (action === "userBreakdown") {
 
       return json(
         getUserBreakdown(
-          e.parameter.username,
+          params.username,
           gameId
         )
       );
 
     }
 
-    // =========================
-    // USER PROFILE
-    // =========================
+    /* =========================
+       USER PROFILE
+    ========================= */
 
     if (action === "getUserProfile") {
 
       return json(
         getUserProfile(
-          e.parameter.username,
+          params.username,
           gameId
         )
       );
 
     }
 
-    // =========================
-    // SAVE USER PROFILE
-    // =========================
-
     if (action === "saveUserProfile") {
 
       return json(
         saveUserProfile({
-
           username:
-            e.parameter.username,
+            params.username,
 
           gameId:
-            gameId,  
+            gameId,
 
           displayName:
-            e.parameter.displayName,
+            params.displayName,
 
           avatar:
-            e.parameter.avatar,
+            params.avatar,
 
           themeColor:
-            e.parameter.themeColor
-
+            params.themeColor
         })
       );
 
     }
 
-    // =========================
-    // USER PROFILE HISTORY
-    // =========================
-
     if (action === "getUserProfileHistory") {
 
-        return json(
-          getUserProfileHistory(
-            e.parameter.username,
-            gameId
-          )
-        );
+      return json(
+        getUserProfileHistory(
+          params.username,
+          gameId
+        )
+      );
 
     }
 
-    // =========================
-// STARTUP PAYLOAD
-// =========================
+    /* =========================
+       ADMIN: SUMMARY / CACHE
+    ========================= */
 
-if (action === "getStartupPayload") {
+    if (action === "adminSummary") {
 
-  return json(
-    apiGetStartupPayload({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      gameId: gameId
-    })
-  );
+      return json(
+        apiAdminSummary({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
 
-}
+    }
 
-    // =========================
-    // ADMIN SUMMARY
-// =========================
+    if (action === "adminClearCaches") {
 
-if (action === "adminSummary") {
+      return json(
+        apiAdminClearCaches({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
 
-  return json(
-    apiAdminSummary({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      gameId: gameId
-    })
-  );
+    }
 
-}
+    /* =========================
+       ADMIN: CATEGORY SETTINGS
+    ========================= */
 
-// =========================
-// ADMIN CLEAR CACHES
-// =========================
+    if (action === "adminUpdateCategorySetting") {
 
-if (action === "adminClearCaches") {
+      return json(
+        apiAdminUpdateCategorySetting({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          categoryId:
+            params.categoryId,
+          locked:
+            params.locked,
+          points:
+            params.points,
+          winnerNomineeId:
+            params.winnerNomineeId
+        })
+      );
 
-  return json(
-    apiAdminClearCaches({
-      username: e.parameter.username,
-      token: e.parameter.token
-    })
-  );
+    }
 
-}  
+    if (action === "adminClearCategoryWinner") {
 
-// =========================
-// ADMIN UPDATE CATEGORY SETTING
-// =========================
+      return json(
+        apiAdminClearCategoryWinner({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          categoryId:
+            params.categoryId
+        })
+      );
 
-if (action === "adminUpdateCategorySetting") {
+    }
 
-  return json(
-    apiAdminUpdateCategorySetting({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      gameId: gameId,
-      categoryId: e.parameter.categoryId,
-      locked: e.parameter.locked,
-      points: e.parameter.points,
-      winnerNomineeId: e.parameter.winnerNomineeId
-    })
-  );
+    /* =========================
+       ADMIN: USERS
+    ========================= */
 
-}
+    if (action === "adminCreateUser") {
 
-// =========================
-// ADMIN CLEAR CATEGORY WINNER
-// =========================
+      return json(
+        apiAdminCreateUser({
+          username:
+            params.username,
+          token:
+            params.token,
+          newUsername:
+            params.newUsername,
+          pin:
+            params.pin,
+          isAdmin:
+            params.isAdmin,
+          avatar:
+            params.avatar,
+          themeColor:
+            params.themeColor
+        })
+      );
 
-if (action === "adminClearCategoryWinner") {
+    }
 
-  return json(
-    apiAdminClearCategoryWinner({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      gameId: gameId,
-      categoryId: e.parameter.categoryId
-    })
-  );
+    if (action === "adminResetUserPin") {
 
-}
+      return json(
+        apiAdminResetUserPin({
+          username:
+            params.username,
+          token:
+            params.token,
+          targetUsername:
+            params.targetUsername,
+          pin:
+            params.pin
+        })
+      );
 
-    // =========================
-// ADMIN CREATE USER
-// =========================
+    }
 
-if (action === "adminCreateUser") {
+    if (action === "adminToggleUserAdmin") {
 
-  return json(
-    apiAdminCreateUser({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      newUsername: e.parameter.newUsername,
-      pin: e.parameter.pin,
-      isAdmin: e.parameter.isAdmin,
-      avatar: e.parameter.avatar,
-      themeColor: e.parameter.themeColor
-    })
-  );
+      return json(
+        apiAdminToggleUserAdmin({
+          username:
+            params.username,
+          token:
+            params.token,
+          targetUsername:
+            params.targetUsername,
+          isAdmin:
+            params.isAdmin
+        })
+      );
 
-}
+    }
 
-// =========================
-// ADMIN RESET USER PIN
-// =========================
+    if (action === "adminToggleUserActive") {
 
-if (action === "adminResetUserPin") {
+      return json(
+        apiAdminToggleUserActive({
+          username:
+            params.username,
+          token:
+            params.token,
+          targetUsername:
+            params.targetUsername,
+          active:
+            params.active
+        })
+      );
 
-  return json(
-    apiAdminResetUserPin({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      targetUsername: e.parameter.targetUsername,
-      pin: e.parameter.pin
-    })
-  );
+    }
 
-}
-
-// =========================
-// ADMIN TOGGLE USER ADMIN
-// =========================
-
-if (action === "adminToggleUserAdmin") {
-
-  return json(
-    apiAdminToggleUserAdmin({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      targetUsername: e.parameter.targetUsername,
-      isAdmin: e.parameter.isAdmin
-    })
-  );
-
-}
-
-// =========================
-// ADMIN TOGGLE USER ACTIVE
-// =========================
-
-if (action === "adminToggleUserActive") {
-
-  return json(
-    apiAdminToggleUserActive({
-      username: e.parameter.username,
-      token: e.parameter.token,
-      targetUsername: e.parameter.targetUsername,
-      active: e.parameter.active
-    })
-  );
-
-}
-
-    // =========================
-    // DEFAULT
-    // =========================
+    /* =========================
+       UNKNOWN ACTION
+    ========================= */
 
     return json({
-      success: true,
-      message: "API running",
-      gameId: gameId
+      success: false,
+      error:
+        "Unknown action: " + action,
+      gameId:
+        gameId
     });
 
   } catch (err) {
 
     Logger.log(
-      "API ERROR: " + err.message
+      "API ERROR: " +
+      (
+        err && err.stack
+          ? err.stack
+          : err.message
+      )
     );
 
     return json({
       success: false,
-      error: err.message
+      error:
+        err && err.message
+          ? err.message
+          : String(err)
     });
 
   }
 
 }
+
+/* =========================
+   JSON RESPONSE
+========================= */
 
 function json(obj) {
 

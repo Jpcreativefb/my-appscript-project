@@ -410,6 +410,123 @@ function adminCatNormalizeValue_(value) {
     ]);
   
   }
+
+  function adminCatAppendCategoryRow_(
+  payload
+) {
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        "Categories"
+      );
+
+  if (!sh) {
+
+    throw new Error(
+      "Categories sheet missing"
+    );
+
+  }
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (!data.length) {
+
+    throw new Error(
+      "Categories sheet is empty"
+    );
+
+  }
+
+  const headers =
+    data[0].map(h =>
+      String(h || "").trim()
+    );
+
+  const row =
+    new Array(headers.length)
+      .fill("");
+
+  function set(header, value) {
+
+    const index =
+      headers.indexOf(header);
+
+    if (index !== -1) {
+      row[index] = value;
+    }
+
+  }
+
+  set(
+    "GameId",
+    payload.gameId
+  );
+
+  set(
+    "Category",
+    payload.category
+  );
+
+  set(
+    "CategoryId",
+    payload.categoryId
+  );
+
+  set(
+    "Nominee",
+    payload.nominee || ""
+  );
+
+  set(
+    "NomineeId",
+    payload.nomineeId || ""
+  );
+
+  set(
+    "Section",
+    payload.section || "Main"
+  );
+
+  set(
+    "FileID",
+    payload.fileId || ""
+  );
+
+  set(
+    "ShortAnswer",
+    payload.shortAnswer || ""
+  );
+
+  set(
+    "CategoryImage",
+    payload.categoryImage || ""
+  );
+
+  set(
+    "Active",
+    payload.active !== false
+  );
+
+  set(
+    "PredictionGame",
+    payload.predictionGame !== false
+  );
+
+  set(
+    "CommunityRank",
+    payload.communityRank || ""
+  );
+
+  sh.appendRow(
+    row
+  );
+
+  }
   
   /* =========================================================
      CATEGORY ROW HELPERS
@@ -945,145 +1062,7 @@ function adminCatNormalizeValue_(value) {
      CREATE CATEGORY / QUESTION
   ========================================================= */
   
-  function adminCreateCategory(payload) {
   
-    if (!payload) {
-  
-      throw new Error(
-        "Category payload missing"
-      );
-  
-    }
-  
-    const gameId =
-      adminCatNormalizeGameId_(
-        payload.gameId
-      );
-  
-    if (!gameId) {
-  
-      throw new Error(
-        "GameId is required"
-      );
-  
-    }
-  
-    validateGameId(gameId);
-  
-    const categoryName =
-      adminCatNormalizeValue_(
-        payload.category ||
-        payload.question ||
-        payload.name
-      );
-  
-    if (!categoryName) {
-  
-      throw new Error(
-        "Category/question name is required"
-      );
-  
-    }
-  
-    const categoryId =
-      adminCatNormalizeId_(
-        payload.categoryId ||
-        adminCatSlugify_(
-          categoryName
-        )
-      );
-  
-    if (!categoryId) {
-  
-      throw new Error(
-        "CategoryId is required"
-      );
-  
-    }
-  
-    const lock =
-      LockService.getScriptLock();
-  
-    lock.waitLock(10000);
-  
-    try {
-  
-      const setup =
-        adminGetGameSetup({
-          gameId: gameId
-        });
-  
-      const exists =
-        setup.categories.some(c =>
-          c.categoryId === categoryId
-        );
-  
-      if (exists) {
-  
-        throw new Error(
-          "Category already exists: " +
-          categoryId
-        );
-  
-      }
-  
-      adminCatUpsertCategorySettings_({
-        gameId: gameId,
-        categoryId: categoryId,
-        points:
-          payload.points || 1,
-        locked:
-          adminCatToBoolean_(
-            payload.locked
-          ),
-        winnerNomineeId: "",
-        changePenalty:
-          payload.changePenalty || 0,
-        maxChanges:
-          payload.maxChanges || 0,
-        lockDateTime:
-          payload.lockDateTime || "",
-        displayOrder:
-          payload.displayOrder || 999,
-        groupId:
-          payload.groupId || "default",
-        parentCategoryId:
-          payload.parentCategoryId || "",
-        followUpCategoryId:
-          payload.followUpCategoryId || "",
-        followUpMapJSON:
-          payload.followUpMapJSON || "",
-        layoutType:
-          payload.layoutType || "image",
-        shortName:
-          payload.shortName || "",
-        countsAsStatue:
-          adminCatToBoolean_(
-            payload.countsAsStatue
-          ),
-        scoreVersion:
-          payload.scoreVersion || "",
-        favoriteNomineeId: ""
-      });
-  
-      SpreadsheetApp.flush();
-  
-      adminCatClearCaches_();
-  
-      return {
-        success: true,
-        message: "Category created",
-        gameId: gameId,
-        categoryId: categoryId
-      };
-  
-    } finally {
-  
-      lock.releaseLock();
-  
-    }
-  
-  }
   
   /* =========================================================
      UPDATE CATEGORY / QUESTION
