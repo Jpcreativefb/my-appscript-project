@@ -1671,3 +1671,56 @@ details[open] > summary .admin-collapse-icon {
 .admin-games-clone-card {
   overflow: hidden;
 }
+
+/* ======================
+   FULL ADMIN GAMES PANEL
+====================== */
+
+.admin-games-panel .admin-collapsible-body {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-games-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 0;
+}
+
+.admin-game-form-details {
+  padding: 14px;
+  border-radius: 16px;
+
+  background:
+    rgba(255, 255, 255, 0.05);
+
+  border:
+    1px solid rgba(255, 255, 255, 0.08);
+}
+
+.admin-game-form-summary {
+  align-items: center;
+}
+
+.admin-game-form-summary h3 {
+  margin: 0;
+}
+
+.admin-game-form {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-game-form .form-grid {
+  margin-top: 0;
+}
+
+.admin-game-form .admin-advanced-details {
+  margin: 0;
+}
+
+.admin-games-create-card .admin-game-form-details {
+  padding: 0;
+  background: transparent;
+  border: none;
+}

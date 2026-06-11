@@ -384,14 +384,17 @@ async function renderAdminGamesPanel() {
 
     return `
       <div class="page admin-page">
+
         <h1>Manage Games</h1>
 
         <div class="card admin-card error-card">
           Could not load games.
+
           <div class="admin-sub">
             ${res && res.error ? escapeHtml_(res.error) : ""}
           </div>
         </div>
+
       </div>
     `;
 
@@ -406,39 +409,95 @@ async function renderAdminGamesPanel() {
   return `
     <div class="page admin-page">
 
-      <h1>Manage Games</h1>
+      <div class="admin-page-header">
+
+        <div>
+          <h1>Manage Games</h1>
+
+          <div class="admin-sub">
+            Create and configure prediction, confidence, wager, and ranking games.
+          </div>
+        </div>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="navigate('admin')"
+        >
+          Back to Admin
+        </button>
+
+      </div>
 
       <div class="admin-section">
 
-        <div class="admin-section-header">
-          <div>
-            <h2>Games Panel</h2>
-            <p class="admin-sub">
-              Create and configure prediction, confidence, wager, and ranking games.
-            </p>
+        <details
+          class="card admin-card admin-collapsible-card admin-games-create-card"
+        >
+
+          <summary class="admin-card-summary">
+
+            <div>
+              <h2>Create New Game</h2>
+
+              <div class="admin-sub">
+                Add a new game shell.
+              </div>
+            </div>
+
+            <span class="admin-collapse-icon">
+              ▾
+            </span>
+
+          </summary>
+
+          <div class="admin-collapsible-body">
+
+            ${renderAdminGameForm(
+              null,
+              gameTypes
+            )}
+
           </div>
 
-          <button
-            class="button admin-button secondary"
-            onclick="navigate('admin')"
-          >
-            Back to Admin
-          </button>
-        </div>
+        </details>
 
-        ${renderAdminGameForm(
-          null,
-          gameTypes
-        )}
+        <details
+          class="card admin-card admin-collapsible-card admin-games-panel"
+          open
+        >
 
-        <div class="admin-games-list">
-          ${games.map(game =>
-            renderAdminGameForm(
-              game,
-              gameTypes
-            )
-          ).join("")}
-        </div>
+          <summary class="admin-card-summary">
+
+            <div>
+              <h2>Existing Games</h2>
+
+              <div class="admin-sub">
+                ${games.length} games configured.
+              </div>
+            </div>
+
+            <span class="admin-collapse-icon">
+              ▾
+            </span>
+
+          </summary>
+
+          <div class="admin-collapsible-body">
+
+            <div class="admin-games-list">
+
+              ${games.map(game =>
+                renderAdminGameForm(
+                  game,
+                  gameTypes
+                )
+              ).join("")}
+
+            </div>
+
+          </div>
+
+        </details>
 
       </div>
 
@@ -455,7 +514,7 @@ function renderAdminGameForm(
   const isNew =
     !game;
 
-    game =
+  game =
     game || {
       gameId: "",
       name: "",
@@ -483,282 +542,328 @@ function renderAdminGameForm(
       votingLocked: false
     };
 
+  const title =
+    isNew
+      ? "Create New Game"
+      : escapeHtml_(game.name || game.gameId);
+
+  const subtitle =
+    isNew
+      ? "Add a new game shell."
+      : escapeHtml_(game.gameId);
+
+  const openAttr =
+    isNew || game.defaultGame || game.active
+      ? "open"
+      : "";
+
   return `
-    <form
-      class="card admin-card admin-game-card"
-      onsubmit="adminSaveGameFromForm(event, this)"
+    <details
+      class="admin-game-form-details admin-collapsible-card"
+      ${openAttr}
     >
 
-      <div class="admin-card-header">
+      <summary class="admin-card-summary admin-game-form-summary">
+
         <div>
           <h3>
-            ${isNew ? "Create New Game" : escapeHtml_(game.name || game.gameId)}
+            ${title}
           </h3>
-          <p class="muted">
-            ${isNew ? "Add a new game shell." : escapeHtml_(game.gameId)}
-          </p>
+
+          <div class="admin-sub">
+            ${subtitle}
+          </div>
         </div>
 
-        <button
-          type="button"
-          class="secondary-btn"
-          onclick="adminToggleGameAdvanced(this)"
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <form
+          class="admin-game-form"
+          onsubmit="adminSaveGameFromForm(event, this)"
         >
-          Advanced
-        </button>
-      </div>
 
-      <div class="form-grid">
+          <div class="form-grid">
 
-        <label>
-          Game Name
-          <input
-            name="name"
-            value="${escapeHtml_(game.name)}"
-            placeholder="Oscars 2026"
-            required
-          />
-        </label>
+            <label>
+              Game Name
 
-        <label>
-          Game ID
-          <input
-            name="gameId"
-            value="${escapeHtml_(game.gameId)}"
-            placeholder="oscars-2026"
-            ${isNew ? "" : "readonly"}
-            required
-          />
-        </label>
+              <input
+                name="name"
+                value="${escapeHtml_(game.name)}"
+                placeholder="Oscars 2026"
+                required
+              />
+            </label>
 
-        <label>
-          Year
-          <input
-            name="year"
-            type="number"
-            value="${escapeHtml_(game.year || "")}"
-            placeholder="2026"
-          />
-        </label>
+            <label>
+              Game ID
 
-        <label>
-          Game Type
-          <select
-            name="type"
-            onchange="adminApplyGameTypeDefaults(this.form)"
-          >
-            ${renderGameTypeOptions_(
-              game.type,
-              gameTypes
+              <input
+                name="gameId"
+                value="${escapeHtml_(game.gameId)}"
+                placeholder="oscars-2026"
+                ${isNew ? "" : "readonly"}
+                required
+              />
+            </label>
+
+            <label>
+              Year
+
+              <input
+                name="year"
+                type="number"
+                value="${escapeHtml_(game.year || "")}"
+                placeholder="2026"
+              />
+            </label>
+
+            <label>
+              Game Type
+
+              <select
+                name="type"
+                onchange="adminApplyGameTypeDefaults(this.form)"
+              >
+                ${renderGameTypeOptions_(
+                  game.type,
+                  gameTypes
+                )}
+              </select>
+            </label>
+
+          </div>
+
+          <div class="form-grid">
+
+            <label>
+              Confidence Scoring
+
+              <select name="confidenceScoringMode">
+
+                <option
+                  value="win_only"
+                  ${game.confidenceScoringMode === "risk_penalty" ? "" : "selected"}
+                >
+                  Win only — wrong picks get 0
+                </option>
+
+                <option
+                  value="risk_penalty"
+                  ${game.confidenceScoringMode === "risk_penalty" ? "selected" : ""}
+                >
+                  Risk penalty — wrong picks lose confidence points
+                </option>
+
+              </select>
+            </label>
+
+          </div>
+
+          <div class="admin-checkbox-row">
+
+            ${renderAdminCheckbox_(
+              "active",
+              "Active",
+              game.active
             )}
-          </select>
-        </label>
+
+            ${renderAdminCheckbox_(
+              "defaultGame",
+              "Default Game",
+              game.defaultGame
+            )}
+
+            ${renderAdminCheckbox_(
+              "archived",
+              "Archived",
+              game.archived
+            )}
+
+            ${renderAdminCheckbox_(
+              "lockAllPicks",
+              "Lock All Picks",
+              game.lockAllPicks
+            )}
+
+          </div>
+
+          <details class="admin-advanced-details">
+
+            <summary>
+              Advanced game behavior
+            </summary>
+
+            <h4>Game Behavior</h4>
+
+            <div class="admin-checkbox-row">
+
+              ${renderAdminCheckbox_(
+                "predictionEnabled",
+                "Prediction Enabled",
+                game.predictionEnabled
+              )}
+
+              ${renderAdminCheckbox_(
+                "rankingEnabled",
+                "Ranking Enabled",
+                game.rankingEnabled
+              )}
+
+              ${renderAdminCheckbox_(
+                "confidenceEnabled",
+                "Confidence Enabled",
+                game.confidenceEnabled
+              )}
+
+              ${renderAdminCheckbox_(
+                "wagerEnabled",
+                "Wager Enabled",
+                game.wagerEnabled
+              )}
+
+              ${renderAdminCheckbox_(
+                "showLeaderboard",
+                "Show Leaderboard",
+                game.showLeaderboard
+              )}
+
+              ${renderAdminCheckbox_(
+                "showResultsBeforeLock",
+                "Show Results Before Lock",
+                game.showResultsBeforeLock
+              )}
+
+              ${renderAdminCheckbox_(
+                "resultsFinalized",
+                "Results Finalized",
+                game.resultsFinalized
+              )}
+
+              ${renderAdminCheckbox_(
+                "votingLocked",
+                "Voting Locked",
+                game.votingLocked
+              )}
+
+            </div>
+
+            <h4>Wager Settings</h4>
+
+            <div class="form-grid">
+
+              <label>
+                Starting Bankroll
+
+                <input
+                  name="startingBankroll"
+                  type="number"
+                  value="${escapeHtml_(game.startingBankroll || 100)}"
+                />
+              </label>
+
+              <label>
+                Min Wager
+
+                <input
+                  name="minWager"
+                  type="number"
+                  value="${escapeHtml_(game.minWager || 1)}"
+                />
+              </label>
+
+              <label>
+                Max Wager
+
+                <input
+                  name="maxWager"
+                  type="number"
+                  value="${escapeHtml_(game.maxWager || 100)}"
+                />
+              </label>
+
+            </div>
+
+            <h4>Display</h4>
+
+            <div class="form-grid">
+
+              <label>
+                Theme Color
+
+                <input
+                  name="themeColor"
+                  value="${escapeHtml_(game.themeColor || "")}"
+                  placeholder="#c8a24a"
+                />
+              </label>
+
+              <label>
+                Icon
+
+                <input
+                  name="icon"
+                  value="${escapeHtml_(game.icon || "")}"
+                  placeholder="🏆"
+                />
+              </label>
+
+              <label>
+                Sort Order
+
+                <input
+                  name="sortOrder"
+                  type="number"
+                  value="${escapeHtml_(game.sortOrder || 999)}"
+                />
+              </label>
+
+              <label>
+                Status
+
+                <input
+                  name="status"
+                  value="${escapeHtml_(game.status || "")}"
+                  placeholder="Open, Locked, Complete"
+                />
+              </label>
+
+            </div>
+
+          </details>
+
+          <div class="admin-card-actions">
+
+            <button
+              type="submit"
+              class="admin-small-button"
+            >
+              ${isNew ? "Create Game" : "Save Game"}
+            </button>
+
+            ${!isNew ? `
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')"
+              >
+                Categories / Questions / Nominees
+              </button>
+            ` : ""}
+
+          </div>
+
+        </form>
 
       </div>
 
-      <div class="form-grid">
-
-  <label>
-    Confidence Scoring
-    <select name="confidenceScoringMode">
-      <option
-        value="win_only"
-        ${game.confidenceScoringMode === "risk_penalty" ? "" : "selected"}
-      >
-        Win only — wrong picks get 0
-      </option>
-
-      <option
-        value="risk_penalty"
-        ${game.confidenceScoringMode === "risk_penalty" ? "selected" : ""}
-      >
-        Risk penalty — wrong picks lose confidence points
-      </option>
-    </select>
-  </label>
-
-</div>
-
-      <div class="admin-checkbox-row">
-
-        ${renderAdminCheckbox_(
-          "active",
-          "Active",
-          game.active
-        )}
-
-        ${renderAdminCheckbox_(
-          "defaultGame",
-          "Default Game",
-          game.defaultGame
-        )}
-
-        ${renderAdminCheckbox_(
-          "archived",
-          "Archived",
-          game.archived
-        )}
-
-        ${renderAdminCheckbox_(
-          "lockAllPicks",
-          "Lock All Picks",
-          game.lockAllPicks
-        )}
-
-      </div>
-
-      <div class="admin-game-advanced hidden">
-
-        <h4>Game Behavior</h4>
-
-        <div class="admin-checkbox-row">
-
-          ${renderAdminCheckbox_(
-            "predictionEnabled",
-            "Prediction Enabled",
-            game.predictionEnabled
-          )}
-
-          ${renderAdminCheckbox_(
-            "rankingEnabled",
-            "Ranking Enabled",
-            game.rankingEnabled
-          )}
-
-          ${renderAdminCheckbox_(
-            "confidenceEnabled",
-            "Confidence Enabled",
-            game.confidenceEnabled
-          )}
-
-          ${renderAdminCheckbox_(
-            "wagerEnabled",
-            "Wager Enabled",
-            game.wagerEnabled
-          )}
-
-          ${renderAdminCheckbox_(
-            "showLeaderboard",
-            "Show Leaderboard",
-            game.showLeaderboard
-          )}
-
-          ${renderAdminCheckbox_(
-            "showResultsBeforeLock",
-            "Show Results Before Lock",
-            game.showResultsBeforeLock
-          )}
-
-          ${renderAdminCheckbox_(
-            "resultsFinalized",
-            "Results Finalized",
-            game.resultsFinalized
-          )}
-          
-          ${renderAdminCheckbox_(
-            "votingLocked",
-            "Voting Locked",
-            game.votingLocked
-          )}
-
-        </div>
-
-        <h4>Wager Settings</h4>
-
-        <div class="form-grid">
-
-          <label>
-            Starting Bankroll
-            <input
-              name="startingBankroll"
-              type="number"
-              value="${escapeHtml_(game.startingBankroll || 100)}"
-            />
-          </label>
-
-          <label>
-            Min Wager
-            <input
-              name="minWager"
-              type="number"
-              value="${escapeHtml_(game.minWager || 1)}"
-            />
-          </label>
-
-          <label>
-            Max Wager
-            <input
-              name="maxWager"
-              type="number"
-              value="${escapeHtml_(game.maxWager || 100)}"
-            />
-          </label>
-
-        </div>
-
-        <h4>Display</h4>
-
-        <div class="form-grid">
-
-          <label>
-            Theme Color
-            <input
-              name="themeColor"
-              value="${escapeHtml_(game.themeColor || "")}"
-              placeholder="#c8a24a"
-            />
-          </label>
-
-          <label>
-            Icon
-            <input
-              name="icon"
-              value="${escapeHtml_(game.icon || "")}"
-              placeholder="🏆"
-            />
-          </label>
-
-          <label>
-            Sort Order
-            <input
-              name="sortOrder"
-              type="number"
-              value="${escapeHtml_(game.sortOrder || 999)}"
-            />
-          </label>
-
-          <label>
-            Status
-            <input
-              name="status"
-              value="${escapeHtml_(game.status || "")}"
-              placeholder="Open, Locked, Complete"
-            />
-          </label>
-
-        </div>
-
-      </div>
-
-      <div class="admin-card-actions">
-
-         <button type="submit">
-          ${isNew ? "Create Game" : "Save Game"}
-         </button>
-    
-         ${!isNew ? `
-         <button
-           type="button"
-           class="admin-small-button secondary"
-           onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')"
-         >
-            Categories / Questions / Nominees
-         </button>
-         ` : ""}
-
-      </div>
-
-    </form>
+    </details>
   `;
 
 }
