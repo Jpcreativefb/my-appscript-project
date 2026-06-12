@@ -756,3 +756,46 @@ async function apiAdminRefreshResultsCaches(gameId) {
   );
 
 }
+
+/* ======================
+   BETTING
+====================== */
+
+async function apiGetBettingOptions(gameId) {
+
+  return api("getBettingOptions", {
+    gameId
+  });
+
+}
+
+async function apiGetMyBets(username, gameId) {
+
+  return api("getMyBets", {
+    username,
+    gameId
+  });
+
+}
+
+async function apiSaveBet(payload) {
+
+  payload = payload || {};
+
+  return api("saveBet", {
+    username: payload.username,
+    gameId: payload.gameId,
+    categoryId: payload.categoryId,
+    nomineeId: payload.nomineeId,
+    betAmount: payload.betAmount
+  });
+
+}
+
+async function apiBettingLeaderboard(gameId) {
+
+  return api("bettingLeaderboard", {
+    gameId
+  });
+
+}

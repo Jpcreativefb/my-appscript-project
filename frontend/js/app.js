@@ -466,6 +466,13 @@ async function renderPage(page) {
 
       break;
 
+    case "betting":
+
+      app.innerHTML =
+        await renderBettingPage();
+    
+      break;   
+
     case "leaderboard":
 
       app.innerHTML =

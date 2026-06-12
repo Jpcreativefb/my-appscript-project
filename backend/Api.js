@@ -736,6 +736,78 @@ function doGet(e) {
 
     }
 
+        // =========================
+    // BETTING OPTIONS
+    // =========================
+
+    if (action === "getBettingOptions") {
+
+      return json(
+        getBettingOptions(
+          gameId
+        )
+      );
+
+    }
+
+    // =========================
+    // MY BETS
+    // =========================
+
+    if (action === "getMyBets") {
+
+      return json(
+        apiGetMyBets(
+          e.parameter.username,
+          gameId
+        )
+      );
+
+    }
+
+    // =========================
+    // SAVE BET
+    // =========================
+
+    if (action === "saveBet") {
+
+      return json(
+        saveBet({
+
+          username:
+            e.parameter.username,
+
+          categoryId:
+            e.parameter.categoryId,
+
+          nomineeId:
+            e.parameter.nomineeId,
+
+          betAmount:
+            e.parameter.betAmount,
+
+          gameId:
+            gameId
+
+        })
+      );
+
+    }
+
+    // =========================
+    // BETTING LEADERBOARD
+    // =========================
+
+    if (action === "bettingLeaderboard") {
+
+      return json(
+        getBettingLeaderboardData(
+          gameId
+        )
+      );
+
+    }
+
     /* =========================
        UNKNOWN ACTION
     ========================= */
