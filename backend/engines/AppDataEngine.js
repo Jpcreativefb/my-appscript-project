@@ -306,14 +306,39 @@ function buildDashboardGameHubItem_(
       mode
     );
 
-  const leaderboardPreview =
+  const leaderboardRows =
     game.showLeaderboard === false
       ? []
-      : getDashboardLeaderboardPreview_(
+      : getDashboardLeaderboardRows_(
           game,
-          mode,
-          3
+          mode
         );
+
+  const leaderboardPreview =
+    getDashboardLeaderboardPreviewFromRows_(
+      game,
+      mode,
+      leaderboardRows,
+      5
+    );
+
+  const userLeaderboard =
+    getDashboardUserLeaderboardInfoFromRows_(
+      game,
+      mode,
+      username,
+      leaderboardRows
+    );
+
+  const userStats =
+    getDashboardUserStats_(
+      mode,
+      progress,
+      userLeaderboard
+    );
+
+  const hasStarted =
+    Number(progress.madeCount) > 0;
 
   return {
     gameId:
@@ -347,9 +372,22 @@ function buildDashboardGameHubItem_(
       game.status || "",
 
     statusLabel:
-      isPast
-        ? "Past Game"
-        : game.status || "Active",
+      getDashboardLockLabel_(
+        game,
+        isPast
+      ),
+
+    lockLabel:
+      getDashboardLockLabel_(
+        game,
+        isPast
+      ),
+
+    description:
+      getDashboardGameDescription_(
+        game,
+        mode
+      ),
 
     themeColor:
       game.themeColor || "#354785",
@@ -363,8 +401,15 @@ function buildDashboardGameHubItem_(
     isPast:
       isPast === true,
 
+    hasStarted:
+      hasStarted,
+
     enterLabel:
-      getDashboardEnterLabel_(mode),
+      getDashboardEnterLabel_(
+        mode,
+        progress,
+        isPast
+      ),
 
     progressLabel:
       progress.progressLabel,
@@ -374,6 +419,9 @@ function buildDashboardGameHubItem_(
 
     userSummary:
       progress.userSummary,
+
+    userStats:
+      userStats,
 
     leaderboardPreview:
       leaderboardPreview,
@@ -474,21 +522,177 @@ function getDashboardGameIcon_(
 
 }
 
-function getDashboardEnterLabel_(mode) {
+function getDashboardEnterLabel_(
+  mode,
+  progress,
+  isPast
+) {
+
+  progress =
+    progress || {};
+
+  if (isPast) {
+    return "View Results";
+  }
+
+  const made =
+    Number(progress.madeCount) || 0;
+
+  const percent =
+    Number(progress.progressValue) || 0;
+
+  if (made <= 0) {
+    return "Play Now";
+  }
 
   if (mode === "wager") {
-    return "Enter Wager Game";
+    return "Manage Wagers";
   }
 
   if (mode === "confidence") {
-    return "Enter Confidence Game";
+    return percent >= 100
+      ? "View Confidence Picks"
+      : "Continue Confidence Picks";
   }
 
   if (mode === "ranking") {
-    return "Enter Ranking Game";
+    return "Check Status";
   }
 
-  return "Enter Game";
+  return percent >= 100
+    ? "View Picks"
+    : "Continue Picks";
+
+}
+
+function getDashboardGameDescription_(
+  game,
+  mode
+) {
+
+  const description =
+    String(
+      game.description ||
+      game.gameDescription ||
+      ""
+    ).trim();
+
+  if (description) {
+    return description;
+  }
+
+  if (mode === "wager") {
+    return "Pick nominees or answers and wager chips. Your bankroll changes as results are entered.";
+  }
+
+  if (mode === "confidence") {
+    return "Make picks and assign confidence value to the choices you feel strongest about.";
+  }
+
+  if (mode === "ranking") {
+    return "Rank the available choices in order. Scoring is based on how close your order is to the final result.";
+  }
+
+  return "Make one pick per category before the game locks. Your score updates as winners are entered.";
+
+}
+
+function getDashboardLockLabel_(
+  game,
+  isPast
+) {
+
+  if (isPast) {
+    return "Finished";
+  }
+
+  if (game.lockAllPicks === true) {
+    return "Locked";
+  }
+
+  const customLabel =
+    String(
+      game.lockLabel ||
+      game.lockTimeLabel ||
+      game.eventTime ||
+      ""
+    ).trim();
+
+  if (customLabel) {
+    return customLabel;
+  }
+
+  const gameId =
+    game.gameId;
+
+  if (!gameId) {
+    return "Lock time TBD";
+  }
+
+  try {
+
+    const settings =
+      getCategorySettings(
+        gameId
+      );
+
+    const lockTimes =
+      Object
+        .keys(settings || {})
+        .map(key =>
+          settings[key] &&
+          settings[key].lockDateTime
+            ? new Date(settings[key].lockDateTime)
+            : null
+        )
+        .filter(date =>
+          date &&
+          !isNaN(date.getTime())
+        )
+        .sort((a, b) =>
+          a.getTime() - b.getTime()
+        );
+
+    if (!lockTimes.length) {
+      return "Lock time TBD";
+    }
+
+    const first =
+      lockTimes[0];
+
+    const last =
+      lockTimes[lockTimes.length - 1];
+
+    const sameLock =
+      first.getTime() === last.getTime();
+
+    return sameLock
+      ? "Locks " + getDashboardDateLabel_(first)
+      : "Locks vary by category";
+
+  } catch (err) {
+
+    return "Lock time TBD";
+
+  }
+
+}
+
+function getDashboardDateLabel_(date) {
+
+  try {
+
+    return Utilities.formatDate(
+      date,
+      Session.getScriptTimeZone(),
+      "MMM d, h:mm a"
+    );
+
+  } catch (err) {
+
+    return date.toLocaleString();
+
+  }
 
 }
 
@@ -530,17 +734,26 @@ function getDashboardGameProgress_(
       const totalBets =
         Number(summary.totalBets) || 0;
 
+      const progressValue =
+        getDashboardProgressPercent_(
+          totalBets,
+          totalCategories
+        );
+
       return {
+        madeCount:
+          totalBets,
+
+        totalCount:
+          totalCategories,
+
         progressLabel:
           totalCategories
             ? totalBets + " / " + totalCategories + " wagers placed"
             : totalBets + " wagers placed",
 
         progressValue:
-          getDashboardProgressPercent_(
-            totalBets,
-            totalCategories
-          ),
+          progressValue,
 
         userSummary:
           "Bankroll: " +
@@ -548,18 +761,27 @@ function getDashboardGameProgress_(
             summary.bankroll,
             0
           ) +
-          " chips"
+          " chips",
+
+        summary:
+          summary
       };
 
     } catch (err) {
 
       return {
+        madeCount:
+          0,
+        totalCount:
+          totalCategories,
         progressLabel:
           "No wagers placed yet",
         progressValue:
           0,
         userSummary:
-          "Wager game ready"
+          "Wager game ready",
+        summary:
+          {}
       };
 
     }
@@ -591,33 +813,54 @@ function getDashboardGameProgress_(
           )
           .length;
 
+      const progressValue =
+        getDashboardProgressPercent_(
+          picksMade,
+          totalCategories
+        );
+
       return {
+        madeCount:
+          picksMade,
+
+        totalCount:
+          totalCategories,
+
         progressLabel:
           totalCategories
             ? picksMade + " / " + totalCategories + " picks made"
             : picksMade + " picks made",
 
         progressValue:
-          getDashboardProgressPercent_(
-            picksMade,
-            totalCategories
-          ),
+          progressValue,
 
         userSummary:
           mode === "confidence"
             ? "Confidence picks"
-            : "Prediction picks"
+            : "Prediction picks",
+
+        summary:
+          {
+            picksMade: picksMade,
+            totalCategories: totalCategories
+          }
       };
 
     } catch (err) {
 
       return {
+        madeCount:
+          0,
+        totalCount:
+          totalCategories,
         progressLabel:
           "No picks made yet",
         progressValue:
           0,
         userSummary:
-          "Prediction game ready"
+          "Prediction game ready",
+        summary:
+          {}
       };
 
     }
@@ -625,20 +868,122 @@ function getDashboardGameProgress_(
   }
 
   return {
+    madeCount:
+      0,
+    totalCount:
+      totalCategories,
     progressLabel:
       "Ready to play",
     progressValue:
       0,
     userSummary:
-      "Game ready"
+      "Game ready",
+    summary:
+      {}
   };
 
 }
 
-function getDashboardLeaderboardPreview_(
-  game,
+function getDashboardUserStats_(
   mode,
-  limit
+  progress,
+  userLeaderboard
+) {
+
+  progress =
+    progress || {};
+
+  userLeaderboard =
+    userLeaderboard || {};
+
+  const stats = [];
+
+  const summary =
+    progress.summary || {};
+
+  if (mode === "wager") {
+
+    stats.push({
+      label: "Bankroll",
+      value:
+        getDashboardSafeNumber_(
+          summary.bankroll,
+          0
+        ) + " chips"
+    });
+
+    stats.push({
+      label: "Wagers",
+      value:
+        getDashboardSafeNumber_(
+          summary.totalBets,
+          0
+        )
+    });
+
+    stats.push({
+      label: "Pending",
+      value:
+        getDashboardSafeNumber_(
+          summary.pendingBets,
+          0
+        )
+    });
+
+    stats.push({
+      label: "Rank",
+      value:
+        userLeaderboard.rank
+          ? "#" + userLeaderboard.rank
+          : "—"
+    });
+
+    return stats;
+
+  }
+
+  stats.push({
+    label:
+      mode === "confidence"
+        ? "Confidence Picks"
+        : "Picks",
+    value:
+      progress.totalCount
+        ? progress.madeCount + " / " + progress.totalCount
+        : progress.madeCount || 0
+  });
+
+  stats.push({
+    label: "Score",
+    value:
+      userLeaderboard.score !== undefined
+        ? userLeaderboard.score
+        : "—"
+  });
+
+  stats.push({
+    label: "Rank",
+    value:
+      userLeaderboard.rank
+        ? "#" + userLeaderboard.rank
+        : "—"
+  });
+
+  stats.push({
+    label: "Status",
+    value:
+      Number(progress.madeCount) > 0
+        ? "Started"
+        : "Not Started"
+  });
+
+  return stats;
+
+}
+
+function getDashboardLeaderboardRows_(
+  game,
+  mode
 ) {
 
   const gameId =
@@ -664,8 +1009,47 @@ function getDashboardLeaderboardPreview_(
     rows = rows.leaderboard || rows.rows || [];
   }
 
+  return Array.isArray(rows)
+    ? rows
+    : [];
+
+}
+
+function getDashboardLeaderboardPreview_(
+  game,
+  mode,
+  limit
+) {
+
+  return getDashboardLeaderboardPreviewFromRows_(
+    game,
+    mode,
+    getDashboardLeaderboardRows_(
+      game,
+      mode
+    ),
+    limit
+  );
+
+}
+
+function getDashboardLeaderboardPreviewFromRows_(
+  game,
+  mode,
+  rows,
+  limit
+) {
+
+  const gameId =
+    game.gameId;
+
+  rows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
   return rows
-    .slice(0, limit || 3)
+    .slice(0, limit || 5)
     .map((row, index) => {
 
       const username =
@@ -728,6 +1112,67 @@ function getDashboardLeaderboardPreview_(
       };
 
     });
+
+}
+
+function getDashboardUserLeaderboardInfoFromRows_(
+  game,
+  mode,
+  username,
+  rows
+) {
+
+  rows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  const normalizedUsername =
+    String(username || "")
+      .trim()
+      .toLowerCase();
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const row =
+      rows[i] || {};
+
+    const rowUsername =
+      String(
+        row.user ||
+        row.username ||
+        ""
+      )
+        .trim()
+        .toLowerCase();
+
+    if (rowUsername !== normalizedUsername) {
+      continue;
+    }
+
+    return {
+      rank:
+        i + 1,
+
+      score:
+        mode === "wager"
+          ? getDashboardSafeNumber_(
+              row.bankroll,
+              0
+            )
+          : getDashboardSafeNumber_(
+              row.total !== undefined
+                ? row.total
+                : row.totalScore !== undefined
+                  ? row.totalScore
+                  : row.score,
+              0
+            )
+    };
+
+  }
+
+  return {};
 
 }
 

@@ -312,15 +312,20 @@ function renderDashboardGameCard(
       ? game.leaderboardPreview
       : [];
 
+  const userStats =
+    Array.isArray(game.userStats)
+      ? game.userStats
+      : [];
+
   const actionButton =
     isPast
       ? ""
       : `
         <button
-          class="dashboard-action-button"
+          class="dashboard-action-button primary"
           onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
         >
-          ${escapeHtml(game.enterLabel || "Enter Game")}
+          ${escapeHtml(game.enterLabel || "Play Now")}
         </button>
       `;
 
@@ -332,9 +337,18 @@ function renderDashboardGameCard(
           class="dashboard-action-button secondary"
           onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
         >
-          Full Leaderboard
+          Open Full Leaderboard
         </button>
       `;
+
+  const progressValue =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(game.progressValue) || 0
+      )
+    );
 
   return `
     <article
@@ -347,8 +361,8 @@ function renderDashboardGameCard(
           ${escapeHtml(game.icon || "🏆")}
         </div>
 
-        <span class="dashboard-game-status">
-          ${escapeHtml(game.statusLabel || (isPast ? "Past Game" : "Active"))}
+        <span class="dashboard-game-lock-label">
+          ${escapeHtml(game.lockLabel || game.statusLabel || "Lock time TBD")}
         </span>
       </div>
 
@@ -360,6 +374,16 @@ function renderDashboardGameCard(
         ${escapeHtml(game.typeLabel || "Game")}
       </p>
 
+      <details class="dashboard-game-description">
+        <summary>
+          Game details
+        </summary>
+
+        <p>
+          ${escapeHtml(game.description || "Game details will appear here.")}
+        </p>
+      </details>
+
       <div class="dashboard-game-progress-wrap">
         <div class="dashboard-game-progress-meta">
           <span>
@@ -367,54 +391,84 @@ function renderDashboardGameCard(
           </span>
 
           <strong>
-            ${Number(game.progressValue) || 0}%
+            ${progressValue}%
           </strong>
         </div>
 
         <div class="dashboard-game-progress-bar">
-          <span style="width: ${Number(game.progressValue) || 0}%;"></span>
+          <span style="width: ${progressValue}%;"></span>
         </div>
       </div>
 
-      <p class="dashboard-game-summary">
-        ${escapeHtml(game.userSummary || "")}
-      </p>
-
-      <div class="dashboard-mini-leaderboard">
+      <div class="dashboard-user-stats-card">
         <h4>
-          Leaderboard
+          Your Stats
         </h4>
 
-        ${
-          leaderboardPreview.length
-            ? leaderboardPreview
-                .map(row => `
-                  <div class="dashboard-mini-leaderboard-row">
-                    <span>
-                      #${Number(row.rank) || ""}
-                      ${escapeHtml(row.displayName || row.username || "Player")}
-                    </span>
+        <div class="dashboard-user-stats-grid">
+          ${
+            userStats.length
+              ? userStats
+                  .map(stat => `
+                    <div class="dashboard-user-stat">
+                      <span>
+                        ${escapeHtml(stat.label || "Stat")}
+                      </span>
 
-                    <strong>
-                      ${escapeHtml(row.scoreLabel || "Score")}:
-                      ${escapeHtml(row.score)}
-                    </strong>
-                  </div>
-                `)
-                .join("")
-            : `<p class="dashboard-muted">No leaderboard yet.</p>`
-        }
+                      <strong>
+                        ${escapeHtml(stat.value !== undefined ? stat.value : "—")}
+                      </strong>
+                    </div>
+                  `)
+                  .join("")
+              : `
+                <p class="dashboard-muted">
+                  No stats yet.
+                </p>
+              `
+          }
+        </div>
       </div>
+
+      <details class="dashboard-leaderboard-details">
+        <summary>
+          Leaderboard
+        </summary>
+
+        <div class="dashboard-mini-leaderboard">
+          ${
+            leaderboardPreview.length
+              ? leaderboardPreview
+                  .map(row => `
+                    <div class="dashboard-mini-leaderboard-row">
+                      <span>
+                        #${Number(row.rank) || ""}
+                        ${escapeHtml(row.displayName || row.username || "Player")}
+                      </span>
+
+                      <strong>
+                        ${escapeHtml(row.scoreLabel || "Score")}:
+                        ${escapeHtml(row.score)}
+                      </strong>
+                    </div>
+                  `)
+                  .join("")
+              : `<p class="dashboard-muted">No leaderboard yet.</p>`
+          }
+
+          ${leaderboardButton}
+        </div>
+      </details>
 
       <div class="dashboard-game-actions">
         ${actionButton}
-        ${leaderboardButton}
       </div>
 
     </article>
   `;
 
 }
+
 
 /* ======================
    SAVE DASHBOARD PROFILE
