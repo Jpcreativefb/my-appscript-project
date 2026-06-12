@@ -439,21 +439,38 @@ function doGet(e) {
             gameId
         })
       );
-
+    
     }
-
+    
+    /* =========================
+       DASHBOARD GAMES HUB
+    ========================= */
+    
+    if (action === "getDashboardGamesHub") {
+    
+      return json(
+        apiGetDashboardGamesHub({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+    
+    }
+    
     /* =========================
        CATEGORIES
     ========================= */
-
+    
     if (action === "getCategories") {
-
+    
       return json(
         getCategories(
           gameId
         )
       );
-
+    
     }
 
     if (action === "getCategorySettings") {
