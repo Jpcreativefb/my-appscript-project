@@ -317,17 +317,72 @@ function renderDashboardGameCard(
       ? game.userStats
       : [];
 
+  const progressValue =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        Number(game.progressValue) || 0
+      )
+    );
+
+  const heroImage =
+    String(
+      game.heroImage ||
+      game.heroImageUrl ||
+      ""
+    ).trim();
+
+  const heroPosition =
+    String(
+      game.heroImagePosition ||
+      "center center"
+    ).trim();
+
+  const lockLabel =
+    game.lockLabel ||
+    game.statusLabel ||
+    "Lock time TBD";
+
+  const actionLabel =
+    getDashboardGameActionLabel_(
+      game,
+      isPast,
+      progressValue
+    );
+
+  const enterDisabled =
+    game.disableEnter === true ||
+    game.available === false;
+
   const actionButton =
     isPast
-      ? ""
-      : `
+      ? `
         <button
           class="dashboard-action-button primary"
-          onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
+          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
         >
-          ${escapeHtml(game.enterLabel || "Play Now")}
+          View Results
         </button>
-      `;
+      `
+      : enterDisabled
+        ? `
+          <button
+            class="dashboard-action-button primary disabled"
+            disabled
+            title="${escapeAttr(game.availabilityLabel || actionLabel)}"
+          >
+            ${escapeHtml(actionLabel)}
+          </button>
+        `
+        : `
+          <button
+            class="dashboard-action-button primary"
+            onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
+          >
+            ${escapeHtml(actionLabel)}
+          </button>
+        `;
 
   const leaderboardButton =
     game.showLeaderboard === false
@@ -341,38 +396,41 @@ function renderDashboardGameCard(
         </button>
       `;
 
-  const progressValue =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(game.progressValue) || 0
-      )
-    );
-
   return `
     <article
-      class="card dashboard-game-card ${isPast ? "past-game-card" : ""}"
-      style="--game-theme-color: ${escapeAttr(game.themeColor || "#354785")};"
+      class="card dashboard-game-card dashboard-game-card-with-hero ${heroImage ? "has-hero-image" : ""} ${isPast ? "past-game-card" : ""} ${enterDisabled ? "game-unavailable" : ""}"
+      style="--game-theme-color: ${escapeAttr(game.themeColor || "#354785")}; --game-hero-image: url('${escapeAttr(heroImage)}'); --game-hero-position: ${escapeAttr(heroPosition)};"
     >
 
-      <div class="dashboard-game-topline">
-        <div class="dashboard-game-icon">
-          ${escapeHtml(game.icon || "🏆")}
+      <div class="dashboard-game-hero-band">
+
+        <div class="dashboard-game-topline">
+          <span class="dashboard-game-lock-label">
+            ${escapeHtml(lockLabel)}
+          </span>
         </div>
 
-        <span class="dashboard-game-lock-label">
-          ${escapeHtml(game.lockLabel || game.statusLabel || "Lock time TBD")}
-        </span>
+        <div class="dashboard-game-title-block">
+          <h3>
+            ${escapeHtml(game.name || game.gameId || "Game")}
+          </h3>
+
+          <p class="dashboard-game-subtitle">
+            ${escapeHtml(game.typeLabel || game.subtitle || "Game")}
+          </p>
+        </div>
+
       </div>
 
-      <h3>
-        ${escapeHtml(game.name || game.gameId || "Game")}
-      </h3>
-
-      <p class="dashboard-game-type">
-        ${escapeHtml(game.typeLabel || "Game")}
-      </p>
+      ${
+        game.availabilityLabel && enterDisabled
+          ? `
+            <div class="dashboard-availability-note">
+              ${escapeHtml(game.availabilityLabel)}
+            </div>
+          `
+          : ""
+      }
 
       <details class="dashboard-game-description">
         <summary>
@@ -466,6 +524,133 @@ function renderDashboardGameCard(
 
     </article>
   `;
+
+}
+
+function getDashboardGameActionLabel_(
+  game,
+  isPast,
+  progressValue
+) {
+
+  if (isPast) {
+    return "View Results";
+  }
+
+  if (game.disableEnter === true || game.available === false) {
+
+    const disabledLabel =
+      String(
+        game.enterLabel ||
+        game.actionLabel ||
+        game.availabilityLabel ||
+        "Check Status"
+      ).trim();
+
+    return disabledLabel || "Check Status";
+
+  }
+
+  const backendLabel =
+    String(
+      game.enterLabel ||
+      game.actionLabel ||
+      ""
+    ).trim();
+
+  if (
+    backendLabel &&
+    backendLabel !== "Play Now"
+  ) {
+    return backendLabel;
+  }
+
+  const type =
+    String(game.type || game.rawType || "")
+      .trim()
+      .toLowerCase();
+
+  const madeCount =
+    Number(game.madeCount) ||
+    getDashboardMadeCountFromStats_(game);
+
+  const totalCount =
+    Number(game.totalCount) || 0;
+
+  const hasStarted =
+    game.hasStarted === true ||
+    madeCount > 0 ||
+    progressValue > 0;
+
+  if (!hasStarted) {
+    return "Play Now";
+  }
+
+  const complete =
+    totalCount > 0 &&
+    madeCount >= totalCount;
+
+  if (
+    type === "wager" ||
+    type === "betting"
+  ) {
+    return complete
+      ? "Review Wagers"
+      : "Manage Wagers";
+  }
+
+  if (type === "confidence") {
+    return complete
+      ? "View Confidence Picks"
+      : "Continue Confidence Picks";
+  }
+
+  if (type === "ranking") {
+    return "Check Status";
+  }
+
+  return complete
+    ? "View Picks"
+    : "Continue Picks";
+
+}
+
+function getDashboardMadeCountFromStats_(game) {
+
+  const stats =
+    Array.isArray(game.userStats)
+      ? game.userStats
+      : [];
+
+  for (let i = 0; i < stats.length; i++) {
+
+    const label =
+      String(stats[i].label || "")
+        .trim()
+        .toLowerCase();
+
+    const value =
+      String(stats[i].value || "")
+        .trim();
+
+    if (
+      label === "wagers" ||
+      label === "picks" ||
+      label === "confidence picks"
+    ) {
+
+      const match =
+        value.match(/^\d+/);
+
+      return match
+        ? Number(match[0]) || 0
+        : 0;
+
+    }
+
+  }
+
+  return 0;
 
 }
 

@@ -264,6 +264,8 @@ function renderAdminGameCard(game) {
 
         </div>
 
+        ${renderAdminGameDashboardSettings(game)}
+
         <div class="admin-card-actions">
 
           <button
@@ -396,6 +398,67 @@ function renderAdminNewGameCard() {
               class="input admin-input"
               placeholder="#d4af37"
             >
+          </label>
+
+          <label>
+            Lock Label
+
+            <input
+              id="adminNewLockLabel"
+              class="input admin-input"
+              placeholder="Locks before ceremony"
+            >
+          </label>
+
+          <label>
+            Available From
+
+            <input
+              id="adminNewAvailableFrom"
+              class="input admin-input"
+              type="datetime-local"
+            >
+          </label>
+
+          <label>
+            Available Until
+
+            <input
+              id="adminNewAvailableUntil"
+              class="input admin-input"
+              type="datetime-local"
+            >
+          </label>
+
+          <label>
+            Hero Image File ID
+
+            <input
+              id="adminNewHeroImageFileId"
+              class="input admin-input"
+              placeholder="Google Drive File ID"
+            >
+          </label>
+
+          <label>
+            Hero Image Position
+
+            <input
+              id="adminNewHeroImagePosition"
+              class="input admin-input"
+              placeholder="center center"
+            >
+          </label>
+
+          <label class="admin-wide-field">
+            Description
+
+            <textarea
+              id="adminNewGameDescription"
+              class="input admin-input"
+              rows="4"
+              placeholder="Briefly explain how this game works."
+            ></textarea>
           </label>
 
         </div>
@@ -559,6 +622,626 @@ function renderAdminCloneGameCard(games) {
 }
 
 /* ======================
+   DASHBOARD DISPLAY SETTINGS
+====================== */
+
+function adminGameDomId_(gameId) {
+
+  return String(gameId || "")
+    .replace(/[^a-zA-Z0-9_-]+/g, "_");
+
+}
+
+function adminGetInputValue_(id) {
+
+  const el =
+    document.getElementById(id);
+
+  return el
+    ? String(el.value || "").trim()
+    : "";
+
+}
+
+function adminSetInputValue_(id, value) {
+
+  const el =
+    document.getElementById(id);
+
+  if (el) {
+    el.value = value || "";
+  }
+
+}
+
+function adminGameHeroThumbnail_(fileId) {
+
+  fileId =
+    String(fileId || "").trim();
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/thumbnail?id=" +
+    encodeURIComponent(fileId) +
+    "&sz=w1600"
+  );
+
+}
+
+function renderAdminGameDashboardSettings(game) {
+
+  const rawGameId =
+    game.gameId || "";
+
+  const domId =
+    adminGameDomId_(rawGameId);
+
+  const title =
+    game.name || rawGameId;
+
+  const subtitle =
+    game.typeLabel || game.type || "Game";
+
+  const heroFileId =
+    game.heroImageFileId || "";
+
+  const heroUrl =
+    game.heroImage || adminGameHeroThumbnail_(heroFileId);
+
+  return `
+    <details class="admin-card admin-collapsible-card admin-game-dashboard-settings">
+
+      <summary class="admin-card-summary">
+        <div>
+          <h3>Dashboard Card Settings</h3>
+
+          <div class="admin-sub">
+            Controls the Home/Dashboard description, lock label, availability window, and card image.
+          </div>
+        </div>
+
+        <span class="admin-collapse-icon">
+          ▾
+        </span>
+      </summary>
+
+      <div class="admin-collapsible-body">
+
+        <div
+          id="adminGameHeroPreview_${domId}"
+          class="admin-game-hero-preview ${heroUrl ? "has-image" : ""}"
+          style="--admin-game-theme-color: ${adminGamesEscapeHtml(game.themeColor || "#354785")}; ${heroUrl ? "--admin-game-hero-image: url('" + adminGamesEscapeHtml(heroUrl) + "');" : ""}"
+        >
+          <div class="admin-game-hero-preview-inner">
+            <div class="admin-game-hero-preview-kicker">
+              ${adminGamesEscapeHtml(game.lockLabel || "Lock label preview")}
+            </div>
+
+            <div class="admin-game-hero-preview-title">
+              ${adminGamesEscapeHtml(title)}
+            </div>
+
+            <div class="admin-game-hero-preview-subtitle">
+              ${adminGamesEscapeHtml(subtitle)}
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-form-grid">
+
+          <label>
+            Game Name / Title
+
+            <input
+              id="adminGameName_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.name || "")}"
+            >
+          </label>
+
+          <label>
+            Theme Color
+
+            <input
+              id="adminGameThemeColor_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.themeColor || "")}"
+              placeholder="#d4af37"
+            >
+          </label>
+
+          <label>
+            Lock Label
+
+            <input
+              id="adminGameLockLabel_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.lockLabel || "")}"
+              placeholder="Locks before ceremony"
+            >
+          </label>
+
+          <label>
+            Available From
+
+            <input
+              id="adminGameAvailableFrom_${domId}"
+              class="input admin-input"
+              type="datetime-local"
+              value="${adminGamesEscapeHtml(game.availableFrom || "")}"
+            >
+          </label>
+
+          <label>
+            Available Until
+
+            <input
+              id="adminGameAvailableUntil_${domId}"
+              class="input admin-input"
+              type="datetime-local"
+              value="${adminGamesEscapeHtml(game.availableUntil || "")}"
+            >
+          </label>
+
+          <label>
+            Hero Image File ID
+
+            <input
+              id="adminGameHeroImageFileId_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(heroFileId)}"
+              placeholder="Google Drive File ID"
+              oninput="adminPreviewGameHeroImage('${adminGamesEscapeJs(rawGameId)}')"
+            >
+          </label>
+
+          <label>
+            Hero Image Position
+
+            <input
+              id="adminGameHeroImagePosition_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.heroImagePosition || "center center")}"
+              placeholder="center center"
+            >
+          </label>
+
+          <label class="admin-wide-field">
+            Description
+
+            <textarea
+              id="adminGameDescription_${domId}"
+              class="input admin-input"
+              rows="4"
+              placeholder="Briefly explain how this game works."
+            >${adminGamesEscapeHtml(game.description || "")}</textarea>
+          </label>
+
+        </div>
+
+        <div class="admin-game-dashboard-tools">
+
+          <div class="admin-game-image-actions">
+            <input
+              id="adminGameHeroFile_${domId}"
+              type="file"
+              accept="image/*"
+            >
+
+            <button
+              class="admin-secondary-button"
+              onclick="adminUploadGameHeroImage('${adminGamesEscapeJs(rawGameId)}')"
+            >
+              Upload Image
+            </button>
+
+            <button
+              class="admin-secondary-button"
+              onclick="adminClearGameHeroImage('${adminGamesEscapeJs(rawGameId)}')"
+            >
+              Clear Image
+            </button>
+          </div>
+
+          <div class="admin-game-image-actions">
+            <input
+              id="adminGameHeroUrl_${domId}"
+              class="input admin-input"
+              placeholder="Paste image URL to import"
+            >
+
+            <button
+              class="admin-secondary-button"
+              onclick="adminImportGameHeroImageFromUrl('${adminGamesEscapeJs(rawGameId)}')"
+            >
+              Import URL
+            </button>
+          </div>
+
+          <button
+            class="button admin-action-button"
+            onclick="adminSaveGameDashboardSettings('${adminGamesEscapeJs(rawGameId)}')"
+          >
+            Save Dashboard Settings
+          </button>
+
+          <div
+            id="adminGameDashboardMessage_${domId}"
+            class="admin-message"
+          ></div>
+
+        </div>
+
+      </div>
+
+    </details>
+  `;
+
+}
+
+function adminReadFileAsBase64_(file) {
+
+  return new Promise((resolve, reject) => {
+
+    const reader =
+      new FileReader();
+
+    reader.onload = () => {
+
+      const result =
+        String(reader.result || "");
+
+      const base64 =
+        result.indexOf(",") === -1
+          ? result
+          : result.split(",").pop();
+
+      resolve(base64);
+
+    };
+
+    reader.onerror = () => {
+      reject(new Error("Could not read image file."));
+    };
+
+    reader.readAsDataURL(file);
+
+  });
+
+}
+
+function adminPreviewGameHeroImage(gameId) {
+
+  const domId =
+    adminGameDomId_(gameId);
+
+  const fileId =
+    adminGetInputValue_(
+      "adminGameHeroImageFileId_" + domId
+    );
+
+  const preview =
+    document.getElementById(
+      "adminGameHeroPreview_" + domId
+    );
+
+  if (!preview) {
+    return;
+  }
+
+  const url =
+    adminGameHeroThumbnail_(fileId);
+
+  preview.classList.toggle(
+    "has-image",
+    Boolean(url)
+  );
+
+  preview.style.setProperty(
+    "--admin-game-hero-image",
+    url
+      ? "url('" + url + "')"
+      : "none"
+  );
+
+}
+
+async function adminSaveGameDashboardSettings(gameId) {
+
+  const domId =
+    adminGameDomId_(gameId);
+
+  const messageId =
+    "adminGameDashboardMessage_" + domId;
+
+  adminSetMessage(
+    messageId,
+    "Saving dashboard settings...",
+    false
+  );
+
+  const payload = {
+    gameId:
+      gameId,
+
+    name:
+      adminGetInputValue_(
+        "adminGameName_" + domId
+      ),
+
+    description:
+      adminGetInputValue_(
+        "adminGameDescription_" + domId
+      ),
+
+    lockLabel:
+      adminGetInputValue_(
+        "adminGameLockLabel_" + domId
+      ),
+
+    availableFrom:
+      adminGetInputValue_(
+        "adminGameAvailableFrom_" + domId
+      ),
+
+    availableUntil:
+      adminGetInputValue_(
+        "adminGameAvailableUntil_" + domId
+      ),
+
+    themeColor:
+      adminGetInputValue_(
+        "adminGameThemeColor_" + domId
+      ),
+
+    heroImageFileId:
+      adminGetInputValue_(
+        "adminGameHeroImageFileId_" + domId
+      ),
+
+    heroImagePosition:
+      adminGetInputValue_(
+        "adminGameHeroImagePosition_" + domId
+      ) || "center center"
+  };
+
+  const res =
+    await apiAdminUpdateGame(
+      payload
+    );
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not save dashboard settings.",
+      true
+    );
+
+    return false;
+
+  }
+
+  adminSetMessage(
+    messageId,
+    "Dashboard settings saved.",
+    false
+  );
+
+  return true;
+
+}
+
+async function adminUploadGameHeroImage(gameId) {
+
+  const domId =
+    adminGameDomId_(gameId);
+
+  const messageId =
+    "adminGameDashboardMessage_" + domId;
+
+  const input =
+    document.getElementById(
+      "adminGameHeroFile_" + domId
+    );
+
+  if (
+    !input ||
+    !input.files ||
+    !input.files.length
+  ) {
+
+    adminSetMessage(
+      messageId,
+      "Choose an image first.",
+      true
+    );
+
+    return;
+
+  }
+
+  const file =
+    input.files[0];
+
+  adminSetMessage(
+    messageId,
+    "Uploading hero image...",
+    false
+  );
+
+  try {
+
+    const base64 =
+      await adminReadFileAsBase64_(
+        file
+      );
+
+    const res =
+      await apiAdminUploadImage({
+        gameId:
+          gameId,
+
+        categoryId:
+          "game-hero",
+
+        nomineeId:
+          gameId + "-hero",
+
+        fileName:
+          file.name,
+
+        mimeType:
+          file.type,
+
+        base64:
+          base64
+      });
+
+    if (
+      !res ||
+      res.success === false
+    ) {
+      throw new Error(
+        res && (res.message || res.error)
+          ? res.message || res.error
+          : "Image upload failed."
+      );
+    }
+
+    adminSetInputValue_(
+      "adminGameHeroImageFileId_" + domId,
+      res.fileId || ""
+    );
+
+    adminPreviewGameHeroImage(
+      gameId
+    );
+
+    await adminSaveGameDashboardSettings(
+      gameId
+    );
+
+  } catch (err) {
+
+    adminSetMessage(
+      messageId,
+      err.message || "Could not upload image.",
+      true
+    );
+
+  }
+
+}
+
+async function adminImportGameHeroImageFromUrl(gameId) {
+
+  const domId =
+    adminGameDomId_(gameId);
+
+  const messageId =
+    "adminGameDashboardMessage_" + domId;
+
+  const imageUrl =
+    adminGetInputValue_(
+      "adminGameHeroUrl_" + domId
+    );
+
+  if (!imageUrl) {
+
+    adminSetMessage(
+      messageId,
+      "Paste an image URL first.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetMessage(
+    messageId,
+    "Importing image...",
+    false
+  );
+
+  const res =
+    await apiAdminImportImageFromUrl({
+      gameId:
+        gameId,
+
+      categoryId:
+        "game-hero",
+
+      nomineeId:
+        gameId + "-hero",
+
+      imageUrl:
+        imageUrl
+    });
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    adminSetMessage(
+      messageId,
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not import image.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetInputValue_(
+    "adminGameHeroImageFileId_" + domId,
+    res.fileId || ""
+  );
+
+  adminPreviewGameHeroImage(
+    gameId
+  );
+
+  await adminSaveGameDashboardSettings(
+    gameId
+  );
+
+}
+
+async function adminClearGameHeroImage(gameId) {
+
+  const domId =
+    adminGameDomId_(gameId);
+
+  adminSetInputValue_(
+    "adminGameHeroImageFileId_" + domId,
+    ""
+  );
+
+  adminPreviewGameHeroImage(
+    gameId
+  );
+
+  await adminSaveGameDashboardSettings(
+    gameId
+  );
+
+}
+
+
+/* ======================
    PUBLISH CONTROLS
 ====================== */
 
@@ -717,6 +1400,42 @@ async function adminCreateGameFromForm() {
       .value
       .trim();
 
+  const description =
+    document
+      .getElementById("adminNewGameDescription")
+      .value
+      .trim();
+
+  const lockLabel =
+    document
+      .getElementById("adminNewLockLabel")
+      .value
+      .trim();
+
+  const availableFrom =
+    document
+      .getElementById("adminNewAvailableFrom")
+      .value
+      .trim();
+
+  const availableUntil =
+    document
+      .getElementById("adminNewAvailableUntil")
+      .value
+      .trim();
+
+  const heroImageFileId =
+    document
+      .getElementById("adminNewHeroImageFileId")
+      .value
+      .trim();
+
+  const heroImagePosition =
+    document
+      .getElementById("adminNewHeroImagePosition")
+      .value
+      .trim();
+
   if (!name || !gameId) {
 
     adminSetMessage(
@@ -742,6 +1461,12 @@ async function adminCreateGameFromForm() {
       year: year,
       type: type,
       themeColor: themeColor,
+      description: description,
+      lockLabel: lockLabel,
+      availableFrom: availableFrom,
+      availableUntil: availableUntil,
+      heroImageFileId: heroImageFileId,
+      heroImagePosition: heroImagePosition || "center center",
       active: false,
       archived: false,
       defaultGame: false,

@@ -25,33 +25,6 @@ function escapeJs(value) {
     .replace(/\\/g, "\\\\")
     .replace(/'/g, "\\'");
 
-}/* ======================
-   FRONTEND UTILITIES
-====================== */
-
-function escapeHtml(value) {
-
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-
-}
-
-function escapeAttr(value) {
-
-  return escapeHtml(value);
-
-}
-
-function escapeJs(value) {
-
-  return String(value || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/'/g, "\\'");
-
 }
 
 /* ======================
@@ -93,46 +66,29 @@ function debugWarn() {
 
 }
 
+function debugError() {
+
+  if (!isDebugMode()) {
+    return;
+  }
+
+  console.error.apply(
+    console,
+    arguments
+  );
+
+}
+
 /* ======================
-   UI STATE HELPERS
+   API RESPONSE HELPERS
 ====================== */
 
-function renderErrorCard(
-  title,
-  message
-) {
+function isApiError(res) {
 
-  return `
-    <div class="card error-card">
-      <h2>${escapeHtml(title || "Something went wrong")}</h2>
-      <p>${escapeHtml(message || "Please try again.")}</p>
-    </div>
-  `;
-
-}
-
-function renderEmptyCard(
-  message
-) {
-
-  return `
-    <div class="card empty-card">
-      <p>${escapeHtml(message || "Nothing found.")}</p>
-    </div>
-  `;
-
-}
-
-function isApiError(
-  res
-) {
-
-  return Boolean(
-    res &&
-    (
-      res.success === false ||
-      res.error === true
-    )
+  return (
+    !res ||
+    res.success === false ||
+    res.error === true
   );
 
 }
@@ -148,6 +104,34 @@ function getApiErrorMessage(
       res.message ||
       res.error
     )
-  ) || fallback || "Request failed.";
+  ) || fallback || "Something went wrong.";
+
+}
+
+/* ======================
+   COMMON CARD HELPERS
+====================== */
+
+function renderErrorCard(
+  title,
+  message
+) {
+
+  return `
+    <div class="card error-card">
+      <h3>${escapeHtml(title)}</h3>
+      <p>${escapeHtml(message)}</p>
+    </div>
+  `;
+
+}
+
+function renderEmptyCard(message) {
+
+  return `
+    <div class="card empty-card">
+      ${escapeHtml(message)}
+    </div>
+  `;
 
 }

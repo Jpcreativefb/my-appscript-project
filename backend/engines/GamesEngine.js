@@ -40,8 +40,8 @@ function getSupportedGameTypes() {
     {
       id: "wager",
       label: "Wager / Chips Game",
-      description: "Users make picks and wager chips.",
-      predictionEnabled: true,
+      description: "Users pick nominees or answers and wager chips.",
+      predictionEnabled: false,
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: true
@@ -242,7 +242,31 @@ function getGamesColumnMap_(headers) {
       headers.indexOf("ShowLeaderboard"),
 
     showResultsBeforeLock:
-      headers.indexOf("ShowResultsBeforeLock")
+      headers.indexOf("ShowResultsBeforeLock"),
+
+    resultsFinalized:
+      headers.indexOf("ResultsFinalized"),
+
+    votingLocked:
+      headers.indexOf("VotingLocked"),
+
+    description:
+      headers.indexOf("Description"),
+
+    lockLabel:
+      headers.indexOf("LockLabel"),
+
+    availableFrom:
+      headers.indexOf("AvailableFrom"),
+
+    availableUntil:
+      headers.indexOf("AvailableUntil"),
+
+    heroImageFileId:
+      headers.indexOf("HeroImageFileID"),
+
+    heroImagePosition:
+      headers.indexOf("HeroImagePosition")
   };
 
 }
@@ -322,6 +346,50 @@ function getGameTypeConfig(type) {
   }
 
   return config;
+
+}
+
+function buildGameHeroImageUrl_(fileId) {
+
+  fileId =
+    normalizeGameValue_(
+      fileId
+    );
+
+  if (!fileId) {
+    return "";
+  }
+
+  return (
+    "https://drive.google.com/thumbnail?id=" +
+    encodeURIComponent(fileId) +
+    "&sz=w1600"
+  );
+
+}
+
+function normalizeGameDateTimeValue_(value) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+    return "";
+  }
+
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value.getTime())
+  ) {
+    return Utilities.formatDate(
+      value,
+      Session.getScriptTimeZone(),
+      "yyyy-MM-dd'T'HH:mm"
+    );
+  }
+
+  return normalizeGameValue_(value);
 
 }
 
@@ -574,7 +642,88 @@ function buildGameObjectFromRow_(
           col.showResultsBeforeLock,
           false
         )
-      )
+      ),
+
+    resultsFinalized:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.resultsFinalized,
+          false
+        )
+      ),
+
+    votingLocked:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.votingLocked,
+          false
+        )
+      ),
+
+    description:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.description,
+          ""
+        )
+      ),
+
+    lockLabel:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.lockLabel,
+          ""
+        )
+      ),
+
+    availableFrom:
+      normalizeGameDateTimeValue_(
+        getGameCell_(
+          row,
+          col.availableFrom,
+          ""
+        )
+      ),
+
+    availableUntil:
+      normalizeGameDateTimeValue_(
+        getGameCell_(
+          row,
+          col.availableUntil,
+          ""
+        )
+      ),
+
+    heroImageFileId:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.heroImageFileId,
+          ""
+        )
+      ),
+
+    heroImage:
+      buildGameHeroImageUrl_(
+        getGameCell_(
+          row,
+          col.heroImageFileId,
+          ""
+        )
+      ),
+
+    heroImagePosition:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.heroImagePosition,
+          "center center"
+        )
+      ) || "center center"
   };
 
 }

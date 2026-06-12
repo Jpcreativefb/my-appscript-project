@@ -461,6 +461,10 @@ async function renderAdminGamesPanel() {
 
         </details>
 
+        ${typeof renderAdminCloneGameCard === "function"
+          ? renderAdminCloneGameCard(games)
+          : ""}
+
         <details
           class="card admin-card admin-collapsible-card admin-games-panel"
           open
@@ -535,6 +539,12 @@ function renderAdminGameForm(
       icon: "",
       sortOrder: 999,
       status: "",
+      description: "",
+      lockLabel: "",
+      availableFrom: "",
+      availableUntil: "",
+      heroImageFileId: "",
+      heroImagePosition: "center center",
       lockAllPicks: false,
       showLeaderboard: true,
       showResultsBeforeLock: false,
@@ -555,6 +565,25 @@ function renderAdminGameForm(
   const openAttr =
     isNew || game.defaultGame || game.active
       ? "open"
+      : "";
+
+  const rawGameId =
+    game.gameId || "new-game";
+
+  const domId =
+    typeof adminGameDomId_ === "function"
+      ? adminGameDomId_(rawGameId)
+      : String(rawGameId)
+          .replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  const heroImageFileId =
+    game.heroImageFileId ||
+    game.heroImageFileID ||
+    "";
+
+  const heroImageUrl =
+    heroImageFileId && typeof adminGameHeroThumbnail_ === "function"
+      ? adminGameHeroThumbnail_(heroImageFileId)
       : "";
 
   return `
@@ -594,6 +623,7 @@ function renderAdminGameForm(
               Game Name
 
               <input
+                id="adminGameName_${domId}"
                 name="name"
                 value="${escapeHtml_(game.name)}"
                 placeholder="Oscars 2026"
@@ -798,19 +828,10 @@ function renderAdminGameForm(
                 Theme Color
 
                 <input
+                  id="adminGameThemeColor_${domId}"
                   name="themeColor"
                   value="${escapeHtml_(game.themeColor || "")}"
                   placeholder="#c8a24a"
-                />
-              </label>
-
-              <label>
-                Icon
-
-                <input
-                  name="icon"
-                  value="${escapeHtml_(game.icon || "")}"
-                  placeholder="🏆"
                 />
               </label>
 
@@ -835,6 +856,153 @@ function renderAdminGameForm(
               </label>
 
             </div>
+
+            <h4>Dashboard Card Settings</h4>
+
+            <p class="admin-muted">
+              The dashboard title uses Game Name. The subtitle uses the selected Game Type.
+            </p>
+
+            <div class="form-grid">
+
+              <label class="admin-wide-field">
+                Description
+
+                <textarea
+                  id="adminGameDescription_${domId}"
+                  name="description"
+                  rows="4"
+                  placeholder="Briefly explain how this game works."
+                >${escapeHtml_(game.description || "")}</textarea>
+              </label>
+
+              <label>
+                Lock Label
+
+                <input
+                  id="adminGameLockLabel_${domId}"
+                  name="lockLabel"
+                  value="${escapeHtml_(game.lockLabel || "")}"
+                  placeholder="Locks before ceremony"
+                />
+              </label>
+
+              <label>
+                Available From
+
+                <input
+                  id="adminGameAvailableFrom_${domId}"
+                  name="availableFrom"
+                  type="datetime-local"
+                  value="${escapeHtml_(game.availableFrom || "")}"
+                />
+              </label>
+
+              <label>
+                Available Until
+
+                <input
+                  id="adminGameAvailableUntil_${domId}"
+                  name="availableUntil"
+                  type="datetime-local"
+                  value="${escapeHtml_(game.availableUntil || "")}"
+                />
+              </label>
+
+              <label>
+                Hero Image File ID
+
+                <input
+                  id="adminGameHeroImageFileId_${domId}"
+                  name="heroImageFileId"
+                  value="${escapeHtml_(heroImageFileId)}"
+                  placeholder="Google Drive File ID"
+                  oninput="adminPreviewGameHeroImage('${escapeJs(rawGameId)}')"
+                />
+              </label>
+
+              <label>
+                Hero Image Position
+
+                <input
+                  id="adminGameHeroImagePosition_${domId}"
+                  name="heroImagePosition"
+                  value="${escapeHtml_(game.heroImagePosition || "center center")}"
+                  placeholder="center center"
+                />
+              </label>
+
+            </div>
+
+            ${!isNew ? `
+              <div
+                id="adminGameHeroPreview_${domId}"
+                class="admin-game-hero-preview ${heroImageUrl ? "has-image" : ""}"
+                style="--admin-game-hero-image: ${heroImageUrl ? `url('${heroImageUrl}')` : "none"};"
+              >
+                <div class="admin-game-hero-preview-overlay">
+                  Hero image preview
+                </div>
+              </div>
+
+              <div class="admin-form-grid admin-game-image-tools">
+
+                <label>
+                  Upload Hero Image
+
+                  <input
+                    id="adminGameHeroFile_${domId}"
+                    class="input admin-input"
+                    type="file"
+                    accept="image/*"
+                  >
+                </label>
+
+                <label>
+                  Import Image URL
+
+                  <input
+                    id="adminGameHeroUrl_${domId}"
+                    class="input admin-input"
+                    placeholder="https://example.com/image.jpg"
+                  >
+                </label>
+
+              </div>
+
+              <div class="admin-card-actions">
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminUploadGameHeroImage('${escapeJs(rawGameId)}')"
+                >
+                  Upload Image
+                </button>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminImportGameHeroImageFromUrl('${escapeJs(rawGameId)}')"
+                >
+                  Import URL
+                </button>
+
+                <button
+                  type="button"
+                  class="admin-small-button secondary"
+                  onclick="adminClearGameHeroImage('${escapeJs(rawGameId)}')"
+                >
+                  Clear Image
+                </button>
+
+              </div>
+
+              <div
+                id="adminGameDashboardMessage_${domId}"
+                class="admin-message"
+              ></div>
+            ` : ""}
 
           </details>
 
@@ -1054,8 +1222,40 @@ function adminGetGamePayloadFromForm_(
     themeColor:
       form.themeColor.value.trim(),
 
+    description:
+      form.description
+        ? form.description.value.trim()
+        : "",
+
+    lockLabel:
+      form.lockLabel
+        ? form.lockLabel.value.trim()
+        : "",
+
+    availableFrom:
+      form.availableFrom
+        ? form.availableFrom.value.trim()
+        : "",
+
+    availableUntil:
+      form.availableUntil
+        ? form.availableUntil.value.trim()
+        : "",
+
+    heroImageFileId:
+      form.heroImageFileId
+        ? form.heroImageFileId.value.trim()
+        : "",
+
+    heroImagePosition:
+      form.heroImagePosition
+        ? form.heroImagePosition.value.trim() || "center center"
+        : "center center",
+
     icon:
-      form.icon.value.trim(),
+      form.icon
+        ? form.icon.value.trim()
+        : "",
 
     sortOrder:
       form.sortOrder.value,
@@ -1141,7 +1341,7 @@ function adminApplyGameTypeDefaults(
 
   if (type === "wager") {
 
-    form.predictionEnabled.checked = true;
+    form.predictionEnabled.checked = false;
     form.rankingEnabled.checked = false;
     form.confidenceEnabled.checked = false;
     form.wagerEnabled.checked = true;

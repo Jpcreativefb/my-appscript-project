@@ -334,6 +334,60 @@ function adminNormalizeGameId_(value) {
         payload.themeColor
       )
     );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "description",
+      adminNormalizeValue_(
+        payload.description
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "lockLabel",
+      adminNormalizeValue_(
+        payload.lockLabel
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "availableFrom",
+      adminNormalizeValue_(
+        payload.availableFrom
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "availableUntil",
+      adminNormalizeValue_(
+        payload.availableUntil
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "heroImageFileId",
+      adminNormalizeValue_(
+        payload.heroImageFileId || payload.heroImageFileID
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "heroImagePosition",
+      adminNormalizeValue_(
+        payload.heroImagePosition || "center center"
+      )
+    );
   
     adminSetIfColumnExists_(
       row,
@@ -955,6 +1009,88 @@ function adminSaveGame(payload) {
           )
         );
   
+      }
+
+      if ("description" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "description",
+          adminNormalizeValue_(
+            payload.description
+          )
+        );
+
+      }
+
+      if ("lockLabel" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "lockLabel",
+          adminNormalizeValue_(
+            payload.lockLabel
+          )
+        );
+
+      }
+
+      if ("availableFrom" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "availableFrom",
+          adminNormalizeValue_(
+            payload.availableFrom
+          )
+        );
+
+      }
+
+      if ("availableUntil" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "availableUntil",
+          adminNormalizeValue_(
+            payload.availableUntil
+          )
+        );
+
+      }
+
+      if (
+        "heroImageFileId" in payload ||
+        "heroImageFileID" in payload
+      ) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "heroImageFileId",
+          adminNormalizeValue_(
+            payload.heroImageFileId ||
+            payload.heroImageFileID
+          )
+        );
+
+      }
+
+      if ("heroImagePosition" in payload) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "heroImagePosition",
+          adminNormalizeValue_(
+            payload.heroImagePosition || "center center"
+          )
+        );
+
       }
   
       if ("icon" in payload) {
