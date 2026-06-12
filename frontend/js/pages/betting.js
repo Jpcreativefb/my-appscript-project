@@ -1,5 +1,6 @@
 /* =========================
-   BETTING PAGE
+   WAGER PAGE
+   Keeps Betting* function names for route/API compatibility.
 ========================= */
 
 const BETTING_STATE = {
@@ -130,7 +131,7 @@ function renderBettingSummary_(summary){
       </div>
 
       <div class="betting-summary-card">
-        <div class="betting-label">Staked</div>
+        <div class="betting-label">Wagered</div>
         <div class="betting-value">${money_(summary.totalStaked)}</div>
       </div>
 
@@ -140,7 +141,7 @@ function renderBettingSummary_(summary){
       </div>
 
       <div class="betting-summary-card">
-        <div class="betting-label">Pending Bets</div>
+        <div class="betting-label">Pending Wagers</div>
         <div class="betting-value">${summary.pendingBets || 0}</div>
       </div>
 
@@ -155,7 +156,7 @@ function renderBettingCategory_(category, bet, config){
 
   const defaultAmount = bet
     ? bet.betAmount
-    : config.minBet;
+    : (config.minWager || config.minBet);
 
   const locked = category.locked === true;
 
@@ -197,8 +198,8 @@ function renderBettingCategory_(category, bet, config){
         class="betting-amount-input"
         type="number"
         inputmode="numeric"
-        min="${config.minBet}"
-        max="${config.maxBet}"
+        min="${config.minWager || config.minBet}"
+        max="${config.maxWager || config.maxBet}"
         step="1"
         value="${defaultAmount}"
         ${locked ? "disabled" : ""}
@@ -254,7 +255,7 @@ function renderBettingLeaderboardPreview_(rows){
 
   return `
     <section class="betting-leaderboard-card">
-      <div class="betting-section-title">Betting Leaderboard</div>
+      <div class="betting-section-title">Wager Leaderboard</div>
 
       ${rows.slice(0, 5).map((row, index) => `
         <div class="betting-leaderboard-row">
@@ -285,7 +286,7 @@ async function renderBettingPage(){
 
     return `
       <div class="page">
-        <h1>Betting</h1>
+        <h1>Wager</h1>
         ${renderBettingNotice_("Please log in again.", "error")}
       </div>
     `;
@@ -303,10 +304,10 @@ async function renderBettingPage(){
 
     return `
       <div class="page">
-        <h1>Betting</h1>
+        <h1>Wager</h1>
         ${renderBettingNotice_(
           (optionsRes && (optionsRes.message || optionsRes.error)) ||
-          "Could not load betting options.",
+          "Could not load wager options.",
           "error"
         )}
       </div>
@@ -320,9 +321,9 @@ async function renderBettingPage(){
 
     return `
       <div class="page betting-page">
-        <h1>Betting</h1>
+        <h1>Wager</h1>
         ${renderBettingNotice_(
-          "Betting is not enabled for this game yet. Set Type to betting or BettingEnabled to TRUE in the Games sheet.",
+          "Wagering is not enabled for this game yet. Set Type to wager or WagerEnabled to TRUE in the Games sheet.",
           "warning"
         )}
       </div>
@@ -350,12 +351,12 @@ async function renderBettingPage(){
   return `
     <div class="page betting-page">
 
-      <h1>Betting</h1>
+      <h1>Wager</h1>
 
       <div id="bettingNotice"></div>
 
       <p class="betting-intro">
-        Start with ${money_(config.startingBankroll)} chips. Pick one nominee per category and wager between ${money_(config.minBet)} and ${money_(config.maxBet)} chips.
+        Start with ${money_(config.startingBankroll)} chips. Pick one nominee per category and wager between ${money_(config.minWager || config.minBet)} and ${money_(config.maxWager || config.maxBet)} chips.
       </p>
 
       ${renderBettingSummary_(summary)}

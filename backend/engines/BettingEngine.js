@@ -1,6 +1,10 @@
 /* =====================================================
-   BETTING ENGINE
+   WAGER / BETTING ENGINE
    Multigame production add-on
+
+   This file keeps the internal function names as Betting*
+   so the existing API/page snippets keep working, but it
+   now reads the app's existing Wager game settings.
 
    Required sheet: Bets
 
@@ -17,11 +21,14 @@
    Optional Categories header:
    BettingOdds
 
-   Optional Games headers:
-   BettingEnabled
+   Existing Games headers used by this engine:
+   WagerEnabled
    StartingBankroll
-   MinBet
-   MaxBet
+   MinWager
+   MaxWager
+
+   Supported game type:
+   wager
 ===================================================== */
 
 const BETS_SHEET = "Bets";
@@ -37,8 +44,8 @@ const BETS_REQUIRED_HEADERS = [
 ];
 
 const DEFAULT_BETTING_BANKROLL = 1000;
-const DEFAULT_BETTING_MIN_BET = 10;
-const DEFAULT_BETTING_MAX_BET = 250;
+const DEFAULT_BETTING_MIN_BET = 1;
+const DEFAULT_BETTING_MAX_BET = 100;
 const DEFAULT_BETTING_ODDS = 2;
 
 /* =====================================================
@@ -196,7 +203,7 @@ function setupBettingSheets(){
 
   return {
     success: true,
-    message: "Betting sheets are ready"
+    message: "Wager sheets are ready"
   };
 
 }
@@ -297,12 +304,38 @@ function getBettingGameConfig(gameId){
   const game = getGame(gameId) || {};
 
   let enabled =
+    normalizeBetKey_(game.type) === "wager" ||
     normalizeBetKey_(game.type) === "betting" ||
+    game.wagerEnabled === true ||
     game.bettingEnabled === true;
 
-  let startingBankroll = DEFAULT_BETTING_BANKROLL;
-  let minBet = DEFAULT_BETTING_MIN_BET;
-  let maxBet = DEFAULT_BETTING_MAX_BET;
+  let startingBankroll = Math.max(
+    toBetNumber_(
+      game.startingBankroll,
+      DEFAULT_BETTING_BANKROLL
+    ),
+    0
+  );
+
+  let minBet = Math.max(
+    toBetNumber_(
+      game.minWager !== undefined
+        ? game.minWager
+        : game.minBet,
+      DEFAULT_BETTING_MIN_BET
+    ),
+    0
+  );
+
+  let maxBet = Math.max(
+    toBetNumber_(
+      game.maxWager !== undefined
+        ? game.maxWager
+        : game.maxBet,
+      DEFAULT_BETTING_MAX_BET
+    ),
+    minBet
+  );
 
   const sh = SpreadsheetApp
     .getActive()
@@ -322,8 +355,11 @@ function getBettingGameConfig(gameId){
       const col = {
         gameId: headers.indexOf("GameId"),
         type: headers.indexOf("Type"),
+        wagerEnabled: headers.indexOf("WagerEnabled"),
         bettingEnabled: headers.indexOf("BettingEnabled"),
         startingBankroll: headers.indexOf("StartingBankroll"),
+        minWager: headers.indexOf("MinWager"),
+        maxWager: headers.indexOf("MaxWager"),
         minBet: headers.indexOf("MinBet"),
         maxBet: headers.indexOf("MaxBet")
       };
@@ -333,17 +369,32 @@ function getBettingGameConfig(gameId){
         const row = data[i];
 
         if (
+          col.gameId === -1 ||
           normalizeBetGameId_(row[col.gameId]) !== gameId
         ) {
           continue;
         }
 
         if (col.type > -1) {
+
+          const type = normalizeBetKey_(
+            row[col.type]
+          );
+
           enabled =
             enabled ||
-            normalizeBetKey_(row[col.type]) === "betting";
+            type === "wager" ||
+            type === "betting";
+
         }
 
+        if (col.wagerEnabled > -1) {
+          enabled =
+            enabled ||
+            isBetBoolean_(row[col.wagerEnabled]);
+        }
+
+        // Legacy compatibility only. New sheet should use WagerEnabled.
         if (col.bettingEnabled > -1) {
           enabled =
             enabled ||
@@ -354,27 +405,37 @@ function getBettingGameConfig(gameId){
           startingBankroll = Math.max(
             toBetNumber_(
               row[col.startingBankroll],
-              DEFAULT_BETTING_BANKROLL
+              startingBankroll
             ),
             0
           );
         }
 
-        if (col.minBet > -1) {
+        const minWagerCol =
+          col.minWager > -1
+            ? col.minWager
+            : col.minBet;
+
+        if (minWagerCol > -1) {
           minBet = Math.max(
             toBetNumber_(
-              row[col.minBet],
-              DEFAULT_BETTING_MIN_BET
+              row[minWagerCol],
+              minBet
             ),
             0
           );
         }
 
-        if (col.maxBet > -1) {
+        const maxWagerCol =
+          col.maxWager > -1
+            ? col.maxWager
+            : col.maxBet;
+
+        if (maxWagerCol > -1) {
           maxBet = Math.max(
             toBetNumber_(
-              row[col.maxBet],
-              DEFAULT_BETTING_MAX_BET
+              row[maxWagerCol],
+              maxBet
             ),
             minBet
           );
@@ -391,9 +452,13 @@ function getBettingGameConfig(gameId){
   return {
     gameId: gameId,
     enabled: enabled,
+    wagerEnabled: enabled,
+    bettingEnabled: enabled,
     startingBankroll: startingBankroll,
     minBet: minBet,
     maxBet: maxBet,
+    minWager: minBet,
+    maxWager: maxBet,
     defaultOdds: DEFAULT_BETTING_ODDS
   };
 
@@ -886,6 +951,8 @@ function getUserBettingSummary(username, gameId){
     startingBankroll: config.startingBankroll,
     minBet: config.minBet,
     maxBet: config.maxBet,
+    minWager: config.minWager,
+    maxWager: config.maxWager,
     totalStaked: totalStaked,
     pendingStake: pendingStake,
     pendingPotentialReturn: pendingPotentialReturn,
@@ -1035,7 +1102,7 @@ function saveBet(payload){
 
       return {
         success: false,
-        message: "Betting is not enabled for this game"
+        message: "Wagering is not enabled for this game"
       };
 
     }
@@ -1048,10 +1115,10 @@ function saveBet(payload){
       return {
         success: false,
         message:
-          "Bet must be between " +
-          config.minBet +
+          "Wager must be between " +
+          config.minWager +
           " and " +
-          config.maxBet
+          config.maxWager
       };
 
     }
