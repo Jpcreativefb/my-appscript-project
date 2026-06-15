@@ -151,6 +151,10 @@ function doGet(e) {
       "adminRunGamePreflight",
       "adminRefreshResultsCaches",
 
+      "adminSetupLiveResultsSystem",
+      "adminSetLiveWinner",
+      "adminClearLiveWinner",
+
       "adminSummary",
       "adminClearCaches",
       "adminUpdateCategorySetting",
@@ -522,15 +526,38 @@ function doGet(e) {
     }
 
     /* =========================
-       LEADERBOARD
+       LIVE RESULTS / LIVE SCORING
     ========================= */
 
-    if (action === "leaderboard") {
+    if (action === "liveLeaderboard") {
 
       return json(
-        getLeaderboardData(
-          gameId
-        )
+        apiGetLiveLeaderboard({
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "liveResults") {
+
+      return json(
+        apiGetLiveResults({
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "liveGameState") {
+
+      return json(
+        apiGetLiveGameState({
+          gameId:
+            gameId
+        })
       );
 
     }
@@ -631,6 +658,19 @@ function doGet(e) {
 
     }
 
+    if (action === "adminSetupLiveResultsSystem") {
+
+      return json(
+        apiSetupLiveResultsSystem({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+
+    }
+
     /* =========================
        ADMIN: CATEGORY SETTINGS
     ========================= */
@@ -652,7 +692,9 @@ function doGet(e) {
           points:
             params.points,
           winnerNomineeId:
-            params.winnerNomineeId
+            params.winnerNomineeId,
+          notes:
+            params.notes || ""
         })
       );
 
@@ -669,7 +711,53 @@ function doGet(e) {
           gameId:
             gameId,
           categoryId:
-            params.categoryId
+            params.categoryId,
+          notes:
+            params.notes || "Winner cleared"
+        })
+      );
+
+    }
+
+    if (action === "adminSetLiveWinner") {
+
+      return json(
+        apiAdminSetLiveWinner({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          categoryId:
+            params.categoryId,
+          nomineeId:
+            params.nomineeId,
+          source:
+            params.source || "admin",
+          notes:
+            params.notes || ""
+        })
+      );
+
+    }
+
+    if (action === "adminClearLiveWinner") {
+
+      return json(
+        apiAdminClearLiveWinner({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          categoryId:
+            params.categoryId,
+          source:
+            params.source || "admin",
+          notes:
+            params.notes || ""
         })
       );
 

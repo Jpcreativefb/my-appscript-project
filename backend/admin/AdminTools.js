@@ -191,6 +191,9 @@ function apiAdminUpdateCategorySetting(payload) {
 
   requireAdmin_(payload);
 
+  payload =
+    payload || {};
+
   const gameId =
     normalizeGameId_(
       payload.gameId ||
@@ -208,14 +211,31 @@ function apiAdminUpdateCategorySetting(payload) {
     throw new Error("Missing categoryId");
   }
 
+  const oldWinnerNomineeId =
+    typeof getLiveResultsCurrentWinnerId_ === "function"
+      ? getLiveResultsCurrentWinnerId_(
+          gameId,
+          categoryId
+        )
+      : "";
+
   const patch = {};
 
-  if (payload.locked !== undefined && payload.locked !== "") {
+  if (
+    payload.locked !== undefined &&
+    payload.locked !== ""
+  ) {
+
     patch.locked =
       adminBoolean_(payload.locked);
+
   }
 
-  if (payload.points !== undefined && payload.points !== "") {
+  if (
+    payload.points !== undefined &&
+    payload.points !== ""
+  ) {
+
     const points =
       Number(payload.points);
 
@@ -225,12 +245,47 @@ function apiAdminUpdateCategorySetting(payload) {
 
     patch.points =
       points;
+
   }
 
-  if (payload.winnerNomineeId !== undefined) {
+  /*
+    Important:
+    Do NOT treat a blank winnerNomineeId as a normal update.
+    Blank winner updates are handled only by apiAdminClearCategoryWinner().
+    This prevents points/lock changes from accidentally clearing winners.
+  */
+  if (
+    payload.winnerNomineeId !== undefined &&
+    payload.winnerNomineeId !== ""
+  ) {
+
     patch.winnerNomineeId =
       String(payload.winnerNomineeId || "")
-        .trim();
+        .trim()
+        .toLowerCase();
+
+    if (
+      patch.locked === undefined
+    ) {
+
+      patch.locked = true;
+
+    }
+
+  }
+
+  if (
+    Object.keys(patch).length === 0
+  ) {
+
+    return {
+      success: true,
+      noChange: true,
+      message: "No category setting changes received",
+      gameId: gameId,
+      categoryId: categoryId
+    };
+
   }
 
   updateCategorySetting(
@@ -239,11 +294,53 @@ function apiAdminUpdateCategorySetting(payload) {
     patch
   );
 
+  const newWinnerNomineeId =
+    "winnerNomineeId" in patch
+      ? patch.winnerNomineeId
+      : oldWinnerNomineeId;
+
   if (
-    typeof clearAppCaches ===
-    "function"
+    "winnerNomineeId" in patch &&
+    typeof recordLiveWinnerChange_ === "function"
   ) {
+
+    recordLiveWinnerChange_({
+      gameId:
+        gameId,
+
+      categoryId:
+        categoryId,
+
+      oldWinnerNomineeId:
+        oldWinnerNomineeId,
+
+      newWinnerNomineeId:
+        newWinnerNomineeId,
+
+      source:
+        "admin",
+
+      updatedBy:
+        payload.username || "",
+
+      notes:
+        payload.notes || ""
+    });
+
+  }
+
+  if (
+    typeof clearLiveResultsCaches === "function"
+  ) {
+
+    clearLiveResultsCaches(gameId);
+
+  } else if (
+    typeof clearAppCaches === "function"
+  ) {
+
     clearAppCaches();
+
   }
 
   return {
@@ -264,6 +361,9 @@ function apiAdminClearCategoryWinner(payload) {
 
   requireAdmin_(payload);
 
+  payload =
+    payload || {};
+
   const gameId =
     normalizeGameId_(
       payload.gameId ||
@@ -281,19 +381,65 @@ function apiAdminClearCategoryWinner(payload) {
     throw new Error("Missing categoryId");
   }
 
+  const oldWinnerNomineeId =
+    typeof getLiveResultsCurrentWinnerId_ === "function"
+      ? getLiveResultsCurrentWinnerId_(
+          gameId,
+          categoryId
+        )
+      : "";
+
   updateCategorySetting(
     gameId,
     categoryId,
     {
-      winnerNomineeId: ""
+      winnerNomineeId:
+        ""
     }
   );
 
   if (
-    typeof clearAppCaches ===
-    "function"
+    oldWinnerNomineeId &&
+    typeof recordLiveWinnerChange_ === "function"
   ) {
+
+    recordLiveWinnerChange_({
+      gameId:
+        gameId,
+
+      categoryId:
+        categoryId,
+
+      oldWinnerNomineeId:
+        oldWinnerNomineeId,
+
+      newWinnerNomineeId:
+        "",
+
+      source:
+        "admin",
+
+      updatedBy:
+        payload.username || "",
+
+      notes:
+        payload.notes || "Winner cleared"
+    });
+
+  }
+
+  if (
+    typeof clearLiveResultsCaches === "function"
+  ) {
+
+    clearLiveResultsCaches(gameId);
+
+  } else if (
+    typeof clearAppCaches === "function"
+  ) {
+
     clearAppCaches();
+
   }
 
   return {
@@ -304,7 +450,6 @@ function apiAdminClearCategoryWinner(payload) {
   };
 
 }
-
 /* =========================
    ADMIN BOOLEAN HELPER
 ========================= */

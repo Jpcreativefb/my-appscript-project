@@ -29,7 +29,7 @@ async function renderLeaderboardPage() {
     res =
       isWagerLeaderboard
         ? await apiBettingLeaderboard(gameId)
-        : await apiLeaderboard(gameId);
+        : await apiLiveLeaderboard(gameId);
 
   } catch (err) {
 

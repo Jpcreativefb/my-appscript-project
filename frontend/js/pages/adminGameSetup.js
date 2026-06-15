@@ -3111,7 +3111,6 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     false
   );
 
-  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
@@ -3281,6 +3280,7 @@ async function adminSetupSaveResults(gameId, categoryId) {
     categoryId: categoryId,
     winnerNomineeId: winnerNomineeId,
     favoriteNomineeId: favoriteNomineeId,
+    notes: "Winner selected from Manage Games panel"
   });
 
   if (!res || res.success === false) {
@@ -3303,7 +3303,6 @@ async function adminSetupSaveResults(gameId, categoryId) {
 
   await apiAdminRefreshResultsCaches(gameId);
 
-  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
@@ -3344,7 +3343,6 @@ async function adminSetupClearResults(gameId, categoryId) {
 
   await apiAdminRefreshResultsCaches(gameId);
 
-  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================

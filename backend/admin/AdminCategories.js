@@ -372,53 +372,65 @@ function adminCatUpsertCategorySettings_(
     "favoriteNomineeId"
   ];
 
-  keys.forEach(key => {
+    keys.forEach(key => {
+
+    /*
+      Important:
+      Only update fields that were intentionally sent.
+
+      adminUpdateCategory() may pass keys with undefined values.
+      Undefined should mean "do not touch this setting",
+      not "clear this setting".
+    */
 
     if (
-      key in payload &&
-      col[key] !== -1
+      !(key in payload) ||
+      payload[key] === undefined ||
+      col[key] === -1
     ) {
 
-      if (
-        key === "points" ||
-        key === "changePenalty" ||
-        key === "maxChanges" ||
-        key === "displayOrder"
-      ) {
+      return;
 
-        row[col[key]] =
-          Number(payload[key]) || 0;
+    }
 
-      } else if (
-        key === "locked" ||
-        key === "countsAsStatue"
-      ) {
+    if (
+      key === "points" ||
+      key === "changePenalty" ||
+      key === "maxChanges" ||
+      key === "displayOrder"
+    ) {
 
-        row[col[key]] =
-          adminCatToBoolean_(
-            payload[key]
-          );
+      row[col[key]] =
+        Number(payload[key]) || 0;
 
-      } else if (
-        key === "winnerNomineeId" ||
-        key === "favoriteNomineeId" ||
-        key === "parentCategoryId" ||
-        key === "followUpCategoryId"
-      ) {
+    } else if (
+      key === "locked" ||
+      key === "countsAsStatue"
+    ) {
 
-        row[col[key]] =
-          adminCatNormalizeId_(
-            payload[key]
-          );
+      row[col[key]] =
+        adminCatToBoolean_(
+          payload[key]
+        );
 
-      } else {
+    } else if (
+      key === "winnerNomineeId" ||
+      key === "favoriteNomineeId" ||
+      key === "parentCategoryId" ||
+      key === "followUpCategoryId"
+    ) {
 
-        row[col[key]] =
-          adminCatNormalizeValue_(
-            payload[key]
-          );
+      row[col[key]] =
+        adminCatNormalizeId_(
+          payload[key]
+        );
 
-      }
+    } else {
+
+      row[col[key]] =
+        adminCatNormalizeValue_(
+          payload[key]
+        );
 
     }
 
@@ -1510,6 +1522,17 @@ function adminUpdateCategory(payload) {
     gameId
   );
 
+  const oldWinnerNomineeId =
+    (
+      "winnerNomineeId" in payload &&
+      typeof getLiveResultsCurrentWinnerId_ === "function"
+    )
+      ? getLiveResultsCurrentWinnerId_(
+          gameId,
+          categoryId
+        )
+      : "";
+
   const lock =
     LockService
       .getScriptLock();
@@ -1737,7 +1760,40 @@ function adminUpdateCategory(payload) {
           ? payload.favoriteNomineeId
           : undefined
     });
+    
+        if (
+      "winnerNomineeId" in payload &&
+      payload.winnerNomineeId !== undefined &&
+      typeof recordLiveWinnerChange_ === "function"
+    ) {
 
+      recordLiveWinnerChange_({
+        gameId:
+          gameId,
+
+        categoryId:
+          categoryId,
+
+        oldWinnerNomineeId:
+          oldWinnerNomineeId,
+
+        newWinnerNomineeId:
+          adminCatNormalizeId_(
+            payload.winnerNomineeId
+          ),
+
+        source:
+          "manage-games",
+
+        updatedBy:
+          payload.username || "",
+
+        notes:
+          payload.notes || "Winner updated from Manage Games panel"
+      });
+
+    }
+    
     SpreadsheetApp.flush();
 
     adminCatClearCaches_();

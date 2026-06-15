@@ -126,7 +126,8 @@ function loginUser(
 
       user["Username"],
 
-      60 * 60 * 6
+      60 * 60 * 24 * 7
+
 
     );
 

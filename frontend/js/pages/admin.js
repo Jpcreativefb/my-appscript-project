@@ -100,6 +100,13 @@ async function renderAdminPage() {
             Clear App Caches
           </button>
 
+          <button
+            class="button admin-button secondary"
+            onclick="adminSetupLiveResultsSystem()"
+          >
+            Setup Live Results
+          </button>
+
           <div
             id="adminMessage"
             class="admin-message"
@@ -1285,7 +1292,6 @@ function adminGetGamePayloadFromForm_(
 
 }
 
-
 function adminToggleGameAdvanced(
   button
 ) {
@@ -1359,8 +1365,7 @@ function adminApplyGameTypeDefaults(
 
 }
 
-
-  async function adminClearCaches() {
+async function adminClearCaches() {
   
     const message =
       document.getElementById("adminMessage");
@@ -1380,203 +1385,245 @@ function adminApplyGameTypeDefaults(
           : res.error || res.message || "Unable to clear caches.";
     }
   
+}
+
+async function adminSetupLiveResultsSystem() {
+
+  const message =
+    document.getElementById("adminMessage");
+
+  if (message) {
+    message.innerText =
+      "Setting up live results...";
   }
 
-  async function adminSaveCategory(categoryId) {
+  const res =
+    await apiAdminSetupLiveResultsSystem();
 
-    const message =
-      document.getElementById("adminMessage");
-  
-    const pointsInput =
-      document.getElementById(
-        "points-" + categoryId
-      );
-  
-    const winnerInput =
-      document.getElementById(
-        "winner-" + categoryId
-      );
-  
-    if (message) {
-      message.innerText =
-        "Saving category...";
-    }
-  
-    const res =
+  if (message) {
+    message.innerText =
+      res.success
+        ? "Live results system ready."
+        : res.error || res.message || "Unable to setup live results.";
+  }
+
+}
+
+async function adminSaveCategory(categoryId) {
+
+  const message =
+    document.getElementById("adminMessage");
+
+  const pointsInput =
+    document.getElementById(
+      "points-" + categoryId
+    );
+
+  const winnerInput =
+    document.getElementById(
+      "winner-" + categoryId
+    );
+
+  if (message) {
+    message.innerText =
+      "Saving category...";
+  }
+
+  let pointsRes = {
+    success: true
+  };
+
+  if (pointsInput) {
+
+    pointsRes =
       await apiAdminUpdateCategorySetting(
         categoryId,
         {
           points:
-            pointsInput
-              ? pointsInput.value
-              : "",
-          winnerNomineeId:
-            winnerInput
-              ? winnerInput.value
-              : ""
+            pointsInput.value
         }
       );
-  
-    if (message) {
-      message.innerText =
-        res.success
-          ? "Category saved."
-          : res.error || res.message || "Unable to save category.";
-    }
-  
-    if (res.success) {
-      await navigate("admin");
-    }
-  
+
   }
-  
-  async function adminToggleCategoryLock(categoryId, locked) {
-  
-    const message =
-      document.getElementById("adminMessage");
-  
+
+  if (!pointsRes.success) {
+
     if (message) {
       message.innerText =
-        locked
-          ? "Locking category..."
-          : "Unlocking category...";
+        pointsRes.error ||
+        pointsRes.message ||
+        "Unable to save points.";
     }
-  
-    const res =
+
+    return;
+
+  }
+
+  const winnerNomineeId =
+    winnerInput
+      ? String(winnerInput.value || "")
+          .trim()
+      : "";
+
+  let winnerRes = {
+    success: true
+  };
+
+  if (winnerNomineeId) {
+
+    winnerRes =
       await apiAdminUpdateCategorySetting(
         categoryId,
         {
-          locked: locked
+          winnerNomineeId:
+            winnerNomineeId,
+
+          notes:
+            "Winner selected from admin panel"
         }
       );
-  
-    if (message) {
-      message.innerText =
-        res.success
-          ? "Category updated."
-          : res.error || res.message || "Unable to update category.";
-    }
-  
-    if (res.success) {
-      await navigate("admin");
-    }
-  
-  }
-  
-  async function adminClearWinner(categoryId) {
-  
-    const confirmed =
-      window.confirm(
-        "Clear winner for this category?"
-      );
-  
-    if (!confirmed) {
-      return;
-    }
-  
-    const message =
-      document.getElementById("adminMessage");
-  
-    if (message) {
-      message.innerText =
-        "Clearing winner...";
-    }
-  
-    const res =
-      await apiAdminClearCategoryWinner(
-        categoryId
-      );
-  
-    if (message) {
-      message.innerText =
-        res.success
-          ? "Winner cleared."
-          : res.error || res.message || "Unable to clear winner.";
-    }
-  
-    if (res.success) {
-      await navigate("admin");
-    }
-  
+
   }
 
-  async function adminCreateUser() {
+  if (message) {
 
-    const message =
-      document.getElementById("adminMessage");
-  
-    const usernameInput =
-      document.getElementById("newUserUsername");
-  
-    const pinInput =
-      document.getElementById("newUserPin");
-  
-    const avatarInput =
-      document.getElementById("newUserAvatar");
-  
-    const themeColorInput =
-      document.getElementById("newUserThemeColor");
-  
-    const isAdminInput =
-      document.getElementById("newUserIsAdmin");
-  
-    const username =
-      usernameInput
-        ? usernameInput.value.trim()
-        : "";
-  
-    const pin =
-      pinInput
-        ? pinInput.value.trim()
-        : "";
-  
-    if (!username) {
-      alert("Username is required.");
-      return;
-    }
-  
-    if (!pin) {
-      alert("PIN is required.");
-      return;
-    }
-  
-    if (message) {
+    if (!winnerRes.success) {
+
       message.innerText =
-        "Creating user...";
-    }
-  
-    const res =
-      await apiAdminCreateUser({
-        username: username,
-        pin: pin,
-        avatar:
-          avatarInput
-            ? avatarInput.value.trim()
-            : "avatar1",
-        themeColor:
-          themeColorInput
-            ? themeColorInput.value.trim()
-            : "#ffcc00",
-        isAdmin:
-          isAdminInput
-            ? isAdminInput.checked
-            : false
-      });
-  
-    if (message) {
+        winnerRes.error ||
+        winnerRes.message ||
+        "Unable to save winner.";
+
+    } else if (winnerNomineeId) {
+
       message.innerText =
-        res.success
-          ? "User created."
-          : res.error || res.message || "Unable to create user.";
+        "Category saved. Winner logged in ResultEvents.";
+
+    } else {
+
+      message.innerText =
+        "Category saved. No winner change was made.";
+
     }
-  
-    if (res.success) {
-      await navigate("admin");
-    }
-  
+
   }
+
+}
   
-  async function adminPromptResetPin(username) {
+async function adminToggleCategoryLock(categoryId, locked) {
+
+  const message =
+    document.getElementById("adminMessage");
+
+  if (message) {
+    message.innerText =
+      locked
+        ? "Locking category..."
+        : "Unlocking category...";
+  }
+
+  const res =
+    await apiAdminUpdateCategorySetting(
+      categoryId,
+      {
+        locked:
+          locked
+      }
+    );
+
+  if (message) {
+    message.innerText =
+      res.success
+        ? "Category lock updated."
+        : res.error || res.message || "Unable to update category.";
+  }
+
+}
+  
+async function adminClearWinner(categoryId) {
+
+  const confirmed =
+    window.confirm(
+      "Clear winner for this category?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const message =
+    document.getElementById("adminMessage");
+
+  if (message) {
+    message.innerText =
+      "Clearing winner...";
+  }
+
+  const res =
+    await apiAdminClearLiveWinner(
+      categoryId
+    );
+
+  if (message) {
+    message.innerText =
+      res.success
+        ? "Winner cleared and leaderboard updated."
+        : res.error || res.message || "Unable to clear winner.";
+  }
+
+  if (res.success) {
+    await navigate("admin");
+  }
+
+}
+
+async function adminClearWinner(categoryId) {
+
+  const confirmed =
+    window.confirm(
+      "Clear winner for this category?"
+    );
+
+  if (!confirmed) {
+    return;
+  }
+
+  const message =
+    document.getElementById("adminMessage");
+
+  if (message) {
+    message.innerText =
+      "Clearing winner...";
+  }
+
+  const res =
+    await apiAdminClearCategoryWinner(
+      categoryId
+    );
+
+  if (res.success) {
+
+    const winnerInput =
+      document.getElementById(
+        "winner-" + categoryId
+      );
+
+    if (winnerInput) {
+      winnerInput.value = "";
+    }
+
+  }
+
+  if (message) {
+    message.innerText =
+      res.success
+        ? "Winner cleared and logged in ResultEvents."
+        : res.error || res.message || "Unable to clear winner.";
+  }
+
+}
+  
+async function adminPromptResetPin(username) {
   
     const pin =
       window.prompt(
@@ -1619,7 +1666,7 @@ function adminApplyGameTypeDefaults(
   
   }
   
-  async function adminToggleUserAdmin(username, isAdmin) {
+async function adminToggleUserAdmin(username, isAdmin) {
   
     const confirmed =
       window.confirm(
@@ -1659,7 +1706,7 @@ function adminApplyGameTypeDefaults(
   
   }
 
-  async function adminToggleUserActive(username, active) {
+async function adminToggleUserActive(username, active) {
 
     const confirmed =
       window.confirm(

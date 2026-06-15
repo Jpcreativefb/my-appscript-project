@@ -180,6 +180,30 @@ async function apiGetLeaderboard(gameId) {
 
 }
 
+async function apiLiveLeaderboard(gameId) {
+
+  return api("liveLeaderboard", {
+    gameId
+  });
+
+}
+
+async function apiLiveResults(gameId) {
+
+  return api("liveResults", {
+    gameId
+  });
+
+}
+
+async function apiLiveGameState(gameId) {
+
+  return api("liveGameState", {
+    gameId
+  });
+
+}
+
 /* ======================
    USER BREAKDOWN
 ====================== */
@@ -302,29 +326,77 @@ async function apiAdminClearCaches() {
 
 }
 
+async function apiAdminSetupLiveResultsSystem() {
+
+  const session =
+    getSession();
+
+  return api("adminSetupLiveResultsSystem", {
+    username:
+      session.username,
+
+    token:
+      session.token
+  });
+
+}
+
 async function apiAdminUpdateCategorySetting(categoryId, patch) {
 
   const session =
     getSession();
 
-  return api("adminUpdateCategorySetting", {
-    username: session.username,
-    token: session.token,
-    gameId: APP_STATE.gameId || "",
-    categoryId: categoryId,
-    locked:
-      patch.locked !== undefined
-        ? patch.locked
-        : "",
-    points:
-      patch.points !== undefined
-        ? patch.points
-        : "",
-    winnerNomineeId:
-      patch.winnerNomineeId !== undefined
-        ? patch.winnerNomineeId
-        : ""
-  });
+  patch =
+    patch || {};
+
+  const params = {
+    username:
+      session.username,
+
+    token:
+      session.token,
+
+    gameId:
+      APP_STATE.gameId || "",
+
+    categoryId:
+      categoryId
+  };
+
+  /*
+    Only send fields that are actually being changed.
+    Do not send blank winnerNomineeId unless the Clear Winner button is used.
+  */
+
+  if (patch.locked !== undefined) {
+    params.locked =
+      patch.locked;
+  }
+
+  if (patch.points !== undefined) {
+    params.points =
+      patch.points;
+  }
+
+  if (
+    patch.winnerNomineeId !== undefined &&
+    patch.winnerNomineeId !== ""
+  ) {
+
+    params.winnerNomineeId =
+      patch.winnerNomineeId;
+
+  }
+
+  if (patch.notes !== undefined) {
+    params.notes =
+      patch.notes;
+  }
+
+  return api(
+    "adminUpdateCategorySetting",
+    params
+  );
 
 }
 
@@ -338,6 +410,85 @@ async function apiAdminClearCategoryWinner(categoryId) {
     token: session.token,
     gameId: APP_STATE.gameId || "",
     categoryId: categoryId
+  });
+
+}
+
+async function apiAdminSetupLiveResultsSystem() {
+
+  const session =
+    getSession();
+
+  return api("adminSetupLiveResultsSystem", {
+    username:
+      session.username,
+
+    token:
+      session.token
+  });
+
+}
+
+async function apiAdminSetLiveWinner(
+  categoryId,
+  nomineeId,
+  notes = ""
+) {
+
+  const session =
+    getSession();
+
+  return api("adminSetLiveWinner", {
+    username:
+      session.username,
+
+    token:
+      session.token,
+
+    gameId:
+      APP_STATE.gameId || "",
+
+    categoryId:
+      categoryId,
+
+    nomineeId:
+      nomineeId,
+
+    source:
+      "admin",
+
+    notes:
+      notes
+  });
+
+}
+
+async function apiAdminClearLiveWinner(
+  categoryId,
+  notes = ""
+) {
+
+  const session =
+    getSession();
+
+  return api("adminClearLiveWinner", {
+    username:
+      session.username,
+
+    token:
+      session.token,
+
+    gameId:
+      APP_STATE.gameId || "",
+
+    categoryId:
+      categoryId,
+
+    source:
+      "admin",
+
+    notes:
+      notes
   });
 
 }
@@ -605,9 +756,23 @@ async function apiAdminCreateCategory(payload) {
 
 async function apiAdminUpdateCategory(payload) {
 
+  const session =
+    getSession();
+
+  payload =
+    payload || {};
+
   return api(
     "adminUpdateCategory",
-    payload
+    {
+      ...payload,
+
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
   );
 
 }
