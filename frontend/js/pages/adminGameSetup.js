@@ -374,6 +374,38 @@ async function renderAdminGameSetupPage(gameId) {
           </button>
 
           <button
+          class="admin-small-button secondary"
+          onclick="adminSetupScoringAutomationSetup('${adminSetupEscapeHtml(
+            safeGameId
+          )}')"
+        >
+          Setup Scoring
+        </button>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminSetupRunScoringAutomation('${adminSetupEscapeHtml(
+            safeGameId
+          )}')"
+        >
+          Run Scoring Now
+        </button>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminSetupStartAutoScoring()"
+        >
+          Start Auto Scoring
+        </button>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminSetupStopAutoScoring()"
+        >
+          Stop Auto Scoring
+        </button>
+
+          <button
             class="admin-small-button secondary"
             onclick="navigate('admin-games')"
           >
@@ -415,6 +447,322 @@ async function renderAdminGameSetupPage(gameId) {
               id="adminSetupMessage"
               class="admin-message"
             ></div>
+
+            <div class="admin-card-actions">
+
+            <button
+              class="admin-small-button secondary"
+              onclick="adminSetupScoringAutomationSetup('${adminSetupEscapeHtml(
+                safeGameId
+              )}')"
+            >
+              Setup Scoring
+            </button>
+
+            <button
+              class="admin-small-button secondary"
+              onclick="adminSetupRunScoringAutomation('${adminSetupEscapeHtml(
+                safeGameId
+              )}')"
+            >
+              Run Scoring Now
+            </button>
+
+            <button
+              class="admin-small-button secondary"
+              onclick="adminSetupStartAutoScoring()"
+            >
+              Start Auto Scoring
+            </button>
+
+            <button
+              class="admin-small-button secondary"
+              onclick="adminSetupStopAutoScoring()"
+            >
+              Stop Auto Scoring
+            </button>
+
+          </div>
+
+          <details class="admin-advanced-details" open>
+
+          <summary>
+            Internet Results Import
+          </summary>
+
+          <div class="admin-control-grid">
+
+            <label class="admin-field">
+              <span>Source ID</span>
+
+              <input
+                type="text"
+                id="internetSourceId"
+                value="manual-results"
+                placeholder="espn-nfl-scoreboard"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Source Name</span>
+
+              <input
+                type="text"
+                id="internetSourceName"
+                value="Manual Results"
+                placeholder="ESPN NFL Scoreboard"
+              >
+            </label>
+
+            <label class="admin-field">
+              <span>Source Type</span>
+
+              <select id="internetSourceType">
+
+                <option value="manual">
+                  Manual Text
+                </option>
+
+                <option value="webpage">
+                  Webpage / HTML
+                </option>
+
+                <option value="json">
+                  JSON / API
+                </option>
+
+                <option value="csv">
+                  CSV / Text
+                </option>
+
+              </select>
+            </label>
+
+            <label class="admin-field">
+              <span>Parser Type</span>
+
+              <select id="internetParserType">
+
+                <option value="manual-text">
+                  Manual Text
+                </option>
+
+                <option value="webpage-text">
+                  Webpage Text
+                </option>
+
+                <option value="json">
+                  JSON
+                </option>
+
+                <option value="csv">
+                  CSV / Text
+                </option>
+
+              </select>
+            </label>
+
+            <label class="admin-field">
+              <span>Match Mode</span>
+
+              <select id="internetMatchMode">
+
+                <option value="nominee-name">
+                  Nominee Name
+                </option>
+
+                <option value="category-name">
+                  Category Name
+                </option>
+
+                <option value="team-name">
+                  Team Name
+                </option>
+
+                <option value="market-title">
+                  Market Title
+                </option>
+
+                <option value="raw">
+                  Raw Only
+                </option>
+
+              </select>
+            </label>
+
+            <label class="admin-field">
+              <span>Trust Level</span>
+
+              <select id="internetTrustLevel">
+
+                <option value="low">
+                  Low
+                </option>
+
+                <option value="medium" selected>
+                  Medium
+                </option>
+
+                <option value="high">
+                  High
+                </option>
+
+                <option value="official">
+                  Official
+                </option>
+
+              </select>
+            </label>
+
+          </div>
+
+          <label class="admin-field">
+            <span>URL</span>
+
+            <input
+              type="url"
+              id="internetSourceUrl"
+              placeholder="https://example.com/results"
+            >
+          </label>
+
+          <label class="admin-field">
+            <span>Manual Results Text</span>
+
+            <textarea
+              id="internetManualText"
+              rows="6"
+              placeholder="Paste results here. Example: Best Picture: Anora"
+            ></textarea>
+          </label>
+
+          <div class="admin-card-actions">
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupLoadInternetSources('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Load Saved Sources
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupSaveInternetSource('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Save Source
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupInternetResultsSetup('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Setup Internet Imports
+          </button>
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupPullInternetResults('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Pull Internet Results
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupViewLastInternetImport('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            View Last Import
+          </button>
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupGenerateResultSuggestions('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Generate Suggestions
+          </button>
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupParseSportsScoreboard('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Parse Sports Scoreboard
+          </button>
+
+          <button
+            class="admin-small-button secondary"
+            onclick="adminSetupViewResultSuggestions('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            View Suggestions
+          </button>
+
+          <button
+            class="admin-small-button"
+            onclick="adminSetupApplyHighConfidenceSuggestions('${adminSetupEscapeHtml(
+              safeGameId
+            )}')"
+          >
+            Apply High Confidence
+          </button>
+
+        </div>
+
+          <div class="admin-control-grid">
+
+          <label class="admin-field">
+            <span>Bulk Apply Min Confidence</span>
+
+            <input
+              type="number"
+              id="internetSuggestionMinConfidence"
+              value="90"
+              min="0"
+              max="100"
+            >
+          </label>
+
+        </div>
+
+          <div
+            id="internetImportMessage"
+            class="admin-message"
+          ></div>
+
+          <div
+            id="internetSourcesPanel"
+            class="admin-sources-panel"
+          ></div>
+
+          <pre
+            id="internetImportPreview"
+            class="admin-code-preview"
+          ></pre>
+
+          <div
+            id="resultSuggestionsPanel"
+            class="admin-suggestions-panel"
+          ></div>
+
+          <div
+            id="sportsScoreboardPanel"
+            class="admin-sources-panel"
+          ></div>
+
+        </details>
 
             ${
               categories.length
@@ -3261,13 +3609,26 @@ async function adminSetupArchiveNominee(gameId, categoryId, nomineeId) {
 ====================== */
 
 async function adminSetupSaveResults(gameId, categoryId) {
-  const winnerInput = document.getElementById("resultWinner_" + categoryId);
 
-  const favoriteInput = document.getElementById("resultFavorite_" + categoryId);
+  const winnerInput =
+    document.getElementById(
+      "resultWinner_" + categoryId
+    );
 
-  const winnerNomineeId = winnerInput ? winnerInput.value.trim() : "";
+  const favoriteInput =
+    document.getElementById(
+      "resultFavorite_" + categoryId
+    );
 
-  const favoriteNomineeId = favoriteInput ? favoriteInput.value.trim() : "";
+  const winnerNomineeId =
+    winnerInput
+      ? winnerInput.value.trim()
+      : "";
+
+  const favoriteNomineeId =
+    favoriteInput
+      ? favoriteInput.value.trim()
+      : "";
 
   adminSetupSetMessage(
     "resultMessage_" + categoryId,
@@ -3275,15 +3636,22 @@ async function adminSetupSaveResults(gameId, categoryId) {
     false
   );
 
-  const res = await apiAdminUpdateCategory({
-    gameId: gameId,
-    categoryId: categoryId,
-    winnerNomineeId: winnerNomineeId,
-    favoriteNomineeId: favoriteNomineeId,
-    notes: "Winner selected from Manage Games panel"
-  });
+  const res =
+    await apiAdminUpdateCategory({
+      gameId:
+        gameId,
+      categoryId:
+        categoryId,
+      winnerNomineeId:
+        winnerNomineeId,
+      favoriteNomineeId:
+        favoriteNomineeId,
+      notes:
+        "Winner selected from Manage Games panel"
+    });
 
   if (!res || res.success === false) {
+
     adminSetupSetMessage(
       "resultMessage_" + categoryId,
       res && (res.message || res.error)
@@ -3293,15 +3661,39 @@ async function adminSetupSaveResults(gameId, categoryId) {
     );
 
     return;
+
   }
 
   adminSetupSetMessage(
     "resultMessage_" + categoryId,
-    "Results saved. Refreshing scoring...",
+    "Results saved. Running scoring automation...",
     false
   );
 
-  await apiAdminRefreshResultsCaches(gameId);
+  const scoringRes =
+    await apiAdminRunScoringAutomation(
+      gameId
+    );
+
+  if (!scoringRes || scoringRes.success === false) {
+
+    adminSetupSetMessage(
+      "resultMessage_" + categoryId,
+      scoringRes && (scoringRes.message || scoringRes.error)
+        ? scoringRes.message || scoringRes.error
+        : "Results saved, but scoring automation failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Results saved and scoring updated.",
+    false
+  );
 
 }
 
@@ -3310,7 +3702,11 @@ async function adminSetupSaveResults(gameId, categoryId) {
 ====================== */
 
 async function adminSetupClearResults(gameId, categoryId) {
-  const ok = confirm("Clear winner and favorite for this category?");
+
+  const ok =
+    confirm(
+      "Clear winner and favorite for this category?"
+    );
 
   if (!ok) {
     return;
@@ -3322,14 +3718,22 @@ async function adminSetupClearResults(gameId, categoryId) {
     false
   );
 
-  const res = await apiAdminUpdateCategory({
-    gameId: gameId,
-    categoryId: categoryId,
-    winnerNomineeId: "",
-    favoriteNomineeId: "",
-  });
+  const res =
+    await apiAdminUpdateCategory({
+      gameId:
+        gameId,
+      categoryId:
+        categoryId,
+      winnerNomineeId:
+        "",
+      favoriteNomineeId:
+        "",
+      notes:
+        "Winner and favorite cleared from Manage Games panel"
+    });
 
   if (!res || res.success === false) {
+
     adminSetupSetMessage(
       "resultMessage_" + categoryId,
       res && (res.message || res.error)
@@ -3339,9 +3743,47 @@ async function adminSetupClearResults(gameId, categoryId) {
     );
 
     return;
+
   }
 
-  await apiAdminRefreshResultsCaches(gameId);
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Results cleared. Running scoring automation...",
+    false
+  );
+
+  const scoringRes =
+    await apiAdminRunScoringAutomation(
+      gameId
+    );
+
+  if (!scoringRes || scoringRes.success === false) {
+
+    adminSetupSetMessage(
+      "resultMessage_" + categoryId,
+      scoringRes && (scoringRes.message || scoringRes.error)
+        ? scoringRes.message || scoringRes.error
+        : "Results cleared, but scoring automation failed.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (document.getElementById("resultWinner_" + categoryId)) {
+    document.getElementById("resultWinner_" + categoryId).value = "";
+  }
+
+  if (document.getElementById("resultFavorite_" + categoryId)) {
+    document.getElementById("resultFavorite_" + categoryId).value = "";
+  }
+
+  adminSetupSetMessage(
+    "resultMessage_" + categoryId,
+    "Results cleared and scoring updated.",
+    false
+  );
 
 }
 
@@ -3372,7 +3814,1224 @@ async function adminSetupFinalizeResults(gameId, finalized) {
     return;
   }
 
-  await apiAdminRefreshResultsCaches(gameId);
+  await apiAdminRunScoringAutomation(gameId);
 
   navigate("admin-game-setup:" + gameId);
+}
+
+
+/* ======================
+   SCORING AUTOMATION
+====================== */
+
+async function adminSetupScoringAutomationSetup(gameId) {
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    "Setting up scoring automation...",
+    false
+  );
+
+  const res =
+    await apiAdminSetupScoringAutomationSystem(
+      gameId
+    );
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    res && res.success
+      ? "Scoring automation ready. ScoringRuns and LiveLeaderboardSnapshot are ready."
+      : res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not setup scoring automation.",
+    !(res && res.success)
+  );
+
+}
+
+async function adminSetupRunScoringAutomation(gameId) {
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    "Running scoring automation...",
+    false
+  );
+
+  const res =
+    await apiAdminRunScoringAutomation(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "adminSetupMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not run scoring automation.",
+      true
+    );
+
+    return;
+
+  }
+
+  const run =
+    res.runs && res.runs.length
+      ? res.runs[0]
+      : null;
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    run
+      ? `Scoring updated. Leader: ${run.leaderDisplayName || run.leaderUser || "None"} with ${run.leaderScore || 0} points.`
+      : "Scoring automation completed.",
+    false
+  );
+
+}
+
+async function adminSetupStartAutoScoring() {
+
+  const ok =
+    confirm(
+      "Start automatic scoring every 1 minute for active games?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    "Starting automatic scoring...",
+    false
+  );
+
+  const res =
+    await apiAdminInstallScoringAutomationTrigger();
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    res && res.success
+      ? "Automatic scoring started. It will run every 1 minute."
+      : res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not start automatic scoring.",
+    !(res && res.success)
+  );
+
+}
+
+async function adminSetupStopAutoScoring() {
+
+  const ok =
+    confirm(
+      "Stop automatic scoring?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    "Stopping automatic scoring...",
+    false
+  );
+
+  const res =
+    await apiAdminUninstallScoringAutomationTrigger();
+
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    res && res.success
+      ? "Automatic scoring stopped."
+      : res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not stop automatic scoring.",
+    !(res && res.success)
+  );
+
+}
+
+/* ======================
+   INTERNET RESULTS IMPORT
+====================== */
+
+function adminSetupGetInternetImportPayload(gameId) {
+
+  const sourceIdInput =
+    document.getElementById(
+      "internetSourceId"
+    );
+
+  const sourceNameInput =
+    document.getElementById(
+      "internetSourceName"
+    );
+
+  const sourceTypeInput =
+    document.getElementById(
+      "internetSourceType"
+    );
+
+  const parserTypeInput =
+    document.getElementById(
+      "internetParserType"
+    );
+
+  const matchModeInput =
+    document.getElementById(
+      "internetMatchMode"
+    );
+
+  const trustLevelInput =
+    document.getElementById(
+      "internetTrustLevel"
+    );
+
+  const urlInput =
+    document.getElementById(
+      "internetSourceUrl"
+    );
+
+  const manualTextInput =
+    document.getElementById(
+      "internetManualText"
+    );
+
+  return {
+    gameId:
+      gameId,
+
+    sourceId:
+      sourceIdInput
+        ? sourceIdInput.value.trim()
+        : "manual-results",
+
+    name:
+      sourceNameInput
+        ? sourceNameInput.value.trim()
+        : "Manual Results",
+
+    sourceType:
+      sourceTypeInput
+        ? sourceTypeInput.value
+        : "manual",
+
+    parserType:
+      parserTypeInput
+        ? parserTypeInput.value
+        : "manual-text",
+
+    matchMode:
+      matchModeInput
+        ? matchModeInput.value
+        : "nominee-name",
+
+    trustLevel:
+      trustLevelInput
+        ? trustLevelInput.value
+        : "medium",
+
+    url:
+      urlInput
+        ? urlInput.value.trim()
+        : "",
+
+    manualText:
+      manualTextInput
+        ? manualTextInput.value.trim()
+        : "",
+
+    notes:
+      "Pulled from Manage Games internet import panel"
+  };
+
+}
+
+function adminSetupShowInternetPreview(res) {
+
+  const preview =
+    document.getElementById(
+      "internetImportPreview"
+    );
+
+  if (!preview) {
+    return;
+  }
+
+  if (!res) {
+
+    preview.innerText =
+      "";
+
+    return;
+
+  }
+
+  const text =
+    res.rawTextPreview ||
+    res.rawJsonPreview ||
+    (
+      res.import &&
+      (
+        res.import.rawTextPreview ||
+        res.import.rawJsonPreview
+      )
+    ) ||
+    "";
+
+  preview.innerText =
+    text ||
+    "No preview available.";
+
+}
+
+async function adminSetupInternetResultsSetup(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Setting up internet import sheets...",
+    false
+  );
+
+  const res =
+    await apiAdminSetupInternetResultsSystem(
+      gameId
+    );
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    res && res.success
+      ? "Internet import system ready. InternetSources and InternetImports are ready."
+      : res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not setup internet imports.",
+    !(res && res.success)
+  );
+
+}
+
+async function adminSetupPullInternetResults(gameId) {
+
+  const payload =
+    adminSetupGetInternetImportPayload(
+      gameId
+    );
+
+  if (
+    payload.sourceType !== "manual" &&
+    !payload.url
+  ) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      "URL is required unless Source Type is Manual Text.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (
+    payload.sourceType === "manual" &&
+    !payload.manualText
+  ) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      "Manual Results Text is required for manual imports.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Pulling internet results...",
+    false
+  );
+
+  adminSetupShowInternetPreview(null);
+
+  const res =
+    await apiAdminPullInternetResults(
+      payload
+    );
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    res && res.success
+      ? "Import saved to InternetImports."
+      : res && (res.message || res.error)
+        ? res.message || res.error
+        : "Internet import failed.",
+    !(res && res.success)
+  );
+
+  adminSetupShowInternetPreview(
+    res
+  );
+
+}
+
+async function adminSetupViewLastInternetImport(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Loading last import...",
+    false
+  );
+
+  const res =
+    await apiAdminGetLastInternetImport(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not load last import.",
+      true
+    );
+
+    return;
+
+  }
+
+  if (!res.import) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      "No internet imports found for this game yet.",
+      false
+    );
+
+    adminSetupShowInternetPreview(null);
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Last import loaded: " +
+      (res.import.sourceName || res.import.sourceId || ""),
+    false
+  );
+
+  adminSetupShowInternetPreview(
+    res
+  );
+
+}
+
+/* ======================
+   RESULT SUGGESTIONS
+====================== */
+
+function adminSetupRenderResultSuggestions(
+  gameId,
+  suggestions
+) {
+
+  const panel =
+    document.getElementById(
+      "resultSuggestionsPanel"
+    );
+
+  if (!panel) {
+    return;
+  }
+
+  suggestions =
+    Array.isArray(suggestions)
+      ? suggestions
+      : [];
+
+  if (!suggestions.length) {
+
+    panel.innerHTML =
+      `
+        <div class="admin-sub">
+          No result suggestions found.
+        </div>
+      `;
+
+    return;
+
+  }
+
+  panel.innerHTML =
+    `
+      <div class="admin-suggestions-list">
+
+        <h3>
+          Result Suggestions
+        </h3>
+
+        ${suggestions
+          .map(item => {
+
+            const status =
+              String(item.status || "pending");
+
+            const canAct =
+              status.toLowerCase() === "pending";
+
+            return `
+              <div class="admin-suggestion-card">
+
+                <div>
+                  <strong>
+                    ${adminSetupEscapeHtml(item.categoryName || item.categoryId)}
+                  </strong>
+
+                  <div class="admin-sub">
+                    Suggested Winner:
+                    ${adminSetupEscapeHtml(item.suggestedNomineeName || item.suggestedNomineeId)}
+                  </div>
+
+                  <div class="admin-sub">
+                    Confidence:
+                    ${Number(item.confidence) || 0}%
+                    · Status:
+                    ${adminSetupEscapeHtml(status)}
+                  </div>
+
+                  <div class="admin-sub">
+                    Matched:
+                    ${adminSetupEscapeHtml(item.matchedText || "")}
+                  </div>
+                </div>
+
+                ${
+                  canAct
+                    ? `
+                      <div class="admin-card-actions">
+
+                        <button
+                          class="admin-small-button"
+                          onclick="adminSetupApplyResultSuggestion('${adminSetupEscapeHtml(
+                            gameId
+                          )}', '${adminSetupEscapeHtml(
+                            item.suggestionId
+                          )}')"
+                        >
+                          Apply
+                        </button>
+
+                        <button
+                          class="admin-danger-button"
+                          onclick="adminSetupRejectResultSuggestion('${adminSetupEscapeHtml(
+                            gameId
+                          )}', '${adminSetupEscapeHtml(
+                            item.suggestionId
+                          )}')"
+                        >
+                          Reject
+                        </button>
+
+                      </div>
+                    `
+                    : ""
+                }
+
+              </div>
+            `;
+
+          })
+          .join("")}
+
+      </div>
+    `;
+
+}
+
+async function adminSetupGenerateResultSuggestions(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Generating result suggestions...",
+    false
+  );
+
+  const res =
+    await apiAdminGenerateResultSuggestions(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not generate suggestions.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Generated " +
+      (res.count || 0) +
+      " suggestion(s).",
+    false
+  );
+
+  adminSetupRenderResultSuggestions(
+    gameId,
+    res.suggestions || []
+  );
+
+}
+
+async function adminSetupViewResultSuggestions(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Loading result suggestions...",
+    false
+  );
+
+  const res =
+    await apiAdminGetResultSuggestions(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not load suggestions.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Suggestions loaded.",
+    false
+  );
+
+  adminSetupRenderResultSuggestions(
+    gameId,
+    res.suggestions || []
+  );
+
+}
+
+async function adminSetupApplyResultSuggestion(
+  gameId,
+  suggestionId
+) {
+
+  const ok =
+    confirm(
+      "Apply this suggestion as the official winner?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Applying suggestion...",
+    false
+  );
+
+  const res =
+    await apiAdminApplyResultSuggestion(
+      gameId,
+      suggestionId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not apply suggestion.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Suggestion applied and scoring updated.",
+    false
+  );
+
+  await adminSetupViewResultSuggestions(
+    gameId
+  );
+
+}
+
+async function adminSetupRejectResultSuggestion(
+  gameId,
+  suggestionId
+) {
+
+  const ok =
+    confirm(
+      "Reject this suggestion?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Rejecting suggestion...",
+    false
+  );
+
+  const res =
+    await apiAdminRejectResultSuggestion(
+      gameId,
+      suggestionId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not reject suggestion.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Suggestion rejected.",
+    false
+  );
+
+  await adminSetupViewResultSuggestions(
+    gameId
+  );
+
+}
+
+async function adminSetupApplyHighConfidenceSuggestions(gameId) {
+
+  const input =
+    document.getElementById(
+      "internetSuggestionMinConfidence"
+    );
+
+  const minConfidence =
+    input
+      ? Number(input.value || 90)
+      : 90;
+
+  const ok =
+    confirm(
+      "Apply all pending suggestions from the latest import with confidence " +
+      minConfidence +
+      "% or higher?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Applying high-confidence suggestions...",
+    false
+  );
+
+  const res =
+    await apiAdminApplyHighConfidenceSuggestions(
+      gameId,
+      minConfidence
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not apply high-confidence suggestions.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Applied " +
+      (res.appliedCount || 0) +
+      " suggestion(s). Failed: " +
+      (res.failedCount || 0) +
+      ". Scoring updated.",
+    false
+  );
+
+  await adminSetupViewResultSuggestions(
+    gameId
+  );
+
+}
+
+/* ======================
+   SAVED INTERNET SOURCES
+====================== */
+
+function adminSetupFillInternetSourceForm(source) {
+
+  source =
+    source || {};
+
+  const sourceIdInput =
+    document.getElementById(
+      "internetSourceId"
+    );
+
+  const sourceNameInput =
+    document.getElementById(
+      "internetSourceName"
+    );
+
+  const sourceTypeInput =
+    document.getElementById(
+      "internetSourceType"
+    );
+
+  const parserTypeInput =
+    document.getElementById(
+      "internetParserType"
+    );
+
+  const matchModeInput =
+    document.getElementById(
+      "internetMatchMode"
+    );
+
+  const trustLevelInput =
+    document.getElementById(
+      "internetTrustLevel"
+    );
+
+  const urlInput =
+    document.getElementById(
+      "internetSourceUrl"
+    );
+
+  if (sourceIdInput) {
+    sourceIdInput.value =
+      source.sourceId || "";
+  }
+
+  if (sourceNameInput) {
+    sourceNameInput.value =
+      source.name || "";
+  }
+
+  if (sourceTypeInput) {
+    sourceTypeInput.value =
+      source.sourceType || "webpage";
+  }
+
+  if (parserTypeInput) {
+    parserTypeInput.value =
+      source.parserType || "webpage-text";
+  }
+
+  if (matchModeInput) {
+    matchModeInput.value =
+      source.matchMode || "nominee-name";
+  }
+
+  if (trustLevelInput) {
+    trustLevelInput.value =
+      source.trustLevel || "medium";
+  }
+
+  if (urlInput) {
+    urlInput.value =
+      source.url || "";
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Loaded source: " +
+      (source.name || source.sourceId || ""),
+    false
+  );
+
+}
+
+function adminSetupRenderInternetSources(
+  gameId,
+  sources
+) {
+
+  const panel =
+    document.getElementById(
+      "internetSourcesPanel"
+    );
+
+  if (!panel) {
+    return;
+  }
+
+  sources =
+    Array.isArray(sources)
+      ? sources
+      : [];
+
+  if (!sources.length) {
+
+    panel.innerHTML =
+      `
+        <div class="admin-sub">
+          No saved internet sources found for this game yet.
+        </div>
+      `;
+
+    return;
+
+  }
+
+  panel.innerHTML =
+    `
+      <div class="admin-sources-list">
+
+        <h3>
+          Saved Internet Sources
+        </h3>
+
+        ${sources
+          .map(source => `
+            <div class="admin-source-card">
+
+              <div>
+                <strong>
+                  ${adminSetupEscapeHtml(source.name || source.sourceId)}
+                </strong>
+
+                <div class="admin-sub">
+                  ${adminSetupEscapeHtml(source.sourceType || "")}
+                  ·
+                  ${adminSetupEscapeHtml(source.parserType || "")}
+                  ·
+                  ${adminSetupEscapeHtml(source.trustLevel || "")}
+                </div>
+
+                <div class="admin-sub">
+                  ${adminSetupEscapeHtml(source.url || "Manual source")}
+                </div>
+
+                <div class="admin-sub">
+                  Last Status:
+                  ${adminSetupEscapeHtml(source.lastStatus || "Never pulled")}
+                </div>
+              </div>
+
+              <div class="admin-card-actions">
+
+                <button
+                  class="admin-small-button secondary"
+                  onclick='adminSetupFillInternetSourceForm(${JSON.stringify(source)})'
+                >
+                  Load
+                </button>
+
+                <button
+                  class="admin-small-button"
+                  onclick='adminSetupFillInternetSourceForm(${JSON.stringify(source)}); adminSetupPullInternetResults("${adminSetupEscapeHtml(gameId)}");'
+                >
+                  Pull
+                </button>
+
+              </div>
+
+            </div>
+          `)
+          .join("")}
+
+      </div>
+    `;
+
+}
+
+async function adminSetupLoadInternetSources(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Loading saved internet sources...",
+    false
+  );
+
+  const res =
+    await apiAdminGetInternetSources(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not load saved sources.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Loaded " +
+      (res.sources ? res.sources.length : 0) +
+      " saved source(s).",
+    false
+  );
+
+  adminSetupRenderInternetSources(
+    gameId,
+    res.sources || []
+  );
+
+}
+
+async function adminSetupSaveInternetSource(gameId) {
+
+  const payload =
+    adminSetupGetInternetImportPayload(
+      gameId
+    );
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Saving internet source...",
+    false
+  );
+
+  const res =
+    await apiAdminSaveInternetSource(
+      payload
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not save internet source.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Internet source saved.",
+    false
+  );
+
+  await adminSetupLoadInternetSources(
+    gameId
+  );
+
+}
+
+/* ======================
+   SPORTS SCOREBOARD PARSER
+====================== */
+
+function adminSetupRenderSportsScoreboard(res) {
+
+  const panel =
+    document.getElementById(
+      "sportsScoreboardPanel"
+    );
+
+  if (!panel) {
+    return;
+  }
+
+  if (!res) {
+
+    panel.innerHTML =
+      "";
+
+    return;
+
+  }
+
+  const games =
+    Array.isArray(res.games)
+      ? res.games
+      : [];
+
+  const suggestions =
+    Array.isArray(res.suggestions)
+      ? res.suggestions
+      : [];
+
+  panel.innerHTML =
+    `
+      <div class="admin-sources-list">
+
+        <h3>
+          Sports Scoreboard Parse
+        </h3>
+
+        <div class="admin-sub">
+          Parsed Games:
+          ${Number(res.parsedGameCount) || 0}
+          · Final Games:
+          ${Number(res.finalGameCount) || 0}
+          · Suggestions:
+          ${Number(res.suggestionCount) || 0}
+        </div>
+
+        ${
+          games.length
+            ? games
+                .map(game => `
+                  <div class="admin-source-card">
+
+                    <div>
+                      <strong>
+                        ${adminSetupEscapeHtml(game.awayName)}
+                        ${adminSetupEscapeHtml(game.awayScore)}
+                        @
+                        ${adminSetupEscapeHtml(game.homeName)}
+                        ${adminSetupEscapeHtml(game.homeScore)}
+                      </strong>
+
+                      <div class="admin-sub">
+                        Winner:
+                        ${adminSetupEscapeHtml(game.winnerName || "")}
+                      </div>
+
+                      <div class="admin-sub">
+                        Status:
+                        ${adminSetupEscapeHtml(game.status || "Final")}
+                      </div>
+
+                    </div>
+
+                  </div>
+                `)
+                .join("")
+            : `
+              <div class="admin-sub">
+                No final scoreboard games found.
+              </div>
+            `
+        }
+
+        ${
+          suggestions.length
+            ? `
+              <div class="admin-sub">
+                Sports suggestions were added to ResultSuggestions.
+                Use View Suggestions or Apply High Confidence next.
+              </div>
+            `
+            : ""
+        }
+
+      </div>
+    `;
+
+}
+
+async function adminSetupParseSportsScoreboard(gameId) {
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Parsing sports scoreboard...",
+    false
+  );
+
+  adminSetupRenderSportsScoreboard(null);
+
+  const res =
+    await apiAdminParseSportsScoreboard(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    adminSetupSetMessage(
+      "internetImportMessage",
+      res && (res.message || res.error)
+        ? res.message || res.error
+        : "Could not parse sports scoreboard.",
+      true
+    );
+
+    return;
+
+  }
+
+  adminSetupSetMessage(
+    "internetImportMessage",
+    "Sports scoreboard parsed. Final games: " +
+      (res.finalGameCount || 0) +
+      ". Suggestions: " +
+      (res.suggestionCount || 0) +
+      ".",
+    false
+  );
+
+  adminSetupRenderSportsScoreboard(
+    res
+  );
+
+  if (
+    res.suggestions &&
+    res.suggestions.length
+  ) {
+
+    adminSetupRenderResultSuggestions(
+      gameId,
+      res.suggestions
+    );
+
+  }
+
 }

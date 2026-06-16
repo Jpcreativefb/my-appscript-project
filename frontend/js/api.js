@@ -946,6 +946,365 @@ async function apiAdminRefreshResultsCaches(gameId) {
 
 }
 
+async function apiAdminSetupScoringAutomationSystem(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminSetupScoringAutomationSystem",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminRunScoringAutomation(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminRunScoringAutomation",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminGetScoringAutomationStatus(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminGetScoringAutomationStatus",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminInstallScoringAutomationTrigger() {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminInstallScoringAutomationTrigger",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
+  );
+
+}
+
+async function apiAdminUninstallScoringAutomationTrigger() {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminUninstallScoringAutomationTrigger",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
+  );
+
+}
+
+/* ======================
+   INTERNET RESULTS IMPORT
+====================== */
+
+async function apiAdminSetupInternetResultsSystem(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminSetupInternetResultsSystem",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminPullInternetResults(payload) {
+
+  const session =
+    getSession();
+
+  payload =
+    payload || {};
+
+  return api(
+    "adminPullInternetResults",
+    {
+      ...payload,
+
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
+  );
+
+}
+
+async function apiAdminGetLastInternetImport(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminGetLastInternetImport",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminGetInternetSources(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminGetInternetSources",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminSaveInternetSource(payload) {
+
+  const session =
+    getSession();
+
+  payload =
+    payload || {};
+
+  return api(
+    "adminSaveInternetSource",
+    {
+      ...payload,
+
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
+  );
+
+}
+
+async function apiAdminGenerateResultSuggestions(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminGenerateResultSuggestions",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminGetResultSuggestions(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminGetResultSuggestions",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminApplyResultSuggestion(
+  gameId,
+  suggestionId
+) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminApplyResultSuggestion",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId,
+
+      suggestionId:
+        suggestionId
+    }
+  );
+
+}
+
+async function apiAdminRejectResultSuggestion(
+  gameId,
+  suggestionId
+) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminRejectResultSuggestion",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId,
+
+      suggestionId:
+        suggestionId
+    }
+  );
+
+}
+
+async function apiAdminApplyHighConfidenceSuggestions(
+  gameId,
+  minConfidence = 90
+) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminApplyHighConfidenceSuggestions",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId,
+
+      minConfidence:
+        minConfidence,
+
+      latestOnly:
+        true
+    }
+  );
+
+}
+
+async function apiAdminParseSportsScoreboard(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminParseSportsScoreboard",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
 /* ======================
    BETTING
 ====================== */

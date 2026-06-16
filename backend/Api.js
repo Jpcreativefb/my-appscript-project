@@ -151,6 +151,24 @@ function doGet(e) {
       "adminRunGamePreflight",
       "adminRefreshResultsCaches",
 
+      "adminSetupScoringAutomationSystem",
+      "adminRunScoringAutomation",
+      "adminGetScoringAutomationStatus",
+      "adminInstallScoringAutomationTrigger",
+      "adminUninstallScoringAutomationTrigger",
+
+      "adminSetupInternetResultsSystem",
+      "adminPullInternetResults",
+      "adminGetLastInternetImport",
+      "adminGetInternetSources",
+      "adminSaveInternetSource",
+      "adminGenerateResultSuggestions",
+      "adminGetResultSuggestions",
+      "adminApplyResultSuggestion",
+      "adminRejectResultSuggestion",
+      "adminApplyHighConfidenceSuggestions",
+      "adminParseSportsScoreboard",
+
       "adminSetupLiveResultsSystem",
       "adminSetLiveWinner",
       "adminClearLiveWinner",
@@ -408,6 +426,290 @@ function doGet(e) {
         adminRefreshResultsCaches(
           params
         )
+      );
+
+    }
+
+    if (action === "adminSetupScoringAutomationSystem") {
+
+      return json(
+        apiAdminSetupScoringAutomationSystem({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminRunScoringAutomation") {
+
+      return json(
+        apiAdminRunScoringAutomation({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminGetScoringAutomationStatus") {
+
+      return json(
+        apiAdminGetScoringAutomationStatus({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminInstallScoringAutomationTrigger") {
+
+      return json(
+        apiAdminInstallScoringAutomationTrigger({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+
+    }
+
+    if (action === "adminUninstallScoringAutomationTrigger") {
+
+      return json(
+        apiAdminUninstallScoringAutomationTrigger({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+
+    }
+
+    if (action === "adminSetupInternetResultsSystem") {
+
+      return json(
+        apiAdminSetupInternetResultsSystem({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminPullInternetResults") {
+
+      return json(
+        apiAdminPullInternetResults({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          sourceId:
+            params.sourceId,
+          name:
+            params.name,
+          sourceType:
+            params.sourceType,
+          url:
+            params.url,
+          parserType:
+            params.parserType,
+          matchMode:
+            params.matchMode,
+          trustLevel:
+            params.trustLevel,
+          manualText:
+            params.manualText,
+          notes:
+            params.notes
+        })
+      );
+
+    }
+
+    if (action === "adminGetLastInternetImport") {
+
+      return json(
+        apiAdminGetLastInternetImport({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+        if (action === "adminGetInternetSources") {
+
+      return json(
+        apiAdminGetInternetSources({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminSaveInternetSource") {
+
+      return json(
+        apiAdminSaveInternetSource({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          sourceId:
+            params.sourceId,
+          name:
+            params.name,
+          sourceType:
+            params.sourceType,
+          url:
+            params.url,
+          parserType:
+            params.parserType,
+          matchMode:
+            params.matchMode,
+          trustLevel:
+            params.trustLevel,
+          notes:
+            params.notes,
+          active:
+            params.active
+        })
+      );
+
+    }
+
+    if (action === "adminGenerateResultSuggestions") {
+
+      return json(
+        apiAdminGenerateResultSuggestions({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminGetResultSuggestions") {
+
+      return json(
+        apiAdminGetResultSuggestions({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "adminApplyResultSuggestion") {
+
+      return json(
+        apiAdminApplyResultSuggestion({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          suggestionId:
+            params.suggestionId
+        })
+      );
+
+    }
+
+    if (action === "adminRejectResultSuggestion") {
+
+      return json(
+        apiAdminRejectResultSuggestion({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          suggestionId:
+            params.suggestionId,
+          notes:
+            params.notes || "Rejected by admin"
+        })
+      );
+
+    }
+
+    if (action === "adminApplyHighConfidenceSuggestions") {
+
+      return json(
+        apiAdminApplyHighConfidenceSuggestions({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          minConfidence:
+            params.minConfidence || 90,
+          latestOnly:
+            params.latestOnly === undefined
+              ? true
+              : params.latestOnly
+        })
+      );
+
+    }
+
+    if (action === "adminParseSportsScoreboard") {
+
+      return json(
+        apiAdminParseSportsScoreboard({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId
+        })
       );
 
     }
