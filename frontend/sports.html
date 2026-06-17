@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <title>Sports Scores</title>
+
+  <link rel="stylesheet" href="css/sports.css" />
+
+  <script defer src="js/sports.js"></script>
+</head>
+
+<body>
+  <header class="app-header">
+    <div>
+      <h1>Sports Scores</h1>
+      <p>Live scores, finals, snapshots, and enabled leagues.</p>
+    </div>
+
+    <nav class="top-nav">
+        <a href="./App.html">PATTC Predictions</a>
+        <a href="./sports.html" class="active">Sports</a>
+      </nav>
+  </header>
+
+  <main class="page">
+    <section class="toolbar">
+
+      <div class="filters-card">
+    
+        <label class="filter-control">
+          <span>League</span>
+    
+          <select id="leagueSelect">
+            <option value="">All Leagues</option>
+          </select>
+        </label>
+    
+        <label class="filter-control">
+          <span>Status</span>
+    
+          <select id="statusSelect">
+            <option value="all">All Games</option>
+            <option value="live">Live Only</option>
+            <option value="final">Final Only</option>
+            <option value="not-final">Not Final</option>
+          </select>
+        </label>
+    
+        <label class="filter-control">
+          <span>Date From</span>
+    
+          <input
+            id="dateFromInput"
+            type="date"
+          >
+        </label>
+    
+        <label class="filter-control">
+          <span>Date To</span>
+    
+          <input
+            id="dateToInput"
+            type="date"
+          >
+        </label>
+    
+        <label class="filter-control">
+          <span>Team</span>
+    
+          <input
+            id="teamInput"
+            type="search"
+            placeholder="Bears, Cubs, Lakers..."
+          >
+        </label>
+    
+        <div class="filter-actions">
+          <button
+            id="btnToday"
+            class="secondary-btn"
+          >
+            Today
+          </button>
+    
+          <button
+            id="btnClearFilters"
+            class="secondary-btn"
+          >
+            Clear
+          </button>
+    
+          <button
+            id="btnReload"
+            class="primary-btn"
+          >
+            Reload
+          </button>
+        </div>
+    
+      </div>
+    
+    </section>
+
+    <section id="statusBox" class="status-box">
+      Loading sports scores...
+    </section>
+
+    <section id="errorBox"></section>
+
+    <section id="scoresGrid" class="scores-grid"></section>
+
+    <section id="snapshotPanel" class="snapshot-panel hidden">
+      <div class="snapshot-header">
+        <h2 id="snapshotTitle">Snapshots</h2>
+
+        <button id="btnCloseSnapshots" class="secondary-btn">
+          Close
+        </button>
+      </div>
+
+      <div id="snapshotContent"></div>
+    </section>
+  </main>
+</body>
+</html>
