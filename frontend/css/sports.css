@@ -210,6 +210,8 @@
   }
   
   .card-actions {
+    display: grid;
+    gap: 8px;
     margin-top: 12px;
   }
   
@@ -222,6 +224,16 @@
   
   .small-btn:hover {
     background: #2563eb;
+  }
+
+  .wager-btn {
+    background: #14532d;
+    border-color: #22c55e;
+    color: #dcfce7;
+  }
+  
+  .wager-btn:hover {
+    background: #16a34a;
   }
   
   .empty-box {

@@ -100,6 +100,9 @@ function getCategoriesColumnMap_(headers){
     fileId:
       headers.indexOf("FileID"),
 
+    logoUrl:
+      headers.indexOf("LogoUrl"),  
+
     shortAnswer:
       headers.indexOf("ShortAnswer"),
 
@@ -450,15 +453,28 @@ function getCategories(gameId){
 
     const fileId =
       col.fileId > -1
-        ? row[col.fileId]
+        ? String(row[col.fileId] || "").trim()
         : "";
 
-    const nomineeImage =
-      fileId
+    const logoUrl =
+      col.logoUrl > -1
+        ? String(row[col.logoUrl] || "").trim()
+        : "";
 
-        ? `https://drive.google.com/thumbnail?id=${fileId}&sz=w240-h360`
+    let nomineeImage =
+      PLACEHOLDER_IMAGE;
 
-        : PLACEHOLDER_IMAGE;
+    if (logoUrl) {
+
+      nomineeImage =
+        logoUrl;
+
+    } else if (fileId) {
+
+      nomineeImage =
+        `https://drive.google.com/thumbnail?id=${fileId}&sz=w240-h360`;
+
+    }
 
     /* =========================
        PUSH NOMINEE

@@ -13,6 +13,9 @@
 const SPORTS_API_URL =
   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
 
+const SPORTS_WAGER_AWARDS_GAME_ID =
+  "sports-wagers";  
+
 /************************************
  STATE
 ************************************/
@@ -20,7 +23,8 @@ const SPORTS_API_URL =
 let sportsScoresState = {
   leagues: [],
   scores: [],
-  activeFilter: {}
+  activeFilter: {},
+  creatingWager: false
 };
 
 const LEAGUE_META = {
@@ -201,20 +205,40 @@ function bindSportsEvents() {
       hideSnapshotPanel();
     });
 
-  document
-    .getElementById("scoresGrid")
-    .addEventListener("click", function(e) {
-      const btn =
-        e.target.closest("[data-snapshot-game-id]");
+    document
+      .getElementById("scoresGrid")
+      .addEventListener("click", function(e) {
 
-      if (!btn) {
-        return;
-      }
+        const wagerBtn =
+          e.target.closest("[data-create-wager-game-id]");
 
-      const gameId =
-        btn.getAttribute("data-snapshot-game-id");
+        if (wagerBtn) {
 
-      loadSportsSnapshots(gameId);
+          const gameId =
+            wagerBtn.getAttribute(
+              "data-create-wager-game-id"
+            );
+
+          createSportsWagerFromCard(gameId);
+
+          return;
+
+        }
+
+        const snapshotBtn =
+          e.target.closest("[data-snapshot-game-id]");
+
+        if (!snapshotBtn) {
+          return;
+        }
+
+        const gameId =
+          snapshotBtn.getAttribute(
+            "data-snapshot-game-id"
+          );
+
+        loadSportsSnapshots(gameId);
+
     });
 }
 
@@ -574,6 +598,8 @@ function renderSportsScores(scores) {
         >
           View Snapshots
         </button>
+
+        ${renderCreateWagerButton(game)}
       </div>
     `;
 
@@ -618,6 +644,291 @@ function getSportsStatusInfo(game) {
     label: game.Status || state || "Status",
     className: "status-other"
   };
+}
+
+/************************************
+ SPORTS WAGER ADMIN TEST
+************************************/
+
+function getSportsStoredSession_() {
+
+  try {
+
+    return JSON.parse(
+      localStorage.getItem("session") || "{}"
+    );
+
+  } catch (err) {
+
+    return {};
+
+  }
+
+}
+
+function sportsSessionIsAdmin_(session) {
+
+  if (!session) {
+    return false;
+  }
+
+  return (
+    session.isAdmin === true ||
+    session.isAdmin === 1 ||
+    String(session.isAdmin || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(session.isAdmin || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(session.isAdmin || "")
+      .trim()
+      .toLowerCase() === "admin"
+  );
+
+}
+
+function getAwardsApiUrlForSportsWager_() {
+
+  if (
+    typeof CONFIG !== "undefined" &&
+    CONFIG.API_URL
+  ) {
+    return CONFIG.API_URL;
+  }
+
+  throw new Error(
+    "Awards API URL not found. Make sure config.js loads before sports.js."
+  );
+
+}
+
+async function sportsAwardsApi_(action, params) {
+
+  const url =
+    new URL(
+      getAwardsApiUrlForSportsWager_()
+    );
+
+  url.searchParams.set(
+    "action",
+    action
+  );
+
+  Object.keys(params || {})
+    .forEach(function(key) {
+
+      const value =
+        params[key];
+
+      if (
+        value === undefined ||
+        value === null ||
+        value === ""
+      ) {
+        return;
+      }
+
+      url.searchParams.set(
+        key,
+        value
+      );
+
+    });
+
+  const response =
+    await fetch(url);
+
+  return response.json();
+
+}
+
+function renderCreateWagerButton(game) {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (
+    !sportsSessionIsAdmin_(session)
+  ) {
+    return "";
+  }
+
+  if (
+    !game ||
+    !game.GameId ||
+    !game.HomeTeam ||
+    !game.AwayTeam
+  ) {
+    return "";
+  }
+
+  return `
+    <button
+      class="small-btn wager-btn"
+      data-create-wager-game-id="${escapeSportsHtml(game.GameId || "")}"
+    >
+      Create Wager
+    </button>
+  `;
+
+}
+
+async function createSportsWagerFromCard(gameId) {
+
+  if (
+    sportsScoresState.creatingWager
+  ) {
+    return;
+  }
+
+  const game =
+    sportsScoresState.scores.find(function(item) {
+      return item.GameId === gameId;
+    });
+
+  if (!game) {
+    showSportsError(
+      "Could not find selected sports game."
+    );
+    return;
+  }
+
+  const session =
+    getSportsStoredSession_();
+
+  if (
+    !session.username ||
+    !session.token ||
+    !sportsSessionIsAdmin_(session)
+  ) {
+    showSportsError(
+      "Log in as an admin in the main app first, then return to Sports."
+    );
+    return;
+  }
+
+  const awardsGameId =
+    prompt(
+      "Awards wager GameId",
+      SPORTS_WAGER_AWARDS_GAME_ID
+    );
+
+  if (!awardsGameId) {
+    return;
+  }
+
+  const awayOdds =
+    prompt(
+      "Away odds for " + game.AwayTeam,
+      "2"
+    );
+
+  if (awayOdds === null) {
+    return;
+  }
+
+  const homeOdds =
+    prompt(
+      "Home odds for " + game.HomeTeam,
+      "2"
+    );
+
+  if (homeOdds === null) {
+    return;
+  }
+
+  sportsScoresState.creatingWager =
+    true;
+
+  setSportsStatus(
+    "Creating wager for " +
+    game.AwayTeam +
+    " @ " +
+    game.HomeTeam +
+    "..."
+  );
+
+  try {
+
+    const res =
+      await sportsAwardsApi_(
+        "adminCreateSportsWager",
+        {
+          username:
+            session.username,
+
+          token:
+            session.token,
+
+          gameId:
+            awardsGameId,
+
+          awardsGameId:
+            awardsGameId,
+
+          sportsGameId:
+            game.GameId,
+
+          espnEventId:
+            game.ESPNEventId,
+
+          awayOdds:
+            awayOdds,
+
+          homeOdds:
+            homeOdds
+        }
+      );
+
+    if (
+      !res ||
+      res.success === false
+    ) {
+
+      if (res && res.duplicate) {
+        setSportsStatus(
+          "This game already exists as a wager."
+        );
+        return;
+      }
+
+      throw new Error(
+        (res && (res.message || res.error)) ||
+        "Could not create wager."
+      );
+
+    }
+
+    setSportsStatus(
+      "Created wager: " +
+      (res.category || res.categoryId) +
+      ". Open the Sports Wagers game to test betting."
+    );
+
+    alert(
+      "Wager created. Now open the Sports Wagers game and place a test bet."
+    );
+
+  } catch (err) {
+
+    showSportsError(
+      err && err.message
+        ? err.message
+        : "Could not create wager."
+    );
+
+    setSportsStatus(
+      "Could not create wager."
+    );
+
+  } finally {
+
+    sportsScoresState.creatingWager =
+      false;
+
+  }
+
 }
 
 /************************************

@@ -173,6 +173,9 @@ function doGet(e) {
       "adminSetLiveWinner",
       "adminClearLiveWinner",
 
+      "adminCreateSportsWager",
+      "adminSettleSportsWagers",
+
       "adminSummary",
       "adminClearCaches",
       "adminUpdateCategorySetting",
@@ -1143,6 +1146,8 @@ function doGet(e) {
 
     }
 
+    
+
         // =========================
     // BETTING OPTIONS
     // =========================
@@ -1153,6 +1158,68 @@ function doGet(e) {
         getBettingOptions(
           gameId
         )
+      );
+
+    }
+
+        // =========================
+    // ADMIN: SPORTS WAGERS
+    // =========================
+
+    if (action === "adminCreateSportsWager") {
+
+      return json(
+        apiAdminCreateSportsWager({
+
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
+
+          sportsGameId:
+            params.sportsGameId,
+
+          espnEventId:
+            params.espnEventId,
+
+          categoryId:
+            params.categoryId,
+
+          awayOdds:
+            params.awayOdds,
+
+          homeOdds:
+            params.homeOdds
+
+        })
+      );
+
+    }
+
+    if (action === "adminSettleSportsWagers") {
+
+      return json(
+        apiAdminSettleSportsWagers({
+
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
+
+          force:
+            params.force
+
+        })
       );
 
     }
