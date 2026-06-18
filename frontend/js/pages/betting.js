@@ -150,99 +150,293 @@ function renderBettingSummary_(summary){
 
 }
 
+function formatBettingGameDate_(value){
+
+  if (!value) {
+    return "";
+  }
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) {
+    return String(value);
+  }
+
+  return d.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+}
+
+function getBettingCountdown_(value, locked){
+
+  if (locked) {
+    return "Locked";
+  }
+
+  if (!value) {
+    return "";
+  }
+
+  const d = new Date(value);
+
+  if (isNaN(d.getTime())) {
+    return "";
+  }
+
+  const diff = d.getTime() - Date.now();
+
+  if (diff <= 0) {
+    return "Locks now";
+  }
+
+  const minutes = Math.floor(diff / 60000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const mins = minutes % 60;
+
+  if (days > 0) {
+    return `Locks in ${days}d ${hours}h`;
+  }
+
+  if (hours > 0) {
+    return `Locks in ${hours}h ${mins}m`;
+  }
+
+  return `Locks in ${mins}m`;
+
+}
+
+function getBettingNomineeRecord_(category, nominee){
+
+  const name =
+    String(nominee.name || nominee.shortAnswer || "")
+      .trim()
+      .toLowerCase();
+
+  const home =
+    String(category.homeTeam || "")
+      .trim()
+      .toLowerCase();
+
+  const away =
+    String(category.awayTeam || "")
+      .trim()
+      .toLowerCase();
+
+  if (name && home && name === home) {
+    return category.homeRecord || "";
+  }
+
+  if (name && away && name === away) {
+    return category.awayRecord || "";
+  }
+
+  return "";
+
+}
+
+function getBettingNomineeScore_(category, nominee){
+
+  const name =
+    String(nominee.name || nominee.shortAnswer || "")
+      .trim()
+      .toLowerCase();
+
+  const home =
+    String(category.homeTeam || "")
+      .trim()
+      .toLowerCase();
+
+  const away =
+    String(category.awayTeam || "")
+      .trim()
+      .toLowerCase();
+
+  if (name && home && name === home && category.homeScore !== "") {
+    return category.homeScore;
+  }
+
+  if (name && away && name === away && category.awayScore !== "") {
+    return category.awayScore;
+  }
+
+  return "";
+
+}
+
 function renderBettingCategory_(category, bet, config){
 
-  const inputId = getBetAmountInputId_(category.id);
+  const inputId =
+    getBetAmountInputId_(category.id);
 
   const defaultAmount = bet
     ? bet.betAmount
     : (config.minWager || config.minBet);
 
-  const locked = category.locked === true;
+  const locked =
+    category.locked === true;
 
   const currentPick = bet
     ? getBettingNomineeName_(category, bet.nomineeId)
     : "";
 
-  return `
-    <section class="betting-category-card ${locked ? "locked" : ""}">
+  const gameDate =
+    formatBettingGameDate_(category.lockDateTime);
 
-      <div class="betting-category-head">
-        <div>
+  const countdown =
+    getBettingCountdown_(category.lockDateTime, locked);
+
+  const league =
+    category.league || category.section || "";
+
+  const statusLine =
+    [
+      category.sportsStatus,
+      category.sportsClock
+        ? category.sportsClock
+        : "",
+      category.sportsPeriod
+        ? "P" + category.sportsPeriod
+        : ""
+    ]
+      .filter(Boolean)
+      .join(" · ");
+
+  return `
+    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""}">
+
+      <summary class="betting-category-summary">
+
+        <div class="betting-summary-main">
           <div class="betting-category-title">
             ${escapeBettingHtml_(category.shortName || category.name)}
           </div>
 
+          <div class="betting-game-meta">
+            ${league ? `
+              <span>${escapeBettingHtml_(String(league).toUpperCase())}</span>
+            ` : ""}
+
+            ${gameDate ? `
+              <span>${escapeBettingHtml_(gameDate)}</span>
+            ` : ""}
+
+            ${statusLine ? `
+              <span>${escapeBettingHtml_(statusLine)}</span>
+            ` : ""}
+          </div>
+
           ${bet ? `
             <div class="betting-current">
-              Current bet: ${money_(bet.betAmount)} on ${escapeBettingHtml_(currentPick)}
+              Current: ${money_(bet.betAmount)} on ${escapeBettingHtml_(currentPick)}
             </div>
           ` : `
             <div class="betting-current muted">
-              No bet placed yet
+              Tap to place bet
             </div>
           `}
         </div>
 
-        ${locked ? `
-          <div class="betting-lock-badge">Locked</div>
-        ` : ""}
-      </div>
+        <div class="betting-summary-side">
+          ${countdown ? `
+            <div class="betting-countdown ${locked ? "locked" : ""}">
+              ${escapeBettingHtml_(countdown)}
+            </div>
+          ` : ""}
 
-      <label class="betting-amount-label" for="${inputId}">
-        Bet amount
-      </label>
+          <div class="betting-expand-icon">⌄</div>
+        </div>
 
-      <input
-        id="${inputId}"
-        class="betting-amount-input"
-        type="number"
-        inputmode="numeric"
-        min="${config.minWager || config.minBet}"
-        max="${config.maxWager || config.maxBet}"
-        step="1"
-        value="${defaultAmount}"
-        ${locked ? "disabled" : ""}
-      >
+      </summary>
 
-      <div class="betting-nominee-grid">
-        ${(category.nominees || []).map(nominee => {
+      <div class="betting-collapsible-body">
 
-          const selected = bet &&
-            bet.nomineeId === nominee.id;
+        <label class="betting-amount-label" for="${inputId}">
+          Bet amount
+        </label>
 
-          const potential = Number(defaultAmount || 0) *
-            Number(nominee.odds || 0);
+        <input
+          id="${inputId}"
+          class="betting-amount-input"
+          type="number"
+          inputmode="numeric"
+          min="${config.minWager || config.minBet}"
+          max="${config.maxWager || config.maxBet}"
+          step="1"
+          value="${defaultAmount}"
+          ${locked ? "disabled" : ""}
+        >
 
-          return `
-            <button
-              class="betting-nominee-card ${selected ? "selected" : ""}"
-              onclick="saveBetSelection('${category.id}', '${nominee.id}')"
-              ${locked ? "disabled" : ""}
-            >
+        <div class="betting-nominee-grid">
+          ${(category.nominees || []).map(nominee => {
+
+            const selected = bet &&
+              bet.nomineeId === nominee.id;
+
+            const potential =
+              Number(defaultAmount || 0) *
+              Number(nominee.odds || 0);
+
+            const record =
+              getBettingNomineeRecord_(category, nominee);
+
+            const score =
+              getBettingNomineeScore_(category, nominee);
+
+            return `
+              <button
+                class="betting-nominee-card ${selected ? "selected" : ""}"
+                onclick="saveBetSelection('${category.id}', '${nominee.id}')"
+                ${locked ? "disabled" : ""}
+              >
+              <div class="betting-logo-score-area">
+
               ${nominee.image ? `
                 <img
                   src="${escapeBettingHtml_(nominee.image)}"
                   alt=""
                   loading="lazy"
                 >
-              ` : ""}
+              ` : `
+                <div class="betting-logo-placeholder"></div>
+              `}
+            
+            </div>
 
-              <div class="betting-nominee-name">
-                ${escapeBettingHtml_(nominee.shortAnswer || nominee.name)}
-              </div>
+                <div class="betting-nominee-name">
+                  ${escapeBettingHtml_(nominee.shortAnswer || nominee.name)}
 
-              <div class="betting-odds-row">
-                <span>${odds_(nominee.odds)}</span>
-                <span>Return ${money_(potential)}</span>
-              </div>
-            </button>
-          `;
+                  ${record ? `
+                    <span class="betting-team-record">
+                      ${escapeBettingHtml_(record)}
+                    </span>
+                  ` : ""}
+                </div>
 
-        }).join("")}
+                <div class="betting-odds-row">
+                  <span>${odds_(nominee.odds)}</span>
+                  <span>Return ${money_(potential)}</span>
+                </div>
+
+                ${score !== "" ? `
+                  <div class="betting-button-score">
+                    ${escapeBettingHtml_(score)}
+                  </div>
+                ` : ""}
+              </button>
+            `;
+
+          }).join("")}
+        </div>
+
       </div>
 
-    </section>
+    </details>
   `;
 
 }

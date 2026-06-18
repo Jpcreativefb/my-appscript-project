@@ -175,6 +175,7 @@ function doGet(e) {
 
       "adminCreateSportsWager",
       "adminSettleSportsWagers",
+      "adminRefreshSportsWagerScores",
 
       "adminSummary",
       "adminClearCaches",
@@ -1205,23 +1206,43 @@ function doGet(e) {
 
       return json(
         apiAdminSettleSportsWagers({
-
+    
           username:
             params.username,
-
+    
           token:
             params.token,
-
+    
           awardsGameId:
             params.awardsGameId ||
             gameId,
-
+    
           force:
             params.force
-
+    
         })
       );
-
+    
+    }
+    
+    if (action === "adminRefreshSportsWagerScores") {
+    
+      return json(
+        apiAdminRefreshSportsWagerScores({
+    
+          username:
+            params.username,
+    
+          token:
+            params.token,
+    
+          awardsGameId:
+            params.awardsGameId ||
+            gameId
+    
+        })
+      );
+    
     }
 
     // =========================

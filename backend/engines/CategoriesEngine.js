@@ -124,8 +124,44 @@ function getCategoriesColumnMap_(headers){
     predictionGame:
       headers.indexOf("PredictionGame"),
 
-    communityRank:
-      headers.indexOf("CommunityRank")
+      communityRank:
+      headers.indexOf("CommunityRank"),
+    
+    sportsLeague:
+      headers.indexOf("SportsLeague"),
+    
+    sportsGameId:
+      headers.indexOf("SportsGameId"),
+    
+    espnEventId:
+      headers.indexOf("ESPNEventId"),
+    
+    homeTeam:
+      headers.indexOf("HomeTeam"),
+    
+    awayTeam:
+      headers.indexOf("AwayTeam"),
+    
+    homeRecord:
+      headers.indexOf("HomeRecord"),
+    
+    awayRecord:
+      headers.indexOf("AwayRecord"),
+    
+    homeScore:
+      headers.indexOf("HomeScore"),
+    
+    awayScore:
+      headers.indexOf("AwayScore"),
+    
+    sportsStatus:
+      headers.indexOf("SportsStatus"),
+    
+    sportsClock:
+      headers.indexOf("SportsClock"),
+    
+    sportsPeriod:
+      headers.indexOf("SportsPeriod")
 
   };
 
@@ -436,6 +472,66 @@ function getCategories(gameId){
               )
 
             : false,
+        
+        sportsLeague:
+            col.sportsLeague > -1
+              ? String(row[col.sportsLeague] || "").trim()
+              : "",
+          
+        sportsGameId:
+            col.sportsGameId > -1
+              ? String(row[col.sportsGameId] || "").trim()
+              : "",
+          
+        espnEventId:
+            col.espnEventId > -1
+              ? String(row[col.espnEventId] || "").trim()
+              : "",
+          
+        homeTeam:
+            col.homeTeam > -1
+              ? String(row[col.homeTeam] || "").trim()
+              : "",
+          
+        awayTeam:
+            col.awayTeam > -1
+              ? String(row[col.awayTeam] || "").trim()
+              : "",
+          
+        homeRecord:
+            col.homeRecord > -1
+              ? String(row[col.homeRecord] || "").trim()
+              : "",
+          
+        awayRecord:
+            col.awayRecord > -1
+              ? String(row[col.awayRecord] || "").trim()
+              : "",
+          
+        homeScore:
+            col.homeScore > -1
+              ? row[col.homeScore]
+              : "",
+          
+        awayScore:
+            col.awayScore > -1
+              ? row[col.awayScore]
+              : "",
+          
+        sportsStatus:
+            col.sportsStatus > -1
+              ? String(row[col.sportsStatus] || "").trim()
+              : "",
+          
+        sportsClock:
+            col.sportsClock > -1
+              ? String(row[col.sportsClock] || "").trim()
+              : "",
+          
+        sportsPeriod:
+            col.sportsPeriod > -1
+              ? String(row[col.sportsPeriod] || "").trim()
+              : "",    
 
         /* =========================
            NOMINEES

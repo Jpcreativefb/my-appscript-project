@@ -672,21 +672,63 @@ function getBettingOptions(gameId){
 
         });
 
-      return {
-        id: categoryId,
-        name: category.name,
-        shortName: category.shortName || setting.shortName || category.name,
-        section: category.section || "Other",
-        image: category.image || "",
-        displayOrder: Number(category.displayOrder) || 999,
-        locked: isBettingCategoryLocked_(category, setting),
-        winnerNomineeId: normalizeBetKey_(
-          setting.winnerNomineeId ||
-          category.winnerNomineeId ||
-          ""
-        ),
-        nominees: nominees
-      };
+        return {
+          id: categoryId,
+          name: category.name,
+          shortName: category.shortName || setting.shortName || category.name,
+          section: category.section || "Other",
+          league: category.sportsLeague || category.section || "Other",
+        
+          image: category.image || "",
+          displayOrder: Number(category.displayOrder) || 999,
+        
+          locked: isBettingCategoryLocked_(category, setting),
+          lockDateTime:
+            setting.lockDateTime ||
+            category.lockDateTime ||
+            "",
+        
+          sportsGameId:
+            category.sportsGameId || "",
+        
+          espnEventId:
+            category.espnEventId || "",
+        
+          homeTeam:
+            category.homeTeam || "",
+        
+          awayTeam:
+            category.awayTeam || "",
+        
+          homeRecord:
+            category.homeRecord || "",
+        
+          awayRecord:
+            category.awayRecord || "",
+        
+          homeScore:
+            category.homeScore || "",
+        
+          awayScore:
+            category.awayScore || "",
+        
+          sportsStatus:
+            category.sportsStatus || "",
+        
+          sportsClock:
+            category.sportsClock || "",
+        
+          sportsPeriod:
+            category.sportsPeriod || "",
+        
+          winnerNomineeId: normalizeBetKey_(
+            setting.winnerNomineeId ||
+            category.winnerNomineeId ||
+            ""
+          ),
+        
+          nominees: nominees
+        };
 
     })
     .filter(category => category.nominees.length > 0)

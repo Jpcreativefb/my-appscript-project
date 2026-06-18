@@ -288,6 +288,14 @@ function setupSportsWagerSystem() {
         "SportsMarket",
         "HomeTeam",
         "AwayTeam",
+        "HomeRecord",
+        "AwayRecord",
+        "HomeScore",
+        "AwayScore",
+        "SportsStatus",
+        "SportsState",
+        "SportsClock",
+        "SportsPeriod",
         "BettingOdds",
         "OddsSource",
         "OddsLastUpdated",
@@ -745,6 +753,62 @@ function appendSportsWagerCategoryRow_(
     col,
     "AwayTeam",
     awayTeam
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "HomeRecord",
+    sportsWagerString_(score.HomeRecord)
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "AwayRecord",
+    sportsWagerString_(score.AwayRecord)
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "HomeScore",
+    score.HomeScore
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "AwayScore",
+    score.AwayScore
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsStatus",
+    sportsWagerString_(score.Status)
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsState",
+    sportsWagerString_(score.State)
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsClock",
+    sportsWagerString_(score.Clock)
+  );
+  
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsPeriod",
+    sportsWagerString_(score.Period)
   );
 
   sportsWagerSetIfExists_(
@@ -1606,124 +1670,225 @@ function apiAdminSettleSportsWagers(payload) {
 }
 
 /* =====================================================
-   ONE-TIME CLEANUP:
-   Merge duplicate Categories.BettingOdds columns.
-   Keeps the first BettingOdds column and deletes later ones.
+   REFRESH LIVE SCORES FOR SPORTS WAGER CATEGORIES
+   Copies latest Sports Scores Engine data into Categories.
 ===================================================== */
 
-function cleanupDuplicateBettingOddsColumn() {
+function refreshSportsWagerScores(payload) {
+
+  payload =
+    payload || {};
+
+  setupSportsWagerSystem();
+
+  const awardsGameId =
+    sportsWagerNormalizeGameId_(
+      payload.awardsGameId ||
+      payload.gameId ||
+      SPORTS_WAGER_DEFAULT_GAME_ID
+    );
+
+  validateGameId(
+    awardsGameId
+  );
 
   const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(CATEGORIES_SHEET);
-
-  if (!sh) {
-    throw new Error(
-      "Missing sheet: " + CATEGORIES_SHEET
+    sportsWagerGetSheet_(
+      CATEGORIES_SHEET
     );
-  }
 
-  const lastRow =
-    sh.getLastRow();
+  const data =
+    sh.getDataRange()
+      .getValues();
 
-  const lastColumn =
-    sh.getLastColumn();
-
-  if (
-    lastRow < 1 ||
-    lastColumn < 1
-  ) {
+  if (data.length <= 1) {
     return {
-      success: false,
-      message: "Categories sheet is empty"
+      success: true,
+      awardsGameId: awardsGameId,
+      checked: 0,
+      updated: 0,
+      message: "No category rows found"
     };
   }
 
   const headers =
-    sh
-      .getRange(1, 1, 1, lastColumn)
-      .getValues()[0]
-      .map(function(header) {
-        return String(header || "").trim();
-      });
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
 
-  const bettingOddsColumns = [];
+  const col =
+    sportsWagerHeaderMap_(
+      headers
+    );
 
-  headers.forEach(function(header, index) {
-    if (header === "BettingOdds") {
-      bettingOddsColumns.push(index + 1);
-    }
-  });
+  const required = [
+    "GameId",
+    "CategoryId",
+    "SportsGameId",
+    "ESPNEventId",
+    "HomeScore",
+    "AwayScore",
+    "SportsStatus",
+    "SportsClock",
+    "SportsPeriod"
+  ];
 
-  if (bettingOddsColumns.length <= 1) {
-    return {
-      success: true,
-      message: "No duplicate BettingOdds columns found",
-      columnsFound: bettingOddsColumns
-    };
+  const missing =
+    required.filter(function(header) {
+      return col[header] === undefined;
+    });
+
+  if (missing.length) {
+    throw new Error(
+      "Categories missing sports score columns: " +
+      missing.join(", ")
+    );
   }
 
-  const keepColumn =
-    bettingOddsColumns[0];
+  const scoreCache = {};
 
-  const duplicateColumns =
-    bettingOddsColumns.slice(1);
+  const summary = {
+    success: true,
+    awardsGameId: awardsGameId,
+    checked: 0,
+    updated: 0,
+    skipped: 0,
+    errors: []
+  };
 
-  const rowCount =
-    Math.max(0, lastRow - 1);
+  for (let i = 1; i < data.length; i++) {
 
-  if (rowCount > 0) {
+    const row =
+      data[i];
 
-    const keepValues =
-      sh
-        .getRange(2, keepColumn, rowCount, 1)
-        .getValues();
+    const rowGameId =
+      sportsWagerString_(
+        row[col.GameId]
+      );
 
-    duplicateColumns.forEach(function(columnNumber) {
+    if (rowGameId !== awardsGameId) {
+      continue;
+    }
 
-      const duplicateValues =
-        sh
-          .getRange(2, columnNumber, rowCount, 1)
-          .getValues();
+    const sportsGameId =
+      sportsWagerString_(
+        row[col.SportsGameId]
+      );
 
-      for (let i = 0; i < rowCount; i++) {
+    const espnEventId =
+      sportsWagerString_(
+        row[col.ESPNEventId]
+      );
 
-        const existing =
-          keepValues[i][0];
+    if (
+      !sportsGameId &&
+      !espnEventId
+    ) {
+      summary.skipped++;
+      continue;
+    }
 
-        const duplicate =
-          duplicateValues[i][0];
+    const cacheKey =
+      sportsGameId ||
+      espnEventId;
 
-        if (
-          (
-            existing === "" ||
-            existing === null ||
-            existing === undefined
-          ) &&
-          duplicate !== "" &&
-          duplicate !== null &&
-          duplicate !== undefined
-        ) {
-          keepValues[i][0] = duplicate;
-        }
+    try {
+
+      if (!scoreCache[cacheKey]) {
+
+        scoreCache[cacheKey] =
+          fetchSportsScoreForWager_({
+            sportsGameId:
+              sportsGameId,
+            espnEventId:
+              espnEventId
+          });
+
+        summary.checked++;
 
       }
 
-    });
+      const score =
+        scoreCache[cacheKey];
 
-    sh
-      .getRange(2, keepColumn, rowCount, 1)
-      .setValues(keepValues);
+      const rowNumber =
+        i + 1;
+
+      sh
+        .getRange(
+          rowNumber,
+          col.HomeScore + 1
+        )
+        .setValue(
+          score.HomeScore
+        );
+
+      sh
+        .getRange(
+          rowNumber,
+          col.AwayScore + 1
+        )
+        .setValue(
+          score.AwayScore
+        );
+
+      sh
+        .getRange(
+          rowNumber,
+          col.SportsStatus + 1
+        )
+        .setValue(
+          sportsWagerString_(score.Status)
+        );
+
+      sh
+        .getRange(
+          rowNumber,
+          col.SportsClock + 1
+        )
+        .setValue(
+          sportsWagerString_(score.Clock)
+        );
+
+      sh
+        .getRange(
+          rowNumber,
+          col.SportsPeriod + 1
+        )
+        .setValue(
+          sportsWagerString_(score.Period)
+        );
+
+      if (col.SportsState !== undefined) {
+        sh
+          .getRange(
+            rowNumber,
+            col.SportsState + 1
+          )
+          .setValue(
+            sportsWagerString_(score.State)
+          );
+      }
+
+      summary.updated++;
+
+    } catch (err) {
+
+      summary.errors.push({
+        row: i + 1,
+        sportsGameId: sportsGameId,
+        espnEventId: espnEventId,
+        error:
+          err && err.message
+            ? err.message
+            : String(err)
+      });
+
+    }
 
   }
 
-  duplicateColumns
-    .slice()
-    .reverse()
-    .forEach(function(columnNumber) {
-      sh.deleteColumn(columnNumber);
-    });
+  SpreadsheetApp.flush();
 
   if (
     typeof clearAppCaches ===
@@ -1732,12 +1897,21 @@ function cleanupDuplicateBettingOddsColumn() {
     clearAppCaches();
   }
 
-  return {
-    success: true,
-    message:
-      "Merged duplicate BettingOdds columns and deleted duplicates",
-    keptColumn: keepColumn,
-    deletedColumns: duplicateColumns
-  };
+  return summary;
+
+}
+
+function apiAdminRefreshSportsWagerScores(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return refreshSportsWagerScores(
+    payload
+  );
 
 }
