@@ -1314,6 +1314,14 @@ function renderBettingAdminControls_(session){
       </button>
 
       <button
+        class="betting-admin-btn tertiary"
+        type="button"
+        onclick="autoSetWagerOddsFromPage_()"
+      >
+        Auto Odds
+      </button>
+
+      <button
         class="betting-admin-btn secondary"
         type="button"
         onclick="settleWagersFromPage_()"
@@ -1678,6 +1686,63 @@ async function settleWagersFromPage_(){
         (res.settled || 0) +
         ", skipped: " +
         (res.skipped || 0),
+        ""
+      );
+  }
+
+  if (app) {
+    app.innerHTML =
+      await renderBettingPage();
+  }
+
+}
+
+async function autoSetWagerOddsFromPage_(){
+
+  const notice =
+    document.getElementById("bettingNotice");
+
+  const app =
+    document.getElementById("app");
+
+  const gameId =
+    getBettingGameId_();
+
+  if (notice) {
+    notice.innerHTML =
+      renderBettingNotice_(
+        "Updating automatic odds. Games with existing bets will be protected...",
+        ""
+      );
+  }
+
+  const res =
+    await apiAdminAutoSetSportsWagerOdds(
+      gameId
+    );
+
+  if (!res || res.success === false) {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          (res && (res.error || res.message)) ||
+          "Could not update automatic odds.",
+          "error"
+        );
+    }
+
+    return;
+
+  }
+
+  if (notice) {
+    notice.innerHTML =
+      renderBettingNotice_(
+        "Auto odds updated. Rows updated: " +
+        (res.updatedRows || 0) +
+        ". Protected games with bets: " +
+        (res.protected || 0),
         ""
       );
   }

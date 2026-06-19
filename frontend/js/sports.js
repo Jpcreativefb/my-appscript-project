@@ -818,31 +818,182 @@ async function createSportsWagerFromCard(gameId) {
     return;
   }
 
-  const awayOdds =
+  const marketChoice =
     prompt(
-      "Away odds for " + game.AwayTeam,
-      "2"
+      "Choose wager market:\n\n" +
+      "1 = Moneyline\n" +
+      "2 = Spread\n" +
+      "3 = Total / Over-Under",
+      "1"
     );
 
-  if (awayOdds === null) {
+  if (marketChoice === null) {
     return;
   }
 
-  const homeOdds =
+  const wagerMarket =
+    String(marketChoice).trim() === "2"
+      ? "spread"
+      : String(marketChoice).trim() === "3"
+        ? "total"
+        : "moneyline";
+
+  const oddsModeChoice =
     prompt(
-      "Home odds for " + game.HomeTeam,
-      "2"
+      "Choose odds mode:\n\n" +
+      "1 = Real Odds\n" +
+      "2 = App Odds / Record Odds\n" +
+      "3 = Manual Odds",
+      "1"
     );
 
-  if (homeOdds === null) {
+  if (oddsModeChoice === null) {
     return;
+  }
+
+  const oddsMode =
+    String(oddsModeChoice).trim() === "2"
+      ? "record"
+      : String(oddsModeChoice).trim() === "3"
+        ? "manual"
+        : "real";
+
+  if (
+    oddsMode === "record" &&
+    wagerMarket !== "moneyline"
+  ) {
+    alert(
+      "App Odds / Record Odds only works for Moneyline.\n\nUse Real Odds or Manual Odds for Spread and Total."
+    );
+    return;
+  }
+
+  let awayOdds = "";
+  let homeOdds = "";
+  let awayLine = "";
+  let homeLine = "";
+  let totalPoints = "";
+  let overOdds = "";
+  let underOdds = "";
+
+  if (
+    oddsMode === "manual" &&
+    wagerMarket === "moneyline"
+  ) {
+
+    awayOdds =
+      prompt(
+        "Away moneyline odds for " + game.AwayTeam,
+        "2"
+      );
+
+    if (awayOdds === null) {
+      return;
+    }
+
+    homeOdds =
+      prompt(
+        "Home moneyline odds for " + game.HomeTeam,
+        "2"
+      );
+
+    if (homeOdds === null) {
+      return;
+    }
+
+  }
+
+  if (
+    oddsMode === "manual" &&
+    wagerMarket === "spread"
+  ) {
+
+    awayLine =
+      prompt(
+        "Away spread line for " + game.AwayTeam + "\nExample: +1.5 or -1.5",
+        "+1.5"
+      );
+
+    if (awayLine === null) {
+      return;
+    }
+
+    awayOdds =
+      prompt(
+        "Away spread odds for " + game.AwayTeam,
+        "1.91"
+      );
+
+    if (awayOdds === null) {
+      return;
+    }
+
+    homeLine =
+      prompt(
+        "Home spread line for " + game.HomeTeam + "\nExample: -1.5 or +1.5",
+        "-1.5"
+      );
+
+    if (homeLine === null) {
+      return;
+    }
+
+    homeOdds =
+      prompt(
+        "Home spread odds for " + game.HomeTeam,
+        "1.91"
+      );
+
+    if (homeOdds === null) {
+      return;
+    }
+
+  }
+
+  if (
+    oddsMode === "manual" &&
+    wagerMarket === "total"
+  ) {
+
+    totalPoints =
+      prompt(
+        "Total points/runs/goals line\nExample: 8.5",
+        "8.5"
+      );
+
+    if (totalPoints === null) {
+      return;
+    }
+
+    overOdds =
+      prompt(
+        "Over odds",
+        "1.91"
+      );
+
+    if (overOdds === null) {
+      return;
+    }
+
+    underOdds =
+      prompt(
+        "Under odds",
+        "1.91"
+      );
+
+    if (underOdds === null) {
+      return;
+    }
+
   }
 
   sportsScoresState.creatingWager =
     true;
 
   setSportsStatus(
-    "Creating wager for " +
+    "Creating " +
+    wagerMarket +
+    " wager for " +
     game.AwayTeam +
     " @ " +
     game.HomeTeam +
@@ -873,11 +1024,37 @@ async function createSportsWagerFromCard(gameId) {
           espnEventId:
             game.ESPNEventId,
 
+          wagerMarket:
+            wagerMarket,
+
+          oddsMode:
+            oddsMode,
+
+          awayLine:
+            awayLine,
+
+          homeLine:
+            homeLine,
+
+          totalPoints:
+            totalPoints,
+
           awayOdds:
             awayOdds,
 
           homeOdds:
-            homeOdds
+            homeOdds,
+
+          overOdds:
+            overOdds,
+
+          underOdds:
+            underOdds,
+
+          autoOdds:
+            oddsMode === "manual"
+              ? "false"
+              : "true"
         }
       );
 
@@ -888,7 +1065,7 @@ async function createSportsWagerFromCard(gameId) {
 
       if (res && res.duplicate) {
         setSportsStatus(
-          "This game already exists as a wager."
+          "This game and market already exists as a wager."
         );
         return;
       }
@@ -901,13 +1078,18 @@ async function createSportsWagerFromCard(gameId) {
     }
 
     setSportsStatus(
-      "Created wager: " +
+      "Created " +
+      wagerMarket +
+      " wager: " +
       (res.category || res.categoryId) +
-      ". Open the Sports Wagers game to test betting."
+      "."
     );
 
     alert(
-      "Wager created. Now open the Sports Wagers game and place a test bet."
+      "Wager created.\n\nMarket: " +
+      wagerMarket +
+      "\nOdds Source: " +
+      (res.oddsSource || oddsMode)
     );
 
   } catch (err) {

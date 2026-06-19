@@ -1389,3 +1389,24 @@ async function apiAdminSettleSportsWagers(gameId) {
   );
 
 }
+
+async function apiAdminAutoSetSportsWagerOdds(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminAutoSetSportsWagerOdds",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}

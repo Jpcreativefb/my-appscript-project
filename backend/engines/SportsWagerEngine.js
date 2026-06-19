@@ -122,6 +122,7 @@ function sportsWagerSafeDateValue_(value) {
 
 }
 
+
 /* =====================================================
    SHEET HELPERS
 ===================================================== */
@@ -286,6 +287,8 @@ function setupSportsWagerSystem() {
         "ESPNEventId",
         "SportsLeague",
         "SportsMarket",
+        "SportsSelection",
+        "SportsLine",
         "HomeTeam",
         "AwayTeam",
         "HomeRecord",
@@ -555,6 +558,18 @@ function sportsWagerGetCategoryRows_(awardsGameId) {
           : "",
       sportsGameId: sportsGameId,
       espnEventId: espnEventId,
+      sportsMarket:
+        col.SportsMarket !== undefined
+          ? sportsWagerNormalizeMarket_(row[col.SportsMarket])
+          : "moneyline",
+      sportsSelection:
+        col.SportsSelection !== undefined
+          ? sportsWagerKey_(row[col.SportsSelection])
+          : "",
+      sportsLine:
+        col.SportsLine !== undefined
+          ? sportsWagerNumber_(row[col.SportsLine], "")
+          : "",
       homeTeam:
         col.HomeTeam !== undefined
           ? sportsWagerString_(row[col.HomeTeam])
@@ -572,6 +587,748 @@ function sportsWagerGetCategoryRows_(awardsGameId) {
 }
 
 /* =====================================================
+   SPORTS WAGER MARKET + ODDS HELPERS
+===================================================== */
+
+const SPORTS_WAGER_MIN_AUTO_ODDS =
+  1.35;
+
+const SPORTS_WAGER_MAX_AUTO_ODDS =
+  3.75;
+
+const SPORTS_WAGER_AUTO_ODDS_SOURCE =
+  "auto-record-v1";
+
+function sportsWagerNormalizeMarket_(market) {
+
+  market =
+    sportsWagerKey_(
+      market ||
+      SPORTS_WAGER_DEFAULT_MARKET ||
+      "moneyline"
+    );
+
+  if (
+    market === "h2h" ||
+    market === "ml" ||
+    market === "moneyline"
+  ) {
+    return "moneyline";
+  }
+
+  if (
+    market === "spread" ||
+    market === "spreads"
+  ) {
+    return "spread";
+  }
+
+  if (
+    market === "total" ||
+    market === "totals" ||
+    market === "overunder" ||
+    market === "over-under"
+  ) {
+    return "total";
+  }
+
+  return "moneyline";
+
+}
+
+function sportsWagerFormatLine_(value) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+    return "";
+  }
+
+  const n =
+    Number(value);
+
+  if (
+    isNaN(n) ||
+    !isFinite(n)
+  ) {
+    return sportsWagerString_(value);
+  }
+
+  if (n > 0) {
+    return "+" + n;
+  }
+
+  return String(n);
+
+}
+
+function sportsWagerMarketLabel_(market) {
+
+  market =
+    sportsWagerNormalizeMarket_(market);
+
+  if (market === "spread") {
+    return "Spread";
+  }
+
+  if (market === "total") {
+    return "Total";
+  }
+
+  return "Moneyline";
+
+}
+
+function sportsWagerCategoryName_(
+  score,
+  market
+) {
+
+  const awayTeam =
+    sportsWagerString_(
+      score.AwayTeam
+    );
+
+  const homeTeam =
+    sportsWagerString_(
+      score.HomeTeam
+    );
+
+  return (
+    awayTeam +
+    " @ " +
+    homeTeam +
+    " — " +
+    sportsWagerMarketLabel_(market)
+  );
+
+}
+
+function sportsWagerClamp_(
+  value,
+  min,
+  max
+) {
+
+  return Math.max(
+    min,
+    Math.min(
+      max,
+      value
+    )
+  );
+
+}
+
+function sportsWagerRoundOdds_(value) {
+
+  return Math.round(
+    Number(value || 0) * 20
+  ) / 20;
+
+}
+
+function sportsWagerPayloadHasValue_(value) {
+
+  return String(value || "")
+    .trim() !== "";
+
+}
+
+function sportsWagerParseRecord_(recordValue) {
+
+  const text =
+    sportsWagerString_(
+      recordValue
+    );
+
+  if (!text) {
+    return null;
+  }
+
+  const match =
+    text.match(
+      /^(\d+)\s*-\s*(\d+)(?:\s*-\s*(\d+))?/
+    );
+
+  if (!match) {
+    return null;
+  }
+
+  const wins =
+    Number(match[1] || 0);
+
+  const losses =
+    Number(match[2] || 0);
+
+  const ties =
+    Number(match[3] || 0);
+
+  const games =
+    wins + losses + ties;
+
+  if (!games) {
+    return null;
+  }
+
+  return {
+    wins: wins,
+    losses: losses,
+    ties: ties,
+    games: games,
+    winPct:
+      (wins + ties * 0.5) / games
+  };
+
+}
+
+function calculateSportsWagerAutoOdds_(score) {
+
+  score =
+    score || {};
+
+  const homeRecord =
+    sportsWagerParseRecord_(
+      score.HomeRecord
+    );
+
+  const awayRecord =
+    sportsWagerParseRecord_(
+      score.AwayRecord
+    );
+
+  if (
+    !homeRecord ||
+    !awayRecord
+  ) {
+
+    return {
+      source: "default-no-record",
+      homeOdds: SPORTS_WAGER_DEFAULT_ODDS,
+      awayOdds: SPORTS_WAGER_DEFAULT_ODDS
+    };
+
+  }
+
+  const strengthDiff =
+    homeRecord.winPct -
+    awayRecord.winPct;
+
+  const homeProbability =
+    sportsWagerClamp_(
+      0.52 + strengthDiff * 0.9,
+      0.27,
+      0.73
+    );
+
+  const awayProbability =
+    1 - homeProbability;
+
+  return {
+    source: SPORTS_WAGER_AUTO_ODDS_SOURCE,
+    homeOdds:
+      sportsWagerClamp_(
+        sportsWagerRoundOdds_(
+          1 / homeProbability
+        ),
+        SPORTS_WAGER_MIN_AUTO_ODDS,
+        SPORTS_WAGER_MAX_AUTO_ODDS
+      ),
+    awayOdds:
+      sportsWagerClamp_(
+        sportsWagerRoundOdds_(
+          1 / awayProbability
+        ),
+        SPORTS_WAGER_MIN_AUTO_ODDS,
+        SPORTS_WAGER_MAX_AUTO_ODDS
+      )
+  };
+
+}
+
+function getSportsWagerRealOddsForScore_(
+  score,
+  market
+) {
+
+  score =
+    score || {};
+
+  market =
+    sportsWagerNormalizeMarket_(
+      market
+    );
+
+  const league =
+    sportsWagerString_(
+      score.League
+    );
+
+  const homeTeam =
+    sportsWagerString_(
+      score.HomeTeam
+    );
+
+  const awayTeam =
+    sportsWagerString_(
+      score.AwayTeam
+    );
+
+  if (
+    !league ||
+    !homeTeam ||
+    !awayTeam
+  ) {
+    return null;
+  }
+
+  const params = {
+    action: "getSportsOdds",
+    league: league,
+    homeTeam: homeTeam,
+    awayTeam: awayTeam,
+    market: market,
+    refreshIfStale: "true"
+  };
+
+  const query =
+    Object.keys(params)
+      .map(function(key) {
+        return (
+          encodeURIComponent(key) +
+          "=" +
+          encodeURIComponent(params[key])
+        );
+      })
+      .join("&");
+
+  const response =
+    UrlFetchApp.fetch(
+      SPORTS_WAGER_API_URL + "?" + query,
+      {
+        method: "get",
+        muteHttpExceptions: true
+      }
+    );
+
+  const code =
+    response.getResponseCode();
+
+  const body =
+    response.getContentText();
+
+  if (
+    code < 200 ||
+    code >= 300
+  ) {
+    throw new Error(
+      "Sports Scores Engine odds API failed. HTTP " +
+      code +
+      ": " +
+      body.slice(0, 250)
+    );
+  }
+
+  const result =
+    JSON.parse(
+      body
+    );
+
+  if (
+    !result.success ||
+    result.found === false
+  ) {
+    return null;
+  }
+
+  return result;
+
+}
+
+function buildSportsWagerEntries_(
+  score,
+  market,
+  oddsMode,
+  payload
+) {
+
+  payload =
+    payload || {};
+
+  market =
+    sportsWagerNormalizeMarket_(
+      market
+    );
+
+  oddsMode =
+    sportsWagerKey_(
+      oddsMode ||
+      payload.oddsMode ||
+      "real"
+    );
+
+  const awayTeam =
+    sportsWagerString_(
+      score.AwayTeam
+    );
+
+  const homeTeam =
+    sportsWagerString_(
+      score.HomeTeam
+    );
+
+  const awayLogo =
+    sportsWagerString_(
+      score.AwayLogo
+    );
+
+  const homeLogo =
+    sportsWagerString_(
+      score.HomeLogo
+    );
+
+  let source = "manual";
+  let real = null;
+
+  if (oddsMode === "real") {
+
+    real =
+      getSportsWagerRealOddsForScore_(
+        score,
+        market
+      );
+
+    if (
+      !real &&
+      market !== "moneyline"
+    ) {
+      throw new Error(
+        "Real " +
+        sportsWagerMarketLabel_(market) +
+        " odds were not found for this game."
+      );
+    }
+
+  }
+
+  if (
+    oddsMode === "record" &&
+    market !== "moneyline"
+  ) {
+    throw new Error(
+      "App record odds only support Moneyline. Use Real Odds or Manual Odds for Spread/Total."
+    );
+  }
+
+  if (market === "moneyline") {
+
+    let awayOdds = "";
+    let homeOdds = "";
+
+    if (
+      oddsMode === "manual"
+    ) {
+
+      awayOdds =
+        sportsWagerNumber_(
+          payload.awayOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      homeOdds =
+        sportsWagerNumber_(
+          payload.homeOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      source = "manual";
+
+    } else if (
+      oddsMode === "record" ||
+      !real
+    ) {
+
+      const autoOdds =
+        calculateSportsWagerAutoOdds_(
+          score
+        );
+
+      awayOdds =
+        autoOdds.awayOdds;
+
+      homeOdds =
+        autoOdds.homeOdds;
+
+      source =
+        autoOdds.source;
+
+    } else {
+
+      awayOdds =
+        sportsWagerNumber_(
+          real.awayOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      homeOdds =
+        sportsWagerNumber_(
+          real.homeOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      source =
+        real.source ||
+        "sports-scores-odds";
+
+    }
+
+    return {
+      source: source,
+      entries: [
+        {
+          selection: "away",
+          name: awayTeam,
+          nomineeId:
+            sportsWagerSlug_(
+              awayTeam
+            ),
+          odds: awayOdds,
+          line: "",
+          logo: awayLogo
+        },
+        {
+          selection: "home",
+          name: homeTeam,
+          nomineeId:
+            sportsWagerSlug_(
+              homeTeam
+            ),
+          odds: homeOdds,
+          line: "",
+          logo: homeLogo
+        }
+      ]
+    };
+
+  }
+
+  if (market === "spread") {
+
+    let awayLine = "";
+    let homeLine = "";
+    let awayOdds = "";
+    let homeOdds = "";
+
+    if (oddsMode === "manual") {
+
+      awayLine =
+        sportsWagerNumber_(
+          payload.awayLine,
+          ""
+        );
+
+      homeLine =
+        sportsWagerNumber_(
+          payload.homeLine,
+          ""
+        );
+
+      awayOdds =
+        sportsWagerNumber_(
+          payload.awayOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      homeOdds =
+        sportsWagerNumber_(
+          payload.homeOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      source = "manual";
+
+    } else {
+
+      awayLine =
+        sportsWagerNumber_(
+          real.awaySpread,
+          ""
+        );
+
+      homeLine =
+        sportsWagerNumber_(
+          real.homeSpread,
+          ""
+        );
+
+      awayOdds =
+        sportsWagerNumber_(
+          real.awaySpreadOdds,
+          ""
+        );
+
+      homeOdds =
+        sportsWagerNumber_(
+          real.homeSpreadOdds,
+          ""
+        );
+
+      source =
+        real.source ||
+        "sports-scores-odds";
+
+    }
+
+    if (
+      awayLine === "" ||
+      homeLine === "" ||
+      !awayOdds ||
+      !homeOdds
+    ) {
+      throw new Error(
+        "Spread line or spread odds are missing."
+      );
+    }
+
+    return {
+      source: source,
+      entries: [
+        {
+          selection: "away",
+          name:
+            awayTeam +
+            " " +
+            sportsWagerFormatLine_(awayLine),
+          nomineeId:
+            sportsWagerSlug_(
+              awayTeam + "-spread"
+            ),
+          odds: awayOdds,
+          line: awayLine,
+          logo: awayLogo
+        },
+        {
+          selection: "home",
+          name:
+            homeTeam +
+            " " +
+            sportsWagerFormatLine_(homeLine),
+          nomineeId:
+            sportsWagerSlug_(
+              homeTeam + "-spread"
+            ),
+          odds: homeOdds,
+          line: homeLine,
+          logo: homeLogo
+        }
+      ]
+    };
+
+  }
+
+  if (market === "total") {
+
+    let totalPoints = "";
+    let overOdds = "";
+    let underOdds = "";
+
+    if (oddsMode === "manual") {
+
+      totalPoints =
+        sportsWagerNumber_(
+          payload.totalPoints,
+          ""
+        );
+
+      overOdds =
+        sportsWagerNumber_(
+          payload.overOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      underOdds =
+        sportsWagerNumber_(
+          payload.underOdds,
+          SPORTS_WAGER_DEFAULT_ODDS
+        );
+
+      source = "manual";
+
+    } else {
+
+      totalPoints =
+        sportsWagerNumber_(
+          real.totalPoints,
+          ""
+        );
+
+      overOdds =
+        sportsWagerNumber_(
+          real.overOdds,
+          ""
+        );
+
+      underOdds =
+        sportsWagerNumber_(
+          real.underOdds,
+          ""
+        );
+
+      source =
+        real.source ||
+        "sports-scores-odds";
+
+    }
+
+    if (
+      totalPoints === "" ||
+      !overOdds ||
+      !underOdds
+    ) {
+      throw new Error(
+        "Total line or over/under odds are missing."
+      );
+    }
+
+    return {
+      source: source,
+      entries: [
+        {
+          selection: "over",
+          name:
+            "Over " + totalPoints,
+          nomineeId:
+            "over-" +
+            sportsWagerSlug_(totalPoints),
+          odds: overOdds,
+          line: totalPoints,
+          logo: ""
+        },
+        {
+          selection: "under",
+          name:
+            "Under " + totalPoints,
+          nomineeId:
+            "under-" +
+            sportsWagerSlug_(totalPoints),
+          odds: underOdds,
+          line: totalPoints,
+          logo: ""
+        }
+      ]
+    };
+
+  }
+
+  throw new Error(
+    "Unsupported sports wager market: " + market
+  );
+
+}
+
+/* =====================================================
    CREATE CATEGORY ROW
 ===================================================== */
 
@@ -579,9 +1336,9 @@ function appendSportsWagerCategoryRow_(
   score,
   awardsGameId,
   categoryId,
-  nomineeName,
-  nomineeId,
-  odds
+  entry,
+  market,
+  oddsSource
 ) {
 
   const sh =
@@ -603,6 +1360,11 @@ function appendSportsWagerCategoryRow_(
     new Array(headers.length)
       .fill("");
 
+  market =
+    sportsWagerNormalizeMarket_(
+      market
+    );
+
   const awayTeam =
     sportsWagerString_(
       score.AwayTeam
@@ -613,13 +1375,11 @@ function appendSportsWagerCategoryRow_(
       score.HomeTeam
     );
 
-  const matchup =
-    awayTeam + " @ " + homeTeam;
-
-  const logo =
-    nomineeName === homeTeam
-      ? sportsWagerString_(score.HomeLogo)
-      : sportsWagerString_(score.AwayLogo);
+  const categoryName =
+    sportsWagerCategoryName_(
+      score,
+      market
+    );
 
   sportsWagerSetIfExists_(
     row,
@@ -632,7 +1392,7 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "Category",
-    matchup
+    categoryName
   );
 
   sportsWagerSetIfExists_(
@@ -646,14 +1406,14 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "Nominee",
-    nomineeName
+    entry.name
   );
 
   sportsWagerSetIfExists_(
     row,
     col,
     "NomineeId",
-    nomineeId
+    entry.nomineeId
   );
 
   sportsWagerSetIfExists_(
@@ -668,7 +1428,7 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "ShortAnswer",
-    nomineeName
+    entry.name
   );
 
   sportsWagerSetIfExists_(
@@ -738,7 +1498,21 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "SportsMarket",
-    SPORTS_WAGER_DEFAULT_MARKET
+    market
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsSelection",
+    entry.selection
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsLine",
+    entry.line
   );
 
   sportsWagerSetIfExists_(
@@ -761,49 +1535,49 @@ function appendSportsWagerCategoryRow_(
     "HomeRecord",
     sportsWagerString_(score.HomeRecord)
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "AwayRecord",
     sportsWagerString_(score.AwayRecord)
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "HomeScore",
     score.HomeScore
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "AwayScore",
     score.AwayScore
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "SportsStatus",
     sportsWagerString_(score.Status)
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "SportsState",
     sportsWagerString_(score.State)
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
     "SportsClock",
     sportsWagerString_(score.Clock)
   );
-  
+
   sportsWagerSetIfExists_(
     row,
     col,
@@ -816,7 +1590,7 @@ function appendSportsWagerCategoryRow_(
     col,
     "BettingOdds",
     sportsWagerNumber_(
-      odds,
+      entry.odds,
       SPORTS_WAGER_DEFAULT_ODDS
     )
   );
@@ -825,7 +1599,7 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "OddsSource",
-    "manual"
+    oddsSource || "manual"
   );
 
   sportsWagerSetIfExists_(
@@ -835,15 +1609,11 @@ function appendSportsWagerCategoryRow_(
     sportsWagerNow_()
   );
 
-  /*
-    Optional future support:
-    If you later add a LogoUrl column, this will fill it.
-  */
   sportsWagerSetIfExists_(
     row,
     col,
     "LogoUrl",
-    logo
+    entry.logo || ""
   );
 
   sh.appendRow(row);
@@ -910,7 +1680,8 @@ function sportsWagerSettingsRowExists_(
 function appendSportsWagerSettingsRow_(
   score,
   awardsGameId,
-  categoryId
+  categoryId,
+  market
 ) {
 
   if (
@@ -921,6 +1692,11 @@ function appendSportsWagerSettingsRow_(
   ) {
     return false;
   }
+
+  market =
+    sportsWagerNormalizeMarket_(
+      market
+    );
 
   const sh =
     sportsWagerGetSheet_(
@@ -941,18 +1717,11 @@ function appendSportsWagerSettingsRow_(
     new Array(headers.length)
       .fill("");
 
-  const awayTeam =
-    sportsWagerString_(
-      score.AwayTeam
+  const categoryName =
+    sportsWagerCategoryName_(
+      score,
+      market
     );
-
-  const homeTeam =
-    sportsWagerString_(
-      score.HomeTeam
-    );
-
-  const matchup =
-    awayTeam + " @ " + homeTeam;
 
   const lockDate =
     sportsWagerSafeDateValue_(
@@ -1063,7 +1832,7 @@ function appendSportsWagerSettingsRow_(
     row,
     col,
     "ShortName",
-    matchup
+    categoryName
   );
 
   sportsWagerSetIfExists_(
@@ -1077,7 +1846,7 @@ function appendSportsWagerSettingsRow_(
     row,
     col,
     "ScoreVersion",
-    "sports-wager-v1"
+    "sports-wager-v2"
   );
 
   sportsWagerSetIfExists_(
@@ -1243,12 +2012,22 @@ function createSportsWagerFromScore(payload) {
     );
   }
 
+  const market =
+    sportsWagerNormalizeMarket_(
+      payload.wagerMarket ||
+      payload.market ||
+      payload.sportsMarket ||
+      SPORTS_WAGER_DEFAULT_MARKET
+    );
+
   const categoryId =
     sportsWagerKey_(
       payload.categoryId ||
       (
         "sports-" +
         sportsWagerSlug_(score.League) +
+        "-" +
+        market +
         "-" +
         sportsWagerSlug_(
           score.ESPNEventId ||
@@ -1267,33 +2046,39 @@ function createSportsWagerFromScore(payload) {
       success: false,
       duplicate: true,
       message:
-        "This sports event already exists as a wager category.",
+        "This sports event and market already exists as a wager category.",
       awardsGameId: awardsGameId,
-      categoryId: categoryId
+      categoryId: categoryId,
+      market: market
     };
   }
 
-  const awayOdds =
-    sportsWagerNumber_(
-      payload.awayOdds,
-      SPORTS_WAGER_DEFAULT_ODDS
+  const oddsMode =
+    sportsWagerKey_(
+      payload.oddsMode ||
+      (
+        sportsWagerBoolean_(payload.autoOdds)
+          ? "real"
+          : "manual"
+      )
     );
 
-  const homeOdds =
-    sportsWagerNumber_(
-      payload.homeOdds,
-      SPORTS_WAGER_DEFAULT_ODDS
+  const wagerData =
+    buildSportsWagerEntries_(
+      score,
+      market,
+      oddsMode,
+      payload
     );
 
-  const awayNomineeId =
-    sportsWagerSlug_(
-      awayTeam
-    );
+  const entries =
+    wagerData.entries || [];
 
-  const homeNomineeId =
-    sportsWagerSlug_(
-      homeTeam
+  if (entries.length !== 2) {
+    throw new Error(
+      "Sports wager market must create exactly two nominees."
     );
+  }
 
   const lock =
     LockService.getScriptLock();
@@ -1302,28 +2087,24 @@ function createSportsWagerFromScore(payload) {
 
   try {
 
-    appendSportsWagerCategoryRow_(
-      score,
-      awardsGameId,
-      categoryId,
-      awayTeam,
-      awayNomineeId,
-      awayOdds
-    );
+    entries.forEach(function(entry) {
 
-    appendSportsWagerCategoryRow_(
-      score,
-      awardsGameId,
-      categoryId,
-      homeTeam,
-      homeNomineeId,
-      homeOdds
-    );
+      appendSportsWagerCategoryRow_(
+        score,
+        awardsGameId,
+        categoryId,
+        entry,
+        market,
+        wagerData.source
+      );
+
+    });
 
     appendSportsWagerSettingsRow_(
       score,
       awardsGameId,
-      categoryId
+      categoryId,
+      market
     );
 
     SpreadsheetApp.flush();
@@ -1344,21 +2125,31 @@ function createSportsWagerFromScore(payload) {
         sportsWagerString_(score.ESPNEventId),
       categoryId: categoryId,
       category:
-        awayTeam + " @ " + homeTeam,
+        sportsWagerCategoryName_(
+          score,
+          market
+        ),
+      market: market,
+      oddsMode: oddsMode,
+      oddsSource:
+        wagerData.source,
       lockDateTime:
         score.GameDateTime || "",
-      nominees: [
-        {
-          nomineeId: awayNomineeId,
-          name: awayTeam,
-          odds: awayOdds
-        },
-        {
-          nomineeId: homeNomineeId,
-          name: homeTeam,
-          odds: homeOdds
-        }
-      ]
+      nominees:
+        entries.map(function(entry) {
+          return {
+            nomineeId:
+              entry.nomineeId,
+            name:
+              entry.name,
+            odds:
+              entry.odds,
+            selection:
+              entry.selection,
+            line:
+              entry.line
+          };
+        })
     };
 
   } finally {
@@ -1406,8 +2197,7 @@ function sportsWagerBuildCategoriesBySportsGame_(
   rows.forEach(function(row) {
 
     const key =
-      row.sportsGameId ||
-      row.espnEventId;
+      row.categoryId;
 
     if (!key) {
       return;
@@ -1423,6 +2213,8 @@ function sportsWagerBuildCategoriesBySportsGame_(
           row.gameId,
         categoryId:
           row.categoryId,
+        market:
+          row.sportsMarket || "moneyline",
         nominees: []
       };
     }
@@ -1431,7 +2223,11 @@ function sportsWagerBuildCategoriesBySportsGame_(
       nomineeId:
         row.nomineeId,
       nominee:
-        row.nominee
+        row.nominee,
+      selection:
+        row.sportsSelection,
+      line:
+        row.sportsLine
     });
 
   });
@@ -1442,43 +2238,147 @@ function sportsWagerBuildCategoriesBySportsGame_(
 
 function sportsWagerFindWinnerNomineeId_(
   score,
-  nominees
+  nominees,
+  market
 ) {
 
-  const winnerName =
-    sportsWagerString_(
-      score.Winner
+  market =
+    sportsWagerNormalizeMarket_(
+      market
     );
 
-  if (!winnerName) {
-    return "";
-  }
-
-  const winnerSlug =
-    sportsWagerSlug_(
-      winnerName
+  const homeScore =
+    sportsWagerNumber_(
+      score.HomeScore,
+      0
     );
 
-  for (let i = 0; i < nominees.length; i++) {
+  const awayScore =
+    sportsWagerNumber_(
+      score.AwayScore,
+      0
+    );
 
-    const nominee = nominees[i];
+  if (market === "moneyline") {
 
-    if (
-      sportsWagerKey_(nominee.nomineeId) === winnerSlug ||
-      sportsWagerSlug_(nominee.nominee) === winnerSlug
-    ) {
-      return sportsWagerKey_(
-        nominee.nomineeId
+    const winnerName =
+      sportsWagerString_(
+        score.Winner
       );
+
+    if (!winnerName) {
+      return "";
     }
 
+    const winnerSlug =
+      sportsWagerSlug_(
+        winnerName
+      );
+
+    for (let i = 0; i < nominees.length; i++) {
+
+      const nominee =
+        nominees[i];
+
+      if (
+        sportsWagerKey_(nominee.nomineeId) === winnerSlug ||
+        sportsWagerSlug_(nominee.nominee) === winnerSlug
+      ) {
+        return sportsWagerKey_(
+          nominee.nomineeId
+        );
+      }
+
+    }
+
+    return "";
+
   }
 
-  /*
-    Fallback:
-    ESPN Winner should normally match the team display name.
-    If it does not, do not guess.
-  */
+  if (market === "spread") {
+
+    let best = null;
+    let bestAdjustedScore = null;
+
+    nominees.forEach(function(nominee) {
+
+      const selection =
+        sportsWagerKey_(
+          nominee.selection
+        );
+
+      const line =
+        sportsWagerNumber_(
+          nominee.line,
+          0
+        );
+
+      let adjusted = null;
+
+      if (selection === "home") {
+        adjusted = homeScore + line;
+      }
+
+      if (selection === "away") {
+        adjusted = awayScore + line;
+      }
+
+      if (adjusted === null) {
+        return;
+      }
+
+      if (
+        bestAdjustedScore === null ||
+        adjusted > bestAdjustedScore
+      ) {
+        bestAdjustedScore = adjusted;
+        best = nominee;
+      } else if (adjusted === bestAdjustedScore) {
+        best = null;
+      }
+
+    });
+
+    return best
+      ? sportsWagerKey_(best.nomineeId)
+      : "";
+
+  }
+
+  if (market === "total") {
+
+    const totalScore =
+      homeScore + awayScore;
+
+    const line =
+      nominees.length
+        ? sportsWagerNumber_(nominees[0].line, "")
+        : "";
+
+    if (line === "") {
+      return "";
+    }
+
+    if (totalScore === line) {
+      return "";
+    }
+
+    const winningSelection =
+      totalScore > line
+        ? "over"
+        : "under";
+
+    const winner =
+      nominees.find(function(nominee) {
+        return sportsWagerKey_(nominee.selection) === winningSelection;
+      });
+
+    return winner
+      ? sportsWagerKey_(winner.nomineeId)
+      : "";
+
+  }
+
   return "";
 
 }
@@ -1568,29 +2468,12 @@ refreshSportsWagerScores(
           0
         );
 
-      /*
-        V1 does not create a Draw nominee.
-        If a game ends tied, leave it unsettled for manual review.
-      */
-      if (homeScore === awayScore) {
-        summary.skipped++;
-        summary.errors.push({
-          sportsGameId:
-            item.sportsGameId,
-          espnEventId:
-            item.espnEventId,
-          categoryId:
-            item.categoryId,
-          error:
-            "Game completed tied. Manual settlement required."
-        });
-        return;
-      }
 
       const winnerNomineeId =
         sportsWagerFindWinnerNomineeId_(
           score,
-          item.nominees
+          item.nominees,
+          item.market
         );
 
       if (!winnerNomineeId) {
@@ -1963,6 +2846,452 @@ function apiAdminRefreshSportsWagerScores(payload) {
   );
 
   return refreshSportsWagerScores(
+    payload
+  );
+
+}
+
+/* =====================================================
+   AUTO UPDATE EXISTING SPORTS WAGER ODDS
+   Safe default: skips games that already have bets.
+===================================================== */
+
+function sportsWagerCategoryHasBets_(
+  awardsGameId,
+  categoryId
+) {
+
+  const sheetName =
+    typeof BETS_SHEET !== "undefined"
+      ? BETS_SHEET
+      : "Bets";
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        sheetName
+      );
+
+  if (!sh) {
+    return false;
+  }
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (data.length <= 1) {
+    return false;
+  }
+
+  const headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const col =
+    sportsWagerHeaderMap_(
+      headers
+    );
+
+  if (
+    col.GameId === undefined ||
+    col.CategoryId === undefined
+  ) {
+    return false;
+  }
+
+  for (let i = 1; i < data.length; i++) {
+
+    const rowGameId =
+      sportsWagerString_(
+        data[i][col.GameId]
+      );
+
+    const rowCategoryId =
+      sportsWagerKey_(
+        data[i][col.CategoryId]
+      );
+
+    if (
+      rowGameId === awardsGameId &&
+      rowCategoryId === sportsWagerKey_(categoryId)
+    ) {
+      return true;
+    }
+
+  }
+
+  return false;
+
+}
+
+function autoSetSportsWagerOdds(payload) {
+
+  payload =
+    payload || {};
+
+  setupSportsWagerSystem();
+
+  const awardsGameId =
+    sportsWagerNormalizeGameId_(
+      payload.awardsGameId ||
+      payload.gameId ||
+      SPORTS_WAGER_DEFAULT_GAME_ID
+    );
+
+  validateGameId(
+    awardsGameId
+  );
+
+  const force =
+    sportsWagerBoolean_(
+      payload.force
+    );
+
+  const sh =
+    sportsWagerGetSheet_(
+      CATEGORIES_SHEET
+    );
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (data.length <= 1) {
+    return {
+      success: true,
+      awardsGameId: awardsGameId,
+      checked: 0,
+      updatedRows: 0,
+      skipped: 0,
+      protected: 0,
+      errors: []
+    };
+  }
+
+  const headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const col =
+    sportsWagerHeaderMap_(
+      headers
+    );
+
+  const required = [
+    "GameId",
+    "CategoryId",
+    "Nominee",
+    "SportsGameId",
+    "ESPNEventId",
+    "SportsMarket",
+    "SportsSelection",
+    "BettingOdds"
+  ];
+
+  const missing =
+    required.filter(function(header) {
+      return col[header] === undefined;
+    });
+
+  if (missing.length) {
+    throw new Error(
+      "Categories missing auto odds columns: " +
+      missing.join(", ")
+    );
+  }
+
+  const groups = {};
+
+  for (let i = 1; i < data.length; i++) {
+
+    const row =
+      data[i];
+
+    const rowGameId =
+      sportsWagerString_(
+        row[col.GameId]
+      );
+
+    if (rowGameId !== awardsGameId) {
+      continue;
+    }
+
+    const sportsGameId =
+      sportsWagerString_(
+        row[col.SportsGameId]
+      );
+
+    const espnEventId =
+      sportsWagerString_(
+        row[col.ESPNEventId]
+      );
+
+    if (
+      !sportsGameId &&
+      !espnEventId
+    ) {
+      continue;
+    }
+
+    const categoryId =
+      sportsWagerKey_(
+        row[col.CategoryId]
+      );
+
+    const market =
+      sportsWagerNormalizeMarket_(
+        row[col.SportsMarket]
+      );
+
+    const key =
+      categoryId;
+
+    if (!groups[key]) {
+      groups[key] = {
+        categoryId: categoryId,
+        market: market,
+        sportsGameId: sportsGameId,
+        espnEventId: espnEventId,
+        rows: []
+      };
+    }
+
+    groups[key].rows.push({
+      rowNumber: i + 1,
+      nominee:
+        sportsWagerString_(
+          row[col.Nominee]
+        ),
+      selection:
+        sportsWagerKey_(
+          row[col.SportsSelection]
+        )
+    });
+
+  }
+
+  const keys =
+    Object.keys(groups);
+
+  const summary = {
+    success: true,
+    awardsGameId: awardsGameId,
+    checked: 0,
+    updatedRows: 0,
+    skipped: 0,
+    protected: 0,
+    errors: []
+  };
+
+  keys.forEach(function(key) {
+
+    const group =
+      groups[key];
+
+    try {
+
+      const hasBets =
+        sportsWagerCategoryHasBets_(
+          awardsGameId,
+          group.categoryId
+        );
+
+      if (
+        hasBets &&
+        !force
+      ) {
+        summary.protected++;
+        return;
+      }
+
+      const score =
+        fetchSportsScoreForWager_({
+          sportsGameId:
+            group.sportsGameId,
+          espnEventId:
+            group.espnEventId
+        });
+
+      const wagerData =
+        buildSportsWagerEntries_(
+          score,
+          group.market,
+          "real",
+          {}
+        );
+
+      const entriesBySelection = {};
+
+      (wagerData.entries || [])
+        .forEach(function(entry) {
+          entriesBySelection[
+            sportsWagerKey_(entry.selection)
+          ] = entry;
+        });
+
+      summary.checked++;
+
+      group.rows.forEach(function(item) {
+
+        let selection =
+          item.selection;
+
+        if (!selection) {
+
+          if (
+            sportsWagerString_(item.nominee) ===
+            sportsWagerString_(score.HomeTeam)
+          ) {
+            selection = "home";
+          }
+
+          if (
+            sportsWagerString_(item.nominee) ===
+            sportsWagerString_(score.AwayTeam)
+          ) {
+            selection = "away";
+          }
+
+        }
+
+        const entry =
+          entriesBySelection[selection];
+
+        if (
+          !entry ||
+          !entry.odds
+        ) {
+          summary.skipped++;
+          return;
+        }
+
+        sh
+          .getRange(
+            item.rowNumber,
+            col.BettingOdds + 1
+          )
+          .setValue(
+            entry.odds
+          );
+
+        if (col.SportsLine !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.SportsLine + 1
+            )
+            .setValue(
+              entry.line
+            );
+        }
+
+        if (col.Nominee !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.Nominee + 1
+            )
+            .setValue(
+              entry.name
+            );
+        }
+
+        if (col.ShortAnswer !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.ShortAnswer + 1
+            )
+            .setValue(
+              entry.name
+            );
+        }
+
+        if (col.LogoUrl !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.LogoUrl + 1
+            )
+            .setValue(
+              entry.logo || ""
+            );
+        }
+
+        if (col.OddsSource !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.OddsSource + 1
+            )
+            .setValue(
+              wagerData.source
+            );
+        }
+
+        if (col.OddsLastUpdated !== undefined) {
+          sh
+            .getRange(
+              item.rowNumber,
+              col.OddsLastUpdated + 1
+            )
+            .setValue(
+              sportsWagerNow_()
+            );
+        }
+
+        summary.updatedRows++;
+
+      });
+
+    } catch (err) {
+
+      summary.errors.push({
+        categoryId:
+          group.categoryId,
+        sportsGameId:
+          group.sportsGameId,
+        espnEventId:
+          group.espnEventId,
+        market:
+          group.market,
+        error:
+          err && err.message
+            ? err.message
+            : String(err)
+      });
+
+    }
+
+  });
+
+  SpreadsheetApp.flush();
+
+  if (
+    typeof clearAppCaches ===
+    "function"
+  ) {
+    clearAppCaches();
+  }
+
+  return summary;
+
+}
+
+function apiAdminAutoSetSportsWagerOdds(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return autoSetSportsWagerOdds(
     payload
   );
 

@@ -176,6 +176,7 @@ function doGet(e) {
       "adminCreateSportsWager",
       "adminSettleSportsWagers",
       "adminRefreshSportsWagerScores",
+      "adminAutoSetSportsWagerOdds",
 
       "adminSummary",
       "adminClearCaches",
@@ -1172,35 +1173,60 @@ function doGet(e) {
       return json(
         apiAdminCreateSportsWager({
 
-          username:
-            params.username,
+        username:
+          params.username,
 
-          token:
-            params.token,
+        token:
+          params.token,
 
-          awardsGameId:
-            params.awardsGameId ||
-            gameId,
+        awardsGameId:
+          params.awardsGameId ||
+          gameId,
 
-          sportsGameId:
-            params.sportsGameId,
+        gameId:
+          params.gameId,
 
-          espnEventId:
-            params.espnEventId,
+        sportsGameId:
+          params.sportsGameId,
 
-          categoryId:
-            params.categoryId,
+        espnEventId:
+          params.espnEventId,
 
-          awayOdds:
-            params.awayOdds,
+        wagerMarket:
+          params.wagerMarket ||
+          params.market,
 
-          homeOdds:
-            params.homeOdds
+        oddsMode:
+          params.oddsMode,
 
-        })
-      );
+        awayLine:
+          params.awayLine,
 
-    }
+        homeLine:
+          params.homeLine,
+
+        totalPoints:
+          params.totalPoints,
+
+        awayOdds:
+          params.awayOdds,
+
+        homeOdds:
+          params.homeOdds,
+
+        overOdds:
+          params.overOdds,
+  
+        underOdds:
+          params.underOdds,
+
+        autoOdds:
+         params.autoOdds
+
+      })
+    );
+
+  }
 
     if (action === "adminSettleSportsWagers") {
 
@@ -1242,6 +1268,29 @@ function doGet(e) {
     
         })
       );
+
+    if (action === "adminAutoSetSportsWagerOdds") {
+
+      return json(
+        apiAdminAutoSetSportsWagerOdds({
+
+        username:
+          params.username,
+
+        token:
+          params.token,
+
+        awardsGameId:
+          params.awardsGameId ||
+          gameId,
+
+        force:
+          params.force
+
+    })
+  );
+
+}
     
     }
 
