@@ -681,6 +681,154 @@ function sportsWagerMarketLabel_(market) {
 
 }
 
+function sportsWagerHasScoreValue_(value) {
+
+  return !(
+    value === "" ||
+    value === null ||
+    value === undefined
+  );
+
+}
+
+function sportsWagerIsCompletedScore_(score) {
+
+  score = score || {};
+
+  const status =
+    sportsWagerKey_(
+      score.Status ||
+      score.status ||
+      ""
+    );
+
+  const state =
+    sportsWagerKey_(
+      score.State ||
+      score.state ||
+      ""
+    );
+
+  return (
+    sportsWagerBoolean_(score.Completed) ||
+    sportsWagerBoolean_(score.completed) ||
+    state === "post" ||
+    state === "final" ||
+    status.indexOf("final") !== -1 ||
+    status.indexOf("full_time") !== -1 ||
+    status.indexOf("complete") !== -1 ||
+    status.indexOf("completed") !== -1
+  );
+
+}
+
+function sportsWagerFindWinnerSideFromScore_(score) {
+
+  score = score || {};
+
+  const explicitSide =
+    sportsWagerKey_(
+      score.WinnerSide ||
+      score.winnerSide ||
+      score.WinningSide ||
+      ""
+    );
+
+  if (
+    explicitSide === "home" ||
+    explicitSide === "away"
+  ) {
+    return explicitSide;
+  }
+
+  const winnerName =
+    sportsWagerString_(
+      score.Winner ||
+      score.winner ||
+      score.WinnerName ||
+      score.winnerName ||
+      score.WinnerTeam ||
+      score.winnerTeam ||
+      score.WinningTeam ||
+      score.winningTeam ||
+      ""
+    );
+
+  if (winnerName) {
+
+    const winnerKey =
+      sportsWagerKey_(winnerName);
+
+    const winnerSlug =
+      sportsWagerSlug_(winnerName);
+
+    const homeTeam =
+      sportsWagerString_(
+        score.HomeTeam ||
+        score.homeTeam ||
+        ""
+      );
+
+    const awayTeam =
+      sportsWagerString_(
+        score.AwayTeam ||
+        score.awayTeam ||
+        ""
+      );
+
+    if (
+      winnerKey === sportsWagerKey_(homeTeam) ||
+      winnerSlug === sportsWagerSlug_(homeTeam)
+    ) {
+      return "home";
+    }
+
+    if (
+      winnerKey === sportsWagerKey_(awayTeam) ||
+      winnerSlug === sportsWagerSlug_(awayTeam)
+    ) {
+      return "away";
+    }
+
+  }
+
+  if (!sportsWagerIsCompletedScore_(score)) {
+    return "";
+  }
+
+  if (
+    !sportsWagerHasScoreValue_(score.HomeScore) ||
+    !sportsWagerHasScoreValue_(score.AwayScore)
+  ) {
+    return "";
+  }
+
+  const homeScore =
+    sportsWagerNumber_(
+      score.HomeScore,
+      null
+    );
+
+  const awayScore =
+    sportsWagerNumber_(
+      score.AwayScore,
+      null
+    );
+
+  if (
+    homeScore === null ||
+    awayScore === null ||
+    homeScore === awayScore
+  ) {
+    return "";
+  }
+
+  return homeScore > awayScore
+    ? "home"
+    : "away";
+
+}
+
 function sportsWagerCategoryName_(
   score,
   market
@@ -2261,39 +2409,67 @@ function sportsWagerFindWinnerNomineeId_(
 
   if (market === "moneyline") {
 
-    const winnerName =
-      sportsWagerString_(
-        score.Winner
-      );
-
-    if (!winnerName) {
-      return "";
-    }
-
-    const winnerSlug =
-      sportsWagerSlug_(
-        winnerName
-      );
-
-    for (let i = 0; i < nominees.length; i++) {
-
-      const nominee =
-        nominees[i];
-
-      if (
-        sportsWagerKey_(nominee.nomineeId) === winnerSlug ||
-        sportsWagerSlug_(nominee.nominee) === winnerSlug
-      ) {
-        return sportsWagerKey_(
-          nominee.nomineeId
+      const winnerSide =
+        sportsWagerFindWinnerSideFromScore_(
+          score
         );
+  
+      const winnerName =
+        sportsWagerString_(
+          score.Winner ||
+          score.winner ||
+          score.WinnerName ||
+          score.winnerName ||
+          score.WinnerTeam ||
+          score.winnerTeam ||
+          score.WinningTeam ||
+          score.winningTeam ||
+          (
+            winnerSide === "home"
+              ? score.HomeTeam
+              : winnerSide === "away"
+                ? score.AwayTeam
+                : ""
+          )
+        );
+  
+      const winnerSlug =
+        sportsWagerSlug_(
+          winnerName
+        );
+  
+      for (let i = 0; i < nominees.length; i++) {
+  
+        const nominee =
+          nominees[i];
+  
+        const nomineeId =
+          sportsWagerKey_(
+            nominee.nomineeId
+          );
+  
+        if (
+          winnerSide &&
+          sportsWagerKey_(nominee.selection) === winnerSide
+        ) {
+          return nomineeId;
+        }
+  
+        if (
+          winnerSlug &&
+          (
+            nomineeId === winnerSlug ||
+            sportsWagerSlug_(nominee.nominee) === winnerSlug
+          )
+        ) {
+          return nomineeId;
+        }
+  
       }
-
+  
+      return "";
+  
     }
-
-    return "";
-
-  }
 
   if (market === "spread") {
 
@@ -2392,9 +2568,17 @@ function settleSportsWagers(payload) {
   payload =
     payload || {};
 
-refreshSportsWagerScores(
-   payload
-);  
+  if (
+    !sportsWagerBoolean_(
+      payload.skipRefresh
+    )
+  ) {
+
+    refreshSportsWagerScores(
+      payload
+    );
+
+  }
 
   const awardsGameId =
     sportsWagerNormalizeGameId_(
@@ -2447,27 +2631,14 @@ refreshSportsWagerScores(
       summary.checked++;
 
       const completed =
-        sportsWagerBoolean_(
-          score.Completed
+        sportsWagerIsCompletedScore_(
+          score
         );
 
       if (!completed) {
         summary.skipped++;
         return;
       }
-
-      const homeScore =
-        sportsWagerNumber_(
-          score.HomeScore,
-          0
-        );
-
-      const awayScore =
-        sportsWagerNumber_(
-          score.AwayScore,
-          0
-        );
-
 
       const winnerNomineeId =
         sportsWagerFindWinnerNomineeId_(
@@ -2487,6 +2658,20 @@ refreshSportsWagerScores(
             item.categoryId,
           winner:
             score.Winner || "",
+          homeTeam:
+            score.HomeTeam || "",
+          awayTeam:
+            score.AwayTeam || "",
+          homeScore:
+            score.HomeScore,
+          awayScore:
+            score.AwayScore,
+          status:
+            score.Status || "",
+          state:
+            score.State || "",
+          completed:
+            score.Completed,
           error:
             "Could not map SportsScores winner to nomineeId."
         });
@@ -2502,9 +2687,13 @@ refreshSportsWagerScores(
         );
 
       if (updated) {
+
         summary.settled++;
+
       } else {
+
         summary.skipped++;
+
       }
 
     } catch (err) {
@@ -2526,11 +2715,15 @@ refreshSportsWagerScores(
 
   });
 
+  SpreadsheetApp.flush();
+
   if (
     typeof clearAppCaches ===
     "function"
   ) {
+
     clearAppCaches();
+
   }
 
   return summary;
@@ -3304,31 +3497,44 @@ function apiAdminAutoSetSportsWagerOdds(payload) {
 const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
   "runSportsWagerScoreRefresh";
 
-function runSportsWagerScoreRefresh() {
+  function runSportsWagerScoreRefresh() {
 
-  const lock =
-    LockService.getScriptLock();
-
-  if (!lock.tryLock(1000)) {
-    return {
-      success: false,
-      message: "Sports wager score refresh already running"
-    };
+    const lock =
+      LockService.getScriptLock();
+  
+    if (!lock.tryLock(1000)) {
+      return {
+        success: false,
+        message: "Sports wager score refresh already running"
+      };
+    }
+  
+    try {
+  
+      const refresh =
+        refreshSportsWagerScores({
+          gameId: SPORTS_WAGER_DEFAULT_GAME_ID
+        });
+  
+      const settle =
+        settleSportsWagers({
+          gameId: SPORTS_WAGER_DEFAULT_GAME_ID,
+          skipRefresh: true
+        });
+  
+      return {
+        success: true,
+        refresh: refresh,
+        settle: settle
+      };
+  
+    } finally {
+  
+      lock.releaseLock();
+  
+    }
+  
   }
-
-  try {
-
-    return refreshSportsWagerScores({
-      gameId: SPORTS_WAGER_DEFAULT_GAME_ID
-    });
-
-  } finally {
-
-    lock.releaseLock();
-
-  }
-
-}
 
 function installSportsWagerScoreRefreshTrigger() {
 
@@ -3408,7 +3614,8 @@ function runSportsWagerAutoRefreshAndSettle() {
 
     const settle =
       settleSportsWagers({
-        gameId: SPORTS_WAGER_DEFAULT_GAME_ID
+        gameId: SPORTS_WAGER_DEFAULT_GAME_ID,
+        skipRefresh: true
       });
 
     return {

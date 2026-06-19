@@ -900,9 +900,15 @@ function getBetResolution_(bet, settings){
 
   }
 
+  const betNomineeId =
+    normalizeBetKey_(
+      bet.nomineeId
+    );
+
   const won =
-    normalizeBetKey_(bet.nomineeId) ===
-    winnerNomineeId;
+    betNomineeId === winnerNomineeId ||
+    slugifyBet_(betNomineeId) ===
+      slugifyBet_(winnerNomineeId);
 
   return {
     status: won ? "won" : "lost",
