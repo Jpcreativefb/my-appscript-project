@@ -27,6 +27,8 @@ let sportsScoresState = {
   creatingWager: false
 };
 
+let sportsUsageByGameId = {};
+
 const LEAGUE_META = {
   "football|nfl": {
     name: "NFL",
@@ -514,6 +516,8 @@ async function loadSportsScores(filters) {
     sportsScoresState.scores =
       data.scores || [];
 
+    await loadSportsUsageForScores_();
+
     renderSportsScores(
       sportsScoresState.scores
     );
@@ -575,7 +579,7 @@ function renderSportsScores(scores) {
            </div>
            <div class="score-value">${formatSportsScore(game.AwayScore)}</div>
          </div>
-   
+
          <div class="team-row ${getWinnerRowClass(game, "home")}">
             <div class="team-left">
               ${renderTeamLogo(game.HomeLogo)}
@@ -586,10 +590,13 @@ function renderSportsScores(scores) {
       </div>
 
       <div class="meta">
+          <div>Status: <span class="${escapeSportsHtml(statusInfo.className)}">${escapeSportsHtml(statusInfo.label)}</span></div>
           <div>${getSportsPeriodLabel(game)}: ${formatSportsPeriodValue(game)}</div>
           <div>${getSportsClockLabel(game)}: ${escapeSportsHtml(game.Clock || "-")}</div>
           <div>Updated: ${formatSportsDate(game.LastUpdated)}</div>
       </div>
+
+      ${renderSportsUsedIn(game)}
 
       <div class="card-actions">
         <button
@@ -605,6 +612,162 @@ function renderSportsScores(scores) {
 
     grid.appendChild(card);
   });
+}
+
+/************************************
+ SPORTS USAGE / USED IN ADMIN VIEW
+************************************/
+
+async function loadSportsUsageForScores_() {
+
+  sportsUsageByGameId = {};
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    return;
+  }
+
+  try {
+
+    const usageRes =
+      await apiAdminGetSportsUsage();
+
+    sportsUsageByGameId =
+      usageRes &&
+      usageRes.success
+        ? usageRes.usage || {}
+        : {};
+
+  } catch (err) {
+
+    console.warn(
+      "Could not load sports usage.",
+      err
+    );
+
+    sportsUsageByGameId = {};
+
+  }
+
+}
+
+function renderSportsUsedIn(game) {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    return "";
+  }
+
+  const usedIn =
+    getSportsUsageForGame_(game);
+
+  if (!usedIn.length) {
+
+    return `
+      <div class="sports-used sports-used-empty">
+        Not used in any app game
+      </div>
+    `;
+
+  }
+
+  return `
+    <div class="sports-used">
+
+      <div class="sports-used-title">
+        Used In
+      </div>
+
+      ${usedIn.map(function(item) {
+        return `
+          <div class="sports-used-item">
+
+            <div class="sports-used-game">
+              ${escapeSportsHtml(
+                item.appGameName ||
+                item.appGameId ||
+                "Awards Game"
+              )}
+            </div>
+
+            <div class="sports-used-line">
+              Category:
+              ${escapeSportsHtml(
+                item.categoryName ||
+                item.categoryId ||
+                "-"
+              )}
+            </div>
+
+            <div class="sports-used-meta">
+              App GameId:
+              ${escapeSportsHtml(
+                item.appGameId || "-"
+              )}
+            </div>
+
+            <div class="sports-used-meta">
+              CategoryId:
+              ${escapeSportsHtml(
+                item.categoryId || "-"
+              )}
+            </div>
+
+            ${
+              item.appGameType
+                ? `
+                  <div class="sports-used-meta">
+                    Type:
+                    ${escapeSportsHtml(
+                      item.appGameType
+                    )}
+                  </div>
+                `
+                : ""
+            }
+
+          </div>
+        `;
+      }).join("")}
+
+    </div>
+  `;
+
+}
+
+function getSportsUsageForGame_(game) {
+
+  if (!game) {
+    return [];
+  }
+
+  const possibleKeys = [
+    game.GameId,
+    game.SportsGameId,
+    game.ESPNEventId
+  ];
+
+  for (let i = 0; i < possibleKeys.length; i++) {
+
+    const key =
+      String(possibleKeys[i] || "")
+        .trim();
+
+    if (
+      key &&
+      Array.isArray(sportsUsageByGameId[key])
+    ) {
+      return sportsUsageByGameId[key];
+    }
+
+  }
+
+  return [];
+
 }
 
 function getSportsStatusInfo(game) {
@@ -692,9 +855,17 @@ function getAwardsApiUrlForSportsWager_() {
 
   if (
     typeof CONFIG !== "undefined" &&
+    CONFIG &&
     CONFIG.API_URL
   ) {
     return CONFIG.API_URL;
+  }
+
+  if (
+    typeof API_BASE !== "undefined" &&
+    API_BASE
+  ) {
+    return API_BASE;
   }
 
   throw new Error(
@@ -1588,4 +1759,41 @@ function getSportsTodayInputValue() {
       .padStart(2, "0");
 
   return yyyy + "-" + mm + "-" + dd;
+}
+
+async function apiAdminGetSportsUsage() {
+
+  const session =
+    getSportsStoredSession_();
+
+  const apiUrl =
+    getAwardsApiUrlForSportsWager_();
+
+  const url =
+    new URL(apiUrl);
+
+  url.searchParams.set(
+    "action",
+    "adminGetSportsUsage"
+  );
+
+  if (session.username) {
+    url.searchParams.set(
+      "username",
+      session.username
+    );
+  }
+
+  if (session.token) {
+    url.searchParams.set(
+      "token",
+      session.token
+    );
+  }
+
+  const response =
+    await fetch(url);
+
+  return response.json();
+
 }

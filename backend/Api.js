@@ -275,6 +275,18 @@ function doGet(e) {
       );
 
     }
+    
+    // =========================
+   // ADMIN SPORTS USAGE
+    // =========================
+
+      if (action === "adminGetSportsUsage") {
+
+         return json(
+          adminGetSportsUsage()
+        );
+
+      }
 
     /* =========================
        HEALTH / DEFAULT
