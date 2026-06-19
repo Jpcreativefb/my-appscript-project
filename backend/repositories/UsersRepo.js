@@ -1,5 +1,6 @@
 /* =========================
    USERS REPO
+   Signup / contact preference / free notification ready
 ========================= */
 
 function getUsersSheet_(){
@@ -38,49 +39,82 @@ function appendUserRow_(row){
 
 }
 
-function findUserByUsername_(username){
+function ensureUsersColumns_(){
 
-  const data =
-    getAllUsersData_();
+  const sh =
+    getUsersSheet_();
 
-  if (data.length <= 1) {
-    return null;
-  }
+  let headers =
+    sh
+      .getRange(1, 1, 1, sh.getLastColumn())
+      .getValues()[0]
+      .map(h => String(h || "").trim());
 
-  const headers =
-    data[0].map(h =>
-      String(h).trim()
-    );
+  const required = [
+    "Username",
+    "PIN",
+    "IsAdmin",
+    "Avatar",
+    "ThemeColor",
+    "CreatedAt",
+    "UsernameKey",
+    "Email",
+    "EmailKey",
+    "Phone",
+    "PhoneKey",
+    "DisplayName",
+    "RealName",
+    "AccountStatus",
+    "PreferredContactMethod",
+    "NotificationOptIn",
+    "NotificationChannel",
+    "NotificationEmail",
+    "NotificationPhone",
+    "NotificationOptInAt",
+    "NotificationOptOutAt",
+    "ResetCodeHash",
+    "ResetCodeExpiresAt",
+    "ResetRequestedAt",
+    "LastLogin",
+    "LastUpdated"
+  ];
 
-  const rows =
-    data.slice(1);
+  required.forEach(header => {
 
-  const col =
-    getUsersColumnMap_(
-      headers
-    );
+    const hasHeader =
+      headers.some(existing =>
+        existing.toLowerCase() ===
+          header.toLowerCase()
+      );
 
-  validateUsersColumns_(
-    col
-  );
+    if (!hasHeader) {
 
-  const userSearch =
-    normalizeUsername_(
-      username
-    );
+      headers.push(header);
 
-  const row =
-    rows.find(r =>
+      sh
+        .getRange(1, headers.length)
+        .setValue(header);
 
-      normalizeUsername_(
-        r[col.username]
-      ) === userSearch
+    }
 
-    );
+  });
 
-  if (!row) {
-    return null;
-  }
+  return headers;
+
+}
+
+function getUsersHeaders_(){
+
+  ensureUsersColumns_();
+
+  return getUsersSheet_()
+    .getRange(1, 1, 1, getUsersSheet_().getLastColumn())
+    .getValues()[0]
+    .map(h => String(h || "").trim());
+
+}
+
+function getUserRecordFromRow_(headers, row, rowNumber){
 
   const obj = {};
 
@@ -90,6 +124,299 @@ function findUserByUsername_(username){
 
   });
 
-  return obj;
+  return {
+    user: obj,
+    row: row,
+    rowNumber: rowNumber,
+    headers: headers,
+    col: getUsersColumnMap_(headers)
+  };
+
+}
+
+function getAllUserRecords_(){
+
+  const data =
+    getAllUsersData_();
+
+  if (data.length <= 1) {
+    return [];
+  }
+
+  const headers =
+    data[0].map(h => String(h || "").trim());
+
+  return data
+    .slice(1)
+    .map((row, index) =>
+      getUserRecordFromRow_(
+        headers,
+        row,
+        index + 2
+      )
+    );
+
+}
+
+function findUserRecordByUsername_(username){
+
+  ensureUsersColumns_();
+
+  const data =
+    getAllUsersData_();
+
+  if (data.length <= 1) {
+    return null;
+  }
+
+  const headers =
+    data[0].map(h => String(h || "").trim());
+
+  const col =
+    getUsersColumnMap_(headers);
+
+  validateUsersColumns_(col);
+
+  const usernameKey =
+    buildUsernameKey_(username);
+
+  if (!usernameKey) {
+    return null;
+  }
+
+  const rows =
+    data.slice(1);
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const row = rows[i];
+
+    const rowUsernameKey =
+      col.usernameKey > -1
+        ? String(row[col.usernameKey] || "").trim()
+        : "";
+
+    const fallbackKey =
+      buildUsernameKey_(row[col.username]);
+
+    if (
+      rowUsernameKey === usernameKey ||
+      fallbackKey === usernameKey
+    ) {
+
+      return getUserRecordFromRow_(
+        headers,
+        row,
+        i + 2
+      );
+
+    }
+
+  }
+
+  return null;
+
+}
+
+function findUserRecordByEmail_(email){
+
+  ensureUsersColumns_();
+
+  const emailKey =
+    normalizeEmail_(email);
+
+  if (!emailKey) {
+    return null;
+  }
+
+  const data =
+    getAllUsersData_();
+
+  if (data.length <= 1) {
+    return null;
+  }
+
+  const headers =
+    data[0].map(h => String(h || "").trim());
+
+  const col =
+    getUsersColumnMap_(headers);
+
+  const rows =
+    data.slice(1);
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const row = rows[i];
+
+    const rowEmailKey =
+      col.emailKey > -1
+        ? normalizeEmail_(row[col.emailKey])
+        : "";
+
+    const fallbackEmail =
+      col.email > -1
+        ? normalizeEmail_(row[col.email])
+        : "";
+
+    if (
+      rowEmailKey === emailKey ||
+      fallbackEmail === emailKey
+    ) {
+
+      return getUserRecordFromRow_(
+        headers,
+        row,
+        i + 2
+      );
+
+    }
+
+  }
+
+  return null;
+
+}
+
+function findUserRecordByPhone_(phone){
+
+  ensureUsersColumns_();
+
+  const phoneKey =
+    buildPhoneKey_(phone);
+
+  if (!phoneKey) {
+    return null;
+  }
+
+  const data =
+    getAllUsersData_();
+
+  if (data.length <= 1) {
+    return null;
+  }
+
+  const headers =
+    data[0].map(h => String(h || "").trim());
+
+  const col =
+    getUsersColumnMap_(headers);
+
+  const rows =
+    data.slice(1);
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const row = rows[i];
+
+    const rowPhoneKey =
+      col.phoneKey > -1
+        ? buildPhoneKey_(row[col.phoneKey])
+        : "";
+
+    const fallbackPhone =
+      col.phone > -1
+        ? buildPhoneKey_(row[col.phone])
+        : "";
+
+    if (
+      rowPhoneKey === phoneKey ||
+      fallbackPhone === phoneKey
+    ) {
+
+      return getUserRecordFromRow_(
+        headers,
+        row,
+        i + 2
+      );
+
+    }
+
+  }
+
+  return null;
+
+}
+
+function findUserRecordByIdentifier_(identifier){
+
+  identifier =
+    String(identifier || "").trim();
+
+  if (!identifier) {
+    return null;
+  }
+
+  if (identifier.indexOf("@") > -1) {
+
+    return findUserRecordByEmail_(
+      identifier
+    );
+
+  }
+
+  const phoneKey =
+    buildPhoneKey_(identifier);
+
+  if (phoneKey && phoneKey.length >= 10) {
+
+    const phoneRecord =
+      findUserRecordByPhone_(
+        identifier
+      );
+
+    if (phoneRecord) {
+      return phoneRecord;
+    }
+
+  }
+
+  return findUserRecordByUsername_(
+    identifier
+  );
+
+}
+
+function findUserByUsername_(username){
+
+  const record =
+    findUserRecordByUsername_(
+      username
+    );
+
+  return record
+    ? record.user
+    : null;
+
+}
+
+function updateUserFields_(rowNumber, fields){
+
+  const sh =
+    getUsersSheet_();
+
+  const headers =
+    getUsersHeaders_();
+
+  const col =
+    getUsersColumnMap_(headers);
+
+  Object.keys(fields).forEach(key => {
+
+    const idx =
+      getUsersFieldIndex_(
+        col,
+        key
+      );
+
+    if (idx > -1) {
+
+      sh
+        .getRange(rowNumber, idx + 1)
+        .setValue(fields[key]);
+
+    }
+
+  });
 
 }

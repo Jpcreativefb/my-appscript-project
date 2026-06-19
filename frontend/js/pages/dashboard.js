@@ -20,6 +20,25 @@ async function renderDashboardPage() {
 
   }
 
+  if (
+    typeof loadActiveProfile === "function"
+  ) {
+
+    try {
+
+      await loadActiveProfile();
+
+    } catch (err) {
+
+      console.warn(
+        "Dashboard profile refresh skipped",
+        err
+      );
+
+    }
+
+  }
+
   let payload;
 
   try {
@@ -72,21 +91,23 @@ async function renderDashboardPage() {
 
   }
 
+  const activeProfile =
+    (
+      typeof APP_STATE !== "undefined" &&
+      APP_STATE.profile
+    )
+      ? APP_STATE.profile
+      : {};
+
   const profileRaw =
-    payload.profile || {};
+    Object.keys(activeProfile).length
+      ? activeProfile
+      : payload.profile || {};
 
   const profile =
     profileRaw.profile ||
     profileRaw ||
     {};
-
-  const profileHistoryRaw =
-    payload.profileHistory || [];
-
-  const profileHistory =
-    Array.isArray(profileHistoryRaw)
-      ? profileHistoryRaw
-      : profileHistoryRaw.history || [];
 
   const activeGames =
     Array.isArray(payload.activeGames)
@@ -101,14 +122,22 @@ async function renderDashboardPage() {
   const displayName =
     profile.displayName ||
     profile.DisplayName ||
+    profile.realName ||
+    profile.RealName ||
     username;
 
   const themeColor =
+    profile.profileColor ||
+    profile.ProfileColor ||
     profile.themeColor ||
     profile.ThemeColor ||
     "#354785";
 
   const avatar =
+    profile.avatarEmoji ||
+    profile.AvatarEmoji ||
+    profile.avatarInitials ||
+    profile.AvatarInitials ||
     profile.avatar ||
     profile.Avatar ||
     "default";
@@ -210,87 +239,6 @@ async function renderDashboardPage() {
               : renderEmptyCard("Finished or archived games will appear here.")
           }
         </div>
-
-      </section>
-
-      <section class="dashboard-profile-card card">
-
-        <h2>Edit Profile</h2>
-
-        <label class="profile-field">
-          <span>Display Name</span>
-          <input
-            id="profileDisplayName"
-            type="text"
-            value="${escapeAttr(displayName)}"
-          >
-        </label>
-
-        <label class="profile-field">
-          <span>Avatar</span>
-          <input
-            id="profileAvatar"
-            type="text"
-            value="${escapeAttr(avatar)}"
-          >
-        </label>
-
-        <label class="profile-field">
-          <span>Theme Color</span>
-          <input
-            id="profileThemeColor"
-            type="color"
-            value="${escapeAttr(themeColor)}"
-          >
-        </label>
-
-        <button
-          class="dashboard-action-button"
-          onclick="saveDashboardProfile()"
-        >
-          Save Profile
-        </button>
-
-        <p
-          id="profileSaveStatus"
-          class="profile-save-status"
-        ></p>
-
-      </section>
-
-      <section class="dashboard-history-card card">
-
-        <h2>Profile History</h2>
-
-        ${
-          profileHistory.length
-            ? `
-              <div class="profile-history-list">
-
-                ${profileHistory.map(item => `
-                  <div class="profile-history-row">
-
-                    <div>
-                      <strong>
-                        ${escapeHtml(item.displayName || item.username || username)}
-                      </strong>
-
-                      <p>
-                        @${escapeHtml(item.username || username)}
-                      </p>
-                    </div>
-
-                    <span>
-                      ${escapeHtml(item.gameId || payload.profileGameId || "")}
-                    </span>
-
-                  </div>
-                `).join("")}
-
-              </div>
-            `
-            : renderEmptyCard("No profile history found yet.")
-        }
 
       </section>
 
@@ -651,112 +599,5 @@ function getDashboardMadeCountFromStats_(game) {
   }
 
   return 0;
-
-}
-
-
-/* ======================
-   SAVE DASHBOARD PROFILE
-====================== */
-
-async function saveDashboardProfile() {
-
-  const username =
-    getCurrentUsername();
-
-  if (!username) {
-    return;
-  }
-
-  const displayNameEl =
-    document.getElementById(
-      "profileDisplayName"
-    );
-
-  const avatarEl =
-    document.getElementById(
-      "profileAvatar"
-    );
-
-  const themeColorEl =
-    document.getElementById(
-      "profileThemeColor"
-    );
-
-  const statusEl =
-    document.getElementById(
-      "profileSaveStatus"
-    );
-
-  const profile = {
-    username:
-      username,
-
-    displayName:
-      displayNameEl
-        ? displayNameEl.value.trim()
-        : username,
-
-    avatar:
-      avatarEl
-        ? avatarEl.value.trim()
-        : "default",
-
-    themeColor:
-      themeColorEl
-        ? themeColorEl.value
-        : "#354785"
-  };
-
-  if (statusEl) {
-    statusEl.innerText =
-      "Saving...";
-  }
-
-  const res =
-    await apiSaveUserProfile(
-      profile
-    );
-
-  if (!res.success) {
-
-    if (statusEl) {
-      statusEl.innerText =
-        res.message ||
-        res.error ||
-        "Could not save profile.";
-    }
-
-    return;
-
-  }
-
-  if (APP_STATE.user) {
-
-    APP_STATE.user.displayName =
-      profile.displayName;
-
-    APP_STATE.user.avatar =
-      profile.avatar;
-
-    APP_STATE.user.themeColor =
-      profile.themeColor;
-
-  }
-
-  clearStartupPayload();
-
-  if (statusEl) {
-
-    statusEl.innerText =
-      "Profile saved.";
-
-  }
-
-  setTimeout(() => {
-
-    navigate("dashboard");
-
-  }, 500);
 
 }

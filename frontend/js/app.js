@@ -38,6 +38,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   }
 
+  if (
+    typeof loadActiveProfile === "function"
+  ) {
+
+    loadActiveProfile();
+
+  }
+
   // 🚀 INIT APP
   initApp();
 
@@ -456,6 +464,18 @@ async function enterGame(
   clearStartupPayload();
 
   if (
+    typeof loadActiveProfile === "function"
+  ) {
+
+    try {
+      loadActiveProfile();
+    } catch (err) {
+      console.warn("Profile refresh after game select failed", err);
+    }
+
+  }
+
+  if (
     gameType === "wager" ||
     gameType === "betting"
   ) {
@@ -597,6 +617,17 @@ async function renderPage(page) {
 
       break; 
 
+    case "profile":
+
+      if (typeof renderProfilePage !== "function") {
+        throw new Error("Profile page script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderProfilePage();
+
+      break;
+
     default:
 
       app.innerHTML =
@@ -617,6 +648,18 @@ async function handleGameSwitch(gameId) {
   setFrontendGameId(
     gameId
   );
+
+  if (
+    typeof loadActiveProfile === "function"
+  ) {
+
+    try {
+      loadActiveProfile();
+    } catch (err) {
+      console.warn("Profile refresh after game switch failed", err);
+    }
+
+  }
 
   clearStartupPayload();
 
@@ -720,6 +763,11 @@ function setFrontendGameId(gameId) {
 
   localStorage.setItem(
     "gameId",
+    gameId
+  );
+
+  localStorage.setItem(
+    "activeGameId",
     gameId
   );
 

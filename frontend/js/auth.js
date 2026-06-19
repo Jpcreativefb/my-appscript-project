@@ -1,4 +1,81 @@
-async function login() {
+function setAuthMessage(message, type){
+
+  const el =
+    document.getElementById("authMessage");
+
+  el.innerText =
+    message || "";
+
+  el.classList.toggle(
+    "hidden",
+    !message
+  );
+
+  el.classList.toggle(
+    "success",
+    type === "success"
+  );
+
+}
+
+function showAuthView(view){
+
+  const views = [
+    "login",
+    "signup",
+    "reset"
+  ];
+
+  views.forEach(name => {
+
+    document
+      .getElementById(name + "View")
+      .classList
+      .toggle(
+        "hidden",
+        name !== view
+      );
+
+  });
+
+  document
+    .querySelectorAll(".auth-tab")
+    .forEach((tab, index) => {
+
+      tab.classList.toggle(
+        "active",
+        views[index] === view
+      );
+
+    });
+
+  const subtitles = {
+    login: "Sign in to continue",
+    signup: "Create your account",
+    reset: "Reset your PIN"
+  };
+
+  document.getElementById("authSubtitle").innerText =
+    subtitles[view] || "Awards App";
+
+  setAuthMessage("");
+
+}
+
+function getSelectedSignupContactMethod(){
+
+  const selected =
+    document.querySelector(
+      "input[name='signupContactMethod']:checked"
+    );
+
+  return selected
+    ? selected.value
+    : "none";
+
+}
+
+async function login(){
 
   const username =
     document
@@ -12,32 +89,19 @@ async function login() {
       .value
       .trim();
 
-  const error =
-    document.getElementById("error");
+  setAuthMessage("");
 
-  error.classList.add("hidden");
-  error.innerText = "";
+  if(!username || !pin){
 
-  if (!username || !pin) {
-
-    error.innerText =
-      "Enter username and PIN";
-
-    error.classList.remove("hidden");
+    setAuthMessage(
+      "Enter your username, email, or phone and PIN"
+    );
 
     return;
 
   }
 
-  try {
-
-    console.log(
-      "LOGIN START",
-      {
-        username:
-          username
-      }
-    );
+  try{
 
     const res =
       await apiLogin(
@@ -45,46 +109,269 @@ async function login() {
         pin
       );
 
-    console.log(
-      "LOGIN RESPONSE",
-      res
-    );
+    if(!res.success){
 
-    if (!res || res.success === false) {
-
-      error.innerText =
-        res && (res.message || res.error)
-          ? res.message || res.error
-          : "Invalid login";
-
-      error.classList.remove("hidden");
+      setAuthMessage(
+        res.message || "Invalid login"
+      );
 
       return;
 
     }
 
-    setSession({
-      ...res,
-      createdAt:
-        Date.now()
-    });
+    localStorage.setItem(
+      "session",
+      JSON.stringify(res)
+    );
 
     window.location.href =
       "./app.html";
 
-  } catch (err) {
+  }catch(err){
 
-    console.error(
-      "LOGIN ERROR",
-      err
+    console.error(err);
+
+    setAuthMessage(
+      "Connection error"
     );
 
-    error.innerText =
-      err && err.message
-        ? err.message
-        : "Connection error";
+  }
 
-    error.classList.remove("hidden");
+}
+
+async function signup(){
+
+  const username =
+    document
+      .getElementById("signupUsername")
+      .value
+      .trim();
+
+  const realName =
+    document
+      .getElementById("signupRealName")
+      .value
+      .trim();
+
+  const email =
+    document
+      .getElementById("signupEmail")
+      .value
+      .trim();
+
+  const phone =
+    document
+      .getElementById("signupPhone")
+      .value
+      .trim();
+
+  const pin =
+    document
+      .getElementById("signupPin")
+      .value
+      .trim();
+
+  const contactMethod =
+    getSelectedSignupContactMethod();
+
+  setAuthMessage("");
+
+  if(!username || !pin){
+
+    setAuthMessage(
+      "Enter username and PIN"
+    );
+
+    return;
+
+  }
+
+  if(contactMethod === "email" && !email){
+
+    setAuthMessage(
+      "Enter an email or choose Play only / Phone only"
+    );
+
+    return;
+
+  }
+
+  if(contactMethod === "phone" && !phone){
+
+    setAuthMessage(
+      "Enter a phone number or choose Play only / Email"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    const res =
+      await apiSignup(
+        username,
+        realName,
+        pin,
+        email,
+        phone,
+        contactMethod
+      );
+
+    if(!res.success){
+
+      setAuthMessage(
+        res.message || "Could not create account"
+      );
+
+      return;
+
+    }
+
+    const loginRes =
+      await apiLogin(
+        username,
+        pin
+      );
+
+    if(loginRes.success){
+
+      localStorage.setItem(
+        "session",
+        JSON.stringify(loginRes)
+      );
+
+      window.location.href =
+        "./app.html";
+
+      return;
+
+    }
+
+    showAuthView("login");
+
+    setAuthMessage(
+      "Account created. Log in to continue.",
+      "success"
+    );
+
+  }catch(err){
+
+    console.error(err);
+
+    setAuthMessage(
+      "Connection error"
+    );
+
+  }
+
+}
+
+async function requestPinReset(){
+
+  const identifier =
+    document
+      .getElementById("resetIdentifier")
+      .value
+      .trim();
+
+  if(!identifier){
+
+    setAuthMessage(
+      "Enter your username or email"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    const res =
+      await apiRequestPinReset(
+        identifier
+      );
+
+    setAuthMessage(
+      res.message || "If that account exists and has email, a reset code was sent.",
+      "success"
+    );
+
+  }catch(err){
+
+    console.error(err);
+
+    setAuthMessage(
+      "Connection error"
+    );
+
+  }
+
+}
+
+async function resetPin(){
+
+  const identifier =
+    document
+      .getElementById("resetIdentifier")
+      .value
+      .trim();
+
+  const resetCode =
+    document
+      .getElementById("resetCode")
+      .value
+      .trim();
+
+  const newPin =
+    document
+      .getElementById("newPin")
+      .value
+      .trim();
+
+  if(!identifier || !resetCode || !newPin){
+
+    setAuthMessage(
+      "Enter username/email, reset code, and new PIN"
+    );
+
+    return;
+
+  }
+
+  try{
+
+    const res =
+      await apiResetPin(
+        identifier,
+        resetCode,
+        newPin
+      );
+
+    if(!res.success){
+
+      setAuthMessage(
+        res.message || "Could not reset PIN"
+      );
+
+      return;
+
+    }
+
+    showAuthView("login");
+
+    setAuthMessage(
+      "PIN reset. Log in with your new PIN.",
+      "success"
+    );
+
+  }catch(err){
+
+    console.error(err);
+
+    setAuthMessage(
+      "Connection error"
+    );
 
   }
 

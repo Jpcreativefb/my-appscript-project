@@ -31,6 +31,20 @@ function doPost(e) {
       params.action ||
       "";
 
+    // =========================
+    // PROFILE AVATAR UPLOAD
+    // =========================
+
+    if (action === "uploadProfileAvatar") {
+
+      return profileDoPost(e);
+
+    }
+
+    // =========================
+    // ADMIN IMAGE UPLOADS
+    // =========================
+
     if (action === "adminUploadImage") {
 
       return json(
@@ -48,7 +62,7 @@ function doPost(e) {
           body
         )
       );
-    
+
     }
 
     if (action === "adminSearchTmdbMoviePosters") {
@@ -58,7 +72,7 @@ function doPost(e) {
           body
         )
       );
-    
+
     }
 
     if (action === "adminDeleteImageFromDrive") {
@@ -68,7 +82,7 @@ function doPost(e) {
           body
         )
       );
-    
+
     }
 
     return json({
@@ -202,6 +216,65 @@ function doGet(e) {
           ? ""
           : getDefaultGameId()
       );
+
+    /* =========================
+       PROFILE
+    ========================= */
+
+    if (action === "getEditableProfile") {
+
+      return json(
+        apiGetEditableProfile(
+          params.username,
+          gameId
+        )
+      );
+
+    }
+
+    if (action === "saveEditableProfile") {
+
+      return json(
+        apiSaveEditableProfile({
+          username:
+            params.username,
+
+          gameId:
+            gameId,
+
+          scope:
+            params.scope,
+
+          displayName:
+            params.displayName,
+
+          realName:
+            params.realName,
+
+          avatarType:
+            params.avatarType,
+
+          avatarInitials:
+            params.avatarInitials,
+
+          avatarEmoji:
+            params.avatarEmoji,
+
+          avatarUrl:
+            params.avatarUrl,
+
+          avatarFileId:
+            params.avatarFileId,
+
+          profileColor:
+            params.profileColor,
+
+          bio:
+            params.bio
+        })
+      );
+
+    }
 
     /* =========================
        HEALTH / DEFAULT
@@ -734,6 +807,111 @@ function doGet(e) {
 
     }
 
+       // =========================
+    // SIGNUP
+    // =========================
+
+    if (action === "signup") {
+
+      return json(
+        createUser(
+          e.parameter.username,
+          e.parameter.realName,
+          e.parameter.pin,
+          e.parameter.email,
+          e.parameter.phone,
+          e.parameter.contactMethod
+        )
+      );
+
+    }
+
+    // =========================
+    // PIN RESET REQUEST
+    // =========================
+
+    if (action === "requestPinReset") {
+
+      return json(
+        requestPinReset(
+          e.parameter.identifier
+        )
+      );
+
+    }
+
+    // =========================
+    // PIN RESET CONFIRM
+    // =========================
+
+    if (action === "resetPin") {
+
+      return json(
+        resetPin(
+          e.parameter.identifier,
+          e.parameter.resetCode,
+          e.parameter.newPin
+        )
+      );
+
+    }
+
+    // =========================
+    // NOTIFICATION PREFERENCE
+    // =========================
+
+    if (action === "getNotificationPreference") {
+
+      return json(
+        getNotificationPreference(
+          e.parameter.token
+        )
+      );
+
+    }
+
+    if (action === "setNotificationPreference") {
+
+      return json(
+        setNotificationPreference(
+          e.parameter.token,
+          e.parameter.contactMethod,
+          e.parameter.email,
+          e.parameter.phone
+        )
+      );
+
+    }
+
+    // =========================
+    // ADMIN MASS NOTIFICATION
+    // Free version sends email only.
+    // Phone users are logged/skipped for manual contact.
+    // =========================
+
+    if (action === "adminSendMassNotification") {
+
+      return json(
+        adminSendMassNotification(
+          e.parameter.token,
+          e.parameter.subject,
+          e.parameter.message,
+          e.parameter.gameId || gameId
+        )
+      );
+
+    }
+
+    if (action === "adminGetPhoneNotificationList") {
+
+      return json(
+        adminGetPhoneNotificationList(
+          e.parameter.token
+        )
+      );
+
+    }
+
     /* =========================
        STARTUP PAYLOAD
     ========================= */
@@ -1252,46 +1430,42 @@ function doGet(e) {
     }
     
     if (action === "adminRefreshSportsWagerScores") {
-    
+
       return json(
         apiAdminRefreshSportsWagerScores({
-    
           username:
             params.username,
-    
+
           token:
             params.token,
-    
+
           awardsGameId:
             params.awardsGameId ||
             gameId
-    
         })
       );
+
+    }
 
     if (action === "adminAutoSetSportsWagerOdds") {
 
       return json(
         apiAdminAutoSetSportsWagerOdds({
+          username:
+            params.username,
 
-        username:
-          params.username,
+          token:
+            params.token,
 
-        token:
-          params.token,
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
 
-        awardsGameId:
-          params.awardsGameId ||
-          gameId,
+          force:
+            params.force
+        })
+      );
 
-        force:
-          params.force
-
-    })
-  );
-
-}
-    
     }
 
     // =========================

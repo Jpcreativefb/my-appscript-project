@@ -3,10 +3,6 @@ function loginUser(
   pin
 ){
 
-  /* =========================
-     VALIDATION
-  ========================= */
-
   username =
     String(username || "")
       .trim();
@@ -18,167 +14,161 @@ function loginUser(
   if (!username || !pin) {
 
     return {
-
       success: false,
-
-      message:
-        "Missing username or PIN"
-
+      message: "Missing username/email/phone or PIN"
     };
 
   }
 
-  /* =========================
-     LOAD USER
-  ========================= */
-
-  const user =
-    findUserByUsername_(
+  const record =
+    findUserRecordByIdentifier_(
       username
     );
 
-  if (!user) {
+  if (!record) {
 
     return {
-
       success: false,
-
-      message:
-        "Invalid login"
-
+      message: "Invalid login"
     };
 
   }
 
-  /* =========================
-     ACTIVE VALIDATION
-  ========================= */
+  const col =
+    record.col;
 
-  const activeValue =
-    user["Active"];
-
-  const isActive =
-    activeValue === undefined ||
-    activeValue === "" ||
-    activeValue === true ||
-    activeValue === 1 ||
-    String(activeValue || "")
-      .trim()
-      .toLowerCase() === "true" ||
-    String(activeValue || "")
-      .trim()
-      .toLowerCase() === "yes" ||
-    String(activeValue || "")
-      .trim()
-      .toLowerCase() === "active";
-
-  if (!isActive) {
-
-    return {
-
-      success: false,
-
-      message:
-        "This account is inactive. Please contact the admin."
-
-    };
-
-  }
-
-  /* =========================
-     PIN VALIDATION
-  ========================= */
-
-  const storedPin =
-    String(
-      user["PIN"] || ""
-    )
-    .replace(/^'/, "")
-    .trim();
+  const status =
+    col.accountStatus > -1
+      ? String(record.row[col.accountStatus] || "active")
+          .trim()
+          .toLowerCase()
+      : "active";
 
   if (
-    storedPin !== pin
+    status &&
+    status !== "active"
   ) {
 
     return {
-
       success: false,
-
-      message:
-        "Invalid login"
-
+      message: "Account is not active"
     };
 
   }
 
-  /* =========================
-     SESSION TOKEN
-  ========================= */
+  const storedPin =
+    col.pin > -1
+      ? String(record.row[col.pin] || "")
+          .replace(/^'/, "")
+          .trim()
+      : "";
+
+  if (storedPin !== pin) {
+
+    return {
+      success: false,
+      message: "Invalid login"
+    };
+
+  }
 
   const token =
     Utilities.getUuid();
 
+  const canonicalUsername =
+    String(record.user["Username"] || username)
+      .trim();
+
   CacheService
     .getScriptCache()
     .put(
-
       token,
-
-      user["Username"],
-
-      60 * 60 * 24 * 7
-
-
+      canonicalUsername,
+      60 * 60 * 6
     );
 
-  /* =========================
-     RESPONSE
-  ========================= */
+  updateUserFields_(
+    record.rowNumber,
+    {
+      lastLogin: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    }
+  );
+
+  const isAdminUser =
+    record.user["IsAdmin"] === true ||
+    String(record.user["IsAdmin"] || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(record.user["IsAdmin"] || "")
+      .trim()
+      .toLowerCase() === "yes";
 
   return {
-
     success: true,
-
-    token:
-      token,
-
-    username:
-      user["Username"],
-
-    isAdmin:
-      authBoolean_(
-        user["IsAdmin"]
-      ),
-
-    active:
-      true,
-
-    avatar:
-      user["Avatar"] ||
-      "default",
-
-    themeColor:
-      user["ThemeColor"] ||
-      "#000000"
-
+    token: token,
+    username: canonicalUsername,
+    realName: record.user["RealName"] || "",
+    displayName: record.user["DisplayName"] || record.user["RealName"] || canonicalUsername,
+    email: record.user["Email"] || "",
+    phone: record.user["Phone"] || "",
+    isAdmin: isAdminUser,
+    avatar: record.user["Avatar"] || "default",
+    themeColor: record.user["ThemeColor"] || "#000000",
+    preferredContactMethod:
+      record.user["PreferredContactMethod"] || "none",
+    notificationOptIn:
+      record.user["NotificationOptIn"] === true ||
+      String(record.user["NotificationOptIn"] || "")
+        .trim()
+        .toLowerCase() === "true",
+    notificationChannel:
+      record.user["NotificationChannel"] || "none"
   };
 
 }
 
-function authBoolean_(value) {
+function getUsernameFromSessionToken_(token){
 
-  return (
-    value === true ||
-    value === 1 ||
-    String(value || "")
-      .trim()
-      .toLowerCase() === "true" ||
-    String(value || "")
-      .trim()
-      .toLowerCase() === "yes" ||
-    String(value || "")
-      .trim()
-      .toLowerCase() === "admin"
-  );
+  token =
+    String(token || "").trim();
+
+  if (!token) {
+    return "";
+  }
+
+  return CacheService
+    .getScriptCache()
+    .get(token) || "";
+
+}
+
+function requireUserFromToken_(token){
+
+  const username =
+    getUsernameFromSessionToken_(
+      token
+    );
+
+  if (!username) {
+    throw new Error("Invalid session");
+  }
+
+  return username;
+
+}
+
+function requireAdminFromToken_(token){
+
+  const username =
+    requireUserFromToken_(
+      token
+    );
+
+  if (!isAdmin(username)) {
+    throw new Error("Invalid admin session");
+  }
+
+  return username;
 
 }

@@ -10,7 +10,17 @@ const APP_STATE = {
 
   picks: {},
 
-  currentPage: "dashboard"
+  currentPage: "dashboard",
+
+  gameId: "",
+
+  startupPayload: null,
+
+  profile: null,
+
+  profileData: null,
+
+  profileGames: []
 
 };
 
@@ -21,9 +31,11 @@ const APP_STATE = {
 function getSessionTtlMs() {
 
   const hours =
-    Number(
-      CONFIG.SESSION_TTL_HOURS
-    ) || 168;
+    typeof CONFIG !== "undefined"
+      ? Number(
+          CONFIG.SESSION_TTL_HOURS
+        ) || 168
+      : 168;
 
   return (
     hours *
@@ -65,10 +77,6 @@ function getSession() {
 
     }
 
-    /*
-      Upgrade older stored sessions that
-      existed before createdAt was added.
-    */
     if (!session.createdAt) {
 
       session.createdAt =
@@ -133,8 +141,26 @@ function setSession(session) {
 
     displayName:
       normalizedSession.displayName ||
-      normalizedSession.username
+      normalizedSession.DisplayName ||
+      normalizedSession.realName ||
+      normalizedSession.RealName ||
+      normalizedSession.username,
+
+    isAdmin:
+      normalizedSession.isAdmin !== undefined
+        ? normalizedSession.isAdmin
+        : normalizedSession.IsAdmin
   };
+
+  if (
+    normalizedSession.gameId &&
+    !APP_STATE.gameId
+  ) {
+
+    APP_STATE.gameId =
+      normalizedSession.gameId;
+
+  }
 
   localStorage.setItem(
     "session",
@@ -149,9 +175,18 @@ function setSession(session) {
 
 function clearSession() {
 
-  APP_STATE.session = null;
-  APP_STATE.user = null;
-  APP_STATE.picks = {};
+  if (
+    typeof APP_STATE !== "undefined"
+  ) {
+
+    APP_STATE.session = null;
+    APP_STATE.user = null;
+    APP_STATE.picks = {};
+    APP_STATE.startupPayload = null;
+    APP_STATE.profile = null;
+    APP_STATE.profileData = null;
+
+  }
 
   localStorage.removeItem(
     "session"
@@ -246,5 +281,101 @@ function isLoggedIn() {
   return Boolean(
     getCurrentUsername()
   );
+
+}
+
+function isCurrentUserAdmin() {
+
+  const session =
+    getCurrentSession() || {};
+
+  const value =
+    session.isAdmin !== undefined
+      ? session.isAdmin
+      : session.IsAdmin;
+
+  return (
+    value === true ||
+    value === 1 ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "yes" ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "admin" ||
+    String(value || "")
+      .trim() === "1"
+  );
+
+}
+
+/* ======================
+   GAME STATE HELPERS
+====================== */
+
+function setActiveGameId(gameId) {
+
+  const cleanGameId =
+    String(gameId || "")
+      .trim();
+
+  APP_STATE.gameId =
+    cleanGameId;
+
+  if (cleanGameId) {
+
+    localStorage.setItem(
+      "gameId",
+      cleanGameId
+    );
+
+    localStorage.setItem(
+      "activeGameId",
+      cleanGameId
+    );
+
+  }
+
+  const session =
+    getCurrentSession();
+
+  if (session) {
+
+    session.gameId =
+      cleanGameId;
+
+    localStorage.setItem(
+      "session",
+      JSON.stringify(session)
+    );
+
+    APP_STATE.session =
+      session;
+
+  }
+
+  return cleanGameId;
+
+}
+
+function getStoredGameId() {
+
+  const session =
+    getCurrentSession();
+
+  return String(
+    APP_STATE.gameId ||
+    localStorage.getItem("activeGameId") ||
+    localStorage.getItem("gameId") ||
+    (
+      session && session.gameId
+        ? session.gameId
+        : ""
+    ) ||
+    ""
+  ).trim();
 
 }

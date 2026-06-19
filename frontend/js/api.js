@@ -122,6 +122,103 @@ async function apiLogin(username, pin) {
 
 }
 
+async function apiSignup(username, realName, pin, email, phone, contactMethod) {
+
+  return api("signup", {
+    username,
+    realName,
+    pin,
+    email,
+    phone,
+    contactMethod
+  });
+
+}
+
+async function apiRequestPinReset(identifier) {
+
+  return api("requestPinReset", {
+    identifier
+  });
+
+}
+
+async function apiResetPin(identifier, resetCode, newPin) {
+
+  return api("resetPin", {
+    identifier,
+    resetCode,
+    newPin
+  });
+
+}
+
+async function apiGetNotificationPreference(token) {
+
+  return api("getNotificationPreference", {
+    token
+  });
+
+}
+
+async function apiSetNotificationPreference(token, contactMethod, email, phone) {
+
+  return api("setNotificationPreference", {
+    token,
+    contactMethod,
+    email,
+    phone
+  });
+
+}
+
+async function apiAdminSendMassNotification(token, subject, message, gameId) {
+
+  return api("adminSendMassNotification", {
+    token,
+    subject,
+    message,
+    gameId
+  });
+
+}
+
+async function apiAdminGetPhoneNotificationList(token) {
+
+  return api("adminGetPhoneNotificationList", {
+    token
+  });
+
+}
+
+/* ======================
+   EDITABLE PROFILE
+====================== */
+
+async function apiGetEditableProfile(username, gameId) {
+
+  return api("getEditableProfile", {
+    username,
+    gameId
+  });
+
+}
+
+async function apiSaveEditableProfile(profile) {
+
+  return api("saveEditableProfile", profile);
+
+}
+
+async function apiUploadProfileAvatar(payload) {
+
+  return apiPost(
+    "uploadProfileAvatar",
+    payload || {}
+  );
+
+}
+
 /* ======================
    CATEGORIES
 ====================== */
@@ -219,7 +316,6 @@ async function apiGetUserBreakdown(username, gameId) {
 
 /* ======================
    COMPATIBILITY WRAPPERS
-   Old page names -> cleaned API names
 ====================== */
 
 async function apiLeaderboard(gameId) {
@@ -283,7 +379,6 @@ async function apiGetDashboardGamesHub() {
   });
 
 }
-
 
 /* ======================
    ACTIVE GAMES
@@ -363,11 +458,6 @@ async function apiAdminUpdateCategorySetting(categoryId, patch) {
       categoryId
   };
 
-  /*
-    Only send fields that are actually being changed.
-    Do not send blank winnerNomineeId unless the Clear Winner button is used.
-  */
-
   if (patch.locked !== undefined) {
     params.locked =
       patch.locked;
@@ -410,21 +500,6 @@ async function apiAdminClearCategoryWinner(categoryId) {
     token: session.token,
     gameId: APP_STATE.gameId || "",
     categoryId: categoryId
-  });
-
-}
-
-async function apiAdminSetupLiveResultsSystem() {
-
-  const session =
-    getSession();
-
-  return api("adminSetupLiveResultsSystem", {
-    username:
-      session.username,
-
-    token:
-      session.token
   });
 
 }
@@ -689,7 +764,6 @@ async function apiAdminCloneGameSetup(payload) {
 
 /* ======================
    ADMIN: GAME SETUP
-   Categories / Questions
 ====================== */
 
 async function apiAdminGetGameSetup(gameId) {
