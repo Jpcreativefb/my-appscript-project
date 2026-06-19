@@ -1492,6 +1492,10 @@ function settleSportsWagers(payload) {
   payload =
     payload || {};
 
+refreshSportsWagerScores(
+   payload
+);  
+
   const awardsGameId =
     sportsWagerNormalizeGameId_(
       payload.awardsGameId ||
@@ -1832,6 +1836,54 @@ function refreshSportsWagerScores(payload) {
           score.AwayScore
         );
 
+        
+        if (col.HomeRecord !== undefined) {
+          sh
+            .getRange(
+              rowNumber,
+              col.HomeRecord + 1
+            )
+            .setValue(
+              sportsWagerString_(score.HomeRecord)
+            );
+        }
+  
+        if (col.AwayRecord !== undefined) {
+          sh
+            .getRange(
+              rowNumber,
+              col.AwayRecord + 1
+            )
+            .setValue(
+              sportsWagerString_(score.AwayRecord)
+            );
+        }
+  
+        if (col.LogoUrl !== undefined) {
+  
+          const rowNominee =
+            col.Nominee !== undefined
+              ? sportsWagerString_(row[col.Nominee])
+              : "";
+  
+          const homeTeam =
+            sportsWagerString_(score.HomeTeam);
+  
+          const logo =
+            rowNominee === homeTeam
+              ? sportsWagerString_(score.HomeLogo)
+              : sportsWagerString_(score.AwayLogo);
+  
+          sh
+            .getRange(
+              rowNumber,
+              col.LogoUrl + 1
+            )
+            .setValue(
+              logo
+            );
+  
+        }
       sh
         .getRange(
           rowNumber,
@@ -1913,5 +1965,183 @@ function apiAdminRefreshSportsWagerScores(payload) {
   return refreshSportsWagerScores(
     payload
   );
+
+}
+
+/* =====================================================
+   AUTOMATIC SPORTS WAGER SCORE REFRESH
+===================================================== */
+
+const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
+  "runSportsWagerScoreRefresh";
+
+function runSportsWagerScoreRefresh() {
+
+  const lock =
+    LockService.getScriptLock();
+
+  if (!lock.tryLock(1000)) {
+    return {
+      success: false,
+      message: "Sports wager score refresh already running"
+    };
+  }
+
+  try {
+
+    return refreshSportsWagerScores({
+      gameId: SPORTS_WAGER_DEFAULT_GAME_ID
+    });
+
+  } finally {
+
+    lock.releaseLock();
+
+  }
+
+}
+
+function installSportsWagerScoreRefreshTrigger() {
+
+  removeSportsWagerScoreRefreshTriggers();
+
+  ScriptApp
+    .newTrigger(
+      SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION
+    )
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  return {
+    success: true,
+    message: "Sports wager score refresh trigger installed every 5 minutes"
+  };
+
+}
+
+function removeSportsWagerScoreRefreshTriggers() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+  let removed = 0;
+
+  triggers.forEach(function(trigger) {
+
+    if (
+      trigger.getHandlerFunction() ===
+      SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION
+    ) {
+
+      ScriptApp.deleteTrigger(
+        trigger
+      );
+
+      removed++;
+
+    }
+
+  });
+
+  return {
+    success: true,
+    removed: removed
+  };
+
+}
+
+/* =====================================================
+   AUTOMATIC SPORTS WAGER REFRESH + SETTLEMENT
+===================================================== */
+
+const SPORTS_WAGER_AUTO_SETTLE_TRIGGER_FUNCTION =
+  "runSportsWagerAutoRefreshAndSettle";
+
+function runSportsWagerAutoRefreshAndSettle() {
+
+  const lock =
+    LockService.getScriptLock();
+
+  if (!lock.tryLock(1000)) {
+    return {
+      success: false,
+      message: "Sports wager auto refresh already running"
+    };
+  }
+
+  try {
+
+    const refresh =
+      refreshSportsWagerScores({
+        gameId: SPORTS_WAGER_DEFAULT_GAME_ID
+      });
+
+    const settle =
+      settleSportsWagers({
+        gameId: SPORTS_WAGER_DEFAULT_GAME_ID
+      });
+
+    return {
+      success: true,
+      refresh: refresh,
+      settle: settle
+    };
+
+  } finally {
+
+    lock.releaseLock();
+
+  }
+
+}
+
+function installSportsWagerAutoSettleTrigger() {
+
+  removeSportsWagerAutoSettleTriggers();
+
+  ScriptApp
+    .newTrigger(
+      SPORTS_WAGER_AUTO_SETTLE_TRIGGER_FUNCTION
+    )
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+
+  return {
+    success: true,
+    message: "Sports wager auto refresh and settle trigger installed every 5 minutes"
+  };
+
+}
+
+function removeSportsWagerAutoSettleTriggers() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+  let removed = 0;
+
+  triggers.forEach(function(trigger) {
+
+    if (
+      trigger.getHandlerFunction() ===
+      SPORTS_WAGER_AUTO_SETTLE_TRIGGER_FUNCTION
+    ) {
+
+      ScriptApp.deleteTrigger(
+        trigger
+      );
+
+      removed++;
+
+    }
+
+  });
+
+  return {
+    success: true,
+    removed: removed
+  };
 
 }

@@ -1347,3 +1347,45 @@ async function apiBettingLeaderboard(gameId) {
   });
 
 }
+
+async function apiAdminRefreshSportsWagerScores(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminRefreshSportsWagerScores",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
+
+async function apiAdminSettleSportsWagers(gameId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminSettleSportsWagers",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId
+    }
+  );
+
+}
