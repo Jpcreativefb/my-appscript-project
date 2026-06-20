@@ -223,6 +223,9 @@ function getGamesColumnMap_(headers) {
     maxWager:
       headers.indexOf("MaxWager"),
 
+    allowBetRemoval:
+      headers.indexOf("AllowBetRemoval"),  
+
     themeColor:
       headers.indexOf("ThemeColor"),
 

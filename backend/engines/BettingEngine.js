@@ -309,6 +309,10 @@ function getBettingGameConfig(gameId){
     game.wagerEnabled === true ||
     game.bettingEnabled === true;
 
+  let allowBetRemoval =
+    game.allowBetRemoval === true ||
+    game.AllowBetRemoval === true;
+
   let startingBankroll = Math.max(
     toBetNumber_(
       game.startingBankroll,
@@ -361,7 +365,9 @@ function getBettingGameConfig(gameId){
         minWager: headers.indexOf("MinWager"),
         maxWager: headers.indexOf("MaxWager"),
         minBet: headers.indexOf("MinBet"),
-        maxBet: headers.indexOf("MaxBet")
+        maxBet: headers.indexOf("MaxBet"),
+        allowBetRemoval: headers.indexOf("AllowBetRemoval"),
+        removeBetEnabled: headers.indexOf("RemoveBetEnabled")
       };
 
       for (let i = 1; i < data.length; i++) {
@@ -394,11 +400,31 @@ function getBettingGameConfig(gameId){
             isBetBoolean_(row[col.wagerEnabled]);
         }
 
-        // Legacy compatibility only. New sheet should use WagerEnabled.
         if (col.bettingEnabled > -1) {
           enabled =
             enabled ||
             isBetBoolean_(row[col.bettingEnabled]);
+        }
+
+        if (col.allowBetRemoval > -1) {
+          allowBetRemoval =
+            isBetBoolean_(
+              row[col.allowBetRemoval]
+            );
+        }
+
+        /*
+          Legacy / alternate column support.
+          Prefer AllowBetRemoval going forward.
+        */
+        if (
+          col.removeBetEnabled > -1 &&
+          col.allowBetRemoval === -1
+        ) {
+          allowBetRemoval =
+            isBetBoolean_(
+              row[col.removeBetEnabled]
+            );
         }
 
         if (col.startingBankroll > -1) {
@@ -454,6 +480,10 @@ function getBettingGameConfig(gameId){
     enabled: enabled,
     wagerEnabled: enabled,
     bettingEnabled: enabled,
+
+    allowBetRemoval: allowBetRemoval,
+    removeBetEnabled: allowBetRemoval,
+
     startingBankroll: startingBankroll,
     minBet: minBet,
     maxBet: maxBet,
@@ -648,6 +678,24 @@ function getBettingOptions(gameId){
 
       const setting = settings[categoryId] || {};
 
+      const winnerNomineeId =
+        normalizeBetKey_(
+          setting.winnerNomineeId ||
+          setting.WinnerNomineeId ||
+          category.winnerNomineeId ||
+          category.WinnerNomineeId ||
+          ""
+        );
+
+      const wagerResultType =
+        normalizeBetKey_(
+          setting.wagerResultType ||
+          setting.WagerResultType ||
+          category.wagerResultType ||
+          category.WagerResultType ||
+          ""
+        );
+
       const nominees = (category.nominees || [])
         .map(nominee => {
 
@@ -672,67 +720,119 @@ function getBettingOptions(gameId){
 
         });
 
-        return {
-          id: categoryId,
-          name: category.name,
-          shortName: category.shortName || setting.shortName || category.name,
-          section: category.section || "Other",
-          league: category.sportsLeague || category.section || "Other",
-        
-          image: category.image || "",
-          displayOrder: Number(category.displayOrder) || 999,
-        
-          locked: isBettingCategoryLocked_(category, setting),
-          lockDateTime:
-            setting.lockDateTime ||
-            category.lockDateTime ||
-            "",
-        
-          sportsGameId:
-            category.sportsGameId || "",
-        
-          espnEventId:
-            category.espnEventId || "",
-        
-          homeTeam:
-            category.homeTeam || "",
-        
-          awayTeam:
-            category.awayTeam || "",
-        
-          homeRecord:
-            category.homeRecord || "",
-        
-          awayRecord:
-            category.awayRecord || "",
-        
-          homeScore:
-            category.homeScore || "",
-        
-          awayScore:
-            category.awayScore || "",
-        
-          sportsStatus:
-            category.sportsStatus || "",
-        
-          sportsClock:
-            category.sportsClock || "",
-        
-          sportsPeriod:
-            category.sportsPeriod || "",
-        
-          winnerNomineeId: normalizeBetKey_(
-            setting.winnerNomineeId ||
-            category.winnerNomineeId ||
-            ""
+      return {
+        id: categoryId,
+        name: category.name,
+
+        shortName:
+          category.shortName ||
+          setting.shortName ||
+          setting.ShortName ||
+          category.name,
+
+        section:
+          category.section ||
+          "Other",
+
+        league:
+          category.sportsLeague ||
+          category.section ||
+          "Other",
+
+        image:
+          category.image || "",
+
+        displayOrder:
+          Number(category.displayOrder) || 999,
+
+        locked:
+          isBettingCategoryLocked_(
+            category,
+            setting
           ),
-        
-          nominees: nominees
-        };
+
+        lockDateTime:
+          setting.lockDateTime ||
+          setting.LockDateTime ||
+          category.lockDateTime ||
+          category.LockDateTime ||
+          "",
+
+        sportsGameId:
+          setting.sportsGameId ||
+          setting.SportsGameId ||
+          category.sportsGameId ||
+          category.SportsGameId ||
+          "",
+
+        espnEventId:
+          setting.espnEventId ||
+          setting.ESPNEventId ||
+          category.espnEventId ||
+          category.ESPNEventId ||
+          "",
+
+        homeTeam:
+          category.homeTeam || "",
+
+        awayTeam:
+          category.awayTeam || "",
+
+        homeRecord:
+          category.homeRecord || "",
+
+        awayRecord:
+          category.awayRecord || "",
+
+        homeScore:
+          keepBettingZeroValue_(
+            category.homeScore
+          ),
+
+        awayScore:
+          keepBettingZeroValue_(
+            category.awayScore
+          ),
+
+        sportsStatus:
+          category.sportsStatus || "",
+
+        sportsClock:
+          category.sportsClock || "",
+
+        sportsPeriod:
+          category.sportsPeriod || "",
+
+        winnerNomineeId:
+          winnerNomineeId,
+
+        wagerResultType:
+          wagerResultType,
+
+        finished:
+          !!winnerNomineeId ||
+          !!wagerResultType,
+
+        nominees: nominees
+      };
 
     })
     .filter(category => category.nominees.length > 0)
-    .sort((a,b) => a.displayOrder - b.displayOrder);
+    .sort((a,b) => {
+
+      const aFinished =
+        isFinishedBettingCategory_(a);
+
+      const bFinished =
+        isFinishedBettingCategory_(b);
+
+      if (aFinished !== bFinished) {
+        return aFinished ? 1 : -1;
+      }
+
+      return a.displayOrder - b.displayOrder;
+
+    });
 
   return {
     success: true,
@@ -740,6 +840,97 @@ function getBettingOptions(gameId){
     config: config,
     categories: bettingCategories
   };
+
+}
+
+function keepBettingZeroValue_(value) {
+
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return "";
+  }
+
+  return value;
+
+}
+
+function isFinishedBettingCategory_(category) {
+
+  if (!category) {
+    return false;
+  }
+
+  return (
+    category.finished === true ||
+    normalizeBetKey_(
+      category.winnerNomineeId ||
+      category.WinnerNomineeId ||
+      ""
+    ) !== "" ||
+    normalizeBetKey_(
+      category.wagerResultType ||
+      category.WagerResultType ||
+      ""
+    ) !== ""
+  );
+
+}
+
+function getBettingCategoryFieldWithZero_(
+  category,
+  fieldNames
+) {
+
+  category =
+    category || {};
+
+  fieldNames =
+    fieldNames || [];
+
+  for (let i = 0; i < fieldNames.length; i++) {
+
+    const fieldName =
+      fieldNames[i];
+
+    if (
+      category[fieldName] !== null &&
+      category[fieldName] !== undefined &&
+      String(category[fieldName]).trim() !== ""
+    ) {
+      return category[fieldName];
+    }
+
+  }
+
+  const nominees =
+    category.nominees || [];
+
+  for (let i = 0; i < nominees.length; i++) {
+
+    const nominee =
+      nominees[i] || {};
+
+    for (let j = 0; j < fieldNames.length; j++) {
+
+      const fieldName =
+        fieldNames[j];
+
+      if (
+        nominee[fieldName] !== null &&
+        nominee[fieldName] !== undefined &&
+        String(nominee[fieldName]).trim() !== ""
+      ) {
+        return nominee[fieldName];
+      }
+
+    }
+
+  }
+
+  return "";
 
 }
 
@@ -883,11 +1074,42 @@ function getUserBets(username, gameId){
 
 function getBetResolution_(bet, settings){
 
-  const config = settings[bet.categoryId] || {};
+  const config =
+    settings[bet.categoryId] || {};
 
-  const winnerNomineeId = normalizeBetKey_(
-    config.winnerNomineeId || ""
-  );
+  const winnerNomineeId =
+    normalizeBetKey_(
+      config.winnerNomineeId || ""
+    );
+
+  const wagerResultType =
+    normalizeBetKey_(
+      config.wagerResultType ||
+      config.WagerResultType ||
+      ""
+    );
+
+  /*
+    Normal 2-option moneyline tie:
+    no winner, half wager returned.
+  */
+  if (
+    !winnerNomineeId &&
+    wagerResultType === "half-refund"
+  ) {
+
+    return {
+      status: "half-refund",
+      payout:
+        roundBetMoney_(
+          Number(bet.betAmount || 0) / 2
+        ),
+      won: false,
+      lost: false,
+      refunded: true
+    };
+
+  }
 
   if (!winnerNomineeId) {
 
@@ -895,7 +1117,8 @@ function getBetResolution_(bet, settings){
       status: "pending",
       payout: 0,
       won: false,
-      lost: false
+      lost: false,
+      refunded: false
     };
 
   }
@@ -918,7 +1141,8 @@ function getBetResolution_(bet, settings){
         )
       : 0,
     won: won,
-    lost: !won
+    lost: !won,
+    refunded: false
   };
 
 }
@@ -965,6 +1189,10 @@ function getUserBettingSummary(username, gameId){
     if (resolution.status === "won") {
       payout += resolution.payout;
       wonBets++;
+    }
+
+    if (resolution.status === "half-refund") {
+  payout += resolution.payout;
     }
 
     if (resolution.status === "lost") {
@@ -1355,6 +1583,296 @@ function saveBet(payload){
 
 }
 
+function removeBet(payload){
+
+  const lock =
+    LockService.getScriptLock();
+
+  lock.waitLock(10000);
+
+  try {
+
+    payload =
+      payload || {};
+
+    const username =
+      normalizeBetString_(
+        payload.username
+      );
+
+    const gameId =
+      normalizeBetGameId_(
+        payload.gameId ||
+        getDefaultGameId()
+      );
+
+    const categoryId =
+      normalizeBetKey_(
+        payload.categoryId
+      );
+
+    if (
+      !username ||
+      !gameId ||
+      !categoryId
+    ) {
+
+      return {
+        success: false,
+        message: "Missing required fields"
+      };
+
+    }
+
+    validateGameId(
+      gameId
+    );
+
+    const config =
+      getBettingGameConfig(
+        gameId
+      );
+
+    if (!config.enabled) {
+
+      return {
+        success: false,
+        message: "Wagering is not enabled for this game"
+      };
+
+    }
+
+    /*
+      Games setup option.
+      Games sheet column:
+      AllowBetRemoval = TRUE
+    */
+    if (
+      config.allowBetRemoval !== true &&
+      config.removeBetEnabled !== true
+    ) {
+
+      return {
+        success: false,
+        message: "Removing bets is not enabled for this game"
+      };
+
+    }
+
+    const categories =
+      getCategories(
+        gameId
+      );
+
+    const category =
+      categories.find(function(item) {
+
+        return (
+          normalizeBetKey_(
+            item.id
+          ) === categoryId
+        );
+
+      });
+
+    if (!category) {
+
+      return {
+        success: false,
+        message: "Category not found"
+      };
+
+    }
+
+    const settings =
+      getCategorySettings(
+        gameId
+      );
+
+    const categoryConfig =
+      settings[categoryId] || {};
+
+    const winnerNomineeId =
+      normalizeBetKey_(
+        categoryConfig.winnerNomineeId ||
+        categoryConfig.WinnerNomineeId ||
+        category.winnerNomineeId ||
+        category.WinnerNomineeId ||
+        ""
+      );
+
+    const wagerResultType =
+      normalizeBetKey_(
+        categoryConfig.wagerResultType ||
+        categoryConfig.WagerResultType ||
+        category.wagerResultType ||
+        category.WagerResultType ||
+        ""
+      );
+
+    if (
+      winnerNomineeId ||
+      wagerResultType
+    ) {
+
+      return {
+        success: false,
+        message: "This wager has already been resolved"
+      };
+
+    }
+
+    if (
+      isBettingCategoryLocked_(
+        category,
+        categoryConfig
+      )
+    ) {
+
+      return {
+        success: false,
+        message: "Category is locked"
+      };
+
+    }
+
+    const sh =
+      getBetsSheet_();
+
+    const data =
+      sh.getDataRange()
+        .getValues();
+
+    if (data.length <= 1) {
+
+      return {
+        success: true,
+        removed: false,
+        removedCount: 0,
+        message: "No bet found",
+        summary:
+          getUserBettingSummary(
+            username,
+            gameId
+          )
+      };
+
+    }
+
+    const headers =
+      data[0].map(function(header) {
+        return String(header || "").trim();
+      });
+
+    const col =
+      getBetsColumnMap_(
+        headers
+      );
+
+    validateBetsColumns_(
+      col
+    );
+
+    const usernameSearch =
+      normalizeBetKey_(
+        username
+      );
+
+    let removedCount =
+      0;
+
+    /*
+      Delete from bottom to top.
+      This safely removes duplicates too.
+    */
+    for (let i = data.length - 1; i >= 1; i--) {
+
+      const row =
+        data[i];
+
+      const rowGameId =
+        normalizeBetGameId_(
+          row[col.gameId]
+        );
+
+      const rowUsername =
+        normalizeBetKey_(
+          row[col.username]
+        );
+
+      const rowCategoryId =
+        normalizeBetKey_(
+          row[col.categoryId]
+        );
+
+      if (
+        rowGameId === gameId &&
+        rowUsername === usernameSearch &&
+        rowCategoryId === categoryId
+      ) {
+
+        sh.deleteRow(
+          i + 1
+        );
+
+        removedCount++;
+
+      }
+
+    }
+
+    SpreadsheetApp.flush();
+
+    if (
+      typeof clearAppCaches ===
+      "function"
+    ) {
+
+      clearAppCaches();
+
+    }
+
+    return {
+      success: true,
+      removed: removedCount > 0,
+      removedCount: removedCount,
+      gameId: gameId,
+      username: username,
+      categoryId: categoryId,
+      summary:
+        getUserBettingSummary(
+          username,
+          gameId
+        )
+    };
+
+  } catch (err) {
+
+    Logger.log(
+      "🚨 removeBet ERROR | " +
+      (
+        err && err.message
+          ? err.message
+          : String(err)
+      )
+    );
+
+    return {
+      success: false,
+      message:
+        err && err.message
+          ? err.message
+          : String(err)
+    };
+
+  } finally {
+
+    lock.releaseLock();
+
+  }
+
+}
+
 /* =====================================================
    LEADERBOARD
 ===================================================== */
@@ -1404,6 +1922,10 @@ function getBettingLeaderboardData(gameId){
         if (resolution.status === "won") {
           payout += resolution.payout;
           wonBets++;
+        }
+
+        if (resolution.status === "half-refund") {
+          payout += resolution.payout;
         }
 
         if (resolution.status === "lost") {

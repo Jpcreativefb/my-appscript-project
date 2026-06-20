@@ -914,6 +914,232 @@ async function sportsAwardsApi_(action, params) {
 
 }
 
+async function apiAdminGetSportsWagerGames_(
+  session
+) {
+
+  return sportsAwardsApi_(
+    "adminGetSportsWagerGames",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token
+    }
+  );
+
+}
+
+async function chooseSportsAwardsGameId_(
+  session
+) {
+
+  let games = [];
+
+  try {
+
+    const res =
+      await apiAdminGetSportsWagerGames_(
+        session
+      );
+
+    if (
+      !res ||
+      res.success === false
+    ) {
+      throw new Error(
+        (res && (res.message || res.error)) ||
+        "Could not load available games."
+      );
+    }
+
+    games =
+      res.games || [];
+
+  } catch (err) {
+
+    showSportsError(
+      err && err.message
+        ? err.message
+        : "Could not load available games."
+    );
+
+    return "";
+
+  }
+
+  if (!games.length) {
+
+    alert(
+      "No active games found. Please create or activate a game first."
+    );
+
+    return "";
+
+  }
+
+  return showSportsGamePickerModal_(
+    games
+  );
+
+}
+
+function showSportsGamePickerModal_(
+  games
+) {
+
+  return new Promise(function(resolve) {
+
+    const existing =
+      document.getElementById(
+        "sportsGamePickerOverlay"
+      );
+
+    if (existing) {
+      existing.remove();
+    }
+
+    const overlay =
+      document.createElement("div");
+
+    overlay.id =
+      "sportsGamePickerOverlay";
+
+    overlay.className =
+      "sports-game-picker-overlay";
+
+    const optionsHtml =
+      games.map(function(game) {
+
+        const gameId =
+          String(game.gameId || "")
+            .trim();
+
+        const label =
+          (
+            String(game.name || gameId).trim() +
+            " — " +
+            gameId +
+            (
+              game.type
+                ? " (" + game.type + ")"
+                : ""
+            )
+          );
+
+        return (
+          '<option value="' +
+          escapeSportsHtml(gameId) +
+          '">' +
+          escapeSportsHtml(label) +
+          '</option>'
+        );
+
+      }).join("");
+
+    overlay.innerHTML = `
+      <div class="sports-game-picker-modal">
+
+        <h3>Create Wager In Game</h3>
+
+        <p>
+          Choose which Awards App game should receive this wager category.
+        </p>
+
+        <select id="sportsGamePickerSelect">
+          ${optionsHtml}
+        </select>
+
+        <div class="sports-game-picker-actions">
+
+          <button
+            type="button"
+            class="small-btn"
+            id="sportsGamePickerCancel"
+          >
+            Cancel
+          </button>
+
+          <button
+            type="button"
+            class="small-btn wager-btn"
+            id="sportsGamePickerConfirm"
+          >
+            Continue
+          </button>
+
+        </div>
+
+      </div>
+    `;
+
+    document.body.appendChild(
+      overlay
+    );
+
+    const select =
+      document.getElementById(
+        "sportsGamePickerSelect"
+      );
+
+    if (SPORTS_WAGER_AWARDS_GAME_ID) {
+
+      const defaultOption =
+        Array.from(select.options)
+          .find(function(option) {
+            return (
+              option.value ===
+              SPORTS_WAGER_AWARDS_GAME_ID
+            );
+          });
+
+      if (defaultOption) {
+        select.value =
+          SPORTS_WAGER_AWARDS_GAME_ID;
+      }
+
+    }
+
+    function close(
+      value
+    ) {
+
+      overlay.remove();
+
+      resolve(
+        value || ""
+      );
+
+    }
+
+    document
+      .getElementById("sportsGamePickerCancel")
+      .addEventListener("click", function() {
+        close("");
+      });
+
+    document
+      .getElementById("sportsGamePickerConfirm")
+      .addEventListener("click", function() {
+        close(
+          select.value
+        );
+      });
+
+    overlay
+      .addEventListener("click", function(e) {
+
+        if (e.target === overlay) {
+          close("");
+        }
+
+      });
+
+  });
+
+}
+
 function renderCreateWagerButton(game) {
 
   const session =
@@ -953,6 +1179,9 @@ async function createSportsWagerFromCard(gameId) {
     return;
   }
 
+  sportsScoresState.creatingWager =
+  true;
+
   const game =
     sportsScoresState.scores.find(function(item) {
       return item.GameId === gameId;
@@ -980,22 +1209,27 @@ async function createSportsWagerFromCard(gameId) {
   }
 
   const awardsGameId =
-    prompt(
-      "Awards wager GameId",
-      SPORTS_WAGER_AWARDS_GAME_ID
+    await chooseSportsAwardsGameId_(
+      session
     );
 
   if (!awardsGameId) {
-    return;
+     return;
   }
+
+  const isSoccer =
+    String(game.Sport || "")
+      .trim()
+      .toLowerCase() === "soccer";
 
   const marketChoice =
     prompt(
       "Choose wager market:\n\n" +
       "1 = Moneyline\n" +
       "2 = Spread\n" +
-      "3 = Total / Over-Under",
-      "1"
+      "3 = Total / Over-Under\n" +
+      "4 = Soccer 3-Way Moneyline",
+      isSoccer ? "4" : "1"
     );
 
   if (marketChoice === null) {
@@ -1007,7 +1241,9 @@ async function createSportsWagerFromCard(gameId) {
       ? "spread"
       : String(marketChoice).trim() === "3"
         ? "total"
-        : "moneyline";
+        : String(marketChoice).trim() === "4"
+          ? "soccer-moneyline"
+          : "moneyline";
 
   const oddsModeChoice =
     prompt(
@@ -1015,7 +1251,7 @@ async function createSportsWagerFromCard(gameId) {
       "1 = Real Odds\n" +
       "2 = App Odds / Record Odds\n" +
       "3 = Manual Odds",
-      "1"
+      wagerMarket === "soccer-moneyline" ? "3" : "1"
     );
 
   if (oddsModeChoice === null) {
@@ -1031,7 +1267,8 @@ async function createSportsWagerFromCard(gameId) {
 
   if (
     oddsMode === "record" &&
-    wagerMarket !== "moneyline"
+    wagerMarket !== "moneyline" &&
+    wagerMarket !== "soccer-moneyline"
   ) {
     alert(
       "App Odds / Record Odds only works for Moneyline.\n\nUse Real Odds or Manual Odds for Spread and Total."
@@ -1041,6 +1278,7 @@ async function createSportsWagerFromCard(gameId) {
 
   let awayOdds = "";
   let homeOdds = "";
+  let drawOdds = "";
   let awayLine = "";
   let homeLine = "";
   let totalPoints = "";
@@ -1049,7 +1287,10 @@ async function createSportsWagerFromCard(gameId) {
 
   if (
     oddsMode === "manual" &&
-    wagerMarket === "moneyline"
+    (
+      wagerMarket === "moneyline" ||
+      wagerMarket === "soccer-moneyline"
+    )
   ) {
 
     awayOdds =
@@ -1060,6 +1301,20 @@ async function createSportsWagerFromCard(gameId) {
 
     if (awayOdds === null) {
       return;
+    }
+
+    if (wagerMarket === "soccer-moneyline") {
+
+      drawOdds =
+        prompt(
+          "Draw odds",
+          "3"
+        );
+
+      if (drawOdds === null) {
+        return;
+      }
+
     }
 
     homeOdds =
@@ -1158,9 +1413,6 @@ async function createSportsWagerFromCard(gameId) {
 
   }
 
-  sportsScoresState.creatingWager =
-    true;
-
   setSportsStatus(
     "Creating " +
     wagerMarket +
@@ -1215,6 +1467,9 @@ async function createSportsWagerFromCard(gameId) {
 
           homeOdds:
             homeOdds,
+
+          drawOdds:
+            drawOdds,
 
           overOdds:
             overOdds,

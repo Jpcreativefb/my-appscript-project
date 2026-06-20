@@ -34,6 +34,12 @@
   border-color: rgba(251,191,36,0.35);
 }
 
+.betting-notice.success {
+  color: #bbf7d0;
+  background: rgba(20,83,45,0.35);
+  border-color: rgba(34,197,94,0.35);
+}
+
 /* =========================
    SUMMARY CARDS
 ========================= */
@@ -126,8 +132,12 @@
   overflow: hidden;
 }
 
-.betting-category-card.locked {
+.betting-category-card.locked:not(.finished) {
   opacity: 0.7;
+}
+
+.betting-category-card.finished.locked {
+  opacity: 1;
 }
 
 .betting-category-card summary {
@@ -299,11 +309,6 @@
   border-color: rgba(250,204,21,0.45);
 }
 
-.betting-nominee-card.selected {
-  background: rgba(250,204,21,0.16);
-  border-color: rgba(250,204,21,0.78);
-  box-shadow: inset 0 0 0 1px rgba(250,204,21,0.22);
-}
 
 .betting-nominee-card:disabled {
   cursor: not-allowed;
@@ -679,9 +684,14 @@
   border-radius: 16px;
 }
 
-/* Final games slightly muted */
+/* Final games slightly muted, but keep result text readable */
 .betting-final-group .betting-category-card {
-  opacity: 0.82;
+  opacity: 0.92;
+}
+
+.betting-final-group .betting-current,
+.betting-category-card.finished .betting-current {
+  opacity: 1;
 }
 
 @media (max-width: 480px) {
@@ -983,4 +993,125 @@
   color: #dbeafe;
   background: rgba(37,99,235,0.42);
   border-color: rgba(96,165,250,0.35);
+}
+
+/* =========================
+   WAGER WINNER / FINISHED STYLING
+   Conflict-free final version
+========================= */
+
+.betting-finished-pill {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.9);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  vertical-align: middle;
+}
+
+.betting-category-card.finished {
+  border-color: rgba(34,197,94,0.32);
+}
+
+.betting-category-card.finished.locked,
+.betting-final-group .betting-category-card.locked {
+  opacity: 1;
+}
+
+.betting-final-group .betting-category-card {
+  opacity: 0.92;
+}
+
+.betting-final-group .betting-current,
+.betting-category-card.finished .betting-current {
+  opacity: 1;
+}
+
+/* Current wager line colors */
+.betting-current.current-wager {
+  color: #38bdf8;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-won {
+  color: #22c55e;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-lost {
+  color: #ef4444;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-half-refund {
+  color: #f59e0b;
+  font-weight: 950;
+  opacity: 1;
+}
+
+/* Selected user pick: light blue unless it is also the winner */
+.betting-nominee-card.selected:not(.winner-pick) {
+  border-color: rgba(56,189,248,0.85);
+  background: rgba(56,189,248,0.16);
+  box-shadow:
+    inset 0 0 0 1px rgba(56,189,248,0.28),
+    0 10px 24px rgba(56,189,248,0.14);
+}
+
+.betting-nominee-card.selected:not(.winner-pick) .betting-nominee-name,
+.betting-nominee-card.selected:not(.winner-pick) .betting-odds-row,
+.betting-nominee-card.selected:not(.winner-pick) .betting-return-value {
+  color: #38bdf8;
+  font-weight: 950;
+}
+
+/* Winner always overrides selected blue */
+.betting-nominee-card.winner-pick,
+.betting-nominee-card.selected.winner-pick {
+  border-color: rgba(34,197,94,0.78) !important;
+  background: rgba(34,197,94,0.18) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(34,197,94,0.28),
+    0 12px 28px rgba(34,197,94,0.18) !important;
+}
+
+.betting-nominee-card.winner-pick .betting-nominee-name,
+.betting-nominee-card.winner-pick .betting-odds-row,
+.betting-nominee-card.winner-pick .betting-return-value {
+  color: #22c55e !important;
+  font-weight: 950;
+}
+
+.betting-nominee-card.winner-pick .betting-logo-score {
+  color: #052e16 !important;
+  background: #22c55e !important;
+  border-color: rgba(187,247,208,0.9) !important;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.34);
+}
+
+.betting-nominee-card.winner-pick::after {
+  content: "Winner";
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.9);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.28);
 }

@@ -288,6 +288,20 @@ function doGet(e) {
 
       }
 
+    // =========================
+   // ADMIN SPORTS WAGER GAMES
+    // =========================
+
+      if (action === "adminGetSportsWagerGames") {
+
+        return json(
+          apiAdminGetSportsWagerGames(
+            e.parameter
+          )
+        );
+
+      }
+
     /* =========================
        HEALTH / DEFAULT
     ========================= */
@@ -1523,6 +1537,23 @@ function doGet(e) {
       );
 
     }
+
+    if (action === "removeBet") {
+
+  return json(
+    removeBet({
+      username:
+        e.parameter.username,
+
+      gameId:
+        e.parameter.gameId,
+
+      categoryId:
+        e.parameter.categoryId
+    })
+  );
+
+}
 
     // =========================
     // BETTING LEADERBOARD

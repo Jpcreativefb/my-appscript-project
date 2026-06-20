@@ -52,6 +52,30 @@ function escapeBettingHtml_(value){
 
 }
 
+function renderBettingNotice_(message, type){
+
+  if (!message) {
+    return "";
+  }
+
+  const cleanType =
+    String(type || "")
+      .trim()
+      .toLowerCase();
+
+  const className =
+    cleanType
+      ? "betting-notice " + cleanType
+      : "betting-notice";
+
+  return `
+    <div class="${className}">
+      ${escapeBettingHtml_(message)}
+    </div>
+  `;
+
+}
+
 function money_(value){
 
   const n = Number(value || 0);
@@ -105,6 +129,111 @@ function getBettingNomineeName_(category, nomineeId){
   return nominee
     ? nominee.shortAnswer || nominee.name
     : nomineeId;
+
+}
+
+function getBettingCurrentDisplay_(category, bet){
+
+  if (!bet) {
+    return {
+      className: "muted",
+      html: ""
+    };
+  }
+
+  const betAmount =
+    Number(bet.betAmount || 0);
+
+  const pickName =
+    getBettingNomineeName_(
+      category,
+      bet.nomineeId
+    );
+
+  const status =
+    String(bet.status || "")
+      .trim()
+      .toLowerCase();
+
+  const winnerNomineeId =
+    String(category.winnerNomineeId || "")
+      .trim()
+      .toLowerCase();
+
+  const wagerResultType =
+    String(category.wagerResultType || "")
+      .trim()
+      .toLowerCase();
+
+  const betNomineeId =
+    String(bet.nomineeId || "")
+      .trim()
+      .toLowerCase();
+
+  const hasWinner =
+    !!winnerNomineeId;
+
+  const isHalfRefund =
+    status === "half-refund" ||
+    wagerResultType === "half-refund";
+
+  const won =
+    status === "won" ||
+    (
+      hasWinner &&
+      winnerNomineeId === betNomineeId
+    );
+
+  const lost =
+    status === "lost" ||
+    (
+      hasWinner &&
+      winnerNomineeId !== betNomineeId
+    );
+
+  if (isHalfRefund) {
+
+    const halfLoss =
+      betAmount / 2;
+
+    return {
+      className: "bet-half-refund",
+      html:
+        `Draw: -${money_(halfLoss)} / ${money_(betAmount)} on ${escapeBettingHtml_(pickName)}`
+    };
+
+  }
+
+  if (won) {
+
+    const payout =
+      Number(bet.payout || 0) > 0
+        ? Number(bet.payout || 0)
+        : Number(bet.potentialReturn || 0);
+
+    return {
+      className: "bet-won",
+      html:
+        `Payout: +${money_(payout)} / ${money_(betAmount)} on ${escapeBettingHtml_(pickName)}`
+    };
+
+  }
+
+  if (lost) {
+
+    return {
+      className: "bet-lost",
+      html:
+        `Lost: -${money_(betAmount)} / ${money_(betAmount)} on ${escapeBettingHtml_(pickName)}`
+    };
+
+  }
+
+  return {
+    className: "current-wager",
+    html:
+      `Current: ${money_(betAmount)} on ${escapeBettingHtml_(pickName)}`
+  };
 
 }
 
@@ -344,32 +473,68 @@ function getBettingNomineeRecord_(category, nominee){
 
 }
 
-function getBettingNomineeScore_(category, nominee){
+function getBettingNomineeScore_(
+  category,
+  nominee
+) {
 
-  const name =
-    String(nominee.name || nominee.shortAnswer || "")
+  const nomineeId =
+    String(nominee.id || "")
       .trim()
       .toLowerCase();
 
-  const home =
+  const nomineeName =
+    String(
+      nominee.name ||
+      nominee.shortAnswer ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const homeTeam =
     String(category.homeTeam || "")
       .trim()
       .toLowerCase();
 
-  const away =
+  const awayTeam =
     String(category.awayTeam || "")
       .trim()
       .toLowerCase();
 
-  if (name && home && name === home && category.homeScore !== "") {
-    return category.homeScore;
+  const isHome =
+    nomineeId === "home" ||
+    nomineeId.indexOf("home") !== -1 ||
+    nomineeName === homeTeam ||
+    nomineeName.indexOf(homeTeam) !== -1;
+
+  const isAway =
+    nomineeId === "away" ||
+    nomineeId.indexOf("away") !== -1 ||
+    nomineeName === awayTeam ||
+    nomineeName.indexOf(awayTeam) !== -1;
+
+  let score = "";
+
+  if (isHome) {
+    score =
+      category.homeScore;
   }
 
-  if (name && away && name === away && category.awayScore !== "") {
-    return category.awayScore;
+  if (isAway) {
+    score =
+      category.awayScore;
   }
 
-  return "";
+  if (
+    score === null ||
+    score === undefined ||
+    String(score).trim() === ""
+  ) {
+    return "";
+  }
+
+  return String(score);
 
 }
 
@@ -597,12 +762,20 @@ function renderBettingCategory_(category, bet, config){
     ? bet.betAmount
     : (config.minWager || config.minBet);
 
-  const locked =
-    category.locked === true;
+  const datePassed =
+    isBettingDatePassed_(
+      category
+    );
 
-  const currentPick = bet
-    ? getBettingNomineeName_(category, bet.nomineeId)
-    : "";
+  const locked =
+     category.locked === true ||
+     datePassed;
+
+  const currentDisplay =
+    getBettingCurrentDisplay_(
+      category,
+      bet
+    );
 
   const gameDate =
     formatBettingGameDate_(category.lockDateTime);
@@ -613,19 +786,43 @@ function renderBettingCategory_(category, bet, config){
   const league =
     category.league || category.section || "";
 
-    const clockLine =
+  const clockLine =
     formatBettingClockLine_(
       category
     );
 
+  const winnerNomineeId =
+    String(category.winnerNomineeId || "")
+      .trim()
+      .toLowerCase();
+
+  const wagerResultType =
+    String(category.wagerResultType || "")
+      .trim()
+      .toLowerCase();
+
+  const categoryFinished =
+    !!winnerNomineeId ||
+    !!wagerResultType ||
+    datePassed;
+
+  const halfRefund =
+    wagerResultType === "half-refund";
+
   return `
-    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""}">
+    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""} ${categoryFinished ? "finished" : ""}">
 
       <summary class="betting-category-summary">
 
         <div class="betting-summary-main">
           <div class="betting-category-title">
             ${escapeBettingHtml_(category.shortName || category.name)}
+
+            ${categoryFinished ? `
+              <span class="betting-finished-pill">
+                Finished
+              </span>
+            ` : ""}
           </div>
 
           <div class="betting-game-meta">
@@ -639,21 +836,21 @@ function renderBettingCategory_(category, bet, config){
 
             ${clockLine ? `
               <span class="betting-clock-pill">
-                 ${escapeBettingHtml_(clockLine)}
+                ${escapeBettingHtml_(clockLine)}
               </span>
-              ` : ""}
-
+            ` : ""}
           </div>
 
           ${bet ? `
-            <div class="betting-current">
-              Current: ${money_(bet.betAmount)} on ${escapeBettingHtml_(currentPick)}
+            <div class="betting-current ${currentDisplay.className}">
+               ${currentDisplay.html}
             </div>
           ` : `
             <div class="betting-current muted">
-              Tap to place bet
+               ${categoryFinished ? "Finished" : "Tap to place bet"}
             </div>
           `}
+          
         </div>
 
         <div class="betting-summary-side">
@@ -677,67 +874,114 @@ function renderBettingCategory_(category, bet, config){
 
       <div class="betting-collapsible-body">
 
-        <label class="betting-amount-label" for="${inputId}">
-          Bet amount
-        </label>
+        ${categoryFinished ? `
+          ${halfRefund ? `
+            <div class="betting-notice warning">
+              This wager finished in a draw. Half of each wager is refunded.
+            </div>
+          ` : `
+            <div class="betting-notice">
+              This wager is finished. The winning option is highlighted below.
+            </div>
+          `}
+        ` : `
+          <label class="betting-amount-label" for="${inputId}">
+            Bet amount
+          </label>
 
-        <input
-          id="${inputId}"
-          class="betting-amount-input"
-          type="number"
-          inputmode="numeric"
-          min="${config.minWager || config.minBet}"
-          max="${config.maxWager || config.maxBet}"
-          step="1"
-          value="${defaultAmount}"
-          data-betting-amount-category="${escapeBettingHtml_(category.id)}"
-          oninput="updateBettingReturnsForCategory('${category.id}')"
-          ${locked ? "disabled" : ""}
-        >
+          <input
+            id="${inputId}"
+            class="betting-amount-input"
+            type="number"
+            inputmode="numeric"
+            min="${config.minWager || config.minBet}"
+            max="${config.maxWager || config.maxBet}"
+            step="1"
+            value="${defaultAmount}"
+            data-betting-amount-category="${escapeBettingHtml_(category.id)}"
+            oninput="updateBettingReturnsForCategory('${category.id}')"
+            ${locked ? "disabled" : ""}
+          >
+        `}
+
+         ${config.allowBetRemoval === true && !locked && !categoryFinished ? `
+            <button
+              class="betting-remove-btn"
+              type="button"
+              onclick="removeBetSelection('${category.id}')"
+            >
+              Take Back
+            </button>
+          ` : ""}
 
         <div class="betting-nominee-grid">
           ${(category.nominees || []).map(nominee => {
 
-            const selected = bet &&
-              bet.nomineeId === nominee.id;
+            const selected =
+              bet &&
+              String(bet.nomineeId || "")
+                .trim()
+                .toLowerCase() ===
+              String(nominee.id || "")
+                .trim()
+                .toLowerCase();
+
+            const nomineeId =
+              String(nominee.id || "")
+                .trim()
+                .toLowerCase();
+
+            const winner =
+              winnerNomineeId &&
+              winnerNomineeId === nomineeId;
 
             const potential =
               Number(defaultAmount || 0) *
               Number(nominee.odds || 0);
 
             const record =
-              getBettingNomineeRecord_(category, nominee);
+              getBettingNomineeRecord_(
+                category,
+                nominee
+              );
 
             const score =
-              getBettingNomineeScore_(category, nominee);
+              getBettingNomineeScore_(
+                category,
+                nominee
+              );
+
+            const hasScore =
+              score !== "" &&
+              score !== null &&
+              score !== undefined;
 
             return `
               <button
-                class="betting-nominee-card ${selected ? "selected" : ""}"
-                onclick="saveBetSelection('${category.id}', '${nominee.id}')"
-                ${locked ? "disabled" : ""}
+                class="betting-nominee-card ${selected ? "selected" : ""} ${winner ? "winner-pick" : ""}"
+                onclick="${categoryFinished || locked ? "" : `saveBetSelection('${category.id}', '${nominee.id}')`}"
+                ${categoryFinished || locked ? "disabled" : ""}
               >
-              <div class="betting-logo-score-area">
+                <div class="betting-logo-score-area">
 
-                ${nominee.image ? `
-                  <img
-                   class="betting-logo-fill"
-                   src="${escapeBettingHtml_(nominee.image)}"
-                   alt=""
-                   loading="lazy"
-                  >
-                ` : `
-                  <div class="betting-logo-placeholder"></div>
-                `}
+                  ${nominee.image ? `
+                    <img
+                      class="betting-logo-fill"
+                      src="${escapeBettingHtml_(nominee.image)}"
+                      alt=""
+                      loading="lazy"
+                    >
+                  ` : `
+                    <div class="betting-logo-placeholder"></div>
+                  `}
 
-                ${score !== "" ? `
-                  <div class="betting-logo-score">
-                    ${escapeBettingHtml_(score)}
-                  </div>
-                ` : ""}
+                  ${hasScore ? `
+                    <div class="betting-logo-score">
+                      ${escapeBettingHtml_(score)}
+                    </div>
+                  ` : ""}
 
-              </div>
-            
+                </div>
 
                 <div class="betting-nominee-name">
                   ${escapeBettingHtml_(nominee.shortAnswer || nominee.name)}
@@ -750,15 +994,15 @@ function renderBettingCategory_(category, bet, config){
                 </div>
 
                 <div class="betting-odds-row">
-                   <span>${odds_(nominee.odds)}</span>
+                  <span>${odds_(nominee.odds)}</span>
 
-                   <span
-                     class="betting-return-value"
-                     data-betting-return-category="${escapeBettingHtml_(category.id)}"
-                     data-betting-odds="${escapeBettingHtml_(nominee.odds)}"
-                   >
-                      Return ${money_(potential)}
-                   </span>
+                  <span
+                    class="betting-return-value"
+                    data-betting-return-category="${escapeBettingHtml_(category.id)}"
+                    data-betting-odds="${escapeBettingHtml_(nominee.odds)}"
+                  >
+                    Return ${money_(potential)}
+                  </span>
                 </div>
 
               </button>
@@ -771,6 +1015,67 @@ function renderBettingCategory_(category, bet, config){
 
     </details>
   `;
+
+}
+
+async function removeBetSelection(categoryId){
+
+  if (BETTING_STATE.saving) {
+    return;
+  }
+
+  BETTING_STATE.saving = true;
+
+  const session = getBettingSession_();
+  const username = session.username || "";
+  const gameId = getBettingGameId_();
+
+  const notice = document.getElementById("bettingNotice");
+
+  try {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_("Removing bet...", "");
+    }
+
+    const res =
+      await apiRemoveBet({
+        username: username,
+        gameId: gameId,
+        categoryId: categoryId
+      });
+
+    if (!res || res.success === false) {
+      throw new Error(
+        (res && (res.message || res.error)) ||
+        "Could not remove bet."
+      );
+    }
+
+    const app = document.getElementById("app");
+
+    if (app) {
+      app.innerHTML = await renderBettingPage();
+    }
+
+  } catch (err) {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          err && err.message
+            ? err.message
+            : "Could not remove bet.",
+          "error"
+        );
+    }
+
+  } finally {
+
+    BETTING_STATE.saving = false;
+
+  }
 
 }
 
@@ -859,8 +1164,71 @@ function renderBettingLeaderboardPreview_(rows, config){
 
 }
 
+function isBettingDatePassed_(category){
+
+  if (!category) {
+    return false;
+  }
+
+  const value =
+    category.lockDateTime ||
+    category.LockDateTime ||
+    category.gameDateTime ||
+    category.GameDateTime ||
+    category.startDateTime ||
+    category.StartDateTime ||
+    "";
+
+  if (!value) {
+    return false;
+  }
+
+  const d =
+    new Date(value);
+
+  if (isNaN(d.getTime())) {
+    return false;
+  }
+
+  return d.getTime() <= Date.now();
+
+}
+
 function isBettingFinalCategory_(category){
 
+  if (!category) {
+    return false;
+  }
+
+  /*
+    If the wager is already resolved, move it down.
+  */
+  if (
+    category.finished === true ||
+    String(category.winnerNomineeId || "")
+      .trim() !== "" ||
+    String(category.wagerResultType || "")
+      .trim() !== ""
+  ) {
+    return true;
+  }
+
+  /*
+    Simple rule:
+    If the game date / lock time has passed,
+    move it to Finished Games.
+  */
+  if (
+    isBettingDatePassed_(
+      category
+    )
+  ) {
+    return true;
+  }
+
+  /*
+    Sports API fallback.
+  */
   const label =
     typeof getBettingGameStateLabel_ === "function"
       ? getBettingGameStateLabel_(category)
@@ -1455,54 +1823,116 @@ async function saveBetSelection(categoryId, nomineeId){
 
   BETTING_STATE.saving = true;
 
-  const session = getBettingSession_();
-  const username = session.username || "";
-  const gameId = getBettingGameId_();
-  const input = document.getElementById(
-    getBetAmountInputId_(categoryId)
-  );
+  const session =
+    getBettingSession_();
 
-  const betAmount = input
-    ? input.value
-    : "";
+  const username =
+    session.username || "";
 
-  const notice = document.getElementById("bettingNotice");
+  const gameId =
+    getBettingGameId_();
 
-  if (notice) {
-    notice.innerHTML = renderBettingNotice_(
-      "Saving bet...",
-      ""
+  const input =
+    document.getElementById(
+      getBetAmountInputId_(categoryId)
     );
-  }
 
-  const res = await apiSaveBet({
-    username: username,
-    gameId: gameId,
-    categoryId: categoryId,
-    nomineeId: nomineeId,
-    betAmount: betAmount
-  });
+  const betAmount =
+    input
+      ? input.value
+      : "";
 
-  BETTING_STATE.saving = false;
+  const notice =
+    document.getElementById(
+      "bettingNotice"
+    );
 
-  if (!res || res.success === false) {
+  try {
 
     if (notice) {
-      notice.innerHTML = renderBettingNotice_(
-        (res && (res.message || res.error)) ||
-        "Could not save bet.",
-        "error"
+      notice.innerHTML =
+        renderBettingNotice_(
+          "Saving bet...",
+          ""
+        );
+    }
+
+    if (!username) {
+      throw new Error(
+        "Please log in again."
       );
     }
 
-    return;
+    if (!categoryId || !nomineeId) {
+      throw new Error(
+        "Missing wager selection."
+      );
+    }
 
-  }
+    if (
+      betAmount === "" ||
+      Number(betAmount) <= 0
+    ) {
+      throw new Error(
+        "Enter a valid wager amount."
+      );
+    }
 
-  const app = document.getElementById("app");
+    const res =
+      await apiSaveBet({
+        username: username,
+        gameId: gameId,
+        categoryId: categoryId,
+        nomineeId: nomineeId,
+        betAmount: betAmount
+      });
 
-  if (app) {
-    app.innerHTML = await renderBettingPage();
+    if (!res || res.success === false) {
+      throw new Error(
+        (res && (res.message || res.error)) ||
+        "Could not save bet."
+      );
+    }
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          "Bet saved.",
+          "success"
+        );
+    }
+
+    const app =
+      document.getElementById(
+        "app"
+      );
+
+    if (app) {
+      app.innerHTML =
+        await renderBettingPage();
+    }
+
+  } catch (err) {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          err && err.message
+            ? err.message
+            : "Could not save bet.",
+          "error"
+        );
+    }
+
+    console.error(
+      "SAVE BET ERROR",
+      err
+    );
+
+  } finally {
+
+    BETTING_STATE.saving = false;
+
   }
 
 }

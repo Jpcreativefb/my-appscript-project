@@ -91,11 +91,15 @@ function adminNormalizeGameId_(value) {
     key,
     value
   ) {
-  
-    if (col[key] !== -1) {
+
+    if (
+      col &&
+      typeof col[key] === "number" &&
+      col[key] !== -1
+    ) {
       row[col[key]] = value;
     }
-  
+
   }
   
   function adminFindGameRow_(
@@ -323,6 +327,16 @@ function adminNormalizeGameId_(value) {
       adminToNumber_(
         payload.maxWager,
         100
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "allowBetRemoval",
+      adminToBoolean_(
+        payload.allowBetRemoval ||
+        payload.AllowBetRemoval
       )
     );
   
@@ -996,6 +1010,23 @@ function adminSaveGame(payload) {
           )
         );
       
+      }
+
+      if (
+         "allowBetRemoval" in payload ||
+         "AllowBetRemoval" in payload
+      ) {
+
+         adminSetIfColumnExists_(
+          row,
+          col,
+          "allowBetRemoval",
+          adminToBoolean_(
+            payload.allowBetRemoval ||
+            payload.AllowBetRemoval
+          )
+         );
+
       }
   
       if ("themeColor" in payload) {
@@ -1878,6 +1909,10 @@ function adminCloneGame(payload) {
     
     maxWager:
       sourceGame.maxWager || 100,
+
+    allowBetRemoval:
+      sourceGame.allowBetRemoval === true ||
+      sourceGame.AllowBetRemoval === true,  
     
     showLeaderboard:
       sourceGame.showLeaderboard !== false,
