@@ -1,0 +1,59 @@
+.page {
+  width: 100%;
+}
+
+.card-grid {
+  display: grid;
+  gap: 16px;
+
+  grid-template-columns:
+    repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.card {
+  background: white;
+
+  border-radius: 18px;
+
+  padding: 20px;
+
+  box-shadow:
+    0 4px 12px rgba(0,0,0,0.08);
+
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.12);
+}
+
+/* ======================
+   EMPTY / ERROR STATES
+====================== */
+
+.error-card {
+  border-left: 5px solid #b42318;
+  background: #fff4f2;
+}
+
+.error-card h2 {
+  margin: 0 0 8px;
+  color: #7a271a;
+  font-size: 1.1rem;
+}
+
+.error-card p {
+  margin: 0;
+  color: #7a271a;
+}
+
+.empty-card {
+  background: #f7f7f7;
+  color: #555555;
+  text-align: center;
+}

@@ -1,0 +1,1117 @@
+/* =========================
+   BETTING / WAGER PAGE
+========================= */
+
+.betting-page {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-bottom: 90px;
+}
+
+.betting-intro {
+  opacity: 0.82;
+  line-height: 1.45;
+  margin: 0 0 18px;
+}
+
+.betting-notice {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.betting-notice.error {
+  color: #fecaca;
+  background: rgba(127,29,29,0.35);
+  border-color: rgba(248,113,113,0.35);
+}
+
+.betting-notice.warning {
+  color: #fef3c7;
+  background: rgba(120,53,15,0.35);
+  border-color: rgba(251,191,36,0.35);
+}
+
+.betting-notice.success {
+  color: #bbf7d0;
+  background: rgba(20,83,45,0.35);
+  border-color: rgba(34,197,94,0.35);
+}
+
+/* =========================
+   SUMMARY CARDS
+========================= */
+
+.betting-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 18px;
+}
+
+.betting-summary-card,
+.betting-leaderboard-card,
+.betting-category-card {
+  background: linear-gradient(
+    180deg,
+    rgba(30,41,59,0.98),
+    rgba(15,23,42,0.98)
+  );
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.24);
+}
+
+.betting-summary-card {
+  padding: 16px;
+}
+
+.betting-label {
+  opacity: 0.7;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.betting-value {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+/* =========================
+   LEADERBOARD PREVIEW
+========================= */
+
+.betting-leaderboard-card {
+  padding: 16px;
+  margin: 0 0 18px;
+}
+
+.betting-section-title {
+  font-size: 18px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.betting-leaderboard-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.betting-leaderboard-row:first-of-type {
+  border-top: 0;
+}
+
+.betting-row-sub {
+  margin-top: 4px;
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.betting-row-score {
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* =========================
+   CATEGORY / ACCORDION CARDS
+========================= */
+
+.betting-category-list {
+  display: grid;
+  gap: 14px;
+}
+
+.betting-category-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.betting-category-card.locked:not(.finished) {
+  opacity: 0.7;
+}
+
+.betting-category-card.finished.locked {
+  opacity: 1;
+}
+
+.betting-category-card summary {
+  list-style: none;
+}
+
+.betting-category-card summary::-webkit-details-marker {
+  display: none;
+}
+
+.betting-category-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px;
+  cursor: pointer;
+}
+
+.betting-summary-main {
+  min-width: 0;
+}
+
+.betting-summary-side {
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.betting-category-title {
+  font-size: 21px;
+  line-height: 1.1;
+  font-weight: 850;
+}
+
+.betting-current {
+  margin-top: 8px;
+  font-size: 14px;
+  opacity: 0.84;
+}
+
+.betting-current.muted {
+  opacity: 0.58;
+}
+
+.betting-game-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.78;
+}
+
+.betting-game-meta span {
+  max-width: 100%;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  overflow-wrap: anywhere;
+}
+
+.betting-clock-pill {
+  color: #bfdbfe;
+  background: rgba(37,99,235,0.18) !important;
+  border: 1px solid rgba(96,165,250,0.22);
+  font-weight: 800;
+}
+
+.betting-countdown {
+  padding: 5px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 850;
+  color: #fef3c7;
+  background: rgba(120,53,15,0.32);
+  border: 1px solid rgba(251,191,36,0.28);
+  white-space: nowrap;
+}
+
+.betting-countdown.locked {
+  color: #fecaca;
+  background: rgba(127,29,29,0.35);
+  border-color: rgba(248,113,113,0.35);
+}
+
+.betting-expand-icon {
+  opacity: 0.65;
+  font-size: 18px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.betting-category-card[open] .betting-expand-icon {
+  transform: rotate(180deg);
+}
+
+.betting-collapsible-body {
+  padding: 0 16px 16px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+/* =========================
+   BET AMOUNT
+========================= */
+
+.betting-amount-label {
+  display: block;
+  margin: 0 0 8px;
+  font-size: 13px;
+  opacity: 0.75;
+}
+
+.betting-amount-input {
+  width: 100%;
+  max-width: 220px;
+  height: 46px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  padding: 0 14px;
+  margin-bottom: 16px;
+  color: white;
+  background: rgba(15,23,42,0.86);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* =========================
+   TEAM SELECTION GRID
+   Keep both teams on same row
+========================= */
+
+.betting-nominee-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  align-items: stretch;
+}
+
+.betting-nominee-card {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  min-height: 174px;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 18px;
+  padding: 8px;
+  background: rgba(15,23,42,0.72);
+  color: white;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-rows: 108px auto auto;
+  align-content: stretch;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease;
+}
+
+.betting-nominee-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: rgba(250,204,21,0.45);
+}
+
+
+.betting-nominee-card:disabled {
+  cursor: not-allowed;
+}
+
+/* =========================
+   LOGO + SCORE AREA
+========================= */
+
+.betting-logo-score-area {
+  position: relative;
+  width: calc(100% + 16px);
+  height: 108px;
+  min-height: 108px;
+  margin: -8px -8px 8px;
+  overflow: hidden;
+  border-radius: 16px 16px 8px 8px;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(255,255,255,0.12),
+      rgba(255,255,255,0.03) 58%,
+      rgba(0,0,0,0.22)
+    );
+}
+
+.betting-logo-fill,
+.betting-logo-score-area img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  transform: scale(1.45);
+  opacity: 0.82;
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.35));
+}
+
+.betting-logo-placeholder {
+  width: 100%;
+  height: 100%;
+  min-height: 108px;
+  background: rgba(255,255,255,0.08);
+}
+
+.betting-logo-score {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 5;
+  min-width: 36px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 22px;
+  line-height: 1;
+  font-weight: 950;
+  color: #fff;
+  background: rgba(15,23,42,0.92);
+  border: 1px solid rgba(255,255,255,0.26);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.35);
+}
+
+/*
+  Legacy score badge from earlier version.
+  Hide it so score only appears over logo.
+*/
+.betting-button-score {
+  display: none;
+}
+
+/* =========================
+   TEAM TEXT / ODDS
+========================= */
+
+.betting-nominee-name {
+  min-width: 0;
+  max-width: 100%;
+  margin-bottom: 5px;
+  font-size: 13px;
+  line-height: 1.12;
+  font-weight: 850;
+  overflow-wrap: anywhere;
+}
+
+.betting-team-record {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.1;
+  opacity: 0.7;
+  font-weight: 700;
+}
+
+.betting-odds-row {
+  min-width: 0;
+  max-width: 100%;
+  display: grid;
+  gap: 2px;
+  color: #facc15;
+  font-size: 12px;
+  line-height: 1.1;
+  font-weight: 850;
+}
+
+.betting-return-value {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 760px) {
+
+  .betting-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .betting-category-list {
+    gap: 12px;
+  }
+
+}
+
+@media (max-width: 480px) {
+
+  .betting-page {
+    padding-bottom: 86px;
+  }
+
+  .betting-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .betting-category-summary {
+    padding: 13px;
+  }
+
+  .betting-collapsible-body {
+    padding: 0 13px 13px;
+  }
+
+  .betting-category-title {
+    font-size: 16px;
+    line-height: 1.18;
+  }
+
+  .betting-current {
+    font-size: 12px;
+  }
+
+  .betting-game-meta {
+    font-size: 11px;
+  }
+
+  .betting-summary-side {
+    gap: 5px;
+  }
+
+  .betting-countdown {
+    font-size: 10px;
+    padding: 5px 7px;
+  }
+
+  .betting-amount-input {
+    max-width: none;
+    height: 42px;
+    margin-bottom: 12px;
+  }
+
+  .betting-nominee-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+  }
+
+  .betting-nominee-card {
+    min-height: 166px;
+    grid-template-rows: 100px auto auto;
+    padding: 8px;
+    border-radius: 16px;
+  }
+
+  .betting-logo-score-area {
+    width: calc(100% + 16px);
+    height: 100px;
+    min-height: 100px;
+    margin: -8px -8px 7px;
+    border-radius: 14px 14px 8px 8px;
+  }
+
+  .betting-logo-fill,
+  .betting-logo-score-area img {
+    transform: scale(1.52);
+  }
+
+  .betting-logo-score {
+    top: 6px;
+    right: 6px;
+    min-width: 34px;
+    padding: 5px 8px;
+    font-size: 21px;
+  }
+
+  .betting-nominee-name {
+    font-size: 12px;
+    line-height: 1.1;
+  }
+
+  .betting-team-record {
+    font-size: 10px;
+  }
+
+  .betting-odds-row {
+    font-size: 11px;
+  }
+
+}
+
+@media (max-width: 360px) {
+
+  .betting-nominee-grid {
+    gap: 6px;
+  }
+
+  .betting-nominee-card {
+    min-height: 156px;
+    grid-template-rows: 92px auto auto;
+    padding: 7px;
+  }
+
+  .betting-logo-score-area {
+    width: calc(100% + 14px);
+    height: 92px;
+    min-height: 92px;
+    margin: -7px -7px 7px;
+  }
+
+  .betting-logo-fill,
+  .betting-logo-score-area img {
+    transform: scale(1.46);
+  }
+
+  .betting-logo-score {
+    font-size: 19px;
+    min-width: 32px;
+    padding: 4px 7px;
+  }
+
+}
+
+/* =========================
+   DATE / LEAGUE DROPDOWN GROUPS
+========================= */
+
+.betting-grouped-list {
+  display: grid;
+  gap: 12px;
+}
+
+.betting-group-section-label {
+  margin: 4px 2px -2px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.62);
+}
+
+.betting-date-group,
+.betting-league-group,
+.betting-final-group {
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.09);
+  background: rgba(15,23,42,0.5);
+}
+
+.betting-final-group {
+  margin-top: 4px;
+  border-color: rgba(148,163,184,0.2);
+  background: rgba(15,23,42,0.38);
+}
+
+.betting-group-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+}
+
+.betting-group-summary::-webkit-details-marker {
+  display: none;
+}
+
+.betting-date-summary {
+  background: rgba(255,255,255,0.06);
+}
+
+.betting-league-summary {
+  padding: 11px 12px;
+  background: rgba(255,255,255,0.04);
+}
+
+.betting-final-summary {
+  background: rgba(100,116,139,0.14);
+}
+
+.betting-group-title {
+  min-width: 0;
+  font-size: 15px;
+  line-height: 1.15;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
+.betting-date-summary .betting-group-title {
+  font-size: 16px;
+}
+
+.betting-group-side {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.betting-group-count {
+  padding: 4px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 850;
+  color: rgba(255,255,255,0.72);
+  background: rgba(255,255,255,0.08);
+}
+
+.betting-group-arrow {
+  opacity: 0.62;
+  font-size: 17px;
+  line-height: 1;
+  transition: transform 0.16s ease;
+}
+
+.betting-date-group[open] > .betting-date-summary .betting-group-arrow,
+.betting-league-group[open] > .betting-league-summary .betting-group-arrow,
+.betting-final-group[open] > .betting-final-summary .betting-group-arrow {
+  transform: rotate(180deg);
+}
+
+.betting-date-body,
+.betting-final-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.betting-league-body {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+/* Nested game cards inside groups */
+.betting-league-body .betting-category-card {
+  border-radius: 16px;
+}
+
+/* Final games slightly muted, but keep result text readable */
+.betting-final-group .betting-category-card {
+  opacity: 0.92;
+}
+
+.betting-final-group .betting-current,
+.betting-category-card.finished .betting-current {
+  opacity: 1;
+}
+
+@media (max-width: 480px) {
+
+  .betting-grouped-list {
+    gap: 10px;
+  }
+
+  .betting-group-summary {
+    padding: 12px;
+  }
+
+  .betting-date-summary .betting-group-title {
+    font-size: 15px;
+  }
+
+  .betting-group-title {
+    font-size: 14px;
+  }
+
+  .betting-date-body,
+  .betting-final-body,
+  .betting-league-body {
+    padding: 8px;
+    gap: 8px;
+  }
+
+}
+
+/* =========================
+   USER HAS BET INDICATORS
+========================= */
+
+/* Individual game marker only */
+.betting-header-bet-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 8px;
+  margin-bottom: 2px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 950;
+  letter-spacing: -0.03em;
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.85);
+  box-shadow: 0 6px 16px rgba(34,197,94,0.28);
+}
+
+/* Date / League / Finished games pill turns green */
+.betting-group-count.has-bet {
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.85);
+  box-shadow: 0 6px 16px rgba(34,197,94,0.22);
+}
+
+/* Subtle green header glow, no $$ */
+.betting-date-group.has-bet > .betting-date-summary,
+.betting-league-group.has-bet > .betting-league-summary,
+.betting-final-group.has-bet > .betting-final-summary {
+  background: linear-gradient(
+    90deg,
+    rgba(34,197,94,0.16),
+    rgba(255,255,255,0.04) 55%,
+    rgba(255,255,255,0.03)
+  );
+}
+
+/* Subtle border around groups that contain user's bets */
+.betting-date-group.has-bet,
+.betting-league-group.has-bet,
+.betting-final-group.has-bet {
+  border-color: rgba(34,197,94,0.32);
+}
+
+/* Individual game header gets a soft green hint */
+.betting-category-card.has-bet .betting-category-summary {
+  background: linear-gradient(
+    90deg,
+    rgba(34,197,94,0.13),
+    transparent 42%
+  );
+}
+
+/* =========================
+   COMPACT WAGER SUMMARY
+========================= */
+
+.betting-summary-grid.compact {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(110px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.betting-summary-grid.compact .betting-summary-card {
+  padding: 10px 11px;
+  border-radius: 15px;
+}
+
+.betting-summary-grid.compact .betting-label {
+  margin-bottom: 4px;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.68;
+}
+
+.betting-summary-grid.compact .betting-value {
+  font-size: 17px;
+  line-height: 1.05;
+  font-weight: 900;
+}
+
+.betting-money-positive {
+  color: #22c55e !important;
+}
+
+.betting-money-negative {
+  color: #ef4444 !important;
+}
+
+.betting-money-neutral {
+  color: rgba(255,255,255,0.82) !important;
+}
+
+/* =========================
+   COLLAPSIBLE WAGER LEADERBOARD
+========================= */
+
+.betting-leaderboard-collapse {
+  padding: 0;
+  overflow: hidden;
+}
+
+.betting-leaderboard-collapse summary {
+  list-style: none;
+}
+
+.betting-leaderboard-collapse summary::-webkit-details-marker {
+  display: none;
+}
+
+.betting-leaderboard-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  cursor: pointer;
+}
+
+.betting-leaderboard-collapse[open] .betting-expand-icon {
+  transform: rotate(180deg);
+}
+
+.betting-leaderboard-subtitle {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.78;
+}
+
+.betting-leaderboard-body {
+  padding: 0 16px 14px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.betting-leaderboard-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.betting-place-pill {
+  min-width: 38px;
+  padding: 5px 7px;
+  border-radius: 999px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 900;
+  color: #fef3c7;
+  background: rgba(120,53,15,0.35);
+  border: 1px solid rgba(251,191,36,0.24);
+}
+
+.betting-leaderboard-user {
+  min-width: 0;
+}
+
+.betting-row-winnings {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+/* =========================
+   PHONE TIGHTENING
+========================= */
+
+@media (max-width: 760px) {
+
+  .betting-summary-grid.compact {
+    grid-template-columns: repeat(4, minmax(92px, 1fr));
+  }
+
+}
+
+@media (max-width: 480px) {
+
+  .betting-summary-grid.compact {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+
+  .betting-summary-grid.compact::-webkit-scrollbar {
+    display: none;
+  }
+
+  .betting-summary-grid.compact .betting-summary-card {
+    min-width: 92px;
+    flex: 0 0 auto;
+  }
+
+  .betting-summary-grid.compact .betting-value {
+    font-size: 16px;
+  }
+
+  .betting-leaderboard-summary {
+    padding: 13px;
+  }
+
+  .betting-leaderboard-body {
+    padding: 0 13px 13px;
+  }
+
+  .betting-leaderboard-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+}
+
+/* =========================
+   ADMIN WAGER CONTROLS
+========================= */
+
+.betting-admin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 14px;
+}
+
+.betting-admin-btn {
+  border: 1px solid rgba(34,197,94,0.45);
+  border-radius: 999px;
+  padding: 9px 13px;
+  color: #052e16;
+  background: #22c55e;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.22);
+}
+
+.betting-admin-btn.secondary {
+  color: #fef3c7;
+  background: rgba(120,53,15,0.45);
+  border-color: rgba(251,191,36,0.35);
+}
+
+.betting-admin-btn:hover {
+  filter: brightness(1.08);
+}
+
+@media (max-width: 480px) {
+
+  .betting-admin-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .betting-admin-btn {
+    padding: 9px 10px;
+    font-size: 12px;
+  }
+
+}
+
+.betting-admin-btn.tertiary {
+  color: #dbeafe;
+  background: rgba(37,99,235,0.42);
+  border-color: rgba(96,165,250,0.35);
+}
+
+/* =========================
+   WAGER WINNER / FINISHED STYLING
+   Conflict-free final version
+========================= */
+
+.betting-finished-pill {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.9);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  vertical-align: middle;
+}
+
+.betting-category-card.finished {
+  border-color: rgba(34,197,94,0.32);
+}
+
+.betting-category-card.finished.locked,
+.betting-final-group .betting-category-card.locked {
+  opacity: 1;
+}
+
+.betting-final-group .betting-category-card {
+  opacity: 0.92;
+}
+
+.betting-final-group .betting-current,
+.betting-category-card.finished .betting-current {
+  opacity: 1;
+}
+
+/* Current wager line colors */
+.betting-current.current-wager {
+  color: #38bdf8;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-won {
+  color: #22c55e;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-lost {
+  color: #ef4444;
+  font-weight: 950;
+  opacity: 1;
+}
+
+.betting-current.bet-half-refund {
+  color: #f59e0b;
+  font-weight: 950;
+  opacity: 1;
+}
+
+/* Selected user pick: light blue unless it is also the winner */
+.betting-nominee-card.selected:not(.winner-pick) {
+  border-color: rgba(56,189,248,0.85);
+  background: rgba(56,189,248,0.16);
+  box-shadow:
+    inset 0 0 0 1px rgba(56,189,248,0.28),
+    0 10px 24px rgba(56,189,248,0.14);
+}
+
+.betting-nominee-card.selected:not(.winner-pick) .betting-nominee-name,
+.betting-nominee-card.selected:not(.winner-pick) .betting-odds-row,
+.betting-nominee-card.selected:not(.winner-pick) .betting-return-value {
+  color: #38bdf8;
+  font-weight: 950;
+}
+
+/* Winner always overrides selected blue */
+.betting-nominee-card.winner-pick,
+.betting-nominee-card.selected.winner-pick {
+  border-color: rgba(34,197,94,0.78) !important;
+  background: rgba(34,197,94,0.18) !important;
+  box-shadow:
+    inset 0 0 0 1px rgba(34,197,94,0.28),
+    0 12px 28px rgba(34,197,94,0.18) !important;
+}
+
+.betting-nominee-card.winner-pick .betting-nominee-name,
+.betting-nominee-card.winner-pick .betting-odds-row,
+.betting-nominee-card.winner-pick .betting-return-value {
+  color: #22c55e !important;
+  font-weight: 950;
+}
+
+.betting-nominee-card.winner-pick .betting-logo-score {
+  color: #052e16 !important;
+  background: #22c55e !important;
+  border-color: rgba(187,247,208,0.9) !important;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.34);
+}
+
+.betting-nominee-card.winner-pick::after {
+  content: "Winner";
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 6;
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: #052e16;
+  background: #22c55e;
+  border: 1px solid rgba(187,247,208,0.9);
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 950;
+  box-shadow: 0 8px 20px rgba(34,197,94,0.28);
+}
