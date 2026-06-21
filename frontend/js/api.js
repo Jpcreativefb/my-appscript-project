@@ -1484,3 +1484,282 @@ async function apiAdminAutoSetSportsWagerOdds(gameId) {
   );
 
 }
+
+/* ======================
+   SPORTS CONTROL ADMIN
+====================== */
+
+function apiAdminSportsSession_() {
+
+  const session =
+    getSession();
+
+  return {
+    username:
+      session && session.username
+        ? session.username
+        : "",
+
+    token:
+      session && session.token
+        ? session.token
+        : ""
+  };
+
+}
+
+async function apiAdminSportsControl_(
+  action,
+  params = {}
+) {
+
+  const session =
+    apiAdminSportsSession_();
+
+  return api(
+    action,
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      ...params
+    }
+  );
+
+}
+
+async function apiAdminGetSportsControlDashboard() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsControlDashboard"
+  );
+
+}
+
+async function apiAdminSetupSportsControls() {
+
+  return apiAdminSportsControl_(
+    "adminSetupSportsControls"
+  );
+
+}
+
+async function apiAdminGetSportsLeagueSettings() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsLeagueSettings"
+  );
+
+}
+
+async function apiAdminUpdateSportsLeagueSetting(
+  league,
+  enabled,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminUpdateSportsLeagueSetting",
+    {
+      league:
+        league,
+
+      enabled:
+        enabled,
+
+      sport:
+        options.sport,
+
+      pollPreGameMinutes:
+        options.pollPreGameMinutes,
+
+      pollLiveMinutes:
+        options.pollLiveMinutes,
+
+      pollFinalMinutes:
+        options.pollFinalMinutes,
+
+      savePeriodSnapshots:
+        options.savePeriodSnapshots,
+
+      espnScoreboardUrl:
+        options.espnScoreboardUrl
+    }
+  );
+
+}
+
+async function apiAdminInstallSportsScoresTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsScoresTrigger"
+  );
+
+}
+
+async function apiAdminRemoveSportsScoresTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsScoresTrigger"
+  );
+
+}
+
+async function apiAdminCreateSportsSeasonJobs(
+  startDate,
+  endDate,
+  batchDays
+) {
+
+  return apiAdminSportsControl_(
+    "adminCreateSportsSeasonJobs",
+    {
+      startDate:
+        startDate,
+
+      endDate:
+        endDate,
+
+      batchDays:
+        batchDays
+    }
+  );
+
+}
+
+async function apiAdminRunSportsSeasonBatch() {
+
+  return apiAdminSportsControl_(
+    "adminRunSportsSeasonBatch"
+  );
+
+}
+
+async function apiAdminUpdateSportsSeasonJobStatus(
+  league,
+  status,
+  jobId
+) {
+
+  return apiAdminSportsControl_(
+    "adminUpdateSportsSeasonJobStatus",
+    {
+      league:
+        league,
+
+      status:
+        status,
+
+      jobId:
+        jobId
+    }
+  );
+
+}
+
+async function apiAdminInstallSportsSeasonBatchTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsSeasonBatchTrigger"
+  );
+
+}
+
+async function apiAdminRemoveSportsSeasonBatchTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsSeasonBatchTrigger"
+  );
+
+}
+
+async function apiAdminGetSportsOddsSettings() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsOddsSettings"
+  );
+
+}
+
+async function apiAdminUpdateSportsOddsSetting(
+  league,
+  patch = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminUpdateSportsOddsSetting",
+    {
+      league:
+        league,
+
+      oddsEnabled:
+        patch.oddsEnabled,
+
+      autoRefreshEnabled:
+        patch.autoRefreshEnabled,
+
+      manualRefreshEnabled:
+        patch.manualRefreshEnabled,
+
+      maxRefreshesPerDay:
+        patch.maxRefreshesPerDay,
+
+      monthlyBudget:
+        patch.monthlyBudget,
+
+      stopAtMonthlyCalls:
+        patch.stopAtMonthlyCalls,
+
+      notes:
+        patch.notes
+    }
+  );
+
+}
+
+async function apiAdminRefreshSportsOddsLeague(
+  league
+) {
+
+  return apiAdminSportsControl_(
+    "adminRefreshSportsOddsLeague",
+    {
+      league:
+        league
+    }
+  );
+
+}
+
+async function apiAdminRunSportsOddsHybridRefresh() {
+
+  return apiAdminSportsControl_(
+    "adminRunSportsOddsHybridRefresh"
+  );
+
+}
+
+async function apiAdminInstallSportsOddsHybridTrigger(
+  hour = 8
+) {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsOddsHybridTrigger",
+    {
+      hour:
+        hour
+    }
+  );
+
+}
+
+async function apiAdminRemoveSportsOddsHybridTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsOddsHybridTrigger"
+  );
+
+}

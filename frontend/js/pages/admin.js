@@ -114,6 +114,44 @@ async function renderAdminPage() {
 
         </div>
 
+                <div class="card admin-card">
+
+          <h2>Sports Engine Controls</h2>
+
+          <div class="admin-sub">
+            Control Sports Scores Engine leagues, schedule loading, and hybrid odds refresh.
+          </div>
+
+          <div class="admin-actions">
+
+            <button
+              class="button admin-button"
+              onclick="adminLoadSportsControls()"
+            >
+              Load Sports Controls
+            </button>
+
+            <button
+              class="button admin-button secondary"
+              onclick="adminSetupSportsControls()"
+            >
+              Setup Sports Controls
+            </button>
+
+          </div>
+
+          <div
+            id="adminSportsControlMessage"
+            class="admin-message"
+          ></div>
+
+          <div
+            id="adminSportsControlPanel"
+            class="admin-list"
+          ></div>
+
+        </div>
+
         <div class="card admin-card">
 
          <h2>Manage Games</h2>
@@ -1747,3 +1785,943 @@ async function adminToggleUserActive(username, active) {
     }
   
   }
+
+/* =========================
+   SPORTS ENGINE ADMIN PANEL
+========================= */
+
+function adminSportsEscape_(value) {
+
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+
+}
+
+function adminSportsBool_(value) {
+
+  return (
+    value === true ||
+    String(value || "")
+      .trim()
+      .toLowerCase() === "true"
+  );
+
+}
+
+function adminSportsMessage_(
+  message,
+  isError
+) {
+
+  const el =
+    document.getElementById(
+      "adminSportsControlMessage"
+    );
+
+  if (!el) {
+    return;
+  }
+
+  el.innerText =
+    message || "";
+
+  el.classList.toggle(
+    "error-card",
+    !!isError
+  );
+
+}
+
+async function adminSetupSportsControls() {
+
+  adminSportsMessage_(
+    "Setting up Sports Controls...",
+    false
+  );
+
+  const res =
+    await apiAdminSetupSportsControls();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Sports Controls setup complete."
+      : (res && (res.error || res.message)) ||
+        "Sports Controls setup failed.",
+    !(res && res.success)
+  );
+
+  if (res && res.success) {
+    await adminLoadSportsControls();
+  }
+
+}
+
+async function adminLoadSportsControls() {
+
+  const panel =
+    document.getElementById(
+      "adminSportsControlPanel"
+    );
+
+  if (!panel) {
+    return;
+  }
+
+  panel.innerHTML =
+    `
+      <div class="admin-sub">
+        Loading Sports Engine controls...
+      </div>
+    `;
+
+  adminSportsMessage_(
+    "Loading Sports Engine dashboard...",
+    false
+  );
+
+  const res =
+    await apiAdminGetSportsControlDashboard();
+
+  if (!res || res.success === false) {
+
+    panel.innerHTML =
+      `
+        <div class="admin-category-card">
+          <strong>Unable to load Sports Controls</strong>
+
+          <div class="admin-sub">
+            ${adminSportsEscape_(
+              res && (res.error || res.message)
+                ? res.error || res.message
+                : "Unknown error"
+            )}
+          </div>
+        </div>
+      `;
+
+    adminSportsMessage_(
+      "Unable to load Sports Controls.",
+      true
+    );
+
+    return;
+
+  }
+
+  panel.innerHTML =
+    adminRenderSportsControlDashboard_(
+      res
+    );
+
+  adminSportsMessage_(
+    "Sports Controls loaded.",
+    false
+  );
+
+}
+
+function adminRenderSportsControlDashboard_(
+  data
+) {
+
+  const sportsSettings =
+    data.sportsSettings || [];
+
+  const odds =
+    data.odds || {};
+
+  const oddsSettings =
+    odds.settings || [];
+
+  const usage =
+    odds.usage || {};
+
+  const scoreTriggers =
+    data.scoreTriggers || [];
+
+  const seasonBatchTriggers =
+    data.seasonBatchTriggers || [];
+
+  return `
+    ${adminRenderSportsTriggerControls_(
+      scoreTriggers,
+      seasonBatchTriggers,
+      usage
+    )}
+
+    ${adminRenderScoreLeagueControls_(
+      sportsSettings
+    )}
+
+    ${adminRenderScheduleControls_()}
+
+    ${adminRenderOddsControls_(
+      oddsSettings,
+      usage
+    )}
+  `;
+
+}
+
+function adminRenderSportsTriggerControls_(
+  scoreTriggers,
+  seasonBatchTriggers,
+  usage
+) {
+
+  return `
+    <div class="admin-category-card">
+
+      <div class="admin-category-header">
+        <div>
+          <strong>System Triggers & Usage</strong>
+
+          <div class="admin-sub">
+            Score triggers: ${scoreTriggers.length || 0}
+            ·
+            Schedule triggers: ${seasonBatchTriggers.length || 0}
+            ·
+            Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-actions">
+
+        <button
+          class="admin-small-button"
+          onclick="adminInstallSportsScoresTrigger()"
+        >
+          Install Score Trigger
+        </button>
+
+        <button
+          class="admin-small-button danger"
+          onclick="adminRemoveSportsScoresTrigger()"
+        >
+          Remove Score Trigger
+        </button>
+
+        <button
+          class="admin-small-button"
+          onclick="adminInstallSportsOddsHybridTrigger()"
+        >
+          Install Hybrid Odds Trigger
+        </button>
+
+        <button
+          class="admin-small-button danger"
+          onclick="adminRemoveSportsOddsHybridTrigger()"
+        >
+          Remove Hybrid Odds Trigger
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+function adminRenderScoreLeagueControls_(
+  leagues
+) {
+
+  if (!leagues.length) {
+    return `
+      <div class="admin-category-card">
+        <strong>Score League Controls</strong>
+
+        <div class="admin-sub">
+          No SportsSettings rows found.
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="admin-category-card">
+
+      <div class="admin-category-header">
+        <div>
+          <strong>Score League Controls</strong>
+
+          <div class="admin-sub">
+            Turn ESPN score pulling on/off per league.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-list">
+
+        ${leagues.map(league => {
+
+          const leagueCode =
+            adminSportsEscape_(
+              league.league
+            );
+
+          const sport =
+            adminSportsEscape_(
+              league.sport
+            );
+
+          const enabled =
+            adminSportsBool_(
+              league.enabled
+            );
+
+          return `
+            <div class="admin-user-card">
+
+              <div class="admin-user-header">
+
+                <div>
+                  <strong>
+                    ${leagueCode.toUpperCase()}
+                  </strong>
+
+                  <div class="admin-sub">
+                    ${sport}
+                    ·
+                    Live poll: ${league.pollLiveMinutes || ""} min
+                    ·
+                    Snapshots: ${adminSportsBool_(league.savePeriodSnapshots) ? "ON" : "OFF"}
+                  </div>
+                </div>
+
+                <div class="admin-pill ${enabled ? "admin" : "inactive"}">
+                  ${enabled ? "Scores ON" : "Scores OFF"}
+                </div>
+
+              </div>
+
+              <div class="admin-actions">
+
+                <button
+                  class="admin-small-button ${enabled ? "danger" : "secondary"}"
+                  onclick="adminToggleSportsScoreLeague('${leagueCode}', ${enabled ? "false" : "true"})"
+                >
+                  ${enabled ? "Disable Scores" : "Enable Scores"}
+                </button>
+
+              </div>
+
+            </div>
+          `;
+
+        }).join("")}
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+function adminRenderScheduleControls_() {
+
+  return `
+    <div class="admin-category-card">
+
+      <div class="admin-category-header">
+        <div>
+          <strong>Schedule / Season Loader</strong>
+
+          <div class="admin-sub">
+            Create and run season schedule batch jobs.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-control-grid">
+
+        <label class="admin-field">
+          <span>Start Date</span>
+
+          <input
+            type="date"
+            id="sportsScheduleStartDate"
+            value="2026-01-01"
+          >
+        </label>
+
+        <label class="admin-field">
+          <span>End Date</span>
+
+          <input
+            type="date"
+            id="sportsScheduleEndDate"
+            value="2026-12-31"
+          >
+        </label>
+
+        <label class="admin-field">
+          <span>Batch Days</span>
+
+          <input
+            type="number"
+            id="sportsScheduleBatchDays"
+            value="2"
+            min="1"
+            max="7"
+          >
+        </label>
+
+      </div>
+
+      <div class="admin-actions">
+
+        <button
+          class="admin-small-button"
+          onclick="adminCreateSportsSeasonJobs()"
+        >
+          Create Season Jobs
+        </button>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminRunSportsSeasonBatch()"
+        >
+          Run Batch Now
+        </button>
+
+        <button
+          class="admin-small-button"
+          onclick="adminInstallSportsSeasonBatchTrigger()"
+        >
+          Install Schedule Trigger
+        </button>
+
+        <button
+          class="admin-small-button danger"
+          onclick="adminRemoveSportsSeasonBatchTrigger()"
+        >
+          Remove Schedule Trigger
+        </button>
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+function adminRenderOddsControls_(
+  oddsSettings,
+  usage
+) {
+
+  if (!oddsSettings.length) {
+    return `
+      <div class="admin-category-card">
+        <strong>Odds Controls</strong>
+
+        <div class="admin-sub">
+          No SportsOddsSettings rows found.
+        </div>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="admin-category-card">
+
+      <div class="admin-category-header">
+        <div>
+          <strong>Odds Controls</strong>
+
+          <div class="admin-sub">
+            Monthly usage: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
+            ·
+            Auto refresh should stay limited for the 500/month plan.
+          </div>
+        </div>
+      </div>
+
+      <div class="admin-actions">
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminRunSportsOddsHybridRefresh()"
+        >
+          Run Hybrid Odds Refresh Now
+        </button>
+
+      </div>
+
+      <div class="admin-list">
+
+        ${oddsSettings.map(setting => {
+
+          const league =
+            adminSportsEscape_(
+              setting.League || setting.league
+            );
+
+          const oddsEnabled =
+            adminSportsBool_(
+              setting.OddsEnabled
+            );
+
+          const autoEnabled =
+            adminSportsBool_(
+              setting.AutoRefreshEnabled
+            );
+
+          const manualEnabled =
+            adminSportsBool_(
+              setting.ManualRefreshEnabled
+            );
+
+          return `
+            <div class="admin-user-card">
+
+              <div class="admin-user-header">
+
+                <div>
+                  <strong>
+                    ${league}
+                  </strong>
+
+                  <div class="admin-sub">
+                    Auto: ${autoEnabled ? "ON" : "OFF"}
+                    ·
+                    Manual: ${manualEnabled ? "ON" : "OFF"}
+                    ·
+                    Calls today: ${setting.CallsToday || 0}
+                    ·
+                    Month: ${setting.CallsThisMonth || 0}/${setting.MonthlyBudget || 0}
+                    ·
+                    Last: ${setting.LastRefreshStatus || "NEVER"}
+                  </div>
+                </div>
+
+                <div class="admin-pill ${oddsEnabled ? "admin" : "inactive"}">
+                  ${oddsEnabled ? "Odds ON" : "Odds OFF"}
+                </div>
+
+              </div>
+
+              <div class="admin-actions">
+
+                <button
+                  class="admin-small-button ${oddsEnabled ? "danger" : "secondary"}"
+                  onclick="adminToggleSportsOddsEnabled('${league}', ${oddsEnabled ? "false" : "true"})"
+                >
+                  ${oddsEnabled ? "Disable Odds" : "Enable Odds"}
+                </button>
+
+                <button
+                  class="admin-small-button ${autoEnabled ? "danger" : "secondary"}"
+                  onclick="adminToggleSportsOddsAuto('${league}', ${autoEnabled ? "false" : "true"})"
+                >
+                  ${autoEnabled ? "Auto Off" : "Auto On"}
+                </button>
+
+                <button
+                  class="admin-small-button secondary"
+                  onclick="adminRefreshSportsOddsLeague('${league}')"
+                >
+                  Refresh Now
+                </button>
+
+              </div>
+
+            </div>
+          `;
+
+        }).join("")}
+
+      </div>
+
+    </div>
+  `;
+
+}
+
+/* =========================
+   SPORTS ADMIN ACTIONS
+========================= */
+
+async function adminToggleSportsScoreLeague(
+  league,
+  enabled
+) {
+
+  const ok =
+    window.confirm(
+      (enabled ? "Enable" : "Disable") +
+      " score pulling for " +
+      league +
+      "?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Updating " + league + " score setting...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateSportsLeagueSetting(
+      league,
+      enabled
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score setting updated."
+      : (res && (res.error || res.message)) ||
+        "Unable to update score setting.",
+    !(res && res.success)
+  );
+
+  if (res && res.success) {
+    await adminLoadSportsControls();
+  }
+
+}
+
+async function adminInstallSportsScoresTrigger() {
+
+  const res =
+    await apiAdminInstallSportsScoresTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score trigger installed."
+      : (res && (res.error || res.message)) ||
+        "Unable to install score trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRemoveSportsScoresTrigger() {
+
+  const res =
+    await apiAdminRemoveSportsScoresTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score trigger removed."
+      : (res && (res.error || res.message)) ||
+        "Unable to remove score trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminCreateSportsSeasonJobs() {
+
+  const startDate =
+    document
+      .getElementById("sportsScheduleStartDate")
+      .value;
+
+  const endDate =
+    document
+      .getElementById("sportsScheduleEndDate")
+      .value;
+
+  const batchDays =
+    document
+      .getElementById("sportsScheduleBatchDays")
+      .value;
+
+  if (!startDate || !endDate) {
+    alert("Start date and end date are required.");
+    return;
+  }
+
+  const ok =
+    window.confirm(
+      "Create season schedule jobs from " +
+      startDate +
+      " to " +
+      endDate +
+      "?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Creating season jobs...",
+    false
+  );
+
+  const res =
+    await apiAdminCreateSportsSeasonJobs(
+      startDate,
+      endDate,
+      batchDays
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Season jobs created/updated."
+      : (res && (res.error || res.message)) ||
+        "Unable to create season jobs.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRunSportsSeasonBatch() {
+
+  const ok =
+    window.confirm(
+      "Run one sports season schedule batch now?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Running season batch...",
+    false
+  );
+
+  const res =
+    await apiAdminRunSportsSeasonBatch();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Season batch complete."
+      : (res && (res.error || res.message)) ||
+        "Season batch failed.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminInstallSportsSeasonBatchTrigger() {
+
+  const res =
+    await apiAdminInstallSportsSeasonBatchTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Schedule batch trigger installed."
+      : (res && (res.error || res.message)) ||
+        "Unable to install schedule trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRemoveSportsSeasonBatchTrigger() {
+
+  const res =
+    await apiAdminRemoveSportsSeasonBatchTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Schedule batch trigger removed."
+      : (res && (res.error || res.message)) ||
+        "Unable to remove schedule trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminToggleSportsOddsEnabled(
+  league,
+  enabled
+) {
+
+  const ok =
+    window.confirm(
+      (enabled ? "Enable" : "Disable") +
+      " odds for " +
+      league +
+      "?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  const res =
+    await apiAdminUpdateSportsOddsSetting(
+      league,
+      {
+        oddsEnabled:
+          enabled
+      }
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Odds setting updated."
+      : (res && (res.error || res.message)) ||
+        "Unable to update odds setting.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminToggleSportsOddsAuto(
+  league,
+  enabled
+) {
+
+  const ok =
+    window.confirm(
+      (enabled ? "Enable" : "Disable") +
+      " auto odds refresh for " +
+      league +
+      "?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  const res =
+    await apiAdminUpdateSportsOddsSetting(
+      league,
+      {
+        autoRefreshEnabled:
+          enabled
+      }
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Auto odds setting updated."
+      : (res && (res.error || res.message)) ||
+        "Unable to update auto odds setting.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRefreshSportsOddsLeague(
+  league
+) {
+
+  const ok =
+    window.confirm(
+      "Refresh odds for " +
+      league +
+      " now? This may use 1 Odds API call."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Refreshing odds for " + league + "...",
+    false
+  );
+
+  const res =
+    await apiAdminRefreshSportsOddsLeague(
+      league
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Odds refresh complete."
+      : (res && (res.error || res.message || res.reason)) ||
+        "Odds refresh failed.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRunSportsOddsHybridRefresh() {
+
+  const ok =
+    window.confirm(
+      "Run hybrid odds refresh now? This may use Odds API calls for enabled auto leagues only."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Running hybrid odds refresh...",
+    false
+  );
+
+  const res =
+    await apiAdminRunSportsOddsHybridRefresh();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Hybrid odds refresh complete."
+      : (res && (res.error || res.message)) ||
+        "Hybrid odds refresh failed.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminInstallSportsOddsHybridTrigger() {
+
+  const res =
+    await apiAdminInstallSportsOddsHybridTrigger(8);
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Hybrid odds trigger installed."
+      : (res && (res.error || res.message)) ||
+        "Unable to install hybrid odds trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRemoveSportsOddsHybridTrigger() {
+
+  const res =
+    await apiAdminRemoveSportsOddsHybridTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Hybrid odds trigger removed."
+      : (res && (res.error || res.message)) ||
+        "Unable to remove hybrid odds trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}  

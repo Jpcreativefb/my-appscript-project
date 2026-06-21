@@ -192,6 +192,27 @@ function doGet(e) {
       "adminRefreshSportsWagerScores",
       "adminAutoSetSportsWagerOdds",
 
+      "adminSetupSportsControls",
+      "adminGetSportsControlDashboard",
+
+      "adminGetSportsLeagueSettings",
+      "adminUpdateSportsLeagueSetting",
+      "adminInstallSportsScoresTrigger",
+      "adminRemoveSportsScoresTrigger",
+
+      "adminCreateSportsSeasonJobs",
+      "adminRunSportsSeasonBatch",
+      "adminUpdateSportsSeasonJobStatus",
+      "adminInstallSportsSeasonBatchTrigger",
+      "adminRemoveSportsSeasonBatchTrigger",
+
+      "adminGetSportsOddsSettings",
+      "adminUpdateSportsOddsSetting",
+      "adminRefreshSportsOddsLeague",
+      "adminRunSportsOddsHybridRefresh",
+      "adminInstallSportsOddsHybridTrigger",
+      "adminRemoveSportsOddsHybridTrigger",
+
       "adminSummary",
       "adminClearCaches",
       "adminUpdateCategorySetting",
@@ -1493,6 +1514,320 @@ function doGet(e) {
       );
 
     }
+
+    // =========================
+// ADMIN: SPORTS CONTROL BRIDGE
+// =========================
+
+if (action === "adminSetupSportsControls") {
+
+  return json(
+    apiAdminSetupSportsControls({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSportsControlDashboard") {
+
+  return json(
+    apiAdminGetSportsControlDashboard({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSportsLeagueSettings") {
+
+  return json(
+    apiAdminGetSportsLeagueSettings({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminUpdateSportsLeagueSetting") {
+
+  return json(
+    apiAdminUpdateSportsLeagueSetting({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      sport:
+        params.sport,
+
+      league:
+        params.league,
+
+      enabled:
+        params.enabled,
+
+      pollPreGameMinutes:
+        params.pollPreGameMinutes,
+
+      pollLiveMinutes:
+        params.pollLiveMinutes,
+
+      pollFinalMinutes:
+        params.pollFinalMinutes,
+
+      savePeriodSnapshots:
+        params.savePeriodSnapshots,
+
+      espnScoreboardUrl:
+        params.espnScoreboardUrl
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsScoresTrigger") {
+
+  return json(
+    apiAdminInstallSportsScoresTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsScoresTrigger") {
+
+  return json(
+    apiAdminRemoveSportsScoresTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminCreateSportsSeasonJobs") {
+
+  return json(
+    apiAdminCreateSportsSeasonJobs({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      startDate:
+        params.startDate,
+
+      endDate:
+        params.endDate,
+
+      batchDays:
+        params.batchDays
+    })
+  );
+
+}
+
+if (action === "adminRunSportsSeasonBatch") {
+
+  return json(
+    apiAdminRunSportsSeasonBatch({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminUpdateSportsSeasonJobStatus") {
+
+  return json(
+    apiAdminUpdateSportsSeasonJobStatus({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      jobId:
+        params.jobId,
+
+      league:
+        params.league,
+
+      status:
+        params.status
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsSeasonBatchTrigger") {
+
+  return json(
+    apiAdminInstallSportsSeasonBatchTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsSeasonBatchTrigger") {
+
+  return json(
+    apiAdminRemoveSportsSeasonBatchTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSportsOddsSettings") {
+
+  return json(
+    apiAdminGetSportsOddsSettings({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminUpdateSportsOddsSetting") {
+
+  return json(
+    apiAdminUpdateSportsOddsSetting({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league,
+
+      oddsEnabled:
+        params.oddsEnabled,
+
+      autoRefreshEnabled:
+        params.autoRefreshEnabled,
+
+      manualRefreshEnabled:
+        params.manualRefreshEnabled,
+
+      maxRefreshesPerDay:
+        params.maxRefreshesPerDay,
+
+      monthlyBudget:
+        params.monthlyBudget,
+
+      stopAtMonthlyCalls:
+        params.stopAtMonthlyCalls,
+
+      notes:
+        params.notes
+    })
+  );
+
+}
+
+if (action === "adminRefreshSportsOddsLeague") {
+
+  return json(
+    apiAdminRefreshSportsOddsLeague({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league
+    })
+  );
+
+}
+
+if (action === "adminRunSportsOddsHybridRefresh") {
+
+  return json(
+    apiAdminRunSportsOddsHybridRefresh({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsOddsHybridTrigger") {
+
+  return json(
+    apiAdminInstallSportsOddsHybridTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      hour:
+        params.hour
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsOddsHybridTrigger") {
+
+  return json(
+    apiAdminRemoveSportsOddsHybridTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
 
     // =========================
     // MY BETS
