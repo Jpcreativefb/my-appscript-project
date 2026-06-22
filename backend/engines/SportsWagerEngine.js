@@ -32,6 +32,12 @@ const SPORTS_WAGER_DEFAULT_MARKET =
 const SPORTS_WAGER_DEFAULT_ODDS =
   2;
 
+const SPORTS_WAGER_DRAW_NOMINEE_ID =
+  "draw";
+
+const SPORTS_WAGER_DRAW_RESULT_TYPE =
+  "draw";
+
 /* =====================================================
    BASIC HELPERS
 ===================================================== */
@@ -3422,7 +3428,11 @@ function sportsWagerGetSettlementResult_(
   /*
     Normal 2-option moneyline:
     Away / Home only.
-    If tied, nobody wins and everyone gets half back.
+
+    If the game ends tied:
+    - WinnerNomineeId must be "draw" so the game is finalized.
+    - WagerResultType must be "half-refund" so the bankroll logic
+      returns half the wager.
   */
   if (
     market === "moneyline" &&
@@ -3430,16 +3440,22 @@ function sportsWagerGetSettlementResult_(
   ) {
     return {
       resolved: true,
-      winnerNomineeId: "",
-      wagerResultType: "half-refund",
-      reason: "moneyline-tie-half-refund"
+      winnerNomineeId:
+        SPORTS_WAGER_DRAW_NOMINEE_ID,
+      wagerResultType:
+        "half-refund",
+      reason:
+        "moneyline-tie-half-refund"
     };
   }
 
   /*
     Soccer 3-way moneyline:
     Away / Draw / Home.
-    If tied, Draw wins normally.
+
+    If the game ends tied:
+    - Draw is an actual winning nominee.
+    - WagerResultType stays "win".
   */
   if (
     market === "soccer-moneyline" &&
@@ -3449,10 +3465,29 @@ function sportsWagerGetSettlementResult_(
     const drawNominee =
       nominees.find(function(nominee) {
 
+        const nomineeId =
+          sportsWagerKey_(
+            nominee.nomineeId
+          );
+
+        const nomineeName =
+          sportsWagerSlug_(
+            nominee.nominee
+          );
+
+        const selection =
+          sportsWagerKey_(
+            nominee.selection
+          );
+
         return (
-          sportsWagerKey_(nominee.nomineeId) === "draw" ||
-          sportsWagerKey_(nominee.nominee) === "draw" ||
-          sportsWagerKey_(nominee.selection) === "draw"
+          nomineeId === "draw" ||
+          nomineeId === "tie" ||
+          nomineeName === "draw" ||
+          nomineeName === "tie" ||
+          nomineeName === "draw-tie" ||
+          selection === "draw" ||
+          selection === "tie"
         );
 
       });
@@ -3464,8 +3499,10 @@ function sportsWagerGetSettlementResult_(
           sportsWagerKey_(
             drawNominee.nomineeId
           ),
-        wagerResultType: "win",
-        reason: "soccer-3way-draw"
+        wagerResultType:
+          "win",
+        reason:
+          "soccer-3way-draw"
       };
     }
 
@@ -3473,7 +3510,8 @@ function sportsWagerGetSettlementResult_(
       resolved: false,
       winnerNomineeId: "",
       wagerResultType: "",
-      reason: "draw-nominee-missing"
+      reason:
+        "draw-nominee-missing"
     };
 
   }
@@ -3496,10 +3534,31 @@ function sportsWagerGetSettlementResult_(
 
   return {
     resolved: true,
-    winnerNomineeId: winnerNomineeId,
-    wagerResultType: "win",
-    reason: "winner-found"
+    winnerNomineeId:
+      winnerNomineeId,
+    wagerResultType:
+      "win",
+    reason:
+      "winner-found"
   };
+
+}
+
+function testForceSettleSportsWagerHalfRefundFix() {
+
+  const result =
+    settleSportsWagers({
+      gameId: "fifa-world-cup-2026",
+      force: true
+    });
+
+  Logger.log(
+    JSON.stringify(
+      result,
+      null,
+      2
+    )
+  );
 
 }
 
