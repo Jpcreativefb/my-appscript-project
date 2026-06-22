@@ -224,7 +224,10 @@ function getGamesColumnMap_(headers) {
       headers.indexOf("MaxWager"),
 
     allowBetRemoval:
-      headers.indexOf("AllowBetRemoval"),  
+      headers.indexOf("AllowBetRemoval"),
+
+    wagerEditMode:
+      headers.indexOf("WagerEditMode"),  
 
     themeColor:
       headers.indexOf("ThemeColor"),
@@ -582,6 +585,24 @@ function buildGameObjectFromRow_(
         ),
         100
       ),
+
+    allowBetRemoval:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.allowBetRemoval,
+          false
+        )
+      ),
+
+    wagerEditMode:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.wagerEditMode,
+          "editable_until_lock"
+        )
+      ) || "editable_until_lock",
 
     themeColor:
       normalizeGameValue_(

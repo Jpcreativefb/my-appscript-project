@@ -84,6 +84,59 @@ function adminNormalizeGameId_(value) {
     );
   
   }
+
+  function adminEnsureGameOptionalHeaders_() {
+
+    const sh =
+      getGamesSheet_();
+
+    const lastColumn =
+      sh.getLastColumn();
+
+    if (lastColumn < 1) {
+      return [];
+    }
+
+    const headers =
+      sh
+        .getRange(
+          1,
+          1,
+          1,
+          lastColumn
+        )
+        .getValues()[0]
+        .map(function(header) {
+          return String(header || "").trim();
+        });
+
+    const required = [
+      "AllowBetRemoval",
+      "WagerEditMode"
+    ];
+
+    const missing =
+      required.filter(function(header) {
+        return headers.indexOf(header) === -1;
+      });
+
+    if (missing.length) {
+      sh
+        .getRange(
+          1,
+          lastColumn + 1,
+          1,
+          missing.length
+        )
+        .setValues([
+          missing
+        ]);
+    }
+
+    return missing;
+
+  }
+
   
   function adminSetIfColumnExists_(
     row,
@@ -339,6 +392,17 @@ function adminNormalizeGameId_(value) {
         payload.AllowBetRemoval
       )
     );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "wagerEditMode",
+      adminNormalizeValue_(
+        payload.wagerEditMode ||
+        payload.WagerEditMode ||
+        "editable_until_lock"
+      )
+    );
   
     adminSetIfColumnExists_(
       row,
@@ -507,6 +571,12 @@ function adminNormalizeGameId_(value) {
 
 function adminGetGames() {
 
+  adminEnsureGameOptionalHeaders_();
+
+  if (typeof clearGamesCache === "function") {
+    clearGamesCache();
+  }
+
   return {
     success: true,
     games: getGames(),
@@ -555,6 +625,8 @@ function adminGetGameTypes() {
   
     try {
   
+      adminEnsureGameOptionalHeaders_();
+
       const sh =
         getGamesSheet_();
   
@@ -694,6 +766,8 @@ function adminSaveGame(payload) {
 
   try {
 
+    adminEnsureGameOptionalHeaders_();
+
     const sh =
       getGamesSheet_();
 
@@ -800,6 +874,8 @@ function adminSaveGame(payload) {
   
     try {
   
+      adminEnsureGameOptionalHeaders_();
+
       const sh =
         getGamesSheet_();
   
@@ -1026,6 +1102,24 @@ function adminSaveGame(payload) {
             payload.AllowBetRemoval
           )
          );
+
+      }
+
+      if (
+        "wagerEditMode" in payload ||
+        "WagerEditMode" in payload
+      ) {
+
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "wagerEditMode",
+          adminNormalizeValue_(
+            payload.wagerEditMode ||
+            payload.WagerEditMode ||
+            "editable_until_lock"
+          )
+        );
 
       }
   
@@ -1912,7 +2006,12 @@ function adminCloneGame(payload) {
 
     allowBetRemoval:
       sourceGame.allowBetRemoval === true ||
-      sourceGame.AllowBetRemoval === true,  
+      sourceGame.AllowBetRemoval === true,
+
+    wagerEditMode:
+      sourceGame.wagerEditMode ||
+      sourceGame.WagerEditMode ||
+      "editable_until_lock",  
     
     showLeaderboard:
       sourceGame.showLeaderboard !== false,

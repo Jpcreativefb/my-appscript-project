@@ -693,6 +693,10 @@ async function apiAdminSaveGame(payload) {
 
       maxWager: payload.maxWager,
 
+      allowBetRemoval: payload.allowBetRemoval,
+
+      wagerEditMode: payload.wagerEditMode,
+
       themeColor: payload.themeColor,
 
       icon: payload.icon,
@@ -1418,6 +1422,18 @@ async function apiBettingLeaderboard(gameId) {
 
   return api("bettingLeaderboard", {
     gameId
+  });
+
+}
+
+async function apiRemoveBet(payload) {
+
+  payload = payload || {};
+
+  return api("removeBet", {
+    username: payload.username,
+    gameId: payload.gameId,
+    categoryId: payload.categoryId
   });
 
 }

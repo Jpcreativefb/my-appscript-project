@@ -6,7 +6,12 @@
 let BETTING_AUTO_REFRESH_TIMER = null;
 
 const BETTING_STATE = {
-  saving: false
+  optimisticBets: {},
+  savingCategories: {},
+  saveTokens: {},
+  saveQueue: Promise.resolve(),
+  saveTimers: {},
+  latestSaveDrafts: {}
 };
 
 function getBettingSession_(){
@@ -52,9 +57,47 @@ function escapeBettingHtml_(value){
 
 }
 
-function renderBettingNotice_(message, type){
+function normalizeBettingNoticeMessage_(message){
 
   if (!message) {
+    return "";
+  }
+
+  if (
+    typeof Promise !== "undefined" &&
+    message instanceof Promise
+  ) {
+    return "Loading picks...";
+  }
+
+  if (
+    typeof message === "object"
+  ) {
+
+    if (message.message) {
+      return String(message.message);
+    }
+
+    if (message.error) {
+      return String(message.error);
+    }
+
+    return "Loading picks...";
+
+  }
+
+  return String(message);
+
+}
+
+function renderBettingNotice_(message, type){
+
+  const cleanMessage =
+    normalizeBettingNoticeMessage_(
+      message
+    );
+
+  if (!cleanMessage) {
     return "";
   }
 
@@ -70,7 +113,7 @@ function renderBettingNotice_(message, type){
 
   return `
     <div class="${className}">
-      ${escapeBettingHtml_(message)}
+      ${escapeBettingHtml_(cleanMessage)}
     </div>
   `;
 
@@ -120,6 +163,276 @@ function buildBetMap_(summary){
   return map;
 
 }
+
+function mergeBettingOptimisticBets_(betMap){
+
+  Object.keys(BETTING_STATE.optimisticBets || {})
+    .forEach(function(categoryId){
+      betMap[categoryId] = Object.assign(
+        {},
+        betMap[categoryId] || {},
+        BETTING_STATE.optimisticBets[categoryId]
+      );
+    });
+
+  return betMap;
+
+}
+
+function escapeBettingSelectorValue_(value){
+
+  if (
+    window.CSS &&
+    typeof window.CSS.escape === "function"
+  ) {
+    return window.CSS.escape(
+      String(value || "")
+    );
+  }
+
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
+
+}
+
+function optimisticSelectBettingNominee_(categoryId, nomineeId, betAmount){
+
+  const categoryKey = String(categoryId || "");
+  const nomineeKey = String(nomineeId || "");
+
+  document
+    .querySelectorAll(
+      `[data-betting-category="${escapeBettingSelectorValue_(categoryKey)}"]`
+    )
+    .forEach(function(button){
+
+      const buttonNominee =
+        button.getAttribute("data-betting-nominee") || "";
+
+      button.classList.toggle(
+        "selected",
+        buttonNominee === nomineeKey
+      );
+
+      button.classList.add("saving");
+
+    });
+
+  const selectedButton =
+    document.querySelector(
+      `[data-betting-category="${escapeBettingSelectorValue_(categoryKey)}"][data-betting-nominee="${escapeBettingSelectorValue_(nomineeKey)}"]`
+    );
+
+  const nomineeNameEl =
+    selectedButton
+      ? selectedButton.querySelector(".betting-nominee-name")
+      : null;
+
+  const nomineeName =
+    nomineeNameEl
+      ? nomineeNameEl.textContent.trim()
+      : nomineeKey;
+
+  document
+    .querySelectorAll(
+      `[data-betting-current-category="${escapeBettingSelectorValue_(categoryKey)}"]`
+    )
+    .forEach(function(el){
+      el.className = "betting-current muted";
+      el.innerHTML =
+        "Saving pick: " +
+        escapeBettingHtml_(money_(betAmount)) +
+        " on " +
+        escapeBettingHtml_(nomineeName);
+    });
+
+  BETTING_STATE.optimisticBets[categoryKey] = {
+    categoryId: categoryKey,
+    nomineeId: nomineeKey,
+    betAmount: Number(betAmount || 0),
+    status: "pending",
+    payout: 0
+  };
+
+}
+
+function clearOptimisticBettingCategory_(categoryId){
+
+  delete BETTING_STATE.optimisticBets[
+    String(categoryId || "")
+  ];
+
+  document
+    .querySelectorAll(
+      `[data-betting-category="${escapeBettingSelectorValue_(String(categoryId || ""))}"]`
+    )
+    .forEach(function(button){
+      button.classList.remove("saving");
+    });
+
+}
+
+function clearBettingCategorySelectionDom_(categoryId){
+
+  document
+    .querySelectorAll(
+      `[data-betting-category="${escapeBettingSelectorValue_(String(categoryId || ""))}"]`
+    )
+    .forEach(function(button){
+      button.classList.remove("selected");
+      button.classList.remove("saving");
+    });
+
+}
+
+function clearBettingCategoryCurrentDom_(categoryId){
+
+  document
+    .querySelectorAll(
+      `[data-betting-current-category="${escapeBettingSelectorValue_(String(categoryId || ""))}"]`
+    )
+    .forEach(function(el){
+      el.className = "betting-current muted";
+      el.innerHTML = "Tap to place bet";
+    });
+
+}
+
+
+function markBettingCategorySaving_(categoryId, saving){
+
+  BETTING_STATE.savingCategories[
+    String(categoryId || "")
+  ] = saving === true;
+
+  document
+    .querySelectorAll(
+      `[data-betting-category="${escapeBettingSelectorValue_(String(categoryId || ""))}"]`
+    )
+    .forEach(function(button){
+      button.classList.toggle(
+        "saving",
+        saving === true
+      );
+    });
+
+}
+
+function isBettingLockTimeoutError_(err){
+
+  const message =
+    err && err.message
+      ? err.message
+      : String(err || "");
+
+  return (
+    message.toLowerCase()
+      .indexOf("lock timeout") !== -1 ||
+    message.toLowerCase()
+      .indexOf("holding the lock") !== -1 ||
+    message.toLowerCase()
+      .indexOf("could not obtain lock") !== -1 ||
+    message.toLowerCase()
+      .indexOf("timed out") !== -1
+  );
+
+}
+
+function waitBetting_(ms){
+
+  return new Promise(function(resolve){
+    setTimeout(resolve, ms);
+  });
+
+}
+
+async function runBettingWorkWithRetry_(work){
+
+  const maxAttempts = 4;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+
+    try {
+
+      const res = await work();
+
+      if (
+        res &&
+        res.success === false &&
+        isBettingLockTimeoutError_(
+          res.message || res.error
+        ) &&
+        attempt < maxAttempts
+      ) {
+
+        await waitBetting_(
+          700 * attempt
+        );
+
+        continue;
+
+      }
+
+      return res;
+
+    } catch (err) {
+
+      if (
+        isBettingLockTimeoutError_(err) &&
+        attempt < maxAttempts
+      ) {
+
+        await waitBetting_(
+          700 * attempt
+        );
+
+        continue;
+
+      }
+
+      throw err;
+
+    }
+
+  }
+
+  return work();
+
+}
+
+function enqueueBettingSave_(work){
+
+  const run = function(){
+    return runBettingWorkWithRetry_(work);
+  };
+
+  const next = BETTING_STATE.saveQueue
+    .catch(function(){
+      return null;
+    })
+    .then(run);
+
+  BETTING_STATE.saveQueue = next
+    .catch(function(){
+      return null;
+    });
+
+  return next;
+
+}
+
+function isBettingSaveInFlight_(){
+
+  return Object.keys(
+    BETTING_STATE.savingCategories || {}
+  ).some(function(categoryId){
+    return BETTING_STATE.savingCategories[categoryId] === true;
+  });
+
+}
+
+
 
 function getBettingNomineeName_(category, nomineeId){
 
@@ -803,8 +1116,7 @@ function renderBettingCategory_(category, bet, config){
 
   const categoryFinished =
     !!winnerNomineeId ||
-    !!wagerResultType ||
-    datePassed;
+    !!wagerResultType;
 
   const halfRefund =
     wagerResultType === "half-refund";
@@ -821,6 +1133,10 @@ function renderBettingCategory_(category, bet, config){
             ${categoryFinished ? `
               <span class="betting-finished-pill">
                 Finished
+              </span>
+            ` : locked ? `
+              <span class="betting-finished-pill betting-locked-pill">
+                Locked
               </span>
             ` : ""}
           </div>
@@ -842,12 +1158,18 @@ function renderBettingCategory_(category, bet, config){
           </div>
 
           ${bet ? `
-            <div class="betting-current ${currentDisplay.className}">
+            <div
+              class="betting-current ${currentDisplay.className}"
+              data-betting-current-category="${escapeBettingHtml_(category.id)}"
+            >
                ${currentDisplay.html}
             </div>
           ` : `
-            <div class="betting-current muted">
-               ${categoryFinished ? "Finished" : "Tap to place bet"}
+            <div
+              class="betting-current muted"
+              data-betting-current-category="${escapeBettingHtml_(category.id)}"
+            >
+               ${categoryFinished ? "Finished" : locked ? "Game started / locked" : "Tap to place bet"}
             </div>
           `}
           
@@ -885,6 +1207,12 @@ function renderBettingCategory_(category, bet, config){
             </div>
           `}
         ` : `
+          ${locked ? `
+            <div class="betting-notice warning">
+              This game has started and wagering is locked. It will move to Finished Games after settlement.
+            </div>
+          ` : ""}
+
           <label class="betting-amount-label" for="${inputId}">
             Bet amount
           </label>
@@ -959,6 +1287,8 @@ function renderBettingCategory_(category, bet, config){
             return `
               <button
                 class="betting-nominee-card ${selected ? "selected" : ""} ${winner ? "winner-pick" : ""}"
+                data-betting-category="${escapeBettingHtml_(category.id)}"
+                data-betting-nominee="${escapeBettingHtml_(nominee.id)}"
                 onclick="${categoryFinished || locked ? "" : `saveBetSelection('${category.id}', '${nominee.id}')`}"
                 ${categoryFinished || locked ? "disabled" : ""}
               >
@@ -1020,31 +1350,63 @@ function renderBettingCategory_(category, bet, config){
 
 async function removeBetSelection(categoryId){
 
-  if (BETTING_STATE.saving) {
-    return;
-  }
-
-  BETTING_STATE.saving = true;
-
   const session = getBettingSession_();
   const username = session.username || "";
   const gameId = getBettingGameId_();
-
+  const categoryKey = String(categoryId || "");
   const notice = document.getElementById("bettingNotice");
+
+  const token =
+    Date.now() + "-" + Math.random();
+
+  BETTING_STATE.saveTokens[categoryKey] = token;
+
+  delete BETTING_STATE.optimisticBets[categoryKey];
+
+  clearBettingCategorySelectionDom_(
+    categoryKey
+  );
+
+  clearBettingCategoryCurrentDom_(
+    categoryKey
+  );
+
+  markBettingCategorySaving_(
+    categoryKey,
+    true
+  );
+
+  if (notice) {
+    notice.innerHTML =
+      renderBettingNotice_(
+        "Taking back wager...",
+        ""
+      );
+  }
 
   try {
 
-    if (notice) {
-      notice.innerHTML =
-        renderBettingNotice_("Removing bet...", "");
+    if (!username) {
+      throw new Error(
+        "Please log in again."
+      );
     }
 
-    const res =
-      await apiRemoveBet({
+    const res = await enqueueBettingSave_(function(){
+
+      return apiRemoveBet({
         username: username,
         gameId: gameId,
-        categoryId: categoryId
+        categoryId: categoryKey
       });
+
+    });
+
+    if (
+      BETTING_STATE.saveTokens[categoryKey] !== token
+    ) {
+      return;
+    }
 
     if (!res || res.success === false) {
       throw new Error(
@@ -1053,10 +1415,14 @@ async function removeBetSelection(categoryId){
       );
     }
 
-    const app = document.getElementById("app");
-
-    if (app) {
-      app.innerHTML = await renderBettingPage();
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          res.removed
+            ? "Wager taken back."
+            : "No saved wager was found to take back.",
+          res.removed ? "success" : "warning"
+        );
     }
 
   } catch (err) {
@@ -1071,9 +1437,21 @@ async function removeBetSelection(categoryId){
         );
     }
 
+    console.error(
+      "REMOVE BET ERROR",
+      err
+    );
+
   } finally {
 
-    BETTING_STATE.saving = false;
+    if (
+      BETTING_STATE.saveTokens[categoryKey] === token
+    ) {
+      markBettingCategorySaving_(
+        categoryKey,
+        false
+      );
+    }
 
   }
 
@@ -1209,19 +1587,6 @@ function isBettingFinalCategory_(category){
       .trim() !== "" ||
     String(category.wagerResultType || "")
       .trim() !== ""
-  ) {
-    return true;
-  }
-
-  /*
-    Simple rule:
-    If the game date / lock time has passed,
-    move it to Finished Games.
-  */
-  if (
-    isBettingDatePassed_(
-      category
-    )
   ) {
     return true;
   }
@@ -1637,7 +2002,7 @@ function renderBettingGroupedCategories_(categories, betMap, config){
 
       ${activeCategories.length ? `
         <div class="betting-group-section-label">
-          Active & Upcoming Games
+          Active, Live & Upcoming Games
         </div>
 
         ${activeGroups.map(function(dateGroup, index){
@@ -1775,7 +2140,9 @@ async function renderBettingPage(){
       ? betsRes.summary
       : emptySummary;
 
-  const betMap = buildBetMap_(summary);
+  const betMap = mergeBettingOptimisticBets_(
+    buildBetMap_(summary)
+  );
 
   const categories = optionsRes.categories || [];
 
@@ -1815,13 +2182,88 @@ ${renderBettingLeaderboardPreview_(
 
 }
 
-async function saveBetSelection(categoryId, nomineeId){
+function getSelectedBettingNomineeId_(categoryId){
 
-  if (BETTING_STATE.saving) {
+  const selected =
+    document.querySelector(
+      `[data-betting-category="${escapeBettingSelectorValue_(String(categoryId || ""))}"].selected`
+    );
+
+  if (!selected) {
+    return "";
+  }
+
+  return String(
+    selected.getAttribute("data-betting-nominee") || ""
+  ).trim();
+
+}
+
+function scheduleBettingSaveSelection_(
+  categoryId,
+  nomineeId,
+  betAmount,
+  delayMs
+){
+
+  const categoryKey =
+    String(categoryId || "");
+
+  const nomineeKey =
+    String(nomineeId || "");
+
+  const amountValue =
+    String(betAmount || "");
+
+  if (!categoryKey || !nomineeKey) {
     return;
   }
 
-  BETTING_STATE.saving = true;
+  const token =
+    Date.now() + "-" + Math.random();
+
+  BETTING_STATE.saveTokens[categoryKey] = token;
+
+  BETTING_STATE.latestSaveDrafts[categoryKey] = {
+    categoryId: categoryKey,
+    nomineeId: nomineeKey,
+    betAmount: amountValue,
+    token: token
+  };
+
+  if (BETTING_STATE.saveTimers[categoryKey]) {
+    clearTimeout(
+      BETTING_STATE.saveTimers[categoryKey]
+    );
+  }
+
+  BETTING_STATE.saveTimers[categoryKey] =
+    setTimeout(function(){
+
+      const draft =
+        BETTING_STATE.latestSaveDrafts[categoryKey];
+
+      if (!draft || draft.token !== token) {
+        return;
+      }
+
+      saveBetSelectionNow_(
+        draft.categoryId,
+        draft.nomineeId,
+        draft.betAmount,
+        draft.token
+      );
+
+    }, delayMs || 350);
+
+}
+
+async function saveBetSelectionNow_(
+  categoryId,
+  nomineeId,
+  betAmount,
+  token
+){
 
   const session =
     getBettingSession_();
@@ -1832,15 +2274,11 @@ async function saveBetSelection(categoryId, nomineeId){
   const gameId =
     getBettingGameId_();
 
-  const input =
-    document.getElementById(
-      getBetAmountInputId_(categoryId)
-    );
+  const categoryKey =
+    String(categoryId || "");
 
-  const betAmount =
-    input
-      ? input.value
-      : "";
+  const nomineeKey =
+    String(nomineeId || "");
 
   const notice =
     document.getElementById(
@@ -1849,21 +2287,13 @@ async function saveBetSelection(categoryId, nomineeId){
 
   try {
 
-    if (notice) {
-      notice.innerHTML =
-        renderBettingNotice_(
-          "Saving bet...",
-          ""
-        );
-    }
-
     if (!username) {
       throw new Error(
         "Please log in again."
       );
     }
 
-    if (!categoryId || !nomineeId) {
+    if (!categoryKey || !nomineeKey) {
       throw new Error(
         "Missing wager selection."
       );
@@ -1878,14 +2308,36 @@ async function saveBetSelection(categoryId, nomineeId){
       );
     }
 
-    const res =
-      await apiSaveBet({
+    markBettingCategorySaving_(
+      categoryKey,
+      true
+    );
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          "Saving pick...",
+          ""
+        );
+    }
+
+    const res = await enqueueBettingSave_(function(){
+
+      return apiSaveBet({
         username: username,
         gameId: gameId,
-        categoryId: categoryId,
-        nomineeId: nomineeId,
+        categoryId: categoryKey,
+        nomineeId: nomineeKey,
         betAmount: betAmount
       });
+
+    });
+
+    if (
+      BETTING_STATE.saveTokens[categoryKey] !== token
+    ) {
+      return;
+    }
 
     if (!res || res.success === false) {
       throw new Error(
@@ -1894,25 +2346,37 @@ async function saveBetSelection(categoryId, nomineeId){
       );
     }
 
+    BETTING_STATE.optimisticBets[categoryKey] = {
+      categoryId: categoryKey,
+      nomineeId: nomineeKey,
+      betAmount: Number(betAmount || 0),
+      odds: res.odds,
+      potentialReturn: res.potentialReturn,
+      status: "pending",
+      payout: 0
+    };
+
     if (notice) {
       notice.innerHTML =
         renderBettingNotice_(
-          "Bet saved.",
+          "Wager saved.",
           "success"
         );
     }
 
-    const app =
-      document.getElementById(
-        "app"
+  } catch (err) {
+
+    if (
+      BETTING_STATE.saveTokens[categoryKey] === token
+    ) {
+      clearOptimisticBettingCategory_(
+        categoryKey
       );
 
-    if (app) {
-      app.innerHTML =
-        await renderBettingPage();
+      clearBettingCategorySelectionDom_(
+        categoryKey
+      );
     }
-
-  } catch (err) {
 
     if (notice) {
       notice.innerHTML =
@@ -1931,16 +2395,81 @@ async function saveBetSelection(categoryId, nomineeId){
 
   } finally {
 
-    BETTING_STATE.saving = false;
+    if (
+      BETTING_STATE.saveTokens[categoryKey] === token
+    ) {
+      markBettingCategorySaving_(
+        categoryKey,
+        false
+      );
+    }
 
   }
 
 }
 
+function saveBetSelection(categoryId, nomineeId){
+
+  const categoryKey =
+    String(categoryId || "");
+
+  const nomineeKey =
+    String(nomineeId || "");
+
+  const input =
+    document.getElementById(
+      getBetAmountInputId_(categoryKey)
+    );
+
+  const betAmount =
+    input
+      ? input.value
+      : "";
+
+  const notice =
+    document.getElementById(
+      "bettingNotice"
+    );
+
+  if (
+    betAmount === "" ||
+    Number(betAmount) <= 0
+  ) {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          "Enter a valid wager amount.",
+          "error"
+        );
+    }
+
+    return;
+
+  }
+
+  optimisticSelectBettingNominee_(
+    categoryKey,
+    nomineeKey,
+    betAmount
+  );
+
+  scheduleBettingSaveSelection_(
+    categoryKey,
+    nomineeKey,
+    betAmount,
+    350
+  );
+
+}
+
 function updateBettingReturnsForCategory(categoryId){
 
+  const categoryKey =
+    String(categoryId || "");
+
   const inputId =
-    getBetAmountInputId_(categoryId);
+    getBetAmountInputId_(categoryKey);
 
   const input =
     document.getElementById(inputId);
@@ -1954,7 +2483,7 @@ function updateBettingReturnsForCategory(categoryId){
 
   const returnEls =
     document.querySelectorAll(
-      `[data-betting-return-category="${categoryId}"]`
+      `[data-betting-return-category="${escapeBettingSelectorValue_(categoryKey)}"]`
     );
 
   returnEls.forEach(function(el){
@@ -1972,6 +2501,31 @@ function updateBettingReturnsForCategory(categoryId){
 
   });
 
+  const selectedNomineeId =
+    getSelectedBettingNomineeId_(
+      categoryKey
+    );
+
+  if (
+    selectedNomineeId &&
+    amount > 0
+  ) {
+
+    optimisticSelectBettingNominee_(
+      categoryKey,
+      selectedNomineeId,
+      input.value
+    );
+
+    scheduleBettingSaveSelection_(
+      categoryKey,
+      selectedNomineeId,
+      input.value,
+      900
+    );
+
+  }
+
 }
 
 function startBettingAutoRefresh_(){
@@ -1985,7 +2539,7 @@ function startBettingAutoRefresh_(){
   BETTING_AUTO_REFRESH_TIMER =
     setInterval(async function(){
 
-      if (BETTING_STATE.saving) {
+      if (isBettingSaveInFlight_()) {
         return;
       }
 

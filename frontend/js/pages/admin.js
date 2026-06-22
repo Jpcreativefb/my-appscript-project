@@ -580,6 +580,8 @@ function renderAdminGameForm(
       startingBankroll: 100,
       minWager: 1,
       maxWager: 100,
+      allowBetRemoval: false,
+      wagerEditMode: "editable_until_lock",
       themeColor: "",
       icon: "",
       sortOrder: 999,
@@ -863,6 +865,34 @@ function renderAdminGameForm(
                 />
               </label>
 
+              <label>
+                Wager Edit Mode
+
+                <select name="wagerEditMode">
+                  <option
+                    value="editable_until_lock"
+                    ${String(game.wagerEditMode || "editable_until_lock") === "final_once_selected" ? "" : "selected"}
+                  >
+                    Editable until game locks
+                  </option>
+
+                  <option
+                    value="final_once_selected"
+                    ${String(game.wagerEditMode || "") === "final_once_selected" ? "selected" : ""}
+                  >
+                    Final once selected
+                  </option>
+                </select>
+              </label>
+
+            </div>
+
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckbox_(
+                "allowBetRemoval",
+                "Allow Take Back Before Lock",
+                game.allowBetRemoval
+              )}
             </div>
 
             <h4>Display</h4>
@@ -1263,6 +1293,16 @@ function adminGetGamePayloadFromForm_(
 
     maxWager:
       form.maxWager.value,
+
+    allowBetRemoval:
+      form.allowBetRemoval
+        ? form.allowBetRemoval.checked
+        : false,
+
+    wagerEditMode:
+      form.wagerEditMode
+        ? form.wagerEditMode.value
+        : "editable_until_lock",
 
     themeColor:
       form.themeColor.value.trim(),

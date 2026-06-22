@@ -99,7 +99,10 @@ function getCategorySettingsColumnMap_(headers){
       headers.indexOf("ScoreVersion"),
 
     favoriteNomineeId:
-      headers.indexOf("FavoriteNomineeId")
+      headers.indexOf("FavoriteNomineeId"),
+
+    wagerResultType:
+      headers.indexOf("WagerResultType")
 
   };
 
@@ -302,9 +305,18 @@ function getCategorySettings(gameId){
         ).trim(),
 
       favoriteNomineeId:
-        String(
-          row[col.favoriteNomineeId] || ""
-        ).trim()
+        col.favoriteNomineeId > -1
+          ? String(
+              row[col.favoriteNomineeId] || ""
+            ).trim()
+          : "",
+
+      wagerResultType:
+        col.wagerResultType > -1
+          ? String(
+              row[col.wagerResultType] || ""
+            ).trim()
+          : ""
 
     };
 

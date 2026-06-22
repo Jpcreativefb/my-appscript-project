@@ -26,6 +26,8 @@
    StartingBankroll
    MinWager
    MaxWager
+   AllowBetRemoval
+   WagerEditMode
 
    Supported game type:
    wager
@@ -105,11 +107,16 @@ function slugifyBet_(value){
 
 function isBetBoolean_(value){
 
-  return (
-    value === true ||
+  const text =
     String(value || "")
       .trim()
-      .toLowerCase() === "true"
+      .toLowerCase();
+
+  return (
+    value === true ||
+    text === "true" ||
+    text === "yes" ||
+    text === "1"
   );
 
 }
@@ -164,6 +171,56 @@ function ensureBettingHeaders_(sh){
 
 }
 
+function ensureBettingGameSettingsHeaders_(){
+
+  const ss = SpreadsheetApp.getActive();
+
+  const gamesSheet = ss.getSheetByName(GAMES_SHEET);
+
+  if (!gamesSheet) {
+    return [];
+  }
+
+  const lastColumn = gamesSheet.getLastColumn();
+
+  if (lastColumn < 1) {
+    return [];
+  }
+
+  const headers = gamesSheet
+    .getRange(1, 1, 1, lastColumn)
+    .getValues()[0]
+    .map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const required = [
+    "AllowBetRemoval",
+    "WagerEditMode"
+  ];
+
+  const missing = required.filter(function(header) {
+    return headers.indexOf(header) === -1;
+  });
+
+  if (missing.length) {
+    gamesSheet
+      .getRange(
+        1,
+        lastColumn + 1,
+        1,
+        missing.length
+      )
+      .setValues([
+        missing
+      ]);
+  }
+
+  return missing;
+
+}
+
+
 function setupBettingSheets(){
 
   const ss = SpreadsheetApp.getActive();
@@ -201,9 +258,13 @@ function setupBettingSheets(){
 
   }
 
+  const addedGameColumns =
+    ensureBettingGameSettingsHeaders_();
+
   return {
     success: true,
-    message: "Wager sheets are ready"
+    message: "Wager sheets are ready",
+    addedGameColumns: addedGameColumns
   };
 
 }
@@ -313,6 +374,12 @@ function getBettingGameConfig(gameId){
     game.allowBetRemoval === true ||
     game.AllowBetRemoval === true;
 
+  let wagerEditMode = normalizeBetKey_(
+    game.wagerEditMode ||
+    game.WagerEditMode ||
+    "editable_until_lock"
+  );
+
   let startingBankroll = Math.max(
     toBetNumber_(
       game.startingBankroll,
@@ -367,7 +434,8 @@ function getBettingGameConfig(gameId){
         minBet: headers.indexOf("MinBet"),
         maxBet: headers.indexOf("MaxBet"),
         allowBetRemoval: headers.indexOf("AllowBetRemoval"),
-        removeBetEnabled: headers.indexOf("RemoveBetEnabled")
+        removeBetEnabled: headers.indexOf("RemoveBetEnabled"),
+        wagerEditMode: headers.indexOf("WagerEditMode")
       };
 
       for (let i = 1; i < data.length; i++) {
@@ -427,6 +495,25 @@ function getBettingGameConfig(gameId){
             );
         }
 
+        if (col.wagerEditMode > -1) {
+          wagerEditMode = normalizeBetKey_(
+            row[col.wagerEditMode] ||
+            wagerEditMode
+          );
+        }
+
+        if (
+          wagerEditMode === "final" ||
+          wagerEditMode === "final-once-selected" ||
+          wagerEditMode === "final_once_selected" ||
+          wagerEditMode === "locked-on-save" ||
+          wagerEditMode === "locked_once_saved"
+        ) {
+          wagerEditMode = "final_once_selected";
+        } else {
+          wagerEditMode = "editable_until_lock";
+        }
+
         if (col.startingBankroll > -1) {
           startingBankroll = Math.max(
             toBetNumber_(
@@ -475,6 +562,18 @@ function getBettingGameConfig(gameId){
 
   }
 
+  if (
+    wagerEditMode === "final" ||
+    wagerEditMode === "final-once-selected" ||
+    wagerEditMode === "final_once_selected" ||
+    wagerEditMode === "locked-on-save" ||
+    wagerEditMode === "locked_once_saved"
+  ) {
+    wagerEditMode = "final_once_selected";
+  } else {
+    wagerEditMode = "editable_until_lock";
+  }
+
   return {
     gameId: gameId,
     enabled: enabled,
@@ -483,6 +582,9 @@ function getBettingGameConfig(gameId){
 
     allowBetRemoval: allowBetRemoval,
     removeBetEnabled: allowBetRemoval,
+    wagerEditMode: wagerEditMode,
+    finalOnceSelected: wagerEditMode === "final_once_selected",
+    editableUntilLock: wagerEditMode !== "final_once_selected",
 
     startingBankroll: startingBankroll,
     minBet: minBet,
@@ -1079,7 +1181,9 @@ function getBetResolution_(bet, settings){
 
   const winnerNomineeId =
     normalizeBetKey_(
-      config.winnerNomineeId || ""
+      config.winnerNomineeId ||
+      config.WinnerNomineeId ||
+      ""
     );
 
   const wagerResultType =
@@ -1091,18 +1195,35 @@ function getBetResolution_(bet, settings){
 
   /*
     Normal 2-option moneyline tie:
-    no winner, half wager returned.
+    WinnerNomineeId is intentionally "draw" so the wager is finalized,
+    but payout must still be a half-refund.
   */
-  if (
-    !winnerNomineeId &&
-    wagerResultType === "half-refund"
-  ) {
+  if (wagerResultType === "half-refund") {
 
     return {
       status: "half-refund",
       payout:
         roundBetMoney_(
           Number(bet.betAmount || 0) / 2
+        ),
+      won: false,
+      lost: false,
+      refunded: true
+    };
+
+  }
+
+  if (
+    wagerResultType === "refund" ||
+    wagerResultType === "push" ||
+    wagerResultType === "void"
+  ) {
+
+    return {
+      status: "refund",
+      payout:
+        roundBetMoney_(
+          Number(bet.betAmount || 0)
         ),
       won: false,
       lost: false,
@@ -1170,6 +1291,7 @@ function getUserBettingSummary(username, gameId){
   let wonBets = 0;
   let lostBets = 0;
   let pendingBets = 0;
+  let refundedBets = 0;
 
   const resolvedBets = bets.map(bet => {
 
@@ -1191,8 +1313,12 @@ function getUserBettingSummary(username, gameId){
       wonBets++;
     }
 
-    if (resolution.status === "half-refund") {
-  payout += resolution.payout;
+    if (
+      resolution.status === "half-refund" ||
+      resolution.status === "refund"
+    ) {
+      payout += resolution.payout;
+      refundedBets++;
     }
 
     if (resolution.status === "lost") {
@@ -1231,6 +1357,7 @@ function getUserBettingSummary(username, gameId){
     maxWager: config.maxWager,
     totalStaked: totalStaked,
     pendingStake: pendingStake,
+    activeWagered: pendingStake,
     pendingPotentialReturn: pendingPotentialReturn,
     payout: payout,
     bankroll: bankroll,
@@ -1238,6 +1365,7 @@ function getUserBettingSummary(username, gameId){
     maxBankroll: maxBankroll,
     wonBets: wonBets,
     lostBets: lostBets,
+    refundedBets: refundedBets,
     pendingBets: pendingBets,
     totalBets: bets.length,
     bets: resolvedBets
@@ -1323,7 +1451,7 @@ function saveBet(payload){
 
   const lock = LockService.getScriptLock();
 
-  lock.waitLock(10000);
+  lock.waitLock(60000);
 
   try {
 
@@ -1431,6 +1559,31 @@ function saveBet(payload){
     const settings = getCategorySettings(gameId);
     const categoryConfig = settings[categoryId] || {};
 
+    const winnerNomineeId = normalizeBetKey_(
+      categoryConfig.winnerNomineeId ||
+      categoryConfig.WinnerNomineeId ||
+      category.winnerNomineeId ||
+      category.WinnerNomineeId ||
+      ""
+    );
+
+    const wagerResultType = normalizeBetKey_(
+      categoryConfig.wagerResultType ||
+      categoryConfig.WagerResultType ||
+      category.wagerResultType ||
+      category.WagerResultType ||
+      ""
+    );
+
+    if (winnerNomineeId || wagerResultType) {
+
+      return {
+        success: false,
+        message: "This wager has already been resolved"
+      };
+
+    }
+
     if (
       isBettingCategoryLocked_(
         category,
@@ -1445,30 +1598,31 @@ function saveBet(payload){
 
     }
 
-    const currentBets = getUserBets(
+    const currentSummary = getUserBettingSummary(
       username,
       gameId
     );
 
-    const stakedExcludingCategory = currentBets
-      .filter(b => b.categoryId !== categoryId)
-      .reduce((sum, b) =>
-        sum + Number(b.betAmount || 0),
-        0
-      );
+    const currentBetForCategory = (currentSummary.bets || [])
+      .find(function(bet) {
+        return normalizeBetKey_(bet.categoryId) === categoryId;
+      });
 
-    if (
-      stakedExcludingCategory + betAmount >
-      config.startingBankroll
-    ) {
+    const existingAmountForCategory = currentBetForCategory
+      ? Number(currentBetForCategory.betAmount || 0)
+      : 0;
+
+    const availableForThisBet = roundBetMoney_(
+      Number(currentSummary.bankroll || 0) +
+      existingAmountForCategory
+    );
+
+    if (betAmount > availableForThisBet) {
 
       return {
         success: false,
         message: "Bet exceeds available bankroll",
-        available: roundBetMoney_(
-          config.startingBankroll -
-          stakedExcludingCategory
-        )
+        available: availableForThisBet
       };
 
     }
@@ -1496,6 +1650,18 @@ function saveBet(payload){
       username,
       categoryId
     );
+
+    if (
+      existingRow > -1 &&
+      config.wagerEditMode === "final_once_selected"
+    ) {
+
+      return {
+        success: false,
+        message: "This wager is final once selected and cannot be changed"
+      };
+
+    }
 
     if (existingRow > -1) {
 
@@ -1588,7 +1754,7 @@ function removeBet(payload){
   const lock =
     LockService.getScriptLock();
 
-  lock.waitLock(10000);
+  lock.waitLock(60000);
 
   try {
 
@@ -1903,6 +2069,7 @@ function getBettingLeaderboardData(gameId){
       let wonBets = 0;
       let lostBets = 0;
       let pendingBets = 0;
+      let refundedBets = 0;
 
       bets.forEach(bet => {
 
@@ -1924,8 +2091,12 @@ function getBettingLeaderboardData(gameId){
           wonBets++;
         }
 
-        if (resolution.status === "half-refund") {
+        if (
+          resolution.status === "half-refund" ||
+          resolution.status === "refund"
+        ) {
           payout += resolution.payout;
+          refundedBets++;
         }
 
         if (resolution.status === "lost") {
@@ -1951,10 +2122,12 @@ function getBettingLeaderboardData(gameId){
         startingBankroll: config.startingBankroll,
         totalStaked: roundBetMoney_(totalStaked),
         pendingStake: roundBetMoney_(pendingStake),
+        activeWagered: roundBetMoney_(pendingStake),
         pendingPotentialReturn: roundBetMoney_(pendingPotentialReturn),
         payout: roundBetMoney_(payout),
         wonBets: wonBets,
         lostBets: lostBets,
+        refundedBets: refundedBets,
         pendingBets: pendingBets,
         totalBets: bets.length,
         eliminated: false
