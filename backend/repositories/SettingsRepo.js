@@ -21,6 +21,12 @@ function getCategorySettingsSheet_(){
 
 function getAllCategorySettingsData_() {
 
+  if (typeof getSheetDataCached === "function") {
+    return getSheetDataCached(
+      CATEGORY_SETTINGS_SHEET
+    );
+  }
+
   const sh =
     getCategorySettingsSheet_();
 

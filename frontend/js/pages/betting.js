@@ -2129,20 +2129,19 @@ async function renderBettingPage(){
 
   }
 
-  const [optionsRes, betsRes, leaderboardRes] =
-    await Promise.all([
-      apiGetBettingOptions(gameId),
-      apiGetMyBets(username, gameId),
-      apiBettingLeaderboard(gameId)
-    ]);
+  const pageRes =
+    await apiGetBettingPagePayload(
+      username,
+      gameId
+    );
 
-  if (!optionsRes || optionsRes.success === false) {
+  if (!pageRes || pageRes.success === false) {
 
     return `
       <div class="page">
         <h1>Wager</h1>
         ${renderBettingNotice_(
-          (optionsRes && (optionsRes.message || optionsRes.error)) ||
+          (pageRes && (pageRes.message || pageRes.error)) ||
           "Could not load wager options.",
           "error"
         )}
@@ -2151,6 +2150,7 @@ async function renderBettingPage(){
 
   }
 
+  const optionsRes = pageRes;
   const config = optionsRes.config || {};
 
   if (config.enabled === false) {
@@ -2176,9 +2176,14 @@ async function renderBettingPage(){
   };
 
   const summary =
-    betsRes && betsRes.summary
-      ? betsRes.summary
+    pageRes && pageRes.summary
+      ? pageRes.summary
       : emptySummary;
+
+  const leaderboardRows =
+    Array.isArray(pageRes.leaderboard)
+      ? pageRes.leaderboard
+      : [];
 
   const betMap = mergeBettingOptimisticBets_(
     buildBetMap_(summary)
@@ -2199,17 +2204,21 @@ async function renderBettingPage(){
         Start with ${money_(config.startingBankroll)} chips. Pick one nominee per category and wager between ${money_(config.minWager || config.minBet)} and ${money_(config.maxWager || config.maxBet)} chips.
       </p>
 
-      ${renderBettingSummary_(
-  summary,
-  leaderboardRes || [],
-  username,
-  config
-)}
+      <div id="bettingSummaryBlock">
+        ${renderBettingSummary_(
+          summary,
+          leaderboardRows,
+          username,
+          config
+        )}
+      </div>
 
-${renderBettingLeaderboardPreview_(
-  leaderboardRes || [],
-  config
-)}
+      <div id="bettingLeaderboardBlock">
+        ${renderBettingLeaderboardPreview_(
+          leaderboardRows,
+          config
+        )}
+      </div>
 
       ${renderBettingGroupedCategories_(
         categories,
@@ -2568,6 +2577,63 @@ function updateBettingReturnsForCategory(categoryId){
 
 }
 
+async function refreshBettingFastBlocks_(){
+
+  const session = getBettingSession_();
+  const username = session.username || "";
+  const gameId = getBettingGameId_();
+
+  if (!username) {
+    return;
+  }
+
+  const summaryBlock =
+    document.getElementById("bettingSummaryBlock");
+
+  const leaderboardBlock =
+    document.getElementById("bettingLeaderboardBlock");
+
+  if (!summaryBlock && !leaderboardBlock) {
+    return;
+  }
+
+  const res =
+    await apiGetBettingPagePayload(
+      username,
+      gameId
+    );
+
+  if (!res || res.success === false) {
+    return;
+  }
+
+  const config = res.config || {};
+  const summary = res.summary || {};
+  const leaderboardRows =
+    Array.isArray(res.leaderboard)
+      ? res.leaderboard
+      : [];
+
+  if (summaryBlock) {
+    summaryBlock.innerHTML =
+      renderBettingSummary_(
+        summary,
+        leaderboardRows,
+        username,
+        config
+      );
+  }
+
+  if (leaderboardBlock) {
+    leaderboardBlock.innerHTML =
+      renderBettingLeaderboardPreview_(
+        leaderboardRows,
+        config
+      );
+  }
+
+}
+
 function startBettingAutoRefresh_(){
 
   if (BETTING_AUTO_REFRESH_TIMER) {
@@ -2602,8 +2668,7 @@ function startBettingAutoRefresh_(){
         return;
       }
 
-      app.innerHTML =
-        await renderBettingPage();
+      await refreshBettingFastBlocks_();
 
     }, 60000);
 

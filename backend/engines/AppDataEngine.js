@@ -43,34 +43,20 @@ function apiGetStartupPayload(payload) {
   const categories =
     getCategories(gameId);
 
-  const categorySettings =
-    getCategorySettings(gameId);
-
   const picks =
     apiGetMyPicks(
       username,
       gameId
     );
 
-  const leaderboard =
-    getLeaderboardData(
-      gameId
-    );
-
-  const profile =
-    getUserProfile(
-      username,
-      gameId
-    );
-
-  const profileHistory =
-    getUserProfileHistory(
-      username,
-      gameId
-    );
-
   return {
     success: true,
+
+    optimized:
+      true,
+
+    payloadType:
+      "picks_lite_v1",
 
     gameId:
       gameId,
@@ -84,20 +70,8 @@ function apiGetStartupPayload(payload) {
     categories:
       categories,
 
-    categorySettings:
-      categorySettings,
-
     picks:
-      picks,
-
-    leaderboard:
-      leaderboard,
-
-    profile:
-      profile,
-
-    profileHistory:
-      profileHistory
+      picks
   };
 
 }
@@ -306,29 +280,10 @@ function buildDashboardGameHubItem_(
       mode
     );
 
-  const leaderboardRows =
-    game.showLeaderboard === false
-      ? []
-      : getDashboardLeaderboardRows_(
-          game,
-          mode
-        );
-
-  const leaderboardPreview =
-    getDashboardLeaderboardPreviewFromRows_(
-      game,
-      mode,
-      leaderboardRows,
-      5
-    );
-
-  const userLeaderboard =
-    getDashboardUserLeaderboardInfoFromRows_(
-      game,
-      mode,
-      username,
-      leaderboardRows
-    );
+  // Keep dashboard game cards intentionally light.
+  // Full leaderboard/projection work is loaded only on the leaderboard page.
+  const leaderboardPreview = [];
+  const userLeaderboard = {};
 
   const userStats =
     getDashboardUserStats_(

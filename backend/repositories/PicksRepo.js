@@ -23,6 +23,12 @@ function getAllPicks(){
 
 function getAllPicksData_(){
 
+  if (typeof getSheetDataCached === "function") {
+    return getSheetDataCached(
+      PICKS_SHEET
+    );
+  }
+
   const sh =
     getPicksSheet_();
 

@@ -666,7 +666,7 @@ function adminGameHeroThumbnail_(fileId) {
   return (
     "https://drive.google.com/thumbnail?id=" +
     encodeURIComponent(fileId) +
-    "&sz=w1600"
+    "&sz=w800"
   );
 
 }

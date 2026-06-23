@@ -247,7 +247,8 @@ function getCommunityGames(){
     a.sortOrder - b.sortOrder
   );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     COMMUNITY_GAMES_CACHE_KEY,
     JSON.stringify(games),
     300

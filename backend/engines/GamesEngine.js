@@ -369,7 +369,7 @@ function buildGameHeroImageUrl_(fileId) {
   return (
     "https://drive.google.com/thumbnail?id=" +
     encodeURIComponent(fileId) +
-    "&sz=w1600"
+    "&sz=w800"
   );
 
 }
@@ -835,7 +835,8 @@ function getGames() {
     a.sortOrder - b.sortOrder
   );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     GAMES_CACHE_KEY,
     JSON.stringify(games),
     300

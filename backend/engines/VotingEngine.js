@@ -501,7 +501,9 @@ function getVotesCached_(){
 
   }
 
-  cache.put(
+  safeScriptCachePut_(
+
+    cache,
 
     VOTES_CACHE_KEY,
 

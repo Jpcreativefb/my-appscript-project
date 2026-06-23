@@ -1387,6 +1387,78 @@ async function apiAdminParseSportsScoreboard(gameId) {
    BETTING
 ====================== */
 
+async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError) {
+
+  const [optionsRes, betsRes, leaderboardRes] =
+    await Promise.all([
+      apiGetBettingOptions(gameId),
+      apiGetMyBets(username, gameId),
+      apiBettingLeaderboard(gameId)
+    ]);
+
+  if (!optionsRes || optionsRes.success === false) {
+    return optionsRes || {
+      success: false,
+      message:
+        firstError ||
+        "Could not load wager options."
+    };
+  }
+
+  const leaderboardRows =
+    Array.isArray(leaderboardRes)
+      ? leaderboardRes
+      : leaderboardRes && Array.isArray(leaderboardRes.leaderboard)
+        ? leaderboardRes.leaderboard
+        : [];
+
+  return {
+    success: true,
+    optimized: false,
+    fallback: true,
+    payloadType: "betting_page_legacy_fallback",
+    gameId,
+    config: optionsRes.config || {},
+    categories: optionsRes.categories || [],
+    summary:
+      betsRes && betsRes.summary
+        ? betsRes.summary
+        : {},
+    leaderboard: leaderboardRows
+  };
+
+}
+
+async function apiGetBettingPagePayload(username, gameId) {
+
+  const res =
+    await api("getBettingPagePayload", {
+      username,
+      gameId
+    });
+
+  if (res && res.success !== false) {
+    return res;
+  }
+
+  const firstError =
+    res && (res.message || res.error)
+      ? String(res.message || res.error)
+      : "";
+
+  console.warn(
+    "Optimized betting payload unavailable; using legacy wager calls.",
+    firstError
+  );
+
+  return apiBuildLegacyBettingPagePayload_(
+    username,
+    gameId,
+    firstError
+  );
+
+}
+
 async function apiGetBettingOptions(gameId) {
 
   return api("getBettingOptions", {

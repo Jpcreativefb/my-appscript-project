@@ -1102,6 +1102,20 @@ async function loadActiveProfile() {
     return;
   }
 
+  if (
+    APP_STATE.profile &&
+    APP_STATE.profileData &&
+    APP_STATE.profileData.username === session.username
+  ) {
+
+    updateHeaderProfile(
+      APP_STATE.profile
+    );
+
+    return;
+
+  }
+
   const gameId =
     getProfileGameId_(
       APP_STATE.profileGames || []
@@ -1119,7 +1133,14 @@ async function loadActiveProfile() {
       res.profile;
 
     APP_STATE.profileData =
-      res;
+      Object.assign(
+        {},
+        res,
+        {
+          username: session.username,
+          gameId: gameId
+        }
+      );
 
     updateHeaderProfile(
       res.profile

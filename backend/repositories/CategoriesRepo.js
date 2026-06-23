@@ -21,14 +21,20 @@ function getCategoriesSheet_(){
 
 function getAllCategoriesData_() {
 
-    const sh =
-      getCategoriesSheet_();
-  
-    return sh
-      .getDataRange()
-      .getValues();
-  
+  if (typeof getSheetDataCached === "function") {
+    return getSheetDataCached(
+      CATEGORIES_SHEET
+    );
   }
+
+  const sh =
+    getCategoriesSheet_();
+
+  return sh
+    .getDataRange()
+    .getValues();
+
+}
   
 function updateNomineeId_(
     rowIndex,

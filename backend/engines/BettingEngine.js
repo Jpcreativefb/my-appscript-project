@@ -287,7 +287,16 @@ function getBetsSheet_(){
 
 function getAllBetsData_(){
 
-  return getBetsSheet_()
+  const sh =
+    getBetsSheet_();
+
+  if (typeof getSheetDataCached === "function") {
+    return getSheetDataCached(
+      BETS_SHEET
+    );
+  }
+
+  return sh
     .getDataRange()
     .getValues();
 
@@ -608,17 +617,20 @@ function getBettingOddsMap_(gameId){
 
   const map = {};
 
-  const sh = SpreadsheetApp
-    .getActive()
-    .getSheetByName(CATEGORIES_SHEET);
+  let data = [];
 
-  if (!sh) {
-    return map;
+  try {
+
+    data =
+      typeof getAllCategoriesData_ === "function"
+        ? getAllCategoriesData_()
+        : [];
+
+  } catch (err) {
+
+    data = [];
+
   }
-
-  const data = sh
-    .getDataRange()
-    .getValues();
 
   if (data.length <= 1) {
     return map;
@@ -1583,6 +1595,73 @@ function apiGetMyBets(username, gameId){
       username,
       gameId
     )
+  };
+
+}
+
+/* =====================================================
+   PAGE PAYLOAD
+   One-call wager page load for frontend speed.
+===================================================== */
+
+function apiGetBettingPagePayload(payload){
+
+  payload = payload || {};
+
+  const username = normalizeBetString_(
+    payload.username
+  );
+
+  const gameId = normalizeBetGameId_(
+    payload.gameId || getDefaultGameId()
+  );
+
+  if (!username) {
+
+    return {
+      success: false,
+      message: "Missing username"
+    };
+
+  }
+
+  const options = getBettingOptions(
+    gameId
+  );
+
+  if (!options || options.success === false) {
+    return options || {
+      success: false,
+      message: "Could not load wager options"
+    };
+  }
+
+  const bets = apiGetMyBets(
+    username,
+    gameId
+  );
+
+  const leaderboard = getBettingLeaderboardData(
+    gameId
+  );
+
+  return {
+    success: true,
+    optimized: true,
+    payloadType: "betting_page_v1",
+    gameId: gameId,
+    config: options.config || {},
+    categories: options.categories || [],
+    summary:
+      bets && bets.summary
+        ? bets.summary
+        : {},
+    leaderboard:
+      Array.isArray(leaderboard)
+        ? leaderboard
+        : leaderboard && leaderboard.leaderboard
+          ? leaderboard.leaderboard
+          : []
   };
 
 }

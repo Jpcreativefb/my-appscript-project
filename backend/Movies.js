@@ -265,7 +265,8 @@ function getMovies(){
 
   );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     MOVIES_CACHE_KEY,
     JSON.stringify(movies),
     300

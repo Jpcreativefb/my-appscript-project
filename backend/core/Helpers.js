@@ -58,19 +58,45 @@ function normalizeUser(user) {
 /* =========================
    CATEGORY CACHE
 ========================= */
-function getCategoriesCached() {
-  const cache = CacheService.getScriptCache();
-  const key = "categories_v2";
+function getCategoriesCached(gameId) {
 
-  const cached = cache.get(key);
+  gameId =
+    gameId ||
+    (typeof getDefaultGameId === "function"
+      ? getDefaultGameId()
+      : "");
+
+  const cache =
+    CacheService.getScriptCache();
+
+  const key =
+    gameId
+      ? "categories_" + gameId
+      : "categories_v2";
+
+  const cached =
+    cache.get(key);
+
   if (cached) {
     try {
       return JSON.parse(cached);
     } catch (e) {}
   }
 
-  const categories = getCategories();
-  cache.put(key, JSON.stringify(categories), 120);
+  const categories =
+    getCategories(gameId);
+
+  if (typeof safeScriptCachePut_ === "function") {
+
+    safeScriptCachePut_(
+      cache,
+      key,
+      JSON.stringify(categories),
+      120
+    );
+
+  }
 
   return categories;
+
 }

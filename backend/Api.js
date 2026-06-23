@@ -1059,6 +1059,32 @@ function doGet(e) {
     }
 
     /* =========================
+       STANDARD LEADERBOARD
+       Lightweight rows-only endpoint for the leaderboard page.
+    ========================= */
+
+    if (action === "leaderboard") {
+
+      const leaderboard =
+        typeof getLeaderboardCached === "function"
+          ? getLeaderboardCached(
+              gameId,
+              false
+            )
+          : getLeaderboardData(
+              gameId
+            );
+
+      return json({
+        success: true,
+        gameId: gameId,
+        leaderboard: leaderboard,
+        updatedAt: new Date().toISOString()
+      });
+
+    }
+
+    /* =========================
        LIVE RESULTS / LIVE SCORING
     ========================= */
 
@@ -1397,6 +1423,24 @@ if (action === "compareUserPicks") {
     }
 
     
+
+        // =========================
+    // BETTING PAGE PAYLOAD
+    // One-call wager page load: options + user bets + leaderboard.
+    // =========================
+
+    if (action === "getBettingPagePayload") {
+
+      return json(
+        apiGetBettingPagePayload({
+          username:
+            params.username,
+          gameId:
+            gameId
+        })
+      );
+
+    }
 
         // =========================
     // BETTING OPTIONS

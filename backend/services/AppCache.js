@@ -4,6 +4,73 @@
 
 const CACHE_TTL = 120;
 
+// Fast per-execution cache. Apps Script startup and Sheet reads are expensive;
+// this avoids re-reading/re-parsing the same sheet several times during one API call.
+var APP_RUNTIME_CACHE = APP_RUNTIME_CACHE || {};
+
+// CacheService has a hard per-item size limit. Large sheets/categories can exceed it.
+// Keep the fast per-execution cache, but skip ScriptCache writes that are too large
+// so the app never crashes with: Argument too large: value.
+const CACHE_MAX_SAFE_CHARS = 90000;
+
+function safeScriptCachePut_(
+  cache,
+  key,
+  value,
+  ttl
+){
+
+  if (!cache || !key) {
+    return false;
+  }
+
+  value =
+    String(
+      value || ""
+    );
+
+  if (
+    value.length >
+    CACHE_MAX_SAFE_CHARS
+  ) {
+
+    Logger.log(
+      "Skipping ScriptCache put because value is too large: " +
+      key +
+      " (" +
+      value.length +
+      " chars)"
+    );
+
+    return false;
+
+  }
+
+  try {
+
+    cache.put(
+      key,
+      value,
+      ttl || CACHE_TTL
+    );
+
+    return true;
+
+  } catch (err) {
+
+    Logger.log(
+      "Skipping ScriptCache put for " +
+      key +
+      ": " +
+      err
+    );
+
+    return false;
+
+  }
+
+}
+
 /* =========================
    RAW SHEET CACHE
 ========================= */
@@ -26,6 +93,13 @@ function getSheetDataCached(
   const key =
     "sheet_" + sheetName;
 
+  if (
+    APP_RUNTIME_CACHE &&
+    APP_RUNTIME_CACHE[key]
+  ) {
+    return APP_RUNTIME_CACHE[key];
+  }
+
   const cached =
     cache.get(key);
 
@@ -33,7 +107,12 @@ function getSheetDataCached(
 
     try {
 
-      return JSON.parse(cached);
+      const parsed =
+        JSON.parse(cached);
+
+      APP_RUNTIME_CACHE[key] = parsed;
+
+      return parsed;
 
     } catch (err) {
 
@@ -64,11 +143,14 @@ function getSheetDataCached(
     sh.getDataRange()
       .getValues();
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     key,
     JSON.stringify(data),
     CACHE_TTL
   );
+
+  APP_RUNTIME_CACHE[key] = data;
 
   return data;
 
@@ -116,7 +198,8 @@ function getCategorySettingsCached(
       gameId
     );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     key,
     JSON.stringify(settings),
     CACHE_TTL
@@ -168,7 +251,8 @@ function getCategoriesCached(
       gameId
     );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     key,
     JSON.stringify(categories),
     CACHE_TTL
@@ -232,7 +316,8 @@ function getLeaderboardCached(
           gameId
         );
 
-  cache.put(
+  safeScriptCachePut_(
+    cache,
     key,
     JSON.stringify(data),
     CACHE_TTL
@@ -249,6 +334,8 @@ function getLeaderboardCached(
 function clearGameCaches(
   gameId
 ){
+
+  APP_RUNTIME_CACHE = {};
 
   gameId =
     gameId ||
@@ -285,6 +372,8 @@ function clearGameCaches(
 ========================= */
 
 function clearAppCaches(){
+
+  APP_RUNTIME_CACHE = {};
 
   const cache =
     CacheService
