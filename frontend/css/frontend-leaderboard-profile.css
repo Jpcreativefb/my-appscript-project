@@ -1,0 +1,40 @@
+/* =========================
+   FRONTEND LEADERBOARD PROFILE CSS
+   NEW DROP-IN FILE: frontend-leaderboard-profile.css
+========================= */
+
+.leaderboard-user {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.leaderboard-avatar,
+.leaderboard-avatar-img {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 34px;
+  font-size: 20px;
+  overflow: hidden;
+}
+
+.leaderboard-avatar-img {
+  object-fit: cover;
+}
+
+.leaderboard-name {
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.leaderboard-compare-btn {
+  border: 0;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}

@@ -235,6 +235,72 @@
   .wager-btn:hover {
     background: #16a34a;
   }
+
+  .sports-bulk-wager-bar {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 12px;
+    align-items: center;
+    background: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 16px;
+  }
+
+  .sports-bulk-select-all,
+  .sports-bulk-card-select {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #dbeafe;
+    font-size: 0.9rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .sports-bulk-select-all input,
+  .sports-bulk-card-select input {
+    width: 18px;
+    height: 18px;
+    accent-color: #22c55e;
+  }
+
+  .sports-bulk-selected-count {
+    color: #cbd5e1;
+    font-size: 0.9rem;
+    white-space: nowrap;
+  }
+
+  .sports-bulk-create-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .sports-bulk-card-select {
+    width: 100%;
+    justify-content: center;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.35);
+    border-radius: 10px;
+    padding: 9px 10px;
+  }
+
+  .sports-bulk-card-select:hover {
+    background: rgba(34, 197, 94, 0.16);
+  }
+
+  @media (max-width: 720px) {
+
+    .sports-bulk-wager-bar {
+      grid-template-columns: 1fr;
+    }
+
+    .sports-bulk-create-btn {
+      width: 100%;
+    }
+
+  }
   
   .empty-box {
     background: #1e293b;

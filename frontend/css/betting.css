@@ -423,6 +423,25 @@
   overflow-wrap: anywhere;
 }
 
+.betting-category-card.odds-pending {
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.betting-odds-pending-pill {
+  background: rgba(250, 204, 21, 0.16);
+  color: #facc15;
+  border-color: rgba(250, 204, 21, 0.45);
+}
+
+.betting-nominee-card.odds-pending {
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.betting-odds-row.odds-pending {
+  color: #facc15;
+}
+
 /* =========================
    RESPONSIVE
 ========================= */

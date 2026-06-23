@@ -131,7 +131,23 @@ function money_(value){
 
 function odds_(value){
 
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return "Odds pending";
+  }
+
   const n = Number(value || 0);
+
+  if (
+    isNaN(n) ||
+    !isFinite(n) ||
+    n <= 0
+  ) {
+    return "Odds pending";
+  }
 
   return n.toFixed(2).replace(/\.00$/, "") + "x";
 
@@ -1118,11 +1134,18 @@ function renderBettingCategory_(category, bet, config){
     !!winnerNomineeId ||
     !!wagerResultType;
 
+  const oddsReady =
+    category.oddsReady !== false;
+
+  const oddsPending =
+    !oddsReady &&
+    !categoryFinished;
+
   const halfRefund =
     wagerResultType === "half-refund";
 
   return `
-    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""} ${categoryFinished ? "finished" : ""}">
+    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""} ${categoryFinished ? "finished" : ""} ${oddsPending ? "odds-pending" : ""}">
 
       <summary class="betting-category-summary">
 
@@ -1137,6 +1160,10 @@ function renderBettingCategory_(category, bet, config){
             ` : locked ? `
               <span class="betting-finished-pill betting-locked-pill">
                 Locked
+              </span>
+            ` : oddsPending ? `
+              <span class="betting-finished-pill betting-odds-pending-pill">
+                Odds pending
               </span>
             ` : ""}
           </div>
@@ -1169,7 +1196,7 @@ function renderBettingCategory_(category, bet, config){
               class="betting-current muted"
               data-betting-current-category="${escapeBettingHtml_(category.id)}"
             >
-               ${categoryFinished ? "Finished" : locked ? "Game started / locked" : "Tap to place bet"}
+               ${categoryFinished ? "Finished" : locked ? "Game started / locked" : oddsPending ? "Waiting for odds" : "Tap to place bet"}
             </div>
           `}
           
@@ -1213,6 +1240,12 @@ function renderBettingCategory_(category, bet, config){
             </div>
           ` : ""}
 
+          ${oddsPending ? `
+            <div class="betting-notice warning">
+              Check Back Soon!  Selections unlock when odds become available.
+            </div>
+          ` : ""}
+
           <label class="betting-amount-label" for="${inputId}">
             Bet amount
           </label>
@@ -1228,7 +1261,7 @@ function renderBettingCategory_(category, bet, config){
             value="${defaultAmount}"
             data-betting-amount-category="${escapeBettingHtml_(category.id)}"
             oninput="updateBettingReturnsForCategory('${category.id}')"
-            ${locked ? "disabled" : ""}
+            ${locked || oddsPending ? "disabled" : ""}
           >
         `}
 
@@ -1263,9 +1296,16 @@ function renderBettingCategory_(category, bet, config){
               winnerNomineeId &&
               winnerNomineeId === nomineeId;
 
+            const nomineeOddsAvailable =
+              oddsReady &&
+              nominee.oddsAvailable !== false &&
+              Number(nominee.odds || 0) > 0;
+
             const potential =
-              Number(defaultAmount || 0) *
-              Number(nominee.odds || 0);
+              nomineeOddsAvailable
+                ? Number(defaultAmount || 0) *
+                  Number(nominee.odds || 0)
+                : 0;
 
             const record =
               getBettingNomineeRecord_(
@@ -1286,11 +1326,11 @@ function renderBettingCategory_(category, bet, config){
 
             return `
               <button
-                class="betting-nominee-card ${selected ? "selected" : ""} ${winner ? "winner-pick" : ""}"
+                class="betting-nominee-card ${selected ? "selected" : ""} ${winner ? "winner-pick" : ""} ${!nomineeOddsAvailable && !categoryFinished ? "odds-pending" : ""}"
                 data-betting-category="${escapeBettingHtml_(category.id)}"
                 data-betting-nominee="${escapeBettingHtml_(nominee.id)}"
-                onclick="${categoryFinished || locked ? "" : `saveBetSelection('${category.id}', '${nominee.id}')`}"
-                ${categoryFinished || locked ? "disabled" : ""}
+                onclick="${categoryFinished || locked || !nomineeOddsAvailable ? "" : `saveBetSelection('${category.id}', '${nominee.id}')`}"
+                ${categoryFinished || locked || !nomineeOddsAvailable ? "disabled" : ""}
               >
                 <div class="betting-logo-score-area">
 
@@ -1323,15 +1363,15 @@ function renderBettingCategory_(category, bet, config){
                   ` : ""}
                 </div>
 
-                <div class="betting-odds-row">
-                  <span>${odds_(nominee.odds)}</span>
+                <div class="betting-odds-row ${!nomineeOddsAvailable && !categoryFinished ? "odds-pending" : ""}">
+                  <span>${nomineeOddsAvailable ? odds_(nominee.odds) : "Odds pending"}</span>
 
                   <span
                     class="betting-return-value"
                     data-betting-return-category="${escapeBettingHtml_(category.id)}"
-                    data-betting-odds="${escapeBettingHtml_(nominee.odds)}"
+                    data-betting-odds="${escapeBettingHtml_(nomineeOddsAvailable ? nominee.odds : "")}"
                   >
-                    Return ${money_(potential)}
+                    ${nomineeOddsAvailable ? "Return " + money_(potential) : "Waiting for odds"}
                   </span>
                 </div>
 

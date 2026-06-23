@@ -207,41 +207,84 @@ function bindSportsEvents() {
       hideSnapshotPanel();
     });
 
-    document
-      .getElementById("scoresGrid")
-      .addEventListener("click", function(e) {
+  const scoresGrid =
+    document.getElementById("scoresGrid");
 
-        const wagerBtn =
-          e.target.closest("[data-create-wager-game-id]");
+  scoresGrid
+    .addEventListener("click", function(e) {
 
-        if (wagerBtn) {
+      const wagerBtn =
+        e.target.closest("[data-create-wager-game-id]");
 
-          const gameId =
-            wagerBtn.getAttribute(
-              "data-create-wager-game-id"
-            );
-
-          createSportsWagerFromCard(gameId);
-
-          return;
-
-        }
-
-        const snapshotBtn =
-          e.target.closest("[data-snapshot-game-id]");
-
-        if (!snapshotBtn) {
-          return;
-        }
+      if (wagerBtn) {
 
         const gameId =
-          snapshotBtn.getAttribute(
-            "data-snapshot-game-id"
+          wagerBtn.getAttribute(
+            "data-create-wager-game-id"
           );
 
-        loadSportsSnapshots(gameId);
+        createSportsWagerFromCard(gameId);
+
+        return;
+
+      }
+
+      const snapshotBtn =
+        e.target.closest("[data-snapshot-game-id]");
+
+      if (!snapshotBtn) {
+        return;
+      }
+
+      const gameId =
+        snapshotBtn.getAttribute(
+          "data-snapshot-game-id"
+        );
+
+      loadSportsSnapshots(gameId);
 
     });
+
+  scoresGrid
+    .addEventListener("change", function(e) {
+
+      const checkbox =
+        e.target.closest(".sports-wager-select");
+
+      if (!checkbox) {
+        return;
+      }
+
+      updateSelectedSportsWagerCount_();
+
+    });
+
+  const bulkSelectAll =
+    document.getElementById("sportsBulkSelectAll");
+
+  if (bulkSelectAll) {
+
+    bulkSelectAll
+      .addEventListener("change", function() {
+        toggleAllSportsWagerSelections_(
+          bulkSelectAll.checked
+        );
+      });
+
+  }
+
+  const bulkCreateBtn =
+    document.getElementById("sportsBulkCreateWagersBtn");
+
+  if (bulkCreateBtn) {
+
+    bulkCreateBtn
+      .addEventListener("click", function() {
+        createSelectedSportsWagers();
+      });
+
+  }
+
 }
 
 function buildSportsFiltersFromControls() {
@@ -541,6 +584,10 @@ function renderSportsScores(scores) {
 
   grid.innerHTML = "";
 
+  renderSportsBulkWagerToolbar_(
+    scores
+  );
+
   if (!scores.length) {
     grid.innerHTML =
       '<div class="empty-box">No scores found for this filter.</div>';
@@ -599,6 +646,8 @@ function renderSportsScores(scores) {
       ${renderSportsUsedIn(game)}
 
       <div class="card-actions">
+        ${renderSportsBulkSelectBox_(game)}
+
         <button
           class="small-btn"
           data-snapshot-game-id="${escapeSportsHtml(game.GameId || "")}"
@@ -612,6 +661,8 @@ function renderSportsScores(scores) {
 
     grid.appendChild(card);
   });
+
+  updateSelectedSportsWagerCount_();
 }
 
 /************************************
@@ -1140,6 +1191,712 @@ function showSportsGamePickerModal_(
 
 }
 
+function renderSportsBulkSelectBox_(game) {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    return "";
+  }
+
+  if (
+    !game ||
+    !game.GameId ||
+    !game.HomeTeam ||
+    !game.AwayTeam
+  ) {
+    return "";
+  }
+
+  return `
+    <label class="sports-bulk-card-select">
+      <input
+        type="checkbox"
+        class="sports-wager-select"
+        data-sports-game-id="${escapeSportsHtml(game.GameId || "")}"
+        data-espn-event-id="${escapeSportsHtml(game.ESPNEventId || "")}"
+      >
+      <span>Select for bulk wager</span>
+    </label>
+  `;
+
+}
+
+function renderSportsBulkWagerToolbar_(scores) {
+
+  const bar =
+    document.getElementById("sportsBulkWagerBar");
+
+  if (!bar) {
+    return;
+  }
+
+  const session =
+    getSportsStoredSession_();
+
+  const shouldShow =
+    sportsSessionIsAdmin_(session) &&
+    Array.isArray(scores) &&
+    scores.length > 0;
+
+  if (!shouldShow) {
+    bar.classList.add("hidden");
+    return;
+  }
+
+  bar.classList.remove("hidden");
+
+  updateSelectedSportsWagerCount_();
+
+}
+
+function toggleAllSportsWagerSelections_(checked) {
+
+  document
+    .querySelectorAll(".sports-wager-select")
+    .forEach(function(box) {
+      box.checked = checked;
+    });
+
+  updateSelectedSportsWagerCount_();
+
+}
+
+function updateSelectedSportsWagerCount_() {
+
+  const boxes =
+    Array.from(
+      document.querySelectorAll(".sports-wager-select")
+    );
+
+  const selected =
+    boxes.filter(function(box) {
+      return box.checked;
+    });
+
+  const countEl =
+    document.getElementById("sportsBulkSelectedCount");
+
+  if (countEl) {
+    countEl.textContent =
+      selected.length +
+      " game" +
+      (selected.length === 1 ? "" : "s") +
+      " selected";
+  }
+
+  const selectAll =
+    document.getElementById("sportsBulkSelectAll");
+
+  if (selectAll) {
+    selectAll.checked =
+      boxes.length > 0 &&
+      selected.length === boxes.length;
+
+    selectAll.indeterminate =
+      selected.length > 0 &&
+      selected.length < boxes.length;
+  }
+
+  const createBtn =
+    document.getElementById("sportsBulkCreateWagersBtn");
+
+  if (createBtn) {
+    createBtn.disabled =
+      selected.length === 0;
+  }
+
+}
+
+function getSelectedSportsWagerGames_() {
+
+  return Array
+    .from(
+      document.querySelectorAll(".sports-wager-select:checked")
+    )
+    .map(function(box) {
+
+      const sportsGameId =
+        box.dataset.sportsGameId || "";
+
+      const espnEventId =
+        box.dataset.espnEventId || "";
+
+      const score =
+        sportsScoresState.scores.find(function(item) {
+          return String(item.GameId || "") === String(sportsGameId || "");
+        }) || null;
+
+      return {
+        sportsGameId: sportsGameId,
+        espnEventId: espnEventId,
+        score: score
+      };
+
+    });
+
+}
+
+function buildSportsWagerCreateConfig_(games) {
+
+  games =
+    Array.isArray(games)
+      ? games.filter(Boolean)
+      : [];
+
+  const firstGame =
+    games[0] || {};
+
+  const allSoccer =
+    games.length > 0 &&
+    games.every(function(game) {
+      return String(game.Sport || "")
+        .trim()
+        .toLowerCase() === "soccer";
+    });
+
+  const marketChoice =
+    prompt(
+      "Choose wager market:\n\n" +
+      "1 = Moneyline\n" +
+      "2 = Spread\n" +
+      "3 = Total / Over-Under\n" +
+      "4 = Soccer 3-Way Moneyline",
+      allSoccer ? "4" : "1"
+    );
+
+  if (marketChoice === null) {
+    return null;
+  }
+
+  const wagerMarket =
+    String(marketChoice).trim() === "2"
+      ? "spread"
+      : String(marketChoice).trim() === "3"
+        ? "total"
+        : String(marketChoice).trim() === "4"
+          ? "soccer-moneyline"
+          : "moneyline";
+
+  const oddsModeChoice =
+    prompt(
+      "Choose odds group / odds mode:\n\n" +
+      "1 = Real Odds Only / Pending Until Odds Pull\n" +
+      "2 = Real Odds with App Fallback\n" +
+      "3 = App Odds / Record Odds\n" +
+      "4 = Manual Odds",
+      wagerMarket === "soccer-moneyline" ? "4" : "1"
+    );
+
+  if (oddsModeChoice === null) {
+    return null;
+  }
+
+  const oddsMode =
+    String(oddsModeChoice).trim() === "2"
+      ? "real"
+      : String(oddsModeChoice).trim() === "3"
+        ? "record"
+        : String(oddsModeChoice).trim() === "4"
+          ? "manual"
+          : "real-only";
+
+  if (
+    oddsMode === "record" &&
+    wagerMarket !== "moneyline" &&
+    wagerMarket !== "soccer-moneyline"
+  ) {
+    alert(
+      "App Odds / Record Odds only works for Moneyline.\n\nUse Real Odds Only, Real Odds with App Fallback, or Manual Odds for Spread and Total."
+    );
+    return null;
+  }
+
+  if (
+    oddsMode === "manual" &&
+    games.length > 1
+  ) {
+
+    const useSameManualOdds =
+      confirm(
+        "Manual odds/lines will be reused for every selected game.\n\n" +
+        "Use the single Create Wager button if each game needs different manual odds.\n\n" +
+        "Continue with the same manual values for all selected games?"
+      );
+
+    if (!useSameManualOdds) {
+      return null;
+    }
+
+  }
+
+  const manualValues =
+    getSportsWagerManualValues_(
+      firstGame,
+      wagerMarket,
+      oddsMode
+    );
+
+  if (!manualValues) {
+    return null;
+  }
+
+  return {
+    wagerMarket: wagerMarket,
+    oddsMode: oddsMode,
+    autoOdds:
+      oddsMode === "manual"
+        ? "false"
+        : "true",
+    awayLine: manualValues.awayLine,
+    homeLine: manualValues.homeLine,
+    totalPoints: manualValues.totalPoints,
+    awayOdds: manualValues.awayOdds,
+    homeOdds: manualValues.homeOdds,
+    drawOdds: manualValues.drawOdds,
+    overOdds: manualValues.overOdds,
+    underOdds: manualValues.underOdds
+  };
+
+}
+
+function getSportsWagerManualValues_(
+  game,
+  wagerMarket,
+  oddsMode
+) {
+
+  const values = {
+    awayOdds: "",
+    homeOdds: "",
+    drawOdds: "",
+    awayLine: "",
+    homeLine: "",
+    totalPoints: "",
+    overOdds: "",
+    underOdds: ""
+  };
+
+  if (oddsMode !== "manual") {
+    return values;
+  }
+
+  game =
+    game || {};
+
+  if (
+    wagerMarket === "moneyline" ||
+    wagerMarket === "soccer-moneyline"
+  ) {
+
+    values.awayOdds =
+      prompt(
+        "Away moneyline odds for " +
+        (game.AwayTeam || "Away"),
+        "2"
+      );
+
+    if (values.awayOdds === null) {
+      return null;
+    }
+
+    if (wagerMarket === "soccer-moneyline") {
+
+      values.drawOdds =
+        prompt(
+          "Draw odds",
+          "3"
+        );
+
+      if (values.drawOdds === null) {
+        return null;
+      }
+
+    }
+
+    values.homeOdds =
+      prompt(
+        "Home moneyline odds for " +
+        (game.HomeTeam || "Home"),
+        "2"
+      );
+
+    if (values.homeOdds === null) {
+      return null;
+    }
+
+  }
+
+  if (wagerMarket === "spread") {
+
+    values.awayLine =
+      prompt(
+        "Away spread line for " +
+        (game.AwayTeam || "Away") +
+        "\nExample: +1.5 or -1.5",
+        "+1.5"
+      );
+
+    if (values.awayLine === null) {
+      return null;
+    }
+
+    values.awayOdds =
+      prompt(
+        "Away spread odds for " +
+        (game.AwayTeam || "Away"),
+        "1.91"
+      );
+
+    if (values.awayOdds === null) {
+      return null;
+    }
+
+    values.homeLine =
+      prompt(
+        "Home spread line for " +
+        (game.HomeTeam || "Home") +
+        "\nExample: -1.5 or +1.5",
+        "-1.5"
+      );
+
+    if (values.homeLine === null) {
+      return null;
+    }
+
+    values.homeOdds =
+      prompt(
+        "Home spread odds for " +
+        (game.HomeTeam || "Home"),
+        "1.91"
+      );
+
+    if (values.homeOdds === null) {
+      return null;
+    }
+
+  }
+
+  if (wagerMarket === "total") {
+
+    values.totalPoints =
+      prompt(
+        "Total points/runs/goals line\nExample: 8.5",
+        "8.5"
+      );
+
+    if (values.totalPoints === null) {
+      return null;
+    }
+
+    values.overOdds =
+      prompt(
+        "Over odds",
+        "1.91"
+      );
+
+    if (values.overOdds === null) {
+      return null;
+    }
+
+    values.underOdds =
+      prompt(
+        "Under odds",
+        "1.91"
+      );
+
+    if (values.underOdds === null) {
+      return null;
+    }
+
+  }
+
+  return values;
+
+}
+
+function buildSportsWagerPayload_(
+  session,
+  awardsGameId,
+  game,
+  config
+) {
+
+  return {
+    username:
+      session.username,
+
+    token:
+      session.token,
+
+    gameId:
+      awardsGameId,
+
+    awardsGameId:
+      awardsGameId,
+
+    sportsGameId:
+      game.GameId ||
+      game.sportsGameId ||
+      "",
+
+    espnEventId:
+      game.ESPNEventId ||
+      game.espnEventId ||
+      "",
+
+    wagerMarket:
+      config.wagerMarket,
+
+    market:
+      config.wagerMarket,
+
+    oddsMode:
+      config.oddsMode,
+
+    awayLine:
+      config.awayLine,
+
+    homeLine:
+      config.homeLine,
+
+    totalPoints:
+      config.totalPoints,
+
+    awayOdds:
+      config.awayOdds,
+
+    homeOdds:
+      config.homeOdds,
+
+    drawOdds:
+      config.drawOdds,
+
+    overOdds:
+      config.overOdds,
+
+    underOdds:
+      config.underOdds,
+
+    autoOdds:
+      config.autoOdds
+  };
+
+}
+
+async function createSelectedSportsWagers() {
+
+  if (sportsScoresState.creatingWager) {
+    return;
+  }
+
+  const selected =
+    getSelectedSportsWagerGames_();
+
+  if (!selected.length) {
+    alert("Select at least one sports game first.");
+    return;
+  }
+
+  const session =
+    getSportsStoredSession_();
+
+  if (
+    !session.username ||
+    !session.token ||
+    !sportsSessionIsAdmin_(session)
+  ) {
+    showSportsError(
+      "Log in as an admin in the main app first, then return to Sports."
+    );
+    return;
+  }
+
+  sportsScoresState.creatingWager =
+    true;
+
+  try {
+
+    const awardsGameId =
+      await chooseSportsAwardsGameId_(
+        session
+      );
+
+    if (!awardsGameId) {
+      return;
+    }
+
+    const selectedScores =
+      selected.map(function(item) {
+        return item.score || item;
+      });
+
+    const config =
+      buildSportsWagerCreateConfig_(
+        selectedScores
+      );
+
+    if (!config) {
+      return;
+    }
+
+    const confirmed =
+      confirm(
+        "Create " +
+        selected.length +
+        " wager" +
+        (selected.length === 1 ? "" : "s") +
+        " in Awards Game: " +
+        awardsGameId +
+        "\n\nMarket: " +
+        config.wagerMarket +
+        "\nOdds Group: " +
+        config.oddsMode +
+        "\n\nContinue?"
+      );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSportsStatus(
+      "Creating " +
+      selected.length +
+      " sports wager" +
+      (selected.length === 1 ? "" : "s") +
+      "..."
+    );
+
+    const selectedGamesJson =
+      JSON.stringify(
+        selected.map(function(item) {
+          return {
+            sportsGameId:
+              item.sportsGameId,
+            espnEventId:
+              item.espnEventId
+          };
+        })
+      );
+
+    const res =
+      await sportsAwardsApi_(
+        "adminCreateSportsWagersBulk",
+        {
+          username:
+            session.username,
+
+          token:
+            session.token,
+
+          gameId:
+            awardsGameId,
+
+          awardsGameId:
+            awardsGameId,
+
+          selectedGamesJson:
+            selectedGamesJson,
+
+          wagerMarket:
+            config.wagerMarket,
+
+          market:
+            config.wagerMarket,
+
+          oddsMode:
+            config.oddsMode,
+
+          awayLine:
+            config.awayLine,
+
+          homeLine:
+            config.homeLine,
+
+          totalPoints:
+            config.totalPoints,
+
+          awayOdds:
+            config.awayOdds,
+
+          homeOdds:
+            config.homeOdds,
+
+          drawOdds:
+            config.drawOdds,
+
+          overOdds:
+            config.overOdds,
+
+          underOdds:
+            config.underOdds,
+
+          autoOdds:
+            config.autoOdds
+        }
+      );
+
+    if (
+      !res ||
+      res.success === false
+    ) {
+
+      const failedText =
+        res && Array.isArray(res.failed) && res.failed.length
+          ? "\n\nFirst error: " +
+            (res.failed[0].message || res.failed[0].error || "Unknown error")
+          : "";
+
+      throw new Error(
+        (
+          res && (res.message || res.error)
+            ? res.message || res.error
+            : "Bulk wager creation failed."
+        ) + failedText
+      );
+
+    }
+
+    setSportsStatus(
+      res.message ||
+      "Bulk wagers created."
+    );
+
+    alert(
+      res.message ||
+      "Bulk wagers created."
+    );
+
+    toggleAllSportsWagerSelections_(
+      false
+    );
+
+    await loadSportsScores(
+      buildSportsFiltersFromControls()
+    );
+
+  } catch (err) {
+
+    showSportsError(
+      err && err.message
+        ? err.message
+        : "Could not create selected wagers."
+    );
+
+    setSportsStatus(
+      "Could not create selected wagers."
+    );
+
+  } finally {
+
+    sportsScoresState.creatingWager =
+      false;
+
+  }
+
+}
+
 function renderCreateWagerButton(game) {
 
   const session =
@@ -1173,14 +1930,9 @@ function renderCreateWagerButton(game) {
 
 async function createSportsWagerFromCard(gameId) {
 
-  if (
-    sportsScoresState.creatingWager
-  ) {
+  if (sportsScoresState.creatingWager) {
     return;
   }
-
-  sportsScoresState.creatingWager =
-  true;
 
   const game =
     sportsScoresState.scores.find(function(item) {
@@ -1208,280 +1960,48 @@ async function createSportsWagerFromCard(gameId) {
     return;
   }
 
-  const awardsGameId =
-    await chooseSportsAwardsGameId_(
-      session
-    );
-
-  if (!awardsGameId) {
-     return;
-  }
-
-  const isSoccer =
-    String(game.Sport || "")
-      .trim()
-      .toLowerCase() === "soccer";
-
-  const marketChoice =
-    prompt(
-      "Choose wager market:\n\n" +
-      "1 = Moneyline\n" +
-      "2 = Spread\n" +
-      "3 = Total / Over-Under\n" +
-      "4 = Soccer 3-Way Moneyline",
-      isSoccer ? "4" : "1"
-    );
-
-  if (marketChoice === null) {
-    return;
-  }
-
-  const wagerMarket =
-    String(marketChoice).trim() === "2"
-      ? "spread"
-      : String(marketChoice).trim() === "3"
-        ? "total"
-        : String(marketChoice).trim() === "4"
-          ? "soccer-moneyline"
-          : "moneyline";
-
-  const oddsModeChoice =
-    prompt(
-      "Choose odds mode:\n\n" +
-      "1 = Real Odds\n" +
-      "2 = App Odds / Record Odds\n" +
-      "3 = Manual Odds",
-      wagerMarket === "soccer-moneyline" ? "3" : "1"
-    );
-
-  if (oddsModeChoice === null) {
-    return;
-  }
-
-  const oddsMode =
-    String(oddsModeChoice).trim() === "2"
-      ? "record"
-      : String(oddsModeChoice).trim() === "3"
-        ? "manual"
-        : "real";
-
-  if (
-    oddsMode === "record" &&
-    wagerMarket !== "moneyline" &&
-    wagerMarket !== "soccer-moneyline"
-  ) {
-    alert(
-      "App Odds / Record Odds only works for Moneyline.\n\nUse Real Odds or Manual Odds for Spread and Total."
-    );
-    return;
-  }
-
-  let awayOdds = "";
-  let homeOdds = "";
-  let drawOdds = "";
-  let awayLine = "";
-  let homeLine = "";
-  let totalPoints = "";
-  let overOdds = "";
-  let underOdds = "";
-
-  if (
-    oddsMode === "manual" &&
-    (
-      wagerMarket === "moneyline" ||
-      wagerMarket === "soccer-moneyline"
-    )
-  ) {
-
-    awayOdds =
-      prompt(
-        "Away moneyline odds for " + game.AwayTeam,
-        "2"
-      );
-
-    if (awayOdds === null) {
-      return;
-    }
-
-    if (wagerMarket === "soccer-moneyline") {
-
-      drawOdds =
-        prompt(
-          "Draw odds",
-          "3"
-        );
-
-      if (drawOdds === null) {
-        return;
-      }
-
-    }
-
-    homeOdds =
-      prompt(
-        "Home moneyline odds for " + game.HomeTeam,
-        "2"
-      );
-
-    if (homeOdds === null) {
-      return;
-    }
-
-  }
-
-  if (
-    oddsMode === "manual" &&
-    wagerMarket === "spread"
-  ) {
-
-    awayLine =
-      prompt(
-        "Away spread line for " + game.AwayTeam + "\nExample: +1.5 or -1.5",
-        "+1.5"
-      );
-
-    if (awayLine === null) {
-      return;
-    }
-
-    awayOdds =
-      prompt(
-        "Away spread odds for " + game.AwayTeam,
-        "1.91"
-      );
-
-    if (awayOdds === null) {
-      return;
-    }
-
-    homeLine =
-      prompt(
-        "Home spread line for " + game.HomeTeam + "\nExample: -1.5 or +1.5",
-        "-1.5"
-      );
-
-    if (homeLine === null) {
-      return;
-    }
-
-    homeOdds =
-      prompt(
-        "Home spread odds for " + game.HomeTeam,
-        "1.91"
-      );
-
-    if (homeOdds === null) {
-      return;
-    }
-
-  }
-
-  if (
-    oddsMode === "manual" &&
-    wagerMarket === "total"
-  ) {
-
-    totalPoints =
-      prompt(
-        "Total points/runs/goals line\nExample: 8.5",
-        "8.5"
-      );
-
-    if (totalPoints === null) {
-      return;
-    }
-
-    overOdds =
-      prompt(
-        "Over odds",
-        "1.91"
-      );
-
-    if (overOdds === null) {
-      return;
-    }
-
-    underOdds =
-      prompt(
-        "Under odds",
-        "1.91"
-      );
-
-    if (underOdds === null) {
-      return;
-    }
-
-  }
-
-  setSportsStatus(
-    "Creating " +
-    wagerMarket +
-    " wager for " +
-    game.AwayTeam +
-    " @ " +
-    game.HomeTeam +
-    "..."
-  );
+  sportsScoresState.creatingWager =
+    true;
 
   try {
+
+    const awardsGameId =
+      await chooseSportsAwardsGameId_(
+        session
+      );
+
+    if (!awardsGameId) {
+      return;
+    }
+
+    const config =
+      buildSportsWagerCreateConfig_(
+        [game]
+      );
+
+    if (!config) {
+      return;
+    }
+
+    setSportsStatus(
+      "Creating " +
+      config.wagerMarket +
+      " wager for " +
+      game.AwayTeam +
+      " @ " +
+      game.HomeTeam +
+      "..."
+    );
 
     const res =
       await sportsAwardsApi_(
         "adminCreateSportsWager",
-        {
-          username:
-            session.username,
-
-          token:
-            session.token,
-
-          gameId:
-            awardsGameId,
-
-          awardsGameId:
-            awardsGameId,
-
-          sportsGameId:
-            game.GameId,
-
-          espnEventId:
-            game.ESPNEventId,
-
-          wagerMarket:
-            wagerMarket,
-
-          oddsMode:
-            oddsMode,
-
-          awayLine:
-            awayLine,
-
-          homeLine:
-            homeLine,
-
-          totalPoints:
-            totalPoints,
-
-          awayOdds:
-            awayOdds,
-
-          homeOdds:
-            homeOdds,
-
-          drawOdds:
-            drawOdds,
-
-          overOdds:
-            overOdds,
-
-          underOdds:
-            underOdds,
-
-          autoOdds:
-            oddsMode === "manual"
-              ? "false"
-              : "true"
-        }
+        buildSportsWagerPayload_(
+          session,
+          awardsGameId,
+          game,
+          config
+        )
       );
 
     if (
@@ -1505,7 +2025,7 @@ async function createSportsWagerFromCard(gameId) {
 
     setSportsStatus(
       "Created " +
-      wagerMarket +
+      config.wagerMarket +
       " wager: " +
       (res.category || res.categoryId) +
       "."
@@ -1513,9 +2033,13 @@ async function createSportsWagerFromCard(gameId) {
 
     alert(
       "Wager created.\n\nMarket: " +
-      wagerMarket +
+      config.wagerMarket +
       "\nOdds Source: " +
-      (res.oddsSource || oddsMode)
+      (res.oddsSource || config.oddsMode)
+    );
+
+    await loadSportsScores(
+      buildSportsFiltersFromControls()
     );
 
   } catch (err) {

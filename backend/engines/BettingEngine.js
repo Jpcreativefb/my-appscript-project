@@ -685,16 +685,34 @@ function getBettingOddsMap_(gameId){
       continue;
     }
 
-    const odds =
-      oddsCol > -1
-        ? Math.max(
-            toBetNumber_(
-              row[oddsCol],
-              DEFAULT_BETTING_ODDS
-            ),
-            1
-          )
-        : DEFAULT_BETTING_ODDS;
+    let odds = DEFAULT_BETTING_ODDS;
+
+    if (oddsCol > -1) {
+
+      const rawOdds = row[oddsCol];
+
+      if (
+        rawOdds === "" ||
+        rawOdds === null ||
+        rawOdds === undefined
+      ) {
+        odds = null;
+      } else {
+
+        const parsedOdds =
+          toBetNumber_(
+            rawOdds,
+            null
+          );
+
+        odds =
+          parsedOdds && parsedOdds > 0
+            ? Math.max(parsedOdds, 1)
+            : null;
+
+      }
+
+    }
 
     if (!map[categoryId]) {
       map[categoryId] = {};
@@ -708,21 +726,156 @@ function getBettingOddsMap_(gameId){
 
 }
 
-function getBettingOddsFor_(gameId, categoryId, nomineeId){
+function isBettingOddsValueReady_(value) {
 
-  const oddsMap = getBettingOddsMap_(gameId);
+  if (
+    value === null ||
+    value === undefined ||
+    value === ""
+  ) {
+    return false;
+  }
+
+  const n = Number(value);
+
+  return (
+    !isNaN(n) &&
+    isFinite(n) &&
+    n > 0
+  );
+
+}
+
+function getBettingOddsFromMap_(
+  oddsMap,
+  categoryId,
+  nomineeId
+) {
 
   categoryId = normalizeBetKey_(categoryId);
   nomineeId = normalizeBetKey_(nomineeId);
 
   if (
     oddsMap[categoryId] &&
-    oddsMap[categoryId][nomineeId]
+    Object.prototype.hasOwnProperty.call(
+      oddsMap[categoryId],
+      nomineeId
+    )
   ) {
     return oddsMap[categoryId][nomineeId];
   }
 
-  return DEFAULT_BETTING_ODDS;
+  return null;
+
+}
+
+function getBettingOddsFor_(gameId, categoryId, nomineeId){
+
+  const oddsMap = getBettingOddsMap_(gameId);
+  const odds = getBettingOddsFromMap_(
+    oddsMap,
+    categoryId,
+    nomineeId
+  );
+
+  return isBettingOddsValueReady_(odds)
+    ? odds
+    : null;
+
+}
+
+function isSportsWagerBettingCategory_(
+  category,
+  setting
+) {
+
+  category = category || {};
+  setting = setting || {};
+
+  const layoutType =
+    normalizeBetKey_(
+      setting.layoutType ||
+      setting.LayoutType ||
+      category.layoutType ||
+      category.LayoutType ||
+      ""
+    );
+
+  const votingTypes =
+    normalizeBetKey_(
+      setting.votingTypes ||
+      setting.VotingTypes ||
+      category.votingTypes ||
+      category.VotingTypes ||
+      ""
+    );
+
+  return (
+    layoutType === "wager" ||
+    votingTypes.indexOf("wager") !== -1 ||
+    !!(
+      category.sportsGameId ||
+      category.SportsGameId ||
+      category.sportsLeague ||
+      category.SportsLeague ||
+      setting.sportsGameId ||
+      setting.SportsGameId
+    )
+  );
+
+}
+
+function isBettingCategoryOddsReady_(
+  category,
+  setting,
+  oddsMap,
+  categoryId
+) {
+
+  category = category || {};
+  setting = setting || {};
+
+  if (
+    !isSportsWagerBettingCategory_(
+      category,
+      setting
+    )
+  ) {
+    return true;
+  }
+
+  if (setting.oddsReady === false) {
+    return false;
+  }
+
+  const nominees =
+    category.nominees || [];
+
+  if (!nominees.length) {
+    return false;
+  }
+
+  categoryId = normalizeBetKey_(
+    categoryId || category.id
+  );
+
+  return nominees.every(function(nominee) {
+
+    const nomineeId =
+      normalizeBetKey_(
+        nominee.id
+      );
+
+    const odds =
+      getBettingOddsFromMap_(
+        oddsMap,
+        categoryId,
+        nomineeId
+      );
+
+    return isBettingOddsValueReady_(odds);
+
+  });
 
 }
 
@@ -805,11 +958,22 @@ function getBettingOptions(gameId){
             nominee.id
           );
 
+          const oddsValue =
+            getBettingOddsFromMap_(
+              oddsMap,
+              categoryId,
+              nomineeId
+            );
+
+          const oddsAvailable =
+            isBettingOddsValueReady_(
+              oddsValue
+            );
+
           const odds =
-            oddsMap[categoryId] &&
-            oddsMap[categoryId][nomineeId]
-              ? oddsMap[categoryId][nomineeId]
-              : DEFAULT_BETTING_ODDS;
+            oddsAvailable
+              ? oddsValue
+              : "";
 
           return {
             id: nomineeId,
@@ -817,10 +981,19 @@ function getBettingOptions(gameId){
             shortAnswer: nominee.shortAnswer || nominee.name || nomineeId,
             image: nominee.image || nominee.img || "",
             odds: odds,
-            potentialReturnPerUnit: odds
+            oddsAvailable: oddsAvailable,
+            potentialReturnPerUnit: oddsAvailable ? odds : 0
           };
 
         });
+
+      const oddsReady =
+        isBettingCategoryOddsReady_(
+          category,
+          setting,
+          oddsMap,
+          categoryId
+        );
 
       return {
         id: categoryId,
@@ -858,6 +1031,26 @@ function getBettingOptions(gameId){
           setting.LockDateTime ||
           category.lockDateTime ||
           category.LockDateTime ||
+          "",
+
+        oddsReady:
+          oddsReady,
+
+        oddsPending:
+          oddsReady === false,
+
+        oddsSource:
+          setting.oddsSource ||
+          setting.OddsSource ||
+          category.oddsSource ||
+          category.OddsSource ||
+          "",
+
+        oddsLastUpdated:
+          setting.oddsLastUpdated ||
+          setting.OddsLastUpdated ||
+          category.oddsLastUpdated ||
+          category.OddsLastUpdated ||
           "",
 
         sportsGameId:
@@ -1598,6 +1791,40 @@ function saveBet(payload){
 
     }
 
+    const oddsMap = getBettingOddsMap_(gameId);
+
+    if (
+      !isBettingCategoryOddsReady_(
+        category,
+        categoryConfig,
+        oddsMap,
+        categoryId
+      )
+    ) {
+
+      return {
+        success: false,
+        message: "Odds are not ready for this wager yet"
+      };
+
+    }
+
+    const selectedOdds =
+      getBettingOddsFromMap_(
+        oddsMap,
+        categoryId,
+        nomineeId
+      );
+
+    if (!isBettingOddsValueReady_(selectedOdds)) {
+
+      return {
+        success: false,
+        message: "Odds are not ready for this selection yet"
+      };
+
+    }
+
     const currentSummary = getUserBettingSummary(
       username,
       gameId
@@ -1627,11 +1854,7 @@ function saveBet(payload){
 
     }
 
-    const odds = getBettingOddsFor_(
-      gameId,
-      categoryId,
-      nomineeId
-    );
+    const odds = selectedOdds;
 
     const data = getAllBetsData_();
 

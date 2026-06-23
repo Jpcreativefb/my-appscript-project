@@ -102,7 +102,22 @@ function getCategorySettingsColumnMap_(headers){
       headers.indexOf("FavoriteNomineeId"),
 
     wagerResultType:
-      headers.indexOf("WagerResultType")
+      headers.indexOf("WagerResultType"),
+
+    sportsGameId:
+      headers.indexOf("SportsGameId"),
+
+    espnEventId:
+      headers.indexOf("ESPNEventId"),
+
+    oddsReady:
+      headers.indexOf("OddsReady"),
+
+    oddsSource:
+      headers.indexOf("OddsSource"),
+
+    oddsLastUpdated:
+      headers.indexOf("OddsLastUpdated")
 
   };
 
@@ -316,6 +331,54 @@ function getCategorySettings(gameId){
           ? String(
               row[col.wagerResultType] || ""
             ).trim()
+          : "",
+
+      sportsGameId:
+        col.sportsGameId > -1
+          ? String(
+              row[col.sportsGameId] || ""
+            ).trim()
+          : "",
+
+      espnEventId:
+        col.espnEventId > -1
+          ? String(
+              row[col.espnEventId] || ""
+            ).trim()
+          : "",
+
+      oddsReady:
+        col.oddsReady > -1
+          ? (
+              String(row[col.oddsReady] || "")
+                .trim() === ""
+                ? true
+                : (
+                    row[col.oddsReady] === true ||
+                    String(row[col.oddsReady] || "")
+                      .trim()
+                      .toLowerCase() === "true" ||
+                    String(row[col.oddsReady] || "")
+                      .trim() === "1" ||
+                    String(row[col.oddsReady] || "")
+                      .trim()
+                      .toLowerCase() === "yes"
+                  )
+            )
+          : true,
+
+      oddsSource:
+        col.oddsSource > -1
+          ? String(
+              row[col.oddsSource] || ""
+            ).trim()
+          : "",
+
+      oddsLastUpdated:
+        col.oddsLastUpdated > -1 && row[col.oddsLastUpdated]
+          ? String(
+              row[col.oddsLastUpdated]
+            ).trim()
           : ""
 
     };
@@ -481,8 +544,25 @@ function saveCategorySettings(
       row[col.scoreVersion] =
         c.scoreVersion || "";
 
-      row[col.favoriteNomineeId] =
-        c.favoriteNomineeId || "";
+      if (col.favoriteNomineeId > -1) {
+        row[col.favoriteNomineeId] =
+          c.favoriteNomineeId || "";
+      }
+
+      if (col.oddsReady > -1) {
+        row[col.oddsReady] =
+          c.oddsReady === true;
+      }
+
+      if (col.oddsSource > -1) {
+        row[col.oddsSource] =
+          c.oddsSource || "";
+      }
+
+      if (col.oddsLastUpdated > -1) {
+        row[col.oddsLastUpdated] =
+          c.oddsLastUpdated || "";
+      }
 
       keepRows.push(row);
 
@@ -697,6 +777,45 @@ function updateCategorySetting(
           rowIndex,
           col.lockDateTime + 1,
           patch.lockDateTime || ""
+        );
+
+      }
+
+      if (
+        "oddsReady" in patch &&
+        col.oddsReady > -1
+      ) {
+
+        updateCategorySettingsCell_(
+          rowIndex,
+          col.oddsReady + 1,
+          patch.oddsReady === true
+        );
+
+      }
+
+      if (
+        "oddsSource" in patch &&
+        col.oddsSource > -1
+      ) {
+
+        updateCategorySettingsCell_(
+          rowIndex,
+          col.oddsSource + 1,
+          patch.oddsSource || ""
+        );
+
+      }
+
+      if (
+        "oddsLastUpdated" in patch &&
+        col.oddsLastUpdated > -1
+      ) {
+
+        updateCategorySettingsCell_(
+          rowIndex,
+          col.oddsLastUpdated + 1,
+          patch.oddsLastUpdated || ""
         );
 
       }

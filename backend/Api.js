@@ -188,6 +188,7 @@ function doGet(e) {
       "adminClearLiveWinner",
 
       "adminCreateSportsWager",
+      "adminCreateSportsWagersBulk",
       "adminSettleSportsWagers",
       "adminRefreshSportsWagerScores",
       "adminAutoSetSportsWagerOdds",
@@ -1110,6 +1111,28 @@ function doGet(e) {
     }
 
     /* =========================
+   COMPARE USER PICKS
+========================= */
+
+if (action === "compareUserPicks") {
+
+  return json(
+    apiCompareUserPicks({
+      username:
+        params.username,
+
+      otherUsername:
+        params.otherUsername ||
+        params.targetUsername,
+
+      gameId:
+        gameId
+    })
+  );
+
+}
+
+    /* =========================
        USER PROFILE
     ========================= */
 
@@ -1439,6 +1462,9 @@ function doGet(e) {
         homeOdds:
           params.homeOdds,
 
+        drawOdds:
+          params.drawOdds,
+
         overOdds:
           params.overOdds,
   
@@ -1452,6 +1478,72 @@ function doGet(e) {
     );
 
   }
+
+
+    if (action === "adminCreateSportsWagersBulk") {
+
+      return json(
+        apiAdminCreateSportsWagersBulk({
+
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
+
+          gameId:
+            params.gameId,
+
+          selectedGamesJson:
+            params.selectedGamesJson ||
+            params.selectedGames,
+
+          wagerMarket:
+            params.wagerMarket ||
+            params.market,
+
+          market:
+            params.market ||
+            params.wagerMarket,
+
+          oddsMode:
+            params.oddsMode,
+
+          awayLine:
+            params.awayLine,
+
+          homeLine:
+            params.homeLine,
+
+          totalPoints:
+            params.totalPoints,
+
+          awayOdds:
+            params.awayOdds,
+
+          homeOdds:
+            params.homeOdds,
+
+          drawOdds:
+            params.drawOdds,
+
+          overOdds:
+            params.overOdds,
+
+          underOdds:
+            params.underOdds,
+
+          autoOdds:
+            params.autoOdds
+
+        })
+      );
+
+    }
 
     if (action === "adminSettleSportsWagers") {
 

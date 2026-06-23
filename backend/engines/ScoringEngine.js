@@ -405,8 +405,13 @@ function getLeaderboardData(
 
         });
 
+      /* =====================================================
+         USER DISPLAY PROFILE
+         Uses UserGameProfiles first, then Users fallback.
+      ===================================================== */
+
       const profile =
-        getUserProfile(
+        getLeaderboardUserProfile_(
           username,
           gameId
         ) || {};
@@ -416,16 +421,20 @@ function getLeaderboardData(
         user:
           username,
 
+        username:
+          username,
+
         displayName:
           profile.displayName ||
           username,
 
         avatar:
           profile.avatar ||
-          "default",
+          "👤",
 
         themeColor:
           profile.themeColor ||
+          profile.profileColor ||
           "#354785",
 
         total:
