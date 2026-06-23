@@ -154,6 +154,23 @@ async function renderAdminPage() {
 
         <div class="card admin-card">
 
+          <h2>League Access</h2>
+
+          <div class="admin-sub">
+            Create leagues, add members, assign private games, and set feature access.
+          </div>
+
+          <button
+            class="button admin-button"
+            onclick="navigate('leagues')"
+          >
+            Open League Manager
+          </button>
+
+        </div>
+
+        <div class="card admin-card">
+
          <h2>Manage Games</h2>
 
          <div class="admin-sub">

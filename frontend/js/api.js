@@ -4,6 +4,14 @@ const API_BASE =
 const API_UPLOAD_PROXY =
   "https://awards-upload-proxy.jpcreativefb.workers.dev";  
 
+function getApiLeagueId_() {
+
+  return typeof getFrontendLeagueId === "function"
+    ? getFrontendLeagueId()
+    : localStorage.getItem("leagueId") || "";
+
+}
+
 /* ======================
    GENERIC API FETCH
 ====================== */
@@ -237,8 +245,12 @@ async function apiUploadProfileAvatar(payload) {
 
 async function apiGetCategories(gameId) {
 
+  const session = getSession ? getSession() : {};
+
   return api("getCategories", {
-    gameId
+    username: session && session.username ? session.username : "",
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -251,7 +263,8 @@ async function apiGetMyPicks(username, gameId) {
 
   return api("getMyPicks", {
     username,
-    gameId
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -264,6 +277,9 @@ async function apiSavePick(payload) {
 
     gameId:
       payload.gameId,
+
+    leagueId:
+      payload.leagueId || getApiLeagueId_(),
 
     categoryId:
       payload.categoryId,
@@ -283,16 +299,24 @@ async function apiSavePick(payload) {
 
 async function apiGetLeaderboard(gameId) {
 
+  const session = getSession ? getSession() : {};
+
   return api("leaderboard", {
-    gameId
+    username: session && session.username ? session.username : "",
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
 
 async function apiLiveLeaderboard(gameId) {
 
+  const session = getSession ? getSession() : {};
+
   return api("liveLeaderboard", {
-    gameId
+    username: session && session.username ? session.username : "",
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -321,7 +345,8 @@ async function apiGetUserBreakdown(username, gameId) {
 
   return api("userBreakdown", {
     username,
-    gameId
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -364,7 +389,8 @@ async function apiGetStartupPayload() {
   return api("getStartupPayload", {
     username: session.username,
     token: session.token,
-    gameId: APP_STATE.gameId || ""
+    gameId: APP_STATE.gameId || "",
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -387,7 +413,10 @@ async function apiGetDashboardGamesHub() {
     token:
       session && session.token
         ? session.token
-        : ""
+        : "",
+
+    leagueId:
+      getApiLeagueId_()
   });
 
 }
@@ -398,9 +427,136 @@ async function apiGetDashboardGamesHub() {
 
 async function apiGetActiveGames() {
 
+  const session = getSession ? getSession() : {};
+
   return api(
-    "getActiveGames"
+    "getActiveGames",
+    {
+      username: session && session.username ? session.username : "",
+      leagueId: getApiLeagueId_()
+    }
   );
+
+}
+
+
+/* ======================
+   LEAGUES
+====================== */
+
+async function apiGetMyLeagues(gameId) {
+
+  const session = getSession ? getSession() : {};
+
+  return api("getMyLeagues", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: gameId || getFrontendGameId() || "",
+    leagueId: getApiLeagueId_()
+  });
+
+}
+
+async function apiCreateLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("createLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId,
+    leagueName: payload.leagueName || payload.name,
+    gameId: payload.gameId || getFrontendGameId() || "",
+    visibility: payload.visibility || "private",
+    joinMode: payload.joinMode || "invite"
+  });
+
+}
+
+async function apiAddLeagueMember(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("addLeagueMember", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    memberUsername: payload.memberUsername || payload.targetUsername,
+    role: payload.role || "member"
+  });
+
+}
+
+async function apiAdminSetupLeagueAccessSystem() {
+
+  const session = getSession ? getSession() : {};
+
+  return api("adminSetupLeagueAccessSystem", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : ""
+  });
+
+}
+
+async function apiAssignGameToLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("assignGameToLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || ""
+  });
+
+}
+
+async function apiGetLeagueMembers(leagueId) {
+
+  const session = getSession ? getSession() : {};
+
+  return api("getLeagueMembers", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: leagueId || getApiLeagueId_()
+  });
+
+}
+
+async function apiRemoveLeagueMember(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("removeLeagueMember", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    memberUsername: payload.memberUsername || payload.targetUsername
+  });
+
+}
+
+async function apiSaveLeagueFeatureAccess(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("saveLeagueFeatureAccess", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || "",
+    feature: payload.feature,
+    accessRule: payload.accessRule,
+    rolesAllowed: payload.rolesAllowed,
+    usersAllowed: payload.usersAllowed,
+    usersBlocked: payload.usersBlocked || "",
+    active: payload.active === undefined ? "true" : payload.active
+  });
 
 }
 
@@ -416,7 +572,8 @@ async function apiAdminSummary() {
   return api("adminSummary", {
     username: session.username,
     token: session.token,
-    gameId: APP_STATE.gameId || ""
+    gameId: APP_STATE.gameId || "",
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -511,6 +668,7 @@ async function apiAdminClearCategoryWinner(categoryId) {
     username: session.username,
     token: session.token,
     gameId: APP_STATE.gameId || "",
+    leagueId: getApiLeagueId_(),
     categoryId: categoryId
   });
 
@@ -1473,8 +1631,12 @@ async function apiGetBettingPagePayload(username, gameId) {
 
 async function apiGetBettingOptions(gameId) {
 
+  const session = getSession ? getSession() : {};
+
   return api("getBettingOptions", {
-    gameId
+    username: session && session.username ? session.username : "",
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -1483,7 +1645,8 @@ async function apiGetMyBets(username, gameId) {
 
   return api("getMyBets", {
     username,
-    gameId
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -1495,6 +1658,7 @@ async function apiSaveBet(payload) {
   return api("saveBet", {
     username: payload.username,
     gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
     categoryId: payload.categoryId,
     nomineeId: payload.nomineeId,
     betAmount: payload.betAmount
@@ -1504,8 +1668,12 @@ async function apiSaveBet(payload) {
 
 async function apiBettingLeaderboard(gameId) {
 
+  const session = getSession ? getSession() : {};
+
   return api("bettingLeaderboard", {
-    gameId
+    username: session && session.username ? session.username : "",
+    gameId,
+    leagueId: getApiLeagueId_()
   });
 
 }
@@ -1517,6 +1685,7 @@ async function apiRemoveBet(payload) {
   return api("removeBet", {
     username: payload.username,
     gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
     categoryId: payload.categoryId
   });
 

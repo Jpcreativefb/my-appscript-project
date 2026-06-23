@@ -481,7 +481,8 @@ async function renderGameSwitcher() {
 
 async function enterGame(
   gameId,
-  gameType
+  gameType,
+  leagueId
 ) {
 
   gameId =
@@ -500,6 +501,10 @@ async function enterGame(
   setFrontendGameId(
     gameId
   );
+
+  if (leagueId !== undefined) {
+    setFrontendLeagueId(leagueId);
+  }
 
   localStorage.setItem(
     "gameMode",
@@ -560,7 +565,8 @@ async function enterGame(
 
 async function viewGameLeaderboard(
   gameId,
-  gameType
+  gameType,
+  leagueId
 ) {
 
   gameId =
@@ -579,6 +585,10 @@ async function viewGameLeaderboard(
   setFrontendGameId(
     gameId
   );
+
+  if (leagueId !== undefined) {
+    setFrontendLeagueId(leagueId);
+  }
 
   localStorage.setItem(
     "leaderboardMode",
@@ -652,6 +662,13 @@ async function renderPage(page) {
 
       app.innerHTML =
         await renderLeaderboardPage();
+
+      break;
+
+    case "leagues":
+
+      app.innerHTML =
+        await renderLeaguesPage();
 
       break;
 
@@ -835,6 +852,62 @@ function setFrontendGameId(gameId) {
       session
     );
 
+  }
+
+}
+
+/* =========================
+   FRONTEND LEAGUE ID
+========================= */
+
+function getFrontendLeagueId() {
+
+  let session = {};
+
+  try {
+    session =
+      getSession
+        ? getSession()
+        : JSON.parse(
+            localStorage.getItem("session") || "{}"
+          );
+  } catch (err) {
+    session = {};
+  }
+
+  return String(
+    APP_STATE.leagueId ||
+    localStorage.getItem("leagueId") ||
+    localStorage.getItem("activeLeagueId") ||
+    session.leagueId ||
+    ""
+  ).trim();
+
+}
+
+function setFrontendLeagueId(leagueId) {
+
+  leagueId =
+    String(leagueId || "")
+      .trim();
+
+  APP_STATE.leagueId =
+    leagueId;
+
+  if (leagueId) {
+    localStorage.setItem("leagueId", leagueId);
+    localStorage.setItem("activeLeagueId", leagueId);
+  } else {
+    localStorage.removeItem("leagueId");
+    localStorage.removeItem("activeLeagueId");
+  }
+
+  const session =
+    getSession();
+
+  if (session) {
+    session.leagueId = leagueId;
+    setSession(session);
   }
 
 }
