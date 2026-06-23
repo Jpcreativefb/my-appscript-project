@@ -130,6 +130,7 @@ async function renderLeaderboardPage() {
 
 }
 
+
 function renderStandardLeaderboardPage_(
   gameId,
   rows
@@ -179,13 +180,7 @@ function renderStandardLeaderboardPage_(
 
               <div class="leaderboard-main">
 
-                <h2>
-                  ${escapeHtml(row.displayName || row.user || row.username || "Player")}
-                </h2>
-
-                <p class="leaderboard-username">
-                  @${escapeHtml(row.user || row.username || "")}
-                </p>
+                ${renderLeaderboardUserDisplay_(row)}
 
                 ${
                   scoringMode === "confidence"
@@ -246,6 +241,7 @@ function renderStandardLeaderboardPage_(
 
 }
 
+
 function renderWagerLeaderboardPage_(
   gameId,
   rows
@@ -280,13 +276,7 @@ function renderWagerLeaderboardPage_(
 
               <div class="leaderboard-main">
 
-                <h2>
-                  ${escapeHtml(row.displayName || row.user || row.username || "Player")}
-                </h2>
-
-                <p class="leaderboard-username">
-                  @${escapeHtml(row.user || row.username || "")}
-                </p>
+                ${renderLeaderboardUserDisplay_(row)}
 
                 <p>
                   Bankroll:
@@ -331,5 +321,123 @@ function renderWagerLeaderboardPage_(
 
     </div>
   `;
+
+}
+
+
+/* ======================
+   LEADERBOARD USER DISPLAY
+====================== */
+
+function renderLeaderboardUserDisplay_(
+  row
+) {
+
+  row =
+    row || {};
+
+  const username =
+    row.username ||
+    row.user ||
+    "";
+
+  const displayName =
+    row.displayName ||
+    row.profileName ||
+    username ||
+    "Player";
+
+  const avatar =
+    row.avatar ||
+    row.avatarEmoji ||
+    row.avatarInitials ||
+    "👤";
+
+  const themeColor =
+    getSafeLeaderboardColor_(
+      row.themeColor ||
+      row.profileColor ||
+      ""
+    );
+
+  const isImageAvatar =
+    isLeaderboardImageAvatar_(
+      avatar
+    );
+
+  const avatarStyle =
+    themeColor
+      ? ` style="background:${escapeHtml(themeColor)};"`
+      : "";
+
+  const avatarHtml =
+    isImageAvatar
+      ? `
+        <img
+          class="leaderboard-avatar-img"
+          src="${escapeHtml(avatar)}"
+          alt=""
+        >
+      `
+      : `
+        <span
+          class="leaderboard-avatar"
+          ${avatarStyle}
+        >
+          ${escapeHtml(avatar)}
+        </span>
+      `;
+
+  return `
+    <div class="leaderboard-user">
+      ${avatarHtml}
+
+      <div class="leaderboard-user-text">
+        <h2 class="leaderboard-name">
+          ${escapeHtml(displayName)}
+        </h2>
+
+        <p class="leaderboard-username">
+          @${escapeHtml(username)}
+        </p>
+      </div>
+    </div>
+  `;
+
+}
+
+
+function isLeaderboardImageAvatar_(
+  value
+) {
+
+  value =
+    String(value || "")
+      .trim();
+
+  return (
+    value.indexOf("http://") === 0 ||
+    value.indexOf("https://") === 0 ||
+    value.indexOf("data:image") === 0
+  );
+
+}
+
+
+function getSafeLeaderboardColor_(
+  value
+) {
+
+  value =
+    String(value || "")
+      .trim();
+
+  if (
+    /^#[0-9a-fA-F]{6}$/.test(value)
+  ) {
+    return value;
+  }
+
+  return "";
 
 }

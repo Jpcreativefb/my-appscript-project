@@ -1,34 +1,50 @@
 /* =========================
-   FRONTEND LEADERBOARD PROFILE CSS
-   NEW DROP-IN FILE: frontend-leaderboard-profile.css
+   LEADERBOARD PROFILE CSS
+   REPLACE OR ADD:
+   frontend/css/frontend-leaderboard-profile.css
 ========================= */
 
 .leaderboard-user {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.leaderboard-user-text {
+  min-width: 0;
 }
 
 .leaderboard-avatar,
 .leaderboard-avatar-img {
-  width: 34px;
-  height: 34px;
+  width: 42px;
+  height: 42px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 34px;
+  flex: 0 0 42px;
   font-size: 20px;
+  font-weight: 800;
   overflow: hidden;
+  background: #354785;
+  color: #ffffff;
 }
 
 .leaderboard-avatar-img {
   object-fit: cover;
+  background: transparent;
 }
 
 .leaderboard-name {
-  font-weight: 700;
-  line-height: 1.2;
+  font-weight: 800;
+  line-height: 1.1;
+  margin: 0;
+}
+
+.leaderboard-username {
+  opacity: 0.75;
+  margin-top: 3px;
 }
 
 .leaderboard-compare-btn {

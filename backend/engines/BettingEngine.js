@@ -2382,6 +2382,9 @@ function getBettingLeaderboardData(gameId){
 
   }
 
-  return rows;
+  return decorateLeaderboardRowsWithProfiles_(
+    rows,
+    gameId
+  );
 
 }
