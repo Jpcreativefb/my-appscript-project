@@ -1,18 +1,30 @@
 /* =========================
-   LEADERBOARD PROFILE CSS
-   REPLACE OR ADD:
-   frontend/css/frontend-leaderboard-profile.css
+   LEADERBOARD PROFILE + COMPARE CSS
+   DROP-IN FILE: frontend/css/frontend-leaderboard-profile.css
 ========================= */
+
+.leaderboard-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 
 .leaderboard-user {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
+  gap: 10px;
+  min-width: 0;
 }
 
 .leaderboard-user-text {
   min-width: 0;
+}
+
+.leaderboard-name {
+  margin: 0;
+  font-weight: 800;
+  line-height: 1.15;
 }
 
 .leaderboard-avatar,
@@ -27,30 +39,284 @@
   font-size: 20px;
   font-weight: 800;
   overflow: hidden;
-  background: #354785;
-  color: #ffffff;
+  background: rgba(255,255,255,0.12);
 }
 
 .leaderboard-avatar-img {
   object-fit: cover;
-  background: transparent;
 }
 
-.leaderboard-name {
-  font-weight: 800;
-  line-height: 1.1;
-  margin: 0;
+.leaderboard-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 12px;
 }
 
-.leaderboard-username {
-  opacity: 0.75;
-  margin-top: 3px;
+.leaderboard-stats-grid p {
+  margin: 4px 0;
 }
 
 .leaderboard-compare-btn {
   border: 0;
   border-radius: 999px;
-  padding: 7px 12px;
-  font-weight: 700;
+  padding: 8px 13px;
+  font-weight: 800;
   cursor: pointer;
+  white-space: nowrap;
+  background: rgba(255,255,255,0.14);
+  color: inherit;
+}
+
+.leaderboard-compare-btn:hover {
+  background: rgba(255,255,255,0.22);
+}
+
+/* =========================
+   COMPARE MODAL
+========================= */
+
+.compare-modal-open {
+  overflow: hidden;
+}
+
+.compare-picks-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  padding: 18px;
+  background: rgba(0,0,0,0.72);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.compare-picks-modal.hidden {
+  display: none;
+}
+
+.compare-picks-panel {
+  width: min(980px, 100%);
+  max-height: min(86vh, 900px);
+  overflow: auto;
+  border-radius: 22px;
+  background: #111827;
+  color: #fff;
+  box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+}
+
+.compare-picks-content {
+  padding: 18px;
+}
+
+.compare-picks-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.compare-picks-header h2 {
+  margin: 0;
+}
+
+.compare-picks-header p {
+  margin: 4px 0 0;
+  opacity: 0.75;
+}
+
+.compare-close-btn {
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 28px;
+  line-height: 1;
+  color: #fff;
+  background: rgba(255,255,255,0.12);
+}
+
+.compare-players {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.compare-profile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.08);
+}
+
+.compare-profile strong,
+.compare-profile span {
+  display: block;
+}
+
+.compare-profile span {
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.compare-versus {
+  font-weight: 900;
+  opacity: 0.8;
+}
+
+.compare-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.compare-summary span {
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.09);
+  font-size: 13px;
+}
+
+.compare-picks-list {
+  display: grid;
+  gap: 10px;
+}
+
+.compare-row {
+  display: grid;
+  grid-template-columns: minmax(170px, 0.9fr) minmax(260px, 1.8fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.07);
+}
+
+.compare-row.same-pick {
+  outline: 1px solid rgba(34,197,94,0.45);
+}
+
+.compare-row.different-pick {
+  outline: 1px solid rgba(250,204,21,0.25);
+}
+
+.compare-row-hidden {
+  opacity: 0.72;
+}
+
+.compare-category strong,
+.compare-category span {
+  display: block;
+}
+
+.compare-category span {
+  margin-top: 4px;
+  font-size: 13px;
+  opacity: 0.72;
+}
+
+.compare-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.compare-pick {
+  min-width: 0;
+}
+
+.compare-pick-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  opacity: 0.68;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.compare-pick-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-weight: 800;
+}
+
+.compare-pick-value span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.compare-pick-image {
+  width: 34px;
+  height: 46px;
+  border-radius: 8px;
+  object-fit: cover;
+  flex: 0 0 34px;
+}
+
+.compare-no-pick,
+.hidden-pick {
+  opacity: 0.65;
+  font-weight: 700;
+}
+
+.compare-match-label {
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.1);
+}
+
+.compare-picks-loading,
+.compare-error,
+.compare-empty {
+  padding: 18px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.08);
+}
+
+@media (max-width: 720px) {
+
+  .leaderboard-top-row {
+    align-items: flex-start;
+  }
+
+  .leaderboard-stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-picks-modal {
+    padding: 8px;
+    align-items: stretch;
+  }
+
+  .compare-picks-panel {
+    max-height: 96vh;
+  }
+
+  .compare-players {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-versus {
+    text-align: center;
+  }
+
+  .compare-row {
+    grid-template-columns: 1fr;
+  }
+
+  .compare-pick-grid {
+    grid-template-columns: 1fr;
+  }
+
 }

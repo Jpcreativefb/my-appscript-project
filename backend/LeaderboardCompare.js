@@ -1,19 +1,14 @@
 /* =========================
    LEADERBOARD COMPARE PICKS
-   NEW DROP-IN FILE: LeaderboardCompare.gs
+   DROP-IN FILE: backend/LeaderboardCompare.gs
 
    Purpose:
    - View another user's picks.
    - Compare another user's picks to your own.
    - Only exposes picks for locked categories or finished/locked games.
 
-   Expected existing functions:
-   - normalizeGameId_(gameId)
-   - getDefaultGameId()
-   - getCategories(gameId)
-   - getCategorySettings(gameId)
-   - getUserPicks(username, gameId)
-   - getLeaderboardUserProfile_(username, gameId)
+   Public API:
+   - apiCompareUserPicks(payload)
 ========================= */
 
 
@@ -77,13 +72,13 @@ function apiCompareUserPicks(
     getUserPicks(
       username,
       gameId
-    ) || {};
+    ) || [];
 
   const opponentPicks =
     getUserPicks(
       otherUsername,
       gameId
-    ) || {};
+    ) || [];
 
   const gameFinished =
     isLeaderboardCompareGameFinished_(
@@ -91,6 +86,11 @@ function apiCompareUserPicks(
     );
 
   const rows = [];
+
+  let visibleCount = 0;
+  let hiddenCount = 0;
+  let sameCount = 0;
+  let differentCount = 0;
 
   categories.forEach(function(category) {
 
@@ -110,12 +110,19 @@ function apiCompareUserPicks(
 
     const categoryLocked =
       isLeaderboardCompareCategoryLocked_(
-        setting
+        setting,
+        category
       );
 
     const visible =
       gameFinished ||
       categoryLocked;
+
+    if (visible) {
+      visibleCount++;
+    } else {
+      hiddenCount++;
+    }
 
     const viewerPickId =
       getComparePickNomineeId_(
@@ -134,17 +141,51 @@ function apiCompareUserPicks(
         category
       );
 
+    const samePick =
+      visible &&
+      !!viewerPickId &&
+      !!opponentPickId &&
+      String(viewerPickId) ===
+      String(opponentPickId);
+
+    if (visible) {
+
+      if (samePick) {
+        sameCount++;
+      } else if (
+        viewerPickId ||
+        opponentPickId
+      ) {
+        differentCount++;
+      }
+
+    }
+
     rows.push({
-      categoryId: categoryId,
+      gameId:
+        gameId,
+
+      categoryId:
+        categoryId,
+
       category:
         category.category ||
         category.name ||
         category.title ||
         categoryId,
+
       locked:
         categoryLocked,
+
+      gameFinished:
+        gameFinished,
+
       visible:
         visible,
+
+      points:
+        Number(setting.points || category.points) || 0,
+
       viewerPick:
         visible
           ? buildComparePickDisplay_(
@@ -152,6 +193,7 @@ function apiCompareUserPicks(
               nomineeMap
             )
           : null,
+
       opponentPick:
         visible
           ? buildComparePickDisplay_(
@@ -159,12 +201,9 @@ function apiCompareUserPicks(
               nomineeMap
             )
           : null,
+
       samePick:
-        visible &&
-        !!viewerPickId &&
-        !!opponentPickId &&
-        String(viewerPickId) ===
-        String(opponentPickId)
+        samePick
     });
 
   });
@@ -174,84 +213,108 @@ function apiCompareUserPicks(
     gameId: gameId,
     viewer: viewerProfile,
     opponent: opponentProfile,
-    categories: rows
+    categories: rows,
+    summary: {
+      visible:
+        visibleCount,
+      hidden:
+        hiddenCount,
+      same:
+        sameCount,
+      different:
+        differentCount
+    }
   };
 
 }
 
 
 function isLeaderboardCompareCategoryLocked_(
-  setting
+  setting,
+  category
 ) {
 
-  if (!setting) {
-    return false;
-  }
+  setting =
+    setting || {};
+
+  category =
+    category || {};
 
   return (
     setting.locked === true ||
     String(setting.locked || "")
+      .trim()
       .toLowerCase() === "true" ||
     setting.Locked === true ||
     String(setting.Locked || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    category.locked === true ||
+    String(category.locked || "")
+      .trim()
       .toLowerCase() === "true"
   );
 
 }
 
 
-/**
- * This is intentionally defensive.
- * If your Games engine already has a clear helper for finished/locked state,
- * replace this function body with that helper later.
- */
 function isLeaderboardCompareGameFinished_(
   gameId
 ) {
 
   try {
 
-    if (
-      typeof getGameById_ === "function"
-    ) {
+    let game = null;
 
-      const game =
-        getGameById_(gameId);
+    if (typeof getGameRuntimeConfig === "function") {
 
-      if (game) {
-
-        const status =
-          String(game.status || game.Status || "")
-            .trim()
-            .toLowerCase();
-
-        const lockAll =
-          game.lockAllPicks === true ||
-          String(game.lockAllPicks || "")
-            .toLowerCase() === "true" ||
-          game.LockAllPicks === true ||
-          String(game.LockAllPicks || "")
-            .toLowerCase() === "true";
-
-        return (
-          lockAll ||
-          status === "finished" ||
-          status === "complete" ||
-          status === "closed"
+      game =
+        getGameRuntimeConfig(
+          gameId
         );
 
-      }
+    } else if (typeof getGame === "function") {
+
+      game =
+        getGame(
+          gameId
+        );
 
     }
 
+    if (!game) {
+      return false;
+    }
+
+    const status =
+      String(game.status || game.Status || "")
+        .trim()
+        .toLowerCase();
+
+    const lockAll =
+      game.lockAllPicks === true ||
+      String(game.lockAllPicks || "")
+        .trim()
+        .toLowerCase() === "true" ||
+      game.LockAllPicks === true ||
+      String(game.LockAllPicks || "")
+        .trim()
+        .toLowerCase() === "true";
+
+    return (
+      lockAll ||
+      status === "finished" ||
+      status === "complete" ||
+      status === "completed" ||
+      status === "closed" ||
+      status === "final"
+    );
+
   } catch (err) {
 
-    // Fall through to false.
-    // Category locks still protect open picks.
+    return false;
 
   }
-
-  return false;
 
 }
 
@@ -261,27 +324,60 @@ function getComparePickNomineeId_(
   categoryId
 ) {
 
-  if (!picks) {
+  categoryId =
+    String(categoryId || "")
+      .trim()
+      .toLowerCase();
+
+  if (!picks || !categoryId) {
     return "";
   }
 
-  if (picks[categoryId]) {
+  if (Array.isArray(picks)) {
 
-    if (
-      typeof picks[categoryId] === "string"
-    ) {
-      return picks[categoryId];
+    const found =
+      picks.find(function(pick) {
+
+        return String(
+          pick.categoryId ||
+          pick.CategoryId ||
+          ""
+        )
+          .trim()
+          .toLowerCase() === categoryId;
+
+      });
+
+    if (!found) {
+      return "";
     }
 
-    return (
-      picks[categoryId].nomineeId ||
-      picks[categoryId].NomineeId ||
+    return String(
+      found.nomineeId ||
+      found.NomineeId ||
       ""
-    );
+    ).trim();
 
   }
 
-  return "";
+  const direct =
+    picks[categoryId] ||
+    picks[String(categoryId)];
+
+  if (!direct) {
+    return "";
+  }
+
+  if (typeof direct === "string") {
+    return direct;
+  }
+
+  return String(
+    direct.nomineeId ||
+    direct.NomineeId ||
+    direct.id ||
+    ""
+  ).trim();
 
 }
 
@@ -293,9 +389,12 @@ function buildCompareNomineeMap_(
   const map = {};
 
   const nominees =
-    category.nominees ||
-    category.Nominees ||
-    [];
+    category && (
+      category.nominees ||
+      category.Nominees
+    )
+      ? category.nominees || category.Nominees
+      : [];
 
   nominees.forEach(function(nominee) {
 
@@ -318,7 +417,18 @@ function buildCompareNomineeMap_(
         nominee.name ||
         nominee.Nominee ||
         nominee.title ||
-        nomineeId
+        nominee.shortAnswer ||
+        nomineeId,
+      image:
+        nominee.image ||
+        nominee.Image ||
+        "",
+      movie:
+        nominee.movie ||
+        "",
+      person:
+        nominee.person ||
+        ""
     };
 
   });
@@ -343,7 +453,10 @@ function buildComparePickDisplay_(
 
   return nomineeMap[nomineeId] || {
     nomineeId: nomineeId,
-    nominee: nomineeId
+    nominee: nomineeId,
+    image: "",
+    movie: "",
+    person: ""
   };
 
 }

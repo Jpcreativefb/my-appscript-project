@@ -171,6 +171,22 @@ function renderStandardLeaderboardPage_(
           const confidenceScoringMode =
             row.confidenceScoringMode || "";
 
+          const username =
+            row.username ||
+            row.user ||
+            "";
+
+          const currentUsername =
+            typeof getCurrentUsername === "function"
+              ? getCurrentUsername()
+              : "";
+
+          const isSelf =
+            username &&
+            currentUsername &&
+            String(username).trim().toLowerCase() ===
+            String(currentUsername).trim().toLowerCase();
+
           return `
             <div class="card leaderboard-card ${total < 0 ? "negative-score" : ""}">
 
@@ -180,7 +196,23 @@ function renderStandardLeaderboardPage_(
 
               <div class="leaderboard-main">
 
-                ${renderLeaderboardUserDisplay_(row)}
+                <div class="leaderboard-top-row">
+
+                  ${renderLeaderboardUser_(row)}
+
+                  <button
+                    class="leaderboard-compare-btn"
+                    type="button"
+                    onclick="openCompareUserPicks('${escapeLeaderboardAttr_(username)}')"
+                  >
+                    ${isSelf ? "View My Picks" : "Compare"}
+                  </button>
+
+                </div>
+
+                <p class="leaderboard-username">
+                  @${escapeHtml(username)}
+                </p>
 
                 ${
                   scoringMode === "confidence"
@@ -197,29 +229,33 @@ function renderStandardLeaderboardPage_(
                     : ""
                 }
 
-                <p>
-                  Total:
-                  <strong>
-                    ${total}
-                  </strong>
-                </p>
+                <div class="leaderboard-stats-grid">
 
-                <p>
-                  Remaining:
-                  ${remaining}
-                  /
-                  ${max}
-                </p>
+                  <p>
+                    Total:
+                    <strong>
+                      ${total}
+                    </strong>
+                  </p>
 
-                <p>
-                  Statues:
-                  ${Number(row.statues) || 0}
-                </p>
+                  <p>
+                    Remaining:
+                    ${remaining}
+                    /
+                    ${max}
+                  </p>
 
-                <p>
-                  Win Chance:
-                  ${Number(row.winChance) || 0}%
-                </p>
+                  <p>
+                    Statues:
+                    ${Number(row.statues) || 0}
+                  </p>
+
+                  <p>
+                    Win Chance:
+                    ${Number(row.winChance) || 0}%
+                  </p>
+
+                </div>
 
                 ${
                   row.eliminated
@@ -234,6 +270,22 @@ function renderStandardLeaderboardPage_(
 
         }).join("")}
 
+      </div>
+
+      <div
+        id="comparePicksModal"
+        class="compare-picks-modal hidden"
+        onclick="handleCompareModalBackdrop_(event)"
+      >
+        <div
+          class="compare-picks-panel"
+          onclick="event.stopPropagation()"
+        >
+          <div
+            id="comparePicksContent"
+            class="compare-picks-content"
+          ></div>
+        </div>
       </div>
 
     </div>
@@ -267,6 +319,11 @@ function renderWagerLeaderboardPage_(
           const maxBankroll =
             Number(row.maxBankroll) || 0;
 
+          const username =
+            row.username ||
+            row.user ||
+            "";
+
           return `
             <div class="card leaderboard-card">
 
@@ -276,7 +333,11 @@ function renderWagerLeaderboardPage_(
 
               <div class="leaderboard-main">
 
-                ${renderLeaderboardUserDisplay_(row)}
+                ${renderLeaderboardUser_(row)}
+
+                <p class="leaderboard-username">
+                  @${escapeHtml(username)}
+                </p>
 
                 <p>
                   Bankroll:
@@ -326,25 +387,21 @@ function renderWagerLeaderboardPage_(
 
 
 /* ======================
-   LEADERBOARD USER DISPLAY
+   LEADERBOARD PROFILE UI
 ====================== */
 
-function renderLeaderboardUserDisplay_(
+function renderLeaderboardUser_(
   row
 ) {
 
   row =
     row || {};
 
-  const username =
-    row.username ||
-    row.user ||
-    "";
-
   const displayName =
     row.displayName ||
     row.profileName ||
-    username ||
+    row.user ||
+    row.username ||
     "Player";
 
   const avatar =
@@ -353,53 +410,24 @@ function renderLeaderboardUserDisplay_(
     row.avatarInitials ||
     "👤";
 
-  const themeColor =
-    getSafeLeaderboardColor_(
-      row.themeColor ||
-      row.profileColor ||
-      ""
-    );
-
-  const isImageAvatar =
-    isLeaderboardImageAvatar_(
-      avatar
-    );
-
-  const avatarStyle =
-    themeColor
-      ? ` style="background:${escapeHtml(themeColor)};"`
-      : "";
+  const color =
+    row.themeColor ||
+    row.profileColor ||
+    "";
 
   const avatarHtml =
-    isImageAvatar
-      ? `
-        <img
-          class="leaderboard-avatar-img"
-          src="${escapeHtml(avatar)}"
-          alt=""
-        >
-      `
-      : `
-        <span
-          class="leaderboard-avatar"
-          ${avatarStyle}
-        >
-          ${escapeHtml(avatar)}
-        </span>
-      `;
+    renderLeaderboardAvatar_(
+      avatar,
+      color
+    );
 
   return `
     <div class="leaderboard-user">
       ${avatarHtml}
-
       <div class="leaderboard-user-text">
         <h2 class="leaderboard-name">
           ${escapeHtml(displayName)}
         </h2>
-
-        <p class="leaderboard-username">
-          @${escapeHtml(username)}
-        </p>
       </div>
     </div>
   `;
@@ -407,37 +435,490 @@ function renderLeaderboardUserDisplay_(
 }
 
 
-function isLeaderboardImageAvatar_(
+function renderLeaderboardAvatar_(
+  avatar,
+  color
+) {
+
+  avatar =
+    String(avatar || "👤")
+      .trim();
+
+  const safeColor =
+    /^#[0-9a-fA-F]{6}$/.test(String(color || ""))
+      ? color
+      : "";
+
+  const style =
+    safeColor
+      ? ` style="background:${escapeLeaderboardAttr_(safeColor)};"`
+      : "";
+
+  const isImage =
+    avatar.indexOf("http://") === 0 ||
+    avatar.indexOf("https://") === 0 ||
+    avatar.indexOf("data:image") === 0;
+
+  if (isImage) {
+
+    return `
+      <img
+        class="leaderboard-avatar-img"
+        src="${escapeLeaderboardAttr_(avatar)}"
+        alt=""
+      >
+    `;
+
+  }
+
+  return `
+    <span
+      class="leaderboard-avatar"
+      ${style}
+    >
+      ${escapeHtml(avatar)}
+    </span>
+  `;
+
+}
+
+
+function escapeLeaderboardAttr_(
   value
 ) {
 
-  value =
-    String(value || "")
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+
+}
+
+
+/* ======================
+   COMPARE PICKS MODAL
+====================== */
+
+async function openCompareUserPicks(
+  otherUsername
+) {
+
+  otherUsername =
+    String(otherUsername || "")
       .trim();
 
-  return (
-    value.indexOf("http://") === 0 ||
-    value.indexOf("https://") === 0 ||
-    value.indexOf("data:image") === 0
+  if (!otherUsername) {
+    return;
+  }
+
+  const currentUsername =
+    typeof getCurrentUsername === "function"
+      ? getCurrentUsername()
+      : "";
+
+  const gameId =
+    getFrontendGameId() ||
+    APP_STATE.gameId ||
+    "";
+
+  if (!currentUsername) {
+    showComparePicksModal_(
+      renderCompareError_(
+        "Could not compare picks",
+        "You need to be logged in first."
+      )
+    );
+    return;
+  }
+
+  showComparePicksModal_(
+    `
+      <div class="compare-picks-loading">
+        Loading comparison...
+      </div>
+    `
+  );
+
+  let res;
+
+  try {
+
+    res =
+      await api(
+        "compareUserPicks",
+        {
+          username:
+            currentUsername,
+          otherUsername:
+            otherUsername,
+          gameId:
+            gameId
+        }
+      );
+
+  } catch (err) {
+
+    showComparePicksModal_(
+      renderCompareError_(
+        "Could not compare picks",
+        err.message || String(err)
+      )
+    );
+    return;
+
+  }
+
+  if (
+    !res ||
+    res.success === false
+  ) {
+
+    showComparePicksModal_(
+      renderCompareError_(
+        "Could not compare picks",
+        res && (res.error || res.message)
+          ? res.error || res.message
+          : "Please try again."
+      )
+    );
+    return;
+
+  }
+
+  showComparePicksModal_(
+    renderComparePicksResult_(
+      res
+    )
   );
 
 }
 
 
-function getSafeLeaderboardColor_(
-  value
+function showComparePicksModal_(
+  html
 ) {
 
-  value =
-    String(value || "")
-      .trim();
+  const modal =
+    document.getElementById(
+      "comparePicksModal"
+    );
+
+  const content =
+    document.getElementById(
+      "comparePicksContent"
+    );
 
   if (
-    /^#[0-9a-fA-F]{6}$/.test(value)
+    !modal ||
+    !content
   ) {
-    return value;
+    return;
   }
 
-  return "";
+  content.innerHTML =
+    html;
+
+  modal.classList.remove(
+    "hidden"
+  );
+
+  document.body.classList.add(
+    "compare-modal-open"
+  );
+
+}
+
+
+function closeComparePicksModal() {
+
+  const modal =
+    document.getElementById(
+      "comparePicksModal"
+    );
+
+  if (modal) {
+    modal.classList.add(
+      "hidden"
+    );
+  }
+
+  document.body.classList.remove(
+    "compare-modal-open"
+  );
+
+}
+
+
+function handleCompareModalBackdrop_(
+  event
+) {
+
+  if (
+    event &&
+    event.target &&
+    event.target.id === "comparePicksModal"
+  ) {
+    closeComparePicksModal();
+  }
+
+}
+
+
+function renderComparePicksResult_(
+  res
+) {
+
+  const viewer =
+    res.viewer || {};
+
+  const opponent =
+    res.opponent || {};
+
+  const categories =
+    Array.isArray(res.categories)
+      ? res.categories
+      : [];
+
+  const summary =
+    res.summary || {};
+
+  return `
+    <div class="compare-picks-header">
+
+      <div>
+        <h2>Compare Picks</h2>
+        <p>
+          ${escapeHtml(res.gameId || "")}
+        </p>
+      </div>
+
+      <button
+        class="compare-close-btn"
+        type="button"
+        onclick="closeComparePicksModal()"
+      >
+        ×
+      </button>
+
+    </div>
+
+    <div class="compare-players">
+
+      <div class="compare-player">
+        ${renderCompareProfile_(viewer, "You")}
+      </div>
+
+      <div class="compare-versus">
+        vs
+      </div>
+
+      <div class="compare-player">
+        ${renderCompareProfile_(opponent, "Other User")}
+      </div>
+
+    </div>
+
+    <div class="compare-summary">
+      <span>
+        Visible:
+        <strong>${Number(summary.visible) || 0}</strong>
+      </span>
+      <span>
+        Hidden:
+        <strong>${Number(summary.hidden) || 0}</strong>
+      </span>
+      <span>
+        Same:
+        <strong>${Number(summary.same) || 0}</strong>
+      </span>
+      <span>
+        Different:
+        <strong>${Number(summary.different) || 0}</strong>
+      </span>
+    </div>
+
+    <div class="compare-picks-list">
+
+      ${
+        categories.length
+          ? categories.map(renderCompareCategoryRow_).join("")
+          : `<div class="compare-empty">No categories found.</div>`
+      }
+
+    </div>
+  `;
+
+}
+
+
+function renderCompareProfile_(
+  profile,
+  fallbackLabel
+) {
+
+  profile =
+    profile || {};
+
+  const name =
+    profile.displayName ||
+    profile.username ||
+    fallbackLabel ||
+    "Player";
+
+  return `
+    <div class="compare-profile">
+      ${renderLeaderboardAvatar_(
+        profile.avatar ||
+        profile.avatarEmoji ||
+        profile.avatarInitials ||
+        "👤",
+        profile.themeColor ||
+        profile.profileColor ||
+        ""
+      )}
+      <div>
+        <strong>${escapeHtml(name)}</strong>
+        <span>@${escapeHtml(profile.username || "")}</span>
+      </div>
+    </div>
+  `;
+
+}
+
+
+function renderCompareCategoryRow_(
+  row
+) {
+
+  row =
+    row || {};
+
+  if (!row.visible) {
+
+    return `
+      <div class="compare-row compare-row-hidden">
+
+        <div class="compare-category">
+          <strong>${escapeHtml(row.category || row.categoryId || "")}</strong>
+          <span>Hidden until this category locks.</span>
+        </div>
+
+        <div class="compare-pick hidden-pick">
+          🔒 Locked
+        </div>
+
+      </div>
+    `;
+
+  }
+
+  const viewerPick =
+    row.viewerPick;
+
+  const opponentPick =
+    row.opponentPick;
+
+  return `
+    <div class="compare-row ${row.samePick ? "same-pick" : "different-pick"}">
+
+      <div class="compare-category">
+        <strong>${escapeHtml(row.category || row.categoryId || "")}</strong>
+        <span>
+          ${Number(row.points) || 0} pts
+          ${row.locked ? "· Locked" : ""}
+        </span>
+      </div>
+
+      <div class="compare-pick-grid">
+
+        <div class="compare-pick">
+          <span class="compare-pick-label">You</span>
+          ${renderComparePick_(viewerPick)}
+        </div>
+
+        <div class="compare-pick">
+          <span class="compare-pick-label">Them</span>
+          ${renderComparePick_(opponentPick)}
+        </div>
+
+      </div>
+
+      <div class="compare-match-label">
+        ${
+          row.samePick
+            ? "Same"
+            : "Different"
+        }
+      </div>
+
+    </div>
+  `;
+
+}
+
+
+function renderComparePick_(
+  pick
+) {
+
+  if (!pick) {
+    return `
+      <span class="compare-no-pick">
+        No pick
+      </span>
+    `;
+  }
+
+  const image =
+    pick.image
+      ? `
+        <img
+          class="compare-pick-image"
+          src="${escapeLeaderboardAttr_(pick.image)}"
+          alt=""
+        >
+      `
+      : "";
+
+  return `
+    <div class="compare-pick-value">
+      ${image}
+      <span>
+        ${escapeHtml(pick.nominee || pick.nomineeId || "")}
+      </span>
+    </div>
+  `;
+
+}
+
+
+function renderCompareError_(
+  title,
+  message
+) {
+
+  return `
+    <div class="compare-picks-header">
+
+      <div>
+        <h2>${escapeHtml(title || "Error")}</h2>
+      </div>
+
+      <button
+        class="compare-close-btn"
+        type="button"
+        onclick="closeComparePicksModal()"
+      >
+        ×
+      </button>
+
+    </div>
+
+    <div class="compare-error">
+      ${escapeHtml(message || "Something went wrong.")}
+    </div>
+  `;
 
 }
