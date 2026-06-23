@@ -129,7 +129,13 @@ function setSession(session) {
 
     createdAt:
       session.createdAt ||
-      Date.now()
+      Date.now(),
+
+    expiresAt:
+      session.expiresAt ||
+      session.sessionExpiresAt ||
+      session.SessionExpiresAt ||
+      ""
   };
 
   APP_STATE.session =
@@ -206,6 +212,26 @@ function isSessionValid(session) {
   ) {
 
     return false;
+
+  }
+
+  const expiresAt =
+    session.expiresAt ||
+    session.sessionExpiresAt ||
+    session.SessionExpiresAt;
+
+  if (expiresAt) {
+
+    const expiresMs =
+      new Date(expiresAt)
+        .getTime();
+
+    if (
+      expiresMs &&
+      Date.now() > expiresMs
+    ) {
+      return false;
+    }
 
   }
 

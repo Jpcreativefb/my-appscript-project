@@ -1,6 +1,7 @@
 function loginUser(
   username,
-  pin
+  pin,
+  rememberMe
 ){
 
   username =
@@ -79,6 +80,26 @@ function loginUser(
     String(record.user["Username"] || username)
       .trim();
 
+  const keepSignedIn =
+    rememberMe === undefined ||
+    rememberMe === true ||
+    String(rememberMe || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(rememberMe || "")
+      .trim() === "1";
+
+  const sessionHours =
+    keepSignedIn
+      ? 24 * 30
+      : 24;
+
+  const sessionExpiresAt =
+    new Date(
+      Date.now() +
+      sessionHours * 60 * 60 * 1000
+    ).toISOString();
+
   CacheService
     .getScriptCache()
     .put(
@@ -90,6 +111,8 @@ function loginUser(
   updateUserFields_(
     record.rowNumber,
     {
+      sessionToken: token,
+      sessionExpiresAt: sessionExpiresAt,
       lastLogin: new Date().toISOString(),
       lastUpdated: new Date().toISOString()
     }
@@ -108,6 +131,8 @@ function loginUser(
     success: true,
     token: token,
     username: canonicalUsername,
+    rememberMe: keepSignedIn,
+    expiresAt: sessionExpiresAt,
     realName: record.user["RealName"] || "",
     displayName: record.user["DisplayName"] || record.user["RealName"] || canonicalUsername,
     email: record.user["Email"] || "",
@@ -137,9 +162,199 @@ function getUsernameFromSessionToken_(token){
     return "";
   }
 
-  return CacheService
-    .getScriptCache()
-    .get(token) || "";
+  const cachedUsername =
+    CacheService
+      .getScriptCache()
+      .get(token) || "";
+
+  if (cachedUsername) {
+    return cachedUsername;
+  }
+
+  const record =
+    findUserRecordBySessionToken_(
+      token
+    );
+
+  if (!record) {
+    return "";
+  }
+
+  const username =
+    String(record.user["Username"] || "")
+      .trim();
+
+  if (username) {
+
+    CacheService
+      .getScriptCache()
+      .put(
+        token,
+        username,
+        60 * 60 * 6
+      );
+
+  }
+
+  return username;
+
+}
+
+function findUserRecordBySessionToken_(token){
+
+  token =
+    String(token || "").trim();
+
+  if (!token) {
+    return null;
+  }
+
+  const records =
+    getAllUserRecords_();
+
+  const now =
+    Date.now();
+
+  for (let i = 0; i < records.length; i++) {
+
+    const record =
+      records[i];
+
+    const col =
+      record.col;
+
+    if (
+      col.sessionToken < 0 ||
+      col.sessionExpiresAt < 0
+    ) {
+      continue;
+    }
+
+    const rowToken =
+      String(record.row[col.sessionToken] || "")
+        .trim();
+
+    if (rowToken !== token) {
+      continue;
+    }
+
+    const expiresAt =
+      record.row[col.sessionExpiresAt];
+
+    const expiresMs =
+      expiresAt
+        ? new Date(expiresAt).getTime()
+        : 0;
+
+    if (
+      !expiresMs ||
+      expiresMs < now
+    ) {
+      return null;
+    }
+
+    const status =
+      col.accountStatus > -1
+        ? String(record.row[col.accountStatus] || "active")
+            .trim()
+            .toLowerCase()
+        : "active";
+
+    if (
+      status &&
+      status !== "active"
+    ) {
+      return null;
+    }
+
+    return record;
+
+  }
+
+  return null;
+
+}
+
+function validateSessionToken(token){
+
+  token =
+    String(token || "").trim();
+
+  let record =
+    findUserRecordBySessionToken_(
+      token
+    );
+
+  if (!record) {
+
+    const cachedUsername =
+      CacheService
+        .getScriptCache()
+        .get(token) || "";
+
+    if (cachedUsername) {
+
+      record =
+        findUserRecordByUsername_(
+          cachedUsername
+        );
+
+    }
+
+  }
+
+  if (!record) {
+
+    return {
+      success: false,
+      message: "Invalid or expired session"
+    };
+
+  }
+
+  const user =
+    record.user;
+
+  const col =
+    record.col;
+
+  const expiresAt =
+    col.sessionExpiresAt > -1
+      ? record.row[col.sessionExpiresAt]
+      : "";
+
+  const isAdminUser =
+    user["IsAdmin"] === true ||
+    String(user["IsAdmin"] || "")
+      .trim()
+      .toLowerCase() === "true" ||
+    String(user["IsAdmin"] || "")
+      .trim()
+      .toLowerCase() === "yes";
+
+  return {
+    success: true,
+    token: String(token || "").trim(),
+    username: user["Username"] || "",
+    realName: user["RealName"] || "",
+    displayName: user["DisplayName"] || user["RealName"] || user["Username"] || "",
+    email: user["Email"] || "",
+    phone: user["Phone"] || "",
+    isAdmin: isAdminUser,
+    avatar: user["Avatar"] || "default",
+    themeColor: user["ThemeColor"] || "#000000",
+    preferredContactMethod:
+      user["PreferredContactMethod"] || "none",
+    notificationOptIn:
+      user["NotificationOptIn"] === true ||
+      String(user["NotificationOptIn"] || "")
+        .trim()
+        .toLowerCase() === "true",
+    notificationChannel:
+      user["NotificationChannel"] || "none",
+    expiresAt: expiresAt,
+    createdAt: Date.now()
+  };
 
 }
 

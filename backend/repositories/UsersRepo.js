@@ -75,6 +75,8 @@ function ensureUsersColumns_(){
     "ResetCodeHash",
     "ResetCodeExpiresAt",
     "ResetRequestedAt",
+    "SessionToken",
+    "SessionExpiresAt",
     "LastLogin",
     "LastUpdated"
   ];
@@ -135,6 +137,8 @@ function getUserRecordFromRow_(headers, row, rowNumber){
 }
 
 function getAllUserRecords_(){
+
+  ensureUsersColumns_();
 
   const data =
     getAllUsersData_();

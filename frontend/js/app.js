@@ -2,7 +2,7 @@
    START APP
 ====================== */
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
 
   const session =
      getSession();
@@ -23,7 +23,59 @@ document.addEventListener("DOMContentLoaded", () => {
 
   }
 
-  setSession(session);
+  if (
+    session.token &&
+    typeof apiValidateSession === "function"
+  ) {
+
+    const validation =
+      await apiValidateSession(
+        session.token
+      );
+
+    if (
+      !validation ||
+      !validation.success
+    ) {
+
+      const message =
+        validation && validation.message
+          ? String(validation.message)
+          : "";
+
+      if (
+        message
+          .toLowerCase()
+          .indexOf("network") > -1
+      ) {
+
+        setSession(session);
+
+      } else {
+
+        clearSession();
+
+        window.location.href =
+          "./index.html";
+
+        return;
+
+      }
+
+    } else {
+
+      setSession({
+        ...session,
+        ...validation
+      });
+
+    }
+
+  } else {
+
+    setSession(session);
+
+  }
 
   // 👤 HEADER USER
   const headerUser =

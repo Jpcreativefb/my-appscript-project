@@ -7,7 +7,7 @@ const CONFIG = {
     "oscars-2026",
   
   SESSION_TTL_HOURS:
-    168,  
+    720,  
 
   DEBUG:
     false

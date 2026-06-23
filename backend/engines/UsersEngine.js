@@ -60,6 +60,9 @@ function getUsersColumnMap_(headers){
     resetCodeExpiresAt: idx(["ResetCodeExpiresAt"]),
     resetRequestedAt: idx(["ResetRequestedAt"]),
 
+    sessionToken: idx(["SessionToken"]),
+    sessionExpiresAt: idx(["SessionExpiresAt"]),
+
     lastLogin: idx(["LastLogin"]),
     lastUpdated: idx(["LastUpdated"])
 
@@ -94,6 +97,8 @@ function getUsersFieldIndex_(col, field){
     resetCodeHash: col.resetCodeHash,
     resetCodeExpiresAt: col.resetCodeExpiresAt,
     resetRequestedAt: col.resetRequestedAt,
+    sessionToken: col.sessionToken,
+    sessionExpiresAt: col.sessionExpiresAt,
     lastLogin: col.lastLogin,
     lastUpdated: col.lastUpdated
   };

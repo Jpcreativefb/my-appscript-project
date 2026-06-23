@@ -849,7 +849,19 @@ function doGet(e) {
       return json(
         loginUser(
           params.username,
-          params.pin
+          params.pin,
+          params.rememberMe
+        )
+      );
+
+    }
+
+
+    if (action === "validateSession") {
+
+      return json(
+        validateSessionToken(
+          params.token
         )
       );
 

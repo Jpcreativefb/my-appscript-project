@@ -113,11 +113,23 @@ async function apiPost(action, payload = {}) {
    LOGIN
 ====================== */
 
-async function apiLogin(username, pin) {
+async function apiLogin(username, pin, rememberMe) {
 
   return api("login", {
     username,
-    pin
+    pin,
+    rememberMe:
+      rememberMe === false
+        ? "false"
+        : "true"
+  });
+
+}
+
+async function apiValidateSession(token) {
+
+  return api("validateSession", {
+    token
   });
 
 }
