@@ -2382,9 +2382,17 @@ function getBettingLeaderboardData(gameId){
 
   }
 
-  return decorateLeaderboardRowsWithProfiles_(
-    rows,
-    gameId
-  );
+  if (
+    typeof decorateLeaderboardRowsWithProfiles_ === "function"
+  ) {
+
+    return decorateLeaderboardRowsWithProfiles_(
+      rows,
+      gameId
+    );
+
+  }
+
+  return rows;
 
 }

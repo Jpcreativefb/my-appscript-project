@@ -1,28 +1,21 @@
 /* =========================
    USER PROFILE DISPLAY HELPERS
-   DROP-IN FILE: backend/UserProfiles.gs
+   REPLACE FILE: backend/UserProfiles.gs
 
-   Uses:
+   This version matches your NEW Profile page system.
+
+   Your profile engine stores:
+   - Users:
+     DisplayName, AvatarType, AvatarInitials, AvatarEmoji,
+     AvatarUrl, AvatarFileId, ProfileColor
+   - UserGameProfiles:
+     GameId, Username, DisplayName, AvatarType, AvatarInitials,
+     AvatarEmoji, AvatarUrl, AvatarFileId, ProfileColor
+
+   Leaderboard lookup order:
    1) UserGameProfiles for selected GameId
    2) Users fallback
    3) raw Username fallback
-
-   Supports the newer Profile page columns:
-   - DisplayName
-   - AvatarType
-   - AvatarInitials
-   - AvatarEmoji
-   - AvatarUrl
-   - AvatarFileId
-   - ProfileColor
-
-   Also supports older columns:
-   - Avatar
-   - ThemeColor
-
-   IMPORTANT:
-   Picks.Username stays as the real account key.
-   This file only controls display profile fields.
 ========================= */
 
 const USER_GAME_PROFILES_SHEET =
@@ -39,101 +32,330 @@ function getLeaderboardUserProfile_(
       .trim();
 
   gameId =
-    normalizeGameId_(
+    normalizeLeaderboardProfileGameId_(
       gameId ||
       getDefaultGameId()
     );
 
   if (!username) {
-    return {
-      username: "",
-      displayName: "",
-      avatar: "",
-      avatarType: "",
-      avatarInitials: "",
-      avatarEmoji: "",
-      avatarUrl: "",
-      avatarFileId: "",
-      themeColor: "",
-      profileColor: ""
-    };
+    return getLeaderboardProfileFallback_(
+      "",
+      gameId
+    );
   }
 
+  /*
+    Best path:
+    Use the real ProfileEngine function if it exists.
+    This keeps leaderboard in sync with the Profile page.
+  */
+  if (
+    typeof apiGetEditableProfile ===
+    "function"
+  ) {
+
+    try {
+
+      const response =
+        apiGetEditableProfile(
+          username,
+          gameId
+        );
+
+      if (
+        response &&
+        response.success !== false &&
+        response.profile
+      ) {
+
+        return normalizeLeaderboardProfileResult_(
+          username,
+          gameId,
+          response.profile
+        );
+
+      }
+
+    } catch (err) {
+
+      Logger.log(
+        "Leaderboard profile engine lookup failed for " +
+        username +
+        ": " +
+        (
+          err && err.message
+            ? err.message
+            : String(err)
+        )
+      );
+
+    }
+
+  }
+
+  /*
+    Fallback path:
+    Read sheets directly if ProfileEngine is unavailable.
+  */
   const ss =
     SpreadsheetApp.getActive();
 
-  const baseProfile =
-    getLeaderboardBaseProfileRow_(
-      ss,
-      username
-    ) || {};
-
   const gameProfile =
-    getLeaderboardGameProfileRow_(
+    getUserGameProfileRow_(
       ss,
       username,
       gameId
-    ) || {};
+    );
 
-  const merged =
-    mergeLeaderboardProfiles_(
-      baseProfile,
+  if (gameProfile) {
+    return normalizeLeaderboardProfileResult_(
+      username,
+      gameId,
       gameProfile
     );
+  }
 
-  const displayName =
-    merged.displayName ||
-    merged.profileName ||
-    username;
-
-  const profileColor =
-    merged.profileColor ||
-    merged.themeColor ||
-    "#354785";
-
-  const avatar =
-    buildLeaderboardAvatarValue_(
-      merged,
-      displayName,
+  const userProfile =
+    getUserBaseProfileRow_(
+      ss,
       username
     );
+
+  if (userProfile) {
+    return normalizeLeaderboardProfileResult_(
+      username,
+      gameId,
+      userProfile
+    );
+  }
+
+  return getLeaderboardProfileFallback_(
+    username,
+    gameId
+  );
+
+}
+
+
+function normalizeLeaderboardProfileResult_(
+  username,
+  gameId,
+  profile
+) {
+
+  profile =
+    profile || {};
+
+  const displayName =
+    String(
+      profile.displayName ||
+      profile.profileName ||
+      profile.DisplayName ||
+      profile.ProfileName ||
+      username ||
+      ""
+    ).trim();
+
+  const profileColor =
+    String(
+      profile.profileColor ||
+      profile.themeColor ||
+      profile.ProfileColor ||
+      profile.ThemeColor ||
+      ""
+    ).trim();
 
   return {
     username:
       username,
 
+    gameId:
+      gameId,
+
     displayName:
-      displayName,
+      displayName ||
+      username,
 
     avatar:
-      avatar,
-
-    avatarType:
-      merged.avatarType || "",
-
-    avatarInitials:
-      merged.avatarInitials || "",
-
-    avatarEmoji:
-      merged.avatarEmoji || "",
-
-    avatarUrl:
-      merged.avatarUrl || "",
-
-    avatarFileId:
-      merged.avatarFileId || "",
+      buildLeaderboardAvatarValue_(
+        profile,
+        displayName || username
+      ),
 
     themeColor:
-      profileColor,
+      profileColor ||
+      "#354785",
 
     profileColor:
-      profileColor
+      profileColor ||
+      "#354785",
+
+    avatarType:
+      profile.avatarType ||
+      profile.AvatarType ||
+      "",
+
+    avatarUrl:
+      profile.avatarUrl ||
+      profile.AvatarUrl ||
+      "",
+
+    avatarEmoji:
+      profile.avatarEmoji ||
+      profile.AvatarEmoji ||
+      "",
+
+    avatarInitials:
+      profile.avatarInitials ||
+      profile.AvatarInitials ||
+      ""
   };
 
 }
 
 
-function getLeaderboardGameProfileRow_(
+function buildLeaderboardAvatarValue_(
+  profile,
+  nameForInitials
+) {
+
+  profile =
+    profile || {};
+
+  const avatarType =
+    String(
+      profile.avatarType ||
+      profile.AvatarType ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const avatarUrl =
+    String(
+      profile.avatarUrl ||
+      profile.AvatarUrl ||
+      ""
+    ).trim();
+
+  const avatarEmoji =
+    String(
+      profile.avatarEmoji ||
+      profile.AvatarEmoji ||
+      ""
+    ).trim();
+
+  const avatarInitials =
+    String(
+      profile.avatarInitials ||
+      profile.AvatarInitials ||
+      ""
+    ).trim();
+
+  if (
+    (
+      avatarType === "url" ||
+      avatarType === "upload"
+    ) &&
+    avatarUrl
+  ) {
+    return avatarUrl;
+  }
+
+  if (
+    avatarType === "emoji" &&
+    avatarEmoji
+  ) {
+    return avatarEmoji;
+  }
+
+  if (
+    avatarType === "initials" &&
+    avatarInitials
+  ) {
+    return avatarInitials;
+  }
+
+  if (avatarUrl) {
+    return avatarUrl;
+  }
+
+  if (avatarEmoji) {
+    return avatarEmoji;
+  }
+
+  if (avatarInitials) {
+    return avatarInitials;
+  }
+
+  return buildLeaderboardInitials_(
+    nameForInitials
+  );
+
+}
+
+
+function buildLeaderboardInitials_(
+  value
+) {
+
+  const words =
+    String(value || "")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+
+  if (!words.length) {
+    return "👤";
+  }
+
+  if (words.length === 1) {
+
+    return words[0]
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(0, 2)
+      .toUpperCase() || "👤";
+
+  }
+
+  return (
+    words[0].charAt(0) +
+    words[words.length - 1].charAt(0)
+  )
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase() || "👤";
+
+}
+
+
+function getLeaderboardProfileFallback_(
+  username,
+  gameId
+) {
+
+  username =
+    String(username || "")
+      .trim();
+
+  return {
+    username:
+      username,
+    gameId:
+      gameId || "",
+    displayName:
+      username || "Player",
+    avatar:
+      buildLeaderboardInitials_(username),
+    themeColor:
+      "#354785",
+    profileColor:
+      "#354785"
+  };
+
+}
+
+
+function getUserGameProfileRow_(
   ss,
   username,
   gameId
@@ -149,7 +371,8 @@ function getLeaderboardGameProfileRow_(
   }
 
   const data =
-    sh.getDataRange().getValues();
+    sh.getDataRange()
+      .getValues();
 
   if (data.length <= 1) {
     return null;
@@ -178,7 +401,9 @@ function getLeaderboardGameProfileRow_(
       .toLowerCase();
 
   const gameIdKey =
-    normalizeGameId_(gameId);
+    normalizeLeaderboardProfileGameId_(
+      gameId
+    );
 
   for (let i = 1; i < data.length; i++) {
 
@@ -191,7 +416,7 @@ function getLeaderboardGameProfileRow_(
         .toLowerCase();
 
     const rowGameId =
-      normalizeGameId_(
+      normalizeLeaderboardProfileGameId_(
         row[col.GameId]
       );
 
@@ -202,9 +427,11 @@ function getLeaderboardGameProfileRow_(
       continue;
     }
 
-    return buildLeaderboardProfileObject_(
+    return leaderboardProfileRowToObject_(
       row,
-      col
+      col,
+      username,
+      gameId
     );
 
   }
@@ -214,7 +441,7 @@ function getLeaderboardGameProfileRow_(
 }
 
 
-function getLeaderboardBaseProfileRow_(
+function getUserBaseProfileRow_(
   ss,
   username
 ) {
@@ -227,7 +454,8 @@ function getLeaderboardBaseProfileRow_(
   }
 
   const data =
-    sh.getDataRange().getValues();
+    sh.getDataRange()
+      .getValues();
 
   if (data.length <= 1) {
     return null;
@@ -259,16 +487,20 @@ function getLeaderboardBaseProfileRow_(
 
     const rowUsername =
       String(row[col.Username] || "")
-        .trim()
-        .toLowerCase();
+        .trim();
 
-    if (rowUsername !== usernameKey) {
+    if (
+      rowUsername.toLowerCase() !==
+      usernameKey
+    ) {
       continue;
     }
 
-    return buildLeaderboardProfileObject_(
+    return leaderboardProfileRowToObject_(
       row,
-      col
+      col,
+      rowUsername || username,
+      ""
     );
 
   }
@@ -278,240 +510,155 @@ function getLeaderboardBaseProfileRow_(
 }
 
 
-function getLeaderboardProfileColumnMap_(
-  headers
-) {
-
-  const names = [
-    "Username",
-    "GameId",
-    "DisplayName",
-    "ProfileName",
-    "Avatar",
-    "AvatarType",
-    "AvatarInitials",
-    "AvatarEmoji",
-    "AvatarUrl",
-    "AvatarFileId",
-    "ThemeColor",
-    "ProfileColor"
-  ];
-
-  const col = {};
-
-  names.forEach(function(name) {
-    col[name] =
-      headers.indexOf(name);
-  });
-
-  return col;
-
-}
-
-
-function buildLeaderboardProfileObject_(
+function leaderboardProfileRowToObject_(
   row,
-  col
+  col,
+  username,
+  gameId
 ) {
-
-  function read(header) {
-
-    return col[header] >= 0
-      ? String(row[col[header]] || "").trim()
-      : "";
-
-  }
 
   return {
     username:
-      read("Username"),
-
+      username,
     gameId:
-      read("GameId"),
-
+      gameId || "",
     displayName:
-      read("DisplayName"),
-
+      getLeaderboardProfileCell_(
+        row,
+        col.DisplayName
+      ) ||
+      getLeaderboardProfileCell_(
+        row,
+        col.ProfileName
+      ),
     profileName:
-      read("ProfileName"),
-
+      getLeaderboardProfileCell_(
+        row,
+        col.ProfileName
+      ),
     avatar:
-      read("Avatar"),
-
-    avatarType:
-      read("AvatarType"),
-
-    avatarInitials:
-      read("AvatarInitials"),
-
-    avatarEmoji:
-      read("AvatarEmoji"),
-
-    avatarUrl:
-      read("AvatarUrl"),
-
-    avatarFileId:
-      read("AvatarFileId"),
-
+      getLeaderboardProfileCell_(
+        row,
+        col.Avatar
+      ),
     themeColor:
-      read("ThemeColor"),
-
+      getLeaderboardProfileCell_(
+        row,
+        col.ThemeColor
+      ),
     profileColor:
-      read("ProfileColor")
+      getLeaderboardProfileCell_(
+        row,
+        col.ProfileColor
+      ),
+    avatarType:
+      getLeaderboardProfileCell_(
+        row,
+        col.AvatarType
+      ),
+    avatarInitials:
+      getLeaderboardProfileCell_(
+        row,
+        col.AvatarInitials
+      ),
+    avatarEmoji:
+      getLeaderboardProfileCell_(
+        row,
+        col.AvatarEmoji
+      ),
+    avatarUrl:
+      getLeaderboardProfileCell_(
+        row,
+        col.AvatarUrl
+      ),
+    avatarFileId:
+      getLeaderboardProfileCell_(
+        row,
+        col.AvatarFileId
+      )
   };
 
 }
 
 
-function mergeLeaderboardProfiles_(
-  baseProfile,
-  gameProfile
+function getLeaderboardProfileCell_(
+  row,
+  index
 ) {
 
-  const merged = {};
+  if (index < 0) {
+    return "";
+  }
+
+  return String(row[index] || "")
+    .trim();
+
+}
+
+
+function getLeaderboardProfileColumnMap_(
+  headers
+) {
+
+  const map = {};
+
+  headers.forEach(function(header, index) {
+    map[header] = index;
+  });
 
   [
-    "username",
-    "gameId",
-    "displayName",
-    "profileName",
-    "avatar",
-    "avatarType",
-    "avatarInitials",
-    "avatarEmoji",
-    "avatarUrl",
-    "avatarFileId",
-    "themeColor",
-    "profileColor"
-  ].forEach(function(key) {
+    "Username",
+    "GameId",
+    "DisplayName",
+    "ProfileName",
+    "Avatar",
+    "ThemeColor",
+    "ProfileColor",
+    "AvatarType",
+    "AvatarInitials",
+    "AvatarEmoji",
+    "AvatarUrl",
+    "AvatarFileId"
+  ].forEach(function(header) {
 
-    merged[key] =
-      baseProfile && baseProfile[key]
-        ? baseProfile[key]
-        : "";
-
-    if (
-      gameProfile &&
-      gameProfile[key] !== undefined &&
-      gameProfile[key] !== null &&
-      String(gameProfile[key]).trim() !== ""
-    ) {
-      merged[key] =
-        gameProfile[key];
+    if (map[header] === undefined) {
+      map[header] = -1;
     }
 
   });
 
-  return merged;
+  return map;
 
 }
 
 
-function buildLeaderboardAvatarValue_(
-  profile,
-  displayName,
-  username
-) {
-
-  profile =
-    profile || {};
-
-  const avatarType =
-    String(profile.avatarType || "")
-      .trim()
-      .toLowerCase();
-
-  if (
-    avatarType === "url" &&
-    profile.avatarUrl
-  ) {
-    return profile.avatarUrl;
-  }
-
-  if (
-    avatarType === "upload" &&
-    profile.avatarUrl
-  ) {
-    return profile.avatarUrl;
-  }
-
-  if (
-    avatarType === "upload" &&
-    profile.avatarFileId
-  ) {
-    return "https://drive.google.com/thumbnail?id=" +
-      encodeURIComponent(profile.avatarFileId) +
-      "&sz=w160-h160";
-  }
-
-  if (
-    avatarType === "emoji" &&
-    profile.avatarEmoji
-  ) {
-    return profile.avatarEmoji;
-  }
-
-  if (
-    avatarType === "initials" &&
-    profile.avatarInitials
-  ) {
-    return profile.avatarInitials;
-  }
-
-  if (profile.avatar) {
-    return profile.avatar;
-  }
-
-  if (profile.avatarEmoji) {
-    return profile.avatarEmoji;
-  }
-
-  if (profile.avatarInitials) {
-    return profile.avatarInitials;
-  }
-
-  return buildLeaderboardInitials_(
-    displayName ||
-    username
-  );
-
-}
-
-
-function buildLeaderboardInitials_(
+function normalizeLeaderboardProfileGameId_(
   value
 ) {
 
-  value =
-    String(value || "")
-      .trim();
+  if (
+    typeof normalizeGameId_ ===
+    "function"
+  ) {
 
-  if (!value) {
-    return "👤";
+    return normalizeGameId_(value);
+
   }
 
-  const parts =
-    value
-      .split(/\s+/)
-      .filter(Boolean);
+  if (
+    typeof normalizeScoreGameId_ ===
+    "function"
+  ) {
 
-  if (!parts.length) {
-    return "👤";
+    return normalizeScoreGameId_(value);
+
   }
 
-  return parts
-    .slice(0, 2)
-    .map(function(part) {
-      return part.charAt(0).toUpperCase();
-    })
-    .join("");
+  return String(value || "")
+    .trim();
 
 }
 
-/* =========================
-   LEADERBOARD ROW DECORATOR
-   Compatibility helper for Scoring.gs
-========================= */
 
 function decorateLeaderboardRowsWithProfiles_(
   leaderboard,
@@ -523,33 +670,11 @@ function decorateLeaderboardRowsWithProfiles_(
       ? leaderboard
       : [];
 
-  let resolvedGameId =
-    gameId ||
-    (
-      typeof getDefaultGameId === "function"
-        ? getDefaultGameId()
-        : ""
+  gameId =
+    normalizeLeaderboardProfileGameId_(
+      gameId ||
+      getDefaultGameId()
     );
-
-  if (
-    typeof normalizeGameId_ === "function"
-  ) {
-
-    resolvedGameId =
-      normalizeGameId_(
-        resolvedGameId
-      );
-
-  } else if (
-    typeof normalizeScoreGameId_ === "function"
-  ) {
-
-    resolvedGameId =
-      normalizeScoreGameId_(
-        resolvedGameId
-      );
-
-  }
 
   return leaderboard.map(function(row) {
 
@@ -558,16 +683,16 @@ function decorateLeaderboardRowsWithProfiles_(
 
     const username =
       row.username ||
-      row.user ||
       row.Username ||
+      row.user ||
       row.User ||
       "";
 
     const profile =
       getLeaderboardUserProfile_(
         username,
-        resolvedGameId
-      ) || {};
+        gameId
+      );
 
     return Object.assign(
       {},
@@ -575,57 +700,21 @@ function decorateLeaderboardRowsWithProfiles_(
       {
         user:
           username,
-
         username:
           username,
-
         displayName:
           profile.displayName ||
-          row.displayName ||
           username,
-
         avatar:
           profile.avatar ||
-          row.avatar ||
           "👤",
-
-        avatarType:
-          profile.avatarType ||
-          row.avatarType ||
-          "",
-
-        avatarInitials:
-          profile.avatarInitials ||
-          row.avatarInitials ||
-          "",
-
-        avatarEmoji:
-          profile.avatarEmoji ||
-          row.avatarEmoji ||
-          "",
-
-        avatarUrl:
-          profile.avatarUrl ||
-          row.avatarUrl ||
-          "",
-
-        avatarFileId:
-          profile.avatarFileId ||
-          row.avatarFileId ||
-          "",
-
         themeColor:
           profile.themeColor ||
           profile.profileColor ||
-          row.themeColor ||
-          row.profileColor ||
           "#354785",
-
         profileColor:
           profile.profileColor ||
           profile.themeColor ||
-          row.profileColor ||
-          row.themeColor ||
           "#354785"
       }
     );

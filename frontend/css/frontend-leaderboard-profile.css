@@ -1,5 +1,5 @@
 /* =========================
-   LEADERBOARD PROFILE + COMPARE CSS
+   LEADERBOARD PROFILE + PICK/WAGER COMPARE CSS v2
    DROP-IN FILE: frontend/css/frontend-leaderboard-profile.css
 ========================= */
 
@@ -95,8 +95,8 @@
 }
 
 .compare-picks-panel {
-  width: min(980px, 100%);
-  max-height: min(86vh, 900px);
+  width: min(1120px, 100%);
+  max-height: min(88vh, 920px);
   overflow: auto;
   border-radius: 22px;
   background: #111827;
@@ -113,7 +113,7 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .compare-picks-header h2 {
@@ -142,7 +142,7 @@
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
 }
 
 .compare-profile {
@@ -173,7 +173,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .compare-summary span {
@@ -183,6 +183,33 @@
   font-size: 13px;
 }
 
+.compare-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 0;
+  background: #111827;
+}
+
+.compare-filter-chip {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 11px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+  color: #fff;
+  background: rgba(255,255,255,0.1);
+}
+
+.compare-filter-chip.active {
+  background: rgba(96,165,250,0.45);
+}
+
 .compare-picks-list {
   display: grid;
   gap: 10px;
@@ -190,16 +217,20 @@
 
 .compare-row {
   display: grid;
-  grid-template-columns: minmax(170px, 0.9fr) minmax(260px, 1.8fr) auto;
+  grid-template-columns: minmax(140px, 0.6fr) minmax(360px, 2fr) minmax(105px, auto);
   gap: 12px;
   align-items: center;
-  padding: 13px;
+  padding: 12px;
   border-radius: 16px;
   background: rgba(255,255,255,0.07);
 }
 
+.compare-filter-hidden {
+  display: none;
+}
+
 .compare-row.same-pick {
-  outline: 1px solid rgba(34,197,94,0.45);
+  outline: 1px solid rgba(34,197,94,0.38);
 }
 
 .compare-row.different-pick {
@@ -217,74 +248,186 @@
 
 .compare-category span {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 12px;
   opacity: 0.72;
 }
 
-.compare-pick-grid {
+.compare-hidden-message {
+  grid-column: span 2;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+.compare-pick-wager-grid.compact {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.compare-pick {
+.compare-side {
   min-width: 0;
 }
 
-.compare-pick-label {
+.compare-user-mini {
   display: block;
-  margin-bottom: 4px;
-  font-size: 12px;
-  font-weight: 800;
-  opacity: 0.68;
+  margin-bottom: 5px;
+  font-size: 11px;
+  font-weight: 900;
+  opacity: 0.62;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.compare-compact-card {
+  min-width: 0;
+  border-radius: 14px;
+  padding: 8px;
+  background: rgba(255,255,255,0.055);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.compare-compact-card.pick-correct {
+  border-color: rgba(34,197,94,0.85);
+  background: rgba(34,197,94,0.12);
+}
+
+.compare-compact-card.pick-wrong {
+  border-color: rgba(239,68,68,0.85);
+  background: rgba(239,68,68,0.12);
+}
+
+.compare-card-image-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.08);
+}
+
+.compare-card-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.compare-card-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(18px, 5vw, 32px);
+  font-weight: 900;
   letter-spacing: 0.04em;
 }
 
-.compare-pick-value {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  font-weight: 800;
+.compare-wager-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 7px 8px;
+  text-align: center;
+  font-weight: 950;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  background: rgba(0,0,0,0.82);
+  color: #fff;
 }
 
-.compare-pick-value span {
-  min-width: 0;
+.compare-wager-overlay.wager-win {
+  background: rgba(22,101,52,0.92);
+  color: #dcfce7;
+}
+
+.compare-wager-overlay.wager-loss {
+  background: rgba(127,29,29,0.92);
+  color: #fee2e2;
+}
+
+.compare-wager-overlay.wager-draw {
+  background: rgba(154,52,18,0.92);
+  color: #ffedd5;
+}
+
+.compare-wager-overlay.wager-pending {
+  background: rgba(30,41,59,0.92);
+  color: #e2e8f0;
+}
+
+.compare-wager-overlay.wager-none {
+  background: rgba(0,0,0,0.62);
+  color: rgba(255,255,255,0.72);
+}
+
+
+.compare-card-name {
+  margin-top: 7px;
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1.2;
   overflow-wrap: anywhere;
 }
 
-.compare-pick-image {
-  width: 34px;
-  height: 46px;
-  border-radius: 8px;
-  object-fit: cover;
-  flex: 0 0 34px;
+.compare-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
 }
 
-.compare-no-pick,
-.hidden-pick {
-  opacity: 0.65;
+.compare-card-meta span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  font-size: 11px;
   font-weight: 700;
+  opacity: 0.82;
 }
 
-.compare-match-label {
+.compare-match-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.compare-pill-good,
+.compare-pill-warn,
+.compare-pill-neutral {
   font-size: 12px;
   font-weight: 900;
   padding: 6px 9px;
   border-radius: 999px;
-  background: rgba(255,255,255,0.1);
 }
 
-.compare-picks-loading,
-.compare-error,
-.compare-empty {
+.compare-pill-good {
+  background: rgba(34,197,94,0.22);
+  color: #bbf7d0;
+}
+
+.compare-pill-warn {
+  background: rgba(250,204,21,0.2);
+  color: #fef08a;
+}
+
+.compare-pill-neutral {
+  background: rgba(255,255,255,0.1);
+  color: #e5e7eb;
+}
+
+.compare-empty,
+.compare-error {
   padding: 18px;
   border-radius: 16px;
   background: rgba(255,255,255,0.08);
 }
 
-@media (max-width: 720px) {
+.compare-empty.hidden {
+  display: none;
+}
+
+@media (max-width: 760px) {
 
   .leaderboard-top-row {
     align-items: flex-start;
@@ -315,7 +458,72 @@
     grid-template-columns: 1fr;
   }
 
-  .compare-pick-grid {
+  .compare-hidden-message {
+    grid-column: auto;
+  }
+
+  .compare-pick-wager-grid.compact {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .compare-match-stack {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+}
+
+@media (max-width: 460px) {
+
+  .compare-pick-wager-grid.compact {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+
+/* =========================
+   v4 compare cleanup
+========================= */
+
+.compare-summary {
+  display: none;
+}
+
+.compare-filter-bar.compact {
+  margin-bottom: 14px;
+}
+
+.compare-row {
+  grid-template-columns: minmax(130px, 0.55fr) minmax(360px, 2fr);
+}
+
+.compare-row .compare-match-stack {
+  display: none;
+}
+
+.compare-category span {
+  display: none;
+}
+
+.compare-user-mini {
+  opacity: 0.78;
+  color: rgba(255,255,255,0.86);
+}
+
+.compare-hidden-message {
+  grid-column: auto;
+}
+
+.compare-pill-good,
+.compare-pill-warn,
+.compare-pill-neutral {
+  display: none;
+}
+
+@media (max-width: 760px) {
+
+  .compare-row {
     grid-template-columns: 1fr;
   }
 

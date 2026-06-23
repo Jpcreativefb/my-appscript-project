@@ -1059,20 +1059,6 @@ function doGet(e) {
     }
 
     /* =========================
-       STANDARD LEADERBOARD
-    ========================= */
-
-    if (action === "leaderboard") {
-
-      return json(
-        getLeaderboardData(
-          gameId
-        )
-      );
-
-    }
-
-    /* =========================
        LIVE RESULTS / LIVE SCORING
     ========================= */
 
