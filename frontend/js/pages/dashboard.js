@@ -299,6 +299,19 @@ function renderDashboardGameCard(
       progressValue
     );
 
+  const leagues =
+    Array.isArray(game.leagues)
+      ? game.leagues
+      : [];
+
+  const leaguePicker =
+    renderDashboardLeaguePicker_(
+      game
+    );
+
+  const selectedLeagueArg =
+    `getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}')`;
+
   const enterDisabled =
     game.disableEnter === true ||
     game.available === false;
@@ -308,7 +321,7 @@ function renderDashboardGameCard(
       ? `
         <button
           class="dashboard-action-button primary"
-          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
+          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
         >
           View Results
         </button>
@@ -326,7 +339,7 @@ function renderDashboardGameCard(
         : `
           <button
             class="dashboard-action-button primary"
-            onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
+            onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
           >
             ${escapeHtml(actionLabel)}
           </button>
@@ -338,7 +351,7 @@ function renderDashboardGameCard(
       : `
         <button
           class="dashboard-action-button secondary"
-          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}')"
+          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
         >
           Open Full Leaderboard
         </button>
@@ -369,6 +382,8 @@ function renderDashboardGameCard(
         </div>
 
       </div>
+
+      ${leaguePicker}
 
       ${
         game.availabilityLabel && enterDisabled
@@ -472,6 +487,81 @@ function renderDashboardGameCard(
 
     </article>
   `;
+
+}
+
+
+function renderDashboardLeaguePicker_(game) {
+
+  game = game || {};
+
+  const leagues =
+    Array.isArray(game.leagues)
+      ? game.leagues
+      : [];
+
+  if (!leagues.length) {
+    return `
+      <div class="dashboard-league-badge public-game-badge">
+        Public Game
+      </div>
+    `;
+  }
+
+  if (leagues.length === 1) {
+
+    const league = leagues[0];
+
+    return `
+      <div class="dashboard-league-badge">
+        League:
+        <strong>${escapeHtml(league.leagueName || league.leagueId || "League")}</strong>
+      </div>
+    `;
+
+  }
+
+  const selectedLeagueId =
+    game.leagueId ||
+    (
+      typeof getFrontendLeagueId === "function"
+        ? getFrontendLeagueId()
+        : ""
+    ) ||
+    (leagues[0] && leagues[0].leagueId) ||
+    "";
+
+  return `
+    <label class="dashboard-league-picker">
+      <span>League</span>
+      <select id="dashboardLeagueSelect-${escapeAttr(game.gameId || "")}">
+        ${leagues.map(league => `
+          <option
+            value="${escapeAttr(league.leagueId || "") }"
+            ${league.leagueId === selectedLeagueId ? "selected" : ""}
+          >
+            ${escapeHtml(league.leagueName || league.leagueId || "League")}
+            ${league.role ? " · " + escapeHtml(league.role) : ""}
+          </option>
+        `).join("")}
+      </select>
+    </label>
+  `;
+
+}
+
+function getDashboardSelectedLeagueId_(gameId) {
+
+  const select =
+    document.getElementById(
+      "dashboardLeagueSelect-" + String(gameId || "")
+    );
+
+  if (select) {
+    return select.value || "";
+  }
+
+  return "";
 
 }
 

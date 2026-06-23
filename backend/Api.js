@@ -221,7 +221,15 @@ function doGet(e) {
       "adminCreateUser",
       "adminResetUserPin",
       "adminToggleUserAdmin",
-      "adminToggleUserActive"
+      "adminToggleUserActive",
+      "getLeagueMembers",
+      "saveLeagueFeatureAccess",
+      "assignGameToLeague",
+      "removeLeagueMember",
+      "addLeagueMember",
+      "getMyLeagues",
+      "createLeague",
+      "adminSetupLeagueAccessSystem"
     ];
 
     const isAdminAction =
@@ -238,6 +246,19 @@ function doGet(e) {
           ? ""
           : getDefaultGameId()
       );
+
+    const leagueId =
+      typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(
+            params.leagueId ||
+            params.activeLeagueId ||
+            ""
+          )
+        : String(
+            params.leagueId ||
+            params.activeLeagueId ||
+            ""
+          ).trim();
 
     /* =========================
        PROFILE
@@ -347,10 +368,19 @@ function doGet(e) {
 
     if (action === "getActiveGames") {
 
+      const activeGamesUsername =
+        params.username ||
+        "";
+
       return json({
         success: true,
         games:
-          getPublicActiveGames(),
+          activeGamesUsername &&
+          typeof getPublicActiveGamesForUser_ === "function"
+            ? getPublicActiveGamesForUser_(
+                activeGamesUsername
+              )
+            : getPublicActiveGames(),
         defaultGameId:
           getDefaultGameId(),
         currentGameId:
@@ -359,6 +389,162 @@ function doGet(e) {
 
     }
 
+
+    /* =========================
+       LEAGUES / ACCESS
+    ========================= */
+
+    if (action === "adminSetupLeagueAccessSystem") {
+
+      return json(
+        apiSetupLeagueAccessSystem({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+
+    }
+
+    if (action === "getMyLeagues") {
+
+      return json(
+        apiGetMyLeagues({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          leagueId:
+            leagueId
+        })
+      );
+
+    }
+
+    if (action === "createLeague") {
+
+      return json(
+        apiCreateLeague({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            params.leagueId,
+          leagueName:
+            params.leagueName || params.name,
+          gameId:
+            gameId,
+          visibility:
+            params.visibility,
+          joinMode:
+            params.joinMode
+        })
+      );
+
+    }
+
+    if (action === "addLeagueMember") {
+
+      return json(
+        apiAddLeagueMember({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          memberUsername:
+            params.memberUsername || params.targetUsername,
+          role:
+            params.role
+        })
+      );
+
+    }
+
+    if (action === "removeLeagueMember") {
+
+      return json(
+        apiRemoveLeagueMember({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          memberUsername:
+            params.memberUsername || params.targetUsername
+        })
+      );
+
+    }
+
+    if (action === "assignGameToLeague") {
+
+      return json(
+        apiAssignGameToLeague({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          gameId:
+            gameId,
+          leagueId:
+            leagueId
+        })
+      );
+
+    }
+
+    if (action === "saveLeagueFeatureAccess") {
+
+      return json(
+        apiSaveLeagueFeatureAccess({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          gameId:
+            gameId,
+          feature:
+            params.feature,
+          accessRule:
+            params.accessRule,
+          rolesAllowed:
+            params.rolesAllowed,
+          usersAllowed:
+            params.usersAllowed,
+          usersBlocked:
+            params.usersBlocked,
+          active:
+            params.active
+        })
+      );
+
+    }
+
+    if (action === "getLeagueMembers") {
+
+      return json(
+        apiGetLeagueMembers({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId
+        })
+      );
+
+    }
     /* =========================
        ADMIN: GAMES
     ========================= */
@@ -1002,7 +1188,9 @@ function doGet(e) {
           username:
             params.username,
           token:
-            params.token
+            params.token,
+          leagueId:
+            leagueId
         })
       );
     
@@ -1013,7 +1201,22 @@ function doGet(e) {
     ========================= */
     
     if (action === "getCategories") {
-    
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewGame",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
       return json(
         getCategories(
           gameId
@@ -1023,6 +1226,21 @@ function doGet(e) {
     }
 
     if (action === "getCategorySettings") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewGame",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         getCategorySettings(
@@ -1038,6 +1256,21 @@ function doGet(e) {
 
     if (action === "getMyPicks") {
 
+      const access =
+        userCanAccessGameFeature_(
+          params.username,
+          gameId,
+          "makePicks",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
       return json(
         apiGetMyPicks(
           params.username,
@@ -1048,6 +1281,21 @@ function doGet(e) {
     }
 
     if (action === "savePick") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username,
+          gameId,
+          "makePicks",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         savePick({
@@ -1087,10 +1335,35 @@ function doGet(e) {
               gameId
             );
 
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewLeaderboard",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason,
+          gameId: gameId
+        });
+      }
+
+      const filteredLeaderboard =
+        filterLeaderboardRowsForLeague_(
+          leaderboard,
+          gameId,
+          access.leagueId || leagueId
+        );
+
       return json({
         success: true,
         gameId: gameId,
-        leaderboard: leaderboard,
+        leagueId: access.leagueId || leagueId || "",
+        leagueName: access.leagueName || "",
+        leaderboard: filteredLeaderboard,
         updatedAt: new Date().toISOString()
       });
 
@@ -1102,16 +1375,65 @@ function doGet(e) {
 
     if (action === "liveLeaderboard") {
 
-      return json(
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewLeaderboard",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason,
+          gameId: gameId
+        });
+      }
+
+      const liveRes =
         apiGetLiveLeaderboard({
           gameId:
             gameId
-        })
-      );
+        });
+
+      if (
+        liveRes &&
+        Array.isArray(liveRes.leaderboard)
+      ) {
+        liveRes.leaderboard =
+          filterLeaderboardRowsForLeague_(
+            liveRes.leaderboard,
+            gameId,
+            access.leagueId || leagueId
+          );
+      }
+
+      if (liveRes) {
+        liveRes.leagueId = access.leagueId || leagueId || "";
+        liveRes.leagueName = access.leagueName || "";
+      }
+
+      return json(liveRes);
 
     }
 
     if (action === "liveResults") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewResults",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         apiGetLiveResults({
@@ -1123,6 +1445,21 @@ function doGet(e) {
     }
 
     if (action === "liveGameState") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewGame",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         apiGetLiveGameState({
@@ -1139,6 +1476,21 @@ function doGet(e) {
 
     if (action === "userBreakdown") {
 
+      const access =
+        userCanAccessGameFeature_(
+          params.username,
+          gameId,
+          "viewLeaderboard",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
       return json(
         getUserBreakdown(
           params.username,
@@ -1154,6 +1506,21 @@ function doGet(e) {
 
 if (action === "compareUserPicks") {
 
+  const access =
+    userCanAccessGameFeature_(
+      params.username,
+      gameId,
+      "comparePicks",
+      leagueId
+    );
+
+  if (!access.allowed) {
+    return json({
+      success: false,
+      error: "Access denied: " + access.reason
+    });
+  }
+
   return json(
     apiCompareUserPicks({
       username:
@@ -1164,7 +1531,10 @@ if (action === "compareUserPicks") {
         params.targetUsername,
 
       gameId:
-        gameId
+        gameId,
+
+      leagueId:
+        access.leagueId || leagueId
     })
   );
 
@@ -1459,6 +1829,21 @@ if (action === "compareUserPicks") {
     // =========================
 
     if (action === "getBettingOptions") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "makeWagers",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         getBettingOptions(
@@ -1983,6 +2368,21 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
 
     if (action === "getMyBets") {
 
+      const access =
+        userCanAccessGameFeature_(
+          e.parameter.username,
+          gameId,
+          "makeWagers",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
       return json(
         apiGetMyBets(
           e.parameter.username,
@@ -1997,6 +2397,21 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
     // =========================
 
     if (action === "saveBet") {
+
+      const access =
+        userCanAccessGameFeature_(
+          e.parameter.username,
+          gameId,
+          "makeWagers",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
       return json(
         saveBet({
@@ -2023,20 +2438,35 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
 
     if (action === "removeBet") {
 
-  return json(
-    removeBet({
-      username:
-        e.parameter.username,
+      const access =
+        userCanAccessGameFeature_(
+          e.parameter.username,
+          gameId,
+          "makeWagers",
+          leagueId
+        );
 
-      gameId:
-        e.parameter.gameId,
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
 
-      categoryId:
-        e.parameter.categoryId
-    })
-  );
+      return json(
+        removeBet({
+          username:
+            e.parameter.username,
 
-}
+          gameId:
+            gameId,
+
+          categoryId:
+            e.parameter.categoryId
+        })
+      );
+
+    }
 
     // =========================
     // BETTING LEADERBOARD
@@ -2044,11 +2474,38 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
 
     if (action === "bettingLeaderboard") {
 
-      return json(
-        getBettingLeaderboardData(
-          gameId
-        )
-      );
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewWagerLeaderboard",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason,
+          gameId: gameId
+        });
+      }
+
+      const bettingRows =
+        filterLeaderboardRowsForLeague_(
+          getBettingLeaderboardData(
+            gameId
+          ),
+          gameId,
+          access.leagueId || leagueId
+        );
+
+      return json({
+        success: true,
+        gameId: gameId,
+        leagueId: access.leagueId || leagueId || "",
+        leagueName: access.leagueName || "",
+        leaderboard: bettingRows
+      });
 
     }
 

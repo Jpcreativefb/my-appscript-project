@@ -528,3 +528,31 @@
   }
 
 }
+
+/* =========================
+   LEAGUE ACCESS UI
+========================= */
+
+.dashboard-league-badge,
+.dashboard-league-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.12);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.dashboard-league-badge.public-game-badge {
+  opacity: 0.78;
+}
+
+.dashboard-league-picker select {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 9px;
+  font-weight: 800;
+}

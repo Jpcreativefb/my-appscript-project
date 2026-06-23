@@ -37,6 +37,13 @@ function apiGetStartupPayload(payload) {
     token
   );
 
+  requireGameFeatureAccess_(
+    username,
+    gameId,
+    "viewGame",
+    payload.leagueId || ""
+  );
+
   const game =
     getGame(gameId);
 
@@ -145,7 +152,12 @@ function apiGetDashboardGamesHub(payload) {
   );
 
   const games =
-    getGames();
+    typeof filterGamesForUser_ === "function"
+      ? filterGamesForUser_(
+          getGames(),
+          username
+        )
+      : getGames();
 
   const activeGames = [];
   const pastGames = [];
@@ -430,7 +442,21 @@ function buildDashboardGameHubItem_(
       leaderboardPreview,
 
     showLeaderboard:
-      game.showLeaderboard !== false
+      game.showLeaderboard !== false,
+
+    leagueId:
+      game.leagueId || "",
+
+    leagueName:
+      game.leagueName || "",
+
+    leagueScoped:
+      game.leagueScoped === true,
+
+    leagues:
+      Array.isArray(game.leagues)
+        ? game.leagues
+        : []
   };
 
 }

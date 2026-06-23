@@ -9,6 +9,11 @@ async function renderLeaderboardPage() {
     APP_STATE.gameId ||
     "";
 
+  const leagueId =
+    typeof getFrontendLeagueId === "function"
+      ? getFrontendLeagueId()
+      : "";
+
   const leaderboardMode =
     String(
       localStorage.getItem("leaderboardMode") ||
@@ -51,6 +56,7 @@ async function renderLeaderboardPage() {
     "LEADERBOARD API RESPONSE",
     {
       gameId: gameId,
+      leagueId: leagueId,
       mode: leaderboardMode,
       response: res
     }
@@ -85,6 +91,7 @@ async function renderLeaderboardPage() {
         <div class="leaderboard-subtitle">
           Game:
           <strong>${escapeHtml(gameId)}</strong>
+          ${leagueId ? ` · League: <strong>${escapeHtml(res.leagueName || leagueId)}</strong>` : ""}
         </div>
         ${renderEmptyCard("No leaderboard data found.")}
       </div>
@@ -109,6 +116,7 @@ function renderStandardLeaderboardPage_(gameId, rows) {
       <div class="leaderboard-subtitle">
         Game:
         <strong>${escapeHtml(gameId)}</strong>
+        ${leagueId ? ` · League: <strong>${escapeHtml((rows[0] && rows[0].leagueName) || leagueId)}</strong>` : ""}
       </div>
 
       <div class="leaderboard-list">
@@ -229,6 +237,7 @@ function renderWagerLeaderboardPage_(gameId, rows) {
       <div class="leaderboard-subtitle">
         Game:
         <strong>${escapeHtml(gameId)}</strong>
+        ${leagueId ? ` · League: <strong>${escapeHtml((rows[0] && rows[0].leagueName) || leagueId)}</strong>` : ""}
       </div>
 
       <div class="leaderboard-list">
@@ -509,7 +518,11 @@ async function openCompareUserPicks(otherUsername) {
         {
           username: currentUsername,
           otherUsername: otherUsername,
-          gameId: gameId
+          gameId: gameId,
+          leagueId:
+            typeof getFrontendLeagueId === "function"
+              ? getFrontendLeagueId()
+              : ""
         }
       );
   } catch (err) {
@@ -633,6 +646,7 @@ function renderComparePicksResult_(res) {
         <p>
           Game:
           <strong>${escapeHtml(res.gameId || "")}</strong>
+          ${res.leagueId ? ` · League: <strong>${escapeHtml(res.leagueName || res.leagueId)}</strong>` : ""}
         </p>
       </div>
 
