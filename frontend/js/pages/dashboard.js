@@ -169,14 +169,6 @@ async function renderDashboardPage() {
             Avatar: ${escapeHtml(avatar)}
           </p>
 
-          <div class="dashboard-league-actions">
-            <button
-              class="button secondary"
-              onclick="navigate('leagues')"
-            >
-              Manage Leagues
-            </button>
-          </div>
         </div>
 
       </section>
