@@ -19,6 +19,26 @@ function getApiLeagueId_() {
 const API_TIMEOUT_MS =
   18000;
 
+const API_LONG_TIMEOUT_MS =
+  90000;
+
+const API_LONG_TIMEOUT_ACTIONS =
+  new Set([
+    "adminRefreshSportsWagerScores",
+    "adminAutoSetSportsWagerOdds",
+    "adminSettleSportsWagers",
+    "adminRunSportsOddsHybridRefresh",
+    "adminRefreshSportsOddsLeague"
+  ]);
+
+function getApiTimeoutMs_(action) {
+
+  return API_LONG_TIMEOUT_ACTIONS.has(String(action || ""))
+    ? API_LONG_TIMEOUT_MS
+    : API_TIMEOUT_MS;
+
+}
+
 function buildApiUrl_(action, params = {}) {
 
   const url =
@@ -58,6 +78,9 @@ function shouldUseJsonpApi_() {
 }
 
 function apiJsonp_(action, params = {}) {
+
+  const timeoutMs =
+    getApiTimeoutMs_(action);
 
   return new Promise((resolve) => {
 
@@ -112,7 +135,7 @@ function apiJsonp_(action, params = {}) {
           message: "Connection timed out. Please try again."
         });
 
-      }, API_TIMEOUT_MS);
+      }, timeoutMs);
 
     window[callbackName] = function(data) {
 
@@ -155,6 +178,9 @@ function apiJsonp_(action, params = {}) {
 
 async function apiFetch_(action, params = {}) {
 
+  const timeoutMs =
+    getApiTimeoutMs_(action);
+
   const controller =
     typeof AbortController !== "undefined"
       ? new AbortController()
@@ -162,7 +188,7 @@ async function apiFetch_(action, params = {}) {
 
   const timer =
     controller
-      ? setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+      ? setTimeout(() => controller.abort(), timeoutMs)
       : null;
 
   try {
@@ -1864,11 +1890,16 @@ async function apiAdminRefreshSportsWagerScores(gameId) {
         session.token,
 
       gameId:
+        gameId,
+
+      awardsGameId:
         gameId
     }
   );
 
 }
+
+
 
 async function apiAdminSettleSportsWagers(gameId) {
 
@@ -1885,11 +1916,19 @@ async function apiAdminSettleSportsWagers(gameId) {
         session.token,
 
       gameId:
-        gameId
+        gameId,
+
+      awardsGameId:
+        gameId,
+
+      skipRefresh:
+        true
     }
   );
 
 }
+
+
 
 async function apiAdminAutoSetSportsWagerOdds(gameId) {
 
@@ -1906,11 +1945,16 @@ async function apiAdminAutoSetSportsWagerOdds(gameId) {
         session.token,
 
       gameId:
+        gameId,
+
+      awardsGameId:
         gameId
     }
   );
 
 }
+
+
 
 /* ======================
    SPORTS CONTROL ADMIN

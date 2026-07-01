@@ -2053,7 +2053,11 @@ if (action === "compareUserPicks") {
             gameId,
 
           force:
-            params.force
+            params.force,
+
+          oddsMode:
+            params.oddsMode ||
+            params.mode
         })
       );
 

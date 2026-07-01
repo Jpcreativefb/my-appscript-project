@@ -2688,7 +2688,7 @@ async function refreshWagerScoresFromPage_(){
   if (notice) {
     notice.innerHTML =
       renderBettingNotice_(
-        "Refreshing scores and records...",
+        "Refreshing scores and records. This can take up to a minute...",
         ""
       );
   }
@@ -2743,7 +2743,7 @@ async function settleWagersFromPage_(){
   if (notice) {
     notice.innerHTML =
       renderBettingNotice_(
-        "Settling final games...",
+        "Settling final games. This can take up to a minute...",
         ""
       );
   }
@@ -2800,7 +2800,7 @@ async function autoSetWagerOddsFromPage_(){
   if (notice) {
     notice.innerHTML =
       renderBettingNotice_(
-        "Updating automatic odds. Games with existing bets will be protected...",
+        "Updating automatic odds. This can take up to a minute. Games with existing bets will be protected...",
         ""
       );
   }

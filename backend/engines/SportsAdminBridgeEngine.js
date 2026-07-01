@@ -22,6 +22,9 @@ const SPORTS_ADMIN_BRIDGE_URL_PROPERTY =
 const SPORTS_ADMIN_BRIDGE_KEY_PROPERTY =
   "SPORTS_SCORES_ADMIN_API_KEY";
 
+const SPORTS_ADMIN_BRIDGE_FALLBACK_KEY_PROPERTY =
+  "SPORTS_ADMIN_API_KEY";
+
 /* =====================================================
    BASIC HELPERS
 ===================================================== */
@@ -50,7 +53,7 @@ function sportsAdminBridgeBoolean_(value) {
 
 function sportsAdminBridgeGetUrl_() {
 
-  const url =
+  let url =
     sportsAdminBridgeString_(
       PropertiesService
         .getScriptProperties()
@@ -59,20 +62,31 @@ function sportsAdminBridgeGetUrl_() {
         )
     );
 
-  if (url) {
-    return url;
+  if (
+    !url &&
+    typeof sportsWagerGetApiUrl_ === "function"
+  ) {
+    url = sportsWagerGetApiUrl_();
   }
 
   /*
-    Fallback:
-    SportsWagerEngine already has the Sports Scores
-    Engine URL as SPORTS_WAGER_API_URL.
+    Last fallback:
+    SportsWagerEngine keeps a fallback URL for backward compatibility.
   */
   if (
+    !url &&
     typeof SPORTS_WAGER_API_URL !== "undefined" &&
     SPORTS_WAGER_API_URL
   ) {
-    return SPORTS_WAGER_API_URL;
+    url = SPORTS_WAGER_API_URL;
+  }
+
+  url =
+    sportsAdminBridgeString_(url)
+      .replace(/\?+$/, "");
+
+  if (url) {
+    return url;
   }
 
   throw new Error(
@@ -84,13 +98,20 @@ function sportsAdminBridgeGetUrl_() {
 
 function sportsAdminBridgeGetKey_() {
 
+  const props =
+    PropertiesService
+      .getScriptProperties();
+
   const key =
     sportsAdminBridgeString_(
-      PropertiesService
-        .getScriptProperties()
-        .getProperty(
-          SPORTS_ADMIN_BRIDGE_KEY_PROPERTY
-        )
+      props.getProperty(
+        SPORTS_ADMIN_BRIDGE_KEY_PROPERTY
+      )
+    ) ||
+    sportsAdminBridgeString_(
+      props.getProperty(
+        SPORTS_ADMIN_BRIDGE_FALLBACK_KEY_PROPERTY
+      )
     );
 
   if (!key) {
@@ -170,6 +191,7 @@ function sportsAdminBridgeCall_(
       url,
       {
         method: "get",
+        followRedirects: true,
         muteHttpExceptions: true
       }
     );
