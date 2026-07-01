@@ -92,24 +92,36 @@ function validateUserSession_(
   token
 ) {
 
-  const cachedUsername =
-    CacheService
-      .getScriptCache()
-      .get(token);
+  username =
+    String(username || "")
+      .trim();
 
-  if (!cachedUsername) {
+  token =
+    String(token || "")
+      .trim();
+
+  if (!username || !token) {
+    throw new Error(
+      "Session expired. Please log in again."
+    );
+  }
+
+  const sessionUsername =
+    typeof getUsernameFromSessionToken_ === "function"
+      ? getUsernameFromSessionToken_(token)
+      : "";
+
+  if (!sessionUsername) {
     throw new Error(
       "Session expired. Please log in again."
     );
   }
 
   if (
-    String(cachedUsername)
+    String(sessionUsername)
       .trim()
       .toLowerCase() !==
-    String(username)
-      .trim()
-      .toLowerCase()
+    username.toLowerCase()
   ) {
     throw new Error(
       "Invalid session"

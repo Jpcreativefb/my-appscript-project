@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v1";
+const AWARDS_CACHE = "awards-app-v2-stability-fix";
 
 const APP_SHELL = [
   "./",
@@ -11,16 +11,23 @@ const APP_SHELL = [
   "./css/components.css",
   "./css/pages.css",
   "./css/picks.css",
+  "./css/betting.css",
+  "./css/profile.css",
+  "./css/league-admin.css",
   "./js/config.js",
   "./js/api.js",
   "./js/auth.js",
   "./js/state.js",
-  "./js/router.js",
   "./js/app.js",
   "./js/pwa.js",
   "./js/pages/dashboard.js",
   "./js/pages/picks.js",
-  "./js/pages/leaderboard.js"
+  "./js/pages/leaderboard.js",
+  "./js/pages/betting.js",
+  "./js/pages/admin.js",
+  "./js/pages/adminGames.js",
+  "./js/pages/adminGameSetup.js",
+  "./js/pages/profile.js"
 ];
 
 self.addEventListener("install", event => {

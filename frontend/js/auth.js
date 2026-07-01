@@ -103,10 +103,16 @@ async function login(){
 
   try{
 
+    const rememberDevice =
+      document.getElementById("rememberDevice");
+
     const res =
       await apiLogin(
         username,
-        pin
+        pin,
+        rememberDevice
+          ? rememberDevice.checked
+          : true
       );
 
     if(!res.success){
@@ -119,10 +125,17 @@ async function login(){
 
     }
 
-    localStorage.setItem(
-      "session",
-      JSON.stringify(res)
-    );
+    if (typeof setSession === "function") {
+      setSession(res);
+    } else {
+      localStorage.setItem(
+        "session",
+        JSON.stringify({
+          ...res,
+          createdAt: Date.now()
+        })
+      );
+    }
 
     window.location.href =
       "./app.html";
@@ -231,15 +244,23 @@ async function signup(){
     const loginRes =
       await apiLogin(
         username,
-        pin
+        pin,
+        true
       );
 
     if(loginRes.success){
 
-      localStorage.setItem(
-        "session",
-        JSON.stringify(loginRes)
-      );
+      if (typeof setSession === "function") {
+        setSession(loginRes);
+      } else {
+        localStorage.setItem(
+          "session",
+          JSON.stringify({
+            ...loginRes,
+            createdAt: Date.now()
+          })
+        );
+      }
 
       window.location.href =
         "./app.html";

@@ -13,10 +13,13 @@ function getApiLeagueId_() {
 }
 
 /* ======================
-   GENERIC API FETCH
+   GENERIC API FETCH / JSONP
 ====================== */
 
-async function api(action, params = {}) {
+const API_TIMEOUT_MS =
+  18000;
+
+function buildApiUrl_(action, params = {}) {
 
   const url =
     new URL(API_BASE);
@@ -26,7 +29,7 @@ async function api(action, params = {}) {
     action
   );
 
-  Object.entries(params)
+  Object.entries(params || {})
     .forEach(([key, value]) => {
 
       if (
@@ -38,19 +41,161 @@ async function api(action, params = {}) {
 
       url.searchParams.set(
         key,
-        value
+        String(value)
       );
 
     });
 
+  return url;
+
+}
+
+function shouldUseJsonpApi_() {
+
+  return String(API_BASE || "")
+    .indexOf("script.google.com/macros/") > -1;
+
+}
+
+function apiJsonp_(action, params = {}) {
+
+  return new Promise((resolve) => {
+
+    const callbackName =
+      "__awardsApiCallback_" +
+      Date.now() +
+      "_" +
+      Math.floor(Math.random() * 1000000);
+
+    const url =
+      buildApiUrl_(
+        action,
+        {
+          ...params,
+          callback: callbackName,
+          _ts: Date.now()
+        }
+      );
+
+    const script =
+      document.createElement("script");
+
+    let finished =
+      false;
+
+    function cleanup() {
+
+      if (script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+
+      try {
+        delete window[callbackName];
+      } catch (err) {
+        window[callbackName] = undefined;
+      }
+
+    }
+
+    const timer =
+      setTimeout(() => {
+
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+        cleanup();
+
+        resolve({
+          success: false,
+          message: "Connection timed out. Please try again."
+        });
+
+      }, API_TIMEOUT_MS);
+
+    window[callbackName] = function(data) {
+
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      clearTimeout(timer);
+      cleanup();
+      resolve(data);
+
+    };
+
+    script.onerror = function() {
+
+      if (finished) {
+        return;
+      }
+
+      finished = true;
+      clearTimeout(timer);
+      cleanup();
+
+      resolve({
+        success: false,
+        message: "Connection error. Please refresh and try again."
+      });
+
+    };
+
+    script.src =
+      url.toString();
+
+    document.head.appendChild(script);
+
+  });
+
+}
+
+async function apiFetch_(action, params = {}) {
+
+  const controller =
+    typeof AbortController !== "undefined"
+      ? new AbortController()
+      : null;
+
+  const timer =
+    controller
+      ? setTimeout(() => controller.abort(), API_TIMEOUT_MS)
+      : null;
+
   try {
 
     const response =
-      await fetch(url);
+      await fetch(
+        buildApiUrl_(action, params),
+        controller
+          ? { signal: controller.signal }
+          : {}
+      );
 
-    return await response.json();
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    const text =
+      await response.text();
+
+    try {
+      return JSON.parse(text);
+    } catch (err) {
+      return {
+        success: false,
+        message: "API returned an invalid response."
+      };
+    }
 
   } catch (err) {
+
+    if (timer) {
+      clearTimeout(timer);
+    }
 
     console.error(
       "API ERROR",
@@ -59,10 +204,23 @@ async function api(action, params = {}) {
 
     return {
       success: false,
-      message: "Network error"
+      message:
+        err && err.name === "AbortError"
+          ? "Connection timed out. Please try again."
+          : "Network error"
     };
 
   }
+
+}
+
+async function api(action, params = {}) {
+
+  if (shouldUseJsonpApi_()) {
+    return apiJsonp_(action, params);
+  }
+
+  return apiFetch_(action, params);
 
 }
 

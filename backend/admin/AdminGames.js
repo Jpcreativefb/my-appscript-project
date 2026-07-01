@@ -90,11 +90,59 @@ function adminNormalizeGameId_(value) {
     const sh =
       getGamesSheet_();
 
+    const required = [
+      "GameId",
+      "Name",
+      "Year",
+      "Type",
+      "Active",
+      "Archived",
+      "DefaultGame",
+      "PredictionEnabled",
+      "RankingEnabled",
+      "ConfidenceEnabled",
+      "ConfidenceScoringMode",
+      "WagerEnabled",
+      "StartingBankroll",
+      "MinWager",
+      "MaxWager",
+      "AllowBetRemoval",
+      "WagerEditMode",
+      "ThemeColor",
+      "Icon",
+      "SortOrder",
+      "Status",
+      "LockAllPicks",
+      "ShowLeaderboard",
+      "ShowResultsBeforeLock",
+      "ResultsFinalized",
+      "VotingLocked",
+      "Description",
+      "LockLabel",
+      "AvailableFrom",
+      "AvailableUntil",
+      "HeroImageFileID",
+      "HeroImagePosition"
+    ];
+
     const lastColumn =
       sh.getLastColumn();
 
     if (lastColumn < 1) {
-      return [];
+
+      sh
+        .getRange(
+          1,
+          1,
+          1,
+          required.length
+        )
+        .setValues([
+          required
+        ]);
+
+      return required;
+
     }
 
     const headers =
@@ -110,14 +158,16 @@ function adminNormalizeGameId_(value) {
           return String(header || "").trim();
         });
 
-    const required = [
-      "AllowBetRemoval",
-      "WagerEditMode"
-    ];
+    const lowerHeaders =
+      headers.map(function(header) {
+        return header.toLowerCase();
+      });
 
     const missing =
       required.filter(function(header) {
-        return headers.indexOf(header) === -1;
+        return lowerHeaders.indexOf(
+          header.toLowerCase()
+        ) === -1;
       });
 
     if (missing.length) {

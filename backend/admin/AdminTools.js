@@ -23,14 +23,14 @@ function requireAdmin_(payload) {
     throw new Error("Admin auth missing");
   }
 
-  const cachedUsername =
-    CacheService
-      .getScriptCache()
-      .get(token);
+  const sessionUsername =
+    typeof getUsernameFromSessionToken_ === "function"
+      ? getUsernameFromSessionToken_(token)
+      : "";
 
   if (
-    !cachedUsername ||
-    String(cachedUsername)
+    !sessionUsername ||
+    String(sessionUsername)
       .trim()
       .toLowerCase() !==
     username.toLowerCase()
@@ -671,9 +671,15 @@ function apiAdminCreateUser(payload) {
 
   requireAdmin_(payload);
 
+  payload =
+    payload || {};
+
   const newUsername =
-    String(payload.newUsername || "")
-      .trim();
+    String(
+      payload.newUsername ||
+      payload.username ||
+      ""
+    ).trim();
 
   const pin =
     String(payload.pin || "")
@@ -687,70 +693,48 @@ function apiAdminCreateUser(payload) {
     throw new Error("Missing PIN");
   }
 
-  const sheet =
-    getUsersSheet_();
-
-  const data =
-    sheet.getDataRange()
-      .getValues();
-
-  const headers =
-    data[0].map(h =>
-      String(h).trim()
+  const result =
+    createUser(
+      newUsername,
+      payload.realName || payload.displayName || "",
+      pin,
+      payload.email || "",
+      payload.phone || "",
+      payload.contactMethod || "none"
     );
 
-  const col =
-    adminUsersColumnMap_(headers);
-
-  adminValidateUsersColumns_(col);
-
-  const existing =
-    data.slice(1).some(row =>
-      String(row[col.username] || "")
-        .trim()
-        .toLowerCase() ===
-      newUsername.toLowerCase()
-    );
-
-  if (existing) {
+  if (!result || result.success === false) {
     throw new Error(
-      "User already exists: " + newUsername
+      result && (result.message || result.error)
+        ? result.message || result.error
+        : "Could not create user"
     );
   }
 
-  const row =
-    new Array(headers.length).fill("");
+  const record =
+    findUserRecordByUsername_(
+      newUsername
+    );
 
-  row[col.username] =
-    newUsername;
+  if (record) {
 
-  row[col.pin] =
-    "'" + pin;
+    updateUserFields_(
+      record.rowNumber,
+      {
+        isAdmin:
+          adminBoolean_(payload.isAdmin),
+        avatar:
+          payload.avatar || "default",
+        themeColor:
+          payload.themeColor || "#000000",
+        accountStatus:
+          "active",
+        lastUpdated:
+          new Date().toISOString()
+      }
+    );
 
-  row[col.isAdmin] =
-    adminBoolean_(payload.isAdmin);
-
-  if (col.avatar > -1) {
-    row[col.avatar] =
-      payload.avatar || "avatar1";
   }
-
-  if (col.themeColor > -1) {
-    row[col.themeColor] =
-      payload.themeColor || "#ffcc00";
-  }
-
-  if (col.createdAt > -1) {
-    row[col.createdAt] =
-      new Date().toISOString();
-  }
-
-  if (col.active > -1) {
-    row[col.active] =
-      true;
-  }
-
-  sheet.appendRow(row);
 
   if (
     typeof clearAppCaches ===
@@ -762,7 +746,8 @@ function apiAdminCreateUser(payload) {
   return {
     success: true,
     message: "User created",
-    username: newUsername
+    username: newUsername,
+    user: result.user || null
   };
 
 }

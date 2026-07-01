@@ -1,8 +1,12 @@
+var API_JSON_CALLBACK_ = "";
+
 /* =========================
    API POST
 ========================= */
 
 function doPost(e) {
+
+  API_JSON_CALLBACK_ = "";
 
   try {
 
@@ -136,6 +140,13 @@ function doGet(e) {
       e && e.parameter
         ? e.parameter
         : {};
+
+    API_JSON_CALLBACK_ =
+      String(
+        params.callback ||
+        params.jsonp ||
+        ""
+      ).trim();
 
     /* =========================
        ADMIN ACTIONS
@@ -2549,6 +2560,34 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
 ========================= */
 
 function json(obj) {
+
+  const callback =
+    String(
+      typeof API_JSON_CALLBACK_ !== "undefined"
+        ? API_JSON_CALLBACK_
+        : ""
+    ).trim();
+
+  if (callback) {
+
+    const safeCallback =
+      /^[A-Za-z_$][0-9A-Za-z_$]*(\.[A-Za-z_$][0-9A-Za-z_$]*)*$/.test(callback)
+        ? callback
+        : "";
+
+    if (safeCallback) {
+
+      return ContentService
+        .createTextOutput(
+          safeCallback + "(" + JSON.stringify(obj) + ");"
+        )
+        .setMimeType(
+          ContentService.MimeType.JAVASCRIPT
+        );
+
+    }
+
+  }
 
   return ContentService
     .createTextOutput(
