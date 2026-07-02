@@ -5261,7 +5261,10 @@ function testApiGetSportsScoresFunctionExists() {
 function testSportsAdminDashboard() {
 
   return apiGetSportsAdminDashboard_({
-    adminKey: "2s11aj0jce77zb3kp904fwm304yw2a0b"
+    adminKey:
+      PropertiesService
+        .getScriptProperties()
+        .getProperty("SPORTS_ADMIN_API_KEY")
   });
 
 }
