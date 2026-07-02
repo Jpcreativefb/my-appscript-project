@@ -9,6 +9,47 @@
  Deploy this project as a web app if you want external calls.
 ************************************************************/
 
+function racingApiGetAdminKey_() {
+
+  const props =
+    PropertiesService.getScriptProperties();
+
+  return String(
+    props.getProperty("RACING_SCORE_ENGINE_API_KEY") ||
+    props.getProperty("RACING_SCORE_ENGINE_ADMIN_KEY") ||
+    ""
+  ).trim();
+
+}
+
+function racingApiRequireAdmin_(params) {
+
+  params = params || {};
+
+  const expected =
+    racingApiGetAdminKey_();
+
+  const provided =
+    String(
+      params.apiKey ||
+      params.adminKey ||
+      ""
+    ).trim();
+
+  if (!expected) {
+    throw new Error(
+      "Racing API admin key is not configured. Set RACING_SCORE_ENGINE_API_KEY in Script Properties."
+    );
+  }
+
+  if (provided !== expected) {
+    throw new Error(
+      "Unauthorized racing admin request"
+    );
+  }
+
+}
+
 function doGet(e) {
 
   const params =
@@ -33,10 +74,12 @@ function doGet(e) {
     }
 
     else if (action === "setupRacing") {
+      racingApiRequireAdmin_(params);
       payload = setupRacingScoreEngine();
     }
 
     else if (action === "refreshRacingLeague") {
+      racingApiRequireAdmin_(params);
       payload = apiRefreshSportsRacingLeague_(params);
     }
 

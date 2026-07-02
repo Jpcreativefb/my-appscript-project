@@ -275,6 +275,11 @@ function getLeaderboardData(
       gameId
     );
 
+  const categoryResultWinners =
+    typeof getCategoryResultsWinnerMap === "function"
+      ? getCategoryResultsWinnerMap(gameId)
+      : {};
+
   /* =====================================================
      PICKS
   ===================================================== */
@@ -344,17 +349,25 @@ function getLeaderboardData(
              DETERMINE WINNER
           ===================================================== */
 
+          const categoryResultWinnerId =
+            normalizeScoreString_(
+              categoryResultWinners[categoryId] ||
+              ""
+            );
+
           const winnerNomineeId =
 
             projected
 
               ? normalizeScoreString_(
+                  categoryResultWinnerId ||
                   config.winnerNomineeId ||
                   config.favoriteNomineeId ||
                   ""
                 )
 
               : normalizeScoreString_(
+                  categoryResultWinnerId ||
                   config.winnerNomineeId ||
                   ""
                 );

@@ -799,6 +799,12 @@ function setupSportsWagerSystem() {
     sportsWagerEnsureColumns_(
       CATEGORIES_SHEET,
       [
+        "QuestionType",
+        "ScoringEngine",
+        "SelectionMode",
+        "EntryType",
+        "OddsMode",
+        "ResultSource",
         "SportsProvider",
         "SportsGameId",
         "ESPNEventId",
@@ -827,8 +833,17 @@ function setupSportsWagerSystem() {
     sportsWagerEnsureColumns_(
       CATEGORY_SETTINGS_SHEET,
       [
+        "QuestionType",
+        "ScoringEngine",
+        "SelectionMode",
+        "ScoreMode",
+        "OddsMode",
+        "ResultSource",
+        "SettlementStatus",
         "SportsGameId",
         "ESPNEventId",
+        "SportsMarket",
+        "SportsLeague",
         "WagerResultType",
         "OddsReady",
         "OddsSource",
@@ -2758,11 +2773,64 @@ function appendSportsWagerCategoryRow_(
     true
   );
 
+  const cleanOdds =
+    sportsWagerCleanOddsForSheet_(
+      entry.odds
+    );
+
   sportsWagerSetIfExists_(
     row,
     col,
     "CommunityRank",
     false
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "QuestionType",
+    market === "soccer-moneyline"
+      ? "team-matchup-draw"
+      : "team-matchup"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "ScoringEngine",
+    "sports"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SelectionMode",
+    "single"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "EntryType",
+    entry.selection === "draw"
+      ? "prop-answer"
+      : "team"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "OddsMode",
+    cleanOdds !== ""
+      ? "manual"
+      : "real"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "ResultSource",
+    "sports-engine"
   );
 
   sportsWagerSetIfExists_(
@@ -2897,11 +2965,6 @@ function appendSportsWagerCategoryRow_(
     "SportsPeriod",
     sportsWagerString_(score.Period)
   );
-
-  const cleanOdds =
-    sportsWagerCleanOddsForSheet_(
-      entry.odds
-    );
 
   sportsWagerSetIfExists_(
     row,
@@ -3103,6 +3166,35 @@ function updateSportsWagerCategoryRowsFromScore_(
     if (col.SportsProvider !== undefined) {
       updatedData[i][col.SportsProvider] =
         "ESPN";
+    }
+
+    if (col.QuestionType !== undefined) {
+      updatedData[i][col.QuestionType] =
+        market === "soccer-moneyline"
+          ? "team-matchup-draw"
+          : "team-matchup";
+    }
+
+    if (col.ScoringEngine !== undefined) {
+      updatedData[i][col.ScoringEngine] =
+        "sports";
+    }
+
+    if (col.SelectionMode !== undefined) {
+      updatedData[i][col.SelectionMode] =
+        "single";
+    }
+
+    if (col.EntryType !== undefined) {
+      updatedData[i][col.EntryType] =
+        selection === "draw"
+          ? "prop-answer"
+          : "team";
+    }
+
+    if (col.ResultSource !== undefined) {
+      updatedData[i][col.ResultSource] =
+        "sports-engine";
     }
 
     if (col.SportsGameId !== undefined) {
@@ -3574,6 +3666,78 @@ function appendSportsWagerSettingsRow_(
     ""
   );
 
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "QuestionType",
+    market === "soccer-moneyline"
+      ? "team-matchup-draw"
+      : "team-matchup"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "ScoringEngine",
+    "sports"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SelectionMode",
+    "single"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "ScoreMode",
+    "wager"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "OddsMode",
+    "real"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "ResultSource",
+    "sports-engine"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SettlementStatus",
+    "pending"
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsMarket",
+    market
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "SportsLeague",
+    sportsWagerString_(score.League)
+  );
+
+  sportsWagerSetIfExists_(
+    row,
+    col,
+    "VotingTypes",
+    "wager"
+  );
+
   sh.appendRow(row);
 
   return true;
@@ -3667,10 +3831,17 @@ function sportsWagerGetCategoryOddsStatus_(
         row[col.SportsMarket]
       );
 
+    const oddsMode =
+      col.OddsMode !== undefined
+        ? sportsWagerKey_(row[col.OddsMode])
+        : "";
+
     const oddsReady =
-      sportsWagerOddsValueIsReady_(
-        row[col.BettingOdds]
-      );
+      oddsMode === "none"
+        ? true
+        : sportsWagerOddsValueIsReady_(
+            row[col.BettingOdds]
+          );
 
     const lineReady =
       market === "spread" ||
@@ -4511,11 +4682,38 @@ function setSportsGameIdOnCategorySettings_(
   const votingTypesCol =
     ensureHeader_("VotingTypes");
 
+  const questionTypeCol =
+    ensureHeader_("QuestionType");
+
+  const scoringEngineCol =
+    ensureHeader_("ScoringEngine");
+
+  const selectionModeCol =
+    ensureHeader_("SelectionMode");
+
+  const scoreModeCol =
+    ensureHeader_("ScoreMode");
+
+  const oddsModeCol =
+    ensureHeader_("OddsMode");
+
+  const resultSourceCol =
+    ensureHeader_("ResultSource");
+
+  const settlementStatusCol =
+    ensureHeader_("SettlementStatus");
+
   const sportsGameIdCol =
     ensureHeader_("SportsGameId");
 
   const espnEventIdCol =
     ensureHeader_("ESPNEventId");
+
+  const sportsMarketCol =
+    ensureHeader_("SportsMarket");
+
+  const sportsLeagueCol =
+    ensureHeader_("SportsLeague");
 
   const wagerResultTypeCol =
     ensureHeader_("WagerResultType");
@@ -4686,6 +4884,43 @@ function setSportsGameIdOnCategorySettings_(
   }
 
   setValue_(
+    questionTypeCol,
+    market === "soccer-moneyline"
+      ? "team-matchup-draw"
+      : "team-matchup"
+  );
+
+  setValue_(
+    scoringEngineCol,
+    "sports"
+  );
+
+  setValue_(
+    selectionModeCol,
+    "single"
+  );
+
+  setValue_(
+    scoreModeCol,
+    "wager"
+  );
+
+  setIfBlank_(
+    oddsModeCol,
+    "real"
+  );
+
+  setValue_(
+    resultSourceCol,
+    "sports-engine"
+  );
+
+  setIfBlank_(
+    settlementStatusCol,
+    "pending"
+  );
+
+  setValue_(
     sportsGameIdCol,
     cleanSportsGameId
   );
@@ -4693,6 +4928,16 @@ function setSportsGameIdOnCategorySettings_(
   setValue_(
     espnEventIdCol,
     cleanEspnEventId
+  );
+
+  setValue_(
+    sportsMarketCol,
+    market
+  );
+
+  setValue_(
+    sportsLeagueCol,
+    league
   );
 
   setIfBlank_(

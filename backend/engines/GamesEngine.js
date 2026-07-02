@@ -44,7 +44,42 @@ function getSupportedGameTypes() {
       predictionEnabled: false,
       rankingEnabled: false,
       confidenceEnabled: false,
-      wagerEnabled: true
+      wagerEnabled: true,
+      racingEnabled: false,
+      mixedGame: false
+    },
+    {
+      id: "racing-wager",
+      label: "Racing Wager Game",
+      description: "Users pick or wager on racing drivers, teams, finishing markets, and race props.",
+      predictionEnabled: false,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: true,
+      racingEnabled: true,
+      mixedGame: false
+    },
+    {
+      id: "mixed",
+      label: "Mixed Question Game",
+      description: "A flexible game that can combine awards, sports, racing, props, survivor, wagers, and rankings.",
+      predictionEnabled: true,
+      rankingEnabled: true,
+      confidenceEnabled: false,
+      wagerEnabled: true,
+      racingEnabled: true,
+      mixedGame: true
+    },
+    {
+      id: "survivor",
+      label: "Survivor / Elimination Game",
+      description: "Users make round-based picks where contestants, teams, or entries can be eliminated over time.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
     },
     {
       id: "ranking",
@@ -53,7 +88,9 @@ function getSupportedGameTypes() {
       predictionEnabled: false,
       rankingEnabled: true,
       confidenceEnabled: false,
-      wagerEnabled: false
+      wagerEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
     }
   ];
 
@@ -227,7 +264,25 @@ function getGamesColumnMap_(headers) {
       headers.indexOf("AllowBetRemoval"),
 
     wagerEditMode:
-      headers.indexOf("WagerEditMode"),  
+      headers.indexOf("WagerEditMode"),
+
+    mixedGame:
+      headers.indexOf("MixedGame"),
+
+    scoringMode:
+      headers.indexOf("ScoringMode"),
+
+    scoringEngine:
+      headers.indexOf("ScoringEngine"),
+
+    racingLeague:
+      headers.indexOf("RacingLeague"),
+
+    racingSeriesId:
+      headers.indexOf("RacingSeriesId"),
+
+    racingMarket:
+      headers.indexOf("RacingMarket"),  
 
     themeColor:
       headers.indexOf("ThemeColor"),
@@ -604,6 +659,69 @@ function buildGameObjectFromRow_(
         )
       ) || "editable_until_lock",
 
+    mixedGame:
+      col.mixedGame !== -1
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.mixedGame,
+              typeConfig.mixedGame === true
+            )
+          )
+        : typeConfig.mixedGame === true,
+
+    scoringMode:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.scoringMode,
+          type === "mixed"
+            ? "mixed"
+            : "standard"
+        )
+      ) || "standard",
+
+    scoringEngine:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.scoringEngine,
+          typeConfig.racingEnabled === true
+            ? "racing"
+            : "manual"
+        )
+      ) || "manual",
+
+    racingEnabled:
+      typeConfig.racingEnabled === true,
+
+    racingLeague:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.racingLeague,
+          ""
+        )
+      ),
+
+    racingSeriesId:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.racingSeriesId,
+          ""
+        )
+      ),
+
+    racingMarket:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.racingMarket,
+          "race-winner"
+        )
+      ) || "race-winner",
+
     themeColor:
       normalizeGameValue_(
         getGameCell_(
@@ -924,6 +1042,27 @@ function getPublicActiveGames() {
 
       wagerEnabled:
         game.wagerEnabled === true,
+
+      mixedGame:
+        game.mixedGame === true,
+
+      scoringMode:
+        game.scoringMode || "standard",
+
+      scoringEngine:
+        game.scoringEngine || "manual",
+
+      racingEnabled:
+        game.racingEnabled === true,
+
+      racingLeague:
+        game.racingLeague || "",
+
+      racingSeriesId:
+        game.racingSeriesId || "",
+
+      racingMarket:
+        game.racingMarket || "race-winner",
 
       themeColor:
         game.themeColor || "",

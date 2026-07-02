@@ -117,7 +117,46 @@ function getCategorySettingsColumnMap_(headers){
       headers.indexOf("OddsSource"),
 
     oddsLastUpdated:
-      headers.indexOf("OddsLastUpdated")
+      headers.indexOf("OddsLastUpdated"),
+
+    questionType:
+      headers.indexOf("QuestionType"),
+
+    scoringEngine:
+      headers.indexOf("ScoringEngine"),
+
+    selectionMode:
+      headers.indexOf("SelectionMode"),
+
+    scoreMode:
+      headers.indexOf("ScoreMode"),
+
+    oddsMode:
+      headers.indexOf("OddsMode"),
+
+    resultSource:
+      headers.indexOf("ResultSource"),
+
+    settlementStatus:
+      headers.indexOf("SettlementStatus"),
+
+    maxSelections:
+      headers.indexOf("MaxSelections"),
+
+    minSelections:
+      headers.indexOf("MinSelections"),
+
+    allowDraw:
+      headers.indexOf("AllowDraw"),
+
+    allowPush:
+      headers.indexOf("AllowPush"),
+
+    sportsMarket:
+      headers.indexOf("SportsMarket"),
+
+    sportsLeague:
+      headers.indexOf("SportsLeague")
 
   };
 
@@ -379,6 +418,81 @@ function getCategorySettings(gameId){
           ? String(
               row[col.oddsLastUpdated]
             ).trim()
+          : "",
+
+      questionType:
+        col.questionType > -1
+          ? String(row[col.questionType] || "").trim()
+          : "award-single-winner",
+
+      scoringEngine:
+        col.scoringEngine > -1
+          ? String(row[col.scoringEngine] || "").trim()
+          : "manual",
+
+      selectionMode:
+        col.selectionMode > -1
+          ? String(row[col.selectionMode] || "").trim()
+          : "single",
+
+      scoreMode:
+        col.scoreMode > -1
+          ? String(row[col.scoreMode] || "").trim()
+          : "correct-pick",
+
+      oddsMode:
+        col.oddsMode > -1
+          ? String(row[col.oddsMode] || "").trim()
+          : "none",
+
+      resultSource:
+        col.resultSource > -1
+          ? String(row[col.resultSource] || "").trim()
+          : "manual",
+
+      settlementStatus:
+        col.settlementStatus > -1
+          ? String(row[col.settlementStatus] || "").trim()
+          : "pending",
+
+      maxSelections:
+        col.maxSelections > -1
+          ? Number(row[col.maxSelections]) || 1
+          : 1,
+
+      minSelections:
+        col.minSelections > -1
+          ? Number(row[col.minSelections]) || 1
+          : 1,
+
+      allowDraw:
+        col.allowDraw > -1
+          ? (
+              row[col.allowDraw] === true ||
+              String(row[col.allowDraw] || "")
+                .trim()
+                .toLowerCase() === "true"
+            )
+          : false,
+
+      allowPush:
+        col.allowPush > -1
+          ? (
+              row[col.allowPush] === true ||
+              String(row[col.allowPush] || "")
+                .trim()
+                .toLowerCase() === "true"
+            )
+          : false,
+
+      sportsMarket:
+        col.sportsMarket > -1
+          ? String(row[col.sportsMarket] || "").trim()
+          : "",
+
+      sportsLeague:
+        col.sportsLeague > -1
+          ? String(row[col.sportsLeague] || "").trim()
           : ""
 
     };
@@ -564,6 +678,43 @@ function saveCategorySettings(
           c.oddsLastUpdated || "";
       }
 
+      const optionalStringFields = [
+        "questionType",
+        "scoringEngine",
+        "selectionMode",
+        "scoreMode",
+        "oddsMode",
+        "resultSource",
+        "settlementStatus",
+        "sportsMarket",
+        "sportsLeague",
+        "wagerResultType",
+        "sportsGameId",
+        "espnEventId"
+      ];
+
+      optionalStringFields.forEach(function(key) {
+        if (col[key] > -1) {
+          row[col[key]] = c[key] || "";
+        }
+      });
+
+      if (col.maxSelections > -1) {
+        row[col.maxSelections] = Number(c.maxSelections) || 1;
+      }
+
+      if (col.minSelections > -1) {
+        row[col.minSelections] = Number(c.minSelections) || 1;
+      }
+
+      if (col.allowDraw > -1) {
+        row[col.allowDraw] = c.allowDraw === true;
+      }
+
+      if (col.allowPush > -1) {
+        row[col.allowPush] = c.allowPush === true;
+      }
+
       keepRows.push(row);
 
     });
@@ -715,6 +866,44 @@ function updateCategorySetting(
       row[col.winnerNomineeId] =
         patch.winnerNomineeId || "";
 
+      [
+        "questionType",
+        "scoringEngine",
+        "selectionMode",
+        "scoreMode",
+        "oddsMode",
+        "resultSource",
+        "settlementStatus",
+        "sportsMarket",
+        "sportsLeague",
+        "wagerResultType",
+        "sportsGameId",
+        "espnEventId"
+      ].forEach(function(key) {
+        if (
+          key in patch &&
+          col[key] > -1
+        ) {
+          row[col[key]] = patch[key] || "";
+        }
+      });
+
+      if (col.maxSelections > -1) {
+        row[col.maxSelections] = Number(patch.maxSelections) || 1;
+      }
+
+      if (col.minSelections > -1) {
+        row[col.minSelections] = Number(patch.minSelections) || 1;
+      }
+
+      if (col.allowDraw > -1) {
+        row[col.allowDraw] = patch.allowDraw === true;
+      }
+
+      if (col.allowPush > -1) {
+        row[col.allowPush] = patch.allowPush === true;
+      }
+
       appendCategorySettingsRow_(row);
 
     }
@@ -819,6 +1008,54 @@ function updateCategorySetting(
         );
 
       }
+
+      const optionalPatchFields = [
+        "questionType",
+        "scoringEngine",
+        "selectionMode",
+        "scoreMode",
+        "oddsMode",
+        "resultSource",
+        "settlementStatus",
+        "sportsMarket",
+        "sportsLeague",
+        "wagerResultType",
+        "sportsGameId",
+        "espnEventId",
+        "maxSelections",
+        "minSelections",
+        "allowDraw",
+        "allowPush"
+      ];
+
+      optionalPatchFields.forEach(function(key) {
+        if (
+          key in patch &&
+          col[key] > -1
+        ) {
+          let value = patch[key];
+
+          if (
+            key === "maxSelections" ||
+            key === "minSelections"
+          ) {
+            value = Number(value) || 1;
+          }
+
+          if (
+            key === "allowDraw" ||
+            key === "allowPush"
+          ) {
+            value = value === true;
+          }
+
+          updateCategorySettingsCell_(
+            rowIndex,
+            col[key] + 1,
+            value
+          );
+        }
+      });
 
     }
 

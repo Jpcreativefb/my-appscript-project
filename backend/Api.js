@@ -198,11 +198,18 @@ function doGet(e) {
       "adminSetLiveWinner",
       "adminClearLiveWinner",
 
+      "adminSetupUniversalQuestionSystem",
+
       "adminCreateSportsWager",
       "adminCreateSportsWagersBulk",
       "adminSettleSportsWagers",
       "adminRefreshSportsWagerScores",
       "adminAutoSetSportsWagerOdds",
+
+      "adminSetupRacingWagerSystem",
+      "adminCreateRacingWager",
+      "adminRefreshRacingWagerScores",
+      "adminSettleRacingWagers",
 
       "adminSetupSportsControls",
       "adminGetSportsControlDashboard",
@@ -1860,6 +1867,88 @@ if (action === "compareUserPicks") {
         getBettingOptions(
           gameId
         )
+      );
+
+    }
+
+    // =========================
+    // ADMIN: UNIVERSAL QUESTION SYSTEM
+    // =========================
+
+    if (action === "adminSetupUniversalQuestionSystem") {
+
+      return json(
+        apiAdminSetupUniversalQuestionSystem({
+          username: params.username,
+          token: params.token
+        })
+      );
+
+    }
+
+    // =========================
+    // ADMIN: RACING WAGERS
+    // =========================
+
+    if (action === "adminSetupRacingWagerSystem") {
+
+      return json(
+        apiAdminSetupRacingWagerSystem({
+          username: params.username,
+          token: params.token
+        })
+      );
+
+    }
+
+    if (action === "adminCreateRacingWager") {
+
+      return json(
+        apiAdminCreateRacingWager({
+          username: params.username,
+          token: params.token,
+          awardsGameId: params.awardsGameId || gameId,
+          gameId: params.gameId,
+          racingGameId: params.racingGameId || params.sportsGameId,
+          sportsGameId: params.sportsGameId || params.racingGameId,
+          espnEventId: params.espnEventId,
+          league: params.league || params.racingLeague,
+          racingLeague: params.racingLeague || params.league,
+          racingMarket: params.racingMarket || params.market,
+          market: params.market || params.racingMarket,
+          categoryId: params.categoryId,
+          categoryName: params.categoryName,
+          raceName: params.raceName,
+          oddsMode: params.oddsMode,
+          oddsByDriverJson: params.oddsByDriverJson
+        })
+      );
+
+    }
+
+    if (action === "adminRefreshRacingWagerScores") {
+
+      return json(
+        apiAdminRefreshRacingWagerScores({
+          username: params.username,
+          token: params.token,
+          awardsGameId: params.awardsGameId || gameId,
+          gameId: params.gameId
+        })
+      );
+
+    }
+
+    if (action === "adminSettleRacingWagers") {
+
+      return json(
+        apiAdminSettleRacingWagers({
+          username: params.username,
+          token: params.token,
+          awardsGameId: params.awardsGameId || gameId,
+          gameId: params.gameId,
+          force: params.force
+        })
       );
 
     }

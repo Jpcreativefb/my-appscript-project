@@ -161,7 +161,76 @@ function getCategoriesColumnMap_(headers){
       headers.indexOf("SportsClock"),
     
     sportsPeriod:
-      headers.indexOf("SportsPeriod")
+      headers.indexOf("SportsPeriod"),
+
+    sportsProvider:
+      headers.indexOf("SportsProvider"),
+
+    sportsState:
+      headers.indexOf("SportsState"),
+
+    sportsMarket:
+      headers.indexOf("SportsMarket"),
+
+    sportsSelection:
+      headers.indexOf("SportsSelection"),
+
+    sportsLine:
+      headers.indexOf("SportsLine"),
+
+    bettingOdds:
+      headers.indexOf("BettingOdds"),
+
+    oddsSource:
+      headers.indexOf("OddsSource"),
+
+    oddsLastUpdated:
+      headers.indexOf("OddsLastUpdated"),
+
+    questionType:
+      headers.indexOf("QuestionType"),
+
+    scoringEngine:
+      headers.indexOf("ScoringEngine"),
+
+    selectionMode:
+      headers.indexOf("SelectionMode"),
+
+    entryType:
+      headers.indexOf("EntryType"),
+
+    oddsMode:
+      headers.indexOf("OddsMode"),
+
+    resultSource:
+      headers.indexOf("ResultSource"),
+
+    roundNumber:
+      headers.indexOf("RoundNumber"),
+
+    racingDriverId:
+      headers.indexOf("RacingDriverId"),
+
+    racingCarNumber:
+      headers.indexOf("RacingCarNumber"),
+
+    racingTeam:
+      headers.indexOf("RacingTeam"),
+
+    racingManufacturer:
+      headers.indexOf("RacingManufacturer"),
+
+    racingStartingPosition:
+      headers.indexOf("RacingStartingPosition"),
+
+    racingCurrentPosition:
+      headers.indexOf("RacingCurrentPosition"),
+
+    racingFinalPosition:
+      headers.indexOf("RacingFinalPosition"),
+
+    racingWinner:
+      headers.indexOf("RacingWinner")
 
   };
 
@@ -425,6 +494,62 @@ function getCategories(gameId){
         scoreVersion:
           config.scoreVersion || "",
 
+        questionType:
+          config.questionType ||
+          (
+            col.questionType > -1
+              ? String(row[col.questionType] || "").trim()
+              : ""
+          ) || "award-single-winner",
+
+        scoringEngine:
+          config.scoringEngine ||
+          (
+            col.scoringEngine > -1
+              ? String(row[col.scoringEngine] || "").trim()
+              : ""
+          ) || "manual",
+
+        selectionMode:
+          config.selectionMode ||
+          (
+            col.selectionMode > -1
+              ? String(row[col.selectionMode] || "").trim()
+              : ""
+          ) || "single",
+
+        entryType:
+          col.entryType > -1
+            ? String(row[col.entryType] || "").trim()
+            : "nominee",
+
+        oddsMode:
+          config.oddsMode ||
+          (
+            col.oddsMode > -1
+              ? String(row[col.oddsMode] || "").trim()
+              : ""
+          ) || "none",
+
+        scoreMode:
+          config.scoreMode || "correct-pick",
+
+        resultSource:
+          config.resultSource ||
+          (
+            col.resultSource > -1
+              ? String(row[col.resultSource] || "").trim()
+              : ""
+          ) || "manual",
+
+        roundNumber:
+          col.roundNumber > -1
+            ? String(row[col.roundNumber] || "").trim()
+            : "",
+
+        settlementStatus:
+          config.settlementStatus || "pending",
+
         /* =========================
            RESULTS
         ========================= */
@@ -473,6 +598,11 @@ function getCategories(gameId){
 
             : false,
         
+        sportsProvider:
+            col.sportsProvider > -1
+              ? String(row[col.sportsProvider] || "").trim()
+              : "",
+
         sportsLeague:
             col.sportsLeague > -1
               ? String(row[col.sportsLeague] || "").trim()
@@ -522,6 +652,19 @@ function getCategories(gameId){
             col.sportsStatus > -1
               ? String(row[col.sportsStatus] || "").trim()
               : "",
+
+        sportsState:
+            col.sportsState > -1
+              ? String(row[col.sportsState] || "").trim()
+              : "",
+
+        sportsMarket:
+            config.sportsMarket ||
+            (
+              col.sportsMarket > -1
+                ? String(row[col.sportsMarket] || "").trim()
+                : ""
+            ),
           
         sportsClock:
             col.sportsClock > -1
@@ -531,7 +674,22 @@ function getCategories(gameId){
         sportsPeriod:
             col.sportsPeriod > -1
               ? String(row[col.sportsPeriod] || "").trim()
-              : "",    
+              : "",
+
+        oddsReady:
+          config.oddsReady === true,
+
+        oddsSource:
+          config.oddsSource || "",
+
+        oddsLastUpdated:
+          config.oddsLastUpdated || "",
+
+        maxSelections:
+          Number(config.maxSelections) || 1,
+
+        minSelections:
+          Number(config.minSelections) || 1,
 
         /* =========================
            NOMINEES
@@ -618,7 +776,85 @@ function getCategories(gameId){
             : "",
 
         image:
-          nomineeImage
+          nomineeImage,
+
+        entryType:
+          col.entryType > -1
+            ? String(row[col.entryType] || "").trim()
+            : "nominee",
+
+        sportsSelection:
+          col.sportsSelection > -1
+            ? String(row[col.sportsSelection] || "").trim()
+            : "",
+
+        sportsLine:
+          col.sportsLine > -1
+            ? String(row[col.sportsLine] || "").trim()
+            : "",
+
+        bettingOdds:
+          col.bettingOdds > -1
+            ? row[col.bettingOdds]
+            : "",
+
+        oddsSource:
+          col.oddsSource > -1
+            ? String(row[col.oddsSource] || "").trim()
+            : "",
+
+        oddsLastUpdated:
+          col.oddsLastUpdated > -1
+            ? String(row[col.oddsLastUpdated] || "").trim()
+            : "",
+
+        logoUrl:
+          logoUrl,
+
+        racingDriverId:
+          col.racingDriverId > -1
+            ? String(row[col.racingDriverId] || "").trim()
+            : "",
+
+        racingCarNumber:
+          col.racingCarNumber > -1
+            ? String(row[col.racingCarNumber] || "").trim()
+            : "",
+
+        racingTeam:
+          col.racingTeam > -1
+            ? String(row[col.racingTeam] || "").trim()
+            : "",
+
+        racingManufacturer:
+          col.racingManufacturer > -1
+            ? String(row[col.racingManufacturer] || "").trim()
+            : "",
+
+        racingStartingPosition:
+          col.racingStartingPosition > -1
+            ? row[col.racingStartingPosition]
+            : "",
+
+        racingCurrentPosition:
+          col.racingCurrentPosition > -1
+            ? row[col.racingCurrentPosition]
+            : "",
+
+        racingFinalPosition:
+          col.racingFinalPosition > -1
+            ? row[col.racingFinalPosition]
+            : "",
+
+        racingWinner:
+          col.racingWinner > -1
+            ? (
+                row[col.racingWinner] === true ||
+                String(row[col.racingWinner] || "")
+                  .trim()
+                  .toLowerCase() === "true"
+              )
+            : false
 
       });
 

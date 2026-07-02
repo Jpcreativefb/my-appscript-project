@@ -17,18 +17,26 @@ function getApiLeagueId_() {
 ====================== */
 
 const API_TIMEOUT_MS =
-  18000;
+  45000;
 
 const API_LONG_TIMEOUT_MS =
-  90000;
+  120000;
 
 const API_LONG_TIMEOUT_ACTIONS =
   new Set([
+    "getStartupPayload",
+    "getDashboardGamesHub",
+    "getEditableProfile",
+    "adminSummary",
+    "adminGetGames",
+    "adminGetGameSetup",
     "adminRefreshSportsWagerScores",
     "adminAutoSetSportsWagerOdds",
     "adminSettleSportsWagers",
     "adminRunSportsOddsHybridRefresh",
-    "adminRefreshSportsOddsLeague"
+    "adminRefreshSportsOddsLeague",
+    "adminRefreshRacingWagerScores",
+    "adminSettleRacingWagers"
   ]);
 
 function getApiTimeoutMs_(action) {
@@ -106,10 +114,29 @@ function apiJsonp_(action, params = {}) {
     let finished =
       false;
 
-    function cleanup() {
+    function cleanup(keepLateCallback) {
 
       if (script.parentNode) {
         script.parentNode.removeChild(script);
+      }
+
+      if (keepLateCallback) {
+
+        // Apps Script can finish after our UI timeout.
+        // Keep a harmless callback temporarily so a late JSONP response
+        // does not throw "callback is not defined" in the console.
+        window[callbackName] = function() {};
+
+        setTimeout(() => {
+          try {
+            delete window[callbackName];
+          } catch (err) {
+            window[callbackName] = undefined;
+          }
+        }, 120000);
+
+        return;
+
       }
 
       try {
@@ -128,7 +155,7 @@ function apiJsonp_(action, params = {}) {
         }
 
         finished = true;
-        cleanup();
+        cleanup(true);
 
         resolve({
           success: false,
@@ -145,7 +172,7 @@ function apiJsonp_(action, params = {}) {
 
       finished = true;
       clearTimeout(timer);
-      cleanup();
+      cleanup(false);
       resolve(data);
 
     };
@@ -158,7 +185,7 @@ function apiJsonp_(action, params = {}) {
 
       finished = true;
       clearTimeout(timer);
-      cleanup();
+      cleanup(false);
 
       resolve({
         success: false,

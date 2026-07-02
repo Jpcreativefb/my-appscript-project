@@ -189,7 +189,7 @@ function apiGetDashboardGamesHub(payload) {
     ) {
 
       activeGames.push(
-        buildDashboardGameHubItem_(
+        buildDashboardGameHubItemLite_(
           game,
           username,
           false
@@ -203,7 +203,7 @@ function apiGetDashboardGamesHub(payload) {
     if (isPast) {
 
       pastGames.push(
-        buildDashboardGameHubItem_(
+        buildDashboardGameHubItemLite_(
           game,
           username,
           true
@@ -234,11 +234,9 @@ function apiGetDashboardGamesHub(payload) {
           profileGameId
         ) || {};
 
-      profileHistory =
-        getUserProfileHistory(
-          username,
-          profileGameId
-        ) || [];
+      // Keep the dashboard hub lightweight. Full profile history can be
+      // loaded from the profile page instead of blocking app startup.
+      profileHistory = [];
 
     } catch (err) {
 
@@ -285,6 +283,179 @@ function isDashboardPastGame_(game) {
     status === "archived" ||
     status === "closed"
   );
+
+}
+
+function buildDashboardGameHubItemLite_(
+  game,
+  username,
+  isPast
+) {
+
+  game =
+    game || {};
+
+  const mode =
+    getDashboardGameMode_(game);
+
+  const availability =
+    getDashboardAvailability_(
+      game,
+      isPast
+    );
+
+  const lockLabel =
+    availability.statusLabel ||
+    String(
+      game.lockLabel ||
+      game.lockTimeLabel ||
+      game.eventTime ||
+      ""
+    ).trim() ||
+    (
+      game.lockAllPicks === true
+        ? "Locked"
+        : isPast
+          ? "Finished"
+          : "Open / Lock time TBD"
+    );
+
+  const enterLabel =
+    availability.available === false
+      ? availability.actionLabel
+      : isPast
+        ? "View Results"
+        : "Play Now";
+
+  return {
+    gameId:
+      game.gameId,
+
+    name:
+      game.name || game.gameId,
+
+    subtitle:
+      getDashboardGameTypeLabel_(
+        game,
+        mode
+      ),
+
+    year:
+      game.year || "",
+
+    type:
+      mode,
+
+    rawType:
+      game.type || "",
+
+    typeLabel:
+      getDashboardGameTypeLabel_(
+        game,
+        mode
+      ),
+
+    icon:
+      "",
+
+    status:
+      game.status || "",
+
+    statusLabel:
+      lockLabel,
+
+    lockLabel:
+      lockLabel,
+
+    description:
+      getDashboardGameDescription_(
+        game,
+        mode
+      ),
+
+    themeColor:
+      game.themeColor || "#354785",
+
+    heroImageFileId:
+      game.heroImageFileId || "",
+
+    heroImage:
+      game.heroImage || "",
+
+    heroImagePosition:
+      game.heroImagePosition || "center center",
+
+    availableFrom:
+      game.availableFrom || "",
+
+    availableUntil:
+      game.availableUntil || "",
+
+    available:
+      availability.available === true,
+
+    availabilityLabel:
+      availability.label || "",
+
+    disableEnter:
+      availability.available === false,
+
+    active:
+      game.active === true,
+
+    archived:
+      game.archived === true,
+
+    isPast:
+      isPast === true,
+
+    hasStarted:
+      false,
+
+    madeCount:
+      0,
+
+    totalCount:
+      0,
+
+    enterLabel:
+      enterLabel,
+
+    actionLabel:
+      enterLabel,
+
+    progressLabel:
+      "Open game to see progress",
+
+    progressValue:
+      0,
+
+    userSummary:
+      "Open game to play",
+
+    userStats:
+      [],
+
+    leaderboardPreview:
+      [],
+
+    showLeaderboard:
+      game.showLeaderboard !== false,
+
+    leagueId:
+      game.leagueId || "",
+
+    leagueName:
+      game.leagueName || "",
+
+    leagueScoped:
+      game.leagueScoped === true,
+
+    leagues:
+      Array.isArray(game.leagues)
+        ? game.leagues
+        : []
+  };
 
 }
 
