@@ -5,62 +5,68 @@
    each Sports Scores GameId.
 
    Required CategorySettings headers:
-   GameId
    CategoryId
    SportsGameId
+
+   GameId is read from Categories, not CategorySettings.
 ===================================================== */
 
 function adminGetSportsUsage() {
 
     const settingsData =
       getAllCategorySettingsData_();
-  
+
     const categoriesData =
       getAllCategoriesData_();
-  
+
     const games =
       typeof getGames === "function"
         ? getGames()
         : [];
-  
+
     const gameMap = {};
-  
+
     games.forEach(game => {
-  
+
       const gameId =
         adminSportsUsageClean_(
           game.gameId ||
           game.GameId ||
           ""
         );
-  
+
       if (!gameId) return;
-  
+
       gameMap[gameId] = game;
-  
+
     });
-  
+
     const categoryNameMap =
       adminSportsUsageBuildCategoryMap_(
         categoriesData
       );
-  
+
+    const categoryRecordsById =
+      adminSportsUsageBuildCategoryRecordsById_(
+        categoriesData
+      );
+
     if (settingsData.length <= 1) {
-  
+
       return {
         success: true,
         usage: {}
       };
-  
+
     }
-  
+
     const headers =
       settingsData[0].map(header =>
         String(header || "").trim()
       );
-  
+
     const col = {
-  
+
       appGameId:
         adminSportsUsageFindHeader_(
           headers,
@@ -68,7 +74,7 @@ function adminGetSportsUsage() {
             "GameId"
           ]
         ),
-  
+
       categoryId:
         adminSportsUsageFindHeader_(
           headers,
@@ -76,7 +82,7 @@ function adminGetSportsUsage() {
             "CategoryId"
           ]
         ),
-  
+
       sportsGameId:
         adminSportsUsageFindHeader_(
           headers,
@@ -88,123 +94,171 @@ function adminGetSportsUsage() {
             "ESPNEventId"
           ]
         )
-  
+
     };
-  
+
     const missing = [];
-  
-    if (col.appGameId === -1) {
-      missing.push("GameId");
-    }
-  
+
     if (col.categoryId === -1) {
       missing.push("CategoryId");
     }
-  
+
     if (col.sportsGameId === -1) {
       missing.push("SportsGameId");
     }
-  
+
     if (missing.length) {
-  
+
       throw new Error(
         "Missing CategorySettings headers: " +
         missing.join(", ")
       );
-  
+
     }
-  
+
     const usage = {};
-  
+    const seen = {};
+
     for (let i = 1; i < settingsData.length; i++) {
-  
+
       const row =
         settingsData[i];
-  
+
       const sportsGameId =
         adminSportsUsageClean_(
           row[col.sportsGameId]
         );
-  
+
       if (!sportsGameId) {
         continue;
       }
-  
-      const appGameId =
-        adminSportsUsageClean_(
-          row[col.appGameId]
-        );
-  
+
       const categoryId =
         adminSportsUsageClean_(
           row[col.categoryId]
         );
-  
-      if (
-        !appGameId ||
-        !categoryId
-      ) {
+
+      if (!categoryId) {
         continue;
       }
-  
-      const game =
-        gameMap[appGameId] || {};
-  
-      const categoryKey =
-        appGameId +
-        "||" +
-        categoryId.toLowerCase();
-  
+
+      let appGameId =
+        col.appGameId > -1
+          ? adminSportsUsageClean_(
+              row[col.appGameId]
+            )
+          : "";
+
+      let records = [];
+
+      if (appGameId) {
+
+        records = [{
+          gameId: appGameId,
+          categoryId: categoryId,
+          categoryName:
+            categoryNameMap[
+              appGameId +
+              "||" +
+              categoryId.toLowerCase()
+            ] || categoryId
+        }];
+
+      } else {
+
+        records =
+          categoryRecordsById[
+            categoryId.toLowerCase()
+          ] || [];
+
+      }
+
+      if (!records.length) {
+
+        records = [{
+          gameId: "",
+          categoryId: categoryId,
+          categoryName: categoryId
+        }];
+
+      }
+
       if (!usage[sportsGameId]) {
         usage[sportsGameId] = [];
       }
-  
-      usage[sportsGameId].push({
-  
-        sportsGameId:
-          sportsGameId,
-  
-        appGameId:
-          appGameId,
-  
-        appGameName:
-          game.name ||
-          game.Name ||
-          appGameId,
-  
-        appGameType:
-          game.type ||
-          game.Type ||
-          "",
-  
-        appGameStatus:
-          game.status ||
-          game.Status ||
-          "",
-  
-        appGameActive:
-          game.active === true ||
-          game.Active === true,
-  
-        categoryId:
-          categoryId,
-  
-        categoryName:
-          categoryNameMap[categoryKey] ||
-          categoryId
-  
+
+      records.forEach(function(record) {
+
+        const recordGameId =
+          adminSportsUsageClean_(
+            record.gameId
+          );
+
+        const game =
+          gameMap[recordGameId] || {};
+
+        const uniqueKey =
+          sportsGameId +
+          "||" +
+          recordGameId +
+          "||" +
+          categoryId.toLowerCase();
+
+        if (seen[uniqueKey]) {
+          return;
+        }
+
+        seen[uniqueKey] = true;
+
+        usage[sportsGameId].push({
+
+          sportsGameId:
+            sportsGameId,
+
+          appGameId:
+            recordGameId,
+
+          appGameName:
+            game.name ||
+            game.Name ||
+            recordGameId ||
+            "Unknown game",
+
+          appGameType:
+            game.type ||
+            game.Type ||
+            "",
+
+          appGameStatus:
+            game.status ||
+            game.Status ||
+            "",
+
+          appGameActive:
+            game.active === true ||
+            game.Active === true,
+
+          categoryId:
+            categoryId,
+
+          categoryName:
+            record.categoryName ||
+            categoryId
+
+        });
+
       });
-  
+
     }
-  
+
     return {
       success: true,
       count: Object.keys(usage).length,
       usage: usage
     };
-  
+
   }
-  
+
   /* =====================================================
      CATEGORY NAME MAP
   ===================================================== */
@@ -333,6 +387,105 @@ function adminGetSportsUsage() {
   
   }
   
+
+
+  function adminSportsUsageBuildCategoryRecordsById_(
+    categoriesData
+  ) {
+
+    const map = {};
+
+    if (
+      !categoriesData ||
+      categoriesData.length <= 1
+    ) {
+      return map;
+    }
+
+    const headers =
+      categoriesData[0].map(header =>
+        String(header || "").trim()
+      );
+
+    const col = {
+      gameId: headers.indexOf("GameId"),
+      categoryId: headers.indexOf("CategoryId"),
+      category: headers.indexOf("Category"),
+      active: headers.indexOf("Active")
+    };
+
+    if (
+      col.gameId === -1 ||
+      col.categoryId === -1
+    ) {
+      return map;
+    }
+
+    for (let i = 1; i < categoriesData.length; i++) {
+
+      const row =
+        categoriesData[i];
+
+      if (col.active > -1) {
+
+        const activeValue =
+          row[col.active];
+
+        const isActive =
+          activeValue === true ||
+          String(activeValue || "")
+            .trim()
+            .toLowerCase() === "true";
+
+        if (!isActive) {
+          continue;
+        }
+
+      }
+
+      const gameId =
+        adminSportsUsageClean_(
+          row[col.gameId]
+        );
+
+      const categoryId =
+        adminSportsUsageClean_(
+          row[col.categoryId]
+        );
+
+      if (
+        !gameId ||
+        !categoryId
+      ) {
+        continue;
+      }
+
+      const key =
+        categoryId.toLowerCase();
+
+      if (!map[key]) {
+        map[key] = [];
+      }
+
+      const categoryName =
+        col.category > -1
+          ? adminSportsUsageClean_(
+              row[col.category]
+            )
+          : categoryId;
+
+      map[key].push({
+        gameId: gameId,
+        categoryId: categoryId,
+        categoryName: categoryName || categoryId
+      });
+
+    }
+
+    return map;
+
+  }
+
   /* =====================================================
      HELPERS
   ===================================================== */

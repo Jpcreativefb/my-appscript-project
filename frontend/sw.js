@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v2-stability-fix";
+const AWARDS_CACHE = "awards-app-v4-batched-game-load";
 
 const APP_SHELL = [
   "./",

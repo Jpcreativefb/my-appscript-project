@@ -3095,18 +3095,25 @@ function updateSportsWagerCategoryRowsFromScore_(
       data[i];
 
     const rowGameId =
-      sportsWagerString_(
-        row[col.GameId]
-      );
+      col.GameId !== undefined
+        ? sportsWagerString_(
+            row[col.GameId]
+          )
+        : "";
 
     const rowCategoryId =
       sportsWagerKey_(
         row[col.CategoryId]
       );
 
+    if (rowCategoryId !== sportsWagerKey_(categoryId)) {
+      continue;
+    }
+
     if (
-      rowGameId !== awardsGameId ||
-      rowCategoryId !== sportsWagerKey_(categoryId)
+      col.GameId !== undefined &&
+      rowGameId &&
+      rowGameId !== awardsGameId
     ) {
       continue;
     }
@@ -3462,21 +3469,46 @@ function sportsWagerSettingsRowExists_(
       headers
     );
 
-  for (let i = 1; i < data.length; i++) {
+  if (col.CategoryId === undefined) {
+    return false;
+  }
 
-    const rowGameId =
-      sportsWagerString_(
-        data[i][col.GameId]
-      );
+  const hasGameId =
+    col.GameId !== undefined;
+
+  const cleanAwardsGameId =
+    sportsWagerString_(
+      awardsGameId
+    );
+
+  const cleanCategoryId =
+    sportsWagerKey_(
+      categoryId
+    );
+
+  for (let i = 1; i < data.length; i++) {
 
     const rowCategoryId =
       sportsWagerKey_(
         data[i][col.CategoryId]
       );
 
+    if (rowCategoryId !== cleanCategoryId) {
+      continue;
+    }
+
+    if (!hasGameId) {
+      return true;
+    }
+
+    const rowGameId =
+      sportsWagerString_(
+        data[i][col.GameId]
+      );
+
     if (
-      rowGameId === awardsGameId &&
-      rowCategoryId === sportsWagerKey_(categoryId)
+      !rowGameId ||
+      rowGameId === cleanAwardsGameId
     ) {
       return true;
     }
@@ -3808,18 +3840,25 @@ function sportsWagerGetCategoryOddsStatus_(
     const row = data[i];
 
     const rowGameId =
-      sportsWagerString_(
-        row[col.GameId]
-      );
+      col.GameId !== undefined
+        ? sportsWagerString_(
+            row[col.GameId]
+          )
+        : "";
 
     const rowCategoryId =
       sportsWagerKey_(
         row[col.CategoryId]
       );
 
+    if (rowCategoryId !== sportsWagerKey_(categoryId)) {
+      continue;
+    }
+
     if (
-      rowGameId !== awardsGameId ||
-      rowCategoryId !== sportsWagerKey_(categoryId)
+      col.GameId !== undefined &&
+      rowGameId &&
+      rowGameId !== awardsGameId
     ) {
       continue;
     }
@@ -3951,7 +3990,7 @@ function sportsWagerSyncCategorySettingsOddsReady_(
 
   }
 
-  const gameIdCol = ensureHeader_("GameId");
+  const gameIdCol = headers.indexOf("GameId");
   const categoryIdCol = ensureHeader_("CategoryId");
   const oddsReadyCol = ensureHeader_("OddsReady");
   const oddsSourceCol = ensureHeader_("OddsSource");
@@ -3967,27 +4006,34 @@ function sportsWagerSyncCategorySettingsOddsReady_(
   for (let i = 1; i < data.length; i++) {
 
     const rowGameId =
-      sportsWagerString_(
-        data[i][gameIdCol]
-      );
+      gameIdCol > -1
+        ? sportsWagerString_(
+            data[i][gameIdCol]
+          )
+        : "";
 
     const rowCategoryId =
       sportsWagerKey_(
         data[i][categoryIdCol]
       );
 
+    if (rowCategoryId !== sportsWagerKey_(categoryId)) {
+      continue;
+    }
+
+    if (gameIdCol === -1) {
+      targetRow = i + 1;
+      break;
+    }
+
     if (
-      rowCategoryId === sportsWagerKey_(categoryId) &&
       !rowGameId &&
       blankGameTargetRow === -1
     ) {
       blankGameTargetRow = i + 1;
     }
 
-    if (
-      rowGameId === awardsGameId &&
-      rowCategoryId === sportsWagerKey_(categoryId)
-    ) {
+    if (rowGameId === awardsGameId) {
       targetRow = i + 1;
       break;
     }
@@ -4000,12 +4046,14 @@ function sportsWagerSyncCategorySettingsOddsReady_(
   ) {
     targetRow = blankGameTargetRow;
 
-    sh
-      .getRange(
-        targetRow,
-        gameIdCol + 1
-      )
-      .setValue(awardsGameId);
+    if (gameIdCol > -1) {
+      sh
+        .getRange(
+          targetRow,
+          gameIdCol + 1
+        )
+        .setValue(awardsGameId);
+    }
   }
 
   if (targetRow === -1) {
@@ -4013,8 +4061,10 @@ function sportsWagerSyncCategorySettingsOddsReady_(
     const newRow =
       new Array(headers.length).fill("");
 
-    newRow[gameIdCol] =
-      awardsGameId;
+    if (gameIdCol > -1) {
+      newRow[gameIdCol] =
+        awardsGameId;
+    }
 
     newRow[categoryIdCol] =
       categoryId;
@@ -4096,12 +4146,11 @@ function updateSportsWagerSettingWinner_(
     );
 
   if (
-    col.GameId === undefined ||
     col.CategoryId === undefined ||
     col.WinnerNomineeId === undefined
   ) {
     throw new Error(
-      "CategorySettings missing GameId, CategoryId, or WinnerNomineeId"
+      "CategorySettings missing CategoryId or WinnerNomineeId"
     );
   }
 
@@ -4156,18 +4205,25 @@ function updateSportsWagerSettingWinner_(
       data[i];
 
     const rowGameId =
-      sportsWagerString_(
-        row[col.GameId]
-      );
+      col.GameId !== undefined
+        ? sportsWagerString_(
+            row[col.GameId]
+          )
+        : "";
 
     const rowCategoryId =
       sportsWagerKey_(
         row[col.CategoryId]
       );
 
+    if (rowCategoryId !== sportsWagerKey_(categoryId)) {
+      continue;
+    }
+
     if (
-      rowGameId !== awardsGameId ||
-      rowCategoryId !== sportsWagerKey_(categoryId)
+      col.GameId !== undefined &&
+      rowGameId &&
+      rowGameId !== awardsGameId
     ) {
       continue;
     }
@@ -4588,7 +4644,6 @@ function setSportsGameIdOnCategorySettings_(
   if (!values.length) {
 
     sheet.appendRow([
-      "GameId",
       "CategoryId",
       "Points",
       "Locked",
@@ -4647,7 +4702,7 @@ function setSportsGameIdOnCategorySettings_(
   }
 
   const gameIdCol =
-    ensureHeader_("GameId");
+    headers.indexOf("GameId");
 
   const categoryIdCol =
     ensureHeader_("CategoryId");
@@ -4796,14 +4851,21 @@ function setSportsGameIdOnCategorySettings_(
   for (let i = 1; i < values.length; i++) {
 
     const rowGameId =
-      String(values[i][gameIdCol] || "").trim();
+      gameIdCol > -1
+        ? String(values[i][gameIdCol] || "").trim()
+        : "";
 
     const rowCategoryId =
       String(values[i][categoryIdCol] || "").trim();
 
+    if (rowCategoryId !== cleanCategoryId) {
+      continue;
+    }
+
     if (
-      rowGameId === cleanGameId &&
-      rowCategoryId === cleanCategoryId
+      gameIdCol === -1 ||
+      !rowGameId ||
+      rowGameId === cleanGameId
     ) {
 
       targetRow =
@@ -4820,8 +4882,10 @@ function setSportsGameIdOnCategorySettings_(
     const newRow =
       new Array(headers.length).fill("");
 
-    newRow[gameIdCol] =
-      cleanGameId;
+    if (gameIdCol > -1) {
+      newRow[gameIdCol] =
+        cleanGameId;
+    }
 
     newRow[categoryIdCol] =
       cleanCategoryId;
@@ -7222,66 +7286,78 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
 function getSportsWagerGameIdsForRefresh_() {
 
-  const sheet =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName("CategorySettings");
+  const gameIdMap = {};
 
-  if (!sheet) {
-    throw new Error(
-      "CategorySettings sheet missing"
-    );
-  }
+  /*
+    Current production layout keeps Awards App GameId on
+    Categories, not CategorySettings. Use Categories as the
+    source of truth for which app games contain sports rows.
+  */
+  try {
 
-  const values =
-    sheet.getDataRange().getValues();
+    const categoriesSheet =
+      SpreadsheetApp
+        .getActive()
+        .getSheetByName(CATEGORIES_SHEET);
 
-  if (values.length <= 1) {
-    return [
-      SPORTS_WAGER_DEFAULT_GAME_ID
-    ];
-  }
+    if (categoriesSheet) {
 
-  const headers =
-    values[0].map(function(header) {
-      return String(header || "").trim();
-    });
+      const values =
+        categoriesSheet.getDataRange().getValues();
 
-  const gameIdCol =
-    headers.indexOf("GameId");
+      if (values.length > 1) {
 
-  const sportsGameIdCol =
-    headers.indexOf("SportsGameId");
+        const headers =
+          values[0].map(function(header) {
+            return String(header || "").trim();
+          });
 
-  if (
-    gameIdCol === -1 ||
-    sportsGameIdCol === -1
-  ) {
-    return [
-      SPORTS_WAGER_DEFAULT_GAME_ID
-    ];
-  }
+        const gameIdCol =
+          headers.indexOf("GameId");
 
-  const gameIdMap =
-    {};
+        const sportsGameIdCol =
+          headers.indexOf("SportsGameId");
 
-  for (let i = 1; i < values.length; i++) {
+        const espnEventIdCol =
+          headers.indexOf("ESPNEventId");
 
-    const row =
-      values[i];
+        if (gameIdCol > -1) {
 
-    const gameId =
-      String(row[gameIdCol] || "").trim();
+          for (let i = 1; i < values.length; i++) {
 
-    const sportsGameId =
-      String(row[sportsGameIdCol] || "").trim();
+            const row = values[i];
 
-    if (
-      gameId &&
-      sportsGameId
-    ) {
-      gameIdMap[gameId] = true;
+            const gameId =
+              String(row[gameIdCol] || "").trim();
+
+            const sportsGameId =
+              sportsGameIdCol > -1
+                ? String(row[sportsGameIdCol] || "").trim()
+                : "";
+
+            const espnEventId =
+              espnEventIdCol > -1
+                ? String(row[espnEventIdCol] || "").trim()
+                : "";
+
+            if (
+              gameId &&
+              (sportsGameId || espnEventId)
+            ) {
+              gameIdMap[gameId] = true;
+            }
+
+          }
+
+        }
+
+      }
+
     }
+
+  } catch (err) {
+
+    // Fall back below.
 
   }
 

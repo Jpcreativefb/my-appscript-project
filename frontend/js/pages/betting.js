@@ -5,6 +5,19 @@
 
 let BETTING_AUTO_REFRESH_TIMER = null;
 
+const BETTING_BATCH_SIZE = 12;
+
+const BETTING_PAGE_BATCH_STATE = {
+  gameId: "",
+  username: "",
+  config: {},
+  summary: {},
+  categories: [],
+  nextOffset: 0,
+  hasMore: false,
+  loading: false
+};
+
 const BETTING_STATE = {
   optimisticBets: {},
   savingCategories: {},
@@ -2132,7 +2145,13 @@ async function renderBettingPage(){
   const pageRes =
     await apiGetBettingPagePayload(
       username,
-      gameId
+      gameId,
+      {
+        offset: 0,
+        limit: BETTING_BATCH_SIZE,
+        includeSummary: true,
+        includeLeaderboard: false
+      }
     );
 
   if (!pageRes || pageRes.success === false) {
@@ -2191,6 +2210,25 @@ async function renderBettingPage(){
 
   const categories = optionsRes.categories || [];
 
+  BETTING_PAGE_BATCH_STATE.gameId = gameId;
+  BETTING_PAGE_BATCH_STATE.username = username;
+  BETTING_PAGE_BATCH_STATE.config = config;
+  BETTING_PAGE_BATCH_STATE.summary = summary;
+  BETTING_PAGE_BATCH_STATE.categories = categories.slice();
+  BETTING_PAGE_BATCH_STATE.nextOffset =
+    Number(pageRes.nextCategoryOffset ||
+      (pageRes.categoryBatch && pageRes.categoryBatch.nextOffset) ||
+      categories.length ||
+      0);
+  BETTING_PAGE_BATCH_STATE.hasMore =
+    pageRes.hasMoreCategories === true ||
+    !!(pageRes.categoryBatch && pageRes.categoryBatch.hasMore);
+  BETTING_PAGE_BATCH_STATE.loading = false;
+
+  setTimeout(function(){
+    hydrateBettingPageAfterRender_();
+  }, 0);
+
   return `
     <div class="page betting-page">
 
@@ -2220,11 +2258,21 @@ async function renderBettingPage(){
         )}
       </div>
 
-      ${renderBettingGroupedCategories_(
-        categories,
-        betMap,
-        config
-      )}
+      <div id="bettingCategoryListBlock">
+        ${renderBettingGroupedCategories_(
+          categories,
+          betMap,
+          config
+        )}
+      </div>
+
+      <div id="bettingBatchStatusBlock">
+        ${BETTING_PAGE_BATCH_STATE.hasMore ? `
+          <div class="betting-notice">
+            Loading more games...
+          </div>
+        ` : ""}
+      </div>
 
     </div>
   `;
@@ -2577,6 +2625,195 @@ function updateBettingReturnsForCategory(categoryId){
 
 }
 
+function updateBettingCategoryListFromBatchState_(){
+
+  const block =
+    document.getElementById("bettingCategoryListBlock");
+
+  if (!block) {
+    return;
+  }
+
+  const betMap = mergeBettingOptimisticBets_(
+    buildBetMap_(BETTING_PAGE_BATCH_STATE.summary || {})
+  );
+
+  block.innerHTML =
+    renderBettingGroupedCategories_(
+      BETTING_PAGE_BATCH_STATE.categories || [],
+      betMap,
+      BETTING_PAGE_BATCH_STATE.config || {}
+    );
+
+}
+
+function updateBettingBatchStatus_(message, type){
+
+  const block =
+    document.getElementById("bettingBatchStatusBlock");
+
+  if (!block) {
+    return;
+  }
+
+  block.innerHTML = message
+    ? renderBettingNotice_(message, type || "")
+    : "";
+
+}
+
+async function loadNextBettingCategoryBatch_(){
+
+  if (
+    BETTING_PAGE_BATCH_STATE.loading ||
+    !BETTING_PAGE_BATCH_STATE.hasMore
+  ) {
+    return;
+  }
+
+  BETTING_PAGE_BATCH_STATE.loading = true;
+
+  updateBettingBatchStatus_(
+    "Loading more games...",
+    ""
+  );
+
+  const res = await apiGetBettingPagePayload(
+    BETTING_PAGE_BATCH_STATE.username,
+    BETTING_PAGE_BATCH_STATE.gameId,
+    {
+      offset: BETTING_PAGE_BATCH_STATE.nextOffset,
+      limit: BETTING_BATCH_SIZE,
+      includeSummary: false,
+      includeLeaderboard: false
+    }
+  );
+
+  BETTING_PAGE_BATCH_STATE.loading = false;
+
+  if (!res || res.success === false) {
+    updateBettingBatchStatus_(
+      (res && (res.message || res.error)) ||
+      "Could not load more games.",
+      "warning"
+    );
+    return;
+  }
+
+  const incoming = Array.isArray(res.categories)
+    ? res.categories
+    : [];
+
+  const seen = {};
+
+  BETTING_PAGE_BATCH_STATE.categories.forEach(function(category){
+    if (category && category.id) {
+      seen[String(category.id)] = true;
+    }
+  });
+
+  incoming.forEach(function(category){
+    if (
+      category &&
+      category.id &&
+      !seen[String(category.id)]
+    ) {
+      BETTING_PAGE_BATCH_STATE.categories.push(category);
+      seen[String(category.id)] = true;
+    }
+  });
+
+  BETTING_PAGE_BATCH_STATE.nextOffset =
+    Number(res.nextCategoryOffset ||
+      (res.categoryBatch && res.categoryBatch.nextOffset) ||
+      BETTING_PAGE_BATCH_STATE.categories.length);
+
+  BETTING_PAGE_BATCH_STATE.hasMore =
+    res.hasMoreCategories === true ||
+    !!(res.categoryBatch && res.categoryBatch.hasMore);
+
+  updateBettingCategoryListFromBatchState_();
+
+  if (BETTING_PAGE_BATCH_STATE.hasMore) {
+    setTimeout(function(){
+      loadNextBettingCategoryBatch_();
+    }, 75);
+  } else {
+    updateBettingBatchStatus_("", "");
+  }
+
+}
+
+async function loadBettingLeaderboardAfterRender_(){
+
+  const block =
+    document.getElementById("bettingLeaderboardBlock");
+
+  if (!block) {
+    return;
+  }
+
+  block.innerHTML =
+    renderBettingNotice_(
+      "Leaderboard loading separately...",
+      ""
+    );
+
+  const res = await apiBettingLeaderboard(
+    BETTING_PAGE_BATCH_STATE.gameId
+  );
+
+  if (!res || res.success === false) {
+    block.innerHTML = "";
+    return;
+  }
+
+  const rows =
+    Array.isArray(res)
+      ? res
+      : Array.isArray(res.leaderboard)
+        ? res.leaderboard
+        : [];
+
+  block.innerHTML =
+    renderBettingLeaderboardPreview_(
+      rows,
+      BETTING_PAGE_BATCH_STATE.config || {}
+    );
+
+  const summaryBlock =
+    document.getElementById("bettingSummaryBlock");
+
+  if (summaryBlock) {
+    summaryBlock.innerHTML =
+      renderBettingSummary_(
+        BETTING_PAGE_BATCH_STATE.summary || {},
+        rows,
+        BETTING_PAGE_BATCH_STATE.username,
+        BETTING_PAGE_BATCH_STATE.config || {}
+      );
+  }
+
+}
+
+function hydrateBettingPageAfterRender_(){
+
+  if (!document.querySelector(".betting-page")) {
+    return;
+  }
+
+  if (BETTING_PAGE_BATCH_STATE.hasMore) {
+    loadNextBettingCategoryBatch_();
+  } else {
+    updateBettingBatchStatus_("", "");
+  }
+
+  setTimeout(function(){
+    loadBettingLeaderboardAfterRender_();
+  }, 250);
+
+}
+
 async function refreshBettingFastBlocks_(){
 
   const session = getBettingSession_();
@@ -2600,7 +2837,13 @@ async function refreshBettingFastBlocks_(){
   const res =
     await apiGetBettingPagePayload(
       username,
-      gameId
+      gameId,
+      {
+        offset: 0,
+        limit: BETTING_BATCH_SIZE,
+        includeSummary: true,
+        includeLeaderboard: false
+      }
     );
 
   if (!res || res.success === false) {
@@ -2624,7 +2867,10 @@ async function refreshBettingFastBlocks_(){
       );
   }
 
-  if (leaderboardBlock) {
+  if (
+    leaderboardBlock &&
+    leaderboardRows.length > 0
+  ) {
     leaderboardBlock.innerHTML =
       renderBettingLeaderboardPreview_(
         leaderboardRows,

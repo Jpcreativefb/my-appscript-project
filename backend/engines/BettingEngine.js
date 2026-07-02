@@ -1352,6 +1352,111 @@ function getLatestBetsByUser_(gameId){
 
 }
 
+function getLatestBetsForSingleUser_(username, gameId){
+
+  const userKey = normalizeBetKey_(username);
+
+  if (!userKey) {
+    return {};
+  }
+
+  gameId = normalizeBetGameId_(
+    gameId || getDefaultGameId()
+  );
+
+  const data = getAllBetsData_();
+
+  if (data.length <= 1) {
+    return {};
+  }
+
+  const headers = data[0]
+    .map(h => String(h || "").trim());
+
+  const col = getBetsColumnMap_(headers);
+  validateBetsColumns_(col);
+
+  const bets = {};
+
+  for (let i = 1; i < data.length; i++) {
+
+    const row = data[i];
+
+    if (
+      normalizeBetGameId_(row[col.gameId]) !== gameId
+    ) {
+      continue;
+    }
+
+    if (
+      normalizeBetKey_(row[col.username]) !== userKey
+    ) {
+      continue;
+    }
+
+    const categoryId = normalizeBetKey_(
+      row[col.categoryId]
+    );
+
+    const nomineeId = normalizeBetKey_(
+      row[col.nomineeId]
+    );
+
+    const betAmount = roundBetMoney_(
+      row[col.betAmount]
+    );
+
+    if (
+      !categoryId ||
+      !nomineeId ||
+      betAmount <= 0
+    ) {
+      continue;
+    }
+
+    const odds = Math.max(
+      toBetNumber_(
+        row[col.odds],
+        DEFAULT_BETTING_ODDS
+      ),
+      1
+    );
+
+    const timestamp = new Date(
+      row[col.lastUpdated] ||
+      row[col.timestamp] ||
+      new Date()
+    );
+
+    const existing = bets[categoryId];
+
+    if (
+      !existing ||
+      existing.timestamp < timestamp
+    ) {
+
+      bets[categoryId] = {
+        username: normalizeBetString_(
+          row[col.username]
+        ),
+        categoryId: categoryId,
+        nomineeId: nomineeId,
+        betAmount: betAmount,
+        odds: odds,
+        potentialReturn: roundBetMoney_(
+          betAmount * odds
+        ),
+        timestamp: timestamp
+      };
+
+    }
+
+  }
+
+  return bets;
+
+}
+
 function getUserBets(username, gameId){
 
   username = normalizeBetKey_(username);
@@ -1364,15 +1469,13 @@ function getUserBets(username, gameId){
     gameId || getDefaultGameId()
   );
 
-  const byUser = getLatestBetsByUser_(gameId);
-  const user = byUser[username];
-
-  if (!user) {
-    return [];
-  }
+  const bets = getLatestBetsForSingleUser_(
+    username,
+    gameId
+  );
 
   return Object
-    .values(user.bets)
+    .values(bets)
     .sort((a,b) =>
       a.categoryId.localeCompare(b.categoryId)
     );
@@ -1604,6 +1707,66 @@ function apiGetMyBets(username, gameId){
    One-call wager page load for frontend speed.
 ===================================================== */
 
+function normalizeBettingBatchNumber_(value, fallback, min, max){
+
+  let n = Number(value);
+
+  if (isNaN(n) || !isFinite(n)) {
+    n = fallback;
+  }
+
+  n = Math.floor(n);
+
+  if (min !== undefined) {
+    n = Math.max(n, min);
+  }
+
+  if (max !== undefined) {
+    n = Math.min(n, max);
+  }
+
+  return n;
+
+}
+
+function normalizeBettingPayloadBoolean_(value, defaultValue){
+
+  if (
+    value === undefined ||
+    value === null ||
+    String(value).trim() === ""
+  ) {
+    return defaultValue;
+  }
+
+  if (value === true || value === false) {
+    return value;
+  }
+
+  const clean = String(value)
+    .trim()
+    .toLowerCase();
+
+  if (
+    clean === "true" ||
+    clean === "1" ||
+    clean === "yes"
+  ) {
+    return true;
+  }
+
+  if (
+    clean === "false" ||
+    clean === "0" ||
+    clean === "no"
+  ) {
+    return false;
+  }
+
+  return defaultValue;
+
+}
+
 function apiGetBettingPagePayload(payload){
 
   payload = payload || {};
@@ -1625,6 +1788,29 @@ function apiGetBettingPagePayload(payload){
 
   }
 
+  const offset = normalizeBettingBatchNumber_(
+    payload.offset,
+    0,
+    0
+  );
+
+  const limit = normalizeBettingBatchNumber_(
+    payload.limit,
+    12,
+    1,
+    50
+  );
+
+  const includeSummary = normalizeBettingPayloadBoolean_(
+    payload.includeSummary,
+    offset === 0
+  );
+
+  const includeLeaderboard = normalizeBettingPayloadBoolean_(
+    payload.includeLeaderboard,
+    false
+  );
+
   const options = getBettingOptions(
     gameId
   );
@@ -1636,32 +1822,61 @@ function apiGetBettingPagePayload(payload){
     };
   }
 
-  const bets = apiGetMyBets(
-    username,
-    gameId
+  const allCategories = Array.isArray(options.categories)
+    ? options.categories
+    : [];
+
+  const categories = allCategories.slice(
+    offset,
+    offset + limit
   );
 
-  const leaderboard = getBettingLeaderboardData(
-    gameId
-  );
+  const nextOffset = offset + categories.length;
+  const hasMoreCategories = nextOffset < allCategories.length;
+
+  const bets = includeSummary
+    ? apiGetMyBets(
+        username,
+        gameId
+      )
+    : null;
+
+  const leaderboard = includeLeaderboard
+    ? getBettingLeaderboardData(
+        gameId
+      )
+    : [];
 
   return {
     success: true,
     optimized: true,
-    payloadType: "betting_page_v1",
+    batched: true,
+    payloadType: "betting_page_v2_batched",
     gameId: gameId,
     config: options.config || {},
-    categories: options.categories || [],
+    categories: categories,
+    categoryBatch: {
+      offset: offset,
+      limit: limit,
+      count: categories.length,
+      total: allCategories.length,
+      nextOffset: nextOffset,
+      hasMore: hasMoreCategories
+    },
+    hasMoreCategories: hasMoreCategories,
+    nextCategoryOffset: nextOffset,
     summary:
       bets && bets.summary
         ? bets.summary
         : {},
+    summaryDeferred: !includeSummary,
     leaderboard:
       Array.isArray(leaderboard)
         ? leaderboard
         : leaderboard && leaderboard.leaderboard
           ? leaderboard.leaderboard
-          : []
+          : [],
+    leaderboardDeferred: !includeLeaderboard
   };
 
 }

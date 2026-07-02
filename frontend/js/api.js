@@ -1768,13 +1768,17 @@ async function apiAdminParseSportsScoreboard(gameId) {
    BETTING
 ====================== */
 
-async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError) {
+async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError, options = {}) {
 
-  const [optionsRes, betsRes, leaderboardRes] =
+  const includeSummary =
+    options.includeSummary !== false;
+
+  const [optionsRes, betsRes] =
     await Promise.all([
       apiGetBettingOptions(gameId),
-      apiGetMyBets(username, gameId),
-      apiBettingLeaderboard(gameId)
+      includeSummary
+        ? apiGetMyBets(username, gameId)
+        : Promise.resolve({ summary: {} })
     ]);
 
   if (!optionsRes || optionsRes.success === false) {
@@ -1786,36 +1790,72 @@ async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError) {
     };
   }
 
-  const leaderboardRows =
-    Array.isArray(leaderboardRes)
-      ? leaderboardRes
-      : leaderboardRes && Array.isArray(leaderboardRes.leaderboard)
-        ? leaderboardRes.leaderboard
-        : [];
+  const categories =
+    Array.isArray(optionsRes.categories)
+      ? optionsRes.categories
+      : [];
+
+  const offset = Number(options.offset || 0);
+  const limit = Number(options.limit || categories.length || 12);
+
+  const batchCategories = categories.slice(
+    offset,
+    offset + limit
+  );
+
+  const nextOffset = offset + batchCategories.length;
 
   return {
     success: true,
     optimized: false,
     fallback: true,
-    payloadType: "betting_page_legacy_fallback",
+    batched: true,
+    payloadType: "betting_page_light_fallback",
     gameId,
     config: optionsRes.config || {},
-    categories: optionsRes.categories || [],
+    categories: batchCategories,
+    categoryBatch: {
+      offset: offset,
+      limit: limit,
+      count: batchCategories.length,
+      total: categories.length,
+      nextOffset: nextOffset,
+      hasMore: nextOffset < categories.length
+    },
+    hasMoreCategories: nextOffset < categories.length,
+    nextCategoryOffset: nextOffset,
     summary:
       betsRes && betsRes.summary
         ? betsRes.summary
         : {},
-    leaderboard: leaderboardRows
+    leaderboard: [],
+    leaderboardDeferred: true
   };
 
 }
 
-async function apiGetBettingPagePayload(username, gameId) {
+async function apiGetBettingPagePayload(username, gameId, options = {}) {
+
+  options = options || {};
 
   const res =
     await api("getBettingPagePayload", {
       username,
-      gameId
+      gameId,
+      offset:
+        options.offset !== undefined
+          ? options.offset
+          : 0,
+      limit:
+        options.limit !== undefined
+          ? options.limit
+          : 12,
+      includeSummary:
+        options.includeSummary !== undefined
+          ? options.includeSummary
+          : true,
+      includeLeaderboard:
+        options.includeLeaderboard === true
     });
 
   if (res && res.success !== false) {
@@ -1835,7 +1875,8 @@ async function apiGetBettingPagePayload(username, gameId) {
   return apiBuildLegacyBettingPagePayload_(
     username,
     gameId,
-    firstError
+    firstError,
+    options
   );
 
 }

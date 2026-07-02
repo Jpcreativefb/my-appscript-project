@@ -4,7 +4,6 @@
 
    REQUIRED SHEET HEADERS
 
-   GameId
    CategoryId
    Points
    Locked
@@ -164,8 +163,13 @@ function getCategorySettingsColumnMap_(headers){
 
 function validateCategorySettingsColumns_(col){
 
+  /*
+    CategorySettings no longer owns GameId in the current
+    production sheet layout. GameId belongs to Categories,
+    and settings are joined by CategoryId. Keep GameId optional
+    for older sheets/backups, but do not require it.
+  */
   const required = [
-    "gameId",
     "categoryId",
     "points",
     "locked"
@@ -183,6 +187,123 @@ function validateCategorySettingsColumns_(col){
       missing.join(", ")
     );
 
+  }
+
+}
+
+function getCategorySettingsAllowedCategoryIds_(gameId){
+
+  const map = {};
+
+  try {
+
+    const data =
+      typeof getAllCategoriesData_ === "function"
+        ? getAllCategoriesData_()
+        : [];
+
+    if (!data || data.length <= 1) {
+      return null;
+    }
+
+    const headers =
+      data[0].map(function(header) {
+        return String(header || "").trim();
+      });
+
+    const gameIdCol =
+      headers.indexOf("GameId");
+
+    const categoryIdCol =
+      headers.indexOf("CategoryId");
+
+    if (
+      gameIdCol === -1 ||
+      categoryIdCol === -1
+    ) {
+      return null;
+    }
+
+    for (let i = 1; i < data.length; i++) {
+
+      const row =
+        data[i];
+
+      const rowGameId =
+        normalizeGameId_(
+          row[gameIdCol]
+        );
+
+      if (rowGameId !== gameId) {
+        continue;
+      }
+
+      const categoryId =
+        normalizeCategoryId_(
+          row[categoryIdCol]
+        );
+
+      if (categoryId) {
+        map[categoryId] = true;
+      }
+
+    }
+
+    return map;
+
+  } catch (err) {
+
+    return null;
+
+  }
+
+}
+
+function categorySettingsRowMatchesGame_(
+  row,
+  col,
+  gameId,
+  categoryId,
+  allowedCategoryIds
+){
+
+  if (!categoryId) {
+    return false;
+  }
+
+  if (
+    allowedCategoryIds &&
+    allowedCategoryIds[categoryId] !== true
+  ) {
+    return false;
+  }
+
+  if (col.gameId > -1) {
+
+    const rowGameId =
+      normalizeGameId_(
+        row[col.gameId]
+      );
+
+    if (rowGameId) {
+      return rowGameId === gameId;
+    }
+
+  }
+
+  return true;
+
+}
+
+function setCategorySettingsCellIfExists_(
+  row,
+  col,
+  key,
+  value
+){
+
+  if (col[key] > -1) {
+    row[col[key]] = value;
   }
 
 }
@@ -222,27 +343,31 @@ function getCategorySettings(gameId){
     col
   );
 
+  const allowedCategoryIds =
+    getCategorySettingsAllowedCategoryIds_(
+      gameId
+    );
+
   const map = {};
 
   for (let r = 1; r < values.length; r++) {
 
     const row = values[r];
 
-    const rowGameId =
-      normalizeGameId_(
-        row[col.gameId]
-      );
-
-    if (rowGameId !== gameId) {
-      continue;
-    }
-
     const categoryId =
       normalizeCategoryId_(
         row[col.categoryId]
       );
 
-    if (!categoryId) {
+    if (
+      !categorySettingsRowMatchesGame_(
+        row,
+        col,
+        gameId,
+        categoryId,
+        allowedCategoryIds
+      )
+    ) {
       continue;
     }
 
@@ -572,23 +697,67 @@ function saveCategorySettings(
     );
 
     /* =========================
-       REMOVE OLD GAME ROWS
+       REMOVE OLD ROWS FOR THIS GAME
+
+       Current production sheets do not keep GameId on
+       CategorySettings. When GameId is absent, remove rows
+       by the current game's CategoryIds from Categories.
     ========================= */
 
     const keepRows = [
       data[0]
     ];
 
+    const allowedCategoryIds =
+      getCategorySettingsAllowedCategoryIds_(
+        gameId
+      );
+
+    const payloadCategoryIds = {};
+
+    Object.keys(payload).forEach(function(id) {
+      const clean = normalizeCategoryId_(id);
+      if (clean) {
+        payloadCategoryIds[clean] = true;
+      }
+    });
+
     for (let i = 1; i < data.length; i++) {
 
       const row = data[i];
 
-      const rowGameId =
-        normalizeGameId_(
-          row[col.gameId]
+      const rowCategoryId =
+        normalizeCategoryId_(
+          row[col.categoryId]
         );
 
-      if (rowGameId !== gameId) {
+      let removeRow = false;
+
+      if (col.gameId > -1) {
+
+        const rowGameId =
+          normalizeGameId_(
+            row[col.gameId]
+          );
+
+        removeRow =
+          rowGameId === gameId;
+
+      } else {
+
+        removeRow =
+          rowCategoryId &&
+          (
+            payloadCategoryIds[rowCategoryId] === true ||
+            (
+              allowedCategoryIds &&
+              allowedCategoryIds[rowCategoryId] === true
+            )
+          );
+
+      }
+
+      if (!removeRow) {
         keepRows.push(row);
       }
 
@@ -607,8 +776,12 @@ function saveCategorySettings(
         new Array(headers.length)
           .fill("");
 
-      row[col.gameId] =
-        gameId;
+      setCategorySettingsCellIfExists_(
+        row,
+        col,
+        "gameId",
+        gameId
+      );
 
       row[col.categoryId] =
         normalizeCategoryId_(id);
@@ -813,16 +986,16 @@ function updateCategorySetting(
       col
     );
 
+    const allowedCategoryIds =
+      getCategorySettingsAllowedCategoryIds_(
+        gameId
+      );
+
     let rowIndex = -1;
 
     for (let i = 1; i < data.length; i++) {
 
       const row = data[i];
-
-      const rowGameId =
-        normalizeGameId_(
-          row[col.gameId]
-        );
 
       const rowCategoryId =
         normalizeCategoryId_(
@@ -830,8 +1003,14 @@ function updateCategorySetting(
         );
 
       if (
-        rowGameId === gameId &&
-        rowCategoryId === categoryId
+        rowCategoryId === categoryId &&
+        categorySettingsRowMatchesGame_(
+          row,
+          col,
+          gameId,
+          rowCategoryId,
+          allowedCategoryIds
+        )
       ) {
 
         rowIndex = i + 1;
@@ -851,8 +1030,12 @@ function updateCategorySetting(
         new Array(headers.length)
           .fill("");
 
-      row[col.gameId] =
-        gameId;
+      setCategorySettingsCellIfExists_(
+        row,
+        col,
+        "gameId",
+        gameId
+      );
 
       row[col.categoryId] =
         categoryId;
