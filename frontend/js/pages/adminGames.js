@@ -464,7 +464,8 @@ function renderAdminNewGameCard() {
         </div>
 
         <button
-          class="button admin-action-button"
+          id="adminNewGameSaveButton"
+          class="button admin-action-button admin-save-button"
           onclick="adminCreateGameFromForm()"
         >
           Create Draft Game
@@ -603,7 +604,8 @@ function renderAdminCloneGameCard(games) {
         </div>
 
         <button
-          class="button admin-action-button"
+          id="adminCloneGameSaveButton"
+          class="button admin-action-button admin-save-button"
           onclick="adminCloneGameFromForm()"
         >
           Clone Game
@@ -862,7 +864,8 @@ function renderAdminGameDashboardSettings(game) {
           </div>
 
           <button
-            class="button admin-action-button"
+            id="adminGameDashboardSaveButton_${domId}"
+            class="button admin-action-button admin-save-button"
             onclick="adminSaveGameDashboardSettings('${adminGamesEscapeJs(rawGameId)}')"
           >
             Save Dashboard Settings
@@ -957,11 +960,19 @@ async function adminSaveGameDashboardSettings(gameId) {
   const messageId =
     "adminGameDashboardMessage_" + domId;
 
-  adminSetMessage(
+  const actionKey =
+    "dashboard:" + gameId;
+
+  if (!adminBeginGamePageAction_(
+    actionKey,
     messageId,
-    "Saving dashboard settings...",
-    false
-  );
+    "adminGameDashboardSaveButton_" + domId,
+    "Saving dashboard settings..."
+  )) {
+    return false;
+  }
+
+  try {
 
   const payload = {
     gameId:
@@ -1037,6 +1048,12 @@ async function adminSaveGameDashboardSettings(gameId) {
   );
 
   return true;
+
+  } finally {
+
+    adminEndGamePageAction_(actionKey);
+
+  }
 
 }
 
@@ -1348,8 +1365,133 @@ function adminSetMessage(id, message, isError) {
     Boolean(isError)
   );
 
+  el.classList.remove(
+    "is-saving"
+  );
+
   el.innerText =
     message || "";
+
+}
+
+function adminSetSavingMessage_(id, message) {
+
+  const el =
+    document.getElementById(id);
+
+  if (!el) {
+    return;
+  }
+
+  el.classList.remove(
+    "is-error"
+  );
+
+  el.classList.add(
+    "is-saving"
+  );
+
+  el.innerHTML =
+    `<div class="admin-save-status">
+      <span class="admin-save-spinner" aria-hidden="true"></span>
+      <span>${adminGamesEscapeHtml(message || "Saving...")}</span>
+    </div>
+    <div class="admin-save-progress" role="progressbar" aria-label="Saving">
+      <span></span>
+    </div>`;
+
+}
+
+function adminSetSavingButton_(buttonId, isSaving, label) {
+
+  const button =
+    document.getElementById(buttonId);
+
+  if (!button) {
+    return;
+  }
+
+  if (isSaving) {
+
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel =
+        button.textContent.trim();
+    }
+
+    button.disabled =
+      true;
+
+    button.classList.add(
+      "is-saving"
+    );
+
+    button.textContent =
+      label || "Saving...";
+
+    return;
+
+  }
+
+  button.disabled =
+    false;
+
+  button.classList.remove(
+    "is-saving"
+  );
+
+  if (button.dataset.originalLabel) {
+    button.textContent =
+      button.dataset.originalLabel;
+  }
+
+}
+
+const ADMIN_GAME_PAGE_ACTIONS = {};
+
+function adminBeginGamePageAction_(key, messageId, buttonId, savingMessage) {
+
+  if (ADMIN_GAME_PAGE_ACTIONS[key]) {
+    adminSetMessage(
+      messageId,
+      "Save already running. Please wait for it to finish.",
+      true
+    );
+    return false;
+  }
+
+  ADMIN_GAME_PAGE_ACTIONS[key] = {
+    buttonId: buttonId || "",
+    messageId: messageId || ""
+  };
+
+  adminSetSavingButton_(
+    buttonId,
+    true,
+    "Saving..."
+  );
+
+  adminSetSavingMessage_(
+    messageId,
+    savingMessage || "Saving..."
+  );
+
+  return true;
+
+}
+
+function adminEndGamePageAction_(key) {
+
+  const action =
+    ADMIN_GAME_PAGE_ACTIONS[key];
+
+  if (action && action.buttonId) {
+    adminSetSavingButton_(
+      action.buttonId,
+      false
+    );
+  }
+
+  delete ADMIN_GAME_PAGE_ACTIONS[key];
 
 }
 
@@ -1448,11 +1590,19 @@ async function adminCreateGameFromForm() {
 
   }
 
-  adminSetMessage(
+  const actionKey =
+    "create:" + gameId;
+
+  if (!adminBeginGamePageAction_(
+    actionKey,
     "adminNewGameMessage",
-    "Creating game...",
-    false
-  );
+    "adminNewGameSaveButton",
+    "Creating draft game..."
+  )) {
+    return;
+  }
+
+  try {
 
   const res =
     await apiAdminCreateGame({
@@ -1500,6 +1650,12 @@ async function adminCreateGameFromForm() {
   );
 
   navigate("admin-games");
+
+  } finally {
+
+    adminEndGamePageAction_(actionKey);
+
+  }
 
 }
 
@@ -1630,50 +1786,64 @@ async function adminCloneGameFromForm() {
 
   }
 
-  adminSetMessage(
+  const actionKey =
+    "clone:" + sourceGameId + ":" + newGameId;
+
+  if (!adminBeginGamePageAction_(
+    actionKey,
     "adminCloneGameMessage",
-    "Cloning game...",
-    false
-  );
+    "adminCloneGameSaveButton",
+    "Cloning game..."
+  )) {
+    return;
+  }
 
-  const res =
-    await apiAdminCloneGame({
-      sourceGameId: sourceGameId,
-      newGameId: newGameId,
-      newName: newName,
-      newYear: newYear,
-      cloneSetup: true,
-      cloneSettings: cloneSettings,
-      cloneNominees: cloneNominees,
-      clearWinners: true,
-      lockClonedCategories: lockClonedCategories,
-      keepActiveState: true
-    });
+  try {
 
-  if (
-    !res ||
-    res.success === false
-  ) {
+    const res =
+      await apiAdminCloneGame({
+        sourceGameId: sourceGameId,
+        newGameId: newGameId,
+        newName: newName,
+        newYear: newYear,
+        cloneSetup: true,
+        cloneSettings: cloneSettings,
+        cloneNominees: cloneNominees,
+        clearWinners: true,
+        lockClonedCategories: lockClonedCategories,
+        keepActiveState: true
+      });
+
+    if (
+      !res ||
+      res.success === false
+    ) {
+
+      adminSetMessage(
+        "adminCloneGameMessage",
+        res && (res.message || res.error)
+          ? res.message || res.error
+          : "Could not clone game.",
+        true
+      );
+
+      return;
+
+    }
 
     adminSetMessage(
       "adminCloneGameMessage",
-      res && (res.message || res.error)
-        ? res.message || res.error
-        : "Could not clone game.",
-      true
+      "Game cloned.",
+      false
     );
 
-    return;
+    navigate("admin-games");
+
+  } finally {
+
+    adminEndGamePageAction_(actionKey);
 
   }
-
-  adminSetMessage(
-    "adminCloneGameMessage",
-    "Game cloned.",
-    false
-  );
-
-  navigate("admin-games");
 
 }
 

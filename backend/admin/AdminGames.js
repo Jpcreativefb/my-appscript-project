@@ -596,25 +596,47 @@ function adminNormalizeGameId_(value) {
   
   }
   
-  function adminClearCaches_() {
-  
-    if (
-      typeof clearAppCaches ===
-      "function"
-    ) {
+  function adminClearGamesOnlyCaches_() {
+
+    try {
+      if (typeof APP_RUNTIME_CACHE !== "undefined") {
+        APP_RUNTIME_CACHE = {};
+      }
+    } catch (err) {
+      Logger.log("Could not clear runtime cache: " + err);
+    }
+
+    if (typeof clearGamesCache === "function") {
+      clearGamesCache();
+    }
+
+    try {
+      CacheService
+        .getScriptCache()
+        .remove("sheet_Games");
+    } catch (err) {
+      Logger.log("Could not clear sheet_Games cache: " + err);
+    }
+
+  }
+
+  function adminClearAllCaches_() {
+
+    if (typeof clearAppCaches === "function") {
       clearAppCaches();
       return;
     }
-  
-    if (
-      typeof clearGamesCache ===
-      "function"
-    ) {
-      clearGamesCache();
-    }
-  
+
+    adminClearGamesOnlyCaches_();
+
   }
-  
+
+  function adminClearCaches_() {
+
+    adminClearGamesOnlyCaches_();
+
+  }
+
  /* =========================================================
    GET ADMIN GAMES
 ========================================================= */
@@ -622,10 +644,6 @@ function adminNormalizeGameId_(value) {
 function adminGetGames() {
 
   adminEnsureGameOptionalHeaders_();
-
-  if (typeof clearGamesCache === "function") {
-    clearGamesCache();
-  }
 
   return {
     success: true,
@@ -672,11 +690,11 @@ function adminGetGameTypes() {
       LockService.getScriptLock();
   
     const gotLock =
-      lock.tryLock(25000);
+      lock.tryLock(5000);
 
     if (!gotLock) {
       throw new Error(
-        "Could not save game: another admin save is still running. Please try again."
+        "Could not save game: another admin save is still running. Please wait a few seconds and try again."
       );
     }
   
@@ -723,11 +741,14 @@ function adminGetGameTypes() {
         );
   
       if (existingRow !== -1) {
-  
-        throw new Error(
-          "Game already exists: " + gameId
-        );
-  
+
+        return {
+          success: true,
+          message: "Game already exists",
+          gameId: gameId,
+          duplicate: true
+        };
+
       }
   
       const safePayload =
@@ -772,8 +793,6 @@ function adminGetGameTypes() {
         );
   
       sh.appendRow(row);
-  
-      SpreadsheetApp.flush();
   
       adminClearCaches_();
   
@@ -879,10 +898,6 @@ function adminSaveGame(payload) {
           ? "Game created"
           : "Game updated",
       gameId: gameId,
-      game:
-        typeof getGame === "function"
-          ? getGame(gameId)
-          : null,
       result: result
     };
 
@@ -924,21 +939,7 @@ function adminSaveGame(payload) {
   
     }
   
-    const lock =
-      LockService.getScriptLock();
-  
-    const gotLock =
-      lock.tryLock(25000);
-
-    if (!gotLock) {
-      throw new Error(
-        "Could not save game: another admin save is still running. Please try again."
-      );
-    }
-  
-    try {
-  
-      adminEnsureGameOptionalHeaders_();
+    adminEnsureGameOptionalHeaders_();
 
       const sh =
         getGamesSheet_();
@@ -1401,27 +1402,33 @@ if ("votingLocked" in payload) {
   
         if (
           makeDefault &&
-          col.defaultGame !== -1
+          col.defaultGame !== -1 &&
+          data.length > 1
         ) {
-  
-          for (let i = 1; i < data.length; i++) {
-  
-            const otherGameId =
-              adminNormalizeValue_(
-                data[i][col.gameId]
-              );
-  
-            if (otherGameId !== gameId) {
-  
-              sh.getRange(
-                i + 1,
-                col.defaultGame + 1
-              ).setValue(false);
-  
-            }
-  
-          }
-  
+
+          const defaultValues =
+            data.slice(1).map(function(dataRow) {
+
+              const otherGameId =
+                adminNormalizeValue_(
+                  dataRow[col.gameId]
+                );
+
+              return [
+                otherGameId === gameId
+              ];
+
+            });
+
+          sh.getRange(
+            2,
+            col.defaultGame + 1,
+            defaultValues.length,
+            1
+          ).setValues(
+            defaultValues
+          );
+
         }
   
       }
@@ -1435,8 +1442,6 @@ if ("votingLocked" in payload) {
         row
       ]);
   
-      SpreadsheetApp.flush();
-  
       adminClearCaches_();
   
       return {
@@ -1444,12 +1449,6 @@ if ("votingLocked" in payload) {
         message: "Game updated",
         gameId: gameId
       };
-  
-    } finally {
-  
-      lock.releaseLock();
-  
-    }
   
   }
   
@@ -1910,11 +1909,11 @@ function adminCloneGameSetup(payload) {
     LockService.getScriptLock();
 
   const gotLock =
-    lock.tryLock(25000);
+    lock.tryLock(5000);
 
   if (!gotLock) {
     throw new Error(
-      "Could not clone game setup: another admin save is still running. Please try again."
+      "Could not clone game setup: another admin save is still running. Please wait a few seconds and try again."
     );
   }
 
@@ -1947,7 +1946,7 @@ function adminCloneGameSetup(payload) {
 
     SpreadsheetApp.flush();
 
-    adminClearCaches_();
+    adminClearAllCaches_();
 
     return {
       success: true,

@@ -1202,6 +1202,101 @@ function escapeHtml_(
 
 }
 
+const ADMIN_LEGACY_GAME_SAVE_ACTIONS = {};
+
+function adminLegacySetSaving_(form, isSaving) {
+
+  if (!form) {
+    return;
+  }
+
+  const button =
+    form.querySelector(
+      'button[type="submit"], .admin-action-button, button'
+    );
+
+  if (!button) {
+    return;
+  }
+
+  if (isSaving) {
+
+    if (!button.dataset.originalLabel) {
+      button.dataset.originalLabel =
+        button.textContent.trim();
+    }
+
+    button.disabled =
+      true;
+
+    button.classList.add(
+      "is-saving"
+    );
+
+    button.textContent =
+      "Saving...";
+
+    return;
+
+  }
+
+  button.disabled =
+    false;
+
+  button.classList.remove(
+    "is-saving"
+  );
+
+  if (button.dataset.originalLabel) {
+    button.textContent =
+      button.dataset.originalLabel;
+  }
+
+}
+
+function adminLegacyShowSavingProgress_(form) {
+
+  let box =
+    form.querySelector(
+      ".admin-save-inline-progress"
+    );
+
+  if (!box) {
+
+    box =
+      document.createElement("div");
+
+    box.className =
+      "admin-save-inline-progress admin-message is-saving";
+
+    form.appendChild(box);
+
+  }
+
+  box.innerHTML =
+    `<div class="admin-save-status">
+      <span class="admin-save-spinner" aria-hidden="true"></span>
+      <span>Saving game...</span>
+    </div>
+    <div class="admin-save-progress" role="progressbar" aria-label="Saving">
+      <span></span>
+    </div>`;
+
+}
+
+function adminLegacyClearSavingProgress_(form) {
+
+  const box =
+    form && form.querySelector(
+      ".admin-save-inline-progress"
+    );
+
+  if (box) {
+    box.remove();
+  }
+
+}
+
 async function adminSaveGameFromForm(
   event,
   form
@@ -1224,10 +1319,48 @@ async function adminSaveGameFromForm(
     return;
   }
 
-  const res =
-    await apiAdminSaveGame(
-      game
+  const saveKey =
+    "legacy-admin-game-save:" + game.gameId;
+
+  if (ADMIN_LEGACY_GAME_SAVE_ACTIONS[saveKey]) {
+    alert("Save already running. Please wait for it to finish.");
+    return;
+  }
+
+  ADMIN_LEGACY_GAME_SAVE_ACTIONS[saveKey] = true;
+
+  adminLegacySetSaving_(
+    form,
+    true
+  );
+
+  adminLegacyShowSavingProgress_(
+    form
+  );
+
+  let res;
+
+  try {
+
+    res =
+      await apiAdminSaveGame(
+        game
+      );
+
+  } finally {
+
+    delete ADMIN_LEGACY_GAME_SAVE_ACTIONS[saveKey];
+
+    adminLegacySetSaving_(
+      form,
+      false
     );
+
+    adminLegacyClearSavingProgress_(
+      form
+    );
+
+  }
 
   if (
     !res ||

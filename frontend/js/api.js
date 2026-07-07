@@ -1040,81 +1040,79 @@ async function apiAdminGetGameConfig(gameId) {
 
 }
 
+const ADMIN_GAME_SAVE_REQUESTS = {};
+
+function adminGameSaveRequestKey_(action, payload) {
+
+  const gameId =
+    payload && payload.gameId
+      ? String(payload.gameId)
+      : payload && payload.newGameId
+        ? String(payload.newGameId)
+        : payload && payload.sourceGameId
+          ? String(payload.sourceGameId)
+          : "new-game";
+
+  return "admin-game-save:" + action + ":" + gameId;
+
+}
+
+async function apiAdminGameSaveRequest_(action, payload) {
+
+  const key =
+    adminGameSaveRequestKey_(
+      action,
+      payload
+    );
+
+  if (ADMIN_GAME_SAVE_REQUESTS[key]) {
+    return ADMIN_GAME_SAVE_REQUESTS[key];
+  }
+
+  ADMIN_GAME_SAVE_REQUESTS[key] =
+    api(
+      action,
+      payload
+    ).finally(function() {
+      delete ADMIN_GAME_SAVE_REQUESTS[key];
+    });
+
+  return ADMIN_GAME_SAVE_REQUESTS[key];
+
+}
+
 async function apiAdminSaveGame(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminSaveGame",
-    {
-      gameId: payload.gameId,
-
-      name: payload.name,
-
-      year: payload.year,
-
-      type: payload.type,
-
-      active: payload.active,
-
-      archived: payload.archived,
-
-      defaultGame: payload.defaultGame,
-
-      predictionEnabled: payload.predictionEnabled,
-
-      rankingEnabled: payload.rankingEnabled,
-
-      confidenceEnabled: payload.confidenceEnabled,
-
-      confidenceScoringMode: payload.confidenceScoringMode,
-
-      wagerEnabled: payload.wagerEnabled,
-
-      startingBankroll: payload.startingBankroll,
-
-      minWager: payload.minWager,
-
-      maxWager: payload.maxWager,
-
-      allowBetRemoval: payload.allowBetRemoval,
-
-      wagerEditMode: payload.wagerEditMode,
-
-      themeColor: payload.themeColor,
-
-      icon: payload.icon,
-
-      sortOrder: payload.sortOrder,
-
-      status: payload.status,
-
-      lockAllPicks: payload.lockAllPicks,
-
-      showLeaderboard: payload.showLeaderboard,
-
-      showResultsBeforeLock: payload.showResultsBeforeLock,
-
-      resultsFinalized: payload.resultsFinalized,
-
-      votingLocked: payload.votingLocked
-    }
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
 
 async function apiAdminCreateGame(payload) {
 
-  return api(
-    "adminCreateGame",
-    payload
+  return apiAdminGameSaveRequest_(
+    "adminSaveGame",
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
 
 async function apiAdminUpdateGame(payload) {
 
-  return api(
-    "adminUpdateGame",
-    payload
+  return apiAdminGameSaveRequest_(
+    "adminSaveGame",
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
@@ -1132,7 +1130,7 @@ async function apiAdminArchiveGame(gameId) {
 
 async function apiAdminCloneGame(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminCloneGame",
     payload
   );
@@ -1141,7 +1139,7 @@ async function apiAdminCloneGame(payload) {
 
 async function apiAdminCloneGameSetup(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminCloneGameSetup",
     payload
   );

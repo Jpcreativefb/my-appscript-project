@@ -2150,3 +2150,78 @@ details[open] > summary .admin-collapse-icon {
   height: 1rem;
   width: 1rem;
 }
+
+/* ======================
+   Admin save progress states
+====================== */
+
+.admin-save-button.is-saving,
+.admin-action-button.is-saving,
+.admin-secondary-button.is-saving,
+button.is-saving {
+  cursor: wait !important;
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+.admin-save-status {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.admin-save-spinner {
+  animation: adminSaveSpin 0.8s linear infinite;
+  border: 2px solid rgba(255,255,255,.28);
+  border-top-color: rgba(255,255,255,.92);
+  border-radius: 999px;
+  display: inline-block;
+  height: 14px;
+  width: 14px;
+}
+
+.admin-save-progress {
+  background: rgba(255,255,255,.18);
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+}
+
+.admin-save-progress span {
+  animation: adminSaveProgress 1.15s ease-in-out infinite;
+  background: rgba(255,255,255,.88);
+  border-radius: 999px;
+  display: block;
+  height: 100%;
+  left: -35%;
+  position: absolute;
+  top: 0;
+  width: 35%;
+}
+
+.admin-message.is-saving {
+  color: rgba(255,255,255,.9) !important;
+}
+
+@keyframes adminSaveSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes adminSaveProgress {
+  0% {
+    left: -35%;
+  }
+
+  50% {
+    left: 42%;
+  }
+
+  100% {
+    left: 100%;
+  }
+}
