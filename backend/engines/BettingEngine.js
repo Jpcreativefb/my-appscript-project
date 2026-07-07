@@ -923,7 +923,7 @@ function isBettingCategoryLocked_(category, config){
 
 }
 
-function getBettingOptions(gameId){
+function getBettingOptions(gameId, options){
 
   gameId = normalizeBetGameId_(
     gameId || getDefaultGameId()
@@ -931,13 +931,34 @@ function getBettingOptions(gameId){
 
   validateGameId(gameId);
 
+  options = options || {};
+
+  const offset = normalizeBettingBatchNumber_(
+    options.offset,
+    0,
+    0
+  );
+
+  const limit = (
+    options.limit === undefined ||
+    options.limit === null ||
+    String(options.limit).trim() === ""
+  )
+    ? 0
+    : normalizeBettingBatchNumber_(
+        options.limit,
+        0,
+        0,
+        50
+      );
+
   const config = getBettingGameConfig(gameId);
   const categories = getCategories(gameId);
   const settings = getCategorySettings(gameId);
   const oddsMap = getBettingOddsMap_(gameId);
 
-  const bettingCategories = categories
-    .map(category => {
+  const preparedCategories = categories
+    .map(function(category) {
 
       const categoryId = normalizeBetKey_(
         category.id
@@ -962,6 +983,52 @@ function getBettingOptions(gameId){
           category.WagerResultType ||
           ""
         );
+
+      return {
+        category: category,
+        categoryId: categoryId,
+        setting: setting,
+        winnerNomineeId: winnerNomineeId,
+        wagerResultType: wagerResultType,
+        displayOrder: Number(category.displayOrder) || 999,
+        finished:
+          !!winnerNomineeId ||
+          !!wagerResultType,
+        nomineeCount:
+          Array.isArray(category.nominees)
+            ? category.nominees.length
+            : 0
+      };
+
+    })
+    .filter(function(item) {
+      return item.nomineeCount > 0;
+    })
+    .sort(function(a, b) {
+
+      if (a.finished !== b.finished) {
+        return a.finished ? 1 : -1;
+      }
+
+      return a.displayOrder - b.displayOrder;
+
+    });
+
+  const selectedPreparedCategories = limit > 0
+    ? preparedCategories.slice(
+        offset,
+        offset + limit
+      )
+    : preparedCategories;
+
+  const bettingCategories = selectedPreparedCategories
+    .map(function(prepared) {
+
+      const category = prepared.category;
+      const categoryId = prepared.categoryId;
+      const setting = prepared.setting;
+      const winnerNomineeId = prepared.winnerNomineeId;
+      const wagerResultType = prepared.wagerResultType;
 
       const nominees = (category.nominees || [])
         .map(nominee => {
@@ -1123,29 +1190,26 @@ function getBettingOptions(gameId){
         nominees: nominees
       };
 
-    })
-    .filter(category => category.nominees.length > 0)
-    .sort((a,b) => {
-
-      const aFinished =
-        isFinishedBettingCategory_(a);
-
-      const bFinished =
-        isFinishedBettingCategory_(b);
-
-      if (aFinished !== bFinished) {
-        return aFinished ? 1 : -1;
-      }
-
-      return a.displayOrder - b.displayOrder;
-
     });
+
+  const nextOffset = limit > 0
+    ? offset + bettingCategories.length
+    : bettingCategories.length;
+
+  const hasMoreCategories = limit > 0
+    ? nextOffset < preparedCategories.length
+    : false;
 
   return {
     success: true,
     gameId: gameId,
     config: config,
-    categories: bettingCategories
+    categories: bettingCategories,
+    totalCategories: preparedCategories.length,
+    offset: offset,
+    limit: limit,
+    nextOffset: nextOffset,
+    hasMoreCategories: hasMoreCategories
   };
 
 }
@@ -1812,7 +1876,11 @@ function apiGetBettingPagePayload(payload){
   );
 
   const options = getBettingOptions(
-    gameId
+    gameId,
+    {
+      offset: offset,
+      limit: limit
+    }
   );
 
   if (!options || options.success === false) {
@@ -1822,17 +1890,13 @@ function apiGetBettingPagePayload(payload){
     };
   }
 
-  const allCategories = Array.isArray(options.categories)
+  const categories = Array.isArray(options.categories)
     ? options.categories
     : [];
 
-  const categories = allCategories.slice(
-    offset,
-    offset + limit
-  );
-
-  const nextOffset = offset + categories.length;
-  const hasMoreCategories = nextOffset < allCategories.length;
+  const totalCategories = Number(options.totalCategories) || categories.length;
+  const nextOffset = Number(options.nextOffset) || (offset + categories.length);
+  const hasMoreCategories = options.hasMoreCategories === true;
 
   const bets = includeSummary
     ? apiGetMyBets(
@@ -1859,7 +1923,7 @@ function apiGetBettingPagePayload(payload){
       offset: offset,
       limit: limit,
       count: categories.length,
-      total: allCategories.length,
+      total: totalCategories,
       nextOffset: nextOffset,
       hasMore: hasMoreCategories
     },
@@ -1938,7 +2002,15 @@ function saveBet(payload){
 
   const lock = LockService.getScriptLock();
 
-  lock.waitLock(60000);
+  const gotLock =
+    lock.tryLock(8000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      message: "Could not save wager: another save is still running. Please try again."
+    };
+  }
 
   try {
 
@@ -2271,7 +2343,15 @@ function removeBet(payload){
   const lock =
     LockService.getScriptLock();
 
-  lock.waitLock(60000);
+  const gotLock =
+    lock.tryLock(8000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      message: "Could not remove wager: another save is still running. Please try again."
+    };
+  }
 
   try {
 

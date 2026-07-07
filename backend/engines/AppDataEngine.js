@@ -221,10 +221,16 @@ function apiGetDashboardGamesHub(payload) {
         ? pastGames[0].gameId
         : getDefaultGameId();
 
+  const includeProfile =
+    payload.includeProfile === true ||
+    String(payload.includeProfile || "")
+      .trim()
+      .toLowerCase() === "true";
+
   let profile = {};
   let profileHistory = [];
 
-  if (profileGameId) {
+  if (profileGameId && includeProfile) {
 
     try {
 

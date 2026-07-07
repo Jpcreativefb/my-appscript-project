@@ -671,7 +671,14 @@ function adminGetGameTypes() {
     const lock =
       LockService.getScriptLock();
   
-    lock.waitLock(10000);
+    const gotLock =
+      lock.tryLock(25000);
+
+    if (!gotLock) {
+      throw new Error(
+        "Could not save game: another admin save is still running. Please try again."
+      );
+    }
   
     try {
   
@@ -920,7 +927,14 @@ function adminSaveGame(payload) {
     const lock =
       LockService.getScriptLock();
   
-    lock.waitLock(10000);
+    const gotLock =
+      lock.tryLock(25000);
+
+    if (!gotLock) {
+      throw new Error(
+        "Could not save game: another admin save is still running. Please try again."
+      );
+    }
   
     try {
   
@@ -1895,7 +1909,14 @@ function adminCloneGameSetup(payload) {
   const lock =
     LockService.getScriptLock();
 
-  lock.waitLock(10000);
+  const gotLock =
+    lock.tryLock(25000);
+
+  if (!gotLock) {
+    throw new Error(
+      "Could not clone game setup: another admin save is still running. Please try again."
+    );
+  }
 
   try {
 

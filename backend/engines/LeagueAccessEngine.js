@@ -60,6 +60,8 @@ const GAME_FEATURE_ACCESS_HEADERS = [
 
 const LEAGUE_ACCESS_PUBLIC_LEAGUE_ID = "public";
 
+var LEAGUE_ACCESS_RUNTIME_CACHE = LEAGUE_ACCESS_RUNTIME_CACHE || {};
+
 /* =========================
    SETUP
 ========================= */
@@ -107,6 +109,7 @@ function leagueEnsureSheet_(sheetName, headers) {
 
   if (!sh) {
     sh = ss.insertSheet(sheetName);
+    clearLeagueAccessRuntimeCache_(sheetName);
   }
 
   const range = sh.getDataRange();
@@ -115,6 +118,7 @@ function leagueEnsureSheet_(sheetName, headers) {
   if (!values.length || !values[0].filter(String).length) {
     sh.getRange(1, 1, 1, headers.length).setValues([headers]);
     sh.setFrozenRows(1);
+    clearLeagueAccessRuntimeCache_(sheetName);
     return sh;
   }
 
@@ -126,6 +130,7 @@ function leagueEnsureSheet_(sheetName, headers) {
     if (existing.indexOf(header) === -1) {
       sh.getRange(1, sh.getLastColumn() + 1).setValue(header);
       existing.push(header);
+      clearLeagueAccessRuntimeCache_(sheetName);
     }
   });
 
@@ -399,6 +404,8 @@ function apiSaveLeagueFeatureAccess(payload) {
   } else {
     leagueAppendObject_(sheet, GAME_FEATURE_ACCESS_HEADERS, obj);
   }
+
+  clearLeagueAccessRuntimeCache_(GAME_FEATURE_ACCESS_SHEET);
 
   return {
     success: true,
@@ -740,6 +747,7 @@ function ensureLeagueMember_(leagueId, username, role, status, invitedBy) {
       sheet.getRange(i + 1, col.Role + 1).setValue(role);
       sheet.getRange(i + 1, col.Status + 1).setValue(status);
       sheet.getRange(i + 1, col.UpdatedAt + 1).setValue(now);
+      clearLeagueAccessRuntimeCache_(LEAGUE_MEMBERS_SHEET);
       return true;
     }
   }
@@ -777,6 +785,7 @@ function updateLeagueMemberStatus_(leagueId, username, status) {
     ) {
       sheet.getRange(i + 1, col.Status + 1).setValue(status);
       sheet.getRange(i + 1, col.UpdatedAt + 1).setValue(now);
+      clearLeagueAccessRuntimeCache_(LEAGUE_MEMBERS_SHEET);
       return true;
     }
   }
@@ -802,6 +811,7 @@ function ensureLeagueGame_(leagueId, gameId, addedBy) {
       normalizeGameId_(data[i][col.GameId]) === gameId
     ) {
       sheet.getRange(i + 1, col.Active + 1).setValue(true);
+      clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
       return true;
     }
   }
@@ -979,10 +989,21 @@ function getLeagueFeatureRule_(gameId, leagueId, feature) {
 
 function leagueReadSheetObjects_(sheetName, headers) {
 
+  const cacheKey =
+    "league_sheet_objects_" + sheetName;
+
+  if (
+    LEAGUE_ACCESS_RUNTIME_CACHE &&
+    LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey]
+  ) {
+    return LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey];
+  }
+
   const sh = leagueEnsureSheet_(sheetName, headers);
   const data = sh.getDataRange().getValues();
 
   if (data.length <= 1) {
+    LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = [];
     return [];
   }
 
@@ -990,13 +1011,17 @@ function leagueReadSheetObjects_(sheetName, headers) {
     return String(h || "").trim();
   });
 
-  return data.slice(1).map(function(row) {
+  const rows = data.slice(1).map(function(row) {
     const obj = {};
     actualHeaders.forEach(function(header, index) {
       obj[header] = row[index];
     });
     return obj;
   });
+
+  LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = rows;
+
+  return rows;
 
 }
 
@@ -1007,6 +1032,11 @@ function leagueAppendObject_(sheet, headers, obj) {
   });
 
   sheet.appendRow(values);
+  clearLeagueAccessRuntimeCache_(
+    sheet && typeof sheet.getName === "function"
+      ? sheet.getName()
+      : ""
+  );
 
 }
 
@@ -1017,6 +1047,24 @@ function leagueColumnMap_(headers) {
     col[header] = index;
   });
   return col;
+
+}
+
+function clearLeagueAccessRuntimeCache_(sheetName) {
+
+  if (!LEAGUE_ACCESS_RUNTIME_CACHE) {
+    LEAGUE_ACCESS_RUNTIME_CACHE = {};
+    return;
+  }
+
+  if (!sheetName) {
+    LEAGUE_ACCESS_RUNTIME_CACHE = {};
+    return;
+  }
+
+  delete LEAGUE_ACCESS_RUNTIME_CACHE[
+    "league_sheet_objects_" + sheetName
+  ];
 
 }
 

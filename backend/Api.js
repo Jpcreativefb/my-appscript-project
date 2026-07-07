@@ -1831,12 +1831,37 @@ if (action === "compareUserPicks") {
 
     if (action === "getBettingPagePayload") {
 
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "makeWagers",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
       return json(
         apiGetBettingPagePayload({
           username:
             params.username,
           gameId:
-            gameId
+            gameId,
+          offset:
+            params.offset,
+          limit:
+            params.limit,
+          includeSummary:
+            params.includeSummary,
+          includeLeaderboard:
+            params.includeLeaderboard,
+          leagueId:
+            leagueId
         })
       );
 

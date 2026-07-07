@@ -12,6 +12,8 @@ const GAMES_CACHE_KEY =
 const DEFAULT_GAME_TYPE =
   "prediction";
 
+var GAMES_RUNTIME_CACHE = GAMES_RUNTIME_CACHE || {};
+
 /* =========================
    SUPPORTED GAME TYPES
 ========================= */
@@ -27,6 +29,17 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: false
+    },
+    {
+      id: "head-to-head",
+      label: "Head-to-Head Game",
+      description: "Users pick between two sides, players, drivers, teams, or nominees.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
     },
     {
       id: "confidence",
@@ -66,6 +79,17 @@ function getSupportedGameTypes() {
       predictionEnabled: true,
       rankingEnabled: true,
       confidenceEnabled: false,
+      wagerEnabled: true,
+      racingEnabled: true,
+      mixedGame: true
+    },
+    {
+      id: "combo",
+      label: "Combo Game",
+      description: "A simple admin-facing game type for combining picks, wagers, rankings, racing, and props in one game.",
+      predictionEnabled: true,
+      rankingEnabled: true,
+      confidenceEnabled: true,
       wagerEnabled: true,
       racingEnabled: true,
       mixedGame: true
@@ -876,6 +900,13 @@ function buildGameObjectFromRow_(
 
 function getGames() {
 
+  if (
+    GAMES_RUNTIME_CACHE &&
+    GAMES_RUNTIME_CACHE[GAMES_CACHE_KEY]
+  ) {
+    return GAMES_RUNTIME_CACHE[GAMES_CACHE_KEY];
+  }
+
   const cache =
     CacheService
       .getScriptCache();
@@ -889,9 +920,13 @@ function getGames() {
 
     try {
 
-      return JSON.parse(
+      const parsed = JSON.parse(
         cached
       );
+
+      GAMES_RUNTIME_CACHE[GAMES_CACHE_KEY] = parsed;
+
+      return parsed;
 
     } catch (err) {
 
@@ -959,6 +994,8 @@ function getGames() {
     JSON.stringify(games),
     300
   );
+
+  GAMES_RUNTIME_CACHE[GAMES_CACHE_KEY] = games;
 
   return games;
 
@@ -1305,6 +1342,8 @@ function getGameRuntimeConfig(gameId) {
 ========================= */
 
 function clearGamesCache() {
+
+  GAMES_RUNTIME_CACHE = {};
 
   CacheService
     .getScriptCache()

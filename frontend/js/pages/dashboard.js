@@ -20,24 +20,8 @@ async function renderDashboardPage() {
 
   }
 
-  if (
-    typeof loadActiveProfile === "function"
-  ) {
-
-    try {
-
-      await loadActiveProfile();
-
-    } catch (err) {
-
-      console.warn(
-        "Dashboard profile refresh skipped",
-        err
-      );
-
-    }
-
-  }
+  // Dashboard intentionally avoids loading profile as a separate request.
+  // The profile page can still load and edit full profile data.
 
   let payload;
 

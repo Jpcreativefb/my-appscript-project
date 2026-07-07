@@ -27,6 +27,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "getStartupPayload",
     "getDashboardGamesHub",
     "getEditableProfile",
+    "getBettingPagePayload",
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",

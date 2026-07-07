@@ -27,6 +27,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "getStartupPayload",
     "getDashboardGamesHub",
     "getEditableProfile",
+    "getBettingPagePayload",
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
@@ -1838,10 +1839,19 @@ async function apiGetBettingPagePayload(username, gameId, options = {}) {
 
   options = options || {};
 
+  const session =
+    typeof getSession === "function"
+      ? getSession() || {}
+      : {};
+
   const res =
     await api("getBettingPagePayload", {
       username,
+      token:
+        session.token || "",
       gameId,
+      leagueId:
+        getApiLeagueId_(),
       offset:
         options.offset !== undefined
           ? options.offset

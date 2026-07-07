@@ -1234,15 +1234,17 @@ async function adminSaveGameFromForm(
     res.success === false
   ) {
 
+    const saveErrorMessage =
+      res && res.error
+        ? res.error
+        : res && res.message
+          ? res.message
+          : "Unknown error";
+
     alert(
-      "Could not save game: " +
-      (
-        res && res.error
-          ? res.error
-          : res && res.message
-            ? res.message
-            : "Unknown error"
-      )
+      /^Could not save game:/i.test(saveErrorMessage)
+        ? saveErrorMessage
+        : "Could not save game: " + saveErrorMessage
     );
 
     return;

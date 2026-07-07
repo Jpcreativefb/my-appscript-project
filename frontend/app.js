@@ -90,13 +90,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   }
 
-  if (
-    typeof loadActiveProfile === "function"
-  ) {
-
-    loadActiveProfile();
-
-  }
+  // Profile data is now loaded only when needed.
+  // This keeps the first dashboard render from making an extra Apps Script call.
 
   // 🚀 INIT APP
   initApp();
@@ -513,7 +508,7 @@ async function enterGame(
 
   localStorage.setItem(
     "leaderboardMode",
-    gameType === "wager"
+    (gameType === "wager" || gameType === "racing-wager")
       ? "wager"
       : "standard"
   );
@@ -521,20 +516,9 @@ async function enterGame(
   clearStartupPayload();
 
   if (
-    typeof loadActiveProfile === "function"
-  ) {
-
-    try {
-      loadActiveProfile();
-    } catch (err) {
-      console.warn("Profile refresh after game select failed", err);
-    }
-
-  }
-
-  if (
     gameType === "wager" ||
-    gameType === "betting"
+    gameType === "betting" ||
+    gameType === "racing-wager"
   ) {
 
     await navigate("betting");
@@ -544,7 +528,11 @@ async function enterGame(
 
   if (
     gameType === "prediction" ||
-    gameType === "confidence"
+    gameType === "confidence" ||
+    gameType === "head-to-head" ||
+    gameType === "combo" ||
+    gameType === "mixed" ||
+    gameType === "survivor"
   ) {
 
     await navigate("picks");
@@ -592,7 +580,7 @@ async function viewGameLeaderboard(
 
   localStorage.setItem(
     "leaderboardMode",
-    gameType === "wager"
+    (gameType === "wager" || gameType === "racing-wager")
       ? "wager"
       : "standard"
   );
