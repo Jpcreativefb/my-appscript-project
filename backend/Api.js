@@ -247,7 +247,11 @@ function doGet(e) {
       "addLeagueMember",
       "getMyLeagues",
       "createLeague",
-      "adminSetupLeagueAccessSystem"
+      "adminSetupLeagueAccessSystem",
+      "adminGetLeagueAccessDashboard",
+      "setGameLeagueVisibility",
+      "removeGameFromLeague",
+      "updateLeague"
     ];
 
     const isAdminAction =
@@ -436,7 +440,11 @@ function doGet(e) {
           gameId:
             gameId,
           leagueId:
-            leagueId
+            leagueId,
+          accessMode:
+            params.accessMode || params.gameAccessMode,
+          pickScope:
+            params.pickScope
         })
       );
 
@@ -456,8 +464,14 @@ function doGet(e) {
             params.leagueName || params.name,
           gameId:
             gameId,
+          gameIds:
+            params.gameIds,
           visibility:
             params.visibility,
+          accessMode:
+            params.accessMode || params.gameAccessMode,
+          pickScope:
+            params.pickScope,
           joinMode:
             params.joinMode
         })
@@ -514,7 +528,11 @@ function doGet(e) {
           gameId:
             gameId,
           leagueId:
-            leagueId
+            leagueId,
+          accessMode:
+            params.accessMode || params.gameAccessMode,
+          pickScope:
+            params.pickScope
         })
       );
 
@@ -559,6 +577,93 @@ function doGet(e) {
             params.token,
           leagueId:
             leagueId
+        })
+      );
+
+    }
+
+
+    if (action === "adminGetLeagueAccessDashboard") {
+
+      return json(
+        apiAdminGetLeagueAccessDashboard({
+          username:
+            params.username,
+          token:
+            params.token
+        })
+      );
+
+    }
+
+    if (action === "setGameLeagueVisibility") {
+
+      return json(
+        apiSetGameLeagueVisibility({
+          username:
+            params.username,
+          token:
+            params.token,
+          gameId:
+            gameId,
+          leagueId:
+            leagueId,
+          leagueIds:
+            params.leagueIds,
+          accessMode:
+            params.accessMode || params.mode,
+          pickScope:
+            params.pickScope,
+          replace:
+            params.replace
+        })
+      );
+
+    }
+
+    if (action === "removeGameFromLeague") {
+
+      return json(
+        apiRemoveGameFromLeague({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
+    if (action === "updateLeague") {
+
+      return json(
+        apiUpdateLeague({
+          username:
+            params.username,
+          token:
+            params.token,
+          leagueId:
+            leagueId,
+          leagueName:
+            params.leagueName || params.name,
+          visibility:
+            params.visibility,
+          accessMode:
+            params.accessMode || params.gameAccessMode,
+          pickScope:
+            params.pickScope,
+          gameIds:
+            params.gameIds,
+          joinMode:
+            params.joinMode,
+          active:
+            params.active,
+          notes:
+            params.notes
         })
       );
 

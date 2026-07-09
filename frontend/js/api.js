@@ -31,6 +31,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminGetLeagueAccessDashboard",
     "adminRefreshSportsWagerScores",
     "adminAutoSetSportsWagerOdds",
     "adminSettleSportsWagers",
@@ -680,7 +681,10 @@ async function apiCreateLeague(payload) {
     leagueId: payload.leagueId,
     leagueName: payload.leagueName || payload.name,
     gameId: payload.gameId || getFrontendGameId() || "",
+    gameIds: payload.gameIds || payload.gameId || "",
     visibility: payload.visibility || "private",
+    accessMode: payload.accessMode || payload.gameAccessMode || payload.visibility || "private",
+    pickScope: payload.pickScope || "universal",
     joinMode: payload.joinMode || "invite"
   });
 
@@ -721,7 +725,9 @@ async function apiAssignGameToLeague(payload) {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
-    gameId: payload.gameId || getFrontendGameId() || ""
+    gameId: payload.gameId || getFrontendGameId() || "",
+    accessMode: payload.accessMode || payload.gameAccessMode || "private",
+    pickScope: payload.pickScope || "universal"
   });
 
 }
@@ -768,6 +774,71 @@ async function apiSaveLeagueFeatureAccess(payload) {
     usersAllowed: payload.usersAllowed,
     usersBlocked: payload.usersBlocked || "",
     active: payload.active === undefined ? "true" : payload.active
+  });
+
+}
+
+
+async function apiAdminGetLeagueAccessDashboard() {
+
+  const session = getSession ? getSession() : {};
+
+  return api("adminGetLeagueAccessDashboard", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : ""
+  });
+
+}
+
+async function apiSetGameLeagueVisibility(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("setGameLeagueVisibility", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: payload.gameId || getFrontendGameId() || "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    leagueIds: payload.leagueIds || payload.leagueId || "",
+    accessMode: payload.accessMode || payload.mode || "private",
+    pickScope: payload.pickScope || "universal",
+    replace: payload.replace === false ? "false" : "true"
+  });
+
+}
+
+async function apiRemoveGameFromLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("removeGameFromLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || ""
+  });
+
+}
+
+async function apiUpdateLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("updateLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    leagueName: payload.leagueName || payload.name || "",
+    visibility: payload.visibility || "private",
+    accessMode: payload.accessMode || payload.gameAccessMode || payload.visibility || "private",
+    pickScope: payload.pickScope || "universal",
+    gameIds: payload.gameIds || payload.gameId || "",
+    joinMode: payload.joinMode || "invite",
+    active: payload.active === undefined ? "true" : payload.active,
+    notes: payload.notes || ""
   });
 
 }

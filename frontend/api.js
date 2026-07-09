@@ -31,6 +31,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminGetLeagueAccessDashboard",
     "adminRefreshSportsWagerScores",
     "adminAutoSetSportsWagerOdds",
     "adminSettleSportsWagers",
@@ -680,7 +681,10 @@ async function apiCreateLeague(payload) {
     leagueId: payload.leagueId,
     leagueName: payload.leagueName || payload.name,
     gameId: payload.gameId || getFrontendGameId() || "",
+    gameIds: payload.gameIds || payload.gameId || "",
     visibility: payload.visibility || "private",
+    accessMode: payload.accessMode || payload.gameAccessMode || payload.visibility || "private",
+    pickScope: payload.pickScope || "universal",
     joinMode: payload.joinMode || "invite"
   });
 
@@ -697,6 +701,144 @@ async function apiAddLeagueMember(payload) {
     leagueId: payload.leagueId || getApiLeagueId_(),
     memberUsername: payload.memberUsername || payload.targetUsername,
     role: payload.role || "member"
+  });
+
+}
+
+async function apiAdminSetupLeagueAccessSystem() {
+
+  const session = getSession ? getSession() : {};
+
+  return api("adminSetupLeagueAccessSystem", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : ""
+  });
+
+}
+
+async function apiAssignGameToLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("assignGameToLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || "",
+    accessMode: payload.accessMode || payload.gameAccessMode || "private",
+    pickScope: payload.pickScope || "universal"
+  });
+
+}
+
+async function apiGetLeagueMembers(leagueId) {
+
+  const session = getSession ? getSession() : {};
+
+  return api("getLeagueMembers", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: leagueId || getApiLeagueId_()
+  });
+
+}
+
+async function apiRemoveLeagueMember(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("removeLeagueMember", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    memberUsername: payload.memberUsername || payload.targetUsername
+  });
+
+}
+
+async function apiSaveLeagueFeatureAccess(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("saveLeagueFeatureAccess", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || "",
+    feature: payload.feature,
+    accessRule: payload.accessRule,
+    rolesAllowed: payload.rolesAllowed,
+    usersAllowed: payload.usersAllowed,
+    usersBlocked: payload.usersBlocked || "",
+    active: payload.active === undefined ? "true" : payload.active
+  });
+
+}
+
+
+async function apiAdminGetLeagueAccessDashboard() {
+
+  const session = getSession ? getSession() : {};
+
+  return api("adminGetLeagueAccessDashboard", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : ""
+  });
+
+}
+
+async function apiSetGameLeagueVisibility(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("setGameLeagueVisibility", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: payload.gameId || getFrontendGameId() || "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    leagueIds: payload.leagueIds || payload.leagueId || "",
+    accessMode: payload.accessMode || payload.mode || "private",
+    pickScope: payload.pickScope || "universal",
+    replace: payload.replace === false ? "false" : "true"
+  });
+
+}
+
+async function apiRemoveGameFromLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("removeGameFromLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    gameId: payload.gameId || getFrontendGameId() || ""
+  });
+
+}
+
+async function apiUpdateLeague(payload) {
+
+  const session = getSession ? getSession() : {};
+  payload = payload || {};
+
+  return api("updateLeague", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    leagueName: payload.leagueName || payload.name || "",
+    visibility: payload.visibility || "private",
+    accessMode: payload.accessMode || payload.gameAccessMode || payload.visibility || "private",
+    pickScope: payload.pickScope || "universal",
+    gameIds: payload.gameIds || payload.gameId || "",
+    joinMode: payload.joinMode || "invite",
+    active: payload.active === undefined ? "true" : payload.active,
+    notes: payload.notes || ""
   });
 
 }
@@ -969,81 +1111,79 @@ async function apiAdminGetGameConfig(gameId) {
 
 }
 
+const ADMIN_GAME_SAVE_REQUESTS = {};
+
+function adminGameSaveRequestKey_(action, payload) {
+
+  const gameId =
+    payload && payload.gameId
+      ? String(payload.gameId)
+      : payload && payload.newGameId
+        ? String(payload.newGameId)
+        : payload && payload.sourceGameId
+          ? String(payload.sourceGameId)
+          : "new-game";
+
+  return "admin-game-save:" + action + ":" + gameId;
+
+}
+
+async function apiAdminGameSaveRequest_(action, payload) {
+
+  const key =
+    adminGameSaveRequestKey_(
+      action,
+      payload
+    );
+
+  if (ADMIN_GAME_SAVE_REQUESTS[key]) {
+    return ADMIN_GAME_SAVE_REQUESTS[key];
+  }
+
+  ADMIN_GAME_SAVE_REQUESTS[key] =
+    api(
+      action,
+      payload
+    ).finally(function() {
+      delete ADMIN_GAME_SAVE_REQUESTS[key];
+    });
+
+  return ADMIN_GAME_SAVE_REQUESTS[key];
+
+}
+
 async function apiAdminSaveGame(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminSaveGame",
-    {
-      gameId: payload.gameId,
-
-      name: payload.name,
-
-      year: payload.year,
-
-      type: payload.type,
-
-      active: payload.active,
-
-      archived: payload.archived,
-
-      defaultGame: payload.defaultGame,
-
-      predictionEnabled: payload.predictionEnabled,
-
-      rankingEnabled: payload.rankingEnabled,
-
-      confidenceEnabled: payload.confidenceEnabled,
-
-      confidenceScoringMode: payload.confidenceScoringMode,
-
-      wagerEnabled: payload.wagerEnabled,
-
-      startingBankroll: payload.startingBankroll,
-
-      minWager: payload.minWager,
-
-      maxWager: payload.maxWager,
-
-      allowBetRemoval: payload.allowBetRemoval,
-
-      wagerEditMode: payload.wagerEditMode,
-
-      themeColor: payload.themeColor,
-
-      icon: payload.icon,
-
-      sortOrder: payload.sortOrder,
-
-      status: payload.status,
-
-      lockAllPicks: payload.lockAllPicks,
-
-      showLeaderboard: payload.showLeaderboard,
-
-      showResultsBeforeLock: payload.showResultsBeforeLock,
-
-      resultsFinalized: payload.resultsFinalized,
-
-      votingLocked: payload.votingLocked
-    }
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
 
 async function apiAdminCreateGame(payload) {
 
-  return api(
-    "adminCreateGame",
-    payload
+  return apiAdminGameSaveRequest_(
+    "adminSaveGame",
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
 
 async function apiAdminUpdateGame(payload) {
 
-  return api(
-    "adminUpdateGame",
-    payload
+  return apiAdminGameSaveRequest_(
+    "adminSaveGame",
+    Object.assign(
+      {},
+      payload || {}
+    )
   );
 
 }
@@ -1061,7 +1201,7 @@ async function apiAdminArchiveGame(gameId) {
 
 async function apiAdminCloneGame(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminCloneGame",
     payload
   );
@@ -1070,7 +1210,7 @@ async function apiAdminCloneGame(payload) {
 
 async function apiAdminCloneGameSetup(payload) {
 
-  return api(
+  return apiAdminGameSaveRequest_(
     "adminCloneGameSetup",
     payload
   );
@@ -1698,13 +1838,17 @@ async function apiAdminParseSportsScoreboard(gameId) {
    BETTING
 ====================== */
 
-async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError) {
+async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError, options = {}) {
 
-  const [optionsRes, betsRes, leaderboardRes] =
+  const includeSummary =
+    options.includeSummary !== false;
+
+  const [optionsRes, betsRes] =
     await Promise.all([
       apiGetBettingOptions(gameId),
-      apiGetMyBets(username, gameId),
-      apiBettingLeaderboard(gameId)
+      includeSummary
+        ? apiGetMyBets(username, gameId)
+        : Promise.resolve({ summary: {} })
     ]);
 
   if (!optionsRes || optionsRes.success === false) {
@@ -1716,36 +1860,81 @@ async function apiBuildLegacyBettingPagePayload_(username, gameId, firstError) {
     };
   }
 
-  const leaderboardRows =
-    Array.isArray(leaderboardRes)
-      ? leaderboardRes
-      : leaderboardRes && Array.isArray(leaderboardRes.leaderboard)
-        ? leaderboardRes.leaderboard
-        : [];
+  const categories =
+    Array.isArray(optionsRes.categories)
+      ? optionsRes.categories
+      : [];
+
+  const offset = Number(options.offset || 0);
+  const limit = Number(options.limit || categories.length || 12);
+
+  const batchCategories = categories.slice(
+    offset,
+    offset + limit
+  );
+
+  const nextOffset = offset + batchCategories.length;
 
   return {
     success: true,
     optimized: false,
     fallback: true,
-    payloadType: "betting_page_legacy_fallback",
+    batched: true,
+    payloadType: "betting_page_light_fallback",
     gameId,
     config: optionsRes.config || {},
-    categories: optionsRes.categories || [],
+    categories: batchCategories,
+    categoryBatch: {
+      offset: offset,
+      limit: limit,
+      count: batchCategories.length,
+      total: categories.length,
+      nextOffset: nextOffset,
+      hasMore: nextOffset < categories.length
+    },
+    hasMoreCategories: nextOffset < categories.length,
+    nextCategoryOffset: nextOffset,
     summary:
       betsRes && betsRes.summary
         ? betsRes.summary
         : {},
-    leaderboard: leaderboardRows
+    leaderboard: [],
+    leaderboardDeferred: true
   };
 
 }
 
-async function apiGetBettingPagePayload(username, gameId) {
+async function apiGetBettingPagePayload(username, gameId, options = {}) {
+
+  options = options || {};
+
+  const session =
+    typeof getSession === "function"
+      ? getSession() || {}
+      : {};
 
   const res =
     await api("getBettingPagePayload", {
       username,
-      gameId
+      token:
+        session.token || "",
+      gameId,
+      leagueId:
+        getApiLeagueId_(),
+      offset:
+        options.offset !== undefined
+          ? options.offset
+          : 0,
+      limit:
+        options.limit !== undefined
+          ? options.limit
+          : 12,
+      includeSummary:
+        options.includeSummary !== undefined
+          ? options.includeSummary
+          : true,
+      includeLeaderboard:
+        options.includeLeaderboard === true
     });
 
   if (res && res.success !== false) {
@@ -1765,7 +1954,8 @@ async function apiGetBettingPagePayload(username, gameId) {
   return apiBuildLegacyBettingPagePayload_(
     username,
     gameId,
-    firstError
+    firstError,
+    options
   );
 
 }

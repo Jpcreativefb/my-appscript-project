@@ -41,6 +41,8 @@ const LEAGUE_MEMBERS_HEADERS = [
 const LEAGUE_GAMES_HEADERS = [
   "LeagueId",
   "GameId",
+  "AccessMode",
+  "PickScope",
   "Active",
   "CreatedAt",
   "AddedBy"
@@ -172,6 +174,73 @@ function apiGetMyLeagues(payload) {
 
 }
 
+function leagueNormalizeGameAccessMode_(value) {
+
+  const mode = String(value || "private")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (
+    mode === "public-leaderboard" ||
+    mode === "public-leaderboards" ||
+    mode === "both" ||
+    mode === "shared" ||
+    mode === "league-leaderboard" ||
+    mode === "league-leaderboards"
+  ) {
+    return "public_leaderboard";
+  }
+
+  if (mode === "public") {
+    return "public";
+  }
+
+  return "private";
+
+}
+
+function leagueNormalizePickScope_(value) {
+
+  const scope = String(value || "universal")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  if (
+    scope === "league" ||
+    scope === "league-specific" ||
+    scope === "different" ||
+    scope === "different-per-league"
+  ) {
+    return "league_specific";
+  }
+
+  return "universal";
+
+}
+
+function leagueCsvToGameIds_(value) {
+
+  if (Array.isArray(value)) {
+    return value
+      .map(function(item) { return normalizeGameId_(item); })
+      .filter(Boolean);
+  }
+
+  return String(value || "")
+    .split(",")
+    .map(function(item) { return normalizeGameId_(item); })
+    .filter(Boolean)
+    .filter(function(item, index, arr) {
+      return arr.indexOf(item) === index;
+    });
+
+}
+
+
 function apiCreateLeague(payload) {
 
   payload = payload || {};
@@ -193,6 +262,9 @@ function apiCreateLeague(payload) {
   }
 
   const leagueId = normalizeLeagueId_(payload.leagueId || leagueName);
+  const gameIds = leagueCsvToGameIds_(payload.gameIds || payload.gameId || "");
+  const accessMode = leagueNormalizeGameAccessMode_(payload.accessMode || payload.gameAccessMode || payload.visibility || "private");
+  const pickScope = leagueNormalizePickScope_(payload.pickScope || "universal");
   const now = new Date().toISOString();
 
   const leaguesSheet = leagueEnsureSheet_(LEAGUES_SHEET, LEAGUES_HEADERS);
@@ -224,14 +296,18 @@ function apiCreateLeague(payload) {
 
   ensureLeagueMember_(leagueId, username, "owner", "active", username);
 
-  if (payload.gameId) {
-    ensureLeagueGame_(leagueId, payload.gameId, username);
-  }
+  gameIds.forEach(function(gameId) {
+    validateGameId(gameId);
+    ensureLeagueGame_(leagueId, gameId, username, accessMode, pickScope);
+  });
 
   return {
     success: true,
     leagueId: leagueId,
-    leagueName: leagueName
+    leagueName: leagueName,
+    gameIds: gameIds,
+    accessMode: accessMode,
+    pickScope: pickScope
   };
 
 }
@@ -329,7 +405,13 @@ function apiAssignGameToLeague(payload) {
   }
 
   validateGameId(gameId);
-  ensureLeagueGame_(leagueId, gameId, username);
+  ensureLeagueGame_(
+    leagueId,
+    gameId,
+    username,
+    payload.accessMode || payload.gameAccessMode || "private",
+    payload.pickScope || "universal"
+  );
 
   return {
     success: true,
@@ -387,7 +469,7 @@ function apiSaveLeagueFeatureAccess(payload) {
     LeagueId: leagueId,
     Feature: feature,
     AccessRule: payload.accessRule || "league-members",
-    RolesAllowed: payload.rolesAllowed || "owner,admin,member",
+    RolesAllowed: payload.rolesAllowed || "owner,admin,member,viewer",
     UsersAllowed: payload.usersAllowed || "",
     UsersBlocked: payload.usersBlocked || "",
     Active: payload.active === undefined ? true : leagueNormalizeBoolean_(payload.active),
@@ -447,6 +529,480 @@ function apiGetLeagueMembers(payload) {
 
 }
 
+
+/* =========================
+   ADMIN LEAGUE DASHBOARD / VISIBILITY
+========================= */
+
+function apiAdminGetLeagueAccessDashboard(payload) {
+
+  payload = payload || {};
+
+  const username = leagueNormalizeString_(payload.username);
+  const token = leagueNormalizeString_(payload.token);
+
+  if (!username) {
+    return { success: false, error: "Missing username" };
+  }
+
+  if (token) {
+    validateUserSession_(username, token);
+  }
+
+  if (!isAdmin(username)) {
+    return { success: false, error: "Admin access required" };
+  }
+
+  apiSetupLeagueAccessSystem({});
+
+  const games =
+    typeof getGames === "function"
+      ? getGames()
+      : [];
+
+  const leagueMap = getLeagueMap_();
+  const memberships = getAllLeagueMembershipRows_();
+  const leagueGames = getAllLeagueGameRows_();
+  const featureRules = getAllLeagueFeatureRuleRows_();
+  const users =
+    typeof adminGetUsers_ === "function"
+      ? adminGetUsers_()
+      : getUsers().map(function(username) {
+          return {
+            username: username,
+            isAdmin: false,
+            active: true
+          };
+        });
+
+  const leagues = Object.keys(leagueMap)
+    .map(function(leagueId) {
+
+      const league = leagueMap[leagueId] || {};
+      const members = memberships.filter(function(member) {
+        return member.leagueId === leagueId && member.status === "active";
+      });
+      const assignedGames = leagueGames.filter(function(row) {
+        return row.leagueId === leagueId && row.active === true;
+      });
+
+      return {
+        leagueId: leagueId,
+        leagueName: league.leagueName || leagueId,
+        ownerUsername: league.ownerUsername || "",
+        visibility: league.visibility || "private",
+        joinMode: league.joinMode || "invite",
+        joinCode: league.joinCode || "",
+        active: league.active !== false,
+        memberCount: members.length,
+        members: members,
+        gameCount: assignedGames.length,
+        games: assignedGames
+      };
+
+    })
+    .sort(function(a, b) {
+      return String(a.leagueName || a.leagueId).localeCompare(String(b.leagueName || b.leagueId));
+    });
+
+  const gameAccess = (Array.isArray(games) ? games : [])
+    .map(function(game) {
+
+      const gameId = normalizeGameId_(game.gameId || game.GameId || "");
+      const assigned = leagueGames.filter(function(row) {
+        return row.gameId === gameId && row.active === true;
+      });
+
+      const assignedLeagues = assigned.map(function(row) {
+        const league = leagueMap[row.leagueId] || {};
+        return {
+          leagueId: row.leagueId,
+          leagueName: league.leagueName || row.leagueId,
+          active: row.active === true,
+          accessMode: row.accessMode || "private",
+          pickScope: row.pickScope || "universal"
+        };
+      });
+
+      const hasPrivateAccess = assignedLeagues.some(function(row) {
+        return row.accessMode === "private";
+      });
+
+      return {
+        gameId: gameId,
+        name: game.name || game.Name || gameId,
+        type: game.type || game.Type || "",
+        active: game.active === true || game.Active === true,
+        archived: game.archived === true || game.Archived === true,
+        accessMode: hasPrivateAccess
+          ? "private"
+          : assignedLeagues.length
+            ? "public_leaderboard"
+            : "public",
+        leagueScoped: assignedLeagues.length > 0,
+        leagues: assignedLeagues
+      };
+
+    })
+    .filter(function(game) {
+      return !!game.gameId;
+    });
+
+  return {
+    success: true,
+    leagues: leagues,
+    games: gameAccess,
+    users: users.map(function(user) {
+      return {
+        username: user.username || user.Username || "",
+        isAdmin: user.isAdmin === true,
+        active: user.active !== false
+      };
+    }),
+    featureRules: featureRules,
+    counts: {
+      leagues: leagues.length,
+      privateGames: gameAccess.filter(function(game) { return game.accessMode === "private"; }).length,
+      publicGames: gameAccess.filter(function(game) { return game.accessMode === "public"; }).length,
+      publicLeagueGames: gameAccess.filter(function(game) { return game.accessMode === "public_leaderboard"; }).length,
+      featureRules: featureRules.length
+    }
+  };
+
+}
+
+function apiSetGameLeagueVisibility(payload) {
+
+  payload = payload || {};
+
+  const username = leagueNormalizeString_(payload.username);
+  const token = leagueNormalizeString_(payload.token);
+  const gameId = normalizeGameId_(payload.gameId);
+  const accessMode = leagueNormalizeGameAccessMode_(payload.accessMode || payload.mode || "private");
+
+  if (!username || !gameId) {
+    return { success: false, error: "Missing username or gameId" };
+  }
+
+  if (token) {
+    validateUserSession_(username, token);
+  }
+
+  if (!isAdmin(username)) {
+    return { success: false, error: "Admin access required" };
+  }
+
+  validateGameId(gameId);
+  apiSetupLeagueAccessSystem({});
+
+  if (accessMode === "public") {
+    const removed = deactivateLeagueGamesForGame_(gameId, "");
+    clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
+    return {
+      success: true,
+      gameId: gameId,
+      accessMode: "public",
+      removed: removed,
+      message: "Game is now public."
+    };
+  }
+
+  const leagueIds = leagueCsvToKeys_(payload.leagueIds || payload.leagueId || "")
+    .map(normalizeLeagueId_)
+    .filter(Boolean);
+
+  if (!leagueIds.length) {
+    return { success: false, error: "Choose at least one league for private access." };
+  }
+
+  if (String(payload.replace || "true").toLowerCase() !== "false") {
+    deactivateLeagueGamesForGame_(gameId, "");
+  }
+
+  const normalizedAccessMode =
+    accessMode === "public_leaderboard"
+      ? "public_leaderboard"
+      : "private";
+
+  const pickScope = leagueNormalizePickScope_(payload.pickScope || "universal");
+
+  leagueIds.forEach(function(leagueId) {
+    ensureLeagueGame_(leagueId, gameId, username, normalizedAccessMode, pickScope);
+  });
+
+  clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
+
+  return {
+    success: true,
+    gameId: gameId,
+    accessMode: normalizedAccessMode,
+    pickScope: pickScope,
+    leagueIds: leagueIds,
+    message: normalizedAccessMode === "private"
+      ? "Game is now private to selected league(s)."
+      : "Game stays public and league leaderboards are enabled."
+  };
+
+}
+
+function apiRemoveGameFromLeague(payload) {
+
+  payload = payload || {};
+
+  const username = leagueNormalizeString_(payload.username);
+  const token = leagueNormalizeString_(payload.token);
+  const leagueId = normalizeLeagueId_(payload.leagueId);
+  const gameId = normalizeGameId_(payload.gameId);
+
+  if (!username || !leagueId || !gameId) {
+    return { success: false, error: "Missing username, leagueId, or gameId" };
+  }
+
+  if (token) {
+    validateUserSession_(username, token);
+  }
+
+  const canManage = userCanManageLeague_(username, leagueId);
+
+  if (!canManage.allowed && !isAdmin(username)) {
+    return { success: false, error: canManage.reason || "You cannot manage this league." };
+  }
+
+  const removed = deactivateLeagueGamesForGame_(gameId, leagueId);
+
+  return {
+    success: true,
+    leagueId: leagueId,
+    gameId: gameId,
+    removed: removed
+  };
+
+}
+
+function apiUpdateLeague(payload) {
+
+  payload = payload || {};
+
+  const username = leagueNormalizeString_(payload.username);
+  const token = leagueNormalizeString_(payload.token);
+  const leagueId = normalizeLeagueId_(payload.leagueId);
+
+  if (!username || !leagueId) {
+    return { success: false, error: "Missing username or leagueId" };
+  }
+
+  if (token) {
+    validateUserSession_(username, token);
+  }
+
+  const canManage = userCanManageLeague_(username, leagueId);
+
+  if (!canManage.allowed && !isAdmin(username)) {
+    return { success: false, error: canManage.reason || "You cannot manage this league." };
+  }
+
+  const sheet = leagueEnsureSheet_(LEAGUES_SHEET, LEAGUES_HEADERS);
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+  const col = leagueColumnMap_(headers);
+  const now = new Date().toISOString();
+
+  for (let i = 1; i < data.length; i++) {
+    if (normalizeLeagueId_(data[i][col.LeagueId]) === leagueId) {
+
+      if ("leagueName" in payload || "name" in payload) {
+        sheet.getRange(i + 1, col.LeagueName + 1).setValue(leagueNormalizeString_(payload.leagueName || payload.name));
+      }
+      if ("visibility" in payload) {
+        sheet.getRange(i + 1, col.Visibility + 1).setValue(leagueNormalizeString_(payload.visibility || "private").toLowerCase());
+      }
+      if ("joinMode" in payload) {
+        sheet.getRange(i + 1, col.JoinMode + 1).setValue(leagueNormalizeString_(payload.joinMode || "invite").toLowerCase());
+      }
+      if ("active" in payload) {
+        sheet.getRange(i + 1, col.Active + 1).setValue(leagueNormalizeBoolean_(payload.active));
+      }
+      if ("notes" in payload) {
+        sheet.getRange(i + 1, col.Notes + 1).setValue(leagueNormalizeString_(payload.notes));
+      }
+
+      sheet.getRange(i + 1, col.UpdatedAt + 1).setValue(now);
+
+      if ("gameIds" in payload || "gameId" in payload) {
+
+        const gameIds = leagueCsvToGameIds_(payload.gameIds || payload.gameId || "");
+        const accessMode = leagueNormalizeGameAccessMode_(payload.accessMode || payload.gameAccessMode || payload.visibility || "private");
+        const pickScope = leagueNormalizePickScope_(payload.pickScope || "universal");
+
+        deactivateLeagueGamesForLeague_(leagueId);
+
+        gameIds.forEach(function(gameId) {
+          validateGameId(gameId);
+          ensureLeagueGame_(leagueId, gameId, username, accessMode, pickScope);
+        });
+
+      }
+
+      clearLeagueAccessRuntimeCache_(LEAGUES_SHEET);
+      clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
+
+      return {
+        success: true,
+        leagueId: leagueId,
+        message: "League updated"
+      };
+
+    }
+  }
+
+  return { success: false, error: "League not found: " + leagueId };
+
+}
+
+function getAllLeagueMembershipRows_() {
+
+  return leagueReadSheetObjects_(LEAGUE_MEMBERS_SHEET, LEAGUE_MEMBERS_HEADERS)
+    .map(function(row) {
+      return {
+        leagueId: normalizeLeagueId_(row.LeagueId),
+        username: leagueNormalizeString_(row.Username),
+        role: leagueNormalizeRole_(row.Role || "member"),
+        status: leagueNormalizeString_(row.Status || "active").toLowerCase(),
+        invitedBy: leagueNormalizeString_(row.InvitedBy),
+        joinedAt: row.JoinedAt || "",
+        updatedAt: row.UpdatedAt || ""
+      };
+    })
+    .filter(function(row) {
+      return row.leagueId && row.username;
+    });
+
+}
+
+function getAllLeagueGameRows_() {
+
+  return leagueReadSheetObjects_(LEAGUE_GAMES_SHEET, LEAGUE_GAMES_HEADERS)
+    .map(function(row) {
+      return {
+        leagueId: normalizeLeagueId_(row.LeagueId),
+        gameId: normalizeGameId_(row.GameId),
+        accessMode: leagueNormalizeGameAccessMode_(row.AccessMode || "private"),
+        pickScope: leagueNormalizePickScope_(row.PickScope || "universal"),
+        active: leagueNormalizeBoolean_(row.Active),
+        createdAt: row.CreatedAt || "",
+        addedBy: leagueNormalizeString_(row.AddedBy)
+      };
+    })
+    .filter(function(row) {
+      return row.leagueId && row.gameId;
+    });
+
+}
+
+function getAllLeagueFeatureRuleRows_() {
+
+  return leagueReadSheetObjects_(GAME_FEATURE_ACCESS_SHEET, GAME_FEATURE_ACCESS_HEADERS)
+    .map(function(row) {
+      return {
+        gameId: normalizeGameId_(row.GameId),
+        leagueId: normalizeLeagueId_(row.LeagueId),
+        feature: leagueNormalizeFeature_(row.Feature),
+        accessRule: leagueNormalizeString_(row.AccessRule || "league-members"),
+        rolesAllowed: leagueNormalizeString_(row.RolesAllowed || "owner,admin,member,viewer"),
+        usersAllowed: leagueNormalizeString_(row.UsersAllowed),
+        usersBlocked: leagueNormalizeString_(row.UsersBlocked),
+        active: row.Active === "" || row.Active === undefined ? true : leagueNormalizeBoolean_(row.Active),
+        updatedAt: row.UpdatedAt || ""
+      };
+    })
+    .filter(function(row) {
+      return row.gameId && row.leagueId && row.feature;
+    });
+
+}
+
+function deactivateLeagueGamesForLeague_(leagueId) {
+
+  leagueId = normalizeLeagueId_(leagueId);
+
+  const sheet = leagueEnsureSheet_(LEAGUE_GAMES_SHEET, LEAGUE_GAMES_HEADERS);
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return 0;
+  }
+
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+  const col = leagueColumnMap_(headers);
+  let changed = 0;
+
+  const values = data.slice(1).map(function(row) {
+
+    const rowLeagueId = normalizeLeagueId_(row[col.LeagueId]);
+    const rowActive = leagueNormalizeBoolean_(row[col.Active]);
+
+    if (rowLeagueId === leagueId && rowActive === true) {
+      changed++;
+      return [false];
+    }
+
+    return [row[col.Active]];
+
+  });
+
+  if (values.length) {
+    sheet.getRange(2, col.Active + 1, values.length, 1).setValues(values);
+  }
+
+  clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
+  return changed;
+
+}
+
+function deactivateLeagueGamesForGame_(gameId, leagueId) {
+
+  gameId = normalizeGameId_(gameId);
+  leagueId = normalizeLeagueId_(leagueId || "");
+
+  const sheet = leagueEnsureSheet_(LEAGUE_GAMES_SHEET, LEAGUE_GAMES_HEADERS);
+  const data = sheet.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return 0;
+  }
+
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+  const col = leagueColumnMap_(headers);
+  let changed = 0;
+
+  const values = data.slice(1).map(function(row) {
+
+    const rowLeagueId = normalizeLeagueId_(row[col.LeagueId]);
+    const rowGameId = normalizeGameId_(row[col.GameId]);
+    const rowActive = leagueNormalizeBoolean_(row[col.Active]);
+
+    if (
+      rowGameId === gameId &&
+      rowActive === true &&
+      (!leagueId || rowLeagueId === leagueId)
+    ) {
+      changed++;
+      return [false];
+    }
+
+    return [row[col.Active]];
+
+  });
+
+  if (values.length) {
+    sheet.getRange(2, col.Active + 1, values.length, 1).setValues(values);
+  }
+
+  clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
+  return changed;
+
+}
+
 /* =========================
    ACCESS DECISIONS
 ========================= */
@@ -472,11 +1028,14 @@ function userCanAccessGameFeature_(username, gameId, feature, leagueId) {
   }
 
   const activeLeagueGames = getActiveLeagueGamesForGame_(gameId);
+  const privateLeagueGames = activeLeagueGames.filter(function(row) {
+    return row.accessMode === "private";
+  });
 
-  if (!activeLeagueGames.length) {
+  if (!privateLeagueGames.length) {
     return {
       allowed: true,
-      reason: "public-game",
+      reason: activeLeagueGames.length ? "public-game-league-leaderboard" : "public-game",
       leagueId: "",
       role: "public"
     };
@@ -522,10 +1081,18 @@ function userCanAccessGameFeature_(username, gameId, feature, leagueId) {
 
     const accessRule = leagueNormalizeString_(rule.accessRule).toLowerCase();
     const usersAllowed = leagueCsvToKeys_(rule.usersAllowed);
-    const rolesAllowed = leagueCsvToKeys_(rule.rolesAllowed || "owner,admin,member");
+    let rolesAllowed = leagueCsvToKeys_(rule.rolesAllowed || "owner,admin,member,viewer");
 
     if (accessRule === "disabled" || accessRule === "none") {
       return { allowed: false, reason: "feature-disabled", leagueId: leagueId, role: role };
+    }
+
+    if (accessRule === "owner-admin" || accessRule === "owner-admin-only") {
+      rolesAllowed = ["owner", "admin"];
+    }
+
+    if (accessRule === "league-members" && !rolesAllowed.length) {
+      rolesAllowed = ["owner", "admin", "member", "viewer"];
     }
 
     if (accessRule === "users-only") {
@@ -691,6 +1258,10 @@ function getAccessibleLeaguesForGame_(username, gameId) {
 
       const league = leagueMap[normalizeLeagueId_(lg.leagueId)] || {};
 
+      if (league.active === false) {
+        return null;
+      }
+
       return {
         leagueId: normalizeLeagueId_(lg.leagueId),
         leagueName: league.leagueName || lg.leagueId,
@@ -698,7 +1269,8 @@ function getAccessibleLeaguesForGame_(username, gameId) {
         status: member.status || "active",
         gameId: gameId
       };
-    });
+    })
+    .filter(Boolean);
 
 }
 
@@ -710,6 +1282,11 @@ function getLeaguesForUser_(username) {
 
   return memberships.map(function(member) {
     const league = leagueMap[normalizeLeagueId_(member.leagueId)] || {};
+
+    if (league.active === false) {
+      return null;
+    }
+
     return {
       leagueId: member.leagueId,
       leagueName: league.leagueName || member.leagueId,
@@ -718,7 +1295,7 @@ function getLeaguesForUser_(username) {
       visibility: league.visibility || "private",
       joinMode: league.joinMode || "invite"
     };
-  });
+  }).filter(Boolean);
 
 }
 
@@ -794,10 +1371,12 @@ function updateLeagueMemberStatus_(leagueId, username, status) {
 
 }
 
-function ensureLeagueGame_(leagueId, gameId, addedBy) {
+function ensureLeagueGame_(leagueId, gameId, addedBy, accessMode, pickScope) {
 
   leagueId = normalizeLeagueId_(leagueId);
   gameId = normalizeGameId_(gameId);
+  accessMode = leagueNormalizeGameAccessMode_(accessMode || "private");
+  pickScope = leagueNormalizePickScope_(pickScope || "universal");
 
   const sheet = leagueEnsureSheet_(LEAGUE_GAMES_SHEET, LEAGUE_GAMES_HEADERS);
   const data = sheet.getDataRange().getValues();
@@ -810,6 +1389,12 @@ function ensureLeagueGame_(leagueId, gameId, addedBy) {
       normalizeLeagueId_(data[i][col.LeagueId]) === leagueId &&
       normalizeGameId_(data[i][col.GameId]) === gameId
     ) {
+      if (typeof col.AccessMode === "number") {
+        sheet.getRange(i + 1, col.AccessMode + 1).setValue(accessMode);
+      }
+      if (typeof col.PickScope === "number") {
+        sheet.getRange(i + 1, col.PickScope + 1).setValue(pickScope);
+      }
       sheet.getRange(i + 1, col.Active + 1).setValue(true);
       clearLeagueAccessRuntimeCache_(LEAGUE_GAMES_SHEET);
       return true;
@@ -819,6 +1404,8 @@ function ensureLeagueGame_(leagueId, gameId, addedBy) {
   leagueAppendObject_(sheet, LEAGUE_GAMES_HEADERS, {
     LeagueId: leagueId,
     GameId: gameId,
+    AccessMode: accessMode,
+    PickScope: pickScope,
     Active: true,
     CreatedAt: now,
     AddedBy: addedBy || ""
@@ -913,16 +1500,21 @@ function getActiveLeagueGamesForGame_(gameId) {
 
   gameId = normalizeGameId_(gameId);
 
+  const leagueMap = getLeagueMap_();
+
   return leagueReadSheetObjects_(LEAGUE_GAMES_SHEET, LEAGUE_GAMES_HEADERS)
     .map(function(row) {
       return {
         leagueId: normalizeLeagueId_(row.LeagueId),
         gameId: normalizeGameId_(row.GameId),
+        accessMode: leagueNormalizeGameAccessMode_(row.AccessMode || "private"),
+        pickScope: leagueNormalizePickScope_(row.PickScope || "universal"),
         active: leagueNormalizeBoolean_(row.Active)
       };
     })
     .filter(function(row) {
-      return row.gameId === gameId && row.leagueId && row.active === true;
+      const league = leagueMap[row.leagueId] || {};
+      return row.gameId === gameId && row.leagueId && row.active === true && league.active !== false;
     });
 
 }
@@ -943,6 +1535,8 @@ function getLeagueMap_() {
         ownerUsername: leagueNormalizeString_(row.OwnerUsername),
         visibility: leagueNormalizeString_(row.Visibility || "private").toLowerCase(),
         joinMode: leagueNormalizeString_(row.JoinMode || "invite").toLowerCase(),
+        accessMode: leagueNormalizeGameAccessMode_(row.AccessMode || "private"),
+        pickScope: leagueNormalizePickScope_(row.PickScope || "universal"),
         active: leagueNormalizeBoolean_(row.Active)
       };
     });
@@ -971,7 +1565,7 @@ function getLeagueFeatureRule_(gameId, leagueId, feature) {
         leagueId: leagueId,
         feature: feature,
         accessRule: row.AccessRule || "league-members",
-        rolesAllowed: row.RolesAllowed || "owner,admin,member",
+        rolesAllowed: row.RolesAllowed || "owner,admin,member,viewer",
         usersAllowed: row.UsersAllowed || "",
         usersBlocked: row.UsersBlocked || "",
         active: row.Active === "" || row.Active === undefined ? true : leagueNormalizeBoolean_(row.Active)

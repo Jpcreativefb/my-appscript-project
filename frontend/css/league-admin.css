@@ -196,3 +196,184 @@
   }
 
 }
+
+/* =========================
+   STAGE 2 LEAGUE ACCESS CLEANUP
+========================= */
+
+.league-quick-card {
+  margin: 14px 0;
+}
+
+.league-count-row,
+.league-actions-row,
+.league-badge-row,
+.league-overview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.league-count-row span,
+.league-assigned-badge,
+.league-mode-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 900;
+  background: rgba(53, 71, 133, 0.10);
+}
+
+.league-mode-pill.public {
+  background: rgba(34, 197, 94, 0.16);
+  color: #166534;
+}
+
+.league-mode-pill.private {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92400e;
+}
+
+.league-quick-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.league-overview-section {
+  margin-top: 18px;
+}
+
+.league-overview-list {
+  display: grid;
+  gap: 10px;
+}
+
+.league-overview-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 16px;
+  background: rgba(0,0,0,0.035);
+}
+
+.league-overview-row strong,
+.league-overview-row span {
+  display: block;
+}
+
+.league-overview-row > div > span {
+  margin-top: 3px;
+  opacity: 0.68;
+  font-size: 13px;
+}
+
+.league-overview-middle {
+  display: grid;
+  gap: 7px;
+}
+
+.league-muted {
+  opacity: 0.65;
+  font-weight: 700;
+}
+
+.button.small {
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+@media (max-width: 860px) {
+
+  .league-quick-grid,
+  .league-overview-row {
+    grid-template-columns: 1fr;
+  }
+
+}
+
+/* =========================
+   STAGE 2B CONDENSED LEAGUE WORKFLOW
+========================= */
+
+.league-section-header.compact {
+  align-items: center;
+  margin-bottom: 0;
+}
+
+.league-workflow-card,
+.league-member-manager-card,
+.league-feature-parked-card {
+  margin: 14px 0;
+}
+
+.league-workflow-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.league-wide-field {
+  grid-column: 1 / -1;
+}
+
+.league-field small,
+.league-help-text,
+.league-id-preview,
+.league-mini-note {
+  font-size: 12px;
+  opacity: 0.68;
+  line-height: 1.35;
+}
+
+.league-field select[multiple] {
+  min-height: 150px;
+}
+
+.league-mode-pill.leagueboard {
+  background: rgba(59, 130, 246, 0.16);
+  color: #1d4ed8;
+}
+
+.league-overview-row.leagueboard {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.league-help-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.42);
+}
+
+.league-help-modal.hidden {
+  display: none;
+}
+
+.league-help-dialog {
+  width: min(760px, 100%);
+  max-height: 86vh;
+  overflow: auto;
+}
+
+.league-help-list {
+  margin: 12px 0 0;
+  padding-left: 22px;
+  line-height: 1.55;
+}
+
+@media (max-width: 760px) {
+
+  .league-workflow-grid {
+    grid-template-columns: 1fr;
+  }
+
+}
