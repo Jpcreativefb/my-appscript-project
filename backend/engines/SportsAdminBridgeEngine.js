@@ -300,6 +300,71 @@ function apiAdminGetSportsControlDashboard(payload) {
 }
 
 /* =====================================================
+   SCORE REFRESH CONTROLS
+===================================================== */
+
+function apiAdminRefreshSportsScoresNow(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "refreshSportsScoresNowAdmin",
+    {}
+  );
+
+}
+
+function apiAdminRefreshSportsScoresWindow(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "refreshSportsScoresWindowAdmin",
+    {
+      daysBack:
+        payload.daysBack || 2,
+
+      daysForward:
+        payload.daysForward || 7
+    }
+  );
+
+}
+
+function apiAdminInstallSportsScoresWindowTrigger(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "installSportsScoresWindowTriggerAdmin",
+    {}
+  );
+
+}
+
+function apiAdminRemoveSportsScoresWindowTrigger(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "removeSportsScoresWindowTriggerAdmin",
+    {}
+  );
+
+}
+
+/* =====================================================
    SCORE LEAGUE CONTROLS
 ===================================================== */
 

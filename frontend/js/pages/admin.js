@@ -2078,6 +2078,22 @@ async function adminLoadSportsControls() {
   const res =
     await apiAdminGetSportsControlDashboard();
 
+  if (res && res.success !== false) {
+
+    try {
+      const wagerSyncStatus =
+        await apiAdminGetSportsWagerAutoSyncStatus();
+
+      res.wagerAutoSyncTriggers =
+        wagerSyncStatus && wagerSyncStatus.success
+          ? wagerSyncStatus.triggers || []
+          : [];
+    } catch (err) {
+      res.wagerAutoSyncTriggers = [];
+    }
+
+  }
+
   if (!res || res.success === false) {
 
     panel.innerHTML =
@@ -2135,14 +2151,22 @@ function adminRenderSportsControlDashboard_(
   const scoreTriggers =
     data.scoreTriggers || [];
 
+  const scoreWindowTriggers =
+    data.scoreWindowTriggers || [];
+
   const seasonBatchTriggers =
     data.seasonBatchTriggers || [];
+
+  const wagerAutoSyncTriggers =
+    data.wagerAutoSyncTriggers || [];
 
   return `
     ${adminRenderSportsTriggerControls_(
       scoreTriggers,
+      scoreWindowTriggers,
       seasonBatchTriggers,
-      usage
+      usage,
+      wagerAutoSyncTriggers
     )}
 
     ${adminRenderScoreLeagueControls_(
@@ -2161,19 +2185,31 @@ function adminRenderSportsControlDashboard_(
 
 function adminRenderSportsTriggerControls_(
   scoreTriggers,
+  scoreWindowTriggers,
   seasonBatchTriggers,
-  usage
+  usage,
+  wagerAutoSyncTriggers
 ) {
+
+  scoreWindowTriggers =
+    scoreWindowTriggers || [];
+
+  wagerAutoSyncTriggers =
+    wagerAutoSyncTriggers || [];
 
   return `
     <div class="admin-category-card">
 
       <div class="admin-category-header">
         <div>
-          <strong>System Triggers & Usage</strong>
+          <strong>Sports Automation & Usage</strong>
 
           <div class="admin-sub">
-            Score triggers: ${scoreTriggers.length || 0}
+            Live score triggers: ${scoreTriggers.length || 0}
+            ·
+            Score window triggers: ${scoreWindowTriggers.length || 0}
+            ·
+            Wager auto-sync triggers: ${wagerAutoSyncTriggers.length || 0}
             ·
             Schedule triggers: ${seasonBatchTriggers.length || 0}
             ·
@@ -2182,24 +2218,70 @@ function adminRenderSportsTriggerControls_(
         </div>
       </div>
 
+      <div class="admin-sub">
+        Use <strong>Refresh Score Window Now</strong> before creating wagers or when games look missing. Use <strong>Install Wager Auto-Sync</strong> to keep existing wager games refreshed and settled automatically.
+      </div>
+
       <div class="admin-actions">
+
+        <button
+          class="admin-small-button"
+          onclick="adminRefreshSportsScoresWindow()"
+        >
+          Refresh Score Window Now
+        </button>
+
+        <button
+          class="admin-small-button secondary"
+          onclick="adminRefreshSportsScoresNow()"
+        >
+          Refresh Current Scores Now
+        </button>
 
         <button
           class="admin-small-button"
           onclick="adminInstallSportsScoresTrigger()"
         >
-          Install Score Trigger
+          Install Live Score Trigger
         </button>
 
         <button
           class="admin-small-button danger"
           onclick="adminRemoveSportsScoresTrigger()"
         >
-          Remove Score Trigger
+          Remove Live Score Trigger
         </button>
 
         <button
           class="admin-small-button"
+          onclick="adminInstallSportsScoresWindowTrigger()"
+        >
+          Install Score Window Trigger
+        </button>
+
+        <button
+          class="admin-small-button danger"
+          onclick="adminRemoveSportsScoresWindowTrigger()"
+        >
+          Remove Score Window Trigger
+        </button>
+
+        <button
+          class="admin-small-button"
+          onclick="adminInstallSportsWagerAutoSyncTrigger()"
+        >
+          Install Wager Auto-Sync
+        </button>
+
+        <button
+          class="admin-small-button danger"
+          onclick="adminRemoveSportsWagerAutoSyncTrigger()"
+        >
+          Remove Wager Auto-Sync
+        </button>
+
+        <button
+          class="admin-small-button secondary"
           onclick="adminInstallSportsOddsHybridTrigger()"
         >
           Install Hybrid Odds Trigger
@@ -2609,6 +2691,134 @@ async function adminRemoveSportsScoresTrigger() {
       ? "Score trigger removed."
       : (res && (res.error || res.message)) ||
         "Unable to remove score trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRefreshSportsScoresNow() {
+
+  adminSportsMessage_(
+    "Refreshing current ESPN scoreboards...",
+    false
+  );
+
+  const res =
+    await apiAdminRefreshSportsScoresNow();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Current score refresh complete. Games fetched: " +
+        (res.gamesFetched || 0)
+      : (res && (res.error || res.message || res.reason)) ||
+        "Current score refresh failed.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRefreshSportsScoresWindow() {
+
+  const ok =
+    window.confirm(
+      "Refresh recent and upcoming scores now? This checks 2 days back and 7 days forward for enabled leagues."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Refreshing recent/upcoming ESPN score window...",
+    false
+  );
+
+  const res =
+    await apiAdminRefreshSportsScoresWindow(
+      2,
+      7
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score window refresh complete. Unique games: " +
+        (res.uniqueGames || 0) +
+        ", fetched rows: " +
+        (res.gamesFetched || 0)
+      : (res && (res.error || res.message || res.reason)) ||
+        "Score window refresh failed.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminInstallSportsScoresWindowTrigger() {
+
+  const res =
+    await apiAdminInstallSportsScoresWindowTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score window trigger installed."
+      : (res && (res.error || res.message)) ||
+        "Unable to install score window trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRemoveSportsScoresWindowTrigger() {
+
+  const res =
+    await apiAdminRemoveSportsScoresWindowTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Score window trigger removed."
+      : (res && (res.error || res.message)) ||
+        "Unable to remove score window trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminInstallSportsWagerAutoSyncTrigger() {
+
+  const res =
+    await apiAdminInstallSportsWagerAutoSyncTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Wager auto-sync trigger installed."
+      : (res && (res.error || res.message)) ||
+        "Unable to install wager auto-sync trigger.",
+    !(res && res.success)
+  );
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminRemoveSportsWagerAutoSyncTrigger() {
+
+  const res =
+    await apiAdminRemoveSportsWagerAutoSyncTrigger();
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Wager auto-sync trigger removed."
+      : (res && (res.error || res.message)) ||
+        "Unable to remove wager auto-sync trigger.",
     !(res && res.success)
   );
 

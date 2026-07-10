@@ -633,6 +633,63 @@ function apiUpdateSportsLeagueSetting_(params) {
 }
 
 /* =====================================================
+   SCORE REFRESH ADMIN
+===================================================== */
+
+function apiRefreshSportsScoresNowAdmin_(params) {
+
+  assertSportsAdmin_(
+    params
+  );
+
+  return runSportsScoresUpdate();
+
+}
+
+function apiRefreshSportsScoresWindowAdmin_(params) {
+
+  assertSportsAdmin_(
+    params
+  );
+
+  let daysBack =
+    sportsAdminNumber_(
+      params.daysBack,
+      2
+    );
+
+  let daysForward =
+    sportsAdminNumber_(
+      params.daysForward,
+      7
+    );
+
+  daysBack =
+    Math.max(
+      0,
+      Math.min(
+        7,
+        Math.floor(daysBack)
+      )
+    );
+
+  daysForward =
+    Math.max(
+      0,
+      Math.min(
+        14,
+        Math.floor(daysForward)
+      )
+    );
+
+  return runSportsScoresDateWindowUpdate_(
+    daysBack,
+    daysForward
+  );
+
+}
+
+/* =====================================================
    TRIGGER ADMIN
 ===================================================== */
 
@@ -653,6 +710,26 @@ function apiRemoveSportsScoresTriggerAdmin_(params) {
   );
 
   return removeSportsScoresTriggers();
+
+}
+
+function apiInstallSportsScoresWindowTriggerAdmin_(params) {
+
+  assertSportsAdmin_(
+    params
+  );
+
+  return installSportsScoresWindowTrigger();
+
+}
+
+function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
+
+  assertSportsAdmin_(
+    params
+  );
+
+  return removeSportsScoresWindowTriggers();
 
 }
 
@@ -2419,6 +2496,10 @@ function apiGetSportsAdminDashboard_(params) {
     scoreTriggers:
       typeof checkSportsScoresTriggers === "function"
         ? checkSportsScoresTriggers()
+        : [],
+    scoreWindowTriggers:
+      typeof checkSportsScoresWindowTriggers === "function"
+        ? checkSportsScoresWindowTriggers()
         : [],
     seasonBatchTriggers:
       typeof checkSportsSeasonBatchTriggers === "function"

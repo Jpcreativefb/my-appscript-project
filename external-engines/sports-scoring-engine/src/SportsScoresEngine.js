@@ -1855,6 +1855,49 @@ function doGet(e) {
 
     }
 
+    else if (action === "runSportsScoresWindowUpdate") {
+
+      payload =
+        runSportsScoresWindowUpdate();
+
+    }
+
+    else if (action === "refreshSportsScoresNowAdmin") {
+
+      payload =
+        apiRefreshSportsScoresNowAdmin_(
+          params
+        );
+
+    }
+
+    else if (action === "refreshSportsScoresWindowAdmin") {
+
+      payload =
+        apiRefreshSportsScoresWindowAdmin_(
+          params
+        );
+
+    }
+
+    else if (action === "installSportsScoresWindowTriggerAdmin") {
+
+      payload =
+        apiInstallSportsScoresWindowTriggerAdmin_(
+          params
+        );
+
+    }
+
+    else if (action === "removeSportsScoresWindowTriggerAdmin") {
+
+      payload =
+        apiRemoveSportsScoresWindowTriggerAdmin_(
+          params
+        );
+
+    }
+
     else if (action === "setupSportsOdds") {
 
       payload =
@@ -3551,6 +3594,112 @@ function runSportsScoresWindowUpdate() {
     2,
     7
   );
+}
+
+const SPORTS_WINDOW_TRIGGER_FUNCTION =
+  "runSportsScoresWindowAutomation";
+
+function runSportsScoresWindowAutomation() {
+
+  return runSportsScoresDateWindowUpdate_(
+    1,
+    2
+  );
+
+}
+
+function installSportsScoresWindowTrigger() {
+
+  removeSportsScoresWindowTriggers();
+
+  ScriptApp
+    .newTrigger(
+      SPORTS_WINDOW_TRIGGER_FUNCTION
+    )
+    .timeBased()
+    .everyMinutes(30)
+    .create();
+
+  logSports_(
+    "INFO",
+    "installSportsScoresWindowTrigger",
+    "Installed sports score window trigger",
+    JSON.stringify({
+      functionName: SPORTS_WINDOW_TRIGGER_FUNCTION,
+      everyMinutes: 30,
+      daysBack: 1,
+      daysForward: 2
+    })
+  );
+
+  return {
+    success: true,
+    message: "Sports score window trigger installed for every 30 minutes",
+    functionName: SPORTS_WINDOW_TRIGGER_FUNCTION,
+    everyMinutes: 30,
+    daysBack: 1,
+    daysForward: 2
+  };
+
+}
+
+function removeSportsScoresWindowTriggers() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+  let removed = 0;
+
+  triggers.forEach(function(trigger) {
+
+    if (
+      trigger.getHandlerFunction() ===
+      SPORTS_WINDOW_TRIGGER_FUNCTION
+    ) {
+      ScriptApp.deleteTrigger(
+        trigger
+      );
+      removed++;
+    }
+
+  });
+
+  logSports_(
+    "INFO",
+    "removeSportsScoresWindowTriggers",
+    "Removed sports score window triggers",
+    JSON.stringify({
+      removed: removed
+    })
+  );
+
+  return {
+    success: true,
+    removed: removed
+  };
+
+}
+
+function checkSportsScoresWindowTriggers() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+  return triggers
+    .filter(function(trigger) {
+      return (
+        trigger.getHandlerFunction() ===
+        SPORTS_WINDOW_TRIGGER_FUNCTION
+      );
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource())
+      };
+    });
+
 }
 
 function runSportsScoresDateWindowUpdate_(

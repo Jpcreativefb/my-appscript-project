@@ -2094,9 +2094,17 @@ function renderBettingAdminControls_(session){
       <button
         class="betting-admin-btn"
         type="button"
+        onclick="refreshAndSettleWagersFromPage_()"
+      >
+        Refresh & Settle This Game
+      </button>
+
+      <button
+        class="betting-admin-btn secondary"
+        type="button"
         onclick="refreshWagerScoresFromPage_()"
       >
-        Refresh Scores / Records
+        Refresh Scores Only
       </button>
 
       <button
@@ -2105,14 +2113,6 @@ function renderBettingAdminControls_(session){
         onclick="autoSetWagerOddsFromPage_()"
       >
         Auto Odds
-      </button>
-
-      <button
-        class="betting-admin-btn secondary"
-        type="button"
-        onclick="settleWagersFromPage_()"
-      >
-        Settle Final Games
       </button>
 
     </div>
@@ -2920,6 +2920,76 @@ function startBettingAutoRefresh_(){
 
 }
 
+async function refreshAndSettleWagersFromPage_(){
+
+  const notice =
+    document.getElementById("bettingNotice");
+
+  const app =
+    document.getElementById("app");
+
+  const gameId =
+    getBettingGameId_();
+
+  if (notice) {
+    notice.innerHTML =
+      renderBettingNotice_(
+        "Refreshing ESPN scores, updating this game, and settling finals. This can take up to a minute...",
+        ""
+      );
+  }
+
+  const res =
+    await apiAdminRefreshAndSettleSportsWagers(
+      gameId,
+      {
+        scoreRefreshMode:
+          "window",
+        daysBack:
+          2,
+        daysForward:
+          2,
+
+        force:
+          true
+      }
+    );
+
+  if (!res || res.success === false) {
+
+    if (notice) {
+      notice.innerHTML =
+        renderBettingNotice_(
+          (res && (res.error || res.message)) ||
+          "Could not refresh and settle this sports game.",
+          "error"
+        );
+    }
+
+    return;
+
+  }
+
+  if (notice) {
+    notice.innerHTML =
+      renderBettingNotice_(
+        "Refresh and settlement complete. Updated rows: " +
+        (res.updated || 0) +
+        ", settled: " +
+        (res.settled || 0) +
+        ", skipped: " +
+        (res.skipped || 0),
+        ""
+      );
+  }
+
+  if (app) {
+    app.innerHTML =
+      await renderBettingPage();
+  }
+
+}
+
 async function refreshWagerScoresFromPage_(){
 
   const notice =
@@ -2941,7 +3011,17 @@ async function refreshWagerScoresFromPage_(){
 
   const res =
     await apiAdminRefreshSportsWagerScores(
-      gameId
+      gameId,
+      {
+        refreshEngineFirst:
+          true,
+        scoreRefreshMode:
+          "window",
+        daysBack:
+          2,
+        daysForward:
+          2
+      }
     );
 
   if (!res || res.success === false) {
@@ -2995,8 +3075,16 @@ async function settleWagersFromPage_(){
   }
 
   const res =
-    await apiAdminSettleSportsWagers(
-      gameId
+    await apiAdminRefreshAndSettleSportsWagers(
+      gameId,
+      {
+        scoreRefreshMode:
+          "window",
+        daysBack:
+          2,
+        daysForward:
+          2
+      }
     );
 
   if (!res || res.success === false) {

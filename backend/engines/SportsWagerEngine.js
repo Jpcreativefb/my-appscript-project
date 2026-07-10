@@ -639,6 +639,183 @@ function sportsWagerFetchJson_(
 
 }
 
+function sportsWagerClampWholeNumber_(
+  value,
+  fallback,
+  min,
+  max
+) {
+
+  let n =
+    sportsWagerNumber_(
+      value,
+      fallback
+    );
+
+  n =
+    Math.floor(n);
+
+  if (n < min) {
+    n = min;
+  }
+
+  if (n > max) {
+    n = max;
+  }
+
+  return n;
+
+}
+
+function sportsWagerThrowIfUnknownSportsAction_(
+  result,
+  label
+) {
+
+  const message =
+    sportsWagerString_(
+      result &&
+      (
+        result.error ||
+        result.message ||
+        result.reason
+      )
+    );
+
+  if (
+    result &&
+    result.success === false &&
+    message.indexOf("Unknown action") !== -1
+  ) {
+    throw new Error(
+      label +
+      ": " +
+      message
+    );
+  }
+
+  return result;
+
+}
+
+function sportsWagerRefreshScoresEngineNow_() {
+
+  return sportsWagerThrowIfUnknownSportsAction_(
+    sportsWagerFetchJson_(
+      {
+        action:
+          "refreshSportsScoresNowAdmin"
+      },
+      "Sports Scores Engine current refresh"
+    ),
+    "Sports Scores Engine current refresh"
+  );
+
+}
+
+function sportsWagerRefreshScoresEngineWindow_(payload) {
+
+  payload =
+    payload || {};
+
+  return sportsWagerThrowIfUnknownSportsAction_(
+    sportsWagerFetchJson_(
+      {
+        action:
+          "refreshSportsScoresWindowAdmin",
+
+        daysBack:
+          sportsWagerClampWholeNumber_(
+            payload.daysBack,
+            2,
+            0,
+            7
+          ),
+
+        daysForward:
+          sportsWagerClampWholeNumber_(
+            payload.daysForward,
+            2,
+            0,
+            14
+          )
+      },
+      "Sports Scores Engine window refresh"
+    ),
+    "Sports Scores Engine window refresh"
+  );
+
+}
+
+function sportsWagerMaybeRefreshScoresEngine_(payload) {
+
+  payload =
+    payload || {};
+
+  if (
+    !sportsWagerBoolean_(
+      payload.refreshEngineFirst
+    )
+  ) {
+    return null;
+  }
+
+  const mode =
+    sportsWagerKey_(
+      payload.scoreRefreshMode ||
+      payload.refreshMode ||
+      "window"
+    );
+
+  try {
+
+    if (
+      mode === "now" ||
+      mode === "current" ||
+      mode === "scoreboard"
+    ) {
+      return sportsWagerRefreshScoresEngineNow_();
+    }
+
+    return sportsWagerRefreshScoresEngineWindow_(
+      payload
+    );
+
+  } catch (err) {
+
+    if (
+      mode !== "now" &&
+      mode !== "current" &&
+      mode !== "scoreboard"
+    ) {
+
+      try {
+        return sportsWagerFetchJson_(
+          {
+            action:
+              "runSportsScoresWindowUpdate"
+          },
+          "Sports Scores Engine window refresh fallback"
+        );
+      } catch (fallbackErr) {
+        // Fall through to current-scoreboard fallback below.
+      }
+
+    }
+
+    return sportsWagerFetchJson_(
+      {
+        action:
+          "runSportsScoresUpdate"
+      },
+      "Sports Scores Engine current refresh fallback"
+    );
+
+  }
+
+}
+
+
 
 /* =====================================================
    SHEET HELPERS
@@ -4279,6 +4456,17 @@ function updateSportsWagerSettingWinner_(
         .setValue(true);
     }
 
+    if (col.SettlementStatus !== undefined) {
+      sh
+        .getRange(
+          i + 1,
+          col.SettlementStatus + 1
+        )
+        .setValue(
+          "settled"
+        );
+    }
+
     return true;
 
   }
@@ -4286,6 +4474,223 @@ function updateSportsWagerSettingWinner_(
   return false;
 
 }
+
+
+function sportsWagerSetCategorySettingFinalLock_(
+  awardsGameId,
+  categoryId,
+  settlementStatus,
+  forceStatus
+) {
+
+  const sh =
+    sportsWagerGetSheet_(
+      CATEGORY_SETTINGS_SHEET
+    );
+
+  let data =
+    sh.getDataRange()
+      .getValues();
+
+  if (!data.length) {
+
+    sh.appendRow([
+      "GameId",
+      "CategoryId",
+      "Locked",
+      "WinnerNomineeId",
+      "SettlementStatus"
+    ]);
+
+    data =
+      sh.getDataRange()
+        .getValues();
+
+  }
+
+  let headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  function ensureCol_(headerName) {
+
+    let index =
+      headers.indexOf(headerName);
+
+    if (index !== -1) {
+      return index;
+    }
+
+    index =
+      headers.length;
+
+    sh
+      .getRange(
+        1,
+        index + 1
+      )
+      .setValue(
+        headerName
+      );
+
+    headers.push(
+      headerName
+    );
+
+    return index;
+
+  }
+
+  const gameIdCol =
+    headers.indexOf("GameId");
+
+  const categoryIdCol =
+    ensureCol_("CategoryId");
+
+  const lockedCol =
+    ensureCol_("Locked");
+
+  const settlementStatusCol =
+    ensureCol_("SettlementStatus");
+
+  const resultSourceCol =
+    ensureCol_("ResultSource");
+
+  data =
+    sh.getDataRange()
+      .getValues();
+
+  const cleanGameId =
+    sportsWagerString_(
+      awardsGameId
+    );
+
+  const cleanCategoryId =
+    sportsWagerKey_(
+      categoryId
+    );
+
+  let targetRow =
+    -1;
+
+  for (let i = 1; i < data.length; i++) {
+
+    const rowCategoryId =
+      sportsWagerKey_(
+        data[i][categoryIdCol]
+      );
+
+    if (rowCategoryId !== cleanCategoryId) {
+      continue;
+    }
+
+    const rowGameId =
+      gameIdCol !== -1
+        ? sportsWagerString_(
+            data[i][gameIdCol]
+          )
+        : "";
+
+    if (
+      gameIdCol === -1 ||
+      !rowGameId ||
+      rowGameId === cleanGameId
+    ) {
+
+      targetRow =
+        i + 1;
+
+      break;
+
+    }
+
+  }
+
+  if (targetRow === -1) {
+
+    const newRow =
+      new Array(headers.length)
+        .fill("");
+
+    if (gameIdCol !== -1) {
+      newRow[gameIdCol] =
+        cleanGameId;
+    }
+
+    newRow[categoryIdCol] =
+      categoryId;
+
+    sh.appendRow(
+      newRow
+    );
+
+    targetRow =
+      sh.getLastRow();
+
+  }
+
+  sh
+    .getRange(
+      targetRow,
+      lockedCol + 1
+    )
+    .setValue(
+      true
+    );
+
+  const requestedStatus =
+    sportsWagerKey_(
+      settlementStatus ||
+      "final-ready-to-settle"
+    );
+
+  const currentStatus =
+    sportsWagerKey_(
+      sh
+        .getRange(
+          targetRow,
+          settlementStatusCol + 1
+        )
+        .getValue()
+    );
+
+  const shouldSetStatus =
+    forceStatus === true ||
+    !currentStatus ||
+    currentStatus === "pending" ||
+    currentStatus === "final-ready-to-settle" ||
+    (
+      requestedStatus === "settled" &&
+      currentStatus !== "settled"
+    );
+
+  if (shouldSetStatus) {
+    sh
+      .getRange(
+        targetRow,
+        settlementStatusCol + 1
+      )
+      .setValue(
+        requestedStatus
+      );
+  }
+
+  if (resultSourceCol !== -1) {
+    sh
+      .getRange(
+        targetRow,
+        resultSourceCol + 1
+      )
+      .setValue(
+        "sports-engine"
+      );
+  }
+
+  return true;
+
+}
+
 
 /* =====================================================
    PUBLIC INTERNAL: CREATE SPORTS WAGER
@@ -5088,6 +5493,10 @@ function apiAdminCreateSportsWager(payload) {
     payload
   );
 
+  sportsWagerMaybeRefreshScoresEngine_(
+    payload
+  );
+
   return createSportsWagerFromScore(
     payload
   );
@@ -5135,6 +5544,10 @@ function apiAdminCreateSportsWagersBulk(payload) {
     payload || {};
 
   requireAdmin_(
+    payload
+  );
+
+  sportsWagerMaybeRefreshScoresEngine_(
     payload
   );
 
@@ -5963,6 +6376,13 @@ function settleSportsWagers(payload) {
         return;
       }
 
+      sportsWagerSetCategorySettingFinalLock_(
+        awardsGameId,
+        item.categoryId,
+        "final-ready-to-settle",
+        false
+      );
+
       const settlement =
         sportsWagerGetSettlementResult_(
           score,
@@ -5971,6 +6391,13 @@ function settleSportsWagers(payload) {
         );
 
       if (!settlement.resolved) {
+
+        sportsWagerSetCategorySettingFinalLock_(
+          awardsGameId,
+          item.categoryId,
+          "final-needs-review",
+          true
+        );
 
         summary.skipped++;
 
@@ -6019,9 +6446,23 @@ function settleSportsWagers(payload) {
 
       if (updated) {
 
+        sportsWagerSetCategorySettingFinalLock_(
+          awardsGameId,
+          item.categoryId,
+          "settled",
+          true
+        );
+
         summary.settled++;
 
       } else {
+
+        sportsWagerSetCategorySettingFinalLock_(
+          awardsGameId,
+          item.categoryId,
+          "settled-existing-or-protected",
+          false
+        );
 
         summary.skipped++;
 
@@ -6100,6 +6541,11 @@ function refreshSportsWagerScores(payload) {
     payload || {};
 
   setupSportsWagerSystem();
+
+  const sourceRefresh =
+    sportsWagerMaybeRefreshScoresEngine_(
+      payload
+    );
 
   const awardsGameId =
     sportsWagerNormalizeGameId_(
@@ -6183,6 +6629,8 @@ function refreshSportsWagerScores(payload) {
   const summary = {
     success: true,
     awardsGameId: awardsGameId,
+    sourceRefresh:
+      sourceRefresh,
     checked: 0,
     updated: 0,
     skipped: 0,
@@ -6446,6 +6894,19 @@ function refreshSportsWagerScores(payload) {
           categoryId
         );
 
+        if (
+          sportsWagerIsCompletedScore_(
+            score
+          )
+        ) {
+          sportsWagerSetCategorySettingFinalLock_(
+            awardsGameId,
+            categoryId,
+            "final-ready-to-settle",
+            false
+          );
+        }
+
         settingsSyncCache[settingsKey] = true;
         summary.settingsSynced++;
 
@@ -6552,6 +7013,132 @@ function apiAdminRefreshSportsWagerScores(payload) {
   );
 
   return refreshSportsWagerScores(
+    payload
+  );
+
+}
+
+/* =====================================================
+   ADMIN API: ONE-CLICK REFRESH + SETTLE SPORTS WAGERS
+===================================================== */
+
+function refreshAndSettleSportsWagers(payload) {
+
+  payload =
+    payload || {};
+
+  const awardsGameId =
+    sportsWagerNormalizeGameId_(
+      payload.awardsGameId ||
+      payload.gameId ||
+      SPORTS_WAGER_DEFAULT_GAME_ID
+    );
+
+  validateGameId(
+    awardsGameId
+  );
+
+  const sourceRefresh =
+    sportsWagerMaybeRefreshScoresEngine_(
+      {
+        refreshEngineFirst:
+          true,
+
+        scoreRefreshMode:
+          payload.scoreRefreshMode ||
+          "window",
+
+        daysBack:
+          payload.daysBack || 2,
+
+        daysForward:
+          payload.daysForward || 2
+      }
+    );
+
+  const refresh =
+    refreshSportsWagerScores(
+      {
+        gameId:
+          awardsGameId,
+
+        awardsGameId:
+          awardsGameId,
+
+        refreshEngineFirst:
+          false
+      }
+    );
+
+  const settle =
+    settleSportsWagers(
+      {
+        gameId:
+          awardsGameId,
+
+        awardsGameId:
+          awardsGameId,
+
+        skipRefresh:
+          true,
+
+        force:
+          payload.force
+      }
+    );
+
+  if (
+    typeof clearAppCaches ===
+    "function"
+  ) {
+    clearAppCaches();
+  }
+
+  return {
+    success: true,
+    awardsGameId: awardsGameId,
+    sourceRefresh: sourceRefresh,
+    refresh: refresh,
+    settle: settle,
+    updated:
+      refresh && refresh.updated
+        ? refresh.updated
+        : 0,
+    checked:
+      refresh && refresh.checked
+        ? refresh.checked
+        : 0,
+    settled:
+      settle && settle.settled
+        ? settle.settled
+        : 0,
+    skipped:
+      settle && settle.skipped
+        ? settle.skipped
+        : 0,
+    errors:
+      (refresh && refresh.errors
+        ? refresh.errors
+        : []
+      ).concat(
+        settle && settle.errors
+          ? settle.errors
+          : []
+      )
+  };
+
+}
+
+function apiAdminRefreshAndSettleSportsWagers(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return refreshAndSettleSportsWagers(
     payload
   );
 
@@ -7227,6 +7814,28 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
   try {
 
+    let sourceRefresh = null;
+
+    try {
+      sourceRefresh =
+        sportsWagerMaybeRefreshScoresEngine_(
+          {
+            refreshEngineFirst:
+              true,
+            scoreRefreshMode:
+              "current"
+          }
+        );
+    } catch (sourceErr) {
+      sourceRefresh = {
+        success: false,
+        error:
+          sourceErr && sourceErr.message
+            ? sourceErr.message
+            : String(sourceErr)
+      };
+    }
+
     const gameIds =
       getSportsWagerGameIdsForRefresh_();
 
@@ -7272,6 +7881,8 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
     return {
       success: true,
+      sourceRefresh:
+        sourceRefresh,
       gameCount: gameIds.length,
       results: results
     };
@@ -7486,3 +8097,69 @@ function removeSportsWagerAutoSettleTriggers() {
   };
 
 }
+
+function checkSportsWagerAutoSettleTriggers() {
+
+  const triggers =
+    ScriptApp.getProjectTriggers();
+
+  return triggers
+    .filter(function(trigger) {
+      return (
+        trigger.getHandlerFunction() ===
+        SPORTS_WAGER_AUTO_SETTLE_TRIGGER_FUNCTION
+      );
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource())
+      };
+    });
+
+}
+
+function apiAdminInstallSportsWagerAutoSyncTrigger(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return installSportsWagerAutoSettleTrigger();
+
+}
+
+function apiAdminRemoveSportsWagerAutoSyncTrigger(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return removeSportsWagerAutoSettleTriggers();
+
+}
+
+function apiAdminGetSportsWagerAutoSyncStatus(payload) {
+
+  payload =
+    payload || {};
+
+  requireAdmin_(
+    payload
+  );
+
+  return {
+    success: true,
+    triggers:
+      checkSportsWagerAutoSettleTriggers()
+  };
+
+}
+

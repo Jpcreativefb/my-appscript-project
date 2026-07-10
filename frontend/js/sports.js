@@ -201,6 +201,15 @@ function bindSportsEvents() {
       );
     });
 
+  const refreshScoreWindowButton =
+    document.getElementById("btnRefreshScoreWindow");
+
+  if (refreshScoreWindowButton) {
+    refreshScoreWindowButton.addEventListener("click", function() {
+      refreshSportsScoreWindowFromSportsPage_();
+    });
+  }
+
   document
     .getElementById("btnCloseSnapshots")
     .addEventListener("click", function() {
@@ -965,6 +974,72 @@ async function sportsAwardsApi_(action, params) {
 
 }
 
+async function refreshSportsScoreWindowFromSportsPage_() {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    showSportsError(
+      "Only admins can refresh the Sports Scores Engine window."
+    );
+    return;
+  }
+
+  setSportsStatus(
+    "Refreshing recent/upcoming scores from ESPN..."
+  );
+
+  try {
+
+    const res =
+      await sportsAwardsApi_(
+        "adminRefreshSportsScoresWindow",
+        {
+          username:
+            session.username,
+
+          token:
+            session.token,
+
+          daysBack:
+            2,
+
+          daysForward:
+            7
+        }
+      );
+
+    if (!res || res.success === false) {
+      throw new Error(
+        (res && (res.error || res.message || res.reason)) ||
+        "Score window refresh failed."
+      );
+    }
+
+    setSportsStatus(
+      "Score window refreshed. Unique games: " +
+      (res.uniqueGames || 0) +
+      ". Reloading visible scores..."
+    );
+
+    await loadSportsScores(
+      buildSportsFiltersFromControls()
+    );
+
+  } catch (err) {
+    showSportsError(
+      err && err.message
+        ? err.message
+        : String(err)
+    );
+    setSportsStatus(
+      "Could not refresh score window."
+    );
+  }
+
+}
+
 async function apiAdminGetSportsWagerGames_(
   session
 ) {
@@ -1680,7 +1755,19 @@ function buildSportsWagerPayload_(
       config.underOdds,
 
     autoOdds:
-      config.autoOdds
+      config.autoOdds,
+
+    refreshEngineFirst:
+      "true",
+
+    scoreRefreshMode:
+      "window",
+
+    daysBack:
+      2,
+
+    daysForward:
+      2
   };
 
 }
@@ -1833,7 +1920,19 @@ async function createSelectedSportsWagers() {
             config.underOdds,
 
           autoOdds:
-            config.autoOdds
+            config.autoOdds,
+
+          refreshEngineFirst:
+            "true",
+
+          scoreRefreshMode:
+            "window",
+
+          daysBack:
+            2,
+
+          daysForward:
+            2
         }
       );
 

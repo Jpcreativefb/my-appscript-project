@@ -33,8 +33,11 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetGameSetup",
     "adminGetLeagueAccessDashboard",
     "adminRefreshSportsWagerScores",
+    "adminRefreshAndSettleSportsWagers",
     "adminAutoSetSportsWagerOdds",
     "adminSettleSportsWagers",
+    "adminRefreshSportsScoresNow",
+    "adminRefreshSportsScoresWindow",
     "adminRunSportsOddsHybridRefresh",
     "adminRefreshSportsOddsLeague",
     "adminRefreshRacingWagerScores",
@@ -2022,7 +2025,10 @@ async function apiRemoveBet(payload) {
 
 }
 
-async function apiAdminRefreshSportsWagerScores(gameId) {
+async function apiAdminRefreshSportsWagerScores(
+  gameId,
+  options = {}
+) {
 
   const session =
     getSession();
@@ -2040,7 +2046,19 @@ async function apiAdminRefreshSportsWagerScores(gameId) {
         gameId,
 
       awardsGameId:
-        gameId
+        gameId,
+
+      refreshEngineFirst:
+        options.refreshEngineFirst,
+
+      scoreRefreshMode:
+        options.scoreRefreshMode,
+
+      daysBack:
+        options.daysBack,
+
+      daysForward:
+        options.daysForward
     }
   );
 
@@ -2048,7 +2066,10 @@ async function apiAdminRefreshSportsWagerScores(gameId) {
 
 
 
-async function apiAdminSettleSportsWagers(gameId) {
+async function apiAdminSettleSportsWagers(
+  gameId,
+  options = {}
+) {
 
   const session =
     getSession();
@@ -2069,7 +2090,64 @@ async function apiAdminSettleSportsWagers(gameId) {
         gameId,
 
       skipRefresh:
-        true
+        options.skipRefresh === undefined
+          ? true
+          : options.skipRefresh,
+
+      refreshEngineFirst:
+        options.refreshEngineFirst,
+
+      scoreRefreshMode:
+        options.scoreRefreshMode,
+
+      daysBack:
+        options.daysBack,
+
+      daysForward:
+        options.daysForward
+    }
+  );
+
+}
+
+async function apiAdminRefreshAndSettleSportsWagers(
+  gameId,
+  options = {}
+) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminRefreshAndSettleSportsWagers",
+    {
+      username:
+        session.username,
+
+      token:
+        session.token,
+
+      gameId:
+        gameId,
+
+      awardsGameId:
+        gameId,
+
+      scoreRefreshMode:
+        options.scoreRefreshMode || "window",
+
+      daysBack:
+        options.daysBack === undefined
+          ? 2
+          : options.daysBack,
+
+      daysForward:
+        options.daysForward === undefined
+          ? 2
+          : options.daysForward,
+
+      force:
+        options.force
     }
   );
 
@@ -2161,6 +2239,72 @@ async function apiAdminSetupSportsControls() {
 
   return apiAdminSportsControl_(
     "adminSetupSportsControls"
+  );
+
+}
+
+async function apiAdminRefreshSportsScoresNow() {
+
+  return apiAdminSportsControl_(
+    "adminRefreshSportsScoresNow"
+  );
+
+}
+
+async function apiAdminRefreshSportsScoresWindow(
+  daysBack = 2,
+  daysForward = 7
+) {
+
+  return apiAdminSportsControl_(
+    "adminRefreshSportsScoresWindow",
+    {
+      daysBack:
+        daysBack,
+
+      daysForward:
+        daysForward
+    }
+  );
+
+}
+
+async function apiAdminInstallSportsScoresWindowTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsScoresWindowTrigger"
+  );
+
+}
+
+async function apiAdminRemoveSportsScoresWindowTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsScoresWindowTrigger"
+  );
+
+}
+
+async function apiAdminInstallSportsWagerAutoSyncTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsWagerAutoSyncTrigger"
+  );
+
+}
+
+async function apiAdminRemoveSportsWagerAutoSyncTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsWagerAutoSyncTrigger"
+  );
+
+}
+
+async function apiAdminGetSportsWagerAutoSyncStatus() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsWagerAutoSyncStatus"
   );
 
 }

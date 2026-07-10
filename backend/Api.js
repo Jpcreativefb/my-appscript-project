@@ -204,6 +204,7 @@ function doGet(e) {
       "adminCreateSportsWagersBulk",
       "adminSettleSportsWagers",
       "adminRefreshSportsWagerScores",
+      "adminRefreshAndSettleSportsWagers",
       "adminAutoSetSportsWagerOdds",
 
       "adminSetupRacingWagerSystem",
@@ -216,8 +217,15 @@ function doGet(e) {
 
       "adminGetSportsLeagueSettings",
       "adminUpdateSportsLeagueSetting",
+      "adminRefreshSportsScoresNow",
+      "adminRefreshSportsScoresWindow",
       "adminInstallSportsScoresTrigger",
       "adminRemoveSportsScoresTrigger",
+      "adminInstallSportsScoresWindowTrigger",
+      "adminRemoveSportsScoresWindowTrigger",
+      "adminInstallSportsWagerAutoSyncTrigger",
+      "adminRemoveSportsWagerAutoSyncTrigger",
+      "adminGetSportsWagerAutoSyncStatus",
 
       "adminCreateSportsSeasonJobs",
       "adminRunSportsSeasonBatch",
@@ -2143,7 +2151,19 @@ if (action === "compareUserPicks") {
           params.underOdds,
 
         autoOdds:
-         params.autoOdds
+         params.autoOdds,
+
+        refreshEngineFirst:
+          params.refreshEngineFirst,
+
+        scoreRefreshMode:
+          params.scoreRefreshMode,
+
+        daysBack:
+          params.daysBack,
+
+        daysForward:
+          params.daysForward
 
       })
     );
@@ -2209,7 +2229,19 @@ if (action === "compareUserPicks") {
             params.underOdds,
 
           autoOdds:
-            params.autoOdds
+            params.autoOdds,
+
+          refreshEngineFirst:
+            params.refreshEngineFirst,
+
+          scoreRefreshMode:
+            params.scoreRefreshMode,
+
+          daysBack:
+            params.daysBack,
+
+          daysForward:
+            params.daysForward
 
         })
       );
@@ -2232,7 +2264,22 @@ if (action === "compareUserPicks") {
             gameId,
     
           force:
-            params.force
+            params.force,
+
+          skipRefresh:
+            params.skipRefresh,
+
+          refreshEngineFirst:
+            params.refreshEngineFirst,
+
+          scoreRefreshMode:
+            params.scoreRefreshMode,
+
+          daysBack:
+            params.daysBack,
+
+          daysForward:
+            params.daysForward
     
         })
       );
@@ -2251,7 +2298,54 @@ if (action === "compareUserPicks") {
 
           awardsGameId:
             params.awardsGameId ||
-            gameId
+            gameId,
+
+          refreshEngineFirst:
+            params.refreshEngineFirst,
+
+          scoreRefreshMode:
+            params.scoreRefreshMode,
+
+          daysBack:
+            params.daysBack,
+
+          daysForward:
+            params.daysForward
+        })
+      );
+
+    }
+
+    if (action === "adminRefreshAndSettleSportsWagers") {
+
+      return json(
+        apiAdminRefreshAndSettleSportsWagers({
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          gameId:
+            params.gameId ||
+            gameId,
+
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
+
+          scoreRefreshMode:
+            params.scoreRefreshMode ||
+            "window",
+
+          daysBack:
+            params.daysBack || 2,
+
+          daysForward:
+            params.daysForward || 2,
+
+          force:
+            params.force
         })
       );
 
@@ -2304,6 +2398,110 @@ if (action === "adminGetSportsControlDashboard") {
 
   return json(
     apiAdminGetSportsControlDashboard({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRefreshSportsScoresNow") {
+
+  return json(
+    apiAdminRefreshSportsScoresNow({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRefreshSportsScoresWindow") {
+
+  return json(
+    apiAdminRefreshSportsScoresWindow({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      daysBack:
+        params.daysBack,
+
+      daysForward:
+        params.daysForward
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsScoresWindowTrigger") {
+
+  return json(
+    apiAdminInstallSportsScoresWindowTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsScoresWindowTrigger") {
+
+  return json(
+    apiAdminRemoveSportsScoresWindowTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsWagerAutoSyncTrigger") {
+
+  return json(
+    apiAdminInstallSportsWagerAutoSyncTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsWagerAutoSyncTrigger") {
+
+  return json(
+    apiAdminRemoveSportsWagerAutoSyncTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSportsWagerAutoSyncStatus") {
+
+  return json(
+    apiAdminGetSportsWagerAutoSyncStatus({
       username:
         params.username,
 
