@@ -4,8 +4,20 @@
 ========================= */
 
 let BETTING_AUTO_REFRESH_TIMER = null;
+let BETTING_LIVE_SPORTS_TIMER = null;
+let BETTING_LIVE_SPORTS_IN_FLIGHT = false;
 
 const BETTING_BATCH_SIZE = 12;
+
+/*
+  Use the same Sports Scores Engine web app that the Sports page uses.
+  This keeps the individual wager game display live without waiting for
+  Categories / CategorySettings sheet snapshots to be rewritten.
+*/
+const BETTING_LIVE_SPORTS_API_URL =
+  "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
+
+const BETTING_LIVE_SPORTS_REFRESH_MS = 30000;
 
 const BETTING_PAGE_BATCH_STATE = {
   gameId: "",
@@ -56,6 +68,763 @@ function getBettingGameId_(){
     window.FRONTEND_GAME_ID ||
     "oscars-2026"
   );
+
+}
+
+
+function bettingLiveSportsJsonp_(url) {
+
+  return new Promise(function(resolve, reject) {
+
+    const callbackName =
+      "__bettingLiveSportsCallback_" +
+      Date.now() +
+      "_" +
+      Math.floor(Math.random() * 1000000);
+
+    const script =
+      document.createElement("script");
+
+    const separator =
+      url.indexOf("?") === -1
+        ? "?"
+        : "&";
+
+    let done = false;
+
+    function cleanup_() {
+      try {
+        delete window[callbackName];
+      } catch (err) {
+        window[callbackName] = undefined;
+      }
+
+      if (script && script.parentNode) {
+        script.parentNode.removeChild(script);
+      }
+    }
+
+    window[callbackName] = function(data) {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      cleanup_();
+      resolve(data || {});
+    };
+
+    script.onerror = function() {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      cleanup_();
+      reject(
+        new Error("Sports Scores Engine request failed")
+      );
+    };
+
+    script.src =
+      url +
+      separator +
+      "callback=" +
+      encodeURIComponent(callbackName) +
+      "&_ts=" +
+      Date.now();
+
+    document.body.appendChild(script);
+
+    setTimeout(function() {
+      if (done) {
+        return;
+      }
+
+      done = true;
+      cleanup_();
+      reject(
+        new Error("Sports Scores Engine request timed out")
+      );
+    }, 15000);
+
+  });
+
+}
+
+function buildBettingLiveSportsApiUrl_(action, params) {
+
+  const query =
+    new URLSearchParams({
+      action: action
+    });
+
+  Object.keys(params || {}).forEach(function(key) {
+    const value = params[key];
+
+    if (
+      value !== "" &&
+      value !== null &&
+      value !== undefined
+    ) {
+      query.set(key, value);
+    }
+  });
+
+  return BETTING_LIVE_SPORTS_API_URL + "?" + query.toString();
+
+}
+
+function getBettingIsoDateOnly_(value) {
+
+  if (!value) {
+    return "";
+  }
+
+  const d =
+    new Date(value);
+
+  if (isNaN(d.getTime())) {
+    return "";
+  }
+
+  return d.toISOString().slice(0, 10);
+
+}
+
+function addBettingDaysToIsoDate_(isoDate, days) {
+
+  if (!isoDate) {
+    return "";
+  }
+
+  const d =
+    new Date(isoDate + "T12:00:00Z");
+
+  if (isNaN(d.getTime())) {
+    return "";
+  }
+
+  d.setUTCDate(
+    d.getUTCDate() + Number(days || 0)
+  );
+
+  return d.toISOString().slice(0, 10);
+
+}
+
+function normalizeBettingLiveKey_(value) {
+
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+
+}
+
+function getBettingLiveCategoryDate_(category) {
+
+  return getBettingIsoDateOnly_(
+    category.lockDateTime ||
+    category.gameDateTime ||
+    category.GameDateTime ||
+    ""
+  );
+
+}
+
+function getBettingLiveScoreKey_(score) {
+
+  const gameId =
+    String(score.GameId || score.gameId || "")
+      .trim();
+
+  const espnEventId =
+    String(score.ESPNEventId || score.espnEventId || "")
+      .trim();
+
+  return {
+    gameId: gameId,
+    espnEventId: espnEventId
+  };
+
+}
+
+function isBettingLiveSportsCategory_(category) {
+
+  if (!category) {
+    return false;
+  }
+
+  return !!(
+    category.sportsGameId ||
+    category.espnEventId ||
+    category.homeTeam ||
+    category.awayTeam ||
+    String(category.id || "").indexOf("sports-") === 0
+  );
+
+}
+
+function getBettingLiveSideForNominee_(category, nominee) {
+
+  const nomineeName =
+    normalizeBettingLiveKey_(
+      nominee.name ||
+      nominee.shortAnswer ||
+      nominee.id ||
+      ""
+    );
+
+  const nomineeId =
+    normalizeBettingLiveKey_(
+      nominee.id || ""
+    );
+
+  const homeTeam =
+    normalizeBettingLiveKey_(category.homeTeam || "");
+
+  const awayTeam =
+    normalizeBettingLiveKey_(category.awayTeam || "");
+
+  if (
+    homeTeam &&
+    (
+      nomineeName === homeTeam ||
+      nomineeId === homeTeam ||
+      nomineeId.indexOf("home") !== -1
+    )
+  ) {
+    return "home";
+  }
+
+  if (
+    awayTeam &&
+    (
+      nomineeName === awayTeam ||
+      nomineeId === awayTeam ||
+      nomineeId.indexOf("away") !== -1
+    )
+  ) {
+    return "away";
+  }
+
+  if (
+    nomineeId === "draw" ||
+    nomineeName === "draw" ||
+    nomineeName === "tie"
+  ) {
+    return "draw";
+  }
+
+  return "";
+
+}
+
+function shouldBettingLiveRerenderNow_() {
+
+  const active =
+    document.activeElement;
+
+  if (!active) {
+    return true;
+  }
+
+  if (
+    active.classList &&
+    active.classList.contains("betting-amount-input")
+  ) {
+    return false;
+  }
+
+  if (
+    typeof active.closest === "function" &&
+    active.closest(".betting-nominee-card")
+  ) {
+    return false;
+  }
+
+  return true;
+
+}
+
+async function fetchBettingLiveScoresForCategories_(categories) {
+
+  const sportsCategories =
+    (categories || [])
+      .filter(isBettingLiveSportsCategory_);
+
+  if (!sportsCategories.length) {
+    return [];
+  }
+
+  const groups = {};
+  const fallbackEventIds = {};
+
+  sportsCategories.forEach(function(category) {
+
+    const league =
+      String(category.league || category.sportsLeague || "")
+        .trim();
+
+    const date =
+      getBettingLiveCategoryDate_(category);
+
+    if (
+      league &&
+      date
+    ) {
+      if (!groups[league]) {
+        groups[league] = {
+          league: league,
+          minDate: date,
+          maxDate: date
+        };
+      }
+
+      if (date < groups[league].minDate) {
+        groups[league].minDate = date;
+      }
+
+      if (date > groups[league].maxDate) {
+        groups[league].maxDate = date;
+      }
+
+      return;
+    }
+
+    const espnEventId =
+      String(category.espnEventId || "")
+        .trim();
+
+    if (espnEventId) {
+      fallbackEventIds[espnEventId] = true;
+    }
+
+  });
+
+  const requests = [];
+
+  Object.keys(groups).forEach(function(league) {
+    const group = groups[league];
+
+    requests.push(
+      bettingLiveSportsJsonp_(
+        buildBettingLiveSportsApiUrl_(
+          "getSportsScores",
+          {
+            league: group.league,
+            dateFrom: addBettingDaysToIsoDate_(group.minDate, -1),
+            dateTo: addBettingDaysToIsoDate_(group.maxDate, 1)
+          }
+        )
+      )
+    );
+  });
+
+  Object.keys(fallbackEventIds)
+    .slice(0, 40)
+    .forEach(function(espnEventId) {
+      requests.push(
+        bettingLiveSportsJsonp_(
+          buildBettingLiveSportsApiUrl_(
+            "getSportsScores",
+            {
+              espnEventId: espnEventId
+            }
+          )
+        )
+      );
+    });
+
+  const responses =
+    await Promise.allSettled(requests);
+
+  const scores = [];
+  const seen = {};
+
+  responses.forEach(function(result) {
+    if (
+      result.status !== "fulfilled" ||
+      !result.value ||
+      result.value.success === false
+    ) {
+      return;
+    }
+
+    (result.value.scores || []).forEach(function(score) {
+      const keyObj =
+        getBettingLiveScoreKey_(score);
+
+      const key =
+        keyObj.espnEventId ||
+        keyObj.gameId;
+
+      if (!key || seen[key]) {
+        return;
+      }
+
+      seen[key] = true;
+      scores.push(score);
+    });
+  });
+
+  return scores;
+
+}
+
+async function fetchBettingLiveOddsForCategories_(categories) {
+
+  const oddsCategories =
+    (categories || [])
+      .filter(function(category) {
+        return (
+          isBettingLiveSportsCategory_(category) &&
+          !category.finished &&
+          category.homeTeam &&
+          category.awayTeam
+        );
+      })
+      .slice(0, 30);
+
+  if (!oddsCategories.length) {
+    return {};
+  }
+
+  const responses =
+    await Promise.allSettled(
+      oddsCategories.map(function(category) {
+        return bettingLiveSportsJsonp_(
+          buildBettingLiveSportsApiUrl_(
+            "getSportsOdds",
+            {
+              gameId: category.sportsGameId || "",
+              espnEventId: category.espnEventId || "",
+              league: category.league || category.sportsLeague || "",
+              homeTeam: category.homeTeam || "",
+              awayTeam: category.awayTeam || "",
+              gameDateTime: category.lockDateTime || "",
+              market: category.sportsMarket || "moneyline"
+            }
+          )
+        );
+      })
+    );
+
+  const oddsByCategoryId = {};
+
+  responses.forEach(function(result, index) {
+    const category =
+      oddsCategories[index];
+
+    if (
+      !category ||
+      result.status !== "fulfilled" ||
+      !result.value ||
+      result.value.success === false ||
+      result.value.found === false
+    ) {
+      return;
+    }
+
+    oddsByCategoryId[String(category.id || "")] = result.value;
+  });
+
+  return oddsByCategoryId;
+
+}
+
+function applyBettingLiveScores_(categories, scores) {
+
+  const byGameId = {};
+  const byEspnEventId = {};
+
+  (scores || []).forEach(function(score) {
+    const keyObj =
+      getBettingLiveScoreKey_(score);
+
+    if (keyObj.gameId) {
+      byGameId[keyObj.gameId] = score;
+    }
+
+    if (keyObj.espnEventId) {
+      byEspnEventId[keyObj.espnEventId] = score;
+    }
+  });
+
+  let changed = false;
+
+  (categories || []).forEach(function(category) {
+    if (!isBettingLiveSportsCategory_(category)) {
+      return;
+    }
+
+    const score =
+      byEspnEventId[String(category.espnEventId || "").trim()] ||
+      byGameId[String(category.sportsGameId || "").trim()];
+
+    if (!score) {
+      return;
+    }
+
+    const before =
+      JSON.stringify({
+        homeScore: category.homeScore,
+        awayScore: category.awayScore,
+        sportsStatus: category.sportsStatus,
+        sportsState: category.sportsState,
+        sportsClock: category.sportsClock,
+        sportsPeriod: category.sportsPeriod,
+        homeRecord: category.homeRecord,
+        awayRecord: category.awayRecord
+      });
+
+    category.homeTeam =
+      score.HomeTeam || category.homeTeam || "";
+
+    category.awayTeam =
+      score.AwayTeam || category.awayTeam || "";
+
+    category.homeScore =
+      score.HomeScore !== undefined && score.HomeScore !== null
+        ? score.HomeScore
+        : category.homeScore;
+
+    category.awayScore =
+      score.AwayScore !== undefined && score.AwayScore !== null
+        ? score.AwayScore
+        : category.awayScore;
+
+    category.sportsStatus =
+      score.Status || category.sportsStatus || "";
+
+    category.sportsState =
+      score.State || category.sportsState || "";
+
+    category.sportsClock =
+      score.Clock || category.sportsClock || "";
+
+    category.sportsPeriod =
+      score.Period !== undefined && score.Period !== null
+        ? score.Period
+        : category.sportsPeriod;
+
+    category.homeRecord =
+      score.HomeRecord || category.homeRecord || "";
+
+    category.awayRecord =
+      score.AwayRecord || category.awayRecord || "";
+
+    category.gameDateTime =
+      score.GameDateTime || category.gameDateTime || "";
+
+    const homeLogo =
+      score.HomeLogo || "";
+
+    const awayLogo =
+      score.AwayLogo || "";
+
+    (category.nominees || []).forEach(function(nominee) {
+      const side =
+        getBettingLiveSideForNominee_(category, nominee);
+
+      if (
+        side === "home" &&
+        homeLogo
+      ) {
+        nominee.image = homeLogo;
+      }
+
+      if (
+        side === "away" &&
+        awayLogo
+      ) {
+        nominee.image = awayLogo;
+      }
+    });
+
+    const after =
+      JSON.stringify({
+        homeScore: category.homeScore,
+        awayScore: category.awayScore,
+        sportsStatus: category.sportsStatus,
+        sportsState: category.sportsState,
+        sportsClock: category.sportsClock,
+        sportsPeriod: category.sportsPeriod,
+        homeRecord: category.homeRecord,
+        awayRecord: category.awayRecord
+      });
+
+    if (before !== after) {
+      changed = true;
+    }
+
+  });
+
+  return changed;
+
+}
+
+function applyBettingLiveOdds_(categories, oddsByCategoryId) {
+
+  let changed = false;
+
+  (categories || []).forEach(function(category) {
+    const odds =
+      oddsByCategoryId[String(category.id || "")];
+
+    if (!odds) {
+      return;
+    }
+
+    let categoryHasOdds = false;
+
+    (category.nominees || []).forEach(function(nominee) {
+      const side =
+        getBettingLiveSideForNominee_(category, nominee);
+
+      let nextOdds = "";
+
+      if (side === "home") {
+        nextOdds = odds.homeOdds;
+      }
+
+      if (side === "away") {
+        nextOdds = odds.awayOdds;
+      }
+
+      if (side === "draw") {
+        nextOdds = odds.drawOdds;
+      }
+
+      if (
+        nextOdds !== "" &&
+        nextOdds !== null &&
+        nextOdds !== undefined &&
+        Number(nextOdds) > 0
+      ) {
+        if (String(nominee.odds || "") !== String(nextOdds)) {
+          nominee.odds = nextOdds;
+          nominee.oddsAvailable = true;
+          nominee.potentialReturnPerUnit = nextOdds;
+          changed = true;
+        }
+
+        categoryHasOdds = true;
+      }
+    });
+
+    if (categoryHasOdds) {
+      category.oddsReady = true;
+      category.oddsPending = false;
+      category.oddsSource =
+        odds.bookmaker ||
+        odds.source ||
+        category.oddsSource ||
+        "sports-engine";
+      category.oddsLastUpdated =
+        odds.lastUpdated ||
+        category.oddsLastUpdated ||
+        "";
+      changed = true;
+    }
+  });
+
+  return changed;
+
+}
+
+async function refreshBettingLiveSportsData_() {
+
+  if (
+    BETTING_LIVE_SPORTS_IN_FLIGHT ||
+    !BETTING_LIVE_SPORTS_API_URL ||
+    BETTING_LIVE_SPORTS_API_URL.indexOf("PASTE_YOUR") !== -1 ||
+    !document.querySelector(".betting-page")
+  ) {
+    return;
+  }
+
+  const categories =
+    BETTING_PAGE_BATCH_STATE.categories || [];
+
+  if (!categories.length) {
+    return;
+  }
+
+  BETTING_LIVE_SPORTS_IN_FLIGHT = true;
+
+  try {
+    const scores =
+      await fetchBettingLiveScoresForCategories_(
+        categories
+      );
+
+    const oddsByCategoryId =
+      await fetchBettingLiveOddsForCategories_(
+        categories
+      );
+
+    const scoresChanged =
+      applyBettingLiveScores_(
+        categories,
+        scores
+      );
+
+    const oddsChanged =
+      applyBettingLiveOdds_(
+        categories,
+        oddsByCategoryId
+      );
+
+    if (
+      (scoresChanged || oddsChanged) &&
+      shouldBettingLiveRerenderNow_()
+    ) {
+      updateBettingCategoryListFromBatchState_();
+    }
+
+  } catch (err) {
+    console.warn(
+      "Could not refresh live sports data on wager page.",
+      err
+    );
+  } finally {
+    BETTING_LIVE_SPORTS_IN_FLIGHT = false;
+  }
+
+}
+
+function startBettingLiveSportsRefresh_() {
+
+  if (BETTING_LIVE_SPORTS_TIMER) {
+    clearInterval(
+      BETTING_LIVE_SPORTS_TIMER
+    );
+  }
+
+  refreshBettingLiveSportsData_();
+
+  BETTING_LIVE_SPORTS_TIMER =
+    setInterval(function() {
+
+      const app =
+        document.getElementById("app");
+
+      if (
+        !app ||
+        !app.querySelector(".betting-page")
+      ) {
+        clearInterval(
+          BETTING_LIVE_SPORTS_TIMER
+        );
+
+        BETTING_LIVE_SPORTS_TIMER = null;
+        return;
+      }
+
+      refreshBettingLiveSportsData_();
+
+    }, BETTING_LIVE_SPORTS_REFRESH_MS);
 
 }
 
@@ -1143,9 +1912,23 @@ function renderBettingCategory_(category, bet, config){
       .trim()
       .toLowerCase();
 
+  const gameStateLabel =
+    typeof getBettingGameStateLabel_ === "function"
+      ? getBettingGameStateLabel_(category)
+      : "";
+
+  const finalByLiveScore =
+    gameStateLabel === "Final";
+
+  const settlementPendingFinal =
+    finalByLiveScore &&
+    !winnerNomineeId &&
+    !wagerResultType;
+
   const categoryFinished =
     !!winnerNomineeId ||
-    !!wagerResultType;
+    !!wagerResultType ||
+    finalByLiveScore;
 
   const oddsReady =
     category.oddsReady !== false;
@@ -1209,7 +1992,7 @@ function renderBettingCategory_(category, bet, config){
               class="betting-current muted"
               data-betting-current-category="${escapeBettingHtml_(category.id)}"
             >
-               ${categoryFinished ? "Finished" : locked ? "Game started / locked" : oddsPending ? "Waiting for odds" : "Tap to place bet"}
+               ${settlementPendingFinal ? "Final / settlement pending" : categoryFinished ? "Finished" : locked ? "Game started / locked" : oddsPending ? "Waiting for odds" : "Tap to place bet"}
             </div>
           `}
           
@@ -1237,7 +2020,11 @@ function renderBettingCategory_(category, bet, config){
       <div class="betting-collapsible-body">
 
         ${categoryFinished ? `
-          ${halfRefund ? `
+          ${settlementPendingFinal ? `
+            <div class="betting-notice warning">
+              This game is final. Settlement is waiting for the next Sports Sync to write the result.
+            </div>
+          ` : halfRefund ? `
             <div class="betting-notice warning">
               This wager finished in a draw. Half of each wager is refunded.
             </div>
@@ -2096,23 +2883,7 @@ function renderBettingAdminControls_(session){
         type="button"
         onclick="refreshAndSettleWagersFromPage_()"
       >
-        Refresh & Settle This Game
-      </button>
-
-      <button
-        class="betting-admin-btn secondary"
-        type="button"
-        onclick="refreshWagerScoresFromPage_()"
-      >
-        Refresh Scores Only
-      </button>
-
-      <button
-        class="betting-admin-btn tertiary"
-        type="button"
-        onclick="autoSetWagerOddsFromPage_()"
-      >
-        Auto Odds
+        Sync Odds, Scores & Settle
       </button>
 
     </div>
@@ -2734,6 +3505,8 @@ async function loadNextBettingCategoryBatch_(){
 
   updateBettingCategoryListFromBatchState_();
 
+  refreshBettingLiveSportsData_();
+
   if (BETTING_PAGE_BATCH_STATE.hasMore) {
     setTimeout(function(){
       loadNextBettingCategoryBatch_();
@@ -2807,6 +3580,10 @@ function hydrateBettingPageAfterRender_(){
   } else {
     updateBettingBatchStatus_("", "");
   }
+
+  setTimeout(function(){
+    startBettingLiveSportsRefresh_();
+  }, 150);
 
   setTimeout(function(){
     loadBettingLeaderboardAfterRender_();
@@ -2915,6 +3692,7 @@ function startBettingAutoRefresh_(){
       }
 
       await refreshBettingFastBlocks_();
+      await refreshBettingLiveSportsData_();
 
     }, 60000);
 
@@ -2934,7 +3712,7 @@ async function refreshAndSettleWagersFromPage_(){
   if (notice) {
     notice.innerHTML =
       renderBettingNotice_(
-        "Refreshing ESPN scores, updating this game, and settling finals. This can take up to a minute...",
+        "Syncing odds, scores, records, and final settlement for this game...",
         ""
       );
   }
@@ -2973,8 +3751,10 @@ async function refreshAndSettleWagersFromPage_(){
   if (notice) {
     notice.innerHTML =
       renderBettingNotice_(
-        "Refresh and settlement complete. Updated rows: " +
+        "Sports sync complete. Score rows: " +
         (res.updated || 0) +
+        ", odds rows: " +
+        (res.oddsUpdated || 0) +
         ", settled: " +
         (res.settled || 0) +
         ", skipped: " +

@@ -206,6 +206,7 @@ function doGet(e) {
       "adminRefreshSportsWagerScores",
       "adminRefreshAndSettleSportsWagers",
       "adminAutoSetSportsWagerOdds",
+      "adminRunSportsFullSync",
 
       "adminSetupRacingWagerSystem",
       "adminCreateRacingWager",
@@ -226,6 +227,9 @@ function doGet(e) {
       "adminInstallSportsWagerAutoSyncTrigger",
       "adminRemoveSportsWagerAutoSyncTrigger",
       "adminGetSportsWagerAutoSyncStatus",
+      "adminInstallSmartSportsAutomation",
+      "adminRemoveSmartSportsAutomation",
+      "adminGetSmartSportsAutomationStatus",
 
       "adminCreateSportsSeasonJobs",
       "adminRunSportsSeasonBatch",
@@ -2376,6 +2380,23 @@ if (action === "compareUserPicks") {
 
     }
 
+    if (action === "adminRunSportsFullSync") {
+
+      return json(
+        apiAdminRunSportsFullSync({
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          refreshOddsEngineFirst:
+            params.refreshOddsEngineFirst
+        })
+      );
+
+    }
+
     // =========================
 // ADMIN: SPORTS CONTROL BRIDGE
 // =========================
@@ -2582,6 +2603,49 @@ if (action === "adminRemoveSportsScoresTrigger") {
 
   return json(
     apiAdminRemoveSportsScoresTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+
+if (action === "adminInstallSmartSportsAutomation") {
+
+  return json(
+    apiAdminInstallSmartSportsAutomation({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSmartSportsAutomation") {
+
+  return json(
+    apiAdminRemoveSmartSportsAutomation({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSmartSportsAutomationStatus") {
+
+  return json(
+    apiAdminGetSmartSportsAutomationStatus({
       username:
         params.username,
 

@@ -3702,10 +3702,40 @@ function checkSportsScoresWindowTriggers() {
 
 }
 
+
+function parseSportsScoresLeagueFilter_(value) {
+
+  if (value === null || value === undefined || value === "") {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map(function(item) {
+        return String(item || "").trim();
+      })
+      .filter(function(item) {
+        return !!item;
+      });
+  }
+
+  return String(value || "")
+    .split(/[|,]/)
+    .map(function(item) {
+      return String(item || "").trim();
+    })
+    .filter(function(item) {
+      return !!item;
+    });
+
+}
+
 function runSportsScoresDateWindowUpdate_(
   daysBack,
-  daysForward
+  daysForward,
+  options
 ) {
+  options = options || {};
   const lock =
     LockService.getScriptLock();
 
@@ -3732,8 +3762,27 @@ function runSportsScoresDateWindowUpdate_(
   };
 
   try {
-    const settings =
+    let settings =
       readEnabledSportsSettings_();
+
+    const requestedLeagues =
+      parseSportsScoresLeagueFilter_(
+        options.leagues || options.league
+      );
+
+    if (requestedLeagues.length) {
+      const allowed = {};
+
+      requestedLeagues.forEach(function(league) {
+        allowed[String(league || "").trim().toLowerCase()] = true;
+      });
+
+      settings = settings.filter(function(setting) {
+        return allowed[String(setting.League || "").trim().toLowerCase()] === true;
+      });
+
+      summary.requestedLeagues = requestedLeagues;
+    }
 
     const previousScores =
       readLatestSportsScoresMap_();

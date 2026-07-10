@@ -119,23 +119,16 @@ async function renderAdminPage() {
           <h2>Sports Engine Controls</h2>
 
           <div class="admin-sub">
-            Control Sports Scores Engine leagues, schedule loading, and hybrid odds refresh.
+            One button checks the Sports Controls setup, opens the dashboard, and keeps the full sync controls in one place.
           </div>
 
           <div class="admin-actions">
 
             <button
               class="button admin-button"
-              onclick="adminLoadSportsControls()"
+              onclick="adminOpenSportsControls()"
             >
-              Load Sports Controls
-            </button>
-
-            <button
-              class="button admin-button secondary"
-              onclick="adminSetupSportsControls()"
-            >
-              Setup Sports Controls
+              Open Sports Controls
             </button>
 
           </div>
@@ -1993,6 +1986,23 @@ function adminSportsEscape_(value) {
 
 }
 
+
+function adminSportsInputId_(
+  prefix,
+  league
+) {
+
+  return (
+    prefix +
+    "_" +
+    String(league || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_|_$/g, "")
+  );
+
+}
+
 function adminSportsBool_(value) {
 
   return (
@@ -2028,27 +2038,50 @@ function adminSportsMessage_(
 
 }
 
-async function adminSetupSportsControls() {
+async function adminOpenSportsControls() {
 
   adminSportsMessage_(
-    "Setting up Sports Controls...",
+    "Opening Sports Controls...",
     false
   );
 
-  const res =
-    await apiAdminSetupSportsControls();
+  let setupRes = null;
 
-  adminSportsMessage_(
-    res && res.success
-      ? "Sports Controls setup complete."
-      : (res && (res.error || res.message)) ||
-        "Sports Controls setup failed.",
-    !(res && res.success)
-  );
+  try {
 
-  if (res && res.success) {
-    await adminLoadSportsControls();
+    setupRes =
+      await apiAdminSetupSportsControls();
+
+  } catch (err) {
+
+    setupRes = {
+      success: false,
+      error: err && err.message
+        ? err.message
+        : String(err || "Setup check failed")
+    };
+
   }
+
+  if (!setupRes || setupRes.success === false) {
+
+    adminSportsMessage_(
+      (setupRes && (setupRes.error || setupRes.message))
+        ? "Sports setup check failed; trying to load existing controls. " +
+          (setupRes.error || setupRes.message)
+        : "Sports setup check failed; trying to load existing controls.",
+      true
+    );
+
+  }
+
+  await adminLoadSportsControls();
+
+}
+
+async function adminSetupSportsControls() {
+
+  await adminOpenSportsControls();
 
 }
 
@@ -2082,7 +2115,7 @@ async function adminLoadSportsControls() {
 
     try {
       const wagerSyncStatus =
-        await apiAdminGetSportsWagerAutoSyncStatus();
+        await apiAdminGetSmartSportsAutomationStatus();
 
       res.wagerAutoSyncTriggers =
         wagerSyncStatus && wagerSyncStatus.success
@@ -2219,79 +2252,30 @@ function adminRenderSportsTriggerControls_(
       </div>
 
       <div class="admin-sub">
-        Use <strong>Refresh Score Window Now</strong> before creating wagers or when games look missing. Use <strong>Install Wager Auto-Sync</strong> to keep existing wager games refreshed and settled automatically.
+        Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, or settlements look stale. Use <strong>Install Smart Sports Automation</strong> once; it runs every 5 minutes but only calls leagues that have due wager games.
       </div>
 
       <div class="admin-actions">
 
         <button
           class="admin-small-button"
-          onclick="adminRefreshSportsScoresWindow()"
+          onclick="adminRunFullSportsSyncNow()"
         >
-          Refresh Score Window Now
-        </button>
-
-        <button
-          class="admin-small-button secondary"
-          onclick="adminRefreshSportsScoresNow()"
-        >
-          Refresh Current Scores Now
+          Run Smart Sports Sync Now
         </button>
 
         <button
           class="admin-small-button"
-          onclick="adminInstallSportsScoresTrigger()"
+          onclick="adminInstallSportsAutomation()"
         >
-          Install Live Score Trigger
+          Install Smart Sports Automation
         </button>
 
         <button
           class="admin-small-button danger"
-          onclick="adminRemoveSportsScoresTrigger()"
+          onclick="adminRemoveSportsAutomation()"
         >
-          Remove Live Score Trigger
-        </button>
-
-        <button
-          class="admin-small-button"
-          onclick="adminInstallSportsScoresWindowTrigger()"
-        >
-          Install Score Window Trigger
-        </button>
-
-        <button
-          class="admin-small-button danger"
-          onclick="adminRemoveSportsScoresWindowTrigger()"
-        >
-          Remove Score Window Trigger
-        </button>
-
-        <button
-          class="admin-small-button"
-          onclick="adminInstallSportsWagerAutoSyncTrigger()"
-        >
-          Install Wager Auto-Sync
-        </button>
-
-        <button
-          class="admin-small-button danger"
-          onclick="adminRemoveSportsWagerAutoSyncTrigger()"
-        >
-          Remove Wager Auto-Sync
-        </button>
-
-        <button
-          class="admin-small-button secondary"
-          onclick="adminInstallSportsOddsHybridTrigger()"
-        >
-          Install Hybrid Odds Trigger
-        </button>
-
-        <button
-          class="admin-small-button danger"
-          onclick="adminRemoveSportsOddsHybridTrigger()"
-        >
-          Remove Hybrid Odds Trigger
+          Remove Smart Sports Automation
         </button>
 
       </div>
@@ -2362,7 +2346,11 @@ function adminRenderScoreLeagueControls_(
                   <div class="admin-sub">
                     ${sport}
                     ·
-                    Live poll: ${league.pollLiveMinutes || ""} min
+                    Pregame: ${league.pollPreGameMinutes || 60} min
+                    ·
+                    Live: ${league.pollLiveMinutes || 5} min
+                    ·
+                    Final: ${league.pollFinalMinutes || 120} min
                     ·
                     Snapshots: ${adminSportsBool_(league.savePeriodSnapshots) ? "ON" : "OFF"}
                   </div>
@@ -2374,6 +2362,51 @@ function adminRenderScoreLeagueControls_(
 
               </div>
 
+              <div class="admin-control-grid">
+
+                <label class="admin-field">
+                  <span>Pregame min</span>
+                  <input
+                    type="number"
+                    min="15"
+                    max="1440"
+                    id="${adminSportsInputId_("sportsPre", leagueCode)}"
+                    value="${league.pollPreGameMinutes || 60}"
+                  >
+                </label>
+
+                <label class="admin-field">
+                  <span>Live min</span>
+                  <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    id="${adminSportsInputId_("sportsLive", leagueCode)}"
+                    value="${league.pollLiveMinutes || 5}"
+                  >
+                </label>
+
+                <label class="admin-field">
+                  <span>Final min</span>
+                  <input
+                    type="number"
+                    min="15"
+                    max="1440"
+                    id="${adminSportsInputId_("sportsFinal", leagueCode)}"
+                    value="${league.pollFinalMinutes || 120}"
+                  >
+                </label>
+
+                <label class="admin-field">
+                  <span>Snapshots</span>
+                  <select id="${adminSportsInputId_("sportsSnapshots", leagueCode)}">
+                    <option value="true" ${adminSportsBool_(league.savePeriodSnapshots) ? "selected" : ""}>ON</option>
+                    <option value="false" ${adminSportsBool_(league.savePeriodSnapshots) ? "" : "selected"}>OFF</option>
+                  </select>
+                </label>
+
+              </div>
+
               <div class="admin-actions">
 
                 <button
@@ -2381,6 +2414,13 @@ function adminRenderScoreLeagueControls_(
                   onclick="adminToggleSportsScoreLeague('${leagueCode}', ${enabled ? "false" : "true"})"
                 >
                   ${enabled ? "Disable Scores" : "Enable Scores"}
+                </button>
+
+                <button
+                  class="admin-small-button secondary"
+                  onclick="adminSaveSportsScoreLeagueSettings('${leagueCode}', '${sport}')"
+                >
+                  Save Poll Settings
                 </button>
 
               </div>
@@ -2622,6 +2662,64 @@ function adminRenderOddsControls_(
    SPORTS ADMIN ACTIONS
 ========================= */
 
+
+async function adminSaveSportsScoreLeagueSettings(
+  league,
+  sport
+) {
+
+  const preEl =
+    document.getElementById(
+      adminSportsInputId_("sportsPre", league)
+    );
+
+  const liveEl =
+    document.getElementById(
+      adminSportsInputId_("sportsLive", league)
+    );
+
+  const finalEl =
+    document.getElementById(
+      adminSportsInputId_("sportsFinal", league)
+    );
+
+  const snapshotsEl =
+    document.getElementById(
+      adminSportsInputId_("sportsSnapshots", league)
+    );
+
+  adminSportsMessage_(
+    "Saving smart poll settings for " + league + "...",
+    false
+  );
+
+  const res =
+    await apiAdminUpdateSportsLeagueSetting(
+      league,
+      true,
+      {
+        sport: sport,
+        pollPreGameMinutes: preEl ? preEl.value : 60,
+        pollLiveMinutes: liveEl ? liveEl.value : 5,
+        pollFinalMinutes: finalEl ? finalEl.value : 120,
+        savePeriodSnapshots: snapshotsEl ? snapshotsEl.value : false
+      }
+    );
+
+  adminSportsMessage_(
+    res && res.success
+      ? "Smart poll settings saved."
+      : (res && (res.error || res.message)) ||
+        "Unable to save smart poll settings.",
+    !(res && res.success)
+  );
+
+  if (res && res.success) {
+    await adminLoadSportsControls();
+  }
+
+}
+
 async function adminToggleSportsScoreLeague(
   league,
   enabled
@@ -2718,6 +2816,156 @@ async function adminRefreshSportsScoresNow() {
   );
 
   await adminLoadSportsControls();
+
+}
+
+async function adminRunFullSportsSyncNow() {
+
+  adminSportsMessage_(
+    "Running smart sports sync for due wager leagues..."
+  );
+
+  try {
+
+    const res =
+      await apiAdminRunSportsFullSync();
+
+    if (!res || res.success === false) {
+      throw new Error(
+        (res && (res.error || res.message)) ||
+        "Full sports sync failed."
+      );
+    }
+
+    const sync =
+      res.sync || res || {};
+
+    const results =
+      sync.results || [];
+
+    const totals =
+      results.reduce(function(acc, item) {
+        const refresh = item.refresh || {};
+        const autoOdds = item.autoOdds || {};
+        const settle = item.settle || {};
+
+        acc.updated += refresh.updated || 0;
+        acc.oddsUpdated += autoOdds.updatedRows || 0;
+        acc.protected += autoOdds.protected || 0;
+        acc.settled += settle.settled || 0;
+        acc.skipped += settle.skipped || 0;
+
+        return acc;
+      }, {
+        updated: 0,
+        oddsUpdated: 0,
+        protected: 0,
+        settled: 0,
+        skipped: 0
+      });
+
+    adminSportsMessage_(
+      "Smart sports sync complete. Score rows: " +
+      totals.updated +
+      ", odds rows: " +
+      totals.oddsUpdated +
+      ", protected odds: " +
+      totals.protected +
+      ", settled: " +
+      totals.settled +
+      ", skipped settlements: " +
+      totals.skipped,
+      false
+    );
+
+    await adminLoadSportsControls();
+
+  } catch (err) {
+
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : "Unable to run full sports sync.",
+      true
+    );
+
+  }
+
+}
+
+async function adminInstallSportsAutomation() {
+
+  adminSportsMessage_(
+    "Installing smart sports automation..."
+  );
+
+  try {
+
+    const res =
+      await apiAdminInstallSmartSportsAutomation();
+
+    adminSportsMessage_(
+      res && res.success
+        ? "Smart Sports Automation installed. One trigger runs every 5 minutes and only calls due leagues."
+        : (res && (res.error || res.message)) ||
+          "Unable to install smart sports automation.",
+      !(res && res.success)
+    );
+
+    await adminLoadSportsControls();
+
+    return res;
+
+  } catch (err) {
+
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : "Unable to install smart sports automation.",
+      true
+    );
+
+  }
+
+}
+
+async function adminRemoveSportsAutomation() {
+
+  if (!confirm("Remove smart sports automation trigger?")) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Removing smart sports automation trigger..."
+  );
+
+  try {
+
+    const res =
+      await apiAdminRemoveSmartSportsAutomation();
+
+    adminSportsMessage_(
+      res && res.success
+        ? "Smart Sports Automation removed."
+        : (res && (res.error || res.message)) ||
+          "Unable to remove smart sports automation.",
+      !(res && res.success)
+    );
+
+    await adminLoadSportsControls();
+
+    return res;
+
+  } catch (err) {
+
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : "Unable to remove smart sports automation.",
+      true
+    );
+
+  }
 
 }
 

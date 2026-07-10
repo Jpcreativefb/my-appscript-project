@@ -35,6 +35,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminRefreshSportsWagerScores",
     "adminRefreshAndSettleSportsWagers",
     "adminAutoSetSportsWagerOdds",
+    "adminRunSportsFullSync",
     "adminSettleSportsWagers",
     "adminRefreshSportsScoresNow",
     "adminRefreshSportsScoresWindow",
@@ -2181,6 +2182,20 @@ async function apiAdminAutoSetSportsWagerOdds(gameId) {
 
 
 
+async function apiAdminRunSportsFullSync() {
+
+  return apiAdminSportsControl_(
+    "adminRunSportsFullSync",
+    {
+      refreshOddsEngineFirst:
+        true
+    }
+  );
+
+}
+
+
+
 /* ======================
    SPORTS CONTROL ADMIN
 ====================== */
@@ -2305,6 +2320,30 @@ async function apiAdminGetSportsWagerAutoSyncStatus() {
 
   return apiAdminSportsControl_(
     "adminGetSportsWagerAutoSyncStatus"
+  );
+
+}
+
+async function apiAdminInstallSmartSportsAutomation() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSmartSportsAutomation"
+  );
+
+}
+
+async function apiAdminRemoveSmartSportsAutomation() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSmartSportsAutomation"
+  );
+
+}
+
+async function apiAdminGetSmartSportsAutomationStatus() {
+
+  return apiAdminSportsControl_(
+    "adminGetSmartSportsAutomationStatus"
   );
 
 }

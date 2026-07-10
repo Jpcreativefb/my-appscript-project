@@ -684,7 +684,13 @@ function apiRefreshSportsScoresWindowAdmin_(params) {
 
   return runSportsScoresDateWindowUpdate_(
     daysBack,
-    daysForward
+    daysForward,
+    {
+      leagues:
+        params.leagues ||
+        params.league ||
+        ""
+    }
   );
 
 }
@@ -2249,7 +2255,37 @@ function refreshSportsOddsForLeagueControlled_(
    HYBRID ODDS REFRESH
 ===================================================== */
 
-function runSportsOddsHybridRefresh() {
+
+function parseSportsOddsLeagueFilter_(value) {
+
+  if (value === null || value === undefined || value === "") {
+    return [];
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map(function(item) {
+        return String(item || "").trim();
+      })
+      .filter(function(item) {
+        return !!item;
+      });
+  }
+
+  return String(value || "")
+    .split(/[|,]/)
+    .map(function(item) {
+      return String(item || "").trim();
+    })
+    .filter(function(item) {
+      return !!item;
+    });
+
+}
+
+function runSportsOddsHybridRefresh(params) {
+
+  params = params || {};
 
   const lock =
     LockService.getScriptLock();
@@ -2277,8 +2313,28 @@ function runSportsOddsHybridRefresh() {
 
     setupSportsAdminControlSystem();
 
-    const settings =
+    let settings =
       readSportsOddsAdminSettings_();
+
+    const requestedLeagues =
+      parseSportsOddsLeagueFilter_(
+        params.leagues ||
+        params.league
+      );
+
+    if (requestedLeagues.length) {
+      const allowed = {};
+
+      requestedLeagues.forEach(function(league) {
+        allowed[String(league || "").trim().toLowerCase()] = true;
+      });
+
+      settings = settings.filter(function(setting) {
+        return allowed[String(setting.League || "").trim().toLowerCase()] === true;
+      });
+
+      summary.requestedLeagues = requestedLeagues;
+    }
 
     settings.forEach(function(setting) {
 
@@ -2357,7 +2413,9 @@ function apiRunSportsOddsHybridRefresh_(params) {
     params
   );
 
-  return runSportsOddsHybridRefresh();
+  return runSportsOddsHybridRefresh(
+    params || {}
+  );
 
 }
 
