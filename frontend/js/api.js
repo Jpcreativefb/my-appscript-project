@@ -2387,8 +2387,93 @@ async function apiAdminUpdateSportsLeagueSetting(
         options.savePeriodSnapshots,
 
       espnScoreboardUrl:
-        options.espnScoreboardUrl
+        options.espnScoreboardUrl,
+
+      season:
+        options.season,
+
+      seasonActive:
+        options.seasonActive,
+
+      seasonStartDate:
+        options.seasonStartDate,
+
+      seasonEndDate:
+        options.seasonEndDate,
+
+      preseasonStartDate:
+        options.preseasonStartDate,
+
+      preseasonEndDate:
+        options.preseasonEndDate,
+
+      regularSeasonStartDate:
+        options.regularSeasonStartDate,
+
+      regularSeasonEndDate:
+        options.regularSeasonEndDate,
+
+      postseasonStartDate:
+        options.postseasonStartDate,
+
+      postseasonEndDate:
+        options.postseasonEndDate,
+
+      tournamentStartDate:
+        options.tournamentStartDate,
+
+      tournamentEndDate:
+        options.tournamentEndDate,
+
+      bowlStartDate:
+        options.bowlStartDate,
+
+      bowlEndDate:
+        options.bowlEndDate,
+
+      oddsEnabled:
+        options.oddsEnabled,
+
+      oddsCooldownMinutes:
+        options.oddsCooldownMinutes,
+
+      oddsDailyMaxPulls:
+        options.oddsDailyMaxPulls,
+
+      oddsMonthlyMaxPulls:
+        options.oddsMonthlyMaxPulls,
+
+      archiveAfterDays:
+        options.archiveAfterDays,
+
+      keepSnapshotsDays:
+        options.keepSnapshotsDays,
+
+      keepLogsDays:
+        options.keepLogsDays
     }
+  );
+
+}
+
+async function apiAdminPreviewSportsLeagueArchive(
+  league
+) {
+
+  return apiAdminSportsControl_(
+    "adminPreviewSportsLeagueArchive",
+    {
+      league:
+        league
+    }
+  );
+
+}
+
+async function apiAdminRepairSportsScoreDisplay() {
+
+  return apiAdminSportsControl_(
+    "adminRepairSportsScoreDisplay"
   );
 
 }
@@ -2412,8 +2497,12 @@ async function apiAdminRemoveSportsScoresTrigger() {
 async function apiAdminCreateSportsSeasonJobs(
   startDate,
   endDate,
-  batchDays
+  batchDays,
+  options
 ) {
+
+  options =
+    options || {};
 
   return apiAdminSportsControl_(
     "adminCreateSportsSeasonJobs",
@@ -2425,7 +2514,19 @@ async function apiAdminCreateSportsSeasonJobs(
         endDate,
 
       batchDays:
-        batchDays
+        batchDays,
+
+      league:
+        options.league || "",
+
+      sport:
+        options.sport || "",
+
+      season:
+        options.season || "",
+
+      seasonName:
+        options.seasonName || ""
     }
   );
 

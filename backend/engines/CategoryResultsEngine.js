@@ -54,6 +54,85 @@ function categoryResultsBool_(value) {
 
 }
 
+function categoryResultsLooksLikeHeaderRow_(row) {
+
+  row = row || [];
+
+  const keys = {};
+
+  row.forEach(function(value) {
+    const key = categoryResultsString_(value);
+    if (key) {
+      keys[key] = true;
+    }
+  });
+
+  return (
+    keys.GameId === true &&
+    keys.CategoryId === true &&
+    keys.NomineeId === true
+  );
+
+}
+
+function categoryResultsNormalizeHeaderRow_(sh, headers) {
+
+  const lastColumn =
+    Math.max(sh.getLastColumn(), headers.length, 1);
+
+  let firstRow =
+    sh.getLastRow() >= 1
+      ? sh
+        .getRange(1, 1, 1, lastColumn)
+        .getValues()[0]
+      : [];
+
+  const firstRowHasContent =
+    firstRow.some(function(value) {
+      return categoryResultsString_(value) !== "";
+    });
+
+  if (!categoryResultsLooksLikeHeaderRow_(firstRow)) {
+
+    if (firstRowHasContent) {
+      /*
+        Protection: if a broken writer placed data on row 1, preserve it by
+        pushing it down before writing the real headers.
+      */
+      sh.insertRowsBefore(1, 1);
+    }
+
+    sh
+      .getRange(1, 1, 1, headers.length)
+      .setValues([headers]);
+
+    firstRow = headers.slice();
+
+  }
+
+  let existing =
+    sh
+      .getRange(1, 1, 1, Math.max(sh.getLastColumn(), headers.length, 1))
+      .getValues()[0]
+      .map(function(header) {
+        return categoryResultsString_(header);
+      });
+
+  const missing =
+    headers.filter(function(header) {
+      return existing.indexOf(header) === -1;
+    });
+
+  if (missing.length) {
+    sh
+      .getRange(1, existing.length + 1, 1, missing.length)
+      .setValues([missing]);
+  }
+
+  return sh;
+
+}
+
 function categoryResultsGetOrCreateSheet_(sheetName, headers) {
 
   const ss =
@@ -66,11 +145,10 @@ function categoryResultsGetOrCreateSheet_(sheetName, headers) {
     sh = ss.insertSheet(sheetName);
   }
 
-  if (sh.getLastRow() < 1) {
-    sh
-      .getRange(1, 1, 1, headers.length)
-      .setValues([headers]);
-  }
+  categoryResultsNormalizeHeaderRow_(
+    sh,
+    headers
+  );
 
   return sh;
 
@@ -214,7 +292,10 @@ function setupUniversalQuestionSystem() {
   const categoryResults =
     setupCategoryResultsSystem();
 
-  if (typeof clearAppCaches === "function") {
+  if (
+    payload.skipCacheClear !== true &&
+    typeof clearAppCaches === "function"
+  ) {
     clearAppCaches();
   }
 
@@ -407,9 +488,20 @@ function upsertCategoryResult_(payload) {
   }
 
   if (rowIndex === -1) {
-    const row = new Array(headers.length).fill("");
-    sh.appendRow(row);
-    rowIndex = sh.getLastRow();
+    /*
+      Do not append a fully blank row and then call getLastRow().
+      Apps Script can ignore blank appended rows when calculating getLastRow(),
+      which caused every new CategoryResults write to reuse/overwrite row 2.
+      Insert a physical row after the current data and write values into that
+      exact row instead.
+    */
+    const lastDataRow =
+      Math.max(sh.getLastRow(), 1);
+
+    sh.insertRowsAfter(lastDataRow, 1);
+
+    rowIndex =
+      lastDataRow + 1;
   }
 
   function set_(header, value) {

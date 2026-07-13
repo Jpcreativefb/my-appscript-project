@@ -322,7 +322,12 @@ function normalizeESPNTeamEvent_(event, sport, league) {
     Period:
       status.period || "",
     Clock:
-      status.displayClock || "",
+      normalizeSportsClockForDisplay_(
+        sport,
+        league,
+        statusType,
+        status
+      ),
     HomeTeam:
       homeTeam.displayName ||
       homeTeam.shortDisplayName ||
@@ -521,6 +526,11 @@ function upsertLatestSportsScores_(games) {
   }
 
   games.forEach(function(game) {
+    game =
+      normalizeSportsScoreRowForStorage_(
+        game
+      );
+
     const row =
       actualHeaders.map(function(header) {
         return game[header] !== undefined
@@ -1116,7 +1126,14 @@ function readEnabledSportsSettings_() {
         row[col.Enabled]
       );
 
-    if (!enabled) {
+    const seasonActive =
+      col.SeasonActive === undefined || row[col.SeasonActive] === ""
+        ? true
+        : normalizeSportsBoolean_(
+            row[col.SeasonActive]
+          );
+
+    if (!enabled || !seasonActive) {
       continue;
     }
 
@@ -1154,6 +1171,10 @@ function readEnabledSportsSettings_() {
       Sport: sport,
       League: league,
       Enabled: enabled,
+      SeasonActive: seasonActive,
+      Season: col.Season === undefined ? "" : String(row[col.Season] || "").trim(),
+      SeasonStartDate: col.SeasonStartDate === undefined ? "" : normalizeSportsDateOnly_(row[col.SeasonStartDate]),
+      SeasonEndDate: col.SeasonEndDate === undefined ? "" : normalizeSportsDateOnly_(row[col.SeasonEndDate]),
       PollPreGameMinutes:
         Number(row[col.PollPreGameMinutes] || 30),
       PollLiveMinutes:
@@ -1936,6 +1957,24 @@ else if (action === "updateSportsLeagueSetting") {
 
   payload =
     apiUpdateSportsLeagueSetting_(
+      params
+    );
+
+}
+
+else if (action === "previewSportsLeagueArchiveAdmin") {
+
+  payload =
+    apiPreviewSportsLeagueArchiveAdmin_(
+      params
+    );
+
+}
+
+else if (action === "repairSportsScoreDisplayAdmin") {
+
+  payload =
+    apiRepairSportsScoreDisplayAdmin_(
       params
     );
 
@@ -4270,7 +4309,8 @@ function createSportsSeasonJobs2026() {
 function createSportsSeasonJobsForDateRange_(
   startDate,
   endDate,
-  batchDays
+  batchDays,
+  options
 ) {
   setupSportsSeasonJobsSheet();
 
@@ -4282,6 +4322,23 @@ function createSportsSeasonJobsForDateRange_(
 
   batchDays =
     Number(batchDays || 2);
+
+  options =
+    options || {};
+
+  const onlySport =
+    String(options.sport || "")
+      .trim()
+      .toLowerCase();
+
+  const onlyLeague =
+    String(options.league || "")
+      .trim()
+      .toLowerCase();
+
+  const requestedSeasonName =
+    String(options.seasonName || "")
+      .trim();
 
   if (!startDate || !endDate) {
     throw new Error(
@@ -4296,7 +4353,33 @@ function createSportsSeasonJobsForDateRange_(
   }
 
   const settings =
-    readEnabledSportsSettings_();
+    readEnabledSportsSettings_()
+      .filter(function(setting) {
+
+        if (onlySport && String(setting.Sport || "").toLowerCase() !== onlySport) {
+          return false;
+        }
+
+        if (onlyLeague && String(setting.League || "").toLowerCase() !== onlyLeague) {
+          return false;
+        }
+
+        return true;
+      });
+
+  if (!settings.length) {
+    return {
+      success: true,
+      startDate: startDate,
+      endDate: endDate,
+      batchDays: batchDays,
+      newJobs: 0,
+      enabledLeagues: 0,
+      message: onlyLeague
+        ? "League is off or no matching SportsSettings row was found: " + onlyLeague
+        : "No enabled leagues found for this date range."
+    };
+  }
 
   const sh =
     SpreadsheetApp
@@ -4371,7 +4454,8 @@ function createSportsSeasonJobsForDateRange_(
       Sport: setting.Sport,
       League: setting.League,
       SeasonName:
-        startDate + " to " + endDate,
+        requestedSeasonName ||
+        (startDate + " to " + endDate),
       StartDate: startDate,
       EndDate: endDate,
       NextDate: startDate,
@@ -5606,7 +5690,12 @@ function normalizeESPNCombatEvent_(event, sport, league) {
     Period:
       status.period || "",
     Clock:
-      status.displayClock || "",
+      normalizeSportsClockForDisplay_(
+        sport,
+        league,
+        statusType,
+        status
+      ),
     HomeTeam:
       firstName,
     AwayTeam:
@@ -6053,3 +6142,187 @@ function addExtraSportsSettings() {
 ************************************/
 
 /* Removed racing-only functions during RacingScoreEngine split. */
+
+
+/* =====================================================
+   STAGE 1 - SCORE DISPLAY NORMALIZATION
+   Prevents bad date/time values from being saved as records,
+   and keeps clock labels sport-friendly.
+===================================================== */
+
+function normalizeSportsScoreRowForStorage_(game) {
+
+  game = game || {};
+
+  game.HomeRecord =
+    cleanSportsRecordValue_(
+      game.HomeRecord
+    );
+
+  game.AwayRecord =
+    cleanSportsRecordValue_(
+      game.AwayRecord
+    );
+
+  game.Clock =
+    normalizeSportsClockValue_(
+      game.Sport,
+      game.League,
+      game.Status,
+      game.State,
+      game.Period,
+      game.Clock
+    );
+
+  return game;
+
+}
+
+function normalizeSportsClockForDisplay_(sport, league, statusType, status) {
+
+  statusType = statusType || {};
+  status = status || {};
+
+  return normalizeSportsClockValue_(
+    sport,
+    league,
+    statusType.name || statusType.description || "",
+    statusType.state || "",
+    status.period || "",
+    status.displayClock || status.detail || status.shortDetail || ""
+  );
+
+}
+
+function normalizeSportsClockValue_(sport, league, status, state, period, clock) {
+
+  sport = String(sport || "").toLowerCase();
+  league = String(league || "").toLowerCase();
+  status = String(status || "").toUpperCase();
+  state = String(state || "").toLowerCase();
+  clock = String(clock || "").trim();
+
+  if (state === "pre") {
+    return "Pregame";
+  }
+
+  if (
+    state === "post" ||
+    /FINAL|FULL_TIME|STATUS_FULL_TIME/.test(status)
+  ) {
+    if (sport === "soccer" || league.indexOf("fifa") !== -1) {
+      return "FT";
+    }
+    return "Final";
+  }
+
+  if (sport === "baseball") {
+    if (/top/i.test(clock)) {
+      return clock.replace(/top/i, "Top");
+    }
+    if (/bot|bottom/i.test(clock)) {
+      return clock.replace(/bot/i, "Bottom").replace(/bottom/i, "Bottom");
+    }
+    if (/^\d+$/.test(String(period || ""))) {
+      return "Inning " + period;
+    }
+    return clock || "Live";
+  }
+
+  if (sport === "soccer" || league.indexOf("fifa") !== -1) {
+    if (/half/i.test(clock)) {
+      return "HT";
+    }
+    if (/^\d+(:\d+)?$/.test(clock)) {
+      return clock;
+    }
+    return clock || "Live";
+  }
+
+  if (!clock || /^0:?00$/.test(clock)) {
+    return state === "in" ? "Live" : clock;
+  }
+
+  return clock;
+
+}
+
+function apiRepairSportsScoreDisplayAdmin_(params) {
+
+  assertSportsAdmin_(params);
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        SPORTS_SHEETS.SCORES
+      );
+
+  if (!sh || sh.getLastRow() < 2) {
+    return {
+      success: true,
+      repaired: 0
+    };
+  }
+
+  ensureSportsScoresLogoDateColumns_();
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  const headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const col =
+    getSportsHeaderMap_(headers);
+
+  let repaired = 0;
+
+  for (let i = 1; i < data.length; i++) {
+
+    const row = data[i];
+
+    const game = {};
+
+    headers.forEach(function(header, index) {
+      game[header] = row[index];
+    });
+
+    const before = JSON.stringify({
+      HomeRecord: game.HomeRecord,
+      AwayRecord: game.AwayRecord,
+      Clock: game.Clock
+    });
+
+    normalizeSportsScoreRowForStorage_(game);
+
+    const after = JSON.stringify({
+      HomeRecord: game.HomeRecord,
+      AwayRecord: game.AwayRecord,
+      Clock: game.Clock
+    });
+
+    if (before !== after) {
+      if (col.HomeRecord !== undefined) {
+        sh.getRange(i + 1, col.HomeRecord + 1).setValue(game.HomeRecord || "");
+      }
+      if (col.AwayRecord !== undefined) {
+        sh.getRange(i + 1, col.AwayRecord + 1).setValue(game.AwayRecord || "");
+      }
+      if (col.Clock !== undefined) {
+        sh.getRange(i + 1, col.Clock + 1).setValue(game.Clock || "");
+      }
+      repaired++;
+    }
+
+  }
+
+  return {
+    success: true,
+    repaired: repaired
+  };
+
+}

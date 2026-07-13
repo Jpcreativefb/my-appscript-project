@@ -412,8 +412,100 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
         payload.savePeriodSnapshots,
 
       espnScoreboardUrl:
-        payload.espnScoreboardUrl
+        payload.espnScoreboardUrl,
+
+      season:
+        payload.season,
+
+      seasonActive:
+        payload.seasonActive,
+
+      seasonStartDate:
+        payload.seasonStartDate,
+
+      seasonEndDate:
+        payload.seasonEndDate,
+
+      preseasonStartDate:
+        payload.preseasonStartDate,
+
+      preseasonEndDate:
+        payload.preseasonEndDate,
+
+      regularSeasonStartDate:
+        payload.regularSeasonStartDate,
+
+      regularSeasonEndDate:
+        payload.regularSeasonEndDate,
+
+      postseasonStartDate:
+        payload.postseasonStartDate,
+
+      postseasonEndDate:
+        payload.postseasonEndDate,
+
+      tournamentStartDate:
+        payload.tournamentStartDate,
+
+      tournamentEndDate:
+        payload.tournamentEndDate,
+
+      bowlStartDate:
+        payload.bowlStartDate,
+
+      bowlEndDate:
+        payload.bowlEndDate,
+
+      oddsEnabled:
+        payload.oddsEnabled,
+
+      oddsCooldownMinutes:
+        payload.oddsCooldownMinutes,
+
+      oddsDailyMaxPulls:
+        payload.oddsDailyMaxPulls,
+
+      oddsMonthlyMaxPulls:
+        payload.oddsMonthlyMaxPulls,
+
+      archiveAfterDays:
+        payload.archiveAfterDays,
+
+      keepSnapshotsDays:
+        payload.keepSnapshotsDays,
+
+      keepLogsDays:
+        payload.keepLogsDays
     }
+  );
+
+}
+
+function apiAdminPreviewSportsLeagueArchive(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "previewSportsLeagueArchiveAdmin",
+    {
+      league:
+        payload.league
+    }
+  );
+
+}
+
+function apiAdminRepairSportsScoreDisplay(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "repairSportsScoreDisplayAdmin",
+    {}
   );
 
 }
@@ -464,7 +556,19 @@ function apiAdminCreateSportsSeasonJobs(payload) {
         payload.endDate,
 
       batchDays:
-        payload.batchDays
+        payload.batchDays,
+
+      league:
+        payload.league || "",
+
+      sport:
+        payload.sport || "",
+
+      season:
+        payload.season || "",
+
+      seasonName:
+        payload.seasonName || ""
     }
   );
 

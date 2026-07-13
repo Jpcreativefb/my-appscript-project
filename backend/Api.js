@@ -207,6 +207,7 @@ function doGet(e) {
       "adminRefreshAndSettleSportsWagers",
       "adminAutoSetSportsWagerOdds",
       "adminRunSportsFullSync",
+      "adminFinalizeSportsWagersFromSourceScores",
 
       "adminSetupRacingWagerSystem",
       "adminCreateRacingWager",
@@ -230,6 +231,7 @@ function doGet(e) {
       "adminInstallSmartSportsAutomation",
       "adminRemoveSmartSportsAutomation",
       "adminGetSmartSportsAutomationStatus",
+      "adminFinalizeAllSportsWagerResults",
 
       "adminCreateSportsSeasonJobs",
       "adminRunSportsSeasonBatch",
@@ -2397,6 +2399,23 @@ if (action === "compareUserPicks") {
 
     }
 
+    if (action === "adminFinalizeSportsWagersFromSourceScores") {
+
+      requireAdmin_({
+        username:
+          params.username,
+
+        token:
+          params.token
+      });
+
+      return json(
+        finalizeSportsWagerResultsFromSourceScoresForAllGames_(true)
+      );
+
+    }
+
+
     // =========================
 // ADMIN: SPORTS CONTROL BRIDGE
 // =========================
@@ -2579,7 +2598,101 @@ if (action === "adminUpdateSportsLeagueSetting") {
         params.savePeriodSnapshots,
 
       espnScoreboardUrl:
-        params.espnScoreboardUrl
+        params.espnScoreboardUrl,
+
+      season:
+        params.season,
+
+      seasonActive:
+        params.seasonActive,
+
+      seasonStartDate:
+        params.seasonStartDate,
+
+      seasonEndDate:
+        params.seasonEndDate,
+
+      preseasonStartDate:
+        params.preseasonStartDate,
+
+      preseasonEndDate:
+        params.preseasonEndDate,
+
+      regularSeasonStartDate:
+        params.regularSeasonStartDate,
+
+      regularSeasonEndDate:
+        params.regularSeasonEndDate,
+
+      postseasonStartDate:
+        params.postseasonStartDate,
+
+      postseasonEndDate:
+        params.postseasonEndDate,
+
+      tournamentStartDate:
+        params.tournamentStartDate,
+
+      tournamentEndDate:
+        params.tournamentEndDate,
+
+      bowlStartDate:
+        params.bowlStartDate,
+
+      bowlEndDate:
+        params.bowlEndDate,
+
+      oddsEnabled:
+        params.oddsEnabled,
+
+      oddsCooldownMinutes:
+        params.oddsCooldownMinutes,
+
+      oddsDailyMaxPulls:
+        params.oddsDailyMaxPulls,
+
+      oddsMonthlyMaxPulls:
+        params.oddsMonthlyMaxPulls,
+
+      archiveAfterDays:
+        params.archiveAfterDays,
+
+      keepSnapshotsDays:
+        params.keepSnapshotsDays,
+
+      keepLogsDays:
+        params.keepLogsDays
+    })
+  );
+
+}
+
+if (action === "adminPreviewSportsLeagueArchive") {
+
+  return json(
+    apiAdminPreviewSportsLeagueArchive({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league
+    })
+  );
+
+}
+
+if (action === "adminRepairSportsScoreDisplay") {
+
+  return json(
+    apiAdminRepairSportsScoreDisplay({
+      username:
+        params.username,
+
+      token:
+        params.token
     })
   );
 
@@ -2656,6 +2769,20 @@ if (action === "adminGetSmartSportsAutomationStatus") {
 
 }
 
+if (action === "adminFinalizeAllSportsWagerResults") {
+
+  return json(
+    apiAdminFinalizeAllSportsWagerResults({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
 if (action === "adminCreateSportsSeasonJobs") {
 
   return json(
@@ -2673,7 +2800,19 @@ if (action === "adminCreateSportsSeasonJobs") {
         params.endDate,
 
       batchDays:
-        params.batchDays
+        params.batchDays,
+
+      league:
+        params.league,
+
+      sport:
+        params.sport,
+
+      season:
+        params.season,
+
+      seasonName:
+        params.seasonName
     })
   );
 
