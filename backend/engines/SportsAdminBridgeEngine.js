@@ -417,6 +417,9 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
       season:
         payload.season,
 
+      seasonTitle:
+        payload.seasonTitle,
+
       seasonActive:
         payload.seasonActive,
 
@@ -425,6 +428,9 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
 
       seasonEndDate:
         payload.seasonEndDate,
+
+      preseasonEnabled:
+        payload.preseasonEnabled,
 
       preseasonStartDate:
         payload.preseasonStartDate,
@@ -438,17 +444,26 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
       regularSeasonEndDate:
         payload.regularSeasonEndDate,
 
+      postseasonEnabled:
+        payload.postseasonEnabled,
+
       postseasonStartDate:
         payload.postseasonStartDate,
 
       postseasonEndDate:
         payload.postseasonEndDate,
 
+      tournamentEnabled:
+        payload.tournamentEnabled,
+
       tournamentStartDate:
         payload.tournamentStartDate,
 
       tournamentEndDate:
         payload.tournamentEndDate,
+
+      bowlEnabled:
+        payload.bowlEnabled,
 
       bowlStartDate:
         payload.bowlStartDate,
@@ -468,8 +483,17 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
       oddsMonthlyMaxPulls:
         payload.oddsMonthlyMaxPulls,
 
+      snapshotRetentionDays:
+        payload.snapshotRetentionDays,
+
+      archiveEnabled:
+        payload.archiveEnabled,
+
       archiveAfterDays:
         payload.archiveAfterDays,
+
+      archiveMode:
+        payload.archiveMode,
 
       keepSnapshotsDays:
         payload.keepSnapshotsDays,

@@ -2603,6 +2603,9 @@ if (action === "adminUpdateSportsLeagueSetting") {
       season:
         params.season,
 
+      seasonTitle:
+        params.seasonTitle,
+
       seasonActive:
         params.seasonActive,
 
@@ -2611,6 +2614,9 @@ if (action === "adminUpdateSportsLeagueSetting") {
 
       seasonEndDate:
         params.seasonEndDate,
+
+      preseasonEnabled:
+        params.preseasonEnabled,
 
       preseasonStartDate:
         params.preseasonStartDate,
@@ -2624,17 +2630,26 @@ if (action === "adminUpdateSportsLeagueSetting") {
       regularSeasonEndDate:
         params.regularSeasonEndDate,
 
+      postseasonEnabled:
+        params.postseasonEnabled,
+
       postseasonStartDate:
         params.postseasonStartDate,
 
       postseasonEndDate:
         params.postseasonEndDate,
 
+      tournamentEnabled:
+        params.tournamentEnabled,
+
       tournamentStartDate:
         params.tournamentStartDate,
 
       tournamentEndDate:
         params.tournamentEndDate,
+
+      bowlEnabled:
+        params.bowlEnabled,
 
       bowlStartDate:
         params.bowlStartDate,
@@ -2654,8 +2669,17 @@ if (action === "adminUpdateSportsLeagueSetting") {
       oddsMonthlyMaxPulls:
         params.oddsMonthlyMaxPulls,
 
+      snapshotRetentionDays:
+        params.snapshotRetentionDays,
+
+      archiveEnabled:
+        params.archiveEnabled,
+
       archiveAfterDays:
         params.archiveAfterDays,
+
+      archiveMode:
+        params.archiveMode,
 
       keepSnapshotsDays:
         params.keepSnapshotsDays,

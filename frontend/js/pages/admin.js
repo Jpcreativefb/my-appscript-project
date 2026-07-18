@@ -2019,42 +2019,34 @@ function adminSportsInfoText_(
 ) {
 
   const map = {
+    seasonSection:
+      "Season controls decide whether this league is active and which calendar windows count as preseason, regular season, postseason, tournament, or bowls.",
+    scoringSection:
+      "Score polling controls how often the engine checks ESPN before games, during live games, and after final games.",
+    snapshotsSection:
+      "Snapshots save quarter/period/final checkpoints. Leave this off for simpler moneyline-only wagers; turn it on when you want history or period-style betting later.",
+    oddsSection:
+      "Odds controls protect the Odds API budget. Keep limits low because the free plan is limited and many leagues can burn calls quickly.",
+    archiveSection:
+      "Archive settings keep old completed rows from slowing down the live sheets. Preview first; archive is meant for cleanup after games are safely final.",
     season:
-      "Season label used for this league, usually the year such as 2026. Date windows still decide when the season is active.",
+      "Season title shown for this league, usually the year or label such as 2026, 2026-27, Regular Season, or World Cup 2026.",
     leagueOn:
-      "Master league switch. When OFF, smart automation skips schedule, score, odds, snapshot, and archive-preview actions for this league.",
+      "Master league switch. When OFF, smart automation skips schedule, score, odds, snapshots, and archive actions for this league.",
     seasonStart:
-      "First date this league season should be considered active for schedule building and smart automation.",
+      "First date this league should be considered active for schedule building and smart automation.",
     seasonEnd:
-      "Last date this league season should be considered active. After this date, use End Season to stop pulls.",
-    scoresOn:
-      "Turns ESPN score pulls on or off for this league. If OFF, scores/clocks/finals are not refreshed for this league.",
-    oddsOn:
-      "Turns odds pulls and odds sync on or off for this league. Odds limits still apply when this is ON.",
-    snapshots:
-      "Saves period/quarter/final snapshots for history. Useful for future period bets, but OFF is faster for simple moneyline wagers.",
-    pregame:
-      "Minimum minutes between pregame score checks. Higher numbers reduce ESPN calls before games start.",
-    live:
-      "Minimum minutes between live score checks. Apps Script should normally use 5 minutes or more.",
-    final:
-      "How often to recheck recently final games for corrections and settlement follow-up.",
-    oddsCooldown:
-      "Minimum minutes between odds pulls for this league. This protects the odds API limit.",
-    oddsDaily:
-      "Maximum odds pulls allowed for this league in one day. Set low for leagues with many games.",
-    oddsMonthly:
-      "Maximum odds pulls allowed for this league in one month. This helps protect your paid/free odds API quota.",
-    archiveDays:
-      "How many days after completed/settled games before they appear in archive preview. Preview only does not delete rows.",
-    snapshotDays:
-      "How many days to keep live snapshot rows before they appear in cleanup/archive preview.",
-    logDays:
-      "How many days to keep live sports log rows before they appear in cleanup preview.",
-    advancedWindows:
-      "Optional detailed windows for preseason, regular season, postseason, tournaments, and bowls. These help smart automation avoid off-season pulls.",
+      "Last date this league should be considered active. After this date, turn the league off to stop all pulls.",
+    preseasonEnabled:
+      "Turns on the optional preseason window. Date fields show only when this is enabled.",
+    postseasonEnabled:
+      "Turns on the optional postseason/playoff window. Date fields show only when this is enabled.",
+    tournamentEnabled:
+      "Turns on the optional tournament window for events such as group/knockout rounds.",
+    bowlEnabled:
+      "Turns on the optional bowl window, mainly useful for college football.",
     preseasonStart:
-      "Start date for preseason games, if this league uses preseason.",
+      "Start date for preseason games.",
     preseasonEnd:
       "End date for preseason games.",
     regularStart:
@@ -2066,26 +2058,216 @@ function adminSportsInfoText_(
     postseasonEnd:
       "End date for postseason/playoff games.",
     tournamentStart:
-      "Start date for tournament-style play, such as group or knockout rounds.",
+      "Start date for tournament-style play.",
     tournamentEnd:
       "End date for tournament-style play.",
     bowlStart:
-      "Start date for bowl/playoff window, mainly useful for college football.",
+      "Start date for bowl/playoff window.",
     bowlEnd:
       "End date for bowl/playoff window.",
+    scoresOn:
+      "Turns ESPN score pulls on or off for this league. If OFF, scores, clocks, and finals are not refreshed for this league.",
+    pregame:
+      "Minimum minutes between pregame score checks. Higher numbers reduce ESPN calls before games start.",
+    live:
+      "Minimum minutes between live score checks. Apps Script should normally use 5 minutes or more.",
+    final:
+      "How often to recheck recently final games for corrections and settlement follow-up.",
+    oddsOn:
+      "Turns odds pulls and odds sync on or off for this league. Odds limits still apply when this is ON.",
+    oddsCooldown:
+      "Minimum minutes between odds pulls for this league. This protects the Odds API limit.",
+    oddsDaily:
+      "Maximum odds pulls allowed for this league in one day. Set low for leagues with many games.",
+    oddsMonthly:
+      "Maximum odds pulls allowed for this league in one month. This helps protect your monthly Odds API quota.",
+    oddsUsage:
+      "Shows this league's Odds API usage counters from SportsOddsSettings/SportsOddsLog.",
+    refreshOdds:
+      "Manually refreshes odds for this one league. This may use one Odds API call.",
+    runHybridOdds:
+      "Runs the hybrid odds refresh for enabled auto leagues only. Use sparingly to protect the API limit.",
+    snapshots:
+      "Saves period/quarter/final snapshots for history. Useful for future period bets; OFF is faster for simple moneyline wagers.",
+    snapshotDays:
+      "How many days to keep snapshot rows before archive/cleanup can move them.",
+    archiveEnabled:
+      "Turns archive cleanup on for this league. Leave OFF until you are comfortable with the preview results.",
+    archiveDays:
+      "How many days after completed/final games before rows become eligible for archive.",
+    archiveMode:
+      "MOVE removes old rows from live sheets after copying them to archive sheets. COPY keeps the live rows.",
+    logDays:
+      "How many days to keep live sports log rows before they become cleanup candidates.",
     defaults:
       "Fills safe default settings on this card. Click Save afterward to store them.",
     save:
       "Saves this league card settings to SportsSettings.",
     leagueState:
-      "Turns this league on or off. Turning off stops schedule, scores, odds, snapshots, and smart sync for this league.",
+      "Turns the whole league on or off. Turning it off stops schedule, scores, odds, snapshots, and smart sync for this league.",
     buildSchedule:
       "Creates a schedule/season job for this league using the selected season start and end dates.",
     previewArchive:
-      "Shows what rows would be eligible for archive/cleanup. This preview does not move or delete anything."
+      "Shows what rows would be eligible for archive/cleanup. This preview does not move or delete anything.",
+    repairRecords:
+      "Repairs display fields such as team records and clocks when existing SportsScores rows look stale or malformed.",
+    runSmartSync:
+      "Runs smart sports sync immediately for scores, odds, wager sync, and settlements that are due.",
+    smartAutomationToggle:
+      "One master button for Smart Sports Automation. Enabled installs the smart trigger; Disabled removes it.",
+    automationSummary:
+      "Shows current trigger counts and Odds API usage so you can see whether automation is active.",
+    scheduleTrigger:
+      "Legacy schedule batch trigger controls. Smart Sports Automation is preferred for normal use.",
+    scoreWindowTrigger:
+      "Legacy score-window trigger controls. Smart Sports Automation is preferred for normal use."
   };
 
   return map[key] || "More information about this setting.";
+
+}
+
+
+var adminSportsInfoTimers_ =
+  adminSportsInfoTimers_ || {};
+
+var adminSportsInfoHandlersReady_ =
+  adminSportsInfoHandlersReady_ || false;
+
+function adminSportsDisplayValue_(value, fallback) {
+
+  if (
+    value === undefined ||
+    value === null ||
+    value === ""
+  ) {
+    return fallback;
+  }
+
+  return value;
+
+}
+
+function adminSportsCloseInfoPopups_() {
+
+  document
+    .querySelectorAll(".sports-info-pop")
+    .forEach(function(box) {
+      box.setAttribute("hidden", "hidden");
+      box.style.left = "";
+      box.style.top = "";
+    });
+
+  document
+    .querySelectorAll(".sports-info-button[aria-expanded='true']")
+    .forEach(function(button) {
+      button.setAttribute("aria-expanded", "false");
+    });
+
+  Object.keys(adminSportsInfoTimers_ || {})
+    .forEach(function(timerKey) {
+      clearTimeout(adminSportsInfoTimers_[timerKey]);
+      delete adminSportsInfoTimers_[timerKey];
+    });
+
+}
+
+function adminSportsPositionInfoPopup_(box, button) {
+
+  if (!box || !button) {
+    return;
+  }
+
+  const rect =
+    button.getBoundingClientRect();
+
+  const margin = 12;
+
+  box.style.left = "0px";
+  box.style.top = "0px";
+
+  const width =
+    Math.min(
+      box.offsetWidth || 260,
+      window.innerWidth - margin * 2
+    );
+
+  const height =
+    box.offsetHeight || 80;
+
+  let left =
+    rect.left + rect.width / 2 - width / 2;
+
+  left =
+    Math.max(
+      margin,
+      Math.min(
+        left,
+        window.innerWidth - width - margin
+      )
+    );
+
+  let top =
+    rect.bottom + 8;
+
+  if (top + height > window.innerHeight - margin) {
+    top =
+      Math.max(
+        margin,
+        rect.top - height - 8
+      );
+  }
+
+  box.style.left =
+    left + "px";
+
+  box.style.top =
+    top + "px";
+
+}
+
+function adminSportsInitInfoHandlers_() {
+
+  if (adminSportsInfoHandlersReady_) {
+    return;
+  }
+
+  adminSportsInfoHandlersReady_ = true;
+
+  document.addEventListener(
+    "click",
+    function(event) {
+      if (
+        event.target &&
+        event.target.closest &&
+        event.target.closest(".sports-info-wrap")
+      ) {
+        return;
+      }
+
+      adminSportsCloseInfoPopups_();
+    }
+  );
+
+  window.addEventListener(
+    "resize",
+    adminSportsCloseInfoPopups_
+  );
+
+  window.addEventListener(
+    "scroll",
+    adminSportsCloseInfoPopups_,
+    true
+  );
+
+  document.addEventListener(
+    "keydown",
+    function(event) {
+      if (event.key === "Escape") {
+        adminSportsCloseInfoPopups_();
+      }
+    }
+  );
 
 }
 
@@ -2120,7 +2302,7 @@ function adminSportsInfoButton_(
         aria-expanded="false"
         aria-controls="${id}"
         onclick="adminToggleSportsInfo_(event, '${id}')"
-      >i</button>
+      >?</button>
       <span
         id="${id}"
         class="sports-info-pop"
@@ -2156,6 +2338,8 @@ function adminToggleSportsInfo_(
     event.stopPropagation();
   }
 
+  adminSportsInitInfoHandlers_();
+
   const box =
     document.getElementById(id);
 
@@ -2169,17 +2353,30 @@ function adminToggleSportsInfo_(
   const shouldShow =
     box.hasAttribute("hidden");
 
-  box.toggleAttribute(
-    "hidden",
-    !shouldShow
-  );
+  adminSportsCloseInfoPopups_();
+
+  if (!shouldShow) {
+    return;
+  }
+
+  box.removeAttribute("hidden");
 
   if (button) {
     button.setAttribute(
       "aria-expanded",
-      shouldShow ? "true" : "false"
+      "true"
+    );
+
+    adminSportsPositionInfoPopup_(
+      box,
+      button
     );
   }
+
+  adminSportsInfoTimers_[id] =
+    setTimeout(function() {
+      adminSportsCloseInfoPopups_();
+    }, 6500);
 
 }
 
@@ -2428,6 +2625,8 @@ async function adminLoadSportsControls(options) {
       openLeagueKeys
     );
 
+  adminSportsInitInfoHandlers_();
+
   adminSportsMessage_(
     "Sports Controls loaded.",
     false
@@ -2470,7 +2669,8 @@ function adminRenderSportsControlDashboard_(
       scoreWindowTriggers,
       seasonBatchTriggers,
       usage,
-      wagerAutoSyncTriggers
+      wagerAutoSyncTriggers,
+      data.smartAutomation || {}
     )}
 
     ${adminRenderScoreLeagueControls_(
@@ -2488,7 +2688,8 @@ function adminRenderSportsTriggerControls_(
   scoreWindowTriggers,
   seasonBatchTriggers,
   usage,
-  wagerAutoSyncTriggers
+  wagerAutoSyncTriggers,
+  smartAutomation
 ) {
 
   scoreWindowTriggers =
@@ -2497,10 +2698,37 @@ function adminRenderSportsTriggerControls_(
   wagerAutoSyncTriggers =
     wagerAutoSyncTriggers || [];
 
+  smartAutomation =
+    smartAutomation || {};
+
+  const externalDetails =
+    smartAutomation.details || {};
+
+  const externalTriggerCount =
+    Number(externalDetails.scoreUpdater || 0) +
+    Number(externalDetails.seasonLoader || 0) +
+    Number(externalDetails.oddsUpdater || 0) +
+    Number(externalDetails.archiveUpdater || 0);
+
+  const smartEnabled =
+    !!(
+      smartAutomation.enabled ||
+      smartAutomation.fullyEnabled ||
+      wagerAutoSyncTriggers.length ||
+      externalTriggerCount
+    );
+
+  const smartPartial =
+    !!smartAutomation.partiallyEnabled;
+
   return `
-    <div class="admin-category-card">
+    <div class="admin-category-card sports-controls-root">
 
       <style>
+        .sports-controls-root .admin-actions {
+          align-items: center;
+          gap: 8px;
+        }
         .sports-setting-title {
           align-items: center;
           display: inline-flex;
@@ -2511,24 +2739,26 @@ function adminRenderSportsTriggerControls_(
         }
         .sports-info-wrap {
           display: inline-flex;
+          line-height: 1;
           position: relative;
+          vertical-align: middle;
         }
         .sports-info-button {
           align-items: center;
-          background: rgba(255, 255, 255, 0.85);
+          background: rgba(255, 255, 255, 0.95);
           border: 1px solid rgba(100, 116, 139, 0.55);
           border-radius: 999px;
           color: #334155;
           cursor: pointer;
           display: inline-flex;
           font-size: 11px;
-          font-weight: 800;
-          height: 17px;
+          font-weight: 900;
+          height: 18px;
           justify-content: center;
           line-height: 1;
           margin: 0;
           padding: 0;
-          width: 17px;
+          width: 18px;
         }
         .sports-info-button:hover,
         .sports-info-button[aria-expanded="true"] {
@@ -2539,77 +2769,127 @@ function adminRenderSportsTriggerControls_(
         .sports-info-pop {
           background: #0f172a;
           border-radius: 10px;
-          box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+          box-shadow: 0 14px 35px rgba(15, 23, 42, 0.35);
           color: #ffffff;
           font-size: 12px;
           font-weight: 500;
-          left: -8px;
           line-height: 1.35;
-          max-width: min(260px, 78vw);
-          min-width: 210px;
+          max-width: min(280px, calc(100vw - 24px));
+          min-width: min(230px, calc(100vw - 24px));
           padding: 9px 10px;
-          position: absolute;
-          top: 24px;
+          position: fixed;
           white-space: normal;
-          z-index: 50;
+          z-index: 9999;
         }
         .sports-info-pop[hidden] {
           display: none !important;
         }
+        .sports-action-wrap {
+          align-items: center;
+          display: inline-flex;
+          gap: 4px;
+        }
+        .sports-control-section {
+          border: 1px solid rgba(148, 163, 184, 0.35);
+          border-radius: 12px;
+          margin-top: 10px;
+          overflow: visible;
+        }
+        .sports-control-section > summary {
+          align-items: center;
+          cursor: pointer;
+          display: flex;
+          font-weight: 800;
+          gap: 6px;
+          justify-content: space-between;
+          padding: 10px 12px;
+        }
+        .sports-control-section-body {
+          border-top: 1px solid rgba(148, 163, 184, 0.22);
+          padding: 10px 12px 12px;
+        }
+        .sports-phase-window {
+          border: 1px dashed rgba(148, 163, 184, 0.45);
+          border-radius: 10px;
+          padding: 8px;
+        }
+        .sports-phase-dates {
+          display: grid;
+          gap: 8px;
+          grid-template-columns: repeat(auto-fit, minmax(138px, 1fr));
+          margin-top: 8px;
+        }
+        .sports-checkbox-field {
+          align-items: center;
+          display: flex;
+          flex-direction: row !important;
+          justify-content: space-between;
+        }
+        .sports-league-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          margin-top: 10px;
+        }
         @media (max-width: 640px) {
-          .sports-info-pop {
-            left: auto;
-            right: -12px;
-            min-width: 220px;
+          .sports-league-actions,
+          .sports-controls-root .admin-actions {
+            align-items: stretch;
+            flex-direction: column;
+          }
+          .sports-action-wrap,
+          .sports-action-wrap button {
+            width: 100%;
+          }
+          .sports-action-wrap {
+            align-items: center;
+            flex-direction: row;
           }
         }
       </style>
 
       <div class="admin-category-header">
         <div>
-          <strong>Sports Automation & Usage</strong>
+          <strong>
+            Sports Automation & Usage
+            ${adminSportsInfoButton_("automationSummary", "global", "Sports Automation & Usage")}
+          </strong>
 
           <div class="admin-sub">
-            Live score triggers: ${scoreTriggers.length || 0}
-            ·
-            Score window triggers: ${scoreWindowTriggers.length || 0}
-            ·
-            Wager auto-sync triggers: ${wagerAutoSyncTriggers.length || 0}
-            ·
-            Schedule triggers: ${seasonBatchTriggers.length || 0}
-            ·
-            Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
+            Smart automation: ${smartEnabled ? "Enabled" : "Disabled"}${smartPartial ? " / partial" : ""}
+            · Live score triggers: ${scoreTriggers.length || 0}
+            · Score window triggers: ${scoreWindowTriggers.length || 0}
+            · Wager smart triggers: ${wagerAutoSyncTriggers.length || 0}
+            · Schedule triggers: ${seasonBatchTriggers.length || 0}
+            · Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
           </div>
         </div>
       </div>
 
       <div class="admin-sub">
-        Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, schedules, or settlements look stale. Use <strong>Install Smart Sports Automation</strong> once; it runs every 5 minutes but only calls leagues that are active, inside a season window, and due by that league's limits.
+        Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, schedules, or settlements look stale. Use the master automation button for normal scheduled running.
       </div>
 
       <div class="admin-actions">
+        ${adminSportsActionButton_(
+          "Run Smart Sports Sync Now",
+          "admin-small-button",
+          "adminRunFullSportsSyncNow()",
+          "runSmartSync",
+          "global"
+        )}
 
-        <button
-          class="admin-small-button"
-          onclick="adminRunFullSportsSyncNow()"
-        >
-          Run Smart Sports Sync Now
-        </button>
-
-        <button
-          class="admin-small-button"
-          onclick="adminInstallSportsAutomation()"
-        >
-          Install Smart Sports Automation
-        </button>
-
-        <button
-          class="admin-small-button danger"
-          onclick="adminRemoveSportsAutomation()"
-        >
-          Remove Smart Sports Automation
-        </button>
-
+        ${adminSportsActionButton_(
+          smartEnabled
+            ? "Smart Sports Automation Enabled"
+            : "Smart Sports Automation Disabled",
+          smartEnabled
+            ? "admin-small-button danger"
+            : "admin-small-button secondary",
+          "adminToggleSportsAutomation(" + (smartEnabled ? "false" : "true") + ")",
+          "smartAutomationToggle",
+          "global"
+        )}
       </div>
 
     </div>
@@ -2623,7 +2903,8 @@ function adminRenderSportsDateField_(
   prefix,
   leagueCode,
   value,
-  infoKey
+  infoKey,
+  disabledAttr
 ) {
 
   return `
@@ -2633,11 +2914,242 @@ function adminRenderSportsDateField_(
         type="date"
         id="${adminSportsInputId_(prefix, leagueCode)}"
         value="${adminSportsEscape_(adminSportsDateValue_(value, ""))}"
+        ${disabledAttr || ""}
       >
     </label>
   `;
 
 }
+
+function adminRenderSportsTextField_(
+  label,
+  prefix,
+  leagueCode,
+  value,
+  fallback,
+  infoKey,
+  disabledAttr
+) {
+
+  return `
+    <label class="admin-field" style="gap:6px;">
+      ${adminSportsLabel_(label, infoKey || prefix, leagueCode)}
+      <input
+        type="text"
+        id="${adminSportsInputId_(prefix, leagueCode)}"
+        value="${adminSportsEscape_(adminSportsDisplayValue_(value, fallback || ""))}"
+        ${disabledAttr || ""}
+      >
+    </label>
+  `;
+
+}
+
+function adminRenderSportsNumberField_(
+  label,
+  prefix,
+  leagueCode,
+  value,
+  fallback,
+  min,
+  max,
+  infoKey,
+  disabledAttr
+) {
+
+  return `
+    <label class="admin-field" style="gap:6px;">
+      ${adminSportsLabel_(label, infoKey || prefix, leagueCode)}
+      <input
+        type="number"
+        min="${adminSportsEscape_(min)}"
+        max="${adminSportsEscape_(max)}"
+        id="${adminSportsInputId_(prefix, leagueCode)}"
+        value="${adminSportsEscape_(adminSportsDisplayValue_(value, fallback))}"
+        ${disabledAttr || ""}
+      >
+    </label>
+  `;
+
+}
+
+function adminRenderSportsCheckboxField_(
+  label,
+  prefix,
+  leagueCode,
+  checked,
+  infoKey,
+  disabledAttr,
+  extraAttrs
+) {
+
+  return `
+    <label class="admin-field sports-checkbox-field" style="gap:6px;">
+      ${adminSportsLabel_(label, infoKey || prefix, leagueCode)}
+      <input
+        type="checkbox"
+        id="${adminSportsInputId_(prefix, leagueCode)}"
+        ${checked ? "checked" : ""}
+        ${disabledAttr || ""}
+        ${extraAttrs || ""}
+      >
+    </label>
+  `;
+
+}
+
+function adminRenderSportsSelectField_(
+  label,
+  prefix,
+  leagueCode,
+  value,
+  options,
+  infoKey,
+  disabledAttr
+) {
+
+  value =
+    String(value || "").toUpperCase();
+
+  return `
+    <label class="admin-field" style="gap:6px;">
+      ${adminSportsLabel_(label, infoKey || prefix, leagueCode)}
+      <select
+        id="${adminSportsInputId_(prefix, leagueCode)}"
+        ${disabledAttr || ""}
+      >
+        ${(options || []).map(function(option) {
+          const optionValue =
+            String(option.value || option).toUpperCase();
+
+          return `
+            <option
+              value="${adminSportsEscape_(optionValue)}"
+              ${optionValue === value ? "selected" : ""}
+            >${adminSportsEscape_(option.label || optionValue)}</option>
+          `;
+        }).join("")}
+      </select>
+    </label>
+  `;
+
+}
+
+function adminSportsSection_(
+  title,
+  key,
+  leagueCode,
+  body,
+  open
+) {
+
+  return `
+    <details class="sports-control-section" ${open ? "open" : ""}>
+      <summary>
+        <span>${adminSportsEscape_(title)}</span>
+        ${adminSportsInfoButton_(key, leagueCode, title)}
+      </summary>
+      <div class="sports-control-section-body">
+        ${body}
+      </div>
+    </details>
+  `;
+
+}
+
+function adminSportsActionButton_(
+  label,
+  className,
+  onclick,
+  infoKey,
+  leagueCode,
+  extraAttrs
+) {
+
+  return `
+    <span class="sports-action-wrap">
+      <button
+        class="${adminSportsEscape_(className || "admin-small-button")}"
+        onclick="${adminSportsEscape_(onclick || "")}"
+        ${extraAttrs || ""}
+      >
+        ${adminSportsEscape_(label)}
+      </button>
+      ${adminSportsInfoButton_(infoKey || "save", leagueCode || "global", label)}
+    </span>
+  `;
+
+}
+
+function adminToggleSportsPhase_(
+  leagueCode,
+  phasePrefix
+) {
+
+  const checkbox =
+    document.getElementById(
+      adminSportsInputId_(
+        "sports" + phasePrefix + "Enabled",
+        leagueCode
+      )
+    );
+
+  const wrap =
+    document.getElementById(
+      adminSportsInputId_(
+        "sports" + phasePrefix + "Fields",
+        leagueCode
+      )
+    );
+
+  if (wrap) {
+    wrap.style.display =
+      checkbox && checkbox.checked
+        ? ""
+        : "none";
+  }
+
+}
+
+function adminRenderSportsPhaseWindow_(
+  label,
+  phasePrefix,
+  leagueCode,
+  enabled,
+  startValue,
+  endValue,
+  startKey,
+  endKey,
+  disabledAttr
+) {
+
+  const checked =
+    !!enabled;
+
+  return `
+    <div class="sports-phase-window">
+      ${adminRenderSportsCheckboxField_(
+        "Use " + label,
+        "sports" + phasePrefix + "Enabled",
+        leagueCode,
+        checked,
+        String(label || "").toLowerCase() + "Enabled",
+        disabledAttr,
+        `onclick="adminToggleSportsPhase_('${leagueCode}', '${phasePrefix}')"`
+      )}
+      <div
+        class="sports-phase-dates"
+        id="${adminSportsInputId_("sports" + phasePrefix + "Fields", leagueCode)}"
+        style="${checked ? "" : "display:none;"}"
+      >
+        ${adminRenderSportsDateField_(label + " start", "sports" + phasePrefix + "Start", leagueCode, startValue, startKey, disabledAttr)}
+        ${adminRenderSportsDateField_(label + " end", "sports" + phasePrefix + "End", leagueCode, endValue, endKey, disabledAttr)}
+      </div>
+    </div>
+  `;
+
+}
+
 
 function adminRenderScoreLeagueControls_(
   leagues,
@@ -2696,10 +3208,13 @@ function adminRenderScoreLeagueControls_(
 
       <div class="admin-category-header">
         <div>
-          <strong>League Smart Controls</strong>
+          <strong>
+            League Smart Controls
+            ${adminSportsInfoButton_("leagueOn", "global", "League Smart Controls")}
+          </strong>
 
           <div class="admin-sub">
-            Compact per-league controls for season windows, scores, odds, schedule/season refresh, safe limits, and archive preview. Archive preview does not delete rows.
+            Per-league controls are grouped into Season, Scoring, Snapshots, Odds, and Archive sections for phone-friendly admin use.
           </div>
 
           <div class="admin-sub">
@@ -2713,12 +3228,13 @@ function adminRenderScoreLeagueControls_(
       </div>
 
       <div class="admin-actions">
-        <button
-          class="admin-small-button secondary"
-          onclick="adminRepairSportsScoreDisplay()"
-        >
-          Repair Records / Clocks
-        </button>
+        ${adminSportsActionButton_(
+          "Repair Records / Clocks",
+          "admin-small-button secondary",
+          "adminRepairSportsScoreDisplay()",
+          "repairRecords",
+          "global"
+        )}
       </div>
 
       <div class="admin-list">
@@ -2750,7 +3266,7 @@ function adminRenderScoreLeagueControls_(
               league.enabled
             );
 
-          const seasonActive =
+          const inSeason =
             league.seasonActive === undefined
               ? true
               : adminSportsBool_(league.seasonActive);
@@ -2763,6 +3279,9 @@ function adminRenderScoreLeagueControls_(
           const snapshotsEnabled =
             adminSportsBool_(league.savePeriodSnapshots);
 
+          const archiveEnabled =
+            adminSportsBool_(league.archiveEnabled);
+
           const forceOpen =
             openLeagueKeys.indexOf(leagueKey) !== -1;
 
@@ -2773,26 +3292,23 @@ function adminRenderScoreLeagueControls_(
             adminSportsEscape_(health.health || "Good");
 
           const oddsToday =
-            oddsUsage.CallsToday || oddsUsage.callsToday || 0;
+            oddsUsage.CallsToday || oddsUsage.callsToday || oddsUsage.requestsToday || 0;
 
           const oddsMonth =
-            oddsUsage.CallsThisMonth || oddsUsage.callsThisMonth || 0;
+            oddsUsage.CallsThisMonth || oddsUsage.callsThisMonth || oddsUsage.requestsThisMonth || 0;
 
           const oddsBudget =
             oddsUsage.MonthlyBudget || oddsUsage.monthlyBudget || league.oddsMonthlyMaxPulls || 30;
 
-          const seasonLabel =
-            seasonActive ? "League ON" : "League OFF";
-
           const leagueOn =
-            seasonActive;
+            enabled;
 
           const controlsDisabled =
             leagueOn ? "" : "disabled";
 
           const seasonYear =
             adminSportsSeasonYear_(
-              league.season || health.season
+              league.seasonTitle || league.season || health.season
             );
 
           const seasonStartDate =
@@ -2807,6 +3323,85 @@ function adminRenderScoreLeagueControls_(
               seasonYear + "-12-31"
             );
 
+          const phaseLabel =
+            adminSportsEscape_(
+              league.seasonPhase ||
+              health.seasonPhase ||
+              (inSeason ? "IN_SEASON" : "OFF_SEASON")
+            );
+
+          const seasonBody = `
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
+              ${adminRenderSportsTextField_("Season title", "sportsSeasonTitle", leagueCode, league.seasonTitle || league.season || health.season, seasonYear, "season", "")}
+              ${adminRenderSportsCheckboxField_("League ON", "sportsSeasonActive", leagueCode, leagueOn, "leagueOn", "", "")}
+              ${adminRenderSportsDateField_("Start", "sportsSeasonStart", leagueCode, seasonStartDate, "seasonStart", controlsDisabled)}
+              ${adminRenderSportsDateField_("End", "sportsSeasonEnd", leagueCode, seasonEndDate, "seasonEnd", controlsDisabled)}
+              ${adminRenderSportsDateField_("Regular start", "sportsRegularStart", leagueCode, league.regularSeasonStartDate || health.regularSeasonStartDate, "regularStart", controlsDisabled)}
+              ${adminRenderSportsDateField_("Regular end", "sportsRegularEnd", leagueCode, league.regularSeasonEndDate || health.regularSeasonEndDate, "regularEnd", controlsDisabled)}
+            </div>
+
+            <div class="admin-sub" style="margin-top:8px;">
+              Current phase: ${phaseLabel}. Optional phase date fields appear only when the phase is enabled.
+            </div>
+
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:8px; margin-top:8px;">
+              ${adminRenderSportsPhaseWindow_("Preseason", "Preseason", leagueCode, league.preseasonEnabled, league.preseasonStartDate || health.preseasonStartDate, league.preseasonEndDate || health.preseasonEndDate, "preseasonStart", "preseasonEnd", controlsDisabled)}
+              ${adminRenderSportsPhaseWindow_("Postseason", "Postseason", leagueCode, league.postseasonEnabled, league.postseasonStartDate || health.postseasonStartDate, league.postseasonEndDate || health.postseasonEndDate, "postseasonStart", "postseasonEnd", controlsDisabled)}
+              ${adminRenderSportsPhaseWindow_("Tournament", "Tournament", leagueCode, league.tournamentEnabled, league.tournamentStartDate || health.tournamentStartDate, league.tournamentEndDate || health.tournamentEndDate, "tournamentStart", "tournamentEnd", controlsDisabled)}
+              ${adminRenderSportsPhaseWindow_("Bowl", "Bowl", leagueCode, league.bowlEnabled, league.bowlStartDate || health.bowlStartDate, league.bowlEndDate || health.bowlEndDate, "bowlStart", "bowlEnd", controlsDisabled)}
+            </div>
+          `;
+
+          const scoringBody = `
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
+              ${adminRenderSportsNumberField_("Pregame min", "sportsPre", leagueCode, league.pollPreGameMinutes, 60, 15, 1440, "pregame", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Live min", "sportsLive", leagueCode, league.pollLiveMinutes, 5, 5, 60, "live", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Final min", "sportsFinal", leagueCode, league.pollFinalMinutes, 120, 15, 1440, "final", controlsDisabled)}
+            </div>
+          `;
+
+          const snapshotsBody = `
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
+              ${adminRenderSportsCheckboxField_("Snapshots", "sportsSnapshots", leagueCode, snapshotsEnabled, "snapshots", controlsDisabled, "")}
+              ${adminRenderSportsNumberField_("Snapshot days", "sportsSnapshotDays", leagueCode, league.snapshotRetentionDays || league.keepSnapshotsDays || health.keepSnapshotsDays, 14, 1, 365, "snapshotDays", controlsDisabled)}
+            </div>
+          `;
+
+          const oddsBody = `
+            <div class="admin-sub" style="margin-bottom:8px;">
+              ${adminSportsLabel_("Odds API usage", "oddsUsage", leagueCode)}
+              Today ${oddsToday} · Month ${oddsMonth}/${oddsBudget} · Last ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never")}
+            </div>
+
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
+              ${adminRenderSportsCheckboxField_("Odds ON", "sportsOddsEnabled", leagueCode, oddsEnabled, "oddsOn", controlsDisabled, "")}
+              ${adminRenderSportsNumberField_("Cooldown min", "sportsOddsCooldown", leagueCode, league.oddsCooldownMinutes, 240, 30, 10080, "oddsCooldown", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Odds/day", "sportsOddsDaily", leagueCode, league.oddsDailyMaxPulls, 2, 0, 24, "oddsDaily", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Odds/month", "sportsOddsMonthly", leagueCode, league.oddsMonthlyMaxPulls, 30, 0, 500, "oddsMonthly", controlsDisabled)}
+            </div>
+
+            <div class="sports-league-actions">
+              ${adminSportsActionButton_("Refresh Odds Now", "admin-small-button secondary", "adminRefreshSportsOddsLeague('" + leagueCode + "')", "refreshOdds", leagueCode, controlsDisabled)}
+            </div>
+          `;
+
+          const archiveBody = `
+            <div class="admin-sub" style="margin-bottom:8px;">
+              Games ${health.liveGames || 0} · Scores ${health.liveScores || 0} · Ready archive ${health.scoreArchiveCandidates || 0} · Snapshot cleanup ${health.snapshotArchiveCandidates || 0} · Log trim ${health.logTrimCandidates || 0}
+            </div>
+
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
+              ${adminRenderSportsCheckboxField_("Archive ON", "sportsArchiveEnabled", leagueCode, archiveEnabled, "archiveEnabled", controlsDisabled, "")}
+              ${adminRenderSportsNumberField_("Archive days", "sportsArchiveDays", leagueCode, league.archiveAfterDays || health.archiveAfterDays, 30, 1, 365, "archiveDays", controlsDisabled)}
+              ${adminRenderSportsSelectField_("Archive mode", "sportsArchiveMode", leagueCode, league.archiveMode || "MOVE", [{ value: "MOVE", label: "Move" }, { value: "COPY", label: "Copy" }], "archiveMode", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Log days", "sportsLogDays", leagueCode, league.keepLogsDays || health.keepLogsDays, 14, 1, 365, "logDays", controlsDisabled)}
+            </div>
+
+            <div class="sports-league-actions">
+              ${adminSportsActionButton_("Preview Archive", "admin-small-button secondary", "adminPreviewSportsLeagueArchive('" + leagueCode + "')", "previewArchive", leagueCode, controlsDisabled)}
+            </div>
+          `;
+
           return `
             <details
               class="admin-user-card"
@@ -2818,12 +3413,13 @@ function adminRenderScoreLeagueControls_(
 
                 <div style="min-width:0; flex:1;">
                   <strong>
-                    ${leagueCode.toUpperCase()} ${league.season ? "· " + adminSportsEscape_(league.season) : ""}
+                    ${leagueCode.toUpperCase()} ${league.seasonTitle || league.season ? "· " + adminSportsEscape_(league.seasonTitle || league.season) : ""}
                   </strong>
 
                   <div class="admin-sub">
                     ${sport}
-                    · ${seasonLabel}
+                    · ${leagueOn ? "League ON" : "League OFF"}
+                    · Season ${phaseLabel}
                     · Scores ${enabled ? "ON" : "OFF"}
                     · Odds ${oddsEnabled ? "ON" : "OFF"}
                     · API ${oddsToday}/${oddsMonth}/${oddsBudget}
@@ -2845,256 +3441,21 @@ function adminRenderScoreLeagueControls_(
               </summary>
 
               <div class="admin-sub" style="margin-top:8px;">
-                Games ${health.liveGames || 0}
-                · Scores ${health.liveScores || 0}
-                · Odds ${health.liveOdds || 0}
-                · Logs ${health.logs || 0}
-                · Snap cleanup ${health.snapshotArchiveCandidates || 0}
-                · Log trim ${health.logTrimCandidates || 0}
-                · Last score ${adminSportsEscape_(health.lastScoreRefresh || "") || "Never"}
+                Last score ${adminSportsEscape_(health.lastScoreRefresh || "") || "Never"}
                 · Last odds ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "") || "Never"}
               </div>
 
-              <div
-                class="admin-control-grid"
-                style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px; margin-top:10px;"
-              >
+              ${adminSportsSection_("Season", "seasonSection", leagueCode, seasonBody, true)}
+              ${adminSportsSection_("Scoring", "scoringSection", leagueCode, scoringBody, false)}
+              ${adminSportsSection_("Snapshots", "snapshotsSection", leagueCode, snapshotsBody, false)}
+              ${adminSportsSection_("Odds", "oddsSection", leagueCode, oddsBody, false)}
+              ${adminSportsSection_("Archive", "archiveSection", leagueCode, archiveBody, false)}
 
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Season", "season", leagueCode)}
-                  <input
-                    type="text"
-                    id="${adminSportsInputId_("sportsSeason", leagueCode)}"
-                    value="${adminSportsEscape_(league.season || health.season || new Date().getFullYear())}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("League ON", "leagueOn", leagueCode)}
-                  <input
-                    type="checkbox"
-                    id="${adminSportsInputId_("sportsSeasonActive", leagueCode)}"
-                    ${seasonActive ? "checked" : ""}
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Start", "seasonStart", leagueCode)}
-                  <input
-                    type="date"
-                    id="${adminSportsInputId_("sportsSeasonStart", leagueCode)}"
-                    value="${adminSportsEscape_(seasonStartDate)}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("End", "seasonEnd", leagueCode)}
-                  <input
-                    type="date"
-                    id="${adminSportsInputId_("sportsSeasonEnd", leagueCode)}"
-                    value="${adminSportsEscape_(seasonEndDate)}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Scores ON", "scoresOn", leagueCode)}
-                  <input
-                    type="checkbox"
-                    id="${adminSportsInputId_("sportsScoresEnabled", leagueCode)}"
-                    ${controlsDisabled}
-                    ${enabled ? "checked" : ""}
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Odds ON", "oddsOn", leagueCode)}
-                  <input
-                    type="checkbox"
-                    id="${adminSportsInputId_("sportsOddsEnabled", leagueCode)}"
-                    ${controlsDisabled}
-                    ${oddsEnabled ? "checked" : ""}
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Snapshots", "snapshots", leagueCode)}
-                  <input
-                    type="checkbox"
-                    id="${adminSportsInputId_("sportsSnapshots", leagueCode)}"
-                    ${controlsDisabled}
-                    ${snapshotsEnabled ? "checked" : ""}
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Pregame min", "pregame", leagueCode)}
-                  <input
-                    type="number"
-                    min="15"
-                    max="1440"
-                    id="${adminSportsInputId_("sportsPre", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.pollPreGameMinutes || 60}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Live min", "live", leagueCode)}
-                  <input
-                    type="number"
-                    min="5"
-                    max="60"
-                    id="${adminSportsInputId_("sportsLive", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.pollLiveMinutes || 5}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Final min", "final", leagueCode)}
-                  <input
-                    type="number"
-                    min="15"
-                    max="1440"
-                    id="${adminSportsInputId_("sportsFinal", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.pollFinalMinutes || 120}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Odds cool min", "oddsCooldown", leagueCode)}
-                  <input
-                    type="number"
-                    min="30"
-                    max="10080"
-                    id="${adminSportsInputId_("sportsOddsCooldown", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.oddsCooldownMinutes || 240}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Odds/day", "oddsDaily", leagueCode)}
-                  <input
-                    type="number"
-                    min="0"
-                    max="24"
-                    id="${adminSportsInputId_("sportsOddsDaily", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.oddsDailyMaxPulls || 2}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Odds/month", "oddsMonthly", leagueCode)}
-                  <input
-                    type="number"
-                    min="0"
-                    max="500"
-                    id="${adminSportsInputId_("sportsOddsMonthly", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.oddsMonthlyMaxPulls || 30}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Archive days", "archiveDays", leagueCode)}
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    id="${adminSportsInputId_("sportsArchiveDays", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.archiveAfterDays || health.archiveAfterDays || 14}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Snap days", "snapshotDays", leagueCode)}
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    id="${adminSportsInputId_("sportsSnapshotDays", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.keepSnapshotsDays || health.keepSnapshotsDays || 14}"
-                  >
-                </label>
-
-                <label class="admin-field" style="gap:6px;">
-                  ${adminSportsLabel_("Log days", "logDays", leagueCode)}
-                  <input
-                    type="number"
-                    min="1"
-                    max="365"
-                    id="${adminSportsInputId_("sportsLogDays", leagueCode)}"
-                    ${controlsDisabled}
-                    value="${league.keepLogsDays || health.keepLogsDays || 14}"
-                  >
-                </label>
-
-              </div>
-
-              <details class="admin-sub" style="margin-top:8px;">
-                <summary style="cursor:pointer;">Advanced season windows ${adminSportsInfoButton_("advancedWindows", leagueCode, "Advanced season windows")}</summary>
-
-                <div
-                  class="admin-control-grid"
-                  style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px; margin-top:8px;"
-                >
-                  ${adminRenderSportsDateField_("Pre start", "sportsPreseasonStart", leagueCode, league.preseasonStartDate || health.preseasonStartDate, "preseasonStart")}
-                  ${adminRenderSportsDateField_("Pre end", "sportsPreseasonEnd", leagueCode, league.preseasonEndDate || health.preseasonEndDate, "preseasonEnd")}
-                  ${adminRenderSportsDateField_("Reg start", "sportsRegularStart", leagueCode, league.regularSeasonStartDate || health.regularSeasonStartDate, "regularStart")}
-                  ${adminRenderSportsDateField_("Reg end", "sportsRegularEnd", leagueCode, league.regularSeasonEndDate || health.regularSeasonEndDate, "regularEnd")}
-                  ${adminRenderSportsDateField_("Post start", "sportsPostseasonStart", leagueCode, league.postseasonStartDate || health.postseasonStartDate, "postseasonStart")}
-                  ${adminRenderSportsDateField_("Post end", "sportsPostseasonEnd", leagueCode, league.postseasonEndDate || health.postseasonEndDate, "postseasonEnd")}
-                  ${adminRenderSportsDateField_("Tournament start", "sportsTournamentStart", leagueCode, league.tournamentStartDate || health.tournamentStartDate, "tournamentStart")}
-                  ${adminRenderSportsDateField_("Tournament end", "sportsTournamentEnd", leagueCode, league.tournamentEndDate || health.tournamentEndDate, "tournamentEnd")}
-                  ${adminRenderSportsDateField_("Bowl start", "sportsBowlStart", leagueCode, league.bowlStartDate || health.bowlStartDate, "bowlStart")}
-                  ${adminRenderSportsDateField_("Bowl end", "sportsBowlEnd", leagueCode, league.bowlEndDate || health.bowlEndDate, "bowlEnd")}
-                </div>
-              </details>
-
-              <div class="admin-actions" style="gap:6px; flex-wrap:wrap;">
-
-                <button
-                  class="admin-small-button secondary"
-                  onclick="adminApplySportsLeagueDefaults('${leagueCode}')"
-                >
-                  Defaults
-                </button>
-
-                <button
-                  class="admin-small-button"
-                  onclick="adminSaveSportsScoreLeagueSettings('${leagueCode}', '${sport}')"
-                >
-                  Save
-                </button>
-
-                <button
-                  class="admin-small-button ${leagueOn ? "danger" : "secondary"}"
-                  onclick="adminSetSportsLeagueSeasonState('${leagueCode}', '${sport}', ${leagueOn ? "false" : "true"})"
-                >
-                  ${leagueOn ? "Turn League Off" : "Turn League On"}
-                </button>
-
-                <button
-                  class="admin-small-button secondary"
-                  ${controlsDisabled}
-                  onclick="adminCreateSportsLeagueSeasonJobs('${leagueCode}', '${sport}')"
-                >
-                  Build Schedule
-                </button>
-
-                <button
-                  class="admin-small-button secondary"
-                  ${controlsDisabled}
-                  onclick="adminPreviewSportsLeagueArchive('${leagueCode}')"
-                >
-                  Preview Archive
-                </button>
-
+              <div class="sports-league-actions">
+                ${adminSportsActionButton_("Defaults", "admin-small-button secondary", "adminApplySportsLeagueDefaults('" + leagueCode + "')", "defaults", leagueCode, "")}
+                ${adminSportsActionButton_("Save", "admin-small-button", "adminSaveSportsScoreLeagueSettings('" + leagueCode + "', '" + sport + "')", "save", leagueCode, "")}
+                ${adminSportsActionButton_(leagueOn ? "Turn League Off" : "Turn League On", leagueOn ? "admin-small-button danger" : "admin-small-button secondary", "adminSetSportsLeagueSeasonState('" + leagueCode + "', '" + sport + "', " + (leagueOn ? "false" : "true") + ")", "leagueState", leagueCode, "")}
+                ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
               </div>
 
             </details>
@@ -3340,83 +3701,35 @@ async function adminSaveSportsScoreLeagueSettings(
   sport
 ) {
 
-  const preEl =
-    document.getElementById(
-      adminSportsInputId_("sportsPre", league)
+  function leagueEl_(prefix) {
+    return document.getElementById(
+      adminSportsInputId_(prefix, league)
     );
-
-  const liveEl =
-    document.getElementById(
-      adminSportsInputId_("sportsLive", league)
-    );
-
-  const finalEl =
-    document.getElementById(
-      adminSportsInputId_("sportsFinal", league)
-    );
-
-  const snapshotsEl =
-    document.getElementById(
-      adminSportsInputId_("sportsSnapshots", league)
-    );
-
-  const scoresEnabledEl =
-    document.getElementById(
-      adminSportsInputId_("sportsScoresEnabled", league)
-    );
-
-  const seasonActiveEl =
-    document.getElementById(
-      adminSportsInputId_("sportsSeasonActive", league)
-    );
-
-  const seasonEl =
-    document.getElementById(
-      adminSportsInputId_("sportsSeason", league)
-    );
-
-  const oddsEnabledEl =
-    document.getElementById(
-      adminSportsInputId_("sportsOddsEnabled", league)
-    );
-
-  const oddsCooldownEl =
-    document.getElementById(
-      adminSportsInputId_("sportsOddsCooldown", league)
-    );
-
-  const oddsDailyEl =
-    document.getElementById(
-      adminSportsInputId_("sportsOddsDaily", league)
-    );
-
-  const oddsMonthlyEl =
-    document.getElementById(
-      adminSportsInputId_("sportsOddsMonthly", league)
-    );
-
-  const archiveDaysEl =
-    document.getElementById(
-      adminSportsInputId_("sportsArchiveDays", league)
-    );
-
-  const snapshotDaysEl =
-    document.getElementById(
-      adminSportsInputId_("sportsSnapshotDays", league)
-    );
-
-  const logDaysEl =
-    document.getElementById(
-      adminSportsInputId_("sportsLogDays", league)
-    );
+  }
 
   function leagueDateValue_(prefix) {
     const el =
-      document.getElementById(
-        adminSportsInputId_(prefix, league)
-      );
+      leagueEl_(prefix);
 
     return el ? el.value : "";
+  }
+
+  function leagueChecked_(prefix, fallback) {
+    const el =
+      leagueEl_(prefix);
+
+    return el ? el.checked : !!fallback;
+  }
+
+  function leagueValue_(prefix, fallback) {
+    const el =
+      leagueEl_(prefix);
+
+    if (!el || el.value === "") {
+      return fallback;
+    }
+
+    return el.value;
   }
 
   adminSportsMessage_(
@@ -3427,34 +3740,42 @@ async function adminSaveSportsScoreLeagueSettings(
   const res =
     await apiAdminUpdateSportsLeagueSetting(
       league,
-      scoresEnabledEl ? scoresEnabledEl.checked : true,
+      leagueChecked_("sportsSeasonActive", true),
       {
         sport: sport,
-        pollPreGameMinutes: preEl ? preEl.value : 60,
-        pollLiveMinutes: liveEl ? liveEl.value : 5,
-        pollFinalMinutes: finalEl ? finalEl.value : 120,
-        savePeriodSnapshots: snapshotsEl ? snapshotsEl.checked : false,
-        season: seasonEl ? seasonEl.value : "",
-        seasonActive: seasonActiveEl ? seasonActiveEl.checked : true,
+        pollPreGameMinutes: leagueValue_("sportsPre", 60),
+        pollLiveMinutes: leagueValue_("sportsLive", 5),
+        pollFinalMinutes: leagueValue_("sportsFinal", 120),
+        savePeriodSnapshots: leagueChecked_("sportsSnapshots", false),
+        season: leagueValue_("sportsSeasonTitle", ""),
+        seasonTitle: leagueValue_("sportsSeasonTitle", ""),
+        seasonActive: leagueChecked_("sportsSeasonActive", true),
         seasonStartDate: leagueDateValue_("sportsSeasonStart"),
         seasonEndDate: leagueDateValue_("sportsSeasonEnd"),
-        preseasonStartDate: leagueDateValue_("sportsPreseasonStart"),
-        preseasonEndDate: leagueDateValue_("sportsPreseasonEnd"),
         regularSeasonStartDate: leagueDateValue_("sportsRegularStart"),
         regularSeasonEndDate: leagueDateValue_("sportsRegularEnd"),
-        postseasonStartDate: leagueDateValue_("sportsPostseasonStart"),
-        postseasonEndDate: leagueDateValue_("sportsPostseasonEnd"),
-        tournamentStartDate: leagueDateValue_("sportsTournamentStart"),
-        tournamentEndDate: leagueDateValue_("sportsTournamentEnd"),
-        bowlStartDate: leagueDateValue_("sportsBowlStart"),
-        bowlEndDate: leagueDateValue_("sportsBowlEnd"),
-        oddsEnabled: oddsEnabledEl ? oddsEnabledEl.checked : true,
-        oddsCooldownMinutes: oddsCooldownEl ? oddsCooldownEl.value : 240,
-        oddsDailyMaxPulls: oddsDailyEl ? oddsDailyEl.value : 2,
-        oddsMonthlyMaxPulls: oddsMonthlyEl ? oddsMonthlyEl.value : 30,
-        archiveAfterDays: archiveDaysEl ? archiveDaysEl.value : 14,
-        keepSnapshotsDays: snapshotDaysEl ? snapshotDaysEl.value : 14,
-        keepLogsDays: logDaysEl ? logDaysEl.value : 14
+        preseasonEnabled: leagueChecked_("sportsPreseasonEnabled", false),
+        preseasonStartDate: leagueChecked_("sportsPreseasonEnabled", false) ? leagueDateValue_("sportsPreseasonStart") : "",
+        preseasonEndDate: leagueChecked_("sportsPreseasonEnabled", false) ? leagueDateValue_("sportsPreseasonEnd") : "",
+        postseasonEnabled: leagueChecked_("sportsPostseasonEnabled", false),
+        postseasonStartDate: leagueChecked_("sportsPostseasonEnabled", false) ? leagueDateValue_("sportsPostseasonStart") : "",
+        postseasonEndDate: leagueChecked_("sportsPostseasonEnabled", false) ? leagueDateValue_("sportsPostseasonEnd") : "",
+        tournamentEnabled: leagueChecked_("sportsTournamentEnabled", false),
+        tournamentStartDate: leagueChecked_("sportsTournamentEnabled", false) ? leagueDateValue_("sportsTournamentStart") : "",
+        tournamentEndDate: leagueChecked_("sportsTournamentEnabled", false) ? leagueDateValue_("sportsTournamentEnd") : "",
+        bowlEnabled: leagueChecked_("sportsBowlEnabled", false),
+        bowlStartDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlStart") : "",
+        bowlEndDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlEnd") : "",
+        oddsEnabled: leagueChecked_("sportsOddsEnabled", true),
+        oddsCooldownMinutes: leagueValue_("sportsOddsCooldown", 240),
+        oddsDailyMaxPulls: leagueValue_("sportsOddsDaily", 2),
+        oddsMonthlyMaxPulls: leagueValue_("sportsOddsMonthly", 30),
+        snapshotRetentionDays: leagueValue_("sportsSnapshotDays", 14),
+        archiveEnabled: leagueChecked_("sportsArchiveEnabled", false),
+        archiveAfterDays: leagueValue_("sportsArchiveDays", 30),
+        archiveMode: leagueValue_("sportsArchiveMode", "MOVE"),
+        keepSnapshotsDays: leagueValue_("sportsSnapshotDays", 14),
+        keepLogsDays: leagueValue_("sportsLogDays", 14)
       }
     );
 
@@ -3472,6 +3793,7 @@ async function adminSaveSportsScoreLeagueSettings(
 
 }
 
+
 function adminApplySportsLeagueDefaults(
   league
 ) {
@@ -3481,10 +3803,6 @@ function adminApplySportsLeagueDefaults(
     true
   );
 
-  adminSportsSetCheckbox_(
-    adminSportsInputId_("sportsScoresEnabled", league),
-    true
-  );
 
   adminSportsSetCheckbox_(
     adminSportsInputId_("sportsOddsEnabled", league),
@@ -3496,9 +3814,28 @@ function adminApplySportsLeagueDefaults(
     false
   );
 
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsArchiveEnabled", league),
+    false
+  );
+
+  [
+    "Preseason",
+    "Postseason",
+    "Tournament",
+    "Bowl"
+  ].forEach(function(phasePrefix) {
+    adminSportsSetCheckbox_(
+      adminSportsInputId_("sports" + phasePrefix + "Enabled", league),
+      false
+    );
+
+    adminToggleSportsPhase_(league, phasePrefix);
+  });
+
   const seasonEl =
     document.getElementById(
-      adminSportsInputId_("sportsSeason", league)
+      adminSportsInputId_("sportsSeasonTitle", league)
     );
 
   const seasonYear =
@@ -3516,12 +3853,30 @@ function adminApplySportsLeagueDefaults(
       adminSportsInputId_("sportsSeasonEnd", league)
     );
 
+  const regularStartEl =
+    document.getElementById(
+      adminSportsInputId_("sportsRegularStart", league)
+    );
+
+  const regularEndEl =
+    document.getElementById(
+      adminSportsInputId_("sportsRegularEnd", league)
+    );
+
   if (seasonStartEl) {
     seasonStartEl.value = seasonYear + "-01-01";
   }
 
   if (seasonEndEl) {
     seasonEndEl.value = seasonYear + "-12-31";
+  }
+
+  if (regularStartEl) {
+    regularStartEl.value = seasonYear + "-01-01";
+  }
+
+  if (regularEndEl) {
+    regularEndEl.value = seasonYear + "-12-31";
   }
 
   const defaults = {
@@ -3531,7 +3886,7 @@ function adminApplySportsLeagueDefaults(
     sportsOddsCooldown: 240,
     sportsOddsDaily: 2,
     sportsOddsMonthly: 30,
-    sportsArchiveDays: 14,
+    sportsArchiveDays: 30,
     sportsSnapshotDays: 14,
     sportsLogDays: 14
   };
@@ -3547,12 +3902,22 @@ function adminApplySportsLeagueDefaults(
     }
   });
 
+  const archiveModeEl =
+    document.getElementById(
+      adminSportsInputId_("sportsArchiveMode", league)
+    );
+
+  if (archiveModeEl) {
+    archiveModeEl.value = "MOVE";
+  }
+
   adminSportsMessage_(
     "Default smart settings filled for " + league + ". Click Save to store them.",
     false
   );
 
 }
+
 
 async function adminSetSportsLeagueSeasonState(
   league,
@@ -3808,6 +4173,62 @@ async function adminRunFullSportsSyncNow() {
       err && err.message
         ? err.message
         : "Unable to run full sports sync.",
+      true
+    );
+
+  }
+
+}
+
+async function adminToggleSportsAutomation(
+  enabled
+) {
+
+  const ok =
+    window.confirm(
+      enabled
+        ? "Turn Smart Sports Automation ON?"
+        : "Turn Smart Sports Automation OFF?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    enabled
+      ? "Enabling Smart Sports Automation..."
+      : "Disabling Smart Sports Automation...",
+    false
+  );
+
+  try {
+
+    const res =
+      enabled
+        ? await apiAdminInstallSmartSportsAutomation()
+        : await apiAdminRemoveSmartSportsAutomation();
+
+    adminSportsMessage_(
+      res && res.success
+        ? (enabled
+          ? "Smart Sports Automation Enabled."
+          : "Smart Sports Automation Disabled.")
+        : (res && (res.error || res.message)) ||
+          "Unable to update Smart Sports Automation.",
+      !(res && res.success)
+    );
+
+    await adminLoadSportsControls({ preserveOpen: true });
+
+    return res;
+
+  } catch (err) {
+
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : "Unable to update Smart Sports Automation.",
       true
     );
 

@@ -2392,6 +2392,9 @@ async function apiAdminUpdateSportsLeagueSetting(
       season:
         options.season,
 
+      seasonTitle:
+        options.seasonTitle,
+
       seasonActive:
         options.seasonActive,
 
@@ -2400,6 +2403,9 @@ async function apiAdminUpdateSportsLeagueSetting(
 
       seasonEndDate:
         options.seasonEndDate,
+
+      preseasonEnabled:
+        options.preseasonEnabled,
 
       preseasonStartDate:
         options.preseasonStartDate,
@@ -2413,17 +2419,26 @@ async function apiAdminUpdateSportsLeagueSetting(
       regularSeasonEndDate:
         options.regularSeasonEndDate,
 
+      postseasonEnabled:
+        options.postseasonEnabled,
+
       postseasonStartDate:
         options.postseasonStartDate,
 
       postseasonEndDate:
         options.postseasonEndDate,
 
+      tournamentEnabled:
+        options.tournamentEnabled,
+
       tournamentStartDate:
         options.tournamentStartDate,
 
       tournamentEndDate:
         options.tournamentEndDate,
+
+      bowlEnabled:
+        options.bowlEnabled,
 
       bowlStartDate:
         options.bowlStartDate,
@@ -2443,8 +2458,17 @@ async function apiAdminUpdateSportsLeagueSetting(
       oddsMonthlyMaxPulls:
         options.oddsMonthlyMaxPulls,
 
+      snapshotRetentionDays:
+        options.snapshotRetentionDays,
+
+      archiveEnabled:
+        options.archiveEnabled,
+
       archiveAfterDays:
         options.archiveAfterDays,
+
+      archiveMode:
+        options.archiveMode,
 
       keepSnapshotsDays:
         options.keepSnapshotsDays,
