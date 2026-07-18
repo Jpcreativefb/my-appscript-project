@@ -2182,18 +2182,39 @@ function adminSportsPositionInfoPopup_(box, button) {
     button.getBoundingClientRect();
 
   const margin = 12;
+  const viewportWidth =
+    Math.max(
+      document.documentElement.clientWidth || 0,
+      window.innerWidth || 0
+    );
+  const viewportHeight =
+    Math.max(
+      document.documentElement.clientHeight || 0,
+      window.innerHeight || 0
+    );
 
+  box.style.position = "fixed";
   box.style.left = "0px";
   box.style.top = "0px";
+  box.style.right = "auto";
+  box.style.bottom = "auto";
+  box.style.maxWidth =
+    Math.max(180, viewportWidth - margin * 2) + "px";
+
+  const measured =
+    box.getBoundingClientRect();
 
   const width =
     Math.min(
-      box.offsetWidth || 260,
-      window.innerWidth - margin * 2
+      measured.width || box.offsetWidth || 280,
+      viewportWidth - margin * 2
     );
 
   const height =
-    box.offsetHeight || 80;
+    Math.min(
+      measured.height || box.offsetHeight || 90,
+      viewportHeight - margin * 2
+    );
 
   let left =
     rect.left + rect.width / 2 - width / 2;
@@ -2203,26 +2224,32 @@ function adminSportsPositionInfoPopup_(box, button) {
       margin,
       Math.min(
         left,
-        window.innerWidth - width - margin
+        viewportWidth - width - margin
       )
     );
 
   let top =
     rect.bottom + 8;
 
-  if (top + height > window.innerHeight - margin) {
+  if (top + height > viewportHeight - margin) {
     top =
-      Math.max(
-        margin,
-        rect.top - height - 8
-      );
+      rect.top - height - 8;
   }
 
+  top =
+    Math.max(
+      margin,
+      Math.min(
+        top,
+        viewportHeight - height - margin
+      )
+    );
+
   box.style.left =
-    left + "px";
+    Math.round(left) + "px";
 
   box.style.top =
-    top + "px";
+    Math.round(top) + "px";
 
 }
 
@@ -2237,6 +2264,40 @@ function adminSportsInitInfoHandlers_() {
   document.addEventListener(
     "click",
     function(event) {
+
+      const infoButton =
+        event.target && event.target.closest
+          ? event.target.closest(".sports-info-button")
+          : null;
+
+      if (infoButton) {
+        const infoId =
+          infoButton.getAttribute("data-sports-info-target") ||
+          infoButton.getAttribute("aria-controls") ||
+          "";
+
+        adminToggleSportsInfo_(
+          event,
+          infoId,
+          infoButton
+        );
+
+        return;
+      }
+
+      const actionButton =
+        event.target && event.target.closest
+          ? event.target.closest("[data-sports-click]")
+          : null;
+
+      if (actionButton) {
+        adminSportsRunActionFromButton_(
+          event,
+          actionButton
+        );
+        return;
+      }
+
       if (
         event.target &&
         event.target.closest &&
@@ -2246,7 +2307,8 @@ function adminSportsInitInfoHandlers_() {
       }
 
       adminSportsCloseInfoPopups_();
-    }
+    },
+    true
   );
 
   window.addEventListener(
@@ -2268,6 +2330,149 @@ function adminSportsInitInfoHandlers_() {
       }
     }
   );
+
+}
+
+function adminSportsParseActionArgs_(argsText) {
+
+  const args = [];
+  let current = "";
+  let quote = "";
+  let escaping = false;
+
+  String(argsText || "")
+    .split("")
+    .forEach(function(ch) {
+
+      if (escaping) {
+        current += ch;
+        escaping = false;
+        return;
+      }
+
+      if (ch === "\\") {
+        escaping = true;
+        return;
+      }
+
+      if (quote) {
+        if (ch === quote) {
+          quote = "";
+        } else {
+          current += ch;
+        }
+        return;
+      }
+
+      if (ch === "'" || ch === '"') {
+        quote = ch;
+        return;
+      }
+
+      if (ch === ",") {
+        args.push(current.trim());
+        current = "";
+        return;
+      }
+
+      current += ch;
+
+    });
+
+  if (current.trim() || argsText.trim()) {
+    args.push(current.trim());
+  }
+
+  return args.map(function(value) {
+
+    if (value === "true") {
+      return true;
+    }
+
+    if (value === "false") {
+      return false;
+    }
+
+    if (value === "null") {
+      return null;
+    }
+
+    if (/^-?\d+(\.\d+)?$/.test(value)) {
+      return Number(value);
+    }
+
+    return value;
+
+  });
+
+}
+
+async function adminSportsRunActionFromButton_(
+  event,
+  button
+) {
+
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (!button || button.disabled) {
+    return;
+  }
+
+  const actionText =
+    button.getAttribute("data-sports-click") ||
+    "";
+
+  const match =
+    String(actionText).match(/^([a-zA-Z_$][\w$]*)\((.*)\)$/);
+
+  if (!match) {
+    adminSportsMessage_(
+      "Button action is not wired correctly: " + actionText,
+      true
+    );
+    return;
+  }
+
+  const fnName =
+    match[1];
+
+  const fn =
+    window[fnName];
+
+  if (typeof fn !== "function") {
+    adminSportsMessage_(
+      "Button function is missing: " + fnName,
+      true
+    );
+    return;
+  }
+
+  const oldDisabled =
+    button.disabled;
+
+  button.disabled = true;
+
+  try {
+    await fn.apply(
+      window,
+      adminSportsParseActionArgs_(match[2] || "")
+    );
+  } catch (err) {
+    console.error(err);
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : String(err || "Sports action failed."),
+      true
+    );
+  } finally {
+    if (document.body.contains(button)) {
+      button.disabled = oldDisabled;
+    }
+  }
 
 }
 
@@ -2301,7 +2506,8 @@ function adminSportsInfoButton_(
         aria-label="Info: ${adminSportsEscape_(label || key)}"
         aria-expanded="false"
         aria-controls="${id}"
-        onclick="adminToggleSportsInfo_(event, '${id}')"
+        data-sports-info-target="${id}"
+        onclick="adminToggleSportsInfo_(event, '${id}', this)"
       >?</button>
       <span
         id="${id}"
@@ -2330,7 +2536,8 @@ function adminSportsLabel_(
 
 function adminToggleSportsInfo_(
   event,
-  id
+  id,
+  sourceButton
 ) {
 
   if (event) {
@@ -2344,7 +2551,10 @@ function adminToggleSportsInfo_(
     document.getElementById(id);
 
   const button =
-    event && event.currentTarget;
+    sourceButton ||
+    (event && event.target && event.target.closest
+      ? event.target.closest(".sports-info-button")
+      : null);
 
   if (!box) {
     return;
@@ -2770,15 +2980,22 @@ function adminRenderSportsTriggerControls_(
           background: #0f172a;
           border-radius: 10px;
           box-shadow: 0 14px 35px rgba(15, 23, 42, 0.35);
+          box-sizing: border-box;
           color: #ffffff;
           font-size: 12px;
           font-weight: 500;
+          left: 12px;
           line-height: 1.35;
-          max-width: min(280px, calc(100vw - 24px));
-          min-width: min(230px, calc(100vw - 24px));
+          max-width: calc(100vw - 24px);
+          min-width: 0;
+          overflow-wrap: anywhere;
           padding: 9px 10px;
+          pointer-events: none;
           position: fixed;
+          right: auto;
+          top: 12px;
           white-space: normal;
+          width: min(280px, calc(100vw - 24px));
           z-index: 9999;
         }
         .sports-info-pop[hidden] {
@@ -2800,9 +3017,48 @@ function adminRenderSportsTriggerControls_(
           cursor: pointer;
           display: flex;
           font-weight: 800;
-          gap: 6px;
+          gap: 8px;
           justify-content: space-between;
           padding: 10px 12px;
+        }
+        .sports-section-title {
+          align-items: center;
+          display: inline-flex;
+          gap: 6px;
+          min-width: 0;
+        }
+        .sports-section-controls {
+          align-items: center;
+          display: inline-flex;
+          flex-shrink: 0;
+          gap: 8px;
+        }
+        .sports-header-toggle,
+        .sports-league-toggle {
+          align-items: center;
+          display: inline-flex;
+          gap: 6px;
+          white-space: nowrap;
+        }
+        .sports-header-toggle input,
+        .sports-league-toggle input {
+          cursor: pointer;
+          height: 16px;
+          width: 16px;
+        }
+        .sports-header-toggle-text,
+        .sports-league-toggle-text {
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.02em;
+          text-transform: uppercase;
+        }
+        .sports-league-topline {
+          align-items: center;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px 12px;
+          justify-content: space-between;
         }
         .sports-control-section-body {
           border-top: 1px solid rgba(148, 163, 184, 0.22);
@@ -2844,6 +3100,14 @@ function adminRenderSportsTriggerControls_(
           .sports-action-wrap {
             align-items: center;
             flex-direction: row;
+          }
+          .sports-control-section > summary {
+            align-items: flex-start;
+          }
+          .sports-section-controls {
+            align-items: flex-end;
+            flex-direction: column-reverse;
+            gap: 5px;
           }
         }
       </style>
@@ -3035,19 +3299,64 @@ function adminRenderSportsSelectField_(
 
 }
 
+function adminRenderSportsHeaderSwitch_(
+  label,
+  prefix,
+  leagueCode,
+  checked,
+  infoKey,
+  disabledAttr,
+  extraAttrs,
+  className
+) {
+
+  const text =
+    checked
+      ? String(label || "On") + " ON"
+      : String(label || "On") + " OFF";
+
+  return `
+    <label
+      class="${adminSportsEscape_(className || "sports-header-toggle")}"
+      data-sports-summary-control="true"
+      onclick="event.stopPropagation()"
+    >
+      <span class="${className === "sports-league-toggle" ? "sports-league-toggle-text" : "sports-header-toggle-text"}">${adminSportsEscape_(text)}</span>
+      <input
+        type="checkbox"
+        id="${adminSportsInputId_(prefix, leagueCode)}"
+        ${checked ? "checked" : ""}
+        ${disabledAttr || ""}
+        ${extraAttrs || ""}
+      >
+    </label>
+  `;
+
+}
+
 function adminSportsSection_(
   title,
   key,
   leagueCode,
   body,
-  open
+  open,
+  headerControl
 ) {
 
   return `
     <details class="sports-control-section" ${open ? "open" : ""}>
       <summary>
-        <span>${adminSportsEscape_(title)}</span>
-        ${adminSportsInfoButton_(key, leagueCode, title)}
+        <span class="sports-section-title">
+          <span>${adminSportsEscape_(title)}</span>
+        </span>
+        <span
+          class="sports-section-controls"
+          data-sports-summary-control="true"
+          onclick="event.stopPropagation()"
+        >
+          ${headerControl || ""}
+          ${adminSportsInfoButton_(key, leagueCode, title)}
+        </span>
       </summary>
       <div class="sports-control-section-body">
         ${body}
@@ -3069,8 +3378,9 @@ function adminSportsActionButton_(
   return `
     <span class="sports-action-wrap">
       <button
+        type="button"
         class="${adminSportsEscape_(className || "admin-small-button")}"
-        onclick="${adminSportsEscape_(onclick || "")}"
+        data-sports-click="${adminSportsEscape_(onclick || "")}"
         ${extraAttrs || ""}
       >
         ${adminSportsEscape_(label)}
@@ -3306,6 +3616,54 @@ function adminRenderScoreLeagueControls_(
           const controlsDisabled =
             leagueOn ? "" : "disabled";
 
+          const leagueToggleControl =
+            adminRenderSportsHeaderSwitch_(
+              "League",
+              "sportsSeasonActive",
+              leagueCode,
+              leagueOn,
+              "leagueState",
+              "",
+              `data-sports-click="adminSetSportsLeagueSeasonState('${leagueCode}', '${sport}', ${leagueOn ? "false" : "true"})"`,
+              "sports-league-toggle"
+            );
+
+          const snapshotsHeaderControl =
+            adminRenderSportsHeaderSwitch_(
+              "Snapshots",
+              "sportsSnapshots",
+              leagueCode,
+              snapshotsEnabled,
+              "snapshots",
+              controlsDisabled,
+              "",
+              "sports-header-toggle"
+            );
+
+          const oddsHeaderControl =
+            adminRenderSportsHeaderSwitch_(
+              "Odds",
+              "sportsOddsEnabled",
+              leagueCode,
+              oddsEnabled,
+              "oddsOn",
+              controlsDisabled,
+              "",
+              "sports-header-toggle"
+            );
+
+          const archiveHeaderControl =
+            adminRenderSportsHeaderSwitch_(
+              "Archive",
+              "sportsArchiveEnabled",
+              leagueCode,
+              archiveEnabled,
+              "archiveEnabled",
+              controlsDisabled,
+              "",
+              "sports-header-toggle"
+            );
+
           const seasonYear =
             adminSportsSeasonYear_(
               league.seasonTitle || league.season || health.season
@@ -3333,7 +3691,6 @@ function adminRenderScoreLeagueControls_(
           const seasonBody = `
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
               ${adminRenderSportsTextField_("Season title", "sportsSeasonTitle", leagueCode, league.seasonTitle || league.season || health.season, seasonYear, "season", "")}
-              ${adminRenderSportsCheckboxField_("League ON", "sportsSeasonActive", leagueCode, leagueOn, "leagueOn", "", "")}
               ${adminRenderSportsDateField_("Start", "sportsSeasonStart", leagueCode, seasonStartDate, "seasonStart", controlsDisabled)}
               ${adminRenderSportsDateField_("End", "sportsSeasonEnd", leagueCode, seasonEndDate, "seasonEnd", controlsDisabled)}
               ${adminRenderSportsDateField_("Regular start", "sportsRegularStart", leagueCode, league.regularSeasonStartDate || health.regularSeasonStartDate, "regularStart", controlsDisabled)}
@@ -3362,7 +3719,6 @@ function adminRenderScoreLeagueControls_(
 
           const snapshotsBody = `
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
-              ${adminRenderSportsCheckboxField_("Snapshots", "sportsSnapshots", leagueCode, snapshotsEnabled, "snapshots", controlsDisabled, "")}
               ${adminRenderSportsNumberField_("Snapshot days", "sportsSnapshotDays", leagueCode, league.snapshotRetentionDays || league.keepSnapshotsDays || health.keepSnapshotsDays, 14, 1, 365, "snapshotDays", controlsDisabled)}
             </div>
           `;
@@ -3374,7 +3730,6 @@ function adminRenderScoreLeagueControls_(
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
-              ${adminRenderSportsCheckboxField_("Odds ON", "sportsOddsEnabled", leagueCode, oddsEnabled, "oddsOn", controlsDisabled, "")}
               ${adminRenderSportsNumberField_("Cooldown min", "sportsOddsCooldown", leagueCode, league.oddsCooldownMinutes, 240, 30, 10080, "oddsCooldown", controlsDisabled)}
               ${adminRenderSportsNumberField_("Odds/day", "sportsOddsDaily", leagueCode, league.oddsDailyMaxPulls, 2, 0, 24, "oddsDaily", controlsDisabled)}
               ${adminRenderSportsNumberField_("Odds/month", "sportsOddsMonthly", leagueCode, league.oddsMonthlyMaxPulls, 30, 0, 500, "oddsMonthly", controlsDisabled)}
@@ -3391,7 +3746,6 @@ function adminRenderScoreLeagueControls_(
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
-              ${adminRenderSportsCheckboxField_("Archive ON", "sportsArchiveEnabled", leagueCode, archiveEnabled, "archiveEnabled", controlsDisabled, "")}
               ${adminRenderSportsNumberField_("Archive days", "sportsArchiveDays", leagueCode, league.archiveAfterDays || health.archiveAfterDays, 30, 1, 365, "archiveDays", controlsDisabled)}
               ${adminRenderSportsSelectField_("Archive mode", "sportsArchiveMode", leagueCode, league.archiveMode || "MOVE", [{ value: "MOVE", label: "Move" }, { value: "COPY", label: "Copy" }], "archiveMode", controlsDisabled)}
               ${adminRenderSportsNumberField_("Log days", "sportsLogDays", leagueCode, league.keepLogsDays || health.keepLogsDays, 14, 1, 365, "logDays", controlsDisabled)}
@@ -3412,9 +3766,12 @@ function adminRenderScoreLeagueControls_(
               <summary class="admin-user-header" style="cursor:pointer; gap:10px; align-items:flex-start;">
 
                 <div style="min-width:0; flex:1;">
-                  <strong>
-                    ${leagueCode.toUpperCase()} ${league.seasonTitle || league.season ? "· " + adminSportsEscape_(league.seasonTitle || league.season) : ""}
-                  </strong>
+                  <div class="sports-league-topline">
+                    <strong>
+                      ${leagueCode.toUpperCase()} ${league.seasonTitle || league.season ? "· " + adminSportsEscape_(league.seasonTitle || league.season) : ""}
+                    </strong>
+                    ${leagueToggleControl}
+                  </div>
 
                   <div class="admin-sub">
                     ${sport}
@@ -3447,14 +3804,13 @@ function adminRenderScoreLeagueControls_(
 
               ${adminSportsSection_("Season", "seasonSection", leagueCode, seasonBody, true)}
               ${adminSportsSection_("Scoring", "scoringSection", leagueCode, scoringBody, false)}
-              ${adminSportsSection_("Snapshots", "snapshotsSection", leagueCode, snapshotsBody, false)}
-              ${adminSportsSection_("Odds", "oddsSection", leagueCode, oddsBody, false)}
-              ${adminSportsSection_("Archive", "archiveSection", leagueCode, archiveBody, false)}
+              ${adminSportsSection_("Snapshots", "snapshotsSection", leagueCode, snapshotsBody, false, snapshotsHeaderControl)}
+              ${adminSportsSection_("Odds", "oddsSection", leagueCode, oddsBody, false, oddsHeaderControl)}
+              ${adminSportsSection_("Archive", "archiveSection", leagueCode, archiveBody, false, archiveHeaderControl)}
 
               <div class="sports-league-actions">
                 ${adminSportsActionButton_("Defaults", "admin-small-button secondary", "adminApplySportsLeagueDefaults('" + leagueCode + "')", "defaults", leagueCode, "")}
                 ${adminSportsActionButton_("Save", "admin-small-button", "adminSaveSportsScoreLeagueSettings('" + leagueCode + "', '" + sport + "')", "save", leagueCode, "")}
-                ${adminSportsActionButton_(leagueOn ? "Turn League Off" : "Turn League On", leagueOn ? "admin-small-button danger" : "admin-small-button secondary", "adminSetSportsLeagueSeasonState('" + leagueCode + "', '" + sport + "', " + (leagueOn ? "false" : "true") + ")", "leagueState", leagueCode, "")}
                 ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
               </div>
 
@@ -3788,7 +4144,10 @@ async function adminSaveSportsScoreLeagueSettings(
   );
 
   if (res && res.success) {
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMessage_(
+      "Smart poll settings saved. Sports Controls stayed open.",
+      false
+    );
   }
 
 }
@@ -4726,7 +5085,7 @@ async function adminCreateSportsLeagueSeasonJobs(
 
   const seasonEl =
     document.getElementById(
-      adminSportsInputId_("sportsSeason", league)
+      adminSportsInputId_("sportsSeasonTitle", league)
     );
 
   const startEl =
