@@ -1,12 +1,6 @@
 /************************************************************
- GENERATED SPLIT PROJECT
- Created from the uploaded CLEAN SPLIT v11/v12/v13 source files.
- Verify in Apps Script after upload.
-************************************************************/
-
-/************************************************************
  CLEAN SPLIT v11
- This file was rebuilt from the working v6 baseline. Racing modules were split into RacingScoreEngine.
+ This file was rebuilt from the working v6 baseline and later racing modules.
  Duplicate patch functions were removed so the project is easier to debug.
 ************************************************************/
 
@@ -89,7 +83,29 @@ const SPORTS_HEADERS = {
     "PollLiveMinutes",
     "PollFinalMinutes",
     "SavePeriodSnapshots",
-    "ESPNScoreboardUrl"
+    "ESPNScoreboardUrl",
+    "SeasonTitle",
+    "SeasonStartDate",
+    "SeasonEndDate",
+    "PreseasonEnabled",
+    "PreseasonStartDate",
+    "PreseasonEndDate",
+    "PostseasonEnabled",
+    "PostseasonStartDate",
+    "PostseasonEndDate",
+    "TournamentEnabled",
+    "TournamentStartDate",
+    "TournamentEndDate",
+    "BowlEnabled",
+    "BowlStartDate",
+    "BowlEndDate",
+    "SnapshotRetentionDays",
+    "ArchiveEnabled",
+    "ArchiveAfterDays",
+    "ArchiveMode",
+    "ArchiveLastRunAt",
+    "ArchiveLastStatus",
+    "ArchiveRowsLastRun"
   ],
 
   SportsLogs: [
@@ -110,17 +126,50 @@ function setupSportsScoresSheet() {
 
   Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
     const sh = ensureSportsSheet_(ss, sheetName);
-    setSportsHeaders_(sh, SPORTS_HEADERS[sheetName]);
+    const headers = SPORTS_HEADERS[sheetName];
+
+    if (sh.getLastRow() === 0 || sh.getLastColumn() === 0) {
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sh.setFrozenRows(1);
+      return;
+    }
+
+    const existing = sh
+      .getRange(1, 1, 1, sh.getLastColumn())
+      .getValues()[0]
+      .map(function(header) { return String(header || "").trim(); });
+
+    const missing = headers.filter(function(header) {
+      return existing.indexOf(header) === -1;
+    });
+
+    if (missing.length) {
+      sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length)
+        .setValues([missing]);
+    }
+
+    sh.setFrozenRows(1);
   });
 
-  seedSportsSettings_();
+  const settingsSheet = ss.getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (settingsSheet && settingsSheet.getLastRow() <= 1) {
+    seedSportsSettings_();
+  }
+
+  upgradeSportsControlsV12();
 
   logSports_(
     "INFO",
     "setupSportsScoresSheet",
-    "Sports Scores Engine setup complete",
+    "Sports Scores Engine v12 setup complete without clearing existing data",
     ""
   );
+
+  return {
+    success: true,
+    version: "12",
+    message: "Sports Scores Engine setup complete. Existing sheet data was preserved."
+  };
 }
 
 function ensureSportsSheet_(ss, sheetName) {
@@ -322,12 +371,7 @@ function normalizeESPNTeamEvent_(event, sport, league) {
     Period:
       status.period || "",
     Clock:
-      normalizeSportsClockForDisplay_(
-        sport,
-        league,
-        statusType,
-        status
-      ),
+      status.displayClock || "",
     HomeTeam:
       homeTeam.displayName ||
       homeTeam.shortDisplayName ||
@@ -361,7 +405,149 @@ function normalizeESPNTeamEvent_(event, sport, league) {
   };
 }
 
-/* Removed racing-only functions during RacingScoreEngine split. */
+function normalizeESPNRacingEvent_(event, sport, league) {
+  const competition =
+    getPrimaryRacingCompetition_(event);
+
+  const status =
+    competition.status ||
+    event.status ||
+    {};
+
+  const statusType =
+    status.type || {};
+
+  const competitors =
+    competition.competitors || [];
+
+  const leader =
+    getRacingLeader_(competitors);
+
+  const winner =
+    getRacingWinner_(competitors);
+
+  const completed =
+    statusType.completed === true;
+
+  return {
+    GameId: league + "_" + String(event.id || ""),
+    ESPNEventId: String(event.id || ""),
+    Sport: sport,
+    League: league,
+    Status:
+      statusType.name ||
+      statusType.description ||
+      "",
+    State:
+      statusType.state ||
+      "",
+    Period:
+      status.period || "",
+    Clock:
+      status.displayClock || "",
+    HomeTeam:
+      event.shortName ||
+      event.name ||
+      "",
+    AwayTeam:
+      leader ||
+      winner ||
+      "",
+    HomeScore: "",
+    AwayScore: "",
+    Winner:
+      completed
+        ? winner
+        : "",
+    Completed: completed,
+    LastUpdated: new Date(),
+
+    GameDateTime:
+     event.date || "",
+
+    HomeLogo:
+     getESPNEventLogo_(event),
+
+    AwayLogo: ""
+  };
+}
+
+function getPrimaryRacingCompetition_(event) {
+  const competitions =
+    event.competitions || [];
+
+  if (!competitions.length) {
+    return {};
+  }
+
+  const race =
+    competitions.find(function(comp) {
+      const type =
+        comp.type || {};
+
+      const abbreviation =
+        String(type.abbreviation || "")
+          .trim()
+          .toLowerCase();
+
+      return (
+        abbreviation === "race" ||
+        abbreviation === "main"
+      );
+    });
+
+  return race || competitions[competitions.length - 1];
+}
+
+function getRacingLeader_(competitors) {
+  if (!competitors || !competitors.length) {
+    return "";
+  }
+
+  const sorted =
+    competitors.slice().sort(function(a, b) {
+      return Number(a.order || 9999) -
+        Number(b.order || 9999);
+    });
+
+  const leader =
+    sorted[0] || {};
+
+  const athlete =
+    leader.athlete || {};
+
+  return (
+    athlete.displayName ||
+    athlete.fullName ||
+    athlete.shortName ||
+    ""
+  );
+}
+
+function getRacingWinner_(competitors) {
+  if (!competitors || !competitors.length) {
+    return "";
+  }
+
+  const winner =
+    competitors.find(function(driver) {
+      return driver.winner === true;
+    });
+
+  if (!winner) {
+    return "";
+  }
+
+  const athlete =
+    winner.athlete || {};
+
+  return (
+    athlete.displayName ||
+    athlete.fullName ||
+    athlete.shortName ||
+    ""
+  );
+}
 
 /************************************
  ESPN TEAM RECORD HELPERS
@@ -526,11 +712,6 @@ function upsertLatestSportsScores_(games) {
   }
 
   games.forEach(function(game) {
-    game =
-      normalizeSportsScoreRowForStorage_(
-        game
-      );
-
     const row =
       actualHeaders.map(function(header) {
         return game[header] !== undefined
@@ -1084,109 +1265,89 @@ function testFetchAllEnabledSportsWithSnapshots() {
  READ ENABLED SETTINGS
 ************************************/
 
-function readEnabledSportsSettings_() {
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SHEETS.SETTINGS
-      );
+function readEnabledSportsSettings_(includeDisabled) {
+  ensureSportsControlsV12SettingsColumns_();
+
+  const sh = SpreadsheetApp
+    .getActive()
+    .getSheetByName(SPORTS_SHEETS.SETTINGS);
 
   if (!sh) {
-    throw new Error(
-      "Missing sheet: " +
-      SPORTS_SHEETS.SETTINGS
-    );
+    throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
   }
 
-  const data =
-    sh.getDataRange().getValues();
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
 
-  if (data.length <= 1) {
-    return [];
-  }
-
-  const headers =
-    data[0].map(function(header) {
-      return String(header).trim();
-    });
-
-  const col =
-    getSportsHeaderMap_(headers);
-
+  const headers = data[0].map(function(header) {
+    return String(header || "").trim();
+  });
+  const col = getSportsHeaderMap_(headers);
   validateSportsSettingsColumns_(col);
+
+  function value_(row, key, fallback) {
+    return col[key] === undefined ? fallback : row[col[key]];
+  }
 
   const settings = [];
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
+    const enabled = normalizeSportsBoolean_(value_(row, "Enabled", false));
+    if (!enabled && !includeDisabled) continue;
 
-    const enabled =
-      normalizeSportsBoolean_(
-        row[col.Enabled]
-      );
-
-    const seasonActive =
-      col.SeasonActive === undefined || row[col.SeasonActive] === ""
-        ? true
-        : normalizeSportsBoolean_(
-            row[col.SeasonActive]
-          );
-
-    if (!enabled || !seasonActive) {
-      continue;
-    }
-
-    const sport =
-      String(row[col.Sport] || "")
-        .trim()
-        .toLowerCase();
-
-    const league =
-      String(row[col.League] || "")
-        .trim()
-        .toLowerCase();
-
-    const url =
-      String(row[col.ESPNScoreboardUrl] || "")
-        .trim();
+    const sport = String(value_(row, "Sport", "")).trim().toLowerCase();
+    const league = String(value_(row, "League", "")).trim().toLowerCase();
+    const url = String(value_(row, "ESPNScoreboardUrl", "")).trim();
 
     if (!sport || !league || !url) {
-      logSports_(
-        "WARN",
-        "readEnabledSportsSettings_",
-        "Skipping incomplete sports setting row",
-        JSON.stringify({
-          row: i + 1,
-          sport: sport,
-          league: league,
-          url: url
-        })
-      );
-
+      logSports_("WARN", "readEnabledSportsSettings_", "Skipping incomplete sports setting row", JSON.stringify({
+        row: i + 1,
+        sport: sport,
+        league: league,
+        url: url
+      }));
       continue;
     }
 
-    settings.push({
+    const setting = {
       Sport: sport,
       League: league,
       Enabled: enabled,
-      SeasonActive: seasonActive,
-      Season: col.Season === undefined ? "" : String(row[col.Season] || "").trim(),
-      SeasonStartDate: col.SeasonStartDate === undefined ? "" : normalizeSportsDateOnly_(row[col.SeasonStartDate]),
-      SeasonEndDate: col.SeasonEndDate === undefined ? "" : normalizeSportsDateOnly_(row[col.SeasonEndDate]),
-      PollPreGameMinutes:
-        Number(row[col.PollPreGameMinutes] || 30),
-      PollLiveMinutes:
-        Number(row[col.PollLiveMinutes] || 1),
-      PollFinalMinutes:
-        Number(row[col.PollFinalMinutes] || 60),
-      SavePeriodSnapshots:
-        normalizeSportsBoolean_(
-          row[col.SavePeriodSnapshots]
-        ),
-      ESPNScoreboardUrl: url
-    });
+      PollPreGameMinutes: sportsV12PositiveNumber_(value_(row, "PollPreGameMinutes", 30), 30),
+      PollLiveMinutes: sportsV12PositiveNumber_(value_(row, "PollLiveMinutes", 1), 1),
+      PollFinalMinutes: sportsV12PositiveNumber_(value_(row, "PollFinalMinutes", 60), 60),
+      SavePeriodSnapshots: normalizeSportsBoolean_(value_(row, "SavePeriodSnapshots", true)),
+      ESPNScoreboardUrl: url,
+      SeasonTitle: String(value_(row, "SeasonTitle", league.toUpperCase())).trim(),
+      SeasonStartDate: normalizeSportsDateOnly_(value_(row, "SeasonStartDate", "")),
+      SeasonEndDate: normalizeSportsDateOnly_(value_(row, "SeasonEndDate", "")),
+      PreseasonEnabled: normalizeSportsBoolean_(value_(row, "PreseasonEnabled", false)),
+      PreseasonStartDate: normalizeSportsDateOnly_(value_(row, "PreseasonStartDate", "")),
+      PreseasonEndDate: normalizeSportsDateOnly_(value_(row, "PreseasonEndDate", "")),
+      PostseasonEnabled: normalizeSportsBoolean_(value_(row, "PostseasonEnabled", false)),
+      PostseasonStartDate: normalizeSportsDateOnly_(value_(row, "PostseasonStartDate", "")),
+      PostseasonEndDate: normalizeSportsDateOnly_(value_(row, "PostseasonEndDate", "")),
+      TournamentEnabled: normalizeSportsBoolean_(value_(row, "TournamentEnabled", false)),
+      TournamentStartDate: normalizeSportsDateOnly_(value_(row, "TournamentStartDate", "")),
+      TournamentEndDate: normalizeSportsDateOnly_(value_(row, "TournamentEndDate", "")),
+      BowlEnabled: normalizeSportsBoolean_(value_(row, "BowlEnabled", false)),
+      BowlStartDate: normalizeSportsDateOnly_(value_(row, "BowlStartDate", "")),
+      BowlEndDate: normalizeSportsDateOnly_(value_(row, "BowlEndDate", "")),
+      SnapshotRetentionDays: sportsV12PositiveNumber_(value_(row, "SnapshotRetentionDays", 14), 14),
+      ArchiveEnabled: normalizeSportsBoolean_(value_(row, "ArchiveEnabled", false)),
+      ArchiveAfterDays: sportsV12PositiveNumber_(value_(row, "ArchiveAfterDays", 30), 30),
+      ArchiveMode: String(value_(row, "ArchiveMode", "MOVE") || "MOVE").trim().toUpperCase(),
+      ArchiveLastRunAt: value_(row, "ArchiveLastRunAt", ""),
+      ArchiveLastStatus: String(value_(row, "ArchiveLastStatus", "")).trim(),
+      ArchiveRowsLastRun: Number(value_(row, "ArchiveRowsLastRun", 0) || 0),
+      _rowNumber: i + 1
+    };
+
+    const phase = sportsGetSeasonPhase_(setting, normalizeSportsDateOnly_(new Date()));
+    setting.SeasonActive = phase.active;
+    setting.SeasonPhase = phase.phase;
+    settings.push(setting);
   }
 
   return settings;
@@ -1501,213 +1662,83 @@ const SPORTS_TRIGGER_FUNCTION =
  Safe to use manually or by trigger.
 ************************************/
 
-function runSportsScoresUpdate() {
-
-  const lock =
-    LockService.getScriptLock();
-
-  const gotLock =
-    lock.tryLock(10000);
+function runSportsScoresUpdate(forceRefresh) {
+  const lock = LockService.getScriptLock();
+  const gotLock = lock.tryLock(10000);
 
   if (!gotLock) {
-    logSports_(
-      "WARN",
-      "runSportsScoresUpdate",
-      "Skipped run because another update is already running",
-      ""
-    );
-
-    return {
-      success: false,
-      skipped: true,
-      reason: "Another update is already running"
-    };
+    logSports_("WARN", "runSportsScoresUpdate", "Skipped run because another update is already running", "");
+    return { success: false, skipped: true, reason: "Another update is already running" };
   }
 
+  const force = forceRefresh === true || String(forceRefresh || "").toLowerCase() === "true";
   const summary = {
     success: true,
     startedAt: new Date(),
+    forceRefresh: force,
     leaguesChecked: 0,
     gamesFetched: 0,
     snapshotsChecked: true,
-    fighterImageSyncBefore: null,
-    fighterImageSyncAfter: null,
-    ufcLogoBackfill: null,
+    skipped: [],
     errors: []
   };
 
   try {
-
-    /*
-      UFC fighter sync BEFORE scores update.
-
-      This checks the ESPN UFC scoreboard and adds current-card fighters
-      to SportsFighterImages before SportsScores gets normalized.
-    */
-    try {
-      summary.fighterImageSyncBefore =
-        syncUfcFighterImagesBeforeScoreUpdate_();
-    } catch (fighterErr) {
-      summary.errors.push({
-        step: "syncUfcFighterImagesBeforeScoreUpdate_",
-        error:
-          fighterErr && fighterErr.message
-            ? fighterErr.message
-            : String(fighterErr)
-      });
-
-      logSports_(
-        "WARN",
-        "runSportsScoresUpdate",
-        "syncUfcFighterImagesBeforeScoreUpdate_ failed",
-        fighterErr && fighterErr.message
-          ? fighterErr.message
-          : String(fighterErr)
-      );
-    }
-
-    const settings =
-      readEnabledSportsSettings_();
-
-    const previousScores =
-      readLatestSportsScoresMap_();
+    const settings = readEnabledSportsSettings_();
+    const previousScores = readLatestSportsScoresMap_();
 
     settings.forEach(function(setting) {
+      const due = sportsShouldPollSetting_(setting, previousScores, force);
+
+      if (!due.shouldPoll) {
+        summary.skipped.push({
+          sport: setting.Sport,
+          league: setting.League,
+          reason: due.reason,
+          phase: setting.SeasonPhase,
+          mode: due.mode,
+          nextDueAt: due.nextDueAt || ""
+        });
+        return;
+      }
 
       try {
-
-        const games =
-          fetchAndNormalizeESPNScoreboardFromSetting_(
-            setting
-          );
+        const games = fetchAndNormalizeESPNScoreboardFromSetting_(setting);
 
         if (setting.SavePeriodSnapshots) {
-          detectAndSaveSportsSnapshots_(
-            previousScores,
-            games
-          );
+          detectAndSaveSportsSnapshots_(previousScores, games);
         }
 
-        upsertLatestSportsScores_(
-          games
-        );
+        upsertLatestSportsScores_(games);
+        sportsMarkSettingPolled_(setting, due.mode);
 
         summary.leaguesChecked++;
         summary.gamesFetched += games.length;
 
-        logSports_(
-          "INFO",
-          "runSportsScoresUpdate",
-          "Fetched league scores",
-          JSON.stringify({
-            sport: setting.Sport,
-            league: setting.League,
-            count: games.length
-          })
-        );
-
+        logSports_("INFO", "runSportsScoresUpdate", "Fetched league scores", JSON.stringify({
+          sport: setting.Sport,
+          league: setting.League,
+          mode: due.mode,
+          seasonPhase: setting.SeasonPhase,
+          count: games.length
+        }));
       } catch (err) {
-
-        const message =
-          err && err.message
-            ? err.message
-            : String(err);
-
-        summary.errors.push({
+        const message = err && err.message ? err.message : String(err);
+        summary.errors.push({ sport: setting.Sport, league: setting.League, error: message });
+        logSports_("ERROR", "runSportsScoresUpdate", "Failed fetching league scores", JSON.stringify({
           sport: setting.Sport,
           league: setting.League,
           error: message
-        });
-
-        logSports_(
-          "ERROR",
-          "runSportsScoresUpdate",
-          "Failed fetching league scores",
-          JSON.stringify({
-            sport: setting.Sport,
-            league: setting.League,
-            error: message
-          })
-        );
-
+        }));
       }
-
     });
 
-    /*
-      UFC fighter name sync AFTER scores update.
-
-      This reads SportsScores and adds any UFC fighters that were saved
-      but are still missing from SportsFighterImages.
-    */
-    try {
-      summary.fighterImageSyncAfter =
-        populateSportsFighterImagesFromSportsScores();
-    } catch (fighterErr2) {
-      summary.errors.push({
-        step: "populateSportsFighterImagesFromSportsScores",
-        error:
-          fighterErr2 && fighterErr2.message
-            ? fighterErr2.message
-            : String(fighterErr2)
-      });
-
-      logSports_(
-        "WARN",
-        "runSportsScoresUpdate",
-        "populateSportsFighterImagesFromSportsScores failed",
-        fighterErr2 && fighterErr2.message
-          ? fighterErr2.message
-          : String(fighterErr2)
-      );
-    }
-
-    /*
-      UFC logo backfill AFTER fighter names/images are synced.
-
-      This reads SportsFighterImages and fills HomeLogo/AwayLogo
-      in SportsScores when an ImageUrl exists.
-    */
-    try {
-      summary.ufcLogoBackfill =
-        backfillUfcLogosInSportsScoresFromFighterImages();
-    } catch (logoErr) {
-      summary.errors.push({
-        step: "backfillUfcLogosInSportsScoresFromFighterImages",
-        error:
-          logoErr && logoErr.message
-            ? logoErr.message
-            : String(logoErr)
-      });
-
-      logSports_(
-        "WARN",
-        "runSportsScoresUpdate",
-        "backfillUfcLogosInSportsScoresFromFighterImages failed",
-        logoErr && logoErr.message
-          ? logoErr.message
-          : String(logoErr)
-      );
-    }
-
-    summary.finishedAt =
-      new Date();
-
-    logSports_(
-      "INFO",
-      "runSportsScoresUpdate",
-      "Sports scores update complete",
-      JSON.stringify(summary)
-    );
-
+    summary.finishedAt = new Date();
+    logSports_("INFO", "runSportsScoresUpdate", "Smart sports scores update complete", JSON.stringify(summary));
     return summary;
-
   } finally {
-
     lock.releaseLock();
-
   }
-
 }
 
 /************************************
@@ -1721,22 +1752,18 @@ function installSportsScoresTrigger() {
   ScriptApp
     .newTrigger(SPORTS_TRIGGER_FUNCTION)
     .timeBased()
-    .everyMinutes(5)
+    .everyMinutes(1)
     .create();
 
-  logSports_(
-    "INFO",
-    "installSportsScoresTrigger",
-    "Installed sports scores trigger",
-    JSON.stringify({
-      functionName: SPORTS_TRIGGER_FUNCTION,
-      everyMinutes: 5
-    })
-  );
+  logSports_("INFO", "installSportsScoresTrigger", "Installed smart sports score trigger", JSON.stringify({
+    functionName: SPORTS_TRIGGER_FUNCTION,
+    everyMinutes: 1,
+    note: "Per-league pregame/live/final timing prevents unnecessary requests"
+  }));
 
   return {
     success: true,
-    message: "Sports scores trigger installed for every 5 minutes"
+    message: "Smart sports score trigger installed. The trigger checks every minute, but each league only fetches when its configured interval is due."
   };
 }
 
@@ -1876,49 +1903,6 @@ function doGet(e) {
 
     }
 
-    else if (action === "runSportsScoresWindowUpdate") {
-
-      payload =
-        runSportsScoresWindowUpdate();
-
-    }
-
-    else if (action === "refreshSportsScoresNowAdmin") {
-
-      payload =
-        apiRefreshSportsScoresNowAdmin_(
-          params
-        );
-
-    }
-
-    else if (action === "refreshSportsScoresWindowAdmin") {
-
-      payload =
-        apiRefreshSportsScoresWindowAdmin_(
-          params
-        );
-
-    }
-
-    else if (action === "installSportsScoresWindowTriggerAdmin") {
-
-      payload =
-        apiInstallSportsScoresWindowTriggerAdmin_(
-          params
-        );
-
-    }
-
-    else if (action === "removeSportsScoresWindowTriggerAdmin") {
-
-      payload =
-        apiRemoveSportsScoresWindowTriggerAdmin_(
-          params
-        );
-
-    }
-
     else if (action === "setupSportsOdds") {
 
       payload =
@@ -1957,24 +1941,6 @@ else if (action === "updateSportsLeagueSetting") {
 
   payload =
     apiUpdateSportsLeagueSetting_(
-      params
-    );
-
-}
-
-else if (action === "previewSportsLeagueArchiveAdmin") {
-
-  payload =
-    apiPreviewSportsLeagueArchiveAdmin_(
-      params
-    );
-
-}
-
-else if (action === "repairSportsScoreDisplayAdmin") {
-
-  payload =
-    apiRepairSportsScoreDisplayAdmin_(
       params
     );
 
@@ -2096,6 +2062,44 @@ else if (action === "removeSportsOddsHybridTrigger") {
     );
 
 }
+
+
+    else if (action === "setSmartSportsAutomation") {
+      payload = apiSetSmartSportsAutomationAdmin_(params);
+    }
+
+    else if (action === "getSportsArchiveStatus") {
+      payload = apiGetSportsArchiveStatusAdmin_(params);
+    }
+
+    else if (action === "runSportsArchiveNowAdmin") {
+      payload = apiRunSportsArchiveNowAdmin_(params);
+    }
+
+    else if (action === "setupSportsRacing") {
+
+      payload =
+        setupSportsRacingSystem();
+
+    }
+
+    else if (action === "getSportsRacingResults") {
+
+      payload =
+        apiGetSportsRacingResults_(
+          params
+        );
+
+    }
+
+    else if (action === "getSportsRacingOdds") {
+
+      payload =
+        apiGetSportsRacingOdds_(
+          params
+        );
+
+    }
 
     else if (action === "refreshSportsOdds") {
 
@@ -2562,1065 +2566,6 @@ function getESPNEventLogo_(event) {
   return "";
 }
 
-const SPORTS_FIGHTER_IMAGES_SHEET =
-  "SportsFighterImages";
-
-const SPORTS_FIGHTER_IMAGES_HEADERS = [
-  "League",
-  "FighterName",
-  "ImageUrl",
-  "Active",
-  "Notes",
-  "UpdatedAt"
-];
-
-function setupSportsFighterImagesSheet() {
-
-  const ss =
-    SpreadsheetApp.getActive();
-
-  let sh =
-    ss.getSheetByName(
-      SPORTS_FIGHTER_IMAGES_SHEET
-    );
-
-  if (!sh) {
-    sh =
-      ss.insertSheet(
-        SPORTS_FIGHTER_IMAGES_SHEET
-      );
-  }
-
-  const lastRow =
-    sh.getLastRow();
-
-  const lastColumn =
-    sh.getLastColumn();
-
-  let headers = [];
-
-  if (lastRow >= 1 && lastColumn >= 1) {
-    headers =
-      sh
-        .getRange(1, 1, 1, lastColumn)
-        .getValues()[0]
-        .map(function(value) {
-          return String(value || "").trim();
-        });
-  }
-
-  if (!headers.length || !headers[0]) {
-    sh
-      .getRange(
-        1,
-        1,
-        1,
-        SPORTS_FIGHTER_IMAGES_HEADERS.length
-      )
-      .setValues([
-        SPORTS_FIGHTER_IMAGES_HEADERS
-      ]);
-
-    sh.setFrozenRows(1);
-
-    return {
-      success: true,
-      created: true,
-      sheet: SPORTS_FIGHTER_IMAGES_SHEET
-    };
-  }
-
-  const missing =
-    SPORTS_FIGHTER_IMAGES_HEADERS.filter(function(header) {
-      return headers.indexOf(header) === -1;
-    });
-
-  if (missing.length) {
-    sh
-      .getRange(
-        1,
-        sh.getLastColumn() + 1,
-        1,
-        missing.length
-      )
-      .setValues([
-        missing
-      ]);
-  }
-
-  return {
-    success: true,
-    created: false,
-    addedColumns: missing,
-    sheet: SPORTS_FIGHTER_IMAGES_SHEET
-  };
-
-}
-
-function populateSportsFighterImagesFromUfcScoreboard() {
-
-  setupSportsFighterImagesSheet();
-
-  const league =
-    "ufc";
-
-  const url =
-    "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard";
-
-  const response =
-    UrlFetchApp.fetch(url, {
-      method: "get",
-      muteHttpExceptions: true
-    });
-
-  const code =
-    response.getResponseCode();
-
-  if (code < 200 || code >= 300) {
-    throw new Error(
-      "UFC scoreboard fetch failed. HTTP " + code
-    );
-  }
-
-  const data =
-    JSON.parse(
-      response.getContentText()
-    );
-
-  const events =
-    data.events || [];
-
-  const ss =
-    SpreadsheetApp.getActive();
-
-  const sh =
-    ss.getSheetByName(
-      SPORTS_FIGHTER_IMAGES_SHEET
-    );
-
-  const values =
-    sh.getDataRange().getValues();
-
-  const headers =
-    values[0].map(function(value) {
-      return String(value || "").trim();
-    });
-
-  const col = {
-    league:
-      headers.indexOf("League"),
-    fighterName:
-      headers.indexOf("FighterName"),
-    imageUrl:
-      headers.indexOf("ImageUrl"),
-    active:
-      headers.indexOf("Active"),
-    notes:
-      headers.indexOf("Notes"),
-    updatedAt:
-      headers.indexOf("UpdatedAt")
-  };
-
-  const existingByKey = {};
-
-  for (let i = 1; i < values.length; i++) {
-
-    const row =
-      values[i];
-
-    const rowLeague =
-      col.league >= 0
-        ? row[col.league]
-        : "";
-
-    const fighterName =
-      col.fighterName >= 0
-        ? row[col.fighterName]
-        : "";
-
-    if (!rowLeague || !fighterName) {
-      continue;
-    }
-
-    existingByKey[
-      sportsFighterImageKey_(
-        rowLeague,
-        fighterName
-      )
-    ] = {
-      rowNumber: i + 1,
-      imageUrl:
-        col.imageUrl >= 0
-          ? String(row[col.imageUrl] || "").trim()
-          : ""
-    };
-
-  }
-
-  const now =
-    new Date();
-
-  const rowsToAppend = [];
-
-  let added =
-    0;
-
-  let updated =
-    0;
-
-  let foundImages =
-    0;
-
-  let blankImages =
-    0;
-
-  events.forEach(function(event) {
-
-    const competitions =
-      event.competitions || [];
-
-    competitions.forEach(function(competition) {
-
-      const competitors =
-        competition.competitors || [];
-
-      competitors.forEach(function(competitor) {
-
-        const athlete =
-          competitor.athlete || {};
-
-        const fighterName =
-          athlete.displayName ||
-          athlete.fullName ||
-          athlete.shortName ||
-          competitor.displayName ||
-          competitor.name ||
-          "";
-
-        if (!fighterName) {
-          return;
-        }
-
-        const fighterId =
-          competitor.id ||
-          extractESPNAthleteIdFromUid_(
-            competitor.uid
-          );
-
-        const imageUrl =
-          getESPNMmaHeadshotIfExists_(
-            fighterId
-          );
-
-        if (imageUrl) {
-          foundImages++;
-        } else {
-          blankImages++;
-        }
-
-        const key =
-          sportsFighterImageKey_(
-            league,
-            fighterName
-          );
-
-        const existing =
-          existingByKey[key];
-
-        if (existing) {
-
-          if (!existing.imageUrl && imageUrl) {
-
-            sh
-              .getRange(
-                existing.rowNumber,
-                col.imageUrl + 1
-              )
-              .setValue(
-                imageUrl
-              );
-
-            if (col.notes >= 0) {
-              sh
-                .getRange(
-                  existing.rowNumber,
-                  col.notes + 1
-                )
-                .setValue(
-                  "Auto-filled from ESPN fighter id: " +
-                  fighterId
-                );
-            }
-
-            if (col.updatedAt >= 0) {
-              sh
-                .getRange(
-                  existing.rowNumber,
-                  col.updatedAt + 1
-                )
-                .setValue(
-                  now
-                );
-            }
-
-            updated++;
-
-          }
-
-          return;
-
-        }
-
-        rowsToAppend.push([
-          league,
-          fighterName,
-          imageUrl,
-          true,
-          fighterId
-            ? "Auto-added from UFC scoreboard. ESPN fighter id: " + fighterId
-            : "Auto-added from UFC scoreboard. No fighter id found.",
-          now
-        ]);
-
-        existingByKey[key] = {
-          rowNumber: -1,
-          imageUrl: imageUrl
-        };
-
-        added++;
-
-      });
-
-    });
-
-  });
-
-  if (rowsToAppend.length) {
-
-    sh
-      .getRange(
-        sh.getLastRow() + 1,
-        1,
-        rowsToAppend.length,
-        SPORTS_FIGHTER_IMAGES_HEADERS.length
-      )
-      .setValues(
-        rowsToAppend
-      );
-
-  }
-
-  return {
-    success: true,
-    eventsFound: events.length,
-    fightersAdded: added,
-    fightersUpdated: updated,
-    imagesFound: foundImages,
-    imagesBlank: blankImages,
-    sheet: SPORTS_FIGHTER_IMAGES_SHEET
-  };
-
-}
-
-function populateSportsFighterImagesFromSportsScores() {
-
-  setupSportsFighterImagesSheet();
-
-  const ss =
-    SpreadsheetApp.getActive();
-
-  const scoresSheet =
-    ss.getSheetByName("SportsScores");
-
-  if (!scoresSheet || scoresSheet.getLastRow() < 2) {
-    return {
-      success: false,
-      message: "No SportsScores rows found"
-    };
-  }
-
-  const fighterSheet =
-    ss.getSheetByName(
-      SPORTS_FIGHTER_IMAGES_SHEET
-    );
-
-  const fighterValues =
-    fighterSheet.getDataRange().getValues();
-
-  const fighterHeaders =
-    fighterValues[0].map(function(value) {
-      return String(value || "").trim();
-    });
-
-  const fighterCol = {
-    league:
-      fighterHeaders.indexOf("League"),
-    fighterName:
-      fighterHeaders.indexOf("FighterName")
-  };
-
-  const existing = {};
-
-  for (let i = 1; i < fighterValues.length; i++) {
-
-    const row =
-      fighterValues[i];
-
-    const league =
-      fighterCol.league >= 0
-        ? row[fighterCol.league]
-        : "";
-
-    const fighterName =
-      fighterCol.fighterName >= 0
-        ? row[fighterCol.fighterName]
-        : "";
-
-    if (!league || !fighterName) {
-      continue;
-    }
-
-    existing[
-      sportsFighterImageKey_(
-        league,
-        fighterName
-      )
-    ] = true;
-
-  }
-
-  const scoreValues =
-    scoresSheet.getDataRange().getValues();
-
-  const scoreHeaders =
-    scoreValues[0].map(function(value) {
-      return String(value || "").trim();
-    });
-
-  const scoreCol = {
-    sport:
-      scoreHeaders.indexOf("Sport"),
-    league:
-      scoreHeaders.indexOf("League"),
-    homeTeam:
-      scoreHeaders.indexOf("HomeTeam"),
-    awayTeam:
-      scoreHeaders.indexOf("AwayTeam"),
-    homeLogo:
-      scoreHeaders.indexOf("HomeLogo"),
-    awayLogo:
-      scoreHeaders.indexOf("AwayLogo")
-  };
-
-  const now =
-    new Date();
-
-  const rowsToAppend = [];
-
-  for (let r = 1; r < scoreValues.length; r++) {
-
-    const row =
-      scoreValues[r];
-
-    const sport =
-      scoreCol.sport >= 0
-        ? String(row[scoreCol.sport] || "").trim().toLowerCase()
-        : "";
-
-    const league =
-      scoreCol.league >= 0
-        ? String(row[scoreCol.league] || "").trim().toLowerCase()
-        : "";
-
-    const isMma =
-      sport === "mma" ||
-      league === "ufc";
-
-    if (!isMma) {
-      continue;
-    }
-
-    const fighters = [
-      {
-        name:
-          scoreCol.homeTeam >= 0
-            ? row[scoreCol.homeTeam]
-            : "",
-        image:
-          scoreCol.homeLogo >= 0
-            ? row[scoreCol.homeLogo]
-            : ""
-      },
-      {
-        name:
-          scoreCol.awayTeam >= 0
-            ? row[scoreCol.awayTeam]
-            : "",
-        image:
-          scoreCol.awayLogo >= 0
-            ? row[scoreCol.awayLogo]
-            : ""
-      }
-    ];
-
-    fighters.forEach(function(fighter) {
-
-      const fighterName =
-        String(fighter.name || "").trim();
-
-      if (!fighterName) {
-        return;
-      }
-
-      const key =
-        sportsFighterImageKey_(
-          "ufc",
-          fighterName
-        );
-
-      if (existing[key]) {
-        return;
-      }
-
-      rowsToAppend.push([
-        "ufc",
-        fighterName,
-        String(fighter.image || "").trim(),
-        true,
-        "Auto-added from SportsScores",
-        now
-      ]);
-
-      existing[key] =
-        true;
-
-    });
-
-  }
-
-  if (rowsToAppend.length) {
-
-    fighterSheet
-      .getRange(
-        fighterSheet.getLastRow() + 1,
-        1,
-        rowsToAppend.length,
-        SPORTS_FIGHTER_IMAGES_HEADERS.length
-      )
-      .setValues(
-        rowsToAppend
-      );
-
-  }
-
-  return {
-    success: true,
-    fightersAdded: rowsToAppend.length,
-    sheet: SPORTS_FIGHTER_IMAGES_SHEET
-  };
-
-}
-
-function backfillUfcLogosInSportsScoresFromFighterImages() {
-
-  setupSportsFighterImagesSheet();
-
-  ensureSportsScoresLogoDateColumns_();
-
-  const ss =
-    SpreadsheetApp.getActive();
-
-  const scoresSheet =
-    ss.getSheetByName(
-      SPORTS_SHEETS.SCORES
-    );
-
-  if (!scoresSheet || scoresSheet.getLastRow() < 2) {
-    return {
-      success: false,
-      message: "No SportsScores rows found"
-    };
-  }
-
-  const data =
-    scoresSheet.getDataRange().getValues();
-
-  const headers =
-    data[0].map(function(header) {
-      return String(header || "").trim();
-    });
-
-  const col =
-    getSportsHeaderMap_(
-      headers
-    );
-
-  const required = [
-    "Sport",
-    "League",
-    "HomeTeam",
-    "AwayTeam",
-    "HomeLogo",
-    "AwayLogo"
-  ];
-
-  const missing =
-    required.filter(function(header) {
-      return col[header] === undefined;
-    });
-
-  if (missing.length) {
-    throw new Error(
-      "SportsScores missing required columns: " +
-      missing.join(", ")
-    );
-  }
-
-  const fighterImageMap =
-    getSportsFighterImageMap_();
-
-  function findImage(league, fighterName) {
-
-    league =
-      String(league || "")
-        .trim()
-        .toLowerCase();
-
-    fighterName =
-      String(fighterName || "")
-        .trim();
-
-    if (!fighterName) {
-      return "";
-    }
-
-    return (
-      fighterImageMap[
-        sportsFighterImageKey_(
-          league,
-          fighterName
-        )
-      ] ||
-      fighterImageMap[
-        sportsFighterImageKey_(
-          "ufc",
-          fighterName
-        )
-      ] ||
-      fighterImageMap[
-        sportsFighterImageKey_(
-          "mma",
-          fighterName
-        )
-      ] ||
-      ""
-    );
-
-  }
-
-  let updatedHome = 0;
-  let updatedAway = 0;
-  let rowsChecked = 0;
-
-  for (let i = 1; i < data.length; i++) {
-
-    const row =
-      data[i];
-
-    const sport =
-      String(row[col.Sport] || "")
-        .trim()
-        .toLowerCase();
-
-    const league =
-      String(row[col.League] || "")
-        .trim()
-        .toLowerCase();
-
-    const isUfc =
-      sport === "mma" ||
-      league === "ufc";
-
-    if (!isUfc) {
-      continue;
-    }
-
-    rowsChecked++;
-
-    const homeTeam =
-      String(row[col.HomeTeam] || "")
-        .trim();
-
-    const awayTeam =
-      String(row[col.AwayTeam] || "")
-        .trim();
-
-    const homeImage =
-      findImage(
-        league,
-        homeTeam
-      );
-
-    const awayImage =
-      findImage(
-        league,
-        awayTeam
-      );
-
-    if (
-      homeImage &&
-      String(row[col.HomeLogo] || "").trim() !== homeImage
-    ) {
-      scoresSheet
-        .getRange(
-          i + 1,
-          col.HomeLogo + 1
-        )
-        .setValue(
-          homeImage
-        );
-
-      updatedHome++;
-    }
-
-    if (
-      awayImage &&
-      String(row[col.AwayLogo] || "").trim() !== awayImage
-    ) {
-      scoresSheet
-        .getRange(
-          i + 1,
-          col.AwayLogo + 1
-        )
-        .setValue(
-          awayImage
-        );
-
-      updatedAway++;
-    }
-
-  }
-
-  SpreadsheetApp.flush();
-
-  return {
-    success: true,
-    rowsChecked: rowsChecked,
-    updatedHome: updatedHome,
-    updatedAway: updatedAway
-  };
-
-}
-
-function syncUfcFighterImagesBeforeScoreUpdate_() {
-
-  try {
-
-    const result =
-      populateSportsFighterImagesFromUfcScoreboard();
-
-    Logger.log(
-      "UFC fighter image sync: " +
-      JSON.stringify(result)
-    );
-
-    return result;
-
-  } catch (err) {
-
-    Logger.log(
-      "UFC fighter image sync failed: " +
-      err.message
-    );
-
-    return {
-      success: false,
-      error: err.message
-    };
-
-  }
-
-}
-
-function extractESPNAthleteIdFromUid_(uid) {
-
-  uid =
-    String(uid || "").trim();
-
-  if (!uid) {
-    return "";
-  }
-
-  const match =
-    uid.match(/a:(\d+)/);
-
-  return match
-    ? match[1]
-    : "";
-
-}
-
-function buildESPNMmaHeadshotUrl_(fighterId) {
-
-  fighterId =
-    String(fighterId || "").trim();
-
-  if (!fighterId) {
-    return "";
-  }
-
-  return (
-    "https://a.espncdn.com/i/headshots/mma/players/full/" +
-    fighterId +
-    ".png"
-  );
-
-}
-
-function getESPNMmaHeadshotIfExists_(fighterId) {
-
-  const url =
-    buildESPNMmaHeadshotUrl_(
-      fighterId
-    );
-
-  if (!url) {
-    return "";
-  }
-
-  try {
-
-    const response =
-      UrlFetchApp.fetch(url, {
-        method: "get",
-        muteHttpExceptions: true,
-        followRedirects: true
-      });
-
-    const code =
-      response.getResponseCode();
-
-    if (code >= 200 && code < 300) {
-      return url;
-    }
-
-  } catch (err) {
-    return "";
-  }
-
-  return "";
-
-}
-
-function sportsFighterImageKey_(league, fighterName) {
-
-  return (
-    String(league || "")
-      .trim()
-      .toLowerCase() +
-    "|" +
-    String(fighterName || "")
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-  );
-
-}
-
-function getSportsFighterImageMap_() {
-
-  const ss =
-    SpreadsheetApp.getActive();
-
-  const sh =
-    ss.getSheetByName(
-      SPORTS_FIGHTER_IMAGES_SHEET
-    );
-
-  if (!sh || sh.getLastRow() < 2) {
-    return {};
-  }
-
-  const data =
-    sh.getDataRange().getValues();
-
-  const headers =
-    data[0].map(function(value) {
-      return String(value || "").trim();
-    });
-
-  const col = {
-    league:
-      headers.indexOf("League"),
-    fighterName:
-      headers.indexOf("FighterName"),
-    imageUrl:
-      headers.indexOf("ImageUrl"),
-    active:
-      headers.indexOf("Active")
-  };
-
-  const map = {};
-
-  for (let i = 1; i < data.length; i++) {
-
-    const row =
-      data[i];
-
-    const league =
-      col.league >= 0
-        ? row[col.league]
-        : "";
-
-    const fighterName =
-      col.fighterName >= 0
-        ? row[col.fighterName]
-        : "";
-
-    const imageUrl =
-      col.imageUrl >= 0
-        ? String(row[col.imageUrl] || "").trim()
-        : "";
-
-    const activeValue =
-      col.active >= 0
-        ? String(row[col.active] || "").trim().toLowerCase()
-        : "true";
-
-    const active =
-      activeValue === "" ||
-      activeValue === "true" ||
-      activeValue === "yes" ||
-      activeValue === "1";
-
-    if (!league || !fighterName || !imageUrl || !active) {
-      continue;
-    }
-
-    map[
-      sportsFighterImageKey_(
-        league,
-        fighterName
-      )
-    ] = imageUrl;
-
-  }
-
-  return map;
-
-}
-
-function getSportsFighterImage_(league, fighterName) {
-
-  const map =
-    getSportsFighterImageMap_();
-
-  return (
-    map[
-      sportsFighterImageKey_(
-        league,
-        fighterName
-      )
-    ] || ""
-  );
-
-}
-
-function getESPNImageUrlFromValue_(value) {
-
-  if (!value) {
-    return "";
-  }
-
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (value.href) {
-    return value.href;
-  }
-
-  if (value.url) {
-    return value.url;
-  }
-
-  if (value.src) {
-    return value.src;
-  }
-
-  return "";
-
-}
-
-function getESPNCombatAthleteImage_(competitor) {
-
-  competitor =
-    competitor || {};
-
-  const athlete =
-    competitor.athlete ||
-    competitor.team ||
-    {};
-
-  const candidates = [
-    athlete.headshot,
-    athlete.image,
-    athlete.logo,
-    competitor.headshot,
-    competitor.image,
-    competitor.logo
-  ];
-
-  for (let i = 0; i < candidates.length; i++) {
-
-    const found =
-      getESPNImageUrlFromValue_(
-        candidates[i]
-      );
-
-    if (found) {
-      return found;
-    }
-
-  }
-
-  const arrays = [
-    athlete.headshots,
-    athlete.images,
-    athlete.logos,
-    competitor.headshots,
-    competitor.images,
-    competitor.logos
-  ];
-
-  for (let a = 0; a < arrays.length; a++) {
-
-    const list =
-      Array.isArray(arrays[a])
-        ? arrays[a]
-        : [];
-
-    for (let j = 0; j < list.length; j++) {
-
-      const found =
-        getESPNImageUrlFromValue_(
-          list[j]
-        );
-
-      if (found) {
-        return found;
-      }
-
-    }
-
-  }
-
-  return "";
-
-}
-
 /************************************
  STEP 11C
  MULTI-DAY SCOREBOARD UPDATE
@@ -3635,146 +2580,10 @@ function runSportsScoresWindowUpdate() {
   );
 }
 
-const SPORTS_WINDOW_TRIGGER_FUNCTION =
-  "runSportsScoresWindowAutomation";
-
-function runSportsScoresWindowAutomation() {
-
-  return runSportsScoresDateWindowUpdate_(
-    1,
-    2
-  );
-
-}
-
-function installSportsScoresWindowTrigger() {
-
-  removeSportsScoresWindowTriggers();
-
-  ScriptApp
-    .newTrigger(
-      SPORTS_WINDOW_TRIGGER_FUNCTION
-    )
-    .timeBased()
-    .everyMinutes(30)
-    .create();
-
-  logSports_(
-    "INFO",
-    "installSportsScoresWindowTrigger",
-    "Installed sports score window trigger",
-    JSON.stringify({
-      functionName: SPORTS_WINDOW_TRIGGER_FUNCTION,
-      everyMinutes: 30,
-      daysBack: 1,
-      daysForward: 2
-    })
-  );
-
-  return {
-    success: true,
-    message: "Sports score window trigger installed for every 30 minutes",
-    functionName: SPORTS_WINDOW_TRIGGER_FUNCTION,
-    everyMinutes: 30,
-    daysBack: 1,
-    daysForward: 2
-  };
-
-}
-
-function removeSportsScoresWindowTriggers() {
-
-  const triggers =
-    ScriptApp.getProjectTriggers();
-
-  let removed = 0;
-
-  triggers.forEach(function(trigger) {
-
-    if (
-      trigger.getHandlerFunction() ===
-      SPORTS_WINDOW_TRIGGER_FUNCTION
-    ) {
-      ScriptApp.deleteTrigger(
-        trigger
-      );
-      removed++;
-    }
-
-  });
-
-  logSports_(
-    "INFO",
-    "removeSportsScoresWindowTriggers",
-    "Removed sports score window triggers",
-    JSON.stringify({
-      removed: removed
-    })
-  );
-
-  return {
-    success: true,
-    removed: removed
-  };
-
-}
-
-function checkSportsScoresWindowTriggers() {
-
-  const triggers =
-    ScriptApp.getProjectTriggers();
-
-  return triggers
-    .filter(function(trigger) {
-      return (
-        trigger.getHandlerFunction() ===
-        SPORTS_WINDOW_TRIGGER_FUNCTION
-      );
-    })
-    .map(function(trigger) {
-      return {
-        handler: trigger.getHandlerFunction(),
-        eventType: String(trigger.getEventType()),
-        source: String(trigger.getTriggerSource())
-      };
-    });
-
-}
-
-
-function parseSportsScoresLeagueFilter_(value) {
-
-  if (value === null || value === undefined || value === "") {
-    return [];
-  }
-
-  if (Array.isArray(value)) {
-    return value
-      .map(function(item) {
-        return String(item || "").trim();
-      })
-      .filter(function(item) {
-        return !!item;
-      });
-  }
-
-  return String(value || "")
-    .split(/[|,]/)
-    .map(function(item) {
-      return String(item || "").trim();
-    })
-    .filter(function(item) {
-      return !!item;
-    });
-
-}
-
 function runSportsScoresDateWindowUpdate_(
   daysBack,
-  daysForward,
-  options
+  daysForward
 ) {
-  options = options || {};
   const lock =
     LockService.getScriptLock();
 
@@ -3801,27 +2610,8 @@ function runSportsScoresDateWindowUpdate_(
   };
 
   try {
-    let settings =
+    const settings =
       readEnabledSportsSettings_();
-
-    const requestedLeagues =
-      parseSportsScoresLeagueFilter_(
-        options.leagues || options.league
-      );
-
-    if (requestedLeagues.length) {
-      const allowed = {};
-
-      requestedLeagues.forEach(function(league) {
-        allowed[String(league || "").trim().toLowerCase()] = true;
-      });
-
-      settings = settings.filter(function(setting) {
-        return allowed[String(setting.League || "").trim().toLowerCase()] === true;
-      });
-
-      summary.requestedLeagues = requestedLeagues;
-    }
 
     const previousScores =
       readLatestSportsScoresMap_();
@@ -4309,8 +3099,7 @@ function createSportsSeasonJobs2026() {
 function createSportsSeasonJobsForDateRange_(
   startDate,
   endDate,
-  batchDays,
-  options
+  batchDays
 ) {
   setupSportsSeasonJobsSheet();
 
@@ -4322,23 +3111,6 @@ function createSportsSeasonJobsForDateRange_(
 
   batchDays =
     Number(batchDays || 2);
-
-  options =
-    options || {};
-
-  const onlySport =
-    String(options.sport || "")
-      .trim()
-      .toLowerCase();
-
-  const onlyLeague =
-    String(options.league || "")
-      .trim()
-      .toLowerCase();
-
-  const requestedSeasonName =
-    String(options.seasonName || "")
-      .trim();
 
   if (!startDate || !endDate) {
     throw new Error(
@@ -4353,33 +3125,7 @@ function createSportsSeasonJobsForDateRange_(
   }
 
   const settings =
-    readEnabledSportsSettings_()
-      .filter(function(setting) {
-
-        if (onlySport && String(setting.Sport || "").toLowerCase() !== onlySport) {
-          return false;
-        }
-
-        if (onlyLeague && String(setting.League || "").toLowerCase() !== onlyLeague) {
-          return false;
-        }
-
-        return true;
-      });
-
-  if (!settings.length) {
-    return {
-      success: true,
-      startDate: startDate,
-      endDate: endDate,
-      batchDays: batchDays,
-      newJobs: 0,
-      enabledLeagues: 0,
-      message: onlyLeague
-        ? "League is off or no matching SportsSettings row was found: " + onlyLeague
-        : "No enabled leagues found for this date range."
-    };
-  }
+    readEnabledSportsSettings_();
 
   const sh =
     SpreadsheetApp
@@ -4454,8 +3200,7 @@ function createSportsSeasonJobsForDateRange_(
       Sport: setting.Sport,
       League: setting.League,
       SeasonName:
-        requestedSeasonName ||
-        (startDate + " to " + endDate),
+        startDate + " to " + endDate,
       StartDate: startDate,
       EndDate: endDate,
       NextDate: startDate,
@@ -5543,10 +4288,7 @@ function testApiGetSportsScoresFunctionExists() {
 function testSportsAdminDashboard() {
 
   return apiGetSportsAdminDashboard_({
-    adminKey:
-      PropertiesService
-        .getScriptProperties()
-        .getProperty("SPORTS_ADMIN_API_KEY")
+    adminKey: "2s11aj0jce77zb3kp904fwm304yw2a0b"
   });
 
 }
@@ -5557,9 +4299,36 @@ function testSportsAdminDashboard() {
  SportsRacingResults sheet for all-driver race data.
 ************************************/
 
-/* Removed racing-only constant SPORTS_RACING_RESULTS_SHEET during RacingScoreEngine split. */
+const SPORTS_RACING_RESULTS_SHEET =
+  "SportsRacingResults";
 
-/* Removed racing-only constant SPORTS_RACING_RESULTS_HEADERS during RacingScoreEngine split. */
+const SPORTS_RACING_RESULTS_HEADERS = [
+  "RaceResultId",
+  "Timestamp",
+  "GameId",
+  "ESPNEventId",
+  "Sport",
+  "League",
+  "RaceName",
+  "RaceDateTime",
+  "Status",
+  "State",
+  "Completed",
+  "DriverId",
+  "DriverName",
+  "Team",
+  "CarNumber",
+  "StartingPosition",
+  "FinalPosition",
+  "CurrentPosition",
+  "Laps",
+  "Points",
+  "StageWins",
+  "Winner",
+  "RawCompetitorJSON",
+  "LastUpdated"
+];
+
 
 /* Removed older duplicate function during v11 cleanup. */
 
@@ -5577,6 +4346,14 @@ function normalizeESPNEvent_(event, sport, league) {
     String(league || "")
       .trim()
       .toLowerCase();
+
+  if (sport === "racing") {
+    return normalizeESPNRacingEvent_(
+      event,
+      sport,
+      league
+    );
+  }
 
   if (
     sport === "mma" ||
@@ -5690,12 +4467,7 @@ function normalizeESPNCombatEvent_(event, sport, league) {
     Period:
       status.period || "",
     Clock:
-      normalizeSportsClockForDisplay_(
-        sport,
-        league,
-        statusType,
-        status
-      ),
+      status.displayClock || "",
     HomeTeam:
       firstName,
     AwayTeam:
@@ -5708,127 +4480,70 @@ function normalizeESPNCombatEvent_(event, sport, league) {
     GameDateTime:
       event.date || "",
     HomeLogo:
-      getSportsFighterImage_(
-        league,
-        firstName
-      ) ||
       getESPNEventLogo_(event),
-
-    AwayLogo:
-      getSportsFighterImage_(
-        league,
-        secondName
-      ) ||
-      getESPNEventLogo_(event)
-    };
+    AwayLogo: ""
+  };
 
 }
 
-function testUfcImageFields() {
+function sportsRacingString_(value) {
 
-  const url =
-    "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard";
-
-  const response =
-    UrlFetchApp.fetch(url, {
-      method: "get",
-      muteHttpExceptions: true
-    });
-
-  const code =
-    response.getResponseCode();
-
-  Logger.log("HTTP Code: " + code);
-
-  const text =
-    response.getContentText();
-
-  const data =
-    JSON.parse(text);
-
-  const events =
-    data.events || [];
-
-  Logger.log("Events found: " + events.length);
-
-  if (!events.length) {
-    Logger.log("No UFC events found in ESPN scoreboard response.");
-    return {
-      success: false,
-      message: "No UFC events found",
-      code: code
-    };
-  }
-
-  const output =
-    events.map(function(event) {
-
-      const competition =
-        event.competitions && event.competitions.length
-          ? event.competitions[0]
-          : {};
-
-      const competitors =
-        competition.competitors || [];
-
-      return {
-        eventId: event.id || "",
-        name: event.name || "",
-        shortName: event.shortName || "",
-        date: event.date || "",
-        competitors: competitors.map(function(c) {
-
-          const athlete =
-            c.athlete || {};
-
-          return {
-            displayName:
-              athlete.displayName ||
-              athlete.fullName ||
-              athlete.shortName ||
-              c.displayName ||
-              c.name ||
-              "",
-            competitorKeys:
-              Object.keys(c),
-            athleteKeys:
-              Object.keys(athlete),
-            athleteHeadshot:
-              athlete.headshot || "",
-            athleteHeadshots:
-              athlete.headshots || "",
-            athleteImage:
-              athlete.image || "",
-            athleteImages:
-              athlete.images || "",
-            athleteLogo:
-              athlete.logo || "",
-            athleteLogos:
-              athlete.logos || "",
-            competitorHeadshot:
-              c.headshot || "",
-            competitorImage:
-              c.image || "",
-            competitorLogo:
-              c.logo || ""
-          };
-
-        })
-      };
-
-    });
-
-  Logger.log(
-    JSON.stringify(
-      output,
-      null,
-      2
-    )
-  );
-
-  return output;
+  return String(value || "")
+    .trim();
 
 }
+
+function sportsRacingDriverId_(competitor) {
+
+  competitor =
+    competitor || {};
+
+  const athlete =
+    competitor.athlete || {};
+
+  const raw =
+    athlete.id ||
+    competitor.id ||
+    getESPNCompetitorDisplayName_(
+      competitor
+    );
+
+  return sportsRacingString_(raw)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+}
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
+
+
+/* Removed older duplicate function during v11 cleanup. */
 
 function fetchAndNormalizeESPNScoreboard_(sport, league) {
 
@@ -5858,6 +4573,36 @@ function fetchAndNormalizeESPNScoreboard_(sport, league) {
 
   const events =
     data.events || [];
+
+  if (
+    String(sport || "")
+      .trim()
+      .toLowerCase() === "racing"
+  ) {
+
+    const driverRows = [];
+
+    events.forEach(function(event) {
+      normalizeESPNRacingDriverRows_(
+        event,
+        String(sport || "")
+          .trim()
+          .toLowerCase(),
+        String(league || "")
+          .trim()
+          .toLowerCase()
+      ).forEach(function(row) {
+        driverRows.push(row);
+      });
+    });
+
+    if (driverRows.length) {
+      upsertSportsRacingResultRows_(
+        driverRows
+      );
+    }
+
+  }
 
   return events.map(function(event) {
     return normalizeESPNEvent_(
@@ -5909,6 +4654,32 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(
   const events =
     data.events || [];
 
+  if (
+    String(setting.Sport || "")
+      .trim()
+      .toLowerCase() === "racing"
+  ) {
+
+    const driverRows = [];
+
+    events.forEach(function(event) {
+      normalizeESPNRacingDriverRows_(
+        event,
+        setting.Sport,
+        setting.League
+      ).forEach(function(row) {
+        driverRows.push(row);
+      });
+    });
+
+    if (driverRows.length) {
+      upsertSportsRacingResultRows_(
+        driverRows
+      );
+    }
+
+  }
+
   return events.map(function(event) {
     return normalizeESPNEvent_(
       event,
@@ -5918,6 +4689,7 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(
   });
 
 }
+
 
 /* Removed older duplicate function during v11 cleanup. */
 
@@ -6000,6 +4772,46 @@ function addMmaAndMotorsportsSettings() {
       1440,
       true,
       "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
+    ],
+    [
+      "racing",
+      "f1",
+      true,
+      720,
+      5,
+      1440,
+      true,
+      "https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard"
+    ],
+    [
+      "racing",
+      "nascar-premier",
+      true,
+      720,
+      5,
+      1440,
+      true,
+      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-premier/scoreboard"
+    ],
+    [
+      "racing",
+      "nascar-xfinity",
+      true,
+      720,
+      5,
+      1440,
+      true,
+      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-xfinity/scoreboard"
+    ],
+    [
+      "racing",
+      "nascar-truck",
+      true,
+      720,
+      5,
+      1440,
+      true,
+      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-truck/scoreboard"
     ]
   ];
 
@@ -6060,7 +4872,7 @@ function addMmaAndMotorsportsSettings() {
     success: true,
     added: newRows.length,
     message:
-      "Soccer and MMA settings are present"
+      "MMA, F1, NASCAR Cup, Xfinity, and Truck settings are present"
   };
 
 }
@@ -6074,10 +4886,11 @@ function addExtraSportsSettings() {
     success: true,
     added: first.added,
     message:
-      "Extra sports settings checked. Soccer and MMA added where missing. Racing was split into RacingScoreEngine."
+      "Extra sports settings checked. MMA and motorsports added where missing."
   };
 
 }
+
 
 /************************************
  PATCH v4 - SAFE RACING SETUP OVERRIDES
@@ -6085,7 +4898,44 @@ function addExtraSportsSettings() {
  setup and retries transient spreadsheet timeouts.
 ************************************/
 
-/* Removed racing-only function sportsRacingSpreadsheetRetry_ during RacingScoreEngine split. */
+function sportsRacingSpreadsheetRetry_(label, fn) {
+
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= 4; attempt++) {
+
+    try {
+      return fn();
+    } catch (err) {
+
+      lastError = err;
+
+      const message =
+        err && err.message
+          ? err.message
+          : String(err);
+
+      const retryable =
+        message.indexOf("Service Spreadsheets timed out") !== -1 ||
+        message.indexOf("Service Spreadsheets failed") !== -1 ||
+        message.indexOf("Service Spreadsheets") !== -1;
+
+      if (!retryable || attempt === 4) {
+        throw err;
+      }
+
+      Utilities.sleep(
+        attempt * 1500
+      );
+
+    }
+
+  }
+
+  throw lastError;
+
+}
+
 
 /* Removed older duplicate function during v11 cleanup. */
 
@@ -6095,7 +4945,57 @@ function addExtraSportsSettings() {
 
 /* Removed older duplicate function during v11 cleanup. */
 
-/* Removed racing-only function setupSportsRacingSystem during RacingScoreEngine split. */
+function setupSportsRacingSystem() {
+
+  const resultsSetup =
+    setupSportsRacingResultsSystem();
+
+  let oddsSetup = null;
+  let oddsError = "";
+
+  if (typeof setupSportsRacingOddsSystem === "function") {
+
+    try {
+      oddsSetup =
+        setupSportsRacingOddsSystem();
+    } catch (err) {
+
+      oddsError =
+        err && err.message
+          ? err.message
+          : String(err);
+
+      if (typeof logSports_ === "function") {
+        logSports_(
+          "WARN",
+          "setupSportsRacingSystem",
+          "Racing results setup completed but racing odds setup failed",
+          oddsError
+        );
+      }
+
+    }
+
+  }
+
+  return {
+    success: true,
+    resultsSheet: SPORTS_RACING_RESULTS_SHEET,
+    oddsSheet:
+      typeof SPORTS_RACING_ODDS_SHEET !== "undefined"
+        ? SPORTS_RACING_ODDS_SHEET
+        : "SportsRacingOdds",
+    resultsSetup: resultsSetup,
+    oddsSetup: oddsSetup,
+    oddsError: oddsError,
+    message:
+      oddsError
+        ? "Racing results setup completed. Racing odds setup needs to be run by itself: setupSportsRacingOddsSystem."
+        : "Racing results and racing odds setup complete."
+  };
+
+}
+
 
 /* Removed older duplicate function during v11 cleanup. */
 
@@ -6115,16 +5015,1059 @@ function addExtraSportsSettings() {
  the v5 zip replacement file.
 ************************************/
 
-/* Removed racing-only constant SPORTS_RACING_HONEST_EXTRA_HEADERS during RacingScoreEngine split. */
+var SPORTS_RACING_HONEST_EXTRA_HEADERS = [
+  "StartingPositionSource",
+  "FinalPositionSource",
+  "CurrentPositionSource",
+  "WinnerSource",
+  "DataQualityNotes"
+];
 
-/* Removed racing-only functions during RacingScoreEngine split. */
+function sportsRacingHonestHeaders_() {
+
+  const fallbackHeaders = [
+    "RaceResultId",
+    "Timestamp",
+    "GameId",
+    "ESPNEventId",
+    "Sport",
+    "League",
+    "RaceName",
+    "RaceDateTime",
+    "Status",
+    "State",
+    "Completed",
+    "DriverId",
+    "DriverName",
+    "Team",
+    "CarNumber",
+    "StartingPosition",
+    "FinalPosition",
+    "CurrentPosition",
+    "Laps",
+    "Points",
+    "StageWins",
+    "Winner",
+    "RawCompetitorJSON",
+    "LastUpdated"
+  ];
+
+  const headers =
+    typeof SPORTS_RACING_RESULTS_HEADERS !== "undefined" &&
+    Array.isArray(SPORTS_RACING_RESULTS_HEADERS)
+      ? SPORTS_RACING_RESULTS_HEADERS.slice()
+      : fallbackHeaders.slice();
+
+  SPORTS_RACING_HONEST_EXTRA_HEADERS
+    .forEach(function(header) {
+      if (headers.indexOf(header) === -1) {
+        headers.push(header);
+      }
+    });
+
+  return headers;
+
+}
+
+function sportsRacingResultsGetSheet_() {
+
+  return sportsRacingEnsureHeaderSheetSafe_(
+    SPORTS_RACING_RESULTS_SHEET,
+    sportsRacingHonestHeaders_()
+  ).sheet;
+
+}
+
+function setupSportsRacingResultsSystem() {
+
+  const result =
+    sportsRacingEnsureHeaderSheetSafe_(
+      SPORTS_RACING_RESULTS_SHEET,
+      sportsRacingHonestHeaders_()
+    );
+
+  return {
+    success: true,
+    sheet: SPORTS_RACING_RESULTS_SHEET,
+    added: result.added || [],
+    message:
+      "Sports racing results sheet setup complete. Racing honest/source columns are present."
+  };
+
+}
+
+function sportsRacingHasValue_(value) {
+
+  return !(
+    value === "" ||
+    value === null ||
+    value === undefined
+  );
+
+}
+
+function sportsRacingMeta_(value, source) {
+
+  if (!sportsRacingHasValue_(value)) {
+    return {
+      value: "",
+      source: ""
+    };
+  }
+
+  return {
+    value: value,
+    source: source || ""
+  };
+
+}
+
+function sportsRacingNormalizeStatName_(value) {
+
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+}
+
+function sportsRacingFindDirectMeta_(
+  competitor,
+  keys,
+  sourcePrefix
+) {
+
+  competitor =
+    competitor || {};
+
+  keys =
+    keys || [];
+
+  for (let i = 0; i < keys.length; i++) {
+
+    const key =
+      keys[i];
+
+    if (
+      key &&
+      sportsRacingHasValue_(
+        competitor[key]
+      )
+    ) {
+      return sportsRacingMeta_(
+        competitor[key],
+        (sourcePrefix || "direct") + ":" + key
+      );
+    }
+
+  }
+
+  return sportsRacingMeta_("", "");
+
+}
+
+function sportsRacingFindNestedMeta_(
+  object,
+  keys,
+  sourcePrefix
+) {
+
+  object =
+    object || {};
+
+  keys =
+    keys || [];
+
+  for (let i = 0; i < keys.length; i++) {
+
+    const key =
+      keys[i];
+
+    if (
+      key &&
+      sportsRacingHasValue_(
+        object[key]
+      )
+    ) {
+      return sportsRacingMeta_(
+        object[key],
+        (sourcePrefix || "nested") + ":" + key
+      );
+    }
+
+  }
+
+  return sportsRacingMeta_("", "");
+
+}
+
+function sportsRacingFindStatMeta_(
+  competitor,
+  names
+) {
+
+  competitor =
+    competitor || {};
+
+  names =
+    names || [];
+
+  const wanted =
+    names.map(function(name) {
+      return sportsRacingNormalizeStatName_(
+        name
+      );
+    });
+
+  const statistics =
+    Array.isArray(competitor.statistics)
+      ? competitor.statistics
+      : [];
+
+  for (let i = 0; i < statistics.length; i++) {
+
+    const stat =
+      statistics[i] || {};
+
+    const possibleNames = [
+      stat.name,
+      stat.displayName,
+      stat.shortDisplayName,
+      stat.abbreviation,
+      stat.type
+    ];
+
+    for (let j = 0; j < possibleNames.length; j++) {
+
+      const normalized =
+        sportsRacingNormalizeStatName_(
+          possibleNames[j]
+        );
+
+      if (
+        normalized &&
+        wanted.indexOf(normalized) !== -1
+      ) {
+
+        const value =
+          sportsRacingHasValue_(stat.displayValue)
+            ? stat.displayValue
+            : sportsRacingHasValue_(stat.value)
+              ? stat.value
+              : sportsRacingHasValue_(stat.amount)
+                ? stat.amount
+                : "";
+
+        return sportsRacingMeta_(
+          value,
+          "stat:" + String(possibleNames[j] || "")
+        );
+
+      }
+
+    }
+
+  }
+
+  return sportsRacingMeta_("", "");
+
+}
+
+function getRacingCompetitorStat_(
+  competitor,
+  names
+) {
+
+  const direct =
+    sportsRacingFindDirectMeta_(
+      competitor,
+      names,
+      "direct"
+    );
+
+  if (sportsRacingHasValue_(direct.value)) {
+    return direct.value;
+  }
+
+  return sportsRacingFindStatMeta_(
+    competitor,
+    names
+  ).value;
+
+}
+
+function getRacingStartingPositionMeta_(competitor) {
+
+  /*
+    HONEST RULE:
+    Never use competitor.order as StartingPosition.
+    ESPN order is result/current ordering in the payload, not the grid.
+  */
+
+  const direct =
+    sportsRacingFindDirectMeta_(
+      competitor,
+      [
+        "startingPosition",
+        "startPosition",
+        "gridPosition",
+        "qualifyingPosition",
+        "startingGridPosition"
+      ],
+      "direct"
+    );
+
+  if (sportsRacingHasValue_(direct.value)) {
+    return direct;
+  }
+
+  return sportsRacingFindStatMeta_(
+    competitor,
+    [
+      "starting position",
+      "start position",
+      "start",
+      "grid position",
+      "grid",
+      "qualifying position",
+      "qualifying",
+      "starting grid"
+    ]
+  );
+
+}
+
+function getRacingStartingPosition_(competitor) {
+
+  return getRacingStartingPositionMeta_(
+    competitor
+  ).value;
+
+}
+
+function getRacingFinalPositionMeta_(competitor) {
+
+  const direct =
+    sportsRacingFindDirectMeta_(
+      competitor,
+      [
+        "finalPosition",
+        "finishPosition",
+        "finishingPosition",
+        "resultPosition",
+        "position",
+        "rank"
+      ],
+      "direct"
+    );
+
+  if (sportsRacingHasValue_(direct.value)) {
+    return direct;
+  }
+
+  const stat =
+    sportsRacingFindStatMeta_(
+      competitor,
+      [
+        "finish",
+        "finish position",
+        "finishing position",
+        "final position",
+        "position",
+        "rank",
+        "result"
+      ]
+    );
+
+  if (sportsRacingHasValue_(stat.value)) {
+    return stat;
+  }
+
+  if (
+    competitor &&
+    competitor.curatedRank &&
+    sportsRacingHasValue_(
+      competitor.curatedRank.current
+    )
+  ) {
+    return sportsRacingMeta_(
+      competitor.curatedRank.current,
+      "curatedRank.current"
+    );
+  }
+
+  if (
+    competitor &&
+    sportsRacingHasValue_(
+      competitor.order
+    )
+  ) {
+    return sportsRacingMeta_(
+      competitor.order,
+      "espn_competitor.order_result_order"
+    );
+  }
+
+  return sportsRacingMeta_("", "");
+
+}
+
+function getRacingFinalPosition_(competitor) {
+
+  return getRacingFinalPositionMeta_(
+    competitor
+  ).value;
+
+}
+
+function getRacingCurrentPositionMeta_(
+  competitor,
+  completed,
+  finalPositionMeta
+) {
+
+  if (
+    completed &&
+    finalPositionMeta &&
+    sportsRacingHasValue_(finalPositionMeta.value)
+  ) {
+    return sportsRacingMeta_(
+      finalPositionMeta.value,
+      "same_as_final_position"
+    );
+  }
+
+  const direct =
+    sportsRacingFindDirectMeta_(
+      competitor,
+      [
+        "currentPosition",
+        "runningPosition",
+        "livePosition",
+        "position",
+        "rank"
+      ],
+      "direct"
+    );
+
+  if (sportsRacingHasValue_(direct.value)) {
+    return direct;
+  }
+
+  if (
+    competitor &&
+    competitor.curatedRank &&
+    sportsRacingHasValue_(
+      competitor.curatedRank.current
+    )
+  ) {
+    return sportsRacingMeta_(
+      competitor.curatedRank.current,
+      "curatedRank.current"
+    );
+  }
+
+  if (
+    competitor &&
+    sportsRacingHasValue_(
+      competitor.order
+    )
+  ) {
+    return sportsRacingMeta_(
+      competitor.order,
+      "espn_competitor.order_current_order"
+    );
+  }
+
+  return sportsRacingMeta_("", "");
+
+}
+
+function getRacingWinnerMeta_(
+  competitor,
+  completed,
+  finalPositionMeta
+) {
+
+  if (!completed) {
+    return {
+      value: false,
+      source: "race_not_completed"
+    };
+  }
+
+  if (
+    competitor &&
+    competitor.winner === true
+  ) {
+    return {
+      value: true,
+      source: "competitor.winner"
+    };
+  }
+
+  if (
+    competitor &&
+    competitor.winner === false
+  ) {
+    return {
+      value: false,
+      source: "competitor.winner"
+    };
+  }
+
+  if (
+    finalPositionMeta &&
+    String(finalPositionMeta.value) === "1"
+  ) {
+    return {
+      value: true,
+      source: "inferred_from_final_position_1"
+    };
+  }
+
+  return {
+    value: false,
+    source: ""
+  };
+
+}
+
+function getRacingLaps_(competitor) {
+
+  return getRacingCompetitorStat_(
+    competitor,
+    [
+      "laps",
+      "lapsCompleted",
+      "completedLaps",
+      "laps completed"
+    ]
+  );
+
+}
+
+function getRacingPoints_(competitor) {
+
+  return getRacingCompetitorStat_(
+    competitor,
+    [
+      "points",
+      "pts",
+      "racePoints",
+      "race points"
+    ]
+  );
+
+}
+
+function getRacingStageWins_(competitor) {
+
+  return getRacingCompetitorStat_(
+    competitor,
+    [
+      "stageWins",
+      "stagesWon",
+      "stage_wins",
+      "stage wins",
+      "stages won"
+    ]
+  );
+
+}
+
+function getRacingDriverTeam_(competitor) {
+
+  competitor =
+    competitor || {};
+
+  const vehicle =
+    competitor.vehicle || {};
+
+  const team =
+    competitor.team || {};
+
+  const vehicleMeta =
+    sportsRacingFindNestedMeta_(
+      vehicle,
+      [
+        "team",
+        "teamName",
+        "manufacturer"
+      ],
+      "vehicle"
+    );
+
+  if (sportsRacingHasValue_(vehicleMeta.value)) {
+    return vehicleMeta.value;
+  }
+
+  return (
+    team.displayName ||
+    team.name ||
+    competitor.teamName ||
+    ""
+  );
+
+}
+
+function getRacingCarNumber_(competitor) {
+
+  competitor =
+    competitor || {};
+
+  const vehicle =
+    competitor.vehicle || {};
+
+  return (
+    vehicle.number ||
+    vehicle.vehicleNumber ||
+    competitor.vehicleNumber ||
+    competitor.carNumber ||
+    competitor.number ||
+    ""
+  );
+
+}
+
+function sportsRacingDataQualityNotes_(
+  competitor,
+  startingMeta,
+  finalMeta,
+  currentMeta,
+  winnerMeta,
+  stageWins
+) {
+
+  const notes = [];
+
+  const statistics =
+    Array.isArray(
+      competitor && competitor.statistics
+    )
+      ? competitor.statistics
+      : [];
+
+  if (!statistics.length) {
+    notes.push(
+      "ESPN statistics array empty"
+    );
+  }
+
+  if (!sportsRacingHasValue_(startingMeta.value)) {
+    notes.push(
+      "StartingPosition not provided by ESPN; order was not used as start"
+    );
+  }
+
+  if (!sportsRacingHasValue_(stageWins)) {
+    notes.push(
+      "StageWins not provided by ESPN"
+    );
+  }
+
+  if (
+    finalMeta.source ===
+    "espn_competitor.order_result_order"
+  ) {
+    notes.push(
+      "FinalPosition uses ESPN competitor.order/result order"
+    );
+  }
+
+  if (
+    currentMeta.source ===
+    "espn_competitor.order_current_order"
+  ) {
+    notes.push(
+      "CurrentPosition uses ESPN competitor.order/current order"
+    );
+  }
+
+  if (
+    winnerMeta.source ===
+    "inferred_from_final_position_1"
+  ) {
+    notes.push(
+      "Winner inferred from FinalPosition = 1 because ESPN winner flag was missing"
+    );
+  }
+
+  return notes.join(" | ");
+
+}
+
+function normalizeESPNRacingDriverRows_(
+  event,
+  sport,
+  league
+) {
+
+  const competition =
+    getPrimaryRacingCompetition_(
+      event
+    );
+
+  const status =
+    competition.status ||
+    event.status ||
+    {};
+
+  const statusType =
+    status.type ||
+    {};
+
+  const competitors =
+    competition.competitors || [];
+
+  const completed =
+    statusType.completed === true;
+
+  const raceName =
+    event.name ||
+    event.shortName ||
+    "";
+
+  return competitors
+    .map(function(competitor) {
+
+      const driverName =
+        getESPNCompetitorDisplayName_(
+          competitor
+        );
+
+      if (!driverName) {
+        return null;
+      }
+
+      const driverId =
+        sportsRacingDriverId_(
+          competitor
+        );
+
+      const startingMeta =
+        getRacingStartingPositionMeta_(
+          competitor
+        );
+
+      const finalMeta =
+        getRacingFinalPositionMeta_(
+          competitor
+        );
+
+      const currentMeta =
+        getRacingCurrentPositionMeta_(
+          competitor,
+          completed,
+          finalMeta
+        );
+
+      const winnerMeta =
+        getRacingWinnerMeta_(
+          competitor,
+          completed,
+          finalMeta
+        );
+
+      const stageWins =
+        getRacingStageWins_(
+          competitor
+        );
+
+      return {
+        RaceResultId:
+          [
+            league,
+            String(event.id || ""),
+            driverId
+          ].join("|"),
+        Timestamp:
+          new Date(),
+        GameId:
+          league + "_" + String(event.id || ""),
+        ESPNEventId:
+          String(event.id || ""),
+        Sport:
+          sport,
+        League:
+          league,
+        RaceName:
+          raceName,
+        RaceDateTime:
+          event.date || "",
+        Status:
+          statusType.name ||
+          statusType.description ||
+          "",
+        State:
+          statusType.state ||
+          "",
+        Completed:
+          completed,
+        DriverId:
+          driverId,
+        DriverName:
+          driverName,
+        Team:
+          getRacingDriverTeam_(
+            competitor
+          ),
+        CarNumber:
+          getRacingCarNumber_(
+            competitor
+          ),
+        StartingPosition:
+          startingMeta.value,
+        FinalPosition:
+          completed
+            ? finalMeta.value
+            : "",
+        CurrentPosition:
+          currentMeta.value,
+        Laps:
+          getRacingLaps_(
+            competitor
+          ),
+        Points:
+          getRacingPoints_(
+            competitor
+          ),
+        StageWins:
+          stageWins,
+        Winner:
+          completed
+            ? winnerMeta.value
+            : false,
+        RawCompetitorJSON:
+          JSON.stringify(
+            competitor || {}
+          ),
+        LastUpdated:
+          new Date(),
+        StartingPositionSource:
+          startingMeta.source,
+        FinalPositionSource:
+          completed
+            ? finalMeta.source
+            : "",
+        CurrentPositionSource:
+          currentMeta.source,
+        WinnerSource:
+          winnerMeta.source,
+        DataQualityNotes:
+          sportsRacingDataQualityNotes_(
+            competitor,
+            startingMeta,
+            finalMeta,
+            currentMeta,
+            winnerMeta,
+            stageWins
+          )
+      };
+
+    })
+    .filter(Boolean);
+
+}
+
+function upsertSportsRacingResultRows_(rows) {
+
+  setupSportsRacingResultsSystem();
+
+  rows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  if (!rows.length) {
+    return {
+      inserted: 0,
+      updated: 0
+    };
+  }
+
+  const sh =
+    sportsRacingResultsGetSheet_();
+
+  const data =
+    sportsRacingSpreadsheetRetry_(
+      "read SportsRacingResults",
+      function() {
+        return sh.getDataRange().getValues();
+      }
+    );
+
+  const headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  const col =
+    getSportsHeaderMap_(headers);
+
+  const existing = {};
+
+  for (let i = 1; i < data.length; i++) {
+
+    const id =
+      String(data[i][col.RaceResultId] || "")
+        .trim();
+
+    if (id) {
+      existing[id] = i + 1;
+    }
+
+  }
+
+  let inserted = 0;
+  let updated = 0;
+  const rowsToAppend = [];
+
+  rows.forEach(function(item) {
+
+    const row =
+      headers.map(function(header) {
+        return item[header] !== undefined
+          ? item[header]
+          : "";
+      });
+
+    if (existing[item.RaceResultId]) {
+
+      sportsRacingSpreadsheetRetry_(
+        "update racing result row",
+        function() {
+          sh
+            .getRange(
+              existing[item.RaceResultId],
+              1,
+              1,
+              headers.length
+            )
+            .setValues([
+              row
+            ]);
+        }
+      );
+
+      updated++;
+
+    } else {
+      rowsToAppend.push(row);
+      inserted++;
+    }
+
+  });
+
+  if (rowsToAppend.length) {
+    sportsRacingSpreadsheetRetry_(
+      "append racing result rows",
+      function() {
+        sh
+          .getRange(
+            sh.getLastRow() + 1,
+            1,
+            rowsToAppend.length,
+            headers.length
+          )
+          .setValues(
+            rowsToAppend
+          );
+      }
+    );
+  }
+
+  SpreadsheetApp.flush();
+
+  return {
+    inserted: inserted,
+    updated: updated
+  };
+
+}
+
+function readSportsRacingResultRows_() {
+
+  setupSportsRacingResultsSystem();
+
+  const sh =
+    sportsRacingResultsGetSheet_();
+
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  if (data.length <= 1) {
+    return [];
+  }
+
+  const headers =
+    data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+  return data
+    .slice(1)
+    .map(function(row) {
+      return sportsRowToObject_(
+        headers,
+        row
+      );
+    })
+    .filter(function(row) {
+      return !!row.RaceResultId;
+    });
+
+}
+
+function sportsRacingSortPosition_(row) {
+
+  const current =
+    Number(row.CurrentPosition || "");
+
+  if (
+    !isNaN(current) &&
+    isFinite(current) &&
+    current > 0
+  ) {
+    return current;
+  }
+
+  const finalPosition =
+    Number(row.FinalPosition || "");
+
+  if (
+    !isNaN(finalPosition) &&
+    isFinite(finalPosition) &&
+    finalPosition > 0
+  ) {
+    return finalPosition;
+  }
+
+  return 9999;
+
+}
+
 
 /* Removed older duplicate function during v11 cleanup. */
 
 
 /* Removed older duplicate function during v11 cleanup. */
 
-/* Removed racing-only function testRacingHonestNascarPremierRows during RacingScoreEngine split. */
+function testRacingHonestNascarPremierRows() {
+
+  const result =
+    apiGetSportsRacingResults_({
+      league: "nascar-premier"
+    });
+
+  Logger.log(
+    JSON.stringify(result, null, 2)
+  );
+
+  return result;
+
+}
 
 /************************************
  PATCH v6 - RACING LOCK FIX
@@ -6141,188 +6084,598 @@ function addExtraSportsSettings() {
  - It is safe to paste at the very bottom of SportsScoresEngine.gs.
 ************************************/
 
-/* Removed racing-only functions during RacingScoreEngine split. */
+function sportsRacingEnsureHeaderSheetSafe_(
+  sheetName,
+  requiredHeaders
+) {
 
+  return sportsRacingSpreadsheetRetry_(
+    "setup " + sheetName,
+    function() {
 
-/* =====================================================
-   STAGE 1 - SCORE DISPLAY NORMALIZATION
-   Prevents bad date/time values from being saved as records,
-   and keeps clock labels sport-friendly.
-===================================================== */
+      const ss =
+        SpreadsheetApp.getActive();
 
-function normalizeSportsScoreRowForStorage_(game) {
+      let sh =
+        ss.getSheetByName(
+          sheetName
+        );
 
-  game = game || {};
+      if (!sh) {
+        sh =
+          ss.insertSheet(
+            sheetName
+          );
 
-  game.HomeRecord =
-    cleanSportsRecordValue_(
-      game.HomeRecord
-    );
+        SpreadsheetApp.flush();
+      }
 
-  game.AwayRecord =
-    cleanSportsRecordValue_(
-      game.AwayRecord
-    );
+      const lastRow =
+        sh.getLastRow();
 
-  game.Clock =
-    normalizeSportsClockValue_(
-      game.Sport,
-      game.League,
-      game.Status,
-      game.State,
-      game.Period,
-      game.Clock
-    );
+      const lastColumn =
+        sh.getLastColumn();
 
-  return game;
+      let existingHeaders = [];
 
-}
+      if (lastRow >= 1 && lastColumn >= 1) {
+        existingHeaders =
+          sh
+            .getRange(
+              1,
+              1,
+              1,
+              lastColumn
+            )
+            .getValues()[0]
+            .map(function(header) {
+              return String(header || "").trim();
+            });
+      }
 
-function normalizeSportsClockForDisplay_(sport, league, statusType, status) {
+      const hasAnyHeader =
+        existingHeaders.some(function(header) {
+          return !!header;
+        });
 
-  statusType = statusType || {};
-  status = status || {};
+      if (!hasAnyHeader) {
 
-  return normalizeSportsClockValue_(
-    sport,
-    league,
-    statusType.name || statusType.description || "",
-    statusType.state || "",
-    status.period || "",
-    status.displayClock || status.detail || status.shortDetail || ""
+        sh
+          .getRange(
+            1,
+            1,
+            1,
+            requiredHeaders.length
+          )
+          .setValues([
+            requiredHeaders
+          ]);
+
+        try {
+          sh.setFrozenRows(1);
+        } catch (freezeErr) {
+          // Non-critical. Avoid failing setup over formatting.
+        }
+
+        SpreadsheetApp.flush();
+
+        return {
+          sheet: sh,
+          added: requiredHeaders.slice()
+        };
+
+      }
+
+      const missing =
+        requiredHeaders.filter(function(header) {
+          return existingHeaders.indexOf(header) === -1;
+        });
+
+      if (missing.length) {
+        sh
+          .getRange(
+            1,
+            sh.getLastColumn() + 1,
+            1,
+            missing.length
+          )
+          .setValues([
+            missing
+          ]);
+
+        SpreadsheetApp.flush();
+      }
+
+      try {
+        sh.setFrozenRows(1);
+      } catch (freezeErr2) {
+        // Non-critical. Avoid failing setup over formatting.
+      }
+
+      return {
+        sheet: sh,
+        added: missing
+      };
+
+    }
   );
 
 }
 
-function normalizeSportsClockValue_(sport, league, status, state, period, clock) {
+function repairSportsRacingHonestColumns() {
 
-  sport = String(sport || "").toLowerCase();
-  league = String(league || "").toLowerCase();
-  status = String(status || "").toUpperCase();
-  state = String(state || "").toLowerCase();
-  clock = String(clock || "").trim();
+  const setup =
+    setupSportsRacingResultsSystem();
 
-  if (state === "pre") {
-    return "Pregame";
-  }
-
-  if (
-    state === "post" ||
-    /FINAL|FULL_TIME|STATUS_FULL_TIME/.test(status)
-  ) {
-    if (sport === "soccer" || league.indexOf("fifa") !== -1) {
-      return "FT";
-    }
-    return "Final";
-  }
-
-  if (sport === "baseball") {
-    if (/top/i.test(clock)) {
-      return clock.replace(/top/i, "Top");
-    }
-    if (/bot|bottom/i.test(clock)) {
-      return clock.replace(/bot/i, "Bottom").replace(/bottom/i, "Bottom");
-    }
-    if (/^\d+$/.test(String(period || ""))) {
-      return "Inning " + period;
-    }
-    return clock || "Live";
-  }
-
-  if (sport === "soccer" || league.indexOf("fifa") !== -1) {
-    if (/half/i.test(clock)) {
-      return "HT";
-    }
-    if (/^\d+(:\d+)?$/.test(clock)) {
-      return clock;
-    }
-    return clock || "Live";
-  }
-
-  if (!clock || /^0:?00$/.test(clock)) {
-    return state === "in" ? "Live" : clock;
-  }
-
-  return clock;
+  return {
+    success: true,
+    setup: setup,
+    message:
+      "Racing honest columns are installed. The nested lock was removed in patch v6. Run runSportsScoresUpdate or runSportsScoresWindowUpdate to refresh rows."
+  };
 
 }
 
-function apiRepairSportsScoreDisplayAdmin_(params) {
+/************************************************************
+ SPORTS SCORES ENGINE v12
+ Smart automation, season phases, poll timing, snapshots,
+ archive storage, and unified trigger control.
+************************************************************/
 
-  assertSportsAdmin_(params);
+const SPORTS_V12_SETTINGS_HEADERS = [
+  "SeasonTitle",
+  "SeasonStartDate",
+  "SeasonEndDate",
+  "PreseasonEnabled",
+  "PreseasonStartDate",
+  "PreseasonEndDate",
+  "PostseasonEnabled",
+  "PostseasonStartDate",
+  "PostseasonEndDate",
+  "TournamentEnabled",
+  "TournamentStartDate",
+  "TournamentEndDate",
+  "BowlEnabled",
+  "BowlStartDate",
+  "BowlEndDate",
+  "SnapshotRetentionDays",
+  "ArchiveEnabled",
+  "ArchiveAfterDays",
+  "ArchiveMode",
+  "ArchiveLastRunAt",
+  "ArchiveLastStatus",
+  "ArchiveRowsLastRun"
+];
 
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SHEETS.SCORES
-      );
+const SPORTS_SCORES_ARCHIVE_SHEET = "SportsScoresArchive";
+const SPORTS_SNAPSHOTS_ARCHIVE_SHEET = "SportsSnapshotsArchive";
+const SPORTS_ARCHIVE_TRIGGER_FUNCTION = "runSportsArchiveUpdate";
+const SPORTS_POLL_PROPERTY_PREFIX = "SPORTS_V12_LAST_POLL_";
 
-  if (!sh || sh.getLastRow() < 2) {
-    return {
-      success: true,
-      repaired: 0
-    };
+function sportsV12PositiveNumber_(value, fallback) {
+  const n = Number(value);
+  if (isNaN(n) || !isFinite(n) || n < 0) return Number(fallback || 0);
+  return n;
+}
+
+function ensureSportsControlsV12SettingsColumns_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function(header) { return String(header || "").trim(); });
+  const missing = SPORTS_V12_SETTINGS_HEADERS.filter(function(header) {
+    return headers.indexOf(header) === -1;
+  });
+
+  if (missing.length) {
+    sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
   }
 
-  ensureSportsScoresLogoDateColumns_();
+  return { success: true, added: missing };
+}
 
-  const data =
-    sh.getDataRange()
-      .getValues();
+function upgradeSportsControlsV12() {
+  const settings = ensureSportsControlsV12SettingsColumns_();
+  const archive = setupSportsArchiveSystem_();
+  return {
+    success: true,
+    version: "12",
+    settingsColumnsAdded: settings.added,
+    archive: archive,
+    message: "Sports controls v12 upgrade complete. Existing data was preserved."
+  };
+}
 
-  const headers =
-    data[0].map(function(header) {
-      return String(header || "").trim();
-    });
+function sportsDateInRange_(dateOnly, startDate, endDate) {
+  dateOnly = normalizeSportsDateOnly_(dateOnly);
+  startDate = normalizeSportsDateOnly_(startDate);
+  endDate = normalizeSportsDateOnly_(endDate);
+  if (!dateOnly || !startDate || !endDate) return false;
+  return dateOnly >= startDate && dateOnly <= endDate;
+}
 
-  const col =
-    getSportsHeaderMap_(headers);
+function sportsGetSeasonPhase_(setting, dateOnly) {
+  dateOnly = normalizeSportsDateOnly_(dateOnly || new Date());
+  const phases = [
+    { name: "PRESEASON", enabled: setting.PreseasonEnabled, start: setting.PreseasonStartDate, end: setting.PreseasonEndDate },
+    { name: "REGULAR SEASON", enabled: !!(setting.SeasonStartDate && setting.SeasonEndDate), start: setting.SeasonStartDate, end: setting.SeasonEndDate },
+    { name: "POSTSEASON", enabled: setting.PostseasonEnabled, start: setting.PostseasonStartDate, end: setting.PostseasonEndDate },
+    { name: "TOURNAMENT", enabled: setting.TournamentEnabled, start: setting.TournamentStartDate, end: setting.TournamentEndDate },
+    { name: "BOWL", enabled: setting.BowlEnabled, start: setting.BowlStartDate, end: setting.BowlEndDate }
+  ];
 
-  let repaired = 0;
+  const configured = phases.some(function(phase) {
+    return phase.enabled && phase.start && phase.end;
+  });
 
-  for (let i = 1; i < data.length; i++) {
+  if (!configured) return { active: true, phase: "DATES NOT SET" };
 
-    const row = data[i];
-
-    const game = {};
-
-    headers.forEach(function(header, index) {
-      game[header] = row[index];
-    });
-
-    const before = JSON.stringify({
-      HomeRecord: game.HomeRecord,
-      AwayRecord: game.AwayRecord,
-      Clock: game.Clock
-    });
-
-    normalizeSportsScoreRowForStorage_(game);
-
-    const after = JSON.stringify({
-      HomeRecord: game.HomeRecord,
-      AwayRecord: game.AwayRecord,
-      Clock: game.Clock
-    });
-
-    if (before !== after) {
-      if (col.HomeRecord !== undefined) {
-        sh.getRange(i + 1, col.HomeRecord + 1).setValue(game.HomeRecord || "");
-      }
-      if (col.AwayRecord !== undefined) {
-        sh.getRange(i + 1, col.AwayRecord + 1).setValue(game.AwayRecord || "");
-      }
-      if (col.Clock !== undefined) {
-        sh.getRange(i + 1, col.Clock + 1).setValue(game.Clock || "");
-      }
-      repaired++;
+  for (let i = 0; i < phases.length; i++) {
+    const phase = phases[i];
+    if (phase.enabled && sportsDateInRange_(dateOnly, phase.start, phase.end)) {
+      return { active: true, phase: phase.name };
     }
+  }
 
+  return { active: false, phase: "OFF SEASON" };
+}
+
+function sportsLeagueScoreRowsFromMap_(previousScores, league) {
+  league = String(league || "").toLowerCase();
+  return Object.keys(previousScores || {}).map(function(key) {
+    return previousScores[key];
+  }).filter(function(row) {
+    return String(row.League || "").toLowerCase() === league;
+  });
+}
+
+function sportsGetPollingMode_(setting, previousScores) {
+  const rows = sportsLeagueScoreRowsFromMap_(previousScores, setting.League);
+  const now = Date.now();
+  let hasLive = false;
+  let hasPregame = false;
+  let hasRecentFinal = false;
+
+  rows.forEach(function(row) {
+    const state = String(row.State || "").toLowerCase();
+    const completed = normalizeSportsBoolean_(row.Completed);
+    const gameMs = new Date(row.GameDateTime || 0).getTime();
+    const updatedMs = new Date(row.LastUpdated || 0).getTime();
+
+    if (!completed && state === "in") hasLive = true;
+    if (!completed && state !== "in" && gameMs && gameMs >= now - 6 * 3600000 && gameMs <= now + 48 * 3600000) hasPregame = true;
+    if (completed && updatedMs && now - updatedMs <= 48 * 3600000) hasRecentFinal = true;
+  });
+
+  if (hasLive) return "LIVE";
+  if (hasPregame) return "PREGAME";
+  if (hasRecentFinal) return "FINAL";
+  return "PREGAME";
+}
+
+function sportsPollIntervalForMode_(setting, mode) {
+  if (mode === "LIVE") return Math.max(1, Number(setting.PollLiveMinutes || 1));
+  if (mode === "FINAL") return Math.max(1, Number(setting.PollFinalMinutes || 60));
+  return Math.max(1, Number(setting.PollPreGameMinutes || 30));
+}
+
+function sportsPollPropertyKey_(setting) {
+  return SPORTS_POLL_PROPERTY_PREFIX + String(setting.Sport || "") + "_" + String(setting.League || "");
+}
+
+function sportsShouldPollSetting_(setting, previousScores, force) {
+  if (!setting.SeasonActive) {
+    return { shouldPoll: false, reason: "League is outside all enabled season date ranges", mode: "OFF SEASON" };
+  }
+
+  const mode = sportsGetPollingMode_(setting, previousScores);
+  const minutes = sportsPollIntervalForMode_(setting, mode);
+  if (force) return { shouldPoll: true, reason: "Forced refresh", mode: mode };
+
+  const raw = PropertiesService.getScriptProperties().getProperty(sportsPollPropertyKey_(setting));
+  const lastMs = Number(raw || 0);
+  const nextMs = lastMs + minutes * 60000;
+
+  if (!lastMs || Date.now() >= nextMs) {
+    return { shouldPoll: true, reason: "Configured interval is due", mode: mode };
+  }
+
+  return {
+    shouldPoll: false,
+    reason: "Waiting for configured " + mode.toLowerCase() + " interval (" + minutes + " minutes)",
+    mode: mode,
+    nextDueAt: new Date(nextMs)
+  };
+}
+
+function sportsMarkSettingPolled_(setting, mode) {
+  PropertiesService.getScriptProperties().setProperty(sportsPollPropertyKey_(setting), String(Date.now()));
+  PropertiesService.getScriptProperties().setProperty(sportsPollPropertyKey_(setting) + "_MODE", String(mode || ""));
+}
+
+function sportsArchiveEnsureSheet_(sheetName, sourceSheetName, keyHeader) {
+  const ss = SpreadsheetApp.getActive();
+  const source = ss.getSheetByName(sourceSheetName);
+  if (!source) throw new Error("Missing source sheet: " + sourceSheetName);
+
+  const sourceHeaders = source.getRange(1, 1, 1, source.getLastColumn()).getValues()[0]
+    .map(function(header) { return String(header || "").trim(); });
+  const required = sourceHeaders.concat(["ArchivedAt", "ArchiveMode"]);
+  let sh = ss.getSheetByName(sheetName);
+  if (!sh) sh = ss.insertSheet(sheetName);
+
+  if (sh.getLastRow() === 0 || sh.getLastColumn() === 0) {
+    sh.getRange(1, 1, 1, required.length).setValues([required]);
+    sh.setFrozenRows(1);
+  } else {
+    const existing = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+      .map(function(header) { return String(header || "").trim(); });
+    const missing = required.filter(function(header) { return existing.indexOf(header) === -1; });
+    if (missing.length) sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+  }
+
+  return sh;
+}
+
+function setupSportsArchiveSystem_() {
+  const scoresArchive = sportsArchiveEnsureSheet_(SPORTS_SCORES_ARCHIVE_SHEET, SPORTS_SHEETS.SCORES, "GameId");
+  const snapshotsArchive = sportsArchiveEnsureSheet_(SPORTS_SNAPSHOTS_ARCHIVE_SHEET, SPORTS_SHEETS.SNAPSHOTS, "SnapshotId");
+  return {
+    success: true,
+    scoreArchiveSheet: scoresArchive.getName(),
+    snapshotArchiveSheet: snapshotsArchive.getName()
+  };
+}
+
+function sportsArchiveExistingKeys_(sh, keyHeader) {
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return {};
+  const headers = data[0].map(function(header) { return String(header || "").trim(); });
+  const col = getSportsHeaderMap_(headers);
+  const result = {};
+  if (col[keyHeader] === undefined) return result;
+  for (let i = 1; i < data.length; i++) {
+    const key = String(data[i][col[keyHeader]] || "").trim();
+    if (key) result[key] = true;
+  }
+  return result;
+}
+
+function sportsArchiveRows_(sourceSheet, archiveSheet, rowNumbers, keyHeader, mode) {
+  if (!rowNumbers.length) return { copied: 0, removed: 0, keys: [] };
+
+  const sourceData = sourceSheet.getDataRange().getValues();
+  const sourceHeaders = sourceData[0].map(function(header) { return String(header || "").trim(); });
+  const sourceCol = getSportsHeaderMap_(sourceHeaders);
+  const archiveHeaders = archiveSheet.getRange(1, 1, 1, archiveSheet.getLastColumn()).getValues()[0]
+    .map(function(header) { return String(header || "").trim(); });
+  const existing = sportsArchiveExistingKeys_(archiveSheet, keyHeader);
+  const rowsToAppend = [];
+  const keys = [];
+
+  rowNumbers.forEach(function(rowNumber) {
+    const sourceRow = sourceData[rowNumber - 1];
+    const key = String(sourceRow[sourceCol[keyHeader]] || "").trim();
+    if (!key) return;
+    keys.push(key);
+    if (existing[key]) return;
+
+    const obj = {};
+    sourceHeaders.forEach(function(header, index) { obj[header] = sourceRow[index]; });
+    obj.ArchivedAt = new Date();
+    obj.ArchiveMode = mode;
+    rowsToAppend.push(archiveHeaders.map(function(header) {
+      return obj[header] !== undefined ? obj[header] : "";
+    }));
+  });
+
+  if (rowsToAppend.length) {
+    archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, archiveHeaders.length)
+      .setValues(rowsToAppend);
+  }
+
+  let removed = 0;
+  if (mode === "MOVE") {
+    rowNumbers.slice().sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
+      sourceSheet.deleteRow(rowNumber);
+      removed++;
+    });
+  }
+
+  return { copied: rowsToAppend.length, removed: removed, keys: keys };
+}
+
+function sportsArchiveUpdateSettingStatus_(setting, status, rows) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh || !setting._rowNumber) return;
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
+    .map(function(header) { return String(header || "").trim(); });
+  const col = getSportsHeaderMap_(headers);
+  const patch = {
+    ArchiveLastRunAt: new Date(),
+    ArchiveLastStatus: status,
+    ArchiveRowsLastRun: Number(rows || 0)
+  };
+  Object.keys(patch).forEach(function(key) {
+    if (col[key] !== undefined) sh.getRange(setting._rowNumber, col[key] + 1).setValue(patch[key]);
+  });
+}
+
+function runSportsArchiveUpdate() {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return { success: false, skipped: true, reason: "Another sports job is running" };
+
+  try {
+    setupSportsArchiveSystem_();
+    const settings = readEnabledSportsSettings_(true);
+    const ss = SpreadsheetApp.getActive();
+    const scoresSheet = ss.getSheetByName(SPORTS_SHEETS.SCORES);
+    const snapshotsSheet = ss.getSheetByName(SPORTS_SHEETS.SNAPSHOTS);
+    const scoresArchive = ss.getSheetByName(SPORTS_SCORES_ARCHIVE_SHEET);
+    const snapshotsArchive = ss.getSheetByName(SPORTS_SNAPSHOTS_ARCHIVE_SHEET);
+    const summary = { success: true, startedAt: new Date(), leagues: [], scoresCopied: 0, scoresRemoved: 0, snapshotsCopied: 0, snapshotsRemoved: 0, errors: [] };
+
+    settings.forEach(function(setting) {
+      if (!setting.ArchiveEnabled) return;
+      try {
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - Math.max(1, Number(setting.ArchiveAfterDays || 30)));
+        const cutoffMs = cutoff.getTime();
+        const mode = setting.ArchiveMode === "COPY" ? "COPY" : "MOVE";
+
+        const scoreData = scoresSheet.getDataRange().getValues();
+        const scoreHeaders = scoreData[0].map(function(header) { return String(header || "").trim(); });
+        const scoreCol = getSportsHeaderMap_(scoreHeaders);
+        const scoreRows = [];
+        const gameIds = {};
+
+        for (let i = 1; i < scoreData.length; i++) {
+          const row = scoreData[i];
+          if (String(row[scoreCol.League] || "").trim().toLowerCase() !== setting.League) continue;
+          if (!normalizeSportsBoolean_(row[scoreCol.Completed])) continue;
+          const dateValue = row[scoreCol.GameDateTime] || row[scoreCol.LastUpdated];
+          const rowMs = new Date(dateValue || 0).getTime();
+          if (!rowMs || rowMs > cutoffMs) continue;
+          scoreRows.push(i + 1);
+          gameIds[String(row[scoreCol.GameId] || "").trim()] = true;
+        }
+
+        const snapshotData = snapshotsSheet.getDataRange().getValues();
+        const snapshotHeaders = snapshotData[0].map(function(header) { return String(header || "").trim(); });
+        const snapshotCol = getSportsHeaderMap_(snapshotHeaders);
+        const snapshotRows = [];
+        const snapshotCutoff = new Date();
+        snapshotCutoff.setDate(snapshotCutoff.getDate() - Math.max(1, Number(setting.SnapshotRetentionDays || 14)));
+        const snapshotCutoffMs = snapshotCutoff.getTime();
+        for (let j = 1; j < snapshotData.length; j++) {
+          const snapshotLeague = String(snapshotData[j][snapshotCol.League] || "").trim().toLowerCase();
+          const snapshotGameId = String(snapshotData[j][snapshotCol.GameId] || "").trim();
+          const snapshotMs = new Date(snapshotData[j][snapshotCol.Timestamp] || 0).getTime();
+          if (
+            gameIds[snapshotGameId] ||
+            (snapshotLeague === setting.League && snapshotMs && snapshotMs <= snapshotCutoffMs)
+          ) {
+            snapshotRows.push(j + 1);
+          }
+        }
+
+        // Move snapshots first so deleting score rows cannot affect lookup state.
+        const snapResult = sportsArchiveRows_(snapshotsSheet, snapshotsArchive, snapshotRows, "SnapshotId", mode);
+        const scoreResult = sportsArchiveRows_(scoresSheet, scoresArchive, scoreRows, "GameId", mode);
+        const total = scoreResult.copied + snapResult.copied;
+        sportsArchiveUpdateSettingStatus_(setting, "OK - " + total + " rows archived", total);
+
+        summary.scoresCopied += scoreResult.copied;
+        summary.scoresRemoved += scoreResult.removed;
+        summary.snapshotsCopied += snapResult.copied;
+        summary.snapshotsRemoved += snapResult.removed;
+        summary.leagues.push({ league: setting.League, mode: mode, cutoff: cutoff, scores: scoreResult, snapshots: snapResult });
+      } catch (err) {
+        const message = err && err.message ? err.message : String(err);
+        sportsArchiveUpdateSettingStatus_(setting, "ERROR - " + message, 0);
+        summary.errors.push({ league: setting.League, error: message });
+      }
+    });
+
+    summary.finishedAt = new Date();
+    return summary;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function installSportsArchiveDailyTrigger(hour) {
+  removeSportsArchiveTriggers();
+  hour = Number(hour === undefined ? 3 : hour);
+  if (isNaN(hour) || hour < 0 || hour > 23) hour = 3;
+  ScriptApp.newTrigger(SPORTS_ARCHIVE_TRIGGER_FUNCTION).timeBased().everyDays(1).atHour(hour).create();
+  return { success: true, installed: true, hour: hour };
+}
+
+function removeSportsArchiveTriggers() {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === SPORTS_ARCHIVE_TRIGGER_FUNCTION) {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+  return { success: true, removed: removed };
+}
+
+function checkSportsArchiveTriggers() {
+  return ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction() === SPORTS_ARCHIVE_TRIGGER_FUNCTION;
+  }).map(function(trigger) {
+    return { handler: trigger.getHandlerFunction(), eventType: String(trigger.getEventType()), source: String(trigger.getTriggerSource()) };
+  });
+}
+
+function getSportsArchiveStatus_() {
+  setupSportsArchiveSystem_();
+  const ss = SpreadsheetApp.getActive();
+  const scoresArchive = ss.getSheetByName(SPORTS_SCORES_ARCHIVE_SHEET);
+  const snapshotsArchive = ss.getSheetByName(SPORTS_SNAPSHOTS_ARCHIVE_SHEET);
+  return {
+    success: true,
+    scoreArchiveRows: Math.max(0, scoresArchive.getLastRow() - 1),
+    snapshotArchiveRows: Math.max(0, snapshotsArchive.getLastRow() - 1),
+    triggers: checkSportsArchiveTriggers()
+  };
+}
+
+function getSmartSportsAutomationStatus_() {
+  const triggers = ScriptApp.getProjectTriggers();
+  function count_(handler) {
+    return triggers.filter(function(trigger) { return trigger.getHandlerFunction() === handler; }).length;
+  }
+  const details = {
+    scoreUpdater: count_(SPORTS_TRIGGER_FUNCTION),
+    seasonLoader: count_(SPORTS_SEASON_BATCH_TRIGGER_FUNCTION),
+    oddsUpdater: count_(SPORTS_ODDS_HYBRID_TRIGGER_FUNCTION),
+    archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
+  };
+  const fullyEnabled =
+    details.scoreUpdater > 0 &&
+    details.seasonLoader > 0 &&
+    details.oddsUpdater > 0 &&
+    details.archiveUpdater > 0;
+  const anyEnabled =
+    details.scoreUpdater > 0 ||
+    details.seasonLoader > 0 ||
+    details.oddsUpdater > 0 ||
+    details.archiveUpdater > 0;
+
+  return {
+    enabled: fullyEnabled,
+    fullyEnabled: fullyEnabled,
+    partiallyEnabled: anyEnabled && !fullyEnabled,
+    details: details
+  };
+}
+
+function setSmartSportsAutomationEnabled_(enabled, oddsHour, archiveHour) {
+  enabled = enabled === true || String(enabled || "").toLowerCase() === "true";
+  const actions = {};
+
+  if (enabled) {
+    actions.scores = installSportsScoresTrigger();
+    actions.season = installSportsSeasonBatchTrigger();
+    actions.odds = installSportsOddsHybridDailyTrigger(oddsHour === undefined ? 8 : oddsHour);
+    actions.archive = installSportsArchiveDailyTrigger(archiveHour === undefined ? 3 : archiveHour);
+  } else {
+    actions.scores = removeSportsScoresTriggers();
+    actions.season = removeSportsSeasonBatchTriggers();
+    actions.odds = removeSportsOddsHybridTriggers();
+    actions.archive = removeSportsArchiveTriggers();
   }
 
   return {
     success: true,
-    repaired: repaired
+    enabled: enabled,
+    status: getSmartSportsAutomationStatus_(),
+    actions: actions,
+    message: enabled ? "Smart Sports Automation Enabled" : "Smart Sports Automation Disabled"
   };
-
 }

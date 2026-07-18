@@ -1,10 +1,4 @@
 /************************************************************
- GENERATED SPLIT PROJECT
- Created from the uploaded CLEAN SPLIT v11/v12/v13 source files.
- Verify in Apps Script after upload.
-************************************************************/
-
-/************************************************************
  CLEAN SPLIT v11
  Older duplicate patch functions removed; latest definitions retained.
 ************************************************************/
@@ -374,7 +368,49 @@ function sportsOddsLeagueToSportKey_(league) {
       "mma_mixed_martial_arts",
 
     "mixed-martial-arts":
-      "mma_mixed_martial_arts"
+      "mma_mixed_martial_arts",
+
+    /* =========================
+       ESPN / APP MOTORSPORT CODES
+       NOTE: Run testListOddsApiMotorsportsAndMma()
+       to verify currently active keys on your plan.
+    ========================= */
+
+    f1:
+      "motorsport_formula_one",
+
+    formula1:
+      "motorsport_formula_one",
+
+    "formula-one":
+      "motorsport_formula_one",
+
+    "nascar-premier":
+      "motorsport_nascar_cup_series",
+
+    nascar:
+      "motorsport_nascar_cup_series",
+
+    "nascar-cup":
+      "motorsport_nascar_cup_series",
+
+    "nascar-cup-series":
+      "motorsport_nascar_cup_series",
+
+    "nascar-xfinity":
+      "motorsport_nascar_xfinity_series",
+
+    "nascar-xfinity-series":
+      "motorsport_nascar_xfinity_series",
+
+    "nascar-truck":
+      "motorsport_nascar_craftsman_truck_series",
+
+    "nascar-trucks":
+      "motorsport_nascar_craftsman_truck_series",
+
+    "nascar-craftsman-truck-series":
+      "motorsport_nascar_craftsman_truck_series"
 
   };
 
@@ -1907,9 +1943,9 @@ function testRefreshMainOddsLeagues() {
 }
 
 /* =====================================================
-   PATCH v3 - ODDS API USAGE LOGGING
-   Added for protected quota usage and MMA support.
-   Racing odds were split into RacingScoreEngine.
+   PATCH v3 - ODDS API USAGE LOGGING + RACING OUTRIGHTS
+   Added for protected quota usage, MMA support, and
+   separate all-driver racing odds rows.
 ===================================================== */
 
 const SPORTS_ODDS_API_LOG_SHEET =
@@ -1932,7 +1968,26 @@ const SPORTS_ODDS_API_LOG_HEADERS = [
   "UrlNoKey"
 ];
 
-/* Removed racing-only odds constants during RacingScoreEngine split. */
+const SPORTS_RACING_ODDS_SHEET =
+  "SportsRacingOdds";
+
+const SPORTS_RACING_ODDS_HEADERS = [
+  "OddsId",
+  "League",
+  "SportKey",
+  "OddsEventId",
+  "EventName",
+  "CommenceTime",
+  "DriverId",
+  "DriverName",
+  "Price",
+  "BookmakerKey",
+  "Bookmaker",
+  "Market",
+  "Source",
+  "LastUpdated",
+  "RawOutcomeJSON"
+];
 
 let SPORTS_ODDS_LAST_API_USAGE_ =
   null;
@@ -2181,9 +2236,29 @@ function fetchSportsOddsApiJsonWithLog_(
 
 }
 
-/* Removed racing-only function sportsOddsIsRacingLeague_ during RacingScoreEngine split. */
+function sportsOddsIsRacingLeague_(league) {
+
+  const sportKey =
+    sportsOddsLeagueToSportKey_(
+      league
+    );
+
+  return (
+    String(sportKey || "")
+      .indexOf("motorsport_") === 0
+  );
+
+}
 
 function sportsOddsGetMarketsForLeague_(league) {
+
+  if (
+    sportsOddsIsRacingLeague_(
+      league
+    )
+  ) {
+    return "outrights";
+  }
 
   return SPORTS_ODDS_MARKETS;
 
@@ -2313,13 +2388,137 @@ function fetchSportsOddsEventsForLeague_(league) {
 
 /* Removed older duplicate function setupSportsRacingOddsSystem during v11 cleanup. */
 
-/* Removed racing-only odds functions during RacingScoreEngine split. */
+function sportsRacingDriverKey_(name) {
+
+  return sportsOddsKey_(name)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+}
+
+function normalizeSportsRacingOddsRows_(
+  event,
+  league,
+  sportKey
+) {
+
+  const rows = [];
+
+  const eventName =
+    sportsOddsString_(
+      event.sport_title ||
+      event.home_team ||
+      event.away_team ||
+      event.id
+    );
+
+  const bookmakers =
+    Array.isArray(event.bookmakers)
+      ? event.bookmakers
+      : [];
+
+  bookmakers.forEach(function(bookmaker) {
+
+    const markets =
+      Array.isArray(bookmaker.markets)
+        ? bookmaker.markets
+        : [];
+
+    markets.forEach(function(market) {
+
+      if (
+        sportsOddsKey_(market.key) !==
+        "outrights"
+      ) {
+        return;
+      }
+
+      const outcomes =
+        Array.isArray(market.outcomes)
+          ? market.outcomes
+          : [];
+
+      outcomes.forEach(function(outcome) {
+
+        const driverName =
+          sportsOddsString_(
+            outcome.name
+          );
+
+        if (!driverName) {
+          return;
+        }
+
+        const driverId =
+          sportsRacingDriverKey_(
+            driverName
+          );
+
+        rows.push({
+          OddsId:
+            [
+              sportsOddsKey_(league),
+              sportsOddsString_(event.id),
+              sportsOddsString_(bookmaker.key),
+              driverId
+            ].join("|"),
+          League:
+            sportsOddsString_(league)
+              .toUpperCase(),
+          SportKey:
+            sportKey,
+          OddsEventId:
+            sportsOddsString_(event.id),
+          EventName:
+            eventName,
+          CommenceTime:
+            sportsOddsString_(
+              event.commence_time
+            ),
+          DriverId:
+            driverId,
+          DriverName:
+            driverName,
+          Price:
+            sportsOddsRound_(
+              outcome.price
+            ),
+          BookmakerKey:
+            sportsOddsString_(
+              bookmaker.key
+            ),
+          Bookmaker:
+            sportsOddsString_(
+              bookmaker.title ||
+              bookmaker.key
+            ),
+          Market:
+            "outrights",
+          Source:
+            "real-odds:" +
+            sportsOddsString_(
+              bookmaker.key || bookmaker.title
+            ),
+          LastUpdated:
+            sportsOddsNow_(),
+          RawOutcomeJSON:
+            JSON.stringify(outcome || {})
+        });
+
+      });
+
+    });
+
+  });
+
+  return rows;
+
+}
+
 
 /* Removed older duplicate function upsertSportsRacingOddsRows_ during v11 cleanup. */
 
-/* Removed racing-only function refreshSportsRacingOddsForLeague during RacingScoreEngine split. */
-
-function refreshSportsOddsForLeague(league) {
+function refreshSportsRacingOddsForLeague(league) {
 
   const fetched =
     fetchSportsOddsEventsForLeague_(
@@ -2330,18 +2529,69 @@ function refreshSportsOddsForLeague(league) {
 
   fetched.events.forEach(function(event) {
 
-    const normalized =
-      normalizeSportsOddsEvent_(
-        event,
-        fetched.league,
-        fetched.sportKey
-      );
-
-    if (normalized) {
-      rows.push(normalized);
-    }
+    normalizeSportsRacingOddsRows_(
+      event,
+      fetched.league,
+      fetched.sportKey
+    ).forEach(function(row) {
+      rows.push(row);
+    });
 
   });
+
+  const writeResult =
+    upsertSportsRacingOddsRows_(
+      rows
+    );
+
+  return {
+    success: true,
+    racing: true,
+    league:
+      fetched.league,
+    sportKey:
+      fetched.sportKey,
+    fetched:
+      fetched.events.length,
+    usable:
+      rows.length,
+    inserted:
+      writeResult.inserted,
+    updated:
+      writeResult.updated,
+    apiUsage:
+      fetched.apiUsage || null
+  };
+
+}
+
+function refreshSportsOddsForLeague(league) {
+
+  if (
+    sportsOddsIsRacingLeague_(
+      league
+    )
+  ) {
+    return refreshSportsRacingOddsForLeague(
+      league
+    );
+  }
+
+  const fetched =
+    fetchSportsOddsEventsForLeague_(
+      league
+    );
+
+  const rows =
+    fetched.events
+      .map(function(event) {
+        return normalizeSportsOddsEvent_(
+          event,
+          fetched.league,
+          fetched.sportKey
+        );
+      })
+      .filter(Boolean);
 
   const writeResult =
     upsertSportsOddsRows_(
@@ -2368,9 +2618,61 @@ function refreshSportsOddsForLeague(league) {
 
 }
 
+
 /* Removed older duplicate function readSportsRacingOddsRows_ during v11 cleanup. */
 
-/* Removed racing-only function apiGetSportsRacingOdds_ during RacingScoreEngine split. */
+function apiGetSportsRacingOdds_(params) {
+
+  params =
+    params || {};
+
+  const league =
+    sportsOddsString_(
+      params.league
+    )
+      .toUpperCase();
+
+  const eventId =
+    sportsOddsString_(
+      params.oddsEventId ||
+      params.eventId
+    );
+
+  const rows =
+    readSportsRacingOddsRows_()
+      .filter(function(row) {
+
+        if (
+          league &&
+          sportsOddsString_(row.League)
+            .toUpperCase() !== league
+        ) {
+          return false;
+        }
+
+        if (
+          eventId &&
+          sportsOddsString_(row.OddsEventId) !== eventId
+        ) {
+          return false;
+        }
+
+        return true;
+
+      })
+      .sort(function(a, b) {
+        return Number(a.Price || 999999) -
+          Number(b.Price || 999999);
+      });
+
+  return {
+    success: true,
+    count: rows.length,
+    odds: rows,
+    timestamp: new Date()
+  };
+
+}
 
 function apiRefreshSportsOdds_(params) {
 
@@ -2450,7 +2752,86 @@ function installSportsOddsRefreshTrigger() {
 
 /* Removed older duplicate function setupSportsOddsSystem during v11 cleanup. */
 
-/* Removed racing-only function testListOddsApiMotorsportsAndMma during RacingScoreEngine split. */
+function testListOddsApiMotorsportsAndMma() {
+
+  const params = {
+    apiKey:
+      getSportsOddsApiKey_(),
+    all:
+      "true"
+  };
+
+  const query =
+    Object.keys(params)
+      .map(function(key) {
+        return (
+          encodeURIComponent(key) +
+          "=" +
+          encodeURIComponent(params[key])
+        );
+      })
+      .join("&");
+
+  const url =
+    SPORTS_ODDS_API_BASE +
+    "/?" +
+    query;
+
+  const fetched =
+    fetchSportsOddsApiJsonWithLog_(
+      url,
+      {
+        source:
+          "testListOddsApiMotorsportsAndMma",
+        league:
+          "",
+        sportKey:
+          "",
+        endpoint:
+          "sports",
+        markets:
+          "",
+        regions:
+          ""
+      }
+    );
+
+  const sports =
+    Array.isArray(fetched.payload)
+      ? fetched.payload
+      : [];
+
+  return sports
+    .filter(function(item) {
+      const key =
+        sportsOddsString_(
+          item.key
+        );
+
+      const group =
+        sportsOddsKey_(
+          item.group
+        );
+
+      return (
+        key.indexOf("motorsport_") === 0 ||
+        key.indexOf("mma_") === 0 ||
+        group.indexOf("motor") >= 0 ||
+        group.indexOf("mma") >= 0
+      );
+    })
+    .map(function(item) {
+      return {
+        key: item.key,
+        group: item.group,
+        title: item.title,
+        active: item.active,
+        has_outrights: item.has_outrights
+      };
+    });
+
+}
+
 
 /* =====================================================
    PATCH v4 - SAFE SHEET SETUP OVERRIDES
@@ -2644,7 +3025,32 @@ function sportsOddsGetApiLogSheet_() {
 
 }
 
-/* Removed racing-only odds functions during RacingScoreEngine split. */
+function sportsRacingOddsGetSheet_() {
+
+  return sportsOddsEnsureHeaderSheetSafe_(
+    SPORTS_RACING_ODDS_SHEET,
+    SPORTS_RACING_ODDS_HEADERS
+  ).sheet;
+
+}
+
+function setupSportsRacingOddsSystem() {
+
+  const result =
+    sportsOddsEnsureHeaderSheetSafe_(
+      SPORTS_RACING_ODDS_SHEET,
+      SPORTS_RACING_ODDS_HEADERS
+    );
+
+  return {
+    success: true,
+    sheet: SPORTS_RACING_ODDS_SHEET,
+    added: result.added || [],
+    message:
+      "Sports racing odds sheet setup complete"
+  };
+
+}
 
 function setupSportsOddsSystem() {
 
@@ -2658,10 +3064,184 @@ function setupSportsOddsSystem() {
     success: true,
     sheet: SPORTS_ODDS_SHEET,
     added: result.added || [],
+    racingSheet:
+      SPORTS_RACING_ODDS_SHEET,
     message:
-      "SportsOdds setup complete. Racing odds were split into RacingScoreEngine."
+      "SportsOdds setup complete. Racing odds setup is separate; run setupSportsRacingOddsSystem if needed."
   };
 
 }
 
-/* Removed racing-only odds functions during RacingScoreEngine split. */
+function setupAllSportsOddsSheets() {
+
+  return {
+    success: true,
+    odds:
+      setupSportsOddsSystem(),
+    racingOdds:
+      setupSportsRacingOddsSystem()
+  };
+
+}
+
+function upsertSportsRacingOddsRows_(rows) {
+
+  setupSportsRacingOddsSystem();
+
+  rows =
+    Array.isArray(rows)
+      ? rows
+      : [];
+
+  if (!rows.length) {
+    return {
+      inserted: 0,
+      updated: 0
+    };
+  }
+
+  const sh =
+    sportsRacingOddsGetSheet_();
+
+  const data =
+    sportsOddsSpreadsheetRetry_(
+      "read SportsRacingOdds",
+      function() {
+        return sh.getDataRange().getValues();
+      }
+    );
+
+  const headers =
+    data[0].map(function(header) {
+      return sportsOddsString_(header);
+    });
+
+  const col =
+    sportsOddsHeaderMap_(
+      headers
+    );
+
+  const existing = {};
+
+  for (let i = 1; i < data.length; i++) {
+
+    const oddsId =
+      sportsOddsString_(
+        data[i][col.OddsId]
+      );
+
+    if (oddsId) {
+      existing[oddsId] = i + 1;
+    }
+
+  }
+
+  let inserted = 0;
+  let updated = 0;
+  const rowsToAppend = [];
+
+  rows.forEach(function(item) {
+
+    const row =
+      headers.map(function(header) {
+        return item[header] !== undefined
+          ? item[header]
+          : "";
+      });
+
+    if (existing[item.OddsId]) {
+
+      sportsOddsSpreadsheetRetry_(
+        "update racing odds row",
+        function() {
+          sh
+            .getRange(
+              existing[item.OddsId],
+              1,
+              1,
+              headers.length
+            )
+            .setValues([
+              row
+            ]);
+        }
+      );
+
+      updated++;
+
+    } else {
+      rowsToAppend.push(row);
+      inserted++;
+    }
+
+  });
+
+  if (rowsToAppend.length) {
+    sportsOddsSpreadsheetRetry_(
+      "append racing odds rows",
+      function() {
+        sh
+          .getRange(
+            sh.getLastRow() + 1,
+            1,
+            rowsToAppend.length,
+            headers.length
+          )
+          .setValues(
+            rowsToAppend
+          );
+      }
+    );
+  }
+
+  SpreadsheetApp.flush();
+
+  return {
+    inserted: inserted,
+    updated: updated
+  };
+
+}
+
+function readSportsRacingOddsRows_() {
+
+  setupSportsRacingOddsSystem();
+
+  const sh =
+    sportsRacingOddsGetSheet_();
+
+  const data =
+    sportsOddsSpreadsheetRetry_(
+      "read SportsRacingOdds rows",
+      function() {
+        return sh.getDataRange().getValues();
+      }
+    );
+
+  if (data.length <= 1) {
+    return [];
+  }
+
+  const headers =
+    data[0].map(function(header) {
+      return sportsOddsString_(header);
+    });
+
+  return data
+    .slice(1)
+    .map(function(row) {
+
+      const obj = {};
+
+      headers.forEach(function(header, index) {
+        obj[header] = row[index];
+      });
+
+      return obj;
+
+    })
+    .filter(function(row) {
+      return !!row.OddsId;
+    });
+
+}
