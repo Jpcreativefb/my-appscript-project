@@ -245,6 +245,8 @@ function doGet(e) {
       "adminRunSportsOddsHybridRefresh",
       "adminInstallSportsOddsHybridTrigger",
       "adminRemoveSportsOddsHybridTrigger",
+      "adminPreviewSportsLeagueArchive",
+      "adminRunSportsArchiveNow",
 
       "adminSummary",
       "adminClearCaches",
@@ -2606,6 +2608,42 @@ if (action === "adminUpdateSportsLeagueSetting") {
       seasonTitle:
         params.seasonTitle,
 
+      seasonYear:
+        params.seasonYear,
+
+      scheduleSource:
+        params.scheduleSource,
+
+      espnSeasonTypesEnabled:
+        params.espnSeasonTypesEnabled,
+
+      espnPreseasonType:
+        params.espnPreseasonType,
+
+      espnRegularSeasonType:
+        params.espnRegularSeasonType,
+
+      espnPostseasonType:
+        params.espnPostseasonType,
+
+      espnTournamentType:
+        params.espnTournamentType,
+
+      espnBowlType:
+        params.espnBowlType,
+
+      collegeCoverageMode:
+        params.collegeCoverageMode,
+
+      espnGroupIds:
+        params.espnGroupIds,
+
+      espnResultLimit:
+        params.espnResultLimit,
+
+      selectedTeamIds:
+        params.selectedTeamIds,
+
       seasonActive:
         params.seasonActive,
 
@@ -2695,6 +2733,23 @@ if (action === "adminPreviewSportsLeagueArchive") {
 
   return json(
     apiAdminPreviewSportsLeagueArchive({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league
+    })
+  );
+
+}
+
+if (action === "adminRunSportsArchiveNow") {
+
+  return json(
+    apiAdminRunSportsArchiveNow({
       username:
         params.username,
 
@@ -2834,6 +2889,12 @@ if (action === "adminCreateSportsSeasonJobs") {
 
       season:
         params.season,
+
+      seasonYear:
+        params.seasonYear,
+
+      scheduleSource:
+        params.scheduleSource,
 
       seasonName:
         params.seasonName

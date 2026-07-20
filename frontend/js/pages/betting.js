@@ -609,10 +609,14 @@ function applyBettingLiveScores_(categories, scores) {
         : category.sportsPeriod;
 
     category.homeRecord =
-      score.HomeRecord || category.homeRecord || "";
+      cleanBettingSportsRecord_(
+        score.HomeRecord || category.homeRecord || ""
+      );
 
     category.awayRecord =
-      score.AwayRecord || category.awayRecord || "";
+      cleanBettingSportsRecord_(
+        score.AwayRecord || category.awayRecord || ""
+      );
 
     category.gameDateTime =
       score.GameDateTime || category.gameDateTime || "";
@@ -1555,6 +1559,58 @@ function getBettingCountdown_(value, locked){
 
 }
 
+function isBettingValidSportsRecord_(value) {
+
+  value =
+    String(value || "")
+      .trim();
+
+  if (!value) {
+    return false;
+  }
+
+  const lower =
+    value.toLowerCase();
+
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}:\d{2}(?:\s*[ap]m)?$/i.test(value)) {
+    return false;
+  }
+
+  if (
+    /\b(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)\b/i.test(lower) ||
+    /\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\b/i.test(lower)
+  ) {
+    return false;
+  }
+
+  return /^\d+\s*-\s*\d+(\s*-\s*\d+)?(\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value);
+
+}
+
+function cleanBettingSportsRecord_(value) {
+
+  value =
+    String(value || "")
+      .trim();
+
+  return isBettingValidSportsRecord_(value)
+    ? value
+    : "";
+
+}
+
 function getBettingNomineeRecord_(category, nominee){
 
   const name =
@@ -1573,11 +1629,11 @@ function getBettingNomineeRecord_(category, nominee){
       .toLowerCase();
 
   if (name && home && name === home) {
-    return category.homeRecord || "";
+    return cleanBettingSportsRecord_(category.homeRecord || "");
   }
 
   if (name && away && name === away) {
-    return category.awayRecord || "";
+    return cleanBettingSportsRecord_(category.awayRecord || "");
   }
 
   return "";

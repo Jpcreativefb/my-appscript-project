@@ -3245,3 +3245,87 @@ function readSportsRacingOddsRows_() {
     });
 
 }
+
+/* =====================================================
+   PATCH v13 ODDS LOG OVERRIDES
+   Creates both SportsOddsApiLog and OddsApiLog because the
+   admin sheet/UI has used both names during development.
+===================================================== */
+
+function sportsOddsGetApiLogSheet_() {
+  return sportsOddsEnsureHeaderSheetSafe_(
+    SPORTS_ODDS_API_LOG_SHEET,
+    SPORTS_ODDS_API_LOG_HEADERS
+  ).sheet;
+}
+
+function sportsOddsGetApiLogAliasSheet_() {
+  return sportsOddsEnsureHeaderSheetSafe_(
+    "OddsApiLog",
+    SPORTS_ODDS_API_LOG_HEADERS
+  ).sheet;
+}
+
+function sportsOddsAppendApiLogRow_(row) {
+  sportsOddsGetApiLogSheet_().appendRow(row);
+  sportsOddsGetApiLogAliasSheet_().appendRow(row);
+}
+
+function sportsOddsLogApiCall_(meta, url, response, payload) {
+  meta = meta || {};
+  const headers = response.getHeaders();
+  const counts = sportsOddsCountApiPayload_(payload);
+
+  const usage = {
+    costLast: sportsOddsHeaderValue_(headers, "x-requests-last"),
+    requestsUsed: sportsOddsHeaderValue_(headers, "x-requests-used"),
+    requestsRemaining: sportsOddsHeaderValue_(headers, "x-requests-remaining")
+  };
+
+  SPORTS_ODDS_LAST_API_USAGE_ = usage;
+
+  const row = [
+    new Date(),
+    meta.source || "",
+    meta.league || "",
+    meta.sportKey || "",
+    meta.endpoint || "",
+    meta.markets || "",
+    meta.regions || "",
+    counts.eventsReturned,
+    counts.bookmakersReturned,
+    counts.marketsReturned,
+    usage.costLast,
+    usage.requestsUsed,
+    usage.requestsRemaining,
+    sportsOddsSanitizeApiUrl_(url)
+  ];
+
+  sportsOddsAppendApiLogRow_(row);
+  return usage;
+}
+
+function setupSportsOddsSystem() {
+  const odds = sportsOddsEnsureHeaderSheetSafe_(SPORTS_ODDS_SHEET, SPORTS_ODDS_HEADERS);
+  const apiLog = sportsOddsEnsureHeaderSheetSafe_(SPORTS_ODDS_API_LOG_SHEET, SPORTS_ODDS_API_LOG_HEADERS);
+  const aliasLog = sportsOddsEnsureHeaderSheetSafe_("OddsApiLog", SPORTS_ODDS_API_LOG_HEADERS);
+  return {
+    success: true,
+    sheet: SPORTS_ODDS_SHEET,
+    added: odds.added || [],
+    apiLogSheet: SPORTS_ODDS_API_LOG_SHEET,
+    apiLogAdded: apiLog.added || [],
+    aliasLogSheet: "OddsApiLog",
+    aliasLogAdded: aliasLog.added || [],
+    racingSheet: SPORTS_RACING_ODDS_SHEET,
+    message: "SportsOdds setup complete. API log sheets are ready."
+  };
+}
+
+function setupAllSportsOddsSheets() {
+  return {
+    success: true,
+    odds: setupSportsOddsSystem(),
+    racingOdds: setupSportsRacingOddsSystem()
+  };
+}

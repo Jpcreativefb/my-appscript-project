@@ -2395,6 +2395,42 @@ async function apiAdminUpdateSportsLeagueSetting(
       seasonTitle:
         options.seasonTitle,
 
+      seasonYear:
+        options.seasonYear,
+
+      scheduleSource:
+        options.scheduleSource,
+
+      espnSeasonTypesEnabled:
+        options.espnSeasonTypesEnabled,
+
+      espnPreseasonType:
+        options.espnPreseasonType,
+
+      espnRegularSeasonType:
+        options.espnRegularSeasonType,
+
+      espnPostseasonType:
+        options.espnPostseasonType,
+
+      espnTournamentType:
+        options.espnTournamentType,
+
+      espnBowlType:
+        options.espnBowlType,
+
+      collegeCoverageMode:
+        options.collegeCoverageMode,
+
+      espnGroupIds:
+        options.espnGroupIds,
+
+      espnResultLimit:
+        options.espnResultLimit,
+
+      selectedTeamIds:
+        options.selectedTeamIds,
+
       seasonActive:
         options.seasonActive,
 
@@ -2494,6 +2530,20 @@ async function apiAdminPreviewSportsLeagueArchive(
 
 }
 
+async function apiAdminRunSportsArchiveNow(
+  league
+) {
+
+  return apiAdminSportsControl_(
+    "adminRunSportsArchiveNow",
+    {
+      league:
+        league || ""
+    }
+  );
+
+}
+
 async function apiAdminRepairSportsScoreDisplay() {
 
   return apiAdminSportsControl_(
@@ -2548,6 +2598,12 @@ async function apiAdminCreateSportsSeasonJobs(
 
       season:
         options.season || "",
+
+      seasonYear:
+        options.seasonYear || "",
+
+      scheduleSource:
+        options.scheduleSource || "HYBRID",
 
       seasonName:
         options.seasonName || ""

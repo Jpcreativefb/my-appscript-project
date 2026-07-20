@@ -627,7 +627,15 @@ function apiCreateSportsSeasonJobsAdmin_(params) {
   return createSportsSeasonJobsForDateRange_(
     startDate,
     endDate,
-    batchDays
+    batchDays,
+    {
+      league:
+        params.league || "",
+      sport:
+        params.sport || "",
+      seasonName:
+        params.seasonName || params.season || ""
+    }
   );
 
 }
@@ -2469,7 +2477,231 @@ function apiGetSportsArchiveStatusAdmin_(params) {
   return getSportsArchiveStatus_();
 }
 
+function apiPreviewSportsLeagueArchiveAdmin_(params) {
+  assertSportsAdmin_(params);
+  return previewSportsLeagueArchive_(
+    params.league || ""
+  );
+}
+
 function apiRunSportsArchiveNowAdmin_(params) {
   assertSportsAdmin_(params);
-  return runSportsArchiveUpdate();
+  return runSportsArchiveUpdate(
+    params.league || ""
+  );
+}
+
+
+/* =====================================================
+   PATCH v13 ADMIN OVERRIDES
+   College coverage + ESPN season type fields.
+===================================================== */
+
+function sportsAdminV13SettingFields_() {
+  return [
+    ["regularSeasonStartDate", "RegularSeasonStartDate", normalizeSportsDateOnly_],
+    ["regularSeasonEndDate", "RegularSeasonEndDate", normalizeSportsDateOnly_],
+    ["seasonYear", "SeasonYear", sportsAdminString_],
+    ["scheduleSource", "ScheduleSource", function(v) { return sportsAdminString_(v || "HYBRID").toUpperCase(); }],
+    ["scheduleBatchDays", "ScheduleBatchDays", function(v) { return Math.max(1, Math.min(30, sportsAdminNumber_(v, 14))); }],
+    ["espnSeasonTypesEnabled", "ESPNSeasonTypesEnabled", function(v) { return sportsAdminBoolean_(v, true); }],
+    ["espnPreseasonType", "ESPNPreseasonType", function(v) { return sportsAdminNumber_(v, 1); }],
+    ["espnRegularSeasonType", "ESPNRegularSeasonType", function(v) { return sportsAdminNumber_(v, 2); }],
+    ["espnPostseasonType", "ESPNPostseasonType", function(v) { return sportsAdminNumber_(v, 3); }],
+    ["espnTournamentType", "ESPNTournamentType", function(v) { return sportsAdminNumber_(v, 3); }],
+    ["espnBowlType", "ESPNBowlType", function(v) { return sportsAdminNumber_(v, 3); }],
+    ["collegeCoverageMode", "CollegeCoverageMode", function(v) { return sportsAdminString_(v || "ALL_D1").toUpperCase(); }],
+    ["espnGroupIds", "ESPNGroupIds", sportsAdminString_],
+    ["espnResultLimit", "ESPNResultLimit", function(v) { return Math.max(25, sportsAdminNumber_(v, 500)); }],
+    ["selectedTeamIds", "SelectedTeamIds", sportsAdminString_]
+  ];
+}
+
+function apiGetSportsSettingsAdmin_(params) {
+  assertSportsAdmin_(params);
+  ensureSportsControlsV12SettingsColumns_();
+
+  const today = normalizeSportsDateOnly_(new Date());
+  const rows = readAllSportsSettingsRows_().map(function(row) {
+    const setting = {
+      sport: sportsAdminString_(row.Sport),
+      league: sportsAdminString_(row.League),
+      enabled: normalizeSportsBoolean_(row.Enabled),
+      pollPreGameMinutes: sportsAdminNumber_(row.PollPreGameMinutes, 30),
+      pollLiveMinutes: sportsAdminNumber_(row.PollLiveMinutes, 1),
+      pollFinalMinutes: sportsAdminNumber_(row.PollFinalMinutes, 60),
+      savePeriodSnapshots: normalizeSportsBoolean_(row.SavePeriodSnapshots),
+      espnScoreboardUrl: sportsAdminString_(row.ESPNScoreboardUrl),
+      seasonTitle: sportsAdminString_(row.SeasonTitle || row.League),
+      seasonYear: sportsAdminString_(row.SeasonYear || row.SeasonTitle || ""),
+      scheduleSource: sportsAdminString_(row.ScheduleSource || "HYBRID").toUpperCase(),
+      scheduleBatchDays: sportsAdminNumber_(row.ScheduleBatchDays, sportsAdminString_(row.League).toLowerCase().indexOf("college") !== -1 ? 7 : 14),
+      espnSeasonTypesEnabled: row.ESPNSeasonTypesEnabled === "" || row.ESPNSeasonTypesEnabled === undefined ? true : normalizeSportsBoolean_(row.ESPNSeasonTypesEnabled),
+      espnPreseasonType: sportsAdminNumber_(row.ESPNPreseasonType, 1),
+      espnRegularSeasonType: sportsAdminNumber_(row.ESPNRegularSeasonType, 2),
+      espnPostseasonType: sportsAdminNumber_(row.ESPNPostseasonType, 3),
+      espnTournamentType: sportsAdminNumber_(row.ESPNTournamentType, 3),
+      espnBowlType: sportsAdminNumber_(row.ESPNBowlType, 3),
+      collegeCoverageMode: sportsAdminString_(row.CollegeCoverageMode || "ALL_D1").toUpperCase(),
+      espnGroupIds: sportsAdminString_(row.ESPNGroupIds),
+      espnResultLimit: sportsAdminNumber_(row.ESPNResultLimit, 500),
+      selectedTeamIds: sportsAdminString_(row.SelectedTeamIds),
+      seasonStartDate: normalizeSportsDateOnly_(row.SeasonStartDate),
+      seasonEndDate: normalizeSportsDateOnly_(row.SeasonEndDate),
+      regularSeasonStartDate: normalizeSportsDateOnly_(row.RegularSeasonStartDate),
+      regularSeasonEndDate: normalizeSportsDateOnly_(row.RegularSeasonEndDate),
+      preseasonEnabled: normalizeSportsBoolean_(row.PreseasonEnabled),
+      preseasonStartDate: normalizeSportsDateOnly_(row.PreseasonStartDate),
+      preseasonEndDate: normalizeSportsDateOnly_(row.PreseasonEndDate),
+      postseasonEnabled: normalizeSportsBoolean_(row.PostseasonEnabled),
+      postseasonStartDate: normalizeSportsDateOnly_(row.PostseasonStartDate),
+      postseasonEndDate: normalizeSportsDateOnly_(row.PostseasonEndDate),
+      tournamentEnabled: normalizeSportsBoolean_(row.TournamentEnabled),
+      tournamentStartDate: normalizeSportsDateOnly_(row.TournamentStartDate),
+      tournamentEndDate: normalizeSportsDateOnly_(row.TournamentEndDate),
+      bowlEnabled: normalizeSportsBoolean_(row.BowlEnabled),
+      bowlStartDate: normalizeSportsDateOnly_(row.BowlStartDate),
+      bowlEndDate: normalizeSportsDateOnly_(row.BowlEndDate),
+      snapshotRetentionDays: sportsAdminNumber_(row.SnapshotRetentionDays, 14),
+      archiveEnabled: normalizeSportsBoolean_(row.ArchiveEnabled),
+      archiveAfterDays: sportsAdminNumber_(row.ArchiveAfterDays, 30),
+      archiveMode: sportsAdminString_(row.ArchiveMode || "MOVE").toUpperCase(),
+      archiveLastRunAt: row.ArchiveLastRunAt || "",
+      archiveLastStatus: sportsAdminString_(row.ArchiveLastStatus),
+      archiveRowsLastRun: sportsAdminNumber_(row.ArchiveRowsLastRun, 0)
+    };
+
+    const phase = sportsGetSeasonPhase_({
+      SeasonStartDate: setting.seasonStartDate,
+      SeasonEndDate: setting.seasonEndDate,
+      RegularSeasonStartDate: setting.regularSeasonStartDate,
+      RegularSeasonEndDate: setting.regularSeasonEndDate,
+      PreseasonEnabled: setting.preseasonEnabled,
+      PreseasonStartDate: setting.preseasonStartDate,
+      PreseasonEndDate: setting.preseasonEndDate,
+      PostseasonEnabled: setting.postseasonEnabled,
+      PostseasonStartDate: setting.postseasonStartDate,
+      PostseasonEndDate: setting.postseasonEndDate,
+      TournamentEnabled: setting.tournamentEnabled,
+      TournamentStartDate: setting.tournamentStartDate,
+      TournamentEndDate: setting.tournamentEndDate,
+      BowlEnabled: setting.bowlEnabled,
+      BowlStartDate: setting.bowlStartDate,
+      BowlEndDate: setting.bowlEndDate
+    }, today);
+    setting.seasonActive = phase.active;
+    setting.seasonPhase = phase.phase;
+    return setting;
+  });
+
+  return { success: true, count: rows.length, leagues: rows };
+}
+
+function apiUpdateSportsLeagueSetting_(params) {
+  assertSportsAdmin_(params);
+  ensureSportsControlsV12SettingsColumns_();
+
+  const league = sportsAdminKey_(params.league);
+  const sport = sportsAdminKey_(params.sport);
+  if (!league) throw new Error("league is required");
+
+  const scheduleSource = sportsAdminString_(params.scheduleSource || "HYBRID").toUpperCase();
+  const requireDates = scheduleSource === "MANUAL";
+
+  function validateRange_(label, enabled, startDate, endDate) {
+    if (!enabled) return;
+    const start = normalizeSportsDateOnly_(startDate);
+    const end = normalizeSportsDateOnly_(endDate);
+    if (requireDates && (!start || !end)) throw new Error(label + " start and end dates are required when Manual Dates mode is used");
+    if (start && end && start > end) throw new Error(label + " start date cannot be after end date");
+  }
+
+  const mainStart = normalizeSportsDateOnly_(params.seasonStartDate);
+  const mainEnd = normalizeSportsDateOnly_(params.seasonEndDate);
+  if (mainStart && mainEnd && mainStart > mainEnd) throw new Error("Season start date cannot be after end date");
+  if (requireDates && ((mainStart && !mainEnd) || (!mainStart && mainEnd))) throw new Error("Season start and end dates must both be entered in Manual Dates mode");
+
+  validateRange_("Preseason", sportsAdminBoolean_(params.preseasonEnabled, false), params.preseasonStartDate, params.preseasonEndDate);
+  validateRange_("Regular season", true, params.regularSeasonStartDate, params.regularSeasonEndDate);
+  validateRange_("Postseason", sportsAdminBoolean_(params.postseasonEnabled, false), params.postseasonStartDate, params.postseasonEndDate);
+  validateRange_("Tournament", sportsAdminBoolean_(params.tournamentEnabled, false), params.tournamentStartDate, params.tournamentEndDate);
+  validateRange_("Bowl", sportsAdminBoolean_(params.bowlEnabled, false), params.bowlStartDate, params.bowlEndDate);
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) throw new Error("SportsSettings has no rows");
+  const headers = data[0].map(function(header) { return sportsAdminString_(header); });
+  const col = sportsAdminHeaderMap_(headers);
+  let updated = 0;
+  let updatedRow = null;
+
+  for (let i = 1; i < data.length; i++) {
+    const rowSport = sportsAdminKey_(data[i][col.Sport]);
+    const rowLeague = sportsAdminKey_(data[i][col.League]);
+    if (rowLeague !== league || (sport && rowSport !== sport)) continue;
+
+    const patch = {};
+    const fields = [
+      ["enabled", "Enabled", function(v) { return sportsAdminBoolean_(v, true); }],
+      ["pollPreGameMinutes", "PollPreGameMinutes", function(v) { return sportsAdminNumber_(v, 30); }],
+      ["pollLiveMinutes", "PollLiveMinutes", function(v) { return sportsAdminNumber_(v, 1); }],
+      ["pollFinalMinutes", "PollFinalMinutes", function(v) { return sportsAdminNumber_(v, 60); }],
+      ["savePeriodSnapshots", "SavePeriodSnapshots", function(v) { return sportsAdminBoolean_(v, true); }],
+      ["espnScoreboardUrl", "ESPNScoreboardUrl", sportsAdminString_],
+      ["seasonTitle", "SeasonTitle", sportsAdminString_],
+      ["seasonStartDate", "SeasonStartDate", normalizeSportsDateOnly_],
+      ["seasonEndDate", "SeasonEndDate", normalizeSportsDateOnly_],
+      ["preseasonEnabled", "PreseasonEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
+      ["preseasonStartDate", "PreseasonStartDate", normalizeSportsDateOnly_],
+      ["preseasonEndDate", "PreseasonEndDate", normalizeSportsDateOnly_],
+      ["postseasonEnabled", "PostseasonEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
+      ["postseasonStartDate", "PostseasonStartDate", normalizeSportsDateOnly_],
+      ["postseasonEndDate", "PostseasonEndDate", normalizeSportsDateOnly_],
+      ["tournamentEnabled", "TournamentEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
+      ["tournamentStartDate", "TournamentStartDate", normalizeSportsDateOnly_],
+      ["tournamentEndDate", "TournamentEndDate", normalizeSportsDateOnly_],
+      ["bowlEnabled", "BowlEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
+      ["bowlStartDate", "BowlStartDate", normalizeSportsDateOnly_],
+      ["bowlEndDate", "BowlEndDate", normalizeSportsDateOnly_],
+      ["snapshotRetentionDays", "SnapshotRetentionDays", function(v) { return Math.max(1, sportsAdminNumber_(v, 14)); }],
+      ["archiveEnabled", "ArchiveEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
+      ["archiveAfterDays", "ArchiveAfterDays", function(v) { return Math.max(1, sportsAdminNumber_(v, 30)); }],
+      ["archiveMode", "ArchiveMode", function(v) { return sportsAdminString_(v).toUpperCase() === "COPY" ? "COPY" : "MOVE"; }]
+    ].concat(sportsAdminV13SettingFields_());
+
+    fields.forEach(function(field) {
+      if (params[field[0]] !== undefined) patch[field[1]] = field[2](params[field[0]]);
+    });
+
+    Object.keys(patch).forEach(function(key) {
+      if (col[key] !== undefined) sh.getRange(i + 1, col[key] + 1).setValue(patch[key]);
+    });
+
+    updated++;
+    updatedRow = i + 1;
+  }
+
+  if (!updated) throw new Error("No SportsSettings row found for league: " + league);
+  logSports_("INFO", "apiUpdateSportsLeagueSetting_", "Updated sports league v13 settings", JSON.stringify({ league: league, sport: sport, row: updatedRow, scheduleSource: scheduleSource }));
+  return { success: true, updated: updated, league: league, sport: sport || "", row: updatedRow };
+}
+
+function apiCreateSportsSeasonJobsAdmin_(params) {
+  assertSportsAdmin_(params);
+
+  const startDate = normalizeSportsDateOnly_(params.startDate);
+  const endDate = normalizeSportsDateOnly_(params.endDate);
+  const batchDays = sportsAdminNumber_(params.batchDays, 2);
+
+  if (!startDate || !endDate) throw new Error("startDate and endDate are required");
+
+  return createSportsSeasonJobsForDateRange_(startDate, endDate, batchDays, {
+    league: params.league || "",
+    sport: params.sport || "",
+    season: params.season || "",
+    seasonName: params.seasonName || params.season || "",
+    seasonYear: params.seasonYear || "",
+    scheduleSource: params.scheduleSource || "HYBRID"
+  });
 }

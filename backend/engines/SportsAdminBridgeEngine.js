@@ -420,6 +420,42 @@ function apiAdminUpdateSportsLeagueSetting(payload) {
       seasonTitle:
         payload.seasonTitle,
 
+      seasonYear:
+        payload.seasonYear,
+
+      scheduleSource:
+        payload.scheduleSource,
+
+      espnSeasonTypesEnabled:
+        payload.espnSeasonTypesEnabled,
+
+      espnPreseasonType:
+        payload.espnPreseasonType,
+
+      espnRegularSeasonType:
+        payload.espnRegularSeasonType,
+
+      espnPostseasonType:
+        payload.espnPostseasonType,
+
+      espnTournamentType:
+        payload.espnTournamentType,
+
+      espnBowlType:
+        payload.espnBowlType,
+
+      collegeCoverageMode:
+        payload.collegeCoverageMode,
+
+      espnGroupIds:
+        payload.espnGroupIds,
+
+      espnResultLimit:
+        payload.espnResultLimit,
+
+      selectedTeamIds:
+        payload.selectedTeamIds,
+
       seasonActive:
         payload.seasonActive,
 
@@ -521,6 +557,22 @@ function apiAdminPreviewSportsLeagueArchive(payload) {
 
 }
 
+function apiAdminRunSportsArchiveNow(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "runSportsArchiveNowAdmin",
+    {
+      league:
+        payload.league || ""
+    }
+  );
+
+}
+
 function apiAdminRepairSportsScoreDisplay(payload) {
 
   sportsAdminBridgeRequireAdmin_(
@@ -590,6 +642,12 @@ function apiAdminCreateSportsSeasonJobs(payload) {
 
       season:
         payload.season || "",
+
+      seasonYear:
+        payload.seasonYear || "",
+
+      scheduleSource:
+        payload.scheduleSource || "HYBRID",
 
       seasonName:
         payload.seasonName || ""

@@ -2065,6 +2065,28 @@ function adminSportsInfoText_(
       "Start date for bowl/playoff window.",
     bowlEnd:
       "End date for bowl/playoff window.",
+    scheduleSource:
+      "ESPN Season Types uses ESPN preseason/regular/postseason filters. Manual Dates uses only your date windows. Hybrid uses ESPN type filters when available and dates as a safety window.",
+    seasonYear:
+      "Season year sent to ESPN, such as 2026. This is separate from the display title.",
+    scheduleBatchDays:
+      "How many calendar days one schedule job should process at a time. Use 14 for normal speed, 7 for large college pulls, and 30 only if Apps Script does not time out.",
+    espnSeasonTypes:
+      "When ON, Build Schedule includes ESPN seasontype filters: 1 preseason, 2 regular season, 3 postseason.",
+    espnPreseasonType:
+      "ESPN seasontype for preseason. Default is 1.",
+    espnRegularSeasonType:
+      "ESPN seasontype for regular season. Default is 2.",
+    espnPostseasonType:
+      "ESPN seasontype for postseason/playoffs. Default is 3.",
+    collegeCoverage:
+      "College coverage controls whether ESPN pulls top 25 only, all D1/FBS groups, selected conference/group IDs, or selected school/team schedules.",
+    espnGroupIds:
+      "Comma-separated ESPN group or conference IDs. College football all FBS is usually 80. Men's college basketball D1 is usually 50.",
+    espnResultLimit:
+      "Maximum ESPN events to request per scoreboard call. College basketball may need 500 or more to avoid missing smaller schools.",
+    selectedTeamIds:
+      "Comma-separated ESPN team IDs. Use this for smaller schools that exist on ESPN but do not reliably appear in the main scoreboard feed.",
     scoresOn:
       "Turns ESPN score pulls on or off for this league. If OFF, scores, clocks, and finals are not refreshed for this league.",
     pregame:
@@ -2106,13 +2128,19 @@ function adminSportsInfoText_(
     leagueState:
       "Turns the whole league on or off. Turning it off stops schedule, scores, odds, snapshots, and smart sync for this league.",
     buildSchedule:
-      "Creates a schedule/season job for this league using the selected season start and end dates.",
+      "Creates or refreshes SportsSeasonJobs for this league from the Season section date range. It builds the job list; the season batch runner does the ESPN pulls.",
     previewArchive:
       "Shows what rows would be eligible for archive/cleanup. This preview does not move or delete anything.",
+    runArchive:
+      "Saves this league card, then runs archive cleanup now for this league only. COPY is safest for testing; MOVE removes copied rows from the live sheets.",
     repairRecords:
       "Repairs display fields such as team records and clocks when existing SportsScores rows look stale or malformed.",
     runSmartSync:
       "Runs smart sports sync immediately for scores, odds, wager sync, and settlements that are due.",
+    refreshScoresNow:
+      "Refreshes the current ESPN scoreboards in the external Sports Scores Engine. Use this when scores, records, or clocks look stale.",
+    refreshScoresWindow:
+      "Refreshes a date window around today in the external Sports Scores Engine. This catches yesterday, today, and upcoming games that may not be in the current scoreboard pull.",
     smartAutomationToggle:
       "One master button for Smart Sports Automation. Enabled installs the smart trigger; Disabled removes it.",
     automationSummary:
@@ -2178,8 +2206,13 @@ function adminSportsPositionInfoPopup_(box, button) {
     return;
   }
 
-  const rect =
-    button.getBoundingClientRect();
+  const wrap =
+    button.closest(".sports-info-wrap") ||
+    button.parentElement;
+
+  if (!wrap) {
+    return;
+  }
 
   const margin = 12;
   const viewportWidth =
@@ -2193,10 +2226,17 @@ function adminSportsPositionInfoPopup_(box, button) {
       window.innerHeight || 0
     );
 
-  box.style.position = "fixed";
+  const buttonRect =
+    button.getBoundingClientRect();
+
+  const wrapRect =
+    wrap.getBoundingClientRect();
+
+  box.style.position = "absolute";
+  box.style.transform = "none";
   box.style.left = "0px";
-  box.style.top = "0px";
   box.style.right = "auto";
+  box.style.top = "calc(100% + 7px)";
   box.style.bottom = "auto";
   box.style.maxWidth =
     Math.max(180, viewportWidth - margin * 2) + "px";
@@ -2216,40 +2256,32 @@ function adminSportsPositionInfoPopup_(box, button) {
       viewportHeight - margin * 2
     );
 
-  let left =
-    rect.left + rect.width / 2 - width / 2;
+  const desiredLeftInViewport =
+    buttonRect.left + buttonRect.width / 2 - width / 2;
 
-  left =
+  const leftInViewport =
     Math.max(
       margin,
       Math.min(
-        left,
+        desiredLeftInViewport,
         viewportWidth - width - margin
       )
     );
 
-  let top =
-    rect.bottom + 8;
-
-  if (top + height > viewportHeight - margin) {
-    top =
-      rect.top - height - 8;
-  }
-
-  top =
-    Math.max(
-      margin,
-      Math.min(
-        top,
-        viewportHeight - height - margin
-      )
-    );
-
   box.style.left =
-    Math.round(left) + "px";
+    Math.round(leftInViewport - wrapRect.left) + "px";
 
-  box.style.top =
-    Math.round(top) + "px";
+  const placeAbove =
+    buttonRect.bottom + height + 10 > viewportHeight - margin &&
+    buttonRect.top - height - 10 > margin;
+
+  if (placeAbove) {
+    box.style.top = "auto";
+    box.style.bottom = "calc(100% + 7px)";
+  } else {
+    box.style.top = "calc(100% + 7px)";
+    box.style.bottom = "auto";
+  }
 
 }
 
@@ -2282,6 +2314,19 @@ function adminSportsInitInfoHandlers_() {
           infoButton
         );
 
+        return;
+      }
+
+      const localToggle =
+        event.target && event.target.closest
+          ? event.target.closest("[data-sports-local-toggle]")
+          : null;
+
+      if (localToggle) {
+        adminSportsToggleLocalSwitch_(
+          event,
+          localToggle
+        );
         return;
       }
 
@@ -2329,6 +2374,185 @@ function adminSportsInitInfoHandlers_() {
         adminSportsCloseInfoPopups_();
       }
     }
+  );
+
+}
+
+
+function adminSportsActionProgressText_(button) {
+
+  const label =
+    String(
+      button && button.textContent
+        ? button.textContent
+        : ""
+    )
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLowerCase();
+
+  if (label.indexOf("save") >= 0) {
+    return "Saving...";
+  }
+
+  if (label.indexOf("build") >= 0) {
+    return "Building...";
+  }
+
+  if (label.indexOf("archive") >= 0) {
+    return label.indexOf("preview") >= 0
+      ? "Previewing..."
+      : "Archiving...";
+  }
+
+  if (label.indexOf("refresh") >= 0) {
+    return "Refreshing...";
+  }
+
+  if (label.indexOf("repair") >= 0) {
+    return "Repairing...";
+  }
+
+  if (label.indexOf("default") >= 0) {
+    return "Applying...";
+  }
+
+  return "Working...";
+
+}
+
+function adminSportsSetActionProgress_(button, message) {
+
+  const wrap =
+    button && button.closest
+      ? button.closest(".sports-action-wrap")
+      : null;
+
+  if (!wrap) {
+    return;
+  }
+
+  const status =
+    wrap.querySelector(".sports-action-status");
+
+  const text =
+    wrap.querySelector("[data-sports-status-text]");
+
+  if (text) {
+    text.textContent =
+      message || "Working...";
+  }
+
+  if (status) {
+    status.removeAttribute("hidden");
+  }
+
+  wrap.classList.add("is-working");
+
+}
+
+function adminSportsClearActionProgress_(button) {
+
+  const wrap =
+    button && button.closest
+      ? button.closest(".sports-action-wrap")
+      : null;
+
+  if (!wrap) {
+    return;
+  }
+
+  const status =
+    wrap.querySelector(".sports-action-status");
+
+  if (status) {
+    status.setAttribute("hidden", "hidden");
+  }
+
+  wrap.classList.remove("is-working");
+
+}
+
+function adminSportsMarkDashboardStale_(message) {
+
+  const panel =
+    document.getElementById("adminSportsControlPanel");
+
+  if (panel) {
+    panel.setAttribute("data-sports-dashboard-stale", "true");
+  }
+
+  const reloadHint =
+    document.getElementById("sportsControlsReloadHint");
+
+  if (reloadHint) {
+    reloadHint.textContent =
+      message ||
+      "Saved. Controls stayed open. Use Reload Sports Controls when you want fresh counts/status.";
+
+    reloadHint.removeAttribute("hidden");
+  }
+
+}
+
+async function adminReloadSportsControlsNow() {
+
+  adminSportsMessage_(
+    "Reloading Sports Controls...",
+    false
+  );
+
+  await adminLoadSportsControls({ preserveOpen: true });
+
+}
+
+function adminSportsToggleLocalSwitch_(event, button) {
+
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (!button || button.disabled) {
+    return;
+  }
+
+  const inputId =
+    button.getAttribute("data-sports-local-toggle") || "";
+
+  const input =
+    document.getElementById(inputId);
+
+  if (!input) {
+    return;
+  }
+
+  input.checked =
+    !input.checked;
+
+  const label =
+    button.getAttribute("data-sports-toggle-label") ||
+    "Setting";
+
+  const state =
+    input.checked ? "ON" : "OFF";
+
+  button.textContent =
+    label + " " + state;
+
+  button.setAttribute(
+    "aria-pressed",
+    input.checked ? "true" : "false"
+  );
+
+  button.classList.toggle(
+    "is-on",
+    input.checked
+  );
+
+  button.classList.toggle(
+    "is-off",
+    !input.checked
   );
 
 }
@@ -2455,6 +2679,11 @@ async function adminSportsRunActionFromButton_(
 
   button.disabled = true;
 
+  adminSportsSetActionProgress_(
+    button,
+    adminSportsActionProgressText_(button)
+  );
+
   try {
     await fn.apply(
       window,
@@ -2471,6 +2700,7 @@ async function adminSportsRunActionFromButton_(
   } finally {
     if (document.body.contains(button)) {
       button.disabled = oldDisabled;
+      adminSportsClearActionProgress_(button);
     }
   }
 
@@ -2507,7 +2737,6 @@ function adminSportsInfoButton_(
         aria-expanded="false"
         aria-controls="${id}"
         data-sports-info-target="${id}"
-        onclick="adminToggleSportsInfo_(event, '${id}', this)"
       >?</button>
       <span
         id="${id}"
@@ -2984,16 +3213,16 @@ function adminRenderSportsTriggerControls_(
           color: #ffffff;
           font-size: 12px;
           font-weight: 500;
-          left: 12px;
+          left: 0;
           line-height: 1.35;
           max-width: calc(100vw - 24px);
           min-width: 0;
           overflow-wrap: anywhere;
           padding: 9px 10px;
           pointer-events: none;
-          position: fixed;
+          position: absolute;
           right: auto;
-          top: 12px;
+          top: calc(100% + 7px);
           white-space: normal;
           width: min(280px, calc(100vw - 24px));
           z-index: 9999;
@@ -3002,9 +3231,49 @@ function adminRenderSportsTriggerControls_(
           display: none !important;
         }
         .sports-action-wrap {
+          align-items: flex-start;
+          display: inline-flex;
+          flex-direction: column;
+          gap: 4px;
+          min-width: 118px;
+        }
+        .sports-action-row {
           align-items: center;
           display: inline-flex;
           gap: 4px;
+          width: 100%;
+        }
+        .sports-action-status {
+          color: #334155;
+          display: block;
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.2;
+          width: 100%;
+        }
+        .sports-action-status[hidden] {
+          display: none !important;
+        }
+        .sports-action-progress {
+          background: rgba(148, 163, 184, 0.35);
+          border-radius: 999px;
+          display: block;
+          height: 5px;
+          margin: 2px 0 4px;
+          overflow: hidden;
+          width: 100%;
+        }
+        .sports-action-progress span {
+          animation: sportsActionProgress 1s ease-in-out infinite;
+          background: rgba(37, 99, 235, 0.9);
+          border-radius: 999px;
+          display: block;
+          height: 100%;
+          width: 45%;
+        }
+        @keyframes sportsActionProgress {
+          0% { transform: translateX(-110%); }
+          100% { transform: translateX(250%); }
         }
         .sports-control-section {
           border: 1px solid rgba(148, 163, 184, 0.35);
@@ -3033,25 +3302,38 @@ function adminRenderSportsTriggerControls_(
           flex-shrink: 0;
           gap: 8px;
         }
-        .sports-header-toggle,
-        .sports-league-toggle {
-          align-items: center;
-          display: inline-flex;
-          gap: 6px;
+        .sports-state-toggle {
+          border: 1px solid rgba(148, 163, 184, 0.55);
+          border-radius: 999px;
+          cursor: pointer;
+          font-size: 11px;
+          font-weight: 900;
+          letter-spacing: 0.02em;
+          line-height: 1;
+          padding: 7px 10px;
+          text-transform: uppercase;
           white-space: nowrap;
         }
-        .sports-header-toggle input,
-        .sports-league-toggle input {
-          cursor: pointer;
-          height: 16px;
-          width: 16px;
+        .sports-state-toggle.is-on {
+          background: #dcfce7;
+          border-color: #16a34a;
+          color: #166534;
         }
-        .sports-header-toggle-text,
-        .sports-league-toggle-text {
-          font-size: 11px;
-          font-weight: 800;
-          letter-spacing: 0.02em;
-          text-transform: uppercase;
+        .sports-state-toggle.is-off {
+          background: #f1f5f9;
+          border-color: #94a3b8;
+          color: #475569;
+        }
+        .sports-state-toggle:disabled {
+          cursor: not-allowed;
+          opacity: 0.55;
+        }
+        .sports-toggle-hidden-input {
+          height: 1px !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          position: absolute !important;
+          width: 1px !important;
         }
         .sports-league-topline {
           align-items: center;
@@ -3094,12 +3376,12 @@ function adminRenderSportsTriggerControls_(
             flex-direction: column;
           }
           .sports-action-wrap,
-          .sports-action-wrap button {
+          .sports-action-wrap button,
+          .sports-action-row {
             width: 100%;
           }
           .sports-action-wrap {
-            align-items: center;
-            flex-direction: row;
+            align-items: stretch;
           }
           .sports-control-section > summary {
             align-items: flex-start;
@@ -3144,6 +3426,22 @@ function adminRenderSportsTriggerControls_(
         )}
 
         ${adminSportsActionButton_(
+          "Refresh ESPN Scores Now",
+          "admin-small-button secondary",
+          "adminRefreshSportsScoresNow()",
+          "refreshScoresNow",
+          "global"
+        )}
+
+        ${adminSportsActionButton_(
+          "Refresh Score Window",
+          "admin-small-button secondary",
+          "adminRefreshSportsScoresWindow()",
+          "refreshScoresWindow",
+          "global"
+        )}
+
+        ${adminSportsActionButton_(
           smartEnabled
             ? "Smart Sports Automation Enabled"
             : "Smart Sports Automation Disabled",
@@ -3154,6 +3452,23 @@ function adminRenderSportsTriggerControls_(
           "smartAutomationToggle",
           "global"
         )}
+
+        ${adminSportsActionButton_(
+          "Reload Sports Controls",
+          "admin-small-button secondary",
+          "adminReloadSportsControlsNow()",
+          "reloadSportsControls",
+          "global"
+        )}
+      </div>
+
+      <div
+        id="sportsControlsReloadHint"
+        class="admin-sub"
+        hidden
+        style="margin-top:8px; font-weight:700;"
+      >
+        Saved. Controls stayed open. Use Reload Sports Controls when you want fresh counts/status.
       </div>
 
     </div>
@@ -3310,26 +3625,39 @@ function adminRenderSportsHeaderSwitch_(
   className
 ) {
 
-  const text =
-    checked
-      ? String(label || "On") + " ON"
-      : String(label || "On") + " OFF";
+  const inputId =
+    adminSportsInputId_(prefix, leagueCode);
+
+  const state =
+    checked ? "ON" : "OFF";
+
+  const actionAttrs =
+    String(extraAttrs || "").indexOf("data-sports-click") >= 0
+      ? extraAttrs
+      : "";
+
+  const localAttrs =
+    actionAttrs
+      ? ""
+      : `data-sports-local-toggle="${inputId}" data-sports-toggle-label="${adminSportsEscape_(label || "Setting")}"`;
 
   return `
-    <label
-      class="${adminSportsEscape_(className || "sports-header-toggle")}"
-      data-sports-summary-control="true"
-      onclick="event.stopPropagation()"
-    >
-      <span class="${className === "sports-league-toggle" ? "sports-league-toggle-text" : "sports-header-toggle-text"}">${adminSportsEscape_(text)}</span>
+    <span class="sports-toggle-wrap ${adminSportsEscape_(className || "")}" data-sports-summary-control="true">
       <input
         type="checkbox"
-        id="${adminSportsInputId_(prefix, leagueCode)}"
+        class="sports-toggle-hidden-input"
+        id="${inputId}"
         ${checked ? "checked" : ""}
         ${disabledAttr || ""}
-        ${extraAttrs || ""}
       >
-    </label>
+      <button
+        type="button"
+        class="sports-state-toggle ${checked ? "is-on" : "is-off"}"
+        aria-pressed="${checked ? "true" : "false"}"
+        ${disabledAttr || ""}
+        ${actionAttrs || localAttrs}
+      >${adminSportsEscape_(String(label || "Setting") + " " + state)}</button>
+    </span>
   `;
 
 }
@@ -3352,7 +3680,6 @@ function adminSportsSection_(
         <span
           class="sports-section-controls"
           data-sports-summary-control="true"
-          onclick="event.stopPropagation()"
         >
           ${headerControl || ""}
           ${adminSportsInfoButton_(key, leagueCode, title)}
@@ -3377,15 +3704,21 @@ function adminSportsActionButton_(
 
   return `
     <span class="sports-action-wrap">
-      <button
-        type="button"
-        class="${adminSportsEscape_(className || "admin-small-button")}"
-        data-sports-click="${adminSportsEscape_(onclick || "")}"
-        ${extraAttrs || ""}
-      >
-        ${adminSportsEscape_(label)}
-      </button>
-      ${adminSportsInfoButton_(infoKey || "save", leagueCode || "global", label)}
+      <span class="sports-action-row">
+        <button
+          type="button"
+          class="${adminSportsEscape_(className || "admin-small-button")}"
+          data-sports-click="${adminSportsEscape_(onclick || "")}"
+          ${extraAttrs || ""}
+        >
+          ${adminSportsEscape_(label)}
+        </button>
+        ${adminSportsInfoButton_(infoKey || "save", leagueCode || "global", label)}
+      </span>
+      <span class="sports-action-status" hidden>
+        <span class="sports-action-progress"><span></span></span>
+        <span data-sports-status-text>Working...</span>
+      </span>
     </span>
   `;
 
@@ -3664,6 +3997,9 @@ function adminRenderScoreLeagueControls_(
               "sports-header-toggle"
             );
 
+          const isCollegeLeague =
+            ["college-football", "mens-college-basketball", "womens-college-basketball"].indexOf(String(leagueCode || "").toLowerCase()) !== -1;
+
           const seasonYear =
             adminSportsSeasonYear_(
               league.seasonTitle || league.season || health.season
@@ -3691,11 +4027,44 @@ function adminRenderScoreLeagueControls_(
           const seasonBody = `
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
               ${adminRenderSportsTextField_("Season title", "sportsSeasonTitle", leagueCode, league.seasonTitle || league.season || health.season, seasonYear, "season", "")}
-              ${adminRenderSportsDateField_("Start", "sportsSeasonStart", leagueCode, seasonStartDate, "seasonStart", controlsDisabled)}
-              ${adminRenderSportsDateField_("End", "sportsSeasonEnd", leagueCode, seasonEndDate, "seasonEnd", controlsDisabled)}
-              ${adminRenderSportsDateField_("Regular start", "sportsRegularStart", leagueCode, league.regularSeasonStartDate || health.regularSeasonStartDate, "regularStart", controlsDisabled)}
-              ${adminRenderSportsDateField_("Regular end", "sportsRegularEnd", leagueCode, league.regularSeasonEndDate || health.regularSeasonEndDate, "regularEnd", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Season year", "sportsSeasonYear", leagueCode, league.seasonYear || health.seasonYear || seasonYear, seasonYear, 2000, 2100, "seasonYear", controlsDisabled)}
+              ${adminRenderSportsSelectField_("Schedule source", "sportsScheduleSource", leagueCode, league.scheduleSource || "HYBRID", [
+                { value: "HYBRID", label: "ESPN + Dates" },
+                { value: "ESPN_TYPES", label: "ESPN Season Types" },
+                { value: "MANUAL", label: "Manual Dates" }
+              ], "scheduleSource", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Batch days", "sportsScheduleBatchDaysLeague", leagueCode, league.scheduleBatchDays, isCollegeLeague ? 7 : 14, 1, 30, "scheduleBatchDays", controlsDisabled)}
+              ${adminRenderSportsHeaderSwitch_("ESPN Types", "sportsESPNSeasonTypesEnabled", leagueCode, league.espnSeasonTypesEnabled !== false, "espnSeasonTypes", controlsDisabled, "", "sports-header-toggle")}
             </div>
+
+            <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap:8px; margin-top:8px;">
+              ${adminRenderSportsNumberField_("Pre type", "sportsESPNPreseasonType", leagueCode, league.espnPreseasonType, 1, 1, 9, "espnPreseasonType", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Regular type", "sportsESPNRegularType", leagueCode, league.espnRegularSeasonType, 2, 1, 9, "espnRegularSeasonType", controlsDisabled)}
+              ${adminRenderSportsNumberField_("Post type", "sportsESPNPostseasonType", leagueCode, league.espnPostseasonType, 3, 1, 9, "espnPostseasonType", controlsDisabled)}
+            </div>
+
+            <details style="margin-top:8px;" ${isCollegeLeague ? "open" : ""}>
+              <summary style="cursor:pointer; font-weight:700;">Advanced dates / college coverage</summary>
+              <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-top:8px;">
+                ${adminRenderSportsDateField_("Start", "sportsSeasonStart", leagueCode, seasonStartDate, "seasonStart", controlsDisabled)}
+                ${adminRenderSportsDateField_("End", "sportsSeasonEnd", leagueCode, seasonEndDate, "seasonEnd", controlsDisabled)}
+                ${adminRenderSportsDateField_("Regular start", "sportsRegularStart", leagueCode, league.regularSeasonStartDate || health.regularSeasonStartDate, "regularStart", controlsDisabled)}
+                ${adminRenderSportsDateField_("Regular end", "sportsRegularEnd", leagueCode, league.regularSeasonEndDate || health.regularSeasonEndDate, "regularEnd", controlsDisabled)}
+              </div>
+              ${isCollegeLeague ? `
+                <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-top:8px;">
+                  ${adminRenderSportsSelectField_("College coverage", "sportsCollegeCoverageMode", leagueCode, league.collegeCoverageMode || "ALL_D1", [
+                    { value: "TOP_25", label: "Top 25 only" },
+                    { value: "ALL_D1", label: "All D1 / FBS" },
+                    { value: "CONFERENCES", label: "Selected groups" },
+                    { value: "SELECTED_SCHOOLS", label: "Selected schools" }
+                  ], "collegeCoverage", controlsDisabled)}
+                  ${adminRenderSportsTextField_("Group IDs", "sportsESPNGroupIds", leagueCode, league.espnGroupIds || "", leagueCode === "college-football" ? "80" : "50", "espnGroupIds", controlsDisabled)}
+                  ${adminRenderSportsNumberField_("Result limit", "sportsESPNResultLimit", leagueCode, league.espnResultLimit, 500, 25, 1000, "espnResultLimit", controlsDisabled)}
+                  ${adminRenderSportsTextField_("Team IDs", "sportsSelectedTeamIds", leagueCode, league.selectedTeamIds || "", "", "selectedTeamIds", controlsDisabled)}
+                </div>
+              ` : ""}
+            </details>
 
             <div class="admin-sub" style="margin-top:8px;">
               Current phase: ${phaseLabel}. Optional phase date fields appear only when the phase is enabled.
@@ -3706,6 +4075,10 @@ function adminRenderScoreLeagueControls_(
               ${adminRenderSportsPhaseWindow_("Postseason", "Postseason", leagueCode, league.postseasonEnabled, league.postseasonStartDate || health.postseasonStartDate, league.postseasonEndDate || health.postseasonEndDate, "postseasonStart", "postseasonEnd", controlsDisabled)}
               ${adminRenderSportsPhaseWindow_("Tournament", "Tournament", leagueCode, league.tournamentEnabled, league.tournamentStartDate || health.tournamentStartDate, league.tournamentEndDate || health.tournamentEndDate, "tournamentStart", "tournamentEnd", controlsDisabled)}
               ${adminRenderSportsPhaseWindow_("Bowl", "Bowl", leagueCode, league.bowlEnabled, league.bowlStartDate || health.bowlStartDate, league.bowlEndDate || health.bowlEndDate, "bowlStart", "bowlEnd", controlsDisabled)}
+            </div>
+
+            <div class="sports-league-actions">
+              ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
             </div>
           `;
 
@@ -3753,6 +4126,7 @@ function adminRenderScoreLeagueControls_(
 
             <div class="sports-league-actions">
               ${adminSportsActionButton_("Preview Archive", "admin-small-button secondary", "adminPreviewSportsLeagueArchive('" + leagueCode + "')", "previewArchive", leagueCode, controlsDisabled)}
+              ${adminSportsActionButton_("Run Archive Now", "admin-small-button", "adminRunSportsLeagueArchiveNow('" + leagueCode + "', '" + sport + "')", "runArchive", leagueCode, controlsDisabled)}
             </div>
           `;
 
@@ -3811,7 +4185,6 @@ function adminRenderScoreLeagueControls_(
               <div class="sports-league-actions">
                 ${adminSportsActionButton_("Defaults", "admin-small-button secondary", "adminApplySportsLeagueDefaults('" + leagueCode + "')", "defaults", leagueCode, "")}
                 ${adminSportsActionButton_("Save", "admin-small-button", "adminSaveSportsScoreLeagueSettings('" + leagueCode + "', '" + sport + "')", "save", leagueCode, "")}
-                ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
               </div>
 
             </details>
@@ -3869,9 +4242,9 @@ function adminRenderScheduleControls_() {
           <input
             type="number"
             id="sportsScheduleBatchDays"
-            value="2"
+            value="14"
             min="1"
-            max="7"
+            max="30"
           >
         </label>
 
@@ -4054,8 +4427,12 @@ function adminRenderOddsControls_(
 
 async function adminSaveSportsScoreLeagueSettings(
   league,
-  sport
+  sport,
+  options
 ) {
+
+  options =
+    options || {};
 
   function leagueEl_(prefix) {
     return document.getElementById(
@@ -4088,10 +4465,12 @@ async function adminSaveSportsScoreLeagueSettings(
     return el.value;
   }
 
-  adminSportsMessage_(
-    "Saving league settings for " + league + "...",
-    false
-  );
+  if (!options.silent) {
+    adminSportsMessage_(
+      "Saving league settings for " + league + "...",
+      false
+    );
+  }
 
   const res =
     await apiAdminUpdateSportsLeagueSetting(
@@ -4105,6 +4484,17 @@ async function adminSaveSportsScoreLeagueSettings(
         savePeriodSnapshots: leagueChecked_("sportsSnapshots", false),
         season: leagueValue_("sportsSeasonTitle", ""),
         seasonTitle: leagueValue_("sportsSeasonTitle", ""),
+        seasonYear: leagueValue_("sportsSeasonYear", adminSportsSeasonYear_(leagueValue_("sportsSeasonTitle", ""))),
+        scheduleSource: leagueValue_("sportsScheduleSource", "HYBRID"),
+        scheduleBatchDays: leagueValue_("sportsScheduleBatchDaysLeague", leagueCode === "college-football" || leagueCode === "mens-college-basketball" || leagueCode === "womens-college-basketball" ? 7 : 14),
+        espnSeasonTypesEnabled: leagueChecked_("sportsESPNSeasonTypesEnabled", true),
+        espnPreseasonType: leagueValue_("sportsESPNPreseasonType", 1),
+        espnRegularSeasonType: leagueValue_("sportsESPNRegularType", 2),
+        espnPostseasonType: leagueValue_("sportsESPNPostseasonType", 3),
+        collegeCoverageMode: leagueValue_("sportsCollegeCoverageMode", "ALL_D1"),
+        espnGroupIds: leagueValue_("sportsESPNGroupIds", ""),
+        espnResultLimit: leagueValue_("sportsESPNResultLimit", 500),
+        selectedTeamIds: leagueValue_("sportsSelectedTeamIds", ""),
         seasonActive: leagueChecked_("sportsSeasonActive", true),
         seasonStartDate: leagueDateValue_("sportsSeasonStart"),
         seasonEndDate: leagueDateValue_("sportsSeasonEnd"),
@@ -4135,20 +4525,17 @@ async function adminSaveSportsScoreLeagueSettings(
       }
     );
 
-  adminSportsMessage_(
-    res && res.success
-      ? "Smart poll settings saved."
-      : (res && (res.error || res.message)) ||
-        "Unable to save smart poll settings.",
-    !(res && res.success)
-  );
-
-  if (res && res.success) {
+  if (!options.silent) {
     adminSportsMessage_(
-      "Smart poll settings saved. Sports Controls stayed open.",
-      false
+      res && res.success
+        ? "Smart poll settings saved. Sports Controls stayed open."
+        : (res && (res.error || res.message)) ||
+          "Unable to save smart poll settings.",
+      !(res && res.success)
     );
   }
+
+  return res;
 
 }
 
@@ -4162,6 +4549,11 @@ function adminApplySportsLeagueDefaults(
     true
   );
 
+
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsESPNSeasonTypesEnabled", league),
+    true
+  );
 
   adminSportsSetCheckbox_(
     adminSportsInputId_("sportsOddsEnabled", league),
@@ -4328,7 +4720,7 @@ async function adminSetSportsLeagueSeasonState(
   );
 
   if (res && res.success) {
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
   }
 
 }
@@ -4370,7 +4762,7 @@ async function adminToggleSportsScoreLeague(
   );
 
   if (res && res.success) {
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
   }
 
 }
@@ -4388,7 +4780,7 @@ async function adminInstallSportsScoresTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4405,7 +4797,7 @@ async function adminRemoveSportsScoresTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4428,7 +4820,7 @@ async function adminRefreshSportsScoresNow() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4469,7 +4861,7 @@ async function adminRunFullSportsSyncNow() {
         false
       );
 
-      await adminLoadSportsControls({ preserveOpen: true });
+      adminSportsMarkDashboardStale_();
       return;
 
     }
@@ -4524,7 +4916,7 @@ async function adminRunFullSportsSyncNow() {
       false
     );
 
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
 
   } catch (err) {
 
@@ -4578,7 +4970,7 @@ async function adminToggleSportsAutomation(
       !(res && res.success)
     );
 
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
 
     return res;
 
@@ -4614,7 +5006,7 @@ async function adminInstallSportsAutomation() {
       !(res && res.success)
     );
 
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
 
     return res;
 
@@ -4654,7 +5046,7 @@ async function adminRemoveSportsAutomation() {
       !(res && res.success)
     );
 
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
 
     return res;
 
@@ -4704,7 +5096,7 @@ async function adminRefreshSportsScoresWindow() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4721,7 +5113,7 @@ async function adminInstallSportsScoresWindowTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4738,7 +5130,7 @@ async function adminRemoveSportsScoresWindowTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4755,7 +5147,7 @@ async function adminInstallSportsWagerAutoSyncTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4772,7 +5164,7 @@ async function adminRemoveSportsWagerAutoSyncTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4831,7 +5223,7 @@ async function adminCreateSportsSeasonJobs() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4862,7 +5254,7 @@ async function adminRunSportsSeasonBatch() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4879,7 +5271,7 @@ async function adminInstallSportsSeasonBatchTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4896,7 +5288,7 @@ async function adminRemoveSportsSeasonBatchTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4934,7 +5326,7 @@ async function adminToggleSportsOddsEnabled(
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -4972,7 +5364,7 @@ async function adminToggleSportsOddsAuto(
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -5009,7 +5401,7 @@ async function adminRefreshSportsOddsLeague(
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -5040,7 +5432,7 @@ async function adminRunSportsOddsHybridRefresh() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -5057,7 +5449,7 @@ async function adminInstallSportsOddsHybridTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }
 
@@ -5074,7 +5466,7 @@ async function adminRemoveSportsOddsHybridTrigger() {
     !(res && res.success)
   );
 
-  await adminLoadSportsControls({ preserveOpen: true });
+  adminSportsMarkDashboardStale_();
 
 }  
 
@@ -5103,8 +5495,20 @@ async function adminCreateSportsLeagueSeasonJobs(
       ? seasonEl.value
       : String(new Date().getFullYear());
 
+  const seasonYearEl =
+    document.getElementById(
+      adminSportsInputId_("sportsSeasonYear", league)
+    );
+
+  const sourceEl =
+    document.getElementById(
+      adminSportsInputId_("sportsScheduleSource", league)
+    );
+
   const year =
-    adminSportsSeasonYear_(season);
+    seasonYearEl && seasonYearEl.value
+      ? seasonYearEl.value
+      : adminSportsSeasonYear_(season);
 
   const startDate =
     startEl && startEl.value
@@ -5116,6 +5520,16 @@ async function adminCreateSportsLeagueSeasonJobs(
       ? endEl.value
       : year + "-12-31";
 
+  const batchDaysEl =
+    document.getElementById(
+      adminSportsInputId_("sportsScheduleBatchDaysLeague", league)
+    );
+
+  const batchDays =
+    batchDaysEl && batchDaysEl.value
+      ? batchDaysEl.value
+      : (league === "college-football" || league === "mens-college-basketball" || league === "womens-college-basketball" ? 7 : 14);
+
   const ok =
     window.confirm(
       "Build schedule job for " +
@@ -5124,7 +5538,9 @@ async function adminCreateSportsLeagueSeasonJobs(
       startDate +
       " to " +
       endDate +
-      "? This creates a league-specific season job and does not pull odds."
+      " using " +
+      batchDays +
+      " day batches? This creates a league-specific season job and does not pull odds."
     );
 
   if (!ok) {
@@ -5140,25 +5556,27 @@ async function adminCreateSportsLeagueSeasonJobs(
     await apiAdminCreateSportsSeasonJobs(
       startDate,
       endDate,
-      2,
+      batchDays,
       {
         league: league,
         sport: sport,
         season: season,
+        seasonYear: year,
+        scheduleSource: sourceEl && sourceEl.value ? sourceEl.value : "HYBRID",
         seasonName: league + " " + season
       }
     );
 
   adminSportsMessage_(
     res && res.success
-      ? (res.message || ("Schedule job ready for " + league + ". New jobs: " + (res.newJobs || 0)))
+      ? (res.message || ("Schedule job ready for " + league + ". New jobs: " + (res.newJobs || 0) + ", updated jobs: " + (res.updatedJobs || 0)))
       : (res && (res.error || res.message)) ||
         "Unable to create schedule job.",
     !(res && res.success)
   );
 
   if (res && res.success) {
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
   }
 
 }
@@ -5212,6 +5630,96 @@ async function adminPreviewSportsLeagueArchive(
 
 }
 
+async function adminRunSportsLeagueArchiveNow(
+  league,
+  sport
+) {
+
+  const ok =
+    window.confirm(
+      "Save current archive settings and run archive now for " +
+      league +
+      "? Use COPY mode first if you are testing."
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    "Saving settings before archive for " + league + "...",
+    false
+  );
+
+  const saveRes =
+    await adminSaveSportsScoreLeagueSettings(
+      league,
+      sport || "",
+      { silent: true }
+    );
+
+  if (!saveRes || saveRes.success === false) {
+    adminSportsMessage_(
+      (saveRes && (saveRes.error || saveRes.message)) ||
+      "Unable to save archive settings before running archive.",
+      true
+    );
+    return;
+  }
+
+  adminSportsMessage_(
+    "Running archive for " + league + "...",
+    false
+  );
+
+  const res =
+    await apiAdminRunSportsArchiveNow(
+      league
+    );
+
+  if (!res || res.success === false) {
+    const firstError =
+      res && res.errors && res.errors.length
+        ? res.errors[0].league + ": " + res.errors[0].error
+        : "";
+
+    adminSportsMessage_(
+      (res && (res.error || res.message)) ||
+      firstError ||
+      "Unable to run archive.",
+      true
+    );
+    return;
+  }
+
+  const totalChanged =
+    Number(res.scoresCopied || 0) +
+    Number(res.scoresRemoved || 0) +
+    Number(res.snapshotsCopied || 0) +
+    Number(res.snapshotsRemoved || 0);
+
+  let archiveMessage =
+    "Archive complete for " + league +
+      ": scores copied " + (res.scoresCopied || 0) +
+      ", scores removed " + (res.scoresRemoved || 0) +
+      ", snapshots copied " + (res.snapshotsCopied || 0) +
+      ", snapshots removed " + (res.snapshotsRemoved || 0) + ".";
+
+  if (!totalChanged) {
+    archiveMessage +=
+      " No eligible rows were old enough to archive. Try Preview Archive or lower Archive days/Snapshot days for testing.";
+  }
+
+  adminSportsMessage_(
+    archiveMessage,
+    false
+  );
+
+  adminSportsMarkDashboardStale_();
+
+}
+
+
 async function adminRepairSportsScoreDisplay() {
 
   adminSportsMessage_(
@@ -5232,7 +5740,7 @@ async function adminRepairSportsScoreDisplay() {
   );
 
   if (res && res.success) {
-    await adminLoadSportsControls({ preserveOpen: true });
+    adminSportsMarkDashboardStale_();
   }
 
 }

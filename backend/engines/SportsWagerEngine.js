@@ -185,6 +185,57 @@ function sportsWagerFirstPresent_(
 
 }
 
+function sportsWagerIsValidRecordDisplay_(value) {
+
+  value =
+    sportsWagerString_(value);
+
+  if (!value) {
+    return false;
+  }
+
+  const lower =
+    value.toLowerCase();
+
+  if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(value)) {
+    return false;
+  }
+
+  if (/^\d{1,2}:\d{2}(?:\s*[ap]m)?$/i.test(value)) {
+    return false;
+  }
+
+  if (
+    /\b(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday)\b/i.test(lower) ||
+    /\b(jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october|nov|november|dec|december)\b/i.test(lower)
+  ) {
+    return false;
+  }
+
+  return /^\d+\s*-\s*\d+(\s*-\s*\d+)?(\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value);
+
+}
+
+function sportsWagerCleanRecordDisplay_(value) {
+
+  value =
+    sportsWagerString_(value);
+
+  return sportsWagerIsValidRecordDisplay_(value)
+    ? value
+    : "";
+
+}
+
+
 function sportsWagerNormalizeScore_(score) {
 
   score =
@@ -258,21 +309,25 @@ function sportsWagerNormalizeScore_(score) {
     );
 
   normalized.AwayRecord =
-    sportsWagerFirstPresent_(
-      score,
-      [
-        "AwayRecord",
-        "awayRecord"
-      ]
+    sportsWagerCleanRecordDisplay_(
+      sportsWagerFirstPresent_(
+        score,
+        [
+          "AwayRecord",
+          "awayRecord"
+        ]
+      )
     );
 
   normalized.HomeRecord =
-    sportsWagerFirstPresent_(
-      score,
-      [
-        "HomeRecord",
-        "homeRecord"
-      ]
+    sportsWagerCleanRecordDisplay_(
+      sportsWagerFirstPresent_(
+        score,
+        [
+          "HomeRecord",
+          "homeRecord"
+        ]
+      )
     );
 
   normalized.AwayScore =
@@ -3175,14 +3230,14 @@ function appendSportsWagerCategoryRow_(
     row,
     col,
     "HomeRecord",
-    sportsWagerString_(score.HomeRecord)
+    sportsWagerCleanRecordDisplay_(score.HomeRecord)
   );
 
   sportsWagerSetIfExists_(
     row,
     col,
     "AwayRecord",
-    sportsWagerString_(score.AwayRecord)
+    sportsWagerCleanRecordDisplay_(score.AwayRecord)
   );
 
   sportsWagerSetIfExists_(
@@ -3505,12 +3560,12 @@ function updateSportsWagerCategoryRowsFromScore_(
 
     if (col.HomeRecord !== undefined) {
       updatedData[i][col.HomeRecord] =
-        sportsWagerString_(score.HomeRecord);
+        sportsWagerCleanRecordDisplay_(score.HomeRecord);
     }
 
     if (col.AwayRecord !== undefined) {
       updatedData[i][col.AwayRecord] =
-        sportsWagerString_(score.AwayRecord);
+        sportsWagerCleanRecordDisplay_(score.AwayRecord);
     }
 
     if (col.HomeScore !== undefined) {
@@ -6019,9 +6074,9 @@ function sportsWagerBuildScoreFromCategoryRow_(row) {
     Period:
       row.sportsPeriod,
     HomeRecord:
-      sportsWagerString_(row.homeRecord || ""),
+      sportsWagerCleanRecordDisplay_(row.homeRecord || ""),
     AwayRecord:
-      sportsWagerString_(row.awayRecord || ""),
+      sportsWagerCleanRecordDisplay_(row.awayRecord || ""),
     Completed:
       sportsWagerIsCompletedScore_({
         Status: status,
@@ -7422,12 +7477,12 @@ function refreshSportsWagerScores(payload) {
 
       if (col.HomeRecord !== undefined) {
         updatedData[i][col.HomeRecord] =
-          sportsWagerString_(score.HomeRecord);
+          sportsWagerCleanRecordDisplay_(score.HomeRecord);
       }
 
       if (col.AwayRecord !== undefined) {
         updatedData[i][col.AwayRecord] =
-          sportsWagerString_(score.AwayRecord);
+          sportsWagerCleanRecordDisplay_(score.AwayRecord);
       }
 
       if (col.LogoUrl !== undefined) {
@@ -9140,12 +9195,12 @@ function autoSetSportsWagerOdds(payload) {
 
         if (col.HomeRecord !== undefined) {
           updatedData[item.rowIndex][col.HomeRecord] =
-            sportsWagerString_(score.HomeRecord);
+            sportsWagerCleanRecordDisplay_(score.HomeRecord);
         }
 
         if (col.AwayRecord !== undefined) {
           updatedData[item.rowIndex][col.AwayRecord] =
-            sportsWagerString_(score.AwayRecord);
+            sportsWagerCleanRecordDisplay_(score.AwayRecord);
         }
 
         if (col.SportsSelection !== undefined && selection) {
