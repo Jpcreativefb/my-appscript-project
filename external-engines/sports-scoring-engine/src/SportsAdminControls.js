@@ -392,158 +392,11 @@ function readAllSportsSettingsRows_() {
 
 }
 
-function apiGetSportsSettingsAdmin_(params) {
-  assertSportsAdmin_(params);
-  ensureSportsControlsV12SettingsColumns_();
+/* Removed earlier duplicate function apiGetSportsSettingsAdmin_ during production cleanup; final definition retained later in file. */
 
-  const today = normalizeSportsDateOnly_(new Date());
-  const rows = readAllSportsSettingsRows_().map(function(row) {
-    const setting = {
-      sport: sportsAdminString_(row.Sport),
-      league: sportsAdminString_(row.League),
-      enabled: normalizeSportsBoolean_(row.Enabled),
-      pollPreGameMinutes: sportsAdminNumber_(row.PollPreGameMinutes, 30),
-      pollLiveMinutes: sportsAdminNumber_(row.PollLiveMinutes, 1),
-      pollFinalMinutes: sportsAdminNumber_(row.PollFinalMinutes, 60),
-      savePeriodSnapshots: normalizeSportsBoolean_(row.SavePeriodSnapshots),
-      espnScoreboardUrl: sportsAdminString_(row.ESPNScoreboardUrl),
-      seasonTitle: sportsAdminString_(row.SeasonTitle || row.League),
-      seasonStartDate: normalizeSportsDateOnly_(row.SeasonStartDate),
-      seasonEndDate: normalizeSportsDateOnly_(row.SeasonEndDate),
-      preseasonEnabled: normalizeSportsBoolean_(row.PreseasonEnabled),
-      preseasonStartDate: normalizeSportsDateOnly_(row.PreseasonStartDate),
-      preseasonEndDate: normalizeSportsDateOnly_(row.PreseasonEndDate),
-      postseasonEnabled: normalizeSportsBoolean_(row.PostseasonEnabled),
-      postseasonStartDate: normalizeSportsDateOnly_(row.PostseasonStartDate),
-      postseasonEndDate: normalizeSportsDateOnly_(row.PostseasonEndDate),
-      tournamentEnabled: normalizeSportsBoolean_(row.TournamentEnabled),
-      tournamentStartDate: normalizeSportsDateOnly_(row.TournamentStartDate),
-      tournamentEndDate: normalizeSportsDateOnly_(row.TournamentEndDate),
-      bowlEnabled: normalizeSportsBoolean_(row.BowlEnabled),
-      bowlStartDate: normalizeSportsDateOnly_(row.BowlStartDate),
-      bowlEndDate: normalizeSportsDateOnly_(row.BowlEndDate),
-      snapshotRetentionDays: sportsAdminNumber_(row.SnapshotRetentionDays, 14),
-      archiveEnabled: normalizeSportsBoolean_(row.ArchiveEnabled),
-      archiveAfterDays: sportsAdminNumber_(row.ArchiveAfterDays, 30),
-      archiveMode: sportsAdminString_(row.ArchiveMode || "MOVE").toUpperCase(),
-      archiveLastRunAt: row.ArchiveLastRunAt || "",
-      archiveLastStatus: sportsAdminString_(row.ArchiveLastStatus),
-      archiveRowsLastRun: sportsAdminNumber_(row.ArchiveRowsLastRun, 0)
-    };
 
-    const phase = sportsGetSeasonPhase_({
-      SeasonStartDate: setting.seasonStartDate,
-      SeasonEndDate: setting.seasonEndDate,
-      PreseasonEnabled: setting.preseasonEnabled,
-      PreseasonStartDate: setting.preseasonStartDate,
-      PreseasonEndDate: setting.preseasonEndDate,
-      PostseasonEnabled: setting.postseasonEnabled,
-      PostseasonStartDate: setting.postseasonStartDate,
-      PostseasonEndDate: setting.postseasonEndDate,
-      TournamentEnabled: setting.tournamentEnabled,
-      TournamentStartDate: setting.tournamentStartDate,
-      TournamentEndDate: setting.tournamentEndDate,
-      BowlEnabled: setting.bowlEnabled,
-      BowlStartDate: setting.bowlStartDate,
-      BowlEndDate: setting.bowlEndDate
-    }, today);
-    setting.seasonActive = phase.active;
-    setting.seasonPhase = phase.phase;
-    return setting;
-  });
+/* Removed earlier duplicate function apiUpdateSportsLeagueSetting_ during production cleanup; final definition retained later in file. */
 
-  return { success: true, count: rows.length, leagues: rows };
-}
-
-function apiUpdateSportsLeagueSetting_(params) {
-  assertSportsAdmin_(params);
-  ensureSportsControlsV12SettingsColumns_();
-
-  const league = sportsAdminKey_(params.league);
-  const sport = sportsAdminKey_(params.sport);
-  if (!league) throw new Error("league is required");
-
-  function validateRange_(label, enabled, startDate, endDate) {
-    if (!enabled) return;
-    if (!normalizeSportsDateOnly_(startDate) || !normalizeSportsDateOnly_(endDate)) {
-      throw new Error(label + " start and end dates are required when enabled");
-    }
-    if (normalizeSportsDateOnly_(startDate) > normalizeSportsDateOnly_(endDate)) {
-      throw new Error(label + " start date cannot be after end date");
-    }
-  }
-
-  const mainStart = normalizeSportsDateOnly_(params.seasonStartDate);
-  const mainEnd = normalizeSportsDateOnly_(params.seasonEndDate);
-  if ((mainStart && !mainEnd) || (!mainStart && mainEnd)) {
-    throw new Error("Season start and end dates must both be entered or both left blank");
-  }
-  if (mainStart && mainStart > mainEnd) throw new Error("Season start date cannot be after end date");
-
-  validateRange_("Preseason", sportsAdminBoolean_(params.preseasonEnabled, false), params.preseasonStartDate, params.preseasonEndDate);
-  validateRange_("Postseason", sportsAdminBoolean_(params.postseasonEnabled, false), params.postseasonStartDate, params.postseasonEndDate);
-  validateRange_("Tournament", sportsAdminBoolean_(params.tournamentEnabled, false), params.tournamentStartDate, params.tournamentEndDate);
-  validateRange_("Bowl", sportsAdminBoolean_(params.bowlEnabled, false), params.bowlStartDate, params.bowlEndDate);
-
-  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
-  const data = sh.getDataRange().getValues();
-  if (data.length <= 1) throw new Error("SportsSettings has no rows");
-  const headers = data[0].map(function(header) { return sportsAdminString_(header); });
-  const col = sportsAdminHeaderMap_(headers);
-  let updated = 0;
-  let updatedRow = null;
-
-  for (let i = 1; i < data.length; i++) {
-    const rowSport = sportsAdminKey_(data[i][col.Sport]);
-    const rowLeague = sportsAdminKey_(data[i][col.League]);
-    if (rowLeague !== league || (sport && rowSport !== sport)) continue;
-
-    const patch = {};
-    const fields = [
-      ["enabled", "Enabled", function(v) { return sportsAdminBoolean_(v, true); }],
-      ["pollPreGameMinutes", "PollPreGameMinutes", function(v) { return sportsAdminNumber_(v, 30); }],
-      ["pollLiveMinutes", "PollLiveMinutes", function(v) { return sportsAdminNumber_(v, 1); }],
-      ["pollFinalMinutes", "PollFinalMinutes", function(v) { return sportsAdminNumber_(v, 60); }],
-      ["savePeriodSnapshots", "SavePeriodSnapshots", function(v) { return sportsAdminBoolean_(v, true); }],
-      ["espnScoreboardUrl", "ESPNScoreboardUrl", sportsAdminString_],
-      ["seasonTitle", "SeasonTitle", sportsAdminString_],
-      ["seasonStartDate", "SeasonStartDate", normalizeSportsDateOnly_],
-      ["seasonEndDate", "SeasonEndDate", normalizeSportsDateOnly_],
-      ["preseasonEnabled", "PreseasonEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
-      ["preseasonStartDate", "PreseasonStartDate", normalizeSportsDateOnly_],
-      ["preseasonEndDate", "PreseasonEndDate", normalizeSportsDateOnly_],
-      ["postseasonEnabled", "PostseasonEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
-      ["postseasonStartDate", "PostseasonStartDate", normalizeSportsDateOnly_],
-      ["postseasonEndDate", "PostseasonEndDate", normalizeSportsDateOnly_],
-      ["tournamentEnabled", "TournamentEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
-      ["tournamentStartDate", "TournamentStartDate", normalizeSportsDateOnly_],
-      ["tournamentEndDate", "TournamentEndDate", normalizeSportsDateOnly_],
-      ["bowlEnabled", "BowlEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
-      ["bowlStartDate", "BowlStartDate", normalizeSportsDateOnly_],
-      ["bowlEndDate", "BowlEndDate", normalizeSportsDateOnly_],
-      ["snapshotRetentionDays", "SnapshotRetentionDays", function(v) { return Math.max(1, sportsAdminNumber_(v, 14)); }],
-      ["archiveEnabled", "ArchiveEnabled", function(v) { return sportsAdminBoolean_(v, false); }],
-      ["archiveAfterDays", "ArchiveAfterDays", function(v) { return Math.max(1, sportsAdminNumber_(v, 30)); }],
-      ["archiveMode", "ArchiveMode", function(v) { return sportsAdminString_(v).toUpperCase() === "COPY" ? "COPY" : "MOVE"; }]
-    ];
-
-    fields.forEach(function(field) {
-      if (params[field[0]] !== undefined) patch[field[1]] = field[2](params[field[0]]);
-    });
-
-    Object.keys(patch).forEach(function(key) {
-      if (col[key] !== undefined) sh.getRange(i + 1, col[key] + 1).setValue(patch[key]);
-    });
-
-    updated++;
-    updatedRow = i + 1;
-  }
-
-  if (!updated) throw new Error("No SportsSettings row found for league: " + league);
-  logSports_("INFO", "apiUpdateSportsLeagueSetting_", "Updated sports league v12 settings", JSON.stringify({ league: league, sport: sport, row: updatedRow }));
-  return { success: true, updated: updated, league: league, sport: sport || "", row: updatedRow };
-}
 
 /* =====================================================
    TRIGGER ADMIN
@@ -593,52 +446,8 @@ function apiRemoveSportsSeasonBatchTriggerAdmin_(params) {
    SEASON JOB ADMIN
 ===================================================== */
 
-function apiCreateSportsSeasonJobsAdmin_(params) {
+/* Removed earlier duplicate function apiCreateSportsSeasonJobsAdmin_ during production cleanup; final definition retained later in file. */
 
-  assertSportsAdmin_(
-    params
-  );
-
-  const startDate =
-    normalizeSportsDateOnly_(
-      params.startDate
-    );
-
-  const endDate =
-    normalizeSportsDateOnly_(
-      params.endDate
-    );
-
-  const batchDays =
-    sportsAdminNumber_(
-      params.batchDays,
-      2
-    );
-
-  if (
-    !startDate ||
-    !endDate
-  ) {
-    throw new Error(
-      "startDate and endDate are required"
-    );
-  }
-
-  return createSportsSeasonJobsForDateRange_(
-    startDate,
-    endDate,
-    batchDays,
-    {
-      league:
-        params.league || "",
-      sport:
-        params.sport || "",
-      seasonName:
-        params.seasonName || params.season || ""
-    }
-  );
-
-}
 
 function apiRunSportsSeasonBatchAdmin_(params) {
 
@@ -2301,24 +2110,8 @@ function apiRemoveSportsOddsHybridTrigger_(params) {
    ADMIN DASHBOARD
 ===================================================== */
 
-function apiGetSportsAdminDashboard_(params) {
-  assertSportsAdmin_(params);
-  setupSportsAdminControlSystem();
+/* Removed earlier duplicate function apiGetSportsAdminDashboard_ during production cleanup; final definition retained later in file. */
 
-  return {
-    success: true,
-    version: "12",
-    checkedAt: new Date(),
-    smartAutomation: getSmartSportsAutomationStatus_(),
-    sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
-    odds: apiGetSportsOddsAdminSettings_(params),
-    archive: getSportsArchiveStatus_(),
-    engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
-    scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
-    seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],
-    archiveTriggers: typeof checkSportsArchiveTriggers === "function" ? checkSportsArchiveTriggers() : []
-  };
-}
 
 /* =====================================================
    PATCH v3 - ODDS ADMIN USAGE DETAILS
@@ -2692,7 +2485,7 @@ function apiCreateSportsSeasonJobsAdmin_(params) {
 
   const startDate = normalizeSportsDateOnly_(params.startDate);
   const endDate = normalizeSportsDateOnly_(params.endDate);
-  const batchDays = sportsAdminNumber_(params.batchDays, 2);
+  const batchDays = sportsAdminNumber_(params.batchDays, 14);
 
   if (!startDate || !endDate) throw new Error("startDate and endDate are required");
 
@@ -2704,4 +2497,39 @@ function apiCreateSportsSeasonJobsAdmin_(params) {
     seasonYear: params.seasonYear || "",
     scheduleSource: params.scheduleSource || "HYBRID"
   });
+}
+
+
+/* =====================================================
+   PRODUCTION CLEANUP v14 - SCORE WINDOW TRIGGER ROUTES
+===================================================== */
+
+function apiInstallSportsScoresWindowTriggerAdmin_(params) {
+  assertSportsAdmin_(params || {});
+  return installSportsScoresWindowTrigger();
+}
+
+function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
+  assertSportsAdmin_(params || {});
+  return removeSportsScoresWindowTriggers();
+}
+
+function apiGetSportsAdminDashboard_(params) {
+  assertSportsAdmin_(params);
+  setupSportsAdminControlSystem();
+
+  return {
+    success: true,
+    version: "14-production",
+    checkedAt: new Date(),
+    smartAutomation: getSmartSportsAutomationStatus_(),
+    sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
+    odds: apiGetSportsOddsAdminSettings_(params),
+    archive: getSportsArchiveStatus_(),
+    engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
+    scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
+    scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],
+    seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],
+    archiveTriggers: typeof checkSportsArchiveTriggers === "function" ? checkSportsArchiveTriggers() : []
+  };
 }

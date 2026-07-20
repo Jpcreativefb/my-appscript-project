@@ -2110,66 +2110,8 @@ function sportsOddsCountApiPayload_(payload) {
 
 }
 
-function sportsOddsLogApiCall_(
-  meta,
-  url,
-  response,
-  payload
-) {
+/* Removed earlier duplicate function sportsOddsLogApiCall_ during production cleanup; final definition retained later in file. */
 
-  meta =
-    meta || {};
-
-  const headers =
-    response.getHeaders();
-
-  const counts =
-    sportsOddsCountApiPayload_(
-      payload
-    );
-
-  const usage = {
-    costLast:
-      sportsOddsHeaderValue_(
-        headers,
-        "x-requests-last"
-      ),
-    requestsUsed:
-      sportsOddsHeaderValue_(
-        headers,
-        "x-requests-used"
-      ),
-    requestsRemaining:
-      sportsOddsHeaderValue_(
-        headers,
-        "x-requests-remaining"
-      )
-  };
-
-  SPORTS_ODDS_LAST_API_USAGE_ =
-    usage;
-
-  sportsOddsGetApiLogSheet_()
-    .appendRow([
-      new Date(),
-      meta.source || "",
-      meta.league || "",
-      meta.sportKey || "",
-      meta.endpoint || "",
-      meta.markets || "",
-      meta.regions || "",
-      counts.eventsReturned,
-      counts.bookmakersReturned,
-      counts.marketsReturned,
-      usage.costLast,
-      usage.requestsUsed,
-      usage.requestsRemaining,
-      sportsOddsSanitizeApiUrl_(url)
-    ]);
-
-  return usage;
-
-}
 
 function fetchSportsOddsApiJsonWithLog_(
   url,
@@ -3016,14 +2958,8 @@ function sportsOddsEnsureHeaderSheetSafe_(
 
 }
 
-function sportsOddsGetApiLogSheet_() {
+/* Removed earlier duplicate function sportsOddsGetApiLogSheet_ during production cleanup; final definition retained later in file. */
 
-  return sportsOddsEnsureHeaderSheetSafe_(
-    SPORTS_ODDS_API_LOG_SHEET,
-    SPORTS_ODDS_API_LOG_HEADERS
-  ).sheet;
-
-}
 
 function sportsRacingOddsGetSheet_() {
 
@@ -3052,37 +2988,11 @@ function setupSportsRacingOddsSystem() {
 
 }
 
-function setupSportsOddsSystem() {
+/* Removed earlier duplicate function setupSportsOddsSystem during production cleanup; final definition retained later in file. */
 
-  const result =
-    sportsOddsEnsureHeaderSheetSafe_(
-      SPORTS_ODDS_SHEET,
-      SPORTS_ODDS_HEADERS
-    );
 
-  return {
-    success: true,
-    sheet: SPORTS_ODDS_SHEET,
-    added: result.added || [],
-    racingSheet:
-      SPORTS_RACING_ODDS_SHEET,
-    message:
-      "SportsOdds setup complete. Racing odds setup is separate; run setupSportsRacingOddsSystem if needed."
-  };
+/* Removed earlier duplicate function setupAllSportsOddsSheets during production cleanup; final definition retained later in file. */
 
-}
-
-function setupAllSportsOddsSheets() {
-
-  return {
-    success: true,
-    odds:
-      setupSportsOddsSystem(),
-    racingOdds:
-      setupSportsRacingOddsSystem()
-  };
-
-}
 
 function upsertSportsRacingOddsRows_(rows) {
 
@@ -3322,10 +3232,20 @@ function setupSportsOddsSystem() {
   };
 }
 
+/* Removed earlier duplicate function setupAllSportsOddsSheets during production cleanup; final definition retained later in file. */
+
+
+
+/* =====================================================
+   PRODUCTION CLEANUP v14 - SPORTS ODDS SETUP
+   Normal sports setup no longer creates racing odds sheets.
+   Racing odds live with the separate Racing Score Engine.
+===================================================== */
+
 function setupAllSportsOddsSheets() {
   return {
     success: true,
     odds: setupSportsOddsSystem(),
-    racingOdds: setupSportsRacingOddsSystem()
+    message: "Sports odds sheets and API logs are ready. Racing odds setup is intentionally not run from Sports Scores Engine."
   };
 }

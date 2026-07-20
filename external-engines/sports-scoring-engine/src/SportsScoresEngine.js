@@ -121,56 +121,8 @@ const SPORTS_HEADERS = {
  SETUP
 ************************************/
 
-function setupSportsScoresSheet() {
-  const ss = SpreadsheetApp.getActive();
+/* Removed earlier duplicate function setupSportsScoresSheet during production cleanup; final definition retained later in file. */
 
-  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
-    const sh = ensureSportsSheet_(ss, sheetName);
-    const headers = SPORTS_HEADERS[sheetName];
-
-    if (sh.getLastRow() === 0 || sh.getLastColumn() === 0) {
-      sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-      sh.setFrozenRows(1);
-      return;
-    }
-
-    const existing = sh
-      .getRange(1, 1, 1, sh.getLastColumn())
-      .getValues()[0]
-      .map(function(header) { return String(header || "").trim(); });
-
-    const missing = headers.filter(function(header) {
-      return existing.indexOf(header) === -1;
-    });
-
-    if (missing.length) {
-      sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length)
-        .setValues([missing]);
-    }
-
-    sh.setFrozenRows(1);
-  });
-
-  const settingsSheet = ss.getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (settingsSheet && settingsSheet.getLastRow() <= 1) {
-    seedSportsSettings_();
-  }
-
-  upgradeSportsControlsV12();
-
-  logSports_(
-    "INFO",
-    "setupSportsScoresSheet",
-    "Sports Scores Engine v12 setup complete without clearing existing data",
-    ""
-  );
-
-  return {
-    success: true,
-    version: "12",
-    message: "Sports Scores Engine setup complete. Existing sheet data was preserved."
-  };
-}
 
 function ensureSportsSheet_(ss, sheetName) {
   let sh = ss.getSheetByName(sheetName);
@@ -665,77 +617,8 @@ function getESPNTeamRecord_(competitor) {
  WRITE LATEST SCORES
 ************************************/
 
-function upsertLatestSportsScores_(games) {
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SHEETS.SCORES
-      );
+/* Removed earlier duplicate function upsertLatestSportsScores_ during production cleanup; final definition retained later in file. */
 
-  if (!sh) {
-    throw new Error(
-      "Missing sheet: " +
-      SPORTS_SHEETS.SCORES
-    );
-  }
-
-  ensureSportsScoresLogoDateColumns_();
-
-  const actualHeaders =
-    sh
-      .getRange(1, 1, 1, sh.getLastColumn())
-      .getValues()[0]
-      .map(function(header) {
-        return String(header).trim();
-      });
-
-  const data =
-    sh.getDataRange().getValues();
-
-  const existingRowsByGameId = {};
-
-  if (data.length > 1) {
-    const headerMap =
-      getSportsHeaderMap_(data[0]);
-
-    for (let i = 1; i < data.length; i++) {
-      const gameId =
-        String(
-          data[i][headerMap.GameId] || ""
-        ).trim();
-
-      if (gameId) {
-        existingRowsByGameId[gameId] = i + 1;
-      }
-    }
-  }
-
-  games.forEach(function(game) {
-    const row =
-      actualHeaders.map(function(header) {
-        return game[header] !== undefined
-          ? game[header]
-          : "";
-      });
-
-    const existingRow =
-      existingRowsByGameId[game.GameId];
-
-    if (existingRow) {
-      sh
-        .getRange(
-          existingRow,
-          1,
-          1,
-          actualHeaders.length
-        )
-        .setValues([row]);
-    } else {
-      sh.appendRow(row);
-    }
-  });
-}
 
 function getSportsHeaderMap_(headers) {
   const map = {};
@@ -1265,93 +1148,8 @@ function testFetchAllEnabledSportsWithSnapshots() {
  READ ENABLED SETTINGS
 ************************************/
 
-function readEnabledSportsSettings_(includeDisabled) {
-  ensureSportsControlsV12SettingsColumns_();
+/* Removed earlier duplicate function readEnabledSportsSettings_ during production cleanup; final definition retained later in file. */
 
-  const sh = SpreadsheetApp
-    .getActive()
-    .getSheetByName(SPORTS_SHEETS.SETTINGS);
-
-  if (!sh) {
-    throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
-  }
-
-  const data = sh.getDataRange().getValues();
-  if (data.length <= 1) return [];
-
-  const headers = data[0].map(function(header) {
-    return String(header || "").trim();
-  });
-  const col = getSportsHeaderMap_(headers);
-  validateSportsSettingsColumns_(col);
-
-  function value_(row, key, fallback) {
-    return col[key] === undefined ? fallback : row[col[key]];
-  }
-
-  const settings = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const enabled = normalizeSportsBoolean_(value_(row, "Enabled", false));
-    if (!enabled && !includeDisabled) continue;
-
-    const sport = String(value_(row, "Sport", "")).trim().toLowerCase();
-    const league = String(value_(row, "League", "")).trim().toLowerCase();
-    const url = String(value_(row, "ESPNScoreboardUrl", "")).trim();
-
-    if (!sport || !league || !url) {
-      logSports_("WARN", "readEnabledSportsSettings_", "Skipping incomplete sports setting row", JSON.stringify({
-        row: i + 1,
-        sport: sport,
-        league: league,
-        url: url
-      }));
-      continue;
-    }
-
-    const setting = {
-      Sport: sport,
-      League: league,
-      Enabled: enabled,
-      PollPreGameMinutes: sportsV12PositiveNumber_(value_(row, "PollPreGameMinutes", 30), 30),
-      PollLiveMinutes: sportsV12PositiveNumber_(value_(row, "PollLiveMinutes", 1), 1),
-      PollFinalMinutes: sportsV12PositiveNumber_(value_(row, "PollFinalMinutes", 60), 60),
-      SavePeriodSnapshots: normalizeSportsBoolean_(value_(row, "SavePeriodSnapshots", true)),
-      ESPNScoreboardUrl: url,
-      SeasonTitle: String(value_(row, "SeasonTitle", league.toUpperCase())).trim(),
-      SeasonStartDate: normalizeSportsDateOnly_(value_(row, "SeasonStartDate", "")),
-      SeasonEndDate: normalizeSportsDateOnly_(value_(row, "SeasonEndDate", "")),
-      PreseasonEnabled: normalizeSportsBoolean_(value_(row, "PreseasonEnabled", false)),
-      PreseasonStartDate: normalizeSportsDateOnly_(value_(row, "PreseasonStartDate", "")),
-      PreseasonEndDate: normalizeSportsDateOnly_(value_(row, "PreseasonEndDate", "")),
-      PostseasonEnabled: normalizeSportsBoolean_(value_(row, "PostseasonEnabled", false)),
-      PostseasonStartDate: normalizeSportsDateOnly_(value_(row, "PostseasonStartDate", "")),
-      PostseasonEndDate: normalizeSportsDateOnly_(value_(row, "PostseasonEndDate", "")),
-      TournamentEnabled: normalizeSportsBoolean_(value_(row, "TournamentEnabled", false)),
-      TournamentStartDate: normalizeSportsDateOnly_(value_(row, "TournamentStartDate", "")),
-      TournamentEndDate: normalizeSportsDateOnly_(value_(row, "TournamentEndDate", "")),
-      BowlEnabled: normalizeSportsBoolean_(value_(row, "BowlEnabled", false)),
-      BowlStartDate: normalizeSportsDateOnly_(value_(row, "BowlStartDate", "")),
-      BowlEndDate: normalizeSportsDateOnly_(value_(row, "BowlEndDate", "")),
-      SnapshotRetentionDays: sportsV12PositiveNumber_(value_(row, "SnapshotRetentionDays", 14), 14),
-      ArchiveEnabled: normalizeSportsBoolean_(value_(row, "ArchiveEnabled", false)),
-      ArchiveAfterDays: sportsV12PositiveNumber_(value_(row, "ArchiveAfterDays", 30), 30),
-      ArchiveMode: String(value_(row, "ArchiveMode", "MOVE") || "MOVE").trim().toUpperCase(),
-      ArchiveLastRunAt: value_(row, "ArchiveLastRunAt", ""),
-      ArchiveLastStatus: String(value_(row, "ArchiveLastStatus", "")).trim(),
-      ArchiveRowsLastRun: Number(value_(row, "ArchiveRowsLastRun", 0) || 0),
-      _rowNumber: i + 1
-    };
-
-    const phase = sportsGetSeasonPhase_(setting, normalizeSportsDateOnly_(new Date()));
-    setting.SeasonActive = phase.active;
-    setting.SeasonPhase = phase.phase;
-    settings.push(setting);
-  }
-
-  return settings;
-}
 
 function validateSportsSettingsColumns_(col) {
   const required = [
@@ -1930,6 +1728,24 @@ function doGet(e) {
 
     }
 
+    else if (action === "installSportsScoresWindowTriggerAdmin") {
+
+      payload =
+        apiInstallSportsScoresWindowTriggerAdmin_(
+          params
+        );
+
+    }
+
+    else if (action === "removeSportsScoresWindowTriggerAdmin") {
+
+      payload =
+        apiRemoveSportsScoresWindowTriggerAdmin_(
+          params
+        );
+
+    }
+
     else if (action === "setupSportsOdds") {
 
       payload =
@@ -2107,28 +1923,12 @@ else if (action === "removeSportsOddsHybridTrigger") {
       payload = apiRunSportsArchiveNowAdmin_(params);
     }
 
-    else if (action === "setupSportsRacing") {
+    else if (action === "setupSportsRacing" || action === "getSportsRacingResults" || action === "getSportsRacingOdds") {
 
-      payload =
-        setupSportsRacingSystem();
-
-    }
-
-    else if (action === "getSportsRacingResults") {
-
-      payload =
-        apiGetSportsRacingResults_(
-          params
-        );
-
-    }
-
-    else if (action === "getSportsRacingOdds") {
-
-      payload =
-        apiGetSportsRacingOdds_(
-          params
-        );
+      payload = {
+        success: false,
+        error: "Racing has been moved out of the Sports Scores Engine. Use the separate Racing Score Engine project."
+      };
 
     }
 
@@ -2946,93 +2746,11 @@ const SPORTS_SEASON_JOB_HEADERS = [
  SETUP SEASON JOB SHEET
 ************************************/
 
-function setupSportsSeasonJobsSheet() {
-  const ss =
-    SpreadsheetApp.getActive();
+/* Removed earlier duplicate function setupSportsSeasonJobsSheet during production cleanup; final definition retained later in file. */
 
-  let sh =
-    ss.getSheetByName(
-      SPORTS_SEASON_JOBS_SHEET
-    );
 
-  if (!sh) {
-    sh =
-      ss.insertSheet(
-        SPORTS_SEASON_JOBS_SHEET
-      );
-  }
+/* Removed earlier duplicate function ensureSportsSeasonJobColumns_ during production cleanup; final definition retained later in file. */
 
-  if (sh.getLastRow() === 0) {
-    sh
-      .getRange(
-        1,
-        1,
-        1,
-        SPORTS_SEASON_JOB_HEADERS.length
-      )
-      .setValues([
-        SPORTS_SEASON_JOB_HEADERS
-      ]);
-
-    sh.setFrozenRows(1);
-  }
-
-  ensureSportsSeasonJobColumns_();
-
-  logSports_(
-    "INFO",
-    "setupSportsSeasonJobsSheet",
-    "SportsSeasonJobs setup complete",
-    ""
-  );
-
-  return {
-    success: true,
-    sheet: SPORTS_SEASON_JOBS_SHEET
-  };
-}
-
-function ensureSportsSeasonJobColumns_() {
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SEASON_JOBS_SHEET
-      );
-
-  if (!sh) {
-    throw new Error(
-      "Missing sheet: " +
-      SPORTS_SEASON_JOBS_SHEET
-    );
-  }
-
-  const headers =
-    sh
-      .getRange(1, 1, 1, sh.getLastColumn())
-      .getValues()[0]
-      .map(function(header) {
-        return String(header).trim();
-      });
-
-  const missing =
-    SPORTS_SEASON_JOB_HEADERS.filter(function(header) {
-      return headers.indexOf(header) === -1;
-    });
-
-  if (!missing.length) {
-    return;
-  }
-
-  sh
-    .getRange(
-      1,
-      sh.getLastColumn() + 1,
-      1,
-      missing.length
-    )
-    .setValues([missing]);
-}
 
 /************************************
  COLLEGE FOOTBALL FBS URL PATCH
@@ -3147,214 +2865,8 @@ function createSportsSeasonJobs2026() {
   );
 }
 
-function createSportsSeasonJobsForDateRange_(
-  startDate,
-  endDate,
-  batchDays,
-  options
-) {
-  setupSportsSeasonJobsSheet();
+/* Removed earlier duplicate function createSportsSeasonJobsForDateRange_ during production cleanup; final definition retained later in file. */
 
-  startDate =
-    normalizeSportsDateOnly_(startDate);
-
-  endDate =
-    normalizeSportsDateOnly_(endDate);
-
-  batchDays =
-    Number(batchDays || 2);
-
-  options =
-    options || {};
-
-  const targetLeague =
-    String(options.league || "")
-      .trim()
-      .toLowerCase();
-
-  const targetSport =
-    String(options.sport || "")
-      .trim()
-      .toLowerCase();
-
-  const customSeasonName =
-    String(options.seasonName || "")
-      .trim();
-
-  if (!startDate || !endDate) {
-    throw new Error(
-      "StartDate and EndDate are required"
-    );
-  }
-
-  if (startDate > endDate) {
-    throw new Error(
-      "StartDate cannot be after EndDate"
-    );
-  }
-
-  let settings =
-    readEnabledSportsSettings_();
-
-  if (targetLeague) {
-    settings =
-      settings.filter(function(setting) {
-        return String(setting.League || "")
-          .trim()
-          .toLowerCase() === targetLeague;
-      });
-  }
-
-  if (targetSport) {
-    settings =
-      settings.filter(function(setting) {
-        return String(setting.Sport || "")
-          .trim()
-          .toLowerCase() === targetSport;
-      });
-  }
-
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SEASON_JOBS_SHEET
-      );
-
-  const data =
-    sh.getDataRange().getValues();
-
-  const headers =
-    data[0].map(function(header) {
-      return String(header).trim();
-    });
-
-  const col =
-    getSportsHeaderMap_(headers);
-
-  const existing = {};
-
-  if (data.length > 1) {
-    for (let i = 1; i < data.length; i++) {
-      const key =
-        String(data[i][col.Sport] || "").toLowerCase() +
-        "|" +
-        String(data[i][col.League] || "").toLowerCase() +
-        "|" +
-        normalizeSportsDateOnly_(data[i][col.StartDate]) +
-        "|" +
-        normalizeSportsDateOnly_(data[i][col.EndDate]);
-
-      existing[key] = i + 1;
-    }
-  }
-
-  const newRows = [];
-  let updatedJobs = 0;
-
-  settings.forEach(function(setting) {
-    const key =
-      setting.Sport +
-      "|" +
-      setting.League +
-      "|" +
-      startDate +
-      "|" +
-      endDate;
-
-    if (existing[key]) {
-      updateSportsSeasonJobRow_(
-        sh,
-        headers,
-        existing[key],
-        {
-          SeasonName:
-            customSeasonName ||
-            startDate + " to " + endDate,
-          Status: "ACTIVE",
-          NextDate: startDate,
-          BatchDays: batchDays,
-          LastRun: "",
-          DaysProcessed: 0,
-          GamesFetched: 0,
-          UniqueGames: 0,
-          Errors: "",
-          CompletedAt: ""
-        }
-      );
-
-      updatedJobs++;
-
-      return;
-    }
-
-    const rowObj = {
-      JobId: Utilities.getUuid(),
-      Sport: setting.Sport,
-      League: setting.League,
-      SeasonName:
-        customSeasonName ||
-        startDate + " to " + endDate,
-      StartDate: startDate,
-      EndDate: endDate,
-      NextDate: startDate,
-      BatchDays: batchDays,
-      Status: "ACTIVE",
-      LastRun: "",
-      DaysProcessed: 0,
-      GamesFetched: 0,
-      UniqueGames: 0,
-      Errors: "",
-      CreatedAt: new Date(),
-      CompletedAt: ""
-    };
-
-    newRows.push(
-      headers.map(function(header) {
-        return rowObj[header] !== undefined
-          ? rowObj[header]
-          : "";
-      })
-    );
-  });
-
-  if (newRows.length) {
-    sh
-      .getRange(
-        sh.getLastRow() + 1,
-        1,
-        newRows.length,
-        headers.length
-      )
-      .setValues(newRows);
-  }
-
-  logSports_(
-    "INFO",
-    "createSportsSeasonJobsForDateRange_",
-    "Created season jobs",
-    JSON.stringify({
-      startDate: startDate,
-      endDate: endDate,
-      batchDays: batchDays,
-      newJobs: newRows.length,
-      updatedJobs: updatedJobs,
-      enabledLeagues: settings.length,
-      league: targetLeague || "ALL"
-    })
-  );
-
-  return {
-    success: true,
-    startDate: startDate,
-    endDate: endDate,
-    batchDays: batchDays,
-    newJobs: newRows.length,
-    updatedJobs: updatedJobs,
-    enabledLeagues: settings.length,
-    league: targetLeague || "ALL"
-  };
-}
 
 /************************************
  RUN SMALL SEASON BATCH
@@ -3484,149 +2996,8 @@ function runSportsSeasonBatchUpdate() {
   }
 }
 
-function runSportsSeasonJobBatch_(
-  job,
-  setting,
-  previousScores,
-  remainingFetchBudget
-) {
-  const batchDays =
-    Math.max(
-      1,
-      Number(job.BatchDays || 1)
-    );
+/* Removed earlier duplicate function runSportsSeasonJobBatch_ during production cleanup; final definition retained later in file. */
 
-  const daysToProcess =
-    Math.min(
-      batchDays,
-      remainingFetchBudget
-    );
-
-  let currentDate =
-    normalizeSportsDateOnly_(
-      job.NextDate || job.StartDate
-    );
-
-  const endDate =
-    normalizeSportsDateOnly_(
-      job.EndDate
-    );
-
-  const gamesById = {};
-  const errors = [];
-
-  let dateFetchesUsed = 0;
-  let daysProcessed = 0;
-  let gamesFetched = 0;
-
-  for (
-    let i = 0;
-    i < daysToProcess;
-    i++
-  ) {
-    if (currentDate > endDate) {
-      break;
-    }
-
-    const espnDate =
-      currentDate.replaceAll("-", "");
-
-    try {
-      const games =
-        fetchAndNormalizeESPNScoreboardFromSetting_(
-          setting,
-          espnDate
-        );
-
-      games.forEach(function(game) {
-        gamesById[game.GameId] = game;
-      });
-
-      gamesFetched +=
-        games.length;
-
-    } catch (err) {
-      errors.push({
-        sport: job.Sport,
-        league: job.League,
-        date: currentDate,
-        error:
-          err && err.message
-            ? err.message
-            : String(err)
-      });
-    }
-
-    dateFetchesUsed++;
-    daysProcessed++;
-
-    currentDate =
-      addSportsDays_(
-        currentDate,
-        1
-      );
-  }
-
-  const allGames =
-    Object.keys(gamesById)
-      .map(function(gameId) {
-        return gamesById[gameId];
-      });
-
-  if (allGames.length) {
-    detectAndSaveSportsSnapshots_(
-      previousScores,
-      allGames
-    );
-
-    upsertLatestSportsScores_(
-      allGames
-    );
-  }
-
-  const completed =
-    currentDate > endDate;
-
-  updateSportsSeasonJob_(
-    job.JobId,
-    {
-      NextDate:
-        completed
-          ? ""
-          : currentDate,
-      Status:
-        completed
-          ? "COMPLETE"
-          : "ACTIVE",
-      LastRun: new Date(),
-      DaysProcessed:
-        Number(job.DaysProcessed || 0) +
-        daysProcessed,
-      GamesFetched:
-        Number(job.GamesFetched || 0) +
-        gamesFetched,
-      UniqueGames:
-        Number(job.UniqueGames || 0) +
-        allGames.length,
-      Errors:
-        errors.length
-          ? JSON.stringify(errors)
-          : job.Errors || "",
-      CompletedAt:
-        completed
-          ? new Date()
-          : job.CompletedAt || ""
-    }
-  );
-
-  return {
-    dateFetchesUsed: dateFetchesUsed,
-    daysProcessed: daysProcessed,
-    gamesFetched: gamesFetched,
-    uniqueGames: allGames.length,
-    errors: errors
-  };
-}
 
 /************************************
  SEASON JOB HELPERS
@@ -3948,159 +3319,8 @@ function checkSportsSeasonBatchTriggers() {
  Use this to confirm everything is working.
 ************************************/
 
-function checkSportsEngineStatus() {
-  const status = {
-    checkedAt: new Date(),
-    triggers: {
-      liveUpdater: 0,
-      seasonBatch: 0
-    },
-    sheets: {},
-    seasonJobs: {
-      active: 0,
-      complete: 0,
-      error: 0,
-      paused: 0
-    },
-    latestLogs: []
-  };
+/* Removed earlier duplicate function checkSportsEngineStatus during production cleanup; final definition retained later in file. */
 
-  /************************************
-   TRIGGERS
-  ************************************/
-
-  const triggers =
-    ScriptApp.getProjectTriggers();
-
-  triggers.forEach(function(trigger) {
-    const handler =
-      trigger.getHandlerFunction();
-
-    if (handler === "runSportsScoresUpdate") {
-      status.triggers.liveUpdater++;
-    }
-
-    if (handler === "runSportsSeasonBatchUpdate") {
-      status.triggers.seasonBatch++;
-    }
-  });
-
-  /************************************
-   SHEET COUNTS
-  ************************************/
-
-  [
-    "SportsScores",
-    "SportsSnapshots",
-    "SportsSettings",
-    "SportsLogs",
-    "SportsSeasonJobs"
-  ].forEach(function(sheetName) {
-    const sh =
-      SpreadsheetApp
-        .getActive()
-        .getSheetByName(sheetName);
-
-    status.sheets[sheetName] =
-      sh
-        ? {
-            exists: true,
-            rows: Math.max(0, sh.getLastRow() - 1),
-            columns: sh.getLastColumn()
-          }
-        : {
-            exists: false,
-            rows: 0,
-            columns: 0
-          };
-  });
-
-  /************************************
-   SEASON JOB STATUS COUNTS
-  ************************************/
-
-  const jobsSheet =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName("SportsSeasonJobs");
-
-  if (jobsSheet && jobsSheet.getLastRow() > 1) {
-    const data =
-      jobsSheet.getDataRange().getValues();
-
-    const headers =
-      data[0].map(function(header) {
-        return String(header).trim();
-      });
-
-    const col =
-      getSportsHeaderMap_(headers);
-
-    for (let i = 1; i < data.length; i++) {
-      const rowStatus =
-        String(data[i][col.Status] || "")
-          .trim()
-          .toUpperCase();
-
-      if (rowStatus === "ACTIVE") {
-        status.seasonJobs.active++;
-      } else if (rowStatus === "COMPLETE") {
-        status.seasonJobs.complete++;
-      } else if (rowStatus === "ERROR") {
-        status.seasonJobs.error++;
-      } else if (rowStatus === "PAUSED") {
-        status.seasonJobs.paused++;
-      }
-    }
-  }
-
-  /************************************
-   LATEST LOGS
-  ************************************/
-
-  const logsSheet =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName("SportsLogs");
-
-  if (logsSheet && logsSheet.getLastRow() > 1) {
-    const lastRow =
-      logsSheet.getLastRow();
-
-    const startRow =
-      Math.max(2, lastRow - 9);
-
-    const numRows =
-      lastRow - startRow + 1;
-
-    const logs =
-      logsSheet
-        .getRange(
-          startRow,
-          1,
-          numRows,
-          logsSheet.getLastColumn()
-        )
-        .getValues();
-
-    status.latestLogs =
-      logs.map(function(row) {
-        return {
-          timestamp: row[0],
-          level: row[1],
-          functionName: row[2],
-          message: row[3],
-          details: row[4]
-        };
-      });
-  }
-
-  Logger.log(
-    JSON.stringify(status, null, 2)
-  );
-
-  return status;
-}
 
 function apiGetSportsScores_(params) {
   const sportFilter =
@@ -4643,150 +3863,11 @@ function sportsRacingDriverId_(competitor) {
 
 /* Removed older duplicate function during v11 cleanup. */
 
-function fetchAndNormalizeESPNScoreboard_(sport, league) {
+/* Removed earlier duplicate function fetchAndNormalizeESPNScoreboard_ during production cleanup; final definition retained later in file. */
 
-  const url =
-    getESPNScoreboardUrl_(sport, league);
 
-  const response =
-    UrlFetchApp.fetch(url, {
-      method: "get",
-      muteHttpExceptions: true
-    });
+/* Removed earlier duplicate function fetchAndNormalizeESPNScoreboardFromSetting_ during production cleanup; final definition retained later in file. */
 
-  const statusCode =
-    response.getResponseCode();
-
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(
-      "ESPN fetch failed. HTTP status: " +
-      statusCode
-    );
-  }
-
-  const data =
-    JSON.parse(
-      response.getContentText()
-    );
-
-  const events =
-    data.events || [];
-
-  if (
-    String(sport || "")
-      .trim()
-      .toLowerCase() === "racing"
-  ) {
-
-    const driverRows = [];
-
-    events.forEach(function(event) {
-      normalizeESPNRacingDriverRows_(
-        event,
-        String(sport || "")
-          .trim()
-          .toLowerCase(),
-        String(league || "")
-          .trim()
-          .toLowerCase()
-      ).forEach(function(row) {
-        driverRows.push(row);
-      });
-    });
-
-    if (driverRows.length) {
-      upsertSportsRacingResultRows_(
-        driverRows
-      );
-    }
-
-  }
-
-  return events.map(function(event) {
-    return normalizeESPNEvent_(
-      event,
-      sport,
-      league
-    );
-  });
-
-}
-
-function fetchAndNormalizeESPNScoreboardFromSetting_(
-  setting,
-  dateString
-) {
-
-  const url =
-    addESPNDateParamToUrl_(
-      setting.ESPNScoreboardUrl,
-      dateString
-    );
-
-  const response =
-    UrlFetchApp.fetch(
-      url,
-      {
-        method: "get",
-        muteHttpExceptions: true
-      }
-    );
-
-  const statusCode =
-    response.getResponseCode();
-
-  if (statusCode < 200 || statusCode >= 300) {
-    throw new Error(
-      "ESPN fetch failed for " +
-      setting.League +
-      ". HTTP status: " +
-      statusCode
-    );
-  }
-
-  const data =
-    JSON.parse(
-      response.getContentText()
-    );
-
-  const events =
-    data.events || [];
-
-  if (
-    String(setting.Sport || "")
-      .trim()
-      .toLowerCase() === "racing"
-  ) {
-
-    const driverRows = [];
-
-    events.forEach(function(event) {
-      normalizeESPNRacingDriverRows_(
-        event,
-        setting.Sport,
-        setting.League
-      ).forEach(function(row) {
-        driverRows.push(row);
-      });
-    });
-
-    if (driverRows.length) {
-      upsertSportsRacingResultRows_(
-        driverRows
-      );
-    }
-
-  }
-
-  return events.map(function(event) {
-    return normalizeESPNEvent_(
-      event,
-      setting.Sport,
-      setting.League
-    );
-  });
-
-}
 
 
 /* Removed older duplicate function during v11 cleanup. */
@@ -4794,200 +3875,11 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(
 
 /* Removed older duplicate function during v11 cleanup. */
 
-function addMmaAndMotorsportsSettings() {
+/* Removed earlier duplicate function addMmaAndMotorsportsSettings during production cleanup; final definition retained later in file. */
 
-  const sh =
-    SpreadsheetApp
-      .getActive()
-      .getSheetByName(
-        SPORTS_SHEETS.SETTINGS
-      );
 
-  if (!sh) {
-    throw new Error(
-      "Missing sheet: " +
-      SPORTS_SHEETS.SETTINGS
-    );
-  }
+/* Removed earlier duplicate function addExtraSportsSettings during production cleanup; final definition retained later in file. */
 
-  const rowsToAdd = [
-    [
-      "soccer",
-      "usa.1",
-      true,
-      60,
-      2,
-      120,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard"
-    ],
-    [
-      "soccer",
-      "eng.1",
-      true,
-      60,
-      2,
-      120,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard"
-    ],
-    [
-      "soccer",
-      "esp.1",
-      true,
-      60,
-      2,
-      120,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard"
-    ],
-    [
-      "soccer",
-      "uefa.champions",
-      true,
-      60,
-      2,
-      120,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"
-    ],
-    [
-      "soccer",
-      "fifa.world",
-      true,
-      60,
-      2,
-      120,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"
-    ],
-    [
-      "mma",
-      "ufc",
-      true,
-      720,
-      5,
-      1440,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
-    ],
-    [
-      "racing",
-      "f1",
-      true,
-      720,
-      5,
-      1440,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/racing/f1/scoreboard"
-    ],
-    [
-      "racing",
-      "nascar-premier",
-      true,
-      720,
-      5,
-      1440,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-premier/scoreboard"
-    ],
-    [
-      "racing",
-      "nascar-xfinity",
-      true,
-      720,
-      5,
-      1440,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-xfinity/scoreboard"
-    ],
-    [
-      "racing",
-      "nascar-truck",
-      true,
-      720,
-      5,
-      1440,
-      true,
-      "https://site.api.espn.com/apis/site/v2/sports/racing/nascar-truck/scoreboard"
-    ]
-  ];
-
-  const data =
-    sh.getDataRange().getValues();
-
-  const existingKeys = {};
-
-  if (data.length > 1) {
-
-    const col =
-      getSportsHeaderMap_(data[0]);
-
-    for (let i = 1; i < data.length; i++) {
-
-      const sport =
-        String(data[i][col.Sport] || "")
-          .trim()
-          .toLowerCase();
-
-      const league =
-        String(data[i][col.League] || "")
-          .trim()
-          .toLowerCase();
-
-      if (sport && league) {
-        existingKeys[sport + "|" + league] = true;
-      }
-
-    }
-
-  }
-
-  const newRows =
-    rowsToAdd.filter(function(row) {
-      const key =
-        String(row[0]).toLowerCase() +
-        "|" +
-        String(row[1]).toLowerCase();
-
-      return !existingKeys[key];
-    });
-
-  if (newRows.length) {
-
-    sh
-      .getRange(
-        sh.getLastRow() + 1,
-        1,
-        newRows.length,
-        newRows[0].length
-      )
-      .setValues(newRows);
-
-  }
-
-  return {
-    success: true,
-    added: newRows.length,
-    message:
-      "MMA, F1, NASCAR Cup, Xfinity, and Truck settings are present"
-  };
-
-}
-
-function addExtraSportsSettings() {
-
-  const first =
-    addMmaAndMotorsportsSettings();
-
-  return {
-    success: true,
-    added: first.added,
-    message:
-      "Extra sports settings checked. MMA and motorsports added where missing."
-  };
-
-}
 
 
 /************************************
@@ -6356,34 +5248,11 @@ function sportsV12PositiveNumber_(value, fallback) {
   return n;
 }
 
-function ensureSportsControlsV12SettingsColumns_() {
-  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
+/* Removed earlier duplicate function ensureSportsControlsV12SettingsColumns_ during production cleanup; final definition retained later in file. */
 
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
-    .map(function(header) { return String(header || "").trim(); });
-  const missing = SPORTS_V12_SETTINGS_HEADERS.filter(function(header) {
-    return headers.indexOf(header) === -1;
-  });
 
-  if (missing.length) {
-    sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
-  }
+/* Removed earlier duplicate function upgradeSportsControlsV12 during production cleanup; final definition retained later in file. */
 
-  return { success: true, added: missing };
-}
-
-function upgradeSportsControlsV12() {
-  const settings = ensureSportsControlsV12SettingsColumns_();
-  const archive = setupSportsArchiveSystem_();
-  return {
-    success: true,
-    version: "12",
-    settingsColumnsAdded: settings.added,
-    archive: archive,
-    message: "Sports controls v12 upgrade complete. Existing data was preserved."
-  };
-}
 
 function sportsDateInRange_(dateOnly, startDate, endDate) {
   dateOnly = normalizeSportsDateOnly_(dateOnly);
@@ -6393,31 +5262,8 @@ function sportsDateInRange_(dateOnly, startDate, endDate) {
   return dateOnly >= startDate && dateOnly <= endDate;
 }
 
-function sportsGetSeasonPhase_(setting, dateOnly) {
-  dateOnly = normalizeSportsDateOnly_(dateOnly || new Date());
-  const phases = [
-    { name: "PRESEASON", enabled: setting.PreseasonEnabled, start: setting.PreseasonStartDate, end: setting.PreseasonEndDate },
-    { name: "REGULAR SEASON", enabled: !!(setting.SeasonStartDate && setting.SeasonEndDate), start: setting.SeasonStartDate, end: setting.SeasonEndDate },
-    { name: "POSTSEASON", enabled: setting.PostseasonEnabled, start: setting.PostseasonStartDate, end: setting.PostseasonEndDate },
-    { name: "TOURNAMENT", enabled: setting.TournamentEnabled, start: setting.TournamentStartDate, end: setting.TournamentEndDate },
-    { name: "BOWL", enabled: setting.BowlEnabled, start: setting.BowlStartDate, end: setting.BowlEndDate }
-  ];
+/* Removed earlier duplicate function sportsGetSeasonPhase_ during production cleanup; final definition retained later in file. */
 
-  const configured = phases.some(function(phase) {
-    return phase.enabled && phase.start && phase.end;
-  });
-
-  if (!configured) return { active: true, phase: "DATES NOT SET" };
-
-  for (let i = 0; i < phases.length; i++) {
-    const phase = phases[i];
-    if (phase.enabled && sportsDateInRange_(dateOnly, phase.start, phase.end)) {
-      return { active: true, phase: phase.name };
-    }
-  }
-
-  return { active: false, phase: "OFF SEASON" };
-}
 
 function sportsLeagueScoreRowsFromMap_(previousScores, league) {
   league = String(league || "").toLowerCase();
@@ -7047,17 +5893,8 @@ function sportsV13CollegeTeamsHeaders_() {
   ];
 }
 
-function sportsV13SeasonJobExtraHeaders_() {
-  return [
-    "SeasonYear",
-    "SeasonType",
-    "SeasonPhase",
-    "Source",
-    "GroupId",
-    "TeamId",
-    "FetchMode"
-  ];
-}
+/* Removed earlier duplicate function sportsV13SeasonJobExtraHeaders_ during production cleanup; final definition retained later in file. */
+
 
 function sportsV13EnsureSheetHeaders_(sheetName, headers) {
   const ss = SpreadsheetApp.getActive();
@@ -7082,36 +5919,8 @@ function sportsV13EnsureSheetHeaders_(sheetName, headers) {
   return { sheet: sh, added: missing };
 }
 
-function setupSportsScoresSheet() {
-  const ss = SpreadsheetApp.getActive();
+/* Removed earlier duplicate function setupSportsScoresSheet during production cleanup; final definition retained later in file. */
 
-  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
-    const sh = ensureSportsSheet_(ss, sheetName);
-    const headers = SPORTS_HEADERS[sheetName];
-    sportsV13EnsureSheetHeaders_(sheetName, headers);
-  });
-
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
-  sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
-  setupSportsSeasonJobsSheet();
-
-  const settingsSheet = ss.getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (settingsSheet && settingsSheet.getLastRow() <= 1) {
-    seedSportsSettings_();
-  }
-
-  upgradeSportsControlsV12();
-
-  logSports_("INFO", "setupSportsScoresSheet", "Sports Scores Engine v13 setup complete without clearing existing data", "");
-
-  return {
-    success: true,
-    version: "13",
-    message: "Sports Scores Engine setup complete. Existing sheet data was preserved. SportsGames, college coverage, and ESPN season-type columns are ready."
-  };
-}
 
 function ensureSportsControlsV12SettingsColumns_() {
   const headers = SPORTS_V12_SETTINGS_HEADERS.concat(sportsV13SettingsExtraHeaders_());
@@ -7119,18 +5928,11 @@ function ensureSportsControlsV12SettingsColumns_() {
   return { success: true, added: result.added || [] };
 }
 
-function setupSportsSeasonJobsSheet() {
-  const headers = SPORTS_SEASON_JOB_HEADERS.concat(sportsV13SeasonJobExtraHeaders_());
-  const result = sportsV13EnsureSheetHeaders_(SPORTS_SEASON_JOBS_SHEET, headers);
-  logSports_("INFO", "setupSportsSeasonJobsSheet", "SportsSeasonJobs setup complete", JSON.stringify({ added: result.added || [] }));
-  return { success: true, sheet: SPORTS_SEASON_JOBS_SHEET, added: result.added || [] };
-}
+/* Removed earlier duplicate function setupSportsSeasonJobsSheet during production cleanup; final definition retained later in file. */
 
-function ensureSportsSeasonJobColumns_() {
-  const headers = SPORTS_SEASON_JOB_HEADERS.concat(sportsV13SeasonJobExtraHeaders_());
-  const result = sportsV13EnsureSheetHeaders_(SPORTS_SEASON_JOBS_SHEET, headers);
-  return { success: true, added: result.added || [] };
-}
+
+/* Removed earlier duplicate function ensureSportsSeasonJobColumns_ during production cleanup; final definition retained later in file. */
+
 
 function upgradeSportsControlsV12() {
   const settings = ensureSportsControlsV12SettingsColumns_();
@@ -7197,94 +5999,8 @@ function sportsV13Upper_(value, fallback) {
   return raw ? raw.toUpperCase() : "";
 }
 
-function readEnabledSportsSettings_(includeDisabled) {
-  ensureSportsControlsV12SettingsColumns_();
+/* Removed earlier duplicate function readEnabledSportsSettings_ during production cleanup; final definition retained later in file. */
 
-  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
-
-  const data = sh.getDataRange().getValues();
-  if (data.length <= 1) return [];
-
-  const headers = data[0].map(function(header) { return String(header || "").trim(); });
-  const col = getSportsHeaderMap_(headers);
-  validateSportsSettingsColumns_(col);
-
-  const settings = [];
-
-  for (let i = 1; i < data.length; i++) {
-    const row = data[i];
-    const enabled = normalizeSportsBoolean_(sportsV13Value_(row, col, "Enabled", false));
-    if (!enabled && !includeDisabled) continue;
-
-    const sport = String(sportsV13Value_(row, col, "Sport", "")).trim().toLowerCase();
-    const league = String(sportsV13Value_(row, col, "League", "")).trim().toLowerCase();
-    const url = String(sportsV13Value_(row, col, "ESPNScoreboardUrl", "")).trim();
-
-    if (!sport || !league || !url) {
-      logSports_("WARN", "readEnabledSportsSettings_", "Skipping incomplete sports setting row", JSON.stringify({ row: i + 1, sport: sport, league: league, url: url }));
-      continue;
-    }
-
-    const seasonTitle = String(sportsV13Value_(row, col, "SeasonTitle", league.toUpperCase())).trim();
-    const seasonYear = sportsV13SeasonYear_(sportsV13Value_(row, col, "SeasonYear", seasonTitle), new Date().getFullYear());
-
-    const setting = {
-      Sport: sport,
-      League: league,
-      Enabled: enabled,
-      PollPreGameMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollPreGameMinutes", 30), 30),
-      PollLiveMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollLiveMinutes", 1), 1),
-      PollFinalMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollFinalMinutes", 60), 60),
-      SavePeriodSnapshots: normalizeSportsBoolean_(sportsV13Value_(row, col, "SavePeriodSnapshots", true)),
-      ESPNScoreboardUrl: url,
-      SeasonTitle: seasonTitle,
-      SeasonYear: seasonYear,
-      ScheduleSource: sportsV13Upper_(sportsV13Value_(row, col, "ScheduleSource", "HYBRID"), "HYBRID"),
-      ESPNSeasonTypesEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "ESPNSeasonTypesEnabled", true)),
-      ESPNPreseasonType: sportsV13Value_(row, col, "ESPNPreseasonType", 1) || 1,
-      ESPNRegularSeasonType: sportsV13Value_(row, col, "ESPNRegularSeasonType", 2) || 2,
-      ESPNPostseasonType: sportsV13Value_(row, col, "ESPNPostseasonType", 3) || 3,
-      ESPNTournamentType: sportsV13Value_(row, col, "ESPNTournamentType", 3) || 3,
-      ESPNBowlType: sportsV13Value_(row, col, "ESPNBowlType", 3) || 3,
-      CollegeCoverageMode: sportsV13Upper_(sportsV13Value_(row, col, "CollegeCoverageMode", sportsV13IsCollegeLeague_(sport, league) ? "ALL_D1" : "DEFAULT"), sportsV13IsCollegeLeague_(sport, league) ? "ALL_D1" : "DEFAULT"),
-      ESPNGroupIds: String(sportsV13Value_(row, col, "ESPNGroupIds", "")).trim(),
-      ESPNResultLimit: sportsV12PositiveNumber_(sportsV13Value_(row, col, "ESPNResultLimit", sportsV13IsCollegeLeague_(sport, league) ? 500 : 100), sportsV13IsCollegeLeague_(sport, league) ? 500 : 100),
-      SelectedTeamIds: String(sportsV13Value_(row, col, "SelectedTeamIds", "")).trim(),
-      SeasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "SeasonStartDate", "")),
-      SeasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "SeasonEndDate", "")),
-      RegularSeasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "RegularSeasonStartDate", "")),
-      RegularSeasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "RegularSeasonEndDate", "")),
-      PreseasonEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "PreseasonEnabled", false)),
-      PreseasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PreseasonStartDate", "")),
-      PreseasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PreseasonEndDate", "")),
-      PostseasonEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "PostseasonEnabled", false)),
-      PostseasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PostseasonStartDate", "")),
-      PostseasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PostseasonEndDate", "")),
-      TournamentEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "TournamentEnabled", false)),
-      TournamentStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "TournamentStartDate", "")),
-      TournamentEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "TournamentEndDate", "")),
-      BowlEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "BowlEnabled", false)),
-      BowlStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "BowlStartDate", "")),
-      BowlEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "BowlEndDate", "")),
-      SnapshotRetentionDays: sportsV12PositiveNumber_(sportsV13Value_(row, col, "SnapshotRetentionDays", 14), 14),
-      ArchiveEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "ArchiveEnabled", false)),
-      ArchiveAfterDays: sportsV12PositiveNumber_(sportsV13Value_(row, col, "ArchiveAfterDays", 30), 30),
-      ArchiveMode: String(sportsV13Value_(row, col, "ArchiveMode", "MOVE") || "MOVE").trim().toUpperCase(),
-      ArchiveLastRunAt: sportsV13Value_(row, col, "ArchiveLastRunAt", ""),
-      ArchiveLastStatus: String(sportsV13Value_(row, col, "ArchiveLastStatus", "")).trim(),
-      ArchiveRowsLastRun: Number(sportsV13Value_(row, col, "ArchiveRowsLastRun", 0) || 0),
-      _rowNumber: i + 1
-    };
-
-    const phase = sportsGetSeasonPhase_(setting, normalizeSportsDateOnly_(new Date()));
-    setting.SeasonActive = phase.active;
-    setting.SeasonPhase = phase.phase;
-    settings.push(setting);
-  }
-
-  return settings;
-}
 
 function sportsV13IsCollegeLeague_(sport, league) {
   sport = String(sport || "").toLowerCase();
@@ -7659,280 +6375,17 @@ function sportsV13PhaseDescriptor_(phase, startDate, endDate, seasonType, enable
   };
 }
 
-function sportsV13BuildSeasonJobDescriptors_(setting, startDate, endDate, options) {
-  options = options || {};
-  const source = sportsV13Upper_(options.scheduleSource || setting.ScheduleSource || "HYBRID", "HYBRID");
-  const descriptors = [];
-  const manualOnly = source === "MANUAL" || setting.ESPNSeasonTypesEnabled === false;
-  const seasonYear = String(options.seasonYear || setting.SeasonYear || sportsV13SeasonYear_(setting.SeasonTitle, new Date().getFullYear()));
-  const selectedTeams = sportsV13SplitList_(setting.SelectedTeamIds);
-  const useTeamSchedule = String(setting.CollegeCoverageMode || "").toUpperCase() === "SELECTED_SCHOOLS" && selectedTeams.length;
+/* Removed earlier duplicate function sportsV13BuildSeasonJobDescriptors_ during production cleanup; final definition retained later in file. */
 
-  if (manualOnly) {
-    descriptors.push(sportsV13PhaseDescriptor_("MANUAL DATES", startDate, endDate, "", true, { source: "MANUAL_DATES", fetchMode: "DATE_SCOREBOARD" }));
-  } else {
-    if (setting.PreseasonEnabled) {
-      descriptors.push(sportsV13PhaseDescriptor_("PRESEASON", setting.PreseasonStartDate || startDate, setting.PreseasonEndDate || endDate, setting.ESPNPreseasonType || 1, true));
-    }
-    descriptors.push(sportsV13PhaseDescriptor_("REGULAR SEASON", setting.RegularSeasonStartDate || setting.SeasonStartDate || startDate, setting.RegularSeasonEndDate || setting.SeasonEndDate || endDate, setting.ESPNRegularSeasonType || 2, true));
-    if (setting.PostseasonEnabled) {
-      descriptors.push(sportsV13PhaseDescriptor_("POSTSEASON", setting.PostseasonStartDate || startDate, setting.PostseasonEndDate || endDate, setting.ESPNPostseasonType || 3, true));
-    }
-    if (setting.TournamentEnabled) {
-      descriptors.push(sportsV13PhaseDescriptor_("TOURNAMENT", setting.TournamentStartDate || startDate, setting.TournamentEndDate || endDate, setting.ESPNTournamentType || setting.ESPNPostseasonType || 3, true));
-    }
-    if (setting.BowlEnabled) {
-      descriptors.push(sportsV13PhaseDescriptor_("BOWL", setting.BowlStartDate || startDate, setting.BowlEndDate || endDate, setting.ESPNBowlType || setting.ESPNPostseasonType || 3, true));
-    }
-  }
 
-  let activeDescriptors = descriptors.filter(function(item) { return item.enabled && item.startDate && item.endDate; });
-  if (!activeDescriptors.length) {
-    activeDescriptors = [sportsV13PhaseDescriptor_("FULL SEASON", startDate, endDate, setting.ESPNRegularSeasonType || 2, true)];
-  }
+/* Removed earlier duplicate function createSportsSeasonJobsForDateRange_ during production cleanup; final definition retained later in file. */
 
-  if (useTeamSchedule) {
-    const expanded = [];
-    activeDescriptors.forEach(function(desc) {
-      selectedTeams.forEach(function(teamId) {
-        const copy = Object.assign({}, desc);
-        copy.source = "ESPN_TEAM_SCHEDULE";
-        copy.fetchMode = "TEAM_SCHEDULE";
-        copy.teamId = teamId;
-        expanded.push(copy);
-      });
-    });
-    activeDescriptors = expanded;
-  }
 
-  activeDescriptors.forEach(function(item) {
-    item.seasonYear = seasonYear;
-  });
+/* Removed earlier duplicate function runSportsSeasonJobBatch_ during production cleanup; final definition retained later in file. */
 
-  return activeDescriptors;
-}
 
-function createSportsSeasonJobsForDateRange_(startDate, endDate, batchDays, options) {
-  setupSportsSeasonJobsSheet();
-  startDate = normalizeSportsDateOnly_(startDate);
-  endDate = normalizeSportsDateOnly_(endDate);
-  batchDays = Number(batchDays || 2);
-  options = options || {};
+/* Removed earlier duplicate function checkSportsEngineStatus during production cleanup; final definition retained later in file. */
 
-  const targetLeague = String(options.league || "").trim().toLowerCase();
-  const targetSport = String(options.sport || "").trim().toLowerCase();
-  const customSeasonName = String(options.seasonName || options.season || "").trim();
-
-  if (!startDate || !endDate) throw new Error("StartDate and EndDate are required");
-  if (startDate > endDate) throw new Error("StartDate cannot be after EndDate");
-
-  let settings = readEnabledSportsSettings_();
-  if (targetLeague) settings = settings.filter(function(setting) { return String(setting.League || "").toLowerCase() === targetLeague; });
-  if (targetSport) settings = settings.filter(function(setting) { return String(setting.Sport || "").toLowerCase() === targetSport; });
-
-  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SEASON_JOBS_SHEET);
-  const data = sh.getDataRange().getValues();
-  const headers = data[0].map(function(header) { return String(header).trim(); });
-  const col = getSportsHeaderMap_(headers);
-  const existing = {};
-
-  if (data.length > 1) {
-    for (let i = 1; i < data.length; i++) {
-      const key = [
-        String(data[i][col.Sport] || "").toLowerCase(),
-        String(data[i][col.League] || "").toLowerCase(),
-        normalizeSportsDateOnly_(data[i][col.StartDate]),
-        normalizeSportsDateOnly_(data[i][col.EndDate]),
-        col.SeasonType === undefined ? "" : String(data[i][col.SeasonType] || ""),
-        col.SeasonPhase === undefined ? "" : String(data[i][col.SeasonPhase] || ""),
-        col.GroupId === undefined ? "" : String(data[i][col.GroupId] || ""),
-        col.TeamId === undefined ? "" : String(data[i][col.TeamId] || "")
-      ].join("|");
-      existing[key] = i + 1;
-    }
-  }
-
-  const newRows = [];
-  let updatedJobs = 0;
-  let descriptorsCount = 0;
-
-  settings.forEach(function(setting) {
-    const descriptors = sportsV13BuildSeasonJobDescriptors_(setting, startDate, endDate, options);
-    descriptorsCount += descriptors.length;
-
-    descriptors.forEach(function(desc) {
-      const key = [setting.Sport, setting.League, desc.startDate, desc.endDate, String(desc.seasonType || ""), String(desc.phase || ""), String(desc.groupId || ""), String(desc.teamId || "")].join("|");
-      const seasonName = customSeasonName || setting.SeasonTitle || (setting.League + " " + desc.seasonYear);
-      const patch = {
-        SeasonName: seasonName + (desc.phase ? " - " + desc.phase : ""),
-        StartDate: desc.startDate,
-        EndDate: desc.endDate,
-        NextDate: desc.startDate,
-        BatchDays: batchDays,
-        Status: "ACTIVE",
-        LastRun: "",
-        DaysProcessed: 0,
-        GamesFetched: 0,
-        UniqueGames: 0,
-        Errors: "",
-        CompletedAt: "",
-        SeasonYear: desc.seasonYear,
-        SeasonType: desc.seasonType,
-        SeasonPhase: desc.phase,
-        Source: desc.source,
-        GroupId: desc.groupId || "",
-        TeamId: desc.teamId || "",
-        FetchMode: desc.fetchMode || "DATE_SCOREBOARD"
-      };
-
-      if (existing[key]) {
-        updateSportsSeasonJobRow_(sh, headers, existing[key], patch);
-        updatedJobs++;
-        return;
-      }
-
-      const rowObj = Object.assign({
-        JobId: Utilities.getUuid(),
-        Sport: setting.Sport,
-        League: setting.League,
-        CreatedAt: new Date()
-      }, patch);
-
-      newRows.push(headers.map(function(header) { return rowObj[header] !== undefined ? rowObj[header] : ""; }));
-    });
-  });
-
-  if (newRows.length) {
-    sh.getRange(sh.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
-  }
-
-  const message = "Schedule jobs ready. New jobs: " + newRows.length + ", updated jobs: " + updatedJobs + ", phases/team jobs: " + descriptorsCount + ".";
-  logSports_("INFO", "createSportsSeasonJobsForDateRange_", message, JSON.stringify({ startDate: startDate, endDate: endDate, batchDays: batchDays, newJobs: newRows.length, updatedJobs: updatedJobs, enabledLeagues: settings.length, league: targetLeague || "ALL", scheduleSource: options.scheduleSource || "" }));
-
-  return { success: true, startDate: startDate, endDate: endDate, batchDays: batchDays, newJobs: newRows.length, updatedJobs: updatedJobs, enabledLeagues: settings.length, league: targetLeague || "ALL", message: message };
-}
-
-function runSportsSeasonJobBatch_(job, setting, previousScores, remainingFetchBudget) {
-  const fetchMode = String(job.FetchMode || "DATE_SCOREBOARD").toUpperCase();
-  const gamesById = {};
-  const errors = [];
-  let dateFetchesUsed = 0;
-  let daysProcessed = 0;
-  let gamesFetched = 0;
-
-  function addGames_(games) {
-    games.forEach(function(game) { gamesById[game.GameId] = game; });
-    gamesFetched += games.length;
-  }
-
-  if (fetchMode === "TEAM_SCHEDULE") {
-    try {
-      addGames_(fetchAndNormalizeESPNScoreboardFromSetting_(setting, "", {
-        SeasonYear: job.SeasonYear,
-        SeasonType: job.SeasonType,
-        SeasonPhase: job.SeasonPhase,
-        TeamId: job.TeamId,
-        GroupId: job.GroupId,
-        FetchMode: "TEAM_SCHEDULE"
-      }));
-    } catch (err) {
-      errors.push({ sport: job.Sport, league: job.League, teamId: job.TeamId, error: err && err.message ? err.message : String(err) });
-    }
-    dateFetchesUsed = 1;
-    daysProcessed = 1;
-  } else {
-    const batchDays = Math.max(1, Number(job.BatchDays || 1));
-    const daysToProcess = Math.min(batchDays, remainingFetchBudget);
-    let currentDate = normalizeSportsDateOnly_(job.NextDate || job.StartDate);
-    const endDate = normalizeSportsDateOnly_(job.EndDate);
-
-    for (let i = 0; i < daysToProcess; i++) {
-      if (currentDate > endDate) break;
-      try {
-        addGames_(fetchAndNormalizeESPNScoreboardFromSetting_(setting, currentDate, {
-          SeasonYear: job.SeasonYear,
-          SeasonType: job.SeasonType,
-          SeasonPhase: job.SeasonPhase,
-          GroupId: job.GroupId,
-          FetchMode: job.FetchMode || "DATE_SCOREBOARD"
-        }));
-      } catch (err) {
-        errors.push({ sport: job.Sport, league: job.League, date: currentDate, seasonType: job.SeasonType || "", phase: job.SeasonPhase || "", error: err && err.message ? err.message : String(err) });
-      }
-      dateFetchesUsed++;
-      daysProcessed++;
-      currentDate = addSportsDays_(currentDate, 1);
-    }
-    job._nextDateAfterRun = currentDate;
-  }
-
-  const allGames = Object.keys(gamesById).map(function(gameId) { return gamesById[gameId]; });
-  if (allGames.length) {
-    detectAndSaveSportsSnapshots_(previousScores, allGames);
-    upsertLatestSportsScores_(allGames);
-  }
-
-  const nextDate = job._nextDateAfterRun || "";
-  const completed = fetchMode === "TEAM_SCHEDULE" ? true : (nextDate > normalizeSportsDateOnly_(job.EndDate));
-
-  updateSportsSeasonJob_(job.JobId, {
-    NextDate: completed ? "" : nextDate,
-    Status: completed ? "COMPLETE" : "ACTIVE",
-    LastRun: new Date(),
-    DaysProcessed: Number(job.DaysProcessed || 0) + daysProcessed,
-    GamesFetched: Number(job.GamesFetched || 0) + gamesFetched,
-    UniqueGames: Number(job.UniqueGames || 0) + allGames.length,
-    Errors: errors.length ? JSON.stringify(errors) : job.Errors || "",
-    CompletedAt: completed ? new Date() : job.CompletedAt || ""
-  });
-
-  return { dateFetchesUsed: dateFetchesUsed, daysProcessed: daysProcessed, gamesFetched: gamesFetched, uniqueGames: allGames.length, errors: errors };
-}
-
-function checkSportsEngineStatus() {
-  const status = {
-    checkedAt: new Date(),
-    triggers: { liveUpdater: 0, seasonBatch: 0, archive: 0 },
-    sheets: {},
-    seasonJobs: { active: 0, complete: 0, error: 0, paused: 0 },
-    latestLogs: []
-  };
-
-  ScriptApp.getProjectTriggers().forEach(function(trigger) {
-    const handler = trigger.getHandlerFunction();
-    if (handler === "runSportsScoresUpdate") status.triggers.liveUpdater++;
-    if (handler === "runSportsSeasonBatchUpdate") status.triggers.seasonBatch++;
-    if (handler === "runSportsArchiveUpdate") status.triggers.archive++;
-  });
-
-  ["SportsGames", "SportsScores", "SportsSnapshots", "SportsSettings", "SportsLogs", "SportsSeasonJobs", "SportsCollegeTeams", "SportsScoresArchive", "SportsSnapshotsArchive"].forEach(function(sheetName) {
-    const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
-    status.sheets[sheetName] = sh ? { exists: true, rows: Math.max(0, sh.getLastRow() - 1), columns: sh.getLastColumn() } : { exists: false, rows: 0, columns: 0 };
-  });
-
-  const jobsSheet = SpreadsheetApp.getActive().getSheetByName("SportsSeasonJobs");
-  if (jobsSheet && jobsSheet.getLastRow() > 1) {
-    const data = jobsSheet.getDataRange().getValues();
-    const col = getSportsHeaderMap_(data[0]);
-    for (let i = 1; i < data.length; i++) {
-      const rowStatus = String(data[i][col.Status] || "").trim().toUpperCase();
-      if (rowStatus === "ACTIVE") status.seasonJobs.active++;
-      else if (rowStatus === "COMPLETE") status.seasonJobs.complete++;
-      else if (rowStatus === "ERROR") status.seasonJobs.error++;
-      else if (rowStatus === "PAUSED") status.seasonJobs.paused++;
-    }
-  }
-
-  const logsSheet = SpreadsheetApp.getActive().getSheetByName("SportsLogs");
-  if (logsSheet && logsSheet.getLastRow() > 1) {
-    const lastRow = logsSheet.getLastRow();
-    const startRow = Math.max(2, lastRow - 9);
-    const logs = logsSheet.getRange(startRow, 1, lastRow - startRow + 1, logsSheet.getLastColumn()).getValues();
-    status.latestLogs = logs.map(function(row) { return { timestamp: row[0], level: row[1], functionName: row[2], message: row[3], details: row[4] }; });
-  }
-
-  return status;
-}
 
 /************************************
  ADMIN SCORE REFRESH + DISPLAY REPAIR ROUTES
@@ -8687,4 +7140,339 @@ function runSportsSeasonJobBatch_(job, setting, previousScores, remainingFetchBu
   });
 
   return { dateFetchesUsed: dateFetchesUsed, daysProcessed: daysProcessed, gamesFetched: gamesFetched, uniqueGames: allGames.length, errors: errors };
+}
+
+
+/************************************
+ PRODUCTION CLEANUP v14
+ - Adds missing score-window trigger admin routes.
+ - Keeps racing out of the Sports Scores Engine active loop; racing remains in the separate racing-score-engine project.
+ - Disables existing racing settings rows without deleting historical sheets.
+************************************/
+
+function sportsScoresWindowTriggerFunction_() {
+  return "runSportsScoresWindowUpdate";
+}
+
+function installSportsScoresWindowTrigger() {
+  removeSportsScoresWindowTriggers();
+
+  ScriptApp
+    .newTrigger(sportsScoresWindowTriggerFunction_())
+    .timeBased()
+    .everyHours(1)
+    .create();
+
+  logSports_(
+    "INFO",
+    "installSportsScoresWindowTrigger",
+    "Installed score window trigger",
+    JSON.stringify({ functionName: sportsScoresWindowTriggerFunction_(), everyHours: 1 })
+  );
+
+  return {
+    success: true,
+    message: "Score window trigger installed. It refreshes a small yesterday/today/upcoming window once per hour."
+  };
+}
+
+function removeSportsScoresWindowTriggers() {
+  const triggers = ScriptApp.getProjectTriggers();
+  let removed = 0;
+
+  triggers.forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === sportsScoresWindowTriggerFunction_()) {
+      ScriptApp.deleteTrigger(trigger);
+      removed++;
+    }
+  });
+
+  logSports_(
+    "INFO",
+    "removeSportsScoresWindowTriggers",
+    "Removed score window triggers",
+    JSON.stringify({ removed: removed })
+  );
+
+  return {
+    success: true,
+    removed: removed
+  };
+}
+
+function checkSportsScoresWindowTriggers() {
+  return ScriptApp.getProjectTriggers()
+    .filter(function(trigger) {
+      return trigger.getHandlerFunction() === sportsScoresWindowTriggerFunction_();
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource())
+      };
+    });
+}
+
+function apiInstallSportsScoresWindowTriggerAdmin_(params) {
+  assertSportsAdmin_(params || {});
+  return installSportsScoresWindowTrigger();
+}
+
+function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
+  assertSportsAdmin_(params || {});
+  return removeSportsScoresWindowTriggers();
+}
+
+function sportsScoresDisableRacingSettingsRows_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh || sh.getLastRow() <= 1) return { success: true, disabled: 0 };
+
+  const data = sh.getDataRange().getValues();
+  const col = getSportsHeaderMap_(data[0]);
+  if (col.Sport === undefined || col.Enabled === undefined) return { success: true, disabled: 0 };
+
+  let disabled = 0;
+  for (let i = 1; i < data.length; i++) {
+    const sport = String(data[i][col.Sport] || "").trim().toLowerCase();
+    if (sport === "racing" && normalizeSportsBoolean_(data[i][col.Enabled])) {
+      sh.getRange(i + 1, col.Enabled + 1).setValue(false);
+      disabled++;
+    }
+  }
+
+  if (disabled) {
+    logSports_(
+      "INFO",
+      "sportsScoresDisableRacingSettingsRows_",
+      "Disabled racing rows in SportsSettings because racing now belongs to the separate Racing Score Engine.",
+      JSON.stringify({ disabled: disabled })
+    );
+  }
+
+  return { success: true, disabled: disabled };
+}
+
+function sportsScoresFilterOutRacingSettings_(settings, includeDisabled) {
+  return (settings || []).filter(function(setting) {
+    const sport = String(setting.Sport || "").trim().toLowerCase();
+    return sport !== "racing";
+  });
+}
+
+function addMmaAndMotorsportsSettings() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
+
+  const rowsToAdd = [
+    ["soccer", "usa.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard"],
+    ["soccer", "eng.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard"],
+    ["soccer", "esp.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard"],
+    ["soccer", "uefa.champions", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"],
+    ["soccer", "fifa.world", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"],
+    ["mma", "ufc", true, 720, 5, 1440, true, "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"]
+  ];
+
+  const data = sh.getDataRange().getValues();
+  const existingKeys = {};
+
+  if (data.length > 1) {
+    const col = getSportsHeaderMap_(data[0]);
+    for (let i = 1; i < data.length; i++) {
+      const sport = String(data[i][col.Sport] || "").trim().toLowerCase();
+      const league = String(data[i][col.League] || "").trim().toLowerCase();
+      if (sport && league) existingKeys[sport + "|" + league] = true;
+    }
+  }
+
+  const newRows = rowsToAdd.filter(function(row) {
+    return !existingKeys[String(row[0]).toLowerCase() + "|" + String(row[1]).toLowerCase()];
+  });
+
+  if (newRows.length) {
+    sh.getRange(sh.getLastRow() + 1, 1, newRows.length, newRows[0].length).setValues(newRows);
+  }
+
+  sportsScoresDisableRacingSettingsRows_();
+
+  return {
+    success: true,
+    added: newRows.length,
+    message: "Extra non-racing sports settings checked. Racing is managed by the separate Racing Score Engine."
+  };
+}
+
+function addExtraSportsSettings() {
+  const result = addMmaAndMotorsportsSettings();
+  return {
+    success: true,
+    added: result.added,
+    message: "Extra non-racing sports settings checked."
+  };
+}
+
+// Final production override: same logic as v13 readEnabledSportsSettings_, plus skip racing settings.
+function readEnabledSportsSettings_(includeDisabled) {
+  ensureSportsControlsV12SettingsColumns_();
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
+
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
+
+  const headers = data[0].map(function(header) { return String(header || "").trim(); });
+  const col = getSportsHeaderMap_(headers);
+  validateSportsSettingsColumns_(col);
+
+  const settings = [];
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const enabled = normalizeSportsBoolean_(sportsV13Value_(row, col, "Enabled", false));
+    if (!enabled && !includeDisabled) continue;
+
+    const sport = String(sportsV13Value_(row, col, "Sport", "")).trim().toLowerCase();
+    const league = String(sportsV13Value_(row, col, "League", "")).trim().toLowerCase();
+    const url = String(sportsV13Value_(row, col, "ESPNScoreboardUrl", "")).trim();
+
+    if (sport === "racing") continue;
+
+    if (!sport || !league || !url) {
+      logSports_("WARN", "readEnabledSportsSettings_", "Skipping incomplete sports setting row", JSON.stringify({ row: i + 1, sport: sport, league: league, url: url }));
+      continue;
+    }
+
+    const seasonTitle = String(sportsV13Value_(row, col, "SeasonTitle", league.toUpperCase())).trim();
+    const seasonYear = sportsV13SeasonYear_(sportsV13Value_(row, col, "SeasonYear", seasonTitle), new Date().getFullYear());
+
+    const setting = {
+      Sport: sport,
+      League: league,
+      Enabled: enabled,
+      PollPreGameMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollPreGameMinutes", 30), 30),
+      PollLiveMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollLiveMinutes", 1), 1),
+      PollFinalMinutes: sportsV12PositiveNumber_(sportsV13Value_(row, col, "PollFinalMinutes", 60), 60),
+      SavePeriodSnapshots: normalizeSportsBoolean_(sportsV13Value_(row, col, "SavePeriodSnapshots", true)),
+      ESPNScoreboardUrl: url,
+      SeasonTitle: seasonTitle,
+      SeasonYear: seasonYear,
+      ScheduleSource: sportsV13Upper_(sportsV13Value_(row, col, "ScheduleSource", "HYBRID"), "HYBRID"),
+      ESPNSeasonTypesEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "ESPNSeasonTypesEnabled", true)),
+      ESPNPreseasonType: sportsV13Value_(row, col, "ESPNPreseasonType", 1) || 1,
+      ESPNRegularSeasonType: sportsV13Value_(row, col, "ESPNRegularSeasonType", 2) || 2,
+      ESPNPostseasonType: sportsV13Value_(row, col, "ESPNPostseasonType", 3) || 3,
+      ESPNTournamentType: sportsV13Value_(row, col, "ESPNTournamentType", 3) || 3,
+      ESPNBowlType: sportsV13Value_(row, col, "ESPNBowlType", 3) || 3,
+      CollegeCoverageMode: sportsV13Upper_(sportsV13Value_(row, col, "CollegeCoverageMode", sportsV13IsCollegeLeague_(sport, league) ? "ALL_D1" : "DEFAULT"), sportsV13IsCollegeLeague_(sport, league) ? "ALL_D1" : "DEFAULT"),
+      ESPNGroupIds: String(sportsV13Value_(row, col, "ESPNGroupIds", "")).trim(),
+      ESPNResultLimit: sportsV12PositiveNumber_(sportsV13Value_(row, col, "ESPNResultLimit", sportsV13IsCollegeLeague_(sport, league) ? 500 : 100), sportsV13IsCollegeLeague_(sport, league) ? 500 : 100),
+      SelectedTeamIds: String(sportsV13Value_(row, col, "SelectedTeamIds", "")).trim(),
+      SeasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "SeasonStartDate", "")),
+      SeasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "SeasonEndDate", "")),
+      RegularSeasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "RegularSeasonStartDate", "")),
+      RegularSeasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "RegularSeasonEndDate", "")),
+      PreseasonEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "PreseasonEnabled", false)),
+      PreseasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PreseasonStartDate", "")),
+      PreseasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PreseasonEndDate", "")),
+      PostseasonEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "PostseasonEnabled", false)),
+      PostseasonStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PostseasonStartDate", "")),
+      PostseasonEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "PostseasonEndDate", "")),
+      TournamentEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "TournamentEnabled", false)),
+      TournamentStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "TournamentStartDate", "")),
+      TournamentEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "TournamentEndDate", "")),
+      BowlEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "BowlEnabled", false)),
+      BowlStartDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "BowlStartDate", "")),
+      BowlEndDate: normalizeSportsDateOnly_(sportsV13Value_(row, col, "BowlEndDate", "")),
+      SnapshotRetentionDays: sportsV12PositiveNumber_(sportsV13Value_(row, col, "SnapshotRetentionDays", 14), 14),
+      ArchiveEnabled: normalizeSportsBoolean_(sportsV13Value_(row, col, "ArchiveEnabled", false)),
+      ArchiveAfterDays: sportsV12PositiveNumber_(sportsV13Value_(row, col, "ArchiveAfterDays", 30), 30),
+      ArchiveMode: String(sportsV13Value_(row, col, "ArchiveMode", "MOVE") || "MOVE").trim().toUpperCase(),
+      ArchiveLastRunAt: sportsV13Value_(row, col, "ArchiveLastRunAt", ""),
+      ArchiveLastStatus: String(sportsV13Value_(row, col, "ArchiveLastStatus", "")).trim(),
+      ArchiveRowsLastRun: Number(sportsV13Value_(row, col, "ArchiveRowsLastRun", 0) || 0),
+      ScheduleBatchDays: sportsV12PositiveNumber_(sportsV13Value_(row, col, "ScheduleBatchDays", sportsV13IsCollegeLeague_(sport, league) ? 7 : 14), sportsV13IsCollegeLeague_(sport, league) ? 7 : 14),
+      _rowNumber: i + 1
+    };
+
+    const phase = sportsGetSeasonPhase_(setting, normalizeSportsDateOnly_(new Date()));
+    setting.SeasonActive = phase.active;
+    setting.SeasonPhase = phase.phase;
+    settings.push(setting);
+  }
+
+  return settings;
+}
+
+function checkSportsEngineStatus() {
+  const status = {
+    checkedAt: new Date(),
+    triggers: { liveUpdater: 0, scoreWindow: 0, seasonBatch: 0, archive: 0 },
+    sheets: {},
+    seasonJobs: { active: 0, complete: 0, error: 0, paused: 0 },
+    latestLogs: []
+  };
+
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    const handler = trigger.getHandlerFunction();
+    if (handler === "runSportsScoresUpdate") status.triggers.liveUpdater++;
+    if (handler === sportsScoresWindowTriggerFunction_()) status.triggers.scoreWindow++;
+    if (handler === "runSportsSeasonBatchUpdate") status.triggers.seasonBatch++;
+    if (handler === "runSportsArchiveUpdate") status.triggers.archive++;
+  });
+
+  ["SportsGames", "SportsScores", "SportsSnapshots", "SportsSettings", "SportsLogs", "SportsSeasonJobs", "SportsCollegeTeams", "SportsScoresArchive", "SportsSnapshotsArchive"].forEach(function(sheetName) {
+    const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+    status.sheets[sheetName] = sh ? { exists: true, rows: Math.max(0, sh.getLastRow() - 1), columns: sh.getLastColumn() } : { exists: false, rows: 0, columns: 0 };
+  });
+
+  const jobsSheet = SpreadsheetApp.getActive().getSheetByName("SportsSeasonJobs");
+  if (jobsSheet && jobsSheet.getLastRow() > 1) {
+    const data = jobsSheet.getDataRange().getValues();
+    const col = getSportsHeaderMap_(data[0]);
+    for (let i = 1; i < data.length; i++) {
+      const rowStatus = String(data[i][col.Status] || "").trim().toUpperCase();
+      if (rowStatus === "ACTIVE") status.seasonJobs.active++;
+      else if (rowStatus === "COMPLETE") status.seasonJobs.complete++;
+      else if (rowStatus === "ERROR") status.seasonJobs.error++;
+      else if (rowStatus === "PAUSED") status.seasonJobs.paused++;
+    }
+  }
+
+  const logsSheet = SpreadsheetApp.getActive().getSheetByName("SportsLogs");
+  if (logsSheet && logsSheet.getLastRow() > 1) {
+    const lastRow = logsSheet.getLastRow();
+    const startRow = Math.max(2, lastRow - 9);
+    const logs = logsSheet.getRange(startRow, 1, lastRow - startRow + 1, logsSheet.getLastColumn()).getValues();
+    status.latestLogs = logs.map(function(row) { return { timestamp: row[0], level: row[1], functionName: row[2], message: row[3], details: row[4] }; });
+  }
+
+  return status;
+}
+
+// Final production override: setup now ensures current live sheets and disables old racing settings rows.
+function setupSportsScoresSheet() {
+  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
+    sportsV13EnsureSheetHeaders_(sheetName, SPORTS_HEADERS[sheetName]);
+  });
+
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
+  sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
+  setupSportsSeasonJobsSheet();
+  setupSportsArchiveSystem_();
+
+  const settingsSheet = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (settingsSheet && settingsSheet.getLastRow() <= 1) seedSportsSettings_();
+  sportsScoresDisableRacingSettingsRows_();
+  upgradeSportsControlsV12();
+
+  logSports_("INFO", "setupSportsScoresSheet", "Sports Scores Engine production setup complete", "");
+
+  return {
+    success: true,
+    version: "14-production",
+    message: "Sports Scores Engine setup complete. Live sheets, SportsGames, season jobs, college coverage, and archives are ready. Racing rows are disabled here because racing is handled by the separate Racing Score Engine."
+  };
 }
