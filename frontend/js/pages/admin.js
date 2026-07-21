@@ -2129,6 +2129,8 @@ function adminSportsInfoText_(
       "Turns the whole league on or off. Turning it off stops schedule, scores, odds, snapshots, and smart sync for this league.",
     buildSchedule:
       "Creates or refreshes SportsSeasonJobs for this league from the Season section date range. It builds the job list; the season batch runner does the ESPN pulls.",
+    runSeasonBatch:
+      "Runs pending SportsSeasonJobs now. Use this after Build Schedule to actually fetch ESPN games into SportsGames/SportsScores. This can take time for MLB, NFL, or college schedules.",
     previewArchive:
       "Shows what rows would be eligible for archive/cleanup. This preview does not move or delete anything.",
     runArchive:
@@ -2161,6 +2163,67 @@ var adminSportsInfoTimers_ =
 
 var adminSportsInfoHandlersReady_ =
   adminSportsInfoHandlersReady_ || false;
+
+var adminSportsLoadSequence_ =
+  adminSportsLoadSequence_ || 0;
+
+function adminSportsRenderLoading_(
+  title,
+  detail,
+  percent
+) {
+
+  const safeTitle =
+    adminSportsEscape_(title || "Loading Sports Controls...");
+
+  const safeDetail =
+    adminSportsEscape_(detail || "Please wait while the dashboard loads.");
+
+  const safePercent =
+    Math.max(5, Math.min(100, Number(percent || 15)));
+
+  return `
+    <div class="admin-category-card sports-controls-loading-card">
+      <strong>${safeTitle}</strong>
+      <div class="admin-sub" style="margin-top:6px;">
+        ${safeDetail}
+      </div>
+      <div
+        class="sports-load-progress"
+        aria-label="Sports Controls loading progress"
+        style="margin-top:12px; height:10px; border-radius:999px; overflow:hidden; background:rgba(148,163,184,.24);"
+      >
+        <div
+          style="height:100%; width:${safePercent}%; border-radius:999px; background:linear-gradient(90deg, #2563eb, #22c55e); transition:width .25s ease;"
+        ></div>
+      </div>
+      <div class="admin-sub" style="margin-top:8px;">
+        Do not press buttons again while this bar is showing.
+      </div>
+    </div>
+  `;
+
+}
+
+function adminSportsSetPanelLoading_(
+  panel,
+  title,
+  detail,
+  percent
+) {
+
+  if (!panel) {
+    return;
+  }
+
+  panel.innerHTML =
+    adminSportsRenderLoading_(
+      title,
+      detail,
+      percent
+    );
+
+}
 
 function adminSportsDisplayValue_(value, fallback) {
 
@@ -2317,19 +2380,6 @@ function adminSportsInitInfoHandlers_() {
         return;
       }
 
-      const localToggle =
-        event.target && event.target.closest
-          ? event.target.closest("[data-sports-local-toggle]")
-          : null;
-
-      if (localToggle) {
-        adminSportsToggleLocalSwitch_(
-          event,
-          localToggle
-        );
-        return;
-      }
-
       const actionButton =
         event.target && event.target.closest
           ? event.target.closest("[data-sports-click]")
@@ -2339,6 +2389,19 @@ function adminSportsInitInfoHandlers_() {
         adminSportsRunActionFromButton_(
           event,
           actionButton
+        );
+        return;
+      }
+
+      const localToggle =
+        event.target && event.target.closest
+          ? event.target.closest("[data-sports-local-toggle]")
+          : null;
+
+      if (localToggle) {
+        adminSportsToggleLocalSwitch_(
+          event,
+          localToggle
         );
         return;
       }
@@ -2429,6 +2492,15 @@ function adminSportsSetActionProgress_(button, message) {
       : null;
 
   if (!wrap) {
+    if (button) {
+      button.setAttribute(
+        "data-sports-original-text",
+        button.textContent || ""
+      );
+      button.textContent =
+        message || "Working...";
+      button.classList.add("is-working");
+    }
     return;
   }
 
@@ -2459,6 +2531,22 @@ function adminSportsClearActionProgress_(button) {
       : null;
 
   if (!wrap) {
+    if (button) {
+      const inputId =
+        button.getAttribute("data-sports-local-toggle") || "";
+
+      if (inputId) {
+        adminSportsSyncLocalToggleButtons_(
+          inputId
+        );
+      } else if (button.hasAttribute("data-sports-original-text")) {
+        button.textContent =
+          button.getAttribute("data-sports-original-text") || button.textContent || "";
+      }
+
+      button.removeAttribute("data-sports-original-text");
+      button.classList.remove("is-working");
+    }
     return;
   }
 
@@ -2530,29 +2618,33 @@ function adminSportsToggleLocalSwitch_(event, button) {
   input.checked =
     !input.checked;
 
-  const label =
-    button.getAttribute("data-sports-toggle-label") ||
-    "Setting";
-
-  const state =
-    input.checked ? "ON" : "OFF";
-
-  button.textContent =
-    label + " " + state;
-
-  button.setAttribute(
-    "aria-pressed",
-    input.checked ? "true" : "false"
+  adminSportsSyncLocalToggleButtons_(
+    inputId
   );
 
-  button.classList.toggle(
-    "is-on",
-    input.checked
-  );
+}
 
-  button.classList.toggle(
-    "is-off",
-    !input.checked
+
+async function adminToggleSportsLeagueState(
+  league,
+  sport
+) {
+
+  const seasonActiveInputId =
+    adminSportsInputId_(
+      "sportsSeasonActive",
+      league
+    );
+
+  const currentlyOn =
+    adminSportsIsChecked_(
+      seasonActiveInputId
+    );
+
+  return await adminSetSportsLeagueSeasonState(
+    league,
+    sport,
+    !currentlyOn
   );
 
 }
@@ -2874,6 +2966,63 @@ function adminSportsSetCheckbox_(id, checked) {
     el.checked = !!checked;
   }
 
+  adminSportsSyncLocalToggleButtons_(
+    id
+  );
+
+}
+
+function adminSportsSyncLocalToggleButtons_(inputId) {
+
+  if (!inputId) {
+    return;
+  }
+
+  const input =
+    document.getElementById(inputId);
+
+  if (!input) {
+    return;
+  }
+
+  document
+    .querySelectorAll("[data-sports-local-toggle]")
+    .forEach(function(button) {
+
+      if (
+        button.getAttribute("data-sports-local-toggle") !==
+        inputId
+      ) {
+        return;
+      }
+
+      const label =
+        button.getAttribute("data-sports-toggle-label") ||
+        "Setting";
+
+      const state =
+        input.checked ? "ON" : "OFF";
+
+      button.textContent =
+        label + " " + state;
+
+      button.setAttribute(
+        "aria-pressed",
+        input.checked ? "true" : "false"
+      );
+
+      button.classList.toggle(
+        "is-on",
+        input.checked
+      );
+
+      button.classList.toggle(
+        "is-off",
+        !input.checked
+      );
+
+    });
+
 }
 
 function adminSportsNumberValue_(id, fallback) {
@@ -2944,6 +3093,18 @@ async function adminOpenSportsControls() {
     false
   );
 
+  const panel =
+    document.getElementById(
+      "adminSportsControlPanel"
+    );
+
+  adminSportsSetPanelLoading_(
+    panel,
+    "Opening Sports Controls",
+    "Checking the Sports Engine setup before loading the dashboard...",
+    10
+  );
+
   let setupRes = null;
 
   try {
@@ -2988,6 +3149,9 @@ async function adminLoadSportsControls(options) {
 
   options = options || {};
 
+  const loadSequence =
+    ++adminSportsLoadSequence_;
+
   const openLeagueKeys =
     options.openLeagueKeys ||
     (options.preserveOpen ? adminSportsGetOpenLeagueKeys_() : []);
@@ -3001,22 +3165,48 @@ async function adminLoadSportsControls(options) {
     return;
   }
 
-  panel.innerHTML =
-    `
-      <div class="admin-sub">
-        Loading Sports Engine controls...
-      </div>
-    `;
+  adminSportsSetPanelLoading_(
+    panel,
+    "Loading Sports Controls",
+    "Step 1 of 3: getting the Sports Engine dashboard...",
+    20
+  );
 
   adminSportsMessage_(
     "Loading Sports Engine dashboard...",
     false
   );
 
-  const res =
-    await apiAdminGetSportsControlDashboard();
+  let res = null;
+
+  try {
+
+    res =
+      await apiAdminGetSportsControlDashboard();
+
+  } catch (err) {
+
+    res = {
+      success: false,
+      error: err && err.message
+        ? err.message
+        : String(err || "Unable to load Sports Controls.")
+    };
+
+  }
+
+  if (loadSequence !== adminSportsLoadSequence_) {
+    return;
+  }
 
   if (res && res.success !== false) {
+
+    adminSportsSetPanelLoading_(
+      panel,
+      "Loading Sports Controls",
+      "Step 2 of 3: checking automation status...",
+      65
+    );
 
     try {
       const wagerSyncStatus =
@@ -3030,6 +3220,10 @@ async function adminLoadSportsControls(options) {
       res.wagerAutoSyncTriggers = [];
     }
 
+  }
+
+  if (loadSequence !== adminSportsLoadSequence_) {
+    return;
   }
 
   if (!res || res.success === false) {
@@ -3046,8 +3240,20 @@ async function adminLoadSportsControls(options) {
                 : "Unknown error"
             )}
           </div>
+
+          <div class="admin-actions" style="margin-top:12px;">
+            <button
+              type="button"
+              class="admin-small-button secondary"
+              data-sports-click="adminReloadSportsControlsNow()"
+            >
+              Try Again
+            </button>
+          </div>
         </div>
       `;
+
+    adminSportsInitInfoHandlers_();
 
     adminSportsMessage_(
       "Unable to load Sports Controls.",
@@ -3057,6 +3263,13 @@ async function adminLoadSportsControls(options) {
     return;
 
   }
+
+  adminSportsSetPanelLoading_(
+    panel,
+    "Loading Sports Controls",
+    "Step 3 of 3: drawing league controls...",
+    90
+  );
 
   panel.innerHTML =
     adminRenderSportsControlDashboard_(
@@ -3328,6 +3541,10 @@ function adminRenderSportsTriggerControls_(
           cursor: not-allowed;
           opacity: 0.55;
         }
+        .sports-state-toggle.is-working {
+          opacity: 0.82;
+          position: relative;
+        }
         .sports-toggle-hidden-input {
           height: 1px !important;
           opacity: 0 !important;
@@ -3438,6 +3655,14 @@ function adminRenderSportsTriggerControls_(
           "admin-small-button secondary",
           "adminRefreshSportsScoresWindow()",
           "refreshScoresWindow",
+          "global"
+        )}
+
+        ${adminSportsActionButton_(
+          "Run Season Batch",
+          "admin-small-button secondary",
+          "adminRunSportsSeasonBatch()",
+          "runSeasonBatch",
           "global"
         )}
 
@@ -3637,9 +3862,7 @@ function adminRenderSportsHeaderSwitch_(
       : "";
 
   const localAttrs =
-    actionAttrs
-      ? ""
-      : `data-sports-local-toggle="${inputId}" data-sports-toggle-label="${adminSportsEscape_(label || "Setting")}"`;
+    `data-sports-local-toggle="${inputId}" data-sports-toggle-label="${adminSportsEscape_(label || "Setting")}"`;
 
   return `
     <span class="sports-toggle-wrap ${adminSportsEscape_(className || "")}" data-sports-summary-control="true">
@@ -3655,7 +3878,7 @@ function adminRenderSportsHeaderSwitch_(
         class="sports-state-toggle ${checked ? "is-on" : "is-off"}"
         aria-pressed="${checked ? "true" : "false"}"
         ${disabledAttr || ""}
-        ${actionAttrs || localAttrs}
+        ${localAttrs} ${actionAttrs}
       >${adminSportsEscape_(String(label || "Setting") + " " + state)}</button>
     </span>
   `;
@@ -3946,8 +4169,13 @@ function adminRenderScoreLeagueControls_(
           const leagueOn =
             enabled;
 
+          /*
+            Keep league settings editable even when the league is OFF.
+            The old UI disabled every input when League was OFF, which made it
+            impossible to prepare MLB/NFL settings before turning the league on.
+          */
           const controlsDisabled =
-            leagueOn ? "" : "disabled";
+            "";
 
           const leagueToggleControl =
             adminRenderSportsHeaderSwitch_(
@@ -3957,7 +4185,7 @@ function adminRenderScoreLeagueControls_(
               leagueOn,
               "leagueState",
               "",
-              `data-sports-click="adminSetSportsLeagueSeasonState('${leagueCode}', '${sport}', ${leagueOn ? "false" : "true"})"`,
+              `data-sports-click="adminToggleSportsLeagueState('${leagueCode}', '${sport}')"`,
               "sports-league-toggle"
             );
 
@@ -4079,6 +4307,7 @@ function adminRenderScoreLeagueControls_(
 
             <div class="sports-league-actions">
               ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
+              ${adminSportsActionButton_("Run Season Batch", "admin-small-button", "adminRunSportsSeasonBatch()", "runSeasonBatch", leagueCode, controlsDisabled)}
             </div>
           `;
 
@@ -4465,6 +4694,21 @@ async function adminSaveSportsScoreLeagueSettings(
     return el.value;
   }
 
+  const leagueKey =
+    adminSportsKey_(league);
+
+  const isCollegeLeague =
+    [
+      "college-football",
+      "mens-college-basketball",
+      "womens-college-basketball"
+    ].indexOf(leagueKey) !== -1;
+
+  const leagueActive =
+    options.overrideSeasonActive === undefined
+      ? leagueChecked_("sportsSeasonActive", true)
+      : !!options.overrideSeasonActive;
+
   if (!options.silent) {
     adminSportsMessage_(
       "Saving league settings for " + league + "...",
@@ -4475,18 +4719,20 @@ async function adminSaveSportsScoreLeagueSettings(
   const res =
     await apiAdminUpdateSportsLeagueSetting(
       league,
-      leagueChecked_("sportsSeasonActive", true),
+      leagueActive,
       {
         sport: sport,
         pollPreGameMinutes: leagueValue_("sportsPre", 60),
         pollLiveMinutes: leagueValue_("sportsLive", 5),
         pollFinalMinutes: leagueValue_("sportsFinal", 120),
-        savePeriodSnapshots: leagueChecked_("sportsSnapshots", false),
+        savePeriodSnapshots: leagueActive
+          ? leagueChecked_("sportsSnapshots", false)
+          : false,
         season: leagueValue_("sportsSeasonTitle", ""),
         seasonTitle: leagueValue_("sportsSeasonTitle", ""),
         seasonYear: leagueValue_("sportsSeasonYear", adminSportsSeasonYear_(leagueValue_("sportsSeasonTitle", ""))),
         scheduleSource: leagueValue_("sportsScheduleSource", "HYBRID"),
-        scheduleBatchDays: leagueValue_("sportsScheduleBatchDaysLeague", leagueCode === "college-football" || leagueCode === "mens-college-basketball" || leagueCode === "womens-college-basketball" ? 7 : 14),
+        scheduleBatchDays: leagueValue_("sportsScheduleBatchDaysLeague", isCollegeLeague ? 7 : 14),
         espnSeasonTypesEnabled: leagueChecked_("sportsESPNSeasonTypesEnabled", true),
         espnPreseasonType: leagueValue_("sportsESPNPreseasonType", 1),
         espnRegularSeasonType: leagueValue_("sportsESPNRegularType", 2),
@@ -4495,7 +4741,7 @@ async function adminSaveSportsScoreLeagueSettings(
         espnGroupIds: leagueValue_("sportsESPNGroupIds", ""),
         espnResultLimit: leagueValue_("sportsESPNResultLimit", 500),
         selectedTeamIds: leagueValue_("sportsSelectedTeamIds", ""),
-        seasonActive: leagueChecked_("sportsSeasonActive", true),
+        seasonActive: leagueActive,
         seasonStartDate: leagueDateValue_("sportsSeasonStart"),
         seasonEndDate: leagueDateValue_("sportsSeasonEnd"),
         regularSeasonStartDate: leagueDateValue_("sportsRegularStart"),
@@ -4512,7 +4758,9 @@ async function adminSaveSportsScoreLeagueSettings(
         bowlEnabled: leagueChecked_("sportsBowlEnabled", false),
         bowlStartDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlStart") : "",
         bowlEndDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlEnd") : "",
-        oddsEnabled: leagueChecked_("sportsOddsEnabled", true),
+        oddsEnabled: leagueActive
+          ? leagueChecked_("sportsOddsEnabled", true)
+          : false,
         oddsCooldownMinutes: leagueValue_("sportsOddsCooldown", 240),
         oddsDailyMaxPulls: leagueValue_("sportsOddsDaily", 2),
         oddsMonthlyMaxPulls: leagueValue_("sportsOddsMonthly", 30),
@@ -4699,28 +4947,63 @@ async function adminSetSportsLeagueSeasonState(
     false
   );
 
+  const seasonActiveInputId =
+    adminSportsInputId_("sportsSeasonActive", league);
+
+  const previousSeasonActive =
+    adminSportsIsChecked_(seasonActiveInputId);
+
+  adminSportsSetCheckbox_(
+    seasonActiveInputId,
+    active
+  );
+
+  if (!active) {
+    adminSportsSetCheckbox_(
+      adminSportsInputId_("sportsOddsEnabled", league),
+      false
+    );
+
+    adminSportsSetCheckbox_(
+      adminSportsInputId_("sportsSnapshots", league),
+      false
+    );
+  }
+
   const res =
-    await apiAdminUpdateSportsLeagueSetting(
+    await adminSaveSportsScoreLeagueSettings(
       league,
-      active,
+      sport,
       {
-        sport: sport,
-        seasonActive: active,
-        oddsEnabled: active,
-        savePeriodSnapshots: false
+        silent: true,
+        overrideSeasonActive: active
       }
     );
 
   adminSportsMessage_(
     res && res.success
-      ? (active ? "Season started." : "Season ended. Scores, odds, and snapshots are off for this league.")
+      ? (active
+        ? "League ON saved to SportsSettings."
+        : "League OFF saved to SportsSettings. Scores, odds, and snapshots are off for this league.")
       : (res && (res.error || res.message)) ||
-        "Unable to update season state.",
+        "Unable to update league state.",
     !(res && res.success)
   );
 
   if (res && res.success) {
-    adminSportsMarkDashboardStale_();
+    adminSportsSetCheckbox_(
+      seasonActiveInputId,
+      active
+    );
+
+    adminSportsMarkDashboardStale_(
+      "Saved. League state changed. Use Reload Sports Controls when you want refreshed counts/status."
+    );
+  } else {
+    adminSportsSetCheckbox_(
+      seasonActiveInputId,
+      previousSeasonActive
+    );
   }
 
 }

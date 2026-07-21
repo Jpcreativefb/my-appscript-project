@@ -2874,6 +2874,52 @@ function createSportsSeasonJobs2026() {
  per run across active season jobs.
 ************************************/
 
+function sportsV15SeasonYearForSetting_(setting) {
+  return String(
+    setting && (
+      setting.SeasonYear ||
+      sportsV13SeasonYear_(setting.SeasonTitle || setting.Season || "", new Date().getFullYear())
+    ) || ""
+  ).trim();
+}
+
+function sportsV15SeasonYearForJob_(job) {
+  const explicitYear =
+    String(job && job.SeasonYear || "").trim();
+
+  if (explicitYear) {
+    return explicitYear;
+  }
+
+  const startDate =
+    normalizeSportsDateOnly_(job && job.StartDate);
+
+  if (startDate && /^\d{4}-/.test(startDate)) {
+    return startDate.slice(0, 4);
+  }
+
+  const seasonName =
+    String(job && job.SeasonName || "");
+
+  const match = seasonName.match(/(20\d{2}|19\d{2})/);
+
+  return match ? match[1] : "";
+}
+
+function sportsV15JobMatchesSettingSeason_(job, setting) {
+  const jobYear =
+    sportsV15SeasonYearForJob_(job);
+
+  const settingYear =
+    sportsV15SeasonYearForSetting_(setting);
+
+  if (!jobYear || !settingYear) {
+    return true;
+  }
+
+  return String(jobYear) === String(settingYear);
+}
+
 function runSportsSeasonBatchUpdate() {
   const lock =
     LockService.getScriptLock();
@@ -2945,6 +2991,25 @@ function runSportsSeasonBatchUpdate() {
               job.Sport +
               " / " +
               job.League
+          }
+        );
+
+        return;
+      }
+
+      if (!sportsV15JobMatchesSettingSeason_(job, setting)) {
+        updateSportsSeasonJob_(
+          job.JobId,
+          {
+            Status: "SUPERSEDED",
+            LastRun: new Date(),
+            Errors:
+              "Skipped stale season job. Job season " +
+              sportsV15SeasonYearForJob_(job) +
+              " does not match current SportsSettings season " +
+              sportsV15SeasonYearForSetting_(setting) +
+              ". Rebuild schedule for this league if needed.",
+            CompletedAt: new Date()
           }
         );
 
@@ -6215,6 +6280,100 @@ function sportsV13AttachMeta_(game, event, request) {
   return game;
 }
 
+
+function sportsV16FourDigitYear_(value) {
+  const text = String(value || "").trim();
+  const match = text.match(/(19\d{2}|20\d{2})/);
+  return match ? Number(match[1]) : 0;
+}
+
+function sportsV16EventSeasonYear_(event) {
+  return sportsV16FourDigitYear_(
+    event && event.season && (
+      event.season.year ||
+      event.season.displayName ||
+      event.season.name
+    )
+  );
+}
+
+function sportsV16EventDateYear_(event) {
+  return sportsV16FourDigitYear_(
+    event && (event.date || event.GameDateTime)
+  );
+}
+
+function sportsV16IsCrossYearSeasonLeague_(sport, league) {
+  sport = String(sport || "").toLowerCase();
+  league = String(league || "").toLowerCase();
+
+  return (
+    sport === "football" ||
+    sport === "basketball" ||
+    sport === "hockey" ||
+    league === "nfl" ||
+    league === "college-football" ||
+    league === "nba" ||
+    league === "wnba" ||
+    league === "nhl" ||
+    league === "mens-college-basketball" ||
+    league === "womens-college-basketball"
+  );
+}
+
+function sportsV16EventMatchesRequestedSeason_(event, request) {
+  request = request || {};
+
+  const requestedYear =
+    sportsV16FourDigitYear_(request.seasonYear);
+
+  if (!requestedYear) {
+    return true;
+  }
+
+  const eventSeasonYear =
+    sportsV16EventSeasonYear_(event);
+
+  if (eventSeasonYear && eventSeasonYear !== requestedYear) {
+    return false;
+  }
+
+  const eventDateYear =
+    sportsV16EventDateYear_(event);
+
+  if (!eventDateYear) {
+    return true;
+  }
+
+  if (eventDateYear === requestedYear) {
+    return true;
+  }
+
+  if (
+    sportsV16IsCrossYearSeasonLeague_(request.sport, request.league) &&
+    eventDateYear === requestedYear + 1
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+function sportsV16SeasonSkipDetails_(event, request) {
+  request = request || {};
+
+  return {
+    requestedSeasonYear: String(request.seasonYear || ""),
+    requestedSeasonType: String(request.seasonType || ""),
+    requestedWeek: String(request.week || ""),
+    eventId: String(event && event.id || event && event.uid || ""),
+    eventName: String(event && (event.name || event.shortName) || ""),
+    eventSeasonYear: sportsV16EventSeasonYear_(event) || "",
+    eventDateYear: sportsV16EventDateYear_(event) || "",
+    eventDate: String(event && event.date || "")
+  };
+}
+
 function fetchAndNormalizeESPNScoreboardFromSetting_(setting, dateString, options) {
   options = options || {};
   const requests = sportsV13BuildESPNRequests_(setting, dateString, options);
@@ -6233,7 +6392,22 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(setting, dateString, option
       });
     }
 
+    let skippedWrongSeason = 0;
+    const skippedSamples = [];
+
     events.forEach(function(event) {
+      if (!sportsV16EventMatchesRequestedSeason_(event, request)) {
+        skippedWrongSeason++;
+
+        if (skippedSamples.length < 5) {
+          skippedSamples.push(
+            sportsV16SeasonSkipDetails_(event, request)
+          );
+        }
+
+        return;
+      }
+
       const game = sportsV13AttachMeta_(
         normalizeESPNEvent_(event, setting.Sport, setting.League),
         event,
@@ -6241,6 +6415,23 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(setting, dateString, option
       );
       if (game && game.GameId) gamesById[game.GameId] = game;
     });
+
+    if (skippedWrongSeason) {
+      logSports_(
+        "WARN",
+        "fetchAndNormalizeESPNScoreboardFromSetting_",
+        "Skipped ESPN events outside requested season",
+        JSON.stringify({
+          sport: request.sport,
+          league: request.league,
+          source: request.source,
+          seasonYear: request.seasonYear,
+          seasonType: request.seasonType,
+          skippedWrongSeason: skippedWrongSeason,
+          samples: skippedSamples
+        })
+      );
+    }
   });
 
   if (driverRows.length) upsertSportsRacingResultRows_(driverRows);
@@ -6837,7 +7028,22 @@ function fetchAndNormalizeESPNWeekScoreboardFromSetting_(setting, seasonYear, se
       });
     }
 
+    let skippedWrongSeason = 0;
+    const skippedSamples = [];
+
     events.forEach(function(event) {
+      if (!sportsV16EventMatchesRequestedSeason_(event, request)) {
+        skippedWrongSeason++;
+
+        if (skippedSamples.length < 5) {
+          skippedSamples.push(
+            sportsV16SeasonSkipDetails_(event, request)
+          );
+        }
+
+        return;
+      }
+
       const game = sportsV13AttachMeta_(
         normalizeESPNEvent_(event, setting.Sport, setting.League),
         event,
@@ -6847,6 +7053,24 @@ function fetchAndNormalizeESPNWeekScoreboardFromSetting_(setting, seasonYear, se
       if (game && !game.Week) game.Week = request.week || "";
       if (game && game.GameId) gamesById[game.GameId] = game;
     });
+
+    if (skippedWrongSeason) {
+      logSports_(
+        "WARN",
+        "fetchAndNormalizeESPNWeekScoreboardFromSetting_",
+        "Skipped ESPN week events outside requested season",
+        JSON.stringify({
+          sport: request.sport,
+          league: request.league,
+          source: request.source,
+          seasonYear: request.seasonYear,
+          seasonType: request.seasonType,
+          week: request.week,
+          skippedWrongSeason: skippedWrongSeason,
+          samples: skippedSamples
+        })
+      );
+    }
   });
 
   if (driverRows.length) upsertSportsRacingResultRows_(driverRows);
@@ -6961,6 +7185,49 @@ function createSportsSeasonJobsForDateRange_(startDate, endDate, batchDays, opti
     }
   }
 
+  let supersededJobs = 0;
+
+  if (targetLeague) {
+    const targetPairs = {};
+
+    settings.forEach(function(setting) {
+      targetPairs[
+        String(setting.Sport || "").toLowerCase() + "|" +
+        String(setting.League || "").toLowerCase()
+      ] = true;
+    });
+
+    for (let i = 1; i < data.length; i++) {
+      const pairKey =
+        String(data[i][col.Sport] || "").toLowerCase() + "|" +
+        String(data[i][col.League] || "").toLowerCase();
+
+      if (!targetPairs[pairKey]) {
+        continue;
+      }
+
+      const currentStatus =
+        String(data[i][col.Status] || "").trim().toUpperCase();
+
+      if (currentStatus === "SUPERSEDED") {
+        continue;
+      }
+
+      updateSportsSeasonJobRow_(
+        sh,
+        headers,
+        i + 1,
+        {
+          Status: "SUPERSEDED",
+          Errors: "Superseded by Build Schedule rebuild on " + new Date(),
+          CompletedAt: new Date()
+        }
+      );
+
+      supersededJobs++;
+    }
+  }
+
   const newRows = [];
   let updatedJobs = 0;
   let descriptorsCount = 0;
@@ -7030,8 +7297,8 @@ function createSportsSeasonJobsForDateRange_(startDate, endDate, batchDays, opti
     sh.getRange(sh.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
   }
 
-  const message = "Schedule jobs ready. New jobs: " + newRows.length + ", updated jobs: " + updatedJobs + ", phases/team/week jobs: " + descriptorsCount + ", football week jobs: " + weekJobs + ".";
-  logSports_("INFO", "createSportsSeasonJobsForDateRange_", message, JSON.stringify({ startDate: startDate, endDate: endDate, batchDays: batchDays, newJobs: newRows.length, updatedJobs: updatedJobs, weekJobs: weekJobs, enabledLeagues: settings.length, league: targetLeague || "ALL", scheduleSource: options.scheduleSource || "" }));
+  const message = "Schedule jobs ready. New jobs: " + newRows.length + ", updated jobs: " + updatedJobs + ", superseded old jobs: " + supersededJobs + ", phases/team/week jobs: " + descriptorsCount + ", football week jobs: " + weekJobs + ".";
+  logSports_("INFO", "createSportsSeasonJobsForDateRange_", message, JSON.stringify({ startDate: startDate, endDate: endDate, batchDays: batchDays, newJobs: newRows.length, updatedJobs: updatedJobs, supersededJobs: supersededJobs, weekJobs: weekJobs, enabledLeagues: settings.length, league: targetLeague || "ALL", scheduleSource: options.scheduleSource || "" }));
 
   return {
     success: true,
@@ -7040,6 +7307,7 @@ function createSportsSeasonJobsForDateRange_(startDate, endDate, batchDays, opti
     batchDays: batchDays,
     newJobs: newRows.length,
     updatedJobs: updatedJobs,
+    supersededJobs: supersededJobs,
     weekJobs: weekJobs,
     enabledLeagues: settings.length,
     league: targetLeague || "ALL",
