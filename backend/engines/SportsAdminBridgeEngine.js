@@ -669,6 +669,57 @@ function apiAdminRunSportsSeasonBatch(payload) {
 
 }
 
+function apiAdminRunSportsScheduleReconcile(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "runSportsScheduleReconcileAdmin",
+    {
+      league:
+        payload.league || "",
+
+      daysBack:
+        payload.daysBack || 1,
+
+      daysForward:
+        payload.daysForward || 21
+    }
+  );
+
+}
+
+function apiAdminInstallSportsScheduleReconcileTrigger(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "installSportsScheduleReconcileTriggerAdmin",
+    {}
+  );
+
+}
+
+function apiAdminRemoveSportsScheduleReconcileTrigger(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "removeSportsScheduleReconcileTriggerAdmin",
+    {}
+  );
+
+}
+
 function apiAdminUpdateSportsSeasonJobStatus(payload) {
 
   sportsAdminBridgeRequireAdmin_(

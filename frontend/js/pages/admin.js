@@ -3623,7 +3623,8 @@ function adminRenderSportsTriggerControls_(
             · Live score triggers: ${scoreTriggers.length || 0}
             · Score window triggers: ${scoreWindowTriggers.length || 0}
             · Wager smart triggers: ${wagerAutoSyncTriggers.length || 0}
-            · Schedule triggers: ${seasonBatchTriggers.length || 0}
+            · Schedule batch triggers: ${seasonBatchTriggers.length || 0}
+            · Schedule reconcile: ${(smart.details && smart.details.scheduleReconcile) || 0}
             · Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
           </div>
         </div>
@@ -3655,6 +3656,14 @@ function adminRenderSportsTriggerControls_(
           "admin-small-button secondary",
           "adminRefreshSportsScoresWindow()",
           "refreshScoresWindow",
+          "global"
+        )}
+
+        ${adminSportsActionButton_(
+          "Recheck Schedule Now",
+          "admin-small-button secondary",
+          "adminRunSportsScheduleReconcile()",
+          "scheduleReconcile",
           "global"
         )}
 
@@ -4307,6 +4316,7 @@ function adminRenderScoreLeagueControls_(
 
             <div class="sports-league-actions">
               ${adminSportsActionButton_("Build Schedule", "admin-small-button secondary", "adminCreateSportsLeagueSeasonJobs('" + leagueCode + "', '" + sport + "')", "buildSchedule", leagueCode, controlsDisabled)}
+              ${adminSportsActionButton_("Recheck Schedule", "admin-small-button secondary", "adminRunSportsScheduleReconcile('" + leagueCode + "')", "scheduleReconcile", leagueCode, controlsDisabled)}
               ${adminSportsActionButton_("Run Season Batch", "admin-small-button", "adminRunSportsSeasonBatch()", "runSeasonBatch", leagueCode, controlsDisabled)}
             </div>
           `;

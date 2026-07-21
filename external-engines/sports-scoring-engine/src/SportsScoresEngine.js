@@ -1825,6 +1825,33 @@ else if (action === "runSportsSeasonBatchAdmin") {
 
 }
 
+else if (action === "runSportsScheduleReconcileAdmin") {
+
+  payload =
+    apiRunSportsScheduleReconcileAdmin_(
+      params
+    );
+
+}
+
+else if (action === "installSportsScheduleReconcileTriggerAdmin") {
+
+  payload =
+    apiInstallSportsScheduleReconcileTriggerAdmin_(
+      params
+    );
+
+}
+
+else if (action === "removeSportsScheduleReconcileTriggerAdmin") {
+
+  payload =
+    apiRemoveSportsScheduleReconcileTriggerAdmin_(
+      params
+    );
+
+}
+
 else if (action === "updateSportsSeasonJobStatus") {
 
   payload =
@@ -2631,6 +2658,51 @@ function ensureSportsScoresLogoDateColumns_() {
 
 }
 
+function sportsRecordFromPossibleSheetDate_(value) {
+
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value.getTime())
+  ) {
+
+    const year = value.getFullYear();
+
+    if (year >= 2000 && year <= 2030) {
+      return [
+        value.getMonth() + 1,
+        value.getDate(),
+        year - 2000
+      ].join("-");
+    }
+
+  }
+
+  let text =
+    String(value || "")
+      .trim();
+
+  const convertedDateMatch =
+    text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})$/);
+
+  if (convertedDateMatch) {
+
+    const third =
+      Number(convertedDateMatch[3]) - 2000;
+
+    if (third >= 0 && third <= 30) {
+      return [
+        Number(convertedDateMatch[1]),
+        Number(convertedDateMatch[2]),
+        third
+      ].join("-");
+    }
+
+  }
+
+  return "";
+
+}
+
 function isSportsRecordValue_(value) {
 
   value =
@@ -2645,28 +2717,34 @@ function isSportsRecordValue_(value) {
     value.toLowerCase();
 
   /*
-    Reject date/time-like values that ESPN sometimes places
+    Accept sports records before rejecting date-looking text.
+    This is important for tied records such as 2-2-1.
+    Google Sheets can try to convert these into dates unless
+    the columns are formatted as text.
+
+    Accepted examples:
+    43-31
+    43-31-1
+    2-2-1
+    12-3-10
+    10-4 Away
+    7-2 Conf
+    15-6 Overall
+  */
+  if (/^\d{1,3}\s*-\s*\d{1,3}(?:\s*-\s*\d{1,2})?(?:\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value)) {
+    return true;
+  }
+
+  /*
+    Reject true date/time-like values that ESPN sometimes places
     into non-record display fields. These were showing in the
     app as HomeRecord / AwayRecord.
-
-    Examples rejected:
-    2026-06-18
-    6/18
-    6/18/2026
-    6-18-2026
-    Thu, Jun 18
-    Sep 7
-    7:30 PM
   */
   if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(value)) {
     return false;
   }
 
   if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
-    return false;
-  }
-
-  if (/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(value)) {
     return false;
   }
 
@@ -2681,29 +2759,68 @@ function isSportsRecordValue_(value) {
     return false;
   }
 
-  /*
-    Accept common sports record formats only:
-    43-31
-    43-31-1
-    10-4 Away
-    7-2 Conf
-    15-6 Overall
-  */
-  return /^\d+\s*-\s*\d+(\s*-\s*\d+)?(\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value);
+  return false;
 
 }
 
 function cleanSportsRecordValue_(value) {
 
+  const recovered =
+    sportsRecordFromPossibleSheetDate_(value);
+
+  if (recovered && isSportsRecordValue_(recovered)) {
+    return recovered;
+  }
+
   value =
     String(value || "")
-      .trim();
+      .trim()
+      .replace(/^'/, "");
 
   if (!isSportsRecordValue_(value)) {
     return "";
   }
 
-  return value;
+  return value.replace(/\s*-\s*/g, "-");
+
+}
+
+function applySportsRecordTextFormats_(sheetName) {
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(sheetName);
+
+  if (!sh || sh.getLastColumn() < 1) {
+    return;
+  }
+
+  const headers =
+    sh
+      .getRange(1, 1, 1, sh.getLastColumn())
+      .getValues()[0]
+      .map(function(header) {
+        return String(header || "").trim();
+      });
+
+  [
+    "HomeRecord",
+    "AwayRecord"
+  ].forEach(function(headerName) {
+
+    const index =
+      headers.indexOf(headerName);
+
+    if (index === -1) {
+      return;
+    }
+
+    sh
+      .getRange(1, index + 1, Math.max(sh.getMaxRows(), 1), 1)
+      .setNumberFormat("@");
+
+  });
 
 }
 
@@ -6460,6 +6577,8 @@ function upsertLatestSportsScores_(games) {
 
   sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
   sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
+  applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
+  applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
 
   const actualHeaders = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
     .map(function(header) { return String(header).trim(); });
@@ -6476,6 +6595,9 @@ function upsertLatestSportsScores_(games) {
 
   games.forEach(function(game) {
     const row = actualHeaders.map(function(header) {
+      if (header === "HomeRecord" || header === "AwayRecord") {
+        return cleanSportsRecordValue_(game[header]);
+      }
       return game[header] !== undefined ? game[header] : "";
     });
     const existingRow = existingRowsByGameId[game.GameId];
@@ -6750,10 +6872,13 @@ function repairSportsScoreDisplaySheet_(sheetName) {
       const c =
         col[item.name];
 
-      const current =
-        String(values[r][c] || "").trim();
+      const rawCurrent =
+        values[r][c];
 
-      if (!current) {
+      const current =
+        String(rawCurrent || "").trim();
+
+      if (!current && !rawCurrent) {
         return;
       }
 
@@ -6763,7 +6888,7 @@ function repairSportsScoreDisplaySheet_(sheetName) {
       if (item.type === "record") {
         next =
           cleanSportsRecordValue_(
-            current
+            rawCurrent
           );
       }
 
@@ -6785,6 +6910,7 @@ function repairSportsScoreDisplaySheet_(sheetName) {
   }
 
   if (repaired) {
+    applySportsRecordTextFormats_(sheetName);
     sh.getRange(
       1,
       1,
@@ -7726,6 +7852,8 @@ function setupSportsScoresSheet() {
 
   sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
   sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
+  applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
+  applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
   sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
   sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
   setupSportsSeasonJobsSheet();
@@ -7742,5 +7870,1210 @@ function setupSportsScoresSheet() {
     success: true,
     version: "14-production",
     message: "Sports Scores Engine setup complete. Live sheets, SportsGames, season jobs, college coverage, and archives are ready. Racing rows are disabled here because racing is handled by the separate Racing Score Engine."
+  };
+}
+
+/************************************
+ PATCH v17 - MLB EXTRA-INNING TIE PROTECTION
+
+ Purpose:
+ - Baseball should not settle as a tied moneyline at the end of 9 innings.
+ - If ESPN temporarily reports a tied baseball game with a final/post state,
+   keep Completed FALSE and Winner blank until the real extra-innings final arrives.
+ - Use the largest available inning value so extra innings can show as 10, 11, etc.
+************************************/
+
+function sportsV17IsBaseballLeague_(sport, league) {
+
+  sport =
+    String(sport || "")
+      .trim()
+      .toLowerCase();
+
+  league =
+    String(league || "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    sport === "baseball" ||
+    league === "mlb"
+  );
+
+}
+
+function sportsV17NumberOrNull_(value) {
+
+  if (
+    value === "" ||
+    value === null ||
+    value === undefined
+  ) {
+    return null;
+  }
+
+  const n = Number(value);
+
+  if (
+    isNaN(n) ||
+    !isFinite(n)
+  ) {
+    return null;
+  }
+
+  return n;
+
+}
+
+function sportsV17ScoresAreEqual_(homeScore, awayScore) {
+
+  return (
+    homeScore !== null &&
+    awayScore !== null &&
+    homeScore === awayScore
+  );
+
+}
+
+function sportsV17TeamDisplayName_(team) {
+
+  team = team || {};
+
+  return (
+    team.displayName ||
+    team.shortDisplayName ||
+    team.name ||
+    ""
+  );
+
+}
+
+function sportsV17BaseballPeriod_(event, competition, status) {
+
+  const candidates = [
+    status && status.period,
+    event && event.status && event.status.period,
+    competition && competition.status && competition.status.period,
+    competition && competition.situation && competition.situation.inning,
+    competition && competition.situation && competition.situation.period,
+    event && event.situation && event.situation.inning,
+    event && event.situation && event.situation.period
+  ];
+
+  let best = 0;
+
+  candidates.forEach(function(value) {
+
+    const n = Number(value || 0);
+
+    if (
+      !isNaN(n) &&
+      isFinite(n) &&
+      n > best
+    ) {
+      best = n;
+    }
+
+  });
+
+  return best || "";
+
+}
+
+function sportsV17TeamEventCompleted_(
+  sport,
+  league,
+  statusType,
+  homeScore,
+  awayScore
+) {
+
+  const completed =
+    statusType && statusType.completed === true;
+
+  if (!completed) {
+    return false;
+  }
+
+  if (
+    sportsV17IsBaseballLeague_(sport, league) &&
+    sportsV17ScoresAreEqual_(homeScore, awayScore)
+  ) {
+    return false;
+  }
+
+  return true;
+
+}
+
+function sportsV17TeamEventWinner_(
+  completed,
+  home,
+  away,
+  homeTeam,
+  awayTeam,
+  homeScore,
+  awayScore
+) {
+
+  if (!completed) {
+    return "";
+  }
+
+  if (home && home.winner === true) {
+    return sportsV17TeamDisplayName_(homeTeam);
+  }
+
+  if (away && away.winner === true) {
+    return sportsV17TeamDisplayName_(awayTeam);
+  }
+
+  if (
+    homeScore !== null &&
+    awayScore !== null &&
+    homeScore !== awayScore
+  ) {
+    return homeScore > awayScore
+      ? sportsV17TeamDisplayName_(homeTeam)
+      : sportsV17TeamDisplayName_(awayTeam);
+  }
+
+  return "";
+
+}
+
+// Final override: baseball-aware normalization.
+function normalizeESPNTeamEvent_(event, sport, league) {
+
+  const competition =
+    event.competitions &&
+    event.competitions.length
+      ? event.competitions[0]
+      : {};
+
+  const status =
+    competition.status ||
+    event.status ||
+    {};
+
+  const statusType =
+    status.type ||
+    {};
+
+  const competitors =
+    competition.competitors || [];
+
+  const home =
+    competitors.find(function(team) {
+      return team.homeAway === "home";
+    }) || {};
+
+  const away =
+    competitors.find(function(team) {
+      return team.homeAway === "away";
+    }) || {};
+
+  const homeTeam =
+    home.team || {};
+
+  const awayTeam =
+    away.team || {};
+
+  const rawHomeScore =
+    sportsV17NumberOrNull_(home.score);
+
+  const rawAwayScore =
+    sportsV17NumberOrNull_(away.score);
+
+  const homeScore =
+    rawHomeScore === null
+      ? 0
+      : rawHomeScore;
+
+  const awayScore =
+    rawAwayScore === null
+      ? 0
+      : rawAwayScore;
+
+  const completed =
+    sportsV17TeamEventCompleted_(
+      sport,
+      league,
+      statusType,
+      rawHomeScore,
+      rawAwayScore
+    );
+
+  const winner =
+    sportsV17TeamEventWinner_(
+      completed,
+      home,
+      away,
+      homeTeam,
+      awayTeam,
+      rawHomeScore,
+      rawAwayScore
+    );
+
+  const period =
+    sportsV17IsBaseballLeague_(sport, league)
+      ? sportsV17BaseballPeriod_(event, competition, status)
+      : status.period || "";
+
+  return {
+    GameId: league + "_" + String(event.id || ""),
+    ESPNEventId: String(event.id || ""),
+    Sport: sport,
+    League: league,
+    Status:
+      statusType.name ||
+      statusType.description ||
+      "",
+    State:
+      statusType.state ||
+      "",
+    Period:
+      period,
+    Clock:
+      status.displayClock || "",
+    HomeTeam:
+      sportsV17TeamDisplayName_(homeTeam),
+    AwayTeam:
+      sportsV17TeamDisplayName_(awayTeam),
+    HomeScore: homeScore,
+    AwayScore: awayScore,
+    Winner: winner,
+    Completed: completed,
+    LastUpdated: new Date(),
+    GameDateTime:
+      event.date || "",
+    HomeLogo:
+      getESPNTeamLogo_(homeTeam),
+    AwayLogo:
+      getESPNTeamLogo_(awayTeam),
+    HomeRecord:
+      getESPNTeamRecord_(home),
+    AwayRecord:
+      getESPNTeamRecord_(away)
+  };
+
+}
+
+function repairSportsBaseballTiedFinalScoresAdmin() {
+
+  const summary = {
+    success: true,
+    repaired: 0,
+    sheets: []
+  };
+
+  [
+    SPORTS_SHEETS.SCORES,
+    SPORTS_SHEETS.GAMES
+  ].forEach(function(sheetName) {
+
+    const result =
+      repairSportsBaseballTiedFinalScoresSheet_(
+        sheetName
+      );
+
+    summary.sheets.push(result);
+    summary.repaired += result.repaired || 0;
+
+  });
+
+  logSports_(
+    "INFO",
+    "repairSportsBaseballTiedFinalScoresAdmin",
+    "Baseball tied final score repair complete",
+    JSON.stringify(summary)
+  );
+
+  return summary;
+
+}
+
+function repairSportsBaseballTiedFinalScoresSheet_(sheetName) {
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(sheetName);
+
+  if (!sh || sh.getLastRow() < 2) {
+    return {
+      sheet: sheetName,
+      repaired: 0,
+      rowsChecked: 0,
+      skipped: !sh
+    };
+  }
+
+  const values =
+    sh.getDataRange()
+      .getValues();
+
+  const headers =
+    values[0]
+      .map(function(header) {
+        return String(header || "").trim();
+      });
+
+  const col =
+    getSportsHeaderMap_(headers);
+
+  const required = [
+    "Sport",
+    "League",
+    "HomeScore",
+    "AwayScore"
+  ];
+
+  const missing =
+    required.filter(function(header) {
+      return col[header] === undefined;
+    });
+
+  if (missing.length) {
+    return {
+      sheet: sheetName,
+      repaired: 0,
+      rowsChecked: values.length - 1,
+      message: "Missing columns: " + missing.join(", ")
+    };
+  }
+
+  let repaired = 0;
+
+  for (let r = 1; r < values.length; r++) {
+
+    const sport =
+      values[r][col.Sport];
+
+    const league =
+      values[r][col.League];
+
+    if (!sportsV17IsBaseballLeague_(sport, league)) {
+      continue;
+    }
+
+    const homeScore =
+      sportsV17NumberOrNull_(
+        values[r][col.HomeScore]
+      );
+
+    const awayScore =
+      sportsV17NumberOrNull_(
+        values[r][col.AwayScore]
+      );
+
+    if (!sportsV17ScoresAreEqual_(homeScore, awayScore)) {
+      continue;
+    }
+
+    let rowChanged = false;
+
+    if (
+      col.Completed !== undefined &&
+      normalizeSportsBoolean_(values[r][col.Completed])
+    ) {
+      values[r][col.Completed] = false;
+      rowChanged = true;
+    }
+
+    if (
+      col.Winner !== undefined &&
+      String(values[r][col.Winner] || "").trim()
+    ) {
+      values[r][col.Winner] = "";
+      rowChanged = true;
+    }
+
+    if (
+      col.Active !== undefined &&
+      values[r][col.Active] !== true
+    ) {
+      values[r][col.Active] = true;
+      rowChanged = true;
+    }
+
+    if (
+      col.State !== undefined &&
+      /^(post|final)$/i.test(String(values[r][col.State] || "").trim())
+    ) {
+      values[r][col.State] = "in";
+      rowChanged = true;
+    }
+
+    if (
+      col.Status !== undefined &&
+      /final|complete/i.test(String(values[r][col.Status] || ""))
+    ) {
+      values[r][col.Status] = "TIED - WAITING EXTRA INNINGS";
+      rowChanged = true;
+    }
+
+    if (
+      col.LastStatus !== undefined &&
+      /final|complete/i.test(String(values[r][col.LastStatus] || ""))
+    ) {
+      values[r][col.LastStatus] = "TIED - WAITING EXTRA INNINGS";
+      rowChanged = true;
+    }
+
+    if (rowChanged) {
+      repaired++;
+    }
+
+  }
+
+  if (repaired) {
+    sh.getRange(
+      1,
+      1,
+      values.length,
+      headers.length
+    ).setValues(values);
+  }
+
+  return {
+    sheet: sheetName,
+    repaired: repaired,
+    rowsChecked: values.length - 1
+  };
+
+}
+
+
+/************************************
+ PATCH v17 - SIMPLE SCHEDULE RECONCILE
+
+ Purpose:
+ - Build Schedule is the first load, not a permanent truth.
+ - Reconcile Schedule keeps SportsGames/SportsScores current when ESPN
+   changes dates, postpones games, or replaces TBD playoff teams.
+ - Nothing is deleted automatically. Changed games are updated, old rows
+   remain available for audit/archive.
+************************************/
+
+const SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION =
+  "runSportsScheduleReconcileUpdate";
+
+function sportsScheduleReconcileExtraHeaders_() {
+  return [
+    "ScheduleStatus",
+    "ScheduleLastChecked",
+    "ScheduleChangedAt",
+    "OriginalGameDateTime",
+    "CurrentGameDateTime",
+    "PreviousStatus",
+    "NeedsReconcile",
+    "TBDTeams",
+    "SupersededByGameId",
+    "ScheduleSource",
+    "ScheduleNotes"
+  ];
+}
+
+// Final override: add schedule-reconcile/audit columns to SportsGames.
+function sportsV13GamesHeaders_() {
+  return [
+    "GameId",
+    "Sport",
+    "League",
+    "ESPNEventId",
+    "Name",
+    "ShortName",
+    "Season",
+    "SeasonYear",
+    "SeasonType",
+    "SeasonPhase",
+    "Week",
+    "GameDateTime",
+    "HomeTeam",
+    "AwayTeam",
+    "HomeTeamId",
+    "AwayTeamId",
+    "Active",
+    "Completed",
+    "Source",
+    "GroupId",
+    "TeamId",
+    "LastChecked",
+    "LastStatus"
+  ].concat(
+    sportsScheduleReconcileExtraHeaders_()
+  );
+}
+
+function sportsScheduleIsTbdValue_(value) {
+  const text = String(value || "")
+    .trim()
+    .toLowerCase();
+
+  if (!text) {
+    return true;
+  }
+
+  return (
+    text === "tbd" ||
+    text === "to be determined" ||
+    text === "unknown" ||
+    text === "winner" ||
+    text.indexOf("tbd") >= 0 ||
+    text.indexOf("winner of") >= 0 ||
+    text.indexOf("to be determined") >= 0
+  );
+}
+
+function sportsScheduleTbdTeams_(game) {
+  const teams = [];
+
+  if (sportsScheduleIsTbdValue_(game.HomeTeam)) {
+    teams.push("HOME");
+  }
+
+  if (sportsScheduleIsTbdValue_(game.AwayTeam)) {
+    teams.push("AWAY");
+  }
+
+  return teams.join(",");
+}
+
+function sportsScheduleStatusForGame_(game, existingRow) {
+  const completed =
+    normalizeSportsBoolean_(
+      game.Completed
+    );
+
+  const status =
+    String(game.Status || "")
+      .trim();
+
+  const statusUpper =
+    status.toUpperCase();
+
+  if (completed) {
+    return "FINAL";
+  }
+
+  if (statusUpper.indexOf("POSTPON") >= 0) {
+    return "POSTPONED";
+  }
+
+  if (statusUpper.indexOf("SUSPEND") >= 0) {
+    return "SUSPENDED";
+  }
+
+  if (statusUpper.indexOf("CANCEL") >= 0) {
+    return "CANCELED";
+  }
+
+  if (statusUpper.indexOf("DELAY") >= 0) {
+    return "DELAYED";
+  }
+
+  if (sportsScheduleTbdTeams_(game)) {
+    return "TBD";
+  }
+
+  if (
+    existingRow &&
+    existingRow.GameDateTime &&
+    game.GameDateTime &&
+    String(existingRow.GameDateTime) !== String(game.GameDateTime)
+  ) {
+    return "RESCHEDULED";
+  }
+
+  return "SCHEDULED";
+}
+
+function sportsScheduleNeedsReconcile_(game) {
+  const scheduleStatus =
+    sportsScheduleStatusForGame_(game, null);
+
+  return (
+    scheduleStatus === "TBD" ||
+    scheduleStatus === "POSTPONED" ||
+    scheduleStatus === "SUSPENDED" ||
+    scheduleStatus === "DELAYED"
+  );
+}
+
+function sportsScheduleExistingGameRows_(sh, headers) {
+  const data =
+    sh.getDataRange()
+      .getValues();
+
+  const col =
+    getSportsHeaderMap_(
+      headers
+    );
+
+  const existing = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const gameId =
+      String(data[i][col.GameId] || "")
+        .trim();
+
+    if (!gameId) {
+      continue;
+    }
+
+    const rowObj = {};
+
+    headers.forEach(function(header, index) {
+      rowObj[header] = data[i][index];
+    });
+
+    rowObj._rowNumber = i + 1;
+    existing[gameId] = rowObj;
+  }
+
+  return existing;
+}
+
+// Final override: preserve original game date/status and track schedule changes.
+function upsertSportsGamesFromScores_(games) {
+  games = games || [];
+
+  if (!games.length) {
+    return {
+      success: true,
+      inserted: 0,
+      updated: 0,
+      scheduleChanged: 0
+    };
+  }
+
+  const sh =
+    sportsV13EnsureSheetHeaders_(
+      SPORTS_SHEETS.GAMES,
+      sportsV13GamesHeaders_()
+    ).sheet;
+
+  applySportsRecordTextFormats_(
+    SPORTS_SHEETS.GAMES
+  );
+
+  const headers =
+    sh
+      .getRange(1, 1, 1, sh.getLastColumn())
+      .getValues()[0]
+      .map(function(header) {
+        return String(header || "").trim();
+      });
+
+  const existing =
+    sportsScheduleExistingGameRows_(
+      sh,
+      headers
+    );
+
+  let inserted = 0;
+  let updated = 0;
+  let scheduleChanged = 0;
+
+  games.forEach(function(game) {
+    const completed =
+      normalizeSportsBoolean_(
+        game.Completed
+      );
+
+    const existingRow =
+      existing[game.GameId] || null;
+
+    const previousStatus =
+      existingRow
+        ? String(existingRow.LastStatus || existingRow.ScheduleStatus || "")
+        : "";
+
+    const originalDateTime =
+      existingRow && existingRow.OriginalGameDateTime
+        ? existingRow.OriginalGameDateTime
+        : (existingRow && existingRow.GameDateTime)
+          ? existingRow.GameDateTime
+          : (game.GameDateTime || "");
+
+    const oldDateTime =
+      existingRow
+        ? String(existingRow.GameDateTime || existingRow.CurrentGameDateTime || "")
+        : "";
+
+    const newDateTime =
+      String(game.GameDateTime || "");
+
+    const oldHomeTeam =
+      existingRow
+        ? String(existingRow.HomeTeam || "")
+        : "";
+
+    const oldAwayTeam =
+      existingRow
+        ? String(existingRow.AwayTeam || "")
+        : "";
+
+    const dateChanged =
+      !!(oldDateTime && newDateTime && oldDateTime !== newDateTime);
+
+    const teamsChanged =
+      !!(
+        existingRow &&
+        (
+          oldHomeTeam !== String(game.HomeTeam || "") ||
+          oldAwayTeam !== String(game.AwayTeam || "")
+        )
+      );
+
+    const statusChanged =
+      !!(
+        existingRow &&
+        previousStatus &&
+        previousStatus !== String(game.Status || "")
+      );
+
+    const changed =
+      dateChanged ||
+      teamsChanged ||
+      statusChanged;
+
+    if (changed) {
+      scheduleChanged++;
+    }
+
+    const scheduleStatus =
+      sportsScheduleStatusForGame_(
+        game,
+        existingRow
+      );
+
+    const tbdTeams =
+      sportsScheduleTbdTeams_(
+        game
+      );
+
+    const rowObj = {
+      GameId: game.GameId || "",
+      Sport: game.Sport || "",
+      League: game.League || "",
+      ESPNEventId: game.ESPNEventId || "",
+      Name:
+        (game.AwayTeam && game.HomeTeam)
+          ? (game.AwayTeam + " at " + game.HomeTeam)
+          : (game.HomeTeam || game.AwayTeam || game.GameId || ""),
+      ShortName:
+        (game.AwayTeam && game.HomeTeam)
+          ? (game.AwayTeam + " @ " + game.HomeTeam)
+          : (game.HomeTeam || game.AwayTeam || ""),
+      Season: game.SeasonYear || "",
+      SeasonYear: game.SeasonYear || "",
+      SeasonType: game.SeasonType || "",
+      SeasonPhase: game.SeasonPhase || "",
+      Week: game.Week || "",
+      GameDateTime: game.GameDateTime || "",
+      HomeTeam: game.HomeTeam || "",
+      AwayTeam: game.AwayTeam || "",
+      HomeTeamId: game.HomeTeamId || "",
+      AwayTeamId: game.AwayTeamId || "",
+      Active:
+        !completed &&
+        scheduleStatus !== "CANCELED",
+      Completed: completed,
+      Source: game.Source || "ESPN_SCOREBOARD",
+      GroupId: game.GroupId || "",
+      TeamId: game.TeamId || "",
+      LastChecked: new Date(),
+      LastStatus: game.Status || "",
+      ScheduleStatus: scheduleStatus,
+      ScheduleLastChecked: new Date(),
+      ScheduleChangedAt:
+        changed
+          ? new Date()
+          : (existingRow && existingRow.ScheduleChangedAt) || "",
+      OriginalGameDateTime: originalDateTime,
+      CurrentGameDateTime: game.GameDateTime || "",
+      PreviousStatus: previousStatus,
+      NeedsReconcile:
+        !!(
+          tbdTeams ||
+          scheduleStatus === "POSTPONED" ||
+          scheduleStatus === "SUSPENDED" ||
+          scheduleStatus === "DELAYED"
+        ),
+      TBDTeams: tbdTeams,
+      SupersededByGameId:
+        (existingRow && existingRow.SupersededByGameId) || "",
+      ScheduleSource:
+        game.Source || "ESPN_SCOREBOARD",
+      ScheduleNotes:
+        changed
+          ? "Schedule/team/status changed during reconcile"
+          : (existingRow && existingRow.ScheduleNotes) || ""
+    };
+
+    const row =
+      headers.map(function(header) {
+        return rowObj[header] !== undefined
+          ? rowObj[header]
+          : "";
+      });
+
+    if (existingRow && existingRow._rowNumber) {
+      sh
+        .getRange(existingRow._rowNumber, 1, 1, headers.length)
+        .setValues([row]);
+      updated++;
+    } else {
+      sh.appendRow(row);
+      inserted++;
+    }
+  });
+
+  return {
+    success: true,
+    inserted: inserted,
+    updated: updated,
+    scheduleChanged: scheduleChanged
+  };
+}
+
+function runSportsScheduleReconcileUpdate(targetLeague, daysBack, daysForward) {
+  const lock =
+    LockService.getScriptLock();
+
+  const gotLock =
+    lock.tryLock(10000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      skipped: true,
+      reason: "Another sports job is already running"
+    };
+  }
+
+  const leagueFilter =
+    String(targetLeague || "")
+      .trim()
+      .toLowerCase();
+
+  daysBack =
+    Math.max(
+      0,
+      Math.min(
+        14,
+        Number(daysBack === undefined ? 1 : daysBack)
+      )
+    );
+
+  daysForward =
+    Math.max(
+      1,
+      Math.min(
+        90,
+        Number(daysForward === undefined ? 21 : daysForward)
+      )
+    );
+
+  const summary = {
+    success: true,
+    startedAt: new Date(),
+    targetLeague: leagueFilter || "ALL",
+    daysBack: daysBack,
+    daysForward: daysForward,
+    leaguesChecked: 0,
+    datesChecked: 0,
+    gamesFetched: 0,
+    uniqueGames: 0,
+    errors: []
+  };
+
+  try {
+    setupSportsScoresSheet();
+
+    let settings =
+      readEnabledSportsSettings_();
+
+    if (leagueFilter) {
+      settings =
+        settings.filter(function(setting) {
+          return String(setting.League || "").toLowerCase() === leagueFilter;
+        });
+    }
+
+    const previousScores =
+      readLatestSportsScoresMap_();
+
+    const dates =
+      buildSportsDateStrings_(
+        daysBack,
+        daysForward
+      );
+
+    const gamesById = {};
+
+    settings.forEach(function(setting) {
+      dates.forEach(function(dateString) {
+        try {
+          const games =
+            fetchAndNormalizeESPNScoreboardFromSetting_(
+              setting,
+              dateString,
+              {
+                FetchMode: "SCHEDULE_RECONCILE",
+                SeasonYear: setting.SeasonYear,
+                SeasonType: "",
+                SeasonPhase: setting.SeasonPhase || "SCHEDULE RECONCILE"
+              }
+            );
+
+          games.forEach(function(game) {
+            game.Source =
+              game.Source || "ESPN_SCHEDULE_RECONCILE";
+            gamesById[game.GameId] = game;
+          });
+
+          summary.gamesFetched += games.length;
+          summary.datesChecked++;
+
+        } catch (err) {
+          summary.errors.push({
+            sport: setting.Sport,
+            league: setting.League,
+            date: dateString,
+            error:
+              err && err.message
+                ? err.message
+                : String(err)
+          });
+        }
+      });
+
+      summary.leaguesChecked++;
+    });
+
+    const allGames =
+      Object.keys(gamesById)
+        .map(function(gameId) {
+          return gamesById[gameId];
+        });
+
+    if (allGames.length) {
+      detectAndSaveSportsSnapshots_(
+        previousScores,
+        allGames
+      );
+
+      upsertLatestSportsScores_(
+        allGames
+      );
+    }
+
+    summary.uniqueGames =
+      allGames.length;
+
+    summary.finishedAt =
+      new Date();
+
+    logSports_(
+      "INFO",
+      "runSportsScheduleReconcileUpdate",
+      "Sports schedule reconcile complete",
+      JSON.stringify(summary)
+    );
+
+    return summary;
+
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function apiRunSportsScheduleReconcileAdmin_(params) {
+  params =
+    params || {};
+
+  assertSportsAdmin_(
+    params
+  );
+
+  return runSportsScheduleReconcileUpdate(
+    params.league || "",
+    params.daysBack,
+    params.daysForward
+  );
+}
+
+function installSportsScheduleReconcileTrigger() {
+  removeSportsScheduleReconcileTriggers();
+
+  ScriptApp
+    .newTrigger(
+      SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION
+    )
+    .timeBased()
+    .everyHours(6)
+    .create();
+
+  return {
+    success: true,
+    installed: true,
+    everyHours: 6,
+    message: "Schedule reconcile trigger installed. It rechecks the near schedule every 6 hours."
+  };
+}
+
+function removeSportsScheduleReconcileTriggers() {
+  let removed = 0;
+
+  ScriptApp.getProjectTriggers()
+    .forEach(function(trigger) {
+      if (
+        trigger.getHandlerFunction() ===
+        SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION
+      ) {
+        ScriptApp.deleteTrigger(trigger);
+        removed++;
+      }
+    });
+
+  return {
+    success: true,
+    removed: removed
+  };
+}
+
+function checkSportsScheduleReconcileTriggers() {
+  return ScriptApp.getProjectTriggers()
+    .filter(function(trigger) {
+      return trigger.getHandlerFunction() === SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION;
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource())
+      };
+    });
+}
+
+function apiInstallSportsScheduleReconcileTriggerAdmin_(params) {
+  assertSportsAdmin_(
+    params || {}
+  );
+
+  return installSportsScheduleReconcileTrigger();
+}
+
+function apiRemoveSportsScheduleReconcileTriggerAdmin_(params) {
+  assertSportsAdmin_(
+    params || {}
+  );
+
+  return removeSportsScheduleReconcileTriggers();
+}
+
+// Final override: include schedule reconcile in smart automation status.
+function getSmartSportsAutomationStatus_() {
+  const triggers = ScriptApp.getProjectTriggers();
+
+  function count_(handler) {
+    return triggers.filter(function(trigger) {
+      return trigger.getHandlerFunction() === handler;
+    }).length;
+  }
+
+  const details = {
+    scoreUpdater: count_(SPORTS_TRIGGER_FUNCTION),
+    scoreWindow: count_(sportsScoresWindowTriggerFunction_()),
+    scheduleReconcile: count_(SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION),
+    seasonLoader: count_(SPORTS_SEASON_BATCH_TRIGGER_FUNCTION),
+    oddsUpdater: count_(SPORTS_ODDS_HYBRID_TRIGGER_FUNCTION),
+    archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
+  };
+
+  const fullyEnabled =
+    details.scoreUpdater > 0 &&
+    details.scoreWindow > 0 &&
+    details.scheduleReconcile > 0 &&
+    details.seasonLoader > 0 &&
+    details.oddsUpdater > 0 &&
+    details.archiveUpdater > 0;
+
+  const anyEnabled =
+    Object.keys(details)
+      .some(function(key) {
+        return details[key] > 0;
+      });
+
+  return {
+    enabled: fullyEnabled,
+    fullyEnabled: fullyEnabled,
+    partiallyEnabled: anyEnabled && !fullyEnabled,
+    details: details
+  };
+}
+
+// Final override: Smart Sports Automation also manages schedule reconcile.
+function setSmartSportsAutomationEnabled_(enabled, oddsHour, archiveHour) {
+  enabled =
+    enabled === true ||
+    String(enabled || "").toLowerCase() === "true";
+
+  const actions = {};
+
+  if (enabled) {
+    actions.scores = installSportsScoresTrigger();
+    actions.scoreWindow = installSportsScoresWindowTrigger();
+    actions.scheduleReconcile = installSportsScheduleReconcileTrigger();
+    actions.season = installSportsSeasonBatchTrigger();
+    actions.odds = installSportsOddsHybridDailyTrigger(oddsHour === undefined ? 8 : oddsHour);
+    actions.archive = installSportsArchiveDailyTrigger(archiveHour === undefined ? 3 : archiveHour);
+  } else {
+    actions.scores = removeSportsScoresTriggers();
+    actions.scoreWindow = removeSportsScoresWindowTriggers();
+    actions.scheduleReconcile = removeSportsScheduleReconcileTriggers();
+    actions.season = removeSportsSeasonBatchTriggers();
+    actions.odds = removeSportsOddsHybridTriggers();
+    actions.archive = removeSportsArchiveTriggers();
+  }
+
+  return {
+    success: true,
+    enabled: enabled,
+    status: getSmartSportsAutomationStatus_(),
+    actions: actions,
+    message: enabled ? "Smart Sports Automation Enabled" : "Smart Sports Automation Disabled"
+  };
+}
+
+// Final override: setup ensures SportsGames has schedule reconcile columns.
+function setupSportsScoresSheet() {
+  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
+    sportsV13EnsureSheetHeaders_(sheetName, SPORTS_HEADERS[sheetName]);
+  });
+
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
+  applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
+  applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
+  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
+  sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
+  setupSportsSeasonJobsSheet();
+  setupSportsArchiveSystem_();
+
+  const settingsSheet = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (settingsSheet && settingsSheet.getLastRow() <= 1) seedSportsSettings_();
+  sportsScoresDisableRacingSettingsRows_();
+  upgradeSportsControlsV12();
+
+  logSports_("INFO", "setupSportsScoresSheet", "Sports Scores Engine production setup complete", "");
+
+  return {
+    success: true,
+    version: "17-schedule-reconcile",
+    message: "Sports Scores Engine setup complete. Schedule reconcile columns and automation are ready."
   };
 }

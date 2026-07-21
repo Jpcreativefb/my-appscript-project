@@ -235,6 +235,9 @@ function doGet(e) {
 
       "adminCreateSportsSeasonJobs",
       "adminRunSportsSeasonBatch",
+      "adminRunSportsScheduleReconcile",
+      "adminInstallSportsScheduleReconcileTrigger",
+      "adminRemoveSportsScheduleReconcileTrigger",
       "adminUpdateSportsSeasonJobStatus",
       "adminInstallSportsSeasonBatchTrigger",
       "adminRemoveSportsSeasonBatchTrigger",
@@ -2907,6 +2910,57 @@ if (action === "adminRunSportsSeasonBatch") {
 
   return json(
     apiAdminRunSportsSeasonBatch({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRunSportsScheduleReconcile") {
+
+  return json(
+    apiAdminRunSportsScheduleReconcile({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league || "",
+
+      daysBack:
+        params.daysBack || 1,
+
+      daysForward:
+        params.daysForward || 21
+    })
+  );
+
+}
+
+if (action === "adminInstallSportsScheduleReconcileTrigger") {
+
+  return json(
+    apiAdminInstallSportsScheduleReconcileTrigger({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminRemoveSportsScheduleReconcileTrigger") {
+
+  return json(
+    apiAdminRemoveSportsScheduleReconcileTrigger({
       username:
         params.username,
 

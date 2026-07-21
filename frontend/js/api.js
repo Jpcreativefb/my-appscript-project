@@ -39,6 +39,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSettleSportsWagers",
     "adminRefreshSportsScoresNow",
     "adminRefreshSportsScoresWindow",
+    "adminRunSportsScheduleReconcile",
     "adminRunSportsOddsHybridRefresh",
     "adminRefreshSportsOddsLeague",
     "adminRefreshRacingWagerScores",
@@ -2616,6 +2617,40 @@ async function apiAdminRunSportsSeasonBatch() {
 
   return apiAdminSportsControl_(
     "adminRunSportsSeasonBatch"
+  );
+
+}
+
+async function apiAdminRunSportsScheduleReconcile(options = {}) {
+
+  return apiAdminSportsControl_(
+    "adminRunSportsScheduleReconcile",
+    {
+      league:
+        options.league || "",
+
+      daysBack:
+        options.daysBack || 1,
+
+      daysForward:
+        options.daysForward || 21
+    }
+  );
+
+}
+
+async function apiAdminInstallSportsScheduleReconcileTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminInstallSportsScheduleReconcileTrigger"
+  );
+
+}
+
+async function apiAdminRemoveSportsScheduleReconcileTrigger() {
+
+  return apiAdminSportsControl_(
+    "adminRemoveSportsScheduleReconcileTrigger"
   );
 
 }

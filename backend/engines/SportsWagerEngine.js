@@ -185,6 +185,51 @@ function sportsWagerFirstPresent_(
 
 }
 
+function sportsWagerRecordFromPossibleSheetDate_(value) {
+
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value.getTime())
+  ) {
+
+    const year =
+      value.getFullYear();
+
+    if (year >= 2000 && year <= 2030) {
+      return [
+        value.getMonth() + 1,
+        value.getDate(),
+        year - 2000
+      ].join("-");
+    }
+
+  }
+
+  const text =
+    sportsWagerString_(value);
+
+  const convertedDateMatch =
+    text.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](20\d{2})$/);
+
+  if (convertedDateMatch) {
+
+    const tieCount =
+      Number(convertedDateMatch[3]) - 2000;
+
+    if (tieCount >= 0 && tieCount <= 30) {
+      return [
+        Number(convertedDateMatch[1]),
+        Number(convertedDateMatch[2]),
+        tieCount
+      ].join("-");
+    }
+
+  }
+
+  return "";
+
+}
+
 function sportsWagerIsValidRecordDisplay_(value) {
 
   value =
@@ -197,15 +242,15 @@ function sportsWagerIsValidRecordDisplay_(value) {
   const lower =
     value.toLowerCase();
 
+  if (/^\d{1,3}\s*-\s*\d{1,3}(?:\s*-\s*\d{1,2})?(?:\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value)) {
+    return true;
+  }
+
   if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(value)) {
     return false;
   }
 
   if (/^\d{1,2}\/\d{1,2}(?:\/\d{2,4})?$/.test(value)) {
-    return false;
-  }
-
-  if (/^\d{1,2}-\d{1,2}-\d{2,4}$/.test(value)) {
     return false;
   }
 
@@ -220,18 +265,52 @@ function sportsWagerIsValidRecordDisplay_(value) {
     return false;
   }
 
-  return /^\d+\s*-\s*\d+(\s*-\s*\d+)?(\s+[A-Za-z][A-Za-z ]{1,24})?$/.test(value);
+  return false;
 
 }
 
 function sportsWagerCleanRecordDisplay_(value) {
 
+  const recovered =
+    sportsWagerRecordFromPossibleSheetDate_(value);
+
+  if (
+    recovered &&
+    sportsWagerIsValidRecordDisplay_(recovered)
+  ) {
+    return recovered;
+  }
+
   value =
-    sportsWagerString_(value);
+    sportsWagerString_(value)
+      .replace(/^'/, "");
 
   return sportsWagerIsValidRecordDisplay_(value)
-    ? value
+    ? value.replace(/\s*-\s*/g, "-")
     : "";
+
+}
+
+function sportsWagerApplyRecordTextFormats_(sheet, headerMap) {
+
+  if (!sheet || !headerMap) {
+    return;
+  }
+
+  [
+    "HomeRecord",
+    "AwayRecord"
+  ].forEach(function(headerName) {
+
+    if (headerMap[headerName] === undefined) {
+      return;
+    }
+
+    sheet
+      .getRange(1, headerMap[headerName] + 1, Math.max(sheet.getMaxRows(), 1), 1)
+      .setNumberFormat("@");
+
+  });
 
 }
 
@@ -7586,6 +7665,8 @@ function refreshSportsWagerScores(payload) {
 
   }
 
+  sportsWagerApplyRecordTextFormats_(sh, col);
+
   const writableHeaders = [
     "Category",
     "Nominee",
@@ -9285,6 +9366,8 @@ function autoSetSportsWagerOdds(payload) {
     }
 
   });
+
+  sportsWagerApplyRecordTextFormats_(sh, col);
 
   const writableHeaders = [
     "Category",
@@ -11119,5 +11202,285 @@ function testRunSmartSportsAutomationNow() {
     });
 
   Logger.log(JSON.stringify(result, null, 2));
+
+}
+
+/************************************
+ PATCH v17 - MLB EXTRA-INNING TIE SETTLEMENT PROTECTION
+
+ Purpose:
+ - MLB/baseball moneyline games should not settle as ties at the end of 9.
+ - A tied baseball score is treated as not ready to settle until ESPN sends
+   the real extra-innings final with a winner.
+************************************/
+
+function sportsWagerIsBaseballScore_(score) {
+
+  score = score || {};
+
+  const sport =
+    sportsWagerKey_(
+      score.Sport ||
+      score.sport ||
+      ""
+    );
+
+  const league =
+    sportsWagerKey_(
+      score.League ||
+      score.league ||
+      score.SportsLeague ||
+      score.sportsLeague ||
+      ""
+    );
+
+  return (
+    sport === "baseball" ||
+    league === "mlb"
+  );
+
+}
+
+function sportsWagerScoresAreEqual_(score) {
+
+  score = score || {};
+
+  if (
+    !sportsWagerHasScoreValue_(score.HomeScore) ||
+    !sportsWagerHasScoreValue_(score.AwayScore)
+  ) {
+    return false;
+  }
+
+  const homeScore =
+    sportsWagerNumber_(
+      score.HomeScore,
+      null
+    );
+
+  const awayScore =
+    sportsWagerNumber_(
+      score.AwayScore,
+      null
+    );
+
+  return (
+    homeScore !== null &&
+    awayScore !== null &&
+    homeScore === awayScore
+  );
+
+}
+
+// Final override: baseball tied score is not a completed wager state.
+function sportsWagerIsCompletedScore_(score) {
+
+  score = score || {};
+
+  if (
+    sportsWagerIsBaseballScore_(score) &&
+    sportsWagerScoresAreEqual_(score)
+  ) {
+    return false;
+  }
+
+  const status =
+    sportsWagerKey_(
+      score.Status ||
+      score.status ||
+      ""
+    );
+
+  const state =
+    sportsWagerKey_(
+      score.State ||
+      score.state ||
+      ""
+    );
+
+  return (
+    sportsWagerBoolean_(score.Completed) ||
+    sportsWagerBoolean_(score.completed) ||
+    state === "post" ||
+    state === "final" ||
+    status.indexOf("final") !== -1 ||
+    status.indexOf("full_time") !== -1 ||
+    status.indexOf("complete") !== -1 ||
+    status.indexOf("completed") !== -1
+  );
+
+}
+
+// Final override: prevent MLB/baseball tied moneyline from half-refund settlement.
+function sportsWagerGetSettlementResult_(
+  score,
+  nominees,
+  market
+) {
+
+  market =
+    sportsWagerNormalizeMarket_(
+      market
+    );
+
+  score =
+    score || {};
+
+  nominees =
+    nominees || [];
+
+  if (
+    sportsWagerIsBaseballScore_(score) &&
+    sportsWagerScoresAreEqual_(score)
+  ) {
+    return {
+      resolved: false,
+      winnerNomineeId: "",
+      wagerResultType: "",
+      reason: "baseball-tied-score-waiting-extra-innings"
+    };
+  }
+
+  if (
+    !sportsWagerIsCompletedScore_(
+      score
+    )
+  ) {
+    return {
+      resolved: false,
+      winnerNomineeId: "",
+      wagerResultType: "",
+      reason: "not-completed"
+    };
+  }
+
+  const hasHomeScore =
+    sportsWagerHasScoreValue_(
+      score.HomeScore
+    );
+
+  const hasAwayScore =
+    sportsWagerHasScoreValue_(
+      score.AwayScore
+    );
+
+  const homeScore =
+    sportsWagerNumber_(
+      score.HomeScore,
+      null
+    );
+
+  const awayScore =
+    sportsWagerNumber_(
+      score.AwayScore,
+      null
+    );
+
+  const isTie =
+    hasHomeScore &&
+    hasAwayScore &&
+    homeScore !== null &&
+    awayScore !== null &&
+    homeScore === awayScore;
+
+  if (
+    market === "moneyline" &&
+    isTie
+  ) {
+    return {
+      resolved: true,
+      winnerNomineeId:
+        SPORTS_WAGER_DRAW_NOMINEE_ID,
+      wagerResultType:
+        "half-refund",
+      reason:
+        "moneyline-tie-half-refund"
+    };
+  }
+
+  if (
+    market === "soccer-moneyline" &&
+    isTie
+  ) {
+
+    const drawNominee =
+      nominees.find(function(nominee) {
+
+        const nomineeId =
+          sportsWagerKey_(
+            nominee.nomineeId
+          );
+
+        const nomineeName =
+          sportsWagerSlug_(
+            nominee.nominee
+          );
+
+        const selection =
+          sportsWagerKey_(
+            nominee.selection
+          );
+
+        return (
+          nomineeId === "draw" ||
+          nomineeId === "tie" ||
+          nomineeName === "draw" ||
+          nomineeName === "tie" ||
+          nomineeName === "draw-tie" ||
+          selection === "draw" ||
+          selection === "tie"
+        );
+
+      });
+
+    if (drawNominee) {
+      return {
+        resolved: true,
+        winnerNomineeId:
+          sportsWagerKey_(
+            drawNominee.nomineeId
+          ),
+        wagerResultType:
+          "win",
+        reason:
+          "soccer-3way-draw"
+      };
+    }
+
+    return {
+      resolved: false,
+      winnerNomineeId: "",
+      wagerResultType: "",
+      reason:
+        "draw-nominee-missing"
+    };
+
+  }
+
+  const winnerNomineeId =
+    sportsWagerFindWinnerNomineeId_(
+      score,
+      nominees,
+      market
+    );
+
+  if (!winnerNomineeId) {
+    return {
+      resolved: false,
+      winnerNomineeId: "",
+      wagerResultType: "",
+      reason: "winner-not-found"
+    };
+  }
+
+  return {
+    resolved: true,
+    winnerNomineeId:
+      winnerNomineeId,
+    wagerResultType:
+      "win",
+    reason:
+      "winner-found"
+  };
 
 }
