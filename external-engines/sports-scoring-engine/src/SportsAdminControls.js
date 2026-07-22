@@ -319,6 +319,7 @@ function setupSportsAdminControlSystem() {
   setupSportsOddsAdminSettingsSheet_();
   setupSportsOddsUsageSheet_();
   seedSportsOddsAdminSettingsFromSportsSettings_();
+  cleanSportsOddsSettingsForUserFriendlyAdmin_();
 
   return {
     success: true,
@@ -779,11 +780,15 @@ function seedSportsOddsAdminSettingsFromSportsSettings_() {
     const rowObj = {
       League: league,
       SportKey: sportKey,
-      OddsEnabled: true,
+      OddsEnabled:
+        sportsAdminBoolean_(setting.Enabled, false) &&
+        sportsAdminBoolean_(setting.OddsEnabled, false),
       AutoRefreshEnabled: false,
       ManualRefreshEnabled: true,
-      MaxRefreshesPerDay: 1,
-      MonthlyBudget: 30,
+      MaxRefreshesPerDay:
+        Math.max(0, sportsAdminNumber_(setting.OddsDailyMaxPulls, 1)),
+      MonthlyBudget:
+        Math.max(0, sportsAdminNumber_(setting.OddsMonthlyMaxPulls, 30)),
       StopAtMonthlyCalls: 450,
       DefaultMarkets:
         typeof sportsOddsGetMarketsForLeague_ === "function"
@@ -841,6 +846,319 @@ function seedSportsOddsAdminSettingsFromSportsSettings_() {
     success: true,
     added: newRows.length
   };
+
+}
+
+/* =====================================================
+   USER-FRIENDLY ODDS CLEANUP / LEAGUE GUARDS
+===================================================== */
+
+function sportsAdminGetLeagueControlState_(league) {
+
+  const target =
+    sportsAdminKey_(league);
+
+  const rows =
+    readAllSportsSettingsRows_();
+
+  for (let i = 0; i < rows.length; i++) {
+
+    const rowLeague =
+      sportsAdminKey_(rows[i].League);
+
+    if (rowLeague !== target) {
+      continue;
+    }
+
+    const enabled =
+      normalizeSportsBoolean_(rows[i].Enabled);
+
+    const seasonActive =
+      rows[i].SeasonActive === undefined ||
+      rows[i].SeasonActive === ""
+        ? true
+        : normalizeSportsBoolean_(rows[i].SeasonActive);
+
+    return {
+      found: true,
+      league: sportsAdminString_(rows[i].League),
+      sport: sportsAdminString_(rows[i].Sport),
+      enabled: enabled,
+      seasonActive: seasonActive,
+      canRun: enabled && seasonActive
+    };
+
+  }
+
+  return {
+    found: false,
+    league: sportsAdminString_(league),
+    sport: "",
+    enabled: false,
+    seasonActive: false,
+    canRun: false
+  };
+
+}
+
+function sportsAdminNormalizeOddsMarkets_(value, league) {
+
+  const allowed = {
+    h2h: true,
+    spreads: true,
+    totals: true,
+    outrights: true
+  };
+
+  const fallback =
+    typeof sportsOddsGetMarketsForLeague_ === "function"
+      ? sportsOddsGetMarketsForLeague_(league)
+      : "h2h";
+
+  const markets =
+    sportsAdminString_(value || fallback)
+      .toLowerCase()
+      .split(",")
+      .map(function(item) {
+        return sportsAdminString_(item).toLowerCase();
+      })
+      .filter(function(item, index, arr) {
+        return !!item && allowed[item] && arr.indexOf(item) === index;
+      });
+
+  if (!markets.length) {
+    return fallback || "h2h";
+  }
+
+  if (
+    markets.indexOf("outrights") !== -1 &&
+    markets.length > 1
+  ) {
+    return "outrights";
+  }
+
+  return markets.join(",");
+
+}
+
+function cleanSportsOddsSettingsForUserFriendlyAdmin_() {
+
+  setupSportsOddsAdminSettingsSheet_();
+
+  const oddsSheet =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        SPORTS_ODDS_SETTINGS_SHEET
+      );
+
+  const oddsData =
+    oddsSheet.getDataRange()
+      .getValues();
+
+  if (oddsData.length <= 1) {
+    return {
+      success: true,
+      updatedOddsRows: 0,
+      updatedSportsRows: 0
+    };
+  }
+
+  const oddsHeaders =
+    oddsData[0].map(function(header) {
+      return sportsAdminString_(header);
+    });
+
+  const oddsCol =
+    sportsAdminHeaderMap_(oddsHeaders);
+
+  const sportsSheet =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(
+        SPORTS_SHEETS.SETTINGS
+      );
+
+  if (!sportsSheet) {
+    return {
+      success: true,
+      updatedOddsRows: 0,
+      updatedSportsRows: 0
+    };
+  }
+
+  const sportsData =
+    sportsSheet.getDataRange()
+      .getValues();
+
+  if (sportsData.length <= 1) {
+    return {
+      success: true,
+      updatedOddsRows: 0,
+      updatedSportsRows: 0
+    };
+  }
+
+  const sportsHeaders =
+    sportsData[0].map(function(header) {
+      return sportsAdminString_(header);
+    });
+
+  const sportsCol =
+    sportsAdminHeaderMap_(sportsHeaders);
+
+  const sportsByLeague = {};
+
+  for (let i = 1; i < sportsData.length; i++) {
+    const key =
+      sportsAdminKey_(sportsData[i][sportsCol.League]);
+
+    if (key) {
+      sportsByLeague[key] = {
+        row: i + 1,
+        values: sportsData[i]
+      };
+    }
+  }
+
+  let updatedOddsRows = 0;
+  let updatedSportsRows = 0;
+
+  for (let i = 1; i < oddsData.length; i++) {
+
+    const league =
+      sportsAdminString_(oddsData[i][oddsCol.League])
+        .toUpperCase();
+
+    if (!league) {
+      continue;
+    }
+
+    const sportsRow =
+      sportsByLeague[sportsAdminKey_(league)] || null;
+
+    const leagueEnabled =
+      sportsRow
+        ? normalizeSportsBoolean_(sportsRow.values[sportsCol.Enabled])
+        : true;
+
+    const sportsOddsOn =
+      sportsRow && sportsCol.OddsEnabled !== undefined
+        ? normalizeSportsBoolean_(sportsRow.values[sportsCol.OddsEnabled])
+        : true;
+
+    const currentOddsOn =
+      sportsAdminBoolean_(oddsData[i][oddsCol.OddsEnabled], sportsOddsOn);
+
+    const effectiveOddsOn =
+      leagueEnabled && currentOddsOn;
+
+    const dailyLimit =
+      Math.max(
+        0,
+        Math.min(
+          24,
+          sportsAdminNumber_(oddsData[i][oddsCol.MaxRefreshesPerDay], 1)
+        )
+      );
+
+    const monthlyBudget =
+      Math.max(
+        0,
+        Math.min(
+          500,
+          sportsAdminNumber_(oddsData[i][oddsCol.MonthlyBudget], 30)
+        )
+      );
+
+    const patch = {
+      OddsEnabled: effectiveOddsOn,
+      AutoRefreshEnabled: leagueEnabled
+        ? sportsAdminBoolean_(oddsData[i][oddsCol.AutoRefreshEnabled], false)
+        : false,
+      ManualRefreshEnabled: true,
+      MaxRefreshesPerDay: dailyLimit,
+      MonthlyBudget: monthlyBudget,
+      StopAtMonthlyCalls: Math.max(
+        monthlyBudget,
+        Math.min(
+          500,
+          sportsAdminNumber_(oddsData[i][oddsCol.StopAtMonthlyCalls], 450)
+        )
+      ),
+      DefaultMarkets: sportsAdminNormalizeOddsMarkets_(
+        oddsData[i][oddsCol.DefaultMarkets],
+        league
+      ),
+      DefaultRegions: "us",
+      EstimatedCostPerRefresh:
+        typeof sportsOddsEstimateRequestCost_ === "function"
+          ? sportsOddsEstimateRequestCost_(
+              sportsAdminNormalizeOddsMarkets_(
+                oddsData[i][oddsCol.DefaultMarkets],
+                league
+              ),
+              "us"
+            )
+          : 1,
+      UpdatedAt: new Date()
+    };
+
+    Object.keys(patch).forEach(function(key) {
+      if (oddsCol[key] === undefined) {
+        return;
+      }
+      oddsSheet
+        .getRange(i + 1, oddsCol[key] + 1)
+        .setValue(patch[key]);
+    });
+
+    updatedOddsRows++;
+
+    if (sportsRow) {
+      const sportsPatch = {
+        OddsEnabled: effectiveOddsOn,
+        OddsCooldownMinutes: 240,
+        OddsDailyMaxPulls: dailyLimit,
+        OddsMonthlyMaxPulls: monthlyBudget
+      };
+
+      Object.keys(sportsPatch).forEach(function(key) {
+        if (sportsCol[key] === undefined) {
+          return;
+        }
+        sportsSheet
+          .getRange(sportsRow.row, sportsCol[key] + 1)
+          .setValue(sportsPatch[key]);
+      });
+
+      updatedSportsRows++;
+    }
+
+  }
+
+  return {
+    success: true,
+    updatedOddsRows: updatedOddsRows,
+    updatedSportsRows: updatedSportsRows
+  };
+
+}
+
+function setupSportsOddsUserFriendlyAdmin() {
+
+  assertSportsAdmin_({
+    adminKey:
+      PropertiesService
+        .getScriptProperties()
+        .getProperty(
+          SPORTS_ADMIN_API_KEY_PROPERTY
+        )
+  });
+
+  seedSportsOddsAdminSettingsFromSportsSettings_();
+
+  return cleanSportsOddsSettingsForUserFriendlyAdmin_();
 
 }
 
@@ -1010,6 +1328,7 @@ function readSportsOddsAdminSettings_() {
 function apiGetSportsOddsAdminSettings_(params) {
   assertSportsAdmin_(params);
   seedSportsOddsAdminSettingsFromSportsSettings_();
+  cleanSportsOddsSettingsForUserFriendlyAdmin_();
 
   const counts = sportsOddsApiRequestCountsByLeague_();
   const settings = readSportsOddsAdminSettings_().map(function(row) {
@@ -1103,7 +1422,7 @@ function apiUpdateSportsOddsAdminSetting_(params) {
     const rowObj = {
       League: league,
       SportKey: sportKey,
-      OddsEnabled: true,
+      OddsEnabled: false,
       AutoRefreshEnabled: false,
       ManualRefreshEnabled: true,
       MaxRefreshesPerDay: 1,
@@ -1207,6 +1526,29 @@ function apiUpdateSportsOddsAdminSetting_(params) {
         450
       );
   }
+
+  if (params.defaultMarkets !== undefined) {
+    patch.DefaultMarkets =
+      sportsAdminNormalizeOddsMarkets_(
+        params.defaultMarkets,
+        league
+      );
+  }
+
+  patch.DefaultRegions =
+    "us";
+
+  patch.EstimatedCostPerRefresh =
+    typeof sportsOddsEstimateRequestCost_ === "function"
+      ? sportsOddsEstimateRequestCost_(
+          patch.DefaultMarkets ||
+            sportsAdminString_(
+              data[rowNumber - 1][col.DefaultMarkets]
+            ) ||
+            "h2h",
+          "us"
+        )
+      : 1;
 
   if (params.notes !== undefined) {
     patch.Notes =
@@ -1685,6 +2027,43 @@ function refreshSportsOddsForLeagueControlled_(
     };
   }
 
+  const leagueState =
+    sportsAdminGetLeagueControlState_(
+      league
+    );
+
+  if (!leagueState.enabled) {
+    updateSportsOddsRefreshStatus_(
+      league,
+      "PAUSED",
+      "League is OFF. Turn the league ON before refreshing odds."
+    );
+
+    return {
+      success: true,
+      skipped: true,
+      league: league,
+      reason:
+        "League is OFF"
+    };
+  }
+
+  if (!leagueState.seasonActive) {
+    updateSportsOddsRefreshStatus_(
+      league,
+      "PAUSED",
+      "Season is inactive for this league."
+    );
+
+    return {
+      success: true,
+      skipped: true,
+      league: league,
+      reason:
+        "Season inactive"
+    };
+  }
+
   if (!setting.OddsEnabled) {
     return {
       success: true,
@@ -1830,9 +2209,19 @@ function refreshSportsOddsForLeagueControlled_(
   try {
 
     const result =
-      refreshSportsOddsForLeague(
-        league
-      );
+      typeof refreshSportsOddsForLeagueWithOptions === "function"
+        ? refreshSportsOddsForLeagueWithOptions(
+            league,
+            {
+              markets:
+                setting.DefaultMarkets || "h2h",
+              regions:
+                "us"
+            }
+          )
+        : refreshSportsOddsForLeague(
+            league
+          );
 
     if (
       result &&
@@ -2517,6 +2906,7 @@ function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
 function apiGetSportsAdminDashboard_(params) {
   assertSportsAdmin_(params);
   setupSportsAdminControlSystem();
+  cleanSportsOddsSettingsForUserFriendlyAdmin_();
 
   return {
     success: true,

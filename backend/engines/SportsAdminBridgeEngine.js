@@ -815,6 +815,9 @@ function apiAdminUpdateSportsOddsSetting(payload) {
       stopAtMonthlyCalls:
         payload.stopAtMonthlyCalls,
 
+      defaultMarkets:
+        payload.defaultMarkets,
+
       notes:
         payload.notes
     }

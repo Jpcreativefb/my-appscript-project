@@ -3067,6 +3067,9 @@ if (action === "adminUpdateSportsOddsSetting") {
       stopAtMonthlyCalls:
         params.stopAtMonthlyCalls,
 
+      defaultMarkets:
+        params.defaultMarkets,
+
       notes:
         params.notes
     })

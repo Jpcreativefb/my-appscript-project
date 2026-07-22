@@ -2730,6 +2730,9 @@ async function apiAdminUpdateSportsOddsSetting(
       stopAtMonthlyCalls:
         patch.stopAtMonthlyCalls,
 
+      defaultMarkets:
+        patch.defaultMarkets,
+
       notes:
         patch.notes
     }

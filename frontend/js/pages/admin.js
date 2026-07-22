@@ -2026,7 +2026,7 @@ function adminSportsInfoText_(
     snapshotsSection:
       "Snapshots save quarter/period/final checkpoints. Leave this off for simpler moneyline-only wagers; turn it on when you want history or period-style betting later.",
     oddsSection:
-      "Odds controls protect the Odds API budget. Keep limits low because the free plan is limited and many leagues can burn calls quickly.",
+      "Odds are simple on purpose: League must be ON, Odds must be ON, daily/monthly limits must allow it, and region is fixed to US. Advanced markets are optional.",
     archiveSection:
       "Archive settings keep old completed rows from slowing down the live sheets. Preview first; archive is meant for cleanup after games are safely final.",
     season:
@@ -2096,17 +2096,17 @@ function adminSportsInfoText_(
     final:
       "How often to recheck recently final games for corrections and settlement follow-up.",
     oddsOn:
-      "Turns odds pulls and odds sync on or off for this league. Odds limits still apply when this is ON.",
+      "Turns odds on for this league. If the League switch is OFF, odds are paused and cannot be refreshed.",
     oddsCooldown:
-      "Minimum minutes between odds pulls for this league. This protects the Odds API limit.",
+      "Legacy field only. The simplified admin uses daily and monthly limits instead.",
     oddsDaily:
-      "Maximum odds pulls allowed for this league in one day. Set low for leagues with many games.",
+      "Maximum odds refreshes allowed for this league today. Keep this at 1 while testing.",
     oddsMonthly:
-      "Maximum odds pulls allowed for this league in one month. This helps protect your monthly Odds API quota.",
+      "Monthly budget for this league. This protects the 500-call Odds API limit.",
     oddsUsage:
-      "Shows this league's Odds API usage counters from SportsOddsSettings/SportsOddsLog.",
+      "Shows the simple odds status, usage counters, last result, and remaining API calls.",
     refreshOdds:
-      "Manually refreshes odds for this one league. This may use one Odds API call.",
+      "Refreshes odds for this one league. It only works when the League switch is ON and odds limits allow it.",
     runHybridOdds:
       "Runs the hybrid odds refresh for enabled auto leagues only. Use sparingly to protect the API limit.",
     snapshots:
@@ -2131,6 +2131,8 @@ function adminSportsInfoText_(
       "Creates or refreshes SportsSeasonJobs for this league from the Season section date range. It builds the job list; the season batch runner does the ESPN pulls.",
     runSeasonBatch:
       "Runs pending SportsSeasonJobs now. Use this after Build Schedule to actually fetch ESPN games into SportsGames/SportsScores. This can take time for MLB, NFL, or college schedules.",
+    scheduleReconcile:
+      "Rechecks ESPN for near-schedule changes, including postponed games, rescheduled games, and playoff/TBD teams. It updates SportsGames and SportsScores without deleting history.",
     previewArchive:
       "Shows what rows would be eligible for archive/cleanup. This preview does not move or delete anything.",
     runArchive:
@@ -2146,7 +2148,7 @@ function adminSportsInfoText_(
     smartAutomationToggle:
       "One master button for Smart Sports Automation. Enabled installs the smart trigger; Disabled removes it.",
     automationSummary:
-      "Shows current trigger counts and Odds API usage so you can see whether automation is active.",
+      "Shows current trigger counts and Odds API usage. Schedule reconcile is the automatic recheck that keeps postponed, rescheduled, and playoff/TBD games current after the original schedule is built.",
     scheduleTrigger:
       "Legacy schedule batch trigger controls. Smart Sports Automation is preferred for normal use.",
     scoreWindowTrigger:
@@ -3359,6 +3361,7 @@ function adminRenderSportsTriggerControls_(
   const externalTriggerCount =
     Number(externalDetails.scoreUpdater || 0) +
     Number(externalDetails.seasonLoader || 0) +
+    Number(externalDetails.scheduleReconcile || 0) +
     Number(externalDetails.oddsUpdater || 0) +
     Number(externalDetails.archiveUpdater || 0);
 
@@ -3624,14 +3627,14 @@ function adminRenderSportsTriggerControls_(
             · Score window triggers: ${scoreWindowTriggers.length || 0}
             · Wager smart triggers: ${wagerAutoSyncTriggers.length || 0}
             · Schedule batch triggers: ${seasonBatchTriggers.length || 0}
-            · Schedule reconcile: ${(smart.details && smart.details.scheduleReconcile) || 0}
+            · Schedule reconcile: ${(smartAutomation.details && smartAutomation.details.scheduleReconcile) || 0}
             · Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
           </div>
         </div>
       </div>
 
       <div class="admin-sub">
-        Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, schedules, or settlements look stale. Use the master automation button for normal scheduled running.
+        Use <strong>Recheck Schedule Now</strong> when postponed games, rescheduled games, or playoff/TBD teams may have changed. Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, or settlements look stale.
       </div>
 
       <div class="admin-actions">
@@ -3808,6 +3811,90 @@ function adminRenderSportsCheckboxField_(
       >
     </label>
   `;
+
+}
+
+
+function adminRenderSportsOddsMarketCheckboxes_(
+  leagueCode,
+  selectedMarkets,
+  disabledAttr
+) {
+
+  const selected = {};
+
+  String(selectedMarkets || "h2h")
+    .split(",")
+    .forEach(function(market) {
+      const key =
+        String(market || "")
+          .trim()
+          .toLowerCase();
+      if (key) {
+        selected[key] = true;
+      }
+    });
+
+  const options = [
+    { value: "h2h", label: "Moneyline" },
+    { value: "spreads", label: "Spread" },
+    { value: "totals", label: "Over/Under" }
+  ];
+
+  return `
+    <details style="margin-top:8px;">
+      <summary style="cursor:pointer; font-weight:700;">Advanced markets</summary>
+      <div class="admin-sub" style="margin-top:6px;">
+        Region is fixed to US. Each checked market can increase Odds API cost.
+      </div>
+      <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px; margin-top:8px;">
+        ${options.map(function(option) {
+          const inputId =
+            adminSportsInputId_(
+              "sportsOddsMarket_" + option.value,
+              leagueCode
+            );
+          return `
+            <label class="admin-field sports-checkbox-field" style="gap:6px;">
+              <span>${adminSportsEscape_(option.label)}</span>
+              <input
+                type="checkbox"
+                id="${inputId}"
+                ${selected[option.value] ? "checked" : ""}
+                ${disabledAttr || ""}
+              >
+            </label>
+          `;
+        }).join("")}
+      </div>
+    </details>
+  `;
+
+}
+
+function adminSportsSelectedOddsMarkets_(
+  league
+) {
+
+  const markets = [];
+
+  ["h2h", "spreads", "totals"].forEach(function(market) {
+    const el =
+      document.getElementById(
+        adminSportsInputId_(
+          "sportsOddsMarket_" + market,
+          league
+        )
+      );
+
+    if (el && el.checked) {
+      markets.push(market);
+    }
+  });
+
+  return markets.length
+    ? markets.join(",")
+    : "h2h";
 
 }
 
@@ -4146,9 +4233,9 @@ function adminRenderScoreLeagueControls_(
               ? true
               : adminSportsBool_(league.seasonActive);
 
-          const oddsEnabled =
+          const sportsSettingsOddsEnabled =
             league.oddsEnabled === undefined
-              ? true
+              ? false
               : adminSportsBool_(league.oddsEnabled);
 
           const snapshotsEnabled =
@@ -4177,6 +4264,47 @@ function adminRenderScoreLeagueControls_(
 
           const leagueOn =
             enabled;
+
+          const oddsEnabled =
+            oddsUsage.OddsEnabled !== undefined
+              ? adminSportsBool_(oddsUsage.OddsEnabled)
+              : sportsSettingsOddsEnabled;
+
+          const oddsAutoEnabled =
+            adminSportsBool_(oddsUsage.AutoRefreshEnabled);
+
+          const oddsActive =
+            leagueOn &&
+            inSeason &&
+            oddsEnabled;
+
+          const oddsStatusText =
+            !leagueOn
+              ? "Paused — League OFF"
+              : !inSeason
+                ? "Paused — Season inactive"
+                : oddsEnabled
+                  ? "Ready"
+                  : "Odds OFF";
+
+          const oddsControlsDisabled =
+            leagueOn && inSeason
+              ? ""
+              : "disabled";
+
+          const oddsDailyLimit =
+            oddsUsage.MaxRefreshesPerDay ||
+            league.oddsDailyMaxPulls ||
+            1;
+
+          const oddsMonthlyBudget =
+            oddsUsage.MonthlyBudget ||
+            league.oddsMonthlyMaxPulls ||
+            30;
+
+          const oddsMarkets =
+            oddsUsage.DefaultMarkets ||
+            "h2h";
 
           /*
             Keep league settings editable even when the league is OFF.
@@ -4217,7 +4345,7 @@ function adminRenderScoreLeagueControls_(
               leagueCode,
               oddsEnabled,
               "oddsOn",
-              controlsDisabled,
+              oddsControlsDisabled,
               "",
               "sports-header-toggle"
             );
@@ -4337,18 +4465,28 @@ function adminRenderScoreLeagueControls_(
 
           const oddsBody = `
             <div class="admin-sub" style="margin-bottom:8px;">
-              ${adminSportsLabel_("Odds API usage", "oddsUsage", leagueCode)}
-              Today ${oddsToday} · Month ${oddsMonth}/${oddsBudget} · Last ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never")}
+              ${adminSportsLabel_("Odds status", "oddsUsage", leagueCode)}
+              ${adminSportsEscape_(oddsStatusText)}
+              · Today ${oddsToday}/${oddsDailyLimit}
+              · Month ${oddsMonth}/${oddsMonthlyBudget}
+              · API left ${oddsUsage.LastApiRemaining || "—"}
+              · Last ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never")}
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
-              ${adminRenderSportsNumberField_("Cooldown min", "sportsOddsCooldown", leagueCode, league.oddsCooldownMinutes, 240, 30, 10080, "oddsCooldown", controlsDisabled)}
-              ${adminRenderSportsNumberField_("Odds/day", "sportsOddsDaily", leagueCode, league.oddsDailyMaxPulls, 2, 0, 24, "oddsDaily", controlsDisabled)}
-              ${adminRenderSportsNumberField_("Odds/month", "sportsOddsMonthly", leagueCode, league.oddsMonthlyMaxPulls, 30, 0, 500, "oddsMonthly", controlsDisabled)}
+              ${adminRenderSportsCheckboxField_("Auto refresh", "sportsOddsAuto", leagueCode, oddsAutoEnabled, "runHybridOdds", oddsControlsDisabled)}
+              ${adminRenderSportsNumberField_("Daily limit", "sportsOddsDaily", leagueCode, oddsDailyLimit, 1, 0, 24, "oddsDaily", oddsControlsDisabled)}
+              ${adminRenderSportsNumberField_("Monthly budget", "sportsOddsMonthly", leagueCode, oddsMonthlyBudget, 30, 0, 500, "oddsMonthly", oddsControlsDisabled)}
+            </div>
+
+            ${adminRenderSportsOddsMarketCheckboxes_(leagueCode, oddsMarkets, oddsControlsDisabled)}
+
+            <div class="admin-sub" style="margin-top:8px;">
+              Region: US only. Manual refresh is always protected by League ON/OFF and your daily/monthly limits.
             </div>
 
             <div class="sports-league-actions">
-              ${adminSportsActionButton_("Refresh Odds Now", "admin-small-button secondary", "adminRefreshSportsOddsLeague('" + leagueCode + "')", "refreshOdds", leagueCode, controlsDisabled)}
+              ${adminSportsActionButton_("Refresh Odds Now", oddsActive ? "admin-small-button secondary" : "admin-small-button secondary inactive", "adminRefreshSportsOddsLeague('" + leagueCode + "')", "refreshOdds", leagueCode, oddsActive ? controlsDisabled : "disabled")}
             </div>
           `;
 
@@ -4391,8 +4529,8 @@ function adminRenderScoreLeagueControls_(
                     · ${leagueOn ? "League ON" : "League OFF"}
                     · Season ${phaseLabel}
                     · Scores ${enabled ? "ON" : "OFF"}
-                    · Odds ${oddsEnabled ? "ON" : "OFF"}
-                    · API ${oddsToday}/${oddsMonth}/${oddsBudget}
+                    · Odds ${adminSportsEscape_(oddsStatusText)}
+                    · API ${oddsToday}/${oddsMonth}/${oddsMonthlyBudget}
                   </div>
 
                   <div class="admin-sub">
@@ -4769,10 +4907,10 @@ async function adminSaveSportsScoreLeagueSettings(
         bowlStartDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlStart") : "",
         bowlEndDate: leagueChecked_("sportsBowlEnabled", false) ? leagueDateValue_("sportsBowlEnd") : "",
         oddsEnabled: leagueActive
-          ? leagueChecked_("sportsOddsEnabled", true)
+          ? leagueChecked_("sportsOddsEnabled", false)
           : false,
-        oddsCooldownMinutes: leagueValue_("sportsOddsCooldown", 240),
-        oddsDailyMaxPulls: leagueValue_("sportsOddsDaily", 2),
+        oddsCooldownMinutes: 240,
+        oddsDailyMaxPulls: leagueValue_("sportsOddsDaily", 1),
         oddsMonthlyMaxPulls: leagueValue_("sportsOddsMonthly", 30),
         snapshotRetentionDays: leagueValue_("sportsSnapshotDays", 14),
         archiveEnabled: leagueChecked_("sportsArchiveEnabled", false),
@@ -4782,6 +4920,33 @@ async function adminSaveSportsScoreLeagueSettings(
         keepLogsDays: leagueValue_("sportsLogDays", 14)
       }
     );
+
+  if (res && res.success) {
+    try {
+      await apiAdminUpdateSportsOddsSetting(
+        league,
+        {
+          oddsEnabled: leagueActive
+            ? leagueChecked_("sportsOddsEnabled", false)
+            : false,
+          autoRefreshEnabled: leagueActive
+            ? leagueChecked_("sportsOddsAuto", false)
+            : false,
+          manualRefreshEnabled: true,
+          maxRefreshesPerDay: leagueValue_("sportsOddsDaily", 1),
+          monthlyBudget: leagueValue_("sportsOddsMonthly", 30),
+          stopAtMonthlyCalls: 450,
+          defaultMarkets: adminSportsSelectedOddsMarkets_(league)
+        }
+      );
+    } catch (oddsErr) {
+      res.success = false;
+      res.error =
+        oddsErr && oddsErr.message
+          ? oddsErr.message
+          : String(oddsErr || "Unable to save odds settings.");
+    }
+  }
 
   if (!options.silent) {
     adminSportsMessage_(
@@ -4816,6 +4981,26 @@ function adminApplySportsLeagueDefaults(
   adminSportsSetCheckbox_(
     adminSportsInputId_("sportsOddsEnabled", league),
     true
+  );
+
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsOddsAuto", league),
+    false
+  );
+
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsOddsMarket_h2h", league),
+    true
+  );
+
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsOddsMarket_spreads", league),
+    false
+  );
+
+  adminSportsSetCheckbox_(
+    adminSportsInputId_("sportsOddsMarket_totals", league),
+    false
   );
 
   adminSportsSetCheckbox_(
@@ -4893,7 +5078,7 @@ function adminApplySportsLeagueDefaults(
     sportsLive: 5,
     sportsFinal: 120,
     sportsOddsCooldown: 240,
-    sportsOddsDaily: 2,
+    sportsOddsDaily: 1,
     sportsOddsMonthly: 30,
     sportsArchiveDays: 30,
     sportsSnapshotDays: 14,
@@ -5517,6 +5702,78 @@ async function adminCreateSportsSeasonJobs() {
   );
 
   adminSportsMarkDashboardStale_();
+
+}
+
+async function adminRunSportsScheduleReconcile(
+  leagueCode
+) {
+
+  const league =
+    String(leagueCode || "")
+      .trim()
+      .toLowerCase();
+
+  const ok =
+    window.confirm(
+      league
+        ? "Recheck ESPN schedule changes for " + league.toUpperCase() + " now?"
+        : "Recheck ESPN schedule changes for enabled leagues now?"
+    );
+
+  if (!ok) {
+    return;
+  }
+
+  adminSportsMessage_(
+    league
+      ? "Rechecking schedule for " + league.toUpperCase() + "..."
+      : "Rechecking schedules for enabled leagues...",
+    false
+  );
+
+  try {
+
+    const res =
+      await apiAdminRunSportsScheduleReconcile({
+        league: league,
+        daysBack: 1,
+        daysForward: 21
+      });
+
+    const success =
+      !!(res && res.success);
+
+    adminSportsMessage_(
+      success
+        ? "Schedule recheck complete. League: " +
+          (res.targetLeague || league || "ALL") +
+          ". Unique games: " +
+          (res.uniqueGames || 0) +
+          ", fetched rows: " +
+          (res.gamesFetched || 0) +
+          ", dates checked: " +
+          (res.datesChecked || 0) +
+          "."
+        : (res && (res.error || res.message || res.reason)) ||
+          "Schedule recheck failed.",
+      !success
+    );
+
+    adminSportsMarkDashboardStale_();
+
+    return res;
+
+  } catch (err) {
+
+    adminSportsMessage_(
+      err && err.message
+        ? err.message
+        : "Schedule recheck failed.",
+      true
+    );
+
+  }
 
 }
 

@@ -2324,6 +2324,141 @@ function fetchSportsOddsEventsForLeague_(league) {
 
 }
 
+function fetchSportsOddsEventsForLeagueWithOptions_(
+  league,
+  options
+) {
+
+  options =
+    options || {};
+
+  const sportKey =
+    sportsOddsLeagueToSportKey_(
+      league
+    );
+
+  if (!sportKey) {
+    throw new Error(
+      "Unsupported odds league: " + league
+    );
+  }
+
+  const markets =
+    sportsOddsString_(
+      options.markets ||
+      sportsOddsGetMarketsForLeague_(league)
+    ) || SPORTS_ODDS_MARKETS;
+
+  const regions =
+    "us";
+
+  const url =
+    buildSportsOddsApiUrl_(
+      sportKey,
+      markets,
+      regions
+    );
+
+  const fetched =
+    fetchSportsOddsApiJsonWithLog_(
+      url,
+      {
+        source:
+          "fetchSportsOddsEventsForLeagueWithOptions_",
+        league:
+          sportsOddsString_(league)
+            .toUpperCase(),
+        sportKey:
+          sportKey,
+        endpoint:
+          "odds",
+        markets:
+          markets,
+        regions:
+          regions
+      }
+    );
+
+  const parsed =
+    fetched.payload;
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(
+      "Odds API returned unexpected payload"
+    );
+  }
+
+  return {
+    success: true,
+    league:
+      sportsOddsString_(league)
+        .toUpperCase(),
+    sportKey: sportKey,
+    events: parsed,
+    apiUsage:
+      fetched.usage || null
+  };
+
+}
+
+function refreshSportsOddsForLeagueWithOptions(
+  league,
+  options
+) {
+
+  if (
+    sportsOddsIsRacingLeague_(
+      league
+    )
+  ) {
+    return refreshSportsRacingOddsForLeague(
+      league
+    );
+  }
+
+  const fetched =
+    fetchSportsOddsEventsForLeagueWithOptions_(
+      league,
+      options || {}
+    );
+
+  const rows =
+    fetched.events
+      .map(function(event) {
+        return normalizeSportsOddsEvent_(
+          event,
+          fetched.league,
+          fetched.sportKey
+        );
+      })
+      .filter(Boolean);
+
+  const writeResult =
+    upsertSportsOddsRows_(
+      rows
+    );
+
+  return {
+    success: true,
+    league:
+      fetched.league,
+    sportKey:
+      fetched.sportKey,
+    fetched:
+      fetched.events.length,
+    usable:
+      rows.length,
+    inserted:
+      writeResult.inserted,
+    updated:
+      writeResult.updated,
+    apiUsage:
+      fetched.apiUsage || null
+  };
+
+}
+
+
 
 /* Removed older duplicate function sportsRacingOddsGetSheet_ during v11 cleanup. */
 
