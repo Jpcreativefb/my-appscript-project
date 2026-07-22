@@ -6138,8 +6138,21 @@ function upgradeSportsControlsV12() {
 
 function sportsGetSeasonPhase_(setting, dateOnly) {
   dateOnly = normalizeSportsDateOnly_(dateOnly || new Date());
-  const regularStart = setting.RegularSeasonStartDate || setting.SeasonStartDate;
-  const regularEnd = setting.RegularSeasonEndDate || setting.SeasonEndDate;
+
+  const seasonStart =
+    setting.SeasonStartDate;
+
+  const seasonEnd =
+    setting.SeasonEndDate;
+
+  const regularStart =
+    setting.RegularSeasonStartDate ||
+    setting.SeasonStartDate;
+
+  const regularEnd =
+    setting.RegularSeasonEndDate ||
+    setting.SeasonEndDate;
+
   const phases = [
     { name: "PRESEASON", enabled: setting.PreseasonEnabled, start: setting.PreseasonStartDate, end: setting.PreseasonEndDate },
     { name: "REGULAR SEASON", enabled: !!(regularStart && regularEnd), start: regularStart, end: regularEnd },
@@ -6148,9 +6161,18 @@ function sportsGetSeasonPhase_(setting, dateOnly) {
     { name: "BOWL", enabled: setting.BowlEnabled, start: setting.BowlStartDate, end: setting.BowlEndDate }
   ];
 
-  const configured = phases.some(function(phase) {
-    return phase.enabled && phase.start && phase.end;
-  });
+  const masterConfigured =
+    !!(seasonStart && seasonEnd);
+
+  const masterActive =
+    masterConfigured &&
+    sportsDateInRange_(dateOnly, seasonStart, seasonEnd);
+
+  const configured =
+    masterConfigured ||
+    phases.some(function(phase) {
+      return phase.enabled && phase.start && phase.end;
+    });
 
   if (!configured) return { active: true, phase: "DATES NOT SET" };
 
@@ -6159,6 +6181,15 @@ function sportsGetSeasonPhase_(setting, dateOnly) {
     if (phase.enabled && sportsDateInRange_(dateOnly, phase.start, phase.end)) {
       return { active: true, phase: phase.name };
     }
+  }
+
+  /*
+    The master Season Start/End dates are the admin's simple ON-season
+    window. Advanced regular/pre/post dates only label the phase; they should
+    not keep the league off if the master season window is active.
+  */
+  if (masterActive) {
+    return { active: true, phase: "SEASON ACTIVE" };
   }
 
   return { active: false, phase: "OFF SEASON" };

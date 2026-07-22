@@ -299,6 +299,33 @@ function apiAdminGetSportsControlDashboard(payload) {
 
 }
 
+function apiAdminSetSportsEngineSmartAutomation(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "setSmartSportsAutomation",
+    {
+      enabled:
+        sportsAdminBridgeBoolean_(
+          payload.enabled
+        ),
+
+      oddsHour:
+        payload.oddsHour || 8,
+
+      archiveHour:
+        payload.archiveHour || 3
+    }
+  );
+
+}
+
 /* =====================================================
    SCORE REFRESH CONTROLS
 ===================================================== */

@@ -861,6 +861,9 @@ function sportsAdminGetLeagueControlState_(league) {
   const rows =
     readAllSportsSettingsRows_();
 
+  const today =
+    normalizeSportsDateOnly_(new Date());
+
   for (let i = 0; i < rows.length; i++) {
 
     const rowLeague =
@@ -873,11 +876,41 @@ function sportsAdminGetLeagueControlState_(league) {
     const enabled =
       normalizeSportsBoolean_(rows[i].Enabled);
 
+    let phase = {
+      active:
+        rows[i].SeasonActive === undefined ||
+        rows[i].SeasonActive === ""
+          ? true
+          : normalizeSportsBoolean_(rows[i].SeasonActive),
+      phase: "SEASON ACTIVE"
+    };
+
+    if (typeof sportsGetSeasonPhase_ === "function") {
+      phase = sportsGetSeasonPhase_(
+        {
+          SeasonStartDate: normalizeSportsDateOnly_(rows[i].SeasonStartDate),
+          SeasonEndDate: normalizeSportsDateOnly_(rows[i].SeasonEndDate),
+          RegularSeasonStartDate: normalizeSportsDateOnly_(rows[i].RegularSeasonStartDate),
+          RegularSeasonEndDate: normalizeSportsDateOnly_(rows[i].RegularSeasonEndDate),
+          PreseasonEnabled: normalizeSportsBoolean_(rows[i].PreseasonEnabled),
+          PreseasonStartDate: normalizeSportsDateOnly_(rows[i].PreseasonStartDate),
+          PreseasonEndDate: normalizeSportsDateOnly_(rows[i].PreseasonEndDate),
+          PostseasonEnabled: normalizeSportsBoolean_(rows[i].PostseasonEnabled),
+          PostseasonStartDate: normalizeSportsDateOnly_(rows[i].PostseasonStartDate),
+          PostseasonEndDate: normalizeSportsDateOnly_(rows[i].PostseasonEndDate),
+          TournamentEnabled: normalizeSportsBoolean_(rows[i].TournamentEnabled),
+          TournamentStartDate: normalizeSportsDateOnly_(rows[i].TournamentStartDate),
+          TournamentEndDate: normalizeSportsDateOnly_(rows[i].TournamentEndDate),
+          BowlEnabled: normalizeSportsBoolean_(rows[i].BowlEnabled),
+          BowlStartDate: normalizeSportsDateOnly_(rows[i].BowlStartDate),
+          BowlEndDate: normalizeSportsDateOnly_(rows[i].BowlEndDate)
+        },
+        today
+      );
+    }
+
     const seasonActive =
-      rows[i].SeasonActive === undefined ||
-      rows[i].SeasonActive === ""
-        ? true
-        : normalizeSportsBoolean_(rows[i].SeasonActive);
+      !!(phase && phase.active);
 
     return {
       found: true,
@@ -885,6 +918,7 @@ function sportsAdminGetLeagueControlState_(league) {
       sport: sportsAdminString_(rows[i].Sport),
       enabled: enabled,
       seasonActive: seasonActive,
+      seasonPhase: phase && phase.phase ? phase.phase : "",
       canRun: enabled && seasonActive
     };
 
@@ -896,6 +930,7 @@ function sportsAdminGetLeagueControlState_(league) {
     sport: "",
     enabled: false,
     seasonActive: false,
+    seasonPhase: "OFF SEASON",
     canRun: false
   };
 
@@ -2049,10 +2084,13 @@ function refreshSportsOddsForLeagueControlled_(
   }
 
   if (!leagueState.seasonActive) {
+    const seasonMessage =
+      "Season inactive. Update the Season Start/End dates or wait until the season starts.";
+
     updateSportsOddsRefreshStatus_(
       league,
       "PAUSED",
-      "Season is inactive for this league."
+      seasonMessage
     );
 
     return {
@@ -2060,7 +2098,9 @@ function refreshSportsOddsForLeagueControlled_(
       skipped: true,
       league: league,
       reason:
-        "Season inactive"
+        "Season inactive",
+      message:
+        seasonMessage
     };
   }
 
@@ -2154,12 +2194,30 @@ function refreshSportsOddsForLeagueControlled_(
     setting.CallsToday >=
     setting.MaxRefreshesPerDay
   ) {
+    const dailyMessage =
+      "Odds limit met for the day: " +
+      setting.CallsToday +
+      " / " +
+      setting.MaxRefreshesPerDay +
+      ". No Odds API call was used.";
+
+    updateSportsOddsRefreshStatus_(
+      league,
+      "BLOCKED",
+      dailyMessage
+    );
+
     return {
       success: true,
       skipped: true,
+      blocked: true,
       league: league,
+      callsToday: setting.CallsToday,
+      maxRefreshesPerDay: setting.MaxRefreshesPerDay,
       reason:
-        "League daily refresh limit reached"
+        "League daily refresh limit reached",
+      message:
+        dailyMessage
     };
   }
 

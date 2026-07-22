@@ -2328,7 +2328,10 @@ async function apiAdminGetSportsWagerAutoSyncStatus() {
 async function apiAdminInstallSmartSportsAutomation() {
 
   return apiAdminSportsControl_(
-    "adminInstallSmartSportsAutomation"
+    "adminSetSportsEngineSmartAutomation",
+    {
+      enabled: true
+    }
   );
 
 }
@@ -2336,7 +2339,10 @@ async function apiAdminInstallSmartSportsAutomation() {
 async function apiAdminRemoveSmartSportsAutomation() {
 
   return apiAdminSportsControl_(
-    "adminRemoveSmartSportsAutomation"
+    "adminSetSportsEngineSmartAutomation",
+    {
+      enabled: false
+    }
   );
 
 }

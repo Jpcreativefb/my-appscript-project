@@ -2453,6 +2453,29 @@ if (action === "adminGetSportsControlDashboard") {
 
 }
 
+if (action === "adminSetSportsEngineSmartAutomation") {
+
+  return json(
+    apiAdminSetSportsEngineSmartAutomation({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      enabled:
+        params.enabled,
+
+      oddsHour:
+        params.oddsHour,
+
+      archiveHour:
+        params.archiveHour
+    })
+  );
+
+}
+
 if (action === "adminRefreshSportsScoresNow") {
 
   return json(
