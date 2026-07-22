@@ -2733,6 +2733,9 @@ async function apiAdminUpdateSportsOddsSetting(
       monthlyBudget:
         patch.monthlyBudget,
 
+      oddsWindow:
+        patch.oddsWindow,
+
       stopAtMonthlyCalls:
         patch.stopAtMonthlyCalls,
 

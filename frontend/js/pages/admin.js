@@ -2026,7 +2026,7 @@ function adminSportsInfoText_(
     snapshotsSection:
       "Snapshots save quarter/period/final checkpoints. Leave this off for simpler moneyline-only wagers; turn it on when you want history or period-style betting later.",
     oddsSection:
-      "Odds are simple on purpose: League must be ON, Odds must be ON, daily/monthly limits must allow it, and region is fixed to US. Advanced markets are optional.",
+      "Odds are simple on purpose: League must be ON, Odds must be ON, daily/monthly limits must allow it, and region is fixed to US. Odds Window controls how far ahead to check.",
     archiveSection:
       "Archive settings keep old completed rows from slowing down the live sheets. Preview first; archive is meant for cleanup after games are safely final.",
     season:
@@ -2103,6 +2103,8 @@ function adminSportsInfoText_(
       "Maximum odds refreshes allowed for this league today. Keep this at 1 while testing.",
     oddsMonthly:
       "Monthly budget for this league. This protects the 500-call Odds API limit.",
+    oddsWindow:
+      "How far ahead this league checks odds. Standard = 14 days, Long = 30 days, Half Season = half the remaining season, Full Season = through season end. Sportsbooks may not post odds that far ahead.",
     oddsUsage:
       "Shows the simple odds status, usage counters, last result, and remaining API calls.",
     refreshOdds:
@@ -3986,6 +3988,39 @@ function adminSportsSelectedOddsMarkets_(
 
 }
 
+function adminSportsOddsWindowLabel_(value) {
+
+  const raw =
+    String(value || "STANDARD")
+      .toUpperCase();
+
+  if (raw === "LONG") {
+    return "Long · 30 days";
+  }
+
+  if (raw === "HALF_SEASON") {
+    return "Half Season";
+  }
+
+  if (raw === "FULL_SEASON") {
+    return "Full Season";
+  }
+
+  return "Standard · 14 days";
+
+}
+
+function adminSportsOddsWindowOptions_() {
+
+  return [
+    { value: "STANDARD", label: "Standard · 14 days" },
+    { value: "LONG", label: "Long · 30 days" },
+    { value: "HALF_SEASON", label: "Half Season" },
+    { value: "FULL_SEASON", label: "Full Season" }
+  ];
+
+}
+
 function adminRenderSportsSelectField_(
   label,
   prefix,
@@ -4655,6 +4690,10 @@ function adminRenderScoreLeagueControls_(
             oddsUsage.DefaultMarkets ||
             "h2h";
 
+          const oddsWindow =
+            String(oddsUsage.OddsWindow || "STANDARD")
+              .toUpperCase();
+
           /*
             Keep league settings editable even when the league is OFF.
             The old UI disabled every input when League was OFF, which made it
@@ -4831,6 +4870,7 @@ function adminRenderScoreLeagueControls_(
               · Today ${oddsToday}/${oddsDailyLimit}
               · Month ${oddsMonth}/${oddsMonthlyBudget}
               · API left ${oddsUsage.LastApiRemaining || "—"}
+              · Window ${adminSportsEscape_(adminSportsOddsWindowLabel_(oddsWindow))}
               · Last ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never")}
             </div>
 
@@ -4838,6 +4878,7 @@ function adminRenderScoreLeagueControls_(
               ${adminRenderSportsCheckboxField_("Auto refresh", "sportsOddsAuto", leagueCode, oddsAutoEnabled, "runHybridOdds", oddsControlsDisabled)}
               ${adminRenderSportsNumberField_("Daily limit", "sportsOddsDaily", leagueCode, oddsDailyLimit, 1, 0, 24, "oddsDaily", oddsControlsDisabled)}
               ${adminRenderSportsNumberField_("Monthly budget", "sportsOddsMonthly", leagueCode, oddsMonthlyBudget, 30, 0, 500, "oddsMonthly", oddsControlsDisabled)}
+              ${adminRenderSportsSelectField_("Odds Window", "sportsOddsWindow", leagueCode, oddsWindow, adminSportsOddsWindowOptions_(), "oddsWindow", oddsControlsDisabled)}
             </div>
 
             ${adminRenderSportsOddsMarketCheckboxes_(leagueCode, oddsMarkets, oddsControlsDisabled)}
@@ -5301,6 +5342,7 @@ async function adminSaveSportsScoreLeagueSettings(
           manualRefreshEnabled: true,
           maxRefreshesPerDay: leagueValue_("sportsOddsDaily", 1),
           monthlyBudget: leagueValue_("sportsOddsMonthly", 30),
+          oddsWindow: leagueValue_("sportsOddsWindow", "STANDARD"),
           stopAtMonthlyCalls: 450,
           defaultMarkets: adminSportsSelectedOddsMarkets_(league)
         }
@@ -5380,6 +5422,7 @@ function adminApplySportsLeagueDefaults(
 
   adminSportsSetCheckbox_(
     adminSportsInputId_("sportsOddsMarket_totals", league),
+    adminSportsInputId_("sportsOddsWindow", league),
     false
   );
 
@@ -5460,6 +5503,7 @@ function adminApplySportsLeagueDefaults(
     sportsOddsCooldown: 240,
     sportsOddsDaily: 1,
     sportsOddsMonthly: 30,
+    sportsOddsWindow: "STANDARD",
     sportsArchiveDays: 30,
     sportsSnapshotDays: 14,
     sportsLogDays: 14
@@ -6365,15 +6409,16 @@ async function adminRefreshSportsOddsLeague(
     window.confirm(
       "Refresh odds for " +
       league +
-      " now? This may use 1 Odds API call."
+      " now? This may use 1 Odds API call and check this league's Odds Window."
     );
 
   if (!ok) {
     return;
   }
 
-  adminSportsMessage_(
-    "Refreshing odds for " + league + "...",
+  adminSportsSetLeagueStatus_(
+    league,
+    "Refreshing odds for " + String(league || "League").toUpperCase() + "...",
     false
   );
 
@@ -6415,12 +6460,16 @@ async function adminRefreshSportsOddsLeague(
       message;
   }
 
-  adminSportsMessage_(
+  adminSportsSetLeagueStatus_(
+    league,
     message,
     isWarning
   );
 
-  adminSportsMarkDashboardStale_();
+  adminSportsMarkDashboardStale_(
+    "Odds status changed. Use Reload Sports Controls when you want fresh counts/status.",
+    { localOnly: true }
+  );
 
 }
 

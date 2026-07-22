@@ -839,6 +839,9 @@ function apiAdminUpdateSportsOddsSetting(payload) {
       monthlyBudget:
         payload.monthlyBudget,
 
+      oddsWindow:
+        payload.oddsWindow,
+
       stopAtMonthlyCalls:
         payload.stopAtMonthlyCalls,
 

@@ -47,6 +47,59 @@ const SPORTS_ODDS_DATE_FORMAT =
 const SPORTS_ODDS_CACHE_MINUTES =
   30;
 
+function sportsOddsIsoTimePlusDays_(daysForward) {
+
+  const days =
+    Math.max(
+      1,
+      Number(daysForward || 14)
+    );
+
+  const date =
+    new Date();
+
+  date.setUTCDate(
+    date.getUTCDate() + days
+  );
+
+  return date.toISOString();
+
+}
+
+function sportsOddsNormalizeWindowDays_(options) {
+
+  options =
+    options || {};
+
+  const rawWindow =
+    sportsOddsString_(options.oddsWindow || "STANDARD")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  if (options.daysForward !== undefined && options.daysForward !== "") {
+    return Math.max(
+      1,
+      Number(options.daysForward || 14)
+    );
+  }
+
+  if (rawWindow === "LONG" || rawWindow === "MONTH" || rawWindow === "MONTHLY") {
+    return 30;
+  }
+
+  if (rawWindow === "HALF" || rawWindow === "HALF_SEASON" || rawWindow === "HALFSEASON") {
+    return 60;
+  }
+
+  if (rawWindow === "FULL" || rawWindow === "FULL_SEASON" || rawWindow === "FULLSEASON" || rawWindow === "SEASON") {
+    return 120;
+  }
+
+  return 14;
+
+}
+
 const SPORTS_ODDS_DEFAULT_BOOKMAKERS = [
   "draftkings",
   "fanduel",
@@ -2215,8 +2268,12 @@ function sportsOddsGetRegionsForLeague_(league) {
 function buildSportsOddsApiUrl_(
   sportKey,
   markets,
-  regions
+  regions,
+  options
 ) {
+
+  options =
+    options || {};
 
   const params = {
     apiKey:
@@ -2230,6 +2287,16 @@ function buildSportsOddsApiUrl_(
     dateFormat:
       SPORTS_ODDS_DATE_FORMAT
   };
+
+  if (options.commenceTimeFrom) {
+    params.commenceTimeFrom =
+      options.commenceTimeFrom;
+  }
+
+  if (options.commenceTimeTo) {
+    params.commenceTimeTo =
+      options.commenceTimeTo;
+  }
 
   const query =
     Object.keys(params)
@@ -2352,11 +2419,30 @@ function fetchSportsOddsEventsForLeagueWithOptions_(
   const regions =
     "us";
 
+  const daysForward =
+    sportsOddsNormalizeWindowDays_(
+      options
+    );
+
+  const commenceTimeFrom =
+    options.commenceTimeFrom ||
+    new Date().toISOString();
+
+  const commenceTimeTo =
+    options.commenceTimeTo ||
+    sportsOddsIsoTimePlusDays_(
+      daysForward
+    );
+
   const url =
     buildSportsOddsApiUrl_(
       sportKey,
       markets,
-      regions
+      regions,
+      {
+        commenceTimeFrom: commenceTimeFrom,
+        commenceTimeTo: commenceTimeTo
+      }
     );
 
   const fetched =
@@ -2375,7 +2461,15 @@ function fetchSportsOddsEventsForLeagueWithOptions_(
         markets:
           markets,
         regions:
-          regions
+          regions,
+        oddsWindow:
+          options.oddsWindow || "STANDARD",
+        daysForward:
+          daysForward,
+        commenceTimeFrom:
+          commenceTimeFrom,
+        commenceTimeTo:
+          commenceTimeTo
       }
     );
 
@@ -2395,6 +2489,8 @@ function fetchSportsOddsEventsForLeagueWithOptions_(
         .toUpperCase(),
     sportKey: sportKey,
     events: parsed,
+    oddsWindow: options.oddsWindow || "STANDARD",
+    daysForward: daysForward,
     apiUsage:
       fetched.usage || null
   };

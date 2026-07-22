@@ -48,6 +48,7 @@ const SPORTS_ODDS_SETTINGS_HEADERS = [
   "StopAtMonthlyCalls",
   "DefaultMarkets",
   "DefaultRegions",
+  "OddsWindow",
   "EstimatedCostPerRefresh",
   "CallsToday",
   "CallsThisMonth",
@@ -798,6 +799,7 @@ function seedSportsOddsAdminSettingsFromSportsSettings_() {
         typeof sportsOddsGetRegionsForLeague_ === "function"
           ? sportsOddsGetRegionsForLeague_(league)
           : "us",
+      OddsWindow: "STANDARD",
       EstimatedCostPerRefresh:
         typeof sportsOddsEstimateRequestCost_ === "function"
           ? sportsOddsEstimateRequestCost_(
@@ -919,6 +921,10 @@ function sportsAdminGetLeagueControlState_(league) {
       enabled: enabled,
       seasonActive: seasonActive,
       seasonPhase: phase && phase.phase ? phase.phase : "",
+      seasonStartDate: normalizeSportsDateOnly_(rows[i].SeasonStartDate),
+      seasonEndDate: normalizeSportsDateOnly_(rows[i].SeasonEndDate),
+      regularSeasonStartDate: normalizeSportsDateOnly_(rows[i].RegularSeasonStartDate),
+      regularSeasonEndDate: normalizeSportsDateOnly_(rows[i].RegularSeasonEndDate),
       canRun: enabled && seasonActive
     };
 
@@ -973,6 +979,110 @@ function sportsAdminNormalizeOddsMarkets_(value, league) {
   }
 
   return markets.join(",");
+
+}
+
+function sportsAdminNormalizeOddsWindow_(value) {
+
+  const raw =
+    sportsAdminString_(value || "STANDARD")
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+
+  if (raw === "LONG" || raw === "MONTH" || raw === "MONTHLY") {
+    return "LONG";
+  }
+
+  if (
+    raw === "HALF" ||
+    raw === "HALF_SEASON" ||
+    raw === "HALFSEASON"
+  ) {
+    return "HALF_SEASON";
+  }
+
+  if (
+    raw === "FULL" ||
+    raw === "FULL_SEASON" ||
+    raw === "FULLSEASON" ||
+    raw === "SEASON"
+  ) {
+    return "FULL_SEASON";
+  }
+
+  return "STANDARD";
+
+}
+
+function sportsAdminDaysBetweenTodayAnd_(dateValue) {
+
+  const end =
+    normalizeSportsDateOnly_(dateValue);
+
+  if (!end) {
+    return 0;
+  }
+
+  const endDate =
+    new Date(end + "T00:00:00");
+
+  const today =
+    new Date();
+
+  today.setHours(
+    0,
+    0,
+    0,
+    0
+  );
+
+  if (isNaN(endDate.getTime()) || endDate < today) {
+    return 0;
+  }
+
+  return Math.ceil(
+    (endDate.getTime() - today.getTime()) / 86400000
+  );
+
+}
+
+function sportsAdminOddsWindowDays_(oddsWindow, leagueState) {
+
+  const normalized =
+    sportsAdminNormalizeOddsWindow_(oddsWindow);
+
+  if (normalized === "LONG") {
+    return 30;
+  }
+
+  if (normalized === "HALF_SEASON") {
+    const remaining =
+      sportsAdminDaysBetweenTodayAnd_(
+        leagueState && leagueState.seasonEndDate
+      );
+
+    if (remaining > 0) {
+      return Math.max(14, Math.ceil(remaining / 2));
+    }
+
+    return 60;
+  }
+
+  if (normalized === "FULL_SEASON") {
+    const remaining =
+      sportsAdminDaysBetweenTodayAnd_(
+        leagueState && leagueState.seasonEndDate
+      );
+
+    if (remaining > 0) {
+      return Math.max(14, remaining);
+    }
+
+    return 120;
+  }
+
+  return 14;
 
 }
 
@@ -1126,6 +1236,11 @@ function cleanSportsOddsSettingsForUserFriendlyAdmin_() {
         league
       ),
       DefaultRegions: "us",
+      OddsWindow: sportsAdminNormalizeOddsWindow_(
+        oddsCol.OddsWindow !== undefined
+          ? oddsData[i][oddsCol.OddsWindow]
+          : "STANDARD"
+      ),
       EstimatedCostPerRefresh:
         typeof sportsOddsEstimateRequestCost_ === "function"
           ? sportsOddsEstimateRequestCost_(
@@ -1304,6 +1419,18 @@ function readSportsOddsAdminSettings_() {
             : "us")
         );
 
+      obj.OddsWindow =
+        sportsAdminNormalizeOddsWindow_(
+          obj.OddsWindow
+        );
+
+      obj.OddsWindowDays =
+        obj.OddsWindow === "LONG"
+          ? 30
+          : obj.OddsWindow === "STANDARD"
+            ? 14
+            : "Season";
+
       obj.EstimatedCostPerRefresh =
         sportsAdminNumber_(
           obj.EstimatedCostPerRefresh,
@@ -1471,6 +1598,7 @@ function apiUpdateSportsOddsAdminSetting_(params) {
         typeof sportsOddsGetRegionsForLeague_ === "function"
           ? sportsOddsGetRegionsForLeague_(league)
           : "us",
+      OddsWindow: "STANDARD",
       EstimatedCostPerRefresh:
         typeof sportsOddsEstimateRequestCost_ === "function"
           ? sportsOddsEstimateRequestCost_(
@@ -1567,6 +1695,13 @@ function apiUpdateSportsOddsAdminSetting_(params) {
       sportsAdminNormalizeOddsMarkets_(
         params.defaultMarkets,
         league
+      );
+  }
+
+  if (params.oddsWindow !== undefined) {
+    patch.OddsWindow =
+      sportsAdminNormalizeOddsWindow_(
+        params.oddsWindow
       );
   }
 
@@ -2274,7 +2409,14 @@ function refreshSportsOddsForLeagueControlled_(
               markets:
                 setting.DefaultMarkets || "h2h",
               regions:
-                "us"
+                "us",
+              oddsWindow:
+                setting.OddsWindow || "STANDARD",
+              daysForward:
+                sportsAdminOddsWindowDays_(
+                  setting.OddsWindow,
+                  leagueState
+                )
             }
           )
         : refreshSportsOddsForLeague(
@@ -2385,17 +2527,28 @@ function runSportsOddsHybridRefresh() {
         return;
       }
 
+      const leagueState =
+        sportsAdminGetLeagueControlState_(
+          setting.League
+        );
+
+      const windowDays =
+        sportsAdminOddsWindowDays_(
+          setting.OddsWindow,
+          leagueState
+        );
+
       const hasGame =
         sportsLeagueHasUpcomingOrLiveGame_(
           setting.League,
-          2
+          windowDays
         );
 
       if (!hasGame) {
         summary.skipped.push({
           league: setting.League,
           reason:
-            "No upcoming/live game in next 2 days"
+            "No upcoming/live game in odds window"
         });
         return;
       }

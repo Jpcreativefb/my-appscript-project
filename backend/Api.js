@@ -3087,6 +3087,9 @@ if (action === "adminUpdateSportsOddsSetting") {
       monthlyBudget:
         params.monthlyBudget,
 
+      oddsWindow:
+        params.oddsWindow,
+
       stopAtMonthlyCalls:
         params.stopAtMonthlyCalls,
 
