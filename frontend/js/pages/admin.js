@@ -3134,6 +3134,46 @@ function adminSportsSetLeagueStatus_(
 
 }
 
+function adminSportsArchiveStatusId_(league) {
+
+  return "sportsArchiveRunStatus_" +
+    adminSportsKey_(league || "global");
+
+}
+
+function adminSportsSetArchiveStatus_(
+  league,
+  message,
+  isError
+) {
+
+  const el =
+    document.getElementById(
+      adminSportsArchiveStatusId_(league)
+    );
+
+  if (!el) {
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
+      isError
+    );
+    return;
+  }
+
+  el.textContent =
+    message || "";
+
+  el.hidden =
+    !message;
+
+  el.classList.toggle(
+    "error-card",
+    !!isError
+  );
+
+}
+
 function adminSportsSetGlobalControlsStatus_(
   message,
   isError
@@ -4892,9 +4932,42 @@ function adminRenderScoreLeagueControls_(
             </div>
           `;
 
+          const archiveLastAt =
+            league.archiveLastRunAt ||
+            health.archiveLastRunAt ||
+            "";
+
+          const archiveLastStatus =
+            league.archiveLastStatus ||
+            health.archiveLastStatus ||
+            "";
+
+          const archiveRowsLastRun =
+            league.archiveRowsLastRun ||
+            health.archiveRowsLastRun ||
+            0;
+
+          const archiveLastText =
+            archiveLastStatus
+              ? "Last archive: " + archiveLastStatus +
+                " · Rows last run " + archiveRowsLastRun +
+                (archiveLastAt ? " · " + archiveLastAt : "")
+              : "Last archive: Never";
+
           const archiveBody = `
             <div class="admin-sub" style="margin-bottom:8px;">
-              Games ${health.liveGames || 0} · Scores ${health.liveScores || 0} · Ready archive ${health.scoreArchiveCandidates || 0} · Snapshot cleanup ${health.snapshotArchiveCandidates || 0} · Log trim ${health.logTrimCandidates || 0}
+              Ready now: Games ${health.liveGames || 0} · Scores ${health.liveScores || 0} · Score rows ${health.scoreArchiveCandidates || 0} · Snapshot rows ${health.snapshotArchiveCandidates || 0} · Log rows ${health.logTrimCandidates || 0}
+            </div>
+
+            <div
+              id="${adminSportsArchiveStatusId_(leagueCode)}"
+              class="sports-league-save-status"
+              style="margin:0 0 8px;"
+              ${archiveLastStatus ? "" : "hidden"}
+            >${adminSportsEscape_(archiveLastText)}</div>
+
+            <div class="admin-sub" style="margin-bottom:8px;">
+              COPY adds rows to archive and keeps live rows. MOVE removes live rows after copying. Test with COPY first.
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
@@ -4934,7 +5007,7 @@ function adminRenderScoreLeagueControls_(
                   </div>
 
                   <div class="admin-sub">
-                    Scores ${health.liveScores || 0}
+                    Live: Scores ${health.liveScores || 0}
                     · Odds rows ${health.liveOdds || 0}
                     · Snapshots ${health.liveSnapshots || 0}
                     · Ready archive ${health.scoreArchiveCandidates || 0}
@@ -6653,8 +6726,15 @@ async function adminPreviewSportsLeagueArchive(
   league
 ) {
 
-  adminSportsMessage_(
-    "Building safe archive preview for " + league + "...",
+  adminSportsSetLeagueStatus_(
+    league,
+    "Building safe archive preview for " + String(league || "League").toUpperCase() + "...",
+    false
+  );
+
+  adminSportsSetArchiveStatus_(
+    league,
+    "Building archive preview...",
     false
   );
 
@@ -6664,11 +6744,22 @@ async function adminPreviewSportsLeagueArchive(
     );
 
   if (!res || res.success === false) {
-    adminSportsMessage_(
+    const message =
       (res && (res.error || res.message)) ||
-      "Unable to build archive preview.",
+      "Unable to build archive preview.";
+
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
       true
     );
+
+    adminSportsSetArchiveStatus_(
+      league,
+      message,
+      true
+    );
+
     return;
   }
 
@@ -6678,21 +6769,43 @@ async function adminPreviewSportsLeagueArchive(
       : null;
 
   if (!item) {
-    adminSportsMessage_(
-      "No archive preview rows found for " + league + ".",
+    const message =
+      "No archive preview rows found for " + String(league || "League").toUpperCase() + ".";
+
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
       false
     );
+
+    adminSportsSetArchiveStatus_(
+      league,
+      message,
+      false
+    );
+
     return;
   }
 
-  adminSportsMessage_(
-    "Archive preview for " + league + ": scores " +
+  const message =
+    "Archive preview for " + String(league || "League").toUpperCase() +
+      ": score rows " +
       (item.scoreArchiveCandidates || 0) +
-      ", snapshots " +
+      ", snapshot rows " +
       (item.snapshotArchiveCandidates || 0) +
-      ", logs " +
+      ", log rows " +
       (item.logTrimCandidates || 0) +
-      ". No rows were moved or deleted.",
+      ". No rows were copied, moved, or deleted.";
+
+  adminSportsSetLeagueStatus_(
+    league,
+    message,
+    false
+  );
+
+  adminSportsSetArchiveStatus_(
+    league,
+    message,
     false
   );
 
@@ -6714,8 +6827,15 @@ async function adminRunSportsLeagueArchiveNow(
     return;
   }
 
-  adminSportsMessage_(
-    "Saving settings before archive for " + league + "...",
+  adminSportsSetLeagueStatus_(
+    league,
+    "Saving archive settings for " + String(league || "League").toUpperCase() + "...",
+    false
+  );
+
+  adminSportsSetArchiveStatus_(
+    league,
+    "Saving archive settings...",
     false
   );
 
@@ -6727,16 +6847,34 @@ async function adminRunSportsLeagueArchiveNow(
     );
 
   if (!saveRes || saveRes.success === false) {
-    adminSportsMessage_(
+    const message =
       (saveRes && (saveRes.error || saveRes.message)) ||
-      "Unable to save archive settings before running archive.",
+      "Unable to save archive settings before running archive.";
+
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
       true
     );
+
+    adminSportsSetArchiveStatus_(
+      league,
+      message,
+      true
+    );
+
     return;
   }
 
-  adminSportsMessage_(
-    "Running archive for " + league + "...",
+  adminSportsSetLeagueStatus_(
+    league,
+    "Running archive for " + String(league || "League").toUpperCase() + "...",
+    false
+  );
+
+  adminSportsSetArchiveStatus_(
+    league,
+    "Running archive...",
     false
   );
 
@@ -6751,12 +6889,23 @@ async function adminRunSportsLeagueArchiveNow(
         ? res.errors[0].league + ": " + res.errors[0].error
         : "";
 
-    adminSportsMessage_(
+    const message =
       (res && (res.error || res.message)) ||
       firstError ||
-      "Unable to run archive.",
+      "Unable to run archive.";
+
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
       true
     );
+
+    adminSportsSetArchiveStatus_(
+      league,
+      message,
+      true
+    );
+
     return;
   }
 
@@ -6767,23 +6916,33 @@ async function adminRunSportsLeagueArchiveNow(
     Number(res.snapshotsRemoved || 0);
 
   let archiveMessage =
-    "Archive complete for " + league +
-      ": scores copied " + (res.scoresCopied || 0) +
-      ", scores removed " + (res.scoresRemoved || 0) +
-      ", snapshots copied " + (res.snapshotsCopied || 0) +
-      ", snapshots removed " + (res.snapshotsRemoved || 0) + ".";
+    "Archive complete for " + String(league || "League").toUpperCase() +
+      ": score rows copied " + (res.scoresCopied || 0) +
+      ", score rows removed " + (res.scoresRemoved || 0) +
+      ", snapshot rows copied " + (res.snapshotsCopied || 0) +
+      ", snapshot rows removed " + (res.snapshotsRemoved || 0) + ".";
 
   if (!totalChanged) {
     archiveMessage +=
       " No eligible rows were old enough to archive. Try Preview Archive or lower Archive days/Snapshot days for testing.";
   }
 
-  adminSportsMessage_(
+  adminSportsSetLeagueStatus_(
+    league,
     archiveMessage,
     false
   );
 
-  adminSportsMarkDashboardStale_();
+  adminSportsSetArchiveStatus_(
+    league,
+    archiveMessage,
+    false
+  );
+
+  adminSportsMarkDashboardStale_(
+    "Archive result saved. Use Reload Sports Controls when you want refreshed ready counts.",
+    { localOnly: true }
+  );
 
 }
 

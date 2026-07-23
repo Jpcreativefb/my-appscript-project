@@ -2806,7 +2806,9 @@ function applySportsRecordTextFormats_(sheetName) {
 
   [
     "HomeRecord",
-    "AwayRecord"
+    "AwayRecord",
+    "Clock",
+    "SportsClock"
   ].forEach(function(headerName) {
 
     const index =
@@ -5525,6 +5527,10 @@ function sportsArchiveEnsureSheet_(sheetName, sourceSheetName, keyHeader) {
   const source = ss.getSheetByName(sourceSheetName);
   if (!source) throw new Error("Missing source sheet: " + sourceSheetName);
 
+  applySportsRecordTextFormats_(
+    sourceSheetName
+  );
+
   const sourceHeaders = source.getRange(1, 1, 1, source.getLastColumn()).getValues()[0]
     .map(function(header) { return String(header || "").trim(); });
   const required = sourceHeaders.concat(["ArchivedAt", "ArchiveMode"]);
@@ -5540,6 +5546,10 @@ function sportsArchiveEnsureSheet_(sheetName, sourceSheetName, keyHeader) {
     const missing = required.filter(function(header) { return existing.indexOf(header) === -1; });
     if (missing.length) sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
   }
+
+  applySportsRecordTextFormats_(
+    sheetName
+  );
 
   return sh;
 }
@@ -5674,11 +5684,21 @@ function sportsArchiveRows_(sourceSheet, archiveSheet, rowNumbers, keyHeader, mo
     obj.ArchiveMode = mode;
 
     rowsToAppend.push(archiveHeaders.map(function(header) {
+      if (header === "HomeRecord" || header === "AwayRecord") {
+        return cleanSportsRecordValue_(obj[header]);
+      }
+      if (header === "Clock" || header === "SportsClock") {
+        return cleanSportsClockDisplayValue_(obj[header]);
+      }
       return obj[header] !== undefined ? obj[header] : "";
     }));
   });
 
   if (rowsToAppend.length) {
+    applySportsRecordTextFormats_(
+      archiveSheet.getName()
+    );
+
     archiveSheet.getRange(archiveSheet.getLastRow() + 1, 1, rowsToAppend.length, archiveHeaders.length)
       .setValues(rowsToAppend);
   }
@@ -6629,6 +6649,9 @@ function upsertLatestSportsScores_(games) {
       if (header === "HomeRecord" || header === "AwayRecord") {
         return cleanSportsRecordValue_(game[header]);
       }
+      if (header === "Clock" || header === "SportsClock") {
+        return cleanSportsClockDisplayValue_(game[header]);
+      }
       return game[header] !== undefined ? game[header] : "";
     });
     const existingRow = existingRowsByGameId[game.GameId];
@@ -6814,7 +6837,10 @@ function repairSportsScoreDisplayAdmin_() {
 
   [
     SPORTS_SHEETS.SCORES,
-    SPORTS_SHEETS.GAMES
+    SPORTS_SHEETS.GAMES,
+    SPORTS_SHEETS.SNAPSHOTS,
+    "SportsScoresArchive",
+    "SportsSnapshotsArchive"
   ].forEach(function(sheetName) {
 
     const result =
@@ -6926,7 +6952,7 @@ function repairSportsScoreDisplaySheet_(sheetName) {
       if (item.type === "clock") {
         next =
           cleanSportsClockDisplayValue_(
-            current
+            rawCurrent
           );
       }
 
@@ -6962,9 +6988,17 @@ function repairSportsScoreDisplaySheet_(sheetName) {
 
 function cleanSportsClockDisplayValue_(value) {
 
+  if (
+    Object.prototype.toString.call(value) === "[object Date]" &&
+    !isNaN(value.getTime())
+  ) {
+    return "";
+  }
+
   value =
     String(value || "")
-      .trim();
+      .trim()
+      .replace(/^'/, "");
 
   if (!value) {
     return "";
