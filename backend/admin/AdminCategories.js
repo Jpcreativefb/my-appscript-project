@@ -28,6 +28,25 @@ function adminCatNormalizeId_(value) {
 
 }
 
+function adminCatNormalizeScoreMode_(value) {
+
+  if (typeof normalizeCategoryScoreMode_ === "function") {
+    return normalizeCategoryScoreMode_(value);
+  }
+
+  const mode = String(value || "fixed-points")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+
+  if (mode === "correct-pick") {
+    return "fixed-points";
+  }
+
+  return mode || "fixed-points";
+
+}
+
 function adminCatSlugify_(value) {
 
   return String(value || "")
@@ -87,6 +106,224 @@ function adminCatClearCaches_() {
 
 }
 
+function adminCatEnsureHybridHeaders_() {
+
+  if (
+    typeof categoryResultsEnsureColumns_ !== "function"
+  ) {
+    return;
+  }
+
+  categoryResultsEnsureColumns_(
+    CATEGORY_SETTINGS_SHEET,
+    [
+      "QuestionType",
+      "ScoringEngine",
+      "SelectionMode",
+      "ScoreMode",
+      "OddsMode",
+      "ResultSource",
+      "SettlementStatus",
+      "MaxSelections",
+      "MinSelections",
+      "AllowDraw",
+      "AllowPush",
+      "SportsGameId",
+      "ESPNEventId",
+      "SportsMarket",
+      "SportsLeague",
+      "WagerResultType",
+      "OddsReady",
+      "OddsSource",
+      "OddsLastUpdated",
+      "MinStake",
+      "MaxStake",
+      "StakeIncrement",
+      "StakeWinMultiplier",
+      "StakeLossMultiplier",
+      "ResultSourceType",
+      "ResultProvider",
+      "ExternalEventId",
+      "ExternalMarketId",
+      "ExternalSubjectId",
+      "StatKey",
+      "ComparisonOperator",
+      "Threshold",
+      "AutoSettle",
+      "RequireAdminReview",
+      "SourceUrl",
+      "SourceConfigJSON"
+    ]
+  );
+
+}
+
+function adminCatValidateQuestionSettingsPayload_(payload) {
+
+  payload = payload || {};
+
+  if (
+    Object.prototype.hasOwnProperty.call(payload, "scoreMode")
+  ) {
+    const allowedScoreModes = {
+      "correct-pick": true,
+      "fixed-points": true,
+      "confidence-points": true,
+      "staked-points": true,
+      "wager": true,
+      "ranking": true
+    };
+
+    const normalizedScoreMode =
+      adminCatNormalizeScoreMode_(payload.scoreMode);
+
+    if (!allowedScoreModes[normalizedScoreMode]) {
+      throw new Error(
+        "Score Mode must be Fixed Points, Confidence Points, Staked Points, Sports Wager, or Ranking."
+      );
+    }
+  }
+
+  if (
+    Object.prototype.hasOwnProperty.call(
+      payload,
+      "sourceConfigJSON"
+    ) &&
+    adminCatNormalizeValue_(payload.sourceConfigJSON)
+  ) {
+    try {
+      JSON.parse(payload.sourceConfigJSON);
+    } catch (err) {
+      throw new Error(
+        "SourceConfigJSON must be valid JSON."
+      );
+    }
+  }
+
+  function optionalFiniteNumber_(key, label) {
+
+    const raw = payload[key];
+
+    if (
+      raw === "" ||
+      raw === null ||
+      raw === undefined
+    ) {
+      return null;
+    }
+
+    const value = Number(raw);
+
+    if (!isFinite(value)) {
+      throw new Error(
+        label + " must be a valid number."
+      );
+    }
+
+    return value;
+
+  }
+
+  function optionalWholeNumber_(key, label) {
+
+    const value =
+      optionalFiniteNumber_(key, label);
+
+    if (value === null) {
+      return null;
+    }
+
+    if (Math.floor(value) !== value) {
+      throw new Error(
+        label + " must be a whole number."
+      );
+    }
+
+    return value;
+
+  }
+
+  const minStake =
+    optionalWholeNumber_(
+      "minStake",
+      "Category minimum stake"
+    );
+
+  const maxStake =
+    optionalWholeNumber_(
+      "maxStake",
+      "Category maximum stake"
+    );
+
+  const stakeIncrement =
+    optionalWholeNumber_(
+      "stakeIncrement",
+      "Category stake increment"
+    );
+
+  [
+    [minStake, "Category minimum stake"],
+    [maxStake, "Category maximum stake"],
+    [stakeIncrement, "Category stake increment"]
+  ].forEach(function(item) {
+
+    if (item[0] !== null && item[0] < 0) {
+      throw new Error(
+        item[1] + " cannot be negative."
+      );
+    }
+
+  });
+
+  if (
+    minStake !== null &&
+    minStake > 0 &&
+    maxStake !== null &&
+    maxStake > 0 &&
+    maxStake < minStake
+  ) {
+    throw new Error(
+      "Category maximum stake must be at least the minimum stake."
+    );
+  }
+
+  if (
+    minStake !== null &&
+    minStake > 0 &&
+    maxStake !== null &&
+    maxStake > 0 &&
+    stakeIncrement !== null &&
+    stakeIncrement > 0 &&
+    (maxStake - minStake) % stakeIncrement !== 0
+  ) {
+    throw new Error(
+      "Category maximum stake must align with its minimum stake and increment."
+    );
+  }
+
+  [
+    ["stakeWinMultiplier", "Stake win multiplier"],
+    ["stakeLossMultiplier", "Stake loss multiplier"]
+  ].forEach(function(item) {
+
+    const value =
+      optionalFiniteNumber_(item[0], item[1]);
+
+    if (value !== null && value < 0) {
+      throw new Error(
+        item[1] + " cannot be negative."
+      );
+    }
+
+  });
+
+  optionalFiniteNumber_(
+    "threshold",
+    "Result threshold"
+  );
+
+}
+
 /* =========================================================
    CATEGORY SETTINGS HELPERS
 ========================================================= */
@@ -105,9 +342,11 @@ function adminCatFindSettingsRow_(
   ) {
 
     const rowGameId =
-      adminCatNormalizeGameId_(
-        data[i][col.gameId]
-      );
+      col.gameId !== -1
+        ? adminCatNormalizeGameId_(
+            data[i][col.gameId]
+          )
+        : "";
 
     const rowCategoryId =
       adminCatNormalizeId_(
@@ -115,7 +354,10 @@ function adminCatFindSettingsRow_(
       );
 
     if (
-      rowGameId === gameId &&
+      (
+        col.gameId === -1 ||
+        rowGameId === gameId
+      ) &&
       rowCategoryId === categoryId
     ) {
 
@@ -287,6 +529,95 @@ function adminCatBuildSettingsRow_(
     )
   );
 
+  [
+    "questionType",
+    "scoringEngine",
+    "selectionMode",
+    "oddsMode",
+    "resultSource",
+    "settlementStatus",
+    "sportsGameId",
+    "espnEventId",
+    "sportsMarket",
+    "sportsLeague",
+    "wagerResultType",
+    "resultSourceType",
+    "resultProvider",
+    "externalEventId",
+    "externalMarketId",
+    "externalSubjectId",
+    "statKey",
+    "comparisonOperator",
+    "sourceUrl",
+    "sourceConfigJSON"
+  ].forEach(function(key) {
+    adminCatSetIfColumnExists_(
+      row,
+      col,
+      key,
+      adminCatNormalizeValue_(
+        payload[key]
+      )
+    );
+  });
+
+  adminCatSetIfColumnExists_(
+    row,
+    col,
+    "scoreMode",
+    adminCatNormalizeScoreMode_(
+      payload.scoreMode
+    )
+  );
+
+  [
+    "maxSelections",
+    "minSelections",
+    "minStake",
+    "maxStake",
+    "stakeIncrement",
+    "stakeWinMultiplier",
+    "stakeLossMultiplier",
+    "threshold"
+  ].forEach(function(key) {
+    adminCatSetIfColumnExists_(
+      row,
+      col,
+      key,
+      payload[key] === "" ||
+      payload[key] === null ||
+      payload[key] === undefined
+        ? ""
+        : Number(payload[key])
+    );
+  });
+
+  [
+    "allowDraw",
+    "allowPush",
+    "autoSettle"
+  ].forEach(function(key) {
+    adminCatSetIfColumnExists_(
+      row,
+      col,
+      key,
+      adminCatToBoolean_(
+        payload[key]
+      )
+    );
+  });
+
+  adminCatSetIfColumnExists_(
+    row,
+    col,
+    "requireAdminReview",
+    payload.requireAdminReview === undefined
+      ? true
+      : adminCatToBoolean_(
+          payload.requireAdminReview
+        )
+  );
+
   return row;
 
 }
@@ -294,6 +625,10 @@ function adminCatBuildSettingsRow_(
 function adminCatUpsertCategorySettings_(
   payload
 ) {
+
+  adminCatValidateQuestionSettingsPayload_(payload);
+
+  adminCatEnsureHybridHeaders_();
 
   const sh =
     getCategorySettingsSheet_();
@@ -369,7 +704,40 @@ function adminCatUpsertCategorySettings_(
     "shortName",
     "countsAsStatue",
     "scoreVersion",
-    "favoriteNomineeId"
+    "favoriteNomineeId",
+    "questionType",
+    "scoringEngine",
+    "selectionMode",
+    "scoreMode",
+    "oddsMode",
+    "resultSource",
+    "settlementStatus",
+    "maxSelections",
+    "minSelections",
+    "allowDraw",
+    "allowPush",
+    "sportsGameId",
+    "espnEventId",
+    "sportsMarket",
+    "sportsLeague",
+    "wagerResultType",
+    "minStake",
+    "maxStake",
+    "stakeIncrement",
+    "stakeWinMultiplier",
+    "stakeLossMultiplier",
+    "resultSourceType",
+    "resultProvider",
+    "externalEventId",
+    "externalMarketId",
+    "externalSubjectId",
+    "statKey",
+    "comparisonOperator",
+    "threshold",
+    "autoSettle",
+    "requireAdminReview",
+    "sourceUrl",
+    "sourceConfigJSON"
   ];
 
     keys.forEach(key => {
@@ -397,19 +765,48 @@ function adminCatUpsertCategorySettings_(
       key === "points" ||
       key === "changePenalty" ||
       key === "maxChanges" ||
-      key === "displayOrder"
+      key === "displayOrder" ||
+      key === "maxSelections" ||
+      key === "minSelections" ||
+      key === "minStake" ||
+      key === "maxStake" ||
+      key === "stakeIncrement" ||
+      key === "stakeWinMultiplier" ||
+      key === "stakeLossMultiplier" ||
+      key === "threshold"
     ) {
 
       row[col[key]] =
-        Number(payload[key]) || 0;
+        (
+          key === "stakeWinMultiplier" ||
+          key === "stakeLossMultiplier" ||
+          key === "threshold"
+        ) &&
+        (
+          payload[key] === "" ||
+          payload[key] === null
+        )
+          ? ""
+          : Number(payload[key]) || 0;
 
     } else if (
       key === "locked" ||
-      key === "countsAsStatue"
+      key === "countsAsStatue" ||
+      key === "allowDraw" ||
+      key === "allowPush" ||
+      key === "autoSettle" ||
+      key === "requireAdminReview"
     ) {
 
       row[col[key]] =
         adminCatToBoolean_(
+          payload[key]
+        );
+
+    } else if (key === "scoreMode") {
+
+      row[col[key]] =
+        adminCatNormalizeScoreMode_(
           payload[key]
         );
 
@@ -831,6 +1228,8 @@ function adminCatBuildNomineeRow_(
 
 function adminGetGameSetup(payload) {
 
+  adminCatEnsureHybridHeaders_();
+
   const gameId =
     adminCatNormalizeGameId_(
       payload && payload.gameId
@@ -1060,18 +1459,30 @@ function adminGetGameSetup(payload) {
       settingsData[i];
 
     const rowGameId =
-      adminCatNormalizeGameId_(
-        row[settingsCol.gameId]
-      );
-
-    if (rowGameId !== gameId) {
-      continue;
-    }
+      settingsCol.gameId !== -1
+        ? adminCatNormalizeGameId_(
+            row[settingsCol.gameId]
+          )
+        : "";
 
     const categoryId =
       adminCatNormalizeId_(
         row[settingsCol.categoryId]
       );
+
+    if (
+      settingsCol.gameId !== -1 &&
+      rowGameId !== gameId
+    ) {
+      continue;
+    }
+
+    if (
+      settingsCol.gameId === -1 &&
+      !map[categoryId]
+    ) {
+      continue;
+    }
 
     if (!categoryId) {
       continue;
@@ -1214,6 +1625,135 @@ function adminGetGameSetup(payload) {
           ? adminCatNormalizeId_(
               row[settingsCol.favoriteNomineeId]
             )
+          : "",
+
+      questionType:
+        settingsCol.questionType !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.questionType])
+          : "award-single-winner",
+
+      scoringEngine:
+        settingsCol.scoringEngine !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.scoringEngine])
+          : "manual",
+
+      selectionMode:
+        settingsCol.selectionMode !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.selectionMode])
+          : "single",
+
+      scoreMode:
+        settingsCol.scoreMode !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.scoreMode])
+          : "correct-pick",
+
+      oddsMode:
+        settingsCol.oddsMode !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.oddsMode])
+          : "none",
+
+      resultSource:
+        settingsCol.resultSource !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.resultSource])
+          : "manual",
+
+      settlementStatus:
+        settingsCol.settlementStatus !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.settlementStatus])
+          : "pending",
+
+      minStake:
+        settingsCol.minStake !== -1
+          ? Number(row[settingsCol.minStake]) || 0
+          : 0,
+
+      maxStake:
+        settingsCol.maxStake !== -1
+          ? Number(row[settingsCol.maxStake]) || 0
+          : 0,
+
+      stakeIncrement:
+        settingsCol.stakeIncrement !== -1
+          ? Number(row[settingsCol.stakeIncrement]) || 0
+          : 0,
+
+      stakeWinMultiplier:
+        settingsCol.stakeWinMultiplier !== -1 &&
+        row[settingsCol.stakeWinMultiplier] !== "" &&
+        row[settingsCol.stakeWinMultiplier] !== null &&
+        row[settingsCol.stakeWinMultiplier] !== undefined
+          ? Number(row[settingsCol.stakeWinMultiplier])
+          : "",
+
+      stakeLossMultiplier:
+        settingsCol.stakeLossMultiplier !== -1 &&
+        row[settingsCol.stakeLossMultiplier] !== "" &&
+        row[settingsCol.stakeLossMultiplier] !== null &&
+        row[settingsCol.stakeLossMultiplier] !== undefined
+          ? Number(row[settingsCol.stakeLossMultiplier])
+          : "",
+
+      resultSourceType:
+        settingsCol.resultSourceType !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.resultSourceType])
+          : "",
+
+      resultProvider:
+        settingsCol.resultProvider !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.resultProvider])
+          : "",
+
+      externalEventId:
+        settingsCol.externalEventId !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.externalEventId])
+          : "",
+
+      externalMarketId:
+        settingsCol.externalMarketId !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.externalMarketId])
+          : "",
+
+      externalSubjectId:
+        settingsCol.externalSubjectId !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.externalSubjectId])
+          : "",
+
+      statKey:
+        settingsCol.statKey !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.statKey])
+          : "",
+
+      comparisonOperator:
+        settingsCol.comparisonOperator !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.comparisonOperator])
+          : "",
+
+      threshold:
+        settingsCol.threshold !== -1 &&
+        row[settingsCol.threshold] !== "" &&
+        row[settingsCol.threshold] !== null &&
+        row[settingsCol.threshold] !== undefined
+          ? Number(row[settingsCol.threshold])
+          : "",
+
+      autoSettle:
+        settingsCol.autoSettle !== -1
+          ? adminCatToBoolean_(row[settingsCol.autoSettle])
+          : false,
+
+      requireAdminReview:
+        settingsCol.requireAdminReview !== -1
+          ? adminCatToBoolean_(row[settingsCol.requireAdminReview])
+          : true,
+
+      sourceUrl:
+        settingsCol.sourceUrl !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.sourceUrl])
+          : "",
+
+      sourceConfigJSON:
+        settingsCol.sourceConfigJSON !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.sourceConfigJSON])
           : ""
     };
 
@@ -1446,7 +1986,110 @@ function adminCreateCategory(payload) {
         payload.scoreVersion || "",
 
       favoriteNomineeId:
-        ""
+        "",
+
+      questionType:
+        payload.questionType || "award-single-winner",
+
+      scoringEngine:
+        payload.scoringEngine || "manual",
+
+      selectionMode:
+        payload.selectionMode || "single",
+
+      scoreMode:
+        adminCatNormalizeScoreMode_(
+          payload.scoreMode || "fixed-points"
+        ),
+
+      oddsMode:
+        payload.oddsMode || "none",
+
+      resultSource:
+        payload.resultSource || "manual",
+
+      settlementStatus:
+        payload.settlementStatus || "pending",
+
+      maxSelections:
+        payload.maxSelections || 1,
+
+      minSelections:
+        payload.minSelections || 1,
+
+      allowDraw:
+        adminCatToBoolean_(payload.allowDraw),
+
+      allowPush:
+        adminCatToBoolean_(payload.allowPush),
+
+      sportsGameId:
+        payload.sportsGameId || "",
+
+      espnEventId:
+        payload.espnEventId || "",
+
+      sportsMarket:
+        payload.sportsMarket || "",
+
+      sportsLeague:
+        payload.sportsLeague || "",
+
+      wagerResultType:
+        payload.wagerResultType || "",
+
+      minStake:
+        payload.minStake === undefined ? 0 : payload.minStake,
+
+      maxStake:
+        payload.maxStake === undefined ? 0 : payload.maxStake,
+
+      stakeIncrement:
+        payload.stakeIncrement === undefined ? 0 : payload.stakeIncrement,
+
+      stakeWinMultiplier:
+        payload.stakeWinMultiplier === undefined ? "" : payload.stakeWinMultiplier,
+
+      stakeLossMultiplier:
+        payload.stakeLossMultiplier === undefined ? "" : payload.stakeLossMultiplier,
+
+      resultSourceType:
+        payload.resultSourceType || "manual",
+
+      resultProvider:
+        payload.resultProvider || "",
+
+      externalEventId:
+        payload.externalEventId || "",
+
+      externalMarketId:
+        payload.externalMarketId || "",
+
+      externalSubjectId:
+        payload.externalSubjectId || "",
+
+      statKey:
+        payload.statKey || "",
+
+      comparisonOperator:
+        payload.comparisonOperator || "",
+
+      threshold:
+        payload.threshold === undefined ? "" : payload.threshold,
+
+      autoSettle:
+        adminCatToBoolean_(payload.autoSettle),
+
+      requireAdminReview:
+        payload.requireAdminReview === undefined
+          ? true
+          : adminCatToBoolean_(payload.requireAdminReview),
+
+      sourceUrl:
+        payload.sourceUrl || "",
+
+      sourceConfigJSON:
+        payload.sourceConfigJSON || ""
     });
 
     SpreadsheetApp.flush();
@@ -1758,9 +2401,245 @@ function adminUpdateCategory(payload) {
       favoriteNomineeId:
         "favoriteNomineeId" in payload
           ? payload.favoriteNomineeId
+          : undefined,
+
+      questionType:
+        "questionType" in payload
+          ? payload.questionType
+          : undefined,
+
+      scoringEngine:
+        "scoringEngine" in payload
+          ? payload.scoringEngine
+          : undefined,
+
+      selectionMode:
+        "selectionMode" in payload
+          ? payload.selectionMode
+          : undefined,
+
+      scoreMode:
+        "scoreMode" in payload
+          ? adminCatNormalizeScoreMode_(payload.scoreMode)
+          : undefined,
+
+      oddsMode:
+        "oddsMode" in payload
+          ? payload.oddsMode
+          : undefined,
+
+      resultSource:
+        "resultSource" in payload
+          ? payload.resultSource
+          : undefined,
+
+      settlementStatus:
+        "settlementStatus" in payload
+          ? payload.settlementStatus
+          : undefined,
+
+      maxSelections:
+        "maxSelections" in payload
+          ? payload.maxSelections
+          : undefined,
+
+      minSelections:
+        "minSelections" in payload
+          ? payload.minSelections
+          : undefined,
+
+      allowDraw:
+        "allowDraw" in payload
+          ? payload.allowDraw
+          : undefined,
+
+      allowPush:
+        "allowPush" in payload
+          ? payload.allowPush
+          : undefined,
+
+      sportsGameId:
+        "sportsGameId" in payload
+          ? payload.sportsGameId
+          : undefined,
+
+      espnEventId:
+        "espnEventId" in payload
+          ? payload.espnEventId
+          : undefined,
+
+      sportsMarket:
+        "sportsMarket" in payload
+          ? payload.sportsMarket
+          : undefined,
+
+      sportsLeague:
+        "sportsLeague" in payload
+          ? payload.sportsLeague
+          : undefined,
+
+      wagerResultType:
+        "wagerResultType" in payload
+          ? payload.wagerResultType
+          : undefined,
+
+      minStake:
+        "minStake" in payload
+          ? payload.minStake
+          : undefined,
+
+      maxStake:
+        "maxStake" in payload
+          ? payload.maxStake
+          : undefined,
+
+      stakeIncrement:
+        "stakeIncrement" in payload
+          ? payload.stakeIncrement
+          : undefined,
+
+      stakeWinMultiplier:
+        "stakeWinMultiplier" in payload
+          ? payload.stakeWinMultiplier
+          : undefined,
+
+      stakeLossMultiplier:
+        "stakeLossMultiplier" in payload
+          ? payload.stakeLossMultiplier
+          : undefined,
+
+      resultSourceType:
+        "resultSourceType" in payload
+          ? payload.resultSourceType
+          : undefined,
+
+      resultProvider:
+        "resultProvider" in payload
+          ? payload.resultProvider
+          : undefined,
+
+      externalEventId:
+        "externalEventId" in payload
+          ? payload.externalEventId
+          : undefined,
+
+      externalMarketId:
+        "externalMarketId" in payload
+          ? payload.externalMarketId
+          : undefined,
+
+      externalSubjectId:
+        "externalSubjectId" in payload
+          ? payload.externalSubjectId
+          : undefined,
+
+      statKey:
+        "statKey" in payload
+          ? payload.statKey
+          : undefined,
+
+      comparisonOperator:
+        "comparisonOperator" in payload
+          ? payload.comparisonOperator
+          : undefined,
+
+      threshold:
+        "threshold" in payload
+          ? payload.threshold
+          : undefined,
+
+      autoSettle:
+        "autoSettle" in payload
+          ? payload.autoSettle
+          : undefined,
+
+      requireAdminReview:
+        "requireAdminReview" in payload
+          ? payload.requireAdminReview
+          : undefined,
+
+      sourceUrl:
+        "sourceUrl" in payload
+          ? payload.sourceUrl
+          : undefined,
+
+      sourceConfigJSON:
+        "sourceConfigJSON" in payload
+          ? payload.sourceConfigJSON
           : undefined
     });
     
+    if (
+      (
+        "settlementStatus" in payload ||
+        "winnerNomineeId" in payload
+      ) &&
+      typeof upsertCategoryResult_ === "function"
+    ) {
+
+      const normalizedSettlementStatus =
+        adminCatNormalizeValue_(
+          payload.settlementStatus || ""
+        ).toLowerCase();
+
+      const normalizedWinnerNomineeId =
+        adminCatNormalizeId_(
+          payload.winnerNomineeId
+        );
+
+      let categoryResultStatus =
+        normalizedSettlementStatus;
+
+      if (!categoryResultStatus) {
+        categoryResultStatus =
+          normalizedWinnerNomineeId
+            ? "settled"
+            : "pending";
+      }
+
+      const isNonWinnerResolution =
+        categoryResultStatus === "push" ||
+        categoryResultStatus === "pushed" ||
+        categoryResultStatus === "void" ||
+        categoryResultStatus === "cancelled" ||
+        categoryResultStatus === "canceled" ||
+        categoryResultStatus === "pending" ||
+        categoryResultStatus === "open" ||
+        categoryResultStatus === "cleared" ||
+        categoryResultStatus === "unsettled";
+
+      if (
+        normalizedWinnerNomineeId ||
+        isNonWinnerResolution
+      ) {
+        upsertCategoryResult_({
+          gameId:
+            gameId,
+          categoryId:
+            categoryId,
+          nomineeId:
+            isNonWinnerResolution
+              ? ""
+              : normalizedWinnerNomineeId,
+          resultStatus:
+            categoryResultStatus,
+          isWinner:
+            !isNonWinnerResolution &&
+            !!normalizedWinnerNomineeId,
+          resultValue:
+            categoryResultStatus,
+          resultSource:
+            payload.resultSource ||
+            payload.resultProvider ||
+            "manual-admin",
+          notes:
+            payload.notes ||
+            "Result saved from Manage Games panel"
+        });
+      }
+
+    }
+
         if (
       "winnerNomineeId" in payload &&
       payload.winnerNomineeId !== undefined &&

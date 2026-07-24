@@ -293,12 +293,59 @@ function getScoringAutomationGameState_(gameId) {
   const totalCategories =
     categories.length;
 
+  const settings =
+    typeof getCategorySettings === "function"
+      ? getCategorySettings(gameId)
+      : {};
+
+  const categoryResolutions =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : {};
+
   const resolvedCount =
-    categories.filter(category =>
-      normalizeScoringAutomationId_(
-        category.winnerNomineeId
-      ) !== ""
-    ).length;
+    categories.filter(function(category) {
+
+      const categoryId =
+        normalizeScoringAutomationId_(
+          category.id ||
+          category.categoryId ||
+          ""
+        );
+
+      const config =
+        settings[categoryId] ||
+        category ||
+        {};
+
+      if (
+        typeof getHybridCategoryResolution_ === "function"
+      ) {
+        return getHybridCategoryResolution_(
+          categoryId,
+          config,
+          categoryResolutions
+        ).resolved === true;
+      }
+
+      const mappedResolution =
+        categoryResolutions[categoryId];
+
+      if (
+        mappedResolution &&
+        typeof mappedResolution === "object" &&
+        mappedResolution.resolved === true
+      ) {
+        return true;
+      }
+
+      return normalizeScoringAutomationId_(
+        config.winnerNomineeId ||
+        category.winnerNomineeId ||
+        ""
+      ) !== "";
+
+    }).length;
 
   const unresolvedCount =
     totalCategories - resolvedCount;

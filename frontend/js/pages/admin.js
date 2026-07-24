@@ -222,9 +222,49 @@ async function renderAdminPage() {
                   </label>
 
                   <label class="admin-field">
-                    <span>Winner</span>
+                    <span>Result Status</span>
 
-                    <select id="winner-${cat.id}">
+                    <select
+                      id="result-status-${cat.id}"
+                      onchange="adminToggleCategoryResultStatus('${cat.id}')"
+                    >
+                      <option
+                        value="pending"
+                        ${cat.resultStatus === "pending" ? "selected" : ""}
+                      >
+                        Pending / Not Settled
+                      </option>
+
+                      <option
+                        value="winner"
+                        ${cat.resultStatus === "winner" ? "selected" : ""}
+                      >
+                        Final — Winner Selected
+                      </option>
+
+                      <option
+                        value="push"
+                        ${cat.resultStatus === "push" ? "selected" : ""}
+                      >
+                        Push — Return Stakes
+                      </option>
+
+                      <option
+                        value="cancelled"
+                        ${cat.resultStatus === "cancelled" ? "selected" : ""}
+                      >
+                        Cancelled / No Contest
+                      </option>
+                    </select>
+                  </label>
+
+                  <label class="admin-field">
+                    <span>Winner Nominee</span>
+
+                    <select
+                      id="winner-${cat.id}"
+                      ${cat.resultStatus === "winner" ? "" : "disabled"}
+                    >
                       <option value="">
                         No winner selected
                       </option>
@@ -271,7 +311,7 @@ async function renderAdminPage() {
                     class="admin-small-button danger"
                     onclick="adminClearWinner('${cat.id}')"
                   >
-                    Clear Winner
+                    Reset to Pending
                   </button>
 
                 </div>
@@ -509,7 +549,8 @@ async function renderAdminGamesPanel() {
 
             ${renderAdminGameForm(
               null,
-              gameTypes
+              gameTypes,
+              games
             )}
 
           </div>
@@ -548,7 +589,8 @@ async function renderAdminGamesPanel() {
               ${games.map(game =>
                 renderAdminGameForm(
                   game,
-                  gameTypes
+                  gameTypes,
+                  games
                 )
               ).join("")}
 
@@ -567,7 +609,8 @@ async function renderAdminGamesPanel() {
 
 function renderAdminGameForm(
   game,
-  gameTypes
+  gameTypes,
+  allGames
 ) {
 
   const isNew =
@@ -592,6 +635,24 @@ function renderAdminGameForm(
       maxWager: 100,
       allowBetRemoval: false,
       wagerEditMode: "editable_until_lock",
+      gameFormat: "standard",
+      gameRole: "standalone",
+      parentGameId: "",
+      includeInParent: true,
+      parentContributionMode: "add-points",
+      parentContributionWeight: 1,
+      parentBestCount: 0,
+      placementPointsJSON: "",
+      leaderboardScoreMode: "combined-net",
+      fixedPointsEnabled: true,
+      stakedPointsEnabled: false,
+      startingPoints: 1000,
+      minStake: 10,
+      maxStake: 100,
+      stakeIncrement: 10,
+      stakeWinMultiplier: 1,
+      stakeLossMultiplier: 1,
+      scoringEngine: "manual",
       themeColor: "",
       icon: "",
       sortOrder: 999,
@@ -608,6 +669,15 @@ function renderAdminGameForm(
       resultsFinalized: false,
       votingLocked: false
     };
+
+  const gameRole =
+    game.gameRole || "standalone";
+
+  const isMiniGame =
+    gameRole === "mini";
+
+  const isParentGame =
+    gameRole === "parent";
 
   const title =
     isNew
@@ -727,6 +797,172 @@ function renderAdminGameForm(
 
           </div>
 
+          <h4>Game Structure</h4>
+
+          <div class="form-grid">
+
+            <label>
+              Game Format
+
+              <select name="gameFormat">
+                <option
+                  value="standard"
+                  ${(game.gameFormat || game.scoringMode || "standard") === "hybrid" ? "" : "selected"}
+                >
+                  Standard
+                </option>
+
+                <option
+                  value="hybrid"
+                  ${(game.gameFormat || game.scoringMode || "") === "hybrid" || (game.gameFormat || game.scoringMode || "") === "mixed" ? "selected" : ""}
+                >
+                  Hybrid — multiple scoring modes
+                </option>
+              </select>
+            </label>
+
+            <label>
+              Game Role
+
+              <select
+                name="gameRole"
+                onchange="adminUpdateGameStructureFields(this.form)"
+              >
+                <option
+                  value="standalone"
+                  ${(game.gameRole || "standalone") === "standalone" ? "selected" : ""}
+                >
+                  Standalone Game
+                </option>
+
+                <option
+                  value="parent"
+                  ${(game.gameRole || "") === "parent" ? "selected" : ""}
+                >
+                  Parent / Full Season
+                </option>
+
+                <option
+                  value="mini"
+                  ${(game.gameRole || "") === "mini" ? "selected" : ""}
+                >
+                  Mini Game
+                </option>
+              </select>
+            </label>
+
+            <label>
+              Parent Game
+
+              <select name="parentGameId" ${isMiniGame ? "" : "disabled"}>
+                <option value="">No parent game</option>
+                ${renderParentGameOptions_(
+                  game.parentGameId || "",
+                  allGames || [],
+                  game.gameId || ""
+                )}
+              </select>
+            </label>
+
+            <label>
+              Mini-Game Contribution
+
+              <select name="parentContributionMode" ${isMiniGame ? "" : "disabled"}>
+                <option
+                  value="add-points"
+                  ${(game.parentContributionMode || "add-points") === "add-points" ? "selected" : ""}
+                >
+                  Add Net Points
+                </option>
+
+                <option
+                  value="weighted-points"
+                  ${(game.parentContributionMode || "") === "weighted-points" ? "selected" : ""}
+                >
+                  Weighted Points
+                </option>
+
+                <option
+                  value="placement-points"
+                  ${(game.parentContributionMode || "") === "placement-points" ? "selected" : ""}
+                >
+                  Placement Points
+                </option>
+
+              </select>
+            </label>
+
+            <label>
+              Contribution Weight
+
+              <input
+                name="parentContributionWeight"
+                type="number"
+                min="0"
+                step="0.1"
+                value="${escapeHtml_(game.parentContributionWeight === undefined ? 1 : game.parentContributionWeight)}"
+                ${isMiniGame ? "" : "disabled"}
+              />
+            </label>
+
+            <label>
+              Best N Mini Games
+
+              <input
+                name="parentBestCount"
+                type="number"
+                min="0"
+                step="1"
+                value="${escapeHtml_(game.parentBestCount || 0)}"
+                placeholder="0 = count all"
+                ${isParentGame ? "" : "disabled"}
+              />
+            </label>
+
+            <label class="admin-wide-field">
+              Placement Points JSON
+
+              <input
+                name="placementPointsJSON"
+                value="${escapeHtml_(game.placementPointsJSON || "")}"
+                placeholder="[10,8,6,5,4,3,2,1]"
+                ${isParentGame ? "" : "disabled"}
+              />
+            </label>
+
+            <label>
+              Default Scoring Engine
+
+              <select name="scoringEngine">
+                ${[
+                  ["manual", "Manual / Admin"],
+                  ["sports", "Sports Scores Engine"],
+                  ["internet", "External Results Hub"],
+                  ["racing", "Racing Engine"],
+                  ["mixed", "Mixed Sources"]
+                ].map(function(option) {
+                  return `
+                    <option
+                      value="${option[0]}"
+                      ${(game.scoringEngine || "manual") === option[0] ? "selected" : ""}
+                    >
+                      ${option[1]}
+                    </option>
+                  `;
+                }).join("")}
+              </select>
+            </label>
+
+          </div>
+
+          <div class="admin-checkbox-row">
+            ${renderAdminCheckbox_(
+              "includeInParent",
+              "Include Mini Game in Parent Standings",
+              game.includeInParent !== false
+            )}
+          </div>
+
           <div class="form-grid">
 
             <label>
@@ -839,6 +1075,132 @@ function renderAdminGameForm(
                 game.votingLocked
               )}
 
+            </div>
+
+            <h4>Prediction Scoring</h4>
+
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckbox_(
+                "fixedPointsEnabled",
+                "Fixed Points Enabled",
+                game.fixedPointsEnabled !== false
+              )}
+
+              ${renderAdminCheckbox_(
+                "stakedPointsEnabled",
+                "Staked Predictions Enabled",
+                game.stakedPointsEnabled === true
+              )}
+            </div>
+
+            <div class="form-grid">
+
+              <label>
+                Starting Stake Points
+
+                <input
+                  name="startingPoints"
+                  type="number"
+                  min="0"
+                  value="${escapeHtml_(game.startingPoints === undefined ? 1000 : game.startingPoints)}"
+                />
+              </label>
+
+              <label>
+                Minimum Stake
+
+                <input
+                  name="minStake"
+                  type="number"
+                  min="1"
+                  value="${escapeHtml_(game.minStake === undefined ? 10 : game.minStake)}"
+                />
+              </label>
+
+              <label>
+                Maximum Stake
+
+                <input
+                  name="maxStake"
+                  type="number"
+                  min="1"
+                  value="${escapeHtml_(game.maxStake === undefined ? 100 : game.maxStake)}"
+                />
+              </label>
+
+              <label>
+                Stake Increment
+
+                <input
+                  name="stakeIncrement"
+                  type="number"
+                  min="1"
+                  value="${escapeHtml_(game.stakeIncrement === undefined ? 10 : game.stakeIncrement)}"
+                />
+              </label>
+
+              <label>
+                Correct Pick Multiplier
+
+                <input
+                  name="stakeWinMultiplier"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="${escapeHtml_(game.stakeWinMultiplier === undefined ? 1 : game.stakeWinMultiplier)}"
+                />
+              </label>
+
+              <label>
+                Wrong Pick Loss Multiplier
+
+                <input
+                  name="stakeLossMultiplier"
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value="${escapeHtml_(game.stakeLossMultiplier === undefined ? 1 : game.stakeLossMultiplier)}"
+                />
+              </label>
+
+              <label>
+                Leaderboard Score
+
+                <select name="leaderboardScoreMode">
+                  <option
+                    value="combined-net"
+                    ${(game.leaderboardScoreMode || "combined-net") === "combined-net" ? "selected" : ""}
+                  >
+                    Fixed Points + Stake Net
+                  </option>
+
+                  <option
+                    value="fixed-only"
+                    ${(game.leaderboardScoreMode || "") === "fixed-only" ? "selected" : ""}
+                  >
+                    Fixed Points Only
+                  </option>
+
+                  <option
+                    value="staked-balance"
+                    ${(game.leaderboardScoreMode || "") === "staked-balance" ? "selected" : ""}
+                  >
+                    Stake Balance
+                  </option>
+
+                  <option
+                    value="separate"
+                    ${(game.leaderboardScoreMode || "") === "separate" ? "selected" : ""}
+                  >
+                    Display Separately
+                  </option>
+                </select>
+              </label>
+
+            </div>
+
+            <div class="admin-sub">
+              A correct staked prediction adds the selected stake multiplied by the win multiplier. A wrong prediction subtracts the stake multiplied by the loss multiplier. Pending stakes are reserved and cannot be reused.
             </div>
 
             <h4>Wager Settings</h4>
@@ -1121,6 +1483,71 @@ function renderAdminGameForm(
 
 }
 
+function renderParentGameOptions_(
+  selectedParentGameId,
+  games,
+  currentGameId
+) {
+
+  return (games || [])
+    .filter(function(candidate) {
+      return (
+        candidate &&
+        candidate.gameId &&
+        candidate.gameId !== currentGameId &&
+        (
+          candidate.gameRole === "parent"
+        )
+      );
+    })
+    .map(function(candidate) {
+      return `
+        <option
+          value="${escapeHtml_(candidate.gameId)}"
+          ${candidate.gameId === selectedParentGameId ? "selected" : ""}
+        >
+          ${escapeHtml_(candidate.name || candidate.gameId)}
+        </option>
+      `;
+    })
+    .join("");
+
+}
+
+function adminUpdateGameStructureFields(form) {
+
+  if (!form || !form.gameRole) {
+    return;
+  }
+
+  const isMini =
+    form.gameRole.value === "mini";
+
+  const isParent =
+    form.gameRole.value === "parent";
+
+  [
+    "parentGameId",
+    "includeInParent",
+    "parentContributionMode",
+    "parentContributionWeight"
+  ].forEach(function(fieldName) {
+    if (form[fieldName]) {
+      form[fieldName].disabled = !isMini;
+    }
+  });
+
+  [
+    "parentBestCount",
+    "placementPointsJSON"
+  ].forEach(function(fieldName) {
+    if (form[fieldName]) {
+      form[fieldName].disabled = !isParent;
+    }
+  });
+
+}
+
 function renderGameTypeOptions_(
   selectedType,
   gameTypes
@@ -1312,6 +1739,45 @@ async function adminSaveGameFromForm(
     return;
   }
 
+  if (game.gameRole === "mini" && !game.parentGameId) {
+    alert("Choose a parent game for this mini game.");
+    return;
+  }
+
+  const minStake = Number(game.minStake) || 0;
+  const maxStake = Number(game.maxStake) || 0;
+  const stakeIncrement = Number(game.stakeIncrement) || 0;
+
+  if (game.stakedPointsEnabled) {
+    if (minStake < 1 || maxStake < minStake) {
+      alert("Staked prediction limits are invalid. Maximum stake must be at least the minimum stake.");
+      return;
+    }
+
+    if (stakeIncrement < 1) {
+      alert("Stake increment must be at least 1 point.");
+      return;
+    }
+
+    if ((maxStake - minStake) % stakeIncrement !== 0) {
+      alert("Maximum stake must align with the minimum stake and stake increment.");
+      return;
+    }
+  }
+
+  if (game.placementPointsJSON) {
+    try {
+      const placementPoints = JSON.parse(game.placementPointsJSON);
+
+      if (!Array.isArray(placementPoints) && (!placementPoints || typeof placementPoints !== "object")) {
+        throw new Error("Placement points must be an array or object");
+      }
+    } catch (err) {
+      alert("Placement Points JSON is not valid JSON.");
+      return;
+    }
+  }
+
   const saveKey =
     "legacy-admin-game-save:" + game.gameId;
 
@@ -1448,6 +1914,106 @@ function adminGetGamePayloadFromForm_(
       form.wagerEditMode
         ? form.wagerEditMode.value
         : "editable_until_lock",
+
+    gameFormat:
+      form.gameFormat
+        ? form.gameFormat.value
+        : "standard",
+
+    scoringMode:
+      form.gameFormat
+        ? form.gameFormat.value
+        : "standard",
+
+    mixedGame:
+      form.gameFormat
+        ? form.gameFormat.value === "hybrid"
+        : false,
+
+    scoringEngine:
+      form.scoringEngine
+        ? form.scoringEngine.value
+        : "manual",
+
+    gameRole:
+      form.gameRole
+        ? form.gameRole.value
+        : "standalone",
+
+    parentGameId:
+      form.parentGameId
+        ? form.parentGameId.value
+        : "",
+
+    includeInParent:
+      form.includeInParent
+        ? form.includeInParent.checked
+        : true,
+
+    parentContributionMode:
+      form.parentContributionMode
+        ? form.parentContributionMode.value
+        : "add-points",
+
+    parentContributionWeight:
+      form.parentContributionWeight
+        ? form.parentContributionWeight.value
+        : 1,
+
+    parentBestCount:
+      form.parentBestCount
+        ? form.parentBestCount.value
+        : 0,
+
+    placementPointsJSON:
+      form.placementPointsJSON
+        ? form.placementPointsJSON.value.trim()
+        : "",
+
+    leaderboardScoreMode:
+      form.leaderboardScoreMode
+        ? form.leaderboardScoreMode.value
+        : "combined-net",
+
+    fixedPointsEnabled:
+      form.fixedPointsEnabled
+        ? form.fixedPointsEnabled.checked
+        : true,
+
+    stakedPointsEnabled:
+      form.stakedPointsEnabled
+        ? form.stakedPointsEnabled.checked
+        : false,
+
+    startingPoints:
+      form.startingPoints
+        ? form.startingPoints.value
+        : 1000,
+
+    minStake:
+      form.minStake
+        ? form.minStake.value
+        : 10,
+
+    maxStake:
+      form.maxStake
+        ? form.maxStake.value
+        : 100,
+
+    stakeIncrement:
+      form.stakeIncrement
+        ? form.stakeIncrement.value
+        : 10,
+
+    stakeWinMultiplier:
+      form.stakeWinMultiplier
+        ? form.stakeWinMultiplier.value
+        : 1,
+
+    stakeLossMultiplier:
+      form.stakeLossMultiplier
+        ? form.stakeLossMultiplier.value
+        : 1,
 
     themeColor:
       form.themeColor.value.trim(),
@@ -1586,6 +2152,23 @@ function adminApplyGameTypeDefaults(
 
   }
 
+  if (
+    type === "mixed" ||
+    type === "combo"
+  ) {
+
+    form.predictionEnabled.checked = true;
+    form.rankingEnabled.checked = true;
+    form.confidenceEnabled.checked =
+      type === "combo";
+    form.wagerEnabled.checked = true;
+
+    if (form.gameFormat) {
+      form.gameFormat.value = "hybrid";
+    }
+
+  }
+
 }
 
 async function adminClearCaches() {
@@ -1632,6 +2215,35 @@ async function adminSetupLiveResultsSystem() {
 
 }
 
+function adminToggleCategoryResultStatus(categoryId) {
+
+  const statusInput =
+    document.getElementById(
+      "result-status-" + categoryId
+    );
+
+  const winnerInput =
+    document.getElementById(
+      "winner-" + categoryId
+    );
+
+  if (!winnerInput) {
+    return;
+  }
+
+  const requiresWinner =
+    !!statusInput &&
+    statusInput.value === "winner";
+
+  winnerInput.disabled =
+    !requiresWinner;
+
+  if (!requiresWinner) {
+    winnerInput.value = "";
+  }
+
+}
+
 async function adminSaveCategory(categoryId) {
 
   const message =
@@ -1642,97 +2254,117 @@ async function adminSaveCategory(categoryId) {
       "points-" + categoryId
     );
 
+  const statusInput =
+    document.getElementById(
+      "result-status-" + categoryId
+    );
+
   const winnerInput =
     document.getElementById(
       "winner-" + categoryId
     );
 
-  if (message) {
-    message.innerText =
-      "Saving category...";
-  }
+  const selectedResultStatus =
+    statusInput
+      ? String(statusInput.value || "pending")
+          .trim()
+          .toLowerCase()
+      : "pending";
 
-  let pointsRes = {
-    success: true
-  };
+  const winnerNomineeId =
+    selectedResultStatus === "winner" &&
+    winnerInput
+      ? String(winnerInput.value || "")
+          .trim()
+      : "";
 
-  if (pointsInput) {
-
-    pointsRes =
-      await apiAdminUpdateCategorySetting(
-        categoryId,
-        {
-          points:
-            pointsInput.value
-        }
-      );
-
-  }
-
-  if (!pointsRes.success) {
+  if (
+    selectedResultStatus === "winner" &&
+    !winnerNomineeId
+  ) {
 
     if (message) {
       message.innerText =
-        pointsRes.error ||
-        pointsRes.message ||
-        "Unable to save points.";
+        "Select the winning nominee before saving a final result.";
     }
 
     return;
 
   }
 
-  const winnerNomineeId =
-    winnerInput
-      ? String(winnerInput.value || "")
-          .trim()
-      : "";
+  if (message) {
+    message.innerText =
+      "Saving category result...";
+  }
 
-  let winnerRes = {
-    success: true
-  };
+  const settlementStatus =
+    selectedResultStatus === "winner"
+      ? "settled"
+      : selectedResultStatus;
 
-  if (winnerNomineeId) {
+  const res =
+    await apiAdminUpdateCategory({
+      gameId:
+        APP_STATE.gameId || "",
 
-    winnerRes =
-      await apiAdminUpdateCategorySetting(
+      categoryId:
         categoryId,
-        {
-          winnerNomineeId:
-            winnerNomineeId,
 
-          notes:
-            "Winner selected from admin panel"
-        }
-      );
+      points:
+        pointsInput
+          ? pointsInput.value
+          : undefined,
+
+      winnerNomineeId:
+        winnerNomineeId,
+
+      settlementStatus:
+        settlementStatus,
+
+      wagerResultType:
+        selectedResultStatus === "push" ||
+        selectedResultStatus === "cancelled"
+          ? selectedResultStatus
+          : "",
+
+      notes:
+        "Result saved from main Category Controls: " +
+        selectedResultStatus
+    });
+
+  if (!res || res.success === false) {
+
+    if (message) {
+      message.innerText =
+        res && (res.error || res.message)
+          ? res.error || res.message
+          : "Unable to save category result.";
+    }
+
+    return;
 
   }
 
   if (message) {
 
-    if (!winnerRes.success) {
-
+    if (selectedResultStatus === "winner") {
       message.innerText =
-        winnerRes.error ||
-        winnerRes.message ||
-        "Unable to save winner.";
-
-    } else if (winnerNomineeId) {
-
+        "Category saved and winner finalized.";
+    } else if (selectedResultStatus === "push") {
       message.innerText =
-        "Category saved. Winner logged in ResultEvents.";
-
+        "Category saved as a push. Stakes will be returned.";
+    } else if (selectedResultStatus === "cancelled") {
+      message.innerText =
+        "Category cancelled. Stakes will be returned.";
     } else {
-
       message.innerText =
-        "Category saved. No winner change was made.";
-
+        "Category reset to pending.";
     }
 
   }
 
 }
-  
+
 async function adminToggleCategoryLock(categoryId, locked) {
 
   const message =
@@ -1762,12 +2394,12 @@ async function adminToggleCategoryLock(categoryId, locked) {
   }
 
 }
-  
+
 async function adminClearWinner(categoryId) {
 
   const confirmed =
     window.confirm(
-      "Clear winner for this category?"
+      "Reset this category result to Pending?"
     );
 
   if (!confirmed) {
@@ -1779,69 +2411,60 @@ async function adminClearWinner(categoryId) {
 
   if (message) {
     message.innerText =
-      "Clearing winner...";
+      "Resetting category to pending...";
   }
 
   const res =
-    await apiAdminClearLiveWinner(
-      categoryId
-    );
+    await apiAdminUpdateCategory({
+      gameId:
+        APP_STATE.gameId || "",
 
-  if (message) {
-    message.innerText =
-      res.success
-        ? "Winner cleared and leaderboard updated."
-        : res.error || res.message || "Unable to clear winner.";
-  }
+      categoryId:
+        categoryId,
 
-  if (res.success) {
-    await navigate("admin");
-  }
+      winnerNomineeId:
+        "",
 
-}
+      settlementStatus:
+        "pending",
 
-async function adminClearWinner(categoryId) {
+      wagerResultType:
+        "",
 
-  const confirmed =
-    window.confirm(
-      "Clear winner for this category?"
-    );
+      notes:
+        "Result reset to pending from main Category Controls"
+    });
 
-  if (!confirmed) {
-    return;
-  }
+  if (res && res.success !== false) {
 
-  const message =
-    document.getElementById("adminMessage");
-
-  if (message) {
-    message.innerText =
-      "Clearing winner...";
-  }
-
-  const res =
-    await apiAdminClearCategoryWinner(
-      categoryId
-    );
-
-  if (res.success) {
+    const statusInput =
+      document.getElementById(
+        "result-status-" + categoryId
+      );
 
     const winnerInput =
       document.getElementById(
         "winner-" + categoryId
       );
 
+    if (statusInput) {
+      statusInput.value = "pending";
+    }
+
     if (winnerInput) {
       winnerInput.value = "";
+      winnerInput.disabled = true;
     }
 
   }
 
   if (message) {
     message.innerText =
-      res.success
-        ? "Winner cleared and logged in ResultEvents."
-        : res.error || res.message || "Unable to clear winner.";
+      res && res.success !== false
+        ? "Category reset to pending."
+        : res && (res.error || res.message)
+          ? res.error || res.message
+          : "Unable to reset category.";
   }
 
 }

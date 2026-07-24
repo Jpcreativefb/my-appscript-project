@@ -515,19 +515,67 @@ function apiGetLiveGameState(payload) {
   const categories =
     getCategories(gameId);
 
+  const settings =
+    typeof getCategorySettings === "function"
+      ? getCategorySettings(gameId)
+      : {};
+
+  const categoryResolutions =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : {};
+
+  const isResolved =
+    function(category) {
+
+      const categoryId =
+        normalizeLiveResultsId_(
+          category.id ||
+          category.categoryId ||
+          ""
+        );
+
+      const config =
+        settings[categoryId] ||
+        category ||
+        {};
+
+      if (
+        typeof getHybridCategoryResolution_ === "function"
+      ) {
+        return getHybridCategoryResolution_(
+          categoryId,
+          config,
+          categoryResolutions
+        ).resolved === true;
+      }
+
+      const mappedResolution =
+        categoryResolutions[categoryId];
+
+      if (
+        mappedResolution &&
+        typeof mappedResolution === "object" &&
+        mappedResolution.resolved === true
+      ) {
+        return true;
+      }
+
+      return normalizeLiveResultsId_(
+        config.winnerNomineeId ||
+        category.winnerNomineeId ||
+        ""
+      ) !== "";
+
+    };
+
   const resolved =
-    categories.filter(category =>
-      normalizeLiveResultsId_(
-        category.winnerNomineeId
-      ) !== ""
-    );
+    categories.filter(isResolved);
 
   const unresolved =
-    categories.filter(category =>
-      normalizeLiveResultsId_(
-        category.winnerNomineeId
-      ) === ""
-    );
+    categories.filter(function(category) {
+      return !isResolved(category);
+    });
 
   return {
     success: true,
@@ -559,6 +607,16 @@ function apiGetLiveResults(payload) {
   const categories =
     getCategories(gameId);
 
+  const settings =
+    typeof getCategorySettings === "function"
+      ? getCategorySettings(gameId)
+      : {};
+
+  const categoryResolutions =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : {};
+
   const rows =
     categories.map(category => {
 
@@ -568,10 +626,47 @@ function apiGetLiveResults(payload) {
           category.categoryId
         );
 
+      const config =
+        settings[categoryId] ||
+        category ||
+        {};
+
+      const resolution =
+        typeof getHybridCategoryResolution_ === "function"
+          ? getHybridCategoryResolution_(
+              categoryId,
+              config,
+              categoryResolutions
+            )
+          : {
+              resolved:
+                normalizeLiveResultsId_(
+                  config.winnerNomineeId ||
+                  category.winnerNomineeId ||
+                  ""
+                ) !== "",
+              result:
+                normalizeLiveResultsId_(
+                  config.winnerNomineeId ||
+                  category.winnerNomineeId ||
+                  ""
+                ) !== ""
+                  ? "winner"
+                  : "pending",
+              winnerNomineeId:
+                normalizeLiveResultsId_(
+                  config.winnerNomineeId ||
+                  category.winnerNomineeId ||
+                  ""
+                )
+            };
+
       const winnerNomineeId =
-        normalizeLiveResultsId_(
-          category.winnerNomineeId
-        );
+        resolution.result === "winner"
+          ? normalizeLiveResultsId_(
+              resolution.winnerNomineeId
+            )
+          : "";
 
       return {
         gameId:
@@ -595,7 +690,11 @@ function apiGetLiveResults(payload) {
             winnerNomineeId
           ),
         resolved:
-          winnerNomineeId !== "",
+          resolution.resolved === true,
+        resultStatus:
+          resolution.result || "pending",
+        isPush:
+          resolution.result === "push",
         nominees:
           category.nominees || []
       };

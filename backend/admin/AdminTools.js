@@ -112,24 +112,63 @@ function apiAdminSummary(payload) {
 
       const categoryId =
         c.id || c.categoryId || "";
-    
+
       const setting =
         settings[categoryId] || {};
-    
+
+      const settlementStatus =
+        String(setting.settlementStatus || "")
+          .trim()
+          .toLowerCase();
+
+      const wagerResultType =
+        String(setting.wagerResultType || "")
+          .trim()
+          .toLowerCase();
+
+      let resultStatus = "pending";
+
+      if (
+        settlementStatus === "push" ||
+        settlementStatus === "pushed" ||
+        settlementStatus === "void" ||
+        settlementStatus === "refund" ||
+        wagerResultType === "push" ||
+        wagerResultType === "void" ||
+        wagerResultType === "refund"
+      ) {
+        resultStatus = "push";
+      } else if (
+        settlementStatus === "cancelled" ||
+        settlementStatus === "canceled" ||
+        settlementStatus === "no-contest" ||
+        settlementStatus === "no_contest" ||
+        wagerResultType === "cancelled" ||
+        wagerResultType === "canceled" ||
+        wagerResultType === "no-contest" ||
+        wagerResultType === "no_contest"
+      ) {
+        resultStatus = "cancelled";
+      } else if (
+        String(setting.winnerNomineeId || "").trim()
+      ) {
+        resultStatus = "winner";
+      }
+
       return {
         id: categoryId,
-    
+
         name:
           c.name ||
           c.category ||
           c.Category ||
           categoryId,
-    
+
         nomineesCount:
           c.nominees
             ? c.nominees.length
             : 0,
-    
+
         nominees:
           (c.nominees || []).map(n => ({
             id:
@@ -137,7 +176,7 @@ function apiAdminSummary(payload) {
               n.nomineeId ||
               n.NomineeId ||
               "",
-    
+
             name:
               n.name ||
               n.nominee ||
@@ -145,17 +184,26 @@ function apiAdminSummary(payload) {
               n.title ||
               ""
           })),
-    
+
         locked:
           setting.locked === true,
-    
+
         points:
           setting.points || 0,
-    
+
         winnerNomineeId:
-          setting.winnerNomineeId || ""
+          setting.winnerNomineeId || "",
+
+        settlementStatus:
+          settlementStatus,
+
+        wagerResultType:
+          wagerResultType,
+
+        resultStatus:
+          resultStatus
       };
-    
+
     })
   };
 

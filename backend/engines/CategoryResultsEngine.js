@@ -75,10 +75,14 @@ function categoryResultsLooksLikeHeaderRow_(row) {
 
 }
 
-function categoryResultsNormalizeHeaderRow_(sh, headers) {
+function categoryResultsNormalizeHeaderRow_(
+  sh,
+  headers,
+  strictCategoryResultsHeader
+) {
 
   const lastColumn =
-    Math.max(sh.getLastColumn(), headers.length, 1);
+    Math.max(sh.getLastColumn(), 1);
 
   let firstRow =
     sh.getLastRow() >= 1
@@ -91,6 +95,53 @@ function categoryResultsNormalizeHeaderRow_(sh, headers) {
     firstRow.some(function(value) {
       return categoryResultsString_(value) !== "";
     });
+
+  /*
+    Only CategoryResults uses the strict header repair that can move a
+    broken data row down. Games, Categories, CategorySettings, and Picks
+    already have their own valid header shapes and must never be judged by
+    the CategoryResults-specific GameId/CategoryId/NomineeId test.
+  */
+  if (strictCategoryResultsHeader !== true) {
+
+    if (!firstRowHasContent) {
+      sh
+        .getRange(1, 1, 1, headers.length)
+        .setValues([headers]);
+    }
+
+    const genericExisting =
+      sh
+        .getRange(
+          1,
+          1,
+          1,
+          Math.max(sh.getLastColumn(), 1)
+        )
+        .getValues()[0]
+        .map(function(header) {
+          return categoryResultsString_(header);
+        });
+
+    const genericMissing =
+      headers.filter(function(header) {
+        return genericExisting.indexOf(header) === -1;
+      });
+
+    if (genericMissing.length) {
+      sh
+        .getRange(
+          1,
+          genericExisting.length + 1,
+          1,
+          genericMissing.length
+        )
+        .setValues([genericMissing]);
+    }
+
+    return sh;
+
+  }
 
   if (!categoryResultsLooksLikeHeaderRow_(firstRow)) {
 
@@ -112,7 +163,7 @@ function categoryResultsNormalizeHeaderRow_(sh, headers) {
 
   let existing =
     sh
-      .getRange(1, 1, 1, Math.max(sh.getLastColumn(), headers.length, 1))
+      .getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
       .getValues()[0]
       .map(function(header) {
         return categoryResultsString_(header);
@@ -147,7 +198,8 @@ function categoryResultsGetOrCreateSheet_(sheetName, headers) {
 
   categoryResultsNormalizeHeaderRow_(
     sh,
-    headers
+    headers,
+    sheetName === CATEGORY_RESULTS_SHEET
   );
 
   return sh;
@@ -217,7 +269,9 @@ function setupCategoryResultsSystem() {
 
 }
 
-function setupUniversalQuestionSystem() {
+function setupUniversalQuestionSystem(payload) {
+
+  payload = payload || {};
 
   const games =
     categoryResultsEnsureColumns_(
@@ -228,7 +282,23 @@ function setupUniversalQuestionSystem() {
         "ScoringEngine",
         "RacingLeague",
         "RacingSeriesId",
-        "RacingMarket"
+        "RacingMarket",
+        "GameRole",
+        "ParentGameId",
+        "IncludeInParent",
+        "ParentContributionMode",
+        "ParentContributionWeight",
+        "ParentBestCount",
+        "PlacementPointsJSON",
+        "LeaderboardScoreMode",
+        "FixedPointsEnabled",
+        "StakedPointsEnabled",
+        "StartingPoints",
+        "MinStake",
+        "MaxStake",
+        "StakeIncrement",
+        "StakeWinMultiplier",
+        "StakeLossMultiplier"
       ]
     );
 
@@ -285,7 +355,32 @@ function setupUniversalQuestionSystem() {
         "OddsReady",
         "OddsSource",
         "OddsLastUpdated",
-        "VotingTypes"
+        "VotingTypes",
+        "MinStake",
+        "MaxStake",
+        "StakeIncrement",
+        "StakeWinMultiplier",
+        "StakeLossMultiplier",
+        "ResultSourceType",
+        "ResultProvider",
+        "ExternalEventId",
+        "ExternalMarketId",
+        "ExternalSubjectId",
+        "StatKey",
+        "ComparisonOperator",
+        "Threshold",
+        "AutoSettle",
+        "RequireAdminReview",
+        "SourceUrl",
+        "SourceConfigJSON"
+      ]
+    );
+
+  const picks =
+    categoryResultsEnsureColumns_(
+      PICKS_SHEET,
+      [
+        "StakePoints"
       ]
     );
 
@@ -305,6 +400,7 @@ function setupUniversalQuestionSystem() {
     games: games,
     categories: categories,
     categorySettings: settings,
+    picks: picks,
     categoryResults: categoryResults
   };
 
@@ -316,7 +412,7 @@ function apiAdminSetupUniversalQuestionSystem(payload) {
 
   requireAdmin_(payload);
 
-  return setupUniversalQuestionSystem();
+  return setupUniversalQuestionSystem(payload);
 
 }
 
@@ -407,29 +503,134 @@ function getCategoryResultsRows_(gameId) {
 
 }
 
-function getCategoryResultsWinnerMap(gameId) {
+function getCategoryResultsResolutionMap(gameId) {
 
   const rows =
     getCategoryResultsRows_(gameId);
 
   const map = {};
 
-  rows.forEach(function(row) {
+  function rowTime_(row, index) {
+
+    const value =
+      row.settledAt ||
+      row.timestamp ||
+      "";
+
+    const time =
+      value instanceof Date
+        ? value.getTime()
+        : new Date(value).getTime();
+
+    return isNaN(time)
+      ? index
+      : time;
+
+  }
+
+  const latestTimes = {};
+
+  rows.forEach(function(row, index) {
+
+    const categoryId =
+      categoryResultsKey_(row.categoryId);
+
+    if (!categoryId) {
+      return;
+    }
 
     const status =
       categoryResultsKey_(row.resultStatus);
 
+    const time =
+      rowTime_(row, index);
+
+    const latestTime =
+      latestTimes[categoryId];
+
+    if (
+      latestTime !== undefined &&
+      latestTime > time
+    ) {
+      return;
+    }
+
+    latestTimes[categoryId] = time;
+
+    if (
+      status === "pending" ||
+      status === "open" ||
+      status === "cleared" ||
+      status === "unsettled"
+    ) {
+      delete map[categoryId];
+      return;
+    }
+
+    if (
+      status === "push" ||
+      status === "pushed" ||
+      status === "void" ||
+      status === "cancelled" ||
+      status === "canceled"
+    ) {
+      map[categoryId] = {
+        resolved: true,
+        result: "push",
+        winnerNomineeId: "",
+        status: status,
+        _time: time
+      };
+      return;
+    }
+
     if (
       row.isWinner === true &&
-      row.categoryId &&
-      row.nomineeId &&
-      status !== "void" &&
-      status !== "push"
+      row.nomineeId
     ) {
-      map[row.categoryId] = row.nomineeId;
+      map[categoryId] = {
+        resolved: true,
+        result: "winner",
+        winnerNomineeId:
+          categoryResultsKey_(row.nomineeId),
+        status: status || "settled",
+        _time: time
+      };
     }
 
   });
+
+  Object.keys(map).forEach(function(categoryId) {
+    delete map[categoryId]._time;
+  });
+
+  return map;
+
+}
+
+function getCategoryResultsWinnerMap(gameId) {
+
+  const resolutions =
+    getCategoryResultsResolutionMap(gameId);
+
+  const map = {};
+
+  Object.keys(resolutions)
+    .forEach(function(categoryId) {
+
+      const resolution =
+        resolutions[categoryId];
+
+      if (
+        resolution &&
+        resolution.result === "winner" &&
+        resolution.winnerNomineeId
+      ) {
+        map[categoryId] =
+          resolution.winnerNomineeId;
+      }
+
+    });
 
   return map;
 
@@ -450,9 +651,29 @@ function upsertCategoryResult_(payload) {
   const nomineeId =
     categoryResultsKey_(payload.nomineeId);
 
-  if (!gameId || !categoryId || !nomineeId) {
+  const resultStatus =
+    categoryResultsKey_(
+      payload.resultStatus || "settled"
+    );
+
+  const allowsBlankNominee =
+    resultStatus === "push" ||
+    resultStatus === "pushed" ||
+    resultStatus === "void" ||
+    resultStatus === "cancelled" ||
+    resultStatus === "canceled" ||
+    resultStatus === "pending" ||
+    resultStatus === "open" ||
+    resultStatus === "cleared" ||
+    resultStatus === "unsettled";
+
+  if (
+    !gameId ||
+    !categoryId ||
+    (!nomineeId && !allowsBlankNominee)
+  ) {
     throw new Error(
-      "Category result requires gameId, categoryId, and nomineeId."
+      "Category result requires gameId, categoryId, and a nomineeId unless the result is pending, pushed, void, or cancelled."
     );
   }
 
@@ -519,7 +740,7 @@ function upsertCategoryResult_(payload) {
   set_("GameId", gameId);
   set_("CategoryId", categoryId);
   set_("NomineeId", nomineeId);
-  set_("ResultStatus", payload.resultStatus || "settled");
+  set_("ResultStatus", resultStatus || "settled");
   set_("IsWinner", payload.isWinner === true);
   set_("FinalRank", payload.finalRank || "");
   set_("FinalPosition", payload.finalPosition || "");

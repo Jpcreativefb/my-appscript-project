@@ -87,6 +87,245 @@ function adminSetupBoolText(value) {
   return value ? "Yes" : "No";
 }
 
+function adminSetupFieldId_(prefix, fieldName, suffix) {
+  return String(prefix || "") + String(fieldName || "") + String(suffix || "");
+}
+
+function adminSetupFieldValue_(id, fallbackValue) {
+  const element = document.getElementById(id);
+
+  if (!element) {
+    return fallbackValue == null ? "" : fallbackValue;
+  }
+
+  return String(element.value == null ? "" : element.value).trim();
+}
+
+function adminSetupFieldChecked_(id, fallbackValue) {
+  const element = document.getElementById(id);
+
+  return element ? Boolean(element.checked) : Boolean(fallbackValue);
+}
+
+function adminSetupSelected_(currentValue, optionValue) {
+  return String(currentValue || "").trim().toLowerCase() ===
+    String(optionValue || "").trim().toLowerCase()
+    ? "selected"
+    : "";
+}
+
+function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings) {
+  const config = settings || {};
+  const id = fieldName => adminSetupFieldId_(prefix, fieldName, suffix);
+  const value = fieldName => adminSetupEscapeHtml(config[fieldName] || "");
+
+  const rawScoreMode = String(config.scoreMode || "fixed-points").trim();
+  const scoreMode = rawScoreMode.toLowerCase().replace(/_/g, "-") === "correct-pick"
+    ? "fixed-points"
+    : rawScoreMode;
+  const scoringEngine = String(config.scoringEngine || "manual").trim();
+  const selectionMode = String(config.selectionMode || "single").trim();
+  const resultSourceType = String(config.resultSourceType || "manual").trim();
+
+  return `
+    <div class="admin-setup-subsection">
+      <h4>Question and scoring</h4>
+
+      <div class="admin-control-grid">
+        <label class="admin-field">
+          <span>Score Mode</span>
+          <select id="${id("ScoreMode")}">
+            <option value="fixed-points" ${adminSetupSelected_(scoreMode, "fixed-points")}>Fixed Points</option>
+            <option value="confidence-points" ${adminSetupSelected_(scoreMode, "confidence-points")}>Confidence Points</option>
+            <option value="staked-points" ${adminSetupSelected_(scoreMode, "staked-points")}>Staked Points</option>
+            <option value="wager" ${adminSetupSelected_(scoreMode, "wager")}>Sports Wager</option>
+            <option value="ranking" ${adminSetupSelected_(scoreMode, "ranking")}>Ranking</option>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span>Question Type</span>
+          <input
+            type="text"
+            id="${id("QuestionType")}"
+            value="${value("questionType") || "award-single-winner"}"
+            placeholder="player-compare, binary, category-winner"
+          >
+        </label>
+
+        <label class="admin-field">
+          <span>Scoring Engine</span>
+          <select id="${id("ScoringEngine")}">
+            <option value="manual" ${adminSetupSelected_(scoringEngine, "manual")}>Manual / Category Result</option>
+            <option value="sports" ${adminSetupSelected_(scoringEngine, "sports")}>Sports Scores Engine</option>
+            <option value="internet" ${adminSetupSelected_(scoringEngine, "internet")}>External Results Hub</option>
+            <option value="racing" ${adminSetupSelected_(scoringEngine, "racing")}>Racing Engine</option>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span>Selection Mode</span>
+          <select id="${id("SelectionMode")}">
+            <option value="single" ${adminSetupSelected_(selectionMode, "single")}>Single Answer</option>
+            <option value="multiple" ${adminSetupSelected_(selectionMode, "multiple")}>Multiple Answers</option>
+            <option value="ranking" ${adminSetupSelected_(selectionMode, "ranking")}>Rank Answers</option>
+          </select>
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-setup-subsection">
+      <h4>Staked-points override</h4>
+      <div class="admin-sub">
+        Use zero to inherit the game-level rule. A correct pick earns the stake multiplier; a wrong pick loses the loss multiplier.
+      </div>
+
+      <div class="admin-control-grid">
+        <label class="admin-field">
+          <span>Minimum Stake</span>
+          <input type="number" id="${id("MinStake")}" value="${Number(config.minStake) || 0}" min="0">
+        </label>
+
+        <label class="admin-field">
+          <span>Maximum Stake</span>
+          <input type="number" id="${id("MaxStake")}" value="${Number(config.maxStake) || 0}" min="0">
+        </label>
+
+        <label class="admin-field">
+          <span>Stake Increment</span>
+          <input type="number" id="${id("StakeIncrement")}" value="${Number(config.stakeIncrement) || 0}" min="0">
+        </label>
+
+        <label class="admin-field">
+          <span>Win Multiplier</span>
+          <input type="number" id="${id("StakeWinMultiplier")}" value="${config.stakeWinMultiplier === "" || config.stakeWinMultiplier == null ? "" : Number(config.stakeWinMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
+        </label>
+
+        <label class="admin-field">
+          <span>Loss Multiplier</span>
+          <input type="number" id="${id("StakeLossMultiplier")}" value="${config.stakeLossMultiplier === "" || config.stakeLossMultiplier == null ? "" : Number(config.stakeLossMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
+        </label>
+      </div>
+    </div>
+
+    <div class="admin-setup-subsection">
+      <h4>Result source</h4>
+
+      <div class="admin-control-grid">
+        <label class="admin-field">
+          <span>Source Type</span>
+          <select id="${id("ResultSourceType")}">
+            <option value="manual" ${adminSetupSelected_(resultSourceType, "manual")}>Manual / Official Review</option>
+            <option value="sports-stats" ${adminSetupSelected_(resultSourceType, "sports-stats")}>Sports Stats</option>
+            <option value="awards" ${adminSetupSelected_(resultSourceType, "awards")}>Awards</option>
+            <option value="reality-tv" ${adminSetupSelected_(resultSourceType, "reality-tv")}>Reality TV</option>
+            <option value="prediction-market" ${adminSetupSelected_(resultSourceType, "prediction-market")}>Prediction Market</option>
+            <option value="imported" ${adminSetupSelected_(resultSourceType, "imported")}>Imported JSON / CSV</option>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span>Provider</span>
+          <input type="text" id="${id("ResultProvider")}" value="${value("resultProvider")}" placeholder="ESPN, Oscars, Kalshi, Manual">
+        </label>
+
+        <label class="admin-field">
+          <span>Result Source Key</span>
+          <input type="text" id="${id("ResultSource")}" value="${value("resultSource")}" placeholder="ESPN_PLAYER_STATS">
+        </label>
+
+        <label class="admin-field">
+          <span>External Event ID</span>
+          <input type="text" id="${id("ExternalEventId")}" value="${value("externalEventId")}" placeholder="ESPN event or ceremony ID">
+        </label>
+
+        <label class="admin-field">
+          <span>External Market ID</span>
+          <input type="text" id="${id("ExternalMarketId")}" value="${value("externalMarketId")}" placeholder="Prediction-market ID">
+        </label>
+
+        <label class="admin-field">
+          <span>External Subject ID</span>
+          <input type="text" id="${id("ExternalSubjectId")}" value="${value("externalSubjectId")}" placeholder="Athlete, nominee, contestant, team">
+        </label>
+
+        <label class="admin-field">
+          <span>Stat / Result Key</span>
+          <input type="text" id="${id("StatKey")}" value="${value("statKey")}" placeholder="passingYards, best-picture, eliminated">
+        </label>
+
+        <label class="admin-field">
+          <span>Comparison</span>
+          <select id="${id("ComparisonOperator")}">
+            <option value="" ${adminSetupSelected_(config.comparisonOperator, "")}>Not Applicable</option>
+            <option value="greater-than" ${adminSetupSelected_(config.comparisonOperator, "greater-than")}>Greater Than</option>
+            <option value="less-than" ${adminSetupSelected_(config.comparisonOperator, "less-than")}>Less Than</option>
+            <option value="greater-or-equal" ${adminSetupSelected_(config.comparisonOperator, "greater-or-equal")}>Greater or Equal</option>
+            <option value="less-or-equal" ${adminSetupSelected_(config.comparisonOperator, "less-or-equal")}>Less or Equal</option>
+            <option value="equals" ${adminSetupSelected_(config.comparisonOperator, "equals")}>Equals</option>
+          </select>
+        </label>
+
+        <label class="admin-field">
+          <span>Threshold</span>
+          <input type="number" id="${id("Threshold")}" value="${config.threshold == null ? "" : adminSetupEscapeHtml(config.threshold)}" step="0.01" placeholder="275.5">
+        </label>
+      </div>
+
+      <label class="admin-field">
+        <span>Official Source URL</span>
+        <input type="url" id="${id("SourceUrl")}" value="${value("sourceUrl")}" placeholder="https://official-source.example/result">
+      </label>
+
+      <label class="admin-field">
+        <span>Source Configuration JSON</span>
+        <textarea id="${id("SourceConfigJSON")}" rows="4" placeholder='{"athleteIds":["1","2"],"answerMap":{"YES":"yes"}}'>${value("sourceConfigJSON")}</textarea>
+      </label>
+
+      <div class="admin-checkbox-row">
+        <label>
+          <input type="checkbox" id="${id("AutoSettle")}" ${config.autoSettle ? "checked" : ""}>
+          Auto-settle when final
+        </label>
+
+        <label>
+          <input type="checkbox" id="${id("RequireAdminReview")}" ${config.requireAdminReview === false ? "" : "checked"}>
+          Require admin review
+        </label>
+      </div>
+    </div>
+  `;
+}
+
+function adminSetupReadQuestionEngineFields_(prefix, suffix) {
+  const id = fieldName => adminSetupFieldId_(prefix, fieldName, suffix);
+
+  return {
+    scoreMode: adminSetupFieldValue_(id("ScoreMode"), "fixed-points"),
+    questionType: adminSetupFieldValue_(id("QuestionType"), "award-single-winner"),
+    scoringEngine: adminSetupFieldValue_(id("ScoringEngine"), "manual"),
+    selectionMode: adminSetupFieldValue_(id("SelectionMode"), "single"),
+    minStake: adminSetupFieldValue_(id("MinStake"), "0"),
+    maxStake: adminSetupFieldValue_(id("MaxStake"), "0"),
+    stakeIncrement: adminSetupFieldValue_(id("StakeIncrement"), "0"),
+    stakeWinMultiplier: adminSetupFieldValue_(id("StakeWinMultiplier"), ""),
+    stakeLossMultiplier: adminSetupFieldValue_(id("StakeLossMultiplier"), ""),
+    resultSourceType: adminSetupFieldValue_(id("ResultSourceType"), "manual"),
+    resultProvider: adminSetupFieldValue_(id("ResultProvider"), ""),
+    resultSource: adminSetupFieldValue_(id("ResultSource"), ""),
+    externalEventId: adminSetupFieldValue_(id("ExternalEventId"), ""),
+    externalMarketId: adminSetupFieldValue_(id("ExternalMarketId"), ""),
+    externalSubjectId: adminSetupFieldValue_(id("ExternalSubjectId"), ""),
+    statKey: adminSetupFieldValue_(id("StatKey"), ""),
+    comparisonOperator: adminSetupFieldValue_(id("ComparisonOperator"), ""),
+    threshold: adminSetupFieldValue_(id("Threshold"), ""),
+    sourceUrl: adminSetupFieldValue_(id("SourceUrl"), ""),
+    sourceConfigJSON: adminSetupFieldValue_(id("SourceConfigJSON"), ""),
+    autoSettle: adminSetupFieldChecked_(id("AutoSettle"), false),
+    requireAdminReview: adminSetupFieldChecked_(id("RequireAdminReview"), true),
+  };
+}
+
 function renderAdminSetupAddCategoryCard(gameId) {
   return `
     <details
@@ -231,6 +470,19 @@ function renderAdminSetupAddCategoryCard(gameId) {
             </label>
 
           </div>
+
+          ${renderAdminSetupQuestionEngineFields_(
+            "setupNewCategory",
+            "",
+            {
+              scoreMode: "fixed-points",
+              questionType: "award-single-winner",
+              scoringEngine: "manual",
+              selectionMode: "single",
+              resultSourceType: "manual",
+              requireAdminReview: true,
+            }
+          )}
 
           <label class="admin-field">
             <span>Follow-Up Map JSON</span>
@@ -2278,6 +2530,12 @@ function renderAdminSetupCategoryCard(category) {
 
             </div>
 
+            ${renderAdminSetupQuestionEngineFields_(
+              "editCategory",
+              "_${categoryId}",
+              settings
+            )}
+
             <label class="admin-field">
               <span>Follow-Up Map JSON</span>
 
@@ -2377,6 +2635,23 @@ function renderAdminResultsPanel(category, nominees, settings) {
   const winnerNomineeId =
     String(settings.winnerNomineeId || "").trim();
 
+  const settlementStatus =
+    String(settings.settlementStatus || "")
+      .trim()
+      .toLowerCase();
+
+  const resultStatus =
+    settlementStatus === "push" ||
+    settlementStatus === "pushed" ||
+    settlementStatus === "void"
+      ? "push"
+      : settlementStatus === "cancelled" ||
+        settlementStatus === "canceled"
+        ? "cancelled"
+        : winnerNomineeId
+          ? "winner"
+          : "pending";
+
   const favoriteNomineeId =
     String(settings.favoriteNomineeId || "").trim();
 
@@ -2453,9 +2728,34 @@ function renderAdminResultsPanel(category, nominees, settings) {
               <div class="admin-control-grid">
 
                 <label class="admin-field">
+                  <span>Result Status</span>
+
+                  <select
+                    id="resultStatus_${categoryId}"
+                    onchange="adminSetupToggleWinnerControl('${categoryId}')"
+                  >
+                    <option value="pending" ${resultStatus === "pending" ? "selected" : ""}>
+                      Pending / Not Settled
+                    </option>
+                    <option value="winner" ${resultStatus === "winner" ? "selected" : ""}>
+                      Final — Winner Selected
+                    </option>
+                    <option value="push" ${resultStatus === "push" ? "selected" : ""}>
+                      Push — Return Stakes
+                    </option>
+                    <option value="cancelled" ${resultStatus === "cancelled" ? "selected" : ""}>
+                      Cancelled / No Contest — Return Stakes
+                    </option>
+                  </select>
+                </label>
+
+                <label class="admin-field">
                   <span>Winner Nominee</span>
 
-                  <select id="resultWinner_${categoryId}">
+                  <select
+                    id="resultWinner_${categoryId}"
+                    ${resultStatus === "winner" ? "" : "disabled"}
+                  >
                     <option value="">Not selected</option>
                     ${nomineeOptions}
                   </select>
@@ -2511,6 +2811,33 @@ function renderAdminResultsPanel(category, nominees, settings) {
 /* ======================
    ACTION HELPERS
 ====================== */
+
+function adminSetupToggleWinnerControl(categoryId) {
+  const statusInput =
+    document.getElementById(
+      "resultStatus_" + categoryId
+    );
+
+  const winnerInput =
+    document.getElementById(
+      "resultWinner_" + categoryId
+    );
+
+  if (!winnerInput) {
+    return;
+  }
+
+  const requiresWinner =
+    !!statusInput &&
+    statusInput.value === "winner";
+
+  winnerInput.disabled =
+    !requiresWinner;
+
+  if (!requiresWinner) {
+    winnerInput.value = "";
+  }
+}
 
 function adminSetupSetMessage(id, message, isError) {
   const el = document.getElementById(id);
@@ -2945,6 +3272,9 @@ async function adminSetupCreateCategory(gameId) {
     "setupNewCategoryFollowUpMapJSON"
   );
 
+  const questionEngineFields =
+    adminSetupReadQuestionEngineFields_("setupNewCategory", "");
+
   const displayOrderInput = document.getElementById(
     "setupNewCategoryDisplayOrder"
   );
@@ -2991,9 +3321,23 @@ async function adminSetupCreateCategory(gameId) {
     }
   }
 
+  if (questionEngineFields.sourceConfigJSON) {
+    try {
+      JSON.parse(questionEngineFields.sourceConfigJSON);
+    } catch (err) {
+      adminSetupSetMessage(
+        "setupAddCategoryMessage",
+        "Source Configuration JSON is not valid JSON.",
+        true
+      );
+
+      return;
+    }
+  }
+
   adminSetupSetMessage("setupAddCategoryMessage", "Adding category...", false);
 
-  const res = await apiAdminCreateCategory({
+  const res = await apiAdminCreateCategory(Object.assign({
     gameId: gameId,
 
     category: categoryName,
@@ -3028,7 +3372,7 @@ async function adminSetupCreateCategory(gameId) {
     countsAsStatue: countsAsStatueInput ? countsAsStatueInput.checked : true,
 
     locked: lockedInput ? lockedInput.checked : false,
-  });
+  }, questionEngineFields));
 
   if (!res || res.success === false) {
     adminSetupSetMessage(
@@ -3348,6 +3692,9 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     "editCategoryFollowUpMapJSON_" + categoryId
   );
 
+  const questionEngineFields =
+    adminSetupReadQuestionEngineFields_("editCategory", "_" + categoryId);
+
   const lockedInput = document.getElementById(
     "editCategoryLocked_" + categoryId
   );
@@ -3394,13 +3741,27 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     }
   }
 
+  if (questionEngineFields.sourceConfigJSON) {
+    try {
+      JSON.parse(questionEngineFields.sourceConfigJSON);
+    } catch (err) {
+      adminSetupSetMessage(
+        "editCategoryMessage_" + categoryId,
+        "Source Configuration JSON is not valid JSON.",
+        true
+      );
+
+      return;
+    }
+  }
+
   adminSetupSetMessage(
     "editCategoryMessage_" + categoryId,
     "Saving category...",
     false
   );
 
-  const res = await apiAdminUpdateCategory({
+  const res = await apiAdminUpdateCategory(Object.assign({
     gameId: gameId,
 
     categoryId: categoryId,
@@ -3439,7 +3800,7 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     predictionGame: predictionInput ? predictionInput.checked : true,
 
     countsAsStatue: statueInput ? statueInput.checked : false,
-  });
+  }, questionEngineFields));
 
   if (!res || res.success === false) {
     adminSetupSetMessage(
@@ -3610,6 +3971,11 @@ async function adminSetupArchiveNominee(gameId, categoryId, nomineeId) {
 
 async function adminSetupSaveResults(gameId, categoryId) {
 
+  const statusInput =
+    document.getElementById(
+      "resultStatus_" + categoryId
+    );
+
   const winnerInput =
     document.getElementById(
       "resultWinner_" + categoryId
@@ -3620,10 +3986,32 @@ async function adminSetupSaveResults(gameId, categoryId) {
       "resultFavorite_" + categoryId
     );
 
+  const selectedResultStatus =
+    statusInput
+      ? statusInput.value.trim().toLowerCase()
+      : "pending";
+
   const winnerNomineeId =
-    winnerInput
+    selectedResultStatus === "winner" && winnerInput
       ? winnerInput.value.trim()
       : "";
+
+  if (
+    selectedResultStatus === "winner" &&
+    !winnerNomineeId
+  ) {
+    adminSetupSetMessage(
+      "resultMessage_" + categoryId,
+      "Select the winning nominee before saving a final result.",
+      true
+    );
+    return;
+  }
+
+  const settlementStatus =
+    selectedResultStatus === "winner"
+      ? "settled"
+      : selectedResultStatus;
 
   const favoriteNomineeId =
     favoriteInput
@@ -3646,8 +4034,16 @@ async function adminSetupSaveResults(gameId, categoryId) {
         winnerNomineeId,
       favoriteNomineeId:
         favoriteNomineeId,
+      settlementStatus:
+        settlementStatus,
+      wagerResultType:
+        selectedResultStatus === "push" ||
+        selectedResultStatus === "cancelled"
+          ? selectedResultStatus
+          : "",
       notes:
-        "Winner selected from Manage Games panel"
+        "Result saved from Manage Games panel: " +
+        selectedResultStatus
     });
 
   if (!res || res.success === false) {
@@ -3728,8 +4124,12 @@ async function adminSetupClearResults(gameId, categoryId) {
         "",
       favoriteNomineeId:
         "",
+      settlementStatus:
+        "pending",
+      wagerResultType:
+        "",
       notes:
-        "Winner and favorite cleared from Manage Games panel"
+        "Winner, favorite, and settlement status cleared from Manage Games panel"
     });
 
   if (!res || res.success === false) {
