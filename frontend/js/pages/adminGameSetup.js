@@ -278,7 +278,46 @@ function adminSetupAutoFillCloneCategoryFields(categoryId) {
   const nameInput = document.getElementById("cloneCategoryName_" + categoryId);
   const idInput = document.getElementById("cloneCategoryId_" + categoryId);
   if (!nameInput || !idInput || idInput.dataset.touched === "true") return;
-  idInput.value = adminSetupSlugify(nameInput.value);
+
+  const suggestedId = String(idInput.dataset.suggestedId || "").trim();
+  idInput.value = suggestedId || adminSetupSlugify(nameInput.value);
+}
+
+function adminSetupNextSequentialCategoryId_(sourceCategoryId, categories) {
+  const used = {};
+
+  (categories || []).forEach(function(category) {
+    const id = adminSetupSlugify(category && category.categoryId);
+    if (id) used[id] = true;
+  });
+
+  const sourceId = adminSetupSlugify(sourceCategoryId) || "question";
+  const match = sourceId.match(/^(.*?)-(\d+)$/);
+  const base = match && match[1] ? match[1] : sourceId;
+  let number = match ? Number(match[2]) + 1 : 2;
+  let candidate = base + "-" + number;
+
+  while (used[candidate]) {
+    number += 1;
+    candidate = base + "-" + number;
+  }
+
+  return candidate;
+}
+
+function adminSetupNextCategoryDisplayOrder_(categories, section) {
+  const targetSection = String(section || "Main").trim().toLowerCase();
+  let highest = 0;
+
+  (categories || []).forEach(function(category) {
+    const categorySection = String(category && category.section || "Main").trim().toLowerCase();
+    if (categorySection !== targetSection) return;
+
+    const order = Number(category && category.settings && category.settings.displayOrder);
+    if (Number.isFinite(order) && order > highest) highest = order;
+  });
+
+  return highest + 1;
 }
 
 function adminSetupAutoFillCloneNomineeFields(categoryId, nomineeId) {
@@ -2576,12 +2615,16 @@ async function adminSetupDeleteNomineeImageFromDrive(
    CLONE / BULK SETUP PANELS
 ====================== */
 
-function renderAdminSetupCloneCategoryPanel_(category) {
+function renderAdminSetupCloneCategoryPanel_(category, categories) {
   const gameId = adminSetupEscapeHtml(category.gameId);
   const categoryId = adminSetupEscapeHtml(category.categoryId);
   const cloneName = adminSetupEscapeHtml((category.category || category.categoryId) + " Copy");
-  const cloneId = adminSetupEscapeHtml(adminSetupSlugify((category.categoryId || category.category || "question") + "-copy"));
+  const cloneIdRaw = adminSetupNextSequentialCategoryId_(category.categoryId, categories);
+  const cloneId = adminSetupEscapeHtml(cloneIdRaw);
   const settings = category.settings || {};
+  const cloneSection = category.section || "Main";
+  const nextDisplayOrder = adminSetupNextCategoryDisplayOrder_(categories, cloneSection);
+  const cloneLockDateTime = adminSetupFormatDateTimeLocal(settings.lockDateTime);
 
   return `
     <details class="admin-setup-tool-panel admin-clone-question-panel">
@@ -2598,19 +2641,19 @@ function renderAdminSetupCloneCategoryPanel_(category) {
           </label>
           <label class="admin-field">
             ${adminSetupFieldLabel_("New Question ID", "Auto-generated from the new title. The backend also prevents duplicate IDs.")}
-            <input type="text" id="cloneCategoryId_${categoryId}" value="${cloneId}" oninput="this.dataset.touched='true'">
+            <input type="text" id="cloneCategoryId_${categoryId}" value="${cloneId}" data-suggested-id="${cloneId}" oninput="this.dataset.touched='true'">
           </label>
           <label class="admin-field">
             ${adminSetupFieldLabel_("Section", "The cloned question can stay in the same section or move to another.")}
-            <input type="text" id="cloneCategorySection_${categoryId}" value="${adminSetupEscapeHtml(category.section || "Main")}" list="adminSetupSectionOptions">
+            <input type="text" id="cloneCategorySection_${categoryId}" value="${adminSetupEscapeHtml(cloneSection)}" list="adminSetupSectionOptions">
           </label>
           <label class="admin-field">
-            ${adminSetupFieldLabel_("Display Order", "Set the position of the cloned question.")}
-            <input type="number" id="cloneCategoryOrder_${categoryId}" value="${(Number(settings.displayOrder) || 999) + 1}" min="0">
+            ${adminSetupFieldLabel_("Display Order", "Automatically uses the next available number in this section. You can still change it before cloning.")}
+            <input type="number" id="cloneCategoryOrder_${categoryId}" value="${nextDisplayOrder}" min="0">
           </label>
           <label class="admin-field">
-            ${adminSetupFieldLabel_("New Lock Date / Time", "The clone starts without the original lock time unless you enter a new one.")}
-            <input type="datetime-local" id="cloneCategoryLockDateTime_${categoryId}" value="">
+            ${adminSetupFieldLabel_("New Lock Date / Time", "Starts with the same lock date and time as the original question. Change it only when this clone should lock at a different time.")}
+            <input type="datetime-local" id="cloneCategoryLockDateTime_${categoryId}" value="${adminSetupEscapeHtml(cloneLockDateTime)}">
           </label>
         </div>
         <div class="admin-checkbox-row">
@@ -2992,7 +3035,7 @@ function renderAdminSetupCategoryCard(category, game, categories) {
           </div>
         </details>
 
-        ${renderAdminSetupCloneCategoryPanel_(category)}
+        ${renderAdminSetupCloneCategoryPanel_(category, categories)}
 
         ${renderAdminResultsPanel(category, nominees, settings)}
 

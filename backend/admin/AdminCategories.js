@@ -3333,6 +3333,47 @@ function adminCatUniqueId_(preferredId, existingIds) {
 
 }
 
+function adminCatNextSequentialId_(sourceId, existingIds) {
+
+  const used = existingIds || {};
+  const normalized = adminCatNormalizeId_(sourceId) || "question";
+  const match = normalized.match(/^(.*?)-(\d+)$/);
+  const base = match && match[1] ? match[1] : normalized;
+  let number = match ? Number(match[2]) + 1 : 2;
+  let candidate = base + "-" + number;
+
+  while (used[candidate]) {
+    number += 1;
+    candidate = base + "-" + number;
+  }
+
+  return candidate;
+
+}
+
+function adminCatNextDisplayOrder_(categories, section) {
+
+  const targetSection = adminCatNormalizeValue_(section || "Main").toLowerCase();
+  let highest = 0;
+
+  (categories || []).forEach(function(category) {
+    const categorySection = adminCatNormalizeValue_(category && category.section || "Main").toLowerCase();
+
+    if (categorySection !== targetSection) {
+      return;
+    }
+
+    const order = Number(category && category.settings && category.settings.displayOrder);
+
+    if (isFinite(order) && order > highest) {
+      highest = order;
+    }
+  });
+
+  return highest + 1;
+
+}
+
 function adminCloneCategory(payload) {
 
   payload = payload || {};
@@ -3380,20 +3421,41 @@ function adminCloneCategory(payload) {
     usedCategoryIds[adminCatNormalizeId_(category.categoryId)] = true;
   });
 
-  const categoryId = adminCatUniqueId_(
-    payload.newCategoryId || payload.categoryIdOverride || adminCatSlugify_(categoryName),
-    usedCategoryIds
-  );
-
   const has = function(key) {
     return Object.prototype.hasOwnProperty.call(payload, key);
   };
+
+  const targetSection = has("section")
+    ? adminCatNormalizeValue_(payload.section) || "Main"
+    : sourceCategory.section || "Main";
+
+  const preferredCategoryId = payload.newCategoryId || payload.categoryIdOverride ||
+    adminCatNextSequentialId_(sourceCategoryId, usedCategoryIds);
+
+  const categoryId = adminCatUniqueId_(
+    preferredCategoryId,
+    usedCategoryIds
+  );
+
+  const requestedDisplayOrder = has("displayOrder")
+    ? adminCatNormalizeValue_(payload.displayOrder)
+    : "";
+
+  const targetDisplayOrder = requestedDisplayOrder !== ""
+    ? payload.displayOrder
+    : adminCatNextDisplayOrder_(targetSetup.categories, targetSection);
+
+  const requestedLockDateTime = has("lockDateTime")
+    ? adminCatNormalizeValue_(payload.lockDateTime)
+    : "";
+
+  const targetLockDateTime = requestedLockDateTime || settings.lockDateTime || "";
 
   const createResult = adminCreateCategory({
     gameId: targetGameId,
     category: categoryName,
     categoryId: categoryId,
-    section: has("section") ? payload.section : sourceCategory.section,
+    section: targetSection,
     categoryImage: adminCatToBoolean_(payload.copyCategoryImage)
       ? sourceCategory.categoryImage || ""
       : "",
@@ -3401,8 +3463,8 @@ function adminCloneCategory(payload) {
     locked: has("locked") ? payload.locked : false,
     changePenalty: settings.changePenalty,
     maxChanges: settings.maxChanges,
-    lockDateTime: has("lockDateTime") ? payload.lockDateTime : "",
-    displayOrder: has("displayOrder") ? payload.displayOrder : settings.displayOrder,
+    lockDateTime: targetLockDateTime,
+    displayOrder: targetDisplayOrder,
     groupId: has("groupId") ? payload.groupId : settings.groupId,
     parentCategoryId: has("parentCategoryId") ? payload.parentCategoryId : settings.parentCategoryId,
     followUpCategoryId: has("followUpCategoryId") ? payload.followUpCategoryId : settings.followUpCategoryId,
@@ -3465,7 +3527,7 @@ function adminCloneCategory(payload) {
       gameId: targetGameId,
       categoryId: categoryId,
       category: categoryName,
-      section: has("section") ? payload.section : sourceCategory.section,
+      section: targetSection,
       itemsJSON: JSON.stringify(sourceCategory.nominees.map(function(nominee) {
         return {
           nominee: nominee.nominee,
