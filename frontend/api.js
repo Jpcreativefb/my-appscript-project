@@ -1236,9 +1236,6 @@ async function apiAdminGetGameSetup(gameId) {
 
   return api(
     "adminGetGameSetup",
-    "adminCloneCategory",
-    "adminBulkCreateNominees",
-    "adminCloneNominee",
     {
       gameId: gameId
     }

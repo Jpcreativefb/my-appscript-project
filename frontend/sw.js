@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v10-guided-question-clone-tools";
+const AWARDS_CACHE = "awards-app-v11-game-setup-gameid-fix";
 
 const APP_SHELL = [
   "./",
