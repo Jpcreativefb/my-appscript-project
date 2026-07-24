@@ -199,6 +199,94 @@ function normalizeConfidenceScoringMode_(value) {
 
 }
 
+
+function normalizeGameFormat_(value) {
+
+  const format =
+    String(value || "standard")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
+
+  return (
+    format === "hybrid" ||
+    format === "mixed" ||
+    format === "combo"
+  )
+    ? "hybrid"
+    : "standard";
+
+}
+
+function normalizeGameRole_(value) {
+
+  const role =
+    String(value || "standalone")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
+
+  if (
+    role === "parent" ||
+    role === "season" ||
+    role === "parent-game"
+  ) {
+    return "parent";
+  }
+
+  if (
+    role === "mini" ||
+    role === "child" ||
+    role === "mini-game"
+  ) {
+    return "mini";
+  }
+
+  return "standalone";
+
+}
+
+function normalizeParentContributionMode_(value) {
+
+  const mode =
+    String(value || "add-points")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
+
+  const allowed = [
+    "add-points",
+    "weighted-points",
+    "placement-points"
+  ];
+
+  return allowed.indexOf(mode) !== -1
+    ? mode
+    : "add-points";
+
+}
+
+function normalizeLeaderboardScoreMode_(value) {
+
+  const mode =
+    String(value || "combined-net")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
+
+  const allowed = [
+    "combined-net",
+    "fixed-only",
+    "staked-balance",
+    "separate"
+  ];
+
+  return allowed.indexOf(mode) !== -1
+    ? mode
+    : "combined-net";
+
+}
+
 function normalizeGameBoolean_(value) {
 
   return (
@@ -298,6 +386,54 @@ function getGamesColumnMap_(headers) {
 
     scoringEngine:
       headers.indexOf("ScoringEngine"),
+
+    gameRole:
+      headers.indexOf("GameRole"),
+
+    parentGameId:
+      headers.indexOf("ParentGameId"),
+
+    includeInParent:
+      headers.indexOf("IncludeInParent"),
+
+    parentContributionMode:
+      headers.indexOf("ParentContributionMode"),
+
+    parentContributionWeight:
+      headers.indexOf("ParentContributionWeight"),
+
+    parentBestCount:
+      headers.indexOf("ParentBestCount"),
+
+    placementPointsJSON:
+      headers.indexOf("PlacementPointsJSON"),
+
+    leaderboardScoreMode:
+      headers.indexOf("LeaderboardScoreMode"),
+
+    fixedPointsEnabled:
+      headers.indexOf("FixedPointsEnabled"),
+
+    stakedPointsEnabled:
+      headers.indexOf("StakedPointsEnabled"),
+
+    startingPoints:
+      headers.indexOf("StartingPoints"),
+
+    minStake:
+      headers.indexOf("MinStake"),
+
+    maxStake:
+      headers.indexOf("MaxStake"),
+
+    stakeIncrement:
+      headers.indexOf("StakeIncrement"),
+
+    stakeWinMultiplier:
+      headers.indexOf("StakeWinMultiplier"),
+
+    stakeLossMultiplier:
+      headers.indexOf("StakeLossMultiplier"),
 
     racingLeague:
       headers.indexOf("RacingLeague"),
@@ -716,6 +852,196 @@ function buildGameObjectFromRow_(
         )
       ) || "manual",
 
+    gameFormat:
+      normalizeGameFormat_(
+        getGameCell_(
+          row,
+          col.scoringMode,
+          (
+            type === "mixed" ||
+            type === "combo" ||
+            typeConfig.mixedGame === true
+          )
+            ? "hybrid"
+            : "standard"
+        )
+      ),
+
+    gameRole:
+      normalizeGameRole_(
+        getGameCell_(
+          row,
+          col.gameRole,
+          "standalone"
+        )
+      ),
+
+    parentGameId:
+      normalizeGameId_(
+        getGameCell_(
+          row,
+          col.parentGameId,
+          ""
+        )
+      ),
+
+    includeInParent:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.includeInParent,
+          true
+        )
+      ),
+
+    parentContributionMode:
+      normalizeParentContributionMode_(
+        getGameCell_(
+          row,
+          col.parentContributionMode,
+          "add-points"
+        )
+      ),
+
+    parentContributionWeight:
+      normalizeGameNumber_(
+        getGameCell_(
+          row,
+          col.parentContributionWeight,
+          1
+        ),
+        1
+      ),
+
+    parentBestCount:
+      Math.max(
+        0,
+        Math.floor(
+          normalizeGameNumber_(
+            getGameCell_(
+              row,
+              col.parentBestCount,
+              0
+            ),
+            0
+          )
+        )
+      ),
+
+    placementPointsJSON:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.placementPointsJSON,
+          ""
+        )
+      ),
+
+    leaderboardScoreMode:
+      normalizeLeaderboardScoreMode_(
+        getGameCell_(
+          row,
+          col.leaderboardScoreMode,
+          "combined-net"
+        )
+      ),
+
+    fixedPointsEnabled:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.fixedPointsEnabled,
+          true
+        )
+      ),
+
+    stakedPointsEnabled:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.stakedPointsEnabled,
+          false
+        )
+      ),
+
+    startingPoints:
+      Math.max(
+        0,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.startingPoints,
+            1000
+          ),
+          1000
+        )
+      ),
+
+    minStake:
+      Math.max(
+        1,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.minStake,
+            10
+          ),
+          10
+        )
+      ),
+
+    maxStake:
+      Math.max(
+        1,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.maxStake,
+            100
+          ),
+          100
+        )
+      ),
+
+    stakeIncrement:
+      Math.max(
+        1,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.stakeIncrement,
+            10
+          ),
+          10
+        )
+      ),
+
+    stakeWinMultiplier:
+      Math.max(
+        0,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.stakeWinMultiplier,
+            1
+          ),
+          1
+        )
+      ),
+
+    stakeLossMultiplier:
+      Math.max(
+        0,
+        normalizeGameNumber_(
+          getGameCell_(
+            row,
+            col.stakeLossMultiplier,
+            1
+          ),
+          1
+        )
+      ),
+
     racingEnabled:
       typeConfig.racingEnabled === true,
 
@@ -1089,6 +1415,57 @@ function getPublicActiveGames() {
       scoringEngine:
         game.scoringEngine || "manual",
 
+      gameFormat:
+        game.gameFormat || "standard",
+
+      gameRole:
+        game.gameRole || "standalone",
+
+      parentGameId:
+        game.parentGameId || "",
+
+      includeInParent:
+        game.includeInParent !== false,
+
+      parentContributionMode:
+        game.parentContributionMode || "add-points",
+
+      parentContributionWeight:
+        normalizeGameNumber_(game.parentContributionWeight, 1),
+
+      parentBestCount:
+        normalizeGameNumber_(game.parentBestCount, 0),
+
+      placementPointsJSON:
+        game.placementPointsJSON || "",
+
+      leaderboardScoreMode:
+        game.leaderboardScoreMode || "combined-net",
+
+      fixedPointsEnabled:
+        game.fixedPointsEnabled !== false,
+
+      stakedPointsEnabled:
+        game.stakedPointsEnabled === true,
+
+      startingPoints:
+        normalizeGameNumber_(game.startingPoints, 1000),
+
+      minStake:
+        normalizeGameNumber_(game.minStake, 10),
+
+      maxStake:
+        normalizeGameNumber_(game.maxStake, 100),
+
+      stakeIncrement:
+        normalizeGameNumber_(game.stakeIncrement, 10),
+
+      stakeWinMultiplier:
+        normalizeGameNumber_(game.stakeWinMultiplier, 1),
+
+      stakeLossMultiplier:
+        normalizeGameNumber_(game.stakeLossMultiplier, 1),
+
       racingEnabled:
         game.racingEnabled === true,
 
@@ -1113,6 +1490,57 @@ function getPublicActiveGames() {
       lockAllPicks:
         game.lockAllPicks === true
     }));
+
+}
+
+/* =========================
+   PARENT / MINI GAME HELPERS
+========================= */
+
+function getChildGames(parentGameId) {
+
+  parentGameId =
+    normalizeGameId_(
+      parentGameId
+    );
+
+  if (!parentGameId) {
+    return [];
+  }
+
+  return getGames()
+    .filter(function(game) {
+      return (
+        game.gameRole === "mini" &&
+        game.parentGameId === parentGameId &&
+        game.includeInParent !== false
+      );
+    })
+    .sort(function(a, b) {
+      return (
+        Number(a.sortOrder || 999) -
+        Number(b.sortOrder || 999)
+      );
+    });
+
+}
+
+function getParentGame(gameId) {
+
+  const game =
+    getGame(gameId);
+
+  if (
+    !game ||
+    game.gameRole !== "mini" ||
+    !game.parentGameId
+  ) {
+    return null;
+  }
+
+  return getGame(
+    game.parentGameId
+  );
 
 }
 
@@ -1253,6 +1681,25 @@ function gameSupportsFeature(
     return game.wagerEnabled === true;
   }
 
+  if (
+    feature === "staked-points" ||
+    feature === "stakedPoints"
+  ) {
+    return game.stakedPointsEnabled === true;
+  }
+
+  if (feature === "hybrid") {
+    return game.gameFormat === "hybrid";
+  }
+
+  if (feature === "parent") {
+    return game.gameRole === "parent";
+  }
+
+  if (feature === "mini") {
+    return game.gameRole === "mini";
+  }
+
   if (feature === "leaderboard") {
     return game.showLeaderboard !== false;
   }
@@ -1312,6 +1759,57 @@ function getGameRuntimeConfig(gameId) {
 
     wagerEnabled:
       game.wagerEnabled,
+
+    gameFormat:
+      game.gameFormat || "standard",
+
+    gameRole:
+      game.gameRole || "standalone",
+
+    parentGameId:
+      game.parentGameId || "",
+
+    includeInParent:
+      game.includeInParent !== false,
+
+    parentContributionMode:
+      game.parentContributionMode || "add-points",
+
+    parentContributionWeight:
+      normalizeGameNumber_(game.parentContributionWeight, 1),
+
+    parentBestCount:
+      Math.max(0, Math.floor(normalizeGameNumber_(game.parentBestCount, 0))),
+
+    placementPointsJSON:
+      game.placementPointsJSON || "",
+
+    leaderboardScoreMode:
+      game.leaderboardScoreMode || "combined-net",
+
+    fixedPointsEnabled:
+      game.fixedPointsEnabled !== false,
+
+    stakedPointsEnabled:
+      game.stakedPointsEnabled === true,
+
+    startingPoints:
+      Math.max(0, normalizeGameNumber_(game.startingPoints, 1000)),
+
+    minStake:
+      Math.max(1, normalizeGameNumber_(game.minStake, 10)),
+
+    maxStake:
+      Math.max(1, normalizeGameNumber_(game.maxStake, 100)),
+
+    stakeIncrement:
+      Math.max(1, normalizeGameNumber_(game.stakeIncrement, 10)),
+
+    stakeWinMultiplier:
+      Math.max(0, normalizeGameNumber_(game.stakeWinMultiplier, 1)),
+
+    stakeLossMultiplier:
+      Math.max(0, normalizeGameNumber_(game.stakeLossMultiplier, 1)),
 
     startingBankroll:
       game.startingBankroll,

@@ -13,6 +13,8 @@ let PICKS_PAGE_DATA = {
   changeCounts: {},
   originalPicks: {},
   confidencePoints: {},
+  stakePoints: {},
+  stakeSummary: {},
   pickMeta: {}
 };
 
@@ -130,6 +132,12 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   
   PICKS_PAGE_DATA.confidencePoints =
     picksResponse.confidencePoints || {};
+
+  PICKS_PAGE_DATA.stakePoints =
+    picksResponse.stakePoints || {};
+
+  PICKS_PAGE_DATA.stakeSummary =
+    picksResponse.stakeSummary || {};
   
   PICKS_PAGE_DATA.pickMeta =
     picksResponse.pickMeta || {};
@@ -146,13 +154,18 @@ PICKS_PAGE_DATA.confidenceScoringMode =
         <h1>Make Your Picks</h1>
         <p>
           ${
-            PICKS_PAGE_DATA.isConfidenceGame
-               ? getConfidenceGameInstructions()
-               : "Pick changes may reduce available points. Locked categories cannot be changed."
+            hasConfidencePointsCategories() && hasStakedPointsCategories()
+              ? "This hybrid game includes confidence and staked predictions. Each question shows the scoring method it uses."
+              : hasConfidencePointsCategories()
+                ? getConfidenceGameInstructions()
+                : hasStakedPointsCategories()
+                  ? "Choose an answer and decide how many prediction points to risk. Pending stakes reduce the points available for other questions."
+                  : "Pick changes may reduce available points. Locked categories cannot be changed."
           }
         </p>
 
-        ${PICKS_PAGE_DATA.isConfidenceGame ? renderConfidenceSummaryBar() : ""}
+        ${hasConfidencePointsCategories() ? renderConfidenceSummaryBar() : ""}
+        ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
 
       </div>
 
@@ -180,6 +193,376 @@ function getConfidenceGameInstructions() {
 
   return "Choose a pick and assign each confidence number once. Correct picks gain points; wrong picks receive zero.";
 
+}
+
+function normalizePicksScoreMode_(value) {
+  const mode = String(value || "correct-pick")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+
+  if (
+    mode === "staked" ||
+    mode === "stake" ||
+    mode === "staked-points" ||
+    mode === "confidence-stake"
+  ) {
+    return "staked-points";
+  }
+
+  if (
+    mode === "wager" ||
+    mode === "wager-odds" ||
+    mode === "sports-wager"
+  ) {
+    return "wager";
+  }
+
+  if (mode === "ranking" || mode === "ranked") {
+    return "ranking";
+  }
+
+  if (
+    mode === "confidence" ||
+    mode === "confidence-points" ||
+    mode === "confidence-pool"
+  ) {
+    return "confidence-points";
+  }
+
+  if (
+    mode === "fixed" ||
+    mode === "fixed-points" ||
+    mode === "standard-points"
+  ) {
+    return "fixed-points";
+  }
+
+  return "correct-pick";
+}
+
+function isStakedPointsCategory(category) {
+  return normalizePicksScoreMode_(
+    category && category.scoreMode
+  ) === "staked-points";
+}
+
+function usesConfidencePointsCategory(category) {
+  const mode = normalizePicksScoreMode_(
+    category && category.scoreMode
+  );
+
+  return (
+    mode === "confidence-points" ||
+    (
+      PICKS_PAGE_DATA.isConfidenceGame === true &&
+      mode === "correct-pick"
+    )
+  );
+}
+
+function isPicksPageCategory(category) {
+  const mode = normalizePicksScoreMode_(
+    category && category.scoreMode
+  );
+
+  if (mode === "wager" || mode === "ranking") {
+    return false;
+  }
+
+  if (mode === "confidence-points") {
+    return !!(
+      PICKS_PAGE_DATA.game &&
+      PICKS_PAGE_DATA.game.confidenceEnabled === true
+    );
+  }
+
+  if (mode === "staked-points") {
+    return !!(
+      PICKS_PAGE_DATA.game &&
+      PICKS_PAGE_DATA.game.stakedPointsEnabled === true
+    );
+  }
+
+  return true;
+}
+
+function hasConfidencePointsCategories() {
+  return (PICKS_PAGE_DATA.categories || []).some(
+    category => usesConfidencePointsCategory(category)
+  );
+}
+
+function hasStakedPointsCategories() {
+  if (
+    !PICKS_PAGE_DATA.game ||
+    PICKS_PAGE_DATA.game.stakedPointsEnabled !== true
+  ) {
+    return false;
+  }
+
+  return (PICKS_PAGE_DATA.categories || []).some(
+    category => isStakedPointsCategory(category)
+  );
+}
+
+function getStakedPointsRules(category) {
+  const game = PICKS_PAGE_DATA.game || {};
+
+  const numberOrFallback = (value, fallback) => {
+    if (value === "" || value === null || value === undefined) {
+      return fallback;
+    }
+
+    const number = Number(value);
+    return Number.isFinite(number) ? number : fallback;
+  };
+
+  const categoryMin = numberOrFallback(category && category.minStake, 0);
+  const categoryMax = numberOrFallback(category && category.maxStake, 0);
+  const categoryIncrement = numberOrFallback(category && category.stakeIncrement, 0);
+  const categoryWin = numberOrFallback(category && category.stakeWinMultiplier, 0);
+  const categoryLoss = numberOrFallback(category && category.stakeLossMultiplier, 0);
+
+  const minStake = Math.max(
+    1,
+    categoryMin > 0
+      ? categoryMin
+      : numberOrFallback(game.minStake, 10)
+  );
+
+  const stakeIncrement = Math.max(
+    1,
+    Math.floor(
+      categoryIncrement > 0
+        ? categoryIncrement
+        : numberOrFallback(game.stakeIncrement, 10)
+    )
+  );
+
+  const requestedMaxStake = Math.max(
+    minStake,
+    Math.floor(
+      categoryMax > 0
+        ? categoryMax
+        : numberOrFallback(game.maxStake, 100)
+    )
+  );
+
+  const maxStake =
+    minStake +
+    Math.floor(
+      (requestedMaxStake - minStake) / stakeIncrement
+    ) * stakeIncrement;
+
+  const hasCategoryWinMultiplier =
+    category &&
+    category.stakeWinMultiplier !== "" &&
+    category.stakeWinMultiplier !== null &&
+    category.stakeWinMultiplier !== undefined;
+
+  const hasCategoryLossMultiplier =
+    category &&
+    category.stakeLossMultiplier !== "" &&
+    category.stakeLossMultiplier !== null &&
+    category.stakeLossMultiplier !== undefined;
+
+  return {
+    startingPoints: Math.max(0, numberOrFallback(game.startingPoints, 1000)),
+    minStake: Math.floor(minStake),
+    maxStake: maxStake,
+    stakeIncrement: stakeIncrement,
+    winMultiplier:
+      hasCategoryWinMultiplier
+        ? Math.max(0, categoryWin)
+        : Math.max(0, numberOrFallback(game.stakeWinMultiplier, 1)),
+    lossMultiplier:
+      hasCategoryLossMultiplier
+        ? Math.max(0, categoryLoss)
+        : Math.max(0, numberOrFallback(game.stakeLossMultiplier, 1)),
+  };
+}
+
+function getStakedPointsSummary() {
+  const game = PICKS_PAGE_DATA.game || {};
+  const summary = PICKS_PAGE_DATA.stakeSummary || {};
+
+  if (game.stakedPointsEnabled !== true) {
+    return {
+      enabled: false,
+      startingPoints: 0,
+      currentBalance: 0,
+      pendingStakes: 0,
+      availablePoints: 0,
+      settledNet: 0,
+    };
+  }
+
+  const startingPoints =
+    summary.startingPoints !== undefined &&
+    summary.startingPoints !== null &&
+    summary.startingPoints !== ""
+      ? Number(summary.startingPoints)
+      : game.startingPoints !== undefined &&
+        game.startingPoints !== null &&
+        game.startingPoints !== ""
+        ? Number(game.startingPoints)
+        : 1000;
+
+  const currentBalance =
+    summary.currentBalance == null
+      ? startingPoints
+      : Number(summary.currentBalance) || 0;
+
+  const pendingStakes = Number(summary.pendingStakes) || 0;
+  const availablePoints =
+    summary.availablePoints == null
+      ? Math.max(0, currentBalance - pendingStakes)
+      : Number(summary.availablePoints) || 0;
+
+  return Object.assign({}, summary, {
+    startingPoints: startingPoints,
+    currentBalance: currentBalance,
+    pendingStakes: pendingStakes,
+    availablePoints: availablePoints,
+    settledNet: Number(summary.settledNet) || 0,
+  });
+}
+
+function formatPicksPoints_(value) {
+  return Math.round(Number(value) || 0).toLocaleString();
+}
+
+function renderStakedPointsSummaryBar() {
+  const summary = getStakedPointsSummary();
+  const net = Number(summary.settledNet) || 0;
+
+  return `
+    <div class="stake-summary-bar">
+      <div>
+        <strong>Staked Prediction Points</strong>
+        <span>
+          Balance ${formatPicksPoints_(summary.currentBalance)}
+          · Available ${formatPicksPoints_(summary.availablePoints)}
+        </span>
+      </div>
+
+      <div class="stake-summary-values">
+        <span>Pending: ${formatPicksPoints_(summary.pendingStakes)}</span>
+        <span>Net: ${net >= 0 ? "+" : ""}${formatPicksPoints_(net)}</span>
+      </div>
+    </div>
+  `;
+}
+
+function getStakePresetValues(category, usablePoints) {
+  const rules = getStakedPointsRules(category);
+  const values = [];
+  const availableCap =
+    usablePoints === undefined || usablePoints === null
+      ? rules.maxStake
+      : Math.max(0, Math.floor(Number(usablePoints) || 0));
+
+  function add(value) {
+    value = Math.floor(Number(value) || 0);
+
+    if (
+      value < rules.minStake ||
+      value > rules.maxStake ||
+      value > availableCap ||
+      (value - rules.minStake) % rules.stakeIncrement !== 0 ||
+      values.indexOf(value) !== -1
+    ) {
+      return;
+    }
+
+    values.push(value);
+  }
+
+  add(rules.minStake);
+  add(rules.minStake + rules.stakeIncrement);
+  add(25);
+  add(50);
+  add(100);
+  add(rules.maxStake);
+
+  return values.sort((a, b) => a - b).slice(0, 6);
+}
+
+function updateStakeForCategory(categoryId, value) {
+  const input = document.getElementById("stake-" + categoryId);
+
+  if (input) {
+    input.value = Math.floor(Number(value) || 0) || "";
+  }
+}
+
+function renderStakedPointsControl(category, locked) {
+  if (!isStakedPointsCategory(category)) {
+    return "";
+  }
+
+  const rules = getStakedPointsRules(category);
+  const summary = getStakedPointsSummary();
+  const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+  const usablePoints = Math.max(0, summary.availablePoints + existingStake);
+  const insufficientPoints = existingStake <= 0 && usablePoints < rules.minStake;
+  const controlDisabled = locked || insufficientPoints;
+  const availableMaxStake = usablePoints < rules.minStake
+    ? rules.minStake
+    : rules.minStake + Math.floor(
+        (Math.min(rules.maxStake, usablePoints) - rules.minStake) /
+        rules.stakeIncrement
+      ) * rules.stakeIncrement;
+  const currentValue = existingStake > 0
+    ? existingStake
+    : insufficientPoints
+      ? ""
+      : rules.minStake;
+
+  return `
+    <div class="stake-control after-nominees">
+      <div class="stake-control-heading">
+        <label for="stake-${escapeAttr(category.id)}">Points to Risk</label>
+        <span>Available for this question: ${formatPicksPoints_(usablePoints)}</span>
+      </div>
+
+      <div class="stake-input-row">
+        <input
+          type="number"
+          id="stake-${escapeAttr(category.id)}"
+          value="${currentValue}"
+          min="${rules.minStake}"
+          max="${availableMaxStake}"
+          step="${rules.stakeIncrement}"
+          ${controlDisabled ? "disabled" : ""}
+          onchange="updateStakeForCategory('${escapeJs(category.id)}', this.value)"
+        >
+        <span>points</span>
+      </div>
+
+      <div class="stake-preset-row">
+        ${getStakePresetValues(category, usablePoints).map(value => `
+          <button
+            type="button"
+            class="stake-preset-button"
+            onclick="updateStakeForCategory('${escapeJs(category.id)}', ${value})"
+            ${controlDisabled ? "disabled" : ""}
+          >
+            ${value}
+          </button>
+        `).join("")}
+      </div>
+
+      <div class="stake-help">
+        ${
+          insufficientPoints
+            ? `You need at least ${rules.minStake} available points to enter this question.`
+            : `Correct: +${rules.winMultiplier}× stake · Wrong: −${rules.lossMultiplier}× stake · Push: stake returned`
+        }
+      </div>
+    </div>
+  `;
 }
 
 function renderConfidenceSummaryBar() {
@@ -248,7 +631,10 @@ function renderConfidenceSummaryBar() {
 function renderPicksCategoryList() {
 
   const categories =
-    PICKS_PAGE_DATA.categories || [];
+    (PICKS_PAGE_DATA.categories || [])
+      .filter(category =>
+        isPicksPageCategory(category)
+      );
 
   const parents =
     categories.filter(cat =>
@@ -287,7 +673,10 @@ function renderPicksCategoryList() {
 function getChildCategories(parent) {
 
   const categories =
-    PICKS_PAGE_DATA.categories || [];
+    (PICKS_PAGE_DATA.categories || [])
+      .filter(category =>
+        isPicksPageCategory(category)
+      );
 
   return categories.filter(cat => {
 
@@ -372,7 +761,18 @@ function renderCategoryCard(category, isChild, parent) {
   const confidencePoints =
     Number(
       PICKS_PAGE_DATA.confidencePoints[category.id]
-    ) || 0;  
+    ) || 0;
+
+  const stakedPointsCategory =
+    isStakedPointsCategory(category);
+
+  const confidencePointsCategory =
+    usesConfidencePointsCategory(category);
+
+  const stakePoints =
+    Number(
+      PICKS_PAGE_DATA.stakePoints[category.id]
+    ) || 0;
 
   const hasPick =
     Boolean(selectedNominee);
@@ -458,10 +858,16 @@ function renderCategoryCard(category, isChild, parent) {
       </div>
 
       ${
-        !PICKS_PAGE_DATA.isConfidenceGame
+        !confidencePointsCategory
           ? `
-            <div class="points-pill">
-              ${adjustedPoints}/${totalPoints} pts
+            <div class="points-pill ${stakedPointsCategory ? "stake-points-pill" : ""}">
+              ${
+                stakedPointsCategory
+                  ? stakePoints > 0
+                    ? `${stakePoints} at risk`
+                    : "Choose stake"
+                  : `${adjustedPoints}/${totalPoints} pts`
+              }
             </div>
           `
           : ""
@@ -480,13 +886,19 @@ function renderCategoryCard(category, isChild, parent) {
         <span>
           ${escapeHtml(selectedNominee.name)}
           ${
-            PICKS_PAGE_DATA.isConfidenceGame
+            confidencePointsCategory
               ? `
                 <span class="selected-confidence-pill">
                   Confidence ${confidencePoints || "not set"} 
                 </span>
               `
-              : ""
+              : stakedPointsCategory
+                ? `
+                  <span class="selected-stake-pill">
+                    ${stakePoints || "No"} point${stakePoints === 1 ? "" : "s"} at risk
+                  </span>
+                `
+                : ""
           }
         </span>
 
@@ -511,20 +923,28 @@ function renderCategoryCard(category, isChild, parent) {
     </button>  
     
     ${
-      !PICKS_PAGE_DATA.isConfidenceGame
-        ? `
-          <div class="pick-rules-row">
-    
-            <div class="penalty-note">
-              Penalty: ${penalty} point${penalty === 1 ? "" : "s"}
+      !confidencePointsCategory
+        ? stakedPointsCategory
+          ? `
+            <div class="pick-rules-row stake-rules-row">
+              <div class="penalty-note">
+                Your selected stake is reserved until this question settles.
+              </div>
+              <div class="changes-pill body-pill">
+                ${changesLeft} changes left
+              </div>
             </div>
-    
-            <div class="changes-pill body-pill">
-              ${changesLeft} changes left
+          `
+          : `
+            <div class="pick-rules-row">
+              <div class="penalty-note">
+                Penalty: ${penalty} point${penalty === 1 ? "" : "s"}
+              </div>
+              <div class="changes-pill body-pill">
+                ${changesLeft} changes left
+              </div>
             </div>
-    
-          </div>
-        `
+          `
         : ""
     }
     
@@ -549,6 +969,11 @@ function renderCategoryCard(category, isChild, parent) {
 
 </div>
 
+${renderStakedPointsControl(
+  category,
+  locked
+)}
+
 ${renderConfidenceControl(
   category,
   locked
@@ -568,7 +993,7 @@ function renderConfidenceControl(
   locked
 ) {
 
-  if (!PICKS_PAGE_DATA.isConfidenceGame) {
+  if (!usesConfidencePointsCategory(category)) {
     return "";
   }
 
@@ -638,6 +1063,15 @@ function getUsedConfidencePointsForOtherCategories(
       return;
     }
 
+    const otherCategory =
+      (PICKS_PAGE_DATA.categories || []).find(category =>
+        normalizeId(category.id) === normalizeId(otherCategoryId)
+      );
+
+    if (!usesConfidencePointsCategory(otherCategory)) {
+      return;
+    }
+
     const otherHasPick =
       Boolean(
         PICKS_PAGE_DATA.picks[otherCategoryId]
@@ -672,6 +1106,15 @@ function getUsedConfidencePoints() {
   Object.keys(
     PICKS_PAGE_DATA.confidencePoints || {}
   ).forEach(categoryId => {
+
+    const category =
+      (PICKS_PAGE_DATA.categories || []).find(item =>
+        normalizeId(item.id) === normalizeId(categoryId)
+      );
+
+    if (!usesConfidencePointsCategory(category)) {
+      return;
+    }
 
     const hasPick =
       Boolean(
@@ -864,7 +1307,7 @@ async function selectNominee(categoryId, nomineeId) {
 
   let confidencePoints = 0;
 
-  if (PICKS_PAGE_DATA.isConfidenceGame) {
+  if (usesConfidencePointsCategory(category)) {
 
     const confidenceInput =
       document.getElementById(
@@ -921,6 +1364,47 @@ async function selectNominee(categoryId, nomineeId) {
 
   }
 
+  let stakePoints = 0;
+
+  if (isStakedPointsCategory(category)) {
+    const rules = getStakedPointsRules(category);
+    const stakeInput = document.getElementById("stake-" + categoryId);
+
+    stakePoints = Math.floor(
+      stakeInput
+        ? Number(stakeInput.value) || 0
+        : Number(PICKS_PAGE_DATA.stakePoints[categoryId]) || 0
+    );
+
+    if (stakePoints < rules.minStake || stakePoints > rules.maxStake) {
+      showPicksMessage(
+        "Choose a stake between " + rules.minStake + " and " + rules.maxStake + " points.",
+        true
+      );
+      return;
+    }
+
+    if ((stakePoints - rules.minStake) % rules.stakeIncrement !== 0) {
+      showPicksMessage(
+        "Stake must increase by " + rules.stakeIncrement + " points.",
+        true
+      );
+      return;
+    }
+
+    const summary = getStakedPointsSummary();
+    const existingStake = Number(PICKS_PAGE_DATA.stakePoints[categoryId]) || 0;
+    const usablePoints = summary.availablePoints + existingStake;
+
+    if (stakePoints > usablePoints) {
+      showPicksMessage(
+        "Only " + usablePoints + " prediction points are available for this question.",
+        true
+      );
+      return;
+    }
+  }
+
   showPicksMessage(
     "Saving pick...",
     false
@@ -941,7 +1425,10 @@ async function selectNominee(categoryId, nomineeId) {
         nomineeId,
 
       confidencePoints:
-        confidencePoints
+        confidencePoints,
+
+      stakePoints:
+        stakePoints
     });
 
   console.log(
@@ -968,13 +1455,21 @@ async function selectNominee(categoryId, nomineeId) {
   PICKS_PAGE_DATA.originalPicks[categoryId] =
     result.originalNomineeId || nomineeId;
 
-  if (PICKS_PAGE_DATA.isConfidenceGame) {
+  if (usesConfidencePointsCategory(category)) {
 
     PICKS_PAGE_DATA.confidencePoints[categoryId] =
       Number(
         result.confidencePoints
       ) || confidencePoints;
 
+  }
+
+  if (isStakedPointsCategory(category)) {
+    PICKS_PAGE_DATA.stakePoints[categoryId] =
+      Number(result.stakePoints) || stakePoints;
+
+    PICKS_PAGE_DATA.stakeSummary =
+      result.stakeSummary || PICKS_PAGE_DATA.stakeSummary || {};
   }
 
   if (result.pickMeta) {
@@ -1004,6 +1499,22 @@ function refreshPicksPage() {
 
   el.innerHTML =
     renderPicksCategoryList();
+
+  const confidenceSummary =
+    document.querySelector(".confidence-summary-bar");
+
+  if (confidenceSummary && hasConfidencePointsCategories()) {
+    confidenceSummary.outerHTML =
+      renderConfidenceSummaryBar();
+  }
+
+  const stakeSummary =
+    document.querySelector(".stake-summary-bar");
+
+  if (stakeSummary && hasStakedPointsCategories()) {
+    stakeSummary.outerHTML =
+      renderStakedPointsSummaryBar();
+  }
 
   mountPicksPage();
 
@@ -1358,7 +1869,8 @@ function getConfidenceEligibleCategories() {
     PICKS_PAGE_DATA.categories || [];
 
   return categories.filter(cat =>
-    !cat.parentCategoryId
+    !cat.parentCategoryId &&
+    usesConfidencePointsCategory(cat)
   );
 
 }

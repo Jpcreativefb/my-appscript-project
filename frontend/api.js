@@ -506,7 +506,10 @@ async function apiSavePick(payload) {
       payload.nomineeId,
 
     confidencePoints:
-      payload.confidencePoints
+      payload.confidencePoints,
+
+    stakePoints:
+      payload.stakePoints
   });
 
 }
@@ -1239,54 +1242,16 @@ async function apiAdminGetGameSetup(gameId) {
 
 async function apiAdminCreateCategory(payload) {
 
+  payload =
+    payload || {};
+
   return api(
     "adminCreateCategory",
-    {
-      gameId:
-        payload.gameId,
-
-      category:
-        payload.category,
-
-      categoryId:
-        payload.categoryId,
-
-      section:
-        payload.section,
-
-      points:
-        payload.points,
-
-      displayOrder:
-        payload.displayOrder,
-
-      layoutType:
-        payload.layoutType,
-
-      countsAsStatue:
-        payload.countsAsStatue,
-
-      locked:
-        payload.locked,
-
-      lockDateTime:
-        payload.lockDateTime,
-
-      groupId:
-        payload.groupId,
-
-      parentCategoryId:
-        payload.parentCategoryId,
-
-      followUpCategoryId:
-        payload.followUpCategoryId,
-
-      followUpMapJSON:
-        payload.followUpMapJSON
-    }
+    payload
   );
 
 }
+
 
 async function apiAdminUpdateCategory(payload) {
 

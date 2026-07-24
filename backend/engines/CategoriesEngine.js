@@ -691,6 +691,68 @@ function getCategories(gameId){
         minSelections:
           Number(config.minSelections) || 1,
 
+        minStake:
+          Number(config.minStake) || 0,
+
+        maxStake:
+          Number(config.maxStake) || 0,
+
+        stakeIncrement:
+          Number(config.stakeIncrement) || 0,
+
+        stakeWinMultiplier:
+          config.stakeWinMultiplier === null ||
+          config.stakeWinMultiplier === undefined ||
+          config.stakeWinMultiplier === ""
+            ? ""
+            : Number(config.stakeWinMultiplier),
+
+        stakeLossMultiplier:
+          config.stakeLossMultiplier === null ||
+          config.stakeLossMultiplier === undefined ||
+          config.stakeLossMultiplier === ""
+            ? ""
+            : Number(config.stakeLossMultiplier),
+
+        resultSourceType:
+          config.resultSourceType || "",
+
+        resultProvider:
+          config.resultProvider || "",
+
+        externalEventId:
+          config.externalEventId || "",
+
+        externalMarketId:
+          config.externalMarketId || "",
+
+        externalSubjectId:
+          config.externalSubjectId || "",
+
+        statKey:
+          config.statKey || "",
+
+        comparisonOperator:
+          config.comparisonOperator || "",
+
+        threshold:
+          config.threshold === null ||
+          config.threshold === undefined
+            ? ""
+            : config.threshold,
+
+        autoSettle:
+          config.autoSettle === true,
+
+        requireAdminReview:
+          config.requireAdminReview !== false,
+
+        sourceUrl:
+          config.sourceUrl || "",
+
+        sourceConfigJSON:
+          config.sourceConfigJSON || "",
+
         /* =========================
            NOMINEES
         ========================= */

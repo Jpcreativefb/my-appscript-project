@@ -155,7 +155,58 @@ function getCategorySettingsColumnMap_(headers){
       headers.indexOf("SportsMarket"),
 
     sportsLeague:
-      headers.indexOf("SportsLeague")
+      headers.indexOf("SportsLeague"),
+
+    minStake:
+      headers.indexOf("MinStake"),
+
+    maxStake:
+      headers.indexOf("MaxStake"),
+
+    stakeIncrement:
+      headers.indexOf("StakeIncrement"),
+
+    stakeWinMultiplier:
+      headers.indexOf("StakeWinMultiplier"),
+
+    stakeLossMultiplier:
+      headers.indexOf("StakeLossMultiplier"),
+
+    resultSourceType:
+      headers.indexOf("ResultSourceType"),
+
+    resultProvider:
+      headers.indexOf("ResultProvider"),
+
+    externalEventId:
+      headers.indexOf("ExternalEventId"),
+
+    externalMarketId:
+      headers.indexOf("ExternalMarketId"),
+
+    externalSubjectId:
+      headers.indexOf("ExternalSubjectId"),
+
+    statKey:
+      headers.indexOf("StatKey"),
+
+    comparisonOperator:
+      headers.indexOf("ComparisonOperator"),
+
+    threshold:
+      headers.indexOf("Threshold"),
+
+    autoSettle:
+      headers.indexOf("AutoSettle"),
+
+    requireAdminReview:
+      headers.indexOf("RequireAdminReview"),
+
+    sourceUrl:
+      headers.indexOf("SourceUrl"),
+
+    sourceConfigJSON:
+      headers.indexOf("SourceConfigJSON")
 
   };
 
@@ -618,6 +669,115 @@ function getCategorySettings(gameId){
       sportsLeague:
         col.sportsLeague > -1
           ? String(row[col.sportsLeague] || "").trim()
+          : "",
+
+      minStake:
+        col.minStake > -1
+          ? Number(row[col.minStake]) || 0
+          : 0,
+
+      maxStake:
+        col.maxStake > -1
+          ? Number(row[col.maxStake]) || 0
+          : 0,
+
+      stakeIncrement:
+        col.stakeIncrement > -1
+          ? Number(row[col.stakeIncrement]) || 0
+          : 0,
+
+      stakeWinMultiplier:
+        col.stakeWinMultiplier > -1 &&
+        row[col.stakeWinMultiplier] !== "" &&
+        row[col.stakeWinMultiplier] !== null &&
+        row[col.stakeWinMultiplier] !== undefined
+          ? Number(row[col.stakeWinMultiplier])
+          : null,
+
+      stakeLossMultiplier:
+        col.stakeLossMultiplier > -1 &&
+        row[col.stakeLossMultiplier] !== "" &&
+        row[col.stakeLossMultiplier] !== null &&
+        row[col.stakeLossMultiplier] !== undefined
+          ? Number(row[col.stakeLossMultiplier])
+          : null,
+
+      resultSourceType:
+        col.resultSourceType > -1
+          ? String(row[col.resultSourceType] || "").trim()
+          : "",
+
+      resultProvider:
+        col.resultProvider > -1
+          ? String(row[col.resultProvider] || "").trim()
+          : "",
+
+      externalEventId:
+        col.externalEventId > -1
+          ? String(row[col.externalEventId] || "").trim()
+          : "",
+
+      externalMarketId:
+        col.externalMarketId > -1
+          ? String(row[col.externalMarketId] || "").trim()
+          : "",
+
+      externalSubjectId:
+        col.externalSubjectId > -1
+          ? String(row[col.externalSubjectId] || "").trim()
+          : "",
+
+      statKey:
+        col.statKey > -1
+          ? String(row[col.statKey] || "").trim()
+          : "",
+
+      comparisonOperator:
+        col.comparisonOperator > -1
+          ? String(row[col.comparisonOperator] || "").trim()
+          : "",
+
+      threshold:
+        col.threshold > -1 &&
+        row[col.threshold] !== "" &&
+        row[col.threshold] !== null &&
+        row[col.threshold] !== undefined
+          ? Number(row[col.threshold])
+          : null,
+
+      autoSettle:
+        col.autoSettle > -1
+          ? (
+              row[col.autoSettle] === true ||
+              String(row[col.autoSettle] || "")
+                .trim()
+                .toLowerCase() === "true"
+            )
+          : false,
+
+      requireAdminReview:
+        col.requireAdminReview > -1
+          ? (
+              String(row[col.requireAdminReview] || "")
+                .trim() === ""
+                ? true
+                : (
+                    row[col.requireAdminReview] === true ||
+                    String(row[col.requireAdminReview] || "")
+                      .trim()
+                      .toLowerCase() === "true"
+                  )
+            )
+          : true,
+
+      sourceUrl:
+        col.sourceUrl > -1
+          ? String(row[col.sourceUrl] || "").trim()
+          : "",
+
+      sourceConfigJSON:
+        col.sourceConfigJSON > -1
+          ? String(row[col.sourceConfigJSON] || "").trim()
           : ""
 
     };
@@ -863,7 +1023,16 @@ function saveCategorySettings(
         "sportsLeague",
         "wagerResultType",
         "sportsGameId",
-        "espnEventId"
+        "espnEventId",
+        "resultSourceType",
+        "resultProvider",
+        "externalEventId",
+        "externalMarketId",
+        "externalSubjectId",
+        "statKey",
+        "comparisonOperator",
+        "sourceUrl",
+        "sourceConfigJSON"
       ];
 
       optionalStringFields.forEach(function(key) {
@@ -886,6 +1055,33 @@ function saveCategorySettings(
 
       if (col.allowPush > -1) {
         row[col.allowPush] = c.allowPush === true;
+      }
+
+      [
+        "minStake",
+        "maxStake",
+        "stakeIncrement",
+        "stakeWinMultiplier",
+        "stakeLossMultiplier",
+        "threshold"
+      ].forEach(function(key) {
+        if (col[key] > -1) {
+          row[col[key]] =
+            c[key] === "" ||
+            c[key] === null ||
+            c[key] === undefined
+              ? ""
+              : Number(c[key]);
+        }
+      });
+
+      if (col.autoSettle > -1) {
+        row[col.autoSettle] = c.autoSettle === true;
+      }
+
+      if (col.requireAdminReview > -1) {
+        row[col.requireAdminReview] =
+          c.requireAdminReview !== false;
       }
 
       keepRows.push(row);

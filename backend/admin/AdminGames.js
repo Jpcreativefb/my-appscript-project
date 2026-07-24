@@ -108,6 +108,28 @@ function adminNormalizeGameId_(value) {
       "MaxWager",
       "AllowBetRemoval",
       "WagerEditMode",
+      "MixedGame",
+      "ScoringMode",
+      "ScoringEngine",
+      "GameRole",
+      "ParentGameId",
+      "IncludeInParent",
+      "ParentContributionMode",
+      "ParentContributionWeight",
+      "ParentBestCount",
+      "PlacementPointsJSON",
+      "LeaderboardScoreMode",
+      "FixedPointsEnabled",
+      "StakedPointsEnabled",
+      "StartingPoints",
+      "MinStake",
+      "MaxStake",
+      "StakeIncrement",
+      "StakeWinMultiplier",
+      "StakeLossMultiplier",
+      "RacingLeague",
+      "RacingSeriesId",
+      "RacingMarket",
       "ThemeColor",
       "Icon",
       "SortOrder",
@@ -205,6 +227,432 @@ function adminNormalizeGameId_(value) {
 
   }
   
+  function adminApplyHybridGameFields_(
+    row,
+    col,
+    payload,
+    onlyProvided
+  ) {
+
+    payload = payload || {};
+
+    const fields = [
+      {
+        key: "mixedGame",
+        value: function() {
+          return adminToBoolean_(payload.mixedGame);
+        },
+        fallback: false
+      },
+      {
+        key: "scoringMode",
+        value: function() {
+          const raw =
+            payload.gameFormat ||
+            payload.scoringMode ||
+            "standard";
+
+          return typeof normalizeGameFormat_ === "function"
+            ? normalizeGameFormat_(raw)
+            : adminNormalizeValue_(raw);
+        },
+        fallback: "standard",
+        aliases: ["gameFormat"]
+      },
+      {
+        key: "scoringEngine",
+        value: function() {
+          return adminNormalizeValue_(
+            payload.scoringEngine || "manual"
+          );
+        },
+        fallback: "manual"
+      },
+      {
+        key: "gameRole",
+        value: function() {
+          return typeof normalizeGameRole_ === "function"
+            ? normalizeGameRole_(payload.gameRole)
+            : adminNormalizeValue_(payload.gameRole || "standalone");
+        },
+        fallback: "standalone"
+      },
+      {
+        key: "parentGameId",
+        value: function() {
+          return adminNormalizeGameId_(
+            payload.parentGameId
+          );
+        },
+        fallback: ""
+      },
+      {
+        key: "includeInParent",
+        value: function() {
+          return payload.includeInParent === undefined
+            ? true
+            : adminToBoolean_(payload.includeInParent);
+        },
+        fallback: true
+      },
+      {
+        key: "parentContributionMode",
+        value: function() {
+          return typeof normalizeParentContributionMode_ === "function"
+            ? normalizeParentContributionMode_(
+                payload.parentContributionMode
+              )
+            : adminNormalizeValue_(
+                payload.parentContributionMode || "add-points"
+              );
+        },
+        fallback: "add-points"
+      },
+      {
+        key: "parentContributionWeight",
+        value: function() {
+          return adminToNumber_(
+            payload.parentContributionWeight,
+            1
+          );
+        },
+        fallback: 1
+      },
+      {
+        key: "parentBestCount",
+        value: function() {
+          return Math.max(
+            0,
+            Math.floor(
+              adminToNumber_(
+                payload.parentBestCount,
+                0
+              )
+            )
+          );
+        },
+        fallback: 0
+      },
+      {
+        key: "placementPointsJSON",
+        value: function() {
+          return adminNormalizeValue_(
+            payload.placementPointsJSON
+          );
+        },
+        fallback: ""
+      },
+      {
+        key: "leaderboardScoreMode",
+        value: function() {
+          return typeof normalizeLeaderboardScoreMode_ === "function"
+            ? normalizeLeaderboardScoreMode_(
+                payload.leaderboardScoreMode
+              )
+            : adminNormalizeValue_(
+                payload.leaderboardScoreMode || "combined-net"
+              );
+        },
+        fallback: "combined-net"
+      },
+      {
+        key: "fixedPointsEnabled",
+        value: function() {
+          return payload.fixedPointsEnabled === undefined
+            ? true
+            : adminToBoolean_(payload.fixedPointsEnabled);
+        },
+        fallback: true
+      },
+      {
+        key: "stakedPointsEnabled",
+        value: function() {
+          return adminToBoolean_(
+            payload.stakedPointsEnabled
+          );
+        },
+        fallback: false
+      },
+      {
+        key: "startingPoints",
+        value: function() {
+          return Math.max(
+            0,
+            adminToNumber_(
+              payload.startingPoints,
+              1000
+            )
+          );
+        },
+        fallback: 1000
+      },
+      {
+        key: "minStake",
+        value: function() {
+          return Math.max(
+            1,
+            adminToNumber_(
+              payload.minStake,
+              10
+            )
+          );
+        },
+        fallback: 10
+      },
+      {
+        key: "maxStake",
+        value: function() {
+          return Math.max(
+            1,
+            adminToNumber_(
+              payload.maxStake,
+              100
+            )
+          );
+        },
+        fallback: 100
+      },
+      {
+        key: "stakeIncrement",
+        value: function() {
+          return Math.max(
+            1,
+            adminToNumber_(
+              payload.stakeIncrement,
+              10
+            )
+          );
+        },
+        fallback: 10
+      },
+      {
+        key: "stakeWinMultiplier",
+        value: function() {
+          return Math.max(
+            0,
+            adminToNumber_(
+              payload.stakeWinMultiplier,
+              1
+            )
+          );
+        },
+        fallback: 1
+      },
+      {
+        key: "stakeLossMultiplier",
+        value: function() {
+          return Math.max(
+            0,
+            adminToNumber_(
+              payload.stakeLossMultiplier,
+              1
+            )
+          );
+        },
+        fallback: 1
+      },
+      {
+        key: "racingLeague",
+        value: function() {
+          return adminNormalizeValue_(payload.racingLeague);
+        },
+        fallback: ""
+      },
+      {
+        key: "racingSeriesId",
+        value: function() {
+          return adminNormalizeValue_(payload.racingSeriesId);
+        },
+        fallback: ""
+      },
+      {
+        key: "racingMarket",
+        value: function() {
+          return adminNormalizeValue_(
+            payload.racingMarket || "race-winner"
+          );
+        },
+        fallback: "race-winner"
+      }
+    ];
+
+    fields.forEach(function(field) {
+
+      const aliases =
+        [field.key].concat(field.aliases || []);
+
+      const provided =
+        aliases.some(function(key) {
+          return Object.prototype.hasOwnProperty.call(
+            payload,
+            key
+          );
+        });
+
+      if (onlyProvided === true && !provided) {
+        return;
+      }
+
+      adminSetIfColumnExists_(
+        row,
+        col,
+        field.key,
+        provided || onlyProvided !== true
+          ? field.value()
+          : field.fallback
+      );
+
+    });
+
+    /*
+      A mini game must point to a different parent game.
+      Invalid/self parent IDs are cleared rather than saved.
+    */
+    if (
+      col.parentGameId !== -1 &&
+      col.gameId !== -1 &&
+      adminNormalizeValue_(row[col.parentGameId]) ===
+        adminNormalizeValue_(row[col.gameId])
+    ) {
+      row[col.parentGameId] = "";
+    }
+
+    const role =
+      col.gameRole !== -1
+        ? adminNormalizeValue_(row[col.gameRole])
+        : "standalone";
+
+    const parentGameId =
+      col.parentGameId !== -1
+        ? adminNormalizeGameId_(row[col.parentGameId])
+        : "";
+
+    if (role === "mini" && !parentGameId) {
+      throw new Error(
+        "A mini game must have a parent game."
+      );
+    }
+
+    if (role === "mini" && parentGameId) {
+
+      const parentGame =
+        typeof getGame === "function"
+          ? getGame(parentGameId)
+          : null;
+
+      if (
+        !parentGame ||
+        parentGame.gameRole !== "parent"
+      ) {
+        throw new Error(
+          "The selected parent must be an existing Parent Game."
+        );
+      }
+
+    }
+
+    if (role !== "mini" && col.parentGameId !== -1) {
+      row[col.parentGameId] = "";
+    }
+
+    if (col.minStake !== -1 && col.maxStake !== -1) {
+      const minStake = Math.max(
+        1,
+        Math.floor(
+          adminToNumber_(row[col.minStake], 10)
+        )
+      );
+
+      const maxStake = Math.max(
+        minStake,
+        Math.floor(
+          adminToNumber_(row[col.maxStake], 100)
+        )
+      );
+
+      row[col.minStake] = minStake;
+      row[col.maxStake] = maxStake;
+    }
+
+    if (col.stakeIncrement !== -1) {
+      row[col.stakeIncrement] = Math.max(
+        1,
+        Math.floor(
+          adminToNumber_(row[col.stakeIncrement], 10)
+        )
+      );
+    }
+
+    if (
+      col.minStake !== -1 &&
+      col.maxStake !== -1 &&
+      col.stakeIncrement !== -1 &&
+      (row[col.maxStake] - row[col.minStake]) %
+        row[col.stakeIncrement] !== 0
+    ) {
+      throw new Error(
+        "Maximum stake must align with the minimum stake and stake increment."
+      );
+    }
+
+    if (col.startingPoints !== -1) {
+      row[col.startingPoints] = Math.max(
+        0,
+        adminToNumber_(row[col.startingPoints], 1000)
+      );
+    }
+
+    if (col.stakeWinMultiplier !== -1) {
+      row[col.stakeWinMultiplier] = Math.max(
+        0,
+        adminToNumber_(row[col.stakeWinMultiplier], 1)
+      );
+    }
+
+    if (col.stakeLossMultiplier !== -1) {
+      row[col.stakeLossMultiplier] = Math.max(
+        0,
+        adminToNumber_(row[col.stakeLossMultiplier], 1)
+      );
+    }
+
+    if (col.parentContributionWeight !== -1) {
+      row[col.parentContributionWeight] = Math.max(
+        0,
+        adminToNumber_(row[col.parentContributionWeight], 1)
+      );
+    }
+
+    if (col.placementPointsJSON !== -1) {
+      const placementPointsJSON =
+        adminNormalizeValue_(row[col.placementPointsJSON]);
+
+      if (placementPointsJSON) {
+        let parsed;
+
+        try {
+          parsed = JSON.parse(placementPointsJSON);
+        } catch (err) {
+          throw new Error(
+            "PlacementPointsJSON must be valid JSON."
+          );
+        }
+
+        if (
+          !Array.isArray(parsed) &&
+          (!parsed || typeof parsed !== "object")
+        ) {
+          throw new Error(
+            "PlacementPointsJSON must be an array or object."
+          );
+        }
+      }
+    }
+
+    return row;
+
+  }
+
   function adminFindGameRow_(
     data,
     col,
@@ -590,6 +1038,13 @@ function adminNormalizeGameId_(value) {
       adminToBoolean_(
         payload.votingLocked
       )
+    );
+
+    adminApplyHybridGameFields_(
+      row,
+      col,
+      payload,
+      false
     );
   
     return row;
@@ -1188,6 +1643,13 @@ function adminSaveGame(payload) {
 
       }
   
+      adminApplyHybridGameFields_(
+        row,
+        col,
+        payload,
+        true
+      );
+
       if ("themeColor" in payload) {
   
         adminSetIfColumnExists_(
@@ -2081,7 +2543,89 @@ function adminCloneGame(payload) {
     wagerEditMode:
       sourceGame.wagerEditMode ||
       sourceGame.WagerEditMode ||
-      "editable_until_lock",  
+      "editable_until_lock",
+
+    mixedGame:
+      sourceGame.mixedGame === true ||
+      sourceGame.gameFormat === "hybrid",
+
+    gameFormat:
+      sourceGame.gameFormat ||
+      sourceGame.scoringMode ||
+      "standard",
+
+    scoringMode:
+      sourceGame.gameFormat ||
+      sourceGame.scoringMode ||
+      "standard",
+
+    scoringEngine:
+      sourceGame.scoringEngine || "manual",
+
+    gameRole:
+      sourceGame.gameRole || "standalone",
+
+    parentGameId:
+      sourceGame.parentGameId || "",
+
+    includeInParent:
+      sourceGame.includeInParent !== false,
+
+    parentContributionMode:
+      sourceGame.parentContributionMode || "add-points",
+
+    parentContributionWeight:
+      sourceGame.parentContributionWeight === undefined
+        ? 1
+        : sourceGame.parentContributionWeight,
+
+    parentBestCount:
+      sourceGame.parentBestCount || 0,
+
+    placementPointsJSON:
+      sourceGame.placementPointsJSON || "",
+
+    leaderboardScoreMode:
+      sourceGame.leaderboardScoreMode || "combined-net",
+
+    fixedPointsEnabled:
+      sourceGame.fixedPointsEnabled !== false,
+
+    stakedPointsEnabled:
+      sourceGame.stakedPointsEnabled === true,
+
+    startingPoints:
+      sourceGame.startingPoints === undefined
+        ? 1000
+        : sourceGame.startingPoints,
+
+    minStake:
+      sourceGame.minStake || 10,
+
+    maxStake:
+      sourceGame.maxStake || 100,
+
+    stakeIncrement:
+      sourceGame.stakeIncrement || 10,
+
+    stakeWinMultiplier:
+      sourceGame.stakeWinMultiplier === undefined
+        ? 1
+        : sourceGame.stakeWinMultiplier,
+
+    stakeLossMultiplier:
+      sourceGame.stakeLossMultiplier === undefined
+        ? 1
+        : sourceGame.stakeLossMultiplier,
+
+    racingLeague:
+      sourceGame.racingLeague || "",
+
+    racingSeriesId:
+      sourceGame.racingSeriesId || "",
+
+    racingMarket:
+      sourceGame.racingMarket || "race-winner",
     
     showLeaderboard:
       sourceGame.showLeaderboard !== false,

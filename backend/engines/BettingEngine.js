@@ -2640,7 +2640,9 @@ function removeBet(payload){
    LEADERBOARD
 ===================================================== */
 
-function getBettingLeaderboardData(gameId){
+function getBettingLeaderboardData(gameId, options){
+
+  options = options || {};
 
   gameId = normalizeBetGameId_(
     gameId || getDefaultGameId()
@@ -2756,17 +2758,30 @@ function getBettingLeaderboardData(gameId){
 
   }
 
+  let finalRows = rows;
+
+  if (
+    options.skipParentRollup !== true &&
+    typeof rollupParentBettingLeaderboard_ === "function"
+  ) {
+    finalRows = rollupParentBettingLeaderboard_(
+      gameId,
+      rows,
+      options
+    );
+  }
+
   if (
     typeof decorateLeaderboardRowsWithProfiles_ === "function"
   ) {
 
     return decorateLeaderboardRowsWithProfiles_(
-      rows,
+      finalRows,
       gameId
     );
 
   }
 
-  return rows;
+  return finalRows;
 
 }

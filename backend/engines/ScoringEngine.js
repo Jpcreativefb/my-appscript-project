@@ -90,10 +90,10 @@ function getConfidenceScoringMode_(
 function getScoringBasePoints_(
   config,
   pick,
-  isConfidenceGame
+  usesConfidencePoints
 ) {
 
-  if (isConfidenceGame) {
+  if (usesConfidencePoints) {
 
     return normalizeScoreNumber_(
       pick.confidencePoints,
@@ -158,7 +158,10 @@ function buildUserPicksMap_(gameId){
       headers.indexOf("OriginalNomineeId"),
 
     confidencePoints:
-      headers.indexOf("ConfidencePoints")  
+      headers.indexOf("ConfidencePoints"),
+
+    stakePoints:
+      headers.indexOf("StakePoints")
 
   };
 
@@ -223,6 +226,14 @@ function buildUserPicksMap_(gameId){
               row[col.confidencePoints],
               0
             )
+          : 0,
+
+      stakePoints:
+        col.stakePoints !== -1
+          ? normalizeScoreNumber_(
+              row[col.stakePoints],
+              0
+            )
           : 0
     
     };
@@ -256,9 +267,20 @@ function getLeaderboardData(
   const projected =
     options.projected === true;
 
+  const game =
+    typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
   const isConfidenceGame =
     isConfidenceScoringGame_(
       gameId
+    );
+
+  const stakedPointsEnabled =
+    !!(
+      game &&
+      game.stakedPointsEnabled === true
     );
 
   const confidenceScoringMode =
@@ -266,23 +288,19 @@ function getLeaderboardData(
       gameId
     );
 
-  /* =====================================================
-     CATEGORY SETTINGS
-  ===================================================== */
-
   const settings =
     getCategorySettings(
       gameId
     );
 
-  const categoryResultWinners =
-    typeof getCategoryResultsWinnerMap === "function"
-      ? getCategoryResultsWinnerMap(gameId)
-      : {};
-
-  /* =====================================================
-     PICKS
-  ===================================================== */
+  const categoryResolutions =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : (
+          typeof getCategoryResultsWinnerMap === "function"
+            ? getCategoryResultsWinnerMap(gameId)
+            : {}
+        );
 
   const userPicks =
     buildUserPicksMap_(
@@ -291,22 +309,24 @@ function getLeaderboardData(
 
   const results = [];
 
-  /* =====================================================
-     CALCULATE SCORES
-  ===================================================== */
-
   Object.keys(userPicks)
-    .forEach(username => {
+    .forEach(function(username) {
 
       const picks =
         userPicks[username];
 
-      let total = 0;
-      let remaining = 0;
+      let fixedPoints = 0;
+      let fixedRemaining = 0;
+      let stakedNet = 0;
+      let stakedPotential = 0;
+      let pendingStakes = 0;
+      let stakedWins = 0;
+      let stakedLosses = 0;
+      let stakedPushes = 0;
       let statues = 0;
 
       Object.keys(picks)
-        .forEach(categoryId => {
+        .forEach(function(categoryId) {
 
           const config =
             settings[categoryId] || {};
@@ -318,11 +338,186 @@ function getLeaderboardData(
             return;
           }
 
+          const resolution =
+            typeof getHybridCategoryResolution_ === "function"
+              ? getHybridCategoryResolution_(
+                  categoryId,
+                  config,
+                  categoryResolutions
+                )
+              : {
+                  resolved:
+                    Boolean(
+                      categoryResolutions[categoryId] ||
+                      config.winnerNomineeId
+                    ),
+                  result: "winner",
+                  winnerNomineeId:
+                    normalizeScoreString_(
+                      categoryResolutions[categoryId] ||
+                      config.winnerNomineeId ||
+                      ""
+                    )
+                };
+
+          const projectedWinnerId =
+            resolution.result === "winner"
+              ? normalizeScoreString_(
+                  resolution.winnerNomineeId ||
+                  ""
+                )
+              : (
+                  projected &&
+                  !resolution.resolved
+                    ? normalizeScoreString_(
+                        config.favoriteNomineeId ||
+                        ""
+                      )
+                    : ""
+                );
+
+          const normalizedScoreMode =
+            typeof normalizeCategoryScoreMode_ === "function"
+              ? normalizeCategoryScoreMode_(
+                  config.scoreMode
+                )
+              : normalizeScoreString_(
+                  config.scoreMode || "correct-pick"
+                );
+
+          const usesConfidencePoints =
+            normalizedScoreMode === "confidence-points" ||
+            (
+              normalizedScoreMode === "correct-pick" &&
+              isConfidenceGame
+            );
+
+          if (
+            normalizedScoreMode === "wager" ||
+            normalizedScoreMode === "ranking"
+          ) {
+            return;
+          }
+
+          const isStaked =
+            normalizedScoreMode === "staked-points";
+
+          if (isStaked) {
+
+            if (!stakedPointsEnabled) {
+              return;
+            }
+
+            const stake =
+              Math.max(
+                0,
+                normalizeScoreNumber_(
+                  pick.stakePoints,
+                  0
+                )
+              );
+
+            if (!stake) {
+              return;
+            }
+
+            const rules =
+              typeof getStakedPredictionRules_ === "function"
+                ? getStakedPredictionRules_(
+                    gameId,
+                    config
+                  )
+                : {
+                    winMultiplier: 1,
+                    lossMultiplier: 1
+                  };
+
+            if (resolution.result === "push") {
+              stakedPushes++;
+              return;
+            }
+
+            if (projectedWinnerId) {
+
+              const isCorrect =
+                normalizeScoreString_(
+                  pick.nomineeId
+                ) === projectedWinnerId;
+
+              if (isCorrect) {
+
+                stakedNet +=
+                  stake *
+                  normalizeScoreNumber_(
+                    rules.winMultiplier,
+                    1
+                  );
+
+                stakedWins++;
+
+                if (
+                  config.countsAsStatue === true
+                ) {
+                  statues++;
+                }
+
+              } else {
+
+                stakedNet -=
+                  stake *
+                  normalizeScoreNumber_(
+                    rules.lossMultiplier,
+                    1
+                  );
+
+                stakedLosses++;
+
+              }
+
+            } else {
+
+              pendingStakes += stake;
+
+              stakedPotential +=
+                stake *
+                normalizeScoreNumber_(
+                  rules.winMultiplier,
+                  1
+                );
+
+            }
+
+            return;
+
+          }
+
+          if (
+            usesConfidencePoints &&
+            (
+              !game ||
+              game.confidenceEnabled !== true
+            )
+          ) {
+            return;
+          }
+
+          if (
+            !usesConfidencePoints &&
+            game &&
+            game.fixedPointsEnabled === false
+          ) {
+            return;
+          }
+
+          if (resolution.result === "push") {
+            return;
+          }
+
           const basePoints =
             getScoringBasePoints_(
               config,
               pick,
-              isConfidenceGame
+              usesConfidencePoints
             );
 
           const penalty =
@@ -345,83 +540,89 @@ function getLeaderboardData(
               0
             );
 
-          /* =====================================================
-             DETERMINE WINNER
-          ===================================================== */
-
-          const categoryResultWinnerId =
-            normalizeScoreString_(
-              categoryResultWinners[categoryId] ||
-              ""
-            );
-
-          const winnerNomineeId =
-
-            projected
-
-              ? normalizeScoreString_(
-                  categoryResultWinnerId ||
-                  config.winnerNomineeId ||
-                  config.favoriteNomineeId ||
-                  ""
-                )
-
-              : normalizeScoreString_(
-                  categoryResultWinnerId ||
-                  config.winnerNomineeId ||
-                  ""
-                );
-
-          /* =====================================================
-             CATEGORY RESOLVED
-          ===================================================== */
-
-          if (winnerNomineeId) {
+          if (projectedWinnerId) {
 
             const isCorrect =
               normalizeScoreString_(
                 pick.nomineeId
-              ) === winnerNomineeId;
+              ) === projectedWinnerId;
 
             if (isCorrect) {
 
-              total += adjustedPoints;
+              fixedPoints += adjustedPoints;
 
               if (
                 config.countsAsStatue === true
               ) {
-
                 statues++;
-
               }
 
             } else if (
-              isConfidenceGame &&
+              usesConfidencePoints &&
               confidenceScoringMode === "risk_penalty"
             ) {
 
-              total -= adjustedPoints;
+              fixedPoints -= adjustedPoints;
 
             }
 
-          }
+          } else {
 
-          /* =====================================================
-             CATEGORY NOT RESOLVED
-          ===================================================== */
-
-          else {
-
-            remaining += adjustedPoints;
+            fixedRemaining += adjustedPoints;
 
           }
 
         });
 
-      /* =====================================================
-         USER DISPLAY PROFILE
-         Uses UserGameProfiles first, then Users fallback.
-      ===================================================== */
+      const startingPoints =
+        stakedPointsEnabled
+          ? Math.max(
+              0,
+              normalizeScoreNumber_(
+                game && game.startingPoints,
+                1000
+              )
+            )
+          : 0;
+
+      const stakedBalance =
+        stakedPointsEnabled
+          ? Math.max(
+              0,
+              startingPoints + stakedNet
+            )
+          : 0;
+
+      const availableStakedPoints =
+        Math.max(
+          0,
+          stakedBalance - pendingStakes
+        );
+
+      const leaderboardScoreMode =
+        game && game.leaderboardScoreMode
+          ? game.leaderboardScoreMode
+          : "combined-net";
+
+      let total =
+        fixedPoints + stakedNet;
+
+      let remaining =
+        fixedRemaining + stakedPotential;
+
+      if (leaderboardScoreMode === "fixed-only") {
+        total = fixedPoints;
+        remaining = fixedRemaining;
+      }
+
+      if (leaderboardScoreMode === "staked-balance") {
+        total = stakedPointsEnabled
+          ? stakedBalance
+          : 0;
+        remaining = stakedPointsEnabled
+          ? stakedPotential
+          : 0;
+      }
 
       const profile =
         getLeaderboardUserProfile_(
@@ -462,6 +663,42 @@ function getLeaderboardData(
         statues:
           statues,
 
+        fixedPointsEnabled:
+          !game || game.fixedPointsEnabled !== false,
+
+        fixedPoints:
+          fixedPoints,
+
+        fixedRemaining:
+          fixedRemaining,
+
+        stakedNet:
+          stakedNet,
+
+        stakedPointsEnabled:
+          stakedPointsEnabled,
+
+        stakedBalance:
+          stakedBalance,
+
+        pendingStakes:
+          pendingStakes,
+
+        stakedPotential:
+          stakedPotential,
+
+        availableStakedPoints:
+          availableStakedPoints,
+
+        stakedWins:
+          stakedWins,
+
+        stakedLosses:
+          stakedLosses,
+
+        stakedPushes:
+          stakedPushes,
+
         eliminated:
           false,
 
@@ -469,9 +706,16 @@ function getLeaderboardData(
           0,
 
         scoringMode:
-          isConfidenceGame
-            ? "confidence"
-            : "standard",
+          game && game.gameFormat === "hybrid"
+            ? "hybrid"
+            : (
+                isConfidenceGame
+                  ? "confidence"
+                  : "standard"
+              ),
+
+        leaderboardScoreMode:
+          leaderboardScoreMode,
 
         confidenceScoringMode:
           isConfidenceGame
@@ -482,21 +726,15 @@ function getLeaderboardData(
 
     });
 
-  /* =====================================================
-     SORT
-  ===================================================== */
-
-  results.sort((a,b) => {
+  results.sort(function(a, b) {
 
     if (
       b.total !== a.total
     ) {
-
       return (
         b.total -
         a.total
       );
-
     }
 
     return (
@@ -506,65 +744,70 @@ function getLeaderboardData(
 
   });
 
-  /* =====================================================
-     ELIMINATION + WIN CHANCE
-  ===================================================== */
-
   if (results.length) {
 
     const leaderScore =
       results[0].total;
 
-    results.forEach(r => {
+    results.forEach(function(row) {
 
-      r.eliminated =
-        r.max < leaderScore;
+      row.eliminated =
+        row.max < leaderScore;
 
     });
 
     const alive =
-      results.filter(r =>
-        !r.eliminated
-      );
+      results.filter(function(row) {
+        return !row.eliminated;
+      });
 
     const totalRemaining =
       alive.reduce(
-        (sum,r) =>
-          sum + r.remaining,
+        function(sum, row) {
+          return sum + row.remaining;
+        },
         0
       );
 
-    results.forEach(r => {
+    results.forEach(function(row) {
 
-      if (r.eliminated) {
-
-        r.winChance = 0;
+      if (row.eliminated) {
+        row.winChance = 0;
         return;
-
       }
 
-      if (
-        totalRemaining === 0
-      ) {
-
-        r.winChance =
-          r.total === leaderScore
+      if (totalRemaining === 0) {
+        row.winChance =
+          row.total === leaderScore
             ? 100
             : 0;
-
         return;
-
       }
 
-      r.winChance =
+      row.winChance =
         Math.round(
           (
-            r.remaining /
+            row.remaining /
             totalRemaining
           ) * 100
         );
 
     });
+
+  }
+
+  if (
+    options.skipParentRollup !== true &&
+    game &&
+    game.gameRole === "parent" &&
+    typeof rollupParentLeaderboard_ === "function"
+  ) {
+
+    return rollupParentLeaderboard_(
+      gameId,
+      results,
+      options
+    );
 
   }
 
@@ -610,6 +853,11 @@ function getUserScoring(
     return {};
   }
 
+  const game =
+    typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
   const isConfidenceGame =
     isConfidenceScoringGame_(
       gameId
@@ -617,20 +865,14 @@ function getUserScoring(
 
   const confidenceScoringMode =
     typeof getConfidenceScoringMode_ === "function"
-      ? getConfidenceScoringMode_(
-          gameId
-        )
+      ? getConfidenceScoringMode_(gameId)
       : "win_only";
 
   const settings =
-    getCategorySettings(
-      gameId
-    );
+    getCategorySettings(gameId);
 
   const categories =
-    getCategories(
-      gameId
-    );
+    getCategories(gameId);
 
   const picksData =
     apiGetMyPicks(
@@ -638,14 +880,21 @@ function getUserScoring(
       gameId
     );
 
+  const categoryResolutions =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : (
+          typeof getCategoryResultsWinnerMap === "function"
+            ? getCategoryResultsWinnerMap(gameId)
+            : {}
+        );
+
   const scoring = {};
 
-  categories.forEach(cat => {
+  categories.forEach(function(cat) {
 
     const categoryId =
-      normalizeScoreString_(
-        cat.id
-      );
+      normalizeScoreString_(cat.id);
 
     const config =
       settings[categoryId] ||
@@ -687,17 +936,205 @@ function getUserScoring(
             ) || 0
           : 0;
 
+    const stakePoints =
+      picksData.stakePoints &&
+      picksData.stakePoints[categoryId]
+        ? Number(
+            picksData.stakePoints[categoryId]
+          ) || 0
+        : picksData.stakePoints &&
+          picksData.stakePoints[cat.id]
+          ? Number(
+              picksData.stakePoints[cat.id]
+            ) || 0
+          : 0;
+
+    const normalizedScoreMode =
+      typeof normalizeCategoryScoreMode_ === "function"
+        ? normalizeCategoryScoreMode_(
+            config.scoreMode
+          )
+        : normalizeScoreString_(
+            config.scoreMode ||
+            "correct-pick"
+          );
+
+    const usesConfidencePoints =
+      normalizedScoreMode === "confidence-points" ||
+      (
+        normalizedScoreMode === "correct-pick" &&
+        isConfidenceGame
+      );
+
+    const resolution =
+      typeof getHybridCategoryResolution_ === "function"
+        ? getHybridCategoryResolution_(
+            categoryId,
+            config,
+            categoryResolutions
+          )
+        : {
+            resolved:
+              Boolean(config.winnerNomineeId),
+            result:
+              config.winnerNomineeId
+                ? "winner"
+                : "pending",
+            winnerNomineeId:
+              normalizeScoreString_(
+                config.winnerNomineeId ||
+                ""
+              )
+          };
+
+    const winnerNomineeId =
+      normalizeScoreString_(
+        resolution.winnerNomineeId ||
+        ""
+      );
+
+    const normalizedPick =
+      normalizeScoreString_(
+        nomineeId
+      );
+
+    const hasPick =
+      Boolean(normalizedPick);
+
+    const isCorrect =
+      resolution.result === "winner" &&
+      hasPick &&
+      normalizedPick === winnerNomineeId;
+
+    const isWrong =
+      resolution.result === "winner" &&
+      hasPick &&
+      normalizedPick !== winnerNomineeId;
+
+    if (normalizedScoreMode === "staked-points") {
+
+      const rules =
+        typeof getStakedPredictionRules_ === "function"
+          ? getStakedPredictionRules_(
+              gameId,
+              config
+            )
+          : {
+              winMultiplier: 1,
+              lossMultiplier: 1
+            };
+
+      let earnedPoints = 0;
+      let remainingPoints = 0;
+      let status = "pending";
+
+      if (resolution.result === "push") {
+        status = "push";
+      } else if (resolution.result === "winner") {
+        if (isCorrect) {
+          earnedPoints =
+            stakePoints *
+            normalizeScoreNumber_(
+              rules.winMultiplier,
+              1
+            );
+          status = "correct";
+        } else if (isWrong) {
+          earnedPoints =
+            -stakePoints *
+            normalizeScoreNumber_(
+              rules.lossMultiplier,
+              1
+            );
+          status = "wrong";
+        } else {
+          status = "no-pick";
+        }
+      } else {
+        remainingPoints =
+          stakePoints *
+          normalizeScoreNumber_(
+            rules.winMultiplier,
+            1
+          );
+      }
+
+      scoring[categoryId] = {
+        shortName:
+          config.shortName ||
+          cat.name,
+        nomineeId:
+          nomineeId || "",
+        winnerNomineeId:
+          winnerNomineeId || "",
+        changes: changes,
+        basePoints: stakePoints,
+        confidencePoints: 0,
+        stakePoints: stakePoints,
+        finalPointsAvailable:
+          remainingPoints,
+        earnedPoints: earnedPoints,
+        remainingPoints: remainingPoints,
+        reservedPoints:
+          resolution.resolved
+            ? 0
+            : stakePoints,
+        displayPoints:
+          resolution.resolved
+            ? String(earnedPoints)
+            : `${remainingPoints}/${stakePoints}`,
+        locked:
+          config.locked === true,
+        resolved:
+          resolution.resolved === true,
+        correct: isCorrect,
+        wrong: isWrong,
+        push:
+          resolution.result === "push",
+        status: status,
+        scoringMode: "staked-points",
+        confidenceScoringMode: ""
+      };
+
+      return;
+    }
+
+    if (
+      normalizedScoreMode === "wager" ||
+      normalizedScoreMode === "ranking"
+    ) {
+      scoring[categoryId] = {
+        shortName:
+          config.shortName ||
+          cat.name,
+        nomineeId:
+          nomineeId || "",
+        winnerNomineeId:
+          winnerNomineeId || "",
+        earnedPoints: 0,
+        remainingPoints: 0,
+        locked:
+          config.locked === true,
+        resolved:
+          resolution.resolved === true,
+        correct: false,
+        wrong: false,
+        push:
+          resolution.result === "push",
+        scoringMode:
+          normalizedScoreMode,
+        confidenceScoringMode: ""
+      };
+      return;
+    }
+
     const basePoints =
-      isConfidenceGame
+      usesConfidencePoints
         ? confidencePoints
-        : Number(
-            config.points
-          ) || 0;
+        : Number(config.points) || 0;
 
     const penalty =
-      Number(
-        config.changePenalty
-      ) || 0;
+      Number(config.changePenalty) || 0;
 
     const finalPointsAvailable =
       Math.max(
@@ -709,128 +1146,71 @@ function getUserScoring(
         0
       );
 
-    const winnerNomineeId =
-      normalizeScoreString_(
-        config.winnerNomineeId || ""
-      );
-
-    const normalizedPick =
-      normalizeScoreString_(
-        nomineeId
-      );
-
-    const hasWinner =
-      Boolean(
-        winnerNomineeId
-      );
-
-    const hasPick =
-      Boolean(
-        normalizedPick
-      );
-
-    const isCorrect =
-      hasWinner &&
-      hasPick &&
-      normalizedPick === winnerNomineeId;
-
-    const isWrong =
-      hasWinner &&
-      hasPick &&
-      normalizedPick !== winnerNomineeId;
-
     let earnedPoints = 0;
     let remainingPoints = 0;
 
-    if (hasWinner) {
+    if (resolution.result === "winner") {
 
       if (isCorrect) {
-
         earnedPoints =
           finalPointsAvailable;
-
       } else if (
         isWrong &&
-        isConfidenceGame &&
+        usesConfidencePoints &&
         confidenceScoringMode === "risk_penalty"
       ) {
-
         earnedPoints =
           -finalPointsAvailable;
-
-      } else {
-
-        earnedPoints =
-          0;
-
       }
 
-    } else {
-
+    } else if (!resolution.resolved) {
       remainingPoints =
         finalPointsAvailable;
-
     }
 
     scoring[categoryId] = {
-
       shortName:
         config.shortName ||
         cat.name,
-
       nomineeId:
         nomineeId || "",
-
       winnerNomineeId:
         winnerNomineeId || "",
-
-      changes:
-        changes,
-
-      basePoints:
-        basePoints,
-
+      changes: changes,
+      basePoints: basePoints,
       confidencePoints:
-        isConfidenceGame
+        usesConfidencePoints
           ? confidencePoints
           : 0,
-
+      stakePoints: 0,
       finalPointsAvailable:
         finalPointsAvailable,
-
       earnedPoints:
         earnedPoints,
-
       remainingPoints:
         remainingPoints,
-
       displayPoints:
-        hasWinner
+        resolution.resolved
           ? String(earnedPoints)
           : `${remainingPoints}/${basePoints}`,
-
       locked:
         config.locked === true,
-
       resolved:
-        hasWinner,
-
+        resolution.resolved === true,
       correct:
         isCorrect,
-
       wrong:
         isWrong,
-
+      push:
+        resolution.result === "push",
       scoringMode:
-        isConfidenceGame
-          ? "confidence"
-          : "standard",
-
+        usesConfidencePoints
+          ? "confidence-points"
+          : "fixed-points",
       confidenceScoringMode:
-        isConfidenceGame
+        usesConfidencePoints
           ? confidenceScoringMode
           : ""
-
     };
 
   });

@@ -19,7 +19,8 @@ function getPicksColumnMap_(headers){
     original: headers.indexOf("OriginalNomineeId"),
     changes: headers.indexOf("ChangeCount"),
     lastUpdated: headers.indexOf("LastUpdated"),
-    confidencePoints: headers.indexOf("ConfidencePoints")
+    confidencePoints: headers.indexOf("ConfidencePoints"),
+    stakePoints: headers.indexOf("StakePoints")
   };
 
 }
@@ -112,6 +113,44 @@ function getPickConfidencePoints_(
 
 }
 
+function getPickStakePoints_(
+  row,
+  col
+) {
+
+  if (
+    !col ||
+    col.stakePoints === -1
+  ) {
+    return 0;
+  }
+
+  return Math.max(
+    0,
+    Math.floor(
+      normalizePickNumber_(
+        row[col.stakePoints],
+        0
+      )
+    )
+  );
+
+}
+
+function normalizeStakePoints_(value) {
+
+  return Math.max(
+    0,
+    Math.floor(
+      normalizePickNumber_(
+        value,
+        0
+      )
+    )
+  );
+
+}
+
 function normalizeConfidencePoints_(
   value
 ) {
@@ -136,7 +175,9 @@ function hasDuplicateConfidencePoints_(
   gameId,
   username,
   categoryId,
-  confidencePoints
+  confidencePoints,
+  settings,
+  isConfidenceGame
 ) {
 
   confidencePoints =
@@ -185,6 +226,10 @@ function hasDuplicateConfidencePoints_(
       categoryId
     );
 
+  settings =
+    settings ||
+    getCategorySettings(targetGameId);
+
   for (
     let i = 1;
     i < data.length;
@@ -218,6 +263,29 @@ function hasDuplicateConfidencePoints_(
       );
 
     if (rowCategoryId === targetCategoryId) {
+      continue;
+    }
+
+    const rowCategoryConfig =
+      settings[rowCategoryId] || {};
+
+    const rowScoreMode =
+      typeof normalizeCategoryScoreMode_ === "function"
+        ? normalizeCategoryScoreMode_(
+            rowCategoryConfig.scoreMode
+          )
+        : normalizeLower_(
+            rowCategoryConfig.scoreMode || "correct-pick"
+          );
+
+    const rowUsesConfidencePoints =
+      rowScoreMode === "confidence-points" ||
+      (
+        isConfidenceGame === true &&
+        rowScoreMode === "correct-pick"
+      );
+
+    if (!rowUsesConfidencePoints) {
       continue;
     }
 
@@ -483,6 +551,12 @@ function getUserPicks(username, gameId){
             row,
             col
           ),
+
+        stakePoints:
+          getPickStakePoints_(
+            row,
+            col
+          ),
       
         originalNomineeId:
           normalizeString_(
@@ -523,6 +597,8 @@ function apiGetMyPicks(username, gameId) {
         changeCounts: {},
         originalPicks: {},
         confidencePoints: {},
+        stakePoints: {},
+        stakeSummary: {},
         pickMeta: {}
       };
 
@@ -543,10 +619,16 @@ function apiGetMyPicks(username, gameId) {
         gameId
       );
 
+    const gameConfig =
+      typeof getGameRuntimeConfig === "function"
+        ? getGameRuntimeConfig(gameId)
+        : getGame(gameId);
+
     const picks = {};
     const changeCounts = {};
     const originalPicks = {};
     const confidencePoints = {};
+    const stakePoints = {};
     const pickMeta = {};
 
     picksData.forEach(p => {
@@ -565,6 +647,9 @@ function apiGetMyPicks(username, gameId) {
 
       confidencePoints[p.categoryId] =
         p.confidencePoints || 0;
+
+      stakePoints[p.categoryId] =
+        p.stakePoints || 0;
 
       pickMeta[p.categoryId] =
         buildPickMeta_(
@@ -585,6 +670,20 @@ function apiGetMyPicks(username, gameId) {
       changeCounts: changeCounts,
       originalPicks: originalPicks,
       confidencePoints: confidencePoints,
+      stakePoints: stakePoints,
+      stakeSummary:
+        gameConfig &&
+        gameConfig.stakedPointsEnabled === true &&
+        typeof getStakedPredictionSummary_ === "function"
+          ? getStakedPredictionSummary_(
+              username,
+              gameId,
+              {
+                picks: picksData,
+                settings: settings
+              }
+            )
+          : {},
       pickMeta: pickMeta
     };
 
@@ -603,6 +702,8 @@ function apiGetMyPicks(username, gameId) {
       changeCounts: {},
       originalPicks: {},
       confidencePoints: {},
+      stakePoints: {},
+      stakeSummary: {},
       pickMeta: {}
     };
 
@@ -679,7 +780,18 @@ function getUserBreakdown(username, gameId){
         p.changeCount || 0,
 
       locked:
-        meta.locked
+        meta.locked,
+
+      scoreMode:
+        typeof normalizeCategoryScoreMode_ === "function"
+          ? normalizeCategoryScoreMode_(config.scoreMode)
+          : normalizeLower_(config.scoreMode || "correct-pick"),
+
+      confidencePoints:
+        p.confidencePoints || 0,
+
+      stakePoints:
+        p.stakePoints || 0
     };
 
   });
@@ -732,6 +844,11 @@ function savePick(payload){
         payload.confidencePoints
       );
 
+    const stakePoints =
+      normalizeStakePoints_(
+        payload.stakePoints
+      );
+
     const gameId =
       normalizeString_(
         payload.gameId ||
@@ -774,40 +891,6 @@ function savePick(payload){
 
     }
 
-    if (
-      isConfidenceGame &&
-      confidencePoints <= 0
-    ) {
-
-      return {
-        success:false,
-        message:"Confidence points are required for this game"
-      };
-
-    }
-
-    if (
-      isConfidenceGame &&
-      hasDuplicateConfidencePoints_(
-        gameId,
-        username,
-        categoryId,
-        confidencePoints
-      )
-    ) {
-    
-      return {
-        success:false,
-        message:
-          "You already used " +
-          confidencePoints +
-          " confidence point" +
-          (confidencePoints === 1 ? "" : "s") +
-          ". Each confidence number can only be used once."
-      };
-    
-    }
-
     /* =========================
        CATEGORY SETTINGS
     ========================= */
@@ -834,6 +917,196 @@ function savePick(payload){
         )
       ] ||
       {};
+
+    const normalizedScoreMode =
+      typeof normalizeCategoryScoreMode_ === "function"
+        ? normalizeCategoryScoreMode_(
+            categoryConfig.scoreMode
+          )
+        : normalizeLower_(
+            categoryConfig.scoreMode || "correct-pick"
+          );
+
+    const isStakedPointsCategory =
+      normalizedScoreMode === "staked-points";
+
+    const currentResolutionMap =
+      typeof getCategoryResultsResolutionMap === "function"
+        ? getCategoryResultsResolutionMap(gameId)
+        : (
+            typeof getCategoryResultsWinnerMap === "function"
+              ? getCategoryResultsWinnerMap(gameId)
+              : {}
+          );
+
+    const currentResolution =
+      typeof getHybridCategoryResolution_ === "function"
+        ? getHybridCategoryResolution_(
+            categoryId,
+            categoryConfig,
+            currentResolutionMap
+          )
+        : {
+            resolved: Boolean(
+              categoryConfig.winnerNomineeId
+            )
+          };
+
+    if (currentResolution.resolved) {
+      return {
+        success: false,
+        message: "This question has already been settled"
+      };
+    }
+
+    const usesConfidencePoints =
+      normalizedScoreMode === "confidence-points" ||
+      (
+        isConfidenceGame &&
+        normalizedScoreMode === "correct-pick"
+      );
+
+    if (
+      normalizedScoreMode === "confidence-points" &&
+      (
+        !gameConfig ||
+        gameConfig.confidenceEnabled !== true
+      )
+    ) {
+
+      return {
+        success:false,
+        message:"Confidence-point predictions are not enabled for this game"
+      };
+
+    }
+
+    if (
+      usesConfidencePoints &&
+      confidencePoints <= 0
+    ) {
+
+      return {
+        success:false,
+        message:"Confidence points are required for this question"
+      };
+
+    }
+
+    if (
+      usesConfidencePoints &&
+      hasDuplicateConfidencePoints_(
+        gameId,
+        username,
+        categoryId,
+        confidencePoints,
+        settings,
+        isConfidenceGame
+      )
+    ) {
+
+      return {
+        success:false,
+        message:
+          "You already used " +
+          confidencePoints +
+          " confidence point" +
+          (confidencePoints === 1 ? "" : "s") +
+          ". Each confidence number can only be used once."
+      };
+
+    }
+
+    if (
+      normalizedScoreMode === "wager" ||
+      normalizedScoreMode === "ranking"
+    ) {
+      return {
+        success: false,
+        message:
+          normalizedScoreMode === "wager"
+            ? "This question must be played from the wager page"
+            : "This question must be played from the ranking page"
+      };
+    }
+
+    const usesFixedPoints =
+      normalizedScoreMode === "fixed-points" ||
+      (
+        normalizedScoreMode === "correct-pick" &&
+        !usesConfidencePoints
+      );
+
+    if (
+      usesFixedPoints &&
+      gameConfig &&
+      gameConfig.fixedPointsEnabled === false
+    ) {
+      return {
+        success: false,
+        message: "Fixed-point predictions are not enabled for this game"
+      };
+    }
+
+    let stakeRules = null;
+
+    if (isStakedPointsCategory) {
+
+      if (
+        !gameConfig ||
+        gameConfig.stakedPointsEnabled !== true
+      ) {
+        return {
+          success: false,
+          message:
+            "Staked predictions are not enabled for this game"
+        };
+      }
+
+      stakeRules =
+        getStakedPredictionRules_(
+          gameId,
+          categoryConfig
+        );
+
+      const stakeValidation =
+        validateStakePoints_(
+          stakePoints,
+          stakeRules
+        );
+
+      if (!stakeValidation.valid) {
+        return {
+          success: false,
+          message: stakeValidation.message
+        };
+      }
+
+      const stakeSummary =
+        getStakedPredictionSummary_(
+          username,
+          gameId,
+          {
+            settings: settings,
+            excludeCategoryId: categoryId
+          }
+        );
+
+      if (
+        stakePoints >
+        stakeSummary.availablePoints
+      ) {
+        return {
+          success: false,
+          message:
+            "Only " +
+            stakeSummary.availablePoints +
+            " points are available to stake",
+          stakeSummary: stakeSummary
+        };
+      }
+
+    }
 
     /* =========================
        CATEGORY VALIDATION
@@ -903,6 +1176,25 @@ function savePick(payload){
        PICKS SHEET
     ========================= */
 
+    if (
+      isStakedPointsCategory &&
+      typeof categoryResultsEnsureColumns_ === "function"
+    ) {
+      const addedStakeColumns =
+        categoryResultsEnsureColumns_(
+          PICKS_SHEET,
+          ["StakePoints"]
+        );
+
+      if (
+        addedStakeColumns &&
+        Number(addedStakeColumns.added) > 0 &&
+        typeof clearPicksCaches === "function"
+      ) {
+        clearPicksCaches();
+      }
+    }
+
     const data =
       PicksRepo.getAllPicks();
 
@@ -934,6 +1226,7 @@ function savePick(payload){
     let originalNominee = nomineeId;
     let changeCount = 0;
     let previousConfidencePoints = 0;
+    let previousStakePoints = 0;
 
     const userSearch =
       normalizeLower_(
@@ -1004,6 +1297,13 @@ function savePick(payload){
               )
             : 0;
 
+        previousStakePoints =
+          col.stakePoints !== -1
+            ? normalizeStakePoints_(
+                row[col.stakePoints]
+              )
+            : 0;
+
         break;
 
       }
@@ -1022,12 +1322,17 @@ function savePick(payload){
       previousNominee === nomineeId;
 
     const isConfidenceChange =
-      isConfidenceGame &&
+      usesConfidencePoints &&
       previousConfidencePoints !== confidencePoints;
+
+    const isStakeChange =
+      isStakedPointsCategory &&
+      previousStakePoints !== stakePoints;
 
     if (
       isSamePick &&
-      !isConfidenceChange
+      !isConfidenceChange &&
+      !isStakeChange
     ) {
 
       const meta =
@@ -1046,9 +1351,23 @@ function savePick(payload){
         categoryId:categoryId,
         nomineeId:nomineeId,
         confidencePoints:
-          isConfidenceGame
+          usesConfidencePoints
             ? confidencePoints
             : 0,
+        stakePoints:
+          isStakedPointsCategory
+            ? stakePoints
+            : 0,
+        stakeSummary:
+          isStakedPointsCategory
+            ? getStakedPredictionSummary_(
+                username,
+                gameId,
+                {
+                  settings: settings
+                }
+              )
+            : {},
         originalNomineeId:originalNominee,
         changeCount:changeCount,
         pickMeta:meta
@@ -1092,8 +1411,17 @@ function savePick(payload){
       if (col.confidencePoints !== -1) {
 
         patch[col.confidencePoints + 1] =
-          isConfidenceGame
+          usesConfidencePoints
             ? confidencePoints
+            : 0;
+
+      }
+
+      if (col.stakePoints !== -1) {
+
+        patch[col.stakePoints + 1] =
+          isStakedPointsCategory
+            ? stakePoints
             : 0;
 
       }
@@ -1129,8 +1457,17 @@ function savePick(payload){
       if (col.confidencePoints !== -1) {
 
         row[col.confidencePoints] =
-          isConfidenceGame
+          usesConfidencePoints
             ? confidencePoints
+            : 0;
+
+      }
+
+      if (col.stakePoints !== -1) {
+
+        row[col.stakePoints] =
+          isStakedPointsCategory
+            ? stakePoints
             : 0;
 
       }
@@ -1179,9 +1516,23 @@ function savePick(payload){
       categoryId:categoryId,
       nomineeId:nomineeId,
       confidencePoints:
-        isConfidenceGame
+        usesConfidencePoints
           ? confidencePoints
           : 0,
+      stakePoints:
+        isStakedPointsCategory
+          ? stakePoints
+          : 0,
+      stakeSummary:
+        isStakedPointsCategory
+          ? getStakedPredictionSummary_(
+              username,
+              gameId,
+              {
+                settings: settings
+              }
+            )
+          : {},
       originalNomineeId:originalNominee,
       changeCount:
         finalChangeCount,

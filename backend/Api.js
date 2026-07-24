@@ -1454,7 +1454,10 @@ function doGet(e) {
             params.nomineeId,
 
           confidencePoints:
-            params.confidencePoints
+            params.confidencePoints,
+
+          stakePoints:
+            params.stakePoints
         })
       );
 

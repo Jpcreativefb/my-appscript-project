@@ -1,0 +1,8 @@
+Hybrid Game Foundation v1 test report
+Generated: 2026-07-23 19:50:20 UTC
+
+PASS: JavaScript syntax checks across backend, frontend, sports engine, and racing engine.
+PASS: Hybrid foundation behavior tests.
+PASS: savePick mixed-mode tests.
+PASS: Additive sheet migration tests.
+PASS: No new duplicate backend function names introduced compared with the uploaded project.

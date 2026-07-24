@@ -540,3 +540,152 @@
   }
 
 }
+/* ======================
+   STAKED PREDICTIONS
+====================== */
+
+.stake-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+
+.stake-summary-bar > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.stake-summary-bar strong {
+  font-size: 0.9rem;
+}
+
+.stake-summary-bar span,
+.stake-summary-values {
+  font-size: 0.78rem;
+  opacity: 0.82;
+}
+
+.stake-summary-values {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px 14px;
+}
+
+.stake-control {
+  margin: 0 16px 16px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.10);
+}
+
+.stake-control-heading,
+.stake-input-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stake-control-heading label {
+  font-size: 0.82rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stake-control-heading span,
+.stake-help {
+  font-size: 0.76rem;
+  opacity: 0.74;
+}
+
+.stake-input-row {
+  justify-content: flex-start;
+  margin-top: 10px;
+}
+
+.stake-input-row input {
+  width: 120px;
+  border-radius: 999px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.10);
+  color: inherit;
+  font-weight: 800;
+}
+
+.stake-preset-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.stake-preset-button {
+  min-width: 48px;
+  border-radius: 999px;
+  padding: 7px 10px;
+  border: 1px solid rgba(255,255,255,0.16);
+  background: rgba(255,255,255,0.08);
+  color: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stake-preset-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.stake-help {
+  margin-top: 9px;
+}
+
+.selected-stake-pill {
+  display: inline-flex;
+  margin-left: 8px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.14);
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.stake-points-pill {
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .stake-summary-bar,
+  .stake-control-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .stake-summary-values {
+    justify-content: flex-start;
+  }
+
+  .stake-control {
+    margin: 0 13px 13px;
+  }
+
+  .stake-input-row input {
+    width: 100%;
+  }
+
+  .selected-stake-pill {
+    display: inline-flex;
+    margin-left: 0;
+    margin-top: 4px;
+  }
+}

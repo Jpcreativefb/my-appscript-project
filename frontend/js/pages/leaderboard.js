@@ -100,123 +100,39 @@ async function renderLeaderboardPage() {
   }
 
   return isWagerLeaderboard
-    ? renderWagerLeaderboardPage_(gameId, rows)
-    : renderStandardLeaderboardPage_(gameId, rows);
+    ? renderWagerLeaderboardPage_(gameId, rows, leagueId)
+    : renderStandardLeaderboardPage_(gameId, rows, leagueId);
 
 }
 
 
-function renderStandardLeaderboardPage_(gameId, rows) {
+function renderStandardLeaderboardPage_(gameId, rows, leagueId) {
+
+  const leaderboardScoreMode =
+    String(
+      (rows[0] && rows[0].leaderboardScoreMode) ||
+      "combined-net"
+    )
+      .trim()
+      .toLowerCase();
+
+  if (leaderboardScoreMode === "separate") {
+    return renderSeparatePredictionLeaderboards_(
+      gameId,
+      rows,
+      leagueId
+    );
+  }
 
   return `
     <div class="page">
 
       <h1>Leaderboard</h1>
 
-      <div class="leaderboard-subtitle">
-        Game:
-        <strong>${escapeHtml(gameId)}</strong>
-        ${leagueId ? ` · League: <strong>${escapeHtml((rows[0] && rows[0].leagueName) || leagueId)}</strong>` : ""}
-      </div>
+      ${renderStandardLeaderboardSubtitle_(gameId, rows, leagueId)}
 
       <div class="leaderboard-list">
-        ${rows.map((row, index) => {
-
-          const total =
-            Number(
-              row.total !== undefined
-                ? row.total
-                : row.totalScore !== undefined
-                  ? row.totalScore
-                  : row.score
-            ) || 0;
-
-          const remaining =
-            Number(row.remaining) || 0;
-
-          const max =
-            Number(row.max) || 0;
-
-          const scoringMode =
-            row.scoringMode || "";
-
-          const confidenceScoringMode =
-            row.confidenceScoringMode || "";
-
-          const username =
-            row.username ||
-            row.user ||
-            "";
-
-          return `
-            <div class="card leaderboard-card ${total < 0 ? "negative-score" : ""}">
-
-              <div class="leaderboard-rank">
-                #${index + 1}
-              </div>
-
-              <div class="leaderboard-main">
-
-                <div class="leaderboard-top-row">
-                  ${renderLeaderboardUser_(row)}
-                  ${renderPickWagerCompareButton_(username)}
-                </div>
-
-                <p class="leaderboard-username">
-                  @${escapeHtml(username)}
-                </p>
-
-                ${
-                  scoringMode === "confidence"
-                    ? `
-                      <p class="leaderboard-mode">
-                        Confidence Pool
-                        ${
-                          confidenceScoringMode === "risk_penalty"
-                            ? "· Risk Penalty"
-                            : "· Win Only"
-                        }
-                      </p>
-                    `
-                    : ""
-                }
-
-                <div class="leaderboard-stats-grid">
-
-                  <p>
-                    Total:
-                    <strong>${total}</strong>
-                  </p>
-
-                  <p>
-                    Remaining:
-                    ${remaining} / ${max}
-                  </p>
-
-                  <p>
-                    Statues:
-                    ${Number(row.statues) || 0}
-                  </p>
-
-                  <p>
-                    Win Chance:
-                    ${Number(row.winChance) || 0}%
-                  </p>
-
-                </div>
-
-                ${
-                  row.eliminated
-                    ? `<p class="eliminated-label">Eliminated</p>`
-                    : ``
-                }
-
-              </div>
-
-            </div>
-          `;
-
-        }).join("")}
+        ${renderStandardLeaderboardCards_(rows, "total")}
       </div>
 
       ${renderCompareModalShell_()}
@@ -227,7 +143,299 @@ function renderStandardLeaderboardPage_(gameId, rows) {
 }
 
 
-function renderWagerLeaderboardPage_(gameId, rows) {
+function renderSeparatePredictionLeaderboards_(gameId, rows, leagueId) {
+
+  const hasFixedScoring =
+    rows.some(function(row) {
+      return row.fixedPointsEnabled !== false;
+    });
+
+  const hasStakedScoring =
+    rows.some(function(row) {
+      return row.stakedPointsEnabled === true;
+    });
+
+  const fixedRows =
+    rows.slice().sort(function(a, b) {
+
+      const scoreDifference =
+        (Number(b.fixedPoints) || 0) -
+        (Number(a.fixedPoints) || 0);
+
+      if (scoreDifference !== 0) {
+        return scoreDifference;
+      }
+
+      return (
+        (Number(b.statues) || 0) -
+        (Number(a.statues) || 0)
+      );
+
+    });
+
+  const stakedRows =
+    rows.slice().sort(function(a, b) {
+
+      const balanceDifference =
+        (Number(b.stakedBalance) || 0) -
+        (Number(a.stakedBalance) || 0);
+
+      if (balanceDifference !== 0) {
+        return balanceDifference;
+      }
+
+      return (
+        (Number(b.stakedNet) || 0) -
+        (Number(a.stakedNet) || 0)
+      );
+
+    });
+
+  return `
+    <div class="page">
+
+      <h1>Leaderboard</h1>
+
+      ${renderStandardLeaderboardSubtitle_(gameId, rows, leagueId)}
+
+      ${hasFixedScoring ? `
+        <section class="leaderboard-section">
+          <h2>Fixed Prediction Standings</h2>
+          <p class="leaderboard-mode">
+            Ranked by points earned from fixed-point questions.
+          </p>
+
+          <div class="leaderboard-list">
+            ${renderStandardLeaderboardCards_(fixedRows, "fixed")}
+          </div>
+        </section>
+      ` : ""}
+
+      ${hasStakedScoring ? `
+        <section class="leaderboard-section">
+          <h2>Staked Prediction Standings</h2>
+          <p class="leaderboard-mode">
+            Ranked by current points balance after settled stakes.
+          </p>
+
+          <div class="leaderboard-list">
+            ${renderStandardLeaderboardCards_(stakedRows, "staked")}
+          </div>
+        </section>
+      ` : ""}
+
+      ${!hasFixedScoring && !hasStakedScoring ? `
+        <div class="card empty-state">
+          No prediction scoring modes are enabled for this game.
+        </div>
+      ` : ""}
+
+      ${renderCompareModalShell_()}
+
+    </div>
+  `;
+
+}
+
+
+function renderStandardLeaderboardSubtitle_(gameId, rows, leagueId) {
+
+  return `
+    <div class="leaderboard-subtitle">
+      Game:
+      <strong>${escapeHtml(gameId)}</strong>
+      ${leagueId ? ` · League: <strong>${escapeHtml((rows[0] && rows[0].leagueName) || leagueId)}</strong>` : ""}
+    </div>
+  `;
+
+}
+
+
+function renderStandardLeaderboardCards_(rows, metricMode) {
+
+  metricMode = metricMode || "total";
+
+  return rows.map(function(row, index) {
+
+    const combinedTotal =
+      Number(
+        row.total !== undefined
+          ? row.total
+          : row.totalScore !== undefined
+            ? row.totalScore
+            : row.score
+      ) || 0;
+
+    const fixedPoints =
+      Number(row.fixedPoints) || 0;
+
+    const stakedBalance =
+      Number(row.stakedBalance) || 0;
+
+    const displayTotal =
+      metricMode === "fixed"
+        ? fixedPoints
+        : metricMode === "staked"
+          ? stakedBalance
+          : combinedTotal;
+
+    const remaining =
+      metricMode === "fixed"
+        ? Number(row.fixedRemaining) || 0
+        : metricMode === "staked"
+          ? Number(row.stakedPotential) || 0
+          : Number(row.remaining) || 0;
+
+    const max =
+      metricMode === "fixed"
+        ? fixedPoints + remaining
+        : metricMode === "staked"
+          ? stakedBalance + remaining
+          : Number(row.max) || 0;
+
+    const scoringMode =
+      row.scoringMode || "";
+
+    const confidenceScoringMode =
+      row.confidenceScoringMode || "";
+
+    const hasStakedScoring =
+      row.stakedPointsEnabled === true;
+
+    const username =
+      row.username ||
+      row.user ||
+      "";
+
+    const metricLabel =
+      metricMode === "fixed"
+        ? "Fixed Points"
+        : metricMode === "staked"
+          ? "Stake Balance"
+          : "Total";
+
+    return `
+      <div class="card leaderboard-card ${displayTotal < 0 ? "negative-score" : ""}">
+
+        <div class="leaderboard-rank">
+          #${index + 1}
+        </div>
+
+        <div class="leaderboard-main">
+
+          <div class="leaderboard-top-row">
+            ${renderLeaderboardUser_(row)}
+            ${renderPickWagerCompareButton_(username)}
+          </div>
+
+          <p class="leaderboard-username">
+            @${escapeHtml(username)}
+          </p>
+
+          ${
+            scoringMode === "confidence"
+              ? `
+                <p class="leaderboard-mode">
+                  Confidence Pool
+                  ${
+                    confidenceScoringMode === "risk_penalty"
+                      ? "· Risk Penalty"
+                      : "· Win Only"
+                  }
+                </p>
+              `
+              : scoringMode === "hybrid" || hasStakedScoring
+                ? `
+                  <p class="leaderboard-mode">
+                    ${metricMode === "fixed"
+                      ? "Fixed Predictions"
+                      : metricMode === "staked"
+                        ? "Staked Predictions"
+                        : scoringMode === "hybrid"
+                          ? "Hybrid Game"
+                          : "Staked Predictions"}
+                    ${metricMode === "total" && row.leaderboardScoreMode
+                      ? `· ${escapeHtml(String(row.leaderboardScoreMode).replace(/-/g, " "))}`
+                      : ""}
+                  </p>
+                `
+                : ""
+          }
+
+          <div class="leaderboard-stats-grid">
+
+            <p>
+              ${metricLabel}:
+              <strong>${displayTotal}</strong>
+            </p>
+
+            <p>
+              Remaining:
+              ${remaining} / ${max}
+            </p>
+
+            <p>
+              Statues:
+              ${Number(row.statues) || 0}
+            </p>
+
+            <p>
+              Win Chance:
+              ${Number(row.winChance) || 0}%
+            </p>
+
+            ${hasStakedScoring ? `
+              ${metricMode !== "fixed" ? `
+                <p>
+                  Fixed Points:
+                  ${fixedPoints}
+                </p>
+              ` : ""}
+
+              ${metricMode !== "staked" ? `
+                <p>
+                  Stake Balance:
+                  ${stakedBalance}
+                </p>
+              ` : ""}
+
+              <p>
+                Stake Net:
+                ${(Number(row.stakedNet) || 0) >= 0 ? "+" : ""}${Number(row.stakedNet) || 0}
+              </p>
+
+              <p>
+                Pending Stakes:
+                ${Number(row.pendingStakes) || 0}
+              </p>
+            ` : ""}
+
+            ${Number(row.miniGamesCounted) > 0 ? `
+              <p>
+                Mini Games Counted:
+                ${Number(row.miniGamesCounted) || 0}
+              </p>
+            ` : ""}
+
+          </div>
+
+          ${
+            row.eliminated
+              ? `<p class="eliminated-label">Eliminated</p>`
+              : ``
+          }
+
+        </div>
+
+      </div>
+    `;
+
+  }).join("");
+
+}
+
+
+function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
 
   return `
     <div class="page">
