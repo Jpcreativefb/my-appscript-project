@@ -863,10 +863,18 @@ function renderCategoryCard(category, isChild, parent) {
             <div class="points-pill ${stakedPointsCategory ? "stake-points-pill" : ""}">
               ${
                 stakedPointsCategory
-                  ? stakePoints > 0
-                    ? `${stakePoints} at risk`
-                    : "Choose stake"
-                  : `${adjustedPoints}/${totalPoints} pts`
+                  ? status.className === "push"
+                    ? "Stake returned"
+                    : status.className === "cancelled"
+                      ? "Cancelled"
+                      : stakePoints > 0
+                        ? `${stakePoints} at risk`
+                        : "Choose stake"
+                  : status.className === "push"
+                    ? "Push"
+                    : status.className === "cancelled"
+                      ? "Cancelled"
+                      : `${adjustedPoints}/${totalPoints} pts`
               }
             </div>
           `
@@ -895,7 +903,12 @@ function renderCategoryCard(category, isChild, parent) {
               : stakedPointsCategory
                 ? `
                   <span class="selected-stake-pill">
-                    ${stakePoints || "No"} point${stakePoints === 1 ? "" : "s"} at risk
+                    ${
+                      status.className === "push" ||
+                      status.className === "cancelled"
+                        ? `${stakePoints || 0} point${stakePoints === 1 ? "" : "s"} returned`
+                        : `${stakePoints || "No"} point${stakePoints === 1 ? "" : "s"} at risk`
+                    }
                   </span>
                 `
                 : ""
@@ -1661,7 +1674,69 @@ function formatCountdown(ms) {
    STATUS HELPERS
 ========================= */
 
+function getCategoryResultStatus(category) {
+
+  category =
+    category || {};
+
+  const rawStatus =
+    String(
+      category.settlementStatus ||
+      category.resultStatus ||
+      category.wagerResultType ||
+      ""
+    )
+      .trim()
+      .toLowerCase()
+      .replace(/[_\s]+/g, "-");
+
+  if (
+    rawStatus === "push" ||
+    rawStatus === "pushed" ||
+    rawStatus === "void"
+  ) {
+    return "push";
+  }
+
+  if (
+    rawStatus === "cancelled" ||
+    rawStatus === "canceled" ||
+    rawStatus === "no-contest" ||
+    rawStatus === "no-contest-return-stakes"
+  ) {
+    return "cancelled";
+  }
+
+  if (
+    normalizeId(category.winnerNomineeId)
+  ) {
+    return "winner";
+  }
+
+  return "pending";
+
+}
+
 function getPickStatus(category, selectedNomineeId) {
+
+  const resultStatus =
+    getCategoryResultStatus(category);
+
+  if (resultStatus === "push") {
+    return {
+      label: "Push — Stakes Returned",
+      className: "push",
+      icon: "↩"
+    };
+  }
+
+  if (resultStatus === "cancelled") {
+    return {
+      label: "Cancelled — Stakes Returned",
+      className: "cancelled",
+      icon: "↩"
+    };
+  }
 
   const winner =
     normalizeId(category.winnerNomineeId);
@@ -1701,6 +1776,14 @@ function getCategoryTitle(category, status) {
 
   if (status.className === "wrong") {
     return `${category.name} — Wrong`;
+  }
+
+  if (status.className === "push") {
+    return `${category.name} — Push`;
+  }
+
+  if (status.className === "cancelled") {
+    return `${category.name} — Cancelled`;
   }
 
   return category.name;
@@ -1780,6 +1863,21 @@ function getThirdLineText(
   status
 ) {
 
+  const resultStatus =
+    getCategoryResultStatus(category);
+
+  if (resultStatus === "push") {
+    return isStakedPointsCategory(category)
+      ? "Push — Stakes Returned"
+      : "Push — No Points Awarded";
+  }
+
+  if (resultStatus === "cancelled") {
+    return isStakedPointsCategory(category)
+      ? "Cancelled — Stakes Returned"
+      : "Cancelled — No Points Awarded";
+  }
+
   const locked =
     isCategoryLocked(category);
 
@@ -1805,6 +1903,17 @@ function getThirdLineText(
 }
 
 function isCategoryLocked(category) {
+
+  const resultStatus =
+    getCategoryResultStatus(category);
+
+  if (
+    resultStatus === "winner" ||
+    resultStatus === "push" ||
+    resultStatus === "cancelled"
+  ) {
+    return true;
+  }
 
   if (category.locked === true) {
     return true;

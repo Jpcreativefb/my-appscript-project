@@ -644,13 +644,19 @@ function rollupParentLeaderboard_(
     return ownResults || [];
   }
 
+  const includeOwnResults =
+    parentGame.hubMode !== "leaderboard-only" &&
+    parentGame.includeParentQuestions !== false;
+
   const children =
     typeof getChildGames === "function"
       ? getChildGames(parentGameId)
       : [];
 
   if (!children.length) {
-    return ownResults || [];
+    return includeOwnResults
+      ? (ownResults || [])
+      : [];
   }
 
   const userMap = {};
@@ -708,7 +714,7 @@ function rollupParentLeaderboard_(
 
   }
 
-  (ownResults || []).forEach(function(row) {
+  (includeOwnResults ? (ownResults || []) : []).forEach(function(row) {
 
     const target = ensureUser(row);
 
@@ -1204,13 +1210,19 @@ function rollupParentBettingLeaderboard_(
     return ownRows || [];
   }
 
+  const includeOwnResults =
+    parentGame.hubMode !== "leaderboard-only" &&
+    parentGame.includeParentQuestions !== false;
+
   const children =
     typeof getChildGames === "function"
       ? getChildGames(parentGameId)
       : [];
 
   if (!children.length) {
-    return ownRows || [];
+    return includeOwnResults
+      ? (ownRows || [])
+      : [];
   }
 
   const parentStartingBankroll =
@@ -1270,7 +1282,7 @@ function rollupParentBettingLeaderboard_(
 
   }
 
-  (ownRows || []).forEach(function(row) {
+  (includeOwnResults ? (ownRows || []) : []).forEach(function(row) {
 
     const target = ensureUser(row);
 

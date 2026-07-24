@@ -403,6 +403,8 @@ async function renderGameSwitcher() {
 
   }
 
+  APP_STATE.gameSwitcherGames = res.games.slice();
+
   const selectedGameId =
     getFrontendGameId() ||
     res.currentGameId ||
@@ -477,7 +479,9 @@ async function renderGameSwitcher() {
 async function enterGame(
   gameId,
   gameType,
-  leagueId
+  leagueId,
+  gameRole,
+  hubMode
 ) {
 
   gameId =
@@ -486,6 +490,16 @@ async function enterGame(
 
   gameType =
     String(gameType || "")
+      .trim()
+      .toLowerCase();
+
+  gameRole =
+    String(gameRole || "")
+      .trim()
+      .toLowerCase();
+
+  hubMode =
+    String(hubMode || "")
       .trim()
       .toLowerCase();
 
@@ -514,6 +528,12 @@ async function enterGame(
   );
 
   clearStartupPayload();
+
+  if (gameRole === "parent") {
+    localStorage.setItem("seasonHubMode", hubMode || "playable-aggregate");
+    await navigate("season-hub");
+    return;
+  }
 
   if (
     gameType === "wager" ||
@@ -653,10 +673,21 @@ async function renderPage(page) {
 
       break;
 
+    case "season-hub":
+
+      app.innerHTML =
+        await renderSeasonHubPage();
+
+      break;
+
     case "admin":
 
       app.innerHTML =
         await renderAdminPage();
+
+      if (typeof adminEnhanceMainAdminSections === "function") {
+        adminEnhanceMainAdminSections();
+      }
 
       break;
  
@@ -695,6 +726,22 @@ async function renderPage(page) {
 
 async function handleGameSwitch(gameId) {
 
+  gameId = String(gameId || "").trim();
+
+  if (!gameId) {
+    return;
+  }
+
+  const games =
+    Array.isArray(APP_STATE.gameSwitcherGames)
+      ? APP_STATE.gameSwitcherGames
+      : [];
+
+  const selectedGame =
+    games.find(function(game) {
+      return game && game.gameId === gameId;
+    }) || null;
+
   setFrontendGameId(
     gameId
   );
@@ -712,6 +759,25 @@ async function handleGameSwitch(gameId) {
   }
 
   clearStartupPayload();
+
+  if (
+    selectedGame &&
+    (
+      selectedGame.gameRole === "parent" ||
+      APP_STATE.currentPage === "season-hub"
+    )
+  ) {
+    await enterGame(
+      selectedGame.gameId,
+      selectedGame.type,
+      typeof getFrontendLeagueId === "function"
+        ? getFrontendLeagueId()
+        : "",
+      selectedGame.gameRole || "standalone",
+      selectedGame.hubMode || "playable-aggregate"
+    );
+    return;
+  }
 
   await navigate(
     APP_STATE.currentPage || "dashboard"

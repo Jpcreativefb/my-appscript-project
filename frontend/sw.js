@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v4-batched-game-load";
+const AWARDS_CACHE = "awards-app-v10-guided-question-clone-tools";
 
 const APP_SHELL = [
   "./",
@@ -23,6 +23,7 @@ const APP_SHELL = [
   "./js/pages/dashboard.js",
   "./js/pages/picks.js",
   "./js/pages/leaderboard.js",
+  "./js/pages/seasonHub.js",
   "./js/pages/betting.js",
   "./js/pages/admin.js",
   "./js/pages/adminGames.js",

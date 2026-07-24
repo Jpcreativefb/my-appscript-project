@@ -114,188 +114,453 @@ function adminSetupSelected_(currentValue, optionValue) {
     : "";
 }
 
-function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings) {
+function adminSetupFieldLabel_(title, helpText) {
+  if (typeof adminFieldLabel_ === "function") {
+    return adminFieldLabel_(title, helpText);
+  }
+
+  return `<span>${adminSetupEscapeHtml(title)}</span>`;
+}
+
+function adminSetupCanonicalGameType_(game) {
+  const type = String(game && game.type || "prediction").trim().toLowerCase();
+  return type === "combo" ? "mixed" : type;
+}
+
+function adminSetupAllowedScoreModes_(game, currentMode) {
+  const type = adminSetupCanonicalGameType_(game);
+  const modes = [];
+  const add = function(value, label) {
+    if (!modes.some(function(item) { return item.value === value; })) {
+      modes.push({ value: value, label: label });
+    }
+  };
+
+  if (["prediction", "head-to-head", "survivor"].indexOf(type) !== -1) {
+    add("fixed-points", "Fixed Points");
+  } else if (type === "staked-prediction") {
+    add("staked-points", "Staked Points");
+  } else if (type === "confidence") {
+    add("confidence-points", "Confidence Points");
+  } else if (type === "wager" || type === "racing-wager") {
+    add("wager", "Wager");
+  } else if (type === "ranking") {
+    add("ranking", "Ranking");
+  } else {
+    if (!game || game.predictionEnabled !== false || game.fixedPointsEnabled !== false) {
+      add("fixed-points", "Fixed Points");
+    }
+    if (game && game.confidenceEnabled === true) {
+      add("confidence-points", "Confidence Points");
+    }
+    if (game && game.stakedPointsEnabled === true) {
+      add("staked-points", "Staked Points");
+    }
+    if (game && game.wagerEnabled === true) {
+      add("wager", "Wager");
+    }
+    if (game && game.rankingEnabled === true) {
+      add("ranking", "Ranking");
+    }
+  }
+
+  const normalizedCurrent = String(currentMode || "fixed-points")
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-");
+
+  if (!modes.some(function(item) { return item.value === normalizedCurrent; })) {
+    const labels = {
+      "fixed-points": "Fixed Points",
+      "confidence-points": "Confidence Points",
+      "staked-points": "Staked Points",
+      "wager": "Wager",
+      "ranking": "Ranking"
+    };
+    add(normalizedCurrent, (labels[normalizedCurrent] || normalizedCurrent) + " — existing");
+  }
+
+  return modes;
+}
+
+
+function adminSetupDefaultScoreMode_(game) {
+  const type = adminSetupCanonicalGameType_(game);
+
+  if (type === "staked-prediction") return "staked-points";
+  if (type === "confidence") return "confidence-points";
+  if (type === "wager" || type === "racing-wager") return "wager";
+  if (type === "ranking") return "ranking";
+  return "fixed-points";
+}
+
+function adminSetupDefaultQuestionType_(game) {
+  const type = adminSetupCanonicalGameType_(game);
+
+  if (type === "head-to-head") return "head-to-head";
+  if (type === "wager" || type === "racing-wager") return "game-winner";
+  if (type === "ranking") return "ranking";
+  if (type === "survivor") return "elimination";
+  return "category-winner";
+}
+
+
+function adminSetupUniqueValues_(items) {
+  const seen = {};
+  return (items || []).map(function(value) {
+    return String(value || "").trim();
+  }).filter(function(value) {
+    const key = value.toLowerCase();
+    if (!value || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+function adminSetupQuestionTypeOptions_() {
+  return [
+    "category-winner",
+    "binary",
+    "yes-no",
+    "player-compare",
+    "team-compare",
+    "over-under",
+    "game-winner",
+    "first-scorer",
+    "elimination",
+    "ranking",
+    "head-to-head",
+    "tiebreaker"
+  ];
+}
+
+function renderAdminSetupDatalists_(categories) {
+  const list = Array.isArray(categories) ? categories : [];
+  const sections = adminSetupUniqueValues_(list.map(function(category) {
+    return category.section || "Main";
+  }).concat(["Main", "Predictions", "Staked Predictions", "Wagers", "Bonus", "Tiebreakers"]));
+  const groups = adminSetupUniqueValues_(list.map(function(category) {
+    return category.settings && category.settings.groupId || "default";
+  }).concat(["default"]));
+  const providers = ["Manual", "ESPN", "The Academy", "Emmys", "Golden Globes", "TVmaze", "Kalshi", "Polymarket"];
+
+  return `
+    <datalist id="adminSetupSectionOptions">
+      ${sections.map(function(value) { return `<option value="${adminSetupEscapeHtml(value)}"></option>`; }).join("")}
+    </datalist>
+    <datalist id="adminSetupGroupOptions">
+      ${groups.map(function(value) { return `<option value="${adminSetupEscapeHtml(value)}"></option>`; }).join("")}
+    </datalist>
+    <datalist id="adminSetupQuestionTypeOptions">
+      ${adminSetupQuestionTypeOptions_().map(function(value) { return `<option value="${adminSetupEscapeHtml(value)}"></option>`; }).join("")}
+    </datalist>
+    <datalist id="adminSetupProviderOptions">
+      ${providers.map(function(value) { return `<option value="${adminSetupEscapeHtml(value)}"></option>`; }).join("")}
+    </datalist>
+  `;
+}
+
+function adminSetupCategoryOptions_(categories, selectedId, excludedId, blankLabel) {
+  const selected = String(selectedId || "").trim().toLowerCase();
+  const excluded = String(excludedId || "").trim().toLowerCase();
+  const options = [`<option value="">${adminSetupEscapeHtml(blankLabel || "None")}</option>`];
+
+  (categories || []).forEach(function(category) {
+    const categoryId = String(category.categoryId || "").trim();
+    if (!categoryId || categoryId.toLowerCase() === excluded) return;
+    options.push(`<option value="${adminSetupEscapeHtml(categoryId)}" ${categoryId.toLowerCase() === selected ? "selected" : ""}>${adminSetupEscapeHtml(category.category || categoryId)}</option>`);
+  });
+
+  return options.join("");
+}
+
+function adminSetupAutoFillCloneCategoryFields(categoryId) {
+  const nameInput = document.getElementById("cloneCategoryName_" + categoryId);
+  const idInput = document.getElementById("cloneCategoryId_" + categoryId);
+  if (!nameInput || !idInput || idInput.dataset.touched === "true") return;
+  idInput.value = adminSetupSlugify(nameInput.value);
+}
+
+function adminSetupAutoFillCloneNomineeFields(categoryId, nomineeId) {
+  const nameInput = document.getElementById("cloneNomineeName_" + categoryId + "_" + nomineeId);
+  const idInput = document.getElementById("cloneNomineeId_" + categoryId + "_" + nomineeId);
+  const shortInput = document.getElementById("cloneNomineeShort_" + categoryId + "_" + nomineeId);
+  if (!nameInput) return;
+  if (idInput && idInput.dataset.touched !== "true") idInput.value = adminSetupSlugify(nameInput.value);
+  if (shortInput && shortInput.dataset.touched !== "true") shortInput.value = nameInput.value;
+}
+
+function adminSetupParseBulkAnswerLines_(text) {
+  const rows = [];
+  String(text || "").split(/\r?\n/).forEach(function(line) {
+    const clean = String(line || "").trim();
+    if (!clean) return;
+    const parts = clean.split("|").map(function(part) { return part.trim(); });
+    const nominee = parts[0] || "";
+    if (!nominee) return;
+    rows.push({
+      nominee: nominee,
+      shortAnswer: parts[1] || nominee,
+      nomineeId: parts[2] || adminSetupSlugify(nominee),
+      fileId: parts[3] || ""
+    });
+  });
+  return rows;
+}
+
+
+function adminSetupAnswerPresetItems_(preset) {
+  const sets = {
+    "yes-no": ["Yes", "No"],
+    "true-false": ["True", "False"],
+    "over-under": ["Over", "Under"],
+    "home-away": ["Home", "Away"],
+    "home-away-draw": ["Home", "Away", "Draw"]
+  };
+  return (sets[String(preset || "")] || []).map(function(name) {
+    return {
+      nominee: name,
+      shortAnswer: name,
+      nomineeId: adminSetupSlugify(name)
+    };
+  });
+}
+
+function adminSetupUpdateQuestionFieldVisibility(root) {
+  if (!root) {
+    return;
+  }
+
+  const scoreSelect = root.querySelector("[data-question-score-mode]");
+  const scoreMode = scoreSelect ? scoreSelect.value : "fixed-points";
+
+  root.querySelectorAll("[data-score-mode-only]").forEach(function(section) {
+    section.hidden = section.dataset.scoreModeOnly !== scoreMode;
+  });
+
+  const card = root.closest(".admin-collapsible-body") || root.closest(".admin-category-edit-panel") || root.parentElement;
+  if (card) {
+    card.querySelectorAll("[data-question-points-field]").forEach(function(field) {
+      field.hidden = ["fixed-points", "confidence-points"].indexOf(scoreMode) === -1;
+    });
+  }
+
+  const sourceSelect = root.querySelector("[data-result-source-type]");
+  const sourceType = sourceSelect ? sourceSelect.value : "manual";
+
+  root.querySelectorAll("[data-result-source-advanced]").forEach(function(section) {
+    section.hidden = sourceType === "manual";
+  });
+}
+
+function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
   const config = settings || {};
   const id = fieldName => adminSetupFieldId_(prefix, fieldName, suffix);
   const value = fieldName => adminSetupEscapeHtml(config[fieldName] || "");
 
   const rawScoreMode = String(config.scoreMode || "fixed-points").trim();
-  const scoreMode = rawScoreMode.toLowerCase().replace(/_/g, "-") === "correct-pick"
+  const normalizedScoreMode = rawScoreMode.toLowerCase().replace(/_/g, "-");
+  const scoreMode = normalizedScoreMode === "correct-pick"
     ? "fixed-points"
-    : rawScoreMode;
-  const scoringEngine = String(config.scoringEngine || "manual").trim();
+    : normalizedScoreMode;
+  const scoringEngine = String(config.scoringEngine || (game && game.scoringEngine) || "manual").trim();
   const selectionMode = String(config.selectionMode || "single").trim();
   const resultSourceType = String(config.resultSourceType || "manual").trim();
+  const allowedScoreModes = adminSetupAllowedScoreModes_(game, scoreMode);
+  const stakedHidden = scoreMode === "staked-points" ? "" : "hidden";
+  const externalHidden = resultSourceType === "manual" ? "hidden" : "";
 
   return `
-    <div class="admin-setup-subsection">
-      <h4>Question and scoring</h4>
+    <div class="admin-question-engine-fields" data-question-engine-root>
+      <div class="admin-setup-subsection">
+        <h4>Question and scoring</h4>
+        <div class="admin-sub">
+          Only scoring modes enabled for this game are shown.
+        </div>
 
-      <div class="admin-control-grid">
-        <label class="admin-field">
-          <span>Score Mode</span>
-          <select id="${id("ScoreMode")}">
-            <option value="fixed-points" ${adminSetupSelected_(scoreMode, "fixed-points")}>Fixed Points</option>
-            <option value="confidence-points" ${adminSetupSelected_(scoreMode, "confidence-points")}>Confidence Points</option>
-            <option value="staked-points" ${adminSetupSelected_(scoreMode, "staked-points")}>Staked Points</option>
-            <option value="wager" ${adminSetupSelected_(scoreMode, "wager")}>Sports Wager</option>
-            <option value="ranking" ${adminSetupSelected_(scoreMode, "ranking")}>Ranking</option>
-          </select>
-        </label>
+        <div class="admin-control-grid">
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Score Mode", "Determines whether the question awards fixed points, confidence points, staked points, wager payouts, or ranking credit.")}
+            <select
+              id="${id("ScoreMode")}"
+              data-question-score-mode
+              onchange="adminSetupUpdateQuestionFieldVisibility(this.closest('[data-question-engine-root]'))"
+            >
+              ${allowedScoreModes.map(function(mode) {
+                return `<option value="${adminSetupEscapeHtml(mode.value)}" ${adminSetupSelected_(scoreMode, mode.value)}>${adminSetupEscapeHtml(mode.label)}</option>`;
+              }).join("")}
+            </select>
+          </label>
 
-        <label class="admin-field">
-          <span>Question Type</span>
-          <input
-            type="text"
-            id="${id("QuestionType")}"
-            value="${value("questionType") || "award-single-winner"}"
-            placeholder="player-compare, binary, category-winner"
-          >
-        </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Question Type", "A machine-readable description used by result adapters, such as category-winner, player-compare, binary, over-under, or elimination.")}
+            <input
+              type="text"
+              id="${id("QuestionType")}"
+              value="${value("questionType") || "category-winner"}"
+              placeholder="player-compare, binary, category-winner"
+              list="adminSetupQuestionTypeOptions"
+            >
+          </label>
 
-        <label class="admin-field">
-          <span>Scoring Engine</span>
-          <select id="${id("ScoringEngine")}">
-            <option value="manual" ${adminSetupSelected_(scoringEngine, "manual")}>Manual / Category Result</option>
-            <option value="sports" ${adminSetupSelected_(scoringEngine, "sports")}>Sports Scores Engine</option>
-            <option value="internet" ${adminSetupSelected_(scoringEngine, "internet")}>External Results Hub</option>
-            <option value="racing" ${adminSetupSelected_(scoringEngine, "racing")}>Racing Engine</option>
-          </select>
-        </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Scoring Engine", "The system that evaluates the result. Manual works for any question; automated engines require matching source information.")}
+            <select id="${id("ScoringEngine")}">
+              <option value="manual" ${adminSetupSelected_(scoringEngine, "manual")}>Manual / Category Result</option>
+              <option value="sports" ${adminSetupSelected_(scoringEngine, "sports")}>Sports Scores Engine</option>
+              <option value="internet" ${adminSetupSelected_(scoringEngine, "internet")}>External Results Hub</option>
+              <option value="racing" ${adminSetupSelected_(scoringEngine, "racing")}>Racing Engine</option>
+            </select>
+          </label>
 
-        <label class="admin-field">
-          <span>Selection Mode</span>
-          <select id="${id("SelectionMode")}">
-            <option value="single" ${adminSetupSelected_(selectionMode, "single")}>Single Answer</option>
-            <option value="multiple" ${adminSetupSelected_(selectionMode, "multiple")}>Multiple Answers</option>
-            <option value="ranking" ${adminSetupSelected_(selectionMode, "ranking")}>Rank Answers</option>
-          </select>
-        </label>
-      </div>
-    </div>
-
-    <div class="admin-setup-subsection">
-      <h4>Staked-points override</h4>
-      <div class="admin-sub">
-        Use zero to inherit the game-level rule. A correct pick earns the stake multiplier; a wrong pick loses the loss multiplier.
-      </div>
-
-      <div class="admin-control-grid">
-        <label class="admin-field">
-          <span>Minimum Stake</span>
-          <input type="number" id="${id("MinStake")}" value="${Number(config.minStake) || 0}" min="0">
-        </label>
-
-        <label class="admin-field">
-          <span>Maximum Stake</span>
-          <input type="number" id="${id("MaxStake")}" value="${Number(config.maxStake) || 0}" min="0">
-        </label>
-
-        <label class="admin-field">
-          <span>Stake Increment</span>
-          <input type="number" id="${id("StakeIncrement")}" value="${Number(config.stakeIncrement) || 0}" min="0">
-        </label>
-
-        <label class="admin-field">
-          <span>Win Multiplier</span>
-          <input type="number" id="${id("StakeWinMultiplier")}" value="${config.stakeWinMultiplier === "" || config.stakeWinMultiplier == null ? "" : Number(config.stakeWinMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
-        </label>
-
-        <label class="admin-field">
-          <span>Loss Multiplier</span>
-          <input type="number" id="${id("StakeLossMultiplier")}" value="${config.stakeLossMultiplier === "" || config.stakeLossMultiplier == null ? "" : Number(config.stakeLossMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
-        </label>
-      </div>
-    </div>
-
-    <div class="admin-setup-subsection">
-      <h4>Result source</h4>
-
-      <div class="admin-control-grid">
-        <label class="admin-field">
-          <span>Source Type</span>
-          <select id="${id("ResultSourceType")}">
-            <option value="manual" ${adminSetupSelected_(resultSourceType, "manual")}>Manual / Official Review</option>
-            <option value="sports-stats" ${adminSetupSelected_(resultSourceType, "sports-stats")}>Sports Stats</option>
-            <option value="awards" ${adminSetupSelected_(resultSourceType, "awards")}>Awards</option>
-            <option value="reality-tv" ${adminSetupSelected_(resultSourceType, "reality-tv")}>Reality TV</option>
-            <option value="prediction-market" ${adminSetupSelected_(resultSourceType, "prediction-market")}>Prediction Market</option>
-            <option value="imported" ${adminSetupSelected_(resultSourceType, "imported")}>Imported JSON / CSV</option>
-          </select>
-        </label>
-
-        <label class="admin-field">
-          <span>Provider</span>
-          <input type="text" id="${id("ResultProvider")}" value="${value("resultProvider")}" placeholder="ESPN, Oscars, Kalshi, Manual">
-        </label>
-
-        <label class="admin-field">
-          <span>Result Source Key</span>
-          <input type="text" id="${id("ResultSource")}" value="${value("resultSource")}" placeholder="ESPN_PLAYER_STATS">
-        </label>
-
-        <label class="admin-field">
-          <span>External Event ID</span>
-          <input type="text" id="${id("ExternalEventId")}" value="${value("externalEventId")}" placeholder="ESPN event or ceremony ID">
-        </label>
-
-        <label class="admin-field">
-          <span>External Market ID</span>
-          <input type="text" id="${id("ExternalMarketId")}" value="${value("externalMarketId")}" placeholder="Prediction-market ID">
-        </label>
-
-        <label class="admin-field">
-          <span>External Subject ID</span>
-          <input type="text" id="${id("ExternalSubjectId")}" value="${value("externalSubjectId")}" placeholder="Athlete, nominee, contestant, team">
-        </label>
-
-        <label class="admin-field">
-          <span>Stat / Result Key</span>
-          <input type="text" id="${id("StatKey")}" value="${value("statKey")}" placeholder="passingYards, best-picture, eliminated">
-        </label>
-
-        <label class="admin-field">
-          <span>Comparison</span>
-          <select id="${id("ComparisonOperator")}">
-            <option value="" ${adminSetupSelected_(config.comparisonOperator, "")}>Not Applicable</option>
-            <option value="greater-than" ${adminSetupSelected_(config.comparisonOperator, "greater-than")}>Greater Than</option>
-            <option value="less-than" ${adminSetupSelected_(config.comparisonOperator, "less-than")}>Less Than</option>
-            <option value="greater-or-equal" ${adminSetupSelected_(config.comparisonOperator, "greater-or-equal")}>Greater or Equal</option>
-            <option value="less-or-equal" ${adminSetupSelected_(config.comparisonOperator, "less-or-equal")}>Less or Equal</option>
-            <option value="equals" ${adminSetupSelected_(config.comparisonOperator, "equals")}>Equals</option>
-          </select>
-        </label>
-
-        <label class="admin-field">
-          <span>Threshold</span>
-          <input type="number" id="${id("Threshold")}" value="${config.threshold == null ? "" : adminSetupEscapeHtml(config.threshold)}" step="0.01" placeholder="275.5">
-        </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Selection Mode", "Single Answer allows one choice. Multiple Answers allows several. Ranking asks players to order the answers.")}
+            <select id="${id("SelectionMode")}">
+              <option value="single" ${adminSetupSelected_(selectionMode, "single")}>Single Answer</option>
+              <option value="multiple" ${adminSetupSelected_(selectionMode, "multiple")}>Multiple Answers</option>
+              <option value="ranking" ${adminSetupSelected_(selectionMode, "ranking")}>Rank Answers</option>
+            </select>
+          </label>
+        </div>
       </div>
 
-      <label class="admin-field">
-        <span>Official Source URL</span>
-        <input type="url" id="${id("SourceUrl")}" value="${value("sourceUrl")}" placeholder="https://official-source.example/result">
-      </label>
+      <div class="admin-setup-subsection" data-score-mode-only="staked-points" ${stakedHidden}>
+        <h4>Staked-points override</h4>
+        <div class="admin-sub">
+          Leave values at zero or blank to inherit the game-level staked-points rules.
+        </div>
 
-      <label class="admin-field">
-        <span>Source Configuration JSON</span>
-        <textarea id="${id("SourceConfigJSON")}" rows="4" placeholder='{"athleteIds":["1","2"],"answerMap":{"YES":"yes"}}'>${value("sourceConfigJSON")}</textarea>
-      </label>
+        <div class="admin-control-grid">
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Minimum Stake", "Overrides the game's minimum stake for this question. Zero inherits the game rule.")}
+            <input type="number" id="${id("MinStake")}" value="${Number(config.minStake) || 0}" min="0">
+          </label>
 
-      <div class="admin-checkbox-row">
-        <label>
-          <input type="checkbox" id="${id("AutoSettle")}" ${config.autoSettle ? "checked" : ""}>
-          Auto-settle when final
-        </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Maximum Stake", "Overrides the game's maximum stake for this question. Zero inherits the game rule.")}
+            <input type="number" id="${id("MaxStake")}" value="${Number(config.maxStake) || 0}" min="0">
+          </label>
 
-        <label>
-          <input type="checkbox" id="${id("RequireAdminReview")}" ${config.requireAdminReview === false ? "" : "checked"}>
-          Require admin review
-        </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Stake Increment", "Overrides the allowed step between stake amounts. Zero inherits the game rule.")}
+            <input type="number" id="${id("StakeIncrement")}" value="${Number(config.stakeIncrement) || 0}" min="0">
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Win Multiplier", "Overrides the game's net-win multiplier for this question. Blank inherits the game rule.")}
+            <input type="number" id="${id("StakeWinMultiplier")}" value="${config.stakeWinMultiplier === "" || config.stakeWinMultiplier == null ? "" : Number(config.stakeWinMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Loss Multiplier", "Overrides the game's loss multiplier for this question. Blank inherits the game rule.")}
+            <input type="number" id="${id("StakeLossMultiplier")}" value="${config.stakeLossMultiplier === "" || config.stakeLossMultiplier == null ? "" : Number(config.stakeLossMultiplier)}" min="0" step="0.01" placeholder="Inherit game rule">
+          </label>
+        </div>
+      </div>
+
+      <div class="admin-setup-subsection">
+        <h4>Result source</h4>
+        <div class="admin-sub">
+          Manual review is the safest default. Choose another source when an adapter will supply the final result.
+        </div>
+
+        <div class="admin-control-grid">
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Source Type", "Identifies where the result comes from: manual review, sports data, awards, reality TV, prediction markets, or an imported file.")}
+            <select
+              id="${id("ResultSourceType")}"
+              data-result-source-type
+              onchange="adminSetupUpdateQuestionFieldVisibility(this.closest('[data-question-engine-root]'))"
+            >
+              <option value="manual" ${adminSetupSelected_(resultSourceType, "manual")}>Manual / Official Review</option>
+              <option value="sports-stats" ${adminSetupSelected_(resultSourceType, "sports-stats")}>Sports Stats</option>
+              <option value="awards" ${adminSetupSelected_(resultSourceType, "awards")}>Awards</option>
+              <option value="reality-tv" ${adminSetupSelected_(resultSourceType, "reality-tv")}>Reality TV</option>
+              <option value="prediction-market" ${adminSetupSelected_(resultSourceType, "prediction-market")}>Prediction Market</option>
+              <option value="imported" ${adminSetupSelected_(resultSourceType, "imported")}>Imported JSON / CSV</option>
+            </select>
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Provider", "The specific source, such as ESPN, The Academy, Kalshi, Polymarket, or Manual.")}
+            <input type="text" id="${id("ResultProvider")}" value="${value("resultProvider")}" placeholder="ESPN, Oscars, Kalshi, Manual" list="adminSetupProviderOptions">
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Result Source Key", "A stable internal key describing the feed or settlement method, such as ESPN_PLAYER_STATS or MANUAL_ADMIN.")}
+            <input type="text" id="${id("ResultSource")}" value="${value("resultSource")}" placeholder="ESPN_PLAYER_STATS">
+          </label>
+        </div>
+
+        <details class="admin-advanced-details" data-result-source-advanced ${externalHidden}>
+          <summary>External source mapping</summary>
+
+          <div class="admin-control-grid">
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("External Event ID", "The external game, ceremony, episode, or event identifier.")}
+              <input type="text" id="${id("ExternalEventId")}" value="${value("externalEventId")}" placeholder="ESPN event or ceremony ID">
+            </label>
+
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("External Market ID", "The external prediction-market identifier when a market resolves this question.")}
+              <input type="text" id="${id("ExternalMarketId")}" value="${value("externalMarketId")}" placeholder="Prediction-market ID">
+            </label>
+
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("External Subject ID", "The athlete, team, nominee, contestant, driver, or other subject identifier.")}
+              <input type="text" id="${id("ExternalSubjectId")}" value="${value("externalSubjectId")}" placeholder="Athlete, nominee, contestant, team">
+            </label>
+
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("Stat / Result Key", "The exact field used to evaluate the question, such as passingYards, best-picture, or eliminated.")}
+              <input type="text" id="${id("StatKey")}" value="${value("statKey")}" placeholder="passingYards, best-picture, eliminated">
+            </label>
+
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("Comparison", "Used for thresholds and over/under questions. Leave Not Applicable for simple winner questions.")}
+              <select id="${id("ComparisonOperator")}">
+                <option value="" ${adminSetupSelected_(config.comparisonOperator, "")}>Not Applicable</option>
+                <option value="greater-than" ${adminSetupSelected_(config.comparisonOperator, "greater-than")}>Greater Than</option>
+                <option value="less-than" ${adminSetupSelected_(config.comparisonOperator, "less-than")}>Less Than</option>
+                <option value="greater-or-equal" ${adminSetupSelected_(config.comparisonOperator, "greater-or-equal")}>Greater or Equal</option>
+                <option value="less-or-equal" ${adminSetupSelected_(config.comparisonOperator, "less-or-equal")}>Less or Equal</option>
+                <option value="equals" ${adminSetupSelected_(config.comparisonOperator, "equals")}>Equals</option>
+              </select>
+            </label>
+
+            <label class="admin-field">
+              ${adminSetupFieldLabel_("Threshold", "The number used by an over/under or comparison question, such as 275.5 passing yards.")}
+              <input type="number" id="${id("Threshold")}" value="${config.threshold == null ? "" : adminSetupEscapeHtml(config.threshold)}" step="0.01" placeholder="275.5">
+            </label>
+          </div>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Official Source URL", "A reference link used for auditing or admin review.")}
+            <input type="url" id="${id("SourceUrl")}" value="${value("sourceUrl")}" placeholder="https://official-source.example/result">
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Source Configuration JSON", "Advanced adapter settings such as athlete IDs, answer maps, or provider-specific options.")}
+            <textarea id="${id("SourceConfigJSON")}" rows="4" placeholder='{"athleteIds":["1","2"],"answerMap":{"YES":"yes"}}'>${value("sourceConfigJSON")}</textarea>
+          </label>
+        </details>
+
+        <div class="admin-checkbox-row">
+          <span class="admin-checkbox-with-help">
+            <label><input type="checkbox" id="${id("AutoSettle")}" ${config.autoSettle ? "checked" : ""}> Auto-settle when final</label>
+            ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Auto-settle when final", "Settles the question automatically after the connected source reports a final result.") : ""}
+          </span>
+
+          <span class="admin-checkbox-with-help">
+            <label><input type="checkbox" id="${id("RequireAdminReview")}" ${config.requireAdminReview === false ? "" : "checked"}> Require admin review</label>
+            ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Require admin review", "Places detected results into a review step before player scores are settled.") : ""}
+          </span>
+        </div>
       </div>
     </div>
   `;
 }
+
 
 function adminSetupReadQuestionEngineFields_(prefix, suffix) {
   const id = fieldName => adminSetupFieldId_(prefix, fieldName, suffix);
@@ -326,11 +591,13 @@ function adminSetupReadQuestionEngineFields_(prefix, suffix) {
   };
 }
 
-function renderAdminSetupAddCategoryCard(gameId) {
+function renderAdminSetupAddCategoryCard(gameId, game, categories) {
+  const defaultScoreMode = adminSetupDefaultScoreMode_(game);
+  const showPoints = ["fixed-points", "confidence-points"].indexOf(defaultScoreMode) !== -1;
+
   return `
     <details
       class="card admin-card admin-collapsible-card"
-      open
     >
 
       <summary class="admin-card-summary">
@@ -354,7 +621,7 @@ function renderAdminSetupAddCategoryCard(gameId) {
         <div class="admin-control-grid">
 
           <label class="admin-field">
-            <span>Category / Question</span>
+            ${adminSetupFieldLabel_("Category / Question", "The player-facing question or category title.")}
 
             <input
               type="text"
@@ -364,8 +631,8 @@ function renderAdminSetupAddCategoryCard(gameId) {
             >
           </label>
 
-          <label class="admin-field">
-            <span>Points</span>
+          <label class="admin-field" data-question-points-field ${showPoints ? "" : "hidden"}>
+            ${adminSetupFieldLabel_("Points", "Used by fixed-point and confidence questions. Staked and wager questions calculate results from the player's stake or wager.")}
 
             <input
               type="number"
@@ -376,12 +643,24 @@ function renderAdminSetupAddCategoryCard(gameId) {
           </label>
 
           <label class="admin-field">
-            <span>Lock Date / Time</span>
+            ${adminSetupFieldLabel_("Lock Date / Time", "The exact time players can no longer change this question.")}
 
             <input
               type="datetime-local"
               id="setupNewCategoryLockDateTime"
             >
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Quick Answer Set", "Optionally creates common answer choices immediately after the question is created.")}
+            <select id="setupNewCategoryAnswerPreset">
+              <option value="">Add answers later</option>
+              <option value="yes-no">Yes / No</option>
+              <option value="true-false">True / False</option>
+              <option value="over-under">Over / Under</option>
+              <option value="home-away">Home / Away</option>
+              <option value="home-away-draw">Home / Away / Draw</option>
+            </select>
           </label>
 
         </div>
@@ -395,7 +674,7 @@ function renderAdminSetupAddCategoryCard(gameId) {
           <div class="admin-control-grid">
 
             <label class="admin-field">
-              <span>Category ID</span>
+              ${adminSetupFieldLabel_("Category ID", "A permanent URL-safe identifier. It auto-generates from the question title.")}
 
               <input
                 type="text"
@@ -406,29 +685,31 @@ function renderAdminSetupAddCategoryCard(gameId) {
             </label>
 
             <label class="admin-field">
-              <span>Section</span>
+              ${adminSetupFieldLabel_("Section", "Groups related questions together on the player page.")}
 
               <input
                 type="text"
                 id="setupNewCategorySection"
                 placeholder="Main"
                 value="Main"
+                list="adminSetupSectionOptions"
               >
             </label>
 
             <label class="admin-field">
-              <span>Group ID</span>
+              ${adminSetupFieldLabel_("Group ID", "An internal grouping key used by layouts, follow-ups, and bulk controls.")}
 
               <input
                 type="text"
                 id="setupNewCategoryGroupId"
                 placeholder="default"
                 value="default"
+                list="adminSetupGroupOptions"
               >
             </label>
 
             <label class="admin-field">
-              <span>Display Order</span>
+              ${adminSetupFieldLabel_("Display Order", "Lower numbers appear earlier within the section.")}
 
               <input
                 type="number"
@@ -439,7 +720,7 @@ function renderAdminSetupAddCategoryCard(gameId) {
             </label>
 
             <label class="admin-field">
-              <span>Layout Type</span>
+              ${adminSetupFieldLabel_("Layout Type", "Controls whether answers appear as image cards, text, compact cards, or a list.")}
 
               <select id="setupNewCategoryLayoutType">
                 <option value="image">Image</option>
@@ -450,23 +731,17 @@ function renderAdminSetupAddCategoryCard(gameId) {
             </label>
 
             <label class="admin-field">
-              <span>Parent Category ID</span>
-
-              <input
-                type="text"
-                id="setupNewCategoryParentCategoryId"
-                placeholder="Optional parent category"
-              >
+              ${adminSetupFieldLabel_("Parent Question", "Optional link to a parent question for conditional or grouped flows.")}
+              <select id="setupNewCategoryParentCategoryId">
+                ${adminSetupCategoryOptions_(categories, "", "", "No parent question")}
+              </select>
             </label>
 
             <label class="admin-field">
-              <span>Follow-Up Category ID</span>
-
-              <input
-                type="text"
-                id="setupNewCategoryFollowUpCategoryId"
-                placeholder="Optional follow-up category"
-              >
+              ${adminSetupFieldLabel_("Follow-Up Question", "Optional question to reveal or activate after this question resolves.")}
+              <select id="setupNewCategoryFollowUpCategoryId">
+                ${adminSetupCategoryOptions_(categories, "", "", "No follow-up question")}
+              </select>
             </label>
 
           </div>
@@ -475,17 +750,18 @@ function renderAdminSetupAddCategoryCard(gameId) {
             "setupNewCategory",
             "",
             {
-              scoreMode: "fixed-points",
-              questionType: "award-single-winner",
-              scoringEngine: "manual",
+              scoreMode: defaultScoreMode,
+              questionType: adminSetupDefaultQuestionType_(game),
+              scoringEngine: (game && game.scoringEngine) || "manual",
               selectionMode: "single",
               resultSourceType: "manual",
               requireAdminReview: true,
-            }
+            },
+            game
           )}
 
           <label class="admin-field">
-            <span>Follow-Up Map JSON</span>
+            ${adminSetupFieldLabel_("Follow-Up Map JSON", "Advanced mapping from a winning answer ID to a follow-up category ID.")}
 
             <textarea
               id="setupNewCategoryFollowUpMapJSON"
@@ -494,28 +770,23 @@ function renderAdminSetupAddCategoryCard(gameId) {
             ></textarea>
           </label>
 
-          <label class="admin-check-row">
-            <input
-              type="checkbox"
-              id="setupNewCategoryCountsAsStatue"
-              checked
-            >
-
-            <span>
-              Counts as statue
+          <div class="admin-checkbox-row">
+            <span class="admin-checkbox-with-help">
+              <label class="admin-check-row">
+                <input type="checkbox" id="setupNewCategoryCountsAsStatue" checked>
+                <span>Counts as statue</span>
+              </label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Counts as statue", "Includes this question in award-statue totals. Turn it off for sports, props, bonuses, and non-award questions.") : ""}
             </span>
-          </label>
 
-          <label class="admin-check-row">
-            <input
-              type="checkbox"
-              id="setupNewCategoryLocked"
-            >
-
-            <span>
-              Start locked
+            <span class="admin-checkbox-with-help">
+              <label class="admin-check-row">
+                <input type="checkbox" id="setupNewCategoryLocked">
+                <span>Start locked</span>
+              </label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Start locked", "Creates the question in a locked state so players cannot make picks until an admin opens it.") : ""}
             </span>
-          </label>
+          </div>
 
         </details>
 
@@ -523,7 +794,7 @@ function renderAdminSetupAddCategoryCard(gameId) {
           class="admin-small-button"
           onclick="adminSetupCreateCategory('${adminSetupEscapeHtml(gameId)}')"
         >
-          Add Category
+          Add Question
         </button>
 
         <div
@@ -592,8 +863,22 @@ async function renderAdminGameSetupPage(gameId) {
       ? res.categories
       : [];
 
+  const game =
+    res.game || {
+      gameId: safeGameId,
+      type: "prediction",
+      predictionEnabled: true,
+      fixedPointsEnabled: true
+    };
+
+  const isLeaderboardOnlyHub =
+    game.gameRole === "parent" &&
+    game.hubMode === "leaderboard-only";
+
   return `
     <div class="page admin-page admin-game-setup-page">
+
+      ${renderAdminSetupDatalists_(categories)}
 
       <div class="admin-page-header">
 
@@ -670,20 +955,27 @@ async function renderAdminGameSetupPage(gameId) {
 
       <div class="admin-section">
 
-        ${renderAdminSetupAddCategoryCard(safeGameId)}
+        ${isLeaderboardOnlyHub ? `
+          <div class="card admin-card admin-season-hub-notice">
+            <h2>Leaderboard-Only Season Hub</h2>
+            <p>
+              This hub combines mini-game standings and links. It does not accept parent-level categories or questions.
+              Change Hub Mode to <strong>Playable + Aggregate</strong> in Manage Games to add season-long questions.
+            </p>
+          </div>
+        ` : renderAdminSetupAddCategoryCard(safeGameId, game, categories)}
 
         <details
           class="card admin-card admin-collapsible-card admin-categories-main-card"
-          open
         >
 
           <summary class="admin-card-summary">
 
             <div>
-              <h2>Categories / Questions</h2>
+              <h2>${isLeaderboardOnlyHub ? "Stored Categories / Questions" : "Categories / Questions"}</h2>
 
               <div class="admin-sub">
-                ${categories.length} categories/questions configured.
+                ${categories.length} categories/questions configured.${isLeaderboardOnlyHub ? " Stored parent questions are excluded from the hub standings." : ""}
               </div>
             </div>
 
@@ -1022,7 +1314,7 @@ async function renderAdminGameSetupPage(gameId) {
                   <div class="admin-list admin-category-list">
                     ${categories
                       .map(category =>
-                        renderAdminSetupCategoryCard(category)
+                        renderAdminSetupCategoryCard(category, game, categories)
                       )
                       .join("")}
                   </div>
@@ -2281,10 +2573,152 @@ async function adminSetupDeleteNomineeImageFromDrive(
 }
 
 /* ======================
+   CLONE / BULK SETUP PANELS
+====================== */
+
+function renderAdminSetupCloneCategoryPanel_(category) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const cloneName = adminSetupEscapeHtml((category.category || category.categoryId) + " Copy");
+  const cloneId = adminSetupEscapeHtml(adminSetupSlugify((category.categoryId || category.category || "question") + "-copy"));
+  const settings = category.settings || {};
+
+  return `
+    <details class="admin-setup-tool-panel admin-clone-question-panel">
+      <summary class="admin-inline-add-summary">
+        <strong>Clone Question</strong>
+        <span class="admin-sub">Copy this question and optionally all answers.</span>
+        <span class="admin-collapse-icon">▾</span>
+      </summary>
+      <div class="admin-inline-add-body">
+        <div class="admin-control-grid">
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("New Question", "Change the title so the cloned question is unique.")}
+            <input type="text" id="cloneCategoryName_${categoryId}" value="${cloneName}" oninput="adminSetupAutoFillCloneCategoryFields('${categoryId}')">
+          </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("New Question ID", "Auto-generated from the new title. The backend also prevents duplicate IDs.")}
+            <input type="text" id="cloneCategoryId_${categoryId}" value="${cloneId}" oninput="this.dataset.touched='true'">
+          </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Section", "The cloned question can stay in the same section or move to another.")}
+            <input type="text" id="cloneCategorySection_${categoryId}" value="${adminSetupEscapeHtml(category.section || "Main")}" list="adminSetupSectionOptions">
+          </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Display Order", "Set the position of the cloned question.")}
+            <input type="number" id="cloneCategoryOrder_${categoryId}" value="${(Number(settings.displayOrder) || 999) + 1}" min="0">
+          </label>
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("New Lock Date / Time", "The clone starts without the original lock time unless you enter a new one.")}
+            <input type="datetime-local" id="cloneCategoryLockDateTime_${categoryId}" value="">
+          </label>
+        </div>
+        <div class="admin-checkbox-row">
+          <label class="admin-check-row"><input type="checkbox" id="cloneCategoryCopyNominees_${categoryId}" checked><span>Copy answers / nominees</span></label>
+          <label class="admin-check-row"><input type="checkbox" id="cloneCategoryCopyImages_${categoryId}" checked><span>Copy answer images</span></label>
+        </div>
+        <div class="admin-card-actions">
+          <button type="button" class="admin-small-button" onclick="adminSetupCloneCategory('${gameId}', '${categoryId}')">Clone Question</button>
+        </div>
+        <div id="cloneCategoryMessage_${categoryId}" class="admin-message"></div>
+      </div>
+    </details>
+  `;
+}
+
+function renderAdminSetupBulkNomineesPanel_(category) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const categoryName = adminSetupEscapeHtml(category.category || category.categoryId);
+
+  return `
+    <details class="admin-setup-tool-panel admin-bulk-answer-panel">
+      <summary class="admin-inline-add-summary">
+        <strong>Bulk Add Answers</strong>
+        <span class="admin-sub">Paste or generate many answers at once.</span>
+        <span class="admin-collapse-icon">▾</span>
+      </summary>
+      <div class="admin-inline-add-body">
+        <div class="admin-control-grid">
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Generate Numbered Answers", "Creates editable lines such as Contestant 1, Contestant 2, and Contestant 3.")}
+            <input type="text" id="bulkNomineePrefix_${categoryId}" placeholder="Contestant">
+          </label>
+          <label class="admin-field">
+            <span>Count</span>
+            <input type="number" id="bulkNomineeCount_${categoryId}" value="5" min="1" max="250">
+          </label>
+          <label class="admin-field">
+            <span>Start Number</span>
+            <input type="number" id="bulkNomineeStart_${categoryId}" value="1" min="0">
+          </label>
+        </div>
+        <div class="admin-card-actions">
+          <button type="button" class="admin-small-button secondary" onclick="adminSetupGenerateBulkAnswerLines('${categoryId}')">Generate Lines</button>
+        </div>
+        <label class="admin-field">
+          ${adminSetupFieldLabel_("Answers", "Enter one answer per line. Optional format: Name | Short Answer | ID | Drive File ID.")}
+          <textarea id="bulkNomineeLines_${categoryId}" rows="8" placeholder="Josh Allen\nPatrick Mahomes\nTie"></textarea>
+        </label>
+        <div class="admin-card-actions">
+          <button type="button" class="admin-small-button" onclick="adminSetupBulkCreateNominees('${gameId}', '${categoryId}', '${categoryName}')">Create All Answers</button>
+        </div>
+        <div id="bulkNomineeMessage_${categoryId}" class="admin-message"></div>
+      </div>
+    </details>
+  `;
+}
+
+function renderAdminSetupCloneNomineePanel_(category, nominee, categories) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
+  const cloneName = adminSetupEscapeHtml((nominee.nominee || nominee.nomineeId) + " Copy");
+  const cloneId = adminSetupEscapeHtml(adminSetupSlugify((nominee.nomineeId || nominee.nominee || "answer") + "-copy"));
+
+  return `
+    <details class="admin-setup-tool-panel admin-clone-answer-panel">
+      <summary class="admin-inline-add-summary">
+        <strong>Clone Answer</strong>
+        <span class="admin-sub">Copy this answer into this or another question.</span>
+        <span class="admin-collapse-icon">▾</span>
+      </summary>
+      <div class="admin-inline-add-body">
+        <div class="admin-control-grid nominee-grid">
+          <label class="admin-field">
+            <span>Target Question</span>
+            <select id="cloneNomineeTarget_${categoryId}_${nomineeId}">
+              ${adminSetupCategoryOptions_(categories, category.categoryId, "", "Select target question")}
+            </select>
+          </label>
+          <label class="admin-field">
+            <span>New Answer</span>
+            <input type="text" id="cloneNomineeName_${categoryId}_${nomineeId}" value="${cloneName}" oninput="adminSetupAutoFillCloneNomineeFields('${categoryId}', '${nomineeId}')">
+          </label>
+          <label class="admin-field">
+            <span>Short Answer</span>
+            <input type="text" id="cloneNomineeShort_${categoryId}_${nomineeId}" value="${cloneName}" oninput="this.dataset.touched='true'">
+          </label>
+          <label class="admin-field">
+            <span>New Answer ID</span>
+            <input type="text" id="cloneNomineeId_${categoryId}_${nomineeId}" value="${cloneId}" oninput="this.dataset.touched='true'">
+          </label>
+        </div>
+        <label class="admin-check-row"><input type="checkbox" id="cloneNomineeCopyImage_${categoryId}_${nomineeId}" checked><span>Copy image / file ID</span></label>
+        <div class="admin-card-actions">
+          <button type="button" class="admin-small-button" onclick="adminSetupCloneNominee('${gameId}', '${categoryId}', '${nomineeId}')">Clone Answer</button>
+        </div>
+        <div id="cloneNomineeMessage_${categoryId}_${nomineeId}" class="admin-message"></div>
+      </div>
+    </details>
+  `;
+}
+
+/* ======================
    CATEGORY CARD
 ====================== */
 
-function renderAdminSetupCategoryCard(category) {
+function renderAdminSetupCategoryCard(category, game, categories) {
   const settings =
     category.settings || {};
 
@@ -2351,12 +2785,19 @@ function renderAdminSetupCategoryCard(category) {
 
       <div class="admin-collapsible-body">
 
-        <div class="admin-edit-panel">
+        <details class="admin-question-settings-shell">
+          <summary class="admin-inline-add-summary">
+            <strong>Settings</strong>
+            <span class="admin-sub">Question text, scoring, source, display, and locking.</span>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+
+          <div class="admin-edit-panel">
 
           <div class="admin-control-grid">
 
             <label class="admin-field">
-              <span>Category / Question</span>
+              ${adminSetupFieldLabel_("Category / Question", "The player-facing question or category title.")}
 
               <input
                 type="text"
@@ -2366,17 +2807,18 @@ function renderAdminSetupCategoryCard(category) {
             </label>
 
             <label class="admin-field">
-              <span>Section</span>
+              ${adminSetupFieldLabel_("Section", "Groups related questions together on the player page.")}
 
               <input
                 type="text"
                 id="editCategorySection_${categoryId}"
                 value="${section}"
+                list="adminSetupSectionOptions"
               >
             </label>
 
-            <label class="admin-field">
-              <span>Points</span>
+            <label class="admin-field" data-question-points-field ${["fixed-points", "confidence-points", "correct-pick"].indexOf(String(settings.scoreMode || "fixed-points").toLowerCase().replace(/_/g, "-")) !== -1 ? "" : "hidden"}>
+              ${adminSetupFieldLabel_("Points", "Used only by fixed-point and confidence questions.")}
 
               <input
                 type="number"
@@ -2387,7 +2829,7 @@ function renderAdminSetupCategoryCard(category) {
             </label>
 
             <label class="admin-field">
-              <span>Display Order</span>
+              ${adminSetupFieldLabel_("Display Order", "Lower numbers appear earlier within the section.")}
 
               <input
                 type="number"
@@ -2398,7 +2840,7 @@ function renderAdminSetupCategoryCard(category) {
             </label>
 
             <label class="admin-field">
-              <span>Layout Type</span>
+              ${adminSetupFieldLabel_("Layout Type", "Controls whether answers appear as image cards, text, compact cards, or a list.")}
 
               <select id="editCategoryLayout_${categoryId}">
 
@@ -2436,43 +2878,25 @@ function renderAdminSetupCategoryCard(category) {
           </div>
 
           <div class="admin-checkbox-row">
+            <span class="admin-checkbox-with-help">
+              <label><input type="checkbox" id="editCategoryLocked_${categoryId}" ${settings.locked ? "checked" : ""}> Locked</label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Locked", "Prevents players from changing this question even if the game itself remains open.") : ""}
+            </span>
 
-            <label>
-              <input
-                type="checkbox"
-                id="editCategoryLocked_${categoryId}"
-                ${settings.locked ? "checked" : ""}
-              >
-              Locked
-            </label>
+            <span class="admin-checkbox-with-help">
+              <label><input type="checkbox" id="editCategoryActive_${categoryId}" ${category.active !== false ? "checked" : ""}> Active</label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Active", "Shows this question to players. Inactive questions remain stored but are hidden.") : ""}
+            </span>
 
-            <label>
-              <input
-                type="checkbox"
-                id="editCategoryActive_${categoryId}"
-                ${category.active !== false ? "checked" : ""}
-              >
-              Active
-            </label>
+            <span class="admin-checkbox-with-help">
+              <label><input type="checkbox" id="editCategoryPrediction_${categoryId}" ${category.predictionGame !== false ? "checked" : ""}> Prediction Question</label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Prediction Question", "Includes this category in the normal prediction/pick flow. Leave off for ranking-only or specialized categories.") : ""}
+            </span>
 
-            <label>
-              <input
-                type="checkbox"
-                id="editCategoryPrediction_${categoryId}"
-                ${category.predictionGame !== false ? "checked" : ""}
-              >
-              Prediction Game
-            </label>
-
-            <label>
-              <input
-                type="checkbox"
-                id="editCategoryStatue_${categoryId}"
-                ${settings.countsAsStatue ? "checked" : ""}
-              >
-              Counts as Statue
-            </label>
-
+            <span class="admin-checkbox-with-help">
+              <label><input type="checkbox" id="editCategoryStatue_${categoryId}" ${settings.countsAsStatue ? "checked" : ""}> Counts as Statue</label>
+              ${typeof adminHelpButton_ === "function" ? adminHelpButton_("Counts as Statue", "Includes this category in award-statue totals. Turn it off for sports, props, bonuses, and non-award questions.") : ""}
+            </span>
           </div>
 
           <details class="admin-advanced-details">
@@ -2484,7 +2908,7 @@ function renderAdminSetupCategoryCard(category) {
             <div class="admin-control-grid">
 
               <label class="admin-field">
-                <span>Lock Date / Time</span>
+                ${adminSetupFieldLabel_("Lock Date / Time", "The exact time players can no longer change this question.")}
 
                 <input
                   type="datetime-local"
@@ -2496,36 +2920,29 @@ function renderAdminSetupCategoryCard(category) {
               </label>
 
               <label class="admin-field">
-                <span>Group ID</span>
+                ${adminSetupFieldLabel_("Group ID", "An internal grouping key used by layouts, follow-ups, and bulk controls.")}
 
                 <input
                   type="text"
                   id="editCategoryGroupId_${categoryId}"
                   value="${groupId}"
                   placeholder="default"
+                  list="adminSetupGroupOptions"
                 >
               </label>
 
               <label class="admin-field">
-                <span>Parent Category ID</span>
-
-                <input
-                  type="text"
-                  id="editCategoryParentCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.parentCategoryId || "")}"
-                  placeholder="Optional parent category"
-                >
+                ${adminSetupFieldLabel_("Parent Question", "Optional link to a parent question for conditional or grouped flows.")}
+                <select id="editCategoryParentCategoryId_${categoryId}">
+                  ${adminSetupCategoryOptions_(categories, settings.parentCategoryId, category.categoryId, "No parent question")}
+                </select>
               </label>
 
               <label class="admin-field">
-                <span>Follow-Up Category ID</span>
-
-                <input
-                  type="text"
-                  id="editCategoryFollowUpCategoryId_${categoryId}"
-                  value="${adminSetupEscapeHtml(settings.followUpCategoryId || "")}"
-                  placeholder="Optional follow-up category"
-                >
+                ${adminSetupFieldLabel_("Follow-Up Question", "Optional question to reveal or activate after this question resolves.")}
+                <select id="editCategoryFollowUpCategoryId_${categoryId}">
+                  ${adminSetupCategoryOptions_(categories, settings.followUpCategoryId, category.categoryId, "No follow-up question")}
+                </select>
               </label>
 
             </div>
@@ -2533,11 +2950,12 @@ function renderAdminSetupCategoryCard(category) {
             ${renderAdminSetupQuestionEngineFields_(
               "editCategory",
               "_${categoryId}",
-              settings
+              settings,
+              game
             )}
 
             <label class="admin-field">
-              <span>Follow-Up Map JSON</span>
+              ${adminSetupFieldLabel_("Follow-Up Map JSON", "Advanced mapping from a winning answer ID to a follow-up category ID.")}
 
               <textarea
                 id="editCategoryFollowUpMapJSON_${categoryId}"
@@ -2554,14 +2972,14 @@ function renderAdminSetupCategoryCard(category) {
               class="admin-small-button"
               onclick="adminSetupUpdateCategory('${gameId}', '${categoryId}')"
             >
-              Save Category
+              Save Question
             </button>
 
             <button
               class="admin-danger-button"
               onclick="adminSetupArchiveCategory('${gameId}', '${categoryId}')"
             >
-              Archive Category
+              Archive Question
             </button>
 
           </div>
@@ -2571,7 +2989,10 @@ function renderAdminSetupCategoryCard(category) {
             class="admin-message"
           ></div>
 
-        </div>
+          </div>
+        </details>
+
+        ${renderAdminSetupCloneCategoryPanel_(category)}
 
         ${renderAdminResultsPanel(category, nominees, settings)}
 
@@ -2599,7 +3020,7 @@ function renderAdminSetupCategoryCard(category) {
               nominees.length
                 ? nominees
                     .map(nominee =>
-                      renderAdminSetupNomineeRow(category, nominee)
+                      renderAdminSetupNomineeRow(category, nominee, categories)
                     )
                     .join("")
                 : `
@@ -2610,6 +3031,7 @@ function renderAdminSetupCategoryCard(category) {
             }
 
             ${renderAdminSetupInlineAddNomineeCard(category)}
+            ${renderAdminSetupBulkNomineesPanel_(category)}
 
           </div>
 
@@ -2865,7 +3287,7 @@ function adminSetupGetCategoryNameById(categoryId) {
   return option ? option.textContent.trim() : "";
 }
 
-function renderAdminSetupNomineeRow(category, nominee) {
+function renderAdminSetupNomineeRow(category, nominee, categories) {
   const gameId =
     adminSetupEscapeHtml(category.gameId);
 
@@ -2885,7 +3307,20 @@ function renderAdminSetupNomineeRow(category, nominee) {
     nomineeId;
 
   return `
-    <div class="admin-setup-nominee-edit-row">
+    <details class="admin-setup-nominee-edit-row admin-collapsible-nominee">
+
+      <summary class="admin-nominee-item-summary">
+        <div>
+          <strong>${adminSetupEscapeHtml(nominee.nominee || nominee.nomineeId)}</strong>
+          <div class="admin-sub">${nomineeId}${fileId ? " · image" : ""}</div>
+        </div>
+        <div class="admin-nominee-summary-status">
+          <span class="admin-pill ${nominee.active === false ? "inactive" : ""}">${nominee.active === false ? "Inactive" : "Active"}</span>
+          <span class="admin-collapse-icon">▾</span>
+        </div>
+      </summary>
+
+      <div class="admin-nominee-item-body">
 
       <div class="admin-control-grid nominee-grid">
 
@@ -3120,12 +3555,15 @@ function renderAdminSetupNomineeRow(category, nominee) {
 
       </div>
 
+      ${renderAdminSetupCloneNomineePanel_(category, nominee, categories)}
+
       <div
         id="editNomineeMessage_${categoryId}_${nomineeId}"
         class="admin-message"
       ></div>
 
-    </div>
+      </div>
+    </details>
   `;
 }
 
@@ -3212,7 +3650,8 @@ function renderAdminSetupInlineAddNomineeCard(category) {
             <input
               type="text"
               id="inlineNewNomineeSection_${categoryId}"
-              value="Main"
+              value="${adminSetupEscapeHtml(category.section || "Main")}"
+              list="adminSetupSectionOptions"
             >
           </label>
 
@@ -3241,6 +3680,142 @@ function renderAdminSetupInlineAddNomineeCard(category) {
   `;
 
 }
+/* ======================
+   CLONE / BULK QUESTION ACTIONS
+====================== */
+
+async function adminSetupCloneCategory(gameId, categoryId) {
+  const name = adminSetupFieldValue_("cloneCategoryName_" + categoryId, "");
+  const newCategoryId = adminSetupSlugify(
+    adminSetupFieldValue_("cloneCategoryId_" + categoryId, name)
+  );
+
+  if (!name || !newCategoryId) {
+    adminSetupSetMessage("cloneCategoryMessage_" + categoryId, "New question name and ID are required.", true);
+    return;
+  }
+
+  adminSetupSetMessage("cloneCategoryMessage_" + categoryId, "Cloning question...", false);
+
+  const res = await apiAdminCloneCategory({
+    gameId: gameId,
+    sourceGameId: gameId,
+    targetGameId: gameId,
+    sourceCategoryId: categoryId,
+    category: name,
+    newCategoryId: newCategoryId,
+    section: adminSetupFieldValue_("cloneCategorySection_" + categoryId, "Main"),
+    displayOrder: adminSetupFieldValue_("cloneCategoryOrder_" + categoryId, "999"),
+    lockDateTime: adminSetupFieldValue_("cloneCategoryLockDateTime_" + categoryId, ""),
+    copyNominees: adminSetupFieldChecked_("cloneCategoryCopyNominees_" + categoryId, true),
+    copyImages: adminSetupFieldChecked_("cloneCategoryCopyImages_" + categoryId, true)
+  });
+
+  if (!res || res.success === false) {
+    adminSetupSetMessage(
+      "cloneCategoryMessage_" + categoryId,
+      res && (res.message || res.error) ? res.message || res.error : "Unable to clone question.",
+      true
+    );
+    return;
+  }
+
+  adminSetupSetMessage(
+    "cloneCategoryMessage_" + categoryId,
+    "Question cloned as " + (res.category || name) + ".",
+    false
+  );
+  navigate("admin-game-setup:" + gameId);
+}
+
+function adminSetupGenerateBulkAnswerLines(categoryId) {
+  const prefix = adminSetupFieldValue_("bulkNomineePrefix_" + categoryId, "Answer");
+  const count = Math.max(1, Math.min(250, Number(adminSetupFieldValue_("bulkNomineeCount_" + categoryId, "5")) || 5));
+  const start = Number(adminSetupFieldValue_("bulkNomineeStart_" + categoryId, "1")) || 0;
+  const textarea = document.getElementById("bulkNomineeLines_" + categoryId);
+  if (!textarea) return;
+
+  const lines = [];
+  for (let index = 0; index < count; index += 1) {
+    const name = (prefix || "Answer") + " " + (start + index);
+    lines.push(name + " | " + name + " | " + adminSetupSlugify(name));
+  }
+  textarea.value = lines.join("\n");
+}
+
+async function adminSetupBulkCreateNominees(gameId, categoryId, categoryName) {
+  const textarea = document.getElementById("bulkNomineeLines_" + categoryId);
+  const items = adminSetupParseBulkAnswerLines_(textarea ? textarea.value : "");
+
+  if (!items.length) {
+    adminSetupSetMessage("bulkNomineeMessage_" + categoryId, "Enter at least one answer.", true);
+    return;
+  }
+
+  adminSetupSetMessage("bulkNomineeMessage_" + categoryId, "Creating " + items.length + " answers...", false);
+
+  const res = await apiAdminBulkCreateNominees({
+    gameId: gameId,
+    categoryId: categoryId,
+    category: categoryName,
+    itemsJSON: JSON.stringify(items)
+  });
+
+  if (!res || (res.success === false && !res.partial)) {
+    adminSetupSetMessage(
+      "bulkNomineeMessage_" + categoryId,
+      res && (res.message || res.error) ? res.message || res.error : "Unable to create answers.",
+      true
+    );
+    return;
+  }
+
+  adminSetupSetMessage(
+    "bulkNomineeMessage_" + categoryId,
+    (res.createdCount || items.length) + " answers created" + (res.errors && res.errors.length ? "; some lines were skipped." : "."),
+    Boolean(res.errors && res.errors.length)
+  );
+  navigate("admin-game-setup:" + gameId);
+}
+
+async function adminSetupCloneNominee(gameId, categoryId, nomineeId) {
+  const targetCategoryId = adminSetupFieldValue_("cloneNomineeTarget_" + categoryId + "_" + nomineeId, categoryId);
+  const nomineeName = adminSetupFieldValue_("cloneNomineeName_" + categoryId + "_" + nomineeId, "");
+  const newNomineeId = adminSetupSlugify(
+    adminSetupFieldValue_("cloneNomineeId_" + categoryId + "_" + nomineeId, nomineeName)
+  );
+
+  if (!targetCategoryId || !nomineeName || !newNomineeId) {
+    adminSetupSetMessage("cloneNomineeMessage_" + categoryId + "_" + nomineeId, "Target question, answer name, and answer ID are required.", true);
+    return;
+  }
+
+  adminSetupSetMessage("cloneNomineeMessage_" + categoryId + "_" + nomineeId, "Cloning answer...", false);
+
+  const res = await apiAdminCloneNominee({
+    gameId: gameId,
+    sourceCategoryId: categoryId,
+    sourceNomineeId: nomineeId,
+    targetCategoryId: targetCategoryId,
+    nominee: nomineeName,
+    newNomineeId: newNomineeId,
+    shortAnswer: adminSetupFieldValue_("cloneNomineeShort_" + categoryId + "_" + nomineeId, nomineeName),
+    copyImage: adminSetupFieldChecked_("cloneNomineeCopyImage_" + categoryId + "_" + nomineeId, true)
+  });
+
+  if (!res || (res.success === false && !res.partial)) {
+    adminSetupSetMessage(
+      "cloneNomineeMessage_" + categoryId + "_" + nomineeId,
+      res && (res.message || res.error) ? res.message || res.error : "Unable to clone answer.",
+      true
+    );
+    return;
+  }
+
+  adminSetupSetMessage("cloneNomineeMessage_" + categoryId + "_" + nomineeId, "Answer cloned.", false);
+  navigate("admin-game-setup:" + gameId);
+}
+
 /* ======================
    CREATE CATEGORY
 ====================== */
@@ -3286,6 +3861,8 @@ async function adminSetupCreateCategory(gameId) {
   );
 
   const lockedInput = document.getElementById("setupNewCategoryLocked");
+
+  const answerPresetInput = document.getElementById("setupNewCategoryAnswerPreset");
 
   const categoryName = nameInput ? nameInput.value.trim() : "";
 
@@ -3386,7 +3963,39 @@ async function adminSetupCreateCategory(gameId) {
     return;
   }
 
-  adminSetupSetMessage("setupAddCategoryMessage", "Category added.", false);
+  const presetItems = adminSetupAnswerPresetItems_(
+    answerPresetInput ? answerPresetInput.value : ""
+  );
+
+  if (presetItems.length) {
+    adminSetupSetMessage(
+      "setupAddCategoryMessage",
+      "Question added. Creating answer choices...",
+      false
+    );
+
+    const bulkResult = await apiAdminBulkCreateNominees({
+      gameId: gameId,
+      categoryId: categoryId,
+      category: categoryName,
+      section: sectionInput ? sectionInput.value.trim() : "Main",
+      itemsJSON: JSON.stringify(presetItems)
+    });
+
+    if (!bulkResult || bulkResult.success === false) {
+      adminSetupSetMessage(
+        "setupAddCategoryMessage",
+        "Question added, but the quick answers could not be created: " +
+          (bulkResult && (bulkResult.message || bulkResult.error)
+            ? bulkResult.message || bulkResult.error
+            : "Unknown error"),
+        true
+      );
+      return;
+    }
+  }
+
+  adminSetupSetMessage("setupAddCategoryMessage", "Question added.", false);
 
   adminSetupCategoryIdTouched = false;
 

@@ -301,16 +301,29 @@ function renderDashboardGameCard(
     game.disableEnter === true ||
     game.available === false;
 
+  const isSeasonHub =
+    game.gameRole === "parent";
+
   const actionButton =
-    isPast
+    isSeasonHub
       ? `
         <button
-          class="dashboard-action-button primary"
-          onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
+          class="dashboard-action-button primary ${enterDisabled && !isPast ? "disabled" : ""}"
+          ${enterDisabled && !isPast ? "disabled" : ""}
+          onclick="${enterDisabled && !isPast ? "" : `enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'), 'parent', '${escapeJs(game.hubMode || 'playable-aggregate')}')`}"
         >
-          View Results
+          ${isPast ? "View Season Hub" : escapeHtml(actionLabel)}
         </button>
       `
+      : isPast
+        ? `
+          <button
+            class="dashboard-action-button primary"
+            onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
+          >
+            View Results
+          </button>
+        `
       : enterDisabled
         ? `
           <button
@@ -324,7 +337,7 @@ function renderDashboardGameCard(
         : `
           <button
             class="dashboard-action-button primary"
-            onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'))"
+            onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', getDashboardSelectedLeagueId_('${escapeJs(game.gameId)}'), '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')"
           >
             ${escapeHtml(actionLabel)}
           </button>

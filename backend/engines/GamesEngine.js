@@ -51,6 +51,17 @@ function getSupportedGameTypes() {
       wagerEnabled: false
     },
     {
+      id: "staked-prediction",
+      label: "Staked Prediction Game",
+      description: "Users risk points on predictions based on confidence.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
+    },
+    {
       id: "wager",
       label: "Wager / Chips Game",
       description: "Users pick nominees or answers and wager chips.",
@@ -215,6 +226,27 @@ function normalizeGameFormat_(value) {
   )
     ? "hybrid"
     : "standard";
+
+}
+
+function normalizeSeasonHubMode_(value) {
+
+  const mode =
+    String(value || "playable-aggregate")
+      .trim()
+      .toLowerCase()
+      .replace(/_/g, "-");
+
+  if (
+    mode === "leaderboard" ||
+    mode === "leaderboard-only" ||
+    mode === "standings-only" ||
+    mode === "hub-only"
+  ) {
+    return "leaderboard-only";
+  }
+
+  return "playable-aggregate";
 
 }
 
@@ -389,6 +421,15 @@ function getGamesColumnMap_(headers) {
 
     gameRole:
       headers.indexOf("GameRole"),
+
+    hubMode:
+      headers.indexOf("HubMode"),
+
+    showMiniGameLinks:
+      headers.indexOf("ShowMiniGameLinks"),
+
+    includeParentQuestions:
+      headers.indexOf("IncludeParentQuestions"),
 
     parentGameId:
       headers.indexOf("ParentGameId"),
@@ -873,6 +914,33 @@ function buildGameObjectFromRow_(
           row,
           col.gameRole,
           "standalone"
+        )
+      ),
+
+    hubMode:
+      normalizeSeasonHubMode_(
+        getGameCell_(
+          row,
+          col.hubMode,
+          "playable-aggregate"
+        )
+      ),
+
+    showMiniGameLinks:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.showMiniGameLinks,
+          true
+        )
+      ),
+
+    includeParentQuestions:
+      normalizeGameBoolean_(
+        getGameCell_(
+          row,
+          col.includeParentQuestions,
+          true
         )
       ),
 
@@ -1421,6 +1489,15 @@ function getPublicActiveGames() {
       gameRole:
         game.gameRole || "standalone",
 
+      hubMode:
+        game.hubMode || "playable-aggregate",
+
+      showMiniGameLinks:
+        game.showMiniGameLinks !== false,
+
+      includeParentQuestions:
+        game.includeParentQuestions !== false,
+
       parentGameId:
         game.parentGameId || "",
 
@@ -1765,6 +1842,15 @@ function getGameRuntimeConfig(gameId) {
 
     gameRole:
       game.gameRole || "standalone",
+
+    hubMode:
+      game.hubMode || "playable-aggregate",
+
+    showMiniGameLinks:
+      game.showMiniGameLinks !== false,
+
+    includeParentQuestions:
+      game.includeParentQuestions !== false,
 
     parentGameId:
       game.parentGameId || "",

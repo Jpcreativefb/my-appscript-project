@@ -112,6 +112,9 @@ function adminNormalizeGameId_(value) {
       "ScoringMode",
       "ScoringEngine",
       "GameRole",
+      "HubMode",
+      "ShowMiniGameLinks",
+      "IncludeParentQuestions",
       "ParentGameId",
       "IncludeInParent",
       "ParentContributionMode",
@@ -276,6 +279,33 @@ function adminNormalizeGameId_(value) {
             : adminNormalizeValue_(payload.gameRole || "standalone");
         },
         fallback: "standalone"
+      },
+      {
+        key: "hubMode",
+        value: function() {
+          return typeof normalizeSeasonHubMode_ === "function"
+            ? normalizeSeasonHubMode_(payload.hubMode)
+            : adminNormalizeValue_(payload.hubMode || "playable-aggregate");
+        },
+        fallback: "playable-aggregate"
+      },
+      {
+        key: "showMiniGameLinks",
+        value: function() {
+          return payload.showMiniGameLinks === undefined
+            ? true
+            : adminToBoolean_(payload.showMiniGameLinks);
+        },
+        fallback: true
+      },
+      {
+        key: "includeParentQuestions",
+        value: function() {
+          return payload.includeParentQuestions === undefined
+            ? true
+            : adminToBoolean_(payload.includeParentQuestions);
+        },
+        fallback: true
       },
       {
         key: "parentGameId",
@@ -553,6 +583,26 @@ function adminNormalizeGameId_(value) {
 
     if (role !== "mini" && col.parentGameId !== -1) {
       row[col.parentGameId] = "";
+    }
+
+    if (role === "parent") {
+      const hubMode =
+        col.hubMode !== -1
+          ? (typeof normalizeSeasonHubMode_ === "function"
+              ? normalizeSeasonHubMode_(row[col.hubMode])
+              : adminNormalizeValue_(row[col.hubMode] || "playable-aggregate"))
+          : "playable-aggregate";
+
+      if (col.hubMode !== -1) {
+        row[col.hubMode] = hubMode;
+      }
+
+      if (
+        hubMode === "leaderboard-only" &&
+        col.includeParentQuestions !== -1
+      ) {
+        row[col.includeParentQuestions] = false;
+      }
     }
 
     if (col.minStake !== -1 && col.maxStake !== -1) {
@@ -2570,6 +2620,15 @@ function adminCloneGame(payload) {
 
     includeInParent:
       sourceGame.includeInParent !== false,
+
+    hubMode:
+      sourceGame.hubMode || "playable-aggregate",
+
+    showMiniGameLinks:
+      sourceGame.showMiniGameLinks !== false,
+
+    includeParentQuestions:
+      sourceGame.includeParentQuestions !== false,
 
     parentContributionMode:
       sourceGame.parentContributionMode || "add-points",

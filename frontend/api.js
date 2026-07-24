@@ -31,6 +31,9 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminCloneCategory",
+    "adminBulkCreateNominees",
+    "adminCloneNominee",
     "adminGetLeagueAccessDashboard",
     "adminRefreshSportsWagerScores",
     "adminRefreshAndSettleSportsWagers",
@@ -1233,6 +1236,9 @@ async function apiAdminGetGameSetup(gameId) {
 
   return api(
     "adminGetGameSetup",
+    "adminCloneCategory",
+    "adminBulkCreateNominees",
+    "adminCloneNominee",
     {
       gameId: gameId
     }
@@ -1252,6 +1258,15 @@ async function apiAdminCreateCategory(payload) {
 
 }
 
+
+async function apiAdminCloneCategory(payload) {
+
+  return api(
+    "adminCloneCategory",
+    payload || {}
+  );
+
+}
 
 async function apiAdminUpdateCategory(payload) {
 
@@ -1297,6 +1312,24 @@ async function apiAdminCreateNominee(payload) {
   return api(
     "adminCreateNominee",
     payload
+  );
+
+}
+
+async function apiAdminBulkCreateNominees(payload) {
+
+  return api(
+    "adminBulkCreateNominees",
+    payload || {}
+  );
+
+}
+
+async function apiAdminCloneNominee(payload) {
+
+  return api(
+    "adminCloneNominee",
+    payload || {}
   );
 
 }

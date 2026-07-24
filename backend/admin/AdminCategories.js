@@ -1785,6 +1785,11 @@ function adminGetGameSetup(payload) {
     gameId:
       gameId,
 
+    game:
+      typeof getGame === "function"
+        ? getGame(gameId)
+        : null,
+
     categories:
       categories
   };
@@ -1835,6 +1840,21 @@ function adminCreateCategory(payload) {
       "Category/question name is required"
     );
 
+  }
+
+  const parentGame =
+    typeof getGame === "function"
+      ? getGame(gameId)
+      : null;
+
+  if (
+    parentGame &&
+    parentGame.gameRole === "parent" &&
+    parentGame.hubMode === "leaderboard-only"
+  ) {
+    throw new Error(
+      "This Season / Series Hub is Leaderboard Only. Change Hub Mode to Playable + Aggregate before adding parent questions."
+    );
   }
 
   const categoryId =
@@ -1917,7 +1937,7 @@ function adminCreateCategory(payload) {
         "",
 
       categoryImage:
-        "",
+        payload.categoryImage || "",
 
       active:
         true,
@@ -3257,5 +3277,397 @@ function adminArchiveNominee(payload) {
     "Nominee archived";
 
   return result;
+
+}
+
+/* =========================================================
+   CLONE / BULK QUESTION SETUP HELPERS
+========================================================= */
+
+function adminCatParseItemsJson_(value) {
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return [];
+  }
+
+  let parsed;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    throw new Error("Invalid items JSON");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error("Items JSON must be an array");
+  }
+
+  return parsed;
+
+}
+
+function adminCatUniqueId_(preferredId, existingIds) {
+
+  const used = existingIds || {};
+  const base = adminCatNormalizeId_(preferredId) || "item";
+
+  if (!used[base]) {
+    return base;
+  }
+
+  let number = 2;
+  let candidate = base + "-" + number;
+
+  while (used[candidate]) {
+    number += 1;
+    candidate = base + "-" + number;
+  }
+
+  return candidate;
+
+}
+
+function adminCloneCategory(payload) {
+
+  payload = payload || {};
+
+  const sourceGameId = adminCatNormalizeGameId_(
+    payload.sourceGameId || payload.gameId
+  );
+
+  const targetGameId = adminCatNormalizeGameId_(
+    payload.targetGameId || payload.gameId || sourceGameId
+  );
+
+  const sourceCategoryId = adminCatNormalizeId_(
+    payload.sourceCategoryId || payload.categoryId
+  );
+
+  if (!sourceGameId || !targetGameId || !sourceCategoryId) {
+    throw new Error("Source game, target game, and source category are required");
+  }
+
+  validateGameId(sourceGameId);
+  validateGameId(targetGameId);
+
+  const sourceSetup = adminGetGameSetup({ gameId: sourceGameId });
+  const targetSetup = sourceGameId === targetGameId
+    ? sourceSetup
+    : adminGetGameSetup({ gameId: targetGameId });
+
+  const sourceCategory = sourceSetup.categories.find(function(category) {
+    return adminCatNormalizeId_(category.categoryId) === sourceCategoryId;
+  });
+
+  if (!sourceCategory) {
+    throw new Error("Source category not found: " + sourceCategoryId);
+  }
+
+  const settings = sourceCategory.settings || {};
+  const requestedName = adminCatNormalizeValue_(
+    payload.category || payload.question || payload.name
+  );
+  const categoryName = requestedName || (sourceCategory.category + " Copy");
+
+  const usedCategoryIds = {};
+  (targetSetup.categories || []).forEach(function(category) {
+    usedCategoryIds[adminCatNormalizeId_(category.categoryId)] = true;
+  });
+
+  const categoryId = adminCatUniqueId_(
+    payload.newCategoryId || payload.categoryIdOverride || adminCatSlugify_(categoryName),
+    usedCategoryIds
+  );
+
+  const has = function(key) {
+    return Object.prototype.hasOwnProperty.call(payload, key);
+  };
+
+  const createResult = adminCreateCategory({
+    gameId: targetGameId,
+    category: categoryName,
+    categoryId: categoryId,
+    section: has("section") ? payload.section : sourceCategory.section,
+    categoryImage: adminCatToBoolean_(payload.copyCategoryImage)
+      ? sourceCategory.categoryImage || ""
+      : "",
+    points: has("points") ? payload.points : settings.points,
+    locked: has("locked") ? payload.locked : false,
+    changePenalty: settings.changePenalty,
+    maxChanges: settings.maxChanges,
+    lockDateTime: has("lockDateTime") ? payload.lockDateTime : "",
+    displayOrder: has("displayOrder") ? payload.displayOrder : settings.displayOrder,
+    groupId: has("groupId") ? payload.groupId : settings.groupId,
+    parentCategoryId: has("parentCategoryId") ? payload.parentCategoryId : settings.parentCategoryId,
+    followUpCategoryId: has("followUpCategoryId") ? payload.followUpCategoryId : settings.followUpCategoryId,
+    followUpMapJSON: has("followUpMapJSON") ? payload.followUpMapJSON : settings.followUpMapJSON,
+    layoutType: has("layoutType") ? payload.layoutType : settings.layoutType,
+    shortName: has("shortName") ? payload.shortName : categoryName,
+    countsAsStatue: has("countsAsStatue") ? payload.countsAsStatue : settings.countsAsStatue,
+    scoreVersion: settings.scoreVersion,
+    questionType: has("questionType") ? payload.questionType : settings.questionType,
+    scoringEngine: has("scoringEngine") ? payload.scoringEngine : settings.scoringEngine,
+    selectionMode: has("selectionMode") ? payload.selectionMode : settings.selectionMode,
+    scoreMode: has("scoreMode") ? payload.scoreMode : settings.scoreMode,
+    oddsMode: settings.oddsMode,
+    resultSource: settings.resultSource,
+    settlementStatus: "pending",
+    maxSelections: settings.maxSelections,
+    minSelections: settings.minSelections,
+    allowDraw: settings.allowDraw,
+    allowPush: settings.allowPush,
+    sportsGameId: has("sportsGameId") ? payload.sportsGameId : settings.sportsGameId,
+    espnEventId: has("espnEventId") ? payload.espnEventId : settings.espnEventId,
+    sportsMarket: has("sportsMarket") ? payload.sportsMarket : settings.sportsMarket,
+    sportsLeague: has("sportsLeague") ? payload.sportsLeague : settings.sportsLeague,
+    wagerResultType: has("wagerResultType") ? payload.wagerResultType : settings.wagerResultType,
+    minStake: has("minStake") ? payload.minStake : settings.minStake,
+    maxStake: has("maxStake") ? payload.maxStake : settings.maxStake,
+    stakeIncrement: has("stakeIncrement") ? payload.stakeIncrement : settings.stakeIncrement,
+    stakeWinMultiplier: has("stakeWinMultiplier") ? payload.stakeWinMultiplier : settings.stakeWinMultiplier,
+    stakeLossMultiplier: has("stakeLossMultiplier") ? payload.stakeLossMultiplier : settings.stakeLossMultiplier,
+    resultSourceType: has("resultSourceType") ? payload.resultSourceType : settings.resultSourceType,
+    resultProvider: has("resultProvider") ? payload.resultProvider : settings.resultProvider,
+    externalEventId: has("externalEventId") ? payload.externalEventId : settings.externalEventId,
+    externalMarketId: has("externalMarketId") ? payload.externalMarketId : settings.externalMarketId,
+    externalSubjectId: has("externalSubjectId") ? payload.externalSubjectId : settings.externalSubjectId,
+    statKey: has("statKey") ? payload.statKey : settings.statKey,
+    comparisonOperator: has("comparisonOperator") ? payload.comparisonOperator : settings.comparisonOperator,
+    threshold: has("threshold") ? payload.threshold : settings.threshold,
+    autoSettle: has("autoSettle") ? payload.autoSettle : settings.autoSettle,
+    requireAdminReview: has("requireAdminReview") ? payload.requireAdminReview : settings.requireAdminReview,
+    sourceUrl: has("sourceUrl") ? payload.sourceUrl : settings.sourceUrl,
+    sourceConfigJSON: has("sourceConfigJSON") ? payload.sourceConfigJSON : settings.sourceConfigJSON
+  });
+
+  const copyNominees = payload.copyNominees === undefined
+    ? true
+    : adminCatToBoolean_(payload.copyNominees);
+  const copyImages = payload.copyImages === undefined
+    ? true
+    : adminCatToBoolean_(payload.copyImages);
+
+  let nomineeResult = {
+    success: true,
+    createdCount: 0,
+    created: [],
+    errors: []
+  };
+
+  if (copyNominees && Array.isArray(sourceCategory.nominees) && sourceCategory.nominees.length) {
+    nomineeResult = adminBulkCreateNominees({
+      gameId: targetGameId,
+      categoryId: categoryId,
+      category: categoryName,
+      section: has("section") ? payload.section : sourceCategory.section,
+      itemsJSON: JSON.stringify(sourceCategory.nominees.map(function(nominee) {
+        return {
+          nominee: nominee.nominee,
+          nomineeId: nominee.nomineeId,
+          shortAnswer: nominee.shortAnswer || nominee.nominee,
+          fileId: copyImages ? nominee.fileId || "" : "",
+          movieId: nominee.movieId || "",
+          movie: nominee.movie || "",
+          person: nominee.person || "",
+          active: nominee.active !== false
+        };
+      }))
+    });
+  }
+
+  return {
+    success: true,
+    message: "Question cloned",
+    gameId: targetGameId,
+    categoryId: categoryId,
+    category: categoryName,
+    categoryResult: createResult,
+    nomineeResult: nomineeResult
+  };
+
+}
+
+function adminBulkCreateNominees(payload) {
+
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  const categoryId = adminCatNormalizeId_(payload.categoryId);
+  const items = adminCatParseItemsJson_(payload.itemsJSON || payload.items);
+
+  if (!gameId || !categoryId) {
+    throw new Error("GameId and CategoryId are required");
+  }
+
+  if (!items.length) {
+    throw new Error("At least one nominee/answer is required");
+  }
+
+  if (items.length > 250) {
+    throw new Error("Bulk nominee limit is 250 answers per request");
+  }
+
+  validateGameId(gameId);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+
+  try {
+    const setup = adminGetGameSetup({ gameId: gameId });
+    const category = setup.categories.find(function(item) {
+      return adminCatNormalizeId_(item.categoryId) === categoryId;
+    });
+
+    if (!category) {
+      throw new Error("Category not found: " + categoryId);
+    }
+
+    const sh = getCategoriesSheet_();
+    const data = sh.getDataRange().getValues();
+    const headers = data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+    const col = getCategoriesColumnMap_(headers);
+    validateCategoriesColumns_(col);
+
+    const usedIds = {};
+    (category.nominees || []).forEach(function(nominee) {
+      usedIds[adminCatNormalizeId_(nominee.nomineeId)] = true;
+    });
+
+    const rows = [];
+    const created = [];
+    const errors = [];
+
+    items.forEach(function(rawItem, index) {
+      const item = rawItem || {};
+      const nomineeName = adminCatNormalizeValue_(
+        item.nominee || item.answer || item.name
+      );
+
+      if (!nomineeName) {
+        errors.push({ index: index, message: "Answer name is required" });
+        return;
+      }
+
+      const preferredId = adminCatNormalizeId_(
+        item.nomineeId || item.answerId || adminCatSlugify_(nomineeName)
+      );
+      const nomineeId = adminCatUniqueId_(preferredId, usedIds);
+      usedIds[nomineeId] = true;
+
+      const row = adminCatBuildNomineeRow_(headers, col, {
+        gameId: gameId,
+        categoryId: categoryId,
+        category: payload.category || category.category,
+        nominee: nomineeName,
+        nomineeId: nomineeId,
+        section: item.section || payload.section || category.section || "Other",
+        fileId: item.fileId || "",
+        shortAnswer: item.shortAnswer || nomineeName,
+        categoryImage: item.categoryImage || category.categoryImage || "",
+        movieId: item.movieId || "",
+        movie: item.movie || "",
+        person: item.person || "",
+        active: item.active === undefined ? true : adminCatToBoolean_(item.active),
+        predictionGame: item.predictionGame === undefined
+          ? category.predictionGame
+          : adminCatToBoolean_(item.predictionGame),
+        communityRank: item.communityRank === undefined
+          ? category.communityRank
+          : item.communityRank
+      });
+
+      rows.push(row);
+      created.push({ nomineeId: nomineeId, nominee: nomineeName });
+    });
+
+    if (rows.length) {
+      sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length)
+        .setValues(rows);
+      SpreadsheetApp.flush();
+      adminCatClearCaches_();
+    }
+
+    return {
+      success: errors.length === 0,
+      partial: errors.length > 0 && created.length > 0,
+      message: created.length + " answer(s) created" + (errors.length ? "; " + errors.length + " skipped" : ""),
+      gameId: gameId,
+      categoryId: categoryId,
+      createdCount: created.length,
+      created: created,
+      errors: errors
+    };
+
+  } finally {
+    lock.releaseLock();
+  }
+
+}
+
+function adminCloneNominee(payload) {
+
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  const sourceCategoryId = adminCatNormalizeId_(payload.sourceCategoryId || payload.categoryId);
+  const sourceNomineeId = adminCatNormalizeId_(payload.sourceNomineeId || payload.nomineeId);
+  const targetCategoryId = adminCatNormalizeId_(payload.targetCategoryId || sourceCategoryId);
+
+  if (!gameId || !sourceCategoryId || !sourceNomineeId || !targetCategoryId) {
+    throw new Error("Game, source answer, and target question are required");
+  }
+
+  const setup = adminGetGameSetup({ gameId: gameId });
+  const sourceCategory = setup.categories.find(function(category) {
+    return adminCatNormalizeId_(category.categoryId) === sourceCategoryId;
+  });
+  const targetCategory = setup.categories.find(function(category) {
+    return adminCatNormalizeId_(category.categoryId) === targetCategoryId;
+  });
+
+  if (!sourceCategory || !targetCategory) {
+    throw new Error("Source or target category not found");
+  }
+
+  const sourceNominee = (sourceCategory.nominees || []).find(function(nominee) {
+    return adminCatNormalizeId_(nominee.nomineeId) === sourceNomineeId;
+  });
+
+  if (!sourceNominee) {
+    throw new Error("Source nominee/answer not found");
+  }
+
+  const nomineeName = adminCatNormalizeValue_(
+    payload.nominee || payload.answer || payload.name
+  ) || (sourceNominee.nominee + " Copy");
+
+  const copyImage = payload.copyImage === undefined
+    ? true
+    : adminCatToBoolean_(payload.copyImage);
+
+  return adminBulkCreateNominees({
+    gameId: gameId,
+    categoryId: targetCategoryId,
+    category: targetCategory.category,
+    section: targetCategory.section,
+    itemsJSON: JSON.stringify([{
+      nominee: nomineeName,
+      nomineeId: payload.newNomineeId || payload.nomineeIdOverride || adminCatSlugify_(nomineeName),
+      shortAnswer: payload.shortAnswer || nomineeName,
+      fileId: copyImage ? sourceNominee.fileId || "" : "",
+      movieId: sourceNominee.movieId || "",
+      movie: sourceNominee.movie || "",
+      person: sourceNominee.person || "",
+      active: true
+    }])
+  });
 
 }

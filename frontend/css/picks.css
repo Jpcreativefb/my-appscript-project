@@ -108,6 +108,14 @@
   border-color: rgba(255,255,255,0.12);
 }
 
+.pick-category-card.push {
+  border-color: rgba(96,165,250,0.85);
+}
+
+.pick-category-card.cancelled {
+  border-color: rgba(148,163,184,0.8);
+}
+
 .pick-card-header {
   width: 100%;
   border: 0;
@@ -155,6 +163,14 @@
 .pick-category-card.wrong .pick-title-wrap h2,
 .pick-category-card.pending .pick-title-wrap h2 {
   color: #ffffff;
+}
+
+.pick-category-card.push .pick-title-wrap h2 {
+  color: #93c5fd;
+}
+
+.pick-category-card.cancelled .pick-title-wrap h2 {
+  color: #cbd5e1;
 }
 
 .pick-status-icon {
@@ -210,6 +226,14 @@
 
 .pick-category-card.wrong .selected-pick-summary span {
   color: #ffb4b4;
+}
+
+.pick-category-card.push .selected-pick-summary span {
+  color: #bfdbfe;
+}
+
+.pick-category-card.cancelled .selected-pick-summary span {
+  color: #cbd5e1;
 }
 
 .selected-confidence-pill {

@@ -467,6 +467,38 @@ async function renderAdminPage() {
    ADMIN GAMES PANEL
 ========================= */
 
+
+function adminEnhanceMainAdminSections() {
+  const root = document.querySelector(".admin-page > .admin-section");
+  if (!root) return;
+
+  Array.from(root.children).forEach(function(child) {
+    if (!child || !child.classList || !child.classList.contains("card")) return;
+    if (child.closest("details.admin-main-section-card")) return;
+
+    const heading = child.querySelector(":scope > h2");
+    if (!heading) return;
+
+    const details = document.createElement("details");
+    details.className = "card admin-card admin-collapsible-card admin-main-section-card";
+
+    const summary = document.createElement("summary");
+    summary.className = "admin-card-summary";
+    summary.innerHTML = `
+      <div>
+        <h2>${escapeHtml_(heading.textContent || "Admin Section")}</h2>
+      </div>
+      <span class="admin-collapse-icon">▾</span>
+    `;
+
+    child.parentNode.insertBefore(details, child);
+    details.appendChild(summary);
+    child.classList.add("admin-main-section-content");
+    heading.remove();
+    details.appendChild(child);
+  });
+}
+
 async function renderAdminGamesPanel() {
 
   const res =
@@ -607,881 +639,1006 @@ async function renderAdminGamesPanel() {
 
 }
 
+function adminCurrentYear_() {
+  return new Date().getFullYear();
+}
+
+function renderAdminYearOptions_(selectedYear) {
+  const currentYear = adminCurrentYear_();
+  const selected = Number(selectedYear) || currentYear;
+  const years = [];
+
+  for (let year = currentYear - 2; year <= currentYear + 6; year++) {
+    years.push(year);
+  }
+
+  if (years.indexOf(selected) === -1) {
+    years.push(selected);
+    years.sort(function(a, b) { return a - b; });
+  }
+
+  return years.map(function(year) {
+    return `
+      <option value="${year}" ${year === selected ? "selected" : ""}>
+        ${year}
+      </option>
+    `;
+  }).join("");
+}
+
+function adminSlugifyGameId_(value) {
+  return String(value || "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function adminAutoFillGameId(form) {
+  if (!form || !form.gameId || form.gameId.readOnly) {
+    return;
+  }
+
+  if (form.gameId.dataset.touched === "true") {
+    return;
+  }
+
+  form.gameId.value = adminSlugifyGameId_(form.name ? form.name.value : "");
+}
+
+function adminNormalizeThemeColor_(value) {
+  const text = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : "#c8a24a";
+}
+
+function adminExtractDriveFileId_(value) {
+  const text = String(value || "").trim();
+
+  if (!text) {
+    return "";
+  }
+
+  const pathMatch = text.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (pathMatch) {
+    return pathMatch[1];
+  }
+
+  const queryMatch = text.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+  if (queryMatch) {
+    return queryMatch[1];
+  }
+
+  return text;
+}
+
+function adminNormalizeHeroDriveInput(input, gameId) {
+  if (!input) {
+    return;
+  }
+
+  input.value = adminExtractDriveFileId_(input.value);
+
+  if (typeof adminPreviewGameHeroImage === "function") {
+    adminPreviewGameHeroImage(gameId);
+  }
+}
+
+function adminSyncThemeColorText(form, picker) {
+  if (!form || !form.themeColor || !picker) {
+    return;
+  }
+
+  form.themeColor.value = picker.value;
+}
+
+function adminSyncThemeColorPicker(form, input) {
+  if (!form || !input) {
+    return;
+  }
+
+  const picker = form.querySelector('[data-theme-color-picker="true"]');
+  if (!picker) {
+    return;
+  }
+
+  if (/^#[0-9a-f]{6}$/i.test(String(input.value || "").trim())) {
+    picker.value = input.value.trim();
+  }
+}
+
+function adminHelpButton_(title, message) {
+  return `
+    <span class="admin-help-wrap">
+      <button
+        type="button"
+        class="admin-help-button"
+        aria-label="Help: ${escapeHtml_(title)}"
+        aria-expanded="false"
+        onclick="adminToggleHelpPopover(event, this)"
+      >?</button>
+      <span class="admin-help-popover" role="tooltip" hidden>
+        <strong>${escapeHtml_(title)}</strong>
+        <span>${escapeHtml_(message)}</span>
+      </span>
+    </span>
+  `;
+}
+
+function adminFieldLabel_(title, message) {
+  return `
+    <span class="admin-field-label">
+      <span>${escapeHtml_(title)}</span>
+      ${message ? adminHelpButton_(title, message) : ""}
+    </span>
+  `;
+}
+
+function adminGetHelpPopover_(button) {
+  if (!button) {
+    return null;
+  }
+
+  return button.__adminHelpPopover || button.nextElementSibling || null;
+}
+
+function adminRestoreHelpPopover_(button, popover) {
+  if (!popover) {
+    return;
+  }
+
+  const wrap = button && button.isConnected
+    ? button.closest(".admin-help-wrap")
+    : null;
+
+  if (wrap) {
+    wrap.appendChild(popover);
+  } else if (popover.parentNode) {
+    popover.parentNode.removeChild(popover);
+  }
+}
+
+function adminCloseHelpPopovers_(exceptButton) {
+  document.querySelectorAll(".admin-help-button[aria-expanded='true']")
+    .forEach(function(button) {
+      if (button === exceptButton) {
+        return;
+      }
+
+      button.setAttribute("aria-expanded", "false");
+      const popover = adminGetHelpPopover_(button);
+
+      if (popover) {
+        popover.hidden = true;
+        popover.classList.remove("is-open");
+        popover.removeAttribute("data-placement");
+        popover.style.removeProperty("left");
+        popover.style.removeProperty("top");
+        popover.style.removeProperty("visibility");
+        popover.style.removeProperty("--admin-help-arrow-offset");
+        adminRestoreHelpPopover_(button, popover);
+      }
+    });
+
+  if (!exceptButton) {
+    window.__adminActiveHelpButton = null;
+  }
+}
+
+function adminClampHelpValue_(value, minimum, maximum) {
+  if (maximum < minimum) {
+    return minimum;
+  }
+
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function adminPositionHelpPopover_(button, popover) {
+  if (!button || !popover || popover.hidden || !button.isConnected) {
+    return;
+  }
+
+  const rect = button.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const viewportWidth = Math.max(240, viewport ? viewport.width : window.innerWidth);
+  const viewportHeight = Math.max(240, viewport ? viewport.height : window.innerHeight);
+  const margin = 10;
+  const gap = 10;
+
+  popover.style.maxWidth = Math.max(200, viewportWidth - (margin * 2)) + "px";
+  popover.style.maxHeight = Math.max(150, viewportHeight - (margin * 2)) + "px";
+  popover.style.left = margin + "px";
+  popover.style.top = margin + "px";
+  popover.style.visibility = "hidden";
+
+  const popoverRect = popover.getBoundingClientRect();
+  const width = Math.min(popoverRect.width, viewportWidth - (margin * 2));
+  const height = Math.min(popoverRect.height, viewportHeight - (margin * 2));
+  const centerX = rect.left + (rect.width / 2);
+  const centerY = rect.top + (rect.height / 2);
+
+  const candidates = [
+    {
+      placement: "right",
+      left: rect.right + gap,
+      top: centerY - (height / 2),
+      preference: 4
+    },
+    {
+      placement: "left",
+      left: rect.left - width - gap,
+      top: centerY - (height / 2),
+      preference: 3
+    },
+    {
+      placement: "below",
+      left: centerX - (width / 2),
+      top: rect.bottom + gap,
+      preference: 2
+    },
+    {
+      placement: "above",
+      left: centerX - (width / 2),
+      top: rect.top - height - gap,
+      preference: 1
+    }
+  ];
+
+  let best = null;
+
+  candidates.forEach(function(candidate) {
+    const visibleLeft = Math.max(margin, candidate.left);
+    const visibleTop = Math.max(margin, candidate.top);
+    const visibleRight = Math.min(viewportWidth - margin, candidate.left + width);
+    const visibleBottom = Math.min(viewportHeight - margin, candidate.top + height);
+    const visibleWidth = Math.max(0, visibleRight - visibleLeft);
+    const visibleHeight = Math.max(0, visibleBottom - visibleTop);
+    const fullyVisible = visibleWidth >= width - 1 && visibleHeight >= height - 1;
+    const score = (visibleWidth * visibleHeight) + (fullyVisible ? 1000000 : 0) + candidate.preference;
+
+    if (!best || score > best.score) {
+      best = Object.assign({}, candidate, { score: score });
+    }
+  });
+
+  const left = adminClampHelpValue_(
+    best.left,
+    margin,
+    viewportWidth - width - margin
+  );
+  const top = adminClampHelpValue_(
+    best.top,
+    margin,
+    viewportHeight - height - margin
+  );
+
+  const arrowOffset = best.placement === "left" || best.placement === "right"
+    ? adminClampHelpValue_(centerY - top, 16, Math.max(16, height - 16))
+    : adminClampHelpValue_(centerX - left, 16, Math.max(16, width - 16));
+
+  popover.dataset.placement = best.placement;
+  popover.style.left = Math.round(left) + "px";
+  popover.style.top = Math.round(top) + "px";
+  popover.style.setProperty("--admin-help-arrow-offset", Math.round(arrowOffset) + "px");
+  popover.style.visibility = "visible";
+}
+
+function adminScheduleHelpPopoverPosition_() {
+  if (window.__adminHelpPositionFrame) {
+    cancelAnimationFrame(window.__adminHelpPositionFrame);
+  }
+
+  window.__adminHelpPositionFrame = requestAnimationFrame(function() {
+    window.__adminHelpPositionFrame = null;
+    const button = window.__adminActiveHelpButton;
+    const popover = adminGetHelpPopover_(button);
+
+    if (button && popover && button.getAttribute("aria-expanded") === "true") {
+      adminPositionHelpPopover_(button, popover);
+    }
+  });
+}
+
+function adminToggleHelpPopover(event, button) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (!button) {
+    return;
+  }
+
+  const popover = adminGetHelpPopover_(button);
+  if (!popover) {
+    return;
+  }
+
+  button.__adminHelpPopover = popover;
+  popover.__adminHelpButton = button;
+
+  const willOpen = button.getAttribute("aria-expanded") !== "true";
+  adminCloseHelpPopovers_(willOpen ? button : null);
+
+  button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  popover.hidden = !willOpen;
+  popover.classList.toggle("is-open", willOpen);
+
+  if (!willOpen) {
+    window.__adminActiveHelpButton = null;
+    adminRestoreHelpPopover_(button, popover);
+    return;
+  }
+
+  window.__adminActiveHelpButton = button;
+
+  // Portal the popup to <body> so card overflow, transforms, and modal
+  // containers cannot clip it or change the meaning of position: fixed.
+  if (popover.parentElement !== document.body) {
+    document.body.appendChild(popover);
+  }
+
+  adminScheduleHelpPopoverPosition_();
+}
+
+if (typeof document !== "undefined" && !window.__adminHelpDismissBound) {
+  window.__adminHelpDismissBound = true;
+
+  document.addEventListener("click", function(event) {
+    if (
+      !event.target.closest(".admin-help-button") &&
+      !event.target.closest(".admin-help-popover")
+    ) {
+      adminCloseHelpPopovers_();
+    }
+  });
+
+  document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") {
+      adminCloseHelpPopovers_();
+    }
+  });
+
+  window.addEventListener("resize", adminScheduleHelpPopoverPosition_);
+  window.addEventListener("scroll", adminScheduleHelpPopoverPosition_, true);
+
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", adminScheduleHelpPopoverPosition_);
+    window.visualViewport.addEventListener("scroll", adminScheduleHelpPopoverPosition_);
+  }
+}
+
+function adminCanonicalGameType_(value) {
+  const type = String(value || "prediction").trim().toLowerCase();
+  return type === "combo" ? "mixed" : type;
+}
+
+function adminUpdateHybridScoringSections(form) {
+  if (!form || !form.type) {
+    return;
+  }
+
+  const type = adminCanonicalGameType_(form.type.value);
+
+  form.querySelectorAll("[data-hybrid-feature-section]").forEach(function(section) {
+    if (type !== "mixed") {
+      return;
+    }
+
+    const fieldName = section.dataset.hybridFeatureSection;
+    const control = form[fieldName];
+    section.hidden = !(control && control.checked);
+  });
+}
+
+function adminUpdateGameTypeSections(form) {
+  if (!form || !form.type) {
+    return;
+  }
+
+  const type = adminCanonicalGameType_(form.type.value);
+
+  form.querySelectorAll("[data-game-types]").forEach(function(section) {
+    const allowed = String(section.dataset.gameTypes || "")
+      .split(/\s+/)
+      .filter(Boolean);
+    section.hidden = allowed.indexOf(type) === -1;
+  });
+
+  if (form.gameFormat) {
+    form.gameFormat.value = type === "mixed" ? "hybrid" : "standard";
+  }
+
+  form.querySelectorAll('[data-game-types="mixed"] input[type="checkbox"]').forEach(function(input) {
+    input.onchange = function() {
+      adminUpdateHybridScoringSections(form);
+    };
+  });
+
+  adminUpdateHybridScoringSections(form);
+  adminUpdateHeroSource(form);
+}
+
+function adminUpdateHeroSource(form) {
+  if (!form || !form.heroImageSource) {
+    return;
+  }
+
+  const source = form.heroImageSource.value || "drive";
+  form.querySelectorAll("[data-hero-source]").forEach(function(panel) {
+    panel.hidden = panel.dataset.heroSource !== source;
+  });
+}
+
+function renderAdminCheckboxWithHelp_(name, label, checked, helpText) {
+  return `
+    <span class="admin-checkbox-with-help">
+      ${renderAdminCheckbox_(name, label, checked)}
+      ${helpText ? adminHelpButton_(label, helpText) : ""}
+    </span>
+  `;
+}
+
 function renderAdminGameForm(
   game,
   gameTypes,
   allGames
 ) {
 
-  const isNew =
-    !game;
+  const isNew = !game;
+  const currentYear = adminCurrentYear_();
 
-  game =
-    game || {
-      gameId: "",
-      name: "",
-      year: "",
-      type: "prediction",
-      active: true,
-      archived: false,
-      defaultGame: false,
-      predictionEnabled: true,
-      rankingEnabled: false,
-      confidenceEnabled: false,
-      confidenceScoringMode: "win_only",
-      wagerEnabled: false,
-      startingBankroll: 100,
-      minWager: 1,
-      maxWager: 100,
-      allowBetRemoval: false,
-      wagerEditMode: "editable_until_lock",
-      gameFormat: "standard",
-      gameRole: "standalone",
-      parentGameId: "",
-      includeInParent: true,
-      parentContributionMode: "add-points",
-      parentContributionWeight: 1,
-      parentBestCount: 0,
-      placementPointsJSON: "",
-      leaderboardScoreMode: "combined-net",
-      fixedPointsEnabled: true,
-      stakedPointsEnabled: false,
-      startingPoints: 1000,
-      minStake: 10,
-      maxStake: 100,
-      stakeIncrement: 10,
-      stakeWinMultiplier: 1,
-      stakeLossMultiplier: 1,
-      scoringEngine: "manual",
-      themeColor: "",
-      icon: "",
-      sortOrder: 999,
-      status: "",
-      description: "",
-      lockLabel: "",
-      availableFrom: "",
-      availableUntil: "",
-      heroImageFileId: "",
-      heroImagePosition: "center center",
-      lockAllPicks: false,
-      showLeaderboard: true,
-      showResultsBeforeLock: false,
-      resultsFinalized: false,
-      votingLocked: false
-    };
+  game = game || {
+    gameId: "",
+    name: "",
+    year: currentYear,
+    type: "prediction",
+    active: true,
+    archived: false,
+    defaultGame: false,
+    predictionEnabled: true,
+    rankingEnabled: false,
+    confidenceEnabled: false,
+    confidenceScoringMode: "win_only",
+    wagerEnabled: false,
+    startingBankroll: 100,
+    minWager: 1,
+    maxWager: 100,
+    allowBetRemoval: false,
+    wagerEditMode: "editable_until_lock",
+    gameFormat: "standard",
+    gameRole: "standalone",
+    hubMode: "leaderboard-only",
+    showMiniGameLinks: true,
+    includeParentQuestions: false,
+    parentGameId: "",
+    includeInParent: true,
+    parentContributionMode: "add-points",
+    parentContributionWeight: 1,
+    parentBestCount: 0,
+    placementPointsJSON: "",
+    leaderboardScoreMode: "combined-net",
+    fixedPointsEnabled: true,
+    stakedPointsEnabled: false,
+    startingPoints: 1000,
+    minStake: 10,
+    maxStake: 100,
+    stakeIncrement: 10,
+    stakeWinMultiplier: 1,
+    stakeLossMultiplier: 1,
+    scoringEngine: "manual",
+    themeColor: "#c8a24a",
+    icon: "",
+    sortOrder: 999,
+    status: "",
+    description: "",
+    lockLabel: "",
+    availableFrom: "",
+    availableUntil: "",
+    heroImageFileId: "",
+    heroImagePosition: "center center",
+    lockAllPicks: false,
+    showLeaderboard: true,
+    showResultsBeforeLock: false,
+    resultsFinalized: false,
+    votingLocked: false
+  };
 
-  const gameRole =
-    game.gameRole || "standalone";
+  const gameRole = game.gameRole || "standalone";
+  const isMiniGame = gameRole === "mini";
+  const isParentGame = gameRole === "parent";
+  const hubMode = game.hubMode || (isNew ? "leaderboard-only" : "playable-aggregate");
+  const isLeaderboardOnlyHub = isParentGame && hubMode === "leaderboard-only";
+  const canonicalType = adminCanonicalGameType_(game.type);
 
-  const isMiniGame =
-    gameRole === "mini";
+  const title = isNew
+    ? "Create New Game"
+    : escapeHtml_(game.name || game.gameId);
 
-  const isParentGame =
-    gameRole === "parent";
+  const subtitle = isNew
+    ? "Choose a game type and only the settings needed for that game will appear."
+    : escapeHtml_(game.gameId);
 
-  const title =
-    isNew
-      ? "Create New Game"
-      : escapeHtml_(game.name || game.gameId);
+  const openAttr = isNew ? "open" : "";
+  const rawGameId = game.gameId || "new-game";
+  const domId = typeof adminGameDomId_ === "function"
+    ? adminGameDomId_(rawGameId)
+    : String(rawGameId).replace(/[^a-zA-Z0-9_-]/g, "_");
 
-  const subtitle =
-    isNew
-      ? "Add a new game shell."
-      : escapeHtml_(game.gameId);
-
-  const openAttr =
-    isNew || game.defaultGame || game.active
-      ? "open"
-      : "";
-
-  const rawGameId =
-    game.gameId || "new-game";
-
-  const domId =
-    typeof adminGameDomId_ === "function"
-      ? adminGameDomId_(rawGameId)
-      : String(rawGameId)
-          .replace(/[^a-zA-Z0-9_-]/g, "_");
-
-  const heroImageFileId =
-    game.heroImageFileId ||
-    game.heroImageFileID ||
-    "";
-
-  const heroImageUrl =
-    heroImageFileId && typeof adminGameHeroThumbnail_ === "function"
-      ? adminGameHeroThumbnail_(heroImageFileId)
-      : "";
+  const heroImageFileId = game.heroImageFileId || game.heroImageFileID || "";
+  const heroImageUrl = heroImageFileId && typeof adminGameHeroThumbnail_ === "function"
+    ? adminGameHeroThumbnail_(heroImageFileId)
+    : "";
+  const themeColor = adminNormalizeThemeColor_(game.themeColor);
 
   return `
-    <details
-      class="admin-game-form-details admin-collapsible-card"
-      ${openAttr}
-    >
-
+    <details class="admin-game-form-details admin-collapsible-card" ${openAttr}>
       <summary class="admin-card-summary admin-game-form-summary">
-
         <div>
-          <h3>
-            ${title}
-          </h3>
-
-          <div class="admin-sub">
-            ${subtitle}
-          </div>
+          <h3>${title}</h3>
+          <div class="admin-sub">${subtitle}</div>
         </div>
-
-        <span class="admin-collapse-icon">
-          ▾
-        </span>
-
+        <span class="admin-collapse-icon">▾</span>
       </summary>
 
       <div class="admin-collapsible-body">
-
         <form
-          class="admin-game-form"
+          class="admin-game-form admin-guided-game-form"
           onsubmit="adminSaveGameFromForm(event, this)"
+          onchange="adminUpdateHybridScoringSections(this)"
+          data-new-game="${isNew ? "true" : "false"}"
         >
+          ${!isNew ? `
+            <details class="admin-game-settings-shell">
+              <summary class="admin-game-settings-summary">
+                <div>
+                  <h4>Settings</h4>
+                  <div class="admin-sub">Open to review or edit this game’s setup.</div>
+                </div>
+                <span class="admin-collapse-icon">▾</span>
+              </summary>
+              <div class="admin-game-settings-body">
+          ` : ""}
 
-          <div class="form-grid">
-
-            <label>
-              Game Name
-
-              <input
-                id="adminGameName_${domId}"
-                name="name"
-                value="${escapeHtml_(game.name)}"
-                placeholder="Oscars 2026"
-                required
-              />
-            </label>
-
-            <label>
-              Game ID
-
-              <input
-                name="gameId"
-                value="${escapeHtml_(game.gameId)}"
-                placeholder="oscars-2026"
-                ${isNew ? "" : "readonly"}
-                required
-              />
-            </label>
-
-            <label>
-              Year
-
-              <input
-                name="year"
-                type="number"
-                value="${escapeHtml_(game.year || "")}"
-                placeholder="2026"
-              />
-            </label>
-
-            <label>
-              Game Type
-
-              <select
-                name="type"
-                onchange="adminApplyGameTypeDefaults(this.form)"
-              >
-                ${renderGameTypeOptions_(
-                  game.type,
-                  gameTypes
-                )}
-              </select>
-            </label>
-
-          </div>
-
-          <h4>Game Structure</h4>
-
-          <div class="form-grid">
-
-            <label>
-              Game Format
-
-              <select name="gameFormat">
-                <option
-                  value="standard"
-                  ${(game.gameFormat || game.scoringMode || "standard") === "hybrid" ? "" : "selected"}
-                >
-                  Standard
-                </option>
-
-                <option
-                  value="hybrid"
-                  ${(game.gameFormat || game.scoringMode || "") === "hybrid" || (game.gameFormat || game.scoringMode || "") === "mixed" ? "selected" : ""}
-                >
-                  Hybrid — multiple scoring modes
-                </option>
-              </select>
-            </label>
-
-            <label>
-              Game Role
-
-              <select
-                name="gameRole"
-                onchange="adminUpdateGameStructureFields(this.form)"
-              >
-                <option
-                  value="standalone"
-                  ${(game.gameRole || "standalone") === "standalone" ? "selected" : ""}
-                >
-                  Standalone Game
-                </option>
-
-                <option
-                  value="parent"
-                  ${(game.gameRole || "") === "parent" ? "selected" : ""}
-                >
-                  Parent / Full Season
-                </option>
-
-                <option
-                  value="mini"
-                  ${(game.gameRole || "") === "mini" ? "selected" : ""}
-                >
-                  Mini Game
-                </option>
-              </select>
-            </label>
-
-            <label>
-              Parent Game
-
-              <select name="parentGameId" ${isMiniGame ? "" : "disabled"}>
-                <option value="">No parent game</option>
-                ${renderParentGameOptions_(
-                  game.parentGameId || "",
-                  allGames || [],
-                  game.gameId || ""
-                )}
-              </select>
-            </label>
-
-            <label>
-              Mini-Game Contribution
-
-              <select name="parentContributionMode" ${isMiniGame ? "" : "disabled"}>
-                <option
-                  value="add-points"
-                  ${(game.parentContributionMode || "add-points") === "add-points" ? "selected" : ""}
-                >
-                  Add Net Points
-                </option>
-
-                <option
-                  value="weighted-points"
-                  ${(game.parentContributionMode || "") === "weighted-points" ? "selected" : ""}
-                >
-                  Weighted Points
-                </option>
-
-                <option
-                  value="placement-points"
-                  ${(game.parentContributionMode || "") === "placement-points" ? "selected" : ""}
-                >
-                  Placement Points
-                </option>
-
-              </select>
-            </label>
-
-            <label>
-              Contribution Weight
-
-              <input
-                name="parentContributionWeight"
-                type="number"
-                min="0"
-                step="0.1"
-                value="${escapeHtml_(game.parentContributionWeight === undefined ? 1 : game.parentContributionWeight)}"
-                ${isMiniGame ? "" : "disabled"}
-              />
-            </label>
-
-            <label>
-              Best N Mini Games
-
-              <input
-                name="parentBestCount"
-                type="number"
-                min="0"
-                step="1"
-                value="${escapeHtml_(game.parentBestCount || 0)}"
-                placeholder="0 = count all"
-                ${isParentGame ? "" : "disabled"}
-              />
-            </label>
-
-            <label class="admin-wide-field">
-              Placement Points JSON
-
-              <input
-                name="placementPointsJSON"
-                value="${escapeHtml_(game.placementPointsJSON || "")}"
-                placeholder="[10,8,6,5,4,3,2,1]"
-                ${isParentGame ? "" : "disabled"}
-              />
-            </label>
-
-            <label>
-              Default Scoring Engine
-
-              <select name="scoringEngine">
-                ${[
-                  ["manual", "Manual / Admin"],
-                  ["sports", "Sports Scores Engine"],
-                  ["internet", "External Results Hub"],
-                  ["racing", "Racing Engine"],
-                  ["mixed", "Mixed Sources"]
-                ].map(function(option) {
-                  return `
-                    <option
-                      value="${option[0]}"
-                      ${(game.scoringEngine || "manual") === option[0] ? "selected" : ""}
-                    >
-                      ${option[1]}
-                    </option>
-                  `;
-                }).join("")}
-              </select>
-            </label>
-
-          </div>
-
-          <div class="admin-checkbox-row">
-            ${renderAdminCheckbox_(
-              "includeInParent",
-              "Include Mini Game in Parent Standings",
-              game.includeInParent !== false
-            )}
-          </div>
-
-          <div class="form-grid">
-
-            <label>
-              Confidence Scoring
-
-              <select name="confidenceScoringMode">
-
-                <option
-                  value="win_only"
-                  ${game.confidenceScoringMode === "risk_penalty" ? "" : "selected"}
-                >
-                  Win only — wrong picks get 0
-                </option>
-
-                <option
-                  value="risk_penalty"
-                  ${game.confidenceScoringMode === "risk_penalty" ? "selected" : ""}
-                >
-                  Risk penalty — wrong picks lose confidence points
-                </option>
-
-              </select>
-            </label>
-
-          </div>
-
-          <div class="admin-checkbox-row">
-
-            ${renderAdminCheckbox_(
-              "active",
-              "Active",
-              game.active
-            )}
-
-            ${renderAdminCheckbox_(
-              "defaultGame",
-              "Default Game",
-              game.defaultGame
-            )}
-
-            ${renderAdminCheckbox_(
-              "archived",
-              "Archived",
-              game.archived
-            )}
-
-            ${renderAdminCheckbox_(
-              "lockAllPicks",
-              "Lock All Picks",
-              game.lockAllPicks
-            )}
-
-          </div>
-
-          <details class="admin-advanced-details">
-
-            <summary>
-              Advanced game behavior
+          <details class="admin-form-section admin-form-section-details" ${isNew ? "open" : ""}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Game Basics</h4>
+                <div class="admin-sub">Name the game and choose how players will participate.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
             </summary>
 
-            <h4>Game Behavior</h4>
+            <div class="form-grid">
+              <label class="admin-field">
+                ${adminFieldLabel_("Game Name", "The name players see on the dashboard and game page.")}
+                <input
+                  id="adminGameName_${domId}"
+                  name="name"
+                  value="${escapeHtml_(game.name)}"
+                  placeholder="2026 NFL Season"
+                  oninput="adminAutoFillGameId(this.form)"
+                  required
+                />
+              </label>
 
-            <div class="admin-checkbox-row">
+              <label class="admin-field">
+                ${adminFieldLabel_("Game ID", "A permanent URL-safe identifier. It auto-fills from the Game Name for new games.")}
+                <input
+                  name="gameId"
+                  value="${escapeHtml_(game.gameId)}"
+                  placeholder="2026-nfl-season"
+                  ${isNew ? "oninput=\"this.dataset.touched='true'\"" : "readonly"}
+                  required
+                />
+              </label>
 
-              ${renderAdminCheckbox_(
-                "predictionEnabled",
-                "Prediction Enabled",
-                game.predictionEnabled
-              )}
+              <label class="admin-field">
+                ${adminFieldLabel_("Year", "Used to organize and label the game. The current year is selected automatically for new games.")}
+                <select name="year">
+                  ${renderAdminYearOptions_(game.year || currentYear)}
+                </select>
+              </label>
 
-              ${renderAdminCheckbox_(
-                "rankingEnabled",
-                "Ranking Enabled",
-                game.rankingEnabled
-              )}
-
-              ${renderAdminCheckbox_(
-                "confidenceEnabled",
-                "Confidence Enabled",
-                game.confidenceEnabled
-              )}
-
-              ${renderAdminCheckbox_(
-                "wagerEnabled",
-                "Wager Enabled",
-                game.wagerEnabled
-              )}
-
-              ${renderAdminCheckbox_(
-                "showLeaderboard",
-                "Show Leaderboard",
-                game.showLeaderboard
-              )}
-
-              ${renderAdminCheckbox_(
-                "showResultsBeforeLock",
-                "Show Results Before Lock",
-                game.showResultsBeforeLock
-              )}
-
-              ${renderAdminCheckbox_(
-                "resultsFinalized",
-                "Results Finalized",
-                game.resultsFinalized
-              )}
-
-              ${renderAdminCheckbox_(
-                "votingLocked",
-                "Voting Locked",
-                game.votingLocked
-              )}
-
+              <label class="admin-field">
+                ${adminFieldLabel_("Game Type", "Controls which scoring and question settings are available. Hybrid is the only type that exposes multiple scoring systems.")}
+                <select
+                  name="type"
+                  onchange="adminApplyGameTypeDefaults(this.form); adminUpdateGameTypeSections(this.form)"
+                >
+                  ${renderGameTypeOptions_(game.type, gameTypes)}
+                </select>
+              </label>
             </div>
 
-            <h4>Prediction Scoring</h4>
+            <input type="hidden" name="gameFormat" value="${canonicalType === "mixed" ? "hybrid" : "standard"}">
+          </details>
 
-            <div class="admin-checkbox-row">
-              ${renderAdminCheckbox_(
-                "fixedPointsEnabled",
-                "Fixed Points Enabled",
-                game.fixedPointsEnabled !== false
-              )}
-
-              ${renderAdminCheckbox_(
-                "stakedPointsEnabled",
-                "Staked Predictions Enabled",
-                game.stakedPointsEnabled === true
-              )}
-            </div>
+          <details class="admin-form-section admin-form-section-details">
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Game Structure</h4>
+                <div class="admin-sub">Choose whether this game stands alone, contains mini games, or contributes to a larger game.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
 
             <div class="form-grid">
-
-              <label>
-                Starting Stake Points
-
-                <input
-                  name="startingPoints"
-                  type="number"
-                  min="0"
-                  value="${escapeHtml_(game.startingPoints === undefined ? 1000 : game.startingPoints)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Game Role", "Standalone is independent. Season / Series Hub combines mini-game standings and can optionally contain season-long questions. Mini Game can contribute to a hub leaderboard.")}
+                <select name="gameRole" onchange="adminUpdateGameStructureFields(this.form)">
+                  <option value="standalone" ${gameRole === "standalone" ? "selected" : ""}>Standalone Game</option>
+                  <option value="parent" ${gameRole === "parent" ? "selected" : ""}>Season / Series Hub</option>
+                  <option value="mini" ${gameRole === "mini" ? "selected" : ""}>Mini Game</option>
+                </select>
               </label>
 
-              <label>
-                Minimum Stake
-
-                <input
-                  name="minStake"
-                  type="number"
-                  min="1"
-                  value="${escapeHtml_(game.minStake === undefined ? 10 : game.minStake)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Default Result Source", "The default system used to resolve questions. Individual questions can override this later.")}
+                <select name="scoringEngine">
+                  ${[
+                    ["manual", "Manual / Admin"],
+                    ["sports", "Sports Scores Engine"],
+                    ["internet", "External Results Hub"],
+                    ["racing", "Racing Engine"],
+                    ["mixed", "Mixed Sources"]
+                  ].map(function(option) {
+                    return `<option value="${option[0]}" ${(game.scoringEngine || "manual") === option[0] ? "selected" : ""}>${option[1]}</option>`;
+                  }).join("")}
+                </select>
               </label>
+            </div>
 
-              <label>
-                Maximum Stake
+            <div class="admin-role-panel" data-game-role-panel="mini" ${isMiniGame ? "" : "hidden"}>
+              <div class="form-grid">
+                <label class="admin-field">
+                  ${adminFieldLabel_("Parent Game", "The full-season or parent game that receives this mini game's results.")}
+                  <select name="parentGameId" ${isMiniGame ? "" : "disabled"}>
+                    <option value="">Select parent game</option>
+                    ${renderParentGameOptions_(game.parentGameId || "", allGames || [], game.gameId || "")}
+                  </select>
+                </label>
 
-                <input
-                  name="maxStake"
-                  type="number"
-                  min="1"
-                  value="${escapeHtml_(game.maxStake === undefined ? 100 : game.maxStake)}"
-                />
+                <label class="admin-field">
+                  ${adminFieldLabel_("How This Mini Game Counts", "Add Net Points uses the mini game's net score. Weighted Points multiplies it by the weight. Placement Points awards points based on finish position.")}
+                  <select name="parentContributionMode" ${isMiniGame ? "" : "disabled"}>
+                    <option value="add-points" ${(game.parentContributionMode || "add-points") === "add-points" ? "selected" : ""}>Add Net Points</option>
+                    <option value="weighted-points" ${(game.parentContributionMode || "") === "weighted-points" ? "selected" : ""}>Weighted Points</option>
+                    <option value="placement-points" ${(game.parentContributionMode || "") === "placement-points" ? "selected" : ""}>Placement Points</option>
+                  </select>
+                </label>
+
+                <label class="admin-field">
+                  ${adminFieldLabel_("Contribution Weight", "Used only with Weighted Points. A weight of 2 makes this mini game count twice.")}
+                  <input name="parentContributionWeight" type="number" min="0" step="0.1" value="${escapeHtml_(game.parentContributionWeight === undefined ? 1 : game.parentContributionWeight)}" ${isMiniGame ? "" : "disabled"}>
+                </label>
+              </div>
+
+              <div class="admin-checkbox-row">
+                ${renderAdminCheckboxWithHelp_("includeInParent", "Include in Parent Standings", game.includeInParent !== false, "Turn this off when a mini game should have its own leaderboard but should not affect the parent season.")}
+              </div>
+            </div>
+
+            <div class="admin-role-panel" data-game-role-panel="parent" ${isParentGame ? "" : "hidden"}>
+              <div class="form-grid">
+                <label class="admin-field">
+                  ${adminFieldLabel_("Hub Mode", "Leaderboard Only creates a standings and mini-game navigation page with no parent questions. Playable + Aggregate also allows season-long questions in the hub.")}
+                  <select name="hubMode" onchange="adminUpdateHubModeFields(this.form)" ${isParentGame ? "" : "disabled"}>
+                    <option value="leaderboard-only" ${hubMode === "leaderboard-only" ? "selected" : ""}>Leaderboard Only</option>
+                    <option value="playable-aggregate" ${hubMode === "playable-aggregate" ? "selected" : ""}>Playable + Aggregate</option>
+                  </select>
+                </label>
+
+                <label class="admin-field">
+                  ${adminFieldLabel_("Best N Mini Games", "Enter 0 to count every mini game. Enter a number to count only each player's best results.")}
+                  <input name="parentBestCount" type="number" min="0" step="1" value="${escapeHtml_(game.parentBestCount || 0)}" placeholder="0 = count all" ${isParentGame ? "" : "disabled"}>
+                </label>
+
+                <label class="admin-field admin-wide-field">
+                  ${adminFieldLabel_("Placement Points", "Used by mini games set to Placement Points. Example: [10,8,6,5,4,3,2,1].")}
+                  <input name="placementPointsJSON" value="${escapeHtml_(game.placementPointsJSON || "")}" placeholder="[10,8,6,5,4,3,2,1]" ${isParentGame ? "" : "disabled"}>
+                </label>
+              </div>
+
+              <div class="admin-checkbox-row">
+                ${renderAdminCheckboxWithHelp_("showMiniGameLinks", "Show Mini-Game Links", game.showMiniGameLinks !== false, "Displays current, upcoming, and completed mini-game cards on the season hub page.")}
+                <span data-parent-question-option ${isLeaderboardOnlyHub ? "hidden" : ""}>
+                  ${renderAdminCheckboxWithHelp_("includeParentQuestions", "Include Parent Questions in Standings", game.includeParentQuestions !== false && !isLeaderboardOnlyHub, "Adds season-long questions created directly in the hub to the mini-game rollup total.")}
+                </span>
+              </div>
+
+              <div class="admin-hub-mode-note" data-hub-mode-note="leaderboard-only" ${isLeaderboardOnlyHub ? "" : "hidden"}>
+                This hub will show standings, season statistics, and mini-game links. Categories and questions created directly in the hub will not count.
+              </div>
+
+              <div class="admin-hub-mode-note" data-hub-mode-note="playable-aggregate" ${isLeaderboardOnlyHub ? "hidden" : ""}>
+                This hub can contain season-long questions while also combining results from its mini games.
+              </div>
+            </div>
+          </details>
+
+          <details class="admin-form-section admin-form-section-details" data-game-types="mixed" ${canonicalType === "mixed" ? "" : "hidden"}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Hybrid Scoring Methods</h4>
+                <div class="admin-sub">Choose only the scoring methods this hybrid game will use.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckboxWithHelp_("predictionEnabled", "Predictions", game.predictionEnabled, "Allows standard one-answer prediction questions.")}
+              ${renderAdminCheckboxWithHelp_("fixedPointsEnabled", "Fixed Points", game.fixedPointsEnabled !== false, "Correct answers receive the point value assigned to the question.")}
+              ${renderAdminCheckboxWithHelp_("stakedPointsEnabled", "Staked Points", game.stakedPointsEnabled === true, "Players risk points based on confidence and win or lose those points.")}
+              ${renderAdminCheckboxWithHelp_("confidenceEnabled", "Confidence Pool", game.confidenceEnabled, "Players assign unique confidence values across questions.")}
+              ${renderAdminCheckboxWithHelp_("wagerEnabled", "Sports Wagers", game.wagerEnabled, "Players use a separate bankroll with odds and payouts.")}
+              ${renderAdminCheckboxWithHelp_("rankingEnabled", "Rankings", game.rankingEnabled, "Players rank answers instead of choosing one winner.")}
+            </div>
+          </details>
+
+          <details class="admin-form-section admin-form-section-details" data-game-types="confidence mixed" data-hybrid-feature-section="confidenceEnabled" ${(canonicalType === "confidence" || (canonicalType === "mixed" && game.confidenceEnabled)) ? "" : "hidden"}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Confidence Scoring</h4>
+                <div class="admin-sub">Controls how assigned confidence values affect the score.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+            <div class="form-grid">
+              <label class="admin-field">
+                ${adminFieldLabel_("Confidence Rule", "Win Only gives zero for wrong picks. Risk Penalty subtracts the confidence value for a wrong pick.")}
+                <select name="confidenceScoringMode">
+                  <option value="win_only" ${game.confidenceScoringMode === "risk_penalty" ? "" : "selected"}>Win only — wrong picks get 0</option>
+                  <option value="risk_penalty" ${game.confidenceScoringMode === "risk_penalty" ? "selected" : ""}>Risk penalty — wrong picks lose confidence points</option>
+                </select>
               </label>
+            </div>
+          </details>
 
-              <label>
-                Stake Increment
-
-                <input
-                  name="stakeIncrement"
-                  type="number"
-                  min="1"
-                  value="${escapeHtml_(game.stakeIncrement === undefined ? 10 : game.stakeIncrement)}"
-                />
+          <details class="admin-form-section admin-form-section-details" data-game-types="staked-prediction mixed" data-hybrid-feature-section="stakedPointsEnabled" ${(canonicalType === "staked-prediction" || (canonicalType === "mixed" && game.stakedPointsEnabled)) ? "" : "hidden"}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Staked Prediction Settings</h4>
+                <div class="admin-sub">Players reserve points on predictions and receive them back only on a push or cancellation.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+            <div class="form-grid">
+              <label class="admin-field">
+                ${adminFieldLabel_("Starting Points", "Each player begins with this point balance for staked predictions.")}
+                <input name="startingPoints" type="number" min="0" value="${escapeHtml_(game.startingPoints === undefined ? 1000 : game.startingPoints)}">
               </label>
-
-              <label>
-                Correct Pick Multiplier
-
-                <input
-                  name="stakeWinMultiplier"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value="${escapeHtml_(game.stakeWinMultiplier === undefined ? 1 : game.stakeWinMultiplier)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Minimum Stake", "The smallest point amount a player may risk on one question.")}
+                <input name="minStake" type="number" min="1" value="${escapeHtml_(game.minStake === undefined ? 10 : game.minStake)}">
               </label>
-
-              <label>
-                Wrong Pick Loss Multiplier
-
-                <input
-                  name="stakeLossMultiplier"
-                  type="number"
-                  min="0"
-                  step="0.1"
-                  value="${escapeHtml_(game.stakeLossMultiplier === undefined ? 1 : game.stakeLossMultiplier)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Maximum Stake", "The largest point amount a player may risk on one question.")}
+                <input name="maxStake" type="number" min="1" value="${escapeHtml_(game.maxStake === undefined ? 100 : game.maxStake)}">
               </label>
-
-              <label>
-                Leaderboard Score
-
+              <label class="admin-field">
+                ${adminFieldLabel_("Stake Increment", "Allowed step between stake choices. Example: 10 creates 10, 20, 30 and so on.")}
+                <input name="stakeIncrement" type="number" min="1" value="${escapeHtml_(game.stakeIncrement === undefined ? 10 : game.stakeIncrement)}">
+              </label>
+              <label class="admin-field">
+                ${adminFieldLabel_("Win Multiplier", "A value of 1 gives a net win equal to the stake. A value of 2 doubles the net win.")}
+                <input name="stakeWinMultiplier" type="number" min="0" step="0.1" value="${escapeHtml_(game.stakeWinMultiplier === undefined ? 1 : game.stakeWinMultiplier)}">
+              </label>
+              <label class="admin-field">
+                ${adminFieldLabel_("Loss Multiplier", "A value of 1 loses the full stake. A value of 0.5 loses half.")}
+                <input name="stakeLossMultiplier" type="number" min="0" step="0.1" value="${escapeHtml_(game.stakeLossMultiplier === undefined ? 1 : game.stakeLossMultiplier)}">
+              </label>
+              <label class="admin-field">
+                ${adminFieldLabel_("Leaderboard Score", "Choose whether the leaderboard combines fixed points and stake results or displays them separately.")}
                 <select name="leaderboardScoreMode">
-                  <option
-                    value="combined-net"
-                    ${(game.leaderboardScoreMode || "combined-net") === "combined-net" ? "selected" : ""}
-                  >
-                    Fixed Points + Stake Net
-                  </option>
-
-                  <option
-                    value="fixed-only"
-                    ${(game.leaderboardScoreMode || "") === "fixed-only" ? "selected" : ""}
-                  >
-                    Fixed Points Only
-                  </option>
-
-                  <option
-                    value="staked-balance"
-                    ${(game.leaderboardScoreMode || "") === "staked-balance" ? "selected" : ""}
-                  >
-                    Stake Balance
-                  </option>
-
-                  <option
-                    value="separate"
-                    ${(game.leaderboardScoreMode || "") === "separate" ? "selected" : ""}
-                  >
-                    Display Separately
-                  </option>
+                  <option value="combined-net" ${(game.leaderboardScoreMode || "combined-net") === "combined-net" ? "selected" : ""}>Fixed Points + Stake Net</option>
+                  <option value="fixed-only" ${(game.leaderboardScoreMode || "") === "fixed-only" ? "selected" : ""}>Fixed Points Only</option>
+                  <option value="staked-balance" ${(game.leaderboardScoreMode || "") === "staked-balance" ? "selected" : ""}>Stake Balance</option>
+                  <option value="separate" ${(game.leaderboardScoreMode || "") === "separate" ? "selected" : ""}>Display Separately</option>
                 </select>
               </label>
-
             </div>
+          </details>
 
-            <div class="admin-sub">
-              A correct staked prediction adds the selected stake multiplied by the win multiplier. A wrong prediction subtracts the stake multiplied by the loss multiplier. Pending stakes are reserved and cannot be reused.
-            </div>
-
-            <h4>Wager Settings</h4>
-
+          <details class="admin-form-section admin-form-section-details" data-game-types="wager racing-wager mixed" data-hybrid-feature-section="wagerEnabled" ${(["wager", "racing-wager"].indexOf(canonicalType) !== -1 || (canonicalType === "mixed" && game.wagerEnabled)) ? "" : "hidden"}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Wager Settings</h4>
+                <div class="admin-sub">Uses a separate bankroll and odds-based settlement.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
             <div class="form-grid">
-
-              <label>
-                Starting Bankroll
-
-                <input
-                  name="startingBankroll"
-                  type="number"
-                  value="${escapeHtml_(game.startingBankroll || 100)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Starting Bankroll", "The chips or play-money balance each player receives.")}
+                <input name="startingBankroll" type="number" value="${escapeHtml_(game.startingBankroll || 100)}">
               </label>
-
-              <label>
-                Min Wager
-
-                <input
-                  name="minWager"
-                  type="number"
-                  value="${escapeHtml_(game.minWager || 1)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Minimum Wager", "The smallest wager allowed on one selection.")}
+                <input name="minWager" type="number" value="${escapeHtml_(game.minWager || 1)}">
               </label>
-
-              <label>
-                Max Wager
-
-                <input
-                  name="maxWager"
-                  type="number"
-                  value="${escapeHtml_(game.maxWager || 100)}"
-                />
+              <label class="admin-field">
+                ${adminFieldLabel_("Maximum Wager", "The largest wager allowed on one selection.")}
+                <input name="maxWager" type="number" value="${escapeHtml_(game.maxWager || 100)}">
               </label>
-
-              <label>
-                Wager Edit Mode
-
+              <label class="admin-field">
+                ${adminFieldLabel_("Wager Edit Rule", "Editable Until Lock permits changes before the event locks. Final Once Selected prevents changes immediately.")}
                 <select name="wagerEditMode">
-                  <option
-                    value="editable_until_lock"
-                    ${String(game.wagerEditMode || "editable_until_lock") === "final_once_selected" ? "" : "selected"}
-                  >
-                    Editable until game locks
-                  </option>
+                  <option value="editable_until_lock" ${String(game.wagerEditMode || "editable_until_lock") === "final_once_selected" ? "" : "selected"}>Editable until game locks</option>
+                  <option value="final_once_selected" ${String(game.wagerEditMode || "") === "final_once_selected" ? "selected" : ""}>Final once selected</option>
+                </select>
+              </label>
+            </div>
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckboxWithHelp_("allowBetRemoval", "Allow Take Back Before Lock", game.allowBetRemoval, "Allows a saved wager to be removed before its lock time.")}
+            </div>
+          </details>
 
-                  <option
-                    value="final_once_selected"
-                    ${String(game.wagerEditMode || "") === "final_once_selected" ? "selected" : ""}
+          <details class="admin-form-section admin-form-section-details">
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Availability</h4>
+                <div class="admin-sub">Control whether the game is visible, open, locked, or complete.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckboxWithHelp_("active", "Active", game.active, "Shows the game as available when its date window also permits it.")}
+              ${renderAdminCheckboxWithHelp_("defaultGame", "Default Game", game.defaultGame, "Opens this game by default when no specific game is selected.")}
+              ${renderAdminCheckboxWithHelp_("archived", "Archived", game.archived, "Removes the game from normal active lists while preserving its records.")}
+              ${renderAdminCheckboxWithHelp_("lockAllPicks", "Lock All Picks", game.lockAllPicks, "Immediately prevents all pick and wager changes in this game.")}
+              ${renderAdminCheckboxWithHelp_("showLeaderboard", "Show Leaderboard", game.showLeaderboard, "Allows players to view standings for this game.")}
+            </div>
+          </details>
+
+          <details class="admin-form-section admin-form-section-details">
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Display</h4>
+                <div class="admin-sub">Customize the dashboard card and game-page appearance.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+
+            <div class="form-grid">
+              <label class="admin-field">
+                ${adminFieldLabel_("Theme Color", "Choose with the color picker or enter a six-digit hex value.")}
+                <span class="admin-color-control">
+                  <input
+                    type="color"
+                    data-theme-color-picker="true"
+                    value="${themeColor}"
+                    onchange="adminSyncThemeColorText(this.form, this)"
+                    aria-label="Choose theme color"
                   >
-                    Final once selected
-                  </option>
+                  <input
+                    id="adminGameThemeColor_${domId}"
+                    name="themeColor"
+                    value="${escapeHtml_(game.themeColor || themeColor)}"
+                    placeholder="#c8a24a"
+                    oninput="adminSyncThemeColorPicker(this.form, this)"
+                  >
+                </span>
+              </label>
+
+              <label class="admin-field">
+                ${adminFieldLabel_("Sort Order", "Lower numbers appear earlier in game lists.")}
+                <input name="sortOrder" type="number" value="${escapeHtml_(game.sortOrder || 999)}">
+              </label>
+
+              <label class="admin-field">
+                ${adminFieldLabel_("Status Label", "Optional display text such as Open, Locked, Playoffs, or Complete.")}
+                <input name="status" value="${escapeHtml_(game.status || "")}" placeholder="Open, Locked, Complete">
+              </label>
+
+              <label class="admin-field admin-wide-field">
+                ${adminFieldLabel_("Description", "A brief explanation shown on the dashboard or game page.")}
+                <textarea id="adminGameDescription_${domId}" name="description" rows="4" placeholder="Briefly explain how this game works.">${escapeHtml_(game.description || "")}</textarea>
+              </label>
+
+              <label class="admin-field">
+                ${adminFieldLabel_("Lock Label", "Player-facing text describing when picks lock.")}
+                <input id="adminGameLockLabel_${domId}" name="lockLabel" value="${escapeHtml_(game.lockLabel || "")}" placeholder="Locks before kickoff">
+              </label>
+
+              <label class="admin-field">
+                ${adminFieldLabel_("Available From", "Optional date and time when the game first becomes visible.")}
+                <input id="adminGameAvailableFrom_${domId}" name="availableFrom" type="datetime-local" value="${escapeHtml_(game.availableFrom || "")}">
+              </label>
+
+              <label class="admin-field">
+                ${adminFieldLabel_("Available Until", "Optional date and time when the game stops being available.")}
+                <input id="adminGameAvailableUntil_${domId}" name="availableUntil" type="datetime-local" value="${escapeHtml_(game.availableUntil || "")}">
+              </label>
+            </div>
+
+            <div class="admin-hero-source-card">
+              <label class="admin-field">
+                ${adminFieldLabel_("Hero Image Source", "Use a Google Drive file ID, upload an image, or import an image from a web address. Upload and URL import become available after the game is first saved.")}
+                <select name="heroImageSource" onchange="adminUpdateHeroSource(this.form)">
+                  <option value="drive" selected>Google Drive File ID</option>
+                  <option value="upload">Upload Image</option>
+                  <option value="url">Import Web Image URL</option>
                 </select>
               </label>
 
-            </div>
-
-            <div class="admin-checkbox-row">
-              ${renderAdminCheckbox_(
-                "allowBetRemoval",
-                "Allow Take Back Before Lock",
-                game.allowBetRemoval
-              )}
-            </div>
-
-            <h4>Display</h4>
-
-            <div class="form-grid">
-
-              <label>
-                Theme Color
-
-                <input
-                  id="adminGameThemeColor_${domId}"
-                  name="themeColor"
-                  value="${escapeHtml_(game.themeColor || "")}"
-                  placeholder="#c8a24a"
-                />
-              </label>
-
-              <label>
-                Sort Order
-
-                <input
-                  name="sortOrder"
-                  type="number"
-                  value="${escapeHtml_(game.sortOrder || 999)}"
-                />
-              </label>
-
-              <label>
-                Status
-
-                <input
-                  name="status"
-                  value="${escapeHtml_(game.status || "")}"
-                  placeholder="Open, Locked, Complete"
-                />
-              </label>
-
-            </div>
-
-            <h4>Dashboard Card Settings</h4>
-
-            <p class="admin-muted">
-              The dashboard title uses Game Name. The subtitle uses the selected Game Type.
-            </p>
-
-            <div class="form-grid">
-
-              <label class="admin-wide-field">
-                Description
-
-                <textarea
-                  id="adminGameDescription_${domId}"
-                  name="description"
-                  rows="4"
-                  placeholder="Briefly explain how this game works."
-                >${escapeHtml_(game.description || "")}</textarea>
-              </label>
-
-              <label>
-                Lock Label
-
-                <input
-                  id="adminGameLockLabel_${domId}"
-                  name="lockLabel"
-                  value="${escapeHtml_(game.lockLabel || "")}"
-                  placeholder="Locks before ceremony"
-                />
-              </label>
-
-              <label>
-                Available From
-
-                <input
-                  id="adminGameAvailableFrom_${domId}"
-                  name="availableFrom"
-                  type="datetime-local"
-                  value="${escapeHtml_(game.availableFrom || "")}"
-                />
-              </label>
-
-              <label>
-                Available Until
-
-                <input
-                  id="adminGameAvailableUntil_${domId}"
-                  name="availableUntil"
-                  type="datetime-local"
-                  value="${escapeHtml_(game.availableUntil || "")}"
-                />
-              </label>
-
-              <label>
-                Hero Image File ID
-
-                <input
-                  id="adminGameHeroImageFileId_${domId}"
-                  name="heroImageFileId"
-                  value="${escapeHtml_(heroImageFileId)}"
-                  placeholder="Google Drive File ID"
-                  oninput="adminPreviewGameHeroImage('${escapeJs(rawGameId)}')"
-                />
-              </label>
-
-              <label>
-                Hero Image Position
-
-                <input
-                  id="adminGameHeroImagePosition_${domId}"
-                  name="heroImagePosition"
-                  value="${escapeHtml_(game.heroImagePosition || "center center")}"
-                  placeholder="center center"
-                />
-              </label>
-
-            </div>
-
-            ${!isNew ? `
-              <div
-                id="adminGameHeroPreview_${domId}"
-                class="admin-game-hero-preview ${heroImageUrl ? "has-image" : ""}"
-                style="--admin-game-hero-image: ${heroImageUrl ? `url('${heroImageUrl}')` : "none"};"
-              >
-                <div class="admin-game-hero-preview-overlay">
-                  Hero image preview
+              <div data-hero-source="drive">
+                <div class="form-grid">
+                  <label class="admin-field">
+                    ${adminFieldLabel_("Google Drive File ID", "Paste a Google Drive file ID or a full share link; the form extracts the ID automatically.")}
+                    <input id="adminGameHeroImageFileId_${domId}" name="heroImageFileId" value="${escapeHtml_(heroImageFileId)}" placeholder="Google Drive File ID or share link" oninput="adminPreviewGameHeroImage('${escapeJs(rawGameId)}')" onchange="adminNormalizeHeroDriveInput(this, '${escapeJs(rawGameId)}')">
+                  </label>
+                  <label class="admin-field">
+                    ${adminFieldLabel_("Image Position", "CSS-style position such as center center, top center, or 50% 30%.")}
+                    <input id="adminGameHeroImagePosition_${domId}" name="heroImagePosition" value="${escapeHtml_(game.heroImagePosition || "center center")}" placeholder="center center">
+                  </label>
                 </div>
               </div>
 
-              <div class="admin-form-grid admin-game-image-tools">
-
-                <label>
-                  Upload Hero Image
-
-                  <input
-                    id="adminGameHeroFile_${domId}"
-                    class="input admin-input"
-                    type="file"
-                    accept="image/*"
-                  >
-                </label>
-
-                <label>
-                  Import Image URL
-
-                  <input
-                    id="adminGameHeroUrl_${domId}"
-                    class="input admin-input"
-                    placeholder="https://example.com/image.jpg"
-                  >
-                </label>
-
+              <div data-hero-source="upload" hidden>
+                ${isNew ? `
+                  <div class="admin-info-box">Create the game first, then reopen it to upload an image.</div>
+                ` : `
+                  <label class="admin-field">
+                    ${adminFieldLabel_("Upload Hero Image", "Select an image from this device. It will be stored through the app's image service.")}
+                    <input id="adminGameHeroFile_${domId}" class="input admin-input" type="file" accept="image/*">
+                  </label>
+                  <button type="button" class="admin-small-button secondary" onclick="adminUploadGameHeroImage('${escapeJs(rawGameId)}')">Upload Image</button>
+                `}
               </div>
 
-              <div class="admin-card-actions">
-
-                <button
-                  type="button"
-                  class="admin-small-button secondary"
-                  onclick="adminUploadGameHeroImage('${escapeJs(rawGameId)}')"
-                >
-                  Upload Image
-                </button>
-
-                <button
-                  type="button"
-                  class="admin-small-button secondary"
-                  onclick="adminImportGameHeroImageFromUrl('${escapeJs(rawGameId)}')"
-                >
-                  Import URL
-                </button>
-
-                <button
-                  type="button"
-                  class="admin-small-button secondary"
-                  onclick="adminClearGameHeroImage('${escapeJs(rawGameId)}')"
-                >
-                  Clear Image
-                </button>
-
+              <div data-hero-source="url" hidden>
+                ${isNew ? `
+                  <div class="admin-info-box">Create the game first, then reopen it to import an image from a web address.</div>
+                ` : `
+                  <label class="admin-field">
+                    ${adminFieldLabel_("Image Web Address", "Paste a direct image URL beginning with https://. The app imports it and stores the resulting Drive file ID.")}
+                    <input id="adminGameHeroUrl_${domId}" class="input admin-input" placeholder="https://example.com/image.jpg">
+                  </label>
+                  <button type="button" class="admin-small-button secondary" onclick="adminImportGameHeroImageFromUrl('${escapeJs(rawGameId)}')">Import URL</button>
+                `}
               </div>
 
-              <div
-                id="adminGameDashboardMessage_${domId}"
-                class="admin-message"
-              ></div>
-            ` : ""}
-
+              ${!isNew ? `
+                <div id="adminGameHeroPreview_${domId}" class="admin-game-hero-preview ${heroImageUrl ? "has-image" : ""}" style="--admin-game-hero-image: ${heroImageUrl ? `url('${heroImageUrl}')` : "none"};">
+                  <div class="admin-game-hero-preview-overlay">Hero image preview</div>
+                </div>
+                <button type="button" class="admin-small-button secondary" onclick="adminClearGameHeroImage('${escapeJs(rawGameId)}')">Clear Image</button>
+                <div id="adminGameDashboardMessage_${domId}" class="admin-message"></div>
+              ` : ""}
+            </div>
           </details>
 
-          <div class="admin-card-actions">
+          <details class="admin-advanced-details">
+            <summary>Advanced game controls</summary>
+            <div class="admin-sub">Use these only when reviewing or overriding game state.</div>
+            <div class="admin-checkbox-row">
+              ${renderAdminCheckboxWithHelp_("showResultsBeforeLock", "Show Results Before Lock", game.showResultsBeforeLock, "Allows result information to appear before the category or game locks.")}
+              ${renderAdminCheckboxWithHelp_("resultsFinalized", "Results Finalized", game.resultsFinalized, "Marks the game results as complete for final standings.")}
+              ${renderAdminCheckboxWithHelp_("votingLocked", "Voting Locked", game.votingLocked, "Prevents ranking or community voting changes.")}
+            </div>
+          </details>
 
-            <button
-              type="submit"
-              class="admin-small-button"
-            >
-              ${isNew ? "Create Game" : "Save Game"}
-            </button>
+          ${!isNew ? `
+              </div>
+            </details>
+          ` : ""}
 
+          <input type="hidden" name="icon" value="${escapeHtml_(game.icon || "")}">
+
+          <div class="admin-card-actions admin-game-primary-actions">
+            <button type="submit" class="admin-small-button">${isNew ? "Create Game" : "Save Game"}</button>
             ${!isNew ? `
-              <button
-                type="button"
-                class="admin-small-button secondary"
-                onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')"
-              >
+              <button type="button" class="admin-small-button secondary" onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')">
                 Categories / Questions / Nominees
               </button>
             ` : ""}
-
           </div>
-
         </form>
-
       </div>
-
     </details>
   `;
-
 }
+
 
 function renderParentGameOptions_(
   selectedParentGameId,
@@ -1514,17 +1671,51 @@ function renderParentGameOptions_(
 
 }
 
+function adminUpdateHubModeFields(form) {
+
+  if (!form || !form.hubMode) {
+    return;
+  }
+
+  const isParent =
+    form.gameRole && form.gameRole.value === "parent";
+
+  const mode = form.hubMode.value || "leaderboard-only";
+  const leaderboardOnly = isParent && mode === "leaderboard-only";
+
+  form.querySelectorAll("[data-parent-question-option]").forEach(function(wrapper) {
+    wrapper.hidden = !isParent || leaderboardOnly;
+  });
+
+  form.querySelectorAll("[data-hub-mode-note]").forEach(function(note) {
+    note.hidden = !isParent || note.dataset.hubModeNote !== mode;
+  });
+
+  if (form.includeParentQuestions) {
+    form.includeParentQuestions.disabled = !isParent || leaderboardOnly;
+    if (leaderboardOnly) {
+      form.includeParentQuestions.checked = false;
+    }
+  }
+
+  if (form.showMiniGameLinks) {
+    form.showMiniGameLinks.disabled = !isParent;
+  }
+}
+
 function adminUpdateGameStructureFields(form) {
 
   if (!form || !form.gameRole) {
     return;
   }
 
-  const isMini =
-    form.gameRole.value === "mini";
+  const role = form.gameRole.value || "standalone";
+  const isMini = role === "mini";
+  const isParent = role === "parent";
 
-  const isParent =
-    form.gameRole.value === "parent";
+  form.querySelectorAll("[data-game-role-panel]").forEach(function(panel) {
+    panel.hidden = panel.dataset.gameRolePanel !== role;
+  });
 
   [
     "parentGameId",
@@ -1538,6 +1729,9 @@ function adminUpdateGameStructureFields(form) {
   });
 
   [
+    "hubMode",
+    "showMiniGameLinks",
+    "includeParentQuestions",
     "parentBestCount",
     "placementPointsJSON"
   ].forEach(function(fieldName) {
@@ -1546,6 +1740,7 @@ function adminUpdateGameStructureFields(form) {
     }
   });
 
+  adminUpdateHubModeFields(form);
 }
 
 function renderGameTypeOptions_(
@@ -1553,40 +1748,42 @@ function renderGameTypeOptions_(
   gameTypes
 ) {
 
-  gameTypes =
-    gameTypes || [];
+  const selected = adminCanonicalGameType_(selectedType);
+  const sourceTypes = Array.isArray(gameTypes) ? gameTypes : [];
+  const byId = {};
 
-  if (!gameTypes.length) {
+  sourceTypes.forEach(function(type) {
+    if (type && type.id) {
+      byId[type.id] = type;
+    }
+  });
 
-    gameTypes = [
-      {
-        id: "prediction",
-        label: "Prediction Game"
-      },
-      {
-        id: "confidence",
-        label: "Confidence Pool"
-      },
-      {
-        id: "wager",
-        label: "Wager / Chips Game"
-      },
-      {
-        id: "ranking",
-        label: "Ranking Game"
-      }
-    ];
+  const orderedTypes = [
+    ["prediction", "Prediction Game"],
+    ["staked-prediction", "Staked Prediction Game"],
+    ["confidence", "Confidence Pool"],
+    ["wager", "Sports Wager Game"],
+    ["racing-wager", "Racing Wager Game"],
+    ["ranking", "Ranking Game"],
+    ["head-to-head", "Head-to-Head Game"],
+    ["survivor", "Survivor / Elimination Game"],
+    ["mixed", "Hybrid Game"]
+  ];
 
-  }
+  return orderedTypes.map(function(entry) {
+    const id = entry[0];
+    const fallbackLabel = entry[1];
+    const source = byId[id] || {};
+    const label = id === "mixed"
+      ? "Hybrid Game"
+      : (source.label || fallbackLabel);
 
-  return gameTypes.map(type => `
-    <option
-      value="${escapeHtml_(type.id)}"
-      ${type.id === selectedType ? "selected" : ""}
-    >
-      ${escapeHtml_(type.label)}
-    </option>
-  `).join("");
+    return `
+      <option value="${escapeHtml_(id)}" ${id === selected ? "selected" : ""}>
+        ${escapeHtml_(label)}
+      </option>
+    `;
+  }).join("");
 
 }
 
@@ -1739,9 +1936,18 @@ async function adminSaveGameFromForm(
     return;
   }
 
+  if (game.themeColor && !/^#[0-9a-f]{6}$/i.test(game.themeColor)) {
+    alert("Theme Color must be a six-digit hex value such as #c8a24a.");
+    return;
+  }
+
   if (game.gameRole === "mini" && !game.parentGameId) {
     alert("Choose a parent game for this mini game.");
     return;
+  }
+
+  if (game.gameRole === "parent" && game.hubMode === "leaderboard-only") {
+    game.includeParentQuestions = false;
   }
 
   const minStake = Number(game.minStake) || 0;
@@ -1765,7 +1971,7 @@ async function adminSaveGameFromForm(
     }
   }
 
-  if (game.placementPointsJSON) {
+  if (game.gameRole === "parent" && game.placementPointsJSON) {
     try {
       const placementPoints = JSON.parse(game.placementPointsJSON);
 
@@ -1940,6 +2146,21 @@ function adminGetGamePayloadFromForm_(
         ? form.gameRole.value
         : "standalone",
 
+    hubMode:
+      form.hubMode
+        ? form.hubMode.value
+        : "playable-aggregate",
+
+    showMiniGameLinks:
+      form.showMiniGameLinks
+        ? form.showMiniGameLinks.checked
+        : true,
+
+    includeParentQuestions:
+      form.includeParentQuestions
+        ? form.includeParentQuestions.checked
+        : true,
+
     parentGameId:
       form.parentGameId
         ? form.parentGameId.value
@@ -2113,62 +2334,60 @@ function adminApplyGameTypeDefaults(
   form
 ) {
 
-  const type =
-    form.type.value;
+  if (!form || !form.type) {
+    return;
+  }
 
-  if (type === "prediction") {
+  const type = adminCanonicalGameType_(form.type.value);
 
-    form.predictionEnabled.checked = true;
-    form.rankingEnabled.checked = false;
-    form.confidenceEnabled.checked = false;
-    form.wagerEnabled.checked = false;
+  const setChecked = function(name, checked) {
+    if (form[name]) {
+      form[name].checked = checked;
+    }
+  };
 
+  setChecked("predictionEnabled", false);
+  setChecked("rankingEnabled", false);
+  setChecked("confidenceEnabled", false);
+  setChecked("wagerEnabled", false);
+  setChecked("fixedPointsEnabled", false);
+  setChecked("stakedPointsEnabled", false);
+
+  if (["prediction", "head-to-head", "survivor"].indexOf(type) !== -1) {
+    setChecked("predictionEnabled", true);
+    setChecked("fixedPointsEnabled", true);
+  }
+
+  if (type === "staked-prediction") {
+    setChecked("predictionEnabled", true);
+    setChecked("stakedPointsEnabled", true);
   }
 
   if (type === "confidence") {
-
-    form.predictionEnabled.checked = true;
-    form.rankingEnabled.checked = false;
-    form.confidenceEnabled.checked = true;
-    form.wagerEnabled.checked = false;
-
+    setChecked("predictionEnabled", true);
+    setChecked("confidenceEnabled", true);
   }
 
-  if (type === "wager") {
-
-    form.predictionEnabled.checked = false;
-    form.rankingEnabled.checked = false;
-    form.confidenceEnabled.checked = false;
-    form.wagerEnabled.checked = true;
-
+  if (type === "wager" || type === "racing-wager") {
+    setChecked("wagerEnabled", true);
   }
 
   if (type === "ranking") {
-
-    form.predictionEnabled.checked = false;
-    form.rankingEnabled.checked = true;
-    form.confidenceEnabled.checked = false;
-    form.wagerEnabled.checked = false;
-
+    setChecked("rankingEnabled", true);
   }
 
-  if (
-    type === "mixed" ||
-    type === "combo"
-  ) {
-
-    form.predictionEnabled.checked = true;
-    form.rankingEnabled.checked = true;
-    form.confidenceEnabled.checked =
-      type === "combo";
-    form.wagerEnabled.checked = true;
-
-    if (form.gameFormat) {
-      form.gameFormat.value = "hybrid";
-    }
-
+  if (type === "mixed") {
+    setChecked("predictionEnabled", true);
+    setChecked("fixedPointsEnabled", true);
+    setChecked("stakedPointsEnabled", true);
+    setChecked("wagerEnabled", true);
   }
 
+  if (form.gameFormat) {
+    form.gameFormat.value = type === "mixed" ? "hybrid" : "standard";
+  }
+
+  adminUpdateGameTypeSections(form);
 }
 
 async function adminClearCaches() {

@@ -165,9 +165,12 @@ function doGet(e) {
 
       "adminGetGameSetup",
       "adminCreateCategory",
+      "adminCloneCategory",
       "adminUpdateCategory",
       "adminArchiveCategory",
       "adminCreateNominee",
+      "adminBulkCreateNominees",
+      "adminCloneNominee",
       "adminUpdateNominee",
       "adminArchiveNominee",
 
@@ -804,6 +807,16 @@ function doGet(e) {
 
     }
 
+    if (action === "adminCloneCategory") {
+
+      return json(
+        adminCloneCategory(
+          params
+        )
+      );
+
+    }
+
     if (action === "adminUpdateCategory") {
 
       return json(
@@ -828,6 +841,26 @@ function doGet(e) {
 
       return json(
         adminCreateNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminBulkCreateNominees") {
+
+      return json(
+        adminBulkCreateNominees(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminCloneNominee") {
+
+      return json(
+        adminCloneNominee(
           params
         )
       );

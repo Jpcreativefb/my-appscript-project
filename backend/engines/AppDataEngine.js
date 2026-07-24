@@ -326,12 +326,17 @@ function buildDashboardGameHubItemLite_(
           : "Open / Lock time TBD"
     );
 
+  const isSeasonHub =
+    game.gameRole === "parent";
+
   const enterLabel =
     availability.available === false
       ? availability.actionLabel
-      : isPast
-        ? "View Results"
-        : "Play Now";
+      : isSeasonHub
+        ? "Open Season Hub"
+        : isPast
+          ? "View Results"
+          : "Play Now";
 
   return {
     gameId:
@@ -360,6 +365,36 @@ function buildDashboardGameHubItemLite_(
         game,
         mode
       ),
+
+    gameRole:
+      game.gameRole || "standalone",
+
+    hubMode:
+      game.hubMode || "playable-aggregate",
+
+    parentGameId:
+      game.parentGameId || "",
+
+    showMiniGameLinks:
+      game.showMiniGameLinks !== false,
+
+    includeParentQuestions:
+      game.includeParentQuestions !== false,
+
+    predictionEnabled:
+      game.predictionEnabled === true,
+
+    fixedPointsEnabled:
+      game.fixedPointsEnabled !== false,
+
+    stakedPointsEnabled:
+      game.stakedPointsEnabled === true,
+
+    wagerEnabled:
+      game.wagerEnabled === true,
+
+    rankingEnabled:
+      game.rankingEnabled === true,
 
     icon:
       "",
@@ -545,6 +580,36 @@ function buildDashboardGameHubItem_(
         game,
         mode
       ),
+
+    gameRole:
+      game.gameRole || "standalone",
+
+    hubMode:
+      game.hubMode || "playable-aggregate",
+
+    parentGameId:
+      game.parentGameId || "",
+
+    showMiniGameLinks:
+      game.showMiniGameLinks !== false,
+
+    includeParentQuestions:
+      game.includeParentQuestions !== false,
+
+    predictionEnabled:
+      game.predictionEnabled === true,
+
+    fixedPointsEnabled:
+      game.fixedPointsEnabled !== false,
+
+    stakedPointsEnabled:
+      game.stakedPointsEnabled === true,
+
+    wagerEnabled:
+      game.wagerEnabled === true,
+
+    rankingEnabled:
+      game.rankingEnabled === true,
 
     icon:
       "",
