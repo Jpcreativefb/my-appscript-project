@@ -190,7 +190,9 @@ function hasDuplicateConfidencePoints_(
   }
 
   const data =
-    PicksRepo.getAllPicks();
+    typeof PicksRepo.getPicksForGame === "function"
+      ? PicksRepo.getPicksForGame(gameId)
+      : PicksRepo.getAllPicks();
 
   if (!data || data.length <= 1) {
     return false;
@@ -489,7 +491,9 @@ function getUserPicks(username, gameId){
     getDefaultGameId();
 
   const data =
-     PicksRepo.getAllPicks();
+    typeof PicksRepo.getPicksForGame === "function"
+      ? PicksRepo.getPicksForGame(gameId)
+      : PicksRepo.getAllPicks();
 
   if (data.length <= 1) {
     return [];

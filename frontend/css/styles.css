@@ -2664,3 +2664,54 @@ button.is-saving {
     flex-shrink: 0;
   }
 }
+
+/* =========================
+   STORAGE HEALTH
+========================= */
+
+.admin-storage-health {
+  margin-top: 12px;
+}
+
+.admin-storage-health-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.admin-storage-health-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.admin-storage-health-summary span {
+  opacity: 0.78;
+  font-size: 0.9rem;
+}
+
+.admin-storage-health-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px;
+}
+
+.admin-storage-health-grid span,
+.admin-storage-sheet-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.admin-storage-sheet-list {
+  display: grid;
+  gap: 6px;
+}

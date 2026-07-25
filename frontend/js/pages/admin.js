@@ -107,9 +107,28 @@ async function renderAdminPage() {
             Setup Live Results
           </button>
 
+          <button
+            class="button admin-button secondary"
+            onclick="adminSetupNormalizedStorage()"
+          >
+            Setup / Migrate Storage
+          </button>
+
+          <button
+            class="button admin-button secondary"
+            onclick="adminCheckStorageHealth('${escapeJs(res.gameId || "")}')"
+          >
+            Check Storage Health
+          </button>
+
           <div
             id="adminMessage"
             class="admin-message"
+          ></div>
+
+          <div
+            id="adminStorageHealth"
+            class="admin-storage-health"
           ></div>
 
         </div>
@@ -1631,6 +1650,9 @@ function renderAdminGameForm(
               <button type="button" class="admin-small-button secondary" onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')">
                 Categories / Questions / Nominees
               </button>
+              <button type="button" class="admin-small-button secondary" onclick="adminArchiveGameDataCopy('${escapeJs(rawGameId)}')">
+                Archive Data Copy
+              </button>
             ` : ""}
           </div>
         </form>
@@ -2431,6 +2453,113 @@ async function adminSetupLiveResultsSystem() {
         ? "Live results system ready."
         : res.error || res.message || "Unable to setup live results.";
   }
+
+}
+
+async function adminSetupNormalizedStorage() {
+
+  const message = document.getElementById("adminMessage");
+
+  if (message) {
+    message.innerText = "Creating normalized storage and migrating existing questions...";
+  }
+
+  const res = await apiAdminSetupNormalizedQuestionStorage(false);
+
+  if (message) {
+    const migration = res && res.migration ? res.migration : null;
+    message.innerText = res && res.success
+      ? "Storage ready. " + (
+          migration
+            ? (migration.questions || 0) + " questions and " +
+              (migration.options || 0) + " answers normalized."
+            : ""
+        )
+      : (res && (res.error || res.message)) || "Unable to setup storage.";
+  }
+
+}
+
+async function adminCheckStorageHealth(gameId) {
+
+  const target = document.getElementById("adminStorageHealth");
+
+  if (target) {
+    target.innerHTML = '<div class="admin-info-box">Checking storage...</div>';
+  }
+
+  const res = await apiAdminGetStorageHealth(gameId || "");
+
+  if (!target) {
+    return;
+  }
+
+  if (!res || res.success === false) {
+    target.innerHTML = `<div class="admin-info-box error-card">${escapeHtml_((res && (res.error || res.message)) || "Unable to load storage health.")}</div>`;
+    return;
+  }
+
+  const game = res.game || null;
+  const largest = (res.sheets || [])
+    .slice()
+    .sort(function(a, b) {
+      return Number(b.cells || 0) - Number(a.cells || 0);
+    })
+    .slice(0, 5);
+
+  target.innerHTML = `
+    <div class="admin-storage-health-card">
+      <div class="admin-storage-health-summary">
+        <strong>${Number(res.totalCells || 0).toLocaleString()} active cells</strong>
+        <span>${Number(res.estimatedPercentUsed || 0).toFixed(2)}% of the spreadsheet cell limit</span>
+      </div>
+      ${game ? `
+        <div class="admin-storage-health-grid">
+          <span>Questions <strong>${Number(game.questions || 0).toLocaleString()}</strong></span>
+          <span>Answers <strong>${Number(game.options || 0).toLocaleString()}</strong></span>
+          <span>Legacy rows <strong>${Number(game.legacyCategoryRows || 0).toLocaleString()}</strong></span>
+        </div>
+      ` : ""}
+      <div class="admin-storage-sheet-list">
+        ${largest.map(function(sheet) {
+          return `<div><span>${escapeHtml_(sheet.sheetName)}</span><strong>${Number(sheet.cells || 0).toLocaleString()} cells</strong></div>`;
+        }).join("")}
+      </div>
+    </div>
+  `;
+
+}
+
+async function adminArchiveGameDataCopy(gameId) {
+
+  if (!gameId) {
+    alert("GameId is required.");
+    return;
+  }
+
+  const ok = confirm(
+    "Create a verified archive copy of this game's questions, answers, results, picks, and wagers? Active data will not be removed."
+  );
+
+  if (!ok) {
+    return;
+  }
+
+  const res = await apiAdminArchiveGameData(
+    gameId,
+    "COPY",
+    "Archive copy created from Manage Games"
+  );
+
+  if (!res || res.success === false) {
+    alert((res && (res.error || res.message)) || "Could not archive game data.");
+    return;
+  }
+
+  alert(
+    "Archive copy verified.\n\n" +
+    "Archive: " + (res.archiveSpreadsheetUrl || res.archiveSpreadsheetId || "Created")
+  );
 
 }
 

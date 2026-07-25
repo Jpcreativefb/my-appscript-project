@@ -339,6 +339,7 @@ function setupUniversalQuestionSystem(payload) {
     categoryResultsEnsureColumns_(
       CATEGORY_SETTINGS_SHEET,
       [
+        "GameId",
         "QuestionType",
         "ScoringEngine",
         "SelectionMode",
@@ -390,6 +391,18 @@ function setupUniversalQuestionSystem(payload) {
   const categoryResults =
     setupCategoryResultsSystem();
 
+  const normalizedStorage =
+    typeof setupNormalizedQuestionStorage === "function"
+      ? setupNormalizedQuestionStorage({
+          migrateExisting: payload.migrateExisting !== false,
+          force: payload.forceNormalizedMigration === true
+        })
+      : {
+          success: false,
+          skipped: true,
+          message: "Normalized storage engine is unavailable."
+        };
+
   if (
     payload.skipCacheClear !== true &&
     typeof clearAppCaches === "function"
@@ -404,7 +417,8 @@ function setupUniversalQuestionSystem(payload) {
     categories: categories,
     categorySettings: settings,
     picks: picks,
-    categoryResults: categoryResults
+    categoryResults: categoryResults,
+    normalizedStorage: normalizedStorage
   };
 
 }
@@ -434,7 +448,14 @@ function getCategoryResultsRows_(gameId) {
       .getSheetByName(CATEGORY_RESULTS_SHEET);
 
   const data =
-    sh.getDataRange().getValues();
+    typeof normalizedStorageReadRowsByGame_ === "function"
+      ? normalizedStorageReadRowsByGame_(
+          CATEGORY_RESULTS_SHEET,
+          gameId,
+          "CategoryResults",
+          { trustIndex: false }
+        )
+      : sh.getDataRange().getValues();
 
   if (data.length <= 1) {
     return [];

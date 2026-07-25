@@ -202,6 +202,9 @@ function doGet(e) {
       "adminClearLiveWinner",
 
       "adminSetupUniversalQuestionSystem",
+      "adminSetupNormalizedQuestionStorage",
+      "adminGetStorageHealth",
+      "adminArchiveGameData",
 
       "adminCreateSportsWager",
       "adminCreateSportsWagersBulk",
@@ -2065,7 +2068,48 @@ if (action === "compareUserPicks") {
       return json(
         apiAdminSetupUniversalQuestionSystem({
           username: params.username,
-          token: params.token
+          token: params.token,
+          migrateExisting: params.migrateExisting !== "false"
+        })
+      );
+
+    }
+
+    if (action === "adminSetupNormalizedQuestionStorage") {
+
+      return json(
+        apiAdminSetupNormalizedQuestionStorage({
+          username: params.username,
+          token: params.token,
+          migrateExisting: params.migrateExisting !== "false",
+          force: params.force === "true"
+        })
+      );
+
+    }
+
+    if (action === "adminGetStorageHealth") {
+
+      return json(
+        apiAdminGetStorageHealth({
+          username: params.username,
+          token: params.token,
+          gameId: params.gameId || gameId || ""
+        })
+      );
+
+    }
+
+    if (action === "adminArchiveGameData") {
+
+      return json(
+        apiAdminArchiveGameData({
+          username: params.username,
+          token: params.token,
+          gameId: params.gameId || gameId,
+          mode: params.mode || "COPY",
+          confirmMove: params.confirmMove === "true",
+          notes: params.notes || ""
         })
       );
 

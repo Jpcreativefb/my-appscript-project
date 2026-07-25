@@ -302,6 +302,48 @@ function getAllBetsData_(){
 
 }
 
+function getBetsDataForGame_(gameId){
+
+  gameId = normalizeBetGameId_(gameId || "");
+
+  if (!gameId) {
+    return getAllBetsData_();
+  }
+
+  if (typeof normalizedStorageReadRowsByGame_ === "function") {
+    return normalizedStorageReadRowsByGame_(
+      BETS_SHEET,
+      gameId,
+      "Bets",
+      {
+        trustIndex: false
+      }
+    );
+  }
+
+  const data = getAllBetsData_();
+
+  if (!data || data.length <= 1) {
+    return data || [];
+  }
+
+  const headers = data[0].map(function(header) {
+    return String(header || "").trim();
+  });
+  const gameIdCol = headers.indexOf("GameId");
+
+  if (gameIdCol === -1) {
+    return data;
+  }
+
+  return [data[0]].concat(
+    data.slice(1).filter(function(row) {
+      return normalizeBetGameId_(row[gameIdCol]) === gameId;
+    })
+  );
+
+}
+
 function appendBetRow_(row){
 
   getBetsSheet_()
@@ -622,9 +664,13 @@ function getBettingOddsMap_(gameId){
   try {
 
     data =
-      typeof getAllCategoriesData_ === "function"
-        ? getAllCategoriesData_()
-        : [];
+      typeof getCategoriesDataForGameScoped_ === "function"
+        ? getCategoriesDataForGameScoped_(gameId)
+        : (
+            typeof getAllCategoriesData_ === "function"
+              ? getAllCategoriesData_()
+              : []
+          );
 
   } catch (err) {
 
@@ -1315,7 +1361,7 @@ function getLatestBetsByUser_(gameId){
     gameId || getDefaultGameId()
   );
 
-  const data = getAllBetsData_();
+  const data = getBetsDataForGame_(gameId);
 
   if (data.length <= 1) {
     return {};

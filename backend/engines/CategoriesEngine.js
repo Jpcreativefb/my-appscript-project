@@ -276,7 +276,9 @@ function getCategories(gameId){
   validateGameId(gameId);
 
   const data =
-     getAllCategoriesData_();
+    typeof getCategoriesDataForGameScoped_ === "function"
+      ? getCategoriesDataForGameScoped_(gameId)
+      : getAllCategoriesData_();
 
   if (data.length <= 1) {
     return [];
@@ -996,7 +998,9 @@ function getNomineesForCategory(
   ========================= */
 
   const data =
-     getAllCategoriesData_();
+    typeof getCategoriesDataForGameScoped_ === "function"
+      ? getCategoriesDataForGameScoped_(gameId)
+      : getAllCategoriesData_();
 
   if (data.length <= 1) {
 
@@ -1111,7 +1115,9 @@ function getNomineesForCategory(
   ========================= */
 
   const pData =
-      getAllPicksData_();
+    typeof getPicksDataForGame_ === "function"
+      ? getPicksDataForGame_(gameId)
+      : getAllPicksData_();
 
   if (pData.length <= 1) {
 

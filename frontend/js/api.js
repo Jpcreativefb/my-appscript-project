@@ -1210,6 +1210,43 @@ async function apiAdminArchiveGame(gameId) {
 
 }
 
+async function apiAdminSetupNormalizedQuestionStorage(force) {
+
+  return api(
+    "adminSetupNormalizedQuestionStorage",
+    {
+      migrateExisting: true,
+      force: force === true
+    }
+  );
+
+}
+
+async function apiAdminGetStorageHealth(gameId) {
+
+  return api(
+    "adminGetStorageHealth",
+    {
+      gameId: gameId || ""
+    }
+  );
+
+}
+
+async function apiAdminArchiveGameData(gameId, mode, notes, confirmMove) {
+
+  return api(
+    "adminArchiveGameData",
+    {
+      gameId: gameId,
+      mode: mode || "COPY",
+      notes: notes || "",
+      confirmMove: confirmMove === true
+    }
+  );
+
+}
+
 async function apiAdminCloneGame(payload) {
 
   return apiAdminGameSaveRequest_(

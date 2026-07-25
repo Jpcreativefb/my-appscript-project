@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v12-question-clone-fix";
+const AWARDS_CACHE = "awards-app-v14-storage-performance-foundation";
 
 const APP_SHELL = [
   "./",

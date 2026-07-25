@@ -1248,7 +1248,13 @@ function adminGetGameSetup(payload) {
   );
 
   const categoryData =
-    getAllCategoriesData_();
+    typeof getAdminCategoriesDataForGameScoped_ === "function"
+      ? getAdminCategoriesDataForGameScoped_(gameId)
+      : (
+          typeof getCategoriesDataForGameScoped_ === "function"
+            ? getCategoriesDataForGameScoped_(gameId)
+            : getAllCategoriesData_()
+        );
 
   const categoryHeaders =
     categoryData[0].map(h =>
@@ -1911,43 +1917,50 @@ function adminCreateCategory(payload) {
 
     }
 
-    adminCatAppendCategoryRow_({
-      gameId:
-        gameId,
-
-      category:
-        categoryName,
-
-      categoryId:
-        categoryId,
-
-      nominee:
-        "",
-
-      nomineeId:
-        "",
-
-      section:
-        section,
-
-      fileId:
-        "",
-
-      shortAnswer:
-        "",
-
-      categoryImage:
-        payload.categoryImage || "",
-
-      active:
-        true,
-
-      predictionGame:
-        true,
-
-      communityRank:
-        ""
-    });
+    /*
+      Normalized storage owns the question row. Categories remains a
+      compatibility projection and receives rows only when answers/options
+      are created. This removes the confusing blank anchor row.
+    */
+    if (typeof normalizedStorageUpsertQuestion_ === "function") {
+      normalizedStorageUpsertQuestion_({
+        gameId: gameId,
+        questionId: categoryId,
+        question: categoryName,
+        section: section,
+        categoryImage: payload.categoryImage || "",
+        active: true,
+        predictionGame: true,
+        communityRank: false,
+        questionType: payload.questionType || "award-single-winner",
+        scoringEngine: payload.scoringEngine || "manual",
+        selectionMode: payload.selectionMode || "single",
+        entryType: payload.entryType || "",
+        oddsMode: payload.oddsMode || "none",
+        resultSource: payload.resultSource || "manual",
+        sportsProvider: payload.sportsProvider || "",
+        sportsLeague: payload.sportsLeague || "",
+        sportsGameId: payload.sportsGameId || "",
+        espnEventId: payload.espnEventId || "",
+        sportsMarket: payload.sportsMarket || "",
+        sourceSystem: "admin-normalized"
+      });
+    } else {
+      adminCatAppendCategoryRow_({
+        gameId: gameId,
+        category: categoryName,
+        categoryId: categoryId,
+        nominee: "",
+        nomineeId: "",
+        section: section,
+        fileId: "",
+        shortAnswer: "",
+        categoryImage: payload.categoryImage || "",
+        active: true,
+        predictionGame: true,
+        communityRank: ""
+      });
+    }
 
     adminCatUpsertCategorySettings_({
       gameId:
@@ -2693,6 +2706,15 @@ function adminUpdateCategory(payload) {
 
     }
     
+    if (typeof normalizedStorageUpsertQuestion_ === "function") {
+      normalizedStorageUpsertQuestion_(
+        Object.assign({}, payload, {
+          gameId: gameId,
+          questionId: categoryId
+        })
+      );
+    }
+
     SpreadsheetApp.flush();
 
     adminCatClearCaches_();
@@ -2977,6 +2999,23 @@ function adminCreateNominee(payload) {
       row
     );
 
+    if (typeof normalizedStorageUpsertOption_ === "function") {
+      normalizedStorageUpsertOption_({
+        gameId: gameId,
+        questionId: categoryId,
+        optionId: nomineeId,
+        option: nomineeName,
+        shortAnswer: payload.shortAnswer || nomineeName,
+        fileId: payload.fileId || "",
+        logoUrl: payload.logoUrl || "",
+        movieId: payload.movieId || "",
+        movie: payload.movie || "",
+        person: payload.person || "",
+        active: "active" in payload ? payload.active : true,
+        sourceSystem: "admin-normalized"
+      });
+    }
+
     SpreadsheetApp.flush();
 
     adminCatClearCaches_();
@@ -3221,6 +3260,16 @@ function adminUpdateNominee(payload) {
     ).setValues([
       row
     ]);
+
+    if (typeof normalizedStorageUpsertOption_ === "function") {
+      normalizedStorageUpsertOption_(
+        Object.assign({}, payload, {
+          gameId: gameId,
+          questionId: categoryId,
+          optionId: nomineeId
+        })
+      );
+    }
 
     SpreadsheetApp.flush();
 
@@ -3647,12 +3696,63 @@ function adminBulkCreateNominees(payload) {
       });
 
       rows.push(row);
-      created.push({ nomineeId: nomineeId, nominee: nomineeName });
+      created.push({
+        nomineeId: nomineeId,
+        nominee: nomineeName,
+        shortAnswer: item.shortAnswer || nomineeName,
+        fileId: item.fileId || "",
+        logoUrl: item.logoUrl || "",
+        movieId: item.movieId || "",
+        movie: item.movie || "",
+        person: item.person || "",
+        active: item.active === undefined ? true : adminCatToBoolean_(item.active)
+      });
     });
 
     if (rows.length) {
       sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length)
         .setValues(rows);
+
+      if (typeof normalizedStorageUpsertOptionsBulk_ === "function") {
+        normalizedStorageUpsertOptionsBulk_(
+          created.map(function(item, itemIndex) {
+            return {
+              gameId: gameId,
+              questionId: categoryId,
+              optionId: item.nomineeId,
+              option: item.nominee,
+              shortAnswer: item.shortAnswer || item.nominee,
+              fileId: item.fileId || "",
+              logoUrl: item.logoUrl || "",
+              movieId: item.movieId || "",
+              movie: item.movie || "",
+              person: item.person || "",
+              active: item.active,
+              displayOrder: itemIndex + 1,
+              sourceSystem: "admin-normalized"
+            };
+          })
+        );
+      } else if (typeof normalizedStorageUpsertOption_ === "function") {
+        created.forEach(function(item, itemIndex) {
+          normalizedStorageUpsertOption_({
+            gameId: gameId,
+            questionId: categoryId,
+            optionId: item.nomineeId,
+            option: item.nominee,
+            shortAnswer: item.shortAnswer || item.nominee,
+            fileId: item.fileId || "",
+            logoUrl: item.logoUrl || "",
+            movieId: item.movieId || "",
+            movie: item.movie || "",
+            person: item.person || "",
+            active: item.active,
+            displayOrder: itemIndex + 1,
+            sourceSystem: "admin-normalized"
+          });
+        });
+      }
+
       SpreadsheetApp.flush();
       adminCatClearCaches_();
     }

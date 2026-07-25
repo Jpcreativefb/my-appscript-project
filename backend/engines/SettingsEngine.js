@@ -248,10 +248,41 @@ function getCategorySettingsAllowedCategoryIds_(gameId){
 
   try {
 
+    if (typeof normalizedStorageReadQuestionsByGame_ === "function") {
+      const questionData = normalizedStorageReadQuestionsByGame_(gameId, {});
+
+      if (questionData && questionData.length > 1) {
+        const questionHeaders = questionData[0].map(function(header) {
+          return String(header || "").trim();
+        });
+        const questionIdCol = questionHeaders.indexOf("QuestionId");
+
+        if (questionIdCol !== -1) {
+          for (let q = 1; q < questionData.length; q++) {
+            const questionId = normalizeCategoryId_(
+              questionData[q][questionIdCol]
+            );
+
+            if (questionId) {
+              map[questionId] = true;
+            }
+          }
+
+          if (Object.keys(map).length) {
+            return map;
+          }
+        }
+      }
+    }
+
     const data =
-      typeof getAllCategoriesData_ === "function"
-        ? getAllCategoriesData_()
-        : [];
+      typeof getCategoriesDataForGameScoped_ === "function"
+        ? getCategoriesDataForGameScoped_(gameId)
+        : (
+            typeof getAllCategoriesData_ === "function"
+              ? getAllCategoriesData_()
+              : []
+          );
 
     if (!data || data.length <= 1) {
       return null;
@@ -363,6 +394,43 @@ function setCategorySettingsCellIfExists_(
    GET CATEGORY SETTINGS
 ========================================================= */
 
+function getCategorySettingsDataForGameScoped_(gameId) {
+
+  const sh = getCategorySettingsSheet_();
+
+  if (!sh || sh.getLastRow() <= 1) {
+    return sh && sh.getLastRow() === 1
+      ? sh.getDataRange().getValues()
+      : [];
+  }
+
+  if (
+    typeof normalizedStorageReadSettingsRowsForGame_ !== "function" ||
+    typeof normalizedStorageBuildQuestionGameMap_ !== "function"
+  ) {
+    return getAllCategorySettingsData_();
+  }
+
+  const allowed = getCategorySettingsAllowedCategoryIds_(gameId);
+
+  if (!allowed) {
+    return getAllCategorySettingsData_();
+  }
+
+  const scoped = normalizedStorageReadSettingsRowsForGame_(
+    sh,
+    gameId,
+    Object.keys(allowed),
+    normalizedStorageBuildQuestionGameMap_()
+  );
+
+  if (scoped.error || scoped.ambiguousCount > 0) {
+    return getAllCategorySettingsData_();
+  }
+
+  return [scoped.headers].concat(scoped.rows || []);
+}
+
 function getCategorySettings(gameId){
 
   gameId =
@@ -374,7 +442,7 @@ function getCategorySettings(gameId){
   validateGameId(gameId);
 
   const values =
-    getAllCategorySettingsData_();
+    getCategorySettingsDataForGameScoped_(gameId);
 
   if (values.length <= 1) {
     return {};

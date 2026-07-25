@@ -352,7 +352,9 @@ function clearGameCaches(
 
     "leaderboard_" + gameId,
 
-    "projected_" + gameId
+    "projected_" + gameId,
+
+    "normalized_sync_" + gameId
 
   ];
 
@@ -375,6 +377,10 @@ function clearAppCaches(){
 
   APP_RUNTIME_CACHE = {};
 
+  if (typeof NORMALIZED_STORAGE_RUNTIME_CACHE !== "undefined") {
+    NORMALIZED_STORAGE_RUNTIME_CACHE = {};
+  }
+
   const cache =
     CacheService
       .getScriptCache();
@@ -393,7 +399,15 @@ function clearAppCaches(){
 
     "sheet_Users",
 
-    "sheet_Games"
+    "sheet_Games",
+
+    "sheet_Questions",
+
+    "sheet_QuestionOptions",
+
+    "sheet_DataIndex",
+
+    "sheet_ArchiveManifest"
 
   ];
 

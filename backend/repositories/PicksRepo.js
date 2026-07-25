@@ -38,6 +38,47 @@ function getAllPicksData_(){
 
 }
 
+
+function getPicksDataForGame_(gameId){
+
+  gameId = String(gameId || "").trim();
+
+  if (!gameId) {
+    return getAllPicksData_();
+  }
+
+  if (typeof normalizedStorageReadRowsByGame_ === "function") {
+    return normalizedStorageReadRowsByGame_(
+      PICKS_SHEET,
+      gameId,
+      "Picks",
+      {
+        trustIndex: false
+      }
+    );
+  }
+
+  const data = getAllPicksData_();
+
+  if (!data || data.length <= 1) {
+    return data || [];
+  }
+
+  const headers = data[0];
+  const gameIdCol = headers.indexOf("GameId");
+
+  if (gameIdCol === -1) {
+    return data;
+  }
+
+  return [headers].concat(
+    data.slice(1).filter(function(row) {
+      return String(row[gameIdCol] || "").trim() === gameId;
+    })
+  );
+
+}
+
 function appendPickRow_(row){
 
   const sh =
@@ -70,6 +111,12 @@ var PicksRepo = {
   getAllPicks: function(){
 
     return getAllPicks();
+
+  },
+
+  getPicksForGame: function(gameId){
+
+    return getPicksDataForGame_(gameId);
 
   },
 
