@@ -1212,9 +1212,14 @@ async function apiAdminArchiveGame(gameId) {
 
 async function apiAdminSetupNormalizedQuestionStorage(force) {
 
+  const session =
+    getSession() || {};
+
   return api(
     "adminSetupNormalizedQuestionStorage",
     {
+      username: session.username || "",
+      token: session.token || "",
       migrateExisting: true,
       force: force === true
     }
@@ -1224,9 +1229,14 @@ async function apiAdminSetupNormalizedQuestionStorage(force) {
 
 async function apiAdminGetStorageHealth(gameId) {
 
+  const session =
+    getSession() || {};
+
   return api(
     "adminGetStorageHealth",
     {
+      username: session.username || "",
+      token: session.token || "",
       gameId: gameId || ""
     }
   );
@@ -1235,9 +1245,14 @@ async function apiAdminGetStorageHealth(gameId) {
 
 async function apiAdminArchiveGameData(gameId, mode, notes, confirmMove) {
 
+  const session =
+    getSession() || {};
+
   return api(
     "adminArchiveGameData",
     {
+      username: session.username || "",
+      token: session.token || "",
       gameId: gameId,
       mode: mode || "COPY",
       notes: notes || "",
