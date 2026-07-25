@@ -1,0 +1,22 @@
+Awards App Storage & Performance Foundation v2.0
+Test Report
+
+PASS - 80 backend/frontend JavaScript files pass Node syntax checks.
+PASS - Concatenated Apps Script backend passes syntax check (no duplicate top-level const declarations).
+PASS - Normalized question merge preserves canonical question title, section, and active state.
+PASS - Normalized option merge preserves canonical answer and active state.
+PASS - CategorySettings exact GameId scoping works.
+PASS - Unique legacy blank-GameId settings rows are accepted.
+PASS - Ambiguous blank-GameId settings rows are rejected.
+PASS - Archive content hashes are stable for Date values.
+PASS - API routes exist for setup, health, and archive actions.
+PASS - MOVE archive requires explicit confirmation.
+PASS - Bet game-scoped fallback is non-recursive.
+PASS - Bulk answer writes use one normalized batch update.
+PASS - New question creation does not add a blank Categories anchor row.
+PASS - Main player paths use game-scoped category/settings/result/pick/bet reads.
+PASS - Archive copy requires per-sheet row-count and content-hash verification.
+PASS - Failed archive verification cannot remove active source rows.
+
+Environment limitation:
+The Apps Script/Google Sheets runtime cannot be executed in this container. A controlled live spreadsheet test is still required before moving production data. The release exposes COPY archive in the UI; test COPY before any future MOVE operation.

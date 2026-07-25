@@ -205,18 +205,108 @@ function normalizedStorageHeaderMap_(headers) {
   return map;
 }
 
-function normalizedStorageEnsureSheet_(sheetName, headers) {
-  const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(sheetName);
+function normalizedStorageIsRetryableSpreadsheetError_(err) {
+  const message = err && err.message
+    ? String(err.message)
+    : String(err || "");
 
-  if (!sh) {
-    sh = ss.insertSheet(sheetName);
+  return (
+    message.indexOf("Service Spreadsheets timed out") !== -1 ||
+    message.indexOf("Service Spreadsheets failed") !== -1 ||
+    message.indexOf("Internal error") !== -1 ||
+    message.indexOf("Please try again") !== -1
+  );
+}
+
+function normalizedStorageSpreadsheetRetry_(label, fn, maxAttempts) {
+  maxAttempts = Math.max(1, Number(maxAttempts || 5));
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return fn();
+    } catch (err) {
+      lastError = err;
+
+      if (
+        !normalizedStorageIsRetryableSpreadsheetError_(err) ||
+        attempt === maxAttempts
+      ) {
+        throw err;
+      }
+
+      Utilities.sleep(
+        Math.min(8000, 750 * attempt * attempt)
+      );
+    }
   }
 
-  const lastColumn = Math.max(sh.getLastColumn(), 1);
-  let existing = sh.getLastRow() >= 1
-    ? sh.getRange(1, 1, 1, lastColumn).getValues()[0]
-      .map(normalizedStorageString_)
+  throw lastError || new Error(
+    "Spreadsheet operation failed: " + label
+  );
+}
+
+function normalizedStorageEnsureSheet_(sheetName, headers) {
+  const ss = normalizedStorageSpreadsheetRetry_(
+    "open active spreadsheet",
+    function() {
+      return SpreadsheetApp.getActive();
+    }
+  );
+
+  let sh = normalizedStorageSpreadsheetRetry_(
+    "find sheet " + sheetName,
+    function() {
+      return ss.getSheetByName(sheetName);
+    }
+  );
+
+  if (!sh) {
+    sh = normalizedStorageSpreadsheetRetry_(
+      "create sheet " + sheetName,
+      function() {
+        return ss.insertSheet(sheetName);
+      }
+    );
+
+    normalizedStorageSpreadsheetRetry_(
+      "flush newly created sheet " + sheetName,
+      function() {
+        SpreadsheetApp.flush();
+        return true;
+      }
+    );
+
+    Utilities.sleep(300);
+
+    sh = normalizedStorageSpreadsheetRetry_(
+      "reopen sheet " + sheetName,
+      function() {
+        return ss.getSheetByName(sheetName);
+      }
+    ) || sh;
+  }
+
+  const dimensions = normalizedStorageSpreadsheetRetry_(
+    "read dimensions for " + sheetName,
+    function() {
+      return {
+        lastRow: sh.getLastRow(),
+        lastColumn: sh.getLastColumn()
+      };
+    }
+  );
+
+  const lastColumn = Math.max(dimensions.lastColumn, 1);
+  let existing = dimensions.lastRow >= 1
+    ? normalizedStorageSpreadsheetRetry_(
+        "read headers for " + sheetName,
+        function() {
+          return sh.getRange(1, 1, 1, lastColumn)
+            .getValues()[0]
+            .map(normalizedStorageString_);
+        }
+      )
     : [];
 
   const hasContent = existing.some(function(value) {
@@ -224,7 +314,14 @@ function normalizedStorageEnsureSheet_(sheetName, headers) {
   });
 
   if (!hasContent) {
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    normalizedStorageSpreadsheetRetry_(
+      "write headers for " + sheetName,
+      function() {
+        sh.getRange(1, 1, 1, headers.length)
+          .setValues([headers]);
+        return true;
+      }
+    );
     existing = headers.slice();
   }
 
@@ -233,8 +330,14 @@ function normalizedStorageEnsureSheet_(sheetName, headers) {
   });
 
   if (missing.length) {
-    sh.getRange(1, existing.length + 1, 1, missing.length)
-      .setValues([missing]);
+    normalizedStorageSpreadsheetRetry_(
+      "append missing headers for " + sheetName,
+      function() {
+        sh.getRange(1, existing.length + 1, 1, missing.length)
+          .setValues([missing]);
+        return true;
+      }
+    );
   }
 
   return sh;
@@ -396,8 +499,76 @@ function normalizedStorageBackfillCategorySettingsGameIds_() {
   };
 }
 
+function setupNormalizedQuestionStorageSheetsOnly() {
+  const sheets = [
+    {
+      name: QUESTIONS_SHEET,
+      headers: QUESTIONS_HEADERS
+    },
+    {
+      name: QUESTION_OPTIONS_SHEET,
+      headers: QUESTION_OPTIONS_HEADERS
+    },
+    {
+      name: DATA_INDEX_SHEET,
+      headers: DATA_INDEX_HEADERS
+    },
+    {
+      name: ARCHIVE_MANIFEST_SHEET,
+      headers: ARCHIVE_MANIFEST_HEADERS
+    },
+    {
+      name: STORAGE_MIGRATION_LOG_SHEET,
+      headers: STORAGE_MIGRATION_LOG_HEADERS
+    }
+  ];
+
+  const created = sheets.map(function(item) {
+    const sh = normalizedStorageEnsureSheet_(
+      item.name,
+      item.headers
+    );
+
+    return {
+      sheet: item.name,
+      exists: !!sh,
+      rows: normalizedStorageSpreadsheetRetry_(
+        "read row count for " + item.name,
+        function() {
+          return sh.getLastRow();
+        }
+      ),
+      columns: normalizedStorageSpreadsheetRetry_(
+        "read column count for " + item.name,
+        function() {
+          return sh.getLastColumn();
+        }
+      )
+    };
+  });
+
+  normalizedStorageSpreadsheetRetry_(
+    "flush normalized storage sheets",
+    function() {
+      SpreadsheetApp.flush();
+      return true;
+    }
+  );
+
+  return {
+    success: created.every(function(item) {
+      return item.exists;
+    }),
+    storageVersion: NORMALIZED_STORAGE_VERSION,
+    sheets: created
+  };
+}
+
 function setupNormalizedQuestionStorage(payload) {
   payload = payload || {};
+
+  const schemaSetup =
+    setupNormalizedQuestionStorageSheetsOnly();
 
   const questions = normalizedStorageEnsureSheet_(
     QUESTIONS_SHEET,
@@ -407,21 +578,6 @@ function setupNormalizedQuestionStorage(payload) {
   const options = normalizedStorageEnsureSheet_(
     QUESTION_OPTIONS_SHEET,
     QUESTION_OPTIONS_HEADERS
-  );
-
-  normalizedStorageEnsureSheet_(
-    DATA_INDEX_SHEET,
-    DATA_INDEX_HEADERS
-  );
-
-  normalizedStorageEnsureSheet_(
-    ARCHIVE_MANIFEST_SHEET,
-    ARCHIVE_MANIFEST_HEADERS
-  );
-
-  normalizedStorageEnsureSheet_(
-    STORAGE_MIGRATION_LOG_SHEET,
-    STORAGE_MIGRATION_LOG_HEADERS
   );
 
   const shouldMigrate =
@@ -470,6 +626,7 @@ function setupNormalizedQuestionStorage(payload) {
     questionsSheet: questions.getName(),
     optionsSheet: options.getName(),
     storageVersion: NORMALIZED_STORAGE_VERSION,
+    schemaSetup: schemaSetup,
     migration: migration,
     categorySettingsBackfill: categorySettingsBackfill
   };
