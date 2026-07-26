@@ -114,6 +114,9 @@ const ARCHIVE_MANIFEST_HEADERS = [
   "VerifiedAt",
   "VerificationErrorsJSON",
   "ReadinessJSON",
+  "RemovedCountsJSON",
+  "RestoredAt",
+  "RestoreVerificationJSON",
   "Notes"
 ];
 
@@ -368,9 +371,9 @@ function normalizedStorageEnsureExistingSheetColumns_(sheetName, headers) {
   return sh;
 }
 
-function normalizedStorageBuildQuestionGameMap_() {
+function normalizedStorageBuildQuestionGameMapForSpreadsheet_(spreadsheet) {
   const map = {};
-  const ss = SpreadsheetApp.getActive();
+  const ss = spreadsheet || SpreadsheetApp.getActive();
 
   function addFromSheet(sheetName, questionHeader) {
     const sh = ss.getSheetByName(sheetName);
@@ -413,6 +416,12 @@ function normalizedStorageBuildQuestionGameMap_() {
   addFromSheet(CATEGORIES_SHEET, "CategoryId");
 
   return map;
+}
+
+function normalizedStorageBuildQuestionGameMap_() {
+  return normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    SpreadsheetApp.getActive()
+  );
 }
 
 function normalizedStorageBackfillCategorySettingsGameIds_() {
@@ -2573,6 +2582,419 @@ function normalizedStorageGetArchiveReadiness_(gameId) {
 }
 
 
+
+function normalizedStorageArchiveMode_(value) {
+  const mode = normalizedStorageKey_(value);
+
+  if (mode === "move") {
+    return "MOVE";
+  }
+
+  if (mode === "restore") {
+    return "RESTORE";
+  }
+
+  return "COPY";
+}
+
+function normalizedStorageSafeJsonObject_(value) {
+  const parsed = normalizedStorageSafeJsonParse_(value, {});
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function normalizedStorageGetManifestRecords_(gameId) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(
+    ARCHIVE_MANIFEST_SHEET
+  );
+
+  if (!sh || sh.getLastRow() <= 1) {
+    return [];
+  }
+
+  const values = sh.getDataRange().getValues();
+  const headers = values[0].map(normalizedStorageString_);
+  const col = normalizedStorageHeaderMap_(headers);
+  const records = [];
+
+  for (let i = 1; i < values.length; i++) {
+    const object = normalizedStorageLegacyRowObject_(headers, values[i]);
+
+    if (normalizedStorageString_(object.GameId) !== gameId) {
+      continue;
+    }
+
+    object._rowNumber = i + 1;
+    object._entityCounts = normalizedStorageSafeJsonObject_(
+      object.EntityCountsJSON
+    );
+    object._verificationErrors = normalizedStorageSafeJsonParse_(
+      object.VerificationErrorsJSON,
+      []
+    ) || [];
+    object._readiness = normalizedStorageSafeJsonObject_(
+      object.ReadinessJSON
+    );
+    records.push(object);
+  }
+
+  return records;
+}
+
+function normalizedStorageManifestRecordIsVerified_(record) {
+  if (!record || !record._entityCounts) {
+    return false;
+  }
+
+  const required = [
+    GAMES_SHEET,
+    QUESTIONS_SHEET,
+    QUESTION_OPTIONS_SHEET,
+    CATEGORIES_SHEET,
+    CATEGORY_RESULTS_SHEET,
+    PICKS_SHEET,
+    typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets",
+    CATEGORY_SETTINGS_SHEET
+  ];
+
+  return (
+    record._verificationErrors.length === 0 &&
+    required.every(function(sheetName) {
+      const item = record._entityCounts[sheetName];
+      return item && item.verified === true;
+    })
+  );
+}
+
+function normalizedStorageLatestManifestRecord_(gameId, statuses) {
+  const allowed = {};
+  (statuses || []).forEach(function(status) {
+    allowed[normalizedStorageString_(status)] = true;
+  });
+
+  const records = normalizedStorageGetManifestRecords_(gameId);
+
+  for (let i = records.length - 1; i >= 0; i--) {
+    const record = records[i];
+    const status = normalizedStorageString_(record.Status);
+
+    if (
+      (!statuses || !statuses.length || allowed[status]) &&
+      normalizedStorageManifestRecordIsVerified_(record) &&
+      normalizedStorageString_(record.ArchiveSpreadsheetId)
+    ) {
+      return record;
+    }
+  }
+
+  return null;
+}
+
+function normalizedStorageGameCompletionState_(gameId) {
+  const game = typeof getGame === "function" ? getGame(gameId) : null;
+
+  if (!game) {
+    return {
+      exists: false,
+      complete: false,
+      reason: "Game not found in active Games sheet."
+    };
+  }
+
+  const status = normalizedStorageKey_(game.status || "");
+  const completedStatuses = {
+    final: true,
+    finished: true,
+    complete: true,
+    completed: true,
+    closed: true,
+    archived: true,
+    inactive: true
+  };
+  const complete =
+    game.resultsFinalized === true ||
+    game.active === false ||
+    game.archived === true ||
+    completedStatuses[status] === true;
+
+  return {
+    exists: true,
+    complete: complete,
+    active: game.active === true,
+    archived: game.archived === true,
+    resultsFinalized: game.resultsFinalized === true,
+    status: normalizedStorageString_(game.status),
+    reason: complete
+      ? "Game is finalized or inactive."
+      : "Mark Results Finalized, set the game inactive, or use a completed status before MOVE."
+  };
+}
+
+function normalizedStorageGetMoveReadiness_(gameId) {
+  const questions = normalizedStorageGetArchiveReadiness_(gameId);
+  const gameState = normalizedStorageGameCompletionState_(gameId);
+  const verifiedCopy = normalizedStorageLatestManifestRecord_(
+    gameId,
+    ["VERIFIED_COPY"]
+  );
+  const activeSpreadsheetId = SpreadsheetApp.getActive().getId();
+  const blockers = [];
+
+  if (!questions.ready) {
+    blockers.push(
+      questions.unresolvedCount + " question(s) remain unresolved."
+    );
+  }
+
+  if (
+    gameState.archived === true &&
+    gameState.active === false
+  ) {
+    blockers.push("Game is already archived. Use Restore Game.");
+  } else if (!gameState.complete) {
+    blockers.push(gameState.reason);
+  }
+
+  if (!verifiedCopy) {
+    blockers.push("A verified COPY archive is required before MOVE.");
+  } else if (
+    normalizedStorageString_(verifiedCopy.SourceSpreadsheetId) !==
+      normalizedStorageString_(activeSpreadsheetId)
+  ) {
+    blockers.push("The verified COPY belongs to a different source spreadsheet.");
+  }
+
+  return {
+    ready: blockers.length === 0,
+    questionCount: questions.questionCount,
+    unresolvedCount: questions.unresolvedCount,
+    unresolved: questions.unresolved,
+    gameState: gameState,
+    verifiedCopy: verifiedCopy ? {
+      archiveId: normalizedStorageString_(verifiedCopy.ArchiveId),
+      archiveSpreadsheetId: normalizedStorageString_(
+        verifiedCopy.ArchiveSpreadsheetId
+      ),
+      archiveSpreadsheetUrl: normalizedStorageString_(
+        verifiedCopy.ArchiveSpreadsheetUrl
+      ),
+      sourceSpreadsheetId: normalizedStorageString_(
+        verifiedCopy.SourceSpreadsheetId
+      ),
+      verifiedAt: verifiedCopy.VerifiedAt || "",
+      entityCounts: verifiedCopy._entityCounts
+    } : null,
+    blockers: blockers
+  };
+}
+
+function normalizedStorageQuestionIdsFromSpreadsheet_(spreadsheet, gameId) {
+  const sh = spreadsheet.getSheetByName(QUESTIONS_SHEET);
+  const data = normalizedStorageReadRowsFromSheetByGame_(sh, gameId);
+  const seen = {};
+
+  if (!data || !data.rows || !data.rows.length) {
+    return [];
+  }
+
+  const col = normalizedStorageHeaderMap_(data.headers);
+
+  if (col.QuestionId === undefined) {
+    return [];
+  }
+
+  return data.rows.map(function(row) {
+    return normalizedStorageKey_(row[col.QuestionId]);
+  }).filter(function(questionId) {
+    if (!questionId || seen[questionId]) {
+      return false;
+    }
+
+    seen[questionId] = true;
+    return true;
+  });
+}
+
+function normalizedStorageCountRowsForGameInSpreadsheet_(
+  spreadsheet,
+  gameId,
+  questionIds
+) {
+  const counts = {};
+  const standardSheets = [
+    GAMES_SHEET,
+    QUESTIONS_SHEET,
+    QUESTION_OPTIONS_SHEET,
+    CATEGORIES_SHEET,
+    CATEGORY_RESULTS_SHEET,
+    PICKS_SHEET,
+    typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"
+  ];
+
+  standardSheets.forEach(function(sheetName) {
+    const sh = spreadsheet.getSheetByName(sheetName);
+    counts[sheetName] = sh
+      ? normalizedStorageFindRowsByGame_(sh, gameId).length
+      : 0;
+  });
+
+  const settingsSheet = spreadsheet.getSheetByName(
+    CATEGORY_SETTINGS_SHEET
+  );
+
+  if (!settingsSheet) {
+    counts[CATEGORY_SETTINGS_SHEET] = 0;
+  } else {
+    const map = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+      spreadsheet
+    );
+    const settings = normalizedStorageReadSettingsRowsForGame_(
+      settingsSheet,
+      gameId,
+      questionIds || [],
+      map
+    );
+    counts[CATEGORY_SETTINGS_SHEET] = settings.rows
+      ? settings.rows.length
+      : 0;
+  }
+
+  return counts;
+}
+
+function normalizedStoragePrepareRestore_(gameId) {
+  const record = normalizedStorageLatestManifestRecord_(
+    gameId,
+    ["VERIFIED_MOVE"]
+  );
+
+  if (!record) {
+    return {
+      ready: false,
+      error: "No verified archive is available to restore."
+    };
+  }
+
+  const activeSpreadsheetId = SpreadsheetApp.getActive().getId();
+
+  if (
+    normalizedStorageString_(record.SourceSpreadsheetId) !==
+      normalizedStorageString_(activeSpreadsheetId)
+  ) {
+    return {
+      ready: false,
+      error: "The verified archive belongs to a different source spreadsheet."
+    };
+  }
+
+  const archiveSpreadsheet = normalizedStorageSpreadsheetRetry_(
+    "open verified archive for restore",
+    function() {
+      return SpreadsheetApp.openById(
+        normalizedStorageString_(record.ArchiveSpreadsheetId)
+      );
+    },
+    3
+  );
+  const questionIds = normalizedStorageQuestionIdsFromSpreadsheet_(
+    archiveSpreadsheet,
+    gameId
+  );
+  const activeCounts = normalizedStorageCountRowsForGameInSpreadsheet_(
+    SpreadsheetApp.getActive(),
+    gameId,
+    questionIds
+  );
+  const nonGameRows = Object.keys(activeCounts).filter(function(sheetName) {
+    return sheetName !== GAMES_SHEET && Number(activeCounts[sheetName] || 0) > 0;
+  });
+  let gameStubAllowed = true;
+  const game = typeof getGame === "function" ? getGame(gameId) : null;
+
+  if (Number(activeCounts[GAMES_SHEET] || 0) > 0) {
+    gameStubAllowed = !!(
+      game &&
+      game.archived === true &&
+      game.active === false
+    );
+  }
+
+  if (nonGameRows.length || !gameStubAllowed) {
+    return {
+      ready: false,
+      error: "Restore was blocked because active game data still exists.",
+      activeCounts: activeCounts,
+      blockingSheets: nonGameRows,
+      gameStubAllowed: gameStubAllowed
+    };
+  }
+
+  return {
+    ready: true,
+    archiveId: normalizedStorageString_(record.ArchiveId),
+    archiveSpreadsheetId: normalizedStorageString_(
+      record.ArchiveSpreadsheetId
+    ),
+    archiveSpreadsheetUrl: normalizedStorageString_(
+      record.ArchiveSpreadsheetUrl
+    ),
+    gameName: normalizedStorageString_(record.GameName || gameId),
+    year: Number(record.Year) || new Date().getFullYear(),
+    sourceSpreadsheetId: normalizedStorageString_(
+      record.SourceSpreadsheetId
+    ),
+    entityCounts: record._entityCounts,
+    questionIds: questionIds,
+    activeCounts: activeCounts
+  };
+}
+
+function normalizedStorageGetArchiveStatus_(gameId) {
+  const latestCopy = normalizedStorageLatestManifestRecord_(
+    gameId,
+    ["VERIFIED_COPY"]
+  );
+  const latestMove = normalizedStorageLatestManifestRecord_(
+    gameId,
+    ["VERIFIED_MOVE"]
+  );
+  const latestRestore = normalizedStorageLatestManifestRecord_(
+    gameId,
+    ["VERIFIED_RESTORE"]
+  );
+  const moveReadiness = normalizedStorageGetMoveReadiness_(gameId);
+  let restore = null;
+
+  if (
+    moveReadiness.gameState &&
+    moveReadiness.gameState.archived === true &&
+    moveReadiness.gameState.active === false
+  ) {
+    try {
+      restore = normalizedStoragePrepareRestore_(gameId);
+    } catch (err) {
+      restore = {
+        ready: false,
+        error: err && err.message ? err.message : String(err)
+      };
+    }
+  } else {
+    restore = {
+      ready: false,
+      error: "Restore becomes available after a verified MOVE marks the game archived."
+    };
+  }
+
+  return {
+    success: true,
+    gameId: gameId,
+    latestCopy: latestCopy,
+    latestMove: latestMove,
+    latestRestore: latestRestore,
+    moveReadiness: moveReadiness,
+    restoreReadiness: restore
+  };
+}
+
 const NORMALIZED_ARCHIVE_JOB_PROPERTY_PREFIX =
   "AWARDS_ARCHIVE_JOB_V2_";
 
@@ -2583,30 +3005,41 @@ const NORMALIZED_ARCHIVE_JOB_MAX_AGE_MS =
   6 * 60 * 60 * 1000;
 
 function normalizedStorageArchiveSteps_(mode) {
-  const normalizedMode = normalizedStorageKey_(mode) === "move"
-    ? "MOVE"
-    : "COPY";
-  const steps = [
-    {
+  const normalizedMode = normalizedStorageArchiveMode_(mode);
+  const steps = [];
+
+  if (normalizedMode === "RESTORE") {
+    steps.push({
+      name: "Find Verified Archive",
+      operation: "PREPARE_RESTORE",
+      stage: "PREPARE"
+    });
+    steps.push({
+      name: "Check Restore Target",
+      operation: "CHECK_RESTORE_TARGET",
+      stage: "PREPARE"
+    });
+  } else {
+    steps.push({
       name: "Validate Game",
       operation: "PREPARE_GAME",
       stage: "PREPARE"
-    }
-  ];
+    });
 
-  if (normalizedMode === "MOVE") {
+    if (normalizedMode === "MOVE") {
+      steps.push({
+        name: "Check Safe Move",
+        operation: "CHECK_MOVE_GUARDS",
+        stage: "PREPARE"
+      });
+    }
+
     steps.push({
-      name: "Check Move Readiness",
-      operation: "CHECK_READINESS",
+      name: "Open Yearly Archive",
+      operation: "PREPARE_ARCHIVE",
       stage: "PREPARE"
     });
   }
-
-  steps.push({
-    name: "Open Yearly Archive",
-    operation: "PREPARE_ARCHIVE",
-    stage: "PREPARE"
-  });
 
   [
     { name: GAMES_SHEET, entityType: "Games" },
@@ -2633,12 +3066,26 @@ function normalizedStorageArchiveSteps_(mode) {
     {
       name: CATEGORY_SETTINGS_SHEET,
       entityType: "CategorySettings",
-      operation: "COPY_SETTINGS"
+      operation: normalizedMode === "RESTORE"
+        ? "RESTORE_SETTINGS"
+        : (
+            normalizedMode === "MOVE"
+              ? "VERIFY_MOVE_SETTINGS"
+              : "COPY_SETTINGS"
+          )
     }
   ].forEach(function(step) {
     steps.push(Object.assign({}, step, {
-      operation: step.operation || "COPY_GAME_ROWS",
-      stage: "ARCHIVE"
+      operation: step.operation || (
+        normalizedMode === "RESTORE"
+          ? "RESTORE_GAME_ROWS"
+          : (
+              normalizedMode === "MOVE"
+                ? "VERIFY_MOVE_GAME_ROWS"
+                : "COPY_GAME_ROWS"
+            )
+      ),
+      stage: normalizedMode === "RESTORE" ? "RESTORE" : "ARCHIVE"
     }));
   });
 
@@ -2694,13 +3141,16 @@ function normalizedStorageUpgradeArchiveJob_(job, mode) {
   job.stepIndex = 0;
   job.preparation = {};
   job.counts = {};
-  job.readiness = normalizedStorageKey_(mode) === "move"
-    ? null
-    : {
+  job.readiness = normalizedStorageArchiveMode_(mode) === "COPY"
+    ? {
         ready: true,
         skipped: true,
         reason: "COPY mode never removes active data."
-      };
+      }
+    : null;
+  job.restoreSource = null;
+  job.restoreQuestionIds = [];
+  job.removedCounts = {};
   job.year = "";
   job.sourceSpreadsheetId = "";
   job.archiveSpreadsheetId = "";
@@ -2879,11 +3329,17 @@ function normalizedStorageArchiveJobProgress_(job, extra) {
   const archiveSteps = steps.filter(function(step) {
     return step.stage === "ARCHIVE";
   });
+  const restoreSteps = steps.filter(function(step) {
+    return step.stage === "RESTORE";
+  });
   const preparationCompleted = completedItems.filter(function(step) {
     return step.stage === "PREPARE";
   }).length;
   const archiveCompleted = completedItems.filter(function(step) {
     return step.stage === "ARCHIVE";
+  }).length;
+  const restoreCompleted = completedItems.filter(function(step) {
+    return step.stage === "RESTORE";
   }).length;
   const response = {
     success: true,
@@ -2900,6 +3356,8 @@ function normalizedStorageArchiveJobProgress_(job, extra) {
     preparationTotal: preparationSteps.length,
     archiveCompleted: archiveCompleted,
     archiveTotal: archiveSteps.length,
+    restoreCompleted: restoreCompleted,
+    restoreTotal: restoreSteps.length,
     nextStep: next ? next.name : "",
     archiveSpreadsheetId: job.archiveSpreadsheetId || "",
     archiveSpreadsheetUrl: job.archiveSpreadsheetUrl || "",
@@ -2918,9 +3376,7 @@ function normalizedStorageStartArchiveJob_(payload) {
   payload = payload || {};
 
   let gameId = normalizedStorageString_(payload.gameId);
-  const mode = normalizedStorageKey_(payload.mode) === "move"
-    ? "MOVE"
-    : "COPY";
+  const mode = normalizedStorageArchiveMode_(payload.mode);
 
   if (typeof normalizeGameId_ === "function") {
     gameId = normalizeGameId_(gameId);
@@ -2930,13 +3386,30 @@ function normalizedStorageStartArchiveJob_(payload) {
     throw new Error("GameId is required");
   }
 
-  if (mode === "MOVE" && payload.confirmMove !== true) {
+  if (
+    mode === "MOVE" &&
+    (
+      payload.confirmMove !== true ||
+      normalizedStorageString_(payload.confirmationText) !==
+        "MOVE " + gameId
+    )
+  ) {
     return {
       success: false,
       gameId: gameId,
       mode: mode,
       verified: false,
-      error: "MOVE archive requires confirmMove=true. Create a COPY first."
+      error: "Type MOVE " + gameId + " to confirm removing active game data."
+    };
+  }
+
+  if (mode === "RESTORE" && payload.confirmRestore !== true) {
+    return {
+      success: false,
+      gameId: gameId,
+      mode: mode,
+      verified: false,
+      error: "Restore requires explicit confirmation."
     };
   }
 
@@ -2991,6 +3464,8 @@ function normalizedStorageStartArchiveJob_(payload) {
       year: "",
       mode: mode,
       confirmMove: payload.confirmMove === true,
+      confirmRestore: payload.confirmRestore === true,
+      confirmationText: normalizedStorageString_(payload.confirmationText),
       notes: normalizedStorageString_(payload.notes),
       sourceSpreadsheetId: "",
       archiveSpreadsheetId: "",
@@ -3002,6 +3477,8 @@ function normalizedStorageStartArchiveJob_(payload) {
             reason: "COPY mode never removes active data."
           }
         : null,
+      restoreSource: null,
+      removedCounts: {},
       steps: normalizedStorageArchiveSteps_(mode),
       stepIndex: 0,
       preparation: {},
@@ -3095,19 +3572,20 @@ function normalizedStorageRunArchiveJobStep_(payload) {
         job.sourceSpreadsheetId = result.sourceSpreadsheetId;
         job.preparation = job.preparation || {};
         job.preparation[step.name] = result;
-      } else if (step.operation === "CHECK_READINESS") {
+      } else if (step.operation === "CHECK_MOVE_GUARDS") {
         result = normalizedStorageSpreadsheetRetry_(
-          "check move archive readiness",
+          "check safe move requirements",
           function() {
-            return normalizedStorageGetArchiveReadiness_(job.gameId);
+            return normalizedStorageGetMoveReadiness_(job.gameId);
           },
           3
         );
 
         if (!result.ready) {
           job.readiness = result;
-          job.lastError =
-            "Game cannot be moved while questions remain unresolved.";
+          job.lastError = result.blockers && result.blockers.length
+            ? result.blockers.join(" ")
+            : "Game cannot be moved yet.";
           job.updatedAt = new Date().toISOString();
           normalizedStorageSaveArchiveJob_(job);
 
@@ -3121,6 +3599,61 @@ function normalizedStorageRunArchiveJobStep_(payload) {
         }
 
         job.readiness = result;
+        job.verifiedCopy = result.verifiedCopy;
+        job.preparation = job.preparation || {};
+        job.preparation[step.name] = result;
+      } else if (step.operation === "PREPARE_RESTORE") {
+        result = normalizedStorageSpreadsheetRetry_(
+          "prepare verified archive restore",
+          function() {
+            return normalizedStoragePrepareRestore_(job.gameId);
+          },
+          3
+        );
+
+        if (!result.ready) {
+          job.lastError = result.error || "Restore is not ready.";
+          job.restoreSource = result;
+          job.updatedAt = new Date().toISOString();
+          normalizedStorageSaveArchiveJob_(job);
+
+          return normalizedStorageArchiveJobProgress_(job, {
+            success: false,
+            retryable: false,
+            failedStep: step.name,
+            restoreReadiness: result,
+            error: job.lastError
+          });
+        }
+
+        job.restoreSource = result;
+        job.archiveSpreadsheetId = result.archiveSpreadsheetId;
+        job.archiveSpreadsheetUrl = result.archiveSpreadsheetUrl;
+        job.restoreQuestionIds = result.questionIds || [];
+        job.gameName = result.gameName || job.gameId;
+        job.year = result.year || new Date().getFullYear();
+        job.sourceSpreadsheetId = result.sourceSpreadsheetId || "";
+        job.preparation = job.preparation || {};
+        job.preparation[step.name] = result;
+      } else if (step.operation === "CHECK_RESTORE_TARGET") {
+        result = job.restoreSource || normalizedStoragePrepareRestore_(
+          job.gameId
+        );
+
+        if (!result.ready) {
+          job.lastError = result.error || "Restore target is not empty.";
+          job.updatedAt = new Date().toISOString();
+          normalizedStorageSaveArchiveJob_(job);
+
+          return normalizedStorageArchiveJobProgress_(job, {
+            success: false,
+            retryable: false,
+            failedStep: step.name,
+            restoreReadiness: result,
+            error: job.lastError
+          });
+        }
+
         job.preparation = job.preparation || {};
         job.preparation[step.name] = result;
       } else if (step.operation === "PREPARE_ARCHIVE") {
@@ -3128,9 +3661,33 @@ function normalizedStorageRunArchiveJobStep_(payload) {
           throw new Error("Archive game metadata has not been prepared yet.");
         }
 
-        const archive = normalizedStorageResolveArchiveSpreadsheet_(
-          Number(job.year)
-        );
+        let archive = null;
+
+        if (
+          job.mode === "MOVE" &&
+          job.verifiedCopy &&
+          job.verifiedCopy.archiveSpreadsheetId
+        ) {
+          const preferredId = normalizedStorageString_(
+            job.verifiedCopy.archiveSpreadsheetId
+          );
+          const preferredSpreadsheet = normalizedStorageSpreadsheetRetry_(
+            "open verified copy archive for move",
+            function() {
+              return SpreadsheetApp.openById(preferredId);
+            },
+            3
+          );
+          archive = {
+            id: preferredId,
+            url: preferredSpreadsheet.getUrl(),
+            spreadsheet: preferredSpreadsheet
+          };
+        } else {
+          archive = normalizedStorageResolveArchiveSpreadsheet_(
+            Number(job.year)
+          );
+        }
 
         result = {
           verified: true,
@@ -3146,7 +3703,7 @@ function normalizedStorageRunArchiveJobStep_(payload) {
           throw new Error("Archive spreadsheet has not been prepared yet.");
         }
 
-        const source = SpreadsheetApp.getActive();
+        const activeSpreadsheet = SpreadsheetApp.getActive();
         const archiveSpreadsheet = normalizedStorageSpreadsheetRetry_(
           "open archive spreadsheet",
           function() {
@@ -3155,27 +3712,87 @@ function normalizedStorageRunArchiveJobStep_(payload) {
           3
         );
 
-        result = normalizedStorageSpreadsheetRetry_(
-          "archive and verify " + step.name,
-          function() {
-            if (step.operation === "COPY_SETTINGS") {
-              return normalizedStorageCopySettingsByQuestionIds_(
-                source,
+        if (job.mode === "RESTORE") {
+          result = normalizedStorageSpreadsheetRetry_(
+            "restore and verify " + step.name,
+            function() {
+              const expected = job.restoreSource &&
+                job.restoreSource.entityCounts
+                ? job.restoreSource.entityCounts[step.name]
+                : null;
+
+              if (step.operation === "RESTORE_SETTINGS") {
+                return normalizedStorageRestoreSettingsByQuestionIds_(
+                  archiveSpreadsheet,
+                  activeSpreadsheet,
+                  job.gameId,
+                  job.restoreQuestionIds || [],
+                  expected
+                );
+              }
+
+              return normalizedStorageRestoreRowsForGame_(
+                archiveSpreadsheet.getSheetByName(step.name),
+                activeSpreadsheet,
+                job.gameId,
+                step.entityType,
+                expected
+              );
+            },
+            3
+          );
+        } else if (job.mode === "MOVE") {
+          result = normalizedStorageSpreadsheetRetry_(
+            "reverify safe move " + step.name,
+            function() {
+              const expected = job.verifiedCopy &&
+                job.verifiedCopy.entityCounts
+                ? job.verifiedCopy.entityCounts[step.name]
+                : null;
+
+              if (step.operation === "VERIFY_MOVE_SETTINGS") {
+                return normalizedStorageVerifySettingsForMove_(
+                  activeSpreadsheet,
+                  archiveSpreadsheet,
+                  job.gameId,
+                  normalizedStorageGetQuestionIdsForGame_(job.gameId),
+                  expected
+                );
+              }
+
+              return normalizedStorageVerifyRowsForMove_(
+                activeSpreadsheet.getSheetByName(step.name),
                 archiveSpreadsheet,
                 job.gameId,
-                normalizedStorageGetQuestionIdsForGame_(job.gameId)
+                step.entityType,
+                expected
               );
-            }
+            },
+            3
+          );
+        } else {
+          result = normalizedStorageSpreadsheetRetry_(
+            "archive and verify " + step.name,
+            function() {
+              if (step.operation === "COPY_SETTINGS") {
+                return normalizedStorageCopySettingsByQuestionIds_(
+                  activeSpreadsheet,
+                  archiveSpreadsheet,
+                  job.gameId,
+                  normalizedStorageGetQuestionIdsForGame_(job.gameId)
+                );
+              }
 
-            return normalizedStorageCopyRowsForGame_(
-              source.getSheetByName(step.name),
-              archiveSpreadsheet,
-              job.gameId,
-              step.entityType
-            );
-          },
-          3
-        );
+              return normalizedStorageCopyRowsForGame_(
+                activeSpreadsheet.getSheetByName(step.name),
+                archiveSpreadsheet,
+                job.gameId,
+                step.entityType
+              );
+            },
+            3
+          );
+        }
 
         job.counts = job.counts || {};
         job.counts[step.name] = result;
@@ -3194,6 +3811,26 @@ function normalizedStorageRunArchiveJobStep_(payload) {
       });
     }
 
+    if (
+      step.stage !== "PREPARE" &&
+      (!result || result.verified !== true)
+    ) {
+      job.lastError = result && result.error
+        ? result.error
+        : step.name + " failed verification.";
+      job.failedStep = step.name;
+      job.updatedAt = new Date().toISOString();
+      normalizedStorageSaveArchiveJob_(job);
+
+      return normalizedStorageArchiveJobProgress_(job, {
+        success: false,
+        retryable: false,
+        failedStep: step.name,
+        stepResult: result || {},
+        error: job.lastError
+      });
+    }
+
     job.stepIndex = stepIndex + 1;
     job.updatedAt = new Date().toISOString();
     job.lastError = "";
@@ -3206,7 +3843,9 @@ function normalizedStorageRunArchiveJobStep_(payload) {
       stepResult: result,
       message: step.stage === "PREPARE"
         ? step.name + " completed."
-        : step.name + " verified (" +
+        : step.name + (
+            step.stage === "RESTORE" ? " restored" : " verified"
+          ) + " (" +
           Number(result && result.count || 0) + " rows)."
     });
   } finally {
@@ -3262,7 +3901,7 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
     const job = normalizedStorageLoadArchiveJob_(payload.jobId);
 
     if (job.finalized === true) {
-      return {
+      return job.finalResult || {
         success: job.verified === true,
         archiveJob: true,
         complete: true,
@@ -3276,11 +3915,8 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
         verified: job.verified === true,
         readiness: job.readiness || {},
         verificationErrors: job.verificationErrors || [],
-        message: job.finalMessage || (
-          job.verified === true
-            ? "Archive copy verified."
-            : "Archive copy failed verification; no source rows were removed."
-        )
+        removedCounts: job.removedCounts || {},
+        message: job.finalMessage || "Archive workflow completed."
       };
     }
 
@@ -3309,14 +3945,78 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
           targetHash: item.targetHash || ""
         };
       });
-    const verified = verificationErrors.length === 0;
+    let verified = verificationErrors.length === 0;
     const now = new Date();
-    const source = SpreadsheetApp.getActive();
+    const activeSpreadsheet = SpreadsheetApp.getActive();
+
+    if (verified && job.mode === "MOVE") {
+      try {
+        const moveQuestionIds = job.moveQuestionIds && job.moveQuestionIds.length
+          ? job.moveQuestionIds
+          : normalizedStorageGetQuestionIdsForGame_(job.gameId);
+
+        job.moveQuestionIds = moveQuestionIds;
+        job.updatedAt = now.toISOString();
+        normalizedStorageSaveArchiveJob_(job);
+
+        job.removedCounts = normalizedStorageDeleteGameRowsAfterArchive_(
+          job.gameId,
+          moveQuestionIds
+        );
+      } catch (deleteErr) {
+        job.lastError = deleteErr && deleteErr.message
+          ? deleteErr.message
+          : String(deleteErr);
+        job.failedStep = "Remove Active Game Data";
+        job.updatedAt = new Date().toISOString();
+        normalizedStorageSaveArchiveJob_(job);
+
+        return {
+          success: false,
+          archiveJob: true,
+          complete: true,
+          finalized: false,
+          retryable: true,
+          jobId: job.jobId,
+          gameId: job.gameId,
+          mode: job.mode,
+          verified: false,
+          counts: counts,
+          error: job.lastError,
+          message: "Archive was verified, but active-data removal did not finish. Retry finalization; do not start another MOVE."
+        };
+      }
+    }
+
     const manifestSheet = normalizedStorageEnsureSheet_(
       ARCHIVE_MANIFEST_SHEET,
       ARCHIVE_MANIFEST_HEADERS
     );
     const manifestHeaders = normalizedStorageGetHeaders_(manifestSheet);
+    const status = verified
+      ? (
+          job.mode === "MOVE"
+            ? "VERIFIED_MOVE"
+            : (
+                job.mode === "RESTORE"
+                  ? "VERIFIED_RESTORE"
+                  : "VERIFIED_COPY"
+              )
+        )
+      : "FAILED_VERIFICATION";
+    const notes = job.notes || (
+      verified
+        ? (
+            job.mode === "MOVE"
+              ? "Archive move verified; active transaction rows were removed and the game was marked archived."
+              : (
+                  job.mode === "RESTORE"
+                    ? "Archived game data restored and verified by row counts and content hashes."
+                    : "Archive copy verified by row counts and content hashes."
+                )
+          )
+        : "Archive verification failed; active data was not removed."
+    );
     const manifestObject = {
       ArchiveId: job.archiveRecordId,
       GameId: job.gameId,
@@ -3324,21 +4024,20 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
       Year: job.year,
       ArchiveSpreadsheetId: job.archiveSpreadsheetId,
       ArchiveSpreadsheetUrl: job.archiveSpreadsheetUrl,
-      Status: verified
-        ? (job.mode === "MOVE" ? "VERIFIED_MOVE" : "VERIFIED_COPY")
-        : "FAILED_VERIFICATION",
+      Status: status,
       Mode: job.mode,
       EntityCountsJSON: JSON.stringify(counts),
-      SourceSpreadsheetId: job.sourceSpreadsheetId || source.getId(),
+      SourceSpreadsheetId: job.sourceSpreadsheetId || activeSpreadsheet.getId(),
       ArchivedAt: now,
       VerifiedAt: verified ? now : "",
       VerificationErrorsJSON: JSON.stringify(verificationErrors),
       ReadinessJSON: JSON.stringify(job.readiness || {}),
-      Notes: job.notes || (
-        verified
-          ? "Archive copy verified by row counts and content hashes."
-          : "Archive copy failed verification; source data was not removed."
-      )
+      RemovedCountsJSON: JSON.stringify(job.removedCounts || {}),
+      RestoredAt: verified && job.mode === "RESTORE" ? now : "",
+      RestoreVerificationJSON: JSON.stringify(
+        job.mode === "RESTORE" ? counts : {}
+      ),
+      Notes: notes
     };
     const manifestRow = normalizedStorageManifestRowByArchiveId_(
       manifestSheet,
@@ -3360,15 +4059,19 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
       manifestSheet.appendRow(manifestValues);
     }
 
-    if (verified && job.mode === "MOVE") {
-      normalizedStorageDeleteGameRowsAfterArchive_(
-        job.gameId,
-        normalizedStorageGetQuestionIdsForGame_(job.gameId)
-      );
-    }
-
     normalizedStorageClearCaches_();
 
+    const finalMessage = verified
+      ? (
+          job.mode === "MOVE"
+            ? "Archive move verified; active game data removed."
+            : (
+                job.mode === "RESTORE"
+                  ? "Archived game restored and verified."
+                  : "Archive copy verified."
+              )
+        )
+      : "Archive verification failed; active data was not removed.";
     const finalResult = {
       success: verified,
       archiveJob: true,
@@ -3383,16 +4086,16 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
       verified: verified,
       readiness: job.readiness || {},
       verificationErrors: verificationErrors,
-      message: verified
-        ? "Archive copy verified."
-        : "Archive copy failed verification; no source rows were removed."
+      removedCounts: job.removedCounts || {},
+      message: finalMessage
     };
 
     job.finalized = true;
     job.finalizedAt = now.toISOString();
     job.verified = verified;
     job.verificationErrors = verificationErrors;
-    job.finalMessage = finalResult.message;
+    job.finalMessage = finalMessage;
+    job.finalResult = finalResult;
     job.updatedAt = now.toISOString();
     normalizedStorageSaveArchiveJob_(job);
 
@@ -3405,15 +4108,23 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
 function archiveGameData(payload) {
   payload = payload || {};
   const gameId = normalizedStorageString_(payload.gameId);
-  const mode = normalizedStorageKey_(payload.mode) === "move"
-    ? "MOVE"
-    : "COPY";
+  const mode = normalizedStorageArchiveMode_(payload.mode);
 
   if (!gameId) {
     throw new Error("GameId is required");
   }
 
   validateGameId(gameId);
+
+  if (mode !== "COPY") {
+    return {
+      success: false,
+      gameId: gameId,
+      mode: mode,
+      verified: false,
+      error: "MOVE and RESTORE require the resumable phased archive workflow. Refresh Manage Games and use the current controls."
+    };
+  }
 
   if (mode === "MOVE" && payload.confirmMove !== true) {
     return {
@@ -3745,14 +4456,14 @@ function normalizedStorageCopySettingsByQuestionIds_(
     CATEGORY_SETTINGS_SHEET
   );
 
-  if (!sourceSheet || sourceSheet.getLastRow() <= 1) {
-    return {
+  if (!sourceSheet || sourceSheet.getLastRow() < 1) {
+    return normalizedStorageExpectedEntityVerification_({
       count: 0,
       targetCount: 0,
       sourceHash: normalizedStorageArchiveHash_([], []),
       targetHash: normalizedStorageArchiveHash_([], []),
       verified: true
-    };
+    }, expected, "RESTORE");
   }
 
   const questionGameMap = normalizedStorageBuildQuestionGameMap_();
@@ -3883,30 +4594,575 @@ function normalizedStorageCopySettingsByQuestionIds_(
   };
 }
 
-function normalizedStorageDeleteGameRowsAfterArchive_(gameId, questionIds) {
-  const source = SpreadsheetApp.getActive();
-  const questionGameMap = normalizedStorageBuildQuestionGameMap_();
-  const deletable = [
-    QUESTIONS_SHEET,
-    QUESTION_OPTIONS_SHEET,
-    CATEGORIES_SHEET,
-    CATEGORY_RESULTS_SHEET,
-    PICKS_SHEET,
-    typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"
-  ];
 
-  deletable.forEach(function(sheetName) {
-    const sh = source.getSheetByName(sheetName);
-    if (!sh) {
-      return;
+function normalizedStorageExpectedEntityVerification_(
+  result,
+  expected,
+  mode
+) {
+  expected = expected || null;
+
+  if (!expected) {
+    result.verified = false;
+    result.error = "Verified archive manifest data is missing for this entity.";
+    return result;
+  }
+
+  const expectedSourceCount = Number(expected.count || 0);
+  const expectedTargetCount = Number(
+    expected.targetCount === undefined
+      ? expectedSourceCount
+      : expected.targetCount
+  );
+  const expectedSourceHash = normalizedStorageString_(
+    expected.sourceHash
+  );
+  const expectedTargetHash = normalizedStorageString_(
+    expected.targetHash || expectedSourceHash
+  );
+  const restoreMode = normalizedStorageArchiveMode_(mode) === "RESTORE";
+  const countMatches = restoreMode
+    ? (
+        Number(result.count || 0) === expectedTargetCount &&
+        Number(result.targetCount || 0) === expectedTargetCount
+      )
+    : (
+        Number(result.count || 0) === expectedSourceCount &&
+        Number(result.targetCount || 0) === expectedTargetCount
+      );
+  const hashMatches = restoreMode
+    ? (
+        normalizedStorageString_(result.sourceHash) === expectedTargetHash &&
+        normalizedStorageString_(result.targetHash) === expectedTargetHash
+      )
+    : (
+        normalizedStorageString_(result.sourceHash) === expectedSourceHash &&
+        normalizedStorageString_(result.targetHash) === expectedTargetHash
+      );
+
+  if (!countMatches || !hashMatches) {
+    result.verified = false;
+    result.error = restoreMode
+      ? "Archived source no longer matches the verified manifest. Restore stopped."
+      : "Live data or archive data changed after the verified COPY. Run Archive Copy again before MOVE.";
+  }
+
+  return result;
+}
+
+function normalizedStorageVerifyRowsForMove_(
+  sourceSheet,
+  archiveSpreadsheet,
+  gameId,
+  entityType,
+  expected
+) {
+  if (!sourceSheet || sourceSheet.getLastRow() < 1) {
+    return normalizedStorageExpectedEntityVerification_({
+      count: 0,
+      targetCount: 0,
+      sourceHash: normalizedStorageArchiveHash_([], []),
+      targetHash: normalizedStorageArchiveHash_([], []),
+      verified: true
+    }, expected, "MOVE");
+  }
+
+  const sourceHeaders = normalizedStorageGetHeaders_(sourceSheet);
+  const sourceCol = normalizedStorageHeaderMap_(sourceHeaders);
+
+  if (sourceCol.GameId === undefined) {
+    return {
+      count: 0,
+      targetCount: 0,
+      sourceHash: "",
+      targetHash: "",
+      verified: false,
+      error: sourceSheet.getName() + ".GameId is missing"
+    };
+  }
+
+  const sourceData = normalizedStorageReadRowsByGame_(
+    sourceSheet.getName(),
+    gameId,
+    entityType,
+    {
+      trustIndex: false,
+      bypassRuntimeCache: true
     }
+  );
+  const sourceRows = sourceData.length > 1 ? sourceData.slice(1) : [];
+  const sourceHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    sourceRows
+  );
+  const archiveSheet = archiveSpreadsheet.getSheetByName(
+    sourceSheet.getName()
+  );
+  const targetData = normalizedStorageReadRowsFromSheetByGame_(
+    archiveSheet,
+    gameId
+  );
+  const targetCanonicalRows = targetData && targetData.rows
+    ? normalizedStorageCanonicalArchiveRows_(
+        sourceHeaders,
+        targetData.headers,
+        targetData.rows
+      )
+    : [];
+  const targetHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    targetCanonicalRows
+  );
+  const result = {
+    count: sourceRows.length,
+    targetCount: targetCanonicalRows.length,
+    sourceHash: sourceHash,
+    targetHash: targetHash,
+    verified:
+      sourceRows.length === targetCanonicalRows.length &&
+      sourceHash === targetHash
+  };
 
-    const rows = normalizedStorageFindRowsByGame_(sh, gameId);
-    normalizedStorageDeleteRows_(sh, rows);
+  return normalizedStorageExpectedEntityVerification_(
+    result,
+    expected,
+    "MOVE"
+  );
+}
+
+function normalizedStorageVerifySettingsForMove_(
+  sourceSpreadsheet,
+  archiveSpreadsheet,
+  gameId,
+  questionIds,
+  expected
+) {
+  const sourceSheet = sourceSpreadsheet.getSheetByName(
+    CATEGORY_SETTINGS_SHEET
+  );
+  const archiveSheet = archiveSpreadsheet.getSheetByName(
+    CATEGORY_SETTINGS_SHEET
+  );
+
+  if (!sourceSheet || sourceSheet.getLastRow() < 1) {
+    return normalizedStorageExpectedEntityVerification_({
+      count: 0,
+      targetCount: 0,
+      sourceHash: normalizedStorageArchiveHash_([], []),
+      targetHash: normalizedStorageArchiveHash_([], []),
+      verified: true
+    }, expected, "MOVE");
+  }
+
+  const sourceMap = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    sourceSpreadsheet
+  );
+  const archiveMap = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    archiveSpreadsheet
+  );
+  const sourceData = normalizedStorageReadSettingsRowsForGame_(
+    sourceSheet,
+    gameId,
+    questionIds,
+    sourceMap
+  );
+  const targetData = normalizedStorageReadSettingsRowsForGame_(
+    archiveSheet,
+    gameId,
+    questionIds,
+    archiveMap
+  );
+
+  if (
+    sourceData.error ||
+    targetData.error ||
+    sourceData.ambiguousCount > 0 ||
+    targetData.ambiguousCount > 0
+  ) {
+    return {
+      count: 0,
+      targetCount: 0,
+      sourceHash: "",
+      targetHash: "",
+      verified: false,
+      error: sourceData.error || targetData.error ||
+        "CategorySettings contains ambiguous blank GameId rows."
+    };
+  }
+
+  const sourceHeaders = sourceData.headers;
+  const sourceRows = sourceData.rows || [];
+  const targetCanonicalRows = targetData && targetData.rows
+    ? normalizedStorageCanonicalArchiveRows_(
+        sourceHeaders,
+        targetData.headers,
+        targetData.rows
+      )
+    : [];
+  const result = {
+    count: sourceRows.length,
+    targetCount: targetCanonicalRows.length,
+    sourceHash: normalizedStorageArchiveHash_(
+      sourceHeaders,
+      sourceRows
+    ),
+    targetHash: normalizedStorageArchiveHash_(
+      sourceHeaders,
+      targetCanonicalRows
+    ),
+    verified: false
+  };
+  result.verified =
+    result.count === result.targetCount &&
+    result.sourceHash === result.targetHash;
+
+  return normalizedStorageExpectedEntityVerification_(
+    result,
+    expected,
+    "MOVE"
+  );
+}
+
+function normalizedStorageRestoreRowsForGame_(
+  archiveSheet,
+  targetSpreadsheet,
+  gameId,
+  entityType,
+  expected
+) {
+  if (!archiveSheet || archiveSheet.getLastRow() < 1) {
+    return normalizedStorageExpectedEntityVerification_({
+      count: 0,
+      targetCount: 0,
+      sourceHash: normalizedStorageArchiveHash_([], []),
+      targetHash: normalizedStorageArchiveHash_([], []),
+      verified: true
+    }, expected, "RESTORE");
+  }
+
+  const sourceHeaders = normalizedStorageGetHeaders_(archiveSheet);
+  const sourceCol = normalizedStorageHeaderMap_(sourceHeaders);
+
+  if (sourceCol.GameId === undefined) {
+    return {
+      count: 0,
+      targetCount: 0,
+      sourceHash: "",
+      targetHash: "",
+      verified: false,
+      error: archiveSheet.getName() + ".GameId is missing"
+    };
+  }
+
+  const sourceData = normalizedStorageReadRowsFromSheetByGame_(
+    archiveSheet,
+    gameId
+  );
+  const sourceRows = sourceData && sourceData.rows
+    ? sourceData.rows
+    : [];
+  const sourceHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    sourceRows
+  );
+  const sourceVerification = normalizedStorageExpectedEntityVerification_({
+    count: sourceRows.length,
+    targetCount: sourceRows.length,
+    sourceHash: sourceHash,
+    targetHash: sourceHash,
+    verified: true
+  }, expected, "RESTORE");
+
+  if (sourceVerification.verified !== true) {
+    return sourceVerification;
+  }
+
+  let targetSheet = targetSpreadsheet.getSheetByName(
+    archiveSheet.getName()
+  );
+
+  if (!targetSheet) {
+    targetSheet = targetSpreadsheet.insertSheet(archiveSheet.getName());
+  }
+
+  const targetHeaders = normalizedStorageEnsureArchiveHeaders_(
+    targetSheet,
+    sourceHeaders
+  );
+  const existingRows = normalizedStorageFindRowsByGame_(
+    targetSheet,
+    gameId
+  );
+
+  if (existingRows.length) {
+    normalizedStorageDeleteRows_(targetSheet, existingRows);
+  }
+
+  if (sourceRows.length) {
+    const sourceObjects = sourceRows.map(function(row) {
+      return normalizedStorageLegacyRowObject_(sourceHeaders, row);
+    });
+    const targetRows = sourceObjects.map(function(object) {
+      return normalizedStorageObjectRow_(targetHeaders, object);
+    });
+
+    targetSheet.getRange(
+      targetSheet.getLastRow() + 1,
+      1,
+      targetRows.length,
+      targetHeaders.length
+    ).setValues(targetRows);
+  }
+
+  SpreadsheetApp.flush();
+
+  const targetData = normalizedStorageReadRowsFromSheetByGame_(
+    targetSheet,
+    gameId
+  );
+  const targetCanonicalRows = targetData && targetData.rows
+    ? normalizedStorageCanonicalArchiveRows_(
+        sourceHeaders,
+        targetData.headers,
+        targetData.rows
+      )
+    : [];
+  const targetHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    targetCanonicalRows
+  );
+
+  if (
+    archiveSheet.getName() === QUESTIONS_SHEET ||
+    archiveSheet.getName() === QUESTION_OPTIONS_SHEET ||
+    archiveSheet.getName() === CATEGORIES_SHEET
+  ) {
+    normalizedStorageRebuildIndexForSheet_(
+      archiveSheet.getName(),
+      entityType
+    );
+  }
+
+  return normalizedStorageExpectedEntityVerification_({
+    count: sourceRows.length,
+    targetCount: targetCanonicalRows.length,
+    sourceHash: sourceHash,
+    targetHash: targetHash,
+    verified:
+      sourceRows.length === targetCanonicalRows.length &&
+      sourceHash === targetHash
+  }, expected, "RESTORE");
+}
+
+function normalizedStorageRestoreSettingsByQuestionIds_(
+  archiveSpreadsheet,
+  targetSpreadsheet,
+  gameId,
+  questionIds,
+  expected
+) {
+  const sourceSheet = archiveSpreadsheet.getSheetByName(
+    CATEGORY_SETTINGS_SHEET
+  );
+
+  if (!sourceSheet || sourceSheet.getLastRow() <= 1) {
+    return normalizedStorageExpectedEntityVerification_({
+      count: 0,
+      targetCount: 0,
+      sourceHash: normalizedStorageArchiveHash_([], []),
+      targetHash: normalizedStorageArchiveHash_([], []),
+      verified: true
+    }, expected, "RESTORE");
+  }
+
+  const sourceMap = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    archiveSpreadsheet
+  );
+  const sourceData = normalizedStorageReadSettingsRowsForGame_(
+    sourceSheet,
+    gameId,
+    questionIds,
+    sourceMap
+  );
+
+  if (sourceData.error || sourceData.ambiguousCount > 0) {
+    return {
+      count: 0,
+      targetCount: 0,
+      sourceHash: "",
+      targetHash: "",
+      verified: false,
+      error: sourceData.error || (
+        sourceData.ambiguousCount +
+        " archived CategorySettings row(s) are ambiguous"
+      )
+    };
+  }
+
+  const sourceHeaders = sourceData.headers;
+  const sourceRows = sourceData.rows;
+  const sourceHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    sourceRows
+  );
+  const sourceVerification = normalizedStorageExpectedEntityVerification_({
+    count: sourceRows.length,
+    targetCount: sourceRows.length,
+    sourceHash: sourceHash,
+    targetHash: sourceHash,
+    verified: true
+  }, expected, "RESTORE");
+
+  if (sourceVerification.verified !== true) {
+    return sourceVerification;
+  }
+
+  let targetSheet = targetSpreadsheet.getSheetByName(
+    CATEGORY_SETTINGS_SHEET
+  );
+
+  if (!targetSheet) {
+    targetSheet = targetSpreadsheet.insertSheet(CATEGORY_SETTINGS_SHEET);
+  }
+
+  const targetHeaders = normalizedStorageEnsureArchiveHeaders_(
+    targetSheet,
+    sourceHeaders
+  );
+  const targetMap = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    targetSpreadsheet
+  );
+  const existing = normalizedStorageReadSettingsRowsForGame_(
+    targetSheet,
+    gameId,
+    questionIds,
+    targetMap
+  );
+
+  if (existing.rowNumbers && existing.rowNumbers.length) {
+    normalizedStorageDeleteRows_(targetSheet, existing.rowNumbers);
+  }
+
+  if (sourceRows.length) {
+    const sourceObjects = sourceRows.map(function(row) {
+      return normalizedStorageLegacyRowObject_(sourceHeaders, row);
+    });
+    const targetRows = sourceObjects.map(function(object) {
+      return normalizedStorageObjectRow_(targetHeaders, object);
+    });
+
+    targetSheet.getRange(
+      targetSheet.getLastRow() + 1,
+      1,
+      targetRows.length,
+      targetHeaders.length
+    ).setValues(targetRows);
+  }
+
+  SpreadsheetApp.flush();
+
+  const refreshedMap = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+    targetSpreadsheet
+  );
+  const targetData = normalizedStorageReadSettingsRowsForGame_(
+    targetSheet,
+    gameId,
+    questionIds,
+    refreshedMap
+  );
+  const targetCanonicalRows = targetData && targetData.rows
+    ? normalizedStorageCanonicalArchiveRows_(
+        sourceHeaders,
+        targetData.headers,
+        targetData.rows
+      )
+    : [];
+  const targetHash = normalizedStorageArchiveHash_(
+    sourceHeaders,
+    targetCanonicalRows
+  );
+
+  return normalizedStorageExpectedEntityVerification_({
+    count: sourceRows.length,
+    targetCount: targetCanonicalRows.length,
+    sourceHash: sourceHash,
+    targetHash: targetHash,
+    verified:
+      sourceRows.length === targetCanonicalRows.length &&
+      sourceHash === targetHash
+  }, expected, "RESTORE");
+}
+
+function normalizedStorageMarkGameArchivedAfterMove_(gameId) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(GAMES_SHEET);
+
+  if (!sh || sh.getLastRow() <= 1) {
+    return {
+      updated: false,
+      error: "Games sheet or game row is missing."
+    };
+  }
+
+  const headers = normalizedStorageGetHeaders_(sh);
+  const col = normalizedStorageHeaderMap_(headers);
+  const rows = normalizedStorageFindRowsByGame_(sh, gameId);
+
+  if (!rows.length) {
+    return {
+      updated: false,
+      error: "Game row was not found."
+    };
+  }
+
+  ["Active", "Archived", "Status"].forEach(function(header) {
+    if (col[header] === undefined) {
+      throw new Error("Games." + header + " is required for safe MOVE.");
+    }
   });
 
-  const settingsSheet = source.getSheetByName(CATEGORY_SETTINGS_SHEET);
+  rows.forEach(function(rowNumber) {
+    sh.getRange(rowNumber, col.Active + 1).setValue(false);
+    sh.getRange(rowNumber, col.Archived + 1).setValue(true);
+    sh.getRange(rowNumber, col.Status + 1).setValue("Archived");
+  });
 
+  return {
+    updated: true,
+    rowCount: rows.length,
+    active: false,
+    archived: true,
+    status: "Archived"
+  };
+}
+
+function normalizedStorageDeleteGameRowsAfterArchive_(gameId, questionIds) {
+  const source = SpreadsheetApp.getActive();
+  const gameSheet = source.getSheetByName(GAMES_SHEET);
+
+  if (!gameSheet || gameSheet.getLastRow() <= 1) {
+    throw new Error("Games sheet or game row is missing for safe MOVE.");
+  }
+
+  const gameHeaders = normalizedStorageGetHeaders_(gameSheet);
+  const gameCol = normalizedStorageHeaderMap_(gameHeaders);
+
+  ["GameId", "Active", "Archived", "Status"].forEach(function(header) {
+    if (gameCol[header] === undefined) {
+      throw new Error("Games." + header + " is required for safe MOVE.");
+    }
+  });
+
+  if (!normalizedStorageFindRowsByGame_(gameSheet, gameId).length) {
+    throw new Error("Game row was not found for safe MOVE.");
+  }
+
+  const questionGameMap = normalizedStorageBuildQuestionGameMap_();
+  const removed = {};
+  const settingsSheet = source.getSheetByName(CATEGORY_SETTINGS_SHEET);
+  removed[CATEGORY_SETTINGS_SHEET] = 0;
+
+  /* Delete settings before Questions/Categories so blank legacy GameId rows
+     can still be matched through the question-to-game map. */
   if (settingsSheet && settingsSheet.getLastRow() > 1) {
     const data = settingsSheet.getDataRange().getValues();
     const headers = data[0].map(normalizedStorageString_);
@@ -3926,8 +5182,33 @@ function normalizedStorageDeleteGameRowsAfterArchive_(gameId, questionIds) {
       }
     }
 
+    removed[CATEGORY_SETTINGS_SHEET] = rows.length;
     normalizedStorageDeleteRows_(settingsSheet, rows);
   }
+
+  const deletable = [
+    QUESTIONS_SHEET,
+    QUESTION_OPTIONS_SHEET,
+    CATEGORIES_SHEET,
+    CATEGORY_RESULTS_SHEET,
+    PICKS_SHEET,
+    typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"
+  ];
+
+  deletable.forEach(function(sheetName) {
+    const sh = source.getSheetByName(sheetName);
+
+    if (!sh) {
+      removed[sheetName] = 0;
+      return;
+    }
+
+    const rows = normalizedStorageFindRowsByGame_(sh, gameId);
+    removed[sheetName] = rows.length;
+    normalizedStorageDeleteRows_(sh, rows);
+  });
+
+  removed.Games = normalizedStorageMarkGameArchivedAfterMove_(gameId);
 
   normalizedStorageRebuildIndexForSheet_(QUESTIONS_SHEET, "Questions");
   normalizedStorageRebuildIndexForSheet_(
@@ -3938,6 +5219,25 @@ function normalizedStorageDeleteGameRowsAfterArchive_(gameId, questionIds) {
     CATEGORIES_SHEET,
     "LegacyCategories"
   );
+
+  const residual = normalizedStorageCountRowsForGameInSpreadsheet_(
+    source,
+    gameId,
+    questionIds
+  );
+  const residualSheets = Object.keys(residual).filter(function(sheetName) {
+    return sheetName !== GAMES_SHEET && Number(residual[sheetName] || 0) > 0;
+  });
+
+  if (residualSheets.length) {
+    throw new Error(
+      "MOVE verification failed. Active rows remain in: " +
+      residualSheets.join(", ")
+    );
+  }
+
+  removed.residualCounts = residual;
+  return removed;
 }
 
 function apiAdminArchiveGameData(payload) {
@@ -3945,6 +5245,12 @@ function apiAdminArchiveGameData(payload) {
   requireAdmin_(payload);
 
   const phase = normalizedStorageKey_(payload.phase);
+
+  if (phase === "status") {
+    return normalizedStorageGetArchiveStatus_(
+      normalizedStorageString_(payload.gameId)
+    );
+  }
 
   if (phase === "start") {
     return normalizedStorageStartArchiveJob_(payload);

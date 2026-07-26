@@ -1652,17 +1652,33 @@ function renderAdminGameForm(
               </button>
               <button
                 type="button"
-                id="adminArchiveButton_${domId}"
+                id="adminArchiveCopyButton_${domId}"
                 class="admin-small-button secondary"
                 onclick="adminArchiveGameDataCopy('${escapeJs(rawGameId)}')"
               >
-                Archive Data Copy
+                Archive Copy
+              </button>
+              <button
+                type="button"
+                id="adminArchiveMoveButton_${domId}"
+                class="admin-small-button danger"
+                onclick="adminArchiveGameDataMove('${escapeJs(rawGameId)}')"
+              >
+                Move to Archive
+              </button>
+              <button
+                type="button"
+                id="adminArchiveRestoreButton_${domId}"
+                class="admin-small-button secondary"
+                onclick="adminRestoreGameData('${escapeJs(rawGameId)}')"
+              >
+                Restore Game
               </button>
               <span
                 id="adminArchiveStatus_${domId}"
                 class="admin-sub"
                 aria-live="polite"
-              ></span>
+              >COPY is non-destructive. MOVE requires a verified copy and finalized game.</span>
             ` : ""}
           </div>
         </form>
@@ -2540,8 +2556,185 @@ async function adminCheckStorageHealth(gameId) {
 
 }
 
-async function adminArchiveGameDataCopy(gameId) {
+function adminArchiveControls_(gameId) {
+  const domId = typeof adminGameDomId_ === "function"
+    ? adminGameDomId_(gameId)
+    : String(gameId).replace(/[^a-zA-Z0-9_-]/g, "_");
 
+  return {
+    domId: domId,
+    status: document.getElementById(
+      "adminArchiveStatus_" + domId
+    ),
+    copyButton: document.getElementById(
+      "adminArchiveCopyButton_" + domId
+    ),
+    moveButton: document.getElementById(
+      "adminArchiveMoveButton_" + domId
+    ),
+    restoreButton: document.getElementById(
+      "adminArchiveRestoreButton_" + domId
+    )
+  };
+}
+
+function adminSetArchiveControlsBusy_(controls, busy, mode) {
+  [
+    controls.copyButton,
+    controls.moveButton,
+    controls.restoreButton
+  ].forEach(function(button) {
+    if (button) {
+      button.disabled = busy === true;
+    }
+  });
+
+  if (controls.copyButton) {
+    controls.copyButton.textContent = busy && mode === "COPY"
+      ? "Copying…"
+      : "Archive Copy";
+  }
+
+  if (controls.moveButton) {
+    controls.moveButton.textContent = busy && mode === "MOVE"
+      ? "Moving…"
+      : "Move to Archive";
+  }
+
+  if (controls.restoreButton) {
+    controls.restoreButton.textContent = busy && mode === "RESTORE"
+      ? "Restoring…"
+      : "Restore Game";
+  }
+}
+
+function adminShowArchiveProgress_(controls, progress) {
+  const status = controls && controls.status;
+
+  if (!status || !progress) {
+    return;
+  }
+
+  if (progress.finalized === true) {
+    status.textContent = progress.success === false
+      ? "Archive workflow failed verification."
+      : (progress.message || "Archive workflow verified.");
+    return;
+  }
+
+  const next = progress.nextStep || "";
+  const stage = progress.currentStage || "PREPARE";
+
+  if (stage === "PREPARE") {
+    const completed = Number(
+      progress.preparationCompleted || 0
+    );
+    const total = Number(
+      progress.preparationTotal || 0
+    );
+
+    if (progress.legacyJobReset === true) {
+      status.textContent =
+        "Outdated archive job reset — restarting safely…";
+      return;
+    }
+
+    status.textContent = total > 0
+      ? "Preparing " + completed + " of " + total +
+        (next ? " — next: " + next : "")
+      : "Preparing archive workflow…";
+    return;
+  }
+
+  if (stage === "RESTORE") {
+    const completed = Number(progress.restoreCompleted || 0);
+    const total = Number(progress.restoreTotal || 0);
+
+    status.textContent = total > 0
+      ? "Restoring " + completed + " of " + total +
+        (next ? " — next: " + next : "")
+      : "Finalizing restore…";
+    return;
+  }
+
+  const completed = Number(progress.archiveCompleted || 0);
+  const total = Number(progress.archiveTotal || 0);
+
+  const archiveVerb = progress.mode === "MOVE"
+    ? "Verifying MOVE "
+    : "Archiving ";
+
+  status.textContent = total > 0
+    ? archiveVerb + completed + " of " + total +
+      (next ? " — next: " + next : "")
+    : "Finalizing archive…";
+}
+
+async function adminRunGameArchiveWorkflow_(
+  gameId,
+  mode,
+  notes,
+  options
+) {
+  const controls = adminArchiveControls_(gameId);
+  options = options || {};
+
+  adminSetArchiveControlsBusy_(controls, true, mode);
+
+  if (controls.status) {
+    controls.status.textContent = mode === "RESTORE"
+      ? "Starting restore job…"
+      : "Starting archive job…";
+  }
+
+  try {
+    const res = await apiAdminArchiveGameData(
+      gameId,
+      mode,
+      notes,
+      mode === "MOVE",
+      function(progress) {
+        adminShowArchiveProgress_(controls, progress);
+      },
+      options
+    );
+
+    if (!res || res.success === false) {
+      const message =
+        (res && (res.error || res.message)) ||
+        "Archive workflow did not complete.";
+
+      if (controls.status) {
+        controls.status.textContent = message;
+      }
+
+      alert(message);
+      return res;
+    }
+
+    if (controls.status) {
+      controls.status.textContent = res.message || "Archive workflow verified.";
+    }
+
+    alert(
+      (res.message || "Archive workflow verified.") +
+      "\n\nArchive: " +
+      (res.archiveSpreadsheetUrl ||
+        res.archiveSpreadsheetId ||
+        "Available")
+    );
+
+    if (mode === "MOVE" || mode === "RESTORE") {
+      navigate("admin-games");
+    }
+
+    return res;
+  } finally {
+    adminSetArchiveControlsBusy_(controls, false, mode);
+  }
+}
+
+async function adminArchiveGameDataCopy(gameId) {
   if (!gameId) {
     alert("GameId is required.");
     return;
@@ -2555,111 +2748,134 @@ async function adminArchiveGameDataCopy(gameId) {
     return;
   }
 
-  const domId = typeof adminGameDomId_ === "function"
-    ? adminGameDomId_(gameId)
-    : String(gameId).replace(/[^a-zA-Z0-9_-]/g, "_");
-  const button = document.getElementById(
-    "adminArchiveButton_" + domId
+  return adminRunGameArchiveWorkflow_(
+    gameId,
+    "COPY",
+    "Archive copy created from Manage Games",
+    {}
   );
-  const status = document.getElementById(
-    "adminArchiveStatus_" + domId
-  );
+}
 
-  function showProgress(progress) {
-    if (!status || !progress) {
-      return;
-    }
-
-    if (progress.finalized === true) {
-      status.textContent = progress.success === false
-        ? "Archive verification failed."
-        : "Archive verified.";
-      return;
-    }
-
-    const next = progress.nextStep || "";
-    const stage = progress.currentStage || "PREPARE";
-
-    if (stage === "PREPARE") {
-      const completed = Number(
-        progress.preparationCompleted || 0
-      );
-      const total = Number(
-        progress.preparationTotal || 0
-      );
-
-      if (progress.legacyJobReset === true) {
-        status.textContent =
-          "Outdated archive job reset — restarting safely…";
-        return;
-      }
-
-      status.textContent = total > 0
-        ? "Preparing " + completed + " of " + total +
-          (next ? " — next: " + next : "")
-        : "Preparing archive workflow…";
-      return;
-    }
-
-    const completed = Number(progress.archiveCompleted || 0);
-    const total = Number(progress.archiveTotal || 0);
-
-    status.textContent = total
-      ? "Archiving " + completed + " of " + total +
-        (next ? " — next: " + next : "")
-      : "Finalizing archive…";
+async function adminArchiveGameDataMove(gameId) {
+  if (!gameId) {
+    alert("GameId is required.");
+    return;
   }
 
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Archiving…";
+  const controls = adminArchiveControls_(gameId);
+
+  if (controls.status) {
+    controls.status.textContent = "Checking safe MOVE requirements…";
   }
 
-  if (status) {
-    status.textContent = "Starting archive job…";
-  }
+  const status = await apiAdminGetArchiveGameStatus(gameId);
 
-  try {
-    const res = await apiAdminArchiveGameData(
-      gameId,
-      "COPY",
-      "Archive copy created from Manage Games",
-      false,
-      showProgress
-    );
-
-    if (!res || res.success === false) {
-      if (status) {
-        status.textContent =
-          (res && (res.error || res.message)) ||
-          "Could not archive game data.";
-      }
-
-      alert(
-        (res && (res.error || res.message)) ||
-        "Could not archive game data."
-      );
-      return;
-    }
-
-    if (status) {
-      status.textContent = "Archive copy verified.";
-    }
-
+  if (!status || status.success === false) {
     alert(
-      "Archive copy verified.\n\n" +
-      "Archive: " +
-      (res.archiveSpreadsheetUrl ||
-        res.archiveSpreadsheetId ||
-        "Created")
+      (status && (status.error || status.message)) ||
+      "Could not check archive status."
     );
-  } finally {
-    if (button) {
-      button.disabled = false;
-      button.textContent = "Archive Data Copy";
-    }
+    return;
   }
 
+  const readiness = status.moveReadiness || {};
+
+  if (readiness.ready !== true) {
+    const blockers = readiness.blockers || [
+      "The game is not ready to move."
+    ];
+    const message = "MOVE is blocked:\n\n- " + blockers.join("\n- ");
+
+    if (controls.status) {
+      controls.status.textContent = blockers.join(" ");
+    }
+
+    alert(message);
+    return;
+  }
+
+  const requiredText = "MOVE " + gameId;
+  const typed = prompt(
+    "This will remove active question, result, pick, wager, and settings rows after another full archive verification.\n\nThe game will remain in Manage Games as an inactive archived record.\n\nType exactly:\n" +
+    requiredText
+  );
+
+  if (typed !== requiredText) {
+    alert("MOVE cancelled. The confirmation text did not match.");
+    return;
+  }
+
+  const confirmed = confirm(
+    "Final confirmation: move " + gameId + " to the verified yearly archive?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  return adminRunGameArchiveWorkflow_(
+    gameId,
+    "MOVE",
+    "Safe MOVE created from Manage Games",
+    {
+      confirmationText: typed
+    }
+  );
+}
+
+async function adminRestoreGameData(gameId) {
+  if (!gameId) {
+    alert("GameId is required.");
+    return;
+  }
+
+  const controls = adminArchiveControls_(gameId);
+
+  if (controls.status) {
+    controls.status.textContent = "Checking restore availability…";
+  }
+
+  const status = await apiAdminGetArchiveGameStatus(gameId);
+
+  if (!status || status.success === false) {
+    alert(
+      (status && (status.error || status.message)) ||
+      "Could not check restore status."
+    );
+    return;
+  }
+
+  const readiness = status.restoreReadiness || {};
+
+  if (readiness.ready !== true) {
+    const message = readiness.error ||
+      "Restore is blocked because active game data still exists or no verified archive is available.";
+
+    if (controls.status) {
+      controls.status.textContent = message;
+    }
+
+    alert(message);
+    return;
+  }
+
+  const confirmed = confirm(
+    "Restore all verified rows for " + gameId +
+    " from the yearly archive? The archived game record will be replaced with its original saved Games row."
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  return adminRunGameArchiveWorkflow_(
+    gameId,
+    "RESTORE",
+    "Verified archive restored from Manage Games",
+    {
+      confirmRestore: true
+    }
+  );
 }
 
 function adminToggleCategoryResultStatus(categoryId) {

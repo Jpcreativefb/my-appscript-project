@@ -1258,6 +1258,8 @@ async function apiAdminArchiveGameDataPhase_(payload) {
       mode: payload.mode || "COPY",
       notes: payload.notes || "",
       confirmMove: payload.confirmMove === true,
+      confirmRestore: payload.confirmRestore === true,
+      confirmationText: payload.confirmationText || "",
       phase: payload.phase || "",
       jobId: payload.jobId || ""
     }
@@ -1312,19 +1314,34 @@ async function apiAdminArchiveGameDataPhaseWithRetry_(
 
 }
 
+async function apiAdminGetArchiveGameStatus(gameId) {
+
+  return apiAdminArchiveGameDataPhaseWithRetry_({
+    gameId: gameId || "",
+    mode: "COPY",
+    phase: "STATUS"
+  }, 2);
+
+}
+
 async function apiAdminArchiveGameData(
   gameId,
   mode,
   notes,
   confirmMove,
-  onProgress
+  onProgress,
+  options
 ) {
+
+  options = options || {};
 
   const base = {
     gameId: gameId || "",
     mode: mode || "COPY",
     notes: notes || "",
-    confirmMove: confirmMove === true
+    confirmMove: confirmMove === true,
+    confirmRestore: options.confirmRestore === true,
+    confirmationText: options.confirmationText || ""
   };
 
   let current = await apiAdminArchiveGameDataPhaseWithRetry_({

@@ -2109,6 +2109,8 @@ if (action === "compareUserPicks") {
           gameId: params.gameId || gameId,
           mode: params.mode || "COPY",
           confirmMove: params.confirmMove === "true",
+          confirmRestore: params.confirmRestore === "true",
+          confirmationText: params.confirmationText || "",
           notes: params.notes || "",
           phase: params.phase || "",
           jobId: params.jobId || ""

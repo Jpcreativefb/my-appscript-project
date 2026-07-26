@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v19-result-auto-lock";
+const AWARDS_CACHE = "awards-app-v20-safe-move-restore";
 
 const APP_SHELL = [
   "./",
