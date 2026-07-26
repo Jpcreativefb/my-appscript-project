@@ -31,6 +31,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminArchiveGameData",
     "adminCloneCategory",
     "adminBulkCreateNominees",
     "adminCloneNominee",
@@ -1243,7 +1244,7 @@ async function apiAdminGetStorageHealth(gameId) {
 
 }
 
-async function apiAdminArchiveGameData(gameId, mode, notes, confirmMove) {
+async function apiAdminArchiveGameDataPhase_(payload) {
 
   const session =
     getSession() || {};
@@ -1253,12 +1254,139 @@ async function apiAdminArchiveGameData(gameId, mode, notes, confirmMove) {
     {
       username: session.username || "",
       token: session.token || "",
-      gameId: gameId,
-      mode: mode || "COPY",
-      notes: notes || "",
-      confirmMove: confirmMove === true
+      gameId: payload.gameId || "",
+      mode: payload.mode || "COPY",
+      notes: payload.notes || "",
+      confirmMove: payload.confirmMove === true,
+      phase: payload.phase || "",
+      jobId: payload.jobId || ""
     }
   );
+
+}
+
+function apiAdminArchiveRetryableResult_(result) {
+
+  if (!result || result.success !== false) {
+    return false;
+  }
+
+  const message = String(
+    result.error || result.message || ""
+  ).toLowerCase();
+
+  return (
+    result.retryable === true ||
+    message.indexOf("timed out") >= 0 ||
+    message.indexOf("connection error") >= 0 ||
+    message.indexOf("please try again") >= 0 ||
+    message.indexOf("another storage or archive operation") >= 0
+  );
+
+}
+
+async function apiAdminArchiveGameDataPhaseWithRetry_(
+  payload,
+  maxAttempts
+) {
+
+  maxAttempts = Math.max(1, Number(maxAttempts || 3));
+  let lastResult = null;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    lastResult = await apiAdminArchiveGameDataPhase_(payload);
+
+    if (
+      !apiAdminArchiveRetryableResult_(lastResult) ||
+      attempt === maxAttempts
+    ) {
+      return lastResult;
+    }
+
+    await new Promise(resolve =>
+      setTimeout(resolve, 900 * attempt)
+    );
+  }
+
+  return lastResult;
+
+}
+
+async function apiAdminArchiveGameData(
+  gameId,
+  mode,
+  notes,
+  confirmMove,
+  onProgress
+) {
+
+  const base = {
+    gameId: gameId || "",
+    mode: mode || "COPY",
+    notes: notes || "",
+    confirmMove: confirmMove === true
+  };
+
+  let current = await apiAdminArchiveGameDataPhaseWithRetry_({
+    ...base,
+    phase: "START"
+  }, 3);
+
+  if (!current || current.success === false) {
+    return current;
+  }
+
+  if (typeof onProgress === "function") {
+    onProgress(current);
+  }
+
+  const jobId = current.jobId || "";
+  let guard = 0;
+
+  while (
+    current &&
+    current.complete !== true &&
+    guard < 20
+  ) {
+    guard++;
+
+    const stepResult =
+      await apiAdminArchiveGameDataPhaseWithRetry_({
+        ...base,
+        phase: "STEP",
+        jobId: jobId
+      }, 3);
+
+    if (!stepResult || stepResult.success === false) {
+      return stepResult;
+    }
+
+    current = stepResult;
+
+    if (typeof onProgress === "function") {
+      onProgress(current);
+    }
+  }
+
+  if (!current || current.complete !== true) {
+    return {
+      success: false,
+      message: "Archive stopped before all sheets were processed."
+    };
+  }
+
+  const finalResult =
+    await apiAdminArchiveGameDataPhaseWithRetry_({
+      ...base,
+      phase: "FINALIZE",
+      jobId: jobId
+    }, 3);
+
+  if (typeof onProgress === "function") {
+    onProgress(finalResult);
+  }
+
+  return finalResult;
 
 }
 

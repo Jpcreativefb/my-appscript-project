@@ -2814,7 +2814,10 @@ function renderAdminSetupCategoryCard(category, game, categories) {
             </div>
           </div>
 
-          <div class="admin-pill ${settings.locked ? "locked" : ""}">
+          <div
+            id="categoryLockPill_${categoryId}"
+            class="admin-pill ${settings.locked ? "locked" : ""}"
+          >
             ${settings.locked ? "Locked" : "Open"}
           </div>
 
@@ -3301,6 +3304,34 @@ function adminSetupToggleWinnerControl(categoryId) {
 
   if (!requiresWinner) {
     winnerInput.value = "";
+  }
+}
+
+function adminSetupApplyLockState_(categoryId, locked) {
+  const checkbox =
+    document.getElementById(
+      "editCategoryLocked_" + categoryId
+    );
+
+  const pill =
+    document.getElementById(
+      "categoryLockPill_" + categoryId
+    );
+
+  if (checkbox) {
+    checkbox.checked = Boolean(locked);
+  }
+
+  if (pill) {
+    pill.classList.toggle(
+      "locked",
+      Boolean(locked)
+    );
+
+    pill.textContent =
+      locked
+        ? "Locked"
+        : "Open";
   }
 }
 
@@ -4466,6 +4497,11 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     return;
   }
 
+  adminSetupApplyLockState_(
+    categoryId,
+    lockedInput ? lockedInput.checked : false
+  );
+
   adminSetupSetMessage(
     "editCategoryMessage_" + categoryId,
     "Category saved.",
@@ -4688,6 +4724,10 @@ async function adminSetupSaveResults(gameId, categoryId) {
         favoriteNomineeId,
       settlementStatus:
         settlementStatus,
+      locked:
+        selectedResultStatus !== "pending"
+          ? true
+          : undefined,
       wagerResultType:
         selectedResultStatus === "push" ||
         selectedResultStatus === "cancelled"
@@ -4737,9 +4777,18 @@ async function adminSetupSaveResults(gameId, categoryId) {
 
   }
 
+  if (selectedResultStatus !== "pending") {
+    adminSetupApplyLockState_(
+      categoryId,
+      true
+    );
+  }
+
   adminSetupSetMessage(
     "resultMessage_" + categoryId,
-    "Results saved and scoring updated.",
+    selectedResultStatus !== "pending"
+      ? "Results saved, scoring updated, and question locked."
+      : "Results saved and scoring updated.",
     false
   );
 

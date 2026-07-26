@@ -2502,6 +2502,28 @@ function normalizedStorageCopyRowsForGame_(
   };
 }
 
+function normalizedStorageGetQuestionIdsForGame_(gameId) {
+  const data = normalizedStorageReadQuestionsByGame_(gameId, {
+    trustIndex: false,
+    bypassRuntimeCache: true
+  });
+  const objects = normalizedStorageRowsToObjects_(data);
+  const seen = {};
+
+  return objects
+    .map(function(question) {
+      return normalizedStorageKey_(question.QuestionId);
+    })
+    .filter(function(questionId) {
+      if (!questionId || seen[questionId]) {
+        return false;
+      }
+
+      seen[questionId] = true;
+      return true;
+    });
+}
+
 function normalizedStorageGetArchiveReadiness_(gameId) {
   const normalized = normalizedStorageGetQuestionSetup_(gameId);
   const settings = typeof getCategorySettings === "function"
@@ -2550,6 +2572,836 @@ function normalizedStorageGetArchiveReadiness_(gameId) {
   };
 }
 
+
+const NORMALIZED_ARCHIVE_JOB_PROPERTY_PREFIX =
+  "AWARDS_ARCHIVE_JOB_V2_";
+
+const NORMALIZED_ARCHIVE_JOB_LEGACY_PROPERTY_PREFIX =
+  "AWARDS_ARCHIVE_JOB_V1_";
+
+const NORMALIZED_ARCHIVE_JOB_MAX_AGE_MS =
+  6 * 60 * 60 * 1000;
+
+function normalizedStorageArchiveSteps_(mode) {
+  const normalizedMode = normalizedStorageKey_(mode) === "move"
+    ? "MOVE"
+    : "COPY";
+  const steps = [
+    {
+      name: "Validate Game",
+      operation: "PREPARE_GAME",
+      stage: "PREPARE"
+    }
+  ];
+
+  if (normalizedMode === "MOVE") {
+    steps.push({
+      name: "Check Move Readiness",
+      operation: "CHECK_READINESS",
+      stage: "PREPARE"
+    });
+  }
+
+  steps.push({
+    name: "Open Yearly Archive",
+    operation: "PREPARE_ARCHIVE",
+    stage: "PREPARE"
+  });
+
+  [
+    { name: GAMES_SHEET, entityType: "Games" },
+    { name: QUESTIONS_SHEET, entityType: "Questions" },
+    {
+      name: QUESTION_OPTIONS_SHEET,
+      entityType: "QuestionOptions"
+    },
+    {
+      name: CATEGORIES_SHEET,
+      entityType: "LegacyCategories"
+    },
+    {
+      name: CATEGORY_RESULTS_SHEET,
+      entityType: "CategoryResults"
+    },
+    { name: PICKS_SHEET, entityType: "Picks" },
+    {
+      name: typeof BETS_SHEET !== "undefined"
+        ? BETS_SHEET
+        : "Bets",
+      entityType: "Bets"
+    },
+    {
+      name: CATEGORY_SETTINGS_SHEET,
+      entityType: "CategorySettings",
+      operation: "COPY_SETTINGS"
+    }
+  ].forEach(function(step) {
+    steps.push(Object.assign({}, step, {
+      operation: step.operation || "COPY_GAME_ROWS",
+      stage: "ARCHIVE"
+    }));
+  });
+
+  return steps;
+}
+
+function normalizedStorageArchiveJobUsesCurrentSteps_(job, mode) {
+  const currentSteps = normalizedStorageArchiveSteps_(mode);
+  const savedSteps = job && Array.isArray(job.steps)
+    ? job.steps
+    : [];
+
+  if (savedSteps.length !== currentSteps.length) {
+    return false;
+  }
+
+  for (let i = 0; i < currentSteps.length; i++) {
+    const saved = savedSteps[i] || {};
+    const current = currentSteps[i] || {};
+
+    if (
+      normalizedStorageString_(saved.name) !==
+        normalizedStorageString_(current.name) ||
+      normalizedStorageString_(saved.operation) !==
+        normalizedStorageString_(current.operation) ||
+      normalizedStorageString_(saved.stage) !==
+        normalizedStorageString_(current.stage)
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function normalizedStorageUpgradeArchiveJob_(job, mode) {
+  if (!job) {
+    return job;
+  }
+
+  if (normalizedStorageArchiveJobUsesCurrentSteps_(job, mode)) {
+    return job;
+  }
+
+  /*
+    v2.0.3 archive jobs stored only the eight copy steps and had no
+    PREPARE / ARCHIVE stage metadata. v2.0.4 could resume one of those
+    jobs and report Preparing 0 of 0. Reset the workflow definition while
+    preserving the job/archive identity. Copy steps are idempotent because
+    each destination sheet replaces this game's prior rows before writing.
+  */
+  job.steps = normalizedStorageArchiveSteps_(mode);
+  job.stepIndex = 0;
+  job.preparation = {};
+  job.counts = {};
+  job.readiness = normalizedStorageKey_(mode) === "move"
+    ? null
+    : {
+        ready: true,
+        skipped: true,
+        reason: "COPY mode never removes active data."
+      };
+  job.year = "";
+  job.sourceSpreadsheetId = "";
+  job.archiveSpreadsheetId = "";
+  job.archiveSpreadsheetUrl = "";
+  job.finalized = false;
+  job.verified = false;
+  job.finalResult = null;
+  job.lastError = "";
+  job.failedStep = "";
+  job.upgradedFromLegacyArchiveJob = true;
+  job.updatedAt = new Date().toISOString();
+
+  return job;
+}
+
+function normalizedStorageArchiveJobPropertyKey_(jobId) {
+  return NORMALIZED_ARCHIVE_JOB_PROPERTY_PREFIX +
+    normalizedStorageString_(jobId);
+}
+
+function normalizedStorageCleanupArchiveJobs_() {
+  const properties = PropertiesService.getScriptProperties();
+  const all = properties.getProperties();
+  const now = Date.now();
+
+  Object.keys(all).forEach(function(key) {
+    const isCurrentJob =
+      key.indexOf(NORMALIZED_ARCHIVE_JOB_PROPERTY_PREFIX) === 0;
+    const isLegacyJob =
+      key.indexOf(NORMALIZED_ARCHIVE_JOB_LEGACY_PROPERTY_PREFIX) === 0;
+
+    if (!isCurrentJob && !isLegacyJob) {
+      return;
+    }
+
+    const job = normalizedStorageSafeJsonParse_(all[key], null);
+    const createdAt = job && job.createdAt
+      ? new Date(job.createdAt).getTime()
+      : 0;
+
+    if (!createdAt || now - createdAt > NORMALIZED_ARCHIVE_JOB_MAX_AGE_MS) {
+      properties.deleteProperty(key);
+    }
+  });
+}
+
+function normalizedStorageSaveArchiveJob_(job) {
+  PropertiesService
+    .getScriptProperties()
+    .setProperty(
+      normalizedStorageArchiveJobPropertyKey_(job.jobId),
+      JSON.stringify(job)
+    );
+
+  return job;
+}
+
+function normalizedStorageLoadArchiveJob_(jobId) {
+  const normalizedJobId = normalizedStorageString_(jobId);
+
+  if (!normalizedJobId) {
+    throw new Error("Archive jobId is required");
+  }
+
+  const raw = PropertiesService
+    .getScriptProperties()
+    .getProperty(
+      normalizedStorageArchiveJobPropertyKey_(normalizedJobId)
+    );
+  const job = normalizedStorageSafeJsonParse_(raw, null);
+
+  if (!job || job.jobId !== normalizedJobId) {
+    throw new Error(
+      "Archive job was not found or expired. Start the archive copy again."
+    );
+  }
+
+  return job;
+}
+
+function normalizedStorageFindResumableArchiveJob_(gameId, mode) {
+  const properties = PropertiesService.getScriptProperties();
+  const all = properties.getProperties();
+  const now = Date.now();
+  let best = null;
+
+  Object.keys(all).forEach(function(key) {
+    if (key.indexOf(NORMALIZED_ARCHIVE_JOB_PROPERTY_PREFIX) !== 0) {
+      return;
+    }
+
+    const job = normalizedStorageSafeJsonParse_(all[key], null);
+
+    if (
+      !job ||
+      job.finalized === true ||
+      normalizedStorageString_(job.gameId) !== gameId ||
+      normalizedStorageString_(job.mode) !== mode
+    ) {
+      return;
+    }
+
+    const createdAt = job.createdAt
+      ? new Date(job.createdAt).getTime()
+      : 0;
+
+    if (!createdAt || now - createdAt > NORMALIZED_ARCHIVE_JOB_MAX_AGE_MS) {
+      return;
+    }
+
+    if (
+      !best ||
+      createdAt > new Date(best.createdAt || 0).getTime()
+    ) {
+      best = job;
+    }
+  });
+
+  return best;
+}
+
+function normalizedStorageResolveArchiveSpreadsheet_(year) {
+  const archiveName = "AwardsAppArchive_" + year;
+  const properties = PropertiesService.getScriptProperties();
+  const propertyKey = "AWARDS_ARCHIVE_SPREADSHEET_" + year;
+  let archiveId = normalizedStorageString_(
+    properties.getProperty(propertyKey)
+  );
+  let archiveSpreadsheet = null;
+
+  if (archiveId) {
+    try {
+      archiveSpreadsheet = normalizedStorageSpreadsheetRetry_(
+        "open yearly archive spreadsheet",
+        function() {
+          return SpreadsheetApp.openById(archiveId);
+        },
+        3
+      );
+    } catch (err) {
+      archiveSpreadsheet = null;
+    }
+  }
+
+  if (!archiveSpreadsheet) {
+    archiveSpreadsheet = normalizedStorageSpreadsheetRetry_(
+      "create archive spreadsheet " + archiveName,
+      function() {
+        return SpreadsheetApp.create(archiveName);
+      }
+    );
+    archiveId = archiveSpreadsheet.getId();
+    properties.setProperty(propertyKey, archiveId);
+  }
+
+  return {
+    id: archiveId,
+    url: archiveSpreadsheet.getUrl(),
+    spreadsheet: archiveSpreadsheet
+  };
+}
+
+function normalizedStorageArchiveJobProgress_(job, extra) {
+  const steps = job.steps || [];
+  const completedSteps = Math.min(
+    Number(job.stepIndex || 0),
+    steps.length
+  );
+  const next = completedSteps < steps.length
+    ? steps[completedSteps]
+    : null;
+  const completedItems = steps.slice(0, completedSteps);
+  const preparationSteps = steps.filter(function(step) {
+    return step.stage === "PREPARE";
+  });
+  const archiveSteps = steps.filter(function(step) {
+    return step.stage === "ARCHIVE";
+  });
+  const preparationCompleted = completedItems.filter(function(step) {
+    return step.stage === "PREPARE";
+  }).length;
+  const archiveCompleted = completedItems.filter(function(step) {
+    return step.stage === "ARCHIVE";
+  }).length;
+  const response = {
+    success: true,
+    archiveJob: true,
+    jobId: job.jobId,
+    gameId: job.gameId,
+    mode: job.mode,
+    complete: completedSteps >= steps.length,
+    finalized: job.finalized === true,
+    currentStage: next ? next.stage : "FINALIZE",
+    completedSteps: completedSteps,
+    totalSteps: steps.length,
+    preparationCompleted: preparationCompleted,
+    preparationTotal: preparationSteps.length,
+    archiveCompleted: archiveCompleted,
+    archiveTotal: archiveSteps.length,
+    nextStep: next ? next.name : "",
+    archiveSpreadsheetId: job.archiveSpreadsheetId || "",
+    archiveSpreadsheetUrl: job.archiveSpreadsheetUrl || "",
+    resumed: job.resumed === true,
+    lastError: job.lastError || ""
+  };
+
+  Object.keys(extra || {}).forEach(function(key) {
+    response[key] = extra[key];
+  });
+
+  return response;
+}
+
+function normalizedStorageStartArchiveJob_(payload) {
+  payload = payload || {};
+
+  let gameId = normalizedStorageString_(payload.gameId);
+  const mode = normalizedStorageKey_(payload.mode) === "move"
+    ? "MOVE"
+    : "COPY";
+
+  if (typeof normalizeGameId_ === "function") {
+    gameId = normalizeGameId_(gameId);
+  }
+
+  if (!gameId) {
+    throw new Error("GameId is required");
+  }
+
+  if (mode === "MOVE" && payload.confirmMove !== true) {
+    return {
+      success: false,
+      gameId: gameId,
+      mode: mode,
+      verified: false,
+      error: "MOVE archive requires confirmMove=true. Create a COPY first."
+    };
+  }
+
+  const lock = LockService.getScriptLock();
+  const gotLock = lock.tryLock(5000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      retryable: true,
+      error: "Another archive request is starting. Retrying the saved job."
+    };
+  }
+
+  try {
+    normalizedStorageCleanupArchiveJobs_();
+
+    let existingJob = normalizedStorageFindResumableArchiveJob_(
+      gameId,
+      mode
+    );
+
+    if (existingJob) {
+      const usedCurrentSteps =
+        normalizedStorageArchiveJobUsesCurrentSteps_(existingJob, mode);
+
+      existingJob = normalizedStorageUpgradeArchiveJob_(
+        existingJob,
+        mode
+      );
+      existingJob.resumed = true;
+      existingJob.updatedAt = new Date().toISOString();
+      normalizedStorageSaveArchiveJob_(existingJob);
+
+      return normalizedStorageArchiveJobProgress_(existingJob, {
+        legacyJobReset: !usedCurrentSteps,
+        message: usedCurrentSteps
+          ? "Resuming the saved archive job."
+          : "An outdated archive job was reset and is ready to restart safely."
+      });
+    }
+
+    const now = new Date();
+    const jobId = Utilities.getUuid();
+    const archiveRecordId =
+      gameId + "-" + now.getTime() + "-" + jobId.slice(0, 8);
+    const job = {
+      jobId: jobId,
+      archiveRecordId: archiveRecordId,
+      gameId: gameId,
+      gameName: gameId,
+      year: "",
+      mode: mode,
+      confirmMove: payload.confirmMove === true,
+      notes: normalizedStorageString_(payload.notes),
+      sourceSpreadsheetId: "",
+      archiveSpreadsheetId: "",
+      archiveSpreadsheetUrl: "",
+      readiness: mode === "COPY"
+        ? {
+            ready: true,
+            skipped: true,
+            reason: "COPY mode never removes active data."
+          }
+        : null,
+      steps: normalizedStorageArchiveSteps_(mode),
+      stepIndex: 0,
+      preparation: {},
+      counts: {},
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      finalized: false,
+      resumed: false,
+      lastError: ""
+    };
+
+    normalizedStorageSaveArchiveJob_(job);
+
+    return normalizedStorageArchiveJobProgress_(job, {
+      message: "Archive job saved. Preparation will run in small steps."
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function normalizedStorageRunArchiveJobStep_(payload) {
+  payload = payload || {};
+  const lock = LockService.getScriptLock();
+  const gotLock = lock.tryLock(30000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      retryable: true,
+      error: "Another storage or archive operation is running. Try again."
+    };
+  }
+
+  try {
+    const job = normalizedStorageLoadArchiveJob_(payload.jobId);
+
+    if (
+      payload.gameId &&
+      normalizedStorageString_(payload.gameId) !== job.gameId
+    ) {
+      throw new Error("Archive job does not match the requested GameId");
+    }
+
+    if (job.finalized === true) {
+      return job.finalResult || normalizedStorageArchiveJobProgress_(job);
+    }
+
+    const steps = job.steps || [];
+    const stepIndex = Number(job.stepIndex || 0);
+
+    if (stepIndex >= steps.length) {
+      return normalizedStorageArchiveJobProgress_(job, {
+        message: "All archive sheets are ready for final verification."
+      });
+    }
+
+    const step = steps[stepIndex];
+    let result;
+
+    try {
+      if (step.operation === "PREPARE_GAME") {
+        result = normalizedStorageSpreadsheetRetry_(
+          "validate archive game",
+          function() {
+            const game = typeof getGame === "function"
+              ? getGame(job.gameId)
+              : null;
+
+            if (!game) {
+              throw new Error("Game not found: " + job.gameId);
+            }
+
+            const source = SpreadsheetApp.getActive();
+
+            return {
+              verified: true,
+              gameName: normalizedStorageString_(
+                game.name || game.Name || job.gameId
+              ),
+              year: Number(game.year || game.Year) ||
+                new Date().getFullYear(),
+              sourceSpreadsheetId: source.getId()
+            };
+          },
+          3
+        );
+
+        job.gameName = result.gameName;
+        job.year = result.year;
+        job.sourceSpreadsheetId = result.sourceSpreadsheetId;
+        job.preparation = job.preparation || {};
+        job.preparation[step.name] = result;
+      } else if (step.operation === "CHECK_READINESS") {
+        result = normalizedStorageSpreadsheetRetry_(
+          "check move archive readiness",
+          function() {
+            return normalizedStorageGetArchiveReadiness_(job.gameId);
+          },
+          3
+        );
+
+        if (!result.ready) {
+          job.readiness = result;
+          job.lastError =
+            "Game cannot be moved while questions remain unresolved.";
+          job.updatedAt = new Date().toISOString();
+          normalizedStorageSaveArchiveJob_(job);
+
+          return normalizedStorageArchiveJobProgress_(job, {
+            success: false,
+            retryable: false,
+            failedStep: step.name,
+            readiness: result,
+            error: job.lastError
+          });
+        }
+
+        job.readiness = result;
+        job.preparation = job.preparation || {};
+        job.preparation[step.name] = result;
+      } else if (step.operation === "PREPARE_ARCHIVE") {
+        if (!job.year) {
+          throw new Error("Archive game metadata has not been prepared yet.");
+        }
+
+        const archive = normalizedStorageResolveArchiveSpreadsheet_(
+          Number(job.year)
+        );
+
+        result = {
+          verified: true,
+          archiveSpreadsheetId: archive.id,
+          archiveSpreadsheetUrl: archive.url
+        };
+        job.archiveSpreadsheetId = archive.id;
+        job.archiveSpreadsheetUrl = archive.url;
+        job.preparation = job.preparation || {};
+        job.preparation[step.name] = result;
+      } else {
+        if (!job.archiveSpreadsheetId) {
+          throw new Error("Archive spreadsheet has not been prepared yet.");
+        }
+
+        const source = SpreadsheetApp.getActive();
+        const archiveSpreadsheet = normalizedStorageSpreadsheetRetry_(
+          "open archive spreadsheet",
+          function() {
+            return SpreadsheetApp.openById(job.archiveSpreadsheetId);
+          },
+          3
+        );
+
+        result = normalizedStorageSpreadsheetRetry_(
+          "archive and verify " + step.name,
+          function() {
+            if (step.operation === "COPY_SETTINGS") {
+              return normalizedStorageCopySettingsByQuestionIds_(
+                source,
+                archiveSpreadsheet,
+                job.gameId,
+                normalizedStorageGetQuestionIdsForGame_(job.gameId)
+              );
+            }
+
+            return normalizedStorageCopyRowsForGame_(
+              source.getSheetByName(step.name),
+              archiveSpreadsheet,
+              job.gameId,
+              step.entityType
+            );
+          },
+          3
+        );
+
+        job.counts = job.counts || {};
+        job.counts[step.name] = result;
+      }
+    } catch (err) {
+      job.lastError = err && err.message ? err.message : String(err);
+      job.failedStep = step.name;
+      job.updatedAt = new Date().toISOString();
+      normalizedStorageSaveArchiveJob_(job);
+
+      return normalizedStorageArchiveJobProgress_(job, {
+        success: false,
+        retryable: normalizedStorageIsRetryableSpreadsheetError_(err),
+        failedStep: step.name,
+        error: job.lastError
+      });
+    }
+
+    job.stepIndex = stepIndex + 1;
+    job.updatedAt = new Date().toISOString();
+    job.lastError = "";
+    job.failedStep = "";
+    normalizedStorageSaveArchiveJob_(job);
+
+    return normalizedStorageArchiveJobProgress_(job, {
+      stepName: step.name,
+      stepVerified: result && result.verified === true,
+      stepResult: result,
+      message: step.stage === "PREPARE"
+        ? step.name + " completed."
+        : step.name + " verified (" +
+          Number(result && result.count || 0) + " rows)."
+    });
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function normalizedStorageManifestRowByArchiveId_(
+  manifestSheet,
+  archiveId
+) {
+  if (!manifestSheet || manifestSheet.getLastRow() <= 1) {
+    return 0;
+  }
+
+  const headers = normalizedStorageGetHeaders_(manifestSheet);
+  const col = normalizedStorageHeaderMap_(headers);
+
+  if (col.ArchiveId === undefined) {
+    return 0;
+  }
+
+  const values = manifestSheet.getRange(
+    2,
+    col.ArchiveId + 1,
+    manifestSheet.getLastRow() - 1,
+    1
+  ).getValues();
+
+  for (let i = 0; i < values.length; i++) {
+    if (normalizedStorageString_(values[i][0]) === archiveId) {
+      return i + 2;
+    }
+  }
+
+  return 0;
+}
+
+function normalizedStorageFinalizeArchiveJob_(payload) {
+  payload = payload || {};
+  const lock = LockService.getScriptLock();
+  const gotLock = lock.tryLock(30000);
+
+  if (!gotLock) {
+    return {
+      success: false,
+      retryable: true,
+      error: "Another storage or archive operation is running. Try again."
+    };
+  }
+
+  try {
+    const job = normalizedStorageLoadArchiveJob_(payload.jobId);
+
+    if (job.finalized === true) {
+      return {
+        success: job.verified === true,
+        archiveJob: true,
+        complete: true,
+        finalized: true,
+        jobId: job.jobId,
+        gameId: job.gameId,
+        archiveSpreadsheetId: job.archiveSpreadsheetId,
+        archiveSpreadsheetUrl: job.archiveSpreadsheetUrl,
+        mode: job.mode,
+        counts: job.counts || {},
+        verified: job.verified === true,
+        readiness: job.readiness || {},
+        verificationErrors: job.verificationErrors || [],
+        message: job.finalMessage || (
+          job.verified === true
+            ? "Archive copy verified."
+            : "Archive copy failed verification; no source rows were removed."
+        )
+      };
+    }
+
+    const steps = job.steps || [];
+
+    if (Number(job.stepIndex || 0) < steps.length) {
+      return normalizedStorageArchiveJobProgress_(job, {
+        success: false,
+        error: "Archive job is not ready to finalize."
+      });
+    }
+
+    const counts = job.counts || {};
+    const verificationErrors = Object.keys(counts)
+      .filter(function(sheetName) {
+        return !counts[sheetName] || counts[sheetName].verified !== true;
+      })
+      .map(function(sheetName) {
+        const item = counts[sheetName] || {};
+        return {
+          sheetName: sheetName,
+          error: item.error || "Archive verification failed",
+          sourceCount: Number(item.count || 0),
+          targetCount: Number(item.targetCount || 0),
+          sourceHash: item.sourceHash || "",
+          targetHash: item.targetHash || ""
+        };
+      });
+    const verified = verificationErrors.length === 0;
+    const now = new Date();
+    const source = SpreadsheetApp.getActive();
+    const manifestSheet = normalizedStorageEnsureSheet_(
+      ARCHIVE_MANIFEST_SHEET,
+      ARCHIVE_MANIFEST_HEADERS
+    );
+    const manifestHeaders = normalizedStorageGetHeaders_(manifestSheet);
+    const manifestObject = {
+      ArchiveId: job.archiveRecordId,
+      GameId: job.gameId,
+      GameName: job.gameName,
+      Year: job.year,
+      ArchiveSpreadsheetId: job.archiveSpreadsheetId,
+      ArchiveSpreadsheetUrl: job.archiveSpreadsheetUrl,
+      Status: verified
+        ? (job.mode === "MOVE" ? "VERIFIED_MOVE" : "VERIFIED_COPY")
+        : "FAILED_VERIFICATION",
+      Mode: job.mode,
+      EntityCountsJSON: JSON.stringify(counts),
+      SourceSpreadsheetId: job.sourceSpreadsheetId || source.getId(),
+      ArchivedAt: now,
+      VerifiedAt: verified ? now : "",
+      VerificationErrorsJSON: JSON.stringify(verificationErrors),
+      ReadinessJSON: JSON.stringify(job.readiness || {}),
+      Notes: job.notes || (
+        verified
+          ? "Archive copy verified by row counts and content hashes."
+          : "Archive copy failed verification; source data was not removed."
+      )
+    };
+    const manifestRow = normalizedStorageManifestRowByArchiveId_(
+      manifestSheet,
+      job.archiveRecordId
+    );
+    const manifestValues = normalizedStorageObjectRow_(
+      manifestHeaders,
+      manifestObject
+    );
+
+    if (manifestRow) {
+      manifestSheet.getRange(
+        manifestRow,
+        1,
+        1,
+        manifestHeaders.length
+      ).setValues([manifestValues]);
+    } else {
+      manifestSheet.appendRow(manifestValues);
+    }
+
+    if (verified && job.mode === "MOVE") {
+      normalizedStorageDeleteGameRowsAfterArchive_(
+        job.gameId,
+        normalizedStorageGetQuestionIdsForGame_(job.gameId)
+      );
+    }
+
+    normalizedStorageClearCaches_();
+
+    const finalResult = {
+      success: verified,
+      archiveJob: true,
+      complete: true,
+      finalized: true,
+      jobId: job.jobId,
+      gameId: job.gameId,
+      archiveSpreadsheetId: job.archiveSpreadsheetId,
+      archiveSpreadsheetUrl: job.archiveSpreadsheetUrl,
+      mode: job.mode,
+      counts: counts,
+      verified: verified,
+      readiness: job.readiness || {},
+      verificationErrors: verificationErrors,
+      message: verified
+        ? "Archive copy verified."
+        : "Archive copy failed verification; no source rows were removed."
+    };
+
+    job.finalized = true;
+    job.finalizedAt = now.toISOString();
+    job.verified = verified;
+    job.verificationErrors = verificationErrors;
+    job.finalMessage = finalResult.message;
+    job.updatedAt = now.toISOString();
+    normalizedStorageSaveArchiveJob_(job);
+
+    return finalResult;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function archiveGameData(payload) {
   payload = payload || {};
   const gameId = normalizedStorageString_(payload.gameId);
@@ -2588,7 +3440,8 @@ function archiveGameData(payload) {
 
   try {
     setupNormalizedQuestionStorage({
-      migrateExisting: true
+      migrateExisting: false,
+      rebuildIndexes: false
     });
 
     const readiness = normalizedStorageGetArchiveReadiness_(gameId);
@@ -2705,7 +3558,9 @@ function archiveGameData(payload) {
       Year: year,
       ArchiveSpreadsheetId: archiveId,
       ArchiveSpreadsheetUrl: archiveSpreadsheet.getUrl(),
-      Status: verified ? "VERIFIED_COPY" : "FAILED_VERIFICATION",
+      Status: verified
+        ? (mode === "MOVE" ? "VERIFIED_MOVE" : "VERIFIED_COPY")
+        : "FAILED_VERIFICATION",
       Mode: mode,
       EntityCountsJSON: JSON.stringify(counts),
       SourceSpreadsheetId: source.getId(),
@@ -3088,5 +3943,20 @@ function normalizedStorageDeleteGameRowsAfterArchive_(gameId, questionIds) {
 function apiAdminArchiveGameData(payload) {
   payload = payload || {};
   requireAdmin_(payload);
+
+  const phase = normalizedStorageKey_(payload.phase);
+
+  if (phase === "start") {
+    return normalizedStorageStartArchiveJob_(payload);
+  }
+
+  if (phase === "step") {
+    return normalizedStorageRunArchiveJobStep_(payload);
+  }
+
+  if (phase === "finalize") {
+    return normalizedStorageFinalizeArchiveJob_(payload);
+  }
+
   return archiveGameData(payload);
 }

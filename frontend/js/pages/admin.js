@@ -1650,9 +1650,19 @@ function renderAdminGameForm(
               <button type="button" class="admin-small-button secondary" onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')">
                 Categories / Questions / Nominees
               </button>
-              <button type="button" class="admin-small-button secondary" onclick="adminArchiveGameDataCopy('${escapeJs(rawGameId)}')">
+              <button
+                type="button"
+                id="adminArchiveButton_${domId}"
+                class="admin-small-button secondary"
+                onclick="adminArchiveGameDataCopy('${escapeJs(rawGameId)}')"
+              >
                 Archive Data Copy
               </button>
+              <span
+                id="adminArchiveStatus_${domId}"
+                class="admin-sub"
+                aria-live="polite"
+              ></span>
             ` : ""}
           </div>
         </form>
@@ -2545,21 +2555,110 @@ async function adminArchiveGameDataCopy(gameId) {
     return;
   }
 
-  const res = await apiAdminArchiveGameData(
-    gameId,
-    "COPY",
-    "Archive copy created from Manage Games"
+  const domId = typeof adminGameDomId_ === "function"
+    ? adminGameDomId_(gameId)
+    : String(gameId).replace(/[^a-zA-Z0-9_-]/g, "_");
+  const button = document.getElementById(
+    "adminArchiveButton_" + domId
+  );
+  const status = document.getElementById(
+    "adminArchiveStatus_" + domId
   );
 
-  if (!res || res.success === false) {
-    alert((res && (res.error || res.message)) || "Could not archive game data.");
-    return;
+  function showProgress(progress) {
+    if (!status || !progress) {
+      return;
+    }
+
+    if (progress.finalized === true) {
+      status.textContent = progress.success === false
+        ? "Archive verification failed."
+        : "Archive verified.";
+      return;
+    }
+
+    const next = progress.nextStep || "";
+    const stage = progress.currentStage || "PREPARE";
+
+    if (stage === "PREPARE") {
+      const completed = Number(
+        progress.preparationCompleted || 0
+      );
+      const total = Number(
+        progress.preparationTotal || 0
+      );
+
+      if (progress.legacyJobReset === true) {
+        status.textContent =
+          "Outdated archive job reset — restarting safely…";
+        return;
+      }
+
+      status.textContent = total > 0
+        ? "Preparing " + completed + " of " + total +
+          (next ? " — next: " + next : "")
+        : "Preparing archive workflow…";
+      return;
+    }
+
+    const completed = Number(progress.archiveCompleted || 0);
+    const total = Number(progress.archiveTotal || 0);
+
+    status.textContent = total
+      ? "Archiving " + completed + " of " + total +
+        (next ? " — next: " + next : "")
+      : "Finalizing archive…";
   }
 
-  alert(
-    "Archive copy verified.\n\n" +
-    "Archive: " + (res.archiveSpreadsheetUrl || res.archiveSpreadsheetId || "Created")
-  );
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Archiving…";
+  }
+
+  if (status) {
+    status.textContent = "Starting archive job…";
+  }
+
+  try {
+    const res = await apiAdminArchiveGameData(
+      gameId,
+      "COPY",
+      "Archive copy created from Manage Games",
+      false,
+      showProgress
+    );
+
+    if (!res || res.success === false) {
+      if (status) {
+        status.textContent =
+          (res && (res.error || res.message)) ||
+          "Could not archive game data.";
+      }
+
+      alert(
+        (res && (res.error || res.message)) ||
+        "Could not archive game data."
+      );
+      return;
+    }
+
+    if (status) {
+      status.textContent = "Archive copy verified.";
+    }
+
+    alert(
+      "Archive copy verified.\n\n" +
+      "Archive: " +
+      (res.archiveSpreadsheetUrl ||
+        res.archiveSpreadsheetId ||
+        "Created")
+    );
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Archive Data Copy";
+    }
+  }
 
 }
 

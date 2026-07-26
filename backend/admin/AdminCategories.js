@@ -1270,8 +1270,15 @@ function adminGetGameSetup(payload) {
     categoryCol
   );
 
+  /*
+    Admin setup must always show the current sheet value.
+    Player requests may use cached settings, but an admin editor
+    cannot safely display a stale Locked or settlement state.
+  */
   const settingsData =
-    getAllCategorySettingsData_();
+    getCategorySettingsSheet_()
+      .getDataRange()
+      .getValues();
 
   const settingsHeaders =
     settingsData[0].map(h =>
@@ -2197,6 +2204,45 @@ function adminUpdateCategory(payload) {
   validateGameId(
     gameId
   );
+
+  /*
+    Production safety rule:
+    Any resolved result automatically locks the question.
+    Clearing a result does not automatically unlock it; an admin
+    must explicitly reopen the question from Settings.
+  */
+  const settlementStatusForLock =
+    adminCatNormalizeValue_(
+      payload.settlementStatus || ""
+    ).toLowerCase();
+
+  const winnerNomineeIdForLock =
+    adminCatNormalizeId_(
+      payload.winnerNomineeId
+    );
+
+  const resolvedSettlementStatuses = {
+    settled: true,
+    final: true,
+    complete: true,
+    completed: true,
+    push: true,
+    pushed: true,
+    void: true,
+    refund: true,
+    refunded: true,
+    cancelled: true,
+    canceled: true,
+    "no-contest": true,
+    no_contest: true
+  };
+
+  if (
+    winnerNomineeIdForLock ||
+    resolvedSettlementStatuses[settlementStatusForLock]
+  ) {
+    payload.locked = true;
+  }
 
   const oldWinnerNomineeId =
     (
