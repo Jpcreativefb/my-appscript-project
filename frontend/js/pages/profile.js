@@ -29,11 +29,33 @@ async function renderProfilePage() {
       playableGames
     );
 
+  const profileRequests =
+    await Promise.all([
+      apiGetEditableProfile(
+        username,
+        currentGameId
+      ),
+      username
+        ? apiGetUserProfileHistory(username, "")
+        : Promise.resolve({
+            success: true,
+            summary: { archivedGames: 0 },
+            games: []
+          })
+    ]);
+
   const res =
-    await apiGetEditableProfile(
-      username,
-      currentGameId
-    );
+    profileRequests[0];
+
+  const historyRes =
+    profileRequests[1] || {
+      success: true,
+      summary: { archivedGames: 0 },
+      games: []
+    };
+
+  APP_STATE.profileHistory =
+    historyRes;
 
   const profile =
     res && res.success
@@ -117,6 +139,8 @@ async function renderProfilePage() {
         </div>
 
       </div>
+
+      ${renderProfileHistorySection_(historyRes, username)}
 
       <div class="card profile-form-card">
 
@@ -1607,3 +1631,382 @@ function escapeProfileAttr_(value) {
   });
 
 })();
+
+
+/* ======================
+   ARCHIVED CAREER HISTORY
+====================== */
+
+function renderProfileHistorySection_(history, username) {
+
+  history = history || {};
+
+  if (history.success === false) {
+    return `
+      <section class="card profile-history-card">
+        <div class="profile-history-heading-row">
+          <div>
+            <h2>Career History</h2>
+            <p>Archived games, picks, leaderboards, and fun facts.</p>
+          </div>
+        </div>
+        <div class="profile-history-empty">
+          Historical stats could not be loaded right now.
+        </div>
+      </section>
+    `;
+  }
+
+  const summary = history.summary || {};
+  const games = Array.isArray(history.games)
+    ? history.games
+    : [];
+
+  if (!games.length) {
+    return `
+      <section class="card profile-history-card">
+        <div class="profile-history-heading-row">
+          <div>
+            <h2>Career History</h2>
+            <p>Archived games, picks, leaderboards, and fun facts.</p>
+          </div>
+        </div>
+        <div class="profile-history-empty">
+          No archived game history yet. Completed archived games will appear here automatically.
+        </div>
+      </section>
+    `;
+  }
+
+  const funFacts = Array.isArray(summary.funFacts)
+    ? summary.funFacts
+    : [];
+
+  return `
+    <section class="card profile-history-card">
+      <div class="profile-history-heading-row">
+        <div>
+          <h2>Career History</h2>
+          <p>Read-only results from verified game archives.</p>
+        </div>
+        <span class="profile-history-badge">
+          ${escapeProfileHtml_(summary.archivedGames || games.length)} games
+        </span>
+      </div>
+
+      <div class="profile-history-stats">
+        ${renderProfileHistoryStat_("Accuracy", formatProfileHistoryPercent_(summary.accuracy))}
+        ${renderProfileHistoryStat_("Correct", summary.correctPicks || 0)}
+        ${renderProfileHistoryStat_("1st Place", summary.firstPlaceFinishes || 0)}
+        ${renderProfileHistoryStat_("Best Streak", summary.longestCorrectStreak || 0)}
+        ${renderProfileHistoryStat_("Prediction Pts", formatProfileHistoryNumber_(summary.totalPredictionPoints || 0))}
+        ${renderProfileHistoryStat_("Wager Net", formatProfileHistorySigned_(summary.totalWagerNet || 0))}
+      </div>
+
+      ${funFacts.length ? `
+        <div class="profile-history-fun-facts">
+          <h3>Fun Facts</h3>
+          <ul>
+            ${funFacts.map(function(fact) {
+              return `<li>${escapeProfileHtml_(fact)}</li>`;
+            }).join("")}
+          </ul>
+        </div>
+      ` : ""}
+
+      <div class="profile-history-games">
+        ${games.map(function(game) {
+          return renderProfileHistoryGameCard_(game, username);
+        }).join("")}
+      </div>
+    </section>
+  `;
+
+}
+
+function renderProfileHistoryStat_(label, value) {
+
+  return `
+    <div class="profile-history-stat">
+      <strong>${escapeProfileHtml_(value)}</strong>
+      <span>${escapeProfileHtml_(label)}</span>
+    </div>
+  `;
+
+}
+
+function renderProfileHistoryGameCard_(game, username) {
+
+  game = game || {};
+
+  const gameId =
+    String(game.gameId || "").trim();
+
+  const detailId =
+    "archiveHistoryDetail_" +
+    gameId.replace(/[^a-zA-Z0-9_-]/g, "_");
+
+  const rankText =
+    game.rank
+      ? "#" + game.rank +
+        (game.totalPlayers ? " of " + game.totalPlayers : "")
+      : "No rank";
+
+  return `
+    <article class="profile-history-game">
+      <div class="profile-history-game-main">
+        <div>
+          <h3>${escapeProfileHtml_(game.name || gameId)}</h3>
+          <div class="profile-history-game-meta">
+            ${escapeProfileHtml_(game.year || "")}
+            · ${escapeProfileHtml_(rankText)}
+            · ${escapeProfileHtml_(formatProfileHistoryPercent_(game.accuracy))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          class="button profile-history-view-button"
+          data-game-id="${escapeProfileAttr_(gameId)}"
+          data-username="${escapeProfileAttr_(username || "")}"
+          data-target-id="${escapeProfileAttr_(detailId)}"
+          onclick="loadArchivedGameHistory_(this)"
+        >
+          View History
+        </button>
+      </div>
+
+      <div class="profile-history-game-summary">
+        <span>${escapeProfileHtml_(game.correctPicks || 0)} correct</span>
+        <span>${escapeProfileHtml_(formatProfileHistoryNumber_(game.totalScore || 0))} score</span>
+        ${Number(game.bets || 0) > 0
+          ? `<span>${escapeProfileHtml_(formatProfileHistorySigned_(game.wagerNet || 0))} wagers</span>`
+          : ""}
+      </div>
+
+      <div
+        id="${escapeProfileAttr_(detailId)}"
+        class="profile-history-detail hidden"
+      ></div>
+    </article>
+  `;
+
+}
+
+async function loadArchivedGameHistory_(button) {
+
+  if (!button) {
+    return;
+  }
+
+  const gameId =
+    String(button.dataset.gameId || "").trim();
+
+  const username =
+    String(button.dataset.username || "").trim();
+
+  const target =
+    document.getElementById(
+      button.dataset.targetId || ""
+    );
+
+  if (!gameId || !target) {
+    return;
+  }
+
+  if (target.dataset.loaded === "true") {
+    const willShow =
+      target.classList.contains("hidden");
+
+    target.classList.toggle("hidden");
+    button.textContent = willShow
+      ? "Hide History"
+      : "View History";
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = "Loading…";
+  target.classList.remove("hidden");
+  target.innerHTML = `
+    <div class="profile-history-loading">
+      Loading archived picks and leaderboard…
+    </div>
+  `;
+
+  const response =
+    await apiGetArchivedGameHistory(
+      gameId,
+      username
+    );
+
+  button.disabled = false;
+
+  if (!response || response.success === false) {
+    button.textContent = "Try Again";
+    target.innerHTML = `
+      <div class="profile-history-error">
+        ${escapeProfileHtml_(
+          response && (response.message || response.error)
+            ? response.message || response.error
+            : "Could not load archived history."
+        )}
+      </div>
+    `;
+    return;
+  }
+
+  target.dataset.loaded = "true";
+  button.textContent = "Hide History";
+  target.innerHTML =
+    renderArchivedGameDetail_(response);
+
+}
+
+function renderArchivedGameDetail_(response) {
+
+  const user = response.user || {};
+  const picks = Array.isArray(user.picks)
+    ? user.picks
+    : [];
+  const leaderboard = Array.isArray(response.leaderboard)
+    ? response.leaderboard
+    : [];
+  const wagerLeaderboard = Array.isArray(response.wagerLeaderboard)
+    ? response.wagerLeaderboard
+    : [];
+
+  return `
+    <div class="profile-history-detail-grid">
+      <section>
+        <h4>Final Leaderboard</h4>
+        <div class="profile-history-leaderboard">
+          ${leaderboard.length
+            ? leaderboard.map(function(row) {
+                return `
+                  <div class="profile-history-leaderboard-row ${
+                    archiveHistoryUsernameMatches_(row.username, user.username)
+                      ? "is-current-user"
+                      : ""
+                  }">
+                    <strong>#${escapeProfileHtml_(row.rank || "-")}</strong>
+                    <span>${escapeProfileHtml_(row.displayName || row.username)}</span>
+                    <b>${escapeProfileHtml_(formatProfileHistoryNumber_(row.totalScore || 0))}</b>
+                  </div>
+                `;
+              }).join("")
+            : `<div class="profile-history-empty-small">No prediction leaderboard rows.</div>`}
+        </div>
+      </section>
+
+      ${wagerLeaderboard.length ? `
+        <section>
+          <h4>Wager Leaderboard</h4>
+          <div class="profile-history-leaderboard">
+            ${wagerLeaderboard.map(function(row) {
+              return `
+                <div class="profile-history-leaderboard-row ${
+                  archiveHistoryUsernameMatches_(row.username, user.username)
+                    ? "is-current-user"
+                    : ""
+                }">
+                  <strong>#${escapeProfileHtml_(row.rank || "-")}</strong>
+                  <span>${escapeProfileHtml_(row.displayName || row.username)}</span>
+                  <b>${escapeProfileHtml_(formatProfileHistorySigned_(row.net || 0))}</b>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        </section>
+      ` : ""}
+    </div>
+
+    <section class="profile-history-picks-section">
+      <h4>My Archived Picks</h4>
+      <div class="profile-history-picks">
+        ${picks.length
+          ? picks.map(renderArchivedPickRow_).join("")
+          : `<div class="profile-history-empty-small">No archived picks for this user.</div>`}
+      </div>
+    </section>
+  `;
+
+}
+
+function renderArchivedPickRow_(pick) {
+
+  pick = pick || {};
+
+  const status =
+    String(pick.status || "pending")
+      .trim()
+      .toLowerCase();
+
+  const statusLabel =
+    status === "correct"
+      ? "Correct"
+      : status === "wrong"
+        ? "Wrong"
+        : status === "push"
+          ? "Push"
+          : "Pending";
+
+  return `
+    <div class="profile-history-pick is-${escapeProfileAttr_(status)}">
+      <div class="profile-history-pick-copy">
+        <strong>${escapeProfileHtml_(pick.question || pick.categoryId)}</strong>
+        <span>Your pick: ${escapeProfileHtml_(pick.selectedOption || pick.selectedNomineeId || "—")}</span>
+        <span>Result: ${escapeProfileHtml_(pick.winnerOption || "—")}</span>
+      </div>
+      <div class="profile-history-pick-result">
+        <b>${escapeProfileHtml_(statusLabel)}</b>
+        ${Number(pick.pointsEarned || 0) !== 0
+          ? `<span>${escapeProfileHtml_(formatProfileHistorySigned_(pick.pointsEarned))} pts</span>`
+          : ""}
+      </div>
+    </div>
+  `;
+
+}
+
+function archiveHistoryUsernameMatches_(left, right) {
+
+  return String(left || "")
+    .trim()
+    .toLowerCase() ===
+    String(right || "")
+      .trim()
+      .toLowerCase();
+
+}
+
+function formatProfileHistoryPercent_(value) {
+
+  const number = Number(value || 0);
+
+  return (
+    Math.round(number * 10) / 10
+  ) + "%";
+
+}
+
+function formatProfileHistoryNumber_(value) {
+
+  const number = Number(value || 0);
+
+  return Number.isInteger(number)
+    ? String(number)
+    : String(Math.round(number * 100) / 100);
+
+}
+
+function formatProfileHistorySigned_(value) {
+
+  const number = Number(value || 0);
+  const formatted = formatProfileHistoryNumber_(number);
+
+  return number > 0
+    ? "+" + formatted
+    : formatted;
+
+}

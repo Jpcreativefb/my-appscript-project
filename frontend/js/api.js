@@ -27,6 +27,9 @@ const API_LONG_TIMEOUT_ACTIONS =
     "getStartupPayload",
     "getDashboardGamesHub",
     "getEditableProfile",
+    "getUserProfileHistory",
+    "getArchivedGameHistory",
+    "getArchivedGamesHistory",
     "getBettingPagePayload",
     "adminSummary",
     "adminGetGames",
@@ -601,8 +604,23 @@ async function apiGetUserProfileHistory(username, gameId) {
 
   return api("getUserProfileHistory", {
     username,
-    gameId
+    gameId: gameId || ""
   });
+
+}
+
+async function apiGetArchivedGameHistory(gameId, username) {
+
+  return api("getArchivedGameHistory", {
+    gameId,
+    username: username || ""
+  });
+
+}
+
+async function apiGetArchivedGamesHistory() {
+
+  return api("getArchivedGamesHistory", {});
 
 }
 

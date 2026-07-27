@@ -242,3 +242,251 @@
     max-width: 96px;
   }
 }
+
+/* ======================
+   ARCHIVED CAREER HISTORY
+====================== */
+
+.profile-history-card {
+  margin-top: 18px;
+  padding: 18px;
+}
+
+.profile-history-heading-row,
+.profile-history-game-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.profile-history-heading-row h2,
+.profile-history-game h3,
+.profile-history-detail h4 {
+  margin: 0;
+}
+
+.profile-history-heading-row p,
+.profile-history-game-meta {
+  margin: 5px 0 0;
+  color: rgba(226, 232, 240, .72);
+}
+
+.profile-history-badge {
+  border: 1px solid rgba(250, 204, 21, .35);
+  background: rgba(250, 204, 21, .1);
+  color: #fde68a;
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.profile-history-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.profile-history-stat {
+  padding: 12px;
+  border-radius: 14px;
+  background: rgba(15, 23, 42, .55);
+  border: 1px solid rgba(148, 163, 184, .16);
+  text-align: center;
+}
+
+.profile-history-stat strong,
+.profile-history-stat span {
+  display: block;
+}
+
+.profile-history-stat strong {
+  font-size: 20px;
+}
+
+.profile-history-stat span {
+  margin-top: 3px;
+  font-size: 12px;
+  color: rgba(226, 232, 240, .7);
+}
+
+.profile-history-fun-facts {
+  margin-top: 16px;
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(59, 130, 246, .08);
+  border: 1px solid rgba(96, 165, 250, .18);
+}
+
+.profile-history-fun-facts h3 {
+  margin: 0 0 8px;
+}
+
+.profile-history-fun-facts ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.profile-history-fun-facts li + li {
+  margin-top: 5px;
+}
+
+.profile-history-games {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.profile-history-game {
+  padding: 14px;
+  border-radius: 16px;
+  border: 1px solid rgba(148, 163, 184, .18);
+  background: rgba(15, 23, 42, .5);
+}
+
+.profile-history-game-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.profile-history-game-summary span {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, .11);
+  font-size: 12px;
+}
+
+.profile-history-view-button {
+  padding: 8px 11px;
+  white-space: nowrap;
+}
+
+.profile-history-detail {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(148, 163, 184, .16);
+}
+
+.profile-history-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.profile-history-leaderboard,
+.profile-history-picks {
+  display: grid;
+  gap: 7px;
+  margin-top: 9px;
+}
+
+.profile-history-leaderboard-row {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(148, 163, 184, .08);
+}
+
+.profile-history-leaderboard-row.is-current-user {
+  background: rgba(250, 204, 21, .12);
+  border: 1px solid rgba(250, 204, 21, .24);
+}
+
+.profile-history-picks-section {
+  margin-top: 16px;
+}
+
+.profile-history-pick {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  border-left: 4px solid rgba(148, 163, 184, .6);
+  background: rgba(148, 163, 184, .07);
+}
+
+.profile-history-pick.is-correct {
+  border-left-color: #4ade80;
+}
+
+.profile-history-pick.is-wrong {
+  border-left-color: #f87171;
+}
+
+.profile-history-pick.is-push {
+  border-left-color: #fb923c;
+}
+
+.profile-history-pick-copy,
+.profile-history-pick-result {
+  display: grid;
+  gap: 3px;
+}
+
+.profile-history-pick-copy span,
+.profile-history-pick-result span {
+  font-size: 12px;
+  color: rgba(226, 232, 240, .72);
+}
+
+.profile-history-pick-result {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.profile-history-empty,
+.profile-history-empty-small,
+.profile-history-loading,
+.profile-history-error {
+  padding: 14px;
+  margin-top: 12px;
+  border-radius: 12px;
+  background: rgba(148, 163, 184, .08);
+  color: rgba(226, 232, 240, .75);
+}
+
+.profile-history-error {
+  color: #fca5a5;
+  background: rgba(127, 29, 29, .18);
+}
+
+@media (max-width: 700px) {
+  .profile-history-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .profile-history-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .profile-history-heading-row,
+  .profile-history-game-main {
+    align-items: flex-start;
+  }
+
+  .profile-history-game-main {
+    flex-direction: column;
+  }
+
+  .profile-history-view-button {
+    width: 100%;
+  }
+
+  .profile-history-pick {
+    flex-direction: column;
+  }
+
+  .profile-history-pick-result {
+    text-align: left;
+  }
+}

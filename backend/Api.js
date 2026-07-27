@@ -1764,8 +1764,27 @@ if (action === "compareUserPicks") {
       return json(
         getUserProfileHistory(
           params.username,
-          gameId
+          params.gameId || ""
         )
+      );
+
+    }
+
+    if (action === "getArchivedGameHistory") {
+
+      return json(
+        getArchivedGameHistory(
+          params.gameId || "",
+          params.username || ""
+        )
+      );
+
+    }
+
+    if (action === "getArchivedGamesHistory") {
+
+      return json(
+        getArchivedGamesHistory()
       );
 
     }

@@ -4061,6 +4061,13 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
 
     normalizedStorageClearCaches_();
 
+    if (
+      verified &&
+      typeof archiveHistoryInvalidateCache_ === "function"
+    ) {
+      archiveHistoryInvalidateCache_();
+    }
+
     const finalMessage = verified
       ? (
           job.mode === "MOVE"
@@ -4295,6 +4302,13 @@ function archiveGameData(payload) {
     }
 
     normalizedStorageClearCaches_();
+
+    if (
+      verified &&
+      typeof archiveHistoryInvalidateCache_ === "function"
+    ) {
+      archiveHistoryInvalidateCache_();
+    }
 
     return {
       success: verified,
