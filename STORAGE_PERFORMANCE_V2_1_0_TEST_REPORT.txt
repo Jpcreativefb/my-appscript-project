@@ -1,0 +1,37 @@
+Awards App Storage and Archive v2.1.0 Test Report
+=================================================
+
+Automated test suites:
+- archive_history_tests.js: PASS
+- archive_move_restore_tests.js: PASS
+- archive_production_readiness_tests.js: PASS
+- result_auto_lock_tests.js: PASS
+- storage_foundation_tests.js: PASS
+
+JavaScript syntax validation:
+- 87 backend, frontend, and test JavaScript files parsed successfully with node --check.
+
+Production checks covered:
+- ArchiveManifest Current/Superseded lifecycle columns
+- Previous verified manifest records remain as audit history
+- One current lifecycle record per game
+- Admin-only archive dashboard route
+- Signed-in-session protection for archived history and career data
+- Bulk Games/ArchiveManifest dashboard reads
+- Shared yearly archive-workbook loading for career history
+- Archived Games page routing and asset registration
+- Searchable history browser
+- Prediction and wager leaderboard rendering
+- Archived user-pick rendering
+- Leaderboard career-history popup
+- Service-worker cache version and new assets
+- Existing COPY/MOVE/RESTORE safety tests
+- Existing result auto-lock tests
+- Existing normalized storage tests
+
+Not executed locally:
+- Live Apps Script deployment
+- Live Google Sheets lifecycle-column creation
+- Live Cloudflare Pages cache refresh
+
+These require the deployment checklist in the release notes.

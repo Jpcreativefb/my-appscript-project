@@ -10,9 +10,9 @@
    Results are cached briefly so profile pages do not repeatedly scan Drive.
 ===================================================== */
 
-const ARCHIVE_HISTORY_CACHE_VERSION = "v1";
+const ARCHIVE_HISTORY_CACHE_VERSION = "v2";
 const ARCHIVE_HISTORY_CACHE_SECONDS = 300;
-const ARCHIVE_HISTORY_MAX_GAMES = 50;
+const ARCHIVE_HISTORY_MAX_GAMES = 200;
 
 function archiveHistoryString_(value) {
   return String(value === undefined || value === null ? "" : value).trim();
@@ -165,6 +165,15 @@ function archiveHistoryManifestVerified_(record) {
   });
 }
 
+function archiveHistoryManifestCurrent_(record) {
+  if (!record) {
+    return false;
+  }
+
+  const raw = archiveHistoryString_(record.Current);
+  return raw === "" || archiveHistoryBool_(record.Current, false);
+}
+
 function archiveHistoryGetLatestSnapshots_() {
   const active = SpreadsheetApp.getActive();
   const sheet = active.getSheetByName("ArchiveManifest");
@@ -193,7 +202,19 @@ function archiveHistoryGetLatestSnapshots_() {
     }
 
     record._manifestIndex = index;
-    latestByGame[gameId] = record;
+    const existing = latestByGame[gameId];
+    const recordCurrent = archiveHistoryManifestCurrent_(record);
+    const existingCurrent = existing
+      ? archiveHistoryManifestCurrent_(existing)
+      : false;
+
+    if (
+      !existing ||
+      (recordCurrent && !existingCurrent) ||
+      (recordCurrent === existingCurrent && index > existing._manifestIndex)
+    ) {
+      latestByGame[gameId] = record;
+    }
   });
 
   return Object.keys(latestByGame)
@@ -961,11 +982,48 @@ function archiveHistoryBuildGameData_(payload, requestedUsername) {
   };
 }
 
-function archiveHistoryLoadGame_(snapshot, username) {
-  const gameId = archiveHistoryString_(snapshot.GameId);
+function archiveHistoryLoadWorkbookData_(snapshot, workbookCache) {
+  workbookCache = workbookCache || {};
+
+  const spreadsheetId = archiveHistoryString_(
+    snapshot && snapshot.ArchiveSpreadsheetId
+  );
+
+  if (!spreadsheetId) {
+    throw new Error("Verified archive spreadsheet was not found.");
+  }
+
+  if (workbookCache[spreadsheetId]) {
+    return workbookCache[spreadsheetId];
+  }
+
   const spreadsheet = archiveHistoryOpenSpreadsheet_(snapshot);
-  const allQuestions = archiveHistoryReadSheetObjects_(spreadsheet, "Questions");
-  const questions = archiveHistoryRowsForGame_(allQuestions, gameId);
+  const data = {
+    spreadsheet: spreadsheet,
+    games: archiveHistoryReadSheetObjects_(spreadsheet, "Games"),
+    questions: archiveHistoryReadSheetObjects_(spreadsheet, "Questions"),
+    options: archiveHistoryReadSheetObjects_(spreadsheet, "QuestionOptions"),
+    categories: archiveHistoryReadSheetObjects_(spreadsheet, "Categories"),
+    results: archiveHistoryReadSheetObjects_(spreadsheet, "CategoryResults"),
+    picks: archiveHistoryReadSheetObjects_(spreadsheet, "Picks"),
+    bets: archiveHistoryReadSheetObjects_(spreadsheet, "Bets"),
+    settings: archiveHistoryReadSheetObjects_(spreadsheet, "CategorySettings")
+  };
+
+  workbookCache[spreadsheetId] = data;
+  return data;
+}
+
+function archiveHistoryLoadGame_(snapshot, username, workbookCache) {
+  const gameId = archiveHistoryString_(snapshot.GameId);
+  const workbook = archiveHistoryLoadWorkbookData_(
+    snapshot,
+    workbookCache || {}
+  );
+  const questions = archiveHistoryRowsForGame_(
+    workbook.questions,
+    gameId
+  );
   const questionIds = {};
 
   questions.forEach(function(row) {
@@ -975,10 +1033,7 @@ function archiveHistoryLoadGame_(snapshot, username) {
     }
   });
 
-  const settings = archiveHistoryReadSheetObjects_(
-    spreadsheet,
-    "CategorySettings"
-  ).filter(function(row) {
+  const settings = (workbook.settings || []).filter(function(row) {
     const rowGameId = archiveHistoryString_(row.GameId);
     const categoryId = archiveHistoryKey_(row.CategoryId);
     return rowGameId ? rowGameId === gameId : questionIds[categoryId] === true;
@@ -990,31 +1045,13 @@ function archiveHistoryLoadGame_(snapshot, username) {
     year: archiveHistoryNumber_(snapshot.Year, 0),
     archiveId: archiveHistoryString_(snapshot.ArchiveId),
     archivedAt: snapshot.ArchivedAt || snapshot.VerifiedAt || "",
-    games: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "Games"),
-      gameId
-    ),
+    games: archiveHistoryRowsForGame_(workbook.games, gameId),
     questions: questions,
-    options: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "QuestionOptions"),
-      gameId
-    ),
-    categories: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "Categories"),
-      gameId
-    ),
-    results: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "CategoryResults"),
-      gameId
-    ),
-    picks: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "Picks"),
-      gameId
-    ),
-    bets: archiveHistoryRowsForGame_(
-      archiveHistoryReadSheetObjects_(spreadsheet, "Bets"),
-      gameId
-    ),
+    options: archiveHistoryRowsForGame_(workbook.options, gameId),
+    categories: archiveHistoryRowsForGame_(workbook.categories, gameId),
+    results: archiveHistoryRowsForGame_(workbook.results, gameId),
+    picks: archiveHistoryRowsForGame_(workbook.picks, gameId),
+    bets: archiveHistoryRowsForGame_(workbook.bets, gameId),
     settings: settings
   }, username);
 }
@@ -1273,11 +1310,12 @@ function getUserProfileHistory(username, gameId) {
   const snapshots = archiveHistoryGetLatestSnapshots_();
   const games = [];
   const errors = [];
+  const workbookCache = {};
 
   snapshots.forEach(function(snapshot) {
     try {
       games.push(
-        archiveHistoryLoadGame_(snapshot, username)
+        archiveHistoryLoadGame_(snapshot, username, workbookCache)
       );
     } catch (err) {
       errors.push({
@@ -1314,7 +1352,13 @@ function getArchivedGamesHistory() {
 
   return {
     success: true,
+    generatedAt: new Date().toISOString(),
     games: snapshots.map(function(snapshot) {
+      const counts = archiveHistorySafeJson_(
+        snapshot.EntityCountsJSON,
+        {}
+      );
+
       return {
         gameId: archiveHistoryString_(snapshot.GameId),
         gameName: archiveHistoryString_(snapshot.GameName),
@@ -1322,8 +1366,21 @@ function getArchivedGamesHistory() {
         status: archiveHistoryString_(snapshot.Status),
         mode: archiveHistoryString_(snapshot.Mode),
         archivedAt: snapshot.ArchivedAt || snapshot.VerifiedAt || "",
-        archiveId: archiveHistoryString_(snapshot.ArchiveId)
+        verifiedAt: snapshot.VerifiedAt || "",
+        archiveId: archiveHistoryString_(snapshot.ArchiveId),
+        archiveSpreadsheetUrl: archiveHistoryString_(
+          snapshot.ArchiveSpreadsheetUrl
+        ),
+        current: archiveHistoryManifestCurrent_(snapshot),
+        counts: {
+          questions: counts.Questions ? Number(counts.Questions.count || 0) : 0,
+          options: counts.QuestionOptions ? Number(counts.QuestionOptions.count || 0) : 0,
+          results: counts.CategoryResults ? Number(counts.CategoryResults.count || 0) : 0,
+          picks: counts.Picks ? Number(counts.Picks.count || 0) : 0,
+          bets: counts.Bets ? Number(counts.Bets.count || 0) : 0
+        }
       };
     })
   };
 }
+

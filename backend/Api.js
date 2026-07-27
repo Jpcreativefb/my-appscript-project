@@ -204,6 +204,7 @@ function doGet(e) {
       "adminSetupUniversalQuestionSystem",
       "adminSetupNormalizedQuestionStorage",
       "adminGetStorageHealth",
+      "adminGetArchiveDashboard",
       "adminArchiveGameData",
 
       "adminCreateSportsWager",
@@ -1761,6 +1762,15 @@ if (action === "compareUserPicks") {
 
     if (action === "getUserProfileHistory") {
 
+      const historySession = validateSessionToken(params.token || "");
+
+      if (!historySession || historySession.success !== true) {
+        return json({
+          success: false,
+          error: "Valid session required for archived profile history."
+        });
+      }
+
       return json(
         getUserProfileHistory(
           params.username,
@@ -1772,6 +1782,15 @@ if (action === "compareUserPicks") {
 
     if (action === "getArchivedGameHistory") {
 
+      const archiveGameSession = validateSessionToken(params.token || "");
+
+      if (!archiveGameSession || archiveGameSession.success !== true) {
+        return json({
+          success: false,
+          error: "Valid session required for archived game history."
+        });
+      }
+
       return json(
         getArchivedGameHistory(
           params.gameId || "",
@@ -1782,6 +1801,15 @@ if (action === "compareUserPicks") {
     }
 
     if (action === "getArchivedGamesHistory") {
+
+      const archiveListSession = validateSessionToken(params.token || "");
+
+      if (!archiveListSession || archiveListSession.success !== true) {
+        return json({
+          success: false,
+          error: "Valid session required for archived games."
+        });
+      }
 
       return json(
         getArchivedGamesHistory()
@@ -2115,6 +2143,16 @@ if (action === "compareUserPicks") {
           token: params.token,
           gameId: params.gameId || gameId || ""
         })
+      );
+
+    }
+
+    if (action === "adminGetArchiveDashboard") {
+
+      requireAdminFromToken_(params.token || "");
+
+      return json(
+        normalizedStorageGetArchiveDashboard_()
       );
 
     }

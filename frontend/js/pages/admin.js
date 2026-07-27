@@ -520,8 +520,22 @@ function adminEnhanceMainAdminSections() {
 
 async function renderAdminGamesPanel() {
 
-  const res =
-    await apiAdminGetGames();
+  const responses = await Promise.all([
+    apiAdminGetGames(),
+    typeof apiAdminGetArchiveDashboard === "function"
+      ? apiAdminGetArchiveDashboard().catch(function() {
+          return { success: false, games: [] };
+        })
+      : Promise.resolve({ success: false, games: [] })
+  ]);
+
+  const res = responses[0];
+  const archiveDashboard = responses[1] || { games: [] };
+
+  APP_STATE.adminArchiveDashboard = {};
+  (archiveDashboard.games || []).forEach(function(item) {
+    APP_STATE.adminArchiveDashboard[String(item.gameId || "")] = item;
+  });
 
   if (
     !res ||
@@ -565,12 +579,20 @@ async function renderAdminGamesPanel() {
           </div>
         </div>
 
-        <button
-          class="admin-small-button secondary"
-          onclick="navigate('admin')"
-        >
-          Back to Admin
-        </button>
+        <div class="admin-header-actions">
+          <button
+            class="admin-small-button secondary"
+            onclick="navigate('history')"
+          >
+            Archived Games
+          </button>
+          <button
+            class="admin-small-button secondary"
+            onclick="navigate('admin')"
+          >
+            Back to Admin
+          </button>
+        </div>
 
       </div>
 
@@ -1097,6 +1119,33 @@ function renderAdminCheckboxWithHelp_(name, label, checked, helpText) {
   `;
 }
 
+function adminArchiveBadgeForGame_(gameId) {
+  const map = APP_STATE.adminArchiveDashboard || {};
+  const item = map[String(gameId || "")] || null;
+
+  if (!item) {
+    return `
+      <span class="admin-archive-status-badge is-neutral">
+        Archive unchecked
+      </span>
+    `;
+  }
+
+  const code = String(item.code || "NOT_ARCHIVED").toLowerCase();
+  const verifiedAt = item.verifiedAt
+    ? ` title="Verified ${escapeHtml_(item.verifiedAt)}"`
+    : "";
+
+  return `
+    <span
+      class="admin-archive-status-badge is-${escapeHtml_(code)}"
+      ${verifiedAt}
+    >
+      ${escapeHtml_(item.label || "Not archived")}
+    </span>
+  `;
+}
+
 function renderAdminGameForm(
   game,
   gameTypes,
@@ -1196,7 +1245,10 @@ function renderAdminGameForm(
           <h3>${title}</h3>
           <div class="admin-sub">${subtitle}</div>
         </div>
-        <span class="admin-collapse-icon">▾</span>
+        <div class="admin-game-summary-actions">
+          ${isNew ? "" : adminArchiveBadgeForGame_(rawGameId)}
+          <span class="admin-collapse-icon">▾</span>
+        </div>
       </summary>
 
       <div class="admin-collapsible-body">

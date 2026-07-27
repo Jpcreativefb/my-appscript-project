@@ -136,6 +136,7 @@ function renderStandardLeaderboardPage_(gameId, rows, leagueId) {
       </div>
 
       ${renderCompareModalShell_()}
+      ${renderCareerProfileModalShell_()}
 
     </div>
   `;
@@ -556,15 +557,23 @@ function renderLeaderboardUser_(row) {
     row.profileColor ||
     "";
 
+  const username = String(row.username || row.user || "").trim();
+
   return `
-    <div class="leaderboard-user">
+    <button
+      class="leaderboard-user leaderboard-user-profile-button"
+      type="button"
+      ${username ? `onclick="openLeaderboardCareerProfile_('${escapeLeaderboardJs_(username)}')"` : "disabled"}
+      aria-label="View career history for ${escapeLeaderboardAttr_(displayName)}"
+    >
       ${renderLeaderboardAvatar_(avatar, color)}
       <div class="leaderboard-user-text">
         <h2 class="leaderboard-name">
           ${escapeHtml(displayName)}
         </h2>
+        ${username ? `<span class="leaderboard-career-link">Career stats</span>` : ""}
       </div>
-    </div>
+    </button>
   `;
 
 }
@@ -652,6 +661,166 @@ function escapeLeaderboardAttr_(value) {
 
 }
 
+function escapeLeaderboardJs_(value) {
+
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, "")
+    .replace(/\n/g, "\\n");
+
+}
+
+
+/* ======================
+   PUBLIC CAREER HISTORY MODAL
+====================== */
+
+function renderCareerProfileModalShell_() {
+
+  return `
+    <div
+      id="careerProfileModal"
+      class="compare-picks-modal hidden"
+      onclick="handleCareerProfileBackdrop_(event)"
+    >
+      <div
+        class="compare-picks-panel career-profile-modal-card"
+        onclick="event.stopPropagation()"
+      >
+        <div id="careerProfileContent" class="compare-picks-content"></div>
+      </div>
+    </div>
+  `;
+
+}
+
+async function openLeaderboardCareerProfile_(username) {
+
+  username = String(username || "").trim();
+  const modal = document.getElementById("careerProfileModal");
+  const content = document.getElementById("careerProfileContent");
+
+  if (!username || !modal || !content) {
+    return;
+  }
+
+  modal.classList.remove("hidden");
+  document.body.classList.add("compare-modal-open");
+  content.innerHTML = `
+    <div class="compare-picks-loading">
+      Loading career history…
+    </div>
+  `;
+
+  let response;
+
+  try {
+    response = await apiGetUserProfileHistory(username, "");
+  } catch (err) {
+    response = {
+      success: false,
+      message: err && err.message ? err.message : String(err)
+    };
+  }
+
+  if (!response || response.success === false) {
+    content.innerHTML = `
+      <div class="compare-picks-header">
+        <div><h2>Career History</h2></div>
+        <button class="compare-close-btn" type="button" onclick="closeLeaderboardCareerProfile_()">×</button>
+      </div>
+      <div class="compare-empty">
+        ${escapeHtml(response && (response.message || response.error) || "Career history could not be loaded.")}
+      </div>
+    `;
+    return;
+  }
+
+  content.innerHTML = renderLeaderboardCareerProfile_(response);
+
+}
+
+function renderLeaderboardCareerProfile_(response) {
+
+  const summary = response.summary || {};
+  const games = Array.isArray(summary.games)
+    ? summary.games
+    : (Array.isArray(response.games) ? response.games : []);
+  const facts = Array.isArray(summary.funFacts) ? summary.funFacts : [];
+  const username = response.username || summary.username || "Player";
+
+  return `
+    <div class="compare-picks-header">
+      <div>
+        <h2>${escapeHtml(username)} · Career History</h2>
+        <p>Verified read-only results from archived games.</p>
+      </div>
+      <button class="compare-close-btn" type="button" onclick="closeLeaderboardCareerProfile_()">×</button>
+    </div>
+
+    <div class="career-profile-stats">
+      ${renderCareerProfileStat_(summary.archivedGames || 0, "Games")}
+      ${renderCareerProfileStat_((summary.accuracy || 0) + "%", "Accuracy")}
+      ${renderCareerProfileStat_(summary.firstPlaceFinishes || 0, "Wins")}
+      ${renderCareerProfileStat_(summary.longestCorrectStreak || 0, "Best streak")}
+    </div>
+
+    ${facts.length ? `
+      <h3>Fun Facts</h3>
+      <div class="career-profile-facts">
+        ${facts.map(function(fact) {
+          return `<div>• ${escapeHtml(fact)}</div>`;
+        }).join("")}
+      </div>
+    ` : ""}
+
+    <h3>Archived Games</h3>
+    <div class="career-profile-games">
+      ${games.length ? games.slice(0, 12).map(function(game) {
+        return `
+          <div class="career-profile-game">
+            <span>
+              <strong>${escapeHtml(game.name || game.gameId || "Archived Game")}</strong>
+              <small> ${escapeHtml(game.year || "")}</small>
+            </span>
+            <span>#${Number(game.rank || 0)} · ${Number(game.accuracy || 0)}%</span>
+          </div>
+        `;
+      }).join("") : `<div class="compare-empty">No archived game history yet.</div>`}
+    </div>
+  `;
+
+}
+
+function renderCareerProfileStat_(value, label) {
+
+  return `
+    <div class="career-profile-stat">
+      <strong>${escapeHtml(value)}</strong>
+      <span>${escapeHtml(label)}</span>
+    </div>
+  `;
+
+}
+
+function closeLeaderboardCareerProfile_() {
+
+  const modal = document.getElementById("careerProfileModal");
+  if (modal) {
+    modal.classList.add("hidden");
+  }
+  document.body.classList.remove("compare-modal-open");
+
+}
+
+function handleCareerProfileBackdrop_(event) {
+
+  if (event && event.target && event.target.id === "careerProfileModal") {
+    closeLeaderboardCareerProfile_();
+  }
+
+}
 
 /* ======================
    COMPARE PICK + WAGER MODAL

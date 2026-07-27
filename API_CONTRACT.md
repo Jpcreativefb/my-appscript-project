@@ -652,3 +652,40 @@ Add admin-only endpoints
 Add stronger auth/session token validation
 Add API versioning
 ```
+---
+
+## Archived History and Production Archive Endpoints (v2.1.0)
+
+All archived-history endpoints require a valid session token.
+
+### Get Archived Games
+
+```txt
+?action=getArchivedGamesHistory&token=SESSION_TOKEN
+```
+
+Returns the current verified archive snapshot for each game, including lifecycle status, verification time, and entity counts.
+
+### Get Archived Game History
+
+```txt
+?action=getArchivedGameHistory&gameId=GAME_ID&username=USERNAME&token=SESSION_TOKEN
+```
+
+Returns read-only archived leaderboards, wagers, results, and the selected user's historical picks.
+
+### Get User Career History
+
+```txt
+?action=getUserProfileHistory&username=USERNAME&token=SESSION_TOKEN
+```
+
+Returns career totals, archived game summaries, accuracy, streaks, finishes, wager results, and fun facts.
+
+### Admin Archive Dashboard
+
+```txt
+?action=adminGetArchiveDashboard&username=ADMIN&token=ADMIN_TOKEN
+```
+
+Admin-only. Returns one archive-status item per configured game. The dashboard reads the Games and ArchiveManifest sheets once per request and normalizes old manifest rows so exactly one verified lifecycle record is marked current for each game.

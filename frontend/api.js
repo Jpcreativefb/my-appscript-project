@@ -34,6 +34,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminGetArchiveDashboard",
     "adminArchiveGameData",
     "adminCloneCategory",
     "adminBulkCreateNominees",
@@ -602,25 +603,35 @@ async function apiGetUserProfile(username, gameId) {
 
 async function apiGetUserProfileHistory(username, gameId) {
 
+  const session = getSession();
+
   return api("getUserProfileHistory", {
     username,
-    gameId: gameId || ""
+    gameId: gameId || "",
+    token: session && session.token ? session.token : ""
   });
 
 }
 
 async function apiGetArchivedGameHistory(gameId, username) {
 
+  const session = getSession();
+
   return api("getArchivedGameHistory", {
     gameId,
-    username: username || ""
+    username: username || "",
+    token: session && session.token ? session.token : ""
   });
 
 }
 
 async function apiGetArchivedGamesHistory() {
 
-  return api("getArchivedGamesHistory", {});
+  const session = getSession();
+
+  return api("getArchivedGamesHistory", {
+    token: session && session.token ? session.token : ""
+  });
 
 }
 
@@ -1329,6 +1340,17 @@ async function apiAdminArchiveGameDataPhaseWithRetry_(
   }
 
   return lastResult;
+
+}
+
+async function apiAdminGetArchiveDashboard() {
+
+  const session = getSession() || {};
+
+  return api("adminGetArchiveDashboard", {
+    username: session.username || "",
+    token: session.token || ""
+  });
 
 }
 

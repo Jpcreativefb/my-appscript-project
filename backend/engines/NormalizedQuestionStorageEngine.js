@@ -117,7 +117,11 @@ const ARCHIVE_MANIFEST_HEADERS = [
   "RemovedCountsJSON",
   "RestoredAt",
   "RestoreVerificationJSON",
-  "Notes"
+  "Notes",
+  "Current",
+  "SupersededByArchiveId",
+  "SupersededAt",
+  "LifecycleVersion"
 ];
 
 const STORAGE_MIGRATION_LOG_HEADERS = [
@@ -2640,6 +2644,49 @@ function normalizedStorageGetManifestRecords_(gameId) {
   return records;
 }
 
+function normalizedStorageGetManifestRecordsByGame_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(
+    ARCHIVE_MANIFEST_SHEET
+  );
+  const byGame = {};
+
+  if (!sh || sh.getLastRow() <= 1) {
+    return byGame;
+  }
+
+  const values = sh.getDataRange().getValues();
+  const headers = values[0].map(normalizedStorageString_);
+
+  for (let i = 1; i < values.length; i++) {
+    const object = normalizedStorageLegacyRowObject_(headers, values[i]);
+    const gameId = normalizedStorageString_(object.GameId);
+
+    if (!gameId) {
+      continue;
+    }
+
+    object._rowNumber = i + 1;
+    object._entityCounts = normalizedStorageSafeJsonObject_(
+      object.EntityCountsJSON
+    );
+    object._verificationErrors = normalizedStorageSafeJsonParse_(
+      object.VerificationErrorsJSON,
+      []
+    ) || [];
+    object._readiness = normalizedStorageSafeJsonObject_(
+      object.ReadinessJSON
+    );
+
+    if (!byGame[gameId]) {
+      byGame[gameId] = [];
+    }
+
+    byGame[gameId].push(object);
+  }
+
+  return byGame;
+}
+
 function normalizedStorageManifestRecordIsVerified_(record) {
   if (!record || !record._entityCounts) {
     return false;
@@ -2665,6 +2712,18 @@ function normalizedStorageManifestRecordIsVerified_(record) {
   );
 }
 
+function normalizedStorageManifestRecordIsCurrent_(record) {
+  if (!record) {
+    return false;
+  }
+
+  const raw = normalizedStorageString_(record.Current);
+
+  // Blank means legacy/current until a newer production lifecycle row
+  // explicitly supersedes it.
+  return raw === "" || normalizedStorageBool_(record.Current, false);
+}
+
 function normalizedStorageLatestManifestRecord_(gameId, statuses) {
   const allowed = {};
   (statuses || []).forEach(function(status) {
@@ -2673,11 +2732,13 @@ function normalizedStorageLatestManifestRecord_(gameId, statuses) {
 
   const records = normalizedStorageGetManifestRecords_(gameId);
 
+  // Prefer the explicitly current lifecycle record.
   for (let i = records.length - 1; i >= 0; i--) {
     const record = records[i];
     const status = normalizedStorageString_(record.Status);
 
     if (
+      normalizedStorageManifestRecordIsCurrent_(record) &&
       (!statuses || !statuses.length || allowed[status]) &&
       normalizedStorageManifestRecordIsVerified_(record) &&
       normalizedStorageString_(record.ArchiveSpreadsheetId)
@@ -2686,7 +2747,82 @@ function normalizedStorageLatestManifestRecord_(gameId, statuses) {
     }
   }
 
+  // Backward compatibility for pre-v2.1.0 manifests.
+  for (let j = records.length - 1; j >= 0; j--) {
+    const legacyRecord = records[j];
+    const legacyStatus = normalizedStorageString_(legacyRecord.Status);
+
+    if (
+      (!statuses || !statuses.length || allowed[legacyStatus]) &&
+      normalizedStorageManifestRecordIsVerified_(legacyRecord) &&
+      normalizedStorageString_(legacyRecord.ArchiveSpreadsheetId)
+    ) {
+      return legacyRecord;
+    }
+  }
+
   return null;
+}
+
+function normalizedStorageSupersedePreviousManifestRecords_(
+  manifestSheet,
+  gameId,
+  newArchiveId,
+  supersededAt
+) {
+  if (!manifestSheet || manifestSheet.getLastRow() <= 1) {
+    return 0;
+  }
+
+  const headers = normalizedStorageGetHeaders_(manifestSheet);
+  const col = normalizedStorageHeaderMap_(headers);
+
+  if (
+    col.GameId === undefined ||
+    col.ArchiveId === undefined ||
+    col.Status === undefined ||
+    col.Current === undefined
+  ) {
+    return 0;
+  }
+
+  const rowCount = manifestSheet.getLastRow() - 1;
+  const values = manifestSheet.getRange(2, 1, rowCount, headers.length)
+    .getValues();
+  let changed = 0;
+
+  values.forEach(function(row) {
+    const rowGameId = normalizedStorageString_(row[col.GameId]);
+    const rowArchiveId = normalizedStorageString_(row[col.ArchiveId]);
+    const status = normalizedStorageString_(row[col.Status]);
+
+    if (
+      rowGameId !== gameId ||
+      rowArchiveId === newArchiveId ||
+      status.indexOf("VERIFIED_") !== 0
+    ) {
+      return;
+    }
+
+    row[col.Current] = false;
+
+    if (col.SupersededByArchiveId !== undefined) {
+      row[col.SupersededByArchiveId] = newArchiveId;
+    }
+
+    if (col.SupersededAt !== undefined) {
+      row[col.SupersededAt] = supersededAt;
+    }
+
+    changed++;
+  });
+
+  if (changed) {
+    manifestSheet.getRange(2, 1, rowCount, headers.length)
+      .setValues(values);
+  }
+
+  return changed;
 }
 
 function normalizedStorageGameCompletionState_(gameId) {
@@ -2992,6 +3128,212 @@ function normalizedStorageGetArchiveStatus_(gameId) {
     latestRestore: latestRestore,
     moveReadiness: moveReadiness,
     restoreReadiness: restore
+  };
+}
+
+function normalizedStorageCurrentGamesHashMap_() {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(GAMES_SHEET);
+  const map = {};
+
+  if (!sheet || sheet.getLastRow() <= 1) {
+    return map;
+  }
+
+  const headers = normalizedStorageGetHeaders_(sheet);
+  const col = normalizedStorageHeaderMap_(headers);
+
+  if (col.GameId === undefined) {
+    return map;
+  }
+
+  const rows = sheet.getRange(
+    2,
+    1,
+    sheet.getLastRow() - 1,
+    headers.length
+  ).getValues();
+
+  rows.forEach(function(row) {
+    const gameId = normalizedStorageString_(row[col.GameId]);
+
+    if (gameId) {
+      map[gameId] = normalizedStorageArchiveHash_(headers, [row]);
+    }
+  });
+
+  return map;
+}
+
+function normalizedStorageNormalizeManifestLifecycle_() {
+  const manifestSheet = normalizedStorageEnsureSheet_(
+    ARCHIVE_MANIFEST_SHEET,
+    ARCHIVE_MANIFEST_HEADERS
+  );
+
+  if (!manifestSheet || manifestSheet.getLastRow() <= 1) {
+    return { updated: 0, games: 0 };
+  }
+
+  const headers = normalizedStorageGetHeaders_(manifestSheet);
+  const col = normalizedStorageHeaderMap_(headers);
+  const rowCount = manifestSheet.getLastRow() - 1;
+  const values = manifestSheet.getRange(2, 1, rowCount, headers.length)
+    .getValues();
+  const latestVerifiedByGame = {};
+
+  values.forEach(function(row, index) {
+    const gameId = normalizedStorageString_(row[col.GameId]);
+    const status = normalizedStorageString_(row[col.Status]);
+    const errors = normalizedStorageSafeJsonParse_(
+      row[col.VerificationErrorsJSON],
+      []
+    ) || [];
+
+    if (
+      gameId &&
+      status.indexOf("VERIFIED_") === 0 &&
+      errors.length === 0
+    ) {
+      latestVerifiedByGame[gameId] = index;
+    }
+  });
+
+  let updated = 0;
+  const now = new Date();
+
+  values.forEach(function(row, index) {
+    const gameId = normalizedStorageString_(row[col.GameId]);
+    const status = normalizedStorageString_(row[col.Status]);
+    const latestIndex = latestVerifiedByGame[gameId];
+    const shouldBeCurrent =
+      status.indexOf("VERIFIED_") === 0 &&
+      latestIndex === index;
+    const existingCurrent = normalizedStorageString_(row[col.Current]);
+    const existingBool = existingCurrent === ""
+      ? null
+      : normalizedStorageBool_(row[col.Current], false);
+
+    if (existingBool !== shouldBeCurrent) {
+      row[col.Current] = shouldBeCurrent;
+      updated++;
+    }
+
+    if (!shouldBeCurrent && status.indexOf("VERIFIED_") === 0 && latestIndex !== undefined) {
+      const currentArchiveId = normalizedStorageString_(
+        values[latestIndex][col.ArchiveId]
+      );
+
+      if (col.SupersededByArchiveId !== undefined && !row[col.SupersededByArchiveId]) {
+        row[col.SupersededByArchiveId] = currentArchiveId;
+      }
+
+      if (col.SupersededAt !== undefined && !row[col.SupersededAt]) {
+        row[col.SupersededAt] = now;
+      }
+    }
+
+    if (col.LifecycleVersion !== undefined && !row[col.LifecycleVersion]) {
+      row[col.LifecycleVersion] = "2.1.0";
+    }
+  });
+
+  if (updated) {
+    manifestSheet.getRange(2, 1, rowCount, headers.length)
+      .setValues(values);
+  }
+
+  return {
+    updated: updated,
+    games: Object.keys(latestVerifiedByGame).length
+  };
+}
+
+function normalizedStorageGetArchiveDashboard_() {
+  const lifecycle = normalizedStorageNormalizeManifestLifecycle_();
+  const games = typeof getGames === "function"
+    ? (getGames() || [])
+    : [];
+  const manifestByGame = normalizedStorageGetManifestRecordsByGame_();
+  const gamesHashMap = normalizedStorageCurrentGamesHashMap_();
+  const items = games.map(function(game) {
+    const gameId = normalizedStorageString_(game.gameId || game.GameId);
+    const records = manifestByGame[gameId] || [];
+    let latest = null;
+
+    for (let i = records.length - 1; i >= 0; i--) {
+      if (
+        normalizedStorageManifestRecordIsCurrent_(records[i]) &&
+        normalizedStorageManifestRecordIsVerified_(records[i])
+      ) {
+        latest = records[i];
+        break;
+      }
+    }
+
+    if (!latest) {
+      for (let j = records.length - 1; j >= 0; j--) {
+        if (normalizedStorageManifestRecordIsVerified_(records[j])) {
+          latest = records[j];
+          break;
+        }
+      }
+    }
+
+    const latestStatus = latest
+      ? normalizedStorageString_(latest.Status)
+      : "";
+    const expectedGamesHash = latest && latest._entityCounts.Games
+      ? normalizedStorageString_(latest._entityCounts.Games.sourceHash)
+      : "";
+    let currentGamesHash = "";
+    let copyFresh = false;
+
+    if (latestStatus === "VERIFIED_COPY" && expectedGamesHash) {
+      try {
+        currentGamesHash = normalizedStorageString_(gamesHashMap[gameId]);
+        copyFresh = currentGamesHash === expectedGamesHash;
+      } catch (err) {
+        copyFresh = false;
+      }
+    }
+
+    let code = "NOT_ARCHIVED";
+    let label = "Not archived";
+
+    if (game.archived === true || latestStatus === "VERIFIED_MOVE") {
+      code = "ARCHIVED";
+      label = "Archived";
+    } else if (latestStatus === "VERIFIED_RESTORE") {
+      code = "RESTORED";
+      label = "Restored";
+    } else if (latestStatus === "VERIFIED_COPY") {
+      code = copyFresh ? "VERIFIED_COPY" : "COPY_OUTDATED";
+      label = copyFresh ? "Verified copy" : "Copy outdated";
+    }
+
+    return {
+      gameId: gameId,
+      code: code,
+      label: label,
+      currentStatus: latestStatus,
+      archiveId: latest ? normalizedStorageString_(latest.ArchiveId) : "",
+      archiveSpreadsheetUrl: latest
+        ? normalizedStorageString_(latest.ArchiveSpreadsheetUrl)
+        : "",
+      verifiedAt: latest ? (latest.VerifiedAt || "") : "",
+      copyFresh: copyFresh,
+      archived: game.archived === true,
+      active: game.active === true,
+      resultsFinalized: game.resultsFinalized === true,
+      historyCount: records.length
+    };
+  });
+
+  return {
+    success: true,
+    generatedAt: new Date().toISOString(),
+    lifecycle: lifecycle,
+    games: items
   };
 }
 
@@ -4017,6 +4359,13 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
           )
         : "Archive verification failed; active data was not removed."
     );
+    normalizedStorageSupersedePreviousManifestRecords_(
+      manifestSheet,
+      job.gameId,
+      job.archiveRecordId,
+      now
+    );
+
     const manifestObject = {
       ArchiveId: job.archiveRecordId,
       GameId: job.gameId,
@@ -4037,7 +4386,11 @@ function normalizedStorageFinalizeArchiveJob_(payload) {
       RestoreVerificationJSON: JSON.stringify(
         job.mode === "RESTORE" ? counts : {}
       ),
-      Notes: notes
+      Notes: notes,
+      Current: true,
+      SupersededByArchiveId: "",
+      SupersededAt: "",
+      LifecycleVersion: "2.1.0"
     };
     const manifestRow = normalizedStorageManifestRowByArchiveId_(
       manifestSheet,

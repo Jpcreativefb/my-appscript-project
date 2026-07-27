@@ -112,6 +112,9 @@ async function renderProfilePage() {
             Edit your default profile or create a profile just for one game.
           </p>
         </div>
+        <button class="button secondary" type="button" onclick="navigate('history')">
+          Archived Games
+        </button>
       </div>
 
       <div class="profile-card-preview">

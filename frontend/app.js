@@ -698,6 +698,17 @@ async function renderPage(page) {
 
       break; 
 
+    case "history":
+
+      if (typeof renderArchiveHistoryPage !== "function") {
+        throw new Error("Archive history page script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderArchiveHistoryPage();
+
+      break;
+
     case "profile":
 
       if (typeof renderProfilePage !== "function") {

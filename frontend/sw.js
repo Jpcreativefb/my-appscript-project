@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v208-archive-history";
+const AWARDS_CACHE = "awards-app-v210-production-archive";
 
 const APP_SHELL = [
   "./",
@@ -13,6 +13,7 @@ const APP_SHELL = [
   "./css/picks.css",
   "./css/betting.css",
   "./css/profile.css",
+  "./css/archive-history.css",
   "./css/league-admin.css",
   "./js/config.js",
   "./js/api.js",
@@ -28,7 +29,8 @@ const APP_SHELL = [
   "./js/pages/admin.js",
   "./js/pages/adminGames.js",
   "./js/pages/adminGameSetup.js",
-  "./js/pages/profile.js"
+  "./js/pages/profile.js",
+  "./js/pages/archiveHistory.js"
 ];
 
 self.addEventListener("install", event => {
