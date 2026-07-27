@@ -223,6 +223,9 @@ function doGet(e) {
 
       "adminSetupSportsControls",
       "adminGetSportsControlDashboard",
+      "adminGetSportsPlayerStatus",
+      "adminSyncSportsPlayers",
+      "adminRefreshSportsPlayerGameStats",
 
       "adminGetSportsLeagueSettings",
       "adminUpdateSportsLeagueSetting",
@@ -2589,6 +2592,69 @@ if (action === "adminGetSportsControlDashboard") {
 
       token:
         params.token
+    })
+  );
+
+}
+
+if (action === "adminGetSportsPlayerStatus") {
+
+  return json(
+    apiAdminGetSportsPlayerStatus({
+      username:
+        params.username,
+
+      token:
+        params.token
+    })
+  );
+
+}
+
+if (action === "adminSyncSportsPlayers") {
+
+  return json(
+    apiAdminSyncSportsPlayers({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league,
+
+      sport:
+        params.sport
+    })
+  );
+
+}
+
+if (action === "adminRefreshSportsPlayerGameStats") {
+
+  return json(
+    apiAdminRefreshSportsPlayerGameStats({
+      username:
+        params.username,
+
+      token:
+        params.token,
+
+      league:
+        params.league,
+
+      sport:
+        params.sport,
+
+      daysBack:
+        params.daysBack,
+
+      daysForward:
+        params.daysForward,
+
+      maxGames:
+        params.maxGames
     })
   );
 

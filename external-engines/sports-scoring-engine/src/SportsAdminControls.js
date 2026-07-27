@@ -321,13 +321,14 @@ function setupSportsAdminControlSystem() {
   setupSportsOddsUsageSheet_();
   seedSportsOddsAdminSettingsFromSportsSettings_();
   cleanSportsOddsSettingsForUserFriendlyAdmin_();
+  if (typeof setupSportsPlayersSystem === "function") setupSportsPlayersSystem();
 
   return {
     success: true,
     version: "12",
     message: "Sports admin control system v12 setup complete",
     upgrade: upgrade,
-    sheets: [SPORTS_ODDS_SETTINGS_SHEET, SPORTS_ODDS_USAGE_SHEET, SPORTS_SCORES_ARCHIVE_SHEET, SPORTS_SNAPSHOTS_ARCHIVE_SHEET]
+    sheets: [SPORTS_ODDS_SETTINGS_SHEET, SPORTS_ODDS_USAGE_SHEET, SPORTS_SCORES_ARCHIVE_SHEET, SPORTS_SNAPSHOTS_ARCHIVE_SHEET, "SportsPlayers", "SportsPlayerGameStats"]
   };
 }
 
@@ -3121,16 +3122,21 @@ function apiGetSportsAdminDashboard_(params) {
 
   return {
     success: true,
-    version: "14-production",
+    version: "15-players-v1",
     checkedAt: new Date(),
     smartAutomation: getSmartSportsAutomationStatus_(),
     sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
     odds: apiGetSportsOddsAdminSettings_(params),
     archive: getSportsArchiveStatus_(),
+    players: typeof getSportsPlayersStatus_ === "function" ? getSportsPlayersStatus_() : null,
     engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
     scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
     scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],
     seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],
     archiveTriggers: typeof checkSportsArchiveTriggers === "function" ? checkSportsArchiveTriggers() : []
   };
+}
+
+function repairSportsScoreDisplayAdmin() {
+  return repairSportsScoreDisplayAdmin_();
 }

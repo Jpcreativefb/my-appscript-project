@@ -1,0 +1,25 @@
+Storage Performance v2.1.2 Test Report
+======================================
+
+PASS archive_history_tests.js
+PASS archive_move_restore_tests.js
+PASS archive_production_readiness_tests.js
+PASS leaderboard_modal_interactions_tests.js
+PASS result_auto_lock_tests.js
+PASS storage_foundation_tests.js
+
+PASS JavaScript syntax validation: 88 files
+
+Targeted interaction coverage:
+- Career Stats click delegation
+- Compare click delegation
+- Career dialog created under document.body
+- Compare dialog created under document.body
+- Career dialog visible while loading
+- Career history content rendered
+- Career dialog closes cleanly
+- Compare content rendered
+- Missing/partial dialog shells are replaceable
+- v2.1.2 service-worker cache and leaderboard CSS pre-cache present
+
+Live Cloudflare/browser verification remains required after deployment.

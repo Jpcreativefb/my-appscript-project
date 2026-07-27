@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v212-career-panel-portal-fix";
+const AWARDS_CACHE = "awards-app-v213-sports-player-controls";
 
 const APP_SHELL = [
   "./",

@@ -3361,6 +3361,12 @@ function adminSportsInfoText_(
       "Season controls decide whether this league is active and which calendar windows count as preseason, regular season, postseason, tournament, or bowls.",
     scoringSection:
       "Score polling controls how often the engine checks ESPN before games, during live games, and after final games.",
+    playersSection:
+      "Players syncs ESPN rosters into SportsPlayers and refreshes current-game box-score statistics into SportsPlayerGameStats. Player support is validated for MLB and NFL in v1.",
+    syncPlayers:
+      "Syncs the complete current ESPN roster for this league, including player IDs, teams, positions, jersey numbers, headshots, and active status.",
+    refreshPlayerStats:
+      "Refreshes player box-score statistics for current, recent, and final games around today. Run score refresh first when a game is missing from SportsScores.",
     snapshotsSection:
       "Snapshots save quarter/period/final checkpoints. Leave this off for simpler moneyline-only wagers; turn it on when you want history or period-style betting later.",
     oddsSection:
@@ -4512,6 +4518,46 @@ function adminSportsSetArchiveStatus_(
 
 }
 
+function adminSportsPlayerStatusId_(league) {
+
+  return "sportsPlayerRunStatus_" +
+    adminSportsKey_(league || "global");
+
+}
+
+function adminSportsSetPlayerStatus_(
+  league,
+  message,
+  isError
+) {
+
+  const el =
+    document.getElementById(
+      adminSportsPlayerStatusId_(league)
+    );
+
+  if (!el) {
+    adminSportsSetLeagueStatus_(
+      league,
+      message,
+      isError
+    );
+    return;
+  }
+
+  el.textContent =
+    message || "";
+
+  el.hidden =
+    !message;
+
+  el.classList.toggle(
+    "error-card",
+    !!isError
+  );
+
+}
+
 function adminSportsSetGlobalControlsStatus_(
   message,
   isError
@@ -4782,7 +4828,8 @@ function adminRenderSportsControlDashboard_(
       sportsSettings,
       data.leagueHealth || {},
       oddsSettings,
-      openLeagueKeys || []
+      openLeagueKeys || [],
+      data.players || {}
     )}
   `;
 
@@ -5870,7 +5917,8 @@ function adminRenderScoreLeagueControls_(
   leagues,
   leagueHealth,
   oddsSettings,
-  openLeagueKeys
+  openLeagueKeys,
+  playersStatus
 ) {
 
   leagueHealth =
@@ -5881,6 +5929,9 @@ function adminRenderScoreLeagueControls_(
 
   openLeagueKeys =
     openLeagueKeys || [];
+
+  playersStatus =
+    playersStatus || {};
 
   const healthByLeague = {};
 
@@ -5900,6 +5951,19 @@ function adminRenderScoreLeagueControls_(
 
     if (key) {
       oddsByLeague[key] = item;
+    }
+  });
+
+  const playersByLeague = {};
+
+  (playersStatus.leagues || []).forEach(function(item) {
+    const key =
+      adminSportsKey_(
+        item.league || item.League
+      );
+
+    if (key) {
+      playersByLeague[key] = item;
     }
   });
 
@@ -5929,13 +5993,15 @@ function adminRenderScoreLeagueControls_(
           </strong>
 
           <div class="admin-sub">
-            Per-league controls are grouped into Season, Scoring, Snapshots, Odds, and Archive sections for phone-friendly admin use.
+            Per-league controls are grouped into Season, Scoring, Players, Snapshots, Odds, and Archive sections for phone-friendly admin use.
           </div>
 
           <div class="admin-sub">
             Live scores: ${totals.liveScores || 0}
             · Odds rows: ${totals.liveOdds || 0}
             · Snapshots: ${totals.liveSnapshots || 0}
+            · Players: ${playersStatus.playerCount || 0}
+            · Player stat rows: ${playersStatus.statRowCount || 0}
             · Logs: ${totals.logs || 0}
             · Score archive candidates: ${totals.scoreArchiveCandidates || 0}
           </div>
@@ -5976,10 +6042,35 @@ function adminRenderScoreLeagueControls_(
           const oddsUsage =
             oddsByLeague[leagueKey] || {};
 
+          const playerUsage =
+            playersByLeague[leagueKey] || {};
+
+          const playerSupported =
+            ["mlb", "nfl"].indexOf(leagueKey) !== -1;
+
+          const playerCount =
+            Number(playerUsage.playerCount || 0);
+
+          const activePlayerCount =
+            Number(playerUsage.activePlayerCount || 0);
+
+          const playerStatRowCount =
+            Number(playerUsage.statRowCount || 0);
+
+          const lastPlayerUpdated =
+            playerUsage.lastPlayerUpdated || "";
+
+          const lastPlayerStatsUpdated =
+            playerUsage.lastStatsUpdated || "";
+
           const enabled =
             adminSportsBool_(
               league.enabled
             );
+
+          const playerActionsEnabled =
+            playerSupported &&
+            enabled;
 
           const inSeason =
             league.seasonActive === undefined
@@ -6235,6 +6326,48 @@ function adminRenderScoreLeagueControls_(
             </div>
           `;
 
+          const playersBody = `
+            <div class="admin-sub" style="margin-bottom:8px;">
+              ${playerSupported
+                ? `Roster: ${activePlayerCount} active / ${playerCount} total
+                  · Stat rows: ${playerStatRowCount}
+                  · Last roster: ${adminSportsEscape_(lastPlayerUpdated || "Never")}
+                  · Last stats: ${adminSportsEscape_(lastPlayerStatsUpdated || "Never")}
+                  ${playerActionsEnabled ? "" : " · Turn League ON to run player actions."}`
+                : "Player sync is not enabled for this league in v1. MLB and NFL are currently supported."}
+            </div>
+
+            <div
+              id="${adminSportsPlayerStatusId_(leagueCode)}"
+              class="sports-league-save-status"
+              style="margin:0 0 8px;"
+              hidden
+            ></div>
+
+            <div class="sports-league-actions">
+              ${adminSportsActionButton_(
+                "Sync Players",
+                playerActionsEnabled ? "admin-small-button secondary" : "admin-small-button secondary inactive",
+                "adminSyncSportsPlayers('" + leagueCode + "', '" + sport + "')",
+                "syncPlayers",
+                leagueCode,
+                playerActionsEnabled ? controlsDisabled : "disabled"
+              )}
+              ${adminSportsActionButton_(
+                "Refresh Current Game Stats",
+                playerActionsEnabled ? "admin-small-button secondary" : "admin-small-button secondary inactive",
+                "adminRefreshSportsPlayerGameStats('" + leagueCode + "', '" + sport + "')",
+                "refreshPlayerStats",
+                leagueCode,
+                playerActionsEnabled ? controlsDisabled : "disabled"
+              )}
+            </div>
+
+            <div class="admin-sub" style="margin-top:8px;">
+              Refresh Current Game Stats checks games around today that already exist in SportsScores. Run score refresh first when a game is missing.
+            </div>
+          `;
+
           const snapshotsBody = `
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
               ${adminRenderSportsNumberField_("Snapshot days", "sportsSnapshotDays", leagueCode, league.snapshotRetentionDays || league.keepSnapshotsDays || health.keepSnapshotsDays, 14, 1, 365, "snapshotDays", controlsDisabled)}
@@ -6346,6 +6479,8 @@ function adminRenderScoreLeagueControls_(
 
                   <div class="admin-sub">
                     Live: Scores ${health.liveScores || 0}
+                    · Players ${playerCount}
+                    · Player stats ${playerStatRowCount}
                     · Odds rows ${health.liveOdds || 0}
                     · Snapshots ${health.liveSnapshots || 0}
                     · Ready archive ${health.scoreArchiveCandidates || 0}
@@ -6361,11 +6496,14 @@ function adminRenderScoreLeagueControls_(
 
               <div class="admin-sub" style="margin-top:8px;">
                 Last score ${adminSportsEscape_(health.lastScoreRefresh || "") || "Never"}
+                · Last roster ${adminSportsEscape_(lastPlayerUpdated || "") || "Never"}
+                · Last player stats ${adminSportsEscape_(lastPlayerStatsUpdated || "") || "Never"}
                 · Last odds ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "") || "Never"}
               </div>
 
               ${adminSportsSection_("Season", "seasonSection", leagueCode, seasonBody, true)}
               ${adminSportsSection_("Scoring", "scoringSection", leagueCode, scoringBody, false)}
+              ${adminSportsSection_("Players", "playersSection", leagueCode, playersBody, false)}
               ${adminSportsSection_("Snapshots", "snapshotsSection", leagueCode, snapshotsBody, false, snapshotsHeaderControl)}
               ${adminSportsSection_("Odds", "oddsSection", leagueCode, oddsBody, false, oddsHeaderControl)}
               ${adminSportsSection_("Archive", "archiveSection", leagueCode, archiveBody, false, archiveHeaderControl)}
@@ -7733,6 +7871,182 @@ async function adminRemoveSportsSeasonBatchTrigger() {
   );
 
   adminSportsMarkDashboardStale_();
+
+}
+
+async function adminSyncSportsPlayers(
+  league,
+  sport
+) {
+
+  const openLeagueKeys =
+    adminSportsGetOpenLeagueKeys_();
+
+  adminSportsSetPlayerStatus_(
+    league,
+    "Syncing ESPN roster...",
+    false
+  );
+
+  const res =
+    await apiAdminSyncSportsPlayers(
+      league,
+      sport
+    );
+
+  if (!res) {
+    const message =
+      "Player roster sync returned no response.";
+
+    adminSportsSetPlayerStatus_(
+      league,
+      message,
+      true
+    );
+
+    throw new Error(message);
+  }
+
+  if (res.skipped) {
+    adminSportsSetPlayerStatus_(
+      league,
+      res.reason || res.message || "Player roster sync was skipped.",
+      false
+    );
+    return;
+  }
+
+  if (res.success === false && !res.partial) {
+    const message =
+      res.error ||
+      res.message ||
+      "Player roster sync failed.";
+
+    adminSportsSetPlayerStatus_(
+      league,
+      message,
+      true
+    );
+
+    throw new Error(message);
+  }
+
+  adminSportsSetPlayerStatus_(
+    league,
+    (res.partial ? "Partial roster sync complete. " : "Roster sync complete. ") +
+      "Teams " +
+      Number(res.teamsSynced || 0) +
+      "/" +
+      Number(res.teamsFound || 0) +
+      " · players " +
+      Number(res.playersFound || 0) +
+      " · inserted " +
+      Number(res.inserted || 0) +
+      " · updated " +
+      Number(res.updated || 0) +
+      (res.errors && res.errors.length
+        ? " · errors " + res.errors.length
+        : "") +
+      ". Reloading counts...",
+    !!res.partial
+  );
+
+  await adminLoadSportsControls({
+    preserveOpen: true,
+    openLeagueKeys: openLeagueKeys
+  });
+
+}
+
+async function adminRefreshSportsPlayerGameStats(
+  league,
+  sport
+) {
+
+  const openLeagueKeys =
+    adminSportsGetOpenLeagueKeys_();
+
+  adminSportsSetPlayerStatus_(
+    league,
+    "Refreshing current-game player stats...",
+    false
+  );
+
+  const res =
+    await apiAdminRefreshSportsPlayerGameStats(
+      league,
+      sport,
+      {
+        daysBack: 1,
+        daysForward: 1,
+        maxGames: 20
+      }
+    );
+
+  if (!res) {
+    const message =
+      "Player game-stat refresh returned no response.";
+
+    adminSportsSetPlayerStatus_(
+      league,
+      message,
+      true
+    );
+
+    throw new Error(message);
+  }
+
+  if (res.skipped) {
+    adminSportsSetPlayerStatus_(
+      league,
+      res.reason || res.message || "Player game-stat refresh was skipped.",
+      false
+    );
+    return;
+  }
+
+  if (res.success === false && !res.partial) {
+    const message =
+      res.error ||
+      res.message ||
+      "Player game-stat refresh failed.";
+
+    adminSportsSetPlayerStatus_(
+      league,
+      message,
+      true
+    );
+
+    throw new Error(message);
+  }
+
+  const statsWrite =
+    res.statsWrite || {};
+
+  adminSportsSetPlayerStatus_(
+    league,
+    (res.partial ? "Partial player-stat refresh complete. " : "Player stats refreshed. ") +
+      "Games " +
+      Number(res.gamesRefreshed || 0) +
+      "/" +
+      Number(res.gamesFound || 0) +
+      " · stats found " +
+      Number(res.statsFound || 0) +
+      " · inserted " +
+      Number(statsWrite.inserted || 0) +
+      " · updated " +
+      Number(statsWrite.updated || 0) +
+      (res.errors && res.errors.length
+        ? " · errors " + res.errors.length
+        : "") +
+      ". Reloading counts...",
+    !!res.partial
+  );
+
+  await adminLoadSportsControls({
+    preserveOpen: true,
+    openLeagueKeys: openLeagueKeys
+  });
 
 }
 

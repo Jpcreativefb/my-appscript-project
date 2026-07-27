@@ -1,6 +1,6 @@
 /************************************************************
  CLEAN SPLIT v11
- This file was rebuilt from the working v6 baseline and later racing modules.
+ This file was rebuilt from the working v6 baseline and production modules.
  Duplicate patch functions were removed so the project is easier to debug.
 ************************************************************/
 
@@ -20,7 +20,9 @@ const SPORTS_SHEETS = {
   SCORES: "SportsScores",
   SNAPSHOTS: "SportsSnapshots",
   SETTINGS: "SportsSettings",
-  LOGS: "SportsLogs"
+  LOGS: "SportsLogs",
+  PLAYERS: "SportsPlayers",
+  PLAYER_GAME_STATS: "SportsPlayerGameStats"
 };
 
 const SPORTS_HEADERS = {
@@ -114,6 +116,41 @@ const SPORTS_HEADERS = {
     "FunctionName",
     "Message",
     "Details"
+  ],
+
+  SportsPlayers: [
+    "PlayerId",
+    "ESPNPlayerId",
+    "Sport",
+    "League",
+    "TeamId",
+    "Team",
+    "FullName",
+    "ShortName",
+    "Position",
+    "JerseyNumber",
+    "HeadshotUrl",
+    "Active",
+    "LastUpdated",
+    "Source"
+  ],
+
+  SportsPlayerGameStats: [
+    "GameId",
+    "ESPNEventId",
+    "PlayerId",
+    "ESPNPlayerId",
+    "Sport",
+    "League",
+    "TeamId",
+    "PlayerName",
+    "Position",
+    "StatType",
+    "StatValue",
+    "DisplayValue",
+    "Completed",
+    "LastUpdated",
+    "Source"
   ]
 };
 
@@ -244,262 +281,6 @@ function getESPNScoreboardUrl_(sport, league) {
 
 
 /* Removed older duplicate function during v11 cleanup. */
-
-function normalizeESPNTeamEvent_(event, sport, league) {
-  const competition =
-    event.competitions &&
-    event.competitions.length
-      ? event.competitions[0]
-      : {};
-
-  const status =
-    competition.status ||
-    event.status ||
-    {};
-
-  const statusType =
-    status.type || {};
-
-  const competitors =
-    competition.competitors || [];
-
-  const home =
-    competitors.find(function(team) {
-      return team.homeAway === "home";
-    }) || {};
-
-  const away =
-    competitors.find(function(team) {
-      return team.homeAway === "away";
-    }) || {};
-
-  const homeTeam =
-    home.team || {};
-
-  const awayTeam =
-    away.team || {};
-
-  const homeScore =
-    Number(home.score || 0);
-
-  const awayScore =
-    Number(away.score || 0);
-
-  const completed =
-    statusType.completed === true;
-
-  let winner = "";
-
-  if (completed) {
-    if (home.winner === true) {
-      winner =
-        homeTeam.displayName ||
-        homeTeam.shortDisplayName ||
-        homeTeam.name ||
-        "";
-    }
-
-    if (away.winner === true) {
-      winner =
-        awayTeam.displayName ||
-        awayTeam.shortDisplayName ||
-        awayTeam.name ||
-        "";
-    }
-  }
-
-  return {
-    GameId: league + "_" + String(event.id || ""),
-    ESPNEventId: String(event.id || ""),
-    Sport: sport,
-    League: league,
-    Status:
-      statusType.name ||
-      statusType.description ||
-      "",
-    State:
-      statusType.state ||
-      "",
-    Period:
-      status.period || "",
-    Clock:
-      status.displayClock || "",
-    HomeTeam:
-      homeTeam.displayName ||
-      homeTeam.shortDisplayName ||
-      homeTeam.name ||
-      "",
-    AwayTeam:
-      awayTeam.displayName ||
-      awayTeam.shortDisplayName ||
-      awayTeam.name ||
-      "",
-    HomeScore: homeScore,
-    AwayScore: awayScore,
-    Winner: winner,
-    Completed: completed,
-    LastUpdated: new Date(),
-
-    GameDateTime:
-      event.date || "",
-
-    HomeLogo:
-      getESPNTeamLogo_(homeTeam),
-
-    AwayLogo:
-      getESPNTeamLogo_(awayTeam),
-
-    HomeRecord:
-      getESPNTeamRecord_(home),
-
-    AwayRecord:
-      getESPNTeamRecord_(away)
-  };
-}
-
-function normalizeESPNRacingEvent_(event, sport, league) {
-  const competition =
-    getPrimaryRacingCompetition_(event);
-
-  const status =
-    competition.status ||
-    event.status ||
-    {};
-
-  const statusType =
-    status.type || {};
-
-  const competitors =
-    competition.competitors || [];
-
-  const leader =
-    getRacingLeader_(competitors);
-
-  const winner =
-    getRacingWinner_(competitors);
-
-  const completed =
-    statusType.completed === true;
-
-  return {
-    GameId: league + "_" + String(event.id || ""),
-    ESPNEventId: String(event.id || ""),
-    Sport: sport,
-    League: league,
-    Status:
-      statusType.name ||
-      statusType.description ||
-      "",
-    State:
-      statusType.state ||
-      "",
-    Period:
-      status.period || "",
-    Clock:
-      status.displayClock || "",
-    HomeTeam:
-      event.shortName ||
-      event.name ||
-      "",
-    AwayTeam:
-      leader ||
-      winner ||
-      "",
-    HomeScore: "",
-    AwayScore: "",
-    Winner:
-      completed
-        ? winner
-        : "",
-    Completed: completed,
-    LastUpdated: new Date(),
-
-    GameDateTime:
-     event.date || "",
-
-    HomeLogo:
-     getESPNEventLogo_(event),
-
-    AwayLogo: ""
-  };
-}
-
-function getPrimaryRacingCompetition_(event) {
-  const competitions =
-    event.competitions || [];
-
-  if (!competitions.length) {
-    return {};
-  }
-
-  const race =
-    competitions.find(function(comp) {
-      const type =
-        comp.type || {};
-
-      const abbreviation =
-        String(type.abbreviation || "")
-          .trim()
-          .toLowerCase();
-
-      return (
-        abbreviation === "race" ||
-        abbreviation === "main"
-      );
-    });
-
-  return race || competitions[competitions.length - 1];
-}
-
-function getRacingLeader_(competitors) {
-  if (!competitors || !competitors.length) {
-    return "";
-  }
-
-  const sorted =
-    competitors.slice().sort(function(a, b) {
-      return Number(a.order || 9999) -
-        Number(b.order || 9999);
-    });
-
-  const leader =
-    sorted[0] || {};
-
-  const athlete =
-    leader.athlete || {};
-
-  return (
-    athlete.displayName ||
-    athlete.fullName ||
-    athlete.shortName ||
-    ""
-  );
-}
-
-function getRacingWinner_(competitors) {
-  if (!competitors || !competitors.length) {
-    return "";
-  }
-
-  const winner =
-    competitors.find(function(driver) {
-      return driver.winner === true;
-    });
-
-  if (!winner) {
-    return "";
-  }
-
-  const athlete =
-    winner.athlete || {};
-
-  return (
-    athlete.displayName ||
-    athlete.fullName ||
-    athlete.shortName ||
-    ""
-  );
-}
 
 /************************************
  ESPN TEAM RECORD HELPERS
@@ -1207,7 +988,7 @@ function addESPNDateParamToUrl_(url, dateString) {
 
 /************************************
  STEP 4
- ADD SOCCER + WORLD CUP + RACING
+ ADD SOCCER + WORLD CUP
  TO SPORTS SETTINGS
 ************************************/
 
@@ -1948,6 +1729,30 @@ else if (action === "removeSportsOddsHybridTrigger") {
 
     else if (action === "runSportsArchiveNowAdmin") {
       payload = apiRunSportsArchiveNowAdmin_(params);
+    }
+
+    else if (action === "getSportsPlayers") {
+      payload = apiGetSportsPlayers_(params);
+    }
+
+    else if (action === "getSportsPlayerGameStats") {
+      payload = apiGetSportsPlayerGameStats_(params);
+    }
+
+    else if (action === "setupSportsPlayersAdmin") {
+      payload = apiSetupSportsPlayersAdmin_(params);
+    }
+
+    else if (action === "syncSportsPlayersAdmin") {
+      payload = apiSyncSportsPlayersAdmin_(params);
+    }
+
+    else if (action === "refreshSportsPlayerGameStatsAdmin") {
+      payload = apiRefreshSportsPlayerGameStatsAdmin_(params);
+    }
+
+    else if (action === "getSportsPlayerStatusAdmin") {
+      payload = apiGetSportsPlayerStatusAdmin_(params);
     }
 
     else if (action === "setupSportsRacing" || action === "getSportsRacingResults" || action === "getSportsRacingOdds") {
@@ -3788,54 +3593,16 @@ function testApiGetSportsScoresFunctionExists() {
 
 
 function testSportsAdminDashboard() {
-
   return apiGetSportsAdminDashboard_({
-    adminKey: "2s11aj0jce77zb3kp904fwm304yw2a0b"
+    adminKey: PropertiesService
+      .getScriptProperties()
+      .getProperty("SPORTS_ADMIN_API_KEY")
   });
-
 }
 
 /************************************
- PATCH v3 - MMA + RACING DRIVER RESULTS
- Adds MMA scoreboard normalization and a separate
- SportsRacingResults sheet for all-driver race data.
+ PATCH v3 - MMA EVENT NORMALIZATION
 ************************************/
-
-const SPORTS_RACING_RESULTS_SHEET =
-  "SportsRacingResults";
-
-const SPORTS_RACING_RESULTS_HEADERS = [
-  "RaceResultId",
-  "Timestamp",
-  "GameId",
-  "ESPNEventId",
-  "Sport",
-  "League",
-  "RaceName",
-  "RaceDateTime",
-  "Status",
-  "State",
-  "Completed",
-  "DriverId",
-  "DriverName",
-  "Team",
-  "CarNumber",
-  "StartingPosition",
-  "FinalPosition",
-  "CurrentPosition",
-  "Laps",
-  "Points",
-  "StageWins",
-  "Winner",
-  "RawCompetitorJSON",
-  "LastUpdated"
-];
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-
-/* Removed older duplicate function during v11 cleanup. */
 
 function normalizeESPNEvent_(event, sport, league) {
 
@@ -3848,14 +3615,6 @@ function normalizeESPNEvent_(event, sport, league) {
     String(league || "")
       .trim()
       .toLowerCase();
-
-  if (sport === "racing") {
-    return normalizeESPNRacingEvent_(
-      event,
-      sport,
-      league
-    );
-  }
 
   if (
     sport === "mma" ||
@@ -3988,35 +3747,6 @@ function normalizeESPNCombatEvent_(event, sport, league) {
 
 }
 
-function sportsRacingString_(value) {
-
-  return String(value || "")
-    .trim();
-
-}
-
-function sportsRacingDriverId_(competitor) {
-
-  competitor =
-    competitor || {};
-
-  const athlete =
-    competitor.athlete || {};
-
-  const raw =
-    athlete.id ||
-    competitor.id ||
-    getESPNCompetitorDisplayName_(
-      competitor
-    );
-
-  return sportsRacingString_(raw)
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-
-}
-
 
 /* Removed older duplicate function during v11 cleanup. */
 
@@ -4059,1336 +3789,12 @@ function sportsRacingDriverId_(competitor) {
 
 /* Removed older duplicate function during v11 cleanup. */
 
-/* Removed earlier duplicate function addMmaAndMotorsportsSettings during production cleanup; final definition retained later in file. */
+/* Older mixed motorsports settings helper removed during production cleanup. */
 
 
 /* Removed earlier duplicate function addExtraSportsSettings during production cleanup; final definition retained later in file. */
 
 
-
-/************************************
- PATCH v4 - SAFE RACING SETUP OVERRIDES
- Keeps racing results setup separate from racing odds
- setup and retries transient spreadsheet timeouts.
-************************************/
-
-function sportsRacingSpreadsheetRetry_(label, fn) {
-
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= 4; attempt++) {
-
-    try {
-      return fn();
-    } catch (err) {
-
-      lastError = err;
-
-      const message =
-        err && err.message
-          ? err.message
-          : String(err);
-
-      const retryable =
-        message.indexOf("Service Spreadsheets timed out") !== -1 ||
-        message.indexOf("Service Spreadsheets failed") !== -1 ||
-        message.indexOf("Service Spreadsheets") !== -1;
-
-      if (!retryable || attempt === 4) {
-        throw err;
-      }
-
-      Utilities.sleep(
-        attempt * 1500
-      );
-
-    }
-
-  }
-
-  throw lastError;
-
-}
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-function setupSportsRacingSystem() {
-
-  const resultsSetup =
-    setupSportsRacingResultsSystem();
-
-  let oddsSetup = null;
-  let oddsError = "";
-
-  if (typeof setupSportsRacingOddsSystem === "function") {
-
-    try {
-      oddsSetup =
-        setupSportsRacingOddsSystem();
-    } catch (err) {
-
-      oddsError =
-        err && err.message
-          ? err.message
-          : String(err);
-
-      if (typeof logSports_ === "function") {
-        logSports_(
-          "WARN",
-          "setupSportsRacingSystem",
-          "Racing results setup completed but racing odds setup failed",
-          oddsError
-        );
-      }
-
-    }
-
-  }
-
-  return {
-    success: true,
-    resultsSheet: SPORTS_RACING_RESULTS_SHEET,
-    oddsSheet:
-      typeof SPORTS_RACING_ODDS_SHEET !== "undefined"
-        ? SPORTS_RACING_ODDS_SHEET
-        : "SportsRacingOdds",
-    resultsSetup: resultsSetup,
-    oddsSetup: oddsSetup,
-    oddsError: oddsError,
-    message:
-      oddsError
-        ? "Racing results setup completed. Racing odds setup needs to be run by itself: setupSportsRacingOddsSystem."
-        : "Racing results and racing odds setup complete."
-  };
-
-}
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-/************************************
- PATCH v5 - RACING HONEST DATA OVERRIDES
-
- Purpose:
- - Do NOT treat ESPN competitor.order as StartingPosition.
- - StartingPosition only fills from real start/grid/qualifying fields.
- - FinalPosition can use ESPN competitor.order/result order.
- - Winner uses ESPN competitor.winner when present; only falls back
-   to FinalPosition = 1 with a clear WinnerSource note.
- - Adds source/quality columns so the sheet shows what was real,
-   what was missing, and what was inferred.
-
- Paste this at the very bottom of SportsScoresEngine.gs, or use
- the v5 zip replacement file.
-************************************/
-
-var SPORTS_RACING_HONEST_EXTRA_HEADERS = [
-  "StartingPositionSource",
-  "FinalPositionSource",
-  "CurrentPositionSource",
-  "WinnerSource",
-  "DataQualityNotes"
-];
-
-function sportsRacingHonestHeaders_() {
-
-  const fallbackHeaders = [
-    "RaceResultId",
-    "Timestamp",
-    "GameId",
-    "ESPNEventId",
-    "Sport",
-    "League",
-    "RaceName",
-    "RaceDateTime",
-    "Status",
-    "State",
-    "Completed",
-    "DriverId",
-    "DriverName",
-    "Team",
-    "CarNumber",
-    "StartingPosition",
-    "FinalPosition",
-    "CurrentPosition",
-    "Laps",
-    "Points",
-    "StageWins",
-    "Winner",
-    "RawCompetitorJSON",
-    "LastUpdated"
-  ];
-
-  const headers =
-    typeof SPORTS_RACING_RESULTS_HEADERS !== "undefined" &&
-    Array.isArray(SPORTS_RACING_RESULTS_HEADERS)
-      ? SPORTS_RACING_RESULTS_HEADERS.slice()
-      : fallbackHeaders.slice();
-
-  SPORTS_RACING_HONEST_EXTRA_HEADERS
-    .forEach(function(header) {
-      if (headers.indexOf(header) === -1) {
-        headers.push(header);
-      }
-    });
-
-  return headers;
-
-}
-
-function sportsRacingResultsGetSheet_() {
-
-  return sportsRacingEnsureHeaderSheetSafe_(
-    SPORTS_RACING_RESULTS_SHEET,
-    sportsRacingHonestHeaders_()
-  ).sheet;
-
-}
-
-function setupSportsRacingResultsSystem() {
-
-  const result =
-    sportsRacingEnsureHeaderSheetSafe_(
-      SPORTS_RACING_RESULTS_SHEET,
-      sportsRacingHonestHeaders_()
-    );
-
-  return {
-    success: true,
-    sheet: SPORTS_RACING_RESULTS_SHEET,
-    added: result.added || [],
-    message:
-      "Sports racing results sheet setup complete. Racing honest/source columns are present."
-  };
-
-}
-
-function sportsRacingHasValue_(value) {
-
-  return !(
-    value === "" ||
-    value === null ||
-    value === undefined
-  );
-
-}
-
-function sportsRacingMeta_(value, source) {
-
-  if (!sportsRacingHasValue_(value)) {
-    return {
-      value: "",
-      source: ""
-    };
-  }
-
-  return {
-    value: value,
-    source: source || ""
-  };
-
-}
-
-function sportsRacingNormalizeStatName_(value) {
-
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "");
-
-}
-
-function sportsRacingFindDirectMeta_(
-  competitor,
-  keys,
-  sourcePrefix
-) {
-
-  competitor =
-    competitor || {};
-
-  keys =
-    keys || [];
-
-  for (let i = 0; i < keys.length; i++) {
-
-    const key =
-      keys[i];
-
-    if (
-      key &&
-      sportsRacingHasValue_(
-        competitor[key]
-      )
-    ) {
-      return sportsRacingMeta_(
-        competitor[key],
-        (sourcePrefix || "direct") + ":" + key
-      );
-    }
-
-  }
-
-  return sportsRacingMeta_("", "");
-
-}
-
-function sportsRacingFindNestedMeta_(
-  object,
-  keys,
-  sourcePrefix
-) {
-
-  object =
-    object || {};
-
-  keys =
-    keys || [];
-
-  for (let i = 0; i < keys.length; i++) {
-
-    const key =
-      keys[i];
-
-    if (
-      key &&
-      sportsRacingHasValue_(
-        object[key]
-      )
-    ) {
-      return sportsRacingMeta_(
-        object[key],
-        (sourcePrefix || "nested") + ":" + key
-      );
-    }
-
-  }
-
-  return sportsRacingMeta_("", "");
-
-}
-
-function sportsRacingFindStatMeta_(
-  competitor,
-  names
-) {
-
-  competitor =
-    competitor || {};
-
-  names =
-    names || [];
-
-  const wanted =
-    names.map(function(name) {
-      return sportsRacingNormalizeStatName_(
-        name
-      );
-    });
-
-  const statistics =
-    Array.isArray(competitor.statistics)
-      ? competitor.statistics
-      : [];
-
-  for (let i = 0; i < statistics.length; i++) {
-
-    const stat =
-      statistics[i] || {};
-
-    const possibleNames = [
-      stat.name,
-      stat.displayName,
-      stat.shortDisplayName,
-      stat.abbreviation,
-      stat.type
-    ];
-
-    for (let j = 0; j < possibleNames.length; j++) {
-
-      const normalized =
-        sportsRacingNormalizeStatName_(
-          possibleNames[j]
-        );
-
-      if (
-        normalized &&
-        wanted.indexOf(normalized) !== -1
-      ) {
-
-        const value =
-          sportsRacingHasValue_(stat.displayValue)
-            ? stat.displayValue
-            : sportsRacingHasValue_(stat.value)
-              ? stat.value
-              : sportsRacingHasValue_(stat.amount)
-                ? stat.amount
-                : "";
-
-        return sportsRacingMeta_(
-          value,
-          "stat:" + String(possibleNames[j] || "")
-        );
-
-      }
-
-    }
-
-  }
-
-  return sportsRacingMeta_("", "");
-
-}
-
-function getRacingCompetitorStat_(
-  competitor,
-  names
-) {
-
-  const direct =
-    sportsRacingFindDirectMeta_(
-      competitor,
-      names,
-      "direct"
-    );
-
-  if (sportsRacingHasValue_(direct.value)) {
-    return direct.value;
-  }
-
-  return sportsRacingFindStatMeta_(
-    competitor,
-    names
-  ).value;
-
-}
-
-function getRacingStartingPositionMeta_(competitor) {
-
-  /*
-    HONEST RULE:
-    Never use competitor.order as StartingPosition.
-    ESPN order is result/current ordering in the payload, not the grid.
-  */
-
-  const direct =
-    sportsRacingFindDirectMeta_(
-      competitor,
-      [
-        "startingPosition",
-        "startPosition",
-        "gridPosition",
-        "qualifyingPosition",
-        "startingGridPosition"
-      ],
-      "direct"
-    );
-
-  if (sportsRacingHasValue_(direct.value)) {
-    return direct;
-  }
-
-  return sportsRacingFindStatMeta_(
-    competitor,
-    [
-      "starting position",
-      "start position",
-      "start",
-      "grid position",
-      "grid",
-      "qualifying position",
-      "qualifying",
-      "starting grid"
-    ]
-  );
-
-}
-
-function getRacingStartingPosition_(competitor) {
-
-  return getRacingStartingPositionMeta_(
-    competitor
-  ).value;
-
-}
-
-function getRacingFinalPositionMeta_(competitor) {
-
-  const direct =
-    sportsRacingFindDirectMeta_(
-      competitor,
-      [
-        "finalPosition",
-        "finishPosition",
-        "finishingPosition",
-        "resultPosition",
-        "position",
-        "rank"
-      ],
-      "direct"
-    );
-
-  if (sportsRacingHasValue_(direct.value)) {
-    return direct;
-  }
-
-  const stat =
-    sportsRacingFindStatMeta_(
-      competitor,
-      [
-        "finish",
-        "finish position",
-        "finishing position",
-        "final position",
-        "position",
-        "rank",
-        "result"
-      ]
-    );
-
-  if (sportsRacingHasValue_(stat.value)) {
-    return stat;
-  }
-
-  if (
-    competitor &&
-    competitor.curatedRank &&
-    sportsRacingHasValue_(
-      competitor.curatedRank.current
-    )
-  ) {
-    return sportsRacingMeta_(
-      competitor.curatedRank.current,
-      "curatedRank.current"
-    );
-  }
-
-  if (
-    competitor &&
-    sportsRacingHasValue_(
-      competitor.order
-    )
-  ) {
-    return sportsRacingMeta_(
-      competitor.order,
-      "espn_competitor.order_result_order"
-    );
-  }
-
-  return sportsRacingMeta_("", "");
-
-}
-
-function getRacingFinalPosition_(competitor) {
-
-  return getRacingFinalPositionMeta_(
-    competitor
-  ).value;
-
-}
-
-function getRacingCurrentPositionMeta_(
-  competitor,
-  completed,
-  finalPositionMeta
-) {
-
-  if (
-    completed &&
-    finalPositionMeta &&
-    sportsRacingHasValue_(finalPositionMeta.value)
-  ) {
-    return sportsRacingMeta_(
-      finalPositionMeta.value,
-      "same_as_final_position"
-    );
-  }
-
-  const direct =
-    sportsRacingFindDirectMeta_(
-      competitor,
-      [
-        "currentPosition",
-        "runningPosition",
-        "livePosition",
-        "position",
-        "rank"
-      ],
-      "direct"
-    );
-
-  if (sportsRacingHasValue_(direct.value)) {
-    return direct;
-  }
-
-  if (
-    competitor &&
-    competitor.curatedRank &&
-    sportsRacingHasValue_(
-      competitor.curatedRank.current
-    )
-  ) {
-    return sportsRacingMeta_(
-      competitor.curatedRank.current,
-      "curatedRank.current"
-    );
-  }
-
-  if (
-    competitor &&
-    sportsRacingHasValue_(
-      competitor.order
-    )
-  ) {
-    return sportsRacingMeta_(
-      competitor.order,
-      "espn_competitor.order_current_order"
-    );
-  }
-
-  return sportsRacingMeta_("", "");
-
-}
-
-function getRacingWinnerMeta_(
-  competitor,
-  completed,
-  finalPositionMeta
-) {
-
-  if (!completed) {
-    return {
-      value: false,
-      source: "race_not_completed"
-    };
-  }
-
-  if (
-    competitor &&
-    competitor.winner === true
-  ) {
-    return {
-      value: true,
-      source: "competitor.winner"
-    };
-  }
-
-  if (
-    competitor &&
-    competitor.winner === false
-  ) {
-    return {
-      value: false,
-      source: "competitor.winner"
-    };
-  }
-
-  if (
-    finalPositionMeta &&
-    String(finalPositionMeta.value) === "1"
-  ) {
-    return {
-      value: true,
-      source: "inferred_from_final_position_1"
-    };
-  }
-
-  return {
-    value: false,
-    source: ""
-  };
-
-}
-
-function getRacingLaps_(competitor) {
-
-  return getRacingCompetitorStat_(
-    competitor,
-    [
-      "laps",
-      "lapsCompleted",
-      "completedLaps",
-      "laps completed"
-    ]
-  );
-
-}
-
-function getRacingPoints_(competitor) {
-
-  return getRacingCompetitorStat_(
-    competitor,
-    [
-      "points",
-      "pts",
-      "racePoints",
-      "race points"
-    ]
-  );
-
-}
-
-function getRacingStageWins_(competitor) {
-
-  return getRacingCompetitorStat_(
-    competitor,
-    [
-      "stageWins",
-      "stagesWon",
-      "stage_wins",
-      "stage wins",
-      "stages won"
-    ]
-  );
-
-}
-
-function getRacingDriverTeam_(competitor) {
-
-  competitor =
-    competitor || {};
-
-  const vehicle =
-    competitor.vehicle || {};
-
-  const team =
-    competitor.team || {};
-
-  const vehicleMeta =
-    sportsRacingFindNestedMeta_(
-      vehicle,
-      [
-        "team",
-        "teamName",
-        "manufacturer"
-      ],
-      "vehicle"
-    );
-
-  if (sportsRacingHasValue_(vehicleMeta.value)) {
-    return vehicleMeta.value;
-  }
-
-  return (
-    team.displayName ||
-    team.name ||
-    competitor.teamName ||
-    ""
-  );
-
-}
-
-function getRacingCarNumber_(competitor) {
-
-  competitor =
-    competitor || {};
-
-  const vehicle =
-    competitor.vehicle || {};
-
-  return (
-    vehicle.number ||
-    vehicle.vehicleNumber ||
-    competitor.vehicleNumber ||
-    competitor.carNumber ||
-    competitor.number ||
-    ""
-  );
-
-}
-
-function sportsRacingDataQualityNotes_(
-  competitor,
-  startingMeta,
-  finalMeta,
-  currentMeta,
-  winnerMeta,
-  stageWins
-) {
-
-  const notes = [];
-
-  const statistics =
-    Array.isArray(
-      competitor && competitor.statistics
-    )
-      ? competitor.statistics
-      : [];
-
-  if (!statistics.length) {
-    notes.push(
-      "ESPN statistics array empty"
-    );
-  }
-
-  if (!sportsRacingHasValue_(startingMeta.value)) {
-    notes.push(
-      "StartingPosition not provided by ESPN; order was not used as start"
-    );
-  }
-
-  if (!sportsRacingHasValue_(stageWins)) {
-    notes.push(
-      "StageWins not provided by ESPN"
-    );
-  }
-
-  if (
-    finalMeta.source ===
-    "espn_competitor.order_result_order"
-  ) {
-    notes.push(
-      "FinalPosition uses ESPN competitor.order/result order"
-    );
-  }
-
-  if (
-    currentMeta.source ===
-    "espn_competitor.order_current_order"
-  ) {
-    notes.push(
-      "CurrentPosition uses ESPN competitor.order/current order"
-    );
-  }
-
-  if (
-    winnerMeta.source ===
-    "inferred_from_final_position_1"
-  ) {
-    notes.push(
-      "Winner inferred from FinalPosition = 1 because ESPN winner flag was missing"
-    );
-  }
-
-  return notes.join(" | ");
-
-}
-
-function normalizeESPNRacingDriverRows_(
-  event,
-  sport,
-  league
-) {
-
-  const competition =
-    getPrimaryRacingCompetition_(
-      event
-    );
-
-  const status =
-    competition.status ||
-    event.status ||
-    {};
-
-  const statusType =
-    status.type ||
-    {};
-
-  const competitors =
-    competition.competitors || [];
-
-  const completed =
-    statusType.completed === true;
-
-  const raceName =
-    event.name ||
-    event.shortName ||
-    "";
-
-  return competitors
-    .map(function(competitor) {
-
-      const driverName =
-        getESPNCompetitorDisplayName_(
-          competitor
-        );
-
-      if (!driverName) {
-        return null;
-      }
-
-      const driverId =
-        sportsRacingDriverId_(
-          competitor
-        );
-
-      const startingMeta =
-        getRacingStartingPositionMeta_(
-          competitor
-        );
-
-      const finalMeta =
-        getRacingFinalPositionMeta_(
-          competitor
-        );
-
-      const currentMeta =
-        getRacingCurrentPositionMeta_(
-          competitor,
-          completed,
-          finalMeta
-        );
-
-      const winnerMeta =
-        getRacingWinnerMeta_(
-          competitor,
-          completed,
-          finalMeta
-        );
-
-      const stageWins =
-        getRacingStageWins_(
-          competitor
-        );
-
-      return {
-        RaceResultId:
-          [
-            league,
-            String(event.id || ""),
-            driverId
-          ].join("|"),
-        Timestamp:
-          new Date(),
-        GameId:
-          league + "_" + String(event.id || ""),
-        ESPNEventId:
-          String(event.id || ""),
-        Sport:
-          sport,
-        League:
-          league,
-        RaceName:
-          raceName,
-        RaceDateTime:
-          event.date || "",
-        Status:
-          statusType.name ||
-          statusType.description ||
-          "",
-        State:
-          statusType.state ||
-          "",
-        Completed:
-          completed,
-        DriverId:
-          driverId,
-        DriverName:
-          driverName,
-        Team:
-          getRacingDriverTeam_(
-            competitor
-          ),
-        CarNumber:
-          getRacingCarNumber_(
-            competitor
-          ),
-        StartingPosition:
-          startingMeta.value,
-        FinalPosition:
-          completed
-            ? finalMeta.value
-            : "",
-        CurrentPosition:
-          currentMeta.value,
-        Laps:
-          getRacingLaps_(
-            competitor
-          ),
-        Points:
-          getRacingPoints_(
-            competitor
-          ),
-        StageWins:
-          stageWins,
-        Winner:
-          completed
-            ? winnerMeta.value
-            : false,
-        RawCompetitorJSON:
-          JSON.stringify(
-            competitor || {}
-          ),
-        LastUpdated:
-          new Date(),
-        StartingPositionSource:
-          startingMeta.source,
-        FinalPositionSource:
-          completed
-            ? finalMeta.source
-            : "",
-        CurrentPositionSource:
-          currentMeta.source,
-        WinnerSource:
-          winnerMeta.source,
-        DataQualityNotes:
-          sportsRacingDataQualityNotes_(
-            competitor,
-            startingMeta,
-            finalMeta,
-            currentMeta,
-            winnerMeta,
-            stageWins
-          )
-      };
-
-    })
-    .filter(Boolean);
-
-}
-
-function upsertSportsRacingResultRows_(rows) {
-
-  setupSportsRacingResultsSystem();
-
-  rows =
-    Array.isArray(rows)
-      ? rows
-      : [];
-
-  if (!rows.length) {
-    return {
-      inserted: 0,
-      updated: 0
-    };
-  }
-
-  const sh =
-    sportsRacingResultsGetSheet_();
-
-  const data =
-    sportsRacingSpreadsheetRetry_(
-      "read SportsRacingResults",
-      function() {
-        return sh.getDataRange().getValues();
-      }
-    );
-
-  const headers =
-    data[0].map(function(header) {
-      return String(header || "").trim();
-    });
-
-  const col =
-    getSportsHeaderMap_(headers);
-
-  const existing = {};
-
-  for (let i = 1; i < data.length; i++) {
-
-    const id =
-      String(data[i][col.RaceResultId] || "")
-        .trim();
-
-    if (id) {
-      existing[id] = i + 1;
-    }
-
-  }
-
-  let inserted = 0;
-  let updated = 0;
-  const rowsToAppend = [];
-
-  rows.forEach(function(item) {
-
-    const row =
-      headers.map(function(header) {
-        return item[header] !== undefined
-          ? item[header]
-          : "";
-      });
-
-    if (existing[item.RaceResultId]) {
-
-      sportsRacingSpreadsheetRetry_(
-        "update racing result row",
-        function() {
-          sh
-            .getRange(
-              existing[item.RaceResultId],
-              1,
-              1,
-              headers.length
-            )
-            .setValues([
-              row
-            ]);
-        }
-      );
-
-      updated++;
-
-    } else {
-      rowsToAppend.push(row);
-      inserted++;
-    }
-
-  });
-
-  if (rowsToAppend.length) {
-    sportsRacingSpreadsheetRetry_(
-      "append racing result rows",
-      function() {
-        sh
-          .getRange(
-            sh.getLastRow() + 1,
-            1,
-            rowsToAppend.length,
-            headers.length
-          )
-          .setValues(
-            rowsToAppend
-          );
-      }
-    );
-  }
-
-  SpreadsheetApp.flush();
-
-  return {
-    inserted: inserted,
-    updated: updated
-  };
-
-}
-
-function readSportsRacingResultRows_() {
-
-  setupSportsRacingResultsSystem();
-
-  const sh =
-    sportsRacingResultsGetSheet_();
-
-  const data =
-    sh.getDataRange()
-      .getValues();
-
-  if (data.length <= 1) {
-    return [];
-  }
-
-  const headers =
-    data[0].map(function(header) {
-      return String(header || "").trim();
-    });
-
-  return data
-    .slice(1)
-    .map(function(row) {
-      return sportsRowToObject_(
-        headers,
-        row
-      );
-    })
-    .filter(function(row) {
-      return !!row.RaceResultId;
-    });
-
-}
-
-function sportsRacingSortPosition_(row) {
-
-  const current =
-    Number(row.CurrentPosition || "");
-
-  if (
-    !isNaN(current) &&
-    isFinite(current) &&
-    current > 0
-  ) {
-    return current;
-  }
-
-  const finalPosition =
-    Number(row.FinalPosition || "");
-
-  if (
-    !isNaN(finalPosition) &&
-    isFinite(finalPosition) &&
-    finalPosition > 0
-  ) {
-    return finalPosition;
-  }
-
-  return 9999;
-
-}
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-
-/* Removed older duplicate function during v11 cleanup. */
-
-function testRacingHonestNascarPremierRows() {
-
-  const result =
-    apiGetSportsRacingResults_({
-      league: "nascar-premier"
-    });
-
-  Logger.log(
-    JSON.stringify(result, null, 2)
-  );
-
-  return result;
-
-}
-
-/************************************
- PATCH v6 - RACING LOCK FIX
-
- Why this exists:
- - runSportsScoresUpdate already uses LockService.
- - The v5 racing setup helper also tried to get a script lock.
- - Apps Script locks are not safe to nest this way, and another trigger/manual run
-   can cause: "Could not lock script while setting up sheet: SportsRacingResults".
-
- Fix:
- - This override removes the nested setup lock.
- - It keeps retry protection for transient Google Sheets timeouts.
- - It is safe to paste at the very bottom of SportsScoresEngine.gs.
-************************************/
-
-function sportsRacingEnsureHeaderSheetSafe_(
-  sheetName,
-  requiredHeaders
-) {
-
-  return sportsRacingSpreadsheetRetry_(
-    "setup " + sheetName,
-    function() {
-
-      const ss =
-        SpreadsheetApp.getActive();
-
-      let sh =
-        ss.getSheetByName(
-          sheetName
-        );
-
-      if (!sh) {
-        sh =
-          ss.insertSheet(
-            sheetName
-          );
-
-        SpreadsheetApp.flush();
-      }
-
-      const lastRow =
-        sh.getLastRow();
-
-      const lastColumn =
-        sh.getLastColumn();
-
-      let existingHeaders = [];
-
-      if (lastRow >= 1 && lastColumn >= 1) {
-        existingHeaders =
-          sh
-            .getRange(
-              1,
-              1,
-              1,
-              lastColumn
-            )
-            .getValues()[0]
-            .map(function(header) {
-              return String(header || "").trim();
-            });
-      }
-
-      const hasAnyHeader =
-        existingHeaders.some(function(header) {
-          return !!header;
-        });
-
-      if (!hasAnyHeader) {
-
-        sh
-          .getRange(
-            1,
-            1,
-            1,
-            requiredHeaders.length
-          )
-          .setValues([
-            requiredHeaders
-          ]);
-
-        try {
-          sh.setFrozenRows(1);
-        } catch (freezeErr) {
-          // Non-critical. Avoid failing setup over formatting.
-        }
-
-        SpreadsheetApp.flush();
-
-        return {
-          sheet: sh,
-          added: requiredHeaders.slice()
-        };
-
-      }
-
-      const missing =
-        requiredHeaders.filter(function(header) {
-          return existingHeaders.indexOf(header) === -1;
-        });
-
-      if (missing.length) {
-        sh
-          .getRange(
-            1,
-            sh.getLastColumn() + 1,
-            1,
-            missing.length
-          )
-          .setValues([
-            missing
-          ]);
-
-        SpreadsheetApp.flush();
-      }
-
-      try {
-        sh.setFrozenRows(1);
-      } catch (freezeErr2) {
-        // Non-critical. Avoid failing setup over formatting.
-      }
-
-      return {
-        sheet: sh,
-        added: missing
-      };
-
-    }
-  );
-
-}
-
-function repairSportsRacingHonestColumns() {
-
-  const setup =
-    setupSportsRacingResultsSystem();
-
-  return {
-    success: true,
-    setup: setup,
-    message:
-      "Racing honest columns are installed. The nested lock was removed in patch v6. Run runSportsScoresUpdate or runSportsScoresWindowUpdate to refresh rows."
-  };
-
-}
 
 /************************************************************
  SPORTS SCORES ENGINE v12
@@ -5942,61 +4348,6 @@ function getSportsArchiveStatus_() {
   };
 }
 
-function getSmartSportsAutomationStatus_() {
-  const triggers = ScriptApp.getProjectTriggers();
-  function count_(handler) {
-    return triggers.filter(function(trigger) { return trigger.getHandlerFunction() === handler; }).length;
-  }
-  const details = {
-    scoreUpdater: count_(SPORTS_TRIGGER_FUNCTION),
-    seasonLoader: count_(SPORTS_SEASON_BATCH_TRIGGER_FUNCTION),
-    oddsUpdater: count_(SPORTS_ODDS_HYBRID_TRIGGER_FUNCTION),
-    archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
-  };
-  const fullyEnabled =
-    details.scoreUpdater > 0 &&
-    details.seasonLoader > 0 &&
-    details.oddsUpdater > 0 &&
-    details.archiveUpdater > 0;
-  const anyEnabled =
-    details.scoreUpdater > 0 ||
-    details.seasonLoader > 0 ||
-    details.oddsUpdater > 0 ||
-    details.archiveUpdater > 0;
-
-  return {
-    enabled: fullyEnabled,
-    fullyEnabled: fullyEnabled,
-    partiallyEnabled: anyEnabled && !fullyEnabled,
-    details: details
-  };
-}
-
-function setSmartSportsAutomationEnabled_(enabled, oddsHour, archiveHour) {
-  enabled = enabled === true || String(enabled || "").toLowerCase() === "true";
-  const actions = {};
-
-  if (enabled) {
-    actions.scores = installSportsScoresTrigger();
-    actions.season = installSportsSeasonBatchTrigger();
-    actions.odds = installSportsOddsHybridDailyTrigger(oddsHour === undefined ? 8 : oddsHour);
-    actions.archive = installSportsArchiveDailyTrigger(archiveHour === undefined ? 3 : archiveHour);
-  } else {
-    actions.scores = removeSportsScoresTriggers();
-    actions.season = removeSportsSeasonBatchTriggers();
-    actions.odds = removeSportsOddsHybridTriggers();
-    actions.archive = removeSportsArchiveTriggers();
-  }
-
-  return {
-    success: true,
-    enabled: enabled,
-    status: getSmartSportsAutomationStatus_(),
-    actions: actions,
-    message: enabled ? "Smart Sports Automation Enabled" : "Smart Sports Automation Disabled"
-  };
-}
-
 
 /************************************
  PATCH v13
@@ -6048,34 +4399,6 @@ function sportsV13ScoresExtraHeaders_() {
   ];
 }
 
-function sportsV13GamesHeaders_() {
-  return [
-    "GameId",
-    "Sport",
-    "League",
-    "ESPNEventId",
-    "Name",
-    "ShortName",
-    "Season",
-    "SeasonYear",
-    "SeasonType",
-    "SeasonPhase",
-    "Week",
-    "GameDateTime",
-    "HomeTeam",
-    "AwayTeam",
-    "HomeTeamId",
-    "AwayTeamId",
-    "Active",
-    "Completed",
-    "Source",
-    "GroupId",
-    "TeamId",
-    "LastChecked",
-    "LastStatus"
-  ];
-}
-
 function sportsV13CollegeTeamsHeaders_() {
   return [
     "Enabled",
@@ -6098,27 +4421,136 @@ function sportsV13CollegeTeamsHeaders_() {
 /* Removed earlier duplicate function sportsV13SeasonJobExtraHeaders_ during production cleanup; final definition retained later in file. */
 
 
-function sportsV13EnsureSheetHeaders_(sheetName, headers) {
-  const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(sheetName);
-  if (!sh) sh = ss.insertSheet(sheetName);
+function sportsV13SpreadsheetRetry_(label, fn) {
+  let lastError = null;
 
-  if (sh.getLastRow() === 0 || sh.getLastColumn() === 0) {
-    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
-    sh.setFrozenRows(1);
-    return { sheet: sh, added: headers.slice() };
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      return fn();
+    } catch (err) {
+      lastError = err;
+
+      const message =
+        err && err.message
+          ? err.message
+          : String(err);
+
+      const retryable =
+        message.indexOf("Service Spreadsheets timed out") !== -1 ||
+        message.indexOf("Service Spreadsheets failed") !== -1 ||
+        message.indexOf("Service Spreadsheets") !== -1 ||
+        message.indexOf("Internal error") !== -1;
+
+      if (!retryable || attempt === 5) {
+        throw err;
+      }
+
+      Utilities.sleep(attempt * 1200);
+    }
   }
 
-  const existing = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
-    .map(function(header) { return String(header || "").trim(); });
-  const missing = headers.filter(function(header) { return existing.indexOf(header) === -1; });
+  throw lastError || new Error("Spreadsheet operation failed: " + label);
+}
+
+function sportsV13EnsureSheetHeaders_(sheetName, headers) {
+  headers = Array.isArray(headers) ? headers.filter(Boolean) : [];
+
+  if (!sheetName || !headers.length) {
+    throw new Error("sheetName and headers are required");
+  }
+
+  const ss = SpreadsheetApp.getActive();
+
+  let sh = sportsV13SpreadsheetRetry_(
+    "open sheet " + sheetName,
+    function() {
+      return ss.getSheetByName(sheetName);
+    }
+  );
+
+  if (!sh) {
+    sh = sportsV13SpreadsheetRetry_(
+      "create sheet " + sheetName,
+      function() {
+        return ss.insertSheet(sheetName);
+      }
+    );
+
+    Utilities.sleep(250);
+  }
+
+  let lastColumn = 0;
+
+  try {
+    lastColumn = sportsV13SpreadsheetRetry_(
+      "read last column for " + sheetName,
+      function() {
+        return sh.getLastColumn();
+      }
+    );
+  } catch (lastColumnError) {
+    lastColumn = headers.length;
+  }
+
+  const readWidth = Math.max(1, Math.min(Math.max(lastColumn, headers.length), 250));
+
+  const existing = sportsV13SpreadsheetRetry_(
+    "read headers for " + sheetName,
+    function() {
+      return sh
+        .getRange(1, 1, 1, readWidth)
+        .getDisplayValues()[0]
+        .map(function(header) {
+          return String(header || "").trim();
+        });
+    }
+  );
+
+  const hasAnyHeader = existing.some(function(header) {
+    return !!header;
+  });
+
+  if (!hasAnyHeader) {
+    sportsV13SpreadsheetRetry_(
+      "write headers for " + sheetName,
+      function() {
+        sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+      }
+    );
+
+    try {
+      sh.setFrozenRows(1);
+    } catch (freezeError) {}
+
+    return {
+      sheet: sh,
+      added: headers.slice()
+    };
+  }
+
+  const missing = headers.filter(function(header) {
+    return existing.indexOf(header) === -1;
+  });
 
   if (missing.length) {
-    sh.getRange(1, sh.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+    const appendColumn = Math.max(lastColumn, existing.filter(Boolean).length) + 1;
+
+    sportsV13SpreadsheetRetry_(
+      "append headers for " + sheetName,
+      function() {
+        sh.getRange(1, appendColumn, 1, missing.length).setValues([missing]);
+      }
+    );
   }
 
-  try { sh.setFrozenRows(1); } catch (err) {}
-  return { sheet: sh, added: missing };
+  try {
+    sh.setFrozenRows(1);
+  } catch (freezeError2) {}
+
+  return {
+    sheet: sh,
+    added: missing
+  };
 }
 
 /* Removed earlier duplicate function setupSportsScoresSheet during production cleanup; final definition retained later in file. */
@@ -6546,19 +4978,10 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(setting, dateString, option
   options = options || {};
   const requests = sportsV13BuildESPNRequests_(setting, dateString, options);
   const gamesById = {};
-  const driverRows = [];
 
   requests.forEach(function(request) {
     const data = sportsV13FetchJson_(request.url);
     const events = sportsV13ExtractEvents_(data);
-
-    if (String(setting.Sport || "").trim().toLowerCase() === "racing") {
-      events.forEach(function(event) {
-        normalizeESPNRacingDriverRows_(event, setting.Sport, setting.League).forEach(function(row) {
-          driverRows.push(row);
-        });
-      });
-    }
 
     let skippedWrongSeason = 0;
     const skippedSamples = [];
@@ -6601,8 +5024,6 @@ function fetchAndNormalizeESPNScoreboardFromSetting_(setting, dateString, option
       );
     }
   });
-
-  if (driverRows.length) upsertSportsRacingResultRows_(driverRows);
 
   return Object.keys(gamesById).map(function(gameId) { return gamesById[gameId]; });
 }
@@ -6663,69 +5084,6 @@ function upsertLatestSportsScores_(games) {
   });
 
   upsertSportsGamesFromScores_(games);
-}
-
-function upsertSportsGamesFromScores_(games) {
-  games = games || [];
-  if (!games.length) return { success: true, inserted: 0, updated: 0 };
-
-  const sh = sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_()).sheet;
-  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0]
-    .map(function(header) { return String(header || "").trim(); });
-  const data = sh.getDataRange().getValues();
-  const col = getSportsHeaderMap_(headers);
-  const existing = {};
-
-  for (let i = 1; i < data.length; i++) {
-    const gameId = String(data[i][col.GameId] || "").trim();
-    if (gameId) existing[gameId] = i + 1;
-  }
-
-  let inserted = 0;
-  let updated = 0;
-
-  games.forEach(function(game) {
-    const completed = normalizeSportsBoolean_(game.Completed);
-    const rowObj = {
-      GameId: game.GameId || "",
-      Sport: game.Sport || "",
-      League: game.League || "",
-      ESPNEventId: game.ESPNEventId || "",
-      Name: (game.AwayTeam && game.HomeTeam) ? (game.AwayTeam + " at " + game.HomeTeam) : (game.HomeTeam || game.AwayTeam || game.GameId || ""),
-      ShortName: (game.AwayTeam && game.HomeTeam) ? (game.AwayTeam + " @ " + game.HomeTeam) : (game.HomeTeam || game.AwayTeam || ""),
-      Season: game.SeasonYear || "",
-      SeasonYear: game.SeasonYear || "",
-      SeasonType: game.SeasonType || "",
-      SeasonPhase: game.SeasonPhase || "",
-      Week: game.Week || "",
-      GameDateTime: game.GameDateTime || "",
-      HomeTeam: game.HomeTeam || "",
-      AwayTeam: game.AwayTeam || "",
-      HomeTeamId: game.HomeTeamId || "",
-      AwayTeamId: game.AwayTeamId || "",
-      Active: !completed,
-      Completed: completed,
-      Source: game.Source || "ESPN_SCOREBOARD",
-      GroupId: game.GroupId || "",
-      TeamId: game.TeamId || "",
-      LastChecked: new Date(),
-      LastStatus: game.Status || ""
-    };
-
-    const row = headers.map(function(header) {
-      return rowObj[header] !== undefined ? rowObj[header] : "";
-    });
-
-    if (existing[rowObj.GameId]) {
-      sh.getRange(existing[rowObj.GameId], 1, 1, headers.length).setValues([row]);
-      updated++;
-    } else {
-      sh.appendRow(row);
-      inserted++;
-    }
-  });
-
-  return { success: true, inserted: inserted, updated: updated };
 }
 
 function sportsV13PhaseDescriptor_(phase, startDate, endDate, seasonType, enabled, options) {
@@ -7205,19 +5563,10 @@ function fetchAndNormalizeESPNWeekScoreboardFromSetting_(setting, seasonYear, se
 
   const requests = sportsV14BuildESPNWeekRequests_(setting, seasonYear, seasonType, week, options);
   const gamesById = {};
-  const driverRows = [];
 
   requests.forEach(function(request) {
     const data = sportsV13FetchJson_(request.url);
     const events = sportsV13ExtractEvents_(data);
-
-    if (String(setting.Sport || "").trim().toLowerCase() === "racing") {
-      events.forEach(function(event) {
-        normalizeESPNRacingDriverRows_(event, setting.Sport, setting.League).forEach(function(row) {
-          driverRows.push(row);
-        });
-      });
-    }
 
     let skippedWrongSeason = 0;
     const skippedSamples = [];
@@ -7263,8 +5612,6 @@ function fetchAndNormalizeESPNWeekScoreboardFromSetting_(setting, seasonYear, se
       );
     }
   });
-
-  if (driverRows.length) upsertSportsRacingResultRows_(driverRows);
 
   return Object.keys(gamesById).map(function(gameId) { return gamesById[gameId]; });
 }
@@ -7673,16 +6020,6 @@ function checkSportsScoresWindowTriggers() {
     });
 }
 
-function apiInstallSportsScoresWindowTriggerAdmin_(params) {
-  assertSportsAdmin_(params || {});
-  return installSportsScoresWindowTrigger();
-}
-
-function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
-  assertSportsAdmin_(params || {});
-  return removeSportsScoresWindowTriggers();
-}
-
 function sportsScoresDisableRacingSettingsRows_() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
   if (!sh || sh.getLastRow() <= 1) return { success: true, disabled: 0 };
@@ -7719,7 +6056,7 @@ function sportsScoresFilterOutRacingSettings_(settings, includeDisabled) {
   });
 }
 
-function addMmaAndMotorsportsSettings() {
+function addMmaAndSoccerSettings() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
   if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
 
@@ -7762,7 +6099,7 @@ function addMmaAndMotorsportsSettings() {
 }
 
 function addExtraSportsSettings() {
-  const result = addMmaAndMotorsportsSettings();
+  const result = addMmaAndSoccerSettings();
   return {
     success: true,
     added: result.added,
@@ -7910,34 +6247,6 @@ function checkSportsEngineStatus() {
 }
 
 // Final production override: setup now ensures current live sheets and disables old racing settings rows.
-function setupSportsScoresSheet() {
-  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
-    sportsV13EnsureSheetHeaders_(sheetName, SPORTS_HEADERS[sheetName]);
-  });
-
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
-  applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
-  applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
-  sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
-  setupSportsSeasonJobsSheet();
-  setupSportsArchiveSystem_();
-
-  const settingsSheet = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (settingsSheet && settingsSheet.getLastRow() <= 1) seedSportsSettings_();
-  sportsScoresDisableRacingSettingsRows_();
-  upgradeSportsControlsV12();
-
-  logSports_("INFO", "setupSportsScoresSheet", "Sports Scores Engine production setup complete", "");
-
-  return {
-    success: true,
-    version: "14-production",
-    message: "Sports Scores Engine setup complete. Live sheets, SportsGames, season jobs, college coverage, and archives are ready. Racing rows are disabled here because racing is handled by the separate Racing Score Engine."
-  };
-}
-
 /************************************
  PATCH v17 - MLB EXTRA-INNING TIE PROTECTION
 
@@ -9114,31 +7423,99 @@ function setSmartSportsAutomationEnabled_(enabled, oddsHour, archiveHour) {
   };
 }
 
-// Final override: setup ensures SportsGames has schedule reconcile columns.
+// Final override: retry-safe setup. Each sheet is upgraded only once per run.
 function setupSportsScoresSheet() {
-  Object.keys(SPORTS_HEADERS).forEach(function(sheetName) {
-    sportsV13EnsureSheetHeaders_(sheetName, SPORTS_HEADERS[sheetName]);
-  });
+  const results = {};
 
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.GAMES, sportsV13GamesHeaders_());
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SCORES, SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_()));
-  applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
-  applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
-  sportsV13EnsureSheetHeaders_(SPORTS_SHEETS.SETTINGS, SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_()));
-  sportsV13EnsureSheetHeaders_("SportsCollegeTeams", sportsV13CollegeTeamsHeaders_());
-  setupSportsSeasonJobsSheet();
-  setupSportsArchiveSystem_();
+  results.games = sportsV13EnsureSheetHeaders_(
+    SPORTS_SHEETS.GAMES,
+    sportsV13GamesHeaders_()
+  );
 
-  const settingsSheet = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
-  if (settingsSheet && settingsSheet.getLastRow() <= 1) seedSportsSettings_();
+  results.scores = sportsV13EnsureSheetHeaders_(
+    SPORTS_SHEETS.SCORES,
+    SPORTS_HEADERS.SportsScores.concat(sportsV13ScoresExtraHeaders_())
+  );
+
+  results.snapshots = sportsV13EnsureSheetHeaders_(
+    SPORTS_SHEETS.SNAPSHOTS,
+    SPORTS_HEADERS.SportsSnapshots
+  );
+
+  results.settings = sportsV13EnsureSheetHeaders_(
+    SPORTS_SHEETS.SETTINGS,
+    SPORTS_HEADERS.SportsSettings.concat(sportsV13SettingsExtraHeaders_())
+  );
+
+  results.logs = sportsV13EnsureSheetHeaders_(
+    SPORTS_SHEETS.LOGS,
+    SPORTS_HEADERS.SportsLogs
+  );
+
+  results.collegeTeams = sportsV13EnsureSheetHeaders_(
+    "SportsCollegeTeams",
+    sportsV13CollegeTeamsHeaders_()
+  );
+
+  results.seasonJobs = setupSportsSeasonJobsSheet();
+  results.archive = setupSportsArchiveSystem_();
+
+  if (typeof setupSportsPlayersSystem === "function") {
+    results.players = setupSportsPlayersSystem();
+  }
+
+  try {
+    applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
+    applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
+  } catch (formatError) {
+    results.formatWarning =
+      formatError && formatError.message
+        ? formatError.message
+        : String(formatError);
+  }
+
+  const settingsSheet = sportsV13SpreadsheetRetry_(
+    "open SportsSettings after setup",
+    function() {
+      return SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
+    }
+  );
+
+  if (settingsSheet) {
+    let lastRow = 0;
+
+    try {
+      lastRow = sportsV13SpreadsheetRetry_(
+        "read SportsSettings row count",
+        function() {
+          return settingsSheet.getLastRow();
+        }
+      );
+    } catch (rowCountError) {
+      lastRow = 2;
+    }
+
+    if (lastRow <= 1) {
+      seedSportsSettings_();
+    }
+  }
+
   sportsScoresDisableRacingSettingsRows_();
-  upgradeSportsControlsV12();
 
-  logSports_("INFO", "setupSportsScoresSheet", "Sports Scores Engine production setup complete", "");
+  logSports_(
+    "INFO",
+    "setupSportsScoresSheet",
+    "Sports Scores Engine retry-safe production setup complete",
+    JSON.stringify({
+      playerSetup: !!results.players,
+      formatWarning: results.formatWarning || ""
+    })
+  );
 
   return {
     success: true,
-    version: "17-schedule-reconcile",
-    message: "Sports Scores Engine setup complete. Schedule reconcile columns and automation are ready."
+    version: "18.0.1-players-retry-safe",
+    results: results,
+    message: "Sports Scores Engine setup complete. Each sheet was checked once with Spreadsheet timeout retries."
   };
 }

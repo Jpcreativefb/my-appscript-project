@@ -1,0 +1,28 @@
+Storage Performance v2.1.1 Test Report
+======================================
+
+Result: PASS
+
+Automated suites:
+- archive_history_tests.js: PASS
+- archive_move_restore_tests.js: PASS
+- archive_production_readiness_tests.js: PASS
+- leaderboard_modal_interactions_tests.js: PASS
+- result_auto_lock_tests.js: PASS
+- storage_foundation_tests.js: PASS
+
+Leaderboard interaction coverage:
+- Career Stats modal is rendered in combined leaderboard: PASS
+- Career Stats modal is rendered in separate fixed/staked leaderboard: PASS
+- Career Stats modal is rendered in wager leaderboard: PASS
+- Career Stats delegated click dispatch: PASS
+- Compare delegated click dispatch: PASS
+- Missing modal-shell recovery is present for Career Stats: PASS
+- Missing modal-shell recovery is present for Compare: PASS
+- Service-worker cache bumped: PASS
+
+Syntax validation:
+- 99 JavaScript files parsed successfully with node --check.
+
+Remaining verification:
+- Controlled live browser test after Cloudflare Pages deployment.

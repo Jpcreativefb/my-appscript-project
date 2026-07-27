@@ -299,6 +299,80 @@ function apiAdminGetSportsControlDashboard(payload) {
 
 }
 
+/* =====================================================
+   PLAYER CONTROLS
+===================================================== */
+
+function apiAdminGetSportsPlayerStatus(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "getSportsPlayerStatusAdmin",
+    {}
+  );
+
+}
+
+function apiAdminSyncSportsPlayers(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "syncSportsPlayersAdmin",
+    {
+      league:
+        payload.league,
+
+      sport:
+        payload.sport
+    }
+  );
+
+}
+
+function apiAdminRefreshSportsPlayerGameStats(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "refreshSportsPlayerGameStatsAdmin",
+    {
+      league:
+        payload.league,
+
+      sport:
+        payload.sport,
+
+      daysBack:
+        payload.daysBack === undefined
+          ? 1
+          : payload.daysBack,
+
+      daysForward:
+        payload.daysForward === undefined
+          ? 1
+          : payload.daysForward,
+
+      maxGames:
+        payload.maxGames || 20
+    }
+  );
+
+}
+
 function apiAdminSetSportsEngineSmartAutomation(payload) {
 
   payload =

@@ -40,6 +40,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminBulkCreateNominees",
     "adminCloneNominee",
     "adminGetLeagueAccessDashboard",
+    "adminGetSportsControlDashboard",
+    "adminGetSportsPlayerStatus",
     "adminRefreshSportsWagerScores",
     "adminRefreshAndSettleSportsWagers",
     "adminAutoSetSportsWagerOdds",
@@ -50,6 +52,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminRunSportsScheduleReconcile",
     "adminRunSportsOddsHybridRefresh",
     "adminRefreshSportsOddsLeague",
+    "adminSyncSportsPlayers",
+    "adminRefreshSportsPlayerGameStats",
     "adminRefreshRacingWagerScores",
     "adminSettleRacingWagers"
   ]);
@@ -2487,6 +2491,64 @@ async function apiAdminSetupSportsControls() {
 
   return apiAdminSportsControl_(
     "adminSetupSportsControls"
+  );
+
+}
+
+async function apiAdminGetSportsPlayerStatus() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsPlayerStatus"
+  );
+
+}
+
+async function apiAdminSyncSportsPlayers(
+  league,
+  sport
+) {
+
+  return apiAdminSportsControl_(
+    "adminSyncSportsPlayers",
+    {
+      league:
+        league,
+
+      sport:
+        sport
+    }
+  );
+
+}
+
+async function apiAdminRefreshSportsPlayerGameStats(
+  league,
+  sport,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminRefreshSportsPlayerGameStats",
+    {
+      league:
+        league,
+
+      sport:
+        sport,
+
+      daysBack:
+        options.daysBack === undefined
+          ? 1
+          : options.daysBack,
+
+      daysForward:
+        options.daysForward === undefined
+          ? 1
+          : options.daysForward,
+
+      maxGames:
+        options.maxGames || 20
+    }
   );
 
 }
