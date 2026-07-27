@@ -82,7 +82,7 @@
 .compare-picks-modal {
   position: fixed;
   inset: 0;
-  z-index: 9999;
+  z-index: 2147483000;
   padding: 18px;
   background: rgba(0,0,0,0.72);
   display: flex;
@@ -95,6 +95,11 @@
 }
 
 .compare-picks-panel {
+  position: relative;
+  z-index: 1;
+  display: block;
+  visibility: visible;
+  opacity: 1;
   width: min(1120px, 100%);
   max-height: min(88vh, 920px);
   overflow: auto;
@@ -555,4 +560,10 @@
   border-radius: 999px;
   padding: 6px 9px;
   font-weight: 800;
+}
+
+
+/* v2.1.2: leaderboard dialogs are mounted directly under body. */
+body > .compare-picks-modal {
+  isolation: isolate;
 }

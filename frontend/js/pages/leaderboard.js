@@ -135,8 +135,6 @@ function renderStandardLeaderboardPage_(gameId, rows, leagueId) {
         ${renderStandardLeaderboardCards_(rows, "total")}
       </div>
 
-      ${renderCompareModalShell_()}
-      ${renderCareerProfileModalShell_()}
 
     </div>
   `;
@@ -231,7 +229,6 @@ function renderSeparatePredictionLeaderboards_(gameId, rows, leagueId) {
         </div>
       ` : ""}
 
-      ${renderCompareModalShell_()}
 
     </div>
   `;
@@ -523,7 +520,6 @@ function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
         }).join("")}
       </div>
 
-      ${renderCompareModalShell_()}
 
     </div>
   `;
@@ -563,7 +559,7 @@ function renderLeaderboardUser_(row) {
     <button
       class="leaderboard-user leaderboard-user-profile-button"
       type="button"
-      ${username ? `onclick="openLeaderboardCareerProfile_('${escapeLeaderboardJs_(username)}')"` : "disabled"}
+      ${username ? `data-leaderboard-action="career" data-username="${escapeLeaderboardAttr_(username)}"` : "disabled"}
       aria-label="View career history for ${escapeLeaderboardAttr_(displayName)}"
     >
       ${renderLeaderboardAvatar_(avatar, color)}
@@ -641,13 +637,172 @@ function renderPickWagerCompareButton_(username) {
     <button
       class="leaderboard-compare-btn"
       type="button"
-      onclick="openCompareUserPicks('${escapeLeaderboardAttr_(username)}')"
+      data-leaderboard-action="compare"
+      data-username="${escapeLeaderboardAttr_(username)}"
     >
       ${isSelf ? "View Pick + Wager" : "Compare"}
     </button>
   `;
 
 }
+
+
+function initializeLeaderboardInteractions_() {
+
+  if (window.__awardsLeaderboardInteractionsReady) {
+    return;
+  }
+
+  window.__awardsLeaderboardInteractionsReady = true;
+
+  document.addEventListener("click", function(event) {
+
+    const target =
+      event && event.target && typeof event.target.closest === "function"
+        ? event.target.closest("[data-leaderboard-action]")
+        : null;
+
+    if (!target) {
+      return;
+    }
+
+    const action =
+      String(target.getAttribute("data-leaderboard-action") || "")
+        .trim()
+        .toLowerCase();
+
+    const username =
+      String(target.getAttribute("data-username") || "")
+        .trim();
+
+    if (!username) {
+      return;
+    }
+
+    event.preventDefault();
+
+    if (action === "career") {
+      openLeaderboardCareerProfile_(username);
+      return;
+    }
+
+    if (action === "compare") {
+      openCompareUserPicks(username);
+    }
+
+  });
+
+}
+
+
+function ensureLeaderboardModalShells_() {
+
+  const host = document.body;
+
+  if (!host) {
+    return;
+  }
+
+  ensureLeaderboardModalShell_(
+    host,
+    "comparePicksModal",
+    "comparePicksContent",
+    renderCompareModalShell_
+  );
+
+  ensureLeaderboardModalShell_(
+    host,
+    "careerProfileModal",
+    "careerProfileContent",
+    renderCareerProfileModalShell_
+  );
+
+}
+
+
+function ensureLeaderboardModalShell_(host, modalId, contentId, renderer) {
+
+  let modal = document.getElementById(modalId);
+
+  const isValid =
+    modal &&
+    typeof modal.querySelector === "function" &&
+    modal.querySelector("#" + contentId) &&
+    modal.querySelector(".compare-picks-panel");
+
+  if (modal && !isValid) {
+    if (typeof modal.remove === "function") {
+      modal.remove();
+    } else if (modal.parentNode) {
+      modal.parentNode.removeChild(modal);
+    }
+    modal = null;
+  }
+
+  if (!modal) {
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = renderer().trim();
+    modal = wrapper.firstElementChild;
+
+    if (modal) {
+      host.appendChild(modal);
+    }
+  } else if (modal.parentNode !== host) {
+    host.appendChild(modal);
+  }
+
+  return modal;
+
+}
+
+
+function showLeaderboardModal_(modal, content, html) {
+
+  if (!modal || !content) {
+    return false;
+  }
+
+  content.innerHTML = html;
+
+  modal.classList.remove("hidden");
+  modal.removeAttribute("hidden");
+  modal.setAttribute("aria-hidden", "false");
+  modal.style.display = "flex";
+  modal.style.visibility = "visible";
+  modal.style.opacity = "1";
+
+  const panel =
+    typeof modal.querySelector === "function"
+      ? modal.querySelector(".compare-picks-panel")
+      : null;
+
+  if (panel) {
+    panel.style.display = "block";
+    panel.style.visibility = "visible";
+    panel.style.opacity = "1";
+  }
+
+  document.body.classList.add("compare-modal-open");
+  return true;
+
+}
+
+
+function hideLeaderboardModal_(modal) {
+
+  if (!modal) {
+    return;
+  }
+
+  modal.classList.add("hidden");
+  modal.setAttribute("aria-hidden", "true");
+  modal.style.display = "none";
+  document.body.classList.remove("compare-modal-open");
+
+}
+
+
+initializeLeaderboardInteractions_();
 
 
 function escapeLeaderboardAttr_(value) {
@@ -682,6 +837,10 @@ function renderCareerProfileModalShell_() {
     <div
       id="careerProfileModal"
       class="compare-picks-modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+      aria-label="Career history"
       onclick="handleCareerProfileBackdrop_(event)"
     >
       <div
@@ -698,6 +857,8 @@ function renderCareerProfileModalShell_() {
 async function openLeaderboardCareerProfile_(username) {
 
   username = String(username || "").trim();
+  ensureLeaderboardModalShells_();
+
   const modal = document.getElementById("careerProfileModal");
   const content = document.getElementById("careerProfileContent");
 
@@ -705,19 +866,43 @@ async function openLeaderboardCareerProfile_(username) {
     return;
   }
 
-  modal.classList.remove("hidden");
-  document.body.classList.add("compare-modal-open");
-  content.innerHTML = `
-    <div class="compare-picks-loading">
-      Loading career history…
-    </div>
-  `;
+  showLeaderboardModal_(
+    modal,
+    content,
+    `
+      <div class="compare-picks-header">
+        <div>
+          <h2>${escapeHtml(username)} · Career History</h2>
+          <p>Loading verified archived results…</p>
+        </div>
+        <button class="compare-close-btn" type="button" onclick="closeLeaderboardCareerProfile_()">×</button>
+      </div>
+      <div class="compare-picks-loading">
+        Loading career history…
+      </div>
+    `
+  );
 
   let response;
 
   try {
-    response = await apiGetUserProfileHistory(username, "");
+    if (typeof apiGetUserProfileHistory !== "function") {
+      throw new Error("Career history API is unavailable. Refresh the app and try again.");
+    }
+
+    response = await Promise.race([
+      apiGetUserProfileHistory(username, ""),
+      new Promise(function(resolve) {
+        setTimeout(function() {
+          resolve({
+            success: false,
+            message: "Career history took too long to load. Please try again."
+          });
+        }, 15000);
+      })
+    ]);
   } catch (err) {
+    console.error("Career history load failed:", err);
     response = {
       success: false,
       message: err && err.message ? err.message : String(err)
@@ -737,7 +922,20 @@ async function openLeaderboardCareerProfile_(username) {
     return;
   }
 
-  content.innerHTML = renderLeaderboardCareerProfile_(response);
+  try {
+    content.innerHTML = renderLeaderboardCareerProfile_(response);
+  } catch (err) {
+    console.error("Career history render failed:", err);
+    content.innerHTML = `
+      <div class="compare-picks-header">
+        <div><h2>Career History</h2></div>
+        <button class="compare-close-btn" type="button" onclick="closeLeaderboardCareerProfile_()">×</button>
+      </div>
+      <div class="compare-empty">
+        ${escapeHtml(err && err.message ? err.message : "Career history could not be displayed.")}
+      </div>
+    `;
+  }
 
 }
 
@@ -807,10 +1005,7 @@ function renderCareerProfileStat_(value, label) {
 function closeLeaderboardCareerProfile_() {
 
   const modal = document.getElementById("careerProfileModal");
-  if (modal) {
-    modal.classList.add("hidden");
-  }
-  document.body.classList.remove("compare-modal-open");
+  hideLeaderboardModal_(modal);
 
 }
 
@@ -832,6 +1027,10 @@ function renderCompareModalShell_() {
     <div
       id="comparePicksModal"
       class="compare-picks-modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-hidden="true"
+      aria-label="Compare picks and wagers"
       onclick="handleCompareModalBackdrop_(event)"
     >
       <div
@@ -933,6 +1132,8 @@ async function openCompareUserPicks(otherUsername) {
 
 function showComparePicksModal_(html) {
 
+  ensureLeaderboardModalShells_();
+
   const modal =
     document.getElementById("comparePicksModal");
 
@@ -943,10 +1144,7 @@ function showComparePicksModal_(html) {
     return;
   }
 
-  content.innerHTML = html;
-
-  modal.classList.remove("hidden");
-  document.body.classList.add("compare-modal-open");
+  showLeaderboardModal_(modal, content, html);
 
 }
 
@@ -956,11 +1154,7 @@ function closeComparePicksModal() {
   const modal =
     document.getElementById("comparePicksModal");
 
-  if (modal) {
-    modal.classList.add("hidden");
-  }
-
-  document.body.classList.remove("compare-modal-open");
+  hideLeaderboardModal_(modal);
 
 }
 

@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v210-production-archive";
+const AWARDS_CACHE = "awards-app-v212-career-panel-portal-fix";
 
 const APP_SHELL = [
   "./",
@@ -14,6 +14,7 @@ const APP_SHELL = [
   "./css/betting.css",
   "./css/profile.css",
   "./css/archive-history.css",
+  "./css/frontend-leaderboard-profile.css",
   "./css/league-admin.css",
   "./js/config.js",
   "./js/api.js",
