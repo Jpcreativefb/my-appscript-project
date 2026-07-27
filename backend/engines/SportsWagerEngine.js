@@ -1136,7 +1136,12 @@ function setupSportsWagerSystem() {
         "BettingOdds",
         "OddsSource",
         "OddsLastUpdated",
-        "LogoUrl"
+        "LogoUrl",
+        "SportsPlayerId",
+        "SportsPlayerName",
+        "SportsStatType",
+        "SportsPropLine",
+        "SportsPropSide"
       ]
     );
 
@@ -1158,7 +1163,12 @@ function setupSportsWagerSystem() {
         "WagerResultType",
         "OddsReady",
         "OddsSource",
-        "OddsLastUpdated"
+        "OddsLastUpdated",
+        "SportsPlayerId",
+        "SportsPlayerName",
+        "SportsStatType",
+        "SportsPropLine",
+        "SportsPropSide"
       ]
     );
 
@@ -1807,6 +1817,16 @@ function sportsWagerNormalizeMarket_(market) {
     );
 
   if (
+    market === "player-prop" ||
+    market === "playerprop" ||
+    market === "player_prop" ||
+    market === "prop" ||
+    market === "player-over-under"
+  ) {
+    return "player-prop";
+  }
+
+  if (
     market === "soccer-moneyline" ||
     market === "soccer-3way" ||
     market === "soccer-3-way" ||
@@ -1879,6 +1899,10 @@ function sportsWagerMarketLabel_(market) {
 
   market =
     sportsWagerNormalizeMarket_(market);
+
+  if (market === "player-prop") {
+    return "Player Prop";
+  }
 
   if (market === "soccer-moneyline") {
     return "Soccer 3-Way Moneyline";
@@ -7044,6 +7068,11 @@ function settleSportsWagers(payload) {
     const item =
       map[key];
 
+    if (item.market === "player-prop") {
+      summary.skipped++;
+      return;
+    }
+
     try {
 
       let score = null;
@@ -7447,6 +7476,9 @@ function refreshSportsWagerScores(payload) {
             )
           : SPORTS_WAGER_DEFAULT_MARKET;
 
+      const isPlayerProp =
+        market === "player-prop";
+
       const categoryName =
         sportsWagerCategoryName_(
           score,
@@ -7493,12 +7525,13 @@ function refreshSportsWagerScores(payload) {
           selection
         );
 
-      if (col.Category !== undefined) {
+      if (!isPlayerProp && col.Category !== undefined) {
         updatedData[i][col.Category] =
           categoryName;
       }
 
       if (
+        !isPlayerProp &&
         selectionName &&
         col.Nominee !== undefined
       ) {
@@ -7507,6 +7540,7 @@ function refreshSportsWagerScores(payload) {
       }
 
       if (
+        !isPlayerProp &&
         selectionName &&
         col.ShortAnswer !== undefined
       ) {
@@ -7564,7 +7598,7 @@ function refreshSportsWagerScores(payload) {
           sportsWagerCleanRecordDisplay_(score.AwayRecord);
       }
 
-      if (col.LogoUrl !== undefined) {
+      if (!isPlayerProp && col.LogoUrl !== undefined) {
 
         let logo = "";
 
@@ -8366,6 +8400,11 @@ function finalizeSportsWagerResultsFromSourceScores_(payload) {
 
     summary.checked++;
 
+    if (item.market === "player-prop") {
+      summary.skipped++;
+      return;
+    }
+
     const sourceScore =
       sportsWagerFindSourceScoreForItem_(
         item,
@@ -8652,6 +8691,15 @@ function refreshAndSettleSportsWagers(payload) {
       force: true
     });
 
+  const playerProps =
+    typeof settleSportsPlayerProps === "function"
+      ? settleSportsPlayerProps({
+          gameId: awardsGameId,
+          force: true,
+          refreshStats: true
+        })
+      : null;
+
   if (
     typeof clearAppCaches ===
     "function"
@@ -8668,6 +8716,7 @@ function refreshAndSettleSportsWagers(payload) {
     autoOdds: autoOdds,
     settle: settle,
     categoryResultsFinalizer: categoryResultsFinalizer,
+    playerProps: playerProps,
     updated:
       refresh && refresh.updated
         ? refresh.updated
@@ -9128,6 +9177,11 @@ function autoSetSportsWagerOdds(payload) {
 
     const group =
       groups[key];
+
+    if (group.market === "player-prop") {
+      summary.skipped++;
+      return;
+    }
 
     if (
       skipFinalOdds &&
@@ -9834,6 +9888,14 @@ function apiAdminRunSportsFullSync(payload) {
       true
     );
 
+  const immediatePlayerProps =
+    typeof settleSportsPlayerPropsForAllGames_ === "function"
+      ? settleSportsPlayerPropsForAllGames_({
+          force: true,
+          refreshStats: false
+        })
+      : null;
+
   const queued =
     queueSportsWagerSmartAutomationNow_(
       "manual-full-sync"
@@ -9845,6 +9907,7 @@ function apiAdminRunSportsFullSync(payload) {
     message:
       "Smart Sports Sync queued. Finished-game finalizer ran now; source scores/odds sync will run in the background trigger shortly.",
     immediateFinalizer: immediateFinalizer,
+    immediatePlayerProps: immediatePlayerProps,
     sync: {
       queued: true,
       preFinalizer: immediateFinalizer,
@@ -10873,6 +10936,7 @@ function runSportsWagerSmartAutomation(payload) {
       relevantEvents: dueInfo.relevant.length,
       skippedEvents: dueInfo.skipped.length,
       sourceScores: null,
+      sourcePlayerStats: null,
       sourceOdds: null,
       preFinalizer: preFinalizer,
       postFinalizer: null,
@@ -10895,6 +10959,20 @@ function runSportsWagerSmartAutomation(payload) {
         success: false,
         error: scoreErr && scoreErr.message ? scoreErr.message : String(scoreErr)
       };
+    }
+
+    if (typeof sportsPlayerPropRefreshStatsForLeagues_ === "function") {
+      try {
+        summary.sourcePlayerStats =
+          sportsPlayerPropRefreshStatsForLeagues_(leagueNames);
+      } catch (playerStatsErr) {
+        summary.sourcePlayerStats = {
+          success: false,
+          error: playerStatsErr && playerStatsErr.message
+            ? playerStatsErr.message
+            : String(playerStatsErr)
+        };
+      }
     }
 
     const oddsLeagueNames =
@@ -10965,13 +11043,23 @@ function runSportsWagerSmartAutomation(payload) {
             force: true
           });
 
+        const playerProps =
+          typeof settleSportsPlayerProps === "function"
+            ? settleSportsPlayerProps({
+                gameId: gameId,
+                force: true,
+                refreshStats: false
+              })
+            : null;
+
         summary.results.push({
           gameId: gameId,
           success: true,
           refresh: refresh,
           autoOdds: autoOdds,
           settle: settle,
-          categoryResultsFinalizer: categoryResultsFinalizer
+          categoryResultsFinalizer: categoryResultsFinalizer,
+          playerProps: playerProps
         });
 
       } catch (err) {
@@ -10988,6 +11076,14 @@ function runSportsWagerSmartAutomation(payload) {
 
     summary.postFinalizer =
       finalizeSportsWagerResultsFromSourceScoresForAllGames_(true);
+
+    summary.postPlayerProps =
+      typeof settleSportsPlayerPropsForAllGames_ === "function"
+        ? settleSportsPlayerPropsForAllGames_({
+            force: true,
+            refreshStats: false
+          })
+        : null;
 
     const props =
       PropertiesService.getScriptProperties();

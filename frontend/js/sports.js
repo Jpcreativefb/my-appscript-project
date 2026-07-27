@@ -24,7 +24,8 @@ let sportsScoresState = {
   leagues: [],
   scores: [],
   activeFilter: {},
-  creatingWager: false
+  creatingWager: false,
+  creatingPlayerProp: false
 };
 
 let sportsUsageByGameId = {};
@@ -221,6 +222,22 @@ function bindSportsEvents() {
 
   scoresGrid
     .addEventListener("click", function(e) {
+
+      const playerPropBtn =
+        e.target.closest("[data-create-player-prop-game-id]");
+
+      if (playerPropBtn) {
+
+        const gameId =
+          playerPropBtn.getAttribute(
+            "data-create-player-prop-game-id"
+          );
+
+        createSportsPlayerPropFromCard(gameId);
+
+        return;
+
+      }
 
       const wagerBtn =
         e.target.closest("[data-create-wager-game-id]");
@@ -665,6 +682,7 @@ function renderSportsScores(scores) {
         </button>
 
         ${renderCreateWagerButton(game)}
+        ${renderCreatePlayerPropButton(game)}
       </div>
     `;
 
@@ -2160,6 +2178,570 @@ async function createSportsWagerFromCard(gameId) {
 
   }
 
+}
+
+
+/************************************
+ PLAYER PROP CREATION
+ Admin-only v1 workflow for MLB/NFL.
+************************************/
+
+function sportsPlayerPropsSupported_(game) {
+  const league =
+    String(game && game.League || "")
+      .trim()
+      .toLowerCase();
+
+  return league === "mlb" || league === "nfl";
+}
+
+function renderCreatePlayerPropButton(game) {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    return "";
+  }
+
+  if (
+    !game ||
+    !game.GameId ||
+    !game.HomeTeam ||
+    !game.AwayTeam ||
+    !sportsPlayerPropsSupported_(game)
+  ) {
+    return "";
+  }
+
+  return `
+    <button
+      class="small-btn player-prop-btn"
+      data-create-player-prop-game-id="${escapeSportsHtml(game.GameId || "")}"
+    >
+      Create Player Prop
+    </button>
+  `;
+
+}
+
+function normalizeSportsPlayerTeamKey_(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sportsPlayerTeamMatchesGame_(player, game) {
+  const playerTeam = normalizeSportsPlayerTeamKey_(
+    player && (player.Team || player.TeamName)
+  );
+  const home = normalizeSportsPlayerTeamKey_(game && game.HomeTeam);
+  const away = normalizeSportsPlayerTeamKey_(game && game.AwayTeam);
+
+  if (!playerTeam) {
+    return false;
+  }
+
+  return [home, away].some(function(team) {
+    if (!team) {
+      return false;
+    }
+
+    return (
+      playerTeam === team ||
+      playerTeam.indexOf(team) !== -1 ||
+      team.indexOf(playerTeam) !== -1
+    );
+  });
+}
+
+function sportsPlayerPropPlayerLabel_(player) {
+  const name =
+    String(
+      player &&
+      (player.FullName || player.ShortName || player.PlayerName) ||
+      "Unknown Player"
+    ).trim();
+
+  const team =
+    String(player && (player.Team || player.TeamName) || "")
+      .trim();
+
+  const position =
+    String(player && player.Position || "")
+      .trim();
+
+  return [
+    team,
+    name,
+    position ? "(" + position + ")" : ""
+  ].filter(Boolean).join(" — ");
+}
+
+async function getSportsPlayerPropOptions_(session, game) {
+  const result =
+    await sportsAwardsApi_(
+      "adminGetSportsPlayerPropPlayers",
+      {
+        username: session.username,
+        token: session.token,
+        league: game.League,
+        sport: game.Sport,
+        limit: 2000
+      }
+    );
+
+  if (!result || result.success === false) {
+    throw new Error(
+      (result && (result.error || result.message || result.reason)) ||
+      "Could not load players from the Sports Scores Engine."
+    );
+  }
+
+  const allPlayers =
+    Array.isArray(result.players)
+      ? result.players
+      : [];
+
+  const gamePlayers =
+    allPlayers
+      .filter(function(player) {
+        return sportsPlayerTeamMatchesGame_(player, game);
+      })
+      .sort(function(a, b) {
+        const teamCompare =
+          String(a.Team || "")
+            .localeCompare(String(b.Team || ""));
+
+        if (teamCompare) {
+          return teamCompare;
+        }
+
+        return String(a.FullName || a.ShortName || "")
+          .localeCompare(String(b.FullName || b.ShortName || ""));
+      });
+
+  if (!gamePlayers.length) {
+    throw new Error(
+      "No synced players matched " +
+      (game.AwayTeam || "Away") +
+      " or " +
+      (game.HomeTeam || "Home") +
+      ". Open Sports Controls and run Sync Players for " +
+      String(game.League || "this league").toUpperCase() +
+      "."
+    );
+  }
+
+  return {
+    players: gamePlayers,
+    statTypes:
+      Array.isArray(result.statTypes)
+        ? result.statTypes
+        : []
+  };
+}
+
+function showSportsPlayerPropModal_(game, awardsGameId, options) {
+
+  return new Promise(function(resolve) {
+
+    const existing =
+      document.getElementById("sportsPlayerPropOverlay");
+
+    if (existing) {
+      existing.remove();
+    }
+
+    const players =
+      Array.isArray(options && options.players)
+        ? options.players
+        : [];
+
+    const statTypes =
+      Array.isArray(options && options.statTypes)
+        ? options.statTypes
+        : [];
+
+    const playerOptions =
+      players.map(function(player) {
+        const playerId =
+          String(player.PlayerId || player.ESPNPlayerId || "")
+            .trim();
+
+        return (
+          '<option value="' +
+          escapeSportsHtml(playerId) +
+          '">' +
+          escapeSportsHtml(sportsPlayerPropPlayerLabel_(player)) +
+          '</option>'
+        );
+      }).join("");
+
+    const statOptions =
+      statTypes.map(function(stat) {
+        return (
+          '<option value="' +
+          escapeSportsHtml(stat.value || "") +
+          '">' +
+          escapeSportsHtml(stat.label || stat.value || "") +
+          '</option>'
+        );
+      }).join("");
+
+    const overlay =
+      document.createElement("div");
+
+    overlay.id =
+      "sportsPlayerPropOverlay";
+
+    overlay.className =
+      "sports-player-prop-overlay";
+
+    overlay.innerHTML = `
+      <div class="sports-player-prop-modal">
+        <h3>Create Player Prop</h3>
+
+        <p class="sports-player-prop-game">
+          ${escapeSportsHtml(game.AwayTeam || "Away")}
+          @
+          ${escapeSportsHtml(game.HomeTeam || "Home")}
+        </p>
+
+        <p class="sports-player-prop-destination">
+          Awards Game: <strong>${escapeSportsHtml(awardsGameId)}</strong>
+        </p>
+
+        <form id="sportsPlayerPropForm">
+          <label class="sports-player-prop-field">
+            <span>Player</span>
+            <select id="sportsPlayerPropPlayer" required>
+              ${playerOptions}
+            </select>
+          </label>
+
+          <label class="sports-player-prop-field">
+            <span>Statistic</span>
+            <select id="sportsPlayerPropStat" required>
+              ${statOptions}
+            </select>
+          </label>
+
+          <label class="sports-player-prop-field">
+            <span>Over / Under Line</span>
+            <input
+              id="sportsPlayerPropLine"
+              type="number"
+              min="0"
+              step="0.5"
+              inputmode="decimal"
+              placeholder="Example: 275.5"
+              required
+            >
+          </label>
+
+          <div class="sports-player-prop-odds-grid">
+            <label class="sports-player-prop-field">
+              <span>Over Odds</span>
+              <input
+                id="sportsPlayerPropOverOdds"
+                type="number"
+                min="1.01"
+                step="0.01"
+                inputmode="decimal"
+                value="1.91"
+                required
+              >
+            </label>
+
+            <label class="sports-player-prop-field">
+              <span>Under Odds</span>
+              <input
+                id="sportsPlayerPropUnderOdds"
+                type="number"
+                min="1.01"
+                step="0.01"
+                inputmode="decimal"
+                value="1.91"
+                required
+              >
+            </label>
+          </div>
+
+          <div id="sportsPlayerPropPreview" class="sports-player-prop-preview"></div>
+
+          <div class="sports-player-prop-actions">
+            <button
+              type="button"
+              class="small-btn"
+              id="sportsPlayerPropCancel"
+            >
+              Cancel
+            </button>
+
+            <button
+              type="submit"
+              class="small-btn player-prop-btn"
+            >
+              Create Player Prop
+            </button>
+          </div>
+        </form>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const form =
+      document.getElementById("sportsPlayerPropForm");
+
+    const playerSelect =
+      document.getElementById("sportsPlayerPropPlayer");
+
+    const statSelect =
+      document.getElementById("sportsPlayerPropStat");
+
+    const lineInput =
+      document.getElementById("sportsPlayerPropLine");
+
+    const overOddsInput =
+      document.getElementById("sportsPlayerPropOverOdds");
+
+    const underOddsInput =
+      document.getElementById("sportsPlayerPropUnderOdds");
+
+    const preview =
+      document.getElementById("sportsPlayerPropPreview");
+
+    function updatePreview() {
+      const playerText =
+        playerSelect.options[playerSelect.selectedIndex]
+          ? playerSelect.options[playerSelect.selectedIndex].text
+          : "Player";
+
+      const statText =
+        statSelect.options[statSelect.selectedIndex]
+          ? statSelect.options[statSelect.selectedIndex].text
+          : "Statistic";
+
+      const line =
+        String(lineInput.value || "").trim();
+
+      preview.textContent =
+        line
+          ? "Question: Will " + playerText + " record over " + line + " " + statText.toLowerCase() + "?"
+          : "Enter a line to preview the question.";
+    }
+
+    function close(value) {
+      overlay.remove();
+      resolve(value || null);
+    }
+
+    [playerSelect, statSelect, lineInput]
+      .forEach(function(control) {
+        control.addEventListener("input", updatePreview);
+        control.addEventListener("change", updatePreview);
+      });
+
+    document
+      .getElementById("sportsPlayerPropCancel")
+      .addEventListener("click", function() {
+        close(null);
+      });
+
+    form.addEventListener("submit", function(event) {
+      event.preventDefault();
+
+      const line =
+        Number(lineInput.value);
+
+      const overOdds =
+        Number(overOddsInput.value);
+
+      const underOdds =
+        Number(underOddsInput.value);
+
+      if (!isFinite(line) || line < 0) {
+        alert("Enter a valid player-prop line.");
+        return;
+      }
+
+      if (
+        !isFinite(overOdds) ||
+        !isFinite(underOdds) ||
+        overOdds <= 1 ||
+        underOdds <= 1
+      ) {
+        alert("Over and Under decimal odds must be greater than 1.00.");
+        return;
+      }
+
+      close({
+        sportsPlayerId: playerSelect.value,
+        sportsStatType: statSelect.value,
+        sportsPropLine: line,
+        overOdds: overOdds,
+        underOdds: underOdds
+      });
+    });
+
+    overlay.addEventListener("click", function(event) {
+      if (event.target === overlay) {
+        close(null);
+      }
+    });
+
+    updatePreview();
+    lineInput.focus();
+  });
+}
+
+async function createSportsPlayerPropFromCard(gameId) {
+
+  if (
+    sportsScoresState.creatingWager ||
+    sportsScoresState.creatingPlayerProp
+  ) {
+    return;
+  }
+
+  const game =
+    sportsScoresState.scores.find(function(item) {
+      return item.GameId === gameId;
+    });
+
+  if (!game) {
+    showSportsError("Could not find selected sports game.");
+    return;
+  }
+
+  if (!sportsPlayerPropsSupported_(game)) {
+    showSportsError("Player props v1 currently supports MLB and NFL only.");
+    return;
+  }
+
+  const session =
+    getSportsStoredSession_();
+
+  if (
+    !session.username ||
+    !session.token ||
+    !sportsSessionIsAdmin_(session)
+  ) {
+    showSportsError(
+      "Log in as an admin in the main app first, then return to Sports."
+    );
+    return;
+  }
+
+  sportsScoresState.creatingPlayerProp =
+    true;
+
+  try {
+    const awardsGameId =
+      await chooseSportsAwardsGameId_(session);
+
+    if (!awardsGameId) {
+      return;
+    }
+
+    setSportsStatus(
+      "Loading " +
+      String(game.League || "").toUpperCase() +
+      " players for " +
+      game.AwayTeam +
+      " @ " +
+      game.HomeTeam +
+      "..."
+    );
+
+    const options =
+      await getSportsPlayerPropOptions_(session, game);
+
+    const config =
+      await showSportsPlayerPropModal_(
+        game,
+        awardsGameId,
+        options
+      );
+
+    if (!config) {
+      setSportsStatus("Player prop creation canceled.");
+      return;
+    }
+
+    setSportsStatus("Creating player prop...");
+
+    const result =
+      await sportsAwardsApi_(
+        "adminCreateSportsPlayerProp",
+        {
+          username: session.username,
+          token: session.token,
+          awardsGameId: awardsGameId,
+          gameId: awardsGameId,
+          sportsGameId: game.GameId,
+          espnEventId: game.ESPNEventId,
+          league: game.League,
+          sport: game.Sport,
+          sportsPlayerId: config.sportsPlayerId,
+          sportsStatType: config.sportsStatType,
+          sportsPropLine: config.sportsPropLine,
+          overOdds: config.overOdds,
+          underOdds: config.underOdds
+        }
+      );
+
+    if (!result || result.success === false) {
+      if (result && result.duplicate) {
+        throw new Error(
+          result.message ||
+          "This player prop already exists in the selected Awards Game."
+        );
+      }
+
+      throw new Error(
+        (result && (result.error || result.message || result.reason)) ||
+        "Could not create player prop."
+      );
+    }
+
+    setSportsStatus(
+      "Created player prop: " +
+      (result.category || result.categoryId) +
+      "."
+    );
+
+    alert(
+      "Player prop created.\n\n" +
+      (result.category || "") +
+      "\nOver: " +
+      result.overOdds +
+      "\nUnder: " +
+      result.underOdds
+    );
+
+    await loadSportsScores(
+      buildSportsFiltersFromControls()
+    );
+
+  } catch (err) {
+    showSportsError(
+      err && err.message
+        ? err.message
+        : "Could not create player prop."
+    );
+
+    setSportsStatus("Could not create player prop.");
+  } finally {
+    sportsScoresState.creatingPlayerProp =
+      false;
+  }
 }
 
 /************************************

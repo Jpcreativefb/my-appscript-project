@@ -1,0 +1,1039 @@
+/* =====================================================
+   SPORTS PLAYER PROP ENGINE v1
+   Lives in Awards App backend.
+
+   Purpose:
+   - Read SportsPlayers / SportsPlayerGameStats from the
+     separate Sports Scores Engine.
+   - Create simple Over / Under player-prop wager questions.
+   - Settle those questions from final ESPN player stats.
+
+   v1 supported leagues:
+   - MLB
+   - NFL
+===================================================== */
+
+const SPORTS_PLAYER_PROP_MARKET = "player-prop";
+const SPORTS_PLAYER_PROP_VERSION = "sports-player-prop-v1";
+const SPORTS_PLAYER_PROP_SECTION = "Player Props";
+
+const SPORTS_PLAYER_PROP_CATEGORY_HEADERS = [
+  "SportsPlayerId",
+  "SportsPlayerName",
+  "SportsStatType",
+  "SportsPropLine",
+  "SportsPropSide"
+];
+
+const SPORTS_PLAYER_PROP_SETTING_HEADERS = [
+  "SportsPlayerId",
+  "SportsPlayerName",
+  "SportsStatType",
+  "SportsPropLine",
+  "SportsPropSide"
+];
+
+function sportsPlayerPropString_(value) {
+  return String(value === null || value === undefined ? "" : value).trim();
+}
+
+function sportsPlayerPropKey_(value) {
+  return sportsPlayerPropString_(value).toLowerCase();
+}
+
+function sportsPlayerPropSlug_(value) {
+  return sportsPlayerPropKey_(value)
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function sportsPlayerPropNumber_(value, fallback) {
+  if (value === "" || value === null || value === undefined) return fallback;
+  const number = Number(value);
+  return isFinite(number) ? number : fallback;
+}
+
+function sportsPlayerPropBoolean_(value, fallback) {
+  if (value === true || value === false) return value;
+  const key = sportsPlayerPropKey_(value);
+  if (["true", "yes", "1", "on"].indexOf(key) !== -1) return true;
+  if (["false", "no", "0", "off"].indexOf(key) !== -1) return false;
+  return fallback;
+}
+
+function sportsPlayerPropHeaderMap_(headers) {
+  const map = {};
+  (headers || []).forEach(function(header, index) {
+    const key = sportsPlayerPropString_(header);
+    if (key && map[key] === undefined) map[key] = index;
+  });
+  return map;
+}
+
+function sportsPlayerPropSet_(row, col, header, value) {
+  if (col[header] !== undefined) row[col[header]] = value;
+}
+
+function sportsPlayerPropEnsureHeaders_(sheetName, headers) {
+  if (typeof sportsWagerEnsureColumns_ === "function") {
+    return sportsWagerEnsureColumns_(sheetName, headers);
+  }
+
+  const ss = SpreadsheetApp.getActive();
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) sheet = ss.insertSheet(sheetName);
+
+  if (sheet.getLastRow() === 0 || sheet.getLastColumn() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    return { success: true, added: headers.slice() };
+  }
+
+  const existing = sheet.getRange(1, 1, 1, sheet.getLastColumn())
+    .getValues()[0]
+    .map(sportsPlayerPropString_);
+
+  const missing = headers.filter(function(header) {
+    return existing.indexOf(header) === -1;
+  });
+
+  if (missing.length) {
+    sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length)
+      .setValues([missing]);
+  }
+
+  return { success: true, added: missing };
+}
+
+function setupSportsPlayerPropSystem() {
+  const categories = sportsPlayerPropEnsureHeaders_(
+    typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories",
+    SPORTS_PLAYER_PROP_CATEGORY_HEADERS
+  );
+
+  const settings = sportsPlayerPropEnsureHeaders_(
+    typeof CATEGORY_SETTINGS_SHEET !== "undefined" ? CATEGORY_SETTINGS_SHEET : "CategorySettings",
+    SPORTS_PLAYER_PROP_SETTING_HEADERS.concat([
+      "SportsGameId",
+      "ESPNEventId",
+      "SportsMarket",
+      "SportsLeague",
+      "QuestionType",
+      "ScoringEngine",
+      "ScoreMode",
+      "SelectionMode",
+      "OddsMode",
+      "ResultSource",
+      "SettlementStatus",
+      "WagerResultType",
+      "OddsReady",
+      "OddsSource",
+      "OddsLastUpdated",
+      "ResultSourceType",
+      "ResultProvider",
+      "ExternalEventId",
+      "ExternalSubjectId",
+      "StatKey",
+      "ComparisonOperator",
+      "Threshold",
+      "AutoSettle",
+      "RequireAdminReview",
+      "SourceConfigJSON"
+    ])
+  );
+
+  return {
+    success: true,
+    version: "1.0",
+    categories: categories,
+    categorySettings: settings
+  };
+}
+
+function sportsPlayerPropLeagueSport_(league, sport) {
+  const leagueKey = sportsPlayerPropKey_(league);
+  const sportKey = sportsPlayerPropKey_(sport);
+
+  if (leagueKey === "mlb" || sportKey === "baseball") {
+    return { league: "mlb", sport: "baseball" };
+  }
+
+  if (leagueKey === "nfl" || sportKey === "football") {
+    return { league: "nfl", sport: "football" };
+  }
+
+  throw new Error("Player props v1 currently supports MLB and NFL only.");
+}
+
+function sportsPlayerPropStatOptions_(league, sport) {
+  const resolved = sportsPlayerPropLeagueSport_(league, sport);
+
+  if (resolved.league === "nfl") {
+    return [
+      ["passing-yards", "Passing Yards"],
+      ["passing-touchdowns", "Passing Touchdowns"],
+      ["interceptions-thrown", "Interceptions Thrown"],
+      ["rushing-yards", "Rushing Yards"],
+      ["rushing-touchdowns", "Rushing Touchdowns"],
+      ["receptions", "Receptions"],
+      ["receiving-yards", "Receiving Yards"],
+      ["receiving-touchdowns", "Receiving Touchdowns"],
+      ["field-goals-made", "Field Goals Made"],
+      ["sacks", "Sacks"],
+      ["tackles", "Tackles"],
+      ["interceptions", "Defensive Interceptions"]
+    ];
+  }
+
+  return [
+    ["hits", "Hits"],
+    ["home-runs", "Home Runs"],
+    ["runs", "Runs"],
+    ["runs-batted-in", "Runs Batted In"],
+    ["walks", "Walks"],
+    ["total-bases", "Total Bases"],
+    ["stolen-bases", "Stolen Bases"],
+    ["batting-strikeouts", "Batter Strikeouts"],
+    ["pitching-strikeouts", "Pitcher Strikeouts"],
+    ["hits-allowed", "Hits Allowed"],
+    ["earned-runs", "Earned Runs"],
+    ["pitching-walks", "Pitching Walks"]
+  ];
+}
+
+function sportsPlayerPropStatLabel_(league, sport, statType) {
+  const key = sportsPlayerPropSlug_(statType);
+  const options = sportsPlayerPropStatOptions_(league, sport);
+  for (let i = 0; i < options.length; i++) {
+    if (options[i][0] === key) return options[i][1];
+  }
+  return key
+    .split("-")
+    .map(function(part) {
+      return part ? part.charAt(0).toUpperCase() + part.slice(1) : "";
+    })
+    .join(" ");
+}
+
+function sportsPlayerPropAssertStat_(league, sport, statType) {
+  const key = sportsPlayerPropSlug_(statType);
+  const allowed = sportsPlayerPropStatOptions_(league, sport).some(function(item) {
+    return item[0] === key;
+  });
+  if (!allowed) {
+    throw new Error("Unsupported " + sportsPlayerPropString_(league).toUpperCase() + " player stat: " + statType);
+  }
+  return key;
+}
+
+function sportsPlayerPropFetch_(params, label) {
+  if (typeof sportsWagerFetchJson_ !== "function") {
+    throw new Error("SportsWagerEngine is required for Sports Player Props.");
+  }
+
+  const result = sportsWagerFetchJson_(params, label || "Sports Player Props");
+  if (!result || result.success === false) {
+    throw new Error(
+      (result && (result.error || result.message || result.reason)) ||
+      (label || "Sports Player Props") + " request failed."
+    );
+  }
+  return result;
+}
+
+function sportsPlayerPropGetGame_(sportsGameId, espnEventId) {
+  const result = sportsPlayerPropFetch_({
+    action: "getSportsScores",
+    gameId: sportsPlayerPropString_(sportsGameId),
+    espnEventId: sportsPlayerPropString_(espnEventId)
+  }, "Sports game lookup");
+
+  const scores = Array.isArray(result.scores) ? result.scores : [];
+  if (!scores.length) throw new Error("Sports game was not found in the Sports Scores Engine.");
+  if (scores.length > 1) throw new Error("Sports game lookup returned more than one game.");
+  return scores[0];
+}
+
+function sportsPlayerPropGetPlayer_(playerId, espnPlayerId, league) {
+  const result = sportsPlayerPropFetch_({
+    action: "getSportsPlayers",
+    playerId: sportsPlayerPropString_(playerId),
+    espnPlayerId: sportsPlayerPropString_(espnPlayerId),
+    league: sportsPlayerPropKey_(league),
+    active: "true",
+    limit: 10
+  }, "Sports player lookup");
+
+  const players = Array.isArray(result.players) ? result.players : [];
+  if (!players.length) throw new Error("Player was not found in SportsPlayers. Run Sync Players for the league first.");
+
+  const exact = players.find(function(player) {
+    return (
+      (playerId && sportsPlayerPropString_(player.PlayerId) === sportsPlayerPropString_(playerId)) ||
+      (espnPlayerId && sportsPlayerPropString_(player.ESPNPlayerId) === sportsPlayerPropString_(espnPlayerId))
+    );
+  });
+
+  return exact || players[0];
+}
+
+function sportsPlayerPropTeamMatchesGame_(player, game) {
+  const playerTeam = sportsPlayerPropSlug_(player.Team);
+  const home = sportsPlayerPropSlug_(game.HomeTeam);
+  const away = sportsPlayerPropSlug_(game.AwayTeam);
+
+  if (!playerTeam || (!home && !away)) return true;
+  return [home, away].some(function(team) {
+    if (!team) return false;
+    return (
+      playerTeam === team ||
+      playerTeam.indexOf(team) !== -1 ||
+      team.indexOf(playerTeam) !== -1
+    );
+  });
+}
+
+function sportsPlayerPropCategoryId_(eventId, playerId, statType, line) {
+  const lineKey = String(line).replace(/\./g, "-").replace(/[^0-9-]+/g, "");
+  return [
+    "player-prop",
+    sportsPlayerPropSlug_(eventId),
+    sportsPlayerPropSlug_(playerId).slice(-30),
+    sportsPlayerPropSlug_(statType),
+    lineKey || "line"
+  ].join("-");
+}
+
+function sportsPlayerPropQuestion_(playerName, statLabel, line) {
+  return "Will " + playerName + " record over " + line + " " + statLabel.toLowerCase() + "?";
+}
+
+function sportsPlayerPropCategoryExists_(awardsGameId, categoryId) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(
+    typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories"
+  );
+  if (!sheet || sheet.getLastRow() < 2) return false;
+
+  const data = sheet.getDataRange().getValues();
+  const col = sportsPlayerPropHeaderMap_(data[0]);
+
+  for (let i = 1; i < data.length; i++) {
+    const gameId = col.GameId === undefined ? "" : sportsPlayerPropString_(data[i][col.GameId]);
+    const rowCategoryId = col.CategoryId === undefined ? "" : sportsPlayerPropKey_(data[i][col.CategoryId]);
+    if (gameId === awardsGameId && rowCategoryId === sportsPlayerPropKey_(categoryId)) return true;
+  }
+  return false;
+}
+
+function sportsPlayerPropAppendCategoryRows_(config) {
+  const sheetName = typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories";
+  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sheet) throw new Error("Missing sheet: " + sheetName);
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(sportsPlayerPropString_);
+  const col = sportsPlayerPropHeaderMap_(headers);
+  const now = new Date();
+
+  const entries = [
+    { side: "over", nominee: "Over " + config.line, odds: config.overOdds },
+    { side: "under", nominee: "Under " + config.line, odds: config.underOdds }
+  ];
+
+  const rows = entries.map(function(entry) {
+    const row = new Array(headers.length).fill("");
+    sportsPlayerPropSet_(row, col, "GameId", config.awardsGameId);
+    sportsPlayerPropSet_(row, col, "Category", config.categoryName);
+    sportsPlayerPropSet_(row, col, "CategoryId", config.categoryId);
+    sportsPlayerPropSet_(row, col, "Nominee", entry.nominee);
+    sportsPlayerPropSet_(row, col, "NomineeId", entry.side);
+    sportsPlayerPropSet_(row, col, "Section", config.league.toUpperCase() + " " + SPORTS_PLAYER_PROP_SECTION);
+    sportsPlayerPropSet_(row, col, "ShortAnswer", entry.nominee);
+    sportsPlayerPropSet_(row, col, "Active", true);
+    sportsPlayerPropSet_(row, col, "PredictionGame", true);
+    sportsPlayerPropSet_(row, col, "CommunityRank", false);
+    sportsPlayerPropSet_(row, col, "QuestionType", "player-prop-over-under");
+    sportsPlayerPropSet_(row, col, "ScoringEngine", "sports");
+    sportsPlayerPropSet_(row, col, "SelectionMode", "single");
+    sportsPlayerPropSet_(row, col, "EntryType", "prop-answer");
+    sportsPlayerPropSet_(row, col, "OddsMode", "manual");
+    sportsPlayerPropSet_(row, col, "ResultSource", "sports-player-stats");
+    sportsPlayerPropSet_(row, col, "SportsProvider", "ESPN");
+    sportsPlayerPropSet_(row, col, "SportsGameId", config.sportsGameId);
+    sportsPlayerPropSet_(row, col, "ESPNEventId", config.espnEventId);
+    sportsPlayerPropSet_(row, col, "SportsLeague", config.league);
+    sportsPlayerPropSet_(row, col, "SportsMarket", SPORTS_PLAYER_PROP_MARKET);
+    sportsPlayerPropSet_(row, col, "SportsSelection", entry.side);
+    sportsPlayerPropSet_(row, col, "SportsLine", config.line);
+    sportsPlayerPropSet_(row, col, "HomeTeam", sportsPlayerPropString_(config.game.HomeTeam));
+    sportsPlayerPropSet_(row, col, "AwayTeam", sportsPlayerPropString_(config.game.AwayTeam));
+    sportsPlayerPropSet_(row, col, "HomeRecord", sportsPlayerPropString_(config.game.HomeRecord));
+    sportsPlayerPropSet_(row, col, "AwayRecord", sportsPlayerPropString_(config.game.AwayRecord));
+    sportsPlayerPropSet_(row, col, "HomeScore", config.game.HomeScore);
+    sportsPlayerPropSet_(row, col, "AwayScore", config.game.AwayScore);
+    sportsPlayerPropSet_(row, col, "SportsStatus", sportsPlayerPropString_(config.game.Status));
+    sportsPlayerPropSet_(row, col, "SportsState", sportsPlayerPropString_(config.game.State));
+    sportsPlayerPropSet_(row, col, "SportsClock", sportsPlayerPropString_(config.game.Clock));
+    sportsPlayerPropSet_(row, col, "SportsPeriod", sportsPlayerPropString_(config.game.Period));
+    sportsPlayerPropSet_(row, col, "BettingOdds", entry.odds);
+    sportsPlayerPropSet_(row, col, "OddsSource", "manual-player-prop");
+    sportsPlayerPropSet_(row, col, "OddsLastUpdated", now);
+    sportsPlayerPropSet_(row, col, "LogoUrl", sportsPlayerPropString_(config.player.HeadshotUrl));
+    sportsPlayerPropSet_(row, col, "SportsPlayerId", config.playerId);
+    sportsPlayerPropSet_(row, col, "SportsPlayerName", config.playerName);
+    sportsPlayerPropSet_(row, col, "SportsStatType", config.statType);
+    sportsPlayerPropSet_(row, col, "SportsPropLine", config.line);
+    sportsPlayerPropSet_(row, col, "SportsPropSide", entry.side);
+    return row;
+  });
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
+  return rows.length;
+}
+
+function sportsPlayerPropAppendSettingsRow_(config) {
+  const sheetName = typeof CATEGORY_SETTINGS_SHEET !== "undefined" ? CATEGORY_SETTINGS_SHEET : "CategorySettings";
+  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sheet) throw new Error("Missing sheet: " + sheetName);
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(sportsPlayerPropString_);
+  const col = sportsPlayerPropHeaderMap_(headers);
+  const row = new Array(headers.length).fill("");
+  const lockDate = config.game.GameDateTime ? new Date(config.game.GameDateTime) : "";
+  const validLock = lockDate instanceof Date && !isNaN(lockDate.getTime()) ? lockDate : "";
+
+  sportsPlayerPropSet_(row, col, "GameId", config.awardsGameId);
+  sportsPlayerPropSet_(row, col, "CategoryId", config.categoryId);
+  sportsPlayerPropSet_(row, col, "Points", 1);
+  sportsPlayerPropSet_(row, col, "Locked", false);
+  sportsPlayerPropSet_(row, col, "WinnerNomineeId", "");
+  sportsPlayerPropSet_(row, col, "ChangePenalty", 0);
+  sportsPlayerPropSet_(row, col, "MaxChanges", 0);
+  sportsPlayerPropSet_(row, col, "LockDateTime", validLock);
+  sportsPlayerPropSet_(row, col, "DisplayOrder", validLock ? validLock.getTime() : 999);
+  sportsPlayerPropSet_(row, col, "GroupId", config.league);
+  sportsPlayerPropSet_(row, col, "LayoutType", "wager");
+  sportsPlayerPropSet_(row, col, "ShortName", config.categoryName);
+  sportsPlayerPropSet_(row, col, "CountsAsStatue", false);
+  sportsPlayerPropSet_(row, col, "ScoreVersion", SPORTS_PLAYER_PROP_VERSION);
+  sportsPlayerPropSet_(row, col, "QuestionType", "player-prop-over-under");
+  sportsPlayerPropSet_(row, col, "ScoringEngine", "sports");
+  sportsPlayerPropSet_(row, col, "SelectionMode", "single");
+  sportsPlayerPropSet_(row, col, "ScoreMode", "wager");
+  sportsPlayerPropSet_(row, col, "OddsMode", "manual");
+  sportsPlayerPropSet_(row, col, "ResultSource", "sports-player-stats");
+  sportsPlayerPropSet_(row, col, "SettlementStatus", "pending");
+  sportsPlayerPropSet_(row, col, "SportsGameId", config.sportsGameId);
+  sportsPlayerPropSet_(row, col, "ESPNEventId", config.espnEventId);
+  sportsPlayerPropSet_(row, col, "SportsMarket", SPORTS_PLAYER_PROP_MARKET);
+  sportsPlayerPropSet_(row, col, "SportsLeague", config.league);
+  sportsPlayerPropSet_(row, col, "WagerResultType", "");
+  sportsPlayerPropSet_(row, col, "OddsReady", true);
+  sportsPlayerPropSet_(row, col, "OddsSource", "manual-player-prop");
+  sportsPlayerPropSet_(row, col, "OddsLastUpdated", new Date());
+  sportsPlayerPropSet_(row, col, "VotingTypes", "wager");
+  sportsPlayerPropSet_(row, col, "ResultSourceType", "sports-stats");
+  sportsPlayerPropSet_(row, col, "ResultProvider", "ESPN");
+  sportsPlayerPropSet_(row, col, "ExternalEventId", config.espnEventId);
+  sportsPlayerPropSet_(row, col, "ExternalSubjectId", config.playerId);
+  sportsPlayerPropSet_(row, col, "StatKey", config.statType);
+  sportsPlayerPropSet_(row, col, "ComparisonOperator", "over-under");
+  sportsPlayerPropSet_(row, col, "Threshold", config.line);
+  sportsPlayerPropSet_(row, col, "AutoSettle", true);
+  sportsPlayerPropSet_(row, col, "RequireAdminReview", false);
+  sportsPlayerPropSet_(row, col, "SportsPlayerId", config.playerId);
+  sportsPlayerPropSet_(row, col, "SportsPlayerName", config.playerName);
+  sportsPlayerPropSet_(row, col, "SportsStatType", config.statType);
+  sportsPlayerPropSet_(row, col, "SportsPropLine", config.line);
+  sportsPlayerPropSet_(row, col, "SportsPropSide", "over-under");
+  sportsPlayerPropSet_(row, col, "SourceConfigJSON", JSON.stringify({
+    version: "1.0",
+    playerId: config.playerId,
+    espnPlayerId: config.espnPlayerId,
+    playerName: config.playerName,
+    statType: config.statType,
+    line: config.line,
+    sportsGameId: config.sportsGameId,
+    espnEventId: config.espnEventId,
+    league: config.league,
+    sport: config.sport
+  }));
+
+  sheet.getRange(sheet.getLastRow() + 1, 1, 1, headers.length).setValues([row]);
+  return true;
+}
+
+function createSportsPlayerProp(payload) {
+  payload = payload || {};
+  setupSportsPlayerPropSystem();
+
+  const awardsGameId = sportsPlayerPropString_(payload.awardsGameId || payload.gameId);
+  if (!awardsGameId) throw new Error("awardsGameId is required.");
+  if (typeof validateGameId === "function") validateGameId(awardsGameId);
+
+  const game = sportsPlayerPropGetGame_(payload.sportsGameId, payload.espnEventId);
+  const resolved = sportsPlayerPropLeagueSport_(payload.league || game.League, payload.sport || game.Sport);
+  const player = sportsPlayerPropGetPlayer_(
+    payload.sportsPlayerId || payload.playerId,
+    payload.espnPlayerId,
+    resolved.league
+  );
+
+  if (!sportsPlayerPropTeamMatchesGame_(player, game) && payload.allowCrossTeam !== true) {
+    throw new Error("The selected player does not appear to belong to either team in this game.");
+  }
+
+  const statType = sportsPlayerPropAssertStat_(resolved.league, resolved.sport, payload.sportsStatType || payload.statType);
+  const line = sportsPlayerPropNumber_(payload.sportsPropLine !== undefined ? payload.sportsPropLine : payload.line, null);
+  if (line === null) throw new Error("Player prop line is required.");
+
+  const overOdds = sportsPlayerPropNumber_(payload.overOdds, 1.91);
+  const underOdds = sportsPlayerPropNumber_(payload.underOdds, 1.91);
+  if (overOdds <= 1 || underOdds <= 1) throw new Error("Over and Under odds must be greater than 1.00 decimal odds.");
+
+  const sportsGameId = sportsPlayerPropString_(game.GameId || payload.sportsGameId);
+  const espnEventId = sportsPlayerPropString_(game.ESPNEventId || payload.espnEventId);
+  const playerId = sportsPlayerPropString_(player.PlayerId || payload.sportsPlayerId || payload.playerId);
+  const playerName = sportsPlayerPropString_(player.FullName || player.ShortName || payload.sportsPlayerName);
+  const espnPlayerId = sportsPlayerPropString_(player.ESPNPlayerId || payload.espnPlayerId);
+  const statLabel = sportsPlayerPropStatLabel_(resolved.league, resolved.sport, statType);
+  const categoryId = sportsPlayerPropKey_(payload.categoryId) || sportsPlayerPropCategoryId_(espnEventId, playerId, statType, line);
+  const categoryName = sportsPlayerPropString_(payload.categoryName) || sportsPlayerPropQuestion_(playerName, statLabel, line);
+
+  if (sportsPlayerPropCategoryExists_(awardsGameId, categoryId)) {
+    return {
+      success: false,
+      duplicate: true,
+      awardsGameId: awardsGameId,
+      categoryId: categoryId,
+      message: "This player prop already exists in the selected Awards Game."
+    };
+  }
+
+  const config = {
+    awardsGameId: awardsGameId,
+    categoryId: categoryId,
+    categoryName: categoryName,
+    sportsGameId: sportsGameId,
+    espnEventId: espnEventId,
+    league: resolved.league,
+    sport: resolved.sport,
+    player: player,
+    playerId: playerId,
+    espnPlayerId: espnPlayerId,
+    playerName: playerName,
+    statType: statType,
+    statLabel: statLabel,
+    line: line,
+    overOdds: overOdds,
+    underOdds: underOdds,
+    game: game
+  };
+
+  const categoryRows = sportsPlayerPropAppendCategoryRows_(config);
+  const settingRow = sportsPlayerPropAppendSettingsRow_(config);
+  SpreadsheetApp.flush();
+  if (typeof clearAppCaches === "function") clearAppCaches();
+
+  return {
+    success: true,
+    version: "1.0",
+    awardsGameId: awardsGameId,
+    categoryId: categoryId,
+    category: categoryName,
+    categoryRows: categoryRows,
+    settingRow: settingRow,
+    sportsGameId: sportsGameId,
+    espnEventId: espnEventId,
+    playerId: playerId,
+    playerName: playerName,
+    statType: statType,
+    statLabel: statLabel,
+    line: line,
+    overOdds: overOdds,
+    underOdds: underOdds,
+    oddsSource: "manual-player-prop"
+  };
+}
+
+function sportsPlayerPropReadItems_(awardsGameId) {
+  const ss = SpreadsheetApp.getActive();
+  const settingsSheet = ss.getSheetByName(typeof CATEGORY_SETTINGS_SHEET !== "undefined" ? CATEGORY_SETTINGS_SHEET : "CategorySettings");
+  const categoriesSheet = ss.getSheetByName(typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories");
+  if (!settingsSheet || !categoriesSheet || settingsSheet.getLastRow() < 2 || categoriesSheet.getLastRow() < 2) return [];
+
+  const categoryData = categoriesSheet.getDataRange().getValues();
+  const categoryCol = sportsPlayerPropHeaderMap_(categoryData[0]);
+  const categories = {};
+
+  for (let i = 1; i < categoryData.length; i++) {
+    const gameId = categoryCol.GameId === undefined ? "" : sportsPlayerPropString_(categoryData[i][categoryCol.GameId]);
+    if (awardsGameId && gameId !== awardsGameId) continue;
+    const categoryId = categoryCol.CategoryId === undefined ? "" : sportsPlayerPropKey_(categoryData[i][categoryCol.CategoryId]);
+    if (!categoryId) continue;
+    const market = categoryCol.SportsMarket === undefined ? "" : sportsPlayerPropKey_(categoryData[i][categoryCol.SportsMarket]);
+    if (market !== SPORTS_PLAYER_PROP_MARKET) continue;
+
+    if (!categories[categoryId]) {
+      categories[categoryId] = { gameId: gameId, categoryId: categoryId, nominees: [] };
+    }
+    categories[categoryId].nominees.push({
+      nomineeId: categoryCol.NomineeId === undefined ? "" : sportsPlayerPropKey_(categoryData[i][categoryCol.NomineeId]),
+      side: categoryCol.SportsPropSide !== undefined
+        ? sportsPlayerPropKey_(categoryData[i][categoryCol.SportsPropSide])
+        : categoryCol.SportsSelection !== undefined
+          ? sportsPlayerPropKey_(categoryData[i][categoryCol.SportsSelection])
+          : ""
+    });
+  }
+
+  const settingsData = settingsSheet.getDataRange().getValues();
+  const col = sportsPlayerPropHeaderMap_(settingsData[0]);
+  const items = [];
+
+  for (let i = 1; i < settingsData.length; i++) {
+    const categoryId = col.CategoryId === undefined ? "" : sportsPlayerPropKey_(settingsData[i][col.CategoryId]);
+    const category = categories[categoryId];
+    if (!category) continue;
+
+    const rowGameId = col.GameId === undefined ? "" : sportsPlayerPropString_(settingsData[i][col.GameId]);
+    if (awardsGameId && rowGameId && rowGameId !== awardsGameId) continue;
+
+    const market = col.SportsMarket === undefined ? "" : sportsPlayerPropKey_(settingsData[i][col.SportsMarket]);
+    const questionType = col.QuestionType === undefined ? "" : sportsPlayerPropKey_(settingsData[i][col.QuestionType]);
+    if (market !== SPORTS_PLAYER_PROP_MARKET && questionType.indexOf("player-prop") === -1) continue;
+
+    items.push({
+      rowNumber: i + 1,
+      awardsGameId: category.gameId || rowGameId,
+      categoryId: categoryId,
+      sportsGameId: col.SportsGameId === undefined ? "" : sportsPlayerPropString_(settingsData[i][col.SportsGameId]),
+      espnEventId: col.ESPNEventId === undefined ? "" : sportsPlayerPropString_(settingsData[i][col.ESPNEventId]),
+      league: col.SportsLeague === undefined ? "" : sportsPlayerPropKey_(settingsData[i][col.SportsLeague]),
+      playerId: col.SportsPlayerId !== undefined
+        ? sportsPlayerPropString_(settingsData[i][col.SportsPlayerId])
+        : col.ExternalSubjectId !== undefined
+          ? sportsPlayerPropString_(settingsData[i][col.ExternalSubjectId])
+          : "",
+      playerName: col.SportsPlayerName === undefined ? "" : sportsPlayerPropString_(settingsData[i][col.SportsPlayerName]),
+      statType: col.SportsStatType !== undefined
+        ? sportsPlayerPropSlug_(settingsData[i][col.SportsStatType])
+        : col.StatKey !== undefined
+          ? sportsPlayerPropSlug_(settingsData[i][col.StatKey])
+          : "",
+      line: col.SportsPropLine !== undefined
+        ? sportsPlayerPropNumber_(settingsData[i][col.SportsPropLine], null)
+        : col.Threshold !== undefined
+          ? sportsPlayerPropNumber_(settingsData[i][col.Threshold], null)
+          : null,
+      settlementStatus: col.SettlementStatus === undefined ? "" : sportsPlayerPropKey_(settingsData[i][col.SettlementStatus]),
+      nominees: category.nominees
+    });
+  }
+
+  return items;
+}
+
+function sportsPlayerPropFetchStatsForItems_(items) {
+  const byEvent = {};
+  const errors = [];
+
+  (items || []).forEach(function(item) {
+    const eventId = sportsPlayerPropString_(item.espnEventId);
+    if (!eventId || byEvent[eventId]) return;
+
+    try {
+      const result = sportsPlayerPropFetch_({
+        action: "getSportsPlayerGameStats",
+        espnEventId: eventId,
+        limit: 10000
+      }, "Player game stats lookup");
+      byEvent[eventId] = Array.isArray(result.stats) ? result.stats : [];
+    } catch (err) {
+      byEvent[eventId] = [];
+      errors.push({
+        espnEventId: eventId,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  });
+
+  return { byEvent: byEvent, errors: errors };
+}
+
+function sportsPlayerPropFindStat_(item, lookup) {
+  const rows = lookup.byEvent[item.espnEventId] || [];
+  return rows.find(function(stat) {
+    return (
+      sportsPlayerPropString_(stat.PlayerId) === item.playerId &&
+      sportsPlayerPropSlug_(stat.StatType) === item.statType
+    );
+  }) || null;
+}
+
+function sportsPlayerPropFindNominee_(item, side) {
+  const wanted = sportsPlayerPropKey_(side);
+  const nominee = (item.nominees || []).find(function(entry) {
+    return entry.side === wanted || entry.nomineeId === wanted;
+  });
+  return nominee ? nominee.nomineeId : wanted;
+}
+
+function sportsPlayerPropResolveValue_(value, line) {
+  const statValue = sportsPlayerPropNumber_(value, null);
+  const propLine = sportsPlayerPropNumber_(line, null);
+
+  if (statValue === null || propLine === null) {
+    return { resolved: false, winnerSide: "", wagerResultType: "" };
+  }
+
+  if (statValue > propLine) {
+    return { resolved: true, winnerSide: "over", wagerResultType: "win" };
+  }
+
+  if (statValue < propLine) {
+    return { resolved: true, winnerSide: "under", wagerResultType: "win" };
+  }
+
+  return { resolved: true, winnerSide: "push", wagerResultType: "push" };
+}
+
+function sportsPlayerPropSyntheticScore_(item, stat, winnerSide) {
+  return {
+    GameId: item.sportsGameId,
+    ESPNEventId: item.espnEventId,
+    Sport: item.league === "mlb" ? "baseball" : "football",
+    League: item.league,
+    Status: "Final",
+    State: "post",
+    Period: "",
+    Clock: "",
+    HomeTeam: item.playerName || stat.PlayerName || "Player",
+    AwayTeam: sportsPlayerPropStatLabel_(item.league, "", item.statType),
+    HomeScore: stat.StatValue,
+    AwayScore: item.line,
+    Winner: winnerSide,
+    Completed: true,
+    LastUpdated: stat.LastUpdated || new Date()
+  };
+}
+
+function sportsPlayerPropRefreshStatsForLeagues_(leagueNames) {
+  const seen = {};
+  const results = [];
+
+  (leagueNames || []).forEach(function(league) {
+    const key = sportsPlayerPropKey_(league);
+    if (!key || seen[key] || ["mlb", "nfl"].indexOf(key) === -1) return;
+    seen[key] = true;
+
+    const sport = key === "mlb" ? "baseball" : "football";
+    try {
+      const refreshResult =
+        typeof sportsAdminBridgeCall_ === "function"
+          ? sportsAdminBridgeCall_(
+              "refreshSportsPlayerGameStatsAdmin",
+              {
+                league: key,
+                sport: sport,
+                daysBack: 3,
+                daysForward: 1,
+                maxGames: 30
+              }
+            )
+          : sportsPlayerPropFetch_({
+              action: "refreshSportsPlayerGameStatsAdmin",
+              adminKey: typeof sportsAdminBridgeGetKey_ === "function"
+                ? sportsAdminBridgeGetKey_()
+                : "",
+              league: key,
+              sport: sport,
+              daysBack: 3,
+              daysForward: 1,
+              maxGames: 30
+            }, key.toUpperCase() + " player-stat refresh");
+
+      if (!refreshResult || refreshResult.success === false) {
+        throw new Error(
+          (refreshResult && (refreshResult.error || refreshResult.message || refreshResult.reason)) ||
+          key.toUpperCase() + " player-stat refresh failed."
+        );
+      }
+
+      results.push(refreshResult);
+    } catch (err) {
+      results.push({
+        success: false,
+        league: key,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  });
+
+  return { success: results.every(function(result) { return result.success !== false; }), results: results };
+}
+
+function settleSportsPlayerProps(payload) {
+  payload = payload || {};
+  setupSportsPlayerPropSystem();
+
+  const awardsGameId = sportsPlayerPropString_(payload.awardsGameId || payload.gameId);
+  const force = sportsPlayerPropBoolean_(payload.force, false);
+  const items = sportsPlayerPropReadItems_(awardsGameId);
+  const leagues = items.map(function(item) { return item.league; });
+
+  const refresh = payload.refreshStats === false
+    ? null
+    : sportsPlayerPropRefreshStatsForLeagues_(leagues);
+
+  const lookup = sportsPlayerPropFetchStatsForItems_(items);
+  const summary = {
+    success: true,
+    awardsGameId: awardsGameId,
+    checked: 0,
+    settled: 0,
+    pushes: 0,
+    pending: 0,
+    review: 0,
+    skipped: 0,
+    refresh: refresh,
+    sourceErrors: lookup.errors,
+    errors: []
+  };
+
+  items.forEach(function(item) {
+    summary.checked++;
+
+    if (item.settlementStatus === "settled" && !force) {
+      summary.skipped++;
+      return;
+    }
+
+    if (!item.playerId || !item.statType || item.line === null || !item.espnEventId) {
+      summary.review++;
+      summary.errors.push({ categoryId: item.categoryId, reason: "player-prop-mapping-incomplete" });
+      if (typeof sportsWagerSetCategorySettingFinalLock_ === "function") {
+        sportsWagerSetCategorySettingFinalLock_(item.awardsGameId, item.categoryId, "needs-review", false);
+      }
+      return;
+    }
+
+    const stat = sportsPlayerPropFindStat_(item, lookup);
+    if (!stat) {
+      summary.pending++;
+      return;
+    }
+
+    if (!sportsPlayerPropBoolean_(stat.Completed, false)) {
+      summary.pending++;
+      return;
+    }
+
+    const value = sportsPlayerPropNumber_(stat.StatValue, null);
+    if (value === null) {
+      summary.review++;
+      summary.errors.push({ categoryId: item.categoryId, reason: "player-stat-not-numeric" });
+      return;
+    }
+
+    const resolution =
+      sportsPlayerPropResolveValue_(value, item.line);
+
+    if (!resolution.resolved) {
+      summary.review++;
+      summary.errors.push({ categoryId: item.categoryId, reason: "player-prop-resolution-failed" });
+      return;
+    }
+
+    const winnerSide =
+      resolution.winnerSide;
+
+    const wagerResultType =
+      resolution.wagerResultType;
+
+    const winnerNomineeId = winnerSide === "push"
+      ? "push"
+      : sportsPlayerPropFindNominee_(item, winnerSide);
+
+    try {
+      const updated = typeof sportsWagerSetCategorySettingWinnerAllMatches_ === "function"
+        ? sportsWagerSetCategorySettingWinnerAllMatches_(
+            item.awardsGameId,
+            item.categoryId,
+            winnerNomineeId,
+            wagerResultType,
+            "settled"
+          )
+        : 0;
+
+      const score = sportsPlayerPropSyntheticScore_(item, stat, winnerSide);
+      const result = typeof sportsWagerUpsertCategoryResultForSettlement_ === "function"
+        ? sportsWagerUpsertCategoryResultForSettlement_(
+            item.awardsGameId,
+            item.categoryId,
+            winnerNomineeId,
+            wagerResultType,
+            score,
+            "player-prop-" + winnerSide + ": " + value + " vs " + item.line
+          )
+        : null;
+
+      if (updated > 0 || (result && result.success)) {
+        summary.settled++;
+        if (wagerResultType === "push") summary.pushes++;
+      } else {
+        summary.review++;
+        summary.errors.push({ categoryId: item.categoryId, reason: "no-category-setting-row-updated" });
+      }
+    } catch (err) {
+      summary.errors.push({
+        categoryId: item.categoryId,
+        error: err && err.message ? err.message : String(err)
+      });
+    }
+  });
+
+  SpreadsheetApp.flush();
+  if (typeof clearAppCaches === "function") clearAppCaches();
+  summary.success = summary.errors.length === 0;
+  return summary;
+}
+
+function settleSportsPlayerPropsForAllGames_(payload) {
+  payload = payload || {};
+  const gameIds = typeof sportsWagerGetAllSportsAwardsGameIds_ === "function"
+    ? sportsWagerGetAllSportsAwardsGameIds_()
+    : [];
+
+  const allItems =
+    sportsPlayerPropReadItems_("");
+
+  const sharedRefresh =
+    payload.refreshStats === false
+      ? null
+      : sportsPlayerPropRefreshStatsForLeagues_(
+          allItems.map(function(item) {
+            return item.league;
+          })
+        );
+
+  const summary = {
+    success: true,
+    gameCount: gameIds.length,
+    checked: 0,
+    settled: 0,
+    pushes: 0,
+    pending: 0,
+    review: 0,
+    refresh: sharedRefresh,
+    errors: [],
+    results: []
+  };
+
+  gameIds.forEach(function(gameId) {
+    try {
+      const result = settleSportsPlayerProps({
+        gameId: gameId,
+        force: payload.force,
+        refreshStats: false
+      });
+      summary.checked += result.checked || 0;
+      summary.settled += result.settled || 0;
+      summary.pushes += result.pushes || 0;
+      summary.pending += result.pending || 0;
+      summary.review += result.review || 0;
+      summary.errors = summary.errors.concat(result.errors || []);
+      summary.results.push(result);
+    } catch (err) {
+      summary.errors.push({ gameId: gameId, error: err && err.message ? err.message : String(err) });
+    }
+  });
+
+  summary.success = summary.errors.length === 0;
+  return summary;
+}
+
+/* =====================================================
+   ADMIN API
+===================================================== */
+
+function apiAdminGetSportsPlayerPropGames(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+
+  const result = sportsPlayerPropFetch_({
+    action: "getSportsScores",
+    league: sportsPlayerPropKey_(payload.league),
+    dateFrom: payload.dateFrom,
+    dateTo: payload.dateTo,
+    completed: payload.completed,
+    state: payload.state
+  }, "Player-prop game list");
+
+  return {
+    success: true,
+    count: Array.isArray(result.scores) ? result.scores.length : 0,
+    games: Array.isArray(result.scores) ? result.scores : []
+  };
+}
+
+function apiAdminGetSportsPlayerPropPlayers(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+  const resolved = sportsPlayerPropLeagueSport_(payload.league, payload.sport);
+
+  const result = sportsPlayerPropFetch_({
+    action: "getSportsPlayers",
+    league: resolved.league,
+    team: payload.team,
+    search: payload.search,
+    active: "true",
+    limit: payload.limit || 2000
+  }, "Player-prop player list");
+
+  return {
+    success: true,
+    count: Array.isArray(result.players) ? result.players.length : 0,
+    players: Array.isArray(result.players) ? result.players : [],
+    league: resolved.league,
+    sport: resolved.sport,
+    statTypes: sportsPlayerPropStatOptions_(resolved.league, resolved.sport).map(function(item) {
+      return { value: item[0], label: item[1] };
+    })
+  };
+}
+
+function apiAdminGetSportsPlayerPropStatTypes(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+  const resolved = sportsPlayerPropLeagueSport_(payload.league, payload.sport);
+  return {
+    success: true,
+    league: resolved.league,
+    sport: resolved.sport,
+    statTypes: sportsPlayerPropStatOptions_(resolved.league, resolved.sport).map(function(item) {
+      return { value: item[0], label: item[1] };
+    })
+  };
+}
+
+function apiAdminCreateSportsPlayerProp(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+  return createSportsPlayerProp(payload);
+}
+
+function apiAdminSettleSportsPlayerProps(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+  return settleSportsPlayerProps(payload);
+}
+
+function testSetupSportsPlayerPropSystem() {
+  return setupSportsPlayerPropSystem();
+}
+
+function testSettleSportsPlayerPropsNow() {
+  return settleSportsPlayerPropsForAllGames_({ force: true, refreshStats: true });
+}

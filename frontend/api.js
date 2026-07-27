@@ -54,6 +54,9 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminRefreshSportsOddsLeague",
     "adminSyncSportsPlayers",
     "adminRefreshSportsPlayerGameStats",
+    "adminGetSportsPlayerPropPlayers",
+    "adminCreateSportsPlayerProp",
+    "adminSettleSportsPlayerProps",
     "adminRefreshRacingWagerScores",
     "adminSettleRacingWagers"
   ]);
@@ -2548,6 +2551,66 @@ async function apiAdminRefreshSportsPlayerGameStats(
 
       maxGames:
         options.maxGames || 20
+    }
+  );
+
+}
+
+async function apiAdminGetSportsPlayerPropPlayers(
+  league,
+  sport,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsPlayerPropPlayers",
+    {
+      league: league,
+      sport: sport,
+      team: options.team || "",
+      search: options.search || "",
+      limit: options.limit || 2000
+    }
+  );
+
+}
+
+async function apiAdminGetSportsPlayerPropStatTypes(
+  league,
+  sport
+) {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsPlayerPropStatTypes",
+    {
+      league: league,
+      sport: sport
+    }
+  );
+
+}
+
+async function apiAdminCreateSportsPlayerProp(payload = {}) {
+
+  return apiAdminSportsControl_(
+    "adminCreateSportsPlayerProp",
+    payload
+  );
+
+}
+
+async function apiAdminSettleSportsPlayerProps(
+  gameId,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminSettleSportsPlayerProps",
+    {
+      gameId: gameId,
+      awardsGameId: gameId,
+      force: options.force === undefined ? true : options.force,
+      refreshStats: options.refreshStats === undefined ? true : options.refreshStats
     }
   );
 

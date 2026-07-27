@@ -226,6 +226,10 @@ function doGet(e) {
       "adminGetSportsPlayerStatus",
       "adminSyncSportsPlayers",
       "adminRefreshSportsPlayerGameStats",
+      "adminGetSportsPlayerPropPlayers",
+      "adminGetSportsPlayerPropStatTypes",
+      "adminCreateSportsPlayerProp",
+      "adminSettleSportsPlayerProps",
 
       "adminGetSportsLeagueSettings",
       "adminUpdateSportsLeagueSetting",
@@ -2655,6 +2659,75 @@ if (action === "adminRefreshSportsPlayerGameStats") {
 
       maxGames:
         params.maxGames
+    })
+  );
+
+}
+
+if (action === "adminGetSportsPlayerPropPlayers") {
+
+  return json(
+    apiAdminGetSportsPlayerPropPlayers({
+      username: params.username,
+      token: params.token,
+      league: params.league,
+      sport: params.sport,
+      team: params.team,
+      search: params.search,
+      limit: params.limit
+    })
+  );
+
+}
+
+if (action === "adminGetSportsPlayerPropStatTypes") {
+
+  return json(
+    apiAdminGetSportsPlayerPropStatTypes({
+      username: params.username,
+      token: params.token,
+      league: params.league,
+      sport: params.sport
+    })
+  );
+
+}
+
+if (action === "adminCreateSportsPlayerProp") {
+
+  return json(
+    apiAdminCreateSportsPlayerProp({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      sportsGameId: params.sportsGameId,
+      espnEventId: params.espnEventId,
+      league: params.league,
+      sport: params.sport,
+      sportsPlayerId: params.sportsPlayerId || params.playerId,
+      espnPlayerId: params.espnPlayerId,
+      sportsStatType: params.sportsStatType || params.statType,
+      sportsPropLine: params.sportsPropLine !== undefined ? params.sportsPropLine : params.line,
+      overOdds: params.overOdds,
+      underOdds: params.underOdds,
+      categoryId: params.categoryId,
+      categoryName: params.categoryName
+    })
+  );
+
+}
+
+if (action === "adminSettleSportsPlayerProps") {
+
+  return json(
+    apiAdminSettleSportsPlayerProps({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      force: params.force,
+      refreshStats: params.refreshStats
     })
   );
 

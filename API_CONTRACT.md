@@ -689,3 +689,57 @@ Returns career totals, archived game summaries, accuracy, streaks, finishes, wag
 ```
 
 Admin-only. Returns one archive-status item per configured game. The dashboard reads the Games and ArchiveManifest sheets once per request and normalizes old manifest rows so exactly one verified lifecycle record is marked current for each game.
+
+---
+
+## Sports Player Props v1 admin actions
+
+These Awards App actions require a valid administrator session. The Awards App backend calls the separate Sports Scores Engine through the existing server-side Sports Admin bridge; the Sports Scores Engine admin key is never returned to the browser.
+
+### `adminGetSportsPlayerPropPlayers`
+
+Parameters:
+
+- `league`: `mlb` or `nfl`
+- `sport`: `baseball` or `football`
+- Optional `team`, `search`, and `limit`
+
+Returns active synced players plus the supported stat types for the league.
+
+### `adminGetSportsPlayerPropStatTypes`
+
+Parameters:
+
+- `league`: `mlb` or `nfl`
+- `sport`: `baseball` or `football`
+
+Returns the supported settlement statistic keys and labels.
+
+### `adminCreateSportsPlayerProp`
+
+Required parameters:
+
+- `awardsGameId`
+- `sportsGameId` or `espnEventId`
+- `league`
+- `sport`
+- `sportsPlayerId`
+- `sportsStatType`
+- `sportsPropLine`
+
+Optional parameters:
+
+- `overOdds` (default `1.91` decimal)
+- `underOdds` (default `1.91` decimal)
+
+Creates one wager category with `Over` and `Under` nominees and writes the player/game/stat references to `Categories` and `CategorySettings`.
+
+### `adminSettleSportsPlayerProps`
+
+Parameters:
+
+- `gameId` or `awardsGameId`
+- Optional `force`
+- Optional `refreshStats`
+
+Reads final rows from `SportsPlayerGameStats`, settles Over or Under, and records an exact-line result as a push/refund.

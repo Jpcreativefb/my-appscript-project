@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v213-sports-player-controls";
+const AWARDS_CACHE = "awards-app-v214-sports-player-props";
 
 const APP_SHELL = [
   "./",
