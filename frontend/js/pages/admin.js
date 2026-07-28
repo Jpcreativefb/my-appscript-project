@@ -4829,7 +4829,8 @@ function adminRenderSportsControlDashboard_(
       data.leagueHealth || {},
       oddsSettings,
       openLeagueKeys || [],
-      data.players || {}
+      data.players || {},
+      data.advancedStats || {}
     )}
   `;
 
@@ -5918,7 +5919,8 @@ function adminRenderScoreLeagueControls_(
   leagueHealth,
   oddsSettings,
   openLeagueKeys,
-  playersStatus
+  playersStatus,
+  advancedStats
 ) {
 
   leagueHealth =
@@ -5932,6 +5934,9 @@ function adminRenderScoreLeagueControls_(
 
   playersStatus =
     playersStatus || {};
+
+  advancedStats =
+    advancedStats || {};
 
   const healthByLeague = {};
 
@@ -5964,6 +5969,19 @@ function adminRenderScoreLeagueControls_(
 
     if (key) {
       playersByLeague[key] = item;
+    }
+  });
+
+  const advancedByLeague = {};
+
+  (advancedStats.leagues || []).forEach(function(item) {
+    const key =
+      adminSportsKey_(
+        item.league || item.League
+      );
+
+    if (key) {
+      advancedByLeague[key] = item;
     }
   });
 
@@ -6002,6 +6020,8 @@ function adminRenderScoreLeagueControls_(
             · Snapshots: ${totals.liveSnapshots || 0}
             · Players: ${playersStatus.playerCount || 0}
             · Player stat rows: ${playersStatus.statRowCount || 0}
+            · Team stat rows: ${advancedStats.teamStatRowCount || 0}
+            · Checkpoint rows: ${advancedStats.checkpointRowCount || 0}
             · Logs: ${totals.logs || 0}
             · Score archive candidates: ${totals.scoreArchiveCandidates || 0}
           </div>
@@ -6045,6 +6065,9 @@ function adminRenderScoreLeagueControls_(
           const playerUsage =
             playersByLeague[leagueKey] || {};
 
+          const advancedUsage =
+            advancedByLeague[leagueKey] || {};
+
           const playerSupported =
             ["mlb", "nfl"].indexOf(leagueKey) !== -1;
 
@@ -6062,6 +6085,21 @@ function adminRenderScoreLeagueControls_(
 
           const lastPlayerStatsUpdated =
             playerUsage.lastStatsUpdated || "";
+
+          const teamStatRowCount =
+            Number(advancedUsage.teamStatRowCount || 0);
+
+          const checkpointRowCount =
+            Number(advancedUsage.checkpointRowCount || 0);
+
+          const checkpointCount =
+            Number(advancedUsage.checkpointCount || 0);
+
+          const lastTeamStatsUpdated =
+            advancedUsage.lastTeamStatsUpdated || "";
+
+          const lastCheckpointCaptured =
+            advancedUsage.lastCheckpointCaptured || "";
 
           const enabled =
             adminSportsBool_(
@@ -6330,10 +6368,14 @@ function adminRenderScoreLeagueControls_(
             <div class="admin-sub" style="margin-bottom:8px;">
               ${playerSupported
                 ? `Roster: ${activePlayerCount} active / ${playerCount} total
-                  · Stat rows: ${playerStatRowCount}
+                  · Player stat rows: ${playerStatRowCount}
+                  · Team stat rows: ${teamStatRowCount}
+                  · Checkpoints: ${checkpointCount} (${checkpointRowCount} rows)
                   · Last roster: ${adminSportsEscape_(lastPlayerUpdated || "Never")}
-                  · Last stats: ${adminSportsEscape_(lastPlayerStatsUpdated || "Never")}
-                  ${playerActionsEnabled ? "" : " · Turn League ON to run player actions."}`
+                  · Last player stats: ${adminSportsEscape_(lastPlayerStatsUpdated || "Never")}
+                  · Last team stats: ${adminSportsEscape_(lastTeamStatsUpdated || "Never")}
+                  · Last checkpoint: ${adminSportsEscape_(lastCheckpointCaptured || "Never")}
+                  ${playerActionsEnabled ? "" : " · Turn League ON to run player/team actions."}`
                 : "Player sync is not enabled for this league in v1. MLB and NFL are currently supported."}
             </div>
 
@@ -6361,10 +6403,18 @@ function adminRenderScoreLeagueControls_(
                 leagueCode,
                 playerActionsEnabled ? controlsDisabled : "disabled"
               )}
+              ${adminSportsActionButton_(
+                "Refresh Team / Checkpoint Stats",
+                playerActionsEnabled ? "admin-small-button secondary" : "admin-small-button secondary inactive",
+                "adminRefreshSportsAdvancedStats('" + leagueCode + "', '" + sport + "')",
+                "refreshAdvancedStats",
+                leagueCode,
+                playerActionsEnabled ? controlsDisabled : "disabled"
+              )}
             </div>
 
             <div class="admin-sub" style="margin-top:8px;">
-              Refresh Current Game Stats checks games around today that already exist in SportsScores. Run score refresh first when a game is missing.
+              Player and team refreshes check games around today that already exist in SportsScores. Checkpoint rows are captured as score polling crosses innings, quarters, halftime, or the first-half two-minute boundary.
             </div>
           `;
 
@@ -8039,6 +8089,66 @@ async function adminRefreshSportsPlayerGameStats(
       (res.errors && res.errors.length
         ? " · errors " + res.errors.length
         : "") +
+      ". Reloading counts...",
+    !!res.partial
+  );
+
+  await adminLoadSportsControls({
+    preserveOpen: true,
+    openLeagueKeys: openLeagueKeys
+  });
+
+}
+
+async function adminRefreshSportsAdvancedStats(
+  league,
+  sport
+) {
+
+  const openLeagueKeys =
+    adminSportsGetOpenLeagueKeys_();
+
+  adminSportsSetPlayerStatus_(
+    league,
+    "Refreshing team stats and checkpoint snapshots...",
+    false
+  );
+
+  const res =
+    await apiAdminRefreshSportsAdvancedStats({
+      league: league,
+      sport: sport,
+      daysBack: 1,
+      daysForward: 1,
+      maxGames: 20
+    });
+
+  if (!res) {
+    throw new Error("Advanced sports-stat refresh returned no response.");
+  }
+
+  if (res.success === false && !res.partial) {
+    const message =
+      res.error ||
+      res.message ||
+      "Advanced sports-stat refresh failed.";
+
+    adminSportsSetPlayerStatus_(
+      league,
+      message,
+      true
+    );
+
+    throw new Error(message);
+  }
+
+  adminSportsSetPlayerStatus_(
+    league,
+    (res.partial ? "Partial advanced-stat refresh complete. " : "Team/checkpoint stats refreshed. ") +
+      "Games " + Number(res.gamesRefreshed || 0) + "/" + Number(res.gamesFound || 0) +
+      " · player stats " + Number(res.playerStatsFound || 0) +
+      " · team stats " + Number(res.teamStatsFound || 0) +
+      (res.errors && res.errors.length ? " · errors " + res.errors.length : "") +
       ". Reloading counts...",
     !!res.partial
   );

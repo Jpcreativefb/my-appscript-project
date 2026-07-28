@@ -229,7 +229,15 @@ function doGet(e) {
       "adminGetSportsPlayerPropPlayers",
       "adminGetSportsPlayerPropStatTypes",
       "adminCreateSportsPlayerProp",
+      "adminCreateSportsPlayerMatchup",
+      "adminGetSportsAdvancedQuestionOptions",
+      "adminCreateSportsAdvancedQuestion",
+      "adminSettleSportsAdvancedQuestions",
+      "adminSetupSportsAdvancedStats",
+      "adminRefreshSportsAdvancedStats",
+      "adminGetSportsAdvancedStatsStatus",
       "adminSettleSportsPlayerProps",
+      "adminSettleSportsPlayerMatchups",
 
       "adminGetSportsLeagueSettings",
       "adminUpdateSportsLeagueSetting",
@@ -2713,6 +2721,141 @@ if (action === "adminCreateSportsPlayerProp") {
       underOdds: params.underOdds,
       categoryId: params.categoryId,
       categoryName: params.categoryName
+    })
+  );
+
+}
+
+
+if (action === "adminCreateSportsPlayerMatchup") {
+
+  return json(
+    apiAdminCreateSportsPlayerMatchup({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      sportsGameId: params.sportsGameId,
+      espnEventId: params.espnEventId,
+      league: params.league,
+      sport: params.sport,
+      sportsStatType: params.sportsStatType || params.statType,
+      questionMode: params.questionMode || params.mode,
+      playersJSON: params.playersJSON || params.players,
+      defaultOdds: params.defaultOdds,
+      points: params.points,
+      categoryId: params.categoryId,
+      categoryName: params.categoryName
+    })
+  );
+
+}
+
+if (action === "adminGetSportsAdvancedQuestionOptions") {
+
+  return json(
+    apiAdminGetSportsAdvancedQuestionOptions({
+      username: params.username,
+      token: params.token,
+      league: params.league,
+      sport: params.sport
+    })
+  );
+
+}
+
+if (action === "adminCreateSportsAdvancedQuestion") {
+
+  return json(
+    apiAdminCreateSportsAdvancedQuestion({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      questionMode: params.questionMode || params.mode,
+      questionKind: params.questionKind || params.kind,
+      entitiesJSON: params.entitiesJSON || params.entities,
+      sportsStatType: params.sportsStatType || params.statType,
+      checkpointType: params.checkpointType,
+      operator: params.operator || params.comparisonOperator,
+      threshold: params.threshold,
+      defaultOdds: params.defaultOdds,
+      yesOdds: params.yesOdds,
+      noOdds: params.noOdds,
+      points: params.points,
+      categoryId: params.categoryId,
+      categoryName: params.categoryName
+    })
+  );
+
+}
+
+if (action === "adminSettleSportsAdvancedQuestions") {
+
+  return json(
+    apiAdminSettleSportsAdvancedQuestions({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      force: params.force,
+      refreshStats: params.refreshStats
+    })
+  );
+
+}
+
+if (action === "adminSetupSportsAdvancedStats") {
+
+  return json(
+    apiAdminSetupSportsAdvancedStats({
+      username: params.username,
+      token: params.token
+    })
+  );
+
+}
+
+if (action === "adminRefreshSportsAdvancedStats") {
+
+  return json(
+    apiAdminRefreshSportsAdvancedStats({
+      username: params.username,
+      token: params.token,
+      gameId: params.gameId,
+      sportsGameId: params.sportsGameId,
+      espnEventId: params.espnEventId,
+      league: params.league,
+      sport: params.sport,
+      daysBack: params.daysBack,
+      daysForward: params.daysForward,
+      maxGames: params.maxGames
+    })
+  );
+
+}
+
+if (action === "adminGetSportsAdvancedStatsStatus") {
+
+  return json(
+    apiAdminGetSportsAdvancedStatsStatus({
+      username: params.username,
+      token: params.token
+    })
+  );
+
+}
+
+if (action === "adminSettleSportsPlayerMatchups") {
+
+  return json(
+    apiAdminSettleSportsPlayerMatchups({
+      username: params.username,
+      token: params.token,
+      awardsGameId: params.awardsGameId || gameId,
+      gameId: params.gameId,
+      force: params.force,
+      refreshStats: params.refreshStats
     })
   );
 

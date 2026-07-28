@@ -721,3 +721,142 @@
     width: 100%;
   }
 }
+
+/* =====================================================
+   SPORTS PLAYER MATCHUPS v1
+===================================================== */
+
+.player-matchup-btn {
+  background: linear-gradient(135deg, #5b3fd6, #7d5cff);
+  color: #fff;
+  border-color: transparent;
+}
+
+.player-matchup-btn:hover {
+  filter: brightness(1.06);
+}
+
+.sports-player-matchup-modal {
+  width: min(760px, 96vw);
+  max-height: 92vh;
+  overflow-y: auto;
+}
+
+.sports-player-matchup-destination {
+  width: min(520px, 94vw);
+}
+
+.sports-player-matchup-help {
+  margin: 10px 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.sports-player-matchup-player-list {
+  display: grid;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 4px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  border-radius: 10px;
+}
+
+.sports-player-matchup-player-row {
+  display: grid;
+  grid-template-columns: auto 38px minmax(0, 1fr) 86px;
+  align-items: center;
+  gap: 9px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.sports-player-matchup-player-row img {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: rgba(127, 127, 127, 0.16);
+}
+
+.sports-player-matchup-player-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sports-player-matchup-odds {
+  width: 86px;
+  box-sizing: border-box;
+}
+
+@media (max-width: 640px) {
+  .sports-player-matchup-player-row {
+    grid-template-columns: auto 34px minmax(0, 1fr);
+  }
+
+  .sports-player-matchup-player-row img {
+    width: 34px;
+    height: 34px;
+  }
+
+  .sports-player-matchup-odds {
+    grid-column: 2 / 4;
+    width: 100%;
+  }
+}
+
+/* =====================================================
+   ADVANCED SPORTS STAT QUESTIONS v1.2
+===================================================== */
+
+.sports-advanced-question-btn {
+  font-weight: 700;
+}
+
+.sports-advanced-question-modal {
+  width: min(980px, calc(100vw - 24px));
+  max-height: min(92vh, 940px);
+  overflow: auto;
+}
+
+.sports-advanced-question-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sports-advanced-entity-list {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.sports-advanced-entity-row {
+  grid-template-columns: auto 38px minmax(0, 1fr) 92px;
+}
+
+.sports-advanced-entity-placeholder {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(127, 127, 127, 0.15);
+  font-weight: 800;
+}
+
+@media (max-width: 680px) {
+  .sports-advanced-question-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sports-advanced-entity-row {
+    grid-template-columns: auto 32px minmax(0, 1fr);
+  }
+
+  .sports-advanced-entity-row .sports-advanced-entity-odds {
+    grid-column: 2 / -1;
+    width: 100%;
+  }
+}

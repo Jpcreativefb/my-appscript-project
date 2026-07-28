@@ -3122,13 +3122,14 @@ function apiGetSportsAdminDashboard_(params) {
 
   return {
     success: true,
-    version: "15-players-v1",
+    version: "15-advanced-stats-v1",
     checkedAt: new Date(),
     smartAutomation: getSmartSportsAutomationStatus_(),
     sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
     odds: apiGetSportsOddsAdminSettings_(params),
     archive: getSportsArchiveStatus_(),
     players: typeof getSportsPlayersStatus_ === "function" ? getSportsPlayersStatus_() : null,
+    advancedStats: typeof getSportsAdvancedStatsStatus_ === "function" ? getSportsAdvancedStatsStatus_() : null,
     engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
     scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
     scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],

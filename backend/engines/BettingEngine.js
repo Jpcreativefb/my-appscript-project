@@ -1995,11 +1995,9 @@ function apiGetBettingPagePayload(payload){
    SAVE BET
 ===================================================== */
 
-function findExistingBetRow_(data, col, gameId, username, categoryId){
+function findExistingBetRows_(data, col, gameId, username, categoryId){
 
-  let existingRow = -1;
-  let latestTimestamp = null;
-
+  const rowNumbers = [];
   const userKey = normalizeBetKey_(username);
 
   for (let i = 1; i < data.length; i++) {
@@ -2024,23 +2022,60 @@ function findExistingBetRow_(data, col, gameId, username, categoryId){
       continue;
     }
 
-    const ts = new Date(
-      row[col.lastUpdated] ||
-      row[col.timestamp] ||
-      new Date()
-    );
-
-    if (
-      existingRow === -1 ||
-      latestTimestamp < ts
-    ) {
-      existingRow = i + 1;
-      latestTimestamp = ts;
-    }
+    rowNumbers.push(i + 1);
 
   }
 
-  return existingRow;
+  rowNumbers.sort(function(a, b) {
+    return a - b;
+  });
+
+  return {
+    rowNumbers: rowNumbers,
+    canonicalRow:
+      rowNumbers.length
+        ? rowNumbers[0]
+        : -1,
+    duplicateRows:
+      rowNumbers.length > 1
+        ? rowNumbers.slice(1)
+        : []
+  };
+
+}
+
+/*
+  Backward-compatible helper retained for any older internal calls.
+  The canonical row is always the earliest row so duplicate rows can
+  be deleted from bottom to top without shifting the row being updated.
+*/
+function findExistingBetRow_(data, col, gameId, username, categoryId){
+
+  return findExistingBetRows_(
+    data,
+    col,
+    gameId,
+    username,
+    categoryId
+  ).canonicalRow;
+
+}
+
+function deleteBetRowsDescending_(sheet, rowNumbers){
+
+  rowNumbers = Array.isArray(rowNumbers)
+    ? rowNumbers.slice()
+    : [];
+
+  rowNumbers
+    .sort(function(a, b) {
+      return b - a;
+    })
+    .forEach(function(rowNumber) {
+      sheet.deleteRow(rowNumber);
+    });
+
+  return rowNumbers.length;
 
 }
 
@@ -2278,7 +2313,7 @@ function saveBet(payload){
 
     const now = new Date();
 
-    const existingRow = findExistingBetRow_(
+    const existing = findExistingBetRows_(
       data,
       col,
       gameId,
@@ -2287,7 +2322,7 @@ function saveBet(payload){
     );
 
     if (
-      existingRow > -1 &&
+      existing.canonicalRow > -1 &&
       config.wagerEditMode === "final_once_selected"
     ) {
 
@@ -2298,31 +2333,42 @@ function saveBet(payload){
 
     }
 
-    if (existingRow > -1) {
+    let saveAction = "created";
+    let duplicatesRemoved = 0;
 
-      updateBetCell_(
-        existingRow,
-        col.nomineeId + 1,
-        nomineeId
+    if (existing.canonicalRow > -1) {
+
+      const sheet = getBetsSheet_();
+      const row = data[existing.canonicalRow - 1]
+        .slice();
+
+      row[col.gameId] = gameId;
+      row[col.username] = username;
+      row[col.categoryId] = categoryId;
+      row[col.nomineeId] = nomineeId;
+      row[col.betAmount] = betAmount;
+      row[col.odds] = odds;
+      row[col.lastUpdated] = now;
+
+      if (!row[col.timestamp]) {
+        row[col.timestamp] = now;
+      }
+
+      sheet
+        .getRange(
+          existing.canonicalRow,
+          1,
+          1,
+          headers.length
+        )
+        .setValues([row]);
+
+      duplicatesRemoved = deleteBetRowsDescending_(
+        sheet,
+        existing.duplicateRows
       );
 
-      updateBetCell_(
-        existingRow,
-        col.betAmount + 1,
-        betAmount
-      );
-
-      updateBetCell_(
-        existingRow,
-        col.odds + 1,
-        odds
-      );
-
-      updateBetCell_(
-        existingRow,
-        col.lastUpdated + 1,
-        now
-      );
+      saveAction = "updated";
 
     } else {
 
@@ -2355,6 +2401,8 @@ function saveBet(payload){
       nomineeId: nomineeId,
       betAmount: betAmount,
       odds: odds,
+      action: saveAction,
+      duplicatesRemoved: duplicatesRemoved,
       potentialReturn: roundBetMoney_(
         betAmount * odds
       ),
@@ -2380,6 +2428,227 @@ function saveBet(payload){
 
     lock.releaseLock();
 
+  }
+
+}
+
+function previewDuplicateBetsCleanup(){
+
+  const sh = getBetsSheet_();
+  const data = sh.getDataRange().getValues();
+
+  if (data.length <= 2) {
+    return {
+      success: true,
+      duplicateGroups: 0,
+      duplicateRows: 0,
+      totalBets: Math.max(0, data.length - 1),
+      groups: []
+    };
+  }
+
+  const headers = data[0].map(function(header) {
+    return String(header || "").trim();
+  });
+
+  const col = getBetsColumnMap_(headers);
+  validateBetsColumns_(col);
+
+  const groups = {};
+
+  for (let i = 1; i < data.length; i++) {
+
+    const row = data[i];
+    const gameId = normalizeBetGameId_(row[col.gameId]);
+    const username = normalizeBetString_(row[col.username]);
+    const categoryId = normalizeBetKey_(row[col.categoryId]);
+
+    if (!gameId || !username || !categoryId) {
+      continue;
+    }
+
+    const key = [
+      gameId,
+      normalizeBetKey_(username),
+      categoryId
+    ].join("|");
+
+    if (!groups[key]) {
+      groups[key] = {
+        gameId: gameId,
+        username: username,
+        categoryId: categoryId,
+        rows: 0
+      };
+    }
+
+    groups[key].rows++;
+
+  }
+
+  const duplicates = Object.keys(groups)
+    .map(function(key) {
+      return groups[key];
+    })
+    .filter(function(group) {
+      return group.rows > 1;
+    })
+    .sort(function(a, b) {
+      return b.rows - a.rows;
+    });
+
+  const duplicateRows = duplicates.reduce(function(total, group) {
+    return total + group.rows - 1;
+  }, 0);
+
+  return {
+    success: true,
+    duplicateGroups: duplicates.length,
+    duplicateRows: duplicateRows,
+    totalBets: data.length - 1,
+    groups: duplicates.slice(0, 25)
+  };
+
+}
+
+function cleanupDuplicateBets(){
+
+  const lock = LockService.getScriptLock();
+
+  if (!lock.tryLock(10000)) {
+    return {
+      success: false,
+      skipped: true,
+      message: "Could not clean duplicate wagers because another wager operation is running."
+    };
+  }
+
+  try {
+
+    const sh = getBetsSheet_();
+    const data = sh.getDataRange().getValues();
+
+    if (data.length <= 2) {
+      return {
+        success: true,
+        groupsConsolidated: 0,
+        rowsRemoved: 0,
+        remainingBets: Math.max(0, data.length - 1)
+      };
+    }
+
+    const headers = data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+    const col = getBetsColumnMap_(headers);
+    validateBetsColumns_(col);
+
+    const output = [data[0].slice()];
+    const outputIndexByKey = {};
+    const duplicateGroupKeys = {};
+    let rowsRemoved = 0;
+
+    function rowTimestamp_(row) {
+      const raw =
+        row[col.lastUpdated] ||
+        row[col.timestamp] ||
+        "";
+
+      const parsed = new Date(raw);
+
+      return isNaN(parsed.getTime())
+        ? 0
+        : parsed.getTime();
+    }
+
+    for (let i = 1; i < data.length; i++) {
+
+      const row = data[i].slice();
+      const gameId = normalizeBetGameId_(row[col.gameId]);
+      const username = normalizeBetKey_(row[col.username]);
+      const categoryId = normalizeBetKey_(row[col.categoryId]);
+
+      if (!gameId || !username || !categoryId) {
+        output.push(row);
+        continue;
+      }
+
+      const key = [gameId, username, categoryId].join("|");
+      const existingOutputIndex = outputIndexByKey[key];
+
+      if (existingOutputIndex === undefined) {
+        outputIndexByKey[key] = output.length;
+        output.push(row);
+        continue;
+      }
+
+      const current = output[existingOutputIndex];
+      const originalTimestamp =
+        current[col.timestamp] ||
+        row[col.timestamp] ||
+        new Date();
+
+      if (rowTimestamp_(row) >= rowTimestamp_(current)) {
+        row[col.timestamp] = originalTimestamp;
+        output[existingOutputIndex] = row;
+      }
+
+      duplicateGroupKeys[key] = true;
+      rowsRemoved++;
+
+    }
+
+    if (!rowsRemoved) {
+      return {
+        success: true,
+        groupsConsolidated: 0,
+        rowsRemoved: 0,
+        remainingBets: output.length - 1
+      };
+    }
+
+    sh
+      .getRange(
+        1,
+        1,
+        output.length,
+        headers.length
+      )
+      .setValues(output);
+
+    const trailingRows = data.length - output.length;
+
+    if (trailingRows > 0) {
+      sh.deleteRows(output.length + 1, trailingRows);
+    }
+
+    SpreadsheetApp.flush();
+
+    if (typeof clearAppCaches === "function") {
+      clearAppCaches();
+    }
+
+    return {
+      success: true,
+      groupsConsolidated: Object.keys(duplicateGroupKeys).length,
+      rowsRemoved: rowsRemoved,
+      remainingBets: output.length - 1,
+      message: "Duplicate wagers were consolidated. The latest selection and amount were retained."
+    };
+
+  } catch (err) {
+
+    return {
+      success: false,
+      message:
+        err && err.message
+          ? err.message
+          : String(err)
+    };
+
+  } finally {
+    lock.releaseLock();
   }
 
 }

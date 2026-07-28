@@ -743,3 +743,72 @@ Parameters:
 - Optional `refreshStats`
 
 Reads final rows from `SportsPlayerGameStats`, settles Over or Under, and records an exact-line result as a push/refund.
+
+---
+
+## Sports Player Matchups v1 admin actions
+
+Player matchups compare one statistic across two to twelve players from the same MLB or NFL game. They may be created as a wager (`Bets`) or a normal prediction (`Picks`).
+
+### `adminCreateSportsPlayerMatchup`
+
+Required parameters:
+
+- `awardsGameId`
+- `sportsGameId` or `espnEventId`
+- `league`: `mlb` or `nfl`
+- `sport`: `baseball` or `football`
+- `sportsStatType`
+- `questionMode`: `wager` or `prediction`
+- `playersJSON`: JSON array containing at least two player objects
+
+Each player object supports:
+
+- `playerId`
+- Optional `espnPlayerId`
+- Optional `odds` for wager matchups
+
+Optional parameters:
+
+- `categoryName`
+- `points` for prediction matchups
+- `defaultOdds` for wager matchups
+
+Creates one category with one nominee row per selected player. Wager matchups write selections to `Bets`; prediction matchups write selections to `Picks`.
+
+### `adminSettleSportsPlayerMatchups`
+
+Parameters:
+
+- `gameId` or `awardsGameId`
+- Optional `force`
+- Optional `refreshStats`
+
+Compares the selected players' final `SportsPlayerGameStats` values. The highest value wins. A tie settles as `push`; wagers refund and prediction questions award no winner.
+
+## Advanced Sports Stat Questions v1.2
+
+Admin actions:
+
+- `adminGetSportsAdvancedQuestionOptions`
+  - Inputs: `league`, `sport`
+  - Returns supported player/team stat types, checkpoints, question kinds, and threshold operators.
+- `adminCreateSportsAdvancedQuestion`
+  - Inputs: `awardsGameId`, `questionMode`, `questionKind`, `entitiesJSON`, `sportsStatType`, `checkpointType`, optional threshold/operator/odds/points/categoryName.
+  - Supports players and teams from one or multiple games in the same league.
+- `adminSettleSportsAdvancedQuestions`
+  - Inputs: `gameId`/`awardsGameId`, optional `force`, `refreshStats`.
+- `adminSetupSportsAdvancedStats`
+- `adminRefreshSportsAdvancedStats`
+  - Inputs: a specific `sportsGameId`/`espnEventId`, or league/sport/date-window controls.
+- `adminGetSportsAdvancedStatsStatus`
+
+Sports Scores Engine read-only actions:
+
+- `getSportsTeamGameStats`
+- `getSportsStatCheckpoints`
+
+Checkpoint precision:
+
+- `EXACT_BOUNDARY`: safe for automatic checkpoint settlement.
+- `POLL_SNAPSHOT`: first cumulative stat poll observed after the checkpoint. It is stored but requires admin review by default because later plays may already be included.

@@ -373,6 +373,73 @@ function apiAdminRefreshSportsPlayerGameStats(payload) {
 
 }
 
+function apiAdminSetupSportsAdvancedStats(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "setupSportsAdvancedStatsAdmin",
+    {}
+  );
+
+}
+
+function apiAdminRefreshSportsAdvancedStats(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "refreshSportsAdvancedStatsAdmin",
+    {
+      gameId:
+        payload.gameId || payload.sportsGameId || "",
+
+      espnEventId:
+        payload.espnEventId || "",
+
+      league:
+        payload.league || "",
+
+      sport:
+        payload.sport || "",
+
+      daysBack:
+        payload.daysBack === undefined
+          ? 1
+          : payload.daysBack,
+
+      daysForward:
+        payload.daysForward === undefined
+          ? 1
+          : payload.daysForward,
+
+      maxGames:
+        payload.maxGames || 20
+    }
+  );
+
+}
+
+function apiAdminGetSportsAdvancedStatsStatus(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "getSportsAdvancedStatsStatusAdmin",
+    {}
+  );
+
+}
+
 function apiAdminSetSportsEngineSmartAutomation(payload) {
 
   payload =

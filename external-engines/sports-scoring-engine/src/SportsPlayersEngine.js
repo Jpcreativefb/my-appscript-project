@@ -1819,3 +1819,49 @@ function testSportsPlayersStatParser() {
     values: values
   };
 }
+
+function testGetSportsPlayerStatusAdmin() {
+
+  const adminKey =
+    PropertiesService
+      .getScriptProperties()
+      .getProperty(
+        "SPORTS_ADMIN_API_KEY"
+      );
+
+  if (!adminKey) {
+    throw new Error(
+      "Missing Script Property: SPORTS_ADMIN_API_KEY"
+    );
+  }
+
+  const result =
+    apiGetSportsPlayerStatusAdmin_({
+      adminKey: adminKey
+    });
+
+  console.log(
+    JSON.stringify(
+      result,
+      null,
+      2
+    )
+  );
+
+  return result;
+}
+
+function testGetSportsPlayerStatusDirect() {
+  const result =
+    getSportsPlayersStatus_();
+
+  console.log(
+    JSON.stringify(
+      result,
+      null,
+      2
+    )
+  );
+
+  return result;
+}

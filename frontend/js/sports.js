@@ -25,7 +25,9 @@ let sportsScoresState = {
   scores: [],
   activeFilter: {},
   creatingWager: false,
-  creatingPlayerProp: false
+  creatingPlayerProp: false,
+  creatingPlayerMatchup: false,
+  creatingAdvancedQuestion: false
 };
 
 let sportsUsageByGameId = {};
@@ -222,6 +224,38 @@ function bindSportsEvents() {
 
   scoresGrid
     .addEventListener("click", function(e) {
+
+      const advancedQuestionBtn =
+        e.target.closest("[data-create-advanced-question-game-id]");
+
+      if (advancedQuestionBtn) {
+
+        const gameId =
+          advancedQuestionBtn.getAttribute(
+            "data-create-advanced-question-game-id"
+          );
+
+        createSportsAdvancedQuestionFromCard(gameId);
+
+        return;
+
+      }
+
+      const playerMatchupBtn =
+        e.target.closest("[data-create-player-matchup-game-id]");
+
+      if (playerMatchupBtn) {
+
+        const gameId =
+          playerMatchupBtn.getAttribute(
+            "data-create-player-matchup-game-id"
+          );
+
+        createSportsPlayerMatchupFromCard(gameId);
+
+        return;
+
+      }
 
       const playerPropBtn =
         e.target.closest("[data-create-player-prop-game-id]");
@@ -683,6 +717,8 @@ function renderSportsScores(scores) {
 
         ${renderCreateWagerButton(game)}
         ${renderCreatePlayerPropButton(game)}
+        ${renderCreatePlayerMatchupButton(game)}
+        ${renderCreateAdvancedQuestionButton(game)}
       </div>
     `;
 
@@ -1116,7 +1152,7 @@ async function chooseSportsAwardsGameId_(
   if (!games.length) {
 
     alert(
-      "No active games found. Please create or activate a game first."
+      "No active wager-enabled games found. Turn WagerEnabled ON for the destination Awards Game first."
     );
 
     return "";
@@ -2225,6 +2261,51 @@ function renderCreatePlayerPropButton(game) {
 
 }
 
+
+function renderCreatePlayerMatchupButton(game) {
+  const session = getSportsStoredSession_();
+  if (!sportsSessionIsAdmin_(session)) return "";
+  if (
+    !game ||
+    !game.GameId ||
+    !game.HomeTeam ||
+    !game.AwayTeam ||
+    !sportsPlayerPropsSupported_(game)
+  ) {
+    return "";
+  }
+  return `
+    <button
+      class="small-btn player-matchup-btn"
+      data-create-player-matchup-game-id="${escapeSportsHtml(game.GameId || "")}"
+    >
+      Create Player Matchup
+    </button>
+  `;
+}
+
+function renderCreateAdvancedQuestionButton(game) {
+  const session = getSportsStoredSession_();
+  if (!sportsSessionIsAdmin_(session)) return "";
+  if (
+    !game ||
+    !game.GameId ||
+    !game.HomeTeam ||
+    !game.AwayTeam ||
+    !sportsPlayerPropsSupported_(game)
+  ) {
+    return "";
+  }
+  return `
+    <button
+      class="small-btn sports-advanced-question-btn"
+      data-create-advanced-question-game-id="${escapeSportsHtml(game.GameId || "")}"
+    >
+      Create Stat Question
+    </button>
+  `;
+}
+
 function normalizeSportsPlayerTeamKey_(value) {
   return String(value || "")
     .trim()
@@ -2741,6 +2822,843 @@ async function createSportsPlayerPropFromCard(gameId) {
   } finally {
     sportsScoresState.creatingPlayerProp =
       false;
+  }
+}
+
+
+/************************************
+ PLAYER MATCHUP CREATION
+ Two or more players, one shared stat.
+ Creates either Picks or Bets questions.
+************************************/
+
+async function getSportsPlayerMatchupDestinationGames_(session, questionMode) {
+  if (questionMode === "wager") {
+    const wagerResult = await apiAdminGetSportsWagerGames_(session);
+    if (!wagerResult || wagerResult.success === false) {
+      throw new Error(
+        (wagerResult && (wagerResult.error || wagerResult.message)) ||
+        "Could not load wager-enabled Awards Games."
+      );
+    }
+    return Array.isArray(wagerResult.games) ? wagerResult.games : [];
+  }
+
+  const predictionResult = await sportsAwardsApi_(
+    "adminGetGames",
+    {
+      username: session.username,
+      token: session.token
+    }
+  );
+
+  if (!predictionResult || predictionResult.success === false) {
+    throw new Error(
+      (predictionResult && (predictionResult.error || predictionResult.message)) ||
+      "Could not load prediction-enabled Awards Games."
+    );
+  }
+
+  return (Array.isArray(predictionResult.games) ? predictionResult.games : [])
+    .filter(function(game) {
+      return game && game.active !== false && game.predictionEnabled === true;
+    });
+}
+
+function showSportsPlayerMatchupDestinationModal_(games, questionMode) {
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("sportsPlayerMatchupDestinationOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "sportsPlayerMatchupDestinationOverlay";
+    overlay.className = "sports-player-prop-overlay";
+
+    const optionsHtml = (games || []).map(function(game) {
+      const gameId = String(game.gameId || game.GameId || "").trim();
+      const name = String(game.name || game.Name || gameId).trim();
+      return '<option value="' + escapeSportsHtml(gameId) + '">' +
+        escapeSportsHtml(name + " — " + gameId) +
+        '</option>';
+    }).join("");
+
+    overlay.innerHTML = `
+      <div class="sports-player-prop-modal sports-player-matchup-destination">
+        <h3>Choose Destination Game</h3>
+        <p>
+          This matchup will appear on the
+          <strong>${questionMode === "wager" ? "Wagers" : "Make Your Picks"}</strong>
+          page.
+        </p>
+        <label class="sports-player-prop-field">
+          <span>Awards Game</span>
+          <select id="sportsPlayerMatchupDestinationSelect">${optionsHtml}</select>
+        </label>
+        <div class="sports-player-prop-actions">
+          <button type="button" class="small-btn" id="sportsPlayerMatchupDestinationCancel">Cancel</button>
+          <button type="button" class="small-btn player-matchup-btn" id="sportsPlayerMatchupDestinationConfirm">Continue</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+    function close(value) {
+      overlay.remove();
+      resolve(value || "");
+    }
+    document.getElementById("sportsPlayerMatchupDestinationCancel")
+      .addEventListener("click", function() { close(""); });
+    document.getElementById("sportsPlayerMatchupDestinationConfirm")
+      .addEventListener("click", function() {
+        const select = document.getElementById("sportsPlayerMatchupDestinationSelect");
+        close(select ? select.value : "");
+      });
+    overlay.addEventListener("click", function(event) {
+      if (event.target === overlay) close("");
+    });
+  });
+}
+
+function showSportsPlayerMatchupModal_(game, options) {
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("sportsPlayerMatchupOverlay");
+    if (existing) existing.remove();
+
+    const players = Array.isArray(options && options.players) ? options.players : [];
+    const statTypes = Array.isArray(options && options.statTypes) ? options.statTypes : [];
+    const statOptions = statTypes.map(function(stat) {
+      return '<option value="' + escapeSportsHtml(stat.value || "") + '">' +
+        escapeSportsHtml(stat.label || stat.value || "") +
+        '</option>';
+    }).join("");
+
+    const playerRows = players.map(function(player, index) {
+      const playerId = String(player.PlayerId || player.ESPNPlayerId || "").trim();
+      return `
+        <label class="sports-player-matchup-player-row">
+          <input
+            type="checkbox"
+            class="sports-player-matchup-checkbox"
+            data-player-index="${index}"
+            value="${escapeSportsHtml(playerId)}"
+          >
+          <img src="${escapeSportsHtml(player.HeadshotUrl || "")}" alt="">
+          <span class="sports-player-matchup-player-name">${escapeSportsHtml(sportsPlayerPropPlayerLabel_(player))}</span>
+          <input
+            type="number"
+            class="sports-player-matchup-odds"
+            data-player-odds-index="${index}"
+            min="1.01"
+            step="0.01"
+            value="1.91"
+            aria-label="Decimal odds"
+          >
+        </label>
+      `;
+    }).join("");
+
+    const overlay = document.createElement("div");
+    overlay.id = "sportsPlayerMatchupOverlay";
+    overlay.className = "sports-player-prop-overlay";
+    overlay.innerHTML = `
+      <div class="sports-player-prop-modal sports-player-matchup-modal">
+        <h3>Create Player Matchup</h3>
+        <p class="sports-player-prop-game">
+          ${escapeSportsHtml(game.AwayTeam || "Away")} @ ${escapeSportsHtml(game.HomeTeam || "Home")}
+        </p>
+        <form id="sportsPlayerMatchupForm">
+          <label class="sports-player-prop-field">
+            <span>Question Type</span>
+            <select id="sportsPlayerMatchupMode">
+              <option value="wager">Wager — writes to Bets</option>
+              <option value="prediction">Prediction — writes to Picks</option>
+            </select>
+          </label>
+          <label class="sports-player-prop-field">
+            <span>Statistic</span>
+            <select id="sportsPlayerMatchupStat" required>${statOptions}</select>
+          </label>
+          <label class="sports-player-prop-field">
+            <span>Question (optional)</span>
+            <input id="sportsPlayerMatchupQuestion" type="text" placeholder="Which player will record the most ...?">
+          </label>
+          <label class="sports-player-prop-field" id="sportsPlayerMatchupPointsField" hidden>
+            <span>Prediction Points</span>
+            <input id="sportsPlayerMatchupPoints" type="number" min="1" step="1" value="1">
+          </label>
+          <div class="sports-player-matchup-help">
+            Select at least two players. For wagers, set decimal odds beside each selected player.
+          </div>
+          <div class="sports-player-matchup-player-list">${playerRows}</div>
+          <div id="sportsPlayerMatchupPreview" class="sports-player-prop-preview"></div>
+          <div class="sports-player-prop-actions">
+            <button type="button" class="small-btn" id="sportsPlayerMatchupCancel">Cancel</button>
+            <button type="submit" class="small-btn player-matchup-btn">Continue</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = document.getElementById("sportsPlayerMatchupForm");
+    const modeSelect = document.getElementById("sportsPlayerMatchupMode");
+    const statSelect = document.getElementById("sportsPlayerMatchupStat");
+    const questionInput = document.getElementById("sportsPlayerMatchupQuestion");
+    const pointsField = document.getElementById("sportsPlayerMatchupPointsField");
+    const pointsInput = document.getElementById("sportsPlayerMatchupPoints");
+    const preview = document.getElementById("sportsPlayerMatchupPreview");
+
+    function selectedRows() {
+      return Array.from(overlay.querySelectorAll(".sports-player-matchup-checkbox:checked"));
+    }
+
+    function updateMode() {
+      const isWager = modeSelect.value === "wager";
+      pointsField.hidden = isWager;
+      overlay.querySelectorAll(".sports-player-matchup-odds")
+        .forEach(function(input) {
+          input.hidden = !isWager;
+          input.disabled = !isWager;
+        });
+      updatePreview();
+    }
+
+    function updatePreview() {
+      const selected = selectedRows();
+      const statText = statSelect.options[statSelect.selectedIndex]
+        ? statSelect.options[statSelect.selectedIndex].text
+        : "statistic";
+      const customQuestion = String(questionInput.value || "").trim();
+      const question = customQuestion || ("Which player will record the most " + statText.toLowerCase() + "?");
+      preview.textContent =
+        question + " — " + selected.length + " player" + (selected.length === 1 ? "" : "s") +
+        " selected — " + (modeSelect.value === "wager" ? "Bets" : "Picks");
+    }
+
+    function close(value) {
+      overlay.remove();
+      resolve(value || null);
+    }
+
+    modeSelect.addEventListener("change", updateMode);
+    statSelect.addEventListener("change", updatePreview);
+    questionInput.addEventListener("input", updatePreview);
+    overlay.querySelectorAll(".sports-player-matchup-checkbox")
+      .forEach(function(input) { input.addEventListener("change", updatePreview); });
+    document.getElementById("sportsPlayerMatchupCancel")
+      .addEventListener("click", function() { close(null); });
+
+    form.addEventListener("submit", function(event) {
+      event.preventDefault();
+      const selected = selectedRows();
+      if (selected.length < 2) {
+        alert("Select at least two players.");
+        return;
+      }
+      const questionMode = modeSelect.value === "prediction" ? "prediction" : "wager";
+      let invalidOdds = false;
+      const selectedPlayers = selected.map(function(checkbox) {
+        const index = Number(checkbox.getAttribute("data-player-index"));
+        const player = players[index] || {};
+        const oddsInput = overlay.querySelector('[data-player-odds-index="' + index + '"]');
+        const odds = questionMode === "wager" ? Number(oddsInput && oddsInput.value) : "";
+        if (questionMode === "wager" && (!isFinite(odds) || odds <= 1)) {
+          invalidOdds = true;
+        }
+        return {
+          playerId: player.PlayerId || player.ESPNPlayerId || checkbox.value,
+          espnPlayerId: player.ESPNPlayerId || "",
+          playerName: player.FullName || player.ShortName || "",
+          odds: odds
+        };
+      });
+      if (invalidOdds) {
+        alert("Every selected player's decimal odds must be greater than 1.00.");
+        return;
+      }
+      const points = Math.max(1, Number(pointsInput.value) || 1);
+      close({
+        questionMode: questionMode,
+        sportsStatType: statSelect.value,
+        categoryName: String(questionInput.value || "").trim(),
+        points: points,
+        players: selectedPlayers
+      });
+    });
+
+    overlay.addEventListener("click", function(event) {
+      if (event.target === overlay) close(null);
+    });
+    updateMode();
+    updatePreview();
+  });
+}
+
+async function createSportsPlayerMatchupFromCard(gameId) {
+  if (
+    sportsScoresState.creatingWager ||
+    sportsScoresState.creatingPlayerProp ||
+    sportsScoresState.creatingPlayerMatchup
+  ) {
+    return;
+  }
+
+  const game = sportsScoresState.scores.find(function(item) {
+    return item.GameId === gameId;
+  });
+  if (!game) {
+    showSportsError("Could not find selected sports game.");
+    return;
+  }
+  if (!sportsPlayerPropsSupported_(game)) {
+    showSportsError("Player matchups v1 currently supports MLB and NFL only.");
+    return;
+  }
+
+  const session = getSportsStoredSession_();
+  if (!session.username || !session.token || !sportsSessionIsAdmin_(session)) {
+    showSportsError("Log in as an admin in the main app first, then return to Sports.");
+    return;
+  }
+
+  sportsScoresState.creatingPlayerMatchup = true;
+  try {
+    setSportsStatus("Loading players for matchup...");
+    const options = await getSportsPlayerPropOptions_(session, game);
+    const config = await showSportsPlayerMatchupModal_(game, options);
+    if (!config) {
+      setSportsStatus("Player matchup creation canceled.");
+      return;
+    }
+
+    const destinationGames = await getSportsPlayerMatchupDestinationGames_(session, config.questionMode);
+    if (!destinationGames.length) {
+      throw new Error(
+        config.questionMode === "wager"
+          ? "No active wager-enabled Awards Games were found."
+          : "No active prediction-enabled Awards Games were found."
+      );
+    }
+    const awardsGameId = await showSportsPlayerMatchupDestinationModal_(destinationGames, config.questionMode);
+    if (!awardsGameId) {
+      setSportsStatus("Player matchup creation canceled.");
+      return;
+    }
+
+    setSportsStatus("Creating player matchup...");
+    const result = await sportsAwardsApi_(
+      "adminCreateSportsPlayerMatchup",
+      {
+        username: session.username,
+        token: session.token,
+        awardsGameId: awardsGameId,
+        gameId: awardsGameId,
+        sportsGameId: game.GameId,
+        espnEventId: game.ESPNEventId,
+        league: game.League,
+        sport: game.Sport,
+        sportsStatType: config.sportsStatType,
+        questionMode: config.questionMode,
+        categoryName: config.categoryName,
+        points: config.points,
+        playersJSON: JSON.stringify(config.players)
+      }
+    );
+
+    if (!result || result.success === false) {
+      throw new Error(
+        (result && (result.error || result.message || result.reason)) ||
+        "Could not create player matchup."
+      );
+    }
+
+    setSportsStatus("Created player matchup: " + (result.category || result.categoryId) + ".");
+    alert(
+      "Player matchup created.\n\n" +
+      (result.category || "") + "\n" +
+      "Mode: " + (result.questionMode === "wager" ? "Wager / Bets" : "Prediction / Picks") + "\n" +
+      "Players: " + result.playerCount
+    );
+    await loadSportsScores(buildSportsFiltersFromControls());
+  } catch (err) {
+    showSportsError(err && err.message ? err.message : "Could not create player matchup.");
+    setSportsStatus("Could not create player matchup.");
+  } finally {
+    sportsScoresState.creatingPlayerMatchup = false;
+  }
+}
+
+/************************************
+ ADVANCED SPORTS STAT QUESTIONS v1.2
+ Cross-game players/teams and checkpoints.
+************************************/
+
+function sportsAdvancedQuestionEntityLabel_(entity) {
+  const game = entity.game || {};
+  const gameLabel =
+    String(game.AwayTeam || "Away") + " @ " +
+    String(game.HomeTeam || "Home") + " — " +
+    formatSportsDateShort(game.GameDateTime);
+
+  return (
+    (entity.entityType === "TEAM" ? "Team: " : "Player: ") +
+    String(entity.entityName || "") +
+    " — " +
+    gameLabel
+  );
+}
+
+function sportsAdvancedQuestionBuildEntities_(games, players) {
+  const entities = [];
+
+  (games || []).forEach(function(game) {
+    [
+      {
+        id: game.AwayTeamId || normalizeSportsPlayerTeamKey_(game.AwayTeam),
+        name: game.AwayTeam,
+        teamId: game.AwayTeamId || ""
+      },
+      {
+        id: game.HomeTeamId || normalizeSportsPlayerTeamKey_(game.HomeTeam),
+        name: game.HomeTeam,
+        teamId: game.HomeTeamId || ""
+      }
+    ].forEach(function(team) {
+      if (!team.name) return;
+      entities.push({
+        entityType: "TEAM",
+        entityId: String(team.id || ""),
+        entityName: String(team.name || ""),
+        teamId: String(team.teamId || team.id || ""),
+        sportsGameId: String(game.GameId || ""),
+        espnEventId: String(game.ESPNEventId || ""),
+        league: String(game.League || ""),
+        sport: String(game.Sport || ""),
+        game: game,
+        logo: team.name === game.HomeTeam ? game.HomeLogo : game.AwayLogo
+      });
+    });
+
+    (players || [])
+      .filter(function(player) {
+        return sportsPlayerTeamMatchesGame_(player, game);
+      })
+      .forEach(function(player) {
+        entities.push({
+          entityType: "PLAYER",
+          entityId: String(player.PlayerId || player.ESPNPlayerId || ""),
+          entityName: String(player.FullName || player.ShortName || player.PlayerName || ""),
+          teamId: String(player.TeamId || ""),
+          espnPlayerId: String(player.ESPNPlayerId || ""),
+          sportsGameId: String(game.GameId || ""),
+          espnEventId: String(game.ESPNEventId || ""),
+          league: String(game.League || ""),
+          sport: String(game.Sport || ""),
+          game: game,
+          logo: String(player.HeadshotUrl || "")
+        });
+      });
+  });
+
+  return entities;
+}
+
+function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) {
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("sportsAdvancedQuestionOverlay");
+    if (existing) existing.remove();
+
+    const entities = sportsAdvancedQuestionBuildEntities_(games, players);
+    const statTypes = Array.isArray(optionData && optionData.statTypes)
+      ? optionData.statTypes
+      : [];
+    const checkpoints = Array.isArray(optionData && optionData.checkpoints)
+      ? optionData.checkpoints
+      : [];
+
+    const rows = entities.map(function(entity, index) {
+      const image = entity.logo
+        ? '<img src="' + escapeSportsHtml(entity.logo) + '" alt="">'
+        : '<span class="sports-advanced-entity-placeholder">' +
+            (entity.entityType === "TEAM" ? "T" : "P") +
+          '</span>';
+      return `
+        <label class="sports-player-matchup-player-row sports-advanced-entity-row">
+          <input
+            type="checkbox"
+            class="sports-advanced-entity-checkbox"
+            data-advanced-entity-index="${index}"
+          >
+          ${image}
+          <span class="sports-player-matchup-player-name">
+            ${escapeSportsHtml(sportsAdvancedQuestionEntityLabel_(entity))}
+          </span>
+          <input
+            type="number"
+            class="sports-player-matchup-odds sports-advanced-entity-odds"
+            data-advanced-odds-index="${index}"
+            min="1.01"
+            step="0.01"
+            value="1.91"
+            aria-label="Decimal odds"
+          >
+        </label>
+      `;
+    }).join("");
+
+    const checkpointOptions = checkpoints.map(function(item) {
+      return '<option value="' + escapeSportsHtml(item.value || "") + '">' +
+        escapeSportsHtml(item.label || item.value || "") +
+        '</option>';
+    }).join("");
+
+    const overlay = document.createElement("div");
+    overlay.id = "sportsAdvancedQuestionOverlay";
+    overlay.className = "sports-player-prop-overlay";
+    overlay.innerHTML = `
+      <div class="sports-player-prop-modal sports-advanced-question-modal">
+        <h3>Create Advanced Sports Question</h3>
+        <p class="sports-player-prop-game">
+          Add players or teams from any loaded ${escapeSportsHtml(String(baseGame.League || "").toUpperCase())} game.
+        </p>
+        <form id="sportsAdvancedQuestionForm">
+          <div class="sports-advanced-question-grid">
+            <label class="sports-player-prop-field">
+              <span>Question Mode</span>
+              <select id="sportsAdvancedQuestionMode">
+                <option value="wager">Wager — writes to Bets</option>
+                <option value="prediction">Prediction — writes to Picks</option>
+              </select>
+            </label>
+            <label class="sports-player-prop-field">
+              <span>Question Type</span>
+              <select id="sportsAdvancedQuestionKind">
+                <option value="highest">Highest total — compare 2-12</option>
+                <option value="threshold">Yes/No threshold — one entity</option>
+              </select>
+            </label>
+            <label class="sports-player-prop-field">
+              <span>Checkpoint</span>
+              <select id="sportsAdvancedCheckpoint">${checkpointOptions}</select>
+            </label>
+            <label class="sports-player-prop-field">
+              <span>Statistic</span>
+              <select id="sportsAdvancedStat" required></select>
+            </label>
+            <label class="sports-player-prop-field sports-advanced-threshold-field" hidden>
+              <span>Comparison</span>
+              <select id="sportsAdvancedOperator">
+                <option value="gte">At least</option>
+                <option value="gt">More than</option>
+                <option value="lte">No more than</option>
+                <option value="lt">Fewer than</option>
+                <option value="eq">Exactly</option>
+              </select>
+            </label>
+            <label class="sports-player-prop-field sports-advanced-threshold-field" hidden>
+              <span>Threshold</span>
+              <input id="sportsAdvancedThreshold" type="number" step="0.5" value="1">
+            </label>
+            <label class="sports-player-prop-field sports-advanced-threshold-odds" hidden>
+              <span>Yes Odds</span>
+              <input id="sportsAdvancedYesOdds" type="number" min="1.01" step="0.01" value="1.91">
+            </label>
+            <label class="sports-player-prop-field sports-advanced-threshold-odds" hidden>
+              <span>No Odds</span>
+              <input id="sportsAdvancedNoOdds" type="number" min="1.01" step="0.01" value="1.91">
+            </label>
+            <label class="sports-player-prop-field" id="sportsAdvancedPointsField" hidden>
+              <span>Prediction Points</span>
+              <input id="sportsAdvancedPoints" type="number" min="1" step="1" value="1">
+            </label>
+          </div>
+          <label class="sports-player-prop-field">
+            <span>Question (optional)</span>
+            <input id="sportsAdvancedQuestionName" type="text" placeholder="A default question will be generated">
+          </label>
+          <div class="sports-player-matchup-help">
+            Final totals settle automatically. Checkpoint questions auto-settle only when an exact boundary snapshot was captured; a late poll is marked for admin review.
+          </div>
+          <div id="sportsAdvancedEntityList" class="sports-player-matchup-player-list sports-advanced-entity-list">${rows}</div>
+          <div id="sportsAdvancedQuestionPreview" class="sports-player-prop-preview"></div>
+          <div class="sports-player-prop-actions">
+            <button type="button" class="small-btn" id="sportsAdvancedQuestionCancel">Cancel</button>
+            <button type="submit" class="small-btn sports-advanced-question-btn">Continue</button>
+          </div>
+        </form>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+
+    const form = document.getElementById("sportsAdvancedQuestionForm");
+    const mode = document.getElementById("sportsAdvancedQuestionMode");
+    const kind = document.getElementById("sportsAdvancedQuestionKind");
+    const stat = document.getElementById("sportsAdvancedStat");
+    const checkpoint = document.getElementById("sportsAdvancedCheckpoint");
+    const operator = document.getElementById("sportsAdvancedOperator");
+    const threshold = document.getElementById("sportsAdvancedThreshold");
+    const name = document.getElementById("sportsAdvancedQuestionName");
+    const preview = document.getElementById("sportsAdvancedQuestionPreview");
+    const pointsField = document.getElementById("sportsAdvancedPointsField");
+
+    function checkedInputs_() {
+      return Array.from(overlay.querySelectorAll(".sports-advanced-entity-checkbox:checked"));
+    }
+
+    function selectedEntities_() {
+      return checkedInputs_().map(function(input) {
+        return entities[Number(input.getAttribute("data-advanced-entity-index"))];
+      }).filter(Boolean);
+    }
+
+    function updateStatOptions_() {
+      const selected = selectedEntities_();
+      const types = selected.map(function(entity) { return entity.entityType; })
+        .filter(function(value, index, array) { return array.indexOf(value) === index; });
+      const current = stat.value;
+      const allowed = statTypes.filter(function(item) {
+        if (!types.length) return true;
+        const supported = Array.isArray(item.entityTypes) ? item.entityTypes : [];
+        return types.every(function(type) { return supported.indexOf(type) !== -1; });
+      });
+      stat.innerHTML = allowed.map(function(item) {
+        return '<option value="' + escapeSportsHtml(item.value || "") + '">' +
+          escapeSportsHtml(item.label || item.value || "") +
+          '</option>';
+      }).join("");
+      if (allowed.some(function(item) { return item.value === current; })) stat.value = current;
+      if (!allowed.length) {
+        stat.innerHTML = '<option value="">No common stat for selected entity types</option>';
+      }
+    }
+
+    function updateControls_() {
+      const thresholdMode = kind.value === "threshold";
+      overlay.querySelectorAll(".sports-advanced-threshold-field")
+        .forEach(function(field) { field.hidden = !thresholdMode; });
+      overlay.querySelectorAll(".sports-advanced-threshold-odds")
+        .forEach(function(field) { field.hidden = !thresholdMode || mode.value !== "wager"; });
+      pointsField.hidden = mode.value === "wager";
+      overlay.querySelectorAll(".sports-advanced-entity-odds")
+        .forEach(function(input) {
+          input.hidden = thresholdMode || mode.value !== "wager";
+          input.disabled = thresholdMode || mode.value !== "wager";
+        });
+      updateStatOptions_();
+      updatePreview_();
+    }
+
+    function updatePreview_() {
+      const selected = selectedEntities_();
+      const statLabel = stat.options[stat.selectedIndex]
+        ? stat.options[stat.selectedIndex].text
+        : "statistic";
+      const checkpointLabel = checkpoint.options[checkpoint.selectedIndex]
+        ? checkpoint.options[checkpoint.selectedIndex].text
+        : "Final game total";
+      const custom = String(name.value || "").trim();
+      let question = custom;
+      if (!question && kind.value === "threshold" && selected[0]) {
+        question = "Will " + selected[0].entityName + " record " +
+          String(operator.options[operator.selectedIndex].text || "at least").toLowerCase() + " " +
+          String(threshold.value || "0") + " " + statLabel.toLowerCase() +
+          (checkpoint.value === "FINAL" ? "" : " " + checkpointLabel.toLowerCase()) + "?";
+      }
+      if (!question) {
+        question = "Who will record the most " + statLabel.toLowerCase() +
+          (checkpoint.value === "FINAL" ? "" : " " + checkpointLabel.toLowerCase()) + "?";
+      }
+      preview.textContent = question + " — " + selected.length + " selected — " +
+        (mode.value === "wager" ? "Bets" : "Picks");
+    }
+
+    function close_(value) {
+      overlay.remove();
+      resolve(value || null);
+    }
+
+    [mode, kind, stat, checkpoint, operator, threshold, name].forEach(function(input) {
+      input.addEventListener(input === name || input === threshold ? "input" : "change", updateControls_);
+    });
+    overlay.querySelectorAll(".sports-advanced-entity-checkbox")
+      .forEach(function(input) { input.addEventListener("change", updateControls_); });
+    document.getElementById("sportsAdvancedQuestionCancel")
+      .addEventListener("click", function() { close_(null); });
+
+    form.addEventListener("submit", function(event) {
+      event.preventDefault();
+      const selected = selectedEntities_();
+      if (kind.value === "threshold" && selected.length !== 1) {
+        alert("A Yes/No threshold question requires exactly one player or team.");
+        return;
+      }
+      if (kind.value === "highest" && selected.length < 2) {
+        alert("Select at least two players or teams.");
+        return;
+      }
+      if (!stat.value) {
+        alert("Choose a statistic supported by every selected entity type.");
+        return;
+      }
+
+      let invalidOdds = false;
+      const payloadEntities = selected.map(function(entity) {
+        const index = entities.indexOf(entity);
+        const oddsInput = overlay.querySelector('[data-advanced-odds-index="' + index + '"]');
+        const odds = mode.value === "wager" && kind.value === "highest"
+          ? Number(oddsInput && oddsInput.value)
+          : 1.91;
+        if (mode.value === "wager" && kind.value === "highest" && (!isFinite(odds) || odds <= 1)) {
+          invalidOdds = true;
+        }
+        return {
+          entityType: entity.entityType,
+          entityId: entity.entityId,
+          entityName: entity.entityName,
+          teamId: entity.teamId,
+          espnPlayerId: entity.espnPlayerId || "",
+          sportsGameId: entity.sportsGameId,
+          espnEventId: entity.espnEventId,
+          statType: stat.value,
+          odds: odds
+        };
+      });
+      if (invalidOdds) {
+        alert("Every selected wager option must have decimal odds greater than 1.00.");
+        return;
+      }
+
+      const yesOdds = Number(document.getElementById("sportsAdvancedYesOdds").value);
+      const noOdds = Number(document.getElementById("sportsAdvancedNoOdds").value);
+      if (mode.value === "wager" && kind.value === "threshold" &&
+          ((!isFinite(yesOdds) || yesOdds <= 1) || (!isFinite(noOdds) || noOdds <= 1))) {
+        alert("Yes and No decimal odds must be greater than 1.00.");
+        return;
+      }
+
+      close_({
+        questionMode: mode.value === "prediction" ? "prediction" : "wager",
+        questionKind: kind.value,
+        sportsStatType: stat.value,
+        checkpointType: checkpoint.value,
+        operator: operator.value,
+        threshold: Number(threshold.value),
+        yesOdds: yesOdds,
+        noOdds: noOdds,
+        points: Math.max(1, Number(document.getElementById("sportsAdvancedPoints").value) || 1),
+        categoryName: String(name.value || "").trim(),
+        entities: payloadEntities
+      });
+    });
+
+    overlay.addEventListener("click", function(event) {
+      if (event.target === overlay) close_(null);
+    });
+    updateControls_();
+  });
+}
+
+async function createSportsAdvancedQuestionFromCard(gameId) {
+  if (
+    sportsScoresState.creatingWager ||
+    sportsScoresState.creatingPlayerProp ||
+    sportsScoresState.creatingPlayerMatchup ||
+    sportsScoresState.creatingAdvancedQuestion
+  ) {
+    return;
+  }
+
+  const baseGame = sportsScoresState.scores.find(function(item) {
+    return item.GameId === gameId;
+  });
+  if (!baseGame) {
+    showSportsError("Could not find selected sports game.");
+    return;
+  }
+  if (!sportsPlayerPropsSupported_(baseGame)) {
+    showSportsError("Advanced stat questions currently support MLB and NFL only.");
+    return;
+  }
+
+  const session = getSportsStoredSession_();
+  if (!session.username || !session.token || !sportsSessionIsAdmin_(session)) {
+    showSportsError("Log in as an admin in the main app first, then return to Sports.");
+    return;
+  }
+
+  sportsScoresState.creatingAdvancedQuestion = true;
+  try {
+    setSportsStatus("Loading players, teams, stats, and checkpoints...");
+    const league = String(baseGame.League || "").toLowerCase();
+    const sport = String(baseGame.Sport || "").toLowerCase();
+    const games = sportsScoresState.scores.filter(function(game) {
+      return String(game.League || "").toLowerCase() === league;
+    });
+    const playerOptions = await getSportsPlayerPropOptions_(session, baseGame);
+    const optionData = await apiAdminGetSportsAdvancedQuestionOptions(league, sport);
+    const config = await showSportsAdvancedQuestionModal_(
+      baseGame,
+      games,
+      playerOptions.players || [],
+      optionData || {}
+    );
+    if (!config) {
+      setSportsStatus("Advanced sports question creation canceled.");
+      return;
+    }
+
+    const destinationGames = await getSportsPlayerMatchupDestinationGames_(session, config.questionMode);
+    if (!destinationGames.length) {
+      throw new Error(
+        config.questionMode === "wager"
+          ? "No active wager-enabled Awards Games were found."
+          : "No active prediction-enabled Awards Games were found."
+      );
+    }
+    const awardsGameId = await showSportsPlayerMatchupDestinationModal_(destinationGames, config.questionMode);
+    if (!awardsGameId) {
+      setSportsStatus("Advanced sports question creation canceled.");
+      return;
+    }
+
+    setSportsStatus("Creating advanced sports question...");
+    const result = await apiAdminCreateSportsAdvancedQuestion({
+      awardsGameId: awardsGameId,
+      gameId: awardsGameId,
+      questionMode: config.questionMode,
+      questionKind: config.questionKind,
+      sportsStatType: config.sportsStatType,
+      checkpointType: config.checkpointType,
+      operator: config.operator,
+      threshold: config.threshold,
+      yesOdds: config.yesOdds,
+      noOdds: config.noOdds,
+      points: config.points,
+      categoryName: config.categoryName,
+      entitiesJSON: JSON.stringify(config.entities)
+    });
+
+    if (!result || result.success === false) {
+      throw new Error(
+        (result && (result.error || result.message || result.reason)) ||
+        "Could not create advanced sports question."
+      );
+    }
+
+    setSportsStatus("Created advanced sports question: " + (result.category || result.categoryId) + ".");
+    alert(
+      "Advanced sports question created.\n\n" +
+      (result.category || "") + "\n" +
+      "Mode: " + (result.questionMode === "wager" ? "Wager / Bets" : "Prediction / Picks") + "\n" +
+      "Entities: " + result.entityCount + "\n" +
+      "Checkpoint: " + result.checkpointLabel
+    );
+    await loadSportsScores(buildSportsFiltersFromControls());
+  } catch (err) {
+    showSportsError(err && err.message ? err.message : "Could not create advanced sports question.");
+    setSportsStatus("Could not create advanced sports question.");
+  } finally {
+    sportsScoresState.creatingAdvancedQuestion = false;
   }
 }
 

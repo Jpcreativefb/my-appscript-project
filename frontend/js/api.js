@@ -56,7 +56,15 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminRefreshSportsPlayerGameStats",
     "adminGetSportsPlayerPropPlayers",
     "adminCreateSportsPlayerProp",
+    "adminCreateSportsPlayerMatchup",
+    "adminGetSportsAdvancedQuestionOptions",
+    "adminCreateSportsAdvancedQuestion",
+    "adminSettleSportsAdvancedQuestions",
+    "adminSetupSportsAdvancedStats",
+    "adminRefreshSportsAdvancedStats",
+    "adminGetSportsAdvancedStatsStatus",
     "adminSettleSportsPlayerProps",
+    "adminSettleSportsPlayerMatchups",
     "adminRefreshRacingWagerScores",
     "adminSettleRacingWagers"
   ]);
@@ -2595,6 +2603,100 @@ async function apiAdminCreateSportsPlayerProp(payload = {}) {
   return apiAdminSportsControl_(
     "adminCreateSportsPlayerProp",
     payload
+  );
+
+}
+
+async function apiAdminCreateSportsPlayerMatchup(payload = {}) {
+
+  return apiAdminSportsControl_(
+    "adminCreateSportsPlayerMatchup",
+    payload
+  );
+
+}
+
+async function apiAdminGetSportsAdvancedQuestionOptions(
+  league,
+  sport
+) {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsAdvancedQuestionOptions",
+    {
+      league: league,
+      sport: sport
+    }
+  );
+
+}
+
+async function apiAdminCreateSportsAdvancedQuestion(payload = {}) {
+
+  return apiAdminSportsControl_(
+    "adminCreateSportsAdvancedQuestion",
+    payload
+  );
+
+}
+
+async function apiAdminSettleSportsAdvancedQuestions(
+  gameId,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminSettleSportsAdvancedQuestions",
+    {
+      gameId: gameId,
+      awardsGameId: gameId,
+      force: options.force === undefined ? true : options.force,
+      refreshStats: options.refreshStats === undefined ? true : options.refreshStats
+    }
+  );
+
+}
+
+async function apiAdminSetupSportsAdvancedStats() {
+
+  return apiAdminSportsControl_(
+    "adminSetupSportsAdvancedStats"
+  );
+
+}
+
+async function apiAdminRefreshSportsAdvancedStats(
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminRefreshSportsAdvancedStats",
+    options
+  );
+
+}
+
+async function apiAdminGetSportsAdvancedStatsStatus() {
+
+  return apiAdminSportsControl_(
+    "adminGetSportsAdvancedStatsStatus"
+  );
+
+}
+
+async function apiAdminSettleSportsPlayerMatchups(
+  gameId,
+  options = {}
+) {
+
+  return apiAdminSportsControl_(
+    "adminSettleSportsPlayerMatchups",
+    {
+      gameId: gameId,
+      awardsGameId: gameId,
+      force: options.force === undefined ? true : options.force,
+      refreshStats: options.refreshStats === undefined ? true : options.refreshStats
+    }
   );
 
 }

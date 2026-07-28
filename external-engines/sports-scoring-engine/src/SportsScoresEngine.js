@@ -1289,6 +1289,34 @@ function runSportsScoresUpdate(forceRefresh) {
         }
 
         upsertLatestSportsScores_(games);
+
+        if (typeof captureSportsStatCheckpointsForGames_ === "function") {
+          try {
+            const checkpointResult = captureSportsStatCheckpointsForGames_(games);
+            summary.checkpoints = summary.checkpoints || [];
+            summary.checkpoints.push({
+              sport: setting.Sport,
+              league: setting.League,
+              result: checkpointResult
+            });
+          } catch (checkpointError) {
+            const checkpointMessage = checkpointError && checkpointError.message
+              ? checkpointError.message
+              : String(checkpointError);
+            summary.errors.push({
+              sport: setting.Sport,
+              league: setting.League,
+              stage: "checkpoint-capture",
+              error: checkpointMessage
+            });
+            logSports_("WARN", "runSportsScoresUpdate", "Checkpoint capture failed", JSON.stringify({
+              sport: setting.Sport,
+              league: setting.League,
+              error: checkpointMessage
+            }));
+          }
+        }
+
         sportsMarkSettingPolled_(setting, due.mode);
 
         summary.leaguesChecked++;
@@ -1753,6 +1781,26 @@ else if (action === "removeSportsOddsHybridTrigger") {
 
     else if (action === "getSportsPlayerStatusAdmin") {
       payload = apiGetSportsPlayerStatusAdmin_(params);
+    }
+
+    else if (action === "getSportsTeamGameStats") {
+      payload = apiGetSportsTeamGameStats_(params);
+    }
+
+    else if (action === "getSportsStatCheckpoints") {
+      payload = apiGetSportsStatCheckpoints_(params);
+    }
+
+    else if (action === "setupSportsAdvancedStatsAdmin") {
+      payload = apiSetupSportsAdvancedStatsAdmin_(params);
+    }
+
+    else if (action === "refreshSportsAdvancedStatsAdmin") {
+      payload = apiRefreshSportsAdvancedStatsAdmin_(params);
+    }
+
+    else if (action === "getSportsAdvancedStatsStatusAdmin") {
+      payload = apiGetSportsAdvancedStatsStatusAdmin_(params);
     }
 
     else if (action === "setupSportsRacing" || action === "getSportsRacingResults" || action === "getSportsRacingOdds") {
@@ -7464,6 +7512,10 @@ function setupSportsScoresSheet() {
     results.players = setupSportsPlayersSystem();
   }
 
+  if (typeof setupSportsAdvancedStatsSystem === "function") {
+    results.advancedStats = setupSportsAdvancedStatsSystem();
+  }
+
   try {
     applySportsRecordTextFormats_(SPORTS_SHEETS.SCORES);
     applySportsRecordTextFormats_(SPORTS_SHEETS.GAMES);
@@ -7514,7 +7566,7 @@ function setupSportsScoresSheet() {
 
   return {
     success: true,
-    version: "18.0.1-players-retry-safe",
+    version: "18.1.0-advanced-stats",
     results: results,
     message: "Sports Scores Engine setup complete. Each sheet was checked once with Spreadsheet timeout retries."
   };
