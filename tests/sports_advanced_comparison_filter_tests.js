@@ -109,7 +109,7 @@ assert(player, 'Expected player entity');
 assert.strictEqual(player.teamAbbreviation, 'CHC');
 assert.strictEqual(player.position, 'P');
 const playerLabel = context.sportsAdvancedQuestionEntityLabel_(player);
-assert(playerLabel.includes('Example Pitcher · CHC · P'));
+assert(playerLabel.includes('Example Pitcher · P · CHC'));
 
 const cubs = entities.find(item => item.entityType === 'TEAM' && item.entityName === 'Chicago Cubs');
 assert.strictEqual(cubs.groupName, 'NL Central');
@@ -119,7 +119,7 @@ assert(source.includes('data-advanced-group='));
 assert(!source.includes('data-advanced-division='));
 assert(source.includes('sportsAdvancedQuestionSearchTokens_'));
 assert(source.includes('groupInfo.label'));
-assert(html.includes('sports.js?v=240-all-league-player-stats'));
-assert(sw.includes('awards-app-v240-all-league-player-stats'));
+assert(html.includes('sports.js?v=250-standalone-stat-comparison'));
+assert(sw.includes('awards-app-v250-standalone-stat-comparison'));
 
 console.log('Sports advanced comparison filter tests passed.');

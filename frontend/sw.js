@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v240-all-league-player-stats";
+const AWARDS_CACHE = "awards-app-v250-standalone-stat-comparison";
 
 const APP_SHELL = [
   "./",

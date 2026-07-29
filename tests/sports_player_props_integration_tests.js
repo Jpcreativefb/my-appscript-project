@@ -72,7 +72,7 @@ requireText(sportsCss, '.sports-player-prop-overlay', 'Sports CSS');
 requireText(playerPropEngine, 'sportsAdminBridgeCall_(', 'Secure player-stat refresh bridge');
 requireText(playerPropEngine, 'sportsPlayerPropRequireWagerGame_(', 'Wager-enabled destination validation');
 requireText(playerPropEngine, 'testLatestSportsPlayerPropWagerReadiness', 'Player-prop wager readiness diagnostic');
-requireText(serviceWorker, 'awards-app-v240-all-league-player-stats', 'Service worker cache');
+requireText(serviceWorker, 'awards-app-v250-standalone-stat-comparison', 'Service worker cache');
 
 const backendContext = {
   console,

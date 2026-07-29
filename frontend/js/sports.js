@@ -815,11 +815,206 @@ function renderSportsLeagueButtons(leagues) {
 
       select.appendChild(option);
     });
+
+  renderSportsAdvancedBuilderSection_();
+}
+
+function sportsAdvancedBuilderWeekSupported_(sport, league) {
+  const sportKey = String(sport || "").trim().toLowerCase();
+  const leagueKey = sportsAdvancedLeagueKey_(league);
+  return sportKey === "football" && ["nfl", "college-football"].indexOf(leagueKey) !== -1;
+}
+
+function sportsAdvancedBuilderLeagueOptions_(leagues) {
+  return (leagues || [])
+    .filter(function(item) {
+      return sportsAdvancedQuestionsSupported_({ Sport: item.sport, League: item.league });
+    })
+    .slice()
+    .sort(function(a, b) {
+      return getLeagueMeta(a).name.localeCompare(getLeagueMeta(b).name);
+    });
+}
+
+function sportsAdvancedBuilderSetScopeVisibility_() {
+  const leagueSelect = document.getElementById("sportsAdvancedBuilderLeague");
+  const scopeSelect = document.getElementById("sportsAdvancedBuilderScope");
+  const dateFields = document.getElementById("sportsAdvancedBuilderDateFields");
+  const weekFields = document.getElementById("sportsAdvancedBuilderWeekFields");
+  const weekOption = scopeSelect && scopeSelect.querySelector('option[value="week"]');
+  if (!leagueSelect || !scopeSelect || !dateFields || !weekFields) return;
+
+  const parts = String(leagueSelect.value || "").split("|");
+  const weekSupported = sportsAdvancedBuilderWeekSupported_(parts[0], parts[1]);
+  if (weekOption) weekOption.disabled = !weekSupported;
+  if (!weekSupported && scopeSelect.value === "week") scopeSelect.value = "date";
+
+  const useWeek = weekSupported && scopeSelect.value === "week";
+  dateFields.hidden = useWeek;
+  weekFields.hidden = !useWeek;
+}
+
+function sportsAdvancedBuilderContext_() {
+  const leagueSelect = document.getElementById("sportsAdvancedBuilderLeague");
+  const scopeSelect = document.getElementById("sportsAdvancedBuilderScope");
+  if (!leagueSelect || !scopeSelect || !leagueSelect.value) return null;
+
+  const parts = String(leagueSelect.value || "").split("|");
+  const context = {
+    sport: String(parts[0] || "").trim().toLowerCase(),
+    league: String(parts[1] || "").trim().toLowerCase(),
+    scope: scopeSelect.value === "week" ? "week" : "date"
+  };
+
+  if (context.scope === "week") {
+    context.seasonYear = String(document.getElementById("sportsAdvancedBuilderSeasonYear").value || "").trim();
+    context.seasonType = String(document.getElementById("sportsAdvancedBuilderSeasonType").value || "").trim();
+    context.week = String(document.getElementById("sportsAdvancedBuilderWeek").value || "").trim();
+  } else {
+    context.dateFrom = String(document.getElementById("sportsAdvancedBuilderDateFrom").value || "").trim();
+    context.dateTo = String(document.getElementById("sportsAdvancedBuilderDateTo").value || "").trim();
+  }
+
+  return context;
+}
+
+function renderSportsAdvancedBuilderSection_() {
+  const section = document.getElementById("sportsAdvancedBuilderSection");
+  if (!section) return;
+
+  const session = getSportsStoredSession_();
+  if (!sportsSessionIsAdmin_(session)) {
+    section.classList.add("hidden");
+    section.innerHTML = "";
+    return;
+  }
+
+  const leagues = sportsAdvancedBuilderLeagueOptions_(sportsScoresState.leagues);
+  if (!leagues.length) {
+    section.classList.add("hidden");
+    section.innerHTML = "";
+    return;
+  }
+
+  const mainLeague = document.getElementById("leagueSelect");
+  const preferredLeague = String(mainLeague && mainLeague.value || "");
+  const leagueOptions = leagues.map(function(item) {
+    const value = String(item.sport || "") + "|" + String(item.league || "");
+    return '<option value="' + escapeSportsHtml(value) + '"' +
+      (value === preferredLeague ? " selected" : "") + '>' +
+      escapeSportsHtml(getLeagueMeta(item).name) + '</option>';
+  }).join("");
+
+  const today = getSportsTodayInputValue();
+  const pageDateFrom = String(document.getElementById("dateFromInput") && document.getElementById("dateFromInput").value || today);
+  const pageDateTo = String(document.getElementById("dateToInput") && document.getElementById("dateToInput").value || pageDateFrom);
+  const year = new Date().getFullYear();
+  const weeks = Array.from({ length: 30 }, function(_, index) {
+    const week = index + 1;
+    return '<option value="' + week + '">Week ' + week + '</option>';
+  }).join("");
+
+  section.classList.remove("hidden");
+  section.innerHTML = `
+    <div class="sports-advanced-builder-header">
+      <div>
+        <h2>Create Stat Comparison</h2>
+        <p>Load an entire league by date range or football week. No game card must be selected first.</p>
+      </div>
+    </div>
+    <div class="sports-advanced-builder-grid">
+      <label class="filter-control">
+        ${sportsFieldLabel_("League", "Choose the league whose games, teams, and players should be loaded into the comparison builder.")}
+        <select id="sportsAdvancedBuilderLeague">${leagueOptions}</select>
+      </label>
+      <label class="filter-control">
+        ${sportsFieldLabel_("Load By", "Date Range works for every league. Week is available for NFL and college football schedules that store a week number.")}
+        <select id="sportsAdvancedBuilderScope">
+          <option value="date">Date Range</option>
+          <option value="week">League Week</option>
+        </select>
+      </label>
+      <div id="sportsAdvancedBuilderDateFields" class="sports-advanced-builder-scope-fields">
+        <label class="filter-control">
+          ${sportsFieldLabel_("Date From", "First game date included in the comparison list.")}
+          <input id="sportsAdvancedBuilderDateFrom" type="date" value="${escapeSportsHtml(pageDateFrom)}">
+        </label>
+        <label class="filter-control">
+          ${sportsFieldLabel_("Date To", "Last game date included in the comparison list. Teams and players from every matching game can be compared.")}
+          <input id="sportsAdvancedBuilderDateTo" type="date" value="${escapeSportsHtml(pageDateTo)}">
+        </label>
+      </div>
+      <div id="sportsAdvancedBuilderWeekFields" class="sports-advanced-builder-scope-fields" hidden>
+        <label class="filter-control">
+          ${sportsFieldLabel_("Season Year", "The season year saved on SportsScores. This prevents Week 1 from mixing multiple seasons.")}
+          <input id="sportsAdvancedBuilderSeasonYear" type="number" min="2000" max="2100" value="${year}">
+        </label>
+        <label class="filter-control">
+          ${sportsFieldLabel_("Season Phase", "Optional ESPN season type: preseason, regular season, or postseason.")}
+          <select id="sportsAdvancedBuilderSeasonType">
+            <option value="">Any Phase</option>
+            <option value="1">Preseason</option>
+            <option value="2">Regular Season</option>
+            <option value="3">Postseason</option>
+          </select>
+        </label>
+        <label class="filter-control">
+          ${sportsFieldLabel_("Week", "Loads every stored game from the chosen league, season, phase, and week.")}
+          <select id="sportsAdvancedBuilderWeek">${weeks}</select>
+        </label>
+      </div>
+      <div class="sports-advanced-builder-actions">
+        <button type="button" id="sportsAdvancedBuilderOpen" class="primary-btn">Open Comparison Builder</button>
+        <span id="sportsAdvancedBuilderStatus">Choose a league and scope.</span>
+      </div>
+    </div>
+  `;
+
+  const leagueSelect = document.getElementById("sportsAdvancedBuilderLeague");
+  const scopeSelect = document.getElementById("sportsAdvancedBuilderScope");
+  const openButton = document.getElementById("sportsAdvancedBuilderOpen");
+  leagueSelect.addEventListener("change", sportsAdvancedBuilderSetScopeVisibility_);
+  scopeSelect.addEventListener("change", sportsAdvancedBuilderSetScopeVisibility_);
+  openButton.addEventListener("click", createSportsAdvancedQuestionFromSection_);
+  sportsAdvancedBuilderSetScopeVisibility_();
 }
 
 /************************************
  SCORES
 ************************************/
+
+function sportsPageTeamSearchTokens_(value) {
+  return String(value || "")
+    .split(/[,;|\n]+/)
+    .map(function(item) {
+      return String(item || "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    })
+    .filter(Boolean)
+    .filter(function(item, index, items) { return items.indexOf(item) === index; });
+}
+
+function sportsPageGameMatchesTeamSearch_(game, tokens) {
+  if (!tokens || !tokens.length) return true;
+  const text = [
+    game && game.HomeTeam,
+    game && game.AwayTeam,
+    game && game.HomeAbbreviation,
+    game && game.AwayAbbreviation,
+    game && game.HomeShortName,
+    game && game.AwayShortName
+  ]
+    .map(function(value) { return String(value || "").trim().toLowerCase(); })
+    .join(" ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return tokens.some(function(token) { return text.indexOf(token) !== -1; });
+}
 
 async function loadSportsScores(filters) {
   clearSportsError();
@@ -828,6 +1023,10 @@ async function loadSportsScores(filters) {
   sportsScoresState.activeFilter =
     filters || {};
 
+  const requestFilters = Object.assign({}, sportsScoresState.activeFilter);
+  const teamTokens = sportsPageTeamSearchTokens_(requestFilters.team || "");
+  if (teamTokens.length > 1) delete requestFilters.team;
+
   setSportsStatus("Loading scores...");
 
   try {
@@ -835,7 +1034,7 @@ async function loadSportsScores(filters) {
       await sportsJsonp(
         buildSportsApiUrl(
           "getSportsScores",
-          sportsScoresState.activeFilter
+          requestFilters
         )
       );
 
@@ -846,7 +1045,9 @@ async function loadSportsScores(filters) {
     }
 
     sportsScoresState.scores =
-      data.scores || [];
+      (data.scores || []).filter(function(game) {
+        return sportsPageGameMatchesTeamSearch_(game, teamTokens);
+      });
 
     await loadSportsUsageForScores_();
 
@@ -865,7 +1066,7 @@ async function loadSportsScores(filters) {
 
     setSportsStatus(
       "Loaded " +
-      data.count +
+      sportsScoresState.scores.length +
       " scores. Last checked: " +
       formatSportsDate(data.timestamp)
     );
@@ -2908,9 +3109,9 @@ function sportsPlayerPropPlayerLabel_(player) {
       .trim();
 
   return [
-    team,
     name,
-    position ? "(" + position + ")" : ""
+    position ? "(" + position + ")" : "",
+    team
   ].filter(Boolean).join(" — ");
 }
 
@@ -3974,10 +4175,20 @@ function sportsAdvancedQuestionGroupInfo_(league, entities) {
   };
 }
 
+function sportsAdvancedNormalizeSearchText_(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function sportsAdvancedQuestionSearchTokens_(value) {
   return String(value || "")
     .split(/[,;|\n]+/)
-    .map(function(item) { return item.trim().toLowerCase(); })
+    .map(sportsAdvancedNormalizeSearchText_)
     .filter(Boolean)
     .filter(function(item, index, items) { return items.indexOf(item) === index; });
 }
@@ -3985,8 +4196,91 @@ function sportsAdvancedQuestionSearchTokens_(value) {
 function sportsAdvancedQuestionSearchMatches_(searchableText, rawSearch) {
   const tokens = sportsAdvancedQuestionSearchTokens_(rawSearch);
   if (!tokens.length) return true;
-  const text = String(searchableText || "").toLowerCase();
+  const text = sportsAdvancedNormalizeSearchText_(searchableText);
   return tokens.some(function(token) { return text.indexOf(token) !== -1; });
+}
+
+function sportsAdvancedNormalizePosition_(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  const aliases = {
+    "STARTING PITCHER": "SP", "RELIEF PITCHER": "RP", "PITCHER": "P",
+    "CATCHER": "C", "FIRST BASE": "1B", "SECOND BASE": "2B",
+    "THIRD BASE": "3B", "SHORTSTOP": "SS", "LEFT FIELD": "LF",
+    "CENTER FIELD": "CF", "RIGHT FIELD": "RF", "DESIGNATED HITTER": "DH",
+    "QUARTERBACK": "QB", "RUNNING BACK": "RB", "FULLBACK": "FB",
+    "WIDE RECEIVER": "WR", "TIGHT END": "TE", "OFFENSIVE TACKLE": "OT",
+    "OFFENSIVE GUARD": "OG", "DEFENSIVE END": "DE", "DEFENSIVE TACKLE": "DT",
+    "LINEBACKER": "LB", "CORNERBACK": "CB", "SAFETY": "S",
+    "POINT GUARD": "PG", "SHOOTING GUARD": "SG", "SMALL FORWARD": "SF",
+    "POWER FORWARD": "PF", "CENTER": "C", "GOALTENDER": "G",
+    "GOALKEEPER": "GK", "DEFENDER": "D", "MIDFIELDER": "M", "FORWARD": "F"
+  };
+  return aliases[raw] || raw.replace(/[^A-Z0-9]+/g, "");
+}
+
+function sportsAdvancedPositionPresets_(league) {
+  const key = sportsAdvancedLeagueKey_(league);
+  if (["nfl", "college-football"].indexOf(key) !== -1) {
+    return [
+      { label: "OFF", positions: ["QB", "RB", "FB", "WR", "TE", "OT", "OG", "OL", "G", "C"] },
+      { label: "DEF", positions: ["DE", "DT", "DL", "NT", "LB", "ILB", "OLB", "CB", "DB", "S", "SS", "FS"] },
+      { label: "WR/TE/RB", positions: ["WR", "TE", "RB", "FB"] },
+      { label: "Special", positions: ["K", "P", "LS", "KR", "PR"] }
+    ];
+  }
+  if (key === "mlb") {
+    return [
+      { label: "Pitchers", positions: ["P", "SP", "RP", "CL"] },
+      { label: "Infield", positions: ["C", "1B", "2B", "3B", "SS", "IF"] },
+      { label: "Outfield", positions: ["LF", "CF", "RF", "OF"] },
+      { label: "Hitters", positions: ["C", "1B", "2B", "3B", "SS", "IF", "LF", "CF", "RF", "OF", "DH"] }
+    ];
+  }
+  if (["nba", "wnba", "mens-college-basketball", "womens-college-basketball"].indexOf(key) !== -1) {
+    return [
+      { label: "Guards", positions: ["PG", "SG", "G"] },
+      { label: "Wings", positions: ["SG", "SF", "G", "F"] },
+      { label: "Forwards", positions: ["SF", "PF", "F"] },
+      { label: "Centers", positions: ["C"] }
+    ];
+  }
+  if (key === "nhl") {
+    return [
+      { label: "Forwards", positions: ["C", "LW", "RW", "F"] },
+      { label: "Defense", positions: ["D", "LD", "RD"] },
+      { label: "Goalies", positions: ["G", "GK"] }
+    ];
+  }
+  if (String(league || "").indexOf(".") !== -1) {
+    return [
+      { label: "Goalkeepers", positions: ["GK", "G"] },
+      { label: "Defenders", positions: ["D", "DF", "CB", "LB", "RB", "LWB", "RWB"] },
+      { label: "Midfielders", positions: ["M", "MF", "CM", "DM", "AM", "LM", "RM"] },
+      { label: "Forwards", positions: ["F", "FW", "ST", "CF", "LW", "RW"] }
+    ];
+  }
+  return [];
+}
+
+function sportsAdvancedPositionInfo_(league, entities) {
+  const positions = {};
+  (entities || []).forEach(function(entity) {
+    if (!entity || entity.entityType !== "PLAYER") return;
+    const position = sportsAdvancedNormalizePosition_(entity.position);
+    if (position) positions[position] = true;
+  });
+  const available = Object.keys(positions).sort();
+  const availableMap = {};
+  available.forEach(function(position) { availableMap[position] = true; });
+  const presets = sportsAdvancedPositionPresets_(league)
+    .map(function(preset) {
+      return {
+        label: preset.label,
+        positions: preset.positions.filter(function(position) { return availableMap[position]; })
+      };
+    })
+    .filter(function(preset) { return preset.positions.length; });
+  return { positions: available, presets: presets };
 }
 
 function sportsAdvancedQuestionEntityLabel_(entity) {
@@ -3998,8 +4292,8 @@ function sportsAdvancedQuestionEntityLabel_(entity) {
 
   if (entity.entityType === "PLAYER") {
     const playerDetails = [
-      String(entity.teamAbbreviation || "").trim(),
-      String(entity.position || "").trim()
+      String(entity.position || "").trim(),
+      String(entity.teamAbbreviation || "").trim()
     ].filter(Boolean).join(" · ");
     return (
       "Player: " + String(entity.entityName || "") +
@@ -4111,6 +4405,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
 
     const entities = sportsAdvancedQuestionBuildEntities_(games, players);
     const groupInfo = sportsAdvancedQuestionGroupInfo_(baseGame && baseGame.League, entities);
+    const positionInfo = sportsAdvancedPositionInfo_(baseGame && baseGame.League, entities);
     const hasPlayers = entities.some(function(entity) { return entity.entityType === "PLAYER"; });
     const entityFilterOptions = hasPlayers
       ? `
@@ -4138,6 +4433,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
           data-advanced-entity-type="${escapeSportsHtml(entity.entityType || "")}"
           data-advanced-entity-name="${escapeSportsHtml(entity.entityName || "")}"
           data-advanced-group="${escapeSportsHtml(entity.entityType === "TEAM" ? entity.groupName || "" : "")}"
+          data-advanced-position="${escapeSportsHtml(sportsAdvancedNormalizePosition_(entity.position || ""))}"
           data-advanced-search="${escapeSportsHtml([
             entity.entityName,
             entity.teamName,
@@ -4193,6 +4489,32 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
       `
       : "";
 
+    const positionPresets = positionInfo.presets.map(function(preset, index) {
+      return '<button type="button" class="small-btn sports-advanced-position-preset" ' +
+        'data-advanced-position-preset="' + index + '">' +
+        escapeSportsHtml(preset.label) + '</button>';
+    }).join("");
+    const positionChoices = positionInfo.positions.map(function(position) {
+      return `
+        <label class="sports-advanced-position-choice">
+          <input type="checkbox" class="sports-advanced-position-checkbox" value="${escapeSportsHtml(position)}">
+          <span>${escapeSportsHtml(position)}</span>
+        </label>
+      `;
+    }).join("");
+    const positionSelector = hasPlayers && positionInfo.positions.length
+      ? `
+        <div class="sports-advanced-position-filter">
+          <div class="sports-advanced-position-header">
+            ${sportsFieldLabel_("Player Positions", "Choose any combination of positions. League shortcuts such as OFF, DEF, WR/TE/RB, Pitchers, or Goalies select several positions at once.")}
+            <button type="button" class="small-btn" id="sportsAdvancedClearPositions">Clear Positions</button>
+          </div>
+          <div class="sports-advanced-position-presets">${positionPresets}</div>
+          <div class="sports-advanced-position-choices">${positionChoices}</div>
+        </div>
+      `
+      : "";
+
     const overlay = document.createElement("div");
     overlay.id = "sportsAdvancedQuestionOverlay";
     overlay.className = "sports-player-prop-overlay";
@@ -4211,9 +4533,10 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
               </select>
             </label>
             ${groupSelector}
+            ${positionSelector}
             <label class="sports-player-prop-field sports-advanced-search-field">
-              ${sportsFieldLabel_("Search", "Enter one or more names separated by commas. Matches for any entered team, player, abbreviation, position, division, conference, or matchup are shown.")}
-              <input id="sportsAdvancedEntitySearch" type="search" placeholder="Cubs, White Sox, CHC, pitcher…">
+              ${sportsFieldLabel_("Search", "Enter multiple teams or players separated by commas, semicolons, pipes, or new lines. Any matching name is shown; the terms do not have to appear in the same row.")}
+              <input id="sportsAdvancedEntitySearch" type="search" placeholder="Cubs, White Sox, CHC, CWS…">
             </label>
             <div class="sports-advanced-selection-actions">
               <button type="button" class="small-btn" id="sportsAdvancedSelectVisible">Select Visible</button>
@@ -4307,6 +4630,13 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     const divisionSelect = document.getElementById("sportsAdvancedDivisionSelect");
     const entitySearch = document.getElementById("sportsAdvancedEntitySearch");
     const visibleCount = document.getElementById("sportsAdvancedVisibleCount");
+    const positionCheckboxes = Array.from(overlay.querySelectorAll(".sports-advanced-position-checkbox"));
+
+    function selectedPositions_() {
+      return positionCheckboxes
+        .filter(function(input) { return input.checked; })
+        .map(function(input) { return sportsAdvancedNormalizePosition_(input.value); });
+    }
 
     function entityRows_() {
       return Array.from(overlay.querySelectorAll(".sports-advanced-entity-row"));
@@ -4315,15 +4645,21 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     function updateEntityVisibility_() {
       const typeFilter = String(entityFilter && entityFilter.value || "all").toUpperCase();
       const search = String(entitySearch && entitySearch.value || "").trim();
+      const selectedPositions = selectedPositions_();
       let count = 0;
       entityRows_().forEach(function(row) {
         const type = String(row.getAttribute("data-advanced-entity-type") || "").toUpperCase();
         const text = String(
           row.getAttribute("data-advanced-search") || row.textContent || ""
-        ).toLowerCase();
+        );
+        const rowPosition = sportsAdvancedNormalizePosition_(
+          row.getAttribute("data-advanced-position") || ""
+        );
         const typeMatch = typeFilter === "ALL" || type === typeFilter;
         const searchMatch = sportsAdvancedQuestionSearchMatches_(text, search);
-        row.hidden = !(typeMatch && searchMatch);
+        const positionMatch = type !== "PLAYER" || !selectedPositions.length ||
+          selectedPositions.indexOf(rowPosition) !== -1;
+        row.hidden = !(typeMatch && searchMatch && positionMatch);
         if (!row.hidden) count++;
       });
       if (visibleCount) {
@@ -4431,6 +4767,36 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
 
     entityFilter.addEventListener("change", updateEntityVisibility_);
     entitySearch.addEventListener("input", updateEntityVisibility_);
+    positionCheckboxes.forEach(function(input) {
+      input.addEventListener("change", function() {
+        if (selectedPositions_().length) entityFilter.value = "player";
+        updateEntityVisibility_();
+      });
+    });
+    overlay.querySelectorAll(".sports-advanced-position-preset").forEach(function(button) {
+      button.addEventListener("click", function() {
+        const preset = positionInfo.presets[Number(button.getAttribute("data-advanced-position-preset"))];
+        if (!preset) return;
+        const allSelected = preset.positions.every(function(position) {
+          return positionCheckboxes.some(function(input) {
+            return sportsAdvancedNormalizePosition_(input.value) === position && input.checked;
+          });
+        });
+        positionCheckboxes.forEach(function(input) {
+          const normalized = sportsAdvancedNormalizePosition_(input.value);
+          if (preset.positions.indexOf(normalized) !== -1) input.checked = !allSelected;
+        });
+        entityFilter.value = "player";
+        updateEntityVisibility_();
+      });
+    });
+    const clearPositions = document.getElementById("sportsAdvancedClearPositions");
+    if (clearPositions) {
+      clearPositions.addEventListener("click", function() {
+        positionCheckboxes.forEach(function(input) { input.checked = false; });
+        updateEntityVisibility_();
+      });
+    }
     if (divisionSelect) {
       divisionSelect.addEventListener("change", function() {
         const group = String(divisionSelect.value || "");
@@ -4535,16 +4901,75 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
   });
 }
 
-async function createSportsAdvancedQuestionFromCard(gameId) {
-  if (
-    sportsScoresState.creatingWager ||
-    sportsScoresState.creatingPlayerProp ||
-    sportsScoresState.creatingPlayerMatchup ||
-    sportsScoresState.creatingAdvancedQuestion
-  ) {
+function sportsAdvancedQuestionContextFromCard_(baseGame) {
+  const dateFromInput = document.getElementById("dateFromInput");
+  const dateToInput = document.getElementById("dateToInput");
+  const gameDate = String(baseGame && baseGame.GameDateTime || "").slice(0, 10);
+  return {
+    sport: String(baseGame && baseGame.Sport || "").trim().toLowerCase(),
+    league: String(baseGame && baseGame.League || "").trim().toLowerCase(),
+    scope: "date",
+    dateFrom: String(dateFromInput && dateFromInput.value || gameDate).trim(),
+    dateTo: String(dateToInput && dateToInput.value || gameDate).trim(),
+    selectedGameId: String(baseGame && baseGame.GameId || "")
+  };
+}
+
+async function sportsAdvancedLoadGamesForContext_(context) {
+  const params = {
+    sport: context.sport,
+    league: context.league
+  };
+  if (context.scope === "week") {
+    params.seasonYear = context.seasonYear;
+    params.seasonType = context.seasonType;
+    params.week = context.week;
+  } else {
+    params.dateFrom = context.dateFrom;
+    params.dateTo = context.dateTo || context.dateFrom;
+  }
+
+  const data = await sportsJsonp(
+    buildSportsApiUrl("getSportsScores", params),
+    { timeoutMs: SPORTS_JSONP_LONG_TIMEOUT_MS }
+  );
+  if (!data || data.success === false) {
+    throw new Error((data && data.error) || "Could not load games for the comparison builder.");
+  }
+  return Array.isArray(data.scores) ? data.scores : [];
+}
+
+async function createSportsAdvancedQuestionFromSection_() {
+  const context = sportsAdvancedBuilderContext_();
+  const status = document.getElementById("sportsAdvancedBuilderStatus");
+  if (!context) {
+    showSportsError("Choose a league before opening the comparison builder.");
+    return;
+  }
+  if (context.scope === "date") {
+    if (!context.dateFrom || !context.dateTo) {
+      showSportsError("Choose both Date From and Date To.");
+      return;
+    }
+    if (context.dateTo < context.dateFrom) {
+      showSportsError("Date To must be the same as or after Date From.");
+      return;
+    }
+  } else if (!context.seasonYear || !context.week) {
+    showSportsError("Choose a season year and week.");
     return;
   }
 
+  if (status) status.textContent = "Loading league games, teams, and players…";
+  const result = await createSportsAdvancedQuestion_(context);
+  if (status) {
+    status.textContent = result && result.created
+      ? "Comparison created."
+      : (result && result.canceled ? "Creation canceled." : "Ready.");
+  }
+}
+
+async function createSportsAdvancedQuestionFromCard(gameId) {
   const baseGame = sportsScoresState.scores.find(function(item) {
     return item.GameId === gameId;
   });
@@ -4552,38 +4977,65 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     showSportsError("Could not find selected sports game.");
     return;
   }
-  if (!sportsAdvancedQuestionsSupported_(baseGame)) {
+  return createSportsAdvancedQuestion_(sportsAdvancedQuestionContextFromCard_(baseGame));
+}
+
+async function createSportsAdvancedQuestion_(context) {
+  if (
+    sportsScoresState.creatingWager ||
+    sportsScoresState.creatingPlayerProp ||
+    sportsScoresState.creatingPlayerMatchup ||
+    sportsScoresState.creatingAdvancedQuestion
+  ) {
+    return { busy: true };
+  }
+
+  const contextGame = {
+    Sport: String(context && context.sport || ""),
+    League: String(context && context.league || "")
+  };
+  if (!sportsAdvancedQuestionsSupported_(contextGame)) {
     showSportsError("Stat comparisons are not enabled for this league yet.");
-    return;
+    return { error: true };
   }
 
   const session = getSportsStoredSession_();
   if (!session.username || !session.token || !sportsSessionIsAdmin_(session)) {
     showSportsError("Log in as an admin in the main app first, then return to Sports.");
-    return;
+    return { error: true };
   }
 
   sportsScoresState.creatingAdvancedQuestion = true;
   try {
-    setSportsStatus("Loading players, teams, stats, and checkpoints...");
-    const league = String(baseGame.League || "").toLowerCase();
-    const sport = String(baseGame.Sport || "").toLowerCase();
-    const games = sportsScoresState.scores.filter(function(game) {
-      return String(game.League || "").toLowerCase() === league;
-    });
+    clearSportsError();
+    setSportsStatus("Loading the full comparison scope, players, stats, and checkpoints...");
+    const league = String(context.league || "").toLowerCase();
+    const sport = String(context.sport || "").toLowerCase();
+    const games = await sportsAdvancedLoadGamesForContext_(context);
+    if (!games.length) {
+      throw new Error(
+        context.scope === "week"
+          ? "No stored games were found for that league, season, phase, and week. Build or refresh that schedule first."
+          : "No stored games were found for that league and date range."
+      );
+    }
+
+    const baseGame = games.find(function(game) {
+      return String(game.GameId || "") === String(context.selectedGameId || "");
+    }) || games[0];
+
     const playerOptions = sportsAdvancedQuestionPlayersSupported_(baseGame)
       ? await getSportsPlayerPropOptions_(session, baseGame, { allLeague: true })
       : { success: true, players: [] };
-    const optionData =
-      await sportsAwardsApi_(
-        "adminGetSportsAdvancedQuestionOptions",
-        {
-          username: session.username,
-          token: session.token,
-          league: league,
-          sport: sport
-        }
-      );
+    const optionData = await sportsAwardsApi_(
+      "adminGetSportsAdvancedQuestionOptions",
+      {
+        username: session.username,
+        token: session.token,
+        league: league,
+        sport: sport
+      }
+    );
 
     if (!optionData || optionData.success === false) {
       throw new Error(
@@ -4603,6 +5055,10 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
       );
     }
 
+    setSportsStatus(
+      "Loaded " + games.length + " " + String(league || "league").toUpperCase() +
+      " games for the comparison builder."
+    );
     const config = await showSportsAdvancedQuestionModal_(
       baseGame,
       games,
@@ -4611,7 +5067,7 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     );
     if (!config) {
       setSportsStatus("Advanced sports question creation canceled.");
-      return;
+      return { canceled: true };
     }
 
     const destinationGames = await getSportsPlayerMatchupDestinationGames_(session, config.questionMode);
@@ -4625,31 +5081,30 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     const awardsGameId = await showSportsPlayerMatchupDestinationModal_(destinationGames, config.questionMode);
     if (!awardsGameId) {
       setSportsStatus("Advanced sports question creation canceled.");
-      return;
+      return { canceled: true };
     }
 
     setSportsStatus("Creating advanced sports question...");
-    const result =
-      await sportsAwardsApi_(
-        "adminCreateSportsAdvancedQuestion",
-        {
-          username: session.username,
-          token: session.token,
-          awardsGameId: awardsGameId,
-          gameId: awardsGameId,
-          questionMode: config.questionMode,
-          questionKind: config.questionKind,
-          sportsStatType: config.sportsStatType,
-          checkpointType: config.checkpointType,
-          operator: config.operator,
-          threshold: config.threshold,
-          yesOdds: config.yesOdds,
-          noOdds: config.noOdds,
-          points: config.points,
-          categoryName: config.categoryName,
-          entitiesJSON: JSON.stringify(config.entities)
-        }
-      );
+    const result = await sportsAwardsApi_(
+      "adminCreateSportsAdvancedQuestion",
+      {
+        username: session.username,
+        token: session.token,
+        awardsGameId: awardsGameId,
+        gameId: awardsGameId,
+        questionMode: config.questionMode,
+        questionKind: config.questionKind,
+        sportsStatType: config.sportsStatType,
+        checkpointType: config.checkpointType,
+        operator: config.operator,
+        threshold: config.threshold,
+        yesOdds: config.yesOdds,
+        noOdds: config.noOdds,
+        points: config.points,
+        categoryName: config.categoryName,
+        entitiesJSON: JSON.stringify(config.entities)
+      }
+    );
 
     if (!result || result.success === false) {
       throw new Error(
@@ -4667,13 +5122,16 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
       "Checkpoint: " + result.checkpointLabel
     );
     await loadSportsScores(buildSportsFiltersFromControls());
+    return { created: true, result: result };
   } catch (err) {
     showSportsError(err && err.message ? err.message : "Could not create advanced sports question.");
     setSportsStatus("Could not create advanced sports question.");
+    return { error: true, message: err && err.message ? err.message : "" };
   } finally {
     sportsScoresState.creatingAdvancedQuestion = false;
   }
 }
+
 
 /************************************
  SNAPSHOTS

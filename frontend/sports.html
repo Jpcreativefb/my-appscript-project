@@ -75,7 +75,7 @@
   />
 
   <script defer src="./js/config.js"></script>
-  <script defer src="./js/sports.js?v=240-all-league-player-stats"></script>
+  <script defer src="./js/sports.js?v=250-standalone-stat-comparison"></script>
   <script defer src="./js/pwa.js"></script>
 
 </head>
@@ -145,7 +145,7 @@
           <input
             id="teamInput"
             type="search"
-            placeholder="Bears, Cubs, Lakers..."
+            placeholder="Cubs, White Sox, CHC, CWS..."
           >
         </label>
 
@@ -185,6 +185,12 @@
       </div>
 
     </section>
+
+    <section
+      id="sportsAdvancedBuilderSection"
+      class="sports-advanced-builder-section hidden"
+      aria-live="polite"
+    ></section>
 
     <section id="statusBox" class="status-box">
       Loading sports scores...

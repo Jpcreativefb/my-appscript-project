@@ -3395,6 +3395,32 @@ function apiGetSportsScores_(params) {
       .trim()
       .toLowerCase();
 
+  const teamFilters =
+    teamFilter
+      .split(/[,;|\n]+/)
+      .map(function(value) { return String(value || "").trim(); })
+      .filter(Boolean)
+      .filter(function(value, index, values) { return values.indexOf(value) === index; });
+
+  const seasonYearFilter =
+    String(params.seasonYear || params.year || "")
+      .trim();
+
+  const seasonTypeFilter =
+    String(params.seasonType || "")
+      .trim()
+      .toLowerCase();
+
+  const seasonPhaseFilter =
+    String(params.seasonPhase || "")
+      .trim()
+      .toLowerCase();
+
+  const weekFilter =
+    String(params.week || params.espnWeek || "")
+      .trim()
+      .toLowerCase();
+
   const gameIdFilter =
     String(params.gameId || "")
        .trim();
@@ -3493,23 +3519,49 @@ function apiGetSportsScores_(params) {
           }
         }
 
-        if (teamFilter) {
-          const homeTeam =
-            String(score.HomeTeam || "")
-              .trim()
-              .toLowerCase();
+        if (seasonYearFilter) {
+          const scoreSeasonYear =
+            String(score.SeasonYear || "").trim();
+          if (scoreSeasonYear !== seasonYearFilter) return false;
+        }
 
-          const awayTeam =
-            String(score.AwayTeam || "")
-              .trim()
-              .toLowerCase();
+        if (seasonTypeFilter) {
+          const scoreSeasonType =
+            String(score.SeasonType || "").trim().toLowerCase();
+          if (scoreSeasonType !== seasonTypeFilter) return false;
+        }
 
-          if (
-            homeTeam.indexOf(teamFilter) === -1 &&
-            awayTeam.indexOf(teamFilter) === -1
-          ) {
-            return false;
-          }
+        if (seasonPhaseFilter) {
+          const scoreSeasonPhase =
+            String(score.SeasonPhase || "").trim().toLowerCase();
+          if (scoreSeasonPhase !== seasonPhaseFilter) return false;
+        }
+
+        if (weekFilter) {
+          const scoreWeek =
+            String(score.Week || score.ESPNWeek || "").trim().toLowerCase();
+          if (scoreWeek !== weekFilter) return false;
+        }
+
+        if (teamFilters.length) {
+          const searchableTeams = [
+            score.HomeTeam,
+            score.AwayTeam,
+            score.HomeAbbreviation,
+            score.AwayAbbreviation,
+            score.HomeShortName,
+            score.AwayShortName
+          ]
+            .map(function(value) { return String(value || "").trim().toLowerCase(); })
+            .filter(Boolean)
+            .join(" ");
+
+          const matchesAnyTeam =
+            teamFilters.some(function(value) {
+              return searchableTeams.indexOf(value) !== -1;
+            });
+
+          if (!matchesAnyTeam) return false;
         }
 
         return true;
@@ -3538,7 +3590,12 @@ function apiGetSportsScores_(params) {
       completed: completedFilter,
       dateFrom: dateFromFilter,
       dateTo: dateToFilter,
-      team: teamFilter
+      team: teamFilter,
+      teamFilters: teamFilters,
+      seasonYear: seasonYearFilter,
+      seasonType: seasonTypeFilter,
+      seasonPhase: seasonPhaseFilter,
+      week: weekFilter
     },
     scores: scores,
     timestamp: new Date()
