@@ -1,5 +1,5 @@
 /************************************************************
- SPORTS ADVANCED STATS ENGINE v1.1.1
+ SPORTS ADVANCED STATS ENGINE v1.2.0
  Lives in the separate Sports Scores Engine project.
 
  Adds:
@@ -176,7 +176,7 @@ function setupSportsAdvancedStatsSystem() {
 
   return {
     success: true,
-    version: "1.1.1",
+    version: "1.2.0",
     sheets: [SPORTS_TEAM_GAME_STATS_SHEET, SPORTS_STAT_CHECKPOINTS_SHEET],
     message: "Sports team stats and checkpoint stats are ready"
   };
@@ -318,9 +318,72 @@ function sportsAdvancedTeamStatAlias_(sport, rawName, label) {
     strikeouts: "strikeouts",
     totalbases: "total-bases",
     stolenbases: "stolen-bases",
-    leftonbase: "left-on-base"
+    leftonbase: "left-on-base",
+    goals: "goals",
+    shots: "shots-on-goal",
+    shotsongoal: "shots-on-goal",
+    sog: "shots-on-goal",
+    powerplaygoals: "power-play-goals",
+    powerplayopportunities: "power-play-opportunities",
+    penaltyminutes: "penalty-minutes",
+    pim: "penalty-minutes",
+    blockedshots: "blocked-shots",
+    faceoffwins: "faceoff-wins",
+    fieldgoalsmade: "field-goals-made",
+    fieldgoalsmadefieldgoalsattempted: "field-goals-made",
+    fieldgoals: "field-goals-made",
+    threepointfieldgoalsmade: "three-pointers-made",
+    threepointfieldgoalsmadethreepointfieldgoalsattempted: "three-pointers-made",
+    threepointersmade: "three-pointers-made",
+    threepointsmade: "three-pointers-made",
+    freethrowsmade: "free-throws-made",
+    freethrowsmadefreethrowsattempted: "free-throws-made",
+    rebounds: "rebounds",
+    totalrebounds: "rebounds",
+    offensiverebounds: "offensive-rebounds",
+    defensiverebounds: "defensive-rebounds",
+    assists: "assists",
+    steals: "steals",
+    blocks: "blocks",
+    fouls: "fouls",
+    personalfouls: "fouls",
+
+    totalshots: "shots",
+    shotstotal: "shots",
+    shots: "shots",
+    shotsontarget: "shots-on-target",
+    shotsongoal: sportKey === "soccer" ? "shots-on-target" : "shots-on-goal",
+    possession: "possession-percentage",
+    possessionpct: "possession-percentage",
+    possessionpercentage: "possession-percentage",
+    passes: "passes",
+    totalpasses: "passes",
+    passescompleted: "passes-completed",
+    accuratepasses: "passes-completed",
+    completedpasses: "passes-completed",
+    passattempts: "passes-attempted",
+    passcompletionpercentage: "pass-completion-percentage",
+    passpct: "pass-completion-percentage",
+    passingaccuracy: "pass-completion-percentage",
+    passpercentage: "pass-completion-percentage",
+    corners: "corner-kicks",
+    woncorners: "corner-kicks",
+    cornerkicks: "corner-kicks",
+    foulscommitted: "fouls",
+    yellowcards: "yellow-cards",
+    redcards: "red-cards",
+    offsides: "offsides",
+    saves: "saves",
+    tackles: "tackles",
+    totaltackles: "tackles",
+    wontackles: "tackles",
+    interceptions: "interceptions",
+    clearances: "clearances",
+    effectiveclearance: "clearances",
+    totalclearance: "clearances"
   };
 
+  if (sportKey === "hockey" && compact === "blocks") return "blocked-shots";
   if (aliases[compact]) return aliases[compact];
   const slug = sportsAdvancedSlug_(rawName || label);
   if (sportKey === "football" && slug.indexOf("touchdown") !== -1) return "touchdowns";
@@ -356,8 +419,57 @@ function sportsAdvancedShouldTrackTeamStat_(sport, statType) {
     "stolen-bases": true,
     "left-on-base": true
   };
+  const hockey = {
+    "goals": true,
+    "shots-on-goal": true,
+    "power-play-goals": true,
+    "power-play-opportunities": true,
+    "penalty-minutes": true,
+    "blocked-shots": true,
+    "hits": true,
+    "faceoff-wins": true
+  };
+  const basketball = {
+    "points": true,
+    "field-goals-made": true,
+    "field-goals-attempted": true,
+    "three-pointers-made": true,
+    "three-pointers-attempted": true,
+    "free-throws-made": true,
+    "free-throws-attempted": true,
+    "rebounds": true,
+    "offensive-rebounds": true,
+    "defensive-rebounds": true,
+    "assists": true,
+    "steals": true,
+    "blocks": true,
+    "turnovers": true,
+    "fouls": true
+  };
+  const soccer = {
+    "goals": true,
+    "shots": true,
+    "shots-on-target": true,
+    "possession-percentage": true,
+    "passes": true,
+    "passes-completed": true,
+    "passes-attempted": true,
+    "pass-completion-percentage": true,
+    "corner-kicks": true,
+    "fouls": true,
+    "yellow-cards": true,
+    "red-cards": true,
+    "offsides": true,
+    "saves": true,
+    "tackles": true,
+    "interceptions": true,
+    "clearances": true
+  };
   if (sportKey === "football") return !!football[key];
   if (sportKey === "baseball") return !!baseball[key];
+  if (sportKey === "hockey") return !!hockey[key];
+  if (sportKey === "basketball") return !!basketball[key];
+  if (sportKey === "soccer") return !!soccer[key];
   return false;
 }
 
@@ -377,6 +489,18 @@ function sportsAdvancedParseFractionStat_(statType, displayValue) {
     return [
       { StatType: "fourth-down-conversions", StatValue: made, DisplayValue: String(made) },
       { StatType: "fourth-down-attempts", StatValue: attempted, DisplayValue: String(attempted) }
+    ];
+  }
+  const madeAttempted = {
+    "field-goals-made": "field-goals-attempted",
+    "three-pointers-made": "three-pointers-attempted",
+    "free-throws-made": "free-throws-attempted",
+    "power-play-goals": "power-play-opportunities"
+  };
+  if (madeAttempted[statType]) {
+    return [
+      { StatType: statType, StatValue: made, DisplayValue: String(made) },
+      { StatType: madeAttempted[statType], StatValue: attempted, DisplayValue: String(attempted) }
     ];
   }
   return [];
@@ -435,7 +559,10 @@ function sportsAdvancedDerivedTeamStats_(summary, score, existingRows) {
 
   teams.forEach(function(team) {
     if (team.score !== "") {
-      add_(team.id, team.name, sport === "baseball" ? "runs" : "points", team.score, "SPORTS_SCORE_DERIVED");
+      const scoreStatType = sport === "baseball"
+        ? "runs"
+        : ((sport === "hockey" || sport === "soccer") ? "goals" : "points");
+      add_(team.id, team.name, scoreStatType, team.score, "SPORTS_SCORE_DERIVED");
     }
   });
 
@@ -940,12 +1067,14 @@ function sportsAdvancedCaptureCheckpointsFromSummary_(score, summary, playerStat
 function captureSportsStatCheckpointsForGame_(score) {
   score = score || {};
 
-  if (sportsAdvancedBoolean_(score.Completed, false)) {
+  const completed = sportsAdvancedBoolean_(score.Completed, false);
+  const state = sportsAdvancedKey_(score.State || score.Status || score.StatusType);
+  if (!completed && ["in", "live", "in-progress", "inprogress"].indexOf(state) === -1) {
     return {
       success: true,
       skipped: true,
       gameId: sportsAdvancedString_(score.GameId),
-      reason: "Completed games are not checkpoint-backfilled",
+      reason: "Player/team statistics refresh starts when the game is live",
       checkpointsCaptured: 0
     };
   }
@@ -956,12 +1085,43 @@ function captureSportsStatCheckpointsForGame_(score) {
     : { players: [], stats: [] };
   const teamStats = sportsAdvancedNormalizeTeamStats_(summary, score);
 
-  return sportsAdvancedCaptureCheckpointsFromSummary_(
+  const playerWrite = typeof upsertSportsPlayersRows_ === "function"
+    ? upsertSportsPlayersRows_(playerNormalized.players || [], {})
+    : { inserted: 0, updated: 0 };
+  const playerStatsWrite = typeof upsertSportsPlayerGameStatsRows_ === "function"
+    ? upsertSportsPlayerGameStatsRows_(playerNormalized.stats || [])
+    : { inserted: 0, updated: 0 };
+  const teamStatsWrite = upsertSportsTeamGameStatsRows_(teamStats);
+
+  if (sportsAdvancedBoolean_(score.Completed, false)) {
+    return {
+      success: true,
+      skipped: true,
+      gameId: sportsAdvancedString_(score.GameId),
+      reason: "Final player/team stats refreshed; completed games are not checkpoint-backfilled",
+      playersFound: (playerNormalized.players || []).length,
+      playerStatsFound: (playerNormalized.stats || []).length,
+      teamStatsFound: teamStats.length,
+      playerWrite: playerWrite,
+      playerStatsWrite: playerStatsWrite,
+      teamStatsWrite: teamStatsWrite,
+      checkpointsCaptured: 0
+    };
+  }
+
+  const checkpointResult = sportsAdvancedCaptureCheckpointsFromSummary_(
     score,
     summary,
     playerNormalized.stats || [],
     teamStats
   );
+  checkpointResult.playersFound = (playerNormalized.players || []).length;
+  checkpointResult.playerStatsFound = (playerNormalized.stats || []).length;
+  checkpointResult.teamStatsFound = teamStats.length;
+  checkpointResult.playerWrite = playerWrite;
+  checkpointResult.playerStatsWrite = playerStatsWrite;
+  checkpointResult.teamStatsWrite = teamStatsWrite;
+  return checkpointResult;
 }
 
 function captureSportsStatCheckpointsForGames_(games) {
@@ -1129,7 +1289,7 @@ function getSportsAdvancedStatsStatus_() {
 
   return {
     success: true,
-    version: "1.1.1",
+    version: "1.2.0",
     teamStatRowCount: teams.length,
     checkpointRowCount: checkpoints.length,
     leagues: Object.keys(leagues).sort().map(function(key) { return leagues[key]; }),

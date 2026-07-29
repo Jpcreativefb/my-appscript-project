@@ -4443,7 +4443,11 @@ function sportsV13ScoresExtraHeaders_() {
     "Week",
     "Source",
     "GroupId",
-    "TeamId"
+    "TeamId",
+    "HomeAbbreviation",
+    "AwayAbbreviation",
+    "HomeConferenceName",
+    "AwayConferenceName"
   ];
 }
 
@@ -4898,7 +4902,41 @@ function sportsV13EventTeamIds_(event) {
   const away = competitors.find(function(team) { return team.homeAway === "away"; }) || {};
   const homeTeam = home.team || {};
   const awayTeam = away.team || {};
-  return { homeTeamId: homeTeam.id || home.id || "", awayTeamId: awayTeam.id || away.id || "" };
+  return {
+    homeTeamId: homeTeam.id || home.id || "",
+    awayTeamId: awayTeam.id || away.id || "",
+    homeAbbreviation: homeTeam.abbreviation || homeTeam.shortDisplayName || "",
+    awayAbbreviation: awayTeam.abbreviation || awayTeam.shortDisplayName || ""
+  };
+}
+
+function sportsV13CollegeTeamMetaMap_() {
+  if (sportsV13CollegeTeamMetaMap_.cache) return sportsV13CollegeTeamMetaMap_.cache;
+  const map = {};
+  const sheet = SpreadsheetApp.getActive().getSheetByName("SportsCollegeTeams");
+  if (!sheet || sheet.getLastRow() <= 1) {
+    sportsV13CollegeTeamMetaMap_.cache = map;
+    return map;
+  }
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0].map(function(value) { return String(value || "").trim(); });
+  const idCol = headers.indexOf("ESPNTeamId");
+  const abbrCol = headers.indexOf("Abbreviation");
+  const conferenceCol = headers.indexOf("ConferenceName");
+  if (idCol === -1) {
+    sportsV13CollegeTeamMetaMap_.cache = map;
+    return map;
+  }
+  for (let i = 1; i < data.length; i++) {
+    const teamId = String(data[i][idCol] || "").trim();
+    if (!teamId) continue;
+    map[teamId] = {
+      abbreviation: abbrCol === -1 ? "" : String(data[i][abbrCol] || "").trim(),
+      conferenceName: conferenceCol === -1 ? "" : String(data[i][conferenceCol] || "").trim()
+    };
+  }
+  sportsV13CollegeTeamMetaMap_.cache = map;
+  return map;
 }
 
 function sportsV13EventWeek_(event) {
@@ -4917,6 +4955,19 @@ function sportsV13AttachMeta_(game, event, request) {
   const teamIds = sportsV13EventTeamIds_(event || {});
   game.HomeTeamId = teamIds.homeTeamId;
   game.AwayTeamId = teamIds.awayTeamId;
+  game.HomeAbbreviation = teamIds.homeAbbreviation || "";
+  game.AwayAbbreviation = teamIds.awayAbbreviation || "";
+  game.HomeConferenceName = "";
+  game.AwayConferenceName = "";
+  if (sportsV13IsCollegeLeague_(game.Sport, game.League)) {
+    const collegeMeta = sportsV13CollegeTeamMetaMap_();
+    const homeMeta = collegeMeta[String(teamIds.homeTeamId || "")] || {};
+    const awayMeta = collegeMeta[String(teamIds.awayTeamId || "")] || {};
+    game.HomeAbbreviation = homeMeta.abbreviation || game.HomeAbbreviation;
+    game.AwayAbbreviation = awayMeta.abbreviation || game.AwayAbbreviation;
+    game.HomeConferenceName = homeMeta.conferenceName || "";
+    game.AwayConferenceName = awayMeta.conferenceName || "";
+  }
   game.SeasonYear = request.seasonYear || (event && event.season && event.season.year) || "";
   game.SeasonType = request.seasonType || (event && event.season && event.season.type) || "";
   game.SeasonPhase = request.seasonPhase || sportsV13SeasonPhaseForType_(game.SeasonType, "");
@@ -6108,14 +6159,73 @@ function addMmaAndSoccerSettings() {
   const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_SHEETS.SETTINGS);
   if (!sh) throw new Error("Missing sheet: " + SPORTS_SHEETS.SETTINGS);
 
-  const rowsToAdd = [
-    ["soccer", "usa.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/usa.1/scoreboard"],
-    ["soccer", "eng.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/eng.1/scoreboard"],
-    ["soccer", "esp.1", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/esp.1/scoreboard"],
-    ["soccer", "uefa.champions", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/uefa.champions/scoreboard"],
-    ["soccer", "fifa.world", true, 60, 2, 120, true, "https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard"],
-    ["mma", "ufc", true, 720, 5, 1440, true, "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"]
+  /*
+    Soccer competition library.
+
+    The first group preserves the previously enabled competitions. New library
+    rows start disabled so Smart Sports Sync does not fan out across dozens of
+    endpoints until an admin explicitly enables the leagues they want.
+
+    Any additional ESPN soccer competition can still be added to SportsSettings
+    without changing parser code; soccer player/team stats are league-generic.
+  */
+  const soccerCompetitions = [
+    ["usa.1", true],
+    ["eng.1", true],
+    ["esp.1", true],
+    ["mex.1", true],
+    ["ita.1", true],
+    ["ger.1", true],
+    ["fra.1", true],
+    ["uefa.champions", true],
+    ["uefa.europa", true],
+    ["uefa.nations", true],
+    ["fifa.world", true],
+
+    ["eng.2", false],
+    ["ned.1", false],
+    ["por.1", false],
+    ["sco.1", false],
+    ["bra.1", false],
+    ["arg.1", false],
+    ["usa.nwsl", false],
+    ["eng.w.1", false],
+    ["uefa.wchampions", false],
+    ["fifa.wwc", false],
+    ["uefa.europa.conf", false],
+    ["concacaf.champions", false],
+    ["conmebol.libertadores", false],
+    ["conmebol.sudamericana", false],
+    ["fifa.cwc", false],
+    ["club.friendly", false],
+    ["fifa.friendly", false]
   ];
+
+  const rowsToAdd = soccerCompetitions.map(function(item) {
+    const league = item[0];
+    const enabled = item[1];
+    return [
+      "soccer",
+      league,
+      enabled,
+      60,
+      2,
+      120,
+      true,
+      "https://site.api.espn.com/apis/site/v2/sports/soccer/" + league + "/scoreboard"
+    ];
+  });
+
+  rowsToAdd.push([
+    "mma",
+    "ufc",
+    true,
+    720,
+    5,
+    1440,
+    true,
+    "https://site.api.espn.com/apis/site/v2/sports/mma/ufc/scoreboard"
+  ]);
 
   const data = sh.getDataRange().getValues();
   const existingKeys = {};
@@ -6142,7 +6252,8 @@ function addMmaAndSoccerSettings() {
   return {
     success: true,
     added: newRows.length,
-    message: "Extra non-racing sports settings checked. Racing is managed by the separate Racing Score Engine."
+    soccerCompetitionsAvailable: soccerCompetitions.length,
+    message: "Expanded soccer competition library checked. Newly added competitions start Off; enable and sync only the leagues you want."
   };
 }
 
@@ -7552,6 +7663,10 @@ function setupSportsScoresSheet() {
     }
   }
 
+  try { results.collegeSettings = addCollegeSportsSettings(); } catch (error) { results.collegeSettingsWarning = error.message || String(error); }
+  try { results.wnbaSettings = addWNBASportsSettings(); } catch (error) { results.wnbaSettingsWarning = error.message || String(error); }
+  try { results.expandedSoccerSettings = addMmaAndSoccerSettings(); } catch (error) { results.expandedSoccerSettingsWarning = error.message || String(error); }
+
   sportsScoresDisableRacingSettingsRows_();
 
   logSports_(
@@ -7566,7 +7681,7 @@ function setupSportsScoresSheet() {
 
   return {
     success: true,
-    version: "18.1.0-advanced-stats",
+    version: "18.3.0-expanded-soccer-player-stats",
     results: results,
     message: "Sports Scores Engine setup complete. Each sheet was checked once with Spreadsheet timeout retries."
   };

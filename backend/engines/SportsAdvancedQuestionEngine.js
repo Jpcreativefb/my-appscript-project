@@ -1,5 +1,5 @@
 /* =====================================================
-   SPORTS ADVANCED QUESTIONS ENGINE v1.2
+   SPORTS ADVANCED QUESTIONS ENGINE v1.3
    Lives in Awards App backend.
 
    Supports:
@@ -15,7 +15,7 @@
 ===================================================== */
 
 const SPORTS_ADVANCED_QUESTION_MARKET = "sports-stat-question";
-const SPORTS_ADVANCED_QUESTION_VERSION = "sports-stat-question-v1.2";
+const SPORTS_ADVANCED_QUESTION_VERSION = "sports-stat-question-v1.3";
 const SPORTS_ADVANCED_QUESTION_SECTION = "Advanced Sports Questions";
 
 const SPORTS_ADVANCED_QUESTION_HEADERS = [
@@ -138,7 +138,7 @@ function setupSportsAdvancedQuestionSystem() {
 
   return {
     success: true,
-    version: "1.2",
+    version: "1.3",
     categories: sportsAdvancedQuestionEnsureHeaders_(categoriesSheet, categoryHeaders),
     categorySettings: sportsAdvancedQuestionEnsureHeaders_(settingsSheet, settingHeaders)
   };
@@ -158,9 +158,15 @@ function sportsAdvancedQuestionParseJSON_(value, fallback) {
 
 function sportsAdvancedQuestionPlayerStats_(league, sport) {
   if (typeof sportsPlayerPropStatOptions_ !== "function") return [];
-  return sportsPlayerPropStatOptions_(league, sport).map(function(item) {
-    return { value: item[0], label: item[1], entityTypes: ["PLAYER"] };
-  });
+  try {
+    return sportsPlayerPropStatOptions_(league, sport).map(function(item) {
+      return { value: item[0], label: item[1], entityTypes: ["PLAYER"] };
+    });
+  } catch (error) {
+    // A source league can still support team comparisons when its player
+    // roster or box-score feed is unavailable for a particular event.
+    return [];
+  }
 }
 
 function sportsAdvancedQuestionTeamStats_(league, sport) {
@@ -183,7 +189,7 @@ function sportsAdvancedQuestionTeamStats_(league, sport) {
     });
   }
 
-  if (leagueKey === "nfl" || sportKey === "football") {
+  if (leagueKey === "nfl" || leagueKey === "college-football" || sportKey === "football") {
     return [
       ["points", "Points"],
       ["touchdowns", "Touchdowns"],
@@ -196,6 +202,73 @@ function sportsAdvancedQuestionTeamStats_(league, sport) {
       ["sacks-allowed", "Sacks Allowed"],
       ["third-down-conversions", "Third-down Conversions"],
       ["fourth-down-conversions", "Fourth-down Conversions"]
+    ].map(function(item) {
+      return { value: item[0], label: item[1], entityTypes: ["TEAM"] };
+    });
+  }
+
+  if (leagueKey === "nhl" || sportKey === "hockey") {
+    return [
+      ["goals", "Goals"],
+      ["shots-on-goal", "Shots on Goal"],
+      ["power-play-goals", "Power-play Goals"],
+      ["power-play-opportunities", "Power-play Opportunities"],
+      ["penalty-minutes", "Penalty Minutes"],
+      ["blocked-shots", "Blocked Shots"],
+      ["hits", "Hits"],
+      ["faceoff-wins", "Faceoff Wins"]
+    ].map(function(item) {
+      return { value: item[0], label: item[1], entityTypes: ["TEAM"] };
+    });
+  }
+
+  if (
+    leagueKey === "nba" ||
+    leagueKey === "wnba" ||
+    leagueKey === "mens-college-basketball" ||
+    leagueKey === "womens-college-basketball" ||
+    sportKey === "basketball"
+  ) {
+    return [
+      ["points", "Points"],
+      ["field-goals-made", "Field Goals Made"],
+      ["field-goals-attempted", "Field Goals Attempted"],
+      ["three-pointers-made", "Three-pointers Made"],
+      ["three-pointers-attempted", "Three-pointers Attempted"],
+      ["free-throws-made", "Free Throws Made"],
+      ["free-throws-attempted", "Free Throws Attempted"],
+      ["rebounds", "Rebounds"],
+      ["offensive-rebounds", "Offensive Rebounds"],
+      ["defensive-rebounds", "Defensive Rebounds"],
+      ["assists", "Assists"],
+      ["steals", "Steals"],
+      ["blocks", "Blocks"],
+      ["turnovers", "Turnovers"],
+      ["fouls", "Fouls"]
+    ].map(function(item) {
+      return { value: item[0], label: item[1], entityTypes: ["TEAM"] };
+    });
+  }
+
+  if (sportKey === "soccer") {
+    return [
+      ["goals", "Goals"],
+      ["shots", "Shots"],
+      ["shots-on-target", "Shots on Target"],
+      ["possession-percentage", "Possession Percentage"],
+      ["passes", "Passes"],
+      ["passes-completed", "Passes Completed"],
+      ["passes-attempted", "Passes Attempted"],
+      ["pass-completion-percentage", "Pass Completion Percentage"],
+      ["corner-kicks", "Corner Kicks"],
+      ["fouls", "Fouls"],
+      ["yellow-cards", "Yellow Cards"],
+      ["red-cards", "Red Cards"],
+      ["offsides", "Offsides"],
+      ["saves", "Goalkeeper Saves"],
+      ["tackles", "Tackles"],
+      ["interceptions", "Interceptions"],
+      ["clearances", "Clearances"]
     ].map(function(item) {
       return { value: item[0], label: item[1], entityTypes: ["TEAM"] };
     });
@@ -274,13 +347,14 @@ function sportsAdvancedQuestionGetPlayer_(playerId, espnPlayerId, league) {
 }
 
 function sportsAdvancedQuestionResolveLeague_(game) {
+  const league = sportsAdvancedQuestionKey_(game && game.League);
+  const sport = sportsAdvancedQuestionKey_(game && game.Sport);
   if (typeof sportsPlayerPropLeagueSport_ === "function") {
-    return sportsPlayerPropLeagueSport_(game.League, game.Sport);
+    try {
+      return sportsPlayerPropLeagueSport_(league, sport);
+    } catch (ignoreUnsupportedSport) {}
   }
-  return {
-    league: sportsAdvancedQuestionKey_(game.League),
-    sport: sportsAdvancedQuestionKey_(game.Sport)
-  };
+  return { league: league, sport: sport };
 }
 
 function sportsAdvancedQuestionNormalizeTeam_(requested, game) {
@@ -781,7 +855,7 @@ function createSportsAdvancedQuestion(payload) {
 
   return {
     success: true,
-    version: "1.2",
+    version: "1.3",
     market: SPORTS_ADVANCED_QUESTION_MARKET,
     questionMode: questionMode,
     questionKind: questionKind,

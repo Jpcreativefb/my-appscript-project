@@ -72,7 +72,7 @@ requireText(sportsCss, '.sports-player-prop-overlay', 'Sports CSS');
 requireText(playerPropEngine, 'sportsAdminBridgeCall_(', 'Secure player-stat refresh bridge');
 requireText(playerPropEngine, 'sportsPlayerPropRequireWagerGame_(', 'Wager-enabled destination validation');
 requireText(playerPropEngine, 'testLatestSportsPlayerPropWagerReadiness', 'Player-prop wager readiness diagnostic');
-requireText(serviceWorker, 'awards-app-v219-sports-live-comparisons', 'Service worker cache');
+requireText(serviceWorker, 'awards-app-v240-all-league-player-stats', 'Service worker cache');
 
 const backendContext = {
   console,
@@ -178,7 +178,7 @@ const unsupportedButton = frontendContext.renderCreatePlayerPropButton({
   HomeTeam: 'Chicago Bulls',
   AwayTeam: 'New York Knicks'
 });
-assert(unsupportedButton === '', 'Unsupported league player-prop button rendered');
+assert(unsupportedButton.includes('Create Player Prop'), 'NBA player-prop button did not render');
 
 assert(
   frontendContext.sportsPlayerTeamMatchesGame_(

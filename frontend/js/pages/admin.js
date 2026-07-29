@@ -3362,7 +3362,7 @@ function adminSportsInfoText_(
     scoringSection:
       "Score polling controls how often the engine checks ESPN before games, during live games, and after final games.",
     playersSection:
-      "Players syncs ESPN rosters into SportsPlayers and refreshes current-game box-score statistics into SportsPlayerGameStats. Player support is validated for MLB and NFL in v1.",
+      "Players syncs ESPN rosters into SportsPlayers and refreshes current-game box-score statistics into SportsPlayerGameStats. Supported team sports include baseball, football, basketball, hockey, and configured soccer competitions.",
     syncPlayers:
       "Syncs the complete current ESPN roster for this league, including player IDs, teams, positions, jersey numbers, headshots, and active status.",
     refreshPlayerStats:
@@ -6051,10 +6051,15 @@ function adminRenderScoreLeagueControls_(
           const leagueKey =
             adminSportsKey_(rawLeague);
 
+          const rawSport = String(league.sport || "").trim();
+
           const sport =
             adminSportsEscape_(
-              league.sport
+              rawSport
             );
+
+          const sportKey =
+            adminSportsKey_(rawSport);
 
           const health =
             healthByLeague[leagueKey] || {};
@@ -6069,7 +6074,7 @@ function adminRenderScoreLeagueControls_(
             advancedByLeague[leagueKey] || {};
 
           const playerSupported =
-            ["mlb", "nfl"].indexOf(leagueKey) !== -1;
+            ["baseball", "football", "basketball", "hockey", "soccer"].indexOf(sportKey) !== -1;
 
           const playerCount =
             Number(playerUsage.playerCount || 0);
@@ -6204,7 +6209,7 @@ function adminRenderScoreLeagueControls_(
           /*
             Keep league settings editable even when the league is OFF.
             The old UI disabled every input when League was OFF, which made it
-            impossible to prepare MLB/NFL settings before turning the league on.
+            impossible to prepare league settings before turning the league on.
           */
           const controlsDisabled =
             "";
@@ -6376,7 +6381,7 @@ function adminRenderScoreLeagueControls_(
                   · Last team stats: ${adminSportsEscape_(lastTeamStatsUpdated || "Never")}
                   · Last checkpoint: ${adminSportsEscape_(lastCheckpointCaptured || "Never")}
                   ${playerActionsEnabled ? "" : " · Turn League ON to run player/team actions."}`
-                : "Player sync is not enabled for this league in v1. MLB and NFL are currently supported."}
+                : "Player sync is not enabled for this sport. Racing and combat sports use separate result engines."}
             </div>
 
             <div

@@ -117,7 +117,7 @@ const html = context.adminRenderSportsControlDashboard_({
   'Sync Players',
   'Refresh Current Game Stats',
   'adminSyncSportsPlayers(&#039;mlb&#039;, &#039;baseball&#039;)',
-  'Player sync is not enabled for this league in v1'
+  'adminSyncSportsPlayers(&#039;nba&#039;, &#039;basketball&#039;)'
 ].forEach((expected) => requireText(html, expected, 'Rendered Sports Controls'));
 
 console.log('Sports Players Controls integration tests passed.');

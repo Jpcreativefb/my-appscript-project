@@ -18,6 +18,7 @@ const frontendMirror = read('frontend/api.js');
 const sportsPage = read('frontend/js/sports.js');
 const sportsCss = read('frontend/css/sports.css');
 const sw = read('frontend/sw.js');
+const scoresEngine = read('external-engines/sports-scoring-engine/src/SportsScoresEngine.js');
 
 [
   'adminGetSportsAdvancedQuestionOptions',
@@ -38,7 +39,9 @@ const sw = read('frontend/sw.js');
   'function settleSportsAdvancedQuestionsForAllGames_(payload)',
   'SportsEntityConfigJSON',
   'EXACT_BOUNDARY_REQUIRED',
-  'review-if-imprecise'
+  'review-if-imprecise',
+  '["goals", "Goals"]',
+  '["three-pointers-made", "Three-pointers Made"]'
 ].forEach((expected) => requireText(engine, expected, 'Advanced question engine'));
 
 [
@@ -61,8 +64,11 @@ const sw = read('frontend/sw.js');
   'Checkpoint questions auto-settle only when an exact boundary snapshot was captured'
 ].forEach((expected) => requireText(sportsPage, expected, 'Sports page'));
 
+requireText(scoresEngine, 'HomeConferenceName', 'Sports Scores college metadata');
+requireText(scoresEngine, 'AwayConferenceName', 'Sports Scores college metadata');
+requireText(scoresEngine, 'HomeAbbreviation', 'Sports Scores team abbreviation metadata');
 requireText(sportsCss, '.sports-advanced-question-modal', 'Sports CSS');
-requireText(sw, 'awards-app-v219-sports-live-comparisons', 'Service worker cache');
+requireText(sw, 'awards-app-v240-all-league-player-stats', 'Service worker cache');
 
 class Range {
   constructor(sheet, row, col, numRows = 1, numCols = 1) {

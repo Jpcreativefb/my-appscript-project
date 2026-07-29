@@ -113,6 +113,144 @@ const LEAGUE_META = {
     logo: ""
   },
 
+  "soccer|uefa.europa": {
+    name: "UEFA Europa League",
+    shortName: "UEL",
+    logo: ""
+  },
+
+  "soccer|uefa.nations": {
+    name: "UEFA Nations League",
+    shortName: "UNL",
+    logo: ""
+  },
+
+  "soccer|mex.1": {
+    name: "Liga MX",
+    shortName: "LIGA MX",
+    logo: ""
+  },
+
+  "soccer|ita.1": {
+    name: "Serie A",
+    shortName: "SERIE A",
+    logo: ""
+  },
+
+  "soccer|ger.1": {
+    name: "Bundesliga",
+    shortName: "BUND",
+    logo: ""
+  },
+
+  "soccer|eng.2": {
+    name: "English Championship",
+    shortName: "EFL CH",
+    logo: ""
+  },
+
+  "soccer|ned.1": {
+    name: "Dutch Eredivisie",
+    shortName: "ERED",
+    logo: ""
+  },
+
+  "soccer|por.1": {
+    name: "Portuguese Primeira Liga",
+    shortName: "PRIMEIRA",
+    logo: ""
+  },
+
+  "soccer|sco.1": {
+    name: "Scottish Premiership",
+    shortName: "SPFL",
+    logo: ""
+  },
+
+  "soccer|bra.1": {
+    name: "Brazilian Série A",
+    shortName: "BRA A",
+    logo: ""
+  },
+
+  "soccer|arg.1": {
+    name: "Argentine Liga Profesional",
+    shortName: "ARG LPF",
+    logo: ""
+  },
+
+  "soccer|usa.nwsl": {
+    name: "NWSL",
+    shortName: "NWSL",
+    logo: ""
+  },
+
+  "soccer|eng.w.1": {
+    name: "Women’s Super League",
+    shortName: "WSL",
+    logo: ""
+  },
+
+  "soccer|uefa.wchampions": {
+    name: "UEFA Women’s Champions League",
+    shortName: "UWCL",
+    logo: ""
+  },
+
+  "soccer|fifa.wwc": {
+    name: "FIFA Women’s World Cup",
+    shortName: "WWC",
+    logo: ""
+  },
+
+  "soccer|uefa.europa.conf": {
+    name: "UEFA Conference League",
+    shortName: "UECL",
+    logo: ""
+  },
+
+  "soccer|concacaf.champions": {
+    name: "Concacaf Champions Cup",
+    shortName: "CCC",
+    logo: ""
+  },
+
+  "soccer|conmebol.libertadores": {
+    name: "CONMEBOL Libertadores",
+    shortName: "LIB",
+    logo: ""
+  },
+
+  "soccer|conmebol.sudamericana": {
+    name: "CONMEBOL Sudamericana",
+    shortName: "SUD",
+    logo: ""
+  },
+
+  "soccer|fifa.cwc": {
+    name: "FIFA Club World Cup",
+    shortName: "CWC",
+    logo: ""
+  },
+
+  "soccer|club.friendly": {
+    name: "Club Friendly",
+    shortName: "CLUB FR",
+    logo: ""
+  },
+
+  "soccer|fifa.friendly": {
+    name: "International Friendly",
+    shortName: "INTL FR",
+    logo: ""
+  },
+
+  "soccer|fra.1": {
+    name: "Ligue 1",
+    shortName: "LIGUE 1",
+    logo: ""
+  },
+
   "racing|f1": {
     name: "Formula 1",
     shortName: "F1",
@@ -2613,16 +2751,35 @@ if (
 
 /************************************
  PLAYER PROP CREATION
- Admin-only v1 workflow for MLB/NFL.
+ Admin workflow for supported team leagues.
 ************************************/
 
 function sportsPlayerPropsSupported_(game) {
-  const league =
-    String(game && game.League || "")
-      .trim()
-      .toLowerCase();
+  const league = sportsAdvancedLeagueKey_(game && game.League);
+  let sport = String(game && game.Sport || "").trim().toLowerCase();
+  const leagueSports = {
+    mlb: "baseball", nfl: "football", "college-football": "football",
+    nba: "basketball", wnba: "basketball",
+    "mens-college-basketball": "basketball",
+    "womens-college-basketball": "basketball", nhl: "hockey"
+  };
+  if (!sport) sport = leagueSports[league] || (league && league.indexOf(".") !== -1 ? "soccer" : "");
+  if (["baseball", "football", "basketball", "hockey", "soccer"].indexOf(sport) === -1) {
+    return false;
+  }
+  if (sport === "soccer") return !!league;
+  return [
+    "mlb", "nfl", "college-football", "nba", "wnba",
+    "mens-college-basketball", "womens-college-basketball", "nhl"
+  ].indexOf(league) !== -1;
+}
 
-  return league === "mlb" || league === "nfl";
+function sportsAdvancedQuestionsSupported_(game) {
+  return sportsPlayerPropsSupported_(game);
+}
+
+function sportsAdvancedQuestionPlayersSupported_(game) {
+  return sportsPlayerPropsSupported_(game);
 }
 
 function renderCreatePlayerPropButton(game) {
@@ -2686,7 +2843,7 @@ function renderCreateAdvancedQuestionButton(game) {
     !game.GameId ||
     !game.HomeTeam ||
     !game.AwayTeam ||
-    !sportsPlayerPropsSupported_(game)
+    !sportsAdvancedQuestionsSupported_(game)
   ) {
     return "";
   }
@@ -3098,7 +3255,7 @@ async function createSportsPlayerPropFromCard(gameId) {
   }
 
   if (!sportsPlayerPropsSupported_(game)) {
-    showSportsError("Player props v1 currently supports MLB and NFL only.");
+    showSportsError("Player statistics are not enabled for this league or sport.");
     return;
   }
 
@@ -3507,7 +3664,7 @@ async function createSportsPlayerMatchupFromCard(gameId) {
     return;
   }
   if (!sportsPlayerPropsSupported_(game)) {
-    showSportsError("Player matchups v1 currently supports MLB and NFL only.");
+    showSportsError("Player matchups are not enabled for this league or sport.");
     return;
   }
 
@@ -3585,57 +3742,251 @@ async function createSportsPlayerMatchupFromCard(gameId) {
 }
 
 /************************************
- ADVANCED SPORTS STAT QUESTIONS v1.2
+ ADVANCED SPORTS STAT QUESTIONS v1.3
  Cross-game players/teams and checkpoints.
 ************************************/
 
-const SPORTS_MLB_DIVISION_BY_TEAM = {
-  "baltimore orioles": "AL East",
-  "boston red sox": "AL East",
-  "new york yankees": "AL East",
-  "tampa bay rays": "AL East",
-  "toronto blue jays": "AL East",
-  "chicago white sox": "AL Central",
-  "cleveland guardians": "AL Central",
-  "detroit tigers": "AL Central",
-  "kansas city royals": "AL Central",
-  "minnesota twins": "AL Central",
-  "houston astros": "AL West",
-  "los angeles angels": "AL West",
-  "athletics": "AL West",
-  "oakland athletics": "AL West",
-  "sacramento athletics": "AL West",
-  "seattle mariners": "AL West",
-  "texas rangers": "AL West",
-  "atlanta braves": "NL East",
-  "miami marlins": "NL East",
-  "new york mets": "NL East",
-  "philadelphia phillies": "NL East",
-  "washington nationals": "NL East",
-  "chicago cubs": "NL Central",
-  "cincinnati reds": "NL Central",
-  "milwaukee brewers": "NL Central",
-  "pittsburgh pirates": "NL Central",
-  "st louis cardinals": "NL Central",
-  "st. louis cardinals": "NL Central",
-  "arizona diamondbacks": "NL West",
-  "colorado rockies": "NL West",
-  "los angeles dodgers": "NL West",
-  "san diego padres": "NL West",
-  "san francisco giants": "NL West"
+const SPORTS_ADVANCED_TEAM_META = {
+  mlb: {
+    "arizona diamondbacks": ["ARI", "NL West"],
+    "athletics": ["ATH", "AL West"],
+    "oakland athletics": ["OAK", "AL West"],
+    "sacramento athletics": ["ATH", "AL West"],
+    "atlanta braves": ["ATL", "NL East"],
+    "baltimore orioles": ["BAL", "AL East"],
+    "boston red sox": ["BOS", "AL East"],
+    "chicago cubs": ["CHC", "NL Central"],
+    "chicago white sox": ["CWS", "AL Central"],
+    "cincinnati reds": ["CIN", "NL Central"],
+    "cleveland guardians": ["CLE", "AL Central"],
+    "colorado rockies": ["COL", "NL West"],
+    "detroit tigers": ["DET", "AL Central"],
+    "houston astros": ["HOU", "AL West"],
+    "kansas city royals": ["KC", "AL Central"],
+    "los angeles angels": ["LAA", "AL West"],
+    "los angeles dodgers": ["LAD", "NL West"],
+    "miami marlins": ["MIA", "NL East"],
+    "milwaukee brewers": ["MIL", "NL Central"],
+    "minnesota twins": ["MIN", "AL Central"],
+    "new york mets": ["NYM", "NL East"],
+    "new york yankees": ["NYY", "AL East"],
+    "philadelphia phillies": ["PHI", "NL East"],
+    "pittsburgh pirates": ["PIT", "NL Central"],
+    "san diego padres": ["SD", "NL West"],
+    "san francisco giants": ["SF", "NL West"],
+    "seattle mariners": ["SEA", "AL West"],
+    "st louis cardinals": ["STL", "NL Central"],
+    "tampa bay rays": ["TB", "AL East"],
+    "texas rangers": ["TEX", "AL West"],
+    "toronto blue jays": ["TOR", "AL East"],
+    "washington nationals": ["WSH", "NL East"]
+  },
+  nfl: {
+    "arizona cardinals": ["ARI", "NFC West"],
+    "atlanta falcons": ["ATL", "NFC South"],
+    "baltimore ravens": ["BAL", "AFC North"],
+    "buffalo bills": ["BUF", "AFC East"],
+    "carolina panthers": ["CAR", "NFC South"],
+    "chicago bears": ["CHI", "NFC North"],
+    "cincinnati bengals": ["CIN", "AFC North"],
+    "cleveland browns": ["CLE", "AFC North"],
+    "dallas cowboys": ["DAL", "NFC East"],
+    "denver broncos": ["DEN", "AFC West"],
+    "detroit lions": ["DET", "NFC North"],
+    "green bay packers": ["GB", "NFC North"],
+    "houston texans": ["HOU", "AFC South"],
+    "indianapolis colts": ["IND", "AFC South"],
+    "jacksonville jaguars": ["JAX", "AFC South"],
+    "kansas city chiefs": ["KC", "AFC West"],
+    "las vegas raiders": ["LV", "AFC West"],
+    "los angeles chargers": ["LAC", "AFC West"],
+    "los angeles rams": ["LAR", "NFC West"],
+    "miami dolphins": ["MIA", "AFC East"],
+    "minnesota vikings": ["MIN", "NFC North"],
+    "new england patriots": ["NE", "AFC East"],
+    "new orleans saints": ["NO", "NFC South"],
+    "new york giants": ["NYG", "NFC East"],
+    "new york jets": ["NYJ", "AFC East"],
+    "philadelphia eagles": ["PHI", "NFC East"],
+    "pittsburgh steelers": ["PIT", "AFC North"],
+    "san francisco 49ers": ["SF", "NFC West"],
+    "seattle seahawks": ["SEA", "NFC West"],
+    "tampa bay buccaneers": ["TB", "NFC South"],
+    "tennessee titans": ["TEN", "AFC South"],
+    "washington commanders": ["WSH", "NFC East"]
+  },
+  nhl: {
+    "anaheim ducks": ["ANA", "Pacific"],
+    "boston bruins": ["BOS", "Atlantic"],
+    "buffalo sabres": ["BUF", "Atlantic"],
+    "calgary flames": ["CGY", "Pacific"],
+    "carolina hurricanes": ["CAR", "Metropolitan"],
+    "chicago blackhawks": ["CHI", "Central"],
+    "colorado avalanche": ["COL", "Central"],
+    "columbus blue jackets": ["CBJ", "Metropolitan"],
+    "dallas stars": ["DAL", "Central"],
+    "detroit red wings": ["DET", "Atlantic"],
+    "edmonton oilers": ["EDM", "Pacific"],
+    "florida panthers": ["FLA", "Atlantic"],
+    "los angeles kings": ["LAK", "Pacific"],
+    "minnesota wild": ["MIN", "Central"],
+    "montreal canadiens": ["MTL", "Atlantic"],
+    "nashville predators": ["NSH", "Central"],
+    "new jersey devils": ["NJD", "Metropolitan"],
+    "new york islanders": ["NYI", "Metropolitan"],
+    "new york rangers": ["NYR", "Metropolitan"],
+    "ottawa senators": ["OTT", "Atlantic"],
+    "philadelphia flyers": ["PHI", "Metropolitan"],
+    "pittsburgh penguins": ["PIT", "Metropolitan"],
+    "san jose sharks": ["SJS", "Pacific"],
+    "seattle kraken": ["SEA", "Pacific"],
+    "st louis blues": ["STL", "Central"],
+    "tampa bay lightning": ["TBL", "Atlantic"],
+    "toronto maple leafs": ["TOR", "Atlantic"],
+    "utah mammoth": ["UTA", "Central"],
+    "utah hockey club": ["UTA", "Central"],
+    "vancouver canucks": ["VAN", "Pacific"],
+    "vegas golden knights": ["VGK", "Pacific"],
+    "washington capitals": ["WSH", "Metropolitan"],
+    "winnipeg jets": ["WPG", "Central"]
+  },
+  nba: {
+    "atlanta hawks": ["ATL", "Eastern Conference"],
+    "boston celtics": ["BOS", "Eastern Conference"],
+    "brooklyn nets": ["BKN", "Eastern Conference"],
+    "charlotte hornets": ["CHA", "Eastern Conference"],
+    "chicago bulls": ["CHI", "Eastern Conference"],
+    "cleveland cavaliers": ["CLE", "Eastern Conference"],
+    "dallas mavericks": ["DAL", "Western Conference"],
+    "denver nuggets": ["DEN", "Western Conference"],
+    "detroit pistons": ["DET", "Eastern Conference"],
+    "golden state warriors": ["GSW", "Western Conference"],
+    "houston rockets": ["HOU", "Western Conference"],
+    "indiana pacers": ["IND", "Eastern Conference"],
+    "la clippers": ["LAC", "Western Conference"],
+    "los angeles clippers": ["LAC", "Western Conference"],
+    "los angeles lakers": ["LAL", "Western Conference"],
+    "memphis grizzlies": ["MEM", "Western Conference"],
+    "miami heat": ["MIA", "Eastern Conference"],
+    "milwaukee bucks": ["MIL", "Eastern Conference"],
+    "minnesota timberwolves": ["MIN", "Western Conference"],
+    "new orleans pelicans": ["NOP", "Western Conference"],
+    "new york knicks": ["NYK", "Eastern Conference"],
+    "oklahoma city thunder": ["OKC", "Western Conference"],
+    "orlando magic": ["ORL", "Eastern Conference"],
+    "philadelphia 76ers": ["PHI", "Eastern Conference"],
+    "phoenix suns": ["PHX", "Western Conference"],
+    "portland trail blazers": ["POR", "Western Conference"],
+    "sacramento kings": ["SAC", "Western Conference"],
+    "san antonio spurs": ["SAS", "Western Conference"],
+    "toronto raptors": ["TOR", "Eastern Conference"],
+    "utah jazz": ["UTA", "Western Conference"],
+    "washington wizards": ["WSH", "Eastern Conference"]
+  }
 };
 
-function sportsMlbDivisionForTeam_(teamName) {
-  const key = String(teamName || "")
+function sportsAdvancedLeagueKey_(league) {
+  const key = String(league || "").trim().toLowerCase();
+  const aliases = {
+    baseball: "mlb",
+    football: "nfl",
+    hockey: "nhl",
+    basketball: "nba",
+    ncaaf: "college-football",
+    "college football": "college-football",
+    ncaam: "mens-college-basketball",
+    "mens college basketball": "mens-college-basketball",
+    "men's college basketball": "mens-college-basketball",
+    ncaaw: "womens-college-basketball",
+    "womens college basketball": "womens-college-basketball",
+    "women's college basketball": "womens-college-basketball"
+  };
+  return aliases[key] || key;
+}
+
+function sportsAdvancedNormalizeTeamName_(teamName) {
+  return String(teamName || "")
     .trim()
     .toLowerCase()
     .replace(/\./g, "")
-    .replace(/\s+/g, " ");
-  if (SPORTS_MLB_DIVISION_BY_TEAM[key]) return SPORTS_MLB_DIVISION_BY_TEAM[key];
-  const match = Object.keys(SPORTS_MLB_DIVISION_BY_TEAM).find(function(name) {
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function sportsAdvancedTeamMeta_(league, teamName) {
+  const leagueKey = sportsAdvancedLeagueKey_(league);
+  const table = SPORTS_ADVANCED_TEAM_META[leagueKey] || {};
+  const key = sportsAdvancedNormalizeTeamName_(teamName);
+  const direct = table[key];
+  if (direct) return { abbreviation: direct[0], group: direct[1] };
+
+  const matchingKey = Object.keys(table).find(function(name) {
     return key === name || key.indexOf(name) !== -1 || name.indexOf(key) !== -1;
   });
-  return match ? SPORTS_MLB_DIVISION_BY_TEAM[match] : "";
+  const match = matchingKey ? table[matchingKey] : null;
+  return match
+    ? { abbreviation: match[0], group: match[1] }
+    : { abbreviation: "", group: "" };
+}
+
+function sportsAdvancedQuestionDynamicGroup_(entity) {
+  const game = entity && entity.game || {};
+  return String(
+    game.ConferenceName ||
+    game.Conference ||
+    game.GroupName ||
+    game.GroupLabel ||
+    ""
+  ).trim();
+}
+
+function sportsAdvancedQuestionGroupInfo_(league, entities) {
+  const leagueKey = sportsAdvancedLeagueKey_(league);
+  const labels = {
+    mlb: "MLB Division",
+    nfl: "NFL Division",
+    nhl: "NHL Division",
+    nba: "NBA Conference",
+    "college-football": "NCAA Conference",
+    "mens-college-basketball": "NCAA Conference",
+    "womens-college-basketball": "NCAA Conference"
+  };
+  const label = labels[leagueKey] || "League Group";
+  const groups = {};
+
+  (entities || []).forEach(function(entity) {
+    if (!entity || entity.entityType !== "TEAM") return;
+    const group = String(entity.groupName || "").trim();
+    if (!group) return;
+    groups[group] = (groups[group] || 0) + 1;
+  });
+
+  return {
+    label: label,
+    groups: Object.keys(groups).sort().map(function(name) {
+      return { name: name, count: groups[name] };
+    }),
+    help:
+      "Select every loaded team from one " +
+      (label.indexOf("Conference") !== -1 ? "conference" : "division") +
+      ". Only teams with games currently loaded on this page can be selected."
+  };
+}
+
+function sportsAdvancedQuestionSearchTokens_(value) {
+  return String(value || "")
+    .split(/[,;|\n]+/)
+    .map(function(item) { return item.trim().toLowerCase(); })
+    .filter(Boolean)
+    .filter(function(item, index, items) { return items.indexOf(item) === index; });
+}
+
+function sportsAdvancedQuestionSearchMatches_(searchableText, rawSearch) {
+  const tokens = sportsAdvancedQuestionSearchTokens_(rawSearch);
+  if (!tokens.length) return true;
+  const text = String(searchableText || "").toLowerCase();
+  return tokens.some(function(token) { return text.indexOf(token) !== -1; });
 }
 
 function sportsAdvancedQuestionEntityLabel_(entity) {
@@ -3645,11 +3996,22 @@ function sportsAdvancedQuestionEntityLabel_(entity) {
     String(game.HomeTeam || "Home") + " — " +
     formatSportsDateShort(game.GameDateTime);
 
+  if (entity.entityType === "PLAYER") {
+    const playerDetails = [
+      String(entity.teamAbbreviation || "").trim(),
+      String(entity.position || "").trim()
+    ].filter(Boolean).join(" · ");
+    return (
+      "Player: " + String(entity.entityName || "") +
+      (playerDetails ? " · " + playerDetails : "") +
+      " — " + gameLabel
+    );
+  }
+
   return (
-    (entity.entityType === "TEAM" ? "Team: " : "Player: ") +
-    String(entity.entityName || "") +
-    " — " +
-    gameLabel
+    "Team: " + String(entity.entityName || "") +
+    (entity.teamAbbreviation ? " (" + entity.teamAbbreviation + ")" : "") +
+    " — " + gameLabel
   );
 }
 
@@ -3657,31 +4019,44 @@ function sportsAdvancedQuestionBuildEntities_(games, players) {
   const entities = [];
 
   (games || []).forEach(function(game) {
+    const league = String(game.League || "");
     [
       {
         id: game.AwayTeamId || normalizeSportsPlayerTeamKey_(game.AwayTeam),
         name: game.AwayTeam,
-        teamId: game.AwayTeamId || ""
+        teamId: game.AwayTeamId || "",
+        abbreviation: game.AwayAbbreviation || "",
+        conferenceName: game.AwayConferenceName || ""
       },
       {
         id: game.HomeTeamId || normalizeSportsPlayerTeamKey_(game.HomeTeam),
         name: game.HomeTeam,
-        teamId: game.HomeTeamId || ""
+        teamId: game.HomeTeamId || "",
+        abbreviation: game.HomeAbbreviation || "",
+        conferenceName: game.HomeConferenceName || ""
       }
     ].forEach(function(team) {
       if (!team.name) return;
-      entities.push({
+      const meta = sportsAdvancedTeamMeta_(league, team.name);
+      const teamEntity = {
         entityType: "TEAM",
         entityId: String(team.id || ""),
         entityName: String(team.name || ""),
+        teamName: String(team.name || ""),
+        teamAbbreviation: String(team.abbreviation || meta.abbreviation || "").trim(),
+        groupName: String(team.conferenceName || meta.group || "").trim(),
         teamId: String(team.teamId || team.id || ""),
         sportsGameId: String(game.GameId || ""),
         espnEventId: String(game.ESPNEventId || ""),
-        league: String(game.League || ""),
+        league: league,
         sport: String(game.Sport || ""),
         game: game,
         logo: team.name === game.HomeTeam ? game.HomeLogo : game.AwayLogo
-      });
+      };
+      if (!teamEntity.groupName) {
+        teamEntity.groupName = sportsAdvancedQuestionDynamicGroup_(teamEntity);
+      }
+      entities.push(teamEntity);
     });
 
     (players || [])
@@ -3689,19 +4064,40 @@ function sportsAdvancedQuestionBuildEntities_(games, players) {
         return sportsPlayerTeamMatchesGame_(player, game);
       })
       .forEach(function(player) {
-        entities.push({
+        const teamName = String(player.Team || player.TeamName || "");
+        const meta = sportsAdvancedTeamMeta_(league, teamName);
+        const playerTeamKey = normalizeSportsPlayerTeamKey_(teamName);
+        const homeTeamKey = normalizeSportsPlayerTeamKey_(game.HomeTeam);
+        const awayTeamKey = normalizeSportsPlayerTeamKey_(game.AwayTeam);
+        const gameAbbreviation = playerTeamKey && playerTeamKey === homeTeamKey
+          ? game.HomeAbbreviation
+          : (playerTeamKey && playerTeamKey === awayTeamKey ? game.AwayAbbreviation : "");
+        const gameConference = playerTeamKey && playerTeamKey === homeTeamKey
+          ? game.HomeConferenceName
+          : (playerTeamKey && playerTeamKey === awayTeamKey ? game.AwayConferenceName : "");
+        const playerEntity = {
           entityType: "PLAYER",
           entityId: String(player.PlayerId || player.ESPNPlayerId || ""),
           entityName: String(player.FullName || player.ShortName || player.PlayerName || ""),
           teamId: String(player.TeamId || ""),
+          teamName: teamName,
+          teamAbbreviation: String(
+            player.TeamAbbreviation || player.TeamAbbr || player.Abbreviation || gameAbbreviation || meta.abbreviation || ""
+          ).trim(),
+          position: String(player.Position || "").trim(),
+          groupName: String(gameConference || meta.group || "").trim(),
           espnPlayerId: String(player.ESPNPlayerId || ""),
           sportsGameId: String(game.GameId || ""),
           espnEventId: String(game.ESPNEventId || ""),
-          league: String(game.League || ""),
+          league: league,
           sport: String(game.Sport || ""),
           game: game,
           logo: String(player.HeadshotUrl || "")
-        });
+        };
+        if (!playerEntity.groupName) {
+          playerEntity.groupName = sportsAdvancedQuestionDynamicGroup_(playerEntity);
+        }
+        entities.push(playerEntity);
       });
   });
 
@@ -3714,6 +4110,15 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     if (existing) existing.remove();
 
     const entities = sportsAdvancedQuestionBuildEntities_(games, players);
+    const groupInfo = sportsAdvancedQuestionGroupInfo_(baseGame && baseGame.League, entities);
+    const hasPlayers = entities.some(function(entity) { return entity.entityType === "PLAYER"; });
+    const entityFilterOptions = hasPlayers
+      ? `
+        <option value="all">Teams and players</option>
+        <option value="team">Teams only</option>
+        <option value="player">Players only</option>
+      `
+      : '<option value="team">Teams only</option>';
     const statTypes = Array.isArray(optionData && optionData.statTypes)
       ? optionData.statTypes
       : [];
@@ -3732,7 +4137,16 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
           class="sports-player-matchup-player-row sports-advanced-entity-row"
           data-advanced-entity-type="${escapeSportsHtml(entity.entityType || "")}"
           data-advanced-entity-name="${escapeSportsHtml(entity.entityName || "")}"
-          data-advanced-division="${escapeSportsHtml(entity.entityType === "TEAM" ? sportsMlbDivisionForTeam_(entity.entityName) : "")}"
+          data-advanced-group="${escapeSportsHtml(entity.entityType === "TEAM" ? entity.groupName || "" : "")}"
+          data-advanced-search="${escapeSportsHtml([
+            entity.entityName,
+            entity.teamName,
+            entity.teamAbbreviation,
+            entity.position,
+            entity.groupName,
+            entity.game && entity.game.AwayTeam,
+            entity.game && entity.game.HomeTeam
+          ].filter(Boolean).join(" "))}"
         >
           <input
             type="checkbox"
@@ -3762,6 +4176,23 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
         '</option>';
     }).join("");
 
+    const groupOptions = groupInfo.groups.map(function(item) {
+      return '<option value="' + escapeSportsHtml(item.name) + '">' +
+        escapeSportsHtml(item.name + " (" + item.count + " loaded)") +
+        '</option>';
+    }).join("");
+    const groupSelector = groupInfo.groups.length
+      ? `
+        <label class="sports-player-prop-field">
+          ${sportsFieldLabel_(groupInfo.label, groupInfo.help)}
+          <select id="sportsAdvancedDivisionSelect">
+            <option value="">Choose ${escapeSportsHtml(groupInfo.label.toLowerCase())}…</option>
+            ${groupOptions}
+          </select>
+        </label>
+      `
+      : "";
+
     const overlay = document.createElement("div");
     overlay.id = "sportsAdvancedQuestionOverlay";
     overlay.className = "sports-player-prop-overlay";
@@ -3776,26 +4207,13 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
             <label class="sports-player-prop-field">
               ${sportsFieldLabel_("Show Entities", "Filter the list to teams, players, or both. This does not change already-created questions.")}
               <select id="sportsAdvancedEntityFilter">
-                <option value="all">Teams and players</option>
-                <option value="team">Teams only</option>
-                <option value="player">Players only</option>
+                ${entityFilterOptions}
               </select>
             </label>
-            <label class="sports-player-prop-field">
-              ${sportsFieldLabel_("MLB Division", "Select every loaded team from one MLB division. Only teams with games currently loaded on this page can be selected.")}
-              <select id="sportsAdvancedDivisionSelect">
-                <option value="">Choose a division…</option>
-                <option value="AL East">AL East</option>
-                <option value="AL Central">AL Central</option>
-                <option value="AL West">AL West</option>
-                <option value="NL East">NL East</option>
-                <option value="NL Central">NL Central</option>
-                <option value="NL West">NL West</option>
-              </select>
-            </label>
+            ${groupSelector}
             <label class="sports-player-prop-field sports-advanced-search-field">
-              ${sportsFieldLabel_("Search", "Filter the loaded player and team list by name or matchup.")}
-              <input id="sportsAdvancedEntitySearch" type="search" placeholder="Cubs, White Sox, pitcher…">
+              ${sportsFieldLabel_("Search", "Enter one or more names separated by commas. Matches for any entered team, player, abbreviation, position, division, conference, or matchup are shown.")}
+              <input id="sportsAdvancedEntitySearch" type="search" placeholder="Cubs, White Sox, CHC, pitcher…">
             </label>
             <div class="sports-advanced-selection-actions">
               <button type="button" class="small-btn" id="sportsAdvancedSelectVisible">Select Visible</button>
@@ -3896,17 +4314,21 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
 
     function updateEntityVisibility_() {
       const typeFilter = String(entityFilter && entityFilter.value || "all").toUpperCase();
-      const search = String(entitySearch && entitySearch.value || "").trim().toLowerCase();
+      const search = String(entitySearch && entitySearch.value || "").trim();
       let count = 0;
       entityRows_().forEach(function(row) {
         const type = String(row.getAttribute("data-advanced-entity-type") || "").toUpperCase();
-        const text = String(row.textContent || "").toLowerCase();
+        const text = String(
+          row.getAttribute("data-advanced-search") || row.textContent || ""
+        ).toLowerCase();
         const typeMatch = typeFilter === "ALL" || type === typeFilter;
-        const searchMatch = !search || text.indexOf(search) !== -1;
+        const searchMatch = sportsAdvancedQuestionSearchMatches_(text, search);
         row.hidden = !(typeMatch && searchMatch);
         if (!row.hidden) count++;
       });
-      if (visibleCount) visibleCount.textContent = count + " shown";
+      if (visibleCount) {
+        visibleCount.textContent = count + " shown · " + checkedInputs_().length + " selected";
+      }
     }
 
     function selectRows_(predicate) {
@@ -4009,16 +4431,21 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
 
     entityFilter.addEventListener("change", updateEntityVisibility_);
     entitySearch.addEventListener("input", updateEntityVisibility_);
-    divisionSelect.addEventListener("change", function() {
-      const division = String(divisionSelect.value || "");
-      if (!division) return;
-      selectRows_(function(row) {
-        return row.getAttribute("data-advanced-entity-type") === "TEAM" &&
-          row.getAttribute("data-advanced-division") === division;
+    if (divisionSelect) {
+      divisionSelect.addEventListener("change", function() {
+        const group = String(divisionSelect.value || "");
+        if (!group) return;
+        overlay.querySelectorAll(".sports-advanced-entity-checkbox")
+          .forEach(function(input) { input.checked = false; });
+        entityFilter.value = "team";
+        entitySearch.value = "";
+        updateEntityVisibility_();
+        selectRows_(function(row) {
+          return row.getAttribute("data-advanced-entity-type") === "TEAM" &&
+            row.getAttribute("data-advanced-group") === group;
+        });
       });
-      entityFilter.value = "team";
-      updateEntityVisibility_();
-    });
+    }
     document.getElementById("sportsAdvancedSelectVisible").addEventListener("click", function() {
       selectRows_(function(row) { return !row.hidden; });
     });
@@ -4125,8 +4552,8 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     showSportsError("Could not find selected sports game.");
     return;
   }
-  if (!sportsPlayerPropsSupported_(baseGame)) {
-    showSportsError("Advanced stat questions currently support MLB and NFL only.");
+  if (!sportsAdvancedQuestionsSupported_(baseGame)) {
+    showSportsError("Stat comparisons are not enabled for this league yet.");
     return;
   }
 
@@ -4144,7 +4571,9 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     const games = sportsScoresState.scores.filter(function(game) {
       return String(game.League || "").toLowerCase() === league;
     });
-    const playerOptions = await getSportsPlayerPropOptions_(session, baseGame, { allLeague: true });
+    const playerOptions = sportsAdvancedQuestionPlayersSupported_(baseGame)
+      ? await getSportsPlayerPropOptions_(session, baseGame, { allLeague: true })
+      : { success: true, players: [] };
     const optionData =
       await sportsAwardsApi_(
         "adminGetSportsAdvancedQuestionOptions",
@@ -4654,9 +5083,15 @@ function cleanLeagueShortName_(league) {
     .replace("nascar-premier", "NASCAR")
     .replace("fifa.world", "WC")
     .replace("uefa.champions", "UCL")
+    .replace("uefa.europa", "UEL")
+    .replace("uefa.nations", "UNL")
     .replace("usa.1", "MLS")
     .replace("eng.1", "EPL")
-    .replace("esp.1", "ESP")
+    .replace("esp.1", "LALIGA")
+    .replace("mex.1", "LIGAMX")
+    .replace("ita.1", "SERIEA")
+    .replace("ger.1", "BUND")
+    .replace("fra.1", "LIGUE1")
     .toUpperCase();
 }
 

@@ -1,5 +1,5 @@
 /************************************************************
- SPORTS PLAYERS ENGINE v1.0.1
+ SPORTS PLAYERS ENGINE v1.1.0
  Lives in the separate Sports Scores Engine project.
 
  First production release:
@@ -10,9 +10,15 @@
  - Public read-only APIs
  - Protected admin setup/sync/refresh APIs
 
- Initial validated leagues: NFL and MLB.
- The parser is intentionally generic enough to support the
- other team leagues after their payloads are verified.
+ Supported team sports:
+ - NFL and NCAA football
+ - MLB
+ - NBA, WNBA, NCAA men's and women's basketball
+ - NHL
+ - Every configured ESPN soccer competition
+
+ Player rows are populated from league rosters and game summaries.
+ Unsupported or unavailable source statistics are skipped rather than guessed.
 ************************************************************/
 
 const SPORTS_PLAYERS_SHEET = "SportsPlayers";
@@ -25,6 +31,7 @@ const SPORTS_PLAYERS_HEADERS = [
   "League",
   "TeamId",
   "Team",
+  "TeamAbbreviation",
   "FullName",
   "ShortName",
   "Position",
@@ -43,6 +50,7 @@ const SPORTS_PLAYER_GAME_STATS_HEADERS = [
   "Sport",
   "League",
   "TeamId",
+  "TeamAbbreviation",
   "PlayerName",
   "Position",
   "StatType",
@@ -57,9 +65,23 @@ const SPORTS_PLAYERS_DEFAULT_MAX_GAMES = 20;
 const SPORTS_PLAYERS_DEFAULT_DAYS_BACK = 1;
 const SPORTS_PLAYERS_DEFAULT_DAYS_FORWARD = 1;
 
-const SPORTS_PLAYERS_V1_SUPPORTED_LEAGUES = {
+const SPORTS_PLAYERS_SUPPORTED_SPORTS = {
+  football: true,
+  baseball: true,
+  basketball: true,
+  hockey: true,
+  soccer: true
+};
+
+const SPORTS_PLAYERS_SUPPORTED_LEAGUES = {
   nfl: true,
-  mlb: true
+  "college-football": true,
+  mlb: true,
+  nba: true,
+  wnba: true,
+  "mens-college-basketball": true,
+  "womens-college-basketball": true,
+  nhl: true
 };
 
 /* =====================================================
@@ -209,6 +231,16 @@ function sportsPlayersTeamName_(team) {
   );
 }
 
+function sportsPlayersTeamAbbreviation_(team) {
+  team = team || {};
+  return sportsPlayersString_(
+    team.abbreviation ||
+    team.shortName ||
+    team.slug ||
+    ""
+  ).toUpperCase();
+}
+
 function sportsPlayersFindSetting_(league, sport) {
   const targetLeague = sportsPlayersKey_(league);
   const targetSport = sportsPlayersKey_(sport);
@@ -252,17 +284,34 @@ function sportsPlayersFindSetting_(league, sport) {
   return null;
 }
 
-function sportsPlayersAssertV1League_(league) {
-  const key = sportsPlayersKey_(league);
+function sportsPlayersAssertSupportedLeague_(league, sport) {
+  const leagueKey = sportsPlayersKey_(league);
+  const sportKey = sportsPlayersKey_(sport);
 
-  if (!SPORTS_PLAYERS_V1_SUPPORTED_LEAGUES[key]) {
+  if (!SPORTS_PLAYERS_SUPPORTED_SPORTS[sportKey]) {
     throw new Error(
-      "Sports Players v1 currently supports NFL and MLB only. Requested league: " +
+      "Sports Players does not support the requested sport: " +
+      sportsPlayersString_(sport || league)
+    );
+  }
+
+  // Soccer competition codes are intentionally dynamic. Any soccer league
+  // present in SportsSettings can use the same roster and summary pipeline.
+  if (sportKey === "soccer") return leagueKey;
+
+  if (!SPORTS_PLAYERS_SUPPORTED_LEAGUES[leagueKey]) {
+    throw new Error(
+      "Sports Players does not support the requested league: " +
       sportsPlayersString_(league)
     );
   }
 
-  return key;
+  return leagueKey;
+}
+
+// Backward-compatible alias retained for older admin calls and tests.
+function sportsPlayersAssertV1League_(league, sport) {
+  return sportsPlayersAssertSupportedLeague_(league, sport);
 }
 
 function sportsPlayersResolveLeague_(league, sport) {
@@ -533,7 +582,7 @@ function setupSportsPlayersSystem() {
 
   return {
     success: true,
-    version: "1.0.1",
+    version: "1.1.0",
     sheets: [SPORTS_PLAYERS_SHEET, SPORTS_PLAYER_GAME_STATS_SHEET],
     formatWarnings: formatWarnings,
     message: "SportsPlayers and SportsPlayerGameStats are ready"
@@ -901,17 +950,39 @@ function sportsPlayersExtractTeams_(payload) {
 
 function sportsPlayersExtractRosterAthletes_(payload) {
   const output = [];
-  const groups = payload && payload.athletes || [];
+  const groups = []
+    .concat(payload && payload.athletes || [])
+    .concat(payload && payload.roster || [])
+    .concat(payload && payload.squad || [])
+    .concat(payload && payload.items || [])
+    .concat(payload && payload.team && payload.team.athletes || []);
 
-  groups.forEach(function(group) {
-    if (group && Array.isArray(group.items)) {
-      group.items.forEach(function(athlete) { output.push(athlete); });
-    } else if (group && (group.id || group.uid)) {
-      output.push(group);
+  function append_(entry) {
+    if (!entry) return;
+    if (Array.isArray(entry)) {
+      entry.forEach(append_);
+      return;
     }
-  });
+    if (Array.isArray(entry.items)) {
+      entry.items.forEach(append_);
+      return;
+    }
+    if (Array.isArray(entry.athletes)) {
+      entry.athletes.forEach(append_);
+      return;
+    }
+    const athlete = entry.athlete || entry.player || entry;
+    if (athlete && (athlete.id || athlete.uid)) output.push(athlete);
+  }
 
-  return output;
+  groups.forEach(append_);
+
+  const unique = {};
+  output.forEach(function(athlete) {
+    const id = sportsPlayersString_(athlete.id || athlete.uid);
+    if (id) unique[id] = athlete;
+  });
+  return Object.keys(unique).map(function(id) { return unique[id]; });
 }
 
 function sportsPlayersNormalizeRosterAthlete_(athlete, team, sport, league, now) {
@@ -930,6 +1001,7 @@ function sportsPlayersNormalizeRosterAthlete_(athlete, team, sport, league, now)
     League: league,
     TeamId: sportsPlayersString_(team.id || (athlete.team && athlete.team.id)),
     Team: sportsPlayersTeamName_(team || athlete.team),
+    TeamAbbreviation: sportsPlayersTeamAbbreviation_(team || athlete.team),
     FullName: fullName,
     ShortName: sportsPlayersString_(athlete.shortName || athlete.displayName || fullName),
     Position: sportsPlayersPosition_(athlete),
@@ -947,7 +1019,7 @@ function sportsPlayersNormalizeRosterAthlete_(athlete, team, sport, league, now)
 
 function syncSportsPlayersForLeague(league, sport) {
   const resolved = sportsPlayersResolveLeague_(league, sport);
-  sportsPlayersAssertV1League_(resolved.League);
+  sportsPlayersAssertSupportedLeague_(resolved.League, resolved.Sport);
 
   if (!resolved.Enabled) {
     return {
@@ -1068,6 +1140,8 @@ function sportsPlayersStatAlias_(sport, category, rawName, label) {
   const categoryKey = sportsPlayersSlug_(category);
   const nameKey = sportsPlayersSlug_(rawName || label);
   const labelKey = sportsPlayersKey_(label).replace(/[^a-z0-9]+/g, "");
+  const compactName = nameKey.replace(/-/g, "");
+  const compact = compactName || labelKey;
 
   const aliases = {
     rbis: "runs-batted-in",
@@ -1079,6 +1153,10 @@ function sportsPlayersStatAlias_(sport, category, rawName, label) {
     k: categoryKey.indexOf("pitch") !== -1 ? "pitching-strikeouts" : "batting-strikeouts",
     pts: "points",
     points: "points",
+    min: "minutes",
+    minutes: "minutes",
+    toi: "minutes",
+    timeonice: "minutes",
     passingyards: "passing-yards",
     rushingyards: "rushing-yards",
     receivingyards: "receiving-yards",
@@ -1098,15 +1176,81 @@ function sportsPlayersStatAlias_(sport, category, rawName, label) {
     inningspitched: "innings-pitched",
     walks: categoryKey.indexOf("pitch") !== -1 ? "pitching-walks" : "walks",
     hits: categoryKey.indexOf("pitch") !== -1 ? "hits-allowed" : "hits",
-    runs: categoryKey.indexOf("pitch") !== -1 ? "runs-allowed" : "runs"
-  };
+    runs: categoryKey.indexOf("pitch") !== -1 ? "runs-allowed" : "runs",
 
-  const compactName = nameKey.replace(/-/g, "");
+    // Basketball
+    oreb: "offensive-rebounds",
+    offensiverebounds: "offensive-rebounds",
+    dreb: "defensive-rebounds",
+    defensiverebounds: "defensive-rebounds",
+    reb: "rebounds",
+    rebounds: "rebounds",
+    ast: "assists",
+    assists: "assists",
+    stl: "steals",
+    steals: "steals",
+    blk: sportKey === "hockey" ? "blocked-shots" : "blocks",
+    blocks: sportKey === "hockey" ? "blocked-shots" : "blocks",
+    to: "turnovers",
+    tov: "turnovers",
+    turnovers: "turnovers",
+    pf: "fouls",
+    personalfouls: "fouls",
+    fouls: "fouls",
+    plusminus: "plus-minus",
+
+    // Hockey
+    g: sportKey === "soccer" || sportKey === "hockey" ? "goals" : "games",
+    goals: "goals",
+    a: "assists",
+    sog: sportKey === "soccer" ? "shots-on-target" : "shots-on-goal",
+    shotsongoal: sportKey === "soccer" ? "shots-on-target" : "shots-on-goal",
+    shotsontarget: "shots-on-target",
+    shots: "shots",
+    s: "shots",
+    pim: "penalty-minutes",
+    penaltyminutes: "penalty-minutes",
+    hitsdelivered: "hits",
+    faceoffwins: "faceoff-wins",
+    faceoffpercentage: "faceoff-percentage",
+    fo: "faceoff-wins",
+    saves: "saves",
+    sv: "saves",
+    goalsagainst: "goals-against",
+    ga: "goals-against",
+    savepercentage: "save-percentage",
+    svpct: "save-percentage",
+
+    // Soccer
+    totalshots: "shots",
+    sh: "shots",
+    fc: "fouls-committed",
+    foulscommitted: "fouls-committed",
+    fs: "fouls-suffered",
+    foulssuffered: "fouls-suffered",
+    yc: "yellow-cards",
+    yellowcards: "yellow-cards",
+    rc: "red-cards",
+    redcards: "red-cards",
+    off: "offsides",
+    offsides: "offsides",
+    tkl: "tackles",
+    tackles: "tackles",
+    clr: "clearances",
+    clearances: "clearances",
+    interceptionswon: "interceptions",
+    passescompleted: "passes-completed",
+    completedpasses: "passes-completed",
+    passattempts: "passes-attempted",
+    passesattempted: "passes-attempted",
+    chancescreated: "chances-created",
+    keypasses: "chances-created"
+  };
 
   if (aliases[compactName]) return aliases[compactName];
   if (aliases[labelKey]) return aliases[labelKey];
 
-  if (nameKey && nameKey !== "yds" && nameKey !== "td" && nameKey !== "avg") {
+  if (nameKey && ["yds", "td", "avg", "fg", "3pt", "ft"].indexOf(nameKey) === -1) {
     return nameKey;
   }
 
@@ -1128,62 +1272,69 @@ function sportsPlayersStatAlias_(sport, category, rawName, label) {
     return categoryKey ? categoryKey + "-average" : "average";
   }
 
+  if (compact === "fg") return sportKey === "football" ? "field-goals-made" : "field-goals-made";
+  if (compact === "3pt") return "three-pointers-made";
+  if (compact === "ft") return "free-throws-made";
+
   return sportsPlayersSlug_([categoryKey, nameKey || label].filter(Boolean).join("-"));
 }
-
 
 function sportsPlayersShouldTrackStat_(sport, statType) {
   const sportKey = sportsPlayersKey_(sport);
   const key = sportsPlayersSlug_(statType);
 
   const football = {
-    "passing-completions": true,
-    "passing-attempts": true,
-    "passing-yards": true,
-    "passing-touchdowns": true,
-    "interceptions-thrown": true,
-    "rushing-attempts": true,
-    "rushing-yards": true,
-    "rushing-touchdowns": true,
-    "receptions": true,
-    "receiving-targets": true,
-    "receiving-yards": true,
-    "receiving-touchdowns": true,
-    "field-goals-made": true,
-    "field-goals-attempted": true,
-    "extra-points-made": true,
-    "extra-points-attempted": true,
-    "sacks": true,
-    "interceptions": true,
-    "tackles": true,
-    "solo-tackles": true
+    "passing-completions": true, "passing-attempts": true, "passing-yards": true,
+    "passing-touchdowns": true, "interceptions-thrown": true,
+    "rushing-attempts": true, "rushing-yards": true, "rushing-touchdowns": true,
+    "receptions": true, "receiving-targets": true, "receiving-yards": true,
+    "receiving-touchdowns": true, "field-goals-made": true,
+    "field-goals-attempted": true, "extra-points-made": true,
+    "extra-points-attempted": true, "sacks": true, "interceptions": true,
+    "tackles": true, "solo-tackles": true
   };
 
   const baseball = {
-    "at-bats": true,
-    "runs": true,
-    "hits": true,
-    "home-runs": true,
-    "runs-batted-in": true,
-    "walks": true,
-    "batting-strikeouts": true,
-    "stolen-bases": true,
-    "total-bases": true,
-    "batting-average": true,
-    "innings-pitched": true,
-    "hits-allowed": true,
-    "runs-allowed": true,
-    "earned-runs": true,
-    "pitching-walks": true,
-    "pitching-strikeouts": true,
-    "home-runs-allowed": true,
-    "pitches": true,
-    "strikes": true
+    "at-bats": true, "runs": true, "hits": true, "home-runs": true,
+    "runs-batted-in": true, "walks": true, "batting-strikeouts": true,
+    "stolen-bases": true, "total-bases": true, "batting-average": true,
+    "innings-pitched": true, "hits-allowed": true, "runs-allowed": true,
+    "earned-runs": true, "pitching-walks": true, "pitching-strikeouts": true,
+    "home-runs-allowed": true, "pitches": true, "strikes": true
+  };
+
+  const basketball = {
+    "minutes": true, "points": true, "field-goals-made": true,
+    "field-goals-attempted": true, "three-pointers-made": true,
+    "three-pointers-attempted": true, "free-throws-made": true,
+    "free-throws-attempted": true, "offensive-rebounds": true,
+    "defensive-rebounds": true, "rebounds": true, "assists": true,
+    "steals": true, "blocks": true, "turnovers": true, "fouls": true,
+    "plus-minus": true
+  };
+
+  const hockey = {
+    "minutes": true, "goals": true, "assists": true, "points": true,
+    "plus-minus": true, "shots": true, "shots-on-goal": true,
+    "hits": true, "blocked-shots": true, "penalty-minutes": true,
+    "faceoff-wins": true, "faceoff-percentage": true,
+    "saves": true, "goals-against": true, "save-percentage": true
+  };
+
+  const soccer = {
+    "minutes": true, "goals": true, "assists": true, "shots": true,
+    "shots-on-target": true, "saves": true, "fouls-committed": true,
+    "fouls-suffered": true, "yellow-cards": true, "red-cards": true,
+    "offsides": true, "tackles": true, "interceptions": true,
+    "clearances": true, "passes-completed": true, "passes-attempted": true,
+    "chances-created": true
   };
 
   if (sportKey === "football") return !!football[key];
   if (sportKey === "baseball") return !!baseball[key];
-
+  if (sportKey === "basketball") return !!basketball[key];
+  if (sportKey === "hockey") return !!hockey[key];
+  if (sportKey === "soccer") return !!soccer[key];
   return false;
 }
 
@@ -1250,6 +1401,20 @@ function sportsPlayersCompositeStats_(sport, category, label, displayValue) {
   return [];
 }
 
+function sportsPlayersStatNumericValue_(statType, displayValue) {
+  const raw = sportsPlayersString_(displayValue);
+  if (!raw) return "";
+
+  if (sportsPlayersSlug_(statType) === "minutes") {
+    const time = raw.match(/^(\d+):(\d{1,2})$/);
+    if (time) {
+      return Number(time[1]) + Number(time[2]) / 60;
+    }
+  }
+
+  return sportsPlayersNumber_(raw, "");
+}
+
 function sportsPlayersNormalizeStatCells_(sport, category, statGroup, athleteEntry) {
   const labels = statGroup.labels || statGroup.abbreviations || [];
   const names = statGroup.names || statGroup.keys || [];
@@ -1272,11 +1437,11 @@ function sportsPlayersNormalizeStatCells_(sport, category, statGroup, athleteEnt
       continue;
     }
 
-    const statValue = sportsPlayersNumber_(displayValue, "");
-    if (statValue === "") continue;
-
     const statType = sportsPlayersStatAlias_(sport, category, rawName, label);
     if (!statType || !sportsPlayersShouldTrackStat_(sport, statType)) continue;
+
+    const statValue = sportsPlayersStatNumericValue_(statType, displayValue);
+    if (statValue === "") continue;
 
     rows.push({
       StatType: statType,
@@ -1284,6 +1449,50 @@ function sportsPlayersNormalizeStatCells_(sport, category, statGroup, athleteEnt
       DisplayValue: displayValue
     });
   }
+
+  return rows;
+}
+
+function sportsPlayersNormalizeLooseStatistics_(sport, category, statistics) {
+  const rows = [];
+  if (!statistics) return rows;
+
+  const items = Array.isArray(statistics)
+    ? statistics
+    : Object.keys(statistics).map(function(key) {
+        const value = statistics[key];
+        return value && typeof value === "object"
+          ? Object.assign({ name: key }, value)
+          : { name: key, value: value, displayValue: value };
+      });
+
+  items.forEach(function(stat) {
+    if (stat === null || stat === undefined) return;
+    if (typeof stat !== "object") return;
+
+    const rawName = sportsPlayersString_(stat.name || stat.key || stat.abbreviation || stat.label || stat.displayName);
+    const label = sportsPlayersString_(stat.displayName || stat.shortDisplayName || stat.label || stat.abbreviation || rawName);
+    const displayValue = sportsPlayersString_(
+      stat.displayValue !== undefined ? stat.displayValue :
+      (stat.value !== undefined ? stat.value : stat.stat)
+    );
+    if (!rawName || !displayValue || displayValue === "--" || displayValue.toUpperCase() === "DNP") return;
+
+    const composite = sportsPlayersCompositeStats_(sport, category, label, displayValue);
+    if (composite.length) {
+      composite.forEach(function(item) {
+        if (sportsPlayersShouldTrackStat_(sport, item.StatType)) rows.push(item);
+      });
+      return;
+    }
+
+    const statType = sportsPlayersStatAlias_(sport, category, rawName, label);
+    if (!statType || !sportsPlayersShouldTrackStat_(sport, statType)) return;
+    const statValue = sportsPlayersStatNumericValue_(statType, displayValue);
+    if (statValue === "") return;
+
+    rows.push({ StatType: statType, StatValue: statValue, DisplayValue: displayValue });
+  });
 
   return rows;
 }
@@ -1343,6 +1552,7 @@ function sportsPlayersNormalizeSummary_(summary, score) {
           League: league,
           TeamId: teamId || sportsPlayersString_(athlete.team && athlete.team.id),
           Team: teamName,
+          TeamAbbreviation: sportsPlayersTeamAbbreviation_(team || athlete.team),
           FullName: playerName,
           ShortName: sportsPlayersString_(athlete.shortName || athlete.displayName || playerName),
           Position: position,
@@ -1362,6 +1572,7 @@ function sportsPlayersNormalizeSummary_(summary, score) {
             Sport: sport,
             League: league,
             TeamId: teamId || sportsPlayersString_(athlete.team && athlete.team.id),
+            TeamAbbreviation: sportsPlayersTeamAbbreviation_(team || athlete.team),
             PlayerName: playerName,
             Position: position,
             StatType: stat.StatType,
@@ -1376,7 +1587,81 @@ function sportsPlayersNormalizeSummary_(summary, score) {
     });
   });
 
-  return { players: playerRows, stats: statRows };
+  // Soccer summaries and some tournament feeds expose player rows under
+  // summary.rosters instead of boxscore.players. Normalize both shapes.
+  (summary.rosters || []).forEach(function(rosterGroup) {
+    const team = rosterGroup.team || {};
+    const teamId = sportsPlayersString_(team.id || team.uid);
+    const teamName = sportsPlayersTeamName_(team);
+    const teamAbbreviation = sportsPlayersTeamAbbreviation_(team);
+    const roster = rosterGroup.roster || rosterGroup.athletes || rosterGroup.entries || [];
+
+    (roster || []).forEach(function(athleteEntry) {
+      const athlete = athleteEntry.athlete || athleteEntry.player || athleteEntry || {};
+      const espnPlayerId = sportsPlayersString_(athlete.id || athlete.uid);
+      const playerName = sportsPlayersString_(athlete.fullName || athlete.displayName || athlete.shortName || athlete.name);
+      if (!espnPlayerId || !playerName) return;
+
+      const playerId = sportsPlayersPlayerId_(league, espnPlayerId);
+      const position = sportsPlayersPosition_(athleteEntry.position ? athleteEntry : athlete);
+      const resolvedTeamId = teamId || sportsPlayersString_(athlete.team && athlete.team.id);
+
+      playerRows.push({
+        PlayerId: playerId,
+        ESPNPlayerId: espnPlayerId,
+        Sport: sport,
+        League: league,
+        TeamId: resolvedTeamId,
+        Team: teamName || sportsPlayersTeamName_(athlete.team),
+        TeamAbbreviation: teamAbbreviation || sportsPlayersTeamAbbreviation_(athlete.team),
+        FullName: playerName,
+        ShortName: sportsPlayersString_(athlete.shortName || athlete.displayName || playerName),
+        Position: position,
+        JerseyNumber: sportsPlayersString_(athleteEntry.jersey || athlete.jersey || athlete.jerseyNumber),
+        HeadshotUrl: sportsPlayersGetHeadshot_(athlete),
+        Active: true,
+        LastUpdated: now,
+        Source: "ESPN_GAME_ROSTER"
+      });
+
+      const looseStats = athleteEntry.statistics || athleteEntry.stats || athlete.statistics || [];
+      sportsPlayersNormalizeLooseStatistics_(sport, rosterGroup.name || "roster", looseStats).forEach(function(stat) {
+        statRows.push({
+          GameId: gameId,
+          ESPNEventId: eventId,
+          PlayerId: playerId,
+          ESPNPlayerId: espnPlayerId,
+          Sport: sport,
+          League: league,
+          TeamId: resolvedTeamId,
+          TeamAbbreviation: teamAbbreviation || sportsPlayersTeamAbbreviation_(athlete.team),
+          PlayerName: playerName,
+          Position: position,
+          StatType: stat.StatType,
+          StatValue: stat.StatValue,
+          DisplayValue: stat.DisplayValue,
+          Completed: completed,
+          LastUpdated: now,
+          Source: "ESPN_GAME_ROSTER"
+        });
+      });
+    });
+  });
+
+  const playersById = {};
+  playerRows.forEach(function(row) {
+    if (row.PlayerId) playersById[row.PlayerId] = row;
+  });
+  const statsByKey = {};
+  statRows.forEach(function(row) {
+    const key = [row.GameId, row.PlayerId, row.StatType].join("|");
+    if (row.GameId && row.PlayerId && row.StatType) statsByKey[key] = row;
+  });
+
+  return {
+    players: Object.keys(playersById).map(function(key) { return playersById[key]; }),
+    stats: Object.keys(statsByKey).map(function(key) { return statsByKey[key]; })
+  };
 }
 
 function refreshSportsPlayerGameStatsForGame(gameId, espnEventId) {
@@ -1398,7 +1683,7 @@ function refreshSportsPlayerGameStatsForGame(gameId, espnEventId) {
     throw new Error("Racing stats belong in the separate Racing Score Engine");
   }
 
-  sportsPlayersAssertV1League_(league);
+  sportsPlayersAssertSupportedLeague_(league, sport);
 
   const summary = sportsPlayersFetchJson_(
     sportsPlayersSummaryUrl_(sport, league, eventId),
@@ -1432,7 +1717,7 @@ function sportsPlayersCurrentGames_(league, sport, options) {
   }
 
   const resolved = sportsPlayersResolveLeague_(league, sport);
-  sportsPlayersAssertV1League_(resolved.League);
+  sportsPlayersAssertSupportedLeague_(resolved.League, resolved.Sport);
   const gameId = sportsPlayersString_(options.gameId);
   const espnEventId = sportsPlayersString_(options.espnEventId);
   const daysBack = Math.max(0, Number(options.daysBack === undefined ? SPORTS_PLAYERS_DEFAULT_DAYS_BACK : options.daysBack));
@@ -1486,7 +1771,7 @@ function refreshCurrentSportsPlayerGameStats(league, sport, options) {
       const leagueKey = sportsPlayersKey_(game.League);
       const eventId = sportsPlayersString_(game.ESPNEventId);
 
-      sportsPlayersAssertV1League_(leagueKey);
+      sportsPlayersAssertSupportedLeague_(leagueKey, sportKey);
 
       const payload = sportsPlayersFetchJson_(
         sportsPlayersSummaryUrl_(sportKey, leagueKey, eventId),
@@ -1588,7 +1873,7 @@ function getSportsPlayersStatus_() {
 
   return {
     success: true,
-    version: "1.0",
+    version: "1.1.0",
     playerCount: players.length,
     statRowCount: stats.length,
     leagues: Object.keys(leagues).sort().map(function(key) { return leagues[key]; }),
@@ -1758,12 +2043,74 @@ function testSyncMLBPlayers() {
   return syncSportsPlayersForLeague("mlb", "baseball");
 }
 
+function testSyncNBAPlayers() {
+  return syncSportsPlayersForLeague("nba", "basketball");
+}
+
+function testSyncWNBAPlayers() {
+  return syncSportsPlayersForLeague("wnba", "basketball");
+}
+
+function testSyncNHLPlayers() {
+  return syncSportsPlayersForLeague("nhl", "hockey");
+}
+
+function testSyncCollegeFootballPlayers() {
+  return syncSportsPlayersForLeague("college-football", "football");
+}
+
+function testSyncMensCollegeBasketballPlayers() {
+  return syncSportsPlayersForLeague("mens-college-basketball", "basketball");
+}
+
+function testSyncWomensCollegeBasketballPlayers() {
+  return syncSportsPlayersForLeague("womens-college-basketball", "basketball");
+}
+
+function testSyncMLSPlayers() {
+  return syncSportsPlayersForLeague("usa.1", "soccer");
+}
+
+function testSyncSoccerLeaguePlayers(league) {
+  league = sportsPlayersKey_(league || "usa.1");
+  return syncSportsPlayersForLeague(league, "soccer");
+}
+
 function testRefreshNFLCurrentPlayerStats() {
   return refreshCurrentSportsPlayerGameStats("nfl", "football", {});
 }
 
 function testRefreshMLBCurrentPlayerStats() {
   return refreshCurrentSportsPlayerGameStats("mlb", "baseball", {});
+}
+
+function testRefreshNBACurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("nba", "basketball", {});
+}
+
+function testRefreshWNBACurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("wnba", "basketball", {});
+}
+
+function testRefreshNHLCurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("nhl", "hockey", {});
+}
+
+function testRefreshCollegeFootballCurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("college-football", "football", {});
+}
+
+function testRefreshMensCollegeBasketballCurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("mens-college-basketball", "basketball", {});
+}
+
+function testRefreshWomensCollegeBasketballCurrentPlayerStats() {
+  return refreshCurrentSportsPlayerGameStats("womens-college-basketball", "basketball", {});
+}
+
+function testRefreshSoccerCurrentPlayerStats(league) {
+  league = sportsPlayersKey_(league || "usa.1");
+  return refreshCurrentSportsPlayerGameStats(league, "soccer", {});
 }
 
 function testSportsPlayersStatParser() {

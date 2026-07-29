@@ -523,7 +523,9 @@ function sportsLiveDisplayTeamSide_(entity, score) {
 }
 
 function sportsLiveDisplayFallbackTeamValue_(entity, statType, score) {
-  if (!score || sportsLiveDisplaySlug_(statType) !== "runs") return null;
+  if (!score) return null;
+  const scoreStats = ["runs", "points", "goals"];
+  if (scoreStats.indexOf(sportsLiveDisplaySlug_(statType)) === -1) return null;
   const side = sportsLiveDisplayTeamSide_(entity, score);
   if (side === "home") return sportsLiveDisplayNumber_(score.HomeScore, null);
   if (side === "away") return sportsLiveDisplayNumber_(score.AwayScore, null);

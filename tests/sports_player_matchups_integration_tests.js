@@ -57,7 +57,7 @@ const serviceWorker = read('frontend/sw.js');
 ].forEach((expected) => requireText(sportsPage, expected, 'Sports page'));
 
 requireText(sportsCss, '.sports-player-matchup-player-list', 'Sports CSS');
-requireText(serviceWorker, 'awards-app-v219-sports-live-comparisons', 'Service worker cache');
+requireText(serviceWorker, 'awards-app-v240-all-league-player-stats', 'Service worker cache');
 
 const backendContext = {
   console, Date, JSON, Math, Number, String, Array, Object, isFinite
@@ -144,6 +144,6 @@ const unsupportedButton = frontendContext.renderCreatePlayerMatchupButton({
   HomeTeam: 'Chicago Bulls',
   AwayTeam: 'New York Knicks'
 });
-assert(unsupportedButton === '', 'Unsupported matchup button rendered');
+assert(unsupportedButton.includes('Create Player Matchup'), 'NBA matchup button did not render');
 
 console.log('Sports Player Matchups integration tests passed.');

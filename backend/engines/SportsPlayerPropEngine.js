@@ -1,5 +1,5 @@
 /* =====================================================
-   SPORTS PLAYER QUESTIONS ENGINE v1.1
+   SPORTS PLAYER QUESTIONS ENGINE v1.3
    Lives in Awards App backend.
 
    Purpose:
@@ -9,9 +9,12 @@
    - Create two-to-twelve-player matchup wagers or predictions.
    - Settle those questions from final ESPN player stats.
 
-   v1 supported leagues:
+   Supported player-stat sports:
    - MLB
-   - NFL
+   - NFL and NCAA football
+   - NBA, WNBA, NCAA men's and women's basketball
+   - NHL
+   - Configured ESPN soccer competitions
 ===================================================== */
 
 const SPORTS_PLAYER_PROP_MARKET = "player-prop";
@@ -158,7 +161,7 @@ function setupSportsPlayerPropSystem() {
 
   return {
     success: true,
-    version: "1.2",
+    version: "1.3",
     categories: categories,
     categorySettings: settings,
     advancedQuestions:
@@ -192,52 +195,144 @@ function sportsPlayerPropRequireWagerGame_(gameId) {
 
 function sportsPlayerPropLeagueSport_(league, sport) {
   const leagueKey = sportsPlayerPropKey_(league);
-  const sportKey = sportsPlayerPropKey_(sport);
+  let sportKey = sportsPlayerPropKey_(sport);
+  const leagueSports = {
+    mlb: "baseball",
+    nfl: "football",
+    "college-football": "football",
+    nba: "basketball",
+    wnba: "basketball",
+    "mens-college-basketball": "basketball",
+    "womens-college-basketball": "basketball",
+    nhl: "hockey"
+  };
+  if (!sportKey) {
+    sportKey = leagueSports[leagueKey] || (leagueKey && leagueKey.indexOf(".") !== -1 ? "soccer" : "");
+  }
+  const allowedSports = {
+    baseball: true,
+    football: true,
+    basketball: true,
+    hockey: true,
+    soccer: true
+  };
 
-  if (leagueKey === "mlb" || sportKey === "baseball") {
-    return { league: "mlb", sport: "baseball" };
+  if (!allowedSports[sportKey]) {
+    throw new Error("Player statistics are not supported for sport: " + sportsPlayerPropString_(sport || league));
   }
 
-  if (leagueKey === "nfl" || sportKey === "football") {
-    return { league: "nfl", sport: "football" };
+  if (!leagueKey) {
+    throw new Error("A league is required for player statistics.");
   }
 
-  throw new Error("Player props v1 currently supports MLB and NFL only.");
+  return { league: leagueKey, sport: sportKey };
 }
 
 function sportsPlayerPropStatOptions_(league, sport) {
   const resolved = sportsPlayerPropLeagueSport_(league, sport);
 
-  if (resolved.league === "nfl") {
+  if (resolved.sport === "football") {
     return [
+      ["passing-completions", "Passing Completions"],
+      ["passing-attempts", "Passing Attempts"],
       ["passing-yards", "Passing Yards"],
       ["passing-touchdowns", "Passing Touchdowns"],
       ["interceptions-thrown", "Interceptions Thrown"],
+      ["rushing-attempts", "Rushing Attempts"],
       ["rushing-yards", "Rushing Yards"],
       ["rushing-touchdowns", "Rushing Touchdowns"],
       ["receptions", "Receptions"],
+      ["receiving-targets", "Receiving Targets"],
       ["receiving-yards", "Receiving Yards"],
       ["receiving-touchdowns", "Receiving Touchdowns"],
       ["field-goals-made", "Field Goals Made"],
       ["sacks", "Sacks"],
       ["tackles", "Tackles"],
+      ["solo-tackles", "Solo Tackles"],
       ["interceptions", "Defensive Interceptions"]
     ];
   }
 
+  if (resolved.sport === "baseball") {
+    return [
+      ["hits", "Hits"],
+      ["home-runs", "Home Runs"],
+      ["runs", "Runs"],
+      ["runs-batted-in", "Runs Batted In"],
+      ["walks", "Walks"],
+      ["total-bases", "Total Bases"],
+      ["stolen-bases", "Stolen Bases"],
+      ["batting-strikeouts", "Batter Strikeouts"],
+      ["pitching-strikeouts", "Pitcher Strikeouts"],
+      ["innings-pitched", "Innings Pitched"],
+      ["hits-allowed", "Hits Allowed"],
+      ["runs-allowed", "Runs Allowed"],
+      ["earned-runs", "Earned Runs"],
+      ["pitching-walks", "Pitching Walks"],
+      ["pitches", "Pitches"],
+      ["strikes", "Strikes"]
+    ];
+  }
+
+  if (resolved.sport === "basketball") {
+    return [
+      ["minutes", "Minutes"],
+      ["points", "Points"],
+      ["field-goals-made", "Field Goals Made"],
+      ["field-goals-attempted", "Field Goals Attempted"],
+      ["three-pointers-made", "Three-pointers Made"],
+      ["three-pointers-attempted", "Three-pointers Attempted"],
+      ["free-throws-made", "Free Throws Made"],
+      ["free-throws-attempted", "Free Throws Attempted"],
+      ["offensive-rebounds", "Offensive Rebounds"],
+      ["defensive-rebounds", "Defensive Rebounds"],
+      ["rebounds", "Rebounds"],
+      ["assists", "Assists"],
+      ["steals", "Steals"],
+      ["blocks", "Blocks"],
+      ["turnovers", "Turnovers"],
+      ["fouls", "Personal Fouls"],
+      ["plus-minus", "Plus/Minus"]
+    ];
+  }
+
+  if (resolved.sport === "hockey") {
+    return [
+      ["minutes", "Time on Ice / Minutes"],
+      ["goals", "Goals"],
+      ["assists", "Assists"],
+      ["points", "Points"],
+      ["shots", "Shots"],
+      ["shots-on-goal", "Shots on Goal"],
+      ["hits", "Hits"],
+      ["blocked-shots", "Blocked Shots"],
+      ["penalty-minutes", "Penalty Minutes"],
+      ["plus-minus", "Plus/Minus"],
+      ["faceoff-wins", "Faceoff Wins"],
+      ["saves", "Goalie Saves"],
+      ["goals-against", "Goals Against"],
+      ["save-percentage", "Save Percentage"]
+    ];
+  }
+
   return [
-    ["hits", "Hits"],
-    ["home-runs", "Home Runs"],
-    ["runs", "Runs"],
-    ["runs-batted-in", "Runs Batted In"],
-    ["walks", "Walks"],
-    ["total-bases", "Total Bases"],
-    ["stolen-bases", "Stolen Bases"],
-    ["batting-strikeouts", "Batter Strikeouts"],
-    ["pitching-strikeouts", "Pitcher Strikeouts"],
-    ["hits-allowed", "Hits Allowed"],
-    ["earned-runs", "Earned Runs"],
-    ["pitching-walks", "Pitching Walks"]
+    ["minutes", "Minutes"],
+    ["goals", "Goals"],
+    ["assists", "Assists"],
+    ["shots", "Shots"],
+    ["shots-on-target", "Shots on Target"],
+    ["saves", "Goalkeeper Saves"],
+    ["fouls-committed", "Fouls Committed"],
+    ["fouls-suffered", "Fouls Suffered"],
+    ["yellow-cards", "Yellow Cards"],
+    ["red-cards", "Red Cards"],
+    ["offsides", "Offsides"],
+    ["tackles", "Tackles"],
+    ["interceptions", "Interceptions"],
+    ["clearances", "Clearances"],
+    ["passes-completed", "Passes Completed"],
+    ["passes-attempted", "Passes Attempted"],
+    ["chances-created", "Chances Created"]
   ];
 }
 
