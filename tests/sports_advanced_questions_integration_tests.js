@@ -53,7 +53,7 @@ const sw = read('frontend/sw.js');
 ].forEach((expected) => requireText(wagerEngine, expected, 'Sports wager integration'));
 
 [
-  'Create Stat Question',
+  'Create Stat Comparison',
   'data-create-advanced-question-game-id',
   'function showSportsAdvancedQuestionModal_',
   'function createSportsAdvancedQuestionFromCard',
@@ -62,7 +62,7 @@ const sw = read('frontend/sw.js');
 ].forEach((expected) => requireText(sportsPage, expected, 'Sports page'));
 
 requireText(sportsCss, '.sports-advanced-question-modal', 'Sports CSS');
-requireText(sw, 'awards-app-v218-sports-stats-runtime', 'Service worker cache');
+requireText(sw, 'awards-app-v219-sports-live-comparisons', 'Service worker cache');
 
 class Range {
   constructor(sheet, row, col, numRows = 1, numCols = 1) {

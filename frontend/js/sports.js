@@ -27,7 +27,9 @@ let sportsScoresState = {
   creatingWager: false,
   creatingPlayerProp: false,
   creatingPlayerMatchup: false,
-  creatingAdvancedQuestion: false
+  creatingAdvancedQuestion: false,
+  gameDetailsByEventId: {},
+  gameDetailsLoading: false
 };
 
 let sportsUsageByGameId = {};
@@ -710,7 +712,16 @@ async function loadSportsScores(filters) {
 
     await loadSportsUsageForScores_();
 
+    sportsScoresState.gameDetailsLoading =
+      sportsScoresState.scores.some(function(game) {
+        return String(game && game.League || "").trim().toLowerCase() === "mlb";
+      });
+
     renderSportsScores(
+      sportsScoresState.scores
+    );
+
+    loadSportsGameDetailsForScores_(
       sportsScoresState.scores
     );
 
@@ -785,6 +796,8 @@ function renderSportsScores(scores) {
        </div>
       </div>
 
+      ${renderSportsStartingPitchers_(game)}
+
       <div class="meta">
           <div>Status: <span class="${escapeSportsHtml(statusInfo.className)}">${escapeSportsHtml(statusInfo.label)}</span></div>
           <div>${getSportsPeriodLabel(game)}: ${formatSportsPeriodValue(game)}</div>
@@ -806,7 +819,6 @@ function renderSportsScores(scores) {
 
         ${renderCreateWagerButton(game)}
         ${renderCreatePlayerPropButton(game)}
-        ${renderCreatePlayerMatchupButton(game)}
         ${renderCreateAdvancedQuestionButton(game)}
       </div>
     `;
@@ -815,6 +827,119 @@ function renderSportsScores(scores) {
   });
 
   updateSelectedSportsWagerCount_();
+}
+
+/************************************
+ MLB STARTING PITCHERS
+************************************/
+
+function sportsGameDetailsFor_(game) {
+  const eventId = String(game && game.ESPNEventId || "").trim();
+  return eventId && sportsScoresState.gameDetailsByEventId
+    ? sportsScoresState.gameDetailsByEventId[eventId] || null
+    : null;
+}
+
+function sportsStarterFallback_(game, side) {
+  const prefix = side === "home" ? "Home" : "Away";
+  const name = String(
+    game && (
+      game[prefix + "StartingPitcher"] ||
+      game[prefix + "ProbablePitcher"] ||
+      game[prefix + "ProbablePitcherName"]
+    ) || ""
+  ).trim();
+  if (!name) return null;
+  return {
+    name: name,
+    role: game[prefix + "StartingPitcher"] ? "starter" : "probable",
+    confirmed: Boolean(game[prefix + "StartingPitcher"]),
+    statLine: ""
+  };
+}
+
+function renderSportsStarterRow_(teamName, starter) {
+  const label = starter && starter.confirmed ? "Starting pitcher" : "Probable pitcher";
+  const name = starter && starter.name ? starter.name : "TBD";
+  const statLine = starter && starter.statLine ? starter.statLine : "";
+  const headshot = starter && starter.headshot
+    ? '<img class="sports-starter-headshot" src="' + escapeSportsHtml(starter.headshot) + '" alt="">'
+    : '<span class="sports-starter-headshot sports-starter-placeholder">P</span>';
+  return `
+    <div class="sports-starter-row">
+      ${headshot}
+      <div class="sports-starter-copy">
+        <span class="sports-starter-team">${escapeSportsHtml(teamName || "Team")}</span>
+        <strong>${escapeSportsHtml(name)}</strong>
+        <span>${escapeSportsHtml(label)}${statLine ? " · " + escapeSportsHtml(statLine) : ""}</span>
+      </div>
+    </div>
+  `;
+}
+
+function renderSportsStartingPitchers_(game) {
+  const league = String(game && game.League || "").trim().toLowerCase();
+  if (league !== "mlb") return "";
+
+  const details = sportsGameDetailsFor_(game);
+  const awayStarter = details && details.awayStarter || sportsStarterFallback_(game, "away");
+  const homeStarter = details && details.homeStarter || sportsStarterFallback_(game, "home");
+
+  if (!awayStarter && !homeStarter && sportsScoresState.gameDetailsLoading) {
+    return '<div class="sports-starters sports-starters-loading">Checking probable starting pitchers…</div>';
+  }
+
+  return `
+    <div class="sports-starters">
+      <div class="sports-starters-title">Starting Pitchers</div>
+      ${renderSportsStarterRow_(game.AwayTeam || "Away", awayStarter)}
+      ${renderSportsStarterRow_(game.HomeTeam || "Home", homeStarter)}
+    </div>
+  `;
+}
+
+async function loadSportsGameDetailsForScores_(scores) {
+  const mlbGames = (scores || []).filter(function(game) {
+    return String(game && game.League || "").trim().toLowerCase() === "mlb" &&
+      String(game && game.ESPNEventId || "").trim();
+  }).slice(0, 30);
+
+  if (!mlbGames.length) {
+    sportsScoresState.gameDetailsLoading = false;
+    return;
+  }
+
+  const eventIds = mlbGames.map(function(game) {
+    return String(game.ESPNEventId || "").trim();
+  });
+  const eventLeagues = {};
+  mlbGames.forEach(function(game) {
+    eventLeagues[String(game.ESPNEventId || "").trim()] = "mlb";
+  });
+
+  try {
+    const result = await sportsAwardsApi_(
+      "getSportsGameDetails",
+      {
+        espnEventIds: eventIds.join(","),
+        eventLeaguesJSON: JSON.stringify(eventLeagues),
+        league: "mlb"
+      }
+    );
+
+    if (result && result.success !== false && result.gameDetails) {
+      sportsScoresState.gameDetailsByEventId = Object.assign(
+        {},
+        sportsScoresState.gameDetailsByEventId || {},
+        result.gameDetails
+      );
+    }
+  } catch (error) {
+    console.warn("Could not load MLB starting pitchers.", error);
+  } finally {
+    sportsScoresState.gameDetailsLoading = false;
+    renderSportsScores(sportsScoresState.scores || []);
+  }
 }
 
 /************************************
@@ -2316,6 +2441,177 @@ async function createSportsWagerFromCard(gameId) {
 
 
 /************************************
+ SPORTS ADMIN HELP POPOVERS
+ Uses the same fixed-position, mobile-safe behavior as Manage Games.
+************************************/
+
+function sportsHelpButton_(title, message) {
+  return `
+    <span class="sports-help-wrap">
+      <button
+        type="button"
+        class="sports-help-button"
+        aria-label="Help: ${escapeSportsHtml(title)}"
+        aria-expanded="false"
+        onclick="sportsToggleHelpPopover_(event, this)"
+      >?</button>
+      <span class="sports-help-popover" role="tooltip" hidden>
+        <strong>${escapeSportsHtml(title)}</strong>
+        <span>${escapeSportsHtml(message)}</span>
+      </span>
+    </span>
+  `;
+}
+
+function sportsFieldLabel_(title, message) {
+  return `
+    <span class="sports-field-label">
+      <span>${escapeSportsHtml(title)}</span>
+      ${message ? sportsHelpButton_(title, message) : ""}
+    </span>
+  `;
+}
+
+function sportsGetHelpPopover_(button) {
+  return button && (button.__sportsHelpPopover || button.nextElementSibling) || null;
+}
+
+function sportsRestoreHelpPopover_(button, popover) {
+  if (!popover) return;
+  const wrap = button && button.isConnected ? button.closest(".sports-help-wrap") : null;
+  if (wrap) wrap.appendChild(popover);
+  else if (popover.parentNode) popover.parentNode.removeChild(popover);
+}
+
+function sportsCloseHelpPopovers_(exceptButton) {
+  document.querySelectorAll(".sports-help-button[aria-expanded='true']")
+    .forEach(function(button) {
+      if (button === exceptButton) return;
+      button.setAttribute("aria-expanded", "false");
+      const popover = sportsGetHelpPopover_(button);
+      if (!popover) return;
+      popover.hidden = true;
+      popover.classList.remove("is-open");
+      popover.removeAttribute("data-placement");
+      popover.style.cssText = "";
+      sportsRestoreHelpPopover_(button, popover);
+    });
+  if (!exceptButton) window.__sportsActiveHelpButton = null;
+}
+
+function sportsClampHelpValue_(value, minimum, maximum) {
+  if (maximum < minimum) return minimum;
+  return Math.min(Math.max(value, minimum), maximum);
+}
+
+function sportsPositionHelpPopover_(button, popover) {
+  if (!button || !popover || popover.hidden || !button.isConnected) return;
+  const rect = button.getBoundingClientRect();
+  const viewport = window.visualViewport;
+  const viewportWidth = Math.max(240, viewport ? viewport.width : window.innerWidth);
+  const viewportHeight = Math.max(240, viewport ? viewport.height : window.innerHeight);
+  const margin = 10;
+  const gap = 10;
+
+  popover.style.maxWidth = Math.max(200, viewportWidth - margin * 2) + "px";
+  popover.style.maxHeight = Math.max(150, viewportHeight - margin * 2) + "px";
+  popover.style.left = margin + "px";
+  popover.style.top = margin + "px";
+  popover.style.visibility = "hidden";
+
+  const popoverRect = popover.getBoundingClientRect();
+  const width = Math.min(popoverRect.width, viewportWidth - margin * 2);
+  const height = Math.min(popoverRect.height, viewportHeight - margin * 2);
+  const centerX = rect.left + rect.width / 2;
+  const centerY = rect.top + rect.height / 2;
+  const candidates = [
+    { placement: "right", left: rect.right + gap, top: centerY - height / 2, preference: 4 },
+    { placement: "left", left: rect.left - width - gap, top: centerY - height / 2, preference: 3 },
+    { placement: "below", left: centerX - width / 2, top: rect.bottom + gap, preference: 2 },
+    { placement: "above", left: centerX - width / 2, top: rect.top - height - gap, preference: 1 }
+  ];
+  let best = null;
+  candidates.forEach(function(candidate) {
+    const visibleWidth = Math.max(0, Math.min(viewportWidth - margin, candidate.left + width) - Math.max(margin, candidate.left));
+    const visibleHeight = Math.max(0, Math.min(viewportHeight - margin, candidate.top + height) - Math.max(margin, candidate.top));
+    const fullyVisible = visibleWidth >= width - 1 && visibleHeight >= height - 1;
+    const score = visibleWidth * visibleHeight + (fullyVisible ? 1000000 : 0) + candidate.preference;
+    if (!best || score > best.score) best = Object.assign({}, candidate, { score: score });
+  });
+
+  const left = sportsClampHelpValue_(best.left, margin, viewportWidth - width - margin);
+  const top = sportsClampHelpValue_(best.top, margin, viewportHeight - height - margin);
+  const arrowOffset = best.placement === "left" || best.placement === "right"
+    ? sportsClampHelpValue_(centerY - top, 16, Math.max(16, height - 16))
+    : sportsClampHelpValue_(centerX - left, 16, Math.max(16, width - 16));
+
+  popover.dataset.placement = best.placement;
+  popover.style.left = Math.round(left) + "px";
+  popover.style.top = Math.round(top) + "px";
+  popover.style.setProperty("--sports-help-arrow-offset", Math.round(arrowOffset) + "px");
+  popover.style.visibility = "visible";
+}
+
+function sportsScheduleHelpPopoverPosition_() {
+  if (window.__sportsHelpPositionFrame) cancelAnimationFrame(window.__sportsHelpPositionFrame);
+  window.__sportsHelpPositionFrame = requestAnimationFrame(function() {
+    window.__sportsHelpPositionFrame = null;
+    const button = window.__sportsActiveHelpButton;
+    const popover = sportsGetHelpPopover_(button);
+    if (button && popover && button.getAttribute("aria-expanded") === "true") {
+      sportsPositionHelpPopover_(button, popover);
+    }
+  });
+}
+
+function sportsToggleHelpPopover_(event, button) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  if (!button) return;
+  const popover = sportsGetHelpPopover_(button);
+  if (!popover) return;
+  button.__sportsHelpPopover = popover;
+  const willOpen = button.getAttribute("aria-expanded") !== "true";
+  sportsCloseHelpPopovers_(willOpen ? button : null);
+  button.setAttribute("aria-expanded", willOpen ? "true" : "false");
+  popover.hidden = !willOpen;
+  popover.classList.toggle("is-open", willOpen);
+  if (!willOpen) {
+    window.__sportsActiveHelpButton = null;
+    sportsRestoreHelpPopover_(button, popover);
+    return;
+  }
+  window.__sportsActiveHelpButton = button;
+  if (popover.parentElement !== document.body) document.body.appendChild(popover);
+  sportsScheduleHelpPopoverPosition_();
+}
+
+if (
+  typeof document !== "undefined" &&
+  typeof window !== "undefined" &&
+  typeof window.addEventListener === "function" &&
+  !window.__sportsHelpDismissBound
+) {
+  window.__sportsHelpDismissBound = true;
+  document.addEventListener("click", function(event) {
+    if (!event.target.closest(".sports-help-button") && !event.target.closest(".sports-help-popover")) {
+      sportsCloseHelpPopovers_();
+    }
+  });
+  document.addEventListener("keydown", function(event) {
+    if (event.key === "Escape") sportsCloseHelpPopovers_();
+  });
+  window.addEventListener("resize", sportsScheduleHelpPopoverPosition_);
+  window.addEventListener("scroll", sportsScheduleHelpPopoverPosition_, true);
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener("resize", sportsScheduleHelpPopoverPosition_);
+    window.visualViewport.addEventListener("scroll", sportsScheduleHelpPopoverPosition_);
+  }
+}
+
+/************************************
  PLAYER PROP CREATION
  Admin-only v1 workflow for MLB/NFL.
 ************************************/
@@ -2399,7 +2695,7 @@ function renderCreateAdvancedQuestionButton(game) {
       class="small-btn sports-advanced-question-btn"
       data-create-advanced-question-game-id="${escapeSportsHtml(game.GameId || "")}"
     >
-      Create Stat Question
+      Create Stat Comparison
     </button>
   `;
 }
@@ -2461,7 +2757,8 @@ function sportsPlayerPropPlayerLabel_(player) {
   ].filter(Boolean).join(" — ");
 }
 
-async function getSportsPlayerPropOptions_(session, game) {
+async function getSportsPlayerPropOptions_(session, game, options) {
+  options = options || {};
   const result =
     await sportsAwardsApi_(
       "adminGetSportsPlayerPropPlayers",
@@ -2489,7 +2786,7 @@ async function getSportsPlayerPropOptions_(session, game) {
   const gamePlayers =
     allPlayers
       .filter(function(player) {
-        return sportsPlayerTeamMatchesGame_(player, game);
+        return options.allLeague === true || sportsPlayerTeamMatchesGame_(player, game);
       })
       .sort(function(a, b) {
         const teamCompare =
@@ -2597,21 +2894,21 @@ function showSportsPlayerPropModal_(game, awardsGameId, options) {
 
         <form id="sportsPlayerPropForm">
           <label class="sports-player-prop-field">
-            <span>Player</span>
+            ${sportsFieldLabel_("Player", "Choose the athlete whose final game statistic will be compared with the line.")}
             <select id="sportsPlayerPropPlayer" required>
               ${playerOptions}
             </select>
           </label>
 
           <label class="sports-player-prop-field">
-            <span>Statistic</span>
+            ${sportsFieldLabel_("Statistic", "Choose the player statistic that the Sports Scores Engine will track and settle.")}
             <select id="sportsPlayerPropStat" required>
               ${statOptions}
             </select>
           </label>
 
           <label class="sports-player-prop-field">
-            <span>Over / Under Line</span>
+            ${sportsFieldLabel_("Over / Under Line", "The exact number the player must finish above or below. An exact tie becomes a push.")}
             <input
               id="sportsPlayerPropLine"
               type="number"
@@ -2625,7 +2922,7 @@ function showSportsPlayerPropModal_(game, awardsGameId, options) {
 
           <div class="sports-player-prop-odds-grid">
             <label class="sports-player-prop-field">
-              <span>Over Odds</span>
+              ${sportsFieldLabel_("Over Odds", "Decimal odds for the Over selection. Example: 1.91 returns 1.91 times the wager, including stake.")}
               <input
                 id="sportsPlayerPropOverOdds"
                 type="number"
@@ -2638,7 +2935,7 @@ function showSportsPlayerPropModal_(game, awardsGameId, options) {
             </label>
 
             <label class="sports-player-prop-field">
-              <span>Under Odds</span>
+              ${sportsFieldLabel_("Under Odds", "Decimal odds for the Under selection. Example: 1.91 returns 1.91 times the wager, including stake.")}
               <input
                 id="sportsPlayerPropUnderOdds"
                 type="number"
@@ -2717,6 +3014,7 @@ function showSportsPlayerPropModal_(game, awardsGameId, options) {
     }
 
     function close(value) {
+      sportsCloseHelpPopovers_();
       overlay.remove();
       resolve(value || null);
     }
@@ -3066,22 +3364,22 @@ function showSportsPlayerMatchupModal_(game, options) {
         </p>
         <form id="sportsPlayerMatchupForm">
           <label class="sports-player-prop-field">
-            <span>Question Type</span>
+            ${sportsFieldLabel_("Question Type", "Highest Total compares 2–12 entries. Yes/No Threshold checks one player or team against a number.")}
             <select id="sportsPlayerMatchupMode">
               <option value="wager">Wager — writes to Bets</option>
               <option value="prediction">Prediction — writes to Picks</option>
             </select>
           </label>
           <label class="sports-player-prop-field">
-            <span>Statistic</span>
+            ${sportsFieldLabel_("Statistic", "Every selected entry must support the same statistic. Team and player stat choices are filtered automatically.")}
             <select id="sportsPlayerMatchupStat" required>${statOptions}</select>
           </label>
           <label class="sports-player-prop-field">
-            <span>Question (optional)</span>
+            ${sportsFieldLabel_("Question", "Leave blank to generate a question automatically, or enter the exact wording players should see.")}
             <input id="sportsPlayerMatchupQuestion" type="text" placeholder="Which player will record the most ...?">
           </label>
           <label class="sports-player-prop-field" id="sportsPlayerMatchupPointsField" hidden>
-            <span>Prediction Points</span>
+            ${sportsFieldLabel_("Prediction Points", "Points awarded for a correct prediction when this is created as a Prediction.")}
             <input id="sportsPlayerMatchupPoints" type="number" min="1" step="1" value="1">
           </label>
           <div class="sports-player-matchup-help">
@@ -3291,6 +3589,55 @@ async function createSportsPlayerMatchupFromCard(gameId) {
  Cross-game players/teams and checkpoints.
 ************************************/
 
+const SPORTS_MLB_DIVISION_BY_TEAM = {
+  "baltimore orioles": "AL East",
+  "boston red sox": "AL East",
+  "new york yankees": "AL East",
+  "tampa bay rays": "AL East",
+  "toronto blue jays": "AL East",
+  "chicago white sox": "AL Central",
+  "cleveland guardians": "AL Central",
+  "detroit tigers": "AL Central",
+  "kansas city royals": "AL Central",
+  "minnesota twins": "AL Central",
+  "houston astros": "AL West",
+  "los angeles angels": "AL West",
+  "athletics": "AL West",
+  "oakland athletics": "AL West",
+  "sacramento athletics": "AL West",
+  "seattle mariners": "AL West",
+  "texas rangers": "AL West",
+  "atlanta braves": "NL East",
+  "miami marlins": "NL East",
+  "new york mets": "NL East",
+  "philadelphia phillies": "NL East",
+  "washington nationals": "NL East",
+  "chicago cubs": "NL Central",
+  "cincinnati reds": "NL Central",
+  "milwaukee brewers": "NL Central",
+  "pittsburgh pirates": "NL Central",
+  "st louis cardinals": "NL Central",
+  "st. louis cardinals": "NL Central",
+  "arizona diamondbacks": "NL West",
+  "colorado rockies": "NL West",
+  "los angeles dodgers": "NL West",
+  "san diego padres": "NL West",
+  "san francisco giants": "NL West"
+};
+
+function sportsMlbDivisionForTeam_(teamName) {
+  const key = String(teamName || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ");
+  if (SPORTS_MLB_DIVISION_BY_TEAM[key]) return SPORTS_MLB_DIVISION_BY_TEAM[key];
+  const match = Object.keys(SPORTS_MLB_DIVISION_BY_TEAM).find(function(name) {
+    return key === name || key.indexOf(name) !== -1 || name.indexOf(key) !== -1;
+  });
+  return match ? SPORTS_MLB_DIVISION_BY_TEAM[match] : "";
+}
+
 function sportsAdvancedQuestionEntityLabel_(entity) {
   const game = entity.game || {};
   const gameLabel =
@@ -3381,7 +3728,12 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
             (entity.entityType === "TEAM" ? "T" : "P") +
           '</span>';
       return `
-        <label class="sports-player-matchup-player-row sports-advanced-entity-row">
+        <label
+          class="sports-player-matchup-player-row sports-advanced-entity-row"
+          data-advanced-entity-type="${escapeSportsHtml(entity.entityType || "")}"
+          data-advanced-entity-name="${escapeSportsHtml(entity.entityName || "")}"
+          data-advanced-division="${escapeSportsHtml(entity.entityType === "TEAM" ? sportsMlbDivisionForTeam_(entity.entityName) : "")}"
+        >
           <input
             type="checkbox"
             class="sports-advanced-entity-checkbox"
@@ -3415,14 +3767,45 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     overlay.className = "sports-player-prop-overlay";
     overlay.innerHTML = `
       <div class="sports-player-prop-modal sports-advanced-question-modal">
-        <h3>Create Advanced Sports Question</h3>
+        <h3>Create Stat Comparison</h3>
         <p class="sports-player-prop-game">
-          Add players or teams from any loaded ${escapeSportsHtml(String(baseGame.League || "").toUpperCase())} game.
+          Compare players or teams from any loaded ${escapeSportsHtml(String(baseGame.League || "").toUpperCase())} game, including different games and multi-team groups.
         </p>
         <form id="sportsAdvancedQuestionForm">
+          <div class="sports-advanced-select-tools">
+            <label class="sports-player-prop-field">
+              ${sportsFieldLabel_("Show Entities", "Filter the list to teams, players, or both. This does not change already-created questions.")}
+              <select id="sportsAdvancedEntityFilter">
+                <option value="all">Teams and players</option>
+                <option value="team">Teams only</option>
+                <option value="player">Players only</option>
+              </select>
+            </label>
+            <label class="sports-player-prop-field">
+              ${sportsFieldLabel_("MLB Division", "Select every loaded team from one MLB division. Only teams with games currently loaded on this page can be selected.")}
+              <select id="sportsAdvancedDivisionSelect">
+                <option value="">Choose a division…</option>
+                <option value="AL East">AL East</option>
+                <option value="AL Central">AL Central</option>
+                <option value="AL West">AL West</option>
+                <option value="NL East">NL East</option>
+                <option value="NL Central">NL Central</option>
+                <option value="NL West">NL West</option>
+              </select>
+            </label>
+            <label class="sports-player-prop-field sports-advanced-search-field">
+              ${sportsFieldLabel_("Search", "Filter the loaded player and team list by name or matchup.")}
+              <input id="sportsAdvancedEntitySearch" type="search" placeholder="Cubs, White Sox, pitcher…">
+            </label>
+            <div class="sports-advanced-selection-actions">
+              <button type="button" class="small-btn" id="sportsAdvancedSelectVisible">Select Visible</button>
+              <button type="button" class="small-btn" id="sportsAdvancedSelectTeams">Select Loaded Teams</button>
+              <button type="button" class="small-btn" id="sportsAdvancedClearEntities">Clear</button>
+            </div>
+          </div>
           <div class="sports-advanced-question-grid">
             <label class="sports-player-prop-field">
-              <span>Question Mode</span>
+              ${sportsFieldLabel_("Question Mode", "Wager creates selections in Bets with decimal odds. Prediction creates a correct-pick question in Picks.")}
               <select id="sportsAdvancedQuestionMode">
                 <option value="wager">Wager — writes to Bets</option>
                 <option value="prediction">Prediction — writes to Picks</option>
@@ -3436,7 +3819,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
               </select>
             </label>
             <label class="sports-player-prop-field">
-              <span>Checkpoint</span>
+              ${sportsFieldLabel_("Checkpoint", "Final Game Total is the safest automatic option. Inning or quarter checkpoints require an exact saved snapshot and may need admin review.")}
               <select id="sportsAdvancedCheckpoint">${checkpointOptions}</select>
             </label>
             <label class="sports-player-prop-field">
@@ -3444,7 +3827,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
               <select id="sportsAdvancedStat" required></select>
             </label>
             <label class="sports-player-prop-field sports-advanced-threshold-field" hidden>
-              <span>Comparison</span>
+              ${sportsFieldLabel_("Comparison", "Choose how the current or final statistic is compared with the threshold.")}
               <select id="sportsAdvancedOperator">
                 <option value="gte">At least</option>
                 <option value="gt">More than</option>
@@ -3454,15 +3837,15 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
               </select>
             </label>
             <label class="sports-player-prop-field sports-advanced-threshold-field" hidden>
-              <span>Threshold</span>
+              ${sportsFieldLabel_("Threshold", "The number used for the Yes/No question. Example: at least 6 strikeouts.")}
               <input id="sportsAdvancedThreshold" type="number" step="0.5" value="1">
             </label>
             <label class="sports-player-prop-field sports-advanced-threshold-odds" hidden>
-              <span>Yes Odds</span>
+              ${sportsFieldLabel_("Yes Odds", "Decimal odds paid when the final result satisfies the threshold.")}
               <input id="sportsAdvancedYesOdds" type="number" min="1.01" step="0.01" value="1.91">
             </label>
             <label class="sports-player-prop-field sports-advanced-threshold-odds" hidden>
-              <span>No Odds</span>
+              ${sportsFieldLabel_("No Odds", "Decimal odds paid when the final result does not satisfy the threshold.")}
               <input id="sportsAdvancedNoOdds" type="number" min="1.01" step="0.01" value="1.91">
             </label>
             <label class="sports-player-prop-field" id="sportsAdvancedPointsField" hidden>
@@ -3477,11 +3860,15 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
           <div class="sports-player-matchup-help">
             Final totals settle automatically. Checkpoint questions auto-settle only when an exact boundary snapshot was captured; a late poll is marked for admin review.
           </div>
+          <div class="sports-advanced-entity-heading">
+            ${sportsFieldLabel_("Selections and Odds", "Check 2–12 entries for Highest Total or exactly one entry for Yes/No Threshold. For wagers, enter decimal odds beside each selected Highest Total option.")}
+            <span id="sportsAdvancedVisibleCount"></span>
+          </div>
           <div id="sportsAdvancedEntityList" class="sports-player-matchup-player-list sports-advanced-entity-list">${rows}</div>
           <div id="sportsAdvancedQuestionPreview" class="sports-player-prop-preview"></div>
           <div class="sports-player-prop-actions">
             <button type="button" class="small-btn" id="sportsAdvancedQuestionCancel">Cancel</button>
-            <button type="submit" class="small-btn sports-advanced-question-btn">Continue</button>
+            <button type="submit" class="small-btn sports-advanced-question-btn">Create Comparison</button>
           </div>
         </form>
       </div>
@@ -3498,6 +3885,44 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     const name = document.getElementById("sportsAdvancedQuestionName");
     const preview = document.getElementById("sportsAdvancedQuestionPreview");
     const pointsField = document.getElementById("sportsAdvancedPointsField");
+    const entityFilter = document.getElementById("sportsAdvancedEntityFilter");
+    const divisionSelect = document.getElementById("sportsAdvancedDivisionSelect");
+    const entitySearch = document.getElementById("sportsAdvancedEntitySearch");
+    const visibleCount = document.getElementById("sportsAdvancedVisibleCount");
+
+    function entityRows_() {
+      return Array.from(overlay.querySelectorAll(".sports-advanced-entity-row"));
+    }
+
+    function updateEntityVisibility_() {
+      const typeFilter = String(entityFilter && entityFilter.value || "all").toUpperCase();
+      const search = String(entitySearch && entitySearch.value || "").trim().toLowerCase();
+      let count = 0;
+      entityRows_().forEach(function(row) {
+        const type = String(row.getAttribute("data-advanced-entity-type") || "").toUpperCase();
+        const text = String(row.textContent || "").toLowerCase();
+        const typeMatch = typeFilter === "ALL" || type === typeFilter;
+        const searchMatch = !search || text.indexOf(search) !== -1;
+        row.hidden = !(typeMatch && searchMatch);
+        if (!row.hidden) count++;
+      });
+      if (visibleCount) visibleCount.textContent = count + " shown";
+    }
+
+    function selectRows_(predicate) {
+      entityRows_().forEach(function(row) {
+        if (!predicate(row)) return;
+        const input = row.querySelector(".sports-advanced-entity-checkbox");
+        if (input) input.checked = true;
+      });
+      updateControls_();
+    }
+
+    function clearRows_() {
+      overlay.querySelectorAll(".sports-advanced-entity-checkbox")
+        .forEach(function(input) { input.checked = false; });
+      updateControls_();
+    }
 
     function checkedInputs_() {
       return Array.from(overlay.querySelectorAll(".sports-advanced-entity-checkbox:checked"));
@@ -3571,6 +3996,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     }
 
     function close_(value) {
+      sportsCloseHelpPopovers_();
       overlay.remove();
       resolve(value || null);
     }
@@ -3580,6 +4006,31 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     });
     overlay.querySelectorAll(".sports-advanced-entity-checkbox")
       .forEach(function(input) { input.addEventListener("change", updateControls_); });
+
+    entityFilter.addEventListener("change", updateEntityVisibility_);
+    entitySearch.addEventListener("input", updateEntityVisibility_);
+    divisionSelect.addEventListener("change", function() {
+      const division = String(divisionSelect.value || "");
+      if (!division) return;
+      selectRows_(function(row) {
+        return row.getAttribute("data-advanced-entity-type") === "TEAM" &&
+          row.getAttribute("data-advanced-division") === division;
+      });
+      entityFilter.value = "team";
+      updateEntityVisibility_();
+    });
+    document.getElementById("sportsAdvancedSelectVisible").addEventListener("click", function() {
+      selectRows_(function(row) { return !row.hidden; });
+    });
+    document.getElementById("sportsAdvancedSelectTeams").addEventListener("click", function() {
+      selectRows_(function(row) {
+        return row.getAttribute("data-advanced-entity-type") === "TEAM";
+      });
+      entityFilter.value = "team";
+      updateEntityVisibility_();
+    });
+    document.getElementById("sportsAdvancedClearEntities").addEventListener("click", clearRows_);
+
     document.getElementById("sportsAdvancedQuestionCancel")
       .addEventListener("click", function() { close_(null); });
 
@@ -3652,6 +4103,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
     overlay.addEventListener("click", function(event) {
       if (event.target === overlay) close_(null);
     });
+    updateEntityVisibility_();
     updateControls_();
   });
 }
@@ -3692,7 +4144,7 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     const games = sportsScoresState.scores.filter(function(game) {
       return String(game.League || "").toLowerCase() === league;
     });
-    const playerOptions = await getSportsPlayerPropOptions_(session, baseGame);
+    const playerOptions = await getSportsPlayerPropOptions_(session, baseGame, { allLeague: true });
     const optionData =
       await sportsAwardsApi_(
         "adminGetSportsAdvancedQuestionOptions",

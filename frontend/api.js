@@ -31,6 +31,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "getArchivedGameHistory",
     "getArchivedGamesHistory",
     "getBettingPagePayload",
+    "getSportsGameDetails",
+    "getSportsLiveQuestionStatus",
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",

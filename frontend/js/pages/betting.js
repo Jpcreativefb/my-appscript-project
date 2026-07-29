@@ -6,6 +6,8 @@
 let BETTING_AUTO_REFRESH_TIMER = null;
 let BETTING_LIVE_SPORTS_TIMER = null;
 let BETTING_LIVE_SPORTS_IN_FLIGHT = false;
+let BETTING_LIVE_TRACKERS_BY_CATEGORY = {};
+let BETTING_LIVE_GAME_DETAILS_BY_EVENT = {};
 
 const BETTING_BATCH_SIZE = 12;
 
@@ -18,6 +20,8 @@ const BETTING_LIVE_SPORTS_API_URL =
   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
 
 const BETTING_LIVE_SPORTS_REFRESH_MS = 30000;
+const BETTING_LIVE_SPORTS_TIMEOUT_MS = 90000;
+const BETTING_LIVE_SPORTS_LATE_CALLBACK_MS = 120000;
 
 const BETTING_PAGE_BATCH_STATE = {
   gameId: "",
@@ -82,48 +86,53 @@ function bettingLiveSportsJsonp_(url) {
       "_" +
       Math.floor(Math.random() * 1000000);
 
-    const script =
-      document.createElement("script");
-
-    const separator =
-      url.indexOf("?") === -1
-        ? "?"
-        : "&";
-
+    const script = document.createElement("script");
+    const separator = url.indexOf("?") === -1 ? "?" : "&";
     let done = false;
 
-    function cleanup_() {
+    function removeScript_() {
+      if (script && script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    function deleteCallback_() {
       try {
         delete window[callbackName];
       } catch (err) {
         window[callbackName] = undefined;
       }
+    }
 
-      if (script && script.parentNode) {
-        script.parentNode.removeChild(script);
+    function cleanup_(keepLateCallback) {
+      removeScript_();
+      if (keepLateCallback) {
+        window[callbackName] = function() {};
+        setTimeout(deleteCallback_, BETTING_LIVE_SPORTS_LATE_CALLBACK_MS);
+      } else {
+        deleteCallback_();
       }
     }
 
-    window[callbackName] = function(data) {
-      if (done) {
-        return;
-      }
-
+    const timeout = setTimeout(function() {
+      if (done) return;
       done = true;
-      cleanup_();
+      cleanup_(true);
+      reject(new Error("Sports Scores Engine request timed out"));
+    }, BETTING_LIVE_SPORTS_TIMEOUT_MS);
+
+    window[callbackName] = function(data) {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      cleanup_(false);
       resolve(data || {});
     };
 
     script.onerror = function() {
-      if (done) {
-        return;
-      }
-
+      if (done) return;
       done = true;
-      cleanup_();
-      reject(
-        new Error("Sports Scores Engine request failed")
-      );
+      clearTimeout(timeout);
+      cleanup_(true);
+      reject(new Error("Sports Scores Engine request failed"));
     };
 
     script.src =
@@ -135,19 +144,6 @@ function bettingLiveSportsJsonp_(url) {
       Date.now();
 
     document.body.appendChild(script);
-
-    setTimeout(function() {
-      if (done) {
-        return;
-      }
-
-      done = true;
-      cleanup_();
-      reject(
-        new Error("Sports Scores Engine request timed out")
-      );
-    }, 15000);
-
   });
 
 }
@@ -737,6 +733,64 @@ function applyBettingLiveOdds_(categories, oddsByCategoryId) {
 
 }
 
+async function fetchBettingLiveQuestionStatus_() {
+
+  if (typeof api !== "function") {
+    return { success: false, trackers: {}, gameDetails: {} };
+  }
+
+  const session = getBettingSession_();
+  const gameId = getBettingGameId_();
+
+  if (!gameId) {
+    return { success: false, trackers: {}, gameDetails: {} };
+  }
+
+  const result = await api(
+    "getSportsLiveQuestionStatus",
+    {
+      username: session.username || "",
+      gameId: gameId,
+      leagueId: typeof getApiLeagueId_ === "function" ? getApiLeagueId_() : ""
+    }
+  );
+
+  return result || { success: false, trackers: {}, gameDetails: {} };
+
+}
+
+function applyBettingLiveQuestionStatus_(categories, payload) {
+
+  if (!payload || payload.success === false) {
+    return false;
+  }
+
+  const trackers = payload.trackers || {};
+  const gameDetails = payload.gameDetails || {};
+  const before = JSON.stringify({
+    trackers: BETTING_LIVE_TRACKERS_BY_CATEGORY,
+    gameDetails: BETTING_LIVE_GAME_DETAILS_BY_EVENT
+  });
+
+  BETTING_LIVE_TRACKERS_BY_CATEGORY = trackers;
+  BETTING_LIVE_GAME_DETAILS_BY_EVENT = gameDetails;
+
+  (categories || []).forEach(function(category) {
+    const categoryId = String(category && category.id || "");
+    const eventId = String(category && category.espnEventId || "").trim();
+    category.liveStatTracker = trackers[categoryId] || null;
+    category.liveGameDetails = eventId ? gameDetails[eventId] || null : null;
+  });
+
+  const after = JSON.stringify({
+    trackers: BETTING_LIVE_TRACKERS_BY_CATEGORY,
+    gameDetails: BETTING_LIVE_GAME_DETAILS_BY_EVENT
+  });
+
+  return before !== after;
+
+}
+
 async function refreshBettingLiveSportsData_() {
 
   if (
@@ -758,30 +812,22 @@ async function refreshBettingLiveSportsData_() {
   BETTING_LIVE_SPORTS_IN_FLIGHT = true;
 
   try {
-    const scores =
-      await fetchBettingLiveScoresForCategories_(
-        categories
-      );
+    const results = await Promise.allSettled([
+      fetchBettingLiveScoresForCategories_(categories),
+      fetchBettingLiveOddsForCategories_(categories),
+      fetchBettingLiveQuestionStatus_()
+    ]);
 
-    const oddsByCategoryId =
-      await fetchBettingLiveOddsForCategories_(
-        categories
-      );
+    const scores = results[0].status === "fulfilled" ? results[0].value : [];
+    const oddsByCategoryId = results[1].status === "fulfilled" ? results[1].value : {};
+    const liveStatus = results[2].status === "fulfilled" ? results[2].value : {};
 
-    const scoresChanged =
-      applyBettingLiveScores_(
-        categories,
-        scores
-      );
-
-    const oddsChanged =
-      applyBettingLiveOdds_(
-        categories,
-        oddsByCategoryId
-      );
+    const scoresChanged = applyBettingLiveScores_(categories, scores);
+    const oddsChanged = applyBettingLiveOdds_(categories, oddsByCategoryId);
+    const trackerChanged = applyBettingLiveQuestionStatus_(categories, liveStatus);
 
     if (
-      (scoresChanged || oddsChanged) &&
+      (scoresChanged || oddsChanged || trackerChanged) &&
       shouldBettingLiveRerenderNow_()
     ) {
       updateBettingCategoryListFromBatchState_();
@@ -1659,6 +1705,28 @@ function getBettingNomineeScore_(
       .trim()
       .toLowerCase();
 
+  const tracker = getBettingLiveTracker_(category);
+  if (tracker) {
+    if ((tracker.questionKind === "over-under" || tracker.questionKind === "threshold") && tracker.currentValue !== null && tracker.currentValue !== undefined) {
+      return String(tracker.currentValue);
+    }
+
+    const entity = (tracker.entities || []).find(function(item) {
+      const itemNomineeId = String(item.nomineeId || "").trim().toLowerCase();
+      const itemId = String(item.entityId || "").trim().toLowerCase();
+      const itemName = String(item.entityName || "").trim().toLowerCase();
+      return (
+        (itemNomineeId && itemNomineeId === nomineeId) ||
+        (itemId && itemId === nomineeId) ||
+        (itemName && (itemName === nomineeName || nomineeName.indexOf(itemName) !== -1 || itemName.indexOf(nomineeName) !== -1))
+      );
+    });
+
+    if (entity && entity.hasValue) {
+      return String(entity.value);
+    }
+  }
+
   const homeTeam =
     String(category.homeTeam || "")
       .trim()
@@ -1920,6 +1988,167 @@ function formatBettingClockLine_(category){
 
 }
 
+function getBettingLiveTracker_(category) {
+  const categoryId = String(category && category.id || "");
+  return category && category.liveStatTracker || BETTING_LIVE_TRACKERS_BY_CATEGORY[categoryId] || null;
+}
+
+function getBettingLiveGameDetails_(category) {
+  const eventId = String(category && category.espnEventId || "").trim();
+  return category && category.liveGameDetails || (eventId ? BETTING_LIVE_GAME_DETAILS_BY_EVENT[eventId] || null : null);
+}
+
+function formatBettingStatLabel_(value) {
+  return String(value || "stat")
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\w/g, function(char) { return char.toUpperCase(); });
+}
+
+function renderBettingStarter_(teamName, starter) {
+  const name = starter && starter.name ? starter.name : "TBD";
+  const label = starter && starter.confirmed ? "Starter" : "Probable";
+  const statLine = starter && starter.statLine ? starter.statLine : "";
+  const headshot = starter && starter.headshot
+    ? '<img class="betting-starter-headshot" src="' + escapeBettingHtml_(starter.headshot) + '" alt="">'
+    : '<span class="betting-starter-headshot betting-starter-placeholder">P</span>';
+
+  return `
+    <div class="betting-starter-row">
+      ${headshot}
+      <div>
+        <span>${escapeBettingHtml_(teamName || "Team")}</span>
+        <strong>${escapeBettingHtml_(name)}</strong>
+        <small>${escapeBettingHtml_(label)}${statLine ? " · " + escapeBettingHtml_(statLine) : ""}</small>
+      </div>
+    </div>
+  `;
+}
+
+function renderBettingStartingPitchers_(category) {
+  const league = String(category && (category.league || category.sportsLeague || category.section) || "")
+    .trim()
+    .toLowerCase();
+  if (league !== "mlb") return "";
+
+  const details = getBettingLiveGameDetails_(category);
+  if (!details) {
+    return `
+      <div class="betting-starting-pitchers betting-starting-pitchers-loading">
+        Checking probable starting pitchers…
+      </div>
+    `;
+  }
+
+  return `
+    <div class="betting-starting-pitchers">
+      <div class="betting-live-panel-title">Starting Pitchers</div>
+      ${renderBettingStarter_(category.awayTeam || "Away", details.awayStarter)}
+      ${renderBettingStarter_(category.homeTeam || "Home", details.homeStarter)}
+    </div>
+  `;
+}
+
+function bettingLiveSelectedStatus_(tracker, bet) {
+  if (!tracker || !bet) return "";
+  const selected = String(bet.nomineeId || "").trim().toLowerCase();
+  if (!selected) return "";
+
+  if (tracker.questionKind === "over-under" && tracker.currentValue !== null && tracker.line !== null) {
+    const ahead = Number(tracker.currentValue) > Number(tracker.line)
+      ? "over"
+      : Number(tracker.currentValue) < Number(tracker.line)
+        ? "under"
+        : "push";
+    if (ahead === "push") return "Your selection is currently a push";
+    return selected.indexOf(ahead) !== -1 ? "Your selection is currently winning" : "Your selection is currently behind";
+  }
+
+  if (tracker.questionKind === "threshold" && tracker.thresholdPassed !== null) {
+    const ahead = tracker.thresholdPassed ? "yes" : "no";
+    return selected.indexOf(ahead) !== -1 ? "Your selection is currently winning" : "Your selection is currently behind";
+  }
+
+  const leaders = (tracker.leaderNomineeIds || []).map(function(value) {
+    return String(value || "").trim().toLowerCase();
+  });
+  if (!leaders.length) return "";
+  if (leaders.indexOf(selected) !== -1) {
+    return leaders.length > 1 ? "Your selection is currently tied for the lead" : "Your selection is currently leading";
+  }
+  return "Your selection is currently behind";
+}
+
+function renderBettingLiveTrackerSummary_(category) {
+  const tracker = getBettingLiveTracker_(category);
+  if (!tracker || !tracker.currentResult) return "";
+  return `
+    <div class="betting-live-summary ${escapeBettingHtml_(tracker.state || "pregame")}">
+      ${escapeBettingHtml_(tracker.currentResult)}
+    </div>
+  `;
+}
+
+function renderBettingLiveStatTracker_(category, bet) {
+  const tracker = getBettingLiveTracker_(category);
+  if (!tracker) return "";
+
+  const statLabel = formatBettingStatLabel_(tracker.statType);
+  const stateLabel = tracker.state === "final" ? "Final" : tracker.state === "live" ? "Live" : "Pregame";
+  const selectedStatus = bettingLiveSelectedStatus_(tracker, bet);
+  const leaders = (tracker.leaderNomineeIds || []).map(function(value) {
+    return String(value || "").trim().toLowerCase();
+  });
+
+  const rows = (tracker.entities || []).map(function(entity) {
+    const entityKey = String(entity.nomineeId || entity.entityId || "").trim().toLowerCase();
+    const isLeader = leaders.indexOf(entityKey) !== -1;
+    const value = entity.hasValue ? entity.value : "—";
+    const entityDetails = entity.gameDetails || {};
+    const starterNames = [
+      entityDetails.awayStarter && entityDetails.awayStarter.name,
+      entityDetails.homeStarter && entityDetails.homeStarter.name
+    ].filter(Boolean);
+    const starterLine = starterNames.length
+      ? "SP: " + starterNames.join(" vs ")
+      : "";
+    return `
+      <div class="betting-live-stat-row ${isLeader ? "leader" : ""}">
+        <div class="betting-live-stat-main">
+          <strong>${escapeBettingHtml_(entity.entityName || "Entry")}</strong>
+          <span>${escapeBettingHtml_(entity.gameLine || "Waiting for game data")}</span>
+          ${starterLine ? `<span class="betting-live-starter-line">${escapeBettingHtml_(starterLine)}</span>` : ""}
+        </div>
+        <div class="betting-live-stat-value">
+          ${escapeBettingHtml_(value)}
+          <small>${escapeBettingHtml_(statLabel)}</small>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  const lineText = tracker.questionKind === "over-under" && tracker.line !== null
+    ? "Line: " + tracker.line
+    : tracker.questionKind === "threshold" && tracker.line !== null
+      ? "Threshold: " + tracker.line
+      : "";
+
+  return `
+    <div class="betting-live-stat-panel">
+      <div class="betting-live-stat-header">
+        <div>
+          <div class="betting-live-panel-title">Current ${escapeBettingHtml_(statLabel)}</div>
+          ${lineText ? `<span>${escapeBettingHtml_(lineText)}</span>` : ""}
+        </div>
+        <span class="betting-live-state-pill ${escapeBettingHtml_(tracker.state || "pregame")}">${escapeBettingHtml_(stateLabel)}</span>
+      </div>
+      <div class="betting-live-stat-list">${rows}</div>
+      <div class="betting-live-current-result">${escapeBettingHtml_(tracker.currentResult || "Waiting for stat data")}</div>
+      ${selectedStatus ? `<div class="betting-live-selected-result">${escapeBettingHtml_(selectedStatus)}</div>` : ""}
+      <div class="betting-live-unofficial">Live values are unofficial until every included game is final.</div>
+    </div>
+  `;
+}
+
 function renderBettingCategory_(category, bet, config){
 
   const inputId =
@@ -2036,6 +2265,8 @@ function renderBettingCategory_(category, bet, config){
             ` : ""}
           </div>
 
+          ${renderBettingLiveTrackerSummary_(category)}
+
           ${bet ? `
             <div
               class="betting-current ${currentDisplay.className}"
@@ -2074,6 +2305,9 @@ function renderBettingCategory_(category, bet, config){
       </summary>
 
       <div class="betting-collapsible-body">
+
+        ${renderBettingStartingPitchers_(category)}
+        ${renderBettingLiveStatTracker_(category, bet)}
 
         ${categoryFinished ? `
           ${settlementPendingFinal ? `

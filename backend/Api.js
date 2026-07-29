@@ -2049,6 +2049,54 @@ if (action === "compareUserPicks") {
 
     
 
+    // =========================
+    // SPORTS LIVE DISPLAY
+    // Batched live player/team stats plus MLB starting pitchers.
+    // =========================
+
+    if (action === "getSportsGameDetails") {
+
+      return json(
+        getSportsGameDetails({
+          espnEventIds:
+            params.espnEventIds || params.eventIds || params.espnEventId || "",
+          eventLeaguesJSON:
+            params.eventLeaguesJSON || params.eventLeagues || "",
+          league:
+            params.league || ""
+        })
+      );
+
+    }
+
+    if (action === "getSportsLiveQuestionStatus") {
+
+      const access =
+        userCanAccessGameFeature_(
+          params.username || "",
+          gameId,
+          "viewGame",
+          leagueId
+        );
+
+      if (!access.allowed) {
+        return json({
+          success: false,
+          error: "Access denied: " + access.reason
+        });
+      }
+
+      return json(
+        getSportsLiveQuestionStatus({
+          username:
+            params.username || "",
+          gameId:
+            gameId
+        })
+      );
+
+    }
+
         // =========================
     // BETTING PAGE PAYLOAD
     // One-call wager page load: options + user bets + leaderboard.

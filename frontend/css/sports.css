@@ -860,3 +860,243 @@
     width: 100%;
   }
 }
+
+/* =====================================================
+   MLB STARTING PITCHERS / LIVE STARTER STATS
+===================================================== */
+
+.sports-starters {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  padding: 11px;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.58);
+}
+
+.sports-starters-title {
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sports-starters-loading {
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.sports-starter-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+}
+
+.sports-starter-headshot {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  object-fit: cover;
+  background: rgba(148, 163, 184, 0.16);
+}
+
+.sports-starter-placeholder {
+  display: inline-grid;
+  place-items: center;
+  color: #bfdbfe;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.sports-starter-copy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sports-starter-copy strong {
+  overflow: hidden;
+  color: #f8fafc;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sports-starter-copy > span:last-child,
+.sports-starter-team {
+  color: #94a3b8;
+  font-size: 11px;
+}
+
+/* =====================================================
+   SPORTS ADMIN HELP POPOVERS
+===================================================== */
+
+.sports-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+}
+
+.sports-help-wrap {
+  display: inline-flex;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.sports-help-button {
+  width: 22px;
+  height: 22px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(250, 204, 21, 0.5);
+  border-radius: 999px;
+  background: rgba(250, 204, 21, 0.12);
+  color: #fde68a;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sports-help-button:hover,
+.sports-help-button[aria-expanded="true"] {
+  border-color: #facc15;
+  background: #facc15;
+  color: #111827;
+}
+
+.sports-help-popover {
+  --sports-help-arrow-offset: 22px;
+  position: fixed !important;
+  z-index: 2147483000;
+  box-sizing: border-box;
+  width: min(320px, calc(100vw - 20px));
+  display: none;
+  gap: 6px;
+  max-height: min(360px, calc(100vh - 20px));
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 12px 14px;
+  border: 1px solid rgba(250, 204, 21, 0.48);
+  border-radius: 13px;
+  background: rgba(2, 6, 23, 0.985);
+  color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.45;
+  isolation: isolate;
+}
+
+.sports-help-popover.is-open:not([hidden]) {
+  display: grid;
+}
+
+.sports-help-popover[hidden] {
+  display: none !important;
+}
+
+.sports-help-popover strong {
+  color: #fde68a;
+}
+
+.sports-help-popover::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 11px;
+  height: 11px;
+  border: solid rgba(250, 204, 21, 0.48);
+  background: rgba(2, 6, 23, 0.985);
+  transform: rotate(45deg);
+}
+
+.sports-help-popover[data-placement="right"]::before {
+  left: -6px;
+  top: calc(var(--sports-help-arrow-offset) - 6px);
+  border-width: 0 0 1px 1px;
+}
+
+.sports-help-popover[data-placement="left"]::before {
+  right: -6px;
+  top: calc(var(--sports-help-arrow-offset) - 6px);
+  border-width: 1px 1px 0 0;
+}
+
+.sports-help-popover[data-placement="below"]::before {
+  top: -6px;
+  left: calc(var(--sports-help-arrow-offset) - 6px);
+  border-width: 1px 0 0 1px;
+}
+
+.sports-help-popover[data-placement="above"]::before {
+  bottom: -6px;
+  left: calc(var(--sports-help-arrow-offset) - 6px);
+  border-width: 0 1px 1px 0;
+}
+
+/* =====================================================
+   ADVANCED COMPARISON SELECTION TOOLS
+===================================================== */
+
+.sports-advanced-select-tools {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0 4px;
+  padding: 12px;
+  border: 1px solid rgba(96, 165, 250, 0.22);
+  border-radius: 14px;
+  background: rgba(30, 64, 175, 0.08);
+}
+
+.sports-advanced-search-field {
+  min-width: 0;
+}
+
+.sports-advanced-selection-actions {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.sports-advanced-entity-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0 7px;
+  color: #e2e8f0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.sports-advanced-entity-heading > span:last-child {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.sports-advanced-entity-row[hidden] {
+  display: none !important;
+}
+
+@media (max-width: 720px) {
+  .sports-advanced-select-tools {
+    grid-template-columns: 1fr;
+  }
+
+  .sports-advanced-selection-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .sports-advanced-entity-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
