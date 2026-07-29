@@ -2,8 +2,15 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const root = path.resolve(__dirname, '..', '..', '..', 'scores');
-const source = fs.readFileSync(path.join(root, 'SportsAdvancedStatsEngine.gs'), 'utf8');
+const root = path.resolve(__dirname, '..');
+const sourcePath = path.join(
+  root,
+  'external-engines',
+  'sports-scoring-engine',
+  'src',
+  'SportsAdvancedStatsEngine.js'
+);
+const source = fs.readFileSync(sourcePath, 'utf8');
 const assert = (condition, message) => { if (!condition) throw new Error(message); };
 const context = { console, Date, JSON, Math, Number, String, Array, Object, isFinite };
 vm.createContext(context);

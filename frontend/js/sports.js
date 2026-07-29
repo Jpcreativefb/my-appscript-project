@@ -437,13 +437,42 @@ async function initSportsPage() {
  JSONP HELPER
 ************************************/
 
-function sportsJsonp(url) {
+const SPORTS_JSONP_TIMEOUT_MS =
+  90000;
+
+const SPORTS_JSONP_LONG_TIMEOUT_MS =
+  120000;
+
+const SPORTS_JSONP_LATE_CALLBACK_MS =
+  120000;
+
+function sportsJsonp(url, options) {
+
+  options =
+    options || {};
+
+  const timeoutMs =
+    Math.max(
+      1000,
+      Number(options.timeoutMs) ||
+      SPORTS_JSONP_TIMEOUT_MS
+    );
+
+  const callbackPrefix =
+    String(
+      options.callbackPrefix ||
+      "sportsJsonpCallback_"
+    )
+      .replace(/[^A-Za-z0-9_$]/g, "") ||
+    "sportsJsonpCallback_";
+
   return new Promise(function(resolve, reject) {
+
     const callbackName =
-      "sportsJsonpCallback_" +
+      callbackPrefix +
       Date.now() +
       "_" +
-      Math.floor(Math.random() * 100000);
+      Math.floor(Math.random() * 1000000);
 
     const separator =
       url.indexOf("?") >= 0 ? "&" : "?";
@@ -451,33 +480,91 @@ function sportsJsonp(url) {
     const script =
       document.createElement("script");
 
-    const timeout =
-      setTimeout(function() {
-        cleanup();
-        reject(
-          new Error("Sports API request timed out")
-        );
-      }, 20000);
+    let finished =
+      false;
 
-    window[callbackName] =
-      function(data) {
-        cleanup();
-        resolve(data);
-      };
-
-    function cleanup() {
-      clearTimeout(timeout);
-
+    function removeScript_() {
       if (script.parentNode) {
         script.parentNode.removeChild(script);
       }
-
-      delete window[callbackName];
     }
+
+    function deleteCallback_() {
+      try {
+        delete window[callbackName];
+      } catch (err) {
+        window[callbackName] = undefined;
+      }
+    }
+
+    function keepLateCallback_() {
+
+      // Apps Script can finish after the UI timeout or after a transient
+      // script load error. Keep a harmless callback temporarily so the
+      // delayed JSONP response does not throw "callback is not defined".
+      window[callbackName] =
+        function() {};
+
+      setTimeout(function() {
+        deleteCallback_();
+      }, SPORTS_JSONP_LATE_CALLBACK_MS);
+    }
+
+    function cleanup_(keepLateCallback) {
+      removeScript_();
+
+      if (keepLateCallback) {
+        keepLateCallback_();
+        return;
+      }
+
+      deleteCallback_();
+    }
+
+    const timeout =
+      setTimeout(function() {
+
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+        cleanup_(true);
+
+        reject(
+          new Error(
+            "Sports API request timed out after " +
+            Math.round(timeoutMs / 1000) +
+            " seconds"
+          )
+        );
+
+      }, timeoutMs);
+
+    window[callbackName] =
+      function(data) {
+
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+        clearTimeout(timeout);
+        cleanup_(false);
+        resolve(data);
+      };
 
     script.onerror =
       function() {
-        cleanup();
+
+        if (finished) {
+          return;
+        }
+
+        finished = true;
+        clearTimeout(timeout);
+        cleanup_(true);
+
         reject(
           new Error("Sports API script failed to load")
         );
@@ -487,7 +574,9 @@ function sportsJsonp(url) {
       url +
       separator +
       "callback=" +
-      encodeURIComponent(callbackName);
+      encodeURIComponent(callbackName) +
+      "&_ts=" +
+      Date.now();
 
     document.body.appendChild(script);
   });
@@ -1021,10 +1110,19 @@ async function sportsAwardsApi_(action, params) {
 
     });
 
-  const response =
-    await fetch(url);
-
-  return response.json();
+  // The Sports page is hosted on Cloudflare while the Awards backend is
+  // an Apps Script web app. Use JSONP here instead of cross-origin fetch so
+  // player props, matchups, stat questions, usage, and wager creation all
+  // use the same browser-safe transport.
+  return sportsJsonp(
+    url.toString(),
+    {
+      timeoutMs:
+        SPORTS_JSONP_LONG_TIMEOUT_MS,
+      callbackPrefix:
+        "sportsAwardsJsonpCallback_"
+    }
+  );
 
 }
 
@@ -3595,7 +3693,35 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
       return String(game.League || "").toLowerCase() === league;
     });
     const playerOptions = await getSportsPlayerPropOptions_(session, baseGame);
-    const optionData = await apiAdminGetSportsAdvancedQuestionOptions(league, sport);
+    const optionData =
+      await sportsAwardsApi_(
+        "adminGetSportsAdvancedQuestionOptions",
+        {
+          username: session.username,
+          token: session.token,
+          league: league,
+          sport: sport
+        }
+      );
+
+    if (!optionData || optionData.success === false) {
+      throw new Error(
+        (optionData && (optionData.error || optionData.message || optionData.reason)) ||
+        "Could not load advanced sports stat options. Confirm the latest Awards App and Sports Scores Engine deployments are active."
+      );
+    }
+
+    if (
+      !Array.isArray(optionData.statTypes) ||
+      !optionData.statTypes.length ||
+      !Array.isArray(optionData.checkpoints) ||
+      !optionData.checkpoints.length
+    ) {
+      throw new Error(
+        "Advanced sports stat options are empty. Run setupSportsAdvancedStatsSystem in the Sports Scores Engine and deploy its latest web-app version."
+      );
+    }
+
     const config = await showSportsAdvancedQuestionModal_(
       baseGame,
       games,
@@ -3622,21 +3748,27 @@ async function createSportsAdvancedQuestionFromCard(gameId) {
     }
 
     setSportsStatus("Creating advanced sports question...");
-    const result = await apiAdminCreateSportsAdvancedQuestion({
-      awardsGameId: awardsGameId,
-      gameId: awardsGameId,
-      questionMode: config.questionMode,
-      questionKind: config.questionKind,
-      sportsStatType: config.sportsStatType,
-      checkpointType: config.checkpointType,
-      operator: config.operator,
-      threshold: config.threshold,
-      yesOdds: config.yesOdds,
-      noOdds: config.noOdds,
-      points: config.points,
-      categoryName: config.categoryName,
-      entitiesJSON: JSON.stringify(config.entities)
-    });
+    const result =
+      await sportsAwardsApi_(
+        "adminCreateSportsAdvancedQuestion",
+        {
+          username: session.username,
+          token: session.token,
+          awardsGameId: awardsGameId,
+          gameId: awardsGameId,
+          questionMode: config.questionMode,
+          questionKind: config.questionKind,
+          sportsStatType: config.sportsStatType,
+          checkpointType: config.checkpointType,
+          operator: config.operator,
+          threshold: config.threshold,
+          yesOdds: config.yesOdds,
+          noOdds: config.noOdds,
+          points: config.points,
+          categoryName: config.categoryName,
+          entitiesJSON: JSON.stringify(config.entities)
+        }
+      );
 
     if (!result || result.success === false) {
       throw new Error(
@@ -4144,34 +4276,15 @@ async function apiAdminGetSportsUsage() {
   const session =
     getSportsStoredSession_();
 
-  const apiUrl =
-    getAwardsApiUrlForSportsWager_();
+  return sportsAwardsApi_(
+    "adminGetSportsUsage",
+    {
+      username:
+        session.username || "",
 
-  const url =
-    new URL(apiUrl);
-
-  url.searchParams.set(
-    "action",
-    "adminGetSportsUsage"
+      token:
+        session.token || ""
+    }
   );
-
-  if (session.username) {
-    url.searchParams.set(
-      "username",
-      session.username
-    );
-  }
-
-  if (session.token) {
-    url.searchParams.set(
-      "token",
-      session.token
-    );
-  }
-
-  const response =
-    await fetch(url);
-
-  return response.json();
 
 }

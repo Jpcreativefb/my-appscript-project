@@ -62,7 +62,7 @@ const sw = read('frontend/sw.js');
 ].forEach((expected) => requireText(sportsPage, expected, 'Sports page'));
 
 requireText(sportsCss, '.sports-advanced-question-modal', 'Sports CSS');
-requireText(sw, 'awards-app-v217-advanced-sports-questions', 'Service worker cache');
+requireText(sw, 'awards-app-v218-sports-stats-runtime', 'Service worker cache');
 
 class Range {
   constructor(sheet, row, col, numRows = 1, numCols = 1) {
