@@ -68,7 +68,7 @@ requireText(scoresEngine, 'HomeConferenceName', 'Sports Scores college metadata'
 requireText(scoresEngine, 'AwayConferenceName', 'Sports Scores college metadata');
 requireText(scoresEngine, 'HomeAbbreviation', 'Sports Scores team abbreviation metadata');
 requireText(sportsCss, '.sports-advanced-question-modal', 'Sports CSS');
-requireText(sw, 'awards-app-v250-standalone-stat-comparison', 'Service worker cache');
+requireText(sw, 'awards-app-v252-phase1-publish-controls', 'Service worker cache');
 
 class Range {
   constructor(sheet, row, col, numRows = 1, numCols = 1) {

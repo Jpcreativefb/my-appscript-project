@@ -120,6 +120,6 @@ assert(!source.includes('data-advanced-division='));
 assert(source.includes('sportsAdvancedQuestionSearchTokens_'));
 assert(source.includes('groupInfo.label'));
 assert(html.includes('sports.js?v=250-standalone-stat-comparison'));
-assert(sw.includes('awards-app-v250-standalone-stat-comparison'));
+assert(sw.includes('awards-app-v252-phase1-publish-controls'));
 
 console.log('Sports advanced comparison filter tests passed.');

@@ -69,7 +69,7 @@ const careerModalShellCount =
 assert.strictEqual(careerModalShellCount, 0);
 assert(leaderboard.includes('const host = document.body;'));
 assert(leaderboard.includes('function showLeaderboardModal_(modal, content, html)'));
-assert(serviceWorker.includes('awards-app-v250-standalone-stat-comparison'));
+assert(serviceWorker.includes('awards-app-v252-phase1-publish-controls'));
 assert(serviceWorker.includes('./css/frontend-leaderboard-profile.css'));
 assert(serviceWorker.includes('./js/pages/archiveHistory.js'));
 assert(serviceWorker.includes('./css/archive-history.css'));

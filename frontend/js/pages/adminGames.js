@@ -1301,6 +1301,7 @@ function renderAdminPublishControls(game) {
       <div class="admin-publish-grid">
 
         <button
+          type="button"
           class="admin-publish-button"
           onclick="adminSetGameDraft('${gameId}')"
         >
@@ -1308,6 +1309,7 @@ function renderAdminPublishControls(game) {
         </button>
 
         <button
+          type="button"
           class="admin-publish-button"
           onclick="adminSetGameSetup('${gameId}')"
         >
@@ -1315,6 +1317,7 @@ function renderAdminPublishControls(game) {
         </button>
 
         <button
+          type="button"
           class="admin-publish-button"
           onclick="adminSetGamePreview('${gameId}')"
         >
@@ -1322,6 +1325,7 @@ function renderAdminPublishControls(game) {
         </button>
 
         <button
+          type="button"
           class="admin-publish-button active"
           onclick="adminSetGameActive('${gameId}')"
         >
@@ -1329,6 +1333,7 @@ function renderAdminPublishControls(game) {
         </button>
 
         <button
+          type="button"
           class="admin-publish-button default"
           onclick="adminSetGameDefault('${gameId}')"
         >

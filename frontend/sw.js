@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v251-phase1-games-hub";
+const AWARDS_CACHE = "awards-app-v252-phase1-publish-controls";
 
 const APP_SHELL = [
   "./",

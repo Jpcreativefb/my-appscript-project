@@ -1734,6 +1734,27 @@ function renderAdminGameForm(
             ` : ""}
           </div>
         </form>
+
+        ${!isNew && typeof renderAdminPublishControls === "function" ? `
+          <div class="admin-game-publish-wrapper">
+            <div class="admin-card-actions">
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="adminRunPreflightCheck('${escapeJs(rawGameId)}')"
+              >
+                Run Check
+              </button>
+            </div>
+
+            ${renderAdminPublishControls(game)}
+
+            <div
+              id="adminPreflightResult_${escapeHtml_(rawGameId)}"
+              class="admin-preflight-result"
+            ></div>
+          </div>
+        ` : ""}
       </div>
     </details>
   `;
@@ -2218,11 +2239,21 @@ async function adminSaveGameFromForm(
           ? res.message
           : "Unknown error";
 
+    const setupWasSaved =
+      /^Game setup was saved/i.test(saveErrorMessage);
+
     alert(
       /^(Could not save game:|Game setup was saved)/i.test(saveErrorMessage)
         ? saveErrorMessage
         : "Could not save game: " + saveErrorMessage
     );
+
+    // Reload the live Manage Games state after a blocked publish. The setup
+    // was saved inactive and locked, so leaving the requested Active checkbox
+    // checked on screen would incorrectly imply that the game went live.
+    if (setupWasSaved) {
+      await navigate("admin-games");
+    }
 
     return;
 
