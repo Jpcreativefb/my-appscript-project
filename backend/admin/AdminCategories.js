@@ -328,12 +328,14 @@ function adminCatValidateQuestionSettingsPayload_(payload) {
    CATEGORY SETTINGS HELPERS
 ========================================================= */
 
-function adminCatFindSettingsRow_(
+function adminCatFindSettingsRows_(
   data,
   col,
   gameId,
   categoryId
 ) {
+
+  const matches = [];
 
   for (
     let i = 1;
@@ -361,13 +363,40 @@ function adminCatFindSettingsRow_(
       rowCategoryId === categoryId
     ) {
 
-      return i + 1;
+      matches.push(i + 1);
 
     }
 
   }
 
-  return -1;
+  return matches;
+
+}
+
+function adminCatFindSettingsRow_(
+  data,
+  col,
+  gameId,
+  categoryId
+) {
+
+  const matches =
+    adminCatFindSettingsRows_(
+      data,
+      col,
+      gameId,
+      categoryId
+    );
+
+  /*
+    adminGetGameSetup() processes sheet rows from top to bottom, so the
+    final matching row is the value the editor and preflight ultimately
+    see when legacy duplicate CategorySettings rows exist. Return that same
+    row here for callers that still expect one canonical row.
+  */
+  return matches.length
+    ? matches[matches.length - 1]
+    : -1;
 
 }
 
@@ -659,15 +688,15 @@ function adminCatUpsertCategorySettings_(
     col
   );
 
-  const rowIndex =
-    adminCatFindSettingsRow_(
+  const rowIndexes =
+    adminCatFindSettingsRows_(
       data,
       col,
       payload.gameId,
       payload.categoryId
     );
 
-  if (rowIndex === -1) {
+  if (!rowIndexes.length) {
 
     const row =
       adminCatBuildSettingsRow_(
@@ -683,10 +712,6 @@ function adminCatUpsertCategorySettings_(
     return;
 
   }
-
-  const row =
-    data[rowIndex - 1]
-      .slice();
 
   const keys = [
     "points",
@@ -740,107 +765,115 @@ function adminCatUpsertCategorySettings_(
     "sourceConfigJSON"
   ];
 
+  rowIndexes.forEach(function(rowIndex) {
+
+    const row =
+      data[rowIndex - 1]
+        .slice();
+
     keys.forEach(key => {
 
-    /*
-      Important:
-      Only update fields that were intentionally sent.
+      /*
+        Important:
+        Only update fields that were intentionally sent.
 
-      adminUpdateCategory() may pass keys with undefined values.
-      Undefined should mean "do not touch this setting",
-      not "clear this setting".
-    */
+        adminUpdateCategory() may pass keys with undefined values.
+        Undefined should mean "do not touch this setting",
+        not "clear this setting".
+      */
 
-    if (
-      !(key in payload) ||
-      payload[key] === undefined ||
-      col[key] === -1
-    ) {
+      if (
+        !(key in payload) ||
+        payload[key] === undefined ||
+        col[key] === -1
+      ) {
 
-      return;
+        return;
 
-    }
+      }
 
-    if (
-      key === "points" ||
-      key === "changePenalty" ||
-      key === "maxChanges" ||
-      key === "displayOrder" ||
-      key === "maxSelections" ||
-      key === "minSelections" ||
-      key === "minStake" ||
-      key === "maxStake" ||
-      key === "stakeIncrement" ||
-      key === "stakeWinMultiplier" ||
-      key === "stakeLossMultiplier" ||
-      key === "threshold"
-    ) {
+      if (
+        key === "points" ||
+        key === "changePenalty" ||
+        key === "maxChanges" ||
+        key === "displayOrder" ||
+        key === "maxSelections" ||
+        key === "minSelections" ||
+        key === "minStake" ||
+        key === "maxStake" ||
+        key === "stakeIncrement" ||
+        key === "stakeWinMultiplier" ||
+        key === "stakeLossMultiplier" ||
+        key === "threshold"
+      ) {
 
-      row[col[key]] =
-        (
-          key === "stakeWinMultiplier" ||
-          key === "stakeLossMultiplier" ||
-          key === "threshold"
-        ) &&
-        (
-          payload[key] === "" ||
-          payload[key] === null
-        )
-          ? ""
-          : Number(payload[key]) || 0;
+        row[col[key]] =
+          (
+            key === "stakeWinMultiplier" ||
+            key === "stakeLossMultiplier" ||
+            key === "threshold"
+          ) &&
+          (
+            payload[key] === "" ||
+            payload[key] === null
+          )
+            ? ""
+            : Number(payload[key]) || 0;
 
-    } else if (
-      key === "locked" ||
-      key === "countsAsStatue" ||
-      key === "allowDraw" ||
-      key === "allowPush" ||
-      key === "autoSettle" ||
-      key === "requireAdminReview"
-    ) {
+      } else if (
+        key === "locked" ||
+        key === "countsAsStatue" ||
+        key === "allowDraw" ||
+        key === "allowPush" ||
+        key === "autoSettle" ||
+        key === "requireAdminReview"
+      ) {
 
-      row[col[key]] =
-        adminCatToBoolean_(
-          payload[key]
-        );
+        row[col[key]] =
+          adminCatToBoolean_(
+            payload[key]
+          );
 
-    } else if (key === "scoreMode") {
+      } else if (key === "scoreMode") {
 
-      row[col[key]] =
-        adminCatNormalizeScoreMode_(
-          payload[key]
-        );
+        row[col[key]] =
+          adminCatNormalizeScoreMode_(
+            payload[key]
+          );
 
-    } else if (
-      key === "winnerNomineeId" ||
-      key === "favoriteNomineeId" ||
-      key === "parentCategoryId" ||
-      key === "followUpCategoryId"
-    ) {
+      } else if (
+        key === "winnerNomineeId" ||
+        key === "favoriteNomineeId" ||
+        key === "parentCategoryId" ||
+        key === "followUpCategoryId"
+      ) {
 
-      row[col[key]] =
-        adminCatNormalizeId_(
-          payload[key]
-        );
+        row[col[key]] =
+          adminCatNormalizeId_(
+            payload[key]
+          );
 
-    } else {
+      } else {
 
-      row[col[key]] =
-        adminCatNormalizeValue_(
-          payload[key]
-        );
+        row[col[key]] =
+          adminCatNormalizeValue_(
+            payload[key]
+          );
 
-    }
+      }
+
+    });
+
+    sh.getRange(
+      rowIndex,
+      1,
+      1,
+      headers.length
+    ).setValues([
+      row
+    ]);
 
   });
-
-  sh.getRange(
-    rowIndex,
-    1,
-    1,
-    headers.length
-  ).setValues([
-    row
-  ]);
 
 }
 

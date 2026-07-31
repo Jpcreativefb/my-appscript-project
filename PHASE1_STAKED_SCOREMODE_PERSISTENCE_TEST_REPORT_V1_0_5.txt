@@ -1,0 +1,11 @@
+Phase 1 Staked ScoreMode Persistence Hotfix v1.0.5
+
+JavaScript syntax validation: PASS (104 files)
+Regression suites: PASS (17 of 17)
+New focused test: category-score-mode-persistence-tests: PASS
+
+Verified behavior:
+- Every duplicate CategorySettings row for the same GameId + CategoryId receives ScoreMode updates.
+- Staked Points remains staked-points when question-level stake overrides are zero.
+- Rows belonging to other games are not changed.
+- Existing Phase 1 and Sports regression suites remain green.
