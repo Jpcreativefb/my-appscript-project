@@ -1119,6 +1119,320 @@ function renderAdminCheckboxWithHelp_(name, label, checked, helpText) {
   `;
 }
 
+function renderAdminGameStateToggle_(
+  name,
+  title,
+  checked,
+  onText,
+  offText,
+  helpText,
+  variant
+) {
+
+  const isOn = checked === true;
+  const stateText = isOn ? onText : offText;
+
+  return `
+    <span class="admin-game-state-field">
+      <span class="admin-game-state-title">${escapeHtml_(title)}</span>
+      <span class="admin-game-state-control">
+        <input
+          type="checkbox"
+          class="admin-game-state-input"
+          name="${escapeHtml_(name)}"
+          ${isOn ? "checked" : ""}
+        />
+        <button
+          type="button"
+          class="admin-game-state-button admin-game-state-${escapeHtml_(variant || "standard")} ${isOn ? "is-on" : "is-off"}"
+          aria-pressed="${isOn ? "true" : "false"}"
+          data-admin-game-state-toggle="true"
+          data-on-text="${escapeHtml_(onText)}"
+          data-off-text="${escapeHtml_(offText)}"
+          onclick="adminToggleGameStateButton(event, this)"
+        >${escapeHtml_(stateText)}</button>
+        ${helpText ? adminHelpButton_(title, helpText) : ""}
+      </span>
+    </span>
+  `;
+}
+
+function adminToggleGameStateButton(event, button) {
+
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (!button || button.disabled) {
+    return;
+  }
+
+  const control = button.closest(".admin-game-state-control");
+  const input = control
+    ? control.querySelector(".admin-game-state-input")
+    : null;
+
+  if (!input) {
+    return;
+  }
+
+  input.checked = !input.checked;
+
+  button.classList.toggle("is-on", input.checked);
+  button.classList.toggle("is-off", !input.checked);
+  button.setAttribute("aria-pressed", input.checked ? "true" : "false");
+  button.textContent = input.checked
+    ? button.getAttribute("data-on-text") || "ON"
+    : button.getAttribute("data-off-text") || "OFF";
+
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+
+}
+
+
+const ADMIN_GAME_FORM_SAVED_RESET_MS = 1800;
+
+function adminGameFormSaveButton_(form) {
+
+  return form
+    ? form.querySelector("[data-admin-game-save-button]")
+    : null;
+
+}
+
+function adminGameFormSaveFeedback_(form) {
+
+  return form
+    ? form.querySelector("[data-admin-game-save-feedback]")
+    : null;
+
+}
+
+function adminSetGameFormSaveState_(form, state, message) {
+
+  if (!form) {
+    return;
+  }
+
+  const button = adminGameFormSaveButton_(form);
+  const feedback = adminGameFormSaveFeedback_(form);
+
+  if (!button) {
+    return;
+  }
+
+  const cleanText = button.getAttribute("data-clean-text") || "SAVE GAME";
+
+  button.classList.remove("is-dirty", "is-saved", "is-saving");
+
+  if (state === "dirty") {
+    button.classList.add("is-dirty");
+    button.textContent = "CHANGES MADE — SAVE NOW";
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.className = "admin-game-save-feedback is-dirty";
+      feedback.textContent = message || "Unsaved changes";
+    }
+    return;
+  }
+
+  if (state === "saving") {
+    button.classList.add("is-saving");
+    button.textContent = "SAVING...";
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.className = "admin-game-save-feedback is-saving";
+      feedback.textContent = message || "Saving changes...";
+    }
+    return;
+  }
+
+  if (state === "saved") {
+    button.classList.add("is-saved");
+    button.textContent = "SAVED ✓";
+    if (feedback) {
+      feedback.hidden = false;
+      feedback.className = "admin-game-save-feedback is-saved";
+      feedback.textContent = message || "Changes saved";
+    }
+    return;
+  }
+
+  button.textContent = cleanText;
+  if (feedback) {
+    feedback.hidden = true;
+    feedback.className = "admin-game-save-feedback";
+    feedback.textContent = "";
+  }
+
+}
+
+function adminMarkGameFormDirty(form) {
+
+  if (!form || form.dataset.saving === "true" || form.dataset.suppressDirty === "true") {
+    return;
+  }
+
+  if (form.dataset.dirty !== "true") {
+    form.dataset.dirty = "true";
+    adminSetGameFormSaveState_(form, "dirty", "Unsaved changes");
+    return;
+  }
+
+  adminSetGameFormSaveState_(form, "dirty", "Unsaved changes");
+
+}
+
+function adminMarkGameFormClean_(form) {
+
+  if (!form) {
+    return;
+  }
+
+  form.dataset.dirty = "false";
+  adminSetGameFormSaveState_(form, "clean");
+
+}
+
+function adminShowGameFormSaved_(form, message) {
+
+  if (!form) {
+    return;
+  }
+
+  form.dataset.dirty = "false";
+  adminSetGameFormSaveState_(form, "saved", message || "Changes saved");
+
+  const saveToken = String(Date.now());
+  form.dataset.savedStateToken = saveToken;
+
+  window.setTimeout(function() {
+    if (
+      form.isConnected &&
+      form.dataset.savedStateToken === saveToken &&
+      form.dataset.dirty !== "true" &&
+      form.dataset.saving !== "true"
+    ) {
+      adminSetGameFormSaveState_(form, "clean");
+    }
+  }, ADMIN_GAME_FORM_SAVED_RESET_MS);
+
+}
+
+function adminHandleGameFormChange(form) {
+
+  if (!form) {
+    return;
+  }
+
+  adminUpdateHybridScoringSections(form);
+  adminMarkGameFormDirty(form);
+
+}
+
+function adminDirtyGameForms_() {
+
+  return Array.from(
+    document.querySelectorAll(".admin-game-form[data-dirty='true']")
+  ).filter(function(form) {
+    return form.dataset.saving !== "true";
+  });
+
+}
+
+function adminHasDirtyGameForms_() {
+
+  return adminDirtyGameForms_().length > 0;
+
+}
+
+function adminConfirmLeaveDirtyGameForms_(targetPage) {
+
+  if (!adminHasDirtyGameForms_()) {
+    return true;
+  }
+
+  return confirm(
+    "You have unsaved game changes. Leave this page without saving them?"
+  );
+
+}
+
+function adminHandleGameCardToggle(details) {
+
+  if (!details || details.open || details.dataset.reopening === "true") {
+    return;
+  }
+
+  const form = details.querySelector(".admin-game-form[data-dirty='true']");
+
+  if (!form || form.dataset.saving === "true") {
+    return;
+  }
+
+  const closeAnyway = confirm(
+    "This game has unsaved changes. Close this card anyway? The changes will remain unsaved until you save or leave the page."
+  );
+
+  if (!closeAnyway) {
+    details.dataset.reopening = "true";
+    details.open = true;
+    window.setTimeout(function() {
+      delete details.dataset.reopening;
+    }, 0);
+  }
+
+}
+
+function adminFindGameFormById_(gameId) {
+
+  const wanted = String(gameId || "");
+
+  return Array.from(document.querySelectorAll(".admin-game-form")).find(function(form) {
+    return String(form.dataset.gameId || "") === wanted;
+  }) || null;
+
+}
+
+async function adminSavePendingGameChangesBeforeAction_(gameId) {
+
+  const form = adminFindGameFormById_(gameId);
+
+  if (!form || form.dataset.dirty !== "true") {
+    return true;
+  }
+
+  const saved = await adminSaveGameFromForm(
+    null,
+    form,
+    {
+      navigateAfterSave: false,
+      suppressSuccessAlert: true,
+      forceSetupState: true,
+      savedMessage: "Changes saved. Continuing..."
+    }
+  );
+
+  return saved === true;
+
+}
+
+if (
+  typeof window !== "undefined" &&
+  !window.__adminGameDirtyBeforeUnloadBound
+) {
+  window.__adminGameDirtyBeforeUnloadBound = true;
+  window.addEventListener("beforeunload", function(event) {
+    if (!adminHasDirtyGameForms_()) {
+      return;
+    }
+
+    event.preventDefault();
+    event.returnValue = "";
+  });
+}
+
 function adminArchiveBadgeForGame_(gameId) {
   const map = APP_STATE.adminArchiveDashboard || {};
   const item = map[String(gameId || "")] || null;
@@ -1239,7 +1553,7 @@ function renderAdminGameForm(
   const themeColor = adminNormalizeThemeColor_(game.themeColor);
 
   return `
-    <details class="admin-game-form-details admin-collapsible-card" ${openAttr}>
+    <details class="admin-game-form-details admin-collapsible-card" ${openAttr} ontoggle="adminHandleGameCardToggle(this)">
       <summary class="admin-card-summary admin-game-form-summary">
         <div>
           <h3>${title}</h3>
@@ -1255,8 +1569,12 @@ function renderAdminGameForm(
         <form
           class="admin-game-form admin-guided-game-form"
           onsubmit="adminSaveGameFromForm(event, this)"
-          onchange="adminUpdateHybridScoringSections(this)"
+          oninput="adminMarkGameFormDirty(this)"
+          onchange="adminHandleGameFormChange(this)"
           data-new-game="${isNew ? "true" : "false"}"
+          data-game-id="${escapeHtml_(rawGameId)}"
+          data-dirty="false"
+          data-saving="false"
         >
           ${!isNew ? `
             <details class="admin-game-settings-shell">
@@ -1552,12 +1870,55 @@ function renderAdminGameForm(
               </div>
               <span class="admin-collapse-icon">▾</span>
             </summary>
-            <div class="admin-checkbox-row">
-              ${renderAdminCheckboxWithHelp_("active", "Active", game.active, "Shows the game as available when its date window also permits it.")}
-              ${renderAdminCheckboxWithHelp_("defaultGame", "Default Game", game.defaultGame, "Opens this game by default when no specific game is selected.")}
-              ${renderAdminCheckboxWithHelp_("archived", "Archived", game.archived, "Removes the game from normal active lists while preserving its records.")}
-              ${renderAdminCheckboxWithHelp_("lockAllPicks", "Lock All Picks", game.lockAllPicks, "Immediately prevents all pick and wager changes in this game.")}
-              ${renderAdminCheckboxWithHelp_("showLeaderboard", "Show Leaderboard", game.showLeaderboard, "Allows players to view standings for this game.")}
+            <div class="admin-game-state-grid">
+              ${renderAdminGameStateToggle_(
+                "active",
+                "Game Status",
+                game.active,
+                "ACTIVE: ON",
+                "ACTIVE: OFF",
+                "ON makes the game available when its date window also permits it. OFF keeps the game unavailable to players.",
+                "active"
+              )}
+              ${renderAdminGameStateToggle_(
+                "lockAllPicks",
+                "Picks",
+                game.lockAllPicks,
+                "PICKS: LOCKED",
+                "PICKS: OPEN",
+                "OPEN allows players to submit or change picks and wagers before their individual lock times. LOCKED immediately blocks all pick and wager changes in this game.",
+                "picks"
+              )}
+              ${renderAdminGameStateToggle_(
+                "defaultGame",
+                "Default Game",
+                game.defaultGame,
+                "DEFAULT GAME: ON",
+                "DEFAULT GAME: OFF",
+                "ON opens this game by default when no specific game is selected. Only one game should be the default.",
+                "default"
+              )}
+              ${renderAdminGameStateToggle_(
+                "showLeaderboard",
+                "Leaderboard",
+                game.showLeaderboard,
+                "LEADERBOARD: SHOWN",
+                "LEADERBOARD: HIDDEN",
+                "SHOWN allows players to view standings for this game. HIDDEN keeps the leaderboard out of the player view.",
+                "leaderboard"
+              )}
+              ${renderAdminGameStateToggle_(
+                "archived",
+                "Archive Status",
+                game.archived,
+                "ARCHIVED: YES",
+                "ARCHIVED: NO",
+                "YES removes the game from normal active lists while preserving its records. Use this only for completed or retired games.",
+                "archived"
+              )}
+            </div>
+            <div class="admin-game-state-note">
+              Button wording and color show the current selection. After any change, the sticky save button changes to <strong>CHANGES MADE — SAVE NOW</strong> until the update is stored.
             </div>
           </details>
 
@@ -1697,7 +2058,18 @@ function renderAdminGameForm(
           <input type="hidden" name="icon" value="${escapeHtml_(game.icon || "")}">
 
           <div class="admin-card-actions admin-game-primary-actions">
-            <button type="submit" class="admin-small-button">${isNew ? "Create Game" : "Save Game"}</button>
+            <div
+              class="admin-game-save-feedback"
+              data-admin-game-save-feedback="true"
+              aria-live="polite"
+              hidden
+            ></div>
+            <button
+              type="submit"
+              class="admin-small-button admin-game-save-button"
+              data-admin-game-save-button="true"
+              data-clean-text="${isNew ? "CREATE GAME" : "SAVE GAME"}"
+            >${isNew ? "CREATE GAME" : "SAVE GAME"}</button>
             ${!isNew ? `
               <button type="button" class="admin-small-button secondary" onclick="navigate('admin-game-setup:${escapeHtml_(game.gameId)}')">
                 Categories / Questions / Nominees
@@ -1948,47 +2320,24 @@ function adminLegacySetSaving_(form, isSaving) {
     return;
   }
 
-  const button =
-    form.querySelector(
-      'button[type="submit"], .admin-action-button, button'
-    );
+  const button = adminGameFormSaveButton_(form);
 
   if (!button) {
     return;
   }
 
+  form.dataset.saving = isSaving ? "true" : "false";
+  button.disabled = isSaving;
+
   if (isSaving) {
-
-    if (!button.dataset.originalLabel) {
-      button.dataset.originalLabel =
-        button.textContent.trim();
-    }
-
-    button.disabled =
-      true;
-
-    button.classList.add(
-      "is-saving"
-    );
-
-    button.textContent =
-      "Saving...";
-
+    adminSetGameFormSaveState_(form, "saving", "Saving changes...");
     return;
-
   }
 
-  button.disabled =
-    false;
-
-  button.classList.remove(
-    "is-saving"
+  adminSetGameFormSaveState_(
+    form,
+    form.dataset.dirty === "true" ? "dirty" : "clean"
   );
-
-  if (button.dataset.originalLabel) {
-    button.textContent =
-      button.dataset.originalLabel;
-  }
 
 }
 
@@ -2037,10 +2386,15 @@ function adminLegacyClearSavingProgress_(form) {
 
 async function adminSaveGameFromForm(
   event,
-  form
+  form,
+  options
 ) {
 
-  event.preventDefault();
+  if (event && typeof event.preventDefault === "function") {
+    event.preventDefault();
+  }
+
+  options = options || {};
 
   const game =
     adminGetGamePayloadFromForm_(
@@ -2049,22 +2403,22 @@ async function adminSaveGameFromForm(
 
   if (!game.gameId) {
     alert("Game ID is required.");
-    return;
+    return false;
   }
 
   if (!game.name) {
     alert("Game name is required.");
-    return;
+    return false;
   }
 
   if (game.themeColor && !/^#[0-9a-f]{6}$/i.test(game.themeColor)) {
     alert("Theme Color must be a six-digit hex value such as #c8a24a.");
-    return;
+    return false;
   }
 
   if (game.gameRole === "mini" && !game.parentGameId) {
     alert("Choose a parent game for this mini game.");
-    return;
+    return false;
   }
 
   if (game.gameRole === "parent" && game.hubMode === "leaderboard-only") {
@@ -2078,17 +2432,17 @@ async function adminSaveGameFromForm(
   if (game.stakedPointsEnabled) {
     if (minStake < 1 || maxStake < minStake) {
       alert("Staked prediction limits are invalid. Maximum stake must be at least the minimum stake.");
-      return;
+      return false;
     }
 
     if (stakeIncrement < 1) {
       alert("Stake increment must be at least 1 point.");
-      return;
+      return false;
     }
 
     if ((maxStake - minStake) % stakeIncrement !== 0) {
       alert("Maximum stake must align with the minimum stake and stake increment.");
-      return;
+      return false;
     }
   }
 
@@ -2101,7 +2455,7 @@ async function adminSaveGameFromForm(
       }
     } catch (err) {
       alert("Placement Points JSON is not valid JSON.");
-      return;
+      return false;
     }
   }
 
@@ -2110,7 +2464,7 @@ async function adminSaveGameFromForm(
 
   if (ADMIN_LEGACY_GAME_SAVE_ACTIONS[saveKey]) {
     alert("Save already running. Please wait for it to finish.");
-    return;
+    return false;
   }
 
   ADMIN_LEGACY_GAME_SAVE_ACTIONS[saveKey] = true;
@@ -2124,9 +2478,14 @@ async function adminSaveGameFromForm(
     form
   );
 
+  const forceSetupState = options.forceSetupState === true;
+
   const publishRequested =
-    game.active === true ||
-    game.defaultGame === true;
+    !forceSetupState &&
+    (
+      game.active === true ||
+      game.defaultGame === true
+    );
 
   const publishAsDefault =
     game.defaultGame === true;
@@ -2139,7 +2498,7 @@ async function adminSaveGameFromForm(
     type-aware preflight inspect the newest questions and settings before the
     game can become visible to players.
   */
-  if (publishRequested) {
+  if (forceSetupState || publishRequested) {
     savePayload.active = false;
     savePayload.defaultGame = false;
     savePayload.lockAllPicks = true;
@@ -2242,6 +2601,12 @@ async function adminSaveGameFromForm(
     const setupWasSaved =
       /^Game setup was saved/i.test(saveErrorMessage);
 
+    if (setupWasSaved) {
+      adminMarkGameFormClean_(form);
+    } else {
+      adminMarkGameFormDirty(form);
+    }
+
     alert(
       /^(Could not save game:|Game setup was saved)/i.test(saveErrorMessage)
         ? saveErrorMessage
@@ -2251,25 +2616,46 @@ async function adminSaveGameFromForm(
     // Reload the live Manage Games state after a blocked publish. The setup
     // was saved inactive and locked, so leaving the requested Active checkbox
     // checked on screen would incorrectly imply that the game went live.
-    if (setupWasSaved) {
-      await navigate("admin-games");
+    if (setupWasSaved && options.navigateAfterSave !== false) {
+      await navigate("admin-games", { skipUnsavedCheck: true });
     }
 
-    return;
+    return false;
 
   }
 
-  alert(
-    res && res.message
-      ? res.message
-      : publishRequested
-        ? "Game saved and activated."
-        : "Game saved."
-  );
+  const successMessage =
+    options.savedMessage ||
+    (
+      res && res.message
+        ? res.message
+        : publishRequested
+          ? "Game saved and activated."
+          : "Game saved."
+    );
 
-  await navigate(
-    "admin-games"
-  );
+  adminShowGameFormSaved_(form, successMessage);
+
+  if (
+    !options.suppressSuccessAlert &&
+    res &&
+    res.setupOnly === true
+  ) {
+    alert(successMessage);
+  }
+
+  if (options.navigateAfterSave !== false) {
+    await new Promise(function(resolve) {
+      window.setTimeout(resolve, 1200);
+    });
+
+    await navigate(
+      "admin-games",
+      { skipUnsavedCheck: true }
+    );
+  }
+
+  return true;
 
 }
 

@@ -1991,6 +1991,12 @@ async function adminSetGameDraft(gameId) {
     return;
   }
 
+  const saved = await adminSavePendingGameChangesBeforeAction_(gameId);
+
+  if (!saved) {
+    return;
+  }
+
   adminPublishMessage(
     gameId,
     "Moving to Draft...",
@@ -2029,6 +2035,12 @@ async function adminSetGameDraft(gameId) {
 }
 
 async function adminSetGameSetup(gameId) {
+
+  const saved = await adminSavePendingGameChangesBeforeAction_(gameId);
+
+  if (!saved) {
+    return;
+  }
 
   adminPublishMessage(
     gameId,
@@ -2078,6 +2090,12 @@ async function adminSetGamePreview(gameId) {
     return;
   }
 
+  const saved = await adminSavePendingGameChangesBeforeAction_(gameId);
+
+  if (!saved) {
+    return;
+  }
+
   adminPublishMessage(
     gameId,
     "Moving to Preview...",
@@ -2116,6 +2134,12 @@ async function adminSetGamePreview(gameId) {
 }
 
 async function adminSetGameActive(gameId) {
+
+  const saved = await adminSavePendingGameChangesBeforeAction_(gameId);
+
+  if (!saved) {
+    return;
+  }
 
   const preflightOk =
     await adminRequirePreflightBeforePublish(
@@ -2174,6 +2198,12 @@ async function adminSetGameActive(gameId) {
 }
 
 async function adminSetGameDefault(gameId) {
+
+  const saved = await adminSavePendingGameChangesBeforeAction_(gameId);
+
+  if (!saved) {
+    return;
+  }
 
   const preflightOk =
     await adminRequirePreflightBeforePublish(

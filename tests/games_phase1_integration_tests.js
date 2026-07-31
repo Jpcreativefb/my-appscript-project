@@ -26,7 +26,7 @@ for (const source of [app, appRoot]) {
 }
 assert(appHtml.includes('./js/pages/gameModeHub.js'));
 assert(serviceWorker.includes('./js/pages/gameModeHub.js'));
-assert(serviceWorker.includes('awards-app-v252-phase1-publish-controls'));
+assert(serviceWorker.includes('awards-app-v254-unsaved-save-warning'));
 assert(modeHub.includes('Make Picks'));
 assert(modeHub.includes('Place Wagers'));
 assert(modeHub.includes('View Leaderboard'));
@@ -62,11 +62,63 @@ assert(adminPage.includes('savePayload.status = "Setup"'));
 assert(adminPage.includes('adminRunPreflightCheck'));
 assert(adminPage.includes('renderAdminPublishControls(game)'));
 assert(adminPage.includes('const setupWasSaved ='));
-assert(adminPage.includes('await navigate("admin-games")'));
+assert(adminPage.includes('await navigate(\n      "admin-games"'));
+assert(adminPage.includes('renderAdminGameStateToggle_'));
+assert(adminPage.includes('adminToggleGameStateButton'));
+for (const label of [
+  'ACTIVE: ON',
+  'ACTIVE: OFF',
+  'PICKS: OPEN',
+  'PICKS: LOCKED',
+  'DEFAULT GAME: ON',
+  'DEFAULT GAME: OFF',
+  'LEADERBOARD: SHOWN',
+  'LEADERBOARD: HIDDEN',
+  'ARCHIVED: YES',
+  'ARCHIVED: NO'
+]) {
+  assert(adminPage.includes(label), `Missing clear game state label: ${label}`);
+}
 const publishControlsStart = adminGames.indexOf('function renderAdminPublishControls(game)');
 const publishControlsEnd = adminGames.indexOf('/* ======================\n   ACTIONS', publishControlsStart);
 const publishControlsBlock = adminGames.slice(publishControlsStart, publishControlsEnd);
 assert.strictEqual((publishControlsBlock.match(/type="button"/g) || []).length, 5);
+
+// Unsaved-change save workflow must be visible, guarded, and publish-safe.
+for (const label of [
+  'CHANGES MADE — SAVE NOW',
+  'Unsaved changes',
+  'SAVED ✓'
+]) {
+  assert(adminPage.includes(label), `Missing save-state label: ${label}`);
+}
+for (const helper of [
+  'adminMarkGameFormDirty',
+  'adminConfirmLeaveDirtyGameForms_',
+  'adminHandleGameCardToggle',
+  'adminSavePendingGameChangesBeforeAction_'
+]) {
+  assert(adminPage.includes(`function ${helper}`) || adminPage.includes(`async function ${helper}`), `${helper} missing`);
+}
+assert(adminPage.includes('data-admin-game-save-button="true"'));
+assert(adminPage.includes('data-admin-game-save-feedback="true"'));
+assert(adminPage.includes('window.addEventListener("beforeunload"'));
+for (const source of [app, appRoot]) {
+  assert(source.includes('options.skipUnsavedCheck !== true'));
+  assert(source.includes('adminConfirmLeaveDirtyGameForms_'));
+}
+for (const functionName of [
+  'adminSetGameDraft',
+  'adminSetGameSetup',
+  'adminSetGamePreview',
+  'adminSetGameActive',
+  'adminSetGameDefault'
+]) {
+  const start = adminGames.indexOf(`async function ${functionName}`);
+  const end = adminGames.indexOf('\nasync function ', start + 10);
+  const block = adminGames.slice(start, end === -1 ? adminGames.length : end);
+  assert(block.includes('adminSavePendingGameChangesBeforeAction_'), `${functionName} does not save pending changes first`);
+}
 
 // Omitted feature flags must remain omitted so backend type defaults apply.
 assert(adminBackend.includes('delete safePayload.predictionEnabled'));

@@ -285,7 +285,17 @@ function logout() {
    NAVIGATION CORE
 ====================== */
 
-async function navigate(page) {
+async function navigate(page, options) {
+
+  options = options || {};
+
+  if (
+    options.skipUnsavedCheck !== true &&
+    typeof adminConfirmLeaveDirtyGameForms_ === "function" &&
+    !adminConfirmLeaveDirtyGameForms_(page)
+  ) {
+    return;
+  }
 
   if (!page) {
     page = "dashboard";

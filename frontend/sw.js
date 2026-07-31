@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v252-phase1-publish-controls";
+const AWARDS_CACHE = "awards-app-v254-unsaved-save-warning";
 
 const APP_SHELL = [
   "./",

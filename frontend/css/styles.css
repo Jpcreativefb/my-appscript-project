@@ -679,6 +679,132 @@
   gap: 8px;
 }
 
+
+/* ======================
+   GAME AVAILABILITY STATE BUTTONS
+====================== */
+
+.admin-game-state-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.admin-game-state-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-game-state-title {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.admin-game-state-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.admin-game-state-input {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.admin-game-state-button {
+  flex: 1 1 auto;
+  min-height: 42px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid rgba(148, 163, 184, 0.65);
+  border-radius: 10px;
+  background: rgba(71, 85, 105, 0.42);
+  color: #e2e8f0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.025em;
+  line-height: 1.15;
+  text-align: center;
+  text-transform: uppercase;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.admin-game-state-button:hover {
+  transform: translateY(-1px);
+}
+
+.admin-game-state-button:focus-visible {
+  outline: 3px solid rgba(96, 165, 250, 0.62);
+  outline-offset: 2px;
+}
+
+.admin-game-state-button.is-off {
+  border-color: #64748b;
+  background: rgba(51, 65, 85, 0.74);
+  color: #e2e8f0;
+}
+
+.admin-game-state-active.is-on,
+.admin-game-state-leaderboard.is-on {
+  border-color: #22c55e;
+  background: #166534;
+  color: #f0fdf4;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25), 0 5px 14px rgba(22, 101, 52, 0.28);
+}
+
+.admin-game-state-default.is-on {
+  border-color: #facc15;
+  background: #854d0e;
+  color: #fefce8;
+  box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.24), 0 5px 14px rgba(133, 77, 14, 0.3);
+}
+
+.admin-game-state-picks.is-off {
+  border-color: #22c55e;
+  background: #166534;
+  color: #f0fdf4;
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.25), 0 5px 14px rgba(22, 101, 52, 0.28);
+}
+
+.admin-game-state-picks.is-on,
+.admin-game-state-archived.is-on {
+  border-color: #f87171;
+  background: #991b1b;
+  color: #fff1f2;
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.24), 0 5px 14px rgba(153, 27, 27, 0.3);
+}
+
+.admin-game-state-note {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(96, 165, 250, 0.25);
+  border-radius: 10px;
+  background: rgba(30, 64, 175, 0.12);
+  color: rgba(219, 234, 254, 0.9);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+@media (max-width: 720px) {
+  .admin-game-state-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-game-state-button {
+    min-height: 46px;
+    font-size: 13px;
+  }
+}
+
 @media (max-width: 720px) {
 
   .admin-control-grid {
@@ -2714,4 +2840,76 @@ button.is-saving {
 .admin-storage-sheet-list {
   display: grid;
   gap: 6px;
+}
+
+
+/* ======================
+   GAME FORM UNSAVED / SAVED STATE
+====================== */
+
+.admin-game-save-feedback {
+  flex: 1 0 100%;
+  min-height: 20px;
+  padding: 8px 11px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.admin-game-save-feedback[hidden] {
+  display: none;
+}
+
+.admin-game-save-feedback.is-dirty {
+  background: rgba(249, 115, 22, 0.16);
+  border: 1px solid rgba(251, 146, 60, 0.42);
+  color: #fed7aa;
+}
+
+.admin-game-save-feedback.is-saving {
+  background: rgba(59, 130, 246, 0.14);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
+}
+
+.admin-game-save-feedback.is-saved {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(74, 222, 128, 0.38);
+  color: #bbf7d0;
+}
+
+.admin-game-save-button {
+  min-width: 150px;
+  transition: transform 160ms ease, box-shadow 160ms ease, background 160ms ease;
+}
+
+.admin-game-save-button.is-dirty {
+  background: linear-gradient(135deg, #fb923c, #ef4444);
+  color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.18), 0 8px 22px rgba(239, 68, 68, 0.24);
+  animation: admin-game-save-pulse-once 650ms ease-out 1;
+}
+
+.admin-game-save-button.is-saving {
+  background: linear-gradient(135deg, #60a5fa, #2563eb);
+  color: #ffffff;
+}
+
+.admin-game-save-button.is-saved {
+  background: linear-gradient(135deg, #4ade80, #16a34a);
+  color: #052e16;
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.17);
+}
+
+@keyframes admin-game-save-pulse-once {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.045); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-game-save-button.is-dirty {
+    animation: none;
+  }
 }
