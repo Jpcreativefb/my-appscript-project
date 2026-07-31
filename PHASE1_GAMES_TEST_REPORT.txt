@@ -1,0 +1,31 @@
+PHASE 1 GAMES SECTION TEST REPORT
+Date: 2026-07-31
+
+RESULT: PASS
+
+JavaScript syntax checks:
+- 116 files checked
+- 116 passed
+
+Regression suites:
+- 16 test files run
+- 16 passed
+
+Phase 1 coverage:
+- Staked Prediction route -> Picks: PASS
+- Mixed/Hybrid route -> Game Sections hub: PASS
+- Legacy Combo compatibility: PASS
+- Picks/Wagers/Leaderboard hub actions present: PASS
+- Publishing actions preserve feature flags: PASS
+- New games default Draft/inactive/locked: PASS
+- Active/default guided save runs preflight first: PASS
+- Type defaults for fixed/staked scoring: PASS
+- Head-to-Head exactly-two validation: PASS
+- Staked configuration validation: PASS
+- Hybrid mode-to-question warnings: PASS
+- Leaderboard-only parent without questions: PASS
+- Survivor/Ranking production block: PASS
+
+Remaining validation:
+- Deploy Apps Script and Cloudflare frontend.
+- Complete the seven live smoke tests in PHASE1_GAMES_SECTION_FIXES_V1_0_0.md.

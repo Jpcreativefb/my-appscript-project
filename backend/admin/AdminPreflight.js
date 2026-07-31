@@ -28,6 +28,103 @@ function adminPreflightBool_(value) {
 
 }
 
+
+function adminPreflightGameType_(game) {
+
+  const type =
+    adminPreflightNormalizeId_(
+      game && game.type
+    ) || "prediction";
+
+  return (type === "combo" || type === "hybrid")
+    ? "mixed"
+    : type;
+
+}
+
+function adminPreflightScoreMode_(category) {
+
+  const settings =
+    category && category.settings
+      ? category.settings
+      : {};
+
+  const raw =
+    adminPreflightNormalizeId_(
+      settings.scoreMode ||
+      category.scoreMode ||
+      "correct-pick"
+    )
+      .replace(/_/g, "-");
+
+  if (
+    raw === "staked" ||
+    raw === "stake" ||
+    raw === "staked-points" ||
+    raw === "confidence-stake"
+  ) {
+    return "staked-points";
+  }
+
+  if (
+    raw === "wager" ||
+    raw === "wager-odds" ||
+    raw === "sports-wager"
+  ) {
+    return "wager";
+  }
+
+  if (
+    raw === "ranking" ||
+    raw === "ranked"
+  ) {
+    return "ranking";
+  }
+
+  if (
+    raw === "confidence" ||
+    raw === "confidence-points" ||
+    raw === "confidence-pool"
+  ) {
+    return "confidence-points";
+  }
+
+  if (
+    raw === "fixed" ||
+    raw === "fixed-points" ||
+    raw === "standard-points"
+  ) {
+    return "fixed-points";
+  }
+
+  return "correct-pick";
+
+}
+
+function adminPreflightQuestionType_(category) {
+
+  const settings =
+    category && category.settings
+      ? category.settings
+      : {};
+
+  return adminPreflightNormalizeId_(
+    settings.questionType ||
+    category.questionType ||
+    ""
+  );
+
+}
+
+function adminPreflightIsPickMode_(mode) {
+
+  return (
+    mode === "correct-pick" ||
+    mode === "fixed-points"
+  );
+
+}
+
 function adminPreflightAddIssue_(
   issues,
   severity,
@@ -198,7 +295,29 @@ function adminRunGamePreflight(payload) {
       ? setup.categories
       : [];
 
-  if (!categories.length) {
+  const gameType =
+    adminPreflightGameType_(game);
+
+  const gameRole =
+    adminPreflightNormalizeId_(
+      game.gameRole || "standalone"
+    );
+
+  const hubMode =
+    adminPreflightNormalizeId_(
+      game.hubMode || "playable-aggregate"
+    );
+
+  const leaderboardOnlyParent =
+    gameRole === "parent" &&
+    hubMode === "leaderboard-only";
+
+  const activeCategories =
+    categories.filter(function(category) {
+      return category && category.active !== false;
+    });
+
+  if (!categories.length && !leaderboardOnlyParent) {
 
     adminPreflightAddIssue_(
       issues,
@@ -208,8 +327,164 @@ function adminRunGamePreflight(payload) {
 
   }
 
+  if (leaderboardOnlyParent) {
+
+    const childGames =
+      games.filter(function(candidate) {
+        return (
+          candidate &&
+          adminPreflightNormalizeId_(candidate.gameRole) === "mini" &&
+          adminPreflightNormalizeId_(candidate.parentGameId) ===
+            adminPreflightNormalizeId_(gameId)
+        );
+      });
+
+    if (!childGames.length) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Leaderboard-only parent game has no connected mini games yet."
+      );
+    }
+
+  }
+
+  /* =========================
+     GAME-TYPE CHECKS
+  ========================= */
+
+  if (
+    [
+      "prediction",
+      "head-to-head",
+      "confidence",
+      "staked-prediction",
+      "survivor"
+    ].indexOf(gameType) !== -1 &&
+    game.predictionEnabled !== true
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "This game type requires Predictions to be enabled."
+    );
+  }
+
+  if (
+    gameType === "confidence" &&
+    game.confidenceEnabled !== true
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Confidence Pool requires ConfidenceEnabled."
+    );
+  }
+
+  if (gameType === "staked-prediction") {
+
+    if (game.stakedPointsEnabled !== true) {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Staked Prediction requires StakedPointsEnabled."
+      );
+    }
+
+    const minStake = Number(game.minStake) || 0;
+    const maxStake = Number(game.maxStake) || 0;
+    const increment = Number(game.stakeIncrement) || 0;
+
+    if (
+      minStake < 1 ||
+      maxStake < minStake ||
+      increment < 1 ||
+      (maxStake - minStake) % increment !== 0
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Staked Prediction limits are invalid. Check minimum, maximum, and stake increment."
+      );
+    }
+
+  }
+
+  if (
+    ["wager", "racing-wager"].indexOf(gameType) !== -1 &&
+    game.wagerEnabled !== true
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "This wager game type requires WagerEnabled."
+    );
+  }
+
+  if (
+    gameType === "ranking" &&
+    game.rankingEnabled !== true
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Ranking Game requires RankingEnabled."
+    );
+  }
+
+  if (gameType === "mixed") {
+
+    const hasPlayableFeature =
+      game.predictionEnabled === true ||
+      game.confidenceEnabled === true ||
+      game.stakedPointsEnabled === true ||
+      game.wagerEnabled === true;
+
+    if (!hasPlayableFeature) {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Hybrid Game must enable at least one playable section: Predictions, Confidence, Staked Points, or Wagers."
+      );
+    }
+
+    if (
+      adminPreflightNormalizeId_(game.type) === "combo"
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Combo is a legacy alias. Save this game as Hybrid/Mixed when convenient; existing Combo games remain supported."
+      );
+    }
+
+  }
+
+  if (gameType === "survivor") {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Survivor publishing is blocked until round advancement, elimination, and survivor-specific standings are completed."
+    );
+  }
+
+  if (gameType === "ranking") {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Ranking publishing is blocked until ranking entry and ranking scoring are completed."
+    );
+  }
+
   const displayOrders = {};
   const categoryIds = {};
+  const categoryModeCounts = {
+    picks: 0,
+    confidence: 0,
+    staked: 0,
+    wagers: 0,
+    rankings: 0
+  };
 
   categories.forEach(category => {
 
@@ -294,6 +569,83 @@ function adminRunGamePreflight(payload) {
       nominees.filter(n =>
         n.active !== false
       );
+
+    const scoreMode =
+      adminPreflightScoreMode_(category);
+
+    const questionType =
+      adminPreflightQuestionType_(category);
+
+    if (category.active !== false) {
+
+      if (adminPreflightIsPickMode_(scoreMode)) {
+        categoryModeCounts.picks++;
+      } else if (scoreMode === "confidence-points") {
+        categoryModeCounts.confidence++;
+      } else if (scoreMode === "staked-points") {
+        categoryModeCounts.staked++;
+      } else if (scoreMode === "wager") {
+        categoryModeCounts.wagers++;
+      } else if (scoreMode === "ranking") {
+        categoryModeCounts.rankings++;
+      }
+
+      if (
+        gameType === "head-to-head" &&
+        activeNominees.length !== 2
+      ) {
+        adminPreflightAddIssue_(
+          issues,
+          "error",
+          categoryName + " must have exactly 2 active choices for a Head-to-Head game."
+        );
+      }
+
+      if (
+        activeNominees.length === 1 &&
+        scoreMode !== "ranking"
+      ) {
+        adminPreflightAddIssue_(
+          issues,
+          "warning",
+          categoryName + " has only one active choice."
+        );
+      }
+
+      const settings = category.settings || {};
+      const sourceType = adminPreflightNormalizeId_(
+        settings.resultSource ||
+        settings.scoringEngine ||
+        ""
+      );
+
+      if (
+        sourceType.indexOf("sports") !== -1 &&
+        !adminPreflightNormalize_(
+          settings.sportsGameId ||
+          settings.espnEventId ||
+          settings.externalEventId
+        )
+      ) {
+        adminPreflightAddIssue_(
+          issues,
+          "warning",
+          categoryName + " uses a sports result source but has no SportsGameId, ESPNEventId, or ExternalEventId."
+        );
+      }
+
+      if (
+        scoreMode === "wager" &&
+        questionType === ""
+      ) {
+        adminPreflightAddIssue_(
+          issues,
+          "warning",
+          categoryName + " is a wager question but QuestionType is blank."
+        );
+      }
+
+    }
 
     if (
       category.active !== false &&
@@ -382,6 +734,109 @@ function adminRunGamePreflight(payload) {
 
   });
 
+  /* =========================
+     TYPE-TO-QUESTION MATCHING
+  ========================= */
+
+  if (
+    ["prediction", "head-to-head"].indexOf(gameType) !== -1 &&
+    activeCategories.length &&
+    categoryModeCounts.picks === 0
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "This prediction game has no active standard or fixed-point questions."
+    );
+  }
+
+  if (
+    gameType === "staked-prediction" &&
+    categoryModeCounts.staked === 0
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Staked Prediction has no active question using ScoreMode staked-points."
+    );
+  }
+
+  if (
+    ["wager", "racing-wager"].indexOf(gameType) !== -1 &&
+    categoryModeCounts.wagers === 0
+  ) {
+    adminPreflightAddIssue_(
+      issues,
+      "error",
+      "Wager game has no active question using ScoreMode wager."
+    );
+  }
+
+  if (gameType === "mixed") {
+
+    if (
+      game.stakedPointsEnabled === true &&
+      categoryModeCounts.staked === 0
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Staked Points is enabled, but the Hybrid game has no staked-points questions."
+      );
+    }
+
+    if (
+      game.wagerEnabled === true &&
+      categoryModeCounts.wagers === 0
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Wagers is enabled, but the Hybrid game has no wager questions."
+      );
+    }
+
+    if (
+      game.confidenceEnabled === true &&
+      categoryModeCounts.confidence === 0
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Confidence is enabled, but the Hybrid game has no confidence-points questions."
+      );
+    }
+
+    if (categoryModeCounts.rankings > 0) {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Hybrid game contains ranking questions, but ranking entry/scoring is not production-ready yet."
+      );
+    } else if (game.rankingEnabled === true) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Ranking is enabled but no ranking questions exist. Turn Ranking off until the ranking workflow is completed."
+      );
+    }
+
+    if (
+      categoryModeCounts.picks +
+      categoryModeCounts.confidence +
+      categoryModeCounts.staked +
+      categoryModeCounts.wagers === 0 &&
+      activeCategories.length
+    ) {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Hybrid game has no currently playable question modes."
+      );
+    }
+
+  }
+
   Object.keys(displayOrders)
     .forEach(order => {
 
@@ -458,7 +913,9 @@ function adminRunGamePreflight(payload) {
     success: true,
     ready: errorCount === 0,
     gameId: gameId,
+    gameType: gameType,
     status: status || "",
+    categoryModeCounts: categoryModeCounts,
     errorCount: errorCount,
     warningCount: warningCount,
     issueCount: issues.length,

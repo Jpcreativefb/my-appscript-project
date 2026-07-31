@@ -28,7 +28,9 @@ function getSupportedGameTypes() {
       predictionEnabled: true,
       rankingEnabled: false,
       confidenceEnabled: false,
-      wagerEnabled: false
+      wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: true,
     },
     {
       id: "head-to-head",
@@ -38,6 +40,8 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: true,
       racingEnabled: false,
       mixedGame: false
     },
@@ -48,7 +52,9 @@ function getSupportedGameTypes() {
       predictionEnabled: true,
       rankingEnabled: false,
       confidenceEnabled: true,
-      wagerEnabled: false
+      wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
     },
     {
       id: "staked-prediction",
@@ -58,6 +64,8 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: false,
+      stakedPointsEnabled: true,
+      fixedPointsEnabled: false,
       racingEnabled: false,
       mixedGame: false
     },
@@ -69,6 +77,8 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: true,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
       racingEnabled: false,
       mixedGame: false
     },
@@ -80,28 +90,35 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: true,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
       racingEnabled: true,
       mixedGame: false
     },
     {
       id: "mixed",
-      label: "Mixed Question Game",
-      description: "A flexible game that can combine awards, sports, racing, props, survivor, wagers, and rankings.",
+      label: "Hybrid Game",
+      description: "Combines standard predictions, confidence, staked predictions, sports wagers, racing wagers, and props in one game.",
       predictionEnabled: true,
-      rankingEnabled: true,
+      rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: true,
+      stakedPointsEnabled: true,
+      fixedPointsEnabled: true,
       racingEnabled: true,
       mixedGame: true
     },
     {
       id: "combo",
-      label: "Combo Game",
-      description: "A simple admin-facing game type for combining picks, wagers, rankings, racing, and props in one game.",
+      label: "Combo Game (Legacy Alias)",
+      description: "Legacy alias for Hybrid Game. Existing Combo games remain supported, but new games should use Hybrid Game.",
+      legacyAliasOf: "mixed",
       predictionEnabled: true,
-      rankingEnabled: true,
-      confidenceEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
       wagerEnabled: true,
+      stakedPointsEnabled: true,
+      fixedPointsEnabled: true,
       racingEnabled: true,
       mixedGame: true
     },
@@ -113,6 +130,8 @@ function getSupportedGameTypes() {
       rankingEnabled: false,
       confidenceEnabled: false,
       wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: true,
       racingEnabled: false,
       mixedGame: false
     },
@@ -124,6 +143,8 @@ function getSupportedGameTypes() {
       rankingEnabled: true,
       confidenceEnabled: false,
       wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
       racingEnabled: false,
       mixedGame: false
     }
@@ -172,10 +193,14 @@ function normalizeGameId_(value) {
 
 function normalizeGameType_(value) {
 
-  const type =
+  let type =
     String(value || DEFAULT_GAME_TYPE)
       .trim()
       .toLowerCase();
+
+  if (type === "hybrid") {
+    type = "mixed";
+  }
 
   const allowed =
     getSupportedGameTypes()
@@ -703,6 +728,12 @@ function buildGameObjectFromRow_(
   const explicitWager =
     col.wagerEnabled !== -1;
 
+  const explicitFixedPoints =
+    col.fixedPointsEnabled !== -1;
+
+  const explicitStakedPoints =
+    col.stakedPointsEnabled !== -1;
+
   return {
     gameId:
       gameId,
@@ -1015,22 +1046,26 @@ function buildGameObjectFromRow_(
       ),
 
     fixedPointsEnabled:
-      normalizeGameBoolean_(
-        getGameCell_(
-          row,
-          col.fixedPointsEnabled,
-          true
-        )
-      ),
+      explicitFixedPoints
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.fixedPointsEnabled,
+              typeConfig.fixedPointsEnabled === true
+            )
+          )
+        : typeConfig.fixedPointsEnabled === true,
 
     stakedPointsEnabled:
-      normalizeGameBoolean_(
-        getGameCell_(
-          row,
-          col.stakedPointsEnabled,
-          false
-        )
-      ),
+      explicitStakedPoints
+        ? normalizeGameBoolean_(
+            getGameCell_(
+              row,
+              col.stakedPointsEnabled,
+              typeConfig.stakedPointsEnabled === true
+            )
+          )
+        : typeConfig.stakedPointsEnabled === true,
 
     startingPoints:
       Math.max(

@@ -1050,7 +1050,7 @@ if (typeof document !== "undefined" && !window.__adminHelpDismissBound) {
 
 function adminCanonicalGameType_(value) {
   const type = String(value || "prediction").trim().toLowerCase();
-  return type === "combo" ? "mixed" : type;
+  return (type === "combo" || type === "hybrid") ? "mixed" : type;
 }
 
 function adminUpdateHybridScoringSections(form) {
@@ -1160,7 +1160,7 @@ function renderAdminGameForm(
     name: "",
     year: currentYear,
     type: "prediction",
-    active: true,
+    active: false,
     archived: false,
     defaultGame: false,
     predictionEnabled: true,
@@ -1197,14 +1197,14 @@ function renderAdminGameForm(
     themeColor: "#c8a24a",
     icon: "",
     sortOrder: 999,
-    status: "",
+    status: "Draft",
     description: "",
     lockLabel: "",
     availableFrom: "",
     availableUntil: "",
     heroImageFileId: "",
     heroImagePosition: "center center",
-    lockAllPicks: false,
+    lockAllPicks: true,
     showLeaderboard: true,
     showResultsBeforeLock: false,
     resultsFinalized: false,
@@ -2103,14 +2103,93 @@ async function adminSaveGameFromForm(
     form
   );
 
+  const publishRequested =
+    game.active === true ||
+    game.defaultGame === true;
+
+  const publishAsDefault =
+    game.defaultGame === true;
+
+  const savePayload =
+    Object.assign({}, game);
+
+  /*
+    Save the complete setup in a locked/inactive state first. This lets the
+    type-aware preflight inspect the newest questions and settings before the
+    game can become visible to players.
+  */
+  if (publishRequested) {
+    savePayload.active = false;
+    savePayload.defaultGame = false;
+    savePayload.lockAllPicks = true;
+    savePayload.status = "Setup";
+  }
+
   let res;
 
   try {
 
     res =
       await apiAdminSaveGame(
-        game
+        savePayload
       );
+
+    if (
+      res &&
+      res.success !== false &&
+      publishRequested
+    ) {
+
+      const preflight =
+        await apiAdminRunGamePreflight(
+          game.gameId
+        );
+
+      if (
+        !preflight ||
+        preflight.success === false
+      ) {
+        res = {
+          success: false,
+          error: preflight && (preflight.error || preflight.message)
+            ? preflight.error || preflight.message
+            : "Game setup was saved, but the production check could not run. The game remains in Setup and locked."
+        };
+      } else if (Number(preflight.errorCount) > 0) {
+        res = {
+          success: false,
+          error: "Game setup was saved, but it was not activated because the production check found " + preflight.errorCount + " error(s). Run Check in Manage Games for details."
+        };
+      } else {
+
+        const continueWithWarnings =
+          Number(preflight.warningCount) === 0 ||
+          confirm(
+            "The production check found " +
+            preflight.warningCount +
+            " warning(s). Activate this game anyway?"
+          );
+
+        if (!continueWithWarnings) {
+          res = {
+            success: true,
+            setupOnly: true,
+            message: "Game setup was saved. Activation was cancelled, so the game remains in Setup and locked."
+          };
+        } else {
+          res = await apiAdminUpdateGame({
+            gameId: game.gameId,
+            status: "Active",
+            active: true,
+            archived: false,
+            defaultGame: publishAsDefault,
+            lockAllPicks: false
+          });
+        }
+
+      }
+
+    }
 
   } finally {
 
@@ -2140,7 +2219,7 @@ async function adminSaveGameFromForm(
           : "Unknown error";
 
     alert(
-      /^Could not save game:/i.test(saveErrorMessage)
+      /^(Could not save game:|Game setup was saved)/i.test(saveErrorMessage)
         ? saveErrorMessage
         : "Could not save game: " + saveErrorMessage
     );
@@ -2150,7 +2229,11 @@ async function adminSaveGameFromForm(
   }
 
   alert(
-    "Game saved."
+    res && res.message
+      ? res.message
+      : publishRequested
+        ? "Game saved and activated."
+        : "Game saved."
   );
 
   await navigate(

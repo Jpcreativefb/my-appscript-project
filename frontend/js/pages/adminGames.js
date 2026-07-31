@@ -1620,8 +1620,6 @@ async function adminCreateGameFromForm() {
       active: false,
       archived: false,
       defaultGame: false,
-      predictionEnabled: false,
-      rankingEnabled: false,
       status: "Draft",
       lockAllPicks: true
     });
@@ -2001,8 +1999,6 @@ async function adminSetGameDraft(gameId) {
       active: false,
       archived: false,
       defaultGame: false,
-      predictionEnabled: false,
-      rankingEnabled: false,
       lockAllPicks: true
     });
 
@@ -2042,8 +2038,6 @@ async function adminSetGameSetup(gameId) {
       active: false,
       archived: false,
       defaultGame: false,
-      predictionEnabled: false,
-      rankingEnabled: false,
       lockAllPicks: true
     });
 
@@ -2072,7 +2066,7 @@ async function adminSetGamePreview(gameId) {
 
   const ok =
     confirm(
-      "Move this game to Preview? It will be active for testing, but predictions and rankings stay off."
+      "Move this game to Preview? It will be visible for testing, but all entries stay locked. The configured game type and scoring features will be preserved."
     );
 
   if (!ok) {
@@ -2092,8 +2086,6 @@ async function adminSetGamePreview(gameId) {
       active: true,
       archived: false,
       defaultGame: false,
-      predictionEnabled: false,
-      rankingEnabled: false,
       lockAllPicks: true
     });
 
@@ -2132,7 +2124,7 @@ async function adminSetGameActive(gameId) {
 
   const ok =
     confirm(
-      "Activate this game? It will become active with predictions and rankings enabled, but it will not become the default game yet."
+      "Activate this game? It will use the game type and scoring features already configured in Setup, but it will not become the default game yet."
     );
 
   if (!ok) {
@@ -2152,8 +2144,6 @@ async function adminSetGameActive(gameId) {
       active: true,
       archived: false,
       defaultGame: false,
-      predictionEnabled: true,
-      rankingEnabled: true,
       lockAllPicks: false
     });
 
@@ -2212,8 +2202,6 @@ async function adminSetGameDefault(gameId) {
       active: true,
       archived: false,
       defaultGame: true,
-      predictionEnabled: true,
-      rankingEnabled: true,
       lockAllPicks: false
     });
 

@@ -1090,10 +1090,22 @@ function adminNormalizeGameId_(value) {
       )
     );
 
+    const hybridPayload =
+      Object.assign(
+        {
+          mixedGame: typeConfig.mixedGame === true,
+          gameFormat: typeConfig.mixedGame === true ? "hybrid" : "standard",
+          scoringMode: typeConfig.mixedGame === true ? "hybrid" : "standard",
+          stakedPointsEnabled: typeConfig.stakedPointsEnabled === true,
+          fixedPointsEnabled: typeConfig.fixedPointsEnabled === true
+        },
+        payload
+      );
+
     adminApplyHybridGameFields_(
       row,
       col,
-      payload,
+      hybridPayload,
       false
     );
   
@@ -1276,19 +1288,23 @@ function adminGetGameTypes() {
             defaultGame:
               adminToBoolean_(
                 payload.defaultGame
-              ),
-  
-            predictionEnabled:
-              adminToBoolean_(
-                payload.predictionEnabled
-              ),
-  
-            rankingEnabled:
-              adminToBoolean_(
-                payload.rankingEnabled
               )
           }
         );
+
+      if (Object.prototype.hasOwnProperty.call(payload, "predictionEnabled")) {
+        safePayload.predictionEnabled =
+          adminToBoolean_(payload.predictionEnabled);
+      } else {
+        delete safePayload.predictionEnabled;
+      }
+
+      if (Object.prototype.hasOwnProperty.call(payload, "rankingEnabled")) {
+        safePayload.rankingEnabled =
+          adminToBoolean_(payload.rankingEnabled);
+      } else {
+        delete safePayload.rankingEnabled;
+      }
   
       const row =
         adminBuildGameRow_(

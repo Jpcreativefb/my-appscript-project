@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v250-standalone-stat-comparison";
+const AWARDS_CACHE = "awards-app-v251-phase1-games-hub";
 
 const APP_SHELL = [
   "./",
@@ -24,6 +24,7 @@ const APP_SHELL = [
   "./js/pwa.js",
   "./js/pages/dashboard.js",
   "./js/pages/picks.js",
+  "./js/pages/gameModeHub.js",
   "./js/pages/leaderboard.js",
   "./js/pages/seasonHub.js",
   "./js/pages/betting.js",

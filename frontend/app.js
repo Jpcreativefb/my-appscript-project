@@ -546,12 +546,27 @@ async function enterGame(
 
   }
 
+  /*
+    Mixed and legacy Combo games can contain both pick-style questions and
+    wagers. Open one simple mode chooser instead of silently hiding part of
+    the game on the Picks page.
+  */
+  if (
+    gameType === "mixed" ||
+    gameType === "hybrid" ||
+    gameType === "combo"
+  ) {
+
+    await navigate("game-hub");
+    return;
+
+  }
+
   if (
     gameType === "prediction" ||
     gameType === "confidence" ||
     gameType === "head-to-head" ||
-    gameType === "combo" ||
-    gameType === "mixed" ||
+    gameType === "staked-prediction" ||
     gameType === "survivor"
   ) {
 
@@ -656,6 +671,13 @@ async function renderPage(page) {
 
       app.innerHTML =
         await renderPicksPage();
+
+      break;
+
+    case "game-hub":
+
+      app.innerHTML =
+        await renderGameModeHubPage();
 
       break;
 
@@ -775,7 +797,8 @@ async function handleGameSwitch(gameId) {
     selectedGame &&
     (
       selectedGame.gameRole === "parent" ||
-      APP_STATE.currentPage === "season-hub"
+      APP_STATE.currentPage === "season-hub" ||
+      APP_STATE.currentPage === "game-hub"
     )
   ) {
     await enterGame(
