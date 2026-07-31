@@ -1,0 +1,11 @@
+Phase 1 Question Save Persistence Hotfix v1.0.6
+
+Result: PASS
+
+Validation performed:
+- 18 of 18 regression test suites passed.
+- JavaScript syntax validation passed across backend, frontend, and tests.
+- New normalized question update persistence regression passed.
+- Existing question text updates now override the old normalized Questions value.
+- Existing option/answer updates now override old normalized QuestionOptions values.
+- Existing CategorySettings ScoreMode persistence regression still passes.
