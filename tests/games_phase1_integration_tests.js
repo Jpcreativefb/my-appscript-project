@@ -26,7 +26,7 @@ for (const source of [app, appRoot]) {
 }
 assert(appHtml.includes('./js/pages/gameModeHub.js'));
 assert(serviceWorker.includes('./js/pages/gameModeHub.js'));
-assert(serviceWorker.includes('awards-app-v254-unsaved-save-warning'));
+assert(serviceWorker.includes('awards-app-v255-unified-game-status'));
 assert(modeHub.includes('Make Picks'));
 assert(modeHub.includes('Place Wagers'));
 assert(modeHub.includes('View Leaderboard'));
@@ -58,31 +58,41 @@ assert(adminPage.includes('const publishRequested ='));
 assert(adminPage.includes('await apiAdminRunGamePreflight'));
 assert(adminPage.includes('savePayload.status = "Setup"'));
 
-// The live Manage Games renderer must expose Run Check and Publish Controls.
+// Manage Games must use one workflow status control, not duplicate Publish Controls.
 assert(adminPage.includes('adminRunPreflightCheck'));
-assert(adminPage.includes('renderAdminPublishControls(game)'));
-assert(adminPage.includes('const setupWasSaved ='));
-assert(adminPage.includes('await navigate(\n      "admin-games"'));
-assert(adminPage.includes('renderAdminGameStateToggle_'));
-assert(adminPage.includes('adminToggleGameStateButton'));
+assert(adminPage.includes('renderAdminGameStatusControl_'));
+assert(adminPage.includes('adminSelectGameStatus'));
+assert(adminPage.includes('adminCanonicalGameStatus_'));
+assert(!adminPage.includes('renderAdminPublishControls(game)'));
+assert(!adminGames.includes('${renderAdminPublishControls(game)}'));
+assert(!adminPage.includes('Status Label'));
 for (const label of [
-  'ACTIVE: ON',
-  'ACTIVE: OFF',
-  'PICKS: OPEN',
-  'PICKS: LOCKED',
-  'DEFAULT GAME: ON',
-  'DEFAULT GAME: OFF',
+  'DRAFT',
+  'SETUP',
+  'PREVIEW',
+  'LIVE',
+  'PICKS & WAGERS: OPEN',
+  'PICKS & WAGERS: LOCKED',
+  'DEFAULT GAME: YES',
+  'DEFAULT GAME: NO',
   'LEADERBOARD: SHOWN',
-  'LEADERBOARD: HIDDEN',
-  'ARCHIVED: YES',
-  'ARCHIVED: NO'
+  'LEADERBOARD: HIDDEN'
 ]) {
-  assert(adminPage.includes(label), `Missing clear game state label: ${label}`);
+  assert(adminPage.includes(label), `Missing unified game workflow label: ${label}`);
 }
-const publishControlsStart = adminGames.indexOf('function renderAdminPublishControls(game)');
-const publishControlsEnd = adminGames.indexOf('/* ======================\n   ACTIONS', publishControlsStart);
-const publishControlsBlock = adminGames.slice(publishControlsStart, publishControlsEnd);
-assert.strictEqual((publishControlsBlock.match(/type="button"/g) || []).length, 5);
+assert(adminPage.includes('Draft → Setup → Preview → Live'));
+assert(adminPage.includes('Default Game can only be turned on when Game Status is LIVE.'));
+assert(adminPage.includes('Move to Archive'));
+assert(adminPage.includes('Restore Game'));
+
+// Game Type is the source of truth for non-Hybrid gameplay methods.
+assert(adminPage.includes('Gameplay enabled by Game Type'));
+assert(adminPage.includes('Only Hybrid Game lets you manually combine gameplay methods'));
+assert(adminPage.includes('function adminGameTypeFeatureFlags_'));
+assert(adminPage.includes('Sports Wagers: ON • Predictions: OFF'));
+assert(adminPage.includes('const featureFlags = adminGameTypeFeatureFlags_(form)'));
+assert(adminBackend.includes('function adminResolveGameTypeFeatureFlags_'));
+assert(adminBackend.includes('Game Type is the single source of truth for non-Hybrid games.'));
 
 // Unsaved-change save workflow must be visible, guarded, and publish-safe.
 for (const label of [
@@ -120,11 +130,11 @@ for (const functionName of [
   assert(block.includes('adminSavePendingGameChangesBeforeAction_'), `${functionName} does not save pending changes first`);
 }
 
-// Omitted feature flags must remain omitted so backend type defaults apply.
+// Backend type defaults and type enforcement remain available.
 assert(adminBackend.includes('delete safePayload.predictionEnabled'));
 assert(adminBackend.includes('delete safePayload.rankingEnabled'));
-assert(adminBackend.includes('stakedPointsEnabled: typeConfig.stakedPointsEnabled === true'));
-assert(adminBackend.includes('fixedPointsEnabled: typeConfig.fixedPointsEnabled === true'));
+assert(adminBackend.includes('stakedPointsEnabled: featureFlags.stakedPointsEnabled === true'));
+assert(adminBackend.includes('fixedPointsEnabled: featureFlags.fixedPointsEnabled === true'));
 
 // Type defaults and legacy Combo behavior.
 const engineContext = {

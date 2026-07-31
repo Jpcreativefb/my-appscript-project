@@ -300,8 +300,6 @@ function renderAdminGameCard(game) {
 
         </div>
 
-        ${renderAdminPublishControls(game)}
-
         <div
           id="adminPreflightResult_${gameId}"
           class="admin-preflight-result"

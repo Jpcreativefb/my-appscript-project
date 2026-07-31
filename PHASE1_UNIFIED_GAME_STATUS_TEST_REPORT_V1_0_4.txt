@@ -1,0 +1,21 @@
+Phase 1 Unified Game Status Hotfix v1.0.4
+Test date: 2026-07-31
+
+RESULTS
+- JavaScript syntax validation: PASS
+- Regression suites passed: 16 of 16
+- Unified Game Status control present: PASS
+- Duplicate Publish Controls no longer rendered: PASS
+- Active toggle / Activate duplication removed: PASS
+- Default Game / Make Default duplication removed: PASS
+- Archive normal toggle removed: PASS
+- Run Check remains available: PASS
+- Wager Game derives Wagers ON and Predictions OFF: PASS
+- Non-Hybrid feature flags enforced in frontend: PASS
+- Non-Hybrid feature flags enforced in backend: PASS
+- Hybrid retains administrator-selected methods: PASS
+- Live save still runs production preflight: PASS
+- Preview remains visible and locked: PASS
+- Service worker cache updated: PASS
+
+Cache: awards-app-v255-unified-game-status

@@ -30,7 +30,7 @@ const assert = require('assert');
   assert(leaderboard.includes('function showLeaderboardModal_(modal, content, html)'));
   assert(leaderboard.includes('modal.style.display = "flex"'));
   assert(leaderboard.includes('showLeaderboardModal_(modal, content, html);'));
-  assert(serviceWorker.includes('awards-app-v254-unsaved-save-warning'));
+  assert(serviceWorker.includes('awards-app-v255-unified-game-status'));
   assert(serviceWorker.includes('"./css/frontend-leaderboard-profile.css"'));
   assert(leaderboardCss.includes('body > .compare-picks-modal'));
   assert(leaderboardCss.includes('z-index: 2147483000'));

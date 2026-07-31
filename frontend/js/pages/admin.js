@@ -1053,6 +1053,125 @@ function adminCanonicalGameType_(value) {
   return (type === "combo" || type === "hybrid") ? "mixed" : type;
 }
 
+function adminCanonicalGameStatus_(value, active, archived) {
+  if (archived === true) {
+    return "Archived";
+  }
+
+  const status = String(value || "").trim().toLowerCase();
+
+  if (status === "setup") {
+    return "Setup";
+  }
+
+  if (status === "preview") {
+    return "Preview";
+  }
+
+  if (status === "active" || status === "live") {
+    return "Active";
+  }
+
+  if (status === "draft") {
+    return "Draft";
+  }
+
+  return active === true ? "Active" : "Draft";
+}
+
+function adminGameTypeFeatureFlags_(form) {
+  const type = adminCanonicalGameType_(
+    form && form.type ? form.type.value : "prediction"
+  );
+
+  const flags = {
+    predictionEnabled: false,
+    rankingEnabled: false,
+    confidenceEnabled: false,
+    wagerEnabled: false,
+    fixedPointsEnabled: false,
+    stakedPointsEnabled: false
+  };
+
+  if (["prediction", "head-to-head", "survivor"].indexOf(type) !== -1) {
+    flags.predictionEnabled = true;
+    flags.fixedPointsEnabled = true;
+  } else if (type === "staked-prediction") {
+    flags.predictionEnabled = true;
+    flags.stakedPointsEnabled = true;
+  } else if (type === "confidence") {
+    flags.predictionEnabled = true;
+    flags.confidenceEnabled = true;
+  } else if (type === "wager" || type === "racing-wager") {
+    flags.wagerEnabled = true;
+  } else if (type === "ranking") {
+    flags.rankingEnabled = true;
+  } else if (type === "mixed") {
+    flags.predictionEnabled = Boolean(form.predictionEnabled && form.predictionEnabled.checked);
+    flags.rankingEnabled = Boolean(form.rankingEnabled && form.rankingEnabled.checked);
+    flags.confidenceEnabled = Boolean(form.confidenceEnabled && form.confidenceEnabled.checked);
+    flags.wagerEnabled = Boolean(form.wagerEnabled && form.wagerEnabled.checked);
+    flags.fixedPointsEnabled = Boolean(form.fixedPointsEnabled && form.fixedPointsEnabled.checked);
+    flags.stakedPointsEnabled = Boolean(form.stakedPointsEnabled && form.stakedPointsEnabled.checked);
+  }
+
+  return flags;
+}
+
+function adminGameTypeSummaryText_(type, flags) {
+  type = adminCanonicalGameType_(type);
+  flags = flags || {};
+
+  if (type === "wager") {
+    return "Sports Wagers: ON • Predictions: OFF";
+  }
+
+  if (type === "racing-wager") {
+    return "Racing Wagers: ON • Predictions: OFF";
+  }
+
+  if (type === "staked-prediction") {
+    return "Staked Predictions: ON • Sports Wagers: OFF";
+  }
+
+  if (type === "confidence") {
+    return "Predictions: ON • Confidence Pool: ON • Sports Wagers: OFF";
+  }
+
+  if (type === "ranking") {
+    return "Rankings: ON • Predictions: OFF • Sports Wagers: OFF";
+  }
+
+  if (type === "mixed") {
+    const enabled = [];
+    if (flags.predictionEnabled) enabled.push("Predictions");
+    if (flags.fixedPointsEnabled) enabled.push("Fixed Points");
+    if (flags.stakedPointsEnabled) enabled.push("Staked Points");
+    if (flags.confidenceEnabled) enabled.push("Confidence");
+    if (flags.wagerEnabled) enabled.push("Wagers");
+    if (flags.rankingEnabled) enabled.push("Rankings");
+    return "Hybrid methods: " + (enabled.length ? enabled.join(" • ") : "Choose methods below");
+  }
+
+  return "Predictions: ON • Sports Wagers: OFF";
+}
+
+function adminUpdateGameTypeSummary_(form) {
+  if (!form || !form.type) {
+    return;
+  }
+
+  const summary = form.querySelector("[data-admin-game-type-summary]");
+  if (!summary) {
+    return;
+  }
+
+  summary.textContent = adminGameTypeSummaryText_(
+    form.type.value,
+    adminGameTypeFeatureFlags_(form)
+  );
+}
+
 function adminUpdateHybridScoringSections(form) {
   if (!form || !form.type) {
     return;
@@ -1096,6 +1215,7 @@ function adminUpdateGameTypeSections(form) {
   });
 
   adminUpdateHybridScoringSections(form);
+  adminUpdateGameTypeSummary_(form);
   adminUpdateHeroSource(form);
 }
 
@@ -1126,7 +1246,8 @@ function renderAdminGameStateToggle_(
   onText,
   offText,
   helpText,
-  variant
+  variant,
+  disabled
 ) {
 
   const isOn = checked === true;
@@ -1150,11 +1271,169 @@ function renderAdminGameStateToggle_(
           data-on-text="${escapeHtml_(onText)}"
           data-off-text="${escapeHtml_(offText)}"
           onclick="adminToggleGameStateButton(event, this)"
+          ${disabled ? 'disabled aria-disabled="true"' : ""}
         >${escapeHtml_(stateText)}</button>
         ${helpText ? adminHelpButton_(title, helpText) : ""}
       </span>
     </span>
   `;
+}
+
+function adminGameStatusDescription_(status) {
+  if (status === "Setup") {
+    return "SETUP: Admin-only work state. The game is hidden, picks are locked, and it cannot be the default game.";
+  }
+
+  if (status === "Preview") {
+    return "PREVIEW: Visible for testing, but all picks and wagers stay locked. It cannot be the default game.";
+  }
+
+  if (status === "Active") {
+    return "LIVE: Visible to players. Picks may be opened or locked separately, and the game may be made the default.";
+  }
+
+  if (status === "Archived") {
+    return "ARCHIVED: Preserved but removed from normal play. Use Restore Game before changing its status.";
+  }
+
+  return "DRAFT: Admin-only starting state. The game is hidden, picks are locked, and it cannot be the default game.";
+}
+
+function renderAdminGameStatusControl_(game) {
+  const status = adminCanonicalGameStatus_(game.status, game.active, game.archived);
+  const isArchived = status === "Archived";
+  const active = status === "Preview" || status === "Active";
+  const statuses = [
+    ["Draft", "DRAFT"],
+    ["Setup", "SETUP"],
+    ["Preview", "PREVIEW"],
+    ["Active", "LIVE"]
+  ];
+
+  return `
+    <div class="admin-game-status-field">
+      <div class="admin-game-state-title-row">
+        <span class="admin-game-state-title">Game Status</span>
+        ${adminHelpButton_(
+          "Game Status",
+          "Draft and Setup are hidden from players. Preview is visible but locked. Live is visible and can accept picks when Picks is set to Open."
+        )}
+      </div>
+      <input type="hidden" name="status" value="${escapeHtml_(status)}">
+      <input type="checkbox" class="admin-game-state-input" name="active" ${active ? "checked" : ""}>
+      <input type="checkbox" class="admin-game-state-input" name="archived" ${isArchived ? "checked" : ""}>
+      ${isArchived ? `
+        <div class="admin-game-status-archived">ARCHIVED — USE RESTORE GAME</div>
+      ` : `
+        <div class="admin-game-status-buttons" role="group" aria-label="Game status">
+          ${statuses.map(function(item) {
+            const value = item[0];
+            const label = item[1];
+            return `
+              <button
+                type="button"
+                class="admin-game-status-button status-${value.toLowerCase()} ${status === value ? "is-selected" : ""}"
+                data-game-status="${value}"
+                aria-pressed="${status === value ? "true" : "false"}"
+                onclick="adminSelectGameStatus(event, this)"
+              >${label}</button>
+            `;
+          }).join("")}
+        </div>
+      `}
+      <div class="admin-game-status-description" data-admin-game-status-description>
+        ${escapeHtml_(adminGameStatusDescription_(status))}
+      </div>
+    </div>
+  `;
+}
+
+function adminSyncGameStateButtonForInput_(input) {
+  if (!input) {
+    return;
+  }
+
+  const control = input.closest(".admin-game-state-control");
+  const button = control
+    ? control.querySelector("[data-admin-game-state-toggle='true']")
+    : null;
+
+  if (!button) {
+    return;
+  }
+
+  button.classList.toggle("is-on", input.checked);
+  button.classList.toggle("is-off", !input.checked);
+  button.setAttribute("aria-pressed", input.checked ? "true" : "false");
+  button.textContent = input.checked
+    ? button.getAttribute("data-on-text") || "ON"
+    : button.getAttribute("data-off-text") || "OFF";
+}
+
+function adminUpdateGameAccessAvailability_(form) {
+  if (!form || !form.status) {
+    return;
+  }
+
+  const isLive = form.status.value === "Active";
+
+  ["lockAllPicks", "defaultGame"].forEach(function(name) {
+    const input = form[name];
+    const control = input ? input.closest(".admin-game-state-control") : null;
+    const button = control
+      ? control.querySelector("[data-admin-game-state-toggle='true']")
+      : null;
+
+    if (button) {
+      button.disabled = !isLive;
+      button.setAttribute("aria-disabled", isLive ? "false" : "true");
+    }
+  });
+}
+
+function adminSelectGameStatus(event, button) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  if (!button || button.disabled) {
+    return;
+  }
+
+  const form = button.closest("form");
+  const status = button.getAttribute("data-game-status") || "Draft";
+
+  if (!form || !form.status || !form.active || !form.lockAllPicks || !form.defaultGame) {
+    return;
+  }
+
+  const previousStatus = form.status.value;
+  form.status.value = status;
+  form.active.checked = status === "Preview" || status === "Active";
+
+  if (status !== "Active") {
+    form.defaultGame.checked = false;
+    form.lockAllPicks.checked = true;
+  } else if (previousStatus !== "Active") {
+    form.lockAllPicks.checked = false;
+  }
+
+  form.querySelectorAll("[data-game-status]").forEach(function(statusButton) {
+    const selected = statusButton.getAttribute("data-game-status") === status;
+    statusButton.classList.toggle("is-selected", selected);
+    statusButton.setAttribute("aria-pressed", selected ? "true" : "false");
+  });
+
+  const description = form.querySelector("[data-admin-game-status-description]");
+  if (description) {
+    description.textContent = adminGameStatusDescription_(status);
+  }
+
+  adminSyncGameStateButtonForInput_(form.defaultGame);
+  adminSyncGameStateButtonForInput_(form.lockAllPicks);
+  adminUpdateGameAccessAvailability_(form);
+  form.status.dispatchEvent(new Event("change", { bubbles: true }));
 }
 
 function adminToggleGameStateButton(event, button) {
@@ -1172,20 +1451,27 @@ function adminToggleGameStateButton(event, button) {
   const input = control
     ? control.querySelector(".admin-game-state-input")
     : null;
+  const form = button.closest("form");
 
   if (!input) {
     return;
   }
 
-  input.checked = !input.checked;
+  const nextChecked = !input.checked;
 
-  button.classList.toggle("is-on", input.checked);
-  button.classList.toggle("is-off", !input.checked);
-  button.setAttribute("aria-pressed", input.checked ? "true" : "false");
-  button.textContent = input.checked
-    ? button.getAttribute("data-on-text") || "ON"
-    : button.getAttribute("data-off-text") || "OFF";
+  if (
+    input.name === "defaultGame" &&
+    nextChecked &&
+    form &&
+    form.status &&
+    form.status.value !== "Active"
+  ) {
+    alert("Default Game can only be turned on when Game Status is LIVE.");
+    return;
+  }
 
+  input.checked = nextChecked;
+  adminSyncGameStateButtonForInput_(input);
   input.dispatchEvent(new Event("change", { bubbles: true }));
 
 }
@@ -1327,6 +1613,7 @@ function adminHandleGameFormChange(form) {
   }
 
   adminUpdateHybridScoringSections(form);
+  adminUpdateGameTypeSummary_(form);
   adminMarkGameFormDirty(form);
 
 }
@@ -1531,6 +1818,8 @@ function renderAdminGameForm(
   const hubMode = game.hubMode || (isNew ? "leaderboard-only" : "playable-aggregate");
   const isLeaderboardOnlyHub = isParentGame && hubMode === "leaderboard-only";
   const canonicalType = adminCanonicalGameType_(game.type);
+  const workflowStatus = adminCanonicalGameStatus_(game.status, game.active, game.archived);
+  const isLiveStatus = workflowStatus === "Active";
 
   const title = isNew
     ? "Create New Game"
@@ -1637,6 +1926,12 @@ function renderAdminGameForm(
                   ${renderGameTypeOptions_(game.type, gameTypes)}
                 </select>
               </label>
+            </div>
+
+            <div class="admin-game-type-summary">
+              <strong>Gameplay enabled by Game Type</strong>
+              <span data-admin-game-type-summary>${escapeHtml_(adminGameTypeSummaryText_(canonicalType, game))}</span>
+              <small>Only Hybrid Game lets you manually combine gameplay methods. Other game types set these automatically.</small>
             </div>
 
             <input type="hidden" name="gameFormat" value="${canonicalType === "mixed" ? "hybrid" : "standard"}">
@@ -1866,37 +2161,33 @@ function renderAdminGameForm(
             <summary class="admin-section-heading admin-form-section-summary">
               <div>
                 <h4>Availability</h4>
-                <div class="admin-sub">Control whether the game is visible, open, locked, or complete.</div>
+                <div class="admin-sub">Use one status control for the game workflow, then manage player access separately.</div>
               </div>
               <span class="admin-collapse-icon">▾</span>
             </summary>
-            <div class="admin-game-state-grid">
-              ${renderAdminGameStateToggle_(
-                "active",
-                "Game Status",
-                game.active,
-                "ACTIVE: ON",
-                "ACTIVE: OFF",
-                "ON makes the game available when its date window also permits it. OFF keeps the game unavailable to players.",
-                "active"
-              )}
+
+            ${renderAdminGameStatusControl_(game)}
+
+            <div class="admin-game-state-grid admin-game-access-grid">
               ${renderAdminGameStateToggle_(
                 "lockAllPicks",
-                "Picks",
+                "Player Entries",
                 game.lockAllPicks,
-                "PICKS: LOCKED",
-                "PICKS: OPEN",
-                "OPEN allows players to submit or change picks and wagers before their individual lock times. LOCKED immediately blocks all pick and wager changes in this game.",
-                "picks"
+                "PICKS & WAGERS: LOCKED",
+                "PICKS & WAGERS: OPEN",
+                "OPEN allows players to submit or change entries before each question's own lock time. LOCKED immediately blocks all picks and wagers in this game.",
+                "picks",
+                !isLiveStatus
               )}
               ${renderAdminGameStateToggle_(
                 "defaultGame",
                 "Default Game",
                 game.defaultGame,
-                "DEFAULT GAME: ON",
-                "DEFAULT GAME: OFF",
-                "ON opens this game by default when no specific game is selected. Only one game should be the default.",
-                "default"
+                "DEFAULT GAME: YES",
+                "DEFAULT GAME: NO",
+                "YES makes this the first game users see when no game is selected. It can only be enabled while Game Status is LIVE.",
+                "default",
+                !isLiveStatus
               )}
               ${renderAdminGameStateToggle_(
                 "showLeaderboard",
@@ -1905,20 +2196,13 @@ function renderAdminGameForm(
                 "LEADERBOARD: SHOWN",
                 "LEADERBOARD: HIDDEN",
                 "SHOWN allows players to view standings for this game. HIDDEN keeps the leaderboard out of the player view.",
-                "leaderboard"
-              )}
-              ${renderAdminGameStateToggle_(
-                "archived",
-                "Archive Status",
-                game.archived,
-                "ARCHIVED: YES",
-                "ARCHIVED: NO",
-                "YES removes the game from normal active lists while preserving its records. Use this only for completed or retired games.",
-                "archived"
+                "leaderboard",
+                false
               )}
             </div>
+
             <div class="admin-game-state-note">
-              Button wording and color show the current selection. After any change, the sticky save button changes to <strong>CHANGES MADE — SAVE NOW</strong> until the update is stored.
+              <strong>Correct workflow:</strong> Draft → Setup → Preview → Live. Draft, Setup, and Preview automatically keep entries locked and Default Game off. Live opens entries by default; you may lock them again at any time. Archive and Restore remain deliberate buttons below the form.
             </div>
           </details>
 
@@ -1955,11 +2239,6 @@ function renderAdminGameForm(
               <label class="admin-field">
                 ${adminFieldLabel_("Sort Order", "Lower numbers appear earlier in game lists.")}
                 <input name="sortOrder" type="number" value="${escapeHtml_(game.sortOrder || 999)}">
-              </label>
-
-              <label class="admin-field">
-                ${adminFieldLabel_("Status Label", "Optional display text such as Open, Locked, Playoffs, or Complete.")}
-                <input name="status" value="${escapeHtml_(game.status || "")}" placeholder="Open, Locked, Complete">
               </label>
 
               <label class="admin-field admin-wide-field">
@@ -2076,6 +2355,13 @@ function renderAdminGameForm(
               </button>
               <button
                 type="button"
+                class="admin-small-button secondary"
+                onclick="adminRunPreflightCheck('${escapeJs(rawGameId)}')"
+              >
+                Run Check
+              </button>
+              <button
+                type="button"
                 id="adminArchiveCopyButton_${domId}"
                 class="admin-small-button secondary"
                 onclick="adminArchiveGameDataCopy('${escapeJs(rawGameId)}')"
@@ -2105,28 +2391,14 @@ function renderAdminGameForm(
               >COPY is non-destructive. MOVE requires a verified copy and finalized game.</span>
             ` : ""}
           </div>
-        </form>
-
-        ${!isNew && typeof renderAdminPublishControls === "function" ? `
-          <div class="admin-game-publish-wrapper">
-            <div class="admin-card-actions">
-              <button
-                type="button"
-                class="admin-small-button secondary"
-                onclick="adminRunPreflightCheck('${escapeJs(rawGameId)}')"
-              >
-                Run Check
-              </button>
-            </div>
-
-            ${renderAdminPublishControls(game)}
-
+          ${!isNew ? `
             <div
               id="adminPreflightResult_${escapeHtml_(rawGameId)}"
               class="admin-preflight-result"
             ></div>
-          </div>
-        ` : ""}
+          ` : ""}
+        </form>
+
       </div>
     </details>
   `;
@@ -2411,6 +2683,32 @@ async function adminSaveGameFromForm(
     return false;
   }
 
+  if (game.status === "Archived") {
+    game.active = false;
+    game.defaultGame = false;
+    game.lockAllPicks = true;
+    game.archived = true;
+  } else if (game.status === "Draft" || game.status === "Setup") {
+    game.active = false;
+    game.defaultGame = false;
+    game.lockAllPicks = true;
+    game.archived = false;
+  } else if (game.status === "Preview") {
+    game.active = true;
+    game.defaultGame = false;
+    game.lockAllPicks = true;
+    game.archived = false;
+  } else {
+    game.status = "Active";
+    game.active = true;
+    game.archived = false;
+  }
+
+  if (game.defaultGame === true && game.status !== "Active") {
+    alert("Default Game can only be enabled when Game Status is LIVE.");
+    return false;
+  }
+
   if (game.themeColor && !/^#[0-9a-f]{6}$/i.test(game.themeColor)) {
     alert("Theme Color must be a six-digit hex value such as #c8a24a.");
     return false;
@@ -2482,10 +2780,7 @@ async function adminSaveGameFromForm(
 
   const publishRequested =
     !forceSetupState &&
-    (
-      game.active === true ||
-      game.defaultGame === true
-    );
+    game.status === "Active";
 
   const publishAsDefault =
     game.defaultGame === true;
@@ -2547,7 +2842,7 @@ async function adminSaveGameFromForm(
           confirm(
             "The production check found " +
             preflight.warningCount +
-            " warning(s). Activate this game anyway?"
+            " warning(s). Publish this game as LIVE anyway?"
           );
 
         if (!continueWithWarnings) {
@@ -2563,7 +2858,7 @@ async function adminSaveGameFromForm(
             active: true,
             archived: false,
             defaultGame: publishAsDefault,
-            lockAllPicks: false
+            lockAllPicks: game.lockAllPicks === true
           });
         }
 
@@ -2663,6 +2958,13 @@ function adminGetGamePayloadFromForm_(
   form
 ) {
 
+  const featureFlags = adminGameTypeFeatureFlags_(form);
+  const status = adminCanonicalGameStatus_(
+    form.status ? form.status.value : "Draft",
+    form.active ? form.active.checked : false,
+    form.archived ? form.archived.checked : false
+  );
+
   return {
     gameId:
       form.gameId.value.trim(),
@@ -2686,13 +2988,13 @@ function adminGetGamePayloadFromForm_(
       form.defaultGame.checked,
 
     predictionEnabled:
-      form.predictionEnabled.checked,
+      featureFlags.predictionEnabled,
 
     rankingEnabled:
-      form.rankingEnabled.checked,
+      featureFlags.rankingEnabled,
 
     confidenceEnabled:
-      form.confidenceEnabled.checked,
+      featureFlags.confidenceEnabled,
 
     confidenceScoringMode:
       form.confidenceScoringMode
@@ -2700,7 +3002,7 @@ function adminGetGamePayloadFromForm_(
         : "win_only",  
 
     wagerEnabled:
-      form.wagerEnabled.checked,
+      featureFlags.wagerEnabled,
 
     startingBankroll:
       form.startingBankroll.value,
@@ -2797,14 +3099,10 @@ function adminGetGamePayloadFromForm_(
         : "combined-net",
 
     fixedPointsEnabled:
-      form.fixedPointsEnabled
-        ? form.fixedPointsEnabled.checked
-        : true,
+      featureFlags.fixedPointsEnabled,
 
     stakedPointsEnabled:
-      form.stakedPointsEnabled
-        ? form.stakedPointsEnabled.checked
-        : false,
+      featureFlags.stakedPointsEnabled,
 
     startingPoints:
       form.startingPoints
@@ -2878,7 +3176,7 @@ function adminGetGamePayloadFromForm_(
       form.sortOrder.value,
 
     status:
-      form.status.value.trim(),
+      status,
 
     lockAllPicks:
       form.lockAllPicks.checked,

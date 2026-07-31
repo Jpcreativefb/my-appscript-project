@@ -63,6 +63,71 @@ function adminNormalizeGameId_(value) {
   
   }
   
+  function adminResolveGameTypeFeatureFlags_(
+    type,
+    payload,
+    existing
+  ) {
+
+    payload = payload || {};
+    existing = existing || {};
+
+    const normalizedType =
+      typeof normalizeGameType_ === "function"
+        ? normalizeGameType_(type || "prediction")
+        : adminNormalizeValue_(type || "prediction").toLowerCase();
+
+    const config =
+      typeof getGameTypeConfig === "function"
+        ? getGameTypeConfig(normalizedType)
+        : {
+            predictionEnabled: normalizedType !== "wager",
+            rankingEnabled: normalizedType === "ranking",
+            confidenceEnabled: normalizedType === "confidence",
+            wagerEnabled: normalizedType === "wager",
+            fixedPointsEnabled: normalizedType === "prediction",
+            stakedPointsEnabled: normalizedType === "staked-prediction",
+            mixedGame: normalizedType === "mixed"
+          };
+
+    const isHybrid = config.mixedGame === true || normalizedType === "mixed";
+
+    const resolveHybridFlag = function(key, fallback) {
+      if (Object.prototype.hasOwnProperty.call(payload, key)) {
+        return adminToBoolean_(payload[key]);
+      }
+
+      if (Object.prototype.hasOwnProperty.call(existing, key)) {
+        return adminToBoolean_(existing[key]);
+      }
+
+      return fallback === true;
+    };
+
+    if (isHybrid) {
+      return {
+        predictionEnabled: resolveHybridFlag("predictionEnabled", config.predictionEnabled),
+        rankingEnabled: resolveHybridFlag("rankingEnabled", config.rankingEnabled),
+        confidenceEnabled: resolveHybridFlag("confidenceEnabled", config.confidenceEnabled),
+        wagerEnabled: resolveHybridFlag("wagerEnabled", config.wagerEnabled),
+        fixedPointsEnabled: resolveHybridFlag("fixedPointsEnabled", config.fixedPointsEnabled),
+        stakedPointsEnabled: resolveHybridFlag("stakedPointsEnabled", config.stakedPointsEnabled),
+        mixedGame: true
+      };
+    }
+
+    return {
+      predictionEnabled: config.predictionEnabled === true,
+      rankingEnabled: config.rankingEnabled === true,
+      confidenceEnabled: config.confidenceEnabled === true,
+      wagerEnabled: config.wagerEnabled === true,
+      fixedPointsEnabled: config.fixedPointsEnabled === true,
+      stakedPointsEnabled: config.stakedPointsEnabled === true,
+      mixedGame: false
+    };
+
+  }
+  
   function adminGetGamesHeaders_() {
   
     const sh =
@@ -786,6 +851,13 @@ function adminNormalizeGameId_(value) {
             wagerEnabled: false
           };
   
+    const featureFlags =
+      adminResolveGameTypeFeatureFlags_(
+        type,
+        payload,
+        null
+      );
+  
     adminSetIfColumnExists_(
       row,
       col,
@@ -848,33 +920,21 @@ function adminNormalizeGameId_(value) {
       row,
       col,
       "predictionEnabled",
-      payload.predictionEnabled === undefined
-        ? typeConfig.predictionEnabled
-        : adminToBoolean_(
-            payload.predictionEnabled
-          )
+      featureFlags.predictionEnabled
     );
   
     adminSetIfColumnExists_(
       row,
       col,
       "rankingEnabled",
-      payload.rankingEnabled === undefined
-        ? typeConfig.rankingEnabled
-        : adminToBoolean_(
-            payload.rankingEnabled
-          )
+      featureFlags.rankingEnabled
     );
   
     adminSetIfColumnExists_(
       row,
       col,
       "confidenceEnabled",
-      payload.confidenceEnabled === undefined
-        ? typeConfig.confidenceEnabled
-        : adminToBoolean_(
-            payload.confidenceEnabled
-          )
+      featureFlags.confidenceEnabled
     );
 
     adminSetIfColumnExists_(
@@ -894,11 +954,7 @@ function adminNormalizeGameId_(value) {
       row,
       col,
       "wagerEnabled",
-      payload.wagerEnabled === undefined
-        ? typeConfig.wagerEnabled
-        : adminToBoolean_(
-            payload.wagerEnabled
-          )
+      featureFlags.wagerEnabled
     );
   
     adminSetIfColumnExists_(
@@ -1092,14 +1148,15 @@ function adminNormalizeGameId_(value) {
 
     const hybridPayload =
       Object.assign(
+        {},
+        payload,
         {
-          mixedGame: typeConfig.mixedGame === true,
-          gameFormat: typeConfig.mixedGame === true ? "hybrid" : "standard",
-          scoringMode: typeConfig.mixedGame === true ? "hybrid" : "standard",
-          stakedPointsEnabled: typeConfig.stakedPointsEnabled === true,
-          fixedPointsEnabled: typeConfig.fixedPointsEnabled === true
-        },
-        payload
+          mixedGame: featureFlags.mixedGame === true,
+          gameFormat: featureFlags.mixedGame === true ? "hybrid" : "standard",
+          scoringMode: featureFlags.mixedGame === true ? "hybrid" : "standard",
+          stakedPointsEnabled: featureFlags.stakedPointsEnabled === true,
+          fixedPointsEnabled: featureFlags.fixedPointsEnabled === true
+        }
       );
 
     adminApplyHybridGameFields_(
@@ -1497,6 +1554,35 @@ function adminSaveGame(payload) {
   
       const row =
         data[rowIndex - 1].slice();
+
+      const resolvedType =
+        typeof normalizeGameType_ === "function"
+          ? normalizeGameType_(
+              Object.prototype.hasOwnProperty.call(payload, "type")
+                ? payload.type
+                : (col.type !== -1 ? row[col.type] : "prediction")
+            )
+          : adminNormalizeValue_(
+              Object.prototype.hasOwnProperty.call(payload, "type")
+                ? payload.type
+                : (col.type !== -1 ? row[col.type] : "prediction")
+            ).toLowerCase();
+
+      const existingFeatureFlags = {
+        predictionEnabled: col.predictionEnabled !== -1 ? row[col.predictionEnabled] : undefined,
+        rankingEnabled: col.rankingEnabled !== -1 ? row[col.rankingEnabled] : undefined,
+        confidenceEnabled: col.confidenceEnabled !== -1 ? row[col.confidenceEnabled] : undefined,
+        wagerEnabled: col.wagerEnabled !== -1 ? row[col.wagerEnabled] : undefined,
+        fixedPointsEnabled: col.fixedPointsEnabled !== -1 ? row[col.fixedPointsEnabled] : undefined,
+        stakedPointsEnabled: col.stakedPointsEnabled !== -1 ? row[col.stakedPointsEnabled] : undefined
+      };
+
+      const featureFlags =
+        adminResolveGameTypeFeatureFlags_(
+          resolvedType,
+          payload,
+          existingFeatureFlags
+        );
   
       if ("name" in payload || "gameName" in payload) {
   
@@ -1530,9 +1616,7 @@ function adminSaveGame(payload) {
           row,
           col,
           "type",
-          adminNormalizeValue_(
-            payload.type
-          )
+          resolvedType
         );
   
       }
@@ -1631,6 +1715,15 @@ function adminSaveGame(payload) {
         );
       
       }
+
+      /*
+        Game Type is the single source of truth for non-Hybrid games.
+        Hybrid games preserve the administrator's selected combination.
+      */
+      adminSetIfColumnExists_(row, col, "predictionEnabled", featureFlags.predictionEnabled);
+      adminSetIfColumnExists_(row, col, "rankingEnabled", featureFlags.rankingEnabled);
+      adminSetIfColumnExists_(row, col, "confidenceEnabled", featureFlags.confidenceEnabled);
+      adminSetIfColumnExists_(row, col, "wagerEnabled", featureFlags.wagerEnabled);
       
       if ("startingBankroll" in payload) {
       
@@ -1709,10 +1802,23 @@ function adminSaveGame(payload) {
 
       }
   
+      const normalizedHybridPayload =
+        Object.assign(
+          {},
+          payload,
+          {
+            mixedGame: featureFlags.mixedGame === true,
+            gameFormat: featureFlags.mixedGame === true ? "hybrid" : "standard",
+            scoringMode: featureFlags.mixedGame === true ? "hybrid" : "standard",
+            fixedPointsEnabled: featureFlags.fixedPointsEnabled === true,
+            stakedPointsEnabled: featureFlags.stakedPointsEnabled === true
+          }
+        );
+
       adminApplyHybridGameFields_(
         row,
         col,
-        payload,
+        normalizedHybridPayload,
         true
       );
 
