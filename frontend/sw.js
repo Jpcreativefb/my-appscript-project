@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v255-unified-game-status";
+const AWARDS_CACHE = "awards-app-v256-game-setup-save-delete";
 
 const APP_SHELL = [
   "./",

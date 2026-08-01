@@ -26,7 +26,7 @@ for (const source of [app, appRoot]) {
 }
 assert(appHtml.includes('./js/pages/gameModeHub.js'));
 assert(serviceWorker.includes('./js/pages/gameModeHub.js'));
-assert(serviceWorker.includes('awards-app-v255-unified-game-status'));
+assert(serviceWorker.includes('awards-app-v256-game-setup-save-delete'));
 assert(modeHub.includes('Make Picks'));
 assert(modeHub.includes('Place Wagers'));
 assert(modeHub.includes('View Leaderboard'));

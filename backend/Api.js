@@ -167,6 +167,8 @@ function doGet(e) {
       "adminCreateCategory",
       "adminCloneCategory",
       "adminUpdateCategory",
+      "adminBulkUpdateGameSetup",
+      "adminDeleteCategory",
       "adminArchiveCategory",
       "adminCreateNominee",
       "adminBulkCreateNominees",
@@ -840,6 +842,26 @@ function doGet(e) {
 
       return json(
         adminUpdateCategory(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminBulkUpdateGameSetup") {
+
+      return json(
+        adminBulkUpdateGameSetup(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminDeleteCategory") {
+
+      return json(
+        adminDeleteCategory(
           params
         )
       );

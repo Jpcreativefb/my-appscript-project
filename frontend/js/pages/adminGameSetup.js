@@ -399,9 +399,14 @@ function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
 
   const rawScoreMode = String(config.scoreMode || "fixed-points").trim();
   const normalizedScoreMode = rawScoreMode.toLowerCase().replace(/_/g, "-");
-  const scoreMode = normalizedScoreMode === "correct-pick"
+  const storedScoreMode = normalizedScoreMode === "correct-pick"
     ? "fixed-points"
     : normalizedScoreMode;
+  const gameType = adminSetupCanonicalGameType_(game);
+  const scoreModeLocked = gameType !== "mixed";
+  const scoreMode = scoreModeLocked
+    ? adminSetupDefaultScoreMode_(game)
+    : storedScoreMode;
   const scoringEngine = String(config.scoringEngine || (game && game.scoringEngine) || "manual").trim();
   const selectionMode = String(config.selectionMode || "single").trim();
   const resultSourceType = String(config.resultSourceType || "manual").trim();
@@ -423,12 +428,14 @@ function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
             <select
               id="${id("ScoreMode")}"
               data-question-score-mode
+              ${scoreModeLocked ? "disabled aria-disabled=\"true\"" : ""}
               onchange="adminSetupUpdateQuestionFieldVisibility(this.closest('[data-question-engine-root]'))"
             >
               ${allowedScoreModes.map(function(mode) {
                 return `<option value="${adminSetupEscapeHtml(mode.value)}" ${adminSetupSelected_(scoreMode, mode.value)}>${adminSetupEscapeHtml(mode.label)}</option>`;
               }).join("")}
             </select>
+            ${scoreModeLocked ? `<span class="admin-field-note">Set automatically by Game Type. Hybrid games allow per-question Score Mode.</span>` : ""}
           </label>
 
           <label class="admin-field">
@@ -1030,6 +1037,21 @@ async function renderAdminGameSetupPage(gameId) {
               id="adminSetupMessage"
               class="admin-message"
             ></div>
+
+            <div class="admin-setup-save-all-bar">
+              <div>
+                <strong>Question and answer changes</strong>
+                <div class="admin-sub">Edit several existing questions and answers, then save them together.</div>
+              </div>
+              <button
+                type="button"
+                id="adminSetupSaveAllButton"
+                class="admin-small-button admin-save-state-button"
+                onclick="adminSetupSaveAllChanges('${adminSetupEscapeHtml(safeGameId)}')"
+              >
+                SAVE ALL CHANGES
+              </button>
+            </div>
 
             <div class="admin-card-actions">
 
@@ -2838,7 +2860,14 @@ function renderAdminSetupCategoryCard(category, game, categories) {
             <span class="admin-collapse-icon">▾</span>
           </summary>
 
-          <div class="admin-edit-panel">
+          <div
+            class="admin-edit-panel"
+            data-question-editor
+            data-category-id="${categoryId}"
+            data-dirty="false"
+            oninput="adminSetupMarkQuestionDirty('${categoryId}')"
+            onchange="adminSetupMarkQuestionDirty('${categoryId}')"
+          >
 
           <div class="admin-control-grid">
 
@@ -3015,17 +3044,28 @@ function renderAdminSetupCategoryCard(category, game, categories) {
           <div class="admin-card-actions">
 
             <button
-              class="admin-small-button"
+              type="button"
+              id="saveQuestionButton_${categoryId}"
+              class="admin-small-button admin-save-state-button"
               onclick="adminSetupUpdateCategory('${gameId}', '${categoryId}')"
             >
-              Save Question
+              SAVE QUESTION
             </button>
 
             <button
-              class="admin-danger-button"
+              type="button"
+              class="admin-small-button secondary"
               onclick="adminSetupArchiveCategory('${gameId}', '${categoryId}')"
             >
               Archive Question
+            </button>
+
+            <button
+              type="button"
+              class="admin-danger-button"
+              onclick="adminSetupDeleteCategory('${gameId}', '${categoryId}')"
+            >
+              Delete Question
             </button>
 
           </div>
@@ -3394,7 +3434,15 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
         </div>
       </summary>
 
-      <div class="admin-nominee-item-body">
+      <div
+        class="admin-nominee-item-body"
+        data-answer-editor
+        data-category-id="${categoryId}"
+        data-nominee-id="${nomineeId}"
+        data-dirty="false"
+        oninput="adminSetupMarkAnswerDirty('${categoryId}', '${nomineeId}')"
+        onchange="adminSetupMarkAnswerDirty('${categoryId}', '${nomineeId}')"
+      >
 
       <div class="admin-control-grid nominee-grid">
 
@@ -3612,10 +3660,12 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
         <div class="admin-card-actions">
 
           <button
-            class="admin-small-button"
+            type="button"
+            id="saveAnswerButton_${categoryId}_${nomineeId}"
+            class="admin-small-button admin-save-state-button"
             onclick="adminSetupUpdateNominee('${gameId}', '${categoryId}', '${nomineeId}')"
           >
-            Save Nominee
+            SAVE ANSWER
           </button>
 
           <button
@@ -4335,92 +4385,120 @@ async function adminSetupCreateInlineNominee(
 }
 
 /* ======================
-   UPDATE CATEGORY
+   QUESTION / ANSWER SAVE STATE
 ====================== */
 
-async function adminSetupUpdateCategory(gameId, categoryId) {
-  const nameInput = document.getElementById("editCategoryName_" + categoryId);
+function adminSetupSetSaveButtonState_(button, state, labels) {
+  if (!button) return;
 
-  const sectionInput = document.getElementById(
-    "editCategorySection_" + categoryId
+  labels = labels || {};
+  button.classList.remove("is-dirty", "is-saving", "is-saved", "is-error");
+
+  if (state) {
+    button.classList.add("is-" + state);
+  }
+
+  const label = labels[state] || labels.default || button.textContent;
+  button.textContent = label;
+  button.disabled = state === "saving";
+}
+
+function adminSetupRefreshSaveAllState_() {
+  const button = document.getElementById("adminSetupSaveAllButton");
+  if (!button) return;
+
+  const hasDirty = Boolean(
+    document.querySelector('[data-question-editor][data-dirty="true"], [data-answer-editor][data-dirty="true"]')
   );
 
-  const pointsInput = document.getElementById(
-    "editCategoryPoints_" + categoryId
+  if (hasDirty) {
+    adminSetupSetSaveButtonState_(button, "dirty", {
+      dirty: "CHANGES MADE — SAVE ALL NOW"
+    });
+  } else if (!button.classList.contains("is-saved")) {
+    adminSetupSetSaveButtonState_(button, "", {
+      default: "SAVE ALL CHANGES"
+    });
+  }
+}
+
+function adminSetupMarkQuestionDirty(categoryId) {
+  const editor = document.querySelector(
+    '[data-question-editor][data-category-id="' + String(categoryId) + '"]'
   );
+  if (editor) editor.dataset.dirty = "true";
 
-  const orderInput = document.getElementById("editCategoryOrder_" + categoryId);
-
-  const layoutInput = document.getElementById(
-    "editCategoryLayout_" + categoryId
+  adminSetupSetSaveButtonState_(
+    document.getElementById("saveQuestionButton_" + categoryId),
+    "dirty",
+    { dirty: "CHANGES MADE — SAVE NOW" }
   );
+  adminSetupRefreshSaveAllState_();
+}
 
-  const lockDateTimeInput = document.getElementById(
-    "editCategoryLockDateTime_" + categoryId
+function adminSetupMarkAnswerDirty(categoryId, nomineeId) {
+  const editor = document.querySelector(
+    '[data-answer-editor][data-category-id="' + String(categoryId) + '"][data-nominee-id="' + String(nomineeId) + '"]'
   );
+  if (editor) editor.dataset.dirty = "true";
 
-  const groupIdInput = document.getElementById(
-    "editCategoryGroupId_" + categoryId
+  adminSetupSetSaveButtonState_(
+    document.getElementById("saveAnswerButton_" + categoryId + "_" + nomineeId),
+    "dirty",
+    { dirty: "CHANGES MADE — SAVE NOW" }
   );
+  adminSetupRefreshSaveAllState_();
+}
 
-  const parentCategoryIdInput = document.getElementById(
-    "editCategoryParentCategoryId_" + categoryId
+function adminSetupMarkQuestionSaved_(categoryId) {
+  const editor = document.querySelector(
+    '[data-question-editor][data-category-id="' + String(categoryId) + '"]'
   );
+  if (editor) editor.dataset.dirty = "false";
 
-  const followUpCategoryIdInput = document.getElementById(
-    "editCategoryFollowUpCategoryId_" + categoryId
+  const button = document.getElementById("saveQuestionButton_" + categoryId);
+  adminSetupSetSaveButtonState_(button, "saved", { saved: "SAVED ✓" });
+  setTimeout(function() {
+    if (editor && editor.dataset.dirty === "true") return;
+    adminSetupSetSaveButtonState_(button, "", { default: "SAVE QUESTION" });
+  }, 2200);
+  adminSetupRefreshSaveAllState_();
+}
+
+function adminSetupMarkAnswerSaved_(categoryId, nomineeId) {
+  const editor = document.querySelector(
+    '[data-answer-editor][data-category-id="' + String(categoryId) + '"][data-nominee-id="' + String(nomineeId) + '"]'
   );
+  if (editor) editor.dataset.dirty = "false";
 
-  const followUpMapJSONInput = document.getElementById(
-    "editCategoryFollowUpMapJSON_" + categoryId
-  );
+  const button = document.getElementById("saveAnswerButton_" + categoryId + "_" + nomineeId);
+  adminSetupSetSaveButtonState_(button, "saved", { saved: "SAVED ✓" });
+  setTimeout(function() {
+    if (editor && editor.dataset.dirty === "true") return;
+    adminSetupSetSaveButtonState_(button, "", { default: "SAVE ANSWER" });
+  }, 2200);
+  adminSetupRefreshSaveAllState_();
+}
 
-  const questionEngineFields =
-    adminSetupReadQuestionEngineFields_("editCategory", "_" + categoryId);
-
-  const lockedInput = document.getElementById(
-    "editCategoryLocked_" + categoryId
-  );
-
-  const activeInput = document.getElementById(
-    "editCategoryActive_" + categoryId
-  );
-
-  const predictionInput = document.getElementById(
-    "editCategoryPrediction_" + categoryId
-  );
-
-  const statueInput = document.getElementById(
-    "editCategoryStatue_" + categoryId
-  );
-
+function adminSetupBuildCategoryPayload_(gameId, categoryId) {
+  const get = function(id) { return document.getElementById(id); };
+  const nameInput = get("editCategoryName_" + categoryId);
   const categoryName = nameInput ? nameInput.value.trim() : "";
 
   if (!categoryName) {
-    adminSetupSetMessage(
-      "editCategoryMessage_" + categoryId,
-      "Category name is required.",
-      true
-    );
-
-    return;
+    return { error: "Category name is required." };
   }
 
-  const followUpMapJSON = followUpMapJSONInput
-    ? followUpMapJSONInput.value.trim()
-    : "";
+  const questionEngineFields =
+    adminSetupReadQuestionEngineFields_("editCategory", "_" + categoryId);
+  const followUpMapInput = get("editCategoryFollowUpMapJSON_" + categoryId);
+  const followUpMapJSON = followUpMapInput ? followUpMapInput.value.trim() : "";
 
   if (followUpMapJSON) {
     try {
       JSON.parse(followUpMapJSON);
     } catch (err) {
-      adminSetupSetMessage(
-        "editCategoryMessage_" + categoryId,
-        "Follow-Up Map JSON is not valid JSON.",
-        true
-      );
-
-      return;
+      return { error: "Follow-Up Map JSON is not valid JSON." };
     }
   }
 
@@ -4428,86 +4506,317 @@ async function adminSetupUpdateCategory(gameId, categoryId) {
     try {
       JSON.parse(questionEngineFields.sourceConfigJSON);
     } catch (err) {
-      adminSetupSetMessage(
-        "editCategoryMessage_" + categoryId,
-        "Source Configuration JSON is not valid JSON.",
-        true
-      );
-
-      return;
+      return { error: "Source Configuration JSON is not valid JSON." };
     }
   }
 
-  adminSetupSetMessage(
-    "editCategoryMessage_" + categoryId,
-    "Saving category...",
-    false
-  );
+  const groupIdInput = get("editCategoryGroupId_" + categoryId);
+  const parentInput = get("editCategoryParentCategoryId_" + categoryId);
+  const followUpInput = get("editCategoryFollowUpCategoryId_" + categoryId);
+  const pointsInput = get("editCategoryPoints_" + categoryId);
+  const orderInput = get("editCategoryOrder_" + categoryId);
+  const layoutInput = get("editCategoryLayout_" + categoryId);
+  const lockDateInput = get("editCategoryLockDateTime_" + categoryId);
+  const sectionInput = get("editCategorySection_" + categoryId);
+  const lockedInput = get("editCategoryLocked_" + categoryId);
+  const activeInput = get("editCategoryActive_" + categoryId);
+  const predictionInput = get("editCategoryPrediction_" + categoryId);
+  const statueInput = get("editCategoryStatue_" + categoryId);
 
-  const res = await apiAdminUpdateCategory(Object.assign({
-    gameId: gameId,
-
-    categoryId: categoryId,
-
-    category: categoryName,
-
-    section: sectionInput ? sectionInput.value.trim() : "",
-
-    points: pointsInput ? pointsInput.value : 0,
-
-    displayOrder: orderInput ? orderInput.value : 999,
-
-    layoutType: layoutInput ? layoutInput.value : "image",
-
-    lockDateTime: lockDateTimeInput ? lockDateTimeInput.value : "",
-
-    groupId:
-      groupIdInput && groupIdInput.value.trim()
+  return {
+    payload: Object.assign({
+      gameId: gameId,
+      categoryId: categoryId,
+      category: categoryName,
+      section: sectionInput ? sectionInput.value.trim() : "",
+      points: pointsInput ? pointsInput.value : 0,
+      displayOrder: orderInput ? orderInput.value : 999,
+      layoutType: layoutInput ? layoutInput.value : "image",
+      lockDateTime: lockDateInput ? lockDateInput.value : "",
+      groupId: groupIdInput && groupIdInput.value.trim()
         ? groupIdInput.value.trim()
         : "default",
+      parentCategoryId: parentInput
+        ? adminSetupSlugify(parentInput.value.trim())
+        : "",
+      followUpCategoryId: followUpInput
+        ? adminSetupSlugify(followUpInput.value.trim())
+        : "",
+      followUpMapJSON: followUpMapJSON,
+      locked: lockedInput ? lockedInput.checked : false,
+      active: activeInput ? activeInput.checked : true,
+      predictionGame: predictionInput ? predictionInput.checked : true,
+      countsAsStatue: statueInput ? statueInput.checked : false
+    }, questionEngineFields)
+  };
+}
 
-    parentCategoryId: parentCategoryIdInput
-      ? adminSetupSlugify(parentCategoryIdInput.value.trim())
-      : "",
+function adminSetupBuildAnswerPayload_(gameId, categoryId, nomineeId) {
+  const get = function(id) { return document.getElementById(id); };
+  const nameInput = get("editNomineeName_" + categoryId + "_" + nomineeId);
+  const nomineeName = nameInput ? nameInput.value.trim() : "";
 
-    followUpCategoryId: followUpCategoryIdInput
-      ? adminSetupSlugify(followUpCategoryIdInput.value.trim())
-      : "",
+  if (!nomineeName) {
+    return { error: "Answer name is required." };
+  }
 
-    followUpMapJSON: followUpMapJSON,
+  const shortInput = get("editNomineeShort_" + categoryId + "_" + nomineeId);
+  const fileInput = get("editNomineeFileId_" + categoryId + "_" + nomineeId);
+  const activeInput = get("editNomineeActive_" + categoryId + "_" + nomineeId);
 
-    locked: lockedInput ? lockedInput.checked : false,
+  return {
+    payload: {
+      gameId: gameId,
+      categoryId: categoryId,
+      nomineeId: nomineeId,
+      nominee: nomineeName,
+      shortAnswer: shortInput && shortInput.value.trim()
+        ? shortInput.value.trim()
+        : nomineeName,
+      fileId: fileInput ? fileInput.value.trim() : "",
+      active: activeInput ? activeInput.checked : true
+    }
+  };
+}
 
-    active: activeInput ? activeInput.checked : true,
+function adminSetupBuildBulkSaveBatches_(questions, answers) {
+  const maxJsonLength = 4200;
+  const batches = [];
+  let current = { questions: [], answers: [], length: 0 };
 
-    predictionGame: predictionInput ? predictionInput.checked : true,
+  const pushCurrent = function() {
+    if (current.questions.length || current.answers.length) {
+      batches.push(current);
+    }
+    current = { questions: [], answers: [], length: 0 };
+  };
 
-    countsAsStatue: statueInput ? statueInput.checked : false,
-  }, questionEngineFields));
+  const addItem = function(type, item) {
+    const length = JSON.stringify(item || {}).length + 80;
+    if (current.length && current.length + length > maxJsonLength) {
+      pushCurrent();
+    }
+    current[type].push(item);
+    current.length += length;
+  };
+
+  (questions || []).forEach(function(item) { addItem("questions", item); });
+  (answers || []).forEach(function(item) { addItem("answers", item); });
+  pushCurrent();
+
+  return batches;
+}
+
+async function adminSetupSaveAllChanges(gameId) {
+  const questionEditors = Array.from(
+    document.querySelectorAll('[data-question-editor][data-dirty="true"]')
+  );
+  const answerEditors = Array.from(
+    document.querySelectorAll('[data-answer-editor][data-dirty="true"]')
+  );
+  const button = document.getElementById("adminSetupSaveAllButton");
+
+  if (!questionEditors.length && !answerEditors.length) {
+    adminSetupSetMessage("adminSetupMessage", "No unsaved question or answer changes.", false);
+    return;
+  }
+
+  const questions = [];
+  const answers = [];
+
+  for (const editor of questionEditors) {
+    const categoryId = editor.dataset.categoryId;
+    const built = adminSetupBuildCategoryPayload_(gameId, categoryId);
+    if (built.error) {
+      adminSetupSetMessage("editCategoryMessage_" + categoryId, built.error, true);
+      adminSetupSetMessage("adminSetupMessage", "Fix the highlighted question before saving all changes.", true);
+      return;
+    }
+    questions.push(built.payload);
+    adminSetupSetSaveButtonState_(
+      document.getElementById("saveQuestionButton_" + categoryId),
+      "saving",
+      { saving: "SAVING..." }
+    );
+  }
+
+  for (const editor of answerEditors) {
+    const categoryId = editor.dataset.categoryId;
+    const nomineeId = editor.dataset.nomineeId;
+    const built = adminSetupBuildAnswerPayload_(gameId, categoryId, nomineeId);
+    if (built.error) {
+      adminSetupSetMessage("editNomineeMessage_" + categoryId + "_" + nomineeId, built.error, true);
+      adminSetupSetMessage("adminSetupMessage", "Fix the highlighted answer before saving all changes.", true);
+      return;
+    }
+    answers.push(built.payload);
+    adminSetupSetSaveButtonState_(
+      document.getElementById("saveAnswerButton_" + categoryId + "_" + nomineeId),
+      "saving",
+      { saving: "SAVING..." }
+    );
+  }
+
+  adminSetupSetSaveButtonState_(button, "saving", { saving: "SAVING ALL..." });
+  adminSetupSetMessage("adminSetupMessage", "Saving all changed questions and answers...", false);
+
+  const batches = adminSetupBuildBulkSaveBatches_(questions, answers);
+  const aggregate = {
+    success: true,
+    message: "All Game Setup changes saved.",
+    questionsSaved: 0,
+    answersSaved: 0,
+    failures: []
+  };
+
+  for (const batch of batches) {
+    const batchResult = await apiAdminBulkUpdateGameSetup(
+      gameId,
+      batch.questions,
+      batch.answers
+    );
+
+    if (!batchResult || batchResult.success === false) {
+      aggregate.success = false;
+      aggregate.message = batchResult && (batchResult.message || batchResult.error)
+        ? batchResult.message || batchResult.error
+        : "Some Game Setup changes could not be saved.";
+    }
+
+    aggregate.questionsSaved += Number(batchResult && batchResult.questionsSaved || 0);
+    aggregate.answersSaved += Number(batchResult && batchResult.answersSaved || 0);
+    if (batchResult && Array.isArray(batchResult.failures)) {
+      aggregate.failures = aggregate.failures.concat(batchResult.failures);
+    }
+  }
+
+  const res = aggregate;
+  const failures = res.failures;
+  const failedQuestions = {};
+  const failedAnswers = {};
+
+  failures.forEach(function(failure) {
+    if (failure.type === "question") {
+      failedQuestions[String(failure.categoryId || "")] = failure.error || "Save failed.";
+    } else {
+      failedAnswers[
+        String(failure.categoryId || "") + "::" + String(failure.nomineeId || "")
+      ] = failure.error || "Save failed.";
+    }
+  });
+
+  questionEditors.forEach(function(editor) {
+    const categoryId = editor.dataset.categoryId;
+    if (failedQuestions[categoryId]) {
+      adminSetupSetMessage("editCategoryMessage_" + categoryId, failedQuestions[categoryId], true);
+      adminSetupSetSaveButtonState_(
+        document.getElementById("saveQuestionButton_" + categoryId),
+        "error",
+        { error: "SAVE FAILED — TRY AGAIN" }
+      );
+    } else {
+      adminSetupSetMessage("editCategoryMessage_" + categoryId, "Question saved.", false);
+      adminSetupMarkQuestionSaved_(categoryId);
+    }
+  });
+
+  answerEditors.forEach(function(editor) {
+    const categoryId = editor.dataset.categoryId;
+    const nomineeId = editor.dataset.nomineeId;
+    const key = categoryId + "::" + nomineeId;
+    if (failedAnswers[key]) {
+      adminSetupSetMessage("editNomineeMessage_" + categoryId + "_" + nomineeId, failedAnswers[key], true);
+      adminSetupSetSaveButtonState_(
+        document.getElementById("saveAnswerButton_" + categoryId + "_" + nomineeId),
+        "error",
+        { error: "SAVE FAILED — TRY AGAIN" }
+      );
+    } else {
+      adminSetupSetMessage("editNomineeMessage_" + categoryId + "_" + nomineeId, "Answer saved.", false);
+      adminSetupMarkAnswerSaved_(categoryId, nomineeId);
+    }
+  });
+
+  if (!res || res.success === false) {
+    adminSetupSetSaveButtonState_(button, "error", { error: "SOME CHANGES FAILED" });
+    adminSetupSetMessage(
+      "adminSetupMessage",
+      res && (res.message || res.error) ? res.message || res.error : "Some changes could not be saved.",
+      true
+    );
+    return;
+  }
+
+  adminSetupSetSaveButtonState_(button, "saved", { saved: "ALL CHANGES SAVED ✓" });
+  adminSetupSetMessage(
+    "adminSetupMessage",
+    "Saved " + Number(res.questionsSaved || 0) + " question(s) and " + Number(res.answersSaved || 0) + " answer(s).",
+    false
+  );
+  setTimeout(function() {
+    adminSetupSetSaveButtonState_(button, "", { default: "SAVE ALL CHANGES" });
+    adminSetupRefreshSaveAllState_();
+  }, 2500);
+}
+
+async function adminSetupDeleteCategory(gameId, categoryId) {
+  const first = confirm(
+    "Permanently delete this question and all of its answers? This cannot be undone. Use Archive Question when you need to preserve history."
+  );
+  if (!first) return;
+
+  const second = confirm("Delete this question permanently now?");
+  if (!second) return;
+
+  adminSetupSetMessage("editCategoryMessage_" + categoryId, "Deleting question...", false);
+  const res = await apiAdminDeleteCategory(gameId, categoryId);
+
+  if (!res || res.success === false) {
+    const message = res && (res.message || res.error)
+      ? res.message || res.error
+      : "Could not delete question.";
+    adminSetupSetMessage("editCategoryMessage_" + categoryId, message, true);
+    alert(message);
+    return;
+  }
+
+  navigate("admin-game-setup:" + gameId);
+}
+
+/* ======================
+   UPDATE CATEGORY
+====================== */
+
+async function adminSetupUpdateCategory(gameId, categoryId) {
+  const built = adminSetupBuildCategoryPayload_(gameId, categoryId);
+  const button = document.getElementById("saveQuestionButton_" + categoryId);
+
+  if (built.error) {
+    adminSetupSetMessage("editCategoryMessage_" + categoryId, built.error, true);
+    adminSetupSetSaveButtonState_(button, "error", { error: "FIX ERROR — SAVE AGAIN" });
+    return;
+  }
+
+  adminSetupSetSaveButtonState_(button, "saving", { saving: "SAVING..." });
+  adminSetupSetMessage("editCategoryMessage_" + categoryId, "Saving question...", false);
+
+  const res = await apiAdminUpdateCategory(built.payload);
 
   if (!res || res.success === false) {
     adminSetupSetMessage(
       "editCategoryMessage_" + categoryId,
       res && (res.message || res.error)
         ? res.message || res.error
-        : "Could not save category.",
+        : "Could not save question.",
       true
     );
-
+    adminSetupSetSaveButtonState_(button, "error", { error: "SAVE FAILED — TRY AGAIN" });
     return;
   }
 
-  adminSetupApplyLockState_(
-    categoryId,
-    lockedInput ? lockedInput.checked : false
-  );
-
-  adminSetupSetMessage(
-    "editCategoryMessage_" + categoryId,
-    "Category saved.",
-    false
-  );
-
+  adminSetupApplyLockState_(categoryId, Boolean(built.payload.locked));
+  adminSetupSetMessage("editCategoryMessage_" + categoryId, "Question saved.", false);
+  adminSetupMarkQuestionSaved_(categoryId);
 }
 
 /* ======================
@@ -4551,72 +4860,48 @@ async function adminSetupArchiveCategory(gameId, categoryId) {
 ====================== */
 
 async function adminSetupUpdateNominee(gameId, categoryId, nomineeId) {
-  const nameInput = document.getElementById(
-    "editNomineeName_" + categoryId + "_" + nomineeId
+  const built = adminSetupBuildAnswerPayload_(gameId, categoryId, nomineeId);
+  const button = document.getElementById(
+    "saveAnswerButton_" + categoryId + "_" + nomineeId
   );
 
-  const shortInput = document.getElementById(
-    "editNomineeShort_" + categoryId + "_" + nomineeId
-  );
-
-  const fileIdInput = document.getElementById(
-    "editNomineeFileId_" + categoryId + "_" + nomineeId
-  );
-
-  const activeInput = document.getElementById(
-    "editNomineeActive_" + categoryId + "_" + nomineeId
-  );
-
-  const nomineeName = nameInput ? nameInput.value.trim() : "";
-
-  if (!nomineeName) {
+  if (built.error) {
     adminSetupSetMessage(
       "editNomineeMessage_" + categoryId + "_" + nomineeId,
-      "Nominee name is required.",
+      built.error,
       true
     );
-
+    adminSetupSetSaveButtonState_(button, "error", { error: "FIX ERROR — SAVE AGAIN" });
     return;
   }
 
+  adminSetupSetSaveButtonState_(button, "saving", { saving: "SAVING..." });
   adminSetupSetMessage(
     "editNomineeMessage_" + categoryId + "_" + nomineeId,
-    "Saving nominee...",
+    "Saving answer...",
     false
   );
 
-  const res = await apiAdminUpdateNominee({
-    gameId: gameId,
-    categoryId: categoryId,
-    nomineeId: nomineeId,
-    nominee: nomineeName,
-    shortAnswer:
-      shortInput && shortInput.value.trim()
-        ? shortInput.value.trim()
-        : nomineeName,
-    fileId: fileIdInput ? fileIdInput.value.trim() : "",
-    active: activeInput ? activeInput.checked : true,
-  });
+  const res = await apiAdminUpdateNominee(built.payload);
 
   if (!res || res.success === false) {
     adminSetupSetMessage(
       "editNomineeMessage_" + categoryId + "_" + nomineeId,
       res && (res.message || res.error)
         ? res.message || res.error
-        : "Could not save nominee.",
+        : "Could not save answer.",
       true
     );
-
+    adminSetupSetSaveButtonState_(button, "error", { error: "SAVE FAILED — TRY AGAIN" });
     return;
   }
 
   adminSetupSetMessage(
     "editNomineeMessage_" + categoryId + "_" + nomineeId,
-    "Nominee saved.",
+    "Answer saved.",
     false
   );
-
-  navigate("admin-game-setup:" + gameId);
+  adminSetupMarkAnswerSaved_(categoryId, nomineeId);
 }
 
 /* ======================

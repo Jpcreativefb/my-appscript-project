@@ -3045,3 +3045,71 @@ button.is-saving {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ======================
+   GAME SETUP SAVE STATES
+====================== */
+
+.admin-setup-save-all-bar {
+  position: sticky;
+  top: 8px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.96);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.admin-save-state-button {
+  min-width: 150px;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.admin-save-state-button.is-dirty {
+  background: linear-gradient(135deg, #fb923c, #ea580c) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(251, 146, 60, 0.22);
+}
+
+.admin-save-state-button.is-saving {
+  background: linear-gradient(135deg, #60a5fa, #2563eb) !important;
+  color: #ffffff !important;
+  cursor: wait;
+  opacity: 0.9;
+}
+
+.admin-save-state-button.is-saved {
+  background: linear-gradient(135deg, #4ade80, #16a34a) !important;
+  color: #052e16 !important;
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.18);
+}
+
+.admin-save-state-button.is-error {
+  background: linear-gradient(135deg, #f87171, #dc2626) !important;
+  color: #ffffff !important;
+  box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.2);
+}
+
+.admin-field-note {
+  display: block;
+  margin-top: 6px;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 700px) {
+  .admin-setup-save-all-bar {
+    align-items: stretch;
+  }
+
+  .admin-setup-save-all-bar .admin-save-state-button {
+    width: 100%;
+  }
+}

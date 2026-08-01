@@ -47,6 +47,65 @@ function adminCatNormalizeScoreMode_(value) {
 
 }
 
+function adminCatResolveScoreModeForGame_(gameId, requestedMode) {
+
+  const hasRequestedMode =
+    requestedMode !== undefined &&
+    requestedMode !== null &&
+    adminCatNormalizeValue_(requestedMode) !== "";
+
+  const normalizedRequested =
+    adminCatNormalizeScoreMode_(
+      hasRequestedMode ? requestedMode : "fixed-points"
+    );
+
+  if (typeof getGame !== "function") {
+    return normalizedRequested;
+  }
+
+  const game = getGame(gameId);
+
+  if (!game) {
+    return normalizedRequested;
+  }
+
+  const type =
+    typeof normalizeGameType_ === "function"
+      ? normalizeGameType_(game.type || "prediction")
+      : adminCatNormalizeValue_(game.type || "prediction")
+          .toLowerCase();
+
+  /*
+    One source of truth:
+    Non-Hybrid game types own their question ScoreMode.
+    Per-question mode selection is only meaningful for Hybrid games.
+  */
+  if (type === "staked-prediction") {
+    return "staked-points";
+  }
+
+  if (type === "confidence") {
+    return "confidence-points";
+  }
+
+  if (type === "wager" || type === "racing-wager") {
+    return "wager";
+  }
+
+  if (type === "ranking") {
+    return "ranking";
+  }
+
+  if (type === "mixed" || type === "combo") {
+    return hasRequestedMode
+      ? normalizedRequested
+      : undefined;
+  }
+
+  return "fixed-points";
+
+}
+
 function adminCatSlugify_(value) {
 
   return String(value || "")
@@ -1893,6 +1952,12 @@ function adminCreateCategory(payload) {
       ? getGame(gameId)
       : null;
 
+  const resolvedScoreMode =
+    adminCatResolveScoreModeForGame_(
+      gameId,
+      payload.scoreMode
+    );
+
   if (
     parentGame &&
     parentGame.gameRole === "parent" &&
@@ -2071,9 +2136,7 @@ function adminCreateCategory(payload) {
         payload.selectionMode || "single",
 
       scoreMode:
-        adminCatNormalizeScoreMode_(
-          payload.scoreMode || "fixed-points"
-        ),
+        resolvedScoreMode,
 
       oddsMode:
         payload.oddsMode || "none",
@@ -2237,6 +2300,12 @@ function adminUpdateCategory(payload) {
   validateGameId(
     gameId
   );
+
+  payload.scoreMode =
+    adminCatResolveScoreModeForGame_(
+      gameId,
+      payload.scoreMode
+    );
 
   /*
     Production safety rule:
@@ -2816,6 +2885,279 @@ function adminUpdateCategory(payload) {
 
     lock.releaseLock();
 
+  }
+
+}
+
+/* =========================================================
+   BULK SAVE QUESTIONS / ANSWERS
+========================================================= */
+
+function adminCatParseJsonArray_(value, label) {
+
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  const text = adminCatNormalizeValue_(value);
+
+  if (!text) {
+    return [];
+  }
+
+  let parsed;
+
+  try {
+    parsed = JSON.parse(text);
+  } catch (err) {
+    throw new Error((label || "Items") + " JSON is invalid.");
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error((label || "Items") + " must be an array.");
+  }
+
+  return parsed;
+
+}
+
+function adminBulkUpdateGameSetup(payload) {
+
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+
+  if (!gameId) {
+    throw new Error("GameId is required");
+  }
+
+  validateGameId(gameId);
+
+  const questions = adminCatParseJsonArray_(
+    payload.questionsJSON || payload.questions,
+    "Questions"
+  );
+
+  const answers = adminCatParseJsonArray_(
+    payload.answersJSON || payload.answers,
+    "Answers"
+  );
+
+  const questionResults = [];
+  const answerResults = [];
+  const failures = [];
+
+  questions.forEach(function(item) {
+    try {
+      const result = adminUpdateCategory(
+        Object.assign({}, item || {}, {
+          gameId: gameId,
+          username: payload.username || ""
+        })
+      );
+
+      questionResults.push(result);
+    } catch (err) {
+      failures.push({
+        type: "question",
+        categoryId: adminCatNormalizeId_(item && item.categoryId),
+        error: String(err && err.message ? err.message : err)
+      });
+    }
+  });
+
+  answers.forEach(function(item) {
+    try {
+      const result = adminUpdateNominee(
+        Object.assign({}, item || {}, {
+          gameId: gameId
+        })
+      );
+
+      answerResults.push(result);
+    } catch (err) {
+      failures.push({
+        type: "answer",
+        categoryId: adminCatNormalizeId_(item && item.categoryId),
+        nomineeId: adminCatNormalizeId_(item && item.nomineeId),
+        error: String(err && err.message ? err.message : err)
+      });
+    }
+  });
+
+  return {
+    success: failures.length === 0,
+    message: failures.length
+      ? "Some Game Setup changes could not be saved."
+      : "All Game Setup changes saved.",
+    questionsSaved: questionResults.length,
+    answersSaved: answerResults.length,
+    failures: failures
+  };
+
+}
+
+/* =========================================================
+   PERMANENT QUESTION DELETE
+========================================================= */
+
+function adminCatQuestionRowsInSheet_(sheetName, gameId, categoryId, idHeaders) {
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+
+  if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 1) {
+    return [];
+  }
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(value) {
+    return adminCatNormalizeValue_(value);
+  });
+
+  const gameCol = headers.indexOf("GameId");
+  let idCol = -1;
+
+  (idHeaders || ["CategoryId", "QuestionId"]).some(function(header) {
+    const candidate = headers.indexOf(header);
+    if (candidate !== -1) {
+      idCol = candidate;
+      return true;
+    }
+    return false;
+  });
+
+  if (gameCol === -1 || idCol === -1) {
+    return [];
+  }
+
+  const normalizedGameId = adminCatNormalizeGameId_(gameId);
+  const normalizedCategoryId = adminCatNormalizeId_(categoryId);
+  const rows = [];
+
+  for (let i = 1; i < data.length; i++) {
+    if (
+      adminCatNormalizeGameId_(data[i][gameCol]) === normalizedGameId &&
+      adminCatNormalizeId_(data[i][idCol]) === normalizedCategoryId
+    ) {
+      rows.push(i + 1);
+    }
+  }
+
+  return rows;
+
+}
+
+function adminCatDeleteQuestionRows_(sheetName, gameId, categoryId, idHeaders) {
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  const rows = adminCatQuestionRowsInSheet_(
+    sheetName,
+    gameId,
+    categoryId,
+    idHeaders
+  );
+
+  if (!sh || !rows.length) {
+    return 0;
+  }
+
+  rows.sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
+    sh.deleteRow(rowNumber);
+  });
+
+  return rows.length;
+
+}
+
+function adminDeleteCategory(payload) {
+
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  const categoryId = adminCatNormalizeId_(payload.categoryId);
+
+  if (!gameId || !categoryId) {
+    throw new Error("GameId and CategoryId are required");
+  }
+
+  validateGameId(gameId);
+
+  const protectedSheets = [
+    { name: typeof PICKS_SHEET !== "undefined" ? PICKS_SHEET : "Picks", idHeaders: ["CategoryId", "QuestionId"] },
+    { name: typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets", idHeaders: ["CategoryId", "QuestionId"] },
+    { name: typeof CATEGORY_RESULTS_SHEET !== "undefined" ? CATEGORY_RESULTS_SHEET : "CategoryResults", idHeaders: ["CategoryId", "QuestionId"] }
+  ];
+
+  const references = {};
+  let referenceCount = 0;
+
+  protectedSheets.forEach(function(config) {
+    const count = adminCatQuestionRowsInSheet_(
+      config.name,
+      gameId,
+      categoryId,
+      config.idHeaders
+    ).length;
+
+    references[config.name] = count;
+    referenceCount += count;
+  });
+
+  if (referenceCount > 0) {
+    return {
+      success: false,
+      blocked: true,
+      message:
+        "This question has saved picks, wagers, or results and cannot be permanently deleted. Use Archive Question to preserve history.",
+      references: references
+    };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const deleted = {};
+
+    [
+      { name: typeof QUESTION_OPTIONS_SHEET !== "undefined" ? QUESTION_OPTIONS_SHEET : "QuestionOptions", idHeaders: ["QuestionId", "CategoryId"] },
+      { name: typeof QUESTIONS_SHEET !== "undefined" ? QUESTIONS_SHEET : "Questions", idHeaders: ["QuestionId", "CategoryId"] },
+      { name: typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories", idHeaders: ["CategoryId", "QuestionId"] },
+      { name: typeof CATEGORY_SETTINGS_SHEET !== "undefined" ? CATEGORY_SETTINGS_SHEET : "CategorySettings", idHeaders: ["CategoryId", "QuestionId"] },
+      { name: typeof CATEGORY_RESULTS_SHEET !== "undefined" ? CATEGORY_RESULTS_SHEET : "CategoryResults", idHeaders: ["CategoryId", "QuestionId"] },
+      { name: "LiveResults", idHeaders: ["CategoryId", "QuestionId"] }
+    ].forEach(function(config) {
+      deleted[config.name] = adminCatDeleteQuestionRows_(
+        config.name,
+        gameId,
+        categoryId,
+        config.idHeaders
+      );
+    });
+
+    if (typeof normalizedStorageRebuildIndexForSheet_ === "function") {
+      normalizedStorageRebuildIndexForSheet_(
+        typeof QUESTIONS_SHEET !== "undefined" ? QUESTIONS_SHEET : "Questions",
+        "Questions"
+      );
+      normalizedStorageRebuildIndexForSheet_(
+        typeof QUESTION_OPTIONS_SHEET !== "undefined" ? QUESTION_OPTIONS_SHEET : "QuestionOptions",
+        "QuestionOptions"
+      );
+    }
+
+    SpreadsheetApp.flush();
+    adminCatClearCaches_();
+
+    return {
+      success: true,
+      message: "Question permanently deleted.",
+      gameId: gameId,
+      categoryId: categoryId,
+      deleted: deleted
+    };
+  } finally {
+    lock.releaseLock();
   }
 
 }

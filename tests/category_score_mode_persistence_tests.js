@@ -110,4 +110,31 @@ assert.strictEqual(rows[3][2], 'fixed-points');
 assert.strictEqual(rows[1][3], 0);
 assert.strictEqual(rows[2][3], 0);
 
+
+context.getGame = gameId => ({
+  gameId,
+  type: gameId === 'stake-test'
+    ? 'staked-prediction'
+    : gameId === 'hybrid-test'
+      ? 'mixed'
+      : 'prediction'
+});
+context.normalizeGameType_ = value => String(value || 'prediction').trim().toLowerCase();
+
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('stake-test', 'fixed-points'),
+  'staked-points',
+  'Staked Prediction must force staked-points even when a stale fixed-points value is submitted.'
+);
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('other-game', 'staked-points'),
+  'fixed-points',
+  'Prediction games must force fixed-points.'
+);
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('hybrid-test', undefined),
+  undefined,
+  'Hybrid result-only updates must preserve the existing per-question ScoreMode.'
+);
+
 console.log('category-score-mode-persistence-tests: PASS');

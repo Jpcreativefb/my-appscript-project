@@ -40,6 +40,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminArchiveGameData",
     "adminCloneCategory",
     "adminBulkCreateNominees",
+    "adminBulkUpdateGameSetup",
     "adminCloneNominee",
     "adminGetLeagueAccessDashboard",
     "adminGetSportsControlDashboard",
@@ -1537,6 +1538,41 @@ async function apiAdminUpdateCategory(payload) {
 
       token:
         session.token
+    }
+  );
+
+}
+
+async function apiAdminBulkUpdateGameSetup(gameId, questions, answers) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminBulkUpdateGameSetup",
+    {
+      gameId: gameId,
+      questionsJSON: JSON.stringify(Array.isArray(questions) ? questions : []),
+      answersJSON: JSON.stringify(Array.isArray(answers) ? answers : []),
+      username: session.username,
+      token: session.token
+    }
+  );
+
+}
+
+async function apiAdminDeleteCategory(gameId, categoryId) {
+
+  const session =
+    getSession();
+
+  return api(
+    "adminDeleteCategory",
+    {
+      gameId: gameId,
+      categoryId: categoryId,
+      username: session.username,
+      token: session.token
     }
   );
 

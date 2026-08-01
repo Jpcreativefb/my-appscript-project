@@ -1,0 +1,15 @@
+Phase 1 Game Setup Editor Hotfix v1.0.7
+
+Validation completed in the packaged source tree.
+
+Results:
+- 19 of 19 local regression suites passed.
+- 106 JavaScript files passed node --check syntax validation.
+- Staked Prediction Game Type forces staked-points.
+- Hybrid result-only updates preserve the existing per-question ScoreMode.
+- Save-state button workflow is present for questions and answers.
+- Save All Changes batching is present.
+- Permanent question deletion is blocked when Picks, Bets, or CategoryResults exist.
+- Service-worker cache updated to awards-app-v256-game-setup-save-delete.
+
+Live Apps Script, Google Sheets, Cloudflare, and PWA testing remains required after deployment.
