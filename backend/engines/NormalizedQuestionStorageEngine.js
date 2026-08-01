@@ -1640,16 +1640,36 @@ function normalizedStorageQuestionObject_(payload, existing) {
   existing = existing || {};
   const now = new Date();
 
-  function value(key, fallback) {
-    return Object.prototype.hasOwnProperty.call(payload, key)
-      ? payload[key]
-      : (existing[key] !== undefined ? existing[key] : fallback);
+  function value(key, fallback, aliases) {
+    const candidates = [
+      key,
+      key.charAt(0).toLowerCase() + key.slice(1)
+    ].concat(aliases || []);
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+
+      if (
+        candidate &&
+        Object.prototype.hasOwnProperty.call(payload, candidate)
+      ) {
+        return payload[candidate];
+      }
+    }
+
+    return existing[key] !== undefined
+      ? existing[key]
+      : fallback;
   }
 
   return {
     GameId: normalizedStorageString_(value("GameId", payload.gameId)),
-    QuestionId: normalizedStorageKey_(value("QuestionId", payload.questionId || payload.categoryId)),
-    Question: normalizedStorageString_(value("Question", payload.question || payload.category || payload.name)),
+    QuestionId: normalizedStorageKey_(
+      value("QuestionId", payload.questionId || payload.categoryId, ["categoryId"])
+    ),
+    Question: normalizedStorageString_(
+      value("Question", payload.question || payload.category || payload.name, ["category", "name"])
+    ),
     Section: normalizedStorageString_(value("Section", payload.section || "Other")),
     CategoryImage: normalizedStorageString_(value("CategoryImage", payload.categoryImage || "")),
     Active: normalizedStorageBool_(value("Active", payload.active), true),
@@ -1665,7 +1685,9 @@ function normalizedStorageQuestionObject_(payload, existing) {
     SportsProvider: normalizedStorageString_(value("SportsProvider", payload.sportsProvider || "")),
     SportsLeague: normalizedStorageString_(value("SportsLeague", payload.sportsLeague || "")),
     SportsGameId: normalizedStorageString_(value("SportsGameId", payload.sportsGameId || "")),
-    ESPNEventId: normalizedStorageString_(value("ESPNEventId", payload.espnEventId || "")),
+    ESPNEventId: normalizedStorageString_(
+      value("ESPNEventId", payload.espnEventId || "", ["espnEventId"])
+    ),
     HomeTeam: normalizedStorageString_(value("HomeTeam", payload.homeTeam || "")),
     AwayTeam: normalizedStorageString_(value("AwayTeam", payload.awayTeam || "")),
     HomeRecord: normalizedStorageString_(value("HomeRecord", payload.homeRecord || "")),
@@ -1695,19 +1717,45 @@ function normalizedStorageOptionObject_(payload, existing) {
   existing = existing || {};
   const now = new Date();
 
-  function value(key, fallback) {
-    return Object.prototype.hasOwnProperty.call(payload, key)
-      ? payload[key]
-      : (existing[key] !== undefined ? existing[key] : fallback);
+  function value(key, fallback, aliases) {
+    const candidates = [
+      key,
+      key.charAt(0).toLowerCase() + key.slice(1)
+    ].concat(aliases || []);
+
+    for (let i = 0; i < candidates.length; i++) {
+      const candidate = candidates[i];
+
+      if (
+        candidate &&
+        Object.prototype.hasOwnProperty.call(payload, candidate)
+      ) {
+        return payload[candidate];
+      }
+    }
+
+    return existing[key] !== undefined
+      ? existing[key]
+      : fallback;
   }
 
   return {
     GameId: normalizedStorageString_(value("GameId", payload.gameId)),
-    QuestionId: normalizedStorageKey_(value("QuestionId", payload.questionId || payload.categoryId)),
-    OptionId: normalizedStorageKey_(value("OptionId", payload.optionId || payload.nomineeId)),
-    Option: normalizedStorageString_(value("Option", payload.option || payload.nominee || payload.answer || payload.name)),
-    ShortAnswer: normalizedStorageString_(value("ShortAnswer", payload.shortAnswer || payload.option || payload.nominee || payload.answer || payload.name)),
-    FileID: normalizedStorageString_(value("FileID", payload.fileId || "")),
+    QuestionId: normalizedStorageKey_(
+      value("QuestionId", payload.questionId || payload.categoryId, ["categoryId"])
+    ),
+    OptionId: normalizedStorageKey_(
+      value("OptionId", payload.optionId || payload.nomineeId, ["nomineeId"])
+    ),
+    Option: normalizedStorageString_(
+      value("Option", payload.option || payload.nominee || payload.answer || payload.name, ["nominee", "answer", "name"])
+    ),
+    ShortAnswer: normalizedStorageString_(
+      value("ShortAnswer", payload.shortAnswer || payload.option || payload.nominee || payload.answer || payload.name)
+    ),
+    FileID: normalizedStorageString_(
+      value("FileID", payload.fileId || "", ["fileId"])
+    ),
     LogoUrl: normalizedStorageString_(value("LogoUrl", payload.logoUrl || "")),
     MovieId: normalizedStorageString_(value("MovieId", payload.movieId || "")),
     Movie: normalizedStorageString_(value("Movie", payload.movie || "")),
@@ -1949,19 +1997,30 @@ function normalizedStorageUpsertOptionsBulk_(payloads) {
   return updated;
 }
 
-function normalizedStorageGetQuestionSetup_(gameId) {
-  normalizedStorageSyncGameFromLegacy_(gameId, {});
+function normalizedStorageGetQuestionSetup_(gameId, options) {
+  options = options || {};
+
+  if (options.syncLegacy !== false) {
+    normalizedStorageSyncGameFromLegacy_(gameId, {
+      force: options.forceLegacySync === true
+    });
+  }
+
+  const readOptions = {
+    bypassRuntimeCache: options.bypassRuntimeCache === true,
+    trustIndex: options.trustIndex !== false
+  };
 
   const questions = normalizedStorageRowsToObjects_(
-    normalizedStorageReadQuestionsByGame_(gameId, {})
+    normalizedStorageReadQuestionsByGame_(gameId, readOptions)
   );
-  const options = normalizedStorageRowsToObjects_(
-    normalizedStorageReadOptionsByGame_(gameId, {})
+  const optionRows = normalizedStorageRowsToObjects_(
+    normalizedStorageReadOptionsByGame_(gameId, readOptions)
   );
 
   return {
     questions: questions,
-    options: options
+    options: optionRows
   };
 }
 
@@ -2069,7 +2128,16 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
   }
 
   const legacyHeaders = normalizedStorageGetHeaders_(categoriesSheet);
-  const normalized = normalizedStorageGetQuestionSetup_(gameId);
+  /*
+    The Game Setup editor is an administrative source-of-truth view.
+    Always bypass runtime/index caches so reopening the page reflects the
+    canonical Questions and QuestionOptions rows that were just saved.
+  */
+  const normalized = normalizedStorageGetQuestionSetup_(gameId, {
+    syncLegacy: true,
+    bypassRuntimeCache: true,
+    trustIndex: false
+  });
   const questionMap = {};
   const optionsByQuestion = {};
 

@@ -57,7 +57,7 @@ const serviceWorker = read('frontend/sw.js');
 ].forEach((expected) => requireText(sportsPage, expected, 'Sports page'));
 
 requireText(sportsCss, '.sports-player-matchup-player-list', 'Sports CSS');
-requireText(serviceWorker, 'awards-app-v257-game-setup-save-compatibility', 'Service worker cache');
+requireText(serviceWorker, 'awards-app-v258-canonical-game-setup-delete-answer', 'Service worker cache');
 
 const backendContext = {
   console, Date, JSON, Math, Number, String, Array, Object, isFinite

@@ -174,6 +174,7 @@ function doGet(e) {
       "adminBulkCreateNominees",
       "adminCloneNominee",
       "adminUpdateNominee",
+      "adminDeleteNominee",
       "adminArchiveNominee",
 
       "adminUploadImage",
@@ -912,6 +913,16 @@ function doGet(e) {
 
       return json(
         adminUpdateNominee(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminDeleteNominee") {
+
+      return json(
+        adminDeleteNominee(
           params
         )
       );

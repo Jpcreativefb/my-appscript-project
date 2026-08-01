@@ -154,6 +154,21 @@ function adminCatSetIfColumnExists_(
 
 function adminCatClearCaches_() {
 
+  /*
+    Game Setup writes update normalized Questions / QuestionOptions as well
+    as compatibility rows. Clear both cache layers so an immediate reopen
+    cannot display the pre-save wording.
+  */
+  if (
+    typeof normalizedStorageClearCaches_ ===
+    "function"
+  ) {
+
+    normalizedStorageClearCaches_();
+    return;
+
+  }
+
   if (
     typeof clearAppCaches ===
     "function"
@@ -1140,13 +1155,15 @@ function adminCatFindCategoryRows_(
 
 }
 
-function adminCatFindNomineeRow_(
+function adminCatFindNomineeRows_(
   data,
   col,
   gameId,
   categoryId,
   nomineeId
 ) {
+
+  const rows = [];
 
   for (
     let i = 1;
@@ -1175,13 +1192,33 @@ function adminCatFindNomineeRow_(
       rowNomineeId === nomineeId
     ) {
 
-      return i + 1;
+      rows.push(i + 1);
 
     }
 
   }
 
-  return -1;
+  return rows;
+
+}
+
+function adminCatFindNomineeRow_(
+  data,
+  col,
+  gameId,
+  categoryId,
+  nomineeId
+) {
+
+  const rows = adminCatFindNomineeRows_(
+    data,
+    col,
+    gameId,
+    categoryId,
+    nomineeId
+  );
+
+  return rows.length ? rows[rows.length - 1] : -1;
 
 }
 
@@ -3163,6 +3200,276 @@ function adminDeleteCategory(payload) {
 }
 
 /* =========================================================
+   PERMANENT NOMINEE / ANSWER DELETE
+========================================================= */
+
+function adminCatAnswerRowsInSheet_(
+  sheetName,
+  gameId,
+  categoryId,
+  nomineeId,
+  categoryHeaders,
+  nomineeHeaders
+) {
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+
+  if (!sh || sh.getLastRow() < 2 || sh.getLastColumn() < 1) {
+    return [];
+  }
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(value) {
+    return adminCatNormalizeValue_(value);
+  });
+
+  function firstColumn_(candidates) {
+    for (let i = 0; i < candidates.length; i++) {
+      const index = headers.indexOf(candidates[i]);
+      if (index !== -1) return index;
+    }
+    return -1;
+  }
+
+  const gameCol = firstColumn_(["GameId"]);
+  const categoryCol = firstColumn_(
+    categoryHeaders || ["CategoryId", "QuestionId"]
+  );
+  const nomineeCols = (nomineeHeaders || ["NomineeId", "OptionId"])
+    .map(function(header) { return headers.indexOf(header); })
+    .filter(function(index) { return index !== -1; });
+
+  if (categoryCol === -1 || !nomineeCols.length) {
+    return [];
+  }
+
+  const cleanGameId = adminCatNormalizeGameId_(gameId);
+  const cleanCategoryId = adminCatNormalizeId_(categoryId);
+  const cleanNomineeId = adminCatNormalizeId_(nomineeId);
+  const rows = [];
+
+  for (let i = 1; i < data.length; i++) {
+    if (
+      gameCol !== -1 &&
+      adminCatNormalizeGameId_(data[i][gameCol]) !== cleanGameId
+    ) {
+      continue;
+    }
+
+    if (
+      adminCatNormalizeId_(data[i][categoryCol]) !== cleanCategoryId
+    ) {
+      continue;
+    }
+
+    const matchesNominee = nomineeCols.some(function(columnIndex) {
+      return adminCatNormalizeId_(data[i][columnIndex]) === cleanNomineeId;
+    });
+
+    if (matchesNominee) {
+      rows.push(i + 1);
+    }
+  }
+
+  return rows;
+
+}
+
+function adminCatDeleteAnswerRows_(
+  sheetName,
+  gameId,
+  categoryId,
+  nomineeId,
+  categoryHeaders,
+  nomineeHeaders
+) {
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  const rows = adminCatAnswerRowsInSheet_(
+    sheetName,
+    gameId,
+    categoryId,
+    nomineeId,
+    categoryHeaders,
+    nomineeHeaders
+  );
+
+  if (!sh || !rows.length) {
+    return 0;
+  }
+
+  rows.sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
+    sh.deleteRow(rowNumber);
+  });
+
+  return rows.length;
+
+}
+
+function adminDeleteNominee(payload) {
+
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  const categoryId = adminCatNormalizeId_(payload.categoryId);
+  const nomineeId = adminCatNormalizeId_(payload.nomineeId);
+
+  if (!gameId || !categoryId || !nomineeId) {
+    throw new Error("GameId, CategoryId, and NomineeId are required");
+  }
+
+  validateGameId(gameId);
+
+  /*
+    Permanent deletion is safe only before this answer is referenced by
+    picks, wagers, votes, winners, or result history. Otherwise archiving
+    preserves the historical IDs and keeps scoring/leaderboards intact.
+  */
+  const protectedSheets = [
+    {
+      name: typeof PICKS_SHEET !== "undefined" ? PICKS_SHEET : "Picks",
+      nomineeHeaders: ["NomineeId", "OriginalNomineeId"]
+    },
+    {
+      name: typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets",
+      nomineeHeaders: ["NomineeId", "OriginalNomineeId"]
+    },
+    {
+      name: "Votes",
+      nomineeHeaders: ["NomineeId"]
+    },
+    {
+      name: typeof CATEGORY_RESULTS_SHEET !== "undefined"
+        ? CATEGORY_RESULTS_SHEET
+        : "CategoryResults",
+      nomineeHeaders: ["NomineeId"]
+    },
+    {
+      name: typeof CATEGORY_SETTINGS_SHEET !== "undefined"
+        ? CATEGORY_SETTINGS_SHEET
+        : "CategorySettings",
+      nomineeHeaders: ["WinnerNomineeId", "FavoriteNomineeId"]
+    },
+    {
+      name: "LiveResults",
+      nomineeHeaders: ["OldWinnerNomineeId", "NewWinnerNomineeId", "NomineeId"]
+    }
+  ];
+
+  const references = {};
+  let referenceCount = 0;
+
+  protectedSheets.forEach(function(config) {
+    const count = adminCatAnswerRowsInSheet_(
+      config.name,
+      gameId,
+      categoryId,
+      nomineeId,
+      ["CategoryId", "QuestionId"],
+      config.nomineeHeaders
+    ).length;
+
+    references[config.name] = count;
+    referenceCount += count;
+  });
+
+  if (referenceCount > 0) {
+    return {
+      success: false,
+      blocked: true,
+      message:
+        "This answer has saved picks, wagers, votes, or results and cannot be permanently deleted. Use Archive Answer to preserve history.",
+      references: references
+    };
+  }
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+
+  try {
+    const deleted = {};
+
+    deleted.Categories = adminCatDeleteAnswerRows_(
+      typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories",
+      gameId,
+      categoryId,
+      nomineeId,
+      ["CategoryId", "QuestionId"],
+      ["NomineeId", "OptionId"]
+    );
+
+    deleted.QuestionOptions = adminCatDeleteAnswerRows_(
+      typeof QUESTION_OPTIONS_SHEET !== "undefined"
+        ? QUESTION_OPTIONS_SHEET
+        : "QuestionOptions",
+      gameId,
+      categoryId,
+      nomineeId,
+      ["QuestionId", "CategoryId"],
+      ["OptionId", "NomineeId"]
+    );
+
+    if (!deleted.Categories && !deleted.QuestionOptions) {
+      return {
+        success: false,
+        message: "Answer was not found.",
+        gameId: gameId,
+        categoryId: categoryId,
+        nomineeId: nomineeId
+      };
+    }
+
+    if (
+      typeof normalizedStorageUpsertIndexEntry_ === "function" &&
+      typeof normalizedStorageFindRowsByGame_ === "function"
+    ) {
+      const optionSheetName =
+        typeof QUESTION_OPTIONS_SHEET !== "undefined"
+          ? QUESTION_OPTIONS_SHEET
+          : "QuestionOptions";
+      const optionSheet = SpreadsheetApp.getActive().getSheetByName(
+        optionSheetName
+      );
+
+      normalizedStorageUpsertIndexEntry_({
+        entityType: "QuestionOptions",
+        gameId: gameId,
+        sheetName: optionSheetName,
+        rowNumbers: optionSheet
+          ? normalizedStorageFindRowsByGame_(optionSheet, gameId)
+          : [],
+        dataVersion:
+          typeof NORMALIZED_STORAGE_VERSION !== "undefined"
+            ? NORMALIZED_STORAGE_VERSION
+            : 1
+      });
+    } else if (typeof normalizedStorageRebuildIndexForSheet_ === "function") {
+      normalizedStorageRebuildIndexForSheet_(
+        typeof QUESTION_OPTIONS_SHEET !== "undefined"
+          ? QUESTION_OPTIONS_SHEET
+          : "QuestionOptions",
+        "QuestionOptions"
+      );
+    }
+
+    SpreadsheetApp.flush();
+    adminCatClearCaches_();
+
+    return {
+      success: true,
+      message: "Answer permanently deleted.",
+      gameId: gameId,
+      categoryId: categoryId,
+      nomineeId: nomineeId,
+      deleted: deleted
+    };
+  } finally {
+    lock.releaseLock();
+  }
+
+}
+
+/* =========================================================
    ARCHIVE CATEGORY / QUESTION
 ========================================================= */
 
@@ -3554,8 +3861,8 @@ function adminUpdateNominee(payload) {
       col
     );
 
-    const rowIndex =
-      adminCatFindNomineeRow_(
+    const rowIndexes =
+      adminCatFindNomineeRows_(
         data,
         col,
         gameId,
@@ -3563,7 +3870,7 @@ function adminUpdateNominee(payload) {
         nomineeId
       );
 
-    if (rowIndex === -1) {
+    if (!rowIndexes.length) {
 
       throw new Error(
         "Nominee not found: " +
@@ -3572,115 +3879,116 @@ function adminUpdateNominee(payload) {
 
     }
 
-    const row =
-      data[rowIndex - 1]
-        .slice();
+    /* Keep every legacy duplicate row aligned with the canonical option. */
+    rowIndexes.forEach(function(rowIndex) {
+      const row = data[rowIndex - 1].slice();
 
-    if (
-      "nominee" in payload ||
-      "answer" in payload ||
-      "name" in payload
-    ) {
+      if (
+        "nominee" in payload ||
+        "answer" in payload ||
+        "name" in payload
+      ) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "nominee",
-        adminCatNormalizeValue_(
-          payload.nominee ||
-          payload.answer ||
-          payload.name
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "nominee",
+          adminCatNormalizeValue_(
+            payload.nominee ||
+            payload.answer ||
+            payload.name
+          )
+        );
 
-    }
+      }
 
-    if ("fileId" in payload) {
+      if ("fileId" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "fileId",
-        adminCatNormalizeValue_(
-          payload.fileId
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "fileId",
+          adminCatNormalizeValue_(
+            payload.fileId
+          )
+        );
 
-    }
+      }
 
-    if ("shortAnswer" in payload) {
+      if ("shortAnswer" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "shortAnswer",
-        adminCatNormalizeValue_(
-          payload.shortAnswer
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "shortAnswer",
+          adminCatNormalizeValue_(
+            payload.shortAnswer
+          )
+        );
 
-    }
+      }
 
-    if ("movieId" in payload) {
+      if ("movieId" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "movieId",
-        adminCatNormalizeValue_(
-          payload.movieId
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "movieId",
+          adminCatNormalizeValue_(
+            payload.movieId
+          )
+        );
 
-    }
+      }
 
-    if ("movie" in payload) {
+      if ("movie" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "movie",
-        adminCatNormalizeValue_(
-          payload.movie
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "movie",
+          adminCatNormalizeValue_(
+            payload.movie
+          )
+        );
 
-    }
+      }
 
-    if ("person" in payload) {
+      if ("person" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "person",
-        adminCatNormalizeValue_(
-          payload.person
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "person",
+          adminCatNormalizeValue_(
+            payload.person
+          )
+        );
 
-    }
+      }
 
-    if ("active" in payload) {
+      if ("active" in payload) {
 
-      adminCatSetIfColumnExists_(
-        row,
-        col,
-        "active",
-        adminCatToBoolean_(
-          payload.active
-        )
-      );
+        adminCatSetIfColumnExists_(
+          row,
+          col,
+          "active",
+          adminCatToBoolean_(
+            payload.active
+          )
+        );
 
-    }
+      }
 
-    sh.getRange(
-      rowIndex,
-      1,
-      1,
-      headers.length
-    ).setValues([
-      row
-    ]);
+      sh.getRange(
+        rowIndex,
+        1,
+        1,
+        headers.length
+      ).setValues([
+        row
+      ]);
+    });
 
     if (typeof normalizedStorageUpsertOption_ === "function") {
       normalizedStorageUpsertOption_(

@@ -1712,6 +1712,23 @@ async function apiAdminUpdateNominee(payload) {
 
 }
 
+async function apiAdminDeleteNominee(gameId, categoryId, nomineeId) {
+
+  const session = getSession();
+
+  return api(
+    "adminDeleteNominee",
+    {
+      gameId: gameId,
+      categoryId: categoryId,
+      nomineeId: nomineeId,
+      username: session.username,
+      token: session.token
+    }
+  );
+
+}
+
 async function apiAdminUploadImage(payload) {
 
   return apiPost(

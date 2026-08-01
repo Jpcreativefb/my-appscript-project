@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v257-game-setup-save-compatibility";
+const AWARDS_CACHE = "awards-app-v258-canonical-game-setup-delete-answer";
 
 const APP_SHELL = [
   "./",

@@ -3693,10 +3693,19 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
           </button>
 
           <button
+            type="button"
             class="admin-danger-button"
             onclick="adminSetupArchiveNominee('${gameId}', '${categoryId}', '${nomineeId}')"
           >
-            Archive
+            Archive Answer
+          </button>
+
+          <button
+            type="button"
+            class="admin-danger-button"
+            onclick="adminSetupDeleteNominee('${gameId}', '${categoryId}', '${nomineeId}')"
+          >
+            Delete Answer
           </button>
 
         </div>
@@ -4935,6 +4944,51 @@ async function adminSetupUpdateNominee(gameId, categoryId, nomineeId) {
     false
   );
   adminSetupMarkAnswerSaved_(categoryId, nomineeId);
+}
+
+/* ======================
+   DELETE NOMINEE / ANSWER
+====================== */
+
+async function adminSetupDeleteNominee(gameId, categoryId, nomineeId) {
+  const answerInput = document.getElementById(
+    "editNomineeName_" + categoryId + "_" + nomineeId
+  );
+  const answerName = answerInput && answerInput.value.trim()
+    ? answerInput.value.trim()
+    : nomineeId;
+
+  const first = confirm(
+    'Permanently delete the answer "' + answerName + '"? This cannot be undone. Use Archive Answer when picks, wagers, or results must be preserved.'
+  );
+  if (!first) return;
+
+  const second = confirm("Delete this answer permanently now?");
+  if (!second) return;
+
+  adminSetupSetMessage(
+    "editNomineeMessage_" + categoryId + "_" + nomineeId,
+    "Deleting answer...",
+    false
+  );
+
+  const res = await apiAdminDeleteNominee(gameId, categoryId, nomineeId);
+
+  if (!res || res.success === false) {
+    const message = res && (res.message || res.error)
+      ? res.message || res.error
+      : "Could not delete answer.";
+
+    adminSetupSetMessage(
+      "editNomineeMessage_" + categoryId + "_" + nomineeId,
+      message,
+      true
+    );
+    alert(message);
+    return;
+  }
+
+  navigate("admin-game-setup:" + gameId);
 }
 
 /* ======================
