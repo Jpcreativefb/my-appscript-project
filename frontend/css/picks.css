@@ -713,3 +713,100 @@
     margin-top: 4px;
   }
 }
+
+
+/* ======================
+   STAKED PICK ORDER V1.0.10
+====================== */
+
+.stake-control.before-nominees {
+  margin-top: 14px;
+  border-color: rgba(250,204,21,0.28);
+  background: linear-gradient(
+    135deg,
+    rgba(250,204,21,0.10),
+    rgba(255,255,255,0.05)
+  );
+}
+
+.stake-step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 58px;
+  margin-bottom: 8px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: rgba(250,204,21,0.18);
+  border: 1px solid rgba(250,204,21,0.35);
+  color: #fde68a;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.stake-input-row input.is-ready {
+  border-color: rgba(34,197,94,0.72);
+  box-shadow: 0 0 0 3px rgba(34,197,94,0.14);
+}
+
+.stake-input-row input.is-invalid {
+  border-color: rgba(239,68,68,0.78);
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.12);
+}
+
+.stake-preset-button.selected {
+  background: rgba(34,197,94,0.20);
+  border-color: rgba(34,197,94,0.65);
+  color: #bbf7d0;
+}
+
+.stake-pick-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 2px 16px 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255,255,255,0.045);
+  border: 1px solid rgba(255,255,255,0.09);
+}
+
+.stake-pick-step .stake-step-badge {
+  flex: 0 0 auto;
+  margin: 0;
+}
+
+.stake-pick-step > div:last-child {
+  display: grid;
+  gap: 3px;
+}
+
+.stake-pick-step strong {
+  font-size: 0.86rem;
+}
+
+.stake-step-status {
+  font-size: 0.77rem;
+  line-height: 1.35;
+}
+
+.stake-step-status.is-waiting {
+  color: #fcd34d;
+}
+
+.stake-step-status.is-ready {
+  color: #86efac;
+}
+
+.nominee-choice.stake-waiting:disabled {
+  opacity: 0.36;
+  filter: grayscale(0.35);
+}
+
+@media (max-width: 520px) {
+  .stake-pick-step {
+    margin: 2px 13px 0;
+    flex-direction: column;
+  }
+}

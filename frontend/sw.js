@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v258-canonical-game-setup-delete-answer";
+const AWARDS_CACHE = "awards-app-v260-hybrid-routing-wager-filter";
 
 const APP_SHELL = [
   "./",

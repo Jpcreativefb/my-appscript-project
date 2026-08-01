@@ -1,0 +1,17 @@
+Phase 1 Staked Pick Risk-First Hotfix v1.0.10
+
+RESULT: PASS
+
+Regression suites passed: 22 of 22
+JavaScript syntax checks passed: 109 of 109
+
+Focused validations:
+- New staked pick renders with a blank risk amount.
+- No minimum/default stake is silently selected.
+- Answer buttons require a valid stake first.
+- Minimum, maximum, increment, and available-point validation remain enforced.
+- Step 1 and Step 2 layout is present.
+- A confirmation is required before a staked pick is saved.
+- Cancelling confirmation saves nothing.
+- Existing saved stakes remain available when editing an existing pick.
+- Service-worker cache updated to awards-app-v259-stake-before-pick.

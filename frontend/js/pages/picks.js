@@ -159,7 +159,7 @@ PICKS_PAGE_DATA.confidenceScoringMode =
               : hasConfidencePointsCategories()
                 ? getConfidenceGameInstructions()
                 : hasStakedPointsCategories()
-                  ? "Choose an answer and decide how many prediction points to risk. Pending stakes reduce the points available for other questions."
+                  ? "Choose how many prediction points to risk first. Then choose an answer and confirm the pick. Pending stakes reduce the points available for other questions."
                   : "Pick changes may reduce available points. Locked categories cannot be changed."
           }
         </p>
@@ -495,6 +495,132 @@ function updateStakeForCategory(categoryId, value) {
   if (input) {
     input.value = Math.floor(Number(value) || 0) || "";
   }
+
+  syncStakedPickControls(categoryId);
+}
+
+function getStakedCategoryById_(categoryId) {
+  return (PICKS_PAGE_DATA.categories || []).find(category =>
+    normalizeId(category && category.id) === normalizeId(categoryId)
+  ) || null;
+}
+
+function getSelectedStakeForCategory_(categoryId) {
+  const input = document.getElementById("stake-" + categoryId);
+
+  if (input) {
+    return Math.floor(Number(input.value) || 0);
+  }
+
+  return Math.floor(
+    Number(PICKS_PAGE_DATA.stakePoints[categoryId]) || 0
+  );
+}
+
+function validateSelectedStakeForCategory_(category, stakePoints) {
+  if (!category || !isStakedPointsCategory(category)) {
+    return { valid: true, message: "" };
+  }
+
+  const rules = getStakedPointsRules(category);
+  const summary = getStakedPointsSummary();
+  const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+  const usablePoints = Math.max(0, summary.availablePoints + existingStake);
+
+  if (usablePoints < rules.minStake) {
+    return {
+      valid: false,
+      message:
+        "You need at least " + rules.minStake +
+        " available points to enter this question."
+    };
+  }
+
+  if (stakePoints <= 0) {
+    return {
+      valid: false,
+      message: "Choose your risk amount first."
+    };
+  }
+
+  if (stakePoints < rules.minStake || stakePoints > rules.maxStake) {
+    return {
+      valid: false,
+      message:
+        "Choose between " + rules.minStake + " and " +
+        Math.min(rules.maxStake, usablePoints) + " points."
+    };
+  }
+
+  if ((stakePoints - rules.minStake) % rules.stakeIncrement !== 0) {
+    return {
+      valid: false,
+      message: "Use " + rules.stakeIncrement + "-point increments."
+    };
+  }
+
+  if (stakePoints > usablePoints) {
+    return {
+      valid: false,
+      message: "Only " + usablePoints + " points are available."
+    };
+  }
+
+  return {
+    valid: true,
+    message:
+      "Risking " + stakePoints + " point" +
+      (stakePoints === 1 ? "" : "s") +
+      ". Now choose your answer."
+  };
+}
+
+function syncStakedPickControls(categoryId) {
+  const category = getStakedCategoryById_(categoryId);
+
+  if (!category || !isStakedPointsCategory(category)) {
+    return;
+  }
+
+  const card = document.querySelector(
+    `[data-category-id="${cssEscape(categoryId)}"]`
+  );
+
+  if (!card) {
+    return;
+  }
+
+  const stakePoints = getSelectedStakeForCategory_(categoryId);
+  const validation = validateSelectedStakeForCategory_(category, stakePoints);
+  const locked = isCategoryLocked(category);
+  const input = document.getElementById("stake-" + categoryId);
+  const status = document.getElementById("stake-step-status-" + categoryId);
+
+  if (input) {
+    input.classList.toggle("is-ready", validation.valid && !locked);
+    input.classList.toggle("is-invalid", !validation.valid && stakePoints > 0);
+  }
+
+  card.querySelectorAll(".stake-preset-button").forEach(button => {
+    const buttonValue = Number(button.dataset.stakeValue) || 0;
+    button.classList.toggle(
+      "selected",
+      validation.valid && buttonValue === stakePoints
+    );
+  });
+
+  card.querySelectorAll(".nominee-choice").forEach(button => {
+    button.disabled = locked || !validation.valid;
+    button.classList.toggle("stake-waiting", !locked && !validation.valid);
+  });
+
+  if (status) {
+    status.textContent = locked
+      ? "This question is locked."
+      : validation.message;
+    status.classList.toggle("is-ready", validation.valid && !locked);
+    status.classList.toggle("is-waiting", !validation.valid && !locked);
+  }
 }
 
 function renderStakedPointsControl(category, locked) {
@@ -516,14 +642,14 @@ function renderStakedPointsControl(category, locked) {
       ) * rules.stakeIncrement;
   const currentValue = existingStake > 0
     ? existingStake
-    : insufficientPoints
-      ? ""
-      : rules.minStake;
+    : "";
 
   return `
-    <div class="stake-control after-nominees">
+    <div class="stake-control before-nominees ${existingStake > 0 ? "has-saved-stake" : "needs-stake"}">
+      <div class="stake-step-badge">STEP 1</div>
+
       <div class="stake-control-heading">
-        <label for="stake-${escapeAttr(category.id)}">Points to Risk</label>
+        <label for="stake-${escapeAttr(category.id)}">Choose Points to Risk</label>
         <span>Available for this question: ${formatPicksPoints_(usablePoints)}</span>
       </div>
 
@@ -532,10 +658,13 @@ function renderStakedPointsControl(category, locked) {
           type="number"
           id="stake-${escapeAttr(category.id)}"
           value="${currentValue}"
+          placeholder="Choose amount"
           min="${rules.minStake}"
           max="${availableMaxStake}"
           step="${rules.stakeIncrement}"
+          aria-describedby="stake-step-status-${escapeAttr(category.id)}"
           ${controlDisabled ? "disabled" : ""}
+          oninput="updateStakeForCategory('${escapeJs(category.id)}', this.value)"
           onchange="updateStakeForCategory('${escapeJs(category.id)}', this.value)"
         >
         <span>points</span>
@@ -545,7 +674,8 @@ function renderStakedPointsControl(category, locked) {
         ${getStakePresetValues(category, usablePoints).map(value => `
           <button
             type="button"
-            class="stake-preset-button"
+            class="stake-preset-button ${existingStake === value ? "selected" : ""}"
+            data-stake-value="${value}"
             onclick="updateStakeForCategory('${escapeJs(category.id)}', ${value})"
             ${controlDisabled ? "disabled" : ""}
           >
@@ -558,7 +688,7 @@ function renderStakedPointsControl(category, locked) {
         ${
           insufficientPoints
             ? `You need at least ${rules.minStake} available points to enter this question.`
-            : `Correct: +${rules.winMultiplier}× stake · Wrong: −${rules.lossMultiplier}× stake · Push: stake returned`
+            : `No amount is selected automatically. Correct: +${rules.winMultiplier}× stake · Wrong: −${rules.lossMultiplier}× stake · Push: stake returned`
         }
       </div>
     </div>
@@ -969,6 +1099,32 @@ function renderCategoryCard(category, isChild, parent) {
       </div>
     ` : ""}
 
+${renderStakedPointsControl(
+  category,
+  locked
+)}
+
+${stakedPointsCategory ? `
+  <div class="stake-pick-step">
+    <div class="stake-step-badge">STEP 2</div>
+    <div>
+      <strong>Choose Your Pick</strong>
+      <span
+        id="stake-step-status-${escapeAttr(category.id)}"
+        class="stake-step-status ${stakePoints > 0 ? "is-ready" : "is-waiting"}"
+      >
+        ${
+          locked
+            ? "This question is locked."
+            : stakePoints > 0
+              ? `Risking ${stakePoints} point${stakePoints === 1 ? "" : "s"}. Choose an answer to confirm or update the pick.`
+              : "Choose your risk amount above before selecting an answer."
+        }
+      </span>
+    </div>
+  </div>
+` : ""}
+
     <div class="${getLayoutClass(category)}">
 
   ${category.nominees.map(nominee =>
@@ -981,11 +1137,6 @@ function renderCategoryCard(category, isChild, parent) {
   ).join("")}
 
 </div>
-
-${renderStakedPointsControl(
-  category,
-  locked
-)}
 
 ${renderConfidenceControl(
   category,
@@ -1191,8 +1342,14 @@ function renderNomineeButton(
     String(category.layoutType || "image")
       .toLowerCase();
 
+  const existingStake =
+    Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+
+  const stakeMustBeChosenFirst =
+    isStakedPointsCategory(category) && existingStake <= 0;
+
   const disabled =
-    locked ? "disabled" : "";
+    locked || stakeMustBeChosenFirst ? "disabled" : "";
 
   if (
     layoutType === "text" ||
@@ -1418,6 +1575,37 @@ async function selectNominee(categoryId, nomineeId) {
     }
   }
 
+  if (isStakedPointsCategory(category)) {
+    const nominee = (category.nominees || []).find(item =>
+      normalizeId(item && item.id) === normalizeId(nomineeId)
+    );
+
+    const nomineeName = nominee
+      ? String(nominee.name || nominee.shortAnswer || "this answer")
+      : "this answer";
+
+    const actionText = previousPick
+      ? "Update your pick to "
+      : "Save ";
+
+    const confirmationMessage =
+      actionText + nomineeName + " with " + stakePoints +
+      " point" + (stakePoints === 1 ? "" : "s") +
+      " at risk?";
+
+    if (
+      typeof window !== "undefined" &&
+      typeof window.confirm === "function" &&
+      !window.confirm(confirmationMessage)
+    ) {
+      showPicksMessage(
+        "Pick not saved. You can change the risk amount or answer.",
+        false
+      );
+      return;
+    }
+  }
+
   showPicksMessage(
     "Saving pick...",
     false
@@ -1563,6 +1751,10 @@ function mountPicksPage() {
   }
 
   updateCountdowns();
+
+  (PICKS_PAGE_DATA.categories || [])
+    .filter(category => isStakedPointsCategory(category))
+    .forEach(category => syncStakedPickControls(category.id));
 
   PICKS_COUNTDOWN_TIMER =
     setInterval(
