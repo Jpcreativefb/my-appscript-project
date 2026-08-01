@@ -2821,12 +2821,12 @@ function renderAdminSetupCategoryCard(category, game, categories) {
         <div class="admin-category-header">
 
           <div>
-            <strong>
+            <strong id="categoryTitle_${categoryId}">
               ${categoryTitle}
             </strong>
 
             <div class="admin-sub">
-              ${categoryId}
+              Question ID (permanent): ${categoryId}
               ·
               ${section}
               ·
@@ -2879,6 +2879,7 @@ function renderAdminSetupCategoryCard(category, game, categories) {
                 id="editCategoryName_${categoryId}"
                 value="${adminSetupEscapeHtml(category.category)}"
               >
+              <span class="admin-sub">Question ID: ${categoryId} (permanent; renaming the question does not change it)</span>
             </label>
 
             <label class="admin-field">
@@ -3375,6 +3376,28 @@ function adminSetupApplyLockState_(categoryId, locked) {
   }
 }
 
+function adminSetupSyncQuestionDisplay_(categoryId) {
+  const input = document.getElementById("editCategoryName_" + categoryId);
+  const title = document.getElementById("categoryTitle_" + categoryId);
+
+  if (input && title) {
+    title.textContent = input.value.trim() || categoryId;
+  }
+}
+
+function adminSetupSyncAnswerDisplay_(categoryId, nomineeId) {
+  const input = document.getElementById(
+    "editNomineeName_" + categoryId + "_" + nomineeId
+  );
+  const title = document.getElementById(
+    "nomineeTitle_" + categoryId + "_" + nomineeId
+  );
+
+  if (input && title) {
+    title.textContent = input.value.trim() || nomineeId;
+  }
+}
+
 function adminSetupSetMessage(id, message, isError) {
   const el = document.getElementById(id);
 
@@ -3425,8 +3448,8 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
 
       <summary class="admin-nominee-item-summary">
         <div>
-          <strong>${adminSetupEscapeHtml(nominee.nominee || nominee.nomineeId)}</strong>
-          <div class="admin-sub">${nomineeId}${fileId ? " · image" : ""}</div>
+          <strong id="nomineeTitle_${categoryId}_${nomineeId}">${adminSetupEscapeHtml(nominee.nominee || nominee.nomineeId)}</strong>
+          <div class="admin-sub">Answer ID (permanent): ${nomineeId}${fileId ? " · image" : ""}</div>
         </div>
         <div class="admin-nominee-summary-status">
           <span class="admin-pill ${nominee.active === false ? "inactive" : ""}">${nominee.active === false ? "Inactive" : "Active"}</span>
@@ -3454,6 +3477,7 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
             id="editNomineeName_${categoryId}_${nomineeId}"
             value="${adminSetupEscapeHtml(nominee.nominee)}"
           >
+          <span class="admin-sub">Answer ID: ${nomineeId} (permanent; renaming the answer does not change it)</span>
         </label>
 
         <label class="admin-field">
@@ -4451,6 +4475,8 @@ function adminSetupMarkAnswerDirty(categoryId, nomineeId) {
 }
 
 function adminSetupMarkQuestionSaved_(categoryId) {
+  adminSetupSyncQuestionDisplay_(categoryId);
+
   const editor = document.querySelector(
     '[data-question-editor][data-category-id="' + String(categoryId) + '"]'
   );
@@ -4466,6 +4492,8 @@ function adminSetupMarkQuestionSaved_(categoryId) {
 }
 
 function adminSetupMarkAnswerSaved_(categoryId, nomineeId) {
+  adminSetupSyncAnswerDisplay_(categoryId, nomineeId);
+
   const editor = document.querySelector(
     '[data-answer-editor][data-category-id="' + String(categoryId) + '"][data-nominee-id="' + String(nomineeId) + '"]'
   );
@@ -4666,7 +4694,8 @@ async function adminSetupSaveAllChanges(gameId) {
     message: "All Game Setup changes saved.",
     questionsSaved: 0,
     answersSaved: 0,
-    failures: []
+    failures: [],
+    compatibilityFallback: false
   };
 
   for (const batch of batches) {
@@ -4687,6 +4716,9 @@ async function adminSetupSaveAllChanges(gameId) {
     aggregate.answersSaved += Number(batchResult && batchResult.answersSaved || 0);
     if (batchResult && Array.isArray(batchResult.failures)) {
       aggregate.failures = aggregate.failures.concat(batchResult.failures);
+    }
+    if (batchResult && batchResult.compatibilityFallback) {
+      aggregate.compatibilityFallback = true;
     }
   }
 
@@ -4750,7 +4782,8 @@ async function adminSetupSaveAllChanges(gameId) {
   adminSetupSetSaveButtonState_(button, "saved", { saved: "ALL CHANGES SAVED ✓" });
   adminSetupSetMessage(
     "adminSetupMessage",
-    "Saved " + Number(res.questionsSaved || 0) + " question(s) and " + Number(res.answersSaved || 0) + " answer(s).",
+    "Saved " + Number(res.questionsSaved || 0) + " question(s) and " + Number(res.answersSaved || 0) + " answer(s)." +
+      (res.compatibilityFallback ? " The app used compatibility save mode because the Apps Script deployment is one version behind." : ""),
     false
   );
   setTimeout(function() {

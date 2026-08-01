@@ -1,0 +1,19 @@
+Phase 1 Game Setup Bulk Save Hotfix v1.0.8
+
+Result: PASS
+
+Regression suites passed: 20 / 20
+JavaScript syntax checks passed: 107 / 107
+
+Focused coverage:
+- Bulk-save compatibility fallback for an older Apps Script deployment
+- Immediate question heading update after save
+- Immediate answer heading update after save
+- Permanent Question ID and Answer ID labels
+- Staked ScoreMode persistence
+- Normalized question persistence
+- Phase 1 game routing and preflight behavior
+- Existing sports, archive, and leaderboard regressions
+
+Service-worker cache:
+awards-app-v257-game-setup-save-compatibility

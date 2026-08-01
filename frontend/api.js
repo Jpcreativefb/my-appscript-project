@@ -1548,16 +1548,98 @@ async function apiAdminBulkUpdateGameSetup(gameId, questions, answers) {
   const session =
     getSession();
 
-  return api(
+  const questionItems =
+    Array.isArray(questions)
+      ? questions
+      : [];
+
+  const answerItems =
+    Array.isArray(answers)
+      ? answers
+      : [];
+
+  const bulkResult = await api(
     "adminBulkUpdateGameSetup",
     {
       gameId: gameId,
-      questionsJSON: JSON.stringify(Array.isArray(questions) ? questions : []),
-      answersJSON: JSON.stringify(Array.isArray(answers) ? answers : []),
+      questionsJSON: JSON.stringify(questionItems),
+      answersJSON: JSON.stringify(answerItems),
       username: session.username,
       token: session.token
     }
   );
+
+  const bulkMessage = String(
+    bulkResult && (bulkResult.message || bulkResult.error)
+      ? bulkResult.message || bulkResult.error
+      : ""
+  );
+
+  const bulkActionIsUnavailable =
+    bulkResult &&
+    bulkResult.success === false &&
+    /Unknown action:\s*adminBulkUpdateGameSetup/i.test(bulkMessage);
+
+  if (!bulkActionIsUnavailable) {
+    return bulkResult;
+  }
+
+  // Compatibility fallback for a frontend that has deployed before the
+  // matching Apps Script web-app version. Save each dirty item through the
+  // long-standing individual update actions rather than losing the edits.
+  const failures = [];
+  let questionsSaved = 0;
+  let answersSaved = 0;
+
+  for (const item of questionItems) {
+    const result = await apiAdminUpdateCategory({
+      ...(item || {}),
+      gameId: gameId
+    });
+
+    if (!result || result.success === false) {
+      failures.push({
+        type: "question",
+        categoryId: String(item && item.categoryId || ""),
+        error: result && (result.message || result.error)
+          ? result.message || result.error
+          : "Question could not be saved."
+      });
+    } else {
+      questionsSaved += 1;
+    }
+  }
+
+  for (const item of answerItems) {
+    const result = await apiAdminUpdateNominee({
+      ...(item || {}),
+      gameId: gameId
+    });
+
+    if (!result || result.success === false) {
+      failures.push({
+        type: "answer",
+        categoryId: String(item && item.categoryId || ""),
+        nomineeId: String(item && item.nomineeId || ""),
+        error: result && (result.message || result.error)
+          ? result.message || result.error
+          : "Answer could not be saved."
+      });
+    } else {
+      answersSaved += 1;
+    }
+  }
+
+  return {
+    success: failures.length === 0,
+    message: failures.length
+      ? "Some Game Setup changes could not be saved."
+      : "All Game Setup changes saved using compatibility mode.",
+    questionsSaved: questionsSaved,
+    answersSaved: answersSaved,
+    failures: failures,
+    compatibilityFallback: true
+  };
 
 }
 

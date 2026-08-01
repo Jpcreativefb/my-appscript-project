@@ -28,7 +28,7 @@ assert(betting.includes('renderBettingStartingPitchers_'));
 assert(sportsCss.includes('.sports-help-popover'));
 assert(sportsCss.includes('.sports-starters'));
 assert(bettingCss.includes('.betting-live-stat-panel'));
-assert(sw.includes('awards-app-v256-game-setup-save-delete'));
+assert(sw.includes('awards-app-v257-game-setup-save-compatibility'));
 
 const context = {
   console,
