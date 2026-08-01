@@ -842,6 +842,64 @@ function getBettingOddsFor_(gameId, categoryId, nomineeId){
 
 }
 
+function normalizeBettingScoreMode_(value) {
+
+  const mode =
+    normalizeBetKey_(value)
+      .replace(/_/g, "-");
+
+  if (mode === "bet" || mode === "betting") {
+    return "wager";
+  }
+
+  return mode;
+
+}
+
+function isWagerBettingCategory_(
+  category,
+  setting
+) {
+
+  category = category || {};
+  setting = setting || {};
+
+  const scoreMode = normalizeBettingScoreMode_(
+    setting.scoreMode ||
+    setting.ScoreMode ||
+    category.scoreMode ||
+    category.ScoreMode ||
+    ""
+  );
+
+  if (scoreMode) {
+    return scoreMode === "wager";
+  }
+
+  /* Legacy wager rows may predate ScoreMode. */
+  const layoutType = normalizeBetKey_(
+    setting.layoutType ||
+    setting.LayoutType ||
+    category.layoutType ||
+    category.LayoutType ||
+    ""
+  );
+
+  const votingTypes = normalizeBetKey_(
+    setting.votingTypes ||
+    setting.VotingTypes ||
+    category.votingTypes ||
+    category.VotingTypes ||
+    ""
+  );
+
+  return (
+    layoutType === "wager" ||
+    votingTypes.indexOf("wager") !== -1
+  );
+
+}
+
 function isSportsWagerBettingCategory_(
   category,
   setting
@@ -850,35 +908,33 @@ function isSportsWagerBettingCategory_(
   category = category || {};
   setting = setting || {};
 
-  const layoutType =
-    normalizeBetKey_(
-      setting.layoutType ||
-      setting.LayoutType ||
-      category.layoutType ||
-      category.LayoutType ||
-      ""
-    );
+  const oddsMode = normalizeBetKey_(
+    setting.oddsMode ||
+    setting.OddsMode ||
+    category.oddsMode ||
+    category.OddsMode ||
+    ""
+  );
 
-  const votingTypes =
-    normalizeBetKey_(
-      setting.votingTypes ||
-      setting.VotingTypes ||
-      category.votingTypes ||
-      category.VotingTypes ||
-      ""
-    );
+  const oddsSource = normalizeBetKey_(
+    setting.oddsSource ||
+    setting.OddsSource ||
+    category.oddsSource ||
+    category.OddsSource ||
+    ""
+  );
 
-  return (
-    layoutType === "wager" ||
-    votingTypes.indexOf("wager") !== -1 ||
-    !!(
-      category.sportsGameId ||
-      category.SportsGameId ||
-      category.sportsLeague ||
-      category.SportsLeague ||
-      setting.sportsGameId ||
-      setting.SportsGameId
-    )
+  return !!(
+    category.sportsGameId ||
+    category.SportsGameId ||
+    category.espnEventId ||
+    category.ESPNEventId ||
+    setting.sportsGameId ||
+    setting.SportsGameId ||
+    setting.espnEventId ||
+    setting.ESPNEventId ||
+    ["sports", "live", "external", "market"].indexOf(oddsMode) !== -1 ||
+    (oddsSource && ["manual", "default", "even"].indexOf(oddsSource) === -1)
   );
 
 }
@@ -1004,6 +1060,18 @@ function getBettingOptions(gameId, options){
   const oddsMap = getBettingOddsMap_(gameId);
 
   const preparedCategories = categories
+    .filter(function(category) {
+
+      const categoryId = normalizeBetKey_(category && category.id);
+      const setting = settings[categoryId] || {};
+
+      /*
+        Hybrid games can contain fixed, confidence, staked, and wager
+        questions together. The Wager page must receive only ScoreMode=wager.
+      */
+      return isWagerBettingCategory_(category, setting);
+
+    })
     .map(function(category) {
 
       const categoryId = normalizeBetKey_(
@@ -1083,12 +1151,25 @@ function getBettingOptions(gameId, options){
             nominee.id
           );
 
-          const oddsValue =
+          const externalOddsRequired =
+            isSportsWagerBettingCategory_(
+              category,
+              setting
+            );
+
+          const mappedOdds =
             getBettingOddsFromMap_(
               oddsMap,
               categoryId,
               nomineeId
             );
+
+          const oddsValue =
+            isBettingOddsValueReady_(mappedOdds)
+              ? mappedOdds
+              : externalOddsRequired
+                ? null
+                : Number(config.defaultOdds || DEFAULT_BETTING_ODDS);
 
           const oddsAvailable =
             isBettingOddsValueReady_(

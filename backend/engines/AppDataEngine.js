@@ -722,36 +722,65 @@ function getDashboardGameMode_(game) {
       .trim()
       .toLowerCase();
 
+  /*
+    The explicit Game Type must win before feature flags are inspected.
+    Hybrid / Mixed games intentionally have WagerEnabled and PredictionEnabled
+    at the same time. Looking at WagerEnabled first incorrectly turned them into
+    plain Wager games and skipped the Game Sections chooser.
+  */
+  const explicitTypes = [
+    "mixed",
+    "hybrid",
+    "combo",
+    "wager",
+    "betting",
+    "racing-wager",
+    "staked-prediction",
+    "confidence",
+    "head-to-head",
+    "survivor",
+    "ranking",
+    "prediction"
+  ];
+
+  if (explicitTypes.indexOf(type) !== -1) {
+    return type === "betting" ? "wager" : type;
+  }
+
+  /* Legacy rows without a recognized Type may still use feature flags. */
   if (
-    type === "wager" ||
-    type === "betting" ||
-    game.wagerEnabled === true
+    game.wagerEnabled === true &&
+    (
+      game.predictionEnabled === true ||
+      game.confidenceEnabled === true ||
+      game.stakedPointsEnabled === true ||
+      game.fixedPointsEnabled === true
+    )
   ) {
+    return "hybrid";
+  }
+
+  if (game.wagerEnabled === true) {
     return "wager";
   }
 
-  if (
-    type === "confidence" ||
-    game.confidenceEnabled === true
-  ) {
+  if (game.stakedPointsEnabled === true) {
+    return "staked-prediction";
+  }
+
+  if (game.confidenceEnabled === true) {
     return "confidence";
   }
 
-  if (
-    type === "ranking" ||
-    game.rankingEnabled === true
-  ) {
+  if (game.rankingEnabled === true) {
     return "ranking";
   }
 
-  if (
-    type === "prediction" ||
-    game.predictionEnabled === true
-  ) {
+  if (game.predictionEnabled === true) {
     return "prediction";
   }
 
-  return type || "prediction";
+  return "prediction";
 
 }
 
@@ -764,12 +793,36 @@ function getDashboardGameTypeLabel_(
     return game.typeLabel;
   }
 
+  if (
+    mode === "mixed" ||
+    mode === "hybrid" ||
+    mode === "combo"
+  ) {
+    return "Hybrid Game";
+  }
+
   if (mode === "wager") {
     return "Wager / Chips Game";
   }
 
+  if (mode === "racing-wager") {
+    return "Racing Wager Game";
+  }
+
+  if (mode === "staked-prediction") {
+    return "Staked Prediction Game";
+  }
+
   if (mode === "confidence") {
     return "Confidence Game";
+  }
+
+  if (mode === "head-to-head") {
+    return "Head-to-Head Game";
+  }
+
+  if (mode === "survivor") {
+    return "Survivor Game";
   }
 
   if (mode === "ranking") {
