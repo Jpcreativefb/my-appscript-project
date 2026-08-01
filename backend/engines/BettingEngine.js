@@ -856,11 +856,214 @@ function normalizeBettingScoreMode_(value) {
     normalizeBetKey_(value)
       .replace(/_/g, "-");
 
-  if (mode === "bet" || mode === "betting") {
+  if (
+    mode === "bet" ||
+    mode === "betting" ||
+    mode === "sports-wager" ||
+    mode === "wager-odds"
+  ) {
     return "wager";
   }
 
   return mode;
+
+}
+
+function getCanonicalHybridBettingSource_(
+  gameId,
+  config,
+  fallbackCategories,
+  fallbackSettings
+) {
+
+  fallbackCategories = Array.isArray(fallbackCategories)
+    ? fallbackCategories
+    : [];
+
+  fallbackSettings = fallbackSettings || {};
+
+  if (
+    !config ||
+    config.mixedGame !== true ||
+    typeof adminGetGameSetup !== "function"
+  ) {
+    return {
+      categories: fallbackCategories,
+      settings: fallbackSettings,
+      canonical: false
+    };
+  }
+
+  try {
+
+    const setup = adminGetGameSetup({
+      gameId: gameId
+    }) || {};
+
+    const setupCategories = Array.isArray(setup.categories)
+      ? setup.categories
+      : [];
+
+    if (!setupCategories.length) {
+      return {
+        categories: fallbackCategories,
+        settings: fallbackSettings,
+        canonical: false
+      };
+    }
+
+    const fallbackCategoryMap = {};
+
+    fallbackCategories.forEach(function(category) {
+      const categoryId = normalizeBetKey_(category && category.id);
+      if (categoryId) fallbackCategoryMap[categoryId] = category;
+    });
+
+    const categories = [];
+    const settings = Object.assign({}, fallbackSettings);
+
+    setupCategories.forEach(function(setupCategory) {
+
+      const categoryId = normalizeBetKey_(
+        setupCategory && (
+          setupCategory.categoryId ||
+          setupCategory.id
+        )
+      );
+
+      if (!categoryId || setupCategory.active === false) {
+        return;
+      }
+
+      const fallbackCategory = fallbackCategoryMap[categoryId] || {};
+      const fallbackNomineeMap = {};
+
+      (fallbackCategory.nominees || []).forEach(function(nominee) {
+        const nomineeId = normalizeBetKey_(nominee && nominee.id);
+        if (nomineeId) fallbackNomineeMap[nomineeId] = nominee;
+      });
+
+      const canonicalSettings = Object.assign(
+        {},
+        fallbackSettings[categoryId] || {},
+        setupCategory.settings || {}
+      );
+
+      const nominees = (setupCategory.nominees || [])
+        .filter(function(nominee) {
+          return nominee && nominee.active !== false;
+        })
+        .map(function(nominee) {
+
+          const nomineeId = normalizeBetKey_(
+            nominee.nomineeId ||
+            nominee.id
+          );
+
+          const fallbackNominee = fallbackNomineeMap[nomineeId] || {};
+
+          return Object.assign({}, fallbackNominee, {
+            id: nomineeId,
+            name:
+              nominee.nominee ||
+              nominee.name ||
+              fallbackNominee.name ||
+              nomineeId,
+            shortAnswer:
+              nominee.shortAnswer ||
+              nominee.nominee ||
+              nominee.name ||
+              fallbackNominee.shortAnswer ||
+              fallbackNominee.name ||
+              nomineeId,
+            image:
+              fallbackNominee.image ||
+              nominee.image ||
+              nominee.logoUrl ||
+              ""
+          });
+
+        })
+        .filter(function(nominee) {
+          return !!nominee.id;
+        });
+
+      settings[categoryId] = canonicalSettings;
+
+      categories.push(
+        Object.assign({}, fallbackCategory, {
+          id: categoryId,
+          name:
+            setupCategory.category ||
+            setupCategory.name ||
+            fallbackCategory.name ||
+            categoryId,
+          shortName:
+            canonicalSettings.shortName ||
+            fallbackCategory.shortName ||
+            setupCategory.category ||
+            categoryId,
+          section:
+            setupCategory.section ||
+            fallbackCategory.section ||
+            "Other",
+          image:
+            fallbackCategory.image ||
+            setupCategory.categoryImage ||
+            "",
+          displayOrder:
+            Number(canonicalSettings.displayOrder) ||
+            Number(fallbackCategory.displayOrder) ||
+            999,
+          locked:
+            canonicalSettings.locked === true ||
+            fallbackCategory.locked === true,
+          lockDateTime:
+            canonicalSettings.lockDateTime ||
+            fallbackCategory.lockDateTime ||
+            "",
+          scoreMode:
+            canonicalSettings.scoreMode ||
+            fallbackCategory.scoreMode ||
+            "",
+          sportsGameId:
+            canonicalSettings.sportsGameId ||
+            fallbackCategory.sportsGameId ||
+            "",
+          espnEventId:
+            canonicalSettings.espnEventId ||
+            fallbackCategory.espnEventId ||
+            "",
+          sportsLeague:
+            canonicalSettings.sportsLeague ||
+            fallbackCategory.sportsLeague ||
+            "",
+          nominees: nominees
+        })
+      );
+
+    });
+
+    return {
+      categories: categories,
+      settings: settings,
+      canonical: true
+    };
+
+  } catch (err) {
+
+    Logger.log(
+      "Canonical Hybrid wager read failed; using standard categories: " +
+      err
+    );
+
+    return {
+      categories: fallbackCategories,
+      settings: fallbackSettings,
+      canonical: false
+    };
+
+  }
 
 }
 
@@ -1063,9 +1266,25 @@ function getBettingOptions(gameId, options){
       );
 
   const config = getBettingGameConfig(gameId);
-  const categories = getCategories(gameId);
-  const settings = getCategorySettings(gameId);
+  let categories = getCategories(gameId);
+  let settings = getCategorySettings(gameId);
   const oddsMap = getBettingOddsMap_(gameId);
+
+  /*
+    Hybrid Game Setup is edited from the canonical Questions,
+    QuestionOptions, and raw CategorySettings rows. Read that same source here
+    so a newly saved wager question cannot disappear because a player-facing
+    projection or cache is one version behind.
+  */
+  const canonicalSource = getCanonicalHybridBettingSource_(
+    gameId,
+    config,
+    categories,
+    settings
+  );
+
+  categories = canonicalSource.categories;
+  settings = canonicalSource.settings;
 
   const preparedCategories = categories
     .filter(function(category) {
@@ -1341,6 +1560,10 @@ function getBettingOptions(gameId, options){
     config: config,
     categories: bettingCategories,
     totalCategories: preparedCategories.length,
+    sourceMode:
+      canonicalSource.canonical === true
+        ? "canonical-hybrid"
+        : "standard",
     offset: offset,
     limit: limit,
     nextOffset: nextOffset,
