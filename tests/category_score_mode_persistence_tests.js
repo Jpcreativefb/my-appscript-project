@@ -137,4 +137,30 @@ assert.strictEqual(
   'Hybrid result-only updates must preserve the existing per-question ScoreMode.'
 );
 
+context.getGame = gameId => ({
+  gameId,
+  type: gameId === 'hybrid-alias-test' ? 'hybrid' : 'prediction',
+  mixedGame: gameId === 'hybrid-flag-test',
+  gameFormat: gameId === 'hybrid-format-test' ? 'hybrid' : 'standard'
+});
+context.normalizeGameType_ = value => (
+  String(value || '').toLowerCase() === 'hybrid' ? 'prediction' : String(value || '').toLowerCase()
+);
+
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('hybrid-alias-test', 'wager'),
+  'wager',
+  'The raw Hybrid alias must preserve the question-level wager ScoreMode even if a stale normalizer falls back to prediction.'
+);
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('hybrid-flag-test', 'staked-points'),
+  'staked-points',
+  'The MixedGame flag must preserve the question-level ScoreMode.'
+);
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('hybrid-format-test', 'confidence-points'),
+  'confidence-points',
+  'GameFormat hybrid must preserve the question-level ScoreMode.'
+);
+
 console.log('category-score-mode-persistence-tests: PASS');

@@ -69,17 +69,35 @@ function adminCatResolveScoreModeForGame_(gameId, requestedMode) {
     return normalizedRequested;
   }
 
+  const rawType =
+    adminCatNormalizeValue_(game.type || game.gameType || "prediction")
+      .toLowerCase();
+
   const type =
     typeof normalizeGameType_ === "function"
-      ? normalizeGameType_(game.type || "prediction")
-      : adminCatNormalizeValue_(game.type || "prediction")
-          .toLowerCase();
+      ? normalizeGameType_(rawType)
+      : rawType;
+
+  const isHybrid =
+    type === "mixed" ||
+    rawType === "mixed" ||
+    rawType === "hybrid" ||
+    rawType === "combo" ||
+    game.mixedGame === true ||
+    adminCatNormalizeValue_(game.gameFormat).toLowerCase() === "hybrid" ||
+    adminCatNormalizeValue_(game.scoringMode).toLowerCase() === "hybrid";
 
   /*
     One source of truth:
     Non-Hybrid game types own their question ScoreMode.
-    Per-question mode selection is only meaningful for Hybrid games.
+    Hybrid questions must preserve the mode selected on each question.
   */
+  if (isHybrid) {
+    return hasRequestedMode
+      ? normalizedRequested
+      : undefined;
+  }
+
   if (type === "staked-prediction") {
     return "staked-points";
   }
@@ -94,12 +112,6 @@ function adminCatResolveScoreModeForGame_(gameId, requestedMode) {
 
   if (type === "ranking") {
     return "ranking";
-  }
-
-  if (type === "mixed" || type === "combo") {
-    return hasRequestedMode
-      ? normalizedRequested
-      : undefined;
   }
 
   return "fixed-points";

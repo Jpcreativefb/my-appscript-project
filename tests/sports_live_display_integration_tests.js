@@ -28,7 +28,7 @@ assert(betting.includes('renderBettingStartingPitchers_'));
 assert(sportsCss.includes('.sports-help-popover'));
 assert(sportsCss.includes('.sports-starters'));
 assert(bettingCss.includes('.betting-live-stat-panel'));
-assert(sw.includes('awards-app-v261-hybrid-fixed-picks-navigation'));
+assert(sw.includes('awards-app-v262-hybrid-question-scoremode'));
 
 const context = {
   console,

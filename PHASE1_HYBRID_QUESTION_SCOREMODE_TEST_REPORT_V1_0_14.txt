@@ -1,0 +1,15 @@
+Phase 1 Hybrid Question ScoreMode Hotfix v1.0.14
+
+Validation completed:
+- 26 of 26 regression test files passed.
+- 113 of 113 JavaScript files passed Node syntax validation.
+
+Focused coverage:
+- Hybrid, Mixed, Combo, MixedGame, GameFormat=hybrid, and ScoringMode=hybrid aliases canonicalize to the Hybrid editor.
+- A Hybrid question saved as Wager remains Wager.
+- A Hybrid question saved as Staked Points or Confidence Points remains in its selected mode.
+- Backend preserves a Hybrid question's requested ScoreMode even if an older normalizer falls back to Prediction.
+- Hybrid Wager visibility and fixed-pick navigation regression suites remain passing.
+
+PWA cache:
+awards-app-v262-hybrid-question-scoremode

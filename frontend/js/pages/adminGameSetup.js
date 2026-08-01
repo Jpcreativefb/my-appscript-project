@@ -123,8 +123,30 @@ function adminSetupFieldLabel_(title, helpText) {
 }
 
 function adminSetupCanonicalGameType_(game) {
-  const type = String(game && game.type || "prediction").trim().toLowerCase();
-  return type === "combo" ? "mixed" : type;
+  const config = game || {};
+  const type = String(config.type || config.gameType || "prediction")
+    .trim()
+    .toLowerCase();
+  const gameFormat = String(config.gameFormat || "").trim().toLowerCase();
+  const scoringMode = String(config.scoringMode || "").trim().toLowerCase();
+
+  /*
+    Hybrid has existed under several persisted names. Treat every alias and
+    explicit hybrid flag as the same canonical type so per-question ScoreMode
+    remains editable and is not replaced by the Fixed Points default.
+  */
+  if (
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo" ||
+    config.mixedGame === true ||
+    gameFormat === "hybrid" ||
+    scoringMode === "hybrid"
+  ) {
+    return "mixed";
+  }
+
+  return type;
 }
 
 function adminSetupAllowedScoreModes_(game, currentMode) {
