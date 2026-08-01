@@ -2,6 +2,39 @@
    LEADERBOARD PAGE
 ====================== */
 
+function isHybridLeaderboardGame_() {
+
+  const type =
+    String(localStorage.getItem("gameMode") || "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo"
+  );
+
+}
+
+function renderHybridLeaderboardBackButton_() {
+
+  if (!isHybridLeaderboardGame_()) {
+    return "";
+  }
+
+  return `
+    <button
+      type="button"
+      class="dashboard-action-button secondary"
+      onclick="navigate('game-hub')"
+    >
+      ← Back to Game Sections
+    </button>
+  `;
+
+}
+
 async function renderLeaderboardPage() {
 
   const gameId =
@@ -42,6 +75,7 @@ async function renderLeaderboardPage() {
 
     return `
       <div class="page">
+        ${renderHybridLeaderboardBackButton_()}
         <h1>Leaderboard</h1>
         ${renderErrorCard(
           "Could not load leaderboard",
@@ -66,6 +100,7 @@ async function renderLeaderboardPage() {
 
     return `
       <div class="page">
+        ${renderHybridLeaderboardBackButton_()}
         <h1>Leaderboard</h1>
         ${renderErrorCard(
           "Could not load leaderboard",
@@ -87,6 +122,7 @@ async function renderLeaderboardPage() {
 
     return `
       <div class="page">
+        ${renderHybridLeaderboardBackButton_()}
         <h1>${isWagerLeaderboard ? "Wager Leaderboard" : "Leaderboard"}</h1>
         <div class="leaderboard-subtitle">
           Game:
@@ -126,6 +162,8 @@ function renderStandardLeaderboardPage_(gameId, rows, leagueId) {
 
   return `
     <div class="page">
+
+      ${renderHybridLeaderboardBackButton_()}
 
       <h1>Leaderboard</h1>
 
@@ -192,6 +230,8 @@ function renderSeparatePredictionLeaderboards_(gameId, rows, leagueId) {
 
   return `
     <div class="page">
+
+      ${renderHybridLeaderboardBackButton_()}
 
       <h1>Leaderboard</h1>
 
@@ -437,6 +477,8 @@ function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
 
   return `
     <div class="page">
+
+      ${renderHybridLeaderboardBackButton_()}
 
       <h1>Wager Leaderboard</h1>
 

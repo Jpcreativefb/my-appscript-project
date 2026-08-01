@@ -1,0 +1,80 @@
+Phase 1 Hybrid Fixed Picks and Navigation v1.0.12
+Test date: 2026-08-01
+
+PASS archive_production_readiness_tests.js
+archive-production-readiness-tests: PASS
+
+PASS bets_single_row_upsert_tests.js
+Single-row wager upsert and duplicate cleanup tests passed.
+
+PASS category_score_mode_persistence_tests.js
+category-score-mode-persistence-tests: PASS
+
+PASS game_setup_bulk_compatibility_tests.js
+game-setup-bulk-compatibility-tests: PASS
+
+PASS game_setup_canonical_reload_and_answer_delete_tests.js
+game-setup-canonical-reload-and-answer-delete-tests: PASS
+
+PASS game_setup_editor_workflow_tests.js
+game-setup-editor-workflow-tests: PASS
+
+PASS games_phase1_integration_tests.js
+games-phase1-integration-tests: PASS
+
+PASS hybrid_fixed_pick_navigation_tests.js
+hybrid-fixed-pick-navigation-tests: PASS
+
+PASS hybrid_routing_wager_filter_tests.js
+hybrid-routing-wager-filter-tests: PASS
+hybrid-routing-wager-filter-runtime-tests: PASS
+
+PASS leaderboard_modal_interactions_tests.js
+leaderboard-modal-interactions-tests: PASS
+
+PASS normalized_question_update_persistence_tests.js
+normalized-question-update-persistence-tests: PASS
+
+PASS sports_advanced_comparison_filter_tests.js
+Sports advanced comparison filter tests passed.
+
+PASS sports_advanced_questions_integration_tests.js
+Sports Advanced Questions integration tests passed.
+
+PASS sports_advanced_stats_engine_tests.js
+Sports Advanced Stats Engine tests passed.
+
+PASS sports_all_league_player_stats_tests.js
+All-league player stats tests passed.
+
+PASS sports_live_display_integration_tests.js
+Sports live display integration tests passed.
+
+PASS sports_page_stats_runtime_tests.js
+Sports page stats runtime tests passed.
+
+PASS sports_player_matchup_creation_tests.js
+Sports Player Matchup creation and settlement tests passed.
+
+PASS sports_player_matchups_integration_tests.js
+Sports Player Matchups integration tests passed.
+
+PASS sports_player_prop_bet_save_integration_tests.js
+Sports Player Prop bet-save integration test passed.
+
+PASS sports_player_props_integration_tests.js
+Sports Player Props integration tests passed.
+
+PASS sports_players_controls_integration_tests.js
+Sports Players Controls integration tests passed.
+
+PASS sports_standalone_comparison_builder_tests.js
+Sports standalone comparison builder tests passed.
+
+PASS staked_pick_risk_first_tests.js
+staked-pick-risk-first-tests: PASS
+
+Suites passed: 24
+Suites failed: 0
+JavaScript files passed syntax: 111
+JavaScript files failed syntax: 0

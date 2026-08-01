@@ -1107,11 +1107,18 @@ function adminGameTypeFeatureFlags_(form) {
   } else if (type === "ranking") {
     flags.rankingEnabled = true;
   } else if (type === "mixed") {
-    flags.predictionEnabled = Boolean(form.predictionEnabled && form.predictionEnabled.checked);
+    // In a Hybrid game, "Standard Predictions" and fixed-point scoring are
+    // one gameplay method. Keeping separate switches allowed a question to
+    // appear on the Picks page while the backend rejected the submitted pick.
+    const standardPredictionsEnabled = Boolean(
+      form.fixedPointsEnabled && form.fixedPointsEnabled.checked
+    );
+
+    flags.predictionEnabled = standardPredictionsEnabled;
+    flags.fixedPointsEnabled = standardPredictionsEnabled;
     flags.rankingEnabled = Boolean(form.rankingEnabled && form.rankingEnabled.checked);
     flags.confidenceEnabled = Boolean(form.confidenceEnabled && form.confidenceEnabled.checked);
     flags.wagerEnabled = Boolean(form.wagerEnabled && form.wagerEnabled.checked);
-    flags.fixedPointsEnabled = Boolean(form.fixedPointsEnabled && form.fixedPointsEnabled.checked);
     flags.stakedPointsEnabled = Boolean(form.stakedPointsEnabled && form.stakedPointsEnabled.checked);
   }
 
@@ -1144,8 +1151,7 @@ function adminGameTypeSummaryText_(type, flags) {
 
   if (type === "mixed") {
     const enabled = [];
-    if (flags.predictionEnabled) enabled.push("Predictions");
-    if (flags.fixedPointsEnabled) enabled.push("Fixed Points");
+    if (flags.fixedPointsEnabled) enabled.push("Standard Predictions (Fixed Points)");
     if (flags.stakedPointsEnabled) enabled.push("Staked Points");
     if (flags.confidenceEnabled) enabled.push("Confidence");
     if (flags.wagerEnabled) enabled.push("Wagers");
@@ -2050,8 +2056,7 @@ function renderAdminGameForm(
             </summary>
 
             <div class="admin-checkbox-row">
-              ${renderAdminCheckboxWithHelp_("predictionEnabled", "Predictions", game.predictionEnabled, "Allows standard one-answer prediction questions.")}
-              ${renderAdminCheckboxWithHelp_("fixedPointsEnabled", "Fixed Points", game.fixedPointsEnabled !== false, "Correct answers receive the point value assigned to the question.")}
+              ${renderAdminCheckboxWithHelp_("fixedPointsEnabled", "Standard Predictions (Fixed Points)", (game.fixedPointsEnabled === true || game.predictionEnabled === true), "Allows normal one-answer prediction questions. Correct answers receive the point value assigned to the question.")}
               ${renderAdminCheckboxWithHelp_("stakedPointsEnabled", "Staked Points", game.stakedPointsEnabled === true, "Players risk points based on confidence and win or lose those points.")}
               ${renderAdminCheckboxWithHelp_("confidenceEnabled", "Confidence Pool", game.confidenceEnabled, "Players assign unique confidence values across questions.")}
               ${renderAdminCheckboxWithHelp_("wagerEnabled", "Sports Wagers", game.wagerEnabled, "Players use a separate bankroll with odds and payouts.")}
@@ -3275,6 +3280,8 @@ function adminApplyGameTypeDefaults(
   }
 
   if (type === "mixed") {
+    // Standard Predictions is represented by the fixedPointsEnabled control.
+    // predictionEnabled is derived from it when the form is saved.
     setChecked("predictionEnabled", true);
     setChecked("fixedPointsEnabled", true);
     setChecked("stakedPointsEnabled", true);

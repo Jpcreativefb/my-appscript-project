@@ -105,12 +105,19 @@ function adminNormalizeGameId_(value) {
     };
 
     if (isHybrid) {
+      // Standard Predictions and fixed-point scoring are one Hybrid method.
+      // Older rows and cached frontends may have saved only one of these flags,
+      // so treat either true value as enabling the complete method.
+      const standardPredictionsEnabled =
+        resolveHybridFlag("fixedPointsEnabled", config.fixedPointsEnabled) ||
+        resolveHybridFlag("predictionEnabled", config.predictionEnabled);
+
       return {
-        predictionEnabled: resolveHybridFlag("predictionEnabled", config.predictionEnabled),
+        predictionEnabled: standardPredictionsEnabled,
         rankingEnabled: resolveHybridFlag("rankingEnabled", config.rankingEnabled),
         confidenceEnabled: resolveHybridFlag("confidenceEnabled", config.confidenceEnabled),
         wagerEnabled: resolveHybridFlag("wagerEnabled", config.wagerEnabled),
-        fixedPointsEnabled: resolveHybridFlag("fixedPointsEnabled", config.fixedPointsEnabled),
+        fixedPointsEnabled: standardPredictionsEnabled,
         stakedPointsEnabled: resolveHybridFlag("stakedPointsEnabled", config.stakedPointsEnabled),
         mixedGame: true
       };

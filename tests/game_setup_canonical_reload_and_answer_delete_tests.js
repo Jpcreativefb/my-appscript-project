@@ -36,6 +36,6 @@ assert(setup.includes('Delete Answer'));
 assert(setup.includes('Archive Answer'));
 assert(setup.includes('async function adminSetupDeleteNominee'));
 assert(setup.includes('apiAdminDeleteNominee(gameId, categoryId, nomineeId)'));
-assert(sw.includes('awards-app-v260-hybrid-routing-wager-filter'));
+assert(sw.includes('awards-app-v261-hybrid-fixed-picks-navigation'));
 
 console.log('game-setup-canonical-reload-and-answer-delete-tests: PASS');

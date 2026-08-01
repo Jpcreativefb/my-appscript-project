@@ -59,6 +59,52 @@ function getBettingSession_(){
 
 }
 
+function isHybridBettingGame_(config) {
+
+  config = config || {};
+
+  const type =
+    String(
+      config.gameType ||
+      localStorage.getItem("gameMode") ||
+      ""
+    )
+      .trim()
+      .toLowerCase();
+
+  const format =
+    String(config.gameFormat || "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo" ||
+    format === "hybrid" ||
+    config.mixedGame === true
+  );
+
+}
+
+function renderHybridBettingBackButton_(config) {
+
+  if (!isHybridBettingGame_(config)) {
+    return "";
+  }
+
+  return `
+    <button
+      type="button"
+      class="dashboard-action-button secondary"
+      onclick="navigate('game-hub')"
+    >
+      ← Back to Game Sections
+    </button>
+  `;
+
+}
+
 function getBettingGameId_(){
 
   if (typeof getFrontendGameId === "function") {
@@ -3196,6 +3242,7 @@ async function renderBettingPage(){
 
     return `
       <div class="page">
+        ${renderHybridBettingBackButton_({})}
         <h1>Wager</h1>
         ${renderBettingNotice_("Please log in again.", "error")}
       </div>
@@ -3219,6 +3266,7 @@ async function renderBettingPage(){
 
     return `
       <div class="page">
+        ${renderHybridBettingBackButton_({})}
         <h1>Wager</h1>
         ${renderBettingNotice_(
           (pageRes && (pageRes.message || pageRes.error)) ||
@@ -3237,6 +3285,7 @@ async function renderBettingPage(){
 
     return `
       <div class="page betting-page">
+        ${renderHybridBettingBackButton_(config)}
         <h1>Wager</h1>
         ${renderBettingNotice_(
           "Wagering is not enabled for this game yet. Set Type to wager or WagerEnabled to TRUE in the Games sheet.",
@@ -3292,6 +3341,8 @@ async function renderBettingPage(){
 
   return `
     <div class="page betting-page">
+
+      ${renderHybridBettingBackButton_(config)}
 
       <h1>Wager</h1>
 

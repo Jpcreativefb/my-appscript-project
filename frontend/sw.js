@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v260-hybrid-routing-wager-filter";
+const AWARDS_CACHE = "awards-app-v261-hybrid-fixed-picks-navigation";
 
 const APP_SHELL = [
   "./",

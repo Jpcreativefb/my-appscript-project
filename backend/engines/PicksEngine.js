@@ -806,6 +806,40 @@ function getUserBreakdown(username, gameId){
    SAVE PICK
 ========================================================= */
 
+function isFixedPointPredictionEnabledForGame_(gameConfig) {
+
+  if (!gameConfig) {
+    return true;
+  }
+
+  const type =
+    normalizeLower_(gameConfig.type || "");
+
+  const format =
+    normalizeLower_(gameConfig.gameFormat || "");
+
+  const isHybrid =
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo" ||
+    format === "hybrid" ||
+    gameConfig.mixedGame === true;
+
+  /*
+    Standard Predictions in a Hybrid game historically used two flags:
+    PredictionEnabled and FixedPointsEnabled. Treat either enabled flag as
+    authorizing fixed-point picks so older Hybrid rows remain playable.
+  */
+  return (
+    gameConfig.fixedPointsEnabled !== false ||
+    (
+      isHybrid &&
+      gameConfig.predictionEnabled === true
+    )
+  );
+
+}
+
 function savePick(payload){
 
   const lock =
@@ -1043,8 +1077,7 @@ function savePick(payload){
 
     if (
       usesFixedPoints &&
-      gameConfig &&
-      gameConfig.fixedPointsEnabled === false
+      !isFixedPointPredictionEnabledForGame_(gameConfig)
     ) {
       return {
         success: false,

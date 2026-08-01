@@ -26,7 +26,7 @@ for (const source of [app, appRoot]) {
 }
 assert(appHtml.includes('./js/pages/gameModeHub.js'));
 assert(serviceWorker.includes('./js/pages/gameModeHub.js'));
-assert(serviceWorker.includes('awards-app-v260-hybrid-routing-wager-filter'));
+assert(serviceWorker.includes('awards-app-v261-hybrid-fixed-picks-navigation'));
 assert(modeHub.includes('Make Picks'));
 assert(modeHub.includes('Place Wagers'));
 assert(modeHub.includes('View Leaderboard'));

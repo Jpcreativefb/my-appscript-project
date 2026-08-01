@@ -627,6 +627,14 @@ function getBettingGameConfig(gameId){
 
   return {
     gameId: gameId,
+    gameType: normalizeBetKey_(game.type || ""),
+    gameFormat: normalizeBetKey_(game.gameFormat || ""),
+    mixedGame:
+      game.mixedGame === true ||
+      normalizeBetKey_(game.type || "") === "mixed" ||
+      normalizeBetKey_(game.type || "") === "hybrid" ||
+      normalizeBetKey_(game.type || "") === "combo" ||
+      normalizeBetKey_(game.gameFormat || "") === "hybrid",
     enabled: enabled,
     wagerEnabled: enabled,
     bettingEnabled: enabled,

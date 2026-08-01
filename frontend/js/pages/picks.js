@@ -20,6 +20,49 @@ let PICKS_PAGE_DATA = {
 
 let PICKS_COUNTDOWN_TIMER = null;
 
+function isHybridPicksGame_() {
+
+  const game =
+    PICKS_PAGE_DATA.game || {};
+
+  const type =
+    String(game.type || localStorage.getItem("gameMode") || "")
+      .trim()
+      .toLowerCase();
+
+  const format =
+    String(game.gameFormat || "")
+      .trim()
+      .toLowerCase();
+
+  return (
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo" ||
+    format === "hybrid" ||
+    game.mixedGame === true
+  );
+
+}
+
+function renderHybridPicksBackButton_() {
+
+  if (!isHybridPicksGame_()) {
+    return "";
+  }
+
+  return `
+    <button
+      type="button"
+      class="dashboard-action-button secondary"
+      onclick="navigate('game-hub')"
+    >
+      ← Back to Game Sections
+    </button>
+  `;
+
+}
+
 /* =========================
    RENDER PAGE
 ========================= */
@@ -149,6 +192,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
 
   return `
     <div class="page picks-page">
+
+      ${renderHybridPicksBackButton_()}
 
       <div class="picks-page-header">
         <h1>Make Your Picks</h1>

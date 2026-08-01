@@ -7,7 +7,7 @@ const GAMES_SHEET =
   "Games";
 
 const GAMES_CACHE_KEY =
-  "games_v2";
+  "games_v3_hybrid_standard_predictions";
 
 const DEFAULT_GAME_TYPE =
   "prediction";
@@ -734,6 +734,36 @@ function buildGameObjectFromRow_(
   const explicitStakedPoints =
     col.stakedPointsEnabled !== -1;
 
+  const storedPredictionEnabled =
+    explicitPrediction
+      ? normalizeGameBoolean_(
+          getGameCell_(
+            row,
+            col.predictionEnabled,
+            typeConfig.predictionEnabled
+          )
+        )
+      : typeConfig.predictionEnabled;
+
+  const storedFixedPointsEnabled =
+    explicitFixedPoints
+      ? normalizeGameBoolean_(
+          getGameCell_(
+            row,
+            col.fixedPointsEnabled,
+            typeConfig.fixedPointsEnabled === true
+          )
+        )
+      : typeConfig.fixedPointsEnabled === true;
+
+  // Compatibility repair for Hybrid rows created while Predictions and Fixed
+  // Points were shown as separate switches. Either stored flag means the
+  // complete Standard Predictions method is enabled.
+  const hybridStandardPredictionsEnabled =
+    typeConfig.mixedGame === true
+      ? (storedPredictionEnabled || storedFixedPointsEnabled)
+      : storedFixedPointsEnabled;
+
   return {
     gameId:
       gameId,
@@ -791,15 +821,9 @@ function buildGameObjectFromRow_(
       ),
 
     predictionEnabled:
-      explicitPrediction
-        ? normalizeGameBoolean_(
-            getGameCell_(
-              row,
-              col.predictionEnabled,
-              typeConfig.predictionEnabled
-            )
-          )
-        : typeConfig.predictionEnabled,
+      typeConfig.mixedGame === true
+        ? hybridStandardPredictionsEnabled
+        : storedPredictionEnabled,
 
     rankingEnabled:
       explicitRanking
@@ -1046,15 +1070,7 @@ function buildGameObjectFromRow_(
       ),
 
     fixedPointsEnabled:
-      explicitFixedPoints
-        ? normalizeGameBoolean_(
-            getGameCell_(
-              row,
-              col.fixedPointsEnabled,
-              typeConfig.fixedPointsEnabled === true
-            )
-          )
-        : typeConfig.fixedPointsEnabled === true,
+      hybridStandardPredictionsEnabled,
 
     stakedPointsEnabled:
       explicitStakedPoints

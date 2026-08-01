@@ -19,7 +19,7 @@ assert(picks.includes('window.confirm(confirmationMessage)'));
 assert(picks.includes('Pick not saved. You can change the risk amount or answer.'));
 assert(css.includes('STAKED PICK ORDER V1.0.10'));
 assert(css.includes('.stake-step-status.is-ready'));
-assert(sw.includes('awards-app-v260-hybrid-routing-wager-filter'));
+assert(sw.includes('awards-app-v261-hybrid-fixed-picks-navigation'));
 
 const context = {
   console,

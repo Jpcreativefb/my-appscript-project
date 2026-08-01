@@ -87,6 +87,35 @@ function getConfidenceScoringMode_(
 
 }
 
+function isFixedPointScoringEnabledForGame_(game) {
+
+  if (!game) {
+    return true;
+  }
+
+  const type =
+    normalizeScoreString_(game.type || "");
+
+  const format =
+    normalizeScoreString_(game.gameFormat || "");
+
+  const isHybrid =
+    type === "mixed" ||
+    type === "hybrid" ||
+    type === "combo" ||
+    format === "hybrid" ||
+    game.mixedGame === true;
+
+  return (
+    game.fixedPointsEnabled !== false ||
+    (
+      isHybrid &&
+      game.predictionEnabled === true
+    )
+  );
+
+}
+
 function getScoringBasePoints_(
   config,
   pick,
@@ -503,8 +532,7 @@ function getLeaderboardData(
 
           if (
             !usesConfidencePoints &&
-            game &&
-            game.fixedPointsEnabled === false
+            !isFixedPointScoringEnabledForGame_(game)
           ) {
             return;
           }
@@ -664,7 +692,7 @@ function getLeaderboardData(
           statues,
 
         fixedPointsEnabled:
-          !game || game.fixedPointsEnabled !== false,
+          isFixedPointScoringEnabledForGame_(game),
 
         fixedPoints:
           fixedPoints,
