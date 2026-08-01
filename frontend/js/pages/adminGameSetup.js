@@ -426,9 +426,12 @@ function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
     : normalizedScoreMode;
   const gameType = adminSetupCanonicalGameType_(game);
   const scoreModeLocked = gameType !== "mixed";
-  const scoreMode = scoreModeLocked
-    ? adminSetupDefaultScoreMode_(game)
-    : storedScoreMode;
+  /*
+    Existing questions always display their own canonical mode. Game Type
+    controls which choices are allowed and supplies the add-question default,
+    but it no longer rewrites a saved question while rendering the editor.
+  */
+  const scoreMode = storedScoreMode || adminSetupDefaultScoreMode_(game);
   const scoringEngine = String(config.scoringEngine || (game && game.scoringEngine) || "manual").trim();
   const selectionMode = String(config.selectionMode || "single").trim();
   const resultSourceType = String(config.resultSourceType || "manual").trim();
@@ -457,7 +460,9 @@ function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
                 return `<option value="${adminSetupEscapeHtml(mode.value)}" ${adminSetupSelected_(scoreMode, mode.value)}>${adminSetupEscapeHtml(mode.label)}</option>`;
               }).join("")}
             </select>
-            ${scoreModeLocked ? `<span class="admin-field-note">Set automatically by Game Type. Hybrid games allow per-question Score Mode.</span>` : ""}
+            ${scoreModeLocked
+              ? `<input type="hidden" id="${id("ScoreModeCanonical")}" value="${adminSetupEscapeHtml(scoreMode)}"><span class="admin-field-note">Set by Game Type when the question is created. The saved question mode is preserved.</span>`
+              : `<span class="admin-field-note">Saved directly on this Question. Every answer inherits the question mode.</span>`}
           </label>
 
           <label class="admin-field">
@@ -634,7 +639,10 @@ function adminSetupReadQuestionEngineFields_(prefix, suffix) {
   const id = fieldName => adminSetupFieldId_(prefix, fieldName, suffix);
 
   return {
-    scoreMode: adminSetupFieldValue_(id("ScoreMode"), "fixed-points"),
+    scoreMode: adminSetupFieldValue_(
+      id("ScoreMode"),
+      adminSetupFieldValue_(id("ScoreModeCanonical"), "fixed-points")
+    ),
     questionType: adminSetupFieldValue_(id("QuestionType"), "award-single-winner"),
     scoringEngine: adminSetupFieldValue_(id("ScoringEngine"), "manual"),
     selectionMode: adminSetupFieldValue_(id("SelectionMode"), "single"),

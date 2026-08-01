@@ -54,19 +54,25 @@ function adminCatResolveScoreModeForGame_(gameId, requestedMode) {
     requestedMode !== null &&
     adminCatNormalizeValue_(requestedMode) !== "";
 
-  const normalizedRequested =
-    adminCatNormalizeScoreMode_(
-      hasRequestedMode ? requestedMode : "fixed-points"
-    );
+  /*
+    Canonical rule v3:
+    Once a question has an explicit ScoreMode, that question owns it.
+    Game Type supplies only the default for a brand-new question. It must
+    never rewrite an existing question during save, reload, answer edits,
+    preflight, or player reads.
+  */
+  if (hasRequestedMode) {
+    return adminCatNormalizeScoreMode_(requestedMode);
+  }
 
   if (typeof getGame !== "function") {
-    return normalizedRequested;
+    return "fixed-points";
   }
 
   const game = getGame(gameId);
 
   if (!game) {
-    return normalizedRequested;
+    return "fixed-points";
   }
 
   const rawType =
@@ -78,44 +84,12 @@ function adminCatResolveScoreModeForGame_(gameId, requestedMode) {
       ? normalizeGameType_(rawType)
       : rawType;
 
-  const isHybrid =
-    type === "mixed" ||
-    rawType === "mixed" ||
-    rawType === "hybrid" ||
-    rawType === "combo" ||
-    game.mixedGame === true ||
-    adminCatNormalizeValue_(game.gameFormat).toLowerCase() === "hybrid" ||
-    adminCatNormalizeValue_(game.scoringMode).toLowerCase() === "hybrid";
-
-  /*
-    One source of truth:
-    Non-Hybrid game types own their question ScoreMode.
-    Hybrid questions must preserve the mode selected on each question.
-  */
-  if (isHybrid) {
-    return hasRequestedMode
-      ? normalizedRequested
-      : undefined;
-  }
-
-  if (type === "staked-prediction") {
-    return "staked-points";
-  }
-
-  if (type === "confidence") {
-    return "confidence-points";
-  }
-
-  if (type === "wager" || type === "racing-wager") {
-    return "wager";
-  }
-
-  if (type === "ranking") {
-    return "ranking";
-  }
+  if (type === "staked-prediction") return "staked-points";
+  if (type === "confidence") return "confidence-points";
+  if (type === "wager" || type === "racing-wager") return "wager";
+  if (type === "ranking") return "ranking";
 
   return "fixed-points";
-
 }
 
 function adminCatSlugify_(value) {
@@ -1388,6 +1362,31 @@ function adminGetGameSetup(payload) {
     gameId
   );
 
+  /*
+    Questions.ScoreMode is the single source of truth. CategorySettings keeps
+    a compatibility mirror for older scoring engines, but it is not allowed
+    to overwrite the canonical question value in Game Setup.
+  */
+  const canonicalScoreModeByQuestion = {};
+
+  if (typeof normalizedStorageGetQuestionSetup_ === "function") {
+    const canonicalSetup = normalizedStorageGetQuestionSetup_(gameId, {
+      syncLegacy: true,
+      bypassRuntimeCache: true,
+      trustIndex: false
+    }) || {};
+
+    (canonicalSetup.questions || []).forEach(function(question) {
+      const questionId = adminCatNormalizeId_(question.QuestionId);
+      const scoreMode = adminCatNormalizeValue_(question.ScoreMode);
+
+      if (questionId && scoreMode) {
+        canonicalScoreModeByQuestion[questionId] =
+          adminCatNormalizeScoreMode_(scoreMode);
+      }
+    });
+  }
+
   const categoryData =
     typeof getAdminCategoriesDataForGameScoped_ === "function"
       ? getAdminCategoriesDataForGameScoped_(gameId)
@@ -1913,6 +1912,17 @@ function adminGetGameSetup(payload) {
 
   }
 
+  Object.keys(map).forEach(function(categoryId) {
+    const canonicalMode = canonicalScoreModeByQuestion[categoryId];
+
+    if (!canonicalMode) {
+      return;
+    }
+
+    map[categoryId].settings = map[categoryId].settings || {};
+    map[categoryId].settings.scoreMode = canonicalMode;
+  });
+
   const categories =
     Object
       .values(map)
@@ -2089,6 +2099,7 @@ function adminCreateCategory(payload) {
         questionType: payload.questionType || "award-single-winner",
         scoringEngine: payload.scoringEngine || "manual",
         selectionMode: payload.selectionMode || "single",
+        scoreMode: resolvedScoreMode,
         entryType: payload.entryType || "",
         oddsMode: payload.oddsMode || "none",
         resultSource: payload.resultSource || "manual",
@@ -2350,11 +2361,9 @@ function adminUpdateCategory(payload) {
     gameId
   );
 
-  payload.scoreMode =
-    adminCatResolveScoreModeForGame_(
-      gameId,
-      payload.scoreMode
-    );
+  if (Object.prototype.hasOwnProperty.call(payload, "scoreMode")) {
+    payload.scoreMode = adminCatNormalizeScoreMode_(payload.scoreMode);
+  }
 
   /*
     Production safety rule:

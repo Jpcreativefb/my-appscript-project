@@ -62,8 +62,8 @@ const html = context.renderAdminSetupQuestionEngineFields_(
 );
 assert(html.includes('value="wager" selected'));
 assert(!html.includes('disabled aria-disabled="true"'));
-assert(backend.includes('rawType === "hybrid"'));
-assert(backend.includes('game.mixedGame === true'));
-assert(sw.includes('awards-app-v262-hybrid-question-scoremode'));
+assert(backend.includes('Once a question has an explicit ScoreMode, that question owns it.'));
+assert(backend.includes('canonicalScoreModeByQuestion'));
+assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
 
 console.log('hybrid-question-score-mode-persistence-tests: PASS');

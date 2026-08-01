@@ -1,0 +1,9 @@
+backend/admin/AdminCategories.js
+backend/engines/NormalizedQuestionStorageEngine.js
+frontend/js/pages/adminGameSetup.js
+frontend/sw.js
+tests/canonical_question_score_mode_source_tests.js
+tests/category_score_mode_persistence_tests.js
+tests/game_setup_editor_workflow_tests.js
+tests/hybrid_question_score_mode_persistence_tests.js
+plus service-worker cache expectation updates in existing regression tests

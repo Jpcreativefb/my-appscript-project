@@ -105,6 +105,6 @@ assert(bettingPage.includes('function isHybridBettingGame_'));
 assert(leaderboardPage.includes('function isHybridLeaderboardGame_'));
 assert(bettingEngine.includes('gameType: normalizeBetKey_(game.type || "")'));
 assert(bettingEngine.includes('mixedGame:'));
-assert(sw.includes('awards-app-v262-hybrid-question-scoremode'));
+assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
 
 console.log('hybrid-fixed-pick-navigation-tests: PASS');

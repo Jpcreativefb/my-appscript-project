@@ -123,18 +123,23 @@ context.normalizeGameType_ = value => String(value || 'prediction').trim().toLow
 
 assert.strictEqual(
   context.adminCatResolveScoreModeForGame_('stake-test', 'fixed-points'),
-  'staked-points',
-  'Staked Prediction must force staked-points even when a stale fixed-points value is submitted.'
+  'fixed-points',
+  'An explicit question mode must never be rewritten by Game Type.'
 );
 assert.strictEqual(
   context.adminCatResolveScoreModeForGame_('other-game', 'staked-points'),
-  'fixed-points',
-  'Prediction games must force fixed-points.'
+  'staked-points',
+  'An explicit question mode remains the canonical question value.'
+);
+assert.strictEqual(
+  context.adminCatResolveScoreModeForGame_('stake-test', undefined),
+  'staked-points',
+  'Game Type supplies the default only when a new question has no explicit mode.'
 );
 assert.strictEqual(
   context.adminCatResolveScoreModeForGame_('hybrid-test', undefined),
-  undefined,
-  'Hybrid result-only updates must preserve the existing per-question ScoreMode.'
+  'fixed-points',
+  'A new Hybrid question defaults to Fixed Points until the admin chooses another mode.'
 );
 
 context.getGame = gameId => ({

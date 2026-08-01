@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v262-hybrid-question-scoremode";
+const AWARDS_CACHE = "awards-app-v263-canonical-question-scoremode";
 
 const APP_SHELL = [
   "./",

@@ -10,7 +10,7 @@ const categories = fs.readFileSync(path.join(root, 'backend/admin/AdminCategorie
 const css = fs.readFileSync(path.join(root, 'frontend/css/styles.css'), 'utf8');
 const sw = fs.readFileSync(path.join(root, 'frontend/sw.js'), 'utf8');
 
-assert(setup.includes('Set automatically by Game Type'));
+assert(setup.includes('The saved question mode is preserved.'));
 assert(setup.includes('adminSetupDefaultScoreMode_(game)'));
 assert(setup.includes('Delete Question'));
 assert(setup.includes('adminSetupDeleteCategory'));
@@ -36,6 +36,6 @@ assert(categories.includes('function adminDeleteCategory'));
 assert(categories.includes('cannot be permanently deleted'));
 assert(css.includes('.admin-save-state-button.is-dirty'));
 assert(css.includes('.admin-save-state-button.is-saved'));
-assert(sw.includes('awards-app-v262-hybrid-question-scoremode'));
+assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
 
 console.log('game-setup-editor-workflow-tests: PASS');

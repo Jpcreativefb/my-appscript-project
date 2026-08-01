@@ -1,0 +1,11 @@
+Phase 1 Canonical Question Mode v1.0.15 Test Report
+
+Result: PASS
+
+- 27 of 27 regression test files passed.
+- 114 of 114 JavaScript files passed syntax validation.
+- Canonical Questions.ScoreMode storage test passed.
+- Renaming a question without ScoreMode preserves the existing canonical mode.
+- Explicit Hybrid mode changes persist exactly.
+- CategorySettings remains a compatibility mirror.
+- Hybrid wager visibility, routing, picks navigation, and Phase 1 integration tests passed.

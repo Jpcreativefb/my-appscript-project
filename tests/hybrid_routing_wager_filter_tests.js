@@ -22,7 +22,7 @@ assert(betting.includes('return scoreMode === "wager";'));
 assert(betting.includes('The Wager page must receive only ScoreMode=wager.'));
 assert(betting.includes('return isWagerBettingCategory_(category, setting);'));
 assert(betting.includes('Number(config.defaultOdds || DEFAULT_BETTING_ODDS)'));
-assert(sw.includes('awards-app-v262-hybrid-question-scoremode'));
+assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
 
 function extractFunction(source, name) {
   const marker = `function ${name}`;
