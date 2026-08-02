@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair";
+const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair-v265-game-setup-visibility-v266-reality-tv-season-manager";
 
 const APP_SHELL = [
   "./",
@@ -31,6 +31,7 @@ const APP_SHELL = [
   "./js/pages/admin.js",
   "./js/pages/adminGames.js",
   "./js/pages/adminGameSetup.js",
+  "./js/pages/adminRealityTv.js",
   "./js/pages/profile.js",
   "./js/pages/archiveHistory.js"
 ];

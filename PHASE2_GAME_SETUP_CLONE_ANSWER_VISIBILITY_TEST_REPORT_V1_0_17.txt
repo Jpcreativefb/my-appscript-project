@@ -1,0 +1,25 @@
+Phase 2 Game Setup Clone / Answer Visibility v1.0.17
+Test date: 2026-08-02
+
+PASS - frontend/js/pages/adminGameSetup.js syntax
+PASS - backend/admin/AdminCategories.js syntax
+PASS - frontend/sw.js syntax
+PASS - existing game_setup_editor_workflow_tests.js
+PASS - existing game_setup_canonical_reload_and_answer_delete_tests.js
+PASS - new game_setup_clone_answer_visibility_tests.js
+PASS - all repository tests in tests/*.js
+
+Validated behaviors by source inspection/tests:
+- Clone action state survives navigation and opens the target question.
+- Cloned question receives permanent normalized clone provenance.
+- Game Setup exposes cloneInfo returned by the backend.
+- Question and answer sections open after create/clone/add/delete actions.
+- New answers receive visible highlight markers.
+- Answer summary includes a direct Delete control.
+- Existing permanent-delete backend protections remain in place.
+- Service-worker cache key changes for frontend refresh.
+
+Live browser / Google Apps Script verification still required after deployment:
+- Smooth scroll and card reopening in desktop and mobile browsers.
+- Apps Script authorization/deployment uses the modified backend file.
+- Cloudflare Pages serves the new service-worker cache version.

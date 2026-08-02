@@ -5,6 +5,123 @@ let adminSetupCategoryIdTouched = false;
 let adminSetupNomineeIdTouched = false;
 let adminSetupShortAnswerTouched = false;
 
+const ADMIN_SETUP_UI_ACTION_KEY = "adminGameSetupUiActionV1";
+
+function adminSetupRememberUiAction_(action) {
+  const state = Object.assign({}, action || {}, {
+    createdAt: Date.now()
+  });
+
+  try {
+    sessionStorage.setItem(ADMIN_SETUP_UI_ACTION_KEY, JSON.stringify(state));
+  } catch (ignore) {
+    /* The setup action still succeeds when browser storage is unavailable. */
+  }
+
+  return state;
+}
+
+function adminSetupReadUiAction_(gameId) {
+  let state = null;
+
+  try {
+    state = JSON.parse(sessionStorage.getItem(ADMIN_SETUP_UI_ACTION_KEY) || "null");
+  } catch (ignore) {
+    state = null;
+  }
+
+  if (!state || String(state.gameId || "").trim() !== String(gameId || "").trim()) {
+    return null;
+  }
+
+  if (!state.createdAt || Date.now() - Number(state.createdAt) > 10 * 60 * 1000) {
+    try {
+      sessionStorage.removeItem(ADMIN_SETUP_UI_ACTION_KEY);
+    } catch (ignore) {}
+    return null;
+  }
+
+  state.categoryId = String(state.categoryId || "").trim().toLowerCase();
+  state.sourceCategoryId = String(state.sourceCategoryId || "").trim().toLowerCase();
+  state.nomineeIds = Array.isArray(state.nomineeIds)
+    ? state.nomineeIds.map(function(value) {
+        return String(value || "").trim().toLowerCase();
+      }).filter(Boolean)
+    : [];
+
+  return state;
+}
+
+function adminSetupActionTargetsCategory_(action, categoryId) {
+  return Boolean(
+    action &&
+    String(action.categoryId || "").trim().toLowerCase() ===
+      String(categoryId || "").trim().toLowerCase()
+  );
+}
+
+function adminSetupActionTargetsNominee_(action, categoryId, nomineeId) {
+  if (!adminSetupActionTargetsCategory_(action, categoryId)) {
+    return false;
+  }
+
+  if (action.highlightAllAnswers === true) {
+    return true;
+  }
+
+  return (action.nomineeIds || []).indexOf(
+    String(nomineeId || "").trim().toLowerCase()
+  ) !== -1;
+}
+
+function renderAdminSetupUiActionBanner_(action) {
+  if (!action) return "";
+
+  const labels = {
+    "clone-question": "Question cloned",
+    "create-question": "Question created",
+    "bulk-add-answers": "Answers created",
+    "add-answer": "Answer created",
+    "clone-answer": "Answer cloned",
+    "delete-answer": "Answer deleted"
+  };
+
+  return `
+    <div id="adminSetupActionBanner" class="admin-setup-action-banner" role="status">
+      <strong>${adminSetupEscapeHtml(labels[action.type] || "Game Setup updated")}</strong>
+      <span>${adminSetupEscapeHtml(action.message || "The changed question is open below.")}</span>
+    </div>
+  `;
+}
+
+function adminSetupScheduleUiActionReveal_(action) {
+  if (!action) return;
+
+  setTimeout(function() {
+    const target = document.getElementById("categoryCard_" + action.categoryId);
+
+    if (target) {
+      target.open = true;
+      target.classList.add("admin-setup-action-flash");
+
+      const answersPanel = document.getElementById("answersPanel_" + action.categoryId);
+      if (answersPanel && action.openAnswers !== false) {
+        answersPanel.open = true;
+      }
+
+      target.scrollIntoView({ behavior: "smooth", block: "center" });
+
+      setTimeout(function() {
+        target.classList.remove("admin-setup-action-flash");
+      }, 4500);
+    }
+
+    try {
+      sessionStorage.removeItem(ADMIN_SETUP_UI_ACTION_KEY);
+    } catch (ignore) {}
+  }, 80);
+}
+
 function adminSetupEscapeHtml(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -951,6 +1068,9 @@ async function renderAdminGameSetupPage(gameId) {
     game.gameRole === "parent" &&
     game.hubMode === "leaderboard-only";
 
+  const uiAction = adminSetupReadUiAction_(safeGameId);
+  adminSetupScheduleUiActionReveal_(uiAction);
+
   return `
     <div class="page admin-page admin-game-setup-page">
 
@@ -1043,6 +1163,7 @@ async function renderAdminGameSetupPage(gameId) {
 
         <details
           class="card admin-card admin-collapsible-card admin-categories-main-card"
+          ${uiAction ? "open" : ""}
         >
 
           <summary class="admin-card-summary">
@@ -1067,6 +1188,8 @@ async function renderAdminGameSetupPage(gameId) {
               id="adminSetupMessage"
               class="admin-message"
             ></div>
+
+            ${renderAdminSetupUiActionBanner_(uiAction)}
 
             <div class="admin-setup-save-all-bar">
               <div>
@@ -1405,7 +1528,7 @@ async function renderAdminGameSetupPage(gameId) {
                   <div class="admin-list admin-category-list">
                     ${categories
                       .map(category =>
-                        renderAdminSetupCategoryCard(category, game, categories)
+                        renderAdminSetupCategoryCard(category, game, categories, uiAction)
                       )
                       .join("")}
                   </div>
@@ -2813,7 +2936,7 @@ function renderAdminSetupCloneNomineePanel_(category, nominee, categories) {
    CATEGORY CARD
 ====================== */
 
-function renderAdminSetupCategoryCard(category, game, categories) {
+function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
   const settings =
     category.settings || {};
 
@@ -2843,8 +2966,29 @@ function renderAdminSetupCategoryCard(category, game, categories) {
       settings.groupId || "default"
     );
 
+  const actionTargetsCategory =
+    adminSetupActionTargetsCategory_(uiAction, category.categoryId);
+  const cloneInfo = category.cloneInfo || {};
+  const cloneSourceCategoryId = String(
+    cloneInfo.sourceCategoryId ||
+    (actionTargetsCategory && uiAction && uiAction.type === "clone-question"
+      ? uiAction.sourceCategoryId
+      : "")
+  ).trim();
+  const cloneSourceGameId = String(cloneInfo.sourceGameId || "").trim();
+  const isJustCloned = Boolean(
+    actionTargetsCategory && uiAction && uiAction.type === "clone-question"
+  );
+  const shouldOpenAnswers = Boolean(
+    actionTargetsCategory && (!uiAction || uiAction.openAnswers !== false)
+  );
+
   return `
-    <details class="admin-category-card admin-collapsible-category">
+    <details
+      id="categoryCard_${categoryId}"
+      class="admin-category-card admin-collapsible-category ${actionTargetsCategory ? "admin-setup-action-target" : ""}"
+      ${actionTargetsCategory ? "open" : ""}
+    >
 
       <summary class="admin-category-summary">
 
@@ -2854,6 +2998,20 @@ function renderAdminSetupCategoryCard(category, game, categories) {
             <strong id="categoryTitle_${categoryId}">
               ${categoryTitle}
             </strong>
+
+            ${(cloneSourceCategoryId || isJustCloned) ? `
+              <div class="admin-setup-question-badges">
+                ${isJustCloned ? `<span class="admin-pill admin-just-cloned-pill">JUST CLONED</span>` : ""}
+                ${cloneSourceCategoryId ? `
+                  <span class="admin-clone-origin-badge">
+                    Clone of ${adminSetupEscapeHtml(cloneSourceCategoryId)}
+                    ${cloneSourceGameId && cloneSourceGameId !== category.gameId
+                      ? ` in ${adminSetupEscapeHtml(cloneSourceGameId)}`
+                      : ""}
+                  </span>
+                ` : ""}
+              </div>
+            ` : ""}
 
             <div class="admin-sub">
               Question ID (permanent): ${categoryId}
@@ -3113,7 +3271,11 @@ function renderAdminSetupCategoryCard(category, game, categories) {
 
         ${renderAdminResultsPanel(category, nominees, settings)}
 
-        <details class="admin-setup-nominees">
+        <details
+          id="answersPanel_${categoryId}"
+          class="admin-setup-nominees"
+          ${shouldOpenAnswers ? "open" : ""}
+        >
 
           <summary class="admin-nominee-summary">
 
@@ -3121,7 +3283,7 @@ function renderAdminSetupCategoryCard(category, game, categories) {
               Nominees / Answers
             </h3>
 
-            <span class="admin-sub">
+            <span id="answerCount_${categoryId}" class="admin-sub">
               ${nominees.length} total
             </span>
 
@@ -3137,7 +3299,7 @@ function renderAdminSetupCategoryCard(category, game, categories) {
               nominees.length
                 ? nominees
                     .map(nominee =>
-                      renderAdminSetupNomineeRow(category, nominee, categories)
+                      renderAdminSetupNomineeRow(category, nominee, categories, uiAction)
                     )
                     .join("")
                 : `
@@ -3454,7 +3616,7 @@ function adminSetupGetCategoryNameById(categoryId) {
   return option ? option.textContent.trim() : "";
 }
 
-function renderAdminSetupNomineeRow(category, nominee, categories) {
+function renderAdminSetupNomineeRow(category, nominee, categories, uiAction) {
   const gameId =
     adminSetupEscapeHtml(category.gameId);
 
@@ -3473,8 +3635,14 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
     "_" +
     nomineeId;
 
+  const actionTargetsNominee =
+    adminSetupActionTargetsNominee_(uiAction, category.categoryId, nominee.nomineeId);
+
   return `
-    <details class="admin-setup-nominee-edit-row admin-collapsible-nominee">
+    <details
+      id="answerRow_${categoryId}_${nomineeId}"
+      class="admin-setup-nominee-edit-row admin-collapsible-nominee ${actionTargetsNominee ? "admin-new-answer-row" : ""}"
+    >
 
       <summary class="admin-nominee-item-summary">
         <div>
@@ -3482,7 +3650,16 @@ function renderAdminSetupNomineeRow(category, nominee, categories) {
           <div class="admin-sub">Answer ID (permanent): ${nomineeId}${fileId ? " · image" : ""}</div>
         </div>
         <div class="admin-nominee-summary-status">
+          ${actionTargetsNominee ? `<span class="admin-pill admin-new-answer-pill">NEW</span>` : ""}
           <span class="admin-pill ${nominee.active === false ? "inactive" : ""}">${nominee.active === false ? "Inactive" : "Active"}</span>
+          <button
+            type="button"
+            class="admin-answer-quick-delete"
+            title="Permanently delete this answer"
+            onclick="event.preventDefault(); event.stopPropagation(); adminSetupDeleteNominee('${gameId}', '${categoryId}', '${nomineeId}')"
+          >
+            Delete
+          </button>
           <span class="admin-collapse-icon">▾</span>
         </div>
       </summary>
@@ -3912,6 +4089,17 @@ async function adminSetupCloneCategory(gameId, categoryId) {
     "Question cloned as " + (res.category || name) + ".",
     false
   );
+  adminSetupRememberUiAction_({
+    type: "clone-question",
+    gameId: gameId,
+    categoryId: res.categoryId || newCategoryId,
+    sourceCategoryId: categoryId,
+    openAnswers: true,
+    highlightAllAnswers: true,
+    message: "Cloned from " + categoryId +
+      " with " + Number(res.nomineeResult && res.nomineeResult.createdCount || 0) +
+      " answer(s). The cloned question and answers are open below."
+  });
   navigate("admin-game-setup:" + gameId);
 }
 
@@ -3962,6 +4150,15 @@ async function adminSetupBulkCreateNominees(gameId, categoryId, categoryName) {
     (res.createdCount || items.length) + " answers created" + (res.errors && res.errors.length ? "; some lines were skipped." : "."),
     Boolean(res.errors && res.errors.length)
   );
+  adminSetupRememberUiAction_({
+    type: "bulk-add-answers",
+    gameId: gameId,
+    categoryId: categoryId,
+    nomineeIds: (res.created || []).map(function(item) { return item.nomineeId; }),
+    openAnswers: true,
+    message: Number(res.createdCount || items.length) +
+      " answer(s) created. The answer list is open below."
+  });
   navigate("admin-game-setup:" + gameId);
 }
 
@@ -4000,6 +4197,16 @@ async function adminSetupCloneNominee(gameId, categoryId, nomineeId) {
   }
 
   adminSetupSetMessage("cloneNomineeMessage_" + categoryId + "_" + nomineeId, "Answer cloned.", false);
+  adminSetupRememberUiAction_({
+    type: "clone-answer",
+    gameId: gameId,
+    categoryId: targetCategoryId,
+    nomineeIds: (res.created || []).map(function(item) { return item.nomineeId; }).concat(
+      res.created && res.created.length ? [] : [newNomineeId]
+    ),
+    openAnswers: true,
+    message: "The cloned answer is shown in " + targetCategoryId + "."
+  });
   navigate("admin-game-setup:" + gameId);
 }
 
@@ -4153,6 +4360,7 @@ async function adminSetupCreateCategory(gameId) {
   const presetItems = adminSetupAnswerPresetItems_(
     answerPresetInput ? answerPresetInput.value : ""
   );
+  let createdAnswerIds = [];
 
   if (presetItems.length) {
     adminSetupSetMessage(
@@ -4180,11 +4388,25 @@ async function adminSetupCreateCategory(gameId) {
       );
       return;
     }
+
+    createdAnswerIds = (bulkResult.created || []).map(function(item) {
+      return item.nomineeId;
+    });
   }
 
   adminSetupSetMessage("setupAddCategoryMessage", "Question added.", false);
 
   adminSetupCategoryIdTouched = false;
+  adminSetupRememberUiAction_({
+    type: "create-question",
+    gameId: gameId,
+    categoryId: res.categoryId || categoryId,
+    nomineeIds: createdAnswerIds,
+    openAnswers: true,
+    message: createdAnswerIds.length
+      ? "Question created with " + createdAnswerIds.length + " answer(s)."
+      : "Question created. Add answers in the open section below."
+  });
 
   navigate("admin-game-setup:" + gameId);
 }
@@ -4263,6 +4485,14 @@ async function adminSetupCreateNominee(gameId) {
 
   adminSetupNomineeIdTouched = false;
   adminSetupShortAnswerTouched = false;
+  adminSetupRememberUiAction_({
+    type: "add-answer",
+    gameId: gameId,
+    categoryId: categoryId,
+    nomineeIds: [res.nomineeId || nomineeId],
+    openAnswers: true,
+    message: "The new answer is highlighted below."
+  });
 
   navigate("admin-game-setup:" + gameId);
 }
@@ -4439,6 +4669,15 @@ async function adminSetupCreateInlineNominee(
     "Answer added.",
     false
   );
+
+  adminSetupRememberUiAction_({
+    type: "add-answer",
+    gameId: gameId,
+    categoryId: categoryId,
+    nomineeIds: [res.nomineeId || nomineeId],
+    openAnswers: true,
+    message: "The new answer is highlighted below."
+  });
 
   navigate(
     "admin-game-setup:" +
@@ -5018,6 +5257,13 @@ async function adminSetupDeleteNominee(gameId, categoryId, nomineeId) {
     return;
   }
 
+  adminSetupRememberUiAction_({
+    type: "delete-answer",
+    gameId: gameId,
+    categoryId: categoryId,
+    openAnswers: true,
+    message: 'Deleted "' + answerName + '". The remaining answers are shown below.'
+  });
   navigate("admin-game-setup:" + gameId);
 }
 

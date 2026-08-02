@@ -198,6 +198,23 @@ async function renderAdminPage() {
 
         </div>
 
+        <div class="card admin-card">
+
+          <h2>Reality TV Season Manager</h2>
+
+          <div class="admin-sub">
+            Create a season from one contestant roster, record weekly eliminations, require administrator approval, and automatically build the next episode.
+          </div>
+
+          <button
+            class="button admin-button"
+            onclick="navigate('admin-reality-tv')"
+          >
+            Open Reality TV Manager
+          </button>
+
+        </div>
+
         <div class="card">
 
           <h2>Category Controls</h2>

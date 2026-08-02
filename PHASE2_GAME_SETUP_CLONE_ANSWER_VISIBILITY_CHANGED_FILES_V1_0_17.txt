@@ -1,0 +1,8 @@
+backend/admin/AdminCategories.js
+frontend/js/pages/adminGameSetup.js
+frontend/css/styles.css
+frontend/sw.js
+tests/game_setup_clone_answer_visibility_tests.js
+PHASE2_GAME_SETUP_CLONE_ANSWER_VISIBILITY_V1_0_17.md
+PHASE2_GAME_SETUP_CLONE_ANSWER_VISIBILITY_TEST_REPORT_V1_0_17.txt
+PHASE2_GAME_SETUP_CLONE_ANSWER_VISIBILITY_CHANGED_FILES_V1_0_17.txt

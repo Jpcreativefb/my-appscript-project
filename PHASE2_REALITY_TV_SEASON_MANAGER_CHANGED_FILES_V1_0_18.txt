@@ -1,0 +1,15 @@
+backend/Api.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/app.html
+frontend/app.js
+frontend/css/styles.css
+frontend/js/api.js
+frontend/js/pages/admin.js
+frontend/js/pages/adminRealityTv.js
+frontend/sw.js
+tests/reality_tv_season_manager_tests.js
+tests/reality_tv_runtime_logic_tests.js
+PHASE2_REALITY_TV_SEASON_MANAGER_V1_0_18.md
+PHASE2_REALITY_TV_SEASON_MANAGER_TEST_REPORT_V1_0_18.txt
+PHASE2_REALITY_TV_SEASON_MANAGER_CHANGED_FILES_V1_0_18.txt

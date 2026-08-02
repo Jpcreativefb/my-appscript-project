@@ -1435,6 +1435,66 @@ function adminGetGameSetup(payload) {
     settingsCol
   );
 
+  /*
+    Clone provenance is stored in the normalized Questions PayloadJSON.
+    Keep it out of the legacy Categories schema, but expose it to the
+    Game Setup page so an administrator can always tell which questions
+    were cloned and where they came from.
+  */
+  const cloneInfoByCategory = {};
+
+  if (typeof normalizedStorageGetQuestionSetup_ === "function") {
+    try {
+      const normalizedSetup = normalizedStorageGetQuestionSetup_(gameId, {
+        syncLegacy: false,
+        bypassRuntimeCache: true,
+        trustIndex: false
+      });
+
+      (normalizedSetup.questions || []).forEach(function(question) {
+        const questionId = adminCatNormalizeId_(question.QuestionId);
+        let metadata = {};
+
+        try {
+          metadata = JSON.parse(String(question.PayloadJSON || "{}"));
+        } catch (ignore) {
+          metadata = {};
+        }
+
+        const nestedClone = metadata.clone && typeof metadata.clone === "object"
+          ? metadata.clone
+          : {};
+        const sourceCategoryId = adminCatNormalizeId_(
+          metadata.CloneSourceCategoryId ||
+          metadata.cloneSourceCategoryId ||
+          nestedClone.sourceCategoryId
+        );
+        const sourceGameId = adminCatNormalizeGameId_(
+          metadata.CloneSourceGameId ||
+          metadata.cloneSourceGameId ||
+          nestedClone.sourceGameId
+        );
+        const clonedAt = adminCatNormalizeValue_(
+          metadata.ClonedAt ||
+          metadata.clonedAt ||
+          nestedClone.clonedAt
+        );
+        const sourceSystem = adminCatNormalizeValue_(question.SourceSystem);
+
+        if (questionId && (sourceCategoryId || sourceSystem === "admin-clone")) {
+          cloneInfoByCategory[questionId] = {
+            sourceGameId: sourceGameId,
+            sourceCategoryId: sourceCategoryId,
+            clonedAt: clonedAt,
+            sourceSystem: sourceSystem || "admin-clone"
+          };
+        }
+      });
+    } catch (ignore) {
+      /* Clone labels are helpful UI metadata, never a load blocker. */
+    }
+  }
+
   const map = {};
 
   for (
@@ -1928,6 +1988,10 @@ function adminGetGameSetup(payload) {
       map[categoryId].settings.scoreMode = adminCatNormalizeScoreMode_(mode);
     });
   }
+
+  Object.keys(map).forEach(function(categoryId) {
+    map[categoryId].cloneInfo = cloneInfoByCategory[categoryId] || null;
+  });
 
   const categories =
     Object
@@ -4347,6 +4411,25 @@ function adminCloneCategory(payload) {
     sourceUrl: has("sourceUrl") ? payload.sourceUrl : settings.sourceUrl,
     sourceConfigJSON: has("sourceConfigJSON") ? payload.sourceConfigJSON : settings.sourceConfigJSON
   });
+
+  /*
+    Persist the clone origin in normalized question metadata. This gives the
+    admin UI a permanent "Clone of ..." label without adding columns to the
+    legacy Categories or CategorySettings tables.
+  */
+  if (typeof normalizedStorageUpsertQuestion_ === "function") {
+    normalizedStorageUpsertQuestion_({
+      gameId: targetGameId,
+      questionId: categoryId,
+      payloadJSON: JSON.stringify({
+        CloneSourceGameId: sourceGameId,
+        CloneSourceCategoryId: sourceCategoryId,
+        ClonedAt: new Date().toISOString()
+      }),
+      sourceSystem: "admin-clone"
+    });
+    adminCatClearCaches_();
+  }
 
   const copyNominees = payload.copyNominees === undefined
     ? true

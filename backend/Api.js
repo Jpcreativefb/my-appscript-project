@@ -163,6 +163,16 @@ function doGet(e) {
       "adminCloneGame",
       "adminCloneGameSetup",
 
+      "adminSetupRealityTvSystem",
+      "adminConfigureRealityTvHub",
+      "adminGetRealityTvDashboard",
+      "adminCreateRealityTvSeason",
+      "adminAddRealityTvContestant",
+      "adminSubmitRealityTvResult",
+      "adminApproveRealityTvResult",
+      "adminRejectRealityTvResult",
+      "adminCreateNextRealityTvEpisode",
+
       "adminGetGameSetup",
       "adminCreateCategory",
       "adminCloneCategory",
@@ -802,6 +812,46 @@ function doGet(e) {
         )
       );
 
+    }
+
+    /* =========================
+       ADMIN: REALITY TV SEASON MANAGER
+    ========================= */
+
+    if (action === "adminSetupRealityTvSystem") {
+      return json(apiAdminSetupRealityTvSystem(params));
+    }
+
+    if (action === "adminConfigureRealityTvHub") {
+      return json(apiAdminConfigureRealityTvHub(params));
+    }
+
+    if (action === "adminGetRealityTvDashboard") {
+      return json(apiAdminGetRealityTvDashboard(params));
+    }
+
+    if (action === "adminCreateRealityTvSeason") {
+      return json(apiAdminCreateRealityTvSeason(params));
+    }
+
+    if (action === "adminAddRealityTvContestant") {
+      return json(apiAdminAddRealityTvContestant(params));
+    }
+
+    if (action === "adminSubmitRealityTvResult") {
+      return json(apiAdminSubmitRealityTvResult(params));
+    }
+
+    if (action === "adminApproveRealityTvResult") {
+      return json(apiAdminApproveRealityTvResult(params));
+    }
+
+    if (action === "adminRejectRealityTvResult") {
+      return json(apiAdminRejectRealityTvResult(params));
+    }
+
+    if (action === "adminCreateNextRealityTvEpisode") {
+      return json(apiAdminCreateNextRealityTvEpisode(params));
     }
 
     /* =========================

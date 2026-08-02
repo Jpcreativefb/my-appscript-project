@@ -3113,3 +3113,420 @@ button.is-saving {
     width: 100%;
   }
 }
+
+/* =========================
+   GAME SETUP CLONE / ANSWER VISIBILITY
+========================= */
+
+.admin-setup-action-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(96, 165, 250, 0.38);
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.14);
+}
+
+.admin-setup-action-banner strong {
+  color: #bfdbfe;
+}
+
+.admin-setup-question-badges {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+.admin-clone-origin-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 3px 9px;
+  border: 1px solid rgba(96, 165, 250, 0.28);
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.1);
+  color: #bfdbfe;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.admin-just-cloned-pill,
+.admin-new-answer-pill {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: rgba(74, 222, 128, 0.42);
+  color: #bbf7d0;
+}
+
+.admin-setup-action-target {
+  border-color: rgba(96, 165, 250, 0.5) !important;
+}
+
+.admin-setup-action-flash {
+  animation: adminSetupActionFlash 1.15s ease-in-out 3;
+}
+
+.admin-new-answer-row {
+  border-color: rgba(74, 222, 128, 0.52) !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.08);
+}
+
+.admin-answer-quick-delete {
+  appearance: none;
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid rgba(248, 113, 113, 0.48);
+  border-radius: 9px;
+  background: rgba(127, 29, 29, 0.2);
+  color: #fecaca;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.admin-answer-quick-delete:hover,
+.admin-answer-quick-delete:focus-visible {
+  background: rgba(185, 28, 28, 0.34);
+  border-color: rgba(252, 165, 165, 0.8);
+  outline: none;
+}
+
+@keyframes adminSetupActionFlash {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(96, 165, 250, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(96, 165, 250, 0.2);
+  }
+}
+
+@media (max-width: 640px) {
+  .admin-nominee-summary-status {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .admin-answer-quick-delete {
+    min-height: 34px;
+  }
+}
+
+/* =========================
+   REALITY TV SEASON MANAGER
+   Phase 2B v1.0.18
+========================= */
+
+.admin-reality-tv-page {
+  padding-bottom: 110px;
+}
+
+.reality-tv-hub-card,
+.reality-tv-create-season-card,
+.reality-tv-season-card {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.reality-tv-hub-header,
+.reality-tv-roster-builder-header,
+.reality-tv-review-header,
+.reality-tv-episode-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.reality-tv-season-form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reality-tv-season-form-grid label,
+.reality-tv-result-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.reality-tv-wide-field {
+  grid-column: span 2;
+}
+
+.reality-tv-checkbox-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin: 16px 0;
+}
+
+.reality-tv-checkbox-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reality-tv-roster-builder {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.reality-tv-roster-column-labels,
+.reality-tv-roster-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.2fr) minmax(180px, 1.5fr) minmax(120px, 1fr) 70px minmax(130px, 1fr) minmax(140px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.reality-tv-roster-column-labels {
+  margin: 16px 0 6px;
+  padding: 0 4px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  opacity: 0.75;
+}
+
+.reality-tv-roster-row {
+  margin-bottom: 8px;
+}
+
+.reality-tv-season-list {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.reality-tv-season-overview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 22px;
+  margin-bottom: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.reality-tv-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 76px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(148, 163, 184, 0.18);
+  border: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.reality-tv-status-pill.active,
+.reality-tv-status-pill.open,
+.reality-tv-status-pill.final {
+  background: rgba(34, 197, 94, 0.16);
+  border-color: rgba(34, 197, 94, 0.45);
+}
+
+.reality-tv-status-pill.review,
+.reality-tv-status-pill.pending {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: rgba(245, 158, 11, 0.48);
+}
+
+.reality-tv-status-pill.complete,
+.reality-tv-status-pill.closed,
+.reality-tv-status-pill.eliminated {
+  background: rgba(100, 116, 139, 0.2);
+  border-color: rgba(100, 116, 139, 0.45);
+}
+
+.reality-tv-result-entry,
+.reality-tv-review-card {
+  margin: 14px 0 18px;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.reality-tv-review-card {
+  border-color: rgba(245, 158, 11, 0.38);
+}
+
+.reality-tv-result-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 14px;
+}
+
+.reality-tv-selection-label {
+  margin: 14px 0 8px;
+  font-weight: 800;
+}
+
+.reality-tv-result-contestants {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.reality-tv-result-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.reality-tv-result-choice:has(input:checked) {
+  border-color: rgba(59, 130, 246, 0.65);
+  background: rgba(59, 130, 246, 0.12);
+}
+
+.reality-tv-result-summary {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0;
+}
+
+.reality-tv-roster-groups {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.reality-tv-contestant-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.reality-tv-contestant-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.reality-tv-contestant-chip.inactive {
+  opacity: 0.6;
+}
+
+.reality-tv-contestant-chip img,
+.reality-tv-avatar-fallback {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: 0 0 38px;
+}
+
+.reality-tv-avatar-fallback {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 900;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.reality-tv-contestant-chip div {
+  min-width: 0;
+  display: grid;
+}
+
+.reality-tv-contestant-chip strong,
+.reality-tv-contestant-chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reality-tv-contestant-chip span {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+
+.reality-tv-subsection {
+  margin-top: 14px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+}
+
+.reality-tv-subsection > summary {
+  cursor: pointer;
+  font-weight: 850;
+}
+
+.reality-tv-episodes-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.reality-tv-episodes-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.reality-tv-episodes-table th,
+.reality-tv-episodes-table td {
+  padding: 9px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .reality-tv-season-form-grid,
+  .reality-tv-result-grid,
+  .reality-tv-roster-groups {
+    grid-template-columns: 1fr;
+  }
+
+  .reality-tv-wide-field {
+    grid-column: auto;
+  }
+
+  .reality-tv-roster-column-labels {
+    display: none;
+  }
+
+  .reality-tv-roster-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .reality-tv-hub-header,
+  .reality-tv-roster-builder-header,
+  .reality-tv-review-header,
+  .reality-tv-episode-heading {
+    flex-direction: column;
+  }
+
+  .reality-tv-roster-row {
+    grid-template-columns: 1fr;
+  }
+
+  .reality-tv-result-contestants,
+  .reality-tv-contestant-grid {
+    grid-template-columns: 1fr;
+  }
+}

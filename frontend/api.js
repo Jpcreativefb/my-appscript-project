@@ -36,6 +36,11 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminGetRealityTvDashboard",
+    "adminCreateRealityTvSeason",
+    "adminSubmitRealityTvResult",
+    "adminApproveRealityTvResult",
+    "adminCreateNextRealityTvEpisode",
     "adminGetArchiveDashboard",
     "adminArchiveGameData",
     "adminCloneCategory",
@@ -1481,6 +1486,67 @@ async function apiAdminCloneGameSetup(payload) {
     payload
   );
 
+}
+
+
+/* ======================
+   ADMIN: REALITY TV SEASON MANAGER
+====================== */
+
+function apiAdminRealityTvRequest_(action, payload) {
+
+  const session = getSession();
+
+  return api(
+    action,
+    {
+      ...(payload || {}),
+      username: session.username,
+      token: session.token
+    }
+  );
+
+}
+
+async function apiAdminSetupRealityTvSystem() {
+  return apiAdminRealityTvRequest_("adminSetupRealityTvSystem", {});
+}
+
+async function apiAdminConfigureRealityTvHub(spreadsheetId) {
+  return apiAdminRealityTvRequest_("adminConfigureRealityTvHub", {
+    spreadsheetId: spreadsheetId
+  });
+}
+
+async function apiAdminGetRealityTvDashboard() {
+  return apiAdminRealityTvRequest_("adminGetRealityTvDashboard", {});
+}
+
+async function apiAdminCreateRealityTvSeason(payload) {
+  return apiAdminRealityTvRequest_("adminCreateRealityTvSeason", payload || {});
+}
+
+async function apiAdminAddRealityTvContestant(payload) {
+  return apiAdminRealityTvRequest_("adminAddRealityTvContestant", payload || {});
+}
+
+async function apiAdminSubmitRealityTvResult(payload) {
+  return apiAdminRealityTvRequest_("adminSubmitRealityTvResult", payload || {});
+}
+
+async function apiAdminApproveRealityTvResult(queueId) {
+  return apiAdminRealityTvRequest_("adminApproveRealityTvResult", { queueId: queueId });
+}
+
+async function apiAdminRejectRealityTvResult(queueId, notes) {
+  return apiAdminRealityTvRequest_("adminRejectRealityTvResult", {
+    queueId: queueId,
+    notes: notes || ""
+  });
+}
+
+async function apiAdminCreateNextRealityTvEpisode(seasonId) {
+  return apiAdminRealityTvRequest_("adminCreateNextRealityTvEpisode", { seasonId: seasonId });
 }
 
 /* ======================
