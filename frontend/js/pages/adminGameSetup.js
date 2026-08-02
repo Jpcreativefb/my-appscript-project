@@ -462,7 +462,7 @@ function renderAdminSetupQuestionEngineFields_(prefix, suffix, settings, game) {
             </select>
             ${scoreModeLocked
               ? `<input type="hidden" id="${id("ScoreModeCanonical")}" value="${adminSetupEscapeHtml(scoreMode)}"><span class="admin-field-note">Set by Game Type when the question is created. The saved question mode is preserved.</span>`
-              : `<span class="admin-field-note">Saved directly on this Question. Every answer inherits the question mode.</span>`}
+              : `<span class="admin-field-note">Saved in the dedicated QuestionModes table. Every answer inherits the question mode.</span>`}
           </label>
 
           <label class="admin-field">

@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v263-canonical-question-scoremode";
+const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair";
 
 const APP_SHELL = [
   "./",

@@ -8,6 +8,10 @@ const storageSource = fs.readFileSync(
   path.join(root, 'backend/engines/NormalizedQuestionStorageEngine.js'),
   'utf8'
 );
+const modeSource = fs.readFileSync(
+  path.join(root, 'backend/engines/QuestionModeEngine.js'),
+  'utf8'
+);
 const adminSource = fs.readFileSync(
   path.join(root, 'backend/admin/AdminCategories.js'),
   'utf8'
@@ -17,14 +21,15 @@ const setupSource = fs.readFileSync(
   'utf8'
 );
 
-assert(storageSource.includes('const NORMALIZED_STORAGE_VERSION = 3;'));
-assert(storageSource.includes('"ScoreMode"'));
-assert(storageSource.includes('ScoreMode: normalizedStorageNormalizeScoreMode_'));
-assert(storageSource.includes('ScoreMode: question.ScoreMode'));
-assert(adminSource.includes('canonicalScoreModeByQuestion'));
-assert(adminSource.includes('map[categoryId].settings.scoreMode = canonicalMode'));
-assert(adminSource.includes('Once a question has an explicit ScoreMode, that question owns it.'));
-assert(setupSource.includes('Existing questions always display their own canonical mode.'));
+assert(storageSource.includes('const NORMALIZED_STORAGE_VERSION = 2;'));
+assert(!/const QUESTIONS_HEADERS = \[[\s\S]*?"ScoreMode"/.test(storageSource));
+assert(modeSource.includes('const QUESTION_MODES_SHEET = "QuestionModes";'));
+assert(modeSource.includes('function questionModeUpsert_'));
+assert(modeSource.includes('function repairQuestionsSheetAfterV115Now'));
+assert(adminSource.includes('questionModeReadMapForGame_'));
+assert(adminSource.includes('questionModeUpsert_'));
+assert(adminSource.includes('delete normalizedQuestionPayload.scoreMode'));
+assert(setupSource.includes('dedicated QuestionModes table'));
 
 function extractFunction(source, name) {
   const marker = `function ${name}`;
@@ -42,49 +47,17 @@ function extractFunction(source, name) {
   throw new Error(`Unable to extract ${name}`);
 }
 
-const context = {
-  String,
-  Object,
-  Date,
-  Boolean,
-  JSON,
-  NORMALIZED_STORAGE_VERSION: 3,
-  normalizedStorageKey_: value => String(value == null ? '' : value).trim().toLowerCase(),
-  normalizedStorageString_: value => String(value == null ? '' : value).trim(),
-  normalizedStorageBool_: (value, fallback) => value === undefined ? fallback === true : value === true
-};
+const context = { String, Array, Object };
 vm.createContext(context);
-vm.runInContext(extractFunction(storageSource, 'normalizedStorageNormalizeScoreMode_'), context);
-vm.runInContext(extractFunction(storageSource, 'normalizedStorageQuestionObject_'), context);
+vm.runInContext(extractFunction(modeSource, 'questionModeString_'), context);
+vm.runInContext(extractFunction(modeSource, 'questionModeKey_'), context);
+vm.runInContext(extractFunction(modeSource, 'questionModeNormalize_'), context);
+vm.runInContext(extractFunction(modeSource, 'questionModeIsRecognized_'), context);
 
-let question = context.normalizedStorageQuestionObject_({
-  gameId: 'hybrid-test',
-  questionId: 'q1',
-  question: 'Manual wager?',
-  scoreMode: 'wager'
-}, {});
-assert.strictEqual(question.ScoreMode, 'wager');
-
-question = context.normalizedStorageQuestionObject_({
-  gameId: 'hybrid-test',
-  questionId: 'q1',
-  question: 'Renamed wager question'
-}, question);
-assert.strictEqual(
-  question.ScoreMode,
-  'wager',
-  'Renaming a question without sending ScoreMode must preserve the canonical mode.'
-);
-
-question = context.normalizedStorageQuestionObject_({
-  gameId: 'hybrid-test',
-  questionId: 'q1',
-  scoreMode: 'fixed-points'
-}, question);
-assert.strictEqual(
-  question.ScoreMode,
-  'fixed-points',
-  'An explicit admin mode change must be stored exactly.'
-);
+assert.strictEqual(context.questionModeNormalize_('WAGER'), 'wager');
+assert.strictEqual(context.questionModeNormalize_('correct-pick'), 'fixed-points');
+assert.strictEqual(context.questionModeNormalize_('sports-wager'), 'wager');
+assert.strictEqual(context.questionModeIsRecognized_('staked-points'), true);
+assert.strictEqual(context.questionModeIsRecognized_('not-a-mode'), false);
 
 console.log('canonical-question-score-mode-source-tests: PASS');

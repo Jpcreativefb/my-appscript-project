@@ -1,0 +1,11 @@
+Phase 1 Question Mode Table Repair v1.0.16
+
+RESULT: PASS
+
+- 28 of 28 regression test files passed.
+- 115 JavaScript files passed Node syntax validation.
+- Exact v1.0.15 shifted-row signature test passed.
+- Questions canonical header no longer includes ScoreMode.
+- Dedicated QuestionModes storage tests passed.
+- Hybrid ScoreMode persistence tests passed.
+- Phase 1 integration tests passed.

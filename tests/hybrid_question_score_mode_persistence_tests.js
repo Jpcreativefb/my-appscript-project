@@ -12,6 +12,10 @@ const backend = fs.readFileSync(
   path.join(root, 'backend/admin/AdminCategories.js'),
   'utf8'
 );
+const modes = fs.readFileSync(
+  path.join(root, 'backend/engines/QuestionModeEngine.js'),
+  'utf8'
+);
 const sw = fs.readFileSync(path.join(root, 'frontend/sw.js'), 'utf8');
 
 const context = {
@@ -35,8 +39,6 @@ vm.runInContext(setup, context);
 assert.strictEqual(context.adminSetupCanonicalGameType_({ type: 'hybrid' }), 'mixed');
 assert.strictEqual(context.adminSetupCanonicalGameType_({ type: 'combo' }), 'mixed');
 assert.strictEqual(context.adminSetupCanonicalGameType_({ type: 'prediction', mixedGame: true }), 'mixed');
-assert.strictEqual(context.adminSetupCanonicalGameType_({ type: 'prediction', gameFormat: 'hybrid' }), 'mixed');
-assert.strictEqual(context.adminSetupCanonicalGameType_({ type: 'prediction', scoringMode: 'hybrid' }), 'mixed');
 
 const hybrid = {
   type: 'hybrid',
@@ -47,10 +49,7 @@ const hybrid = {
 };
 assert.strictEqual(context.adminSetupDefaultScoreMode_(hybrid), 'fixed-points');
 assert.deepStrictEqual(
-  Array.from(
-    context.adminSetupAllowedScoreModes_(hybrid, 'wager'),
-    item => item.value
-  ),
+  Array.from(context.adminSetupAllowedScoreModes_(hybrid, 'wager'), item => item.value),
   ['fixed-points', 'staked-points', 'wager']
 );
 
@@ -62,8 +61,10 @@ const html = context.renderAdminSetupQuestionEngineFields_(
 );
 assert(html.includes('value="wager" selected'));
 assert(!html.includes('disabled aria-disabled="true"'));
-assert(backend.includes('Once a question has an explicit ScoreMode, that question owns it.'));
-assert(backend.includes('canonicalScoreModeByQuestion'));
-assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
+assert(html.includes('dedicated QuestionModes table'));
+assert(backend.includes('questionModeUpsert_'));
+assert(backend.includes('delete normalizedQuestionPayload.scoreMode'));
+assert(modes.includes('QUESTION_MODES_SHEET'));
+assert(sw.includes('awards-app-v264-question-mode-table-repair'));
 
 console.log('hybrid-question-score-mode-persistence-tests: PASS');

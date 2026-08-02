@@ -21,7 +21,7 @@ const QUESTION_OPTIONS_SHEET = "QuestionOptions";
 const DATA_INDEX_SHEET = "DataIndex";
 const ARCHIVE_MANIFEST_SHEET = "ArchiveManifest";
 const STORAGE_MIGRATION_LOG_SHEET = "StorageMigrationLog";
-const NORMALIZED_STORAGE_VERSION = 3;
+const NORMALIZED_STORAGE_VERSION = 2;
 
 const QUESTIONS_HEADERS = [
   "GameId",
@@ -35,7 +35,6 @@ const QUESTIONS_HEADERS = [
   "QuestionType",
   "ScoringEngine",
   "SelectionMode",
-  "ScoreMode",
   "EntryType",
   "OddsMode",
   "ResultSource",
@@ -160,27 +159,6 @@ function normalizedStorageBool_(value, defaultValue) {
     text === "yes" ||
     text === "1"
   );
-}
-
-
-function normalizedStorageNormalizeScoreMode_(value) {
-  const mode = normalizedStorageKey_(value || "fixed-points")
-    .replace(/_/g, "-");
-
-  if (mode === "correct-pick") {
-    return "fixed-points";
-  }
-
-  if (
-    mode === "bet" ||
-    mode === "betting" ||
-    mode === "sports-wager" ||
-    mode === "wager-odds"
-  ) {
-    return "wager";
-  }
-
-  return mode || "fixed-points";
 }
 
 function normalizedStorageSafeJsonParse_(value, fallback) {
@@ -1700,9 +1678,6 @@ function normalizedStorageQuestionObject_(payload, existing) {
     QuestionType: normalizedStorageString_(value("QuestionType", payload.questionType || "")),
     ScoringEngine: normalizedStorageString_(value("ScoringEngine", payload.scoringEngine || "")),
     SelectionMode: normalizedStorageString_(value("SelectionMode", payload.selectionMode || "")),
-    ScoreMode: normalizedStorageNormalizeScoreMode_(
-      value("ScoreMode", payload.scoreMode || existing.ScoreMode || "fixed-points")
-    ),
     EntryType: normalizedStorageString_(value("EntryType", payload.entryType || "")),
     OddsMode: normalizedStorageString_(value("OddsMode", payload.oddsMode || "")),
     ResultSource: normalizedStorageString_(value("ResultSource", payload.resultSource || "")),
@@ -2095,7 +2070,6 @@ function normalizedStorageBuildLegacyProjection_(gameId) {
       QuestionType: question.QuestionType,
       ScoringEngine: question.ScoringEngine,
       SelectionMode: question.SelectionMode,
-      ScoreMode: question.ScoreMode,
       EntryType: question.EntryType,
       OddsMode: question.OddsMode,
       ResultSource: question.ResultSource,
@@ -2201,7 +2175,6 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
       QuestionType: question.QuestionType,
       ScoringEngine: question.ScoringEngine,
       SelectionMode: question.SelectionMode,
-      ScoreMode: question.ScoreMode,
       EntryType: question.EntryType,
       OddsMode: question.OddsMode,
       ResultSource: question.ResultSource,

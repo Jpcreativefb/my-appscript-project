@@ -1,0 +1,10 @@
+backend/admin/AdminCategories.js
+backend/engines/NormalizedQuestionStorageEngine.js
+backend/engines/QuestionModeEngine.js
+frontend/js/pages/adminGameSetup.js
+frontend/sw.js
+tests/canonical_question_score_mode_source_tests.js
+tests/category_score_mode_persistence_tests.js
+tests/hybrid_question_score_mode_persistence_tests.js
+tests/question_storage_v115_repair_tests.js
+Other regression test files only received the new service-worker cache expectation.

@@ -36,6 +36,6 @@ assert(setup.includes('Delete Answer'));
 assert(setup.includes('Archive Answer'));
 assert(setup.includes('async function adminSetupDeleteNominee'));
 assert(setup.includes('apiAdminDeleteNominee(gameId, categoryId, nomineeId)'));
-assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
+assert(sw.includes('awards-app-v264-question-mode-table-repair'));
 
 console.log('game-setup-canonical-reload-and-answer-delete-tests: PASS');

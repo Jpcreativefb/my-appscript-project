@@ -36,6 +36,6 @@ assert(categories.includes('function adminDeleteCategory'));
 assert(categories.includes('cannot be permanently deleted'));
 assert(css.includes('.admin-save-state-button.is-dirty'));
 assert(css.includes('.admin-save-state-button.is-saved'));
-assert(sw.includes('awards-app-v263-canonical-question-scoremode'));
+assert(sw.includes('awards-app-v264-question-mode-table-repair'));
 
 console.log('game-setup-editor-workflow-tests: PASS');
