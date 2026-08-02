@@ -363,6 +363,7 @@ function setActiveNav(page) {
 
   const navPage =
     page === "admin-games" ||
+    page === "admin-reality-tv" ||
     page.indexOf("admin-game-setup:") === 0
       ? "admin"
       : page;
@@ -736,6 +737,17 @@ async function renderPage(page) {
         await renderAdminGamesPanel();
 
       break; 
+
+    case "admin-reality-tv":
+
+      if (typeof renderAdminRealityTvPage !== "function") {
+        throw new Error("Reality TV Season Manager script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderAdminRealityTvPage();
+
+      break;
 
     case "history":
 

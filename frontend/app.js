@@ -713,6 +713,13 @@ async function renderPage(page) {
 
       break;
 
+    case "leagues":
+
+      app.innerHTML =
+        await renderLeaguesPage();
+
+      break;
+
     case "admin":
 
       app.innerHTML =
