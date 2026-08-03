@@ -90,6 +90,12 @@ const context = {
       setProperty: (key, value) => props.set(key, value)
     })
   },
+  LockService: {
+    getScriptLock: () => ({
+      tryLock: () => true,
+      releaseLock: () => true
+    })
+  },
   requireAdmin_: () => true,
   adminCreateGame: payload => {
     if (!gameSetups.has(payload.gameId)) gameSetups.set(payload.gameId, { game: payload, categories: [] });
@@ -134,6 +140,15 @@ vm.createContext(context);
 const engine = fs.readFileSync(path.join(__dirname, '../backend/engines/RealityTvSeasonEngine.js'), 'utf8');
 vm.runInContext(engine, context);
 
+function completeApproval(queueId) {
+  let state = context.apiAdminApproveRealityTvResult({ username: 'admin', token: 'x', queueId });
+  for (let i = 0; i < 6 && !state.complete; i++) {
+    state = context.apiAdminContinueRealityTvApproval({ username: 'admin', token: 'x', queueId });
+  }
+  assert.strictEqual(state.complete, true, `Approval did not complete; stage=${state.stage}`);
+  return state;
+}
+
 context.apiAdminConfigureRealityTvHub({ username: 'admin', token: 'x', spreadsheetId: 'hub-id' });
 const created = context.apiAdminCreateRealityTvSeason({
   username: 'admin', token: 'x',
@@ -170,9 +185,9 @@ assert.strictEqual(submitted.success, true);
 const dashboard2 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' });
 const pending = dashboard2.seasons[0].queue.find(q => q.ReviewStatus === 'PENDING');
 assert(pending, 'Expected pending review queue item');
-const approved = context.apiAdminApproveRealityTvResult({ username: 'admin', token: 'x', queueId: pending.QueueId });
+const approved = completeApproval(pending.QueueId);
 assert.strictEqual(approved.success, true);
-assert(approved.nextEpisode, 'Expected Episode 2 to be created');
+assert(approved.nextEpisode || approved.nextEpisodeId, 'Expected Episode 2 to be created');
 
 const dashboard3 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' });
 const finalBundle = dashboard3.seasons[0];
@@ -198,11 +213,30 @@ assert.strictEqual(submitNoElim.success, true);
 const dashNoElim = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' });
 const pendingNoElim = dashNoElim.seasons[0].queue.find(q => q.EpisodeId === episode2.EpisodeId && q.ReviewStatus === 'PENDING');
 assert(pendingNoElim, 'Expected no-elimination result to require review');
-const approveNoElim = context.apiAdminApproveRealityTvResult({ username: 'admin', token: 'x', queueId: pendingNoElim.QueueId });
-assert(approveNoElim.nextEpisode, 'Expected Episode 3 after a no-elimination result');
+const approveNoElim = completeApproval(pendingNoElim.QueueId);
+assert(approveNoElim.nextEpisode || approveNoElim.nextEpisodeId, 'Expected Episode 3 after a no-elimination result');
 const finalNoElim = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' }).seasons[0];
 assert.strictEqual(finalNoElim.episodes.length, 3);
 assert.strictEqual(finalNoElim.contestants.filter(c => c.Active === true).length, 2);
 assert(categoryResults.some(r => r.categoryId === episode2.CategoryId && r.resultStatus === 'push'), 'Expected no-elimination question to be pushed');
+
+// Bulk-add supports full contestant profiles, skips duplicates, and does not change existing episode questions.
+const episodeCountBeforeBulk = gameSetups.get(created.gameId).categories.length;
+const bulkAdded = context.apiAdminBulkAddRealityTvContestants({
+  username: 'admin', token: 'x', seasonId: finalNoElim.season.SeasonId,
+  contestantsJSON: JSON.stringify([
+    { name: 'Contestant D', fullName: 'D Example', age: '34', hometown: 'Dallas, TX', occupation: 'Chef', biography: 'Late arrival', externalSubjectId: 'contestant-d-ext' },
+    { name: 'Contestant A' }
+  ])
+});
+assert.strictEqual(bulkAdded.success, true);
+assert.strictEqual(bulkAdded.createdCount, 1);
+assert.strictEqual(bulkAdded.skippedCount, 1);
+const afterBulk = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' }).seasons[0];
+const contestantD = afterBulk.contestants.find(c => c.Name === 'Contestant D');
+assert(contestantD, 'Expected Contestant D to be added');
+assert.strictEqual(contestantD.FullName, 'D Example');
+assert.strictEqual(contestantD.ExternalSubjectId, 'contestant-d-ext');
+assert.strictEqual(gameSetups.get(created.gameId).categories.length, episodeCountBeforeBulk, 'Bulk add must not alter existing episode questions');
 
 console.log('Reality TV runtime logic tests passed.');

@@ -22,8 +22,10 @@ const sw = fs.readFileSync(path.join(root, 'frontend/sw.js'), 'utf8');
   'apiAdminConfigureRealityTvHub',
   'apiAdminGetRealityTvDashboard',
   'apiAdminCreateRealityTvSeason',
+  'apiAdminBulkAddRealityTvContestants',
   'apiAdminSubmitRealityTvResult',
   'apiAdminApproveRealityTvResult',
+  'apiAdminContinueRealityTvApproval',
   'apiAdminRejectRealityTvResult',
   'apiAdminCreateNextRealityTvEpisode'
 ].forEach(name => {
@@ -38,11 +40,16 @@ assert(engine.includes('NextEpisodeCreated'), 'Duplicate next-episode guard meta
 assert(engine.includes('manual-reality-tv'), 'Manual Reality TV provider is missing');
 assert(engine.includes('realityTvSyncEpisodeToHub_'), 'External Results Hub mirroring is missing');
 assert(engine.includes('ReviewStatus: "PENDING"'), 'Pending review state is missing');
-assert(engine.includes('Approve'), 'Approval workflow text is missing');
+assert(engine.includes('ApprovalStage'), 'Staged approval metadata is missing');
+assert(engine.includes('BUILD_NEXT'), 'Next-episode approval stage is missing');
+assert(engine.includes('SYNC_HUB'), 'Hub sync approval stage is missing');
 
 assert(page.includes('Create Season &amp; Episode 1'), 'Season creation UI is missing');
 assert(page.includes('Approve &amp; Build Next Episode'), 'One-click approval and next episode UI is missing');
+assert(page.includes('Resume Approval'), 'Retry-safe approval UI is missing');
+assert(page.includes('apiAdminContinueRealityTvApproval'), 'Staged approval client loop is missing');
 assert(page.includes('Contestant Roster'), 'Contestant roster builder is missing');
+assert(page.includes('Mass Enter Contestants'), 'Mass contestant entry UI is missing');
 assert(page.includes('Double elimination (question is pushed)'), 'Double elimination safety behavior is missing');
 assert(page.includes('No elimination (question is pushed)'), 'No-elimination safety behavior is missing');
 assert(app.includes('case "admin-reality-tv"'), 'Reality TV route is missing');

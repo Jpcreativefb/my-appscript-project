@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Phase 2B v1.0.22
+   Phase 2B v1.0.23
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -34,6 +34,7 @@ const REALITY_TV_QUEUE_HEADERS = [
   "QueueId", "SeasonId", "GameId", "EpisodeId", "EpisodeNumber", "CategoryId",
   "OutcomeType", "SelectedContestantIds", "ReviewStatus", "EvidenceUrl", "Notes",
   "SubmittedBy", "SubmittedAt", "ReviewedBy", "ReviewedAt", "PushStatus",
+  "ApprovalStage", "ApprovalStartedAt", "ApprovalCompletedAt", "ApprovalAttemptCount",
   "PushedAt", "NextEpisodeId", "HubImportedResultId", "HubReviewId",
   "ErrorMessage", "UpdatedAt"
 ];
@@ -201,10 +202,15 @@ function realityTvAppendObject_(sheet, payload) {
 
 function realityTvUpdateObjectRow_(sheet, rowNumber, patch) {
   const schema = realityTvHeaderMap_(sheet);
+  const range = sheet.getRange(rowNumber, 1, 1, schema.headers.length);
+  const row = range.getValues()[0];
+  let changed = false;
   Object.keys(patch || {}).forEach(function(header) {
     if (schema.map[header] === undefined) return;
-    sheet.getRange(rowNumber, schema.map[header] + 1).setValue(patch[header]);
+    row[schema.map[header]] = patch[header];
+    changed = true;
   });
+  if (changed) range.setValues([row]);
 }
 
 function realityTvUpsertObject_(spreadsheet, sheetName, headers, keyFields, payload) {
@@ -343,7 +349,8 @@ function realityTvEpisodeTiming_(season, episodeNumber) {
   return { airDateTime: air, lockDateTime: lock };
 }
 
-function realityTvCreateEpisode_(season, episodeNumber) {
+function realityTvCreateEpisode_(season, episodeNumber, options) {
+  options = options || {};
   const ss = SpreadsheetApp.getActive();
   const existing = realityTvEpisodesForSeason_(season.SeasonId).find(function(row) {
     return realityTvNumber_(row.EpisodeNumber, 0) === episodeNumber;
@@ -468,7 +475,9 @@ function realityTvCreateEpisode_(season, episodeNumber) {
     UpdatedAt: now
   });
 
-  realityTvSyncEpisodeToHub_(season, episode, activeContestants, question);
+  if (!options.skipHubSync) {
+    realityTvSyncEpisodeToHub_(season, episode, activeContestants, question);
+  }
   return episode;
 }
 
@@ -1040,11 +1049,13 @@ function apiAdminSubmitRealityTvResult(payload) {
   return { success: true, message: "Result submitted for administrator review.", queueId: queue.QueueId };
 }
 
-function realityTvSettleEpisode_(season, episode, queue, reviewer) {
+function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
   const selectedIds = realityTvParseJson_(queue.SelectedContestantIds, []).map(realityTvKey_);
   const outcomeType = realityTvKey_(queue.OutcomeType);
   const contestants = realityTvContestantsForSeason_(season.SeasonId);
-  const selected = contestants.filter(function(row) { return selectedIds.indexOf(realityTvKey_(row.ContestantId)) !== -1; });
+  const selected = contestants.filter(function(row) {
+    return selectedIds.indexOf(realityTvKey_(row.ContestantId)) !== -1;
+  });
   const setup = adminGetGameSetup({ gameId: season.GameId });
   const category = (setup.categories || []).find(function(item) {
     return realityTvKey_(item.categoryId) === realityTvKey_(episode.CategoryId);
@@ -1053,9 +1064,8 @@ function realityTvSettleEpisode_(season, episode, queue, reviewer) {
 
   const isPush = outcomeType === "no-elimination" || outcomeType === "double-elimination";
   const winnerId = !isPush && selected.length === 1 ? selected[0].ContestantId : "";
-
-  (category.nominees || []).forEach(function(nominee) {
-    upsertCategoryResult_({
+  const resultPayloads = (category.nominees || []).map(function(nominee) {
+    return {
       gameId: season.GameId,
       categoryId: episode.CategoryId,
       nomineeId: nominee.nomineeId,
@@ -1064,8 +1074,14 @@ function realityTvSettleEpisode_(season, episode, queue, reviewer) {
       resultValue: outcomeType,
       resultSource: "manual-reality-tv",
       notes: "Approved in Reality TV Season Manager by " + (reviewer || "administrator")
-    });
+    };
   });
+
+  if (typeof upsertCategoryResultsBulk_ === "function") {
+    upsertCategoryResultsBulk_(resultPayloads);
+  } else {
+    resultPayloads.forEach(function(payload) { upsertCategoryResult_(payload); });
+  }
 
   adminUpdateCategory({
     gameId: season.GameId,
@@ -1105,19 +1121,88 @@ function realityTvSettleEpisode_(season, episode, queue, reviewer) {
     UpdatedAt: now
   });
 
-  let nextEpisode = null;
   const remaining = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
     return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
   });
-  if (realityTvBool_(season.AutoCreateNextEpisode) && remaining.length > 1) {
-    nextEpisode = realityTvCreateEpisode_(realityTvGetSeason_(season.SeasonId), realityTvNumber_(episode.EpisodeNumber, 0) + 1);
-    realityTvUpdateObjectRow_(episodeSheet, episode.__rowNumber, { NextEpisodeCreated: true, UpdatedAt: now });
-  } else if (remaining.length <= 1) {
+  if (remaining.length <= 1) {
     const seasonSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_SEASONS_SHEET);
     const freshSeason = realityTvGetSeason_(season.SeasonId);
     realityTvUpdateObjectRow_(seasonSheet, freshSeason.__rowNumber, { Status: "COMPLETE", UpdatedAt: now });
   }
+
+  return {
+    remainingCount: remaining.length,
+    selectedIds: selectedIds,
+    winnerId: winnerId,
+    isPush: isPush
+  };
+}
+
+function realityTvBuildNextEpisodeAfterApproval_(season, episode) {
+  const freshSeason = realityTvGetSeason_(season.SeasonId);
+  const freshEpisode = realityTvGetEpisode_(episode.EpisodeId);
+  const remaining = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+  });
+  let nextEpisode = null;
+
+  if (realityTvBool_(freshSeason.AutoCreateNextEpisode) && remaining.length > 1) {
+    const nextNumber = realityTvNumber_(freshEpisode.EpisodeNumber, 0) + 1;
+    nextEpisode = realityTvCreateEpisode_(freshSeason, nextNumber, { skipHubSync: true });
+    realityTvUpdateObjectRow_(
+      SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODES_SHEET),
+      freshEpisode.__rowNumber,
+      { NextEpisodeCreated: true, UpdatedAt: new Date() }
+    );
+  }
+
   return { nextEpisode: nextEpisode, remainingCount: remaining.length };
+}
+
+function realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode) {
+  const warnings = [];
+  if (nextEpisode) {
+    try {
+      const contestants = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+        return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+      });
+      const question = realityTvFormatQuestion_(season.QuestionTemplate, nextEpisode.EpisodeNumber);
+      const sync = realityTvSyncEpisodeToHub_(season, nextEpisode, contestants, question);
+      if (sync && sync.error) warnings.push(sync.error);
+    } catch (err) {
+      warnings.push(err.message || String(err));
+    }
+  }
+
+  try {
+    realityTvUpdateHubReview_(
+      queue,
+      "APPROVED",
+      reviewer,
+      nextEpisode
+        ? "Pushed to CategoryResults and created " + nextEpisode.EpisodeName + "."
+        : "Pushed to CategoryResults."
+    );
+  } catch (err) {
+    warnings.push(err.message || String(err));
+  }
+
+  return { warning: warnings.join(" | ") };
+}
+
+function realityTvApprovalState_(queue) {
+  const status = realityTvString_(queue.ReviewStatus).toUpperCase();
+  const stage = realityTvString_(queue.ApprovalStage || (status === "APPROVED" ? "COMPLETE" : "SETTLE")).toUpperCase();
+  return {
+    success: true,
+    queueId: queue.QueueId,
+    reviewStatus: status,
+    stage: stage,
+    pushStatus: realityTvString_(queue.PushStatus),
+    nextEpisodeId: realityTvString_(queue.NextEpisodeId),
+    complete: status === "APPROVED" || stage === "COMPLETE",
+    error: realityTvString_(queue.ErrorMessage)
+  };
 }
 
 function apiAdminApproveRealityTvResult(payload) {
@@ -1125,43 +1210,165 @@ function apiAdminApproveRealityTvResult(payload) {
   realityTvEnsureSystem_();
   const queue = realityTvGetQueue_(payload.queueId);
   if (!queue) throw new Error("Review queue item not found.");
-  if (realityTvKey_(queue.ReviewStatus) !== "pending") throw new Error("This result is no longer pending.");
-  const season = realityTvGetSeason_(queue.SeasonId);
-  const episode = realityTvGetEpisode_(queue.EpisodeId);
-  if (!season || !episode) throw new Error("Season or episode not found.");
 
-  const reviewer = realityTvString_(payload.username || "administrator");
-  const now = new Date();
-  try {
-    const settlement = realityTvSettleEpisode_(season, episode, queue, reviewer);
-    const queueSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET);
-    realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
-      ReviewStatus: "APPROVED",
-      ReviewedBy: reviewer,
-      ReviewedAt: now,
-      PushStatus: "PUSHED",
-      PushedAt: now,
-      NextEpisodeId: settlement.nextEpisode ? settlement.nextEpisode.EpisodeId : "",
-      ErrorMessage: "",
-      UpdatedAt: now
-    });
-    realityTvUpdateHubReview_(queue, "APPROVED", reviewer,
-      settlement.nextEpisode ? "Pushed to CategoryResults and created " + settlement.nextEpisode.EpisodeName + "." : "Pushed to CategoryResults.");
+  const status = realityTvString_(queue.ReviewStatus).toUpperCase();
+  if (status === "REJECTED") throw new Error("This result was rejected. Submit a corrected result.");
+  if (status === "APPROVED") return realityTvApprovalState_(queue);
+  if (status !== "PENDING" && status !== "APPROVING") {
+    throw new Error("This result cannot be approved from its current status: " + status + ".");
+  }
+
+  if (status === "PENDING") {
+    const now = new Date();
+    const reviewer = realityTvString_(payload.username || "administrator");
+    realityTvUpdateObjectRow_(
+      SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET),
+      queue.__rowNumber,
+      {
+        ReviewStatus: "APPROVING",
+        ReviewedBy: reviewer,
+        ReviewedAt: now,
+        PushStatus: "QUEUED",
+        ApprovalStage: "SETTLE",
+        ApprovalStartedAt: now,
+        ApprovalCompletedAt: "",
+        ApprovalAttemptCount: realityTvNumber_(queue.ApprovalAttemptCount, 0),
+        ErrorMessage: "",
+        UpdatedAt: now
+      }
+    );
+  }
+
+  return realityTvApprovalState_(realityTvGetQueue_(payload.queueId));
+}
+
+function apiAdminContinueRealityTvApproval(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1000)) {
     return {
       success: true,
-      message: settlement.nextEpisode
-        ? "Result approved, episode settled, and " + settlement.nextEpisode.EpisodeName + " created."
-        : "Result approved and episode settled.",
-      nextEpisode: settlement.nextEpisode,
-      remainingCount: settlement.remainingCount
+      busy: true,
+      complete: false,
+      message: "Another approval stage is still running."
     };
-  } catch (err) {
-    realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET), queue.__rowNumber, {
-      PushStatus: "ERROR",
-      ErrorMessage: err.message,
-      UpdatedAt: now
-    });
-    throw err;
+  }
+
+  try {
+    let queue = realityTvGetQueue_(payload.queueId);
+    if (!queue) throw new Error("Review queue item not found.");
+    if (realityTvString_(queue.ReviewStatus).toUpperCase() === "PENDING") {
+      apiAdminApproveRealityTvResult(payload);
+      queue = realityTvGetQueue_(payload.queueId);
+    }
+    if (realityTvString_(queue.ReviewStatus).toUpperCase() === "APPROVED") {
+      return realityTvApprovalState_(queue);
+    }
+    if (realityTvString_(queue.ReviewStatus).toUpperCase() !== "APPROVING") {
+      throw new Error("This result is not awaiting approval processing.");
+    }
+
+    const season = realityTvGetSeason_(queue.SeasonId);
+    const episode = realityTvGetEpisode_(queue.EpisodeId);
+    if (!season || !episode) throw new Error("Season or episode not found.");
+
+    const queueSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET);
+    const reviewer = realityTvString_(queue.ReviewedBy || payload.username || "administrator");
+    const stage = realityTvString_(queue.ApprovalStage || "SETTLE").toUpperCase();
+    const now = new Date();
+    const attempts = realityTvNumber_(queue.ApprovalAttemptCount, 0) + 1;
+
+    try {
+      if (stage === "SETTLE") {
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          PushStatus: "SETTLING EPISODE",
+          ApprovalAttemptCount: attempts,
+          ErrorMessage: "",
+          UpdatedAt: now
+        });
+        const settlement = realityTvSettleEpisodeOnly_(season, episode, queue, reviewer);
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          PushStatus: "EPISODE SETTLED",
+          ApprovalStage: "BUILD_NEXT",
+          ErrorMessage: "",
+          UpdatedAt: new Date()
+        });
+        const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+        state.remainingCount = settlement.remainingCount;
+        state.message = "Episode settled. Preparing the next episode.";
+        return state;
+      }
+
+      if (stage === "BUILD_NEXT") {
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          PushStatus: "BUILDING NEXT EPISODE",
+          ApprovalAttemptCount: attempts,
+          ErrorMessage: "",
+          UpdatedAt: now
+        });
+        const build = realityTvBuildNextEpisodeAfterApproval_(season, episode);
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          PushStatus: build.nextEpisode ? "NEXT EPISODE READY" : "EPISODE COMPLETE",
+          ApprovalStage: "SYNC_HUB",
+          NextEpisodeId: build.nextEpisode ? build.nextEpisode.EpisodeId : "",
+          ErrorMessage: "",
+          UpdatedAt: new Date()
+        });
+        const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+        state.nextEpisode = build.nextEpisode;
+        state.remainingCount = build.remainingCount;
+        state.message = build.nextEpisode
+          ? build.nextEpisode.EpisodeName + " created. Finishing approval records."
+          : "Episode settled. Finishing approval records.";
+        return state;
+      }
+
+      if (stage === "SYNC_HUB") {
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          PushStatus: "SYNCING APPROVAL",
+          ApprovalAttemptCount: attempts,
+          ErrorMessage: "",
+          UpdatedAt: now
+        });
+        const nextEpisode = queue.NextEpisodeId ? realityTvGetEpisode_(queue.NextEpisodeId) : null;
+        const hub = realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode);
+        const completedAt = new Date();
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          ReviewStatus: "APPROVED",
+          PushStatus: "PUSHED",
+          PushedAt: completedAt,
+          ApprovalStage: "COMPLETE",
+          ApprovalCompletedAt: completedAt,
+          ErrorMessage: hub.warning || "",
+          UpdatedAt: completedAt
+        });
+        const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+        state.nextEpisode = nextEpisode;
+        state.warning = hub.warning || "";
+        state.message = nextEpisode
+          ? "Result approved, episode settled, and " + nextEpisode.EpisodeName + " created."
+          : "Result approved and episode settled.";
+        return state;
+      }
+
+      if (stage === "COMPLETE") {
+        return realityTvApprovalState_(queue);
+      }
+
+      throw new Error("Unknown approval stage: " + stage + ".");
+    } catch (err) {
+      realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+        PushStatus: "ERROR",
+        ApprovalAttemptCount: attempts,
+        ErrorMessage: err.message || String(err),
+        UpdatedAt: new Date()
+      });
+      throw err;
+    }
+  } finally {
+    lock.releaseLock();
   }
 }
 

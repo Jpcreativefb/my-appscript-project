@@ -41,6 +41,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminBulkAddRealityTvContestants",
     "adminSubmitRealityTvResult",
     "adminApproveRealityTvResult",
+    "adminContinueRealityTvApproval",
     "adminCreateNextRealityTvEpisode",
     "adminGetArchiveDashboard",
     "adminArchiveGameData",
@@ -346,7 +347,35 @@ async function apiPost(action, payload = {}) {
         }
       );
 
-    return await response.json();
+    const text = await response.text();
+    let parsed = null;
+
+    try {
+      parsed = text ? JSON.parse(text) : null;
+    } catch (parseError) {
+      const detail = String(text || "").trim().slice(0, 180);
+      return {
+        success: false,
+        status: response.status,
+        error: response.status === 524
+          ? "The server timed out before confirming the operation. The work may have partially completed; refresh and retry safely."
+          : "Server returned an invalid response" + (detail ? ": " + detail : "."),
+        message: response.status === 524
+          ? "The server timed out before confirming the operation. The work may have partially completed; refresh and retry safely."
+          : "Server returned an invalid response."
+      };
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        status: response.status,
+        error: (parsed && (parsed.error || parsed.message)) || ("Server returned status " + response.status + "."),
+        message: (parsed && (parsed.message || parsed.error)) || ("Server returned status " + response.status + ".")
+      };
+    }
+
+    return parsed || { success: true };
 
   } catch (err) {
 
@@ -359,13 +388,18 @@ async function apiPost(action, payload = {}) {
       success:
         false,
 
+      error:
+        err && err.message ? err.message : "Network error",
+
       message:
-        "Network error"
+        err && err.message ? err.message : "Network error"
     };
 
   }
 
 }
+
+
 
 /* ======================
    LOGIN
@@ -1556,6 +1590,10 @@ async function apiAdminSubmitRealityTvResult(payload) {
 
 async function apiAdminApproveRealityTvResult(queueId) {
   return apiAdminRealityTvRequest_("adminApproveRealityTvResult", { queueId: queueId });
+}
+
+async function apiAdminContinueRealityTvApproval(queueId) {
+  return apiAdminRealityTvRequest_("adminContinueRealityTvApproval", { queueId: queueId });
 }
 
 async function apiAdminRejectRealityTvResult(queueId, notes) {

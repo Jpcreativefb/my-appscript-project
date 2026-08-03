@@ -183,6 +183,7 @@ function doGet(e) {
       "adminBulkAddRealityTvContestants",
       "adminSubmitRealityTvResult",
       "adminApproveRealityTvResult",
+      "adminContinueRealityTvApproval",
       "adminRejectRealityTvResult",
       "adminCreateNextRealityTvEpisode",
 
@@ -861,6 +862,10 @@ function doGet(e) {
 
     if (action === "adminApproveRealityTvResult") {
       return json(apiAdminApproveRealityTvResult(params));
+    }
+
+    if (action === "adminContinueRealityTvApproval") {
+      return json(apiAdminContinueRealityTvApproval(params));
     }
 
     if (action === "adminRejectRealityTvResult") {

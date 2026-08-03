@@ -1,6 +1,6 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.20
+   Phase 2B v1.0.23
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
@@ -48,8 +48,9 @@ function adminRealityTvCurrentEpisode_(bundle) {
 function adminRealityTvPendingQueue_(bundle, episode) {
   if (!episode) return null;
   return (bundle.queue || []).find(function(item) {
+    const status = String(item.ReviewStatus || "").toUpperCase();
     return String(item.EpisodeId || "") === String(episode.EpisodeId || "") &&
-      String(item.ReviewStatus || "").toUpperCase() === "PENDING";
+      ["PENDING", "APPROVING"].indexOf(status) !== -1;
   }) || null;
 }
 
@@ -92,10 +93,18 @@ function adminRealityTvContestantRows_(contestants) {
 
 function adminRealityTvResultPanel_(bundle) {
   const season = bundle.season;
-  const episode = adminRealityTvCurrentEpisode_(bundle);
+  const approvalInProgress = (bundle.queue || []).find(function(item) {
+    return String(item.ReviewStatus || "").toUpperCase() === "APPROVING";
+  }) || null;
+  let episode = approvalInProgress
+    ? (bundle.episodes || []).find(function(item) {
+        return String(item.EpisodeId || "") === String(approvalInProgress.EpisodeId || "");
+      })
+    : adminRealityTvCurrentEpisode_(bundle);
+  if (!episode) episode = adminRealityTvCurrentEpisode_(bundle);
   if (!episode) return `<div class="admin-message warning">No episode exists yet.</div>`;
 
-  const pending = adminRealityTvPendingQueue_(bundle, episode);
+  const pending = approvalInProgress || adminRealityTvPendingQueue_(bundle, episode);
   const activeContestants = (bundle.contestants || []).filter(function(item) {
     return item.Active === true || String(item.Active || "").toLowerCase() === "true";
   });
@@ -105,32 +114,34 @@ function adminRealityTvResultPanel_(bundle) {
       try { return JSON.parse(pending.SelectedContestantIds || "[]"); }
       catch (err) { return []; }
     })();
-    const selectedNames = activeContestants
+    const selectedNames = (bundle.contestants || [])
       .filter(function(item) { return selectedIds.indexOf(String(item.ContestantId || "").toLowerCase()) !== -1; })
       .map(function(item) { return item.Name; });
 
+    const reviewStatus = String(pending.ReviewStatus || "PENDING").toUpperCase();
+    const isApproving = reviewStatus === "APPROVING";
     return `
       <div class="reality-tv-review-card">
         <div class="reality-tv-review-header">
           <div>
-            <strong>Administrator approval required</strong>
-            <div class="admin-sub">${adminRealityTvEscape_(episode.EpisodeName)} result is pending.</div>
+            <strong>${isApproving ? "Approval in progress" : "Administrator approval required"}</strong>
+            <div class="admin-sub">${adminRealityTvEscape_(episode.EpisodeName)} result ${isApproving ? "can be resumed safely" : "is pending"}.</div>
           </div>
-          <span class="reality-tv-status-pill pending">PENDING</span>
+          <span class="reality-tv-status-pill ${isApproving ? "review" : "pending"}">${adminRealityTvEscape_(reviewStatus)}</span>
         </div>
         <div class="reality-tv-result-summary">
           <span><b>Result type:</b> ${adminRealityTvEscape_(pending.OutcomeType)}</span>
           <span><b>Contestant:</b> ${adminRealityTvEscape_(selectedNames.join(", ") || "No elimination")}</span>
+          ${pending.PushStatus ? `<span><b>Progress:</b> ${adminRealityTvEscape_(pending.PushStatus)}</span>` : ""}
+          ${pending.ErrorMessage ? `<span class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(pending.ErrorMessage)}</span>` : ""}
           ${pending.EvidenceUrl ? `<span><b>Evidence:</b> <a href="${adminRealityTvEscape_(pending.EvidenceUrl)}" target="_blank" rel="noopener">Open source</a></span>` : ""}
           ${pending.Notes ? `<span><b>Notes:</b> ${adminRealityTvEscape_(pending.Notes)}</span>` : ""}
         </div>
         <div class="admin-actions">
           <button class="button admin-button" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">
-            Approve &amp; Build Next Episode
+            ${isApproving ? "Resume Approval" : "Approve &amp; Build Next Episode"}
           </button>
-          <button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">
-            Reject
-          </button>
+          ${isApproving ? "" : `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
         </div>
       </div>
     `;
@@ -792,16 +803,53 @@ async function adminRealityTvSubmitResult(seasonId, episodeId) {
   }
 }
 
+function adminRealityTvSleep_(milliseconds) {
+  return new Promise(function(resolve) { setTimeout(resolve, milliseconds); });
+}
+
+function adminRealityTvResponseError_(response, fallback) {
+  return (response && (response.error || response.message)) || fallback;
+}
+
 async function adminRealityTvApproveResult(queueId) {
-  if (!confirm("Approve this result?\n\nThis will settle the episode, update CategoryResults, eliminate the selected contestant, and build the next episode.")) return;
+  const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
+    .flatMap(function(bundle) { return bundle.queue || []; })
+    .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
+  const resuming = existing && String(existing.ReviewStatus || "").toUpperCase() === "APPROVING";
+
+  if (!resuming && !confirm("Approve this result?\n\nThis will settle the episode, update CategoryResults, eliminate the selected contestant, and build the next episode.")) return;
   showLoader();
   try {
-    const res = await apiAdminApproveRealityTvResult(queueId);
-    if (!res || res.success === false) throw new Error((res && res.error) || "Could not approve the result.");
-    alert(res.message || "Result approved.");
+    let state = await apiAdminApproveRealityTvResult(queueId);
+    if (!state || state.success === false) {
+      throw new Error(adminRealityTvResponseError_(state, "Could not start the approval."));
+    }
+
+    let transientFailures = 0;
+    for (let step = 0; step < 10 && !state.complete; step++) {
+      await adminRealityTvSleep_(state.busy ? 1400 : 250);
+      const next = await apiAdminContinueRealityTvApproval(queueId);
+      if (!next || next.success === false) {
+        const message = adminRealityTvResponseError_(next, "Could not continue the approval.");
+        if (/timeout|network|524|invalid response/i.test(message) && transientFailures < 3) {
+          transientFailures += 1;
+          await adminRealityTvSleep_(1600);
+          continue;
+        }
+        throw new Error(message);
+      }
+      state = next;
+    }
+
+    if (!state.complete) {
+      alert("The approval did not return a final confirmation. Refresh this page and select Resume Approval; completed stages will not be repeated.");
+    } else {
+      alert((state.message || "Result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : ""));
+    }
     navigate("admin-reality-tv");
   } catch (err) {
-    alert(err.message);
+    alert((err && err.message ? err.message : String(err)) + "\n\nRefresh the page and use Resume Approval. The staged process is safe to retry.");
+    navigate("admin-reality-tv");
   } finally {
     hideLoader();
   }

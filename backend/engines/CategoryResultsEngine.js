@@ -660,6 +660,118 @@ function getCategoryResultsWinnerMap(gameId) {
 
 }
 
+function upsertCategoryResultsBulk_(payloads) {
+
+  const items = Array.isArray(payloads)
+    ? payloads.filter(Boolean)
+    : [];
+
+  if (!items.length) {
+    return { success: true, updated: 0, appended: 0, total: 0 };
+  }
+
+  setupCategoryResultsSystem();
+
+  const sh = SpreadsheetApp.getActive().getSheetByName(CATEGORY_RESULTS_SHEET);
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(header) {
+    return categoryResultsString_(header);
+  });
+  const col = categoryResultsHeaderMap_(headers);
+  const width = headers.length;
+  const existingByKey = {};
+
+  for (let i = 1; i < data.length; i++) {
+    const key = [
+      categoryResultsString_(data[i][col.GameId]),
+      categoryResultsKey_(data[i][col.CategoryId]),
+      categoryResultsKey_(data[i][col.NomineeId])
+    ].join("||");
+    existingByKey[key] = i + 1;
+  }
+
+  const updates = {};
+  const appends = [];
+  const now = new Date();
+
+  function setRowValue_(row, header, value) {
+    if (col[header] === undefined) return;
+    row[col[header]] = value;
+  }
+
+  items.forEach(function(payload) {
+    payload = payload || {};
+    const gameId = categoryResultsString_(payload.gameId);
+    const categoryId = categoryResultsKey_(payload.categoryId);
+    const nomineeId = categoryResultsKey_(payload.nomineeId);
+    const resultStatus = categoryResultsKey_(payload.resultStatus || "settled");
+    const allowsBlankNominee = [
+      "push", "pushed", "void", "cancelled", "canceled",
+      "pending", "open", "cleared", "unsettled"
+    ].indexOf(resultStatus) !== -1;
+
+    if (!gameId || !categoryId || (!nomineeId && !allowsBlankNominee)) {
+      throw new Error(
+        "Category result requires gameId, categoryId, and a nomineeId unless the result is pending, pushed, void, or cancelled."
+      );
+    }
+
+    const key = [gameId, categoryId, nomineeId].join("||");
+    const rowNumber = existingByKey[key];
+    const row = rowNumber
+      ? data[rowNumber - 1].slice()
+      : new Array(width).fill("");
+
+    setRowValue_(row, "Timestamp", payload.timestamp || now);
+    setRowValue_(row, "GameId", gameId);
+    setRowValue_(row, "CategoryId", categoryId);
+    setRowValue_(row, "NomineeId", nomineeId);
+    setRowValue_(row, "ResultStatus", resultStatus || "settled");
+    setRowValue_(row, "IsWinner", payload.isWinner === true);
+    setRowValue_(row, "FinalRank", payload.finalRank || "");
+    setRowValue_(row, "FinalPosition", payload.finalPosition || "");
+    setRowValue_(row, "ResultValue", payload.resultValue || "");
+    setRowValue_(row, "ResultSource", payload.resultSource || "manual");
+    setRowValue_(row, "SettledAt", payload.settledAt || now);
+    setRowValue_(row, "Notes", payload.notes || "");
+
+    if (rowNumber) {
+      updates[rowNumber] = row;
+    } else {
+      appends.push(row);
+      existingByKey[key] = -1;
+    }
+  });
+
+  const updateRows = Object.keys(updates)
+    .map(Number)
+    .sort(function(a, b) { return a - b; });
+
+  updateRows.forEach(function(rowNumber) {
+    sh.getRange(rowNumber, 1, 1, width).setValues([updates[rowNumber]]);
+  });
+
+  if (appends.length) {
+    const startRow = Math.max(sh.getLastRow(), 1) + 1;
+    const requiredLastRow = startRow + appends.length - 1;
+    if (typeof sh.getMaxRows === "function" && requiredLastRow > sh.getMaxRows()) {
+      sh.insertRowsAfter(sh.getMaxRows(), requiredLastRow - sh.getMaxRows());
+    }
+    sh.getRange(startRow, 1, appends.length, width).setValues(appends);
+  }
+
+  if (typeof clearAppCaches === "function") {
+    clearAppCaches();
+  }
+
+  return {
+    success: true,
+    updated: updateRows.length,
+    appended: appends.length,
+    total: items.length
+  };
+}
+
 function upsertCategoryResult_(payload) {
 
   payload = payload || {};
