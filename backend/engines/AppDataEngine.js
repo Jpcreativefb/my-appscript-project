@@ -87,7 +87,7 @@ function apiGetStartupPayload(payload) {
 
     realityTvView:
       typeof realityTvUserGameViewPayload_ === "function"
-        ? realityTvUserGameViewPayload_(gameId)
+        ? realityTvUserGameViewPayload_(gameId, username)
         : { enabled: false }
   };
 

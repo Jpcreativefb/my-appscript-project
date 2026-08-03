@@ -101,6 +101,38 @@ function realityTvProfileDetailsHtml_(item) {
   return `<div class="reality-profile-facts">${facts.map(function(pair) { return `<div><span>${escapeHtml(pair[0])}</span><strong>${escapeHtml(pair[1])}</strong></div>`; }).join("")}</div>${item.biography ? `<p class="reality-profile-bio">${escapeHtml(item.biography)}</p>` : ""}`;
 }
 
+
+function realityTvFormatPoints_(value) {
+  const number = Number(value || 0);
+  return Number.isInteger(number) ? number.toLocaleString() : number.toLocaleString(undefined, { maximumFractionDigits: 2 });
+}
+
+function realityTvMovementHtml_(value) {
+  const movement = Number(value || 0);
+  if (movement > 0) return `<span class="reality-stat-movement up">▲${movement}</span>`;
+  if (movement < 0) return `<span class="reality-stat-movement down">▼${Math.abs(movement)}</span>`;
+  return `<span class="reality-stat-movement even">—</span>`;
+}
+
+function renderRealityTvPlayerSummary_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true || !view.playerStats || !view.playerStats.overall) return "";
+  const overall = view.playerStats.overall || {};
+  const rows = Array.isArray(view.playerStats.compactLeaderboard) ? view.playerStats.compactLeaderboard : [];
+  const leaderboard = rows.length ? `<div class="reality-compact-leaderboard">${rows.map(function(row) {
+    return `<div class="reality-compact-leaderboard-row ${row.isCurrent ? "is-current" : ""} ${row.separated ? "is-separated" : ""}"><span class="reality-compact-rank">#${Number(row.rank || 0) || "—"}</span><span class="reality-compact-avatar">${escapeHtml(row.avatar || "👤")}</span><strong>${escapeHtml(row.displayName || row.username || "Player")}</strong><span>${realityTvFormatPoints_(row.total)} pts</span></div>`;
+  }).join("")}</div>` : `<div class="reality-compact-empty">Leaderboard appears after players submit picks.</div>`;
+  return `<section class="reality-player-summary-card">
+    <div class="reality-player-summary-heading"><div><span class="season-anchor-eyebrow">Your season</span><h2>Score & Standings</h2></div><div class="reality-player-score-total"><strong>${realityTvFormatPoints_(overall.totalPoints)}</strong><span>Total points</span></div></div>
+    <div class="reality-player-summary-stats">
+      <div><span>Current place</span><strong>${Number(overall.rank || 0) ? "#" + Number(overall.rank) : "—"}</strong><small>${Number(overall.totalPlayers || 0)} player${Number(overall.totalPlayers || 0) === 1 ? "" : "s"}</small></div>
+      <div><span>Correct answers</span><strong>${Number(overall.correct || 0)} of ${Number(overall.settled || 0)}</strong><small>Settled questions</small></div>
+      <div><span>Survivor adjustment</span><strong>${Number(overall.seasonAnchorNet || 0) >= 0 ? "+" : ""}${realityTvFormatPoints_(overall.seasonAnchorNet)}</strong><small>Bonus minus penalties</small></div>
+    </div>
+    <details class="reality-compact-leaderboard-shell" open><summary>Compact leaderboard</summary>${leaderboard}</details>
+  </section>`;
+}
+
 function renderSeasonAnchorPickCard_() {
   const anchor = PICKS_PAGE_DATA.seasonAnchor;
   if (!anchor || anchor.enabled !== true) return "";
@@ -336,6 +368,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
         ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
 
       </div>
+
+      ${renderRealityTvPlayerSummary_()}
 
       ${renderSeasonAnchorPickCard_()}
 
@@ -952,6 +986,29 @@ function realityTvEpisodeCategoryMap_() {
   return map;
 }
 
+
+function realityTvEpisodeNumberForCategory_(categoryId) {
+  return Number(realityTvEpisodeCategoryMap_()[normalizeId(categoryId)] || 0);
+}
+
+function realityTvEpisodeHeaderStats_(episode, itemCount, pickedCount) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const stats = view.playerStats && view.playerStats.episodes
+    ? (view.playerStats.episodes[String(Number(episode.episodeNumber || 0))] || {})
+    : {};
+  const eliminated = Array.isArray(episode.eliminated) ? episode.eliminated : [];
+  const eliminatedText = eliminated.length
+    ? `Eliminated: ${eliminated.map(function(item) { return item.name; }).join(", ")}`
+    : (String(episode.status || "").toUpperCase() === "FINAL" ? "No elimination recorded" : "Result pending");
+  return `<div class="reality-episode-header-stats">
+    <div><span>Week points</span><strong>${realityTvFormatPoints_(stats.points || 0)}</strong></div>
+    <div><span>Place</span><strong>${Number(stats.place || 0) ? "#" + Number(stats.place) : "—"}</strong></div>
+    <div><span>Position</span><strong>${realityTvMovementHtml_(stats.positionChange)}</strong></div>
+    <div><span>Correct</span><strong>${Number(stats.correct || 0)} of ${Number(stats.settled || 0)}</strong></div>
+    <div class="reality-episode-header-eliminated"><span>${escapeHtml(eliminatedText)}</span><small>${pickedCount}/${itemCount} picks saved</small></div>
+  </div>`;
+}
+
 function renderRealityTvEpisodeSections_(categories) {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const episodes = (view.episodes || []).slice().sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
@@ -966,7 +1023,7 @@ function renderRealityTvEpisodeSections_(categories) {
     if (!items.length) return "";
     const latest = index === 0;
     const picked = items.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
-    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${picked}/${items.length} questions picked · ${escapeHtml(formatSeasonAnchorLock_(episode.lockDateTime))}</span></div><span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}</div></details>`;
+    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div class="reality-episode-summary-title"><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${escapeHtml(formatSeasonAnchorLock_(episode.lockDateTime))}</span></div>${realityTvEpisodeHeaderStats_(episode, items.length, picked)}<span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}</div></details>`;
   }).join("");
   const remaining = categories.filter(function(category) { return !used[normalizeId(category.id)]; });
   return sections + (remaining.length ? `<details class="reality-episode-picks-section other" open><summary><div><span class="reality-episode-kicker">Other</span><h2>Season Questions</h2><span>${remaining.length} question${remaining.length === 1 ? "" : "s"}</span></div></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(remaining)}</div></details>` : "");
@@ -1556,7 +1613,8 @@ function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locke
   const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
   const disabled = locked || (isStakedPointsCategory(category) && existingStake <= 0) ? "disabled" : "";
   const color = realityTvSafeColor_(meta.teamColor);
-  const eliminated = meta.kind === "participant" && (meta.active === false || String(meta.status || "").toUpperCase() !== "ACTIVE");
+  const categoryEpisodeNumber = realityTvEpisodeNumberForCategory_(category && category.id);
+  const eliminated = meta.kind === "participant" && categoryEpisodeNumber > 0 && Number(meta.eliminatedEpisode || 0) === categoryEpisodeNumber;
   const visual = realityTvQuestionVisual_(category);
   const layout = ["image", "compact", "list", "text", "short-answer"].includes(visual.layoutType) ? visual.layoutType : "image";
   let image = nominee.image || "";

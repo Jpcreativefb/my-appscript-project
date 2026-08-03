@@ -1,0 +1,15 @@
+Reality TV Weekly Stats Header v1.0.32
+=====================================
+
+Result: PASS
+Test files executed: 43
+
+Validated:
+- Logged-in username is passed to the Reality TV view payload.
+- Overall score summary is returned.
+- Compact leaderboard is returned.
+- Per-episode points, place, movement, and correct counts are returned.
+- Episode headers render weekly statistics.
+- Historical eliminated overlays match the exact eliminated episode.
+- Frontend and service-worker cache versions are bumped.
+- Existing Reality TV, Season Survivor, Sports, Hybrid, Game Setup, and leaderboard tests continue to pass.
