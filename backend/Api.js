@@ -186,6 +186,12 @@ function doGet(e) {
       "adminContinueRealityTvApproval",
       "adminRejectRealityTvResult",
       "adminCreateNextRealityTvEpisode",
+      "adminUpdateRealityTvQuestionPack",
+      "adminBuildRealityTvEpisodeQuestions",
+      "adminSubmitRealityTvQuestionResult",
+      "adminApproveRealityTvQuestionResult",
+      "adminContinueRealityTvQuestionApproval",
+      "adminRejectRealityTvQuestionResult",
 
       "adminGetGameSetup",
       "adminCreateCategory",
@@ -874,6 +880,30 @@ function doGet(e) {
 
     if (action === "adminCreateNextRealityTvEpisode") {
       return json(apiAdminCreateNextRealityTvEpisode(params));
+    }
+
+    if (action === "adminUpdateRealityTvQuestionPack") {
+      return json(apiAdminUpdateRealityTvQuestionPack(params));
+    }
+
+    if (action === "adminBuildRealityTvEpisodeQuestions") {
+      return json(apiAdminBuildRealityTvEpisodeQuestions(params));
+    }
+
+    if (action === "adminSubmitRealityTvQuestionResult") {
+      return json(apiAdminSubmitRealityTvQuestionResult(params));
+    }
+
+    if (action === "adminApproveRealityTvQuestionResult") {
+      return json(apiAdminApproveRealityTvQuestionResult(params));
+    }
+
+    if (action === "adminContinueRealityTvQuestionApproval") {
+      return json(apiAdminContinueRealityTvQuestionApproval(params));
+    }
+
+    if (action === "adminRejectRealityTvQuestionResult") {
+      return json(apiAdminRejectRealityTvQuestionResult(params));
     }
 
     /* =========================

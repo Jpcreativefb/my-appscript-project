@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Phase 2B v1.0.23
+   Phase 2B v1.0.24
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -367,7 +367,7 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
   const timing = realityTvEpisodeTiming_(season, episodeNumber);
   const categoryId = "episode-" + episodeNumber + "-eliminated";
   const externalEventId = season.GameId + "-episode-" + episodeNumber;
-  const externalMarketId = "episode-" + episodeNumber + "-elimination";
+  const externalMarketId = season.GameId + "-episode-" + episodeNumber + "-elimination";
   const question = realityTvFormatQuestion_(season.QuestionTemplate, episodeNumber);
 
   const setup = adminGetGameSetup({ gameId: season.GameId });
@@ -477,6 +477,9 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
 
   if (!options.skipHubSync) {
     realityTvSyncEpisodeToHub_(season, episode, activeContestants, question);
+  }
+  if (!options.skipQuestionPack && typeof realityTvBuildSupplementalQuestionsForEpisode_ === "function") {
+    realityTvBuildSupplementalQuestionsForEpisode_(season, episode, { skipHubSync: !!options.skipHubSync });
   }
   return episode;
 }
@@ -665,10 +668,15 @@ function realityTvUpdateHubReview_(queue, reviewStatus, reviewer, message) {
 
 function setupRealityTvSeasonManager() {
   realityTvEnsureSystem_();
+  if (typeof realityTvEnsureQuestionPackSystem_ === "function") realityTvEnsureQuestionPackSystem_();
+  const sheets = [REALITY_TV_SEASONS_SHEET, REALITY_TV_CONTESTANTS_SHEET, REALITY_TV_EPISODES_SHEET, REALITY_TV_RESULTS_QUEUE_SHEET];
+  if (typeof REALITY_TV_QUESTION_TEMPLATES_SHEET !== "undefined") {
+    sheets.push(REALITY_TV_QUESTION_TEMPLATES_SHEET, REALITY_TV_EPISODE_QUESTIONS_SHEET, REALITY_TV_QUESTION_QUEUE_SHEET);
+  }
   return {
     success: true,
     message: "Reality TV Season Manager is ready.",
-    sheets: [REALITY_TV_SEASONS_SHEET, REALITY_TV_CONTESTANTS_SHEET, REALITY_TV_EPISODES_SHEET, REALITY_TV_RESULTS_QUEUE_SHEET]
+    sheets: sheets
   };
 }
 
@@ -698,7 +706,16 @@ function apiAdminGetRealityTvDashboard(payload) {
       season: season,
       contestants: realityTvContestantsForSeason_(season.SeasonId),
       episodes: realityTvEpisodesForSeason_(season.SeasonId),
-      queue: realityTvQueueForSeason_(season.SeasonId)
+      queue: realityTvQueueForSeason_(season.SeasonId),
+      questionTemplates: typeof realityTvQuestionTemplatesForSeason_ === "function"
+        ? realityTvQuestionTemplatesForSeason_(season.SeasonId)
+        : [],
+      episodeQuestions: typeof realityTvEpisodeQuestionsForSeason_ === "function"
+        ? realityTvEpisodeQuestionsForSeason_(season.SeasonId)
+        : [],
+      questionQueue: typeof realityTvQuestionQueueForSeason_ === "function"
+        ? realityTvQuestionQueueForSeason_(season.SeasonId)
+        : []
     };
   }).sort(function(a, b) {
     return new Date(b.season.UpdatedAt || b.season.CreatedAt || 0).getTime() - new Date(a.season.UpdatedAt || a.season.CreatedAt || 0).getTime();
@@ -831,6 +848,13 @@ function apiAdminCreateRealityTvSeason(payload) {
     REALITY_TV_CONTESTANT_HEADERS, ["SeasonId", "ContestantId"], contestantRows);
 
   const createdSeason = realityTvGetSeason_(seasonId);
+  if (typeof realityTvSaveStandardQuestionPack_ === "function") {
+    realityTvSaveStandardQuestionPack_(
+      createdSeason,
+      payload.enabledQuestionTypesJSON || payload.enabledQuestionTypes || [],
+      payload.points
+    );
+  }
   const episode = realityTvCreateEpisode_(createdSeason, 1);
   return {
     success: true,
@@ -1169,6 +1193,10 @@ function realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode
       const question = realityTvFormatQuestion_(season.QuestionTemplate, nextEpisode.EpisodeNumber);
       const sync = realityTvSyncEpisodeToHub_(season, nextEpisode, contestants, question);
       if (sync && sync.error) warnings.push(sync.error);
+      if (typeof realityTvBuildSupplementalQuestionsForEpisode_ === "function") {
+        const supplemental = realityTvBuildSupplementalQuestionsForEpisode_(season, nextEpisode, { skipHubSync: false });
+        if (supplemental && supplemental.error) warnings.push(supplemental.error);
+      }
     } catch (err) {
       warnings.push(err.message || String(err));
     }

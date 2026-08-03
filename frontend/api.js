@@ -1607,6 +1607,33 @@ async function apiAdminCreateNextRealityTvEpisode(seasonId) {
   return apiAdminRealityTvRequest_("adminCreateNextRealityTvEpisode", { seasonId: seasonId });
 }
 
+async function apiAdminUpdateRealityTvQuestionPack(payload) {
+  return apiAdminRealityTvRequest_("adminUpdateRealityTvQuestionPack", payload || {});
+}
+
+async function apiAdminBuildRealityTvEpisodeQuestions(payload) {
+  return apiAdminRealityTvRequest_("adminBuildRealityTvEpisodeQuestions", payload || {});
+}
+
+async function apiAdminSubmitRealityTvQuestionResult(payload) {
+  return apiAdminRealityTvRequest_("adminSubmitRealityTvQuestionResult", payload || {});
+}
+
+async function apiAdminApproveRealityTvQuestionResult(queueId) {
+  return apiAdminRealityTvRequest_("adminApproveRealityTvQuestionResult", { queueId: queueId });
+}
+
+async function apiAdminContinueRealityTvQuestionApproval(queueId) {
+  return apiAdminRealityTvRequest_("adminContinueRealityTvQuestionApproval", { queueId: queueId });
+}
+
+async function apiAdminRejectRealityTvQuestionResult(queueId, notes) {
+  return apiAdminRealityTvRequest_("adminRejectRealityTvQuestionResult", {
+    queueId: queueId,
+    notes: notes || ""
+  });
+}
+
 /* ======================
    ADMIN: GAME SETUP
 ====================== */

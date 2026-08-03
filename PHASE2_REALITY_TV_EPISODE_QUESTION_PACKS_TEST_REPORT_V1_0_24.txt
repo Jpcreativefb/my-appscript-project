@@ -1,0 +1,14 @@
+Phase 2 Reality TV Episode Question Packs v1.0.24
+
+PASS: Standard question templates are stored in normalized tables.
+PASS: Episode 1 creates elimination plus four optional question categories.
+PASS: Immunity and reward derive tribe answers before merge.
+PASS: Tribal Council mapping is generated for active tribes.
+PASS: Idol finder includes a No one outcome.
+PASS: Every question creates External Results Hub markets and mappings.
+PASS: Supplemental results require administrator review.
+PASS: Supplemental approval writes CategoryResults and does not alter the active roster.
+PASS: Supplemental approval does not create the next episode.
+PASS: Elimination approval still creates the next episode.
+PASS: The next episode inherits the enabled question pack.
+PASS: All 34 repository test files passed.
