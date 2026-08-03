@@ -1613,6 +1613,10 @@ async function apiAdminBuildRealityTvEpisodeQuestions(payload) {
   return apiAdminRealityTvRequest_("adminBuildRealityTvEpisodeQuestions", payload || {});
 }
 
+async function apiAdminContinueRealityTvQuestionPackBuild(buildId) {
+  return apiAdminRealityTvRequest_("adminContinueRealityTvQuestionPackBuild", { buildId: buildId });
+}
+
 async function apiAdminSubmitRealityTvQuestionResult(payload) {
   return apiAdminRealityTvRequest_("adminSubmitRealityTvQuestionResult", payload || {});
 }

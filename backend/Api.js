@@ -188,6 +188,7 @@ function doGet(e) {
       "adminCreateNextRealityTvEpisode",
       "adminUpdateRealityTvQuestionPack",
       "adminBuildRealityTvEpisodeQuestions",
+      "adminContinueRealityTvQuestionPackBuild",
       "adminSubmitRealityTvQuestionResult",
       "adminApproveRealityTvQuestionResult",
       "adminContinueRealityTvQuestionApproval",
@@ -888,6 +889,10 @@ function doGet(e) {
 
     if (action === "adminBuildRealityTvEpisodeQuestions") {
       return json(apiAdminBuildRealityTvEpisodeQuestions(params));
+    }
+
+    if (action === "adminContinueRealityTvQuestionPackBuild") {
+      return json(apiAdminContinueRealityTvQuestionPackBuild(params));
     }
 
     if (action === "adminSubmitRealityTvQuestionResult") {

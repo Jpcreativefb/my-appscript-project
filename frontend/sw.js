@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair-v265-game-setup-visibility-v266-reality-tv-season-manager-v267-reality-tv-route-hotfix-v268-reality-tv-bulk-import-v269-reality-tv-multiline-import-v270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs";
+const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair-v265-game-setup-visibility-v266-reality-tv-season-manager-v267-reality-tv-route-hotfix-v268-reality-tv-bulk-import-v269-reality-tv-multiline-import-v270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs-v273-reality-tv-staged-question-build";
 
 const APP_SHELL = [
   "./",

@@ -1,6 +1,6 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.24
+   Phase 2B v1.0.25
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
@@ -188,8 +188,20 @@ function adminRealityTvQuestionPackPanel_(bundle) {
     enabled[String(item.TemplateId || "")] = item.Enabled === true || String(item.Enabled || "").toLowerCase() === "true";
   });
   const current = adminRealityTvCurrentEpisode_(bundle);
+  const build = bundle.questionBuild && !bundle.questionBuild.complete ? bundle.questionBuild : null;
+  const buildLabel = build
+    ? "Resume Build (" + Number(build.currentIndex || 0) + "/" + Number(build.totalCount || 0) + ")"
+    : "Save & Build Current Episode";
+  const buildAction = build
+    ? `adminRealityTvResumeQuestionPackBuild('${adminRealityTvEscape_(build.buildId)}','${adminRealityTvEscape_(season.SeasonId)}')`
+    : `adminRealityTvSaveQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')`;
+  const buildStatus = build ? `
+    <div class="admin-message ${build.error ? "error" : "warning"}">
+      <b>Build in progress:</b> ${adminRealityTvEscape_(build.lastMessage || build.progressLabel || "Ready to resume.")}
+      ${build.error ? `<br><b>Last error:</b> ${adminRealityTvEscape_(build.error)}` : ""}
+    </div>` : "";
   return `
-    <details class="reality-tv-subsection reality-tv-question-pack" ${bundle.questionTemplates && bundle.questionTemplates.some(function(item) { return item.Enabled === true || String(item.Enabled || "").toLowerCase() === "true"; }) ? "" : "open"}>
+    <details class="reality-tv-subsection reality-tv-question-pack" ${(bundle.questionTemplates && bundle.questionTemplates.some(function(item) { return item.Enabled === true || String(item.Enabled || "").toLowerCase() === "true"; })) || build ? "open" : ""}>
       <summary>Episode Question Pack</summary>
       <div class="admin-sub">Elimination is always included. Select the additional questions that should be generated for every new episode.</div>
       <div class="reality-tv-question-pack-grid">
@@ -197,8 +209,9 @@ function adminRealityTvQuestionPackPanel_(bundle) {
           return `<label class="reality-tv-question-pack-choice"><input type="checkbox" class="rt-season-question-type" data-season-id="${adminRealityTvEscape_(season.SeasonId)}" value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}><span><b>${adminRealityTvEscape_(item.label)}</b><small>${adminRealityTvEscape_(item.help)}</small></span></label>`;
         }).join("")}
       </div>
+      ${buildStatus}
       <div class="admin-actions">
-        <button class="admin-small-button" onclick="adminRealityTvSaveQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Save &amp; Build Current Episode</button>
+        <button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button>
       </div>
       <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
     </details>
@@ -1092,24 +1105,88 @@ async function adminRealityTvBulkAddToSeason(seasonId) {
   }
 }
 
+async function adminRealityTvRunQuestionPackBuild_(state, seasonId) {
+  let current = state || {};
+  let transientFailures = 0;
+  for (let step = 0; step < 20 && !current.complete; step++) {
+    await adminRealityTvSleep_(current.busy ? 1400 : 250);
+    const next = await apiAdminContinueRealityTvQuestionPackBuild(current.buildId);
+    if (!next || next.success === false) {
+      const message = adminRealityTvResponseError_(next, "Could not continue the episode question build.");
+      if (/timeout|network|524|invalid response/i.test(message) && transientFailures < 3) {
+        transientFailures += 1;
+        adminRealityTvSetMessage_(
+          "realityTvQuestionPackMessage_" + seasonId,
+          "The connection timed out while a stage was running. Checking the saved build progress…",
+          "warning"
+        );
+        await adminRealityTvSleep_(1800);
+        continue;
+      }
+      throw new Error(message);
+    }
+    transientFailures = 0;
+    current = next;
+    adminRealityTvSetMessage_(
+      "realityTvQuestionPackMessage_" + seasonId,
+      (current.message || current.lastMessage || "Building episode questions…") +
+        (current.totalCount ? " (" + Math.min(Number(current.currentIndex || 0), Number(current.totalCount || 0)) + "/" + Number(current.totalCount || 0) + ")" : ""),
+      current.complete ? "success" : "info"
+    );
+  }
+  return current;
+}
+
 async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
   const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
     return box.value;
   });
-  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Saving question pack and building the current episode…", "info");
+  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Saving the question pack and starting a staged build…", "info");
   showLoader();
   try {
-    const res = await apiAdminUpdateRealityTvQuestionPack({
+    let state = await apiAdminUpdateRealityTvQuestionPack({
       seasonId: seasonId,
       episodeId: episodeId || "",
       enabledQuestionTypesJSON: JSON.stringify(selected),
       buildCurrentEpisode: true
     });
-    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not save the question pack.");
-    alert(res.message || "Question pack saved.");
+    if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save the question pack."));
+    if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
+    if (!state.complete) {
+      alert("The question pack build paused before final confirmation. Refresh the manager and select Resume Build. Completed stages will not repeat.");
+    } else {
+      alert(state.message || state.lastMessage || "Episode question pack saved and built.");
+    }
     navigate("admin-reality-tv");
   } catch (err) {
-    adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, err.message, "error");
+    adminRealityTvSetMessage_(
+      "realityTvQuestionPackMessage_" + seasonId,
+      (err && err.message ? err.message : String(err)) + " Refresh the manager and select Resume Build; completed stages are safe.",
+      "error"
+    );
+  } finally {
+    hideLoader();
+  }
+}
+
+async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
+  if (!buildId) return alert("Question pack build ID is missing. Refresh and try again.");
+  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Resuming the saved question pack build…", "info");
+  showLoader();
+  try {
+    const state = await adminRealityTvRunQuestionPackBuild_({ buildId: buildId, complete: false }, seasonId);
+    if (!state.complete) {
+      alert("The build is still paused. Refresh and select Resume Build again; completed stages will not repeat.");
+    } else {
+      alert(state.message || state.lastMessage || "Episode question pack build completed.");
+    }
+    navigate("admin-reality-tv");
+  } catch (err) {
+    adminRealityTvSetMessage_(
+      "realityTvQuestionPackMessage_" + seasonId,
+      (err && err.message ? err.message : String(err)) + " Refresh and select Resume Build.",
+      "error"
+    );
   } finally {
     hideLoader();
   }

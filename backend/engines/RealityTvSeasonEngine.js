@@ -672,6 +672,7 @@ function setupRealityTvSeasonManager() {
   const sheets = [REALITY_TV_SEASONS_SHEET, REALITY_TV_CONTESTANTS_SHEET, REALITY_TV_EPISODES_SHEET, REALITY_TV_RESULTS_QUEUE_SHEET];
   if (typeof REALITY_TV_QUESTION_TEMPLATES_SHEET !== "undefined") {
     sheets.push(REALITY_TV_QUESTION_TEMPLATES_SHEET, REALITY_TV_EPISODE_QUESTIONS_SHEET, REALITY_TV_QUESTION_QUEUE_SHEET);
+    if (typeof REALITY_TV_QUESTION_BUILD_JOBS_SHEET !== "undefined") sheets.push(REALITY_TV_QUESTION_BUILD_JOBS_SHEET);
   }
   return {
     success: true,
@@ -715,7 +716,10 @@ function apiAdminGetRealityTvDashboard(payload) {
         : [],
       questionQueue: typeof realityTvQuestionQueueForSeason_ === "function"
         ? realityTvQuestionQueueForSeason_(season.SeasonId)
-        : []
+        : [],
+      questionBuild: typeof realityTvLatestQuestionBuildStateForSeason_ === "function"
+        ? realityTvLatestQuestionBuildStateForSeason_(season.SeasonId)
+        : null
     };
   }).sort(function(a, b) {
     return new Date(b.season.UpdatedAt || b.season.CreatedAt || 0).getTime() - new Date(a.season.UpdatedAt || a.season.CreatedAt || 0).getTime();
