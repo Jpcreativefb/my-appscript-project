@@ -1,10 +1,11 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.18
+   Phase 2B v1.0.20
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
 let ADMIN_REALITY_TV_ROSTER_ROW = 0;
+let ADMIN_REALITY_TV_BULK_PREVIEW = {};
 
 function adminRealityTvEscape_(value) {
   if (typeof escapeHtml_ === "function") return escapeHtml_(value);
@@ -247,14 +248,26 @@ function adminRealityTvSeasonCard_(bundle) {
         ${adminRealityTvContestantRows_(bundle.contestants)}
 
         <details class="reality-tv-subsection">
-          <summary>Add a late-entry contestant</summary>
+          <summary>Add contestant(s) to this season</summary>
           <div class="admin-form-grid">
             <input id="realityTvAddName_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Contestant name">
             <input id="realityTvAddImage_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Image URL (optional)">
             <input id="realityTvAddTeam_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Team / tribe (optional)">
           </div>
-          <button class="admin-small-button" onclick="adminRealityTvAddContestant('${adminRealityTvEscape_(season.SeasonId)}')">Add Contestant</button>
-          <div class="admin-sub">This adds the contestant to the season roster. Existing episode questions are not changed.</div>
+          <button class="admin-small-button" onclick="adminRealityTvAddContestant('${adminRealityTvEscape_(season.SeasonId)}')">Add One Contestant</button>
+
+          <div class="reality-tv-existing-bulk-add">
+            <h4>Mass add contestants</h4>
+            <div class="admin-sub">Use the same spreadsheet format as the season builder. Existing contestants are skipped safely.</div>
+            <textarea id="realityTvBulkContestants_${adminRealityTvEscape_(season.SeasonId)}" class="input reality-tv-bulk-textarea" rows="6" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
+            <div class="admin-actions reality-tv-bulk-actions">
+              <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('${adminRealityTvEscape_(season.SeasonId)}')">Load Example</button>
+              <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('${adminRealityTvEscape_(season.SeasonId)}')">Preview</button>
+              <button type="button" class="admin-small-button" onclick="adminRealityTvBulkAddToSeason('${adminRealityTvEscape_(season.SeasonId)}')">Add All Valid Contestants</button>
+            </div>
+            <div id="realityTvBulkPreview_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-bulk-preview"></div>
+          </div>
+          <div class="admin-sub">New contestants are added to the season roster. Existing episode questions are not changed; they will appear in the next newly created episode.</div>
         </details>
 
         <details class="reality-tv-subsection">
@@ -273,24 +286,226 @@ function adminRealityTvSeasonCard_(bundle) {
 
 function adminRealityTvBlankRosterRows_(count) {
   let html = "";
-  for (let index = 0; index < count; index++) html += adminRealityTvRosterRowHtml_();
+  for (let index = 0; index < count; index++) html += adminRealityTvRosterRowHtml_({});
   return html;
 }
 
-function adminRealityTvRosterRowHtml_() {
+function adminRealityTvValue_(value) {
+  return adminRealityTvEscape_(value === undefined || value === null ? "" : value);
+}
+
+function adminRealityTvRosterRowHtml_(contestant) {
+  contestant = contestant || {};
   ADMIN_REALITY_TV_ROSTER_ROW += 1;
   const id = ADMIN_REALITY_TV_ROSTER_ROW;
   return `
     <div class="reality-tv-roster-row" data-roster-row="${id}">
-      <input class="input rt-roster-name" placeholder="Name *">
-      <input class="input rt-roster-image" placeholder="Image URL">
-      <input class="input rt-roster-team" placeholder="Team / tribe">
-      <input class="input rt-roster-age" placeholder="Age" inputmode="numeric">
-      <input class="input rt-roster-hometown" placeholder="Hometown">
-      <input class="input rt-roster-occupation" placeholder="Occupation">
-      <button type="button" class="admin-small-button danger" onclick="this.closest('[data-roster-row]').remove()">Remove</button>
+      <div class="reality-tv-roster-primary">
+        <input class="input rt-roster-name" placeholder="Name *" value="${adminRealityTvValue_(contestant.name)}">
+        <input class="input rt-roster-image" placeholder="Image URL" value="${adminRealityTvValue_(contestant.imageUrl)}">
+        <input class="input rt-roster-team" placeholder="Team / tribe" value="${adminRealityTvValue_(contestant.teamOrTribe)}">
+        <input class="input rt-roster-age" placeholder="Age" inputmode="numeric" value="${adminRealityTvValue_(contestant.age)}">
+        <button type="button" class="admin-small-button danger" onclick="this.closest('[data-roster-row]').remove()">Remove</button>
+      </div>
+      <details class="reality-tv-roster-profile" ${contestant.fullName || contestant.hometown || contestant.occupation || contestant.biography || contestant.externalSubjectId ? "open" : ""}>
+        <summary>More contestant info</summary>
+        <div class="reality-tv-roster-profile-grid">
+          <input class="input rt-roster-full-name" placeholder="Full name" value="${adminRealityTvValue_(contestant.fullName)}">
+          <input class="input rt-roster-hometown" placeholder="Hometown" value="${adminRealityTvValue_(contestant.hometown)}">
+          <input class="input rt-roster-occupation" placeholder="Occupation" value="${adminRealityTvValue_(contestant.occupation)}">
+          <input class="input rt-roster-external-id" placeholder="External subject ID" value="${adminRealityTvValue_(contestant.externalSubjectId)}">
+          <textarea class="input rt-roster-biography" rows="2" placeholder="Biography / notes">${adminRealityTvValue_(contestant.biography)}</textarea>
+        </div>
+      </details>
     </div>
   `;
+}
+
+function adminRealityTvNormalizeBulkHeader_(value) {
+  return String(value || "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "");
+}
+
+function adminRealityTvParseDelimitedLine_(line, delimiter) {
+  if (!delimiter) return [String(line || "").trim()];
+  const parsed = adminRealityTvParseDelimitedText_(String(line || ""), delimiter);
+  return parsed.rows.length ? parsed.rows[0] : [""];
+}
+
+function adminRealityTvParseDelimitedText_(text, delimiter) {
+  const input = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+
+  function finishCell_() {
+    row.push(value.trim());
+    value = "";
+  }
+
+  function finishRow_() {
+    finishCell_();
+    if (row.some(function(cell) { return String(cell || "").trim() !== ""; })) rows.push(row);
+    row = [];
+  }
+
+  for (let index = 0; index < input.length; index++) {
+    const char = input.charAt(index);
+    if (char === '"') {
+      if (quoted && input.charAt(index + 1) === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === delimiter && !quoted) {
+      finishCell_();
+    } else if (char === "\n" && !quoted) {
+      finishRow_();
+    } else if (char === "\n" && quoted) {
+      // Spreadsheet cells can contain wrapped/multiline text. Keep it in the
+      // same field, but normalize the pasted line break to a single space.
+      if (value && !/\s$/.test(value)) value += " ";
+    } else {
+      value += char;
+    }
+  }
+
+  if (value !== "" || row.length) finishRow_();
+  return { rows: rows, unclosedQuote: quoted };
+}
+
+function adminRealityTvParseBulkContestants_(text) {
+  const normalizedText = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const physicalLines = normalizedText.split("\n").filter(function(line) {
+    return line.trim() !== "";
+  });
+  const result = { items: [], warnings: [], errors: [], hasHeader: false };
+  if (!physicalLines.length) {
+    result.errors.push("Paste at least one contestant.");
+    return result;
+  }
+
+  const firstLine = physicalLines[0];
+  const delimiter = firstLine.indexOf("\t") !== -1 ? "\t" : (firstLine.indexOf(",") !== -1 ? "," : null);
+  let rows;
+  if (delimiter) {
+    const parsedText = adminRealityTvParseDelimitedText_(normalizedText, delimiter);
+    rows = parsedText.rows;
+    if (parsedText.unclosedQuote) result.errors.push("A quoted cell is missing its closing quote.");
+  } else {
+    rows = physicalLines.map(function(line) { return [String(line || "").trim()]; });
+  }
+  const aliases = {
+    name: ["name", "contestant", "contestantname", "displayname"],
+    fullName: ["fullname", "legalname", "realname"],
+    imageUrl: ["image", "imageurl", "photo", "photourl", "headshot", "headshoturl"],
+    teamOrTribe: ["team", "tribe", "teamtribe", "teamortribe", "group"],
+    age: ["age"],
+    hometown: ["hometown", "home", "city", "location"],
+    occupation: ["occupation", "job", "profession"],
+    biography: ["biography", "bio", "notes", "description"],
+    externalSubjectId: ["externalsubjectid", "externalid", "subjectid", "providerid", "contestantid"]
+  };
+  const normalizedHeaders = rows[0].map(adminRealityTvNormalizeBulkHeader_);
+  const columnMap = {};
+  Object.keys(aliases).forEach(function(field) {
+    const index = normalizedHeaders.findIndex(function(header) { return aliases[field].indexOf(header) !== -1; });
+    if (index !== -1) columnMap[field] = index;
+  });
+  // A roster copied from many public sources often has only "Full Name".
+  // Treat that column as the display name when a separate Name column is absent.
+  if (columnMap.name === undefined && columnMap.fullName !== undefined) columnMap.name = columnMap.fullName;
+  result.hasHeader = rows.length > 1 && columnMap.name !== undefined && Object.keys(columnMap).length >= 1;
+
+  const positional = ["name", "fullName", "imageUrl", "teamOrTribe", "age", "hometown", "occupation", "biography", "externalSubjectId"];
+  const dataRows = result.hasHeader ? rows.slice(1) : rows;
+  const seen = {};
+  dataRows.forEach(function(cells, rowIndex) {
+    const item = {};
+    if (result.hasHeader) {
+      Object.keys(columnMap).forEach(function(field) { item[field] = String(cells[columnMap[field]] || "").trim(); });
+    } else if (!delimiter) {
+      item.name = String(cells[0] || "").trim();
+    } else {
+      positional.forEach(function(field, index) { item[field] = String(cells[index] || "").trim(); });
+    }
+
+    if (!item.name) {
+      result.warnings.push("Skipped row " + (rowIndex + (result.hasHeader ? 2 : 1)) + ": contestant name is blank.");
+      return;
+    }
+    const duplicateKey = String(item.externalSubjectId || item.name).trim().toLowerCase();
+    if (seen[duplicateKey]) {
+      result.warnings.push("Skipped duplicate: " + item.name + ".");
+      return;
+    }
+    seen[duplicateKey] = true;
+    if (item.age && !/^\d{1,3}$/.test(item.age)) {
+      result.warnings.push(item.name + ": age is not a whole number; it will still be saved as entered.");
+    }
+    result.items.push(item);
+  });
+
+  if (!result.items.length) result.errors.push("No valid contestant rows were found.");
+  if (result.items.length > 250) {
+    result.errors.push("A maximum of 250 contestants can be imported at once.");
+    result.items = [];
+  }
+  return result;
+}
+
+function adminRealityTvBulkPreviewHtml_(parsed) {
+  if (parsed.errors.length) {
+    return `<div class="admin-message error">${parsed.errors.map(adminRealityTvEscape_).join(" ")}</div>`;
+  }
+  const rows = parsed.items.slice(0, 12).map(function(item) {
+    return `<tr><td>${adminRealityTvEscape_(item.name)}</td><td>${adminRealityTvEscape_(item.teamOrTribe || "")}</td><td>${adminRealityTvEscape_(item.age || "")}</td><td>${adminRealityTvEscape_(item.hometown || "")}</td><td>${adminRealityTvEscape_(item.occupation || "")}</td></tr>`;
+  }).join("");
+  const warning = parsed.warnings.length
+    ? `<div class="admin-message warning">${parsed.warnings.slice(0, 8).map(adminRealityTvEscape_).join(" ")}</div>`
+    : "";
+  return `
+    <div class="admin-message success">${parsed.items.length} contestant${parsed.items.length === 1 ? "" : "s"} ready to import.</div>
+    ${warning}
+    <div class="reality-tv-bulk-preview-table-wrap">
+      <table class="reality-tv-bulk-preview-table"><thead><tr><th>Name</th><th>Team / Tribe</th><th>Age</th><th>Hometown</th><th>Occupation</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    ${parsed.items.length > 12 ? `<div class="admin-sub">Showing the first 12 of ${parsed.items.length} contestants.</div>` : ""}
+  `;
+}
+
+function adminRealityTvPreviewBulk_(targetKey) {
+  const textarea = document.getElementById("realityTvBulkContestants_" + targetKey);
+  const preview = document.getElementById("realityTvBulkPreview_" + targetKey);
+  if (!textarea || !preview) return null;
+  const parsed = adminRealityTvParseBulkContestants_(textarea.value);
+  ADMIN_REALITY_TV_BULK_PREVIEW[targetKey] = parsed;
+  preview.innerHTML = adminRealityTvBulkPreviewHtml_(parsed);
+  return parsed;
+}
+
+function adminRealityTvLoadBulkExample_(targetKey) {
+  const textarea = document.getElementById("realityTvBulkContestants_" + targetKey);
+  if (!textarea) return;
+  textarea.value = [
+    "Name\tFull Name\tImage URL\tTeam / Tribe\tAge\tHometown\tOccupation\tBiography\tExternal Subject ID",
+    "Contestant A\tAlex Example\thttps://example.com/alex.jpg\tBlue Tribe\t31\tChicago, IL\tTeacher\tSample biography\talex-example",
+    "Contestant B\tBailey Example\t\tRed Tribe\t27\tAustin, TX\tDesigner\t\tbailey-example"
+  ].join("\n");
+  adminRealityTvPreviewBulk_(targetKey);
+}
+
+function adminRealityTvApplyBulkToRoster_(mode) {
+  const parsed = adminRealityTvPreviewBulk_("create");
+  if (!parsed || parsed.errors.length) return;
+  const container = document.getElementById("realityTvRosterRows");
+  if (!container) return;
+  if (mode === "replace") container.innerHTML = "";
+  parsed.items.forEach(function(item) {
+    container.insertAdjacentHTML("beforeend", adminRealityTvRosterRowHtml_(item));
+  });
+  adminRealityTvSetMessage_("realityTvCreateMessage", parsed.items.length + " contestants loaded into the roster. Review them, then create the season.", "success");
 }
 
 async function renderAdminRealityTvPage() {
@@ -361,10 +576,24 @@ async function renderAdminRealityTvPage() {
                 </div>
                 <button type="button" class="admin-small-button" onclick="adminRealityTvAddRosterRow()">Add Row</button>
               </div>
+
+              <details class="reality-tv-bulk-import" open>
+                <summary>Mass Enter Contestants</summary>
+                <div class="admin-sub">Paste one name per line, or copy rows from Excel/Google Sheets. Header-based tab-separated or CSV data is supported.</div>
+                <textarea id="realityTvBulkContestants_create" class="input reality-tv-bulk-textarea" rows="8" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
+                <div class="admin-actions reality-tv-bulk-actions">
+                  <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('create')">Load Example</button>
+                  <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('create')">Preview</button>
+                  <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('replace')">Replace Current Rows</button>
+                  <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('append')">Add to Current Rows</button>
+                </div>
+                <div id="realityTvBulkPreview_create" class="reality-tv-bulk-preview"></div>
+              </details>
+
               <div class="reality-tv-roster-column-labels">
-                <span>Name</span><span>Image URL</span><span>Team / Tribe</span><span>Age</span><span>Hometown</span><span>Occupation</span><span></span>
+                <span>Name</span><span>Image URL</span><span>Team / Tribe</span><span>Age</span><span></span>
               </div>
-              <div id="realityTvRosterRows">${adminRealityTvBlankRosterRows_(6)}</div>
+              <div id="realityTvRosterRows">${adminRealityTvBlankRosterRows_(4)}</div>
             </div>
 
             <div class="admin-actions">
@@ -414,11 +643,14 @@ function adminRealityTvCollectRoster_() {
   return Array.from(document.querySelectorAll("#realityTvRosterRows [data-roster-row]")).map(function(row) {
     return {
       name: row.querySelector(".rt-roster-name").value.trim(),
+      fullName: row.querySelector(".rt-roster-full-name").value.trim(),
       imageUrl: row.querySelector(".rt-roster-image").value.trim(),
       teamOrTribe: row.querySelector(".rt-roster-team").value.trim(),
       age: row.querySelector(".rt-roster-age").value.trim(),
       hometown: row.querySelector(".rt-roster-hometown").value.trim(),
-      occupation: row.querySelector(".rt-roster-occupation").value.trim()
+      occupation: row.querySelector(".rt-roster-occupation").value.trim(),
+      biography: row.querySelector(".rt-roster-biography").value.trim(),
+      externalSubjectId: row.querySelector(".rt-roster-external-id").value.trim()
     };
   }).filter(function(item) { return item.name; });
 }
@@ -485,7 +717,7 @@ async function adminRealityTvCreateSeason() {
   showLoader();
   try {
     const res = await apiAdminCreateRealityTvSeason(payload);
-    if (!res || res.success === false) throw new Error((res && res.error) || "Could not create the season.");
+    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not create the season.");
     alert(res.message || "Reality TV season created.");
     navigate("admin-reality-tv");
   } catch (err) {
@@ -621,6 +853,28 @@ async function adminRealityTvAddContestant(seasonId) {
     navigate("admin-reality-tv");
   } catch (err) {
     alert(err.message);
+  } finally {
+    hideLoader();
+  }
+}
+
+
+async function adminRealityTvBulkAddToSeason(seasonId) {
+  const parsed = adminRealityTvPreviewBulk_(seasonId);
+  if (!parsed || parsed.errors.length) return;
+  if (!confirm("Add " + parsed.items.length + " contestants to this season? Existing episode questions will not be changed.")) return;
+  showLoader();
+  try {
+    const res = await apiAdminBulkAddRealityTvContestants({
+      seasonId: seasonId,
+      contestantsJSON: JSON.stringify(parsed.items)
+    });
+    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not add contestants.");
+    alert(res.message || (res.createdCount + " contestants added."));
+    navigate("admin-reality-tv");
+  } catch (err) {
+    const preview = document.getElementById("realityTvBulkPreview_" + seasonId);
+    if (preview) preview.innerHTML = `<div class="admin-message error">${adminRealityTvEscape_(err.message)}</div>`;
   } finally {
     hideLoader();
   }

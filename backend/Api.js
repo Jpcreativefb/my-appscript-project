@@ -89,6 +89,18 @@ function doPost(e) {
 
     }
 
+    // =========================
+    // REALITY TV LARGE WRITES
+    // =========================
+
+    if (action === "adminCreateRealityTvSeason") {
+      return json(apiAdminCreateRealityTvSeason(body));
+    }
+
+    if (action === "adminBulkAddRealityTvContestants") {
+      return json(apiAdminBulkAddRealityTvContestants(body));
+    }
+
     return json({
       success:
         false,
@@ -168,6 +180,7 @@ function doGet(e) {
       "adminGetRealityTvDashboard",
       "adminCreateRealityTvSeason",
       "adminAddRealityTvContestant",
+      "adminBulkAddRealityTvContestants",
       "adminSubmitRealityTvResult",
       "adminApproveRealityTvResult",
       "adminRejectRealityTvResult",
@@ -836,6 +849,10 @@ function doGet(e) {
 
     if (action === "adminAddRealityTvContestant") {
       return json(apiAdminAddRealityTvContestant(params));
+    }
+
+    if (action === "adminBulkAddRealityTvContestants") {
+      return json(apiAdminBulkAddRealityTvContestants(params));
     }
 
     if (action === "adminSubmitRealityTvResult") {

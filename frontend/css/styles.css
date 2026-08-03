@@ -3217,7 +3217,7 @@ button.is-saving {
 
 /* =========================
    REALITY TV SEASON MANAGER
-   Phase 2B v1.0.18
+   Phase 2B v1.0.20
 ========================= */
 
 .admin-reality-tv-page {
@@ -3278,9 +3278,9 @@ button.is-saving {
 }
 
 .reality-tv-roster-column-labels,
-.reality-tv-roster-row {
+.reality-tv-roster-primary {
   display: grid;
-  grid-template-columns: minmax(150px, 1.2fr) minmax(180px, 1.5fr) minmax(120px, 1fr) 70px minmax(130px, 1fr) minmax(140px, 1fr) auto;
+  grid-template-columns: minmax(160px, 1.25fr) minmax(190px, 1.5fr) minmax(130px, 1fr) 76px auto;
   gap: 8px;
   align-items: center;
 }
@@ -3294,7 +3294,87 @@ button.is-saving {
 }
 
 .reality-tv-roster-row {
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.reality-tv-roster-profile {
+  margin-top: 8px;
+}
+
+.reality-tv-roster-profile > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 800;
+  opacity: 0.82;
+}
+
+.reality-tv-roster-profile-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.reality-tv-roster-profile-grid textarea {
+  grid-column: 1 / -1;
+  resize: vertical;
+}
+
+.reality-tv-bulk-import,
+.reality-tv-existing-bulk-add {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(59, 130, 246, 0.28);
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.reality-tv-bulk-import > summary {
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.reality-tv-existing-bulk-add h4 {
+  margin: 0 0 4px;
+}
+
+.reality-tv-bulk-textarea {
+  width: 100%;
+  margin-top: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.82rem;
+  resize: vertical;
+}
+
+.reality-tv-bulk-actions {
+  margin-top: 10px;
+}
+
+.reality-tv-bulk-preview {
+  margin-top: 10px;
+}
+
+.reality-tv-bulk-preview-table-wrap {
+  overflow-x: auto;
+  margin-top: 8px;
+}
+
+.reality-tv-bulk-preview-table {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.reality-tv-bulk-preview-table th,
+.reality-tv-bulk-preview-table td {
+  padding: 7px 8px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .reality-tv-season-list {
@@ -3505,11 +3585,9 @@ button.is-saving {
     display: none;
   }
 
-  .reality-tv-roster-row {
+  .reality-tv-roster-primary,
+  .reality-tv-roster-profile-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    padding: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    border-radius: 12px;
   }
 }
 
@@ -3521,8 +3599,13 @@ button.is-saving {
     flex-direction: column;
   }
 
-  .reality-tv-roster-row {
+  .reality-tv-roster-primary,
+  .reality-tv-roster-profile-grid {
     grid-template-columns: 1fr;
+  }
+
+  .reality-tv-roster-profile-grid textarea {
+    grid-column: auto;
   }
 
   .reality-tv-result-contestants,

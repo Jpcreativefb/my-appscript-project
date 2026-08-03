@@ -38,6 +38,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetGameSetup",
     "adminGetRealityTvDashboard",
     "adminCreateRealityTvSeason",
+    "adminBulkAddRealityTvContestants",
     "adminSubmitRealityTvResult",
     "adminApproveRealityTvResult",
     "adminCreateNextRealityTvEpisode",
@@ -1508,6 +1509,21 @@ function apiAdminRealityTvRequest_(action, payload) {
 
 }
 
+function apiAdminRealityTvPostRequest_(action, payload) {
+
+  const session = getSession();
+
+  return apiPost(
+    action,
+    {
+      ...(payload || {}),
+      username: session.username,
+      token: session.token
+    }
+  );
+
+}
+
 async function apiAdminSetupRealityTvSystem() {
   return apiAdminRealityTvRequest_("adminSetupRealityTvSystem", {});
 }
@@ -1523,11 +1539,15 @@ async function apiAdminGetRealityTvDashboard() {
 }
 
 async function apiAdminCreateRealityTvSeason(payload) {
-  return apiAdminRealityTvRequest_("adminCreateRealityTvSeason", payload || {});
+  return apiAdminRealityTvPostRequest_("adminCreateRealityTvSeason", payload || {});
 }
 
 async function apiAdminAddRealityTvContestant(payload) {
   return apiAdminRealityTvRequest_("adminAddRealityTvContestant", payload || {});
+}
+
+async function apiAdminBulkAddRealityTvContestants(payload) {
+  return apiAdminRealityTvPostRequest_("adminBulkAddRealityTvContestants", payload || {});
 }
 
 async function apiAdminSubmitRealityTvResult(payload) {
