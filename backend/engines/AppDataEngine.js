@@ -83,6 +83,11 @@ function apiGetStartupPayload(payload) {
     seasonAnchor:
       typeof seasonAnchorUserPayload_ === "function"
         ? seasonAnchorUserPayload_(username, gameId)
+        : { enabled: false },
+
+    realityTvView:
+      typeof realityTvUserGameViewPayload_ === "function"
+        ? realityTvUserGameViewPayload_(gameId)
         : { enabled: false }
   };
 

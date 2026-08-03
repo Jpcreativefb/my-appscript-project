@@ -16,7 +16,8 @@ let PICKS_PAGE_DATA = {
   stakePoints: {},
   stakeSummary: {},
   pickMeta: {},
-  seasonAnchor: null
+  seasonAnchor: null,
+  realityTvView: null
 };
 
 let PICKS_COUNTDOWN_TIMER = null;
@@ -82,6 +83,24 @@ function formatSeasonAnchorLock_(value) {
   });
 }
 
+function realityTvSafeColor_(value) {
+  const text = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : "#64748B";
+}
+
+function realityTvProfileDetailsHtml_(item) {
+  item = item || {};
+  const facts = [];
+  if (item.fullName && item.fullName !== item.name) facts.push(["Full name", item.fullName]);
+  if (item.member1 || item.member2) facts.push(["Members", [item.member1, item.member2].filter(Boolean).join(" & ")]);
+  if (item.relationship) facts.push(["Relationship", item.relationship]);
+  if (item.age) facts.push(["Age", item.age]);
+  if (item.hometown) facts.push(["Hometown", item.hometown]);
+  if (item.occupation) facts.push(["Occupation", item.occupation]);
+  if (item.teamOrTribe) facts.push(["Team / group", item.teamOrTribe]);
+  return `<div class="reality-profile-facts">${facts.map(function(pair) { return `<div><span>${escapeHtml(pair[0])}</span><strong>${escapeHtml(pair[1])}</strong></div>`; }).join("")}</div>${item.biography ? `<p class="reality-profile-bio">${escapeHtml(item.biography)}</p>` : ""}`;
+}
+
 function renderSeasonAnchorPickCard_() {
   const anchor = PICKS_PAGE_DATA.seasonAnchor;
   if (!anchor || anchor.enabled !== true) return "";
@@ -89,6 +108,8 @@ function renderSeasonAnchorPickCard_() {
   const user = anchor.user || null;
   const entities = Array.isArray(anchor.entities) ? anchor.entities : [];
   const currentId = user ? String(user.currentEntityId || "") : "";
+  const currentProfile = anchor.currentEntity || (anchor.allEntities || []).find(function(item) { return String(item.id) === currentId; }) || null;
+  const stats = anchor.stats || {};
   const needsPick = !user || String(user.status || "NEEDS_PICK").toUpperCase() === "NEEDS_PICK" || !currentId;
   const currentMultiplier = user ? Number(user.currentMultiplier || settings.StartMultiplier || 1) : Number(settings.StartMultiplier || 1);
   const growth = Number(settings.GrowthPerSuccess || 0);
@@ -98,57 +119,41 @@ function renderSeasonAnchorPickCard_() {
   const locked = anchor.locked === true;
   const switchText = user && currentId && !needsPick
     ? (settings.ManualSwitchAllowed ? "Changing before lock resets the streak and multiplier." : "Manual switching is disabled until this pick is eliminated.")
-    : "Choose any currently active contestant. Late starters begin at the base multiplier.";
+    : "Choose any currently active participant or team. Late starters begin at the base multiplier.";
   const optionHtml = entities.map(function(item) {
     return `<option value="${escapeAttr(item.id)}" ${String(item.id) === currentId ? "selected" : ""}>${escapeHtml(item.name)}${item.teamOrTribe ? " — " + escapeHtml(item.teamOrTribe) : ""}</option>`;
   }).join("");
+  const image = currentProfile && currentProfile.imageUrl ? currentProfile.imageUrl : "";
+  const color = realityTvSafeColor_(currentProfile && currentProfile.teamColor);
+  const eliminated = currentProfile && String(currentProfile.status || "").toUpperCase() !== "ACTIVE";
   const currentSummary = needsPick
-    ? `<div class="season-anchor-current-pick needs-pick">
-        <span class="season-anchor-label">New selection needed</span>
-        <strong>${user && user.currentEntityName ? escapeHtml(user.currentEntityName) + " was eliminated" : "Choose an active contestant"}</strong>
-        <span>Your next pick starts at ${formatSeasonAnchorMultiplier_(settings.StartMultiplier || 1)}.</span>
-      </div>`
-    : `<div class="season-anchor-current-pick">
-        <span class="season-anchor-label">Current pick</span>
-        <strong>${escapeHtml(user.currentEntityName || currentId)}</strong>
-        <span>${Number(user.streak || 0)} successful episode${Number(user.streak || 0) === 1 ? "" : "s"}</span>
-      </div>`;
+    ? `<div class="season-anchor-current-pick needs-pick"><span class="season-anchor-label">New selection needed</span><strong>${user && user.currentEntityName ? escapeHtml(user.currentEntityName) + " was eliminated" : "Choose an active participant"}</strong><span>Your next pick starts at ${formatSeasonAnchorMultiplier_(settings.StartMultiplier || 1)}.</span></div>`
+    : `<div class="season-anchor-current-pick"><span class="season-anchor-label">Current pick</span><strong>${escapeHtml(user.currentEntityName || currentId)}</strong><span>${Number(user.streak || 0)} successful ${escapeHtml((anchor.season && anchor.season.periodLabel) || "period")}${Number(user.streak || 0) === 1 ? "" : "s"}</span></div>`;
 
   return `
     <section class="season-anchor-card ${needsPick ? "needs-pick" : "active"}">
-      <div class="season-anchor-card-header">
-        <div>
-          <span class="season-anchor-eyebrow">Optional season bonus</span>
-          <h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2>
-          <p>Keep the same contestant while they remain active. Your normal picks still score at their regular value.</p>
+      <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2><p>Keep the same participant or team while they remain active. Normal episode questions still score at their regular value.</p></div><span class="season-anchor-status ${locked ? "locked" : "open"}">${locked ? "Locked" : "Open"}</span></div>
+      <div class="season-anchor-feature-grid">
+        <div class="season-anchor-profile ${eliminated ? "is-eliminated" : ""}" style="--reality-team-color:${escapeAttr(color)}">
+          <div class="season-anchor-profile-image">${image ? `<img src="${escapeAttr(image)}" alt="">` : `<span>${escapeHtml((currentProfile && currentProfile.name || "?").slice(0, 2).toUpperCase())}</span>`}${eliminated ? `<div class="reality-eliminated-overlay">ELIMINATED</div>` : ""}</div>
+          ${currentSummary}
+          ${currentProfile ? `<details class="reality-profile-details"><summary>View bio & details</summary>${realityTvProfileDetailsHtml_(currentProfile)}</details>` : ""}
         </div>
-        <span class="season-anchor-status ${locked ? "locked" : "open"}">${locked ? "Locked" : "Open"}</span>
-      </div>
-      <div class="season-anchor-summary-grid">
-        ${currentSummary}
-        <div><span>Current multiplier</span><strong>${formatSeasonAnchorMultiplier_(currentMultiplier)}</strong></div>
-        <div><span>Next survival</span><strong>${formatSeasonAnchorMultiplier_(nextMultiplier)}</strong></div>
-        <div><span>Maximum weekly bonus</span><strong>${Number(anchor.maxWeeklyBonus || 0).toLocaleString()} pts</strong></div>
-        <div><span>${escapeHtml(anchor.episode ? anchor.episode.episodeName : "Current period")}</span><strong>${escapeHtml(formatSeasonAnchorLock_(anchor.episode && anchor.episode.lockDateTime))}</strong></div>
-      </div>
-      ${canChoose ? `
-        <div class="season-anchor-picker">
-          <label for="seasonAnchorEntitySelect">${needsPick ? "Select your contestant" : "Keep or change your contestant"}</label>
-          <div class="season-anchor-picker-row">
-            <select id="seasonAnchorEntitySelect" class="input">
-              <option value="">Choose a contestant…</option>
-              ${optionHtml}
-            </select>
-            <button type="button" class="button" onclick="saveSeasonAnchorPick_()">${needsPick ? "Save Survivor Pick" : "Update Pick"}</button>
-          </div>
-          <small>${escapeHtml(switchText)}</small>
+        <div class="season-anchor-summary-grid">
+          <div><span>Current multiplier</span><strong>${formatSeasonAnchorMultiplier_(currentMultiplier)}</strong></div>
+          <div><span>Next survival</span><strong>${formatSeasonAnchorMultiplier_(nextMultiplier)}</strong></div>
+          <div><span>Current streak</span><strong>${Number(user && user.streak || 0)}</strong></div>
+          <div><span>Longest streak</span><strong>${Number(stats.longestStreak || 0)}</strong></div>
+          <div><span>Total bonus</span><strong>+${Number(stats.totalBonus || 0).toLocaleString()} pts</strong></div>
+          <div><span>Total penalties</span><strong>-${Number(stats.totalPenalty || 0).toLocaleString()} pts</strong></div>
+          <div><span>Net adjustment</span><strong>${Number(stats.netAdjustment || 0) >= 0 ? "+" : ""}${Number(stats.netAdjustment || 0).toLocaleString()} pts</strong></div>
+          <div><span>Maximum weekly bonus</span><strong>${Number(anchor.maxWeeklyBonus || 0).toLocaleString()} pts</strong></div>
+          <div><span>${escapeHtml(anchor.episode ? anchor.episode.episodeName : "Current period")}</span><strong>${escapeHtml(formatSeasonAnchorLock_(anchor.episode && anchor.episode.lockDateTime))}</strong></div>
         </div>
-      ` : `<div class="season-anchor-locked-note">${locked ? "The selection window is closed for this episode." : escapeHtml(switchText)}</div>`}
-      <div class="season-anchor-rules-line">
-        Growth: +${Number(settings.GrowthPerSuccess || 0).toFixed(2)}x · Cap: ${formatSeasonAnchorMultiplier_(settings.MaxMultiplier || 1)} · Eligible points cap: ${Number(settings.EligiblePointsCap || 0)} · Loss penalty: -${Number(settings.LossPenalty || 0)}
       </div>
-    </section>
-  `;
+      ${canChoose ? `<div class="season-anchor-picker"><label for="seasonAnchorEntitySelect">${needsPick ? "Select your participant / team" : "Keep or change your participant / team"}</label><div class="season-anchor-picker-row"><select id="seasonAnchorEntitySelect" class="input"><option value="">Choose…</option>${optionHtml}</select><button type="button" class="button" onclick="saveSeasonAnchorPick_()">${needsPick ? "Save Survivor Pick" : "Update Pick"}</button></div><small>${escapeHtml(switchText)}</small></div>` : `<div class="season-anchor-locked-note">${locked ? "The selection window is closed for this period." : escapeHtml(switchText)}</div>`}
+      <div class="season-anchor-rules-line">Growth: +${Number(settings.GrowthPerSuccess || 0).toFixed(2)}x · Cap: ${formatSeasonAnchorMultiplier_(settings.MaxMultiplier || 1)} · Eligible points cap: ${Number(settings.EligiblePointsCap || 0)} · Loss penalty: -${Number(settings.LossPenalty || 0)}</div>
+    </section>`;
 }
 
 async function saveSeasonAnchorPick_() {
@@ -299,6 +304,9 @@ PICKS_PAGE_DATA.confidenceScoringMode =
 
   PICKS_PAGE_DATA.seasonAnchor =
     payload.seasonAnchor || null;
+
+  PICKS_PAGE_DATA.realityTvView =
+    payload.realityTvView || null;
 
   setTimeout(
     mountPicksPage,
@@ -920,42 +928,54 @@ function renderConfidenceSummaryBar() {
    CATEGORY LIST
 ========================= */
 
-function renderPicksCategoryList() {
-
-  const categories =
-    (PICKS_PAGE_DATA.categories || [])
-      .filter(category =>
-        isPicksPageCategory(category)
-      );
-
-  const parents =
-    categories.filter(cat =>
-      !cat.parentCategoryId
-    );
-
-  return parents.map(parent => {
-
-    const children =
-      getChildCategories(parent);
-
-    return `
-      <div class="picks-parent-block">
-
-        ${renderCategoryCard(parent, false)}
-
-        ${children.length ? `
-          <div class="child-category-wrapper">
-            ${children.map(child =>
-              renderCategoryCard(child, true, parent)
-            ).join("")}
-          </div>
-        ` : ""}
-
-      </div>
-    `;
-
+function renderPicksCategoryCards_(categories) {
+  const ids = {};
+  (categories || []).forEach(function(item) { ids[normalizeId(item.id)] = true; });
+  const parents = (categories || []).filter(function(cat) {
+    return !cat.parentCategoryId || !ids[normalizeId(cat.parentCategoryId)];
+  });
+  return parents.map(function(parent) {
+    const children = getChildCategories(parent).filter(function(child) { return ids[normalizeId(child.id)]; });
+    return `<div class="picks-parent-block">${renderCategoryCard(parent, false)}${children.length ? `<div class="child-category-wrapper">${children.map(function(child) { return renderCategoryCard(child, true, parent); }).join("")}</div>` : ""}</div>`;
   }).join("");
+}
 
+function realityTvEpisodeCategoryMap_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const map = {};
+  (view.episodes || []).forEach(function(episode) {
+    if (episode.categoryId) map[normalizeId(episode.categoryId)] = Number(episode.episodeNumber || 0);
+  });
+  (view.episodeQuestions || []).forEach(function(question) {
+    if (question.categoryId) map[normalizeId(question.categoryId)] = Number(question.episodeNumber || 0);
+  });
+  return map;
+}
+
+function renderRealityTvEpisodeSections_(categories) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const episodes = (view.episodes || []).slice().sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
+  const categoryMap = realityTvEpisodeCategoryMap_();
+  const used = {};
+  const sections = episodes.map(function(episode, index) {
+    const items = categories.filter(function(category) {
+      const match = categoryMap[normalizeId(category.id)] === Number(episode.episodeNumber || 0);
+      if (match) used[normalizeId(category.id)] = true;
+      return match;
+    });
+    if (!items.length) return "";
+    const latest = index === 0;
+    const picked = items.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
+    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${picked}/${items.length} questions picked · ${escapeHtml(formatSeasonAnchorLock_(episode.lockDateTime))}</span></div><span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}</div></details>`;
+  }).join("");
+  const remaining = categories.filter(function(category) { return !used[normalizeId(category.id)]; });
+  return sections + (remaining.length ? `<details class="reality-episode-picks-section other" open><summary><div><span class="reality-episode-kicker">Other</span><h2>Season Questions</h2><span>${remaining.length} question${remaining.length === 1 ? "" : "s"}</span></div></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(remaining)}</div></details>` : "");
+}
+
+function renderPicksCategoryList() {
+  const categories = (PICKS_PAGE_DATA.categories || []).filter(function(category) { return isPicksPageCategory(category); });
+  if (PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true) return renderRealityTvEpisodeSections_(categories);
+  return renderPicksCategoryCards_(categories);
 }
 
 /* =========================
@@ -1289,14 +1309,7 @@ ${stakedPointsCategory ? `
 
     <div class="${getLayoutClass(category)}">
 
-  ${category.nominees.map(nominee =>
-    renderNomineeButton(
-      category,
-      nominee,
-      selectedNomineeId,
-      locked
-    )
-  ).join("")}
+  ${renderCategoryNominees_(category, selectedNomineeId, locked)}
 
 </div>
 
@@ -1488,6 +1501,102 @@ function updateConfidenceForCategory(
 /* =========================
    NOMINEE BUTTON
 ========================= */
+
+
+function realityTvQuestionVisual_(category) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const categoryId = normalizeId(category && category.id);
+  const supplemental = (view.episodeQuestions || []).find(function(item) {
+    return normalizeId(item.categoryId) === categoryId;
+  });
+  if (supplemental) {
+    return {
+      layoutType: String(supplemental.layoutType || category.layoutType || "auto").toLowerCase(),
+      imageSource: String(supplemental.imageSource || "auto").toLowerCase()
+    };
+  }
+  const mainEpisode = (view.episodes || []).find(function(item) {
+    return normalizeId(item.categoryId) === categoryId;
+  });
+  if (mainEpisode) {
+    return {
+      layoutType: String((view.season && view.season.eliminationLayoutType) || category.layoutType || "auto").toLowerCase(),
+      imageSource: String((view.season && view.season.eliminationImageSource) || "roster").toLowerCase()
+    };
+  }
+  return {
+    layoutType: String(category && category.layoutType || "auto").toLowerCase(),
+    imageSource: "auto"
+  };
+}
+
+function realityTvNomineeMeta_(nominee) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const id = normalizeId(nominee && nominee.id);
+  const participant = (view.participants || []).find(function(item) { return normalizeId(item.id) === id; });
+  if (participant) return Object.assign({ kind: "participant" }, participant);
+  const group = (view.groups || []).find(function(item) {
+    const groupId = normalizeId(item.id);
+    const groupName = normalizeId(item.name);
+    return groupId === id || groupName === id || (groupName && id.endsWith("-" + groupName));
+  });
+  if (group) return { kind: "group", id: group.id, name: group.name, imageUrl: group.imageUrl, groupImageUrl: group.imageUrl, teamColor: group.color, status: group.active ? "ACTIVE" : "INACTIVE", biography: "" };
+  return null;
+}
+
+function toggleRealityNomineeBio_(id) {
+  const panel = document.getElementById(id);
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+}
+
+function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locked) {
+  const meta = realityTvNomineeMeta_(nominee) || {};
+  const selected = normalizeId(nominee.id) === normalizeId(selectedNomineeId);
+  const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+  const disabled = locked || (isStakedPointsCategory(category) && existingStake <= 0) ? "disabled" : "";
+  const color = realityTvSafeColor_(meta.teamColor);
+  const eliminated = meta.kind === "participant" && (meta.active === false || String(meta.status || "").toUpperCase() !== "ACTIVE");
+  const visual = realityTvQuestionVisual_(category);
+  const layout = ["image", "compact", "list", "text", "short-answer"].includes(visual.layoutType) ? visual.layoutType : "image";
+  let image = nominee.image || "";
+  if (visual.imageSource === "roster") image = meta.kind === "participant" ? (meta.imageUrl || "") : (meta.imageUrl || nominee.image || "");
+  else if (visual.imageSource === "group") image = meta.groupImageUrl || (meta.kind === "group" ? meta.imageUrl : "") || "";
+  else if (visual.imageSource === "none") image = "";
+  else if (!image) image = meta.imageUrl || "";
+  const showImage = layout !== "text" && layout !== "short-answer" && !!image;
+  const bioId = "realityBio_" + String(category.id).replace(/[^a-z0-9_-]/gi, "_") + "_" + String(nominee.id).replace(/[^a-z0-9_-]/gi, "_");
+  return `<div class="nominee-choice reality-profile-choice reality-layout-${escapeAttr(layout)} ${selected ? "selected" : ""} ${eliminated ? "is-eliminated" : ""} ${showImage ? "has-image" : "no-image"}" style="--reality-team-color:${escapeAttr(color)}">
+    <button type="button" class="reality-profile-select" onclick="selectNominee('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')" ${disabled}>
+      ${showImage ? `<span class="reality-profile-image"><img src="${escapeAttr(image)}" alt="">${eliminated ? `<span class="reality-eliminated-overlay">ELIMINATED</span>` : ""}</span>` : `<span class="reality-profile-text-marker">${eliminated ? "ELIMINATED" : escapeHtml((nominee.name || "?").slice(0, 2).toUpperCase())}</span>`}
+      <span class="reality-profile-name">${escapeHtml(nominee.name)}</span>
+      ${meta.teamOrTribe ? `<span class="reality-profile-team">${escapeHtml(meta.teamOrTribe)}</span>` : ""}
+      ${selected ? `<span class="reality-user-pick-badge">YOUR PICK</span>` : ""}
+    </button>
+    ${(meta.biography || meta.hometown || meta.occupation || meta.age || meta.member1 || meta.member2 || meta.relationship) ? `<button type="button" class="reality-profile-toggle" onclick="toggleRealityNomineeBio_('${escapeJs(bioId)}')">Bio & details</button><div id="${escapeAttr(bioId)}" class="reality-profile-panel" hidden>${realityTvProfileDetailsHtml_(meta)}</div>` : ""}
+  </div>`;
+}
+
+function renderCategoryNominees_(category, selectedNomineeId, locked) {
+  const isReality = PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true;
+  if (!isReality) return (category.nominees || []).map(function(nominee) { return renderNomineeButton(category, nominee, selectedNomineeId, locked); }).join("");
+  const grouped = {};
+  const order = [];
+  (category.nominees || []).forEach(function(nominee) {
+    const meta = realityTvNomineeMeta_(nominee) || {};
+    const label = meta.teamOrTribe || "";
+    if (!grouped[label]) { grouped[label] = []; order.push(label); }
+    grouped[label].push(nominee);
+  });
+  const hasGroups = order.filter(Boolean).length > 1;
+  return order.map(function(label) {
+    const group = (PICKS_PAGE_DATA.realityTvView.groups || []).find(function(item) { return normalizeId(item.name) === normalizeId(label); }) || {};
+    const color = realityTvSafeColor_(group.color);
+    const content = grouped[label].map(function(nominee) { return renderRealityNomineeButton_(category, nominee, selectedNomineeId, locked); }).join("");
+    if (!hasGroups || !label) return content;
+    return `<section class="reality-nominee-group" style="--reality-team-color:${escapeAttr(color)}"><div class="reality-nominee-group-header">${group.imageUrl ? `<img src="${escapeAttr(group.imageUrl)}" alt="">` : ""}<strong>${escapeHtml(label)}</strong></div><div class="reality-nominee-group-grid">${content}</div></section>`;
+  }).join("");
+}
 
 function renderNomineeButton(
   category,

@@ -1,6 +1,6 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.29
+   Phase 2B v1.0.30
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
@@ -120,18 +120,57 @@ function adminRealityTvFormatOptions_(selected) {
   }).join("");
 }
 
-function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, inputClass, seasonId, defaultPoints, preservedPoints) {
+function adminRealityTvHelp_(title, message) {
+  if (typeof adminHelpButton_ === "function") return adminHelpButton_(title, message);
+  return `<button type="button" class="admin-help-button" title="${adminRealityTvEscape_(message)}">?</button>`;
+}
+
+function adminRealityTvFieldTitle_(title, message) {
+  return `<span class="reality-tv-field-title"><span>${adminRealityTvEscape_(title)}</span>${adminRealityTvHelp_(title, message)}</span>`;
+}
+
+function adminRealityTvQuestionStatusHtml_(status) {
+  if (!status) return "";
+  const key = String(status.status || "").toUpperCase();
+  const label = key === "BUILT" ? "Built" : key === "ALREADY_EXISTS" ? "Verified" : key === "SKIPPED" ? "Skipped" : key || "Pending";
+  const detail = status.message ? `<span>${adminRealityTvEscape_(status.message)}</span>` : "";
+  return `<div class="reality-tv-question-build-status ${adminRealityTvEscape_(key.toLowerCase().replace(/_/g, "-"))}"><b>${adminRealityTvEscape_(label)}</b>${detail}</div>`;
+}
+
+function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, inputClass, seasonId, defaultPoints, preservedPoints, statusById, preservedDisplay) {
   enabled = enabled || {};
   preservedPoints = preservedPoints || {};
+  statusById = statusById || {};
+  preservedDisplay = preservedDisplay || {};
   const scope = seasonId || "create";
   const templateMap = {};
   (templates || []).forEach(function(item) { templateMap[String(item.TemplateId || "")] = item; });
   return adminRealityTvQuestionPackTypes_(formatId, templates).map(function(item) {
-    const stored = templateMap[item.id];
+    const stored = templateMap[item.id] || {};
     const pointValue = Object.prototype.hasOwnProperty.call(preservedPoints, item.id)
       ? preservedPoints[item.id]
-      : Number(stored && stored.Points !== undefined && stored.Points !== "" ? stored.Points : (defaultPoints === undefined ? 1 : defaultPoints));
-    return `<div class="reality-tv-question-pack-choice ${item.custom ? "custom" : ""}"><label class="reality-tv-question-pack-toggle"><input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}><span><b>${adminRealityTvEscape_(item.label)}${item.custom ? " · Custom" : ""}</b><small>${adminRealityTvEscape_(item.help)}</small></span></label><label class="reality-tv-question-points-control">Points<input type="number" min="0" step="0.5" class="input rt-question-points" data-points-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(Number.isFinite(pointValue) ? pointValue : 1)}"></label></div>`;
+      : Number(stored.Points !== undefined && stored.Points !== "" ? stored.Points : (defaultPoints === undefined ? 1 : defaultPoints));
+    const display = preservedDisplay[item.id] || {};
+    const layoutType = String(display.layoutType || stored.LayoutType || "auto").toLowerCase();
+    const imageSource = String(display.imageSource || stored.ImageSource || "auto").toLowerCase();
+    const optionTitle = item.label + (item.custom ? " · Custom" : "");
+    return `<div class="reality-tv-question-pack-choice ${item.custom ? "custom" : ""}">
+      <div class="reality-tv-question-pack-choice-main">
+        <label class="reality-tv-question-pack-toggle">
+          <input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}>
+          <span class="reality-tv-question-option-copy"><span class="reality-tv-question-option-title"><b>${adminRealityTvEscape_(optionTitle)}</b>${adminRealityTvHelp_(optionTitle, item.help || "Creates this question for each new period and sends the result through administrator review.")}</span></span>
+        </label>
+        <label class="reality-tv-question-points-control"><span class="reality-tv-question-points-title">Points${adminRealityTvHelp_("Question points", "Points awarded when a user selects the correct answer. This applies to the current open question and future periods; finalized history is preserved.")}</span><input type="number" min="0" step="0.5" class="input rt-question-points" data-points-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(Number.isFinite(pointValue) ? pointValue : 1)}"></label>
+      </div>
+      <details class="reality-tv-question-display-settings">
+        <summary>Display & Images ${adminRealityTvHelp_("Display and images", "Choose how answers look to users and where answer images come from. Automatic uses roster or group images when available and falls back to text.")}</summary>
+        <div class="reality-tv-question-display-grid">
+          <label>${adminRealityTvFieldTitle_("Answer display", "Automatic chooses image cards when images exist and text cards otherwise. Compact and List use smaller rows.")}<select class="input rt-question-layout" data-display-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}"><option value="auto" ${layoutType === "auto" ? "selected" : ""}>Automatic</option><option value="image" ${layoutType === "image" ? "selected" : ""}>Image cards</option><option value="compact" ${layoutType === "compact" ? "selected" : ""}>Compact image cards</option><option value="list" ${layoutType === "list" ? "selected" : ""}>List</option><option value="text" ${layoutType === "text" ? "selected" : ""}>Text cards</option></select></label>
+          <label>${adminRealityTvFieldTitle_("Image source", "Roster reuses participant/team images. Group uses tribe/team images. Custom uses images stored with manual answers. No images forces text-only answers.")}<select class="input rt-question-image-source" data-display-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}"><option value="auto" ${imageSource === "auto" ? "selected" : ""}>Automatic</option><option value="roster" ${imageSource === "roster" ? "selected" : ""}>Participant / team roster</option><option value="group" ${imageSource === "group" ? "selected" : ""}>Group / tribe image</option><option value="custom" ${imageSource === "custom" ? "selected" : ""}>Custom answer images</option><option value="none" ${imageSource === "none" ? "selected" : ""}>No images</option></select></label>
+        </div>
+      </details>
+      ${adminRealityTvQuestionStatusHtml_(statusById[item.id])}
+    </div>`;
   }).join("") || `<div class="admin-message warning">No preset extra questions are selected for this format. Add a custom question below or use only the elimination question.</div>`;
 }
 
@@ -146,18 +185,31 @@ function adminRealityTvCollectQuestionPoints_(scope) {
   return result;
 }
 
+
+function adminRealityTvCollectQuestionDisplay_(scope) {
+  const result = {};
+  document.querySelectorAll('.rt-question-layout[data-display-scope="' + scope + '"]').forEach(function(select) {
+    const id = String(select.dataset.templateId || "");
+    if (!id) return;
+    const image = document.querySelector('.rt-question-image-source[data-display-scope="' + scope + '"][data-template-id="' + id + '"]');
+    result[id] = { layoutType: select.value || "auto", imageSource: image ? image.value : "auto" };
+  });
+  return result;
+}
+
 function adminRealityTvApplyCreateFormat_(preserveSelection) {
   const select = document.getElementById("realityTvShowFormat");
   if (!select) return;
   const format = adminRealityTvShowFormat_(select.value);
   const current = {};
   const preservedPoints = preserveSelection ? adminRealityTvCollectQuestionPoints_("create") : {};
+  const preservedDisplay = preserveSelection ? adminRealityTvCollectQuestionDisplay_("create") : {};
   if (preserveSelection) document.querySelectorAll(".rt-create-question-type:checked").forEach(function(box) { current[box.value] = true; });
   if (!preserveSelection) format.defaults.forEach(function(id) { current[id] = true; });
   const container = document.getElementById("realityTvCreateQuestionPackGrid");
   const defaultPointsInput = document.getElementById("realityTvPoints");
   const defaultPoints = defaultPointsInput ? Number(defaultPointsInput.value || 1) : 1;
-  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, [], "rt-create-question-type", "", defaultPoints, preservedPoints);
+  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, [], "rt-create-question-type", "", defaultPoints, preservedPoints, {}, preservedDisplay);
   const participant = document.getElementById("realityTvParticipantLabel");
   const group = document.getElementById("realityTvGroupLabel");
   const period = document.getElementById("realityTvPeriodLabel");
@@ -298,43 +350,84 @@ function adminRealityTvQuestionPackPanel_(bundle) {
     enabled[String(item.TemplateId || "")] = item.Enabled === true || String(item.Enabled || "").toLowerCase() === "true";
   });
   const current = adminRealityTvCurrentEpisode_(bundle);
+  const statusById = {};
+  const buildSummary = bundle.questionBuildSummary || null;
+  (buildSummary && buildSummary.results ? buildSummary.results : []).forEach(function(item) {
+    statusById[String(item.templateId || "")] = item;
+  });
+  (bundle.questionBuild && bundle.questionBuild.results ? bundle.questionBuild.results : []).forEach(function(item) {
+    statusById[String(item.templateId || "")] = item;
+  });
+  (bundle.episodeQuestions || []).filter(function(item) {
+    return current && String(item.EpisodeId || "") === String(current.EpisodeId || "");
+  }).forEach(function(item) {
+    const id = String(item.TemplateId || item.QuestionType || "");
+    if (!id || statusById[id]) return;
+    statusById[id] = {
+      status: "ALREADY_EXISTS",
+      message: "This question is present in the current " + (season.PeriodLabel || "episode") + "."
+    };
+  });
   const build = bundle.questionBuild && !bundle.questionBuild.complete ? bundle.questionBuild : null;
   const buildLabel = build ? "Resume Build (" + Number(build.currentIndex || 0) + "/" + Number(build.totalCount || 0) + ")" : "Save Format & Build Current " + (season.PeriodLabel || "Episode");
   const buildAction = build
     ? `adminRealityTvResumeQuestionPackBuild('${adminRealityTvEscape_(build.buildId)}','${adminRealityTvEscape_(season.SeasonId)}')`
     : `adminRealityTvSaveQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')`;
   const buildStatus = build ? `<div class="admin-message ${build.error ? "error" : "warning"}"><b>Build in progress:</b> ${adminRealityTvEscape_(build.lastMessage || build.progressLabel || "Ready to resume.")}${build.error ? `<br><b>Last error:</b> ${adminRealityTvEscape_(build.error)}` : ""}</div>` : "";
+  const completedSummary = !build && buildSummary && buildSummary.results && buildSummary.results.length
+    ? `<details class="reality-tv-build-summary"><summary>Last build results · ${Number(buildSummary.builtCount || 0)} built, ${Number(buildSummary.existingCount || 0)} verified, ${(buildSummary.skippedDetails || []).length} skipped</summary><div class="reality-tv-build-summary-list">${buildSummary.results.map(function(item) { return adminRealityTvQuestionStatusHtml_(item); }).join("")}</div></details>`
+    : "";
   return `
     <details class="reality-tv-subsection reality-tv-question-pack" open>
       <summary>Show Format & Episode Question Pack</summary>
       <div class="admin-sub">Choose the show style, edit the labels, and enable only the questions that belong to this season. Historical questions and picks are never deleted.</div>
-      <div class="admin-form-grid reality-tv-format-settings-grid">
-        <label>Show format<select id="realityTvFormat_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">${adminRealityTvFormatOptions_(format.id)}</select></label>
-        <label>Participant type<select id="realityTvParticipantType_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="individual" ${String(season.ParticipantType || format.participantType) === "individual" ? "selected" : ""}>Individual / couple</option><option value="team" ${String(season.ParticipantType || format.participantType) === "team" ? "selected" : ""}>Team</option></select></label>
-        <label>Participant label<input id="realityTvParticipantLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.ParticipantLabel || format.participantLabel)}"></label>
-        <label>Group label<input id="realityTvGroupLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.GroupLabel || format.groupLabel)}"></label>
-        <label>Period label<input id="realityTvPeriodLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.PeriodLabel || format.periodLabel)}" placeholder="Episode, Leg, Round"></label>
-        <label class="reality-tv-wide-field">Elimination / exit question<input id="realityTvEliminationTemplate_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.QuestionTemplate || format.eliminationTemplate)}"></label>
-        <label>Elimination / exit points<input id="realityTvEliminationPoints_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="0.5" value="${adminRealityTvValue_(season.Points === undefined || season.Points === "" ? 1 : season.Points)}"></label>
-      </div>
-      <div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">Apply Format Preset</button></div>
-      <div id="realityTvQuestionPackGrid_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-question-pack-grid">
-        ${adminRealityTvQuestionPackChoicesHtml_(format.id, enabled, bundle.questionTemplates || [], "rt-season-question-type", season.SeasonId, season.Points || 1, {})}
-      </div>
-      ${buildStatus}
-      <div class="admin-actions"><button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button></div>
-      <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
 
-      <details class="reality-tv-custom-question-builder">
-        <summary>Add Custom Question</summary>
+      <details class="reality-tv-config-section" open>
+        <summary>1. Show Format & Labels</summary>
+        <div class="admin-form-grid reality-tv-format-settings-grid">
+          <label>${adminRealityTvFieldTitle_("Show format", "Loads suggested labels and question types for Survivor, cooking, performance, social deduction, Amazing Race, team, general, or custom competitions.")}<select id="realityTvFormat_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">${adminRealityTvFormatOptions_(format.id)}</select></label>
+          <label>${adminRealityTvFieldTitle_("Participant type", "Choose Individual / couple when answers are people or pairs. Choose Team when each selectable participant is a team, such as Amazing Race.")}<select id="realityTvParticipantType_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="individual" ${String(season.ParticipantType || format.participantType) === "individual" ? "selected" : ""}>Individual / couple</option><option value="team" ${String(season.ParticipantType || format.participantType) === "team" ? "selected" : ""}>Team</option></select></label>
+          <label>${adminRealityTvFieldTitle_("Participant label", "The word shown in admin instructions and user-facing descriptions, such as Contestant, Chef, Couple, Player, or Team.")}<input id="realityTvParticipantLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.ParticipantLabel || format.participantLabel)}"></label>
+          <label>${adminRealityTvFieldTitle_("Group label", "Used by group-based questions. Every participant must have a matching Team / Tribe value for those questions to be built.")}<input id="realityTvGroupLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.GroupLabel || format.groupLabel)}"></label>
+          <label>${adminRealityTvFieldTitle_("Period label", "The recurring scoring period name, such as Episode, Leg, Round, Week, or Heat.")}<input id="realityTvPeriodLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.PeriodLabel || format.periodLabel)}" placeholder="Episode, Leg, Round"></label>
+        </div>
+        <div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">Apply Format Preset</button></div>
+      </details>
+
+      <details class="reality-tv-config-section" open>
+        <summary>2. Main Elimination / Exit Question</summary>
+        <div class="admin-form-grid reality-tv-format-settings-grid">
+          <label class="reality-tv-wide-field">${adminRealityTvFieldTitle_("Question text", "This is the one result that can remove a participant and automatically create the next period. Use {episode}, {period}, {show}, and {season} placeholders.")}<input id="realityTvEliminationTemplate_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.QuestionTemplate || format.eliminationTemplate)}"></label>
+          <label>${adminRealityTvFieldTitle_("Points", "Points awarded for correctly predicting the elimination or exit result.")}<input id="realityTvEliminationPoints_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="0.5" value="${adminRealityTvValue_(season.Points === undefined || season.Points === "" ? 1 : season.Points)}"></label>
+          <label>${adminRealityTvFieldTitle_("Answer display", "Automatic uses image cards when roster or group images are available. This controls the main elimination / exit question.")}<select id="realityTvEliminationLayout_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="auto" ${String(season.EliminationLayoutType || "auto") === "auto" ? "selected" : ""}>Automatic</option><option value="image" ${String(season.EliminationLayoutType || "") === "image" ? "selected" : ""}>Image cards</option><option value="compact" ${String(season.EliminationLayoutType || "") === "compact" ? "selected" : ""}>Compact image cards</option><option value="list" ${String(season.EliminationLayoutType || "") === "list" ? "selected" : ""}>List</option><option value="text" ${String(season.EliminationLayoutType || "") === "text" ? "selected" : ""}>Text cards</option></select></label>
+          <label>${adminRealityTvFieldTitle_("Image source", "Roster reuses participant/team photos. Group uses saved tribe/team images. No images forces text-only answers.")}<select id="realityTvEliminationImageSource_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="roster" ${String(season.EliminationImageSource || "roster") === "roster" ? "selected" : ""}>Participant / team roster</option><option value="group" ${String(season.EliminationImageSource || "") === "group" ? "selected" : ""}>Group / tribe image</option><option value="none" ${String(season.EliminationImageSource || "") === "none" ? "selected" : ""}>No images</option></select></label>
+        </div>
+      </details>
+
+      <details class="reality-tv-config-section" open>
+        <summary>3. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
+        <div class="admin-sub">Checked questions are verified one by one. Group-based questions require at least two valid Team / Tribe values. The build summary below explains every skipped item.</div>
+        <div id="realityTvQuestionPackGrid_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-question-pack-grid">
+          ${adminRealityTvQuestionPackChoicesHtml_(format.id, enabled, bundle.questionTemplates || [], "rt-season-question-type", season.SeasonId, season.Points || 1, {}, statusById)}
+        </div>
+        ${buildStatus}
+        ${completedSummary}
+        <div class="admin-actions"><button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button></div>
+        <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </details>
+
+      <details class="reality-tv-custom-question-builder reality-tv-config-section">
+        <summary>4. Add Custom Question</summary>
         <div class="admin-sub">Custom questions are saved for this season, generated for future periods, mapped to the Hub, and always require administrator approval. They do not remove participants or advance the season.</div>
         <div class="admin-form-grid reality-tv-custom-question-grid">
-          <label class="reality-tv-wide-field">Question text<input id="realityTvCustomQuestion_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Who will win the special challenge in {period} {episode}?"></label>
-          <label>Answer source<select id="realityTvCustomSource_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvCustomSourceChanged_('${adminRealityTvEscape_(season.SeasonId)}')"><option value="active-participants">Active participants / teams</option><option value="active-groups">Active groups</option><option value="groups-or-participants">Groups before merge, participants after</option><option value="yes-no">Yes / No</option><option value="manual-options">Manual answers</option></select></label>
-          <label>Points<input id="realityTvCustomPoints_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" value="${adminRealityTvValue_(season.Points || 1)}"></label>
-          <label id="realityTvCustomOptionsWrap_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-wide-field" style="display:none">Manual answers<textarea id="realityTvCustomOptions_${adminRealityTvEscape_(season.SeasonId)}" class="input" rows="3" placeholder="One answer per line"></textarea></label>
-          <label><input id="realityTvCustomNoOutcome_${adminRealityTvEscape_(season.SeasonId)}" type="checkbox"> Add a no-result option</label>
-          <label>No-result label<input id="realityTvCustomNoOutcomeLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="No one"></label>
+          <label class="reality-tv-wide-field">${adminRealityTvFieldTitle_("Question text", "Write the question exactly as users should see it. You may use {episode}, {period}, {show}, and {season} placeholders.")}<input id="realityTvCustomQuestion_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Who will win the special challenge in {period} {episode}?"></label>
+          <label>${adminRealityTvFieldTitle_("Answer source", "Choose where answer choices come from. Group sources require Team / Tribe values in the roster. Manual answers are entered one per line.")}<select id="realityTvCustomSource_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvCustomSourceChanged_('${adminRealityTvEscape_(season.SeasonId)}')"><option value="active-participants">Active participants / teams</option><option value="active-groups">Active groups</option><option value="groups-or-participants">Groups before merge, participants after</option><option value="yes-no">Yes / No</option><option value="manual-options">Manual answers</option></select></label>
+          <label>${adminRealityTvFieldTitle_("Points", "Points awarded for a correct answer to this custom question.")}<input id="realityTvCustomPoints_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="0.5" value="${adminRealityTvValue_(season.Points || 1)}"></label>
+          <label>${adminRealityTvFieldTitle_("Answer display", "Automatic uses image cards when the selected source has images.")}<select id="realityTvCustomLayout_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="auto">Automatic</option><option value="image">Image cards</option><option value="compact">Compact image cards</option><option value="list">List</option><option value="text">Text cards</option></select></label>
+          <label>${adminRealityTvFieldTitle_("Image source", "Roster reuses participant/team photos. Group uses saved group images. No images forces text.")}<select id="realityTvCustomImageSource_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="auto">Automatic</option><option value="roster">Participant / team roster</option><option value="group">Group / tribe image</option><option value="custom">Custom answer images</option><option value="none">No images</option></select></label>
+          <label id="realityTvCustomOptionsWrap_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-wide-field" style="display:none">${adminRealityTvFieldTitle_("Manual answers", "Enter one possible answer per line. At least two answers are required.")}<textarea id="realityTvCustomOptions_${adminRealityTvEscape_(season.SeasonId)}" class="input" rows="3" placeholder="One answer per line"></textarea></label>
+          <label class="reality-tv-inline-option"><input id="realityTvCustomNoOutcome_${adminRealityTvEscape_(season.SeasonId)}" type="checkbox"><span>Add a no-result option</span>${adminRealityTvHelp_("No-result option", "Adds an answer such as No one, No challenge, or No result so the question can still be settled when the event does not happen.")}</label>
+          <label>${adminRealityTvFieldTitle_("No-result label", "Text shown for the optional no-result answer.")}<input id="realityTvCustomNoOutcomeLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="No one"></label>
         </div>
         <div class="admin-actions"><button class="admin-small-button" onclick="adminRealityTvAddCustomQuestion('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Save & Build Custom Question</button></div>
         <div id="realityTvCustomMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
@@ -350,6 +443,7 @@ function adminRealityTvApplyExistingFormatPreset_(seasonId, preserveSelection) {
   const bundle = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || []).find(function(item) { return item.season && String(item.season.SeasonId) === String(seasonId); });
   const current = {};
   const preservedPoints = adminRealityTvCollectQuestionPoints_(seasonId);
+  const preservedDisplay = adminRealityTvCollectQuestionDisplay_(seasonId);
   if (preserveSelection) document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked').forEach(function(box) { current[box.value] = true; });
   if (!preserveSelection) {
     format.defaults.forEach(function(id) { current[id] = true; });
@@ -360,7 +454,17 @@ function adminRealityTvApplyExistingFormatPreset_(seasonId, preserveSelection) {
   const container = document.getElementById("realityTvQuestionPackGrid_" + seasonId);
   const defaultPointsInput = document.getElementById("realityTvEliminationPoints_" + seasonId);
   const defaultPoints = defaultPointsInput ? Number(defaultPointsInput.value || 1) : 1;
-  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, bundle ? bundle.questionTemplates : [], "rt-season-question-type", seasonId, defaultPoints, preservedPoints);
+  const statusById = {};
+  const currentEpisode = bundle ? adminRealityTvCurrentEpisode_(bundle) : null;
+  const summary = bundle && bundle.questionBuildSummary ? bundle.questionBuildSummary : null;
+  (summary && summary.results ? summary.results : []).forEach(function(item) { statusById[String(item.templateId || "")] = item; });
+  ((bundle && bundle.episodeQuestions) || []).filter(function(item) {
+    return currentEpisode && String(item.EpisodeId || "") === String(currentEpisode.EpisodeId || "");
+  }).forEach(function(item) {
+    const id = String(item.TemplateId || item.QuestionType || "");
+    if (id && !statusById[id]) statusById[id] = { status: "ALREADY_EXISTS", message: "Present in the current period." };
+  });
+  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, bundle ? bundle.questionTemplates : [], "rt-season-question-type", seasonId, defaultPoints, preservedPoints, statusById);
   document.getElementById("realityTvParticipantType_" + seasonId).value = format.participantType;
   document.getElementById("realityTvParticipantLabel_" + seasonId).value = format.participantLabel;
   document.getElementById("realityTvGroupLabel_" + seasonId).value = format.groupLabel;
@@ -696,6 +800,62 @@ function adminRealityTvEpisodesTable_(episodes) {
   `;
 }
 
+
+function adminRealityTvGroupsPanel_(bundle) {
+  const season = bundle.season || {};
+  const groups = (bundle.groups || []).slice();
+  if (!groups.length) return `
+    <details class="reality-tv-subsection reality-tv-group-manager">
+      <summary>Groups / Tribes / Teams ${adminRealityTvHelp_("Groups and team visuals", "Groups are created automatically from the Team / Tribe column in the roster. Add those values first, then reopen this section to set images and colors.")}</summary>
+      <div class="admin-message warning">No groups were found. Add Team / Tribe values to at least one participant.</div>
+    </details>`;
+  return `
+    <details class="reality-tv-subsection reality-tv-group-manager">
+      <summary>${adminRealityTvEscape_(season.GroupLabel || "Group")} Images & Colors ${adminRealityTvHelp_("Group images and colors", "These images and colors are reused for group-based episode questions and colored participant borders on the Picks page.")}</summary>
+      <div class="admin-sub">Colors accept six-digit hex values. Group images are reused automatically whenever a question uses group answers.</div>
+      <div class="reality-tv-group-editor-list">
+        ${groups.map(function(group, index) {
+          const id = adminRealityTvEscape_(group.GroupId || group.id || ("group-" + index));
+          const name = adminRealityTvEscape_(group.GroupName || group.name || "");
+          const image = adminRealityTvEscape_(group.ImageUrl || group.imageUrl || "");
+          const color = adminRealityTvEscape_(group.Color || group.color || "#64748B");
+          const active = group.Active === true || String(group.Active || group.active || "").toLowerCase() === "true";
+          return `<div class="reality-tv-group-editor-row" data-reality-group-row data-group-id="${id}">
+            <div class="reality-tv-group-preview" style="--reality-team-color:${color}">${image ? `<img src="${image}" alt="">` : `<span>${name.slice(0, 2).toUpperCase()}</span>`}</div>
+            <input class="input rt-group-name" value="${name}" placeholder="Group name">
+            <input class="input rt-group-image" value="${image}" placeholder="Group image URL">
+            <label class="reality-tv-color-field"><input class="rt-group-color-picker" type="color" value="${/^#[0-9A-Fa-f]{6}$/.test(color) ? color : "#64748B"}" oninput="this.nextElementSibling.value=this.value"><input class="input rt-group-color" value="${color}" placeholder="#64748B"></label>
+            <label class="reality-tv-inline-option"><input class="rt-group-active" type="checkbox" ${active ? "checked" : ""}><span>Active</span></label>
+          </div>`;
+        }).join("")}
+      </div>
+      <div class="admin-actions"><button class="admin-small-button" onclick="adminRealityTvSaveGroups('${adminRealityTvEscape_(season.SeasonId)}')">Save Group Images & Colors</button></div>
+      <div id="realityTvGroupsMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+    </details>`;
+}
+
+async function adminRealityTvSaveGroups(seasonId) {
+  const groups = Array.from(document.querySelectorAll('[data-reality-group-row]')).map(function(row, index) {
+    return {
+      groupId: row.dataset.groupId || "",
+      groupName: row.querySelector('.rt-group-name').value.trim(),
+      imageUrl: row.querySelector('.rt-group-image').value.trim(),
+      color: row.querySelector('.rt-group-color').value.trim(),
+      active: row.querySelector('.rt-group-active').checked,
+      displayOrder: index + 1
+    };
+  }).filter(function(group) { return group.groupName; });
+  adminRealityTvSetMessage_("realityTvGroupsMessage_" + seasonId, "Saving group display settings…", "info");
+  try {
+    const result = await apiAdminSaveRealityTvGroups({ seasonId: seasonId, groupsJSON: JSON.stringify(groups) });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save groups."));
+    adminRealityTvSetMessage_("realityTvGroupsMessage_" + seasonId, result.message || "Group settings saved.", "success");
+    navigate("admin-reality-tv");
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvGroupsMessage_" + seasonId, err.message || String(err), "error");
+  }
+}
+
 function adminRealityTvSeasonCard_(bundle) {
   const season = bundle.season;
   const current = adminRealityTvCurrentEpisode_(bundle);
@@ -721,6 +881,7 @@ function adminRealityTvSeasonCard_(bundle) {
         ${adminRealityTvResultPanel_(bundle)}
         ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
         ${adminRealityTvQuestionPackPanel_(bundle)}
+        ${adminRealityTvGroupsPanel_(bundle)}
         ${adminRealityTvSeasonAnchorPanel_(bundle)}
         ${adminRealityTvContestantRows_(bundle.contestants)}
 
@@ -1046,68 +1207,84 @@ async function renderAdminRealityTvPage() {
             </div>
           </summary>
           <div class="admin-collapsible-body">
-            <div class="admin-form-grid reality-tv-season-form-grid">
-              <label>Show name *<input id="realityTvShowName" class="input" placeholder="Survivor, Top Chef, The Amazing Race"></label>
-              <label>Show format<select id="realityTvShowFormat" class="input" onchange="adminRealityTvApplyCreateFormat_(false)">${adminRealityTvFormatOptions_("survivor-tribal")}</select></label>
-              <input id="realityTvParticipantType" type="hidden" value="individual">
-              <label>Participant label<input id="realityTvParticipantLabel" class="input" value="Contestant"></label>
-              <label>Group label<input id="realityTvGroupLabel" class="input" value="Tribe"></label>
-              <label>Period label<input id="realityTvPeriodLabel" class="input" value="Episode" placeholder="Episode, Leg, Round"></label>
-              <label>Season name *<input id="realityTvSeasonName" class="input" placeholder="Season 50"></label>
-              <label>Season number<input id="realityTvSeasonNumber" class="input" value="1"></label>
-              <label>Year<input id="realityTvYear" class="input" type="number" value="${new Date().getFullYear()}"></label>
-              <label>Game ID<input id="realityTvGameId" class="input" placeholder="Auto-generated if blank"></label>
-              <label>First episode date &amp; time *<input id="realityTvFirstEpisode" class="input" type="datetime-local"></label>
-              <label>Repeat every days<input id="realityTvIntervalDays" class="input" type="number" min="1" value="7"></label>
-              <label>Lock minutes before airtime<input id="realityTvLockOffset" class="input" type="number" min="0" value="5"></label>
-              <label>Elimination / exit points<input id="realityTvPoints" class="input" type="number" min="0" step="0.5" value="1"></label>
-              <label class="reality-tv-wide-field">Elimination / exit question<input id="realityTvQuestionTemplate" class="input" value="Who will be eliminated in Episode {episode}?"></label>
-            </div>
+            <details class="reality-tv-create-step" open>
+              <summary>1. Season Basics</summary>
+              <div class="admin-form-grid reality-tv-season-form-grid">
+                <label>${adminRealityTvFieldTitle_("Show name", "Public name of the program, such as Survivor, Top Chef, Dancing with the Stars, The Traitors, or The Amazing Race.")}<input id="realityTvShowName" class="input" placeholder="Survivor, Top Chef, The Amazing Race"></label>
+                <label>${adminRealityTvFieldTitle_("Show format", "Loads the best starting labels and question templates for this type of competition. Everything remains editable.")}<select id="realityTvShowFormat" class="input" onchange="adminRealityTvApplyCreateFormat_(false)">${adminRealityTvFormatOptions_("survivor-tribal")}</select></label>
+                <input id="realityTvParticipantType" type="hidden" value="individual">
+                <label>${adminRealityTvFieldTitle_("Participant label", "Generic name for selectable entries, such as Contestant, Chef, Couple, Player, or Team.")}<input id="realityTvParticipantLabel" class="input" value="Contestant"></label>
+                <label>${adminRealityTvFieldTitle_("Group label", "Name for teams or groups, such as Tribe, Team, House, or Division. Group-based questions require this value on roster rows.")}<input id="realityTvGroupLabel" class="input" value="Tribe"></label>
+                <label>${adminRealityTvFieldTitle_("Period label", "Recurring period name shown in questions, such as Episode, Leg, Round, or Week.")}<input id="realityTvPeriodLabel" class="input" value="Episode" placeholder="Episode, Leg, Round"></label>
+                <label>${adminRealityTvFieldTitle_("Season name", "Display name for this season, such as Season 50, All-Stars, or 2026 Celebrity Edition.")}<input id="realityTvSeasonName" class="input" placeholder="Season 50"></label>
+                <label>${adminRealityTvFieldTitle_("Season number", "Optional numeric season identifier used for organization and IDs.")}<input id="realityTvSeasonNumber" class="input" value="1"></label>
+                <label>${adminRealityTvFieldTitle_("Year", "Year associated with the season. Past years are allowed for testing and historical games.")}<input id="realityTvYear" class="input" type="number" value="${new Date().getFullYear()}"></label>
+                <label>${adminRealityTvFieldTitle_("Game ID", "Permanent internal ID. Leave blank to generate it automatically from the show and season names.")}<input id="realityTvGameId" class="input" placeholder="Auto-generated if blank"></label>
+                <label>${adminRealityTvFieldTitle_("First period date & time", "Airtime for Episode, Leg, or Round 1. The question lock time is calculated from the lock offset.")}<input id="realityTvFirstEpisode" class="input" type="datetime-local"></label>
+                <label>${adminRealityTvFieldTitle_("Repeat every days", "Number of days between automatically generated periods. Use 7 for weekly shows or 1 for rapid testing.")}<input id="realityTvIntervalDays" class="input" type="number" min="1" value="7"></label>
+                <label>${adminRealityTvFieldTitle_("Lock minutes before airtime", "How many minutes before airtime all questions and the Season Survivor Pick stop accepting changes.")}<input id="realityTvLockOffset" class="input" type="number" min="0" value="5"></label>
+              </div>
+            </details>
 
-            <div class="reality-tv-create-question-pack">
-              <h3>Show Format Question Pack</h3>
-              <div class="admin-sub">The main elimination / exit question is always created. Set points separately for every selected question; all results remain administrator reviewed.</div>
-              <div id="realityTvCreateQuestionPackGrid" class="reality-tv-question-pack-grid"></div>
-            </div>
+            <details class="reality-tv-create-step" open>
+              <summary>2. Main Exit & Extra Questions</summary>
+              <div class="admin-form-grid reality-tv-season-form-grid">
+                <label>${adminRealityTvFieldTitle_("Elimination / exit points", "Points awarded for correctly predicting the participant or team that leaves the competition.")}<input id="realityTvPoints" class="input" type="number" min="0" step="0.5" value="1"></label>
+                <label class="reality-tv-wide-field">${adminRealityTvFieldTitle_("Elimination / exit question", "The only question that changes the active roster and can create the next period. Use {episode}, {period}, {show}, and {season} placeholders.")}<input id="realityTvQuestionTemplate" class="input" value="Who will be eliminated in Episode {episode}?"></label>
+                <label>${adminRealityTvFieldTitle_("Answer display", "Automatic uses image cards when roster or group images exist.")}<select id="realityTvEliminationLayout" class="input"><option value="auto">Automatic</option><option value="image">Image cards</option><option value="compact">Compact image cards</option><option value="list">List</option><option value="text">Text cards</option></select></label>
+                <label>${adminRealityTvFieldTitle_("Image source", "Use participant/team roster photos, saved group images, or no images.")}<select id="realityTvEliminationImageSource" class="input"><option value="roster">Participant / team roster</option><option value="group">Group / tribe image</option><option value="none">No images</option></select></label>
+              </div>
+              <div class="reality-tv-create-question-pack">
+                <h3>Show Format Question Pack</h3>
+                <div class="admin-sub">The main elimination / exit question is always created. Check the extra questions you want and set points separately for each one.</div>
+                <div id="realityTvCreateQuestionPackGrid" class="reality-tv-question-pack-grid"></div>
+              </div>
+            </details>
 
-            <details class="reality-tv-create-anchor-panel">
-              <summary>Optional Season Survivor Pick</summary>
-              <div class="admin-sub">Users keep one contestant while that contestant remains active. The multiplier applies only to capped weekly fixed points.</div>
+            <details class="reality-tv-create-step reality-tv-create-anchor-panel">
+              <summary>3. Optional Season Survivor Pick</summary>
+              <div class="admin-sub">Users keep one contestant or team while it remains active. The multiplier applies only to capped weekly fixed points.</div>
               ${adminRealityTvSeasonAnchorFields_("create", null)}
             </details>
 
-            <div class="reality-tv-checkbox-row">
-              <label><input id="realityTvPublishGame" type="checkbox"> Make game active immediately</label>
-              <label><input id="realityTvAutoNext" type="checkbox" checked> Automatically build the next episode after approval</label>
-            </div>
-
-            <div class="reality-tv-roster-builder">
-              <div class="reality-tv-roster-builder-header">
-                <div>
-                  <h3>Participant / Team Roster</h3>
-                  <div class="admin-sub">Only the participant, couple, or team name is required. Amazing Race teams can include both member names and relationship details.</div>
+            <details class="reality-tv-create-step" open>
+              <summary>4. Participant / Team Roster</summary>
+              <div class="reality-tv-roster-builder">
+                <div class="reality-tv-roster-builder-header">
+                  <div>
+                    <h3>Participant / Team Roster</h3>
+                    <div class="admin-sub">Only the participant, couple, or team name is required. Team / Tribe values are required only for group-based questions.</div>
+                  </div>
+                  <button type="button" class="admin-small-button" onclick="adminRealityTvAddRosterRow()">Add Row</button>
                 </div>
-                <button type="button" class="admin-small-button" onclick="adminRealityTvAddRosterRow()">Add Row</button>
-              </div>
 
-              <details class="reality-tv-bulk-import" open>
-                <summary>Mass Enter Participants / Teams</summary>
-                <div class="admin-sub">Paste one name per line or copy rows from Excel/Google Sheets. Team Name, Member 1, Member 2, Relationship, images, and profile fields are recognized.</div>
-                <textarea id="realityTvBulkContestants_create" class="input reality-tv-bulk-textarea" rows="8" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
-                <div class="admin-actions reality-tv-bulk-actions">
-                  <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('create')">Load Example</button>
-                  <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('create')">Preview</button>
-                  <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('replace')">Replace Current Rows</button>
-                  <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('append')">Add to Current Rows</button>
+                <details class="reality-tv-bulk-import" open>
+                  <summary>Mass Enter Participants / Teams</summary>
+                  <div class="admin-sub">Paste one name per line or copy rows from Excel/Google Sheets. Team Name, Member 1, Member 2, Relationship, images, and profile fields are recognized.</div>
+                  <textarea id="realityTvBulkContestants_create" class="input reality-tv-bulk-textarea" rows="8" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
+                  <div class="admin-actions reality-tv-bulk-actions">
+                    <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('create')">Load Example</button>
+                    <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('create')">Preview</button>
+                    <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('replace')">Replace Current Rows</button>
+                    <button type="button" class="admin-small-button" onclick="adminRealityTvApplyBulkToRoster_('append')">Add to Current Rows</button>
+                  </div>
+                  <div id="realityTvBulkPreview_create" class="reality-tv-bulk-preview"></div>
+                </details>
+
+                <div class="reality-tv-roster-column-labels">
+                  <span>Name</span><span>Image URL</span><span>Team / Tribe</span><span>Age</span><span></span>
                 </div>
-                <div id="realityTvBulkPreview_create" class="reality-tv-bulk-preview"></div>
-              </details>
-
-              <div class="reality-tv-roster-column-labels">
-                <span>Name</span><span>Image URL</span><span>Team / Tribe</span><span>Age</span><span></span>
+                <div id="realityTvRosterRows">${adminRealityTvBlankRosterRows_(4)}</div>
               </div>
-              <div id="realityTvRosterRows">${adminRealityTvBlankRosterRows_(4)}</div>
-            </div>
+            </details>
+
+            <details class="reality-tv-create-step">
+              <summary>5. Publishing & Automation</summary>
+              <div class="reality-tv-checkbox-row">
+                <label class="reality-tv-inline-option"><input id="realityTvPublishGame" type="checkbox"><span>Make game active immediately</span>${adminRealityTvHelp_("Publish immediately", "Turns the new game on as soon as it is created. Leave unchecked when you want to review Game Setup first.")}</label>
+                <label class="reality-tv-inline-option"><input id="realityTvAutoNext" type="checkbox" checked><span>Automatically build the next period after approval</span>${adminRealityTvHelp_("Automatic next period", "After the approved exit result, creates the next Episode, Leg, or Round using only active participants.")}</label>
+              </div>
+            </details>
 
             <div class="admin-actions">
               <button class="button admin-button" onclick="adminRealityTvCreateSeason()">Create Season &amp; Episode 1</button>
@@ -1227,6 +1404,8 @@ async function adminRealityTvCreateSeason() {
     lockOffsetMinutes: document.getElementById("realityTvLockOffset").value,
     points: document.getElementById("realityTvPoints").value,
     questionTemplate: document.getElementById("realityTvQuestionTemplate").value.trim(),
+    eliminationLayoutType: document.getElementById("realityTvEliminationLayout").value,
+    eliminationImageSource: document.getElementById("realityTvEliminationImageSource").value,
     publishGame: document.getElementById("realityTvPublishGame").checked,
     autoCreateNextEpisode: document.getElementById("realityTvAutoNext").checked,
     seasonAnchorEnabled: document.getElementById("realityTvAnchorEnabled_create").checked,
@@ -1240,6 +1419,7 @@ async function adminRealityTvCreateSeason() {
     seasonAnchorManualSwitchAllowed: document.getElementById("realityTvAnchorSwitch_create").checked,
     enabledQuestionTypesJSON: JSON.stringify(Array.from(document.querySelectorAll(".rt-create-question-type:checked")).map(function(box) { return box.value; })),
     questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_("create")),
+    questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_("create")),
     contestantsJSON: JSON.stringify(roster)
   };
 
@@ -1455,7 +1635,11 @@ async function adminRealityTvBulkAddToSeason(seasonId) {
 async function adminRealityTvRunQuestionPackBuild_(state, seasonId) {
   let current = state || {};
   let transientFailures = 0;
-  for (let step = 0; step < 20 && !current.complete; step++) {
+  let busyResponses = 0;
+  let completedRequests = 0;
+  const totalCount = Math.max(1, Number(current.totalCount || 1));
+  const maxCompletedRequests = Math.max(40, (totalCount * 4) + 20);
+  while (!current.complete && completedRequests < maxCompletedRequests) {
     await adminRealityTvSleep_(current.busy ? 1400 : 250);
     const next = await apiAdminContinueRealityTvQuestionPackBuild(current.buildId);
     if (!next || next.success === false) {
@@ -1472,6 +1656,14 @@ async function adminRealityTvRunQuestionPackBuild_(state, seasonId) {
       }
       throw new Error(message);
     }
+    if (next.busy) {
+      busyResponses += 1;
+      current = next;
+      if (busyResponses > 20) throw new Error("The question builder is still busy. Refresh the manager and select Resume Build.");
+      continue;
+    }
+    busyResponses = 0;
+    completedRequests += 1;
     transientFailures = 0;
     current = next;
     adminRealityTvSetMessage_(
@@ -1482,6 +1674,18 @@ async function adminRealityTvRunQuestionPackBuild_(state, seasonId) {
     );
   }
   return current;
+}
+
+function adminRealityTvBuildCompletionMessage_(state) {
+  const results = state && Array.isArray(state.results) ? state.results : [];
+  if (!results.length) return (state && (state.message || state.lastMessage)) || "Episode question pack saved and built.";
+  const built = results.filter(function(item) { return String(item.status || "").toUpperCase() === "BUILT"; }).length;
+  const verified = results.filter(function(item) { return String(item.status || "").toUpperCase() === "ALREADY_EXISTS"; }).length;
+  const skipped = results.filter(function(item) { return String(item.status || "").toUpperCase() === "SKIPPED"; });
+  let message = "Question pack finished: " + built + " built, " + verified + " verified";
+  if (skipped.length) message += ", " + skipped.length + " skipped. Open Last build results to see why.";
+  else message += ".";
+  return message;
 }
 
 async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
@@ -1501,7 +1705,10 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
       periodLabel: document.getElementById("realityTvPeriodLabel_" + seasonId).value.trim(),
       questionTemplate: document.getElementById("realityTvEliminationTemplate_" + seasonId).value.trim(),
       eliminationPoints: document.getElementById("realityTvEliminationPoints_" + seasonId).value,
+      eliminationLayoutType: document.getElementById("realityTvEliminationLayout_" + seasonId).value,
+      eliminationImageSource: document.getElementById("realityTvEliminationImageSource_" + seasonId).value,
       questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_(seasonId)),
+      questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_(seasonId)),
       enabledQuestionTypesJSON: JSON.stringify(selected),
       buildCurrentEpisode: true
     });
@@ -1510,7 +1717,7 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
     if (!state.complete) {
       alert("The question pack build paused before final confirmation. Refresh the manager and select Resume Build. Completed stages will not repeat.");
     } else {
-      alert(state.message || state.lastMessage || "Episode question pack saved and built.");
+      alert(adminRealityTvBuildCompletionMessage_(state));
     }
     navigate("admin-reality-tv");
   } catch (err) {
@@ -1540,6 +1747,8 @@ async function adminRealityTvAddCustomQuestion(seasonId, episodeId) {
       questionTemplate: question,
       answerSource: source,
       points: document.getElementById("realityTvCustomPoints_" + seasonId).value,
+      layoutType: document.getElementById("realityTvCustomLayout_" + seasonId).value,
+      imageSource: document.getElementById("realityTvCustomImageSource_" + seasonId).value,
       manualOptionsJSON: JSON.stringify(manualOptions),
       includeNoOutcome: document.getElementById("realityTvCustomNoOutcome_" + seasonId).checked,
       noOutcomeLabel: document.getElementById("realityTvCustomNoOutcomeLabel_" + seasonId).value.trim()

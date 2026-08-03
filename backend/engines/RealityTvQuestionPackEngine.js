@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV EPISODE QUESTION PACKS
-   Phase 2B v1.0.29
+   Phase 2B v1.0.31
 
    Adds independent, administrator-reviewed episode questions without
    changing the stable elimination/next-episode workflow.
@@ -15,7 +15,7 @@ const REALITY_TV_QUESTION_TEMPLATE_HEADERS = [
   "SeasonId", "GameId", "TemplateId", "QuestionType", "Label", "HelpText",
   "QuestionTemplate", "AnswerSource", "ResultKey", "Points", "Enabled",
   "DisplayOrder", "IncludeNoOutcome", "NoOutcomeLabel", "ShowFormatsJSON",
-  "TemplateSource", "CustomAnswerOptionsJSON", "CreatedAt", "UpdatedAt"
+  "TemplateSource", "CustomAnswerOptionsJSON", "LayoutType", "ImageSource", "CreatedAt", "UpdatedAt"
 ];
 
 const REALITY_TV_EPISODE_QUESTION_HEADERS = [
@@ -23,7 +23,7 @@ const REALITY_TV_EPISODE_QUESTION_HEADERS = [
   "TemplateId", "QuestionType", "QuestionText", "CategoryId", "AnswerSource",
   "AnswerOptionsJSON", "ResultKey", "ExternalEventId", "ExternalMarketId",
   "Status", "WinningOutcomeIds", "ResultQueueId", "TemplateSource",
-  "Points", "CreatedAt", "UpdatedAt"
+  "Points", "LayoutType", "ImageSource", "CreatedAt", "UpdatedAt"
 ];
 
 const REALITY_TV_QUESTION_QUEUE_HEADERS = [
@@ -41,7 +41,7 @@ const REALITY_TV_QUESTION_BUILD_JOB_HEADERS = [
   "EnabledQuestionTypesJSON", "CurrentIndex", "TotalCount",
   "Stage", "Status", "ProcessedCount", "SkippedCount",
   "LastTemplateId", "LastEpisodeQuestionId", "LastMessage",
-  "ErrorMessage", "AttemptCount", "StartedAt", "CompletedAt", "UpdatedAt"
+  "BuildResultsJSON", "ErrorMessage", "AttemptCount", "StartedAt", "CompletedAt", "UpdatedAt"
 ];
 
 function realityTvShowFormatDefinitions_() {
@@ -213,6 +213,7 @@ function realityTvQuestionBuildState_(job) {
   const stage = realityTvString_(job.Stage || "BUILD_LOCAL").toUpperCase();
   const total = Math.max(0, realityTvNumber_(job.TotalCount, 0));
   const index = Math.max(0, realityTvNumber_(job.CurrentIndex, 0));
+  const results = realityTvQuestionBuildResults_(job);
   return {
     success: true,
     buildId: job.BuildId,
@@ -226,10 +227,46 @@ function realityTvQuestionBuildState_(job) {
     skippedCount: Math.max(0, realityTvNumber_(job.SkippedCount, 0)),
     lastTemplateId: realityTvString_(job.LastTemplateId),
     lastMessage: realityTvString_(job.LastMessage),
+    results: results,
+    builtCount: results.filter(function(item) { return item.status === "BUILT"; }).length,
+    existingCount: results.filter(function(item) { return item.status === "ALREADY_EXISTS"; }).length,
+    skippedDetails: results.filter(function(item) { return item.status === "SKIPPED"; }),
     error: realityTvString_(job.ErrorMessage),
     complete: status === "COMPLETE" || stage === "COMPLETE",
     progressLabel: Math.min(index, total) + " of " + total + " question types processed"
   };
+}
+
+function realityTvQuestionBuildResults_(job) {
+  const parsed = realityTvParseJson_(job && job.BuildResultsJSON ? job.BuildResultsJSON : "[]", []);
+  return (Array.isArray(parsed) ? parsed : []).map(function(item) {
+    return {
+      templateId: realityTvKey_(item && item.templateId),
+      label: realityTvString_(item && item.label),
+      status: realityTvString_(item && item.status || "PENDING").toUpperCase(),
+      message: realityTvString_(item && item.message),
+      episodeQuestionId: realityTvString_(item && item.episodeQuestionId),
+      hubStatus: realityTvString_(item && item.hubStatus),
+      updatedAt: realityTvString_(item && item.updatedAt)
+    };
+  }).filter(function(item) { return item.templateId; });
+}
+
+function realityTvSetQuestionBuildResult_(job, template, status, message, episodeQuestionId, hubStatus) {
+  const templateId = realityTvKey_(template && (template.TemplateId || template.templateId || template));
+  const results = realityTvQuestionBuildResults_(job).filter(function(item) {
+    return item.templateId !== templateId;
+  });
+  results.push({
+    templateId: templateId,
+    label: realityTvString_(template && (template.Label || template.label)) || templateId,
+    status: realityTvString_(status || "PENDING").toUpperCase(),
+    message: realityTvString_(message),
+    episodeQuestionId: realityTvString_(episodeQuestionId),
+    hubStatus: realityTvString_(hubStatus),
+    updatedAt: new Date().toISOString()
+  });
+  return JSON.stringify(results);
 }
 
 function realityTvLatestQuestionBuildForSeason_(seasonId, episodeId) {
@@ -242,6 +279,14 @@ function realityTvLatestQuestionBuildForSeason_(seasonId, episodeId) {
 
 function realityTvLatestQuestionBuildStateForSeason_(seasonId, episodeId) {
   return realityTvQuestionBuildState_(realityTvLatestQuestionBuildForSeason_(seasonId, episodeId));
+}
+
+function realityTvLatestCompletedQuestionBuildStateForSeason_(seasonId, episodeId) {
+  const row = realityTvQuestionBuildJobsForSeason_(seasonId).find(function(item) {
+    const episodeMatches = !episodeId || realityTvKey_(item.EpisodeId) === realityTvKey_(episodeId);
+    return episodeMatches && realityTvString_(item.Status).toUpperCase() === "COMPLETE";
+  }) || null;
+  return realityTvQuestionBuildState_(row);
 }
 
 function realityTvStartQuestionPackBuild_(season, episode, enabledTypes) {
@@ -272,6 +317,7 @@ function realityTvStartQuestionPackBuild_(season, episode, enabledTypes) {
     LastTemplateId: "",
     LastEpisodeQuestionId: "",
     LastMessage: normalized.length ? "Question pack build queued." : "Question pack saved; no extra questions are enabled.",
+    BuildResultsJSON: "[]",
     ErrorMessage: "",
     AttemptCount: 0,
     StartedAt: now,
@@ -315,7 +361,33 @@ function realityTvQuestionPointsMap_(value) {
   return result;
 }
 
-function realityTvSaveStandardQuestionPack_(season, enabledTypes, points, questionPoints) {
+
+function realityTvQuestionDisplayMap_(value) {
+  let parsed = value;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) parsed = realityTvParseJson_(value || "{}", {});
+  const result = {};
+  Object.keys(parsed || {}).forEach(function(key) {
+    const normalized = realityTvKey_(key);
+    const item = parsed[key] || {};
+    result[normalized] = {
+      layoutType: realityTvKey_(item.layoutType || item.LayoutType || "auto"),
+      imageSource: realityTvKey_(item.imageSource || item.ImageSource || "auto")
+    };
+  });
+  return result;
+}
+
+function realityTvNormalizeLayoutType_(value) {
+  const key = realityTvKey_(value || "auto");
+  return ["auto", "image", "compact", "text", "list"].indexOf(key) !== -1 ? key : "auto";
+}
+
+function realityTvNormalizeImageSource_(value) {
+  const key = realityTvKey_(value || "auto");
+  return ["auto", "roster", "group", "custom", "none"].indexOf(key) !== -1 ? key : "auto";
+}
+
+function realityTvSaveStandardQuestionPack_(season, enabledTypes, points, questionPoints, questionDisplay) {
   realityTvEnsureQuestionPackSystem_();
   const enabled = {};
   realityTvEnabledQuestionTypes_(enabledTypes, season.SeasonId).forEach(function(type) { enabled[type] = true; });
@@ -323,6 +395,7 @@ function realityTvSaveStandardQuestionPack_(season, enabledTypes, points, questi
   const existingById = {};
   existing.forEach(function(row) { existingById[realityTvKey_(row.TemplateId)] = row; });
   const pointsById = realityTvQuestionPointsMap_(questionPoints || {});
+  const displayById = realityTvQuestionDisplayMap_(questionDisplay || {});
   const defaultPoints = Math.max(0, realityTvNumber_(points, realityTvNumber_(season.Points, 1)));
   const now = new Date();
   const formatId = realityTvShowFormatDefinition_(season.ShowFormat || "survivor-tribal").id;
@@ -352,6 +425,8 @@ function realityTvSaveStandardQuestionPack_(season, enabledTypes, points, questi
       ShowFormatsJSON: JSON.stringify(definition.formats || []),
       TemplateSource: "preset",
       CustomAnswerOptionsJSON: "",
+      LayoutType: realityTvNormalizeLayoutType_((displayById[definition.templateId] || {}).layoutType || (prior && prior.LayoutType) || "auto"),
+      ImageSource: realityTvNormalizeImageSource_((displayById[definition.templateId] || {}).imageSource || (prior && prior.ImageSource) || "auto"),
       CreatedAt: prior && prior.CreatedAt ? prior.CreatedAt : now,
       UpdatedAt: now
     };
@@ -367,8 +442,10 @@ function realityTvSaveStandardQuestionPack_(season, enabledTypes, points, questi
       Enabled: !!enabled[templateId],
       UpdatedAt: now
     };
-    if (Object.prototype.hasOwnProperty.call(pointsById, templateId)) {
-      patch.Points = pointsById[templateId];
+    if (Object.prototype.hasOwnProperty.call(pointsById, templateId)) patch.Points = pointsById[templateId];
+    if (displayById[templateId]) {
+      patch.LayoutType = realityTvNormalizeLayoutType_(displayById[templateId].layoutType);
+      patch.ImageSource = realityTvNormalizeImageSource_(displayById[templateId].imageSource);
     }
     realityTvUpdateObjectRow_(templateSheet, row.__rowNumber, patch);
   });
@@ -406,17 +483,28 @@ function realityTvActiveTribes_(seasonId) {
   const season = realityTvGetSeason_(seasonId) || {};
   const survivorMode = realityTvKey_(season.ShowFormat || "survivor-tribal") === "survivor-tribal";
   const prefix = survivorMode ? "tribe" : "group";
+  const savedGroups = typeof realityTvSyncGroupsFromContestants_ === "function"
+    ? realityTvSyncGroupsFromContestants_(season)
+    : [];
+  const savedByName = {};
+  savedGroups.forEach(function(group) { savedByName[realityTvKey_(group.GroupName)] = group; });
   realityTvActiveContestants_(seasonId).forEach(function(contestant) {
     const label = realityTvString_(contestant.TeamOrTribe);
     if (!label) return;
     const key = realityTvKey_(label);
+    const group = savedByName[key] || {};
     if (!map[key]) {
       map[key] = {
-        id: prefix + "-" + realityTvSlug_(label),
+        id: group.GroupId || prefix + "-" + realityTvSlug_(label),
         label: label,
-        imageUrl: "",
+        imageUrl: realityTvString_(group.ImageUrl),
+        teamColor: typeof realityTvNormalizeColor_ === "function" ? realityTvNormalizeColor_(group.Color || contestant.TeamColor, "#64748B") : (group.Color || contestant.TeamColor || "#64748B"),
         subjectType: prefix,
-        externalSubjectId: prefix + "-" + realityTvSlug_(label)
+        externalSubjectId: group.GroupId || prefix + "-" + realityTvSlug_(label),
+        biography: "",
+        hometown: "",
+        occupation: "",
+        status: "ACTIVE"
       };
     }
   });
@@ -426,11 +514,30 @@ function realityTvActiveTribes_(seasonId) {
 function realityTvContestantAnswerOptions_(seasonId) {
   const season = realityTvGetSeason_(seasonId) || {};
   const subjectType = realityTvKey_(season.ParticipantType) === "team" ? "team" : "contestant";
+  const groups = typeof realityTvSyncGroupsFromContestants_ === "function" ? realityTvSyncGroupsFromContestants_(season) : [];
+  const groupByName = {};
+  groups.forEach(function(group) { groupByName[realityTvKey_(group.GroupName)] = group; });
   return realityTvActiveContestants_(seasonId).map(function(contestant) {
+    const group = groupByName[realityTvKey_(contestant.TeamOrTribe)] || {};
     return {
       id: contestant.ContestantId,
       label: contestant.Name,
       imageUrl: contestant.ImageUrl || "",
+      teamOrTribe: contestant.TeamOrTribe || "",
+      groupImageUrl: group.ImageUrl || "",
+      teamColor: typeof realityTvNormalizeColor_ === "function" ? realityTvNormalizeColor_(contestant.TeamColor || group.Color, "#64748B") : (contestant.TeamColor || group.Color || "#64748B"),
+      fullName: contestant.FullName || "",
+      age: contestant.Age || "",
+      hometown: contestant.Hometown || "",
+      occupation: contestant.Occupation || "",
+      biography: contestant.Biography || "",
+      member1: contestant.Member1 || "",
+      member2: contestant.Member2 || "",
+      relationship: contestant.Relationship || "",
+      member1ImageUrl: contestant.Member1ImageUrl || "",
+      member2ImageUrl: contestant.Member2ImageUrl || "",
+      status: contestant.Status || "ACTIVE",
+      eliminatedEpisode: contestant.EliminatedEpisode || "",
       subjectType: subjectType,
       externalSubjectId: contestant.ExternalSubjectId || contestant.ContestantId
     };
@@ -443,7 +550,6 @@ function realityTvAnswerOptionsForTemplate_(season, template) {
   let options = [];
   if (source === "active-groups" || source === "active-tribes") {
     options = groups;
-    if (options.length < 2) return { options: [], skipped: true, reason: "Fewer than two active groups remain." };
   } else if (source === "groups-or-participants" || source === "auto-competition") {
     options = groups.length >= 2 ? groups : realityTvContestantAnswerOptions_(season.SeasonId);
   } else if (source === "yes-no") {
@@ -454,9 +560,18 @@ function realityTvAnswerOptionsForTemplate_(season, template) {
   } else if (source === "manual-options") {
     const manual = realityTvParseJson_(template.CustomAnswerOptionsJSON, []);
     options = manual.map(function(value) {
-      const label = realityTvString_(value && typeof value === "object" ? (value.label || value.name || value.id) : value);
-      const id = realityTvSlug_(value && typeof value === "object" ? (value.id || label) : label);
-      return { id: id, label: label, imageUrl: "", subjectType: "outcome", externalSubjectId: id };
+      const objectValue = value && typeof value === "object" ? value : {};
+      const label = realityTvString_(objectValue.label || objectValue.name || objectValue.id || value);
+      const id = realityTvSlug_(objectValue.id || label);
+      return {
+        id: id,
+        label: label,
+        imageUrl: realityTvString_(objectValue.imageUrl || objectValue.image),
+        teamColor: realityTvString_(objectValue.teamColor || objectValue.color),
+        biography: realityTvString_(objectValue.biography || objectValue.bio),
+        subjectType: "outcome",
+        externalSubjectId: id
+      };
     }).filter(function(item) { return item.label; });
   } else {
     options = realityTvContestantAnswerOptions_(season.SeasonId);
@@ -467,12 +582,43 @@ function realityTvAnswerOptionsForTemplate_(season, template) {
     const noId = realityTvSlug_(realityTvString_(template.QuestionType || template.TemplateId) + "-" + noLabel);
     options = options.concat([{ id: noId, label: noLabel, imageUrl: "", subjectType: "outcome", externalSubjectId: noId }]);
   }
+  if (options.length < 2) {
+    let reason = "This question has fewer than two valid answers.";
+    if (source === "active-groups" || source === "active-tribes") {
+      reason = groups.length
+        ? "Only one active team / tribe is available. Add another active group or disable this question for the current period."
+        : "No active team / tribe values were found. Add Team / Tribe information to the participant roster or disable this group-based question.";
+    } else if (source === "active-participants") {
+      reason = "Fewer than two active participants remain for this question.";
+    }
+    return { options: options, skipped: true, reason: reason };
+  }
   return { options: options, skipped: false, reason: "" };
+}
+
+
+function realityTvApplyQuestionImageSource_(answerOptions, template) {
+  const imageSource = realityTvNormalizeImageSource_(template.ImageSource || "auto");
+  return (answerOptions || []).map(function(item) {
+    const copy = Object.assign({}, item);
+    if (imageSource === "none") copy.imageUrl = "";
+    if (imageSource === "group" && ["tribe", "group"].indexOf(realityTvKey_(copy.subjectType)) === -1) copy.imageUrl = copy.groupImageUrl || "";
+    if (imageSource === "roster" && ["contestant", "team"].indexOf(realityTvKey_(copy.subjectType)) === -1) copy.imageUrl = "";
+    return copy;
+  });
+}
+
+function realityTvResolvedQuestionLayout_(template, answerOptions) {
+  const requested = realityTvNormalizeLayoutType_(template.LayoutType || "auto");
+  if (requested !== "auto") return requested;
+  return (answerOptions || []).some(function(item) { return realityTvString_(item.imageUrl); }) ? "image" : "text";
 }
 
 function realityTvBuildSupplementalQuestionForTemplate_(season, episode, template, options) {
   options = options || {};
   const answerBundle = realityTvAnswerOptionsForTemplate_(season, template);
+  answerBundle.options = realityTvApplyQuestionImageSource_(answerBundle.options, template);
+  const resolvedLayout = realityTvResolvedQuestionLayout_(template, answerBundle.options);
   if (answerBundle.skipped || answerBundle.options.length < 2) {
     return {
       success: true,
@@ -508,7 +654,7 @@ function realityTvBuildSupplementalQuestionForTemplate_(season, episode, templat
         lockDateTime: episode.LockDateTime,
         displayOrder: (realityTvNumber_(episode.EpisodeNumber, 0) * 100) + realityTvNumber_(template.DisplayOrder, 50),
         groupId: "reality-tv-" + realityTvSlug_(season.PeriodLabel || "episode") + "-" + episode.EpisodeNumber,
-        layoutType: answerBundle.options.some(function(item) { return item.imageUrl; }) ? "image" : "text",
+        layoutType: resolvedLayout,
         shortName: realityTvString_(template.Label || template.QuestionType).replace(/-/g, " "),
         countsAsStatue: false,
         questionType: "reality-" + type,
@@ -565,7 +711,8 @@ function realityTvBuildSupplementalQuestionForTemplate_(season, episode, templat
       categoryId: categoryId,
       category: question,
       points: questionPoints,
-      lockDateTime: episode.LockDateTime
+      lockDateTime: episode.LockDateTime,
+      layoutType: resolvedLayout
     });
   }
 
@@ -618,6 +765,8 @@ function realityTvBuildSupplementalQuestionForTemplate_(season, episode, templat
     Points: prior && realityTvKey_(prior.Status || "open") === "final"
       ? Math.max(0, realityTvNumber_(prior.Points, questionPoints))
       : questionPoints,
+    LayoutType: resolvedLayout,
+    ImageSource: realityTvNormalizeImageSource_(template.ImageSource || "auto"),
     CreatedAt: prior && prior.CreatedAt ? prior.CreatedAt : now,
     UpdatedAt: now
   };
@@ -871,6 +1020,8 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
       Points: requestedEliminationPoints === undefined
         ? Math.max(0, realityTvNumber_(season.Points, 1))
         : Math.max(0, realityTvNumber_(requestedEliminationPoints, realityTvNumber_(season.Points, 1))),
+      EliminationLayoutType: realityTvNormalizeLayoutType_(payload.eliminationLayoutType || season.EliminationLayoutType || "auto"),
+      EliminationImageSource: realityTvNormalizeImageSource_(payload.eliminationImageSource || season.EliminationImageSource || "roster"),
       UpdatedAt: new Date()
     };
     realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_SEASONS_SHEET), season.__rowNumber, patch);
@@ -890,7 +1041,8 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
     season,
     enabledTypes,
     season.Points,
-    payload.questionPointsJSON || payload.questionPoints || {}
+    payload.questionPointsJSON || payload.questionPoints || {},
+    payload.questionDisplayJSON || payload.questionDisplay || {}
   );
 
   if (payload.buildCurrentEpisode === undefined || realityTvBool_(payload.buildCurrentEpisode)) {
@@ -949,6 +1101,8 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
     ShowFormatsJSON: JSON.stringify([realityTvShowFormatDefinition_(season.ShowFormat).id]),
     TemplateSource: "custom",
     CustomAnswerOptionsJSON: JSON.stringify(manualOptions),
+    LayoutType: realityTvNormalizeLayoutType_(payload.layoutType || "auto"),
+    ImageSource: realityTvNormalizeImageSource_(payload.imageSource || "auto"),
     CreatedAt: prior && prior.CreatedAt ? prior.CreatedAt : now,
     UpdatedAt: now
   };
@@ -1017,6 +1171,24 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
   const attempts = realityTvNumber_(job.AttemptCount, 0) + 1;
 
   if (index >= enabledTypes.length) {
+    const completedResults = realityTvQuestionBuildResults_(job);
+    const resultIds = {};
+    completedResults.forEach(function(item) { resultIds[item.templateId] = true; });
+    const missingIndex = enabledTypes.findIndex(function(item) { return !resultIds[realityTvKey_(item)]; });
+    if (missingIndex !== -1) {
+      realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+        CurrentIndex: missingIndex,
+        Stage: "BUILD_LOCAL",
+        Status: "BUILDING",
+        LastTemplateId: enabledTypes[missingIndex],
+        LastMessage: "Verification found an unchecked build result for " + enabledTypes[missingIndex] + ". Repairing it now.",
+        ErrorMessage: "",
+        UpdatedAt: new Date()
+      });
+      const repairState = realityTvQuestionBuildState_(realityTvGetQuestionBuildJob_(job.BuildId));
+      repairState.message = repairState.lastMessage;
+      return repairState;
+    }
     const completedAt = new Date();
     realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
       Stage: "COMPLETE",
@@ -1044,31 +1216,61 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
       });
 
       if (!template || !realityTvBool_(template.Enabled)) {
+        const resultJson = realityTvSetQuestionBuildResult_(
+          job,
+          template || { TemplateId: templateId, Label: templateId },
+          "SKIPPED",
+          templateId + " is disabled.",
+          "",
+          "NOT_SYNCED"
+        );
         realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
           CurrentIndex: index + 1,
           SkippedCount: realityTvNumber_(job.SkippedCount, 0) + 1,
           Stage: "BUILD_LOCAL",
           LastMessage: templateId + " is disabled and was skipped.",
+          BuildResultsJSON: resultJson,
           ErrorMessage: "",
           UpdatedAt: new Date()
         });
       } else {
         const result = realityTvBuildSupplementalQuestionForTemplate_(season, episode, template, { skipHubSync: true });
         if (result.skipped) {
+          const resultJson = realityTvSetQuestionBuildResult_(
+            job,
+            template,
+            "SKIPPED",
+            result.reason || "Not enough answer options.",
+            "",
+            "NOT_SYNCED"
+          );
           realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
             CurrentIndex: index + 1,
             SkippedCount: realityTvNumber_(job.SkippedCount, 0) + 1,
             Stage: "BUILD_LOCAL",
             LastMessage: templateId + " was skipped: " + (result.reason || "not enough answer options"),
+            BuildResultsJSON: resultJson,
             ErrorMessage: "",
             UpdatedAt: new Date()
           });
         } else {
+          const localStatus = result.createdCategory ? "BUILT" : "ALREADY_EXISTS";
+          const resultJson = realityTvSetQuestionBuildResult_(
+            job,
+            template,
+            localStatus,
+            result.createdCategory
+              ? "Question and answers were added to Game Setup."
+              : "Question already existed and was verified / repaired.",
+            result.question.EpisodeQuestionId,
+            "PENDING"
+          );
           realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
             Stage: "SYNC_HUB",
             ProcessedCount: realityTvNumber_(job.ProcessedCount, 0) + 1,
             LastEpisodeQuestionId: result.question.EpisodeQuestionId,
             LastMessage: result.question.QuestionText + " was built. Preparing Hub mappings.",
+            BuildResultsJSON: resultJson,
             ErrorMessage: "",
             UpdatedAt: new Date()
           });
@@ -1083,13 +1285,39 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
     if (stage === "SYNC_HUB") {
       const question = realityTvGetEpisodeQuestion_(job.LastEpisodeQuestionId || (episode.EpisodeId + "-" + realityTvSlug_(templateId)));
       let warning = "";
+      let hubStatus = "NOT_CONFIGURED";
       if (question) {
         const sync = realityTvSyncSupplementalQuestionToHub_(season, episode, question,
           realityTvParseJson_(question.AnswerOptionsJSON, []));
         warning = sync && sync.error ? sync.error : "";
+        hubStatus = warning ? "WARNING" : (sync && sync.skipped ? "SKIPPED" : "SYNCED");
       }
-      const nextIndex = index + 1;
-      const complete = nextIndex >= enabledTypes.length;
+      const existingResult = realityTvQuestionBuildResults_(job).find(function(item) {
+        return item.templateId === realityTvKey_(templateId);
+      });
+      const resultJson = realityTvSetQuestionBuildResult_(
+        job,
+        template || { TemplateId: templateId, Label: templateId },
+        existingResult ? existingResult.status : "ALREADY_EXISTS",
+        existingResult ? existingResult.message : "Question was verified.",
+        question ? question.EpisodeQuestionId : (existingResult ? existingResult.episodeQuestionId : ""),
+        hubStatus
+      );
+      let nextIndex = index + 1;
+      let complete = nextIndex >= enabledTypes.length;
+      if (complete) {
+        const verifiedIds = {};
+        realityTvParseJson_(resultJson, []).forEach(function(item) {
+          verifiedIds[realityTvKey_(item && item.templateId)] = true;
+        });
+        const missingIndex = enabledTypes.findIndex(function(item) {
+          return !verifiedIds[realityTvKey_(item)];
+        });
+        if (missingIndex !== -1) {
+          nextIndex = missingIndex;
+          complete = false;
+        }
+      }
       const now = new Date();
       realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
         CurrentIndex: nextIndex,
@@ -1097,7 +1325,10 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
         Status: complete ? "COMPLETE" : "BUILDING",
         LastMessage: complete
           ? "Episode question pack build completed." + (warning ? " Hub warning: " + warning : "")
-          : templateId + " mappings finished." + (warning ? " Hub warning: " + warning : ""),
+          : (nextIndex < index + 1
+            ? "Verification found a missing question result. Repairing " + enabledTypes[nextIndex] + "."
+            : templateId + " mappings finished." + (warning ? " Hub warning: " + warning : "")),
+        BuildResultsJSON: resultJson,
         ErrorMessage: "",
         CompletedAt: complete ? now : "",
         UpdatedAt: now
