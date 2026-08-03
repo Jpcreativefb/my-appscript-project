@@ -4023,3 +4023,47 @@ button.is-saving {
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Reality TV per-question points — v1.0.29 */
+.reality-tv-question-pack-choice {
+  justify-content: space-between;
+  align-items: stretch;
+  cursor: default;
+}
+.reality-tv-question-pack-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+}
+.reality-tv-question-points-control {
+  display: flex;
+  flex: 0 0 88px;
+  flex-direction: column;
+  gap: 4px;
+  color: rgba(226, 232, 240, 0.82);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.reality-tv-question-points-control .input {
+  width: 88px;
+  min-height: 38px;
+  padding: 7px 9px;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.9);
+}
+@media (max-width: 560px) {
+  .reality-tv-question-pack-choice {
+    flex-direction: column;
+  }
+  .reality-tv-question-points-control,
+  .reality-tv-question-points-control .input {
+    width: 100%;
+    flex-basis: auto;
+  }
+}

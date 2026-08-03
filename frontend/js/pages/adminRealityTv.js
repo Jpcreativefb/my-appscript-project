@@ -1,6 +1,6 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.28
+   Phase 2B v1.0.29
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
@@ -120,11 +120,30 @@ function adminRealityTvFormatOptions_(selected) {
   }).join("");
 }
 
-function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, inputClass, seasonId) {
+function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, inputClass, seasonId, defaultPoints, preservedPoints) {
   enabled = enabled || {};
+  preservedPoints = preservedPoints || {};
+  const scope = seasonId || "create";
+  const templateMap = {};
+  (templates || []).forEach(function(item) { templateMap[String(item.TemplateId || "")] = item; });
   return adminRealityTvQuestionPackTypes_(formatId, templates).map(function(item) {
-    return `<label class="reality-tv-question-pack-choice ${item.custom ? "custom" : ""}"><input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}><span><b>${adminRealityTvEscape_(item.label)}${item.custom ? " · Custom" : ""}</b><small>${adminRealityTvEscape_(item.help)}</small></span></label>`;
+    const stored = templateMap[item.id];
+    const pointValue = Object.prototype.hasOwnProperty.call(preservedPoints, item.id)
+      ? preservedPoints[item.id]
+      : Number(stored && stored.Points !== undefined && stored.Points !== "" ? stored.Points : (defaultPoints === undefined ? 1 : defaultPoints));
+    return `<div class="reality-tv-question-pack-choice ${item.custom ? "custom" : ""}"><label class="reality-tv-question-pack-toggle"><input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}><span><b>${adminRealityTvEscape_(item.label)}${item.custom ? " · Custom" : ""}</b><small>${adminRealityTvEscape_(item.help)}</small></span></label><label class="reality-tv-question-points-control">Points<input type="number" min="0" step="0.5" class="input rt-question-points" data-points-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(Number.isFinite(pointValue) ? pointValue : 1)}"></label></div>`;
   }).join("") || `<div class="admin-message warning">No preset extra questions are selected for this format. Add a custom question below or use only the elimination question.</div>`;
+}
+
+function adminRealityTvCollectQuestionPoints_(scope) {
+  const result = {};
+  document.querySelectorAll('.rt-question-points[data-points-scope="' + scope + '"]').forEach(function(input) {
+    const id = String(input.dataset.templateId || "");
+    if (!id) return;
+    const value = Number(input.value);
+    result[id] = Number.isFinite(value) ? Math.max(0, value) : 0;
+  });
+  return result;
 }
 
 function adminRealityTvApplyCreateFormat_(preserveSelection) {
@@ -132,10 +151,13 @@ function adminRealityTvApplyCreateFormat_(preserveSelection) {
   if (!select) return;
   const format = adminRealityTvShowFormat_(select.value);
   const current = {};
+  const preservedPoints = preserveSelection ? adminRealityTvCollectQuestionPoints_("create") : {};
   if (preserveSelection) document.querySelectorAll(".rt-create-question-type:checked").forEach(function(box) { current[box.value] = true; });
   if (!preserveSelection) format.defaults.forEach(function(id) { current[id] = true; });
   const container = document.getElementById("realityTvCreateQuestionPackGrid");
-  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, [], "rt-create-question-type", "");
+  const defaultPointsInput = document.getElementById("realityTvPoints");
+  const defaultPoints = defaultPointsInput ? Number(defaultPointsInput.value || 1) : 1;
+  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, [], "rt-create-question-type", "", defaultPoints, preservedPoints);
   const participant = document.getElementById("realityTvParticipantLabel");
   const group = document.getElementById("realityTvGroupLabel");
   const period = document.getElementById("realityTvPeriodLabel");
@@ -180,6 +202,7 @@ function adminRealityTvQuestionCard_(bundle, question) {
           <div>
             <span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span>
             <h4>${adminRealityTvEscape_(question.QuestionText)}</h4>
+            <div class="admin-sub">${adminRealityTvEscape_(question.Points === "" || question.Points === undefined ? "" : question.Points + " points")}</div>
           </div>
           <span class="reality-tv-status-pill ${approving ? "review" : "pending"}">${adminRealityTvEscape_(reviewStatus)}</span>
         </div>
@@ -206,7 +229,7 @@ function adminRealityTvQuestionCard_(bundle, question) {
     return `
       <div class="reality-tv-question-card final">
         <div class="reality-tv-question-card-header">
-          <div><span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span><h4>${adminRealityTvEscape_(question.QuestionText)}</h4></div>
+          <div><span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span><h4>${adminRealityTvEscape_(question.QuestionText)}</h4><div class="admin-sub">${adminRealityTvEscape_(question.Points === "" || question.Points === undefined ? "" : question.Points + " points")}</div></div>
           <span class="reality-tv-status-pill final">FINAL</span>
         </div>
         <div class="admin-sub">Result: <b>${adminRealityTvEscape_(labels.join(", ") || "Final")}</b></div>
@@ -221,7 +244,7 @@ function adminRealityTvQuestionCard_(bundle, question) {
         <div>
           <span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span>
           <h4>${adminRealityTvEscape_(question.QuestionText)}</h4>
-          <div class="admin-sub">Category: ${adminRealityTvEscape_(question.CategoryId)}</div>
+          <div class="admin-sub">Category: ${adminRealityTvEscape_(question.CategoryId)}${question.Points === "" || question.Points === undefined ? "" : " · " + adminRealityTvEscape_(question.Points) + " points"}</div>
         </div>
         <span class="reality-tv-status-pill open">OPEN</span>
       </div>
@@ -292,10 +315,11 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         <label>Group label<input id="realityTvGroupLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.GroupLabel || format.groupLabel)}"></label>
         <label>Period label<input id="realityTvPeriodLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.PeriodLabel || format.periodLabel)}" placeholder="Episode, Leg, Round"></label>
         <label class="reality-tv-wide-field">Elimination / exit question<input id="realityTvEliminationTemplate_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.QuestionTemplate || format.eliminationTemplate)}"></label>
+        <label>Elimination / exit points<input id="realityTvEliminationPoints_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="0.5" value="${adminRealityTvValue_(season.Points === undefined || season.Points === "" ? 1 : season.Points)}"></label>
       </div>
       <div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">Apply Format Preset</button></div>
       <div id="realityTvQuestionPackGrid_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-question-pack-grid">
-        ${adminRealityTvQuestionPackChoicesHtml_(format.id, enabled, bundle.questionTemplates || [], "rt-season-question-type", season.SeasonId)}
+        ${adminRealityTvQuestionPackChoicesHtml_(format.id, enabled, bundle.questionTemplates || [], "rt-season-question-type", season.SeasonId, season.Points || 1, {})}
       </div>
       ${buildStatus}
       <div class="admin-actions"><button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button></div>
@@ -325,6 +349,7 @@ function adminRealityTvApplyExistingFormatPreset_(seasonId, preserveSelection) {
   const format = adminRealityTvShowFormat_(select.value);
   const bundle = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || []).find(function(item) { return item.season && String(item.season.SeasonId) === String(seasonId); });
   const current = {};
+  const preservedPoints = adminRealityTvCollectQuestionPoints_(seasonId);
   if (preserveSelection) document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked').forEach(function(box) { current[box.value] = true; });
   if (!preserveSelection) {
     format.defaults.forEach(function(id) { current[id] = true; });
@@ -333,7 +358,9 @@ function adminRealityTvApplyExistingFormatPreset_(seasonId, preserveSelection) {
     }).forEach(function(item) { current[item.TemplateId] = true; });
   }
   const container = document.getElementById("realityTvQuestionPackGrid_" + seasonId);
-  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, bundle ? bundle.questionTemplates : [], "rt-season-question-type", seasonId);
+  const defaultPointsInput = document.getElementById("realityTvEliminationPoints_" + seasonId);
+  const defaultPoints = defaultPointsInput ? Number(defaultPointsInput.value || 1) : 1;
+  if (container) container.innerHTML = adminRealityTvQuestionPackChoicesHtml_(format.id, current, bundle ? bundle.questionTemplates : [], "rt-season-question-type", seasonId, defaultPoints, preservedPoints);
   document.getElementById("realityTvParticipantType_" + seasonId).value = format.participantType;
   document.getElementById("realityTvParticipantLabel_" + seasonId).value = format.participantLabel;
   document.getElementById("realityTvGroupLabel_" + seasonId).value = format.groupLabel;
@@ -1033,13 +1060,13 @@ async function renderAdminRealityTvPage() {
               <label>First episode date &amp; time *<input id="realityTvFirstEpisode" class="input" type="datetime-local"></label>
               <label>Repeat every days<input id="realityTvIntervalDays" class="input" type="number" min="1" value="7"></label>
               <label>Lock minutes before airtime<input id="realityTvLockOffset" class="input" type="number" min="0" value="5"></label>
-              <label>Points per correct pick<input id="realityTvPoints" class="input" type="number" min="0" value="1"></label>
+              <label>Elimination / exit points<input id="realityTvPoints" class="input" type="number" min="0" step="0.5" value="1"></label>
               <label class="reality-tv-wide-field">Elimination / exit question<input id="realityTvQuestionTemplate" class="input" value="Who will be eliminated in Episode {episode}?"></label>
             </div>
 
             <div class="reality-tv-create-question-pack">
               <h3>Show Format Question Pack</h3>
-              <div class="admin-sub">The main elimination / exit question is always created. The selected preset questions are independent and administrator reviewed.</div>
+              <div class="admin-sub">The main elimination / exit question is always created. Set points separately for every selected question; all results remain administrator reviewed.</div>
               <div id="realityTvCreateQuestionPackGrid" class="reality-tv-question-pack-grid"></div>
             </div>
 
@@ -1212,6 +1239,7 @@ async function adminRealityTvCreateSeason() {
     seasonAnchorWithdrawalBehavior: document.getElementById("realityTvAnchorWithdrawal_create").value,
     seasonAnchorManualSwitchAllowed: document.getElementById("realityTvAnchorSwitch_create").checked,
     enabledQuestionTypesJSON: JSON.stringify(Array.from(document.querySelectorAll(".rt-create-question-type:checked")).map(function(box) { return box.value; })),
+    questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_("create")),
     contestantsJSON: JSON.stringify(roster)
   };
 
@@ -1472,6 +1500,8 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
       groupLabel: document.getElementById("realityTvGroupLabel_" + seasonId).value.trim(),
       periodLabel: document.getElementById("realityTvPeriodLabel_" + seasonId).value.trim(),
       questionTemplate: document.getElementById("realityTvEliminationTemplate_" + seasonId).value.trim(),
+      eliminationPoints: document.getElementById("realityTvEliminationPoints_" + seasonId).value,
+      questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_(seasonId)),
       enabledQuestionTypesJSON: JSON.stringify(selected),
       buildCurrentEpisode: true
     });

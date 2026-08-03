@@ -1,0 +1,11 @@
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/app.html
+frontend/css/styles.css
+frontend/js/pages/adminRealityTv.js
+frontend/sw.js
+tests/reality_tv_individual_question_points_tests.js
+tests/reality_tv_question_contrast_tests.js
+PHASE2_REALITY_TV_INDIVIDUAL_QUESTION_POINTS_V1_0_29.md
+PHASE2_REALITY_TV_INDIVIDUAL_QUESTION_POINTS_TEST_REPORT_V1_0_29.txt
+PHASE2_REALITY_TV_INDIVIDUAL_QUESTION_POINTS_CHANGED_FILES_V1_0_29.txt

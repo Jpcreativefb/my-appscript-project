@@ -1,0 +1,10 @@
+Phase 2 Reality TV Individual Question Points v1.0.29
+
+Validation completed:
+- JavaScript syntax checks passed for modified backend and frontend files.
+- Focused individual-question point test passed.
+- All 40 repository test files passed.
+- Verified separate elimination, immunity, and reward point values.
+- Verified current open questions update after Save Format & Build Current Episode.
+- Verified episode question audit rows store applied points.
+- Final historical questions are protected from point changes.

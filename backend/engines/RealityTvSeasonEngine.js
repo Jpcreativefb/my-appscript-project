@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Phase 2B v1.0.28
+   Phase 2B v1.0.29
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -351,12 +351,17 @@ function realityTvUpdateCurrentPeriodPresentation_(season, episode) {
   const episodeName = periodLabel + " " + episodeNumber;
   const question = realityTvFormatQuestion_(season.QuestionTemplate, episodeNumber, season);
 
-  adminUpdateCategory({
+  const categoryPatch = {
     gameId: season.GameId,
     categoryId: episode.CategoryId,
     category: question,
     section: episodeName
-  });
+  };
+  if (realityTvKey_(episode.Status || "open") !== "final") {
+    categoryPatch.points = Math.max(0, realityTvNumber_(season.Points, 1));
+    categoryPatch.lockDateTime = episode.LockDateTime;
+  }
+  adminUpdateCategory(categoryPatch);
 
   const sheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODES_SHEET);
   realityTvUpdateObjectRow_(sheet, episode.__rowNumber, {
@@ -987,7 +992,8 @@ function apiAdminCreateRealityTvSeason(payload) {
     realityTvSaveStandardQuestionPack_(
       createdSeason,
       payload.enabledQuestionTypesJSON || payload.enabledQuestionTypes || format.defaultQuestionTypes || [],
-      payload.points
+      payload.points,
+      payload.questionPointsJSON || payload.questionPoints || {}
     );
   }
   const episode = realityTvCreateEpisode_(createdSeason, 1);
