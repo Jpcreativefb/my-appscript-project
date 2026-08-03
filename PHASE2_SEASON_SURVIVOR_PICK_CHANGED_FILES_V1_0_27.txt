@@ -1,0 +1,22 @@
+Phase 2C Season Survivor Pick v1.0.27 — changed files from v1.0.26
+
+backend/Api.js
+backend/engines/AppDataEngine.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+backend/engines/ScoringEngine.js
+backend/engines/SeasonAnchorEngine.js (new)
+frontend/api.js
+frontend/app.html
+frontend/css/styles.css
+frontend/js/api.js
+frontend/js/pages/adminRealityTv.js
+frontend/js/pages/leaderboard.js
+frontend/js/pages/picks.js
+frontend/sw.js
+tests/reality_tv_question_contrast_tests.js
+tests/season_anchor_engine_tests.js (new)
+tests/season_anchor_runtime_logic_tests.js (new)
+PHASE2_SEASON_SURVIVOR_PICK_V1_0_27.md (new)
+PHASE2_SEASON_SURVIVOR_PICK_CHANGED_FILES_V1_0_27.txt (new)
+PHASE2_SEASON_SURVIVOR_PICK_TEST_REPORT_V1_0_27.txt (new)

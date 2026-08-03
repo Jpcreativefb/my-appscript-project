@@ -336,13 +336,22 @@ function getLeaderboardData(
       gameId
     );
 
+  const seasonAnchorAdjustments =
+    typeof seasonAnchorAdjustmentsForGame_ === "function"
+      ? seasonAnchorAdjustmentsForGame_(gameId)
+      : {};
+
+  const leaderboardUsers = {};
+  Object.keys(userPicks).forEach(function(username) { leaderboardUsers[username] = true; });
+  Object.keys(seasonAnchorAdjustments).forEach(function(username) { leaderboardUsers[username] = true; });
+
   const results = [];
 
-  Object.keys(userPicks)
+  Object.keys(leaderboardUsers)
     .forEach(function(username) {
 
       const picks =
-        userPicks[username];
+        userPicks[username] || {};
 
       let fixedPoints = 0;
       let fixedRemaining = 0;
@@ -602,6 +611,21 @@ function getLeaderboardData(
 
         });
 
+      const seasonAnchor =
+        seasonAnchorAdjustments[username] || {
+          bonus: 0,
+          penalty: 0,
+          net: 0,
+          longestStreak: 0,
+          currentStreak: 0,
+          currentMultiplier: 0,
+          currentEntityName: "",
+          status: ""
+        };
+
+      const fixedPointsBeforeSeasonAnchor = fixedPoints;
+      fixedPoints += normalizeScoreNumber_(seasonAnchor.net, 0);
+
       const startingPoints =
         stakedPointsEnabled
           ? Math.max(
@@ -696,6 +720,33 @@ function getLeaderboardData(
 
         fixedPoints:
           fixedPoints,
+
+        fixedPointsBeforeSeasonAnchor:
+          fixedPointsBeforeSeasonAnchor,
+
+        seasonAnchorBonus:
+          normalizeScoreNumber_(seasonAnchor.bonus, 0),
+
+        seasonAnchorPenalty:
+          normalizeScoreNumber_(seasonAnchor.penalty, 0),
+
+        seasonAnchorNet:
+          normalizeScoreNumber_(seasonAnchor.net, 0),
+
+        seasonAnchorCurrentStreak:
+          normalizeScoreNumber_(seasonAnchor.currentStreak, 0),
+
+        seasonAnchorLongestStreak:
+          normalizeScoreNumber_(seasonAnchor.longestStreak, 0),
+
+        seasonAnchorCurrentMultiplier:
+          normalizeScoreNumber_(seasonAnchor.currentMultiplier, 0),
+
+        seasonAnchorCurrentEntityName:
+          seasonAnchor.currentEntityName || "",
+
+        seasonAnchorStatus:
+          seasonAnchor.status || "",
 
         fixedRemaining:
           fixedRemaining,

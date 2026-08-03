@@ -15,7 +15,8 @@ let PICKS_PAGE_DATA = {
   confidencePoints: {},
   stakePoints: {},
   stakeSummary: {},
-  pickMeta: {}
+  pickMeta: {},
+  seasonAnchor: null
 };
 
 let PICKS_COUNTDOWN_TIMER = null;
@@ -61,6 +62,117 @@ function renderHybridPicksBackButton_() {
     </button>
   `;
 
+}
+
+
+function formatSeasonAnchorMultiplier_(value) {
+  const number = Number(value);
+  return (Number.isFinite(number) ? number : 1).toFixed(2) + "x";
+}
+
+function formatSeasonAnchorLock_(value) {
+  if (!value) return "No lock time";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString([], {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+}
+
+function renderSeasonAnchorPickCard_() {
+  const anchor = PICKS_PAGE_DATA.seasonAnchor;
+  if (!anchor || anchor.enabled !== true) return "";
+  const settings = anchor.settings || {};
+  const user = anchor.user || null;
+  const entities = Array.isArray(anchor.entities) ? anchor.entities : [];
+  const currentId = user ? String(user.currentEntityId || "") : "";
+  const needsPick = !user || String(user.status || "NEEDS_PICK").toUpperCase() === "NEEDS_PICK" || !currentId;
+  const currentMultiplier = user ? Number(user.currentMultiplier || settings.StartMultiplier || 1) : Number(settings.StartMultiplier || 1);
+  const growth = Number(settings.GrowthPerSuccess || 0);
+  const cap = Number(settings.MaxMultiplier || currentMultiplier);
+  const nextMultiplier = Math.min(cap, currentMultiplier + growth);
+  const canChoose = anchor.canChoose === true;
+  const locked = anchor.locked === true;
+  const switchText = user && currentId && !needsPick
+    ? (settings.ManualSwitchAllowed ? "Changing before lock resets the streak and multiplier." : "Manual switching is disabled until this pick is eliminated.")
+    : "Choose any currently active contestant. Late starters begin at the base multiplier.";
+  const optionHtml = entities.map(function(item) {
+    return `<option value="${escapeAttr(item.id)}" ${String(item.id) === currentId ? "selected" : ""}>${escapeHtml(item.name)}${item.teamOrTribe ? " — " + escapeHtml(item.teamOrTribe) : ""}</option>`;
+  }).join("");
+  const currentSummary = needsPick
+    ? `<div class="season-anchor-current-pick needs-pick">
+        <span class="season-anchor-label">New selection needed</span>
+        <strong>${user && user.currentEntityName ? escapeHtml(user.currentEntityName) + " was eliminated" : "Choose an active contestant"}</strong>
+        <span>Your next pick starts at ${formatSeasonAnchorMultiplier_(settings.StartMultiplier || 1)}.</span>
+      </div>`
+    : `<div class="season-anchor-current-pick">
+        <span class="season-anchor-label">Current pick</span>
+        <strong>${escapeHtml(user.currentEntityName || currentId)}</strong>
+        <span>${Number(user.streak || 0)} successful episode${Number(user.streak || 0) === 1 ? "" : "s"}</span>
+      </div>`;
+
+  return `
+    <section class="season-anchor-card ${needsPick ? "needs-pick" : "active"}">
+      <div class="season-anchor-card-header">
+        <div>
+          <span class="season-anchor-eyebrow">Optional season bonus</span>
+          <h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2>
+          <p>Keep the same contestant while they remain active. Your normal picks still score at their regular value.</p>
+        </div>
+        <span class="season-anchor-status ${locked ? "locked" : "open"}">${locked ? "Locked" : "Open"}</span>
+      </div>
+      <div class="season-anchor-summary-grid">
+        ${currentSummary}
+        <div><span>Current multiplier</span><strong>${formatSeasonAnchorMultiplier_(currentMultiplier)}</strong></div>
+        <div><span>Next survival</span><strong>${formatSeasonAnchorMultiplier_(nextMultiplier)}</strong></div>
+        <div><span>Maximum weekly bonus</span><strong>${Number(anchor.maxWeeklyBonus || 0).toLocaleString()} pts</strong></div>
+        <div><span>${escapeHtml(anchor.episode ? anchor.episode.episodeName : "Current period")}</span><strong>${escapeHtml(formatSeasonAnchorLock_(anchor.episode && anchor.episode.lockDateTime))}</strong></div>
+      </div>
+      ${canChoose ? `
+        <div class="season-anchor-picker">
+          <label for="seasonAnchorEntitySelect">${needsPick ? "Select your contestant" : "Keep or change your contestant"}</label>
+          <div class="season-anchor-picker-row">
+            <select id="seasonAnchorEntitySelect" class="input">
+              <option value="">Choose a contestant…</option>
+              ${optionHtml}
+            </select>
+            <button type="button" class="button" onclick="saveSeasonAnchorPick_()">${needsPick ? "Save Survivor Pick" : "Update Pick"}</button>
+          </div>
+          <small>${escapeHtml(switchText)}</small>
+        </div>
+      ` : `<div class="season-anchor-locked-note">${locked ? "The selection window is closed for this episode." : escapeHtml(switchText)}</div>`}
+      <div class="season-anchor-rules-line">
+        Growth: +${Number(settings.GrowthPerSuccess || 0).toFixed(2)}x · Cap: ${formatSeasonAnchorMultiplier_(settings.MaxMultiplier || 1)} · Eligible points cap: ${Number(settings.EligiblePointsCap || 0)} · Loss penalty: -${Number(settings.LossPenalty || 0)}
+      </div>
+    </section>
+  `;
+}
+
+async function saveSeasonAnchorPick_() {
+  const anchor = PICKS_PAGE_DATA.seasonAnchor || {};
+  const select = document.getElementById("seasonAnchorEntitySelect");
+  const entityId = select ? String(select.value || "") : "";
+  if (!entityId) {
+    showPicksMessage("Choose a contestant first.", true);
+    return;
+  }
+  const existingId = anchor.user ? String(anchor.user.currentEntityId || "") : "";
+  if (existingId && existingId !== entityId) {
+    if (!window.confirm("Change your Season Survivor pick?\n\nYour streak and multiplier will reset to the starting value.")) return;
+  }
+  showPicksMessage("Saving Season Survivor pick…", false);
+  try {
+    const response = await apiSaveSeasonAnchorPick(PICKS_PAGE_DATA.gameId, entityId);
+    if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not save the Season Survivor pick.");
+    clearStartupPayload();
+    showPicksMessage(response.message || "Season Survivor pick saved.", false);
+    navigate("picks");
+  } catch (err) {
+    showPicksMessage(err.message || String(err), true);
+  }
 }
 
 /* =========================
@@ -185,6 +297,9 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   PICKS_PAGE_DATA.pickMeta =
     picksResponse.pickMeta || {};
 
+  PICKS_PAGE_DATA.seasonAnchor =
+    payload.seasonAnchor || null;
+
   setTimeout(
     mountPicksPage,
     0
@@ -213,6 +328,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
         ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
 
       </div>
+
+      ${renderSeasonAnchorPickCard_()}
 
       <div id="picksPageMessage" class="picks-message hidden"></div>
 

@@ -578,6 +578,27 @@ async function apiSavePick(payload) {
 
 }
 
+async function apiGetSeasonAnchor(gameId) {
+  const session = getSession ? getSession() : {};
+  return api("getSeasonAnchor", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiSaveSeasonAnchorPick(gameId, entityId) {
+  const session = getSession ? getSession() : {};
+  return api("saveSeasonAnchorPick", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    entityId: entityId,
+    leagueId: getApiLeagueId_()
+  });
+}
+
 /* ======================
    LEADERBOARD
 ====================== */
@@ -1568,6 +1589,10 @@ async function apiAdminConfigureRealityTvHub(spreadsheetId) {
 
 async function apiAdminGetRealityTvDashboard() {
   return apiAdminRealityTvRequest_("adminGetRealityTvDashboard", {});
+}
+
+async function apiAdminSaveSeasonAnchorSettings(payload) {
+  return apiAdminRealityTvRequest_("adminSaveSeasonAnchorSettings", payload || {});
 }
 
 async function apiAdminCreateRealityTvSeason(payload) {

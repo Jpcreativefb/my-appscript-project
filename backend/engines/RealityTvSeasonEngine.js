@@ -669,10 +669,14 @@ function realityTvUpdateHubReview_(queue, reviewStatus, reviewer, message) {
 function setupRealityTvSeasonManager() {
   realityTvEnsureSystem_();
   if (typeof realityTvEnsureQuestionPackSystem_ === "function") realityTvEnsureQuestionPackSystem_();
+  if (typeof seasonAnchorEnsureSystem_ === "function") seasonAnchorEnsureSystem_();
   const sheets = [REALITY_TV_SEASONS_SHEET, REALITY_TV_CONTESTANTS_SHEET, REALITY_TV_EPISODES_SHEET, REALITY_TV_RESULTS_QUEUE_SHEET];
   if (typeof REALITY_TV_QUESTION_TEMPLATES_SHEET !== "undefined") {
     sheets.push(REALITY_TV_QUESTION_TEMPLATES_SHEET, REALITY_TV_EPISODE_QUESTIONS_SHEET, REALITY_TV_QUESTION_QUEUE_SHEET);
     if (typeof REALITY_TV_QUESTION_BUILD_JOBS_SHEET !== "undefined") sheets.push(REALITY_TV_QUESTION_BUILD_JOBS_SHEET);
+  }
+  if (typeof SEASON_ANCHOR_SETTINGS_SHEET !== "undefined") {
+    sheets.push(SEASON_ANCHOR_SETTINGS_SHEET, SEASON_ANCHOR_USERS_SHEET, SEASON_ANCHOR_HISTORY_SHEET);
   }
   return {
     success: true,
@@ -719,6 +723,9 @@ function apiAdminGetRealityTvDashboard(payload) {
         : [],
       questionBuild: typeof realityTvLatestQuestionBuildStateForSeason_ === "function"
         ? realityTvLatestQuestionBuildStateForSeason_(season.SeasonId)
+        : null,
+      seasonAnchorSettings: typeof seasonAnchorGetSettings_ === "function"
+        ? (seasonAnchorGetSettings_(season.GameId) || seasonAnchorDefaultSettings_(season.GameId, season.SeasonId))
         : null
     };
   }).sort(function(a, b) {
@@ -815,6 +822,26 @@ function apiAdminCreateRealityTvSeason(payload) {
     UpdatedAt: now
   };
   realityTvUpsertObject_(SpreadsheetApp.getActive(), REALITY_TV_SEASONS_SHEET, REALITY_TV_SEASON_HEADERS, ["SeasonId"], season);
+
+  if (typeof seasonAnchorSaveSettings_ === "function") {
+    seasonAnchorSaveSettings_({
+      gameId: gameId,
+      seasonId: seasonId,
+      enabled: payload.seasonAnchorEnabled,
+      displayLabel: payload.seasonAnchorDisplayLabel,
+      entityType: "contestant",
+      survivalMode: "active",
+      startMultiplier: payload.seasonAnchorStartMultiplier,
+      growthPerSuccess: payload.seasonAnchorGrowthPerSuccess,
+      maxMultiplier: payload.seasonAnchorMaxMultiplier,
+      eligiblePointsCap: payload.seasonAnchorEligiblePointsCap,
+      lossPenalty: payload.seasonAnchorLossPenalty,
+      noResultBehavior: "preserve",
+      withdrawalBehavior: payload.seasonAnchorWithdrawalBehavior,
+      manualSwitchAllowed: payload.seasonAnchorManualSwitchAllowed,
+      sourceType: "reality-tv"
+    });
+  }
 
   const usedIds = {};
   const contestantRows = [];
@@ -1148,6 +1175,10 @@ function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
     EliminatedContestantIds: JSON.stringify(selectedIds),
     UpdatedAt: now
   });
+
+  if (typeof seasonAnchorSettleRealityEpisode_ === "function") {
+    seasonAnchorSettleRealityEpisode_(season, episode, selectedIds, outcomeType, reviewer);
+  }
 
   const remaining = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
     return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";

@@ -218,6 +218,141 @@ function adminRealityTvQuestionPackPanel_(bundle) {
   `;
 }
 
+
+function adminRealityTvSeasonAnchorSettings_(bundle) {
+  const season = bundle && bundle.season ? bundle.season : {};
+  const raw = bundle && bundle.seasonAnchorSettings ? bundle.seasonAnchorSettings : {};
+  return {
+    enabled: raw.Enabled === true || String(raw.Enabled || "").toLowerCase() === "true",
+    displayLabel: raw.DisplayLabel || "Season Survivor Pick",
+    startMultiplier: Number(raw.StartMultiplier === undefined || raw.StartMultiplier === "" ? 1 : raw.StartMultiplier),
+    growthPerSuccess: Number(raw.GrowthPerSuccess === undefined || raw.GrowthPerSuccess === "" ? 0.05 : raw.GrowthPerSuccess),
+    maxMultiplier: Number(raw.MaxMultiplier === undefined || raw.MaxMultiplier === "" ? 1.4 : raw.MaxMultiplier),
+    eligiblePointsCap: Number(raw.EligiblePointsCap === undefined || raw.EligiblePointsCap === "" ? 20 : raw.EligiblePointsCap),
+    lossPenalty: Number(raw.LossPenalty === undefined || raw.LossPenalty === "" ? 5 : raw.LossPenalty),
+    withdrawalBehavior: raw.WithdrawalBehavior || "penalty",
+    manualSwitchAllowed: raw.ManualSwitchAllowed === "" || raw.ManualSwitchAllowed === undefined
+      ? true
+      : (raw.ManualSwitchAllowed === true || String(raw.ManualSwitchAllowed).toLowerCase() === "true"),
+    seasonId: season.SeasonId || "",
+    gameId: season.GameId || ""
+  };
+}
+
+function adminRealityTvSeasonAnchorFields_(key, settings) {
+  settings = settings || {
+    enabled: false,
+    displayLabel: "Season Survivor Pick",
+    startMultiplier: 1,
+    growthPerSuccess: 0.05,
+    maxMultiplier: 1.4,
+    eligiblePointsCap: 20,
+    lossPenalty: 5,
+    withdrawalBehavior: "penalty",
+    manualSwitchAllowed: true
+  };
+  const safeKey = adminRealityTvEscape_(key);
+  return `
+    <div class="reality-tv-anchor-enabled-row">
+      <label class="reality-tv-anchor-toggle">
+        <input id="realityTvAnchorEnabled_${safeKey}" type="checkbox" ${settings.enabled ? "checked" : ""} onchange="adminRealityTvAnchorPreview_('${safeKey}')">
+        <span><b>Enable Season Survivor Pick</b><small>Users select one active contestant and build a capped survival multiplier.</small></span>
+      </label>
+    </div>
+    <div class="admin-form-grid reality-tv-anchor-settings-grid">
+      <label>Display label<input id="realityTvAnchorLabel_${safeKey}" class="input" value="${adminRealityTvValue_(settings.displayLabel)}"></label>
+      <label>Starting multiplier<input id="realityTvAnchorStart_${safeKey}" class="input" type="number" min="1" max="3" step="0.01" value="${adminRealityTvValue_(settings.startMultiplier)}" oninput="adminRealityTvAnchorPreview_('${safeKey}')"></label>
+      <label>Growth per survival<input id="realityTvAnchorGrowth_${safeKey}" class="input" type="number" min="0" max="1" step="0.01" value="${adminRealityTvValue_(settings.growthPerSuccess)}" oninput="adminRealityTvAnchorPreview_('${safeKey}')"></label>
+      <label>Maximum multiplier cap<input id="realityTvAnchorCap_${safeKey}" class="input" type="number" min="1" max="5" step="0.01" value="${adminRealityTvValue_(settings.maxMultiplier)}" oninput="adminRealityTvAnchorPreview_('${safeKey}')"></label>
+      <label>Weekly eligible-points cap<input id="realityTvAnchorPointsCap_${safeKey}" class="input" type="number" min="0" max="1000" step="1" value="${adminRealityTvValue_(settings.eligiblePointsCap)}" oninput="adminRealityTvAnchorPreview_('${safeKey}')"></label>
+      <label>Loss penalty<input id="realityTvAnchorPenalty_${safeKey}" class="input" type="number" min="0" max="1000" step="1" value="${adminRealityTvValue_(settings.lossPenalty)}" oninput="adminRealityTvAnchorPreview_('${safeKey}')"></label>
+      <label>Quit / medical withdrawal
+        <select id="realityTvAnchorWithdrawal_${safeKey}" class="input">
+          <option value="penalty" ${settings.withdrawalBehavior === "penalty" ? "selected" : ""}>Count as a loss</option>
+          <option value="free-reset" ${settings.withdrawalBehavior === "free-reset" ? "selected" : ""}>Free reset, no penalty</option>
+        </select>
+      </label>
+      <label class="reality-tv-anchor-switch-setting"><input id="realityTvAnchorSwitch_${safeKey}" type="checkbox" ${settings.manualSwitchAllowed ? "checked" : ""}> Allow users to switch before lock (resets multiplier)</label>
+    </div>
+    <div id="realityTvAnchorPreview_${safeKey}" class="reality-tv-anchor-preview"></div>
+  `;
+}
+
+function adminRealityTvSeasonAnchorPanel_(bundle) {
+  const season = bundle.season;
+  const settings = adminRealityTvSeasonAnchorSettings_(bundle);
+  return `
+    <details class="reality-tv-subsection reality-tv-anchor-panel">
+      <summary>Season Survivor Pick</summary>
+      <div class="admin-sub">Optional season-long pick. Normal question points remain unchanged; only a capped weekly bonus and configured loss penalty are added. Disabling it stops future picks but keeps already-earned adjustments.</div>
+      ${adminRealityTvSeasonAnchorFields_(season.SeasonId, settings)}
+      <div class="admin-actions">
+        <button class="admin-small-button" onclick="adminRealityTvSaveSeasonAnchorSettings('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(season.GameId)}')">Save Survivor Settings</button>
+      </div>
+      <div id="realityTvAnchorMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+    </details>
+  `;
+}
+
+function adminRealityTvAnchorReadNumber_(id, fallback) {
+  const input = document.getElementById(id);
+  const value = input ? Number(input.value) : fallback;
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function adminRealityTvAnchorPreview_(key) {
+  const target = document.getElementById("realityTvAnchorPreview_" + key);
+  if (!target) return;
+  const start = Math.max(1, adminRealityTvAnchorReadNumber_("realityTvAnchorStart_" + key, 1));
+  const growth = Math.max(0, adminRealityTvAnchorReadNumber_("realityTvAnchorGrowth_" + key, 0.05));
+  const cap = Math.max(start, adminRealityTvAnchorReadNumber_("realityTvAnchorCap_" + key, 1.4));
+  const pointsCap = Math.max(0, adminRealityTvAnchorReadNumber_("realityTvAnchorPointsCap_" + key, 20));
+  const penalty = Math.max(0, adminRealityTvAnchorReadNumber_("realityTvAnchorPenalty_" + key, 5));
+  const maxBonus = Math.round(pointsCap * Math.max(0, cap - 1) * 100) / 100;
+  const successes = growth > 0 ? Math.max(0, Math.ceil((cap - start) / growth)) : 0;
+  target.innerHTML = `
+    <b>Scoring preview:</b> maximum weekly bonus <b>${maxBonus}</b> points
+    (${pointsCap} eligible points × ${(cap - 1).toFixed(2)} bonus rate).
+    ${growth > 0 ? `The cap is reached after about ${successes} successful episode${successes === 1 ? "" : "s"}.` : "The multiplier will not grow."}
+    A loss deducts <b>${penalty}</b> points and resets the pick to ${start.toFixed(2)}x.
+  `;
+}
+
+function adminRealityTvAnchorPayload_(key, gameId, seasonId) {
+  return {
+    gameId: gameId,
+    seasonId: seasonId,
+    enabled: document.getElementById("realityTvAnchorEnabled_" + key).checked,
+    displayLabel: document.getElementById("realityTvAnchorLabel_" + key).value.trim(),
+    startMultiplier: document.getElementById("realityTvAnchorStart_" + key).value,
+    growthPerSuccess: document.getElementById("realityTvAnchorGrowth_" + key).value,
+    maxMultiplier: document.getElementById("realityTvAnchorCap_" + key).value,
+    eligiblePointsCap: document.getElementById("realityTvAnchorPointsCap_" + key).value,
+    lossPenalty: document.getElementById("realityTvAnchorPenalty_" + key).value,
+    withdrawalBehavior: document.getElementById("realityTvAnchorWithdrawal_" + key).value,
+    manualSwitchAllowed: document.getElementById("realityTvAnchorSwitch_" + key).checked,
+    entityType: "contestant",
+    survivalMode: "active",
+    noResultBehavior: "preserve",
+    sourceType: "reality-tv"
+  };
+}
+
+async function adminRealityTvSaveSeasonAnchorSettings(seasonId, gameId) {
+  adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, "Saving Season Survivor settings…", "info");
+  showLoader();
+  try {
+    const result = await apiAdminSaveSeasonAnchorSettings(adminRealityTvAnchorPayload_(seasonId, gameId, seasonId));
+    if (!result || result.success === false) throw new Error((result && (result.error || result.message)) || "Could not save Season Survivor settings.");
+    adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, result.message || "Season Survivor settings saved.", "success");
+    setTimeout(function() { navigate("admin-reality-tv"); }, 500);
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, err.message || String(err), "error");
+  } finally {
+    hideLoader();
+  }
+}
+
 function adminRealityTvContestantRows_(contestants) {
   const active = (contestants || []).filter(function(item) {
     return item.Active === true || String(item.Active || "").toLowerCase() === "true";
@@ -422,6 +557,7 @@ function adminRealityTvSeasonCard_(bundle) {
         ${adminRealityTvResultPanel_(bundle)}
         ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
         ${adminRealityTvQuestionPackPanel_(bundle)}
+        ${adminRealityTvSeasonAnchorPanel_(bundle)}
         ${adminRealityTvContestantRows_(bundle.contestants)}
 
         <details class="reality-tv-subsection">
@@ -691,6 +827,12 @@ async function renderAdminRealityTvPage() {
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not load Reality TV manager.");
     ADMIN_REALITY_TV_DASHBOARD = res;
     ADMIN_REALITY_TV_ROSTER_ROW = 0;
+    setTimeout(function() {
+      adminRealityTvAnchorPreview_("create");
+      (res.seasons || []).forEach(function(bundle) {
+        if (bundle && bundle.season) adminRealityTvAnchorPreview_(bundle.season.SeasonId);
+      });
+    }, 0);
 
     const hubStatus = res.hubConfigured
       ? `<div class="admin-message success">Connected to External Results Hub: <b>${adminRealityTvEscape_(res.hubSpreadsheetName || res.hubSpreadsheetId)}</b></div>`
@@ -749,6 +891,12 @@ async function renderAdminRealityTvPage() {
                 }).join("")}
               </div>
             </div>
+
+            <details class="reality-tv-create-anchor-panel">
+              <summary>Optional Season Survivor Pick</summary>
+              <div class="admin-sub">Users keep one contestant while that contestant remains active. The multiplier applies only to capped weekly fixed points.</div>
+              ${adminRealityTvSeasonAnchorFields_("create", null)}
+            </details>
 
             <div class="reality-tv-checkbox-row">
               <label><input id="realityTvPublishGame" type="checkbox"> Make game active immediately</label>
@@ -892,6 +1040,15 @@ async function adminRealityTvCreateSeason() {
     questionTemplate: document.getElementById("realityTvQuestionTemplate").value.trim(),
     publishGame: document.getElementById("realityTvPublishGame").checked,
     autoCreateNextEpisode: document.getElementById("realityTvAutoNext").checked,
+    seasonAnchorEnabled: document.getElementById("realityTvAnchorEnabled_create").checked,
+    seasonAnchorDisplayLabel: document.getElementById("realityTvAnchorLabel_create").value.trim(),
+    seasonAnchorStartMultiplier: document.getElementById("realityTvAnchorStart_create").value,
+    seasonAnchorGrowthPerSuccess: document.getElementById("realityTvAnchorGrowth_create").value,
+    seasonAnchorMaxMultiplier: document.getElementById("realityTvAnchorCap_create").value,
+    seasonAnchorEligiblePointsCap: document.getElementById("realityTvAnchorPointsCap_create").value,
+    seasonAnchorLossPenalty: document.getElementById("realityTvAnchorPenalty_create").value,
+    seasonAnchorWithdrawalBehavior: document.getElementById("realityTvAnchorWithdrawal_create").value,
+    seasonAnchorManualSwitchAllowed: document.getElementById("realityTvAnchorSwitch_create").checked,
     enabledQuestionTypesJSON: JSON.stringify(Array.from(document.querySelectorAll(".rt-create-question-type:checked")).map(function(box) { return box.value; })),
     contestantsJSON: JSON.stringify(roster)
   };

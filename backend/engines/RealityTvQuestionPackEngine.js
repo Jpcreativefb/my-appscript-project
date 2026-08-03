@@ -1050,6 +1050,9 @@ function realityTvSettleSupplementalQuestion_(question, queue, reviewer) {
     WinningOutcomeIds: JSON.stringify([winnerId]),
     UpdatedAt: new Date()
   });
+  if (typeof seasonAnchorRecalculateEpisodeScores_ === "function") {
+    seasonAnchorRecalculateEpisodeScores_(question.GameId, question.SeasonId, question.EpisodeId);
+  }
   return { winnerId: winnerId };
 }
 

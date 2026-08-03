@@ -193,6 +193,7 @@ function doGet(e) {
       "adminApproveRealityTvQuestionResult",
       "adminContinueRealityTvQuestionApproval",
       "adminRejectRealityTvQuestionResult",
+      "adminSaveSeasonAnchorSettings",
 
       "adminGetGameSetup",
       "adminCreateCategory",
@@ -909,6 +910,10 @@ function doGet(e) {
 
     if (action === "adminRejectRealityTvQuestionResult") {
       return json(apiAdminRejectRealityTvQuestionResult(params));
+    }
+
+    if (action === "adminSaveSeasonAnchorSettings") {
+      return json(apiAdminSaveSeasonAnchorSettings(params));
     }
 
     /* =========================
@@ -1653,6 +1658,27 @@ function doGet(e) {
         })
       );
 
+    }
+
+    if (action === "getSeasonAnchor") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetSeasonAnchor({
+        username: params.username,
+        token: params.token,
+        gameId: gameId
+      }));
+    }
+
+    if (action === "saveSeasonAnchorPick") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "makePicks", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiSaveSeasonAnchorPick({
+        username: params.username,
+        token: params.token,
+        gameId: gameId,
+        entityId: params.entityId
+      }));
     }
 
     /* =========================

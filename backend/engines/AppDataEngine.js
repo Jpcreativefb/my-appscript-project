@@ -78,7 +78,12 @@ function apiGetStartupPayload(payload) {
       categories,
 
     picks:
-      picks
+      picks,
+
+    seasonAnchor:
+      typeof seasonAnchorUserPayload_ === "function"
+        ? seasonAnchorUserPayload_(username, gameId)
+        : { enabled: false }
   };
 
 }

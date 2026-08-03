@@ -455,6 +455,21 @@ function renderStandardLeaderboardCards_(rows, metricMode) {
               </p>
             ` : ""}
 
+            ${row.seasonAnchorCurrentEntityName || Number(row.seasonAnchorBonus) || Number(row.seasonAnchorPenalty) ? `
+              <p>
+                Survivor Pick:
+                ${escapeHtml(row.seasonAnchorCurrentEntityName || "Needs new pick")}
+              </p>
+              <p>
+                Survivor Streak:
+                ${Number(row.seasonAnchorCurrentStreak) || 0} · ${Number(row.seasonAnchorCurrentMultiplier || 0).toFixed(2)}x
+              </p>
+              <p>
+                Survivor Adjustment:
+                ${(Number(row.seasonAnchorNet) || 0) >= 0 ? "+" : ""}${Number(row.seasonAnchorNet) || 0}
+              </p>
+            ` : ""}
+
           </div>
 
           ${
