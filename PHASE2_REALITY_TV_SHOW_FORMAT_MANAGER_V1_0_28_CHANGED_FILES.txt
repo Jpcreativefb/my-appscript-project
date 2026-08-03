@@ -1,0 +1,13 @@
+backend/Api.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/app.html
+frontend/css/styles.css
+frontend/js/api.js
+frontend/js/pages/adminRealityTv.js
+frontend/sw.js
+tests/reality_tv_show_format_manager_tests.js
+PHASE2_REALITY_TV_SHOW_FORMAT_MANAGER_V1_0_28.md
+PHASE2_REALITY_TV_SHOW_FORMAT_MANAGER_V1_0_28_CHANGED_FILES.txt
+PHASE2_REALITY_TV_SHOW_FORMAT_MANAGER_V1_0_28_TEST_REPORT.txt

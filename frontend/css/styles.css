@@ -3990,3 +3990,36 @@ button.is-saving {
     width: 100%;
   }
 }
+
+
+/* Reality TV show formats and custom question templates — v1.0.28 */
+.reality-tv-format-settings-grid,
+.reality-tv-custom-question-grid {
+  margin-top: 14px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.reality-tv-custom-question-builder {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(167, 139, 250, 0.35);
+  border-radius: 12px;
+  background: rgba(109, 40, 217, 0.09);
+}
+.reality-tv-custom-question-builder > summary {
+  cursor: pointer;
+  font-weight: 850;
+  color: #f8fafc;
+}
+.reality-tv-question-pack-choice.custom {
+  border-color: rgba(167, 139, 250, 0.42);
+}
+.reality-tv-format-settings-grid label,
+.reality-tv-custom-question-grid label {
+  color: #f8fafc;
+}
+@media (max-width: 900px) {
+  .reality-tv-format-settings-grid,
+  .reality-tv-custom-question-grid {
+    grid-template-columns: 1fr;
+  }
+}

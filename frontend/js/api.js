@@ -39,6 +39,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetRealityTvDashboard",
     "adminCreateRealityTvSeason",
     "adminBulkAddRealityTvContestants",
+    "adminAddRealityTvCustomQuestionTemplate",
     "adminSubmitRealityTvResult",
     "adminApproveRealityTvResult",
     "adminContinueRealityTvApproval",
@@ -1632,6 +1633,10 @@ async function apiAdminCreateNextRealityTvEpisode(seasonId) {
 
 async function apiAdminUpdateRealityTvQuestionPack(payload) {
   return apiAdminRealityTvRequest_("adminUpdateRealityTvQuestionPack", payload || {});
+}
+
+async function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
+  return apiAdminRealityTvPostRequest_("adminAddRealityTvCustomQuestionTemplate", payload || {});
 }
 
 async function apiAdminBuildRealityTvEpisodeQuestions(payload) {

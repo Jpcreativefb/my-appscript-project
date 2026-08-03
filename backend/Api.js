@@ -101,6 +101,10 @@ function doPost(e) {
       return json(apiAdminBulkAddRealityTvContestants(body));
     }
 
+    if (action === "adminAddRealityTvCustomQuestionTemplate") {
+      return json(apiAdminAddRealityTvCustomQuestionTemplate(body));
+    }
+
     return json({
       success:
         false,
@@ -187,6 +191,7 @@ function doGet(e) {
       "adminRejectRealityTvResult",
       "adminCreateNextRealityTvEpisode",
       "adminUpdateRealityTvQuestionPack",
+      "adminAddRealityTvCustomQuestionTemplate",
       "adminBuildRealityTvEpisodeQuestions",
       "adminContinueRealityTvQuestionPackBuild",
       "adminSubmitRealityTvQuestionResult",
@@ -886,6 +891,10 @@ function doGet(e) {
 
     if (action === "adminUpdateRealityTvQuestionPack") {
       return json(apiAdminUpdateRealityTvQuestionPack(params));
+    }
+
+    if (action === "adminAddRealityTvCustomQuestionTemplate") {
+      return json(apiAdminAddRealityTvCustomQuestionTemplate(params));
     }
 
     if (action === "adminBuildRealityTvEpisodeQuestions") {
