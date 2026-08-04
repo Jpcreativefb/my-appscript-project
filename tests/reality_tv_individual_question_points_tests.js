@@ -60,6 +60,9 @@ const created = context.apiAdminCreateRealityTvSeason({
   ])
 });
 assert.strictEqual(created.success, true);
+let initialBuild = created.questionBuild || null;
+for (let i = 0; initialBuild && !initialBuild.complete && i < 50; i++) initialBuild = context.apiAdminContinueRealityTvQuestionPackBuild({ buildId: initialBuild.buildId });
+if (initialBuild) assert.strictEqual(initialBuild.complete, true);
 let dashboard = context.apiAdminGetRealityTvDashboard({});
 let bundle = dashboard.seasons[0];
 const exitCategory = gameSetups.get(created.gameId).categories.find(c => c.categoryId === bundle.episodes[0].CategoryId);

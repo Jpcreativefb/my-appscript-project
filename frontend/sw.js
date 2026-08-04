@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v302-reality-season-detail-speed";
+const AWARDS_CACHE = "awards-app-v303-admin-page-module-loader-fix";
 
 const APP_SHELL = [
   "./",
@@ -16,7 +16,8 @@ const APP_SHELL = [
   "./js/auth.js",
   "./js/state.js",
   "./js/app.js",
-  "./js/pwa.js"
+  "./js/pwa.js",
+  "./js/pages/adminGames.js"
 ];
 
 self.addEventListener("install", event => {

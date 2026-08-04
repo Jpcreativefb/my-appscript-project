@@ -93,6 +93,9 @@ const created = context.apiAdminCreateRealityTvSeason({
   ])
 });
 assert.strictEqual(created.success, true);
+let initialBuild = created.questionBuild || null;
+for (let i = 0; initialBuild && !initialBuild.complete && i < 50; i++) initialBuild = context.apiAdminContinueRealityTvQuestionPackBuild({ buildId: initialBuild.buildId });
+if (initialBuild) assert.strictEqual(initialBuild.complete, true);
 let dashboard = context.apiAdminGetRealityTvDashboard({});
 let bundle = dashboard.seasons[0];
 assert.strictEqual(bundle.questionTemplates.filter(t => t.Enabled === true).length, 4);
@@ -121,7 +124,10 @@ const contestantA = bundle.contestants.find(c => c.Name === 'A');
 context.apiAdminSubmitRealityTvResult({ seasonId: bundle.season.SeasonId, episodeId: episode1.EpisodeId, outcomeType: 'elimination', selectedContestantIdsJSON: JSON.stringify([contestantA.ContestantId]) });
 dashboard = context.apiAdminGetRealityTvDashboard({});
 bundle = dashboard.seasons[0];
-completeElimination(bundle.queue.find(q => q.ReviewStatus === 'PENDING').QueueId);
+const eliminationState = completeElimination(bundle.queue.find(q => q.ReviewStatus === 'PENDING').QueueId);
+let episode2Build = eliminationState.questionBuild || null;
+for (let i = 0; episode2Build && !episode2Build.complete && i < 50; i++) episode2Build = context.apiAdminContinueRealityTvQuestionPackBuild({ buildId: episode2Build.buildId });
+if (episode2Build) assert.strictEqual(episode2Build.complete, true);
 dashboard = context.apiAdminGetRealityTvDashboard({});
 bundle = dashboard.seasons[0];
 assert.strictEqual(bundle.episodes.length, 2);

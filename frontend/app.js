@@ -353,8 +353,17 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "302-reality-season-detail-speed";
+const APP_ASSET_VERSION = "303-admin-page-module-loader-fix";
 const APP_LOADED_SCRIPTS = {};
+
+const APP_MAIN_SCRIPT_URL = (function() {
+  const current = document.currentScript && document.currentScript.src;
+  return new URL(current || "./js/app.js", document.baseURI);
+})();
+
+const APP_PAGE_SCRIPT_BASE_URL = APP_MAIN_SCRIPT_URL.pathname.indexOf("/js/app.js") !== -1
+  ? new URL("./pages/", APP_MAIN_SCRIPT_URL)
+  : new URL("./js/pages/", APP_MAIN_SCRIPT_URL);
 
 const APP_PAGE_MODULES = {
   "dashboard": ["dashboard"],
@@ -378,22 +387,17 @@ function pageModuleKey_(page) {
     : String(page || "");
 }
 
-function loadPageScript_(name) {
-  if (APP_LOADED_SCRIPTS[name]) return APP_LOADED_SCRIPTS[name];
+function appPageScriptUrl_(name, retryToken) {
+  const url = new URL(name + ".js", APP_PAGE_SCRIPT_BASE_URL);
+  url.searchParams.set("v", APP_ASSET_VERSION);
+  if (retryToken) url.searchParams.set("retry", retryToken);
+  return url.href;
+}
 
-  APP_LOADED_SCRIPTS[name] = new Promise(function(resolve, reject) {
-    const existing = document.querySelector('script[data-page-module="' + name + '"]');
-    if (existing) {
-      if (existing.dataset.loaded === "true") resolve();
-      else {
-        existing.addEventListener("load", resolve, { once: true });
-        existing.addEventListener("error", reject, { once: true });
-      }
-      return;
-    }
-
+function appendPageScript_(name, url) {
+  return new Promise(function(resolve, reject) {
     const script = document.createElement("script");
-    script.src = "./js/pages/" + name + ".js?v=" + APP_ASSET_VERSION;
+    script.src = url;
     script.async = false;
     script.dataset.pageModule = name;
     script.addEventListener("load", function() {
@@ -401,11 +405,39 @@ function loadPageScript_(name) {
       resolve();
     }, { once: true });
     script.addEventListener("error", function() {
-      delete APP_LOADED_SCRIPTS[name];
-      reject(new Error("Could not load the " + name + " page module."));
+      script.remove();
+      reject(new Error("Could not load the " + name + " page module from " + url));
     }, { once: true });
     document.head.appendChild(script);
   });
+}
+
+function loadPageScript_(name) {
+  if (APP_LOADED_SCRIPTS[name]) return APP_LOADED_SCRIPTS[name];
+
+  APP_LOADED_SCRIPTS[name] = (async function() {
+    const existing = document.querySelector('script[data-page-module="' + name + '"][data-loaded="true"]');
+    if (existing) return;
+
+    const primaryUrl = appPageScriptUrl_(name, "");
+    try {
+      await appendPageScript_(name, primaryUrl);
+      return;
+    } catch (firstError) {
+      console.warn("Page module first load failed; retrying without cache:", name, firstError);
+    }
+
+    const retryUrl = appPageScriptUrl_(name, String(Date.now()));
+    try {
+      await appendPageScript_(name, retryUrl);
+    } catch (retryError) {
+      delete APP_LOADED_SCRIPTS[name];
+      throw new Error(
+        "Could not load the " + name + " page module. " +
+        "Confirm this file exists: " + new URL(name + ".js", APP_PAGE_SCRIPT_BASE_URL).pathname
+      );
+    }
+  })();
 
   return APP_LOADED_SCRIPTS[name];
 }

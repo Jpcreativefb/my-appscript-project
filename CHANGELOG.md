@@ -30,3 +30,9 @@
 - Reduced dashboard summary counting to one indexed pass per table.
 - Added admin-only long-load progress messages and a safe retry action.
 - Added season-load performance diagnostics and a 30-contestant regression test.
+
+## v1.1.3 - Admin Games module loader repair
+- Fixed `adminGames.js` lazy-load failures under VS Code Live Server.
+- Disabled and cleared stale Awards App service workers/caches on localhost.
+- Added cache-busting retry and exact module-path diagnostics.
+- Updated Reality TV staged question-pack regression tests.
