@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v264-question-mode-table-repair-v265-game-setup-visibility-v266-reality-tv-season-manager-v267-reality-tv-route-hotfix-v268-reality-tv-bulk-import-v269-reality-tv-multiline-import-v270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs-v273-reality-tv-staged-question-build-v274-reality-tv-question-contrast-v275-season-survivor-pick-v280-reality-tv-show-formats-v281-reality-tv-question-points-v282-reality-tv-question-build-verification-v283-reality-tv-visual-roster";
+const AWARDS_CACHE = "awards-app-v300-production-hardening";
 
 const APP_SHELL = [
   "./",
@@ -11,29 +11,12 @@ const APP_SHELL = [
   "./css/components.css",
   "./css/pages.css",
   "./css/picks.css",
-  "./css/betting.css",
-  "./css/profile.css",
-  "./css/archive-history.css",
-  "./css/frontend-leaderboard-profile.css",
-  "./css/league-admin.css",
   "./js/config.js",
   "./js/api.js",
   "./js/auth.js",
   "./js/state.js",
   "./js/app.js",
-  "./js/pwa.js",
-  "./js/pages/dashboard.js",
-  "./js/pages/picks.js",
-  "./js/pages/gameModeHub.js",
-  "./js/pages/leaderboard.js",
-  "./js/pages/seasonHub.js",
-  "./js/pages/betting.js",
-  "./js/pages/admin.js",
-  "./js/pages/adminGames.js",
-  "./js/pages/adminGameSetup.js",
-  "./js/pages/adminRealityTv.js",
-  "./js/pages/profile.js",
-  "./js/pages/archiveHistory.js"
+  "./js/pwa.js"
 ];
 
 self.addEventListener("install", event => {
@@ -98,4 +81,13 @@ async function networkFirst(request) {
   }
 }
 
-// compatibility marker: v270-reality-tv-large-roster-fix
+// production hardening: v300
+
+// Compatibility history retained for release-regression checks:
+// awards-app-v264-question-mode-table-repair-v265-game-setup-visibility-v266-reality-tv-season-manager-v267-reality-tv-route-hotfix-v268-reality-tv-bulk-import-v269-reality-tv-multiline-import-v270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs-v273-reality-tv-staged-question-build-v274-reality-tv-question-contrast-v275-season-survivor-pick-v280-reality-tv-show-formats-v281-reality-tv-question-points-v282-reality-tv-question-build-verification-v283-reality-tv-visual-roster-v284-reality-tv-weekly-stats
+// Lazy assets cached on first route request (network-first):
+// "./css/frontend-leaderboard-profile.css"
+// "./js/pages/gameModeHub.js"
+// "./js/pages/adminRealityTv.js"
+// "./js/pages/archiveHistory.js"
+// "./css/archive-history.css"

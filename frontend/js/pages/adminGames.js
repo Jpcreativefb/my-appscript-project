@@ -55,6 +55,8 @@ function adminGamesStatusBadge(game) {
 
 async function renderAdminGamesPage() {
 
+  setPageLoadStep(50, "Loading games and publishing controls…");
+
   const res =
     await apiAdminGetGames();
 

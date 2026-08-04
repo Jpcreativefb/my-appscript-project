@@ -7,6 +7,12 @@ document.addEventListener("DOMContentLoaded", async () => {
   const session =
      getSession();
 
+  showLoader({
+    percent: 6,
+    detail: "Checking your session…",
+    title: "Opening Awards App"
+  });
+
   // 🔒 AUTH GUARD
    if (
      !session ||
@@ -27,6 +33,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     session.token &&
     typeof apiValidateSession === "function"
   ) {
+
+    updateLoaderProgress(14, "Validating account access…");
 
     const validation =
       await apiValidateSession(
@@ -94,6 +102,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // This keeps the first dashboard render from making an extra Apps Script call.
 
   // 🚀 INIT APP
+  updateLoaderProgress(22, "Preparing navigation…");
   initApp();
 
 });
@@ -115,8 +124,6 @@ function initApp(session) {
     "INIT SESSION:",
     activeSession
   );
-
-  hideLoader();
 
   bindGlobalEvents();
 
@@ -202,21 +209,82 @@ function setupAdminNav(session) {
 }
 
 /* ======================
-   LOADER CONTROL
+   ROLE-AWARE LOADER CONTROL
 ====================== */
+
+const APP_LOADER_STATE = {
+  visible: false,
+  percent: 0,
+  detail: "",
+  hideTimer: null
+};
+
+function isAdminPage_(page) {
+  page = String(page || APP_STATE.currentPage || "");
+  return page === "admin" ||
+    page === "admin-games" ||
+    page === "admin-reality-tv" ||
+    page.indexOf("admin-game-setup:") === 0;
+}
+
+function loaderUsesAdminDetails_() {
+  return isAdminSession(getSession()) && isAdminPage_(APP_STATE.currentPage || window.location.hash.replace("#", ""));
+}
+
+function showLoader(options) {
+  options = options || {};
+  const loader = document.getElementById("loader");
+  if (!loader) return;
+
+  if (APP_LOADER_STATE.hideTimer) {
+    clearTimeout(APP_LOADER_STATE.hideTimer);
+    APP_LOADER_STATE.hideTimer = null;
+  }
+
+  APP_LOADER_STATE.visible = true;
+  loader.classList.remove("hidden");
+  loader.classList.toggle("is-admin", loaderUsesAdminDetails_());
+
+  const title = document.getElementById("loaderTitle");
+  if (title) title.textContent = options.title || (loaderUsesAdminDetails_() ? "Loading Admin Tools" : "Loading");
+
+  updateLoaderProgress(
+    options.percent === undefined ? Math.max(APP_LOADER_STATE.percent, 4) : options.percent,
+    options.detail || APP_LOADER_STATE.detail || "Preparing page…"
+  );
+}
+
+function updateLoaderProgress(percent, detail) {
+  const normalized = Math.max(0, Math.min(100, Number(percent) || 0));
+  APP_LOADER_STATE.percent = normalized;
+  if (detail !== undefined) APP_LOADER_STATE.detail = String(detail || "");
+
+  const bar = document.getElementById("loaderBar");
+  const percentNode = document.getElementById("loaderPercent");
+  const detailNode = document.getElementById("loaderDetail");
+
+  if (bar) bar.style.width = normalized + "%";
+  if (percentNode) percentNode.textContent = Math.round(normalized) + "%";
+  if (detailNode && detail !== undefined) detailNode.textContent = APP_LOADER_STATE.detail;
+}
+
+function setPageLoadStep(percent, adminDetail) {
+  if (!APP_LOADER_STATE.visible) return;
+  updateLoaderProgress(percent, adminDetail || APP_LOADER_STATE.detail);
+}
 
 function hideLoader() {
   const loader = document.getElementById("loader");
-  if (loader) {
-    loader.classList.add("hidden");
-  }
-}
+  if (!loader) return;
 
-function showLoader() {
-  const loader = document.getElementById("loader");
-  if (loader) {
-    loader.classList.remove("hidden");
-  }
+  updateLoaderProgress(100, loaderUsesAdminDetails_() ? "Ready" : "");
+  APP_LOADER_STATE.hideTimer = setTimeout(function() {
+    loader.classList.add("hidden");
+    loader.classList.remove("is-admin");
+    APP_LOADER_STATE.visible = false;
+    APP_LOADER_STATE.percent = 0;
+    APP_LOADER_STATE.detail = "";
+  }, 120);
 }
 
 /* ======================
@@ -282,6 +350,78 @@ function logout() {
 
 
 /* ======================
+   ROUTE-BASED PAGE MODULES
+====================== */
+
+const APP_ASSET_VERSION = "300-production-hardening";
+const APP_LOADED_SCRIPTS = {};
+
+const APP_PAGE_MODULES = {
+  "dashboard": ["dashboard"],
+  "picks": ["picks"],
+  "game-hub": ["gameModeHub"],
+  "betting": ["betting"],
+  "leaderboard": ["leaderboard"],
+  "season-hub": ["seasonHub"],
+  "leagues": ["leagues"],
+  "admin": ["admin", "adminUi"],
+  "admin-games": ["admin", "adminUi", "adminGames"],
+  "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
+  "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
+  "profile": ["profile"],
+  "history": ["archiveHistory"]
+};
+
+function pageModuleKey_(page) {
+  return String(page || "").indexOf("admin-game-setup:") === 0
+    ? "admin-game-setup"
+    : String(page || "");
+}
+
+function loadPageScript_(name) {
+  if (APP_LOADED_SCRIPTS[name]) return APP_LOADED_SCRIPTS[name];
+
+  APP_LOADED_SCRIPTS[name] = new Promise(function(resolve, reject) {
+    const existing = document.querySelector('script[data-page-module="' + name + '"]');
+    if (existing) {
+      if (existing.dataset.loaded === "true") resolve();
+      else {
+        existing.addEventListener("load", resolve, { once: true });
+        existing.addEventListener("error", reject, { once: true });
+      }
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = "./js/pages/" + name + ".js?v=" + APP_ASSET_VERSION;
+    script.async = false;
+    script.dataset.pageModule = name;
+    script.addEventListener("load", function() {
+      script.dataset.loaded = "true";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", function() {
+      delete APP_LOADED_SCRIPTS[name];
+      reject(new Error("Could not load the " + name + " page module."));
+    }, { once: true });
+    document.head.appendChild(script);
+  });
+
+  return APP_LOADED_SCRIPTS[name];
+}
+
+async function ensurePageModules_(page) {
+  const names = APP_PAGE_MODULES[pageModuleKey_(page)] || [];
+  if (!names.length) return;
+
+  for (let index = 0; index < names.length; index += 1) {
+    const percent = 18 + Math.round(((index + 1) / names.length) * 18);
+    setPageLoadStep(percent, "Loading " + names[index].replace(/([A-Z])/g, " $1").trim() + " tools…");
+    await loadPageScript_(names[index]);
+  }
+}
+
+/* ======================
    NAVIGATION CORE
 ====================== */
 
@@ -311,13 +451,24 @@ async function navigate(page, options) {
 
   app.classList.add("page-enter");
 
-  showLoader();
+  APP_STATE.currentPage = page;
+  showLoader({
+    percent: 8,
+    title: isAdminPage_(page) ? "Loading Admin Tools" : "Loading",
+    detail: isAdminPage_(page) ? "Preparing " + page.replace(/[-:]/g, " ") + "…" : ""
+  });
 
   window.location.hash = page;
 
   try {
 
+    await ensurePageModules_(page);
+    setPageLoadStep(42, isAdminPage_(page) ? "Requesting page data…" : "");
     await renderPage(page);
+    if (isAdminPage_(page) && typeof adminUiEnhancePage === "function") {
+      adminUiEnhancePage(app);
+    }
+    setPageLoadStep(94, isAdminPage_(page) ? "Finishing page layout…" : "");
 
   } catch (err) {
 
@@ -727,6 +878,9 @@ async function renderPage(page) {
 
       if (typeof adminEnhanceMainAdminSections === "function") {
         adminEnhanceMainAdminSections();
+      }
+      if (typeof adminUiEnhancePage === "function") {
+        setTimeout(function() { adminUiEnhancePage(app); }, 0);
       }
 
       break;

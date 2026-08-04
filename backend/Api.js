@@ -182,6 +182,8 @@ function doGet(e) {
       "adminSetupRealityTvSystem",
       "adminConfigureRealityTvHub",
       "adminGetRealityTvDashboard",
+      "adminGetRealityTvDashboardSummary",
+      "adminGetRealityTvSeasonDetails",
       "adminSaveRealityTvGroups",
       "adminCreateRealityTvSeason",
       "adminAddRealityTvContestant",
@@ -856,6 +858,14 @@ function doGet(e) {
 
     if (action === "adminGetRealityTvDashboard") {
       return json(apiAdminGetRealityTvDashboard(params));
+    }
+
+    if (action === "adminGetRealityTvDashboardSummary") {
+      return json(apiAdminGetRealityTvDashboardSummary(params));
+    }
+
+    if (action === "adminGetRealityTvSeasonDetails") {
+      return json(apiAdminGetRealityTvSeasonDetails(params));
     }
 
     if (action === "adminSaveRealityTvGroups") {

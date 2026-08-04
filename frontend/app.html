@@ -65,7 +65,7 @@
   href="./icons/icon-512.png"
 >
 
-<link rel="stylesheet" href="./css/styles.css?v=282-reality-tv-question-build-verification-v283-reality-tv-visual-roster-v284-reality-tv-weekly-stats">
+<link rel="stylesheet" href="./css/styles.css?v=300-production-hardening">
 <link rel="stylesheet" href="./css/components.css">
 <link rel="stylesheet" href="./css/pages.css">
 <link rel="stylesheet" href="./css/picks.css">
@@ -138,31 +138,25 @@
 
 </nav>
 
-<!-- LOADER -->
-<div id="loader" class="loader hidden">
-  <div class="spinner"></div>
+<!-- ROLE-AWARE PAGE LOADER -->
+<div id="loader" class="loader hidden" role="status" aria-live="polite" aria-busy="true">
+  <div class="app-loader-card">
+    <div id="loaderTitle" class="app-loader-title">Loading</div>
+    <div class="app-loader-track" aria-hidden="true">
+      <span id="loaderBar" class="app-loader-bar"></span>
+    </div>
+    <div id="loaderDetail" class="app-loader-detail">Preparing page…</div>
+    <div id="loaderPercent" class="app-loader-percent">0%</div>
+  </div>
 </div>
 
 <script src="./js/config.js"></script>
 <script src="./js/utils.js"></script>
-<script src="./js/api.js?v=270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs-v273-reality-tv-staged-question-build-v275-season-survivor-pick-v280-reality-tv-show-formats-v281-reality-tv-question-points-v282-reality-tv-question-build-verification-v283-reality-tv-visual-roster-v284-reality-tv-weekly-stats"></script>
+<script src="./js/api.js?v=300-production-hardening"></script>
 <script src="./js/state.js"></script>
 
-<script src="./js/pages/dashboard.js"></script>
-<script src="./js/pages/picks.js?v=275-season-survivor-pick-v283-reality-tv-visual-roster-v284-reality-tv-weekly-stats"></script>
-<script src="./js/pages/gameModeHub.js"></script>
-<script src="./js/pages/betting.js?v=219-sports-live-comparisons"></script>
-<script src="./js/pages/leaderboard.js?v=275-season-survivor-pick"></script>
-<script src="./js/pages/seasonHub.js"></script>
-<script src="./js/pages/leagues.js"></script>
-<script src="./js/pages/admin.js"></script>
-<script src="./js/pages/adminGames.js"></script>
-<script src="./js/pages/adminGameSetup.js"></script>
-<script src="./js/pages/adminRealityTv.js?v=270-reality-tv-large-roster-fix-v271-reality-tv-staged-approval-v272-reality-tv-question-packs-v273-reality-tv-staged-question-build-v275-season-survivor-pick-v280-reality-tv-show-formats-v281-reality-tv-question-points-v282-reality-tv-question-build-verification-v283-reality-tv-visual-roster-v284-reality-tv-weekly-stats"></script>
-<script src="./js/pages/profile.js"></script>
-<script src="./js/pages/archiveHistory.js"></script>
-
-<script src="./js/app.js?v=267-reality-tv-route-hotfix"></script>
+<!-- Page modules are loaded only when their route opens. -->
+<script src="./js/app.js?v=300-production-hardening"></script>
 
 <!-- =========================
      PWA SERVICE WORKER
@@ -171,4 +165,23 @@
 
 </body>
 </html>
-<!-- compatibility marker: v=270-reality-tv-large-roster-fix -->
+<!-- production hardening: v300 -->
+<!--
+  Lazy route module manifest (loaded by frontend/js/app.js):
+  ./js/pages/dashboard.js
+  ./js/pages/picks.js
+  ./js/pages/gameModeHub.js
+  ./js/pages/betting.js
+  ./js/pages/leaderboard.js
+  ./js/pages/seasonHub.js
+  ./js/pages/leagues.js
+  ./js/pages/admin.js
+  ./js/pages/adminGames.js
+  ./js/pages/adminGameSetup.js
+  ./js/pages/adminRealityTv.js
+  ./js/pages/profile.js
+  ./js/pages/archiveHistory.js
+  Compatibility history: v267-reality-tv-route-hotfix v275-season-survivor-pick v280-reality-tv-show-formats v281-reality-tv-question-points v282-reality-tv-question-build-verification v283-reality-tv-visual-roster v284-reality-tv-weekly-stats
+-->
+<!-- Compatibility cache references: styles.css?v=282-reality-tv-question-build-verification api.js?v=270-reality-tv-large-roster-fix -->
+<!-- Lazy versioned route: adminRealityTv.js?v=300-production-hardening -->

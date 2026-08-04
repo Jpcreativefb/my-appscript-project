@@ -13,6 +13,8 @@ const PROFILE_DEFAULT_EMOJI = "🏆";
 
 async function renderProfilePage() {
 
+  setPageLoadStep(50, "Loading profile and history…");
+
   const session =
     getSessionSafe_();
 

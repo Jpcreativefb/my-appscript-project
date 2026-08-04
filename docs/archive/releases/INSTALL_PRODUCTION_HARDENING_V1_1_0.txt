@@ -1,0 +1,23 @@
+PRODUCTION HARDENING v1.1.0 — CHANGED FILES INSTALL
+
+1. Back up or commit your current project.
+2. Copy this package over the project root, preserving folders.
+3. Optional repository cleanup:
+     bash tools/cleanup_repository_docs.sh .
+   This moves old root release notes/reports into docs/archive/releases,
+   moves README guides into docs/guides, deletes two empty accidental files,
+   and preserves all automated tests.
+4. Backend:
+     clasp push -f
+   Then edit the existing Apps Script web-app deployment and deploy a New version.
+5. Frontend:
+     git add .
+     git commit -m "Production hardening v1.1.0"
+     git push
+6. After Cloudflare deploys, hard-refresh the application.
+7. Complete PRODUCTION_SMOKE_TEST_V1_1_0.md before wider use.
+
+IMPORTANT
+- This release intentionally pauses new features.
+- External Results Hub queued synchronization and Awards Manager are not included.
+- Do not delete tests; they are not loaded by production and protect against regressions.

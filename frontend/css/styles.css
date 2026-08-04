@@ -280,54 +280,181 @@
   }
   
   /* ======================
-     LOADER
+     ROLE-AWARE PAGE LOADER
   ====================== */
-  
-  .loader{
-  
-    position:fixed;
-    inset:0;
-  
-    background:
-      rgba(255,255,255,0.65);
-  
-    display:flex;
-    align-items:center;
-    justify-content:center;
-  
-    font-size:22px;
-    font-weight:700;
-  
-    z-index:9999;
+
+  .loader {
+    position: fixed;
+    inset: 0;
+    background: rgba(3, 7, 18, 0.72);
+    backdrop-filter: blur(3px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 9999;
   }
 
   .loader.hidden {
     display: none !important;
   }
 
-  .spinner {
-
-  width: 34px;
-  height: 34px;
-
-  border-radius: 50%;
-
-  border:
-    3px solid rgba(0,0,0,0.15);
-
-  border-top:
-    3px solid #111;
-
-  animation:
-    spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
+  .app-loader-card {
+    width: min(420px, calc(100vw - 40px));
+    padding: 22px 22px 18px;
+    border-radius: 18px;
+    border: 1px solid rgba(212, 175, 55, 0.5);
+    background: rgba(17, 24, 39, 0.97);
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.42);
+    color: #f9fafb;
   }
-}
-  
+
+  .app-loader-title {
+    margin-bottom: 12px;
+    font-size: 17px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    text-align: center;
+  }
+
+  .app-loader-track {
+    position: relative;
+    height: 10px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.12);
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
+  }
+
+  .app-loader-bar {
+    display: block;
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #9f7418, #d4af37 48%, #f7df86);
+    box-shadow: 0 0 18px rgba(212, 175, 55, 0.45);
+    transition: width 180ms ease;
+  }
+
+  .app-loader-detail {
+    display: none;
+    min-height: 20px;
+    margin-top: 12px;
+    color: #e5e7eb;
+    font-size: 13px;
+    line-height: 1.45;
+    text-align: center;
+  }
+
+  .loader.is-admin .app-loader-detail {
+    display: block;
+  }
+
+  .app-loader-percent {
+    margin-top: 9px;
+    color: #d4af37;
+    font-size: 12px;
+    font-weight: 800;
+    text-align: center;
+  }
+
+  .loader.is-admin .app-loader-percent {
+    margin-top: 5px;
+  }
+
+  /* Common admin action progress used across all manager pages. */
+  .admin-action-progress-wrap {
+    display: grid;
+    gap: 6px;
+    width: min(280px, 100%);
+    margin-top: 8px;
+  }
+
+  .admin-action-progress-track {
+    height: 6px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.25);
+  }
+
+  .admin-action-progress-fill {
+    display: block;
+    width: 18%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #9f7418, #d4af37, #f7df86);
+    animation: adminSharedProgress 1.05s ease-in-out infinite;
+  }
+
+  .admin-action-progress-text {
+    color: #cbd5e1;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .admin-action-progress-wrap.is-success .admin-action-progress-fill {
+    width: 100%;
+    background: #22c55e;
+    animation: none;
+  }
+
+  .admin-action-progress-wrap.is-error .admin-action-progress-fill {
+    width: 100%;
+    background: #ef4444;
+    animation: none;
+  }
+
+  .admin-page button.is-admin-processing,
+  .admin-page .button.is-admin-processing {
+    border-color: #d4af37 !important;
+    background: linear-gradient(135deg, #9f7418, #d4af37) !important;
+    color: #111827 !important;
+    box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.18);
+  }
+
+  .admin-page button.is-admin-success,
+  .admin-page .button.is-admin-success {
+    border-color: #22c55e !important;
+    background: #166534 !important;
+    color: #f0fdf4 !important;
+  }
+
+  .admin-page button.is-admin-error,
+  .admin-page .button.is-admin-error {
+    border-color: #ef4444 !important;
+    background: #991b1b !important;
+    color: #fef2f2 !important;
+  }
+
+  @keyframes adminSharedProgress {
+    0% { transform: translateX(-110%); width: 24%; }
+    55% { width: 48%; }
+    100% { transform: translateX(420%); width: 24%; }
+  }
+
+  .admin-help-wrap.admin-help-auto {
+    margin-left: 6px;
+    vertical-align: middle;
+  }
+
+  .admin-lazy-section-body {
+    min-height: 96px;
+  }
+
+  .admin-lazy-section-loading {
+    display: grid;
+    gap: 10px;
+    padding: 20px;
+    color: #cbd5e1;
+    text-align: center;
+  }
+
+  .admin-lazy-section-loading .app-loader-track {
+    max-width: 360px;
+    width: 100%;
+    margin: 0 auto;
+  }
+
   /* ======================
      RESPONSIVE
   ====================== */

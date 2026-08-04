@@ -856,70 +856,141 @@ async function adminRealityTvSaveGroups(seasonId) {
   }
 }
 
+function adminRealityTvSeasonBody_(bundle) {
+  const season = bundle.season || {};
+  const current = adminRealityTvCurrentEpisode_(bundle);
+  return `
+    <div class="reality-tv-season-overview">
+      <div><b>Format:</b> ${adminRealityTvEscape_(adminRealityTvShowFormat_(season.ShowFormat).label)}</div>
+      <div><b>Participants:</b> ${adminRealityTvEscape_(season.ParticipantLabel || "Contestant")}</div>
+      <div><b>Schedule:</b> every ${adminRealityTvEscape_(season.WeeklyIntervalDays)} days</div>
+      <div><b>Lock offset:</b> ${adminRealityTvEscape_(season.LockOffsetMinutes)} minutes before airtime</div>
+      <div><b>Current:</b> ${current ? adminRealityTvEscape_(current.EpisodeName) : "None"}</div>
+    </div>
+    ${adminRealityTvResultPanel_(bundle)}
+    ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
+    ${adminRealityTvQuestionPackPanel_(bundle)}
+    ${adminRealityTvGroupsPanel_(bundle)}
+    ${adminRealityTvSeasonAnchorPanel_(bundle)}
+    ${adminRealityTvContestantRows_(bundle.contestants)}
+
+    <details class="reality-tv-subsection">
+      <summary>Add participant(s) to this season</summary>
+      <div class="admin-form-grid">
+        <input id="realityTvAddName_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Participant / team name">
+        <input id="realityTvAddImage_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Image URL (optional)">
+        <input id="realityTvAddTeam_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Team / tribe (optional)">
+      </div>
+      <button class="admin-small-button" onclick="adminRealityTvAddContestant('${adminRealityTvEscape_(season.SeasonId)}')">Add One Participant</button>
+
+      <div class="reality-tv-existing-bulk-add">
+        <h4>Mass add participants</h4>
+        <div class="admin-sub">Use the same spreadsheet format as the season builder. Existing participants or teams are skipped safely.</div>
+        <textarea id="realityTvBulkContestants_${adminRealityTvEscape_(season.SeasonId)}" class="input reality-tv-bulk-textarea" rows="6" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
+        <div class="admin-actions reality-tv-bulk-actions">
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('${adminRealityTvEscape_(season.SeasonId)}')">Load Example</button>
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('${adminRealityTvEscape_(season.SeasonId)}')">Preview</button>
+          <button type="button" class="admin-small-button" onclick="adminRealityTvBulkAddToSeason('${adminRealityTvEscape_(season.SeasonId)}')">Add All Valid Contestants</button>
+        </div>
+        <div id="realityTvBulkPreview_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-bulk-preview"></div>
+      </div>
+      <div class="admin-sub">New participants or teams are added to the season roster. Existing questions are not changed; they appear in the next newly created period.</div>
+    </details>
+
+    <details class="reality-tv-subsection">
+      <summary>${adminRealityTvEscape_(season.PeriodLabel || "Episode")} history</summary>
+      ${adminRealityTvEpisodesTable_(bundle.episodes)}
+    </details>
+
+    <div class="admin-actions">
+      <button class="admin-small-button secondary" onclick="navigate('admin-game-setup:${adminRealityTvEscape_(season.GameId)}')">Open Game Setup</button>
+      <button class="admin-small-button secondary" onclick="adminRealityTvCreateNextEpisode('${adminRealityTvEscape_(season.SeasonId)}')">Create Next ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Manually</button>
+    </div>
+  `;
+}
+
 function adminRealityTvSeasonCard_(bundle) {
   const season = bundle.season;
-  const current = adminRealityTvCurrentEpisode_(bundle);
   return `
     <details class="card admin-card admin-collapsible-card reality-tv-season-card" open>
       <summary class="admin-card-summary">
         <div>
           <h2>${adminRealityTvEscape_(season.ShowName)} — ${adminRealityTvEscape_(season.SeasonName)}</h2>
-          <div class="admin-sub">
-            Game: ${adminRealityTvEscape_(season.GameId)} · Current ${adminRealityTvEscape_(String(season.PeriodLabel || "period").toLowerCase())} ${adminRealityTvEscape_(season.CurrentEpisodeNumber)}
-          </div>
+          <div class="admin-sub">Game: ${adminRealityTvEscape_(season.GameId)} · Current ${adminRealityTvEscape_(String(season.PeriodLabel || "period").toLowerCase())} ${adminRealityTvEscape_(season.CurrentEpisodeNumber)}</div>
         </div>
         <span class="reality-tv-status-pill ${adminRealityTvStatusClass_(season.Status)}">${adminRealityTvEscape_(season.Status)}</span>
       </summary>
-      <div class="admin-collapsible-body">
-        <div class="reality-tv-season-overview">
-          <div><b>Format:</b> ${adminRealityTvEscape_(adminRealityTvShowFormat_(season.ShowFormat).label)}</div>
-          <div><b>Participants:</b> ${adminRealityTvEscape_(season.ParticipantLabel || "Contestant")}</div>
-          <div><b>Schedule:</b> every ${adminRealityTvEscape_(season.WeeklyIntervalDays)} days</div>
-          <div><b>Lock offset:</b> ${adminRealityTvEscape_(season.LockOffsetMinutes)} minutes before airtime</div>
-          <div><b>Current:</b> ${current ? adminRealityTvEscape_(current.EpisodeName) : "None"}</div>
+      <div class="admin-collapsible-body">${adminRealityTvSeasonBody_(bundle)}</div>
+    </details>
+  `;
+}
+
+function adminRealityTvSeasonSummaryCard_(bundle) {
+  const season = bundle.season || {};
+  const summary = bundle.summary || {};
+  const current = bundle.currentEpisode || null;
+  const seasonId = adminRealityTvEscape_(season.SeasonId);
+  return `
+    <details class="card admin-card admin-collapsible-card reality-tv-season-card reality-tv-season-summary-card"
+      data-reality-season-summary="${seasonId}"
+      ontoggle="adminRealityTvLoadSeasonDetails_(event, '${seasonId}')">
+      <summary class="admin-card-summary">
+        <div>
+          <h2>${adminRealityTvEscape_(season.ShowName)} — ${adminRealityTvEscape_(season.SeasonName)}</h2>
+          <div class="admin-sub">
+            ${adminRealityTvEscape_(adminRealityTvShowFormat_(season.ShowFormat).label)} ·
+            ${adminRealityTvEscape_(summary.contestants || 0)} ${adminRealityTvEscape_(String(season.ParticipantLabel || "participants").toLowerCase())} ·
+            ${adminRealityTvEscape_(summary.episodes || 0)} ${adminRealityTvEscape_(String(season.PeriodLabel || "periods").toLowerCase())}
+            ${summary.pendingReviews ? ` · <b>${adminRealityTvEscape_(summary.pendingReviews)} pending review</b>` : ""}
+          </div>
+          <div class="admin-sub">Current: ${current ? adminRealityTvEscape_(current.EpisodeName || (season.PeriodLabel + " " + current.EpisodeNumber)) : "Not created"}</div>
         </div>
-        ${adminRealityTvResultPanel_(bundle)}
-        ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
-        ${adminRealityTvQuestionPackPanel_(bundle)}
-        ${adminRealityTvGroupsPanel_(bundle)}
-        ${adminRealityTvSeasonAnchorPanel_(bundle)}
-        ${adminRealityTvContestantRows_(bundle.contestants)}
-
-        <details class="reality-tv-subsection">
-          <summary>Add participant(s) to this season</summary>
-          <div class="admin-form-grid">
-            <input id="realityTvAddName_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Participant / team name">
-            <input id="realityTvAddImage_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Image URL (optional)">
-            <input id="realityTvAddTeam_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Team / tribe (optional)">
-          </div>
-          <button class="admin-small-button" onclick="adminRealityTvAddContestant('${adminRealityTvEscape_(season.SeasonId)}')">Add One Participant</button>
-
-          <div class="reality-tv-existing-bulk-add">
-            <h4>Mass add participants</h4>
-            <div class="admin-sub">Use the same spreadsheet format as the season builder. Existing participants or teams are skipped safely.</div>
-            <textarea id="realityTvBulkContestants_${adminRealityTvEscape_(season.SeasonId)}" class="input reality-tv-bulk-textarea" rows="6" placeholder="Name    Full Name    Image URL    Team / Tribe    Age    Hometown    Occupation    Biography    External Subject ID"></textarea>
-            <div class="admin-actions reality-tv-bulk-actions">
-              <button type="button" class="admin-small-button secondary" onclick="adminRealityTvLoadBulkExample_('${adminRealityTvEscape_(season.SeasonId)}')">Load Example</button>
-              <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewBulk_('${adminRealityTvEscape_(season.SeasonId)}')">Preview</button>
-              <button type="button" class="admin-small-button" onclick="adminRealityTvBulkAddToSeason('${adminRealityTvEscape_(season.SeasonId)}')">Add All Valid Contestants</button>
-            </div>
-            <div id="realityTvBulkPreview_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-bulk-preview"></div>
-          </div>
-          <div class="admin-sub">New participants or teams are added to the season roster. Existing questions are not changed; they appear in the next newly created period.</div>
-        </details>
-
-        <details class="reality-tv-subsection">
-          <summary>${adminRealityTvEscape_(season.PeriodLabel || "Episode")} history</summary>
-          ${adminRealityTvEpisodesTable_(bundle.episodes)}
-        </details>
-
-        <div class="admin-actions">
-          <button class="admin-small-button secondary" onclick="navigate('admin-game-setup:${adminRealityTvEscape_(season.GameId)}')">Open Game Setup</button>
-          <button class="admin-small-button secondary" onclick="adminRealityTvCreateNextEpisode('${adminRealityTvEscape_(season.SeasonId)}')">Create Next ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Manually</button>
+        <span class="reality-tv-status-pill ${adminRealityTvStatusClass_(season.Status)}">${adminRealityTvEscape_(season.Status)}</span>
+      </summary>
+      <div id="realityTvSeasonDetail_${seasonId}" class="admin-collapsible-body admin-lazy-section-body">
+        <div class="admin-lazy-section-loading">
+          <span>Expand this season to load contestants, episodes, questions, results, and settings.</span>
         </div>
       </div>
     </details>
   `;
+}
+
+async function adminRealityTvLoadSeasonDetails_(event, seasonId) {
+  const details = event && event.currentTarget;
+  if (!details || !details.open || details.dataset.detailsLoaded === "true" || details.dataset.detailsLoading === "true") return;
+
+  const target = document.getElementById("realityTvSeasonDetail_" + seasonId);
+  if (!target) return;
+  details.dataset.detailsLoading = "true";
+  target.innerHTML = `
+    <div class="admin-lazy-section-loading">
+      <b>Loading season details…</b>
+      <div class="app-loader-track"><span class="app-loader-bar" style="width:68%"></span></div>
+      <span>Reading this season only. Other seasons remain unloaded for faster administration.</span>
+    </div>`;
+
+  try {
+    const response = await apiAdminGetRealityTvSeasonDetails(seasonId);
+    if (!response || response.success === false || !response.bundle) {
+      throw new Error(adminRealityTvResponseError_(response, "Could not load this season."));
+    }
+    const bundle = response.bundle;
+    const index = (ADMIN_REALITY_TV_DASHBOARD.seasons || []).findIndex(function(item) {
+      return item && item.season && String(item.season.SeasonId) === String(seasonId);
+    });
+    if (index !== -1) ADMIN_REALITY_TV_DASHBOARD.seasons[index] = bundle;
+    target.innerHTML = adminRealityTvSeasonBody_(bundle);
+    details.dataset.detailsLoaded = "true";
+    setTimeout(function() {
+      adminRealityTvAnchorPreview_(seasonId);
+      if (typeof adminUiEnhancePage === "function") adminUiEnhancePage(details);
+    }, 0);
+  } catch (err) {
+    target.innerHTML = `<div class="admin-message error">${adminRealityTvEscape_(err.message || String(err))}<br><button type="button" class="admin-small-button" onclick="this.closest('details').dataset.detailsLoading='false'; this.closest('details').dispatchEvent(new Event('toggle'))">Retry</button></div>`;
+  } finally {
+    details.dataset.detailsLoading = "false";
+  }
 }
 
 function adminRealityTvBlankRosterRows_(count) {
@@ -1160,20 +1231,19 @@ function adminRealityTvApplyBulkToRoster_(mode) {
 
 async function renderAdminRealityTvPage() {
   try {
-    const res = await apiAdminGetRealityTvDashboard();
+    setPageLoadStep(50, "Loading season summaries…");
+    const res = await apiAdminGetRealityTvDashboardSummary();
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not load Reality TV manager.");
     ADMIN_REALITY_TV_DASHBOARD = res;
     ADMIN_REALITY_TV_ROSTER_ROW = 0;
     setTimeout(function() {
       adminRealityTvApplyCreateFormat_(false);
       adminRealityTvAnchorPreview_("create");
-      (res.seasons || []).forEach(function(bundle) {
-        if (bundle && bundle.season) adminRealityTvAnchorPreview_(bundle.season.SeasonId);
-      });
+
     }, 0);
 
     const hubStatus = res.hubConfigured
-      ? `<div class="admin-message success">Connected to External Results Hub: <b>${adminRealityTvEscape_(res.hubSpreadsheetName || res.hubSpreadsheetId)}</b></div>`
+      ? `<div class="admin-message success">Connected to External Results Hub: <b>${adminRealityTvEscape_(res.hubSpreadsheetName || res.hubSpreadsheetId || "Connected spreadsheet")}</b></div>`
       : `<div class="admin-message warning">External Results Hub is not connected. The manager still works, but Hub mappings and review records will not be mirrored.</div>`;
 
     return `
@@ -1294,7 +1364,9 @@ async function renderAdminRealityTvPage() {
         </details>
 
         <div class="reality-tv-season-list">
-          ${(res.seasons || []).map(adminRealityTvSeasonCard_).join("") || `<div class="card admin-card"><p>No Reality TV seasons have been created yet.</p></div>`}
+          ${(res.seasons || []).map(function(bundle) {
+            return res.lightweight ? adminRealityTvSeasonSummaryCard_(bundle) : adminRealityTvSeasonCard_(bundle);
+          }).join("") || `<div class="card admin-card"><p>No Reality TV seasons have been created yet.</p></div>`}
         </div>
       </div>
     `;

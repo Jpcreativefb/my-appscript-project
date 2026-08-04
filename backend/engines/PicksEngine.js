@@ -619,9 +619,9 @@ function apiGetMyPicks(username, gameId) {
       );
 
     const settings =
-      getCategorySettings(
-        gameId
-      );
+      typeof getCategorySettingsCached === "function"
+        ? getCategorySettingsCached(gameId)
+        : getCategorySettings(gameId);
 
     const gameConfig =
       typeof getGameRuntimeConfig === "function"
@@ -1150,9 +1150,9 @@ function savePick(payload){
     ========================= */
 
     const categories =
-      getCategories(
-        gameId
-      );
+      typeof getCategoriesCached === "function"
+        ? getCategoriesCached(gameId)
+        : getCategories(gameId);
 
     const category =
       categories.find(c =>
@@ -1232,8 +1232,17 @@ function savePick(payload){
       }
     }
 
+    const directPick =
+      PicksRepo && typeof PicksRepo.findPick === "function"
+        ? PicksRepo.findPick(gameId, username, categoryId)
+        : null;
+
     const data =
-      PicksRepo.getAllPicks();
+      directPick
+        ? [directPick.headers, directPick.row]
+        : PicksRepo && typeof PicksRepo.getPicksForGame === "function"
+          ? PicksRepo.getPicksForGame(gameId)
+          : PicksRepo.getAllPicks();
 
     if (data.length === 0) {
 
@@ -1274,7 +1283,44 @@ function savePick(payload){
        FIND EXISTING PICK
     ========================= */
 
-    for (
+    if (directPick) {
+
+      const row = directPick.row;
+
+      existingRow = directPick.rowNumber;
+
+      previousNominee =
+        normalizeLower_(
+          row[col.nominee]
+        );
+
+      originalNominee =
+        normalizeLower_(
+          row[col.original]
+        ) ||
+        previousNominee ||
+        nomineeId;
+
+      changeCount =
+        Number(
+          row[col.changes]
+        ) || 0;
+
+      previousConfidencePoints =
+        col.confidencePoints !== -1
+          ? normalizeConfidencePoints_(
+              row[col.confidencePoints]
+            )
+          : 0;
+
+      previousStakePoints =
+        col.stakePoints !== -1
+          ? normalizeStakePoints_(
+              row[col.stakePoints]
+            )
+          : 0;
+
+    } else for (
       let i = 1;
       i < data.length;
       i++

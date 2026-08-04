@@ -1002,6 +1002,8 @@ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
 }
 
 async function renderAdminGameSetupPage(gameId) {
+
+  setPageLoadStep(50, "Loading game questions, answers, and settings…");
   const safeGameId =
     String(gameId || "").trim();
 

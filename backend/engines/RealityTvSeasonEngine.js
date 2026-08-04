@@ -956,7 +956,9 @@ function realityTvPlayerStatsPayload_(season, episodes, episodeQuestions, userna
     ? getGameRuntimeConfig(gameId)
     : (typeof getGame === "function" ? getGame(gameId) : {});
   const allPicks = buildUserPicksMap_(gameId) || {};
-  const settings = getCategorySettings(gameId) || {};
+  const settings = typeof getCategorySettingsCached === "function"
+    ? (getCategorySettingsCached(gameId) || {})
+    : (getCategorySettings(gameId) || {});
   const resolutions = typeof getCategoryResultsResolutionMap === "function"
     ? (getCategoryResultsResolutionMap(gameId) || {})
     : {};
@@ -1100,9 +1102,10 @@ function realityTvPlayerStatsPayload_(season, episodes, episodeQuestions, userna
     acc.settled += realityTvNumber_(perEpisode[key].settled, 0);
     return acc;
   }, { correct: 0, settled: 0 });
-  const anchorAdjustments = typeof seasonAnchorAdjustmentsForGame_ === "function"
-    ? (seasonAnchorAdjustmentsForGame_(gameId)[requestedUsername] || seasonAnchorAdjustmentsForGame_(gameId)[requestedKey] || {})
+  const allAnchorAdjustments = typeof seasonAnchorAdjustmentsForGame_ === "function"
+    ? (seasonAnchorAdjustmentsForGame_(gameId) || {})
     : {};
+  const anchorAdjustments = allAnchorAdjustments[requestedUsername] || allAnchorAdjustments[requestedKey] || {};
   const latestEpisodeNumber = sortedEpisodes.length
     ? realityTvNumber_(sortedEpisodes[sortedEpisodes.length - 1].EpisodeNumber !== undefined ? sortedEpisodes[sortedEpisodes.length - 1].EpisodeNumber : sortedEpisodes[sortedEpisodes.length - 1].episodeNumber, 0)
     : 0;
@@ -1122,12 +1125,25 @@ function realityTvPlayerStatsPayload_(season, episodes, episodeQuestions, userna
 }
 
 function realityTvUserGameViewPayload_(gameId, username) {
+  const cacheKey = "rtv_user_view_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username);
+  if (typeof CacheService !== "undefined") {
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (cacheReadError) {
+      Logger.log("Reality TV user-view cache read skipped: " + cacheReadError);
+    }
+  }
+
   realityTvEnsureSystem_();
   const season = realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_SEASONS_SHEET).find(function(row) {
     return realityTvKey_(row.GameId) === realityTvKey_(gameId);
   });
   if (!season) return { enabled: false };
-  const groups = realityTvSyncGroupsFromContestants_(season);
+  let groups = realityTvGroupsForSeason_(season.SeasonId);
+  if (!groups.length) {
+    groups = realityTvSyncGroupsFromContestants_(season);
+  }
   const groupByName = {};
   groups.forEach(function(group) { groupByName[realityTvKey_(group.GroupName)] = group; });
   const participants = realityTvContestantsForSeason_(season.SeasonId).map(function(row) {
@@ -1184,7 +1200,7 @@ function realityTvUserGameViewPayload_(gameId, username) {
         };
       })
     : [];
-  return {
+  const payload = {
     enabled: true,
     season: {
       seasonId: season.SeasonId,
@@ -1214,8 +1230,21 @@ function realityTvUserGameViewPayload_(gameId, username) {
     }),
     episodes: episodes,
     episodeQuestions: episodeQuestions,
-    playerStats: realityTvPlayerStatsPayload_(season, realityTvEpisodesForSeason_(season.SeasonId), typeof realityTvEpisodeQuestionsForSeason_ === "function" ? realityTvEpisodeQuestionsForSeason_(season.SeasonId) : [], username)
+    playerStats: realityTvPlayerStatsPayload_(season, episodes, episodeQuestions, username)
   };
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const serialized = JSON.stringify(payload);
+      if (serialized.length < 90000) {
+        CacheService.getScriptCache().put(cacheKey, serialized, 30);
+      }
+    } catch (cacheWriteError) {
+      Logger.log("Reality TV user-view cache write skipped: " + cacheWriteError);
+    }
+  }
+
+  return payload;
 }
 
 function setupRealityTvSeasonManager() {
@@ -1252,6 +1281,142 @@ function apiAdminConfigureRealityTvHub(payload) {
   });
   PropertiesService.getScriptProperties().setProperty(REALITY_TV_HUB_PROPERTY, id);
   return { success: true, message: "External Results Hub connected.", spreadsheetId: id, spreadsheetName: hub.getName() };
+}
+
+
+function apiAdminGetRealityTvDashboardSummary(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+
+  const ss = SpreadsheetApp.getActive();
+  const seasons = realityTvReadObjects_(ss, REALITY_TV_SEASONS_SHEET);
+  const contestants = realityTvReadObjects_(ss, REALITY_TV_CONTESTANTS_SHEET);
+  const groups = realityTvReadObjects_(ss, REALITY_TV_GROUPS_SHEET);
+  const episodes = realityTvReadObjects_(ss, REALITY_TV_EPISODES_SHEET);
+  const queue = realityTvReadObjects_(ss, REALITY_TV_RESULTS_QUEUE_SHEET);
+  const episodeQuestions = typeof REALITY_TV_EPISODE_QUESTIONS_SHEET !== "undefined"
+    ? realityTvReadObjects_(ss, REALITY_TV_EPISODE_QUESTIONS_SHEET)
+    : [];
+  const questionQueue = typeof REALITY_TV_QUESTION_QUEUE_SHEET !== "undefined"
+    ? realityTvReadObjects_(ss, REALITY_TV_QUESTION_QUEUE_SHEET)
+    : [];
+
+  function rowsForSeason(rows, seasonId) {
+    return rows.filter(function(row) {
+      return realityTvKey_(row.SeasonId) === realityTvKey_(seasonId);
+    });
+  }
+
+  const summaries = seasons.map(function(season) {
+    const seasonEpisodes = rowsForSeason(episodes, season.SeasonId).sort(function(a, b) {
+      return realityTvNumber_(a.EpisodeNumber, 0) - realityTvNumber_(b.EpisodeNumber, 0);
+    });
+    const current = seasonEpisodes.length ? seasonEpisodes[seasonEpisodes.length - 1] : null;
+    const seasonQueue = rowsForSeason(queue, season.SeasonId);
+    const seasonQuestionQueue = rowsForSeason(questionQueue, season.SeasonId);
+    const pending = seasonQueue.concat(seasonQuestionQueue).filter(function(row) {
+      return ["PENDING", "APPROVING", "SETTLING", "BUILDING_NEXT_EPISODE", "SYNCING_HUB"]
+        .indexOf(realityTvString_(row.ReviewStatus || row.Status || row.PushStatus).toUpperCase()) !== -1;
+    }).length;
+
+    return {
+      season: season,
+      currentEpisode: current,
+      summary: {
+        contestants: rowsForSeason(contestants, season.SeasonId).length,
+        groups: rowsForSeason(groups, season.SeasonId).length,
+        episodes: seasonEpisodes.length,
+        episodeQuestions: rowsForSeason(episodeQuestions, season.SeasonId).length,
+        pendingReviews: pending
+      },
+      detailsLoaded: false
+    };
+  }).sort(function(a, b) {
+    return new Date(b.season.UpdatedAt || b.season.CreatedAt || 0).getTime() -
+      new Date(a.season.UpdatedAt || a.season.CreatedAt || 0).getTime();
+  });
+
+  const hubId = realityTvGetHubId_();
+  return {
+    success: true,
+    lightweight: true,
+    hubConfigured: !!hubId,
+    hubSpreadsheetId: hubId,
+    hubSpreadsheetName: "",
+    hubError: "",
+    showFormats: typeof realityTvShowFormatDefinitions_ === "function"
+      ? realityTvShowFormatDefinitions_()
+      : [],
+    seasons: summaries
+  };
+}
+
+function apiAdminGetRealityTvSeasonDetails(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+
+  const seasonId = realityTvString_(payload.seasonId || payload.SeasonId);
+  if (!seasonId) throw new Error("Season ID is required.");
+
+  let season = realityTvGetSeason_(seasonId);
+  if (!season) throw new Error("Reality TV season not found.");
+
+  if (!season.ShowFormat) {
+    const fallback = typeof realityTvShowFormatDefinition_ === "function"
+      ? realityTvShowFormatDefinition_("survivor-tribal")
+      : null;
+    realityTvUpdateObjectRow_(
+      SpreadsheetApp.getActive().getSheetByName(REALITY_TV_SEASONS_SHEET),
+      season.__rowNumber,
+      {
+        ShowFormat: fallback ? fallback.id : "survivor-tribal",
+        ParticipantType: fallback ? fallback.participantType : "individual",
+        ParticipantLabel: fallback ? fallback.participantLabel : "Contestant",
+        GroupLabel: fallback ? fallback.groupLabel : "Tribe",
+        PeriodLabel: fallback ? fallback.periodLabel : "Episode",
+        UpdatedAt: new Date()
+      }
+    );
+    season = realityTvGetSeason_(seasonId);
+  }
+
+  if (typeof realityTvEnsureQuestionTemplateCatalogForSeason_ === "function") {
+    realityTvEnsureQuestionTemplateCatalogForSeason_(season);
+  }
+
+  const groups = realityTvSyncGroupsFromContestants_(season);
+  const episodes = realityTvEpisodesForSeason_(season.SeasonId);
+  const bundle = {
+    season: season,
+    contestants: realityTvContestantsForSeason_(season.SeasonId),
+    groups: groups,
+    episodes: episodes,
+    queue: realityTvQueueForSeason_(season.SeasonId),
+    questionTemplates: typeof realityTvQuestionTemplatesForSeason_ === "function"
+      ? realityTvQuestionTemplatesForSeason_(season.SeasonId)
+      : [],
+    episodeQuestions: typeof realityTvEpisodeQuestionsForSeason_ === "function"
+      ? realityTvEpisodeQuestionsForSeason_(season.SeasonId)
+      : [],
+    questionQueue: typeof realityTvQuestionQueueForSeason_ === "function"
+      ? realityTvQuestionQueueForSeason_(season.SeasonId)
+      : [],
+    questionBuild: typeof realityTvLatestQuestionBuildStateForSeason_ === "function"
+      ? realityTvLatestQuestionBuildStateForSeason_(season.SeasonId)
+      : null,
+    questionBuildSummary: typeof realityTvLatestCompletedQuestionBuildStateForSeason_ === "function"
+      ? realityTvLatestCompletedQuestionBuildStateForSeason_(
+          season.SeasonId,
+          (episodes.slice(-1)[0] || {}).EpisodeId
+        )
+      : null,
+    seasonAnchorSettings: typeof seasonAnchorGetSettings_ === "function"
+      ? (seasonAnchorGetSettings_(season.GameId) || seasonAnchorDefaultSettings_(season.GameId, season.SeasonId))
+      : null,
+    detailsLoaded: true
+  };
+
+  return { success: true, bundle: bundle };
 }
 
 function apiAdminGetRealityTvDashboard(payload) {

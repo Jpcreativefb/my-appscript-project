@@ -1,5 +1,7 @@
 async function renderAdminPage() {
 
+  setPageLoadStep(50, "Loading administrator dashboard…");
+
   const session =
     getSession();
 

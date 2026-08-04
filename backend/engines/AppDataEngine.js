@@ -48,7 +48,9 @@ function apiGetStartupPayload(payload) {
     getGame(gameId);
 
   const categories =
-    getCategories(gameId);
+    typeof getCategoriesCached === "function"
+      ? getCategoriesCached(gameId)
+      : getCategories(gameId);
 
   const picks =
     apiGetMyPicks(

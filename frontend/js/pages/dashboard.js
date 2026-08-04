@@ -25,6 +25,8 @@ async function renderDashboardPage() {
 
   let payload;
 
+  setPageLoadStep(50, "Loading games dashboard…");
+
   try {
 
     payload =
@@ -74,6 +76,8 @@ async function renderDashboardPage() {
     `;
 
   }
+
+  setPageLoadStep(82, "Building game cards…");
 
   const activeProfile =
     (

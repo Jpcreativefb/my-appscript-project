@@ -12,6 +12,16 @@ function getApiLeagueId_() {
 
 }
 
+
+function apiDispatchEvent_(name, detail) {
+  if (typeof document === "undefined" || typeof CustomEvent === "undefined") return;
+  document.dispatchEvent(new CustomEvent(name, { detail: detail || {} }));
+}
+
+function apiRequestId_(action) {
+  return String(action || "api") + "-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
+}
+
 /* ======================
    GENERIC API FETCH / JSONP
 ====================== */
@@ -37,6 +47,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetGames",
     "adminGetGameSetup",
     "adminGetRealityTvDashboard",
+    "adminGetRealityTvDashboardSummary",
+    "adminGetRealityTvSeasonDetails",
     "adminCreateRealityTvSeason",
     "adminBulkAddRealityTvContestants",
     "adminAddRealityTvCustomQuestionTemplate",
@@ -308,7 +320,7 @@ async function apiFetch_(action, params = {}) {
 
 }
 
-async function api(action, params = {}) {
+async function apiRaw_(action, params = {}) {
 
   if (shouldUseJsonpApi_()) {
     return apiJsonp_(action, params);
@@ -318,11 +330,29 @@ async function api(action, params = {}) {
 
 }
 
+async function api(action, params = {}) {
+  const requestId = apiRequestId_(action);
+  apiDispatchEvent_("awards:api-start", { requestId: requestId, action: action, method: "GET" });
+  let result = null;
+  try {
+    result = await apiRaw_(action, params);
+    return result;
+  } finally {
+    apiDispatchEvent_("awards:api-end", {
+      requestId: requestId,
+      action: action,
+      method: "GET",
+      success: !!(result && result.success !== false),
+      result: result
+    });
+  }
+}
+
 /* ======================
    GENERIC API POST
 ====================== */
 
-async function apiPost(action, payload = {}) {
+async function apiPostRaw_(action, payload = {}) {
 
   try {
 
@@ -398,6 +428,24 @@ async function apiPost(action, payload = {}) {
 
   }
 
+}
+
+async function apiPost(action, payload = {}) {
+  const requestId = apiRequestId_(action);
+  apiDispatchEvent_("awards:api-start", { requestId: requestId, action: action, method: "POST" });
+  let result = null;
+  try {
+    result = await apiPostRaw_(action, payload);
+    return result;
+  } finally {
+    apiDispatchEvent_("awards:api-end", {
+      requestId: requestId,
+      action: action,
+      method: "POST",
+      success: !!(result && result.success !== false),
+      result: result
+    });
+  }
 }
 
 /* ======================
@@ -1590,6 +1638,14 @@ async function apiAdminConfigureRealityTvHub(spreadsheetId) {
 
 async function apiAdminGetRealityTvDashboard() {
   return apiAdminRealityTvRequest_("adminGetRealityTvDashboard", {});
+}
+
+async function apiAdminGetRealityTvDashboardSummary() {
+  return apiAdminRealityTvRequest_("adminGetRealityTvDashboardSummary", {});
+}
+
+async function apiAdminGetRealityTvSeasonDetails(seasonId) {
+  return apiAdminRealityTvRequest_("adminGetRealityTvSeasonDetails", { seasonId: seasonId });
 }
 
 async function apiAdminSaveRealityTvGroups(payload) {

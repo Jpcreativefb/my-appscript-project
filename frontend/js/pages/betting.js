@@ -3229,6 +3229,8 @@ function renderBettingAdminControls_(session){
 
 async function renderBettingPage(){
 
+  setPageLoadStep(50, "Loading wagers, markets, and saved picks…");
+
   const session = getBettingSession_();
   const username = session.username || "";
   const gameId = getBettingGameId_();

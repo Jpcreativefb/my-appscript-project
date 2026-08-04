@@ -235,6 +235,8 @@ async function renderPicksPage() {
 
   let payload;
 
+  setPageLoadStep(50, "Loading questions, saved picks, and game rules…");
+
   try {
 
     payload =
@@ -260,6 +262,8 @@ async function renderPicksPage() {
     `;
 
   }
+
+  setPageLoadStep(78, "Preparing Reality TV, scoring, and weekly statistics…");
 
   const gameId =
   payload.gameId ||

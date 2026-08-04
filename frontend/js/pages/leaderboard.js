@@ -37,6 +37,8 @@ function renderHybridLeaderboardBackButton_() {
 
 async function renderLeaderboardPage() {
 
+  setPageLoadStep(50, "Loading leaderboard and player standings…");
+
   const gameId =
     getFrontendGameId() ||
     APP_STATE.gameId ||
