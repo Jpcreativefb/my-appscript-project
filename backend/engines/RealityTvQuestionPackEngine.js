@@ -472,13 +472,16 @@ function realityTvFormatSupplementalQuestion_(template, season, episodeNumber) {
     .replace(/\{season\}/gi, realityTvString_(season.SeasonName));
 }
 
-function realityTvActiveContestants_(seasonId) {
+function realityTvActiveContestants_(seasonId, episodeNumber) {
+  if (typeof realityTvContestantsEligibleForEpisode_ === "function" && episodeNumber) {
+    return realityTvContestantsEligibleForEpisode_(seasonId, episodeNumber);
+  }
   return realityTvContestantsForSeason_(seasonId).filter(function(row) {
     return realityTvBool_(row.Active) && realityTvKey_(row.Status || "active") === "active";
   });
 }
 
-function realityTvActiveTribes_(seasonId) {
+function realityTvActiveTribes_(seasonId, episodeNumber) {
   const map = {};
   const season = realityTvGetSeason_(seasonId) || {};
   const survivorMode = realityTvKey_(season.ShowFormat || "survivor-tribal") === "survivor-tribal";
@@ -488,19 +491,23 @@ function realityTvActiveTribes_(seasonId) {
     : [];
   const savedByName = {};
   savedGroups.forEach(function(group) { savedByName[realityTvKey_(group.GroupName)] = group; });
-  realityTvActiveContestants_(seasonId).forEach(function(contestant) {
-    const label = realityTvString_(contestant.TeamOrTribe);
+  const assignments = typeof realityTvGroupAssignmentsForEpisode_ === "function" && episodeNumber
+    ? realityTvGroupAssignmentsForEpisode_(seasonId, episodeNumber)
+    : {};
+  realityTvActiveContestants_(seasonId, episodeNumber).forEach(function(contestant) {
+    const assignment = assignments[realityTvKey_(contestant.ContestantId)] || {};
+    const label = realityTvString_(assignment.GroupName || contestant.TeamOrTribe);
     if (!label) return;
     const key = realityTvKey_(label);
     const group = savedByName[key] || {};
     if (!map[key]) {
       map[key] = {
-        id: group.GroupId || prefix + "-" + realityTvSlug_(label),
+        id: group.GroupId || assignment.GroupId || prefix + "-" + realityTvSlug_(label),
         label: label,
         imageUrl: realityTvString_(group.ImageUrl),
         teamColor: typeof realityTvNormalizeColor_ === "function" ? realityTvNormalizeColor_(group.Color || contestant.TeamColor, "#64748B") : (group.Color || contestant.TeamColor || "#64748B"),
         subjectType: prefix,
-        externalSubjectId: group.GroupId || prefix + "-" + realityTvSlug_(label),
+        externalSubjectId: group.GroupId || assignment.GroupId || prefix + "-" + realityTvSlug_(label),
         biography: "",
         hometown: "",
         occupation: "",
@@ -511,19 +518,31 @@ function realityTvActiveTribes_(seasonId) {
   return Object.keys(map).sort().map(function(key) { return map[key]; });
 }
 
-function realityTvContestantAnswerOptions_(seasonId) {
+function realityTvContestantAnswerOptions_(seasonId, episodeNumber) {
   const season = realityTvGetSeason_(seasonId) || {};
   const subjectType = realityTvKey_(season.ParticipantType) === "team" ? "team" : "contestant";
   const groups = typeof realityTvSyncGroupsFromContestants_ === "function" ? realityTvSyncGroupsFromContestants_(season) : [];
   const groupByName = {};
   groups.forEach(function(group) { groupByName[realityTvKey_(group.GroupName)] = group; });
-  return realityTvActiveContestants_(seasonId).map(function(contestant) {
-    const group = groupByName[realityTvKey_(contestant.TeamOrTribe)] || {};
+  const assignments = typeof realityTvGroupAssignmentsForEpisode_ === "function" && episodeNumber
+    ? realityTvGroupAssignmentsForEpisode_(seasonId, episodeNumber)
+    : {};
+  return realityTvActiveContestants_(seasonId, episodeNumber).map(function(contestant) {
+    const assignment = assignments[realityTvKey_(contestant.ContestantId)] || {};
+    const groupName = realityTvString_(assignment.GroupName || contestant.TeamOrTribe);
+    const group = groupByName[realityTvKey_(groupName)] || {};
+    const profile = typeof realityTvContestantGroupProfile_ === "function"
+      ? realityTvContestantGroupProfile_(seasonId, contestant.ContestantId)
+      : { startingGroup: groupName, currentGroup: groupName, finalGroup: groupName, history: [] };
     return {
       id: contestant.ContestantId,
       label: contestant.Name,
       imageUrl: contestant.ImageUrl || "",
-      teamOrTribe: contestant.TeamOrTribe || "",
+      teamOrTribe: groupName,
+      startingGroup: profile.startingGroup || "",
+      currentGroup: profile.currentGroup || "",
+      finalGroup: profile.finalGroup || "",
+      groupHistory: profile.history || [],
       groupImageUrl: group.ImageUrl || "",
       teamColor: typeof realityTvNormalizeColor_ === "function" ? realityTvNormalizeColor_(contestant.TeamColor || group.Color, "#64748B") : (contestant.TeamColor || group.Color || "#64748B"),
       fullName: contestant.FullName || "",
@@ -544,14 +563,26 @@ function realityTvContestantAnswerOptions_(seasonId) {
   });
 }
 
-function realityTvAnswerOptionsForTemplate_(season, template) {
+function realityTvAnswerOptionsForTemplate_(season, template, episode) {
   const source = realityTvKey_(template.AnswerSource);
-  const groups = realityTvActiveTribes_(season.SeasonId);
+  const episodeNumber = episode ? realityTvNumber_(episode.EpisodeNumber, 0) : realityTvNumber_(season.CurrentEpisodeNumber, 0);
+  const groups = realityTvActiveTribes_(season.SeasonId, episodeNumber);
+  const individualStart = Math.max(0, realityTvNumber_(season.IndividualPlayStartsEpisode, 0));
+  const isIndividualPeriod = individualStart > 0 && episodeNumber >= individualStart;
   let options = [];
   if (source === "active-groups" || source === "active-tribes") {
+    if (isIndividualPeriod) {
+      return {
+        options: [],
+        skipped: true,
+        reason: "This group-based question is pre-merge only. Individual play starts in " + realityTvString_(season.PeriodLabel || "Episode") + " " + individualStart + "."
+      };
+    }
     options = groups;
   } else if (source === "groups-or-participants" || source === "auto-competition") {
-    options = groups.length >= 2 ? groups : realityTvContestantAnswerOptions_(season.SeasonId);
+    options = isIndividualPeriod
+      ? realityTvContestantAnswerOptions_(season.SeasonId, episodeNumber)
+      : (groups.length >= 2 ? groups : realityTvContestantAnswerOptions_(season.SeasonId, episodeNumber));
   } else if (source === "yes-no") {
     options = [
       { id: "yes", label: "Yes", imageUrl: "", subjectType: "outcome", externalSubjectId: "yes" },
@@ -574,7 +605,7 @@ function realityTvAnswerOptionsForTemplate_(season, template) {
       };
     }).filter(function(item) { return item.label; });
   } else {
-    options = realityTvContestantAnswerOptions_(season.SeasonId);
+    options = realityTvContestantAnswerOptions_(season.SeasonId, episodeNumber);
   }
 
   if (realityTvBool_(template.IncludeNoOutcome)) {
@@ -586,10 +617,10 @@ function realityTvAnswerOptionsForTemplate_(season, template) {
     let reason = "This question has fewer than two valid answers.";
     if (source === "active-groups" || source === "active-tribes") {
       reason = groups.length
-        ? "Only one active team / tribe is available. Add another active group or disable this question for the current period."
-        : "No active team / tribe values were found. Add Team / Tribe information to the participant roster or disable this group-based question.";
+        ? "Only one active team / tribe is available for this period. Add another group assignment or disable this question."
+        : "No active Team / Tribe information was found for this period. Add group membership history or disable this group-based question.";
     } else if (source === "active-participants") {
-      reason = "Fewer than two active participants remain for this question.";
+      reason = "Fewer than two eligible participants remain for this question.";
     }
     return { options: options, skipped: true, reason: reason };
   }
@@ -616,7 +647,7 @@ function realityTvResolvedQuestionLayout_(template, answerOptions) {
 
 function realityTvBuildSupplementalQuestionForTemplate_(season, episode, template, options) {
   options = options || {};
-  const answerBundle = realityTvAnswerOptionsForTemplate_(season, template);
+  const answerBundle = realityTvAnswerOptionsForTemplate_(season, template, episode);
   answerBundle.options = realityTvApplyQuestionImageSource_(answerBundle.options, template);
   const resolvedLayout = realityTvResolvedQuestionLayout_(template, answerBundle.options);
   if (answerBundle.skipped || answerBundle.options.length < 2) {
@@ -1007,7 +1038,7 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
   let season = realityTvGetSeason_(payload.seasonId);
   if (!season) throw new Error("Reality TV season not found.");
 
-  if (payload.showFormat || payload.participantLabel || payload.groupLabel || payload.periodLabel || payload.questionTemplate || payload.eliminationPoints !== undefined || payload.points !== undefined) {
+  if (payload.showFormat || payload.participantLabel || payload.groupLabel || payload.periodLabel || payload.questionTemplate || payload.individualPlayStartsEpisode !== undefined || payload.eliminationPoints !== undefined || payload.points !== undefined) {
     const format = realityTvShowFormatDefinition_(payload.showFormat || season.ShowFormat || "survivor-tribal");
     const requestedEliminationPoints = payload.eliminationPoints !== undefined ? payload.eliminationPoints : payload.points;
     const patch = {
@@ -1022,6 +1053,9 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
         : Math.max(0, realityTvNumber_(requestedEliminationPoints, realityTvNumber_(season.Points, 1))),
       EliminationLayoutType: realityTvNormalizeLayoutType_(payload.eliminationLayoutType || season.EliminationLayoutType || "auto"),
       EliminationImageSource: realityTvNormalizeImageSource_(payload.eliminationImageSource || season.EliminationImageSource || "roster"),
+      IndividualPlayStartsEpisode: payload.individualPlayStartsEpisode === undefined
+        ? Math.max(0, realityTvNumber_(season.IndividualPlayStartsEpisode, 0))
+        : Math.max(0, realityTvNumber_(payload.individualPlayStartsEpisode, 0)),
       UpdatedAt: new Date()
     };
     realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_SEASONS_SHEET), season.__rowNumber, patch);

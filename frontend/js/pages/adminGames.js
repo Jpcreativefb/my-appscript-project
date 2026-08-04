@@ -2327,9 +2327,36 @@ function adminRenderPreflightResult(res) {
           .join("")}
       </ul>
 
+      ${res.canRepairRealityTv ? `<div class="admin-actions"><button class="admin-small-button" onclick="adminRepairRealityTvFromPreflight('${adminGamesEscapeHtml(res.gameId || "")}')">Repair Reality TV Setup</button><span class="admin-sub">Repairs missing episode questions and answers without duplicating existing rows.</span></div>` : ""}
+
     </div>
   `;
 
+}
+
+async function adminRepairRealityTvFromPreflight(gameId) {
+  const target = document.getElementById("adminPreflightResult_" + gameId);
+  if (target) target.innerHTML = `<div class="admin-preflight-card"><strong>Repairing Reality TV setup…</strong><div class="admin-sub">Checking the main exit question and answer roster.</div></div>`;
+  try {
+    let result = await apiAdminRepairRealityTvSetup({ gameId: gameId });
+    if (!result || result.success === false) throw new Error((result && (result.error || result.message)) || "Could not repair the Reality TV setup.");
+    let build = result.questionBuild || null;
+    let steps = 0;
+    const maxSteps = Math.max(30, Number(build && build.totalCount || 0) * 5 + 10);
+    while (build && !build.complete && steps < maxSteps) {
+      if (target) target.innerHTML = `<div class="admin-preflight-card"><strong>Repairing Reality TV setup…</strong><div class="admin-sub">${adminGamesEscapeHtml(build.lastMessage || build.progressLabel || "Building checked extra questions")}</div></div>`;
+      await new Promise(function(resolve) { setTimeout(resolve, build.busy ? 1200 : 250); });
+      build = await apiAdminContinueRealityTvQuestionPackBuild(build.buildId);
+      if (!build || build.success === false) throw new Error((build && (build.error || build.message)) || "Could not continue the Reality TV repair.");
+      if (!build.busy) steps += 1;
+    }
+    const check = await apiAdminRunGamePreflight(gameId);
+    if (target) target.innerHTML = adminRenderPreflightResult(check);
+    if (check && check.ready) alert("Reality TV setup repaired. The game now passes the activation check.");
+    else alert("Repair finished, but the check still found items that need attention. Review the list shown under Run Check.");
+  } catch (err) {
+    if (target) target.innerHTML = `<div class="admin-preflight-card is-error"><strong>Repair failed.</strong><div>${adminGamesEscapeHtml(err.message || String(err))}</div><div class="admin-sub">The repair is retry-safe. Run Check and select Repair Reality TV Setup again.</div></div>`;
+  }
 }
 
 async function adminRunPreflightCheck(gameId) {

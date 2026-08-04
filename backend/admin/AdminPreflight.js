@@ -909,12 +909,21 @@ function adminRunGamePreflight(payload) {
       i.severity === "warning"
     ).length;
 
+  let realityTvManaged = false;
+  try {
+    realityTvManaged = typeof realityTvGetSeasonByGameId_ === "function" && !!realityTvGetSeasonByGameId_(gameId);
+  } catch (realityTvCheckError) {
+    realityTvManaged = false;
+  }
+
   return {
     success: true,
     ready: errorCount === 0,
     gameId: gameId,
     gameType: gameType,
     status: status || "",
+    realityTvManaged: realityTvManaged,
+    canRepairRealityTv: realityTvManaged && errorCount > 0,
     categoryModeCounts: categoryModeCounts,
     errorCount: errorCount,
     warningCount: warningCount,

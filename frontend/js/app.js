@@ -353,7 +353,7 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "300-production-hardening";
+const APP_ASSET_VERSION = "302-reality-season-detail-speed";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_PAGE_MODULES = {

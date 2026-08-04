@@ -1,8 +1,10 @@
+# Current Production Candidate: v1.1.2
+
 # Production Status
 
 ## Current release
 
-Production hardening v1.1.0, based on the Reality TV weekly statistics build v1.0.32.
+Production repair v1.1.1, based on production hardening v1.1.0.
 
 ## Feature readiness
 
@@ -10,12 +12,20 @@ Production hardening v1.1.0, based on the Reality TV weekly statistics build v1.
 |---|---:|---:|---|
 | Core games and Game Setup | 88% | 75% | Live regression, repair diagnostics, final UI consistency |
 | Fixed/confidence/staked/hybrid scoring | 88% | 78% | High-volume tests and settlement audit |
-| Reality TV Manager | 93% | 78% | Live browser testing and Hub job separation |
-| Reality TV player experience | 90% | 78% | Mobile/device testing and accessibility review |
+| Reality TV Manager | 95% | 84% | Live repair/activation verification and Hub job separation |
+| Reality TV player experience | 92% | 82% | Mobile/device testing and accessibility review |
 | Sports platform | 82% | 68% | League-specific production testing and timeout reduction |
 | Archives/career history | 78% | 68% | Restore verification and larger archive testing |
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
+
+## Reality TV production repair completed in v1.1.1
+
+- Initial episode question packs are built in resumable stages after the main exit question and its roster are safely created.
+- Manage Games preflight can repair missing Reality TV questions and answers and then rerun the activation check.
+- Participant tribe/team/group changes are stored by effective episode instead of overwriting history.
+- Group-based gameplay uses the assignment active during each historical episode.
+- An administrator-controlled individual-play episode switches hybrid group/participant questions after merge.
 
 ## Production hardening completed in v1.1.0
 

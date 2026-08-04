@@ -1652,6 +1652,14 @@ async function apiAdminSaveRealityTvGroups(payload) {
   return apiAdminRealityTvRequest_("adminSaveRealityTvGroups", payload || {});
 }
 
+async function apiAdminUpdateRealityTvContestantGroup(payload) {
+  return apiAdminRealityTvRequest_("adminUpdateRealityTvContestantGroup", payload || {});
+}
+
+async function apiAdminRepairRealityTvSetup(payload) {
+  return apiAdminRealityTvRequest_("adminRepairRealityTvSetup", payload || {});
+}
+
 async function apiAdminSaveSeasonAnchorSettings(payload) {
   return apiAdminRealityTvRequest_("adminSaveSeasonAnchorSettings", payload || {});
 }

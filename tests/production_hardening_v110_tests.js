@@ -24,7 +24,7 @@ assert(app.includes('loadPageScript_'), 'Lazy page loader missing');
 assert(app.includes('loader.classList.toggle("is-admin"'), 'Role-aware admin loader missing');
 assert(styles.includes('linear-gradient(90deg, #9f7418, #d4af37'), 'Gold progress styling missing');
 assert(styles.includes('.loader.is-admin .app-loader-detail'), 'Admin-only detail styling missing');
-assert(sw.includes('awards-app-v300-production-hardening'), 'Production service worker cache missing');
+assert(/awards-app-v30\d-[a-z0-9-]+/i.test(sw), 'Production service worker cache missing');
 assert(api.includes('awards:api-start') && api.includes('awards:api-end'), 'API progress events missing');
 assert(adminUi.includes('adminUiEnhanceHelp_'), 'Common admin help enhancement missing');
 assert(adminUi.includes('adminUiStartButton_') && adminUi.includes('adminUiFinishButton_'), 'Common save progress states missing');

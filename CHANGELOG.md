@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.1 — Reality TV setup repair and group history
+
+- Changed initial Reality TV extra-question creation to a staged, resumable build.
+- Added a one-click Reality TV repair action to the Manage Games activation check.
+- Added safe repair for missing questions and missing answers without duplication.
+- Added normalized participant tribe/team/group history by episode.
+- Added an administrator-set individual-play/merge episode.
+- Preserved historical episode answers when participants change groups.
+- Added starting, current, final/latest, and full group history to participant profiles.
+
 ## v1.1.0 — Production hardening
 
 - Added route-based page module loading.
@@ -11,3 +21,12 @@
 - Reduced service-worker prefetching to the core shell.
 - Archived old repository release notes and reports.
 - Added production smoke tests and status documentation.
+
+## v1.1.2 — Reality TV Season Load Optimization
+
+- Made Reality TV season expansion strictly read-only.
+- Removed automatic group sync, question-template repair, and group-history writes from season loading.
+- Replaced per-contestant full-sheet group-history reads with one in-memory profile pass.
+- Reduced dashboard summary counting to one indexed pass per table.
+- Added admin-only long-load progress messages and a safe retry action.
+- Added season-load performance diagnostics and a 30-contestant regression test.

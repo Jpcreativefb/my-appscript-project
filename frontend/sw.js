@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v300-production-hardening";
+const AWARDS_CACHE = "awards-app-v302-reality-season-detail-speed";
 
 const APP_SHELL = [
   "./",

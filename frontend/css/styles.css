@@ -4495,3 +4495,19 @@ button.is-saving {
   .reality-episode-header-eliminated { grid-column:1/-1; }
   .reality-episode-status { display:none; }
 }
+
+/* Reality TV setup repair and group-history management — v1.1.1 */
+.reality-tv-group-history-list { display:grid; gap:12px; margin-top:12px; }
+.reality-tv-group-history-row { padding:14px; border:1px solid rgba(148,163,184,.22); border-radius:14px; background:rgba(15,23,42,.52); }
+.reality-tv-group-history-person { display:flex; align-items:flex-start; gap:12px; }
+.reality-tv-group-history-person img,.reality-tv-group-history-person .reality-tv-avatar-fallback { width:52px; height:52px; flex:0 0 52px; border-radius:50%; object-fit:cover; display:grid; place-items:center; background:#334155; color:#fff; font-weight:900; }
+.reality-tv-group-history-person strong,.reality-tv-group-history-person span,.reality-tv-group-history-person small { display:block; }
+.reality-tv-group-history-person span { margin-top:3px; color:rgba(226,232,240,.78); font-size:.82rem; }
+.reality-tv-group-history-person small { margin-top:6px; color:rgba(226,232,240,.6); line-height:1.45; }
+.reality-tv-group-history-controls { display:grid; grid-template-columns:minmax(150px,1.1fr) minmax(130px,.55fr) minmax(180px,1.2fr) auto; align-items:end; gap:10px; margin-top:12px; }
+.reality-profile-group-history { margin-top:10px; padding-top:9px; border-top:1px solid rgba(148,163,184,.18); }
+.reality-profile-group-history > span { display:block; margin-bottom:5px; color:rgba(226,232,240,.65); font-size:.72rem; font-weight:850; text-transform:uppercase; letter-spacing:.05em; }
+.reality-profile-group-history > div { display:flex; justify-content:space-between; gap:12px; padding:5px 0; }
+.reality-profile-group-history small { color:rgba(226,232,240,.58); }
+@media (max-width:850px) { .reality-tv-group-history-controls { grid-template-columns:1fr 1fr; } }
+@media (max-width:560px) { .reality-tv-group-history-controls { grid-template-columns:1fr; } }

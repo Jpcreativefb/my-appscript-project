@@ -97,8 +97,16 @@ function realityTvProfileDetailsHtml_(item) {
   if (item.age) facts.push(["Age", item.age]);
   if (item.hometown) facts.push(["Hometown", item.hometown]);
   if (item.occupation) facts.push(["Occupation", item.occupation]);
-  if (item.teamOrTribe) facts.push(["Team / group", item.teamOrTribe]);
-  return `<div class="reality-profile-facts">${facts.map(function(pair) { return `<div><span>${escapeHtml(pair[0])}</span><strong>${escapeHtml(pair[1])}</strong></div>`; }).join("")}</div>${item.biography ? `<p class="reality-profile-bio">${escapeHtml(item.biography)}</p>` : ""}`;
+  if (item.startingGroup) facts.push(["Starting group", item.startingGroup]);
+  if (item.currentGroup) facts.push(["Current group", item.currentGroup]);
+  if (item.finalGroup && item.finalGroup !== item.currentGroup) facts.push(["Final / latest group", item.finalGroup]);
+  if (!item.startingGroup && item.teamOrTribe) facts.push(["Team / group", item.teamOrTribe]);
+  const history = Array.isArray(item.groupHistory) ? item.groupHistory : [];
+  const historyHtml = history.length ? `<div class="reality-profile-group-history"><span>Group history</span>${history.map(function(entry) {
+    const end = Number(entry.endEpisode || 0);
+    return `<div><strong>${escapeHtml(entry.groupName || "Unassigned")}</strong><small>Episode ${Number(entry.startEpisode || 1)}${end ? "–" + end : "+"}</small></div>`;
+  }).join("")}</div>` : "";
+  return `<div class="reality-profile-facts">${facts.map(function(pair) { return `<div><span>${escapeHtml(pair[0])}</span><strong>${escapeHtml(pair[1])}</strong></div>`; }).join("")}</div>${historyHtml}${item.biography ? `<p class="reality-profile-bio">${escapeHtml(item.biography)}</p>` : ""}`;
 }
 
 
@@ -1591,11 +1599,26 @@ function realityTvQuestionVisual_(category) {
   };
 }
 
-function realityTvNomineeMeta_(nominee) {
+function realityTvNomineeMeta_(nominee, category) {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const id = normalizeId(nominee && nominee.id);
   const participant = (view.participants || []).find(function(item) { return normalizeId(item.id) === id; });
-  if (participant) return Object.assign({ kind: "participant" }, participant);
+  if (participant) {
+    const copy = Object.assign({ kind: "participant" }, participant);
+    const episodeNumber = realityTvEpisodeNumberForCategory_(category && category.id);
+    if (episodeNumber > 0 && Array.isArray(copy.groupHistory)) {
+      const assignment = copy.groupHistory.filter(function(entry) {
+        const start = Number(entry.startEpisode || 1);
+        const end = Number(entry.endEpisode || 0);
+        return start <= episodeNumber && (!end || end >= episodeNumber);
+      }).slice(-1)[0];
+      if (assignment && assignment.groupName) copy.teamOrTribe = assignment.groupName;
+    }
+    const group = (view.groups || []).find(function(item) { return normalizeId(item.name) === normalizeId(copy.teamOrTribe); }) || {};
+    copy.teamColor = group.color || copy.teamColor;
+    copy.groupImageUrl = group.imageUrl || copy.groupImageUrl;
+    return copy;
+  }
   const group = (view.groups || []).find(function(item) {
     const groupId = normalizeId(item.id);
     const groupName = normalizeId(item.name);
@@ -1605,6 +1628,7 @@ function realityTvNomineeMeta_(nominee) {
   return null;
 }
 
+
 function toggleRealityNomineeBio_(id) {
   const panel = document.getElementById(id);
   if (!panel) return;
@@ -1612,7 +1636,7 @@ function toggleRealityNomineeBio_(id) {
 }
 
 function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locked) {
-  const meta = realityTvNomineeMeta_(nominee) || {};
+  const meta = realityTvNomineeMeta_(nominee, category) || {};
   const selected = normalizeId(nominee.id) === normalizeId(selectedNomineeId);
   const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
   const disabled = locked || (isStakedPointsCategory(category) && existingStake <= 0) ? "disabled" : "";
@@ -1645,7 +1669,7 @@ function renderCategoryNominees_(category, selectedNomineeId, locked) {
   const grouped = {};
   const order = [];
   (category.nominees || []).forEach(function(nominee) {
-    const meta = realityTvNomineeMeta_(nominee) || {};
+    const meta = realityTvNomineeMeta_(nominee, category) || {};
     const label = meta.teamOrTribe || "";
     if (!grouped[label]) { grouped[label] = []; order.push(label); }
     grouped[label].push(nominee);
