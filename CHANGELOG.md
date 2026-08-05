@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.1.9 — Reality TV Extra Questions Production Readiness
+
+- Restricted each Reality TV season to preset templates that match its selected show format.
+- Automatically pruned unrelated preset rows when the question pack is saved or repaired.
+- Made the queued build list authoritative so selected questions are not skipped by stale template flags.
+- Added immediate server-side build advancement plus a time-trigger fallback for interrupted browsers.
+- Added one master current-episode build status control with stage-by-stage and question-by-question readiness.
+- Added automatic custom-question insertion into the current episode and safe individual custom-question deletion.
+- Moved the large Save Format & Build request to POST and synchronized both frontend API copies.
+- Added production regression coverage for cooking presets, custom manual-answer questions, deletion, and readiness.
+
 ## v1.1.8 — Reality TV Current Episode Recovery and Custom Questions
 
 - Auto-repaired missing `RealityEpisodes` rows when the current game question already exists.

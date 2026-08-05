@@ -131,10 +131,123 @@ function adminRealityTvFieldTitle_(title, message) {
 
 function adminRealityTvQuestionStatusHtml_(status) {
   if (!status) return "";
-  const key = String(status.status || "").toUpperCase();
-  const label = key === "BUILT" ? "Built" : key === "ALREADY_EXISTS" ? "Verified" : key === "SKIPPED" ? "Skipped" : key || "Pending";
+  const key = String(status.status || status.state || "").toUpperCase();
+  const labels = {
+    AVAILABLE: "Available",
+    NEEDS_BUILD: "Needs build",
+    BUILDING: "Building",
+    VERIFYING: "Needs verification",
+    READY: "Ready in episode",
+    BLOCKED: "Needs attention",
+    BUILT: "Built",
+    ALREADY_EXISTS: "Verified",
+    SKIPPED: "Skipped",
+    ERROR: "Error"
+  };
+  const label = labels[key] || key || "Pending";
   const detail = status.message ? `<span>${adminRealityTvEscape_(status.message)}</span>` : "";
   return `<div class="reality-tv-question-build-status ${adminRealityTvEscape_(key.toLowerCase().replace(/_/g, "-"))}"><b>${adminRealityTvEscape_(label)}</b>${detail}</div>`;
+}
+
+function adminRealityTvQuestionReadiness_(bundle) {
+  if (bundle && bundle.questionReadiness) return bundle.questionReadiness;
+  const season = bundle && bundle.season ? bundle.season : {};
+  const current = adminRealityTvCurrentEpisode_(bundle || {});
+  const currentQuestions = {};
+  ((bundle && bundle.episodeQuestions) || []).filter(function(item) {
+    return current && String(item.EpisodeId || "") === String(current.EpisodeId || "");
+  }).forEach(function(item) {
+    currentQuestions[String(item.TemplateId || item.QuestionType || "")] = item;
+  });
+  const states = adminRealityTvQuestionPackTypes_(season.ShowFormat || "survivor-tribal", (bundle && bundle.questionTemplates) || []).map(function(item) {
+    const template = ((bundle && bundle.questionTemplates) || []).find(function(row) { return String(row.TemplateId || "") === String(item.id); }) || {};
+    const selected = template.Enabled === true || String(template.Enabled || "").toLowerCase() === "true";
+    const question = currentQuestions[item.id] || null;
+    let options = [];
+    try { options = question ? JSON.parse(question.AnswerOptionsJSON || "[]") : []; } catch (err) { options = []; }
+    const ready = !!question && Array.isArray(options) && options.length >= 2;
+    return {
+      templateId: item.id,
+      label: item.label,
+      templateSource: item.custom ? "custom" : "preset",
+      selected: selected,
+      inserted: !!question,
+      answersVerified: ready,
+      state: selected ? (ready ? "READY" : "NEEDS_BUILD") : "AVAILABLE",
+      message: selected ? (ready ? "Already in the current episode with verified answers." : "Selected but not inserted yet.") : "Available but not selected."
+    };
+  });
+  const selected = states.filter(function(item) { return item.selected; });
+  const eliminationReady = !!(current && current.CategoryId);
+  const readyCount = selected.filter(function(item) { return item.state === "READY"; }).length;
+  const build = bundle && bundle.questionBuild && !bundle.questionBuild.complete ? bundle.questionBuild : null;
+  const status = !current ? "NO_EPISODE" : !eliminationReady ? "NEEDS_BUILD" : build ? "BUILDING" : readyCount === selected.length ? "READY" : "NEEDS_BUILD";
+  return {
+    status: status,
+    ready: status === "READY",
+    action: build ? "RESUME" : status === "READY" ? "VERIFY" : "BUILD",
+    label: status === "READY" ? "READY · " + readyCount + "/" + selected.length : status === "BUILDING" ? "BUILDING · " + readyCount + "/" + selected.length : status === "NO_EPISODE" ? "EPISODE NOT CREATED" : "NEEDS BUILD · " + readyCount + "/" + selected.length,
+    selectedCount: selected.length,
+    eliminationReady: eliminationReady,
+    insertedCount: selected.filter(function(item) { return item.inserted; }).length,
+    readyCount: readyCount,
+    questionStates: states,
+    stages: [
+      { label: "Current episode exists", complete: !!current, detail: current ? "Current episode selected." : "Create or repair the current episode." },
+      { label: "Main elimination question linked", complete: eliminationReady, detail: eliminationReady ? "The episode's main question is connected." : "Repair the current episode's main question." },
+      { label: "Extra-question selection saved", complete: !!current, detail: selected.length + " extra questions selected." },
+      { label: "Questions inserted into Game Setup", complete: selected.every(function(item) { return item.inserted; }), detail: selected.filter(function(item) { return item.inserted; }).length + " of " + selected.length + " inserted." },
+      { label: "Answers verified", complete: readyCount === selected.length, detail: readyCount + " of " + selected.length + " ready." },
+      { label: "Episode question pack ready", complete: status === "READY", detail: status === "READY" ? "All selected local questions are ready." : "Finish the remaining local questions." }
+    ]
+  };
+}
+
+function adminRealityTvBuildMasterStatusHtml_(bundle) {
+  const season = bundle.season || {};
+  const current = adminRealityTvCurrentEpisode_(bundle);
+  const readiness = adminRealityTvQuestionReadiness_(bundle);
+  const stateClass = String(readiness.status || "needs-build").toLowerCase().replace(/_/g, "-");
+  const activeBuild = bundle.questionBuild && !bundle.questionBuild.complete ? bundle.questionBuild : null;
+  const actionLabel = activeBuild ? "Resume Automatic Build" : readiness.ready ? "Verify Again" : "Build / Repair Now";
+  const action = activeBuild
+    ? `adminRealityTvResumeQuestionPackBuild('${adminRealityTvEscape_(activeBuild.buildId)}','${adminRealityTvEscape_(season.SeasonId)}')`
+    : readiness.ready
+      ? `adminRealityTvRepairQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')`
+      : `adminRealityTvSaveQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')`;
+  const selectedQuestions = (readiness.questionStates || []).filter(function(item) { return item.selected; });
+  const availableQuestions = (readiness.questionStates || []).filter(function(item) { return !item.selected; });
+  return `<div class="reality-tv-master-build ${adminRealityTvEscape_(stateClass)}">
+    <button type="button" id="realityTvMasterBuildButton_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-master-build-button" aria-expanded="false" onclick="adminRealityTvToggleBuildStages_('${adminRealityTvEscape_(season.SeasonId)}')">
+      <span>Current ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Build Status</span>
+      <b>${adminRealityTvEscape_(readiness.label || "CHECK STATUS")}</b>
+      <span class="reality-tv-master-chevron">Show stages ▾</span>
+    </button>
+    <div id="realityTvBuildStages_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-master-build-details" hidden>
+      <div class="reality-tv-master-stage-list">
+        ${(readiness.stages || []).map(function(stage, index) {
+          return `<div class="reality-tv-master-stage ${stage.complete ? "complete" : "pending"}"><span>${stage.complete ? "✓" : index + 1}</span><div><b>${adminRealityTvEscape_(stage.label)}</b><small>${adminRealityTvEscape_(stage.detail || "")}</small></div></div>`;
+        }).join("")}
+      </div>
+      <div class="reality-tv-master-question-groups">
+        <div><b>Selected for this episode (${selectedQuestions.length})</b>${selectedQuestions.length ? selectedQuestions.map(function(item) { return `<div class="reality-tv-master-question-row"><span>${adminRealityTvEscape_(item.label)}</span>${adminRealityTvQuestionStatusHtml_(item)}</div>`; }).join("") : `<small>No extra questions selected. The elimination question can still be used by itself.</small>`}</div>
+        <details><summary>Available but not selected (${availableQuestions.length})</summary>${availableQuestions.map(function(item) { return `<div class="reality-tv-master-question-row"><span>${adminRealityTvEscape_(item.label)}</span>${adminRealityTvQuestionStatusHtml_(item)}</div>`; }).join("")}</details>
+      </div>
+      <div class="admin-actions"><button class="admin-small-button" type="button" onclick="${action}">${adminRealityTvEscape_(actionLabel)}</button></div>
+    </div>
+  </div>`;
+}
+
+function adminRealityTvToggleBuildStages_(seasonId) {
+  const panel = document.getElementById("realityTvBuildStages_" + seasonId);
+  const button = document.getElementById("realityTvMasterBuildButton_" + seasonId);
+  if (!panel) return;
+  panel.hidden = !panel.hidden;
+  if (button) {
+    button.setAttribute("aria-expanded", panel.hidden ? "false" : "true");
+    const chevron = button.querySelector(".reality-tv-master-chevron");
+    if (chevron) chevron.textContent = panel.hidden ? "Show stages ▾" : "Hide stages ▴";
+  }
 }
 
 function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, inputClass, seasonId, defaultPoints, preservedPoints, statusById, preservedDisplay) {
@@ -355,6 +468,11 @@ function adminRealityTvCustomSourceLabel_(value) {
 }
 
 function adminRealityTvSavedCustomQuestionsHtml_(bundle) {
+  const season = bundle.season || {};
+  const current = adminRealityTvCurrentEpisode_(bundle);
+  const readiness = adminRealityTvQuestionReadiness_(bundle);
+  const statusById = {};
+  (readiness.questionStates || []).forEach(function(item) { statusById[String(item.templateId || "")] = item; });
   const custom = (bundle.questionTemplates || []).filter(function(item) {
     return String(item.TemplateSource || "").toLowerCase() === "custom";
   }).sort(function(a, b) {
@@ -375,13 +493,14 @@ function adminRealityTvSavedCustomQuestionsHtml_(bundle) {
             ? manual.join(", ")
             : adminRealityTvCustomSourceLabel_(source);
           const enabled = item.Enabled === true || String(item.Enabled || "").toLowerCase() === "true";
+          const status = statusById[String(item.TemplateId || "")] || { state: enabled ? "NEEDS_BUILD" : "AVAILABLE", message: enabled ? "Selected for the current episode." : "Saved for future use." };
           return `<div class="reality-tv-saved-custom-item">
-            <div><b>${index + 1}. ${adminRealityTvEscape_(item.QuestionTemplate || item.Label || item.TemplateId)}</b><span>${adminRealityTvEscape_(answerSummary)}</span></div>
-            <div><span class="reality-tv-status-pill ${enabled ? "open" : "closed"}">${enabled ? "ENABLED" : "DISABLED"}</span><span>${adminRealityTvEscape_(item.Points || 0)} pts</span></div>
+            <div class="reality-tv-saved-custom-copy"><b>${index + 1}. ${adminRealityTvEscape_(item.QuestionTemplate || item.Label || item.TemplateId)}</b><span>${adminRealityTvEscape_(answerSummary)}</span>${adminRealityTvQuestionStatusHtml_(status)}</div>
+            <div class="reality-tv-saved-custom-actions"><span class="reality-tv-status-pill ${enabled ? "open" : "closed"}">${enabled ? "ENABLED" : "DISABLED"}</span><span>${adminRealityTvEscape_(item.Points || 0)} pts</span><button class="admin-small-button danger" type="button" onclick="adminRealityTvDeleteCustomQuestion('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(item.TemplateId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Delete</button></div>
           </div>`;
         }).join("")}
       </div>
-      <div class="admin-sub">Each saved custom question remains available for future episodes. Use the form below again to add another question.</div>
+      <div class="admin-sub">Enabled custom questions are automatically included in the current episode build. Delete removes the reusable template and removes the current episode copy only when no picks or results depend on it.</div>
     </details>`;
 }
 
@@ -422,6 +541,10 @@ function adminRealityTvQuestionPackPanel_(bundle) {
   });
   (bundle.questionBuild && bundle.questionBuild.results ? bundle.questionBuild.results : []).forEach(function(item) {
     statusById[String(item.templateId || "")] = item;
+  });
+  const readiness = adminRealityTvQuestionReadiness_(bundle);
+  (readiness.questionStates || []).forEach(function(item) {
+    statusById[String(item.templateId || "")] = { status: item.state, message: item.message };
   });
   (bundle.episodeQuestions || []).filter(function(item) {
     return current && String(item.EpisodeId || "") === String(current.EpisodeId || "");
@@ -489,7 +612,8 @@ function adminRealityTvQuestionPackPanel_(bundle) {
 
       <details class="reality-tv-config-section" open>
         <summary>4. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
-        <div class="admin-sub">Checked questions are verified one by one. Group-based questions require at least two valid Team / Tribe values. The build summary below explains every skipped item.</div>
+        <div class="admin-sub">Checked preset and custom questions are included in one automatic current-episode build. Group-based questions require at least two valid Team / Tribe values.</div>
+        ${adminRealityTvBuildMasterStatusHtml_(bundle)}
         <details class="reality-tv-build-help">
           <summary>How Save & Build and Resume Build work ${adminRealityTvHelp_("Question build help", "Normally click Save Format & Build once. Resume Build is only a recovery button after a timeout, closed browser, or interrupted connection.")}</summary>
           <div class="admin-sub"><b>Normal use:</b> Click Save Format & Build once. The manager continues through every checked local question automatically.</div>
@@ -512,7 +636,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
 
       <details class="reality-tv-custom-question-builder reality-tv-config-section" open>
         <summary>5. Custom Questions</summary>
-        <div class="admin-sub"><b>You can create more than one.</b> Save one question, then use this same blank form again for the next question. Custom questions are kept for future periods and never remove participants or advance the season.</div>
+        <div class="admin-sub"><b>You can create more than one.</b> Saving a custom question enables it and automatically inserts it into the current episode build. It also remains available for future episodes until disabled or deleted.</div>
         ${adminRealityTvSavedCustomQuestionsHtml_(bundle)}
         <div class="reality-tv-custom-builder-heading"><b>Create Another Custom Question</b><span>Choose where its answers come from before saving.</span></div>
         <div class="admin-form-grid reality-tv-custom-question-grid">
@@ -533,7 +657,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         <div class="admin-actions reality-tv-custom-save-actions">
           <button class="admin-small-button" onclick="adminRealityTvAddCustomQuestion('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Save & Build This Custom Question</button>
           <button class="admin-small-button secondary" type="button" onclick="adminRealityTvClearCustomQuestion_('${adminRealityTvEscape_(season.SeasonId)}')">Clear Form / Add Another</button>
-          ${adminRealityTvHelp_("Multiple custom questions", "Save one question at a time. After it builds, return to this section and enter another. There is no one-question limit.")}
+          ${adminRealityTvHelp_("Multiple custom questions", "Save one question at a time. Each saved question joins the same current-episode build automatically. There is no one-question limit.")}
         </div>
         <div id="realityTvCustomMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
       </details>
@@ -2102,7 +2226,29 @@ async function adminRealityTvAddCustomQuestion(seasonId, episodeId) {
     });
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save the custom question."));
     if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
-    alert((state.message || state.lastMessage || "Custom question saved and built.") + "\n\nYou can return to Custom Questions and add another question.");
+    alert((state.message || state.lastMessage || "Custom question saved and built.") + "\n\nIt is now part of the current episode build and remains available for future episodes.");
+    navigate("admin-reality-tv");
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, err.message || String(err), "error");
+  } finally {
+    hideLoader();
+  }
+}
+
+async function adminRealityTvDeleteCustomQuestion(seasonId, templateId, episodeId) {
+  if (!seasonId || !templateId) return;
+  if (!confirm("Delete this custom question template? If the current episode copy has no saved picks or results, it will be removed from the game too. Historical played questions are preserved.")) return;
+  showLoader();
+  try {
+    const res = await apiAdminDeleteRealityTvCustomQuestionTemplate({
+      seasonId: seasonId,
+      templateId: templateId,
+      episodeId: episodeId || ""
+    });
+    if (!res || res.success === false) throw new Error(adminRealityTvResponseError_(res, "Could not delete the custom question."));
+    let build = res.build || null;
+    if (build && !build.complete) build = await adminRealityTvRunQuestionPackBuild_(build, seasonId);
+    alert(res.message || "Custom question deleted.");
     navigate("admin-reality-tv");
   } catch (err) {
     adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, err.message || String(err), "error");

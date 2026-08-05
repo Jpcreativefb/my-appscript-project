@@ -119,7 +119,7 @@ assert(source.includes('data-advanced-group='));
 assert(!source.includes('data-advanced-division='));
 assert(source.includes('sportsAdvancedQuestionSearchTokens_'));
 assert(source.includes('groupInfo.label'));
-assert(html.includes('sports.js?v=308-reality-tv-episode-recovery'));
+assert(html.includes('sports.js?v=309-reality-tv-extra-question-readiness'));
 assert(sw.includes('awards-app-v264-question-mode-table-repair'));
 
 console.log('Sports advanced comparison filter tests passed.');

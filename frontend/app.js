@@ -372,7 +372,7 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "308-reality-tv-episode-recovery";
+const APP_ASSET_VERSION = "309-reality-tv-extra-question-readiness";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

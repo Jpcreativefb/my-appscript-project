@@ -1,0 +1,33 @@
+Production v1.1.9 changed files
+Generated: 2026-08-05
+
+API_CONTRACT.md
+CHANGELOG.md
+PRODUCTION_REALITY_TV_EXTRA_QUESTIONS_V1_1_9.md
+PRODUCTION_SMOKE_TEST_V1_1_9.md
+PRODUCTION_STATUS.md
+backend/Api.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/app.html
+frontend/app.js
+frontend/css/styles.css
+frontend/index.html
+frontend/js/api.js
+frontend/js/app.js
+frontend/js/pages/adminRealityTv.js
+frontend/sports.html
+frontend/sw.js
+tests/admin_games_lazy_loader_tests.js
+tests/platform_image_engine_tests.js
+tests/reality_tv_episode_recovery_custom_questions_v118_tests.js
+tests/reality_tv_extra_questions_production_v119_tests.js
+tests/reality_tv_player_fast_startup_tests.js
+tests/reality_tv_player_flow_v116_tests.js
+tests/reality_tv_staged_question_pack_build_tests.js
+tests/reality_tv_survivor_comparison_v117_tests.js
+tests/reality_tv_weekly_header_stats_tests.js
+tests/sports_advanced_comparison_filter_tests.js
+tests/sports_all_league_player_stats_tests.js
+CHANGED_FILES_V1_1_9.txt

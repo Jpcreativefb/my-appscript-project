@@ -59,8 +59,8 @@ assert(player.includes('(penalty > 0 || maxChanges > 0)'));
 assert(css.includes('overflow-wrap: anywhere'));
 assert(css.includes('white-space: normal'));
 assert(app.includes('startPageLoadPulse_'));
-assert(app.includes('308-reality-tv-episode-recovery'));
-assert(html.includes('308-reality-tv-episode-recovery'));
-assert(sw.includes('308-reality-tv-episode-recovery'));
+assert(app.includes('309-reality-tv-extra-question-readiness'));
+assert(html.includes('309-reality-tv-extra-question-readiness'));
+assert(sw.includes('309-reality-tv-extra-question-readiness'));
 
 console.log('Reality TV player flow v1.1.6 tests passed.');

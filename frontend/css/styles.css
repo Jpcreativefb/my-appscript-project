@@ -4936,3 +4936,202 @@ button.is-saving {
     position: static;
   }
 }
+
+/* Reality TV automatic extra-question build readiness — v1.1.9 */
+.reality-tv-master-build {
+  margin: 14px 0;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.48);
+}
+
+.reality-tv-master-build-button {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 0;
+  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.16);
+  cursor: pointer;
+  text-align: left;
+}
+
+.reality-tv-master-build.ready .reality-tv-master-build-button {
+  background: rgba(34, 197, 94, 0.17);
+}
+
+.reality-tv-master-build.building .reality-tv-master-build-button {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.reality-tv-master-build.needs-build .reality-tv-master-build-button,
+.reality-tv-master-build.no-episode .reality-tv-master-build-button {
+  background: rgba(245, 158, 11, 0.18);
+}
+
+.reality-tv-master-build.blocked .reality-tv-master-build-button,
+.reality-tv-master-build.error .reality-tv-master-build-button {
+  background: rgba(239, 68, 68, 0.18);
+}
+
+.reality-tv-master-build-button > span:first-child {
+  font-weight: 800;
+}
+
+.reality-tv-master-build-button > b {
+  padding: 5px 9px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.5);
+  white-space: nowrap;
+}
+
+.reality-tv-master-chevron {
+  font-size: 0.8rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+.reality-tv-master-build-details {
+  padding: 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.reality-tv-master-stage-list {
+  display: grid;
+  gap: 8px;
+}
+
+.reality-tv-master-stage {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.reality-tv-master-stage > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.18);
+  font-weight: 900;
+}
+
+.reality-tv-master-stage.complete > span {
+  background: rgba(34, 197, 94, 0.2);
+  color: #86efac;
+}
+
+.reality-tv-master-stage div {
+  display: grid;
+  gap: 2px;
+}
+
+.reality-tv-master-stage small {
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.reality-tv-master-question-groups {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.reality-tv-master-question-groups > div,
+.reality-tv-master-question-groups > details {
+  padding: 10px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 12px;
+}
+
+.reality-tv-master-question-groups summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.reality-tv-master-question-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  align-items: start;
+  margin-top: 8px;
+}
+
+.reality-tv-master-question-row > span {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.reality-tv-master-question-row .reality-tv-question-build-status {
+  padding: 0;
+  border: 0;
+}
+
+.reality-tv-question-build-status.ready b,
+.reality-tv-question-build-status.built b {
+  background: rgba(34, 197, 94, 0.18);
+  color: #86efac;
+}
+
+.reality-tv-question-build-status.available b {
+  background: rgba(148, 163, 184, 0.18);
+  color: #cbd5e1;
+}
+
+.reality-tv-question-build-status.needs-build b,
+.reality-tv-question-build-status.verifying b,
+.reality-tv-question-build-status.skipped b {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+}
+
+.reality-tv-question-build-status.building b,
+.reality-tv-question-build-status.already-exists b {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.reality-tv-question-build-status.blocked b,
+.reality-tv-question-build-status.error b {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fca5a5;
+}
+
+.reality-tv-saved-custom-copy {
+  flex: 1 1 auto;
+}
+
+.reality-tv-saved-custom-actions {
+  justify-items: end;
+  flex: 0 0 auto;
+}
+
+.reality-tv-saved-custom-copy .reality-tv-question-build-status {
+  margin-top: 4px;
+  padding: 5px 0 0;
+  border: 0;
+}
+
+@media (max-width: 700px) {
+  .reality-tv-master-build-button,
+  .reality-tv-master-question-row {
+    grid-template-columns: 1fr;
+  }
+
+  .reality-tv-master-chevron {
+    justify-self: start;
+  }
+
+  .reality-tv-saved-custom-actions {
+    justify-items: start;
+  }
+}

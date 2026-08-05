@@ -98,8 +98,8 @@ assert(admin.includes('Save & Build will now repair'));
 assert(styles.includes('Reality TV current-period recovery and custom question builder — v1.1.8'));
 
 // Release cache contract.
-assert(app.includes('308-reality-tv-episode-recovery'));
-assert(html.includes('308-reality-tv-episode-recovery'));
-assert(sw.includes('308-reality-tv-episode-recovery'));
+assert(app.includes('309-reality-tv-extra-question-readiness'));
+assert(html.includes('309-reality-tv-extra-question-readiness'));
+assert(sw.includes('309-reality-tv-extra-question-readiness'));
 
 console.log('Reality TV episode recovery, question collapse, and custom-question v1.1.8 tests passed.');

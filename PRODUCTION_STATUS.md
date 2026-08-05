@@ -1,10 +1,10 @@
-# Current Production Candidate: v1.1.8
+# Current Production Candidate: v1.1.9
 
 # Production Status
 
 ## Current release
 
-Reality TV current-episode recovery and custom-question workflow v1.1.8, including the v1.1.7 Survivor/comparison work, v1.1.6 player-flow improvements, platform image engine v1.1.5, and production hardening v1.1.0.
+Reality TV Extra Questions production-readiness workflow v1.1.9, including automatic format filtering, resilient local builds, current-episode readiness stages, safe custom-question deletion, the v1.1.8 recovery/custom workflow, and the v1.1.7 Survivor/comparison work.
 
 ## Feature readiness
 
@@ -12,12 +12,25 @@ Reality TV current-episode recovery and custom-question workflow v1.1.8, includi
 |---|---:|---:|---|
 | Core games and Game Setup | 88% | 75% | Live regression, repair diagnostics, final UI consistency |
 | Fixed/confidence/staked/hybrid scoring | 88% | 78% | High-volume tests and settlement audit |
-| Reality TV Manager | 97% | 88% | Live activation verification and a dedicated deferred Hub-sync queue |
+| Reality TV Manager | 99% | 94% | Live deployment smoke test and the deferred External Results Hub queue |
 | Reality TV player experience | 96% | 88% | Live save-duration measurement, device testing, and accessibility review |
 | Sports platform | 82% | 68% | League-specific production testing and timeout reduction |
 | Archives/career history | 78% | 68% | Restore verification and larger archive testing |
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
+
+
+## Reality TV Extra Questions finalized in v1.1.9
+
+- Each season now stores and loads only presets that match the selected show format; custom questions remain season-specific.
+- Save, Build, and Verify operations remove stale cross-theme preset rows without touching custom templates.
+- A selected build job uses its saved question list as the source of truth and no longer re-skips a selected item because of an older `Enabled` value.
+- New builds advance immediately on the server and schedule a one-time continuation trigger when work remains, so a closed browser does not leave a job permanently at `BUILD_LOCAL 0/N`.
+- The manager has one master current-episode status control showing episode creation, main elimination linkage, selection, insertion, answer verification, and final local readiness.
+- Every preset and custom question displays Available, Needs Build, Building, Needs Verification, Needs Attention, or Ready in Episode.
+- Saving a custom question automatically enables and inserts it into the current episode; custom templates can now be deleted individually.
+- Custom deletion removes the current episode copy only when no saved picks, wagers, or results depend on it; played history remains preserved.
+- Local readiness does not wait for External Results Hub mappings. Hub synchronization remains the next production phase.
 
 
 

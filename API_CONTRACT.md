@@ -866,3 +866,33 @@ The following existing administrator actions now resolve or repair a missing cur
 Resolution order is requested episode ID, `CurrentEpisodeNumber`, newest open/review episode, newest episode, then repair/create. Repair skips Hub synchronization and preserves an existing main-category lock time when available.
 
 `getSeasonAnchor` and `saveSeasonAnchorPick` may use a read-only current-episode view derived from the main `episode-N-eliminated` category when the normalized episode row is temporarily absent.
+
+
+## Reality TV Extra Question Build Contract — v1.1.9
+
+### Large save request
+
+`adminUpdateRealityTvQuestionPack` is sent with POST through `apiAdminRealityTvPostRequest_`. The payload contains format settings, selected question IDs, per-question points, and display settings.
+
+### Custom deletion
+
+Action: `adminDeleteRealityTvCustomQuestionTemplate`
+
+Frontend: `apiAdminDeleteRealityTvCustomQuestionTemplate({ seasonId, templateId, episodeId })`
+
+Only `TemplateSource = custom` rows may be deleted. The reusable template is deleted. The current episode question/category is also deleted when no protected picks, wagers, or results reference it. Otherwise the played question is preserved as history.
+
+### Automatic continuation
+
+Question builds advance immediately within a bounded server budget. Incomplete jobs schedule `realityTvContinuePendingQuestionBuilds` as a one-time Apps Script trigger. The trigger resumes saved jobs from `CurrentIndex` and reschedules itself only while unfinished work remains.
+
+### Readiness payload
+
+`apiAdminGetRealityTvSeasonDetails` returns `bundle.questionReadiness` with:
+
+- `status`: `NO_EPISODE`, `NEEDS_BUILD`, `BUILDING`, `BLOCKED`, `ERROR`, or `READY`
+- counts for available, selected, inserted, ready, blocked, and needing build
+- `stages` for episode, elimination linkage, selection, insertion, answer verification, and local readiness
+- `questionStates` for every compatible preset and custom template
+
+External Results Hub mapping is not required for local `READY` status.

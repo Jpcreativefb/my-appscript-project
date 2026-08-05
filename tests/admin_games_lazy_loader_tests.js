@@ -10,7 +10,7 @@ const sw = fs.readFileSync(path.join(projectRoot, 'frontend/sw.js'), 'utf8');
 const html = fs.readFileSync(path.join(projectRoot, 'frontend/app.html'), 'utf8');
 
 assert(fs.existsSync(path.join(projectRoot, 'frontend/js/pages/adminGames.js')), 'adminGames.js must exist');
-assert(app.includes('308-reality-tv-episode-recovery'));
+assert(app.includes('309-reality-tv-extra-question-readiness'));
 assert(app.includes('APP_MAIN_SCRIPT_URL'));
 assert(app.includes('APP_PAGE_SCRIPT_BASE_URL'));
 assert(app.includes('retryToken'));
@@ -20,6 +20,6 @@ assert(pwa.includes('isLocalDevelopment'));
 assert(pwa.includes('registration.unregister()'));
 assert(pwa.includes('window.caches.delete'));
 assert(sw.includes('"./js/pages/adminGames.js"'));
-assert(html.includes('308-reality-tv-episode-recovery'));
+assert(html.includes('309-reality-tv-extra-question-readiness'));
 
 console.log('Admin Games lazy loader tests passed.');

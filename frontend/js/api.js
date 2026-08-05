@@ -1722,11 +1722,15 @@ async function apiAdminCreateNextRealityTvEpisode(seasonId) {
 }
 
 async function apiAdminUpdateRealityTvQuestionPack(payload) {
-  return apiAdminRealityTvRequest_("adminUpdateRealityTvQuestionPack", payload || {});
+  return apiAdminRealityTvPostRequest_("adminUpdateRealityTvQuestionPack", payload || {});
 }
 
 async function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
   return apiAdminRealityTvPostRequest_("adminAddRealityTvCustomQuestionTemplate", payload || {});
+}
+
+async function apiAdminDeleteRealityTvCustomQuestionTemplate(payload) {
+  return apiAdminRealityTvPostRequest_("adminDeleteRealityTvCustomQuestionTemplate", payload || {});
 }
 
 async function apiAdminBuildRealityTvEpisodeQuestions(payload) {
