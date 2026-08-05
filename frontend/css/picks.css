@@ -311,7 +311,7 @@
 ====================== */
 
 .pick-card-body {
-  padding: 16px;
+  padding: 0;
 }
 
 .pick-category-card.collapsed .pick-card-body {

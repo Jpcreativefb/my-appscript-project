@@ -4825,3 +4825,114 @@ button.is-saving {
 .season-anchor-picker + .season-anchor-current-pick {
   margin-top: 12px;
 }
+
+/* Reality TV current-period recovery and custom question builder — v1.1.8 */
+.reality-tv-saved-custom-questions {
+  margin: 14px 0;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.reality-tv-saved-custom-questions > summary {
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.reality-tv-saved-custom-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.reality-tv-saved-custom-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.reality-tv-saved-custom-item > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.reality-tv-saved-custom-item span {
+  overflow-wrap: anywhere;
+}
+
+.reality-tv-custom-builder-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin: 16px 0 10px;
+}
+
+.reality-tv-custom-builder-heading span {
+  font-size: 0.86rem;
+  opacity: 0.78;
+}
+
+.reality-tv-custom-answer-preview {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 14px;
+}
+
+.reality-tv-custom-answer-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 9px 0 6px;
+}
+
+.reality-tv-custom-answer-chip {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: rgba(212, 175, 55, 0.16);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+  font-size: 0.82rem;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.reality-tv-custom-answer-chip.more {
+  opacity: 0.76;
+}
+
+.reality-tv-custom-answer-empty {
+  font-size: 0.86rem;
+  opacity: 0.75;
+}
+
+.reality-tv-custom-save-actions {
+  position: sticky;
+  bottom: 8px;
+  z-index: 3;
+  padding: 10px;
+  border-radius: 14px;
+  background: rgba(18, 18, 18, 0.94);
+  border: 1px solid rgba(212, 175, 55, 0.34);
+  backdrop-filter: blur(10px);
+}
+
+@media (max-width: 640px) {
+  .reality-tv-saved-custom-item,
+  .reality-tv-custom-builder-heading {
+    display: grid;
+  }
+
+  .reality-tv-custom-save-actions {
+    position: static;
+  }
+}

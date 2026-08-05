@@ -22,7 +22,7 @@ assert(picks.includes('Week points') && picks.includes('Correct'), 'Weekly point
 assert(picks.includes('Number(meta.eliminatedEpisode || 0) === categoryEpisodeNumber'), 'Historical episodes must only mark the contestant eliminated in that episode.');
 assert(css.includes('.reality-player-summary-card'), 'Player summary styles are missing.');
 assert(css.includes('.reality-episode-header-stats'), 'Episode header stat styles are missing.');
-assert(html.includes('307-reality-tv-survivor-comparison'), 'Frontend cache version was not bumped.');
-assert(sw.includes('v307-reality-tv-survivor-comparison'), 'Service worker cache version was not bumped.');
+assert(html.includes('308-reality-tv-episode-recovery'), 'Frontend cache version was not bumped.');
+assert(sw.includes('v308-reality-tv-episode-recovery'), 'Service worker cache version was not bumped.');
 
 console.log('Reality TV weekly header stats tests passed.');

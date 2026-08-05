@@ -34,7 +34,7 @@ assert(picks.includes('hydratePicksEnhancements_'), 'Picks page deferred hydrato
 assert(picks.includes('realityTvPlayerSummaryMount'), 'Player summary mount is missing.');
 assert(picks.includes('seasonAnchorPickMount'), 'Season Survivor mount is missing.');
 assert(picks.includes('refreshPicksEnhancementUi_'), 'Deferred enhancement UI refresh is missing.');
-assert(html.includes('307-reality-tv-survivor-comparison'), 'Frontend cache version was not bumped.');
-assert(sw.includes('307-reality-tv-survivor-comparison'), 'Service worker cache version was not bumped.');
+assert(html.includes('308-reality-tv-episode-recovery'), 'Frontend cache version was not bumped.');
+assert(sw.includes('308-reality-tv-episode-recovery'), 'Service worker cache version was not bumped.');
 
 console.log('Reality TV player fast startup tests passed.');

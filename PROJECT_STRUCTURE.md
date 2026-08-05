@@ -934,3 +934,10 @@ Voting/ranking frontend
 
 - `docs/guides/REALITY_TV_QUESTION_BUILD_HELP.md` — Save, Resume, and Verify & Repair guidance.
 - `docs/guides/REALITY_TV_SURVIVOR_PICK_AND_LOCKED_COMPARISON.md` — Sole Survivor finalization, elimination replacement, bios, and post-lock comparison.
+
+
+## v1.1.8 reference files
+
+- `PRODUCTION_REALITY_TV_EPISODE_RECOVERY_V1_1_8.md` — release behavior and architecture notes.
+- `PRODUCTION_SMOKE_TEST_V1_1_8.md` — live deployment verification.
+- `docs/guides/REALITY_TV_CUSTOM_QUESTIONS_AND_EPISODE_RECOVERY.md` — administrator help for episode recovery, multiple custom questions, and answer sources.

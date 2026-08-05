@@ -1035,6 +1035,38 @@ function realityTvCreateSupplementalHubPendingResult_(season, episode, question,
   }
 }
 
+
+function realityTvResolveQuestionBuildEpisode_(season, requestedEpisodeId, createIfMissing) {
+  if (!season) return null;
+  let episode = requestedEpisodeId ? realityTvGetEpisode_(requestedEpisodeId) : null;
+  const episodes = realityTvEpisodesForSeason_(season.SeasonId);
+  const currentNumber = Math.max(1, realityTvNumber_(season.CurrentEpisodeNumber,
+    episodes.length ? episodes[episodes.length - 1].EpisodeNumber : 1));
+
+  if (!episode) {
+    episode = episodes.find(function(row) {
+      return realityTvNumber_(row.EpisodeNumber, 0) === currentNumber;
+    }) || null;
+  }
+  if (!episode) {
+    episode = episodes.slice().reverse().find(function(row) {
+      const status = realityTvString_(row.Status || "OPEN").toUpperCase();
+      return status === "OPEN" || status === "REVIEW";
+    }) || null;
+  }
+  if (!episode && episodes.length) episode = episodes[episodes.length - 1];
+
+  if (!episode && createIfMissing && typeof realityTvCreateEpisode_ === "function") {
+    episode = realityTvCreateEpisode_(season, currentNumber, {
+      repair: true,
+      skipHubSync: true,
+      skipQuestionPack: true
+    });
+    episode.autoRepaired = true;
+  }
+  return episode;
+}
+
 function apiAdminUpdateRealityTvQuestionPack(payload) {
   requireAdmin_(payload || {});
   realityTvEnsureSystem_();
@@ -1096,14 +1128,18 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
   );
 
   if (payload.buildCurrentEpisode === undefined || realityTvBool_(payload.buildCurrentEpisode)) {
-    let episode = realityTvGetEpisode_(payload.episodeId) || realityTvEpisodesForSeason_(season.SeasonId).slice(-1)[0];
-    if (!episode) throw new Error("Current Reality TV episode not found.");
+    let episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, true);
+    if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
     episode = realityTvUpdateCurrentPeriodPresentation_(season, episode);
     const state = realityTvStartQuestionPackBuild_(season, episode, enabledTypes);
     state.enabledQuestionTypes = enabledTypes;
-    state.message = state.complete
-      ? "Show format and question pack saved. No additional question types are enabled."
-      : "Show format and question pack saved. The current period build is ready to continue in short stages.";
+    state.message = episode.autoRepaired
+      ? (state.complete
+          ? "The missing current period was repaired with its existing lock time. No additional question types are enabled."
+          : "The missing current period was repaired with its existing lock time. The question build is ready to continue.")
+      : (state.complete
+          ? "Show format and question pack saved. No additional question types are enabled."
+          : "Show format and question pack saved. The current period build is ready to continue in short stages.");
     return state;
   }
 
@@ -1158,10 +1194,13 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
   };
   realityTvUpsertObject_(SpreadsheetApp.getActive(), REALITY_TV_QUESTION_TEMPLATES_SHEET,
     REALITY_TV_QUESTION_TEMPLATE_HEADERS, ["SeasonId", "TemplateId"], row);
-  const episode = realityTvGetEpisode_(payload.episodeId) || realityTvEpisodesForSeason_(season.SeasonId).slice(-1)[0];
+  const episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, true);
+  if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
   const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId).filter(function(item) { return realityTvBool_(item.Enabled); }).map(function(item) { return item.TemplateId; });
   const state = realityTvStartQuestionPackBuild_(season, episode, enabledTypes);
-  state.message = "Custom question saved. The current period build is ready to continue.";
+  state.message = episode.autoRepaired
+    ? "The missing current period was repaired with its existing lock time. The custom question was saved and is ready to build."
+    : "Custom question saved. The current period build is ready to continue.";
   state.customTemplateId = templateId;
   return state;
 }
@@ -1171,8 +1210,9 @@ function apiAdminBuildRealityTvEpisodeQuestions(payload) {
   realityTvEnsureSystem_();
   realityTvEnsureQuestionPackSystem_();
   const season = realityTvGetSeason_(payload.seasonId);
-  const episode = realityTvGetEpisode_(payload.episodeId);
-  if (!season || !episode) throw new Error("Season or episode not found.");
+  if (!season) throw new Error("Reality TV season not found.");
+  const episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, true);
+  if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
   const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId)
     .filter(function(row) { return realityTvBool_(row.Enabled); })
     .map(function(row) { return row.TemplateId; });
@@ -1228,17 +1268,19 @@ function apiAdminRepairRealityTvQuestionPack(payload) {
   realityTvEnsureQuestionPackSystem_();
   const season = realityTvGetSeason_(payload.seasonId);
   if (!season) throw new Error("Reality TV season not found.");
-  const episode = realityTvGetEpisode_(payload.episodeId) || realityTvEpisodesForSeason_(season.SeasonId).slice(-1)[0];
-  if (!episode) throw new Error("Current Reality TV episode not found.");
+  const episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, true);
+  if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
   const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId).filter(function(row) {
     return realityTvBool_(row.Enabled);
   }).map(function(row) {
     return realityTvKey_(row.TemplateId);
   });
   const state = realityTvStartQuestionPackBuild_(season, episode, enabledTypes);
-  state.message = state.complete
-    ? "No enabled extra questions require repair."
-    : "Verification and repair build queued. Existing questions and answers will be reused.";
+  state.message = episode.autoRepaired
+    ? "The missing current period was repaired with its existing lock time. Extra-question verification is ready."
+    : (state.complete
+        ? "No enabled extra questions require repair."
+        : "Verification and repair build queued. Existing questions and answers will be reused.");
   return state;
 }
 

@@ -853,3 +853,16 @@ apiAdminRepairRealityTvQuestionPack(seasonId, episodeId)
 ### Behavior
 
 Starts or resumes a staged verification build. Verification checks the episode-question record, game category, and each expected answer ID. Valid existing rows are reused and only missing local records are repaired.
+
+## Reality TV current-period recovery contract — v1.1.8
+
+The following existing administrator actions now resolve or repair a missing current `RealityEpisodes` row before building:
+
+- `adminUpdateRealityTvQuestionPack`
+- `adminAddRealityTvCustomQuestionTemplate`
+- `adminBuildRealityTvEpisodeQuestions`
+- `adminRepairRealityTvQuestionPack`
+
+Resolution order is requested episode ID, `CurrentEpisodeNumber`, newest open/review episode, newest episode, then repair/create. Repair skips Hub synchronization and preserves an existing main-category lock time when available.
+
+`getSeasonAnchor` and `saveSeasonAnchorPick` may use a read-only current-episode view derived from the main `episode-N-eliminated` category when the normalized episode row is temporarily absent.

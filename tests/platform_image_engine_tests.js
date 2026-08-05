@@ -87,7 +87,7 @@ assert(configSource.includes('transformExternal: false'), 'External transformati
 assert(appHtml.indexOf('image-manifest.js') < appHtml.indexOf('imageEngine.js'));
 assert(appHtml.indexOf('imageEngine.js') < appHtml.indexOf('js/app.js'));
 assert(sportsHtml.indexOf('imageEngine.js') < sportsHtml.indexOf('js/sports.js'));
-assert(sw.includes('awards-app-v307-reality-tv-survivor-comparison'));
+assert(sw.includes('awards-app-v308-reality-tv-episode-recovery'));
 assert(sw.includes('./assets/images/image-manifest.js'));
 assert(sw.includes('./js/imageEngine.js'));
 

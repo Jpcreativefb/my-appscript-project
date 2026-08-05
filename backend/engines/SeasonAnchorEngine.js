@@ -252,6 +252,46 @@ function seasonAnchorCurrentRealityEpisode_(season) {
   }) || episodes[episodes.length - 1];
 }
 
+
+function seasonAnchorResolveRealityEpisodeView_(view) {
+  if (!view || !view.season) return null;
+  const episodes = Array.isArray(view.episodes) ? view.episodes.slice() : [];
+  const currentNumber = Math.max(1, seasonAnchorNumber_(view.season.currentEpisodeNumber, 1));
+  const now = new Date().getTime();
+  const isSelectable = function(row) {
+    if (!row || seasonAnchorKey_(row.status || "open") !== "open") return false;
+    const value = row.lockDateTime || "";
+    if (!value) return true;
+    const lockDate = new Date(value);
+    return isNaN(lockDate.getTime()) || lockDate.getTime() > now;
+  };
+
+  let episode = episodes.find(function(row) {
+    return seasonAnchorNumber_(row.episodeNumber, 0) === currentNumber && isSelectable(row);
+  }) || episodes.find(isSelectable) || episodes.find(function(row) {
+    return seasonAnchorNumber_(row.episodeNumber, 0) === currentNumber;
+  }) || episodes[0] || null;
+
+  if (!episode && typeof getCategoriesCached === "function") {
+    const categoryId = "episode-" + currentNumber + "-eliminated";
+    const category = (getCategoriesCached(view.season.gameId) || []).find(function(row) {
+      return seasonAnchorKey_(row.id || row.categoryId) === seasonAnchorKey_(categoryId);
+    }) || null;
+    if (category) {
+      episode = {
+        episodeId: view.season.seasonId + "-episode-" + currentNumber,
+        episodeNumber: currentNumber,
+        episodeName: seasonAnchorString_(category.shortName || category.name || ((view.season.periodLabel || "Episode") + " " + currentNumber)),
+        lockDateTime: category.lockDateTime || category.LockDateTime || "",
+        status: seasonAnchorBool_(category.locked) ? "LOCKED" : "OPEN",
+        categoryId: categoryId,
+        derivedFromCategory: true
+      };
+    }
+  }
+  return episode;
+}
+
 function seasonAnchorRealityEntities_(season, activeOnly) {
   if (!season) return [];
   const view = typeof realityTvUserGameViewPayload_ === "function" ? realityTvUserGameViewPayload_(season.GameId) : null;
@@ -315,11 +355,7 @@ function seasonAnchorUserPayload_(username, gameId) {
     return { enabled: false, message: "Reality TV season record was not found." };
   }
 
-  const episodes = Array.isArray(view.episodes) ? view.episodes : [];
-  const currentNumber = seasonAnchorNumber_(view.season.currentEpisodeNumber, 0);
-  const episode = episodes.find(function(row) {
-    return seasonAnchorNumber_(row.episodeNumber, 0) === currentNumber;
-  }) || episodes[0] || null;
+  const episode = seasonAnchorResolveRealityEpisodeView_(view);
 
   const user = seasonAnchorReadObjects_(SEASON_ANCHOR_USERS_SHEET, true).find(function(row) {
     return seasonAnchorKey_(row.GameId) === seasonAnchorKey_(gameId) &&

@@ -1,10 +1,10 @@
-# Current Production Candidate: v1.1.7
+# Current Production Candidate: v1.1.8
 
 # Production Status
 
 ## Current release
 
-Reality TV Survivor finalization and locked comparison v1.1.7, including the v1.1.6 player-flow improvements, platform image engine v1.1.5, and production hardening v1.1.0.
+Reality TV current-episode recovery and custom-question workflow v1.1.8, including the v1.1.7 Survivor/comparison work, v1.1.6 player-flow improvements, platform image engine v1.1.5, and production hardening v1.1.0.
 
 ## Feature readiness
 
@@ -20,6 +20,15 @@ Reality TV Survivor finalization and locked comparison v1.1.7, including the v1.
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
 
 
+
+
+## Reality TV episode recovery and custom questions completed in v1.1.8
+
+- Missing current `RealityEpisodes` rows are repaired automatically by Save & Build, Verify & Repair, and custom-question creation.
+- Existing Game Setup lock times are preserved during repair, including episodes less than an hour from lock.
+- Sole Survivor can resolve an open current period from the main game question when the normalized episode row is absent.
+- Each weekly question now has a real collapsible body, and successful saves collapse and advance correctly.
+- Custom Questions clearly supports multiple saved questions, roster/group/merge-aware/Yes-No/manual answer sources, judges and special choices, and a live answer preview.
 
 ## Reality TV Survivor and comparison completed in v1.1.7
 

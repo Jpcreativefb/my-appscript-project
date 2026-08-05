@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.8 — Reality TV Current Episode Recovery and Custom Questions
+
+- Auto-repaired missing `RealityEpisodes` rows when the current game question already exists.
+- Preserved the existing Game Setup lock time during current-period repair.
+- Added a Sole Survivor fallback that resolves the current period from the live main question before lock.
+- Fixed individual weekly-question collapse by placing all answer controls inside the collapsible card body.
+- Added accessible expanded/collapsed state and restored save-and-advance behavior.
+- Rebuilt Custom Questions with a visible save button, multiple-question workflow, saved-question list, answer-source selector, manual judge/special answers, and live answer preview.
+- Added v1.1.8 help, smoke testing, and regression coverage.
+
 ## v1.1.7 — Reality TV Survivor Finalization and Locked Comparison
 
 - Rebuilt the Sole Survivor card with immediate image/bio preview and a red Finalize Pick action.

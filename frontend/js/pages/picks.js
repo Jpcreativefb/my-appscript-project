@@ -1348,6 +1348,7 @@ function renderCategoryCard(category, isChild, parent) {
     <button
       type="button"
       class="pick-card-header"
+      aria-expanded="${collapsedClass ? "false" : "true"}"
       onclick="togglePickCategory('${escapeJs(category.id)}')"
     >
 
@@ -1440,8 +1441,9 @@ function renderCategoryCard(category, isChild, parent) {
 
      </div>
 
-    </button>  
-    
+    </button>
+
+    <div class="pick-card-body">
     ${
       !confidencePointsCategory
         ? stakedPointsCategory
@@ -1509,6 +1511,7 @@ ${renderConfidenceControl(
   locked
 )}
 
+    </div>
 </section>
   `;
 
@@ -2186,7 +2189,11 @@ function scheduleRealityTvPickAutoAdvance_(categoryId) {
   PICKS_AUTO_ADVANCE_TIMER = setTimeout(function() {
     PICKS_TEMP_OPEN_CATEGORY_ID = "";
     const current = document.querySelector('[data-category-id="' + cssEscape(categoryId) + '"]');
-    if (current) current.classList.add("collapsed");
+    if (current) {
+      current.classList.add("collapsed");
+      const currentHeader = current.querySelector(".pick-card-header");
+      if (currentHeader) currentHeader.setAttribute("aria-expanded", "false");
+    }
 
     const cards = Array.from(document.querySelectorAll(".pick-category-card[data-category-id]"));
     const currentIndex = cards.findIndex(function(card) {
@@ -2207,6 +2214,8 @@ function scheduleRealityTvPickAutoAdvance_(categoryId) {
     const episode = next.closest("details.reality-episode-picks-section");
     if (episode) episode.open = true;
     next.classList.remove("collapsed");
+    const nextHeader = next.querySelector(".pick-card-header");
+    if (nextHeader) nextHeader.setAttribute("aria-expanded", "true");
     setTimeout(function() {
       next.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 80);
@@ -2261,6 +2270,8 @@ function togglePickCategory(categoryId) {
   }
 
   card.classList.toggle("collapsed");
+  const header = card.querySelector(".pick-card-header");
+  if (header) header.setAttribute("aria-expanded", card.classList.contains("collapsed") ? "false" : "true");
 
 }
 

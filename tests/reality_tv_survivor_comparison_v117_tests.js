@@ -73,8 +73,8 @@ assert(picks.includes('is-saving'));
 assert(picksCss.includes('.pick-category-card.is-saving'));
 
 // Release cache contract.
-assert(app.includes('307-reality-tv-survivor-comparison'));
-assert(html.includes('307-reality-tv-survivor-comparison'));
-assert(sw.includes('307-reality-tv-survivor-comparison'));
+assert(app.includes('308-reality-tv-episode-recovery'));
+assert(html.includes('308-reality-tv-episode-recovery'));
+assert(sw.includes('308-reality-tv-episode-recovery'));
 
 console.log('Reality TV Survivor and locked comparison v1.1.7 tests passed.');

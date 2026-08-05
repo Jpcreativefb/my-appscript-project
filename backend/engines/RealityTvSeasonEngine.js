@@ -513,12 +513,20 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
     throw new Error("At least two eligible " + realityTvString_(season.ParticipantLabel || "participants").toLowerCase() + "s are required to create or repair " + realityTvString_(season.PeriodLabel || "period").toLowerCase() + " " + episodeNumber + ".");
   }
 
+  const categoryId = existing && existing.CategoryId ? existing.CategoryId : "episode-" + episodeNumber + "-eliminated";
+  const setup = adminGetGameSetup({ gameId: season.GameId });
+  const existingCategory = (setup.categories || []).find(function(item) {
+    return realityTvKey_(item.categoryId || item.id) === realityTvKey_(categoryId);
+  }) || null;
   const calculatedTiming = realityTvEpisodeTiming_(season, episodeNumber);
   const timing = {
-    airDateTime: existing && existing.AirDateTime ? existing.AirDateTime : calculatedTiming.airDateTime,
-    lockDateTime: existing && existing.LockDateTime ? existing.LockDateTime : calculatedTiming.lockDateTime
+    airDateTime: existing && existing.AirDateTime
+      ? existing.AirDateTime
+      : (existingCategory && (existingCategory.airDateTime || existingCategory.AirDateTime)) || calculatedTiming.airDateTime,
+    lockDateTime: existing && existing.LockDateTime
+      ? existing.LockDateTime
+      : (existingCategory && (existingCategory.lockDateTime || existingCategory.LockDateTime)) || calculatedTiming.lockDateTime
   };
-  const categoryId = existing && existing.CategoryId ? existing.CategoryId : "episode-" + episodeNumber + "-eliminated";
   const externalEventId = existing && existing.ExternalEventId ? existing.ExternalEventId : season.GameId + "-episode-" + episodeNumber;
   const externalMarketId = existing && existing.ExternalMarketId ? existing.ExternalMarketId : season.GameId + "-episode-" + episodeNumber + "-elimination";
   const periodLabel = realityTvString_(season.PeriodLabel || "Episode");
@@ -541,7 +549,6 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
     ? realityTvResolvedQuestionLayout_({ LayoutType: season.EliminationLayoutType || "auto" }, eliminationAnswers.map(function(item) { return { imageUrl: item.imageUrl }; }))
     : realityTvString_(season.EliminationLayoutType || "image");
 
-  const setup = adminGetGameSetup({ gameId: season.GameId });
   let category = (setup.categories || []).find(function(item) {
     return realityTvKey_(item.categoryId) === realityTvKey_(categoryId);
   });
