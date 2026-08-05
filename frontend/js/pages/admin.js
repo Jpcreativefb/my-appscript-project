@@ -2334,7 +2334,7 @@ function renderAdminGameForm(
               </div>
 
               ${!isNew ? `
-                <div id="adminGameHeroPreview_${domId}" class="admin-game-hero-preview ${heroImageUrl ? "has-image" : ""}" style="--admin-game-hero-image: ${heroImageUrl ? `url('${heroImageUrl}')` : "none"};">
+                <div id="adminGameHeroPreview_${domId}" class="admin-game-hero-preview ${heroImageUrl ? "has-image" : ""}" ${heroImageUrl ? platformBackgroundAttrs(heroImageUrl, { variant: "hero", cssVariable: "--admin-game-hero-image", eager: true }) : ""} style="--admin-game-hero-image: none;">
                   <div class="admin-game-hero-preview-overlay">Hero image preview</div>
                 </div>
                 <button type="button" class="admin-small-button secondary" onclick="adminClearGameHeroImage('${escapeJs(rawGameId)}')">Clear Image</button>

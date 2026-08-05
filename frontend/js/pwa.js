@@ -35,7 +35,7 @@
 
   window.addEventListener("load", function () {
     navigator.serviceWorker
-      .register("./sw.js?v=304-player-picks-fast-startup")
+      .register("./sw.js?v=305-platform-image-engine")
       .then(function () {
         console.log("Awards App PWA ready");
       })

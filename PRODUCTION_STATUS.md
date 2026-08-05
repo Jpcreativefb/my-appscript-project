@@ -1,10 +1,10 @@
-# Current Production Candidate: v1.1.2
+# Current Production Candidate: v1.1.5
 
 # Production Status
 
 ## Current release
 
-Production repair v1.1.1, based on production hardening v1.1.0.
+Platform image engine v1.1.5, including Reality TV player fast startup v1.1.4 and production hardening v1.1.0.
 
 ## Feature readiness
 
@@ -18,6 +18,16 @@ Production repair v1.1.1, based on production hardening v1.1.0.
 | Archives/career history | 78% | 68% | Restore verification and larger archive testing |
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
+
+
+## Platform image delivery completed in v1.1.5
+
+- All current dynamic images in the main frontend use one shared rendering helper.
+- Off-screen images wait until they approach the viewport instead of loading every contestant, nominee, player, and logo at once.
+- The default browser mode is free and requires no Images subscription, R2 bucket, Worker, or custom domain.
+- Permission-cleared images can be compressed locally into small WebP variants and served as free Cloudflare Pages static assets.
+- Existing external URLs remain compatible and fall back to the original source when an optimization attempt fails.
+- This release improves browser rendering and bandwidth; it does not replace the separate Apps Script payload and Hub timeout work.
 
 ## Reality TV production repair completed in v1.1.1
 

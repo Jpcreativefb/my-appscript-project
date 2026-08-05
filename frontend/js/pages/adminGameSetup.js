@@ -1692,11 +1692,7 @@ function renderAdminSetupFileTools(fileId, inputId) {
     <div class="admin-file-tools">
 
       <div class="admin-file-preview">
-        <img
-          src="${adminSetupEscapeHtml(thumbnailUrl)}"
-          alt="Image preview"
-          loading="lazy"
-        >
+        ${platformImgHtml(thumbnailUrl, { className: "admin-file-preview-image", variant: "profile", alt: "Image preview" })}
       </div>
 
       <div class="admin-file-actions">
@@ -2553,11 +2549,7 @@ async function adminSetupSearchTmdbPosters(
         .map(item => `
           <div class="admin-tmdb-result">
 
-            <img
-              src="${adminSetupEscapeHtml(item.posterUrl)}"
-              alt="${adminSetupEscapeHtml(item.title)} poster"
-              loading="lazy"
-            >
+            ${platformImgHtml(item.posterUrl, { className: "admin-tmdb-poster", variant: "card", alt: (item.title || "Movie") + " poster" })}
 
             <div class="admin-tmdb-result-body">
 

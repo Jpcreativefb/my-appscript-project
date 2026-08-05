@@ -297,7 +297,7 @@ function archivePageRenderAvatar_(avatar) {
     value.indexOf("data:image/") === 0;
 
   return isImage
-    ? `<img src="${archivePageEscapeAttr_(value)}" alt="">`
+    ? platformImgHtml(value, { className: "archive-history-image", variant: "thumb", alt: "Archived image" })
     : archivePageEscapeHtml_(value);
 }
 

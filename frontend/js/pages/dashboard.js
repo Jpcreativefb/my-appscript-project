@@ -362,7 +362,8 @@ function renderDashboardGameCard(
   return `
     <article
       class="card dashboard-game-card dashboard-game-card-with-hero ${heroImage ? "has-hero-image" : ""} ${isPast ? "past-game-card" : ""} ${enterDisabled ? "game-unavailable" : ""}"
-      style="--game-theme-color: ${escapeAttr(game.themeColor || "#354785")}; --game-hero-image: url('${escapeAttr(heroImage)}'); --game-hero-position: ${escapeAttr(heroPosition)};"
+      ${heroImage ? platformBackgroundAttrs(heroImage, { variant: "hero", cssVariable: "--game-hero-image" }) : ""}
+      style="--game-theme-color: ${escapeAttr(game.themeColor || "#354785")}; --game-hero-image: none; --game-hero-position: ${escapeAttr(heroPosition)};"
     >
 
       <div class="dashboard-game-hero-band">

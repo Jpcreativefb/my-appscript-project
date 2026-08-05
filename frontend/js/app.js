@@ -353,7 +353,7 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "304-player-picks-fast-startup";
+const APP_ASSET_VERSION = "305-platform-image-engine";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

@@ -2055,7 +2055,7 @@ function renderBettingStarter_(teamName, starter) {
   const label = starter && starter.confirmed ? "Starter" : "Probable";
   const statLine = starter && starter.statLine ? starter.statLine : "";
   const headshot = starter && starter.headshot
-    ? '<img class="betting-starter-headshot" src="' + escapeBettingHtml_(starter.headshot) + '" alt="">'
+    ? platformImgHtml(starter.headshot, { className: "betting-starter-headshot", variant: "avatar", alt: name })
     : '<span class="betting-starter-headshot betting-starter-placeholder">P</span>';
 
   return `
@@ -2471,12 +2471,7 @@ function renderBettingCategory_(category, bet, config){
                 <div class="betting-logo-score-area">
 
                   ${nominee.image ? `
-                    <img
-                      class="betting-logo-fill"
-                      src="${escapeBettingHtml_(nominee.image)}"
-                      alt=""
-                      loading="lazy"
-                    >
+                    ${platformImgHtml(nominee.image, { className: "betting-logo-fill", variant: "logo", alt: nominee.name || "" })}
                   ` : `
                     <div class="betting-logo-placeholder"></div>
                   `}

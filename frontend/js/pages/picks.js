@@ -178,7 +178,7 @@ function renderSeasonAnchorPickCard_() {
       <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2><p>Keep the same participant or team while they remain active. Normal episode questions still score at their regular value.</p></div><span class="season-anchor-status ${locked ? "locked" : "open"}">${locked ? "Locked" : "Open"}</span></div>
       <div class="season-anchor-feature-grid">
         <div class="season-anchor-profile ${eliminated ? "is-eliminated" : ""}" style="--reality-team-color:${escapeAttr(color)}">
-          <div class="season-anchor-profile-image">${image ? `<img src="${escapeAttr(image)}" alt="">` : `<span>${escapeHtml((currentProfile && currentProfile.name || "?").slice(0, 2).toUpperCase())}</span>`}${eliminated ? `<div class="reality-eliminated-overlay">ELIMINATED</div>` : ""}</div>
+          <div class="season-anchor-profile-image">${image ? platformImgHtml(image, { className: "season-anchor-current-image", variant: "profile", alt: currentProfile && currentProfile.name || "Current survivor pick", critical: true }) : `<span>${escapeHtml((currentProfile && currentProfile.name || "?").slice(0, 2).toUpperCase())}</span>`}${eliminated ? `<div class="reality-eliminated-overlay">ELIMINATED</div>` : ""}</div>
           ${currentSummary}
           ${currentProfile ? `<details class="reality-profile-details"><summary>View bio & details</summary>${realityTvProfileDetailsHtml_(currentProfile)}</details>` : ""}
         </div>
@@ -1280,10 +1280,7 @@ function renderCategoryCard(category, isChild, parent) {
      ${selectedNominee ? `
         <div class="selected-pick-summary">
 
-        <img
-          src="${escapeAttr(selectedNominee.image)}"
-          alt=""
-        />
+        ${platformImgHtml(selectedNominee.image, { className: "selected-pick-image", variant: "thumb", alt: selectedNominee.name || "Selected pick" })}
 
         <span>
           ${escapeHtml(selectedNominee.name)}
@@ -1667,7 +1664,7 @@ function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locke
   const bioId = "realityBio_" + String(category.id).replace(/[^a-z0-9_-]/gi, "_") + "_" + String(nominee.id).replace(/[^a-z0-9_-]/gi, "_");
   return `<div class="nominee-choice reality-profile-choice reality-layout-${escapeAttr(layout)} ${selected ? "selected" : ""} ${eliminated ? "is-eliminated" : ""} ${showImage ? "has-image" : "no-image"}" style="--reality-team-color:${escapeAttr(color)}">
     <button type="button" class="reality-profile-select" onclick="selectNominee('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')" ${disabled}>
-      ${showImage ? `<span class="reality-profile-image"><img src="${escapeAttr(image)}" alt="">${eliminated ? `<span class="reality-eliminated-overlay">ELIMINATED</span>` : ""}</span>` : `<span class="reality-profile-text-marker">${eliminated ? "ELIMINATED" : escapeHtml((nominee.name || "?").slice(0, 2).toUpperCase())}</span>`}
+      ${showImage ? `<span class="reality-profile-image">${platformImgHtml(image, { className: "reality-profile-choice-image", variant: layout === "compact" || layout === "list" ? "thumb" : "card", alt: nominee.name || "Contestant" })}${eliminated ? `<span class="reality-eliminated-overlay">ELIMINATED</span>` : ""}</span>` : `<span class="reality-profile-text-marker">${eliminated ? "ELIMINATED" : escapeHtml((nominee.name || "?").slice(0, 2).toUpperCase())}</span>`}
       <span class="reality-profile-name">${escapeHtml(nominee.name)}</span>
       ${meta.teamOrTribe ? `<span class="reality-profile-team">${escapeHtml(meta.teamOrTribe)}</span>` : ""}
       ${selected ? `<span class="reality-user-pick-badge">YOUR PICK</span>` : ""}
@@ -1693,7 +1690,7 @@ function renderCategoryNominees_(category, selectedNomineeId, locked) {
     const color = realityTvSafeColor_(group.color);
     const content = grouped[label].map(function(nominee) { return renderRealityNomineeButton_(category, nominee, selectedNomineeId, locked); }).join("");
     if (!hasGroups || !label) return content;
-    return `<section class="reality-nominee-group" style="--reality-team-color:${escapeAttr(color)}"><div class="reality-nominee-group-header">${group.imageUrl ? `<img src="${escapeAttr(group.imageUrl)}" alt="">` : ""}<strong>${escapeHtml(label)}</strong></div><div class="reality-nominee-group-grid">${content}</div></section>`;
+    return `<section class="reality-nominee-group" style="--reality-team-color:${escapeAttr(color)}"><div class="reality-nominee-group-header">${group.imageUrl ? platformImgHtml(group.imageUrl, { className: "reality-nominee-group-image", variant: "logo", alt: label }) : ""}<strong>${escapeHtml(label)}</strong></div><div class="reality-nominee-group-grid">${content}</div></section>`;
   }).join("");
 }
 
@@ -1752,10 +1749,7 @@ function renderNomineeButton(
         ${disabled}
       >
 
-        <img
-          src="${escapeAttr(nominee.image)}"
-          alt=""
-        />
+        ${platformImgHtml(nominee.image, { className: "nominee-list-image", variant: "thumb", alt: nominee.name || "Nominee" })}
 
         <span>
           ${escapeHtml(nominee.name)}
@@ -1774,10 +1768,7 @@ function renderNomineeButton(
       ${disabled}
     >
 
-      <img
-        src="${escapeAttr(nominee.image)}"
-        alt=""
-      />
+      ${platformImgHtml(nominee.image, { className: "nominee-card-image", variant: "card", alt: nominee.name || "Nominee" })}
 
       <span>
         ${escapeHtml(nominee.name)}

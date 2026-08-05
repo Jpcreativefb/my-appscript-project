@@ -353,7 +353,7 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "303-admin-page-module-loader-fix";
+const APP_ASSET_VERSION = "305-platform-image-engine";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

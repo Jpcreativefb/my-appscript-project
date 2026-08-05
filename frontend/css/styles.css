@@ -4511,3 +4511,24 @@ button.is-saving {
 .reality-profile-group-history small { color:rgba(226,232,240,.58); }
 @media (max-width:850px) { .reality-tv-group-history-controls { grid-template-columns:1fr 1fr; } }
 @media (max-width:560px) { .reality-tv-group-history-controls { grid-template-columns:1fr; } }
+
+/* =========================
+   PLATFORM IMAGE ENGINE
+========================= */
+
+.platform-image {
+  max-width: 100%;
+  transition: opacity 160ms ease;
+}
+
+.platform-image.platform-image-loading {
+  opacity: 0.72;
+}
+
+.platform-image.platform-image-failed {
+  visibility: hidden;
+}
+
+[data-platform-bg] {
+  background-repeat: no-repeat;
+}

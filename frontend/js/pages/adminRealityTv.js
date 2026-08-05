@@ -630,7 +630,7 @@ function adminRealityTvContestantRows_(contestants) {
 
   function chip(item) {
     const image = item.ImageUrl
-      ? `<img src="${adminRealityTvEscape_(item.ImageUrl)}" alt="">`
+      ? platformImgHtml(item.ImageUrl, { className: "reality-tv-contestant-chip-image", variant: "avatar", alt: item.Name || "Contestant" })
       : `<span class="reality-tv-avatar-fallback">${adminRealityTvEscape_(String(item.Name || "?").charAt(0).toUpperCase())}</span>`;
     return `
       <div class="reality-tv-contestant-chip ${item.Active ? "active" : "inactive"}">
@@ -822,7 +822,7 @@ function adminRealityTvGroupsPanel_(bundle) {
           const color = adminRealityTvEscape_(group.Color || group.color || "#64748B");
           const active = group.Active === true || String(group.Active || group.active || "").toLowerCase() === "true";
           return `<div class="reality-tv-group-editor-row" data-reality-group-row data-group-id="${id}">
-            <div class="reality-tv-group-preview" style="--reality-team-color:${color}">${image ? `<img src="${image}" alt="">` : `<span>${name.slice(0, 2).toUpperCase()}</span>`}</div>
+            <div class="reality-tv-group-preview" style="--reality-team-color:${color}">${image ? platformImgHtml(group.ImageUrl || group.imageUrl || "", { className: "reality-tv-group-preview-image", variant: "logo", alt: name }) : `<span>${name.slice(0, 2).toUpperCase()}</span>`}</div>
             <input class="input rt-group-name" value="${name}" placeholder="Group name">
             <input class="input rt-group-image" value="${image}" placeholder="Group image URL">
             <label class="reality-tv-color-field"><input class="rt-group-color-picker" type="color" value="${/^#[0-9A-Fa-f]{6}$/.test(color) ? color : "#64748B"}" oninput="this.nextElementSibling.value=this.value"><input class="input rt-group-color" value="${color}" placeholder="#64748B"></label>
@@ -879,7 +879,7 @@ function adminRealityTvGroupHistoryPanel_(bundle) {
           const key = adminRealityTvEscape_(item.ContestantId);
           return `<div class="reality-tv-group-history-row">
             <div class="reality-tv-group-history-person">
-              ${item.ImageUrl ? `<img src="${adminRealityTvEscape_(item.ImageUrl)}" alt="">` : `<span class="reality-tv-avatar-fallback">${adminRealityTvEscape_(String(item.Name || "?").slice(0, 1).toUpperCase())}</span>`}
+              ${item.ImageUrl ? platformImgHtml(item.ImageUrl, { className: "reality-tv-group-history-image", variant: "avatar", alt: item.Name || "Contestant" }) : `<span class="reality-tv-avatar-fallback">${adminRealityTvEscape_(String(item.Name || "?").slice(0, 1).toUpperCase())}</span>`}
               <div><strong>${adminRealityTvEscape_(item.Name)}</strong><span>Starting: ${adminRealityTvEscape_(item.StartingGroup || "—")} · Current: ${adminRealityTvEscape_(item.CurrentGroup || item.TeamOrTribe || "—")} · Final/latest: ${adminRealityTvEscape_(item.FinalGroup || item.TeamOrTribe || "—")}</span><small>${historyText}</small></div>
             </div>
             <div class="reality-tv-group-history-controls">

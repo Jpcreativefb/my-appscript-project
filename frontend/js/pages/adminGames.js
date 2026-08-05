@@ -715,7 +715,8 @@ function renderAdminGameDashboardSettings(game) {
         <div
           id="adminGameHeroPreview_${domId}"
           class="admin-game-hero-preview ${heroUrl ? "has-image" : ""}"
-          style="--admin-game-theme-color: ${adminGamesEscapeHtml(game.themeColor || "#354785")}; ${heroUrl ? "--admin-game-hero-image: url('" + adminGamesEscapeHtml(heroUrl) + "');" : ""}"
+          ${heroUrl ? platformBackgroundAttrs(heroUrl, { variant: "hero", cssVariable: "--admin-game-hero-image", eager: true }) : ""}
+          style="--admin-game-theme-color: ${adminGamesEscapeHtml(game.themeColor || "#354785")}; --admin-game-hero-image: none;"
         >
           <div class="admin-game-hero-preview-inner">
             <div class="admin-game-hero-preview-kicker">
@@ -946,7 +947,7 @@ function adminPreviewGameHeroImage(gameId) {
   preview.style.setProperty(
     "--admin-game-hero-image",
     url
-      ? "url('" + url + "')"
+      ? "url('" + platformImageUrl(url, "hero") + "')"
       : "none"
   );
 

@@ -1202,7 +1202,7 @@ function renderSportsStarterRow_(teamName, starter) {
   const name = starter && starter.name ? starter.name : "TBD";
   const statLine = starter && starter.statLine ? starter.statLine : "";
   const headshot = starter && starter.headshot
-    ? '<img class="sports-starter-headshot" src="' + escapeSportsHtml(starter.headshot) + '" alt="">'
+    ? platformImgHtml(starter.headshot, { className: "sports-starter-headshot", variant: "avatar", alt: name })
     : '<span class="sports-starter-headshot sports-starter-placeholder">P</span>';
   return `
     <div class="sports-starter-row">
@@ -3696,7 +3696,7 @@ function showSportsPlayerMatchupModal_(game, options) {
             data-player-index="${index}"
             value="${escapeSportsHtml(playerId)}"
           >
-          <img src="${escapeSportsHtml(player.HeadshotUrl || "")}" alt="">
+          ${platformImgHtml(player.HeadshotUrl || "", { className: "sports-player-matchup-headshot", variant: "avatar", alt: sportsPlayerPropPlayerLabel_(player) })}
           <span class="sports-player-matchup-player-name">${escapeSportsHtml(sportsPlayerPropPlayerLabel_(player))}</span>
           <input
             type="number"
@@ -4423,7 +4423,7 @@ function showSportsAdvancedQuestionModal_(baseGame, games, players, optionData) 
 
     const rows = entities.map(function(entity, index) {
       const image = entity.logo
-        ? '<img src="' + escapeSportsHtml(entity.logo) + '" alt="">'
+        ? platformImgHtml(entity.logo, { className: "sports-advanced-entity-image", variant: entity.entityType === "TEAM" ? "logo" : "avatar", alt: entity.entityName || "" })
         : '<span class="sports-advanced-entity-placeholder">' +
             (entity.entityType === "TEAM" ? "T" : "P") +
           '</span>';
@@ -5321,11 +5321,11 @@ function renderTeamLogo(url) {
       return '<div class="team-logo-placeholder"></div>';
     }
   
-    return (
-      '<img class="team-logo" src="' +
-      escapeSportsHtml(url) +
-      '" alt="">'
-    );
+    return platformImgHtml(url, {
+      className: "team-logo",
+      variant: "logo",
+      alt: "Team logo"
+    });
 }
 
 function getWinnerRowClass(game, side) {
@@ -5558,13 +5558,11 @@ function renderLeagueLogo(item) {
     getLeagueMeta(item);
 
   if (meta.logo) {
-    return (
-      '<img class="league-logo" src="' +
-      escapeSportsHtml(meta.logo) +
-      '" alt="' +
-      escapeSportsHtml(meta.name) +
-      '">'
-    );
+    return platformImgHtml(meta.logo, {
+      className: "league-logo",
+      variant: "logo",
+      alt: meta.name || "League logo"
+    });
   }
 
   return (

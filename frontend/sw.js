@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v304-player-picks-fast-startup";
+const AWARDS_CACHE = "awards-app-v305-platform-image-engine";
 
 const APP_SHELL = [
   "./",
@@ -12,6 +12,8 @@ const APP_SHELL = [
   "./css/pages.css",
   "./css/picks.css",
   "./js/config.js",
+  "./assets/images/image-manifest.js",
+  "./js/imageEngine.js",
   "./js/api.js",
   "./js/auth.js",
   "./js/state.js",

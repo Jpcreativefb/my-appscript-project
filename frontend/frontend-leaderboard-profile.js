@@ -41,7 +41,7 @@ function escapeLeaderboardHtml(value) {
   
     const avatarHtml =
       isImageAvatar
-        ? `<img class="leaderboard-avatar-img" src="${escapeLeaderboardHtml(avatar)}" alt="">`
+        ? platformImgHtml(avatar, { className: "leaderboard-avatar-img", variant: "avatar", alt: "" })
         : `<span class="leaderboard-avatar">${escapeLeaderboardHtml(avatar)}</span>`;
   
     return `

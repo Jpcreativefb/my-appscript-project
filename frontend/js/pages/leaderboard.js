@@ -656,11 +656,7 @@ function renderLeaderboardAvatar_(avatar, color) {
 
   if (isImage) {
     return `
-      <img
-        class="leaderboard-avatar-img"
-        src="${escapeLeaderboardAttr_(avatar)}"
-        alt=""
-      >
+      ${platformImgHtml(avatar, { className: "leaderboard-avatar-img", variant: "avatar", alt: "" })}
     `;
   }
 
@@ -1486,11 +1482,7 @@ function renderCompactPickWagerCard_(pick, wager, correctness) {
   const image =
     displayPick && displayPick.image
       ? `
-        <img
-          class="compare-card-image"
-          src="${escapeLeaderboardAttr_(displayPick.image)}"
-          alt=""
-        >
+        ${platformImgHtml(displayPick.image, { className: "compare-card-image", variant: "profile", alt: displayPick.name || "Pick" })}
       `
       : `
         <div class="compare-card-image compare-card-placeholder">

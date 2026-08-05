@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.5 — Platform Image Engine
+
+- Added one shared image-delivery helper across Reality TV, awards, sports, racing, dashboard heroes, profiles, archives, leaderboards, and admin previews.
+- Deferred off-screen images with IntersectionObserver and native lazy loading.
+- Added asynchronous decoding, fetch priority, fixed image dimensions, and original-URL fallback.
+- Added safe provider-native size reduction for TMDB posters, ESPN team logos, Google Drive thumbnails, and Google-hosted images.
+- Added optional local WebP generation with an asset manifest and `asset:` image references.
+- Kept Cloudflare transformation mode disabled by default so the release remains zero-charge and works on `pages.dev`.
+- Added platform-wide image regression tests and a production smoke test.
+
 ## v1.1.1 — Reality TV setup repair and group history
 
 - Changed initial Reality TV extra-question creation to a staged, resumable build.

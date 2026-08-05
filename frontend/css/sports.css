@@ -1237,3 +1237,18 @@
     flex-direction: column;
   }
 }
+
+/* Shared platform image-delivery states. */
+.platform-image {
+  max-width: 100%;
+  transition: opacity 160ms ease;
+}
+.platform-image.platform-image-loading {
+  opacity: 0.72;
+}
+.platform-image.platform-image-failed {
+  visibility: hidden;
+}
+[data-platform-bg] {
+  background-repeat: no-repeat;
+}

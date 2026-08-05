@@ -1237,11 +1237,7 @@ function renderProfileAvatar_(
     ) {
 
       return `
-        <img
-          src="${escapeProfileAttr_(url)}"
-          alt=""
-          class="profile-avatar-img"
-        >
+        ${platformImgHtml(url, { className: "profile-avatar-img", variant: "avatar", alt: "Profile image" })}
       `;
 
     }
