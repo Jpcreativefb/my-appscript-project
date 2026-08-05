@@ -683,6 +683,8 @@ Documentation:
 PROJECT_STRUCTURE.md
 API_CONTRACT.md
 DEPLOYMENT_CHECKLIST.md
+docs/guides/README.md
+docs/guides/README_PLATFORM_IMAGE_OPTIMIZATION.md
 ```
 
 ---

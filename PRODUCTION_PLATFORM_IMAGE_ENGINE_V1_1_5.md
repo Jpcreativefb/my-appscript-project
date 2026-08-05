@@ -26,6 +26,16 @@ The External Results Hub is a separate project and is not changed by this packag
 - Uses smaller provider-native URLs where a safe provider rule exists for TMDB, ESPN team logos, Google Drive thumbnails, and Google-hosted images.
 - Falls back to the original image URL if an optimized URL fails.
 
+## Dedicated later-reference guide
+
+The complete step-by-step local image workflow is stored at:
+
+```text
+docs/guides/README_PLATFORM_IMAGE_OPTIMIZATION.md
+```
+
+Use that guide when adding, shrinking, testing, and committing images you own or have permission to host.
+
 ## Optional locally hosted images
 
 Only copy and host images when you have permission to do so.
