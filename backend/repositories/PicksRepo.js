@@ -280,17 +280,19 @@ var PicksRepo = {
 
     }
 
-    Object.entries(updates)
-      .forEach(([colNumber, value]) => {
+    const sh = getPicksSheet_();
+    const lastColumn = sh.getLastColumn();
+    const range = sh.getRange(rowNumber, 1, 1, lastColumn);
+    const row = range.getValues()[0];
 
-        updatePickCell_(
-          rowNumber,
-          Number(colNumber),
-          value
-        );
+    Object.entries(updates).forEach(function(entry) {
+      const columnNumber = Number(entry[0]);
+      if (columnNumber >= 1 && columnNumber <= lastColumn) {
+        row[columnNumber - 1] = entry[1];
+      }
+    });
 
-      });
-
+    range.setValues([row]);
     return true;
 
   },

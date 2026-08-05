@@ -111,7 +111,7 @@ assert.strictEqual(gameSetups.get(created.gameId).categories.length, 5, 'Retryin
 const dashboard = context.apiAdminGetRealityTvDashboard({});
 assert.strictEqual(dashboard.seasons[0].questionBuild, null, 'Completed builds should not display as pending');
 assert(main.getSheetByName('RealityQuestionBuildJobs'), 'Normalized build-job sheet should exist');
-assert.strictEqual(hub.getSheetByName('ExternalMarkets').getLastRow(), 6, 'Elimination plus four supplemental Hub markets');
+assert.strictEqual(hub.getSheetByName('ExternalMarkets').getLastRow(), 2, 'Supplemental Hub mappings are deferred and do not block the local build');
 
 const apiSource = fs.readFileSync(path.join(__dirname, '../backend/Api.js'), 'utf8');
 const pageSource = fs.readFileSync(path.join(__dirname, '../frontend/js/pages/adminRealityTv.js'), 'utf8');

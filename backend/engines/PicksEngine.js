@@ -447,11 +447,13 @@ function buildPickMeta_(
     maxChanges:
       maxChanges,
 
+    unlimitedChanges:
+      maxChanges < 0,
+
     changesLeft:
-      Math.max(
-        maxChanges - safeChangeCount,
-        0
-      ),
+      maxChanges < 0
+        ? null
+        : Math.max(maxChanges - safeChangeCount, 0),
 
     basePoints:
       basePoints,
@@ -842,10 +844,8 @@ function isFixedPointPredictionEnabledForGame_(gameConfig) {
 
 function savePick(payload){
 
-  const lock =
-    LockService.getScriptLock();
-
-  lock.waitLock(10000);
+  let lock = null;
+  let lockAcquired = false;
 
   try {
 
@@ -1232,6 +1232,10 @@ function savePick(payload){
       }
     }
 
+    lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    lockAcquired = true;
+
     const directPick =
       PicksRepo && typeof PicksRepo.findPick === "function"
         ? PicksRepo.findPick(gameId, username, categoryId)
@@ -1460,6 +1464,7 @@ function savePick(payload){
 
     if (
       isChange &&
+      MAX_CHANGES >= 0 &&
       changeCount >= MAX_CHANGES
     ) {
 
@@ -1561,7 +1566,10 @@ function savePick(payload){
 
     }
 
-    PicksRepo.flush();
+    if (lockAcquired) {
+      lock.releaseLock();
+      lockAcquired = false;
+    }
 
     if (
       typeof AppCache !== "undefined" &&
@@ -1569,13 +1577,13 @@ function savePick(payload){
       typeof AppCache.clearPicksCaches === "function"
     ) {
 
-      AppCache.clearPicksCaches();
+      AppCache.clearPicksCaches(gameId, username);
 
     } else if (
-      typeof clearAppCaches === "function"
+      typeof clearPicksCaches === "function"
     ) {
 
-      clearAppCaches();
+      clearPicksCaches(gameId, username);
 
     }
 
@@ -1637,7 +1645,7 @@ function savePick(payload){
 
   } finally {
 
-    lock.releaseLock();
+    if (lockAcquired && lock) lock.releaseLock();
 
   }
 

@@ -15,7 +15,8 @@ const REALITY_TV_SEASON_HEADERS = [
   "SeasonId", "GameId", "ShowName", "SeasonName", "SeasonNumber", "Year",
   "ShowFormat", "ParticipantType", "ParticipantLabel", "GroupLabel", "PeriodLabel",
   "Provider", "FirstEpisodeDateTime", "WeeklyIntervalDays", "LockOffsetMinutes",
-  "Points", "QuestionTemplate", "EliminationLayoutType", "EliminationImageSource", "IndividualPlayStartsEpisode", "CurrentEpisodeNumber", "Status",
+  "Points", "QuestionTemplate", "EliminationLayoutType", "EliminationImageSource", "IndividualPlayStartsEpisode",
+  "PickChangesAllowed", "MaxPickChanges", "PickChangePenalty", "CurrentEpisodeNumber", "Status",
   "AutoCreateNextEpisode", "CreatedAt", "UpdatedAt"
 ];
 
@@ -130,6 +131,57 @@ function realityTvParseJson_(value, fallback) {
   } catch (err) {
     throw new Error("Invalid JSON: " + err.message);
   }
+}
+
+function realityTvPickRules_(source) {
+  source = source || {};
+  const allowedValue = source.PickChangesAllowed !== undefined
+    ? source.PickChangesAllowed
+    : source.pickChangesAllowed;
+  const allowed = allowedValue === undefined || allowedValue === ""
+    ? true
+    : realityTvBool_(allowedValue);
+  const maxValue = source.MaxPickChanges !== undefined
+    ? source.MaxPickChanges
+    : source.maxPickChanges;
+  let maxChanges = -1;
+  if (!allowed) maxChanges = 0;
+  else if (maxValue !== undefined && maxValue !== "" && maxValue !== null) {
+    maxChanges = Math.max(-1, Math.floor(realityTvNumber_(maxValue, -1)));
+  }
+  const penaltyValue = source.PickChangePenalty !== undefined
+    ? source.PickChangePenalty
+    : source.pickChangePenalty;
+  return {
+    allowed: allowed,
+    maxChanges: maxChanges,
+    changePenalty: Math.max(0, realityTvNumber_(penaltyValue, 0))
+  };
+}
+
+function realityTvApplyPickRulesToSeasonCategories_(season) {
+  if (!season || typeof adminUpdateCategory !== "function") return 0;
+  const rules = realityTvPickRules_(season);
+  const ids = {};
+  realityTvEpisodesForSeason_(season.SeasonId).forEach(function(row) {
+    if (row.CategoryId) ids[realityTvKey_(row.CategoryId)] = row.CategoryId;
+  });
+  if (typeof REALITY_TV_EPISODE_QUESTIONS_SHEET !== "undefined") {
+    realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_EPISODE_QUESTIONS_SHEET).forEach(function(row) {
+      if (realityTvKey_(row.SeasonId) === realityTvKey_(season.SeasonId) && row.CategoryId) {
+        ids[realityTvKey_(row.CategoryId)] = row.CategoryId;
+      }
+    });
+  }
+  Object.keys(ids).forEach(function(key) {
+    adminUpdateCategory({
+      gameId: season.GameId,
+      categoryId: ids[key],
+      maxChanges: rules.maxChanges,
+      changePenalty: rules.changePenalty
+    });
+  });
+  return Object.keys(ids).length;
 }
 
 function realityTvDate_(value, label) {
@@ -501,6 +553,8 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
       categoryId: categoryId,
       section: periodLabel + " " + episodeNumber,
       points: realityTvNumber_(season.Points, 1),
+      maxChanges: realityTvPickRules_(season).maxChanges,
+      changePenalty: realityTvPickRules_(season).changePenalty,
       locked: false,
       lockDateTime: timing.lockDateTime,
       displayOrder: episodeNumber,
@@ -540,6 +594,8 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
     categoryId: categoryId,
     category: question,
     points: realityTvNumber_(season.Points, 1),
+    maxChanges: realityTvPickRules_(season).maxChanges,
+    changePenalty: realityTvPickRules_(season).changePenalty,
     lockDateTime: timing.lockDateTime,
     layoutType: eliminationLayout
   });
@@ -2161,6 +2217,9 @@ function apiAdminCreateRealityTvSeason(payload) {
     EliminationLayoutType: typeof realityTvNormalizeLayoutType_ === "function" ? realityTvNormalizeLayoutType_(payload.eliminationLayoutType || "auto") : realityTvString_(payload.eliminationLayoutType || "auto"),
     EliminationImageSource: typeof realityTvNormalizeImageSource_ === "function" ? realityTvNormalizeImageSource_(payload.eliminationImageSource || "roster") : realityTvString_(payload.eliminationImageSource || "roster"),
     IndividualPlayStartsEpisode: Math.max(0, realityTvNumber_(payload.individualPlayStartsEpisode, 0)),
+    PickChangesAllowed: payload.pickChangesAllowed === undefined ? true : realityTvBool_(payload.pickChangesAllowed),
+    MaxPickChanges: realityTvPickRules_(payload).maxChanges,
+    PickChangePenalty: realityTvPickRules_(payload).changePenalty,
     CurrentEpisodeNumber: 1,
     Status: "ACTIVE",
     AutoCreateNextEpisode: payload.autoCreateNextEpisode === undefined ? true : realityTvBool_(payload.autoCreateNextEpisode),

@@ -1,10 +1,10 @@
-# Current Production Candidate: v1.1.5
+# Current Production Candidate: v1.1.6
 
 # Production Status
 
 ## Current release
 
-Platform image engine v1.1.5, including Reality TV player fast startup v1.1.4 and production hardening v1.1.0.
+Reality TV player flow and pick performance v1.1.6, including the platform image engine v1.1.5 and production hardening v1.1.0.
 
 ## Feature readiness
 
@@ -12,13 +12,24 @@ Platform image engine v1.1.5, including Reality TV player fast startup v1.1.4 an
 |---|---:|---:|---|
 | Core games and Game Setup | 88% | 75% | Live regression, repair diagnostics, final UI consistency |
 | Fixed/confidence/staked/hybrid scoring | 88% | 78% | High-volume tests and settlement audit |
-| Reality TV Manager | 95% | 84% | Live repair/activation verification and Hub job separation |
-| Reality TV player experience | 92% | 82% | Mobile/device testing and accessibility review |
+| Reality TV Manager | 97% | 88% | Live activation verification and a dedicated deferred Hub-sync queue |
+| Reality TV player experience | 96% | 88% | Live save-duration measurement, device testing, and accessibility review |
 | Sports platform | 82% | 68% | League-specific production testing and timeout reduction |
 | Archives/career history | 78% | 68% | Restore verification and larger archive testing |
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
 
+
+## Reality TV player flow completed in v1.1.6
+
+- Episode-question builds now finish all local questions and answers before optional External Results Hub mappings.
+- Resume Build is a recovery action and continues from the saved question index without duplicating completed questions.
+- Season Survivor Pick loads in its reserved position immediately after the score area and no longer waits behind weekly statistics.
+- Reality TV Manager now controls whether picks may change before lock, the maximum changes, and any penalty.
+- Blank maximum changes defaults to unlimited changes before lock.
+- Pick saves use a shorter lock, one row write, and targeted cache clearing instead of full application cache invalidation.
+- Reality TV questions collapse and advance after a successful save, unused counters stay hidden, and long mobile titles wrap correctly.
+- The page progress bar now advances while a long request is still running instead of remaining at one percentage.
 
 ## Platform image delivery completed in v1.1.5
 

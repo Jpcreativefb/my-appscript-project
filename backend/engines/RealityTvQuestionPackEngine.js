@@ -681,6 +681,8 @@ function realityTvBuildSupplementalQuestionForTemplate_(season, episode, templat
         categoryId: categoryId,
         section: realityTvString_(season.PeriodLabel || "Episode") + " " + episode.EpisodeNumber,
         points: questionPoints,
+        maxChanges: realityTvPickRules_(season).maxChanges,
+        changePenalty: realityTvPickRules_(season).changePenalty,
         locked: false,
         lockDateTime: episode.LockDateTime,
         displayOrder: (realityTvNumber_(episode.EpisodeNumber, 0) * 100) + realityTvNumber_(template.DisplayOrder, 50),
@@ -742,6 +744,8 @@ function realityTvBuildSupplementalQuestionForTemplate_(season, episode, templat
       categoryId: categoryId,
       category: question,
       points: questionPoints,
+      maxChanges: realityTvPickRules_(season).maxChanges,
+      changePenalty: realityTvPickRules_(season).changePenalty,
       lockDateTime: episode.LockDateTime,
       layoutType: resolvedLayout
     });
@@ -1038,7 +1042,7 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
   let season = realityTvGetSeason_(payload.seasonId);
   if (!season) throw new Error("Reality TV season not found.");
 
-  if (payload.showFormat || payload.participantLabel || payload.groupLabel || payload.periodLabel || payload.questionTemplate || payload.individualPlayStartsEpisode !== undefined || payload.eliminationPoints !== undefined || payload.points !== undefined) {
+  if (payload.showFormat || payload.participantLabel || payload.groupLabel || payload.periodLabel || payload.questionTemplate || payload.individualPlayStartsEpisode !== undefined || payload.eliminationPoints !== undefined || payload.points !== undefined || payload.pickChangesAllowed !== undefined || payload.maxPickChanges !== undefined || payload.pickChangePenalty !== undefined) {
     const format = realityTvShowFormatDefinition_(payload.showFormat || season.ShowFormat || "survivor-tribal");
     const requestedEliminationPoints = payload.eliminationPoints !== undefined ? payload.eliminationPoints : payload.points;
     const patch = {
@@ -1056,10 +1060,22 @@ function apiAdminUpdateRealityTvQuestionPack(payload) {
       IndividualPlayStartsEpisode: payload.individualPlayStartsEpisode === undefined
         ? Math.max(0, realityTvNumber_(season.IndividualPlayStartsEpisode, 0))
         : Math.max(0, realityTvNumber_(payload.individualPlayStartsEpisode, 0)),
+      PickChangesAllowed: payload.pickChangesAllowed === undefined
+        ? (season.PickChangesAllowed === "" || season.PickChangesAllowed === undefined ? true : realityTvBool_(season.PickChangesAllowed))
+        : realityTvBool_(payload.pickChangesAllowed),
+      MaxPickChanges: payload.maxPickChanges === undefined
+        ? realityTvPickRules_(season).maxChanges
+        : realityTvPickRules_({ pickChangesAllowed: payload.pickChangesAllowed === undefined ? season.PickChangesAllowed : payload.pickChangesAllowed, maxPickChanges: payload.maxPickChanges }).maxChanges,
+      PickChangePenalty: payload.pickChangePenalty === undefined
+        ? realityTvPickRules_(season).changePenalty
+        : Math.max(0, realityTvNumber_(payload.pickChangePenalty, 0)),
       UpdatedAt: new Date()
     };
     realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_SEASONS_SHEET), season.__rowNumber, patch);
     season = realityTvGetSeason_(season.SeasonId);
+    if (typeof realityTvApplyPickRulesToSeasonCategories_ === "function") {
+      realityTvApplyPickRulesToSeasonCategories_(season);
+    }
   }
 
   let requested = payload.enabledQuestionTypesJSON || payload.enabledQuestionTypes || [];
@@ -1299,14 +1315,32 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
             result.question.EpisodeQuestionId,
             "PENDING"
           );
+          const nextIndex = index + 1;
+          const complete = nextIndex >= enabledTypes.length;
+          const now = new Date();
+          const deferredResultJson = realityTvSetQuestionBuildResult_(
+            job,
+            template,
+            localStatus,
+            result.createdCategory
+              ? "Question and answers were added to Game Setup. Hub sync is optional and deferred."
+              : "Question already existed and was verified / repaired. Hub sync is optional and deferred.",
+            result.question.EpisodeQuestionId,
+            "DEFERRED"
+          );
           realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
-            Stage: "SYNC_HUB",
+            CurrentIndex: nextIndex,
+            Stage: complete ? "COMPLETE" : "BUILD_LOCAL",
+            Status: complete ? "COMPLETE" : "BUILDING",
             ProcessedCount: realityTvNumber_(job.ProcessedCount, 0) + 1,
             LastEpisodeQuestionId: result.question.EpisodeQuestionId,
-            LastMessage: result.question.QuestionText + " was built. Preparing Hub mappings.",
-            BuildResultsJSON: resultJson,
+            LastMessage: complete
+              ? "Episode question pack build completed. Hub mappings can be synchronized separately."
+              : result.question.QuestionText + " was built and verified. Continuing to the next question.",
+            BuildResultsJSON: deferredResultJson,
             ErrorMessage: "",
-            UpdatedAt: new Date()
+            CompletedAt: complete ? now : "",
+            UpdatedAt: now
           });
         }
       }
@@ -1317,15 +1351,9 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
     }
 
     if (stage === "SYNC_HUB") {
+      // Recovery for builds created before v1.1.6. Game Setup is authoritative;
+      // optional Hub mappings must never block playable questions.
       const question = realityTvGetEpisodeQuestion_(job.LastEpisodeQuestionId || (episode.EpisodeId + "-" + realityTvSlug_(templateId)));
-      let warning = "";
-      let hubStatus = "NOT_CONFIGURED";
-      if (question) {
-        const sync = realityTvSyncSupplementalQuestionToHub_(season, episode, question,
-          realityTvParseJson_(question.AnswerOptionsJSON, []));
-        warning = sync && sync.error ? sync.error : "";
-        hubStatus = warning ? "WARNING" : (sync && sync.skipped ? "SKIPPED" : "SYNCED");
-      }
       const existingResult = realityTvQuestionBuildResults_(job).find(function(item) {
         return item.templateId === realityTvKey_(templateId);
       });
@@ -1333,42 +1361,26 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
         job,
         template || { TemplateId: templateId, Label: templateId },
         existingResult ? existingResult.status : "ALREADY_EXISTS",
-        existingResult ? existingResult.message : "Question was verified.",
+        existingResult ? existingResult.message : "Question was verified. Hub sync is optional and deferred.",
         question ? question.EpisodeQuestionId : (existingResult ? existingResult.episodeQuestionId : ""),
-        hubStatus
+        "DEFERRED"
       );
-      let nextIndex = index + 1;
-      let complete = nextIndex >= enabledTypes.length;
-      if (complete) {
-        const verifiedIds = {};
-        realityTvParseJson_(resultJson, []).forEach(function(item) {
-          verifiedIds[realityTvKey_(item && item.templateId)] = true;
-        });
-        const missingIndex = enabledTypes.findIndex(function(item) {
-          return !verifiedIds[realityTvKey_(item)];
-        });
-        if (missingIndex !== -1) {
-          nextIndex = missingIndex;
-          complete = false;
-        }
-      }
+      const nextIndex = index + 1;
+      const complete = nextIndex >= enabledTypes.length;
       const now = new Date();
       realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
         CurrentIndex: nextIndex,
         Stage: complete ? "COMPLETE" : "BUILD_LOCAL",
         Status: complete ? "COMPLETE" : "BUILDING",
         LastMessage: complete
-          ? "Episode question pack build completed." + (warning ? " Hub warning: " + warning : "")
-          : (nextIndex < index + 1
-            ? "Verification found a missing question result. Repairing " + enabledTypes[nextIndex] + "."
-            : templateId + " mappings finished." + (warning ? " Hub warning: " + warning : "")),
+          ? "Episode question pack build completed. Hub mappings can be synchronized separately."
+          : templateId + " was verified. Continuing without waiting for optional Hub mappings.",
         BuildResultsJSON: resultJson,
         ErrorMessage: "",
         CompletedAt: complete ? now : "",
         UpdatedAt: now
       });
       const state = realityTvQuestionBuildState_(realityTvGetQuestionBuildJob_(job.BuildId));
-      state.warning = warning;
       state.message = state.lastMessage;
       return state;
     }

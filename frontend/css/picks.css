@@ -134,16 +134,17 @@
 
 .pick-header-topline {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
 .pick-title-wrap {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 7px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
 .pick-title-wrap h2 {
@@ -151,9 +152,11 @@
   font-size: 1rem;
   line-height: 1.18;
   font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pick-category-card.correct .pick-title-wrap h2 {
@@ -210,9 +213,10 @@
 .selected-pick-summary span {
   font-size: 0.84rem;
   font-weight: 800;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .selected-pick-summary.empty span {
@@ -504,6 +508,14 @@
 ====================== */
 
 @media (max-width: 520px) {
+
+  .pick-header-topline {
+    flex-wrap: wrap;
+  }
+
+  .points-pill {
+    margin-left: 0;
+  }
 
   .pick-card-header {
     padding: 12px 13px 10px;

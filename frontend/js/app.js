@@ -273,6 +273,25 @@ function setPageLoadStep(percent, adminDetail) {
   updateLoaderProgress(percent, adminDetail || APP_LOADER_STATE.detail);
 }
 
+let APP_PAGE_LOAD_PULSE_TIMER = null;
+
+function startPageLoadPulse_() {
+  stopPageLoadPulse_();
+  APP_PAGE_LOAD_PULSE_TIMER = setInterval(function() {
+    if (!APP_LOADER_STATE.visible) return stopPageLoadPulse_();
+    const current = Number(APP_LOADER_STATE.percent || 0);
+    if (current >= 90) return;
+    const step = current < 60 ? 3 : current < 78 ? 2 : 1;
+    updateLoaderProgress(Math.min(90, current + step), APP_LOADER_STATE.detail);
+  }, 850);
+}
+
+function stopPageLoadPulse_() {
+  if (!APP_PAGE_LOAD_PULSE_TIMER) return;
+  clearInterval(APP_PAGE_LOAD_PULSE_TIMER);
+  APP_PAGE_LOAD_PULSE_TIMER = null;
+}
+
 function hideLoader() {
   const loader = document.getElementById("loader");
   if (!loader) return;
@@ -353,7 +372,7 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "305-platform-image-engine";
+const APP_ASSET_VERSION = "306-reality-tv-player-flow";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -496,7 +515,9 @@ async function navigate(page, options) {
 
     await ensurePageModules_(page);
     setPageLoadStep(42, isAdminPage_(page) ? "Requesting page data…" : "");
+    startPageLoadPulse_();
     await renderPage(page);
+    stopPageLoadPulse_();
     if (isAdminPage_(page) && typeof adminUiEnhancePage === "function") {
       adminUiEnhancePage(app);
     }
@@ -521,6 +542,8 @@ async function navigate(page, options) {
     `;
 
   } finally {
+
+    stopPageLoadPulse_();
 
     requestAnimationFrame(() => {
 

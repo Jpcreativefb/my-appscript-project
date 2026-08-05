@@ -302,39 +302,97 @@ function seasonAnchorUserHistorySummary_(gameId, username) {
 }
 
 function seasonAnchorUserPayload_(username, gameId) {
-  seasonAnchorEnsureSystem_();
   const settings = seasonAnchorGetSettings_(gameId);
   if (!settings || !settings.Enabled) return { enabled: false };
   if (settings.SourceType !== "reality-tv") {
     return { enabled: false, unsupported: true, message: "This Season Survivor source is not active yet." };
   }
-  const season = seasonAnchorRealitySeasonForGame_(gameId);
-  if (!season) return { enabled: false, message: "Reality TV season record was not found." };
-  const episode = seasonAnchorCurrentRealityEpisode_(season);
-  const user = seasonAnchorGetUserRow_(gameId, username);
-  const now = new Date();
-  const lockDate = episode && episode.LockDateTime ? new Date(episode.LockDateTime) : null;
-  const locked = !episode || seasonAnchorKey_(episode.Status) !== "open" || (lockDate && !isNaN(lockDate.getTime()) && now.getTime() >= lockDate.getTime());
-  const currentEntityActive = user && seasonAnchorRealityEntities_(season, true).some(function(item) {
-    return seasonAnchorKey_(item.id) === seasonAnchorKey_(user.CurrentEntityId);
+
+  const view = typeof realityTvUserGameViewPayload_ === "function"
+    ? realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false })
+    : null;
+  if (!view || view.enabled !== true || !view.season) {
+    return { enabled: false, message: "Reality TV season record was not found." };
+  }
+
+  const episodes = Array.isArray(view.episodes) ? view.episodes : [];
+  const currentNumber = seasonAnchorNumber_(view.season.currentEpisodeNumber, 0);
+  const episode = episodes.find(function(row) {
+    return seasonAnchorNumber_(row.episodeNumber, 0) === currentNumber;
+  }) || episodes[0] || null;
+
+  const user = seasonAnchorReadObjects_(SEASON_ANCHOR_USERS_SHEET, true).find(function(row) {
+    return seasonAnchorKey_(row.GameId) === seasonAnchorKey_(gameId) &&
+      seasonAnchorKey_(row.Username) === seasonAnchorKey_(username);
+  }) || null;
+
+  const allEntities = Array.isArray(view.participants) ? view.participants : [];
+  const entities = allEntities.filter(function(row) {
+    return row.active === true && seasonAnchorKey_(row.status || "active") === "active";
   });
+  const currentEntity = user ? (allEntities.find(function(item) {
+    return seasonAnchorKey_(item.id) === seasonAnchorKey_(user.CurrentEntityId);
+  }) || null) : null;
+  const currentEntityActive = !!(user && entities.some(function(item) {
+    return seasonAnchorKey_(item.id) === seasonAnchorKey_(user.CurrentEntityId);
+  }));
+
+  const historyRows = seasonAnchorReadObjects_(SEASON_ANCHOR_HISTORY_SHEET, true).filter(function(row) {
+    return seasonAnchorKey_(row.GameId) === seasonAnchorKey_(gameId) &&
+      seasonAnchorKey_(row.Username) === seasonAnchorKey_(username);
+  });
+  let bonus = 0, penalty = 0, net = 0, longest = 0, survived = 0;
+  historyRows.forEach(function(row) {
+    bonus += seasonAnchorNumber_(row.BonusPoints, 0);
+    penalty += seasonAnchorNumber_(row.PenaltyPoints, 0);
+    net += seasonAnchorNumber_(row.NetAdjustment, 0);
+    longest = Math.max(longest, seasonAnchorNumber_(row.StreakAfter, 0));
+    if (seasonAnchorKey_(row.Outcome) === "survived") survived += 1;
+  });
+  const stats = {
+    totalBonus: seasonAnchorRound_(bonus),
+    totalPenalty: seasonAnchorRound_(penalty),
+    netAdjustment: seasonAnchorRound_(net),
+    longestStreak: longest,
+    successfulPeriods: survived,
+    settledPeriods: historyRows.length,
+    recent: historyRows.sort(function(a, b) {
+      return seasonAnchorNumber_(b.EpisodeNumber, 0) - seasonAnchorNumber_(a.EpisodeNumber, 0);
+    }).slice(0, 5).map(function(row) {
+      return {
+        episodeNumber: seasonAnchorNumber_(row.EpisodeNumber, 0),
+        entityName: seasonAnchorString_(row.EntityName),
+        outcome: seasonAnchorString_(row.Outcome),
+        multiplier: seasonAnchorNumber_(row.MultiplierApplied, 1),
+        bonus: seasonAnchorNumber_(row.BonusPoints, 0),
+        penalty: seasonAnchorNumber_(row.PenaltyPoints, 0),
+        net: seasonAnchorNumber_(row.NetAdjustment, 0)
+      };
+    })
+  };
+
+  const now = new Date();
+  const lockDate = episode && episode.lockDateTime ? new Date(episode.lockDateTime) : null;
+  const locked = !episode || seasonAnchorKey_(episode.status) !== "open" ||
+    (lockDate && !isNaN(lockDate.getTime()) && now.getTime() >= lockDate.getTime());
+
   return {
     enabled: true,
     settings: settings,
     season: {
-      seasonId: season.SeasonId,
-      showName: season.ShowName,
-      seasonName: season.SeasonName,
-      periodLabel: season.PeriodLabel || "Episode",
-      participantLabel: season.ParticipantLabel || "Contestant",
-      groupLabel: season.GroupLabel || "Group"
+      seasonId: view.season.seasonId,
+      showName: view.season.showName,
+      seasonName: view.season.seasonName,
+      periodLabel: view.season.periodLabel || "Episode",
+      participantLabel: view.season.participantLabel || "Contestant",
+      groupLabel: view.season.groupLabel || "Group"
     },
     episode: episode ? {
-      episodeId: episode.EpisodeId,
-      episodeNumber: seasonAnchorNumber_(episode.EpisodeNumber, 0),
-      episodeName: episode.EpisodeName,
-      lockDateTime: episode.LockDateTime,
-      status: episode.Status
+      episodeId: episode.episodeId,
+      episodeNumber: seasonAnchorNumber_(episode.episodeNumber, 0),
+      episodeName: episode.episodeName,
+      lockDateTime: episode.lockDateTime,
+      status: episode.status
     } : null,
     user: user ? {
       currentEntityId: seasonAnchorString_(user.CurrentEntityId),
@@ -346,12 +404,10 @@ function seasonAnchorUserPayload_(username, gameId) {
       lastSettledEpisodeNumber: seasonAnchorNumber_(user.LastSettledEpisodeNumber, 0),
       currentEntityActive: currentEntityActive
     } : null,
-    entities: seasonAnchorRealityEntities_(season, true),
-    allEntities: seasonAnchorRealityEntities_(season, false),
-    currentEntity: user ? (seasonAnchorRealityEntities_(season, false).find(function(item) {
-      return seasonAnchorKey_(item.id) === seasonAnchorKey_(user.CurrentEntityId);
-    }) || null) : null,
-    stats: seasonAnchorUserHistorySummary_(gameId, username),
+    entities: entities,
+    allEntities: allEntities,
+    currentEntity: currentEntity,
+    stats: stats,
     locked: !!locked,
     canChoose: !locked && (!user || seasonAnchorKey_(user.Status) === "needs_pick" || settings.ManualSwitchAllowed || !user.CurrentEntityId),
     maxWeeklyBonus: seasonAnchorRound_(settings.EligiblePointsCap * Math.max(0, settings.MaxMultiplier - 1))

@@ -23,6 +23,8 @@ let PICKS_PAGE_DATA = {
 let PICKS_COUNTDOWN_TIMER = null;
 let PICKS_ENHANCEMENTS_REQUEST = null;
 const PICKS_ENHANCEMENTS_CACHE = {};
+const PICKS_PENDING_SAVES = {};
+let PICKS_AUTO_ADVANCE_TIMER = null;
 
 
 function isHybridPicksGame_() {
@@ -146,6 +148,11 @@ function renderRealityTvPlayerSummary_() {
 
 function renderSeasonAnchorPickCard_() {
   const anchor = PICKS_PAGE_DATA.seasonAnchor;
+  if (anchor && anchor.deferred === true) {
+    return `<section class="season-anchor-card loading" aria-live="polite">
+      <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>Season Survivor Pick</h2><p>Loading the current survivor selection and active participants…</p></div><span class="season-anchor-status open">Loading</span></div>
+    </section>`;
+  }
   if (!anchor || anchor.enabled !== true) return "";
   const settings = anchor.settings || {};
   const user = anchor.user || null;
@@ -246,7 +253,7 @@ async function renderPicksPage() {
 
   let payload;
 
-  setPageLoadStep(50, "Loading questions, saved picks, and game rules…");
+  setPageLoadStep(46, "Loading questions, saved picks, and game rules…");
 
   try {
 
@@ -274,7 +281,7 @@ async function renderPicksPage() {
 
   }
 
-  setPageLoadStep(78, "Preparing Reality TV, scoring, and weekly statistics…");
+  setPageLoadStep(84, "Preparing Reality TV questions and saved selections…");
 
   const gameId =
   payload.gameId ||
@@ -1196,14 +1203,13 @@ function renderCategoryCard(category, isChild, parent) {
       PICKS_PAGE_DATA.changeCounts[category.id]
     ) || 0;
 
-  const maxChanges =
-    Number(category.maxChanges) || 0;
+  const rawMaxChanges = Number(category.maxChanges);
+  const maxChanges = Number.isFinite(rawMaxChanges) ? rawMaxChanges : 0;
+  const unlimitedChanges = maxChanges < 0;
 
-  const changesLeft =
-    Math.max(
-      maxChanges - changeCount,
-      0
-    );
+  const changesLeft = unlimitedChanges
+    ? null
+    : Math.max(maxChanges - changeCount, 0);
 
   const totalPoints =
     Number(category.points) || 0;
@@ -1227,6 +1233,8 @@ function renderCategoryCard(category, isChild, parent) {
     <section
       class="pick-category-card ${collapsedClass} ${childClass} ${status.className}"
       data-category-id="${escapeAttr(category.id)}"
+      data-has-pick="${hasPick ? "true" : "false"}"
+      data-locked="${locked ? "true" : "false"}"
     >
 
     <button
@@ -1334,21 +1342,17 @@ function renderCategoryCard(category, isChild, parent) {
               <div class="penalty-note">
                 Your selected stake is reserved until this question settles.
               </div>
-              <div class="changes-pill body-pill">
-                ${changesLeft} changes left
-              </div>
+              ${maxChanges > 0 ? `<div class="changes-pill body-pill">${changesLeft} changes left</div>` : ""}
             </div>
           `
-          : `
-            <div class="pick-rules-row">
-              <div class="penalty-note">
-                Penalty: ${penalty} point${penalty === 1 ? "" : "s"}
+          : (penalty > 0 || maxChanges > 0)
+            ? `
+              <div class="pick-rules-row">
+                ${penalty > 0 ? `<div class="penalty-note">Penalty: ${penalty} point${penalty === 1 ? "" : "s"}</div>` : ""}
+                ${maxChanges > 0 ? `<div class="changes-pill body-pill">${changesLeft} changes left</div>` : ""}
               </div>
-              <div class="changes-pill body-pill">
-                ${changesLeft} changes left
-              </div>
-            </div>
-          `
+            `
+            : ""
         : ""
     }
     
@@ -1785,6 +1789,11 @@ function renderNomineeButton(
 
 async function selectNominee(categoryId, nomineeId) {
 
+  if (PICKS_PENDING_SAVES[categoryId]) {
+    showPicksMessage("This pick is already saving…", false);
+    return;
+  }
+
   const session =
     PICKS_PAGE_DATA.session ||
     getSession();
@@ -1822,11 +1831,12 @@ async function selectNominee(categoryId, nomineeId) {
       PICKS_PAGE_DATA.changeCounts[categoryId]
     ) || 0;
 
-  const maxChanges =
-    Number(category.maxChanges) || 0;
+  const rawMaxChanges = Number(category.maxChanges);
+  const maxChanges = Number.isFinite(rawMaxChanges) ? rawMaxChanges : 0;
 
   if (
     isChange &&
+    maxChanges >= 0 &&
     changeCount >= maxChanges
   ) {
     showPicksMessage(
@@ -1972,8 +1982,10 @@ async function selectNominee(categoryId, nomineeId) {
     false
   );
 
-  const result =
-    await apiSavePick({
+  PICKS_PENDING_SAVES[categoryId] = true;
+  let result;
+  try {
+    result = await apiSavePick({
       username:
         session.username,
 
@@ -1992,6 +2004,12 @@ async function selectNominee(categoryId, nomineeId) {
       stakePoints:
         stakePoints
     });
+  } catch (saveError) {
+    showPicksMessage(saveError && saveError.message ? saveError.message : "Could not save pick.", true);
+    return;
+  } finally {
+    delete PICKS_PENDING_SAVES[categoryId];
+  }
 
   console.log(
     "SAVE PICK RESULT",
@@ -2048,6 +2066,41 @@ async function selectNominee(categoryId, nomineeId) {
     false
   );
 
+  scheduleRealityTvPickAutoAdvance_(categoryId);
+
+}
+
+function scheduleRealityTvPickAutoAdvance_(categoryId) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true) return;
+  if (PICKS_AUTO_ADVANCE_TIMER) clearTimeout(PICKS_AUTO_ADVANCE_TIMER);
+  const savedCard = document.querySelector('[data-category-id="' + cssEscape(categoryId) + '"]');
+  if (savedCard) savedCard.classList.remove("collapsed");
+  PICKS_AUTO_ADVANCE_TIMER = setTimeout(function() {
+    const current = document.querySelector('[data-category-id="' + cssEscape(categoryId) + '"]');
+    if (current) current.classList.add("collapsed");
+
+    const cards = Array.from(document.querySelectorAll(".pick-category-card[data-category-id]"));
+    const currentIndex = cards.findIndex(function(card) {
+      return normalizeId(card.dataset.categoryId) === normalizeId(categoryId);
+    });
+    if (currentIndex < 0) return;
+
+    let next = cards.slice(currentIndex + 1).find(function(card) {
+      return card.dataset.locked !== "true" && card.dataset.hasPick !== "true";
+    });
+    if (!next) {
+      next = cards.slice(currentIndex + 1).find(function(card) {
+        return card.dataset.locked !== "true";
+      });
+    }
+    if (!next) return;
+
+    const episode = next.closest("details.reality-episode-picks-section");
+    if (episode) episode.open = true;
+    next.classList.remove("collapsed");
+    next.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, 1800);
 }
 
 function refreshPicksPage() {
@@ -2145,45 +2198,38 @@ async function hydratePicksEnhancements_() {
 
   const promise = (async function() {
     const cached = PICKS_ENHANCEMENTS_CACHE[key] || {};
-    const tasks = [];
+
+    // The pinned Season Survivor feature is visually above the questions, so load
+    // it before the heavier weekly leaderboard/statistics request.
+    if (!cached.seasonAnchor && (!PICKS_PAGE_DATA.seasonAnchor || PICKS_PAGE_DATA.seasonAnchor.deferred === true)) {
+      try {
+        const response = await apiGetSeasonAnchor(PICKS_PAGE_DATA.gameId);
+        if (response && response.success !== false && response.seasonAnchor) {
+          cached.seasonAnchor = response.seasonAnchor;
+          PICKS_PAGE_DATA.seasonAnchor = response.seasonAnchor;
+          refreshPicksEnhancementUi_();
+        }
+      } catch (error) {
+        console.warn("Season Survivor details loaded later or were skipped:", error);
+      }
+    }
 
     if (!cached.playerStats && (!view.playerStats || view.playerStatsDeferred === true)) {
-      tasks.push(
-        apiGetRealityTvPlayerStats(PICKS_PAGE_DATA.gameId)
-          .then(function(response) {
-            if (response && response.success !== false && response.playerStats) {
-              cached.playerStats = response.playerStats;
-              if (PICKS_PAGE_DATA.realityTvView) {
-                PICKS_PAGE_DATA.realityTvView.playerStats = response.playerStats;
-                PICKS_PAGE_DATA.realityTvView.playerStatsDeferred = false;
-              }
-              refreshPicksEnhancementUi_();
-            }
-          })
-          .catch(function(error) {
-            console.warn("Reality TV player statistics loaded later or were skipped:", error);
-          })
-      );
+      try {
+        const response = await apiGetRealityTvPlayerStats(PICKS_PAGE_DATA.gameId);
+        if (response && response.success !== false && response.playerStats) {
+          cached.playerStats = response.playerStats;
+          if (PICKS_PAGE_DATA.realityTvView) {
+            PICKS_PAGE_DATA.realityTvView.playerStats = response.playerStats;
+            PICKS_PAGE_DATA.realityTvView.playerStatsDeferred = false;
+          }
+          refreshPicksEnhancementUi_();
+        }
+      } catch (error) {
+        console.warn("Reality TV player statistics loaded later or were skipped:", error);
+      }
     }
 
-    if (!cached.seasonAnchor && (!PICKS_PAGE_DATA.seasonAnchor || PICKS_PAGE_DATA.seasonAnchor.deferred === true)) {
-      tasks.push(
-        apiGetSeasonAnchor(PICKS_PAGE_DATA.gameId)
-          .then(function(response) {
-            if (response && response.success !== false && response.seasonAnchor) {
-              cached.seasonAnchor = response.seasonAnchor;
-              PICKS_PAGE_DATA.seasonAnchor = response.seasonAnchor;
-              refreshPicksEnhancementUi_();
-            }
-          })
-          .catch(function(error) {
-            console.warn("Season Survivor details loaded later or were skipped:", error);
-          })
-      );
-    }
-
-    PICKS_ENHANCEMENTS_CACHE[key] = cached;
-    if (tasks.length) await Promise.all(tasks);
     PICKS_ENHANCEMENTS_CACHE[key] = cached;
     refreshPicksEnhancementUi_();
   })();

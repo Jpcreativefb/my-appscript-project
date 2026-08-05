@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v305-platform-image-engine";
+const AWARDS_CACHE = "awards-app-v306-reality-tv-player-flow";
 
 const APP_SHELL = [
   "./",

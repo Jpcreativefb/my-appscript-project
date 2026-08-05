@@ -406,8 +406,28 @@ function adminRealityTvQuestionPackPanel_(bundle) {
       </details>
 
       <details class="reality-tv-config-section" open>
-        <summary>3. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
+        <summary>3. Player Pick Rules</summary>
+        <div class="admin-sub">These rules apply to the main exit question and every extra Reality TV question. Picks can only be changed before each question locks.</div>
+        <div class="reality-tv-checkbox-row">
+          <label class="reality-tv-inline-option"><input id="realityTvPickChangesAllowed_${adminRealityTvEscape_(season.SeasonId)}" type="checkbox" ${(season.PickChangesAllowed === "" || season.PickChangesAllowed === undefined || String(season.PickChangesAllowed).toLowerCase() === "true") ? "checked" : ""}><span>Allow players to change picks before lock</span>${adminRealityTvHelp_("Change picks before lock", "When enabled, users can revise an answer until that question's lock time. Disable it for one-and-done picks.")}</label>
+        </div>
+        <div class="admin-form-grid reality-tv-format-settings-grid">
+          <label>${adminRealityTvFieldTitle_("Maximum changes", "Leave blank for unlimited changes before lock. Enter 1, 2, 3, and so on to set a limit. This field is ignored when changes are disabled.")}<input id="realityTvMaxPickChanges_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="1" step="1" placeholder="Unlimited" value="${Number(season.MaxPickChanges) >= 0 ? adminRealityTvValue_(season.MaxPickChanges) : ""}"></label>
+          <label>${adminRealityTvFieldTitle_("Penalty per change", "Optional points removed for each answer change. Leave at 0 for no penalty. The player card hides penalty and changes-left labels when these values are not configured.")}<input id="realityTvPickChangePenalty_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="0.5" value="${adminRealityTvValue_(Number(season.PickChangePenalty || 0))}"></label>
+        </div>
+        <div class="admin-actions"><button class="admin-small-button" onclick="adminRealityTvSavePickRules('${adminRealityTvEscape_(season.SeasonId)}')">Save Player Pick Rules</button></div>
+        <div id="realityTvPickRulesMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </details>
+
+      <details class="reality-tv-config-section" open>
+        <summary>4. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
         <div class="admin-sub">Checked questions are verified one by one. Group-based questions require at least two valid Team / Tribe values. The build summary below explains every skipped item.</div>
+        <details class="reality-tv-build-help">
+          <summary>How Save & Build and Resume Build work ${adminRealityTvHelp_("Question build help", "Normally click Save Format & Build once. Resume Build is only a recovery button after a timeout, closed browser, or interrupted connection.")}</summary>
+          <div class="admin-sub"><b>Normal use:</b> Click Save Format & Build once. The manager continues through every checked local question automatically.</div>
+          <div class="admin-sub"><b>Resume Build (3/4):</b> Three of four checked question types are already built or verified. Click Resume once to continue the remaining saved work. Completed questions are not duplicated.</div>
+          <div class="admin-sub"><b>Hub mappings:</b> They are optional and no longer block local Game Setup questions. A Hub issue will not prevent the game from becoming playable.</div>
+        </details>
         <div id="realityTvQuestionPackGrid_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-question-pack-grid">
           ${adminRealityTvQuestionPackChoicesHtml_(format.id, enabled, bundle.questionTemplates || [], "rt-season-question-type", season.SeasonId, season.Points || 1, {}, statusById)}
         </div>
@@ -418,7 +438,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
       </details>
 
       <details class="reality-tv-custom-question-builder reality-tv-config-section">
-        <summary>4. Add Custom Question</summary>
+        <summary>5. Add Custom Question</summary>
         <div class="admin-sub">Custom questions are saved for this season, generated for future periods, mapped to the Hub, and always require administrator approval. They do not remove participants or advance the season.</div>
         <div class="admin-form-grid reality-tv-custom-question-grid">
           <label class="reality-tv-wide-field">${adminRealityTvFieldTitle_("Question text", "Write the question exactly as users should see it. You may use {episode}, {period}, {show}, and {season} placeholders.")}<input id="realityTvCustomQuestion_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Who will win the special challenge in {period} {episode}?"></label>
@@ -1386,6 +1406,16 @@ async function renderAdminRealityTvPage() {
                 <label>${adminRealityTvFieldTitle_("Answer display", "Automatic uses image cards when roster or group images exist.")}<select id="realityTvEliminationLayout" class="input"><option value="auto">Automatic</option><option value="image">Image cards</option><option value="compact">Compact image cards</option><option value="list">List</option><option value="text">Text cards</option></select></label>
                 <label>${adminRealityTvFieldTitle_("Image source", "Use participant/team roster photos, saved group images, or no images.")}<select id="realityTvEliminationImageSource" class="input"><option value="roster">Participant / team roster</option><option value="group">Group / tribe image</option><option value="none">No images</option></select></label>
               </div>
+              <details class="reality-tv-config-section" open>
+                <summary>Player Pick Rules</summary>
+                <div class="reality-tv-checkbox-row">
+                  <label class="reality-tv-inline-option"><input id="realityTvPickChangesAllowed" type="checkbox" checked><span>Allow players to change picks before lock</span>${adminRealityTvHelp_("Change picks before lock", "Recommended for Reality TV. Users may revise an answer until its lock time.")}</label>
+                </div>
+                <div class="admin-form-grid reality-tv-season-form-grid">
+                  <label>${adminRealityTvFieldTitle_("Maximum changes", "Leave blank for unlimited changes before lock. Enter a number only when the season should limit revisions.")}<input id="realityTvMaxPickChanges" class="input" type="number" min="1" step="1" placeholder="Unlimited"></label>
+                  <label>${adminRealityTvFieldTitle_("Penalty per change", "Optional points removed for each change. Keep 0 for no penalty.")}<input id="realityTvPickChangePenalty" class="input" type="number" min="0" step="0.5" value="0"></label>
+                </div>
+              </details>
               <div class="reality-tv-create-question-pack">
                 <h3>Show Format Question Pack</h3>
                 <div class="admin-sub">The main elimination / exit question is always created. Check the extra questions you want and set points separately for each one.</div>
@@ -1557,6 +1587,9 @@ async function adminRealityTvCreateSeason() {
     weeklyIntervalDays: document.getElementById("realityTvIntervalDays").value,
     lockOffsetMinutes: document.getElementById("realityTvLockOffset").value,
     individualPlayStartsEpisode: document.getElementById("realityTvIndividualStart").value,
+    pickChangesAllowed: document.getElementById("realityTvPickChangesAllowed").checked,
+    maxPickChanges: document.getElementById("realityTvMaxPickChanges").value.trim() === "" ? -1 : document.getElementById("realityTvMaxPickChanges").value,
+    pickChangePenalty: document.getElementById("realityTvPickChangePenalty").value,
     points: document.getElementById("realityTvPoints").value,
     questionTemplate: document.getElementById("realityTvQuestionTemplate").value.trim(),
     eliminationLayoutType: document.getElementById("realityTvEliminationLayout").value,
@@ -1854,6 +1887,30 @@ function adminRealityTvBuildCompletionMessage_(state) {
   return message;
 }
 
+async function adminRealityTvSavePickRules(seasonId) {
+  const allowed = document.getElementById("realityTvPickChangesAllowed_" + seasonId);
+  const maxInput = document.getElementById("realityTvMaxPickChanges_" + seasonId);
+  const penaltyInput = document.getElementById("realityTvPickChangePenalty_" + seasonId);
+  if (!allowed || !maxInput || !penaltyInput) return;
+  adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, "Saving player pick rules…", "info");
+  showLoader();
+  try {
+    const state = await apiAdminUpdateRealityTvQuestionPack({
+      seasonId: seasonId,
+      pickChangesAllowed: allowed.checked,
+      maxPickChanges: maxInput.value.trim() === "" ? -1 : maxInput.value,
+      pickChangePenalty: penaltyInput.value,
+      buildCurrentEpisode: false
+    });
+    if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save player pick rules."));
+    adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, "Player pick rules saved and applied to all Reality TV questions in this season.", "success");
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, err.message || String(err), "error");
+  } finally {
+    hideLoader();
+  }
+}
+
 async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
   const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
     return box.value;
@@ -1870,6 +1927,9 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
       groupLabel: document.getElementById("realityTvGroupLabel_" + seasonId).value.trim(),
       periodLabel: document.getElementById("realityTvPeriodLabel_" + seasonId).value.trim(),
       individualPlayStartsEpisode: document.getElementById("realityTvIndividualStart_" + seasonId).value,
+      pickChangesAllowed: document.getElementById("realityTvPickChangesAllowed_" + seasonId).checked,
+      maxPickChanges: document.getElementById("realityTvMaxPickChanges_" + seasonId).value.trim() === "" ? -1 : document.getElementById("realityTvMaxPickChanges_" + seasonId).value,
+      pickChangePenalty: document.getElementById("realityTvPickChangePenalty_" + seasonId).value,
       questionTemplate: document.getElementById("realityTvEliminationTemplate_" + seasonId).value.trim(),
       eliminationPoints: document.getElementById("realityTvEliminationPoints_" + seasonId).value,
       eliminationLayoutType: document.getElementById("realityTvEliminationLayout_" + seasonId).value,
@@ -1882,7 +1942,7 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save the question pack."));
     if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
     if (!state.complete) {
-      alert("The question pack build paused before final confirmation. Refresh the manager and select Resume Build. Completed stages will not repeat.");
+      alert("The question pack build paused before final confirmation. The local build paused. Select Resume Build once; completed questions will not repeat.");
     } else {
       alert(adminRealityTvBuildCompletionMessage_(state));
     }
@@ -1890,7 +1950,7 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
   } catch (err) {
     adminRealityTvSetMessage_(
       "realityTvQuestionPackMessage_" + seasonId,
-      (err && err.message ? err.message : String(err)) + " Refresh the manager and select Resume Build; completed stages are safe.",
+      (err && err.message ? err.message : String(err)) + " Select Resume Build once; completed local questions are safe.",
       "error"
     );
   } finally {
@@ -1938,7 +1998,7 @@ async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
   try {
     const state = await adminRealityTvRunQuestionPackBuild_({ buildId: buildId, complete: false }, seasonId);
     if (!state.complete) {
-      alert("The build is still paused. Refresh and select Resume Build again; completed stages will not repeat.");
+      alert("The build is still paused. Select Resume Build once more only if the connection was interrupted again; completed questions will not repeat.");
     } else {
       alert(state.message || state.lastMessage || "Episode question pack build completed.");
     }
@@ -1946,7 +2006,7 @@ async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
   } catch (err) {
     adminRealityTvSetMessage_(
       "realityTvQuestionPackMessage_" + seasonId,
-      (err && err.message ? err.message : String(err)) + " Refresh and select Resume Build.",
+      (err && err.message ? err.message : String(err)) + " Select Resume Build once.",
       "error"
     );
   } finally {

@@ -438,16 +438,26 @@ function clearAppCaches(){
 
 }
 
-function clearPicksCaches(){
+function clearPicksCaches(gameId, username){
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
+  APP_RUNTIME_CACHE = {};
+  const cache = CacheService.getScriptCache();
+  cache.remove("sheet_Picks");
 
-    clearAppCaches();
+  gameId = String(gameId || "").trim();
+  username = String(username || "").trim();
 
+  if (gameId) {
+    cache.remove("leaderboard_" + gameId);
+    cache.remove("projected_" + gameId);
+    if (typeof realityTvSlug_ === "function") {
+      if (username) cache.remove("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
+    }
+    return;
   }
+
+  // Backward-compatible maintenance path only. Normal saves pass a Game ID.
+  if (typeof clearAppCaches === "function") clearAppCaches();
 
 }
 

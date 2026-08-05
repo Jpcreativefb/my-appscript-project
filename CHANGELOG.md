@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.6 — Reality TV Player Flow and Pick Performance
+
+- Completed local Reality TV episode-question builds before optional External Results Hub mappings.
+- Made Resume Build a recovery-only action with persistent progress and dedicated help documentation.
+- Restored the Season Survivor Pick directly after the score area with prioritized read-only loading.
+- Added Reality TV Manager controls for pick changes, maximum changes, and change penalties.
+- Defaulted Reality TV picks to unlimited changes until lock when no limit is configured.
+- Reduced pick-save lock duration, row writes, and cache invalidation.
+- Added delayed collapse and auto-scroll to the next unanswered Reality TV question.
+- Hid unused penalty/change counters and fixed mobile question-title clipping.
+- Added a progressive loader pulse while page data is still loading.
+- Added v1.1.6 regression coverage and a production smoke test.
+
 ## v1.1.5 — Platform Image Engine
 
 - Added one shared image-delivery helper across Reality TV, awards, sports, racing, dashboard heroes, profiles, archives, leaderboards, and admin previews.
