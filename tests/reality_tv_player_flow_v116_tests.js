@@ -59,8 +59,8 @@ assert(player.includes('(penalty > 0 || maxChanges > 0)'));
 assert(css.includes('overflow-wrap: anywhere'));
 assert(css.includes('white-space: normal'));
 assert(app.includes('startPageLoadPulse_'));
-assert(app.includes('306-reality-tv-player-flow'));
-assert(html.includes('306-reality-tv-player-flow'));
-assert(sw.includes('306-reality-tv-player-flow'));
+assert(app.includes('307-reality-tv-survivor-comparison'));
+assert(html.includes('307-reality-tv-survivor-comparison'));
+assert(sw.includes('307-reality-tv-survivor-comparison'));
 
 console.log('Reality TV player flow v1.1.6 tests passed.');

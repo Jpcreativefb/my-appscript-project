@@ -150,7 +150,7 @@ function seasonAnchorDefaultSettings_(gameId, seasonId) {
     LossPenalty: 5,
     NoResultBehavior: "preserve",
     WithdrawalBehavior: "penalty",
-    ManualSwitchAllowed: true,
+    ManualSwitchAllowed: false,
     SourceType: "reality-tv",
     CreatedAt: "",
     UpdatedAt: ""
@@ -409,7 +409,8 @@ function seasonAnchorUserPayload_(username, gameId) {
     currentEntity: currentEntity,
     stats: stats,
     locked: !!locked,
-    canChoose: !locked && (!user || seasonAnchorKey_(user.Status) === "needs_pick" || settings.ManualSwitchAllowed || !user.CurrentEntityId),
+    finalized: !!(user && user.CurrentEntityId && seasonAnchorKey_(user.Status) === "active" && currentEntityActive),
+    canChoose: !locked && (!user || seasonAnchorKey_(user.Status) === "needs_pick" || !user.CurrentEntityId || !currentEntityActive),
     maxWeeklyBonus: seasonAnchorRound_(settings.EligiblePointsCap * Math.max(0, settings.MaxMultiplier - 1))
   };
 }
@@ -446,11 +447,21 @@ function apiSaveSeasonAnchorPick(payload) {
   const settings = view.settings;
   const existing = seasonAnchorGetUserRow_(gameId, username);
   const changing = existing && existing.CurrentEntityId && seasonAnchorKey_(existing.CurrentEntityId) !== seasonAnchorKey_(entity.id);
-  if (changing && seasonAnchorKey_(existing.Status) === "active" && !settings.ManualSwitchAllowed) {
-    throw new Error("Manual switching is disabled. You can choose again after your current pick is eliminated.");
+  const existingStillActive = !!(existing && seasonAnchorKey_(existing.Status) === "active" && (view.entities || []).some(function(item) {
+    return seasonAnchorKey_(item.id) === seasonAnchorKey_(existing.CurrentEntityId);
+  }));
+  if (changing && existingStillActive) {
+    throw new Error("This Sole Survivor pick is finalized. You can choose again only after the contestant is eliminated.");
+  }
+  if (existingStillActive && !changing) {
+    return {
+      success: true,
+      message: "This Sole Survivor pick is already finalized.",
+      seasonAnchor: view
+    };
   }
 
-  const reset = !existing || changing || seasonAnchorKey_(existing.Status) === "needs_pick";
+  const reset = !existing || changing || seasonAnchorKey_(existing.Status) === "needs_pick" || !existingStillActive;
   const now = new Date();
   const row = {
     GameId: gameId,
@@ -473,7 +484,7 @@ function apiSaveSeasonAnchorPick(payload) {
   seasonAnchorUpsert_(SEASON_ANCHOR_USERS_SHEET, SEASON_ANCHOR_USER_HEADERS, ["GameId", "Username"], row);
   return {
     success: true,
-    message: changing ? "Season Survivor pick changed. The multiplier reset to the starting value." : "Season Survivor pick saved.",
+    message: "Sole Survivor pick finalized.",
     seasonAnchor: seasonAnchorUserPayload_(username, gameId)
   };
 }

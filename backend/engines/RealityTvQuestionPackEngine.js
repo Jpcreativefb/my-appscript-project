@@ -1183,6 +1183,65 @@ function apiAdminBuildRealityTvEpisodeQuestions(payload) {
   return state;
 }
 
+
+function realityTvQuestionPackMissingTemplateIndex_(season, episode, enabledTypes, definitionsById) {
+  const setup = adminGetGameSetup({ gameId: season.GameId });
+  const categories = setup && Array.isArray(setup.categories) ? setup.categories : [];
+  const questions = realityTvEpisodeQuestionsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId);
+  });
+
+  for (let i = 0; i < enabledTypes.length; i += 1) {
+    const templateId = realityTvKey_(enabledTypes[i]);
+    const template = definitionsById[templateId];
+    if (!template || !realityTvBool_(template.Enabled)) continue;
+
+    const answerBundle = realityTvAnswerOptionsForTemplate_(season, template, episode);
+    if (answerBundle.skipped || answerBundle.options.length < 2) continue;
+
+    const type = realityTvSlug_(template.QuestionType || template.TemplateId);
+    const categoryId = "episode-" + episode.EpisodeNumber + "-" + type;
+    const episodeQuestionId = episode.EpisodeId + "-" + type;
+    const question = questions.find(function(row) {
+      return realityTvKey_(row.EpisodeQuestionId) === realityTvKey_(episodeQuestionId);
+    });
+    const category = categories.find(function(row) {
+      return realityTvKey_(row.categoryId || row.id) === realityTvKey_(categoryId);
+    });
+    if (!question || !category) return i;
+
+    const existingNominees = {};
+    (category.nominees || []).forEach(function(item) {
+      existingNominees[realityTvKey_(item.nomineeId || item.id)] = true;
+    });
+    const missingAnswer = answerBundle.options.some(function(item) {
+      return !existingNominees[realityTvKey_(item.id)];
+    });
+    if (missingAnswer) return i;
+  }
+  return -1;
+}
+
+function apiAdminRepairRealityTvQuestionPack(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+  realityTvEnsureQuestionPackSystem_();
+  const season = realityTvGetSeason_(payload.seasonId);
+  if (!season) throw new Error("Reality TV season not found.");
+  const episode = realityTvGetEpisode_(payload.episodeId) || realityTvEpisodesForSeason_(season.SeasonId).slice(-1)[0];
+  if (!episode) throw new Error("Current Reality TV episode not found.");
+  const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvBool_(row.Enabled);
+  }).map(function(row) {
+    return realityTvKey_(row.TemplateId);
+  });
+  const state = realityTvStartQuestionPackBuild_(season, episode, enabledTypes);
+  state.message = state.complete
+    ? "No enabled extra questions require repair."
+    : "Verification and repair build queued. Existing questions and answers will be reused.";
+  return state;
+}
+
 function apiAdminContinueRealityTvQuestionPackBuild(payload) {
   requireAdmin_(payload || {});
   realityTvEnsureSystem_();
@@ -1222,6 +1281,26 @@ function apiAdminContinueRealityTvQuestionPackBuild(payload) {
 
   if (index >= enabledTypes.length) {
     const completedResults = realityTvQuestionBuildResults_(job);
+    const actualMissingIndex = realityTvQuestionPackMissingTemplateIndex_(season, episode, enabledTypes, definitionsById);
+    if (actualMissingIndex !== -1) {
+      const missingTemplateId = realityTvKey_(enabledTypes[actualMissingIndex]);
+      const repairedResults = completedResults.filter(function(item) {
+        return item.templateId !== missingTemplateId;
+      });
+      realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+        CurrentIndex: actualMissingIndex,
+        Stage: "BUILD_LOCAL",
+        Status: "BUILDING",
+        LastTemplateId: missingTemplateId,
+        LastMessage: "Verification found a missing question or answer for " + missingTemplateId + ". Repairing it now.",
+        BuildResultsJSON: JSON.stringify(repairedResults),
+        ErrorMessage: "",
+        UpdatedAt: new Date()
+      });
+      const repairState = realityTvQuestionBuildState_(realityTvGetQuestionBuildJob_(job.BuildId));
+      repairState.message = repairState.lastMessage;
+      return repairState;
+    }
     const resultIds = {};
     completedResults.forEach(function(item) { resultIds[item.templateId] = true; });
     const missingIndex = enabledTypes.findIndex(function(item) { return !resultIds[realityTvKey_(item)]; });

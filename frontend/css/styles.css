@@ -4532,3 +4532,296 @@ button.is-saving {
 [data-platform-bg] {
   background-repeat: no-repeat;
 }
+
+/* Reality TV Survivor finalization, bios, and locked comparison — v1.1.7 */
+.season-anchor-status.finalized {
+  background: rgba(220, 38, 38, 0.18);
+  color: #fecaca;
+}
+
+.season-anchor-profile-image {
+  aspect-ratio: 4 / 5;
+  isolation: isolate;
+}
+
+.season-anchor-profile-image .season-anchor-image-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 0;
+  color: rgba(248, 250, 252, 0.9);
+  background: color-mix(in srgb, var(--reality-team-color, #64748b) 32%, #0f172a);
+  font-size: 2.2rem;
+  font-weight: 950;
+}
+
+.season-anchor-profile-image .season-anchor-current-image {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.season-anchor-profile-image.is-eliminated .season-anchor-current-image,
+.season-anchor-profile.is-eliminated .season-anchor-current-image {
+  filter: grayscale(1) contrast(1.08);
+  opacity: 0.55;
+}
+
+.season-anchor-profile-image .reality-eliminated-overlay {
+  z-index: 3;
+  inset: 44% -6% auto;
+  transform: rotate(-8deg);
+  background: rgba(0, 0, 0, 0.9);
+  border-top: 2px solid rgba(255,255,255,.85);
+  border-bottom: 2px solid rgba(255,255,255,.85);
+}
+
+.season-anchor-profile .season-anchor-picker {
+  margin-top: 12px;
+  padding: 12px;
+}
+
+.season-anchor-finalize-button {
+  border-color: #b91c1c !important;
+  background: #dc2626 !important;
+  color: #fff !important;
+  font-weight: 950;
+}
+
+.season-anchor-finalize-button:hover:not(:disabled) {
+  background: #b91c1c !important;
+}
+
+.season-anchor-finalize-button:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+.season-anchor-locked-note.finalized {
+  margin-top: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: rgba(127, 29, 29, 0.2);
+}
+
+.season-anchor-current-episode {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.season-anchor-current-episode span,
+.season-anchor-current-episode strong {
+  margin: 0;
+}
+
+.season-anchor-cast-bios {
+  margin: 14px 0 0;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.season-anchor-cast-bios > summary {
+  cursor: pointer;
+  padding: 12px 14px;
+  color: #dbeafe;
+  background: rgba(255, 255, 255, 0.04);
+  font-weight: 900;
+}
+
+.season-anchor-bio-browser {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.season-anchor-bio-card {
+  min-width: 0;
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 12px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.52);
+}
+
+.season-anchor-bio-preview {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.season-anchor-bio-thumb,
+.season-anchor-bio-initials {
+  width: 58px;
+  height: 72px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: rgba(255,255,255,.08);
+}
+
+.season-anchor-bio-initials {
+  display: grid;
+  place-items: center;
+  font-weight: 950;
+}
+
+.season-anchor-bio-preview strong,
+.season-anchor-bio-preview small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.season-anchor-bio-preview small {
+  margin-top: 3px;
+  color: rgba(226,232,240,.68);
+}
+
+.season-anchor-bio-card > details {
+  border-top: 1px solid rgba(255,255,255,.08);
+  padding: 8px 10px 10px;
+}
+
+.season-anchor-bio-card > details > summary {
+  cursor: pointer;
+  color: #bfdbfe;
+  font-weight: 800;
+}
+
+.reality-player-summary-card,
+.reality-compact-leaderboard-shell,
+.reality-compact-leaderboard {
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.reality-tv-comparison-card {
+  margin: 0 0 20px;
+  border: 1px solid rgba(96, 165, 250, 0.4);
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(15, 23, 42, 0.96);
+  color: #f8fafc;
+}
+
+.reality-tv-comparison-card > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  background: rgba(30, 41, 59, 0.92);
+}
+
+.reality-tv-comparison-card > summary strong,
+.reality-tv-comparison-card > summary span {
+  display: block;
+}
+
+.reality-tv-comparison-card > p {
+  margin: 0;
+  padding: 12px 16px 0;
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.reality-tv-comparison-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px 16px 16px;
+}
+
+.reality-tv-comparison-grid {
+  width: 100%;
+  min-width: 680px;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.85rem;
+}
+
+.reality-tv-comparison-grid th,
+.reality-tv-comparison-grid td {
+  max-width: 220px;
+  padding: 9px 10px;
+  border-right: 1px solid rgba(148, 163, 184, 0.16);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+  background: rgba(255,255,255,.035);
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.reality-tv-comparison-grid thead th {
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+  color: #dbeafe;
+}
+
+.reality-tv-comparison-grid th:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: #172033;
+}
+
+@media (max-width: 600px) {
+  .season-anchor-feature-grid .season-anchor-summary-grid,
+  .season-anchor-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .season-anchor-current-episode {
+    grid-column: 1 / -1;
+    grid-template-columns: 1fr;
+  }
+
+  .season-anchor-bio-browser {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Reality TV Survivor card containment and preview polish — v1.1.7 */
+.season-anchor-card,
+.season-anchor-feature-grid,
+.season-anchor-profile {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.season-anchor-card {
+  position: relative;
+  overflow: hidden;
+  contain: layout paint;
+}
+
+.season-anchor-profile {
+  overflow: hidden;
+}
+
+.season-anchor-profile-image {
+  z-index: 0;
+  max-width: 260px;
+}
+
+.season-anchor-current-pick {
+  margin-top: 12px;
+}
+
+.season-anchor-picker + .season-anchor-current-pick {
+  margin-top: 12px;
+}

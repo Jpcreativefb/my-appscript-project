@@ -199,6 +199,7 @@ function doGet(e) {
       "adminAddRealityTvCustomQuestionTemplate",
       "adminBuildRealityTvEpisodeQuestions",
       "adminContinueRealityTvQuestionPackBuild",
+      "adminRepairRealityTvQuestionPack",
       "adminSubmitRealityTvQuestionResult",
       "adminApproveRealityTvQuestionResult",
       "adminContinueRealityTvQuestionApproval",
@@ -928,6 +929,10 @@ function doGet(e) {
 
     if (action === "adminContinueRealityTvQuestionPackBuild") {
       return json(apiAdminContinueRealityTvQuestionPackBuild(params));
+    }
+
+    if (action === "adminRepairRealityTvQuestionPack") {
+      return json(apiAdminRepairRealityTvQuestionPack(params));
     }
 
     if (action === "adminSubmitRealityTvQuestionResult") {
@@ -1708,6 +1713,16 @@ function doGet(e) {
       const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
       if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
       return json(apiGetSeasonAnchor({
+        username: params.username,
+        token: params.token,
+        gameId: gameId
+      }));
+    }
+
+    if (action === "getRealityTvEpisodeComparison") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetRealityTvEpisodeComparison({
         username: params.username,
         token: params.token,
         gameId: gameId

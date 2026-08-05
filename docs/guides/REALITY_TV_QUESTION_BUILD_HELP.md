@@ -20,6 +20,19 @@ means three of the four checked question types have already been created or veri
 
 You should not need to keep selecting Resume repeatedly during a healthy build. If the connection is interrupted again, refresh the Reality TV Manager and select Resume once more.
 
+
+## Verify and repair incomplete extra questions
+
+Use **Verify & Repair Extra Questions** when the build counter says complete, built, or verified but a question is missing from the game or has missing answers.
+
+This action checks the actual game category, episode-question row, and every expected answer ID. It reuses valid existing rows and rebuilds only missing local records. It is safer than repeatedly selecting Resume when the saved counter does not match the real game data.
+
+Recommended order:
+
+1. Use **Save Format & Build Current Episode** once.
+2. Use **Resume Build** once only after an interrupted build.
+3. Use **Verify & Repair Extra Questions** when the build reports completion but the playable question or answers are still missing.
+
 ## Local questions versus External Results Hub mappings
 
 The local game questions and answers are now completed first. External Results Hub mappings are optional follow-up work and no longer block the playable question build.

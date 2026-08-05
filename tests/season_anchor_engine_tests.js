@@ -53,7 +53,7 @@ assert(scoring.includes('seasonAnchorBonus'), 'Leaderboard Season Anchor fields 
 ].forEach(text => assert(admin.includes(text), `Admin control missing: ${text}`));
 
 assert(picks.includes('renderSeasonAnchorPickCard_'), 'Picks page Season Survivor card is missing');
-assert(picks.includes('Save Survivor Pick'), 'User save button is missing');
+assert(picks.includes('Finalize Pick'), 'User finalize button is missing');
 assert(picks.includes('Maximum weekly bonus'), 'User bonus guardrail is missing');
 assert(leaderboard.includes('Survivor Adjustment'), 'Leaderboard Survivor adjustment details are missing');
 assert(css.includes('.season-anchor-card'), 'Season Survivor user styling is missing');

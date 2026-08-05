@@ -822,3 +822,17 @@
     flex-direction: column;
   }
 }
+
+/* Reliable optimistic save and automatic Reality TV advance — v1.1.7 */
+.pick-category-card.is-saving {
+  border-color: rgba(245, 158, 11, 0.82);
+}
+
+.pick-category-card.is-saving .pick-card-header::after {
+  content: "Saving…";
+  display: inline-block;
+  margin-top: 7px;
+  color: #fcd34d;
+  font-size: 0.76rem;
+  font-weight: 900;
+}

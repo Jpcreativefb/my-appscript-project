@@ -928,3 +928,9 @@ Community results frontend
 Compare frontend
 Voting/ranking frontend
 ```
+---
+
+## Reality TV gameplay references
+
+- `docs/guides/REALITY_TV_QUESTION_BUILD_HELP.md` — Save, Resume, and Verify & Repair guidance.
+- `docs/guides/REALITY_TV_SURVIVOR_PICK_AND_LOCKED_COMPARISON.md` — Sole Survivor finalization, elimination replacement, bios, and post-lock comparison.

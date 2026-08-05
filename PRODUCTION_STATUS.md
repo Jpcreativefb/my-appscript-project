@@ -1,10 +1,10 @@
-# Current Production Candidate: v1.1.6
+# Current Production Candidate: v1.1.7
 
 # Production Status
 
 ## Current release
 
-Reality TV player flow and pick performance v1.1.6, including the platform image engine v1.1.5 and production hardening v1.1.0.
+Reality TV Survivor finalization and locked comparison v1.1.7, including the v1.1.6 player-flow improvements, platform image engine v1.1.5, and production hardening v1.1.0.
 
 ## Feature readiness
 
@@ -19,6 +19,17 @@ Reality TV player flow and pick performance v1.1.6, including the platform image
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
 | Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
 
+
+
+## Reality TV Survivor and comparison completed in v1.1.7
+
+- The Sole Survivor image and biography preview update immediately when a player chooses a contestant.
+- Finalized active picks cannot be switched; the selector returns only after elimination.
+- Eliminated picks remain visible in grayscale with an ELIMINATED overlay until replacement.
+- Survivor statistics are condensed, and portrait containment prevents leaderboard overlap.
+- The most recently locked episode exposes a group comparison grid for Survivor Picks and weekly answers.
+- Verify & Repair Extra Questions validates the actual game category, episode-question row, and expected answers.
+- Weekly pick saves use cached settings and retain the collapse/advance player flow.
 
 ## Reality TV player flow completed in v1.1.6
 

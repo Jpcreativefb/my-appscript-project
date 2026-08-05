@@ -433,7 +433,11 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         </div>
         ${buildStatus}
         ${completedSummary}
-        <div class="admin-actions"><button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button></div>
+        <div class="admin-actions">
+          <button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button>
+          <button class="admin-small-button secondary" onclick="adminRealityTvRepairQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Verify & Repair Extra Questions</button>
+          ${adminRealityTvHelp_("Verify & Repair", "Use this when a question says built or verified but is missing from the game, has no answers, or the build counter will not finish. It reuses existing rows and repairs only missing questions or answers.")}
+        </div>
         <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
       </details>
 
@@ -530,7 +534,7 @@ function adminRealityTvSeasonAnchorFields_(key, settings) {
     eligiblePointsCap: 20,
     lossPenalty: 5,
     withdrawalBehavior: "penalty",
-    manualSwitchAllowed: true
+    manualSwitchAllowed: false
   };
   const safeKey = adminRealityTvEscape_(key);
   return `
@@ -553,7 +557,7 @@ function adminRealityTvSeasonAnchorFields_(key, settings) {
           <option value="free-reset" ${settings.withdrawalBehavior === "free-reset" ? "selected" : ""}>Free reset, no penalty</option>
         </select>
       </label>
-      <label class="reality-tv-anchor-switch-setting"><input id="realityTvAnchorSwitch_${safeKey}" type="checkbox" ${settings.manualSwitchAllowed ? "checked" : ""}> Allow users to switch before lock (resets multiplier)</label>
+      <div class="reality-tv-anchor-switch-setting"><input id="realityTvAnchorSwitch_${safeKey}" type="checkbox" hidden><b>Finalized pick rule:</b> A Sole Survivor pick cannot be switched. The selector returns only after that contestant is eliminated.</div>
     </div>
     <div id="realityTvAnchorPreview_${safeKey}" class="reality-tv-anchor-preview"></div>
   `;
@@ -2009,6 +2013,27 @@ async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
       (err && err.message ? err.message : String(err)) + " Select Resume Build once.",
       "error"
     );
+  } finally {
+    hideLoader();
+  }
+}
+
+
+async function adminRealityTvRepairQuestionPack(seasonId, episodeId) {
+  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Verifying every enabled extra question and answer…", "info");
+  showLoader();
+  try {
+    let state = await apiAdminRepairRealityTvQuestionPack(seasonId, episodeId || "");
+    if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not start the question repair."));
+    if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
+    if (!state.complete) {
+      throw new Error("Verification paused before completion. Select Resume Build once to continue the saved repair.");
+    }
+    adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, adminRealityTvBuildCompletionMessage_(state), "success");
+    alert(adminRealityTvBuildCompletionMessage_(state));
+    navigate("admin-reality-tv");
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, err.message || String(err), "error");
   } finally {
     hideLoader();
   }

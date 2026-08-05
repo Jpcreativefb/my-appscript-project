@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.1.7 — Reality TV Survivor Finalization and Locked Comparison
+
+- Rebuilt the Sole Survivor card with immediate image/bio preview and a red Finalize Pick action.
+- Locked finalized active Survivor picks until elimination, then restored a filtered active-contestant selector.
+- Added grayscale eliminated presentation, bio browsing, portrait containment, and condensed responsive stats.
+- Added a latest-locked-episode comparison grid for every player’s Survivor Pick and weekly answers.
+- Added actual-row and expected-answer verification through Verify & Repair Extra Questions.
+- Improved pick-save responsiveness with cached category settings, optimistic rendering, and reliable auto-advance.
+- Added v1.1.7 help, smoke testing, and regression coverage.
+
 ## v1.1.6 — Reality TV Player Flow and Pick Performance
 
 - Completed local Reality TV episode-question builds before optional External Results Hub mappings.

@@ -812,3 +812,44 @@ Checkpoint precision:
 
 - `EXACT_BOUNDARY`: safe for automatic checkpoint settlement.
 - `POLL_SNAPSHOT`: first cumulative stat poll observed after the checkpoint. It is stored but requires admin review by default because later plays may already be included.
+
+
+---
+
+## Endpoint: Get Reality TV Episode Comparison
+
+### Request
+
+```txt
+?action=getRealityTvEpisodeComparison&username=USER&token=SESSION_TOKEN&gameId=GAME_ID
+```
+
+### Frontend Function
+
+```js
+apiGetRealityTvEpisodeComparison(gameId)
+```
+
+### Behavior
+
+Returns the latest locked Reality TV episode comparison. Before the episode lock time, `comparison.available` is false. After lock, the response contains question columns and player rows with the finalized Sole Survivor Pick and weekly answers.
+
+---
+
+## Admin Endpoint: Repair Reality TV Question Pack
+
+### Action
+
+```txt
+adminRepairRealityTvQuestionPack
+```
+
+### Frontend Function
+
+```js
+apiAdminRepairRealityTvQuestionPack(seasonId, episodeId)
+```
+
+### Behavior
+
+Starts or resumes a staged verification build. Verification checks the episode-question record, game category, and each expected answer ID. Valid existing rows are reused and only missing local records are repaired.

@@ -649,6 +649,16 @@ async function apiGetSeasonAnchor(gameId) {
   });
 }
 
+async function apiGetRealityTvEpisodeComparison(gameId) {
+  const session = getSession ? getSession() : {};
+  return api("getRealityTvEpisodeComparison", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    leagueId: getApiLeagueId_()
+  });
+}
+
 async function apiSaveSeasonAnchorPick(gameId, entityId) {
   const session = getSession ? getSession() : {};
   return api("saveSeasonAnchorPick", {
@@ -1725,6 +1735,13 @@ async function apiAdminBuildRealityTvEpisodeQuestions(payload) {
 
 async function apiAdminContinueRealityTvQuestionPackBuild(buildId) {
   return apiAdminRealityTvRequest_("adminContinueRealityTvQuestionPackBuild", { buildId: buildId });
+}
+
+async function apiAdminRepairRealityTvQuestionPack(seasonId, episodeId) {
+  return apiAdminRealityTvRequest_("adminRepairRealityTvQuestionPack", {
+    seasonId: seasonId,
+    episodeId: episodeId || ""
+  });
 }
 
 async function apiAdminSubmitRealityTvQuestionResult(payload) {

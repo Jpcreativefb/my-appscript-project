@@ -934,9 +934,9 @@ function savePick(payload){
     ========================= */
 
     const settings =
-      getCategorySettings(
-        gameId
-      );
+      typeof getCategorySettingsCached === "function"
+        ? getCategorySettingsCached(gameId)
+        : getCategorySettings(gameId);
 
     if (!settings[categoryId]) {
 

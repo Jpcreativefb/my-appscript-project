@@ -34,7 +34,6 @@ const API_LONG_TIMEOUT_MS =
 
 const API_LONG_TIMEOUT_ACTIONS =
   new Set([
-    "getStartupPayload",
     "getDashboardGamesHub",
     "getEditableProfile",
     "getUserProfileHistory",
@@ -627,9 +626,32 @@ async function apiSavePick(payload) {
 
 }
 
+async function apiGetRealityTvPlayerStats(gameId) {
+
+  const session = getSession();
+
+  return api("getRealityTvPlayerStats", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: gameId || APP_STATE.gameId || "",
+    leagueId: getApiLeagueId_()
+  });
+
+}
+
 async function apiGetSeasonAnchor(gameId) {
   const session = getSession ? getSession() : {};
   return api("getSeasonAnchor", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiGetRealityTvEpisodeComparison(gameId) {
+  const session = getSession ? getSession() : {};
+  return api("getRealityTvEpisodeComparison", {
     username: session.username || "",
     token: session.token || "",
     gameId: gameId,
@@ -1713,6 +1735,13 @@ async function apiAdminBuildRealityTvEpisodeQuestions(payload) {
 
 async function apiAdminContinueRealityTvQuestionPackBuild(buildId) {
   return apiAdminRealityTvRequest_("adminContinueRealityTvQuestionPackBuild", { buildId: buildId });
+}
+
+async function apiAdminRepairRealityTvQuestionPack(seasonId, episodeId) {
+  return apiAdminRealityTvRequest_("adminRepairRealityTvQuestionPack", {
+    seasonId: seasonId,
+    episodeId: episodeId || ""
+  });
 }
 
 async function apiAdminSubmitRealityTvQuestionResult(payload) {

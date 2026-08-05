@@ -1682,6 +1682,167 @@ function apiGetRealityTvPlayerStats(payload) {
   return { success: true, enabled: true, playerStats: stats };
 }
 
+
+function realityTvEpisodeLockedForComparison_(episode) {
+  if (!episode) return false;
+  if (realityTvKey_(episode.status || episode.Status || "open") !== "open") return true;
+  const value = episode.lockDateTime || episode.LockDateTime || "";
+  if (!value) return false;
+  const lockDate = new Date(value);
+  return !isNaN(lockDate.getTime()) && new Date().getTime() >= lockDate.getTime();
+}
+
+function realityTvLockedEpisodeComparisonPayload_(gameId, username) {
+  const core = realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false });
+  if (!core || core.enabled !== true || !core.season) {
+    return { enabled: false, available: false, message: "Reality TV season was not found." };
+  }
+
+  const lockedEpisodes = (core.episodes || []).filter(realityTvEpisodeLockedForComparison_).sort(function(a, b) {
+    return realityTvNumber_(b.episodeNumber, 0) - realityTvNumber_(a.episodeNumber, 0);
+  });
+  const episode = lockedEpisodes[0] || null;
+  if (!episode) {
+    return {
+      enabled: true,
+      available: false,
+      message: "Group picks become visible after an episode locks."
+    };
+  }
+
+  const cacheKey = "rtv_episode_compare_" + realityTvSlug_(gameId) + "_" + realityTvNumber_(episode.episodeNumber, 0);
+  if (typeof CacheService !== "undefined") {
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (cacheReadError) {
+      Logger.log("Reality TV episode comparison cache read skipped: " + cacheReadError);
+    }
+  }
+
+  const categoryMap = realityTvEpisodeStatsCategoryMap_(
+    { GameId: gameId, SeasonId: core.season.seasonId },
+    core.episodes || [],
+    core.episodeQuestions || []
+  );
+  const categoryIds = categoryMap[realityTvNumber_(episode.episodeNumber, 0)] || [];
+  const categories = typeof getCategoriesCached === "function"
+    ? (getCategoriesCached(gameId) || [])
+    : (typeof getCategories === "function" ? (getCategories(gameId) || []) : []);
+  const categoryById = {};
+  categories.forEach(function(category) {
+    categoryById[realityTvKey_(category.id)] = category;
+  });
+
+  const columns = categoryIds.map(function(categoryId) {
+    const category = categoryById[realityTvKey_(categoryId)] || {};
+    return {
+      id: realityTvKey_(categoryId),
+      label: realityTvString_(category.shortName || category.name || categoryId),
+      fullLabel: realityTvString_(category.name || category.shortName || categoryId)
+    };
+  });
+
+  const allPicks = typeof buildUserPicksMap_ === "function" ? (buildUserPicksMap_(gameId) || {}) : {};
+  const anchorByUser = {};
+  const usernames = {};
+  if (typeof seasonAnchorReadObjects_ === "function" && typeof SEASON_ANCHOR_HISTORY_SHEET !== "undefined") {
+    seasonAnchorReadObjects_(SEASON_ANCHOR_HISTORY_SHEET, true).forEach(function(row) {
+      if (realityTvKey_(row.GameId) !== realityTvKey_(gameId)) return;
+      if (realityTvNumber_(row.EpisodeNumber, 0) !== realityTvNumber_(episode.episodeNumber, 0)) return;
+      const userKey = realityTvKey_(row.Username);
+      if (!userKey) return;
+      usernames[userKey] = realityTvString_(row.Username);
+      anchorByUser[userKey] = realityTvString_(row.EntityName || row.EntityId);
+    });
+  }
+
+  if (typeof seasonAnchorReadObjects_ === "function" && typeof SEASON_ANCHOR_USERS_SHEET !== "undefined") {
+    seasonAnchorReadObjects_(SEASON_ANCHOR_USERS_SHEET, true).forEach(function(row) {
+      if (realityTvKey_(row.GameId) !== realityTvKey_(gameId)) return;
+      const userKey = realityTvKey_(row.Username);
+      if (!userKey) return;
+      usernames[userKey] = realityTvString_(row.Username);
+      if (!anchorByUser[userKey] && realityTvNumber_(episode.episodeNumber, 0) === realityTvNumber_(core.season.currentEpisodeNumber, 0)) {
+        anchorByUser[userKey] = realityTvString_(row.CurrentEntityName || row.CurrentEntityId);
+      }
+    });
+  }
+
+  Object.keys(allPicks).forEach(function(name) {
+    usernames[realityTvKey_(name)] = realityTvString_(name);
+  });
+
+  const rows = Object.keys(usernames).map(function(userKey) {
+    const actualUsername = usernames[userKey];
+    const picks = allPicks[actualUsername] || allPicks[userKey] || {};
+    const answers = {};
+    let hasEpisodePick = false;
+    columns.forEach(function(column) {
+      const pick = picks[column.id] || picks[realityTvKey_(column.id)] || null;
+      const nomineeId = realityTvKey_(pick && pick.nomineeId);
+      const category = categoryById[column.id] || {};
+      const nominee = (category.nominees || []).find(function(item) {
+        return realityTvKey_(item.id) === nomineeId;
+      });
+      answers[column.id] = nominee ? realityTvString_(nominee.name || nominee.shortAnswer) : "";
+      if (nomineeId) hasEpisodePick = true;
+    });
+    return {
+      username: actualUsername,
+      displayName: actualUsername,
+      survivorPick: anchorByUser[userKey] || "",
+      answers: answers,
+      hasActivity: hasEpisodePick || !!anchorByUser[userKey]
+    };
+  }).filter(function(row) {
+    return row.hasActivity;
+  }).sort(function(a, b) {
+    return realityTvString_(a.displayName).localeCompare(realityTvString_(b.displayName));
+  });
+
+  const payload = {
+    enabled: true,
+    available: true,
+    episode: {
+      episodeId: realityTvString_(episode.episodeId),
+      episodeNumber: realityTvNumber_(episode.episodeNumber, 0),
+      episodeName: realityTvString_(episode.episodeName || (core.season.periodLabel + " " + episode.episodeNumber)),
+      lockDateTime: episode.lockDateTime || ""
+    },
+    columns: columns,
+    rows: rows,
+    playerCount: rows.length,
+    message: rows.length
+      ? "Locked episode picks are visible to the group."
+      : "No group picks were submitted for this locked episode."
+  };
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const serialized = JSON.stringify(payload);
+      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 60);
+    } catch (cacheWriteError) {
+      Logger.log("Reality TV episode comparison cache write skipped: " + cacheWriteError);
+    }
+  }
+  return payload;
+}
+
+function apiGetRealityTvEpisodeComparison(payload) {
+  payload = payload || {};
+  const username = realityTvString_(payload.username);
+  const token = realityTvString_(payload.token);
+  const gameId = realityTvString_(payload.gameId);
+  if (!username || !gameId) throw new Error("Username and Game ID are required.");
+  if (!token) throw new Error("Session expired. Please log in again.");
+  if (typeof validateUserSession_ === "function") validateUserSession_(username, token);
+  return {
+    success: true,
+    comparison: realityTvLockedEpisodeComparisonPayload_(gameId, username)
+  };
+}
+
 function setupRealityTvSeasonManager() {
   realityTvEnsureSystem_();
   if (typeof realityTvEnsureQuestionPackSystem_ === "function") realityTvEnsureQuestionPackSystem_();

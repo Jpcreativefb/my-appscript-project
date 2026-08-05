@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v306-reality-tv-player-flow";
+const AWARDS_CACHE = "awards-app-v307-reality-tv-survivor-comparison";
 
 const APP_SHELL = [
   "./",

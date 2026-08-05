@@ -118,8 +118,14 @@ const dash1 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 
 const ep1 = dash1.episodes[0];
 const a = dash1.contestants.find(c => c.Name === 'A');
 const b = dash1.contestants.find(c => c.Name === 'B');
+const cBeforeElimination = dash1.contestants.find(c => c.Name === 'C');
 
 assert.strictEqual(context.apiSaveSeasonAnchorPick({ username: 'alice', token: 'token', gameId, entityId: a.ContestantId }).success, true);
+assert.throws(
+  () => context.apiSaveSeasonAnchorPick({ username: 'alice', token: 'token', gameId, entityId: cBeforeElimination.ContestantId }),
+  /finalized/i,
+  'A finalized Sole Survivor pick must not be switchable before elimination.'
+);
 assert.strictEqual(context.apiSaveSeasonAnchorPick({ username: 'bob', token: 'token', gameId, entityId: b.ContestantId }).success, true);
 userPicks.alice = { [ep1.CategoryId]: { nomineeId: b.ContestantId, changeCount: 0 } };
 userPicks.bob = { [ep1.CategoryId]: { nomineeId: b.ContestantId, changeCount: 0 } };

@@ -8,6 +8,7 @@
 ## Reality TV
 
 - [Reality TV Question Build Help](REALITY_TV_QUESTION_BUILD_HELP.md)
+- [Reality TV Sole Survivor Pick and Locked Comparison](REALITY_TV_SURVIVOR_PICK_AND_LOCKED_COMPARISON.md)
 
 ## Betting and odds
 
