@@ -10,7 +10,7 @@ const sw = fs.readFileSync(path.join(projectRoot, 'frontend/sw.js'), 'utf8');
 const html = fs.readFileSync(path.join(projectRoot, 'frontend/app.html'), 'utf8');
 
 assert(fs.existsSync(path.join(projectRoot, 'frontend/js/pages/adminGames.js')), 'adminGames.js must exist');
-assert(app.includes('303-admin-page-module-loader-fix'));
+assert(app.includes('304-player-picks-fast-startup'));
 assert(app.includes('APP_MAIN_SCRIPT_URL'));
 assert(app.includes('APP_PAGE_SCRIPT_BASE_URL'));
 assert(app.includes('retryToken'));
@@ -20,6 +20,6 @@ assert(pwa.includes('isLocalDevelopment'));
 assert(pwa.includes('registration.unregister()'));
 assert(pwa.includes('window.caches.delete'));
 assert(sw.includes('"./js/pages/adminGames.js"'));
-assert(html.includes('303-admin-page-module-loader-fix'));
+assert(html.includes('304-player-picks-fast-startup'));
 
 console.log('Admin Games lazy loader tests passed.');

@@ -36,3 +36,12 @@
 - Disabled and cleared stale Awards App service workers/caches on localhost.
 - Added cache-busting retry and exact module-path diagnostics.
 - Updated Reality TV staged question-pack regression tests.
+## v1.1.4 — Reality TV Player Fast Startup
+
+- Removed Reality TV leaderboard and Season Survivor calculations from the blocking Picks startup request.
+- Rebuilt the player Reality TV view as a read-only, single-pass cached payload.
+- Added deferred player-statistics and Season Survivor hydration after questions render.
+- Prevented optional background updates from rerendering or erasing unsaved question selections.
+- Reduced the core startup request timeout from 120 seconds to 45 seconds.
+- Added player startup regression coverage.
+

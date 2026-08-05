@@ -82,14 +82,17 @@ function apiGetStartupPayload(payload) {
     picks:
       picks,
 
-    seasonAnchor:
-      typeof seasonAnchorUserPayload_ === "function"
-        ? seasonAnchorUserPayload_(username, gameId)
-        : { enabled: false },
+    // Optional Reality TV enhancements are deliberately deferred so the
+    // core Picks page can render before leaderboard, Survivor history, and
+    // other cross-sheet calculations finish.
+    seasonAnchor: {
+      enabled: false,
+      deferred: typeof seasonAnchorUserPayload_ === "function"
+    },
 
     realityTvView:
       typeof realityTvUserGameViewPayload_ === "function"
-        ? realityTvUserGameViewPayload_(gameId, username)
+        ? realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false })
         : { enabled: false }
   };
 

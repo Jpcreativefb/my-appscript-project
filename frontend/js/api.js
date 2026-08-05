@@ -34,7 +34,6 @@ const API_LONG_TIMEOUT_MS =
 
 const API_LONG_TIMEOUT_ACTIONS =
   new Set([
-    "getStartupPayload",
     "getDashboardGamesHub",
     "getEditableProfile",
     "getUserProfileHistory",
@@ -623,6 +622,19 @@ async function apiSavePick(payload) {
 
     stakePoints:
       payload.stakePoints
+  });
+
+}
+
+async function apiGetRealityTvPlayerStats(gameId) {
+
+  const session = getSession();
+
+  return api("getRealityTvPlayerStats", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: gameId || APP_STATE.gameId || "",
+    leagueId: getApiLeagueId_()
   });
 
 }

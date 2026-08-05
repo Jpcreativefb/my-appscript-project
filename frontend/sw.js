@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v303-admin-page-module-loader-fix";
+const AWARDS_CACHE = "awards-app-v304-player-picks-fast-startup";
 
 const APP_SHELL = [
   "./",

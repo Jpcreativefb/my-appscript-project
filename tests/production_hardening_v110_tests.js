@@ -32,7 +32,7 @@ assert(backendApi.includes('adminGetRealityTvDashboardSummary'), 'Reality TV sum
 assert(backendApi.includes('adminGetRealityTvSeasonDetails'), 'Reality TV detail route missing');
 assert(reality.includes('function apiAdminGetRealityTvDashboardSummary'), 'Lightweight Reality TV dashboard missing');
 assert(reality.includes('function apiAdminGetRealityTvSeasonDetails'), 'Lazy Reality TV details missing');
-assert(reality.includes('rtv_user_view_'), 'Reality TV user payload cache missing');
+assert(reality.includes('rtv_user_core_'), 'Reality TV user core payload cache missing');
 assert(picksRepo.includes('function findPickRecord_'), 'Indexed exact pick lookup missing');
 assert(picksRepo.includes('pick_row_'), 'Pick row cache missing');
 assert(picks.includes('PicksRepo.findPick'), 'Pick save does not use exact lookup');

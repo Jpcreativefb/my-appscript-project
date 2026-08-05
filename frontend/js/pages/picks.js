@@ -21,6 +21,9 @@ let PICKS_PAGE_DATA = {
 };
 
 let PICKS_COUNTDOWN_TIMER = null;
+let PICKS_ENHANCEMENTS_REQUEST = null;
+const PICKS_ENHANCEMENTS_CACHE = {};
+
 
 function isHybridPicksGame_() {
 
@@ -352,6 +355,16 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   PICKS_PAGE_DATA.realityTvView =
     payload.realityTvView || null;
 
+  const enhancementKey = picksEnhancementKey_();
+  const cachedEnhancements = PICKS_ENHANCEMENTS_CACHE[enhancementKey] || null;
+  if (cachedEnhancements) {
+    if (cachedEnhancements.seasonAnchor) PICKS_PAGE_DATA.seasonAnchor = cachedEnhancements.seasonAnchor;
+    if (cachedEnhancements.playerStats && PICKS_PAGE_DATA.realityTvView) {
+      PICKS_PAGE_DATA.realityTvView.playerStats = cachedEnhancements.playerStats;
+      PICKS_PAGE_DATA.realityTvView.playerStatsDeferred = false;
+    }
+  }
+
   setTimeout(
     mountPicksPage,
     0
@@ -381,9 +394,9 @@ PICKS_PAGE_DATA.confidenceScoringMode =
 
       </div>
 
-      ${renderRealityTvPlayerSummary_()}
+      <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
 
-      ${renderSeasonAnchorPickCard_()}
+      <div id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
 
       <div id="picksPageMessage" class="picks-message hidden"></div>
 
@@ -1012,7 +1025,7 @@ function realityTvEpisodeHeaderStats_(episode, itemCount, pickedCount) {
   const eliminatedText = eliminated.length
     ? `Eliminated: ${eliminated.map(function(item) { return item.name; }).join(", ")}`
     : (String(episode.status || "").toUpperCase() === "FINAL" ? "No elimination recorded" : "Result pending");
-  return `<div class="reality-episode-header-stats">
+  return `<div class="reality-episode-header-stats" data-reality-episode-stats="${Number(episode.episodeNumber || 0)}">
     <div><span>Week points</span><strong>${realityTvFormatPoints_(stats.points || 0)}</strong></div>
     <div><span>Place</span><strong>${Number(stats.place || 0) ? "#" + Number(stats.place) : "—"}</strong></div>
     <div><span>Position</span><strong>${realityTvMovementHtml_(stats.positionChange)}</strong></div>
@@ -2101,6 +2114,99 @@ function togglePickCategory(categoryId) {
    MOUNT / COUNTDOWN
 ========================= */
 
+function picksEnhancementKey_() {
+  const session = PICKS_PAGE_DATA.session || {};
+  return String(PICKS_PAGE_DATA.gameId || "") + "::" + String(session.username || "");
+}
+
+function refreshPicksEnhancementUi_() {
+  const summaryMount = document.getElementById("realityTvPlayerSummaryMount");
+  if (summaryMount) summaryMount.innerHTML = renderRealityTvPlayerSummary_();
+
+  const anchorMount = document.getElementById("seasonAnchorPickMount");
+  if (anchorMount) anchorMount.innerHTML = renderSeasonAnchorPickCard_();
+
+  const categoryMap = realityTvEpisodeCategoryMap_();
+  (PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.episodes || []).forEach(function(episode) {
+    const episodeNumber = Number(episode.episodeNumber || 0);
+    const items = (PICKS_PAGE_DATA.categories || []).filter(function(category) {
+      return Number(categoryMap[normalizeId(category.id)] || 0) === episodeNumber;
+    });
+    const picked = items.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
+    const current = document.querySelector('[data-reality-episode-stats="' + episodeNumber + '"]');
+    if (!current) return;
+    const holder = document.createElement("div");
+    holder.innerHTML = realityTvEpisodeHeaderStats_(episode, items.length, picked);
+    const replacement = holder.firstElementChild;
+    if (replacement) current.replaceWith(replacement);
+  });
+  updateCountdowns();
+}
+
+async function hydratePicksEnhancements_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true) return;
+
+  const key = picksEnhancementKey_();
+  if (PICKS_ENHANCEMENTS_REQUEST && PICKS_ENHANCEMENTS_REQUEST.key === key) {
+    return PICKS_ENHANCEMENTS_REQUEST.promise;
+  }
+
+  const promise = (async function() {
+    const cached = PICKS_ENHANCEMENTS_CACHE[key] || {};
+    const tasks = [];
+
+    if (!cached.playerStats && (!view.playerStats || view.playerStatsDeferred === true)) {
+      tasks.push(
+        apiGetRealityTvPlayerStats(PICKS_PAGE_DATA.gameId)
+          .then(function(response) {
+            if (response && response.success !== false && response.playerStats) {
+              cached.playerStats = response.playerStats;
+              if (PICKS_PAGE_DATA.realityTvView) {
+                PICKS_PAGE_DATA.realityTvView.playerStats = response.playerStats;
+                PICKS_PAGE_DATA.realityTvView.playerStatsDeferred = false;
+              }
+              refreshPicksEnhancementUi_();
+            }
+          })
+          .catch(function(error) {
+            console.warn("Reality TV player statistics loaded later or were skipped:", error);
+          })
+      );
+    }
+
+    if (!cached.seasonAnchor && (!PICKS_PAGE_DATA.seasonAnchor || PICKS_PAGE_DATA.seasonAnchor.deferred === true)) {
+      tasks.push(
+        apiGetSeasonAnchor(PICKS_PAGE_DATA.gameId)
+          .then(function(response) {
+            if (response && response.success !== false && response.seasonAnchor) {
+              cached.seasonAnchor = response.seasonAnchor;
+              PICKS_PAGE_DATA.seasonAnchor = response.seasonAnchor;
+              refreshPicksEnhancementUi_();
+            }
+          })
+          .catch(function(error) {
+            console.warn("Season Survivor details loaded later or were skipped:", error);
+          })
+      );
+    }
+
+    PICKS_ENHANCEMENTS_CACHE[key] = cached;
+    if (tasks.length) await Promise.all(tasks);
+    PICKS_ENHANCEMENTS_CACHE[key] = cached;
+    refreshPicksEnhancementUi_();
+  })();
+
+  PICKS_ENHANCEMENTS_REQUEST = { key: key, promise: promise };
+  try {
+    await promise;
+  } finally {
+    if (PICKS_ENHANCEMENTS_REQUEST && PICKS_ENHANCEMENTS_REQUEST.key === key) {
+      PICKS_ENHANCEMENTS_REQUEST = null;
+    }
+  }
+}
+
 function mountPicksPage() {
 
   if (PICKS_COUNTDOWN_TIMER) {
@@ -2118,6 +2224,10 @@ function mountPicksPage() {
       updateCountdowns,
       1000
     );
+
+  // Optional Reality TV statistics and Season Survivor details load after
+  // the core questions and saved picks are already usable.
+  hydratePicksEnhancements_();
 
 }
 

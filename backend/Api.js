@@ -1694,6 +1694,16 @@ function doGet(e) {
 
     }
 
+    if (action === "getRealityTvPlayerStats") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetRealityTvPlayerStats({
+        username: params.username,
+        token: params.token,
+        gameId: gameId
+      }));
+    }
+
     if (action === "getSeasonAnchor") {
       const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
       if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });

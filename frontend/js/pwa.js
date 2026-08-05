@@ -35,7 +35,7 @@
 
   window.addEventListener("load", function () {
     navigator.serviceWorker
-      .register("./sw.js?v=303-admin-page-module-loader-fix")
+      .register("./sw.js?v=304-player-picks-fast-startup")
       .then(function () {
         console.log("Awards App PWA ready");
       })
