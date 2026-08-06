@@ -373,7 +373,7 @@ function logout() {
 ====================== */
 
 const APP_ASSET_VERSION = "309-reality-tv-extra-question-readiness";
-const APP_ROUTE_HOTFIX_VERSION = "v1115-reality-tv-approval-episode-plan";
+const APP_ROUTE_HOTFIX_VERSION = "v1116-reality-tv-approval-progress";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

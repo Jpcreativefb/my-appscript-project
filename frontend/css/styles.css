@@ -5404,3 +5404,108 @@ button.is-saving {
     grid-template-columns: 1fr;
   }
 }
+
+/* Reality TV staged approval progress (v1.1.16). */
+.reality-tv-approval-progress {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 12px;
+  border: 1px solid rgba(212, 175, 55, 0.32);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+.reality-tv-approval-progress-head,
+.reality-tv-approval-progress-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reality-tv-approval-progress-head span {
+  color: #f7df86;
+  font-weight: 900;
+}
+
+.reality-tv-approval-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.24);
+}
+
+.reality-tv-approval-progress-track > span {
+  display: block;
+  min-width: 3px;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #9f7418, #d4af37, #f7df86);
+  transition: width 0.45s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.reality-tv-approval-progress-track > span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.42), transparent);
+  transform: translateX(-100%);
+  animation: realityTvApprovalShimmer 1.4s linear infinite;
+}
+
+.reality-tv-approval-progress-detail {
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.reality-tv-approval-progress-time {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.reality-tv-approval-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(105px, 1fr));
+  gap: 6px;
+}
+
+.reality-tv-approval-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.reality-tv-approval-step i {
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  border-radius: 50%;
+  background: #475569;
+}
+
+.reality-tv-approval-step.current { color: #f7df86; }
+.reality-tv-approval-step.current i {
+  background: #d4af37;
+  box-shadow: 0 0 0 4px rgba(212, 175, 55, 0.15);
+}
+.reality-tv-approval-step.complete { color: #86efac; }
+.reality-tv-approval-step.complete i { background: #22c55e; }
+.reality-tv-approval-progress.is-stalled { border-color: rgba(239, 68, 68, 0.6); }
+.reality-tv-approval-stalled { margin: 2px 0 0; }
+
+@keyframes realityTvApprovalShimmer {
+  to { transform: translateX(100%); }
+}
+
+@media (max-width: 640px) {
+  .reality-tv-approval-progress-head,
+  .reality-tv-approval-progress-time { align-items: flex-start; flex-direction: column; gap: 4px; }
+}

@@ -1,3 +1,14 @@
+## v1.1.16 — Reality TV staged approval progress
+
+- Replaced the single frozen `QUEUED` label with a live five-stage episode approval progress bar.
+- Split next-episode Extra Question creation into its own resumable `BUILD_QUESTIONS` approval stage.
+- Advanced one Extra Question per browser checkpoint so the UI can show real `N of N` progress instead of waiting on one long Apps Script request.
+- Added elapsed time, approximate remaining time, a working animation, and a clear stalled warning after no saved heartbeat for 150 seconds.
+- Added progress bars to supplemental question approvals as well as the main elimination approval.
+- Skipped unconfigured External Results Hub work immediately and kept configured Hub work best-effort after local episode readiness.
+- Increased the approval continuation guard to support large Extra Question packs without stopping early.
+- Added v1.1.16 runtime, progress, cache, and compatibility regression coverage.
+
 ## v1.1.15 — Reality TV approval recovery and episode question plans
 
 - Added a stage-aware **Reset Stuck Approval** action that resumes from settlement, next-episode creation, or final sync without intentionally repeating completed work.

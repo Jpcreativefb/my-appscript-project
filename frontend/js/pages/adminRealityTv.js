@@ -1,11 +1,12 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Production v1.1.14
+   Production v1.1.16
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
 let ADMIN_REALITY_TV_ROSTER_ROW = 0;
 let ADMIN_REALITY_TV_BULK_PREVIEW = {};
+let ADMIN_REALITY_TV_APPROVAL_TIMERS = {};
 /* Backward-compatible UI labels retained for deployment tests and search:
    Contestant Roster · Mass Enter Contestants · Mass add contestants
 */
@@ -65,6 +66,198 @@ function adminRealityTvPendingQueue_(bundle, episode) {
     return String(item.EpisodeId || "") === String(episode.EpisodeId || "") &&
       ["PENDING", "APPROVING"].indexOf(status) !== -1;
   }) || null;
+}
+
+function adminRealityTvFormatDuration_(seconds) {
+  const value = Math.max(0, Math.round(Number(seconds || 0)));
+  if (value < 60) return value + " sec";
+  const minutes = Math.floor(value / 60);
+  const remainder = value % 60;
+  return minutes + " min" + (remainder ? " " + remainder + " sec" : "");
+}
+
+function adminRealityTvApprovalStepDefinitions_(kind) {
+  if (kind === "question") {
+    return [
+      { id: "SETTLE", label: "Settle question" },
+      { id: "SYNC_HUB", label: "Finalize" },
+      { id: "COMPLETE", label: "Ready" }
+    ];
+  }
+  return [
+    { id: "SETTLE", label: "Settle result" },
+    { id: "BUILD_NEXT", label: "Create next episode" },
+    { id: "BUILD_QUESTIONS", label: "Build Extra Questions" },
+    { id: "FINALIZE", label: "Finalize" },
+    { id: "COMPLETE", label: "Ready" }
+  ];
+}
+
+function adminRealityTvApprovalProgressData_(source, kind) {
+  source = source || {};
+  const reviewStatus = String(source.reviewStatus || source.ReviewStatus || "PENDING").toUpperCase();
+  let stage = String(source.stage || source.ApprovalStage || (reviewStatus === "APPROVED" ? "COMPLETE" : "SETTLE")).toUpperCase();
+  if (stage === "SYNC_HUB" && kind !== "question") stage = "FINALIZE";
+  const pushStatus = String(source.pushStatus || source.PushStatus || "").toUpperCase();
+  const explicitPercent = Number(source.progressPercent !== undefined ? source.progressPercent : source.ApprovalProgressPercent);
+  const explicitElapsed = Number(source.elapsedSeconds !== undefined ? source.elapsedSeconds : source.ApprovalElapsedSeconds);
+  const explicitEta = Number(source.estimatedRemainingSeconds !== undefined ? source.estimatedRemainingSeconds : source.ApprovalEstimatedRemainingSeconds);
+  const startedMs = new Date(source.ApprovalStartedAt || source.ReviewedAt || source.UpdatedAt || 0).getTime();
+  const stageStartedMs = new Date(source.ApprovalStageStartedAt || source.ApprovalStartedAt || source.UpdatedAt || 0).getTime();
+  const heartbeatMs = new Date(source.ApprovalHeartbeatAt || source.UpdatedAt || source.ApprovalStartedAt || 0).getTime();
+  const derivedElapsed = startedMs > 0 ? Math.max(0, Math.floor((Date.now() - startedMs) / 1000)) : 0;
+  const stageElapsed = stageStartedMs > 0 ? Math.max(0, Math.floor((Date.now() - stageStartedMs) / 1000)) : 0;
+  const heartbeatAge = heartbeatMs > 0 ? Math.max(0, Math.floor((Date.now() - heartbeatMs) / 1000)) : 0;
+  let percent = Number.isFinite(explicitPercent) ? explicitPercent : 0;
+  let label = String(source.progressLabel || source.ApprovalProgressLabel || "");
+  let detail = String(source.progressDetail || source.ApprovalProgressDetail || "");
+  let eta = Number.isFinite(explicitEta) ? explicitEta : 0;
+
+  if (!Number.isFinite(explicitPercent)) {
+    if (reviewStatus === "PENDING") {
+      percent = 0; label = "Ready to start approval"; detail = "Select Approve to begin the staged process."; eta = kind === "question" ? 30 : 75;
+    } else if (kind === "question") {
+      if (stage === "SETTLE") { percent = pushStatus === "SETTLING QUESTION" ? 32 : 12; label = "Settling question result"; detail = "Writing the result and scoring this question."; eta = 28; }
+      else if (stage === "SYNC_HUB") { percent = 82; label = "Finalizing question approval"; detail = "Saving the final approval record."; eta = 10; }
+      else { percent = 100; label = "Question approval complete"; detail = "This result is ready."; eta = 0; }
+    } else {
+      if (stage === "SETTLE") { percent = pushStatus === "SETTLING EPISODE" ? 18 : 7; label = "Settling episode result"; detail = "Scoring picks and updating the active roster."; eta = 70; }
+      else if (stage === "BUILD_NEXT") { percent = 45; label = "Creating the next episode"; detail = "Creating the episode and main elimination question."; eta = 45; }
+      else if (stage === "BUILD_QUESTIONS") {
+        const done = Number(source.ApprovalQuestionDone || 0);
+        const total = Number(source.ApprovalQuestionTotal || 0);
+        percent = total ? 57 + Math.round((Math.min(done, total) / total) * 31) : 60;
+        label = total ? "Building Extra Questions " + done + " of " + total : "Building Extra Questions";
+        detail = "Building and verifying the next episode's enabled questions.";
+        eta = Math.max(15, (Math.max(0, total - done) * 9) + 15);
+      } else if (stage === "FINALIZE") { percent = 92; label = "Finalizing approval"; detail = "Saving the final approval record."; eta = 15; }
+      else { percent = 100; label = "Approval complete"; detail = "The next episode is ready."; eta = 0; }
+    }
+  }
+
+  return {
+    queueId: String(source.queueId || source.QueueId || ""),
+    reviewStatus: reviewStatus,
+    stage: stage,
+    pushStatus: pushStatus,
+    percent: Math.max(0, Math.min(100, Math.round(percent))),
+    label: label,
+    detail: detail,
+    elapsedSeconds: Number.isFinite(explicitElapsed) ? Math.max(0, explicitElapsed) : derivedElapsed,
+    estimatedRemainingSeconds: Math.max(0, eta - Math.min(eta, stageElapsed)),
+    stalled: source.stalled === true || String(source.ApprovalStalled || "").toLowerCase() === "true" || (reviewStatus === "APPROVING" && heartbeatAge >= (kind === "question" ? 120 : 150)),
+    kind: kind || "episode"
+  };
+}
+
+function adminRealityTvApprovalProgressHtml_(source, kind) {
+  const progress = adminRealityTvApprovalProgressData_(source, kind);
+  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind);
+  const currentIndex = Math.max(0, steps.findIndex(function(step) { return step.id === progress.stage; }));
+  const stepHtml = steps.map(function(step, index) {
+    const status = progress.percent >= 100 || index < currentIndex ? "complete" : (index === currentIndex ? "current" : "pending");
+    return `<span class="reality-tv-approval-step ${status}" data-approval-step="${adminRealityTvEscape_(step.id)}"><i></i>${adminRealityTvEscape_(step.label)}</span>`;
+  }).join("");
+  const etaText = progress.percent >= 100
+    ? "Complete"
+    : (progress.estimatedRemainingSeconds > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(progress.estimatedRemainingSeconds) : "Estimating remaining time…");
+  return `
+    <div id="realityTvApprovalProgress_${adminRealityTvEscape_(progress.queueId)}" class="reality-tv-approval-progress${progress.stalled ? " is-stalled" : ""}" data-approval-kind="${adminRealityTvEscape_(progress.kind)}">
+      <div class="reality-tv-approval-progress-head">
+        <strong data-role="approval-label">${adminRealityTvEscape_(progress.label)}</strong>
+        <span data-role="approval-percent">${adminRealityTvEscape_(progress.percent)}%</span>
+      </div>
+      <div class="reality-tv-approval-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${adminRealityTvEscape_(progress.percent)}">
+        <span data-role="approval-fill" style="width:${adminRealityTvEscape_(progress.percent)}%"></span>
+      </div>
+      <div class="reality-tv-approval-progress-detail" data-role="approval-detail">${adminRealityTvEscape_(progress.detail)}</div>
+      <div class="reality-tv-approval-progress-time">
+        <span data-role="approval-elapsed">Elapsed: ${adminRealityTvFormatDuration_(progress.elapsedSeconds)}</span>
+        <span data-role="approval-eta">${adminRealityTvEscape_(etaText)}</span>
+      </div>
+      <div class="reality-tv-approval-steps" data-role="approval-steps">${stepHtml}</div>
+      <div class="admin-message warning reality-tv-approval-stalled" data-role="approval-stalled"${progress.stalled ? "" : " hidden"}>
+        No new checkpoint has been saved for more than two minutes. This approval may be stalled; use Reset Stuck Approval, then Resume Approval.
+      </div>
+    </div>
+  `;
+}
+
+function adminRealityTvStopApprovalTicker_(queueId) {
+  const key = String(queueId || "");
+  if (ADMIN_REALITY_TV_APPROVAL_TIMERS[key]) {
+    clearInterval(ADMIN_REALITY_TV_APPROVAL_TIMERS[key]);
+    delete ADMIN_REALITY_TV_APPROVAL_TIMERS[key];
+  }
+}
+
+function adminRealityTvUpdateApprovalProgress_(queueId, source, kind, options) {
+  const container = document.getElementById("realityTvApprovalProgress_" + queueId);
+  if (!container) return;
+  const progress = adminRealityTvApprovalProgressData_(source, kind || container.dataset.approvalKind || "episode");
+  options = options || {};
+  const percent = options.percent === undefined ? progress.percent : options.percent;
+  const label = options.label || progress.label;
+  const detail = options.detail || progress.detail;
+  const elapsed = options.elapsedSeconds === undefined ? progress.elapsedSeconds : options.elapsedSeconds;
+  const eta = options.estimatedRemainingSeconds === undefined ? progress.estimatedRemainingSeconds : options.estimatedRemainingSeconds;
+  const fill = container.querySelector('[data-role="approval-fill"]');
+  const track = container.querySelector('.reality-tv-approval-progress-track');
+  if (fill) fill.style.width = Math.max(0, Math.min(100, percent)) + "%";
+  if (track) track.setAttribute("aria-valuenow", String(Math.round(percent)));
+  const labelEl = container.querySelector('[data-role="approval-label"]');
+  const percentEl = container.querySelector('[data-role="approval-percent"]');
+  const detailEl = container.querySelector('[data-role="approval-detail"]');
+  const elapsedEl = container.querySelector('[data-role="approval-elapsed"]');
+  const etaEl = container.querySelector('[data-role="approval-eta"]');
+  if (labelEl) labelEl.textContent = label;
+  if (percentEl) percentEl.textContent = Math.round(percent) + "%";
+  if (detailEl) detailEl.textContent = detail;
+  if (elapsedEl) elapsedEl.textContent = "Elapsed: " + adminRealityTvFormatDuration_(elapsed);
+  if (etaEl) etaEl.textContent = percent >= 100 ? "Complete" : (eta > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(eta) : "Taking longer than estimated — still working");
+
+  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind);
+  let currentIndex = steps.findIndex(function(step) { return step.id === progress.stage; });
+  if (currentIndex < 0) currentIndex = 0;
+  container.querySelectorAll('[data-approval-step]').forEach(function(stepEl, index) {
+    stepEl.classList.remove("complete", "current", "pending");
+    stepEl.classList.add(percent >= 100 || index < currentIndex ? "complete" : (index === currentIndex ? "current" : "pending"));
+  });
+  const stalledEl = container.querySelector('[data-role="approval-stalled"]');
+  const stalled = options.stalled === true || progress.stalled;
+  container.classList.toggle("is-stalled", stalled);
+  if (stalledEl) stalledEl.hidden = !stalled;
+}
+
+function adminRealityTvStartApprovalTicker_(queueId, state, kind) {
+  adminRealityTvStopApprovalTicker_(queueId);
+  const progress = adminRealityTvApprovalProgressData_(state, kind);
+  adminRealityTvUpdateApprovalProgress_(queueId, state, kind);
+  if (progress.percent >= 100) return;
+  const startedAt = Date.now();
+  const baseElapsed = progress.elapsedSeconds;
+  const basePercent = progress.percent;
+  const caps = progress.kind === "question"
+    ? { SETTLE: 76, SYNC_HUB: 98, COMPLETE: 100 }
+    : { SETTLE: 39, BUILD_NEXT: 54, BUILD_QUESTIONS: 88, FINALIZE: 98, COMPLETE: 100 };
+  const cap = caps[progress.stage] || Math.min(98, basePercent + 10);
+  const expected = Math.max(8, progress.estimatedRemainingSeconds || 20);
+  ADMIN_REALITY_TV_APPROVAL_TIMERS[String(queueId)] = setInterval(function() {
+    const stageElapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const totalElapsed = baseElapsed + stageElapsed;
+    const fraction = Math.min(0.94, stageElapsed / expected);
+    const animatedPercent = Math.max(basePercent, basePercent + ((cap - basePercent) * fraction));
+    const remaining = Math.max(0, Math.round(progress.estimatedRemainingSeconds - stageElapsed));
+    const takingLong = stageElapsed > Math.max(30, progress.estimatedRemainingSeconds + 15);
+    const stalled = stageElapsed >= 150;
+    adminRealityTvUpdateApprovalProgress_(queueId, state, kind, {
+      percent: animatedPercent,
+      elapsedSeconds: totalElapsed,
+      estimatedRemainingSeconds: takingLong ? 0 : remaining,
+      detail: takingLong ? progress.detail + " This stage is taking longer than usual, but the request is still active." : progress.detail,
+      stalled: stalled
+    });
+  }, 1000);
 }
 
 
@@ -388,10 +581,10 @@ function adminRealityTvQuestionCard_(bundle, question) {
         <div class="reality-tv-result-summary">
           <span><b>Result type:</b> ${adminRealityTvEscape_(resultTypeLabel)}</span>
           <span><b>Selected result:</b> ${adminRealityTvEscape_(pending.SelectedOutcomeLabel || "Push / no official result")}</span>
-          ${pending.PushStatus ? `<span><b>Progress:</b> ${adminRealityTvEscape_(pending.PushStatus)}</span>` : ""}
           ${pending.ErrorMessage ? `<span class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(pending.ErrorMessage)}</span>` : ""}
           ${pending.EvidenceUrl ? `<span><b>Evidence:</b> <a href="${adminRealityTvEscape_(pending.EvidenceUrl)}" target="_blank" rel="noopener">Open source</a></span>` : ""}
         </div>
+        ${adminRealityTvApprovalProgressHtml_(pending, "question")}
         <div class="admin-actions">
           <button class="admin-small-button" onclick="adminRealityTvApproveQuestionResult('${adminRealityTvEscape_(pending.QueueId)}')">${approving ? "Resume Approval" : "Approve Question Result"}</button>
           ${approving ? "" : `<button class="admin-small-button danger" onclick="adminRealityTvRejectQuestionResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
@@ -1451,11 +1644,11 @@ function adminRealityTvResultPanel_(bundle) {
         <div class="reality-tv-result-summary">
           <span><b>Result type:</b> ${adminRealityTvEscape_(pending.OutcomeType)}</span>
           <span><b>${adminRealityTvEscape_(season.ParticipantLabel || "Participant")}:</b> ${adminRealityTvEscape_(selectedNames.join(", ") || "No elimination")}</span>
-          ${pending.PushStatus ? `<span><b>Progress:</b> ${adminRealityTvEscape_(pending.PushStatus)}</span>` : ""}
           ${pending.ErrorMessage ? `<span class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(pending.ErrorMessage)}</span>` : ""}
           ${pending.EvidenceUrl ? `<span><b>Evidence:</b> <a href="${adminRealityTvEscape_(pending.EvidenceUrl)}" target="_blank" rel="noopener">Open source</a></span>` : ""}
           ${pending.Notes ? `<span><b>Notes:</b> ${adminRealityTvEscape_(pending.Notes)}</span>` : ""}
         </div>
+        ${adminRealityTvApprovalProgressHtml_(pending, "episode")}
         <div class="admin-actions">
           <button class="button admin-button" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">
             ${isApproving ? "Resume Approval" : "Approve &amp; Build Next Episode"}
@@ -2657,11 +2850,12 @@ async function adminRealityTvApproveResult(queueId) {
     if (!state || state.success === false) {
       throw new Error(adminRealityTvResponseError_(state, "Could not start the approval."));
     }
+    adminRealityTvStartApprovalTicker_(queueId, state, "episode");
 
     let transientFailures = 0;
     let busyResponses = 0;
     let completedStages = 0;
-    while (completedStages < 10 && !state.complete && busyResponses < 20) {
+    while (completedStages < 60 && !state.complete && busyResponses < 40) {
       await adminRealityTvSleep_(state.busy ? 1400 : 250);
       const next = await apiAdminContinueRealityTvApproval(queueId);
       if (!next || next.success === false) {
@@ -2678,10 +2872,13 @@ async function adminRealityTvApproveResult(queueId) {
         busyResponses += 1;
         continue;
       }
+      adminRealityTvStartApprovalTicker_(queueId, state, "episode");
       busyResponses = 0;
       completedStages += 1;
     }
 
+    adminRealityTvStopApprovalTicker_(queueId);
+    adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
     if (!state.complete) {
       alert("The approval did not return a final confirmation. Refresh this page and select Resume Approval; completed stages will not be repeated.");
     } else {
@@ -2696,6 +2893,7 @@ async function adminRealityTvApproveResult(queueId) {
       navigate("admin-reality-tv", { suppressLoader: true });
     }
   } catch (err) {
+    adminRealityTvStopApprovalTicker_(queueId);
     alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. The staged process is safe to retry.");
     if (existing && existing.SeasonId) {
       try { await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId }); }
@@ -3077,10 +3275,11 @@ async function adminRealityTvApproveQuestionResult(queueId) {
   try {
     let state = await apiAdminApproveRealityTvQuestionResult(queueId);
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not start the question approval."));
+    adminRealityTvStartApprovalTicker_(queueId, state, "question");
     let transientFailures = 0;
     let busyResponses = 0;
     let completedStages = 0;
-    while (completedStages < 8 && !state.complete && busyResponses < 20) {
+    while (completedStages < 20 && !state.complete && busyResponses < 40) {
       await adminRealityTvSleep_(state.busy ? 1400 : 250);
       const next = await apiAdminContinueRealityTvQuestionApproval(queueId);
       if (!next || next.success === false) {
@@ -3097,9 +3296,12 @@ async function adminRealityTvApproveQuestionResult(queueId) {
         busyResponses += 1;
         continue;
       }
+      adminRealityTvStartApprovalTicker_(queueId, state, "question");
       busyResponses = 0;
       completedStages += 1;
     }
+    adminRealityTvStopApprovalTicker_(queueId);
+    adminRealityTvUpdateApprovalProgress_(queueId, state, "question");
     if (!state.complete) alert("The approval did not return a final confirmation. Use Resume Approval.");
     else alert((state.message || "Question result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : ""));
     if (existing && existing.SeasonId) {
@@ -3111,6 +3313,7 @@ async function adminRealityTvApproveQuestionResult(queueId) {
       navigate("admin-reality-tv", { suppressLoader: true });
     }
   } catch (err) {
+    adminRealityTvStopApprovalTicker_(queueId);
     alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. Completed stages will not repeat.");
     if (existing && existing.SeasonId) {
       try {

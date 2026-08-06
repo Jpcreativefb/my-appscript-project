@@ -76,7 +76,7 @@ function completeQuestionApproval(queueId) {
 }
 function completeElimination(queueId) {
   let state = context.apiAdminApproveRealityTvResult({ queueId, username: 'admin' });
-  for (let i = 0; i < 6 && !state.complete; i++) state = context.apiAdminContinueRealityTvApproval({ queueId, username: 'admin' });
+  for (let i = 0; i < 30 && !state.complete; i++) state = context.apiAdminContinueRealityTvApproval({ queueId, username: 'admin' });
   assert.strictEqual(state.complete, true);
   return state;
 }

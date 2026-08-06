@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV EPISODE QUESTION PACKS
-   Production v1.1.11
+   Production v1.1.16
 
    Adds independent, administrator-reviewed episode questions without
    changing the stable elimination/next-episode workflow.
@@ -33,7 +33,7 @@ const REALITY_TV_QUESTION_QUEUE_HEADERS = [
   "SelectedOutcomeId", "SelectedOutcomeLabel", "ReviewStatus", "EvidenceUrl",
   "Notes", "SubmittedBy", "SubmittedAt", "ReviewedBy", "ReviewedAt",
   "PushStatus", "ApprovalStage", "ApprovalStartedAt", "ApprovalCompletedAt",
-  "ApprovalAttemptCount", "PushedAt", "HubImportedResultId", "HubReviewId",
+  "ApprovalAttemptCount", "ApprovalStageStartedAt", "ApprovalHeartbeatAt", "PushedAt", "HubImportedResultId", "HubReviewId",
   "ErrorMessage", "UpdatedAt"
 ];
 
@@ -2121,6 +2121,33 @@ function apiAdminSubmitRealityTvQuestionResult(payload) {
 function realityTvQuestionApprovalState_(queue) {
   const status = realityTvString_(queue.ReviewStatus).toUpperCase();
   const stage = realityTvString_(queue.ApprovalStage || (status === "APPROVED" ? "COMPLETE" : "SETTLE")).toUpperCase();
+  const nowMs = Date.now();
+  const startedMs = new Date(queue.ApprovalStartedAt || queue.UpdatedAt || 0).getTime();
+  const stageStartedMs = new Date(queue.ApprovalStageStartedAt || queue.ApprovalStartedAt || queue.UpdatedAt || 0).getTime();
+  const heartbeatMs = new Date(queue.ApprovalHeartbeatAt || queue.UpdatedAt || 0).getTime();
+  const elapsedSeconds = startedMs > 0 ? Math.max(0, Math.floor((nowMs - startedMs) / 1000)) : 0;
+  const stageElapsedSeconds = stageStartedMs > 0 ? Math.max(0, Math.floor((nowMs - stageStartedMs) / 1000)) : 0;
+  let percent = 8;
+  let label = "Queued for approval";
+  let detail = "Waiting to settle this question result.";
+  let estimatedRemainingSeconds = 30;
+  if (stage === "SETTLE") {
+    percent = realityTvString_(queue.PushStatus).toUpperCase() === "SETTLING QUESTION" ? 32 : 12;
+    label = "Settling question result";
+    detail = "Writing the winning answer or push and scoring this question.";
+    estimatedRemainingSeconds = Math.max(4, 18 - stageElapsedSeconds) + 10;
+  } else if (stage === "SYNC_HUB") {
+    percent = 82;
+    label = "Finalizing question approval";
+    detail = "Saving the final approval record and optional Hub status.";
+    estimatedRemainingSeconds = Math.max(3, 10 - stageElapsedSeconds);
+  } else if (stage === "COMPLETE" || status === "APPROVED") {
+    percent = 100;
+    label = "Question approval complete";
+    detail = "This question result is settled and ready.";
+    estimatedRemainingSeconds = 0;
+  }
+  const heartbeatAgeSeconds = heartbeatMs > 0 ? Math.max(0, Math.floor((nowMs - heartbeatMs) / 1000)) : 0;
   return {
     success: true,
     queueId: queue.QueueId,
@@ -2128,7 +2155,13 @@ function realityTvQuestionApprovalState_(queue) {
     stage: stage,
     pushStatus: realityTvString_(queue.PushStatus),
     complete: status === "APPROVED" || stage === "COMPLETE",
-    error: realityTvString_(queue.ErrorMessage)
+    error: realityTvString_(queue.ErrorMessage),
+    progressPercent: percent,
+    progressLabel: label,
+    progressDetail: detail,
+    elapsedSeconds: elapsedSeconds,
+    estimatedRemainingSeconds: estimatedRemainingSeconds,
+    stalled: status === "APPROVING" && heartbeatAgeSeconds >= 120
   };
 }
 
@@ -2152,6 +2185,8 @@ function apiAdminApproveRealityTvQuestionResult(payload) {
         ApprovalStage: "SETTLE",
         ApprovalStartedAt: now,
         ApprovalCompletedAt: "",
+        ApprovalStageStartedAt: now,
+        ApprovalHeartbeatAt: now,
         ErrorMessage: "",
         UpdatedAt: now
       });
@@ -2308,6 +2343,8 @@ function apiAdminContinueRealityTvQuestionApproval(payload) {
         realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
           PushStatus: "QUESTION SETTLED",
           ApprovalStage: "SYNC_HUB",
+          ApprovalStageStartedAt: new Date(),
+          ApprovalHeartbeatAt: new Date(),
           ErrorMessage: "",
           UpdatedAt: new Date()
         });
@@ -2328,6 +2365,7 @@ function apiAdminContinueRealityTvQuestionApproval(payload) {
           PushedAt: completedAt,
           ApprovalStage: "COMPLETE",
           ApprovalCompletedAt: completedAt,
+          ApprovalHeartbeatAt: completedAt,
           ErrorMessage: hub.warning || "",
           UpdatedAt: completedAt
         });
@@ -2344,6 +2382,7 @@ function apiAdminContinueRealityTvQuestionApproval(payload) {
         realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
           PushStatus: "ERROR",
           ApprovalAttemptCount: attempts,
+          ApprovalHeartbeatAt: new Date(),
           ErrorMessage: err.message || String(err),
           UpdatedAt: new Date()
         });

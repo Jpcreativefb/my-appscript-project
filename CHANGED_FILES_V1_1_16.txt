@@ -1,0 +1,21 @@
+Reality TV staged approval progress v1.1.16
+
+Changed files:
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/app.html
+frontend/app.js
+frontend/css/styles.css
+frontend/js/app.js
+frontend/js/pages/adminRealityTv.js
+tests/reality_tv_approval_episode_plan_v1115_tests.js
+tests/reality_tv_approval_progress_v1116_tests.js
+tests/reality_tv_episode_question_pack_tests.js
+tests/reality_tv_inline_admin_actions_v1113_tests.js
+tests/reality_tv_mass_votes_approval_v1114_tests.js
+API_CONTRACT.md
+CHANGELOG.md
+PRODUCTION_REALITY_TV_APPROVAL_PROGRESS_V1_1_16.md
+PRODUCTION_SMOKE_TEST_V1_1_16.md
+PRODUCTION_STATUS.md
+CHANGED_FILES_V1_1_16.txt

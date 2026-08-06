@@ -1,5 +1,21 @@
 # Production Status
 
+Current production candidate: **v1.1.16**
+
+Reality TV approvals now expose visible, resumable progress through settlement, next-episode creation, Extra Question building, finalization, and readiness. The interface shows elapsed time, an approximate remaining-time estimate, per-question build counts, and a stalled warning instead of leaving administrators with only `Progress: QUEUED`.
+
+## v1.1.16 release readiness
+
+- Backend and frontend deployment required.
+- 58 regression test files passed.
+- 166 JavaScript files passed syntax validation.
+- Complete `PRODUCTION_SMOKE_TEST_V1_1_16.md` after deployment.
+- External Results Hub connection remains the next planned Reality TV phase.
+
+---
+
+# Production Status
+
 Current production candidate: **v1.1.15**
 
 Reality TV approvals can now be reset safely by stage. Unexpected double or larger eliminations settle every eliminated contestant as a winning answer. Main-elimination approval automatically creates the next episode and inherits the season's Extra Question defaults, while **Update This Episode Only** supports one-off changes without altering future episodes.

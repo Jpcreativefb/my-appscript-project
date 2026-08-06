@@ -943,3 +943,35 @@ Administrator-only POST action. Accepts `seasonId`, `episodeId`, `enabledQuestio
 ### Next-episode inheritance
 
 Approval of the main elimination creates the next episode automatically when `AutoCreateNextEpisode` is enabled and more than one active contestant remains. The new episode inherits the enabled season templates and their current points, display, image, wording, and answer-source settings. Supplemental-question approvals never create another episode.
+
+
+## Reality TV staged approval progress contract — v1.1.16
+
+`adminApproveRealityTvResult` and `adminContinueRealityTvApproval` return the normal approval state plus:
+
+```txt
+progressPercent
+progressLabel
+progressDetail
+elapsedSeconds
+estimatedRemainingSeconds
+stalled
+approvalProgress
+questionBuild
+```
+
+Main elimination approval now uses these persisted stages:
+
+```txt
+SETTLE
+BUILD_NEXT
+BUILD_QUESTIONS
+FINALIZE
+COMPLETE
+```
+
+`BUILD_QUESTIONS` advances one enabled Extra Question per continuation request and returns the question pack's `currentIndex`, `totalCount`, and latest message. The queue stores `ApprovalStageStartedAt`, `ApprovalHeartbeatAt`, and `ApprovalQuestionBuildId` so a refreshed manager can reconstruct elapsed time and identify a potentially stalled stage.
+
+Supplemental question approvals continue to use `SETTLE`, `SYNC_HUB`, and `COMPLETE`, but now return the same core progress fields. Remaining-time values are estimates, not deadlines; the frontend replaces an expired estimate with a longer-than-usual message while the request remains active.
+
+When no External Results Hub spreadsheet is configured, finalization skips Hub access immediately. Local settlement, next-episode creation, and Extra Question readiness remain authoritative.
