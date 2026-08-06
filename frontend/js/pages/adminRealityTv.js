@@ -1,12 +1,13 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Production v1.1.16
+   Production v1.1.18
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
 let ADMIN_REALITY_TV_ROSTER_ROW = 0;
 let ADMIN_REALITY_TV_BULK_PREVIEW = {};
 let ADMIN_REALITY_TV_APPROVAL_TIMERS = {};
+let ADMIN_REALITY_TV_APPROVAL_POLLERS = {};
 /* Backward-compatible UI labels retained for deployment tests and search:
    Contestant Roster · Mass Enter Contestants · Mass add contestants
 */
@@ -108,6 +109,7 @@ function adminRealityTvApprovalProgressData_(source, kind) {
   const derivedElapsed = startedMs > 0 ? Math.max(0, Math.floor((Date.now() - startedMs) / 1000)) : 0;
   const stageElapsed = stageStartedMs > 0 ? Math.max(0, Math.floor((Date.now() - stageStartedMs) / 1000)) : 0;
   const heartbeatAge = heartbeatMs > 0 ? Math.max(0, Math.floor((Date.now() - heartbeatMs) / 1000)) : 0;
+  const waiting = source.waiting === true;
   let percent = Number.isFinite(explicitPercent) ? explicitPercent : 0;
   let label = String(source.progressLabel || source.ApprovalProgressLabel || "");
   let detail = String(source.progressDetail || source.ApprovalProgressDetail || "");
@@ -144,8 +146,10 @@ function adminRealityTvApprovalProgressData_(source, kind) {
     label: label,
     detail: detail,
     elapsedSeconds: Number.isFinite(explicitElapsed) ? Math.max(0, explicitElapsed) : derivedElapsed,
+    heartbeatAgeSeconds: heartbeatAge,
     estimatedRemainingSeconds: Math.max(0, eta - Math.min(eta, stageElapsed)),
-    stalled: source.stalled === true || String(source.ApprovalStalled || "").toLowerCase() === "true" || (reviewStatus === "APPROVING" && heartbeatAge >= (kind === "question" ? 120 : 150)),
+    stalled: !waiting && (source.stalled === true || String(source.ApprovalStalled || "").toLowerCase() === "true" || (reviewStatus === "APPROVING" && heartbeatAge >= (kind === "question" ? 120 : 150))),
+    waiting: waiting,
     kind: kind || "episode"
   };
 }
@@ -158,7 +162,9 @@ function adminRealityTvApprovalProgressHtml_(source, kind) {
     const status = progress.percent >= 100 || index < currentIndex ? "complete" : (index === currentIndex ? "current" : "pending");
     return `<span class="reality-tv-approval-step ${status}" data-approval-step="${adminRealityTvEscape_(step.id)}"><i></i>${adminRealityTvEscape_(step.label)}</span>`;
   }).join("");
-  const etaText = progress.percent >= 100
+  const etaText = progress.waiting
+    ? "Waiting in approval queue"
+    : progress.percent >= 100
     ? "Complete"
     : (progress.estimatedRemainingSeconds > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(progress.estimatedRemainingSeconds) : "Estimating remaining time…");
   return `
@@ -174,6 +180,7 @@ function adminRealityTvApprovalProgressHtml_(source, kind) {
       <div class="reality-tv-approval-progress-time">
         <span data-role="approval-elapsed">Elapsed: ${adminRealityTvFormatDuration_(progress.elapsedSeconds)}</span>
         <span data-role="approval-eta">${adminRealityTvEscape_(etaText)}</span>
+        <span data-role="approval-heartbeat">Last checkpoint: ${adminRealityTvFormatDuration_(progress.heartbeatAgeSeconds)} ago</span>
       </div>
       <div class="reality-tv-approval-steps" data-role="approval-steps">${stepHtml}</div>
       <div class="admin-message warning reality-tv-approval-stalled" data-role="approval-stalled"${progress.stalled ? "" : " hidden"}>
@@ -191,12 +198,25 @@ function adminRealityTvStopApprovalTicker_(queueId) {
   }
 }
 
+function adminRealityTvStopApprovalPoller_(queueId) {
+  const key = String(queueId || "");
+  if (ADMIN_REALITY_TV_APPROVAL_POLLERS[key]) {
+    clearInterval(ADMIN_REALITY_TV_APPROVAL_POLLERS[key]);
+    delete ADMIN_REALITY_TV_APPROVAL_POLLERS[key];
+  }
+}
+
 function adminRealityTvUpdateApprovalProgress_(queueId, source, kind, options) {
   const container = document.getElementById("realityTvApprovalProgress_" + queueId);
   if (!container) return;
   const progress = adminRealityTvApprovalProgressData_(source, kind || container.dataset.approvalKind || "episode");
   options = options || {};
-  const percent = options.percent === undefined ? progress.percent : options.percent;
+  const requestedPercent = options.percent === undefined ? progress.percent : options.percent;
+  const priorMax = Number(container.dataset.maxPercent || 0);
+  const percent = options.allowDecrease === true
+    ? requestedPercent
+    : Math.max(priorMax, requestedPercent);
+  container.dataset.maxPercent = String(Math.max(0, Math.min(100, percent)));
   const label = options.label || progress.label;
   const detail = options.detail || progress.detail;
   const elapsed = options.elapsedSeconds === undefined ? progress.elapsedSeconds : options.elapsedSeconds;
@@ -210,11 +230,15 @@ function adminRealityTvUpdateApprovalProgress_(queueId, source, kind, options) {
   const detailEl = container.querySelector('[data-role="approval-detail"]');
   const elapsedEl = container.querySelector('[data-role="approval-elapsed"]');
   const etaEl = container.querySelector('[data-role="approval-eta"]');
+  const heartbeatEl = container.querySelector('[data-role="approval-heartbeat"]');
   if (labelEl) labelEl.textContent = label;
   if (percentEl) percentEl.textContent = Math.round(percent) + "%";
   if (detailEl) detailEl.textContent = detail;
   if (elapsedEl) elapsedEl.textContent = "Elapsed: " + adminRealityTvFormatDuration_(elapsed);
-  if (etaEl) etaEl.textContent = percent >= 100 ? "Complete" : (eta > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(eta) : "Taking longer than estimated — still working");
+  if (etaEl) etaEl.textContent = progress.waiting
+    ? "Waiting in approval queue"
+    : (percent >= 100 ? "Complete" : (eta > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(eta) : "Taking longer than estimated — still working"));
+  if (heartbeatEl) heartbeatEl.textContent = "Last checkpoint: " + adminRealityTvFormatDuration_(progress.heartbeatAgeSeconds) + " ago";
 
   const steps = adminRealityTvApprovalStepDefinitions_(progress.kind);
   let currentIndex = steps.findIndex(function(step) { return step.id === progress.stage; });
@@ -236,28 +260,50 @@ function adminRealityTvStartApprovalTicker_(queueId, state, kind) {
   if (progress.percent >= 100) return;
   const startedAt = Date.now();
   const baseElapsed = progress.elapsedSeconds;
-  const basePercent = progress.percent;
-  const caps = progress.kind === "question"
-    ? { SETTLE: 76, SYNC_HUB: 98, COMPLETE: 100 }
-    : { SETTLE: 39, BUILD_NEXT: 54, BUILD_QUESTIONS: 88, FINALIZE: 98, COMPLETE: 100 };
-  const cap = caps[progress.stage] || Math.min(98, basePercent + 10);
   const expected = Math.max(8, progress.estimatedRemainingSeconds || 20);
   ADMIN_REALITY_TV_APPROVAL_TIMERS[String(queueId)] = setInterval(function() {
     const stageElapsed = Math.floor((Date.now() - startedAt) / 1000);
     const totalElapsed = baseElapsed + stageElapsed;
-    const fraction = Math.min(0.94, stageElapsed / expected);
-    const animatedPercent = Math.max(basePercent, basePercent + ((cap - basePercent) * fraction));
     const remaining = Math.max(0, Math.round(progress.estimatedRemainingSeconds - stageElapsed));
     const takingLong = stageElapsed > Math.max(30, progress.estimatedRemainingSeconds + 15);
-    const stalled = stageElapsed >= 150;
+    const stalled = state && state.waiting ? false : stageElapsed + Number(state && state.heartbeatAgeSeconds || 0) >= 150;
     adminRealityTvUpdateApprovalProgress_(queueId, state, kind, {
-      percent: animatedPercent,
+      percent: progress.percent,
       elapsedSeconds: totalElapsed,
       estimatedRemainingSeconds: takingLong ? 0 : remaining,
-      detail: takingLong ? progress.detail + " This stage is taking longer than usual, but the request is still active." : progress.detail,
+      detail: state && state.waiting
+        ? progress.detail
+        : (takingLong ? progress.detail + " This stage is taking longer than usual. Waiting for the next saved checkpoint." : progress.detail),
       stalled: stalled
     });
   }, 1000);
+}
+
+function adminRealityTvStartApprovalPoller_(queueId) {
+  adminRealityTvStopApprovalPoller_(queueId);
+  let inFlight = false;
+  ADMIN_REALITY_TV_APPROVAL_POLLERS[String(queueId)] = setInterval(async function() {
+    if (!document.getElementById("realityTvApprovalProgress_" + queueId)) {
+      adminRealityTvStopApprovalPoller_(queueId);
+      return;
+    }
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      const state = await apiAdminGetRealityTvApprovalState(queueId);
+      if (!state || state.success === false) return;
+      adminRealityTvStartApprovalTicker_(queueId, state, "episode");
+      if (state.complete) {
+        adminRealityTvStopApprovalPoller_(queueId);
+        adminRealityTvStopApprovalTicker_(queueId);
+        adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
+      }
+    } catch (err) {
+      // The main approval request may temporarily occupy Apps Script. Poll again.
+    } finally {
+      inFlight = false;
+    }
+  }, 3000);
 }
 
 
@@ -2851,12 +2897,13 @@ async function adminRealityTvApproveResult(queueId) {
       throw new Error(adminRealityTvResponseError_(state, "Could not start the approval."));
     }
     adminRealityTvStartApprovalTicker_(queueId, state, "episode");
+    adminRealityTvStartApprovalPoller_(queueId);
 
     let transientFailures = 0;
     let busyResponses = 0;
     let completedStages = 0;
-    while (completedStages < 60 && !state.complete && busyResponses < 40) {
-      await adminRealityTvSleep_(state.busy ? 1400 : 250);
+    while (completedStages < 120 && !state.complete && busyResponses < 300) {
+      await adminRealityTvSleep_(state.waiting ? 3000 : (state.busy ? 1400 : 500));
       const next = await apiAdminContinueRealityTvApproval(queueId);
       if (!next || next.success === false) {
         const message = adminRealityTvResponseError_(next, "Could not continue the approval.");
@@ -2868,23 +2915,21 @@ async function adminRealityTvApproveResult(queueId) {
         throw new Error(message);
       }
       state = next;
+      adminRealityTvStartApprovalTicker_(queueId, state, "episode");
       if (state.busy) {
         busyResponses += 1;
         continue;
       }
-      adminRealityTvStartApprovalTicker_(queueId, state, "episode");
       busyResponses = 0;
       completedStages += 1;
     }
 
+    adminRealityTvStopApprovalPoller_(queueId);
     adminRealityTvStopApprovalTicker_(queueId);
     adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
     if (!state.complete) {
-      alert("The approval did not return a final confirmation. Refresh this page and select Resume Approval; completed stages will not be repeated.");
+      alert("This approval is still queued on the server. It will continue automatically. Reopen this season to see its latest checkpoint; use Reset Stuck Approval only if the heartbeat is older than two minutes.");
     } else {
-      if (state.questionBuild && !state.questionBuild.complete) {
-        state.questionBuild = await adminRealityTvRunQuestionPackBuild_(state.questionBuild, existing ? existing.SeasonId : "");
-      }
       alert((state.message || "Result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : "") + (state.questionBuild ? "\n\n" + adminRealityTvBuildCompletionMessage_(state.questionBuild) : ""));
     }
     if (existing && existing.SeasonId) {
@@ -2893,6 +2938,7 @@ async function adminRealityTvApproveResult(queueId) {
       navigate("admin-reality-tv", { suppressLoader: true });
     }
   } catch (err) {
+    adminRealityTvStopApprovalPoller_(queueId);
     adminRealityTvStopApprovalTicker_(queueId);
     alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. The staged process is safe to retry.");
     if (existing && existing.SeasonId) {

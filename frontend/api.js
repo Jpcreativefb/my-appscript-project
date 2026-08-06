@@ -1714,6 +1714,10 @@ async function apiAdminContinueRealityTvApproval(queueId) {
   return apiAdminRealityTvRequest_("adminContinueRealityTvApproval", { queueId: queueId });
 }
 
+async function apiAdminGetRealityTvApprovalState(queueId) {
+  return apiAdminRealityTvRequest_("adminGetRealityTvApprovalState", { queueId: queueId });
+}
+
 async function apiAdminResetRealityTvApproval(queueId) {
   return apiAdminRealityTvPostRequest_("adminResetRealityTvApproval", { queueId: queueId });
 }

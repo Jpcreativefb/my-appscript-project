@@ -1,5 +1,38 @@
 # Production Status
 
+Current production candidate: **v1.1.18**
+
+Reality TV next-episode Extra Questions are now compiled and written in one bulk pass instead of being built one question at a time. Approvals remain serialized across seasons, use real server checkpoints, and can safely retry the idempotent bulk materializer after temporary Google Sheets or lock failures.
+
+## v1.1.18 release readiness
+
+- Backend and frontend deployment required.
+- 60 regression test files passed.
+- 155 JavaScript files passed syntax validation.
+- Complete `PRODUCTION_SMOKE_TEST_V1_1_18.md` after deployment.
+- External Results Hub remains separate and must not block local episode readiness.
+
+---
+
+# Production Status
+
+Current production candidate: **v1.1.17**
+
+Reality TV main-elimination approvals now run through one serialized server queue. Progress is based on saved checkpoints rather than simulated movement, so percentages do not move backward and a second show displays **Waiting for another approval** instead of silently competing for the shared sheets. Approval-owned Extra Question builds no longer contend with the generic question worker.
+
+## v1.1.17 release readiness
+
+- Backend and frontend deployment required.
+- 59 regression test files passed.
+- 154 JavaScript files passed syntax validation.
+- Complete `PRODUCTION_SMOKE_TEST_V1_1_17.md` after deployment.
+- Reset the currently stale Survivor approval after the active MasterChef approval finishes.
+- External Results Hub connection remains the next planned phase after local approval timing is verified.
+
+---
+
+# Production Status
+
 Current production candidate: **v1.1.16**
 
 Reality TV approvals now expose visible, resumable progress through settlement, next-episode creation, Extra Question building, finalization, and readiness. The interface shows elapsed time, an approximate remaining-time estimate, per-question build counts, and a stalled warning instead of leaving administrators with only `Progress: QUEUED`.

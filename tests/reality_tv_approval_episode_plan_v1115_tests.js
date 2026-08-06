@@ -36,8 +36,8 @@ assert(ui.includes('Update This Episode Only'), 'One-episode Extra Question butt
 assert(ui.includes('each is a winner'), 'Multiple elimination UI must explain winner scoring');
 assert(ui.includes('This episode only — do not enable for future episodes'), 'One-time custom-question option is missing');
 
-assert(app.includes('v1116-reality-tv-approval-progress'), 'New route cache key is missing');
+assert(app.includes('v1118-reality-tv-bulk-question-pack'), 'New route cache key is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1116-reality-tv-approval-progress'), 'App shell cache key is missing');
+assert(html.includes('hotfix=v1118-reality-tv-bulk-question-pack'), 'App shell cache key is missing');
 
 console.log('Reality TV approval reset and episode question plan v1.1.15 tests passed.');

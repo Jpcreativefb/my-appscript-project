@@ -975,3 +975,56 @@ COMPLETE
 Supplemental question approvals continue to use `SETTLE`, `SYNC_HUB`, and `COMPLETE`, but now return the same core progress fields. Remaining-time values are estimates, not deadlines; the frontend replaces an expired estimate with a longer-than-usual message while the request remains active.
 
 When no External Results Hub spreadsheet is configured, finalization skips Hub access immediately. Local settlement, next-episode creation, and Extra Question readiness remain authoritative.
+
+## Reality TV serialized approval queue contract — v1.1.17
+
+`adminGetRealityTvApprovalState` is a read-only administrator endpoint used by the manager while an approval stage is running. It returns the same approval state shape as `adminContinueRealityTvApproval` without claiming or executing a stage.
+
+Main-elimination approvals are serialized across the Apps Script project because all Reality TV seasons share the same Game Setup and result sheets. The oldest fresh `APPROVING` queue item owns the shared write path. Other approvals return:
+
+```txt
+busy: true
+waiting: true
+progressLabel: Waiting for another approval
+progressDetail: Another Reality TV approval is using the shared game sheets...
+```
+
+A processing owner whose heartbeat is older than three minutes does not block newer queued approvals. The stalled row remains recoverable through `adminResetRealityTvApproval`.
+
+Next-episode creation writes these heartbeat checkpoints while its request is running:
+
+```txt
+PREPARING NEXT EPISODE
+CREATING MAIN QUESTION
+ADDING MAIN ANSWERS
+SAVING NEXT EPISODE
+```
+
+The frontend polls the read-only state every three seconds and never advances the displayed percentage beyond the last saved checkpoint. Percentages are monotonic for the life of the visible progress card.
+
+Approval-owned rows in `RealityQuestionBuildJobs` store `ManagedBy = APPROVAL`. The generic question-pack continuation trigger ignores those rows; the approval queue advances them one template at a time and stores their exact `ApprovalQuestionBuildId` on the result queue.
+
+A one-time `realityTvContinuePendingApprovals` trigger continues the oldest queued approval after the browser closes or a frontend request ends. Stage claims remain idempotent, so concurrent browser and trigger requests return busy instead of repeating settlement or episode creation.
+
+## Reality TV bulk episode-question materializer contract — v1.1.18
+
+Main-elimination approval no longer advances the generic per-template question worker. During `BUILD_QUESTIONS`, the backend calls `realityTvMaterializeEpisodeQuestionPackBulk_` once for the new episode.
+
+The bulk materializer:
+
+1. Reads the active roster, groups, templates, existing normalized setup, and current episode-question rows once.
+2. Compiles every enabled question, setting, and answer payload in memory.
+3. Writes Questions, CategorySettings, legacy Categories answer rows, QuestionOptions, and RealityEpisodeQuestions through bulk operations.
+4. Flushes, clears the affected caches, and marks the linked build job complete.
+
+Saved approval checkpoints are:
+
+```txt
+COMPILING QUESTION PACK
+WRITING QUESTION PACK
+VERIFYING QUESTION PACK
+QUESTIONS COMPLETE
+```
+
+The pass is idempotent: existing questions are updated or verified, missing answers are added, and a retry must not intentionally duplicate valid episode-question records. Approval-owned build jobs use `ManagedBy = APPROVAL` and are ignored by the generic question-build continuation trigger.
+

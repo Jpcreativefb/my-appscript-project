@@ -1,3 +1,26 @@
+## v1.1.18 — Reality TV bulk Extra Question materializer
+
+- Removed the old one-question-at-a-time Extra Question worker from the main-elimination approval path.
+- Compiles the complete next-episode question and answer plan in memory after one roster/group read.
+- Writes normalized questions, CategorySettings, legacy answer rows, normalized options, and RealityEpisodeQuestions in bulk operations.
+- Added real `COMPILING QUESTION PACK`, `WRITING QUESTION PACK`, and `VERIFYING QUESTION PACK` approval checkpoints.
+- Keeps approvals serialized across shows and continues queued work through a server trigger.
+- Prevents the displayed approval percentage from moving backward and polls saved server checkpoints every three seconds.
+- Makes the bulk pass idempotent and retryable after temporary lock or Google Sheets service failures.
+- Added v1.1.18 bulk-materializer regression coverage.
+
+## v1.1.17 — Reality TV approval queue and real checkpoints
+
+- Serialized main-elimination approvals so MasterChef, Survivor, and other Reality TV seasons cannot write the shared Game Setup sheets at the same time.
+- Added a server-side continuation trigger so queued approvals continue even when the browser request ends or the administrator leaves the page.
+- Added a read-only approval-state endpoint and three-second frontend polling for live saved checkpoints during long Apps Script requests.
+- Replaced simulated percentage movement with monotonic, checkpoint-based progress that never falls backward.
+- Split next-episode creation into visible Preparing, Main Question, Main Answers, and Save checkpoints.
+- Avoided unnecessary full Game Setup reloads when creating a new episode's main question.
+- Marked approval-owned Extra Question builds so they do not compete with the generic question-pack background trigger.
+- Linked progress to the exact approval question-build ID and migrated in-progress v1.1.16 builds into approval ownership on resume.
+- Added last-checkpoint age, visible waiting-in-queue status, stale-owner bypass, and v1.1.17 regression coverage.
+
 ## v1.1.16 — Reality TV staged approval progress
 
 - Replaced the single frozen `QUEUED` label with a live five-stage episode approval progress bar.

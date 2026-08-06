@@ -15,8 +15,9 @@ const html = fs.readFileSync(path.join(root, 'frontend/app.html'), 'utf8');
 assert(season.includes('"ApprovalStageStartedAt", "ApprovalHeartbeatAt", "ApprovalQuestionBuildId"'), 'Approval queue must store stage timing and question-build linkage');
 assert(season.includes('function realityTvApprovalProgress_'), 'Backend approval progress calculation is missing');
 assert(season.includes('const nextStage = build.nextEpisode && enabledTypes.length ? "BUILD_QUESTIONS" : "FINALIZE";'), 'Approval must expose a separate Extra Question stage');
-assert(season.includes('realityTvAdvanceQuestionPackBuild_(questionBuild, 1, 8000)'), 'Extra Questions should advance one visible checkpoint per request');
-assert(season.includes('ApprovalStage: complete ? "FINALIZE" : "BUILD_QUESTIONS"'), 'Question build must advance to finalization only when complete');
+assert(season.includes('realityTvMaterializeEpisodeQuestionPackBulk_(season, nextEpisode'), 'Approval must use the bulk Extra Question materializer');
+assert(season.includes('checkpoint: checkpoint'), 'Bulk Extra Question work must publish real checkpoints');
+assert(season.includes('ApprovalStage: "FINALIZE"'), 'Successful bulk question materialization must advance to finalization');
 assert(season.includes('if (realityTvGetHubId_())'), 'Unconfigured External Results Hub must be skipped without delaying local approval');
 assert(season.includes('stalledAfterSeconds: 150'), 'Main approval stalled threshold is missing');
 assert(questions.includes('progressLabel: label'), 'Supplemental question approvals must return progress data');
@@ -28,12 +29,12 @@ assert(questions.includes('ApprovalStageStartedAt: now'), 'Question approval sta
 ['Settle result', 'Create next episode', 'Build Extra Questions', 'Finalize', 'Ready'].forEach(label => {
   assert(ui.includes(label), `Main approval step missing: ${label}`);
 });
-assert(ui.includes('completedStages < 60'), 'Main approval loop must allow enough calls for large question packs');
+assert(/completedStages < (?:60|120)/.test(ui), 'Main approval loop must allow enough calls for large question packs');
 assert(css.includes('.reality-tv-approval-progress-track'), 'Approval progress-bar styles are missing');
 assert(css.includes('@keyframes realityTvApprovalShimmer'), 'Working animation is missing');
-assert(app.includes('v1116-reality-tv-approval-progress'), 'New route cache key is missing');
+assert(app.includes('v1118-reality-tv-bulk-question-pack'), 'New route cache key is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1116-reality-tv-approval-progress'), 'App shell cache key is missing');
+assert(html.includes('hotfix=v1118-reality-tv-bulk-question-pack'), 'App shell cache key is missing');
 
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
