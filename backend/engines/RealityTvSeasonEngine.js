@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Production v1.1.18
+   Production v1.2.0
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -897,15 +897,19 @@ function realityTvUpdateEpisodeQuestionTiming_(season, episode) {
 }
 
 function realityTvSyncEpisodeScheduleToHub_(season, episode) {
-  try {
-    const hub = realityTvOpenHub_();
-    if (!hub) return { success: false, skipped: true };
-    const now = new Date();
-    const status = realityTvKey_(episode.ScheduleStatus || episode.Status || "scheduled") === "tba"
-      ? "delayed"
-      : realityTvString_(episode.ScheduleStatus || episode.Status || "scheduled").toLowerCase();
-    realityTvUpsertObject_(hub, "ExternalEvents", REALITY_TV_HUB_HEADERS.ExternalEvents,
-      ["Provider", "ExternalEventId"], {
+  if (typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { success: false, skipped: true, message: "External Results Hub bridge is not installed." };
+  }
+  const now = new Date();
+  const status = realityTvKey_(episode.ScheduleStatus || episode.Status || "scheduled") === "tba"
+    ? "delayed"
+    : realityTvString_(episode.ScheduleStatus || episode.Status || "scheduled").toLowerCase();
+  return externalResultsBridgeEnqueue_(
+    "UPSERT_EPISODE_SCHEDULE",
+    episode.ExternalEventId || episode.EpisodeId,
+    "manual-reality-tv",
+    {
+      event: {
         Provider: "manual-reality-tv",
         ExternalEventId: episode.ExternalEventId,
         EventName: season.ShowName + " " + episode.EpisodeName,
@@ -923,9 +927,8 @@ function realityTvSyncEpisodeScheduleToHub_(season, episode) {
           scheduleNotes: episode.ScheduleNotes || ""
         }),
         CreatedAt: now
-      });
-    realityTvUpsertObject_(hub, "ExternalMarkets", REALITY_TV_HUB_HEADERS.ExternalMarkets,
-      ["Provider", "ExternalMarketId"], {
+      },
+      market: {
         Provider: "manual-reality-tv",
         ExternalMarketId: episode.ExternalMarketId,
         ExternalEventId: episode.ExternalEventId,
@@ -936,11 +939,9 @@ function realityTvSyncEpisodeScheduleToHub_(season, episode) {
           episodeId: episode.EpisodeId,
           scheduleStatus: episode.ScheduleStatus || "SCHEDULED"
         })
-      });
-    return { success: true };
-  } catch (err) {
-    return { success: false, warning: err && err.message ? err.message : String(err) };
-  }
+      }
+    }
+  );
 }
 
 function realityTvApplyEpisodeSchedule_(season, episode, patch) {
@@ -1056,7 +1057,6 @@ function realityTvFormatQuestion_(template, episodeNumber, season) {
 }
 
 function realityTvUpdateCurrentPeriodPresentation_(season, episode) {
-  if (!season || !episode) return episode;
   const periodLabel = realityTvString_(season.PeriodLabel || "Episode");
   const episodeNumber = realityTvNumber_(episode.EpisodeNumber, 1);
   const episodeName = periodLabel + " " + episodeNumber;
@@ -1080,50 +1080,12 @@ function realityTvUpdateCurrentPeriodPresentation_(season, episode) {
     UpdatedAt: new Date()
   });
 
-  try {
-    const hub = realityTvOpenHub_();
-    if (hub) {
-      const now = new Date();
-      const active = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
-        return realityTvBool_(row.Active) && realityTvKey_(row.Status || "active") === "active";
-      });
-      realityTvUpsertObject_(hub, "ExternalEvents", REALITY_TV_HUB_HEADERS.ExternalEvents,
-        ["Provider", "ExternalEventId"], {
-          Provider: "manual-reality-tv",
-          ExternalEventId: episode.ExternalEventId,
-          EventName: season.ShowName + " " + episodeName,
-          EventType: "reality-tv",
-          StartDate: episode.AirDateTime,
-          EndDate: episode.AirDateTime,
-          Status: realityTvString_(episode.Status || "scheduled"),
-          SourceUrl: "",
-          LastUpdated: now,
-          RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
-          CreatedAt: now
-        });
-      realityTvUpsertObject_(hub, "ExternalMarkets", REALITY_TV_HUB_HEADERS.ExternalMarkets,
-        ["Provider", "ExternalMarketId"], {
-          Provider: "manual-reality-tv",
-          ExternalMarketId: episode.ExternalMarketId,
-          ExternalEventId: episode.ExternalEventId,
-          MarketQuestion: question,
-          OutcomesJSON: JSON.stringify(active.map(function(item) { return item.Name; })),
-          PricesJSON: "{}",
-          ClosingTime: episode.LockDateTime,
-          ResolutionStatus: "pending",
-          WinningOutcome: "",
-          ResolutionSource: "manual-reality-tv",
-          SourceUrl: "",
-          LastUpdated: now,
-          RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
-          CreatedAt: now
-        });
-    }
-  } catch (err) {
-    // The main application remains authoritative. A temporary Hub problem must not block format edits.
-  }
-
-  return realityTvGetEpisode_(episode.EpisodeId) || episode;
+  const refreshed = realityTvGetEpisode_(episode.EpisodeId) || episode;
+  const active = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvBool_(row.Active) && realityTvKey_(row.Status || "active") === "active";
+  });
+  realityTvSyncEpisodeToHub_(season, refreshed, active, question);
+  return refreshed;
 }
 
 function realityTvEpisodeTiming_(season, episodeNumber) {
@@ -1403,28 +1365,82 @@ function realityTvCreateEpisode_(season, episodeNumber, options) {
 }
 
 function realityTvSyncEpisodeToHub_(season, episode, contestants, question) {
-  try {
-    const hub = realityTvOpenHub_();
-    if (!hub) return { success: false, skipped: true, message: "External Results Hub is not configured." };
-    const now = new Date();
+  if (typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { success: false, skipped: true, message: "External Results Hub bridge is not installed." };
+  }
+  const now = new Date();
+  const subjectRows = contestants.map(function(contestant) {
+    const assignment = realityTvGroupAssignmentForEpisode_(season.SeasonId, contestant.ContestantId, episode.EpisodeNumber);
+    const profile = realityTvContestantGroupProfile_(season.SeasonId, contestant.ContestantId);
+    return {
+      Provider: "manual-reality-tv",
+      ExternalSubjectId: contestant.ExternalSubjectId || contestant.ContestantId,
+      Name: contestant.Name,
+      SubjectType: realityTvKey_(season.ParticipantType) === "team" ? "team" : "contestant",
+      ImageUrl: contestant.ImageUrl || "",
+      MetadataJSON: JSON.stringify({
+        fullName: contestant.FullName || "",
+        teamOrTribe: realityTvString_((assignment || {}).GroupName || contestant.TeamOrTribe),
+        startingGroup: profile.startingGroup || "",
+        currentGroup: profile.currentGroup || "",
+        finalGroup: profile.finalGroup || "",
+        groupHistory: profile.history || [],
+        age: contestant.Age || "",
+        hometown: contestant.Hometown || "",
+        occupation: contestant.Occupation || "",
+        member1: contestant.Member1 || "",
+        member2: contestant.Member2 || "",
+        relationship: contestant.Relationship || "",
+        teamColor: contestant.TeamColor || ""
+      }),
+      SourceUrl: "",
+      LastUpdated: now,
+      CreatedAt: now
+    };
+  });
+  const mappingRows = contestants.map(function(contestant) {
+    return {
+      MappingId: season.GameId + "-" + episode.CategoryId + "-" + contestant.ContestantId,
+      AppGameId: season.GameId,
+      CategoryId: episode.CategoryId,
+      NomineeId: contestant.ContestantId,
+      Provider: "manual-reality-tv",
+      ExternalEventId: episode.ExternalEventId,
+      ExternalMarketId: episode.ExternalMarketId,
+      ExternalSubjectId: contestant.ExternalSubjectId || contestant.ContestantId,
+      ResultKey: "eliminated",
+      ComparisonOperator: "eq",
+      Threshold: "",
+      ExpectedOutcome: contestant.Name,
+      AutoSettle: false,
+      RequireAdminReview: true,
+      SourceUrl: "",
+      SourceConfigJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
+      Active: true,
+      CreatedAt: now,
+      UpdatedAt: now
+    };
+  });
 
-    realityTvUpsertObject_(hub, "ExternalEvents", REALITY_TV_HUB_HEADERS.ExternalEvents,
-      ["Provider", "ExternalEventId"], {
+  return externalResultsBridgeEnqueue_(
+    "UPSERT_EPISODE_BUNDLE",
+    episode.ExternalEventId || episode.EpisodeId,
+    "manual-reality-tv",
+    {
+      event: {
         Provider: "manual-reality-tv",
         ExternalEventId: episode.ExternalEventId,
         EventName: season.ShowName + " " + episode.EpisodeName,
         EventType: "reality-tv",
         StartDate: episode.AirDateTime,
         EndDate: episode.AirDateTime,
-        Status: "scheduled",
+        Status: realityTvString_(episode.Status || "scheduled").toLowerCase(),
         SourceUrl: "",
         LastUpdated: now,
         RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
         CreatedAt: now
-      });
-
-    realityTvUpsertObject_(hub, "ExternalMarkets", REALITY_TV_HUB_HEADERS.ExternalMarkets,
-      ["Provider", "ExternalMarketId"], {
+      },
+      market: {
         Provider: "manual-reality-tv",
         ExternalMarketId: episode.ExternalMarketId,
         ExternalEventId: episode.ExternalEventId,
@@ -1439,83 +1455,30 @@ function realityTvSyncEpisodeToHub_(season, episode, contestants, question) {
         LastUpdated: now,
         RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
         CreatedAt: now
-      });
-
-    const subjectRows = contestants.map(function(contestant) {
-      const assignment = realityTvGroupAssignmentForEpisode_(season.SeasonId, contestant.ContestantId, episode.EpisodeNumber);
-      const profile = realityTvContestantGroupProfile_(season.SeasonId, contestant.ContestantId);
-      return {
-        Provider: "manual-reality-tv",
-        ExternalSubjectId: contestant.ExternalSubjectId || contestant.ContestantId,
-        Name: contestant.Name,
-        SubjectType: realityTvKey_(season.ParticipantType) === "team" ? "team" : "contestant",
-        ImageUrl: contestant.ImageUrl || "",
-        MetadataJSON: JSON.stringify({
-          fullName: contestant.FullName || "",
-          teamOrTribe: realityTvString_((assignment || {}).GroupName || contestant.TeamOrTribe),
-          startingGroup: profile.startingGroup || "",
-          currentGroup: profile.currentGroup || "",
-          finalGroup: profile.finalGroup || "",
-          groupHistory: profile.history || [],
-          age: contestant.Age || "",
-          hometown: contestant.Hometown || "",
-          occupation: contestant.Occupation || "",
-          member1: contestant.Member1 || "",
-          member2: contestant.Member2 || "",
-          relationship: contestant.Relationship || "",
-          teamColor: contestant.TeamColor || ""
-        }),
-        SourceUrl: "",
-        LastUpdated: now,
-        CreatedAt: now
-      };
-    });
-    const mappingRows = contestants.map(function(contestant) {
-      return {
-        MappingId: season.GameId + "-" + episode.CategoryId + "-" + contestant.ContestantId,
-        AppGameId: season.GameId,
-        CategoryId: episode.CategoryId,
-        NomineeId: contestant.ContestantId,
-        Provider: "manual-reality-tv",
-        ExternalEventId: episode.ExternalEventId,
-        ExternalMarketId: episode.ExternalMarketId,
-        ExternalSubjectId: contestant.ExternalSubjectId || contestant.ContestantId,
-        ResultKey: "eliminated",
-        ComparisonOperator: "eq",
-        Threshold: "",
-        ExpectedOutcome: contestant.Name,
-        AutoSettle: false,
-        RequireAdminReview: true,
-        SourceUrl: "",
-        SourceConfigJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
-        Active: true,
-        CreatedAt: now,
-        UpdatedAt: now
-      };
-    });
-
-    realityTvBulkUpsertObjects_(hub, "ExternalSubjects", REALITY_TV_HUB_HEADERS.ExternalSubjects,
-      ["Provider", "ExternalSubjectId"], subjectRows);
-    realityTvBulkUpsertObjects_(hub, "AppMappings", REALITY_TV_HUB_HEADERS.AppMappings,
-      ["MappingId"], mappingRows);
-    return { success: true };
-  } catch (err) {
-    return { success: false, skipped: true, error: err.message };
-  }
+      },
+      subjects: subjectRows,
+      mappings: mappingRows
+    }
+  );
 }
 
 function realityTvCreateHubPendingResult_(season, episode, selectedContestants, outcomeType, evidenceUrl, notes) {
-  try {
-    const hub = realityTvOpenHub_();
-      if (!hub) return { importedResultId: "", reviewId: "", skipped: true };
-      const now = new Date();
-      const names = selectedContestants.map(function(item) { return item.Name; });
-      const resultValue = outcomeType === "no-elimination" ? "NO ELIMINATION" : names.join(", ");
-      const importedResultId = realityTvId_("rt-result");
-      const reviewId = realityTvId_("rt-review");
-      const fingerprint = ["manual-reality-tv", episode.ExternalEventId, episode.ExternalMarketId, resultValue].join("|").toLowerCase();
-    
-      realityTvAppendObject_(realityTvGetOrCreateSheet_(hub, "ImportedResults", REALITY_TV_HUB_HEADERS.ImportedResults), {
+  if (!realityTvGetHubId_() || typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { importedResultId: "", reviewId: "", skipped: true };
+  }
+  const now = new Date();
+  const names = selectedContestants.map(function(item) { return item.Name; });
+  const resultValue = outcomeType === "no-elimination" ? "NO ELIMINATION" : names.join(", ");
+  const importedResultId = realityTvId_("rt-result");
+  const reviewId = realityTvId_("rt-review");
+  const fingerprint = ["manual-reality-tv", episode.ExternalEventId, episode.ExternalMarketId, resultValue]
+    .join("|").toLowerCase();
+  const queued = externalResultsBridgeEnqueue_(
+    "CREATE_RESULT_REVIEW",
+    importedResultId,
+    "manual-reality-tv",
+    {
+      importedResult: {
         ImportedResultId: importedResultId,
         Provider: "manual-reality-tv",
         ExternalEventId: episode.ExternalEventId,
@@ -1528,15 +1491,19 @@ function realityTvCreateHubPendingResult_(season, episode, selectedContestants, 
         ImportedAt: now,
         EvidenceUrl: evidenceUrl || "",
         SourceUrl: evidenceUrl || "",
-        RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId, outcomeType: outcomeType }),
+        RawJSON: JSON.stringify({
+          seasonId: season.SeasonId,
+          episodeId: episode.EpisodeId,
+          outcomeType: outcomeType,
+          winnerContestantIds: selectedContestants.map(function(item) { return item.ContestantId; })
+        }),
         ReviewStatus: "PENDING",
         ReviewRequired: true,
         SourceFingerprint: fingerprint,
         CreatedAt: now,
         UpdatedAt: now
-      });
-    
-      realityTvAppendObject_(realityTvGetOrCreateSheet_(hub, "ReviewQueue", REALITY_TV_HUB_HEADERS.ReviewQueue), {
+      },
+      review: {
         ReviewId: reviewId,
         ImportedResultId: importedResultId,
         Provider: "manual-reality-tv",
@@ -1556,42 +1523,49 @@ function realityTvCreateHubPendingResult_(season, episode, selectedContestants, 
         PushMessage: "Waiting for Reality TV Season Manager approval.",
         CreatedAt: now,
         UpdatedAt: now
-      });
-      return { importedResultId: importedResultId, reviewId: reviewId };
-  } catch (err) {
-    return { importedResultId: "", reviewId: "", skipped: true, error: err.message };
-  }
+      }
+    }
+  );
+  return {
+    importedResultId: importedResultId,
+    reviewId: reviewId,
+    queued: !!(queued && queued.success),
+    skipped: !!(queued && queued.skipped),
+    error: queued && queued.error ? queued.error : ""
+  };
 }
 
 function realityTvUpdateHubReview_(queue, reviewStatus, reviewer, message) {
-  try {
-    const hub = realityTvOpenHub_();
-      if (!hub || !queue.HubReviewId) return;
-      const now = new Date();
-      const reviewRows = realityTvReadObjects_(hub, "ReviewQueue");
-      const review = reviewRows.find(function(row) { return realityTvKey_(row.ReviewId) === realityTvKey_(queue.HubReviewId); });
-      if (review) {
-        realityTvUpdateObjectRow_(hub.getSheetByName("ReviewQueue"), review.__rowNumber, {
-          ReviewStatus: reviewStatus,
-          ReviewedBy: reviewer || "",
-          ReviewedAt: now,
-          PushStatus: reviewStatus === "APPROVED" ? "PUSHED" : "NOT PUSHED",
-          PushedAt: reviewStatus === "APPROVED" ? now : "",
-          PushMessage: message || "",
-          UpdatedAt: now
-        });
-      }
-      const importedRows = realityTvReadObjects_(hub, "ImportedResults");
-      const imported = importedRows.find(function(row) { return realityTvKey_(row.ImportedResultId) === realityTvKey_(queue.HubImportedResultId); });
-      if (imported) {
-        realityTvUpdateObjectRow_(hub.getSheetByName("ImportedResults"), imported.__rowNumber, {
-          ReviewStatus: reviewStatus,
-          UpdatedAt: now
-        });
-      }
-  } catch (err) {
-    return { success: false, skipped: true, error: err.message };
+  if (!realityTvGetHubId_() || !queue.HubReviewId || typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { success: false, skipped: true };
   }
+  const now = new Date();
+  return externalResultsBridgeEnqueue_(
+    "UPDATE_REVIEW",
+    queue.HubReviewId,
+    "manual-reality-tv",
+    {
+      review: {
+        ReviewId: queue.HubReviewId,
+        ImportedResultId: queue.HubImportedResultId || "",
+        Provider: "manual-reality-tv",
+        ReviewStatus: reviewStatus,
+        ReviewedBy: reviewer || "",
+        ReviewedAt: now,
+        PushStatus: reviewStatus === "APPROVED" ? "PUSHED" : "NOT PUSHED",
+        PushedAt: reviewStatus === "APPROVED" ? now : "",
+        PushMessage: message || "",
+        UpdatedAt: now
+      },
+      importedResult: queue.HubImportedResultId ? {
+        ImportedResultId: queue.HubImportedResultId,
+        Provider: "manual-reality-tv",
+        ReviewStatus: reviewStatus,
+        ReviewRequired: true,
+        UpdatedAt: now
+      } : null
+    }
+  );
 }
 
 
@@ -2650,6 +2624,7 @@ function setupRealityTvSeasonManager() {
   realityTvEnsureSystem_();
   if (typeof realityTvEnsureQuestionPackSystem_ === "function") realityTvEnsureQuestionPackSystem_();
   if (typeof seasonAnchorEnsureSystem_ === "function") seasonAnchorEnsureSystem_();
+  if (typeof externalResultsBridgeEnsureSystem_ === "function") externalResultsBridgeEnsureSystem_();
   const sheets = [REALITY_TV_SEASONS_SHEET, REALITY_TV_CONTESTANTS_SHEET, REALITY_TV_EPISODES_SHEET, REALITY_TV_GROUPS_SHEET, REALITY_TV_GROUP_HISTORY_SHEET, REALITY_TV_RESULTS_QUEUE_SHEET, REALITY_TV_EPISODE_VOTES_SHEET];
   if (typeof REALITY_TV_QUESTION_TEMPLATES_SHEET !== "undefined") {
     sheets.push(REALITY_TV_QUESTION_TEMPLATES_SHEET, REALITY_TV_EPISODE_QUESTIONS_SHEET, REALITY_TV_QUESTION_QUEUE_SHEET);
@@ -2657,6 +2632,9 @@ function setupRealityTvSeasonManager() {
   }
   if (typeof SEASON_ANCHOR_SETTINGS_SHEET !== "undefined") {
     sheets.push(SEASON_ANCHOR_SETTINGS_SHEET, SEASON_ANCHOR_USERS_SHEET, SEASON_ANCHOR_HISTORY_SHEET);
+  }
+  if (typeof EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET !== "undefined") {
+    sheets.push(EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET, EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET);
   }
   return {
     success: true,
@@ -2679,7 +2657,17 @@ function apiAdminConfigureRealityTvHub(payload) {
     realityTvGetOrCreateSheet_(hub, name, REALITY_TV_HUB_HEADERS[name]);
   });
   PropertiesService.getScriptProperties().setProperty(REALITY_TV_HUB_PROPERTY, id);
-  return { success: true, message: "External Results Hub connected.", spreadsheetId: id, spreadsheetName: hub.getName() };
+  if (typeof externalResultsBridgeEnsureSystem_ === "function") externalResultsBridgeEnsureSystem_();
+  const health = typeof externalResultsBridgeHealth_ === "function"
+    ? externalResultsBridgeHealth_()
+    : null;
+  return {
+    success: true,
+    message: "External Results Hub connected. New Hub writes will use the background bridge.",
+    spreadsheetId: id,
+    spreadsheetName: hub.getName(),
+    bridgeHealth: health
+  };
 }
 
 
@@ -3129,19 +3117,13 @@ function apiAdminGetRealityTvDashboard(payload) {
     return new Date(b.season.UpdatedAt || b.season.CreatedAt || 0).getTime() - new Date(a.season.UpdatedAt || a.season.CreatedAt || 0).getTime();
   });
 
-  let hubName = "";
-  let hubError = "";
   const hubId = realityTvGetHubId_();
-  if (hubId) {
-    try { hubName = SpreadsheetApp.openById(hubId).getName(); }
-    catch (err) { hubError = err.message; }
-  }
   return {
     success: true,
-    hubConfigured: !!hubId && !hubError,
+    hubConfigured: !!hubId,
     hubSpreadsheetId: hubId,
-    hubSpreadsheetName: hubName,
-    hubError: hubError,
+    hubSpreadsheetName: "",
+    hubError: "",
     showFormats: typeof realityTvShowFormatDefinitions_ === "function" ? realityTvShowFormatDefinitions_() : [],
     seasons: seasons
   };
@@ -3776,38 +3758,32 @@ function realityTvBuildNextEpisodeAfterApproval_(season, episode, onCheckpoint) 
 
 function realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode) {
   const warnings = [];
-  // Local approval and question creation are authoritative. External Hub work is
-  // best-effort and must not hold the progress bar before the local episode is ready.
   if (realityTvGetHubId_()) {
-    if (nextEpisode) {
-      try {
-        const contestants = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
-          return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
-        });
-        const question = realityTvFormatQuestion_(season.QuestionTemplate, nextEpisode.EpisodeNumber);
-        const sync = realityTvSyncEpisodeToHub_(season, nextEpisode, contestants, question);
-        if (sync && sync.error) warnings.push(sync.error);
-      } catch (err) {
-        warnings.push(err.message || String(err));
-      }
-    }
-
-    try {
-      const reviewSync = realityTvUpdateHubReview_(
-        queue,
-        "APPROVED",
-        reviewer,
-        nextEpisode
-          ? "Pushed to CategoryResults and created " + nextEpisode.EpisodeName + "."
-          : "Pushed to CategoryResults."
-      );
-      if (reviewSync && reviewSync.error) warnings.push(reviewSync.error);
-    } catch (err) {
-      warnings.push(err.message || String(err));
-    }
+    // Continue below. The Hub work is queued locally and never blocks approval.
+  } else {
+    return { warning: "" };
   }
 
-  return { warning: warnings.join(" | ") };
+  if (nextEpisode) {
+    const contestants = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+      return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+    });
+    const question = realityTvFormatQuestion_(season.QuestionTemplate, nextEpisode.EpisodeNumber, season);
+    const sync = realityTvSyncEpisodeToHub_(season, nextEpisode, contestants, question);
+    if (sync && sync.error) warnings.push(sync.error);
+  }
+
+  const reviewSync = realityTvUpdateHubReview_(
+    queue,
+    "APPROVED",
+    reviewer,
+    nextEpisode
+      ? "Local approval completed and " + nextEpisode.EpisodeName + " was created."
+      : "Local approval completed."
+  );
+  if (reviewSync && reviewSync.error) warnings.push(reviewSync.error);
+
+  return { warning: warnings.join(" | "), queued: true };
 }
 
 function realityTvApprovalQuestionBuildState_(queue) {

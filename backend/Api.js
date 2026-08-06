@@ -213,6 +213,10 @@ function doGet(e) {
 
       "adminSetupRealityTvSystem",
       "adminConfigureRealityTvHub",
+      "adminSetupExternalResultsBridge",
+      "adminGetExternalResultsBridgeHealth",
+      "adminRunExternalResultsBridgeNow",
+      "adminRetryExternalResultsBridgeFailures",
       "adminGetRealityTvDashboard",
       "adminGetRealityTvDashboardSummary",
       "adminGetRealityTvSeasonDetails",
@@ -895,6 +899,22 @@ function doGet(e) {
 
     if (action === "adminConfigureRealityTvHub") {
       return json(apiAdminConfigureRealityTvHub(params));
+    }
+
+    if (action === "adminSetupExternalResultsBridge") {
+      return json(apiAdminSetupExternalResultsBridge(params));
+    }
+
+    if (action === "adminGetExternalResultsBridgeHealth") {
+      return json(apiAdminGetExternalResultsBridgeHealth(params));
+    }
+
+    if (action === "adminRunExternalResultsBridgeNow") {
+      return json(apiAdminRunExternalResultsBridgeNow(params));
+    }
+
+    if (action === "adminRetryExternalResultsBridgeFailures") {
+      return json(apiAdminRetryExternalResultsBridgeFailures(params));
     }
 
     if (action === "adminGetRealityTvDashboard") {

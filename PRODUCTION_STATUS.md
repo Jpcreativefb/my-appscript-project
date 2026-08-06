@@ -1,5 +1,14 @@
 # Production Status
 
+Current candidate: **v1.2.0 External Results Hub queued bridge**
+
+- Reality TV bulk question materializer from v1.1.18 retained.
+- Hub writes removed from the Reality TV approval critical path.
+- Outbound queue, retries, health status, and inbound staging are implemented.
+- Automatic inbound settlement and Awards Show Manager remain the next phase.
+
+# Production Status
+
 Current production candidate: **v1.1.18**
 
 Reality TV next-episode Extra Questions are now compiled and written in one bulk pass instead of being built one question at a time. Approvals remain serialized across seasons, use real server checkpoints, and can safely retry the idempotent bulk materializer after temporary Google Sheets or lock failures.

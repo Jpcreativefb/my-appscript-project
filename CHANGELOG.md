@@ -1,3 +1,12 @@
+
+## v1.2.0 — External Results Hub queued bridge
+
+- Moved Reality TV Hub mirroring out of the approval/request path into `ExternalResultsHubOutbox`.
+- Added a retrying background bridge worker and Hub health controls.
+- Added `ExternalResultsInbox` for reviewed external deliveries.
+- Changed the Hub bridge to deliver to the inbox instead of writing directly to `CategoryResults`.
+- Added normalized multiple-winner delivery support.
+- Automatic inbox settlement remains disabled pending phase-two verification.
 ## v1.1.18 — Reality TV bulk Extra Question materializer
 
 - Removed the old one-question-at-a-time Extra Question worker from the main-elimination approval path.

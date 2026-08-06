@@ -2388,7 +2388,7 @@ async function renderAdminRealityTvPage() {
     setTimeout(function() {
       adminRealityTvApplyCreateFormat_(false);
       adminRealityTvAnchorPreview_("create");
-
+      adminRealityTvRefreshHubBridgeHealth_();
     }, 0);
 
     const hubStatus = res.hubConfigured
@@ -2413,9 +2413,14 @@ async function renderAdminRealityTvPage() {
               <h2>External Results Hub</h2>
               <div class="admin-sub">Optional mirroring keeps events, markets, mappings, imported results, and review history in the separate Hub.</div>
             </div>
-            <button class="admin-small-button" onclick="adminRealityTvConfigureHub()">${res.hubConfigured ? "Change Hub" : "Connect Hub"}</button>
+            <div class="admin-header-actions">
+              <button class="admin-small-button secondary" onclick="adminRealityTvRunHubBridgeNow(this)">Sync Queue Now</button>
+              <button class="admin-small-button secondary" onclick="adminRealityTvRetryHubBridge(this)">Retry Failed</button>
+              <button class="admin-small-button" onclick="adminRealityTvConfigureHub()">${res.hubConfigured ? "Change Hub" : "Connect Hub"}</button>
+            </div>
           </div>
           ${hubStatus}
+          <div id="realityTvHubBridgeHealth" class="admin-message">Checking background bridge…</div>
         </div>
 
         <details class="card admin-card admin-collapsible-card reality-tv-create-season-card" ${res.seasons && res.seasons.length ? "" : "open"}>
@@ -2585,6 +2590,75 @@ function adminRealityTvSetMessage_(id, message, type) {
   if (!el) return;
   el.className = "admin-message " + (type || "");
   el.textContent = message || "";
+}
+
+function adminRealityTvHubCount_(counts, key) {
+  return counts && Number(counts[key] || 0) || 0;
+}
+
+async function adminRealityTvRefreshHubBridgeHealth_() {
+  const target = document.getElementById("realityTvHubBridgeHealth");
+  if (!target || typeof apiAdminGetExternalResultsBridgeHealth !== "function") return;
+  try {
+    const health = await apiAdminGetExternalResultsBridgeHealth();
+    if (!health || health.success === false) throw new Error((health && health.error) || "Could not read Hub bridge health.");
+    const queued = Number(health.pendingOutbox || 0);
+    const failed = Number(health.failedOutbox || 0);
+    const ready = Number(health.readyInbox || 0);
+    const connected = !!health.connected;
+    target.className = "admin-message " + (failed ? "error" : connected ? "success" : "warning");
+    if (!health.configured) {
+      target.textContent = "Background bridge is ready locally, but no External Results Hub is connected.";
+      return;
+    }
+    target.textContent = [
+      connected ? "Background bridge connected" : "Hub connection needs attention",
+      queued + " queued",
+      failed + " failed",
+      ready + " inbound result" + (ready === 1 ? "" : "s") + " awaiting the next integration phase"
+    ].join(" · ") + (health.issues && health.issues.length ? " · " + health.issues[0] : "");
+  } catch (err) {
+    target.className = "admin-message error";
+    target.textContent = err.message || String(err);
+  }
+}
+
+async function adminRealityTvRunHubBridgeNow(button) {
+  if (button) button.disabled = true;
+  const target = document.getElementById("realityTvHubBridgeHealth");
+  if (target) {
+    target.className = "admin-message";
+    target.textContent = "Syncing queued Hub records in the background bridge…";
+  }
+  try {
+    const result = await apiAdminRunExternalResultsBridgeNow();
+    if (!result || result.success === false) throw new Error((result && result.error) || "Hub bridge sync failed.");
+    await adminRealityTvRefreshHubBridgeHealth_();
+  } catch (err) {
+    if (target) {
+      target.className = "admin-message error";
+      target.textContent = err.message || String(err);
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function adminRealityTvRetryHubBridge(button) {
+  if (button) button.disabled = true;
+  try {
+    const result = await apiAdminRetryExternalResultsBridgeFailures();
+    if (!result || result.success === false) throw new Error((result && result.error) || "Could not retry failed Hub jobs.");
+    await adminRealityTvRunHubBridgeNow(null);
+  } catch (err) {
+    const target = document.getElementById("realityTvHubBridgeHealth");
+    if (target) {
+      target.className = "admin-message error";
+      target.textContent = err.message || String(err);
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
 }
 
 async function adminRealityTvConfigureHub() {

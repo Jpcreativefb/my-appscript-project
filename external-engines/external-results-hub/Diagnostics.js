@@ -52,12 +52,33 @@ function checkExternalResultsHubHealth() {
 
   const mainAppId = PropertiesService.getScriptProperties()
     .getProperty(ERH_MAIN_APP_SPREADSHEET_ID_PROPERTY) || "";
+  let mainAppInboxReady = false;
+  let mainAppInboxRows = 0;
+  let mainAppName = "";
+  if (mainAppId) {
+    try {
+      const mainApp = SpreadsheetApp.openById(mainAppId);
+      mainAppName = mainApp.getName();
+      const inbox = mainApp.getSheetByName("ExternalResultsInbox");
+      if (!inbox) {
+        issues.push("Main Awards App is missing ExternalResultsInbox. Deploy the Awards App bridge setup first.");
+      } else {
+        mainAppInboxReady = true;
+        mainAppInboxRows = Math.max(inbox.getLastRow() - 1, 0);
+      }
+    } catch (err) {
+      issues.push("Main Awards App connection failed: " + (err.message || err));
+    }
+  }
 
   const report = {
     success: issues.length === 0,
     schemaVersion: ERH_SCHEMA_VERSION,
     spreadsheetName: ss.getName(),
     mainAppConfigured: Boolean(mainAppId),
+    mainAppName: mainAppName,
+    mainAppInboxReady: mainAppInboxReady,
+    mainAppInboxRows: mainAppInboxRows,
     counts: counts,
     issues: issues,
     checkedAt: new Date()

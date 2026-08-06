@@ -6,7 +6,7 @@
    approval. No provider can settle the Awards App directly.
 ===================================================== */
 
-const ERH_SCHEMA_VERSION = "2.0.0";
+const ERH_SCHEMA_VERSION = "2.1.0";
 const ERH_MAIN_APP_SPREADSHEET_ID_PROPERTY = "ERH_MAIN_APP_SPREADSHEET_ID";
 const ERH_REVIEW_REQUIRED_FOR_ALL_IMPORTS = true;
 
@@ -205,7 +205,7 @@ function onOpen() {
     .addItem("Rebuild Review Queue", "rebuildExternalReviewQueueNow")
     .addItem("Approve Selected Review Rows", "approveSelectedExternalResults")
     .addItem("Reject Selected Review Rows", "rejectSelectedExternalResults")
-    .addItem("Push Approved Final Results", "pushApprovedExternalResultsNow")
+    .addItem("Deliver Approved Results to App Inbox", "pushApprovedExternalResultsNow")
     .addSeparator()
     .addItem("Configure Main App Spreadsheet", "configureExternalResultsHubMainApp")
     .addItem("Run Health Check", "checkExternalResultsHubHealth")

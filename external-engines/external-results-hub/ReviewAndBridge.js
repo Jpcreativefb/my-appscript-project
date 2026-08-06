@@ -1,8 +1,9 @@
 /* =====================================================
    ADMINISTRATOR REVIEW + MAIN APP BRIDGE
 
-   Only approved FINAL results can be pushed. The bridge
-   writes to the main app's existing CategoryResults sheet.
+   Only approved FINAL results can be delivered. The bridge
+   writes to the main app's ExternalResultsInbox. The Awards
+   App remains responsible for settlement and scoring.
 ===================================================== */
 
 function approveSelectedExternalResults() {
@@ -84,52 +85,49 @@ function pushApprovedExternalResultsNow() {
 
   if (!mainSpreadsheetId) {
     SpreadsheetApp.getUi().alert(
-      "Configure the Main Awards App spreadsheet before pushing approved results."
+      "Configure the Main Awards App spreadsheet before delivering approved results."
     );
     return { success: false, error: "Main spreadsheet is not configured." };
   }
 
   const mainSs = SpreadsheetApp.openById(mainSpreadsheetId);
-  const resultSheet = mainSs.getSheetByName("CategoryResults");
-  if (!resultSheet) {
-    throw new Error("The main Awards App spreadsheet does not contain CategoryResults.");
-  }
+  let inboxSheet = mainSs.getSheetByName("ExternalResultsInbox");
+  if (!inboxSheet) inboxSheet = mainSs.insertSheet("ExternalResultsInbox");
 
-  const requiredHeaders = [
-    "Timestamp",
-    "GameId",
-    "CategoryId",
-    "NomineeId",
-    "ResultStatus",
-    "IsWinner",
-    "FinalRank",
-    "FinalPosition",
-    "ResultValue",
-    "ResultSource",
-    "SettledAt",
-    "Notes"
+  const inboxHeaders = [
+    "DeliveryId", "DeliveryBatchId", "ReviewId", "ImportedResultId", "Provider",
+    "AppGameId", "CategoryId", "NomineeId", "ExternalEventId", "ExternalMarketId",
+    "ExternalSubjectId", "ResultKey", "ResultValue", "WinningOutcome", "WinnersJSON",
+    "IsWinner", "Finality", "EvidenceUrl", "SourceConfigJSON", "Status",
+    "AttemptCount", "LastAttemptAt", "AppliedAt", "ErrorMessage", "CreatedAt", "UpdatedAt"
   ];
-  const resultHeaders = erhEnsureTargetHeaders_(resultSheet, requiredHeaders);
-  const existingKeys = erhReadExistingCategoryResultKeys_(resultSheet, resultHeaders);
+  const headers = erhEnsureTargetHeaders_(inboxSheet, inboxHeaders);
+  const existingDeliveryIds = {};
+  const inboxRows = inboxSheet.getDataRange().getValues();
+  const inboxCol = erhHeaderMap_(headers);
+  inboxRows.slice(1).forEach(function(row) {
+    const deliveryId = erhKey_(row[inboxCol.deliveryid]);
+    if (deliveryId) existingDeliveryIds[deliveryId] = true;
+  });
+
   const reviews = erhReadObjects_(ERH_SHEETS.REVIEW);
   const importedResults = erhReadObjects_(ERH_SHEETS.RESULTS);
   const mappings = erhReadObjects_(ERH_SHEETS.MAPPINGS).filter(function(mapping) {
     return erhBoolean_(mapping.Active, true);
   });
   const resultById = {};
-
   importedResults.forEach(function(result) {
     resultById[erhKey_(result.ImportedResultId)] = result;
   });
 
-  let pushedReviews = 0;
-  let appendedRows = 0;
+  let deliveredReviews = 0;
+  let deliveredRows = 0;
   let waitingFinal = 0;
   let errors = 0;
 
   reviews.forEach(function(review) {
     if (erhKey_(review.ReviewStatus) !== "approved") return;
-    if (erhKey_(review.PushStatus) === "pushed") return;
+    if (["delivered", "pushed"].indexOf(erhKey_(review.PushStatus)) !== -1) return;
 
     const result = resultById[erhKey_(review.ImportedResultId)];
     if (!result) {
@@ -137,7 +135,6 @@ function pushApprovedExternalResultsNow() {
       errors += 1;
       return;
     }
-
     if (erhNormalizeFinality_(result.Finality) !== "FINAL") {
       erhSetReviewPushState_(
         review.ReviewId,
@@ -152,7 +149,6 @@ function pushApprovedExternalResultsNow() {
     const matchingMappings = mappings.filter(function(mapping) {
       return erhMappingMatchesResult_(mapping, result);
     });
-
     if (!matchingMappings.length) {
       erhSetReviewPushState_(
         review.ReviewId,
@@ -164,6 +160,8 @@ function pushApprovedExternalResultsNow() {
       return;
     }
 
+    const batchId = "hub-delivery-" + review.ReviewId;
+    const winners = erhWinningOutcomeList_(result);
     const rowsToAppend = [];
     const mappingErrors = [];
 
@@ -174,92 +172,79 @@ function pushApprovedExternalResultsNow() {
         return;
       }
 
-      const uniqueKey = [
-        mapping.AppGameId,
-        mapping.CategoryId,
-        mapping.NomineeId,
-        result.Provider,
-        result.ImportedResultId
-      ].map(erhKey_).join("|");
-
-      if (existingKeys[uniqueKey]) return;
-
+      const deliveryId = batchId + "-" + mapping.MappingId;
+      if (existingDeliveryIds[erhKey_(deliveryId)]) return;
       const now = new Date();
-      const notes = [
-        "External Results Hub",
-        "ReviewId=" + review.ReviewId,
-        "ImportedResultId=" + result.ImportedResultId,
-        result.EvidenceUrl ? "Evidence=" + result.EvidenceUrl : ""
-      ].filter(Boolean).join("; ");
-
       const rowObject = {
-        Timestamp: now,
-        GameId: mapping.AppGameId,
+        DeliveryId: deliveryId,
+        DeliveryBatchId: batchId,
+        ReviewId: review.ReviewId,
+        ImportedResultId: result.ImportedResultId,
+        Provider: result.Provider,
+        AppGameId: mapping.AppGameId,
         CategoryId: mapping.CategoryId,
         NomineeId: mapping.NomineeId,
-        ResultStatus: "FINAL",
-        IsWinner: evaluation.isWinner,
-        FinalRank: "",
-        FinalPosition: "",
+        ExternalEventId: result.ExternalEventId,
+        ExternalMarketId: result.ExternalMarketId,
+        ExternalSubjectId: mapping.ExternalSubjectId,
+        ResultKey: result.ResultKey,
         ResultValue: result.ResultValue,
-        ResultSource: "external-results-hub:" + result.Provider,
-        SettledAt: now,
-        Notes: notes
+        WinningOutcome: result.WinningOutcome,
+        WinnersJSON: JSON.stringify(winners),
+        IsWinner: evaluation.isWinner,
+        Finality: "FINAL",
+        EvidenceUrl: result.EvidenceUrl || review.EvidenceUrl || "",
+        SourceConfigJSON: mapping.SourceConfigJSON || "{}",
+        Status: "READY",
+        AttemptCount: 0,
+        LastAttemptAt: "",
+        AppliedAt: "",
+        ErrorMessage: "",
+        CreatedAt: now,
+        UpdatedAt: now
       };
-
-      rowsToAppend.push(resultHeaders.map(function(header) {
-        return Object.prototype.hasOwnProperty.call(rowObject, header)
-          ? rowObject[header]
-          : "";
+      rowsToAppend.push(headers.map(function(header) {
+        return Object.prototype.hasOwnProperty.call(rowObject, header) ? rowObject[header] : "";
       }));
-      existingKeys[uniqueKey] = true;
+      existingDeliveryIds[erhKey_(deliveryId)] = true;
     });
 
     if (mappingErrors.length) {
-      erhSetReviewPushState_(
-        review.ReviewId,
-        "ERROR",
-        mappingErrors.join(" | "),
-        ""
-      );
+      erhSetReviewPushState_(review.ReviewId, "ERROR", mappingErrors.join(" | "), "");
       errors += 1;
       return;
     }
 
     if (rowsToAppend.length) {
-      resultSheet.getRange(
-        resultSheet.getLastRow() + 1,
-        1,
-        rowsToAppend.length,
-        resultHeaders.length
-      ).setValues(rowsToAppend);
-      appendedRows += rowsToAppend.length;
+      inboxSheet.getRange(inboxSheet.getLastRow() + 1, 1, rowsToAppend.length, headers.length)
+        .setValues(rowsToAppend);
+      deliveredRows += rowsToAppend.length;
     }
 
     erhSetReviewPushState_(
       review.ReviewId,
-      "PUSHED",
+      "DELIVERED",
       rowsToAppend.length
-        ? rowsToAppend.length + " CategoryResults row(s) added."
-        : "Already present; no duplicate rows added.",
+        ? rowsToAppend.length + " result mapping row(s) delivered to ExternalResultsInbox."
+        : "Already delivered; no duplicate inbox rows added.",
       new Date()
     );
-    pushedReviews += 1;
+    deliveredReviews += 1;
   });
 
   SpreadsheetApp.getActive().toast(
-    "Reviews pushed: " + pushedReviews +
-      " • CategoryResults rows: " + appendedRows +
+    "Reviews delivered: " + deliveredReviews +
+      " • Inbox rows: " + deliveredRows +
       " • Waiting final: " + waitingFinal +
       " • Errors: " + errors,
-    "Main App Bridge",
+    "Awards App Inbox",
     10
   );
 
   return {
     success: errors === 0,
-    pushedReviews: pushedReviews,
-    appendedRows: appendedRows,
+    deliveredReviews: deliveredReviews,
+    deliveredRows: deliveredRows,
     waitingFinal: waitingFinal,
     errors: errors,
     mainSpreadsheetName: mainSs.getName()
@@ -281,10 +266,26 @@ function erhMappingMatchesResult_(mapping, result) {
   );
 }
 
+function erhWinningOutcomeList_(result) {
+  const raw = result && (result.WinningOutcome !== undefined && result.WinningOutcome !== ""
+    ? result.WinningOutcome
+    : result.ResultValue);
+  if (Array.isArray(raw)) return raw.map(erhString_).filter(Boolean);
+  const text = erhString_(raw);
+  if (!text) return [];
+  if (text.charAt(0) === "[") {
+    try {
+      const parsed = JSON.parse(text);
+      if (Array.isArray(parsed)) return parsed.map(erhString_).filter(Boolean);
+    } catch (err) {}
+  }
+  return text.split(/\s*,\s*|\s*\|\s*/).map(erhString_).filter(Boolean);
+}
+
 function erhEvaluateMappingWinner_(mapping, result) {
   const expectedOutcome = erhString_(mapping.ExpectedOutcome);
   const externalSubjectId = erhString_(mapping.ExternalSubjectId);
-  const winningOutcome = erhString_(result.WinningOutcome);
+  const winners = erhWinningOutcomeList_(result).map(erhKey_).filter(Boolean);
   const resultValue = result.ResultValue;
   const operator = erhKey_(mapping.ComparisonOperator);
   const threshold = mapping.Threshold;
@@ -292,7 +293,7 @@ function erhEvaluateMappingWinner_(mapping, result) {
   if (expectedOutcome) {
     return {
       ok: true,
-      isWinner: erhKey_(expectedOutcome) === erhKey_(winningOutcome || resultValue)
+      isWinner: winners.indexOf(erhKey_(expectedOutcome)) !== -1
     };
   }
 
@@ -301,7 +302,7 @@ function erhEvaluateMappingWinner_(mapping, result) {
     const candidates = [externalSubjectId, subjectName].map(erhKey_).filter(Boolean);
     return {
       ok: true,
-      isWinner: candidates.indexOf(erhKey_(winningOutcome || resultValue)) !== -1
+      isWinner: candidates.some(function(candidate) { return winners.indexOf(candidate) !== -1; })
     };
   }
 

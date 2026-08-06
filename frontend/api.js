@@ -1662,6 +1662,18 @@ async function apiAdminConfigureRealityTvHub(spreadsheetId) {
   });
 }
 
+async function apiAdminGetExternalResultsBridgeHealth() {
+  return apiAdminRealityTvRequest_("adminGetExternalResultsBridgeHealth", {});
+}
+
+async function apiAdminRunExternalResultsBridgeNow() {
+  return apiAdminRealityTvRequest_("adminRunExternalResultsBridgeNow", {});
+}
+
+async function apiAdminRetryExternalResultsBridgeFailures() {
+  return apiAdminRealityTvRequest_("adminRetryExternalResultsBridgeFailures", {});
+}
+
 async function apiAdminGetRealityTvDashboard() {
   return apiAdminRealityTvRequest_("adminGetRealityTvDashboard", {});
 }

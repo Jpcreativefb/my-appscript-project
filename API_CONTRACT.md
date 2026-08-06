@@ -1028,3 +1028,20 @@ QUESTIONS COMPLETE
 
 The pass is idempotent: existing questions are updated or verified, missing answers are added, and a retry must not intentionally duplicate valid episode-question records. Approval-owned build jobs use `ManagedBy = APPROVAL` and are ignored by the generic question-build continuation trigger.
 
+
+
+## External Results Hub Bridge v1.2.0
+
+### Admin actions
+
+- `adminSetupExternalResultsBridge` — creates the local outbox and inbox sheets.
+- `adminGetExternalResultsBridgeHealth` — returns Hub connectivity, schema issues, and local queue counts.
+- `adminRunExternalResultsBridgeNow` — processes eligible outbound jobs immediately.
+- `adminRetryExternalResultsBridgeFailures` — resets failed outbound jobs to queued.
+
+### Local sheets
+
+- `ExternalResultsHubOutbox` — asynchronous outbound jobs to the Hub.
+- `ExternalResultsInbox` — reviewed inbound delivery rows from the Hub.
+
+`ExternalResultsInbox` rows are staged only in v1.2.0. They are not automatically settled.
