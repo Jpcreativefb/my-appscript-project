@@ -105,12 +105,20 @@ function doPost(e) {
       return json(apiAdminUpdateRealityTvQuestionPack(body));
     }
 
+    if (action === "adminApplyRealityTvEpisodeQuestionPlan") {
+      return json(apiAdminApplyRealityTvEpisodeQuestionPlan(body));
+    }
+
     if (action === "adminAddRealityTvCustomQuestionTemplate") {
       return json(apiAdminAddRealityTvCustomQuestionTemplate(body));
     }
 
     if (action === "adminDeleteRealityTvCustomQuestionTemplate") {
       return json(apiAdminDeleteRealityTvCustomQuestionTemplate(body));
+    }
+
+    if (action === "adminResetRealityTvApproval") {
+      return json(apiAdminResetRealityTvApproval(body));
     }
 
     if (action === "adminSaveRealityTvEpisodeVote") {
@@ -936,6 +944,10 @@ function doGet(e) {
       return json(apiAdminContinueRealityTvApproval(params));
     }
 
+    if (action === "adminResetRealityTvApproval") {
+      return json(apiAdminResetRealityTvApproval(params));
+    }
+
     if (action === "adminRejectRealityTvResult") {
       return json(apiAdminRejectRealityTvResult(params));
     }
@@ -946,6 +958,10 @@ function doGet(e) {
 
     if (action === "adminUpdateRealityTvQuestionPack") {
       return json(apiAdminUpdateRealityTvQuestionPack(params));
+    }
+
+    if (action === "adminApplyRealityTvEpisodeQuestionPlan") {
+      return json(apiAdminApplyRealityTvEpisodeQuestionPlan(params));
     }
 
     if (action === "adminAddRealityTvCustomQuestionTemplate") {

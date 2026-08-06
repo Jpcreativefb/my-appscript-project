@@ -1,5 +1,21 @@
 # Production Status
 
+Current production candidate: **v1.1.15**
+
+Reality TV approvals can now be reset safely by stage. Unexpected double or larger eliminations settle every eliminated contestant as a winning answer. Main-elimination approval automatically creates the next episode and inherits the season's Extra Question defaults, while **Update This Episode Only** supports one-off changes without altering future episodes.
+
+## v1.1.15 release readiness
+
+- Backend and frontend deployment required.
+- 57 regression test files passed.
+- 165 JavaScript files passed syntax validation.
+- Complete `PRODUCTION_SMOKE_TEST_V1_1_15.md` after deployment.
+- External Results Hub connection remains the next planned Reality TV phase.
+
+---
+
+# Production Status
+
 Current production candidate: **v1.1.14**
 
 Reality TV episode voting now supports tribe-restricted full-round entry with an explicit outside-voter exception. Main and supplemental approvals use short stage claims plus retryable spreadsheet operations, eliminating the self-created global-lock timeout. All Show Format & Episode Questions sections start collapsed.

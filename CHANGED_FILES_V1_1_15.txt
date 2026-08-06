@@ -1,0 +1,22 @@
+Reality TV v1.1.15 changed files compared with v1.1.14
+
+API_CONTRACT.md
+CHANGED_FILES_V1_1_15.txt
+CHANGELOG.md
+PRODUCTION_REALITY_TV_APPROVAL_EPISODE_PLAN_V1_1_15.md
+PRODUCTION_SMOKE_TEST_V1_1_15.md
+PRODUCTION_STATUS.md
+backend/Api.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/app.html
+frontend/app.js
+frontend/js/api.js
+frontend/js/app.js
+frontend/js/pages/adminRealityTv.js
+tests/reality_tv_approval_episode_plan_v1115_tests.js
+tests/reality_tv_inline_admin_actions_v1113_tests.js
+tests/reality_tv_manual_results_v1111_tests.js
+tests/reality_tv_mass_votes_approval_v1114_tests.js
+tests/reality_tv_season_manager_tests.js

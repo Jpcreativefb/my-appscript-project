@@ -667,7 +667,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
 
       <details class="reality-tv-config-section">
         <summary>4. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
-        <div class="admin-sub">Checked preset and custom questions are included in one automatic current-episode build. Group-based questions require at least two valid Team / Tribe values.</div>
+        <div class="admin-sub">When the main elimination is approved, the next episode automatically inherits the season defaults shown here, including points and display settings. Use <b>Update This Episode Only</b> for a one-time change without affecting later episodes.</div>
         ${adminRealityTvBuildMasterStatusHtml_(bundle)}
         <details class="reality-tv-build-help">
           <summary>How Save & Build and Resume Build work ${adminRealityTvHelp_("Question build help", "Normally click Save Format & Build once. Resume Build is only a recovery button after a timeout, closed browser, or interrupted connection.")}</summary>
@@ -683,7 +683,9 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         ${completedSummary}
         <div class="admin-actions">
           <button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button>
+          <button class="admin-small-button secondary" onclick="adminRealityTvApplyEpisodeQuestionPlan_('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Update This Episode Only</button>
           <button class="admin-small-button secondary" onclick="adminRealityTvRepairQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Verify & Repair Extra Questions</button>
+          ${adminRealityTvHelp_("This Episode Only", "Uses the checked questions and current point/display values only for this open episode. Unchecked questions are removed only when no picks or results depend on them. Season defaults for future episodes remain unchanged.")}
           ${adminRealityTvHelp_("Verify & Repair", "Use this when a question says built or verified but is missing from the game, has no answers, or the build counter will not finish. It reuses existing rows and repairs only missing questions or answers.")}
         </div>
         <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
@@ -691,7 +693,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
 
       <details class="reality-tv-custom-question-builder reality-tv-config-section">
         <summary>5. Custom Questions</summary>
-        <div class="admin-sub"><b>You can create more than one.</b> Saving a custom question enables it and automatically inserts it into the current episode build. It also remains available for future episodes until disabled or deleted.</div>
+        <div class="admin-sub"><b>You can create more than one.</b> By default a custom question is built now and remains enabled for future episodes. Check <b>This episode only</b> for a one-time question.</div>
         ${adminRealityTvSavedCustomQuestionsHtml_(bundle)}
         <div class="reality-tv-custom-builder-heading"><b>Create Another Custom Question</b><span>Choose where its answers come from before saving.</span></div>
         <div class="admin-form-grid reality-tv-custom-question-grid">
@@ -701,6 +703,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
           <label>${adminRealityTvFieldTitle_("Answer display", "Automatic uses image cards when the selected source has images.")}<select id="realityTvCustomLayout_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="auto">Automatic</option><option value="image">Image cards</option><option value="compact">Compact image cards</option><option value="list">List</option><option value="text">Text cards</option></select></label>
           <label>${adminRealityTvFieldTitle_("Image source", "Roster reuses participant/team photos. Group uses saved group images. Manual choices can be text-only unless custom images are added later.")}<select id="realityTvCustomImageSource_${adminRealityTvEscape_(season.SeasonId)}" class="input"><option value="auto">Automatic</option><option value="roster">Participant / team roster</option><option value="group">Group / tribe image</option><option value="custom">Custom answer images</option><option value="none">No images</option></select></label>
           <label id="realityTvCustomOptionsWrap_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-wide-field" style="display:none">${adminRealityTvFieldTitle_("Manual answers", "Use this for judges, special guests, locations, outcomes, or any answers not stored in the roster. Enter one possible answer per line. At least two are required.")}<textarea id="realityTvCustomOptions_${adminRealityTvEscape_(season.SeasonId)}" class="input" rows="5" placeholder="Judge A\nJudge B\nJudge C" oninput="adminRealityTvRenderCustomAnswerPreview_('${adminRealityTvEscape_(season.SeasonId)}')"></textarea></label>
+          <label class="reality-tv-inline-option"><input id="realityTvCustomEpisodeOnly_${adminRealityTvEscape_(season.SeasonId)}" type="checkbox"><span>This episode only — do not enable for future episodes</span>${adminRealityTvHelp_("One-time custom question", "Builds the custom question in the current open episode and saves its template disabled. It will not appear automatically in later episodes unless you enable it later.")}</label>
           <label class="reality-tv-inline-option"><input id="realityTvCustomNoOutcome_${adminRealityTvEscape_(season.SeasonId)}" type="checkbox"><span>Add a no-result option</span>${adminRealityTvHelp_("No-result option", "Adds an answer such as No one, No challenge, or No result so the question can still be settled when the event does not happen.")}</label>
           <label>${adminRealityTvFieldTitle_("No-result label", "Text shown for the optional no-result answer.")}<input id="realityTvCustomNoOutcomeLabel_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="No one"></label>
         </div>
@@ -790,6 +793,8 @@ function adminRealityTvClearCustomQuestion_(seasonId) {
   });
   const source = document.getElementById("realityTvCustomSource_" + seasonId);
   if (source) source.value = "active-participants";
+  const episodeOnly = document.getElementById("realityTvCustomEpisodeOnly_" + seasonId);
+  if (episodeOnly) episodeOnly.checked = false;
   const noOutcome = document.getElementById("realityTvCustomNoOutcome_" + seasonId);
   if (noOutcome) noOutcome.checked = false;
   adminRealityTvCustomSourceChanged_(seasonId);
@@ -1455,7 +1460,7 @@ function adminRealityTvResultPanel_(bundle) {
           <button class="button admin-button" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">
             ${isApproving ? "Resume Approval" : "Approve &amp; Build Next Episode"}
           </button>
-          ${isApproving ? "" : `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
+          ${isApproving ? `<button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Reset Stuck Approval</button>` : `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
         </div>
       </div>
     `;
@@ -1487,15 +1492,15 @@ function adminRealityTvResultPanel_(bundle) {
       <div class="admin-form-grid reality-tv-result-grid">
         <label>
           Result type
-          <!-- Double elimination (question is pushed) remains supported as the two-person case inside Multiple elimination. -->
+          <!-- Two or more eliminated contestants are all valid winning answers. -->
           <select id="realityTvOutcome_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvOutcomeChanged('${adminRealityTvEscape_(season.SeasonId)}')">
             <option value="elimination">Standard elimination</option>
-            <option value="multiple-elimination">Multiple elimination — select 2 or more (question is pushed)</option>
+            <option value="multiple-elimination">Multiple elimination — select 2 or more (each is a winner)</option>
             <option value="no-elimination">No elimination (question is pushed)</option>
             <option value="medical-withdrawal">Medical withdrawal</option>
             <option value="quit">Contestant quit</option>
           </select>
-          <span class="admin-sub">Use Multiple elimination when the episode unexpectedly removes two or more contestants. The original single-elimination prediction is pushed while every selected contestant is removed from the active roster.</span>
+          <span class="admin-sub">Use Multiple elimination when the episode unexpectedly removes two or more contestants. Every selected contestant is a correct winning answer, so any user who picked one of them receives the normal elimination points.</span>
         </label>
         <label>
           Evidence URL (optional)
@@ -2701,6 +2706,26 @@ async function adminRealityTvApproveResult(queueId) {
   }
 }
 
+async function adminRealityTvResetApproval(queueId) {
+  if (!queueId) return alert("Approval queue ID is missing. Refresh and try again.");
+  if (!confirm("Reset this stuck approval?\n\nThe manager will inspect what already completed and resume only the first unfinished stage. It will not intentionally settle the episode or create the next episode twice.")) return;
+  const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
+    .flatMap(function(bundle) { return bundle.queue || []; })
+    .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
+  try {
+    const state = await apiAdminResetRealityTvApproval(queueId);
+    if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not reset the approval."));
+    alert((state.message || "Approval reset.") + "\n\nSelect Resume Approval to continue.");
+    if (existing && existing.SeasonId) {
+      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
+  } catch (err) {
+    alert(err && err.message ? err.message : String(err));
+  }
+}
+
 async function adminRealityTvRejectResult(queueId) {
   const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
     .flatMap(function(bundle) { return bundle.queue || []; })
@@ -2848,6 +2873,29 @@ async function adminRealityTvSavePickRules(seasonId) {
   }
 }
 
+async function adminRealityTvApplyEpisodeQuestionPlan_(seasonId, episodeId) {
+  if (!episodeId) return adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Create or repair the current episode first.", "error");
+  const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
+    return box.value;
+  });
+  if (!confirm("Update Extra Questions for this episode only?\n\nChecked questions will be built or updated with the point and display values shown. Unchecked questions will be removed only when no picks or results depend on them. Future episode defaults will not change.")) return;
+  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Updating only this episode's Extra Questions…", "info");
+  try {
+    const state = await apiAdminApplyRealityTvEpisodeQuestionPlan({
+      seasonId: seasonId,
+      episodeId: episodeId,
+      enabledQuestionTypesJSON: JSON.stringify(selected),
+      questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_(seasonId)),
+      questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_(seasonId))
+    });
+    if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not update this episode's questions."));
+    alert(state.message || "This episode's Extra Questions were updated.");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvQuestionPackMessage_" + seasonId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, err && err.message ? err.message : String(err), "error");
+  }
+}
+
 async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
   const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
     return box.value;
@@ -2910,12 +2958,13 @@ async function adminRealityTvAddCustomQuestion(seasonId, episodeId) {
       layoutType: document.getElementById("realityTvCustomLayout_" + seasonId).value,
       imageSource: document.getElementById("realityTvCustomImageSource_" + seasonId).value,
       manualOptionsJSON: JSON.stringify(manualOptions),
+      episodeOnly: document.getElementById("realityTvCustomEpisodeOnly_" + seasonId).checked,
       includeNoOutcome: document.getElementById("realityTvCustomNoOutcome_" + seasonId).checked,
       noOutcomeLabel: document.getElementById("realityTvCustomNoOutcomeLabel_" + seasonId).value.trim()
     });
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save the custom question."));
     if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
-    alert((state.message || state.lastMessage || "Custom question saved and built.") + "\n\nIt is now part of the current episode build and remains available for future episodes.");
+    alert(state.message || state.lastMessage || "Custom question saved and built.");
     await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvCustomMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, err.message || String(err), "error");

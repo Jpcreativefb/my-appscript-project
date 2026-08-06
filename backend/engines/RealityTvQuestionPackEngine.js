@@ -1444,7 +1444,7 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
     AnswerSource: answerSource,
     ResultKey: realityTvSlug_(payload.resultKey || templateId),
     Points: Math.max(0, realityTvNumber_(payload.points, realityTvNumber_(season.Points, 1))),
-    Enabled: true,
+    Enabled: !realityTvBool_(payload.episodeOnly),
     DisplayOrder: Math.max(10, realityTvNumber_(payload.displayOrder, 900)),
     IncludeNoOutcome: realityTvBool_(payload.includeNoOutcome),
     NoOutcomeLabel: realityTvString_(payload.noOutcomeLabel || "No one"),
@@ -1460,6 +1460,20 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
     REALITY_TV_QUESTION_TEMPLATE_HEADERS, ["SeasonId", "TemplateId"], row);
   const episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, true);
   if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
+  if (realityTvBool_(payload.episodeOnly)) {
+    const built = realityTvBuildSupplementalQuestionForTemplate_(season, episode, row, { skipHubSync: true });
+    return {
+      success: true,
+      complete: true,
+      customTemplateId: templateId,
+      episodeOnly: true,
+      created: built && !built.skipped ? 1 : 0,
+      skipped: built && built.skipped ? 1 : 0,
+      message: built && built.skipped
+        ? "The custom question was saved for this episode only but could not be built: " + (built.reason || "not enough answers")
+        : "Custom question saved and built for this episode only. It is disabled for future episodes unless you enable it later."
+    };
+  }
   const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId).filter(function(item) { return realityTvBool_(item.Enabled); }).map(function(item) { return item.TemplateId; });
   let state = realityTvStartQuestionPackBuild_(season, episode, enabledTypes);
   if (!state.complete) state = realityTvAdvanceQuestionPackBuild_(state, Math.max(4, enabledTypes.length + 1), 22000);
@@ -1541,6 +1555,122 @@ function apiAdminDeleteRealityTvCustomQuestionTemplate(payload) {
       : (deletedCurrentQuestion
           ? "Custom question deleted from the template list and the current episode."
           : "Custom question template deleted.")
+  };
+}
+
+function realityTvDeleteEpisodeQuestionForPlan_(season, question) {
+  if (!question) return { removed: false, preserved: false };
+  if (realityTvString_(question.Status).toUpperCase() === "FINAL") {
+    return { removed: false, preserved: true, reason: "finalized history" };
+  }
+  const queues = realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_QUESTION_QUEUE_SHEET).filter(function(row) {
+    return realityTvKey_(row.EpisodeQuestionId) === realityTvKey_(question.EpisodeQuestionId);
+  });
+  const activeQueue = queues.some(function(row) {
+    return ["PENDING", "APPROVING", "APPROVED"].indexOf(realityTvString_(row.ReviewStatus).toUpperCase()) !== -1;
+  });
+  if (activeQueue) return { removed: false, preserved: true, reason: "saved result or approval history" };
+
+  let deleted = { success: false };
+  try {
+    deleted = typeof adminDeleteCategory === "function"
+      ? adminDeleteCategory({ gameId: season.GameId, categoryId: question.CategoryId })
+      : { success: false };
+  } catch (err) {
+    return { removed: false, preserved: true, reason: err.message || String(err) };
+  }
+  if (!deleted || !deleted.success) {
+    return { removed: false, preserved: true, reason: "saved picks, wagers, or results" };
+  }
+
+  const queueSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_QUESTION_QUEUE_SHEET);
+  if (queueSheet) queues.sort(function(a, b) { return b.__rowNumber - a.__rowNumber; }).forEach(function(row) {
+    queueSheet.deleteRow(row.__rowNumber);
+  });
+  const questionSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODE_QUESTIONS_SHEET);
+  if (questionSheet) questionSheet.deleteRow(question.__rowNumber);
+  return { removed: true, preserved: false };
+}
+
+function apiAdminApplyRealityTvEpisodeQuestionPlan(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+  realityTvEnsureQuestionPackSystem_();
+  const season = realityTvGetSeason_(payload.seasonId);
+  if (!season) throw new Error("Reality TV season not found.");
+  const episode = realityTvResolveQuestionBuildEpisode_(season, payload.episodeId, false);
+  if (!episode) throw new Error("Current episode not found.");
+  if (realityTvString_(episode.Status).toUpperCase() === "FINAL") {
+    throw new Error("Finalized episode questions cannot be changed.");
+  }
+
+  const requested = realityTvParseJson_(payload.enabledQuestionTypesJSON || payload.enabledQuestionTypes || [], []);
+  const selectedIds = (Array.isArray(requested) ? requested : []).map(realityTvKey_).filter(function(id, index, all) {
+    return id && all.indexOf(id) === index;
+  });
+  const pointsById = realityTvQuestionPointsMap_(payload.questionPointsJSON || payload.questionPoints || {});
+  const displayById = realityTvQuestionDisplayMap_(payload.questionDisplayJSON || payload.questionDisplay || {});
+  const templates = realityTvQuestionTemplatesForSeason_(season.SeasonId);
+  const templatesById = {};
+  templates.forEach(function(row) { templatesById[realityTvKey_(row.TemplateId)] = row; });
+  selectedIds.forEach(function(id) {
+    if (!templatesById[id]) throw new Error("Question template not found: " + id);
+  });
+
+  realityTvCancelOtherQuestionBuildsForEpisode_(season.SeasonId, episode.EpisodeId, "");
+  const existingQuestions = realityTvEpisodeQuestionsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId);
+  });
+  const selectedLookup = {};
+  selectedIds.forEach(function(id) { selectedLookup[id] = true; });
+  let removed = 0;
+  const preserved = [];
+  existingQuestions.forEach(function(question) {
+    const id = realityTvKey_(question.TemplateId || question.QuestionType);
+    if (selectedLookup[id]) return;
+    const result = realityTvDeleteEpisodeQuestionForPlan_(season, question);
+    if (result.removed) removed += 1;
+    if (result.preserved) preserved.push({ templateId: id, reason: result.reason || "historical data" });
+  });
+
+  let built = 0;
+  let skipped = 0;
+  const results = [];
+  const setup = adminGetGameSetup({ gameId: season.GameId });
+  selectedIds.forEach(function(id) {
+    const template = Object.assign({}, templatesById[id]);
+    if (Object.prototype.hasOwnProperty.call(pointsById, id)) template.Points = pointsById[id];
+    if (displayById[id]) {
+      template.LayoutType = realityTvNormalizeLayoutType_(displayById[id].layoutType || template.LayoutType || "auto");
+      template.ImageSource = realityTvNormalizeImageSource_(displayById[id].imageSource || template.ImageSource || "auto");
+    }
+    const result = realityTvBuildSupplementalQuestionForTemplate_(season, episode, template, {
+      setup: setup,
+      skipHubSync: true
+    });
+    if (result.skipped) skipped += 1;
+    else built += 1;
+    results.push({
+      templateId: id,
+      status: result.skipped ? "SKIPPED" : "READY",
+      message: result.skipped ? (result.reason || "Not enough answers") : "Ready in this episode."
+    });
+  });
+
+  realityTvClearRuntimeCaches_(season.GameId, season.SeasonId);
+  return {
+    success: true,
+    complete: true,
+    episodeId: episode.EpisodeId,
+    selectedCount: selectedIds.length,
+    builtCount: built,
+    removedCount: removed,
+    skippedCount: skipped,
+    preserved: preserved,
+    results: results,
+    message: "This episode's Extra Questions were updated: " + built + " ready, " + removed + " removed" +
+      (skipped ? ", " + skipped + " skipped" : "") +
+      (preserved.length ? ", " + preserved.length + " preserved because picks or results already exist" : "") + ". Future episode defaults were not changed."
   };
 }
 

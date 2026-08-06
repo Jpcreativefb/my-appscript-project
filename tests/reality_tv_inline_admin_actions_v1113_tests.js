@@ -14,7 +14,7 @@ assert(manager.includes('await adminRealityTvRefreshSeasonDetails_(seasonId'), "
 assert(appJs.includes('const usePageLoader = options.suppressLoader !== true;'), "Main app navigation must support suppressLoader");
 assert(appJs.includes('if (usePageLoader) hideLoader();'), "Main app must not hide a loader it did not open");
 assert.strictEqual(appJs, appCompat, "Both app loader copies must remain synchronized");
-assert(appJs.includes('APP_ROUTE_HOTFIX_VERSION = \"v1114-reality-tv-votes-approval\"'), "Route hotfix version must force fresh admin modules");
-assert(fs.readFileSync(path.join(root, 'frontend/app.html'), 'utf8').includes('hotfix=v1114-reality-tv-votes-approval'), "App shell must force a fresh app.js request");
+assert(appJs.includes('APP_ROUTE_HOTFIX_VERSION = \"v1115-reality-tv-approval-episode-plan\"'), "Route hotfix version must force fresh admin modules");
+assert(fs.readFileSync(path.join(root, 'frontend/app.html'), 'utf8').includes('hotfix=v1115-reality-tv-approval-episode-plan'), "App shell must force a fresh app.js request");
 
 console.log("Reality TV inline admin action v1.1.13 tests passed.");

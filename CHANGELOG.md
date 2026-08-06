@@ -1,3 +1,13 @@
+## v1.1.15 — Reality TV approval recovery and episode question plans
+
+- Added a stage-aware **Reset Stuck Approval** action that resumes from settlement, next-episode creation, or final sync without intentionally repeating completed work.
+- Changed unexpected two-or-more eliminations from push settlement to multiple-winner settlement; every eliminated contestant is a valid winning answer and earns normal points for matching picks.
+- Confirmed that main-elimination approval automatically creates the next episode when more than one active contestant remains.
+- Kept automatic inheritance of enabled Extra Questions, points, wording, layout, image source, and answer rules for each newly created episode.
+- Added **Update This Episode Only** so administrators can add, remove, or change Extra Questions for one open episode without changing future defaults.
+- Added one-time custom questions that build in the current episode but remain disabled for future episodes.
+- Added v1.1.15 runtime and regression coverage.
+
 ## v1.1.14 — Reality TV mass voting and approval resilience
 
 - Added one-click full-round vote entry restricted to the detected losing or Tribal Council tribe.

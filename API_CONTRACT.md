@@ -924,3 +924,22 @@ The existing single-ballot save action remains supported for corrections.
 
 Temporary Spreadsheet service errors and retryable lock errors are retried with bounded backoff. The persisted stage remains resumable, and duplicate requests receive an already-processing response rather than starting concurrent settlement work.
 
+
+
+## Reality TV approval reset and episode question plan contract — v1.1.15
+
+### `adminResetRealityTvApproval`
+
+Administrator-only POST action. Accepts `queueId`. It inspects the episode, remaining roster, saved next episode, and current approval stage, clears the stale error/progress claim, and resumes from the first unfinished stage. Completed settlement and next-episode creation are not intentionally repeated.
+
+### `adminApplyRealityTvEpisodeQuestionPlan`
+
+Administrator-only POST action. Accepts `seasonId`, `episodeId`, `enabledQuestionTypesJSON`, `questionPointsJSON`, and `questionDisplayJSON`. It builds or updates the selected Extra Questions for the specified open episode, safely removes unselected questions only when no picks/results depend on them, and leaves the season template defaults unchanged.
+
+### Main elimination multiple-winner result
+
+`multiple-elimination` settles every selected contestant as a winning nominee in `CategoryResults`. Matching picks receive the category's normal points. Only `no-elimination` uses push settlement.
+
+### Next-episode inheritance
+
+Approval of the main elimination creates the next episode automatically when `AutoCreateNextEpisode` is enabled and more than one active contestant remains. The new episode inherits the enabled season templates and their current points, display, image, wording, and answer-source settings. Supplemental-question approvals never create another episode.

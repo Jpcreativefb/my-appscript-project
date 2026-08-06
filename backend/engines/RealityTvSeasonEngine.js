@@ -3428,18 +3428,26 @@ function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
   });
   if (!category) throw new Error("Episode question not found in Game Setup.");
 
-  const isPush = outcomeType === "no-elimination" || outcomeType === "double-elimination" || outcomeType === "multiple-elimination";
-  const winnerId = !isPush && selected.length === 1 ? selected[0].ContestantId : "";
+  // A no-elimination episode pushes the prediction because there is no correct
+  // eliminated contestant. Double or larger eliminations are different: every
+  // contestant who leaves is a valid winning answer and receives normal points.
+  const isPush = outcomeType === "no-elimination";
+  const winnerIds = isPush ? [] : selected.map(function(row) { return row.ContestantId; });
+  const winnerLookup = {};
+  winnerIds.forEach(function(id) { winnerLookup[realityTvKey_(id)] = true; });
+  const winnerId = winnerIds.length === 1 ? winnerIds[0] : "";
   const resultPayloads = (category.nominees || []).map(function(nominee) {
     return {
       gameId: season.GameId,
       categoryId: episode.CategoryId,
       nomineeId: nominee.nomineeId,
       resultStatus: isPush ? "push" : "settled",
-      isWinner: !isPush && realityTvKey_(nominee.nomineeId) === realityTvKey_(winnerId),
+      isWinner: !isPush && winnerLookup[realityTvKey_(nominee.nomineeId)] === true,
       resultValue: outcomeType,
       resultSource: "manual-reality-tv",
-      notes: "Approved in Reality TV Season Manager by " + (reviewer || "administrator")
+      notes: winnerIds.length > 1
+        ? "Approved as one of multiple eliminated winners in Reality TV Season Manager by " + (reviewer || "administrator")
+        : "Approved in Reality TV Season Manager by " + (reviewer || "administrator")
     };
   });
 
@@ -3464,7 +3472,9 @@ function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
     autoSettle: false,
     requireAdminReview: true,
     username: reviewer || "",
-    notes: "Approved Reality TV result"
+    notes: winnerIds.length > 1
+      ? "Approved Reality TV result with multiple eliminated winners"
+      : "Approved Reality TV result"
   });
 
   const now = new Date();
@@ -3518,6 +3528,7 @@ function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
     remainingCount: remaining.length,
     selectedIds: selectedIds,
     winnerId: winnerId,
+    winnerIds: winnerIds,
     isPush: isPush
   };
 }
@@ -3774,6 +3785,71 @@ function apiAdminContinueRealityTvApproval(payload) {
   }
 }
 
+
+function apiAdminResetRealityTvApproval(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+  const queue = realityTvGetQueue_(payload.queueId);
+  if (!queue) throw new Error("Review queue item not found.");
+
+  const status = realityTvString_(queue.ReviewStatus).toUpperCase();
+  if (status === "APPROVED") {
+    const completeState = realityTvApprovalState_(queue);
+    completeState.message = "This approval is already complete. No reset was needed.";
+    return completeState;
+  }
+  if (status !== "APPROVING") {
+    throw new Error("Only an approval currently marked APPROVING can be reset.");
+  }
+
+  const season = realityTvGetSeason_(queue.SeasonId);
+  const episode = realityTvGetEpisode_(queue.EpisodeId);
+  if (!season || !episode) throw new Error("Season or episode not found for this approval.");
+
+  const episodeFinal = realityTvString_(episode.Status).toUpperCase() === "FINAL";
+  const remaining = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+  });
+  const nextNumber = realityTvNumber_(episode.EpisodeNumber, 0) + 1;
+  const existingNext = realityTvEpisodesForSeason_(season.SeasonId).find(function(row) {
+    return realityTvNumber_(row.EpisodeNumber, 0) === nextNumber;
+  }) || null;
+
+  let stage = realityTvString_(queue.ApprovalStage || "SETTLE").toUpperCase();
+  if (!episodeFinal) {
+    stage = "SETTLE";
+  } else if (existingNext || realityTvString_(queue.NextEpisodeId)) {
+    stage = "SYNC_HUB";
+  } else if (realityTvBool_(season.AutoCreateNextEpisode) && remaining.length > 1) {
+    stage = "BUILD_NEXT";
+  } else {
+    stage = "SYNC_HUB";
+  }
+
+  const now = new Date();
+  realityTvSpreadsheetRetry_("Reset stuck Reality TV approval", function() {
+    realityTvUpdateObjectRow_(
+      SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET),
+      queue.__rowNumber,
+      {
+        PushStatus: "QUEUED",
+        ApprovalStage: stage,
+        NextEpisodeId: existingNext ? existingNext.EpisodeId : realityTvString_(queue.NextEpisodeId),
+        ErrorMessage: "",
+        UpdatedAt: now
+      }
+    );
+  }, 4);
+
+  const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+  state.reset = true;
+  state.message = stage === "SETTLE"
+    ? "Approval reset. Settlement will safely resume from the beginning."
+    : (stage === "BUILD_NEXT"
+        ? "Approval reset. The episode is already settled; next-episode creation will resume."
+        : "Approval reset. Settlement and next-episode creation are already complete; final approval sync will resume.");
+  return state;
+}
 
 function apiAdminRejectRealityTvResult(payload) {
   requireAdmin_(payload || {});

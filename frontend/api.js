@@ -1714,6 +1714,10 @@ async function apiAdminContinueRealityTvApproval(queueId) {
   return apiAdminRealityTvRequest_("adminContinueRealityTvApproval", { queueId: queueId });
 }
 
+async function apiAdminResetRealityTvApproval(queueId) {
+  return apiAdminRealityTvPostRequest_("adminResetRealityTvApproval", { queueId: queueId });
+}
+
 async function apiAdminRejectRealityTvResult(queueId, notes) {
   return apiAdminRealityTvRequest_("adminRejectRealityTvResult", {
     queueId: queueId,
@@ -1727,6 +1731,10 @@ async function apiAdminCreateNextRealityTvEpisode(seasonId) {
 
 async function apiAdminUpdateRealityTvQuestionPack(payload) {
   return apiAdminRealityTvPostRequest_("adminUpdateRealityTvQuestionPack", payload || {});
+}
+
+async function apiAdminApplyRealityTvEpisodeQuestionPlan(payload) {
+  return apiAdminRealityTvPostRequest_("adminApplyRealityTvEpisodeQuestionPlan", payload || {});
 }
 
 async function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
