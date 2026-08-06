@@ -148,6 +148,10 @@ function adminUiEnhanceHelp_(root) {
 
 function adminUiIsActionButton_(button) {
   if (!button || button.disabled || button.dataset.adminNoProgress === "true") return false;
+  // Expand/collapse and disclosure controls are navigation controls, not API actions.
+  // Without this guard, labels such as “Build Status” are mistaken for build buttons
+  // and the shared progress UI remains on “Starting…” even though no request should run.
+  if (button.hasAttribute("aria-expanded") || button.closest("summary")) return false;
   if (button.classList.contains("secondary") || button.classList.contains("danger")) return false;
   const text = adminUiNormalizeText_(button.textContent).toLowerCase();
   if (!text) return false;

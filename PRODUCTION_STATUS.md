@@ -1,3 +1,7 @@
+## v1.1.10 Reality TV build-status UI hotfix
+
+The Current Episode Build Status header is now treated strictly as an expand/collapse control. It no longer displays a false `Starting…` progress state. Use the action inside the expanded panel to build, resume, or verify the current episode.
+
 # Current Production Candidate: v1.1.9
 
 # Production Status

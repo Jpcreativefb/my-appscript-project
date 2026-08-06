@@ -218,7 +218,7 @@ function adminRealityTvBuildMasterStatusHtml_(bundle) {
   const selectedQuestions = (readiness.questionStates || []).filter(function(item) { return item.selected; });
   const availableQuestions = (readiness.questionStates || []).filter(function(item) { return !item.selected; });
   return `<div class="reality-tv-master-build ${adminRealityTvEscape_(stateClass)}">
-    <button type="button" id="realityTvMasterBuildButton_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-master-build-button" aria-expanded="false" onclick="adminRealityTvToggleBuildStages_('${adminRealityTvEscape_(season.SeasonId)}')">
+    <button type="button" id="realityTvMasterBuildButton_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-master-build-button" data-admin-no-progress="true" aria-expanded="false" onclick="adminRealityTvToggleBuildStages_('${adminRealityTvEscape_(season.SeasonId)}')">
       <span>Current ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Build Status</span>
       <b>${adminRealityTvEscape_(readiness.label || "CHECK STATUS")}</b>
       <span class="reality-tv-master-chevron">Show stages ▾</span>

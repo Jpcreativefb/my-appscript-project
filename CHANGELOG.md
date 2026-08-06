@@ -1,3 +1,9 @@
+## v1.1.10 — Reality TV build-status disclosure fix
+
+- Fixed the false permanent **Starting…** state when opening **Current Episode Build Status**.
+- Shared admin progress now ignores expand/collapse disclosure controls.
+- The real build/resume actions remain inside the expanded stage panel.
+
 # Changelog
 
 ## v1.1.9 — Reality TV Extra Questions Production Readiness
