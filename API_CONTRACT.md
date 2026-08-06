@@ -896,3 +896,31 @@ Question builds advance immediately within a bounded server budget. Incomplete j
 - `questionStates` for every compatible preset and custom template
 
 External Results Hub mapping is not required for local `READY` status.
+
+## Reality TV mass vote and approval resilience contract — v1.1.14
+
+### Bulk episode votes
+
+Action: `adminSaveRealityTvEpisodeVotesBulk`
+
+Frontend: `apiAdminSaveRealityTvEpisodeVotesBulk(payload)`
+
+The POST payload contains `seasonId`, `episodeId`, `voteRound`, optional `votingGroupName`, and `votes`. Each vote may contain `voterParticipantId`, `targetParticipantId`, `voteStatus`, `voteValue`, `notes`, and `outsideVoter`.
+
+Rules:
+
+- normal voters must belong to the selected voting group for the episode;
+- `outsideVoter: true` permits an explicitly added voter from outside that group;
+- targets always remain members of the selected voting group;
+- one voter may have only one ballot row per saved round unless separate weighted/extra-vote rows are deliberately represented by distinct stored vote records;
+- the full round is validated before rows are written;
+- existing matching voter/round rows are updated and new rows are appended in a bounded bulk write.
+
+The existing single-ballot save action remains supported for corrections.
+
+### Approval jobs
+
+`adminApproveRealityTvResult`, `adminContinueRealityTvApproval`, `adminApproveRealityTvQuestionResult`, and `adminContinueRealityTvQuestionApproval` now use a brief claim lock. The lock protects only stage ownership and is released before settlement, roster updates, question writes, and optional Hub synchronization.
+
+Temporary Spreadsheet service errors and retryable lock errors are retried with bounded backoff. The persisted stage remains resumable, and duplicate requests receive an already-processing response rather than starting concurrent settlement work.
+

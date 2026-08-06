@@ -1147,6 +1147,42 @@ function realityTvEpisodeHeaderStats_(episode, itemCount, pickedCount) {
   </div>`;
 }
 
+function realityTvEpisodeScheduleText_(episode) {
+  const status = String(episode.scheduleStatus || "SCHEDULED").toUpperCase();
+  if (status === "TBA") return "Air date TBA · picks remain open";
+  const lock = formatSeasonAnchorLock_(episode.lockDateTime);
+  if (status === "DELAYED") return "Delayed · " + lock;
+  if (status === "RESCHEDULED") return "Rescheduled · " + lock;
+  return lock;
+}
+
+function realityTvEpisodeVoteDetailsHtml_(episode) {
+  const details = episode && episode.voteDetails;
+  if (!details || String(episode.status || "").toUpperCase() !== "FINAL") return "";
+  const tallies = Array.isArray(details.tallies) ? details.tallies : [];
+  const rows = Array.isArray(details.rows) ? details.rows : [];
+  if (!tallies.length && !rows.length) return "";
+  const statusLabel = function(status) {
+    const labels = { VALID: "Valid", NULLIFIED: "Nullified", "NOT-READ": "Not read", "LOST-VOTE": "Lost vote", ABSTAINED: "Abstained" };
+    return labels[String(status || "VALID").toUpperCase()] || String(status || "");
+  };
+  return `<details class="reality-player-vote-details">
+    <summary><span><strong>Episode Vote Details</strong><small>${rows.length} recorded ballot${rows.length === 1 ? "" : "s"}</small></span><span>View tally</span></summary>
+    <div class="reality-player-vote-body">
+      ${tallies.length ? `<div class="reality-player-vote-tallies">${tallies.map(function(tally) {
+        const notes = [];
+        if (Number(tally.nullified || 0)) notes.push(Number(tally.nullified) + " nullified");
+        if (Number(tally.notRead || 0)) notes.push(Number(tally.notRead) + " not read");
+        return `<div><strong>${escapeHtml(tally.contestantName || tally.contestantId || "Unknown")}</strong><span>${Number(tally.valid || 0)} valid / ${Number(tally.cast || 0)} cast</span>${notes.length ? `<small>${escapeHtml(notes.join(" · "))}</small>` : ""}</div>`;
+      }).join("")}</div>` : ""}
+      ${rows.length ? `<div class="reality-player-vote-table-wrap"><table class="reality-player-vote-table"><thead><tr><th>Round</th><th>Voter</th><th>Voted for</th><th>Status</th><th>Value</th></tr></thead><tbody>${rows.map(function(row) {
+        const target = row.targetName || (String(row.status || "").toUpperCase() === "LOST-VOTE" ? "No vote" : String(row.status || "").toUpperCase() === "ABSTAINED" ? "Abstained" : "—");
+        return `<tr><td>${escapeHtml(row.round || "Initial Vote")}</td><td>${escapeHtml(row.voterName || "Unknown")}</td><td>${escapeHtml(target)}</td><td>${escapeHtml(statusLabel(row.status))}</td><td>${Number(row.value || 0)}</td></tr>`;
+      }).join("")}</tbody></table></div>` : ""}
+    </div>
+  </details>`;
+}
+
 function renderRealityTvEpisodeSections_(categories) {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const episodes = (view.episodes || []).slice().sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
@@ -1161,7 +1197,7 @@ function renderRealityTvEpisodeSections_(categories) {
     if (!items.length) return "";
     const latest = index === 0;
     const picked = items.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
-    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div class="reality-episode-summary-title"><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${escapeHtml(formatSeasonAnchorLock_(episode.lockDateTime))}</span></div>${realityTvEpisodeHeaderStats_(episode, items.length, picked)}<span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}</div></details>`;
+    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div class="reality-episode-summary-title"><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${escapeHtml(realityTvEpisodeScheduleText_(episode))}</span>${episode.scheduleNotes ? `<small>${escapeHtml(episode.scheduleNotes)}</small>` : ""}</div>${realityTvEpisodeHeaderStats_(episode, items.length, picked)}<span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}${realityTvEpisodeVoteDetailsHtml_(episode)}</div></details>`;
   }).join("");
   const remaining = categories.filter(function(category) { return !used[normalizeId(category.id)]; });
   return sections + (remaining.length ? `<details class="reality-episode-picks-section other" open><summary><div><span class="reality-episode-kicker">Other</span><h2>Season Questions</h2><span>${remaining.length} question${remaining.length === 1 ? "" : "s"}</span></div></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(remaining)}</div></details>` : "");

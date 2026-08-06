@@ -1,28 +1,61 @@
-## v1.1.10 Reality TV build-status UI hotfix
+# Production Status
 
-The Current Episode Build Status header is now treated strictly as an expand/collapse control. It no longer displays a false `Starting…` progress state. Use the action inside the expanded panel to build, resume, or verify the current episode.
+Current production candidate: **v1.1.14**
 
-# Current Production Candidate: v1.1.9
+Reality TV episode voting now supports tribe-restricted full-round entry with an explicit outside-voter exception. Main and supplemental approvals use short stage claims plus retryable spreadsheet operations, eliminating the self-created global-lock timeout. All Show Format & Episode Questions sections start collapsed.
+
+## v1.1.14 release readiness
+
+- Backend and frontend deployment required.
+- 56 regression test files passed.
+- 151 JavaScript files passed syntax validation.
+- Complete `PRODUCTION_SMOKE_TEST_V1_1_14.md` after deployment.
+- External Results Hub connection remains the next planned Reality TV phase.
+
+---
+
+# Production Status
+
+Current production candidate: **v1.1.13**
+
+Reality TV action buttons now run with inline progress and no full-screen 4% admin overlay. Backend remains v1.1.12-compatible.
+
+# Current Production Candidate: v1.1.12
 
 # Production Status
 
 ## Current release
 
-Reality TV Extra Questions production-readiness workflow v1.1.9, including automatic format filtering, resilient local builds, current-episode readiness stages, safe custom-question deletion, the v1.1.8 recovery/custom workflow, and the v1.1.7 Survivor/comparison work.
+Reality TV Results, Votes, and Schedule Resilience v1.1.12. This release includes the v1.1.11 manual-result improvements and the v1.1.12 episode vote and schedule controls.
 
 ## Feature readiness
 
 | Area | Feature completeness | Production readiness | Main remaining work |
 |---|---:|---:|---|
-| Core games and Game Setup | 88% | 75% | Live regression, repair diagnostics, final UI consistency |
-| Fixed/confidence/staked/hybrid scoring | 88% | 78% | High-volume tests and settlement audit |
-| Reality TV Manager | 99% | 94% | Live deployment smoke test and the deferred External Results Hub queue |
-| Reality TV player experience | 96% | 88% | Live save-duration measurement, device testing, and accessibility review |
+| Core games and Game Setup | 89% | 77% | Live regression, repair diagnostics, final UI consistency |
+| Fixed/confidence/staked/hybrid scoring | 89% | 80% | High-volume tests and settlement audit |
+| Reality TV Manager | 99% | 96% | Live deployment smoke test and External Results Hub queue |
+| Reality TV player experience | 97% | 91% | Device testing, accessibility review, and live vote-history validation |
 | Sports platform | 82% | 68% | League-specific production testing and timeout reduction |
 | Archives/career history | 78% | 68% | Restore verification and larger archive testing |
 | External Results Hub | 72% | 58% | Common queued bridge, provider polling, repair/retry dashboard |
-| Awards Manager | 0% | Foundation available | Deliberately deferred until reliability work is complete |
+| Awards Manager | 0% | Foundation available | Deliberately deferred until the shared Hub queue is stable |
 
+## Reality TV results, votes, and scheduling completed in v1.1.12
+
+- Manual result work remains inside the expanded season and advances to the next unresolved question.
+- Supplemental questions support one winner, multiple winners, and push/no-result settlement.
+- Unexpected multiple eliminations push the original single-choice prediction while removing every selected contestant.
+- Episode Vote Details stores and displays valid, nullified, unrevealed, lost, abstained, extra, and revote ballots.
+- Players see vote tallies and who voted for whom only after an episode is finalized.
+- Episode schedules support Scheduled, Delayed, Rescheduled, and TBA states.
+- Administrators may move one episode or shift every later open episode, including episodes created in the future.
+- Schedule edits preserve permanent episode IDs, questions, picks, results, vote history, and contestant history.
+- TBA episodes keep their questions and remain open until a replacement date is saved.
+
+## Remaining Reality TV production step
+
+Deploy v1.1.12 and complete `PRODUCTION_SMOKE_TEST_V1_1_12.md`. After that, connect the queued External Results Hub workflow and then begin the Awards Show Manager.
 
 ## Reality TV Extra Questions finalized in v1.1.9
 
@@ -108,3 +141,4 @@ Reality TV Extra Questions production-readiness workflow v1.1.9, including autom
 4. Add persisted Reality TV weekly-stat snapshots at settlement if first-load scoring remains slow with a large user base.
 5. Complete Sports admin/page payload splitting using the same summary/detail pattern.
 6. Build the Awards Manager only after the shared Hub queue is stable.
+

@@ -1,3 +1,31 @@
+## v1.1.14 — Reality TV mass voting and approval resilience
+
+- Added one-click full-round vote entry restricted to the detected losing or Tribal Council tribe.
+- Added an explicit outside-voter exception while keeping vote targets restricted to the selected voting tribe.
+- Added separate tribe/council selection for unusual episodes and multiple Tribal Councils.
+- Replaced long-held approval locks with brief stage claims so settlement code cannot deadlock itself.
+- Added bounded retries for temporary Google Sheets service and lock-contention failures.
+- Collapsed the Show Format & Episode Questions parent and all five numbered sections by default.
+- Added v1.1.14 functional and regression coverage.
+
+## v1.1.13 - Reality TV inline admin actions
+
+- Removed the global Loading Admin Tools overlay from Reality TV in-page actions.
+- Preserved the open season and refreshed only the affected section.
+- Added loader-suppressed fallback navigation and bumped the frontend asset cache key.
+
+## v1.1.12 — Reality TV Results, Votes, and Schedule Resilience
+
+- Kept manual result submission and approval inside the currently expanded season instead of returning to the manager start.
+- Added one-winner, multiple-winner, and push settlement for supplemental episode questions.
+- Added unexpected two-or-more elimination handling with a pushed original prediction and complete roster updates.
+- Added per-ballot episode vote storage, revotes, nullified/unrevealed/lost votes, weighted extra votes, editing, deletion, tallies, and voter-to-target history.
+- Exposed vote history to players only after episode finalization.
+- Added Scheduled, Delayed, Rescheduled, and TBA episode controls with original-date preservation and schedule notes.
+- Added optional shifting of existing and not-yet-created future episodes while preserving episode IDs, questions, picks, results, and vote history.
+- Updated main and supplemental question lock times together and kept Hub schedule work non-blocking.
+- Added v1.1.11 and v1.1.12 regression coverage.
+
 ## v1.1.10 — Reality TV build-status disclosure fix
 
 - Fixed the false permanent **Starting…** state when opening **Current Episode Build Status**.

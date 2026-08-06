@@ -3872,6 +3872,21 @@ button.is-saving {
   margin: 12px 0;
 }
 
+.reality-tv-question-result-mode-grid {
+  align-items: end;
+  margin-top: 12px;
+}
+
+.reality-tv-question-result-mode-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.reality-tv-result-mode-help {
+  padding: 8px 0;
+  line-height: 1.4;
+}
+
 .reality-tv-question-result-fields {
   margin-top: 10px;
 }
@@ -5133,5 +5148,259 @@ button.is-saving {
 
   .reality-tv-saved-custom-actions {
     justify-items: start;
+  }
+}
+
+/* Reality TV episode votes and schedule controls — production v1.1.12 */
+.reality-tv-vote-episodes,
+.reality-tv-schedule-grid {
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.reality-tv-vote-episode,
+.reality-tv-schedule-card {
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.32);
+}
+
+.reality-tv-vote-episode > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.reality-tv-vote-episode-body,
+.reality-tv-schedule-card {
+  padding: 14px;
+}
+
+.reality-tv-vote-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.reality-tv-vote-summary-card {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid rgba(96, 165, 250, 0.2);
+}
+
+.reality-tv-vote-summary-card span {
+  font-weight: 800;
+}
+
+.reality-tv-vote-summary-card small,
+.reality-tv-schedule-heading small,
+.reality-tv-table-note {
+  display: block;
+  color: rgba(226, 232, 240, 0.68);
+}
+
+.reality-tv-vote-entry-grid,
+.reality-tv-schedule-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.reality-tv-vote-entry-grid label,
+.reality-tv-schedule-fields label {
+  display: grid;
+  gap: 5px;
+}
+
+.reality-tv-votes-table-wrap,
+.reality-tv-episodes-table-wrap {
+  overflow-x: auto;
+  margin-top: 12px;
+}
+
+.reality-tv-votes-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+}
+
+.reality-tv-votes-table th,
+.reality-tv-votes-table td {
+  padding: 9px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.16);
+}
+
+.reality-tv-schedule-card {
+  display: grid;
+  gap: 12px;
+}
+
+.reality-tv-schedule-card.final {
+  opacity: 0.78;
+}
+
+.reality-tv-schedule-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reality-tv-schedule-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.reality-tv-status-pill.delayed,
+.reality-tv-status-pill.tba {
+  background: rgba(245, 158, 11, 0.18);
+  color: #fcd34d;
+}
+
+.reality-tv-status-pill.rescheduled {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93c5fd;
+}
+
+.admin-actions.compact {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+@media (max-width: 700px) {
+  .reality-tv-vote-episode > summary,
+  .reality-tv-schedule-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .reality-tv-vote-entry-grid,
+  .reality-tv-schedule-fields {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Reality TV tribe-restricted mass voting — production v1.1.14 */
+.reality-tv-mass-vote-card {
+  display: grid;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 14px;
+  background: rgba(30, 64, 175, 0.08);
+}
+
+.reality-tv-mass-vote-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reality-tv-mass-vote-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.reality-tv-mass-vote-heading span {
+  color: rgba(226, 232, 240, 0.72);
+}
+
+.reality-tv-vote-round-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.reality-tv-vote-round-controls label {
+  display: grid;
+  gap: 5px;
+}
+
+.reality-tv-mass-vote-labels,
+.reality-tv-mass-vote-row {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.1fr) minmax(150px, 1.1fr) minmax(170px, 1fr) 82px minmax(160px, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.reality-tv-mass-vote-labels {
+  padding: 0 4px;
+  color: rgba(226, 232, 240, 0.68);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.reality-tv-mass-vote-rows {
+  display: grid;
+  gap: 8px;
+}
+
+.reality-tv-mass-vote-row {
+  padding: 8px;
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.42);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+}
+
+.reality-tv-mass-voter-cell {
+  min-width: 0;
+}
+
+.reality-tv-single-vote-editor {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  border-radius: 12px;
+}
+
+.reality-tv-single-vote-editor > summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+@media (max-width: 900px) {
+  .reality-tv-mass-vote-labels {
+    display: none;
+  }
+
+  .reality-tv-mass-vote-row {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .reality-tv-mass-vote-row::before {
+    content: "Ballot";
+    grid-column: 1 / -1;
+    color: rgba(226, 232, 240, 0.68);
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+}
+
+@media (max-width: 620px) {
+  .reality-tv-mass-vote-heading {
+    flex-direction: column;
+  }
+
+  .reality-tv-mass-vote-row {
+    grid-template-columns: 1fr;
   }
 }

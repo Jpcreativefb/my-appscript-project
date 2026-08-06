@@ -533,6 +533,7 @@ function getCategoryResultsResolutionMap(gameId) {
     getCategoryResultsRows_(gameId);
 
   const map = {};
+  const grouped = {};
 
   function rowTime_(row, index) {
 
@@ -552,8 +553,6 @@ function getCategoryResultsResolutionMap(gameId) {
 
   }
 
-  const latestTimes = {};
-
   rows.forEach(function(row, index) {
 
     const categoryId =
@@ -563,69 +562,85 @@ function getCategoryResultsResolutionMap(gameId) {
       return;
     }
 
-    const status =
-      categoryResultsKey_(row.resultStatus);
-
     const time =
       rowTime_(row, index);
 
-    const latestTime =
-      latestTimes[categoryId];
-
-    if (
-      latestTime !== undefined &&
-      latestTime > time
-    ) {
-      return;
-    }
-
-    latestTimes[categoryId] = time;
-
-    if (
-      status === "pending" ||
-      status === "open" ||
-      status === "cleared" ||
-      status === "unsettled"
-    ) {
-      delete map[categoryId];
-      return;
-    }
-
-    if (
-      status === "push" ||
-      status === "pushed" ||
-      status === "void" ||
-      status === "cancelled" ||
-      status === "canceled"
-    ) {
-      map[categoryId] = {
-        resolved: true,
-        result: "push",
-        winnerNomineeId: "",
-        status: status,
-        _time: time
+    if (!grouped[categoryId] || time > grouped[categoryId].time) {
+      grouped[categoryId] = {
+        time: time,
+        rows: [row]
       };
       return;
     }
 
-    if (
-      row.isWinner === true &&
-      row.nomineeId
-    ) {
-      map[categoryId] = {
-        resolved: true,
-        result: "winner",
-        winnerNomineeId:
-          categoryResultsKey_(row.nomineeId),
-        status: status || "settled",
-        _time: time
-      };
+    if (time === grouped[categoryId].time) {
+      grouped[categoryId].rows.push(row);
     }
 
   });
 
-  Object.keys(map).forEach(function(categoryId) {
-    delete map[categoryId]._time;
+  Object.keys(grouped).forEach(function(categoryId) {
+
+    const batch = grouped[categoryId];
+    const batchRows = batch.rows || [];
+    const statuses = batchRows.map(function(row) {
+      return categoryResultsKey_(row.resultStatus);
+    });
+
+    if (statuses.some(function(status) {
+      return (
+        status === "pending" ||
+        status === "open" ||
+        status === "cleared" ||
+        status === "unsettled"
+      );
+    })) {
+      return;
+    }
+
+    const pushStatus = statuses.find(function(status) {
+      return (
+        status === "push" ||
+        status === "pushed" ||
+        status === "void" ||
+        status === "cancelled" ||
+        status === "canceled"
+      );
+    });
+
+    if (pushStatus) {
+      map[categoryId] = {
+        resolved: true,
+        result: "push",
+        winnerNomineeId: "",
+        winnerNomineeIds: [],
+        status: pushStatus
+      };
+      return;
+    }
+
+    const winnerNomineeIds = [];
+    batchRows.forEach(function(row) {
+      const nomineeId = categoryResultsKey_(row.nomineeId);
+      if (
+        row.isWinner === true &&
+        nomineeId &&
+        winnerNomineeIds.indexOf(nomineeId) === -1
+      ) {
+        winnerNomineeIds.push(nomineeId);
+      }
+    });
+
+    if (winnerNomineeIds.length) {
+      map[categoryId] = {
+        resolved: true,
+        result: "winner",
+        winnerNomineeId: winnerNomineeIds[0],
+        winnerNomineeIds: winnerNomineeIds,
+        status: statuses.find(Boolean) || "settled"
+      };
+    }
+
   });
 
   return map;
@@ -692,6 +707,7 @@ function upsertCategoryResultsBulk_(payloads) {
 
   const updates = {};
   const appends = [];
+  const appendIndexByKey = {};
   const now = new Date();
 
   function setRowValue_(row, header, value) {
@@ -718,9 +734,10 @@ function upsertCategoryResultsBulk_(payloads) {
 
     const key = [gameId, categoryId, nomineeId].join("||");
     const rowNumber = existingByKey[key];
-    const row = rowNumber
+    const appendIndex = appendIndexByKey[key];
+    const row = rowNumber && rowNumber > 0
       ? data[rowNumber - 1].slice()
-      : new Array(width).fill("");
+      : (appendIndex !== undefined ? appends[appendIndex].slice() : new Array(width).fill(""));
 
     setRowValue_(row, "Timestamp", payload.timestamp || now);
     setRowValue_(row, "GameId", gameId);
@@ -735,9 +752,12 @@ function upsertCategoryResultsBulk_(payloads) {
     setRowValue_(row, "SettledAt", payload.settledAt || now);
     setRowValue_(row, "Notes", payload.notes || "");
 
-    if (rowNumber) {
+    if (rowNumber && rowNumber > 0) {
       updates[rowNumber] = row;
+    } else if (appendIndex !== undefined) {
+      appends[appendIndex] = row;
     } else {
+      appendIndexByKey[key] = appends.length;
       appends.push(row);
       existingByKey[key] = -1;
     }

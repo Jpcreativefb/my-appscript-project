@@ -1072,6 +1072,13 @@ function getUserScoring(
         ""
       );
 
+    const winnerNomineeIds =
+      Array.isArray(resolution.winnerNomineeIds) && resolution.winnerNomineeIds.length
+        ? resolution.winnerNomineeIds.map(function(value) {
+            return normalizeScoreString_(value);
+          }).filter(Boolean)
+        : (winnerNomineeId ? [winnerNomineeId] : []);
+
     const normalizedPick =
       normalizeScoreString_(
         nomineeId
@@ -1083,12 +1090,12 @@ function getUserScoring(
     const isCorrect =
       resolution.result === "winner" &&
       hasPick &&
-      normalizedPick === winnerNomineeId;
+      winnerNomineeIds.indexOf(normalizedPick) !== -1;
 
     const isWrong =
       resolution.result === "winner" &&
       hasPick &&
-      normalizedPick !== winnerNomineeId;
+      winnerNomineeIds.indexOf(normalizedPick) === -1;
 
     if (normalizedScoreMode === "staked-points") {
 

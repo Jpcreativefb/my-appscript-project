@@ -113,6 +113,22 @@ function doPost(e) {
       return json(apiAdminDeleteRealityTvCustomQuestionTemplate(body));
     }
 
+    if (action === "adminSaveRealityTvEpisodeVote") {
+      return json(apiAdminSaveRealityTvEpisodeVote(body));
+    }
+
+    if (action === "adminSaveRealityTvEpisodeVotesBulk") {
+      return json(apiAdminSaveRealityTvEpisodeVotesBulk(body));
+    }
+
+    if (action === "adminDeleteRealityTvEpisodeVote") {
+      return json(apiAdminDeleteRealityTvEpisodeVote(body));
+    }
+
+    if (action === "adminUpdateRealityTvEpisodeSchedule") {
+      return json(apiAdminUpdateRealityTvEpisodeSchedule(body));
+    }
+
     return json({
       success:
         false,
@@ -213,6 +229,10 @@ function doGet(e) {
       "adminApproveRealityTvQuestionResult",
       "adminContinueRealityTvQuestionApproval",
       "adminRejectRealityTvQuestionResult",
+      "adminSaveRealityTvEpisodeVote",
+      "adminSaveRealityTvEpisodeVotesBulk",
+      "adminDeleteRealityTvEpisodeVote",
+      "adminUpdateRealityTvEpisodeSchedule",
       "adminSaveSeasonAnchorSettings",
 
       "adminGetGameSetup",
@@ -962,6 +982,22 @@ function doGet(e) {
 
     if (action === "adminRejectRealityTvQuestionResult") {
       return json(apiAdminRejectRealityTvQuestionResult(params));
+    }
+
+    if (action === "adminSaveRealityTvEpisodeVote") {
+      return json(apiAdminSaveRealityTvEpisodeVote(params));
+    }
+
+    if (action === "adminSaveRealityTvEpisodeVotesBulk") {
+      return json(apiAdminSaveRealityTvEpisodeVotesBulk(params));
+    }
+
+    if (action === "adminDeleteRealityTvEpisodeVote") {
+      return json(apiAdminDeleteRealityTvEpisodeVote(params));
+    }
+
+    if (action === "adminUpdateRealityTvEpisodeSchedule") {
+      return json(apiAdminUpdateRealityTvEpisodeSchedule(params));
     }
 
     if (action === "adminSaveSeasonAnchorSettings") {

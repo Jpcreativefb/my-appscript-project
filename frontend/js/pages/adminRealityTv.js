@@ -1,6 +1,6 @@
 /* =========================
    ADMIN REALITY TV SEASON MANAGER
-   Phase 2B v1.0.30
+   Production v1.1.14
 ========================= */
 
 let ADMIN_REALITY_TV_DASHBOARD = null;
@@ -32,6 +32,15 @@ function adminRealityTvDateTime_(value) {
     hour: "numeric",
     minute: "2-digit"
   });
+}
+
+function adminRealityTvDateTimeLocalValue_(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = function(number) { return String(number).padStart(2, "0"); };
+  return date.getFullYear() + "-" + pad(date.getMonth() + 1) + "-" + pad(date.getDate()) +
+    "T" + pad(date.getHours()) + ":" + pad(date.getMinutes());
 }
 
 function adminRealityTvStatusClass_(value) {
@@ -358,11 +367,16 @@ function adminRealityTvQuestionCard_(bundle, question) {
   const pending = adminRealityTvQuestionPending_(bundle, question);
   const status = String(question.Status || "OPEN").toUpperCase();
   const key = adminRealityTvEscape_(question.EpisodeQuestionId);
+  const cardId = "realityTvQuestionCard_" + key;
   if (pending) {
     const reviewStatus = String(pending.ReviewStatus || "PENDING").toUpperCase();
     const approving = reviewStatus === "APPROVING";
+    const resultMode = String(pending.ResultMode || "winner").toLowerCase();
+    const resultTypeLabel = resultMode === "multiple-winners"
+      ? "Multiple winners"
+      : (resultMode === "push" ? "Push / no official result" : "One winner");
     return `
-      <div class="reality-tv-question-card review">
+      <div id="${cardId}" class="reality-tv-question-card review" data-episode-question-id="${key}">
         <div class="reality-tv-question-card-header">
           <div>
             <span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span>
@@ -372,7 +386,8 @@ function adminRealityTvQuestionCard_(bundle, question) {
           <span class="reality-tv-status-pill ${approving ? "review" : "pending"}">${adminRealityTvEscape_(reviewStatus)}</span>
         </div>
         <div class="reality-tv-result-summary">
-          <span><b>Selected result:</b> ${adminRealityTvEscape_(pending.SelectedOutcomeLabel)}</span>
+          <span><b>Result type:</b> ${adminRealityTvEscape_(resultTypeLabel)}</span>
+          <span><b>Selected result:</b> ${adminRealityTvEscape_(pending.SelectedOutcomeLabel || "Push / no official result")}</span>
           ${pending.PushStatus ? `<span><b>Progress:</b> ${adminRealityTvEscape_(pending.PushStatus)}</span>` : ""}
           ${pending.ErrorMessage ? `<span class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(pending.ErrorMessage)}</span>` : ""}
           ${pending.EvidenceUrl ? `<span><b>Evidence:</b> <a href="${adminRealityTvEscape_(pending.EvidenceUrl)}" target="_blank" rel="noopener">Open source</a></span>` : ""}
@@ -392,19 +407,19 @@ function adminRealityTvQuestionCard_(bundle, question) {
     const options = adminRealityTvQuestionOptions_(question);
     const labels = options.filter(function(item) { return winners.indexOf(item.id) !== -1; }).map(function(item) { return item.label; });
     return `
-      <div class="reality-tv-question-card final">
+      <div id="${cardId}" class="reality-tv-question-card final" data-episode-question-id="${key}">
         <div class="reality-tv-question-card-header">
           <div><span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span><h4>${adminRealityTvEscape_(question.QuestionText)}</h4><div class="admin-sub">${adminRealityTvEscape_(question.Points === "" || question.Points === undefined ? "" : question.Points + " points")}</div></div>
           <span class="reality-tv-status-pill final">FINAL</span>
         </div>
-        <div class="admin-sub">Result: <b>${adminRealityTvEscape_(labels.join(", ") || "Final")}</b></div>
+        <div class="admin-sub">Result: <b>${adminRealityTvEscape_(labels.join(", ") || "Pushed / no official winner")}</b></div>
       </div>
     `;
   }
 
   const options = adminRealityTvQuestionOptions_(question);
   return `
-    <div class="reality-tv-question-card">
+    <div id="${cardId}" class="reality-tv-question-card" data-episode-question-id="${key}">
       <div class="reality-tv-question-card-header">
         <div>
           <span class="reality-tv-question-episode">${adminRealityTvEscape_((bundle.season && bundle.season.PeriodLabel) || "Episode")} ${adminRealityTvEscape_(question.EpisodeNumber)}</span>
@@ -413,9 +428,20 @@ function adminRealityTvQuestionCard_(bundle, question) {
         </div>
         <span class="reality-tv-status-pill open">OPEN</span>
       </div>
+      <div class="admin-form-grid reality-tv-question-result-mode-grid">
+        <label>
+          Result type
+          <select id="realityTvQuestionResultMode_${key}" class="input" onchange="adminRealityTvQuestionResultModeChanged('${key}')">
+            <option value="winner">One winner</option>
+            <option value="multiple-winners">Multiple winners</option>
+            <option value="push">Push / no official result</option>
+          </select>
+        </label>
+        <div class="admin-sub reality-tv-result-mode-help">For multiple winners, every selected answer is scored as correct. Players still make one pick unless the question itself is later configured for multi-pick play.</div>
+      </div>
       <div class="reality-tv-question-options" id="realityTvQuestionOptions_${key}">
         ${options.map(function(item) {
-          return `<label class="reality-tv-result-choice"><input type="radio" name="realityTvQuestion_${key}" value="${adminRealityTvEscape_(item.id)}"><span>${adminRealityTvEscape_(item.label)}</span></label>`;
+          return `<label class="reality-tv-result-choice"><input type="checkbox" name="realityTvQuestion_${key}" value="${adminRealityTvEscape_(item.id)}" onchange="adminRealityTvQuestionOutcomeChecked('${key}', this)"><span>${adminRealityTvEscape_(item.label)}</span></label>`;
         }).join("")}
       </div>
       <div class="admin-form-grid reality-tv-question-result-fields">
@@ -430,6 +456,35 @@ function adminRealityTvQuestionCard_(bundle, question) {
   `;
 }
 
+function adminRealityTvQuestionResultModeChanged(episodeQuestionId) {
+  const key = String(episodeQuestionId || "");
+  const modeEl = document.getElementById("realityTvQuestionResultMode_" + key);
+  const mode = modeEl ? modeEl.value : "winner";
+  const boxes = Array.from(document.querySelectorAll('input[name="realityTvQuestion_' + key + '"]'));
+  if (mode === "push") {
+    boxes.forEach(function(box) { box.checked = false; box.disabled = true; });
+    return;
+  }
+  boxes.forEach(function(box) { box.disabled = false; });
+  if (mode === "winner") {
+    let found = false;
+    boxes.forEach(function(box) {
+      if (box.checked && found) box.checked = false;
+      if (box.checked) found = true;
+    });
+  }
+}
+
+function adminRealityTvQuestionOutcomeChecked(episodeQuestionId, changed) {
+  const key = String(episodeQuestionId || "");
+  const modeEl = document.getElementById("realityTvQuestionResultMode_" + key);
+  const mode = modeEl ? modeEl.value : "winner";
+  if (mode !== "winner" || !changed.checked) return;
+  document.querySelectorAll('input[name="realityTvQuestion_' + key + '"]').forEach(function(box) {
+    if (box !== changed) box.checked = false;
+  });
+}
+
 function adminRealityTvSupplementalQuestionsPanel_(bundle) {
   const questions = (bundle.episodeQuestions || []).slice().sort(function(a, b) {
     const episodeDiff = Number(b.EpisodeNumber || 0) - Number(a.EpisodeNumber || 0);
@@ -442,7 +497,7 @@ function adminRealityTvSupplementalQuestionsPanel_(bundle) {
   const unresolved = questions.filter(function(item) { return String(item.Status || "OPEN").toUpperCase() !== "FINAL"; });
   const finalQuestions = questions.filter(function(item) { return String(item.Status || "").toUpperCase() === "FINAL"; });
   return `
-    <div class="reality-tv-episode-questions-panel">
+    <div id="realityTvEpisodeQuestions_${adminRealityTvEscape_((bundle.season || {}).SeasonId)}" class="reality-tv-episode-questions-panel">
       <div class="reality-tv-panel-heading">
         <div><h3>Episode Questions</h3><div class="admin-sub">Each result is reviewed and settled independently. Only the main elimination / exit result changes the active roster or creates the next period.</div></div>
         <span class="reality-tv-status-pill open">${unresolved.length} OPEN</span>
@@ -569,11 +624,11 @@ function adminRealityTvQuestionPackPanel_(bundle) {
     ? `<details class="reality-tv-build-summary"><summary>Last build results · ${Number(buildSummary.builtCount || 0)} built, ${Number(buildSummary.existingCount || 0)} verified, ${(buildSummary.skippedDetails || []).length} skipped</summary><div class="reality-tv-build-summary-list">${buildSummary.results.map(function(item) { return adminRealityTvQuestionStatusHtml_(item); }).join("")}</div></details>`
     : "";
   return `
-    <details class="reality-tv-subsection reality-tv-question-pack" open>
+    <details class="reality-tv-subsection reality-tv-question-pack">
       <summary>Show Format & Episode Question Pack</summary>
       <div class="admin-sub">Choose the show style, edit the labels, and enable only the questions that belong to this season. Historical questions and picks are never deleted.</div>
 
-      <details class="reality-tv-config-section" open>
+      <details class="reality-tv-config-section">
         <summary>1. Show Format & Labels</summary>
         <div class="admin-form-grid reality-tv-format-settings-grid">
           <label>${adminRealityTvFieldTitle_("Show format", "Loads suggested labels and question types for Survivor, cooking, performance, social deduction, Amazing Race, team, general, or custom competitions.")}<select id="realityTvFormat_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">${adminRealityTvFormatOptions_(format.id)}</select></label>
@@ -586,7 +641,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         <div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvApplyExistingFormatPreset_('${adminRealityTvEscape_(season.SeasonId)}', false)">Apply Format Preset</button></div>
       </details>
 
-      <details class="reality-tv-config-section" open>
+      <details class="reality-tv-config-section">
         <summary>2. Main Elimination / Exit Question</summary>
         <div class="admin-form-grid reality-tv-format-settings-grid">
           <label class="reality-tv-wide-field">${adminRealityTvFieldTitle_("Question text", "This is the one result that can remove a participant and automatically create the next period. Use {episode}, {period}, {show}, and {season} placeholders.")}<input id="realityTvEliminationTemplate_${adminRealityTvEscape_(season.SeasonId)}" class="input" value="${adminRealityTvValue_(season.QuestionTemplate || format.eliminationTemplate)}"></label>
@@ -596,7 +651,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         </div>
       </details>
 
-      <details class="reality-tv-config-section" open>
+      <details class="reality-tv-config-section">
         <summary>3. Player Pick Rules</summary>
         <div class="admin-sub">These rules apply to the main exit question and every extra Reality TV question. Picks can only be changed before each question locks.</div>
         <div class="reality-tv-checkbox-row">
@@ -610,7 +665,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         <div id="realityTvPickRulesMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
       </details>
 
-      <details class="reality-tv-config-section" open>
+      <details class="reality-tv-config-section">
         <summary>4. Extra ${adminRealityTvEscape_(season.PeriodLabel || "Episode")} Questions</summary>
         <div class="admin-sub">Checked preset and custom questions are included in one automatic current-episode build. Group-based questions require at least two valid Team / Tribe values.</div>
         ${adminRealityTvBuildMasterStatusHtml_(bundle)}
@@ -634,7 +689,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
       </details>
 
-      <details class="reality-tv-custom-question-builder reality-tv-config-section" open>
+      <details class="reality-tv-custom-question-builder reality-tv-config-section">
         <summary>5. Custom Questions</summary>
         <div class="admin-sub"><b>You can create more than one.</b> Saving a custom question enables it and automatically inserts it into the current episode build. It also remains available for future episodes until disabled or deleted.</div>
         ${adminRealityTvSavedCustomQuestionsHtml_(bundle)}
@@ -870,16 +925,13 @@ function adminRealityTvAnchorPayload_(key, gameId, seasonId) {
 
 async function adminRealityTvSaveSeasonAnchorSettings(seasonId, gameId) {
   adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, "Saving Season Survivor settings…", "info");
-  showLoader();
   try {
     const result = await apiAdminSaveSeasonAnchorSettings(adminRealityTvAnchorPayload_(seasonId, gameId, seasonId));
     if (!result || result.success === false) throw new Error((result && (result.error || result.message)) || "Could not save Season Survivor settings.");
     adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, result.message || "Season Survivor settings saved.", "success");
-    setTimeout(function() { navigate("admin-reality-tv"); }, 500);
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvAnchorMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvAnchorMessage_" + seasonId, err.message || String(err), "error");
-  } finally {
-    hideLoader();
   }
 }
 
@@ -920,6 +972,439 @@ function adminRealityTvContestantRows_(contestants) {
   `;
 }
 
+function adminRealityTvContestantNameMap_(contestants) {
+  const map = {};
+  (contestants || []).forEach(function(item) {
+    map[String(item.ContestantId || "").toLowerCase()] = item.Name || item.FullName || item.ContestantId;
+  });
+  return map;
+}
+
+function adminRealityTvVoteStatusLabel_(status) {
+  const labels = {
+    VALID: "Valid",
+    NULLIFIED: "Nullified",
+    "NOT-READ": "Not read",
+    "LOST-VOTE": "Lost vote",
+    ABSTAINED: "Abstained"
+  };
+  return labels[String(status || "VALID").toUpperCase()] || String(status || "Valid");
+}
+
+function adminRealityTvEpisodeVoteSummary_(bundle, episode, votes) {
+  const names = adminRealityTvContestantNameMap_(bundle.contestants || []);
+  const totals = {};
+  (votes || []).forEach(function(vote) {
+    const targetKey = String(vote.TargetContestantId || "").toLowerCase();
+    if (!targetKey) return;
+    if (!totals[targetKey]) totals[targetKey] = { valid: 0, cast: 0, nullified: 0, notRead: 0 };
+    const value = Math.max(0, Number(vote.VoteValue || 0));
+    const status = String(vote.VoteStatus || "VALID").toUpperCase();
+    if (["VALID", "NULLIFIED", "NOT-READ"].indexOf(status) !== -1) totals[targetKey].cast += value;
+    if (status === "VALID") totals[targetKey].valid += value;
+    if (status === "NULLIFIED") totals[targetKey].nullified += value;
+    if (status === "NOT-READ") totals[targetKey].notRead += value;
+  });
+  const keys = Object.keys(totals).sort(function(a, b) {
+    if (totals[b].valid !== totals[a].valid) return totals[b].valid - totals[a].valid;
+    return String(names[a] || a).localeCompare(String(names[b] || b));
+  });
+  if (!keys.length) return `<div class="admin-message info">No votes have been entered for ${adminRealityTvEscape_(episode.EpisodeName)}.</div>`;
+  return `<div class="reality-tv-vote-summary-grid">${keys.map(function(key) {
+    const row = totals[key];
+    const details = [];
+    if (row.nullified) details.push(row.nullified + " nullified");
+    if (row.notRead) details.push(row.notRead + " not read");
+    return `<div class="reality-tv-vote-summary-card">
+      <strong>${adminRealityTvEscape_(names[key] || key)}</strong>
+      <span>${adminRealityTvEscape_(row.valid)} valid / ${adminRealityTvEscape_(row.cast)} cast</span>
+      ${details.length ? `<small>${adminRealityTvEscape_(details.join(" · "))}</small>` : ""}
+    </div>`;
+  }).join("")}</div>`;
+}
+
+function adminRealityTvContestantGroupAtEpisode_(contestant, episodeNumber) {
+  const history = Array.isArray(contestant && contestant.GroupHistory) ? contestant.GroupHistory : [];
+  const number = Math.max(1, Number(episodeNumber || 1));
+  const matching = history.filter(function(item) {
+    const start = Math.max(1, Number(item.startEpisode || item.StartEpisode || 1));
+    const end = Math.max(0, Number(item.endEpisode || item.EndEpisode || 0));
+    return start <= number && (!end || end >= number);
+  }).sort(function(a, b) {
+    return Number(b.startEpisode || b.StartEpisode || 0) - Number(a.startEpisode || a.StartEpisode || 0);
+  });
+  return String((matching[0] && (matching[0].groupName || matching[0].GroupName)) || contestant.CurrentGroup || contestant.TeamOrTribe || "").trim();
+}
+
+function adminRealityTvVoteEligibleContestants_(bundle, episode) {
+  const episodeNumber = Math.max(1, Number(episode && episode.EpisodeNumber || 1));
+  return (bundle.contestants || []).filter(function(item) {
+    const eliminatedEpisode = Math.max(0, Number(item.EliminatedEpisode || 0));
+    return !eliminatedEpisode || eliminatedEpisode >= episodeNumber;
+  }).map(function(item) {
+    return Object.assign({}, item, { VoteGroupName: adminRealityTvContestantGroupAtEpisode_(item, episodeNumber) });
+  }).sort(function(a, b) {
+    return Number(a.DisplayOrder || 9999) - Number(b.DisplayOrder || 9999) || String(a.Name || "").localeCompare(String(b.Name || ""));
+  });
+}
+
+function adminRealityTvResolvedQuestionLabels_(bundle, episode, questionType) {
+  const question = (bundle.episodeQuestions || []).find(function(item) {
+    return String(item.EpisodeId || "") === String(episode.EpisodeId || "") &&
+      String(item.QuestionType || "").toLowerCase() === String(questionType || "").toLowerCase();
+  });
+  if (!question) return [];
+  const options = adminRealityTvQuestionOptions_(question);
+  let ids = [];
+  try { ids = JSON.parse(question.WinningOutcomeIds || "[]"); } catch (err) { ids = []; }
+  let labels = options.filter(function(item) {
+    return ids.map(String).indexOf(String(item.id)) !== -1;
+  }).map(function(item) { return String(item.label || "").trim(); }).filter(Boolean);
+  if (labels.length) return labels;
+
+  const queue = (bundle.questionQueue || []).find(function(item) {
+    const status = String(item.ReviewStatus || "").toUpperCase();
+    return String(item.EpisodeQuestionId || "") === String(question.EpisodeQuestionId || "") &&
+      ["PENDING", "APPROVING", "APPROVED"].indexOf(status) !== -1;
+  });
+  if (!queue) return [];
+  try {
+    const parsed = JSON.parse(queue.SelectedOutcomeLabelsJSON || "[]");
+    if (Array.isArray(parsed) && parsed.length) labels = parsed;
+  } catch (err) { labels = []; }
+  if (!labels.length && queue.SelectedOutcomeLabel) labels = [queue.SelectedOutcomeLabel];
+  return labels.map(function(label) { return String(label || "").trim(); }).filter(Boolean);
+}
+
+function adminRealityTvVotingGroupContext_(bundle, episode) {
+  const contestants = adminRealityTvVoteEligibleContestants_(bundle, episode);
+  const groupMap = {};
+  contestants.forEach(function(item) {
+    const name = String(item.VoteGroupName || "").trim();
+    if (name) groupMap[name.toLowerCase()] = name;
+  });
+  const allGroups = Object.keys(groupMap).map(function(key) { return groupMap[key]; }).sort();
+  if (allGroups.length <= 1) {
+    return {
+      contestants: contestants,
+      allGroups: allGroups,
+      detectedGroups: allGroups.length ? allGroups : ["All active contestants"],
+      defaultGroup: allGroups[0] || "__ALL__",
+      source: allGroups.length ? "Merged or single-group episode" : "No tribe assignments found"
+    };
+  }
+
+  function matchedGroups(labels) {
+    const found = {};
+    (labels || []).forEach(function(label) {
+      const key = String(label || "").trim().toLowerCase();
+      if (groupMap[key]) found[key] = groupMap[key];
+    });
+    return Object.keys(found).map(function(key) { return found[key]; });
+  }
+
+  const tribalGroups = matchedGroups(adminRealityTvResolvedQuestionLabels_(bundle, episode, "tribal-attendee"));
+  if (tribalGroups.length) {
+    return { contestants: contestants, allGroups: allGroups, detectedGroups: tribalGroups, defaultGroup: tribalGroups[0], source: "Tribe going to Tribal Council result" };
+  }
+
+  const immunityWinners = matchedGroups(adminRealityTvResolvedQuestionLabels_(bundle, episode, "immunity-winner"));
+  if (immunityWinners.length) {
+    const winnerKeys = {};
+    immunityWinners.forEach(function(name) { winnerKeys[name.toLowerCase()] = true; });
+    const losingGroups = allGroups.filter(function(name) { return !winnerKeys[name.toLowerCase()]; });
+    if (losingGroups.length === 1) {
+      return { contestants: contestants, allGroups: allGroups, detectedGroups: losingGroups, defaultGroup: losingGroups[0], source: "Immunity result — remaining tribe" };
+    }
+  }
+
+  return { contestants: contestants, allGroups: allGroups, detectedGroups: [], defaultGroup: allGroups[0] || "__ALL__", source: "Select the voting tribe manually" };
+}
+
+function adminRealityTvMassVoteStatusOptions_(selected) {
+  const value = String(selected || "NOT-ENTERED").toUpperCase();
+  return [
+    ["NOT-ENTERED", "Not entered"],
+    ["VALID", "Valid"],
+    ["NULLIFIED", "Nullified by idol/advantage"],
+    ["NOT-READ", "Not read / unrevealed"],
+    ["LOST-VOTE", "Lost / blocked vote"],
+    ["ABSTAINED", "Abstained / no vote cast"]
+  ].map(function(item) {
+    return `<option value="${item[0]}" ${item[0] === value ? "selected" : ""}>${adminRealityTvEscape_(item[1])}</option>`;
+  }).join("");
+}
+
+function adminRealityTvMassVoteTargetOptions_(members, voterId, selectedTargetId) {
+  const selected = String(selectedTargetId || "");
+  return `<option value="">Select target</option>` + (members || []).filter(function(item) {
+    return String(item.ContestantId || "") !== String(voterId || "");
+  }).map(function(item) {
+    return `<option value="${adminRealityTvEscape_(item.ContestantId)}" ${String(item.ContestantId) === selected ? "selected" : ""}>${adminRealityTvEscape_(item.Name)}</option>`;
+  }).join("");
+}
+
+function adminRealityTvMassVoteRowHtml_(contestants, members, vote, outside, rowKey) {
+  const status = String(vote && vote.VoteStatus || "NOT-ENTERED").toUpperCase();
+  const voterId = String(vote && vote.VoterContestantId || "");
+  const selectedTarget = String(vote && vote.TargetContestantId || "");
+  const voter = contestants.find(function(item) { return String(item.ContestantId) === voterId; });
+  const voterCell = outside
+    ? `<select class="input reality-tv-mass-vote-voter"><option value="">Select outside voter</option>${contestants.map(function(item) {
+        return `<option value="${adminRealityTvEscape_(item.ContestantId)}" ${String(item.ContestantId) === voterId ? "selected" : ""}>${adminRealityTvEscape_(item.Name)}${item.VoteGroupName ? " — " + adminRealityTvEscape_(item.VoteGroupName) : ""}</option>`;
+      }).join("")}</select>`
+    : `<input class="reality-tv-mass-vote-voter" type="hidden" value="${adminRealityTvEscape_(voterId)}"><strong>${adminRealityTvEscape_(voter ? voter.Name : voterId)}</strong>`;
+  return `<div class="reality-tv-mass-vote-row" data-outside-voter="${outside ? "true" : "false"}" data-row-key="${adminRealityTvEscape_(rowKey || voterId)}">
+    <div class="reality-tv-mass-voter-cell">${voterCell}</div>
+    <select class="input reality-tv-mass-vote-target" ${["LOST-VOTE", "ABSTAINED", "NOT-ENTERED"].indexOf(status) !== -1 ? "disabled" : ""}>${adminRealityTvMassVoteTargetOptions_(members, outside ? "" : voterId, selectedTarget)}</select>
+    <select class="input reality-tv-mass-vote-status" onchange="adminRealityTvMassVoteStatusChanged_(this)">${adminRealityTvMassVoteStatusOptions_(status)}</select>
+    <input class="input reality-tv-mass-vote-value" type="number" min="0" max="20" step="1" value="${adminRealityTvEscape_(vote && vote.VoteValue !== undefined ? vote.VoteValue : (status === "NOT-ENTERED" ? 0 : 1))}">
+    <input class="input reality-tv-mass-vote-notes" value="${adminRealityTvValue_(vote && vote.Notes || "")}" placeholder="Optional note">
+    ${outside ? `<button type="button" class="admin-small-button danger" onclick="this.closest('.reality-tv-mass-vote-row').remove()">Remove</button>` : `<span></span>`}
+  </div>`;
+}
+
+function adminRealityTvMassVoteRowsHtml_(bundle, episode, groupName, roundLabel) {
+  const context = adminRealityTvVotingGroupContext_(bundle, episode);
+  const all = context.contestants;
+  const members = groupName === "__ALL__" ? all : all.filter(function(item) {
+    return String(item.VoteGroupName || "").toLowerCase() === String(groupName || "").toLowerCase();
+  });
+  const round = String(roundLabel || "Round 1 — Initial Vote");
+  const votes = (bundle.episodeVotes || []).filter(function(item) {
+    return String(item.EpisodeId || "") === String(episode.EpisodeId || "") && String(item.VoteRoundLabel || "") === round;
+  });
+  const byVoter = {};
+  votes.forEach(function(item) { byVoter[String(item.VoterContestantId || "").toLowerCase()] = item; });
+  const memberKeys = {};
+  members.forEach(function(item) { memberKeys[String(item.ContestantId || "").toLowerCase()] = true; });
+  const fixedRows = members.map(function(item) {
+    const prior = byVoter[String(item.ContestantId || "").toLowerCase()] || { VoterContestantId: item.ContestantId };
+    return adminRealityTvMassVoteRowHtml_(all, members, prior, false, item.ContestantId);
+  });
+  const outsideRows = votes.filter(function(item) {
+    return !memberKeys[String(item.VoterContestantId || "").toLowerCase()];
+  }).map(function(item) {
+    return adminRealityTvMassVoteRowHtml_(all, members, item, true, item.VoteId || item.VoterContestantId);
+  });
+  return fixedRows.concat(outsideRows).join("") || `<div class="admin-message warning">No eligible members were found for this tribe in this episode.</div>`;
+}
+
+function adminRealityTvRenderMassVoteRows_(seasonId, episodeId) {
+  const bundle = adminRealityTvSeasonBundle_(seasonId);
+  if (!bundle) return;
+  const episode = (bundle.episodes || []).find(function(item) { return String(item.EpisodeId || "") === String(episodeId || ""); });
+  if (!episode) return;
+  const group = document.getElementById("realityTvMassVoteGroup_" + episodeId);
+  const round = document.getElementById("realityTvMassVoteRound_" + episodeId);
+  const target = document.getElementById("realityTvMassVoteRows_" + episodeId);
+  if (target) target.innerHTML = adminRealityTvMassVoteRowsHtml_(bundle, episode, group ? group.value : "__ALL__", round ? round.value.trim() : "Round 1 — Initial Vote");
+}
+
+function adminRealityTvMassVoteStatusChanged_(select) {
+  const row = select && select.closest(".reality-tv-mass-vote-row");
+  if (!row) return;
+  const status = String(select.value || "NOT-ENTERED").toUpperCase();
+  const target = row.querySelector(".reality-tv-mass-vote-target");
+  const value = row.querySelector(".reality-tv-mass-vote-value");
+  const targetRequired = ["VALID", "NULLIFIED", "NOT-READ"].indexOf(status) !== -1;
+  if (target) {
+    target.disabled = !targetRequired;
+    if (!targetRequired) target.value = "";
+  }
+  if (value) value.value = status === "NOT-ENTERED" || status === "LOST-VOTE" || status === "ABSTAINED" ? 0 : Math.max(1, Number(value.value || 1));
+}
+
+function adminRealityTvAddOutsideVoteRow_(seasonId, episodeId) {
+  const bundle = adminRealityTvSeasonBundle_(seasonId);
+  if (!bundle) return;
+  const episode = (bundle.episodes || []).find(function(item) { return String(item.EpisodeId || "") === String(episodeId || ""); });
+  const group = document.getElementById("realityTvMassVoteGroup_" + episodeId);
+  const container = document.getElementById("realityTvMassVoteRows_" + episodeId);
+  if (!episode || !container) return;
+  const context = adminRealityTvVotingGroupContext_(bundle, episode);
+  const members = group && group.value !== "__ALL__" ? context.contestants.filter(function(item) {
+    return String(item.VoteGroupName || "").toLowerCase() === String(group.value || "").toLowerCase();
+  }) : context.contestants;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = adminRealityTvMassVoteRowHtml_(context.contestants, members, {}, true, "outside-" + Date.now());
+  container.appendChild(wrapper.firstElementChild);
+}
+
+async function adminRealityTvSaveMassVoteRound_(seasonId, episodeId) {
+  const group = document.getElementById("realityTvMassVoteGroup_" + episodeId);
+  const round = document.getElementById("realityTvMassVoteRound_" + episodeId);
+  const container = document.getElementById("realityTvMassVoteRows_" + episodeId);
+  if (!container) return;
+  const votes = [];
+  const rows = Array.from(container.querySelectorAll(".reality-tv-mass-vote-row"));
+  for (const row of rows) {
+    const status = row.querySelector(".reality-tv-mass-vote-status");
+    const statusValue = status ? String(status.value || "NOT-ENTERED").toUpperCase() : "NOT-ENTERED";
+    if (statusValue === "NOT-ENTERED") continue;
+    const voter = row.querySelector(".reality-tv-mass-vote-voter");
+    const target = row.querySelector(".reality-tv-mass-vote-target");
+    const value = row.querySelector(".reality-tv-mass-vote-value");
+    const notes = row.querySelector(".reality-tv-mass-vote-notes");
+    if (!voter || !voter.value) return alert("Select the voter for every outside-voter row.");
+    if (["VALID", "NULLIFIED", "NOT-READ"].indexOf(statusValue) !== -1 && (!target || !target.value)) {
+      return alert("Select who received each valid, nullified, or unread vote.");
+    }
+    votes.push({
+      voterContestantId: voter.value,
+      targetContestantId: target ? target.value : "",
+      voteStatus: statusValue,
+      voteValue: value ? value.value : 1,
+      voteRoundLabel: round ? round.value.trim() : "Round 1 — Initial Vote",
+      notes: notes ? notes.value.trim() : "",
+      outsideVoter: row.dataset.outsideVoter === "true"
+    });
+  }
+  if (!votes.length) return alert("Enter at least one ballot before saving the round.");
+  adminRealityTvSetMessage_("realityTvMassVoteMessage_" + episodeId, "Saving " + votes.length + " ballots…", "info");
+  try {
+    const result = await apiAdminSaveRealityTvEpisodeVotesBulk({
+      seasonId: seasonId,
+      episodeId: episodeId,
+      votingGroupName: group ? group.value : "",
+      votes: votes
+    });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save the vote round."));
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvVotes_" + episodeId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvMassVoteMessage_" + episodeId, err.message || String(err), "error");
+  }
+}
+
+function adminRealityTvEpisodeVotePanel_(bundle, episode, open) {
+  const context = adminRealityTvVotingGroupContext_(bundle, episode);
+  const contestants = context.contestants;
+  const names = adminRealityTvContestantNameMap_(contestants);
+  const votes = (bundle.episodeVotes || []).filter(function(vote) {
+    return String(vote.EpisodeId || "") === String(episode.EpisodeId || "");
+  });
+  const key = adminRealityTvEscape_(episode.EpisodeId);
+  const contestantOptions = contestants.map(function(item) {
+    return `<option value="${adminRealityTvEscape_(item.ContestantId)}">${adminRealityTvEscape_(item.Name)}${item.VoteGroupName ? " — " + adminRealityTvEscape_(item.VoteGroupName) : ""}</option>`;
+  }).join("");
+  const detectedKeys = {};
+  context.detectedGroups.forEach(function(name) { detectedKeys[String(name).toLowerCase()] = true; });
+  const detectedOptions = context.detectedGroups.map(function(name) {
+    const value = name === "All active contestants" ? "__ALL__" : name;
+    return `<option value="${adminRealityTvEscape_(value)}" ${String(value) === String(context.defaultGroup) ? "selected" : ""}>${adminRealityTvEscape_(name)}</option>`;
+  }).join("");
+  const manualOptions = context.allGroups.filter(function(name) { return !detectedKeys[String(name).toLowerCase()]; }).map(function(name) {
+    return `<option value="${adminRealityTvEscape_(name)}" ${String(name) === String(context.defaultGroup) ? "selected" : ""}>${adminRealityTvEscape_(name)}</option>`;
+  }).join("");
+  const groupOptions = (detectedOptions || `<option value="">Select voting tribe</option>`) + (manualOptions ? `<optgroup label="Other tribes — manual override">${manualOptions}</optgroup>` : "");
+  const defaultRound = "Round 1 — Initial Vote";
+  const rows = votes.slice().sort(function(a, b) {
+    const round = String(a.VoteRoundLabel || "").localeCompare(String(b.VoteRoundLabel || ""));
+    if (round) return round;
+    return new Date(a.RecordedAt || 0).getTime() - new Date(b.RecordedAt || 0).getTime();
+  }).map(function(vote) {
+    const status = String(vote.VoteStatus || "VALID").toUpperCase();
+    const target = names[String(vote.TargetContestantId || "").toLowerCase()] || (status === "LOST-VOTE" ? "No vote" : status === "ABSTAINED" ? "Abstained" : "—");
+    return `<tr>
+      <td>${adminRealityTvEscape_(vote.VoteRoundLabel || defaultRound)}</td>
+      <td>${adminRealityTvEscape_(names[String(vote.VoterContestantId || "").toLowerCase()] || vote.VoterContestantId || "Unknown")}</td>
+      <td>${adminRealityTvEscape_(target)}</td>
+      <td>${adminRealityTvEscape_(adminRealityTvVoteStatusLabel_(status))}</td>
+      <td>${adminRealityTvEscape_(vote.VoteValue || 0)}</td>
+      <td>${adminRealityTvEscape_(vote.Notes || "")}</td>
+      <td><div class="admin-actions compact"><button type="button" class="admin-small-button secondary" onclick="adminRealityTvEditEpisodeVote_('${key}','${adminRealityTvEscape_(vote.VoteId)}')">Edit</button><button type="button" class="admin-small-button danger" onclick="adminRealityTvDeleteEpisodeVote_('${key}','${adminRealityTvEscape_(vote.VoteId)}')">Delete</button></div></td>
+    </tr>`;
+  }).join("");
+
+  return `<details id="realityTvVotes_${key}" class="reality-tv-vote-episode" ${open ? "open" : ""}>
+    <summary><span>${adminRealityTvEscape_(episode.EpisodeName)}</span><span class="reality-tv-status-pill ${adminRealityTvStatusClass_(episode.Status)}">${adminRealityTvEscape_(votes.length)} vote record${votes.length === 1 ? "" : "s"}</span></summary>
+    <div class="reality-tv-vote-episode-body">
+      ${adminRealityTvEpisodeVoteSummary_(bundle, episode, votes)}
+      <div class="reality-tv-mass-vote-card">
+        <div class="reality-tv-mass-vote-heading">
+          <div><strong>Enter the full vote round</strong><span>${adminRealityTvEscape_(context.source)}. Voters and targets are restricted to the selected tribe.</span></div>
+          <span class="reality-tv-status-pill ${context.detectedGroups.length ? "ready" : "pending"}">${context.detectedGroups.length ? "TRIBE DETECTED" : "SELECT TRIBE"}</span>
+        </div>
+        <div class="reality-tv-vote-round-controls">
+          <label>Voting tribe / council<select id="realityTvMassVoteGroup_${key}" class="input" onchange="adminRealityTvRenderMassVoteRows_('${adminRealityTvEscape_(bundle.season.SeasonId)}','${key}')">${groupOptions}</select></label>
+          <label>Voting round<input id="realityTvMassVoteRound_${key}" class="input" list="realityTvVoteRoundList_${key}" value="${adminRealityTvEscape_(defaultRound)}" onchange="adminRealityTvRenderMassVoteRows_('${adminRealityTvEscape_(bundle.season.SeasonId)}','${key}')"></label>
+          <datalist id="realityTvVoteRoundList_${key}"><option value="Round 1 — Initial Vote"><option value="Round 2 — Revote"><option value="Second Tribal"><option value="Fire-making / tiebreaker"></datalist>
+        </div>
+        <div class="reality-tv-mass-vote-labels"><span>Voter</span><span>Voted for</span><span>Status</span><span>Value</span><span>Notes</span><span></span></div>
+        <div id="realityTvMassVoteRows_${key}" class="reality-tv-mass-vote-rows">${adminRealityTvMassVoteRowsHtml_(bundle, episode, context.defaultGroup, defaultRound)}</div>
+        <div class="admin-actions">
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvAddOutsideVoteRow_('${adminRealityTvEscape_(bundle.season.SeasonId)}','${key}')">Add Outside Voter</button>
+          <button type="button" class="admin-small-button" onclick="adminRealityTvSaveMassVoteRound_('${adminRealityTvEscape_(bundle.season.SeasonId)}','${key}')">Save Entire Vote Round</button>
+        </div>
+        <div class="admin-sub">Use <b>Add Outside Voter</b> only when a contestant from another tribe, a juror, or another eligible player is allowed to cast a ballot. The target list remains limited to the voting tribe.</div>
+        <div id="realityTvMassVoteMessage_${key}" class="admin-message"></div>
+      </div>
+
+      <details class="reality-tv-single-vote-editor">
+        <summary>Add or correct one ballot</summary>
+        <div class="reality-tv-vote-entry-grid">
+          <input id="realityTvVoteId_${key}" type="hidden" value="">
+          <label>Voting round<input id="realityTvVoteRound_${key}" class="input" list="realityTvVoteRoundList_${key}" value="${adminRealityTvEscape_(defaultRound)}" placeholder="Round 1 — Initial Vote"></label>
+          <label>Voter<select id="realityTvVoteVoter_${key}" class="input"><option value="">Select voter</option>${contestantOptions}</select></label>
+          <label>Voted for<select id="realityTvVoteTarget_${key}" class="input"><option value="">Select target</option>${contestantOptions}</select></label>
+          <label>Vote status<select id="realityTvVoteStatus_${key}" class="input" onchange="adminRealityTvVoteStatusChanged_('${key}')"><option value="VALID">Valid</option><option value="NULLIFIED">Nullified by idol/advantage</option><option value="NOT-READ">Not read / unrevealed</option><option value="LOST-VOTE">Lost / blocked vote</option><option value="ABSTAINED">Abstained / no vote cast</option></select></label>
+          <label>Vote value<input id="realityTvVoteValue_${key}" class="input" type="number" min="0" max="20" step="1" value="1"></label>
+          <label class="reality-tv-wide-field">Notes<input id="realityTvVoteNotes_${key}" class="input" placeholder="Extra vote, idol played, tie, or other context"></label>
+        </div>
+        <div class="admin-actions">
+          <button type="button" class="admin-small-button" onclick="adminRealityTvSaveEpisodeVote_('${adminRealityTvEscape_(bundle.season.SeasonId)}','${key}')">Save One Vote</button>
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvClearEpisodeVoteForm_('${key}')">Clear</button>
+        </div>
+        <div id="realityTvVoteMessage_${key}" class="admin-message"></div>
+      </details>
+      <div class="reality-tv-votes-table-wrap"><table class="reality-tv-votes-table"><thead><tr><th>Round</th><th>Voter</th><th>Voted for</th><th>Status</th><th>Value</th><th>Notes</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="7">No vote details entered.</td></tr>`}</tbody></table></div>
+    </div>
+  </details>`;
+}
+
+
+function adminRealityTvEpisodeVotesPanel_(bundle) {
+  const current = adminRealityTvCurrentEpisode_(bundle);
+  const episodes = (bundle.episodes || []).slice().sort(function(a, b) { return Number(b.EpisodeNumber || 0) - Number(a.EpisodeNumber || 0); });
+  return `<details class="reality-tv-subsection reality-tv-votes-manager">
+    <summary>Episode Vote Details ${adminRealityTvHelp_("Episode vote details", "Record one row per ballot. Valid, nullified, unrevealed, lost, extra, and revote ballots are kept separately from the official elimination result.")}</summary>
+    <div class="admin-sub">Votes are episode history and do not settle questions or remove contestants. Enter the official elimination separately above.</div>
+    <div class="reality-tv-vote-episodes">${episodes.map(function(episode) {
+      return adminRealityTvEpisodeVotePanel_(bundle, episode, current && String(current.EpisodeId) === String(episode.EpisodeId));
+    }).join("") || `<div class="admin-message warning">Create an episode before entering votes.</div>`}</div>
+  </details>`;
+}
+
+function adminRealityTvScheduleStatusLabel_(status) {
+  const labels = { SCHEDULED: "Scheduled", DELAYED: "Delayed", RESCHEDULED: "Rescheduled", TBA: "TBA" };
+  return labels[String(status || "SCHEDULED").toUpperCase()] || String(status || "Scheduled");
+}
+
+function adminRealityTvEpisodeSchedulePanel_(bundle) {
+  const season = bundle.season || {};
+  const episodes = (bundle.episodes || []).slice().sort(function(a, b) { return Number(a.EpisodeNumber || 0) - Number(b.EpisodeNumber || 0); });
+  return `<details class="reality-tv-subsection reality-tv-schedule-manager">
+    <summary>Episode Schedule &amp; Delays ${adminRealityTvHelp_("Schedule changes", "Move one episode without rebuilding it, mark an air date TBA, or shift every later open episode by the same amount. Existing questions, picks, votes, and permanent IDs remain attached to their episode.")}</summary>
+    <div class="admin-message info">For March Madness, the World Cup, holidays, or a network change: update the affected episode. Choose <b>Shift later open episodes</b> when the rest of the season should move by the same number of days.</div>
+    <div class="reality-tv-schedule-grid">${episodes.map(function(episode) {
+      const key = adminRealityTvEscape_(episode.EpisodeId);
+      const final = String(episode.Status || "").toUpperCase() === "FINAL";
+      const scheduleStatus = String(episode.ScheduleStatus || "SCHEDULED").toUpperCase();
+      return `<div id="realityTvScheduleCard_${key}" class="reality-tv-schedule-card ${final ? "final" : ""}">
+        <div class="reality-tv-schedule-heading"><div><strong>${adminRealityTvEscape_(episode.EpisodeName)}</strong><small>${episode.OriginalAirDateTime ? "Originally " + adminRealityTvDateTime_(episode.OriginalAirDateTime) : "Uses the season schedule unless changed"}</small></div><span class="reality-tv-status-pill ${adminRealityTvStatusClass_(scheduleStatus)}">${adminRealityTvEscape_(adminRealityTvScheduleStatusLabel_(scheduleStatus))}</span></div>
+        <div class="reality-tv-schedule-fields">
+          <label>Status<select id="realityTvScheduleStatus_${key}" class="input" ${final ? "disabled" : ""} onchange="adminRealityTvScheduleStatusChanged_('${key}')"><option value="SCHEDULED" ${scheduleStatus === "SCHEDULED" ? "selected" : ""}>Scheduled</option><option value="DELAYED" ${scheduleStatus === "DELAYED" ? "selected" : ""}>Delayed</option><option value="RESCHEDULED" ${scheduleStatus === "RESCHEDULED" ? "selected" : ""}>Rescheduled</option><option value="TBA" ${scheduleStatus === "TBA" ? "selected" : ""}>TBA — date unknown</option></select></label>
+          <label>Air date/time<input id="realityTvScheduleAir_${key}" class="input" type="datetime-local" value="${adminRealityTvEscape_(adminRealityTvDateTimeLocalValue_(episode.AirDateTime))}" ${final || scheduleStatus === "TBA" ? "disabled" : ""}></label>
+          <label>Pick lock time<input id="realityTvScheduleLock_${key}" class="input" type="datetime-local" value="${adminRealityTvEscape_(adminRealityTvDateTimeLocalValue_(episode.LockDateTime))}" ${final || scheduleStatus === "TBA" ? "disabled" : ""}></label>
+          <label class="reality-tv-wide-field">Schedule note<input id="realityTvScheduleNotes_${key}" class="input" value="${adminRealityTvValue_(episode.ScheduleNotes || "")}" placeholder="Delayed for tournament coverage; now airs Thursday"></label>
+        </div>
+        ${final ? `<div class="admin-sub">Finalized episodes are schedule-locked.</div>` : `<label class="reality-tv-inline-option"><input id="realityTvScheduleShift_${key}" type="checkbox"><span>Shift every later open episode by the same amount</span></label><div class="admin-actions"><button type="button" class="admin-small-button" onclick="adminRealityTvSaveEpisodeSchedule_('${adminRealityTvEscape_(season.SeasonId)}','${key}')">Save Schedule</button></div>`}
+        <div id="realityTvScheduleMessage_${key}" class="admin-message"></div>
+      </div>`;
+    }).join("") || `<div class="admin-message warning">No episodes exist yet.</div>`}</div>
+  </details>`;
+}
+
 function adminRealityTvResultPanel_(bundle) {
   const season = bundle.season;
   const approvalInProgress = (bundle.queue || []).find(function(item) {
@@ -950,7 +1435,7 @@ function adminRealityTvResultPanel_(bundle) {
     const reviewStatus = String(pending.ReviewStatus || "PENDING").toUpperCase();
     const isApproving = reviewStatus === "APPROVING";
     return `
-      <div class="reality-tv-review-card">
+      <div id="realityTvResultPanel_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-review-card">
         <div class="reality-tv-review-header">
           <div>
             <strong>${isApproving ? "Approval in progress" : "Administrator approval required"}</strong>
@@ -978,7 +1463,7 @@ function adminRealityTvResultPanel_(bundle) {
 
   if (String(episode.Status || "").toUpperCase() === "FINAL") {
     return `
-      <div class="admin-message success">
+      <div id="realityTvResultPanel_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message success">
         ${adminRealityTvEscape_(episode.EpisodeName)} is final.
         <button class="admin-small-button secondary" onclick="adminRealityTvCreateNextEpisode('${adminRealityTvEscape_(season.SeasonId)}')">
           Create Next Episode
@@ -988,7 +1473,7 @@ function adminRealityTvResultPanel_(bundle) {
   }
 
   return `
-    <div class="reality-tv-result-entry">
+    <div id="realityTvResultPanel_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-result-entry">
       <div class="reality-tv-episode-heading">
         <div>
           <h3>Record ${adminRealityTvEscape_(episode.EpisodeName)} Result</h3>
@@ -1002,13 +1487,15 @@ function adminRealityTvResultPanel_(bundle) {
       <div class="admin-form-grid reality-tv-result-grid">
         <label>
           Result type
+          <!-- Double elimination (question is pushed) remains supported as the two-person case inside Multiple elimination. -->
           <select id="realityTvOutcome_${adminRealityTvEscape_(season.SeasonId)}" class="input" onchange="adminRealityTvOutcomeChanged('${adminRealityTvEscape_(season.SeasonId)}')">
             <option value="elimination">Standard elimination</option>
-            <option value="double-elimination">Double elimination (question is pushed)</option>
+            <option value="multiple-elimination">Multiple elimination — select 2 or more (question is pushed)</option>
             <option value="no-elimination">No elimination (question is pushed)</option>
             <option value="medical-withdrawal">Medical withdrawal</option>
             <option value="quit">Contestant quit</option>
           </select>
+          <span class="admin-sub">Use Multiple elimination when the episode unexpectedly removes two or more contestants. The original single-elimination prediction is pushed while every selected contestant is removed from the active roster.</span>
         </label>
         <label>
           Evidence URL (optional)
@@ -1047,13 +1534,14 @@ function adminRealityTvEpisodesTable_(episodes) {
   return `
     <div class="reality-tv-episodes-table-wrap">
       <table class="reality-tv-episodes-table">
-        <thead><tr><th>Episode</th><th>Air date</th><th>Lock</th><th>Question</th><th>Status</th></tr></thead>
+        <thead><tr><th>Episode</th><th>Air date</th><th>Lock</th><th>Schedule</th><th>Question</th><th>Status</th></tr></thead>
         <tbody>
           ${(episodes || []).map(function(item) {
             return `<tr>
               <td>${adminRealityTvEscape_(item.EpisodeName)}</td>
-              <td>${adminRealityTvDateTime_(item.AirDateTime)}</td>
-              <td>${adminRealityTvDateTime_(item.LockDateTime)}</td>
+              <td>${String(item.ScheduleStatus || "").toUpperCase() === "TBA" ? "TBA" : adminRealityTvDateTime_(item.AirDateTime)}${item.OriginalAirDateTime ? `<small class="reality-tv-table-note">Originally ${adminRealityTvDateTime_(item.OriginalAirDateTime)}</small>` : ""}</td>
+              <td>${String(item.ScheduleStatus || "").toUpperCase() === "TBA" ? "Open until rescheduled" : adminRealityTvDateTime_(item.LockDateTime)}</td>
+              <td><span class="reality-tv-status-pill ${adminRealityTvStatusClass_(item.ScheduleStatus || "scheduled")}">${adminRealityTvEscape_(adminRealityTvScheduleStatusLabel_(item.ScheduleStatus || "SCHEDULED"))}</span></td>
               <td>${adminRealityTvEscape_(item.CategoryId)}</td>
               <td><span class="reality-tv-status-pill ${adminRealityTvStatusClass_(item.Status)}">${adminRealityTvEscape_(item.Status)}</span></td>
             </tr>`;
@@ -1114,7 +1602,7 @@ async function adminRealityTvSaveGroups(seasonId) {
     const result = await apiAdminSaveRealityTvGroups({ seasonId: seasonId, groupsJSON: JSON.stringify(groups) });
     if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save groups."));
     adminRealityTvSetMessage_("realityTvGroupsMessage_" + seasonId, result.message || "Group settings saved.", "success");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvGroupsMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvGroupsMessage_" + seasonId, err.message || String(err), "error");
   }
@@ -1176,7 +1664,7 @@ async function adminRealityTvSaveContestantGroup(seasonId, contestantId) {
     });
     if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save the group assignment."));
     adminRealityTvSetMessage_(messageId, result.message || "Group assignment saved.", "success");
-    setTimeout(function() { navigate("admin-reality-tv"); }, 500);
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: messageId });
   } catch (err) {
     adminRealityTvSetMessage_(messageId, err.message || String(err), "error");
   }
@@ -1194,6 +1682,8 @@ function adminRealityTvSeasonBody_(bundle) {
       <div><b>Current:</b> ${current ? adminRealityTvEscape_(current.EpisodeName) : "None"}</div>
     </div>
     ${adminRealityTvResultPanel_(bundle)}
+    ${adminRealityTvEpisodeSchedulePanel_(bundle)}
+    ${adminRealityTvEpisodeVotesPanel_(bundle)}
     ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
     ${adminRealityTvQuestionPackPanel_(bundle)}
     ${adminRealityTvGroupsPanel_(bundle)}
@@ -1238,8 +1728,9 @@ function adminRealityTvSeasonBody_(bundle) {
 
 function adminRealityTvSeasonCard_(bundle) {
   const season = bundle.season;
+  const seasonId = adminRealityTvEscape_(season.SeasonId);
   return `
-    <details class="card admin-card admin-collapsible-card reality-tv-season-card" open>
+    <details class="card admin-card admin-collapsible-card reality-tv-season-card" data-reality-season-summary="${seasonId}" open>
       <summary class="admin-card-summary">
         <div>
           <h2>${adminRealityTvEscape_(season.ShowName)} — ${adminRealityTvEscape_(season.SeasonName)}</h2>
@@ -1247,7 +1738,7 @@ function adminRealityTvSeasonCard_(bundle) {
         </div>
         <span class="reality-tv-status-pill ${adminRealityTvStatusClass_(season.Status)}">${adminRealityTvEscape_(season.Status)}</span>
       </summary>
-      <div class="admin-collapsible-body">${adminRealityTvSeasonBody_(bundle)}</div>
+      <div id="realityTvSeasonDetail_${seasonId}" class="admin-collapsible-body">${adminRealityTvSeasonBody_(bundle)}</div>
     </details>
   `;
 }
@@ -1336,6 +1827,75 @@ async function adminRealityTvLoadSeasonDetails_(event, seasonId) {
     clearTimeout(longTimer);
     details.dataset.detailsLoading = "false";
   }
+}
+
+function adminRealityTvSeasonBundle_(seasonId) {
+  return ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || []).find(function(item) {
+    return item && item.season && String(item.season.SeasonId || "") === String(seasonId || "");
+  }) || null;
+}
+
+function adminRealityTvNextOpenQuestionId_(bundle, afterQuestionId) {
+  const questions = (bundle && bundle.episodeQuestions ? bundle.episodeQuestions : []).slice().sort(function(a, b) {
+    const episodeDiff = Number(b.EpisodeNumber || 0) - Number(a.EpisodeNumber || 0);
+    if (episodeDiff) return episodeDiff;
+    return String(a.QuestionType || "").localeCompare(String(b.QuestionType || ""));
+  });
+  const open = questions.filter(function(item) {
+    return String(item.Status || "OPEN").toUpperCase() === "OPEN" && !adminRealityTvQuestionPending_(bundle, item);
+  });
+  if (!open.length) return "";
+  const afterIndex = questions.findIndex(function(item) {
+    return String(item.EpisodeQuestionId || "") === String(afterQuestionId || "");
+  });
+  const next = open.find(function(item) {
+    const index = questions.indexOf(item);
+    return afterIndex === -1 || index > afterIndex;
+  }) || open[0];
+  return String(next.EpisodeQuestionId || "");
+}
+
+async function adminRealityTvRefreshSeasonDetails_(seasonId, options) {
+  options = options || {};
+  const response = await apiAdminGetRealityTvSeasonDetails(seasonId);
+  if (!response || response.success === false || !response.bundle) {
+    throw new Error(adminRealityTvResponseError_(response, "Could not refresh this season."));
+  }
+  const bundle = response.bundle;
+  const index = (ADMIN_REALITY_TV_DASHBOARD.seasons || []).findIndex(function(item) {
+    return item && item.season && String(item.season.SeasonId || "") === String(seasonId || "");
+  });
+  if (index !== -1) ADMIN_REALITY_TV_DASHBOARD.seasons[index] = bundle;
+
+  const target = document.getElementById("realityTvSeasonDetail_" + seasonId);
+  if (!target) {
+    navigate("admin-reality-tv", { suppressLoader: true });
+    return bundle;
+  }
+  const seasonCard = target.closest("details.reality-tv-season-card");
+  if (seasonCard) {
+    seasonCard.open = true;
+    seasonCard.dataset.detailsLoaded = "true";
+    seasonCard.dataset.detailsLoading = "false";
+  }
+  target.innerHTML = adminRealityTvSeasonBody_(bundle);
+
+  setTimeout(function() {
+    adminRealityTvAnchorPreview_(seasonId);
+    adminRealityTvCustomSourceChanged_(seasonId);
+    if (typeof adminUiEnhancePage === "function") adminUiEnhancePage(seasonCard || target);
+
+    let focusId = options.focusElementId || "";
+    if (options.nextAfterQuestionId) {
+      const nextId = adminRealityTvNextOpenQuestionId_(bundle, options.nextAfterQuestionId);
+      focusId = nextId ? "realityTvQuestionCard_" + nextId : "realityTvEpisodeQuestions_" + seasonId;
+    }
+    const focus = focusId ? document.getElementById(focusId) : null;
+    if (focus && typeof focus.scrollIntoView === "function") {
+      focus.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, 0);
+  return bundle;
 }
 
 function adminRealityTvBlankRosterRows_(count) {
@@ -1740,15 +2300,12 @@ async function renderAdminRealityTvPage() {
 }
 
 async function adminRealityTvSetupSystem() {
-  showLoader();
   try {
     const res = await apiAdminSetupRealityTvSystem();
     if (!res || res.success === false) throw new Error((res && res.error) || "Setup failed.");
-    navigate("admin-reality-tv");
+    navigate("admin-reality-tv", { suppressLoader: true });
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
@@ -1791,16 +2348,13 @@ async function adminRealityTvConfigureHub() {
   const value = prompt("Paste the External Results Hub Google Sheet URL or spreadsheet ID:", current);
   if (value === null) return;
   if (!value.trim()) return alert("A spreadsheet URL or ID is required.");
-  showLoader();
   try {
     const res = await apiAdminConfigureRealityTvHub(value.trim());
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not connect the Hub.");
     alert(res.message || "External Results Hub connected.");
-    navigate("admin-reality-tv");
+    navigate("admin-reality-tv", { suppressLoader: true });
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
@@ -1861,7 +2415,6 @@ async function adminRealityTvCreateSeason() {
   }
 
   adminRealityTvSetMessage_("realityTvCreateMessage", "Creating season, roster, episode question pack, mappings, and Episode 1…", "info");
-  showLoader();
   try {
     const res = await apiAdminCreateRealityTvSeason(payload);
     if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not create the season.");
@@ -1872,11 +2425,151 @@ async function adminRealityTvCreateSeason() {
     }
     const buildMessage = build ? adminRealityTvBuildCompletionMessage_(build) : "";
     alert((res.message || "Reality TV season created.") + (buildMessage ? "\n\n" + buildMessage : ""));
-    navigate("admin-reality-tv");
+    navigate("admin-reality-tv", { suppressLoader: true });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvCreateMessage", err.message, "error");
-  } finally {
-    hideLoader();
+  }
+}
+
+function adminRealityTvVoteStatusChanged_(episodeId) {
+  const status = document.getElementById("realityTvVoteStatus_" + episodeId);
+  const target = document.getElementById("realityTvVoteTarget_" + episodeId);
+  const value = document.getElementById("realityTvVoteValue_" + episodeId);
+  if (!status || !target || !value) return;
+  const noTarget = ["LOST-VOTE", "ABSTAINED"].indexOf(status.value) !== -1;
+  target.disabled = noTarget;
+  value.disabled = noTarget;
+  if (noTarget) {
+    target.value = "";
+    value.value = "0";
+  } else if (!Number(value.value)) {
+    value.value = "1";
+  }
+}
+
+function adminRealityTvClearEpisodeVoteForm_(episodeId) {
+  const ids = ["VoteId", "VoteVoter", "VoteTarget", "VoteNotes"];
+  ids.forEach(function(suffix) {
+    const element = document.getElementById("realityTv" + suffix + "_" + episodeId);
+    if (element) element.value = "";
+  });
+  const status = document.getElementById("realityTvVoteStatus_" + episodeId);
+  const value = document.getElementById("realityTvVoteValue_" + episodeId);
+  if (status) status.value = "VALID";
+  if (value) value.value = "1";
+  adminRealityTvVoteStatusChanged_(episodeId);
+}
+
+function adminRealityTvEditEpisodeVote_(episodeId, voteId) {
+  const vote = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
+    .flatMap(function(bundle) { return bundle.episodeVotes || []; })
+    .find(function(item) { return String(item.VoteId || "") === String(voteId || ""); });
+  if (!vote) return alert("Vote record not found. Refresh and try again.");
+  const values = {
+    VoteId: vote.VoteId || "",
+    VoteRound: vote.VoteRoundLabel || "Round 1 — Initial Vote",
+    VoteVoter: vote.VoterContestantId || "",
+    VoteTarget: vote.TargetContestantId || "",
+    VoteStatus: vote.VoteStatus || "VALID",
+    VoteValue: vote.VoteValue || 0,
+    VoteNotes: vote.Notes || ""
+  };
+  Object.keys(values).forEach(function(suffix) {
+    const element = document.getElementById("realityTv" + suffix + "_" + episodeId);
+    if (element) element.value = values[suffix];
+  });
+  adminRealityTvVoteStatusChanged_(episodeId);
+  const form = document.getElementById("realityTvVotes_" + episodeId);
+  if (form) {
+    form.open = true;
+    form.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+async function adminRealityTvSaveEpisodeVote_(seasonId, episodeId) {
+  const voteId = document.getElementById("realityTvVoteId_" + episodeId);
+  const round = document.getElementById("realityTvVoteRound_" + episodeId);
+  const voter = document.getElementById("realityTvVoteVoter_" + episodeId);
+  const target = document.getElementById("realityTvVoteTarget_" + episodeId);
+  const status = document.getElementById("realityTvVoteStatus_" + episodeId);
+  const value = document.getElementById("realityTvVoteValue_" + episodeId);
+  const notes = document.getElementById("realityTvVoteNotes_" + episodeId);
+  if (!voter || !voter.value) return alert("Select the contestant who cast the vote.");
+  if (status && ["VALID", "NULLIFIED", "NOT-READ"].indexOf(status.value) !== -1 && (!target || !target.value)) {
+    return alert("Select who received the vote.");
+  }
+  adminRealityTvSetMessage_("realityTvVoteMessage_" + episodeId, "Saving vote…", "info");
+  try {
+    const result = await apiAdminSaveRealityTvEpisodeVote({
+      voteId: voteId ? voteId.value : "",
+      seasonId: seasonId,
+      episodeId: episodeId,
+      voteRoundLabel: round ? round.value.trim() : "Round 1 — Initial Vote",
+      voterContestantId: voter.value,
+      targetContestantId: target ? target.value : "",
+      voteStatus: status ? status.value : "VALID",
+      voteValue: value ? value.value : 1,
+      notes: notes ? notes.value.trim() : ""
+    });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save the vote."));
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvVotes_" + episodeId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvVoteMessage_" + episodeId, err.message || String(err), "error");
+  }
+}
+
+async function adminRealityTvDeleteEpisodeVote_(episodeId, voteId) {
+  if (!confirm("Delete this recorded vote?")) return;
+  const bundle = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || []).find(function(item) {
+    return (item.episodes || []).some(function(episode) { return String(episode.EpisodeId || "") === String(episodeId || ""); });
+  });
+  try {
+    const result = await apiAdminDeleteRealityTvEpisodeVote(voteId);
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not delete the vote."));
+    if (bundle && bundle.season) await adminRealityTvRefreshSeasonDetails_(bundle.season.SeasonId, { focusElementId: "realityTvVotes_" + episodeId });
+  } catch (err) {
+    alert(err.message || String(err));
+  }
+}
+
+function adminRealityTvScheduleStatusChanged_(episodeId) {
+  const status = document.getElementById("realityTvScheduleStatus_" + episodeId);
+  const air = document.getElementById("realityTvScheduleAir_" + episodeId);
+  const lock = document.getElementById("realityTvScheduleLock_" + episodeId);
+  if (!status || !air || !lock) return;
+  const tba = status.value === "TBA";
+  air.disabled = tba;
+  lock.disabled = tba;
+}
+
+async function adminRealityTvSaveEpisodeSchedule_(seasonId, episodeId) {
+  const status = document.getElementById("realityTvScheduleStatus_" + episodeId);
+  const air = document.getElementById("realityTvScheduleAir_" + episodeId);
+  const lock = document.getElementById("realityTvScheduleLock_" + episodeId);
+  const notes = document.getElementById("realityTvScheduleNotes_" + episodeId);
+  const shift = document.getElementById("realityTvScheduleShift_" + episodeId);
+  if (!status) return;
+  if (status.value !== "TBA" && (!air || !air.value)) return alert("Enter the new air date/time, or mark the episode TBA.");
+  if (status.value !== "TBA" && lock && lock.value && new Date(lock.value).getTime() > new Date(air.value).getTime()) {
+    return alert("The pick lock time cannot be after the episode air time.");
+  }
+  const moveFuture = !!(shift && shift.checked);
+  if (moveFuture && !confirm("Shift every later open episode by the same amount? Existing questions, picks, and votes will stay attached to their original episode numbers.")) return;
+  adminRealityTvSetMessage_("realityTvScheduleMessage_" + episodeId, "Saving schedule…", "info");
+  try {
+    const result = await apiAdminUpdateRealityTvEpisodeSchedule({
+      seasonId: seasonId,
+      episodeId: episodeId,
+      scheduleStatus: status.value,
+      airDateTime: status.value === "TBA" ? "" : air.value,
+      lockDateTime: status.value === "TBA" ? "" : (lock ? lock.value : ""),
+      scheduleNotes: notes ? notes.value.trim() : "",
+      shiftFutureEpisodes: moveFuture
+    });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not update the episode schedule."));
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvScheduleCard_" + episodeId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvScheduleMessage_" + episodeId, err.message || String(err), "error");
   }
 }
 
@@ -1889,7 +2582,7 @@ function adminRealityTvOutcomeChanged(seasonId) {
     checkboxes.forEach(function(box) { box.checked = false; box.disabled = true; });
   } else {
     checkboxes.forEach(function(box) { box.disabled = false; });
-    if (outcome !== "double-elimination") {
+    if (["double-elimination", "multiple-elimination"].indexOf(outcome) === -1) {
       let found = false;
       checkboxes.forEach(function(box) {
         if (box.checked && found) box.checked = false;
@@ -1901,11 +2594,7 @@ function adminRealityTvOutcomeChanged(seasonId) {
 
 function adminRealityTvContestantChecked(seasonId, changed) {
   const outcome = document.getElementById("realityTvOutcome_" + seasonId).value;
-  if (outcome === "double-elimination") {
-    const checked = Array.from(document.querySelectorAll("#realityTvSelections_" + seasonId + ' input[type="checkbox"]:checked'));
-    if (checked.length > 2) changed.checked = false;
-    return;
-  }
+  if (["double-elimination", "multiple-elimination"].indexOf(outcome) !== -1) return;
   if (changed.checked) {
     document.querySelectorAll("#realityTvSelections_" + seasonId + ' input[type="checkbox"]').forEach(function(box) {
       if (box !== changed) box.checked = false;
@@ -1921,12 +2610,12 @@ async function adminRealityTvSubmitResult(seasonId, episodeId) {
   if (outcome === "no-elimination" && selected.length) return alert("No Elimination cannot include a contestant.");
   if (["elimination", "medical-withdrawal", "quit"].indexOf(outcome) !== -1 && selected.length !== 1) return alert("Select exactly one contestant.");
   if (outcome === "double-elimination" && selected.length !== 2) return alert("Select exactly two contestants.");
+  if (outcome === "multiple-elimination" && selected.length < 2) return alert("Select at least two contestants.");
 
   const summary = outcome === "no-elimination" ? "No elimination" : selected.join(", ");
   if (!confirm("Submit this FINAL result for administrator review?\n\n" + summary)) return;
 
   adminRealityTvSetMessage_("realityTvMessage_" + seasonId, "Submitting result for review…", "info");
-  showLoader();
   try {
     const res = await apiAdminSubmitRealityTvResult({
       seasonId: seasonId,
@@ -1937,11 +2626,9 @@ async function adminRealityTvSubmitResult(seasonId, episodeId) {
       notes: document.getElementById("realityTvNotes_" + seasonId).value.trim()
     });
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not submit the result.");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvResultPanel_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvMessage_" + seasonId, err.message, "error");
-  } finally {
-    hideLoader();
   }
 }
 
@@ -1959,8 +2646,7 @@ async function adminRealityTvApproveResult(queueId) {
     .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
   const resuming = existing && String(existing.ReviewStatus || "").toUpperCase() === "APPROVING";
 
-  if (!resuming && !confirm("Approve this result?\n\nThis will settle the episode, update CategoryResults, eliminate the selected contestant, and build the next episode.")) return;
-  showLoader();
+  if (!resuming && !confirm("Approve this result?\n\nThis will settle the episode, update CategoryResults, remove the selected participant(s), and build the next episode.")) return;
   try {
     let state = await apiAdminApproveRealityTvResult(queueId);
     if (!state || state.success === false) {
@@ -1968,19 +2654,27 @@ async function adminRealityTvApproveResult(queueId) {
     }
 
     let transientFailures = 0;
-    for (let step = 0; step < 10 && !state.complete; step++) {
+    let busyResponses = 0;
+    let completedStages = 0;
+    while (completedStages < 10 && !state.complete && busyResponses < 20) {
       await adminRealityTvSleep_(state.busy ? 1400 : 250);
       const next = await apiAdminContinueRealityTvApproval(queueId);
       if (!next || next.success === false) {
         const message = adminRealityTvResponseError_(next, "Could not continue the approval.");
-        if (/timeout|network|524|invalid response/i.test(message) && transientFailures < 3) {
+        if (/timeout|network|524|invalid response|service spreadsheets|lock timeout/i.test(message) && transientFailures < 4) {
           transientFailures += 1;
-          await adminRealityTvSleep_(1600);
+          await adminRealityTvSleep_(1800);
           continue;
         }
         throw new Error(message);
       }
       state = next;
+      if (state.busy) {
+        busyResponses += 1;
+        continue;
+      }
+      busyResponses = 0;
+      completedStages += 1;
     }
 
     if (!state.complete) {
@@ -1991,51 +2685,58 @@ async function adminRealityTvApproveResult(queueId) {
       }
       alert((state.message || "Result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : "") + (state.questionBuild ? "\n\n" + adminRealityTvBuildCompletionMessage_(state.questionBuild) : ""));
     }
-    navigate("admin-reality-tv");
+    if (existing && existing.SeasonId) {
+      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   } catch (err) {
-    alert((err && err.message ? err.message : String(err)) + "\n\nRefresh the page and use Resume Approval. The staged process is safe to retry.");
-    navigate("admin-reality-tv");
-  } finally {
-    hideLoader();
+    alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. The staged process is safe to retry.");
+    if (existing && existing.SeasonId) {
+      try { await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId }); }
+      catch (refreshErr) { navigate("admin-reality-tv", { suppressLoader: true }); }
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   }
 }
 
 async function adminRealityTvRejectResult(queueId) {
+  const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
+    .flatMap(function(bundle) { return bundle.queue || []; })
+    .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
   const notes = prompt("Why is this result being rejected?", "Incorrect result; submit a corrected result.");
   if (notes === null) return;
-  showLoader();
   try {
     const res = await apiAdminRejectRealityTvResult(queueId, notes);
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not reject the result.");
-    navigate("admin-reality-tv");
+    if (existing && existing.SeasonId) {
+      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
 async function adminRealityTvCreateNextEpisode(seasonId) {
   if (!confirm("Create the next episode question using the currently active contestants?")) return;
-  showLoader();
   try {
     const res = await apiAdminCreateNextRealityTvEpisode(seasonId);
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not create the next episode.");
     let build = res.episode && res.episode.questionBuild ? res.episode.questionBuild : null;
     if (build && !build.complete) build = await adminRealityTvRunQuestionPackBuild_(build, seasonId);
     alert((res.message || "Next episode created.") + (build ? "\n\n" + adminRealityTvBuildCompletionMessage_(build) : ""));
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvResultPanel_" + seasonId });
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
 async function adminRealityTvAddContestant(seasonId) {
   const name = document.getElementById("realityTvAddName_" + seasonId).value.trim();
   if (!name) return alert("Contestant name is required.");
-  showLoader();
   try {
     const res = await apiAdminAddRealityTvContestant({
       seasonId: seasonId,
@@ -2045,11 +2746,9 @@ async function adminRealityTvAddContestant(seasonId) {
     });
     if (!res || res.success === false) throw new Error((res && res.error) || "Could not add contestant.");
     alert(res.message || "Contestant added.");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvAddName_" + seasonId });
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2058,7 +2757,6 @@ async function adminRealityTvBulkAddToSeason(seasonId) {
   const parsed = adminRealityTvPreviewBulk_(seasonId);
   if (!parsed || parsed.errors.length) return;
   if (!confirm("Add " + parsed.items.length + " contestants to this season? Existing episode questions will not be changed.")) return;
-  showLoader();
   try {
     const res = await apiAdminBulkAddRealityTvContestants({
       seasonId: seasonId,
@@ -2066,12 +2764,10 @@ async function adminRealityTvBulkAddToSeason(seasonId) {
     });
     if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not add contestants.");
     alert(res.message || (res.createdCount + " contestants added."));
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvBulkPreview_" + seasonId });
   } catch (err) {
     const preview = document.getElementById("realityTvBulkPreview_" + seasonId);
     if (preview) preview.innerHTML = `<div class="admin-message error">${adminRealityTvEscape_(err.message)}</div>`;
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2137,7 +2833,6 @@ async function adminRealityTvSavePickRules(seasonId) {
   const penaltyInput = document.getElementById("realityTvPickChangePenalty_" + seasonId);
   if (!allowed || !maxInput || !penaltyInput) return;
   adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, "Saving player pick rules…", "info");
-  showLoader();
   try {
     const state = await apiAdminUpdateRealityTvQuestionPack({
       seasonId: seasonId,
@@ -2150,8 +2845,6 @@ async function adminRealityTvSavePickRules(seasonId) {
     adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, "Player pick rules saved and applied to all Reality TV questions in this season.", "success");
   } catch (err) {
     adminRealityTvSetMessage_("realityTvPickRulesMessage_" + seasonId, err.message || String(err), "error");
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2160,7 +2853,6 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
     return box.value;
   });
   adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Saving the question pack and starting a staged build…", "info");
-  showLoader();
   try {
     let state = await apiAdminUpdateRealityTvQuestionPack({
       seasonId: seasonId,
@@ -2190,15 +2882,13 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
     } else {
       alert(adminRealityTvBuildCompletionMessage_(state));
     }
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvQuestionPackMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_(
       "realityTvQuestionPackMessage_" + seasonId,
       (err && err.message ? err.message : String(err)) + " Select Resume Build once; completed local questions are safe.",
       "error"
     );
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2210,7 +2900,6 @@ async function adminRealityTvAddCustomQuestion(seasonId, episodeId) {
   if (!question) return adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, "Enter the custom question text.", "error");
   if (source === "manual-options" && manualOptions.length < 2) return adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, "Enter at least two manual answers.", "error");
   adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, "Saving the custom question and starting the staged build…", "info");
-  showLoader();
   try {
     let state = await apiAdminAddRealityTvCustomQuestionTemplate({
       seasonId: seasonId,
@@ -2227,18 +2916,15 @@ async function adminRealityTvAddCustomQuestion(seasonId, episodeId) {
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not save the custom question."));
     if (!state.complete) state = await adminRealityTvRunQuestionPackBuild_(state, seasonId);
     alert((state.message || state.lastMessage || "Custom question saved and built.") + "\n\nIt is now part of the current episode build and remains available for future episodes.");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvCustomMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, err.message || String(err), "error");
-  } finally {
-    hideLoader();
   }
 }
 
 async function adminRealityTvDeleteCustomQuestion(seasonId, templateId, episodeId) {
   if (!seasonId || !templateId) return;
   if (!confirm("Delete this custom question template? If the current episode copy has no saved picks or results, it will be removed from the game too. Historical played questions are preserved.")) return;
-  showLoader();
   try {
     const res = await apiAdminDeleteRealityTvCustomQuestionTemplate({
       seasonId: seasonId,
@@ -2249,18 +2935,15 @@ async function adminRealityTvDeleteCustomQuestion(seasonId, templateId, episodeI
     let build = res.build || null;
     if (build && !build.complete) build = await adminRealityTvRunQuestionPackBuild_(build, seasonId);
     alert(res.message || "Custom question deleted.");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvCustomMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvCustomMessage_" + seasonId, err.message || String(err), "error");
-  } finally {
-    hideLoader();
   }
 }
 
 async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
   if (!buildId) return alert("Question pack build ID is missing. Refresh and try again.");
   adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Resuming the saved question pack build…", "info");
-  showLoader();
   try {
     const state = await adminRealityTvRunQuestionPackBuild_({ buildId: buildId, complete: false }, seasonId);
     if (!state.complete) {
@@ -2268,22 +2951,19 @@ async function adminRealityTvResumeQuestionPackBuild(buildId, seasonId) {
     } else {
       alert(state.message || state.lastMessage || "Episode question pack build completed.");
     }
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvQuestionPackMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_(
       "realityTvQuestionPackMessage_" + seasonId,
       (err && err.message ? err.message : String(err)) + " Select Resume Build once.",
       "error"
     );
-  } finally {
-    hideLoader();
   }
 }
 
 
 async function adminRealityTvRepairQuestionPack(seasonId, episodeId) {
   adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Verifying every enabled extra question and answer…", "info");
-  showLoader();
   try {
     let state = await apiAdminRepairRealityTvQuestionPack(seasonId, episodeId || "");
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not start the question repair."));
@@ -2293,11 +2973,9 @@ async function adminRealityTvRepairQuestionPack(seasonId, episodeId) {
     }
     adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, adminRealityTvBuildCompletionMessage_(state), "success");
     alert(adminRealityTvBuildCompletionMessage_(state));
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvQuestionPackMessage_" + seasonId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, err.message || String(err), "error");
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2307,26 +2985,37 @@ async function adminRealityTvSubmitQuestionResult(episodeQuestionId) {
     .find(function(item) { return String(item.EpisodeQuestionId || "") === String(episodeQuestionId || ""); });
   if (!question) return alert("Episode question not found. Refresh and try again.");
   const key = question.EpisodeQuestionId;
-  const selected = document.querySelector('input[name="realityTvQuestion_' + key + '"]:checked');
-  if (!selected) return alert("Select one result.");
+  const modeEl = document.getElementById("realityTvQuestionResultMode_" + key);
+  const resultMode = modeEl ? modeEl.value : "winner";
+  const selected = Array.from(document.querySelectorAll('input[name="realityTvQuestion_' + key + '"]:checked'));
+  if (resultMode === "winner" && selected.length !== 1) return alert("Select exactly one winner.");
+  if (resultMode === "multiple-winners" && selected.length < 2) return alert("Select at least two winners.");
+  if (resultMode === "push" && selected.length) return alert("A pushed question cannot include a winner.");
+
+  const selectedIds = selected.map(function(item) { return item.value; });
   const options = adminRealityTvQuestionOptions_(question);
-  const option = options.find(function(item) { return String(item.id) === String(selected.value); });
-  if (!confirm("Submit this FINAL result for administrator review?\n\n" + (option ? option.label : selected.value))) return;
+  const selectedLabels = selectedIds.map(function(id) {
+    const option = options.find(function(item) { return String(item.id) === String(id); });
+    return option ? option.label : id;
+  });
+  const summary = resultMode === "push"
+    ? "Push / no official result"
+    : selectedLabels.join(", ");
+  if (!confirm("Submit this FINAL result for administrator review?\n\n" + summary)) return;
   adminRealityTvSetMessage_("realityTvQuestionMessage_" + key, "Submitting result for review…", "info");
-  showLoader();
   try {
     const res = await apiAdminSubmitRealityTvQuestionResult({
       episodeQuestionId: episodeQuestionId,
-      selectedOutcomeId: selected.value,
+      resultMode: resultMode,
+      selectedOutcomeIdsJSON: JSON.stringify(selectedIds),
+      selectedOutcomeId: selectedIds[0] || "",
       evidenceUrl: (document.getElementById("realityTvQuestionEvidence_" + key) || {}).value || "",
       notes: (document.getElementById("realityTvQuestionNotes_" + key) || {}).value || ""
     });
     if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not submit the question result.");
-    navigate("admin-reality-tv");
+    await adminRealityTvRefreshSeasonDetails_(question.SeasonId, { nextAfterQuestionId: episodeQuestionId });
   } catch (err) {
     adminRealityTvSetMessage_("realityTvQuestionMessage_" + key, err.message, "error");
-  } finally {
-    hideLoader();
   }
 }
 
@@ -2336,47 +3025,71 @@ async function adminRealityTvApproveQuestionResult(queueId) {
     .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
   const resuming = existing && String(existing.ReviewStatus || "").toUpperCase() === "APPROVING";
   if (!resuming && !confirm("Approve this question result?\n\nThis settles only this question. It will not eliminate anyone or create the next episode.")) return;
-  showLoader();
   try {
     let state = await apiAdminApproveRealityTvQuestionResult(queueId);
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not start the question approval."));
     let transientFailures = 0;
-    for (let step = 0; step < 8 && !state.complete; step++) {
+    let busyResponses = 0;
+    let completedStages = 0;
+    while (completedStages < 8 && !state.complete && busyResponses < 20) {
       await adminRealityTvSleep_(state.busy ? 1400 : 250);
       const next = await apiAdminContinueRealityTvQuestionApproval(queueId);
       if (!next || next.success === false) {
         const message = adminRealityTvResponseError_(next, "Could not continue the question approval.");
-        if (/timeout|network|524|invalid response/i.test(message) && transientFailures < 3) {
+        if (/timeout|network|524|invalid response|service spreadsheets|lock timeout/i.test(message) && transientFailures < 4) {
           transientFailures += 1;
-          await adminRealityTvSleep_(1600);
+          await adminRealityTvSleep_(1800);
           continue;
         }
         throw new Error(message);
       }
       state = next;
+      if (state.busy) {
+        busyResponses += 1;
+        continue;
+      }
+      busyResponses = 0;
+      completedStages += 1;
     }
-    if (!state.complete) alert("The approval did not return a final confirmation. Refresh and select Resume Approval.");
+    if (!state.complete) alert("The approval did not return a final confirmation. Use Resume Approval.");
     else alert((state.message || "Question result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : ""));
-    navigate("admin-reality-tv");
+    if (existing && existing.SeasonId) {
+      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, {
+        nextAfterQuestionId: state.complete ? existing.EpisodeQuestionId : "",
+        focusElementId: state.complete ? "" : ("realityTvQuestionCard_" + existing.EpisodeQuestionId)
+      });
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   } catch (err) {
-    alert((err && err.message ? err.message : String(err)) + "\n\nRefresh the page and use Resume Approval. Completed stages will not repeat.");
-    navigate("admin-reality-tv");
-  } finally {
-    hideLoader();
+    alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. Completed stages will not repeat.");
+    if (existing && existing.SeasonId) {
+      try {
+        await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvQuestionCard_" + existing.EpisodeQuestionId });
+      } catch (refreshErr) {
+        navigate("admin-reality-tv", { suppressLoader: true });
+      }
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   }
 }
 
 async function adminRealityTvRejectQuestionResult(queueId) {
+  const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
+    .flatMap(function(bundle) { return bundle.questionQueue || []; })
+    .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
   const notes = prompt("Why is this question result being rejected?", "Incorrect result; submit a corrected result.");
   if (notes === null) return;
-  showLoader();
   try {
     const res = await apiAdminRejectRealityTvQuestionResult(queueId, notes);
     if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not reject the question result.");
-    navigate("admin-reality-tv");
+    if (existing && existing.SeasonId) {
+      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvQuestionCard_" + existing.EpisodeQuestionId });
+    } else {
+      navigate("admin-reality-tv", { suppressLoader: true });
+    }
   } catch (err) {
     alert(err.message);
-  } finally {
-    hideLoader();
   }
 }

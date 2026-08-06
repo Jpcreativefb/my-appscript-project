@@ -373,6 +373,7 @@ function logout() {
 ====================== */
 
 const APP_ASSET_VERSION = "309-reality-tv-extra-question-readiness";
+const APP_ROUTE_HOTFIX_VERSION = "v1114-reality-tv-votes-approval";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -409,6 +410,7 @@ function pageModuleKey_(page) {
 function appPageScriptUrl_(name, retryToken) {
   const url = new URL(name + ".js", APP_PAGE_SCRIPT_BASE_URL);
   url.searchParams.set("v", APP_ASSET_VERSION);
+  url.searchParams.set("hotfix", APP_ROUTE_HOTFIX_VERSION);
   if (retryToken) url.searchParams.set("retry", retryToken);
   return url.href;
 }
@@ -503,11 +505,14 @@ async function navigate(page, options) {
   app.classList.add("page-enter");
 
   APP_STATE.currentPage = page;
-  showLoader({
-    percent: 8,
-    title: isAdminPage_(page) ? "Loading Admin Tools" : "Loading",
-    detail: isAdminPage_(page) ? "Preparing " + page.replace(/[-:]/g, " ") + "…" : ""
-  });
+  const usePageLoader = options.suppressLoader !== true;
+  if (usePageLoader) {
+    showLoader({
+      percent: 8,
+      title: isAdminPage_(page) ? "Loading Admin Tools" : "Loading",
+      detail: isAdminPage_(page) ? "Preparing " + page.replace(/[-:]/g, " ") + "…" : ""
+    });
+  }
 
   window.location.hash = page;
 
@@ -551,7 +556,7 @@ async function navigate(page, options) {
 
       app.classList.add("page-enter-active");
 
-      hideLoader();
+      if (usePageLoader) hideLoader();
 
       setActiveNav(page);
 

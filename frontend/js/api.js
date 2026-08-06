@@ -51,6 +51,10 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminCreateRealityTvSeason",
     "adminBulkAddRealityTvContestants",
     "adminAddRealityTvCustomQuestionTemplate",
+    "adminSaveRealityTvEpisodeVote",
+    "adminSaveRealityTvEpisodeVotesBulk",
+    "adminDeleteRealityTvEpisodeVote",
+    "adminUpdateRealityTvEpisodeSchedule",
     "adminSubmitRealityTvResult",
     "adminApproveRealityTvResult",
     "adminContinueRealityTvApproval",
@@ -1731,6 +1735,22 @@ async function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
 
 async function apiAdminDeleteRealityTvCustomQuestionTemplate(payload) {
   return apiAdminRealityTvPostRequest_("adminDeleteRealityTvCustomQuestionTemplate", payload || {});
+}
+
+async function apiAdminSaveRealityTvEpisodeVote(payload) {
+  return apiAdminRealityTvPostRequest_("adminSaveRealityTvEpisodeVote", payload || {});
+}
+
+async function apiAdminSaveRealityTvEpisodeVotesBulk(payload) {
+  return apiAdminRealityTvPostRequest_("adminSaveRealityTvEpisodeVotesBulk", payload || {});
+}
+
+async function apiAdminDeleteRealityTvEpisodeVote(voteId) {
+  return apiAdminRealityTvPostRequest_("adminDeleteRealityTvEpisodeVote", { voteId: voteId });
+}
+
+async function apiAdminUpdateRealityTvEpisodeSchedule(payload) {
+  return apiAdminRealityTvPostRequest_("adminUpdateRealityTvEpisodeSchedule", payload || {});
 }
 
 async function apiAdminBuildRealityTvEpisodeQuestions(payload) {

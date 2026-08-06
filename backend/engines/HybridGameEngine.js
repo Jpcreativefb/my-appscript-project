@@ -355,15 +355,21 @@ function getHybridCategoryResolution_(
       };
     }
 
+    const mappedWinnerIds = Array.isArray(mappedResolution.winnerNomineeIds)
+      ? mappedResolution.winnerNomineeIds.map(hybridId_).filter(Boolean)
+      : [];
+
     if (
       mappedResolution.resolved === true &&
-      mappedResolution.winnerNomineeId
+      (mappedResolution.winnerNomineeId || mappedWinnerIds.length)
     ) {
+      const winnerNomineeId = hybridId_(mappedResolution.winnerNomineeId || mappedWinnerIds[0]);
+      const winnerNomineeIds = mappedWinnerIds.length ? mappedWinnerIds : [winnerNomineeId];
       return {
         resolved: true,
         result: "winner",
-        winnerNomineeId:
-          hybridId_(mappedResolution.winnerNomineeId)
+        winnerNomineeId: winnerNomineeId,
+        winnerNomineeIds: winnerNomineeIds
       };
     }
 
@@ -387,7 +393,8 @@ function getHybridCategoryResolution_(
   return {
     resolved: true,
     result: "winner",
-    winnerNomineeId: winnerNomineeId
+    winnerNomineeId: winnerNomineeId,
+    winnerNomineeIds: [winnerNomineeId]
   };
 
 }
@@ -535,9 +542,12 @@ function getStakedPredictionSummary_(
       return;
     }
 
+    const winnerNomineeIds = Array.isArray(resolution.winnerNomineeIds) && resolution.winnerNomineeIds.length
+      ? resolution.winnerNomineeIds.map(hybridId_)
+      : [hybridId_(resolution.winnerNomineeId)];
+
     const isCorrect =
-      hybridId_(pick.nomineeId) ===
-      resolution.winnerNomineeId;
+      winnerNomineeIds.indexOf(hybridId_(pick.nomineeId)) !== -1;
 
     if (isCorrect) {
       const win =
