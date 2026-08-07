@@ -19,10 +19,11 @@ assert(picks.includes('apiGetRealityTvPlayerStats') && picks.includes('hydratePi
 assert(picks.includes('renderRealityTvPlayerSummary_'), 'Top player score summary is missing.');
 assert(picks.includes('realityTvEpisodeHeaderStats_'), 'Per-episode header stats renderer is missing.');
 assert(picks.includes('Week points') && picks.includes('Correct'), 'Weekly points/correct totals are missing from the collapsible header.');
-assert(picks.includes('Number(meta.eliminatedEpisode || 0) === categoryEpisodeNumber'), 'Historical episodes must only mark the contestant eliminated in that episode.');
+assert(!picks.includes('Number(meta.eliminatedEpisode || 0) === categoryEpisodeNumber'), 'Elimination state must not bleed into every question in the same historical episode.');
+assert(picks.includes('realityTvNomineeResultState_'), 'Historical result styling must be driven by the settled question result.');
 assert(css.includes('.reality-player-summary-card'), 'Player summary styles are missing.');
 assert(css.includes('.reality-episode-header-stats'), 'Episode header stat styles are missing.');
-assert(html.includes('309-reality-tv-extra-question-readiness'), 'Frontend cache version was not bumped.');
-assert(sw.includes('v309-reality-tv-extra-question-readiness'), 'Service worker cache version was not bumped.');
+assert(html.includes('310-reality-tv-historical-results'), 'Frontend cache version was not bumped.');
+assert(sw.includes('v310-reality-tv-historical-results'), 'Service worker cache version was not bumped.');
 
 console.log('Reality TV weekly header stats tests passed.');

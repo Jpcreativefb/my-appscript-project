@@ -1,3 +1,15 @@
+## v1.2.5 — Reality TV historical settled-result display
+
+- Historical Reality TV questions now read authoritative settled results from `CategoryResults`.
+- Added full `winnerNomineeIds` support so every winner is shown for multi-winner questions.
+- Added result-scoped overlays/badges for WINNER, SAFE, IMMUNITY, REWARD, IDOL, TRIBAL, BOTTOM, and other Reality TV outcomes.
+- Kept elimination as grayscale + ELIMINATED overlay, but only on the actual elimination question/result.
+- Removed the old episode-level elimination shortcut that incorrectly grayscaled a contestant across every question in the episode.
+- Historical question headers now list all settled winners instead of only the first winner.
+- Multi-winner user picks are evaluated against every valid winner in the player UI.
+- Result decoration is scoped to Reality TV startup so Sports/Awards startup paths do not gain an extra CategoryResults read.
+- Bumped browser/service-worker assets to v310.
+
 ## v1.2.4 — Durable Reality TV approval watchdog
 
 - Replaced all-at-once Extra Question settlement with one durable question per worker pass.

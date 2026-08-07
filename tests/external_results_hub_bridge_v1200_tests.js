@@ -67,9 +67,9 @@ assert.strictEqual(frontendApi, frontendApiCompat, 'Both frontend API copies mus
 assert(ui.includes('Sync Queue Now'), 'Reality TV manager Hub sync control is missing');
 assert(ui.includes('Retry Failed'), 'Reality TV manager Hub retry control is missing');
 assert(ui.includes('adminRealityTvRefreshHubBridgeHealth_'), 'Reality TV manager Hub health display is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1240-durable-reality-approval"'), 'Hub bridge cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1250-historical-reality-results"'), 'Hub bridge cache version is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1240-durable-reality-approval'), 'App shell must request the Hub bridge cache version');
+assert(html.includes('hotfix=v1250-historical-reality-results'), 'App shell must request the Hub bridge cache version');
 
 const context = { console, JSON, String, Array, Object, Error };
 vm.createContext(context);

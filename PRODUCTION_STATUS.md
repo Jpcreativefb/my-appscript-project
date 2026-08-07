@@ -1,3 +1,10 @@
+## Reality TV historical results completed in v1.2.5
+
+- Historical Extra Questions display their settled result directly on the matching answer card.
+- Multiple winners are preserved and rendered instead of collapsing to the first winner.
+- Elimination grayscale/overlay is scoped to the elimination result and no longer bleeds into immunity, reward, safety, or other questions.
+- The player startup payload reads authoritative Reality TV resolutions from CategoryResults without adding that read to non-Reality startup paths.
+
 # Production Status
 
 Current candidate: **v1.2.4 durable Reality TV approval watchdog**

@@ -1790,6 +1790,84 @@ function realityTvNomineeMeta_(nominee, category) {
 }
 
 
+function realityTvWinnerIds_(category) {
+  const values = Array.isArray(category && category.winnerNomineeIds)
+    ? category.winnerNomineeIds
+    : [];
+  const ids = values.map(function(value) { return normalizeId(value); }).filter(Boolean);
+  const single = normalizeId(category && category.winnerNomineeId);
+  if (single && ids.indexOf(single) === -1) ids.push(single);
+  return ids;
+}
+
+function realityTvQuestionType_(category) {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const categoryId = normalizeId(category && category.id);
+  const supplemental = (view.episodeQuestions || []).find(function(item) {
+    return normalizeId(item.categoryId) === categoryId;
+  });
+  if (supplemental && supplemental.questionType) return normalizeId(supplemental.questionType);
+  const mainEpisode = (view.episodes || []).find(function(item) {
+    return normalizeId(item.categoryId) === categoryId;
+  });
+  if (mainEpisode) return "elimination";
+  return normalizeId((category && category.questionType) || "");
+}
+
+function realityTvResultLabel_(category) {
+  const type = realityTvQuestionType_(category);
+  const labels = {
+    "elimination": "ELIMINATED",
+    "eliminated": "ELIMINATED",
+    "immunity-winner": "IMMUNITY",
+    "reward-winner": "REWARD",
+    "idol-finder": "IDOL",
+    "tribal-attendee": "TRIBAL",
+    "individual-challenge-winner": "WINNER",
+    "team-challenge-winner": "WINNER",
+    "safety-winner": "SAFE",
+    "team-safety-winner": "SAFE",
+    "shield-winner": "SAFE",
+    "bottom-finish": "BOTTOM",
+    "lowest-score": "BOTTOM",
+    "last-place-team": "BOTTOM",
+    "highest-score": "WINNER",
+    "perfect-score": "PERFECT",
+    "mission-winner": "WINNER",
+    "leg-winner": "WINNER",
+    "murdered-player": "MURDERED",
+    "banished-player": "BANISHED",
+    "traitor-banished": "BANISHED",
+    "fast-forward": "FAST FORWARD",
+    "u-turn-recipient": "U-TURN",
+    "time-penalty": "PENALTY"
+  };
+  if (labels[type]) return labels[type];
+  const title = String(getCategoryDisplayTitle(category) || "").toLowerCase();
+  if (/eliminat|leave the game|voted out/.test(title)) return "ELIMINATED";
+  if (/safe|safety|protected|shield/.test(title)) return "SAFE";
+  if (/immunity/.test(title)) return "IMMUNITY";
+  if (/reward/.test(title)) return "REWARD";
+  if (/idol/.test(title)) return "IDOL";
+  if (/tribal/.test(title)) return "TRIBAL";
+  if (/bottom|last place|lowest/.test(title)) return "BOTTOM";
+  if (/winner|wins|won|highest|first place/.test(title)) return "WINNER";
+  return "RESULT";
+}
+
+function realityTvNomineeResultState_(category, nominee) {
+  const winnerIds = realityTvWinnerIds_(category);
+  const nomineeId = normalizeId(nominee && nominee.id);
+  const matched = !!nomineeId && winnerIds.indexOf(nomineeId) !== -1;
+  const label = matched ? realityTvResultLabel_(category) : "";
+  return {
+    matched: matched,
+    label: label,
+    elimination: matched && label === "ELIMINATED"
+  };
+}
+
+
 function toggleRealityNomineeBio_(id) {
   const panel = document.getElementById(id);
   if (!panel) return;
@@ -1802,8 +1880,8 @@ function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locke
   const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
   const disabled = locked || (isStakedPointsCategory(category) && existingStake <= 0) ? "disabled" : "";
   const color = realityTvSafeColor_(meta.teamColor);
-  const categoryEpisodeNumber = realityTvEpisodeNumberForCategory_(category && category.id);
-  const eliminated = meta.kind === "participant" && categoryEpisodeNumber > 0 && Number(meta.eliminatedEpisode || 0) === categoryEpisodeNumber;
+  const resultState = realityTvNomineeResultState_(category, nominee);
+  const eliminated = resultState.elimination;
   const visual = realityTvQuestionVisual_(category);
   const layout = ["image", "compact", "list", "text", "short-answer"].includes(visual.layoutType) ? visual.layoutType : "image";
   let image = nominee.image || "";
@@ -1813,11 +1891,12 @@ function renderRealityNomineeButton_(category, nominee, selectedNomineeId, locke
   else if (!image) image = meta.imageUrl || "";
   const showImage = layout !== "text" && layout !== "short-answer" && !!image;
   const bioId = "realityBio_" + String(category.id).replace(/[^a-z0-9_-]/gi, "_") + "_" + String(nominee.id).replace(/[^a-z0-9_-]/gi, "_");
-  return `<div class="nominee-choice reality-profile-choice reality-layout-${escapeAttr(layout)} ${selected ? "selected" : ""} ${eliminated ? "is-eliminated" : ""} ${showImage ? "has-image" : "no-image"}" style="--reality-team-color:${escapeAttr(color)}">
+  return `<div class="nominee-choice reality-profile-choice reality-layout-${escapeAttr(layout)} ${selected ? "selected" : ""} ${resultState.matched ? "is-result" : ""} ${eliminated ? "is-eliminated" : ""} ${showImage ? "has-image" : "no-image"}" style="--reality-team-color:${escapeAttr(color)}">
     <button type="button" class="reality-profile-select" onclick="selectNominee('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')" ${disabled}>
-      ${showImage ? `<span class="reality-profile-image">${platformImgHtml(image, { className: "reality-profile-choice-image", variant: layout === "compact" || layout === "list" ? "thumb" : "card", alt: nominee.name || "Contestant" })}${eliminated ? `<span class="reality-eliminated-overlay">ELIMINATED</span>` : ""}</span>` : `<span class="reality-profile-text-marker">${eliminated ? "ELIMINATED" : escapeHtml((nominee.name || "?").slice(0, 2).toUpperCase())}</span>`}
+      ${showImage ? `<span class="reality-profile-image">${platformImgHtml(image, { className: "reality-profile-choice-image", variant: layout === "compact" || layout === "list" ? "thumb" : "card", alt: nominee.name || "Contestant" })}${eliminated ? `<span class="reality-eliminated-overlay">ELIMINATED</span>` : (resultState.matched ? `<span class="reality-result-overlay">${escapeHtml(resultState.label)}</span>` : "")}</span>` : `<span class="reality-profile-text-marker ${resultState.matched ? "is-result" : ""}">${resultState.matched ? escapeHtml(resultState.label) : escapeHtml((nominee.name || "?").slice(0, 2).toUpperCase())}</span>`}
       <span class="reality-profile-name">${escapeHtml(nominee.name)}</span>
       ${meta.teamOrTribe ? `<span class="reality-profile-team">${escapeHtml(meta.teamOrTribe)}</span>` : ""}
+      ${resultState.matched ? `<span class="reality-result-badge">${escapeHtml(resultState.label)}</span>` : ""}
       ${selected ? `<span class="reality-user-pick-badge">YOUR PICK</span>` : ""}
     </button>
     ${(meta.biography || meta.hometown || meta.occupation || meta.age || meta.member1 || meta.member2 || meta.relationship) ? `<button type="button" class="reality-profile-toggle" onclick="toggleRealityNomineeBio_('${escapeJs(bioId)}')">Bio & details</button><div id="${escapeAttr(bioId)}" class="reality-profile-panel" hidden>${realityTvProfileDetailsHtml_(meta)}</div>` : ""}
@@ -2581,9 +2660,7 @@ function getCategoryResultStatus(category) {
     return "cancelled";
   }
 
-  if (
-    normalizeId(category.winnerNomineeId)
-  ) {
+  if (realityTvWinnerIds_(category).length) {
     return "winner";
   }
 
@@ -2612,13 +2689,12 @@ function getPickStatus(category, selectedNomineeId) {
     };
   }
 
-  const winner =
-    normalizeId(category.winnerNomineeId);
+  const winners = realityTvWinnerIds_(category);
 
   const pick =
     normalizeId(selectedNomineeId);
 
-  if (!winner || !pick) {
+  if (!winners.length || !pick) {
     return {
       label: "Pending",
       className: "pending",
@@ -2626,7 +2702,7 @@ function getPickStatus(category, selectedNomineeId) {
     };
   }
 
-  if (winner === pick) {
+  if (winners.indexOf(pick) !== -1) {
     return {
       label: "Winner",
       className: "correct",
@@ -2694,19 +2770,22 @@ function getSelectedNominee(category) {
 
 }
 
-function getWinnerNominee(category) {
+function getWinnerNominees(category) {
 
-  const winnerId =
-    category.winnerNomineeId;
+  const winnerIds = realityTvWinnerIds_(category);
 
-  if (!winnerId) {
-    return null;
+  if (!winnerIds.length) {
+    return [];
   }
 
-  return category.nominees.find(n =>
-    normalizeId(n.id) === normalizeId(winnerId)
-  ) || null;
+  return (category.nominees || []).filter(function(nominee) {
+    return winnerIds.indexOf(normalizeId(nominee.id)) !== -1;
+  });
 
+}
+
+function getWinnerNominee(category) {
+  return getWinnerNominees(category)[0] || null;
 }
 
 function getOriginalNominee(category) {
@@ -2755,8 +2834,8 @@ function getThirdLineText(
   const locked =
     isCategoryLocked(category);
 
-  const hasWinner =
-    Boolean(winnerNominee);
+  const winnerNominees = getWinnerNominees(category);
+  const hasWinner = winnerNominees.length > 0;
 
   if (!hasWinner) {
 
@@ -2769,10 +2848,12 @@ function getThirdLineText(
   }
 
   if (status.className === "correct") {
-    return "Winner";
+    return winnerNominees.length > 1
+      ? "Correct — " + winnerNominees.map(function(item) { return item.name; }).join(", ")
+      : "Winner";
   }
 
-  return winnerNominee.name;
+  return winnerNominees.map(function(item) { return item.name; }).join(", ");
 
 }
 

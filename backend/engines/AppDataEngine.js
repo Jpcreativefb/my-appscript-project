@@ -47,7 +47,7 @@ function apiGetStartupPayload(payload) {
   const game =
     getGame(gameId);
 
-  const categories =
+  let categories =
     typeof getCategoriesCached === "function"
       ? getCategoriesCached(gameId)
       : getCategories(gameId);
@@ -57,6 +57,41 @@ function apiGetStartupPayload(payload) {
       username,
       gameId
     );
+
+  const realityTvView =
+    typeof realityTvUserGameViewPayload_ === "function"
+      ? realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false })
+      : { enabled: false };
+
+  // CategorySettings has room for one WinnerNomineeId, but Reality TV
+  // questions can settle with multiple valid winners.  For Reality TV Picks
+  // only, merge the authoritative CategoryResults resolution into the
+  // category payload so historical episodes can display every result without
+  // adding a CategoryResults read to Sports/Awards/other game startup paths.
+  if (
+    realityTvView &&
+    realityTvView.enabled === true &&
+    typeof getCategoryResultsResolutionMap === "function"
+  ) {
+    const resultResolutions = getCategoryResultsResolutionMap(gameId) || {};
+    categories = (categories || []).map(function(category) {
+      const categoryId = String(category && category.id || "").trim().toLowerCase();
+      const resolution = resultResolutions[categoryId] || null;
+      const copy = Object.assign({}, category);
+      if (resolution && resolution.resolved === true) {
+        copy.winnerNomineeId = resolution.winnerNomineeId || copy.winnerNomineeId || "";
+        copy.winnerNomineeIds = Array.isArray(resolution.winnerNomineeIds)
+          ? resolution.winnerNomineeIds.slice()
+          : (copy.winnerNomineeId ? [copy.winnerNomineeId] : []);
+        copy.resultStatus = String(resolution.result || resolution.status || "settled");
+        copy.resultResolved = true;
+      } else {
+        copy.winnerNomineeIds = copy.winnerNomineeId ? [copy.winnerNomineeId] : [];
+        copy.resultResolved = false;
+      }
+      return copy;
+    });
+  }
 
   return {
     success: true,
@@ -91,9 +126,7 @@ function apiGetStartupPayload(payload) {
     },
 
     realityTvView:
-      typeof realityTvUserGameViewPayload_ === "function"
-        ? realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false })
-        : { enabled: false }
+      realityTvView
   };
 
 }

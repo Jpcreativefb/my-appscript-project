@@ -1,4 +1,4 @@
-const AWARDS_CACHE = "awards-app-v309-reality-tv-extra-question-readiness";
+const AWARDS_CACHE = "awards-app-v310-reality-tv-historical-results";
 
 const APP_SHELL = [
   "./",
