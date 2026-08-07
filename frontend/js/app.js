@@ -374,7 +374,7 @@ function logout() {
 
 const APP_ASSET_VERSION = "309-reality-tv-extra-question-readiness";
 // Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1118-reality-tv-bulk-question-pack";
-const APP_ROUTE_HOTFIX_VERSION = "v1210-external-results-hub-verification";
+const APP_ROUTE_HOTFIX_VERSION = "v1220-reality-tv-episode-finalizer";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

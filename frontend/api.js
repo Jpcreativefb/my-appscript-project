@@ -56,6 +56,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminDeleteRealityTvEpisodeVote",
     "adminUpdateRealityTvEpisodeSchedule",
     "adminSubmitRealityTvResult",
+    "adminFinalizeRealityTvEpisode",
     "adminApproveRealityTvResult",
     "adminContinueRealityTvApproval",
     "adminCreateNextRealityTvEpisode",
@@ -1720,6 +1721,10 @@ async function apiAdminBulkAddRealityTvContestants(payload) {
 
 async function apiAdminSubmitRealityTvResult(payload) {
   return apiAdminRealityTvRequest_("adminSubmitRealityTvResult", payload || {});
+}
+
+async function apiAdminFinalizeRealityTvEpisode(queueId) {
+  return apiAdminRealityTvPostRequest_("adminFinalizeRealityTvEpisode", { queueId: queueId });
 }
 
 async function apiAdminApproveRealityTvResult(queueId) {

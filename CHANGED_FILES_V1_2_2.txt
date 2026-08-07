@@ -1,0 +1,26 @@
+# v1.2.2 changed files
+
+Application / runtime files:
+- backend/Api.js
+- backend/engines/RealityTvQuestionPackEngine.js
+- backend/engines/RealityTvSeasonEngine.js
+- frontend/api.js
+- frontend/app.html
+- frontend/app.js
+- frontend/js/api.js
+- frontend/js/app.js
+- frontend/js/pages/adminRealityTv.js
+
+Tests:
+- tests/external_results_hub_bridge_v1200_tests.js
+- tests/external_results_hub_bridge_verification_v1210_tests.js
+- tests/reality_tv_episode_finalizer_v122_tests.js
+- tests/reality_tv_season_manager_tests.js
+
+Release documentation:
+- API_CONTRACT.md
+- CHANGED_FILES_V1_2_2.txt
+- CHANGELOG.md
+- PRODUCTION_REALITY_TV_EPISODE_FINALIZER_V1_2_2.md
+- PRODUCTION_SMOKE_TEST_V1_2_2.md
+- PRODUCTION_STATUS.md

@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Production v1.2.0
+   Production v1.2.2
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -10,6 +10,7 @@ const REALITY_TV_GROUPS_SHEET = "RealityGroups";
 const REALITY_TV_GROUP_HISTORY_SHEET = "RealityContestantGroupHistory";
 const REALITY_TV_RESULTS_QUEUE_SHEET = "RealityResultQueue";
 const REALITY_TV_EPISODE_VOTES_SHEET = "RealityEpisodeVotes";
+const REALITY_TV_NEXT_EPISODE_JOBS_SHEET = "RealityNextEpisodeJobs";
 const REALITY_TV_HUB_PROPERTY = "EXTERNAL_RESULTS_HUB_SPREADSHEET_ID";
 
 const REALITY_TV_SEASON_HEADERS = [
@@ -56,7 +57,15 @@ const REALITY_TV_QUEUE_HEADERS = [
   "ApprovalStage", "ApprovalStartedAt", "ApprovalCompletedAt", "ApprovalAttemptCount",
   "ApprovalStageStartedAt", "ApprovalHeartbeatAt", "ApprovalQuestionBuildId",
   "PushedAt", "NextEpisodeId", "HubImportedResultId", "HubReviewId",
+  "EpisodeFinalizeMode", "ApprovalQuestionQueueIdsJSON", "NextEpisodeJobId",
   "ErrorMessage", "UpdatedAt"
+];
+
+const REALITY_TV_NEXT_EPISODE_JOB_HEADERS = [
+  "JobId", "SeasonId", "GameId", "SourceEpisodeId", "SourceEpisodeNumber",
+  "TargetEpisodeNumber", "NextEpisodeId", "Status", "Stage", "ProgressLabel",
+  "ProgressDetail", "AttemptCount", "HeartbeatAt", "NextAttemptAt", "QuestionBuildId",
+  "ErrorMessage", "CreatedAt", "StartedAt", "CompletedAt", "UpdatedAt"
 ];
 
 const REALITY_TV_EPISODE_VOTE_HEADERS = [
@@ -176,6 +185,7 @@ function realityTvApprovalProcessingFresh_(queue, processingStatus) {
 function realityTvApprovalIsProcessingStatus_(value) {
   const status = realityTvString_(value).toUpperCase();
   return [
+    "SETTLING EXTRA RESULTS",
     "SETTLING EPISODE",
     "BUILDING NEXT EPISODE",
     "PREPARING NEXT EPISODE",
@@ -186,6 +196,7 @@ function realityTvApprovalIsProcessingStatus_(value) {
     "COMPILING QUESTION PACK",
     "WRITING QUESTION PACK",
     "VERIFYING QUESTION PACK",
+    "FINALIZING EPISODE",
     "FINALIZING APPROVAL",
     "SYNCING APPROVAL"
   ].indexOf(status) !== -1 || status.indexOf("BUILDING QUESTIONS ") === 0;
@@ -424,6 +435,7 @@ function realityTvEnsureSystem_() {
   realityTvGetOrCreateSheet_(ss, REALITY_TV_GROUP_HISTORY_SHEET, REALITY_TV_GROUP_HISTORY_HEADERS);
   realityTvGetOrCreateSheet_(ss, REALITY_TV_RESULTS_QUEUE_SHEET, REALITY_TV_QUEUE_HEADERS);
   realityTvGetOrCreateSheet_(ss, REALITY_TV_EPISODE_VOTES_SHEET, REALITY_TV_EPISODE_VOTE_HEADERS);
+  realityTvGetOrCreateSheet_(ss, REALITY_TV_NEXT_EPISODE_JOBS_SHEET, REALITY_TV_NEXT_EPISODE_JOB_HEADERS);
   return { success: true };
 }
 
@@ -2920,6 +2932,7 @@ function apiAdminGetRealityTvSeasonDetails(payload) {
   const allEpisodes = realityTvReadObjects_(ss, REALITY_TV_EPISODES_SHEET);
   const allQueue = realityTvReadObjects_(ss, REALITY_TV_RESULTS_QUEUE_SHEET);
   const allEpisodeVotes = realityTvReadObjects_(ss, REALITY_TV_EPISODE_VOTES_SHEET);
+  const allNextEpisodeJobs = realityTvReadObjects_(ss, REALITY_TV_NEXT_EPISODE_JOBS_SHEET);
   const allTemplates = typeof REALITY_TV_QUESTION_TEMPLATES_SHEET !== "undefined"
     ? realityTvReadObjects_(ss, REALITY_TV_QUESTION_TEMPLATES_SHEET)
     : [];
@@ -2989,6 +3002,11 @@ function apiAdminGetRealityTvSeasonDetails(payload) {
     if (episodeDiff) return episodeDiff;
     return realityTvString_(a.QuestionType).localeCompare(realityTvString_(b.QuestionType));
   });
+  const nextEpisodeJobs = realityTvRowsForSeasonReadOnly_(allNextEpisodeJobs, seasonId).sort(function(a, b) {
+    return new Date(b.UpdatedAt || b.CreatedAt || 0).getTime() - new Date(a.UpdatedAt || a.CreatedAt || 0).getTime();
+  }).map(function(row) {
+    return Object.assign({}, row, { state: realityTvNextEpisodeJobState_(row) });
+  });
   const questionQueue = realityTvRowsForSeasonReadOnly_(allQuestionQueue, seasonId).sort(function(a, b) {
     return new Date(b.SubmittedAt || 0).getTime() - new Date(a.SubmittedAt || 0).getTime();
   });
@@ -3029,6 +3047,7 @@ function apiAdminGetRealityTvSeasonDetails(payload) {
     questionTemplates: questionTemplates,
     episodeQuestions: episodeQuestions,
     questionQueue: questionQueue,
+    nextEpisodeJobs: nextEpisodeJobs,
     questionBuild: typeof realityTvQuestionBuildState_ === "function" ? realityTvQuestionBuildState_(activeBuild) : null,
     questionBuildSummary: typeof realityTvQuestionBuildState_ === "function" ? realityTvQuestionBuildState_(completedBuild) : null,
     questionReadiness: typeof realityTvQuestionPackReadiness_ === "function"
@@ -3058,7 +3077,8 @@ function apiAdminGetRealityTvSeasonDetails(payload) {
     episodeQuestions: episodeQuestions.length,
     questionTemplates: questionTemplates.length,
     pendingRows: queue.length + questionQueue.length,
-    episodeVotes: episodeVotes.length
+    episodeVotes: episodeVotes.length,
+    nextEpisodeJobs: nextEpisodeJobs.length
   };
   if (performance.durationMs > 5000 && typeof Logger !== "undefined") {
     Logger.log("Slow Reality TV season detail load: " + JSON.stringify(performance));
@@ -3826,11 +3846,21 @@ function realityTvApprovalProgress_(queue) {
   let detail = "Waiting to begin episode settlement.";
   let estimatedRemainingSeconds = 70;
 
-  if (stage === "SETTLE") {
-    percent = pushStatus === "SETTLING EPISODE" ? 18 : 7;
-    label = "Settling episode result";
-    detail = "Writing winners, scoring picks, updating the episode, and changing the active roster.";
-    estimatedRemainingSeconds = Math.max(5, 35 - stageElapsedSeconds) + 12 + Math.max(8, questionTotal * 9) + 15;
+  if (stage === "SETTLE_QUESTIONS") {
+    percent = pushStatus === "SETTLING EXTRA RESULTS" ? 24 : 12;
+    label = "Settling all Extra Question results";
+    detail = "Applying every submitted Extra Question result in one server-owned episode finalization job.";
+    estimatedRemainingSeconds = Math.max(5, 35 - stageElapsedSeconds);
+  } else if (stage === "SETTLE") {
+    percent = pushStatus === "SETTLING EPISODE" ? 58 : 50;
+    label = "Settling elimination result";
+    detail = "Scoring the elimination, updating the roster, and marking the current episode final.";
+    estimatedRemainingSeconds = Math.max(5, 30 - stageElapsedSeconds);
+  } else if (stage === "FINALIZE_CURRENT") {
+    percent = 88;
+    label = "Finalizing current episode";
+    detail = "Saving the final approval record and queuing next-episode preparation separately.";
+    estimatedRemainingSeconds = Math.max(3, 12 - stageElapsedSeconds);
   } else if (stage === "BUILD_NEXT") {
     if (pushStatus === "CREATING MAIN QUESTION") {
       percent = 47;
@@ -3887,8 +3917,10 @@ function realityTvApprovalProgress_(queue) {
     estimatedRemainingSeconds = Math.max(3, 15 - stageElapsedSeconds);
   } else if (stage === "COMPLETE" || reviewStatus === "APPROVED") {
     percent = 100;
-    label = "Approval complete";
-    detail = "The episode result, roster, next episode, and enabled questions are ready.";
+    label = "Episode finalization complete";
+    detail = realityTvString_(queue.EpisodeFinalizeMode).toUpperCase() === "ALL_RESULTS"
+      ? "The current episode results, scoring, and roster are final. Next-episode preparation runs separately."
+      : "The episode result, roster, next episode, and enabled questions are ready.";
     estimatedRemainingSeconds = 0;
   }
 
@@ -3919,6 +3951,10 @@ function realityTvApprovalState_(queue) {
   return {
     success: true,
     queueId: queue.QueueId,
+    seasonId: realityTvString_(queue.SeasonId),
+    episodeId: realityTvString_(queue.EpisodeId),
+    episodeFinalizeMode: realityTvString_(queue.EpisodeFinalizeMode),
+    nextEpisodeJobId: realityTvString_(queue.NextEpisodeJobId),
     reviewStatus: status,
     stage: stage,
     pushStatus: realityTvString_(queue.PushStatus),
@@ -3937,6 +3973,437 @@ function realityTvApprovalState_(queue) {
     approvalProgress: progress,
     questionBuild: progress.questionBuild
   };
+}
+
+
+function realityTvEpisodeFinalizeReadiness_(seasonId, episodeId) {
+  const questions = typeof REALITY_TV_EPISODE_QUESTIONS_SHEET !== "undefined"
+    ? realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_EPISODE_QUESTIONS_SHEET).filter(function(row) {
+        return realityTvKey_(row.SeasonId) === realityTvKey_(seasonId) && realityTvKey_(row.EpisodeId) === realityTvKey_(episodeId);
+      })
+    : [];
+  const questionQueue = typeof REALITY_TV_QUESTION_QUEUE_SHEET !== "undefined"
+    ? realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_QUESTION_QUEUE_SHEET).filter(function(row) {
+        return realityTvKey_(row.SeasonId) === realityTvKey_(seasonId) && realityTvKey_(row.EpisodeId) === realityTvKey_(episodeId);
+      })
+    : [];
+  const queueByQuestion = {};
+  questionQueue.slice().sort(function(a, b) {
+    return new Date(b.SubmittedAt || b.UpdatedAt || 0).getTime() - new Date(a.SubmittedAt || a.UpdatedAt || 0).getTime();
+  }).forEach(function(row) {
+    const key = realityTvKey_(row.EpisodeQuestionId);
+    if (key && !queueByQuestion[key]) queueByQuestion[key] = row;
+  });
+  const missing = [];
+  const readyQueues = [];
+  let finalCount = 0;
+  questions.forEach(function(question) {
+    const status = realityTvString_(question.Status).toUpperCase();
+    if (status === "FINAL" || status === "CLOSED") {
+      finalCount += 1;
+      return;
+    }
+    const queue = queueByQuestion[realityTvKey_(question.EpisodeQuestionId)];
+    const reviewStatus = queue ? realityTvString_(queue.ReviewStatus).toUpperCase() : "";
+    if (queue && ["PENDING", "APPROVING", "APPROVED"].indexOf(reviewStatus) !== -1) {
+      readyQueues.push(queue);
+      return;
+    }
+    missing.push({
+      episodeQuestionId: question.EpisodeQuestionId,
+      questionText: question.QuestionText,
+      categoryId: question.CategoryId,
+      status: status || "OPEN"
+    });
+  });
+  return {
+    ready: missing.length === 0,
+    questionCount: questions.length,
+    finalCount: finalCount,
+    pendingCount: readyQueues.filter(function(row) { return realityTvString_(row.ReviewStatus).toUpperCase() !== "APPROVED"; }).length,
+    questionQueueIds: readyQueues.map(function(row) { return row.QueueId; }),
+    missing: missing
+  };
+}
+
+function realityTvSettleEpisodeQuestionQueues_(season, episode, mainQueue, reviewer) {
+  if (typeof REALITY_TV_QUESTION_QUEUE_SHEET === "undefined" || typeof realityTvSettleSupplementalQuestion_ !== "function") {
+    return { settledCount: 0, queueIds: [] };
+  }
+  let requested = realityTvParseJson_(mainQueue.ApprovalQuestionQueueIdsJSON || "[]", []);
+  requested = Array.isArray(requested) ? requested.map(realityTvKey_).filter(Boolean) : [];
+  const requestedMap = {};
+  requested.forEach(function(id) { requestedMap[id] = true; });
+  const queueSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_QUESTION_QUEUE_SHEET);
+  const rows = realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_QUESTION_QUEUE_SHEET).filter(function(row) {
+    if (realityTvKey_(row.SeasonId) !== realityTvKey_(season.SeasonId) || realityTvKey_(row.EpisodeId) !== realityTvKey_(episode.EpisodeId)) return false;
+    const status = realityTvString_(row.ReviewStatus).toUpperCase();
+    if (["PENDING", "APPROVING", "APPROVED"].indexOf(status) === -1) return false;
+    return !requested.length || requestedMap[realityTvKey_(row.QueueId)];
+  }).sort(function(a, b) {
+    return realityTvNumber_(a.EpisodeNumber, 0) - realityTvNumber_(b.EpisodeNumber, 0) || realityTvNumber_(a.__rowNumber, 0) - realityTvNumber_(b.__rowNumber, 0);
+  });
+  const setup = typeof adminGetGameSetup === "function" ? adminGetGameSetup({ gameId: season.GameId }) : null;
+  let settledCount = 0;
+  const now = new Date();
+  rows.forEach(function(queue) {
+    if (realityTvString_(queue.ReviewStatus).toUpperCase() === "APPROVED") return;
+    const question = realityTvGetEpisodeQuestion_(queue.EpisodeQuestionId);
+    if (!question) throw new Error("Episode question not found for queued result: " + queue.EpisodeQuestionId);
+    if (["FINAL", "CLOSED"].indexOf(realityTvString_(question.Status).toUpperCase()) === -1) {
+      realityTvSettleSupplementalQuestion_(question, queue, reviewer, { setup: setup, skipScoreRecalc: true });
+    }
+    realityTvUpdateHubReview_(queue, "APPROVED", reviewer, "Approved with episode finalization.");
+    realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+      ReviewStatus: "APPROVED",
+      ReviewedBy: reviewer,
+      ReviewedAt: queue.ReviewedAt || now,
+      PushStatus: "PUSHED",
+      ApprovalStage: "COMPLETE",
+      ApprovalCompletedAt: now,
+      ApprovalHeartbeatAt: now,
+      PushedAt: now,
+      ErrorMessage: "",
+      UpdatedAt: now
+    });
+    settledCount += 1;
+  });
+  if (settledCount && typeof seasonAnchorRecalculateEpisodeScores_ === "function") {
+    seasonAnchorRecalculateEpisodeScores_(season.GameId, season.SeasonId, episode.EpisodeId);
+  }
+  return { settledCount: settledCount, queueIds: rows.map(function(row) { return row.QueueId; }) };
+}
+
+function realityTvNextEpisodeJobState_(job) {
+  if (!job) return null;
+  const status = realityTvString_(job.Status || "QUEUED").toUpperCase();
+  const stage = realityTvString_(job.Stage || "CREATE_EPISODE").toUpperCase();
+  let percent = 5;
+  let label = realityTvString_(job.ProgressLabel || "Queued to prepare next episode");
+  let detail = realityTvString_(job.ProgressDetail || "The server will prepare the next episode automatically.");
+  if (status === "COMPLETE") {
+    percent = 100;
+    label = "Next episode ready";
+    detail = "The next episode and all enabled questions are ready for picks.";
+  } else if (status === "NEEDS_ATTENTION") {
+    percent = stage === "BUILD_QUESTIONS" ? 70 : 25;
+    label = "Next episode needs attention";
+  } else if (stage === "CREATE_EPISODE") {
+    percent = 25;
+    if (!job.ProgressLabel) label = "Creating next episode";
+  } else if (stage === "BUILD_QUESTIONS") {
+    const progressKey = realityTvString_(job.ProgressLabel).toUpperCase();
+    percent = progressKey.indexOf("VERIFY") !== -1 ? 92 : (progressKey.indexOf("WRIT") !== -1 ? 78 : 60);
+    if (!job.ProgressLabel) label = "Building Extra Questions";
+  }
+  return {
+    jobId: job.JobId,
+    seasonId: job.SeasonId,
+    sourceEpisodeId: job.SourceEpisodeId,
+    targetEpisodeNumber: realityTvNumber_(job.TargetEpisodeNumber, 0),
+    nextEpisodeId: realityTvString_(job.NextEpisodeId),
+    status: status,
+    stage: stage,
+    percent: percent,
+    label: label,
+    detail: detail,
+    attemptCount: realityTvNumber_(job.AttemptCount, 0),
+    error: realityTvString_(job.ErrorMessage),
+    complete: status === "COMPLETE",
+    needsAttention: status === "NEEDS_ATTENTION",
+    updatedAt: job.UpdatedAt || ""
+  };
+}
+
+function realityTvGetNextEpisodeJob_(jobId) {
+  return realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_NEXT_EPISODE_JOBS_SHEET).find(function(row) {
+    return realityTvKey_(row.JobId) === realityTvKey_(jobId);
+  }) || null;
+}
+
+function realityTvLatestNextEpisodeJobForSource_(seasonId, sourceEpisodeId) {
+  return realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_NEXT_EPISODE_JOBS_SHEET).filter(function(row) {
+    return realityTvKey_(row.SeasonId) === realityTvKey_(seasonId) && realityTvKey_(row.SourceEpisodeId) === realityTvKey_(sourceEpisodeId);
+  }).sort(function(a, b) {
+    return new Date(b.UpdatedAt || b.CreatedAt || 0).getTime() - new Date(a.UpdatedAt || a.CreatedAt || 0).getTime();
+  })[0] || null;
+}
+
+function realityTvHasNextEpisodeTrigger_() {
+  if (typeof ScriptApp === "undefined" || typeof ScriptApp.getProjectTriggers !== "function") return false;
+  return ScriptApp.getProjectTriggers().some(function(trigger) {
+    return trigger.getHandlerFunction && trigger.getHandlerFunction() === "realityTvContinueNextEpisodeJobs";
+  });
+}
+
+function realityTvScheduleNextEpisodeContinuation_() {
+  try {
+    if (typeof ScriptApp === "undefined" || realityTvHasNextEpisodeTrigger_()) return false;
+    ScriptApp.newTrigger("realityTvContinueNextEpisodeJobs").timeBased().after(10000).create();
+    return true;
+  } catch (err) {
+    if (typeof Logger !== "undefined") Logger.log("Reality TV next-episode trigger warning: " + (err.message || err));
+    return false;
+  }
+}
+
+function realityTvDeleteNextEpisodeTriggers_() {
+  if (typeof ScriptApp === "undefined" || typeof ScriptApp.getProjectTriggers !== "function") return;
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction && trigger.getHandlerFunction() === "realityTvContinueNextEpisodeJobs") ScriptApp.deleteTrigger(trigger);
+  });
+}
+
+function realityTvQueueNextEpisodePreparation_(season, episode, reviewer) {
+  const remaining = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+    return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+  });
+  if (!realityTvBool_(season.AutoCreateNextEpisode) || remaining.length <= 1) {
+    return { queued: false, skipped: true, reason: "Automatic next episode is disabled or the season is complete." };
+  }
+  const prior = realityTvLatestNextEpisodeJobForSource_(season.SeasonId, episode.EpisodeId);
+  if (prior && ["QUEUED", "RUNNING", "RETRY", "COMPLETE", "NEEDS_ATTENTION"].indexOf(realityTvString_(prior.Status).toUpperCase()) !== -1) {
+    if (realityTvString_(prior.Status).toUpperCase() !== "COMPLETE") realityTvScheduleNextEpisodeContinuation_();
+    return { queued: realityTvString_(prior.Status).toUpperCase() !== "COMPLETE", job: prior, state: realityTvNextEpisodeJobState_(prior) };
+  }
+  const now = new Date();
+  const targetNumber = realityTvNumber_(episode.EpisodeNumber, 0) + 1;
+  const existingNext = realityTvEpisodesForSeason_(season.SeasonId).find(function(row) {
+    return realityTvNumber_(row.EpisodeNumber, 0) === targetNumber;
+  }) || null;
+  const job = {
+    JobId: realityTvId_("rt-next"),
+    SeasonId: season.SeasonId,
+    GameId: season.GameId,
+    SourceEpisodeId: episode.EpisodeId,
+    SourceEpisodeNumber: episode.EpisodeNumber,
+    TargetEpisodeNumber: targetNumber,
+    NextEpisodeId: existingNext ? existingNext.EpisodeId : "",
+    Status: "QUEUED",
+    Stage: existingNext ? "BUILD_QUESTIONS" : "CREATE_EPISODE",
+    ProgressLabel: existingNext ? "Building Extra Questions" : "Queued to create next episode",
+    ProgressDetail: "Runs automatically after the current episode is finalized.",
+    AttemptCount: 0,
+    HeartbeatAt: now,
+    NextAttemptAt: now,
+    QuestionBuildId: "",
+    ErrorMessage: "",
+    CreatedAt: now,
+    StartedAt: "",
+    CompletedAt: "",
+    UpdatedAt: now
+  };
+  realityTvAppendObject_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_NEXT_EPISODE_JOBS_SHEET), job);
+  realityTvScheduleNextEpisodeContinuation_();
+  const saved = realityTvGetNextEpisodeJob_(job.JobId);
+  return { queued: true, job: saved, state: realityTvNextEpisodeJobState_(saved) };
+}
+
+function realityTvNextEpisodeJobOwner_() {
+  const now = Date.now();
+  return realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_NEXT_EPISODE_JOBS_SHEET).filter(function(row) {
+    const status = realityTvString_(row.Status).toUpperCase();
+    if (["QUEUED", "RUNNING", "RETRY"].indexOf(status) === -1) return false;
+    const nextAttempt = new Date(row.NextAttemptAt || 0).getTime();
+    return !nextAttempt || nextAttempt <= now;
+  }).sort(function(a, b) {
+    return new Date(a.CreatedAt || a.UpdatedAt || 0).getTime() - new Date(b.CreatedAt || b.UpdatedAt || 0).getTime();
+  })[0] || null;
+}
+
+function realityTvContinueNextEpisodeJob_(jobId) {
+  realityTvEnsureSystem_();
+  const job = realityTvGetNextEpisodeJob_(jobId);
+  if (!job) throw new Error("Next-episode job not found.");
+  if (realityTvString_(job.Status).toUpperCase() === "COMPLETE") return realityTvNextEpisodeJobState_(job);
+  const sheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_NEXT_EPISODE_JOBS_SHEET);
+  const season = realityTvGetSeason_(job.SeasonId);
+  const sourceEpisode = realityTvGetEpisode_(job.SourceEpisodeId);
+  if (!season || !sourceEpisode) throw new Error("Season or source episode not found for next-episode job.");
+  const attempt = realityTvNumber_(job.AttemptCount, 0) + 1;
+  const startedAt = job.StartedAt || new Date();
+  realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+    Status: "RUNNING",
+    AttemptCount: attempt,
+    StartedAt: startedAt,
+    HeartbeatAt: new Date(),
+    ErrorMessage: "",
+    UpdatedAt: new Date()
+  });
+  const checkpoint = function(label, detail) {
+    realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+      ProgressLabel: label,
+      ProgressDetail: detail || label,
+      HeartbeatAt: new Date(),
+      UpdatedAt: new Date()
+    });
+  };
+  try {
+    const stage = realityTvString_(job.Stage || "CREATE_EPISODE").toUpperCase();
+    if (stage === "CREATE_EPISODE") {
+      checkpoint("Creating next episode", "Creating the episode, main elimination question, and active answer roster.");
+      let nextEpisode = realityTvEpisodesForSeason_(season.SeasonId).find(function(row) {
+        return realityTvNumber_(row.EpisodeNumber, 0) === realityTvNumber_(job.TargetEpisodeNumber, 0);
+      }) || null;
+      if (!nextEpisode) {
+        const built = realityTvBuildNextEpisodeAfterApproval_(season, sourceEpisode, function(status) {
+          checkpoint(realityTvString_(status).replace(/_/g, " ") || "Creating next episode", "Saving the next episode locally.");
+        });
+        nextEpisode = built.nextEpisode;
+      }
+      if (!nextEpisode) {
+        realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+          Status: "COMPLETE", Stage: "COMPLETE", ProgressLabel: "No next episode needed",
+          ProgressDetail: "The season is complete or automatic next-episode creation is disabled.",
+          CompletedAt: new Date(), HeartbeatAt: new Date(), UpdatedAt: new Date()
+        });
+        return realityTvNextEpisodeJobState_(realityTvGetNextEpisodeJob_(job.JobId));
+      }
+      realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+        NextEpisodeId: nextEpisode.EpisodeId,
+        Stage: "BUILD_QUESTIONS",
+        ProgressLabel: "Episode created",
+        ProgressDetail: "The main question is ready. Preparing Extra Questions in the background.",
+        HeartbeatAt: new Date(), UpdatedAt: new Date()
+      });
+      realityTvScheduleNextEpisodeContinuation_();
+      return realityTvNextEpisodeJobState_(realityTvGetNextEpisodeJob_(job.JobId));
+    }
+    if (stage === "BUILD_QUESTIONS") {
+      const nextEpisode = realityTvGetEpisode_(job.NextEpisodeId) || realityTvEpisodesForSeason_(season.SeasonId).find(function(row) {
+        return realityTvNumber_(row.EpisodeNumber, 0) === realityTvNumber_(job.TargetEpisodeNumber, 0);
+      });
+      if (!nextEpisode) throw new Error("Next episode was not found after creation.");
+      const enabledTypes = typeof realityTvQuestionTemplatesForSeason_ === "function"
+        ? realityTvQuestionTemplatesForSeason_(season.SeasonId).filter(function(row) { return realityTvBool_(row.Enabled); }).map(function(row) { return realityTvKey_(row.TemplateId); })
+        : [];
+      checkpoint("Compiling Extra Questions", "Reading the roster once and compiling the complete question pack.");
+      const build = enabledTypes.length && typeof realityTvMaterializeEpisodeQuestionPackBulk_ === "function"
+        ? realityTvMaterializeEpisodeQuestionPackBulk_(season, nextEpisode, {
+            enabledTypes: enabledTypes,
+            buildId: realityTvString_(job.QuestionBuildId),
+            managedBy: "NEXT_EPISODE_JOB",
+            checkpoint: function(status) {
+              const key = realityTvString_(status).toUpperCase();
+              const label = key.indexOf("WRITING") !== -1 ? "Writing Extra Questions" : (key.indexOf("VERIFY") !== -1 ? "Verifying Extra Questions" : "Compiling Extra Questions");
+              checkpoint(label, label + " for " + nextEpisode.EpisodeName + ".");
+            }
+          })
+        : { buildId: "", complete: true };
+      realityTvSyncEpisodeToHub_(season, nextEpisode, realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+        return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+      }), realityTvFormatQuestion_(season.QuestionTemplate, nextEpisode.EpisodeNumber, season));
+      const completedAt = new Date();
+      realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+        Status: "COMPLETE", Stage: "COMPLETE", QuestionBuildId: build && build.buildId ? build.buildId : "",
+        ProgressLabel: "Next episode ready", ProgressDetail: nextEpisode.EpisodeName + " and all enabled questions are ready for picks.",
+        CompletedAt: completedAt, HeartbeatAt: completedAt, ErrorMessage: "", UpdatedAt: completedAt
+      });
+      return realityTvNextEpisodeJobState_(realityTvGetNextEpisodeJob_(job.JobId));
+    }
+    throw new Error("Unknown next-episode job stage: " + stage + ".");
+  } catch (err) {
+    const retryable = realityTvIsRetryableSpreadsheetError_(err) && attempt < 5;
+    const nextAt = new Date(Date.now() + Math.min(120000, 10000 * attempt));
+    realityTvUpdateObjectRow_(sheet, job.__rowNumber, {
+      Status: retryable ? "RETRY" : "NEEDS_ATTENTION",
+      NextAttemptAt: retryable ? nextAt : "",
+      HeartbeatAt: new Date(),
+      ErrorMessage: err.message || String(err),
+      ProgressLabel: retryable ? "Retry scheduled" : "Next episode needs attention",
+      ProgressDetail: retryable ? "A temporary spreadsheet error occurred. The server will retry automatically." : "Automatic retries were exhausted. Use Repair / Build Current Episode if needed.",
+      UpdatedAt: new Date()
+    });
+    if (retryable) realityTvScheduleNextEpisodeContinuation_();
+    return realityTvNextEpisodeJobState_(realityTvGetNextEpisodeJob_(job.JobId));
+  }
+}
+
+function realityTvContinueNextEpisodeJobs() {
+  realityTvEnsureSystem_();
+  realityTvDeleteNextEpisodeTriggers_();
+  if (realityTvApprovalQueueOwner_()) {
+    realityTvScheduleNextEpisodeContinuation_();
+    return;
+  }
+  const deadline = Date.now() + (4 * 60 * 1000);
+  let guard = 0;
+  while (Date.now() < deadline && guard < 8) {
+    const job = realityTvNextEpisodeJobOwner_();
+    if (!job) return;
+    realityTvContinueNextEpisodeJob_(job.JobId);
+    guard += 1;
+  }
+  if (realityTvNextEpisodeJobOwner_()) realityTvScheduleNextEpisodeContinuation_();
+}
+
+function apiAdminFinalizeRealityTvEpisode(payload) {
+  requireAdmin_(payload || {});
+  realityTvEnsureSystem_();
+  let queue = payload.queueId ? realityTvGetQueue_(payload.queueId) : null;
+  if (!queue && payload.episodeId) {
+    queue = realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_RESULTS_QUEUE_SHEET).filter(function(row) {
+      return realityTvKey_(row.EpisodeId) === realityTvKey_(payload.episodeId) && ["PENDING", "APPROVING"].indexOf(realityTvString_(row.ReviewStatus).toUpperCase()) !== -1;
+    }).sort(function(a, b) { return new Date(b.SubmittedAt || 0).getTime() - new Date(a.SubmittedAt || 0).getTime(); })[0] || null;
+  }
+  if (!queue) throw new Error("Submit the main elimination result before finalizing the episode.");
+  const status = realityTvString_(queue.ReviewStatus).toUpperCase();
+  if (status === "APPROVED") return realityTvApprovalState_(queue);
+  if (["PENDING", "APPROVING"].indexOf(status) === -1) throw new Error("This episode cannot be finalized from status " + status + ".");
+  const season = realityTvGetSeason_(queue.SeasonId);
+  const episode = realityTvGetEpisode_(queue.EpisodeId);
+  if (!season || !episode) throw new Error("Season or episode not found.");
+  const readiness = realityTvEpisodeFinalizeReadiness_(season.SeasonId, episode.EpisodeId);
+  if (!readiness.ready) {
+    return {
+      success: false,
+      code: "MISSING_EPISODE_RESULTS",
+      message: "Enter a result or Push for every Extra Question before finalizing the episode.",
+      missingResults: readiness.missing,
+      readiness: readiness
+    };
+  }
+  if (status === "PENDING") {
+    const now = new Date();
+    const reviewer = realityTvString_(payload.username || "administrator");
+    const questionIds = readiness.questionQueueIds || [];
+    const questionIdMap = {};
+    questionIds.forEach(function(id) { questionIdMap[realityTvKey_(id)] = true; });
+    if (typeof REALITY_TV_QUESTION_QUEUE_SHEET !== "undefined" && questionIds.length) {
+      const qSheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_QUESTION_QUEUE_SHEET);
+      realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_QUESTION_QUEUE_SHEET).forEach(function(row) {
+        if (!questionIdMap[realityTvKey_(row.QueueId)] || realityTvString_(row.ReviewStatus).toUpperCase() === "APPROVED") return;
+        realityTvUpdateObjectRow_(qSheet, row.__rowNumber, {
+          ReviewStatus: "APPROVING", ReviewedBy: reviewer, ReviewedAt: now,
+          PushStatus: "QUEUED BY EPISODE", ApprovalStage: "EPISODE_BATCH",
+          ApprovalStartedAt: row.ApprovalStartedAt || now, ApprovalStageStartedAt: now,
+          ApprovalHeartbeatAt: now, ErrorMessage: "", UpdatedAt: now
+        });
+      });
+    }
+    realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET), queue.__rowNumber, {
+      ReviewStatus: "APPROVING",
+      ReviewedBy: reviewer,
+      ReviewedAt: now,
+      PushStatus: "QUEUED",
+      ApprovalStage: "SETTLE_QUESTIONS",
+      ApprovalStartedAt: now,
+      ApprovalCompletedAt: "",
+      ApprovalStageStartedAt: now,
+      ApprovalHeartbeatAt: now,
+      EpisodeFinalizeMode: "ALL_RESULTS",
+      ApprovalQuestionQueueIdsJSON: JSON.stringify(questionIds),
+      ErrorMessage: "",
+      UpdatedAt: now
+    });
+  }
+  realityTvScheduleApprovalContinuation_();
+  const refreshed = realityTvGetQueue_(queue.QueueId);
+  const state = realityTvApprovalState_(refreshed);
+  state.setAndForget = true;
+  state.readiness = readiness;
+  state.message = "Episode finalization queued. You may leave this page; the server will continue automatically.";
+  return state;
 }
 
 function apiAdminApproveRealityTvResult(payload) {
@@ -4022,11 +4489,15 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
 
   const stage = realityTvString_(queue.ApprovalStage || "SETTLE").toUpperCase();
   if (stage === "COMPLETE") return realityTvApprovalState_(queue);
-  const processingStatus = stage === "SETTLE"
-    ? "SETTLING EPISODE"
-    : (stage === "BUILD_NEXT"
-        ? "BUILDING NEXT EPISODE"
-        : (stage === "BUILD_QUESTIONS" ? "BUILDING EXTRA QUESTIONS" : "FINALIZING APPROVAL"));
+  const processingStatus = stage === "SETTLE_QUESTIONS"
+    ? "SETTLING EXTRA RESULTS"
+    : (stage === "SETTLE"
+        ? "SETTLING EPISODE"
+        : (stage === "BUILD_NEXT"
+            ? "BUILDING NEXT EPISODE"
+            : (stage === "BUILD_QUESTIONS"
+                ? "BUILDING EXTRA QUESTIONS"
+                : (stage === "FINALIZE_CURRENT" ? "FINALIZING EPISODE" : "FINALIZING APPROVAL"))));
   const claim = realityTvClaimApprovalStage_({
     queueId: payload.queueId,
     stage: stage,
@@ -4067,15 +4538,36 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
   };
 
   try {
+    if (stage === "SETTLE_QUESTIONS") {
+      const supplemental = realityTvSpreadsheetRetry_("Settle all Reality TV Extra Question results", function() {
+        return realityTvSettleEpisodeQuestionQueues_(season, episode, queue, reviewer);
+      }, 4);
+      const now = new Date();
+      realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+        PushStatus: "EXTRA RESULTS SETTLED",
+        ApprovalStage: "SETTLE",
+        ApprovalStageStartedAt: now,
+        ApprovalHeartbeatAt: now,
+        ErrorMessage: "",
+        UpdatedAt: now
+      });
+      realityTvScheduleApprovalContinuation_();
+      const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+      state.settledQuestionCount = supplemental.settledCount;
+      state.message = supplemental.settledCount + " Extra Question result" + (supplemental.settledCount === 1 ? " was" : "s were") + " settled. Finalizing the elimination next.";
+      return state;
+    }
+
     if (stage === "SETTLE") {
       const settlement = realityTvSpreadsheetRetry_("Settle Reality TV episode", function() {
         return realityTvSettleEpisodeOnly_(season, episode, queue, reviewer);
       }, 5);
+      const allResultsMode = realityTvString_(queue.EpisodeFinalizeMode).toUpperCase() === "ALL_RESULTS";
       realityTvSpreadsheetRetry_("Advance Reality TV episode approval", function() {
         const now = new Date();
         realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
           PushStatus: "EPISODE SETTLED",
-          ApprovalStage: "BUILD_NEXT",
+          ApprovalStage: allResultsMode ? "FINALIZE_CURRENT" : "BUILD_NEXT",
           ApprovalStageStartedAt: now,
           ApprovalHeartbeatAt: now,
           ErrorMessage: "",
@@ -4085,7 +4577,34 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
       realityTvScheduleApprovalContinuation_();
       const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
       state.remainingCount = settlement.remainingCount;
-      state.message = "Episode settled. Preparing the next episode.";
+      state.message = allResultsMode ? "Current episode settled. Saving the final episode record now." : "Episode settled. Preparing the next episode.";
+      return state;
+    }
+
+    if (stage === "FINALIZE_CURRENT") {
+      const hub = realityTvSpreadsheetRetry_("Queue final Reality TV Hub review", function() {
+        return realityTvUpdateHubReview_(queue, "APPROVED", reviewer, "Local episode finalization completed. Next episode preparation is queued separately.");
+      }, 3);
+      const nextJob = realityTvQueueNextEpisodePreparation_(season, episode, reviewer);
+      const completedAt = new Date();
+      realityTvSpreadsheetRetry_("Complete current Reality TV episode finalization", function() {
+        realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
+          ReviewStatus: "APPROVED",
+          PushStatus: "PUSHED",
+          PushedAt: completedAt,
+          ApprovalStage: "COMPLETE",
+          ApprovalCompletedAt: completedAt,
+          ApprovalHeartbeatAt: completedAt,
+          NextEpisodeJobId: nextJob && nextJob.job ? nextJob.job.JobId : "",
+          ErrorMessage: hub && hub.error ? hub.error : "",
+          UpdatedAt: completedAt
+        });
+      }, 4);
+      const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+      state.nextEpisodeJob = nextJob && nextJob.state ? nextJob.state : null;
+      state.message = nextJob && nextJob.queued
+        ? "Episode finalized and scored. You are done; the server is preparing the next episode automatically."
+        : "Episode finalized and scored.";
       return state;
     }
 
@@ -4199,19 +4718,27 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
 
     throw new Error("Unknown approval stage: " + stage + ".");
   } catch (err) {
+    const retryable = realityTvIsRetryableSpreadsheetError_(err) && attempts < 5;
     try {
       realityTvSpreadsheetRetry_("Record Reality TV approval error", function() {
         const now = new Date();
         realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
-          PushStatus: "ERROR",
+          PushStatus: retryable ? "QUEUED" : "ERROR",
           ApprovalAttemptCount: attempts,
           ApprovalHeartbeatAt: now,
-          ErrorMessage: err.message || String(err),
+          ErrorMessage: retryable ? "Temporary spreadsheet error; automatic retry scheduled: " + (err.message || String(err)) : (err.message || String(err)),
           UpdatedAt: now
         });
       }, 3);
     } catch (recordError) {
       if (typeof Logger !== "undefined") Logger.log("Could not record Reality TV approval error: " + recordError);
+    }
+    if (retryable) {
+      realityTvScheduleApprovalContinuation_();
+      const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
+      state.retryScheduled = true;
+      state.message = "A temporary spreadsheet error occurred. The server will retry this stage automatically.";
+      return state;
     }
     throw err;
   }
@@ -4272,7 +4799,12 @@ function apiAdminResetRealityTvApproval(payload) {
   }) || null;
 
   let stage = realityTvString_(queue.ApprovalStage || "SETTLE").toUpperCase();
-  if (!episodeFinal) {
+  const allResultsMode = realityTvString_(queue.EpisodeFinalizeMode).toUpperCase() === "ALL_RESULTS";
+  if (allResultsMode) {
+    const readiness = realityTvEpisodeFinalizeReadiness_(season.SeasonId, episode.EpisodeId);
+    if (!episodeFinal) stage = readiness.pendingCount > 0 ? "SETTLE_QUESTIONS" : "SETTLE";
+    else stage = "FINALIZE_CURRENT";
+  } else if (!episodeFinal) {
     stage = "SETTLE";
   } else if (existingNext || realityTvString_(queue.NextEpisodeId)) {
     const resolvedNextId = existingNext ? existingNext.EpisodeId : realityTvString_(queue.NextEpisodeId);
@@ -4314,13 +4846,17 @@ function apiAdminResetRealityTvApproval(payload) {
   const waitingFor = realityTvApprovalWaitingFor_(refreshed);
   const state = waitingFor ? realityTvApprovalWaitingState_(refreshed, waitingFor) : realityTvApprovalState_(refreshed);
   state.reset = true;
-  state.message = stage === "SETTLE"
-    ? "Approval reset. Settlement will safely resume from the beginning."
-    : (stage === "BUILD_NEXT"
-        ? "Approval reset. The episode is already settled; next-episode creation will resume."
-        : (stage === "BUILD_QUESTIONS"
-            ? "Approval reset. The episode and next episode already exist; Extra Question building will resume."
-            : "Approval reset. Settlement and next-episode creation are already complete; final approval records will resume."));
+  state.message = stage === "SETTLE_QUESTIONS"
+    ? "Approval reset. Extra Question settlement will resume automatically."
+    : (stage === "SETTLE"
+        ? "Approval reset. Elimination settlement will resume automatically."
+        : (stage === "FINALIZE_CURRENT"
+            ? "Approval reset. The episode is already settled; final episode records will resume automatically."
+            : (stage === "BUILD_NEXT"
+                ? "Approval reset. The episode is already settled; next-episode creation will resume."
+                : (stage === "BUILD_QUESTIONS"
+                    ? "Approval reset. The episode and next episode already exist; Extra Question building will resume."
+                    : "Approval reset. Final approval records will resume."))));
   return state;
 }
 

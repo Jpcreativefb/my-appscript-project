@@ -1,3 +1,12 @@
+## v1.2.2 — Set-and-forget Reality TV episode finalization
+
+- Added one-click **Approve All & Finalize Episode** for the current episode.
+- Settles all submitted Extra Question results server-side before the main elimination.
+- Marks the current episode final before next-episode preparation.
+- Added `RealityNextEpisodeJobs` so next-episode creation and bulk question materialization continue separately in the background.
+- Added automatic retry for transient Sheets/lock failures; Reset/Resume are recovery-only.
+- Reopening the manager polls saved state without driving approval work.
+- Kept External Results Hub synchronization asynchronous and outside the local finalization critical path.
 
 ## v1.2.1 — External Results Hub write verification
 - Require read-after-write verification before outbox jobs become COMPLETE.

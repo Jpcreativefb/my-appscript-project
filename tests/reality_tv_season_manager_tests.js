@@ -46,7 +46,7 @@ assert(engine.includes('BUILD_NEXT'), 'Next-episode approval stage is missing');
 assert(engine.includes('SYNC_HUB'), 'Hub sync approval stage is missing');
 
 assert(page.includes('Create Season &amp; Episode 1'), 'Season creation UI is missing');
-assert(page.includes('Approve &amp; Build Next Episode'), 'One-click approval and next episode UI is missing');
+assert(page.includes('Approve All &amp; Finalize Episode'), 'One-click episode finalization UI is missing');
 assert(page.includes('Resume Approval'), 'Retry-safe approval UI is missing');
 assert(page.includes('Reset Stuck Approval'), 'Stuck approval reset UI is missing');
 assert(page.includes('Update This Episode Only'), 'Episode-only Extra Question controls are missing');

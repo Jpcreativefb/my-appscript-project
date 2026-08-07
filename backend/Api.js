@@ -117,6 +117,10 @@ function doPost(e) {
       return json(apiAdminDeleteRealityTvCustomQuestionTemplate(body));
     }
 
+    if (action === "adminFinalizeRealityTvEpisode") {
+      return json(apiAdminFinalizeRealityTvEpisode(body));
+    }
+
     if (action === "adminResetRealityTvApproval") {
       return json(apiAdminResetRealityTvApproval(body));
     }
@@ -228,6 +232,7 @@ function doGet(e) {
       "adminAddRealityTvContestant",
       "adminBulkAddRealityTvContestants",
       "adminSubmitRealityTvResult",
+      "adminFinalizeRealityTvEpisode",
       "adminApproveRealityTvResult",
       "adminContinueRealityTvApproval",
       "adminGetRealityTvApprovalState",
@@ -960,6 +965,10 @@ function doGet(e) {
 
     if (action === "adminSubmitRealityTvResult") {
       return json(apiAdminSubmitRealityTvResult(params));
+    }
+
+    if (action === "adminFinalizeRealityTvEpisode") {
+      return json(apiAdminFinalizeRealityTvEpisode(params));
     }
 
     if (action === "adminApproveRealityTvResult") {

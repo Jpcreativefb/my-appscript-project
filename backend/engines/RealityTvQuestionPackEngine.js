@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV EPISODE QUESTION PACKS
-   Production v1.1.18
+   Production v1.2.2
 
    Adds independent, administrator-reviewed episode questions without
    changing the stable elimination/next-episode workflow.
@@ -2764,8 +2764,9 @@ function apiAdminApproveRealityTvQuestionResult(payload) {
   return realityTvQuestionApprovalState_(realityTvGetQuestionQueue_(payload.queueId));
 }
 
-function realityTvSettleSupplementalQuestion_(question, queue, reviewer) {
-  const setup = adminGetGameSetup({ gameId: question.GameId });
+function realityTvSettleSupplementalQuestion_(question, queue, reviewer, options) {
+  options = options || {};
+  const setup = options.setup || adminGetGameSetup({ gameId: question.GameId });
   const category = (setup.categories || []).find(function(item) {
     return realityTvKey_(item.categoryId) === realityTvKey_(question.CategoryId);
   });
@@ -2824,7 +2825,7 @@ function realityTvSettleSupplementalQuestion_(question, queue, reviewer) {
     WinningOutcomeIds: JSON.stringify(winnerIds),
     UpdatedAt: settledAt
   });
-  if (typeof seasonAnchorRecalculateEpisodeScores_ === "function") {
+  if (!options.skipScoreRecalc && typeof seasonAnchorRecalculateEpisodeScores_ === "function") {
     seasonAnchorRecalculateEpisodeScores_(question.GameId, question.SeasonId, question.EpisodeId);
   }
   return { winnerId: winnerIds[0] || "", winnerIds: winnerIds, isPush: isPush };

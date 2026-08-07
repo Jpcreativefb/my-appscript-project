@@ -1045,3 +1045,47 @@ The pass is idempotent: existing questions are updated or verified, missing answ
 - `ExternalResultsInbox` — reviewed inbound delivery rows from the Hub.
 
 `ExternalResultsInbox` rows are staged only in v1.2.0. They are not automatically settled.
+
+## Reality TV set-and-forget episode finalizer contract — v1.2.2
+
+### Admin action
+
+`adminFinalizeRealityTvEpisode` starts the server-owned all-results finalization for the submitted main elimination queue. The endpoint refuses to start when an enabled built Extra Question has neither a final result nor a submitted/pending result.
+
+The main result queue stores:
+
+```txt
+EpisodeFinalizeMode = ALL_RESULTS
+ApprovalQuestionQueueIdsJSON
+NextEpisodeJobId
+```
+
+The current-episode stages are:
+
+```txt
+SETTLE_QUESTIONS
+SETTLE
+FINALIZE_CURRENT
+COMPLETE
+```
+
+`SETTLE_QUESTIONS` settles all eligible supplemental result queues with one reused Game Setup read and one score recalculation after the batch. `SETTLE` applies the main elimination. `FINALIZE_CURRENT` completes the current episode and queues next-episode preparation. A completed current-episode approval does not wait for the next episode to finish building.
+
+Transient retryable lock / Google Sheets failures are returned to `QUEUED` and scheduled for server continuation, up to five attempts. Manual Reset/Resume remains compatible with legacy approvals and recovery scenarios.
+
+### Next-episode jobs
+
+The backend automatically creates `RealityNextEpisodeJobs`. A job references the source episode and intended target episode and persists stage, heartbeat, attempt count, error state, and question-build information.
+
+Stages:
+
+```txt
+CREATE_EPISODE
+BUILD_QUESTIONS
+COMPLETE
+```
+
+`realityTvContinueNextEpisodeJobs` is the server continuation worker. It waits while a current-episode approval owns the shared write path and uses the bulk episode-question materializer for enabled Extra Questions. Hub mirroring is queued asynchronously only after local preparation.
+
+The season-details response includes `nextEpisodeJobs` with computed state for the admin progress card.
+

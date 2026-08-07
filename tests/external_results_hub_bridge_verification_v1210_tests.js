@@ -27,7 +27,7 @@ assert.strictEqual(frontendApi, frontendApiCompat, 'Frontend API copies must mat
 assert(ui.includes('Requeue Unverified'), 'Reality TV Hub card must expose unverified job recovery');
 assert(ui.includes('unverified complete'), 'Reality TV Hub health must display unverified completed jobs');
 assert(ui.includes('health.spreadsheetName'), 'Hub card must identify the actual configured target spreadsheet');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1210-external-results-hub-verification"'), 'v1.2.1 cache version is missing');
-assert(html.includes('hotfix=v1210-external-results-hub-verification'), 'App shell must load the v1.2.1 cache version');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1220-reality-tv-episode-finalizer"'), 'v1.2.1 cache version is missing');
+assert(html.includes('hotfix=v1220-reality-tv-episode-finalizer'), 'App shell must load the v1.2.1 cache version');
 
 console.log('External Results Hub verification v1.2.1 tests passed.');

@@ -69,6 +69,67 @@ function adminRealityTvPendingQueue_(bundle, episode) {
   }) || null;
 }
 
+
+function adminRealityTvEpisodeFinalizeReadiness_(bundle, episode) {
+  if (!episode) return { ready: false, total: 0, finalCount: 0, pendingCount: 0, missing: [] };
+  const questions = (bundle.episodeQuestions || []).filter(function(item) {
+    return String(item.EpisodeId || "") === String(episode.EpisodeId || "");
+  });
+  const queue = (bundle.questionQueue || []).slice().sort(function(a, b) {
+    return new Date(b.SubmittedAt || b.UpdatedAt || 0).getTime() - new Date(a.SubmittedAt || a.UpdatedAt || 0).getTime();
+  });
+  const byQuestion = {};
+  queue.forEach(function(item) {
+    const key = String(item.EpisodeQuestionId || "");
+    if (key && !byQuestion[key]) byQuestion[key] = item;
+  });
+  const missing = [];
+  let finalCount = 0;
+  let pendingCount = 0;
+  questions.forEach(function(question) {
+    const status = String(question.Status || "OPEN").toUpperCase();
+    if (status === "FINAL" || status === "CLOSED") {
+      finalCount += 1;
+      return;
+    }
+    const result = byQuestion[String(question.EpisodeQuestionId || "")];
+    const review = result ? String(result.ReviewStatus || "").toUpperCase() : "";
+    if (["PENDING", "APPROVING", "APPROVED"].indexOf(review) !== -1) {
+      if (review === "APPROVED") finalCount += 1;
+      else pendingCount += 1;
+      return;
+    }
+    missing.push(question);
+  });
+  return {
+    ready: missing.length === 0,
+    total: questions.length,
+    finalCount: finalCount,
+    pendingCount: pendingCount,
+    missing: missing
+  };
+}
+
+function adminRealityTvNextEpisodeJobForSource_(bundle, episode) {
+  return (bundle.nextEpisodeJobs || []).find(function(job) {
+    return String(job.SourceEpisodeId || "") === String(episode && episode.EpisodeId || "");
+  }) || null;
+}
+
+function adminRealityTvNextEpisodeJobHtml_(job) {
+  if (!job) return "";
+  const state = job.state || {};
+  const percent = Math.max(0, Math.min(100, Number(state.percent || 0)));
+  const status = String(state.status || job.Status || "QUEUED").toUpperCase();
+  return `<div class="reality-tv-next-episode-job ${adminRealityTvStatusClass_(status)}">
+    <div class="reality-tv-approval-progress-head"><strong>${adminRealityTvEscape_(state.label || "Preparing next episode")}</strong><span>${adminRealityTvEscape_(Math.round(percent))}%</span></div>
+    <div class="reality-tv-approval-progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${adminRealityTvEscape_(Math.round(percent))}"><span style="width:${adminRealityTvEscape_(percent)}%"></span></div>
+    <div class="reality-tv-approval-progress-detail">${adminRealityTvEscape_(state.detail || "The server is preparing the next episode automatically.")}</div>
+    ${state.error ? `<div class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(state.error)}</div>` : ""}
+    <div class="admin-sub">This is separate from the finalized episode. You do not need to keep this page open.</div>
+  </div>`;
+}
+
 function adminRealityTvFormatDuration_(seconds) {
   const value = Math.max(0, Math.round(Number(seconds || 0)));
   if (value < 60) return value + " sec";
@@ -77,7 +138,7 @@ function adminRealityTvFormatDuration_(seconds) {
   return minutes + " min" + (remainder ? " " + remainder + " sec" : "");
 }
 
-function adminRealityTvApprovalStepDefinitions_(kind) {
+function adminRealityTvApprovalStepDefinitions_(kind, stage) {
   if (kind === "question") {
     return [
       { id: "SETTLE", label: "Settle question" },
@@ -85,12 +146,20 @@ function adminRealityTvApprovalStepDefinitions_(kind) {
       { id: "COMPLETE", label: "Ready" }
     ];
   }
+  if (["BUILD_NEXT", "BUILD_QUESTIONS", "FINALIZE"].indexOf(String(stage || "").toUpperCase()) !== -1) {
+    return [
+      { id: "SETTLE", label: "Settle result" },
+      { id: "BUILD_NEXT", label: "Create next episode" },
+      { id: "BUILD_QUESTIONS", label: "Build Extra Questions" },
+      { id: "FINALIZE", label: "Finalize" },
+      { id: "COMPLETE", label: "Ready" }
+    ];
+  }
   return [
-    { id: "SETTLE", label: "Settle result" },
-    { id: "BUILD_NEXT", label: "Create next episode" },
-    { id: "BUILD_QUESTIONS", label: "Build Extra Questions" },
-    { id: "FINALIZE", label: "Finalize" },
-    { id: "COMPLETE", label: "Ready" }
+    { id: "SETTLE_QUESTIONS", label: "Settle Extra Questions" },
+    { id: "SETTLE", label: "Settle elimination" },
+    { id: "FINALIZE_CURRENT", label: "Finalize episode" },
+    { id: "COMPLETE", label: "Episode Final" }
   ];
 }
 
@@ -123,7 +192,9 @@ function adminRealityTvApprovalProgressData_(source, kind) {
       else if (stage === "SYNC_HUB") { percent = 82; label = "Finalizing question approval"; detail = "Saving the final approval record."; eta = 10; }
       else { percent = 100; label = "Question approval complete"; detail = "This result is ready."; eta = 0; }
     } else {
-      if (stage === "SETTLE") { percent = pushStatus === "SETTLING EPISODE" ? 18 : 7; label = "Settling episode result"; detail = "Scoring picks and updating the active roster."; eta = 70; }
+      if (stage === "SETTLE_QUESTIONS") { percent = pushStatus === "SETTLING EXTRA RESULTS" ? 24 : 12; label = "Settling all Extra Question results"; detail = "Applying all submitted Extra Question results automatically."; eta = 35; }
+      else if (stage === "SETTLE") { percent = pushStatus === "SETTLING EPISODE" ? 58 : 50; label = "Settling elimination result"; detail = "Scoring the elimination and updating the active roster."; eta = 30; }
+      else if (stage === "FINALIZE_CURRENT") { percent = 88; label = "Finalizing current episode"; detail = "Saving the final episode record and queuing the next episode separately."; eta = 12; }
       else if (stage === "BUILD_NEXT") { percent = 45; label = "Creating the next episode"; detail = "Creating the episode and main elimination question."; eta = 45; }
       else if (stage === "BUILD_QUESTIONS") {
         const done = Number(source.ApprovalQuestionDone || 0);
@@ -156,7 +227,7 @@ function adminRealityTvApprovalProgressData_(source, kind) {
 
 function adminRealityTvApprovalProgressHtml_(source, kind) {
   const progress = adminRealityTvApprovalProgressData_(source, kind);
-  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind);
+  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind, progress.stage);
   const currentIndex = Math.max(0, steps.findIndex(function(step) { return step.id === progress.stage; }));
   const stepHtml = steps.map(function(step, index) {
     const status = progress.percent >= 100 || index < currentIndex ? "complete" : (index === currentIndex ? "current" : "pending");
@@ -240,7 +311,7 @@ function adminRealityTvUpdateApprovalProgress_(queueId, source, kind, options) {
     : (percent >= 100 ? "Complete" : (eta > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(eta) : "Taking longer than estimated — still working"));
   if (heartbeatEl) heartbeatEl.textContent = "Last checkpoint: " + adminRealityTvFormatDuration_(progress.heartbeatAgeSeconds) + " ago";
 
-  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind);
+  const steps = adminRealityTvApprovalStepDefinitions_(progress.kind, progress.stage);
   let currentIndex = steps.findIndex(function(step) { return step.id === progress.stage; });
   if (currentIndex < 0) currentIndex = 0;
   container.querySelectorAll('[data-approval-step]').forEach(function(stepEl, index) {
@@ -297,6 +368,10 @@ function adminRealityTvStartApprovalPoller_(queueId) {
         adminRealityTvStopApprovalPoller_(queueId);
         adminRealityTvStopApprovalTicker_(queueId);
         adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
+        if (state.seasonId) {
+          try { await adminRealityTvRefreshSeasonDetails_(state.seasonId, { focusElementId: "realityTvResultPanel_" + state.seasonId }); }
+          catch (refreshErr) { /* The finalized state is saved even if the UI refresh fails. */ }
+        }
       }
     } catch (err) {
       // The main approval request may temporarily occupy Apps Script. Poll again.
@@ -632,7 +707,7 @@ function adminRealityTvQuestionCard_(bundle, question) {
         </div>
         ${adminRealityTvApprovalProgressHtml_(pending, "question")}
         <div class="admin-actions">
-          <button class="admin-small-button" onclick="adminRealityTvApproveQuestionResult('${adminRealityTvEscape_(pending.QueueId)}')">${approving ? "Resume Approval" : "Approve Question Result"}</button>
+          <button class="admin-small-button" onclick="adminRealityTvApproveQuestionResult('${adminRealityTvEscape_(pending.QueueId)}')">${approving ? "Resume This Question" : "Approve This Question Only"}</button>
           ${approving ? "" : `<button class="admin-small-button danger" onclick="adminRealityTvRejectQuestionResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
         </div>
       </div>
@@ -1666,6 +1741,7 @@ function adminRealityTvResultPanel_(bundle) {
   const activeContestants = (bundle.contestants || []).filter(function(item) {
     return item.Active === true || String(item.Active || "").toLowerCase() === "true";
   });
+  const finalizeReadiness = adminRealityTvEpisodeFinalizeReadiness_(bundle, episode);
 
   if (pending) {
     const selectedIds = (() => {
@@ -1695,23 +1771,28 @@ function adminRealityTvResultPanel_(bundle) {
           ${pending.Notes ? `<span><b>Notes:</b> ${adminRealityTvEscape_(pending.Notes)}</span>` : ""}
         </div>
         ${adminRealityTvApprovalProgressHtml_(pending, "episode")}
-        <div class="admin-actions">
-          <button class="button admin-button" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">
-            ${isApproving ? "Resume Approval" : "Approve &amp; Build Next Episode"}
-          </button>
-          ${isApproving ? `<button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Reset Stuck Approval</button>` : `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject</button>`}
+        <div class="admin-message ${finalizeReadiness.ready ? "success" : "warning"}">
+          <b>Episode result check:</b> ${adminRealityTvEscape_(finalizeReadiness.finalCount + finalizeReadiness.pendingCount)} of ${adminRealityTvEscape_(finalizeReadiness.total)} Extra Question results are ready.
+          ${finalizeReadiness.missing.length ? `<div>${adminRealityTvEscape_(finalizeReadiness.missing.length)} still need a result or Push before the episode can be finalized.</div>` : `<div>All Extra Question results are ready for one-click finalization.</div>`}
         </div>
+        ${isApproving ? `<div class="admin-message info"><b>Working automatically.</b> You may leave this page. The server will continue without Resume Approval.</div>` : ""}
+        <div class="admin-actions">
+          ${isApproving
+            ? `<button class="button admin-button" disabled>Finalizing automatically…</button>`
+            : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve All &amp; Finalize Episode</button>`}
+          ${!isApproving ? `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject Main Result</button>` : ""}
+        </div>
+        ${isApproving ? `<details class="reality-tv-recovery-tools"><summary>Recovery tools — only if marked stalled</summary><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Reset Stuck Approval</button><button class="admin-small-button secondary" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">Resume Manually</button></div></details>` : ""}
       </div>
     `;
   }
 
   if (String(episode.Status || "").toUpperCase() === "FINAL") {
+    const nextJob = adminRealityTvNextEpisodeJobForSource_(bundle, episode);
     return `
       <div id="realityTvResultPanel_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message success">
-        ${adminRealityTvEscape_(episode.EpisodeName)} is final.
-        <button class="admin-small-button secondary" onclick="adminRealityTvCreateNextEpisode('${adminRealityTvEscape_(season.SeasonId)}')">
-          Create Next Episode
-        </button>
+        <b>${adminRealityTvEscape_(episode.EpisodeName)} is FINAL.</b> Results, scoring, and roster updates are complete.
+        ${nextJob ? adminRealityTvNextEpisodeJobHtml_(nextJob) : `<div class="admin-sub">If automatic next-episode creation is enabled, the server queues it separately after finalization.</div><button class="admin-small-button secondary" onclick="adminRealityTvCreateNextEpisode('${adminRealityTvEscape_(season.SeasonId)}')">Create / Repair Next Episode</button>`}
       </div>
     `;
   }
@@ -2128,6 +2209,12 @@ async function adminRealityTvRefreshSeasonDetails_(seasonId, options) {
     adminRealityTvAnchorPreview_(seasonId);
     adminRealityTvCustomSourceChanged_(seasonId);
     if (typeof adminUiEnhancePage === "function") adminUiEnhancePage(seasonCard || target);
+    (bundle.queue || []).filter(function(item) {
+      return String(item.ReviewStatus || "").toUpperCase() === "APPROVING";
+    }).forEach(function(item) {
+      adminRealityTvStartApprovalTicker_(item.QueueId, item, "episode");
+      adminRealityTvStartApprovalPoller_(item.QueueId);
+    });
 
     let focusId = options.focusElementId || "";
     if (options.nextAfterQuestionId) {
@@ -2985,6 +3072,26 @@ function adminRealityTvResponseError_(response, fallback) {
   return (response && (response.error || response.message)) || fallback;
 }
 
+
+async function adminRealityTvFinalizeEpisode(queueId, seasonId) {
+  if (!queueId) return alert("Main elimination result is missing. Submit it first.");
+  if (!confirm("Approve ALL submitted results and finalize this episode?\n\nThe server will settle every Extra Question, settle the elimination, finalize scoring and roster changes, then prepare the next episode separately. You may leave the page after it starts.")) return;
+  try {
+    const state = await apiAdminFinalizeRealityTvEpisode(queueId);
+    if (!state || state.success === false) {
+      const missing = state && Array.isArray(state.missingResults) ? state.missingResults : [];
+      const suffix = missing.length ? "\n\nMissing results:\n- " + missing.map(function(item) { return item.questionText || item.categoryId || item.episodeQuestionId; }).join("\n- ") : "";
+      throw new Error(adminRealityTvResponseError_(state, "Could not queue episode finalization.") + suffix);
+    }
+    adminRealityTvStartApprovalTicker_(queueId, state, "episode");
+    adminRealityTvStartApprovalPoller_(queueId);
+    await adminRealityTvRefreshSeasonDetails_(seasonId || state.seasonId || "", { focusElementId: "realityTvResultPanel_" + (seasonId || "") });
+    alert("Episode finalization is running automatically. You can leave this page; Resume Approval is no longer required for the normal workflow.");
+  } catch (err) {
+    alert(err && err.message ? err.message : String(err));
+  }
+}
+
 async function adminRealityTvApproveResult(queueId) {
   const existing = ADMIN_REALITY_TV_DASHBOARD && (ADMIN_REALITY_TV_DASHBOARD.seasons || [])
     .flatMap(function(bundle) { return bundle.queue || []; })
@@ -3060,7 +3167,7 @@ async function adminRealityTvResetApproval(queueId) {
   try {
     const state = await apiAdminResetRealityTvApproval(queueId);
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not reset the approval."));
-    alert((state.message || "Approval reset.") + "\n\nSelect Resume Approval to continue.");
+    alert((state.message || "Approval reset.") + "\n\nThe server has requeued the work automatically. Manual Resume remains available only as a recovery tool.");
     if (existing && existing.SeasonId) {
       await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
     } else {

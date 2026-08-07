@@ -1,5 +1,20 @@
 # Production Status
 
+Current candidate: **v1.2.2 set-and-forget Reality TV episode finalizer**
+
+- One master approval settles all submitted Extra Questions and the main elimination.
+- The browser no longer owns normal episode finalization; a server continuation worker does.
+- The current episode becomes FINAL before the next episode is prepared.
+- `RealityNextEpisodeJobs` prepares the next episode separately using the bulk question materializer.
+- Temporary lock / Google Sheets failures automatically retry up to five times.
+- External Results Hub bridge v1.2.1 remains asynchronous and verified.
+- Backend and frontend deployment required; Hub script deployment is not required for v1.2.2.
+- 63 regression test files and 176 JavaScript syntax checks passed before packaging.
+
+---
+
+# Production Status
+
 Current candidate: **v1.2.0 External Results Hub queued bridge**
 
 - Reality TV bulk question materializer from v1.1.18 retained.
