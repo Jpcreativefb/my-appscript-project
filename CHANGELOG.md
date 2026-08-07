@@ -1,4 +1,10 @@
 
+## v1.2.1 — External Results Hub write verification
+- Require read-after-write verification before outbox jobs become COMPLETE.
+- Record exact Hub target and write receipt.
+- Recover v1.2.0 unverified COMPLETE jobs safely.
+- Show configured Hub name and unverified count in Reality TV Manager.
+
 ## v1.2.0 — External Results Hub queued bridge
 
 - Moved Reality TV Hub mirroring out of the approval/request path into `ExternalResultsHubOutbox`.

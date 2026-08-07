@@ -217,6 +217,7 @@ function doGet(e) {
       "adminGetExternalResultsBridgeHealth",
       "adminRunExternalResultsBridgeNow",
       "adminRetryExternalResultsBridgeFailures",
+      "adminRequeueUnverifiedExternalResultsBridgeJobs",
       "adminGetRealityTvDashboard",
       "adminGetRealityTvDashboardSummary",
       "adminGetRealityTvSeasonDetails",
@@ -915,6 +916,10 @@ function doGet(e) {
 
     if (action === "adminRetryExternalResultsBridgeFailures") {
       return json(apiAdminRetryExternalResultsBridgeFailures(params));
+    }
+
+    if (action === "adminRequeueUnverifiedExternalResultsBridgeJobs") {
+      return json(apiAdminRequeueUnverifiedExternalResultsBridgeJobs(params));
     }
 
     if (action === "adminGetRealityTvDashboard") {

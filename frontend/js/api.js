@@ -1674,6 +1674,10 @@ async function apiAdminRetryExternalResultsBridgeFailures() {
   return apiAdminRealityTvRequest_("adminRetryExternalResultsBridgeFailures", {});
 }
 
+async function apiAdminRequeueUnverifiedExternalResultsBridgeJobs() {
+  return apiAdminRealityTvRequest_("adminRequeueUnverifiedExternalResultsBridgeJobs", {});
+}
+
 async function apiAdminGetRealityTvDashboard() {
   return apiAdminRealityTvRequest_("adminGetRealityTvDashboard", {});
 }

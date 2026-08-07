@@ -2416,6 +2416,7 @@ async function renderAdminRealityTvPage() {
             <div class="admin-header-actions">
               <button class="admin-small-button secondary" onclick="adminRealityTvRunHubBridgeNow(this)">Sync Queue Now</button>
               <button class="admin-small-button secondary" onclick="adminRealityTvRetryHubBridge(this)">Retry Failed</button>
+              <button class="admin-small-button secondary" onclick="adminRealityTvRequeueUnverifiedHubBridge(this)">Requeue Unverified</button>
               <button class="admin-small-button" onclick="adminRealityTvConfigureHub()">${res.hubConfigured ? "Change Hub" : "Connect Hub"}</button>
             </div>
           </div>
@@ -2605,6 +2606,7 @@ async function adminRealityTvRefreshHubBridgeHealth_() {
     const queued = Number(health.pendingOutbox || 0);
     const failed = Number(health.failedOutbox || 0);
     const ready = Number(health.readyInbox || 0);
+    const unverified = Number(health.unverifiedComplete || 0);
     const connected = !!health.connected;
     target.className = "admin-message " + (failed ? "error" : connected ? "success" : "warning");
     if (!health.configured) {
@@ -2612,11 +2614,15 @@ async function adminRealityTvRefreshHubBridgeHealth_() {
       return;
     }
     target.textContent = [
-      connected ? "Background bridge connected" : "Hub connection needs attention",
+      connected ? "Background bridge connected to " + (health.spreadsheetName || "configured Hub") : "Hub connection needs attention",
       queued + " queued",
       failed + " failed",
+      unverified + " unverified complete",
       ready + " inbound result" + (ready === 1 ? "" : "s") + " awaiting the next integration phase"
     ].join(" · ") + (health.issues && health.issues.length ? " · " + health.issues[0] : "");
+    if (connected && health.spreadsheetId) {
+      target.title = "Hub spreadsheet ID: " + health.spreadsheetId;
+    }
   } catch (err) {
     target.className = "admin-message error";
     target.textContent = err.message || String(err);
@@ -2652,6 +2658,27 @@ async function adminRealityTvRetryHubBridge(button) {
     await adminRealityTvRunHubBridgeNow(null);
   } catch (err) {
     const target = document.getElementById("realityTvHubBridgeHealth");
+    if (target) {
+      target.className = "admin-message error";
+      target.textContent = err.message || String(err);
+    }
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function adminRealityTvRequeueUnverifiedHubBridge(button) {
+  if (button) button.disabled = true;
+  const target = document.getElementById("realityTvHubBridgeHealth");
+  try {
+    const result = await apiAdminRequeueUnverifiedExternalResultsBridgeJobs();
+    if (!result || result.success === false) throw new Error((result && result.error) || "Could not requeue unverified Hub jobs.");
+    if (target) {
+      target.className = "admin-message";
+      target.textContent = result.message || "Unverified Hub jobs requeued.";
+    }
+    await adminRealityTvRunHubBridgeNow(null);
+  } catch (err) {
     if (target) {
       target.className = "admin-message error";
       target.textContent = err.message || String(err);

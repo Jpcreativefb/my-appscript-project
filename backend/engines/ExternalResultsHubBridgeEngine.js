@@ -17,7 +17,8 @@ const EXTERNAL_RESULTS_BRIDGE_MAX_ATTEMPTS = 5;
 const EXTERNAL_RESULTS_BRIDGE_OUTBOX_HEADERS = [
   "JobId", "JobType", "EntityKey", "Provider", "PayloadJSON", "Status",
   "AttemptCount", "NextAttemptAt", "LastAttemptAt", "CompletedAt",
-  "ErrorMessage", "CreatedAt", "UpdatedAt"
+  "ErrorMessage", "CreatedAt", "UpdatedAt",
+  "TargetSpreadsheetId", "TargetSpreadsheetName", "WriteReceiptJSON", "VerifiedAt"
 ];
 
 const EXTERNAL_RESULTS_BRIDGE_INBOX_HEADERS = [
@@ -174,6 +175,65 @@ function externalResultsBridgeUpsertRows_(ss, sheetName, headers, keyFields, obj
   return { inserted: inserted, updated: updated };
 }
 
+function externalResultsBridgeRequireKey_(object, fields, label) {
+  (fields || []).forEach(function(field) {
+    if (!externalResultsBridgeString_((object || {})[field])) {
+      throw new Error((label || "Hub row") + " is missing required key " + field + ".");
+    }
+  });
+}
+
+function externalResultsBridgeVerifiedUpsert_(ss, sheetName, headers, keyFields, objects) {
+  const usable = (objects || []).filter(Boolean);
+  if (!usable.length) {
+    return { sheetName: sheetName, expected: 0, verified: 0, inserted: 0, updated: 0, keys: [] };
+  }
+  usable.forEach(function(object) {
+    externalResultsBridgeRequireKey_(object, keyFields, sheetName);
+  });
+  const write = externalResultsBridgeUpsertRows_(ss, sheetName, headers, keyFields, usable);
+  SpreadsheetApp.flush();
+  const sheet = ss.getSheetByName(sheetName);
+  const rows = externalResultsBridgeReadObjects_(sheet);
+  const keys = usable.map(function(object) {
+    return keyFields.map(function(field) { return externalResultsBridgeKey_(object[field]); }).join("|");
+  });
+  const existing = {};
+  rows.forEach(function(row) {
+    const key = keyFields.map(function(field) { return externalResultsBridgeKey_(row[field]); }).join("|");
+    if (key) existing[key] = true;
+  });
+  const missing = keys.filter(function(key) { return !existing[key]; });
+  if (missing.length) {
+    throw new Error("Hub write verification failed for " + sheetName + ": " + missing.length + " expected row(s) were not found after write.");
+  }
+  return {
+    sheetName: sheetName,
+    expected: usable.length,
+    verified: usable.length,
+    inserted: Number(write.inserted || 0),
+    updated: Number(write.updated || 0),
+    keys: keys
+  };
+}
+
+function externalResultsBridgeReceipt_(hub, type, writes) {
+  const verifiedRows = (writes || []).reduce(function(total, item) {
+    return total + Number((item || {}).verified || 0);
+  }, 0);
+  if (!verifiedRows) {
+    throw new Error("Hub job produced zero verified rows. The payload was incomplete or no Hub write occurred.");
+  }
+  return {
+    jobType: type,
+    targetSpreadsheetId: hub.getId(),
+    targetSpreadsheetName: hub.getName(),
+    verifiedRows: verifiedRows,
+    writes: writes || [],
+    verifiedAt: new Date()
+  };
+}
+
 function externalResultsBridgeJobId_() {
   return "hub-job-" + Utilities.getUuid().replace(/-/g, "").slice(0, 18);
 }
@@ -248,55 +308,60 @@ function externalResultsBridgeRetryable_(err) {
 function externalResultsBridgeApplyJob_(hub, job) {
   const payload = externalResultsBridgeParseJson_(job.PayloadJSON, {});
   const type = externalResultsBridgeString_(job.JobType).toUpperCase();
+  const writes = [];
   if (type === "UPSERT_EPISODE_BUNDLE") {
-    externalResultsBridgeUpsertRows_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
-      ["Provider", "ExternalEventId"], [payload.event]);
-    externalResultsBridgeUpsertRows_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
-      ["Provider", "ExternalMarketId"], [payload.market]);
-    externalResultsBridgeUpsertRows_(hub, "ExternalSubjects", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalSubjects,
-      ["Provider", "ExternalSubjectId"], payload.subjects || []);
-    externalResultsBridgeUpsertRows_(hub, "AppMappings", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.AppMappings,
-      ["MappingId"], payload.mappings || []);
-    return;
+    externalResultsBridgeRequireKey_(payload.event, ["Provider", "ExternalEventId"], "Episode event");
+    externalResultsBridgeRequireKey_(payload.market, ["Provider", "ExternalMarketId"], "Episode market");
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
+      ["Provider", "ExternalEventId"], [payload.event]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
+      ["Provider", "ExternalMarketId"], [payload.market]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalSubjects", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalSubjects,
+      ["Provider", "ExternalSubjectId"], payload.subjects || []));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "AppMappings", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.AppMappings,
+      ["MappingId"], payload.mappings || []));
+    return externalResultsBridgeReceipt_(hub, type, writes);
   }
   if (type === "UPSERT_EPISODE_SCHEDULE") {
-    externalResultsBridgeUpsertRows_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
-      ["Provider", "ExternalEventId"], [payload.event]);
-    externalResultsBridgeUpsertRows_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
-      ["Provider", "ExternalMarketId"], [payload.market]);
-    return;
+    externalResultsBridgeRequireKey_(payload.event, ["Provider", "ExternalEventId"], "Episode event");
+    externalResultsBridgeRequireKey_(payload.market, ["Provider", "ExternalMarketId"], "Episode market");
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
+      ["Provider", "ExternalEventId"], [payload.event]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
+      ["Provider", "ExternalMarketId"], [payload.market]));
+    return externalResultsBridgeReceipt_(hub, type, writes);
   }
   if (type === "CREATE_RESULT_REVIEW") {
-    externalResultsBridgeUpsertRows_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults,
-      ["ImportedResultId"], [payload.importedResult]);
-    externalResultsBridgeUpsertRows_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue,
-      ["ReviewId"], [payload.review]);
-    return;
+    externalResultsBridgeRequireKey_(payload.importedResult, ["ImportedResultId"], "Imported result");
+    externalResultsBridgeRequireKey_(payload.review, ["ReviewId"], "Review row");
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults,
+      ["ImportedResultId"], [payload.importedResult]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue,
+      ["ReviewId"], [payload.review]));
+    return externalResultsBridgeReceipt_(hub, type, writes);
   }
   if (type === "UPDATE_REVIEW") {
     if (payload.review) {
-      const reviewSheet = externalResultsBridgeEnsureSheet_(
-        hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue
-      );
+      externalResultsBridgeRequireKey_(payload.review, ["ReviewId"], "Review update");
+      const reviewSheet = externalResultsBridgeEnsureSheet_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue);
       const reviewExists = externalResultsBridgeReadObjects_(reviewSheet).some(function(row) {
         return externalResultsBridgeKey_(row.ReviewId) === externalResultsBridgeKey_(payload.review.ReviewId);
       });
       if (!reviewExists) throw new Error("Hub dependency not ready: ReviewQueue row has not been created yet.");
-      externalResultsBridgeUpsertRows_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue,
-        ["ReviewId"], [payload.review]);
+      writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue,
+        ["ReviewId"], [payload.review]));
     }
     if (payload.importedResult) {
-      const resultSheet = externalResultsBridgeEnsureSheet_(
-        hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults
-      );
+      externalResultsBridgeRequireKey_(payload.importedResult, ["ImportedResultId"], "Imported result update");
+      const resultSheet = externalResultsBridgeEnsureSheet_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults);
       const resultExists = externalResultsBridgeReadObjects_(resultSheet).some(function(row) {
         return externalResultsBridgeKey_(row.ImportedResultId) === externalResultsBridgeKey_(payload.importedResult.ImportedResultId);
       });
       if (!resultExists) throw new Error("Hub dependency not ready: ImportedResults row has not been created yet.");
-      externalResultsBridgeUpsertRows_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults,
-        ["ImportedResultId"], [payload.importedResult]);
+      writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults,
+        ["ImportedResultId"], [payload.importedResult]));
     }
-    return;
+    return externalResultsBridgeReceipt_(hub, type, writes);
   }
   throw new Error("Unsupported External Results Hub job type: " + type);
 }
@@ -330,10 +395,17 @@ function externalResultsProcessHubOutbox() {
         ErrorMessage: "", UpdatedAt: new Date()
       });
       try {
-        externalResultsBridgeApplyJob_(hub, job);
+        const receipt = externalResultsBridgeApplyJob_(hub, job);
+        if (!receipt || !Number(receipt.verifiedRows || 0)) {
+          throw new Error("Hub write verification did not return a valid receipt.");
+        }
         externalResultsBridgeUpdateRow_(sheet, job.__rowNumber, {
           Status: "COMPLETE", CompletedAt: new Date(), NextAttemptAt: "",
-          ErrorMessage: "", UpdatedAt: new Date()
+          ErrorMessage: "", UpdatedAt: new Date(),
+          TargetSpreadsheetId: receipt.targetSpreadsheetId || hubId,
+          TargetSpreadsheetName: receipt.targetSpreadsheetName || hub.getName(),
+          WriteReceiptJSON: JSON.stringify(receipt),
+          VerifiedAt: receipt.verifiedAt || new Date()
         });
         completed += 1;
       } catch (err) {
@@ -374,6 +446,7 @@ function externalResultsBridgeHealth_() {
   const hubId = externalResultsBridgeGetHubId_();
   const issues = [];
   let hubName = "";
+  let hubRowCounts = {};
   if (hubId) {
     try {
       const hub = SpreadsheetApp.openById(hubId);
@@ -384,6 +457,7 @@ function externalResultsBridgeHealth_() {
           issues.push("Missing Hub sheet: " + sheetName);
           return;
         }
+        hubRowCounts[sheetName] = Math.max(0, sheet.getLastRow() - 1);
         const headers = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0]
           .map(externalResultsBridgeString_);
         EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS[sheetName].forEach(function(header) {
@@ -411,9 +485,42 @@ function externalResultsBridgeHealth_() {
     readyInbox: inbox.filter(function(row) {
       return externalResultsBridgeString_(row.Status).toUpperCase() === "READY";
     }).length,
+    unverifiedComplete: outbox.filter(function(row) {
+      return externalResultsBridgeString_(row.Status).toUpperCase() === "COMPLETE" &&
+        (!row.VerifiedAt || !externalResultsBridgeString_(row.WriteReceiptJSON));
+    }).length,
+    hubRowCounts: hubRowCounts,
+    lastVerifiedJob: outbox.filter(function(row) {
+      return externalResultsBridgeString_(row.Status).toUpperCase() === "COMPLETE" && !!row.VerifiedAt;
+    }).sort(function(a, b) {
+      return new Date(b.VerifiedAt || 0).getTime() - new Date(a.VerifiedAt || 0).getTime();
+    })[0] || null,
     issues: issues,
     checkedAt: new Date()
   };
+}
+
+function apiAdminRequeueUnverifiedExternalResultsBridgeJobs(payload) {
+  requireAdmin_(payload || {});
+  externalResultsBridgeEnsureSystem_();
+  const hubId = externalResultsBridgeGetHubId_();
+  if (!hubId) throw new Error("External Results Hub is not configured.");
+  const sheet = SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET);
+  let reset = 0;
+  externalResultsBridgeReadObjects_(sheet).forEach(function(row) {
+    const complete = externalResultsBridgeString_(row.Status).toUpperCase() === "COMPLETE";
+    const verified = !!row.VerifiedAt && !!externalResultsBridgeString_(row.WriteReceiptJSON) &&
+      externalResultsBridgeKey_(row.TargetSpreadsheetId) === externalResultsBridgeKey_(hubId);
+    if (!complete || verified) return;
+    externalResultsBridgeUpdateRow_(sheet, row.__rowNumber, {
+      Status: "QUEUED", NextAttemptAt: "", CompletedAt: "", ErrorMessage: "",
+      TargetSpreadsheetId: "", TargetSpreadsheetName: "", WriteReceiptJSON: "", VerifiedAt: "",
+      UpdatedAt: new Date()
+    });
+    reset += 1;
+  });
+  if (reset) externalResultsBridgeSchedule_();
+  return { success: true, reset: reset, message: reset + " unverified completed Hub job(s) requeued." };
 }
 
 function apiAdminSetupExternalResultsBridge(payload) {
