@@ -36,12 +36,12 @@ assert.strictEqual(frontendApi, frontendApiCompat, 'Frontend API copies must mat
 assert(ui.includes('Approve All &amp; Finalize Episode'), 'Master finalization button is missing');
 assert(ui.includes('Working automatically.'), 'UI must tell the admin the server owns the job');
 assert(ui.includes('You may leave this page'), 'Set-and-forget guidance is missing');
-assert(ui.includes('Recovery tools — only if marked stalled'), 'Reset/Resume must be demoted to recovery tools');
+assert(ui.includes('Emergency recovery — normally not needed'), 'Recovery controls must be demoted to emergency-only tools');
 assert(ui.includes('adminRealityTvStartApprovalPoller_(item.QueueId)'), 'Reopened approving episodes should resume read-only progress polling');
 assert(ui.includes('This is separate from the finalized episode. You do not need to keep this page open.'), 'Separate next-episode status UI is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1230-reality-tv-hub-complete-mirror"'), 'Finalizer cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1240-durable-reality-approval"'), 'Finalizer cache version is missing');
 assert.strictEqual(app, appCompat, 'App loader copies must match');
-assert(html.includes('hotfix=v1230-reality-tv-hub-complete-mirror'), 'App shell must load the finalizer cache version');
+assert(html.includes('hotfix=v1240-durable-reality-approval'), 'App shell must load the finalizer cache version');
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
 vm.createContext(runtime);
@@ -51,10 +51,12 @@ runtime.realityTvLatestQuestionBuildStateForSeason_ = () => null;
 runtime.realityTvLatestCompletedQuestionBuildStateForSeason_ = () => null;
 const progress = runtime.realityTvApprovalProgress_({
   ReviewStatus: 'APPROVING', ApprovalStage: 'SETTLE_QUESTIONS', PushStatus: 'SETTLING EXTRA RESULTS',
+  ApprovalQuestionQueueIdsJSON: JSON.stringify(['q1','q2','q3','q4']),
+  ApprovalQuestionCompletedCount: 1, ApprovalQuestionTotalCount: 4,
   ApprovalStartedAt: new Date(Date.now() - 5000), ApprovalStageStartedAt: new Date(Date.now() - 3000), ApprovalHeartbeatAt: new Date()
 });
-assert.strictEqual(progress.label, 'Settling all Extra Question results');
-assert(progress.percent > 0 && progress.percent < 50, 'Extra Question batch settlement should be the first visible phase');
+assert(progress.label.includes('1 of 4'), 'Extra Question settlement should expose durable per-question progress');
+assert(progress.percent > 0 && progress.percent < 50, 'Extra Question settlement should be the first visible phase');
 
 const jobState = runtime.realityTvNextEpisodeJobState_({
   JobId: 'j1', SeasonId: 's1', SourceEpisodeId: 'e1', TargetEpisodeNumber: 2,

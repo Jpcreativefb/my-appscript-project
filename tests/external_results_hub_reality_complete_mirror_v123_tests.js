@@ -62,9 +62,9 @@ assert(bridge.includes('realityTv: realityTv'), 'Reality TV Hub health must be e
 assert(ui.includes('Repair / Retry Failed'), 'Hub repair/retry control is missing');
 assert(ui.includes('realityTvHubMirrorStatus'), 'Reality TV Hub mirror status area is missing');
 assert(ui.includes('Hub mirror complete'), 'Hub mirror completion label is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1230-reality-tv-hub-complete-mirror"'), 'v1.2.3 route cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1240-durable-reality-approval"'), 'v1.2.3 route cache version is missing');
 assert.strictEqual(app, appCompat, 'Both app-loader copies must match');
-assert(html.includes('hotfix=v1230-reality-tv-hub-complete-mirror'), 'App shell must load the v1.2.3 Reality TV Hub route');
+assert(html.includes('hotfix=v1240-durable-reality-approval'), 'App shell must load the v1.2.3 Reality TV Hub route');
 
 const context = { console, JSON, String, Array, Object, Date };
 vm.createContext(context);

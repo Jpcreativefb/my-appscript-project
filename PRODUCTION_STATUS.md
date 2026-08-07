@@ -1,5 +1,21 @@
 # Production Status
 
+Current candidate: **v1.2.4 durable Reality TV approval watchdog**
+
+- One Extra Question settles per durable server pass, with a checkpoint saved after every question.
+- A separate score-recalculation stage runs after all Extra Questions are settled.
+- Fast ~10-second continuation is backed by a persistent one-minute watchdog.
+- Killed Apps Script executions are automatically reclaimed from their last durable checkpoint.
+- Legacy stalled v1.2.2/v1.2.3 approvals self-upgrade when their status is polled after deployment.
+- Reset/Resume is no longer part of normal operation; **Force Recovery** is emergency-only.
+- Current episode finalization remains independent of next-episode preparation and External Results Hub work.
+- Backend and frontend deployment required; separate Hub Apps Script deployment is not required.
+- 65 regression test files and 178 JavaScript syntax checks passed before packaging.
+
+---
+
+# Production Status
+
 Current candidate: **v1.2.3 External Results Hub Reality TV complete mirror**
 
 - Every built Reality TV Extra Question mirrors to the Hub as a separate market with verified mappings.

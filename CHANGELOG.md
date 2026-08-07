@@ -1,3 +1,15 @@
+## v1.2.4 — Durable Reality TV approval watchdog
+
+- Replaced all-at-once Extra Question settlement with one durable question per worker pass.
+- Added persisted Extra Question completed/total/current-question checkpoints.
+- Added a separate `SCORE_QUESTIONS` stage so score recalculation cannot hide inside the settlement batch.
+- Added a fast ~10-second continuation trigger backed by a persistent one-minute watchdog.
+- Stale APPROVING rows are automatically reclaimed instead of disappearing from the server work queue.
+- Approval freshness now uses the approval heartbeat rather than unrelated row updates.
+- Reopening a legacy stalled v1.2.2/v1.2.3 approval upgrades and requeues it automatically; no Reset is required.
+- Next-episode continuation also uses a persistent watchdog and one durable stage per invocation.
+- Recovery controls are emergency-only; normal workflow remains one-click and set-and-forget.
+
 ## v1.2.3 — External Results Hub Reality TV complete mirror
 
 - Mirrors every built Reality TV Extra Question as its own verified Hub market with answer mappings.

@@ -157,6 +157,7 @@ function adminRealityTvApprovalStepDefinitions_(kind, stage) {
   }
   return [
     { id: "SETTLE_QUESTIONS", label: "Settle Extra Questions" },
+    { id: "SCORE_QUESTIONS", label: "Score episode" },
     { id: "SETTLE", label: "Settle elimination" },
     { id: "FINALIZE_CURRENT", label: "Finalize episode" },
     { id: "COMPLETE", label: "Episode Final" }
@@ -192,8 +193,16 @@ function adminRealityTvApprovalProgressData_(source, kind) {
       else if (stage === "SYNC_HUB") { percent = 82; label = "Finalizing question approval"; detail = "Saving the final approval record."; eta = 10; }
       else { percent = 100; label = "Question approval complete"; detail = "This result is ready."; eta = 0; }
     } else {
-      if (stage === "SETTLE_QUESTIONS") { percent = pushStatus === "SETTLING EXTRA RESULTS" ? 24 : 12; label = "Settling all Extra Question results"; detail = "Applying all submitted Extra Question results automatically."; eta = 35; }
-      else if (stage === "SETTLE") { percent = pushStatus === "SETTLING EPISODE" ? 58 : 50; label = "Settling elimination result"; detail = "Scoring the elimination and updating the active roster."; eta = 30; }
+      if (stage === "SETTLE_QUESTIONS") {
+        const done = Number(source.settledQuestionDone || source.ApprovalQuestionCompletedCount || 0);
+        const total = Number(source.settledQuestionTotal || source.ApprovalQuestionTotalCount || 0);
+        percent = total ? 10 + Math.round((Math.min(done, total) / total) * 32) : 10;
+        label = total ? "Settling Extra Questions " + done + " of " + total : "Settling Extra Questions";
+        detail = "One result is settled per server pass with a durable checkpoint after each question.";
+        eta = 0;
+      }
+      else if (stage === "SCORE_QUESTIONS") { percent = 46; label = "Recalculating episode scores"; detail = "All Extra Questions are settled. Recalculating the episode score once."; eta = 0; }
+      else if (stage === "SETTLE") { percent = pushStatus === "SETTLING EPISODE" ? 62 : 55; label = "Settling elimination result"; detail = "Scoring the elimination and updating the active roster."; eta = 0; }
       else if (stage === "FINALIZE_CURRENT") { percent = 88; label = "Finalizing current episode"; detail = "Saving the final episode record and queuing the next episode separately."; eta = 12; }
       else if (stage === "BUILD_NEXT") { percent = 45; label = "Creating the next episode"; detail = "Creating the episode and main elimination question."; eta = 45; }
       else if (stage === "BUILD_QUESTIONS") {
@@ -237,7 +246,7 @@ function adminRealityTvApprovalProgressHtml_(source, kind) {
     ? "Waiting in approval queue"
     : progress.percent >= 100
     ? "Complete"
-    : (progress.estimatedRemainingSeconds > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(progress.estimatedRemainingSeconds) : "Estimating remaining time…");
+    : (progress.estimatedRemainingSeconds > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(progress.estimatedRemainingSeconds) : "Server watchdog active");
   return `
     <div id="realityTvApprovalProgress_${adminRealityTvEscape_(progress.queueId)}" class="reality-tv-approval-progress${progress.stalled ? " is-stalled" : ""}" data-approval-kind="${adminRealityTvEscape_(progress.kind)}">
       <div class="reality-tv-approval-progress-head">
@@ -249,13 +258,13 @@ function adminRealityTvApprovalProgressHtml_(source, kind) {
       </div>
       <div class="reality-tv-approval-progress-detail" data-role="approval-detail">${adminRealityTvEscape_(progress.detail)}</div>
       <div class="reality-tv-approval-progress-time">
-        <span data-role="approval-elapsed">Elapsed: ${adminRealityTvFormatDuration_(progress.elapsedSeconds)}</span>
+        <span data-role="approval-elapsed">Total elapsed: ${adminRealityTvFormatDuration_(progress.elapsedSeconds)}</span>
         <span data-role="approval-eta">${adminRealityTvEscape_(etaText)}</span>
         <span data-role="approval-heartbeat">Last checkpoint: ${adminRealityTvFormatDuration_(progress.heartbeatAgeSeconds)} ago</span>
       </div>
       <div class="reality-tv-approval-steps" data-role="approval-steps">${stepHtml}</div>
       <div class="admin-message warning reality-tv-approval-stalled" data-role="approval-stalled"${progress.stalled ? "" : " hidden"}>
-        No new checkpoint has been saved for more than two minutes. This approval may be stalled; use Reset Stuck Approval, then Resume Approval.
+        No new checkpoint has been saved for more than two minutes. The server watchdog will reclaim this stage automatically. Do not Reset or Resume during normal processing.
       </div>
     </div>
   `;
@@ -305,7 +314,7 @@ function adminRealityTvUpdateApprovalProgress_(queueId, source, kind, options) {
   if (labelEl) labelEl.textContent = label;
   if (percentEl) percentEl.textContent = Math.round(percent) + "%";
   if (detailEl) detailEl.textContent = detail;
-  if (elapsedEl) elapsedEl.textContent = "Elapsed: " + adminRealityTvFormatDuration_(elapsed);
+  if (elapsedEl) elapsedEl.textContent = "Total elapsed: " + adminRealityTvFormatDuration_(elapsed);
   if (etaEl) etaEl.textContent = progress.waiting
     ? "Waiting in approval queue"
     : (percent >= 100 ? "Complete" : (eta > 0 ? "Estimated remaining: about " + adminRealityTvFormatDuration_(eta) : "Taking longer than estimated — still working"));
@@ -1754,12 +1763,13 @@ function adminRealityTvResultPanel_(bundle) {
 
     const reviewStatus = String(pending.ReviewStatus || "PENDING").toUpperCase();
     const isApproving = reviewStatus === "APPROVING";
+    const approvalProgress = adminRealityTvApprovalProgressData_(pending, "episode");
     return `
       <div id="realityTvResultPanel_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-review-card">
         <div class="reality-tv-review-header">
           <div>
             <strong>${isApproving ? "Approval in progress" : "Administrator approval required"}</strong>
-            <div class="admin-sub">${adminRealityTvEscape_(episode.EpisodeName)} result ${isApproving ? "can be resumed safely" : "is pending"}.</div>
+            <div class="admin-sub">${adminRealityTvEscape_(episode.EpisodeName)} result ${isApproving ? "is being finalized by the server watchdog" : "is pending"}.</div>
           </div>
           <span class="reality-tv-status-pill ${isApproving ? "review" : "pending"}">${adminRealityTvEscape_(reviewStatus)}</span>
         </div>
@@ -1773,16 +1783,20 @@ function adminRealityTvResultPanel_(bundle) {
         ${adminRealityTvApprovalProgressHtml_(pending, "episode")}
         <div class="admin-message ${finalizeReadiness.ready ? "success" : "warning"}">
           <b>Episode result check:</b> ${adminRealityTvEscape_(finalizeReadiness.finalCount + finalizeReadiness.pendingCount)} of ${adminRealityTvEscape_(finalizeReadiness.total)} Extra Question results are ready.
-          ${finalizeReadiness.missing.length ? `<div>${adminRealityTvEscape_(finalizeReadiness.missing.length)} still need a result or Push before the episode can be finalized.</div>` : `<div>All Extra Question results are ready for one-click finalization.</div>`}
+          ${finalizeReadiness.missing.length
+            ? `<div>${adminRealityTvEscape_(finalizeReadiness.missing.length)} still need a result or Push before the episode can be finalized.</div>`
+            : (isApproving
+                ? `<div>All Extra Question results were received. The server is settling them automatically; no additional approval is required.</div>`
+                : `<div>All Extra Question results are ready for one-click finalization.</div>`)}
         </div>
-        ${isApproving ? `<div class="admin-message info"><b>Working automatically.</b> You may leave this page. The server will continue without Resume Approval.</div>` : ""}
+        ${isApproving ? `<div class="admin-message info"><b>Working automatically.</b> You may leave this page. A persistent server watchdog continues the job and saves a checkpoint after each Extra Question.</div>` : ""}
         <div class="admin-actions">
           ${isApproving
             ? `<button class="button admin-button" disabled>Finalizing automatically…</button>`
             : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve All &amp; Finalize Episode</button>`}
           ${!isApproving ? `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject Main Result</button>` : ""}
         </div>
-        ${isApproving ? `<details class="reality-tv-recovery-tools"><summary>Recovery tools — only if marked stalled</summary><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Reset Stuck Approval</button><button class="admin-small-button secondary" onclick="adminRealityTvApproveResult('${adminRealityTvEscape_(pending.QueueId)}')">Resume Manually</button></div></details>` : ""}
+        ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than five minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
       </div>
     `;
   }
@@ -3167,7 +3181,7 @@ async function adminRealityTvApproveResult(queueId) {
   } catch (err) {
     adminRealityTvStopApprovalPoller_(queueId);
     adminRealityTvStopApprovalTicker_(queueId);
-    alert((err && err.message ? err.message : String(err)) + "\n\nUse Resume Approval. The staged process is safe to retry.");
+    alert((err && err.message ? err.message : String(err)) + "\n\nThe server watchdog will keep retrying durable stages automatically. Use Force Recovery only if the saved checkpoint remains stale for more than five minutes.");
     if (existing && existing.SeasonId) {
       try { await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId }); }
       catch (refreshErr) { navigate("admin-reality-tv", { suppressLoader: true }); }
@@ -3186,7 +3200,7 @@ async function adminRealityTvResetApproval(queueId) {
   try {
     const state = await apiAdminResetRealityTvApproval(queueId);
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not reset the approval."));
-    alert((state.message || "Approval reset.") + "\n\nThe server has requeued the work automatically. Manual Resume remains available only as a recovery tool.");
+    alert((state.message || "Approval reset.") + "\n\nThe server has requeued the work automatically. No manual Resume step is required.");
     if (existing && existing.SeasonId) {
       await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
     } else {
