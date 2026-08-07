@@ -1,0 +1,18 @@
+External Results Hub Reality TV complete mirror v1.2.3
+
+backend/engines/ExternalResultsHubBridgeEngine.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/js/pages/adminRealityTv.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+tests/external_results_hub_bridge_v1200_tests.js
+tests/external_results_hub_bridge_verification_v1210_tests.js
+tests/reality_tv_episode_finalizer_v122_tests.js
+tests/external_results_hub_reality_complete_mirror_v123_tests.js
+CHANGELOG.md
+PRODUCTION_STATUS.md
+PRODUCTION_EXTERNAL_RESULTS_HUB_REALITY_TV_COMPLETE_MIRROR_V1_2_3.md
+PRODUCTION_SMOKE_TEST_V1_2_3.md
+CHANGED_FILES_V1_2_3.txt

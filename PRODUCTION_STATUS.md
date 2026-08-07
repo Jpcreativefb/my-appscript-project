@@ -1,5 +1,23 @@
 # Production Status
 
+Current candidate: **v1.2.3 External Results Hub Reality TV complete mirror**
+
+- Every built Reality TV Extra Question mirrors to the Hub as a separate market with verified mappings.
+- Extra Question result submission and approval now use only the verified local outbox; no synchronous Hub spreadsheet calls remain in those paths.
+- Review updates wait for their matching create dependency without burning retry attempts.
+- Main elimination and Extra Question markets receive resolution updates after local approval.
+- Episode schedule changes propagate to all Hub markets for that episode.
+- Removed Extra Questions deactivate stale Hub mappings/markets rather than leaving them active.
+- Reality TV Manager shows current-episode Hub mirror completeness.
+- `Repair / Retry Failed` retries valid jobs and archives only irreparable legacy dependency errors.
+- Automatic inbound settlement remains disabled.
+- Awards App backend and frontend deployment required; separate Hub Apps Script deployment is not required.
+- 64 regression test files and 177 JavaScript syntax checks passed before packaging.
+
+---
+
+# Production Status
+
 Current candidate: **v1.2.2 set-and-forget Reality TV episode finalizer**
 
 - One master approval settles all submitted Extra Questions and the main elimination.

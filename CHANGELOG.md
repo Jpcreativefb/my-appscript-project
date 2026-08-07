@@ -1,3 +1,13 @@
+## v1.2.3 — External Results Hub Reality TV complete mirror
+
+- Mirrors every built Reality TV Extra Question as its own verified Hub market with answer mappings.
+- Removed the remaining synchronous Hub writes from Extra Question submission and approval.
+- Added create-before-update dependency ordering so review updates cannot outrun their result/review creation.
+- Added main elimination market resolution updates and schedule propagation to every episode market.
+- Deactivates stale supplemental markets/mappings after episode-only question removal.
+- Added per-season Reality TV Hub mirror health and smarter Repair / Retry Failed handling.
+- Automatic Hub-to-App inbox settlement remains disabled for the next controlled phase.
+
 ## v1.2.2 — Set-and-forget Reality TV episode finalization
 
 - Added one-click **Approve All & Finalize Episode** for the current episode.

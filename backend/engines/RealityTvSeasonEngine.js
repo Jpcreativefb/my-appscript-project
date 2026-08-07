@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV SEASON MANAGER
-   Production v1.2.2
+   Production v1.2.3
 ========================= */
 
 const REALITY_TV_SEASONS_SHEET = "RealitySeasons";
@@ -916,6 +916,26 @@ function realityTvSyncEpisodeScheduleToHub_(season, episode) {
   const status = realityTvKey_(episode.ScheduleStatus || episode.Status || "scheduled") === "tba"
     ? "delayed"
     : realityTvString_(episode.ScheduleStatus || episode.Status || "scheduled").toLowerCase();
+  const supplementalMarkets = typeof realityTvEpisodeQuestionsForSeason_ === "function"
+    ? realityTvEpisodeQuestionsForSeason_(season.SeasonId).filter(function(row) {
+        return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId);
+      }).map(function(row) {
+        return {
+          Provider: "manual-reality-tv",
+          ExternalMarketId: row.ExternalMarketId,
+          ExternalEventId: episode.ExternalEventId,
+          ClosingTime: episode.LockDateTime || "",
+          LastUpdated: now,
+          RawJSON: JSON.stringify({
+            seasonId: season.SeasonId,
+            episodeId: episode.EpisodeId,
+            episodeQuestionId: row.EpisodeQuestionId,
+            questionType: row.QuestionType,
+            scheduleStatus: episode.ScheduleStatus || "SCHEDULED"
+          })
+        };
+      })
+    : [];
   return externalResultsBridgeEnqueue_(
     "UPSERT_EPISODE_SCHEDULE",
     episode.ExternalEventId || episode.EpisodeId,
@@ -951,7 +971,8 @@ function realityTvSyncEpisodeScheduleToHub_(season, episode) {
           episodeId: episode.EpisodeId,
           scheduleStatus: episode.ScheduleStatus || "SCHEDULED"
         })
-      }
+      },
+      markets: supplementalMarkets
     }
   );
 }
@@ -3776,6 +3797,42 @@ function realityTvBuildNextEpisodeAfterApproval_(season, episode, onCheckpoint) 
   return { nextEpisode: nextEpisode, remainingCount: remaining.length };
 }
 
+function realityTvQueueMainMarketResolution_(season, episode, queue) {
+  if (!realityTvGetHubId_() || typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { success: false, skipped: true };
+  }
+  const selectedIds = realityTvParseJson_(queue.SelectedContestantIds || "[]", []).map(realityTvKey_);
+  const contestants = realityTvContestantsForSeason_(season.SeasonId);
+  const selectedNames = contestants.filter(function(row) {
+    return selectedIds.indexOf(realityTvKey_(row.ContestantId)) !== -1;
+  }).map(function(row) { return row.Name; });
+  const outcomeType = realityTvKey_(queue.OutcomeType);
+  const winningOutcome = outcomeType === "no-elimination" ? "NO ELIMINATION" : selectedNames.join(", ");
+  const now = new Date();
+  return externalResultsBridgeEnqueue_(
+    "UPSERT_MARKET_RESOLUTION",
+    episode.ExternalMarketId,
+    "manual-reality-tv",
+    {
+      market: {
+        Provider: "manual-reality-tv",
+        ExternalMarketId: episode.ExternalMarketId,
+        ExternalEventId: episode.ExternalEventId,
+        ResolutionStatus: "resolved",
+        WinningOutcome: winningOutcome,
+        ResolutionSource: "manual-reality-tv",
+        LastUpdated: now,
+        RawJSON: JSON.stringify({
+          seasonId: season.SeasonId,
+          episodeId: episode.EpisodeId,
+          outcomeType: queue.OutcomeType || "elimination",
+          winnerContestantIds: selectedIds
+        })
+      }
+    }
+  );
+}
+
 function realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode) {
   const warnings = [];
   if (realityTvGetHubId_()) {
@@ -3783,6 +3840,9 @@ function realityTvSyncApprovalHub_(season, episode, queue, reviewer, nextEpisode
   } else {
     return { warning: "" };
   }
+
+  const resolutionSync = realityTvQueueMainMarketResolution_(season, episode, queue);
+  if (resolutionSync && resolutionSync.error) warnings.push(resolutionSync.error);
 
   if (nextEpisode) {
     const contestants = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {

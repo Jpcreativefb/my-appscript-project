@@ -1,6 +1,6 @@
 /* =====================================================
-   EXTERNAL RESULTS HUB BRIDGE — PHASE 1
-   Production v1.2.0
+   EXTERNAL RESULTS HUB BRIDGE — REALITY TV COMPLETE MIRROR
+   Production v1.2.3
 
    The Awards App remains authoritative. Local game actions
    only enqueue Hub work. A separate trigger performs the
@@ -305,6 +305,208 @@ function externalResultsBridgeRetryable_(err) {
   return /service spreadsheets|internal error|timed out|please try again|lock timeout|holding the lock|dependency not ready/i.test(message);
 }
 
+
+function externalResultsBridgeBool_(value) {
+  return value === true || ["true", "yes", "1", "on"].indexOf(externalResultsBridgeKey_(value)) !== -1;
+}
+
+function externalResultsBridgeJobPriority_(job) {
+  const type = externalResultsBridgeString_((job || {}).JobType).toUpperCase();
+  if (type === "UPSERT_EPISODE_BUNDLE") return 10;
+  if (type === "UPSERT_REALITY_QUESTION_PACK") return 20;
+  if (type === "UPSERT_EPISODE_SCHEDULE") return 30;
+  if (type === "UPSERT_MARKET_RESOLUTION") return 35;
+  if (type === "CREATE_RESULT_REVIEW") return 40;
+  if (type === "UPDATE_REVIEW") return 50;
+  return 100;
+}
+
+function externalResultsBridgeFindCreateDependency_(jobs, updateJob) {
+  const payload = externalResultsBridgeParseJson_((updateJob || {}).PayloadJSON, {});
+  const reviewId = externalResultsBridgeKey_((payload.review || {}).ReviewId);
+  const importedResultId = externalResultsBridgeKey_((payload.importedResult || {}).ImportedResultId || (payload.review || {}).ImportedResultId);
+  return (jobs || []).find(function(candidate) {
+    if (externalResultsBridgeString_(candidate.JobType).toUpperCase() !== "CREATE_RESULT_REVIEW") return false;
+    const createPayload = externalResultsBridgeParseJson_(candidate.PayloadJSON, {});
+    const candidateReview = externalResultsBridgeKey_((createPayload.review || {}).ReviewId);
+    const candidateResult = externalResultsBridgeKey_((createPayload.importedResult || {}).ImportedResultId);
+    return (!!reviewId && candidateReview === reviewId) || (!!importedResultId && candidateResult === importedResultId);
+  }) || null;
+}
+
+function externalResultsBridgeHubHasReviewDependency_(hub, payload) {
+  const review = payload && payload.review || null;
+  const importedResult = payload && payload.importedResult || null;
+  let reviewReady = !review;
+  let resultReady = !importedResult;
+  if (review) {
+    const sheet = externalResultsBridgeEnsureSheet_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue);
+    reviewReady = externalResultsBridgeReadObjects_(sheet).some(function(row) {
+      return externalResultsBridgeKey_(row.ReviewId) === externalResultsBridgeKey_(review.ReviewId);
+    });
+  }
+  if (importedResult) {
+    const sheet = externalResultsBridgeEnsureSheet_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults);
+    resultReady = externalResultsBridgeReadObjects_(sheet).some(function(row) {
+      return externalResultsBridgeKey_(row.ImportedResultId) === externalResultsBridgeKey_(importedResult.ImportedResultId);
+    });
+  }
+  return reviewReady && resultReady;
+}
+
+function externalResultsBridgeDependencyState_(hub, allJobs, job) {
+  if (externalResultsBridgeString_(job.JobType).toUpperCase() !== "UPDATE_REVIEW") {
+    return { ready: true };
+  }
+  const payload = externalResultsBridgeParseJson_(job.PayloadJSON, {});
+  if (externalResultsBridgeHubHasReviewDependency_(hub, payload)) return { ready: true, alreadyInHub: true };
+  const createJob = externalResultsBridgeFindCreateDependency_(allJobs, job);
+  if (!createJob) {
+    return {
+      ready: false,
+      orphan: true,
+      message: "Legacy Hub dependency missing: no matching CREATE_RESULT_REVIEW job or Hub review row exists."
+    };
+  }
+  const createStatus = externalResultsBridgeString_(createJob.Status).toUpperCase();
+  if (createStatus === "COMPLETE") {
+    return { ready: true, createJob: createJob };
+  }
+  return {
+    ready: false,
+    createJob: createJob,
+    dependencyStatus: createStatus,
+    message: "Waiting for CREATE_RESULT_REVIEW " + createJob.JobId + " before applying this review update."
+  };
+}
+
+function externalResultsBridgeDeactivateStaleRealityQuestionPack_(hub, payload) {
+  if (!payload || !payload.replaceQuestionPack) return { markets: 0, mappings: 0 };
+  const provider = externalResultsBridgeKey_((payload.event || {}).Provider || "manual-reality-tv");
+  const eventId = externalResultsBridgeKey_((payload.event || {}).ExternalEventId || payload.externalEventId);
+  if (!eventId) return { markets: 0, mappings: 0 };
+  const activeMarkets = {};
+  (payload.markets || []).forEach(function(row) {
+    activeMarkets[externalResultsBridgeKey_(row.ExternalMarketId)] = true;
+  });
+  const activeMappings = {};
+  (payload.mappings || []).forEach(function(row) {
+    activeMappings[externalResultsBridgeKey_(row.MappingId)] = true;
+  });
+  const mainMarketId = externalResultsBridgeKey_(payload.mainExternalMarketId);
+  let deactivatedMarkets = 0;
+  let deactivatedMappings = 0;
+
+  const marketSheet = externalResultsBridgeEnsureSheet_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets);
+  externalResultsBridgeReadObjects_(marketSheet).forEach(function(row) {
+    if (externalResultsBridgeKey_(row.Provider) !== provider || externalResultsBridgeKey_(row.ExternalEventId) !== eventId) return;
+    const marketId = externalResultsBridgeKey_(row.ExternalMarketId);
+    if (!marketId || marketId === mainMarketId || activeMarkets[marketId]) return;
+    const raw = externalResultsBridgeParseJson_(row.RawJSON, {});
+    if (!raw || !raw.episodeQuestionId) return;
+    externalResultsBridgeUpdateRow_(marketSheet, row.__rowNumber, {
+      ResolutionStatus: "inactive",
+      LastUpdated: new Date()
+    });
+    deactivatedMarkets += 1;
+  });
+
+  const mappingSheet = externalResultsBridgeEnsureSheet_(hub, "AppMappings", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.AppMappings);
+  externalResultsBridgeReadObjects_(mappingSheet).forEach(function(row) {
+    if (externalResultsBridgeKey_(row.Provider) !== provider || externalResultsBridgeKey_(row.ExternalEventId) !== eventId) return;
+    const source = externalResultsBridgeParseJson_(row.SourceConfigJSON, {});
+    if (!source || !source.episodeQuestionId) return;
+    const mappingId = externalResultsBridgeKey_(row.MappingId);
+    if (activeMappings[mappingId]) return;
+    externalResultsBridgeUpdateRow_(mappingSheet, row.__rowNumber, {
+      Active: false,
+      UpdatedAt: new Date()
+    });
+    deactivatedMappings += 1;
+  });
+  if (deactivatedMarkets || deactivatedMappings) SpreadsheetApp.flush();
+  return { markets: deactivatedMarkets, mappings: deactivatedMappings };
+}
+
+function externalResultsBridgeRealityTvHealth_(main, hub) {
+  const seasonSheet = main.getSheetByName("RealitySeasons");
+  const episodeSheet = main.getSheetByName("RealityEpisodes");
+  if (!seasonSheet || !episodeSheet || !hub) return [];
+  const seasons = externalResultsBridgeReadObjects_(seasonSheet);
+  const episodes = externalResultsBridgeReadObjects_(episodeSheet);
+  const questionSheet = main.getSheetByName("RealityEpisodeQuestions");
+  const contestantSheet = main.getSheetByName("RealityContestants");
+  const questions = questionSheet ? externalResultsBridgeReadObjects_(questionSheet) : [];
+  const contestants = contestantSheet ? externalResultsBridgeReadObjects_(contestantSheet) : [];
+  const hubEvents = externalResultsBridgeReadObjects_(hub.getSheetByName("ExternalEvents"));
+  const hubMarkets = externalResultsBridgeReadObjects_(hub.getSheetByName("ExternalMarkets"));
+  const hubMappings = externalResultsBridgeReadObjects_(hub.getSheetByName("AppMappings"));
+  const hubSubjects = externalResultsBridgeReadObjects_(hub.getSheetByName("ExternalSubjects"));
+
+  return seasons.filter(function(season) {
+    return externalResultsBridgeKey_(season.Status || "active") !== "archived";
+  }).map(function(season) {
+    const seasonEpisodes = episodes.filter(function(ep) {
+      return externalResultsBridgeKey_(ep.SeasonId) === externalResultsBridgeKey_(season.SeasonId);
+    }).sort(function(a, b) { return Number(a.EpisodeNumber || 0) - Number(b.EpisodeNumber || 0); });
+    if (!seasonEpisodes.length) return null;
+    const requested = Number(season.CurrentEpisodeNumber || 0);
+    const episode = seasonEpisodes.find(function(ep) { return Number(ep.EpisodeNumber || 0) === requested; }) || seasonEpisodes[seasonEpisodes.length - 1];
+    const eventId = externalResultsBridgeKey_(episode.ExternalEventId || episode.EpisodeId);
+    const localQuestions = questions.filter(function(row) {
+      return externalResultsBridgeKey_(row.EpisodeId) === externalResultsBridgeKey_(episode.EpisodeId);
+    });
+    const activeContestants = contestants.filter(function(row) {
+      return externalResultsBridgeKey_(row.SeasonId) === externalResultsBridgeKey_(season.SeasonId) &&
+        externalResultsBridgeBool_(row.Active === "" ? true : row.Active) &&
+        externalResultsBridgeKey_(row.Status || "active") !== "eliminated";
+    });
+    const expectedMarkets = 1 + localQuestions.length;
+    const expectedMappings = activeContestants.length + localQuestions.reduce(function(total, question) {
+      const options = externalResultsBridgeParseJson_(question.AnswerOptionsJSON || "[]", []);
+      return total + (Array.isArray(options) ? options.length : 0);
+    }, 0);
+    const eventFound = hubEvents.some(function(row) {
+      return externalResultsBridgeKey_(row.Provider) === "manual-reality-tv" && externalResultsBridgeKey_(row.ExternalEventId) === eventId;
+    });
+    const actualMarkets = hubMarkets.filter(function(row) {
+      return externalResultsBridgeKey_(row.Provider) === "manual-reality-tv" &&
+        externalResultsBridgeKey_(row.ExternalEventId) === eventId &&
+        externalResultsBridgeKey_(row.ResolutionStatus) !== "inactive";
+    }).length;
+    const actualMappings = hubMappings.filter(function(row) {
+      return externalResultsBridgeKey_(row.Provider) === "manual-reality-tv" &&
+        externalResultsBridgeKey_(row.ExternalEventId) === eventId &&
+        (row.Active === "" || externalResultsBridgeBool_(row.Active));
+    }).length;
+    const subjectLookup = {};
+    hubSubjects.filter(function(row) {
+      return externalResultsBridgeKey_(row.Provider) === "manual-reality-tv";
+    }).forEach(function(row) {
+      subjectLookup[externalResultsBridgeKey_(row.ExternalSubjectId)] = true;
+    });
+    const contestantSubjects = activeContestants.filter(function(row) {
+      return !!subjectLookup[externalResultsBridgeKey_(row.ExternalSubjectId || row.ContestantId)];
+    }).length;
+    return {
+      seasonId: season.SeasonId,
+      gameId: season.GameId,
+      showName: season.ShowName,
+      episodeId: episode.EpisodeId,
+      episodeNumber: Number(episode.EpisodeNumber || 0),
+      episodeName: episode.EpisodeName || ("Episode " + episode.EpisodeNumber),
+      eventFound: eventFound,
+      marketsExpected: expectedMarkets,
+      marketsFound: actualMarkets,
+      contestantsExpected: activeContestants.length,
+      contestantSubjectsFound: contestantSubjects,
+      mappingsExpected: expectedMappings,
+      mappingsFound: actualMappings,
+      ready: eventFound && actualMarkets >= expectedMarkets && contestantSubjects >= activeContestants.length && actualMappings >= expectedMappings
+    };
+  }).filter(Boolean);
+}
+
 function externalResultsBridgeApplyJob_(hub, job) {
   const payload = externalResultsBridgeParseJson_(job.PayloadJSON, {});
   const type = externalResultsBridgeString_(job.JobType).toUpperCase();
@@ -322,11 +524,34 @@ function externalResultsBridgeApplyJob_(hub, job) {
       ["MappingId"], payload.mappings || []));
     return externalResultsBridgeReceipt_(hub, type, writes);
   }
-  if (type === "UPSERT_EPISODE_SCHEDULE") {
-    externalResultsBridgeRequireKey_(payload.event, ["Provider", "ExternalEventId"], "Episode event");
-    externalResultsBridgeRequireKey_(payload.market, ["Provider", "ExternalMarketId"], "Episode market");
+  if (type === "UPSERT_REALITY_QUESTION_PACK") {
+    externalResultsBridgeRequireKey_(payload.event, ["Provider", "ExternalEventId"], "Reality TV episode event");
     writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
       ["Provider", "ExternalEventId"], [payload.event]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
+      ["Provider", "ExternalMarketId"], payload.markets || []));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalSubjects", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalSubjects,
+      ["Provider", "ExternalSubjectId"], payload.subjects || []));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "AppMappings", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.AppMappings,
+      ["MappingId"], payload.mappings || []));
+    const stale = externalResultsBridgeDeactivateStaleRealityQuestionPack_(hub, payload);
+    writes.push({ sheetName: "RealityQuestionPackCleanup", expected: 0, verified: 0, inserted: 0, updated: 0, deactivatedMarkets: stale.markets, deactivatedMappings: stale.mappings, keys: [] });
+    return externalResultsBridgeReceipt_(hub, type, writes);
+  }
+  if (type === "UPSERT_EPISODE_SCHEDULE") {
+    externalResultsBridgeRequireKey_(payload.event, ["Provider", "ExternalEventId"], "Episode event");
+    const markets = [];
+    if (payload.market) markets.push(payload.market);
+    (payload.markets || []).forEach(function(row) { if (row) markets.push(row); });
+    markets.forEach(function(row) { externalResultsBridgeRequireKey_(row, ["Provider", "ExternalMarketId"], "Episode market"); });
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalEvents", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
+      ["Provider", "ExternalEventId"], [payload.event]));
+    writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
+      ["Provider", "ExternalMarketId"], markets));
+    return externalResultsBridgeReceipt_(hub, type, writes);
+  }
+  if (type === "UPSERT_MARKET_RESOLUTION") {
+    externalResultsBridgeRequireKey_(payload.market, ["Provider", "ExternalMarketId"], "Market resolution");
     writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ExternalMarkets", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
       ["Provider", "ExternalMarketId"], [payload.market]));
     return externalResultsBridgeReceipt_(hub, type, writes);
@@ -380,20 +605,50 @@ function externalResultsProcessHubOutbox() {
     const hub = SpreadsheetApp.openById(hubId);
     const sheet = SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET);
     const now = new Date();
-    const jobs = externalResultsBridgeReadObjects_(sheet).filter(function(job) {
+    const allJobs = externalResultsBridgeReadObjects_(sheet);
+    const jobs = allJobs.filter(function(job) {
       const status = externalResultsBridgeString_(job.Status).toUpperCase();
       if (["QUEUED", "RETRY"].indexOf(status) === -1) return false;
       const next = job.NextAttemptAt ? new Date(job.NextAttemptAt).getTime() : 0;
       return !next || next <= now.getTime();
-    }).slice(0, 20);
+    }).sort(function(a, b) {
+      return externalResultsBridgeJobPriority_(a) - externalResultsBridgeJobPriority_(b) || a.__rowNumber - b.__rowNumber;
+    }).slice(0, 30);
     let completed = 0;
     let failed = 0;
+    let waiting = 0;
     jobs.forEach(function(job) {
+      const dependency = externalResultsBridgeDependencyState_(hub, allJobs, job);
+      if (!dependency.ready) {
+        if (dependency.orphan) {
+          externalResultsBridgeUpdateRow_(sheet, job.__rowNumber, {
+            Status: "ERROR", NextAttemptAt: "", ErrorMessage: dependency.message, UpdatedAt: new Date()
+          });
+          job.Status = "ERROR";
+          failed += 1;
+          return;
+        }
+        if (dependency.createJob && externalResultsBridgeString_(dependency.createJob.Status).toUpperCase() === "ERROR") {
+          externalResultsBridgeUpdateRow_(sheet, dependency.createJob.__rowNumber, {
+            Status: "QUEUED", NextAttemptAt: "", ErrorMessage: "", UpdatedAt: new Date()
+          });
+          dependency.createJob.Status = "QUEUED";
+        }
+        externalResultsBridgeUpdateRow_(sheet, job.__rowNumber, {
+          Status: "RETRY", NextAttemptAt: new Date(Date.now() + 60000), ErrorMessage: dependency.message, UpdatedAt: new Date()
+        });
+        job.Status = "RETRY";
+        waiting += 1;
+        return;
+      }
+
       const attempts = Number(job.AttemptCount || 0) + 1;
       externalResultsBridgeUpdateRow_(sheet, job.__rowNumber, {
         Status: "PROCESSING", AttemptCount: attempts, LastAttemptAt: new Date(),
         ErrorMessage: "", UpdatedAt: new Date()
       });
+      job.Status = "PROCESSING";
+      job.AttemptCount = attempts;
       try {
         const receipt = externalResultsBridgeApplyJob_(hub, job);
         if (!receipt || !Number(receipt.verifiedRows || 0)) {
@@ -407,6 +662,7 @@ function externalResultsProcessHubOutbox() {
           WriteReceiptJSON: JSON.stringify(receipt),
           VerifiedAt: receipt.verifiedAt || new Date()
         });
+        job.Status = "COMPLETE";
         completed += 1;
       } catch (err) {
         const retry = externalResultsBridgeRetryable_(err) && attempts < EXTERNAL_RESULTS_BRIDGE_MAX_ATTEMPTS;
@@ -417,6 +673,7 @@ function externalResultsProcessHubOutbox() {
           ErrorMessage: err && err.message ? err.message : String(err),
           UpdatedAt: new Date()
         });
+        job.Status = retry ? "RETRY" : "ERROR";
         failed += 1;
       }
     });
@@ -424,7 +681,7 @@ function externalResultsProcessHubOutbox() {
       return ["QUEUED", "RETRY"].indexOf(externalResultsBridgeString_(job.Status).toUpperCase()) !== -1;
     }).length;
     if (remaining) externalResultsBridgeSchedule_();
-    return { success: true, processed: jobs.length, completed: completed, failed: failed, remaining: remaining };
+    return { success: true, processed: jobs.length, completed: completed, failed: failed, waitingOnDependencies: waiting, remaining: remaining };
   } finally {
     lock.releaseLock();
   }
@@ -447,6 +704,7 @@ function externalResultsBridgeHealth_() {
   const issues = [];
   let hubName = "";
   let hubRowCounts = {};
+  let realityTv = [];
   if (hubId) {
     try {
       const hub = SpreadsheetApp.openById(hubId);
@@ -464,6 +722,7 @@ function externalResultsBridgeHealth_() {
           if (headers.indexOf(header) === -1) issues.push(sheetName + " missing header " + header);
         });
       });
+      if (!issues.length) realityTv = externalResultsBridgeRealityTvHealth_(ss, hub);
     } catch (err) {
       issues.push(err && err.message ? err.message : String(err));
     }
@@ -490,6 +749,11 @@ function externalResultsBridgeHealth_() {
         (!row.VerifiedAt || !externalResultsBridgeString_(row.WriteReceiptJSON));
     }).length,
     hubRowCounts: hubRowCounts,
+    realityTv: realityTv,
+    realityTvReady: realityTv.filter(function(item) { return item.ready; }).length,
+    archivedOutbox: outbox.filter(function(row) {
+      return externalResultsBridgeString_(row.Status).toUpperCase() === "ARCHIVED";
+    }).length,
     lastVerifiedJob: outbox.filter(function(row) {
       return externalResultsBridgeString_(row.Status).toUpperCase() === "COMPLETE" && !!row.VerifiedAt;
     }).sort(function(a, b) {
@@ -542,14 +806,43 @@ function apiAdminRetryExternalResultsBridgeFailures(payload) {
   requireAdmin_(payload || {});
   externalResultsBridgeEnsureSystem_();
   const sheet = SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET);
+  const rows = externalResultsBridgeReadObjects_(sheet);
+  const hubId = externalResultsBridgeGetHubId_();
+  const hub = hubId ? SpreadsheetApp.openById(hubId) : null;
   let reset = 0;
-  externalResultsBridgeReadObjects_(sheet).forEach(function(row) {
+  let archived = 0;
+  rows.forEach(function(row) {
     if (externalResultsBridgeString_(row.Status).toUpperCase() !== "ERROR") return;
+    const isUpdate = externalResultsBridgeString_(row.JobType).toUpperCase() === "UPDATE_REVIEW";
+    const isDependencyError = /dependency|CREATE_RESULT_REVIEW|ReviewQueue row|ImportedResults row/i.test(externalResultsBridgeString_(row.ErrorMessage));
+    if (isUpdate && isDependencyError && hub) {
+      const dependency = externalResultsBridgeDependencyState_(hub, rows, row);
+      if (dependency.orphan) {
+        externalResultsBridgeUpdateRow_(sheet, row.__rowNumber, {
+          Status: "ARCHIVED",
+          NextAttemptAt: "",
+          ErrorMessage: "Archived legacy Hub dependency error. The local result remains authoritative; no matching CREATE_RESULT_REVIEW job or Hub review row exists.",
+          UpdatedAt: new Date()
+        });
+        archived += 1;
+        return;
+      }
+      if (dependency.createJob && externalResultsBridgeString_(dependency.createJob.Status).toUpperCase() === "ERROR") {
+        externalResultsBridgeUpdateRow_(sheet, dependency.createJob.__rowNumber, {
+          Status: "QUEUED", NextAttemptAt: "", ErrorMessage: "", UpdatedAt: new Date()
+        });
+      }
+    }
     externalResultsBridgeUpdateRow_(sheet, row.__rowNumber, {
       Status: "QUEUED", NextAttemptAt: "", ErrorMessage: "", UpdatedAt: new Date()
     });
     reset += 1;
   });
   if (reset) externalResultsBridgeSchedule_();
-  return { success: true, reset: reset, message: reset + " failed Hub job(s) queued for retry." };
+  return {
+    success: true,
+    reset: reset,
+    archived: archived,
+    message: reset + " failed Hub job(s) queued for retry" + (archived ? "; " + archived + " obsolete legacy dependency error(s) archived." : ".")
+  };
 }

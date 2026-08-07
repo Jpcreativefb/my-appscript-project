@@ -2502,13 +2502,14 @@ async function renderAdminRealityTvPage() {
             </div>
             <div class="admin-header-actions">
               <button class="admin-small-button secondary" onclick="adminRealityTvRunHubBridgeNow(this)">Sync Queue Now</button>
-              <button class="admin-small-button secondary" onclick="adminRealityTvRetryHubBridge(this)">Retry Failed</button>
+              <button class="admin-small-button secondary" onclick="adminRealityTvRetryHubBridge(this)">Repair / Retry Failed</button>
               <button class="admin-small-button secondary" onclick="adminRealityTvRequeueUnverifiedHubBridge(this)">Requeue Unverified</button>
               <button class="admin-small-button" onclick="adminRealityTvConfigureHub()">${res.hubConfigured ? "Change Hub" : "Connect Hub"}</button>
             </div>
           </div>
           ${hubStatus}
           <div id="realityTvHubBridgeHealth" class="admin-message">Checking background bridge…</div>
+          <div id="realityTvHubMirrorStatus"></div>
         </div>
 
         <details class="card admin-card admin-collapsible-card reality-tv-create-season-card" ${res.seasons && res.seasons.length ? "" : "open"}>
@@ -2686,6 +2687,7 @@ function adminRealityTvHubCount_(counts, key) {
 
 async function adminRealityTvRefreshHubBridgeHealth_() {
   const target = document.getElementById("realityTvHubBridgeHealth");
+  const mirrorTarget = document.getElementById("realityTvHubMirrorStatus");
   if (!target || typeof apiAdminGetExternalResultsBridgeHealth !== "function") return;
   try {
     const health = await apiAdminGetExternalResultsBridgeHealth();
@@ -2694,6 +2696,7 @@ async function adminRealityTvRefreshHubBridgeHealth_() {
     const failed = Number(health.failedOutbox || 0);
     const ready = Number(health.readyInbox || 0);
     const unverified = Number(health.unverifiedComplete || 0);
+    const archived = Number(health.archivedOutbox || 0);
     const connected = !!health.connected;
     target.className = "admin-message " + (failed ? "error" : connected ? "success" : "warning");
     if (!health.configured) {
@@ -2705,14 +2708,30 @@ async function adminRealityTvRefreshHubBridgeHealth_() {
       queued + " queued",
       failed + " failed",
       unverified + " unverified complete",
+      archived ? archived + " archived legacy" : "0 archived legacy",
       ready + " inbound result" + (ready === 1 ? "" : "s") + " awaiting the next integration phase"
     ].join(" · ") + (health.issues && health.issues.length ? " · " + health.issues[0] : "");
     if (connected && health.spreadsheetId) {
       target.title = "Hub spreadsheet ID: " + health.spreadsheetId;
     }
+    if (mirrorTarget) {
+      const items = Array.isArray(health.realityTv) ? health.realityTv : [];
+      mirrorTarget.innerHTML = items.length ? items.map(function(item) {
+        const ok = !!item.ready;
+        const title = adminRealityTvEscape_((item.showName || "Reality TV") + " " + (item.episodeName || ("Episode " + item.episodeNumber)));
+        const checks = [
+          (item.eventFound ? "✓" : "○") + " Event",
+          (Number(item.marketsFound || 0) >= Number(item.marketsExpected || 0) ? "✓" : "○") + " " + Number(item.marketsFound || 0) + "/" + Number(item.marketsExpected || 0) + " markets",
+          (Number(item.contestantSubjectsFound || 0) >= Number(item.contestantsExpected || 0) ? "✓" : "○") + " " + Number(item.contestantSubjectsFound || 0) + "/" + Number(item.contestantsExpected || 0) + " contestants",
+          (Number(item.mappingsFound || 0) >= Number(item.mappingsExpected || 0) ? "✓" : "○") + " " + Number(item.mappingsFound || 0) + "/" + Number(item.mappingsExpected || 0) + " mappings"
+        ].join(" · ");
+        return `<div class="admin-message ${ok ? "success" : "warning"}"><b>${title}</b> · ${adminRealityTvEscape_(checks)}${ok ? " · Hub mirror complete" : " · Sync Queue Now to finish mirroring"}</div>`;
+      }).join("") : "";
+    }
   } catch (err) {
     target.className = "admin-message error";
     target.textContent = err.message || String(err);
+    if (mirrorTarget) mirrorTarget.innerHTML = "";
   }
 }
 

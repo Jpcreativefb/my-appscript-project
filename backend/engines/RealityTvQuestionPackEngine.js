@@ -1,6 +1,6 @@
 /* =========================
    REALITY TV EPISODE QUESTION PACKS
-   Production v1.2.2
+   Production v1.2.3
 
    Adds independent, administrator-reviewed episode questions without
    changing the stable elimination/next-episode workflow.
@@ -1530,6 +1530,9 @@ function realityTvMaterializeEpisodeQuestionPackBulk_(season, episode, options) 
     { built: builtQuestions.length, skipped: skipped },
     options.managedBy || "BULK"
   );
+  const hubSync = typeof realityTvSyncAllSupplementalQuestionsToHub_ === "function"
+    ? realityTvSyncAllSupplementalQuestionsToHub_(season, episode)
+    : { success: false, skipped: true };
   return {
     success: true,
     complete: true,
@@ -1541,6 +1544,8 @@ function realityTvMaterializeEpisodeQuestionPackBulk_(season, episode, options) 
     questions: builtQuestions,
     results: results,
     skippedDetails: results.filter(function(item) { return item.status === "SKIPPED" || item.status === "BLOCKED"; }),
+    hubSync: hubSync,
+    hubWarning: hubSync && hubSync.error ? hubSync.error : "",
     lastMessage: "All enabled Extra Questions and answers were written in one bulk pass.",
     message: "All enabled Extra Questions and answers were written in one bulk pass."
   };
@@ -1568,109 +1573,170 @@ function realityTvBuildSupplementalQuestionsForEpisode_(season, episode, options
 }
 
 
-function realityTvSyncSupplementalQuestionsToHubBatch_(season, episode, items) {
-  try {
-    const hub = realityTvOpenHub_();
-    if (!hub) return { success: false, skipped: true, message: "External Results Hub is not configured." };
-    const now = new Date();
-    const entries = Array.isArray(items) ? items.filter(Boolean) : [];
-    realityTvUpsertObject_(hub, "ExternalEvents", REALITY_TV_HUB_HEADERS.ExternalEvents,
-      ["Provider", "ExternalEventId"], {
-        Provider: "manual-reality-tv",
-        ExternalEventId: episode.ExternalEventId,
-        EventName: season.ShowName + " " + episode.EpisodeName,
-        EventType: "reality-tv",
-        StartDate: episode.AirDateTime,
-        EndDate: episode.AirDateTime,
-        Status: "scheduled",
-        SourceUrl: "",
-        LastUpdated: now,
-        RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
-        CreatedAt: now
-      });
+function realityTvSupplementalHubEntriesForEpisode_(season, episode) {
+  if (!season || !episode) return [];
+  return realityTvEpisodeQuestionsForSeason_(season.SeasonId)
+    .filter(function(row) {
+      return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId);
+    })
+    .map(function(question) {
+      return {
+        question: question,
+        answerOptions: realityTvParseJson_(question.AnswerOptionsJSON || "[]", [])
+      };
+    });
+}
 
-    const marketRows = [];
-    const subjectByKey = {};
-    const mappingRows = [];
-    entries.forEach(function(entry) {
-      const question = entry.question;
-      const answerOptions = entry.answerOptions || [];
-      marketRows.push({
+function realityTvBuildSupplementalHubPayload_(season, episode, items) {
+  const now = new Date();
+  const entries = Array.isArray(items) ? items.filter(function(item) {
+    return item && item.question;
+  }) : [];
+  const marketRows = [];
+  const subjectByKey = {};
+  const mappingRows = [];
+
+  entries.forEach(function(entry) {
+    const question = entry.question;
+    const answerOptions = Array.isArray(entry.answerOptions)
+      ? entry.answerOptions
+      : realityTvParseJson_(question.AnswerOptionsJSON || "[]", []);
+    const winnerIds = realityTvParseJson_(question.WinningOutcomeIds || "[]", []);
+    const normalizedWinnerIds = Array.isArray(winnerIds)
+      ? winnerIds.map(realityTvKey_)
+      : realityTvString_(question.WinningOutcomeIds).split(",").map(realityTvKey_).filter(Boolean);
+    const winningLabels = answerOptions.filter(function(item) {
+      return normalizedWinnerIds.indexOf(realityTvKey_(item.id)) !== -1;
+    }).map(function(item) { return item.label; });
+    const isFinal = realityTvKey_(question.Status) === "final";
+
+    marketRows.push({
+      Provider: "manual-reality-tv",
+      ExternalMarketId: question.ExternalMarketId,
+      ExternalEventId: episode.ExternalEventId,
+      MarketQuestion: question.QuestionText,
+      OutcomesJSON: JSON.stringify(answerOptions.map(function(item) { return item.label; })),
+      PricesJSON: "{}",
+      ClosingTime: episode.LockDateTime,
+      ResolutionStatus: isFinal ? "resolved" : "pending",
+      WinningOutcome: winningLabels.join(", "),
+      ResolutionSource: "manual-reality-tv",
+      SourceUrl: "",
+      LastUpdated: now,
+      RawJSON: JSON.stringify({
+        seasonId: season.SeasonId,
+        episodeId: episode.EpisodeId,
+        episodeQuestionId: question.EpisodeQuestionId,
+        questionType: question.QuestionType,
+        templateId: question.TemplateId || ""
+      }),
+      CreatedAt: question.CreatedAt || now
+    });
+
+    answerOptions.forEach(function(item) {
+      const externalSubjectId = item.subjectType === "outcome" ? "" : (item.externalSubjectId || item.id);
+      if (externalSubjectId) {
+        const subjectKey = realityTvKey_(externalSubjectId);
+        subjectByKey[subjectKey] = {
+          Provider: "manual-reality-tv",
+          ExternalSubjectId: externalSubjectId,
+          Name: item.label,
+          SubjectType: item.subjectType || "subject",
+          ImageUrl: item.imageUrl || "",
+          MetadataJSON: JSON.stringify({
+            seasonId: season.SeasonId,
+            episodeId: episode.EpisodeId,
+            questionType: question.QuestionType
+          }),
+          SourceUrl: "",
+          LastUpdated: now,
+          CreatedAt: now
+        };
+      }
+      mappingRows.push({
+        MappingId: season.GameId + "-" + question.CategoryId + "-" + item.id,
+        AppGameId: season.GameId,
+        CategoryId: question.CategoryId,
+        NomineeId: item.id,
         Provider: "manual-reality-tv",
-        ExternalMarketId: question.ExternalMarketId,
         ExternalEventId: episode.ExternalEventId,
-        MarketQuestion: question.QuestionText,
-        OutcomesJSON: JSON.stringify(answerOptions.map(function(item) { return item.label; })),
-        PricesJSON: "{}",
-        ClosingTime: episode.LockDateTime,
-        ResolutionStatus: "pending",
-        WinningOutcome: "",
-        ResolutionSource: "manual-reality-tv",
+        ExternalMarketId: question.ExternalMarketId,
+        ExternalSubjectId: externalSubjectId,
+        ResultKey: question.ResultKey,
+        ComparisonOperator: "eq",
+        Threshold: "",
+        ExpectedOutcome: item.label,
+        AutoSettle: false,
+        RequireAdminReview: true,
         SourceUrl: "",
-        LastUpdated: now,
-        RawJSON: JSON.stringify({
+        SourceConfigJSON: JSON.stringify({
           seasonId: season.SeasonId,
           episodeId: episode.EpisodeId,
           episodeQuestionId: question.EpisodeQuestionId,
-          questionType: question.QuestionType
+          questionType: question.QuestionType,
+          templateId: question.TemplateId || ""
         }),
-        CreatedAt: now
-      });
-      answerOptions.forEach(function(item) {
-        const externalSubjectId = item.subjectType === "outcome" ? "" : (item.externalSubjectId || item.id);
-        if (externalSubjectId) {
-          const subjectKey = realityTvKey_(externalSubjectId);
-          subjectByKey[subjectKey] = {
-            Provider: "manual-reality-tv",
-            ExternalSubjectId: externalSubjectId,
-            Name: item.label,
-            SubjectType: item.subjectType || "subject",
-            ImageUrl: item.imageUrl || "",
-            MetadataJSON: JSON.stringify({ seasonId: season.SeasonId }),
-            SourceUrl: "",
-            LastUpdated: now,
-            CreatedAt: now
-          };
-        }
-        mappingRows.push({
-          MappingId: season.GameId + "-" + question.CategoryId + "-" + item.id,
-          AppGameId: season.GameId,
-          CategoryId: question.CategoryId,
-          NomineeId: item.id,
-          Provider: "manual-reality-tv",
-          ExternalEventId: episode.ExternalEventId,
-          ExternalMarketId: question.ExternalMarketId,
-          ExternalSubjectId: externalSubjectId,
-          ResultKey: question.ResultKey,
-          ComparisonOperator: "eq",
-          Threshold: "",
-          ExpectedOutcome: item.label,
-          AutoSettle: false,
-          RequireAdminReview: true,
-          SourceUrl: "",
-          SourceConfigJSON: JSON.stringify({
-            seasonId: season.SeasonId,
-            episodeId: episode.EpisodeId,
-            episodeQuestionId: question.EpisodeQuestionId,
-            questionType: question.QuestionType
-          }),
-          Active: true,
-          CreatedAt: now,
-          UpdatedAt: now
-        });
+        Active: true,
+        CreatedAt: now,
+        UpdatedAt: now
       });
     });
+  });
 
-    realityTvBulkUpsertObjects_(hub, "ExternalMarkets", REALITY_TV_HUB_HEADERS.ExternalMarkets,
-      ["Provider", "ExternalMarketId"], marketRows);
-    realityTvBulkUpsertObjects_(hub, "ExternalSubjects", REALITY_TV_HUB_HEADERS.ExternalSubjects,
-      ["Provider", "ExternalSubjectId"], Object.keys(subjectByKey).map(function(key) { return subjectByKey[key]; }));
-    realityTvBulkUpsertObjects_(hub, "AppMappings", REALITY_TV_HUB_HEADERS.AppMappings,
-      ["MappingId"], mappingRows);
-    return { success: true, markets: marketRows.length, mappings: mappingRows.length };
-  } catch (err) {
-    return { success: false, skipped: true, error: err.message };
+  return {
+    event: {
+      Provider: "manual-reality-tv",
+      ExternalEventId: episode.ExternalEventId,
+      EventName: season.ShowName + " " + episode.EpisodeName,
+      EventType: "reality-tv",
+      StartDate: episode.AirDateTime,
+      EndDate: episode.AirDateTime,
+      Status: realityTvString_(episode.Status || "scheduled").toLowerCase(),
+      SourceUrl: "",
+      LastUpdated: now,
+      RawJSON: JSON.stringify({ seasonId: season.SeasonId, episodeId: episode.EpisodeId }),
+      CreatedAt: episode.CreatedAt || now
+    },
+    markets: marketRows,
+    subjects: Object.keys(subjectByKey).map(function(key) { return subjectByKey[key]; }),
+    mappings: mappingRows,
+    replaceQuestionPack: true,
+    mainExternalMarketId: episode.ExternalMarketId,
+    seasonId: season.SeasonId,
+    episodeId: episode.EpisodeId
+  };
+}
+
+function realityTvSyncSupplementalQuestionsToHubBatch_(season, episode, items) {
+  if (!realityTvGetHubId_() || typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { success: false, skipped: true, message: "External Results Hub is not configured." };
   }
+  const entries = Array.isArray(items) ? items.filter(Boolean) : [];
+  const payload = realityTvBuildSupplementalHubPayload_(season, episode, entries);
+  const queued = externalResultsBridgeEnqueue_(
+    "UPSERT_REALITY_QUESTION_PACK",
+    (episode.ExternalEventId || episode.EpisodeId) + ":question-pack",
+    "manual-reality-tv",
+    payload
+  );
+  return {
+    success: !!(queued && queued.success),
+    queued: !!(queued && queued.queued),
+    skipped: !!(queued && queued.skipped),
+    jobId: queued && queued.jobId || "",
+    markets: payload.markets.length,
+    mappings: payload.mappings.length,
+    error: queued && queued.error || "",
+    message: queued && queued.message || "Reality TV question pack queued for Hub mirroring."
+  };
+}
+
+function realityTvSyncAllSupplementalQuestionsToHub_(season, episode) {
+  return realityTvSyncSupplementalQuestionsToHubBatch_(
+    season,
+    episode,
+    realityTvSupplementalHubEntriesForEpisode_(season, episode)
+  );
 }
 
 function realityTvSyncSupplementalQuestionToHub_(season, episode, question, answerOptions) {
@@ -1681,70 +1747,80 @@ function realityTvSyncSupplementalQuestionToHub_(season, episode, question, answ
 }
 
 function realityTvCreateSupplementalHubPendingResult_(season, episode, question, outcome, evidenceUrl, notes) {
-  try {
-    const hub = realityTvOpenHub_();
-    if (!hub) return { importedResultId: "", reviewId: "", skipped: true };
-    const now = new Date();
-    const importedResultId = realityTvId_("rtq-result");
-    const reviewId = realityTvId_("rtq-review");
-    const outcomeIds = Array.isArray(outcome && outcome.ids) ? outcome.ids : [outcome && outcome.id].filter(Boolean);
-    const outcomeLabels = Array.isArray(outcome && outcome.labels) ? outcome.labels : [outcome && outcome.label].filter(Boolean);
-    const fingerprint = ["manual-reality-tv", question.ExternalEventId, question.ExternalMarketId, outcomeLabels.join(",")].join("|").toLowerCase();
-    realityTvAppendObject_(realityTvGetOrCreateSheet_(hub, "ImportedResults", REALITY_TV_HUB_HEADERS.ImportedResults), {
-      ImportedResultId: importedResultId,
-      Provider: "manual-reality-tv",
-      ExternalEventId: question.ExternalEventId,
-      ExternalMarketId: question.ExternalMarketId,
-      ResultKey: question.ResultKey,
-      ResultValue: outcome.label,
-      Finality: "FINAL",
-      WinningOutcome: outcome.label,
-      ProviderTimestamp: now,
-      ImportedAt: now,
-      EvidenceUrl: evidenceUrl || "",
-      SourceUrl: evidenceUrl || "",
-      RawJSON: JSON.stringify({
-        seasonId: season.SeasonId,
-        episodeId: episode.EpisodeId,
-        episodeQuestionId: question.EpisodeQuestionId,
-        questionType: question.QuestionType,
-        outcomeId: outcome.id || "",
-        outcomeIds: outcomeIds,
-        outcomeLabels: outcomeLabels
-      }),
-      ReviewStatus: "PENDING",
-      ReviewRequired: true,
-      SourceFingerprint: fingerprint,
-      CreatedAt: now,
-      UpdatedAt: now
-    });
-    realityTvAppendObject_(realityTvGetOrCreateSheet_(hub, "ReviewQueue", REALITY_TV_HUB_HEADERS.ReviewQueue), {
-      ReviewId: reviewId,
-      ImportedResultId: importedResultId,
-      Provider: "manual-reality-tv",
-      ExternalEventId: question.ExternalEventId,
-      ExternalMarketId: question.ExternalMarketId,
-      ResultKey: question.ResultKey,
-      ResultValue: outcome.label,
-      Finality: "FINAL",
-      WinningOutcome: outcome.label,
-      EvidenceUrl: evidenceUrl || "",
-      ReviewStatus: "PENDING",
-      ReviewedBy: "",
-      ReviewedAt: "",
-      ReviewNotes: notes || "",
-      PushStatus: "NOT PUSHED",
-      PushedAt: "",
-      PushMessage: "Waiting for Reality TV Season Manager approval.",
-      CreatedAt: now,
-      UpdatedAt: now
-    });
-    return { importedResultId: importedResultId, reviewId: reviewId };
-  } catch (err) {
-    return { importedResultId: "", reviewId: "", skipped: true, error: err.message };
+  if (!realityTvGetHubId_() || typeof externalResultsBridgeEnqueue_ !== "function") {
+    return { importedResultId: "", reviewId: "", skipped: true };
   }
+  const now = new Date();
+  const importedResultId = realityTvId_("rtq-result");
+  const reviewId = realityTvId_("rtq-review");
+  const outcomeIds = Array.isArray(outcome && outcome.ids) ? outcome.ids : [outcome && outcome.id].filter(Boolean);
+  const outcomeLabels = Array.isArray(outcome && outcome.labels) ? outcome.labels : [outcome && outcome.label].filter(Boolean);
+  const resultValue = realityTvString_(outcome && outcome.label) || outcomeLabels.join(", ");
+  const fingerprint = ["manual-reality-tv", question.ExternalEventId, question.ExternalMarketId, resultValue].join("|").toLowerCase();
+  const queued = externalResultsBridgeEnqueue_(
+    "CREATE_RESULT_REVIEW",
+    importedResultId,
+    "manual-reality-tv",
+    {
+      importedResult: {
+        ImportedResultId: importedResultId,
+        Provider: "manual-reality-tv",
+        ExternalEventId: question.ExternalEventId,
+        ExternalMarketId: question.ExternalMarketId,
+        ResultKey: question.ResultKey,
+        ResultValue: resultValue,
+        Finality: "FINAL",
+        WinningOutcome: resultValue,
+        ProviderTimestamp: now,
+        ImportedAt: now,
+        EvidenceUrl: evidenceUrl || "",
+        SourceUrl: evidenceUrl || "",
+        RawJSON: JSON.stringify({
+          seasonId: season.SeasonId,
+          episodeId: episode.EpisodeId,
+          episodeQuestionId: question.EpisodeQuestionId,
+          questionType: question.QuestionType,
+          outcomeId: outcome && outcome.id || "",
+          outcomeIds: outcomeIds,
+          outcomeLabels: outcomeLabels
+        }),
+        ReviewStatus: "PENDING",
+        ReviewRequired: true,
+        SourceFingerprint: fingerprint,
+        CreatedAt: now,
+        UpdatedAt: now
+      },
+      review: {
+        ReviewId: reviewId,
+        ImportedResultId: importedResultId,
+        Provider: "manual-reality-tv",
+        ExternalEventId: question.ExternalEventId,
+        ExternalMarketId: question.ExternalMarketId,
+        ResultKey: question.ResultKey,
+        ResultValue: resultValue,
+        Finality: "FINAL",
+        WinningOutcome: resultValue,
+        EvidenceUrl: evidenceUrl || "",
+        ReviewStatus: "PENDING",
+        ReviewedBy: "",
+        ReviewedAt: "",
+        ReviewNotes: notes || "",
+        PushStatus: "NOT PUSHED",
+        PushedAt: "",
+        PushMessage: "Waiting for Reality TV Season Manager approval.",
+        CreatedAt: now,
+        UpdatedAt: now
+      }
+    }
+  );
+  return {
+    importedResultId: importedResultId,
+    reviewId: reviewId,
+    queued: !!(queued && queued.success),
+    skipped: !!(queued && queued.skipped),
+    error: queued && queued.error ? queued.error : ""
+  };
 }
-
 
 function realityTvResolveQuestionBuildEpisode_(season, requestedEpisodeId, createIfMissing) {
   if (!season) return null;
@@ -2025,6 +2101,7 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
   if (!episode) throw new Error("The current Reality TV episode could not be repaired. Open Episode Schedule and create the current episode, then try again.");
   if (realityTvBool_(payload.episodeOnly)) {
     const built = realityTvBuildSupplementalQuestionForTemplate_(season, episode, row, { skipHubSync: true });
+    const hubSync = realityTvSyncAllSupplementalQuestionsToHub_(season, episode);
     return {
       success: true,
       complete: true,
@@ -2032,6 +2109,7 @@ function apiAdminAddRealityTvCustomQuestionTemplate(payload) {
       episodeOnly: true,
       created: built && !built.skipped ? 1 : 0,
       skipped: built && built.skipped ? 1 : 0,
+      hubSync: hubSync,
       message: built && built.skipped
         ? "The custom question was saved for this episode only but could not be built: " + (built.reason || "not enough answers")
         : "Custom question saved and built for this episode only. It is disabled for future episodes unless you enable it later."
@@ -2099,7 +2177,9 @@ function apiAdminDeleteRealityTvCustomQuestionTemplate(payload) {
   if (currentEpisode) realityTvCancelOtherQuestionBuildsForEpisode_(season.SeasonId, currentEpisode.EpisodeId, "");
 
   let build = null;
+  let hubSync = { success: true, skipped: true };
   if (currentEpisode) {
+    hubSync = realityTvSyncAllSupplementalQuestionsToHub_(season, currentEpisode);
     const enabledTypes = realityTvQuestionTemplatesForSeason_(season.SeasonId)
       .filter(function(row) { return realityTvBool_(row.Enabled); })
       .map(function(row) { return row.TemplateId; });
@@ -2109,6 +2189,7 @@ function apiAdminDeleteRealityTvCustomQuestionTemplate(payload) {
 
   return {
     success: true,
+    hubSync: hubSync,
     templateId: templateId,
     deletedCurrentQuestion: deletedCurrentQuestion,
     preservedCurrentQuestion: currentQuestionPreserved,
@@ -2221,10 +2302,12 @@ function apiAdminApplyRealityTvEpisodeQuestionPlan(payload) {
   });
 
   realityTvClearRuntimeCaches_(season.GameId, season.SeasonId);
+  const hubSync = realityTvSyncAllSupplementalQuestionsToHub_(season, episode);
   return {
     success: true,
     complete: true,
     episodeId: episode.EpisodeId,
+    hubSync: hubSync,
     selectedCount: selectedIds.length,
     builtCount: built,
     removedCount: removed,
@@ -2412,11 +2495,12 @@ function realityTvContinueQuestionPackBuildStage_(buildId) {
       Stage: "COMPLETE",
       Status: "COMPLETE",
       CurrentIndex: enabledTypes.length,
-      LastMessage: "Episode question pack build completed.",
+      LastMessage: "Episode question pack build completed. Complete Hub mirroring was queued.",
       ErrorMessage: "",
       CompletedAt: completedAt,
       UpdatedAt: completedAt
     });
+    realityTvSyncAllSupplementalQuestionsToHub_(season, episode);
     return realityTvQuestionBuildState_(realityTvGetQuestionBuildJob_(job.BuildId));
   }
 
@@ -2487,13 +2571,14 @@ function realityTvContinueQuestionPackBuildStage_(buildId) {
             ProcessedCount: realityTvNumber_(job.ProcessedCount, 0) + 1,
             LastEpisodeQuestionId: result.question.EpisodeQuestionId,
             LastMessage: complete
-              ? "Episode question pack build completed. Hub mappings can be synchronized separately."
+              ? "Episode question pack build completed. Complete Hub mirroring was queued."
               : result.question.QuestionText + " was built and verified. Continuing to the next question.",
             BuildResultsJSON: deferredResultJson,
             ErrorMessage: "",
             CompletedAt: complete ? now : "",
             UpdatedAt: now
           });
+          if (complete) realityTvSyncAllSupplementalQuestionsToHub_(season, episode);
         }
       }
 
@@ -2834,21 +2919,11 @@ function realityTvSettleSupplementalQuestion_(question, queue, reviewer, options
 function realityTvSyncSupplementalApprovalHub_(question, queue, reviewer) {
   const warnings = [];
   try {
-    const hub = realityTvOpenHub_();
-    if (hub) {
-      const markets = realityTvReadObjects_(hub, "ExternalMarkets");
-      const market = markets.find(function(row) {
-        return realityTvKey_(row.Provider) === "manual-reality-tv" &&
-          realityTvKey_(row.ExternalMarketId) === realityTvKey_(question.ExternalMarketId);
-      });
-      if (market) {
-        realityTvUpdateObjectRow_(hub.getSheetByName("ExternalMarkets"), market.__rowNumber, {
-          ResolutionStatus: "final",
-          WinningOutcome: realityTvString_(queue.SelectedOutcomeLabel),
-          ResolutionSource: "manual-reality-tv",
-          LastUpdated: new Date()
-        });
-      }
+    const season = realityTvGetSeason_(question.SeasonId);
+    const episode = realityTvGetEpisode_(question.EpisodeId);
+    if (season && episode && typeof realityTvSyncAllSupplementalQuestionsToHub_ === "function") {
+      const mirror = realityTvSyncAllSupplementalQuestionsToHub_(season, episode);
+      if (mirror && mirror.error) warnings.push(mirror.error);
     }
   } catch (err) {
     warnings.push(err.message || String(err));
