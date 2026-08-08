@@ -222,6 +222,10 @@ function doGet(e) {
       "adminRunExternalResultsBridgeNow",
       "adminRetryExternalResultsBridgeFailures",
       "adminRequeueUnverifiedExternalResultsBridgeJobs",
+      "adminGetExternalResultsInboxStatus",
+      "adminValidateExternalResultsInbox",
+      "adminApplyExternalResultsInbox",
+      "adminRetryExternalResultsInboxErrors",
       "adminGetRealityTvDashboard",
       "adminGetRealityTvDashboardSummary",
       "adminGetRealityTvSeasonDetails",
@@ -925,6 +929,22 @@ function doGet(e) {
 
     if (action === "adminRequeueUnverifiedExternalResultsBridgeJobs") {
       return json(apiAdminRequeueUnverifiedExternalResultsBridgeJobs(params));
+    }
+
+    if (action === "adminGetExternalResultsInboxStatus") {
+      return json(apiAdminGetExternalResultsInboxStatus(params));
+    }
+
+    if (action === "adminValidateExternalResultsInbox") {
+      return json(apiAdminValidateExternalResultsInbox(params));
+    }
+
+    if (action === "adminApplyExternalResultsInbox") {
+      return json(apiAdminApplyExternalResultsInbox(params));
+    }
+
+    if (action === "adminRetryExternalResultsInboxErrors") {
+      return json(apiAdminRetryExternalResultsInboxErrors(params));
     }
 
     if (action === "adminGetRealityTvDashboard") {

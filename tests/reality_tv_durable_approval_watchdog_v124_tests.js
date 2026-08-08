@@ -68,9 +68,9 @@ assert(ui.includes('persistent server watchdog'), 'UI must explain persistent wa
 assert(ui.includes('Emergency recovery — normally not needed'), 'Reset must be emergency-only');
 assert(!ui.includes('use Reset Stuck Approval, then Resume Approval'), 'Normal UI must not instruct Reset + Resume');
 assert(ui.includes('{ id: "SCORE_QUESTIONS", label: "Score episode" }'), 'UI must display the separate score checkpoint');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1250-historical-reality-results"'), 'v1.2.4 route cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1260-external-results-inbox"'), 'v1.2.4 route cache version is missing');
 assert.strictEqual(app, appCompat, 'Both app-loader copies must match');
-assert(html.includes('hotfix=v1250-historical-reality-results'), 'App shell must request v1.2.4 assets');
+assert(html.includes('hotfix=v1260-external-results-inbox'), 'App shell must request v1.2.4 assets');
 
 
 const ownerRuntime = { console, Date, JSON, Math, Number, String, Array, Object, Error };

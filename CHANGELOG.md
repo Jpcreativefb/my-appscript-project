@@ -1,3 +1,16 @@
+## v1.2.6 — External Results Inbox validation and safe apply
+
+- Added a generic External Results Inbox validator for approved Hub deliveries.
+- Restricted inbound providers to Manual Awards, Manual Reality TV, Kalshi, and Polymarket; Sports/Racing are explicitly rejected.
+- Requires FINAL results, complete nominee mapping coverage, valid nominee IDs, and a non-conflicting local settlement before apply.
+- Added idempotent duplicate detection so a matching already-settled category is confirmed without writing duplicate results.
+- Awards and prediction-market deliveries apply through the normal `CategoryResults` + category settlement path.
+- Reality TV Extra Questions stage into `RealityQuestionResultQueue`; elimination results stage into `RealityResultQueue` so the durable Reality TV finalizer remains authoritative for roster and next-episode changes.
+- Added asynchronous Hub acknowledgement after a generic Awards/prediction result is applied.
+- Added a main Admin `External Results Inbox` card with Refresh, Validate Ready, Apply Validated, and Retry Errors controls.
+- Automatic inbound apply remains OFF until production inbox routing is verified.
+- Bumped browser/service-worker assets to v311.
+
 ## v1.2.5 — Reality TV historical settled-result display
 
 - Historical Reality TV questions now read authoritative settled results from `CategoryResults`.

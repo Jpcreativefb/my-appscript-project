@@ -26,8 +26,8 @@ assert(picks.includes('"immunity-winner": "IMMUNITY"'), 'Immunity result label i
 assert(css.includes('.reality-profile-choice.is-result:not(.is-eliminated)'), 'Historical winner highlight style is missing.');
 assert(css.includes('.reality-result-badge'), 'Historical result badge style is missing.');
 assert(css.includes('.reality-eliminated-overlay'), 'Elimination overlay style must remain available.');
-assert(app.includes('310-reality-tv-historical-results'), 'App asset cache version not bumped.');
-assert(html.includes('310-reality-tv-historical-results'), 'HTML asset cache version not bumped.');
-assert(sw.includes('v310-reality-tv-historical-results'), 'Service worker cache version not bumped.');
+assert(app.includes('311-external-results-inbox'), 'App asset cache version not bumped.');
+assert(html.includes('311-external-results-inbox'), 'HTML asset cache version not bumped.');
+assert(sw.includes('v311-external-results-inbox'), 'Service worker cache version not bumped.');
 
 console.log('Reality TV historical settled-result display v1.2.5 tests passed.');

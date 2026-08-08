@@ -1,6 +1,6 @@
 /* =====================================================
-   EXTERNAL RESULTS HUB BRIDGE — REALITY TV COMPLETE MIRROR
-   Production v1.2.3
+   EXTERNAL RESULTS HUB BRIDGE — OUTBOUND + SAFE INBOUND
+   Production v1.2.6
 
    The Awards App remains authoritative. Local game actions
    only enqueue Hub work. A separate trigger performs the
@@ -845,4 +845,474 @@ function apiAdminRetryExternalResultsBridgeFailures(payload) {
     archived: archived,
     message: reset + " failed Hub job(s) queued for retry" + (archived ? "; " + archived + " obsolete legacy dependency error(s) archived." : ".")
   };
+}
+
+/* =====================================================
+   EXTERNAL RESULTS INBOX — VALIDATE / APPLY
+   Production v1.2.6
+
+   Approved Hub deliveries land in ExternalResultsInbox.
+   This layer validates complete mapped batches before any
+   local game state is changed. Sports/racing are intentionally
+   excluded. Reality TV is staged into its native durable queues;
+   Awards/prediction categories can be applied manually.
+===================================================== */
+
+const EXTERNAL_RESULTS_INBOX_ALLOWED_PROVIDERS = [
+  "manual-awards", "manual-reality-tv", "kalshi", "polymarket"
+];
+
+function externalResultsInboxProviderAllowed_(provider) {
+  return EXTERNAL_RESULTS_INBOX_ALLOWED_PROVIDERS.indexOf(externalResultsBridgeKey_(provider)) !== -1;
+}
+
+function externalResultsInboxNormalizeStatus_(status) {
+  return externalResultsBridgeString_(status || "READY").toUpperCase();
+}
+
+function externalResultsInboxGroupKey_(row) {
+  return [
+    externalResultsBridgeString_(row.DeliveryBatchId || row.ReviewId || row.ImportedResultId),
+    externalResultsBridgeString_(row.AppGameId),
+    externalResultsBridgeString_(row.CategoryId)
+  ].join("||");
+}
+
+function externalResultsInboxRows_() {
+  externalResultsBridgeEnsureSystem_();
+  return externalResultsBridgeReadObjects_(SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET));
+}
+
+function externalResultsInboxGroups_(statuses) {
+  const allowed = {};
+  (statuses || ["READY", "VALIDATED"]).forEach(function(status) {
+    allowed[externalResultsInboxNormalizeStatus_(status)] = true;
+  });
+  const groups = {};
+  externalResultsInboxRows_().forEach(function(row) {
+    if (!allowed[externalResultsInboxNormalizeStatus_(row.Status)]) return;
+    const key = externalResultsInboxGroupKey_(row);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(row);
+  });
+  return groups;
+}
+
+function externalResultsInboxSortedUnique_(values) {
+  return (values || []).map(externalResultsBridgeKey_).filter(Boolean).filter(function(value, index, all) {
+    return all.indexOf(value) === index;
+  }).sort();
+}
+
+function externalResultsInboxSameIds_(a, b) {
+  const left = externalResultsInboxSortedUnique_(a);
+  const right = externalResultsInboxSortedUnique_(b);
+  return left.length === right.length && left.every(function(value, index) { return value === right[index]; });
+}
+
+function externalResultsInboxWinnerIds_(rows) {
+  return externalResultsInboxSortedUnique_((rows || []).filter(function(row) {
+    return externalResultsBridgeBool_(row.IsWinner);
+  }).map(function(row) { return row.NomineeId; }));
+}
+
+function externalResultsInboxLooksLikePush_(rows) {
+  const row = (rows || [])[0] || {};
+  const text = [row.ResultValue, row.WinningOutcome, row.ResultKey]
+    .map(externalResultsBridgeString_).join(" ").toLowerCase();
+  const winners = externalResultsBridgeParseJson_(row.WinnersJSON, []);
+  return (!Array.isArray(winners) || winners.length === 0) &&
+    /(push|void|cancel|no[ -]?result|no[ -]?elimination|no official result)/i.test(text);
+}
+
+function externalResultsInboxRealityMain_(gameId, categoryId) {
+  if (typeof REALITY_TV_EPISODES_SHEET === "undefined") return null;
+  const sheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODES_SHEET);
+  if (!sheet) return null;
+  return externalResultsBridgeReadObjects_(sheet).find(function(row) {
+    return externalResultsBridgeKey_(row.GameId) === externalResultsBridgeKey_(gameId) &&
+      externalResultsBridgeKey_(row.CategoryId) === externalResultsBridgeKey_(categoryId);
+  }) || null;
+}
+
+function externalResultsInboxRealityQuestion_(gameId, categoryId) {
+  if (typeof REALITY_TV_EPISODE_QUESTIONS_SHEET === "undefined") return null;
+  const sheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODE_QUESTIONS_SHEET);
+  if (!sheet) return null;
+  return externalResultsBridgeReadObjects_(sheet).find(function(row) {
+    return externalResultsBridgeKey_(row.GameId) === externalResultsBridgeKey_(gameId) &&
+      externalResultsBridgeKey_(row.CategoryId) === externalResultsBridgeKey_(categoryId);
+  }) || null;
+}
+
+function externalResultsInboxExistingResolution_(gameId, categoryId) {
+  if (typeof getCategoryResultsResolutionMap !== "function") return null;
+  const map = getCategoryResultsResolutionMap(gameId) || {};
+  return map[externalResultsBridgeKey_(categoryId)] || map[externalResultsBridgeString_(categoryId)] || null;
+}
+
+function externalResultsInboxValidateGroup_(rows) {
+  rows = rows || [];
+  if (!rows.length) return { ok: false, error: "Inbox batch has no rows." };
+  const first = rows[0];
+  const provider = externalResultsBridgeKey_(first.Provider);
+  const gameId = externalResultsBridgeString_(first.AppGameId);
+  const categoryId = externalResultsBridgeString_(first.CategoryId);
+  if (!externalResultsInboxProviderAllowed_(provider)) {
+    return { ok: false, error: "Provider is not allowed through External Results Hub: " + provider + ". Sports and racing must use their native engines." };
+  }
+  if (!gameId || !categoryId) return { ok: false, error: "Inbox delivery is missing AppGameId or CategoryId." };
+  if (rows.some(function(row) { return externalResultsBridgeKey_(row.Provider) !== provider; })) {
+    return { ok: false, error: "Inbox batch mixes providers." };
+  }
+  if (rows.some(function(row) { return externalResultsBridgeKey_(row.Finality) !== "final"; })) {
+    return { ok: false, error: "Only FINAL Hub results may be applied." };
+  }
+
+  let setup;
+  try {
+    setup = adminGetGameSetup({ gameId: gameId });
+  } catch (err) {
+    return { ok: false, error: "Game Setup could not be loaded: " + (err.message || err) };
+  }
+  const category = (setup.categories || []).find(function(item) {
+    return externalResultsBridgeKey_(item.categoryId) === externalResultsBridgeKey_(categoryId);
+  });
+  if (!category) return { ok: false, error: "Mapped category was not found in the Awards App." };
+
+  const gameType = externalResultsBridgeKey_((setup.game || {}).type || (setup.game || {}).gameType);
+  if (["wager", "racing-wager"].indexOf(gameType) !== -1) {
+    return { ok: false, error: "Wager and racing games are not settled through External Results Hub." };
+  }
+
+  const nomineeIds = externalResultsInboxSortedUnique_((category.nominees || []).map(function(item) { return item.nomineeId; }));
+  const deliveredIds = externalResultsInboxSortedUnique_(rows.map(function(row) { return row.NomineeId; }));
+  const invalid = deliveredIds.filter(function(id) { return nomineeIds.indexOf(id) === -1; });
+  if (invalid.length) return { ok: false, error: "Inbox contains nominee IDs that do not exist in this category: " + invalid.join(", ") };
+  const missing = nomineeIds.filter(function(id) { return deliveredIds.indexOf(id) === -1; });
+  if (missing.length) {
+    return { ok: false, error: "Hub mapping coverage is incomplete for this category (" + deliveredIds.length + "/" + nomineeIds.length + "). Missing: " + missing.join(", ") };
+  }
+
+  const winnerIds = externalResultsInboxWinnerIds_(rows);
+  const isPush = externalResultsInboxLooksLikePush_(rows);
+  if (!winnerIds.length && !isPush) {
+    return { ok: false, error: "The FINAL result has no winning nominee. Correct the Hub mapping/result before applying." };
+  }
+
+  const existing = externalResultsInboxExistingResolution_(gameId, categoryId);
+  if (existing && ["winner", "push", "void", "cancelled", "canceled"].indexOf(externalResultsBridgeKey_(existing.result)) !== -1) {
+    const existingWinners = Array.isArray(existing.winnerNomineeIds) && existing.winnerNomineeIds.length
+      ? existing.winnerNomineeIds
+      : (existing.winnerNomineeId ? [existing.winnerNomineeId] : []);
+    const existingPush = ["push", "void", "cancelled", "canceled"].indexOf(externalResultsBridgeKey_(existing.result)) !== -1;
+    if ((isPush && existingPush) || (!isPush && externalResultsInboxSameIds_(existingWinners, winnerIds))) {
+      return {
+        ok: true, alreadyApplied: true, route: "NOOP", provider: provider, gameId: gameId,
+        categoryId: categoryId, category: category, setup: setup, winnerIds: winnerIds, isPush: isPush
+      };
+    }
+    return { ok: false, conflict: true, error: "This category is already settled with a different result. It was not overwritten." };
+  }
+
+  const realityMain = externalResultsInboxRealityMain_(gameId, categoryId);
+  const realityQuestion = realityMain ? null : externalResultsInboxRealityQuestion_(gameId, categoryId);
+  return {
+    ok: true,
+    alreadyApplied: false,
+    route: realityMain ? "REALITY_MAIN" : (realityQuestion ? "REALITY_QUESTION" : "GENERIC"),
+    provider: provider,
+    gameId: gameId,
+    categoryId: categoryId,
+    category: category,
+    setup: setup,
+    winnerIds: winnerIds,
+    isPush: isPush,
+    realityMain: realityMain,
+    realityQuestion: realityQuestion
+  };
+}
+
+function externalResultsInboxPatchRows_(rows, patch) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET);
+  (rows || []).forEach(function(row) {
+    externalResultsBridgeUpdateRow_(sheet, row.__rowNumber, patch);
+  });
+}
+
+function externalResultsInboxStageRealityQuestion_(validation, rows, username) {
+  if (typeof realityTvEnsureQuestionPackSystem_ !== "function") throw new Error("Reality TV question system is not installed.");
+  realityTvEnsureQuestionPackSystem_();
+  const question = validation.realityQuestion;
+  if (!question) throw new Error("Reality TV episode question was not found.");
+  const existing = realityTvQuestionQueueForSeason_(question.SeasonId).find(function(row) {
+    return realityTvKey_(row.EpisodeQuestionId) === realityTvKey_(question.EpisodeQuestionId) &&
+      ["pending", "approving"].indexOf(realityTvKey_(row.ReviewStatus)) !== -1;
+  });
+  if (existing) {
+    const existingIds = realityTvQuestionSelectedIds_(existing);
+    if (!externalResultsInboxSameIds_(existingIds, validation.winnerIds) && !(validation.isPush && !existingIds.length)) {
+      throw new Error("Reality TV question already has a different pending local result.");
+    }
+    return { staged: true, queueId: existing.QueueId, existing: true };
+  }
+
+  const options = realityTvParseJson_(question.AnswerOptionsJSON, []);
+  const winnerMap = {};
+  validation.winnerIds.forEach(function(id) { winnerMap[realityTvKey_(id)] = true; });
+  const selected = options.filter(function(item) { return !!winnerMap[realityTvKey_(item.id)]; });
+  if (!validation.isPush && selected.length !== validation.winnerIds.length) {
+    throw new Error("One or more Hub winners are not valid answer options for the Reality TV question.");
+  }
+  const labels = selected.map(function(item) { return realityTvString_(item.label); }).filter(Boolean);
+  const first = rows[0] || {};
+  const now = new Date();
+  const queue = {
+    QueueId: realityTvId_("rtq-queue"), SeasonId: question.SeasonId, GameId: question.GameId,
+    EpisodeId: question.EpisodeId, EpisodeNumber: question.EpisodeNumber,
+    EpisodeQuestionId: question.EpisodeQuestionId, CategoryId: question.CategoryId,
+    QuestionType: question.QuestionType, ResultKey: question.ResultKey,
+    ResultMode: validation.isPush ? "push" : (validation.winnerIds.length > 1 ? "multiple-winners" : "winner"),
+    SelectedOutcomeIdsJSON: JSON.stringify(validation.isPush ? [] : validation.winnerIds),
+    SelectedOutcomeLabelsJSON: JSON.stringify(labels), SelectedOutcomeId: validation.winnerIds[0] || "",
+    SelectedOutcomeLabel: validation.isPush ? "Push / no official result" : labels.join(", "),
+    ReviewStatus: "PENDING", EvidenceUrl: externalResultsBridgeString_(first.EvidenceUrl),
+    Notes: "Staged from approved External Results Hub result " + externalResultsBridgeString_(first.ImportedResultId),
+    SubmittedBy: username || "external-results-hub", SubmittedAt: now, ReviewedBy: "", ReviewedAt: "",
+    PushStatus: "NOT PUSHED", ApprovalStage: "", ApprovalStartedAt: "", ApprovalCompletedAt: "",
+    ApprovalAttemptCount: 0, ApprovalStageStartedAt: "", ApprovalHeartbeatAt: "", PushedAt: "",
+    HubImportedResultId: externalResultsBridgeString_(first.ImportedResultId), HubReviewId: externalResultsBridgeString_(first.ReviewId),
+    ErrorMessage: "", UpdatedAt: now
+  };
+  realityTvAppendObject_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_QUESTION_QUEUE_SHEET), queue);
+  realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODE_QUESTIONS_SHEET), question.__rowNumber, {
+    ResultQueueId: queue.QueueId, Status: "REVIEW", UpdatedAt: now
+  });
+  return { staged: true, queueId: queue.QueueId, existing: false };
+}
+
+function externalResultsInboxStageRealityMain_(validation, rows, username) {
+  if (typeof realityTvEnsureSystem_ !== "function") throw new Error("Reality TV system is not installed.");
+  realityTvEnsureSystem_();
+  const episode = validation.realityMain;
+  const season = realityTvGetSeason_(episode.SeasonId);
+  if (!season) throw new Error("Reality TV season was not found.");
+  const existing = realityTvQueueForSeason_(season.SeasonId).find(function(row) {
+    return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId) &&
+      ["pending", "approving"].indexOf(realityTvKey_(row.ReviewStatus)) !== -1;
+  });
+  if (existing) {
+    const existingIds = realityTvParseJson_(existing.SelectedContestantIds, []).map(realityTvKey_).filter(Boolean);
+    if (!externalResultsInboxSameIds_(existingIds, validation.winnerIds) && !(validation.isPush && !existingIds.length)) {
+      throw new Error("Reality TV episode already has a different pending local elimination result.");
+    }
+    return { staged: true, queueId: existing.QueueId, existing: true };
+  }
+
+  const contestantIds = externalResultsInboxSortedUnique_(realityTvContestantsForSeason_(season.SeasonId).map(function(row) { return row.ContestantId; }));
+  const invalid = validation.winnerIds.filter(function(id) { return contestantIds.indexOf(realityTvKey_(id)) === -1; });
+  if (invalid.length) throw new Error("Hub elimination winner is not a Reality TV contestant: " + invalid.join(", "));
+  const outcomeType = validation.isPush ? "no-elimination" :
+    (validation.winnerIds.length === 1 ? "elimination" : (validation.winnerIds.length === 2 ? "double-elimination" : "multiple-elimination"));
+  const first = rows[0] || {};
+  const now = new Date();
+  const queue = {
+    QueueId: realityTvId_("rt-queue"), SeasonId: season.SeasonId, GameId: season.GameId,
+    EpisodeId: episode.EpisodeId, EpisodeNumber: episode.EpisodeNumber, CategoryId: episode.CategoryId,
+    OutcomeType: outcomeType, SelectedContestantIds: JSON.stringify(validation.isPush ? [] : validation.winnerIds),
+    ReviewStatus: "PENDING", EvidenceUrl: externalResultsBridgeString_(first.EvidenceUrl),
+    Notes: "Staged from approved External Results Hub result " + externalResultsBridgeString_(first.ImportedResultId),
+    SubmittedBy: username || "external-results-hub", SubmittedAt: now, ReviewedBy: "", ReviewedAt: "",
+    PushStatus: "NOT PUSHED", ApprovalStage: "", ApprovalStartedAt: "", ApprovalCompletedAt: "",
+    ApprovalAttemptCount: 0, ApprovalStageStartedAt: "", ApprovalHeartbeatAt: "", ApprovalQuestionBuildId: "",
+    PushedAt: "", NextEpisodeId: "", HubImportedResultId: externalResultsBridgeString_(first.ImportedResultId),
+    HubReviewId: externalResultsBridgeString_(first.ReviewId), EpisodeFinalizeMode: "", ApprovalQuestionQueueIdsJSON: "[]",
+    ApprovalQuestionCompletedCount: 0, ApprovalQuestionTotalCount: 0, ApprovalCurrentQuestionQueueId: "",
+    ApprovalCurrentQuestionLabel: "", ApprovalQuestionScoresRecalculated: false, NextEpisodeJobId: "",
+    ErrorMessage: "", UpdatedAt: now
+  };
+  realityTvAppendObject_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET), queue);
+  realityTvUpdateObjectRow_(SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODES_SHEET), episode.__rowNumber, {
+    ResultQueueId: queue.QueueId, OutcomeType: outcomeType, Status: "REVIEW", UpdatedAt: now
+  });
+  return { staged: true, queueId: queue.QueueId, existing: false };
+}
+
+function externalResultsInboxQueueHubAck_(rows, message) {
+  const first = (rows || [])[0] || {};
+  if (!first.ReviewId || typeof externalResultsBridgeEnqueue_ !== "function") return { skipped: true };
+  const now = new Date();
+  return externalResultsBridgeEnqueue_("UPDATE_REVIEW", first.ReviewId, first.Provider, {
+    review: {
+      ReviewId: first.ReviewId, ImportedResultId: first.ImportedResultId, Provider: first.Provider,
+      ReviewStatus: "APPROVED", ReviewedBy: "Awards App", ReviewedAt: now,
+      PushStatus: "PUSHED", PushedAt: now, PushMessage: message || "Applied by Awards App from ExternalResultsInbox.", UpdatedAt: now
+    },
+    importedResult: {
+      ImportedResultId: first.ImportedResultId, Provider: first.Provider,
+      ReviewStatus: "APPROVED", ReviewRequired: true, UpdatedAt: now
+    }
+  });
+}
+
+function externalResultsInboxApplyGeneric_(validation, rows, username) {
+  const category = validation.category;
+  const first = rows[0] || {};
+  const winnerLookup = {};
+  validation.winnerIds.forEach(function(id) { winnerLookup[externalResultsBridgeKey_(id)] = true; });
+  const now = new Date();
+  const resultPayloads = (category.nominees || []).map(function(nominee) {
+    return {
+      gameId: validation.gameId,
+      categoryId: validation.categoryId,
+      nomineeId: nominee.nomineeId,
+      resultStatus: validation.isPush ? "push" : "settled",
+      isWinner: !validation.isPush && !!winnerLookup[externalResultsBridgeKey_(nominee.nomineeId)],
+      resultValue: externalResultsBridgeString_(first.ResultValue || first.WinningOutcome),
+      resultSource: "external-results-hub:" + validation.provider,
+      settledAt: now,
+      timestamp: now,
+      notes: "ImportedResultId=" + externalResultsBridgeString_(first.ImportedResultId) +
+        "; ReviewId=" + externalResultsBridgeString_(first.ReviewId) +
+        "; DeliveryBatchId=" + externalResultsBridgeString_(first.DeliveryBatchId)
+    };
+  });
+  if (typeof upsertCategoryResultsBulk_ === "function") upsertCategoryResultsBulk_(resultPayloads);
+  else resultPayloads.forEach(function(item) { upsertCategoryResult_(item); });
+
+  adminUpdateCategory({
+    gameId: validation.gameId,
+    categoryId: validation.categoryId,
+    locked: true,
+    winnerNomineeId: validation.winnerIds.length === 1 ? validation.winnerIds[0] : "",
+    settlementStatus: validation.isPush ? "push" : "settled",
+    resultSource: "external-results-hub",
+    resultSourceType: "external",
+    resultProvider: validation.provider,
+    externalEventId: externalResultsBridgeString_(first.ExternalEventId),
+    externalMarketId: externalResultsBridgeString_(first.ExternalMarketId),
+    statKey: externalResultsBridgeString_(first.ResultKey),
+    autoSettle: false,
+    requireAdminReview: true,
+    username: username || "administrator",
+    notes: "Applied from approved External Results Hub delivery " + externalResultsBridgeString_(first.DeliveryBatchId)
+  });
+  if (typeof clearAppCaches === "function") clearAppCaches();
+  externalResultsInboxQueueHubAck_(rows, "Applied to Awards App category " + validation.categoryId + ".");
+  return { applied: true, route: "GENERIC" };
+}
+
+function externalResultsInboxSummary_() {
+  externalResultsBridgeEnsureSystem_();
+  const rows = externalResultsInboxRows_();
+  const counts = {};
+  rows.forEach(function(row) {
+    const status = externalResultsInboxNormalizeStatus_(row.Status);
+    counts[status] = (counts[status] || 0) + 1;
+  });
+  const groups = {};
+  rows.forEach(function(row) {
+    const key = externalResultsInboxGroupKey_(row);
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(row);
+  });
+  const groupSummary = Object.keys(groups).map(function(key) {
+    const batch = groups[key];
+    const first = batch[0] || {};
+    return {
+      deliveryBatchId: externalResultsBridgeString_(first.DeliveryBatchId), reviewId: externalResultsBridgeString_(first.ReviewId),
+      importedResultId: externalResultsBridgeString_(first.ImportedResultId), provider: externalResultsBridgeString_(first.Provider),
+      gameId: externalResultsBridgeString_(first.AppGameId), categoryId: externalResultsBridgeString_(first.CategoryId),
+      resultKey: externalResultsBridgeString_(first.ResultKey), resultValue: externalResultsBridgeString_(first.ResultValue),
+      status: externalResultsInboxNormalizeStatus_(first.Status), rowCount: batch.length,
+      winnerIds: externalResultsInboxWinnerIds_(batch), error: externalResultsBridgeString_(first.ErrorMessage)
+    };
+  }).sort(function(a, b) {
+    return String(b.deliveryBatchId || "").localeCompare(String(a.deliveryBatchId || ""));
+  });
+  return { success: true, counts: counts, totalRows: rows.length, batches: groupSummary.slice(0, 25), autoApply: false };
+}
+
+function apiAdminGetExternalResultsInboxStatus(payload) {
+  requireAdmin_(payload || {});
+  return externalResultsInboxSummary_();
+}
+
+function apiAdminValidateExternalResultsInbox(payload) {
+  requireAdmin_(payload || {});
+  const groups = externalResultsInboxGroups_(["READY", "VALIDATED"]);
+  let validated = 0;
+  let alreadyApplied = 0;
+  let errors = 0;
+  Object.keys(groups).forEach(function(key) {
+    const rows = groups[key];
+    const result = externalResultsInboxValidateGroup_(rows);
+    if (!result.ok) {
+      externalResultsInboxPatchRows_(rows, { Status: "ERROR", ErrorMessage: result.error || "Inbox validation failed.", LastAttemptAt: new Date(), UpdatedAt: new Date() });
+      errors += 1;
+      return;
+    }
+    if (result.alreadyApplied) {
+      externalResultsInboxPatchRows_(rows, { Status: "APPLIED", AppliedAt: new Date(), ErrorMessage: "Already settled locally with the same result; no duplicate settlement was written.", UpdatedAt: new Date() });
+      externalResultsInboxQueueHubAck_(rows, "Awards App already had the same settled result; delivery confirmed idempotently.");
+      alreadyApplied += 1;
+      return;
+    }
+    externalResultsInboxPatchRows_(rows, { Status: "VALIDATED", ErrorMessage: "", LastAttemptAt: new Date(), UpdatedAt: new Date() });
+    validated += 1;
+  });
+  return { success: errors === 0, validated: validated, alreadyApplied: alreadyApplied, errors: errors, summary: externalResultsInboxSummary_() };
+}
+
+function apiAdminApplyExternalResultsInbox(payload) {
+  requireAdmin_(payload || {});
+  const username = externalResultsBridgeString_((payload || {}).username || "administrator");
+  const groups = externalResultsInboxGroups_(["VALIDATED"]);
+  let applied = 0;
+  let stagedReality = 0;
+  let errors = 0;
+  Object.keys(groups).forEach(function(key) {
+    const rows = groups[key];
+    const validation = externalResultsInboxValidateGroup_(rows);
+    if (!validation.ok) {
+      externalResultsInboxPatchRows_(rows, { Status: "ERROR", ErrorMessage: validation.error || "Inbox apply validation failed.", LastAttemptAt: new Date(), UpdatedAt: new Date() });
+      errors += 1;
+      return;
+    }
+    try {
+      if (validation.alreadyApplied) {
+        externalResultsInboxPatchRows_(rows, { Status: "APPLIED", AppliedAt: new Date(), ErrorMessage: "Already settled locally with the same result.", UpdatedAt: new Date() });
+        externalResultsInboxQueueHubAck_(rows, "Awards App already had the same settled result; delivery confirmed idempotently.");
+        applied += 1;
+      } else if (validation.route === "REALITY_QUESTION") {
+        const staged = externalResultsInboxStageRealityQuestion_(validation, rows, username);
+        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", ErrorMessage: "Staged in Reality TV question review queue: " + staged.queueId, UpdatedAt: new Date() });
+        stagedReality += 1;
+      } else if (validation.route === "REALITY_MAIN") {
+        const staged = externalResultsInboxStageRealityMain_(validation, rows, username);
+        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", ErrorMessage: "Staged in Reality TV episode review queue: " + staged.queueId, UpdatedAt: new Date() });
+        stagedReality += 1;
+      } else {
+        externalResultsInboxApplyGeneric_(validation, rows, username);
+        externalResultsInboxPatchRows_(rows, { Status: "APPLIED", AppliedAt: new Date(), ErrorMessage: "", UpdatedAt: new Date() });
+        applied += 1;
+      }
+    } catch (err) {
+      externalResultsInboxPatchRows_(rows, { Status: "ERROR", AttemptCount: Number((rows[0] || {}).AttemptCount || 0) + 1, LastAttemptAt: new Date(), ErrorMessage: err.message || String(err), UpdatedAt: new Date() });
+      errors += 1;
+    }
+  });
+  return { success: errors === 0, applied: applied, stagedReality: stagedReality, errors: errors, summary: externalResultsInboxSummary_() };
+}
+
+function apiAdminRetryExternalResultsInboxErrors(payload) {
+  requireAdmin_(payload || {});
+  const sheet = SpreadsheetApp.getActive().getSheetByName(EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET);
+  let reset = 0;
+  externalResultsInboxRows_().forEach(function(row) {
+    if (externalResultsInboxNormalizeStatus_(row.Status) !== "ERROR") return;
+    externalResultsBridgeUpdateRow_(sheet, row.__rowNumber, { Status: "READY", ErrorMessage: "", UpdatedAt: new Date() });
+    reset += 1;
+  });
+  return { success: true, reset: reset, summary: externalResultsInboxSummary_() };
 }

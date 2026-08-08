@@ -59,8 +59,8 @@ assert(player.includes('(penalty > 0 || maxChanges > 0)'));
 assert(css.includes('overflow-wrap: anywhere'));
 assert(css.includes('white-space: normal'));
 assert(app.includes('startPageLoadPulse_'));
-assert(app.includes('310-reality-tv-historical-results'));
-assert(html.includes('310-reality-tv-historical-results'));
-assert(sw.includes('310-reality-tv-historical-results'));
+assert(app.includes('311-external-results-inbox'));
+assert(html.includes('311-external-results-inbox'));
+assert(sw.includes('311-external-results-inbox'));
 
 console.log('Reality TV player flow v1.1.6 tests passed.');

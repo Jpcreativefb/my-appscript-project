@@ -1,3 +1,20 @@
+# Production Status
+
+Current candidate: **v1.2.6 External Results Inbox validation and safe apply**
+
+- External Results Hub approved deliveries are validated before any local scoring state is changed.
+- Allowed providers are Manual Awards, Manual Reality TV, Kalshi, and Polymarket only.
+- Sports/Racing providers are rejected and remain on their native engines.
+- Awards/prediction results can be manually applied through the standard CategoryResults/category settlement path.
+- Reality TV results are staged into the native Reality queues instead of bypassing durable episode finalization.
+- Complete category mapping coverage and settlement-conflict checks are mandatory.
+- Matching already-applied results are handled idempotently.
+- Automatic inbound apply is OFF for this verification release.
+- Awards App backend + frontend deployment required; separate Hub Apps Script deployment is not required.
+- 67 regression test files and 180 JavaScript syntax checks passed before packaging.
+
+---
+
 ## Reality TV historical results completed in v1.2.5
 
 - Historical Extra Questions display their settled result directly on the matching answer card.

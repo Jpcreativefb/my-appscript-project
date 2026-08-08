@@ -217,6 +217,27 @@ async function renderAdminPage() {
 
         </div>
 
+        <div class="card admin-card">
+
+          <h2>External Results Inbox</h2>
+
+          <div class="admin-sub">
+            Approved Awards, Reality TV, Kalshi, and Polymarket results arrive here before the Awards App changes scoring. Sports and racing never use this inbox. Automatic apply is off while we verify the bridge.
+          </div>
+
+          <div id="adminExternalResultsInboxStatus" class="admin-message">Checking External Results Inbox…</div>
+
+          <div class="admin-actions">
+            <button class="button admin-button secondary" onclick="adminExternalResultsInboxRefresh(this)">Refresh Status</button>
+            <button class="button admin-button secondary" onclick="adminExternalResultsInboxValidate(this)">Validate Ready</button>
+            <button class="button admin-button" onclick="adminExternalResultsInboxApply(this)">Apply Validated</button>
+            <button class="button admin-button secondary" onclick="adminExternalResultsInboxRetry(this)">Retry Errors</button>
+          </div>
+
+          <div id="adminExternalResultsInboxBatches" class="admin-list"></div>
+
+        </div>
+
         <div class="card">
 
           <h2>Category Controls</h2>
@@ -535,6 +556,88 @@ function adminEnhanceMainAdminSections() {
     heading.remove();
     details.appendChild(child);
   });
+
+  if (typeof adminExternalResultsInboxRefresh === "function") {
+    setTimeout(function() { adminExternalResultsInboxRefresh(null, true); }, 0);
+  }
+}
+
+function adminExternalResultsInboxCount_(counts, key) {
+  return Number((counts || {})[key] || 0);
+}
+
+function adminExternalResultsInboxRender_(res) {
+  const status = document.getElementById("adminExternalResultsInboxStatus");
+  const batches = document.getElementById("adminExternalResultsInboxBatches");
+  if (!status || !res) return;
+  const counts = res.counts || {};
+  const ready = adminExternalResultsInboxCount_(counts, "READY");
+  const validated = adminExternalResultsInboxCount_(counts, "VALIDATED");
+  const staged = adminExternalResultsInboxCount_(counts, "STAGED_REALITY");
+  const applied = adminExternalResultsInboxCount_(counts, "APPLIED");
+  const errors = adminExternalResultsInboxCount_(counts, "ERROR");
+  status.className = "admin-message " + (errors ? "warning" : (ready || validated ? "" : "success"));
+  status.innerHTML = `<b>${ready}</b> ready · <b>${validated}</b> validated · <b>${staged}</b> staged to Reality TV · <b>${applied}</b> applied · <b>${errors}</b> errors · Automatic apply OFF`;
+  if (!batches) return;
+  const rows = Array.isArray(res.batches) ? res.batches.slice(0, 12) : [];
+  batches.innerHTML = rows.length ? rows.map(function(row) {
+    const winners = (row.winnerIds || []).join(", ") || "—";
+    const error = row.error ? `<div class="admin-sub">${escapeHtml_(row.error)}</div>` : "";
+    return `<div class="admin-list-row"><div><b>${escapeHtml_(row.gameId || "Unknown game")}</b> · ${escapeHtml_(row.categoryId || "Unknown category")}<div class="admin-sub">${escapeHtml_(row.provider || "")} · ${escapeHtml_(row.resultKey || "result")} · Winner(s): ${escapeHtml_(winners)}</div>${error}</div><span class="admin-pill">${escapeHtml_(row.status || "")}</span></div>`;
+  }).join("") : `<div class="admin-sub">No inbox deliveries yet.</div>`;
+}
+
+async function adminExternalResultsInboxRefresh(button, silent) {
+  const status = document.getElementById("adminExternalResultsInboxStatus");
+  if (!status) return;
+  if (!silent) status.textContent = "Refreshing External Results Inbox…";
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminGetExternalResultsInboxStatus();
+    if (!res || res.success === false) throw new Error((res && res.error) || "Could not read External Results Inbox.");
+    adminExternalResultsInboxRender_(res);
+  } catch (err) {
+    status.className = "admin-message error";
+    status.textContent = err && err.message ? err.message : String(err);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+async function adminExternalResultsInboxValidate(button) {
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminValidateExternalResultsInbox();
+    adminExternalResultsInboxRender_((res && res.summary) || res);
+  } catch (err) {
+    const status = document.getElementById("adminExternalResultsInboxStatus");
+    if (status) { status.className = "admin-message error"; status.textContent = err.message || String(err); }
+  } finally { if (button) button.disabled = false; }
+}
+
+async function adminExternalResultsInboxApply(button) {
+  if (!confirm("Apply all VALIDATED Awards/prediction results and stage validated Reality TV results into the Reality TV Manager? Sports/racing are excluded.")) return;
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminApplyExternalResultsInbox();
+    adminExternalResultsInboxRender_((res && res.summary) || res);
+    const status = document.getElementById("adminExternalResultsInboxStatus");
+    if (status && res) status.title = `${Number(res.applied || 0)} applied; ${Number(res.stagedReality || 0)} staged to Reality TV; ${Number(res.errors || 0)} errors.`;
+  } catch (err) {
+    const status = document.getElementById("adminExternalResultsInboxStatus");
+    if (status) { status.className = "admin-message error"; status.textContent = err.message || String(err); }
+  } finally { if (button) button.disabled = false; }
+}
+
+async function adminExternalResultsInboxRetry(button) {
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminRetryExternalResultsInboxErrors();
+    adminExternalResultsInboxRender_((res && res.summary) || res);
+  } catch (err) {
+    const status = document.getElementById("adminExternalResultsInboxStatus");
+    if (status) { status.className = "admin-message error"; status.textContent = err.message || String(err); }
+  } finally { if (button) button.disabled = false; }
 }
 
 async function renderAdminGamesPanel() {

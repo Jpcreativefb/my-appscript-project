@@ -48,6 +48,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetRealityTvDashboard",
     "adminGetRealityTvDashboardSummary",
     "adminGetRealityTvSeasonDetails",
+    "adminValidateExternalResultsInbox",
+    "adminApplyExternalResultsInbox",
     "adminCreateRealityTvSeason",
     "adminBulkAddRealityTvContestants",
     "adminAddRealityTvCustomQuestionTemplate",
@@ -1677,6 +1679,22 @@ async function apiAdminRetryExternalResultsBridgeFailures() {
 
 async function apiAdminRequeueUnverifiedExternalResultsBridgeJobs() {
   return apiAdminRealityTvRequest_("adminRequeueUnverifiedExternalResultsBridgeJobs", {});
+}
+
+async function apiAdminGetExternalResultsInboxStatus() {
+  return apiAdminRealityTvRequest_("adminGetExternalResultsInboxStatus", {});
+}
+
+async function apiAdminValidateExternalResultsInbox() {
+  return apiAdminRealityTvRequest_("adminValidateExternalResultsInbox", {});
+}
+
+async function apiAdminApplyExternalResultsInbox() {
+  return apiAdminRealityTvRequest_("adminApplyExternalResultsInbox", {});
+}
+
+async function apiAdminRetryExternalResultsInboxErrors() {
+  return apiAdminRealityTvRequest_("adminRetryExternalResultsInboxErrors", {});
 }
 
 async function apiAdminGetRealityTvDashboard() {

@@ -1089,3 +1089,20 @@ COMPLETE
 
 The season-details response includes `nextEpisodeJobs` with computed state for the admin progress card.
 
+
+---
+
+## External Results Inbox — v1.2.6
+
+Administrator-only endpoints:
+
+```txt
+?action=adminGetExternalResultsInboxStatus
+?action=adminValidateExternalResultsInbox
+?action=adminApplyExternalResultsInbox
+?action=adminRetryExternalResultsInboxErrors
+```
+
+`adminGetExternalResultsInboxStatus` returns status counts plus recent delivery batches. `adminValidateExternalResultsInbox` validates READY batches without changing game scoring. `adminApplyExternalResultsInbox` applies VALIDATED Awards/prediction batches through normal category settlement and stages Reality TV batches into their native review queues. `adminRetryExternalResultsInboxErrors` returns ERROR rows to READY for correction/revalidation.
+
+Automatic inbound application is disabled in v1.2.6.
