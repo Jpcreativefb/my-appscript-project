@@ -406,7 +406,10 @@ function erhNormalizeKalshiEvent_(event, baseUrl) {
 function erhNormalizeKalshiMarket_(market, event, baseUrl) {
   const id = erhString_(market.ticker || market.market_ticker || market.id);
   const eventId = erhString_(market.event_ticker || (event && (event.event_ticker || event.ticker)));
-  const settlement = Number(market.settlement_value_dollars);
+  const settlementRaw = market.settlement_value_dollars;
+  const settlement = settlementRaw === undefined || settlementRaw === null || erhString_(settlementRaw) === ""
+    ? NaN
+    : Number(settlementRaw);
   const hasSettlement = Number.isFinite(settlement);
   const winner = hasSettlement && settlement === 1
     ? "Yes"
@@ -443,10 +446,16 @@ function erhNormalizeKalshiMarket_(market, event, baseUrl) {
 }
 
 function erhMaybeImportKalshiResult_(market, event, normalized) {
-  const settlement = Number(market.settlement_value_dollars);
+  const settlementRaw = market.settlement_value_dollars;
+  const settlement = settlementRaw === undefined || settlementRaw === null || erhString_(settlementRaw) === ""
+    ? NaN
+    : Number(settlementRaw);
   const resultText = erhKey_(market.result || market.winning_outcome);
-  let winner = normalized.WinningOutcome;
+  const status = erhKey_(market.status);
+  const hasSettlementMarker = Boolean(market.settlement_ts) || status === "settled";
+  let winner = hasSettlementMarker ? normalized.WinningOutcome : "";
 
+  if (!hasSettlementMarker) return null;
   if (!winner && resultText === "yes") winner = "Yes";
   if (!winner && resultText === "no") winner = "No";
   if (!winner && Number.isFinite(settlement) && settlement === 1) winner = "Yes";
@@ -577,5 +586,205 @@ function erhMaybeImportPolymarketResult_(market, event, normalized) {
     EvidenceUrl: normalized.ResolutionSource || normalized.SourceUrl,
     SourceUrl: normalized.SourceUrl,
     RawJSON: JSON.stringify({ market: market, event: event || null })
+  });
+}
+
+
+/* =====================================================
+   MAPPED PROVIDER RESULT WATCH — Production v1.2.8
+
+   Broad provider sync remains a manual discovery tool. The
+   recurring watch polls only markets that have active AppMappings,
+   so the Hub does not repeatedly crawl unrelated markets.
+===================================================== */
+
+const ERH_MAPPED_PROVIDER_TRIGGER = "erhScheduledMappedProviderSync";
+
+function erhMappedProviderTargets_(providerId) {
+  const providerKey = erhKey_(providerId);
+  const mappings = erhReadObjects_(ERH_SHEETS.MAPPINGS).filter(function(mapping) {
+    return erhBoolean_(mapping.Active, true) &&
+      erhKey_(mapping.Provider) === providerKey &&
+      Boolean(erhString_(mapping.ExternalMarketId));
+  });
+  const seen = {};
+  return mappings.map(function(mapping) {
+    return {
+      externalMarketId: erhString_(mapping.ExternalMarketId),
+      externalEventId: erhString_(mapping.ExternalEventId)
+    };
+  }).filter(function(target) {
+    const key = erhKey_(target.externalMarketId);
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+}
+
+function syncMappedExternalProvidersNow() {
+  erhEnsureHubReady_();
+  const results = [];
+  const kalshi = erhGetProviderSetting_("kalshi");
+  const polymarket = erhGetProviderSetting_("polymarket");
+  if (kalshi && erhBoolean_(kalshi.Enabled, false)) results.push(syncMappedKalshiNow());
+  if (polymarket && erhBoolean_(polymarket.Enabled, false)) results.push(syncMappedPolymarketNow());
+  SpreadsheetApp.getActive().toast("Mapped provider results refreshed.", "External Results Hub", 7);
+  return { success: results.every(function(result) { return result && result.success !== false; }), providers: results };
+}
+
+function syncMappedKalshiNow() {
+  erhEnsureHubReady_();
+  return erhRunProviderSync_("kalshi", function(provider, config, stats) {
+    const baseUrl = erhString_(provider.BaseUrl) || "https://external-api.kalshi.com/trade-api/v2";
+    const targets = erhMappedProviderTargets_("kalshi");
+    stats.mappedTargets = targets.length;
+    targets.forEach(function(target) {
+      const payload = erhFetchKalshiMappedMarket_(baseUrl, target.externalMarketId, stats);
+      const market = payload && (payload.market || (payload.markets && payload.markets[0]) || payload);
+      if (!market || !erhString_(market.ticker || market.market_ticker || market.id)) {
+        throw new Error("Kalshi mapped market was not found: " + target.externalMarketId);
+      }
+
+      let event = null;
+      const eventTicker = erhString_(market.event_ticker || target.externalEventId);
+      if (eventTicker) {
+        try {
+          const eventPayload = erhFetchJson_(baseUrl + "/events/" + encodeURIComponent(eventTicker), stats);
+          event = eventPayload.event || eventPayload;
+          const eventResult = erhUpsertExternalEvent_(erhNormalizeKalshiEvent_(event, baseUrl));
+          if (eventResult.created || eventResult.updated) stats.eventsUpserted += 1;
+        } catch (eventErr) {
+          // A market result can still be processed when optional event metadata is unavailable.
+        }
+      }
+
+      const normalized = erhNormalizeKalshiMarket_(market, event, baseUrl);
+      const marketResult = erhUpsertExternalMarket_(normalized);
+      if (marketResult.created || marketResult.updated) stats.marketsUpserted += 1;
+      stats.subjectsUpserted += erhUpsertOutcomeSubjects_(
+        "kalshi", normalized.ExternalEventId, normalized.ExternalMarketId,
+        ["Yes", "No"], "", normalized.SourceUrl, { marketQuestion: normalized.MarketQuestion }
+      );
+      const imported = erhMaybeImportKalshiResult_(market, event, normalized);
+      if (imported && !imported.duplicate) stats.resultsImported += 1;
+      if (imported && imported.queueCreated) stats.queueRowsCreated += 1;
+    });
+  });
+}
+
+function erhFetchKalshiMappedMarket_(baseUrl, ticker, stats) {
+  try {
+    return erhFetchJson_(baseUrl + "/markets/" + encodeURIComponent(ticker), stats);
+  } catch (err) {
+    if (String(err && err.message || err).indexOf("HTTP 404") === -1) throw err;
+    // Kalshi moves older settled markets to the historical endpoint.
+    return erhFetchJson_(
+      baseUrl + "/historical/markets?" + erhQueryString_({ tickers: ticker, limit: 10 }),
+      stats
+    );
+  }
+}
+
+function syncMappedPolymarketNow() {
+  erhEnsureHubReady_();
+  return erhRunProviderSync_("polymarket", function(provider, config, stats) {
+    const baseUrl = erhString_(provider.BaseUrl) || "https://gamma-api.polymarket.com";
+    const targets = erhMappedProviderTargets_("polymarket");
+    stats.mappedTargets = targets.length;
+    targets.forEach(function(target) {
+      const market = erhFetchPolymarketMappedMarket_(baseUrl, target.externalMarketId, stats);
+      if (!market || !erhString_(market.id || market.conditionId || market.slug)) {
+        throw new Error("Polymarket mapped market was not found: " + target.externalMarketId);
+      }
+
+      const linkedEvent = Array.isArray(market.events) && market.events.length ? market.events[0] : null;
+      if (linkedEvent) {
+        const eventResult = erhUpsertExternalEvent_(erhNormalizePolymarketEvent_(linkedEvent, baseUrl));
+        if (eventResult.created || eventResult.updated) stats.eventsUpserted += 1;
+      }
+      const normalized = erhNormalizePolymarketMarket_(market, linkedEvent, baseUrl);
+      const marketResult = erhUpsertExternalMarket_(normalized);
+      if (marketResult.created || marketResult.updated) stats.marketsUpserted += 1;
+      const outcomes = erhParseArray_(market.outcomes || normalized.OutcomesJSON);
+      stats.subjectsUpserted += erhUpsertOutcomeSubjects_(
+        "polymarket", normalized.ExternalEventId, normalized.ExternalMarketId,
+        outcomes, erhString_(market.image || market.icon), normalized.SourceUrl,
+        { marketQuestion: normalized.MarketQuestion }
+      );
+      const imported = erhMaybeImportPolymarketResult_(market, linkedEvent, normalized);
+      if (imported && !imported.duplicate) stats.resultsImported += 1;
+      if (imported && imported.queueCreated) stats.queueRowsCreated += 1;
+    });
+  });
+}
+
+function erhFetchPolymarketMappedMarket_(baseUrl, marketId, stats) {
+  const target = erhString_(marketId);
+  if (/^\d+$/.test(target)) {
+    return erhFetchJson_(baseUrl + "/markets/" + encodeURIComponent(target), stats);
+  }
+  const payload = erhFetchJson_(baseUrl + "/markets?" + erhQueryString_({ slug: target }), stats);
+  const rows = Array.isArray(payload) ? payload : (payload.markets || []);
+  return rows[0] || null;
+}
+
+function erhProviderSyncDue_(provider, now) {
+  if (!provider || !erhBoolean_(provider.Enabled, false)) return false;
+  const intervalMinutes = Math.max(60, Number(provider.PollingIntervalMinutes || 60));
+  const last = new Date(provider.LastSuccessfulSync || 0).getTime();
+  if (!last || isNaN(last)) return true;
+  return (now.getTime() - last) >= intervalMinutes * 60 * 1000;
+}
+
+function erhScheduledMappedProviderSync() {
+  erhEnsureHubReady_();
+  const now = new Date();
+  const providers = erhReadObjects_(ERH_SHEETS.PROVIDERS);
+  const result = { success: true, ran: [], skipped: [] };
+  ["kalshi", "polymarket"].forEach(function(providerId) {
+    const provider = providers.find(function(row) { return erhKey_(row.ProviderId) === providerId; });
+    if (!erhProviderSyncDue_(provider, now)) {
+      result.skipped.push(providerId);
+      return;
+    }
+    const run = providerId === "kalshi" ? syncMappedKalshiNow() : syncMappedPolymarketNow();
+    result.ran.push(run);
+    if (run && run.success === false) result.success = false;
+  });
+  return result;
+}
+
+function installExternalResultsProviderWatch() {
+  erhEnsureHubReady_();
+  removeExternalResultsProviderWatch(true);
+  ScriptApp.newTrigger(ERH_MAPPED_PROVIDER_TRIGGER)
+    .timeBased()
+    .everyHours(1)
+    .create();
+  SpreadsheetApp.getActive().toast(
+    "Hourly watch installed. Only active mapped Kalshi/Polymarket markets are polled.",
+    "External Results Hub",
+    8
+  );
+  return { success: true, handler: ERH_MAPPED_PROVIDER_TRIGGER, everyHours: 1 };
+}
+
+function removeExternalResultsProviderWatch(silent) {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction && trigger.getHandlerFunction() === ERH_MAPPED_PROVIDER_TRIGGER) {
+      ScriptApp.deleteTrigger(trigger);
+      removed += 1;
+    }
+  });
+  if (!silent) {
+    SpreadsheetApp.getActive().toast(removed + " mapped provider watch trigger(s) removed.", "External Results Hub", 6);
+  }
+  return { success: true, removed: removed };
+}
+
+function erhMappedProviderWatchInstalled_() {
+  return ScriptApp.getProjectTriggers().some(function(trigger) {
+    return trigger.getHandlerFunction && trigger.getHandlerFunction() === ERH_MAPPED_PROVIDER_TRIGGER;
   });
 }

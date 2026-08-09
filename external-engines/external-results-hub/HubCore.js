@@ -6,7 +6,7 @@
    approval. No provider can settle the Awards App directly.
 ===================================================== */
 
-const ERH_SCHEMA_VERSION = "2.1.0";
+const ERH_SCHEMA_VERSION = "2.2.0";
 const ERH_MAIN_APP_SPREADSHEET_ID_PROPERTY = "ERH_MAIN_APP_SPREADSHEET_ID";
 const ERH_REVIEW_REQUIRED_FOR_ALL_IMPORTS = true;
 
@@ -198,9 +198,15 @@ function onOpen() {
     .addItem("1. Setup / Repair Hub", "setupExternalResultsHub")
     .addSeparator()
     .addItem("Import Manual Entries", "importManualResultsNow")
-    .addItem("Sync Kalshi", "syncKalshiNow")
-    .addItem("Sync Polymarket", "syncPolymarketNow")
+    .addItem("Sync Kalshi Discovery", "syncKalshiNow")
+    .addItem("Sync Polymarket Discovery", "syncPolymarketNow")
     .addItem("Sync All Enabled Providers", "syncAllExternalProvidersNow")
+    .addSeparator()
+    .addItem("Sync Mapped Kalshi Results", "syncMappedKalshiNow")
+    .addItem("Sync Mapped Polymarket Results", "syncMappedPolymarketNow")
+    .addItem("Sync All Mapped Results", "syncMappedExternalProvidersNow")
+    .addItem("Install Hourly Mapped Result Watch", "installExternalResultsProviderWatch")
+    .addItem("Remove Mapped Result Watch", "removeExternalResultsProviderWatch")
     .addSeparator()
     .addItem("Rebuild Review Queue", "rebuildExternalReviewQueueNow")
     .addItem("Approve Selected Review Rows", "approveSelectedExternalResults")
@@ -354,7 +360,7 @@ function erhSeedProviders_() {
       RequireAdminReview: true,
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
-      Notes: "Read-only public market discovery. No trading or automatic settlement.",
+      Notes: "Read-only public market discovery. Hourly watch polls only active mapped markets; no trading or automatic settlement.",
       UpdatedAt: now
     },
     {
@@ -383,7 +389,7 @@ function erhSeedProviders_() {
       RequireAdminReview: true,
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
-      Notes: "Read-only Gamma API discovery. No CLOB trading actions are used.",
+      Notes: "Read-only Gamma API discovery. Hourly watch polls only active mapped markets; no CLOB trading actions are used.",
       UpdatedAt: now
     }
   ];
@@ -590,15 +596,21 @@ function erhImportNormalizedResult_(input) {
     input.ResultKey,
     erhString_(input.ResultValue),
     input.WinningOutcome,
-    finality,
-    input.ProviderTimestamp
+    finality
   ].map(erhString_).join("|");
   const sourceFingerprint = erhSha256_(fingerprintSource);
 
   const existing = erhFindObject_(
     ERH_SHEETS.RESULTS,
     function(row) {
-      return erhKey_(row.SourceFingerprint) === erhKey_(sourceFingerprint);
+      if (erhKey_(row.SourceFingerprint) === erhKey_(sourceFingerprint)) return true;
+      return erhKey_(row.Provider) === erhKey_(input.Provider) &&
+        erhKey_(row.ExternalEventId) === erhKey_(input.ExternalEventId) &&
+        erhKey_(row.ExternalMarketId) === erhKey_(input.ExternalMarketId) &&
+        erhKey_(row.ResultKey) === erhKey_(input.ResultKey || "winning-outcome") &&
+        erhString_(row.ResultValue) === erhString_(input.ResultValue) &&
+        erhKey_(row.WinningOutcome) === erhKey_(input.WinningOutcome) &&
+        erhNormalizeFinality_(row.Finality) === finality;
     }
   );
 

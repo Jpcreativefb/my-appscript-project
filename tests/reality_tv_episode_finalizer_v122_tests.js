@@ -39,9 +39,9 @@ assert(ui.includes('You may leave this page'), 'Set-and-forget guidance is missi
 assert(ui.includes('Emergency recovery — normally not needed'), 'Recovery controls must be demoted to emergency-only tools');
 assert(ui.includes('adminRealityTvStartApprovalPoller_(item.QueueId)'), 'Reopened approving episodes should resume read-only progress polling');
 assert(ui.includes('This is separate from the finalized episode. You do not need to keep this page open.'), 'Separate next-episode status UI is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1260-external-results-inbox"'), 'Finalizer cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end"'), 'Finalizer cache version is missing');
 assert.strictEqual(app, appCompat, 'App loader copies must match');
-assert(html.includes('hotfix=v1260-external-results-inbox'), 'App shell must load the finalizer cache version');
+assert(html.includes('hotfix=v1280-external-results-hub-end-to-end'), 'App shell must load the finalizer cache version');
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
 vm.createContext(runtime);

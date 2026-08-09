@@ -223,6 +223,7 @@ function doGet(e) {
       "adminRetryExternalResultsBridgeFailures",
       "adminRequeueUnverifiedExternalResultsBridgeJobs",
       "adminGetExternalResultsInboxStatus",
+      "adminReconcileExternalResultsInbox",
       "adminValidateExternalResultsInbox",
       "adminApplyExternalResultsInbox",
       "adminRetryExternalResultsInboxErrors",
@@ -933,6 +934,10 @@ function doGet(e) {
 
     if (action === "adminGetExternalResultsInboxStatus") {
       return json(apiAdminGetExternalResultsInboxStatus(params));
+    }
+
+    if (action === "adminReconcileExternalResultsInbox") {
+      return json(apiAdminReconcileExternalResultsInbox(params));
     }
 
     if (action === "adminValidateExternalResultsInbox") {

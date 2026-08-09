@@ -1106,3 +1106,39 @@ Administrator-only endpoints:
 `adminGetExternalResultsInboxStatus` returns status counts plus recent delivery batches. `adminValidateExternalResultsInbox` validates READY batches without changing game scoring. `adminApplyExternalResultsInbox` applies VALIDATED Awards/prediction batches through normal category settlement and stages Reality TV batches into their native review queues. `adminRetryExternalResultsInboxErrors` returns ERROR rows to READY for correction/revalidation.
 
 Automatic inbound application is disabled in v1.2.6.
+## External Results Hub end-to-end lifecycle — v1.2.8
+
+The local `ExternalResultsInbox` adds native settlement tracking fields:
+
+```txt
+NativeRoute
+NativeQueueId
+NativeStatus
+NativeUpdatedAt
+```
+
+New administrator endpoint:
+
+```txt
+?action=adminReconcileExternalResultsInbox
+```
+
+`adminGetExternalResultsInboxStatus` also reconciles staged Reality TV batches before returning summary state. A native Reality queue with `ReviewStatus = APPROVED` moves the matching Inbox batch to `APPLIED`; a rejected native queue moves it to `REJECTED`; a native worker error remains `STAGED_REALITY` so recovery operates on the same queue instead of creating a duplicate.
+
+Reality native routing accepts `manual-reality-tv` only. Prediction providers (`kalshi`, `polymarket`) must settle prediction categories rather than Reality season queues.
+
+The Hub provides separate mapped-result operations:
+
+```txt
+syncMappedKalshiNow
+syncMappedPolymarketNow
+syncMappedExternalProvidersNow
+installExternalResultsProviderWatch
+removeExternalResultsProviderWatch
+erhScheduledMappedProviderSync
+```
+
+The recurring provider watch runs hourly and polls only active `AppMappings` market IDs. It imports/provider-reviews results but never bypasses administrator approval or the Awards App Inbox.
+
+Provider result identity excludes changing provider timestamps; the same provider/event/market/result/outcome/finality is idempotent across repeated syncs. Hub delivery uses a deterministic mapping key when `MappingId` is blank.
+

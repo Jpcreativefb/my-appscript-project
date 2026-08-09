@@ -229,6 +229,7 @@ async function renderAdminPage() {
 
           <div class="admin-actions">
             <button class="button admin-button secondary" onclick="adminExternalResultsInboxRefresh(this)">Refresh Status</button>
+            <button class="button admin-button secondary" onclick="adminExternalResultsInboxReconcile(this)">Sync Reality Status</button>
             <button class="button admin-button secondary" onclick="adminExternalResultsInboxValidate(this)">Validate Ready</button>
             <button class="button admin-button" onclick="adminExternalResultsInboxApply(this)">Apply Validated</button>
             <button class="button admin-button secondary" onclick="adminExternalResultsInboxRetry(this)">Retry Errors</button>
@@ -575,15 +576,19 @@ function adminExternalResultsInboxRender_(res) {
   const validated = adminExternalResultsInboxCount_(counts, "VALIDATED");
   const staged = adminExternalResultsInboxCount_(counts, "STAGED_REALITY");
   const applied = adminExternalResultsInboxCount_(counts, "APPLIED");
+  const rejected = adminExternalResultsInboxCount_(counts, "REJECTED");
   const errors = adminExternalResultsInboxCount_(counts, "ERROR");
-  status.className = "admin-message " + (errors ? "warning" : (ready || validated ? "" : "success"));
-  status.innerHTML = `<b>${ready}</b> ready · <b>${validated}</b> validated · <b>${staged}</b> staged to Reality TV · <b>${applied}</b> applied · <b>${errors}</b> errors · Automatic apply OFF`;
+  status.className = "admin-message " + (errors || rejected ? "warning" : (ready || validated || staged ? "" : "success"));
+  status.innerHTML = `<b>${ready}</b> ready · <b>${validated}</b> validated · <b>${staged}</b> staged to Reality TV · <b>${applied}</b> applied · <b>${rejected}</b> rejected · <b>${errors}</b> errors · Automatic apply OFF`;
   if (!batches) return;
   const rows = Array.isArray(res.batches) ? res.batches.slice(0, 12) : [];
   batches.innerHTML = rows.length ? rows.map(function(row) {
     const winners = (row.winnerIds || []).join(", ") || "—";
+    const native = row.nativeQueueId
+      ? `<div class="admin-sub">Reality queue: ${escapeHtml_(row.nativeQueueId)} · ${escapeHtml_(row.nativeStatus || "PENDING")}</div>`
+      : "";
     const error = row.error ? `<div class="admin-sub">${escapeHtml_(row.error)}</div>` : "";
-    return `<div class="admin-list-row"><div><b>${escapeHtml_(row.gameId || "Unknown game")}</b> · ${escapeHtml_(row.categoryId || "Unknown category")}<div class="admin-sub">${escapeHtml_(row.provider || "")} · ${escapeHtml_(row.resultKey || "result")} · Winner(s): ${escapeHtml_(winners)}</div>${error}</div><span class="admin-pill">${escapeHtml_(row.status || "")}</span></div>`;
+    return `<div class="admin-list-row"><div><b>${escapeHtml_(row.gameId || "Unknown game")}</b> · ${escapeHtml_(row.categoryId || "Unknown category")}<div class="admin-sub">${escapeHtml_(row.provider || "")} · ${escapeHtml_(row.resultKey || "result")} · Winner(s): ${escapeHtml_(winners)}</div>${native}${error}</div><span class="admin-pill">${escapeHtml_(row.status || "")}</span></div>`;
   }).join("") : `<div class="admin-sub">No inbox deliveries yet.</div>`;
 }
 
@@ -602,6 +607,17 @@ async function adminExternalResultsInboxRefresh(button, silent) {
   } finally {
     if (button) button.disabled = false;
   }
+}
+
+async function adminExternalResultsInboxReconcile(button) {
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminReconcileExternalResultsInbox();
+    adminExternalResultsInboxRender_((res && res.summary) || res);
+  } catch (err) {
+    const status = document.getElementById("adminExternalResultsInboxStatus");
+    if (status) { status.className = "admin-message error"; status.textContent = err.message || String(err); }
+  } finally { if (button) button.disabled = false; }
 }
 
 async function adminExternalResultsInboxValidate(button) {

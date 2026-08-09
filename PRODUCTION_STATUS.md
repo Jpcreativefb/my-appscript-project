@@ -1,5 +1,37 @@
 # Production Status
 
+Current candidate: **v1.2.8 External Results Hub end-to-end reliability**
+
+- Manual Awards Hub → Inbox → validation → CategoryResults settlement is proven in production.
+- Duplicate provider results and duplicate deliveries are now outcome-stable and idempotent.
+- Reality TV Hub deliveries persist their native queue identity and reconcile to `APPLIED` only after the native Reality queue is actually approved.
+- Reality Extra Questions reuse `RealityQuestionResultQueue`; eliminations reuse `RealityResultQueue`; the durable Reality finalizer remains authoritative.
+- Kalshi/Polymarket recurring polling is mapped-only. Broad discovery remains a manual action.
+- Kalshi settlement parsing is hardened against blank settlement values and can fall back to historical market data for mapped settled markets.
+- Automatic inbound apply remains OFF; every external result still requires administrator review.
+- **Both Awards App and External Results Hub Apps Script projects require clasp push for v1.2.8.**
+- Awards App frontend deployment is also required.
+- 69 regression test files and 182 JavaScript syntax checks passed before packaging.
+
+---
+
+# Production Status
+
+Current candidate: **v1.2.7 External Results Inbox result-row cleanup**
+
+- The first end-to-end Manual Awards Hub settlement reached `APPLIED` and wrote the expected winner into `CategoryResults`.
+- v1.2.7 hardens that proven path by preventing the category update from rewriting the winner result row after the authoritative bulk result write.
+- Duplicate legacy `CategoryResults` rows for the applied game/category/nominee are removed after a successful Awards/prediction apply, keeping the newest row.
+- Hub result provenance stays consistent across winner and non-winner rows.
+- The Admin `Starting…` progress indicator now clears correctly even when an API request completes before the click-fallback timer runs.
+- Automatic inbound apply remains OFF; Reality TV still stages into its native queues; Sports/Racing remain excluded.
+- Awards App backend + frontend deployment required; separate External Results Hub Apps Script deployment is not required.
+- 68 regression test files and 181 JavaScript syntax checks passed before packaging.
+
+---
+
+# Production Status
+
 Current candidate: **v1.2.6 External Results Inbox validation and safe apply**
 
 - External Results Hub approved deliveries are validated before any local scoring state is changed.

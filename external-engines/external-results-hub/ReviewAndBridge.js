@@ -78,6 +78,18 @@ function erhUpdateImportedResultReviewStatus_(importedResultId, status) {
   );
 }
 
+function erhMappingDeliveryKey_(mapping) {
+  const explicit = erhString_(mapping && mapping.MappingId);
+  if (explicit) return explicit;
+  const source = [
+    mapping && mapping.Provider, mapping && mapping.AppGameId, mapping && mapping.CategoryId,
+    mapping && mapping.NomineeId, mapping && mapping.ExternalEventId, mapping && mapping.ExternalMarketId,
+    mapping && mapping.ExternalSubjectId, mapping && mapping.ResultKey, mapping && mapping.ExpectedOutcome,
+    mapping && mapping.ComparisonOperator, mapping && mapping.Threshold
+  ].map(erhString_).join("|");
+  return "map-" + erhSha256_(source).slice(0, 20);
+}
+
 function pushApprovedExternalResultsNow() {
   erhEnsureHubReady_();
   const mainSpreadsheetId = PropertiesService.getScriptProperties()
@@ -99,7 +111,8 @@ function pushApprovedExternalResultsNow() {
     "AppGameId", "CategoryId", "NomineeId", "ExternalEventId", "ExternalMarketId",
     "ExternalSubjectId", "ResultKey", "ResultValue", "WinningOutcome", "WinnersJSON",
     "IsWinner", "Finality", "EvidenceUrl", "SourceConfigJSON", "Status",
-    "AttemptCount", "LastAttemptAt", "AppliedAt", "ErrorMessage", "CreatedAt", "UpdatedAt"
+    "AttemptCount", "LastAttemptAt", "AppliedAt", "NativeRoute", "NativeQueueId",
+    "NativeStatus", "NativeUpdatedAt", "ErrorMessage", "CreatedAt", "UpdatedAt"
   ];
   const headers = erhEnsureTargetHeaders_(inboxSheet, inboxHeaders);
   const existingDeliveryIds = {};
@@ -168,11 +181,11 @@ function pushApprovedExternalResultsNow() {
     matchingMappings.forEach(function(mapping) {
       const evaluation = erhEvaluateMappingWinner_(mapping, result);
       if (!evaluation.ok) {
-        mappingErrors.push(mapping.MappingId + ": " + evaluation.error);
+        mappingErrors.push(erhMappingDeliveryKey_(mapping) + ": " + evaluation.error);
         return;
       }
 
-      const deliveryId = batchId + "-" + mapping.MappingId;
+      const deliveryId = batchId + "-" + erhMappingDeliveryKey_(mapping);
       if (existingDeliveryIds[erhKey_(deliveryId)]) return;
       const now = new Date();
       const rowObject = {

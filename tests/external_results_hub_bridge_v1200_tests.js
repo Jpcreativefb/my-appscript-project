@@ -58,7 +58,7 @@ assert(pushFn.includes('Status: "READY"'), 'Inbound deliveries must be staged as
 assert(pushFn.includes('"DELIVERED"'), 'Hub review rows must be marked DELIVERED');
 assert(!pushFn.includes('CategoryResults'), 'Hub must not write directly to CategoryResults');
 assert(hubBridge.includes('function erhWinningOutcomeList_'), 'Multiple-winner normalization is missing');
-assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.1.0"'), 'Hub schema version was not advanced');
+assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.2.0"'), 'Hub schema version was not advanced');
 assert(hubCore.includes('Deliver Approved Results to App Inbox'), 'Hub menu still describes direct settlement');
 assert(hubDiagnostics.includes('mainAppInboxReady'), 'Hub health must verify the Awards App inbox');
 
@@ -67,9 +67,9 @@ assert.strictEqual(frontendApi, frontendApiCompat, 'Both frontend API copies mus
 assert(ui.includes('Sync Queue Now'), 'Reality TV manager Hub sync control is missing');
 assert(ui.includes('Retry Failed'), 'Reality TV manager Hub retry control is missing');
 assert(ui.includes('adminRealityTvRefreshHubBridgeHealth_'), 'Reality TV manager Hub health display is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1260-external-results-inbox"'), 'Hub bridge cache version is missing');
+assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end"'), 'Hub bridge cache version is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1260-external-results-inbox'), 'App shell must request the Hub bridge cache version');
+assert(html.includes('hotfix=v1280-external-results-hub-end-to-end'), 'App shell must request the Hub bridge cache version');
 
 const context = { console, JSON, String, Array, Object, Error };
 vm.createContext(context);

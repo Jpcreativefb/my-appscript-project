@@ -71,6 +71,14 @@ function checkExternalResultsHubHealth() {
     }
   }
 
+  const mappedTargets = {
+    kalshi: typeof erhMappedProviderTargets_ === "function" ? erhMappedProviderTargets_("kalshi").length : 0,
+    polymarket: typeof erhMappedProviderTargets_ === "function" ? erhMappedProviderTargets_("polymarket").length : 0
+  };
+  const providerWatchInstalled = typeof erhMappedProviderWatchInstalled_ === "function"
+    ? erhMappedProviderWatchInstalled_()
+    : false;
+
   const report = {
     success: issues.length === 0,
     schemaVersion: ERH_SCHEMA_VERSION,
@@ -79,6 +87,8 @@ function checkExternalResultsHubHealth() {
     mainAppName: mainAppName,
     mainAppInboxReady: mainAppInboxReady,
     mainAppInboxRows: mainAppInboxRows,
+    mappedTargets: mappedTargets,
+    providerWatchInstalled: providerWatchInstalled,
     counts: counts,
     issues: issues,
     checkedAt: new Date()

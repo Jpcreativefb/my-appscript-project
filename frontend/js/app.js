@@ -372,9 +372,9 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "311-external-results-inbox";
+const APP_ASSET_VERSION = "313-external-results-hub-end-to-end";
 // Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1118-reality-tv-bulk-question-pack";
-const APP_ROUTE_HOTFIX_VERSION = "v1260-external-results-inbox";
+const APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

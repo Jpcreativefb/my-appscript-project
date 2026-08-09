@@ -87,7 +87,7 @@ assert(configSource.includes('transformExternal: false'), 'External transformati
 assert(appHtml.indexOf('image-manifest.js') < appHtml.indexOf('imageEngine.js'));
 assert(appHtml.indexOf('imageEngine.js') < appHtml.indexOf('js/app.js'));
 assert(sportsHtml.indexOf('imageEngine.js') < sportsHtml.indexOf('js/sports.js'));
-assert(sw.includes('awards-app-v311-external-results-inbox'));
+assert(sw.includes('awards-app-v313-external-results-hub-end-to-end'));
 assert(sw.includes('./assets/images/image-manifest.js'));
 assert(sw.includes('./js/imageEngine.js'));
 

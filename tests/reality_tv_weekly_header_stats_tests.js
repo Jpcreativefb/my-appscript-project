@@ -23,7 +23,7 @@ assert(!picks.includes('Number(meta.eliminatedEpisode || 0) === categoryEpisodeN
 assert(picks.includes('realityTvNomineeResultState_'), 'Historical result styling must be driven by the settled question result.');
 assert(css.includes('.reality-player-summary-card'), 'Player summary styles are missing.');
 assert(css.includes('.reality-episode-header-stats'), 'Episode header stat styles are missing.');
-assert(html.includes('311-external-results-inbox'), 'Frontend cache version was not bumped.');
-assert(sw.includes('v311-external-results-inbox'), 'Service worker cache version was not bumped.');
+assert(html.includes('313-external-results-hub-end-to-end'), 'Frontend cache version was not bumped.');
+assert(sw.includes('v313-external-results-hub-end-to-end'), 'Service worker cache version was not bumped.');
 
 console.log('Reality TV weekly header stats tests passed.');

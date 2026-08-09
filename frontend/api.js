@@ -48,6 +48,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminGetRealityTvDashboard",
     "adminGetRealityTvDashboardSummary",
     "adminGetRealityTvSeasonDetails",
+    "adminReconcileExternalResultsInbox",
     "adminValidateExternalResultsInbox",
     "adminApplyExternalResultsInbox",
     "adminCreateRealityTvSeason",
@@ -1683,6 +1684,10 @@ async function apiAdminRequeueUnverifiedExternalResultsBridgeJobs() {
 
 async function apiAdminGetExternalResultsInboxStatus() {
   return apiAdminRealityTvRequest_("adminGetExternalResultsInboxStatus", {});
+}
+
+async function apiAdminReconcileExternalResultsInbox() {
+  return apiAdminRealityTvRequest_("adminReconcileExternalResultsInbox", {});
 }
 
 async function apiAdminValidateExternalResultsInbox() {

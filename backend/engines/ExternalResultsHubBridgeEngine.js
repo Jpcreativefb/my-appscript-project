@@ -1,6 +1,6 @@
 /* =====================================================
    EXTERNAL RESULTS HUB BRIDGE — OUTBOUND + SAFE INBOUND
-   Production v1.2.6
+   Production v1.2.8
 
    The Awards App remains authoritative. Local game actions
    only enqueue Hub work. A separate trigger performs the
@@ -26,7 +26,8 @@ const EXTERNAL_RESULTS_BRIDGE_INBOX_HEADERS = [
   "AppGameId", "CategoryId", "NomineeId", "ExternalEventId", "ExternalMarketId",
   "ExternalSubjectId", "ResultKey", "ResultValue", "WinningOutcome", "WinnersJSON",
   "IsWinner", "Finality", "EvidenceUrl", "SourceConfigJSON", "Status",
-  "AttemptCount", "LastAttemptAt", "AppliedAt", "ErrorMessage", "CreatedAt", "UpdatedAt"
+  "AttemptCount", "LastAttemptAt", "AppliedAt", "NativeRoute", "NativeQueueId",
+  "NativeStatus", "NativeUpdatedAt", "ErrorMessage", "CreatedAt", "UpdatedAt"
 ];
 
 const EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS = {
@@ -849,7 +850,7 @@ function apiAdminRetryExternalResultsBridgeFailures(payload) {
 
 /* =====================================================
    EXTERNAL RESULTS INBOX — VALIDATE / APPLY
-   Production v1.2.6
+   Production v1.2.8
 
    Approved Hub deliveries land in ExternalResultsInbox.
    This layer validates complete mapped batches before any
@@ -951,6 +952,130 @@ function externalResultsInboxExistingResolution_(gameId, categoryId) {
   return map[externalResultsBridgeKey_(categoryId)] || map[externalResultsBridgeString_(categoryId)] || null;
 }
 
+
+function externalResultsInboxRealityQueueSelectedIds_(native) {
+  if (!native || !native.queue) return [];
+  if (native.route === "REALITY_QUESTION") {
+    if (typeof realityTvQuestionSelectedIds_ === "function") {
+      return externalResultsInboxSortedUnique_(realityTvQuestionSelectedIds_(native.queue));
+    }
+    return externalResultsInboxSortedUnique_(externalResultsBridgeParseJson_(native.queue.SelectedOutcomeIdsJSON, []));
+  }
+  return externalResultsInboxSortedUnique_(externalResultsBridgeParseJson_(native.queue.SelectedContestantIds, []));
+}
+
+function externalResultsInboxExistingRealityDelivery_(rows) {
+  const first = (rows || [])[0] || {};
+  const reviewId = externalResultsBridgeKey_(first.ReviewId);
+  const importedResultId = externalResultsBridgeKey_(first.ImportedResultId);
+  const nativeQueueId = externalResultsBridgeKey_(first.NativeQueueId);
+  if (!reviewId && !importedResultId && !nativeQueueId) return null;
+
+  const ss = SpreadsheetApp.getActive();
+  const candidates = [];
+  if (typeof REALITY_TV_QUESTION_QUEUE_SHEET !== "undefined") {
+    candidates.push({ route: "REALITY_QUESTION", sheetName: REALITY_TV_QUESTION_QUEUE_SHEET });
+  }
+  if (typeof REALITY_TV_RESULTS_QUEUE_SHEET !== "undefined") {
+    candidates.push({ route: "REALITY_MAIN", sheetName: REALITY_TV_RESULTS_QUEUE_SHEET });
+  }
+
+  for (let i = 0; i < candidates.length; i += 1) {
+    const candidate = candidates[i];
+    const sheet = ss.getSheetByName(candidate.sheetName);
+    if (!sheet) continue;
+    const queue = externalResultsBridgeReadObjects_(sheet).find(function(row) {
+      if (nativeQueueId && externalResultsBridgeKey_(row.QueueId) === nativeQueueId) return true;
+      if (reviewId && externalResultsBridgeKey_(row.HubReviewId) === reviewId) return true;
+      return importedResultId && externalResultsBridgeKey_(row.HubImportedResultId) === importedResultId;
+    });
+    if (!queue) continue;
+    return {
+      route: candidate.route,
+      queue: queue,
+      queueId: externalResultsBridgeString_(queue.QueueId),
+      reviewStatus: externalResultsInboxNormalizeStatus_(queue.ReviewStatus || "PENDING"),
+      pushStatus: externalResultsInboxNormalizeStatus_(queue.PushStatus || ""),
+      error: externalResultsBridgeString_(queue.ErrorMessage),
+      completedAt: queue.ApprovalCompletedAt || queue.ReviewedAt || queue.PushedAt || queue.UpdatedAt || ""
+    };
+  }
+  return null;
+}
+
+function externalResultsInboxRealityDeliveryMatches_(native, winnerIds, isPush) {
+  if (!native) return false;
+  const selectedIds = externalResultsInboxRealityQueueSelectedIds_(native);
+  return isPush ? selectedIds.length === 0 : externalResultsInboxSameIds_(selectedIds, winnerIds);
+}
+
+function externalResultsInboxReconcileReality_() {
+  const groups = externalResultsInboxGroups_(["STAGED_REALITY"]);
+  let applied = 0;
+  let rejected = 0;
+  let pending = 0;
+  let missing = 0;
+  let nativeErrors = 0;
+
+  Object.keys(groups).forEach(function(key) {
+    const rows = groups[key];
+    const native = externalResultsInboxExistingRealityDelivery_(rows);
+    if (!native) {
+      externalResultsInboxPatchRows_(rows, {
+        NativeStatus: "MISSING",
+        NativeUpdatedAt: new Date(),
+        ErrorMessage: "Staged Reality TV queue could not be found. The Inbox was not reapplied.",
+        UpdatedAt: new Date()
+      });
+      missing += 1;
+      return;
+    }
+
+    const nativeStatus = native.reviewStatus === "APPROVED"
+      ? "APPROVED"
+      : (native.reviewStatus === "REJECTED" ? "REJECTED" : (native.pushStatus || native.reviewStatus || "PENDING"));
+    const basePatch = {
+      NativeRoute: native.route,
+      NativeQueueId: native.queueId,
+      NativeStatus: nativeStatus,
+      NativeUpdatedAt: new Date(),
+      UpdatedAt: new Date()
+    };
+
+    if (native.reviewStatus === "APPROVED") {
+      externalResultsInboxPatchRows_(rows, Object.assign({}, basePatch, {
+        Status: "APPLIED",
+        AppliedAt: native.completedAt || new Date(),
+        ErrorMessage: "Reality TV result finalized by native queue " + native.queueId + "."
+      }));
+      applied += 1;
+      return;
+    }
+    if (native.reviewStatus === "REJECTED") {
+      externalResultsInboxPatchRows_(rows, Object.assign({}, basePatch, {
+        Status: "REJECTED",
+        AppliedAt: "",
+        ErrorMessage: native.error || ("Reality TV result was rejected in native queue " + native.queueId + ".")
+      }));
+      rejected += 1;
+      return;
+    }
+    if (native.pushStatus === "ERROR") {
+      externalResultsInboxPatchRows_(rows, Object.assign({}, basePatch, {
+        ErrorMessage: native.error || ("Reality TV native queue " + native.queueId + " needs recovery.")
+      }));
+      nativeErrors += 1;
+      return;
+    }
+    externalResultsInboxPatchRows_(rows, Object.assign({}, basePatch, {
+      ErrorMessage: "Staged in Reality TV native queue " + native.queueId + "; waiting for finalization."
+    }));
+    pending += 1;
+  });
+
+  return { success: missing === 0, applied: applied, rejected: rejected, pending: pending, missing: missing, nativeErrors: nativeErrors };
+}
+
 function externalResultsInboxValidateGroup_(rows) {
   rows = rows || [];
   if (!rows.length) return { ok: false, error: "Inbox batch has no rows." };
@@ -1000,6 +1125,20 @@ function externalResultsInboxValidateGroup_(rows) {
     return { ok: false, error: "The FINAL result has no winning nominee. Correct the Hub mapping/result before applying." };
   }
 
+  const nativeReality = externalResultsInboxExistingRealityDelivery_(rows);
+  if (nativeReality) {
+    if (!externalResultsInboxRealityDeliveryMatches_(nativeReality, winnerIds, isPush)) {
+      return { ok: false, conflict: true, error: "This Hub delivery already has a Reality TV native queue with a different result. It was not duplicated." };
+    }
+    if (nativeReality.reviewStatus === "APPROVED") {
+      return {
+        ok: true, alreadyApplied: true, route: "NOOP", provider: provider, gameId: gameId,
+        categoryId: categoryId, category: category, setup: setup, winnerIds: winnerIds, isPush: isPush,
+        nativeReality: nativeReality
+      };
+    }
+  }
+
   const existing = externalResultsInboxExistingResolution_(gameId, categoryId);
   if (existing && ["winner", "push", "void", "cancelled", "canceled"].indexOf(externalResultsBridgeKey_(existing.result)) !== -1) {
     const existingWinners = Array.isArray(existing.winnerNomineeIds) && existing.winnerNomineeIds.length
@@ -1017,6 +1156,12 @@ function externalResultsInboxValidateGroup_(rows) {
 
   const realityMain = externalResultsInboxRealityMain_(gameId, categoryId);
   const realityQuestion = realityMain ? null : externalResultsInboxRealityQuestion_(gameId, categoryId);
+  if ((realityMain || realityQuestion) && provider !== "manual-reality-tv") {
+    return { ok: false, error: "Reality TV native settlement only accepts the manual-reality-tv provider. Prediction-market providers must map to prediction questions instead." };
+  }
+  if (provider === "manual-reality-tv" && !realityMain && !realityQuestion) {
+    return { ok: false, error: "manual-reality-tv mapping does not point to a registered Reality TV episode or Extra Question." };
+  }
   return {
     ok: true,
     alreadyApplied: false,
@@ -1029,7 +1174,8 @@ function externalResultsInboxValidateGroup_(rows) {
     winnerIds: winnerIds,
     isPush: isPush,
     realityMain: realityMain,
-    realityQuestion: realityQuestion
+    realityQuestion: realityQuestion,
+    nativeReality: nativeReality
   };
 }
 
@@ -1041,6 +1187,9 @@ function externalResultsInboxPatchRows_(rows, patch) {
 }
 
 function externalResultsInboxStageRealityQuestion_(validation, rows, username) {
+  if (validation && validation.nativeReality && validation.nativeReality.route === "REALITY_QUESTION") {
+    return { staged: true, queueId: validation.nativeReality.queueId, existing: true, nativeStatus: validation.nativeReality.reviewStatus };
+  }
   if (typeof realityTvEnsureQuestionPackSystem_ !== "function") throw new Error("Reality TV question system is not installed.");
   realityTvEnsureQuestionPackSystem_();
   const question = validation.realityQuestion;
@@ -1092,6 +1241,9 @@ function externalResultsInboxStageRealityQuestion_(validation, rows, username) {
 }
 
 function externalResultsInboxStageRealityMain_(validation, rows, username) {
+  if (validation && validation.nativeReality && validation.nativeReality.route === "REALITY_MAIN") {
+    return { staged: true, queueId: validation.nativeReality.queueId, existing: true, nativeStatus: validation.nativeReality.reviewStatus };
+  }
   if (typeof realityTvEnsureSystem_ !== "function") throw new Error("Reality TV system is not installed.");
   realityTvEnsureSystem_();
   const episode = validation.realityMain;
@@ -1155,6 +1307,16 @@ function externalResultsInboxQueueHubAck_(rows, message) {
   });
 }
 
+function externalResultsInboxDedupeCategoryResults_(validation) {
+  if (!validation || typeof dedupeCategoryResultsForCategory_ !== "function") {
+    return { success: true, removed: 0 };
+  }
+  return dedupeCategoryResultsForCategory_(
+    validation.gameId,
+    validation.categoryId
+  ) || { success: true, removed: 0 };
+}
+
 function externalResultsInboxApplyGeneric_(validation, rows, username) {
   const category = validation.category;
   const first = rows[0] || {};
@@ -1194,16 +1356,27 @@ function externalResultsInboxApplyGeneric_(validation, rows, username) {
     statKey: externalResultsBridgeString_(first.ResultKey),
     autoSettle: false,
     requireAdminReview: true,
+    skipCategoryResultWrite: true,
     username: username || "administrator",
     notes: "Applied from approved External Results Hub delivery " + externalResultsBridgeString_(first.DeliveryBatchId)
   });
+  const dedupe =
+    externalResultsInboxDedupeCategoryResults_(
+      validation
+    );
+
   if (typeof clearAppCaches === "function") clearAppCaches();
   externalResultsInboxQueueHubAck_(rows, "Applied to Awards App category " + validation.categoryId + ".");
-  return { applied: true, route: "GENERIC" };
+  return {
+    applied: true,
+    route: "GENERIC",
+    duplicateRowsRemoved: Number((dedupe || {}).removed || 0)
+  };
 }
 
 function externalResultsInboxSummary_() {
   externalResultsBridgeEnsureSystem_();
+  const reconciliation = externalResultsInboxReconcileReality_();
   const rows = externalResultsInboxRows_();
   const counts = {};
   rows.forEach(function(row) {
@@ -1225,17 +1398,25 @@ function externalResultsInboxSummary_() {
       gameId: externalResultsBridgeString_(first.AppGameId), categoryId: externalResultsBridgeString_(first.CategoryId),
       resultKey: externalResultsBridgeString_(first.ResultKey), resultValue: externalResultsBridgeString_(first.ResultValue),
       status: externalResultsInboxNormalizeStatus_(first.Status), rowCount: batch.length,
-      winnerIds: externalResultsInboxWinnerIds_(batch), error: externalResultsBridgeString_(first.ErrorMessage)
+      winnerIds: externalResultsInboxWinnerIds_(batch), error: externalResultsBridgeString_(first.ErrorMessage),
+      nativeRoute: externalResultsBridgeString_(first.NativeRoute), nativeQueueId: externalResultsBridgeString_(first.NativeQueueId),
+      nativeStatus: externalResultsBridgeString_(first.NativeStatus)
     };
   }).sort(function(a, b) {
     return String(b.deliveryBatchId || "").localeCompare(String(a.deliveryBatchId || ""));
   });
-  return { success: true, counts: counts, totalRows: rows.length, batches: groupSummary.slice(0, 25), autoApply: false };
+  return { success: true, counts: counts, totalRows: rows.length, batches: groupSummary.slice(0, 25), autoApply: false, reconciliation: reconciliation };
 }
 
 function apiAdminGetExternalResultsInboxStatus(payload) {
   requireAdmin_(payload || {});
   return externalResultsInboxSummary_();
+}
+
+function apiAdminReconcileExternalResultsInbox(payload) {
+  requireAdmin_(payload || {});
+  const reconciliation = externalResultsInboxReconcileReality_();
+  return { success: reconciliation.success, reconciliation: reconciliation, summary: externalResultsInboxSummary_() };
 }
 
 function apiAdminValidateExternalResultsInbox(payload) {
@@ -1253,7 +1434,15 @@ function apiAdminValidateExternalResultsInbox(payload) {
       return;
     }
     if (result.alreadyApplied) {
-      externalResultsInboxPatchRows_(rows, { Status: "APPLIED", AppliedAt: new Date(), ErrorMessage: "Already settled locally with the same result; no duplicate settlement was written.", UpdatedAt: new Date() });
+      const dedupe = externalResultsInboxDedupeCategoryResults_(result);
+      const removed = Number((dedupe || {}).removed || 0);
+      externalResultsInboxPatchRows_(rows, {
+        Status: "APPLIED",
+        AppliedAt: new Date(),
+        ErrorMessage: "Already settled locally with the same result; no duplicate settlement was written." +
+          (removed ? " Removed " + removed + " duplicate CategoryResults row(s)." : ""),
+        UpdatedAt: new Date()
+      });
       externalResultsInboxQueueHubAck_(rows, "Awards App already had the same settled result; delivery confirmed idempotently.");
       alreadyApplied += 1;
       return;
@@ -1281,16 +1470,24 @@ function apiAdminApplyExternalResultsInbox(payload) {
     }
     try {
       if (validation.alreadyApplied) {
-        externalResultsInboxPatchRows_(rows, { Status: "APPLIED", AppliedAt: new Date(), ErrorMessage: "Already settled locally with the same result.", UpdatedAt: new Date() });
+        const dedupe = externalResultsInboxDedupeCategoryResults_(validation);
+        const removed = Number((dedupe || {}).removed || 0);
+        externalResultsInboxPatchRows_(rows, {
+          Status: "APPLIED",
+          AppliedAt: new Date(),
+          ErrorMessage: "Already settled locally with the same result." +
+            (removed ? " Removed " + removed + " duplicate CategoryResults row(s)." : ""),
+          UpdatedAt: new Date()
+        });
         externalResultsInboxQueueHubAck_(rows, "Awards App already had the same settled result; delivery confirmed idempotently.");
         applied += 1;
       } else if (validation.route === "REALITY_QUESTION") {
         const staged = externalResultsInboxStageRealityQuestion_(validation, rows, username);
-        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", ErrorMessage: "Staged in Reality TV question review queue: " + staged.queueId, UpdatedAt: new Date() });
+        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", NativeRoute: "REALITY_QUESTION", NativeQueueId: staged.queueId, NativeStatus: staged.nativeStatus || "PENDING", NativeUpdatedAt: new Date(), ErrorMessage: "Staged in Reality TV question review queue: " + staged.queueId, UpdatedAt: new Date() });
         stagedReality += 1;
       } else if (validation.route === "REALITY_MAIN") {
         const staged = externalResultsInboxStageRealityMain_(validation, rows, username);
-        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", ErrorMessage: "Staged in Reality TV episode review queue: " + staged.queueId, UpdatedAt: new Date() });
+        externalResultsInboxPatchRows_(rows, { Status: "STAGED_REALITY", AppliedAt: "", NativeRoute: "REALITY_MAIN", NativeQueueId: staged.queueId, NativeStatus: staged.nativeStatus || "PENDING", NativeUpdatedAt: new Date(), ErrorMessage: "Staged in Reality TV episode review queue: " + staged.queueId, UpdatedAt: new Date() });
         stagedReality += 1;
       } else {
         externalResultsInboxApplyGeneric_(validation, rows, username);

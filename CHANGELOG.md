@@ -1,3 +1,27 @@
+## v1.2.8 — External Results Hub end-to-end reliability
+
+- Added Reality TV Inbox reconciliation so native Reality approvals move Hub batches from `STAGED_REALITY` to `APPLIED`, while rejected/native-error states remain explicit and duplicate-safe.
+- Added persistent native route/queue/status fields to `ExternalResultsInbox` and an Admin **Sync Reality Status** control.
+- Reuses an existing Reality native queue for the same Hub review and blocks conflicting duplicate results.
+- Restricts native Reality routing to `manual-reality-tv`; Kalshi/Polymarket remain prediction-result providers.
+- Made provider-result dedupe stable across changing provider timestamps.
+- Added deterministic delivery IDs when a manual AppMappings row has no MappingId.
+- Added mapped-only Kalshi/Polymarket sync plus an optional hourly mapped-result watch; broad provider sync remains manual discovery only.
+- Hardened Kalshi settlement parsing so blank/null settlement values cannot be mistaken for `No`, with historical-market fallback for older settled mapped markets.
+- Hub Health Check now reports mapped target counts and provider-watch installation state.
+- Automatic inbound apply remains OFF and administrator review remains mandatory.
+- Bumped browser/service-worker assets to v313.
+
+## v1.2.7 — External Results Inbox result-row cleanup
+
+- Fixed a CategoryResults double-write path where the External Results Inbox first wrote the complete nominee result set and then `adminUpdateCategory` rewrote the winner row a second time.
+- Added an internal `skipCategoryResultWrite` guard so category/settings state can be updated without overwriting the authoritative Hub-import result row.
+- Added scoped CategoryResults deduplication after a successful Awards/prediction settlement; duplicate legacy rows for the same GameId + CategoryId + NomineeId keep only the newest result row.
+- Preserves Hub provenance, ResultValue, ImportedResultId, ReviewId, and DeliveryBatchId consistently on both winner and non-winner rows.
+- Fixed the shared Admin action-progress race that could leave a completed fast request showing `Starting…` indefinitely.
+- Automatic inbound apply remains OFF. Reality TV staging and Sports/Racing separation are unchanged.
+- Bumped browser/service-worker assets to v312.
+
 ## v1.2.6 — External Results Inbox validation and safe apply
 
 - Added a generic External Results Inbox validator for approved Hub deliveries.
