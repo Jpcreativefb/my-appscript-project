@@ -1,4 +1,5 @@
-const AWARDS_CACHE = "awards-app-v313-external-results-hub-end-to-end";
+// Previous cache: awards-app-v313-external-results-hub-end-to-end
+const AWARDS_CACHE = "awards-app-v314-reality-tv-approval-race-fix";
 
 const APP_SHELL = [
   "./",

@@ -168,6 +168,9 @@ function adminRealityTvApprovalProgressData_(source, kind) {
   source = source || {};
   const reviewStatus = String(source.reviewStatus || source.ReviewStatus || "PENDING").toUpperCase();
   let stage = String(source.stage || source.ApprovalStage || (reviewStatus === "APPROVED" ? "COMPLETE" : "SETTLE")).toUpperCase();
+  // ReviewStatus=APPROVED is authoritative even if an older worker left a stale
+  // ApprovalStage behind. Never render an approved episode as 62%/88% in progress.
+  if (reviewStatus === "APPROVED") stage = "COMPLETE";
   if (stage === "SYNC_HUB" && kind !== "question") stage = "FINALIZE";
   const pushStatus = String(source.pushStatus || source.PushStatus || "").toUpperCase();
   const explicitPercent = Number(source.progressPercent !== undefined ? source.progressPercent : source.ApprovalProgressPercent);
@@ -228,7 +231,7 @@ function adminRealityTvApprovalProgressData_(source, kind) {
     elapsedSeconds: Number.isFinite(explicitElapsed) ? Math.max(0, explicitElapsed) : derivedElapsed,
     heartbeatAgeSeconds: heartbeatAge,
     estimatedRemainingSeconds: Math.max(0, eta - Math.min(eta, stageElapsed)),
-    stalled: !waiting && (source.stalled === true || String(source.ApprovalStalled || "").toLowerCase() === "true" || (reviewStatus === "APPROVING" && heartbeatAge >= (kind === "question" ? 120 : 150))),
+    stalled: !waiting && (source.stalled === true || String(source.ApprovalStalled || "").toLowerCase() === "true" || (reviewStatus === "APPROVING" && heartbeatAge >= (kind === "question" ? 120 : 420))),
     waiting: waiting,
     kind: kind || "episode"
   };
@@ -264,7 +267,7 @@ function adminRealityTvApprovalProgressHtml_(source, kind) {
       </div>
       <div class="reality-tv-approval-steps" data-role="approval-steps">${stepHtml}</div>
       <div class="admin-message warning reality-tv-approval-stalled" data-role="approval-stalled"${progress.stalled ? "" : " hidden"}>
-        No new checkpoint has been saved for more than two minutes. The server watchdog will reclaim this stage automatically. Do not Reset or Resume during normal processing.
+        No new checkpoint has been saved for more than seven minutes. The server watchdog will reclaim this stage automatically. Do not Reset or Resume during normal processing.
       </div>
     </div>
   `;
@@ -346,7 +349,7 @@ function adminRealityTvStartApprovalTicker_(queueId, state, kind) {
     const totalElapsed = baseElapsed + stageElapsed;
     const remaining = Math.max(0, Math.round(progress.estimatedRemainingSeconds - stageElapsed));
     const takingLong = stageElapsed > Math.max(30, progress.estimatedRemainingSeconds + 15);
-    const stalled = state && state.waiting ? false : stageElapsed + Number(state && state.heartbeatAgeSeconds || 0) >= 150;
+    const stalled = state && state.waiting ? false : stageElapsed + Number(state && state.heartbeatAgeSeconds || 0) >= 420;
     adminRealityTvUpdateApprovalProgress_(queueId, state, kind, {
       percent: progress.percent,
       elapsedSeconds: totalElapsed,
@@ -1796,7 +1799,7 @@ function adminRealityTvResultPanel_(bundle) {
             : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve All &amp; Finalize Episode</button>`}
           ${!isApproving ? `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject Main Result</button>` : ""}
         </div>
-        ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than five minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
+        ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than seven minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
       </div>
     `;
   }

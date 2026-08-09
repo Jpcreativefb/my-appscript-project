@@ -19,7 +19,7 @@ assert(season.includes('realityTvMaterializeEpisodeQuestionPackBulk_(season, nex
 assert(season.includes('checkpoint: checkpoint'), 'Bulk Extra Question work must publish real checkpoints');
 assert(season.includes('ApprovalStage: "FINALIZE"'), 'Successful bulk question materialization must advance to finalization');
 assert(season.includes('if (realityTvGetHubId_())'), 'Unconfigured External Results Hub must be skipped without delaying local approval');
-assert(season.includes('stalledAfterSeconds: 150'), 'Main approval stalled threshold is missing');
+assert(season.includes('stalledAfterSeconds: 420'), 'Main approval stalled threshold is missing');
 assert(questions.includes('progressLabel: label'), 'Supplemental question approvals must return progress data');
 assert(questions.includes('ApprovalStageStartedAt: now'), 'Question approval stage timing is missing');
 
@@ -65,8 +65,8 @@ assert(building.estimatedRemainingSeconds > 0, 'Question build should return an 
 
 const stale = runtime.realityTvApprovalProgress_({
   QueueId: 'q2', SeasonId: 's1', ReviewStatus: 'APPROVING', ApprovalStage: 'SETTLE',
-  PushStatus: 'SETTLING EPISODE', ApprovalStartedAt: new Date(Date.now() - 200000),
-  ApprovalStageStartedAt: new Date(Date.now() - 200000), ApprovalHeartbeatAt: new Date(Date.now() - 160000)
+  PushStatus: 'SETTLING EPISODE', ApprovalStartedAt: new Date(Date.now() - 500000),
+  ApprovalStageStartedAt: new Date(Date.now() - 500000), ApprovalHeartbeatAt: new Date(Date.now() - 430000)
 });
 assert.strictEqual(stale.stalled, true, 'Approval should be marked stalled after the heartbeat threshold');
 
