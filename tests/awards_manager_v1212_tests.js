@@ -63,10 +63,10 @@ assert(appMirror.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]')
 assert(app.includes('case "admin-awards"'), 'admin-awards render route missing');
 assert(admin.includes("navigate('admin-awards')"), 'Admin dashboard Awards Manager card missing');
 assert(page.includes('Search Providers'), 'Awards Manager search UI missing');
-assert(page.includes('Create Question'), 'Create Question action missing');
-assert(page.includes('Link Existing'), 'Link Existing action missing');
+assert(page.includes('View Event'), 'View Event action missing');
+assert(page.includes('Select Markets / Answers'), 'Event market selection UI missing');
 
-console.log('Awards Manager v1.2.12 tests passed.');
+console.log('Awards Manager regression tests passed.');
 
 
 assert(engine.includes('adminBulkCreateNominees({'), 'Awards Manager create must use bulk answer creation');
@@ -74,5 +74,16 @@ assert(engine.includes('function awardsManagerQueueMarketGroup_'), 'Grouped even
 assert(engine.includes('"UPSERT_EXTERNAL_MARKET_GROUP"'), 'Grouped event Hub job type missing');
 assert(bridge.includes('type === "UPSERT_EXTERNAL_MARKET_MAPPING"'), 'Hub bridge must support single Awards market jobs');
 assert(bridge.includes('type === "UPSERT_EXTERNAL_MARKET_GROUP"'), 'Hub bridge must support grouped Awards market jobs');
-assert(page.includes('Group related markets into one question'), 'Grouped event create UI missing');
-assert(page.includes('awards-group-answer-label'), 'Grouped event editable answer labels missing');
+assert(page.includes('Select Markets / Answers'), 'Event market selection UI missing');
+assert(page.includes('awards-event-answer-label'), 'Event editable answer labels missing');
+
+
+assert(engine.includes('function apiAdminAwardsGetExternalEvent(payload)'), 'Awards Manager full-event API missing');
+assert(engine.includes('function awardsManagerKalshiEvent_'), 'Awards Manager Kalshi event loader missing');
+assert(engine.includes('function awardsManagerPolymarketEvent_'), 'Awards Manager Polymarket event loader missing');
+assert(backendApi.includes('"adminAwardsGetExternalEvent"'), 'Awards Manager event API route missing');
+assert(page.includes('View Event'), 'Awards Manager event-first search UI missing');
+assert(page.includes('Loading full provider event and all live markets'), 'Awards Manager full-event loader missing');
+assert(page.includes('Select Markets / Answers'), 'Awards Manager event market selector missing');
+assert(page.includes('awards-event-market-use'), 'Awards Manager event market checkboxes missing');
+assert(page.includes('awards-event-answer-label'), 'Awards Manager event answer labels missing');

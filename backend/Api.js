@@ -228,6 +228,7 @@ function doGet(e) {
       "adminAwardsGetDashboard",
       "adminAwardsGetGameSetup",
       "adminAwardsSearchExternalMarkets",
+      "adminAwardsGetExternalEvent",
       "adminAwardsCreateQuestionFromMarket",
       "adminAwardsLinkMarket",
 
@@ -930,6 +931,10 @@ function doGet(e) {
 
     if (action === "adminAwardsSearchExternalMarkets") {
       return json(apiAdminAwardsSearchExternalMarkets(params));
+    }
+
+    if (action === "adminAwardsGetExternalEvent") {
+      return json(apiAdminAwardsGetExternalEvent(params));
     }
 
     /* =========================

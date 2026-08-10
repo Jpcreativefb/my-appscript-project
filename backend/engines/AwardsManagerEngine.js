@@ -4,7 +4,7 @@
    Live Kalshi/Polymarket discovery + safe Hub mappings.
 ===================================================== */
 
-const AWARDS_MANAGER_VERSION = "1.2.13";
+const AWARDS_MANAGER_VERSION = "1.2.14";
 const AWARDS_MANAGER_KALSHI_BASE = "https://external-api.kalshi.com/trade-api/v2";
 const AWARDS_MANAGER_POLYMARKET_BASE = "https://gamma-api.polymarket.com";
 const AWARDS_MANAGER_PROVIDERS = ["kalshi", "polymarket"];
@@ -350,6 +350,262 @@ function awardsManagerPolymarketSearch_(query, limit) {
   });
 
   return results;
+}
+
+
+function awardsManagerPolymarketResult_(market, event) {
+  market = market || {};
+  event = event || {};
+
+  const outcomes = awardsManagerArray_(market.outcomes)
+    .map(awardsManagerString_)
+    .filter(Boolean);
+
+  const rawPrices = awardsManagerArray_(market.outcomePrices);
+  const prices = {};
+
+  outcomes.forEach(function(outcome, index) {
+    prices[outcome] = awardsManagerPercent_(rawPrices[index]);
+  });
+
+  const marketId = awardsManagerString_(
+    market.id ||
+    market.conditionId ||
+    market.condition_id ||
+    market.slug
+  );
+
+  if (!marketId) return null;
+
+  const yesOutcome = outcomes.find(function(outcome) {
+    return awardsManagerKey_(outcome) === "yes";
+  });
+
+  const firstOutcome = yesOutcome || outcomes[0] || "";
+  const eventSlug = awardsManagerString_(event.slug);
+
+  return {
+    provider: "polymarket",
+    externalEventId: awardsManagerString_(
+      event.id || event.slug || event.ticker
+    ),
+    externalMarketId: marketId,
+    eventName: awardsManagerString_(
+      event.title || event.slug || event.id
+    ),
+    marketQuestion: awardsManagerString_(
+      market.question ||
+      market.title ||
+      market.marketTitle ||
+      event.title
+    ),
+    outcomes: outcomes.length ? outcomes : ["Yes", "No"],
+    prices: prices,
+    primaryProbability: firstOutcome
+      ? prices[firstOutcome]
+      : null,
+    closeTime: awardsManagerString_(
+      market.endDate || event.endDate
+    ),
+    status:
+      market.closed === true || event.closed === true
+        ? "closed"
+        : "open",
+    resolutionSource: awardsManagerString_(
+      market.resolutionSource ||
+      event.resolutionSource
+    ),
+    sourceUrl: eventSlug
+      ? "https://polymarket.com/event/" +
+        encodeURIComponent(eventSlug)
+      : AWARDS_MANAGER_POLYMARKET_BASE +
+        "/markets?id=" +
+        encodeURIComponent(marketId),
+    raw: {
+      eventId: event.id,
+      eventSlug: event.slug,
+      eventTitle: event.title,
+      marketId: market.id,
+      conditionId: market.conditionId,
+      marketSlug: market.slug,
+      question: market.question,
+      outcomes: market.outcomes,
+      outcomePrices: market.outcomePrices,
+      endDate: market.endDate,
+      resolutionSource: market.resolutionSource,
+      active: market.active,
+      closed: market.closed
+    }
+  };
+}
+
+function awardsManagerKalshiEvent_(eventId) {
+  const data = awardsManagerFetchJson_(
+    AWARDS_MANAGER_KALSHI_BASE +
+    "/events/" +
+    encodeURIComponent(eventId)
+  );
+
+  const event = data && data.event
+    ? data.event
+    : {};
+
+  const rawMarkets = Array.isArray(data && data.markets)
+    ? data.markets
+    : (
+        Array.isArray(event.markets)
+          ? event.markets
+          : []
+      );
+
+  const eventName = awardsManagerString_(
+    event.title ||
+    event.sub_title ||
+    event.event_ticker ||
+    eventId
+  );
+
+  const markets = rawMarkets
+    .filter(function(market) {
+      return awardsManagerMarketIsLive_(market, event);
+    })
+    .map(function(market) {
+      const result = awardsManagerKalshiResult_(
+        market,
+        event
+      );
+
+      result.eventName = eventName;
+      result.externalEventId = awardsManagerString_(
+        event.event_ticker ||
+        market.event_ticker ||
+        eventId
+      );
+
+      if (
+        !result.resolutionSource &&
+        Array.isArray(event.settlement_sources)
+      ) {
+        result.resolutionSource =
+          awardsManagerKalshiSettlementSource_(event);
+      }
+
+      return result;
+    });
+
+  return {
+    success: true,
+    provider: "kalshi",
+    externalEventId: awardsManagerString_(
+      event.event_ticker || eventId
+    ),
+    eventName: eventName,
+    status: awardsManagerString_(event.status || "open"),
+    sourceUrl:
+      AWARDS_MANAGER_KALSHI_BASE +
+      "/events/" +
+      encodeURIComponent(
+        awardsManagerString_(
+          event.event_ticker || eventId
+        )
+      ),
+    markets: markets
+  };
+}
+
+function awardsManagerPolymarketEvent_(eventId) {
+  const data = awardsManagerFetchJson_(
+    AWARDS_MANAGER_POLYMARKET_BASE +
+    "/events/" +
+    encodeURIComponent(eventId)
+  );
+
+  const event = data || {};
+  const eventName = awardsManagerString_(
+    event.title ||
+    event.slug ||
+    event.id ||
+    eventId
+  );
+
+  const markets = (
+    Array.isArray(event.markets)
+      ? event.markets
+      : []
+  )
+    .filter(function(market) {
+      return awardsManagerMarketIsLive_(market, event);
+    })
+    .map(function(market) {
+      return awardsManagerPolymarketResult_(
+        market,
+        event
+      );
+    })
+    .filter(Boolean);
+
+  return {
+    success: true,
+    provider: "polymarket",
+    externalEventId: awardsManagerString_(
+      event.id || event.slug || eventId
+    ),
+    eventName: eventName,
+    status:
+      event.closed === true
+        ? "closed"
+        : "open",
+    sourceUrl: event.slug
+      ? "https://polymarket.com/event/" +
+        encodeURIComponent(event.slug)
+      : AWARDS_MANAGER_POLYMARKET_BASE +
+        "/events/" +
+        encodeURIComponent(eventId),
+    markets: markets
+  };
+}
+
+function apiAdminAwardsGetExternalEvent(payload) {
+  awardsManagerRequireAdmin_(payload);
+  payload = payload || {};
+
+  const provider = awardsManagerKey_(
+    payload.provider
+  );
+
+  const eventId = awardsManagerString_(
+    payload.eventId ||
+    payload.externalEventId
+  );
+
+  if (
+    AWARDS_MANAGER_PROVIDERS.indexOf(provider) === -1
+  ) {
+    throw new Error(
+      "Provider must be Kalshi or Polymarket."
+    );
+  }
+
+  if (!eventId) {
+    throw new Error(
+      "Selected provider event is missing its event ID."
+    );
+  }
+
+  const result = provider === "kalshi"
+    ? awardsManagerKalshiEvent_(eventId)
+    : awardsManagerPolymarketEvent_(eventId);
+
+  if (
+    !result ||
+    !Array.isArray(result.markets)
+  ) {
+    throw new Error(
+      "Could not load provider event markets."
+    );
+  }
+
+  return result;
 }
 
 function apiAdminAwardsGetDashboard(payload) {

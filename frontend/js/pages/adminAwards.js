@@ -1,11 +1,14 @@
 
 /* =====================================================
-   AWARDS MANAGER — Admin Page v1.2.13
+   AWARDS MANAGER — Admin Page v1.2.14
 ===================================================== */
 
 const AWARDS_MANAGER_STATE = {
   dashboard: null,
   results: [],
+  events: [],
+  selectedEvent: null,
+  eventMarkets: [],
   selectedMarket: null,
   targetSetup: null,
   mode: ""
@@ -183,6 +186,9 @@ async function renderAdminAwardsPage() {
 
   AWARDS_MANAGER_STATE.dashboard = dashboard;
   AWARDS_MANAGER_STATE.results = [];
+  AWARDS_MANAGER_STATE.events = [];
+  AWARDS_MANAGER_STATE.selectedEvent = null;
+  AWARDS_MANAGER_STATE.eventMarkets = [];
   AWARDS_MANAGER_STATE.selectedMarket = null;
   AWARDS_MANAGER_STATE.targetSetup = null;
   AWARDS_MANAGER_STATE.mode = "";
@@ -264,190 +270,658 @@ async function renderAdminAwardsPage() {
   `;
 }
 
-async function adminAwardsSearch(button) {
-  const queryNode = document.getElementById("awardsSearchQuery");
-  const providerNode = document.getElementById("awardsProvider");
-  const status = document.getElementById("awardsSearchStatus");
-  const resultsNode = document.getElementById("awardsSearchResults");
-  if (!queryNode || !providerNode || !status || !resultsNode) return;
+function awardsAdminSearchEvents_(results) {
+  const byKey = {};
+  const order = [];
 
-  const query = String(queryNode.value || "").trim();
+  (Array.isArray(results) ? results : [])
+    .forEach(function(market) {
+      if (!market) return;
+
+      const provider = String(
+        market.provider || ""
+      ).toLowerCase();
+
+      const eventId = String(
+        market.externalEventId ||
+        market.externalMarketId ||
+        ""
+      );
+
+      const key = provider + "|" + eventId;
+
+      if (!byKey[key]) {
+        byKey[key] = {
+          provider: provider,
+          externalEventId: eventId,
+          eventName:
+            market.eventName ||
+            market.marketQuestion ||
+            eventId,
+          markets: []
+        };
+        order.push(key);
+      }
+
+      byKey[key].markets.push(market);
+    });
+
+  return order.map(function(key) {
+    return byKey[key];
+  });
+}
+
+async function adminAwardsSearch(button) {
+  const queryNode =
+    document.getElementById("awardsSearchQuery");
+
+  const providerNode =
+    document.getElementById("awardsProvider");
+
+  const status =
+    document.getElementById("awardsSearchStatus");
+
+  const resultsNode =
+    document.getElementById("awardsSearchResults");
+
+  if (
+    !queryNode ||
+    !providerNode ||
+    !status ||
+    !resultsNode
+  ) {
+    return;
+  }
+
+  const query = String(
+    queryNode.value || ""
+  ).trim();
+
   if (query.length < 2) {
-    status.className = "admin-message warning";
-    status.textContent = "Enter at least 2 characters.";
+    status.className =
+      "admin-message warning";
+    status.textContent =
+      "Enter at least 2 characters.";
     return;
   }
 
   if (button) button.disabled = true;
+
   status.className = "admin-message";
-  status.textContent = "Searching live providers…";
+  status.textContent =
+    "Searching live provider events…";
+
   resultsNode.innerHTML = "";
 
   try {
-    const res = await apiAdminAwardsSearchExternalMarkets(providerNode.value, query);
-    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Search failed.");
+    const res =
+      await apiAdminAwardsSearchExternalMarkets(
+        providerNode.value,
+        query
+      );
 
-    AWARDS_MANAGER_STATE.results = Array.isArray(res.results) ? res.results : [];
-    const errors = Array.isArray(res.errors) ? res.errors : [];
-    status.className = "admin-message " + (errors.length ? "warning" : "success");
-    status.textContent = AWARDS_MANAGER_STATE.results.length +
-      " live market" + (AWARDS_MANAGER_STATE.results.length === 1 ? "" : "s") +
-      " found." + (errors.length ? " " + errors.join(" · ") : "");
+    if (!res || res.success === false) {
+      throw new Error(
+        (
+          res &&
+          (res.error || res.message)
+        ) ||
+        "Search failed."
+      );
+    }
 
-    resultsNode.innerHTML = AWARDS_MANAGER_STATE.results.length
-      ? AWARDS_MANAGER_STATE.results.map(function(market, index) {
-          const outcomes = Array.isArray(market.outcomes) ? market.outcomes : [];
-          const priceText = outcomes.slice(0, 4).map(function(outcome) {
-            const pct = market.prices && market.prices[outcome] !== undefined
-              ? awardsAdminPct_(market.prices[outcome])
-              : "—";
-            return awardsAdminEsc_(outcome) + " " + pct;
-          }).join(" · ");
+    AWARDS_MANAGER_STATE.results =
+      Array.isArray(res.results)
+        ? res.results
+        : [];
 
-          return `
-            <div class="admin-category-card">
-              <div class="admin-category-header">
-                <div>
-                  <strong>${awardsAdminEsc_(market.marketQuestion || market.eventName || market.externalMarketId)}</strong>
-                  <div class="admin-sub">${awardsAdminEsc_(market.provider)} · ${awardsAdminEsc_(market.eventName || market.externalEventId)}</div>
-                  <div class="admin-sub">${priceText || "Probability unavailable"}</div>
-                  ${market.closeTime ? `<div class="admin-sub">Closes: ${awardsAdminEsc_(market.closeTime)}</div>` : ""}
+    AWARDS_MANAGER_STATE.events =
+      awardsAdminSearchEvents_(
+        AWARDS_MANAGER_STATE.results
+      );
+
+    AWARDS_MANAGER_STATE.selectedEvent = null;
+    AWARDS_MANAGER_STATE.eventMarkets = [];
+    AWARDS_MANAGER_STATE.selectedMarket = null;
+
+    const errors =
+      Array.isArray(res.errors)
+        ? res.errors
+        : [];
+
+    status.className =
+      "admin-message " +
+      (
+        errors.length
+          ? "warning"
+          : "success"
+      );
+
+    status.textContent =
+      AWARDS_MANAGER_STATE.events.length +
+      " live event" +
+      (
+        AWARDS_MANAGER_STATE.events.length === 1
+          ? ""
+          : "s"
+      ) +
+      " found." +
+      (
+        errors.length
+          ? " " + errors.join(" · ")
+          : ""
+      );
+
+    resultsNode.innerHTML =
+      AWARDS_MANAGER_STATE.events.length
+        ? AWARDS_MANAGER_STATE.events
+            .map(function(event, index) {
+              const sample =
+                event.markets &&
+                event.markets[0];
+
+              return `
+                <div class="admin-category-card">
+                  <div class="admin-category-header">
+                    <div>
+                      <strong>
+                        ${awardsAdminEsc_(
+                          event.eventName ||
+                          event.externalEventId
+                        )}
+                      </strong>
+
+                      <div class="admin-sub">
+                        ${awardsAdminEsc_(
+                          event.provider
+                        )}
+                        ·
+                        ${awardsAdminEsc_(
+                          event.externalEventId
+                        )}
+                      </div>
+
+                      <div class="admin-sub">
+                        ${
+                          event.markets.length
+                        }
+                        matching market${
+                          event.markets.length === 1
+                            ? ""
+                            : "s"
+                        }
+                        found in this search.
+                        Open the event to load all live markets.
+                      </div>
+
+                      ${
+                        sample &&
+                        sample.closeTime
+                          ? `
+                            <div class="admin-sub">
+                              Example close:
+                              ${awardsAdminEsc_(
+                                sample.closeTime
+                              )}
+                            </div>
+                          `
+                          : ""
+                      }
+                    </div>
+
+                    <span class="admin-pill">
+                      event
+                    </span>
+                  </div>
+
+                  <div class="admin-actions">
+                    <button
+                      type="button"
+                      class="admin-small-button"
+                      onclick="adminAwardsOpenEvent(${index})"
+                    >
+                      View Event
+                    </button>
+                  </div>
                 </div>
-                <span class="admin-pill">${awardsAdminEsc_(market.status || "open")}</span>
-              </div>
-              <div class="admin-actions">
-                <button class="admin-small-button" onclick="adminAwardsChooseMarket(${index}, 'create')">Create Question</button>
-                <button class="admin-small-button secondary" onclick="adminAwardsChooseMarket(${index}, 'link')">Link Existing</button>
-              </div>
+              `;
+            })
+            .join("")
+        : `
+            <div class="admin-sub">
+              No matching live events found.
+              Try a broader term or the other provider.
             </div>
           `;
-        }).join("")
-      : `<div class="admin-sub">No matching live markets found. Try a broader term or the other provider.</div>`;
   } catch (err) {
-    status.className = "admin-message error";
-    status.textContent = err && err.message ? err.message : String(err);
+    status.className =
+      "admin-message error";
+
+    status.textContent =
+      err && err.message
+        ? err.message
+        : String(err);
   } finally {
     if (button) button.disabled = false;
   }
 }
 
-function adminAwardsChooseMarket(index, mode) {
-  const market = AWARDS_MANAGER_STATE.results[index];
-  if (!market) return;
+function awardsAdminSetAllEventMarkets_(checked) {
+  document
+    .querySelectorAll(
+      ".awards-event-market-use"
+    )
+    .forEach(function(input) {
+      input.checked = checked === true;
+    });
+}
 
-  AWARDS_MANAGER_STATE.selectedMarket = market;
-  AWARDS_MANAGER_STATE.mode = mode;
-  AWARDS_MANAGER_STATE.targetSetup = null;
+function awardsAdminRenderEventBuilder_() {
+  const builder =
+    document.getElementById(
+      "awardsTargetBuilder"
+    );
 
-  const summary = document.getElementById("awardsSelectedMarket");
-  if (summary) {
-    summary.innerHTML = `
-      <b>${awardsAdminEsc_(market.provider)}</b> ·
-      ${awardsAdminEsc_(market.marketQuestion || market.externalMarketId)}
-      <div class="admin-sub">${awardsAdminEsc_(market.externalMarketId)}</div>
-    `;
-  }
+  const event =
+    AWARDS_MANAGER_STATE.selectedEvent;
 
-  const builder = document.getElementById("awardsTargetBuilder");
-  if (!builder) return;
+  const markets =
+    AWARDS_MANAGER_STATE.eventMarkets || [];
 
-  if (mode === "create") {
-    const related = awardsAdminRelatedMarkets_(market);
-    const canGroup = related.length >= 2;
-    const defaultQuestion = canGroup
-      ? (market.eventName || market.marketQuestion || "")
-      : (market.marketQuestion || "");
+  if (!builder || !event) return;
 
+  if (!markets.length) {
     builder.innerHTML = `
-      <div class="admin-control-grid" style="margin-top:12px;">
-        <label class="admin-field">
-          <span>Awards App Game</span>
-          <select id="awardsCreateGame">${awardsAdminGameOptions_("")}</select>
-        </label>
-
-        <label class="admin-field" style="grid-column:span 2;">
-          <span>Question</span>
-          <input
-            id="awardsCreateQuestion"
-            type="text"
-            value="${awardsAdminEsc_(defaultQuestion)}"
-          >
-        </label>
-
-        <label class="admin-field">
-          <span>Section</span>
-          <input id="awardsCreateSection" type="text" value="Awards">
-        </label>
-
-        <label class="admin-field">
-          <span>Points</span>
-          <input id="awardsCreatePoints" type="number" min="0" value="1">
-        </label>
+      <div class="admin-message warning">
+        This provider event currently has no live markets.
       </div>
-
-      ${canGroup ? `
-        <label
-          class="admin-list-row"
-          style="margin-top:12px;cursor:pointer;"
-        >
-          <div>
-            <b>Group related markets into one question</b>
-            <div class="admin-sub">
-              ${related.length} live markets share this provider event.
-              Example: one Super Bowl question with one team per answer.
-            </div>
-          </div>
-
-          <input
-            id="awardsCreateGrouped"
-            type="checkbox"
-            checked
-            onchange="awardsAdminRenderCreateAnswersPreview_()"
-          >
-        </label>
-      ` : ""}
-
-      <div
-        id="awardsCreateAnswersPreview"
-        style="margin-top:10px;"
-      ></div>
-
-      <div class="admin-actions">
-        <button
-          class="button admin-button"
-          onclick="adminAwardsCreateFromMarket(this)"
-        >
-          Create & Link Question
-        </button>
-      </div>
-
-      <div id="awardsBuilderStatus" class="admin-message"></div>
     `;
-
-    awardsAdminRenderCreateAnswersPreview_();
     return;
   }
+
+  const grouped = markets.length >= 2;
 
   builder.innerHTML = `
     <div class="admin-control-grid" style="margin-top:12px;">
       <label class="admin-field">
         <span>Awards App Game</span>
-        <select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">
+        <select id="awardsCreateGame">
           ${awardsAdminGameOptions_("")}
         </select>
       </label>
-      <label class="admin-field">
+
+      <label
+        class="admin-field"
+        style="grid-column:span 2;"
+      >
         <span>Question</span>
-        <select id="awardsLinkQuestion" onchange="adminAwardsRenderOutcomeMap()">
-          <option value="">Choose game first…</option>
-        </select>
+        <input
+          id="awardsCreateQuestion"
+          type="text"
+          value="${awardsAdminEsc_(
+            event.eventName ||
+            markets[0].marketQuestion ||
+            ""
+          )}"
+        >
+      </label>
+
+      <label class="admin-field">
+        <span>Section</span>
+        <input
+          id="awardsCreateSection"
+          type="text"
+          value="Awards"
+        >
+      </label>
+
+      <label class="admin-field">
+        <span>Points</span>
+        <input
+          id="awardsCreatePoints"
+          type="number"
+          min="0"
+          value="1"
+        >
       </label>
     </div>
-    <div id="awardsOutcomeMap"></div>
+
+    ${
+      grouped
+        ? `
+          <div
+            class="admin-list-row"
+            style="margin-top:12px;"
+          >
+            <div>
+              <b>Select Markets / Answers</b>
+              <div class="admin-sub">
+                ${markets.length}
+                live markets are in this provider event.
+                Each checked market becomes one answer.
+              </div>
+            </div>
+
+            <div class="admin-actions">
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="awardsAdminSetAllEventMarkets_(true)"
+              >
+                Select All
+              </button>
+
+              <button
+                type="button"
+                class="admin-small-button secondary"
+                onclick="awardsAdminSetAllEventMarkets_(false)"
+              >
+                Clear All
+              </button>
+            </div>
+          </div>
+
+          <div class="admin-list">
+            ${markets
+              .map(function(item, index) {
+                const label =
+                  awardsAdminGroupedAnswerLabel_(
+                    item
+                  );
+
+                const yesValue =
+                  item.prices &&
+                  item.prices.Yes !== undefined
+                    ? item.prices.Yes
+                    : item.primaryProbability;
+
+                return `
+                  <div
+                    class="admin-list-row"
+                    style="align-items:flex-start;"
+                  >
+                    <label
+                      style="
+                        display:flex;
+                        gap:8px;
+                        align-items:center;
+                        min-width:34px;
+                      "
+                    >
+                      <input
+                        type="checkbox"
+                        class="awards-event-market-use"
+                        data-event-market-index="${index}"
+                        checked
+                      >
+                    </label>
+
+                    <div style="flex:1;min-width:0;">
+                      <div class="admin-sub">
+                        ${awardsAdminEsc_(
+                          item.marketQuestion ||
+                          item.externalMarketId
+                        )}
+                      </div>
+
+                      <label
+                        class="admin-field"
+                        style="margin-top:6px;"
+                      >
+                        <span>
+                          Answer ${index + 1}
+                        </span>
+
+                        <input
+                          type="text"
+                          class="awards-event-answer-label"
+                          data-event-market-index="${index}"
+                          value="${awardsAdminEsc_(
+                            label
+                          )}"
+                        >
+                      </label>
+                    </div>
+
+                    <span class="admin-pill">
+                      ${awardsAdminPct_(
+                        yesValue
+                      )}
+                    </span>
+                  </div>
+                `;
+              })
+              .join("")}
+          </div>
+        `
+        : `
+          <div
+            id="awardsCreateAnswersPreview"
+            style="margin-top:10px;"
+          >
+            <div class="admin-sub">
+              Single-market event.
+              Answers:
+              ${(markets[0].outcomes || [])
+                .map(awardsAdminEsc_)
+                .join(", ")}
+            </div>
+          </div>
+        `
+    }
+
     <div class="admin-actions">
-      <button class="button admin-button" onclick="adminAwardsLinkMarket(this)">Save Link</button>
+      <button
+        class="button admin-button"
+        onclick="adminAwardsCreateFromMarket(this)"
+      >
+        Create & Link Question
+      </button>
     </div>
-    <div id="awardsBuilderStatus" class="admin-message"></div>
+
+    <div
+      id="awardsBuilderStatus"
+      class="admin-message"
+    ></div>
+  `;
+}
+
+async function adminAwardsOpenEvent(index) {
+  const event =
+    AWARDS_MANAGER_STATE.events[index];
+
+  if (!event) return;
+
+  AWARDS_MANAGER_STATE.mode = "create";
+  AWARDS_MANAGER_STATE.selectedEvent = null;
+  AWARDS_MANAGER_STATE.eventMarkets = [];
+  AWARDS_MANAGER_STATE.selectedMarket =
+    event.markets &&
+    event.markets[0]
+      ? event.markets[0]
+      : null;
+
+  const summary =
+    document.getElementById(
+      "awardsSelectedMarket"
+    );
+
+  const builder =
+    document.getElementById(
+      "awardsTargetBuilder"
+    );
+
+  if (summary) {
+    summary.innerHTML = `
+      <b>
+        ${awardsAdminEsc_(
+          event.provider
+        )}
+      </b>
+      ·
+      ${awardsAdminEsc_(
+        event.eventName ||
+        event.externalEventId
+      )}
+
+      <div class="admin-sub">
+        ${awardsAdminEsc_(
+          event.externalEventId
+        )}
+      </div>
+    `;
+  }
+
+  if (builder) {
+    builder.innerHTML = `
+      <div class="admin-message">
+        Loading full provider event and all live markets…
+      </div>
+    `;
+  }
+
+  try {
+    const res =
+      await apiAdminAwardsGetExternalEvent(
+        event.provider,
+        event.externalEventId
+      );
+
+    if (!res || res.success === false) {
+      throw new Error(
+        (
+          res &&
+          (res.error || res.message)
+        ) ||
+        "Could not load provider event."
+      );
+    }
+
+    AWARDS_MANAGER_STATE.selectedEvent = res;
+
+    AWARDS_MANAGER_STATE.eventMarkets =
+      Array.isArray(res.markets)
+        ? res.markets
+        : [];
+
+    AWARDS_MANAGER_STATE.selectedMarket =
+      AWARDS_MANAGER_STATE.eventMarkets[0] ||
+      AWARDS_MANAGER_STATE.selectedMarket;
+
+    if (summary) {
+      summary.innerHTML = `
+        <b>
+          ${awardsAdminEsc_(
+            res.provider ||
+            event.provider
+          )}
+        </b>
+        ·
+        ${awardsAdminEsc_(
+          res.eventName ||
+          event.eventName ||
+          event.externalEventId
+        )}
+
+        <div class="admin-sub">
+          ${awardsAdminEsc_(
+            res.externalEventId ||
+            event.externalEventId
+          )}
+          ·
+          ${
+            AWARDS_MANAGER_STATE
+              .eventMarkets.length
+          }
+          live market${
+            AWARDS_MANAGER_STATE
+              .eventMarkets.length === 1
+              ? ""
+              : "s"
+          }
+        </div>
+      `;
+    }
+
+    awardsAdminRenderEventBuilder_();
+  } catch (err) {
+    if (builder) {
+      builder.innerHTML = `
+        <div class="admin-message error">
+          ${awardsAdminEsc_(
+            err && err.message
+              ? err.message
+              : String(err)
+          )}
+        </div>
+      `;
+    }
+  }
+}
+
+function adminAwardsChooseMarket(index, mode) {
+  const market =
+    AWARDS_MANAGER_STATE.results[index];
+
+  if (!market) return;
+
+  if (mode === "create") {
+    const eventIndex =
+      AWARDS_MANAGER_STATE.events.findIndex(
+        function(event) {
+          return (
+            String(event.provider || "") ===
+              String(market.provider || "") &&
+            String(event.externalEventId || "") ===
+              String(market.externalEventId || "")
+          );
+        }
+      );
+
+    if (eventIndex >= 0) {
+      return adminAwardsOpenEvent(eventIndex);
+    }
+  }
+
+  AWARDS_MANAGER_STATE.selectedMarket = market;
+  AWARDS_MANAGER_STATE.mode = mode;
+  AWARDS_MANAGER_STATE.targetSetup = null;
+
+  const summary =
+    document.getElementById(
+      "awardsSelectedMarket"
+    );
+
+  if (summary) {
+    summary.innerHTML = `
+      <b>${awardsAdminEsc_(market.provider)}</b>
+      ·
+      ${awardsAdminEsc_(
+        market.marketQuestion ||
+        market.externalMarketId
+      )}
+
+      <div class="admin-sub">
+        ${awardsAdminEsc_(
+          market.externalMarketId
+        )}
+      </div>
+    `;
+  }
+
+  const builder =
+    document.getElementById(
+      "awardsTargetBuilder"
+    );
+
+  if (!builder) return;
+
+  builder.innerHTML = `
+    <div class="admin-message warning">
+      Event-first mode is active.
+      Open the provider event to create a new question.
+      Existing-question event mapping will be added separately.
+    </div>
   `;
 }
 
@@ -521,71 +995,123 @@ function adminAwardsRenderOutcomeMap() {
 }
 
 async function adminAwardsCreateFromMarket(button) {
-  const market = AWARDS_MANAGER_STATE.selectedMarket;
+  const eventMarkets =
+    Array.isArray(
+      AWARDS_MANAGER_STATE.eventMarkets
+    )
+      ? AWARDS_MANAGER_STATE.eventMarkets
+      : [];
+
+  const market =
+    eventMarkets[0] ||
+    AWARDS_MANAGER_STATE.selectedMarket;
+
   const gameId = String(
-    (document.getElementById("awardsCreateGame") || {}).value || ""
+    (
+      document.getElementById(
+        "awardsCreateGame"
+      ) || {}
+    ).value || ""
   );
 
   const question = String(
-    (document.getElementById("awardsCreateQuestion") || {}).value || ""
+    (
+      document.getElementById(
+        "awardsCreateQuestion"
+      ) || {}
+    ).value || ""
   ).trim();
 
   const section = String(
-    (document.getElementById("awardsCreateSection") || {}).value || "Awards"
+    (
+      document.getElementById(
+        "awardsCreateSection"
+      ) || {}
+    ).value || "Awards"
   ).trim();
 
   const points = Number(
-    (document.getElementById("awardsCreatePoints") || {}).value || 1
+    (
+      document.getElementById(
+        "awardsCreatePoints"
+      ) || {}
+    ).value || 1
   );
 
-  const status = document.getElementById("awardsBuilderStatus");
+  const status =
+    document.getElementById(
+      "awardsBuilderStatus"
+    );
 
-  if (!market || !gameId || !question) {
+  if (
+    !market ||
+    !gameId ||
+    !question
+  ) {
     if (status) {
-      status.className = "admin-message warning";
-      status.textContent = "Choose a game and enter the question text.";
+      status.className =
+        "admin-message warning";
+
+      status.textContent =
+        "Choose a game and enter the question text.";
     }
     return;
   }
 
-  const groupToggle = document.getElementById("awardsCreateGrouped");
-  const grouped = !!(groupToggle && groupToggle.checked);
-
   const groupMarkets = [];
   const answerLabels = {};
+  const grouped =
+    eventMarkets.length >= 2;
 
   if (grouped) {
     document
-      .querySelectorAll(".awards-group-market-use[data-result-index]")
+      .querySelectorAll(
+        ".awards-event-market-use[data-event-market-index]"
+      )
       .forEach(function(checkbox) {
         if (!checkbox.checked) return;
 
-        const index = Number(checkbox.dataset.resultIndex);
-        const item = AWARDS_MANAGER_STATE.results[index];
+        const index = Number(
+          checkbox.dataset
+            .eventMarketIndex
+        );
+
+        const item =
+          eventMarkets[index];
 
         if (!item) return;
 
-        const labelInput = document.querySelector(
-          '.awards-group-answer-label[data-result-index="' +
-          index +
-          '"]'
-        );
+        const labelInput =
+          document.querySelector(
+            '.awards-event-answer-label[data-event-market-index="' +
+            index +
+            '"]'
+          );
 
         const label = String(
-          labelInput ? labelInput.value : awardsAdminGroupedAnswerLabel_(item)
+          labelInput
+            ? labelInput.value
+            : awardsAdminGroupedAnswerLabel_(
+                item
+              )
         ).trim();
 
         if (!label) return;
 
         groupMarkets.push(item);
-        answerLabels[item.externalMarketId] = label;
+
+        answerLabels[
+          item.externalMarketId
+        ] = label;
       });
 
     if (groupMarkets.length < 2) {
       if (status) {
-        status.className = "admin-message warning";
+        status.className =
+          "admin-message warning";
+
         status.textContent =
-          "Choose at least two related markets for a grouped question.";
+          "Choose at least two markets/answers from this event.";
       }
       return;
     }
@@ -594,43 +1120,58 @@ async function adminAwardsCreateFromMarket(button) {
   if (button) button.disabled = true;
 
   if (status) {
-    status.className = "admin-message";
+    status.className =
+      "admin-message";
+
     status.textContent = grouped
-      ? "Creating grouped question, answers, and one Hub bundle…"
+      ? "Creating one question from the selected event markets…"
       : "Creating question with batched answers and queuing Hub mapping…";
   }
 
   try {
-    const res = await apiAdminAwardsCreateQuestionFromMarket({
-      gameId: gameId,
-      question: question,
-      section: section,
-      points: points,
-      marketJSON: JSON.stringify(market),
-      groupMarketsJSON: grouped
-        ? JSON.stringify(groupMarkets)
-        : "",
-      answerLabelsJSON: grouped
-        ? JSON.stringify(answerLabels)
-        : ""
-    });
+    const res =
+      await apiAdminAwardsCreateQuestionFromMarket({
+        gameId: gameId,
+        question: question,
+        section: section,
+        points: points,
+        marketJSON:
+          JSON.stringify(market),
+        groupMarketsJSON: grouped
+          ? JSON.stringify(
+              groupMarkets
+            )
+          : "",
+        answerLabelsJSON: grouped
+          ? JSON.stringify(
+              answerLabels
+            )
+          : ""
+      });
 
     if (!res || res.success === false) {
       throw new Error(
-        (res && (res.error || res.message)) ||
+        (
+          res &&
+          (res.error || res.message)
+        ) ||
         "Could not create question."
       );
     }
 
     if (status) {
-      status.className = "admin-message success";
+      status.className =
+        "admin-message success";
+
       status.textContent =
         res.message ||
         "Question created and linked.";
     }
   } catch (err) {
     if (status) {
-      status.className = "admin-message error";
+      status.className =
+        "admin-message error";
+
       status.textContent =
         err.message ||
         String(err);

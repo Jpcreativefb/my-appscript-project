@@ -3789,6 +3789,19 @@ async function apiAdminAwardsSearchExternalMarkets(provider, query) {
   });
 }
 
+async function apiAdminAwardsGetExternalEvent(
+  provider,
+  eventId
+) {
+  return apiAdminAwardsRequest_(
+    "adminAwardsGetExternalEvent",
+    {
+      provider: provider || "",
+      eventId: eventId || ""
+    }
+  );
+}
+
 async function apiAdminAwardsCreateQuestionFromMarket(payload) {
   return apiAdminAwardsPostRequest_(
     "adminAwardsCreateQuestionFromMarket",
