@@ -67,3 +67,12 @@ assert(page.includes('Create Question'), 'Create Question action missing');
 assert(page.includes('Link Existing'), 'Link Existing action missing');
 
 console.log('Awards Manager v1.2.12 tests passed.');
+
+
+assert(engine.includes('adminBulkCreateNominees({'), 'Awards Manager create must use bulk answer creation');
+assert(engine.includes('function awardsManagerQueueMarketGroup_'), 'Grouped event Hub queue helper missing');
+assert(engine.includes('"UPSERT_EXTERNAL_MARKET_GROUP"'), 'Grouped event Hub job type missing');
+assert(bridge.includes('type === "UPSERT_EXTERNAL_MARKET_MAPPING"'), 'Hub bridge must support single Awards market jobs');
+assert(bridge.includes('type === "UPSERT_EXTERNAL_MARKET_GROUP"'), 'Hub bridge must support grouped Awards market jobs');
+assert(page.includes('Group related markets into one question'), 'Grouped event create UI missing');
+assert(page.includes('awards-group-answer-label'), 'Grouped event editable answer labels missing');

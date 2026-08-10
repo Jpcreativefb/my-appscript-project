@@ -1,6 +1,6 @@
 
 /* =====================================================
-   AWARDS MANAGER — Admin Page v1.2.12
+   AWARDS MANAGER — Admin Page v1.2.13
 ===================================================== */
 
 const AWARDS_MANAGER_STATE = {
@@ -32,6 +32,141 @@ function awardsAdminGameOptions_(selected) {
     const suffix = game.archived === true ? " — archived" : game.active === false ? " — inactive" : "";
     return `<option value="${awardsAdminEsc_(id)}" ${id === selected ? "selected" : ""}>${awardsAdminEsc_(name)} (${awardsAdminEsc_(id)})${suffix}</option>`;
   }).join("");
+}
+
+
+function awardsAdminRelatedMarkets_(market) {
+  if (!market) return [];
+
+  const provider = String(market.provider || "").toLowerCase();
+  const eventId = String(market.externalEventId || "").toLowerCase();
+
+  if (!provider || !eventId) {
+    return [{
+      market: market,
+      index: AWARDS_MANAGER_STATE.results.indexOf(market)
+    }];
+  }
+
+  return (AWARDS_MANAGER_STATE.results || [])
+    .map(function(item, index) {
+      return {
+        market: item,
+        index: index
+      };
+    })
+    .filter(function(entry) {
+      return (
+        String(entry.market.provider || "").toLowerCase() === provider &&
+        String(entry.market.externalEventId || "").toLowerCase() === eventId
+      );
+    });
+}
+
+function awardsAdminGroupedAnswerLabel_(market) {
+  market = market || {};
+  const raw = market.raw || {};
+
+  const explicit = String(
+    raw.yes_sub_title ||
+    raw.yesTitle ||
+    raw.yes_title ||
+    raw.outcomeLabel ||
+    raw.answerLabel ||
+    ""
+  ).trim();
+
+  if (explicit) return explicit;
+
+  const question = String(
+    market.marketQuestion ||
+    market.eventName ||
+    market.externalMarketId ||
+    ""
+  ).trim();
+
+  const match = question.match(
+    /^Will\s+(.+?)\s+(?:win|be|become|receive|take|finish|lead|earn)\b/i
+  );
+
+  return match && match[1]
+    ? String(match[1]).trim()
+    : question;
+}
+
+function awardsAdminRenderCreateAnswersPreview_() {
+  const preview = document.getElementById("awardsCreateAnswersPreview");
+  const groupToggle = document.getElementById("awardsCreateGrouped");
+  const market = AWARDS_MANAGER_STATE.selectedMarket;
+
+  if (!preview || !market) return;
+
+  const related = awardsAdminRelatedMarkets_(market);
+  const grouped = !!(
+    groupToggle &&
+    groupToggle.checked &&
+    related.length >= 2
+  );
+
+  if (!grouped) {
+    preview.innerHTML = `
+      <div class="admin-sub">
+        Answers created from provider outcomes:
+        ${(market.outcomes || []).map(awardsAdminEsc_).join(", ")}
+      </div>
+    `;
+    return;
+  }
+
+  preview.innerHTML = `
+    <div class="admin-sub" style="margin-bottom:8px;">
+      One Awards App question will be created with one answer per selected provider market.
+      Edit any answer name before saving.
+    </div>
+
+    <div class="admin-list">
+      ${related.map(function(entry, groupIndex) {
+        const item = entry.market;
+        const label = awardsAdminGroupedAnswerLabel_(item);
+        const yesValue = item.prices && item.prices.Yes !== undefined
+          ? item.prices.Yes
+          : item.primaryProbability;
+
+        return `
+          <div class="admin-list-row" style="align-items:flex-start;">
+            <label style="display:flex;gap:8px;align-items:center;min-width:34px;">
+              <input
+                type="checkbox"
+                class="awards-group-market-use"
+                data-result-index="${entry.index}"
+                checked
+              >
+            </label>
+
+            <div style="flex:1;min-width:0;">
+              <div class="admin-sub">
+                ${awardsAdminEsc_(item.marketQuestion || item.externalMarketId)}
+              </div>
+
+              <label class="admin-field" style="margin-top:6px;">
+                <span>Answer ${groupIndex + 1}</span>
+                <input
+                  type="text"
+                  class="awards-group-answer-label"
+                  data-result-index="${entry.index}"
+                  value="${awardsAdminEsc_(label)}"
+                >
+              </label>
+            </div>
+
+            <span class="admin-pill">
+              ${awardsAdminPct_(yesValue)}
+            </span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
 }
 
 async function renderAdminAwardsPage() {
@@ -217,34 +352,79 @@ function adminAwardsChooseMarket(index, mode) {
   if (!builder) return;
 
   if (mode === "create") {
+    const related = awardsAdminRelatedMarkets_(market);
+    const canGroup = related.length >= 2;
+    const defaultQuestion = canGroup
+      ? (market.eventName || market.marketQuestion || "")
+      : (market.marketQuestion || "");
+
     builder.innerHTML = `
       <div class="admin-control-grid" style="margin-top:12px;">
         <label class="admin-field">
           <span>Awards App Game</span>
           <select id="awardsCreateGame">${awardsAdminGameOptions_("")}</select>
         </label>
+
         <label class="admin-field" style="grid-column:span 2;">
           <span>Question</span>
-          <input id="awardsCreateQuestion" type="text" value="${awardsAdminEsc_(market.marketQuestion || "")}">
+          <input
+            id="awardsCreateQuestion"
+            type="text"
+            value="${awardsAdminEsc_(defaultQuestion)}"
+          >
         </label>
+
         <label class="admin-field">
           <span>Section</span>
           <input id="awardsCreateSection" type="text" value="Awards">
         </label>
+
         <label class="admin-field">
           <span>Points</span>
           <input id="awardsCreatePoints" type="number" min="0" value="1">
         </label>
       </div>
-      <div class="admin-sub" style="margin-top:10px;">
-        Answers created from provider outcomes:
-        ${(market.outcomes || []).map(awardsAdminEsc_).join(", ")}
-      </div>
+
+      ${canGroup ? `
+        <label
+          class="admin-list-row"
+          style="margin-top:12px;cursor:pointer;"
+        >
+          <div>
+            <b>Group related markets into one question</b>
+            <div class="admin-sub">
+              ${related.length} live markets share this provider event.
+              Example: one Super Bowl question with one team per answer.
+            </div>
+          </div>
+
+          <input
+            id="awardsCreateGrouped"
+            type="checkbox"
+            checked
+            onchange="awardsAdminRenderCreateAnswersPreview_()"
+          >
+        </label>
+      ` : ""}
+
+      <div
+        id="awardsCreateAnswersPreview"
+        style="margin-top:10px;"
+      ></div>
+
       <div class="admin-actions">
-        <button class="button admin-button" onclick="adminAwardsCreateFromMarket(this)">Create & Link Question</button>
+        <button
+          class="button admin-button"
+          onclick="adminAwardsCreateFromMarket(this)"
+        >
+          Create & Link Question
+        </button>
       </div>
+
       <div id="awardsBuilderStatus" class="admin-message"></div>
     `;
+
+    awardsAdminRenderCreateAnswersPreview_();
     return;
   }
 
@@ -342,10 +522,22 @@ function adminAwardsRenderOutcomeMap() {
 
 async function adminAwardsCreateFromMarket(button) {
   const market = AWARDS_MANAGER_STATE.selectedMarket;
-  const gameId = String((document.getElementById("awardsCreateGame") || {}).value || "");
-  const question = String((document.getElementById("awardsCreateQuestion") || {}).value || "").trim();
-  const section = String((document.getElementById("awardsCreateSection") || {}).value || "Awards").trim();
-  const points = Number((document.getElementById("awardsCreatePoints") || {}).value || 1);
+  const gameId = String(
+    (document.getElementById("awardsCreateGame") || {}).value || ""
+  );
+
+  const question = String(
+    (document.getElementById("awardsCreateQuestion") || {}).value || ""
+  ).trim();
+
+  const section = String(
+    (document.getElementById("awardsCreateSection") || {}).value || "Awards"
+  ).trim();
+
+  const points = Number(
+    (document.getElementById("awardsCreatePoints") || {}).value || 1
+  );
+
   const status = document.getElementById("awardsBuilderStatus");
 
   if (!market || !gameId || !question) {
@@ -356,10 +548,56 @@ async function adminAwardsCreateFromMarket(button) {
     return;
   }
 
+  const groupToggle = document.getElementById("awardsCreateGrouped");
+  const grouped = !!(groupToggle && groupToggle.checked);
+
+  const groupMarkets = [];
+  const answerLabels = {};
+
+  if (grouped) {
+    document
+      .querySelectorAll(".awards-group-market-use[data-result-index]")
+      .forEach(function(checkbox) {
+        if (!checkbox.checked) return;
+
+        const index = Number(checkbox.dataset.resultIndex);
+        const item = AWARDS_MANAGER_STATE.results[index];
+
+        if (!item) return;
+
+        const labelInput = document.querySelector(
+          '.awards-group-answer-label[data-result-index="' +
+          index +
+          '"]'
+        );
+
+        const label = String(
+          labelInput ? labelInput.value : awardsAdminGroupedAnswerLabel_(item)
+        ).trim();
+
+        if (!label) return;
+
+        groupMarkets.push(item);
+        answerLabels[item.externalMarketId] = label;
+      });
+
+    if (groupMarkets.length < 2) {
+      if (status) {
+        status.className = "admin-message warning";
+        status.textContent =
+          "Choose at least two related markets for a grouped question.";
+      }
+      return;
+    }
+  }
+
   if (button) button.disabled = true;
+
   if (status) {
     status.className = "admin-message";
-    status.textContent = "Creating question and queuing Hub mapping…";
+    status.textContent = grouped
+      ? "Creating grouped question, answers, and one Hub bundle…"
+      : "Creating question with batched answers and queuing Hub mapping…";
   }
 
   try {
@@ -368,18 +606,34 @@ async function adminAwardsCreateFromMarket(button) {
       question: question,
       section: section,
       points: points,
-      marketJSON: JSON.stringify(market)
+      marketJSON: JSON.stringify(market),
+      groupMarketsJSON: grouped
+        ? JSON.stringify(groupMarkets)
+        : "",
+      answerLabelsJSON: grouped
+        ? JSON.stringify(answerLabels)
+        : ""
     });
-    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not create question.");
+
+    if (!res || res.success === false) {
+      throw new Error(
+        (res && (res.error || res.message)) ||
+        "Could not create question."
+      );
+    }
 
     if (status) {
       status.className = "admin-message success";
-      status.textContent = res.message || "Question created and linked.";
+      status.textContent =
+        res.message ||
+        "Question created and linked.";
     }
   } catch (err) {
     if (status) {
       status.className = "admin-message error";
-      status.textContent = err.message || String(err);
+      status.textContent =
+        err.message ||
+        String(err);
     }
   } finally {
     if (button) button.disabled = false;

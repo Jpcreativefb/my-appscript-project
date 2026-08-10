@@ -316,6 +316,7 @@ function externalResultsBridgeJobPriority_(job) {
   if (type === "UPSERT_EPISODE_BUNDLE") return 10;
   if (type === "UPSERT_REALITY_QUESTION_PACK") return 20;
   if (type === "UPSERT_EXTERNAL_MARKET_MAPPING") return 25;
+  if (type === "UPSERT_EXTERNAL_MARKET_GROUP") return 25;
   if (type === "UPSERT_EPISODE_SCHEDULE") return 30;
   if (type === "UPSERT_MARKET_RESOLUTION") return 35;
   if (type === "CREATE_RESULT_REVIEW") return 40;
@@ -537,6 +538,50 @@ function externalResultsBridgeApplyJob_(hub, job) {
       ["MappingId"],
       payload.mappings || []
     ));
+    return externalResultsBridgeReceipt_(hub, type, writes);
+  }
+
+  if (type === "UPSERT_EXTERNAL_MARKET_GROUP") {
+    externalResultsBridgeRequireKey_(
+      payload.event,
+      ["Provider", "ExternalEventId"],
+      "External market event"
+    );
+
+    const markets = payload.markets || [];
+
+    markets.forEach(function(row) {
+      externalResultsBridgeRequireKey_(
+        row,
+        ["Provider", "ExternalMarketId"],
+        "External market"
+      );
+    });
+
+    writes.push(externalResultsBridgeVerifiedUpsert_(
+      hub,
+      "ExternalEvents",
+      EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalEvents,
+      ["Provider", "ExternalEventId"],
+      [payload.event]
+    ));
+
+    writes.push(externalResultsBridgeVerifiedUpsert_(
+      hub,
+      "ExternalMarkets",
+      EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ExternalMarkets,
+      ["Provider", "ExternalMarketId"],
+      markets
+    ));
+
+    writes.push(externalResultsBridgeVerifiedUpsert_(
+      hub,
+      "AppMappings",
+      EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.AppMappings,
+      ["MappingId"],
+      payload.mappings || []
+    ));
+
     return externalResultsBridgeReceipt_(hub, type, writes);
   }
 
