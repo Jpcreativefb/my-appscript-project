@@ -71,6 +71,59 @@ function awardsManagerArray_(value) {
   const parsed = awardsManagerParseJson_(value, value);
   return Array.isArray(parsed) ? parsed : [];
 }
+function awardsManagerDateMs_(value) {
+  const text = awardsManagerString_(value);
+  if (!text) return null;
+
+  const ms = Date.parse(text);
+  return isNaN(ms) ? null : ms;
+}
+
+function awardsManagerMarketIsLive_(market, event) {
+  market = market || {};
+  event = event || {};
+
+  const status = awardsManagerKey_(
+    market.status ||
+    event.status ||
+    ""
+  );
+
+  if (
+    status === "closed" ||
+    status === "settled" ||
+    status === "resolved" ||
+    status === "archived"
+  ) {
+    return false;
+  }
+
+  if (
+    market.closed === true ||
+    event.closed === true ||
+    market.archived === true ||
+    event.archived === true ||
+    market.active === false ||
+    event.active === false
+  ) {
+    return false;
+  }
+
+  const closeMs = awardsManagerDateMs_(
+    market.close_time ||
+    market.endDate ||
+    market.expected_expiration_time ||
+    market.expiration_time ||
+    event.endDate
+  );
+
+  if (closeMs !== null && closeMs < Date.now()) {
+    return false;
+  }
+
+  return true;
+}
+
 function awardsManagerKalshiProbability_(market) {
   const last = awardsManagerNumber_(market.last_price_dollars, null);
   if (last !== null && last >= 0 && last <= 1) return last * 100;
@@ -157,6 +210,7 @@ function awardsManagerKalshiSearch_(query, limit) {
 
   function addMarket_(market, series, allowSeriesMatch) {
     if (!market || results.length >= maxResults) return;
+    if (!awardsManagerMarketIsLive_(market, null)) return;
     const ticker = awardsManagerString_(market.ticker);
     if (!ticker || seen[ticker]) return;
     if (!allowSeriesMatch && !awardsManagerKalshiMarketMatches_(market, wanted)) return;
@@ -235,6 +289,7 @@ function awardsManagerPolymarketSearch_(query, limit) {
     const markets = Array.isArray(event.markets) ? event.markets : [];
     markets.forEach(function(market) {
       if (results.length >= maxResults) return;
+      if (!awardsManagerMarketIsLive_(market, event)) return;
 
       const outcomes = awardsManagerArray_(market.outcomes)
         .map(awardsManagerString_)

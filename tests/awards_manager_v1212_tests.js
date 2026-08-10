@@ -28,6 +28,10 @@ assert(engine.includes('AWARDS_MANAGER_KALSHI_BASE'), 'Kalshi live-search base m
 assert(engine.includes('AWARDS_MANAGER_POLYMARKET_BASE'), 'Polymarket live-search base missing');
 assert(engine.includes('/public-search?q='), 'Polymarket public-search missing');
 assert(engine.includes('/markets?status=open'), 'Kalshi live-market search missing');
+assert(engine.includes('function awardsManagerMarketIsLive_'), 'Live-market filter missing');
+assert(engine.includes('market.closed === true'), 'Closed markets must be filtered');
+assert(engine.includes('market.active === false'), 'Inactive markets must be filtered');
+assert(engine.includes('closeMs < Date.now()'), 'Expired markets must be filtered');
 assert(engine.includes('\"/series\"'), 'Kalshi live-series discovery missing');
 assert(engine.includes('settlement_sources'), 'Kalshi settlement-source metadata missing');
 assert(engine.includes('AutoSettle: false'), 'Mappings must force AutoSettle false');
