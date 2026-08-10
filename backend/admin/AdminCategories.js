@@ -2907,6 +2907,7 @@ function adminUpdateCategory(payload) {
     }
 
     if (
+      payload.skipCategoryResultWrite !== true &&
       (
         "settlementStatus" in payload ||
         "winnerNomineeId" in payload

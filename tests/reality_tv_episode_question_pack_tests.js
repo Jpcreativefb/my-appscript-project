@@ -101,7 +101,7 @@ let bundle = dashboard.seasons[0];
 assert.strictEqual(bundle.questionTemplates.filter(t => t.Enabled === true).length, 4);
 assert.strictEqual(bundle.episodeQuestions.length, 4);
 assert.strictEqual(gameSetups.get(created.gameId).categories.length, 5, 'Elimination plus four extra questions');
-assert.strictEqual(hub.getSheetByName('ExternalMarkets').getLastRow(), 2, 'Only the main elimination Hub market is synchronous; supplemental mappings are deferred');
+assert.strictEqual(hub.getSheetByName('ExternalMarkets').getLastRow(), 1, 'Hub writes are queued through the External Results Hub bridge; this isolated test does not run the bridge worker');
 
 const immunity = bundle.episodeQuestions.find(q => q.QuestionType === 'immunity-winner');
 const immunityOptions = JSON.parse(immunity.AnswerOptionsJSON);

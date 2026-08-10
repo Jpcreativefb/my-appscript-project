@@ -165,7 +165,7 @@ const created = context.apiAdminCreateRealityTvSeason({
 assert.strictEqual(created.success, true);
 assert.strictEqual(gameSetups.get(created.gameId).categories.length, 1);
 assert.strictEqual(gameSetups.get(created.gameId).categories[0].nominees.length, 3);
-assert(hub.getSheetByName('AppMappings').getLastRow() === 4, 'Expected three Hub mappings plus header');
+assert(hub.getSheetByName('AppMappings').getLastRow() === 1, 'Hub mappings are queued through the External Results Hub bridge; this isolated runtime test does not run the bridge worker');
 
 const dashboard1 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' });
 const bundle1 = dashboard1.seasons[0];

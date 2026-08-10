@@ -433,6 +433,119 @@ function apiAdminSetupUniversalQuestionSystem(payload) {
 
 }
 
+
+function dedupeCategoryResultsForCategory_(gameId, categoryId) {
+  setupCategoryResultsSystem();
+
+  gameId = categoryResultsString_(gameId);
+  categoryId = categoryResultsKey_(categoryId);
+
+  if (!gameId || !categoryId) {
+    return { success: true, removed: 0 };
+  }
+
+  const sh =
+    SpreadsheetApp
+      .getActive()
+      .getSheetByName(CATEGORY_RESULTS_SHEET);
+
+  if (!sh || sh.getLastRow() < 2) {
+    return { success: true, removed: 0 };
+  }
+
+  const data = sh.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return { success: true, removed: 0 };
+  }
+
+  const headers =
+    data[0].map(function(header) {
+      return categoryResultsString_(header);
+    });
+
+  const col =
+    categoryResultsHeaderMap_(headers);
+
+  const newestByKey = {};
+  const duplicateRows = [];
+
+  function rowTime_(row, rowNumber) {
+    const value =
+      (col.SettledAt !== undefined ? row[col.SettledAt] : "") ||
+      (col.Timestamp !== undefined ? row[col.Timestamp] : "");
+
+    const time =
+      value instanceof Date
+        ? value.getTime()
+        : new Date(value).getTime();
+
+    return isNaN(time)
+      ? rowNumber
+      : time;
+  }
+
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+
+    if (
+      categoryResultsString_(row[col.GameId]) !== gameId ||
+      categoryResultsKey_(row[col.CategoryId]) !== categoryId
+    ) {
+      continue;
+    }
+
+    const nomineeId =
+      categoryResultsKey_(row[col.NomineeId]);
+
+    const candidate = {
+      rowNumber: i + 1,
+      time: rowTime_(row, i + 1)
+    };
+
+    const current =
+      newestByKey[nomineeId];
+
+    if (!current) {
+      newestByKey[nomineeId] = candidate;
+      continue;
+    }
+
+    if (
+      candidate.time > current.time ||
+      (
+        candidate.time === current.time &&
+        candidate.rowNumber > current.rowNumber
+      )
+    ) {
+      duplicateRows.push(current.rowNumber);
+      newestByKey[nomineeId] = candidate;
+    } else {
+      duplicateRows.push(candidate.rowNumber);
+    }
+  }
+
+  duplicateRows
+    .sort(function(a, b) {
+      return b - a;
+    })
+    .forEach(function(rowNumber) {
+      sh.deleteRow(rowNumber);
+    });
+
+  if (
+    duplicateRows.length &&
+    typeof clearAppCaches === "function"
+  ) {
+    clearAppCaches();
+  }
+
+  return {
+    success: true,
+    removed: duplicateRows.length
+  };
+}
+
 function getCategoryResultsRows_(gameId) {
 
   setupCategoryResultsSystem();

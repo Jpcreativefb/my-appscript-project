@@ -226,8 +226,10 @@ if (!window.__adminUiGlobalBound) {
   document.addEventListener("click", function(event) {
     const button = event.target.closest(".admin-page button");
     if (!adminUiIsActionButton_(button)) return;
-    ADMIN_UI_LAST_ACTION = { button: button, at: Date.now() };
+    const actionAt = Date.now();
+    ADMIN_UI_LAST_ACTION = { button: button, at: actionAt };
     setTimeout(function() {
+      if (Number(button.__adminApiLastEndAt || 0) >= actionAt) return;
       if (ADMIN_UI_LAST_ACTION && ADMIN_UI_LAST_ACTION.button === button && !button.__adminApiAttached) {
         adminUiStartButton_(button, "Starting…");
       }
@@ -250,6 +252,10 @@ if (!window.__adminUiGlobalBound) {
     if (!button) return;
     delete ADMIN_UI_REQUEST_BUTTONS[detail.requestId];
     button.__adminApiAttached = false;
+    button.__adminApiLastEndAt = Date.now();
+    if (ADMIN_UI_LAST_ACTION && ADMIN_UI_LAST_ACTION.button === button) {
+      ADMIN_UI_LAST_ACTION = null;
+    }
     const result = detail.result || {};
     adminUiFinishButton_(
       button,
