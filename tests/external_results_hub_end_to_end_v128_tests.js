@@ -115,6 +115,7 @@ const kalshiCtx = {
 };
 kalshiCtx.erhString_ = value => String(value === undefined || value === null ? '' : value).trim();
 kalshiCtx.erhKey_ = value => kalshiCtx.erhString_(value).toLowerCase();
+kalshiCtx.erhSafeProviderJson_ = value => JSON.stringify(value);
 kalshiCtx.erhImportNormalizedResult_ = value => { kalshiCtx.imported.push(value); return { duplicate: false, queueCreated: true }; };
 vm.createContext(kalshiCtx);
 vm.runInContext(functionSource(providers, 'erhMaybeImportKalshiResult_'), kalshiCtx);

@@ -347,10 +347,10 @@ function erhSeedProviders_() {
       DiscoveryConfigJSON: JSON.stringify({
         eventStatus: "open",
         marketStatus: "open",
-        limit: 50,
-        includeNestedMarkets: true,
+        limit: 5,
+        includeNestedMarkets: false,
         includeSettled: true,
-        settledLimit: 50,
+        settledLimit: 2,
         eventTickers: [],
         marketTickers: []
       }),
@@ -372,12 +372,12 @@ function erhSeedProviders_() {
       PollingIntervalMinutes: 60,
       BaseUrl: "https://gamma-api.polymarket.com",
       DiscoveryConfigJSON: JSON.stringify({
-        limit: 50,
+        limit: 5,
         offset: 0,
         active: true,
         closed: false,
         includeClosed: true,
-        closedLimit: 50,
+        closedLimit: 2,
         eventIds: [],
         eventSlugs: [],
         marketIds: [],

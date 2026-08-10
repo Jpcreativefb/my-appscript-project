@@ -7,6 +7,10 @@
    bypass administrator review.
 ===================================================== */
 
+const ERH_DISCOVERY_MAX_ITEMS = 5;
+const ERH_DISCOVERY_MAX_HISTORICAL_ITEMS = 2;
+const ERH_PROVIDER_RAW_JSON_CELL_LIMIT = 45000;
+
 function syncAllExternalProvidersNow() {
   erhEnsureHubReady_();
   const providers = erhReadObjects_(ERH_SHEETS.PROVIDERS);
@@ -34,9 +38,16 @@ function syncKalshiNow() {
     const baseUrl = erhString_(provider.BaseUrl) || "https://external-api.kalshi.com/trade-api/v2";
     const eventTickers = Array.isArray(config.eventTickers) ? config.eventTickers : [];
     const marketTickers = Array.isArray(config.marketTickers) ? config.marketTickers : [];
-    const limit = Math.max(1, Math.min(Number(config.limit || 50), 200));
+    const targetedDiscovery = eventTickers.length > 0 || marketTickers.length > 0;
+    const limit = targetedDiscovery
+      ? Math.max(1, Math.min(Number(config.limit || 50), 200))
+      : Math.max(1, Math.min(Number(config.limit || ERH_DISCOVERY_MAX_ITEMS), ERH_DISCOVERY_MAX_ITEMS));
+    const settledLimit = targetedDiscovery
+      ? Math.max(1, Math.min(Number(config.settledLimit || 50), 200))
+      : Math.max(1, Math.min(Number(config.settledLimit || ERH_DISCOVERY_MAX_HISTORICAL_ITEMS), ERH_DISCOVERY_MAX_HISTORICAL_ITEMS));
     const seenEvents = {};
     const seenMarkets = {};
+    let processedMarkets = 0;
 
     function processEvent(event) {
       if (!event) return;
@@ -58,7 +69,9 @@ function syncKalshiNow() {
       if (!market) return;
       const marketId = erhString_(market.ticker || market.market_ticker || market.id);
       if (!marketId || seenMarkets[marketId]) return;
+      if (!targetedDiscovery && processedMarkets >= ERH_DISCOVERY_MAX_ITEMS) return;
       seenMarkets[marketId] = true;
+      processedMarkets += 1;
 
       const eventId = erhString_(market.event_ticker || (event && (event.event_ticker || event.ticker)));
       if (eventId && !seenEvents[eventId]) {
@@ -99,7 +112,7 @@ function syncKalshiNow() {
       const eventParams = {
         limit: limit,
         status: config.eventStatus || "open",
-        with_nested_markets: config.includeNestedMarkets !== false
+        with_nested_markets: false
       };
       const payload = erhFetchJson_(baseUrl + "/events?" + erhQueryString_(eventParams), stats);
       (payload.events || []).forEach(processEvent);
@@ -126,7 +139,7 @@ function syncKalshiNow() {
     if (config.includeSettled !== false) {
       const settledPayload = erhFetchJson_(
         baseUrl + "/markets?" + erhQueryString_({
-          limit: Math.max(1, Math.min(Number(config.settledLimit || 50), 200)),
+          limit: settledLimit,
           status: "settled"
         }),
         stats
@@ -142,10 +155,21 @@ function syncPolymarketNow() {
   erhEnsureHubReady_();
   return erhRunProviderSync_("polymarket", function(provider, config, stats) {
     const baseUrl = erhString_(provider.BaseUrl) || "https://gamma-api.polymarket.com";
-    const limit = Math.max(1, Math.min(Number(config.limit || 50), 100));
+    const specificEventIds = Array.isArray(config.eventIds) ? config.eventIds : [];
+    const specificEventSlugs = Array.isArray(config.eventSlugs) ? config.eventSlugs : [];
+    const marketIds = Array.isArray(config.marketIds) ? config.marketIds : [];
+    const marketSlugs = Array.isArray(config.marketSlugs) ? config.marketSlugs : [];
+    const targetedDiscovery = specificEventIds.length > 0 || specificEventSlugs.length > 0 || marketIds.length > 0 || marketSlugs.length > 0;
+    const limit = targetedDiscovery
+      ? Math.max(1, Math.min(Number(config.limit || 50), 100))
+      : Math.max(1, Math.min(Number(config.limit || ERH_DISCOVERY_MAX_ITEMS), ERH_DISCOVERY_MAX_ITEMS));
+    const closedLimit = targetedDiscovery
+      ? Math.max(1, Math.min(Number(config.closedLimit || 50), 100))
+      : Math.max(1, Math.min(Number(config.closedLimit || ERH_DISCOVERY_MAX_HISTORICAL_ITEMS), ERH_DISCOVERY_MAX_HISTORICAL_ITEMS));
     const offset = Math.max(0, Number(config.offset || 0));
     const seenEvents = {};
     const seenMarkets = {};
+    let processedMarkets = 0;
 
     function processEvent(event) {
       if (!event) return;
@@ -167,7 +191,9 @@ function syncPolymarketNow() {
       if (!market) return;
       const marketId = erhString_(market.id || market.conditionId || market.slug);
       if (!marketId || seenMarkets[marketId]) return;
+      if (!targetedDiscovery && processedMarkets >= ERH_DISCOVERY_MAX_ITEMS) return;
       seenMarkets[marketId] = true;
+      processedMarkets += 1;
 
       const normalized = erhNormalizePolymarketMarket_(market, event, baseUrl);
       const result = erhUpsertExternalMarket_(normalized);
@@ -188,9 +214,6 @@ function syncPolymarketNow() {
       if (imported && !imported.duplicate) stats.resultsImported += 1;
       if (imported && imported.queueCreated) stats.queueRowsCreated += 1;
     }
-
-    const specificEventIds = Array.isArray(config.eventIds) ? config.eventIds : [];
-    const specificEventSlugs = Array.isArray(config.eventSlugs) ? config.eventSlugs : [];
 
     if (specificEventIds.length || specificEventSlugs.length) {
       specificEventIds.forEach(function(id) {
@@ -214,9 +237,6 @@ function syncPolymarketNow() {
       (Array.isArray(payload) ? payload : payload.events || []).forEach(processEvent);
     }
 
-    const marketIds = Array.isArray(config.marketIds) ? config.marketIds : [];
-    const marketSlugs = Array.isArray(config.marketSlugs) ? config.marketSlugs : [];
-
     marketIds.forEach(function(id) {
       const payload = erhFetchJson_(baseUrl + "/markets?" + erhQueryString_({ id: id }), stats);
       (Array.isArray(payload) ? payload : payload.markets || []).forEach(function(market) {
@@ -234,7 +254,7 @@ function syncPolymarketNow() {
     if (config.includeClosed !== false) {
       const payload = erhFetchJson_(
         baseUrl + "/events?" + erhQueryString_({
-          limit: Math.max(1, Math.min(Number(config.closedLimit || 50), 100)),
+          limit: closedLimit,
           offset: 0,
           closed: true
         }),
@@ -380,6 +400,31 @@ function erhQueryString_(params) {
     .join("&");
 }
 
+function erhSafeProviderJson_(value) {
+  let text;
+  try {
+    text = JSON.stringify(value === undefined ? null : value);
+  } catch (error) {
+    text = JSON.stringify({ serializationError: true, message: erhString_(error && error.message) });
+  }
+
+  if (text.length <= ERH_PROVIDER_RAW_JSON_CELL_LIMIT) return text;
+
+  let previewLength = Math.min(18000, text.length);
+  let wrapped = "";
+  do {
+    wrapped = JSON.stringify({
+      truncated: true,
+      originalLength: text.length,
+      preview: text.slice(0, previewLength)
+    });
+    if (wrapped.length <= ERH_PROVIDER_RAW_JSON_CELL_LIMIT) return wrapped;
+    previewLength = Math.floor(previewLength * 0.75);
+  } while (previewLength > 500);
+
+  return JSON.stringify({ truncated: true, originalLength: text.length });
+}
+
 function erhNormalizeKalshiEvent_(event, baseUrl) {
   const id = erhString_(event.event_ticker || event.ticker || event.id);
   const markets = Array.isArray(event.markets) ? event.markets : [];
@@ -398,7 +443,7 @@ function erhNormalizeKalshiEvent_(event, baseUrl) {
     Status: erhString_(event.status || "discovered"),
     SourceUrl: baseUrl + "/events/" + encodeURIComponent(id),
     LastUpdated: new Date(),
-    RawJSON: JSON.stringify(event),
+    RawJSON: erhSafeProviderJson_(event),
     CreatedAt: new Date()
   };
 }
@@ -440,7 +485,7 @@ function erhNormalizeKalshiMarket_(market, event, baseUrl) {
     ResolutionSource: source,
     SourceUrl: baseUrl + "/markets/" + encodeURIComponent(id),
     LastUpdated: market.updated_time || new Date(),
-    RawJSON: JSON.stringify(market),
+    RawJSON: erhSafeProviderJson_(market),
     CreatedAt: new Date()
   };
 }
@@ -477,7 +522,7 @@ function erhMaybeImportKalshiResult_(market, event, normalized) {
     ImportedAt: new Date(),
     EvidenceUrl: evidenceUrl,
     SourceUrl: normalized.SourceUrl,
-    RawJSON: JSON.stringify({ market: market, event: event || null })
+    RawJSON: erhSafeProviderJson_({ market: market, event: event || null })
   });
 }
 
@@ -502,7 +547,7 @@ function erhNormalizePolymarketEvent_(event, baseUrl) {
     Status: status,
     SourceUrl: slug ? "https://polymarket.com/event/" + slug : baseUrl + "/events?id=" + encodeURIComponent(id),
     LastUpdated: event.updatedAt || new Date(),
-    RawJSON: JSON.stringify(event),
+    RawJSON: erhSafeProviderJson_(event),
     CreatedAt: new Date()
   };
 }
@@ -534,7 +579,7 @@ function erhNormalizePolymarketMarket_(market, event, baseUrl) {
     ResolutionSource: erhString_(market.resolutionSource || (event && event.resolutionSource)),
     SourceUrl: slug ? "https://polymarket.com/market/" + slug : baseUrl + "/markets?id=" + encodeURIComponent(id),
     LastUpdated: market.updatedAt || new Date(),
-    RawJSON: JSON.stringify(market),
+    RawJSON: erhSafeProviderJson_(market),
     CreatedAt: new Date()
   };
 }
@@ -585,7 +630,7 @@ function erhMaybeImportPolymarketResult_(market, event, normalized) {
     ImportedAt: new Date(),
     EvidenceUrl: normalized.ResolutionSource || normalized.SourceUrl,
     SourceUrl: normalized.SourceUrl,
-    RawJSON: JSON.stringify({ market: market, event: event || null })
+    RawJSON: erhSafeProviderJson_({ market: market, event: event || null })
   });
 }
 
