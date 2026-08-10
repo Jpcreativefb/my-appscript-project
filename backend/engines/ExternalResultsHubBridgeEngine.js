@@ -110,9 +110,13 @@ function externalResultsBridgeEnsureSystem_() {
   const ss = SpreadsheetApp.getActive();
   externalResultsBridgeEnsureSheet_(ss, EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET, EXTERNAL_RESULTS_BRIDGE_OUTBOX_HEADERS);
   externalResultsBridgeEnsureSheet_(ss, EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET, EXTERNAL_RESULTS_BRIDGE_INBOX_HEADERS);
+
+  const workerScheduled = externalResultsBridgeSchedule_();
+
   return {
     success: true,
-    sheets: [EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET, EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET]
+    sheets: [EXTERNAL_RESULTS_BRIDGE_OUTBOX_SHEET, EXTERNAL_RESULTS_BRIDGE_INBOX_SHEET],
+    workerScheduled: workerScheduled
   };
 }
 
@@ -284,10 +288,17 @@ function externalResultsBridgeHasTrigger_() {
 function externalResultsBridgeSchedule_() {
   try {
     if (typeof ScriptApp === "undefined" || externalResultsBridgeHasTrigger_()) return false;
-    ScriptApp.newTrigger(EXTERNAL_RESULTS_BRIDGE_TRIGGER).timeBased().after(15000).create();
+
+    ScriptApp.newTrigger(EXTERNAL_RESULTS_BRIDGE_TRIGGER)
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+
     return true;
   } catch (err) {
-    if (typeof Logger !== "undefined") Logger.log("External Results Hub trigger warning: " + (err.message || err));
+    if (typeof Logger !== "undefined") {
+      Logger.log("External Results Hub trigger warning: " + (err.message || err));
+    }
     return false;
   }
 }
@@ -299,6 +310,25 @@ function externalResultsBridgeDeleteTriggers_() {
       ScriptApp.deleteTrigger(trigger);
     }
   });
+}
+
+function externalResultsInstallHubWorkerTrigger() {
+  if (typeof ScriptApp === "undefined") {
+    throw new Error("ScriptApp is unavailable.");
+  }
+
+  externalResultsBridgeDeleteTriggers_();
+
+  ScriptApp.newTrigger(EXTERNAL_RESULTS_BRIDGE_TRIGGER)
+    .timeBased()
+    .everyMinutes(1)
+    .create();
+
+  return {
+    success: true,
+    handler: EXTERNAL_RESULTS_BRIDGE_TRIGGER,
+    frequencyMinutes: 1
+  };
 }
 
 function externalResultsBridgeRetryable_(err) {
@@ -667,7 +697,6 @@ function externalResultsBridgeApplyJob_(hub, job) {
 
 function externalResultsProcessHubOutbox() {
   externalResultsBridgeEnsureSystem_();
-  externalResultsBridgeDeleteTriggers_();
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(1000)) {
     externalResultsBridgeSchedule_();
