@@ -196,6 +196,7 @@ function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu("External Results Hub")
     .addItem("1. Setup / Repair Hub", "setupExternalResultsHub")
+    .addItem("Open Mapping Manager", "showExternalResultsMappingManager")
     .addSeparator()
     .addItem("Import Manual Entries", "importManualResultsNow")
     .addItem("Sync Kalshi Discovery", "syncKalshiNow")

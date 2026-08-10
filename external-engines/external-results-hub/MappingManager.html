@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 14px;
+      font-family: Arial, Helvetica, sans-serif;
+      color: #202124;
+      background: #f8f9fa;
+      font-size: 13px;
+    }
+    h1 { margin: 0 0 4px; font-size: 20px; }
+    h2 { margin: 0 0 10px; font-size: 15px; }
+    .sub { color: #5f6368; margin-bottom: 12px; line-height: 1.4; }
+    .card {
+      background: #fff;
+      border: 1px solid #dadce0;
+      border-radius: 10px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .step {
+      display: inline-block;
+      min-width: 22px;
+      height: 22px;
+      line-height: 22px;
+      border-radius: 11px;
+      text-align: center;
+      background: #1a73e8;
+      color: white;
+      margin-right: 6px;
+      font-weight: 700;
+      font-size: 12px;
+    }
+    label { display: block; margin: 9px 0 4px; font-weight: 700; }
+    select, input[type="search"] {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid #bdc1c6;
+      border-radius: 6px;
+      padding: 7px 8px;
+      background: white;
+    }
+    select:disabled, input:disabled { background: #f1f3f4; color: #80868b; }
+    .row { display: flex; gap: 8px; align-items: end; }
+    .grow { flex: 1; min-width: 0; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 9px 11px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: default; }
+    .primary { background: #1a73e8; color: white; }
+    .secondary { background: #e8f0fe; color: #174ea6; }
+    .danger { background: #fce8e6; color: #b3261e; }
+    .success { background: #e6f4ea; color: #137333; }
+    .actions { display: flex; gap: 8px; margin-top: 12px; }
+    .actions button { flex: 1; }
+    .notice {
+      display: none;
+      padding: 9px;
+      margin-bottom: 10px;
+      border-radius: 6px;
+      line-height: 1.35;
+    }
+    .notice.show { display: block; }
+    .notice.info { background: #e8f0fe; color: #174ea6; }
+    .notice.good { background: #e6f4ea; color: #137333; }
+    .notice.bad { background: #fce8e6; color: #b3261e; }
+    .market-detail, .safety {
+      margin-top: 8px;
+      padding: 8px;
+      border-radius: 6px;
+      background: #f1f3f4;
+      color: #5f6368;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+    .safety { background: #e6f4ea; color: #137333; font-weight: 700; }
+    .mapping {
+      border-top: 1px solid #eee;
+      padding: 10px 0;
+    }
+    .mapping:first-child { border-top: 0; padding-top: 0; }
+    .mapping-title { font-weight: 700; overflow-wrap: anywhere; }
+    .mapping-meta { color: #5f6368; font-size: 11px; line-height: 1.45; margin: 3px 0 7px; overflow-wrap: anywhere; }
+    .mapping-actions { display: flex; gap: 6px; }
+    .mapping-actions button { padding: 6px 8px; font-size: 11px; }
+    .pill {
+      display: inline-block;
+      border-radius: 10px;
+      padding: 2px 7px;
+      font-size: 10px;
+      font-weight: 700;
+      margin-left: 4px;
+    }
+    .on { background: #e6f4ea; color: #137333; }
+    .off { background: #f1f3f4; color: #5f6368; }
+    .empty { color: #80868b; padding: 4px 0; }
+    .loading { opacity: .65; pointer-events: none; }
+  </style>
+</head>
+<body>
+  <h1>Mapping Manager</h1>
+  <div class="sub" id="subtitle">Connect a discovered provider outcome to an Awards App answer.</div>
+  <div id="notice" class="notice"></div>
+
+  <div class="card" id="editorCard">
+    <h2><span class="step">1</span>Choose provider result</h2>
+
+    <label for="provider">Provider</label>
+    <select id="provider">
+      <option value="kalshi">Kalshi</option>
+      <option value="polymarket">Polymarket</option>
+    </select>
+
+    <div class="row">
+      <div class="grow">
+        <label for="marketSearch">Find market</label>
+        <input id="marketSearch" type="search" placeholder="Search question, event, or market ID">
+      </div>
+      <button id="searchButton" class="secondary" type="button">Search</button>
+    </div>
+
+    <label for="market">External market</label>
+    <select id="market"></select>
+    <div id="marketDetail" class="market-detail">Choose a provider and search for a discovered market.</div>
+
+    <label for="outcome">Provider outcome that means WIN</label>
+    <select id="outcome" disabled></select>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>Choose Awards App target</h2>
+
+    <label for="game">Game</label>
+    <select id="game"></select>
+
+    <label for="category">Question</label>
+    <select id="category" disabled></select>
+
+    <label for="nominee">Answer / Nominee</label>
+    <select id="nominee" disabled></select>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>Save mapping</h2>
+    <label style="font-weight:400">
+      <input id="active" type="checkbox" checked>
+      Active — include this market in mapped provider watch
+    </label>
+    <div class="safety">Safety locked: Auto settlement OFF · Administrator review REQUIRED</div>
+    <div class="actions">
+      <button id="saveButton" class="primary" type="button">Save Mapping</button>
+      <button id="cancelButton" class="secondary" type="button" style="display:none">Cancel Edit</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Existing mappings</h2>
+    <div id="mappings"><div class="empty">Loading…</div></div>
+  </div>
+
+<script>
+  const state = {
+    bootstrap: null,
+    markets: [],
+    mappings: [],
+    editingMappingId: "",
+    pendingEdit: null
+  };
+
+  const el = id => document.getElementById(id);
+
+  function setBusy(busy) {
+    document.body.classList.toggle('loading', !!busy);
+  }
+
+  function showNotice(message, type) {
+    const box = el('notice');
+    box.textContent = message || '';
+    box.className = 'notice show ' + (type || 'info');
+    if (!message) box.className = 'notice';
+  }
+
+  function option(value, label) {
+    const o = document.createElement('option');
+    o.value = value == null ? '' : String(value);
+    o.textContent = label == null ? '' : String(label);
+    return o;
+  }
+
+  function clearSelect(select, placeholder) {
+    select.innerHTML = '';
+    select.appendChild(option('', placeholder));
+  }
+
+  function escapeHtml(value) {
+    return String(value == null ? '' : value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  function loadBootstrap() {
+    setBusy(true);
+    google.script.run
+      .withSuccessHandler(data => {
+        setBusy(false);
+        state.bootstrap = data;
+        state.mappings = data.mappings || [];
+        el('subtitle').textContent =
+          'Connected to ' + (data.mainSpreadsheetName || 'Awards App') +
+          ' · Mapping Manager v' + (data.version || '');
+        renderGames();
+        renderMappings();
+        searchMarkets();
+      })
+      .withFailureHandler(error => {
+        setBusy(false);
+        showNotice(error && error.message ? error.message : String(error), 'bad');
+      })
+      .getExternalResultsMappingManagerBootstrap();
+  }
+
+  function renderGames(selectedGameId) {
+    const select = el('game');
+    clearSelect(select, 'Choose game…');
+    (state.bootstrap && state.bootstrap.games || []).forEach(game => {
+      let label = game.name + ' (' + game.gameId + ')';
+      if (game.archived) label += ' — archived';
+      else if (!game.active) label += ' — inactive';
+      select.appendChild(option(game.gameId, label));
+    });
+    if (selectedGameId) select.value = selectedGameId;
+    renderCategories();
+  }
+
+  function renderCategories(selectedCategoryId) {
+    const gameId = el('game').value;
+    const select = el('category');
+    clearSelect(select, gameId ? 'Choose question…' : 'Choose game first…');
+    select.disabled = !gameId;
+
+    if (gameId) {
+      (state.bootstrap && state.bootstrap.categories || [])
+        .filter(category => category.gameId === gameId)
+        .forEach(category => {
+          const prefix = category.section ? category.section + ' — ' : '';
+          const inactive = category.active ? '' : ' — inactive';
+          select.appendChild(option(category.categoryId, prefix + category.categoryName + inactive));
+        });
+    }
+
+    if (selectedCategoryId) select.value = selectedCategoryId;
+    renderNominees();
+  }
+
+  function selectedCategory() {
+    const gameId = el('game').value;
+    const categoryId = el('category').value;
+    return (state.bootstrap && state.bootstrap.categories || []).find(category =>
+      category.gameId === gameId && category.categoryId === categoryId
+    ) || null;
+  }
+
+  function renderNominees(selectedNomineeId) {
+    const category = selectedCategory();
+    const select = el('nominee');
+    clearSelect(select, category ? 'Choose answer…' : 'Choose question first…');
+    select.disabled = !category;
+
+    if (category) {
+      (category.nominees || []).forEach(nominee => {
+        select.appendChild(option(
+          nominee.nomineeId,
+          nominee.nomineeName + ' (' + nominee.nomineeId + ')'
+        ));
+      });
+    }
+
+    if (selectedNomineeId) select.value = selectedNomineeId;
+  }
+
+  function searchMarkets(selectedMarketId) {
+    const provider = el('provider').value;
+    const query = el('marketSearch').value;
+    setBusy(true);
+
+    google.script.run
+      .withSuccessHandler(markets => {
+        setBusy(false);
+        state.markets = markets || [];
+        const select = el('market');
+        clearSelect(select, state.markets.length ? 'Choose market…' : 'No matching markets');
+        state.markets.forEach(market => {
+          const event = market.eventName && market.eventName !== market.externalEventId
+            ? market.eventName + ' — '
+            : '';
+          select.appendChild(option(
+            market.externalMarketId,
+            event + market.marketQuestion
+          ));
+        });
+
+        const desired = selectedMarketId || (state.pendingEdit && state.pendingEdit.externalMarketId) || '';
+        if (desired) select.value = desired;
+        renderMarketDetail();
+
+        if (state.pendingEdit && select.value === state.pendingEdit.externalMarketId) {
+          const edit = state.pendingEdit;
+          state.pendingEdit = null;
+          renderOutcomes(edit.expectedOutcome);
+          renderGames(edit.appGameId);
+          renderCategories(edit.categoryId);
+          renderNominees(edit.nomineeId);
+        }
+      })
+      .withFailureHandler(error => {
+        setBusy(false);
+        showNotice(error && error.message ? error.message : String(error), 'bad');
+      })
+      .searchExternalResultsMappingMarkets(provider, query);
+  }
+
+  function selectedMarket() {
+    const id = el('market').value;
+    return state.markets.find(market => market.externalMarketId === id) || null;
+  }
+
+  function renderMarketDetail() {
+    const market = selectedMarket();
+    const detail = el('marketDetail');
+    if (!market) {
+      detail.textContent = state.markets.length
+        ? 'Choose a market.'
+        : 'No matching discovered markets. Run provider discovery first if needed.';
+      renderOutcomes();
+      return;
+    }
+
+    detail.textContent = [
+      market.eventName || market.externalEventId,
+      market.externalMarketId,
+      market.resolutionStatus ? 'Status: ' + market.resolutionStatus : '',
+      market.closingTime ? 'Closes: ' + market.closingTime : ''
+    ].filter(Boolean).join(' · ');
+    renderOutcomes();
+  }
+
+  function renderOutcomes(selectedOutcome) {
+    const market = selectedMarket();
+    const select = el('outcome');
+    clearSelect(select, market ? 'Choose outcome…' : 'Choose market first…');
+    select.disabled = !market;
+
+    if (market) {
+      (market.outcomes || []).forEach(outcome => {
+        select.appendChild(option(outcome, outcome));
+      });
+      if (!market.outcomes || !market.outcomes.length) {
+        select.disabled = false;
+        select.appendChild(option('Yes', 'Yes'));
+        select.appendChild(option('No', 'No'));
+      }
+    }
+
+    if (selectedOutcome) select.value = selectedOutcome;
+  }
+
+  function saveMapping() {
+    const payload = {
+      mappingId: state.editingMappingId,
+      provider: el('provider').value,
+      externalMarketId: el('market').value,
+      expectedOutcome: el('outcome').value,
+      appGameId: el('game').value,
+      categoryId: el('category').value,
+      nomineeId: el('nominee').value,
+      active: el('active').checked
+    };
+
+    setBusy(true);
+    showNotice('Saving mapping…', 'info');
+    google.script.run
+      .withSuccessHandler(result => {
+        setBusy(false);
+        state.mappings = result.mappings || [];
+        showNotice(result.message || 'Mapping saved.', 'good');
+        resetEditor(false);
+        renderMappings();
+      })
+      .withFailureHandler(error => {
+        setBusy(false);
+        showNotice(error && error.message ? error.message : String(error), 'bad');
+      })
+      .saveExternalResultsMapping(payload);
+  }
+
+  function editMapping(mappingId) {
+    const mapping = state.mappings.find(item => item.mappingId === mappingId);
+    if (!mapping) return;
+
+    state.editingMappingId = mapping.mappingId;
+    state.pendingEdit = mapping;
+    el('provider').value = mapping.provider;
+    el('marketSearch').value = mapping.externalMarketId;
+    el('active').checked = mapping.active;
+    el('saveButton').textContent = 'Update Mapping';
+    el('cancelButton').style.display = '';
+    showNotice('Editing ' + mapping.mappingId, 'info');
+    searchMarkets(mapping.externalMarketId);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function resetEditor(clearNotice) {
+    state.editingMappingId = '';
+    state.pendingEdit = null;
+    el('active').checked = true;
+    el('saveButton').textContent = 'Save Mapping';
+    el('cancelButton').style.display = 'none';
+    el('marketSearch').value = '';
+    el('market').value = '';
+    renderMarketDetail();
+    el('game').value = '';
+    renderCategories();
+    if (clearNotice !== false) showNotice('', 'info');
+  }
+
+  function toggleMapping(mappingId, active) {
+    setBusy(true);
+    google.script.run
+      .withSuccessHandler(result => {
+        setBusy(false);
+        state.mappings = result.mappings || [];
+        renderMappings();
+        showNotice(active ? 'Mapping activated.' : 'Mapping deactivated.', 'good');
+      })
+      .withFailureHandler(error => {
+        setBusy(false);
+        showNotice(error && error.message ? error.message : String(error), 'bad');
+      })
+      .setExternalResultsMappingActive(mappingId, active);
+  }
+
+  function renderMappings() {
+    const box = el('mappings');
+    const mappings = state.mappings || [];
+    if (!mappings.length) {
+      box.innerHTML = '<div class="empty">No mappings yet.</div>';
+      return;
+    }
+
+    box.innerHTML = mappings.map(mapping => {
+      const statusClass = mapping.active ? 'on' : 'off';
+      const statusText = mapping.active ? 'ACTIVE' : 'INACTIVE';
+      const toggleText = mapping.active ? 'Deactivate' : 'Activate';
+      const toggleClass = mapping.active ? 'danger' : 'success';
+      return '<div class="mapping">' +
+        '<div class="mapping-title">' + escapeHtml(mapping.appGameId + ' → ' + mapping.categoryId + ' → ' + mapping.nomineeId) +
+        '<span class="pill ' + statusClass + '">' + statusText + '</span></div>' +
+        '<div class="mapping-meta">' +
+          escapeHtml(mapping.provider + ' · ' + mapping.externalMarketId) + '<br>' +
+          'Provider WIN outcome: <strong>' + escapeHtml(mapping.expectedOutcome || '(blank)') + '</strong>' +
+          (mapping.updatedAt ? '<br>Updated: ' + escapeHtml(mapping.updatedAt) : '') +
+        '</div>' +
+        '<div class="mapping-actions">' +
+          '<button class="secondary" onclick="editMapping(\'' + escapeHtml(mapping.mappingId) + '\')">Edit</button>' +
+          '<button class="' + toggleClass + '" onclick="toggleMapping(\'' + escapeHtml(mapping.mappingId) + '\',' + (!mapping.active) + ')">' + toggleText + '</button>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  el('provider').addEventListener('change', () => {
+    el('marketSearch').value = '';
+    searchMarkets();
+  });
+  el('searchButton').addEventListener('click', () => searchMarkets());
+  el('marketSearch').addEventListener('keydown', event => {
+    if (event.key === 'Enter') searchMarkets();
+  });
+  el('market').addEventListener('change', renderMarketDetail);
+  el('game').addEventListener('change', () => renderCategories());
+  el('category').addEventListener('change', () => renderNominees());
+  el('saveButton').addEventListener('click', saveMapping);
+  el('cancelButton').addEventListener('click', () => resetEditor(true));
+
+  loadBootstrap();
+</script>
+</body>
+</html>
