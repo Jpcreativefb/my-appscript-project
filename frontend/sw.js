@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v316-awards-manager-v1214-event-first";
+const AWARDS_CACHE = "awards-app-v317-awards-manager-v1215-event-search";
 
 const APP_SHELL = [
   "./",

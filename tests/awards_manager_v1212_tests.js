@@ -62,7 +62,7 @@ assert(app.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]'), 'adm
 assert(appMirror.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]'), 'admin-awards mirror route missing');
 assert(app.includes('case "admin-awards"'), 'admin-awards render route missing');
 assert(admin.includes("navigate('admin-awards')"), 'Admin dashboard Awards Manager card missing');
-assert(page.includes('Search Providers'), 'Awards Manager search UI missing');
+assert(page.includes('Search Events'), 'Awards Manager search UI missing');
 assert(page.includes('View Event'), 'View Event action missing');
 assert(page.includes('Select Markets / Answers'), 'Event market selection UI missing');
 
@@ -87,3 +87,17 @@ assert(page.includes('Loading full provider event and all live markets'), 'Award
 assert(page.includes('Select Markets / Answers'), 'Awards Manager event market selector missing');
 assert(page.includes('awards-event-market-use'), 'Awards Manager event market checkboxes missing');
 assert(page.includes('awards-event-answer-label'), 'Awards Manager event answer labels missing');
+
+
+assert(engine.includes('function awardsManagerKalshiEventSearchPage_'), 'Kalshi true event search missing');
+assert(engine.includes('"/events?status=open"'), 'Kalshi open-event endpoint missing');
+assert(engine.includes('"&with_nested_markets=true"'), 'Kalshi nested event markets missing');
+assert(engine.includes('function awardsManagerPolymarketEventSearchPage_'), 'Polymarket paged event search missing');
+assert(engine.includes('"&page="'), 'Polymarket page pagination missing');
+assert(engine.includes('searchStateJSON'), 'Awards search continuation state missing');
+assert(page.includes('Advanced Search'), 'Awards advanced search UI missing');
+assert(page.includes('Load More Events'), 'Awards Load More Events button missing');
+assert(page.includes('Context unavailable or incomplete'), 'Awards universal context fallback missing');
+assert(page.includes('Open Original Market'), 'Awards original market link missing');
+assert(page.includes('Open Provider Event'), 'Awards provider event link missing');
+assert(frontendApi.includes('searchStateJSON'), 'Frontend Awards search state wrapper missing');

@@ -1,6 +1,6 @@
 
 /* =====================================================
-   AWARDS MANAGER — Admin Page v1.2.14
+   AWARDS MANAGER — Admin Page v1.2.15
 ===================================================== */
 
 const AWARDS_MANAGER_STATE = {
@@ -11,7 +11,10 @@ const AWARDS_MANAGER_STATE = {
   eventMarkets: [],
   selectedMarket: null,
   targetSetup: null,
-  mode: ""
+  mode: "",
+  searchState: {},
+  hasMore: false,
+  lastSearch: null
 };
 
 function awardsAdminEsc_(value) {
@@ -192,6 +195,9 @@ async function renderAdminAwardsPage() {
   AWARDS_MANAGER_STATE.selectedMarket = null;
   AWARDS_MANAGER_STATE.targetSetup = null;
   AWARDS_MANAGER_STATE.mode = "";
+  AWARDS_MANAGER_STATE.searchState = {};
+  AWARDS_MANAGER_STATE.hasMore = false;
+  AWARDS_MANAGER_STATE.lastSearch = null;
 
   return `
     <div class="page admin-page awards-manager-page">
@@ -227,15 +233,97 @@ async function renderAdminAwardsPage() {
             </label>
 
             <label class="admin-field" style="grid-column:span 2;">
-              <span>Find market or event</span>
-              <input id="awardsSearchQuery" type="text"
-                placeholder="Best Picture, Oscars, Survivor, World Cup…"
-                onkeydown="if(event.key==='Enter'){adminAwardsSearch(this.closest('.card').querySelector('button'))}">
+              <span>Find event</span>
+              <input
+                id="awardsSearchQuery"
+                type="text"
+                placeholder="Trump, Best Picture, Survivor, Cubs, World Cup…"
+                onkeydown="if(event.key==='Enter'){adminAwardsSearch(document.getElementById('awardsSearchButton'))}"
+              >
             </label>
           </div>
 
+          <details style="margin-top:10px;">
+            <summary style="cursor:pointer;font-weight:700;">
+              Advanced Search
+            </summary>
+
+            <div class="admin-control-grid" style="margin-top:12px;">
+              <label class="admin-field">
+                <span>Category contains</span>
+                <input
+                  id="awardsSearchCategory"
+                  type="text"
+                  placeholder="Sports, Politics, Entertainment…"
+                >
+              </label>
+
+              <label class="admin-field">
+                <span>Search in</span>
+                <select id="awardsSearchIn">
+                  <option value="both">Event + markets</option>
+                  <option value="event">Event context only</option>
+                  <option value="markets">Market questions only</option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>Closing</span>
+                <select id="awardsSearchCloseDays">
+                  <option value="0">Any future date</option>
+                  <option value="1">Next 24 hours</option>
+                  <option value="7">Next 7 days</option>
+                  <option value="30">Next 30 days</option>
+                  <option value="90">Next 90 days</option>
+                </select>
+              </label>
+
+              <label class="admin-field">
+                <span>Sort</span>
+                <select id="awardsSearchSort">
+                  <option value="relevance">Relevance</option>
+                  <option value="title">Event title</option>
+                  <option value="closing">Closing soon</option>
+                </select>
+              </label>
+
+              <label
+                class="admin-list-row"
+                style="align-self:end;"
+              >
+                <span>
+                  <b>Exact phrase</b>
+                  <div class="admin-sub">
+                    Require the typed phrase in provider text.
+                  </div>
+                </span>
+                <input
+                  id="awardsSearchExact"
+                  type="checkbox"
+                >
+              </label>
+            </div>
+          </details>
+
           <div class="admin-actions">
-            <button class="button admin-button" onclick="adminAwardsSearch(this)">Search Providers</button>
+            <button
+              id="awardsSearchButton"
+              type="button"
+              class="button admin-button"
+              onclick="adminAwardsSearch(this)"
+            >
+              Search Events
+            </button>
+
+            <button
+              id="awardsLoadMoreButton"
+              type="button"
+              class="button admin-button secondary"
+              onclick="adminAwardsLoadMore(this)"
+              style="display:none;"
+            >
+              Load More Events
+            </button>
           </div>
 
           <div id="awardsSearchStatus" class="admin-message"></div>
@@ -270,40 +358,83 @@ async function renderAdminAwardsPage() {
   `;
 }
 
-function awardsAdminSearchEvents_(results) {
+function awardsAdminSearchOptions_() {
+  const category =
+    document.getElementById(
+      "awardsSearchCategory"
+    );
+
+  const searchIn =
+    document.getElementById(
+      "awardsSearchIn"
+    );
+
+  const closeDays =
+    document.getElementById(
+      "awardsSearchCloseDays"
+    );
+
+  const sort =
+    document.getElementById(
+      "awardsSearchSort"
+    );
+
+  const exact =
+    document.getElementById(
+      "awardsSearchExact"
+    );
+
+  return {
+    category: category
+      ? String(category.value || "").trim()
+      : "",
+    searchIn: searchIn
+      ? String(searchIn.value || "both")
+      : "both",
+    closeDays: closeDays
+      ? Number(closeDays.value || 0)
+      : 0,
+    sort: sort
+      ? String(sort.value || "relevance")
+      : "relevance",
+    exactPhrase: !!(
+      exact &&
+      exact.checked
+    )
+  };
+}
+
+function awardsAdminEventKey_(event) {
+  return [
+    event && event.provider,
+    event && event.externalEventId
+  ]
+    .map(function(value) {
+      return String(value || "")
+        .toLowerCase();
+    })
+    .join("|");
+}
+
+function awardsAdminMergeEvents_(current, incoming) {
   const byKey = {};
   const order = [];
 
-  (Array.isArray(results) ? results : [])
-    .forEach(function(market) {
-      if (!market) return;
+  (current || [])
+    .concat(incoming || [])
+    .forEach(function(event) {
+      if (!event) return;
 
-      const provider = String(
-        market.provider || ""
-      ).toLowerCase();
+      const key =
+        awardsAdminEventKey_(event);
 
-      const eventId = String(
-        market.externalEventId ||
-        market.externalMarketId ||
-        ""
-      );
-
-      const key = provider + "|" + eventId;
+      if (!key) return;
 
       if (!byKey[key]) {
-        byKey[key] = {
-          provider: provider,
-          externalEventId: eventId,
-          eventName:
-            market.eventName ||
-            market.marketQuestion ||
-            eventId,
-          markets: []
-        };
         order.push(key);
       }
 
-      byKey[key].markets.push(market);
+      byKey[key] = event;
     });
 
   return order.map(function(key) {
@@ -311,24 +442,268 @@ function awardsAdminSearchEvents_(results) {
   });
 }
 
-async function adminAwardsSearch(button) {
+function awardsAdminSortLoadedEvents_(events, sortMode) {
+  const mode = String(
+    sortMode || "relevance"
+  ).toLowerCase();
+
+  if (mode === "relevance") {
+    return (events || []).slice();
+  }
+
+  return (events || []).slice().sort(
+    function(a, b) {
+      if (mode === "closing") {
+        const aMs = Date.parse(
+          a.closeTime || ""
+        );
+
+        const bMs = Date.parse(
+          b.closeTime || ""
+        );
+
+        if (
+          isFinite(aMs) &&
+          isFinite(bMs) &&
+          aMs !== bMs
+        ) {
+          return aMs - bMs;
+        }
+      }
+
+      return String(
+        a.eventName ||
+        a.externalEventId ||
+        ""
+      ).localeCompare(
+        String(
+          b.eventName ||
+          b.externalEventId ||
+          ""
+        )
+      );
+    }
+  );
+}
+
+function awardsAdminExternalLink_(url, label) {
+  const safe = String(url || "").trim();
+
+  if (!safe) return "";
+
+  return `
+    <a
+      class="admin-small-button secondary"
+      href="${awardsAdminEsc_(safe)}"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      ${awardsAdminEsc_(
+        label || "Open Provider"
+      )}
+    </a>
+  `;
+}
+
+function awardsAdminRenderSearchResults_() {
+  const resultsNode =
+    document.getElementById(
+      "awardsSearchResults"
+    );
+
+  const loadMore =
+    document.getElementById(
+      "awardsLoadMoreButton"
+    );
+
+  if (!resultsNode) return;
+
+  const options =
+    AWARDS_MANAGER_STATE.lastSearch &&
+    AWARDS_MANAGER_STATE.lastSearch.options
+      ? AWARDS_MANAGER_STATE.lastSearch.options
+      : {};
+
+  AWARDS_MANAGER_STATE.events =
+    awardsAdminSortLoadedEvents_(
+      AWARDS_MANAGER_STATE.events,
+      options.sort
+    );
+
+  resultsNode.innerHTML =
+    AWARDS_MANAGER_STATE.events.length
+      ? AWARDS_MANAGER_STATE.events
+          .map(function(event, index) {
+            const contextBits = [
+              event.category,
+              event.contextSubtitle,
+              event.seriesTicker
+            ]
+              .map(function(value) {
+                return String(
+                  value || ""
+                ).trim();
+              })
+              .filter(Boolean);
+
+            const contextLine =
+              contextBits.join(" · ");
+
+            const weakContext =
+              event.contextComplete === false;
+
+            const count =
+              Number(
+                event.liveMarketCount ||
+                event.markets &&
+                event.markets.length ||
+                0
+              );
+
+            const matching =
+              Number(
+                event.matchingMarketCount ||
+                0
+              );
+
+            return `
+              <div class="admin-category-card">
+                <div class="admin-category-header">
+                  <div style="min-width:0;">
+                    <strong>
+                      ${awardsAdminEsc_(
+                        event.eventName ||
+                        event.externalEventId
+                      )}
+                    </strong>
+
+                    <div class="admin-sub">
+                      ${awardsAdminEsc_(
+                        event.provider
+                      )}
+                      ${
+                        contextLine
+                          ? " · " +
+                            awardsAdminEsc_(
+                              contextLine
+                            )
+                          : ""
+                      }
+                    </div>
+
+                    ${
+                      event.closeTime
+                        ? `
+                          <div class="admin-sub">
+                            Closes:
+                            ${awardsAdminEsc_(
+                              event.closeTime
+                            )}
+                          </div>
+                        `
+                        : ""
+                    }
+
+                    <div class="admin-sub">
+                      ${
+                        count
+                          ? count +
+                            " live market" +
+                            (count === 1 ? "" : "s")
+                          : "Open event to load live markets"
+                      }
+                      ${
+                        matching
+                          ? " · " +
+                            matching +
+                            " matched your search"
+                          : ""
+                      }
+                    </div>
+
+                    ${
+                      weakContext
+                        ? `
+                          <div
+                            class="admin-message warning"
+                            style="margin-top:8px;"
+                          >
+                            Context unavailable or incomplete.
+                            Verify the original provider market before using it.
+                          </div>
+                        `
+                        : ""
+                    }
+                  </div>
+
+                  <span class="admin-pill">
+                    event
+                  </span>
+                </div>
+
+                <div class="admin-actions">
+                  <button
+                    type="button"
+                    class="admin-small-button"
+                    onclick="adminAwardsOpenEvent(${index})"
+                  >
+                    View Event
+                  </button>
+
+                  ${awardsAdminExternalLink_(
+                    event.originalMarketUrl ||
+                    event.sourceUrl,
+                    weakContext
+                      ? "Open Original Market"
+                      : "Open Provider Event"
+                  )}
+                </div>
+              </div>
+            `;
+          })
+          .join("")
+      : `
+          <div class="admin-sub">
+            No matching live events were found in the provider pages scanned so far.
+            ${
+              AWARDS_MANAGER_STATE.hasMore
+                ? "Use Load More Events to continue through the provider catalog."
+                : "No more provider pages remain for this search."
+            }
+          </div>
+        `;
+
+  if (loadMore) {
+    loadMore.style.display =
+      AWARDS_MANAGER_STATE.hasMore
+        ? ""
+        : "none";
+  }
+}
+
+async function adminAwardsRunSearch_(
+  button,
+  append
+) {
   const queryNode =
-    document.getElementById("awardsSearchQuery");
+    document.getElementById(
+      "awardsSearchQuery"
+    );
 
   const providerNode =
-    document.getElementById("awardsProvider");
+    document.getElementById(
+      "awardsProvider"
+    );
 
   const status =
-    document.getElementById("awardsSearchStatus");
-
-  const resultsNode =
-    document.getElementById("awardsSearchResults");
+    document.getElementById(
+      "awardsSearchStatus"
+    );
 
   if (
     !queryNode ||
     !providerNode ||
-    !status ||
-    !resultsNode
+    !status
   ) {
     return;
   }
@@ -340,24 +715,56 @@ async function adminAwardsSearch(button) {
   if (query.length < 2) {
     status.className =
       "admin-message warning";
+
     status.textContent =
       "Enter at least 2 characters.";
+
     return;
   }
+
+  const options =
+    awardsAdminSearchOptions_();
+
+  if (!append) {
+    AWARDS_MANAGER_STATE.events = [];
+    AWARDS_MANAGER_STATE.results = [];
+    AWARDS_MANAGER_STATE.searchState = {};
+    AWARDS_MANAGER_STATE.hasMore = false;
+    AWARDS_MANAGER_STATE.selectedEvent = null;
+    AWARDS_MANAGER_STATE.eventMarkets = [];
+    AWARDS_MANAGER_STATE.selectedMarket = null;
+  }
+
+  AWARDS_MANAGER_STATE.lastSearch = {
+    query: query,
+    provider:
+      providerNode.value,
+    options: options
+  };
 
   if (button) button.disabled = true;
 
   status.className = "admin-message";
-  status.textContent =
-    "Searching live provider events…";
-
-  resultsNode.innerHTML = "";
+  status.textContent = append
+    ? "Loading more provider event pages…"
+    : "Searching live provider events…";
 
   try {
     const res =
       await apiAdminAwardsSearchExternalMarkets(
         providerNode.value,
-        query
+        query,
+        {
+          category: options.category,
+          searchIn: options.searchIn,
+          closeDays: options.closeDays,
+          sort: options.sort,
+          exactPhrase:
+            options.exactPhrase,
+          searchState: append
+            ? AWARDS_MANAGER_STATE.searchState
+            : {}
+        }
       );
 
     if (!res || res.success === false) {
@@ -370,24 +777,58 @@ async function adminAwardsSearch(button) {
       );
     }
 
-    AWARDS_MANAGER_STATE.results =
-      Array.isArray(res.results)
-        ? res.results
+    const incoming =
+      Array.isArray(res.events)
+        ? res.events
         : [];
 
     AWARDS_MANAGER_STATE.events =
-      awardsAdminSearchEvents_(
-        AWARDS_MANAGER_STATE.results
+      awardsAdminMergeEvents_(
+        append
+          ? AWARDS_MANAGER_STATE.events
+          : [],
+        incoming
       );
 
-    AWARDS_MANAGER_STATE.selectedEvent = null;
-    AWARDS_MANAGER_STATE.eventMarkets = [];
-    AWARDS_MANAGER_STATE.selectedMarket = null;
+    AWARDS_MANAGER_STATE.searchState =
+      res.searchState || {};
+
+    AWARDS_MANAGER_STATE.hasMore =
+      res.hasMore === true;
 
     const errors =
       Array.isArray(res.errors)
         ? res.errors
         : [];
+
+    const scanned = res.scannedPages || {};
+    const scanBits = [];
+
+    if (scanned.kalshi) {
+      scanBits.push(
+        "Kalshi scanned " +
+        scanned.kalshi +
+        " page" +
+        (
+          Number(scanned.kalshi) === 1
+            ? ""
+            : "s"
+        )
+      );
+    }
+
+    if (scanned.polymarket) {
+      scanBits.push(
+        "Polymarket scanned " +
+        scanned.polymarket +
+        " page" +
+        (
+          Number(scanned.polymarket) === 1
+            ? ""
+            : "s"
+        )
+      );
+    }
 
     status.className =
       "admin-message " +
@@ -399,100 +840,33 @@ async function adminAwardsSearch(button) {
 
     status.textContent =
       AWARDS_MANAGER_STATE.events.length +
-      " live event" +
+      " unique live event" +
       (
         AWARDS_MANAGER_STATE.events.length === 1
           ? ""
           : "s"
       ) +
-      " found." +
+      " loaded." +
+      (
+        AWARDS_MANAGER_STATE.hasMore
+          ? " More provider pages are available."
+          : " Search exhausted."
+      ) +
+      (
+        scanBits.length
+          ? " " +
+            scanBits.join(" · ") +
+            "."
+          : ""
+      ) +
       (
         errors.length
-          ? " " + errors.join(" · ")
+          ? " " +
+            errors.join(" · ")
           : ""
       );
 
-    resultsNode.innerHTML =
-      AWARDS_MANAGER_STATE.events.length
-        ? AWARDS_MANAGER_STATE.events
-            .map(function(event, index) {
-              const sample =
-                event.markets &&
-                event.markets[0];
-
-              return `
-                <div class="admin-category-card">
-                  <div class="admin-category-header">
-                    <div>
-                      <strong>
-                        ${awardsAdminEsc_(
-                          event.eventName ||
-                          event.externalEventId
-                        )}
-                      </strong>
-
-                      <div class="admin-sub">
-                        ${awardsAdminEsc_(
-                          event.provider
-                        )}
-                        ·
-                        ${awardsAdminEsc_(
-                          event.externalEventId
-                        )}
-                      </div>
-
-                      <div class="admin-sub">
-                        ${
-                          event.markets.length
-                        }
-                        matching market${
-                          event.markets.length === 1
-                            ? ""
-                            : "s"
-                        }
-                        found in this search.
-                        Open the event to load all live markets.
-                      </div>
-
-                      ${
-                        sample &&
-                        sample.closeTime
-                          ? `
-                            <div class="admin-sub">
-                              Example close:
-                              ${awardsAdminEsc_(
-                                sample.closeTime
-                              )}
-                            </div>
-                          `
-                          : ""
-                      }
-                    </div>
-
-                    <span class="admin-pill">
-                      event
-                    </span>
-                  </div>
-
-                  <div class="admin-actions">
-                    <button
-                      type="button"
-                      class="admin-small-button"
-                      onclick="adminAwardsOpenEvent(${index})"
-                    >
-                      View Event
-                    </button>
-                  </div>
-                </div>
-              `;
-            })
-            .join("")
-        : `
-            <div class="admin-sub">
-              No matching live events found.
-              Try a broader term or the other provider.
-            </div>
-          `;
+    awardsAdminRenderSearchResults_();
   } catch (err) {
     status.className =
       "admin-message error";
@@ -504,6 +878,24 @@ async function adminAwardsSearch(button) {
   } finally {
     if (button) button.disabled = false;
   }
+}
+
+async function adminAwardsSearch(button) {
+  return adminAwardsRunSearch_(
+    button,
+    false
+  );
+}
+
+async function adminAwardsLoadMore(button) {
+  if (!AWARDS_MANAGER_STATE.hasMore) {
+    return;
+  }
+
+  return adminAwardsRunSearch_(
+    button,
+    true
+  );
 }
 
 function awardsAdminSetAllEventMarkets_(checked) {
@@ -663,6 +1055,19 @@ function awardsAdminRenderEventBuilder_() {
                           item.externalMarketId
                         )}
                       </div>
+
+                      ${
+                        item.sourceUrl
+                          ? `
+                            <div style="margin-top:6px;">
+                              ${awardsAdminExternalLink_(
+                                item.sourceUrl,
+                                "Open Original Market"
+                              )}
+                            </div>
+                          `
+                          : ""
+                      }
 
                       <label
                         class="admin-field"
@@ -825,6 +1230,18 @@ async function adminAwardsOpenEvent(index) {
 
         <div class="admin-sub">
           ${awardsAdminEsc_(
+            [
+              res.category,
+              res.contextSubtitle,
+              res.seriesTicker
+            ]
+              .filter(Boolean)
+              .join(" · ")
+          )}
+        </div>
+
+        <div class="admin-sub">
+          ${awardsAdminEsc_(
             res.externalEventId ||
             event.externalEventId
           )}
@@ -839,6 +1256,27 @@ async function adminAwardsOpenEvent(index) {
               ? ""
               : "s"
           }
+        </div>
+
+        ${
+          res.contextComplete === false
+            ? `
+              <div
+                class="admin-message warning"
+                style="margin-top:8px;"
+              >
+                Context unavailable or incomplete.
+                Verify the provider before creating or linking a question.
+              </div>
+            `
+            : ""
+        }
+
+        <div style="margin-top:8px;">
+          ${awardsAdminExternalLink_(
+            res.sourceUrl,
+            "Open Provider Event"
+          )}
         </div>
       `;
     }

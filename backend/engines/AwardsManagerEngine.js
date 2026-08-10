@@ -4,7 +4,7 @@
    Live Kalshi/Polymarket discovery + safe Hub mappings.
 ===================================================== */
 
-const AWARDS_MANAGER_VERSION = "1.2.14";
+const AWARDS_MANAGER_VERSION = "1.2.15";
 const AWARDS_MANAGER_KALSHI_BASE = "https://external-api.kalshi.com/trade-api/v2";
 const AWARDS_MANAGER_POLYMARKET_BASE = "https://gamma-api.polymarket.com";
 const AWARDS_MANAGER_PROVIDERS = ["kalshi", "polymarket"];
@@ -170,8 +170,11 @@ function awardsManagerKalshiResult_(market, series) {
     resolutionSource:
       awardsManagerKalshiSettlementSource_(series) ||
       awardsManagerString_(market.rules_primary || market.rules_secondary),
-    sourceUrl: AWARDS_MANAGER_KALSHI_BASE +
-      "/markets/" + encodeURIComponent(awardsManagerString_(market.ticker)),
+    sourceUrl:
+      awardsManagerKalshiWebMarketUrl_(
+        market,
+        series || {}
+      ),
     raw: {
       ticker: market.ticker,
       event_ticker: market.event_ticker,
@@ -500,15 +503,19 @@ function awardsManagerKalshiEvent_(eventId) {
       event.event_ticker || eventId
     ),
     eventName: eventName,
+    contextSubtitle: awardsManagerString_(event.sub_title),
+    category: awardsManagerString_(event.category),
+    seriesTicker: awardsManagerString_(event.series_ticker),
+    closeTime: awardsManagerEventCloseTime_(event),
+    contextComplete: awardsManagerContextComplete_({
+      eventName: eventName,
+      contextSubtitle: event.sub_title,
+      category: event.category,
+      seriesTicker: event.series_ticker
+    }),
     status: awardsManagerString_(event.status || "open"),
     sourceUrl:
-      AWARDS_MANAGER_KALSHI_BASE +
-      "/events/" +
-      encodeURIComponent(
-        awardsManagerString_(
-          event.event_ticker || eventId
-        )
-      ),
+      awardsManagerKalshiWebEventUrl_(event),
     markets: markets
   };
 }
@@ -551,6 +558,18 @@ function awardsManagerPolymarketEvent_(eventId) {
       event.id || event.slug || eventId
     ),
     eventName: eventName,
+    contextSubtitle: awardsManagerString_(event.subtitle),
+    category: awardsManagerString_(
+      event.category || event.subcategory
+    ),
+    seriesTicker: awardsManagerString_(event.ticker),
+    closeTime: awardsManagerEventCloseTime_(event),
+    contextComplete: awardsManagerContextComplete_({
+      eventName: eventName,
+      contextSubtitle: event.subtitle,
+      category: event.category || event.subcategory,
+      seriesTicker: event.ticker
+    }),
     status:
       event.closed === true
         ? "closed"
@@ -608,6 +627,694 @@ function apiAdminAwardsGetExternalEvent(payload) {
   return result;
 }
 
+
+function awardsManagerBool_(value) {
+  if (value === true || value === false) return value;
+  return ["1", "true", "yes", "on"].indexOf(
+    awardsManagerKey_(value)
+  ) !== -1;
+}
+
+function awardsManagerSearchTokens_(query) {
+  return awardsManagerKey_(query)
+    .split(/\s+/)
+    .map(function(token) {
+      return token.trim();
+    })
+    .filter(Boolean);
+}
+
+function awardsManagerSearchTextMatches_(parts, query, exactPhrase) {
+  const haystack = (parts || [])
+    .map(awardsManagerKey_)
+    .filter(Boolean)
+    .join(" ");
+
+  const wanted = awardsManagerKey_(query);
+  if (!wanted) return true;
+
+  if (exactPhrase === true) {
+    return haystack.indexOf(wanted) !== -1;
+  }
+
+  const tokens = awardsManagerSearchTokens_(wanted);
+  return tokens.every(function(token) {
+    return haystack.indexOf(token) !== -1;
+  });
+}
+
+function awardsManagerEventCloseTime_(event) {
+  event = event || {};
+
+  const direct = awardsManagerString_(
+    event.endDate ||
+    event.end_date ||
+    event.strike_date
+  );
+  if (direct) return direct;
+
+  const markets = Array.isArray(event.markets)
+    ? event.markets
+    : [];
+
+  const times = markets
+    .map(function(market) {
+      return awardsManagerString_(
+        market.close_time ||
+        market.endDate ||
+        market.expected_expiration_time ||
+        market.expiration_time
+      );
+    })
+    .filter(Boolean)
+    .sort();
+
+  return times.length
+    ? times[times.length - 1]
+    : "";
+}
+
+function awardsManagerEventPassesCloseFilter_(event, closeDays) {
+  const days = Number(closeDays || 0);
+  if (!days || days < 1) return true;
+
+  const closeTime = awardsManagerEventCloseTime_(event);
+  const closeMs = awardsManagerDateMs_(closeTime);
+
+  if (closeMs === null) return true;
+
+  const maxMs =
+    Date.now() +
+    (days * 24 * 60 * 60 * 1000);
+
+  return closeMs <= maxMs;
+}
+
+function awardsManagerEventPassesCategory_(event, category) {
+  const wanted = awardsManagerKey_(category);
+  if (!wanted || wanted === "all") return true;
+
+  const haystack = [
+    event && event.category,
+    event && event.subcategory,
+    event && event.series_ticker,
+    event && event.title,
+    event && event.sub_title,
+    event && event.subtitle
+  ]
+    .map(awardsManagerKey_)
+    .join(" ");
+
+  return haystack.indexOf(wanted) !== -1;
+}
+
+function awardsManagerEventMatchesSearch_(event, query, options) {
+  event = event || {};
+  options = options || {};
+
+  if (!awardsManagerEventPassesCategory_(
+    event,
+    options.category
+  )) {
+    return false;
+  }
+
+  if (!awardsManagerEventPassesCloseFilter_(
+    event,
+    options.closeDays
+  )) {
+    return false;
+  }
+
+  const eventParts = [
+    event.title,
+    event.sub_title,
+    event.subtitle,
+    event.description,
+    event.category,
+    event.subcategory,
+    event.series_ticker,
+    event.event_ticker,
+    event.ticker,
+    event.slug
+  ];
+
+  const markets = Array.isArray(event.markets)
+    ? event.markets
+    : [];
+
+  const marketParts = [];
+
+  markets.forEach(function(market) {
+    marketParts.push(
+      market.title,
+      market.subtitle,
+      market.question,
+      market.yes_sub_title,
+      market.no_sub_title,
+      market.ticker,
+      market.event_ticker,
+      market.series_ticker
+    );
+  });
+
+  const scope = awardsManagerKey_(
+    options.searchIn || "both"
+  );
+
+  const parts = scope === "event"
+    ? eventParts
+    : scope === "markets"
+      ? marketParts
+      : eventParts.concat(marketParts);
+
+  return awardsManagerSearchTextMatches_(
+    parts,
+    query,
+    options.exactPhrase === true
+  );
+}
+
+function awardsManagerKalshiWebEventUrl_(event) {
+  event = event || {};
+
+  const seriesTicker = awardsManagerKey_(
+    event.series_ticker
+  );
+
+  const eventTicker = awardsManagerKey_(
+    event.event_ticker
+  );
+
+  if (seriesTicker && eventTicker) {
+    return "https://kalshi.com/markets/" +
+      encodeURIComponent(seriesTicker) +
+      "/x/" +
+      encodeURIComponent(eventTicker);
+  }
+
+  return "https://kalshi.com/markets";
+}
+
+function awardsManagerKalshiWebMarketUrl_(market, event) {
+  const eventUrl =
+    awardsManagerKalshiWebEventUrl_(event);
+
+  const ticker = awardsManagerString_(
+    market && market.ticker
+  );
+
+  if (!ticker) return eventUrl;
+
+  return eventUrl +
+    "?op_market_ticker=" +
+    encodeURIComponent(ticker);
+}
+
+function awardsManagerContextComplete_(summary) {
+  summary = summary || {};
+
+  const title = awardsManagerString_(
+    summary.eventName
+  );
+
+  const detail = [
+    summary.category,
+    summary.contextSubtitle,
+    summary.seriesTicker
+  ]
+    .map(awardsManagerString_)
+    .filter(Boolean)
+    .join(" ");
+
+  if (title.length >= 12 && detail) {
+    return true;
+  }
+
+  return title.length >= 22;
+}
+
+function awardsManagerKalshiEventSummary_(event, query) {
+  event = event || {};
+
+  const liveMarkets = (
+    Array.isArray(event.markets)
+      ? event.markets
+      : []
+  )
+    .filter(function(market) {
+      return awardsManagerMarketIsLive_(
+        market,
+        event
+      );
+    });
+
+  const matchingMarkets = liveMarkets
+    .filter(function(market) {
+      return awardsManagerSearchTextMatches_(
+        [
+          market.title,
+          market.subtitle,
+          market.yes_sub_title,
+          market.no_sub_title,
+          market.ticker
+        ],
+        query,
+        false
+      );
+    });
+
+  const previewSource = matchingMarkets.length
+    ? matchingMarkets
+    : liveMarkets;
+
+  const previewMarkets = previewSource
+    .slice(0, 3)
+    .map(function(market) {
+      const row =
+        awardsManagerKalshiResult_(
+          market,
+          event
+        );
+
+      row.sourceUrl =
+        awardsManagerKalshiWebMarketUrl_(
+          market,
+          event
+        );
+
+      return row;
+    });
+
+  const summary = {
+    provider: "kalshi",
+    externalEventId: awardsManagerString_(
+      event.event_ticker
+    ),
+    eventName: awardsManagerString_(
+      event.title ||
+      event.sub_title ||
+      event.event_ticker
+    ),
+    contextSubtitle: awardsManagerString_(
+      event.sub_title
+    ),
+    category: awardsManagerString_(
+      event.category
+    ),
+    seriesTicker: awardsManagerString_(
+      event.series_ticker
+    ),
+    closeTime: awardsManagerEventCloseTime_(event),
+    liveMarketCount: liveMarkets.length,
+    matchingMarketCount: matchingMarkets.length,
+    markets: previewMarkets,
+    sourceUrl:
+      awardsManagerKalshiWebEventUrl_(event),
+    originalMarketUrl:
+      previewMarkets[0] &&
+      previewMarkets[0].sourceUrl
+        ? previewMarkets[0].sourceUrl
+        : awardsManagerKalshiWebEventUrl_(event)
+  };
+
+  summary.contextComplete =
+    awardsManagerContextComplete_(summary);
+
+  return summary;
+}
+
+function awardsManagerPolymarketEventSummary_(event, query) {
+  event = event || {};
+
+  const liveMarkets = (
+    Array.isArray(event.markets)
+      ? event.markets
+      : []
+  )
+    .filter(function(market) {
+      return awardsManagerMarketIsLive_(
+        market,
+        event
+      );
+    });
+
+  const matchingMarkets = liveMarkets
+    .filter(function(market) {
+      return awardsManagerSearchTextMatches_(
+        [
+          market.question,
+          market.title,
+          market.slug
+        ],
+        query,
+        false
+      );
+    });
+
+  const previewSource = matchingMarkets.length
+    ? matchingMarkets
+    : liveMarkets;
+
+  const previewMarkets = previewSource
+    .slice(0, 3)
+    .map(function(market) {
+      return awardsManagerPolymarketResult_(
+        market,
+        event
+      );
+    })
+    .filter(Boolean);
+
+  const eventSlug = awardsManagerString_(
+    event.slug
+  );
+
+  const eventUrl = eventSlug
+    ? "https://polymarket.com/event/" +
+      encodeURIComponent(eventSlug)
+    : AWARDS_MANAGER_POLYMARKET_BASE +
+      "/events/" +
+      encodeURIComponent(
+        awardsManagerString_(
+          event.id || event.ticker
+        )
+      );
+
+  const summary = {
+    provider: "polymarket",
+    externalEventId: awardsManagerString_(
+      event.id ||
+      event.slug ||
+      event.ticker
+    ),
+    eventName: awardsManagerString_(
+      event.title ||
+      event.subtitle ||
+      event.slug ||
+      event.id
+    ),
+    contextSubtitle: awardsManagerString_(
+      event.subtitle
+    ),
+    category: awardsManagerString_(
+      event.category ||
+      event.subcategory
+    ),
+    seriesTicker: awardsManagerString_(
+      event.ticker
+    ),
+    closeTime: awardsManagerEventCloseTime_(event),
+    liveMarketCount: liveMarkets.length,
+    matchingMarketCount: matchingMarkets.length,
+    markets: previewMarkets,
+    sourceUrl: eventUrl,
+    originalMarketUrl:
+      previewMarkets[0] &&
+      previewMarkets[0].sourceUrl
+        ? previewMarkets[0].sourceUrl
+        : eventUrl
+  };
+
+  summary.contextComplete =
+    awardsManagerContextComplete_(summary);
+
+  return summary;
+}
+
+function awardsManagerSortEvents_(events, query, sortMode) {
+  const wanted = awardsManagerKey_(query);
+  const mode = awardsManagerKey_(
+    sortMode || "relevance"
+  );
+
+  function relevance_(event) {
+    const title = awardsManagerKey_(
+      event.eventName
+    );
+
+    let score = 0;
+
+    if (title === wanted) score += 100;
+    if (
+      wanted &&
+      title.indexOf(wanted) === 0
+    ) {
+      score += 60;
+    }
+    if (
+      wanted &&
+      title.indexOf(wanted) !== -1
+    ) {
+      score += 40;
+    }
+
+    score += Math.min(
+      20,
+      Number(event.matchingMarketCount || 0)
+    );
+
+    return score;
+  }
+
+  return (events || []).slice().sort(
+    function(a, b) {
+      if (mode === "title") {
+        return (
+          awardsManagerKey_(a.eventName)
+            .localeCompare(
+              awardsManagerKey_(b.eventName)
+            ) ||
+          awardsManagerKey_(a.externalEventId)
+            .localeCompare(
+              awardsManagerKey_(b.externalEventId)
+            )
+        );
+      }
+
+      if (mode === "closing") {
+        const aMs =
+          awardsManagerDateMs_(a.closeTime);
+        const bMs =
+          awardsManagerDateMs_(b.closeTime);
+
+        if (
+          aMs !== null &&
+          bMs !== null &&
+          aMs !== bMs
+        ) {
+          return aMs - bMs;
+        }
+      }
+
+      const scoreDiff =
+        relevance_(b) -
+        relevance_(a);
+
+      if (scoreDiff) return scoreDiff;
+
+      return (
+        awardsManagerKey_(a.eventName)
+          .localeCompare(
+            awardsManagerKey_(b.eventName)
+          ) ||
+        awardsManagerKey_(a.externalEventId)
+          .localeCompare(
+            awardsManagerKey_(b.externalEventId)
+          )
+      );
+    }
+  );
+}
+
+function awardsManagerKalshiEventSearchPage_(
+  query,
+  options,
+  state
+) {
+  options = options || {};
+  state = state || {};
+
+  if (state.done === true) {
+    return {
+      events: [],
+      state: state,
+      scannedPages: 0
+    };
+  }
+
+  const matches = [];
+  let cursor = awardsManagerString_(
+    state.cursor
+  );
+
+  let pagesScanned = 0;
+  const maxPagesPerRequest = 4;
+  const targetMatches = 20;
+
+  while (
+    pagesScanned < maxPagesPerRequest &&
+    matches.length < targetMatches
+  ) {
+    let url =
+      AWARDS_MANAGER_KALSHI_BASE +
+      "/events?status=open" +
+      "&limit=50" +
+      "&with_nested_markets=true";
+
+    if (cursor) {
+      url +=
+        "&cursor=" +
+        encodeURIComponent(cursor);
+    }
+
+    const data =
+      awardsManagerFetchJson_(url);
+
+    const rows = Array.isArray(data.events)
+      ? data.events
+      : [];
+
+    rows.forEach(function(event) {
+      if (
+        awardsManagerEventMatchesSearch_(
+          event,
+          query,
+          options
+        )
+      ) {
+        matches.push(
+          awardsManagerKalshiEventSummary_(
+            event,
+            query
+          )
+        );
+      }
+    });
+
+    pagesScanned += 1;
+
+    cursor = awardsManagerString_(
+      data.cursor
+    );
+
+    if (!cursor || !rows.length) {
+      break;
+    }
+  }
+
+  return {
+    events: matches,
+    scannedPages: pagesScanned,
+    state: {
+      cursor: cursor,
+      done: !cursor,
+      totalScannedPages:
+        Number(state.totalScannedPages || 0) +
+        pagesScanned
+    }
+  };
+}
+
+function awardsManagerPolymarketEventSearchPage_(
+  query,
+  options,
+  state
+) {
+  options = options || {};
+  state = state || {};
+
+  if (state.done === true) {
+    return {
+      events: [],
+      state: state,
+      scannedPages: 0
+    };
+  }
+
+  let page = Math.max(
+    1,
+    Number(state.page || 1)
+  );
+
+  let pagesScanned = 0;
+  let hasMore = true;
+
+  const matches = [];
+  const maxPagesPerRequest = 3;
+  const targetMatches = 20;
+
+  while (
+    pagesScanned < maxPagesPerRequest &&
+    matches.length < targetMatches &&
+    hasMore
+  ) {
+    const url =
+      AWARDS_MANAGER_POLYMARKET_BASE +
+      "/public-search?q=" +
+      encodeURIComponent(
+        awardsManagerString_(query)
+      ) +
+      "&limit_per_type=20" +
+      "&page=" +
+      encodeURIComponent(page) +
+      "&search_profiles=false" +
+      "&keep_closed_markets=0";
+
+    const data =
+      awardsManagerFetchJson_(url);
+
+    const rows = Array.isArray(data.events)
+      ? data.events
+      : [];
+
+    rows.forEach(function(event) {
+      if (
+        awardsManagerMarketIsLive_(
+          null,
+          event
+        ) &&
+        awardsManagerEventMatchesSearch_(
+          event,
+          query,
+          options
+        )
+      ) {
+        matches.push(
+          awardsManagerPolymarketEventSummary_(
+            event,
+            query
+          )
+        );
+      }
+    });
+
+    hasMore = !!(
+      data.pagination &&
+      data.pagination.hasMore
+    );
+
+    page += 1;
+    pagesScanned += 1;
+
+    if (!rows.length) {
+      hasMore = false;
+    }
+  }
+
+  return {
+    events: matches,
+    scannedPages: pagesScanned,
+    state: {
+      page: page,
+      done: !hasMore,
+      totalScannedPages:
+        Number(state.totalScannedPages || 0) +
+        pagesScanned
+    }
+  };
+}
+
 function apiAdminAwardsGetDashboard(payload) {
   awardsManagerRequireAdmin_(payload);
   const gamesResult = typeof adminGetGames === "function"
@@ -641,31 +1348,188 @@ function apiAdminAwardsGetGameSetup(payload) {
 function apiAdminAwardsSearchExternalMarkets(payload) {
   awardsManagerRequireAdmin_(payload);
   payload = payload || {};
-  const query = awardsManagerString_(payload.query);
-  const provider = awardsManagerKey_(payload.provider || "both");
-  const limit = Math.max(1, Math.min(Number(payload.limit || 40), 60));
 
-  if (query.length < 2) throw new Error("Enter at least 2 characters.");
-  if (["both", "kalshi", "polymarket"].indexOf(provider) === -1) {
-    throw new Error("Provider must be Kalshi, Polymarket, or Both.");
+  const query = awardsManagerString_(
+    payload.query
+  );
+
+  const provider = awardsManagerKey_(
+    payload.provider || "both"
+  );
+
+  if (query.length < 2) {
+    throw new Error(
+      "Enter at least 2 characters."
+    );
   }
 
-  let results = [];
+  if (
+    ["both", "kalshi", "polymarket"]
+      .indexOf(provider) === -1
+  ) {
+    throw new Error(
+      "Provider must be Kalshi, Polymarket, or Both."
+    );
+  }
+
+  const options = {
+    category: awardsManagerString_(
+      payload.category
+    ),
+    searchIn: awardsManagerKey_(
+      payload.searchIn || "both"
+    ),
+    closeDays: Number(
+      payload.closeDays || 0
+    ),
+    exactPhrase: awardsManagerBool_(
+      payload.exactPhrase
+    ),
+    sort: awardsManagerKey_(
+      payload.sort || "relevance"
+    )
+  };
+
+  const searchState =
+    awardsManagerParseJson_(
+      payload.searchStateJSON,
+      {}
+    ) || {};
+
+  let events = [];
   const errors = [];
-  if (provider === "both" || provider === "kalshi") {
-    try { results = results.concat(awardsManagerKalshiSearch_(query, limit)); }
-    catch (err) { errors.push("Kalshi: " + (err.message || err)); }
+  const providerState = {};
+  const scanInfo = {};
+
+  if (
+    provider === "both" ||
+    provider === "kalshi"
+  ) {
+    try {
+      const kalshi =
+        awardsManagerKalshiEventSearchPage_(
+          query,
+          options,
+          searchState.kalshi || {}
+        );
+
+      events = events.concat(
+        kalshi.events || []
+      );
+
+      providerState.kalshi =
+        kalshi.state || {};
+
+      scanInfo.kalshi =
+        kalshi.scannedPages || 0;
+    } catch (err) {
+      errors.push(
+        "Kalshi: " +
+        (err.message || err)
+      );
+
+      providerState.kalshi =
+        searchState.kalshi || {
+          done: true
+        };
+    }
   }
-  if (provider === "both" || provider === "polymarket") {
-    try { results = results.concat(awardsManagerPolymarketSearch_(query, limit)); }
-    catch (err) { errors.push("Polymarket: " + (err.message || err)); }
+
+  if (
+    provider === "both" ||
+    provider === "polymarket"
+  ) {
+    try {
+      const polymarket =
+        awardsManagerPolymarketEventSearchPage_(
+          query,
+          options,
+          searchState.polymarket || {}
+        );
+
+      events = events.concat(
+        polymarket.events || []
+      );
+
+      providerState.polymarket =
+        polymarket.state || {};
+
+      scanInfo.polymarket =
+        polymarket.scannedPages || 0;
+    } catch (err) {
+      errors.push(
+        "Polymarket: " +
+        (err.message || err)
+      );
+
+      providerState.polymarket =
+        searchState.polymarket || {
+          done: true
+        };
+    }
   }
+
+  const seen = {};
+
+  events = events.filter(
+    function(event) {
+      const key = [
+        event.provider,
+        event.externalEventId
+      ]
+        .map(awardsManagerKey_)
+        .join("|");
+
+      if (!key || seen[key]) {
+        return false;
+      }
+
+      seen[key] = true;
+      return true;
+    }
+  );
+
+  events =
+    awardsManagerSortEvents_(
+      events,
+      query,
+      options.sort
+    );
+
+  const kalshiMore =
+    (
+      provider === "both" ||
+      provider === "kalshi"
+    ) &&
+    !(
+      providerState.kalshi &&
+      providerState.kalshi.done === true
+    );
+
+  const polymarketMore =
+    (
+      provider === "both" ||
+      provider === "polymarket"
+    ) &&
+    !(
+      providerState.polymarket &&
+      providerState.polymarket.done === true
+    );
 
   return {
     success: true,
+    version: AWARDS_MANAGER_VERSION,
     query: query,
     provider: provider,
-    results: results.slice(0, limit),
+    events: events,
+    results: [],
+    options: options,
+    searchState: providerState,
+    hasMore: !!(
+      kalshiMore ||
+      polymarketMore
+    ),
+    scannedPages: scanInfo,
     errors: errors
   };
 }

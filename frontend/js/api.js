@@ -3781,12 +3781,32 @@ async function apiAdminAwardsGetGameSetup(gameId) {
   });
 }
 
-async function apiAdminAwardsSearchExternalMarkets(provider, query) {
-  return apiAdminAwardsRequest_("adminAwardsSearchExternalMarkets", {
-    provider: provider || "both",
-    query: query || "",
-    limit: 40
-  });
+async function apiAdminAwardsSearchExternalMarkets(
+  provider,
+  query,
+  options
+) {
+  options = options || {};
+
+  return apiAdminAwardsRequest_(
+    "adminAwardsSearchExternalMarkets",
+    {
+      provider: provider || "both",
+      query: query || "",
+      category: options.category || "",
+      searchIn: options.searchIn || "both",
+      closeDays: options.closeDays || 0,
+      exactPhrase:
+        options.exactPhrase === true
+          ? "true"
+          : "false",
+      sort: options.sort || "relevance",
+      searchStateJSON:
+        options.searchState
+          ? JSON.stringify(options.searchState)
+          : ""
+    }
+  );
 }
 
 async function apiAdminAwardsGetExternalEvent(
