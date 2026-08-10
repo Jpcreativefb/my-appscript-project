@@ -90,6 +90,17 @@ function doPost(e) {
     }
 
     // =========================
+    // AWARDS MANAGER WRITES
+    // =========================
+    if (action === "adminAwardsCreateQuestionFromMarket") {
+      return json(apiAdminAwardsCreateQuestionFromMarket(body));
+    }
+
+    if (action === "adminAwardsLinkMarket") {
+      return json(apiAdminAwardsLinkMarket(body));
+    }
+
+    // =========================
     // REALITY TV LARGE WRITES
     // =========================
 
@@ -214,6 +225,11 @@ function doGet(e) {
       "adminArchiveGame",
       "adminCloneGame",
       "adminCloneGameSetup",
+      "adminAwardsGetDashboard",
+      "adminAwardsGetGameSetup",
+      "adminAwardsSearchExternalMarkets",
+      "adminAwardsCreateQuestionFromMarket",
+      "adminAwardsLinkMarket",
 
       "adminSetupRealityTvSystem",
       "adminConfigureRealityTvHub",
@@ -898,6 +914,22 @@ function doGet(e) {
         )
       );
 
+    }
+
+    /* =========================
+       ADMIN: AWARDS MANAGER
+    ========================= */
+
+    if (action === "adminAwardsGetDashboard") {
+      return json(apiAdminAwardsGetDashboard(params));
+    }
+
+    if (action === "adminAwardsGetGameSetup") {
+      return json(apiAdminAwardsGetGameSetup(params));
+    }
+
+    if (action === "adminAwardsSearchExternalMarkets") {
+      return json(apiAdminAwardsSearchExternalMarkets(params));
     }
 
     /* =========================

@@ -223,6 +223,7 @@ function isAdminPage_(page) {
   page = String(page || APP_STATE.currentPage || "");
   return page === "admin" ||
     page === "admin-games" ||
+    page === "admin-awards" ||
     page === "admin-reality-tv" ||
     page.indexOf("admin-game-setup:") === 0;
 }
@@ -372,10 +373,10 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "313-external-results-hub-end-to-end";
+const APP_ASSET_VERSION = "315-awards-manager-v1212";
 // Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1118-reality-tv-bulk-question-pack";
 // Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end";
-const APP_ROUTE_HOTFIX_VERSION = "v1290-reality-tv-approval-race-fix";
+const APP_ROUTE_HOTFIX_VERSION = "v12120-awards-manager";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -397,6 +398,7 @@ const APP_PAGE_MODULES = {
   "leagues": ["leagues"],
   "admin": ["admin", "adminUi"],
   "admin-games": ["admin", "adminUi", "adminGames"],
+  "admin-awards": ["admin", "adminUi", "adminAwards"],
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "profile": ["profile"],
@@ -576,6 +578,7 @@ function setActiveNav(page) {
 
   const navPage =
     page === "admin-games" ||
+    page === "admin-awards" ||
     page === "admin-reality-tv" ||
     page.indexOf("admin-game-setup:") === 0
       ? "admin"
@@ -954,6 +957,16 @@ async function renderPage(page) {
 
       break; 
 
+    case "admin-awards":
+
+      if (typeof renderAdminAwardsPage !== "function") {
+        throw new Error("Awards Manager script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderAdminAwardsPage();
+
+      break;
     case "admin-reality-tv":
 
       if (typeof renderAdminRealityTvPage !== "function") {

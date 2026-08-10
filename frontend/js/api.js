@@ -45,6 +45,7 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminAwardsSearchExternalMarkets",
     "adminGetRealityTvDashboard",
     "adminGetRealityTvDashboardSummary",
     "adminGetRealityTvSeasonDetails",
@@ -3747,4 +3748,57 @@ async function apiAdminRemoveSportsOddsHybridTrigger() {
     "adminRemoveSportsOddsHybridTrigger"
   );
 
+}
+
+/* ======================
+   ADMIN: AWARDS MANAGER v1.2.12
+====================== */
+function apiAdminAwardsRequest_(action, payload) {
+  const session = getSession ? (getSession() || {}) : {};
+  return api(action, {
+    ...(payload || {}),
+    username: session.username || "",
+    token: session.token || ""
+  });
+}
+
+function apiAdminAwardsPostRequest_(action, payload) {
+  const session = getSession ? (getSession() || {}) : {};
+  return apiPost(action, {
+    ...(payload || {}),
+    username: session.username || "",
+    token: session.token || ""
+  });
+}
+
+async function apiAdminAwardsGetDashboard() {
+  return apiAdminAwardsRequest_("adminAwardsGetDashboard", {});
+}
+
+async function apiAdminAwardsGetGameSetup(gameId) {
+  return apiAdminAwardsRequest_("adminAwardsGetGameSetup", {
+    gameId: gameId || ""
+  });
+}
+
+async function apiAdminAwardsSearchExternalMarkets(provider, query) {
+  return apiAdminAwardsRequest_("adminAwardsSearchExternalMarkets", {
+    provider: provider || "both",
+    query: query || "",
+    limit: 40
+  });
+}
+
+async function apiAdminAwardsCreateQuestionFromMarket(payload) {
+  return apiAdminAwardsPostRequest_(
+    "adminAwardsCreateQuestionFromMarket",
+    payload || {}
+  );
+}
+
+async function apiAdminAwardsLinkMarket(payload) {
+  return apiAdminAwardsPostRequest_(
+    "adminAwardsLinkMarket",
+    payload || {}
+  );
 }

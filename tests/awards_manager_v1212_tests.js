@@ -1,0 +1,65 @@
+const fs = require('fs');
+const path = require('path');
+const assert = require('assert');
+
+function read(rel) {
+  return fs.readFileSync(path.join(__dirname, '..', rel), 'utf8');
+}
+
+const engine = read('backend/engines/AwardsManagerEngine.js');
+const backendApi = read('backend/Api.js');
+const frontendApi = read('frontend/js/api.js');
+const frontendApiMirror = read('frontend/api.js');
+const app = read('frontend/js/app.js');
+const appMirror = read('frontend/app.js');
+const admin = read('frontend/js/pages/admin.js');
+const page = read('frontend/js/pages/adminAwards.js');
+const bridge = read('backend/engines/ExternalResultsHubBridgeEngine.js');
+
+[
+  'apiAdminAwardsGetDashboard',
+  'apiAdminAwardsGetGameSetup',
+  'apiAdminAwardsSearchExternalMarkets',
+  'apiAdminAwardsCreateQuestionFromMarket',
+  'apiAdminAwardsLinkMarket'
+].forEach(name => assert(engine.includes('function ' + name), name + ' missing'));
+
+assert(engine.includes('AWARDS_MANAGER_KALSHI_BASE'), 'Kalshi live-search base missing');
+assert(engine.includes('AWARDS_MANAGER_POLYMARKET_BASE'), 'Polymarket live-search base missing');
+assert(engine.includes('/public-search?q='), 'Polymarket public-search missing');
+assert(engine.includes('/markets?status=open'), 'Kalshi live-market search missing');
+assert(engine.includes('\"/series\"'), 'Kalshi live-series discovery missing');
+assert(engine.includes('settlement_sources'), 'Kalshi settlement-source metadata missing');
+assert(engine.includes('AutoSettle: false'), 'Mappings must force AutoSettle false');
+assert(engine.includes('RequireAdminReview: true'), 'Mappings must require admin review');
+assert(engine.includes('UPSERT_EXTERNAL_MARKET_MAPPING'), 'Awards Manager must use Hub bridge job');
+assert(bridge.includes('UPSERT_EXTERNAL_MARKET_MAPPING'), 'Hub bridge job type missing');
+
+[
+  'adminAwardsGetDashboard',
+  'adminAwardsGetGameSetup',
+  'adminAwardsSearchExternalMarkets',
+  'adminAwardsCreateQuestionFromMarket',
+  'adminAwardsLinkMarket'
+].forEach(action => assert(backendApi.includes('"' + action + '"'), 'Backend API missing ' + action));
+
+[
+  'apiAdminAwardsGetDashboard',
+  'apiAdminAwardsGetGameSetup',
+  'apiAdminAwardsSearchExternalMarkets',
+  'apiAdminAwardsCreateQuestionFromMarket',
+  'apiAdminAwardsLinkMarket'
+].forEach(name => {
+  assert(frontendApi.includes('function ' + name), 'Frontend API missing ' + name);
+  assert(frontendApiMirror.includes('function ' + name), 'Frontend API mirror missing ' + name);
+});
+
+assert(app.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]'), 'admin-awards route module missing');
+assert(appMirror.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]'), 'admin-awards mirror route missing');
+assert(app.includes('case "admin-awards"'), 'admin-awards render route missing');
+assert(admin.includes("navigate('admin-awards')"), 'Admin dashboard Awards Manager card missing');
+assert(page.includes('Search Providers'), 'Awards Manager search UI missing');
+assert(page.includes('Create Question'), 'Create Question action missing');
+assert(page.includes('Link Existing'), 'Link Existing action missing');
+
+console.log('Awards Manager v1.2.12 tests passed.');

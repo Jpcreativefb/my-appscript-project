@@ -202,6 +202,23 @@ async function renderAdminPage() {
 
         <div class="card admin-card">
 
+          <h2>Awards Manager</h2>
+          <div class="admin-sub">
+            Build awards questions, search Kalshi and Polymarket live, attach market probabilities,
+            and queue selected mappings to the External Results Hub for administrator-reviewed results.
+          </div>
+
+          <button
+            class="button admin-button"
+            onclick="navigate('admin-awards')"
+          >
+            Open Awards Manager
+          </button>
+
+        </div>
+
+        <div class="card admin-card">
+
           <h2>Reality TV Season Manager</h2>
 
           <div class="admin-sub">
