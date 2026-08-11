@@ -1419,6 +1419,437 @@ function externalResultsInboxDedupeCategoryResults_(validation) {
   ) || { success: true, removed: 0 };
 }
 
+function externalResultsBridgeMarketNumber_(value) {
+  if (
+    value === null ||
+    value === undefined ||
+    String(value).trim() === ""
+  ) {
+    return null;
+  }
+
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function externalResultsBridgeClampPercent_(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return null;
+  return Math.max(0, Math.min(100, number));
+}
+
+function externalResultsBridgeMarketProbability_(market, expectedOutcome) {
+  market = market || {};
+
+  const provider =
+    externalResultsBridgeKey_(market.Provider);
+
+  const expected =
+    externalResultsBridgeKey_(expectedOutcome || "Yes");
+
+  const outcomes =
+    externalResultsBridgeParseJson_(
+      market.OutcomesJSON || "[]",
+      []
+    );
+
+  const prices =
+    externalResultsBridgeParseJson_(
+      market.PricesJSON || "{}",
+      {}
+    );
+
+  /*
+    Awards Manager initially writes prices as:
+      { "Yes": 42, "No": 58 }
+
+    Those values are already percentages.
+  */
+  if (
+    prices &&
+    !Array.isArray(prices) &&
+    typeof prices === "object"
+  ) {
+    const directKey =
+      Object.keys(prices).find(function(key) {
+        return externalResultsBridgeKey_(key) === expected;
+      });
+
+    if (directKey) {
+      const direct =
+        externalResultsBridgeMarketNumber_(
+          prices[directKey]
+        );
+
+      if (direct !== null) {
+        return externalResultsBridgeClampPercent_(direct);
+      }
+    }
+  }
+
+  /*
+    Hub-refreshed Kalshi format:
+      {
+        yesBid: 0.42,
+        yesAsk: 0.44,
+        noBid: 0.56,
+        noAsk: 0.58,
+        last: 0.43
+      }
+  */
+  if (
+    provider === "kalshi" &&
+    prices &&
+    !Array.isArray(prices) &&
+    typeof prices === "object"
+  ) {
+    const last =
+      externalResultsBridgeMarketNumber_(prices.last);
+
+    if (last !== null) {
+      const yesPercent =
+        externalResultsBridgeClampPercent_(
+          last * 100
+        );
+
+      return expected === "no"
+        ? externalResultsBridgeClampPercent_(
+            100 - yesPercent
+          )
+        : yesPercent;
+    }
+
+    const bidKey =
+      expected === "no"
+        ? "noBid"
+        : "yesBid";
+
+    const askKey =
+      expected === "no"
+        ? "noAsk"
+        : "yesAsk";
+
+    const bid =
+      externalResultsBridgeMarketNumber_(
+        prices[bidKey]
+      );
+
+    const ask =
+      externalResultsBridgeMarketNumber_(
+        prices[askKey]
+      );
+
+    if (bid !== null && ask !== null) {
+      return externalResultsBridgeClampPercent_(
+        ((bid + ask) / 2) * 100
+      );
+    }
+
+    if (bid !== null) {
+      return externalResultsBridgeClampPercent_(
+        bid * 100
+      );
+    }
+
+    if (ask !== null) {
+      return externalResultsBridgeClampPercent_(
+        ask * 100
+      );
+    }
+  }
+
+  /*
+    Hub-refreshed Polymarket format:
+      OutcomesJSON = ["Yes","No"]
+      PricesJSON   = [0.42,0.58]
+  */
+  if (Array.isArray(prices)) {
+    const outcomeList =
+      Array.isArray(outcomes)
+        ? outcomes
+        : [];
+
+    const index =
+      outcomeList.findIndex(function(outcome) {
+        return externalResultsBridgeKey_(outcome) === expected;
+      });
+
+    if (
+      index >= 0 &&
+      index < prices.length
+    ) {
+      const raw =
+        externalResultsBridgeMarketNumber_(
+          prices[index]
+        );
+
+      if (raw !== null) {
+        return externalResultsBridgeClampPercent_(
+          raw >= 0 && raw <= 1
+            ? raw * 100
+            : raw
+        );
+      }
+    }
+  }
+
+  return null;
+}
+
+function externalResultsBridgeLiveProbabilityKey_(
+  categoryId,
+  nomineeId
+) {
+  return (
+    externalResultsBridgeKey_(categoryId) +
+    "|" +
+    externalResultsBridgeKey_(nomineeId)
+  );
+}
+
+function externalResultsBridgeLiveProbabilityDate_(value) {
+  if (!value) return "";
+
+  if (
+    Object.prototype.toString.call(value) ===
+      "[object Date]" &&
+    !isNaN(value.getTime())
+  ) {
+    return value.toISOString();
+  }
+
+  return String(value);
+}
+
+function externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
+  gameId,
+  categories
+) {
+  const source =
+    Array.isArray(categories)
+      ? categories
+      : [];
+
+  const needsExternalPrices =
+    source.some(function(category) {
+      return (
+        externalResultsBridgeKey_(
+          category && category.oddsMode
+        ) === "external-market"
+      );
+    });
+
+  if (!needsExternalPrices) {
+    return source;
+  }
+
+  try {
+    const hubId =
+      externalResultsBridgeGetHubId_();
+
+    if (!hubId) {
+      return source;
+    }
+
+    const hub =
+      SpreadsheetApp.openById(hubId);
+
+    const mappingSheet =
+      hub.getSheetByName("AppMappings");
+
+    const marketSheet =
+      hub.getSheetByName("ExternalMarkets");
+
+    if (!mappingSheet || !marketSheet) {
+      return source;
+    }
+
+    const gameKey =
+      externalResultsBridgeKey_(gameId);
+
+    const markets =
+      externalResultsBridgeReadObjects_(
+        marketSheet
+      );
+
+    const marketLookup = {};
+
+    markets.forEach(function(market) {
+      const key =
+        externalResultsBridgeKey_(market.Provider) +
+        "|" +
+        externalResultsBridgeKey_(
+          market.ExternalMarketId
+        );
+
+      if (key !== "|") {
+        marketLookup[key] = market;
+      }
+    });
+
+    const probabilityLookup = {};
+
+    externalResultsBridgeReadObjects_(
+      mappingSheet
+    ).forEach(function(mapping) {
+      if (
+        externalResultsBridgeKey_(
+          mapping.AppGameId
+        ) !== gameKey
+      ) {
+        return;
+      }
+
+      const active =
+        mapping.Active === "" ||
+        mapping.Active === null ||
+        mapping.Active === undefined
+          ? true
+          : externalResultsBridgeBool_(
+              mapping.Active
+            );
+
+      if (!active) return;
+
+      const marketKey =
+        externalResultsBridgeKey_(
+          mapping.Provider
+        ) +
+        "|" +
+        externalResultsBridgeKey_(
+          mapping.ExternalMarketId
+        );
+
+      const market =
+        marketLookup[marketKey];
+
+      if (!market) return;
+
+      const probability =
+        externalResultsBridgeMarketProbability_(
+          market,
+          mapping.ExpectedOutcome || "Yes"
+        );
+
+      if (probability === null) {
+        return;
+      }
+
+      const nomineeKey =
+        externalResultsBridgeLiveProbabilityKey_(
+          mapping.CategoryId,
+          mapping.NomineeId
+        );
+
+      probabilityLookup[nomineeKey] = {
+        probability:
+          Math.round(probability * 10) / 10,
+
+        provider:
+          externalResultsBridgeString_(
+            mapping.Provider
+          ).toLowerCase(),
+
+        externalMarketId:
+          externalResultsBridgeString_(
+            mapping.ExternalMarketId
+          ),
+
+        expectedOutcome:
+          externalResultsBridgeString_(
+            mapping.ExpectedOutcome || "Yes"
+          ),
+
+        sourceUrl:
+          externalResultsBridgeString_(
+            mapping.SourceUrl ||
+            market.SourceUrl ||
+            ""
+          ),
+
+        lastUpdated:
+          externalResultsBridgeLiveProbabilityDate_(
+            market.LastUpdated ||
+            mapping.UpdatedAt ||
+            ""
+          )
+      };
+    });
+
+    return source.map(function(category) {
+      if (
+        externalResultsBridgeKey_(
+          category && category.oddsMode
+        ) !== "external-market"
+      ) {
+        return category;
+      }
+
+      const copy =
+        Object.assign({}, category);
+
+      copy.nominees =
+        (category.nominees || []).map(
+          function(nominee) {
+            const info =
+              probabilityLookup[
+                externalResultsBridgeLiveProbabilityKey_(
+                  category.id,
+                  nominee.id
+                )
+              ];
+
+            if (!info) {
+              return nominee;
+            }
+
+            return Object.assign(
+              {},
+              nominee,
+              {
+                liveProbability:
+                  info.probability,
+
+                liveProbabilityProvider:
+                  info.provider,
+
+                liveProbabilityUpdatedAt:
+                  info.lastUpdated,
+
+                liveProbabilityMarketId:
+                  info.externalMarketId,
+
+                liveProbabilityOutcome:
+                  info.expectedOutcome,
+
+                liveProbabilitySourceUrl:
+                  info.sourceUrl
+              }
+            );
+          }
+        );
+
+      return copy;
+    });
+
+  } catch (err) {
+    if (typeof Logger !== "undefined") {
+      Logger.log(
+        "External market probability read warning: " +
+        (err && err.message
+          ? err.message
+          : err)
+      );
+    }
+
+    /*
+      Live market pricing must never prevent
+      the normal Picks page from loading.
+    */
+    return source;
+  }
+}
+
 function externalResultsInboxApplyGeneric_(validation, rows, username) {
   const category = validation.category;
   const first = rows[0] || {};

@@ -52,6 +52,16 @@ function apiGetStartupPayload(payload) {
       ? getCategoriesCached(gameId)
       : getCategories(gameId);
 
+  if (
+    typeof externalResultsBridgeEnrichCategoriesWithLiveProbabilities_ === "function"
+  ) {
+    categories =
+      externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
+        gameId,
+        categories
+      );
+  }
+
   const picks =
     apiGetMyPicks(
       username,
