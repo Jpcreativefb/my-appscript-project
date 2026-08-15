@@ -841,12 +841,29 @@ function apiAdminResetUserPin(payload) {
     );
   }
 
-  found.sheet
-    .getRange(
-      found.rowIndex,
-      found.col.pin + 1
-    )
-    .setValue("'" + pin);
+  const userRecord =
+    typeof findUserRecordByUsername_ === "function"
+      ? findUserRecordByUsername_(targetUsername)
+      : null;
+
+  if (userRecord && typeof updateUserFields_ === "function") {
+    updateUserFields_(
+      userRecord.rowNumber,
+      {
+        pin: hashUserPinForStorage_(pin),
+        sessionToken: "",
+        sessionExpiresAt: "",
+        lastUpdated: new Date().toISOString()
+      }
+    );
+  } else {
+    found.sheet
+      .getRange(
+        found.rowIndex,
+        found.col.pin + 1
+      )
+      .setValue(hashUserPinForStorage_(pin));
+  }
 
   if (
     typeof clearAppCaches ===
@@ -958,12 +975,30 @@ function apiAdminToggleUserActive(payload) {
     );
   }
 
-  found.sheet
-    .getRange(
-      found.rowIndex,
-      found.col.active + 1
-    )
-    .setValue(nextActive);
+  const userRecord =
+    typeof findUserRecordByUsername_ === "function"
+      ? findUserRecordByUsername_(targetUsername)
+      : null;
+
+  if (userRecord && typeof updateUserFields_ === "function") {
+    updateUserFields_(
+      userRecord.rowNumber,
+      {
+        active: nextActive,
+        accountStatus: nextActive ? "active" : "inactive",
+        sessionToken: nextActive ? String(userRecord.user["SessionToken"] || "") : "",
+        sessionExpiresAt: nextActive ? String(userRecord.user["SessionExpiresAt"] || "") : "",
+        lastUpdated: new Date().toISOString()
+      }
+    );
+  } else {
+    found.sheet
+      .getRange(
+        found.rowIndex,
+        found.col.active + 1
+      )
+      .setValue(nextActive);
+  }
 
   if (
     typeof clearAppCaches ===

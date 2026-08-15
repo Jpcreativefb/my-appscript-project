@@ -373,10 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "317-awards-manager-v1215-event-search";
-// Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1118-reality-tv-bulk-question-pack";
-// Previous checkpoint: APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end";
-const APP_ROUTE_HOTFIX_VERSION = "v12150-awards-manager-event-search";
+const APP_ASSET_VERSION = "318-fall-production-hardening-v1216";
+const APP_ROUTE_HOTFIX_VERSION = "v12160-fall-production-hardening";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

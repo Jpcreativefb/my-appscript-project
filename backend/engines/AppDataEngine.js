@@ -1319,7 +1319,11 @@ function getDashboardWagerProgress_(
 
     progressLabel:
       totalCategories
-        ? totalBets + " / " + totalCategories + " wagers placed"
+        ? totalBets >= totalCategories
+          ? "All " + totalCategories + " wagers placed"
+          : (totalCategories - totalBets) +
+            ((totalCategories - totalBets) === 1 ? " wager left" : " wagers left") +
+            " · " + totalBets + " / " + totalCategories + " placed"
         : totalBets > 0
           ? totalBets + " wagers placed"
           : "No wagers placed yet",
@@ -1411,7 +1415,11 @@ function getDashboardPickProgress_(
 
     progressLabel:
       totalCategories
-        ? picksMade + " / " + totalCategories + " picks made"
+        ? picksMade >= totalCategories
+          ? "All " + totalCategories + " picks complete"
+          : (totalCategories - picksMade) +
+            ((totalCategories - picksMade) === 1 ? " pick left" : " picks left") +
+            " · " + picksMade + " / " + totalCategories + " complete"
         : picksMade > 0
           ? picksMade + " picks made"
           : "No picks made yet",
@@ -1711,12 +1719,17 @@ function getDashboardUserStats_(
         : "—"
   });
 
+  const madeCount = Number(progress.madeCount) || 0;
+  const totalCount = Number(progress.totalCount) || 0;
+
   stats.push({
     label: "Status",
     value:
-      Number(progress.madeCount) > 0
-        ? "Started"
-        : "Not Started"
+      totalCount > 0 && madeCount >= totalCount
+        ? "Complete"
+        : madeCount > 0
+          ? "In Progress"
+          : "Not Started"
   });
 
   return stats;

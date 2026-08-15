@@ -1,3 +1,54 @@
+## v1.2.16 — Fall Production Hardening
+
+- Added centralized GET/POST API authorization with automatic protection for all `admin...` actions.
+- Player-owned routes derive identity from the authenticated session and reject browser-supplied username impersonation.
+- Moved login/signup/PIN reset, player writes, notification preference writes, and league-management writes to POST.
+- Added automatic authenticated-session attachment in the frontend API layer.
+- Added versioned salted HMAC-SHA256 PIN storage with legacy in-place migration.
+- Added hashed persisted session-token storage with legacy compatibility/migration.
+- Added login-failure and PIN-reset request throttling plus session revocation on reset/deactivation.
+- Normalized legacy `Active` and `AccountStatus` behavior.
+- Improved dashboard completion text to surface remaining picks/wagers.
+- Replaced stale historic cache-marker test assertions with a current-release contract.
+- Added `tools/run_production_checks.sh` and GitHub Actions CI.
+- Archived historical root release notes instead of deleting them.
+- Bumped browser/service-worker assets to v318.
+
+## v1.2.15 — Awards Manager true event search
+
+- Provider search now discovers events directly with pagination rather than grouping a sampled market batch.
+- Added Kalshi event-catalog pagination, Polymarket public-search pagination, Load More Events, advanced provider/category/scope/closing/sort filters, and exact phrase mode.
+- Event cards and opened markets include richer provider context and source links.
+- Question creation reloads the selected event independently so search-page limits do not cap available answers.
+
+## v1.2.14 — Awards Manager event-first selection
+
+- Search results are grouped as provider events and `View Event` loads all current event markets.
+- Admin can select multiple live markets as answers, edit answer labels, and create one Awards App question from the selected event.
+- Hub mappings remain administrator-reviewed with automatic settlement disabled.
+
+## v1.2.13 — Awards Manager grouped question creation
+
+- Added batch answer creation and Awards Manager single-market Hub mapping jobs.
+- Multiple related provider markets can become one Awards App question with one mapped answer per market.
+
+## v1.2.12 — Awards Manager initial app workflow
+
+- Added Admin Awards Manager with Kalshi/Polymarket search, create/link question flows, probability context, and External Results Hub mapping.
+- Auto-settlement is forced off and administrator review is required.
+
+## v1.2.11 — External Results Hub Mapping Manager
+
+- Added an app-side Mapping Manager for reviewing and maintaining External Results Hub mappings with the required container UI scope.
+
+## v1.2.10 — External Results Hub provider discovery limits
+
+- Added safer provider-discovery boundaries so broad Kalshi/Polymarket discovery remains administrator-driven while mapped-result polling stays focused.
+
+## v1.2.9 — Reality TV approval completion race fix
+
+- Hardened completion-state handling around long-running Reality TV approvals so the saved final state wins over stale browser progress.
+
 ## v1.2.8 — External Results Hub end-to-end reliability
 
 - Added Reality TV Inbox reconciliation so native Reality approvals move Hub batches from `STAGED_REALITY` to `APPLIED`, while rejected/native-error states remain explicit and duplicate-safe.

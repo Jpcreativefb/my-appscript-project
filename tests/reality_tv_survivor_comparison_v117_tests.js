@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { assertCurrentReleaseMarkers } = require('../tools/release_test_helpers');
 
 const root = path.resolve(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
@@ -73,8 +74,6 @@ assert(picks.includes('is-saving'));
 assert(picksCss.includes('.pick-category-card.is-saving'));
 
 // Release cache contract.
-assert(app.includes('313-external-results-hub-end-to-end'));
-assert(html.includes('313-external-results-hub-end-to-end'));
-assert(sw.includes('313-external-results-hub-end-to-end'));
+assertCurrentReleaseMarkers(assert, app, html, sw);
 
 console.log('Reality TV Survivor and locked comparison v1.1.7 tests passed.');

@@ -22,7 +22,5 @@ assert(engine.includes('const mappingRows = contestants.map'), 'Hub mappings are
 assert(engine.includes('The interrupted Reality TV season setup was repaired'), 'Interrupted setup repair message is missing');
 assert(engine.includes('missingContestants'), 'Episode resume logic for missing answers is missing');
 assert(page.includes('res.error || res.message'), 'Detailed create errors are not surfaced');
-assert(app.includes('v=270-reality-tv-large-roster-fix'), 'Frontend cache-bust version is missing');
-assert(sw.includes('v270-reality-tv-large-roster-fix'), 'Service-worker cache version is missing');
 
 console.log('Reality TV large roster creation tests passed.');

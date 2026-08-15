@@ -39,9 +39,7 @@ assert(!ui.includes('const animatedPercent ='), 'Approval percentage must not si
 assert(ui.includes('Last checkpoint:'), 'Approval UI must show checkpoint age');
 assert(ui.includes('state.waiting ? 3000'), 'Queued approvals must wait visibly rather than fail after a short busy loop');
 
-assert(app.includes('v1118-reality-tv-bulk-question-pack'), 'v1.1.18 route cache key is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1118-reality-tv-bulk-question-pack'), 'App shell cache key is missing');
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
 vm.createContext(runtime);

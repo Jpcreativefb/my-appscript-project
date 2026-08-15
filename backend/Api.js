@@ -35,13 +35,275 @@ function doPost(e) {
       params.action ||
       "";
 
+    apiSecurityAuthorizeRequest_(
+      action,
+      body
+    );
+
+    // =========================
+    // AUTHENTICATION WRITES
+    // Sensitive credentials never belong in GET/query strings.
+    // =========================
+
+    if (action === "login") {
+      return json(loginUser(
+        body.username,
+        body.pin,
+        body.rememberMe
+      ));
+    }
+
+    if (action === "signup") {
+      return json(createUser(
+        body.username,
+        body.realName,
+        body.pin,
+        body.email,
+        body.phone,
+        body.contactMethod
+      ));
+    }
+
+    if (action === "requestPinReset") {
+      return json(requestPinReset(body.identifier));
+    }
+
+    if (action === "resetPin") {
+      return json(resetPin(
+        body.identifier,
+        body.resetCode,
+        body.newPin
+      ));
+    }
+
+    // =========================
+    // PLAYER WRITES
+    // =========================
+
+    if (action === "saveEditableProfile") {
+      return json(apiSaveEditableProfile(body));
+    }
+
+    if (action === "savePick") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "makePicks",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(savePick({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId,
+        nomineeId: body.nomineeId,
+        confidencePoints: body.confidencePoints,
+        stakePoints: body.stakePoints
+      }));
+    }
+
+    if (action === "saveBet") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "makeWagers",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(saveBet({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId,
+        nomineeId: body.nomineeId,
+        betAmount: body.betAmount
+      }));
+    }
+
+    if (action === "removeBet") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "makeWagers",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(removeBet({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId
+      }));
+    }
+
+    if (action === "saveSeasonAnchorPick") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "makePicks",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(apiSaveSeasonAnchorPick({
+        username: body.username,
+        token: body.token,
+        gameId: postGameId,
+        entityId: body.entityId
+      }));
+    }
+
+    if (action === "saveUserProfile") {
+      return json(saveUserProfile({
+        username: body.username,
+        gameId: body.gameId || getDefaultGameId(),
+        displayName: body.displayName,
+        avatar: body.avatar,
+        themeColor: body.themeColor
+      }));
+    }
+
+    if (action === "setNotificationPreference") {
+      return json(setNotificationPreference(
+        body.token,
+        body.contactMethod,
+        body.email,
+        body.phone
+      ));
+    }
+
+    // =========================
+    // LEAGUE / ACCESS WRITES
+    // =========================
+
+    if (action === "createLeague") {
+      return json(apiCreateLeague({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        leagueName: body.leagueName || body.name,
+        gameId: body.gameId || "",
+        gameIds: body.gameIds,
+        visibility: body.visibility,
+        accessMode: body.accessMode || body.gameAccessMode,
+        pickScope: body.pickScope,
+        joinMode: body.joinMode
+      }));
+    }
+
+    if (action === "addLeagueMember") {
+      return json(apiAddLeagueMember({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        memberUsername: body.memberUsername || body.targetUsername,
+        role: body.role
+      }));
+    }
+
+    if (action === "removeLeagueMember") {
+      return json(apiRemoveLeagueMember({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        memberUsername: body.memberUsername || body.targetUsername
+      }));
+    }
+
+    if (action === "assignGameToLeague") {
+      return json(apiAssignGameToLeague({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        gameId: body.gameId || "",
+        accessMode: body.accessMode || body.gameAccessMode,
+        pickScope: body.pickScope
+      }));
+    }
+
+    if (action === "saveLeagueFeatureAccess") {
+      return json(apiSaveLeagueFeatureAccess({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        gameId: body.gameId || "",
+        feature: body.feature,
+        accessRule: body.accessRule,
+        rolesAllowed: body.rolesAllowed,
+        usersAllowed: body.usersAllowed,
+        usersBlocked: body.usersBlocked,
+        active: body.active
+      }));
+    }
+
+    if (action === "setGameLeagueVisibility") {
+      return json(apiSetGameLeagueVisibility({
+        username: body.username,
+        token: body.token,
+        gameId: body.gameId || "",
+        leagueId: body.leagueId,
+        leagueIds: body.leagueIds,
+        accessMode: body.accessMode || body.mode,
+        pickScope: body.pickScope,
+        replace: body.replace
+      }));
+    }
+
+    if (action === "removeGameFromLeague") {
+      return json(apiRemoveGameFromLeague({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        gameId: body.gameId || ""
+      }));
+    }
+
+    if (action === "updateLeague") {
+      return json(apiUpdateLeague({
+        username: body.username,
+        token: body.token,
+        leagueId: body.leagueId,
+        leagueName: body.leagueName || body.name,
+        visibility: body.visibility,
+        accessMode: body.accessMode || body.gameAccessMode,
+        pickScope: body.pickScope,
+        gameIds: body.gameIds,
+        joinMode: body.joinMode,
+        active: body.active,
+        notes: body.notes
+      }));
+    }
+
     // =========================
     // PROFILE AVATAR UPLOAD
     // =========================
 
     if (action === "uploadProfileAvatar") {
 
-      return profileDoPost(e);
+      return json(
+        apiUploadProfileAvatar(body)
+      );
 
     }
 
@@ -211,208 +473,65 @@ function doGet(e) {
         ""
       ).trim();
 
+    apiSecurityAuthorizeRequest_(
+      action,
+      params
+    );
+
+    if (
+      action === "login" ||
+      action === "signup" ||
+      action === "requestPinReset" ||
+      action === "resetPin" ||
+      action === "saveEditableProfile" ||
+      action === "saveUserProfile" ||
+      action === "uploadProfileAvatar" ||
+      action === "savePick" ||
+      action === "saveBet" ||
+      action === "removeBet" ||
+      action === "saveSeasonAnchorPick" ||
+      action === "setNotificationPreference" ||
+      action === "createLeague" ||
+      action === "addLeagueMember" ||
+      action === "removeLeagueMember" ||
+      action === "assignGameToLeague" ||
+      action === "saveLeagueFeatureAccess" ||
+      action === "setGameLeagueVisibility" ||
+      action === "removeGameFromLeague" ||
+      action === "updateLeague"
+    ) {
+      return json({
+        success: false,
+        error: "This action requires POST."
+      });
+    }
+
     /* =========================
-       ADMIN ACTIONS
+       REQUEST CLASSIFICATION
+       All admin-prefixed actions are classified centrally.
+       League-management actions also skip the default-game fallback
+       because their game scope is optional or explicitly supplied.
     ========================= */
 
-    const adminActions = [
-      "adminGetGames",
-      "adminGetGameTypes",
-      "adminGetGameConfig",
-      "adminSaveGame",
-      "adminCreateGame",
-      "adminUpdateGame",
-      "adminArchiveGame",
-      "adminCloneGame",
-      "adminCloneGameSetup",
-      "adminAwardsGetDashboard",
-      "adminAwardsGetGameSetup",
-      "adminAwardsSearchExternalMarkets",
-      "adminAwardsGetExternalEvent",
-      "adminAwardsCreateQuestionFromMarket",
-      "adminAwardsLinkMarket",
-
-      "adminSetupRealityTvSystem",
-      "adminConfigureRealityTvHub",
-      "adminSetupExternalResultsBridge",
-      "adminGetExternalResultsBridgeHealth",
-      "adminRunExternalResultsBridgeNow",
-      "adminRetryExternalResultsBridgeFailures",
-      "adminRequeueUnverifiedExternalResultsBridgeJobs",
-      "adminGetExternalResultsInboxStatus",
-      "adminReconcileExternalResultsInbox",
-      "adminValidateExternalResultsInbox",
-      "adminApplyExternalResultsInbox",
-      "adminRetryExternalResultsInboxErrors",
-      "adminGetRealityTvDashboard",
-      "adminGetRealityTvDashboardSummary",
-      "adminGetRealityTvSeasonDetails",
-      "adminSaveRealityTvGroups",
-      "adminUpdateRealityTvContestantGroup",
-      "adminRepairRealityTvSetup",
-      "adminCreateRealityTvSeason",
-      "adminAddRealityTvContestant",
-      "adminBulkAddRealityTvContestants",
-      "adminSubmitRealityTvResult",
-      "adminFinalizeRealityTvEpisode",
-      "adminApproveRealityTvResult",
-      "adminContinueRealityTvApproval",
-      "adminGetRealityTvApprovalState",
-      "adminRejectRealityTvResult",
-      "adminCreateNextRealityTvEpisode",
-      "adminUpdateRealityTvQuestionPack",
-      "adminAddRealityTvCustomQuestionTemplate",
-      "adminDeleteRealityTvCustomQuestionTemplate",
-      "adminBuildRealityTvEpisodeQuestions",
-      "adminContinueRealityTvQuestionPackBuild",
-      "adminRepairRealityTvQuestionPack",
-      "adminSubmitRealityTvQuestionResult",
-      "adminApproveRealityTvQuestionResult",
-      "adminContinueRealityTvQuestionApproval",
-      "adminRejectRealityTvQuestionResult",
-      "adminSaveRealityTvEpisodeVote",
-      "adminSaveRealityTvEpisodeVotesBulk",
-      "adminDeleteRealityTvEpisodeVote",
-      "adminUpdateRealityTvEpisodeSchedule",
-      "adminSaveSeasonAnchorSettings",
-
-      "adminGetGameSetup",
-      "adminCreateCategory",
-      "adminCloneCategory",
-      "adminUpdateCategory",
-      "adminBulkUpdateGameSetup",
-      "adminDeleteCategory",
-      "adminArchiveCategory",
-      "adminCreateNominee",
-      "adminBulkCreateNominees",
-      "adminCloneNominee",
-      "adminUpdateNominee",
-      "adminDeleteNominee",
-      "adminArchiveNominee",
-
-      "adminUploadImage",
-
-      "adminRunGamePreflight",
-      "adminRefreshResultsCaches",
-
-      "adminSetupScoringAutomationSystem",
-      "adminRunScoringAutomation",
-      "adminGetScoringAutomationStatus",
-      "adminInstallScoringAutomationTrigger",
-      "adminUninstallScoringAutomationTrigger",
-
-      "adminSetupInternetResultsSystem",
-      "adminPullInternetResults",
-      "adminGetLastInternetImport",
-      "adminGetInternetSources",
-      "adminSaveInternetSource",
-      "adminGenerateResultSuggestions",
-      "adminGetResultSuggestions",
-      "adminApplyResultSuggestion",
-      "adminRejectResultSuggestion",
-      "adminApplyHighConfidenceSuggestions",
-      "adminParseSportsScoreboard",
-
-      "adminSetupLiveResultsSystem",
-      "adminSetLiveWinner",
-      "adminClearLiveWinner",
-
-      "adminSetupUniversalQuestionSystem",
-      "adminSetupNormalizedQuestionStorage",
-      "adminGetStorageHealth",
-      "adminGetArchiveDashboard",
-      "adminArchiveGameData",
-
-      "adminCreateSportsWager",
-      "adminCreateSportsWagersBulk",
-      "adminSettleSportsWagers",
-      "adminRefreshSportsWagerScores",
-      "adminRefreshAndSettleSportsWagers",
-      "adminAutoSetSportsWagerOdds",
-      "adminRunSportsFullSync",
-      "adminFinalizeSportsWagersFromSourceScores",
-
-      "adminSetupRacingWagerSystem",
-      "adminCreateRacingWager",
-      "adminRefreshRacingWagerScores",
-      "adminSettleRacingWagers",
-
-      "adminSetupSportsControls",
-      "adminGetSportsControlDashboard",
-      "adminGetSportsPlayerStatus",
-      "adminSyncSportsPlayers",
-      "adminRefreshSportsPlayerGameStats",
-      "adminGetSportsPlayerPropPlayers",
-      "adminGetSportsPlayerPropStatTypes",
-      "adminCreateSportsPlayerProp",
-      "adminCreateSportsPlayerMatchup",
-      "adminGetSportsAdvancedQuestionOptions",
-      "adminCreateSportsAdvancedQuestion",
-      "adminSettleSportsAdvancedQuestions",
-      "adminSetupSportsAdvancedStats",
-      "adminRefreshSportsAdvancedStats",
-      "adminGetSportsAdvancedStatsStatus",
-      "adminSettleSportsPlayerProps",
-      "adminSettleSportsPlayerMatchups",
-
-      "adminGetSportsLeagueSettings",
-      "adminUpdateSportsLeagueSetting",
-      "adminRefreshSportsScoresNow",
-      "adminRefreshSportsScoresWindow",
-      "adminInstallSportsScoresTrigger",
-      "adminRemoveSportsScoresTrigger",
-      "adminInstallSportsScoresWindowTrigger",
-      "adminRemoveSportsScoresWindowTrigger",
-      "adminInstallSportsWagerAutoSyncTrigger",
-      "adminRemoveSportsWagerAutoSyncTrigger",
-      "adminGetSportsWagerAutoSyncStatus",
-      "adminInstallSmartSportsAutomation",
-      "adminRemoveSmartSportsAutomation",
-      "adminGetSmartSportsAutomationStatus",
-      "adminFinalizeAllSportsWagerResults",
-
-      "adminCreateSportsSeasonJobs",
-      "adminRunSportsSeasonBatch",
-      "adminRunSportsScheduleReconcile",
-      "adminInstallSportsScheduleReconcileTrigger",
-      "adminRemoveSportsScheduleReconcileTrigger",
-      "adminUpdateSportsSeasonJobStatus",
-      "adminInstallSportsSeasonBatchTrigger",
-      "adminRemoveSportsSeasonBatchTrigger",
-
-      "adminGetSportsOddsSettings",
-      "adminUpdateSportsOddsSetting",
-      "adminRefreshSportsOddsLeague",
-      "adminRunSportsOddsHybridRefresh",
-      "adminInstallSportsOddsHybridTrigger",
-      "adminRemoveSportsOddsHybridTrigger",
-      "adminPreviewSportsLeagueArchive",
-      "adminRunSportsArchiveNow",
-
-      "adminSummary",
-      "adminClearCaches",
-      "adminUpdateCategorySetting",
-      "adminClearCategoryWinner",
-      "adminCreateUser",
-      "adminResetUserPin",
-      "adminToggleUserAdmin",
-      "adminToggleUserActive",
-      "getLeagueMembers",
-      "saveLeagueFeatureAccess",
-      "assignGameToLeague",
-      "removeLeagueMember",
-      "addLeagueMember",
-      "getMyLeagues",
-      "createLeague",
-      "adminSetupLeagueAccessSystem",
-      "adminGetLeagueAccessDashboard",
-      "setGameLeagueVisibility",
-      "removeGameFromLeague",
-      "updateLeague"
-    ];
-
     const isAdminAction =
-      adminActions.indexOf(action) !== -1;
+      apiSecurityIsAdminAction_(action);
+
+    const skipDefaultGameActions = {
+      getMyLeagues: true,
+      createLeague: true,
+      addLeagueMember: true,
+      removeLeagueMember: true,
+      assignGameToLeague: true,
+      saveLeagueFeatureAccess: true,
+      getLeagueMembers: true,
+      setGameLeagueVisibility: true,
+      removeGameFromLeague: true,
+      updateLeague: true
+    };
+
+    const skipDefaultGameId =
+      isAdminAction ||
+      skipDefaultGameActions[action] === true;
 
     /* =========================
        GAME ID
@@ -421,7 +540,7 @@ function doGet(e) {
     const gameId =
       params.gameId ||
       (
-        isAdminAction
+        skipDefaultGameId
           ? ""
           : getDefaultGameId()
       );
@@ -2081,7 +2200,7 @@ function doGet(e) {
 
       return json(
         getUserBreakdown(
-          params.username,
+          params.targetUsername || params.username,
           gameId
         )
       );
@@ -2136,7 +2255,7 @@ if (action === "compareUserPicks") {
 
       return json(
         getUserProfile(
-          params.username,
+          params.targetUsername || params.username,
           gameId
         )
       );
@@ -2179,7 +2298,7 @@ if (action === "compareUserPicks") {
 
       return json(
         getUserProfileHistory(
-          params.username,
+          params.targetUsername || params.username,
           params.gameId || ""
         )
       );
@@ -2200,7 +2319,7 @@ if (action === "compareUserPicks") {
       return json(
         getArchivedGameHistory(
           params.gameId || "",
-          params.username || ""
+          params.targetUsername || params.username || ""
         )
       );
 

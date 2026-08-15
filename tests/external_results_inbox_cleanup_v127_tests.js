@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { assertCurrentReleaseMarkers } = require('../tools/release_test_helpers');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
@@ -88,11 +89,7 @@ assert(adminUi.includes('__adminApiLastEndAt'), 'Admin action progress must reco
 assert(adminUi.includes('Number(button.__adminApiLastEndAt || 0) >= actionAt'), 'Fallback Starting bar must not appear after a fast API request already completed');
 assert(adminUi.includes('ADMIN_UI_LAST_ACTION = null'), 'Completed API requests must clear the pending click fallback');
 
-assert(app.includes('APP_ASSET_VERSION = "313-external-results-hub-end-to-end"'), 'v1.2.7 asset version is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end"'), 'v1.2.7 route hotfix version is missing');
+assertCurrentReleaseMarkers(assert, app, html, sw);
 assert.strictEqual(app, appCompat, 'Frontend app loader copies must match');
-assert(html.includes('313-external-results-hub-end-to-end'), 'App shell must request v1.2.7 assets');
-assert(html.includes('hotfix=v1280-external-results-hub-end-to-end'), 'App shell must request v1.2.7 route hotfix');
-assert(sw.includes('awards-app-v313-external-results-hub-end-to-end'), 'Service worker cache must advance for v1.2.7');
 
 console.log('External Results Inbox cleanup v1.2.7 tests passed.');

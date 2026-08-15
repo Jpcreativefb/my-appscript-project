@@ -1,0 +1,45 @@
+Awards App v1.2.16 — Fall Production Hardening
+
+FUNCTIONAL BACKEND
+backend/Api.js
+backend/AuthEngine.js
+backend/core/ApiSecurity.js (new)
+backend/admin/AdminTools.js
+backend/engines/AppDataEngine.js
+backend/engines/UsersEngine.js
+backend/repositories/UsersRepo.js
+
+FRONTEND
+frontend/js/api.js
+frontend/api.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+
+RELEASE / CI / TOOLS
+.github/workflows/production-checks.yml (new)
+tools/release_test_helpers.js (new)
+tools/run_production_checks.sh (new)
+tools/sync_frontend_mirrors.sh (new)
+tools/cleanup_repository_docs.sh
+
+TESTS
+tests/production_hardening_v1216_tests.js (new)
+Historical regression files that asserted obsolete cache/release strings were updated to use tools/release_test_helpers.js.
+The Reality TV question contrast loader assertion was updated to reflect the current lazy-loader architecture.
+
+DOCUMENTATION
+PRODUCTION_STATUS.md
+PRODUCTION_HARDENING_V1_2_16.md (new)
+PRODUCTION_SMOKE_TEST_V1_2_16.md (new)
+DEPLOYMENT_CHECKLIST.md
+PROJECT_STRUCTURE.md
+CHANGELOG.md
+CHANGED_FILES_V1_2_16.txt (new)
+
+REPOSITORY CLEANUP
+Historical root release notes / smoke tests / changed-file lists were moved, not deleted, to:
+docs/archive/releases/
+
+No large Sports, Racing, Awards, Reality TV, or admin engine was rewritten merely to reduce line count.

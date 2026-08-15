@@ -44,7 +44,5 @@ assert(backendApi.includes('action === "adminSaveRealityTvEpisodeVotesBulk"'), "
 assert(frontendApi.includes("async function apiAdminSaveRealityTvEpisodeVotesBulk"), "Frontend API should expose mass vote saves");
 assert.strictEqual(frontendApi, frontendApiCompat, "Both frontend API copies must remain synchronized");
 assert.strictEqual(app, appCompat, "Both app loader copies must remain synchronized");
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1118-reality-tv-bulk-question-pack"'), "New frontend modules should bypass cached v1.1.13 scripts");
-assert(html.includes("hotfix=v1118-reality-tv-bulk-question-pack"), "App shell should request the v1.1.14 route hotfix");
 
 console.log("Reality TV mass votes, approval retries, and collapsed sections v1.1.14 tests passed.");

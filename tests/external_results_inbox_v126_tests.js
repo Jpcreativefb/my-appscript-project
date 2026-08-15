@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { assertCurrentReleaseMarkers } = require('../tools/release_test_helpers');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
@@ -54,11 +55,8 @@ assert(admin.includes('External Results Inbox'), 'Main Admin External Results In
 assert(admin.includes('Validate Ready'), 'Inbox validation button is missing');
 assert(admin.includes('Apply Validated'), 'Inbox apply button is missing');
 assert(admin.includes('Automatic apply OFF'), 'Inbox UI must clearly show automatic apply is disabled');
-assert(app.includes('APP_ASSET_VERSION = "313-external-results-hub-end-to-end"'), 'v1.2.6 asset cache version is missing');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end"'), 'v1.2.6 route cache version is missing');
+assertCurrentReleaseMarkers(assert, app, html, sw);
 assert.strictEqual(app, appCompat, 'Both app-loader copies must match');
-assert(html.includes('313-external-results-hub-end-to-end'), 'App shell must request v1.2.6 assets');
-assert(sw.includes('awards-app-v313-external-results-hub-end-to-end'), 'Service worker cache must advance for v1.2.6');
 
 const pushFn = functionSource(hubBridge, 'pushApprovedExternalResultsNow');
 assert(pushFn.includes('ExternalResultsInbox'), 'Hub must still deliver only to ExternalResultsInbox');

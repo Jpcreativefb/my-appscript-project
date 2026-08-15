@@ -65,6 +65,7 @@ function ensureUsersColumns_(){
     "DisplayName",
     "RealName",
     "AccountStatus",
+    "Active",
     "PreferredContactMethod",
     "NotificationOptIn",
     "NotificationChannel",
@@ -100,6 +101,19 @@ function ensureUsersColumns_(){
     }
 
   });
+
+  try {
+    if (typeof migrateLegacyUserCredentialsV1216_ === "function") {
+      migrateLegacyUserCredentialsV1216_();
+    }
+  } catch (err) {
+    // Do not block authentication if the one-time migration is temporarily
+    // unable to acquire a lock; legacy verification remains supported.
+    Logger.log(
+      "Credential migration deferred: " +
+      (err && err.message ? err.message : String(err))
+    );
+  }
 
   return headers;
 

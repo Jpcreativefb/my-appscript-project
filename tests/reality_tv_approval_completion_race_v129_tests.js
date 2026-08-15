@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { assertCurrentReleaseMarkers } = require('../tools/release_test_helpers');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
@@ -19,10 +20,8 @@ assert(season.includes('Approved is authoritative; normalize the'), 'Approval-st
 assert(season.includes('PushStatus: "PUSHED"') && season.includes('ApprovalStage: "COMPLETE"'), 'Approved queue repair must canonicalize PUSHED/COMPLETE');
 assert(ui.includes('if (reviewStatus === "APPROVED") stage = "COMPLETE";'), 'Frontend must always render approved queues as complete');
 assert(ui.includes('kind === "question" ? 120 : 420'), 'Main approval stall UI must use the longer episode lease');
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1290-reality-tv-approval-race-fix"'), 'Route cache marker must be bumped');
+assertCurrentReleaseMarkers(assert, app, html, sw);
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1290-reality-tv-approval-race-fix'), 'App shell must load the new route cache marker');
-assert(sw.includes('awards-app-v314-reality-tv-approval-race-fix'), 'Service worker cache must be bumped');
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
 vm.createContext(runtime);

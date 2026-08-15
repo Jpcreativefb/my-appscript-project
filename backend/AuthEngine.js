@@ -1,3 +1,61 @@
+/* =========================================================
+   AUTH RATE LIMITING — v1.2.16
+========================================================= */
+
+function authRateLimitKey_(prefix, identifier){
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    String(identifier || "").trim().toLowerCase()
+  );
+  return String(prefix || "auth") + ":" + authBytesToText_(bytes).slice(0, 32);
+}
+
+function authLoginRateState_(identifier){
+  const cache = CacheService.getScriptCache();
+  const key = authRateLimitKey_("auth-login", identifier);
+  const raw = cache.get(key);
+  let state = { failures: 0, blockedUntil: 0 };
+  if (raw) {
+    try { state = JSON.parse(raw) || state; } catch (err) {}
+  }
+  return { cache: cache, key: key, state: state };
+}
+
+function authCheckLoginRate_(identifier){
+  const item = authLoginRateState_(identifier);
+  return Number(item.state.blockedUntil || 0) <= Date.now();
+}
+
+function authRecordLoginFailure_(identifier){
+  const item = authLoginRateState_(identifier);
+  const failures = Number(item.state.failures || 0) + 1;
+  const blockedUntil = failures >= 5
+    ? Date.now() + 15 * 60 * 1000
+    : Number(item.state.blockedUntil || 0);
+  item.cache.put(
+    item.key,
+    JSON.stringify({ failures: failures, blockedUntil: blockedUntil }),
+    60 * 60
+  );
+}
+
+function authClearLoginFailures_(identifier){
+  CacheService.getScriptCache().remove(
+    authRateLimitKey_("auth-login", identifier)
+  );
+}
+
+function authAllowResetRequest_(identifier){
+  const cache = CacheService.getScriptCache();
+  const key = authRateLimitKey_("auth-reset", identifier);
+  const count = Number(cache.get(key) || 0);
+  if (count >= 3) {
+    return false;
+  }
+  cache.put(key, String(count + 1), 30 * 60);
+  return true;
+}
+
 function loginUser(
   username,
   pin,
@@ -11,6 +69,13 @@ function loginUser(
   pin =
     String(pin || "")
       .trim();
+
+  if (!authCheckLoginRate_(username)) {
+    return {
+      success: false,
+      message: "Too many login attempts. Try again in about 15 minutes."
+    };
+  }
 
   if (!username || !pin) {
 
@@ -28,6 +93,8 @@ function loginUser(
 
   if (!record) {
 
+    authRecordLoginFailure_(username);
+
     return {
       success: false,
       message: "Invalid login"
@@ -38,17 +105,7 @@ function loginUser(
   const col =
     record.col;
 
-  const status =
-    col.accountStatus > -1
-      ? String(record.row[col.accountStatus] || "active")
-          .trim()
-          .toLowerCase()
-      : "active";
-
-  if (
-    status &&
-    status !== "active"
-  ) {
+  if (!isUserRecordActive_(record)) {
 
     return {
       success: false,
@@ -64,7 +121,9 @@ function loginUser(
           .trim()
       : "";
 
-  if (storedPin !== pin) {
+  if (!verifyStoredUserPin_(storedPin, pin)) {
+
+    authRecordLoginFailure_(username);
 
     return {
       success: false,
@@ -72,6 +131,8 @@ function loginUser(
     };
 
   }
+
+  authClearLoginFailures_(username);
 
   const token =
     Utilities.getUuid();
@@ -108,14 +169,20 @@ function loginUser(
       60 * 60 * 6
     );
 
+  const loginUpdates = {
+    sessionToken: hashSessionTokenForStorage_(token),
+    sessionExpiresAt: sessionExpiresAt,
+    lastLogin: new Date().toISOString(),
+    lastUpdated: new Date().toISOString()
+  };
+
+  if (isLegacyStoredUserPin_(storedPin)) {
+    loginUpdates.pin = hashUserPinForStorage_(pin);
+  }
+
   updateUserFields_(
     record.rowNumber,
-    {
-      sessionToken: token,
-      sessionExpiresAt: sessionExpiresAt,
-      lastLogin: new Date().toISOString(),
-      lastUpdated: new Date().toISOString()
-    }
+    loginUpdates
   );
 
   const isAdminUser =
@@ -160,15 +227,6 @@ function getUsernameFromSessionToken_(token){
 
   if (!token) {
     return "";
-  }
-
-  const cachedUsername =
-    CacheService
-      .getScriptCache()
-      .get(token) || "";
-
-  if (cachedUsername) {
-    return cachedUsername;
   }
 
   const record =
@@ -234,7 +292,7 @@ function findUserRecordBySessionToken_(token){
       String(record.row[col.sessionToken] || "")
         .trim();
 
-    if (rowToken !== token) {
+    if (!storedSessionTokenMatches_(rowToken, token)) {
       continue;
     }
 
@@ -253,18 +311,18 @@ function findUserRecordBySessionToken_(token){
       return null;
     }
 
-    const status =
-      col.accountStatus > -1
-        ? String(record.row[col.accountStatus] || "active")
-            .trim()
-            .toLowerCase()
-        : "active";
-
-    if (
-      status &&
-      status !== "active"
-    ) {
+    if (!isUserRecordActive_(record)) {
       return null;
+    }
+
+    if (rowToken && rowToken.indexOf("sha256$") !== 0) {
+      updateUserFields_(
+        record.rowNumber,
+        {
+          sessionToken: hashSessionTokenForStorage_(token),
+          lastUpdated: new Date().toISOString()
+        }
+      );
     }
 
     return record;
@@ -284,24 +342,6 @@ function validateSessionToken(token){
     findUserRecordBySessionToken_(
       token
     );
-
-  if (!record) {
-
-    const cachedUsername =
-      CacheService
-        .getScriptCache()
-        .get(token) || "";
-
-    if (cachedUsername) {
-
-      record =
-        findUserRecordByUsername_(
-          cachedUsername
-        );
-
-    }
-
-  }
 
   if (!record) {
 

@@ -47,6 +47,7 @@ function getUsersColumnMap_(headers){
     displayName: idx(["DisplayName"]),
     realName: idx(["RealName", "Real Name", "Name"]),
     accountStatus: idx(["AccountStatus"]),
+    active: idx(["Active"]),
 
     preferredContactMethod: idx(["PreferredContactMethod"]),
     notificationOptIn: idx(["NotificationOptIn"]),
@@ -87,6 +88,7 @@ function getUsersFieldIndex_(col, field){
     displayName: col.displayName,
     realName: col.realName,
     accountStatus: col.accountStatus,
+    active: col.active,
     preferredContactMethod: col.preferredContactMethod,
     notificationOptIn: col.notificationOptIn,
     notificationChannel: col.notificationChannel,
@@ -239,6 +241,205 @@ function validatePin_(pin){
 
 }
 
+/* =========================
+   CREDENTIAL STORAGE
+   PINs are peppered + salted before being stored in Sheets.
+   Legacy plaintext PINs remain readable only long enough to migrate
+   automatically after a successful login.
+========================= */
+
+function getAuthPinPepper_(){
+
+  const props = PropertiesService.getScriptProperties();
+  const key = "AUTH_PIN_PEPPER_V1";
+  let pepper = String(props.getProperty(key) || "").trim();
+
+  if (!pepper) {
+    pepper = Utilities.getUuid() + Utilities.getUuid();
+    props.setProperty(key, pepper);
+  }
+
+  return pepper;
+
+}
+
+function authBytesToText_(bytes){
+  return Utilities.base64EncodeWebSafe(bytes).replace(/=+$/g, "");
+}
+
+function authConstantTimeEquals_(left, right){
+
+  left = String(left || "");
+  right = String(right || "");
+
+  let mismatch = left.length ^ right.length;
+  const maxLength = Math.max(left.length, right.length);
+
+  for (let i = 0; i < maxLength; i++) {
+    mismatch |= (left.charCodeAt(i) || 0) ^ (right.charCodeAt(i) || 0);
+  }
+
+  return mismatch === 0;
+
+}
+
+function hashUserPinForStorage_(pin){
+
+  pin = String(pin || "").trim();
+
+  if (!validatePin_(pin)) {
+    throw new Error("PIN must be 4 digits");
+  }
+
+  const salt = Utilities.getUuid().replace(/-/g, "");
+  const signature = Utilities.computeHmacSha256Signature(
+    salt + ":" + pin,
+    getAuthPinPepper_()
+  );
+
+  return "hmac-sha256-v1$" + salt + "$" + authBytesToText_(signature);
+
+}
+
+function verifyStoredUserPin_(storedPin, candidatePin){
+
+  const stored = String(storedPin || "").replace(/^'/, "").trim();
+  const candidate = String(candidatePin || "").trim();
+
+  if (stored.indexOf("hmac-sha256-v1$") === 0) {
+    const parts = stored.split("$");
+    if (parts.length !== 3 || !parts[1] || !parts[2]) {
+      return false;
+    }
+
+    const signature = Utilities.computeHmacSha256Signature(
+      parts[1] + ":" + candidate,
+      getAuthPinPepper_()
+    );
+
+    return authConstantTimeEquals_(
+      parts[2],
+      authBytesToText_(signature)
+    );
+  }
+
+  // Backward-compatible migration path for pre-v1.2.16 Users rows.
+  return authConstantTimeEquals_(stored, candidate);
+
+}
+
+function isLegacyStoredUserPin_(storedPin){
+  const stored = String(storedPin || "").replace(/^'/, "").trim();
+  return !!stored && stored.indexOf("hmac-sha256-v1$") !== 0;
+}
+
+function hashSessionTokenForStorage_(token){
+
+  token = String(token || "").trim();
+  if (!token) {
+    return "";
+  }
+
+  const bytes = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    token
+  );
+
+  return "sha256$" + authBytesToText_(bytes);
+
+}
+
+function migrateLegacyUserCredentialsV1216_(){
+
+  const props = PropertiesService.getScriptProperties();
+  const migrationKey = "USER_CREDENTIAL_STORAGE_V1216_MIGRATED";
+
+  if (String(props.getProperty(migrationKey) || "") === "true") {
+    return { migratedPins: 0, migratedSessions: 0, alreadyComplete: true };
+  }
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(1)) {
+    return { migratedPins: 0, migratedSessions: 0, deferred: true };
+  }
+
+  try {
+    const sheet = getUsersSheet_();
+    const lastRow = sheet.getLastRow();
+    const lastColumn = sheet.getLastColumn();
+
+    if (lastRow <= 1 || lastColumn <= 0) {
+      props.setProperty(migrationKey, "true");
+      return { migratedPins: 0, migratedSessions: 0 };
+    }
+
+    const headers = sheet
+      .getRange(1, 1, 1, lastColumn)
+      .getValues()[0]
+      .map(h => String(h || "").trim());
+    const col = getUsersColumnMap_(headers);
+    const rows = sheet.getRange(2, 1, lastRow - 1, lastColumn).getValues();
+
+    let migratedPins = 0;
+    let migratedSessions = 0;
+
+    rows.forEach((row, index) => {
+      const sheetRow = index + 2;
+
+      if (col.pin > -1) {
+        const storedPin = String(row[col.pin] || "").replace(/^'/, "").trim();
+        if (isLegacyStoredUserPin_(storedPin) && validatePin_(storedPin)) {
+          sheet.getRange(sheetRow, col.pin + 1)
+            .setValue(hashUserPinForStorage_(storedPin));
+          migratedPins += 1;
+        }
+      }
+
+      if (col.sessionToken > -1) {
+        const storedToken = String(row[col.sessionToken] || "").trim();
+        if (storedToken && storedToken.indexOf("sha256$") !== 0) {
+          sheet.getRange(sheetRow, col.sessionToken + 1)
+            .setValue(hashSessionTokenForStorage_(storedToken));
+          migratedSessions += 1;
+        }
+      }
+    });
+
+    props.setProperty(migrationKey, "true");
+
+    return {
+      migratedPins: migratedPins,
+      migratedSessions: migratedSessions,
+      alreadyComplete: false
+    };
+
+  } finally {
+    lock.releaseLock();
+  }
+
+}
+
+function storedSessionTokenMatches_(storedToken, rawToken){
+
+  const stored = String(storedToken || "").trim();
+  const raw = String(rawToken || "").trim();
+
+  if (!stored || !raw) {
+    return false;
+  }
+
+  if (stored.indexOf("sha256$") === 0) {
+    return authConstantTimeEquals_(
+      stored,
+      hashSessionTokenForStorage_(raw)
+    );
+  }
+
+  // Legacy v1.2.15 and older session rows.
+  return authConstantTimeEquals_(stored, raw);
+
+}
+
 function validateEmail_(email){
 
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
@@ -298,6 +499,43 @@ function getUsers(){
       String(record.user["Username"] || "").trim()
     )
     .filter(username => username !== "");
+
+}
+
+function isUserRecordActive_(record) {
+
+  if (!record || !record.col) {
+    return false;
+  }
+
+  const col = record.col;
+  const row = record.row || [];
+
+  if (col.accountStatus > -1) {
+    const status = String(row[col.accountStatus] || "").trim().toLowerCase();
+    if (status && status !== "active") {
+      return false;
+    }
+  }
+
+  if (col.active > -1) {
+    const value = row[col.active];
+    const text = String(value === undefined || value === null ? "" : value)
+      .trim()
+      .toLowerCase();
+    if (
+      value === false ||
+      text === "false" ||
+      text === "no" ||
+      text === "0" ||
+      text === "inactive" ||
+      text === "disabled"
+    ) {
+      return false;
+    }
+  }
+
+  return true;
 
 }
 
@@ -526,7 +764,7 @@ function createUser(
     }
 
     set("username", username);
-    set("pin", "'" + pin);
+    set("pin", hashUserPinForStorage_(pin));
     set("isAdmin", false);
     set("avatar", "default");
     set("themeColor", "#000000");
@@ -539,6 +777,7 @@ function createUser(
     set("displayName", realName || username);
     set("realName", realName);
     set("accountStatus", "active");
+    set("active", true);
     set("preferredContactMethod", preferredContactMethod);
     set("notificationOptIn", wantsNotifications);
     set("notificationChannel", preferredContactMethod);
@@ -589,6 +828,13 @@ function requestPinReset(identifier){
   };
 
   if (!identifier) {
+    return genericResponse;
+  }
+
+  if (
+    typeof authAllowResetRequest_ === "function" &&
+    !authAllowResetRequest_(identifier)
+  ) {
     return genericResponse;
   }
 
@@ -726,7 +972,9 @@ function resetPin(identifier, resetCode, newPin){
   updateUserFields_(
     record.rowNumber,
     {
-      pin: "'" + newPin,
+      pin: hashUserPinForStorage_(newPin),
+      sessionToken: "",
+      sessionExpiresAt: "",
       resetCodeHash: "",
       resetCodeExpiresAt: "",
       resetRequestedAt: "",

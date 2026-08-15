@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
+const { assertCurrentReleaseMarkers } = require('../tools/release_test_helpers');
 const vm = require('vm');
 
 const root = path.resolve(__dirname, '..');
@@ -141,10 +142,6 @@ assert(pushFn.includes('ExternalResultsInbox'), 'Hub must deliver only to Extern
 assert(!pushFn.includes('CategoryResults'), 'Hub must never settle CategoryResults directly');
 
 // Current frontend checkpoint.
-assert(app.includes('APP_ASSET_VERSION = "313-external-results-hub-end-to-end"'));
-assert(app.includes('APP_ROUTE_HOTFIX_VERSION = "v1280-external-results-hub-end-to-end"'));
-assert(html.includes('313-external-results-hub-end-to-end'));
-assert(html.includes('hotfix=v1280-external-results-hub-end-to-end'));
-assert(sw.includes('awards-app-v313-external-results-hub-end-to-end'));
+assertCurrentReleaseMarkers(assert, app, html, sw);
 
 console.log('External Results Hub end-to-end v1.2.8 tests passed.');

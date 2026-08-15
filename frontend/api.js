@@ -22,6 +22,43 @@ function apiRequestId_(action) {
   return String(action || "api") + "-" + Date.now() + "-" + Math.floor(Math.random() * 1000000);
 }
 
+const API_NO_SESSION_ACTIONS_ = new Set([
+  "health",
+  "login",
+  "signup",
+  "requestPinReset",
+  "resetPin"
+]);
+
+function apiAttachSession_(action, params) {
+
+  const next = { ...(params || {}) };
+
+  if (API_NO_SESSION_ACTIONS_.has(String(action || ""))) {
+    return next;
+  }
+
+  let session = {};
+
+  try {
+    session = typeof getSession === "function"
+      ? (getSession() || {})
+      : {};
+  } catch (err) {
+    session = {};
+  }
+
+  if (!next.token && session.token) {
+    next.token = session.token;
+  }
+
+  if (!next.username && session.username) {
+    next.username = session.username;
+  }
+
+  return next;
+}
+
 /* ======================
    GENERIC API FETCH / JSONP
 ====================== */
@@ -339,6 +376,7 @@ async function apiRaw_(action, params = {}) {
 }
 
 async function api(action, params = {}) {
+  params = apiAttachSession_(action, params);
   const requestId = apiRequestId_(action);
   apiDispatchEvent_("awards:api-start", { requestId: requestId, action: action, method: "GET" });
   let result = null;
@@ -361,6 +399,8 @@ async function api(action, params = {}) {
 ====================== */
 
 async function apiPostRaw_(action, payload = {}) {
+
+  payload = apiAttachSession_(action, payload);
 
   try {
 
@@ -462,7 +502,7 @@ async function apiPost(action, payload = {}) {
 
 async function apiLogin(username, pin, rememberMe) {
 
-  return api("login", {
+  return apiPost("login", {
     username,
     pin,
     rememberMe:
@@ -483,7 +523,7 @@ async function apiValidateSession(token) {
 
 async function apiSignup(username, realName, pin, email, phone, contactMethod) {
 
-  return api("signup", {
+  return apiPost("signup", {
     username,
     realName,
     pin,
@@ -496,7 +536,7 @@ async function apiSignup(username, realName, pin, email, phone, contactMethod) {
 
 async function apiRequestPinReset(identifier) {
 
-  return api("requestPinReset", {
+  return apiPost("requestPinReset", {
     identifier
   });
 
@@ -504,7 +544,7 @@ async function apiRequestPinReset(identifier) {
 
 async function apiResetPin(identifier, resetCode, newPin) {
 
-  return api("resetPin", {
+  return apiPost("resetPin", {
     identifier,
     resetCode,
     newPin
@@ -522,7 +562,7 @@ async function apiGetNotificationPreference(token) {
 
 async function apiSetNotificationPreference(token, contactMethod, email, phone) {
 
-  return api("setNotificationPreference", {
+  return apiPost("setNotificationPreference", {
     token,
     contactMethod,
     email,
@@ -565,7 +605,7 @@ async function apiGetEditableProfile(username, gameId) {
 
 async function apiSaveEditableProfile(profile) {
 
-  return api("saveEditableProfile", profile);
+  return apiPost("saveEditableProfile", profile);
 
 }
 
@@ -610,7 +650,7 @@ async function apiGetMyPicks(username, gameId) {
 
 async function apiSavePick(payload) {
 
-  return api("savePick", {
+  return apiPost("savePick", {
     username:
       payload.username,
 
@@ -670,7 +710,7 @@ async function apiGetRealityTvEpisodeComparison(gameId) {
 
 async function apiSaveSeasonAnchorPick(gameId, entityId) {
   const session = getSession ? getSession() : {};
-  return api("saveSeasonAnchorPick", {
+  return apiPost("saveSeasonAnchorPick", {
     username: session.username || "",
     token: session.token || "",
     gameId: gameId,
@@ -730,7 +770,7 @@ async function apiLiveGameState(gameId) {
 async function apiGetUserBreakdown(username, gameId) {
 
   return api("userBreakdown", {
-    username,
+    targetUsername: username,
     gameId,
     leagueId: getApiLeagueId_()
   });
@@ -752,7 +792,7 @@ async function apiLeaderboard(gameId) {
 async function apiGetUserProfile(username, gameId) {
 
   return api("getUserProfile", {
-    username,
+    targetUsername: username,
     gameId
   });
 
@@ -763,7 +803,7 @@ async function apiGetUserProfileHistory(username, gameId) {
   const session = getSession();
 
   return api("getUserProfileHistory", {
-    username,
+    targetUsername: username,
     gameId: gameId || "",
     token: session && session.token ? session.token : ""
   });
@@ -776,7 +816,7 @@ async function apiGetArchivedGameHistory(gameId, username) {
 
   return api("getArchivedGameHistory", {
     gameId,
-    username: username || "",
+    targetUsername: username || "",
     token: session && session.token ? session.token : ""
   });
 
@@ -873,7 +913,7 @@ async function apiCreateLeague(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("createLeague", {
+  return apiPost("createLeague", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId,
@@ -893,7 +933,7 @@ async function apiAddLeagueMember(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("addLeagueMember", {
+  return apiPost("addLeagueMember", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -919,7 +959,7 @@ async function apiAssignGameToLeague(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("assignGameToLeague", {
+  return apiPost("assignGameToLeague", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -947,7 +987,7 @@ async function apiRemoveLeagueMember(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("removeLeagueMember", {
+  return apiPost("removeLeagueMember", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -961,7 +1001,7 @@ async function apiSaveLeagueFeatureAccess(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("saveLeagueFeatureAccess", {
+  return apiPost("saveLeagueFeatureAccess", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -993,7 +1033,7 @@ async function apiSetGameLeagueVisibility(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("setGameLeagueVisibility", {
+  return apiPost("setGameLeagueVisibility", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     gameId: payload.gameId || getFrontendGameId() || "",
@@ -1011,7 +1051,7 @@ async function apiRemoveGameFromLeague(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("removeGameFromLeague", {
+  return apiPost("removeGameFromLeague", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -1025,7 +1065,7 @@ async function apiUpdateLeague(payload) {
   const session = getSession ? getSession() : {};
   payload = payload || {};
 
-  return api("updateLeague", {
+  return apiPost("updateLeague", {
     username: session && session.username ? session.username : "",
     token: session && session.token ? session.token : "",
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -2736,7 +2776,7 @@ async function apiSaveBet(payload) {
 
   payload = payload || {};
 
-  return api("saveBet", {
+  return apiPost("saveBet", {
     username: payload.username,
     gameId: payload.gameId,
     leagueId: payload.leagueId || getApiLeagueId_(),
@@ -2763,7 +2803,7 @@ async function apiRemoveBet(payload) {
 
   payload = payload || {};
 
-  return api("removeBet", {
+  return apiPost("removeBet", {
     username: payload.username,
     gameId: payload.gameId,
     leagueId: payload.leagueId || getApiLeagueId_(),

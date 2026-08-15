@@ -32,9 +32,7 @@ assert(questions.includes('ApprovalStageStartedAt: now'), 'Question approval sta
 assert(/completedStages < (?:60|120)/.test(ui), 'Main approval loop must allow enough calls for large question packs');
 assert(css.includes('.reality-tv-approval-progress-track'), 'Approval progress-bar styles are missing');
 assert(css.includes('@keyframes realityTvApprovalShimmer'), 'Working animation is missing');
-assert(app.includes('v1118-reality-tv-bulk-question-pack'), 'New route cache key is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');
-assert(html.includes('hotfix=v1118-reality-tv-bulk-question-pack'), 'App shell cache key is missing');
 
 
 const runtime = { console, Date, JSON, Math, Number, String, Array, Object, Error };
