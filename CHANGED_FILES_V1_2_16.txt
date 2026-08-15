@@ -209,3 +209,5 @@ tests/game_startup_performance_v1216_tests.js
 GAME_LOAD_QUESTION_CONTROLS_HOTFIX_V1_2_16.md (new)
 PRODUCTION_STATUS.md
 CHANGELOG.md
+HOME_DASHBOARD_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md
+tests/dashboard_startup_batch_progress_v1216_tests.js

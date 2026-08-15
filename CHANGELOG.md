@@ -1,3 +1,8 @@
+
+## v1.2.16 — Home Dashboard Startup Performance Hotfix
+- Batched Home progress calculation across active games instead of per-game Categories/Picks/Bets reads.
+- Past Games no longer perform live pick/wager progress work during initial Dashboard startup.
+- Added regression coverage for the batched Dashboard progress snapshot.
 ## v1.2.16 — Game Load + Question Controls Hotfix
 
 - Removed automatic legacy-to-normalized synchronization from normal player/game category reads; migration work now remains an explicit admin/migration concern.

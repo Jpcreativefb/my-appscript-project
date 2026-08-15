@@ -238,6 +238,26 @@ function apiGetDashboardGamesHub(payload) {
   const activeGames = [];
   const pastGames = [];
 
+  // Home used to calculate category/pick/wager progress separately for every
+  // game card.  As the archive grew this created an N x games sheet-read
+  // pattern and made the initial Dashboard much slower than opening a game.
+  // Build one compact progress snapshot for active games only.  Past games are
+  // archive cards and do not need live completion counts during Home startup.
+  const activeGameIdsForProgress = games
+    .filter(function(game) {
+      return game && game.gameId && game.active === true && isDashboardPastGame_(game) !== true;
+    })
+    .map(function(game) {
+      return String(game.gameId || "").trim();
+    })
+    .filter(Boolean);
+
+  const dashboardProgressContext =
+    buildDashboardProgressContext_(
+      username,
+      activeGameIdsForProgress
+    );
+
   games.forEach(game => {
 
     if (!game || !game.gameId) {
@@ -256,7 +276,8 @@ function apiGetDashboardGamesHub(payload) {
         buildDashboardGameHubItemLite_(
           game,
           username,
-          false
+          false,
+          dashboardProgressContext
         )
       );
 
@@ -270,7 +291,8 @@ function apiGetDashboardGamesHub(payload) {
         buildDashboardGameHubItemLite_(
           game,
           username,
-          true
+          true,
+          dashboardProgressContext
         )
       );
 
@@ -359,7 +381,8 @@ function isDashboardPastGame_(game) {
 function buildDashboardGameHubItemLite_(
   game,
   username,
-  isPast
+  isPast,
+  progressContext
 ) {
 
   game =
@@ -383,7 +406,11 @@ function buildDashboardGameHubItemLite_(
       username,
       mode,
       {
-        suppressProgress: isSeasonHub
+        // Archive cards do not need live progress and season hubs own their
+        // progress inside the season view.  Skipping both keeps Home startup
+        // independent from the number of historical games.
+        suppressProgress: isSeasonHub || isPast === true,
+        progressContext: progressContext || null
       }
     );
 
@@ -595,10 +622,16 @@ function getDashboardGameProgressLite_(
   const gameId =
     String(game.gameId || "").trim();
 
+  const progressContext =
+    options.progressContext || null;
+
+  const progressGameKey =
+    dashboardProgressGameKey_(gameId);
+
   const totalCategories =
-    getDashboardTotalCategories_(
-      gameId
-    );
+    progressContext && progressContext.totalCategoriesByGame
+      ? Number(progressContext.totalCategoriesByGame[progressGameKey] || 0)
+      : getDashboardTotalCategories_(gameId);
 
   if (
     options.suppressProgress === true ||
@@ -625,16 +658,20 @@ function getDashboardGameProgressLite_(
   }
 
   const pickCategoryIds =
-    getDashboardUserPickCategoryIdsDirect_(
-      gameId,
-      username
-    );
+    progressContext && progressContext.pickCategoryIdsByGame
+      ? (progressContext.pickCategoryIdsByGame[progressGameKey] || [])
+      : getDashboardUserPickCategoryIdsDirect_(
+          gameId,
+          username
+        );
 
   const betCategoryIds =
-    getDashboardUserBetCategoryIdsDirect_(
-      gameId,
-      username
-    );
+    progressContext && progressContext.betCategoryIdsByGame
+      ? (progressContext.betCategoryIdsByGame[progressGameKey] || [])
+      : getDashboardUserBetCategoryIdsDirect_(
+          gameId,
+          username
+        );
 
   const pickCount =
     pickCategoryIds.length;
@@ -754,6 +791,252 @@ function getDashboardGameProgressLite_(
       totalCategories: totalCategories
     }
   };
+
+}
+
+function dashboardProgressGameKey_(value) {
+
+  return String(value || "")
+    .trim()
+    .toLowerCase();
+
+}
+
+function buildDashboardProgressContext_(
+  username,
+  gameIds
+) {
+
+  username = String(username || "").trim();
+
+  const requestedGames = {};
+
+  (Array.isArray(gameIds) ? gameIds : [])
+    .forEach(function(gameId) {
+      const key = dashboardProgressGameKey_(gameId);
+      if (key) requestedGames[key] = true;
+    });
+
+  const context = {
+    totalCategoriesByGame: {},
+    pickCategoryIdsByGame: {},
+    betCategoryIdsByGame: {}
+  };
+
+  const requestedKeys = Object.keys(requestedGames);
+
+  requestedKeys.forEach(function(key) {
+    context.totalCategoriesByGame[key] = 0;
+    context.pickCategoryIdsByGame[key] = [];
+    context.betCategoryIdsByGame[key] = [];
+  });
+
+  if (!requestedKeys.length) {
+    return context;
+  }
+
+  buildDashboardCategoryTotalsIntoContext_(context, requestedGames);
+  buildDashboardPickProgressIntoContext_(context, requestedGames, username);
+  buildDashboardBetProgressIntoContext_(context, requestedGames, username);
+
+  return context;
+
+}
+
+function buildDashboardCategoryTotalsIntoContext_(
+  context,
+  requestedGames
+) {
+
+  if (typeof getAllCategoriesData_ !== "function") {
+    return;
+  }
+
+  try {
+
+    const data = getAllCategoriesData_() || [];
+
+    if (data.length <= 1) return;
+
+    const headers = data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+    const col = getCategoriesColumnMap_(headers);
+    validateCategoriesColumns_(col);
+
+    const seenByGame = {};
+
+    for (let i = 1; i < data.length; i++) {
+
+      const row = data[i];
+      const gameKey = dashboardProgressGameKey_(row[col.gameId]);
+
+      if (!requestedGames[gameKey]) continue;
+
+      const active =
+        col.active > -1
+          ? normalizeBoolean_(row[col.active])
+          : true;
+
+      if (!active) continue;
+
+      const categoryName = String(row[col.category] || "").trim();
+      const nomineeName = String(row[col.nominee] || "").trim();
+      const categoryId = String(row[col.categoryId] || "").trim().toLowerCase();
+
+      if (!categoryName || !nomineeName || !categoryId) continue;
+
+      if (!seenByGame[gameKey]) seenByGame[gameKey] = {};
+      seenByGame[gameKey][categoryId] = true;
+    }
+
+    Object.keys(seenByGame).forEach(function(gameKey) {
+      context.totalCategoriesByGame[gameKey] =
+        Object.keys(seenByGame[gameKey]).length;
+    });
+
+  } catch (err) {
+
+    // Dashboard progress is helpful but must never prevent Home from loading.
+
+  }
+
+}
+
+function buildDashboardPickProgressIntoContext_(
+  context,
+  requestedGames,
+  username
+) {
+
+  if (typeof getAllPicksData_ !== "function") {
+    return;
+  }
+
+  try {
+
+    const data = getAllPicksData_() || [];
+
+    if (data.length <= 1) return;
+
+    const headers = data[0];
+    const col = getPicksColumnMap_(headers);
+    validatePickColumns_(col);
+
+    const userKey = normalizeLower_(username);
+    const latestByGame = {};
+
+    for (let i = 1; i < data.length; i++) {
+
+      const row = data[i];
+      const gameKey = dashboardProgressGameKey_(row[col.gameId]);
+
+      if (!requestedGames[gameKey]) continue;
+      if (normalizeLower_(row[col.username]) !== userKey) continue;
+
+      const categoryId = normalizeString_(row[col.category]);
+      if (!categoryId) continue;
+
+      const timestamp = new Date(row[col.lastUpdated] || row[col.timestamp]);
+
+      if (!latestByGame[gameKey]) latestByGame[gameKey] = {};
+
+      const existing = latestByGame[gameKey][categoryId];
+
+      if (!existing || existing.timestamp < timestamp) {
+        latestByGame[gameKey][categoryId] = {
+          nomineeId: normalizeString_(row[col.nominee]),
+          timestamp: timestamp
+        };
+      }
+    }
+
+    Object.keys(latestByGame).forEach(function(gameKey) {
+      context.pickCategoryIdsByGame[gameKey] =
+        Object.keys(latestByGame[gameKey])
+          .filter(function(categoryId) {
+            return !!latestByGame[gameKey][categoryId].nomineeId;
+          });
+    });
+
+  } catch (err) {
+
+    // Home still renders even if optional progress cannot be computed.
+
+  }
+
+}
+
+function buildDashboardBetProgressIntoContext_(
+  context,
+  requestedGames,
+  username
+) {
+
+  if (typeof getAllBetsData_ !== "function") {
+    return;
+  }
+
+  try {
+
+    const data = getAllBetsData_() || [];
+
+    if (data.length <= 1) return;
+
+    const headers = data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+    const col = getBetsColumnMap_(headers);
+    validateBetsColumns_(col);
+
+    const userKey = normalizeBetKey_(username);
+    const latestByGame = {};
+
+    for (let i = 1; i < data.length; i++) {
+
+      const row = data[i];
+      const gameKey = dashboardProgressGameKey_(row[col.gameId]);
+
+      if (!requestedGames[gameKey]) continue;
+      if (normalizeBetKey_(row[col.username]) !== userKey) continue;
+
+      const categoryId = normalizeBetKey_(row[col.categoryId]);
+      const nomineeId = normalizeBetKey_(row[col.nomineeId]);
+      const betAmount = roundBetMoney_(row[col.betAmount]);
+
+      if (!categoryId || !nomineeId || betAmount <= 0) continue;
+
+      const timestamp = new Date(
+        row[col.lastUpdated] ||
+        row[col.timestamp] ||
+        new Date()
+      );
+
+      if (!latestByGame[gameKey]) latestByGame[gameKey] = {};
+
+      const existing = latestByGame[gameKey][categoryId];
+
+      if (!existing || existing.timestamp < timestamp) {
+        latestByGame[gameKey][categoryId] = {
+          nomineeId: nomineeId,
+          betAmount: betAmount,
+          timestamp: timestamp
+        };
+      }
+    }
+
+    Object.keys(latestByGame).forEach(function(gameKey) {
+      context.betCategoryIdsByGame[gameKey] =
+        Object.keys(latestByGame[gameKey]);
+    });
+
+  } catch (err) {
+
+    // Home still renders even if optional wager progress cannot be computed.
+
+  }
 
 }
 

@@ -100,3 +100,5 @@ After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_16.md` before declaring v
 - Fixed normalized storage `optionPayload` scope failure that blocked Awards batch question creation.
 - Runtime regression coverage added for question/option odds projection.
 
+
+- Home Dashboard startup now batches active-game question/pick/wager progress and skips live archive progress (`HOME_DASHBOARD_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md`).
