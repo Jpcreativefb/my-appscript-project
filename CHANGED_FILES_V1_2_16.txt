@@ -187,3 +187,25 @@ Behavior changes:
 - Reads normalized DataIndex once per Apps Script execution.
 - Caches the global question/game compatibility map.
 - Caches compact per-game K/P live probability lookups and skips Hub reads when odds display is hidden.
+
+GAME LOAD + QUESTION CONTROLS HOTFIX
+backend/Api.js
+backend/admin/AdminCategories.js
+backend/engines/NormalizedQuestionStorageEngine.js
+backend/engines/RealityTvSeasonEngine.js
+backend/services/AppCache.js
+frontend/js/api.js
+frontend/api.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/js/pages/adminGameSetup.js
+frontend/css/styles.css
+frontend/sw.js
+tests/game_startup_final_stage_v1216_tests.js (new)
+tests/manage_game_pick_change_controls_v1216_tests.js (new)
+tests/manage_game_question_reorder_v1216_tests.js
+tests/game_startup_performance_v1216_tests.js
+GAME_LOAD_QUESTION_CONTROLS_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md

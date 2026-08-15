@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **324-awards-mobile-workflow-v1216**
+Release asset marker: **325-game-load-question-controls-v1216**
 
 ## Release state
 
@@ -57,6 +57,8 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Saved pick cards explicitly surface the change affordance (`Tap to change until lock` or remaining changes) so unlimited/fixed change settings are visible to players.
 - Manage Games now supports persisted question up/down ordering; nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
 - Game startup performance now reuses per-game settings, caches the global question/game compatibility map, reads normalized DataIndex once per execution, and caches compact K/P probability lookups so game switching does not repeatedly rescan growing project sheets/Hub data.
+- Normal player/game reads no longer run legacy→normalized synchronization; non-Reality games also use a cached season-existence check before touching Reality TV support data.
+- Manage Games question ordering now uses one atomic backend reorder operation, and question Settings exposes Pick Changes Before Lock (Unlimited / None / numeric limit) beside Lock Date / Time.
 - Disabled Awards markets/outcomes are excluded from both created answers and External Results Hub mappings.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.
@@ -76,7 +78,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 86 regression tests
+PASS: 89 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

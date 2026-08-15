@@ -2283,6 +2283,54 @@ function realityTvGroupNameForEpisodeFromProfile_(profile, episodeNumber, fallba
   return realityTvString_((match && match.groupName) || fallback || "");
 }
 
+function realityTvHasSeasonForGameCached_(gameId) {
+  const gameKey = realityTvKey_(gameId);
+  if (!gameKey) return false;
+
+  const cacheKey = "rtv_season_game_ids_v1";
+  let lookup = null;
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) lookup = JSON.parse(cached);
+    } catch (ignore) {
+      lookup = null;
+    }
+  }
+
+  if (!lookup || typeof lookup !== "object") {
+    lookup = {};
+    try {
+      const ss = SpreadsheetApp.getActive();
+      const sheet = ss.getSheetByName(REALITY_TV_SEASONS_SHEET);
+      if (sheet && sheet.getLastRow() > 1 && sheet.getLastColumn() > 0) {
+        const values = sheet.getDataRange().getValues();
+        const headers = values[0].map(function(value) { return realityTvString_(value); });
+        const gameIdCol = headers.indexOf("GameId");
+        if (gameIdCol !== -1) {
+          for (let index = 1; index < values.length; index += 1) {
+            const rowGameKey = realityTvKey_(values[index][gameIdCol]);
+            if (rowGameKey) lookup[rowGameKey] = true;
+          }
+        }
+      }
+    } catch (readError) {
+      // If the quick lookup fails, fall through to the normal Reality TV read
+      // rather than incorrectly hiding a real season.
+      return true;
+    }
+
+    if (typeof CacheService !== "undefined") {
+      try {
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify(lookup), 120);
+      } catch (ignoreCacheWrite) {}
+    }
+  }
+
+  return lookup[gameKey] === true;
+}
+
 function realityTvUserGameViewPayload_(gameId, username, options) {
   options = options || {};
   const includePlayerStats = options.includePlayerStats === true;
@@ -2299,6 +2347,12 @@ function realityTvUserGameViewPayload_(gameId, username, options) {
   }
 
   if (!corePayload) {
+    // Most Awards/Sports/standard games have no Reality TV season. Avoid
+    // opening every Reality TV support sheet just to discover that fact.
+    if (!realityTvHasSeasonForGameCached_(gameId)) {
+      return { enabled: false };
+    }
+
     const ss = SpreadsheetApp.getActive();
     const seasons = realityTvReadObjects_(ss, REALITY_TV_SEASONS_SHEET);
     const season = seasons.find(function(row) {

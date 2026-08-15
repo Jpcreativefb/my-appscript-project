@@ -1285,6 +1285,16 @@ function doGet(e) {
 
     }
 
+    if (action === "adminReorderQuestion") {
+
+      return json(
+        adminReorderQuestion(
+          params
+        )
+      );
+
+    }
+
     if (action === "adminBulkUpdateGameSetup") {
 
       return json(

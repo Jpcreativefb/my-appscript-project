@@ -3188,6 +3188,75 @@ function adminBulkUpdateGameSetup(payload) {
 }
 
 /* =========================================================
+   REORDER QUESTION
+   Atomically rewrites DisplayOrder for the whole game so two
+   independent updates cannot leave duplicate/stale order values.
+========================================================= */
+
+function adminReorderQuestion(payload) {
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  const categoryId = adminCatNormalizeId_(payload.categoryId);
+  const direction = Number(payload.direction || 0);
+
+  if (!gameId || !categoryId || (direction !== -1 && direction !== 1)) {
+    throw new Error("GameId, CategoryId, and direction (-1 or 1) are required");
+  }
+
+  validateGameId(gameId);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    const setup = adminGetGameSetup({ gameId: gameId });
+    const categories = Array.isArray(setup.categories) ? setup.categories.slice() : [];
+    const index = categories.findIndex(function(item) {
+      return adminCatNormalizeId_(item && item.categoryId) === categoryId;
+    });
+    const targetIndex = index + direction;
+
+    if (index < 0) {
+      throw new Error("Question not found: " + categoryId);
+    }
+
+    if (targetIndex < 0 || targetIndex >= categories.length) {
+      return {
+        success: true,
+        unchanged: true,
+        message: "Question is already at the " + (direction < 0 ? "top" : "bottom") + "."
+      };
+    }
+
+    const moved = categories.splice(index, 1)[0];
+    categories.splice(targetIndex, 0, moved);
+
+    categories.forEach(function(category, orderIndex) {
+      adminCatUpsertCategorySettings_({
+        gameId: gameId,
+        categoryId: category.categoryId,
+        displayOrder: (orderIndex + 1) * 10
+      });
+    });
+
+    SpreadsheetApp.flush();
+    adminCatClearCaches_();
+
+    return {
+      success: true,
+      gameId: gameId,
+      categoryId: categoryId,
+      direction: direction,
+      displayOrder: (targetIndex + 1) * 10,
+      message: "Question moved " + (direction < 0 ? "up." : "down.")
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* =========================================================
    PERMANENT QUESTION DELETE
 ========================================================= */
 

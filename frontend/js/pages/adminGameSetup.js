@@ -232,6 +232,59 @@ function adminSetupSelected_(currentValue, optionValue) {
     : "";
 }
 
+function adminSetupMaxChangesMode_(value) {
+  const number = Number(value);
+  if (Number.isFinite(number) && number < 0) return "unlimited";
+  if (!Number.isFinite(number) || number === 0) return "none";
+  return "limited";
+}
+
+function adminSetupReadMaxChangesControl_(modeId, amountId) {
+  const mode = String((document.getElementById(modeId) || {}).value || "unlimited");
+  if (mode === "unlimited") return -1;
+  if (mode === "none") return 0;
+  const amount = Number((document.getElementById(amountId) || {}).value || 1);
+  return Math.max(1, Math.floor(Number.isFinite(amount) ? amount : 1));
+}
+
+function adminSetupToggleMaxChangesAmount_(modeId, amountId) {
+  const mode = String((document.getElementById(modeId) || {}).value || "unlimited");
+  const amount = document.getElementById(amountId);
+  if (!amount) return;
+  amount.disabled = mode !== "limited";
+  amount.hidden = mode !== "limited";
+}
+
+function adminSetupMaxChangesControls_(modeId, amountId, value, defaultUnlimited) {
+  const raw = Number(value);
+  const hasValue = Number.isFinite(raw);
+  const normalized = hasValue ? raw : (defaultUnlimited === true ? -1 : 0);
+  const mode = adminSetupMaxChangesMode_(normalized);
+  const amount = normalized > 0 ? Math.floor(normalized) : 1;
+  return `
+    <div class="admin-inline-control-pair admin-pick-change-control">
+      <select
+        id="${adminSetupEscapeHtml(modeId)}"
+        onchange="adminSetupToggleMaxChangesAmount_('${adminSetupEscapeHtml(modeId)}', '${adminSetupEscapeHtml(amountId)}')"
+      >
+        <option value="unlimited" ${mode === "unlimited" ? "selected" : ""}>Unlimited until lock</option>
+        <option value="none" ${mode === "none" ? "selected" : ""}>No changes after first pick</option>
+        <option value="limited" ${mode === "limited" ? "selected" : ""}>Limit number of changes</option>
+      </select>
+      <input
+        type="number"
+        id="${adminSetupEscapeHtml(amountId)}"
+        min="1"
+        step="1"
+        value="${adminSetupEscapeHtml(amount)}"
+        ${mode === "limited" ? "" : "hidden disabled"}
+        aria-label="Number of pick changes allowed before lock"
+      >
+    </div>
+    <small class="admin-field-note">The first saved pick does not count as a change. Lock Date / Time still closes the question at the scheduled time.</small>
+  `;
+}
+
 function adminSetupFieldLabel_(title, helpText) {
   if (typeof adminFieldLabel_ === "function") {
     return adminFieldLabel_(title, helpText);
@@ -843,6 +896,11 @@ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
               type="datetime-local"
               id="setupNewCategoryLockDateTime"
             >
+          </label>
+
+          <label class="admin-field">
+            ${adminSetupFieldLabel_("Pick Changes Before Lock", "Choose whether a player may change a saved pick before the question locks. Unlimited means they can keep changing until Lock Date / Time or the manual Locked switch closes the question.")}
+            ${adminSetupMaxChangesControls_("setupNewCategoryMaxChangesMode", "setupNewCategoryMaxChangesAmount", -1, true)}
           </label>
 
           <label class="admin-field">
@@ -3205,6 +3263,16 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
               </label>
 
               <label class="admin-field">
+                ${adminSetupFieldLabel_("Pick Changes Before Lock", "Unlimited lets players change a saved pick as often as they want until Lock Date / Time or the manual Locked switch closes the question. A numeric limit counts only changes after the first saved pick.")}
+                ${adminSetupMaxChangesControls_(
+                  "editCategoryMaxChangesMode_" + categoryId,
+                  "editCategoryMaxChangesAmount_" + categoryId,
+                  settings.maxChanges,
+                  false
+                )}
+              </label>
+
+              <label class="admin-field">
                 ${adminSetupFieldLabel_("Group ID", "An internal grouping key used by layouts, follow-ups, and bulk controls.")}
 
                 <input
@@ -4248,6 +4316,11 @@ async function adminSetupCreateCategory(gameId) {
     "setupNewCategoryLockDateTime"
   );
 
+  const maxChanges = adminSetupReadMaxChangesControl_(
+    "setupNewCategoryMaxChangesMode",
+    "setupNewCategoryMaxChangesAmount"
+  );
+
   const groupIdInput = document.getElementById("setupNewCategoryGroupId");
 
   const parentCategoryIdInput = document.getElementById(
@@ -4341,6 +4414,8 @@ async function adminSetupCreateCategory(gameId) {
     points: pointsInput ? pointsInput.value : 1,
 
     lockDateTime: lockDateTimeInput ? lockDateTimeInput.value : "",
+
+    maxChanges: maxChanges,
 
     groupId:
       groupIdInput && groupIdInput.value.trim()
@@ -4844,6 +4919,10 @@ function adminSetupBuildCategoryPayload_(gameId, categoryId) {
   const orderInput = get("editCategoryOrder_" + categoryId);
   const layoutInput = get("editCategoryLayout_" + categoryId);
   const lockDateInput = get("editCategoryLockDateTime_" + categoryId);
+  const maxChanges = adminSetupReadMaxChangesControl_(
+    "editCategoryMaxChangesMode_" + categoryId,
+    "editCategoryMaxChangesAmount_" + categoryId
+  );
   const sectionInput = get("editCategorySection_" + categoryId);
   const lockedInput = get("editCategoryLocked_" + categoryId);
   const activeInput = get("editCategoryActive_" + categoryId);
@@ -4860,6 +4939,7 @@ function adminSetupBuildCategoryPayload_(gameId, categoryId) {
       displayOrder: orderInput ? orderInput.value : 999,
       layoutType: layoutInput ? layoutInput.value : "image",
       lockDateTime: lockDateInput ? lockDateInput.value : "",
+      maxChanges: maxChanges,
       groupId: groupIdInput && groupIdInput.value.trim()
         ? groupIdInput.value.trim()
         : "default",
@@ -5474,60 +5554,30 @@ async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event
   const safeCategoryId = String(categoryId || "").trim().toLowerCase();
   const step = Number(direction || 0);
 
-  if (!safeGameId || !safeCategoryId || !step) return;
+  if (!safeGameId || !safeCategoryId || (step !== -1 && step !== 1)) return false;
 
   adminSetupSetMessage("adminSetupMessage", "Reordering question…", false);
 
   try {
-    const setup = await apiAdminGetGameSetup(safeGameId);
-    if (!setup || setup.success === false) {
-      throw new Error((setup && (setup.error || setup.message)) || "Could not reload question order.");
-    }
+    const response = await apiAdminReorderQuestion(
+      safeGameId,
+      safeCategoryId,
+      step
+    );
 
-    const categories = Array.isArray(setup.categories) ? setup.categories : [];
-    const index = categories.findIndex(function(item) {
-      return String(item && item.categoryId || "").trim().toLowerCase() === safeCategoryId;
-    });
-    const targetIndex = index + step;
-
-    if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) return;
-
-    const current = categories[index];
-    const target = categories[targetIndex];
-    let currentOrder = Number(current && current.settings && current.settings.displayOrder);
-    let targetOrder = Number(target && target.settings && target.settings.displayOrder);
-
-    if (!Number.isFinite(currentOrder) || !Number.isFinite(targetOrder) || currentOrder === targetOrder) {
-      currentOrder = (index + 1) * 10;
-      targetOrder = (targetIndex + 1) * 10;
-    }
-
-    const first = await apiAdminUpdateCategory({
-      gameId: safeGameId,
-      categoryId: current.categoryId,
-      displayOrder: targetOrder
-    });
-    if (!first || first.success === false) {
-      throw new Error((first && (first.error || first.message)) || "Could not move the selected question.");
-    }
-
-    const second = await apiAdminUpdateCategory({
-      gameId: safeGameId,
-      categoryId: target.categoryId,
-      displayOrder: currentOrder
-    });
-    if (!second || second.success === false) {
-      throw new Error((second && (second.error || second.message)) || "Could not finish the question reorder.");
+    if (!response || response.success === false) {
+      throw new Error((response && (response.error || response.message)) || "Could not reorder the question.");
     }
 
     adminSetupRememberUiAction_({
       type: "reorder-question",
       gameId: safeGameId,
-      categoryId: current.categoryId,
+      categoryId: safeCategoryId,
       openAnswers: false,
-      message: "Question moved " + (step < 0 ? "up." : "down.")
+      message: response.message || ("Question moved " + (step < 0 ? "up." : "down."))
     });
-    navigate("admin-game-setup:" + safeGameId);
+
+    await navigate("admin-game-setup:" + safeGameId);
   } catch (err) {
     adminSetupSetMessage(
       "adminSetupMessage",
@@ -5535,6 +5585,8 @@ async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event
       true
     );
   }
+
+  return false;
 }
 
 /* ======================

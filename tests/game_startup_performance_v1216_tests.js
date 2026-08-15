@@ -47,4 +47,9 @@ assert(
   'Startup performance caches must be invalidated by normal game/app cache clears.'
 );
 
+assert(
+  cache.includes('"rtv_season_game_ids_v1"'),
+  'Reality TV season lookup must be invalidated with normal app/game cache clears.'
+);
+
 console.log('PASS: game startup performance cache tests');

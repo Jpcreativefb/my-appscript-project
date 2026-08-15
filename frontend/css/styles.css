@@ -5981,3 +5981,33 @@ button.is-saving {
     justify-content: flex-end;
   }
 }
+
+/* v1.2.16 Manage Games pick-change controls */
+.admin-pick-change-control {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+}
+
+.admin-pick-change-control select {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-pick-change-control input[type="number"] {
+  flex: 0 0 92px;
+  width: 92px;
+}
+
+@media (max-width: 640px) {
+  .admin-pick-change-control {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-pick-change-control input[type="number"] {
+    flex-basis: auto;
+    width: 100%;
+  }
+}

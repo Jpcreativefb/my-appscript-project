@@ -1,3 +1,12 @@
+## v1.2.16 — Game Load + Question Controls Hotfix
+
+- Removed automatic legacy-to-normalized synchronization from normal player/game category reads; migration work now remains an explicit admin/migration concern.
+- Added a cached Reality TV season-existence lookup so non-Reality games do not inspect the full Reality TV support tables during startup.
+- Replaced Manage Games question-order swapping with one atomic backend reorder action that rewrites stable DisplayOrder values for the whole game.
+- Added Manage Games **Pick Changes Before Lock** controls next to Lock Date / Time: Unlimited, No changes after first pick, or any numeric change limit.
+- New Manage Games questions default to Unlimited until lock; existing questions keep their saved MaxChanges until edited.
+- Bumped frontend/service-worker assets to v325 and added runtime/static regression coverage for the startup path, atomic reorder, and pick-change controls.
+
 ## v1.2.16 — Game Startup Performance Hotfix
 
 - Removed duplicate CategorySettings rebuilds during game startup by reusing the per-game settings cache.

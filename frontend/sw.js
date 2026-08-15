@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v324-awards-mobile-workflow-v1216";
+const AWARDS_CACHE = "awards-app-v325-game-load-question-controls-v1216";
 
 const APP_SHELL = [
   "./",

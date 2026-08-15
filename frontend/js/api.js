@@ -1944,6 +1944,17 @@ async function apiAdminUpdateCategory(payload) {
 
 }
 
+async function apiAdminReorderQuestion(gameId, categoryId, direction) {
+  return api(
+    "adminReorderQuestion",
+    {
+      gameId: gameId,
+      categoryId: categoryId,
+      direction: direction
+    }
+  );
+}
+
 async function apiAdminBulkUpdateGameSetup(gameId, questions, answers) {
 
   const session =

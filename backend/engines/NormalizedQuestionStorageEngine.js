@@ -2073,7 +2073,8 @@ function normalizedStorageGetQuestionSetup_(gameId, options) {
   };
 }
 
-function normalizedStorageBuildLegacyProjection_(gameId) {
+function normalizedStorageBuildLegacyProjection_(gameId, options) {
+  options = options || {};
   const categoriesSheet = SpreadsheetApp.getActive()
     .getSheetByName(CATEGORIES_SHEET);
 
@@ -2082,7 +2083,13 @@ function normalizedStorageBuildLegacyProjection_(gameId) {
   }
 
   const legacyHeaders = normalizedStorageGetHeaders_(categoriesSheet);
-  const normalized = normalizedStorageGetQuestionSetup_(gameId);
+  const normalized = normalizedStorageGetQuestionSetup_(gameId, {
+    // Player/runtime reads must never run legacy -> normalized migration work.
+    // Explicit admin/migration callers can opt in with syncLegacy: true.
+    syncLegacy: options.syncLegacy === true,
+    bypassRuntimeCache: options.bypassRuntimeCache === true,
+    trustIndex: options.trustIndex !== false
+  });
   const questionMap = {};
 
   normalized.questions.forEach(function(question) {
@@ -2297,7 +2304,8 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
   return rows;
 }
 
-function getCategoriesDataForGameScoped_(gameId) {
+function getCategoriesDataForGameScoped_(gameId, options) {
+  options = options || {};
   gameId = normalizedStorageString_(gameId);
 
   if (!gameId) {
@@ -2305,7 +2313,13 @@ function getCategoriesDataForGameScoped_(gameId) {
   }
 
   try {
-    const projection = normalizedStorageBuildLegacyProjection_(gameId);
+    const projection = normalizedStorageBuildLegacyProjection_(gameId, {
+      // Default to read-only projection. Automatic legacy synchronization is
+      // intentionally excluded from normal player/game startup requests.
+      syncLegacy: options.syncLegacy === true,
+      bypassRuntimeCache: options.bypassRuntimeCache === true,
+      trustIndex: options.trustIndex !== false
+    });
 
     if (projection.length > 1) {
       return projection;

@@ -363,7 +363,9 @@ function clearGameCaches(
 
     "external_live_probabilities_v1_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 120),
 
-    "normalized_question_game_map_v1"
+    "normalized_question_game_map_v1",
+
+    "rtv_season_game_ids_v1"
 
   ];
 
@@ -418,7 +420,9 @@ function clearAppCaches(){
 
     "sheet_ArchiveManifest",
 
-    "normalized_question_game_map_v1"
+    "normalized_question_game_map_v1",
+
+    "rtv_season_game_ids_v1"
 
   ];
 
