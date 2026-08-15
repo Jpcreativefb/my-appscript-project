@@ -17,5 +17,5 @@ assert(
   reality.includes('if (!realityTvHasSeasonForGameCached_(gameId))'),
   'Non-Reality games must use a cached fast season-existence check before loading Reality TV support sheets.'
 );
-assert(app.includes('326-question-position-controls-v1216'), 'v325 frontend asset marker missing.');
+assert(app.includes('327-question-drag-order-v1216'), 'v325 frontend asset marker missing.');
 console.log('PASS: game startup final-stage optimization tests');

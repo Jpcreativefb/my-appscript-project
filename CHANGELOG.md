@@ -398,3 +398,11 @@
 - Reduced the core startup request timeout from 120 seconds to 45 seconds.
 - Added player startup regression coverage.
 
+
+
+## v1.2.16 Question Drag / Order Reliability Hotfix
+
+- Replaced slow per-question reorder writes with one canonical ordered-list save.
+- Added handle-based desktop drag/drop and simpler mobile position controls in Manage Games and Awards Manager.
+- Removed redundant `/ total` position text and the separate Move button.
+- Added batch CategorySettings DisplayOrder persistence and regression coverage.

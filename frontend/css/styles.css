@@ -6176,3 +6176,51 @@ button.is-saving {
     grid-row: 2;
   }
 }
+
+
+/* v1.2.16 Question ordering reliability + drag/drop */
+.admin-question-drag-handle,
+.awards-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 32px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  font-weight: 900;
+  letter-spacing: -2px;
+  opacity: 0.8;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.admin-question-drag-handle:active,
+.awards-drag-handle:active {
+  cursor: grabbing;
+}
+
+.admin-question-drop-target {
+  outline: 2px dashed currentColor;
+  outline-offset: 2px;
+}
+
+.admin-question-position-jump input,
+.awards-position-jump input {
+  width: 48px;
+  min-width: 48px;
+}
+
+@media (max-width: 720px) {
+  .admin-question-drag-handle,
+  .awards-drag-handle {
+    display: none;
+  }
+
+  .admin-question-position-jump,
+  .awards-position-jump {
+    flex: 0 0 auto;
+  }
+}

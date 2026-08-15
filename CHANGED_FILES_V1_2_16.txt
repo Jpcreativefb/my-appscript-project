@@ -228,3 +228,30 @@ Current-release marker assertions updated for v326.
 QUESTION_POSITION_CONTROLS_HOTFIX_V1_2_16.md (new)
 PRODUCTION_STATUS.md
 CHANGELOG.md
+
+QUESTION DRAG / ORDER RELIABILITY HOTFIX
+backend/Api.js
+backend/admin/AdminCategories.js
+frontend/js/api.js
+frontend/api.js
+frontend/js/pages/adminGameSetup.js
+frontend/js/pages/adminAwards.js
+frontend/css/styles.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/question_position_controls_v1216_tests.js
+tests/manage_game_question_reorder_v1216_tests.js
+tests/question_drag_order_v1216_tests.js (new)
+QUESTION_DRAG_ORDER_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
+
+Behavior changes:
+- Manage Games desktop drag/drop is handle-based and persists the complete final question order once.
+- Mobile keeps a compact direct-position field plus up/down fallback controls.
+- Redundant `/ total` position text and the separate Move button are removed.
+- CategorySettings DisplayOrder persistence is batched instead of rereading the full settings sheet per question.
+- Awards Manager staging uses the same simplified drag/position interaction.
+- Current-release marker assertions updated for v327.

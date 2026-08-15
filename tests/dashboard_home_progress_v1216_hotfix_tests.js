@@ -60,7 +60,7 @@ assert(
   'Progress bar must only render when progress is available.'
 );
 assert(
-  app.includes('326-question-position-controls-v1216'),
+  app.includes('327-question-drag-order-v1216'),
   'Current v1.2.16 asset marker is missing after the Awards View Event hotfix.'
 );
 

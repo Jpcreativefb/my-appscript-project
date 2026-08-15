@@ -7,34 +7,45 @@ const setup = fs.readFileSync('frontend/js/pages/adminGameSetup.js', 'utf8');
 const awards = fs.readFileSync('frontend/js/pages/adminAwards.js', 'utf8');
 const api = fs.readFileSync('frontend/js/api.js', 'utf8');
 const categories = fs.readFileSync('backend/admin/AdminCategories.js', 'utf8');
+const backendApi = fs.readFileSync('backend/Api.js', 'utf8');
 const css = fs.readFileSync('frontend/css/styles.css', 'utf8');
 
-assert(setup.includes('adminSetupMoveQuestionToPosition_'), 'Manage Games direct-position handler missing.');
-assert(setup.includes('categoryPositionInput_'), 'Manage Games must render a visible question-position input.');
+assert(setup.includes('adminSetupQuestionDragStart_'), 'Manage Games drag-start handler missing.');
+assert(setup.includes('adminSetupQuestionDrop_'), 'Manage Games drop handler missing.');
+assert(setup.includes('adminSetupPersistQuestionOrder_'), 'Manage Games shared order persistence helper missing.');
+assert(setup.includes('apiAdminSetQuestionOrder('), 'Manage Games must persist the full final question order in one request.');
+assert(setup.includes('onchange="event.stopPropagation();adminSetupMoveQuestionToPosition_'), 'Manage Games direct position input must save on change.');
+assert(!setup.includes('admin-question-position-total">/ ${questionCount}'), 'Manage Games should not show redundant / total position text.');
 assert(setup.includes('Collapse All Questions') && setup.includes('Expand All Questions'), 'Manage Games compact question-list controls missing.');
-assert(setup.includes('requested') && setup.includes('apiAdminReorderQuestion('), 'Manage Games reorder request must send an explicit requested position.');
-assert(api.includes('targetPosition: Number(targetPosition || 0)'), 'Frontend reorder API must send targetPosition.');
-assert(categories.includes('const requestedPosition = Number(payload.targetPosition || 0);'), 'Backend target-position reorder support missing.');
-assert(awards.includes('adminAwardsMoveBatchRowToPosition_'), 'Awards Manager direct-position helper missing.');
-assert(awards.includes('adminAwardsSetBatchCardsExpanded_'), 'Awards Manager collapse/expand-all control missing.');
-assert(awards.includes('type="number"') && awards.includes('Question position'), 'Awards Manager question-position input missing.');
-assert(css.includes('.admin-question-position-jump') && css.includes('.awards-position-jump'), 'Position controls need responsive styling.');
-assert(css.includes('.awards-question-order-card:not([open]) .awards-build-card-meta'), 'Collapsed Awards cards must reduce to the question-focused summary.');
+assert(api.includes('async function apiAdminSetQuestionOrder'), 'Frontend full-order API helper missing.');
+assert(backendApi.includes('action === "adminSetQuestionOrder"'), 'Backend full-order API route missing.');
+assert(categories.includes('function adminSetQuestionOrder(payload)'), 'Backend full-order action missing.');
+assert(categories.includes('function adminCatPersistQuestionOrder_'), 'Backend batch order persistence helper missing.');
+assert(categories.includes('contiguous row groups'), 'Backend reorder should batch DisplayOrder writes instead of rereading settings per question.');
 
-// Execute the real backend reorder with 30 questions. Move #29 directly to #4
-// and verify all stored DisplayOrder values are rewritten canonically.
+assert(awards.includes('adminAwardsBatchDragStart_'), 'Awards Manager drag reorder support missing.');
+assert(awards.includes('onchange="event.stopPropagation();adminAwardsMoveBatchRowToPosition_'), 'Awards Manager position input must move on change.');
+assert(!awards.includes('<span>/ ${rows.length}</span>'), 'Awards Manager should not show redundant / total position text.');
+assert(awards.includes('adminAwardsSetBatchCardsExpanded_'), 'Awards Manager collapse/expand-all control missing.');
+assert(css.includes('.admin-question-drag-handle') && css.includes('.awards-drag-handle'), 'Drag handles need shared responsive styling.');
+assert(css.includes('@media (max-width: 720px)') && css.includes('display: none;'), 'Drag handles should be hidden on mobile in favor of touch-friendly position controls.');
+
+// Execute the real reorder planning logic with 30 questions. Move #29 directly
+// to #4 and verify a single canonical ordered ID list is handed to persistence.
 const context = { console };
 vm.createContext(context);
 vm.runInContext(categories, context);
-const writes = [];
 context.validateGameId = () => {};
 context.LockService = { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) };
-context.SpreadsheetApp = { flush: () => {} };
 context.adminGetGameSetup = () => ({
   categories: Array.from({ length: 30 }, (_, i) => ({ categoryId: 'q' + (i + 1) }))
 });
-context.adminCatUpsertCategorySettings_ = payload => writes.push(payload);
-context.adminCatClearCaches_ = () => {};
+let persistedGameId = '';
+let persistedIds = [];
+context.adminCatPersistQuestionOrder_ = (gameId, ids) => {
+  persistedGameId = gameId;
+  persistedIds = ids.slice();
+};
 
 const result = context.adminReorderQuestion({
   gameId: 'demo',
@@ -43,16 +54,12 @@ const result = context.adminReorderQuestion({
 });
 assert.strictEqual(result.success, true, 'Direct-position reorder should succeed.');
 assert.strictEqual(result.position, 4, 'Question #29 should report new position #4.');
+assert.strictEqual(persistedGameId, 'demo', 'Reorder should persist the correct game.');
 assert.deepStrictEqual(
-  writes.slice(0, 7).map(item => item.categoryId),
+  persistedIds.slice(0, 7),
   ['q1', 'q2', 'q3', 'q29', 'q4', 'q5', 'q6'],
   'Moving #29 to #4 must insert it at #4 and shift following questions down.'
 );
-assert.deepStrictEqual(
-  writes.slice(0, 7).map(item => item.displayOrder),
-  [10, 20, 30, 40, 50, 60, 70],
-  'Direct-position reorder must rewrite stable canonical display order values.'
-);
-assert.strictEqual(writes.length, 30, 'All 30 questions should be renumbered after a direct move.');
+assert.strictEqual(persistedIds.length, 30, 'The server should persist one complete 30-question order.');
 
-console.log('PASS: Shared question position controls');
+console.log('PASS: Shared question drag/position ordering controls');

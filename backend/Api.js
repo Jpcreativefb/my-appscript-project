@@ -351,6 +351,10 @@ function doPost(e) {
 
     }
 
+    if (action === "adminSetQuestionOrder") {
+      return json(adminSetQuestionOrder(body));
+    }
+
     // =========================
     // AWARDS MANAGER WRITES
     // =========================
@@ -1289,6 +1293,16 @@ function doGet(e) {
 
       return json(
         adminReorderQuestion(
+          params
+        )
+      );
+
+    }
+
+    if (action === "adminSetQuestionOrder") {
+
+      return json(
+        adminSetQuestionOrder(
           params
         )
       );

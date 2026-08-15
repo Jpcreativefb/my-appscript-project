@@ -1956,6 +1956,16 @@ async function apiAdminReorderQuestion(gameId, categoryId, direction, targetPosi
   );
 }
 
+async function apiAdminSetQuestionOrder(gameId, orderedCategoryIds) {
+  return apiPost(
+    "adminSetQuestionOrder",
+    {
+      gameId: gameId,
+      orderedCategoryIds: Array.isArray(orderedCategoryIds) ? orderedCategoryIds : []
+    }
+  );
+}
+
 async function apiAdminBulkUpdateGameSetup(gameId, questions, answers) {
 
   const session =

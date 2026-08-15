@@ -3053,7 +3053,11 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
   return `
     <details
       id="categoryCard_${categoryId}"
-      class="admin-category-card admin-collapsible-category ${actionTargetsCategory ? "admin-setup-action-target" : ""}"
+      class="admin-category-card admin-collapsible-category admin-question-sort-card ${actionTargetsCategory ? "admin-setup-action-target" : ""}"
+      data-question-category-id="${categoryId}"
+      data-question-game-id="${gameId}"
+      ondragover="adminSetupQuestionDragOver_(event)"
+      ondrop="adminSetupQuestionDrop_(event, '${gameId}', '${categoryId}')"
       ${actionTargetsCategory ? "open" : ""}
     >
 
@@ -3095,16 +3099,17 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
           </div>
 
           <div class="admin-question-summary-actions">
-            <div class="admin-question-order-controls" title="Move question">
+            <div class="admin-question-order-controls" title="Reorder question">
               <button
                 type="button"
                 class="admin-small-button secondary admin-question-order-button"
                 onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', ${questionPosition}, -1, event)"
                 ${canMoveUp ? "" : "disabled"}
                 aria-label="Move question up"
+                title="Move up one position"
               >↑</button>
-              <label class="admin-question-position-jump" title="Type a question position and press Enter or Move">
-                <span class="sr-only">Question position</span>
+              <label class="admin-question-position-jump" title="Type a destination position, then press Enter or leave the field">
+                <span class="sr-only">Move question to position</span>
                 <input
                   id="categoryPositionInput_${categoryId}"
                   type="number"
@@ -3113,15 +3118,10 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
                   value="${questionPosition}"
                   inputmode="numeric"
                   onclick="event.stopPropagation()"
-                  onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();adminSetupMoveQuestionToPosition_('${gameId}', '${categoryId}', event);}"
-                  aria-label="Question position ${questionPosition} of ${questionCount}"
+                  onchange="event.stopPropagation();adminSetupMoveQuestionToPosition_('${gameId}', '${categoryId}', event)"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();this.blur();}"
+                  aria-label="Move question to position ${questionPosition}"
                 >
-                <span class="admin-question-position-total">/ ${questionCount}</span>
-                <button
-                  type="button"
-                  class="admin-small-button secondary admin-question-position-move-button"
-                  onclick="adminSetupMoveQuestionToPosition_('${gameId}', '${categoryId}', event)"
-                >Move</button>
               </label>
               <button
                 type="button"
@@ -3129,7 +3129,18 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
                 onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', ${questionPosition}, 1, event)"
                 ${canMoveDown ? "" : "disabled"}
                 aria-label="Move question down"
+                title="Move down one position"
               >↓</button>
+              <span
+                class="admin-question-drag-handle"
+                draggable="true"
+                ondragstart="adminSetupQuestionDragStart_(event, '${categoryId}')"
+                onclick="event.preventDefault();event.stopPropagation()"
+                title="Drag to reorder"
+                aria-label="Drag question to reorder"
+                role="button"
+                tabindex="0"
+              >⋮⋮</span>
             </div>
 
             <div
@@ -5574,6 +5585,94 @@ async function adminSetupSaveResults(gameId, categoryId) {
 }
 
 
+let adminSetupDraggedQuestionId_ = "";
+
+function adminSetupQuestionCards_() {
+  const list = document.querySelector(".admin-category-list");
+  if (!list) return [];
+  return Array.from(list.querySelectorAll(":scope > details.admin-question-sort-card"));
+}
+
+function adminSetupQuestionOrderIds_() {
+  return adminSetupQuestionCards_().map(function(card) {
+    return String(card.getAttribute("data-question-category-id") || "").trim().toLowerCase();
+  }).filter(Boolean);
+}
+
+function adminSetupRefreshQuestionOrderUi_() {
+  const cards = adminSetupQuestionCards_();
+  cards.forEach(function(card, index) {
+    const categoryId = String(card.getAttribute("data-question-category-id") || "").trim().toLowerCase();
+    const position = index + 1;
+    const badge = document.getElementById("categoryPositionBadge_" + categoryId);
+    const input = document.getElementById("categoryPositionInput_" + categoryId);
+    if (badge) badge.textContent = "#" + position;
+    if (input) {
+      input.value = String(position);
+      input.max = String(cards.length);
+    }
+    const buttons = card.querySelectorAll(".admin-question-order-button");
+    if (buttons[0]) buttons[0].disabled = position <= 1;
+    if (buttons[1]) buttons[1].disabled = position >= cards.length;
+  });
+}
+
+function adminSetupRestoreQuestionOrderDom_(orderedIds) {
+  const list = document.querySelector(".admin-category-list");
+  if (!list || !Array.isArray(orderedIds)) return;
+  const byId = {};
+  adminSetupQuestionCards_().forEach(function(card) {
+    const id = String(card.getAttribute("data-question-category-id") || "").trim().toLowerCase();
+    byId[id] = card;
+  });
+  orderedIds.forEach(function(id) {
+    const card = byId[String(id || "").trim().toLowerCase()];
+    if (card) list.appendChild(card);
+  });
+  adminSetupRefreshQuestionOrderUi_();
+}
+
+function adminSetupMoveQuestionCardDom_(categoryId, requestedPosition) {
+  const list = document.querySelector(".admin-category-list");
+  const cards = adminSetupQuestionCards_();
+  const safeId = String(categoryId || "").trim().toLowerCase();
+  if (!list || !cards.length || !safeId) return false;
+  const card = cards.find(function(item) {
+    return String(item.getAttribute("data-question-category-id") || "").trim().toLowerCase() === safeId;
+  });
+  if (!card) return false;
+  const currentIndex = cards.indexOf(card);
+  const targetIndex = Math.max(0, Math.min(cards.length - 1, Math.round(Number(requestedPosition) || 1) - 1));
+  if (currentIndex === targetIndex) return true;
+
+  const without = cards.filter(function(item) { return item !== card; });
+  if (targetIndex >= without.length) list.appendChild(card);
+  else list.insertBefore(card, without[targetIndex]);
+  adminSetupRefreshQuestionOrderUi_();
+  return true;
+}
+
+async function adminSetupPersistQuestionOrder_(gameId, originalOrder) {
+  const safeGameId = String(gameId || "").trim();
+  const orderedIds = adminSetupQuestionOrderIds_();
+  if (!safeGameId || !orderedIds.length) return false;
+
+  adminSetupSetMessage("adminSetupMessage", "Saving question order…", false);
+  try {
+    const response = await apiAdminSetQuestionOrder(safeGameId, orderedIds);
+    if (!response || response.success === false) {
+      throw new Error((response && (response.error || response.message)) || "Could not save question order.");
+    }
+    adminSetupRefreshQuestionOrderUi_();
+    adminSetupSetMessage("adminSetupMessage", response.message || "Question order saved.", false);
+    return true;
+  } catch (err) {
+    adminSetupRestoreQuestionOrderDom_(originalOrder || []);
+    adminSetupSetMessage("adminSetupMessage", err && err.message ? err.message : String(err), true);
+    return false;
+  }
+}
+
 async function adminSetupMoveQuestionToPosition_(gameId, categoryId, event) {
   if (event) {
     event.preventDefault();
@@ -5584,65 +5683,81 @@ async function adminSetupMoveQuestionToPosition_(gameId, categoryId, event) {
   const safeCategoryId = String(categoryId || "").trim().toLowerCase();
   const input = document.getElementById("categoryPositionInput_" + safeCategoryId);
   const requested = Math.round(Number(input && input.value || 0));
+  const cards = adminSetupQuestionCards_();
 
-  if (!safeGameId || !safeCategoryId || !Number.isFinite(requested) || requested < 1) {
-    adminSetupSetMessage("adminSetupMessage", "Enter a valid question position.", true);
+  if (!safeGameId || !safeCategoryId || !Number.isFinite(requested) || requested < 1 || requested > cards.length) {
+    adminSetupSetMessage("adminSetupMessage", "Enter a position from 1 to " + cards.length + ".", true);
+    adminSetupRefreshQuestionOrderUi_();
     return false;
   }
 
-  return adminSetupMoveQuestionOrder_(safeGameId, safeCategoryId, 0, 0, event, requested);
+  const originalOrder = adminSetupQuestionOrderIds_();
+  adminSetupMoveQuestionCardDom_(safeCategoryId, requested);
+  return adminSetupPersistQuestionOrder_(safeGameId, originalOrder);
 }
 
-async function adminSetupMoveQuestionOrder_(gameId, categoryId, currentPosition, direction, event, explicitPosition) {
+async function adminSetupMoveQuestionOrder_(gameId, categoryId, currentPosition, direction, event) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
   }
-
-  const safeGameId = String(gameId || "").trim();
+  const cards = adminSetupQuestionCards_();
   const safeCategoryId = String(categoryId || "").trim().toLowerCase();
-  const current = Math.max(1, Math.round(Number(currentPosition || 1)));
-  const step = Number(direction || 0);
-  const requested = Number.isFinite(Number(explicitPosition)) && Number(explicitPosition) > 0
-    ? Math.round(Number(explicitPosition))
-    : current + step;
+  const currentIndex = cards.findIndex(function(card) {
+    return String(card.getAttribute("data-question-category-id") || "").trim().toLowerCase() === safeCategoryId;
+  });
+  if (currentIndex < 0) return false;
+  const requested = currentIndex + 1 + Number(direction || 0);
+  if (requested < 1 || requested > cards.length) return false;
+  const originalOrder = adminSetupQuestionOrderIds_();
+  adminSetupMoveQuestionCardDom_(safeCategoryId, requested);
+  return adminSetupPersistQuestionOrder_(gameId, originalOrder);
+}
 
-  if (!safeGameId || !safeCategoryId || requested < 1) return false;
-
-  adminSetupSetMessage("adminSetupMessage", "Moving question to position " + requested + "…", false);
-
-  try {
-    const response = await apiAdminReorderQuestion(
-      safeGameId,
-      safeCategoryId,
-      0,
-      requested
-    );
-
-    if (!response || response.success === false) {
-      throw new Error((response && (response.error || response.message)) || "Could not reorder the question.");
-    }
-
-    adminSetupRememberUiAction_({
-      type: "reorder-question",
-      gameId: safeGameId,
-      categoryId: safeCategoryId,
-      openAnswers: false,
-      message: response.message || ("Question moved to position " + requested + ".")
-    });
-
-    await navigate("admin-game-setup:" + safeGameId, {
-      skipUnsavedCheck: true
-    });
-  } catch (err) {
-    adminSetupSetMessage(
-      "adminSetupMessage",
-      err && err.message ? err.message : String(err),
-      true
-    );
+function adminSetupQuestionDragStart_(event, categoryId) {
+  adminSetupDraggedQuestionId_ = String(categoryId || "").trim().toLowerCase();
+  if (event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    try { event.dataTransfer.setData("text/plain", adminSetupDraggedQuestionId_); } catch (ignore) {}
   }
+  if (event) event.stopPropagation();
+}
 
-  return false;
+function adminSetupQuestionDragOver_(event) {
+  if (!event) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+  const card = event.currentTarget;
+  if (card && card.classList) card.classList.add("admin-question-drop-target");
+}
+
+async function adminSetupQuestionDrop_(event, gameId, targetCategoryId) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+  document.querySelectorAll(".admin-question-drop-target").forEach(function(card) {
+    card.classList.remove("admin-question-drop-target");
+  });
+
+  let draggedId = adminSetupDraggedQuestionId_;
+  if (!draggedId && event && event.dataTransfer) {
+    try { draggedId = event.dataTransfer.getData("text/plain"); } catch (ignore) {}
+  }
+  adminSetupDraggedQuestionId_ = "";
+  draggedId = String(draggedId || "").trim().toLowerCase();
+  const targetId = String(targetCategoryId || "").trim().toLowerCase();
+  if (!draggedId || !targetId || draggedId === targetId) return false;
+
+  const cards = adminSetupQuestionCards_();
+  const targetIndex = cards.findIndex(function(card) {
+    return String(card.getAttribute("data-question-category-id") || "").trim().toLowerCase() === targetId;
+  });
+  if (targetIndex < 0) return false;
+
+  const originalOrder = adminSetupQuestionOrderIds_();
+  adminSetupMoveQuestionCardDom_(draggedId, targetIndex + 1);
+  return adminSetupPersistQuestionOrder_(gameId, originalOrder);
 }
 
 function adminSetupSetQuestionCardsExpanded_(expanded) {

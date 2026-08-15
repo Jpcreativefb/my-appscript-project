@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "326-question-position-controls-v1216";
-const APP_ROUTE_HOTFIX_VERSION = "v12168-question-position-controls";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216";
+const APP_ROUTE_HOTFIX_VERSION = "v12169-question-drag-order";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

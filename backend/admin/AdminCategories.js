@@ -3193,6 +3193,140 @@ function adminBulkUpdateGameSetup(payload) {
    independent updates cannot leave duplicate/stale order values.
 ========================================================= */
 
+function adminCatPersistQuestionOrder_(gameId, orderedCategoryIds) {
+  const safeGameId = adminCatNormalizeGameId_(gameId);
+  const ids = (orderedCategoryIds || []).map(adminCatNormalizeId_).filter(Boolean);
+
+  if (!safeGameId || !ids.length) {
+    throw new Error("GameId and orderedCategoryIds are required");
+  }
+
+  const sh = getCategorySettingsSheet_();
+  const data = sh.getDataRange().getValues();
+  if (!data.length) throw new Error("CategorySettings sheet is empty");
+
+  const headers = data[0].map(function(h) { return String(h || "").trim(); });
+  const col = getCategorySettingsColumnMap_(headers);
+  validateCategorySettingsColumns_(col);
+
+  if (col.displayOrder === -1) {
+    throw new Error("CategorySettings DisplayOrder column is required");
+  }
+
+  const rowMap = {};
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const rowGameId = adminCatNormalizeGameId_(row[col.gameId]);
+    if (rowGameId !== safeGameId) continue;
+    const rowCategoryId = adminCatNormalizeId_(row[col.categoryId]);
+    if (!rowCategoryId) continue;
+    if (!rowMap[rowCategoryId]) rowMap[rowCategoryId] = [];
+    rowMap[rowCategoryId].push(i + 1);
+  }
+
+  const missing = [];
+  const updates = [];
+  ids.forEach(function(categoryId, index) {
+    const rows = rowMap[categoryId] || [];
+    if (!rows.length) {
+      missing.push({ categoryId: categoryId, displayOrder: (index + 1) * 10 });
+      return;
+    }
+    rows.forEach(function(rowNumber) {
+      updates.push({ rowNumber: rowNumber, displayOrder: (index + 1) * 10 });
+    });
+  });
+
+  // Write the DisplayOrder column in contiguous row groups. This avoids the
+  // previous reorder implementation repeatedly rereading the entire settings
+  // sheet once per question, which made 20-30 question games appear frozen.
+  updates.sort(function(a, b) { return a.rowNumber - b.rowNumber; });
+  let group = [];
+  function flushGroup_() {
+    if (!group.length) return;
+    sh.getRange(group[0].rowNumber, col.displayOrder + 1, group.length, 1)
+      .setValues(group.map(function(item) { return [item.displayOrder]; }));
+    group = [];
+  }
+  updates.forEach(function(update) {
+    if (!group.length || update.rowNumber === group[group.length - 1].rowNumber + 1) {
+      group.push(update);
+    } else {
+      flushGroup_();
+      group.push(update);
+    }
+  });
+  flushGroup_();
+
+  // Older/legacy questions may not yet have a CategorySettings row. Create
+  // only those missing rows after the batch write.
+  missing.forEach(function(item) {
+    adminCatUpsertCategorySettings_({
+      gameId: safeGameId,
+      categoryId: item.categoryId,
+      displayOrder: item.displayOrder
+    });
+  });
+
+  SpreadsheetApp.flush();
+  adminCatClearCaches_();
+}
+
+function adminSetQuestionOrder(payload) {
+  payload = payload || {};
+
+  const gameId = adminCatNormalizeGameId_(payload.gameId);
+  let orderedCategoryIds = payload.orderedCategoryIds;
+  if (typeof orderedCategoryIds === "string") {
+    try { orderedCategoryIds = JSON.parse(orderedCategoryIds); } catch (ignore) {}
+  }
+  orderedCategoryIds = Array.isArray(orderedCategoryIds)
+    ? orderedCategoryIds.map(adminCatNormalizeId_).filter(Boolean)
+    : [];
+
+  if (!gameId || !orderedCategoryIds.length) {
+    throw new Error("GameId and orderedCategoryIds are required");
+  }
+
+  validateGameId(gameId);
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(15000);
+
+  try {
+    const setup = adminGetGameSetup({ gameId: gameId });
+    const currentIds = (Array.isArray(setup.categories) ? setup.categories : [])
+      .map(function(item) { return adminCatNormalizeId_(item && item.categoryId); })
+      .filter(Boolean);
+
+    if (currentIds.length !== orderedCategoryIds.length) {
+      throw new Error("Question order is stale. Refresh Manage Games and try again.");
+    }
+
+    const currentSet = {};
+    currentIds.forEach(function(id) { currentSet[id] = (currentSet[id] || 0) + 1; });
+    orderedCategoryIds.forEach(function(id) {
+      if (!currentSet[id]) throw new Error("Question order contains an unknown question: " + id);
+      currentSet[id] -= 1;
+    });
+    Object.keys(currentSet).forEach(function(id) {
+      if (currentSet[id] !== 0) throw new Error("Question order is missing question: " + id);
+    });
+
+    adminCatPersistQuestionOrder_(gameId, orderedCategoryIds);
+
+    return {
+      success: true,
+      gameId: gameId,
+      totalQuestions: orderedCategoryIds.length,
+      orderedCategoryIds: orderedCategoryIds,
+      message: "Question order saved."
+    };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function adminReorderQuestion(payload) {
   payload = payload || {};
 
@@ -3202,11 +3336,7 @@ function adminReorderQuestion(payload) {
   const requestedPosition = Number(payload.targetPosition || 0);
   const hasTargetPosition = Number.isFinite(requestedPosition) && requestedPosition > 0;
 
-  if (
-    !gameId ||
-    !categoryId ||
-    (!hasTargetPosition && direction !== -1 && direction !== 1)
-  ) {
+  if (!gameId || !categoryId || (!hasTargetPosition && direction !== -1 && direction !== 1)) {
     throw new Error("GameId, CategoryId, and either targetPosition or direction (-1 or 1) are required");
   }
 
@@ -3222,17 +3352,9 @@ function adminReorderQuestion(payload) {
       return adminCatNormalizeId_(item && item.categoryId) === categoryId;
     });
 
-    if (index < 0) {
-      throw new Error("Question not found: " + categoryId);
-    }
-
+    if (index < 0) throw new Error("Question not found: " + categoryId);
     if (!categories.length) {
-      return {
-        success: true,
-        unchanged: true,
-        position: 0,
-        message: "No questions are available to reorder."
-      };
+      return { success: true, unchanged: true, position: 0, message: "No questions are available to reorder." };
     }
 
     const targetPosition = hasTargetPosition
@@ -3254,17 +3376,11 @@ function adminReorderQuestion(payload) {
 
     const moved = categories.splice(index, 1)[0];
     categories.splice(targetIndex, 0, moved);
+    const orderedCategoryIds = categories.map(function(item) {
+      return adminCatNormalizeId_(item && item.categoryId);
+    }).filter(Boolean);
 
-    categories.forEach(function(category, orderIndex) {
-      adminCatUpsertCategorySettings_({
-        gameId: gameId,
-        categoryId: category.categoryId,
-        displayOrder: (orderIndex + 1) * 10
-      });
-    });
-
-    SpreadsheetApp.flush();
-    adminCatClearCaches_();
+    adminCatPersistQuestionOrder_(gameId, orderedCategoryIds);
 
     return {
       success: true,
@@ -3273,7 +3389,7 @@ function adminReorderQuestion(payload) {
       direction: direction,
       position: targetPosition,
       totalQuestions: categories.length,
-      displayOrder: targetPosition * 10,
+      orderedCategoryIds: orderedCategoryIds,
       message: "Question moved to position " + targetPosition + "."
     };
   } finally {

@@ -23,10 +23,10 @@ assert(page.includes('Official Website URL'), 'Official Website field missing fr
 assert(page.includes('id="awardsOfficialSourceUrl"'), 'Official Website input missing.');
 assert(page.includes('Open Official Site'), 'Official website open button missing.');
 assert(page.includes('officialSourceUrl: officialSourceUrl'), 'Official source must be sent to the create/link backend payload.');
-assert(app.includes('326-question-position-controls-v1216'), 'Main frontend asset marker missing.');
-assert(appMirror.includes('326-question-position-controls-v1216'), 'Frontend mirror asset marker missing.');
-assert(html.includes('326-question-position-controls-v1216'), 'HTML asset marker missing.');
-assert(sw.includes('awards-app-v326-question-position-controls-v1216'), 'Service-worker cache marker missing.');
+assert(app.includes('327-question-drag-order-v1216'), 'Main frontend asset marker missing.');
+assert(appMirror.includes('327-question-drag-order-v1216'), 'Frontend mirror asset marker missing.');
+assert(html.includes('327-question-drag-order-v1216'), 'HTML asset marker missing.');
+assert(sw.includes('awards-app-v327-question-drag-order-v1216'), 'Service-worker cache marker missing.');
 
 const sandbox = {};
 vm.createContext(sandbox);

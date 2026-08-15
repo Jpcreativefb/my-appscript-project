@@ -103,3 +103,11 @@ After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_16.md` before declaring v
 
 
 - Home Dashboard startup now batches active-game question/pick/wager progress and skips live archive progress (`HOME_DASHBOARD_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md`).
+
+
+## v1.2.16 Question Drag / Order Reliability Hotfix
+
+- Question ordering now persists through `adminSetQuestionOrder` using one final ordered ID list.
+- Manage Games supports desktop drag/drop plus mobile direct-position and arrow fallback.
+- Awards Manager staging uses the same simplified ordering controls.
+- Production gate: 117 JavaScript syntax checks and 92 regression/behavior tests passing.

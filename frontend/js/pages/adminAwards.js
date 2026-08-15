@@ -1481,30 +1481,27 @@ function awardsAdminRenderBatchQuestionGrid_() {
       <details
         class="admin-category-card awards-build-card awards-question-order-card ${built ? "is-built" : ""}"
         data-awards-batch-row="${index}"
-        draggable="true"
-        ondragstart="adminAwardsBatchDragStart_(event, ${index})"
         ondragover="adminAwardsBatchDragOver_(event)"
         ondrop="adminAwardsBatchDrop_(event, ${index})"
       >
         <summary class="awards-build-card-summary">
-          <div class="awards-order-controls" title="Question position">
-            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position - 1}, event)" ${index === 0 ? "disabled" : ""}>↑</button>
-            <label class="awards-position-jump" onclick="event.stopPropagation()">
-              <span class="sr-only">Question position</span>
+          <div class="awards-order-controls" title="Reorder question">
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position - 1}, event)" ${index === 0 ? "disabled" : ""} title="Move up one position">↑</button>
+            <label class="awards-position-jump" onclick="event.stopPropagation()" title="Type a destination position, then press Enter or leave the field">
+              <span class="sr-only">Move question to position</span>
               <input
                 type="number"
                 min="1"
                 max="${rows.length}"
                 value="${position}"
                 inputmode="numeric"
-                aria-label="Question position ${position} of ${rows.length}"
-                onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, this.value, event); }"
+                aria-label="Move question to position ${position}"
+                onchange="event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, this.value, event)"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();this.blur();}"
               >
-              <span>/ ${rows.length}</span>
-              <button type="button" class="admin-small-button secondary awards-position-move-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, this.parentElement.querySelector('input').value, event)">Move</button>
             </label>
-            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position + 1}, event)" ${index === rows.length - 1 ? "disabled" : ""}>↓</button>
-            <span class="awards-drag-handle" aria-hidden="true">⋮⋮</span>
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position + 1}, event)" ${index === rows.length - 1 ? "disabled" : ""} title="Move down one position">↓</button>
+            <span class="awards-drag-handle" draggable="true" ondragstart="event.stopPropagation();adminAwardsBatchDragStart_(event, ${index})" onclick="event.preventDefault();event.stopPropagation()" title="Drag to reorder" aria-label="Drag question to reorder" role="button" tabindex="0">⋮⋮</span>
           </div>
 
           <div class="awards-build-card-main awards-collapsed-question-main">
