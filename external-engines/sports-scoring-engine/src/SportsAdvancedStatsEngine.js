@@ -688,7 +688,10 @@ function sportsAdvancedFetchSummary_(score) {
   }
 
   const url = "https://site.api.espn.com/apis/site/v2/sports/" + encodeURIComponent(sport) + "/" + encodeURIComponent(league) + "/summary?event=" + encodeURIComponent(eventId);
-  const response = UrlFetchApp.fetch(url, { method: "get", muteHttpExceptions: true, followRedirects: true });
+  const fetchOptions = { method: "get", muteHttpExceptions: true, followRedirects: true };
+  const response = typeof sportsEspnFetch_ === "function"
+    ? sportsEspnFetch_(url, fetchOptions)
+    : UrlFetchApp.fetch(url, fetchOptions);
   const code = response.getResponseCode();
   const text = response.getContentText();
   if (code < 200 || code >= 300) throw new Error("ESPN summary failed. HTTP " + code + ": " + text.slice(0, 200));

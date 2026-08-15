@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **326-question-position-controls-v1216**
+Release asset marker: **sports-live-score-fetch-hotfix-v1216**
 
 ## Release state
 
@@ -66,6 +66,13 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - GitHub Actions production checks were added.
 - Repository release-note clutter is archived under `docs/archive/releases/` rather than deleted.
 
+
+### Sports Live Score Fetch Hotfix
+
+- External Sports Scores Engine live polling is date-scoped (yesterday/today/tomorrow) rather than season-wide.
+- Professional live score requests omit the broad `season=...&limit=500` pattern that returned ESPN HTTP 403 from Apps Script on August 15, 2026.
+- This requires a separate deployment of `external-engines/sports-scoring-engine/src/SportsScoresEngine.js`; updating the main Awards App deployment alone does not deploy it.
+
 ## Automated release gate
 
 Run:
@@ -79,7 +86,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 91 regression tests
+PASS: 93 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

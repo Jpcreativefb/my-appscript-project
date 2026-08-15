@@ -15,6 +15,134 @@
  ESPN FETCH + WRITE LATEST SCORES
 ************************************/
 
+const SPORTS_ESPN_PROXY_PROPERTY = "SPORTS_ESPN_PROXY_URL";
+const SPORTS_ESPN_PROXY_TOKEN_PROPERTY = "SPORTS_ESPN_PROXY_TOKEN";
+
+function sportsEspnProxyBaseUrl_() {
+  try {
+    return String(
+      PropertiesService
+        .getScriptProperties()
+        .getProperty(SPORTS_ESPN_PROXY_PROPERTY) || ""
+    ).trim().replace(/\/+$/, "");
+  } catch (err) {
+    return "";
+  }
+}
+
+function sportsEspnIsProxyEligibleUrl_(url) {
+  return /^https:\/\/site\.api\.espn\.com\/apis\/site\/v2\/sports\//i.test(String(url || ""));
+}
+
+function sportsEspnProxyToken_() {
+  try {
+    return String(
+      PropertiesService
+        .getScriptProperties()
+        .getProperty(SPORTS_ESPN_PROXY_TOKEN_PROPERTY) || ""
+    ).trim();
+  } catch (err) {
+    return "";
+  }
+}
+
+function sportsEspnRequestUrl_(url) {
+  const directUrl = String(url || "").trim();
+  const proxyBase = sportsEspnProxyBaseUrl_();
+  if (!proxyBase || !sportsEspnIsProxyEligibleUrl_(directUrl)) {
+    return directUrl;
+  }
+  return proxyBase + (proxyBase.indexOf("?") >= 0 ? "&" : "?") + "url=" + encodeURIComponent(directUrl);
+}
+
+function sportsEspnRequestOptions_(url, options) {
+  const next = {};
+  Object.keys(options || {}).forEach(function(key) {
+    next[key] = options[key];
+  });
+
+  const requestUrl = sportsEspnRequestUrl_(url);
+  const usingProxy = requestUrl !== String(url || "").trim();
+  if (!usingProxy) {
+    return next;
+  }
+
+  const token = sportsEspnProxyToken_();
+  if (!token) {
+    throw new Error(
+      "SPORTS_ESPN_PROXY_URL is configured but SPORTS_ESPN_PROXY_TOKEN is missing. " +
+      "Refusing to use an unauthenticated Sports proxy."
+    );
+  }
+
+  const headers = {};
+  Object.keys(next.headers || {}).forEach(function(key) {
+    headers[key] = next.headers[key];
+  });
+  headers["x-awards-sports-token"] = token;
+  next.headers = headers;
+  return next;
+}
+
+function sportsEspnFetch_(url, options) {
+  return UrlFetchApp.fetch(
+    sportsEspnRequestUrl_(url),
+    sportsEspnRequestOptions_(url, options || {})
+  );
+}
+
+function sportsEspnFetchAll_(requests) {
+  const safeRequests = (requests || []).map(function(request) {
+    const originalUrl = request && request.url;
+    const next = sportsEspnRequestOptions_(originalUrl, request || {});
+    next.url = sportsEspnRequestUrl_(originalUrl);
+    return next;
+  });
+  return UrlFetchApp.fetchAll(safeRequests);
+}
+
+function getSportsEspnProxyStatus() {
+  const url = sportsEspnProxyBaseUrl_();
+  const tokenConfigured = !!sportsEspnProxyToken_();
+  return {
+    success: true,
+    configured: !!url && tokenConfigured,
+    urlConfigured: !!url,
+    tokenConfigured: tokenConfigured,
+    property: SPORTS_ESPN_PROXY_PROPERTY,
+    tokenProperty: SPORTS_ESPN_PROXY_TOKEN_PROPERTY,
+    proxyUrl: url
+  };
+}
+
+function setSportsEspnProxyUrl(url) {
+  const value = String(url || "").trim().replace(/\/+$/, "");
+  if (!/^https:\/\//i.test(value)) {
+    throw new Error("Sports ESPN proxy URL must be HTTPS.");
+  }
+  PropertiesService.getScriptProperties().setProperty(SPORTS_ESPN_PROXY_PROPERTY, value);
+  return getSportsEspnProxyStatus();
+}
+
+function setSportsEspnProxyToken(token) {
+  const value = String(token || "").trim();
+  if (value.length < 32) {
+    throw new Error("Sports ESPN proxy token must be at least 32 characters.");
+  }
+  PropertiesService.getScriptProperties().setProperty(SPORTS_ESPN_PROXY_TOKEN_PROPERTY, value);
+  return getSportsEspnProxyStatus();
+}
+
+function clearSportsEspnProxyUrl() {
+  PropertiesService.getScriptProperties().deleteProperty(SPORTS_ESPN_PROXY_PROPERTY);
+  return getSportsEspnProxyStatus();
+}
+
+function clearSportsEspnProxyToken() {
+  PropertiesService.getScriptProperties().deleteProperty(SPORTS_ESPN_PROXY_TOKEN_PROPERTY);
+  return getSportsEspnProxyStatus();
+}
+
 const SPORTS_SHEETS = {
   GAMES: "SportsGames",
   SCORES: "SportsScores",
@@ -1282,7 +1410,30 @@ function runSportsScoresUpdate(forceRefresh) {
       }
 
       try {
-        const games = fetchAndNormalizeESPNScoreboardFromSetting_(setting);
+        // The smart live updater must never perform a season-wide scoreboard
+        // pull. Fetch a tiny yesterday/today/tomorrow window instead so live
+        // and late-night games update without triggering ESPN's broad-query
+        // protection. Season/schedule builders continue to use their own jobs.
+        const liveDates = buildSportsDateStrings_(1, 1);
+        const gamesById = {};
+        liveDates.forEach(function(dateString) {
+          const dateGames = fetchAndNormalizeESPNScoreboardFromSetting_(
+            setting,
+            dateString,
+            {
+              FetchMode: "LIVE_SCOREBOARD",
+              SeasonYear: setting.SeasonYear,
+              SeasonType: "",
+              SeasonPhase: setting.SeasonPhase || "LIVE SCOREBOARD"
+            }
+          );
+          dateGames.forEach(function(game) {
+            if (game && game.GameId) gamesById[game.GameId] = game;
+          });
+        });
+        const games = Object.keys(gamesById).map(function(gameId) {
+          return gamesById[gameId];
+        });
 
         if (setting.SavePeriodSnapshots) {
           detectAndSaveSportsSnapshots_(previousScores, games);
@@ -4901,13 +5052,25 @@ function sportsV13BuildESPNRequests_(setting, dateString, options) {
   }
 
   function pushScoreboard_(groupId) {
-    const params = {
-      dates: espnDate,
-      season: seasonYear,
-      seasontype: seasonType,
-      groups: groupId,
-      limit: resultLimit
-    };
+    // Live/date-scoped score polling should stay intentionally small. ESPN's
+    // edge can reject broad season-wide scoreboard requests from Apps Script
+    // (for example ?season=2026&limit=500). When a concrete date is present,
+    // the date is sufficient and we keep only group/limit where broad college
+    // coverage actually needs them. Season filtering still happens locally in
+    // sportsV16EventMatchesRequestedSeason_.
+    const isDateScoped = !!espnDate;
+    const params = isDateScoped
+      ? {
+          dates: espnDate,
+          groups: groupId,
+          limit: sportsV13IsCollegeLeague_(sport, league) ? resultLimit : ""
+        }
+      : {
+          season: seasonYear,
+          seasontype: seasonType,
+          groups: groupId,
+          limit: resultLimit
+        };
     requests.push({
       url: sportsV13UrlWithParams_(cleanBase, params),
       sport: sport,
@@ -4943,11 +5106,26 @@ function sportsV13ExtractEvents_(payload) {
 }
 
 function sportsV13FetchJson_(url) {
-  const response = UrlFetchApp.fetch(url, { method: "get", muteHttpExceptions: true });
+  const requestUrl = sportsEspnRequestUrl_(url);
+  const response = sportsEspnFetch_(url, {
+    method: "get",
+    muteHttpExceptions: true,
+    followRedirects: true,
+    headers: {
+      Accept: "application/json,text/plain,*/*",
+      "Cache-Control": "no-cache"
+    }
+  });
   const statusCode = response.getResponseCode();
   const body = response.getContentText();
   if (statusCode < 200 || statusCode >= 300) {
-    throw new Error("ESPN fetch failed. HTTP status: " + statusCode + " URL: " + url + " Body: " + body.slice(0, 200));
+    const providerHint = statusCode === 403
+      ? (requestUrl !== url
+          ? " Cloudflare proxy reached the provider but the provider returned 403."
+          : " Provider rejected the Apps Script fetch. Configure SPORTS_ESPN_PROXY_URL to route ESPN requests through Cloudflare.")
+      : "";
+    const transportHint = requestUrl !== url ? " via configured Cloudflare proxy" : " direct from Apps Script";
+    throw new Error("ESPN fetch failed. HTTP status: " + statusCode + " URL: " + url + transportHint + providerHint + " Body: " + body.slice(0, 200));
   }
   return JSON.parse(body || "{}");
 }

@@ -883,12 +883,15 @@ function sportsPlayersFetchJson_(url, label) {
 
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const response = UrlFetchApp.fetch(url, {
+      const fetchOptions = {
         method: "get",
         muteHttpExceptions: true,
         followRedirects: true,
         headers: { Accept: "application/json" }
-      });
+      };
+      const response = typeof sportsEspnFetch_ === "function"
+        ? sportsEspnFetch_(url, fetchOptions)
+        : UrlFetchApp.fetch(url, fetchOptions);
 
       const code = response.getResponseCode();
       const text = response.getContentText();
@@ -1054,7 +1057,9 @@ function syncSportsPlayersForLeague(league, sport) {
     };
   });
 
-  const responses = UrlFetchApp.fetchAll(requests);
+  const responses = typeof sportsEspnFetchAll_ === "function"
+    ? sportsEspnFetchAll_(requests)
+    : UrlFetchApp.fetchAll(requests);
   const now = new Date();
   const players = [];
   const errors = [];

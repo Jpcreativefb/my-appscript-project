@@ -255,3 +255,12 @@ Behavior changes:
 - CategorySettings DisplayOrder persistence is batched instead of rereading the full settings sheet per question.
 - Awards Manager staging uses the same simplified drag/position interaction.
 - Current-release marker assertions updated for v327.
+
+Sports ESPN Cloudflare Proxy Hotfix:
+functions/api/espn-proxy.js
+frontend/_routes.json
+external-engines/sports-scoring-engine/src/SportsScoresEngine.js
+external-engines/sports-scoring-engine/src/SportsPlayersEngine.js
+external-engines/sports-scoring-engine/src/SportsAdvancedStatsEngine.js
+tests/sports_espn_cloudflare_proxy_v1216_tests.js
+SPORTS_ESPN_CLOUDFLARE_PROXY_HOTFIX_V1_2_16.md

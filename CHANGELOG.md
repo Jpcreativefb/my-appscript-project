@@ -1,3 +1,10 @@
+## v1.2.16 — Sports Live Score Fetch Hotfix
+
+- Replaced season-wide smart score polling with a small yesterday/today/tomorrow ESPN scoreboard window.
+- Date-scoped NFL/MLB requests no longer send unnecessary `season`, `seasontype`, or `limit=500` parameters that were returning HTTP 403 from Apps Script.
+- Added de-duplication across the live date window and clearer provider 403 diagnostics while leaving season/schedule builders unchanged.
+- Added regression coverage for the live score fetch path.
+
 ## v1.2.16 — Shared Question Position Controls Hotfix
 
 - Replaced unreliable arrow-only Manage Games question ordering with one target-position backend operation.
@@ -406,3 +413,9 @@
 - Added handle-based desktop drag/drop and simpler mobile position controls in Manage Games and Awards Manager.
 - Removed redundant `/ total` position text and the separate Move button.
 - Added batch CategorySettings DisplayOrder persistence and regression coverage.
+
+## v1.2.16 Sports ESPN Cloudflare Proxy Hotfix
+- Secured the ESPN Pages Function with an encrypted `SPORTS_PROXY_TOKEN` and matching Sports Engine request header so the endpoint cannot be used anonymously to consume the free quota.
+- Routed Sports Scores Engine ESPN requests through a locked-down Cloudflare Pages Function when `SPORTS_ESPN_PROXY_URL` is configured.
+- Covered scoreboard, player roster/game stats, and advanced-stat ESPN transport.
+- Preserved direct ESPN as a fallback and disabled proxy response caching for live data.
