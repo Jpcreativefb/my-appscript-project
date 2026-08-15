@@ -56,3 +56,25 @@ tests/production_hardening_v1216_tests.js
 HOME_DASHBOARD_PROGRESS_HOTFIX_V1_2_16.md (new)
 PRODUCTION_STATUS.md
 CHANGELOG.md
+
+AWARDS MANAGER VIEW EVENT HOTFIX (smoke-test follow-up)
+frontend/js/pages/adminAwards.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/awards_manager_view_event_v1216_hotfix_tests.js (new)
+tests/production_hardening_v1216_tests.js
+AWARDS_MANAGER_VIEW_EVENT_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
+
+Awards official-source hotfix:
+- backend/engines/AwardsManagerEngine.js
+- frontend/js/pages/adminAwards.js
+- frontend/app.js
+- frontend/js/app.js
+- frontend/app.html
+- frontend/sw.js
+- tests/awards_manager_official_source_v1216_hotfix_tests.js
+- AWARDS_MANAGER_OFFICIAL_SOURCE_HOTFIX_V1_2_16.md

@@ -70,6 +70,6 @@ assert(admin.includes('sessionToken: ""'), 'PIN reset/deactivation paths must re
 
 assertCurrentReleaseMarkers(assert, app, html, sw);
 assert.strictEqual(app, appMirror, 'Frontend app compatibility mirror is out of sync.');
-assert(app.includes('319-home-dashboard-progress-v1216'), 'v1.2.16 asset marker is missing.');
+assert(app.includes('321-awards-official-source-v1216'), 'v1.2.16 asset marker is missing.');
 
 console.log('Production hardening v1.2.16 tests passed.');

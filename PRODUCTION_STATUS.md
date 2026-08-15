@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **319-home-dashboard-progress-v1216**
+Release asset marker: **321-awards-official-source-v1216**
 
 ## Release state
 
@@ -45,6 +45,8 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Deactivating a user revokes their current session.
 - User Active / AccountStatus compatibility was normalized.
 - Dashboard/Home progress now reads the logged-in user’s actual saved picks/wagers and tells players how many selections remain.
+- Awards Manager `View Event` now scrolls/focuses the Build/Link workspace with visible loading/error feedback so provider-event selection cannot appear to do nothing.
+- Awards Manager now supports a preferred Official Website URL, auto-detects non-provider settlement URLs when available, and preserves Kalshi/Polymarket as secondary market-data references.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.
 - GitHub Actions production checks were added.
@@ -63,7 +65,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 78 regression tests
+PASS: 80 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

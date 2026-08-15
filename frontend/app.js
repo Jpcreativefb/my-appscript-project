@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "319-home-dashboard-progress-v1216";
-const APP_ROUTE_HOTFIX_VERSION = "v12161-home-dashboard-progress";
+const APP_ASSET_VERSION = "321-awards-official-source-v1216";
+const APP_ROUTE_HOTFIX_VERSION = "v12163-awards-official-source";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

@@ -60,8 +60,8 @@ assert(
   'Progress bar must only render when progress is available.'
 );
 assert(
-  app.includes('319-home-dashboard-progress-v1216'),
-  'Home progress hotfix asset marker is missing.'
+  app.includes('321-awards-official-source-v1216'),
+  'Current v1.2.16 asset marker is missing after the Awards View Event hotfix.'
 );
 
 console.log('Dashboard Home progress v1.2.16 hotfix tests passed.');

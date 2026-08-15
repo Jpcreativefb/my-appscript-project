@@ -330,7 +330,11 @@ async function renderAdminAwardsPage() {
           <div id="awardsSearchResults" class="admin-list"></div>
         </div>
 
-        <div class="card admin-card">
+        <div
+          id="awardsEventWorkspace"
+          class="card admin-card"
+          tabindex="-1"
+        >
           <h2>2. Build or Link the Question</h2>
           <div id="awardsSelectedMarket" class="admin-sub">Choose a provider market above.</div>
           <div id="awardsTargetBuilder"></div>
@@ -505,6 +509,32 @@ function awardsAdminExternalLink_(url, label) {
   `;
 }
 
+function awardsAdminOfficialSourceUrl_() {
+  const input = document.getElementById("awardsOfficialSourceUrl");
+  const value = String(input && input.value || "").trim();
+  if (!value) return "";
+  if (!/^https?:\/\//i.test(value)) {
+    throw new Error("Official Website URL must start with http:// or https://.");
+  }
+  return value;
+}
+
+function adminAwardsOpenOfficialSource() {
+  const status = document.getElementById("awardsBuilderStatus");
+  try {
+    const url = awardsAdminOfficialSourceUrl_();
+    if (!url) {
+      throw new Error("Paste an official website URL first.");
+    }
+    window.open(url, "_blank", "noopener,noreferrer");
+  } catch (err) {
+    if (status) {
+      status.className = "admin-message warning";
+      status.textContent = err && err.message ? err.message : String(err);
+    }
+  }
+}
+
 function awardsAdminRenderSearchResults_() {
   const resultsNode =
     document.getElementById(
@@ -645,7 +675,7 @@ function awardsAdminRenderSearchResults_() {
                   <button
                     type="button"
                     class="admin-small-button"
-                    onclick="adminAwardsOpenEvent(${index})"
+                    onclick="adminAwardsOpenEvent(${index}, this)"
                   >
                     View Event
                   </button>
@@ -935,6 +965,34 @@ function awardsAdminRenderEventBuilder_() {
 
   builder.innerHTML = `
     <div class="admin-control-grid" style="margin-top:12px;">
+      <label
+        class="admin-field"
+        style="grid-column:1 / -1;"
+      >
+        <span>Official Website URL (preferred result source)</span>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input
+            id="awardsOfficialSourceUrl"
+            type="url"
+            placeholder="https://www.emmys.com/..."
+            value="${awardsAdminEsc_(event.officialSourceUrl || "")}"
+            style="flex:1;min-width:240px;"
+          >
+          <button
+            type="button"
+            class="admin-small-button secondary"
+            onclick="adminAwardsOpenOfficialSource()"
+          >
+            Open Official Site
+          </button>
+        </div>
+        <span class="admin-sub">
+          Auto-filled from the provider settlement source when available.
+          You can paste the official awards/results page manually.
+          Official is stored as the preferred reference; Kalshi/Polymarket stays linked for market data.
+        </span>
+      </label>
+
       <label class="admin-field">
         <span>Awards App Game</span>
         <select id="awardsCreateGame">
@@ -1131,11 +1189,21 @@ function awardsAdminRenderEventBuilder_() {
   `;
 }
 
-async function adminAwardsOpenEvent(index) {
+async function adminAwardsOpenEvent(index, button) {
   const event =
     AWARDS_MANAGER_STATE.events[index];
 
   if (!event) return;
+
+  const originalButtonText =
+    button && button.textContent
+      ? button.textContent
+      : "View Event";
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Loading Event…";
+  }
 
   AWARDS_MANAGER_STATE.mode = "create";
   AWARDS_MANAGER_STATE.selectedEvent = null;
@@ -1183,6 +1251,33 @@ async function adminAwardsOpenEvent(index) {
         Loading full provider event and all live markets…
       </div>
     `;
+  }
+
+  const workspace =
+    document.getElementById(
+      "awardsEventWorkspace"
+    );
+
+  if (
+    workspace &&
+    typeof workspace.scrollIntoView === "function"
+  ) {
+    workspace.scrollIntoView({
+      behavior: "smooth",
+      block: "start"
+    });
+
+    if (typeof workspace.focus === "function") {
+      window.setTimeout(function() {
+        try {
+          workspace.focus({
+            preventScroll: true
+          });
+        } catch (focusErr) {
+          workspace.focus();
+        }
+      }, 250);
+    }
   }
 
   try {
@@ -1272,10 +1367,14 @@ async function adminAwardsOpenEvent(index) {
             : ""
         }
 
-        <div style="margin-top:8px;">
+        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
           ${awardsAdminExternalLink_(
             res.sourceUrl,
             "Open Provider Event"
+          )}
+          ${awardsAdminExternalLink_(
+            res.officialSourceUrl,
+            "Open Official Website"
           )}
         </div>
       `;
@@ -1293,6 +1392,11 @@ async function adminAwardsOpenEvent(index) {
           )}
         </div>
       `;
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalButtonText;
     }
   }
 }
@@ -1476,6 +1580,18 @@ async function adminAwardsCreateFromMarket(button) {
     ).value || 1
   );
 
+  let officialSourceUrl = "";
+  try {
+    officialSourceUrl = awardsAdminOfficialSourceUrl_();
+  } catch (urlErr) {
+    const urlStatus = document.getElementById("awardsBuilderStatus");
+    if (urlStatus) {
+      urlStatus.className = "admin-message warning";
+      urlStatus.textContent = urlErr.message || String(urlErr);
+    }
+    return;
+  }
+
   const status =
     document.getElementById(
       "awardsBuilderStatus"
@@ -1573,6 +1689,7 @@ async function adminAwardsCreateFromMarket(button) {
         question: question,
         section: section,
         points: points,
+        officialSourceUrl: officialSourceUrl,
         marketJSON:
           JSON.stringify(market),
         groupMarketsJSON: grouped
@@ -1602,8 +1719,8 @@ async function adminAwardsCreateFromMarket(button) {
         "admin-message success";
 
       status.textContent =
-        res.message ||
-        "Question created and linked.";
+        (res.message || "Question created and linked.") +
+        (officialSourceUrl ? " Official website saved as the preferred result reference." : "");
     }
   } catch (err) {
     if (status) {
@@ -1653,10 +1770,14 @@ async function adminAwardsLinkMarket(button) {
   }
 
   try {
+    const officialSourceUrl = document.getElementById("awardsOfficialSourceUrl")
+      ? awardsAdminOfficialSourceUrl_()
+      : "";
     const res = await apiAdminAwardsLinkMarket({
       gameId: gameId,
       categoryId: categoryId,
       outcomeMapJSON: JSON.stringify(outcomeMap),
+      officialSourceUrl: officialSourceUrl,
       marketJSON: JSON.stringify(market)
     });
     if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not save mapping.");

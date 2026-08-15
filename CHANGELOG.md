@@ -1,5 +1,11 @@
 ## v1.2.16 — Fall Production Hardening
 
+- Hotfix: Awards Manager now supports an Official Website URL as the preferred result/reference source while preserving Kalshi/Polymarket for market data.
+- Kalshi settlement-source URLs and provider resolution URLs are used to auto-fill the official source when they point to a non-provider website; admins can override/paste the official awards/results page manually.
+- Created Awards questions store both official and provider source URLs plus an explicit source priority (`official → provider → manual`) for review-first settlement.
+- Bumped browser/service-worker assets to v321 for the Awards official-source hotfix.
+- Hotfix: Awards Manager `View Event` now visibly opens the Build/Link workspace instead of updating a section below the search-results list with no navigation feedback.
+- `View Event` now shows a loading state, scrolls/focuses the event workspace immediately, and surfaces provider-event load errors where the admin lands.
 - Hotfix: Home/Active Games cards now calculate real per-user completion instead of returning a hard-coded 0%.
 - Home progress supports Prediction, Confidence, Staked Prediction, Head-to-Head, Wager, Racing Wager, and Hybrid games.
 - Season hubs and unfinished generic Ranking/Survivor modes no longer display a misleading 0% progress bar.
@@ -15,7 +21,7 @@
 - Replaced stale historic cache-marker test assertions with a current-release contract.
 - Added `tools/run_production_checks.sh` and GitHub Actions CI.
 - Archived historical root release notes instead of deleting them.
-- Bumped browser/service-worker assets to v319 for the Home progress hotfix.
+- Bumped browser/service-worker assets to v320 for the Awards Manager View Event UX hotfix.
 
 ## v1.2.15 — Awards Manager true event search
 

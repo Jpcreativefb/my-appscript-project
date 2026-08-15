@@ -4,7 +4,7 @@
    Live Kalshi/Polymarket discovery + safe Hub mappings.
 ===================================================== */
 
-const AWARDS_MANAGER_VERSION = "1.2.15";
+const AWARDS_MANAGER_VERSION = "1.2.16";
 const AWARDS_MANAGER_KALSHI_BASE = "https://external-api.kalshi.com/trade-api/v2";
 const AWARDS_MANAGER_POLYMARKET_BASE = "https://gamma-api.polymarket.com";
 const AWARDS_MANAGER_PROVIDERS = ["kalshi", "polymarket"];
@@ -77,6 +77,78 @@ function awardsManagerDateMs_(value) {
 
   const ms = Date.parse(text);
   return isNaN(ms) ? null : ms;
+}
+
+function awardsManagerSafeHttpUrl_(value) {
+  const text = awardsManagerString_(value);
+  if (!text) return "";
+  if (!/^https?:\/\//i.test(text)) {
+    throw new Error("Official Website URL must start with http:// or https://.");
+  }
+  return text.slice(0, 2000);
+}
+
+function awardsManagerExtractHttpUrl_(value) {
+  const text = awardsManagerString_(value);
+  if (!text) return "";
+  const match = text.match(/https?:\/\/[^\s·<>"]+/i);
+  if (!match) return "";
+  return String(match[0] || "").replace(/[),.;]+$/, "");
+}
+
+function awardsManagerIsProviderUrl_(value) {
+  const url = awardsManagerKey_(value);
+  return url.indexOf("kalshi.com") !== -1 ||
+    url.indexOf("polymarket.com") !== -1 ||
+    url.indexOf("gamma-api.polymarket.com") !== -1;
+}
+
+function awardsManagerOfficialSourceUrl_(event, markets) {
+  event = event || {};
+
+  const settlementSources = Array.isArray(event.settlement_sources)
+    ? event.settlement_sources
+    : [];
+
+  for (let i = 0; i < settlementSources.length; i += 1) {
+    const candidate = awardsManagerExtractHttpUrl_(
+      settlementSources[i] && settlementSources[i].url
+    );
+    if (candidate && !awardsManagerIsProviderUrl_(candidate)) return candidate;
+  }
+
+  const direct = [
+    event.resolutionSource,
+    event.resolution_source,
+    event.rules_primary,
+    event.rules_secondary
+  ];
+
+  for (let j = 0; j < direct.length; j += 1) {
+    const candidate = awardsManagerExtractHttpUrl_(direct[j]);
+    if (candidate && !awardsManagerIsProviderUrl_(candidate)) return candidate;
+  }
+
+  const rows = Array.isArray(markets) ? markets : [];
+  for (let k = 0; k < rows.length; k += 1) {
+    const market = rows[k] || {};
+    const raw = market.raw || {};
+    const rawSources = Array.isArray(raw.settlement_sources)
+      ? raw.settlement_sources
+      : [];
+
+    for (let s = 0; s < rawSources.length; s += 1) {
+      const candidate = awardsManagerExtractHttpUrl_(
+        rawSources[s] && rawSources[s].url
+      );
+      if (candidate && !awardsManagerIsProviderUrl_(candidate)) return candidate;
+    }
+
+    const candidate = awardsManagerExtractHttpUrl_(market.resolutionSource);
+    if (candidate && !awardsManagerIsProviderUrl_(candidate)) return candidate;
+  }
+
+  return "";
 }
 
 function awardsManagerMarketIsLive_(market, event) {
@@ -516,6 +588,7 @@ function awardsManagerKalshiEvent_(eventId) {
     status: awardsManagerString_(event.status || "open"),
     sourceUrl:
       awardsManagerKalshiWebEventUrl_(event),
+    officialSourceUrl: awardsManagerOfficialSourceUrl_(event, markets),
     markets: markets
   };
 }
@@ -580,6 +653,7 @@ function awardsManagerPolymarketEvent_(eventId) {
       : AWARDS_MANAGER_POLYMARKET_BASE +
         "/events/" +
         encodeURIComponent(eventId),
+    officialSourceUrl: awardsManagerOfficialSourceUrl_(event, markets),
     markets: markets
   };
 }
@@ -1564,6 +1638,7 @@ function awardsManagerMarketPayload_(payload) {
     status: awardsManagerString_(market.status || "open"),
     resolutionSource: awardsManagerString_(market.resolutionSource),
     sourceUrl: awardsManagerString_(market.sourceUrl),
+    officialSourceUrl: awardsManagerString_(market.officialSourceUrl),
     raw: market.raw || {}
   };
 }
@@ -1574,7 +1649,7 @@ function awardsManagerMappingId_(gameId, categoryId, nomineeId, provider, market
     awardsManagerSlug_(marketId).slice(-40), awardsManagerSlug_(outcome)
   ].filter(Boolean).join("-").slice(0, 220);
 }
-function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap) {
+function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap, officialSourceUrl) {
   if (typeof externalResultsBridgeEnqueue_ !== "function") {
     throw new Error("External Results Hub bridge is unavailable.");
   }
@@ -1610,7 +1685,10 @@ function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap)
         marketQuestion: market.marketQuestion,
         eventName: market.eventName,
         livePrices: market.prices,
-        resolutionSource: market.resolutionSource || ""
+        resolutionSource: market.resolutionSource || "",
+        officialSourceUrl: officialSourceUrl || "",
+        providerSourceUrl: market.sourceUrl || "",
+        sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"]
       }),
       Active: true,
       CreatedAt: now,
@@ -1688,7 +1766,7 @@ function awardsManagerGroupedAnswerLabel_(market) {
   return question;
 }
 
-function awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMarketId) {
+function awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMarketId, officialSourceUrl) {
   if (typeof externalResultsBridgeEnqueue_ !== "function") {
     throw new Error("External Results Hub bridge is unavailable.");
   }
@@ -1780,7 +1858,10 @@ function awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMa
         marketQuestion: market.marketQuestion,
         eventName: market.eventName,
         livePrices: market.prices,
-        resolutionSource: market.resolutionSource || ""
+        resolutionSource: market.resolutionSource || "",
+        officialSourceUrl: officialSourceUrl || "",
+        providerSourceUrl: market.sourceUrl || "",
+        sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"]
       }),
       Active: true,
       CreatedAt: now,
@@ -1818,6 +1899,8 @@ function awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMa
           source: "awards-manager",
           groupedEvent: true,
           provider: provider,
+          officialSourceUrl: officialSourceUrl || "",
+          providerSourceUrl: first.sourceUrl || "",
           marketIds: usable.map(function(market) {
             return market.externalMarketId;
           })
@@ -1836,6 +1919,10 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
 
   const gameId = awardsManagerString_(payload.gameId);
   if (!gameId) throw new Error("Choose the Awards App game.");
+
+  const officialSourceUrl = awardsManagerSafeHttpUrl_(
+    payload.officialSourceUrl || ""
+  );
 
   const groupRaw = awardsManagerParseJson_(payload.groupMarketsJSON, []);
   const grouped = Array.isArray(groupRaw) && groupRaw.length >= 2;
@@ -1908,7 +1995,7 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     externalMarketId: grouped ? "" : market.externalMarketId,
     autoSettle: false,
     requireAdminReview: true,
-    sourceUrl: market.sourceUrl,
+    sourceUrl: officialSourceUrl || market.sourceUrl,
     sourceConfigJSON: awardsManagerCompactJson_({
       source: "awards-manager",
       version: AWARDS_MANAGER_VERSION,
@@ -1919,7 +2006,10 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
       marketIds: markets.map(function(item) {
         return item.externalMarketId;
       }),
-      resolutionSource: market.resolutionSource
+      resolutionSource: market.resolutionSource,
+      officialSourceUrl: officialSourceUrl || "",
+      providerSourceUrl: market.sourceUrl || "",
+      sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"]
     })
   });
 
@@ -2000,7 +2090,8 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
       markets,
       gameId,
       categoryId,
-      nomineeByMarketId
+      nomineeByMarketId,
+      officialSourceUrl
     );
   } else {
     const outcomeMap = {};
@@ -2018,7 +2109,8 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
       market,
       gameId,
       categoryId,
-      outcomeMap
+      outcomeMap,
+      officialSourceUrl
     );
   }
 
@@ -2036,6 +2128,11 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     categoryResult: categoryResult,
     nomineeResult: nomineeResult,
     bridge: bridge,
+    sources: {
+      officialSourceUrl: officialSourceUrl || "",
+      providerSourceUrl: market.sourceUrl || "",
+      preferred: officialSourceUrl ? "official" : "provider"
+    },
     safety: {
       autoSettle: false,
       requireAdminReview: true
@@ -2048,6 +2145,9 @@ function apiAdminAwardsLinkMarket(payload) {
   payload = payload || {};
   const gameId = awardsManagerString_(payload.gameId);
   const categoryId = awardsManagerString_(payload.categoryId);
+  const officialSourceUrl = awardsManagerSafeHttpUrl_(
+    payload.officialSourceUrl || ""
+  );
   if (!gameId) throw new Error("Choose the Awards App game.");
   if (!categoryId) throw new Error("Choose the Awards App question.");
 
@@ -2085,18 +2185,21 @@ function apiAdminAwardsLinkMarket(payload) {
     externalMarketId: market.externalMarketId,
     autoSettle: false,
     requireAdminReview: true,
-    sourceUrl: market.sourceUrl,
+    sourceUrl: officialSourceUrl || market.sourceUrl,
     sourceConfigJSON: awardsManagerCompactJson_({
       source: "awards-manager",
       version: AWARDS_MANAGER_VERSION,
       provider: market.provider,
       marketQuestion: market.marketQuestion,
-      resolutionSource: market.resolutionSource
+      resolutionSource: market.resolutionSource,
+      officialSourceUrl: officialSourceUrl || "",
+      providerSourceUrl: market.sourceUrl || "",
+      sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"]
     }),
     skipCategoryResultWrite: true
   });
 
-  const bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, safeMap);
+  const bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, safeMap, officialSourceUrl);
   return {
     success: true,
     message: "Provider market linked and queued to the External Results Hub.",
@@ -2104,6 +2207,11 @@ function apiAdminAwardsLinkMarket(payload) {
     categoryId: categoryId,
     outcomeMap: safeMap,
     bridge: bridge,
+    sources: {
+      officialSourceUrl: officialSourceUrl || "",
+      providerSourceUrl: market.sourceUrl || "",
+      preferred: officialSourceUrl ? "official" : "provider"
+    },
     safety: { autoSettle: false, requireAdminReview: true }
   };
 }
