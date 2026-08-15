@@ -135,3 +135,10 @@ Behavior changes:
 - Player K/P percentages honor question-level and per-answer visibility.
 - Inline existing-question market linking remains available.
 
+
+Awards Batch Builder Runtime Hotfix
+- backend/engines/NormalizedQuestionStorageEngine.js
+- tests/normalized_storage_option_payload_scope_v1216_hotfix_tests.js
+- AWARDS_BATCH_BUILDER_RUNTIME_HOTFIX_V1_2_16.md
+- CHANGELOG.md
+- PRODUCTION_STATUS.md

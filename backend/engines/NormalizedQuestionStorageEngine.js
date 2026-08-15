@@ -2198,11 +2198,15 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
       SportsMarket: question.SportsMarket,
       SportsSelection: question.SportsSelection,
       SportsLine: question.SportsLine,
-      BettingOdds: optionPayload.BettingOdds !== undefined && optionPayload.BettingOdds !== ""
-        ? optionPayload.BettingOdds
-        : question.BettingOdds,
-      OddsSource: optionPayload.OddsSource || question.OddsSource,
-      OddsLastUpdated: optionPayload.OddsLastUpdated || question.OddsLastUpdated,
+      /*
+       * The synthetic admin anchor represents the question itself, so it can
+       * only use question-level odds metadata here. Per-option odds live in
+       * QuestionOptions.PayloadJSON and are merged below inside the option
+       * loop, where optionPayload is actually defined.
+       */
+      BettingOdds: question.BettingOdds,
+      OddsSource: question.OddsSource,
+      OddsLastUpdated: question.OddsLastUpdated,
       Nominee: "",
       NomineeId: "",
       ShortAnswer: "",

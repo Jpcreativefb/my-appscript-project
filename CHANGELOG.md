@@ -1,3 +1,10 @@
+
+## v1.2.16 — Awards Batch Builder Runtime Hotfix
+
+- Fixed `optionPayload is not defined` in normalized question projection during Awards batch creation.
+- Preserved question-level odds on synthetic admin anchors and per-answer odds on option rows.
+- Added executable regression coverage for the failing runtime path.
+
 ## v1.2.16 — Fall Production Hardening
 
 - Awards Manager Batch Builder: reorganized Awards setup into Game & Source Setup → Find & Select Events → Configure & Build Questions.

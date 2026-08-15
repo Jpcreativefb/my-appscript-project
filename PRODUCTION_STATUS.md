@@ -89,3 +89,8 @@ After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_16.md` before declaring v
 2. Finish and certify Ranking games.
 3. Build reusable Fall game templates for football, Emmys/awards, and recurring Reality TV seasons.
 4. Continue reducing normal admin workflows to Create → Configure → Test → Activate → Approve Results → Archive while keeping repair tools under Advanced/Diagnostics.
+
+### Awards Batch Builder Runtime Hotfix
+- Fixed normalized storage `optionPayload` scope failure that blocked Awards batch question creation.
+- Runtime regression coverage added for question/option odds projection.
+
