@@ -23,6 +23,6 @@ assert(awardsEngine.includes('probabilityDisplayByNomineeId'), 'Awards backend m
 assert(awardsEngine.includes('selectedOutcomesJSON'), 'Awards backend must honor selected single-market outcomes.');
 assert(picks.includes('sourceConfig.showMarketProbabilities === false'), 'Player picks must hide question-level market probabilities.');
 assert(picks.includes('probabilityDisplayByNomineeId') && picks.includes('perAnswer[nomineeId] === false'), 'Player picks must hide answer-level probabilities.');
-assert(app.includes('325-game-load-question-controls-v1216'), 'v323 Awards batch-builder asset marker missing.');
-assert(sw.includes('awards-app-v325-game-load-question-controls-v1216'), 'v323 Awards batch-builder service-worker cache missing.');
+assert(app.includes('326-question-position-controls-v1216'), 'v323 Awards batch-builder asset marker missing.');
+assert(sw.includes('awards-app-v326-question-position-controls-v1216'), 'v323 Awards batch-builder service-worker cache missing.');
 console.log('PASS: Awards Manager v1.2.16 batch-builder tests');

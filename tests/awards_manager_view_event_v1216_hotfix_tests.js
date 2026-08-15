@@ -14,7 +14,7 @@ assert(awards.includes('awardsAdminRenderCompactEventEditor_'), 'Compact event e
 assert(awards.includes('Advanced Settings') && awards.includes('Markets / Answers'), 'Event editor must keep advanced settings and markets collapsible.');
 assert(awards.includes('Answer Text'), 'Event editor must support player-facing answer text edits.');
 assert(awards.includes('Loading…'), 'Configure action must show visible loading feedback.');
-assert(app.includes('325-game-load-question-controls-v1216'), 'Awards mobile workflow asset marker missing from app.js.');
-assert(html.includes('325-game-load-question-controls-v1216'), 'Awards mobile workflow asset marker missing from app.html.');
-assert(sw.includes('awards-app-v325-game-load-question-controls-v1216'), 'Awards mobile workflow cache marker missing.');
+assert(app.includes('326-question-position-controls-v1216'), 'Awards mobile workflow asset marker missing from app.js.');
+assert(html.includes('326-question-position-controls-v1216'), 'Awards mobile workflow asset marker missing from app.html.');
+assert(sw.includes('awards-app-v326-question-position-controls-v1216'), 'Awards mobile workflow cache marker missing.');
 console.log('Awards Manager compact event editor tests passed.');

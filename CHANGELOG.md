@@ -1,3 +1,10 @@
+## v1.2.16 — Shared Question Position Controls Hotfix
+
+- Replaced unreliable arrow-only Manage Games question ordering with one target-position backend operation.
+- Every Manage Games question now shows its visible position and supports ↑/↓ plus direct moves such as #29 → #4; all following questions shift automatically.
+- Added Collapse All Questions / Expand All Questions and compact collapsed question summaries for long games.
+- Awards Manager Review/Sort uses the same visible position model, direct position jump, ↑/↓, desktop drag/drop, and collapsible question cards.
+- Bumped browser/service-worker assets to v326 and added executable 30-question direct-position regression coverage.
 
 ## v1.2.16 — Home Dashboard Startup Performance Hotfix
 - Batched Home progress calculation across active games instead of per-game Categories/Picks/Bets reads.

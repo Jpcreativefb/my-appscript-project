@@ -3199,9 +3199,15 @@ function adminReorderQuestion(payload) {
   const gameId = adminCatNormalizeGameId_(payload.gameId);
   const categoryId = adminCatNormalizeId_(payload.categoryId);
   const direction = Number(payload.direction || 0);
+  const requestedPosition = Number(payload.targetPosition || 0);
+  const hasTargetPosition = Number.isFinite(requestedPosition) && requestedPosition > 0;
 
-  if (!gameId || !categoryId || (direction !== -1 && direction !== 1)) {
-    throw new Error("GameId, CategoryId, and direction (-1 or 1) are required");
+  if (
+    !gameId ||
+    !categoryId ||
+    (!hasTargetPosition && direction !== -1 && direction !== 1)
+  ) {
+    throw new Error("GameId, CategoryId, and either targetPosition or direction (-1 or 1) are required");
   }
 
   validateGameId(gameId);
@@ -3215,17 +3221,34 @@ function adminReorderQuestion(payload) {
     const index = categories.findIndex(function(item) {
       return adminCatNormalizeId_(item && item.categoryId) === categoryId;
     });
-    const targetIndex = index + direction;
 
     if (index < 0) {
       throw new Error("Question not found: " + categoryId);
     }
 
-    if (targetIndex < 0 || targetIndex >= categories.length) {
+    if (!categories.length) {
       return {
         success: true,
         unchanged: true,
-        message: "Question is already at the " + (direction < 0 ? "top" : "bottom") + "."
+        position: 0,
+        message: "No questions are available to reorder."
+      };
+    }
+
+    const targetPosition = hasTargetPosition
+      ? Math.max(1, Math.min(categories.length, Math.round(requestedPosition)))
+      : Math.max(1, Math.min(categories.length, index + 1 + direction));
+    const targetIndex = targetPosition - 1;
+
+    if (targetIndex === index) {
+      return {
+        success: true,
+        unchanged: true,
+        gameId: gameId,
+        categoryId: categoryId,
+        position: index + 1,
+        totalQuestions: categories.length,
+        message: "Question is already at position " + (index + 1) + "."
       };
     }
 
@@ -3248,8 +3271,10 @@ function adminReorderQuestion(payload) {
       gameId: gameId,
       categoryId: categoryId,
       direction: direction,
-      displayOrder: (targetIndex + 1) * 10,
-      message: "Question moved " + (direction < 0 ? "up." : "down.")
+      position: targetPosition,
+      totalQuestions: categories.length,
+      displayOrder: targetPosition * 10,
+      message: "Question moved to position " + targetPosition + "."
     };
   } finally {
     lock.releaseLock();

@@ -515,7 +515,12 @@ async function renderAdminAwardsPage() {
           <div class="admin-collapsible-body awards-section-body">
             <div class="awards-section-help">
               <strong>What this section does:</strong>
-              The order shown here becomes the question order in the game. Drag cards on desktop or use ↑/↓ on a phone. Question text is always visible; Advanced Settings and Markets / Answers stay collapsed until you need them.
+              The order shown here becomes the question order in the game. Use ↑/↓ for small moves, type a position such as 4 for a large jump, or drag cards on desktop. Cards stay collapsed to the question title until you open one.
+            </div>
+
+            <div class="admin-actions awards-question-list-actions">
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetBatchCardsExpanded_(false)">Collapse All Questions</button>
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetBatchCardsExpanded_(true)">Expand All Questions</button>
             </div>
 
             <div id="awardsBuildProgressWrap" class="awards-build-progress" hidden>
@@ -1471,79 +1476,102 @@ function awardsAdminRenderBatchQuestionGrid_() {
     const failed = row.buildStatus && row.buildStatus.indexOf("Error") === 0;
     const statusClass = built ? "success" : failed ? "warning" : "";
     const statusLabel = built ? "Built" : failed ? "Needs retry" : row.buildStatus || "Ready";
+    const position = index + 1;
     return `
-      <div
-        class="admin-category-card awards-build-card ${built ? "is-built" : ""}"
+      <details
+        class="admin-category-card awards-build-card awards-question-order-card ${built ? "is-built" : ""}"
         data-awards-batch-row="${index}"
         draggable="true"
         ondragstart="adminAwardsBatchDragStart_(event, ${index})"
         ondragover="adminAwardsBatchDragOver_(event)"
         ondrop="adminAwardsBatchDrop_(event, ${index})"
       >
-        <div class="awards-build-card-head">
-          <div class="awards-order-controls" title="Question order">
-            <button type="button" class="admin-small-button secondary awards-order-button" onclick="adminAwardsMoveBatchRow_(${index}, -1)" ${index === 0 ? "disabled" : ""}>↑</button>
-            <span class="awards-order-number">${index + 1}</span>
-            <button type="button" class="admin-small-button secondary awards-order-button" onclick="adminAwardsMoveBatchRow_(${index}, 1)" ${index === rows.length - 1 ? "disabled" : ""}>↓</button>
+        <summary class="awards-build-card-summary">
+          <div class="awards-order-controls" title="Question position">
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position - 1}, event)" ${index === 0 ? "disabled" : ""}>↑</button>
+            <label class="awards-position-jump" onclick="event.stopPropagation()">
+              <span class="sr-only">Question position</span>
+              <input
+                type="number"
+                min="1"
+                max="${rows.length}"
+                value="${position}"
+                inputmode="numeric"
+                aria-label="Question position ${position} of ${rows.length}"
+                onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, this.value, event); }"
+              >
+              <span>/ ${rows.length}</span>
+              <button type="button" class="admin-small-button secondary awards-position-move-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, this.parentElement.querySelector('input').value, event)">Move</button>
+            </label>
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="event.preventDefault();event.stopPropagation();adminAwardsMoveBatchRowToPosition_(${index}, ${position + 1}, event)" ${index === rows.length - 1 ? "disabled" : ""}>↓</button>
             <span class="awards-drag-handle" aria-hidden="true">⋮⋮</span>
           </div>
 
-          <div class="awards-build-card-main">
-            <label class="admin-field awards-question-field">
-              <span>Question ${index + 1}</span>
-              <input type="text" value="${awardsAdminEsc_(row.question)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'question', this.value)">
-            </label>
+          <div class="awards-build-card-main awards-collapsed-question-main">
+            <div class="awards-question-summary-title"><span class="admin-question-position-badge">#${position}</span><strong>${awardsAdminEsc_(row.question || ("Question " + position))}</strong></div>
             <div class="awards-build-card-meta">
               <span class="admin-pill">${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</span>
               <span>${includedAnswers}/${answerCount} answers</span>
-              <span>Order ${Number(row.displayOrder) || 0}</span>
               <span class="awards-row-status ${statusClass}">${awardsAdminEsc_(statusLabel)}</span>
             </div>
           </div>
 
-          <label class="awards-build-toggle">
-            <input type="checkbox" ${row.include ? "checked" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'include', this.checked)">
-            <span>Build</span>
-          </label>
-        </div>
+          <span class="admin-collapse-icon">▾</span>
+        </summary>
 
-        <details class="awards-subdetails awards-question-advanced">
-          <summary>Advanced Settings</summary>
-          <div class="admin-control-grid awards-advanced-grid">
-            <label class="admin-field"><span>Section</span><input type="text" value="${awardsAdminEsc_(row.section)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'section', this.value)"></label>
-            <label class="admin-field"><span>Points</span><input type="number" min="0" value="${Number(row.points) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'points', this.value)"></label>
-            <label class="admin-field"><span>Question Order</span><input type="number" min="0" value="${Number(row.displayOrder) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'displayOrder', this.value)"></label>
-            <label class="admin-field"><span>Question Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'layoutType', this.value)">${awardsAdminLayoutOptions_(row.layoutType)}</select></label>
-            <label class="admin-field">
-              <span>Play Type</span>
-              <select ${scoreDisabled ? "disabled" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'scoreMode', this.value)">${awardsAdminScoreModeOptions_(row.scoreMode)}</select>
-              <span class="admin-sub">${scoreDisabled ? "Controlled by the selected game type." : "Hybrid game: this question can use a different play type."}</span>
+        <div class="awards-build-card-body">
+          <div class="awards-build-card-head awards-build-editor-head">
+            <div class="awards-build-card-main">
+              <label class="admin-field awards-question-field">
+                <span>Question ${position}</span>
+                <input type="text" value="${awardsAdminEsc_(row.question)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'question', this.value)">
+              </label>
+            </div>
+
+            <label class="awards-build-toggle">
+              <input type="checkbox" ${row.include ? "checked" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'include', this.checked)">
+              <span>Build</span>
             </label>
-            <label class="admin-field"><span>Pick Changes</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'maxChanges', this.value)">${awardsAdminPickChangeOptions_(row.maxChanges)}</select></label>
-            <label class="admin-field"><span>Market Odds Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'showProbabilities', this.value)">${awardsAdminProbabilityOptions_(row.showProbabilities, true)}</select></label>
           </div>
-        </details>
 
-        <details class="awards-subdetails awards-market-answer-details">
-          <summary>
-            <span>Markets / Answers</span>
-            <span class="admin-pill">${includedAnswers}/${answerCount} included</span>
-          </summary>
-          <div class="admin-sub awards-market-help">Turn individual answers on/off, hide/show K/P odds, or edit the player-facing Answer Text. Provider mapping stays tied to the original market.</div>
-          <div class="admin-actions">
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, true)">Include All</button>
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, false)">Clear All</button>
+          <details class="awards-subdetails awards-question-advanced">
+            <summary>Advanced Settings</summary>
+            <div class="admin-control-grid awards-advanced-grid">
+              <label class="admin-field"><span>Section</span><input type="text" value="${awardsAdminEsc_(row.section)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'section', this.value)"></label>
+              <label class="admin-field"><span>Points</span><input type="number" min="0" value="${Number(row.points) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'points', this.value)"></label>
+              <label class="admin-field"><span>Stored Display Order</span><input type="number" min="0" value="${Number(row.displayOrder) || 0}" readonly><span class="admin-sub">Updated automatically when you reorder this batch.</span></label>
+              <label class="admin-field"><span>Question Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'layoutType', this.value)">${awardsAdminLayoutOptions_(row.layoutType)}</select></label>
+              <label class="admin-field">
+                <span>Play Type</span>
+                <select ${scoreDisabled ? "disabled" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'scoreMode', this.value)">${awardsAdminScoreModeOptions_(row.scoreMode)}</select>
+                <span class="admin-sub">${scoreDisabled ? "Controlled by the selected game type." : "Hybrid game: this question can use a different play type."}</span>
+              </label>
+              <label class="admin-field"><span>Pick Changes</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'maxChanges', this.value)">${awardsAdminPickChangeOptions_(row.maxChanges)}</select></label>
+              <label class="admin-field"><span>Market Odds Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'showProbabilities', this.value)">${awardsAdminProbabilityOptions_(row.showProbabilities, true)}</select></label>
+            </div>
+          </details>
+
+          <details class="awards-subdetails awards-market-answer-details">
+            <summary>
+              <span>Markets / Answers</span>
+              <span class="admin-pill">${includedAnswers}/${answerCount} included</span>
+            </summary>
+            <div class="admin-sub awards-market-help">Turn individual answers on/off, hide/show K/P odds, or edit the player-facing Answer Text. Provider mapping stays tied to the original market.</div>
+            <div class="admin-actions">
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, true)">Include All</button>
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, false)">Clear All</button>
+            </div>
+            ${awardsAdminAnswerCardsHtml_(row, index, "batch")}
+          </details>
+
+          <div class="admin-actions awards-build-card-actions">
+            ${awardsAdminExternalLink_(row.detail && row.detail.sourceUrl, "Open Provider")}
+            ${awardsAdminExternalLink_(row.officialSourceUrl, "Open Official Site")}
+            <button type="button" class="admin-small-button secondary" onclick="adminAwardsRemoveBatchRow_(${index})">Remove</button>
           </div>
-          ${awardsAdminAnswerCardsHtml_(row, index, "batch")}
-        </details>
-
-        <div class="admin-actions awards-build-card-actions">
-          ${awardsAdminExternalLink_(row.detail && row.detail.sourceUrl, "Open Provider")}
-          ${awardsAdminExternalLink_(row.officialSourceUrl, "Open Official Site")}
-          <button type="button" class="admin-small-button secondary" onclick="adminAwardsRemoveBatchRow_(${index})">Remove</button>
+          ${row.buildStatus ? `<div class="admin-message ${statusClass}" style="margin-top:8px;">${awardsAdminEsc_(row.buildStatus)}</div>` : ""}
         </div>
-        ${row.buildStatus ? `<div class="admin-message ${statusClass}" style="margin-top:8px;">${awardsAdminEsc_(row.buildStatus)}</div>` : ""}
-      </div>
+      </details>
     `;
   }).join("");
 }
@@ -1557,14 +1585,30 @@ function adminAwardsRenumberBatchRows_(force) {
   });
 }
 
-function adminAwardsMoveBatchRow_(index, direction) {
+function adminAwardsMoveBatchRowToPosition_(index, targetPosition, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
   const rows = AWARDS_MANAGER_STATE.batchRows || [];
-  const target = index + Number(direction || 0);
-  if (index < 0 || target < 0 || index >= rows.length || target >= rows.length) return;
+  if (index < 0 || index >= rows.length || !rows.length) return;
+  const requested = Math.max(1, Math.min(rows.length, Math.round(Number(targetPosition) || 1)));
+  const targetIndex = requested - 1;
+  if (targetIndex === index) return;
   const item = rows.splice(index, 1)[0];
-  rows.splice(target, 0, item);
+  rows.splice(targetIndex, 0, item);
   adminAwardsRenumberBatchRows_(true);
   awardsAdminRenderBatchQuestionGrid_();
+}
+
+function adminAwardsMoveBatchRow_(index, direction) {
+  adminAwardsMoveBatchRowToPosition_(index, index + 1 + Number(direction || 0));
+}
+
+function adminAwardsSetBatchCardsExpanded_(expanded) {
+  document.querySelectorAll("details.awards-question-order-card").forEach(function(card) {
+    card.open = expanded === true;
+  });
 }
 
 function adminAwardsBatchDragStart_(event, index) {
@@ -1590,10 +1634,7 @@ function adminAwardsBatchDrop_(event, targetIndex) {
   }
   AWARDS_MANAGER_STATE.dragRowIndex = -1;
   if (!Number.isFinite(from) || from < 0 || from >= rows.length || targetIndex < 0 || targetIndex >= rows.length || from === targetIndex) return;
-  const item = rows.splice(from, 1)[0];
-  rows.splice(targetIndex, 0, item);
-  adminAwardsRenumberBatchRows_(true);
-  awardsAdminRenderBatchQuestionGrid_();
+  adminAwardsMoveBatchRowToPosition_(from, targetIndex + 1);
 }
 
 function adminAwardsSetAllBatchAnswersInline_(rowIndex, checked) {

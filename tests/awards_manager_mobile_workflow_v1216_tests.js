@@ -23,6 +23,6 @@ assert(awards.includes('awardsAdminSetBuildProgress_') && awards.includes('award
 assert(awards.includes('Keep this Awards Manager page open while the build is running'), 'Current client-driven build requirement must be explicit.');
 assert(picks.includes('Pick saved · Tap to change until lock'), 'Player pick card must clearly expose unlimited pick changes.');
 assert(css.includes('.awards-answer-card') && css.includes('@media (max-width: 720px)') && css.includes('.awards-market-modal'), 'Awards market/answer UI must have mobile card/modal styling.');
-assert(app.includes('325-game-load-question-controls-v1216'), 'v324 mobile workflow asset marker missing.');
-assert(sw.includes('awards-app-v325-game-load-question-controls-v1216'), 'v324 service worker cache marker missing.');
+assert(app.includes('326-question-position-controls-v1216'), 'v324 mobile workflow asset marker missing.');
+assert(sw.includes('awards-app-v326-question-position-controls-v1216'), 'v324 service worker cache marker missing.');
 console.log('PASS: Awards Manager mobile workflow tests');

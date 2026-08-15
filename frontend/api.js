@@ -1944,13 +1944,14 @@ async function apiAdminUpdateCategory(payload) {
 
 }
 
-async function apiAdminReorderQuestion(gameId, categoryId, direction) {
+async function apiAdminReorderQuestion(gameId, categoryId, direction, targetPosition) {
   return api(
     "adminReorderQuestion",
     {
       gameId: gameId,
       categoryId: categoryId,
-      direction: direction
+      direction: Number(direction || 0),
+      targetPosition: Number(targetPosition || 0)
     }
   );
 }

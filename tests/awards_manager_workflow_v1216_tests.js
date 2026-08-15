@@ -22,6 +22,6 @@ assert(awardsEngine.includes('awardsManagerDecimalOddsFromProbability_'), 'Award
 assert(awardsEngine.includes('maxChangesRaw') && awardsEngine.includes('? -1'), 'Awards-created questions must default to changeable picks.');
 assert(awardsEngine.includes('scoreMode: resolvedScoreMode'), 'Awards questions must inherit/use target game score mode.');
 assert(adminCategories.includes('"bettingOdds"') && adminCategories.includes('payload.bettingOdds'), 'Bulk Awards answers must persist wager odds.');
-assert(app.includes('325-game-load-question-controls-v1216'), 'Current Awards workflow asset marker missing.');
-assert(sw.includes('awards-app-v325-game-load-question-controls-v1216'), 'Current service-worker cache marker missing.');
+assert(app.includes('326-question-position-controls-v1216'), 'Current Awards workflow asset marker missing.');
+assert(sw.includes('awards-app-v326-question-position-controls-v1216'), 'Current service-worker cache marker missing.');
 console.log('PASS: Awards Manager v1.2.16 workflow tests');

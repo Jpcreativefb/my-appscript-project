@@ -1267,6 +1267,11 @@ async function renderAdminGameSetupPage(gameId) {
               </button>
             </div>
 
+            <div class="admin-card-actions admin-question-list-actions">
+              <button type="button" class="admin-small-button secondary" onclick="adminSetupSetQuestionCardsExpanded_(false)">Collapse All Questions</button>
+              <button type="button" class="admin-small-button secondary" onclick="adminSetupSetQuestionCardsExpanded_(true)">Expand All Questions</button>
+            </div>
+
             <div class="admin-card-actions">
 
             <button
@@ -3040,8 +3045,10 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
     return String(item && item.categoryId || "").trim().toLowerCase() ===
       String(category.categoryId || "").trim().toLowerCase();
   });
-  const canMoveUp = categoryIndex > 0;
-  const canMoveDown = categoryIndex >= 0 && categoryIndex < (categories || []).length - 1;
+  const questionPosition = categoryIndex >= 0 ? categoryIndex + 1 : 1;
+  const questionCount = Math.max(1, (categories || []).length);
+  const canMoveUp = questionPosition > 1;
+  const canMoveDown = questionPosition < questionCount;
 
   return `
     <details
@@ -3054,10 +3061,13 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
 
         <div class="admin-category-header">
 
-          <div>
-            <strong id="categoryTitle_${categoryId}">
-              ${categoryTitle}
-            </strong>
+          <div class="admin-question-summary-main">
+            <div class="admin-question-title-line">
+              <span class="admin-question-position-badge" id="categoryPositionBadge_${categoryId}">#${questionPosition}</span>
+              <strong id="categoryTitle_${categoryId}">
+                ${categoryTitle}
+              </strong>
+            </div>
 
             ${(cloneSourceCategoryId || isJustCloned) ? `
               <div class="admin-setup-question-badges">
@@ -3073,7 +3083,7 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
               </div>
             ` : ""}
 
-            <div class="admin-sub">
+            <div class="admin-sub admin-question-summary-meta">
               Question ID (permanent): ${categoryId}
               ·
               ${section}
@@ -3089,14 +3099,34 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
               <button
                 type="button"
                 class="admin-small-button secondary admin-question-order-button"
-                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', -1, event)"
+                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', ${questionPosition}, -1, event)"
                 ${canMoveUp ? "" : "disabled"}
                 aria-label="Move question up"
               >↑</button>
+              <label class="admin-question-position-jump" title="Type a question position and press Enter or Move">
+                <span class="sr-only">Question position</span>
+                <input
+                  id="categoryPositionInput_${categoryId}"
+                  type="number"
+                  min="1"
+                  max="${questionCount}"
+                  value="${questionPosition}"
+                  inputmode="numeric"
+                  onclick="event.stopPropagation()"
+                  onkeydown="if(event.key==='Enter'){event.preventDefault();event.stopPropagation();adminSetupMoveQuestionToPosition_('${gameId}', '${categoryId}', event);}"
+                  aria-label="Question position ${questionPosition} of ${questionCount}"
+                >
+                <span class="admin-question-position-total">/ ${questionCount}</span>
+                <button
+                  type="button"
+                  class="admin-small-button secondary admin-question-position-move-button"
+                  onclick="adminSetupMoveQuestionToPosition_('${gameId}', '${categoryId}', event)"
+                >Move</button>
+              </label>
               <button
                 type="button"
                 class="admin-small-button secondary admin-question-order-button"
-                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', 1, event)"
+                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', ${questionPosition}, 1, event)"
                 ${canMoveDown ? "" : "disabled"}
                 aria-label="Move question down"
               >↓</button>
@@ -5544,7 +5574,7 @@ async function adminSetupSaveResults(gameId, categoryId) {
 }
 
 
-async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event) {
+async function adminSetupMoveQuestionToPosition_(gameId, categoryId, event) {
   if (event) {
     event.preventDefault();
     event.stopPropagation();
@@ -5552,17 +5582,41 @@ async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event
 
   const safeGameId = String(gameId || "").trim();
   const safeCategoryId = String(categoryId || "").trim().toLowerCase();
+  const input = document.getElementById("categoryPositionInput_" + safeCategoryId);
+  const requested = Math.round(Number(input && input.value || 0));
+
+  if (!safeGameId || !safeCategoryId || !Number.isFinite(requested) || requested < 1) {
+    adminSetupSetMessage("adminSetupMessage", "Enter a valid question position.", true);
+    return false;
+  }
+
+  return adminSetupMoveQuestionOrder_(safeGameId, safeCategoryId, 0, 0, event, requested);
+}
+
+async function adminSetupMoveQuestionOrder_(gameId, categoryId, currentPosition, direction, event, explicitPosition) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const safeGameId = String(gameId || "").trim();
+  const safeCategoryId = String(categoryId || "").trim().toLowerCase();
+  const current = Math.max(1, Math.round(Number(currentPosition || 1)));
   const step = Number(direction || 0);
+  const requested = Number.isFinite(Number(explicitPosition)) && Number(explicitPosition) > 0
+    ? Math.round(Number(explicitPosition))
+    : current + step;
 
-  if (!safeGameId || !safeCategoryId || (step !== -1 && step !== 1)) return false;
+  if (!safeGameId || !safeCategoryId || requested < 1) return false;
 
-  adminSetupSetMessage("adminSetupMessage", "Reordering question…", false);
+  adminSetupSetMessage("adminSetupMessage", "Moving question to position " + requested + "…", false);
 
   try {
     const response = await apiAdminReorderQuestion(
       safeGameId,
       safeCategoryId,
-      step
+      0,
+      requested
     );
 
     if (!response || response.success === false) {
@@ -5574,10 +5628,12 @@ async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event
       gameId: safeGameId,
       categoryId: safeCategoryId,
       openAnswers: false,
-      message: response.message || ("Question moved " + (step < 0 ? "up." : "down."))
+      message: response.message || ("Question moved to position " + requested + ".")
     });
 
-    await navigate("admin-game-setup:" + safeGameId);
+    await navigate("admin-game-setup:" + safeGameId, {
+      skipUnsavedCheck: true
+    });
   } catch (err) {
     adminSetupSetMessage(
       "adminSetupMessage",
@@ -5587,6 +5643,12 @@ async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event
   }
 
   return false;
+}
+
+function adminSetupSetQuestionCardsExpanded_(expanded) {
+  document.querySelectorAll("details.admin-collapsible-category").forEach(function(card) {
+    card.open = expanded === true;
+  });
 }
 
 /* ======================

@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **325-game-load-question-controls-v1216**
+Release asset marker: **326-question-position-controls-v1216**
 
 ## Release state
 
@@ -54,8 +54,9 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - External probability labels use `K` / `P`; admins can hide probabilities game-wide, per question, or per answer without discarding market data. Awards Wager questions persist provider-derived decimal odds per answer.
 - Awards question display now supports Text, Compact, and Image plus explicit question order, section, points, and pick-change controls in the batch grid.
 - Awards Manager now uses collapsible, mobile-first sections with a compact event editor, touch-friendly question ordering, provider category choices, clearer contextual help, and staged build progress.
+- Awards Manager Review/Sort now uses the same question position model as Manage Games: visible # position, direct jump, ↑/↓, desktop drag/drop, and collapse/expand-all controls.
 - Saved pick cards explicitly surface the change affordance (`Tap to change until lock` or remaining changes) so unlimited/fixed change settings are visible to players.
-- Manage Games now supports persisted question up/down ordering; nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
+- Manage Games now shows a canonical question position and supports ↑/↓ plus direct moves to any position (for example #29 → #4), with atomic backend renumbering. Question cards can be collapsed to a compact title-only list. Nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
 - Game startup performance now reuses per-game settings, caches the global question/game compatibility map, reads normalized DataIndex once per execution, and caches compact K/P probability lookups so game switching does not repeatedly rescan growing project sheets/Hub data.
 - Normal player/game reads no longer run legacy→normalized synchronization; non-Reality games also use a cached season-existence check before touching Reality TV support data.
 - Manage Games question ordering now uses one atomic backend reorder operation, and question Settings exposes Pick Changes Before Lock (Unlimited / None / numeric limit) beside Lock Date / Time.
@@ -78,7 +79,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 89 regression tests
+PASS: 91 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

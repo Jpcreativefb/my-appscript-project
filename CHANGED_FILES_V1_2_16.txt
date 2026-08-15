@@ -211,3 +211,20 @@ PRODUCTION_STATUS.md
 CHANGELOG.md
 HOME_DASHBOARD_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md
 tests/dashboard_startup_batch_progress_v1216_tests.js
+
+SHARED QUESTION POSITION CONTROLS HOTFIX
+backend/admin/AdminCategories.js
+frontend/js/api.js
+frontend/api.js
+frontend/js/pages/adminGameSetup.js
+frontend/js/pages/adminAwards.js
+frontend/css/styles.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/question_position_controls_v1216_tests.js (new)
+Current-release marker assertions updated for v326.
+QUESTION_POSITION_CONTROLS_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
