@@ -171,3 +171,19 @@ Behavior changes:
 - Saved player picks explicitly show how to change them before lock.
 - Manage Games supports question up/down ordering through DisplayOrder.
 - Nominee/answer reorder is intentionally deferred until storage compatibility can be handled safely.
+
+GAME STARTUP PERFORMANCE HOTFIX (Fall smoke-test follow-up)
+backend/engines/CategoriesEngine.js
+backend/engines/NormalizedQuestionStorageEngine.js
+backend/engines/ExternalResultsHubBridgeEngine.js
+backend/services/AppCache.js
+tests/game_startup_performance_v1216_tests.js (new)
+GAME_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
+
+Behavior changes:
+- Reuses per-game settings cache during category projection.
+- Reads normalized DataIndex once per Apps Script execution.
+- Caches the global question/game compatibility map.
+- Caches compact per-game K/P live probability lookups and skips Hub reads when odds display is hidden.

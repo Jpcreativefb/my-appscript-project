@@ -337,6 +337,11 @@ function clearGameCaches(
 
   APP_RUNTIME_CACHE = {};
 
+  if (typeof NORMALIZED_STORAGE_RUNTIME_CACHE !== "undefined") {
+    delete NORMALIZED_STORAGE_RUNTIME_CACHE["question-game-map:all"];
+    delete NORMALIZED_STORAGE_RUNTIME_CACHE["data-index:all"];
+  }
+
   gameId =
     gameId ||
     getDefaultGameId();
@@ -354,7 +359,11 @@ function clearGameCaches(
 
     "projected_" + gameId,
 
-    "normalized_sync_" + gameId
+    "normalized_sync_" + gameId,
+
+    "external_live_probabilities_v1_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 120),
+
+    "normalized_question_game_map_v1"
 
   ];
 
@@ -407,7 +416,9 @@ function clearAppCaches(){
 
     "sheet_DataIndex",
 
-    "sheet_ArchiveManifest"
+    "sheet_ArchiveManifest",
+
+    "normalized_question_game_map_v1"
 
   ];
 

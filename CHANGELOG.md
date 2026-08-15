@@ -1,3 +1,10 @@
+## v1.2.16 — Game Startup Performance Hotfix
+
+- Removed duplicate CategorySettings rebuilds during game startup by reusing the per-game settings cache.
+- Cached the normalized QuestionId → GameId compatibility map and per-execution DataIndex reads so project growth no longer forces repeated global sheet scans for every game.
+- Added a compact per-game live K/P probability cache and skipped External Results Hub reads when probability display is disabled.
+- Added game-startup performance regression coverage.
+
 ## v1.2.16 — Awards Manager Mobile Workflow
 
 - Reworked Awards Manager into four collapsible, task-focused sections with clearer section-specific help.

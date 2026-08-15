@@ -423,9 +423,47 @@ function normalizedStorageBuildQuestionGameMapForSpreadsheet_(spreadsheet) {
 }
 
 function normalizedStorageBuildQuestionGameMap_() {
-  return normalizedStorageBuildQuestionGameMapForSpreadsheet_(
+  const runtimeKey = "question-game-map:all";
+  const scriptCacheKey = "normalized_question_game_map_v1";
+
+  if (NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey]) {
+    return NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey];
+  }
+
+  try {
+    const cached = CacheService.getScriptCache().get(scriptCacheKey);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey] = parsed;
+      return parsed;
+    }
+  } catch (cacheReadError) {
+    Logger.log("Question/game map cache read skipped: " + cacheReadError);
+  }
+
+  const map = normalizedStorageBuildQuestionGameMapForSpreadsheet_(
     SpreadsheetApp.getActive()
   );
+
+  NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey] = map;
+
+  try {
+    const serialized = JSON.stringify(map || {});
+    if (typeof safeScriptCachePut_ === "function") {
+      safeScriptCachePut_(
+        CacheService.getScriptCache(),
+        scriptCacheKey,
+        serialized,
+        typeof CACHE_TTL !== "undefined" ? CACHE_TTL : 120
+      );
+    } else if (serialized.length < 90000) {
+      CacheService.getScriptCache().put(scriptCacheKey, serialized, 120);
+    }
+  } catch (cacheWriteError) {
+    Logger.log("Question/game map cache write skipped: " + cacheWriteError);
+  }
+
+  return map;
 }
 
 function normalizedStorageBackfillCategorySettingsGameIds_() {
@@ -660,6 +698,12 @@ function normalizedStorageGetHeaders_(sh) {
 }
 
 function normalizedStorageReadDataIndex_() {
+  const runtimeKey = "data-index:all";
+
+  if (NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey]) {
+    return NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey];
+  }
+
   const sh = normalizedStorageEnsureSheet_(
     DATA_INDEX_SHEET,
     DATA_INDEX_HEADERS
@@ -689,12 +733,16 @@ function normalizedStorageReadDataIndex_() {
     });
   }
 
-  return {
+  const output = {
     sheet: sh,
     headers: headers,
     col: col,
     rows: rows
   };
+
+  NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey] = output;
+
+  return output;
 }
 
 function normalizedStorageGetIndexEntry_(entityType, gameId) {
@@ -775,6 +823,7 @@ function normalizedStorageUpsertIndexEntry_(payload) {
     index.sheet.appendRow(values);
   }
 
+  delete NORMALIZED_STORAGE_RUNTIME_CACHE["data-index:all"];
   delete NORMALIZED_STORAGE_RUNTIME_CACHE[
     "index:" + normalizedStorageKey_(entityType) + ":" + gameId
   ];

@@ -1621,6 +1621,123 @@ function externalResultsBridgeLiveProbabilityDate_(value) {
   return String(value);
 }
 
+function externalResultsBridgeLiveProbabilityCacheKey_(gameId) {
+  return "external_live_probabilities_v1_" +
+    externalResultsBridgeKey_(gameId)
+      .replace(/[^a-z0-9_-]+/g, "_")
+      .slice(0, 120);
+}
+
+function externalResultsBridgeReadLiveProbabilityCache_(gameId) {
+  try {
+    const raw = CacheService.getScriptCache().get(
+      externalResultsBridgeLiveProbabilityCacheKey_(gameId)
+    );
+
+    if (raw === null || raw === undefined || raw === "") {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    Logger.log("External live-probability cache read skipped: " + err);
+    return null;
+  }
+}
+
+function externalResultsBridgeWriteLiveProbabilityCache_(gameId, lookup) {
+  try {
+    const serialized = JSON.stringify(lookup || {});
+    const cache = CacheService.getScriptCache();
+    const ttl = typeof CACHE_TTL !== "undefined" ? CACHE_TTL : 120;
+
+    if (typeof safeScriptCachePut_ === "function") {
+      return safeScriptCachePut_(
+        cache,
+        externalResultsBridgeLiveProbabilityCacheKey_(gameId),
+        serialized,
+        ttl
+      );
+    }
+
+    if (serialized.length < 90000) {
+      cache.put(
+        externalResultsBridgeLiveProbabilityCacheKey_(gameId),
+        serialized,
+        ttl
+      );
+      return true;
+    }
+  } catch (err) {
+    Logger.log("External live-probability cache write skipped: " + err);
+  }
+
+  return false;
+}
+
+function externalResultsBridgeCategoryShowsLiveProbabilities_(category) {
+  if (
+    externalResultsBridgeKey_(category && category.oddsMode) !==
+      "external-market"
+  ) {
+    return false;
+  }
+
+  const raw = category && (
+    category.sourceConfigJSON !== undefined
+      ? category.sourceConfigJSON
+      : category.SourceConfigJSON
+  );
+
+  if (!raw) return true;
+
+  let config = raw;
+  if (typeof raw !== "object") {
+    try {
+      config = JSON.parse(String(raw));
+    } catch (err) {
+      return true;
+    }
+  }
+
+  return !(config && config.showMarketProbabilities === false);
+}
+
+function externalResultsBridgeApplyLiveProbabilityLookup_(source, probabilityLookup) {
+  probabilityLookup = probabilityLookup || {};
+
+  return (source || []).map(function(category) {
+    if (
+      externalResultsBridgeKey_(category && category.oddsMode) !==
+        "external-market"
+    ) {
+      return category;
+    }
+
+    const copy = Object.assign({}, category);
+
+    copy.nominees = (category.nominees || []).map(function(nominee) {
+      const info = probabilityLookup[
+        externalResultsBridgeLiveProbabilityKey_(category.id, nominee.id)
+      ];
+
+      if (!info) return nominee;
+
+      return Object.assign({}, nominee, {
+        liveProbability: info.probability,
+        liveProbabilityProvider: info.provider,
+        liveProbabilityUpdatedAt: info.lastUpdated,
+        liveProbabilityMarketId: info.externalMarketId,
+        liveProbabilityOutcome: info.expectedOutcome,
+        liveProbabilitySourceUrl: info.sourceUrl
+      });
+    });
+
+    return copy;
+  });
+}
+
 function externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
   gameId,
   categories
@@ -1632,15 +1749,21 @@ function externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
 
   const needsExternalPrices =
     source.some(function(category) {
-      return (
-        externalResultsBridgeKey_(
-          category && category.oddsMode
-        ) === "external-market"
-      );
+      return externalResultsBridgeCategoryShowsLiveProbabilities_(category);
     });
 
   if (!needsExternalPrices) {
     return source;
+  }
+
+  const cachedLookup =
+    externalResultsBridgeReadLiveProbabilityCache_(gameId);
+
+  if (cachedLookup !== null) {
+    return externalResultsBridgeApplyLiveProbabilityLookup_(
+      source,
+      cachedLookup
+    );
   }
 
   try {
@@ -1776,61 +1899,15 @@ function externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
       };
     });
 
-    return source.map(function(category) {
-      if (
-        externalResultsBridgeKey_(
-          category && category.oddsMode
-        ) !== "external-market"
-      ) {
-        return category;
-      }
+    externalResultsBridgeWriteLiveProbabilityCache_(
+      gameId,
+      probabilityLookup
+    );
 
-      const copy =
-        Object.assign({}, category);
-
-      copy.nominees =
-        (category.nominees || []).map(
-          function(nominee) {
-            const info =
-              probabilityLookup[
-                externalResultsBridgeLiveProbabilityKey_(
-                  category.id,
-                  nominee.id
-                )
-              ];
-
-            if (!info) {
-              return nominee;
-            }
-
-            return Object.assign(
-              {},
-              nominee,
-              {
-                liveProbability:
-                  info.probability,
-
-                liveProbabilityProvider:
-                  info.provider,
-
-                liveProbabilityUpdatedAt:
-                  info.lastUpdated,
-
-                liveProbabilityMarketId:
-                  info.externalMarketId,
-
-                liveProbabilityOutcome:
-                  info.expectedOutcome,
-
-                liveProbabilitySourceUrl:
-                  info.sourceUrl
-              }
-            );
-          }
-        );
-
-      return copy;
-    });
+    return externalResultsBridgeApplyLiveProbabilityLookup_(
+      source,
+      probabilityLookup
+    );
 
   } catch (err) {
     if (typeof Logger !== "undefined") {

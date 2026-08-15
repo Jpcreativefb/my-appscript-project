@@ -56,6 +56,7 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Awards Manager now uses collapsible, mobile-first sections with a compact event editor, touch-friendly question ordering, provider category choices, clearer contextual help, and staged build progress.
 - Saved pick cards explicitly surface the change affordance (`Tap to change until lock` or remaining changes) so unlimited/fixed change settings are visible to players.
 - Manage Games now supports persisted question up/down ordering; nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
+- Game startup performance now reuses per-game settings, caches the global question/game compatibility map, reads normalized DataIndex once per execution, and caches compact K/P probability lookups so game switching does not repeatedly rescan growing project sheets/Hub data.
 - Disabled Awards markets/outcomes are excluded from both created answers and External Results Hub mappings.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.

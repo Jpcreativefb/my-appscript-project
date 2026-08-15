@@ -301,7 +301,9 @@ function getCategories(gameId){
   ========================= */
 
   const settings =
-    getCategorySettings(gameId);
+    typeof getCategorySettingsCached === "function"
+      ? getCategorySettingsCached(gameId)
+      : getCategorySettings(gameId);
 
   /* =========================
      CATEGORY MAP
