@@ -118,3 +118,7 @@ After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_16.md` before declaring v
 - Manage Games supports desktop drag/drop plus mobile direct-position and arrow fallback.
 - Awards Manager staging uses the same simplified ordering controls.
 - Production gate: 117 JavaScript syntax checks and 92 regression/behavior tests passing.
+
+### Sports ESPN CDN fallback
+- Date-scoped NFL/MLB live score requests can fall back to ESPN CDN when `site.api.espn.com` returns HTTP 403 from Cloudflare/Apps Script.
+- Secure token and strict proxy allowlist remain required.

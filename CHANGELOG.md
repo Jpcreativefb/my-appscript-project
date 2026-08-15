@@ -419,3 +419,8 @@
 - Routed Sports Scores Engine ESPN requests through a locked-down Cloudflare Pages Function when `SPORTS_ESPN_PROXY_URL` is configured.
 - Covered scoreboard, player roster/game stats, and advanced-stat ESPN transport.
 - Preserved direct ESPN as a fallback and disabled proxy response caching for live data.
+
+## v1.2.16 Sports ESPN CDN fallback
+- Added secure Cloudflare fallback from blocked `site.api.espn.com` date-scoped NFL/MLB scoreboards to ESPN's real-time `cdn.espn.com` scoreboards.
+- Added CDN `content.sbData.events` parsing in Sports Scores Engine.
+- Season builders remain fail-loud and are not silently substituted with current-day data.

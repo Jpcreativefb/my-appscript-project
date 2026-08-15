@@ -5102,6 +5102,9 @@ function sportsV13ExtractEvents_(payload) {
   if (Array.isArray(payload.schedule)) return payload.schedule;
   if (payload.schedule && Array.isArray(payload.schedule.events)) return payload.schedule.events;
   if (payload.content && Array.isArray(payload.content.events)) return payload.content.events;
+  if (payload.content && payload.content.sbData && Array.isArray(payload.content.sbData.events)) {
+    return payload.content.sbData.events;
+  }
   return [];
 }
 

@@ -34,3 +34,10 @@ assert(!proxy.includes('access-control-allow-origin'), 'Server-only proxy should
 assert(proxy.includes('cache-control", "no-store"'), 'Proxy must avoid stale live-score caching.');
 
 console.log('Sports ESPN Cloudflare proxy v1.2.16 tests passed.');
+
+assert(proxy.includes('cdn.espn.com'), 'Proxy must support ESPN CDN live-score fallback.');
+assert(proxy.includes('LIVE_CDN_LEAGUES'), 'Proxy must explicitly allow only known live CDN league mappings.');
+assert(proxy.includes('target.searchParams.get("dates")'), 'CDN fallback must be limited to date-scoped live requests.');
+assert(proxy.includes('/scoreboard?xhr=1&limit=50'), 'CDN fallback must use the real-time scoreboard endpoint.');
+assert(proxy.includes('x-awards-sports-fallback-from-status'), 'Proxy should expose when the primary ESPN host was rejected.');
+assert(scores.includes('payload.content.sbData') && scores.includes('payload.content.sbData.events'), 'Sports Engine must parse CDN scoreboard events.');
