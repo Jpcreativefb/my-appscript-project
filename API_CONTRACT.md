@@ -1142,3 +1142,17 @@ The recurring provider watch runs hourly and polls only active `AppMappings` mar
 
 Provider result identity excludes changing provider timestamps; the same provider/event/market/result/outcome/finality is idempotent across repeated syncs. Hub delivery uses a deterministic mapping key when `MappingId` is blank.
 
+## Awards Manager batch-builder payload — v1.2.16
+
+`adminAwardsCreateQuestionFromMarket` remains administrator-only and now accepts these optional batch-builder fields in addition to the existing provider market payload:
+
+- `layoutType`: `text`, `compact`, or `image`.
+- `displayOrder`: numeric question order.
+- `maxChanges`: `-1` for unlimited until lock or a non-negative change limit.
+- `showMarketProbabilities`: whether K/P percentages are visible for the question.
+- `probabilityDisplayJSON`: object keyed by provider market ID (grouped event) or `outcome:<label>` (single multi-outcome market), with boolean per-answer probability visibility.
+- `selectedOutcomesJSON`: optional list of included outcomes for a single multi-outcome provider market.
+- `answerLabelsJSON`: editable answer labels keyed by provider market ID or `outcome:<label>`.
+
+Only selected markets/outcomes are created as answers and queued into Hub mappings. The official source remains preferred when supplied, `autoSettle` remains false, and administrator review remains required.
+

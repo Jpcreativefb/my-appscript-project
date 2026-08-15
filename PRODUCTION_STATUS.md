@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **321-awards-official-source-v1216**
+Release asset marker: **323-awards-batch-builder-v1216**
 
 ## Release state
 
@@ -16,7 +16,7 @@ v1.2.16 is the first release candidate focused primarily on production engineeri
 - Staked prediction games
 - Wager / chips games
 - Hybrid games
-- Awards Manager through v1.2.15 event-first provider search and Hub mapping
+- Awards Manager v1.2.16 batch builder with event-first provider search, Official Website references, per-market answer controls, and Hub mapping
 - Reality TV seasons, episodes, extra questions, contestant/tribe workflows, durable approvals, historical results, and Season Survivor picks
 - Sports score/wager integrations
 - Racing score/wager integrations
@@ -47,6 +47,13 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Dashboard/Home progress now reads the logged-in user’s actual saved picks/wagers and tells players how many selections remain.
 - Awards Manager `View Event` now scrolls/focuses the Build/Link workspace with visible loading/error feedback so provider-event selection cannot appear to do nothing.
 - Awards Manager now supports a preferred Official Website URL, auto-detects non-provider settlement URLs when available, and preserves Kalshi/Polymarket as secondary market-data references.
+- Awards Manager uses a staged batch builder: choose game/source defaults once, multi-select events, load them into an editable question grid, choose individual markets/answers, then build all selected questions. `View Event` still expands Build/Link inline under the event.
+- Awards-created questions inherit the target Game Type scoring; Hybrid games can choose Fixed, Confidence, Staked, Wager, or Ranking per question.
+- New Awards pick questions default to unlimited changes until lock, and admins can choose a fixed change limit.
+- Non-Reality-TV games no longer render the deferred Season Survivor placeholder.
+- External probability labels use `K` / `P`; admins can hide probabilities game-wide, per question, or per answer without discarding market data. Awards Wager questions persist provider-derived decimal odds per answer.
+- Awards question display now supports Text, Compact, and Image plus explicit question order, section, points, and pick-change controls in the batch grid.
+- Disabled Awards markets/outcomes are excluded from both created answers and External Results Hub mappings.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.
 - GitHub Actions production checks were added.
@@ -65,7 +72,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 80 regression tests
+PASS: 83 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

@@ -1924,45 +1924,42 @@ function renderCategoryNominees_(category, selectedNomineeId, locked) {
   }).join("");
 }
 
-function renderNomineeLiveProbability_(nominee) {
+function renderNomineeLiveProbability_(category, nominee) {
   if (!nominee) return "";
 
-  const raw = nominee.liveProbability;
-
-  if (raw === "" || raw === null || raw === undefined) {
-    return "";
+  let sourceConfig = null;
+  if (category) {
+    if (category.__marketProbabilityDisplayConfig !== undefined) {
+      sourceConfig = category.__marketProbabilityDisplayConfig;
+    } else {
+      const rawConfig = category.sourceConfigJSON || category.SourceConfigJSON || "";
+      if (rawConfig && typeof rawConfig === "object") {
+        sourceConfig = rawConfig;
+      } else if (rawConfig) {
+        try { sourceConfig = JSON.parse(String(rawConfig)); } catch (err) { sourceConfig = null; }
+      }
+      try { category.__marketProbabilityDisplayConfig = sourceConfig || null; } catch (err) {}
+    }
   }
+
+  if (sourceConfig && sourceConfig.showMarketProbabilities === false) return "";
+
+  const nomineeId = String(nominee.id || nominee.nomineeId || "");
+  const perAnswer = sourceConfig && sourceConfig.probabilityDisplayByNomineeId;
+  if (perAnswer && nomineeId && perAnswer[nomineeId] === false) return "";
+
+  const raw = nominee.liveProbability;
+  if (raw === "" || raw === null || raw === undefined) return "";
 
   const probability = Number(raw);
+  if (!Number.isFinite(probability)) return "";
 
-  if (!Number.isFinite(probability)) {
-    return "";
-  }
+  const provider = String(nominee.liveProbabilityProvider || "market").trim().toLowerCase();
+  const providerLabel = provider === "kalshi" ? "K" : provider === "polymarket" ? "P" : "M";
+  const rounded = Math.abs(probability - Math.round(probability)) < 0.05 ? probability.toFixed(0) : probability.toFixed(1);
 
-  const provider = String(
-    nominee.liveProbabilityProvider || "market"
-  ).trim().toLowerCase();
-
-  const providerLabel =
-    provider === "kalshi"
-      ? "Kalshi"
-      : provider === "polymarket"
-        ? "Polymarket"
-        : "Market";
-
-  const rounded =
-    Math.abs(probability - Math.round(probability)) < 0.05
-      ? probability.toFixed(0)
-      : probability.toFixed(1);
-
-  return (
-    '<small class="nominee-live-probability" ' +
-    'style="display:block;margin-top:4px;font-size:.78em;opacity:.78;">' +
-    escapeHtml(providerLabel) +
-    " · " +
-    escapeHtml(rounded) +
-    "%</small>"
-  );
+  return '<small class="nominee-live-probability" style="display:block;margin-top:4px;font-size:.78em;opacity:.78;">' +
+    escapeHtml(providerLabel) + " · " + escapeHtml(rounded) + "%</small>";
 }
 
 function renderNomineeButton(
@@ -2002,7 +1999,7 @@ function renderNomineeButton(
         ${disabled}
       >
         ${escapeHtml(nominee.shortAnswer || nominee.name)}
-    ${renderNomineeLiveProbability_(nominee)}
+    ${renderNomineeLiveProbability_(category, nominee)}
       </button>
     `;
 
@@ -2025,7 +2022,7 @@ function renderNomineeButton(
 
         <span>
           ${escapeHtml(nominee.name)}
-      ${renderNomineeLiveProbability_(nominee)}
+      ${renderNomineeLiveProbability_(category, nominee)}
         </span>
 
       </button>
@@ -2045,7 +2042,7 @@ function renderNomineeButton(
 
       <span>
         ${escapeHtml(nominee.name)}
-      ${renderNomineeLiveProbability_(nominee)}
+      ${renderNomineeLiveProbability_(category, nominee)}
       </span>
 
     </button>

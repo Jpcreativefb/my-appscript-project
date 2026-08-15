@@ -132,7 +132,13 @@ function apiGetStartupPayload(payload) {
     // other cross-sheet calculations finish.
     seasonAnchor: {
       enabled: false,
-      deferred: typeof seasonAnchorUserPayload_ === "function"
+      // Only Reality TV games can have the pinned Season Survivor feature.
+      // Non-Reality games must not render a misleading deferred placeholder.
+      deferred: !!(
+        realityTvView &&
+        realityTvView.enabled === true &&
+        typeof seasonAnchorUserPayload_ === "function"
+      )
     },
 
     realityTvView:

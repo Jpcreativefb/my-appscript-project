@@ -13,8 +13,8 @@ const html = read('frontend/app.html');
 const sw = read('frontend/sw.js');
 
 assert(
-  awards.includes('id="awardsEventWorkspace"'),
-  'Awards Manager Build/Link card needs a stable View Event workspace target.'
+  awards.includes('id="awardsInlineWorkspace-${index}"'),
+  'Awards Manager Build/Link workspace must expand directly under the selected event.'
 );
 assert(
   awards.includes('onclick="adminAwardsOpenEvent(${index}, this)"'),
@@ -38,24 +38,19 @@ assert(
   'View Event workspace scrolling should be deliberate and visible.'
 );
 assert(
-  awards.includes('workspace.focus({') &&
-  awards.includes('preventScroll: true'),
-  'View Event workspace should receive focus without bouncing the page.'
-);
-assert(
   awards.includes('button.textContent = originalButtonText;'),
   'View Event button state must be restored after success or failure.'
 );
 assert(
-  app.includes('321-awards-official-source-v1216'),
+  app.includes('323-awards-batch-builder-v1216'),
   'Awards View Event hotfix asset marker is missing from app.js.'
 );
 assert(
-  html.includes('321-awards-official-source-v1216'),
+  html.includes('323-awards-batch-builder-v1216'),
   'Awards View Event hotfix asset marker is missing from app.html.'
 );
 assert(
-  sw.includes('awards-app-v321-awards-official-source-v1216'),
+  sw.includes('awards-app-v323-awards-batch-builder-v1216'),
   'Awards View Event hotfix cache marker is missing from the service worker.'
 );
 

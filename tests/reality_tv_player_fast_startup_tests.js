@@ -13,7 +13,7 @@ const html = read('frontend/app.html');
 const sw = read('frontend/sw.js');
 
 assert(appData.includes('includePlayerStats: false'), 'Core startup must defer Reality TV statistics.');
-assert(appData.includes('deferred: typeof seasonAnchorUserPayload_'), 'Season Survivor details must be deferred.');
+assert(appData.includes('deferred: !!(') && appData.includes('realityTvView.enabled === true'), 'Season Survivor details must be deferred only for Reality TV games.');
 assert(season.includes('function apiGetRealityTvPlayerStats'), 'Deferred Reality TV stats endpoint is missing.');
 assert(season.includes('rtv_user_core_'), 'Shared Reality TV core cache is missing.');
 assert(season.includes('playerStatsDeferred: true'), 'Core payload must advertise deferred stats.');

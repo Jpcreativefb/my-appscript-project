@@ -67,6 +67,11 @@ function awardsManagerPercent_(value) {
   if (n === null) return null;
   return Math.max(0, Math.min(100, (n > 1 ? n / 100 : n) * 100));
 }
+function awardsManagerDecimalOddsFromProbability_(value) {
+  const percent = awardsManagerPercent_(value);
+  if (percent === null || percent <= 0 || percent >= 100) return "";
+  return Math.round(Math.max(1.01, 100 / percent) * 10000) / 10000;
+}
 function awardsManagerArray_(value) {
   const parsed = awardsManagerParseJson_(value, value);
   return Array.isArray(parsed) ? parsed : [];
@@ -1920,10 +1925,7 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
   const gameId = awardsManagerString_(payload.gameId);
   if (!gameId) throw new Error("Choose the Awards App game.");
 
-  const officialSourceUrl = awardsManagerSafeHttpUrl_(
-    payload.officialSourceUrl || ""
-  );
-
+  const officialSourceUrl = awardsManagerSafeHttpUrl_(payload.officialSourceUrl || "");
   const groupRaw = awardsManagerParseJson_(payload.groupMarketsJSON, []);
   const grouped = Array.isArray(groupRaw) && groupRaw.length >= 2;
 
@@ -1932,61 +1934,142 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
 
   if (grouped) {
     markets = groupRaw.map(function(rawMarket) {
-      return awardsManagerMarketPayload_({
-        marketJSON: JSON.stringify(rawMarket)
-      });
+      return awardsManagerMarketPayload_({ marketJSON: JSON.stringify(rawMarket) });
     });
 
     const provider = awardsManagerKey_(markets[0].provider);
     const eventId = awardsManagerKey_(markets[0].externalEventId);
-
     markets.forEach(function(item) {
-      if (awardsManagerKey_(item.provider) !== provider) {
-        throw new Error("Grouped markets must come from the same provider.");
-      }
-
-      if (
-        eventId &&
-        awardsManagerKey_(item.externalEventId) &&
-        awardsManagerKey_(item.externalEventId) !== eventId
-      ) {
+      if (awardsManagerKey_(item.provider) !== provider) throw new Error("Grouped markets must come from the same provider.");
+      if (eventId && awardsManagerKey_(item.externalEventId) && awardsManagerKey_(item.externalEventId) !== eventId) {
         throw new Error("Grouped markets must belong to the same provider event.");
       }
     });
-
     market = markets[0];
   } else {
     market = awardsManagerMarketPayload_(payload);
     markets = [market];
   }
 
-  const question = awardsManagerString_(
-    payload.question ||
-    (grouped ? market.eventName : market.marketQuestion)
-  );
-
+  const question = awardsManagerString_(payload.question || (grouped ? market.eventName : market.marketQuestion));
   if (!question) throw new Error("Question text is required.");
 
-  const categoryId = awardsManagerSlug_(
-    payload.categoryId || question
-  );
-
+  const categoryId = awardsManagerSlug_(payload.categoryId || question);
   if (!categoryId) throw new Error("Could not create Question ID.");
 
-  const section = awardsManagerString_(
-    payload.section || "Awards"
-  );
+  const section = awardsManagerString_(payload.section || "Awards");
+  const requestedScoreMode = awardsManagerString_(payload.scoreMode || "");
+  const resolvedScoreMode = typeof adminCatResolveScoreModeForGame_ === "function"
+    ? adminCatResolveScoreModeForGame_(gameId, requestedScoreMode)
+    : (requestedScoreMode || "fixed-points");
+  const questionType = awardsManagerString_(payload.questionType || (resolvedScoreMode === "ranking" ? "ranking" : "category-winner"));
+  const selectionMode = awardsManagerString_(payload.selectionMode || (resolvedScoreMode === "ranking" || questionType === "ranking" ? "ranking" : "single"));
+  const maxChangesRaw = payload.maxChanges === undefined || payload.maxChanges === null || payload.maxChanges === "" ? -1 : Number(payload.maxChanges);
+  const maxChanges = isFinite(maxChangesRaw) ? Math.max(-1, Math.floor(maxChangesRaw)) : -1;
+  const changePenalty = Math.max(0, Number(payload.changePenalty || 0) || 0);
+  const pointsRaw = payload.points === undefined || payload.points === null || payload.points === "" ? 1 : Number(payload.points);
+  const points = isFinite(pointsRaw) ? Math.max(0, pointsRaw) : 1;
+  const displayOrderRaw = Number(payload.displayOrder);
+  const displayOrder = isFinite(displayOrderRaw) ? Math.max(0, Math.floor(displayOrderRaw)) : 999;
+  const requestedLayout = awardsManagerKey_(payload.layoutType || "image");
+  const layoutType = ["text", "compact", "image"].indexOf(requestedLayout) !== -1 ? requestedLayout : "image";
+  const showMarketProbabilities = payload.showMarketProbabilities === false || awardsManagerKey_(payload.showMarketProbabilities) === "false" || awardsManagerKey_(payload.showMarketProbabilities) === "hide" ? false : true;
+  const labels = awardsManagerParseJson_(payload.answerLabelsJSON, {});
+  const probabilityDisplay = awardsManagerParseJson_(payload.probabilityDisplayJSON, {});
+
+  let answerItems = [];
+  let selectedOutcomes = [];
+  const probabilityDisplayByNomineeId = {};
+  const probabilityDisplayBySourceKey = {};
+
+  if (grouped) {
+    answerItems = markets.map(function(item) {
+      const marketId = awardsManagerString_(item.externalMarketId);
+      const label = awardsManagerString_(labels[marketId] || awardsManagerGroupedAnswerLabel_(item));
+      if (!label) throw new Error("Every grouped market needs an answer label.");
+      const nomineeId = awardsManagerSlug_(label);
+      const yesValue = item.prices && item.prices.Yes !== undefined ? item.prices.Yes : item.primaryProbability;
+      const answerShowProbability = probabilityDisplay[marketId] === false ? false : true;
+      probabilityDisplayByNomineeId[nomineeId] = answerShowProbability;
+      probabilityDisplayBySourceKey[marketId] = answerShowProbability;
+      return {
+        nominee: label,
+        nomineeId: nomineeId,
+        shortAnswer: label,
+        section: section,
+        active: true,
+        predictionGame: true,
+        bettingOdds: awardsManagerDecimalOddsFromProbability_(yesValue),
+        oddsSource: item.provider || market.provider || "external-market",
+        oddsLastUpdated: new Date()
+      };
+    });
+  } else {
+    const requestedOutcomes = awardsManagerParseJson_(payload.selectedOutcomesJSON, []);
+    const available = Array.isArray(market.outcomes) ? market.outcomes.map(function(outcome) { return awardsManagerString_(outcome); }).filter(Boolean) : [];
+    selectedOutcomes = Array.isArray(requestedOutcomes) && requestedOutcomes.length
+      ? requestedOutcomes.map(function(outcome) { return awardsManagerString_(outcome); }).filter(function(outcome) { return available.indexOf(outcome) !== -1; })
+      : available.slice();
+
+    if (selectedOutcomes.length < 2) throw new Error("Select at least two answers from this market.");
+
+    answerItems = selectedOutcomes.map(function(outcome) {
+      const sourceKey = "outcome:" + outcome;
+      const label = awardsManagerString_(labels[sourceKey] || labels[outcome] || outcome);
+      if (!label) throw new Error("Every selected outcome needs an answer label.");
+      const nomineeId = awardsManagerSlug_(label);
+      const probability = market.prices && market.prices[outcome] !== undefined ? market.prices[outcome] : "";
+      const answerShowProbability = probabilityDisplay[sourceKey] === false ? false : true;
+      probabilityDisplayByNomineeId[nomineeId] = answerShowProbability;
+      probabilityDisplayBySourceKey[sourceKey] = answerShowProbability;
+      return {
+        nominee: label,
+        nomineeId: nomineeId,
+        shortAnswer: label,
+        section: section,
+        active: true,
+        predictionGame: true,
+        bettingOdds: awardsManagerDecimalOddsFromProbability_(probability),
+        oddsSource: market.provider || "external-market",
+        oddsLastUpdated: new Date()
+      };
+    });
+  }
+
+  if (answerItems.length < 2) throw new Error("At least two answers are required.");
+
+  const sourceConfig = {
+    source: "awards-manager",
+    version: AWARDS_MANAGER_VERSION,
+    provider: market.provider,
+    groupedEvent: grouped,
+    marketQuestion: market.marketQuestion,
+    eventName: market.eventName,
+    marketIds: markets.map(function(item) { return item.externalMarketId; }),
+    selectedOutcomes: grouped ? [] : selectedOutcomes,
+    resolutionSource: market.resolutionSource,
+    officialSourceUrl: officialSourceUrl || "",
+    providerSourceUrl: market.sourceUrl || "",
+    sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"],
+    showMarketProbabilities: showMarketProbabilities,
+    probabilityDisplayByNomineeId: probabilityDisplayByNomineeId,
+    probabilityDisplayBySourceKey: probabilityDisplayBySourceKey
+  };
 
   const categoryResult = adminCreateCategory({
     gameId: gameId,
     categoryId: categoryId,
     category: question,
     section: section,
-    points: Number(payload.points || 1),
-    questionType: "award-single-winner",
+    points: points,
+    displayOrder: displayOrder,
+    layoutType: layoutType,
+    questionType: questionType,
     scoringEngine: "manual",
-    selectionMode: "single",
-    scoreMode: "fixed-points",
+    selectionMode: selectionMode,
+    scoreMode: resolvedScoreMode,
+    changePenalty: changePenalty,
+    maxChanges: maxChanges,
     oddsMode: "external-market",
     resultSource: "external-results-hub",
     resultSourceType: "prediction-market",
@@ -1996,67 +2079,10 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     autoSettle: false,
     requireAdminReview: true,
     sourceUrl: officialSourceUrl || market.sourceUrl,
-    sourceConfigJSON: awardsManagerCompactJson_({
-      source: "awards-manager",
-      version: AWARDS_MANAGER_VERSION,
-      provider: market.provider,
-      groupedEvent: grouped,
-      marketQuestion: market.marketQuestion,
-      eventName: market.eventName,
-      marketIds: markets.map(function(item) {
-        return item.externalMarketId;
-      }),
-      resolutionSource: market.resolutionSource,
-      officialSourceUrl: officialSourceUrl || "",
-      providerSourceUrl: market.sourceUrl || "",
-      sourcePriority: officialSourceUrl ? ["official", "provider", "manual"] : ["provider", "manual"]
-    })
+    sourceConfigJSON: awardsManagerCompactJson_(sourceConfig)
   });
 
-  if (typeof adminBulkCreateNominees !== "function") {
-    throw new Error("Bulk answer creation is unavailable.");
-  }
-
-  const labels = awardsManagerParseJson_(
-    payload.answerLabelsJSON,
-    {}
-  );
-
-  let answerItems = [];
-
-  if (grouped) {
-    answerItems = markets.map(function(item) {
-      const marketId = awardsManagerString_(item.externalMarketId);
-      const label = awardsManagerString_(
-        labels[marketId] ||
-        awardsManagerGroupedAnswerLabel_(item)
-      );
-
-      if (!label) {
-        throw new Error("Every grouped market needs an answer label.");
-      }
-
-      return {
-        nominee: label,
-        nomineeId: awardsManagerSlug_(label),
-        shortAnswer: label,
-        section: section,
-        active: true,
-        predictionGame: true
-      };
-    });
-  } else {
-    answerItems = market.outcomes.map(function(outcome) {
-      return {
-        nominee: outcome,
-        nomineeId: awardsManagerSlug_(outcome),
-        shortAnswer: outcome,
-        section: section,
-        active: true,
-        predictionGame: true
-      };
-    });
-  }
+  if (typeof adminBulkCreateNominees !== "function") throw new Error("Bulk answer creation is unavailable.");
 
   const nomineeResult = adminBulkCreateNominees({
     gameId: gameId,
@@ -2065,64 +2091,31 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     section: section,
     itemsJSON: JSON.stringify(answerItems)
   });
-
-  if (!nomineeResult || nomineeResult.createdCount < 1) {
-    throw new Error("No answers were created.");
-  }
+  if (!nomineeResult || nomineeResult.createdCount < 1) throw new Error("No answers were created.");
 
   let bridge = null;
-
   if (grouped) {
     const nomineeByMarketId = {};
-
     markets.forEach(function(item, index) {
-      const created = nomineeResult.created &&
-        nomineeResult.created[index];
-
-      if (created && created.nomineeId) {
-        nomineeByMarketId[
-          awardsManagerString_(item.externalMarketId)
-        ] = created.nomineeId;
-      }
+      const created = nomineeResult.created && nomineeResult.created[index];
+      if (created && created.nomineeId) nomineeByMarketId[awardsManagerString_(item.externalMarketId)] = created.nomineeId;
     });
-
-    bridge = awardsManagerQueueMarketGroup_(
-      markets,
-      gameId,
-      categoryId,
-      nomineeByMarketId,
-      officialSourceUrl
-    );
+    bridge = awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMarketId, officialSourceUrl);
   } else {
     const outcomeMap = {};
-
-    market.outcomes.forEach(function(outcome, index) {
-      const created = nomineeResult.created &&
-        nomineeResult.created[index];
-
-      if (created && created.nomineeId) {
-        outcomeMap[outcome] = created.nomineeId;
-      }
+    selectedOutcomes.forEach(function(outcome, index) {
+      const created = nomineeResult.created && nomineeResult.created[index];
+      if (created && created.nomineeId) outcomeMap[outcome] = created.nomineeId;
     });
-
-    bridge = awardsManagerQueueMarketBundle_(
-      market,
-      gameId,
-      categoryId,
-      outcomeMap,
-      officialSourceUrl
-    );
+    bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap, officialSourceUrl);
   }
 
   return {
     success: true,
     grouped: grouped,
     message: grouped
-      ? nomineeResult.createdCount +
-        " answers created from " +
-        markets.length +
-        " related markets; Hub group queued."
-      : "Question created with batched answers and provider market queued to the External Results Hub.",
+      ? nomineeResult.createdCount + " answers created from " + markets.length + " selected markets; Hub group queued."
+      : nomineeResult.createdCount + " selected answers created and provider market queued to the External Results Hub.",
     gameId: gameId,
     categoryId: categoryId,
     categoryResult: categoryResult,
@@ -2133,10 +2126,17 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
       providerSourceUrl: market.sourceUrl || "",
       preferred: officialSourceUrl ? "official" : "provider"
     },
-    safety: {
-      autoSettle: false,
-      requireAdminReview: true
-    }
+    questionConfig: {
+      scoreMode: resolvedScoreMode || "fixed-points",
+      questionType: questionType,
+      selectionMode: selectionMode,
+      maxChanges: maxChanges,
+      changePenalty: changePenalty,
+      layoutType: layoutType,
+      displayOrder: displayOrder,
+      showMarketProbabilities: showMarketProbabilities
+    },
+    safety: { autoSettle: false, requireAdminReview: true }
   };
 }
 

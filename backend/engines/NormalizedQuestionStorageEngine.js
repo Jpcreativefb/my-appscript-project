@@ -2091,9 +2091,11 @@ function normalizedStorageBuildLegacyProjection_(gameId) {
       SportsMarket: question.SportsMarket,
       SportsSelection: question.SportsSelection,
       SportsLine: question.SportsLine,
-      BettingOdds: question.BettingOdds,
-      OddsSource: question.OddsSource,
-      OddsLastUpdated: question.OddsLastUpdated,
+      BettingOdds: optionPayload.BettingOdds !== undefined && optionPayload.BettingOdds !== ""
+        ? optionPayload.BettingOdds
+        : question.BettingOdds,
+      OddsSource: optionPayload.OddsSource || question.OddsSource,
+      OddsLastUpdated: optionPayload.OddsLastUpdated || question.OddsLastUpdated,
       NomineeId: option.OptionId,
       Nominee: option.Option,
       ShortAnswer: option.ShortAnswer,
@@ -2196,9 +2198,11 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
       SportsMarket: question.SportsMarket,
       SportsSelection: question.SportsSelection,
       SportsLine: question.SportsLine,
-      BettingOdds: question.BettingOdds,
-      OddsSource: question.OddsSource,
-      OddsLastUpdated: question.OddsLastUpdated,
+      BettingOdds: optionPayload.BettingOdds !== undefined && optionPayload.BettingOdds !== ""
+        ? optionPayload.BettingOdds
+        : question.BettingOdds,
+      OddsSource: optionPayload.OddsSource || question.OddsSource,
+      OddsLastUpdated: optionPayload.OddsLastUpdated || question.OddsLastUpdated,
       Nominee: "",
       NomineeId: "",
       ShortAnswer: "",

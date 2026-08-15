@@ -78,3 +78,60 @@ Awards official-source hotfix:
 - frontend/sw.js
 - tests/awards_manager_official_source_v1216_hotfix_tests.js
 - AWARDS_MANAGER_OFFICIAL_SOURCE_HOTFIX_V1_2_16.md
+
+AWARDS MANAGER WORKFLOW HOTFIX (smoke-test follow-up)
+backend/admin/AdminCategories.js
+backend/engines/AppDataEngine.js
+backend/engines/AwardsManagerEngine.js
+backend/engines/NormalizedQuestionStorageEngine.js
+frontend/js/pages/adminAwards.js
+frontend/js/pages/picks.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/awards_manager_workflow_v1216_tests.js (new)
+tests/awards_manager_view_event_v1216_hotfix_tests.js
+tests/reality_tv_player_fast_startup_tests.js
+tests/production_hardening_v1216_tests.js
+AWARDS_MANAGER_WORKFLOW_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
+
+Behavior changes:
+- Season Survivor placeholder only on actual Reality TV games.
+- Awards picks default to unlimited changes until lock with admin-selectable limits.
+- Batch-select multiple provider events into one target game.
+- Build/Link workspace expands under View Event.
+- Target Game Type controls question scoring; Hybrid supports per-question scoring mode.
+- Provider badges shortened to K/P.
+- Provider probabilities persist as per-answer decimal odds for Awards wagers.
+
+AWARDS MANAGER BATCH BUILDER (replacement Fall workflow)
+backend/engines/AwardsManagerEngine.js
+frontend/js/pages/adminAwards.js
+frontend/js/pages/picks.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/awards_manager_batch_builder_v1216_tests.js (new)
+tests/awards_manager_batch_builder_behavior_v1216_tests.js (new)
+tests/awards_manager_workflow_v1216_tests.js
+tests/awards_manager_official_source_v1216_hotfix_tests.js
+tests/awards_manager_view_event_v1216_hotfix_tests.js
+tests/dashboard_home_progress_v1216_hotfix_tests.js
+tests/production_hardening_v1216_tests.js
+AWARDS_MANAGER_BATCH_BUILDER_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md
+
+Behavior changes:
+- Section 1 now holds target game, Official Website, probability display default, Text/Compact/Image display, changes, section, points, and starting order.
+- Multiple checked events load into one editable question grid before build.
+- Every loaded question can edit question text, section, points, order, display, play type, changes, and probability visibility.
+- Market Grid popup exposes every provider market/outcome with independent Include and Show Odds controls.
+- Disabled markets/outcomes are not created or mapped to the External Results Hub.
+- Player K/P percentages honor question-level and per-answer visibility.
+- Inline existing-question market linking remains available.
+

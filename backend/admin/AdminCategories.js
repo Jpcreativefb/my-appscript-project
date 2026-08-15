@@ -1359,6 +1359,32 @@ function adminCatBuildNomineeRow_(
     )
   );
 
+  // Awards/external-market wager questions may arrive with live provider
+  // probabilities converted to decimal odds. Persist them on each option so
+  // the Betting engine can use the market price immediately.
+  adminCatSetIfColumnExists_(
+    row,
+    col,
+    "bettingOdds",
+    payload.bettingOdds === undefined || payload.bettingOdds === null
+      ? ""
+      : payload.bettingOdds
+  );
+
+  adminCatSetIfColumnExists_(
+    row,
+    col,
+    "oddsSource",
+    payload.oddsSource || ""
+  );
+
+  adminCatSetIfColumnExists_(
+    row,
+    col,
+    "oddsLastUpdated",
+    payload.oddsLastUpdated || ""
+  );
+
   return row;
 
 }
@@ -4567,7 +4593,10 @@ function adminBulkCreateNominees(payload) {
           : adminCatToBoolean_(item.predictionGame),
         communityRank: item.communityRank === undefined
           ? category.communityRank
-          : item.communityRank
+          : item.communityRank,
+        bettingOdds: item.bettingOdds,
+        oddsSource: item.oddsSource || "",
+        oddsLastUpdated: item.oddsLastUpdated || ""
       });
 
       rows.push(row);
@@ -4580,7 +4609,10 @@ function adminBulkCreateNominees(payload) {
         movieId: item.movieId || "",
         movie: item.movie || "",
         person: item.person || "",
-        active: item.active === undefined ? true : adminCatToBoolean_(item.active)
+        active: item.active === undefined ? true : adminCatToBoolean_(item.active),
+        bettingOdds: item.bettingOdds === undefined || item.bettingOdds === null ? "" : item.bettingOdds,
+        oddsSource: item.oddsSource || "",
+        oddsLastUpdated: item.oddsLastUpdated || ""
       });
     });
 
@@ -4604,6 +4636,11 @@ function adminBulkCreateNominees(payload) {
               person: item.person || "",
               active: item.active,
               displayOrder: itemIndex + 1,
+              payloadJSON: JSON.stringify({
+                BettingOdds: item.bettingOdds,
+                OddsSource: item.oddsSource || "",
+                OddsLastUpdated: item.oddsLastUpdated || ""
+              }),
               sourceSystem: "admin-normalized"
             };
           })
@@ -4623,6 +4660,11 @@ function adminBulkCreateNominees(payload) {
             person: item.person || "",
             active: item.active,
             displayOrder: itemIndex + 1,
+            payloadJSON: JSON.stringify({
+              BettingOdds: item.bettingOdds,
+              OddsSource: item.oddsSource || "",
+              OddsLastUpdated: item.oddsLastUpdated || ""
+            }),
             sourceSystem: "admin-normalized"
           });
         });

@@ -1,5 +1,24 @@
 ## v1.2.16 — Fall Production Hardening
 
+- Awards Manager Batch Builder: reorganized Awards setup into Game & Source Setup → Find & Select Events → Configure & Build Questions.
+- Official Website, target game, default Text/Compact/Image display, probability visibility, pick-change limit, section, points, and starting order now live in Section 1.
+- Search results support Check All/Clear checks, inline View Event, and a provider Market Grid popup.
+- Multiple selected events load into one editable question grid before any questions are created.
+- Each loaded question can independently edit wording, section, points, display order, display style, play type (Hybrid), changes, and probability visibility.
+- Every provider market/answer has separate Include and Show Odds switches plus an editable answer label. Disabled answers are excluded from both nominee creation and External Results Hub mappings.
+- Single multi-outcome markets can now include only selected outcomes rather than forcing every provider outcome into the game.
+- Player K/P probabilities honor question-level and per-answer visibility settings while market/wager data remains stored.
+- Restored inline linking of an individual provider market to an existing Awards App question.
+- Bumped browser/service-worker assets to v323 for the Awards batch-builder workflow.
+- Hotfix: Awards Manager workflow now supports selecting multiple provider events and adding them to one target game, with one question created per selected event.
+- `View Event` now expands the Build/Link workspace directly under the selected event card.
+- Awards target games show their Game Type; Prediction, Confidence, Staked, Wager, and Hybrid question scoring now follows the target game, while Hybrid can select the scoring mode per question.
+- New Awards-created pick questions default to unlimited changes until lock, with explicit 0/1/2/3/5-change options.
+- Fixed the deferred Season Survivor placeholder so it is emitted only for actual Reality TV games.
+- Kalshi/Polymarket answer probability labels are compact `K` / `P` badges.
+- Awards Wager questions convert provider probabilities to decimal wager odds and persist them per answer through normalized storage.
+- Ranking can be configured in Awards Manager but remains flagged as in development until the generic Ranking engine is completed.
+- Bumped browser/service-worker assets to v322 for the Awards workflow hotfix.
 - Hotfix: Awards Manager now supports an Official Website URL as the preferred result/reference source while preserving Kalshi/Polymarket for market data.
 - Kalshi settlement-source URLs and provider resolution URLs are used to auto-fill the official source when they point to a non-provider website; admins can override/paste the official awards/results page manually.
 - Created Awards questions store both official and provider source URLs plus an explicit source priority (`official → provider → manual`) for review-first settlement.
