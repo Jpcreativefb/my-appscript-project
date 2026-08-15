@@ -1,0 +1,11 @@
+'use strict';
+const fs = require('fs');
+const assert = require('assert');
+const setup = fs.readFileSync('frontend/js/pages/adminGameSetup.js', 'utf8');
+const css = fs.readFileSync('frontend/css/styles.css', 'utf8');
+assert(setup.includes('function adminSetupMoveQuestionOrder_'), 'Manage Games question reorder handler missing.');
+assert(setup.includes("apiAdminUpdateCategory({") && setup.includes('displayOrder: targetOrder') && setup.includes('displayOrder: currentOrder'), 'Question reorder must swap persisted DisplayOrder values.');
+assert(setup.includes('aria-label="Move question up"') && setup.includes('aria-label="Move question down"'), 'Question reorder buttons missing.');
+assert(setup.includes('"reorder-question": "Question reordered"'), 'Question reorder feedback banner missing.');
+assert(css.includes('.admin-question-order-controls'), 'Question reorder controls need responsive styling.');
+console.log('PASS: Manage Games question reorder tests');

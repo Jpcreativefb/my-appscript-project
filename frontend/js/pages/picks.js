@@ -2884,6 +2884,20 @@ function getThirdLineText(
       return "Locked";
     }
 
+    if (selectedNominee) {
+      const rawMaxChanges = Number(category && category.maxChanges);
+      const maxChanges = Number.isFinite(rawMaxChanges) ? rawMaxChanges : 0;
+      const changeCount = Number(PICKS_PAGE_DATA.changeCounts && PICKS_PAGE_DATA.changeCounts[category.id]) || 0;
+      if (maxChanges < 0) {
+        return "Pick saved · Tap to change until lock ↓";
+      }
+      if (changeCount < maxChanges) {
+        const left = Math.max(maxChanges - changeCount, 0);
+        return "Pick saved · " + left + " change" + (left === 1 ? "" : "s") + " left · Tap to change ↓";
+      }
+      return "Pick saved · No changes remaining";
+    }
+
     return "Make Pick Now ↓";
 
   }

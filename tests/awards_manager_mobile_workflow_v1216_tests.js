@@ -1,0 +1,28 @@
+'use strict';
+const fs = require('fs');
+const path = require('path');
+const assert = require('assert');
+const root = path.join(__dirname, '..');
+const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
+const awards = read('frontend/js/pages/adminAwards.js');
+const picks = read('frontend/js/pages/picks.js');
+const css = read('frontend/css/styles.css');
+const app = read('frontend/js/app.js');
+const sw = read('frontend/sw.js');
+
+assert(awards.includes('id="awardsSection1"') && awards.includes('id="awardsSection2"') && awards.includes('id="awardsSection3"'), 'Awards main sections must be collapsible details.');
+assert(awards.includes('What this section does:'), 'Awards sections need specific workflow help.');
+assert(awards.includes('id="awardsSearchCategory"') && awards.includes('Any category'), 'Provider category filter must be a dropdown.');
+assert(awards.includes('awardsAdminRefreshCategoryOptions_'), 'Category dropdown must populate from provider results.');
+assert(awards.includes('adminAwardsToggleAllEvents_') && awards.includes('awardsToggleAllEventsButton'), 'Check/Clear all must use one toggle button.');
+assert(awards.includes('Build All Unbuilt Questions'), 'Final batch action must build only unbuilt questions.');
+assert(awards.includes('awardsAdminRenderCompactEventEditor_'), 'Compact inline event editor missing.');
+assert(awards.includes('Advanced Settings') && awards.includes('Markets / Answers') && awards.includes('Answer Text'), 'Compact event editor must expose question/advanced/answers workflow.');
+assert(awards.includes('adminAwardsMoveBatchRow_') && awards.includes('adminAwardsBatchDrop_'), 'Awards question queue must support up/down and drag/drop ordering.');
+assert(awards.includes('awardsAdminSetBuildProgress_') && awards.includes('awardsBuildProgressBar'), 'Batch build needs overall progress feedback.');
+assert(awards.includes('Keep this Awards Manager page open while the build is running'), 'Current client-driven build requirement must be explicit.');
+assert(picks.includes('Pick saved · Tap to change until lock'), 'Player pick card must clearly expose unlimited pick changes.');
+assert(css.includes('.awards-answer-card') && css.includes('@media (max-width: 720px)') && css.includes('.awards-market-modal'), 'Awards market/answer UI must have mobile card/modal styling.');
+assert(app.includes('324-awards-mobile-workflow-v1216'), 'v324 mobile workflow asset marker missing.');
+assert(sw.includes('awards-app-v324-awards-mobile-workflow-v1216'), 'v324 service worker cache marker missing.');
+console.log('PASS: Awards Manager mobile workflow tests');

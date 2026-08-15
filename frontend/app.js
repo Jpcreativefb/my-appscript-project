@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "323-awards-batch-builder-v1216";
-const APP_ROUTE_HOTFIX_VERSION = "v12165-awards-batch-builder";
+const APP_ASSET_VERSION = "324-awards-mobile-workflow-v1216";
+const APP_ROUTE_HOTFIX_VERSION = "v12166-awards-mobile-workflow";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

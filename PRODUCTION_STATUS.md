@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **323-awards-batch-builder-v1216**
+Release asset marker: **324-awards-mobile-workflow-v1216**
 
 ## Release state
 
@@ -53,6 +53,9 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Non-Reality-TV games no longer render the deferred Season Survivor placeholder.
 - External probability labels use `K` / `P`; admins can hide probabilities game-wide, per question, or per answer without discarding market data. Awards Wager questions persist provider-derived decimal odds per answer.
 - Awards question display now supports Text, Compact, and Image plus explicit question order, section, points, and pick-change controls in the batch grid.
+- Awards Manager now uses collapsible, mobile-first sections with a compact event editor, touch-friendly question ordering, provider category choices, clearer contextual help, and staged build progress.
+- Saved pick cards explicitly surface the change affordance (`Tap to change until lock` or remaining changes) so unlimited/fixed change settings are visible to players.
+- Manage Games now supports persisted question up/down ordering; nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
 - Disabled Awards markets/outcomes are excluded from both created answers and External Results Hub mappings.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.
@@ -72,7 +75,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 83 regression tests
+PASS: 86 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

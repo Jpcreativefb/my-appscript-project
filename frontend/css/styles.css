@@ -5514,3 +5514,470 @@ button.is-saving {
   .reality-tv-approval-progress-head,
   .reality-tv-approval-progress-time { align-items: flex-start; flex-direction: column; gap: 4px; }
 }
+
+/* ======================
+   AWARDS MANAGER MOBILE WORKFLOW v1.2.16
+====================== */
+.awards-manager-sections {
+  gap: 14px;
+}
+
+.awards-manager-section {
+  padding: 0 !important;
+}
+
+.awards-manager-section > .awards-section-summary {
+  padding: 16px 18px;
+}
+
+.awards-manager-section[open] > .awards-section-summary {
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.awards-section-body {
+  padding: 16px 18px 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.awards-section-help {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(59,130,246,.10);
+  border: 1px solid rgba(96,165,250,.18);
+  color: rgba(255,255,255,.78);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.awards-summary-right,
+.awards-inline-input-action,
+.awards-event-editor-head,
+.awards-build-card-head,
+.awards-build-card-meta,
+.awards-answer-toggle-row,
+.awards-market-modal-head,
+.awards-build-progress-head,
+.awards-event-editor-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.awards-summary-right,
+.awards-market-modal-head,
+.awards-build-progress-head,
+.awards-event-editor-head {
+  justify-content: space-between;
+}
+
+.awards-field-wide {
+  grid-column: span 2;
+}
+
+.awards-inline-input-action input {
+  flex: 1;
+  min-width: 0;
+}
+
+.awards-subdetails {
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+  overflow: hidden;
+}
+
+.awards-subdetails > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 12px 14px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.awards-subdetails > summary::-webkit-details-marker {
+  display: none;
+}
+
+.awards-subdetails[open] > summary {
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+.awards-subdetails > :not(summary) {
+  margin-left: 12px;
+  margin-right: 12px;
+}
+
+.awards-subdetails > :last-child {
+  margin-bottom: 12px;
+}
+
+.awards-advanced-grid {
+  margin-top: 12px;
+}
+
+.awards-search-actions .admin-button,
+.awards-section-final-actions .admin-button {
+  margin-top: 0;
+}
+
+.awards-selection-summary {
+  margin-top: 2px;
+}
+
+.awards-event-results {
+  margin-top: 4px;
+}
+
+.awards-event-card-actions {
+  margin-top: 10px;
+}
+
+.awards-inline-workspace:empty {
+  display: none;
+}
+
+.awards-event-editor {
+  margin-top: 10px;
+  padding: 14px;
+  border: 1px solid rgba(250,204,21,.18);
+  border-radius: 14px;
+  background: rgba(15,23,42,.72);
+  display: grid;
+  gap: 12px;
+}
+
+.awards-question-field input {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.awards-market-help {
+  padding-top: 10px;
+  line-height: 1.45;
+}
+
+.awards-answer-card-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.awards-answer-card {
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,.09);
+  background: rgba(15,23,42,.65);
+  display: grid;
+  gap: 10px;
+}
+
+.awards-answer-card.is-disabled {
+  opacity: .62;
+}
+
+.awards-answer-toggle-row {
+  flex-wrap: wrap;
+}
+
+.awards-switch-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.awards-answer-toggle-row .admin-pill {
+  margin-left: auto;
+}
+
+.awards-answer-readonly {
+  padding: 9px 10px;
+  border-radius: 10px;
+  background: rgba(255,255,255,.04);
+}
+
+.awards-answer-market-question {
+  margin-top: 0;
+}
+
+.awards-answer-source {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.awards-build-card {
+  transition: border-color .18s ease, transform .18s ease;
+}
+
+.awards-build-card[draggable="true"] {
+  cursor: default;
+}
+
+.awards-build-card.is-built {
+  border-color: rgba(34,197,94,.28);
+}
+
+.awards-build-card-head {
+  align-items: flex-start;
+}
+
+.awards-build-card-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.awards-build-card-meta {
+  flex-wrap: wrap;
+  margin-top: 7px;
+  color: rgba(255,255,255,.58);
+  font-size: 12px;
+}
+
+.awards-row-status {
+  font-weight: 800;
+}
+
+.awards-row-status.success {
+  color: #86efac;
+}
+
+.awards-row-status.warning {
+  color: #fde68a;
+}
+
+.awards-order-controls {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.awards-order-button {
+  width: 34px;
+  min-width: 34px;
+  padding: 7px 0 !important;
+}
+
+.awards-order-number {
+  min-width: 24px;
+  text-align: center;
+  font-weight: 900;
+}
+
+.awards-drag-handle {
+  cursor: grab;
+  color: rgba(255,255,255,.45);
+  font-size: 18px;
+  letter-spacing: -3px;
+  padding: 4px;
+}
+
+.awards-build-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.awards-build-card-actions {
+  margin-top: 10px;
+}
+
+.awards-build-progress {
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid rgba(96,165,250,.2);
+  background: rgba(59,130,246,.08);
+}
+
+.awards-build-progress-track {
+  height: 9px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.08);
+}
+
+.awards-build-progress-bar {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #60a5fa, #22c55e);
+  transition: width .2s ease;
+}
+
+.awards-build-browser-note {
+  margin-top: 0;
+}
+
+.awards-market-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(2,6,23,.8);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 4vh 12px;
+  overflow: auto;
+}
+
+.awards-market-modal {
+  width: min(900px, 96vw);
+  max-height: 90vh;
+  overflow: auto;
+  padding: 16px;
+  box-shadow: 0 24px 70px rgba(0,0,0,.5);
+}
+
+.awards-market-modal h2 {
+  margin: 0;
+}
+
+@media (max-width: 720px) {
+  .awards-manager-section > .awards-section-summary,
+  .awards-section-body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .awards-section-summary {
+    align-items: flex-start;
+  }
+
+  .awards-section-summary h2 {
+    font-size: 18px;
+  }
+
+  .awards-field-wide {
+    grid-column: span 1;
+  }
+
+  .awards-inline-input-action {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .awards-inline-input-action .admin-small-button {
+    width: 100%;
+  }
+
+  .awards-search-actions,
+  .awards-section-final-actions,
+  .awards-build-card-actions,
+  .awards-event-card-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .awards-search-actions .admin-button,
+  .awards-search-actions .admin-small-button,
+  .awards-section-final-actions .admin-button,
+  .awards-section-final-actions .admin-small-button,
+  .awards-build-card-actions .admin-small-button,
+  .awards-event-card-actions .admin-small-button,
+  .awards-event-card-actions a,
+  .awards-build-card-actions a {
+    width: 100%;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .awards-build-card-head {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+  }
+
+  .awards-order-controls {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+
+  .awards-drag-handle {
+    display: none;
+  }
+
+  .awards-build-card-main {
+    grid-column: 1;
+  }
+
+  .awards-build-toggle {
+    grid-column: 2;
+    align-self: start;
+    padding-top: 24px;
+  }
+
+  .awards-answer-toggle-row {
+    align-items: flex-start;
+  }
+
+  .awards-answer-toggle-row .admin-pill {
+    width: 100%;
+    margin-left: 0;
+    text-align: center;
+  }
+
+  .awards-answer-source {
+    justify-content: stretch;
+  }
+
+  .awards-answer-source a {
+    width: 100%;
+    text-align: center;
+    box-sizing: border-box;
+  }
+
+  .awards-market-modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .awards-market-modal {
+    width: 100vw;
+    max-height: 100vh;
+    min-height: 100vh;
+    border-radius: 0 !important;
+    padding: 14px;
+  }
+
+  .awards-build-progress-head {
+    align-items: flex-start;
+  }
+}
+
+.admin-question-summary-actions,
+.admin-question-order-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-question-summary-actions {
+  margin-left: auto;
+}
+
+.admin-question-order-button {
+  width: 34px;
+  min-width: 34px;
+  padding: 7px 0 !important;
+}
+
+@media (max-width: 720px) {
+  .admin-question-summary-actions {
+    flex-direction: column-reverse;
+    align-items: flex-end;
+  }
+
+  .admin-question-order-controls {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}

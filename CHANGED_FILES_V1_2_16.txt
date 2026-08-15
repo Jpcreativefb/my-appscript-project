@@ -142,3 +142,32 @@ Awards Batch Builder Runtime Hotfix
 - AWARDS_BATCH_BUILDER_RUNTIME_HOTFIX_V1_2_16.md
 - CHANGELOG.md
 - PRODUCTION_STATUS.md
+
+
+AWARDS MANAGER MOBILE WORKFLOW / MANAGE GAMES QUESTION ORDERING
+frontend/js/pages/adminAwards.js
+frontend/js/pages/picks.js
+frontend/js/pages/adminGameSetup.js
+frontend/css/styles.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/awards_manager_mobile_workflow_v1216_tests.js (new)
+tests/manage_game_question_reorder_v1216_tests.js (new)
+tests/awards_manager_view_event_v1216_hotfix_tests.js
+tests/awards_manager_v1212_tests.js
+tests/production_hardening_v1216_tests.js
+AWARDS_MANAGER_MOBILE_WORKFLOW_V1_2_16.md (new)
+CHANGELOG.md
+PRODUCTION_STATUS.md
+
+Behavior changes:
+- Four Awards Manager sections are collapsible with clearer task-specific help.
+- Configure opens a compact Question / Advanced Settings / Markets & Answers editor.
+- Mobile uses stacked cards and up/down ordering; desktop also supports drag/drop ordering.
+- Provider category filter is populated from search results; Check All/Clear is one toggle; Load Selected is at the end of Section 2.
+- Build All Unbuilt Questions shows overall + per-question progress and skips completed rows; page must remain open during the current client-driven build.
+- Saved player picks explicitly show how to change them before lock.
+- Manage Games supports question up/down ordering through DisplayOrder.
+- Nominee/answer reorder is intentionally deferred until storage compatibility can be handled safely.

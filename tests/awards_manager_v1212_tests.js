@@ -63,7 +63,7 @@ assert(appMirror.includes('"admin-awards": ["admin", "adminUi", "adminAwards"]')
 assert(app.includes('case "admin-awards"'), 'admin-awards render route missing');
 assert(admin.includes("navigate('admin-awards')"), 'Admin dashboard Awards Manager card missing');
 assert(page.includes('Search Events'), 'Awards Manager search UI missing');
-assert(page.includes('View Event'), 'View Event action missing');
+assert(page.includes('Configure'), 'Configure action missing');
 assert(page.includes('Select Markets / Answers'), 'Event market selection UI missing');
 
 console.log('Awards Manager regression tests passed.');
@@ -82,11 +82,11 @@ assert(engine.includes('function apiAdminAwardsGetExternalEvent(payload)'), 'Awa
 assert(engine.includes('function awardsManagerKalshiEvent_'), 'Awards Manager Kalshi event loader missing');
 assert(engine.includes('function awardsManagerPolymarketEvent_'), 'Awards Manager Polymarket event loader missing');
 assert(backendApi.includes('"adminAwardsGetExternalEvent"'), 'Awards Manager event API route missing');
-assert(page.includes('View Event'), 'Awards Manager event-first search UI missing');
-assert(page.includes('Loading full provider event and all live markets'), 'Awards Manager full-event loader missing');
-assert(page.includes('Select Markets / Answers'), 'Awards Manager event market selector missing');
-assert(page.includes('awards-event-market-use'), 'Awards Manager event market checkboxes missing');
-assert(page.includes('awards-event-answer-label'), 'Awards Manager event answer labels missing');
+assert(page.includes('Configure'), 'Awards Manager event-first configure UI missing');
+assert(page.includes('Loading live markets') && page.includes('awardsAdminGetEventDetailCached_'), 'Awards Manager full-event loader missing');
+assert(page.includes('Markets / Answers'), 'Awards Manager event market selector missing');
+assert(page.includes('adminAwardsUpdateDraftAnswer_') && page.includes("'include'"), 'Awards Manager event market include controls missing');
+assert(page.includes('Answer Text'), 'Awards Manager event answer labels missing');
 
 
 assert(engine.includes('function awardsManagerKalshiEventSearchPage_'), 'Kalshi true event search missing');
@@ -96,7 +96,7 @@ assert(engine.includes('function awardsManagerPolymarketEventSearchPage_'), 'Pol
 assert(engine.includes('"&page="'), 'Polymarket page pagination missing');
 assert(engine.includes('searchStateJSON'), 'Awards search continuation state missing');
 assert(page.includes('Advanced Search'), 'Awards advanced search UI missing');
-assert(page.includes('Load More Events'), 'Awards Load More Events button missing');
+assert(page.includes('Load More'), 'Awards Load More button missing');
 assert(page.includes('Context unavailable or incomplete'), 'Awards universal context fallback missing');
 assert(page.includes('Open Original Market'), 'Awards original market link missing');
 assert(page.includes('Open Provider Event'), 'Awards provider event link missing');

@@ -1,3 +1,15 @@
+## v1.2.16 — Awards Manager Mobile Workflow
+
+- Reworked Awards Manager into four collapsible, task-focused sections with clearer section-specific help.
+- Replaced the bulky event workspace with a compact Question → Advanced Settings → Markets / Answers editor.
+- Added mobile card layouts, touch-friendly up/down ordering, and desktop drag/drop ordering for staged Awards questions.
+- Added provider category choices populated from returned event data, a single Check All/Clear toggle, smaller Load More control, and moved Load Selected Events & Questions to the end of the event section.
+- Added overall build progress plus per-question Building/Built/Error status; Build All now skips questions already built. The page must remain open while the current client-driven batch runs.
+- Player pick cards now explicitly show that a saved Awards pick can be changed until lock (or show the remaining change count).
+- Clarified Play Type behavior: non-Hybrid games control the scoring type; Hybrid games allow per-question overrides.
+- Added question up/down ordering controls to Manage Games using persisted category DisplayOrder. Nominee/answer reorder is deferred until the legacy/normalized storage compatibility path can be made migration-safe.
+- Bumped browser/service-worker assets to v324 for the Awards mobile workflow.
+
 
 ## v1.2.16 — Awards Batch Builder Runtime Hotfix
 

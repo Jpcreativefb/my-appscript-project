@@ -83,7 +83,8 @@ function renderAdminSetupUiActionBanner_(action) {
     "bulk-add-answers": "Answers created",
     "add-answer": "Answer created",
     "clone-answer": "Answer cloned",
-    "delete-answer": "Answer deleted"
+    "delete-answer": "Answer deleted",
+    "reorder-question": "Question reordered"
   };
 
   return `
@@ -2977,6 +2978,13 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
     actionTargetsCategory && (!uiAction || uiAction.openAnswers !== false)
   );
 
+  const categoryIndex = (categories || []).findIndex(function(item) {
+    return String(item && item.categoryId || "").trim().toLowerCase() ===
+      String(category.categoryId || "").trim().toLowerCase();
+  });
+  const canMoveUp = categoryIndex > 0;
+  const canMoveDown = categoryIndex >= 0 && categoryIndex < (categories || []).length - 1;
+
   return `
     <details
       id="categoryCard_${categoryId}"
@@ -3018,11 +3026,30 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
             </div>
           </div>
 
-          <div
-            id="categoryLockPill_${categoryId}"
-            class="admin-pill ${settings.locked ? "locked" : ""}"
-          >
-            ${settings.locked ? "Locked" : "Open"}
+          <div class="admin-question-summary-actions">
+            <div class="admin-question-order-controls" title="Move question">
+              <button
+                type="button"
+                class="admin-small-button secondary admin-question-order-button"
+                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', -1, event)"
+                ${canMoveUp ? "" : "disabled"}
+                aria-label="Move question up"
+              >↑</button>
+              <button
+                type="button"
+                class="admin-small-button secondary admin-question-order-button"
+                onclick="adminSetupMoveQuestionOrder_('${gameId}', '${categoryId}', 1, event)"
+                ${canMoveDown ? "" : "disabled"}
+                aria-label="Move question down"
+              >↓</button>
+            </div>
+
+            <div
+              id="categoryLockPill_${categoryId}"
+              class="admin-pill ${settings.locked ? "locked" : ""}"
+            >
+              ${settings.locked ? "Locked" : "Open"}
+            </div>
           </div>
 
         </div>
@@ -5434,6 +5461,80 @@ async function adminSetupSaveResults(gameId, categoryId) {
     false
   );
 
+}
+
+
+async function adminSetupMoveQuestionOrder_(gameId, categoryId, direction, event) {
+  if (event) {
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
+  const safeGameId = String(gameId || "").trim();
+  const safeCategoryId = String(categoryId || "").trim().toLowerCase();
+  const step = Number(direction || 0);
+
+  if (!safeGameId || !safeCategoryId || !step) return;
+
+  adminSetupSetMessage("adminSetupMessage", "Reordering question…", false);
+
+  try {
+    const setup = await apiAdminGetGameSetup(safeGameId);
+    if (!setup || setup.success === false) {
+      throw new Error((setup && (setup.error || setup.message)) || "Could not reload question order.");
+    }
+
+    const categories = Array.isArray(setup.categories) ? setup.categories : [];
+    const index = categories.findIndex(function(item) {
+      return String(item && item.categoryId || "").trim().toLowerCase() === safeCategoryId;
+    });
+    const targetIndex = index + step;
+
+    if (index < 0 || targetIndex < 0 || targetIndex >= categories.length) return;
+
+    const current = categories[index];
+    const target = categories[targetIndex];
+    let currentOrder = Number(current && current.settings && current.settings.displayOrder);
+    let targetOrder = Number(target && target.settings && target.settings.displayOrder);
+
+    if (!Number.isFinite(currentOrder) || !Number.isFinite(targetOrder) || currentOrder === targetOrder) {
+      currentOrder = (index + 1) * 10;
+      targetOrder = (targetIndex + 1) * 10;
+    }
+
+    const first = await apiAdminUpdateCategory({
+      gameId: safeGameId,
+      categoryId: current.categoryId,
+      displayOrder: targetOrder
+    });
+    if (!first || first.success === false) {
+      throw new Error((first && (first.error || first.message)) || "Could not move the selected question.");
+    }
+
+    const second = await apiAdminUpdateCategory({
+      gameId: safeGameId,
+      categoryId: target.categoryId,
+      displayOrder: currentOrder
+    });
+    if (!second || second.success === false) {
+      throw new Error((second && (second.error || second.message)) || "Could not finish the question reorder.");
+    }
+
+    adminSetupRememberUiAction_({
+      type: "reorder-question",
+      gameId: safeGameId,
+      categoryId: current.categoryId,
+      openAnswers: false,
+      message: "Question moved " + (step < 0 ? "up." : "down.")
+    });
+    navigate("admin-game-setup:" + safeGameId);
+  } catch (err) {
+    adminSetupSetMessage(
+      "adminSetupMessage",
+      err && err.message ? err.message : String(err),
+      true
+    );
+  }
 }
 
 /* ======================

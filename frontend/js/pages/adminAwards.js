@@ -19,7 +19,9 @@ const AWARDS_MANAGER_STATE = {
   batchGameId: "",
   eventDetailsByKey: {},
   batchRows: [],
-  marketModalRowIndex: -1
+  marketModalRowIndex: -1,
+  eventDraftsByKey: {},
+  dragRowIndex: -1
 };
 
 function awardsAdminEsc_(value) {
@@ -305,6 +307,8 @@ async function renderAdminAwardsPage() {
   AWARDS_MANAGER_STATE.eventDetailsByKey = {};
   AWARDS_MANAGER_STATE.batchRows = [];
   AWARDS_MANAGER_STATE.marketModalRowIndex = -1;
+  AWARDS_MANAGER_STATE.eventDraftsByKey = {};
+  AWARDS_MANAGER_STATE.dragRowIndex = -1;
 
   return `
     <div class="page admin-page awards-manager-page">
@@ -321,150 +325,237 @@ async function renderAdminAwardsPage() {
         </div>
       </div>
 
-      <div class="admin-section">
-        <div class="card admin-card">
-          <h2>1. Game & Source Setup</h2>
-          <div class="admin-sub">
-            These are the defaults for every selected event. Each loaded question can still be changed individually before you build it.
-          </div>
-
-          <div class="admin-control-grid" style="margin-top:12px;">
-            <label class="admin-field">
-              <span>Awards App Game</span>
-              <select id="awardsBatchGame" onchange="adminAwardsSyncBatchModeForGame_(this.value)">
-                ${awardsAdminGameOptions_("")}
-              </select>
-              <span id="awardsBatchGameTypeNote" class="admin-sub"></span>
-            </label>
-
-            <label class="admin-field" style="grid-column:span 2;">
-              <span>Official Website URL (preferred result source)</span>
-              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-                <input id="awardsOfficialSourceUrl" type="url" placeholder="https://www.emmys.com/..." style="flex:1;min-width:240px;">
-                <button type="button" class="admin-small-button secondary" onclick="adminAwardsOpenOfficialSource()">Open Official Site</button>
-              </div>
-              <span class="admin-sub">Optional game-wide default. If blank, an event's provider settlement source can supply the official reference.</span>
-            </label>
-
-            <label class="admin-field">
-              <span>Question Play Type</span>
-              <select id="awardsBatchScoreMode">${awardsAdminScoreModeOptions_("auto")}</select>
-            </label>
-
-            <label class="admin-field">
-              <span>Question Display</span>
-              <select id="awardsBatchLayoutType">${awardsAdminLayoutOptions_("image")}</select>
-              <span class="admin-sub">Text, Compact, or Image answer cards.</span>
-            </label>
-
-            <label class="admin-field">
-              <span>Display Market Probabilities</span>
-              <select id="awardsBatchShowProbabilities">${awardsAdminProbabilityOptions_("show", false)}</select>
-              <span class="admin-sub">Controls K/P percentages on the player pick screen. Market data is still stored when hidden.</span>
-            </label>
-
-            <label class="admin-field">
-              <span>Number of Changes</span>
-              <select id="awardsBatchMaxChanges">${awardsAdminPickChangeOptions_(-1)}</select>
-            </label>
-
-            <label class="admin-field">
-              <span>Default Section</span>
-              <input id="awardsBatchSection" type="text" value="Awards">
-            </label>
-
-            <label class="admin-field">
-              <span>Default Points</span>
-              <input id="awardsBatchPoints" type="number" min="0" value="1">
-            </label>
-
-            <label class="admin-field">
-              <span>First Question Order</span>
-              <input id="awardsBatchStartOrder" type="number" min="0" value="10">
-              <span class="admin-sub">Loaded questions increase by 10 so you can insert questions later.</span>
-            </label>
-          </div>
-
-          <div class="admin-actions">
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsApplyDefaultsToLoaded_()">Apply Defaults to Loaded Questions</button>
-          </div>
-        </div>
-
-        <div class="card admin-card">
-          <h2>2. Find & Select Events</h2>
-          <div class="admin-sub">
-            Search Kalshi and Polymarket live. Check every event you want in the game. View Event still expands directly under the selected event.
-          </div>
-
-          <div class="admin-control-grid" style="margin-top:12px;">
-            <label class="admin-field">
-              <span>Provider</span>
-              <select id="awardsProvider">
-                <option value="both">Kalshi + Polymarket</option>
-                <option value="kalshi">Kalshi</option>
-                <option value="polymarket">Polymarket</option>
-              </select>
-            </label>
-
-            <label class="admin-field" style="grid-column:span 2;">
-              <span>Find event</span>
-              <input id="awardsSearchQuery" type="text" placeholder="Emmys, Best Drama, Survivor, World Cup…" onkeydown="if(event.key==='Enter'){adminAwardsSearch(document.getElementById('awardsSearchButton'))}">
-            </label>
-          </div>
-
-          <details style="margin-top:10px;">
-            <summary style="cursor:pointer;font-weight:700;">Advanced Search</summary>
-            <div class="admin-control-grid" style="margin-top:12px;">
-              <label class="admin-field"><span>Category contains</span><input id="awardsSearchCategory" type="text" placeholder="Entertainment, Television…"></label>
-              <label class="admin-field"><span>Search in</span><select id="awardsSearchIn"><option value="both">Event + markets</option><option value="event">Event context only</option><option value="markets">Market questions only</option></select></label>
-              <label class="admin-field"><span>Closing</span><select id="awardsSearchCloseDays"><option value="0">Any future date</option><option value="1">Next 24 hours</option><option value="7">Next 7 days</option><option value="30">Next 30 days</option><option value="90">Next 90 days</option></select></label>
-              <label class="admin-field"><span>Sort</span><select id="awardsSearchSort"><option value="relevance">Relevance</option><option value="title">Event title</option><option value="closing">Closing soon</option></select></label>
-              <label class="admin-list-row" style="align-self:end;"><span><b>Exact phrase</b><div class="admin-sub">Require the typed phrase in provider text.</div></span><input id="awardsSearchExact" type="checkbox"></label>
-            </div>
-          </details>
-
-          <div class="admin-actions">
-            <button id="awardsSearchButton" type="button" class="button admin-button" onclick="adminAwardsSearch(this)">Search Events</button>
-            <button id="awardsLoadMoreButton" type="button" class="button admin-button secondary" onclick="adminAwardsLoadMore(this)" style="display:none;">Load More Events</button>
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllEvents_(true)">Check All Results</button>
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllEvents_(false)">Clear Event Checks</button>
-          </div>
-
-          <div id="awardsSearchStatus" class="admin-message"></div>
-          <div class="admin-list-row" style="margin-top:10px;">
-            <div><b>Selected events</b><div class="admin-sub">Load the checked events into the editable question grid.</div></div>
-            <span id="awardsBatchCount" class="admin-pill">0 selected</span>
-          </div>
-          <div class="admin-actions">
-            <button type="button" class="button admin-button" onclick="adminAwardsLoadSelectedEvents(this)">Load Selected Events & Questions</button>
-          </div>
-          <div id="awardsSearchResults" class="admin-list"></div>
-        </div>
-
-        <div class="card admin-card">
-          <div class="admin-list-row" style="align-items:flex-start;">
+      <div class="admin-section awards-manager-sections">
+        <details id="awardsSection1" class="card admin-card admin-collapsible-card awards-manager-section" open>
+          <summary class="admin-card-summary awards-section-summary">
             <div>
-              <h2 style="margin:0;">3. Configure & Build Questions</h2>
-              <div class="admin-sub">Edit question wording, section, points, order, display, scoring, changes, probability visibility, and exactly which markets/answers are included.</div>
+              <h2>1. Game & Default Settings</h2>
+              <div class="admin-sub">Choose the destination game and the defaults that new Awards questions will inherit. You can override any question later.</div>
             </div>
-            <span id="awardsLoadedCount" class="admin-pill">0 loaded</span>
-          </div>
-          <div class="admin-actions">
-            <button type="button" class="button admin-button" onclick="adminAwardsBuildLoadedQuestions(this)">Build All Loaded Questions</button>
-            <button type="button" class="admin-small-button secondary" onclick="adminAwardsClearLoadedQuestions_()">Clear Loaded</button>
-          </div>
-          <div id="awardsBatchQuestionGrid" class="admin-list" style="margin-top:12px;"><div class="admin-sub">Select events above, then load them here.</div></div>
-          <div id="awardsBatchStatus" class="admin-message"></div>
-        </div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body awards-section-body">
+            <div class="awards-section-help">
+              <strong>What this section does:</strong>
+              Pick the Awards App game once. Set the official results site, player display style, market-odds visibility, pick-change rule, points, section, and starting order. These defaults are copied into every event you load.
+            </div>
 
-        <div class="card admin-card">
-          <h2>4. Result Safety</h2>
-          <div class="admin-list">
-            <div class="admin-list-row"><div><b>Live market source</b><div class="admin-sub">K/P probabilities are read-only and can be shown or hidden from players.</div></div><span class="admin-pill">Read only</span></div>
-            <div class="admin-list-row"><div><b>External Results Hub</b><div class="admin-sub">Stores selected markets, mappings, watch state, reviews, and audit history.</div></div><span class="admin-pill">${dashboard.hubConfigured ? "Connected" : "Setup needed"}</span></div>
-            <div class="admin-list-row"><div><b>Final scoring result</b><div class="admin-sub">Official website is preferred when supplied; final settlement still requires administrator review.</div></div><span class="admin-pill">Auto-settle OFF</span></div>
+            <div class="admin-control-grid">
+              <label class="admin-field">
+                <span>Awards App Game</span>
+                <select id="awardsBatchGame" onchange="adminAwardsSyncBatchModeForGame_(this.value)">
+                  ${awardsAdminGameOptions_("")}
+                </select>
+                <span id="awardsBatchGameTypeNote" class="admin-sub">Choose a game to set its play type.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Default Play Type</span>
+                <select id="awardsBatchScoreMode">${awardsAdminScoreModeOptions_("auto")}</select>
+                <span id="awardsBatchScoreModeNote" class="admin-sub">Prediction, Confidence, Staked, and Wager games control this automatically. Hybrid games may mix play types by question.</span>
+              </label>
+
+              <label class="admin-field awards-field-wide">
+                <span>Official Website URL</span>
+                <div class="awards-inline-input-action">
+                  <input id="awardsOfficialSourceUrl" type="url" placeholder="https://www.emmys.com/awards/nominees-winners">
+                  <button type="button" class="admin-small-button secondary" onclick="adminAwardsOpenOfficialSource()">Open Official Site</button>
+                </div>
+                <span class="admin-sub">Preferred human result/reference source. Kalshi/Polymarket remain attached for market data.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Question Display</span>
+                <select id="awardsBatchLayoutType">${awardsAdminLayoutOptions_("image")}</select>
+                <span class="admin-sub">Text = names only. Compact = small image/list cards. Image = larger answer cards.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Show Market Odds to Players</span>
+                <select id="awardsBatchShowProbabilities">${awardsAdminProbabilityOptions_("show", false)}</select>
+                <span class="admin-sub">Turns K/P percentages on or off by default. Market data is still stored when hidden.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Pick Changes</span>
+                <select id="awardsBatchMaxChanges">${awardsAdminPickChangeOptions_(-1)}</select>
+                <span class="admin-sub">Unlimited until lock is recommended for most Awards games.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Default Section</span>
+                <input id="awardsBatchSection" type="text" value="Awards">
+                <span class="admin-sub">Example: Drama, Comedy, Acting, Main Awards.</span>
+              </label>
+
+              <label class="admin-field">
+                <span>Default Points</span>
+                <input id="awardsBatchPoints" type="number" min="0" value="1">
+              </label>
+
+              <label class="admin-field">
+                <span>First Question Order</span>
+                <input id="awardsBatchStartOrder" type="number" min="0" value="10">
+                <span class="admin-sub">Questions are spaced by 10 so you can insert others later.</span>
+              </label>
+            </div>
+
+            <div class="admin-actions">
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsApplyDefaultsToLoaded_()">Apply These Defaults to Loaded Questions</button>
+            </div>
           </div>
-        </div>
+        </details>
+
+        <details id="awardsSection2" class="card admin-card admin-collapsible-card awards-manager-section" open>
+          <summary class="admin-card-summary awards-section-summary">
+            <div>
+              <h2>2. Find & Choose Events</h2>
+              <div class="admin-sub">Search K/P events, check the ones you want, optionally inspect/edit an event, then load the selected events into the build queue.</div>
+            </div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body awards-section-body">
+            <div class="awards-section-help">
+              <strong>What this section does:</strong>
+              Search the live provider catalogs. Checking an event adds it to your selection. Use <b>Configure</b> only when you want to inspect or change that event before loading. The final button at the bottom loads every checked event into Section 3.
+            </div>
+
+            <div class="admin-control-grid">
+              <label class="admin-field">
+                <span>Provider</span>
+                <select id="awardsProvider">
+                  <option value="both">Kalshi + Polymarket</option>
+                  <option value="kalshi">Kalshi only</option>
+                  <option value="polymarket">Polymarket only</option>
+                </select>
+              </label>
+
+              <label class="admin-field awards-field-wide">
+                <span>Find Event</span>
+                <input id="awardsSearchQuery" type="text" placeholder="Emmys, Best Drama, Survivor, World Cup…" onkeydown="if(event.key==='Enter'){adminAwardsSearch(document.getElementById('awardsSearchButton'))}">
+                <span class="admin-sub">Searches event titles and, by default, the markets inside each event.</span>
+              </label>
+            </div>
+
+            <details class="awards-subdetails">
+              <summary>Advanced Search</summary>
+              <div class="admin-control-grid awards-advanced-grid">
+                <label class="admin-field">
+                  <span>Category</span>
+                  <select id="awardsSearchCategory">
+                    <option value="">Any category</option>
+                  </select>
+                  <span class="admin-sub">Categories populate from provider results after your first search so you do not have to know provider category names.</span>
+                </label>
+                <label class="admin-field">
+                  <span>Search In</span>
+                  <select id="awardsSearchIn">
+                    <option value="both">Event + markets</option>
+                    <option value="event">Event title/context only</option>
+                    <option value="markets">Market questions only</option>
+                  </select>
+                  <span class="admin-sub">Use Event + markets unless you are narrowing a very large search.</span>
+                </label>
+                <label class="admin-field">
+                  <span>Closing Window</span>
+                  <select id="awardsSearchCloseDays">
+                    <option value="0">Any future date</option>
+                    <option value="1">Next 24 hours</option>
+                    <option value="7">Next 7 days</option>
+                    <option value="30">Next 30 days</option>
+                    <option value="90">Next 90 days</option>
+                  </select>
+                </label>
+                <label class="admin-field">
+                  <span>Sort Search Results</span>
+                  <select id="awardsSearchSort">
+                    <option value="relevance">Relevance</option>
+                    <option value="title">Event title</option>
+                    <option value="closing">Closing soon</option>
+                  </select>
+                </label>
+                <label class="admin-list-row awards-checkbox-row">
+                  <span><b>Exact phrase</b><div class="admin-sub">Require the typed phrase in provider text.</div></span>
+                  <input id="awardsSearchExact" type="checkbox">
+                </label>
+              </div>
+            </details>
+
+            <div class="admin-actions awards-search-actions">
+              <button id="awardsSearchButton" type="button" class="button admin-button" onclick="adminAwardsSearch(this)">Search Events</button>
+              <button id="awardsLoadMoreButton" type="button" class="admin-small-button secondary" onclick="adminAwardsLoadMore(this)" style="display:none;">Load More</button>
+              <button id="awardsToggleAllEventsButton" type="button" class="admin-small-button secondary" onclick="adminAwardsToggleAllEvents_()">Check All Results</button>
+            </div>
+
+            <div id="awardsSearchStatus" class="admin-message"></div>
+            <div class="admin-list-row awards-selection-summary">
+              <div><b>Selected Events</b><div class="admin-sub">Checked events will be loaded into the final review/build queue.</div></div>
+              <span id="awardsBatchCount" class="admin-pill">0 selected</span>
+            </div>
+
+            <div id="awardsSearchResults" class="admin-list awards-event-results"></div>
+
+            <div class="admin-actions awards-section-final-actions">
+              <button type="button" class="button admin-button" onclick="adminAwardsLoadSelectedEvents(this)">Load Selected Events & Questions</button>
+            </div>
+          </div>
+        </details>
+
+        <details id="awardsSection3" class="card admin-card admin-collapsible-card awards-manager-section" open>
+          <summary class="admin-card-summary awards-section-summary">
+            <div>
+              <h2>3. Review, Sort & Build Questions</h2>
+              <div class="admin-sub">This is the final queue. Reorder questions here, edit only what you need, then build them into the selected Awards App game.</div>
+            </div>
+            <div class="awards-summary-right">
+              <span id="awardsLoadedCount" class="admin-pill">0 loaded</span>
+              <span class="admin-collapse-icon">▾</span>
+            </div>
+          </summary>
+          <div class="admin-collapsible-body awards-section-body">
+            <div class="awards-section-help">
+              <strong>What this section does:</strong>
+              The order shown here becomes the question order in the game. Drag cards on desktop or use ↑/↓ on a phone. Question text is always visible; Advanced Settings and Markets / Answers stay collapsed until you need them.
+            </div>
+
+            <div id="awardsBuildProgressWrap" class="awards-build-progress" hidden>
+              <div class="awards-build-progress-head">
+                <strong id="awardsBuildProgressText">Preparing build…</strong>
+                <span id="awardsBuildProgressPct">0%</span>
+              </div>
+              <div class="awards-build-progress-track"><div id="awardsBuildProgressBar" class="awards-build-progress-bar" style="width:0%;"></div></div>
+            </div>
+
+            <div class="admin-message warning awards-build-browser-note">
+              Build All saves one question at a time to avoid Apps Script timeouts. Keep this Awards Manager page open while the build is running. Each completed question is safe even if a later question fails.
+            </div>
+
+            <div id="awardsBatchQuestionGrid" class="admin-list awards-build-queue"><div class="admin-sub">Select events above, then load them here.</div></div>
+
+            <div class="admin-actions awards-section-final-actions">
+              <button type="button" class="button admin-button" onclick="adminAwardsBuildLoadedQuestions(this)">Build All Unbuilt Questions</button>
+              <button type="button" class="admin-small-button secondary" onclick="adminAwardsClearLoadedQuestions_()">Clear Loaded</button>
+            </div>
+            <div id="awardsBatchStatus" class="admin-message"></div>
+          </div>
+        </details>
+
+        <details id="awardsSection4" class="card admin-card admin-collapsible-card awards-manager-section">
+          <summary class="admin-card-summary awards-section-summary">
+            <div>
+              <h2>4. Result Safety</h2>
+              <div class="admin-sub">How market data and final results are handled after questions are created.</div>
+            </div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body awards-section-body">
+            <div class="admin-list">
+              <div class="admin-list-row"><div><b>Live market source</b><div class="admin-sub">K/P probabilities are read-only. Showing odds to players is optional.</div></div><span class="admin-pill">Read only</span></div>
+              <div class="admin-list-row"><div><b>External Results Hub</b><div class="admin-sub">Stores the selected provider markets, answer mappings, review state, and audit history.</div></div><span class="admin-pill">${dashboard.hubConfigured ? "Connected" : "Setup needed"}</span></div>
+              <div class="admin-list-row"><div><b>Final scoring result</b><div class="admin-sub">The official website is preferred when supplied. Final settlement still requires administrator review.</div></div><span class="admin-pill">Auto-settle OFF</span></div>
+            </div>
+          </div>
+        </details>
       </div>
       <div id="awardsMarketGridModalHost"></div>
     </div>
@@ -644,6 +735,87 @@ function adminAwardsOpenOfficialSource() {
   }
 }
 
+
+function awardsAdminRefreshCategoryOptions_() {
+  const select = document.getElementById("awardsSearchCategory");
+  if (!select) return;
+  const previous = String(select.value || "");
+  const categories = [];
+  (AWARDS_MANAGER_STATE.events || []).forEach(function(event) {
+    const value = String(event && event.category || "").trim();
+    if (value && categories.indexOf(value) === -1) categories.push(value);
+  });
+  categories.sort(function(a, b) { return a.localeCompare(b); });
+  select.innerHTML = '<option value="">Any category</option>' + categories.map(function(value) {
+    return '<option value="' + awardsAdminEsc_(value) + '">' + awardsAdminEsc_(value) + '</option>';
+  }).join("");
+  if (previous && categories.indexOf(previous) !== -1) select.value = previous;
+}
+
+function awardsAdminAllEventsSelected_() {
+  const events = AWARDS_MANAGER_STATE.events || [];
+  if (!events.length) return false;
+  return events.every(function(event) {
+    return !!AWARDS_MANAGER_STATE.selectedEventKeys[awardsAdminEventKey_(event)];
+  });
+}
+
+function awardsAdminUpdateToggleAllButton_() {
+  const button = document.getElementById("awardsToggleAllEventsButton");
+  if (!button) return;
+  button.textContent = awardsAdminAllEventsSelected_() ? "Clear Event Checks" : "Check All Results";
+}
+
+function adminAwardsToggleAllEvents_() {
+  adminAwardsSetAllEvents_(!awardsAdminAllEventsSelected_());
+}
+
+function awardsAdminEventDraft_(event, detail) {
+  const key = awardsAdminEventKey_(event);
+  if (AWARDS_MANAGER_STATE.eventDraftsByKey[key]) return AWARDS_MANAGER_STATE.eventDraftsByKey[key];
+  const defaults = awardsAdminCurrentDefaults_();
+  const row = awardsAdminMakeBatchRow_(event, detail, 0, defaults);
+  row.showProbabilities = "default";
+  AWARDS_MANAGER_STATE.eventDraftsByKey[key] = row;
+  return row;
+}
+
+function awardsAdminAnswerCardsHtml_(row, rowIndex, mode) {
+  const editable = mode !== "inspect";
+  const draftMode = mode === "draft";
+  const answers = row.answers || [];
+  if (!answers.length) return '<div class="admin-sub">No live markets/answers were returned for this event.</div>';
+  return '<div class="awards-answer-card-list">' + answers.map(function(answer, answerIndex) {
+    const updatePrefix = draftMode
+      ? "adminAwardsUpdateDraftAnswer_("
+      : "adminAwardsToggleBatchAnswer_(";
+    const source = awardsAdminExternalLink_(answer.sourceUrl, "Open");
+    return `
+      <div class="awards-answer-card ${answer.include ? "" : "is-disabled"}">
+        <div class="awards-answer-toggle-row">
+          <label class="awards-switch-label">
+            <input type="checkbox" ${answer.include ? "checked" : ""} ${editable ? `onchange="${updatePrefix}${rowIndex}, ${answerIndex}, 'include', this.checked)"` : "disabled"}>
+            <span>Include</span>
+          </label>
+          <label class="awards-switch-label">
+            <input type="checkbox" ${answer.showProbability ? "checked" : ""} ${editable ? `onchange="${updatePrefix}${rowIndex}, ${answerIndex}, 'showProbability', this.checked)"` : "disabled"}>
+            <span>Show Odds</span>
+          </label>
+          <span class="admin-pill">${awardsAdminEsc_(awardsAdminProviderBadge_(answer.provider))} · ${awardsAdminPct_(answer.probability)}</span>
+        </div>
+        <label class="admin-field">
+          <span>Answer Text</span>
+          ${editable
+            ? `<input type="text" value="${awardsAdminEsc_(answer.label)}" oninput="${updatePrefix}${rowIndex}, ${answerIndex}, 'label', this.value)">`
+            : `<div class="awards-answer-readonly">${awardsAdminEsc_(answer.label)}</div>`}
+        </label>
+        <div class="admin-sub awards-answer-market-question">${awardsAdminEsc_(answer.marketQuestion)}</div>
+        ${source ? `<div class="awards-answer-source">${source}</div>` : ""}
+      </div>
+    `;
+  }).join("") + '</div>';
+}
+
 function awardsAdminRenderSearchResults_() {
   const resultsNode =
     document.getElementById(
@@ -781,21 +953,13 @@ function awardsAdminRenderSearchResults_() {
                   </label>
                 </div>
 
-                <div class="admin-actions">
+                <div class="admin-actions awards-event-card-actions">
                   <button
                     type="button"
                     class="admin-small-button"
                     onclick="adminAwardsOpenEvent(${index}, this)"
                   >
-                    View Event
-                  </button>
-
-                  <button
-                    type="button"
-                    class="admin-small-button secondary"
-                    onclick="adminAwardsOpenMarketGridFromSearch(${index}, this)"
-                  >
-                    Market Grid
+                    Configure
                   </button>
 
                   ${awardsAdminExternalLink_(
@@ -829,7 +993,9 @@ function awardsAdminRenderSearchResults_() {
         : "none";
   }
 
+  awardsAdminRefreshCategoryOptions_();
   awardsAdminUpdateBatchCount_();
+  awardsAdminUpdateToggleAllButton_();
 }
 
 async function adminAwardsRunSearch_(
@@ -1082,25 +1248,30 @@ function adminAwardsSyncBatchModeForGame_(gameId) {
   const type = awardsAdminCanonicalGameType_(game);
   const scoreNode = document.getElementById("awardsBatchScoreMode");
   const note = document.getElementById("awardsBatchGameTypeNote");
+  const scoreNote = document.getElementById("awardsBatchScoreModeNote");
   if (!scoreNode) return;
 
   if (!game) {
-    scoreNode.disabled = false;
-    if (note) note.textContent = "";
+    scoreNode.value = "auto";
+    scoreNode.disabled = true;
+    if (note) note.textContent = "Choose a game to set its play type.";
+    if (scoreNote) scoreNote.textContent = "The selected game determines the default play type.";
     return;
   }
 
   if (type !== "mixed") {
-    scoreNode.value = awardsAdminDefaultScoreModeForGame_(gameId);
+    const mode = awardsAdminDefaultScoreModeForGame_(gameId);
+    scoreNode.value = mode;
     scoreNode.disabled = true;
-    if (note) note.textContent = "This game uses " + awardsAdminGameTypeLabel_(game) + "; questions will follow that play type.";
+    if (note) note.textContent = "Game type: " + awardsAdminGameTypeLabel_(game) + ".";
+    if (scoreNote) scoreNote.textContent = "Controlled by the game type. Choose a Hybrid game if you need different play types on different questions.";
   } else {
     scoreNode.disabled = false;
-    if (scoreNode.value !== "auto" && !scoreNode.value) scoreNode.value = "auto";
-    if (note) note.textContent = "Hybrid game: each loaded question may use a different play type.";
+    if (!scoreNode.value || scoreNode.value === "auto") scoreNode.value = "fixed-points";
+    if (note) note.textContent = "Game type: Hybrid.";
+    if (scoreNote) scoreNote.textContent = "Hybrid game: choose the default here, then override individual questions in Section 3.";
   }
 }
-
 function awardsAdminUpdateBatchCount_() {
   const count = Object.keys(AWARDS_MANAGER_STATE.selectedEventKeys || {}).filter(function(key) {
     return AWARDS_MANAGER_STATE.selectedEventKeys[key];
@@ -1116,6 +1287,7 @@ function adminAwardsToggleEventSelected(index, checked) {
   if (checked) AWARDS_MANAGER_STATE.selectedEventKeys[key] = true;
   else delete AWARDS_MANAGER_STATE.selectedEventKeys[key];
   awardsAdminUpdateBatchCount_();
+  awardsAdminUpdateToggleAllButton_();
 }
 
 function adminAwardsSetAllEvents_(checked) {
@@ -1128,6 +1300,7 @@ function adminAwardsSetAllEvents_(checked) {
     input.checked = checked === true;
   });
   awardsAdminUpdateBatchCount_();
+  awardsAdminUpdateToggleAllButton_();
 }
 
 function adminAwardsClearSelectedEvents_() {
@@ -1242,8 +1415,16 @@ async function adminAwardsLoadSelectedEvents(button) {
       const event = selected[i];
       try {
         const detail = await awardsAdminGetEventDetailCached_(event);
-        const row = awardsAdminMakeBatchRow_(event, detail, rows.length, defaults);
+        const draft = AWARDS_MANAGER_STATE.eventDraftsByKey[awardsAdminEventKey_(event)];
+        const row = draft
+          ? Object.assign({}, draft, {
+              detail: detail,
+              answers: (draft.answers || []).map(function(answer) { return Object.assign({}, answer); }),
+              buildStatus: draft.buildStatus || ""
+            })
+          : awardsAdminMakeBatchRow_(event, detail, rows.length, defaults);
         if (!row.answers.length) throw new Error("No live markets/answers were available.");
+        if (!draft) row.displayOrder = defaults.startOrder + (rows.length * 10);
         rows.push(row);
       } catch (err) {
         failures.push((event.eventName || event.externalEventId) + " — " + (err && err.message ? err.message : String(err)));
@@ -1251,7 +1432,13 @@ async function adminAwardsLoadSelectedEvents(button) {
       if (status) status.textContent = "Loaded " + (i + 1) + " of " + selected.length + " selected events…";
     }
     AWARDS_MANAGER_STATE.batchRows = rows;
+    adminAwardsRenumberBatchRows_(false);
     awardsAdminRenderBatchQuestionGrid_();
+    const section3 = document.getElementById("awardsSection3");
+    if (section3) {
+      section3.open = true;
+      if (typeof section3.scrollIntoView === "function") section3.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
     if (status) {
       status.className = failures.length ? "admin-message warning" : "admin-message success";
       status.textContent = rows.length + " question" + (rows.length === 1 ? "" : "s") + " loaded into the grid." + (failures.length ? " Failed: " + failures.join(" | ") : "");
@@ -1280,32 +1467,79 @@ function awardsAdminRenderBatchQuestionGrid_() {
   grid.innerHTML = rows.map(function(row, index) {
     const includedAnswers = (row.answers || []).filter(function(answer) { return answer.include; }).length;
     const answerCount = (row.answers || []).length;
-    const statusClass = row.buildStatus && row.buildStatus.indexOf("Built") === 0 ? "success" : row.buildStatus && row.buildStatus.indexOf("Error") === 0 ? "warning" : "";
+    const built = row.buildStatus && row.buildStatus.indexOf("Built") === 0;
+    const failed = row.buildStatus && row.buildStatus.indexOf("Error") === 0;
+    const statusClass = built ? "success" : failed ? "warning" : "";
+    const statusLabel = built ? "Built" : failed ? "Needs retry" : row.buildStatus || "Ready";
     return `
-      <div class="admin-category-card" data-awards-batch-row="${index}">
-        <div class="admin-category-header" style="align-items:flex-start;">
-          <div style="min-width:0;flex:1;">
-            <strong>${awardsAdminEsc_(row.eventName)}</strong>
-            <div class="admin-sub"><b>${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</b> · ${awardsAdminEsc_(row.externalEventId)}</div>
+      <div
+        class="admin-category-card awards-build-card ${built ? "is-built" : ""}"
+        data-awards-batch-row="${index}"
+        draggable="true"
+        ondragstart="adminAwardsBatchDragStart_(event, ${index})"
+        ondragover="adminAwardsBatchDragOver_(event)"
+        ondrop="adminAwardsBatchDrop_(event, ${index})"
+      >
+        <div class="awards-build-card-head">
+          <div class="awards-order-controls" title="Question order">
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="adminAwardsMoveBatchRow_(${index}, -1)" ${index === 0 ? "disabled" : ""}>↑</button>
+            <span class="awards-order-number">${index + 1}</span>
+            <button type="button" class="admin-small-button secondary awards-order-button" onclick="adminAwardsMoveBatchRow_(${index}, 1)" ${index === rows.length - 1 ? "disabled" : ""}>↓</button>
+            <span class="awards-drag-handle" aria-hidden="true">⋮⋮</span>
           </div>
-          <label class="admin-pill" style="display:flex;gap:6px;align-items:center;cursor:pointer;"><input type="checkbox" ${row.include ? "checked" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'include', this.checked)"> Build</label>
+
+          <div class="awards-build-card-main">
+            <label class="admin-field awards-question-field">
+              <span>Question ${index + 1}</span>
+              <input type="text" value="${awardsAdminEsc_(row.question)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'question', this.value)">
+            </label>
+            <div class="awards-build-card-meta">
+              <span class="admin-pill">${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</span>
+              <span>${includedAnswers}/${answerCount} answers</span>
+              <span>Order ${Number(row.displayOrder) || 0}</span>
+              <span class="awards-row-status ${statusClass}">${awardsAdminEsc_(statusLabel)}</span>
+            </div>
+          </div>
+
+          <label class="awards-build-toggle">
+            <input type="checkbox" ${row.include ? "checked" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'include', this.checked)">
+            <span>Build</span>
+          </label>
         </div>
 
-        <div class="admin-control-grid" style="margin-top:10px;">
-          <label class="admin-field" style="grid-column:span 2;"><span>Question</span><input type="text" value="${awardsAdminEsc_(row.question)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'question', this.value)"></label>
-          <label class="admin-field"><span>Section</span><input type="text" value="${awardsAdminEsc_(row.section)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'section', this.value)"></label>
-          <label class="admin-field"><span>Points</span><input type="number" min="0" value="${Number(row.points) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'points', this.value)"></label>
-          <label class="admin-field"><span>Question Order</span><input type="number" min="0" value="${Number(row.displayOrder) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'displayOrder', this.value)"></label>
-          <label class="admin-field"><span>Question Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'layoutType', this.value)">${awardsAdminLayoutOptions_(row.layoutType)}</select></label>
-          <label class="admin-field"><span>Play Type</span><select ${scoreDisabled ? "disabled" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'scoreMode', this.value)">${awardsAdminScoreModeOptions_(row.scoreMode)}</select></label>
-          <label class="admin-field"><span>Number of Changes</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'maxChanges', this.value)">${awardsAdminPickChangeOptions_(row.maxChanges)}</select></label>
-          <label class="admin-field"><span>Probability Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'showProbabilities', this.value)">${awardsAdminProbabilityOptions_(row.showProbabilities, true)}</select></label>
-        </div>
+        <details class="awards-subdetails awards-question-advanced">
+          <summary>Advanced Settings</summary>
+          <div class="admin-control-grid awards-advanced-grid">
+            <label class="admin-field"><span>Section</span><input type="text" value="${awardsAdminEsc_(row.section)}" oninput="adminAwardsUpdateBatchRow_(${index}, 'section', this.value)"></label>
+            <label class="admin-field"><span>Points</span><input type="number" min="0" value="${Number(row.points) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'points', this.value)"></label>
+            <label class="admin-field"><span>Question Order</span><input type="number" min="0" value="${Number(row.displayOrder) || 0}" oninput="adminAwardsUpdateBatchRow_(${index}, 'displayOrder', this.value)"></label>
+            <label class="admin-field"><span>Question Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'layoutType', this.value)">${awardsAdminLayoutOptions_(row.layoutType)}</select></label>
+            <label class="admin-field">
+              <span>Play Type</span>
+              <select ${scoreDisabled ? "disabled" : ""} onchange="adminAwardsUpdateBatchRow_(${index}, 'scoreMode', this.value)">${awardsAdminScoreModeOptions_(row.scoreMode)}</select>
+              <span class="admin-sub">${scoreDisabled ? "Controlled by the selected game type." : "Hybrid game: this question can use a different play type."}</span>
+            </label>
+            <label class="admin-field"><span>Pick Changes</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'maxChanges', this.value)">${awardsAdminPickChangeOptions_(row.maxChanges)}</select></label>
+            <label class="admin-field"><span>Market Odds Display</span><select onchange="adminAwardsUpdateBatchRow_(${index}, 'showProbabilities', this.value)">${awardsAdminProbabilityOptions_(row.showProbabilities, true)}</select></label>
+          </div>
+        </details>
 
-        <div class="admin-actions">
-          <button type="button" class="admin-small-button" onclick="adminAwardsOpenMarketGrid_(${index})">Markets / Answers (${includedAnswers}/${answerCount})</button>
-          ${awardsAdminExternalLink_(row.detail && row.detail.sourceUrl, "Open Provider Event")}
-          ${awardsAdminExternalLink_(row.officialSourceUrl, "Open Event Official Source")}
+        <details class="awards-subdetails awards-market-answer-details">
+          <summary>
+            <span>Markets / Answers</span>
+            <span class="admin-pill">${includedAnswers}/${answerCount} included</span>
+          </summary>
+          <div class="admin-sub awards-market-help">Turn individual answers on/off, hide/show K/P odds, or edit the player-facing Answer Text. Provider mapping stays tied to the original market.</div>
+          <div class="admin-actions">
+            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, true)">Include All</button>
+            <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswersInline_(${index}, false)">Clear All</button>
+          </div>
+          ${awardsAdminAnswerCardsHtml_(row, index, "batch")}
+        </details>
+
+        <div class="admin-actions awards-build-card-actions">
+          ${awardsAdminExternalLink_(row.detail && row.detail.sourceUrl, "Open Provider")}
+          ${awardsAdminExternalLink_(row.officialSourceUrl, "Open Official Site")}
           <button type="button" class="admin-small-button secondary" onclick="adminAwardsRemoveBatchRow_(${index})">Remove</button>
         </div>
         ${row.buildStatus ? `<div class="admin-message ${statusClass}" style="margin-top:8px;">${awardsAdminEsc_(row.buildStatus)}</div>` : ""}
@@ -1314,6 +1548,74 @@ function awardsAdminRenderBatchQuestionGrid_() {
   }).join("");
 }
 
+function adminAwardsRenumberBatchRows_(force) {
+  const defaults = awardsAdminCurrentDefaults_();
+  (AWARDS_MANAGER_STATE.batchRows || []).forEach(function(row, index) {
+    if (force !== false || !Number.isFinite(Number(row.displayOrder))) {
+      row.displayOrder = defaults.startOrder + (index * 10);
+    }
+  });
+}
+
+function adminAwardsMoveBatchRow_(index, direction) {
+  const rows = AWARDS_MANAGER_STATE.batchRows || [];
+  const target = index + Number(direction || 0);
+  if (index < 0 || target < 0 || index >= rows.length || target >= rows.length) return;
+  const item = rows.splice(index, 1)[0];
+  rows.splice(target, 0, item);
+  adminAwardsRenumberBatchRows_(true);
+  awardsAdminRenderBatchQuestionGrid_();
+}
+
+function adminAwardsBatchDragStart_(event, index) {
+  AWARDS_MANAGER_STATE.dragRowIndex = index;
+  if (event && event.dataTransfer) {
+    event.dataTransfer.effectAllowed = "move";
+    try { event.dataTransfer.setData("text/plain", String(index)); } catch (ignore) {}
+  }
+}
+
+function adminAwardsBatchDragOver_(event) {
+  if (!event) return;
+  event.preventDefault();
+  if (event.dataTransfer) event.dataTransfer.dropEffect = "move";
+}
+
+function adminAwardsBatchDrop_(event, targetIndex) {
+  if (event) event.preventDefault();
+  const rows = AWARDS_MANAGER_STATE.batchRows || [];
+  let from = Number(AWARDS_MANAGER_STATE.dragRowIndex);
+  if ((!Number.isFinite(from) || from < 0) && event && event.dataTransfer) {
+    from = Number(event.dataTransfer.getData("text/plain"));
+  }
+  AWARDS_MANAGER_STATE.dragRowIndex = -1;
+  if (!Number.isFinite(from) || from < 0 || from >= rows.length || targetIndex < 0 || targetIndex >= rows.length || from === targetIndex) return;
+  const item = rows.splice(from, 1)[0];
+  rows.splice(targetIndex, 0, item);
+  adminAwardsRenumberBatchRows_(true);
+  awardsAdminRenderBatchQuestionGrid_();
+}
+
+function adminAwardsSetAllBatchAnswersInline_(rowIndex, checked) {
+  const row = (AWARDS_MANAGER_STATE.batchRows || [])[rowIndex];
+  if (!row) return;
+  (row.answers || []).forEach(function(answer) { answer.include = checked === true; });
+  awardsAdminRenderBatchQuestionGrid_();
+}
+
+function awardsAdminSetBuildProgress_(done, total, label) {
+  const wrap = document.getElementById("awardsBuildProgressWrap");
+  const text = document.getElementById("awardsBuildProgressText");
+  const pct = document.getElementById("awardsBuildProgressPct");
+  const bar = document.getElementById("awardsBuildProgressBar");
+  const safeTotal = Math.max(0, Number(total) || 0);
+  const safeDone = Math.max(0, Math.min(safeTotal || 0, Number(done) || 0));
+  const value = safeTotal ? Math.round((safeDone / safeTotal) * 100) : 0;
+  if (wrap) wrap.hidden = safeTotal < 1;
+  if (text) text.textContent = label || (safeDone + " of " + safeTotal + " complete");
+  if (pct) pct.textContent = value + "%";
+  if (bar) bar.style.width = value + "%";
+}
 function adminAwardsUpdateBatchRow_(index, field, value) {
   const row = (AWARDS_MANAGER_STATE.batchRows || [])[index];
   if (!row) return;
@@ -1354,40 +1656,28 @@ function adminAwardsApplyDefaultsToLoaded_() {
 }
 
 function awardsAdminMarketGridHtml_(row, rowIndex, editable) {
-  const answers = row.answers || [];
   const globalSetting = awardsAdminCurrentDefaults_().showProbabilities === "hide" ? "Hide" : "Show";
   return `
-    <div style="position:fixed;inset:0;background:rgba(2,6,23,.78);z-index:9999;display:flex;align-items:flex-start;justify-content:center;padding:4vh 12px;overflow:auto;" onclick="if(event.target===this)adminAwardsCloseMarketGrid_()">
-      <div class="card admin-card" style="width:min(1100px,96vw);max-height:90vh;overflow:auto;box-shadow:0 24px 70px rgba(0,0,0,.5);">
-        <div class="admin-list-row" style="align-items:flex-start;position:sticky;top:0;background:inherit;z-index:2;padding-bottom:10px;">
-          <div><h2 style="margin:0;">Market / Answer Grid</h2><div class="admin-sub">${awardsAdminEsc_(row.eventName)} · ${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</div></div>
+    <div class="awards-market-modal-backdrop" onclick="if(event.target===this)adminAwardsCloseMarketGrid_()">
+      <div class="card admin-card awards-market-modal">
+        <div class="awards-market-modal-head">
+          <div>
+            <h2>Markets / Answers</h2>
+            <div class="admin-sub">${awardsAdminEsc_(row.eventName)} · ${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</div>
+          </div>
           <button type="button" class="admin-small-button secondary" onclick="adminAwardsCloseMarketGrid_()">Close</button>
         </div>
-        <div class="admin-message" style="margin:8px 0;">Question probability setting: <b>${awardsAdminEsc_(row.showProbabilities === "default" ? "Use Game Setting (" + globalSetting + ")" : (row.showProbabilities === "hide" ? "Hide" : "Show"))}</b>. Each answer can also suppress its own K/P percentage.</div>
-        ${editable ? `<div class="admin-actions"><button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswers_(${rowIndex}, true)">Include All</button><button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswers_(${rowIndex}, false)">Clear All</button></div>` : `<div class="admin-sub">Inspection only. Load this event into Section 3 to change included answers.</div>`}
-        <div style="overflow-x:auto;margin-top:10px;">
-          <table style="width:100%;border-collapse:collapse;min-width:820px;">
-            <thead><tr><th style="text-align:left;padding:8px;">Include</th><th style="text-align:left;padding:8px;">Show Odds</th><th style="text-align:left;padding:8px;">Answer</th><th style="text-align:left;padding:8px;">Provider Market</th><th style="text-align:left;padding:8px;">Probability</th><th style="text-align:left;padding:8px;">Source</th></tr></thead>
-            <tbody>
-              ${answers.map(function(answer, answerIndex) {
-                return `<tr style="border-top:1px solid rgba(148,163,184,.22);">
-                  <td style="padding:8px;"><input type="checkbox" ${answer.include ? "checked" : ""} ${editable ? `onchange="adminAwardsToggleBatchAnswer_(${rowIndex}, ${answerIndex}, 'include', this.checked)"` : "disabled"}></td>
-                  <td style="padding:8px;"><input type="checkbox" ${answer.showProbability ? "checked" : ""} ${editable ? `onchange="adminAwardsToggleBatchAnswer_(${rowIndex}, ${answerIndex}, 'showProbability', this.checked)"` : "disabled"}></td>
-                  <td style="padding:8px;min-width:180px;">${editable ? `<input type="text" value="${awardsAdminEsc_(answer.label)}" style="width:100%;" oninput="adminAwardsToggleBatchAnswer_(${rowIndex}, ${answerIndex}, 'label', this.value)">` : awardsAdminEsc_(answer.label)}</td>
-                  <td style="padding:8px;min-width:260px;">${awardsAdminEsc_(answer.marketQuestion)}</td>
-                  <td style="padding:8px;white-space:nowrap;"><b>${awardsAdminEsc_(awardsAdminProviderBadge_(answer.provider))}</b> · ${awardsAdminPct_(answer.probability)}</td>
-                  <td style="padding:8px;white-space:nowrap;">${awardsAdminExternalLink_(answer.sourceUrl, "Open")}</td>
-                </tr>`;
-              }).join("")}
-            </tbody>
-          </table>
+        <div class="admin-message">
+          Question odds display: <b>${awardsAdminEsc_(row.showProbabilities === "default" ? "Use Game Setting (" + globalSetting + ")" : (row.showProbabilities === "hide" ? "Hide" : "Show"))}</b>.
+          Include controls whether an answer exists in the game. Show Odds only controls the player-facing K/P percentage.
         </div>
-        <div class="admin-actions" style="margin-top:12px;"><button type="button" class="button admin-button" onclick="adminAwardsCloseMarketGrid_()">Done</button></div>
+        ${editable ? `<div class="admin-actions"><button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswers_(${rowIndex}, true)">Include All</button><button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllBatchAnswers_(${rowIndex}, false)">Clear All</button></div>` : ""}
+        ${awardsAdminAnswerCardsHtml_(row, rowIndex, editable ? "batch" : "inspect")}
+        <div class="admin-actions"><button type="button" class="button admin-button" onclick="adminAwardsCloseMarketGrid_()">Done</button></div>
       </div>
     </div>
   `;
 }
-
 function adminAwardsOpenMarketGrid_(rowIndex) {
   const row = (AWARDS_MANAGER_STATE.batchRows || [])[rowIndex];
   const host = document.getElementById("awardsMarketGridModalHost");
@@ -1512,51 +1802,208 @@ function awardsAdminBuildPayloadForRow_(row) {
 async function adminAwardsBuildLoadedQuestions(button) {
   const status = document.getElementById("awardsBatchStatus");
   const defaults = awardsAdminCurrentDefaults_();
-  const rows = (AWARDS_MANAGER_STATE.batchRows || []).filter(function(row) { return row.include !== false; });
+  const allRows = AWARDS_MANAGER_STATE.batchRows || [];
+  const rows = allRows.filter(function(row) {
+    return row.include !== false && !(row.buildStatus && row.buildStatus.indexOf("Built") === 0);
+  });
+
   if (!defaults.gameId) {
     if (status) { status.className = "admin-message warning"; status.textContent = "Choose the Awards App game in Section 1 first."; }
     return;
   }
   if (!rows.length) {
-    if (status) { status.className = "admin-message warning"; status.textContent = "Load at least one question first."; }
+    const alreadyBuilt = allRows.some(function(row) { return row.buildStatus && row.buildStatus.indexOf("Built") === 0; });
+    if (status) {
+      status.className = alreadyBuilt ? "admin-message success" : "admin-message warning";
+      status.textContent = alreadyBuilt ? "All included questions in this queue are already built." : "Load at least one question first.";
+    }
     return;
   }
 
-  if (button) button.disabled = true;
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Building…";
+  }
+
   let built = 0;
   const failures = [];
+  awardsAdminSetBuildProgress_(0, rows.length, "Starting " + rows.length + " question" + (rows.length === 1 ? "" : "s") + "…");
+
   try {
     for (let i = 0; i < rows.length; i += 1) {
       const row = rows[i];
       row.buildStatus = "Building…";
       awardsAdminRenderBatchQuestionGrid_();
-      if (status) { status.className = "admin-message"; status.textContent = "Building " + (i + 1) + " of " + rows.length + ": " + row.question; }
+      awardsAdminSetBuildProgress_(i, rows.length, "Building " + (i + 1) + " of " + rows.length + ": " + row.question);
+      if (status) {
+        status.className = "admin-message";
+        status.textContent = "Building " + (i + 1) + " of " + rows.length + ": " + row.question;
+      }
+
       try {
         const payload = awardsAdminBuildPayloadForRow_(row);
         const response = await apiAdminAwardsCreateQuestionFromMarket(payload);
-        if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Create failed.");
-        row.buildStatus = "Built · " + (response.categoryId || "question created");
+        if (!response || response.success === false) {
+          throw new Error((response && (response.error || response.message)) || "Create failed.");
+        }
+        row.buildStatus = "Built · " + (response.categoryId || "question created") +
+          (response.questionConfig && response.questionConfig.maxChanges < 0 ? " · changes unlimited until lock" : "");
         built += 1;
       } catch (err) {
         const message = err && err.message ? err.message : String(err);
         row.buildStatus = "Error · " + message;
         failures.push(row.eventName + " — " + message);
       }
+
       awardsAdminRenderBatchQuestionGrid_();
+      awardsAdminSetBuildProgress_(i + 1, rows.length, (i + 1) + " of " + rows.length + " processed");
     }
 
     if (status) {
       status.className = failures.length ? "admin-message warning" : "admin-message success";
-      status.textContent = built + " of " + rows.length + " question" + (rows.length === 1 ? "" : "s") + " built." + (failures.length ? " Failed: " + failures.join(" | ") : " All selected provider markets were queued to the Hub with administrator review required.");
+      status.textContent =
+        built + " of " + rows.length + " unbuilt question" + (rows.length === 1 ? "" : "s") + " built." +
+        (failures.length
+          ? " Failed: " + failures.join(" | ")
+          : " All selected provider markets were queued to the Hub with administrator review required.");
     }
   } finally {
-    if (button) button.disabled = false;
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Build All Unbuilt Questions";
+    }
   }
 }
-
 // Backward-compatible name retained for older buttons/cache during the hotfix rollout.
 async function adminAwardsBatchCreateSelected(button) {
   return adminAwardsLoadSelectedEvents(button);
+}
+
+
+function adminAwardsUpdateEventDraft_(eventIndex, field, value) {
+  const event = (AWARDS_MANAGER_STATE.events || [])[eventIndex];
+  if (!event) return;
+  const key = awardsAdminEventKey_(event);
+  const row = AWARDS_MANAGER_STATE.eventDraftsByKey[key];
+  if (!row) return;
+  if (field === "points") row.points = Math.max(0, Number(value) || 0);
+  else if (field === "displayOrder") row.displayOrder = Math.max(0, Number(value) || 0);
+  else if (field === "maxChanges") row.maxChanges = Number(value);
+  else if (field === "include") row.include = value === true;
+  else row[field] = String(value === undefined || value === null ? "" : value);
+}
+
+function adminAwardsUpdateDraftAnswer_(eventIndex, answerIndex, field, value) {
+  const event = (AWARDS_MANAGER_STATE.events || [])[eventIndex];
+  if (!event) return;
+  const row = AWARDS_MANAGER_STATE.eventDraftsByKey[awardsAdminEventKey_(event)];
+  const answer = row && (row.answers || [])[answerIndex];
+  if (!answer) return;
+  if (field === "include" || field === "showProbability") answer[field] = value === true;
+  else answer[field] = String(value === undefined || value === null ? "" : value);
+  const card = document.querySelector('#awardsInlineWorkspace-' + eventIndex + ' .awards-event-editor');
+  if (card && field === "include") {
+    const count = (row.answers || []).filter(function(item) { return item.include; }).length;
+    const countNode = card.querySelector('[data-awards-draft-answer-count]');
+    if (countNode) countNode.textContent = count + "/" + (row.answers || []).length + " included";
+  }
+}
+
+function adminAwardsSetAllDraftAnswers_(eventIndex, checked) {
+  const event = (AWARDS_MANAGER_STATE.events || [])[eventIndex];
+  if (!event) return;
+  const row = AWARDS_MANAGER_STATE.eventDraftsByKey[awardsAdminEventKey_(event)];
+  if (!row) return;
+  (row.answers || []).forEach(function(answer) { answer.include = checked === true; });
+  awardsAdminRenderCompactEventEditor_(eventIndex, event, row.detail, row);
+}
+
+function awardsAdminRenderCompactEventEditor_(eventIndex, event, detail, existingRow) {
+  const workspace = document.getElementById("awardsInlineWorkspace-" + eventIndex);
+  if (!workspace) return;
+  const row = existingRow || awardsAdminEventDraft_(event, detail);
+  const game = awardsAdminGameById_(awardsAdminCurrentDefaults_().gameId);
+  const gameType = awardsAdminCanonicalGameType_(game);
+  const scoreDisabled = game && gameType !== "mixed";
+  const includedAnswers = (row.answers || []).filter(function(answer) { return answer.include; }).length;
+  const answerCount = (row.answers || []).length;
+
+  workspace.innerHTML = `
+    <div class="awards-event-editor">
+      <div class="awards-event-editor-head">
+        <div>
+          <strong>${awardsAdminEsc_(row.eventName)}</strong>
+          <div class="admin-sub"><b>${awardsAdminEsc_(awardsAdminProviderBadge_(row.provider))}</b> · ${answerCount} live market/answer${answerCount === 1 ? "" : "s"}</div>
+        </div>
+        <button type="button" class="admin-small-button secondary" onclick="adminAwardsCloseEventEditor_(${eventIndex})">Close</button>
+      </div>
+
+      <label class="admin-field awards-question-field">
+        <span>Question</span>
+        <input type="text" value="${awardsAdminEsc_(row.question)}" oninput="adminAwardsUpdateEventDraft_(${eventIndex}, 'question', this.value)">
+        <span class="admin-sub">Change this only if you want different player-facing wording from the provider event title.</span>
+      </label>
+
+      <details class="awards-subdetails awards-event-advanced">
+        <summary>Advanced Settings</summary>
+        <div class="admin-control-grid awards-advanced-grid">
+          <label class="admin-field"><span>Section</span><input type="text" value="${awardsAdminEsc_(row.section)}" oninput="adminAwardsUpdateEventDraft_(${eventIndex}, 'section', this.value)"></label>
+          <label class="admin-field"><span>Points</span><input type="number" min="0" value="${Number(row.points) || 0}" oninput="adminAwardsUpdateEventDraft_(${eventIndex}, 'points', this.value)"></label>
+          <label class="admin-field"><span>Question Order</span><input type="number" min="0" value="${Number(row.displayOrder) || 0}" oninput="adminAwardsUpdateEventDraft_(${eventIndex}, 'displayOrder', this.value)"></label>
+          <label class="admin-field"><span>Question Display</span><select onchange="adminAwardsUpdateEventDraft_(${eventIndex}, 'layoutType', this.value)">${awardsAdminLayoutOptions_(row.layoutType)}</select></label>
+          <label class="admin-field">
+            <span>Play Type</span>
+            <select ${scoreDisabled ? "disabled" : ""} onchange="adminAwardsUpdateEventDraft_(${eventIndex}, 'scoreMode', this.value)">${awardsAdminScoreModeOptions_(row.scoreMode)}</select>
+            <span class="admin-sub">${scoreDisabled ? "Controlled by the selected game type." : "Hybrid games may override the play type for this question."}</span>
+          </label>
+          <label class="admin-field"><span>Pick Changes</span><select onchange="adminAwardsUpdateEventDraft_(${eventIndex}, 'maxChanges', this.value)">${awardsAdminPickChangeOptions_(row.maxChanges)}</select></label>
+          <label class="admin-field"><span>Market Odds Display</span><select onchange="adminAwardsUpdateEventDraft_(${eventIndex}, 'showProbabilities', this.value)">${awardsAdminProbabilityOptions_(row.showProbabilities, true)}</select></label>
+        </div>
+      </details>
+
+      <details class="awards-subdetails awards-market-answer-details">
+        <summary>
+          <span>Markets / Answers</span>
+          <span class="admin-pill" data-awards-draft-answer-count>${includedAnswers}/${answerCount} included</span>
+        </summary>
+        <div class="admin-sub awards-market-help">Include controls whether the answer is created. Show Odds controls only whether the K/P percentage is visible to players. Answer Text can be renamed without changing the provider mapping.</div>
+        <div class="admin-actions">
+          <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllDraftAnswers_(${eventIndex}, true)">Include All</button>
+          <button type="button" class="admin-small-button secondary" onclick="adminAwardsSetAllDraftAnswers_(${eventIndex}, false)">Clear All</button>
+        </div>
+        ${awardsAdminAnswerCardsHtml_(row, eventIndex, "draft")}
+      </details>
+
+      <details class="awards-subdetails awards-existing-link-tools">
+        <summary>Advanced Tool: Link Provider Market to an Existing Question</summary>
+        <div class="admin-sub">Use this only when the Awards App question already exists and you want to attach a K/P market to it. Normal new questions should use Section 3 Build All instead.</div>
+        <div class="admin-control-grid awards-advanced-grid">
+          <label class="admin-field"><span>Provider Market</span><select id="awardsLinkMarket" onchange="adminAwardsSelectLinkMarket_(this.value)">${(detail.markets || []).map(function(item, index) { return `<option value="${index}">${awardsAdminEsc_(awardsAdminProviderBadge_(item.provider))} · ${awardsAdminEsc_(item.marketQuestion || item.externalMarketId)}</option>`; }).join("")}</select></label>
+          <label class="admin-field"><span>Awards App Game</span><select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">${awardsAdminGameOptions_(awardsAdminCurrentDefaults_().gameId)}</select></label>
+          <label class="admin-field"><span>Existing Question</span><select id="awardsLinkQuestion" onchange="adminAwardsRenderOutcomeMap()"><option value="">Choose game first…</option></select></label>
+        </div>
+        <div id="awardsOutcomeMap"></div>
+        <div class="admin-actions"><button type="button" class="admin-small-button" onclick="adminAwardsLinkMarket(this)">Link Selected Market</button></div>
+      </details>
+
+      <div class="awards-event-editor-links">
+        ${awardsAdminExternalLink_(detail.sourceUrl, "Open Provider")}
+        ${awardsAdminExternalLink_(detail.officialSourceUrl || row.officialSourceUrl, "Open Official Site")}
+      </div>
+      <div id="awardsBuilderStatus" class="admin-message"></div>
+    </div>
+  `;
+
+  AWARDS_MANAGER_STATE.selectedEvent = detail;
+  AWARDS_MANAGER_STATE.eventMarkets = Array.isArray(detail.markets) ? detail.markets : [];
+  AWARDS_MANAGER_STATE.selectedMarket = AWARDS_MANAGER_STATE.eventMarkets[0] || null;
+  const presetGameId = awardsAdminCurrentDefaults_().gameId;
+  if (presetGameId) adminAwardsLoadGameQuestions(presetGameId);
+}
+
+function adminAwardsCloseEventEditor_(eventIndex) {
+  const workspace = document.getElementById("awardsInlineWorkspace-" + eventIndex);
+  if (workspace) workspace.innerHTML = "";
 }
 
 function awardsAdminRenderEventBuilder_() {
@@ -1720,178 +2167,37 @@ function adminAwardsSyncQuestionModeForGame_() {
 }
 
 async function adminAwardsOpenEvent(index, button) {
-  const event =
-    AWARDS_MANAGER_STATE.events[index];
-
+  const event = (AWARDS_MANAGER_STATE.events || [])[index];
   if (!event) return;
 
-  const originalButtonText =
-    button && button.textContent
-      ? button.textContent
-      : "View Event";
-
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Loading Event…";
-  }
-
-  AWARDS_MANAGER_STATE.mode = "create";
-  AWARDS_MANAGER_STATE.selectedEvent = null;
-  AWARDS_MANAGER_STATE.eventMarkets = [];
-  AWARDS_MANAGER_STATE.selectedMarket =
-    event.markets &&
-    event.markets[0]
-      ? event.markets[0]
-      : null;
-
   const workspace = document.getElementById("awardsInlineWorkspace-" + index);
+  if (workspace && workspace.innerHTML.trim()) {
+    workspace.innerHTML = "";
+    if (button) button.textContent = "Configure";
+    return;
+  }
 
   document.querySelectorAll(".awards-inline-workspace").forEach(function(node) {
     if (node !== workspace) node.innerHTML = "";
   });
 
-  if (workspace) {
-    workspace.innerHTML = `
-      <div class="card admin-card" style="margin-top:12px;" tabindex="-1">
-        <h3 style="margin-top:0;">Build or Link Questions</h3>
-        <div id="awardsSelectedMarket" class="admin-sub">
-          <b>${awardsAdminEsc_(awardsAdminProviderBadge_(event.provider))}</b> ·
-          ${awardsAdminEsc_(event.eventName || event.externalEventId)}
-          <div class="admin-sub">${awardsAdminEsc_(event.externalEventId)}</div>
-        </div>
-        <div id="awardsTargetBuilder">
-          <div class="admin-message">Loading full provider event and all live markets…</div>
-        </div>
-      </div>
-    `;
+  const originalButtonText = button && button.textContent ? button.textContent : "Configure";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Loading…";
   }
-
-  const summary = document.getElementById("awardsSelectedMarket");
-  const builder = document.getElementById("awardsTargetBuilder");
-
-  if (
-    workspace &&
-    typeof workspace.scrollIntoView === "function"
-  ) {
-    workspace.scrollIntoView({
-      behavior: "smooth",
-      block: "start"
-    });
-
-  }
+  if (workspace) workspace.innerHTML = '<div class="admin-message">Loading live markets…</div>';
 
   try {
-    const res =
-      await apiAdminAwardsGetExternalEvent(
-        event.provider,
-        event.externalEventId
-      );
-
-    if (!res || res.success === false) {
-      throw new Error(
-        (
-          res &&
-          (res.error || res.message)
-        ) ||
-        "Could not load provider event."
-      );
+    const detail = await awardsAdminGetEventDetailCached_(event);
+    const row = awardsAdminEventDraft_(event, detail);
+    awardsAdminRenderCompactEventEditor_(index, event, detail, row);
+    if (workspace && typeof workspace.scrollIntoView === "function") {
+      workspace.scrollIntoView({ behavior: "smooth", block: "nearest" });
     }
-
-    AWARDS_MANAGER_STATE.selectedEvent = res;
-
-    AWARDS_MANAGER_STATE.eventMarkets =
-      Array.isArray(res.markets)
-        ? res.markets
-        : [];
-
-    AWARDS_MANAGER_STATE.selectedMarket =
-      AWARDS_MANAGER_STATE.eventMarkets[0] ||
-      AWARDS_MANAGER_STATE.selectedMarket;
-
-    if (summary) {
-      summary.innerHTML = `
-        <b>
-          ${awardsAdminEsc_(awardsAdminProviderBadge_(
-            res.provider ||
-            event.provider
-          ))}
-        </b>
-        ·
-        ${awardsAdminEsc_(
-          res.eventName ||
-          event.eventName ||
-          event.externalEventId
-        )}
-
-        <div class="admin-sub">
-          ${awardsAdminEsc_(
-            [
-              res.category,
-              res.contextSubtitle,
-              res.seriesTicker
-            ]
-              .filter(Boolean)
-              .join(" · ")
-          )}
-        </div>
-
-        <div class="admin-sub">
-          ${awardsAdminEsc_(
-            res.externalEventId ||
-            event.externalEventId
-          )}
-          ·
-          ${
-            AWARDS_MANAGER_STATE
-              .eventMarkets.length
-          }
-          live market${
-            AWARDS_MANAGER_STATE
-              .eventMarkets.length === 1
-              ? ""
-              : "s"
-          }
-        </div>
-
-        ${
-          res.contextComplete === false
-            ? `
-              <div
-                class="admin-message warning"
-                style="margin-top:8px;"
-              >
-                Context unavailable or incomplete.
-                Verify the provider before creating or linking a question.
-              </div>
-            `
-            : ""
-        }
-
-        <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-          ${awardsAdminExternalLink_(
-            res.sourceUrl,
-            "Open Provider Event"
-          )}
-          ${awardsAdminExternalLink_(
-            res.officialSourceUrl,
-            "Open Official Website"
-          )}
-        </div>
-      `;
-    }
-
-    awardsAdminRenderEventBuilder_();
   } catch (err) {
-    if (builder) {
-      builder.innerHTML = `
-        <div class="admin-message error">
-          ${awardsAdminEsc_(
-            err && err.message
-              ? err.message
-              : String(err)
-          )}
-        </div>
-      `;
+    if (workspace) {
+      workspace.innerHTML = '<div class="admin-message error">' + awardsAdminEsc_(err && err.message ? err.message : String(err)) + '</div>';
     }
   } finally {
     if (button) {
@@ -1900,7 +2206,6 @@ async function adminAwardsOpenEvent(index, button) {
     }
   }
 }
-
 function adminAwardsChooseMarket(index, mode) {
   const market =
     AWARDS_MANAGER_STATE.results[index];

@@ -1,57 +1,20 @@
 'use strict';
-
 const fs = require('fs');
 const path = require('path');
 const assert = require('assert');
-
 const root = path.join(__dirname, '..');
 const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
-
 const awards = read('frontend/js/pages/adminAwards.js');
 const app = read('frontend/js/app.js');
 const html = read('frontend/app.html');
 const sw = read('frontend/sw.js');
-
-assert(
-  awards.includes('id="awardsInlineWorkspace-${index}"'),
-  'Awards Manager Build/Link workspace must expand directly under the selected event.'
-);
-assert(
-  awards.includes('onclick="adminAwardsOpenEvent(${index}, this)"'),
-  'View Event must pass the clicked button for visible loading feedback.'
-);
-assert(
-  awards.includes('async function adminAwardsOpenEvent(index, button)'),
-  'View Event handler must accept the clicked button.'
-);
-assert(
-  awards.includes('button.textContent = "Loading Event…";'),
-  'View Event must show an immediate loading state.'
-);
-assert(
-  awards.includes('workspace.scrollIntoView({'),
-  'View Event must navigate the admin to the Build/Link workspace.'
-);
-assert(
-  awards.includes('behavior: "smooth"') &&
-  awards.includes('block: "start"'),
-  'View Event workspace scrolling should be deliberate and visible.'
-);
-assert(
-  awards.includes('button.textContent = originalButtonText;'),
-  'View Event button state must be restored after success or failure.'
-);
-assert(
-  app.includes('323-awards-batch-builder-v1216'),
-  'Awards View Event hotfix asset marker is missing from app.js.'
-);
-assert(
-  html.includes('323-awards-batch-builder-v1216'),
-  'Awards View Event hotfix asset marker is missing from app.html.'
-);
-assert(
-  sw.includes('awards-app-v323-awards-batch-builder-v1216'),
-  'Awards View Event hotfix cache marker is missing from the service worker.'
-);
-
-console.log('Awards Manager View Event v1.2.16 hotfix tests passed.');
+assert(awards.includes('id="awardsInlineWorkspace-${index}"'), 'Awards event editor must expand directly under its event.');
+assert(awards.includes('>Configure<') || awards.includes('Configure\n'), 'Compact Configure action missing.');
+assert(awards.includes('awardsAdminRenderCompactEventEditor_'), 'Compact event editor is missing.');
+assert(awards.includes('Advanced Settings') && awards.includes('Markets / Answers'), 'Event editor must keep advanced settings and markets collapsible.');
+assert(awards.includes('Answer Text'), 'Event editor must support player-facing answer text edits.');
+assert(awards.includes('Loading…'), 'Configure action must show visible loading feedback.');
+assert(app.includes('324-awards-mobile-workflow-v1216'), 'Awards mobile workflow asset marker missing from app.js.');
+assert(html.includes('324-awards-mobile-workflow-v1216'), 'Awards mobile workflow asset marker missing from app.html.');
+assert(sw.includes('awards-app-v324-awards-mobile-workflow-v1216'), 'Awards mobile workflow cache marker missing.');
+console.log('Awards Manager compact event editor tests passed.');

@@ -60,7 +60,7 @@ assert(
   'Progress bar must only render when progress is available.'
 );
 assert(
-  app.includes('323-awards-batch-builder-v1216'),
+  app.includes('324-awards-mobile-workflow-v1216'),
   'Current v1.2.16 asset marker is missing after the Awards View Event hotfix.'
 );
 
