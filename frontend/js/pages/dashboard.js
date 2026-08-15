@@ -263,6 +263,16 @@ function renderDashboardGameCard(
       )
     );
 
+  const progressAvailable =
+    game.progressAvailable === true ||
+    (
+      game.progressAvailable !== false &&
+      (
+        Number(game.totalCount) > 0 ||
+        progressValue > 0
+      )
+    );
+
   const heroImage =
     String(
       game.heroImage ||
@@ -415,13 +425,19 @@ function renderDashboardGameCard(
           </span>
 
           <strong>
-            ${progressValue}%
+            ${progressAvailable ? `${progressValue}%` : "—"}
           </strong>
         </div>
 
-        <div class="dashboard-game-progress-bar">
-          <span style="width: ${progressValue}%;"></span>
-        </div>
+        ${
+          progressAvailable
+            ? `
+              <div class="dashboard-game-progress-bar">
+                <span style="width: ${progressValue}%;"></span>
+              </div>
+            `
+            : ""
+        }
       </div>
 
       <div class="dashboard-user-stats-card">

@@ -2,7 +2,7 @@
 
 Current release candidate: **v1.2.16 — Fall Production Hardening**
 
-Release asset marker: **318-fall-production-hardening-v1216**
+Release asset marker: **319-home-dashboard-progress-v1216**
 
 ## Release state
 
@@ -44,7 +44,7 @@ Those two modes remain blocked by production preflight until their dedicated ent
 - Login failure throttling and PIN-reset request throttling were added.
 - Deactivating a user revokes their current session.
 - User Active / AccountStatus compatibility was normalized.
-- Dashboard progress text now tells players how many picks or wagers remain.
+- Dashboard/Home progress now reads the logged-in user’s actual saved picks/wagers and tells players how many selections remain.
 - Release/cache markers are unified at v1.2.16.
 - Brittle old version-marker regression assertions were replaced with a current-release contract.
 - GitHub Actions production checks were added.
@@ -63,7 +63,7 @@ Expected v1.2.16 result before packaging/deployment:
 ```txt
 PASS: 117 JavaScript files
 PASS: API/app mirrors synchronized
-PASS: 77 regression tests
+PASS: 78 regression tests
 PASS: v1.2.16 release/security contract
 ALL PRODUCTION CHECKS PASSED
 ```

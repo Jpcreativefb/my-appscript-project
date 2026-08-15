@@ -1,5 +1,8 @@
 ## v1.2.16 — Fall Production Hardening
 
+- Hotfix: Home/Active Games cards now calculate real per-user completion instead of returning a hard-coded 0%.
+- Home progress supports Prediction, Confidence, Staked Prediction, Head-to-Head, Wager, Racing Wager, and Hybrid games.
+- Season hubs and unfinished generic Ranking/Survivor modes no longer display a misleading 0% progress bar.
 - Added centralized GET/POST API authorization with automatic protection for all `admin...` actions.
 - Player-owned routes derive identity from the authenticated session and reject browser-supplied username impersonation.
 - Moved login/signup/PIN reset, player writes, notification preference writes, and league-management writes to POST.
@@ -12,7 +15,7 @@
 - Replaced stale historic cache-marker test assertions with a current-release contract.
 - Added `tools/run_production_checks.sh` and GitHub Actions CI.
 - Archived historical root release notes instead of deleting them.
-- Bumped browser/service-worker assets to v318.
+- Bumped browser/service-worker assets to v319 for the Home progress hotfix.
 
 ## v1.2.15 — Awards Manager true event search
 

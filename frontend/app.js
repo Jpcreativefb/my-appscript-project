@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "318-fall-production-hardening-v1216";
-const APP_ROUTE_HOTFIX_VERSION = "v12160-fall-production-hardening";
+const APP_ASSET_VERSION = "319-home-dashboard-progress-v1216";
+const APP_ROUTE_HOTFIX_VERSION = "v12161-home-dashboard-progress";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

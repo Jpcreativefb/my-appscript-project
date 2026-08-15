@@ -43,3 +43,16 @@ Historical root release notes / smoke tests / changed-file lists were moved, not
 docs/archive/releases/
 
 No large Sports, Racing, Awards, Reality TV, or admin engine was rewritten merely to reduce line count.
+
+HOME DASHBOARD PROGRESS HOTFIX (smoke-test follow-up)
+backend/engines/AppDataEngine.js
+frontend/js/pages/dashboard.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+tests/dashboard_home_progress_v1216_hotfix_tests.js (new)
+tests/production_hardening_v1216_tests.js
+HOME_DASHBOARD_PROGRESS_HOTFIX_V1_2_16.md (new)
+PRODUCTION_STATUS.md
+CHANGELOG.md

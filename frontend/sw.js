@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v318-fall-production-hardening-v1216";
+const AWARDS_CACHE = "awards-app-v319-home-dashboard-progress-v1216";
 
 const APP_SHELL = [
   "./",

@@ -368,6 +368,19 @@ function buildDashboardGameHubItemLite_(
       isPast
     );
 
+  const isSeasonHub =
+    game.gameRole === "parent";
+
+  const progress =
+    getDashboardGameProgressLite_(
+      game,
+      username,
+      mode,
+      {
+        suppressProgress: isSeasonHub
+      }
+    );
+
   const lockLabel =
     availability.statusLabel ||
     String(
@@ -384,17 +397,16 @@ function buildDashboardGameHubItemLite_(
           : "Open / Lock time TBD"
     );
 
-  const isSeasonHub =
-    game.gameRole === "parent";
-
   const enterLabel =
     availability.available === false
       ? availability.actionLabel
       : isSeasonHub
         ? "Open Season Hub"
-        : isPast
-          ? "View Results"
-          : "Play Now";
+        : getDashboardEnterLabel_(
+            mode,
+            progress,
+            isPast
+          );
 
   return {
     gameId:
@@ -509,13 +521,13 @@ function buildDashboardGameHubItemLite_(
       isPast === true,
 
     hasStarted:
-      false,
+      Number(progress.madeCount) > 0,
 
     madeCount:
-      0,
+      Number(progress.madeCount) || 0,
 
     totalCount:
-      0,
+      Number(progress.totalCount) || 0,
 
     enterLabel:
       enterLabel,
@@ -523,14 +535,17 @@ function buildDashboardGameHubItemLite_(
     actionLabel:
       enterLabel,
 
+    progressAvailable:
+      progress.progressAvailable === true,
+
     progressLabel:
-      "Open game to see progress",
+      progress.progressLabel,
 
     progressValue:
-      0,
+      Number(progress.progressValue) || 0,
 
     userSummary:
-      "Open game to play",
+      progress.userSummary,
 
     userStats:
       [],
@@ -555,6 +570,293 @@ function buildDashboardGameHubItemLite_(
         ? game.leagues
         : []
   };
+
+}
+
+function getDashboardGameProgressLite_(
+  game,
+  username,
+  mode,
+  options
+) {
+
+  game =
+    game || {};
+
+  options =
+    options || {};
+
+  const gameId =
+    String(game.gameId || "").trim();
+
+  const totalCategories =
+    getDashboardTotalCategories_(
+      gameId
+    );
+
+  if (
+    options.suppressProgress === true ||
+    !gameId ||
+    !totalCategories
+  ) {
+
+    return {
+      madeCount: 0,
+      totalCount: totalCategories,
+      progressAvailable: false,
+      progressLabel:
+        options.suppressProgress === true
+          ? "Open season hub to see episode progress"
+          : "Open game to see progress",
+      progressValue: 0,
+      userSummary:
+        options.suppressProgress === true
+          ? "Season hub"
+          : "Game ready",
+      summary: {}
+    };
+
+  }
+
+  const pickCategoryIds =
+    getDashboardUserPickCategoryIdsDirect_(
+      gameId,
+      username
+    );
+
+  const betCategoryIds =
+    getDashboardUserBetCategoryIdsDirect_(
+      gameId,
+      username
+    );
+
+  const pickCount =
+    pickCategoryIds.length;
+
+  const betCount =
+    betCategoryIds.length;
+
+  const normalizedMode =
+    String(mode || "")
+      .trim()
+      .toLowerCase();
+
+  let madeCount = 0;
+  let noun = "pick";
+  let userSummary = "Prediction picks";
+
+  if (
+    normalizedMode === "wager" ||
+    normalizedMode === "racing-wager"
+  ) {
+    madeCount = betCount;
+    noun = "wager";
+    userSummary = "Wagers";
+  } else if (
+    normalizedMode === "hybrid" ||
+    normalizedMode === "mixed" ||
+    normalizedMode === "combo"
+  ) {
+    const completed = {};
+
+    pickCategoryIds.forEach(function(categoryId) {
+      completed[categoryId] = true;
+    });
+
+    betCategoryIds.forEach(function(categoryId) {
+      completed[categoryId] = true;
+    });
+
+    madeCount =
+      Object.keys(completed).length;
+
+    noun = "selection";
+    userSummary = "Hybrid picks & wagers";
+  } else if (
+    normalizedMode === "prediction" ||
+    normalizedMode === "confidence" ||
+    normalizedMode === "staked-prediction" ||
+    normalizedMode === "head-to-head"
+  ) {
+    madeCount = pickCount;
+    noun = "pick";
+    userSummary =
+      normalizedMode === "confidence"
+        ? "Confidence picks"
+        : normalizedMode === "staked-prediction"
+          ? "Staked prediction picks"
+          : normalizedMode === "head-to-head"
+            ? "Head-to-head picks"
+            : "Prediction picks";
+  } else {
+    return {
+      madeCount: 0,
+      totalCount: totalCategories,
+      progressAvailable: false,
+      progressLabel: "Open game to see progress",
+      progressValue: 0,
+      userSummary: "Game ready",
+      summary: {}
+    };
+  }
+
+  madeCount =
+    Math.min(
+      totalCategories,
+      Math.max(0, madeCount)
+    );
+
+  const remaining =
+    Math.max(
+      0,
+      totalCategories - madeCount
+    );
+
+  const progressValue =
+    getDashboardProgressPercent_(
+      madeCount,
+      totalCategories
+    );
+
+  const pluralNoun =
+    noun === "wager"
+      ? "wagers"
+      : noun === "selection"
+        ? "selections"
+        : "picks";
+
+  const progressLabel =
+    madeCount >= totalCategories
+      ? "All " + totalCategories + " " + pluralNoun + " complete"
+      : remaining +
+        (remaining === 1
+          ? " " + noun + " left"
+          : " " + pluralNoun + " left") +
+        " · " + madeCount + " / " + totalCategories + " complete";
+
+  return {
+    madeCount: madeCount,
+    totalCount: totalCategories,
+    progressAvailable: true,
+    progressLabel: progressLabel,
+    progressValue: progressValue,
+    userSummary: userSummary,
+    summary: {
+      picksMade: pickCount,
+      wagersMade: betCount,
+      completedCount: madeCount,
+      totalCategories: totalCategories
+    }
+  };
+
+}
+
+function getDashboardUserPickCategoryIdsDirect_(
+  gameId,
+  username
+) {
+
+  if (
+    typeof getUserPicks !== "function"
+  ) {
+    return [];
+  }
+
+  try {
+
+    const picks =
+      getUserPicks(
+        username,
+        gameId
+      ) || [];
+
+    const seen = {};
+
+    (Array.isArray(picks) ? picks : [])
+      .forEach(function(pick) {
+        const categoryId =
+          String(
+            pick && pick.categoryId || ""
+          )
+            .trim()
+            .toLowerCase();
+
+        const nomineeId =
+          String(
+            pick && pick.nomineeId || ""
+          ).trim();
+
+        if (categoryId && nomineeId) {
+          seen[categoryId] = true;
+        }
+      });
+
+    return Object.keys(seen);
+
+  } catch (err) {
+
+    return [];
+
+  }
+
+}
+
+function getDashboardUserBetCategoryIdsDirect_(
+  gameId,
+  username
+) {
+
+  if (
+    typeof getUserBets !== "function"
+  ) {
+    return [];
+  }
+
+  try {
+
+    const bets =
+      getUserBets(
+        username,
+        gameId
+      ) || [];
+
+    const seen = {};
+
+    (Array.isArray(bets) ? bets : [])
+      .forEach(function(bet) {
+        const categoryId =
+          String(
+            bet && bet.categoryId || ""
+          )
+            .trim()
+            .toLowerCase();
+
+        const nomineeId =
+          String(
+            bet && bet.nomineeId || ""
+          ).trim();
+
+        const betAmount =
+          Number(
+            bet && bet.betAmount
+          ) || 0;
+
+        if (
+          categoryId &&
+          nomineeId &&
+          betAmount > 0
+        ) {
+          seen[categoryId] = true;
+        }
+      });
+
+    return Object.keys(seen);
+
+  } catch (err) {
+
+    return [];
+
+  }
 
 }
 
