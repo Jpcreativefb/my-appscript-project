@@ -1,3 +1,10 @@
+## v1.2.16 — Sports Confidence Week Bulk Hotfix
+
+- Replaced the Confidence week builder's per-game create loop with grouped weekly writes so a full NFL week does not time out after only a few questions.
+- Reuses the Sports Scores Engine snapshots already loaded by the Sports page instead of making one server fetch per selected matchup.
+- Preserves duplicate protection and supports recovery from partial builds (for example 3 existing + 13 missing).
+- Added a 16-game scheduled-week regression test and grouped-write assertions.
+
 ## v1.2.16 — Sports Confidence Week Builder
 
 - Added an admin Sports Builders workflow to load NFL/college football by season/week (or any supported league by date range) and select matchups for an existing Confidence Game.

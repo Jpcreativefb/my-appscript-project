@@ -5196,7 +5196,8 @@ async function createSportsConfidenceWeekFromSection_() {
         selectedGamesJson: JSON.stringify(selected.map(function(item) {
           return {
             sportsGameId: item.sportsGameId,
-            espnEventId: item.espnEventId
+            espnEventId: item.espnEventId,
+            game: item.game || {}
           };
         }))
       }
