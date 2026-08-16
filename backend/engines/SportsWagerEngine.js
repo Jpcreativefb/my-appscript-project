@@ -1526,6 +1526,10 @@ function sportsWagerGetCategorySettingsLookup_(awardsGameId) {
       sportsMarket:
         col.SportsMarket !== undefined
           ? sportsWagerNormalizeMarket_(row[col.SportsMarket])
+          : "",
+      scoreMode:
+        col.ScoreMode !== undefined
+          ? sportsWagerKey_(row[col.ScoreMode])
           : ""
     };
 
@@ -1731,7 +1735,11 @@ function sportsWagerGetCategoryRows_(awardsGameId) {
       sportsMarket:
         col.SportsMarket !== undefined
           ? sportsWagerNormalizeMarket_(row[col.SportsMarket])
-          : "moneyline",
+          : (settingsLookup[categoryId] && settingsLookup[categoryId].sportsMarket) || "moneyline",
+      scoreMode:
+        settingsLookup[categoryId] && settingsLookup[categoryId].scoreMode
+          ? sportsWagerKey_(settingsLookup[categoryId].scoreMode)
+          : "",
       sportsLeague:
         col.SportsLeague !== undefined
           ? sportsWagerString_(row[col.SportsLeague])
@@ -6638,6 +6646,8 @@ function sportsWagerBuildCategoriesBySportsGame_(
           row.categoryId,
         market:
           row.sportsMarket || "moneyline",
+        scoreMode:
+          row.scoreMode || "",
         sportsLeague:
           row.sportsLeague || "",
         categoryScore:
@@ -7873,6 +7883,7 @@ function finalizeSportsWagerResultsFromCategories_(
     awardsGameId: awardsGameId,
     checked: 0,
     finalized: 0,
+    categoryResultsWritten: 0,
     skipped: 0,
     errors: []
   };
@@ -7892,6 +7903,58 @@ function finalizeSportsWagerResultsFromCategories_(
       !sportsWagerIsCompletedScore_(score)
     ) {
       summary.skipped++;
+      return;
+    }
+
+    /*
+      Confidence questions use the sports moneyline winner only as a result
+      source. A tied football game is a push/no-points result for Confidence;
+      wager-specific half-refund behavior must not leak into Confidence scoring.
+    */
+    const confidenceTie =
+      sportsWagerKey_(item.scoreMode) === "confidence-points" &&
+      sportsWagerHasScoreValue_(score.HomeScore) &&
+      sportsWagerHasScoreValue_(score.AwayScore) &&
+      sportsWagerNumber_(score.HomeScore, null) === sportsWagerNumber_(score.AwayScore, null);
+
+    if (confidenceTie) {
+      const settingsUpdated =
+        sportsWagerSetCategorySettingWinnerAllMatches_(
+          awardsGameId,
+          item.categoryId,
+          "",
+          "push",
+          "settled"
+        );
+
+      let categoryResult = null;
+      if (typeof upsertCategoryResult_ === "function") {
+        categoryResult = upsertCategoryResult_({
+          gameId: awardsGameId,
+          categoryId: item.categoryId,
+          nomineeId: "",
+          resultStatus: "push",
+          isWinner: false,
+          resultValue: "push",
+          resultSource: "sports-engine",
+          settledAt: new Date(),
+          notes: "confidence-tie-push-from-source-scores",
+          skipCacheClear: true
+        });
+      }
+
+      if (settingsUpdated > 0 || categoryResult && categoryResult.success) {
+        summary.finalized++;
+        if (categoryResult && categoryResult.success) summary.categoryResultsWritten++;
+      } else {
+        summary.skipped++;
+        summary.errors.push({
+          categoryId: item.categoryId,
+          sportsGameId: item.sportsGameId,
+          espnEventId: item.espnEventId,
+          reason: "confidence-tie-push-could-not-be-written"
+        });
+      }
       return;
     }
 
@@ -8481,6 +8544,53 @@ function finalizeSportsWagerResultsFromSourceScores_(payload) {
       !sportsWagerIsCompletedScore_(score)
     ) {
       summary.skipped++;
+      return;
+    }
+
+    const confidenceTie =
+      sportsWagerKey_(item.scoreMode) === "confidence-points" &&
+      sportsWagerHasScoreValue_(score.HomeScore) &&
+      sportsWagerHasScoreValue_(score.AwayScore) &&
+      sportsWagerNumber_(score.HomeScore, null) === sportsWagerNumber_(score.AwayScore, null);
+
+    if (confidenceTie) {
+      const settingsUpdated =
+        sportsWagerSetCategorySettingWinnerAllMatches_(
+          awardsGameId,
+          item.categoryId,
+          "",
+          "push",
+          "settled"
+        );
+
+      let categoryResult = null;
+      if (typeof upsertCategoryResult_ === "function") {
+        categoryResult = upsertCategoryResult_({
+          gameId: awardsGameId,
+          categoryId: item.categoryId,
+          nomineeId: "",
+          resultStatus: "push",
+          isWinner: false,
+          resultValue: "push",
+          resultSource: "sports-engine",
+          settledAt: new Date(),
+          notes: "confidence-tie-push-from-source-scores",
+          skipCacheClear: true
+        });
+      }
+
+      if (settingsUpdated > 0 || categoryResult && categoryResult.success) {
+        summary.finalized++;
+        if (categoryResult && categoryResult.success) summary.categoryResultsWritten++;
+      } else {
+        summary.skipped++;
+        summary.errors.push({
+          categoryId: item.categoryId,
+          sportsGameId: item.sportsGameId,
+          espnEventId: item.espnEventId,
+          reason: "confidence-tie-push-could-not-be-written"
+        });
+      }
       return;
     }
 

@@ -918,8 +918,8 @@ function renderSportsAdvancedBuilderSection_() {
   section.innerHTML = `
     <div class="sports-advanced-builder-header">
       <div>
-        <h2>Create Stat Comparison</h2>
-        <p>Load an entire league by date range or football week. No game card must be selected first.</p>
+        <h2>Sports Builders</h2>
+        <p>Use one league/date/week selector to add Confidence matchups or create a stat comparison.</p>
       </div>
     </div>
     <div class="sports-advanced-builder-grid">
@@ -964,7 +964,8 @@ function renderSportsAdvancedBuilderSection_() {
         </label>
       </div>
       <div class="sports-advanced-builder-actions">
-        <button type="button" id="sportsAdvancedBuilderOpen" class="primary-btn">Open Comparison Builder</button>
+        <button type="button" id="sportsConfidenceBuilderOpen" class="primary-btn">Pick Games for Confidence</button>
+        <button type="button" id="sportsAdvancedBuilderOpen" class="secondary-btn">Open Comparison Builder</button>
         <span id="sportsAdvancedBuilderStatus">Choose a league and scope.</span>
       </div>
     </div>
@@ -972,9 +973,11 @@ function renderSportsAdvancedBuilderSection_() {
 
   const leagueSelect = document.getElementById("sportsAdvancedBuilderLeague");
   const scopeSelect = document.getElementById("sportsAdvancedBuilderScope");
+  const confidenceButton = document.getElementById("sportsConfidenceBuilderOpen");
   const openButton = document.getElementById("sportsAdvancedBuilderOpen");
   leagueSelect.addEventListener("change", sportsAdvancedBuilderSetScopeVisibility_);
   scopeSelect.addEventListener("change", sportsAdvancedBuilderSetScopeVisibility_);
+  if (confidenceButton) confidenceButton.addEventListener("click", createSportsConfidenceWeekFromSection_);
   openButton.addEventListener("click", createSportsAdvancedQuestionFromSection_);
   sportsAdvancedBuilderSetScopeVisibility_();
 }
@@ -1727,9 +1730,49 @@ async function chooseSportsAwardsGameId_(
 
 }
 
+async function apiAdminGetSportsConfidenceGames_(session) {
+  return sportsAwardsApi_(
+    "adminGetSportsConfidenceGames",
+    {
+      username: session.username,
+      token: session.token
+    }
+  );
+}
+
+async function chooseSportsConfidenceGameId_(session) {
+  let games = [];
+
+  try {
+    const res = await apiAdminGetSportsConfidenceGames_(session);
+    if (!res || res.success === false) {
+      throw new Error((res && (res.message || res.error)) || "Could not load Confidence games.");
+    }
+    games = res.games || [];
+  } catch (err) {
+    showSportsError(err && err.message ? err.message : "Could not load Confidence games.");
+    return "";
+  }
+
+  if (!games.length) {
+    alert(
+      "No Setup, Preview, or Live Confidence-enabled games were found. Put the Confidence Game in Setup (or later) first."
+    );
+    return "";
+  }
+
+  return showSportsGamePickerModal_(games, {
+    title: "Add Games to Confidence",
+    description: "Choose which Confidence Game should receive the selected sports matchups.",
+    confirmLabel: "Use This Confidence Game"
+  });
+}
+
 function showSportsGamePickerModal_(
-  games
+  games,
+  options
 ) {
+  options = options || {};
 
   return new Promise(function(resolve) {
 
@@ -1788,10 +1831,10 @@ function showSportsGamePickerModal_(
     overlay.innerHTML = `
       <div class="sports-game-picker-modal">
 
-        <h3>Create Wager In Game</h3>
+        <h3>${escapeSportsHtml(options.title || "Create Wager In Game")}</h3>
 
         <p>
-          Choose which Awards App game should receive this wager category.
+          ${escapeSportsHtml(options.description || "Choose which Awards App game should receive this wager category.")}
         </p>
 
         <select id="sportsGamePickerSelect">
@@ -1813,7 +1856,7 @@ function showSportsGamePickerModal_(
             class="small-btn wager-btn"
             id="sportsGamePickerConfirm"
           >
-            Continue
+            ${escapeSportsHtml(options.confirmLabel || "Continue")}
           </button>
 
         </div>
@@ -1830,22 +1873,21 @@ function showSportsGamePickerModal_(
         "sportsGamePickerSelect"
       );
 
-    if (SPORTS_WAGER_AWARDS_GAME_ID) {
+    const preferredGameId =
+      options.defaultGameId ||
+      SPORTS_WAGER_AWARDS_GAME_ID ||
+      "";
 
+    if (preferredGameId) {
       const defaultOption =
         Array.from(select.options)
           .find(function(option) {
-            return (
-              option.value ===
-              SPORTS_WAGER_AWARDS_GAME_ID
-            );
+            return option.value === preferredGameId;
           });
 
       if (defaultOption) {
-        select.value =
-          SPORTS_WAGER_AWARDS_GAME_ID;
+        select.value = preferredGameId;
       }
-
     }
 
     function close(
@@ -4942,6 +4984,236 @@ async function sportsAdvancedLoadGamesForContext_(context) {
     throw new Error((data && data.error) || "Could not load games for the comparison builder.");
   }
   return Array.isArray(data.scores) ? data.scores : [];
+}
+
+function sportsConfidenceGameIsPregame_(game) {
+  game = game || {};
+  const state = String(game.State || game.state || "").trim().toLowerCase();
+  const status = String(game.Status || game.status || "").trim().toLowerCase();
+  const completed = game.Completed === true || String(game.Completed || "").toLowerCase() === "true";
+  return !completed && state !== "in" && state !== "post" && state !== "final" &&
+    status.indexOf("in_progress") === -1 && status.indexOf("in-progress") === -1 &&
+    status.indexOf("final") === -1 && status.indexOf("complete") === -1;
+}
+
+function showSportsConfidenceSelectionModal_(games, context) {
+  games = Array.isArray(games) ? games : [];
+
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("sportsConfidenceSelectionOverlay");
+    if (existing) existing.remove();
+
+    const overlay = document.createElement("div");
+    overlay.id = "sportsConfidenceSelectionOverlay";
+    overlay.className = "sports-game-picker-overlay";
+
+    const rows = games.map(function(game, index) {
+      const pregame = sportsConfidenceGameIsPregame_(game);
+      const away = String(game.AwayTeam || game.AwayAbbreviation || "Away").trim();
+      const home = String(game.HomeTeam || game.HomeAbbreviation || "Home").trim();
+      const when = game.GameDateTime ? formatSportsDate(game.GameDateTime) : "Time TBD";
+      const status = String(game.Status || game.State || "Scheduled").trim();
+      const id = String(game.GameId || "").trim();
+      const eventId = String(game.ESPNEventId || "").trim();
+
+      return `
+        <label class="sports-confidence-game-row ${pregame ? "" : "is-disabled"}">
+          <input
+            type="checkbox"
+            class="sports-confidence-game-choice"
+            data-index="${index}"
+            data-sports-game-id="${escapeSportsHtml(id)}"
+            data-espn-event-id="${escapeSportsHtml(eventId)}"
+            ${pregame ? "checked" : "disabled"}
+          >
+          <span class="sports-confidence-game-main">
+            <strong>${escapeSportsHtml(away)} @ ${escapeSportsHtml(home)}</strong>
+            <small>${escapeSportsHtml(when)} · ${escapeSportsHtml(status)}</small>
+          </span>
+        </label>
+      `;
+    }).join("");
+
+    const scopeLabel = context && context.scope === "week"
+      ? ("Week " + String(context.week || "") + " · " + String(context.seasonYear || ""))
+      : ((context && context.dateFrom || "") + (context && context.dateTo && context.dateTo !== context.dateFrom ? " through " + context.dateTo : ""));
+
+    overlay.innerHTML = `
+      <div class="sports-game-picker-modal sports-confidence-picker-modal">
+        <h3>Pick Confidence Games</h3>
+        <p>Select the matchups to add. Games that have already started are disabled.</p>
+        <div class="sports-confidence-picker-summary">
+          ${escapeSportsHtml(scopeLabel)}
+        </div>
+        <div class="sports-confidence-picker-tools">
+          <button type="button" class="small-btn" id="sportsConfidenceSelectAll">Select All Pregame</button>
+          <button type="button" class="small-btn" id="sportsConfidenceClearAll">Clear</button>
+          <span id="sportsConfidenceSelectionCount"></span>
+        </div>
+        <div class="sports-confidence-game-list">
+          ${rows || '<div class="empty-box">No games found.</div>'}
+        </div>
+        <div class="sports-game-picker-actions">
+          <button type="button" class="small-btn" id="sportsConfidenceSelectionCancel">Cancel</button>
+          <button type="button" class="small-btn wager-btn" id="sportsConfidenceSelectionConfirm">Add Selected</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    function boxes_() {
+      return Array.from(overlay.querySelectorAll(".sports-confidence-game-choice"));
+    }
+
+    function update_() {
+      const selected = boxes_().filter(function(box) { return box.checked && !box.disabled; });
+      const count = document.getElementById("sportsConfidenceSelectionCount");
+      const confirmButton = document.getElementById("sportsConfidenceSelectionConfirm");
+      if (count) count.textContent = selected.length + " selected";
+      if (confirmButton) confirmButton.disabled = selected.length === 0;
+    }
+
+    function close_(value) {
+      overlay.remove();
+      resolve(value || []);
+    }
+
+    boxes_().forEach(function(box) { box.addEventListener("change", update_); });
+
+    document.getElementById("sportsConfidenceSelectAll").addEventListener("click", function() {
+      boxes_().forEach(function(box) { if (!box.disabled) box.checked = true; });
+      update_();
+    });
+
+    document.getElementById("sportsConfidenceClearAll").addEventListener("click", function() {
+      boxes_().forEach(function(box) { box.checked = false; });
+      update_();
+    });
+
+    document.getElementById("sportsConfidenceSelectionCancel").addEventListener("click", function() {
+      close_([]);
+    });
+
+    document.getElementById("sportsConfidenceSelectionConfirm").addEventListener("click", function() {
+      const selected = boxes_().filter(function(box) { return box.checked && !box.disabled; }).map(function(box) {
+        const index = Number(box.dataset.index);
+        const game = games[index] || {};
+        return {
+          sportsGameId: String(game.GameId || box.dataset.sportsGameId || ""),
+          espnEventId: String(game.ESPNEventId || box.dataset.espnEventId || ""),
+          game: game
+        };
+      });
+      close_(selected);
+    });
+
+    overlay.addEventListener("click", function(event) {
+      if (event.target === overlay) close_([]);
+    });
+
+    update_();
+  });
+}
+
+async function createSportsConfidenceWeekFromSection_() {
+  const context = sportsAdvancedBuilderContext_();
+  const status = document.getElementById("sportsAdvancedBuilderStatus");
+
+  if (!context) {
+    showSportsError("Choose a league before loading Confidence games.");
+    return;
+  }
+
+  if (context.scope === "date") {
+    if (!context.dateFrom || !context.dateTo) {
+      showSportsError("Choose both Date From and Date To.");
+      return;
+    }
+    if (context.dateTo < context.dateFrom) {
+      showSportsError("Date To must be the same as or after Date From.");
+      return;
+    }
+  } else if (!context.seasonYear || !context.week) {
+    showSportsError("Choose a season year and week.");
+    return;
+  }
+
+  const session = getSportsStoredSession_();
+  if (!session.username || !session.token || !sportsSessionIsAdmin_(session)) {
+    showSportsError("Log in as an admin in the main app first, then return to Sports.");
+    return;
+  }
+
+  try {
+    if (status) status.textContent = "Loading sports games for Confidence…";
+    const games = await sportsAdvancedLoadGamesForContext_(context);
+
+    if (!games.length) {
+      if (status) status.textContent = "No games found for that league/week.";
+      alert("No sports games were found for that selection.");
+      return;
+    }
+
+    const selected = await showSportsConfidenceSelectionModal_(games, context);
+    if (!selected.length) {
+      if (status) status.textContent = "Confidence build canceled.";
+      return;
+    }
+
+    const awardsGameId = await chooseSportsConfidenceGameId_(session);
+    if (!awardsGameId) {
+      if (status) status.textContent = "Confidence build canceled.";
+      return;
+    }
+
+    const confirmed = confirm(
+      "Add " + selected.length + " sports matchup" + (selected.length === 1 ? "" : "s") +
+      " to Confidence Game: " + awardsGameId + "?\n\n" +
+      "Each question will lock at its scheduled kickoff and settle from the Sports Scores Engine."
+    );
+    if (!confirmed) {
+      if (status) status.textContent = "Confidence build canceled.";
+      return;
+    }
+
+    if (status) status.textContent = "Adding selected games to Confidence…";
+
+    const res = await sportsAwardsApi_(
+      "adminCreateSportsConfidenceQuestionsBulk",
+      {
+        username: session.username,
+        token: session.token,
+        gameId: awardsGameId,
+        awardsGameId: awardsGameId,
+        selectedGamesJson: JSON.stringify(selected.map(function(item) {
+          return {
+            sportsGameId: item.sportsGameId,
+            espnEventId: item.espnEventId
+          };
+        }))
+      }
+    );
+
+    if (!res) throw new Error("Confidence builder returned no response.");
+
+    const message = res.message || (
+      "Added: " + (res.createdCount || 0) +
+      ". Already existed: " + (res.duplicateCount || 0) +
+      ". Failed: " + (res.failedCount || 0) + "."
+    );
+
+    if (status) status.textContent = message;
+
+    if (res.success === false && res.failed && res.failed.length) {
+      throw new Error(message + " First error: " + (res.failed[0].message || "Unknown error"));
+    }
+
+    alert(message + "\n\nOpen Manage Games to review the new Confidence questions, then Run Check when the week is ready.");
+  } catch (err) {
+    showSportsError(err && err.message ? err.message : "Could not build Confidence games.");
+    if (status) status.textContent = "Could not build Confidence games.";
+  }
 }
 
 async function createSportsAdvancedQuestionFromSection_() {

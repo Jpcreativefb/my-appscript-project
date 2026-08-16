@@ -1252,3 +1252,81 @@
 [data-platform-bg] {
   background-repeat: no-repeat;
 }
+
+/* Confidence weekly sports picker */
+.sports-confidence-picker-modal {
+  width: min(760px, calc(100vw - 28px));
+  max-height: min(82vh, 760px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sports-confidence-picker-summary {
+  font-size: 13px;
+  font-weight: 800;
+  color: #cbd5e1;
+}
+
+.sports-confidence-picker-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+#sportsConfidenceSelectionCount {
+  margin-left: auto;
+  font-size: 13px;
+  font-weight: 800;
+  color: #cbd5e1;
+}
+
+.sports-confidence-game-list {
+  display: grid;
+  gap: 8px;
+  overflow-y: auto;
+  max-height: 52vh;
+  padding-right: 2px;
+}
+
+.sports-confidence-game-row {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.68);
+  cursor: pointer;
+}
+
+.sports-confidence-game-row input {
+  flex: 0 0 auto;
+}
+
+.sports-confidence-game-main {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.sports-confidence-game-main small {
+  color: #94a3b8;
+}
+
+.sports-confidence-game-row.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 650px) {
+  #sportsConfidenceSelectionCount {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .sports-confidence-picker-modal {
+    max-height: 88vh;
+  }
+}

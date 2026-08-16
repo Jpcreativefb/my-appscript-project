@@ -1,3 +1,11 @@
+## v1.2.16 — Sports Confidence Week Builder
+
+- Added an admin Sports Builders workflow to load NFL/college football by season/week (or any supported league by date range) and select matchups for an existing Confidence Game.
+- Creates `confidence-points` questions with team choices, kickoff locks, SportsGameId/ESPNEventId linkage, sports result source, duplicate protection, and team metadata.
+- Confidence destinations may be Setup, Preview, or Live; Draft/Archived games remain excluded.
+- Existing Sports finalization now treats tied Confidence matchups as push/no-points instead of wager half-refunds.
+- Existing Confidence scoring is reused unchanged.
+
 ## v1.2.16 — Sports Live Score Fetch Hotfix
 
 - Replaced season-wide smart score polling with a small yesterday/today/tomorrow ESPN scoreboard window.

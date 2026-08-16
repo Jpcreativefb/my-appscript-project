@@ -647,6 +647,16 @@ function doGet(e) {
 
       }
 
+      if (action === "adminGetSportsConfidenceGames") {
+
+        return json(
+          apiAdminGetSportsConfidenceGames(
+            e.parameter
+          )
+        );
+
+      }
+
     /* =========================
        HEALTH / DEFAULT
     ========================= */
@@ -2918,6 +2928,34 @@ if (action === "compareUserPicks") {
     );
 
   }
+
+
+    if (action === "adminCreateSportsConfidenceQuestionsBulk") {
+
+      return json(
+        apiAdminCreateSportsConfidenceQuestionsBulk({
+
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          awardsGameId:
+            params.awardsGameId ||
+            gameId,
+
+          gameId:
+            params.gameId,
+
+          selectedGamesJson:
+            params.selectedGamesJson ||
+            params.selectedGames
+
+        })
+      );
+
+    }
 
 
     if (action === "adminCreateSportsWagersBulk") {
