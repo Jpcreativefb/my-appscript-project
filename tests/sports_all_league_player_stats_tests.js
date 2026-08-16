@@ -177,7 +177,7 @@ assert(sportsFrontendSource.includes('sport === "soccer"'), 'Generic soccer play
 
 const sportsHtml = fs.readFileSync(path.join(root, 'frontend', 'sports.html'), 'utf8');
 const serviceWorker = fs.readFileSync(path.join(root, 'frontend', 'sw.js'), 'utf8');
-assert(sportsHtml.includes('sports.js?v=313-external-results-hub-end-to-end'), 'Sports page cache buster missing');
+assert(sportsHtml.includes('sports.js?v=328-sports-confidence-server-loader-v1216'), 'Sports page cache buster missing');
 assert(serviceWorker.includes('awards-app-v264-question-mode-table-repair'), 'Service worker cache version missing');
 
 console.log('All-league player stats tests passed.');

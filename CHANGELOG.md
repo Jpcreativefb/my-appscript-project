@@ -1,5 +1,11 @@
 ## v1.2.16 — Sports Confidence Week Bulk Hotfix
 
+## Sports Confidence server loader hotfix
+- Confidence week selection now loads Sports Scores Engine games through the authenticated Awards backend instead of browser JSONP.
+- Removes the `Sports API script failed to load` failure path from Confidence week creation.
+- Existing duplicate protection allows safe re-running of a partially-created week.
+
+
 - Replaced the Confidence week builder's per-game create loop with grouped weekly writes so a full NFL week does not time out after only a few questions.
 - Reuses the Sports Scores Engine snapshots already loaded by the Sports page instead of making one server fetch per selected matchup.
 - Preserves duplicate protection and supports recovery from partial builds (for example 3 existing + 13 missing).

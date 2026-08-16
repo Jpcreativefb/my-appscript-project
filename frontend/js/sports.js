@@ -4993,6 +4993,39 @@ async function sportsAdvancedLoadGamesForContext_(context) {
   return Array.isArray(data.scores) ? data.scores : [];
 }
 
+async function sportsConfidenceLoadGamesViaAwardsBackend_(session, context) {
+  const params = {
+    username: session.username,
+    token: session.token,
+    sport: context.sport,
+    league: context.league
+  };
+
+  if (context.scope === "week") {
+    params.seasonYear = context.seasonYear;
+    params.seasonType = context.seasonType;
+    params.seasonPhase = context.seasonPhase;
+    params.week = context.week;
+  } else {
+    params.dateFrom = context.dateFrom;
+    params.dateTo = context.dateTo || context.dateFrom;
+  }
+
+  const data = await sportsAwardsApi_(
+    "adminGetSportsConfidenceBuilderScores",
+    params
+  );
+
+  if (!data || data.success === false) {
+    throw new Error(
+      (data && (data.error || data.message)) ||
+      "Could not load Sports games for Confidence."
+    );
+  }
+
+  return Array.isArray(data.scores) ? data.scores : [];
+}
+
 function sportsConfidenceGameIsPregame_(game) {
   game = game || {};
   const state = String(game.State || game.state || "").trim().toLowerCase();
@@ -5154,7 +5187,7 @@ async function createSportsConfidenceWeekFromSection_() {
 
   try {
     if (status) status.textContent = "Loading sports games for Confidence…";
-    const games = await sportsAdvancedLoadGamesForContext_(context);
+    const games = await sportsConfidenceLoadGamesViaAwardsBackend_(session, context);
 
     if (!games.length) {
       if (status) status.textContent = "No games found for that league/week.";

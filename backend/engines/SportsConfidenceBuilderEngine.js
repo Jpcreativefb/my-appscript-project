@@ -114,6 +114,57 @@ function apiAdminGetSportsConfidenceGames(payload) {
   };
 }
 
+function apiAdminGetSportsConfidenceBuilderScores(payload) {
+  payload = payload || {};
+  requireAdmin_(payload);
+
+  if (typeof sportsWagerFetchJson_ !== "function") {
+    throw new Error("SportsWagerEngine is required to load Sports games for Confidence.");
+  }
+
+  const params = {
+    action: "getSportsScores"
+  };
+
+  [
+    "sport",
+    "league",
+    "dateFrom",
+    "dateTo",
+    "seasonYear",
+    "seasonType",
+    "seasonPhase",
+    "week",
+    "state",
+    "team"
+  ].forEach(function(key) {
+    const value = sportsConfidenceString_(payload[key]);
+    if (value) params[key] = value;
+  });
+
+  const result = sportsWagerFetchJson_(
+    params,
+    "Sports Confidence week loader"
+  );
+
+  if (!result || result.success === false) {
+    throw new Error(
+      result && (result.error || result.message) ||
+      "Sports Scores Engine could not load Confidence games."
+    );
+  }
+
+  return {
+    success: true,
+    scores: Array.isArray(result.scores)
+      ? result.scores
+      : (Array.isArray(result.games) ? result.games : []),
+    count: Number(result.count) ||
+      (Array.isArray(result.scores) ? result.scores.length : 0),
+    filters: result.filters || {}
+  };
+}
+
 function sportsConfidenceCategoryId_(score) {
   score = score || {};
   const league = typeof sportsWagerSlug_ === "function"

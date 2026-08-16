@@ -2930,6 +2930,53 @@ if (action === "compareUserPicks") {
   }
 
 
+    if (action === "adminGetSportsConfidenceBuilderScores") {
+
+      return json(
+        apiAdminGetSportsConfidenceBuilderScores({
+
+          username:
+            params.username,
+
+          token:
+            params.token,
+
+          sport:
+            params.sport,
+
+          league:
+            params.league,
+
+          dateFrom:
+            params.dateFrom,
+
+          dateTo:
+            params.dateTo,
+
+          seasonYear:
+            params.seasonYear,
+
+          seasonType:
+            params.seasonType,
+
+          seasonPhase:
+            params.seasonPhase,
+
+          week:
+            params.week,
+
+          state:
+            params.state,
+
+          team:
+            params.team
+
+        })
+      );
+
+    }
+
+
     if (action === "adminCreateSportsConfidenceQuestionsBulk") {
 
       return json(
