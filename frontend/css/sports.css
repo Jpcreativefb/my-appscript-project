@@ -1146,6 +1146,13 @@
   gap: 10px;
 }
 
+/* Respect the builder's mode switch. Author display rules otherwise override
+   the browser's hidden presentation hint and make Date Range look required
+   even while League Week is selected. */
+.sports-advanced-builder-scope-fields[hidden] {
+  display: none;
+}
+
 #sportsAdvancedBuilderDateFields {
   grid-template-columns: repeat(2, minmax(140px, 1fr));
 }

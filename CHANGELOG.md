@@ -437,3 +437,8 @@
 - Fixed the Sports admin wager destination lookup so wager-enabled games in Setup can receive their first Sports wager before production preflight.
 - Preserved Preview/Live and legacy Active destinations while continuing to exclude Draft and Archived games.
 - Added lifecycle status to the Sports destination picker and regression coverage for the bootstrap workflow.
+
+## v1.2.16 — Sports Confidence Builder Scope UI Hotfix
+- Fixed Sports Builders scope fields so Date Range is hidden for League Week and vice versa.
+- Clarified that only the selected Load By fields are required.
+- Frontend-only; no backend behavior changed.

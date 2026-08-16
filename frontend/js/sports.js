@@ -852,6 +852,13 @@ function sportsAdvancedBuilderSetScopeVisibility_() {
   const useWeek = weekSupported && scopeSelect.value === "week";
   dateFields.hidden = useWeek;
   weekFields.hidden = !useWeek;
+
+  const status = document.getElementById("sportsAdvancedBuilderStatus");
+  if (status) {
+    status.textContent = useWeek
+      ? "League Week selected — dates are not required."
+      : "Date Range selected — season/week fields are not required.";
+  }
 }
 
 function sportsAdvancedBuilderContext_() {
@@ -919,7 +926,7 @@ function renderSportsAdvancedBuilderSection_() {
     <div class="sports-advanced-builder-header">
       <div>
         <h2>Sports Builders</h2>
-        <p>Use one league/date/week selector to add Confidence matchups or create a stat comparison.</p>
+        <p>Choose either a Date Range or League Week. Only the fields for the selected Load By mode are used.</p>
       </div>
     </div>
     <div class="sports-advanced-builder-grid">
@@ -928,7 +935,7 @@ function renderSportsAdvancedBuilderSection_() {
         <select id="sportsAdvancedBuilderLeague">${leagueOptions}</select>
       </label>
       <label class="filter-control">
-        ${sportsFieldLabel_("Load By", "Date Range works for every league. Week is available for NFL and college football schedules that store a week number.")}
+        ${sportsFieldLabel_("Load By", "Choose one loading method. Date Range uses only Date From/To. League Week uses only Season Year, Season Phase, and Week.")}
         <select id="sportsAdvancedBuilderScope">
           <option value="date">Date Range</option>
           <option value="week">League Week</option>
