@@ -277,3 +277,14 @@ tests/sports_confidence_post_transport_v1216_tests.js
 SPORTS_CONFIDENCE_POST_TRANSPORT_HOTFIX_V1_2_16.md
 tests/sports_advanced_comparison_filter_tests.js
 tests/sports_all_league_player_stats_tests.js
+
+SPORTS WAGER CREATE / PREFLIGHT HOTFIX
+frontend/js/sports.js
+frontend/sports.html
+backend/admin/AdminCategories.js
+tests/sports_wager_create_preflight_v1216_tests.js (new)
+tests/sports_advanced_comparison_filter_tests.js (cache-buster assertion)
+tests/sports_confidence_post_transport_v1216_tests.js (cache-buster assertion)
+tests/sports_all_league_player_stats_tests.js (cache-buster assertion)
+SPORTS_WAGER_CREATE_PREFLIGHT_HOTFIX_V1_2_16.md (new)
+CHANGELOG.md

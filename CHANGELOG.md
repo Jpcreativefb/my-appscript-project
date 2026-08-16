@@ -462,3 +462,7 @@
 - Fixed Sports Builders scope fields so Date Range is hidden for League Week and vice versa.
 - Clarified that only the selected Load By fields are required.
 - Frontend-only; no backend behavior changed.
+
+## v1.2.16 — Sports Wager Create / Preflight Hotfix
+- Removed automatic Sports Scores Engine refresh from wager creation to avoid false update-lock errors.
+- Restored Sports metadata projection into admin game setup so Run Check sees SportsGameId / ESPNEventId.

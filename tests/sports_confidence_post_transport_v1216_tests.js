@@ -37,6 +37,6 @@ for (const action of [
   assert(re.test(api), action + ' must have a doPost(body) route');
 }
 
-assert(sportsHtml.includes('sports.js?v=329-sports-confidence-post-transport-v1216'));
+assert(sportsHtml.includes('sports.js?v=330-sports-wager-create-preflight-v1216'));
 
 console.log('sports-confidence-post-transport-v1216-tests: PASS');

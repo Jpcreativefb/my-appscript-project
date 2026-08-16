@@ -119,7 +119,7 @@ assert(source.includes('data-advanced-group='));
 assert(!source.includes('data-advanced-division='));
 assert(source.includes('sportsAdvancedQuestionSearchTokens_'));
 assert(source.includes('groupInfo.label'));
-assert(html.includes('sports.js?v=329-sports-confidence-post-transport-v1216'));
+assert(html.includes('sports.js?v=330-sports-wager-create-preflight-v1216'));
 assert(sw.includes('awards-app-v264-question-mode-table-repair'));
 
 console.log('Sports advanced comparison filter tests passed.');

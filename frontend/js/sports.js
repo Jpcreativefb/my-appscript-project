@@ -2479,19 +2479,7 @@ function buildSportsWagerPayload_(
       config.underOdds,
 
     autoOdds:
-      config.autoOdds,
-
-    refreshEngineFirst:
-      "true",
-
-    scoreRefreshMode:
-      "window",
-
-    daysBack:
-      2,
-
-    daysForward:
-      2
+      config.autoOdds
   };
 
 }
@@ -2644,19 +2632,7 @@ async function createSelectedSportsWagers() {
             config.underOdds,
 
           autoOdds:
-            config.autoOdds,
-
-          refreshEngineFirst:
-            "true",
-
-          scoreRefreshMode:
-            "window",
-
-          daysBack:
-            2,
-
-          daysForward:
-            2
+            config.autoOdds
         }
       );
 

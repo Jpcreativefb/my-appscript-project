@@ -1902,6 +1902,51 @@ function adminGetGameSetup(payload) {
           ? adminCatNormalizeValue_(row[settingsCol.settlementStatus])
           : "pending",
 
+      maxSelections:
+        settingsCol.maxSelections !== -1
+          ? Number(row[settingsCol.maxSelections]) || 0
+          : 0,
+
+      minSelections:
+        settingsCol.minSelections !== -1
+          ? Number(row[settingsCol.minSelections]) || 0
+          : 0,
+
+      allowDraw:
+        settingsCol.allowDraw !== -1
+          ? adminCatToBoolean_(row[settingsCol.allowDraw])
+          : false,
+
+      allowPush:
+        settingsCol.allowPush !== -1
+          ? adminCatToBoolean_(row[settingsCol.allowPush])
+          : false,
+
+      sportsGameId:
+        settingsCol.sportsGameId !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.sportsGameId])
+          : "",
+
+      espnEventId:
+        settingsCol.espnEventId !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.espnEventId])
+          : "",
+
+      sportsMarket:
+        settingsCol.sportsMarket !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.sportsMarket])
+          : "",
+
+      sportsLeague:
+        settingsCol.sportsLeague !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.sportsLeague])
+          : "",
+
+      wagerResultType:
+        settingsCol.wagerResultType !== -1
+          ? adminCatNormalizeValue_(row[settingsCol.wagerResultType])
+          : "",
+
       minStake:
         settingsCol.minStake !== -1
           ? Number(row[settingsCol.minStake]) || 0
