@@ -264,3 +264,11 @@ external-engines/sports-scoring-engine/src/SportsPlayersEngine.js
 external-engines/sports-scoring-engine/src/SportsAdvancedStatsEngine.js
 tests/sports_espn_cloudflare_proxy_v1216_tests.js
 SPORTS_ESPN_CLOUDFLARE_PROXY_HOTFIX_V1_2_16.md
+
+SPORTS WAGER SETUP DESTINATION HOTFIX
+backend/engines/SportsWagerEngine.js
+frontend/js/sports.js
+tests/sports_wager_setup_destination_v1216_tests.js (new)
+SPORTS_WAGER_SETUP_DESTINATION_HOTFIX_V1_2_16.md (new)
+CHANGELOG.md
+tests/leaderboard_modal_interactions_tests.js (test teardown only)

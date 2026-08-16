@@ -6051,12 +6051,18 @@ function apiAdminGetSportsWagerGames(payload) {
     payload
   );
 
+  // Admin Sports builders must be able to seed the first wager while the
+  // destination game is still in SETUP. Manage Games intentionally stores
+  // Active=FALSE for Draft/Setup and runs preflight before a game may become
+  // Live, so using getActiveGames() here created a circular dependency:
+  // Sports could not create the first wager until the game was Live, while
+  // preflight would not allow Live until a wager question already existed.
   const games =
-    typeof getActiveGames === "function"
-      ? getActiveGames()
-      : getGames();
+    typeof getGames === "function"
+      ? getGames()
+      : getActiveGames();
 
-  const activeGames =
+  const adminBuildableGames =
     games.filter(function(game) {
 
       const active =
@@ -6073,15 +6079,33 @@ function apiAdminGetSportsWagerGames(payload) {
           .trim()
           .toLowerCase() === "true";
 
+      const status =
+        String(game.status || game.Status || "")
+          .trim()
+          .toLowerCase();
+
+      const buildableStatus =
+        status === "setup" ||
+        status === "preview" ||
+        status === "active" ||
+        status === "live";
+
+      // Preserve compatibility with legacy rows that predate Status and use
+      // only Active=TRUE to represent a playable destination. Draft remains
+      // excluded; admins should move a game to Setup before building wagers.
+      const legacyActive =
+        !status &&
+        active;
+
       return (
-        active &&
-        !archived
+        !archived &&
+        (buildableStatus || legacyActive)
       );
 
     });
 
   const wagerGames =
-    activeGames.filter(function(game) {
+    adminBuildableGames.filter(function(game) {
 
       const type =
         String(game.type || game.Type || "")
@@ -6140,7 +6164,14 @@ function apiAdminGetSportsWagerGames(payload) {
             game.Year ||
             "",
 
-          wagerEnabled: true
+          wagerEnabled: true,
+
+          status:
+            String(
+              game.status ||
+              game.Status ||
+              (game.active === true || game.Active === true ? "Active" : "")
+            ).trim()
         };
 
       })

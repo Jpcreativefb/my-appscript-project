@@ -231,6 +231,9 @@ const assert = require('assert');
   assert.strictEqual(openedCompare, 'joel');
 
   console.log('leaderboard-modal-interactions-tests: PASS');
+  // Explicitly exit after all assertions because the VM fixture exposes the host
+  // setTimeout, which can leave a harmless pending timer and stall the release gate.
+  process.exit(0);
 })().catch(err => {
   console.error(err);
   process.exit(1);

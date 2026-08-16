@@ -424,3 +424,8 @@
 - Added secure Cloudflare fallback from blocked `site.api.espn.com` date-scoped NFL/MLB scoreboards to ESPN's real-time `cdn.espn.com` scoreboards.
 - Added CDN `content.sbData.events` parsing in Sports Scores Engine.
 - Season builders remain fail-loud and are not silently substituted with current-day data.
+
+## v1.2.16 Sports Wager Setup Destination Hotfix
+- Fixed the Sports admin wager destination lookup so wager-enabled games in Setup can receive their first Sports wager before production preflight.
+- Preserved Preview/Live and legacy Active destinations while continuing to exclude Draft and Archived games.
+- Added lifecycle status to the Sports destination picker and regression coverage for the bootstrap workflow.

@@ -1714,7 +1714,7 @@ async function chooseSportsAwardsGameId_(
   if (!games.length) {
 
     alert(
-      "No active wager-enabled games found. Turn WagerEnabled ON for the destination Awards Game first."
+      "No Setup, Preview, or Live wager-enabled games were found. Put the destination game in Setup (or later) and confirm Sports Wagers is ON."
     );
 
     return "";
@@ -1766,6 +1766,11 @@ function showSportsGamePickerModal_(
             (
               game.type
                 ? " (" + game.type + ")"
+                : ""
+            ) +
+            (
+              game.status
+                ? " [" + String(game.status).toUpperCase() + "]"
                 : ""
             )
           );
@@ -3889,7 +3894,7 @@ async function createSportsPlayerMatchupFromCard(gameId) {
     if (!destinationGames.length) {
       throw new Error(
         config.questionMode === "wager"
-          ? "No active wager-enabled Awards Games were found."
+          ? "No Setup, Preview, or Live wager-enabled Awards Games were found."
           : "No active prediction-enabled Awards Games were found."
       );
     }
@@ -5074,7 +5079,7 @@ async function createSportsAdvancedQuestion_(context) {
     if (!destinationGames.length) {
       throw new Error(
         config.questionMode === "wager"
-          ? "No active wager-enabled Awards Games were found."
+          ? "No Setup, Preview, or Live wager-enabled Awards Games were found."
           : "No active prediction-enabled Awards Games were found."
       );
     }
