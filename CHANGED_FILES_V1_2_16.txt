@@ -272,3 +272,8 @@ tests/sports_wager_setup_destination_v1216_tests.js (new)
 SPORTS_WAGER_SETUP_DESTINATION_HOTFIX_V1_2_16.md (new)
 CHANGELOG.md
 tests/leaderboard_modal_interactions_tests.js (test teardown only)
+frontend/sports.html
+tests/sports_confidence_post_transport_v1216_tests.js
+SPORTS_CONFIDENCE_POST_TRANSPORT_HOTFIX_V1_2_16.md
+tests/sports_advanced_comparison_filter_tests.js
+tests/sports_all_league_player_stats_tests.js

@@ -1,3 +1,10 @@
+
+## v1.2.16 Sports Confidence POST Transport Hotfix
+- Removed JSONP from all three Confidence-builder admin calls: week load, destination-game load, and weekly bulk create.
+- Routes those calls through the existing Awards POST proxy with request bodies instead of `<script>` query-string URLs.
+- Added matching `doPost` handlers for the Confidence builder actions.
+- Keeps the normal Sports scoreboard transport unchanged.
+
 ## v1.2.16 — Sports Confidence Week Bulk Hotfix
 
 ## Sports Confidence server loader hotfix

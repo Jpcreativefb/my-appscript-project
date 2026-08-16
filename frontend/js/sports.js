@@ -1551,6 +1551,60 @@ function getAwardsApiUrlForSportsWager_() {
 
 }
 
+const SPORTS_AWARDS_POST_PROXY_URL =
+  "https://awards-upload-proxy.jpcreativefb.workers.dev";
+
+async function sportsAwardsPost_(action, payload) {
+  const controller =
+    typeof AbortController !== "undefined"
+      ? new AbortController()
+      : null;
+
+  const timeout =
+    controller
+      ? setTimeout(function() { controller.abort(); }, SPORTS_JSONP_LONG_TIMEOUT_MS)
+      : null;
+
+  try {
+    const response = await fetch(
+      SPORTS_AWARDS_POST_PROXY_URL,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8"
+        },
+        body: JSON.stringify(Object.assign({ action: action }, payload || {})),
+        signal: controller ? controller.signal : undefined
+      }
+    );
+
+    if (timeout) clearTimeout(timeout);
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch (parseErr) {
+      throw new Error("Awards POST transport returned an invalid response.");
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        (data && (data.error || data.message)) ||
+        ("Awards POST transport returned status " + response.status + ".")
+      );
+    }
+
+    return data || { success: true };
+  } catch (err) {
+    if (timeout) clearTimeout(timeout);
+    if (err && err.name === "AbortError") {
+      throw new Error("Awards POST transport timed out.");
+    }
+    throw err;
+  }
+}
+
 async function sportsAwardsApi_(action, params) {
 
   const url =
@@ -1738,7 +1792,7 @@ async function chooseSportsAwardsGameId_(
 }
 
 async function apiAdminGetSportsConfidenceGames_(session) {
-  return sportsAwardsApi_(
+  return sportsAwardsPost_(
     "adminGetSportsConfidenceGames",
     {
       username: session.username,
@@ -5011,7 +5065,7 @@ async function sportsConfidenceLoadGamesViaAwardsBackend_(session, context) {
     params.dateTo = context.dateTo || context.dateFrom;
   }
 
-  const data = await sportsAwardsApi_(
+  const data = await sportsAwardsPost_(
     "adminGetSportsConfidenceBuilderScores",
     params
   );
@@ -5219,7 +5273,7 @@ async function createSportsConfidenceWeekFromSection_() {
 
     if (status) status.textContent = "Adding selected games to Confidence…";
 
-    const res = await sportsAwardsApi_(
+    const res = await sportsAwardsPost_(
       "adminCreateSportsConfidenceQuestionsBulk",
       {
         username: session.username,

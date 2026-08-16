@@ -356,6 +356,23 @@ function doPost(e) {
     }
 
     // =========================
+    // SPORTS CONFIDENCE BUILDER POST TRANSPORT
+    // Keeps the full weekly selection out of JSONP/query-string URLs.
+    // =========================
+
+    if (action === "adminGetSportsConfidenceGames") {
+      return json(apiAdminGetSportsConfidenceGames(body));
+    }
+
+    if (action === "adminGetSportsConfidenceBuilderScores") {
+      return json(apiAdminGetSportsConfidenceBuilderScores(body));
+    }
+
+    if (action === "adminCreateSportsConfidenceQuestionsBulk") {
+      return json(apiAdminCreateSportsConfidenceQuestionsBulk(body));
+    }
+
+    // =========================
     // AWARDS MANAGER WRITES
     // =========================
     if (action === "adminAwardsCreateQuestionFromMarket") {
