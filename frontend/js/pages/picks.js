@@ -18,7 +18,8 @@ let PICKS_PAGE_DATA = {
   pickMeta: {},
   seasonAnchor: null,
   episodeComparison: null,
-  realityTvView: null
+  realityTvView: null,
+  appearance: null
 };
 
 let PICKS_COUNTDOWN_TIMER = null;
@@ -40,6 +41,8 @@ let PICKS_CONFIDENCE_LIVE_TIMER = null;
 let PICKS_CONFIDENCE_LIVE_IN_FLIGHT = false;
 let PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
 let PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+let PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
+let PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
 
 const PICKS_CONFIDENCE_SPORTS_API_URL =
   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
@@ -714,6 +717,9 @@ function resetConfidenceViewState_() {
   PICKS_CONFIDENCE_EXPANDED = new Set();
   PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
   PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+  PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
+  PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
+  PICKS_PAGE_DATA.appearance = null;
 
 }
 
@@ -1475,6 +1481,140 @@ function persistConfidenceDraft_() {
 
 }
 
+function confidenceAppearanceBool_(value, defaultValue) {
+  if (value === true || value === false) return value;
+  const text = String(value == null ? "" : value).trim().toLowerCase();
+  if (["true", "1", "yes", "on"].indexOf(text) !== -1) return true;
+  if (["false", "0", "no", "off"].indexOf(text) !== -1) return false;
+  return defaultValue === true;
+}
+
+function confidenceAppearanceKey_(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function confidenceAppearanceEntityType_(category, nominee) {
+  return String(
+    nominee && nominee.entryType ||
+    category && category.entryType ||
+    "nominee"
+  ).trim().toLowerCase() || "nominee";
+}
+
+function confidenceAppearanceDriveUrl_(fileId) {
+  const id = String(fileId || "").trim();
+  return id ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w640" : "";
+}
+
+function confidenceAppearanceResolvedImage_(category, nominee) {
+  const bundle = PICKS_PAGE_DATA.appearance || {};
+  const assignment = bundle.assignment || {};
+  const entityType = confidenceAppearanceEntityType_(category, nominee);
+  const entityId = String(nominee && nominee.id || "").trim();
+  const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
+
+  const override = (bundle.overrides || []).find(function(row) {
+    return confidenceAppearanceBool_(row.Active, true) &&
+      confidenceAppearanceKey_(row.GameId || gameId) === confidenceAppearanceKey_(gameId) &&
+      confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
+      confidenceAppearanceKey_(row.EntityId) === confidenceAppearanceKey_(entityId);
+  });
+
+  if (override) {
+    const url = String(override.ImageUrl || "").trim() || confidenceAppearanceDriveUrl_(override.ImageFileId);
+    if (url) return { imageUrl: url, source: "override" };
+  }
+
+  const imagePackId = String(bundle.imagePackId || assignment.ImagePackId || "").trim();
+  const imageMode = confidenceAppearanceKey_(assignment.ImageMode || "pack");
+
+  if (imagePackId && imageMode !== "default") {
+    const item = (bundle.imagePackItems || []).find(function(row) {
+      const variant = confidenceAppearanceKey_(row.Variant || "default");
+      return confidenceAppearanceBool_(row.Active, true) &&
+        confidenceAppearanceKey_(row.PackId) === confidenceAppearanceKey_(imagePackId) &&
+        confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
+        confidenceAppearanceKey_(row.EntityId) === confidenceAppearanceKey_(entityId) &&
+        (variant === "default" || !variant);
+    });
+
+    if (item) {
+      const url = String(item.ImageUrl || "").trim() || confidenceAppearanceDriveUrl_(item.ImageFileId);
+      if (url) return { imageUrl: url, source: "image-pack" };
+    }
+  }
+
+  return { imageUrl: String(nominee && nominee.image || "").trim(), source: "default" };
+}
+
+function confidenceThemeToken_(value, allowed, fallback) {
+  const key = String(value || "").trim().toLowerCase();
+  return allowed.indexOf(key) !== -1 ? key : fallback;
+}
+
+function confidenceThemeSafeColor_(value, fallback) {
+  const text = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+}
+
+function confidenceThemePresentation_() {
+  const theme = (PICKS_PAGE_DATA.appearance && PICKS_PAGE_DATA.appearance.theme) || {};
+  const team = theme.team || {};
+  const row = theme.row || {};
+  const colors = theme.colors || {};
+
+  const classes = [
+    "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
+    "confidence-theme-city-" + confidenceThemeToken_(team.cityScale, ["small", "medium"], "small"),
+    "confidence-theme-name-" + confidenceThemeToken_(team.nameScale, ["medium", "large", "xlarge"], "large"),
+    "confidence-theme-unselected-" + confidenceThemeToken_(team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale"),
+    "confidence-theme-corners-" + confidenceThemeToken_(row.corners, ["square", "soft", "rounded"], "soft"),
+    "confidence-theme-spacing-" + confidenceThemeToken_(row.spacing, ["tight", "normal"], "tight")
+  ];
+
+  if (Object.keys(colors).length) classes.push("confidence-theme-custom-colors");
+
+  const vars = [
+    "--confidence-theme-accent:" + confidenceThemeSafeColor_(colors.accent, "#60a5fa"),
+    "--confidence-theme-surface:" + confidenceThemeSafeColor_(colors.surface, "#0f172a"),
+    "--confidence-theme-text:" + confidenceThemeSafeColor_(colors.text, "#ffffff"),
+    "--confidence-theme-muted:" + confidenceThemeSafeColor_(colors.muted, "#94a3b8"),
+    "--confidence-theme-correct:" + confidenceThemeSafeColor_(colors.correct, "#22c55e"),
+    "--confidence-theme-incorrect:" + confidenceThemeSafeColor_(colors.incorrect, "#ef4444"),
+    "--confidence-theme-live:" + confidenceThemeSafeColor_(colors.live, "#ef4444")
+  ];
+
+  return { className: classes.join(" "), style: vars.join(";") };
+}
+
+async function hydrateConfidenceAppearance_() {
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+  if (typeof apiGetGameAppearance !== "function") return;
+
+  const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
+  if (!gameId) return;
+
+  if (PICKS_PAGE_DATA.appearance && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return;
+  if (PICKS_CONFIDENCE_APPEARANCE_REQUEST && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return PICKS_CONFIDENCE_APPEARANCE_REQUEST;
+
+  PICKS_CONFIDENCE_APPEARANCE_GAME_ID = gameId;
+  PICKS_CONFIDENCE_APPEARANCE_REQUEST = (async function() {
+    try {
+      const result = await apiGetGameAppearance(gameId);
+      if (result && result.success !== false && String(PICKS_PAGE_DATA.gameId || "") === gameId) {
+        PICKS_PAGE_DATA.appearance = result;
+        refreshPicksPage();
+      }
+    } catch (err) {
+      console.warn("Confidence appearance load skipped", err);
+    } finally {
+      PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
+    }
+  })();
+
+  return PICKS_CONFIDENCE_APPEARANCE_REQUEST;
+}
+
 function splitConfidenceTeamName_(name) {
 
   const words = String(name || "Team")
@@ -1523,6 +1663,7 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
   const score = confidenceScoreValue_(category, side);
   const phase = getConfidenceSportsPhase_(category);
   const actualWinner = Boolean(result && result.winnerNomineeId && normalizeId(result.winnerNomineeId) === normalizeId(nominee && nominee.id));
+  const appearanceImage = confidenceAppearanceResolvedImage_(category, nominee);
 
   return `
     <button
@@ -1536,7 +1677,7 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
       <span class="confidence-team-city">${escapeHtml(parts.city)}</span>
       <strong class="confidence-team-nickname">${escapeHtml(parts.nickname)}</strong>
       <span class="confidence-team-visual">
-        ${platformImgHtml(nominee.image, {
+        ${platformImgHtml(appearanceImage.imageUrl, {
           className: "confidence-team-logo",
           variant: "thumb",
           alt: nominee.name || "Team"
@@ -1602,9 +1743,10 @@ function renderCompactConfidenceRow_(category) {
 function renderCompactConfidenceSlate_() {
 
   const categories = getCompactConfidenceDisplayCategories_();
+  const presentation = confidenceThemePresentation_();
 
   return `
-    <div class="confidence-compact-slate">
+    <div class="confidence-compact-slate ${escapeAttr(presentation.className)}" style="${escapeAttr(presentation.style)}">
       ${categories.map(renderCompactConfidenceRow_).join("")}
     </div>
   `;
@@ -3745,6 +3887,7 @@ function mountPicksPage() {
 
   // Confidence games keep the same dense weekly card in pregame, live, and final states.
   mountConfidenceLiveSports_();
+  hydrateConfidenceAppearance_();
 
 }
 

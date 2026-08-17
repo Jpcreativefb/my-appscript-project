@@ -1,0 +1,79 @@
+/* =========================================================
+   Appearance Manager — v1.2.17d
+========================================================= */
+.appearance-manager-page { padding-bottom: 110px; }
+.appearance-page-heading { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; margin-bottom:16px; }
+.appearance-page-heading h1 { margin-bottom:4px; }
+.appearance-message { margin-bottom:12px; }
+.appearance-assignment-grid { display:grid; grid-template-columns: minmax(220px,2fr) repeat(2,minmax(180px,1fr)); gap:12px; }
+.appearance-assignment-grid label,
+.appearance-theme-grid label,
+.appearance-pack-toolbar label { display:grid; gap:6px; font-weight:700; }
+.appearance-card-body { padding-top:14px; }
+.appearance-pack-card > summary,
+.appearance-theme-card > summary { display:flex; justify-content:space-between; gap:12px; align-items:center; cursor:pointer; }
+.appearance-pack-card > summary span,
+.appearance-theme-card > summary span { font-size:.82rem; font-weight:500; opacity:.7; }
+.appearance-pack-toolbar { display:grid; grid-template-columns:minmax(220px,1fr) 2fr; gap:12px; margin-bottom:12px; }
+.appearance-new-pack { display:grid; grid-template-columns:1.4fr .7fr .7fr auto; gap:8px; align-items:end; }
+.appearance-entity-list { display:grid; gap:8px; margin-top:12px; }
+.appearance-entity-card { display:grid; grid-template-columns:74px minmax(150px,.8fr) minmax(260px,2fr); gap:10px; align-items:center; padding:9px; border:1px solid rgba(100,116,139,.24); border-radius:12px; background:rgba(255,255,255,.025); }
+.appearance-entity-preview { display:grid; justify-items:center; gap:3px; }
+.appearance-entity-preview img { width:58px; height:58px; object-fit:contain; border-radius:9px; background:#fff; }
+.appearance-entity-preview small { font-size:.62rem; text-align:center; opacity:.65; }
+.appearance-image-empty { width:58px; height:58px; display:grid; place-items:center; border:1px dashed #94a3b8; border-radius:9px; font-size:.68rem; opacity:.7; }
+.appearance-entity-copy { display:grid; gap:3px; min-width:0; }
+.appearance-entity-copy strong { overflow-wrap:anywhere; }
+.appearance-entity-copy span { font-size:.72rem; opacity:.65; overflow-wrap:anywhere; }
+.appearance-entity-editor summary { cursor:pointer; font-weight:700; }
+.appearance-entity-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:9px; }
+.appearance-entity-fields > div { display:grid; gap:6px; padding:9px; border-radius:9px; background:rgba(100,116,139,.08); }
+.appearance-entity-fields small { opacity:.7; }
+.admin-actions.compact { gap:6px; flex-wrap:wrap; }
+.appearance-theme-editor-header { display:flex; gap:10px; align-items:end; justify-content:space-between; margin-bottom:12px; }
+.appearance-theme-editor-header label { min-width:240px; }
+.appearance-theme-grid { display:grid; grid-template-columns:repeat(3,minmax(150px,1fr)); gap:10px; }
+.appearance-theme-grid input[type="color"] { width:100%; min-height:42px; padding:3px; border:1px solid rgba(100,116,139,.35); border-radius:8px; background:transparent; }
+.appearance-theme-preview { --ap-accent:#2563eb; --ap-surface:#fff; --ap-text:#111827; --ap-correct:#16a34a; margin:16px 0 12px; display:grid; grid-template-columns:1fr 34px 1fr 84px; gap:6px; align-items:stretch; padding:8px; border:1px solid rgba(100,116,139,.25); background:var(--ap-surface); color:var(--ap-text); border-radius:12px; }
+.appearance-preview-team { min-height:72px; display:grid; grid-template-rows:auto auto 1fr; align-items:center; justify-items:center; padding:6px; border:2px solid transparent; background:rgba(148,163,184,.08); }
+.appearance-preview-team.selected { border-color:var(--ap-accent); }
+.appearance-theme-preview.unselected-grayscale .appearance-preview-team.muted { filter:grayscale(1); opacity:.48; }
+.appearance-theme-preview.unselected-dim .appearance-preview-team.muted { filter:none; opacity:.5; }
+.appearance-theme-preview.unselected-none .appearance-preview-team.muted { filter:none; opacity:1; }
+.appearance-preview-team small { font-size:.62rem; opacity:.7; }
+.appearance-preview-team strong { font-size:1rem; width:100%; text-align:center; }
+.appearance-preview-team span { font-size:1.7rem; }
+.appearance-preview-vs { display:grid; place-items:center; font-size:.72rem; opacity:.55; }
+.appearance-preview-confidence { display:grid; place-items:center; align-content:center; border-left:1px solid rgba(100,116,139,.3); }
+.appearance-preview-confidence small { font-size:.58rem; text-transform:uppercase; }
+.appearance-preview-confidence strong { font-size:1.35rem; }
+.appearance-preview-corners-square .appearance-preview-team { border-radius:0; }
+.appearance-preview-corners-soft .appearance-preview-team { border-radius:8px; }
+.appearance-preview-corners-rounded .appearance-preview-team { border-radius:15px; }
+.appearance-preview-city-medium .appearance-preview-team small { font-size:.74rem; }
+.appearance-preview-name-medium .appearance-preview-team strong { font-size:.88rem; }
+.appearance-preview-name-large .appearance-preview-team strong { font-size:1rem; }
+.appearance-preview-name-xlarge .appearance-preview-team strong { font-size:1.12rem; }
+.appearance-preview-density-comfortable .appearance-preview-team { min-height:92px; }
+
+@media (max-width: 900px) {
+  .appearance-assignment-grid,
+  .appearance-pack-toolbar,
+  .appearance-theme-grid { grid-template-columns:1fr 1fr; }
+  .appearance-new-pack { grid-template-columns:1fr 1fr; }
+  .appearance-entity-card { grid-template-columns:64px 1fr; }
+  .appearance-entity-editor { grid-column:1 / -1; }
+}
+
+@media (max-width: 620px) {
+  .appearance-page-heading { display:grid; }
+  .appearance-assignment-grid,
+  .appearance-pack-toolbar,
+  .appearance-theme-grid,
+  .appearance-new-pack,
+  .appearance-entity-fields { grid-template-columns:1fr; }
+  .appearance-theme-editor-header { display:grid; }
+  .appearance-theme-preview { grid-template-columns:1fr 24px 1fr 66px; padding:5px; }
+  .appearance-entity-card { grid-template-columns:58px 1fr; padding:7px; }
+  .appearance-entity-preview img, .appearance-image-empty { width:50px; height:50px; }
+}

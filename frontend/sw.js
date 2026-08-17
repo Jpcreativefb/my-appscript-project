@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v1217b-confidence-live";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217b-confidence-live";
 
 const APP_SHELL = [
   "./",
@@ -12,6 +12,7 @@ const APP_SHELL = [
   "./css/components.css",
   "./css/pages.css",
   "./css/picks.css",
+  "./css/appearance.css",
   "./js/config.js",
   "./assets/images/image-manifest.js",
   "./js/imageEngine.js",
@@ -20,7 +21,8 @@ const APP_SHELL = [
   "./js/state.js",
   "./js/app.js",
   "./js/pwa.js",
-  "./js/pages/adminGames.js"
+  "./js/pages/adminGames.js",
+  "./js/pages/adminAppearance.js"
 ];
 
 self.addEventListener("install", event => {
@@ -95,3 +97,5 @@ async function networkFirst(request) {
 // "./js/pages/adminRealityTv.js"
 // "./js/pages/archiveHistory.js"
 // "./css/archive-history.css"
+
+// v1.2.17d: Appearance Manager + Confidence Image/Theme integration.

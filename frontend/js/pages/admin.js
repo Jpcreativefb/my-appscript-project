@@ -202,6 +202,23 @@ async function renderAdminPage() {
 
         <div class="card admin-card">
 
+          <h2>Appearance Manager</h2>
+
+          <div class="admin-sub">
+            Build reusable Image Packs and Theme Packs, assign them to any game, and override individual team or nominee artwork without rebuilding the game.
+          </div>
+
+          <button
+            class="button admin-button"
+            onclick="navigate('admin-appearance')"
+          >
+            Open Appearance Manager
+          </button>
+
+        </div>
+
+        <div class="card admin-card">
+
           <h2>Awards Manager</h2>
           <div class="admin-sub">
             Build awards questions, search Kalshi and Polymarket live, attach market probabilities,

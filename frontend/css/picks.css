@@ -1662,3 +1662,78 @@
     font-size: 0.52rem;
   }
 }
+
+
+/* =========================================================
+   v1.2.17d — Confidence Theme Pack runtime
+========================================================= */
+.confidence-compact-slate {
+  --confidence-theme-accent: #60a5fa;
+  --confidence-theme-surface: #0f172a;
+  --confidence-theme-text: #ffffff;
+  --confidence-theme-muted: #94a3b8;
+  --confidence-theme-correct: #22c55e;
+  --confidence-theme-incorrect: #ef4444;
+  --confidence-theme-live: #ef4444;
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-game-row {
+  background: var(--confidence-theme-surface);
+  color: var(--confidence-theme-text);
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-team-choice.selected {
+  border-color: var(--confidence-theme-accent);
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-team-city,
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-game-question,
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-details-prompt {
+  color: var(--confidence-theme-muted);
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-game-row.correct .confidence-team-choice.selected,
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-team-choice.actual-winner {
+  border-color: var(--confidence-theme-correct);
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-game-row.wrong .confidence-team-choice.selected {
+  border-color: var(--confidence-theme-incorrect);
+}
+
+.confidence-compact-slate.confidence-theme-custom-colors .confidence-live-status.live {
+  color: var(--confidence-theme-live);
+}
+
+.confidence-theme-unselected-grayscale .confidence-team-choice.not-selected:not(.actual-winner) .confidence-team-logo {
+  filter: grayscale(1);
+  opacity: .42;
+}
+
+.confidence-theme-unselected-dim .confidence-team-choice.not-selected:not(.actual-winner) {
+  opacity: .52;
+}
+
+.confidence-theme-unselected-none .confidence-team-choice.not-selected:not(.actual-winner),
+.confidence-theme-unselected-none .confidence-team-choice.not-selected:not(.actual-winner) .confidence-team-logo {
+  filter: none;
+  opacity: 1;
+}
+
+.confidence-theme-city-small .confidence-team-city { font-size: .64rem; }
+.confidence-theme-city-medium .confidence-team-city { font-size: .76rem; }
+.confidence-theme-name-medium .confidence-team-nickname { font-size: .9rem; }
+.confidence-theme-name-large .confidence-team-nickname { font-size: 1rem; }
+.confidence-theme-name-xlarge .confidence-team-nickname { font-size: 1.12rem; }
+
+.confidence-theme-corners-square .confidence-game-row,
+.confidence-theme-corners-square .confidence-team-choice { border-radius: 0; }
+.confidence-theme-corners-soft .confidence-game-row { border-radius: 10px; }
+.confidence-theme-corners-soft .confidence-team-choice { border-radius: 8px; }
+.confidence-theme-corners-rounded .confidence-game-row { border-radius: 18px; }
+.confidence-theme-corners-rounded .confidence-team-choice { border-radius: 14px; }
+
+.confidence-theme-spacing-tight .confidence-game-main { gap: 5px; }
+.confidence-theme-spacing-normal .confidence-game-main { gap: 10px; padding-block: 8px; }
+.confidence-theme-density-comfortable .confidence-team-choice { min-height: 96px; }
+.confidence-theme-density-standard .confidence-team-choice { min-height: 82px; }

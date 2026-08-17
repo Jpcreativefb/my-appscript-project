@@ -326,6 +326,15 @@ function appearanceSetupSystem() {
         row: {
           corners: "soft",
           spacing: "tight"
+        },
+        colors: {
+          accent: "#60a5fa",
+          surface: "#0f172a",
+          text: "#ffffff",
+          muted: "#94a3b8",
+          correct: "#22c55e",
+          incorrect: "#ef4444",
+          live: "#ef4444"
         }
       }),
       Active: true,

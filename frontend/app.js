@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216";
-const APP_ROUTE_HOTFIX_VERSION = "v12169-question-drag-order";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d";
+const APP_ROUTE_HOTFIX_VERSION = "v1217d-appearance-manager";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -399,6 +399,7 @@ const APP_PAGE_MODULES = {
   "admin-awards": ["admin", "adminUi", "adminAwards"],
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
+  "admin-appearance": ["admin", "adminUi", "adminAppearance"],
   "profile": ["profile"],
   "history": ["archiveHistory"]
 };
@@ -973,6 +974,17 @@ async function renderPage(page) {
 
       app.innerHTML =
         await renderAdminRealityTvPage();
+
+      break;
+
+    case "admin-appearance":
+
+      if (typeof renderAdminAppearancePage !== "function") {
+        throw new Error("Appearance Manager script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderAdminAppearancePage();
 
       break;
 

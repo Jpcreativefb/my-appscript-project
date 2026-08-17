@@ -1,0 +1,15 @@
+backend/engines/AppearanceEngine.js
+frontend/api.js
+frontend/js/api.js
+frontend/app.js
+frontend/js/app.js
+frontend/app.html
+frontend/sw.js
+frontend/js/pages/admin.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/picks.css
+frontend/css/appearance.css
+tests/appearance_manager_confidence_v1217d_tests.js
+APPEARANCE_MANAGER_CONFIDENCE_V1_2_17D.md
+CHANGED_FILES_V1_2_17D.txt

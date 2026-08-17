@@ -1676,6 +1676,43 @@ async function apiAdminCloneGameSetup(payload) {
 }
 
 
+
+/* ======================
+   ADMIN: APPEARANCE PACKS / THEMES
+====================== */
+
+async function apiAdminSetupAppearanceSystem() {
+  return apiPost("adminSetupAppearanceSystem", {});
+}
+
+async function apiAdminGetAppearanceDashboard(gameId) {
+  return api("adminGetAppearanceDashboard", { gameId: gameId || "" });
+}
+
+async function apiAdminSaveAppearanceImagePack(payload) {
+  return apiPost("adminSaveAppearanceImagePack", payload || {});
+}
+
+async function apiAdminSaveAppearanceImagePackItem(payload) {
+  return apiPost("adminSaveAppearanceImagePackItem", payload || {});
+}
+
+async function apiAdminSaveAppearanceThemePack(payload) {
+  return apiPost("adminSaveAppearanceThemePack", payload || {});
+}
+
+async function apiAdminSaveGameAppearance(payload) {
+  return apiPost("adminSaveGameAppearance", payload || {});
+}
+
+async function apiAdminSaveAppearanceOverride(payload) {
+  return apiPost("adminSaveAppearanceOverride", payload || {});
+}
+
+async function apiGetGameAppearance(gameId) {
+  return api("getGameAppearance", { gameId: gameId || getFrontendGameId() || "" });
+}
+
 /* ======================
    ADMIN: REALITY TV SEASON MANAGER
 ====================== */
