@@ -1057,6 +1057,10 @@ function doGet(e) {
 
     }
 
+    if (action === "adminSetupAppearanceSystem") {
+      return json(apiAdminSetupAppearanceSystem(params));
+    }
+
     if (action === "adminGetAppearanceDashboard") {
       return json(apiAdminGetAppearanceDashboard(params));
     }

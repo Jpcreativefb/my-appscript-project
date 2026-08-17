@@ -82,6 +82,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "adminSummary",
     "adminGetGames",
     "adminGetGameSetup",
+    "adminSetupAppearanceSystem",
+    "adminGetAppearanceDashboard",
     "adminAwardsSearchExternalMarkets",
     "adminGetRealityTvDashboard",
     "adminGetRealityTvDashboardSummary",
@@ -1682,7 +1684,10 @@ async function apiAdminCloneGameSetup(payload) {
 ====================== */
 
 async function apiAdminSetupAppearanceSystem() {
-  return apiPost("adminSetupAppearanceSystem", {});
+  // Setup is intentionally sent directly to Apps Script via JSONP/GET.
+  // The upload proxy can return an HTML error page when Google Sheets is slow,
+  // which surfaced to admins as “Server returned an invalid response.”
+  return api("adminSetupAppearanceSystem", { singleStep: "true" });
 }
 
 async function apiAdminGetAppearanceDashboard(gameId) {

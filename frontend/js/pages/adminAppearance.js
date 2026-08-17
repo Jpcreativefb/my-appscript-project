@@ -192,13 +192,26 @@ async function adminAppearanceInitialLoad_() {
   if (!dashboard || dashboard.success === false) {
     throw new Error(dashboard && (dashboard.message || dashboard.error) || "Could not load appearance system.");
   }
-  if (dashboard.setupComplete !== true) {
+
+  // Large production workbooks can time out when several new sheets are inserted
+  // in one Apps Script execution. Create one missing Appearance sheet at a time,
+  // then re-check readiness before continuing.
+  for (let setupAttempt = 0; dashboard.setupComplete !== true && setupAttempt < 8; setupAttempt++) {
     const setup = await apiAdminSetupAppearanceSystem();
     if (!setup || setup.success === false) {
       throw new Error(setup && (setup.message || setup.error) || "Could not initialize appearance system.");
     }
+
     dashboard = await apiAdminGetAppearanceDashboard("");
+    if (!dashboard || dashboard.success === false) {
+      throw new Error(dashboard && (dashboard.message || dashboard.error) || "Could not reload appearance system.");
+    }
   }
+
+  if (dashboard.setupComplete !== true) {
+    throw new Error("Appearance setup is incomplete. Refresh Appearance Manager to continue setup.");
+  }
+
   ADMIN_APPEARANCE_STATE.dashboard = dashboard;
 
   const saved = String(localStorage.getItem("appearanceManagerGameId") || "").trim();

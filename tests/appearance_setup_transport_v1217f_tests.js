@@ -1,0 +1,23 @@
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const root = path.resolve(__dirname, '..');
+const apiServer = fs.readFileSync(path.join(root, 'backend/Api.js'), 'utf8');
+const engine = fs.readFileSync(path.join(root, 'backend/engines/AppearanceEngine.js'), 'utf8');
+const apiClient = fs.readFileSync(path.join(root, 'frontend/js/api.js'), 'utf8');
+const apiMirror = fs.readFileSync(path.join(root, 'frontend/api.js'), 'utf8');
+const manager = fs.readFileSync(path.join(root, 'frontend/js/pages/adminAppearance.js'), 'utf8');
+const sw = fs.readFileSync(path.join(root, 'frontend/sw.js'), 'utf8');
+
+assert(apiServer.includes('if (action === "adminSetupAppearanceSystem")') && apiServer.includes('apiAdminSetupAppearanceSystem(params)'), 'GET router must expose Appearance setup.');
+assert(apiClient.includes('return api("adminSetupAppearanceSystem", { singleStep: "true" });'), 'Appearance setup must bypass upload proxy.');
+assert.strictEqual(apiClient, apiMirror, 'Frontend API mirrors must stay synchronized.');
+assert(apiClient.includes('"adminSetupAppearanceSystem"') && apiClient.includes('"adminGetAppearanceDashboard"'), 'Appearance startup actions must use long timeout coverage.');
+assert(engine.includes('function appearanceSpreadsheet_()'), 'Appearance spreadsheet access retry helper missing.');
+assert(engine.includes('const singleStep = appearanceBool_(payload.singleStep, false);'), 'Staged setup mode missing.');
+assert(engine.includes('createdSheet: spec.name'), 'Staged setup should report the created sheet.');
+assert(engine.includes('const seedComplete = !!appearanceFindById_'), 'Dashboard must not report setup complete until built-in packs/themes are seeded.');
+assert(manager.includes('setupAttempt < 8'), 'Appearance Manager must repeat staged setup until ready.');
+assert(manager.includes('dashboard.setupComplete !== true'), 'Appearance Manager must verify setup completion.');
+assert(sw.includes('v1217f-appearance-setup'), 'Service worker cache must be bumped for v1.2.17f.');
+console.log('PASS: Appearance setup transport/reliability v1.2.17f tests.');

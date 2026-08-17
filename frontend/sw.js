@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217b-confidence-live";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217b-confidence-live-v1217f-appearance-setup";
 
 const APP_SHELL = [
   "./",
@@ -99,3 +99,5 @@ async function networkFirst(request) {
 // "./css/archive-history.css"
 
 // v1.2.17d: Appearance Manager + Confidence Image/Theme integration.
+
+// v1.2.17f: Appearance setup transport/reliability hotfix.

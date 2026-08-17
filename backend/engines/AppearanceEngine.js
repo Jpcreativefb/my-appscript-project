@@ -21,6 +21,21 @@ const APPEARANCE_THEME_PACKS_SHEET = "AppearanceThemePacks";
 const APPEARANCE_GAME_ASSIGNMENTS_SHEET = "GameAppearance";
 const APPEARANCE_OVERRIDES_SHEET = "AppearanceOverrides";
 
+function appearanceSpreadsheet_() {
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const spreadsheet = SpreadsheetApp.getActive();
+      if (spreadsheet) return spreadsheet;
+    } catch (err) {
+      lastError = err;
+    }
+    if (attempt < 2) Utilities.sleep(350 * (attempt + 1));
+  }
+  if (lastError) throw lastError;
+  throw new Error("Could not access the Awards App spreadsheet.");
+}
+
 const APPEARANCE_IMAGE_PACK_HEADERS = [
   "PackId",
   "PackName",
@@ -211,8 +226,9 @@ function appearanceEnsureSheet_(spreadsheet, sheetName, headers) {
   return sheet;
 }
 
-function appearanceReadObjects_(sheetName) {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+function appearanceReadObjects_(sheetName, spreadsheet) {
+  const ss = spreadsheet || appearanceSpreadsheet_();
+  const sheet = ss.getSheetByName(sheetName);
   if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
   return appearanceSheetRowsToObjects_(
     sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues()
@@ -266,95 +282,139 @@ function appearanceUpsertObject_(sheet, keyMap, objectValue) {
   return sheet.getLastRow();
 }
 
-function appearanceSetupSystem() {
-  const ss = SpreadsheetApp.getActive();
-  const imagePacks = appearanceEnsureSheet_(ss, APPEARANCE_IMAGE_PACKS_SHEET, APPEARANCE_IMAGE_PACK_HEADERS);
-  appearanceEnsureSheet_(ss, APPEARANCE_IMAGE_ITEMS_SHEET, APPEARANCE_IMAGE_ITEM_HEADERS);
-  const themes = appearanceEnsureSheet_(ss, APPEARANCE_THEME_PACKS_SHEET, APPEARANCE_THEME_PACK_HEADERS);
-  appearanceEnsureSheet_(ss, APPEARANCE_GAME_ASSIGNMENTS_SHEET, APPEARANCE_GAME_ASSIGNMENT_HEADERS);
-  appearanceEnsureSheet_(ss, APPEARANCE_OVERRIDES_SHEET, APPEARANCE_OVERRIDE_HEADERS);
+function appearanceSetupSystem(payload) {
+  payload = payload || {};
+  const singleStep = appearanceBool_(payload.singleStep, false);
+  const lock = LockService.getScriptLock();
 
-  const now = new Date();
-
-  if (!appearanceFindRow_(imagePacks, { PackId: "sports-default" })) {
-    appearanceUpsertObject_(imagePacks, { PackId: "sports-default" }, {
-      PackId: "sports-default",
-      PackName: "Sports Default Logos",
-      ScopeType: "sports",
-      ScopeValue: "",
-      Description: "Uses the existing sports/provider image unless a pack item or override is assigned.",
-      Active: true,
-      IsDefault: false,
-      CreatedAt: now,
-      UpdatedAt: now
-    });
+  if (!lock.tryLock(10000)) {
+    return {
+      success: false,
+      setupComplete: false,
+      message: "Appearance setup is already running. Try again in a moment."
+    };
   }
 
-  if (!appearanceFindRow_(themes, { ThemePackId: "app-default" })) {
-    appearanceUpsertObject_(themes, { ThemePackId: "app-default" }, {
-      ThemePackId: "app-default",
-      ThemeName: "App Default",
-      Description: "Base Awards App appearance. Individual game types keep their current styling until a theme opts in.",
-      BaseThemeId: "",
-      ThemeJSON: "{}",
-      Active: true,
-      IsDefault: true,
-      CreatedAt: now,
-      UpdatedAt: now
-    });
-  }
+  try {
+    const ss = appearanceSpreadsheet_();
+    const specs = [
+      { name: APPEARANCE_IMAGE_PACKS_SHEET, headers: APPEARANCE_IMAGE_PACK_HEADERS },
+      { name: APPEARANCE_IMAGE_ITEMS_SHEET, headers: APPEARANCE_IMAGE_ITEM_HEADERS },
+      { name: APPEARANCE_THEME_PACKS_SHEET, headers: APPEARANCE_THEME_PACK_HEADERS },
+      { name: APPEARANCE_GAME_ASSIGNMENTS_SHEET, headers: APPEARANCE_GAME_ASSIGNMENT_HEADERS },
+      { name: APPEARANCE_OVERRIDES_SHEET, headers: APPEARANCE_OVERRIDE_HEADERS }
+    ];
 
-  if (!appearanceFindRow_(themes, { ThemePackId: "confidence-pro" })) {
-    appearanceUpsertObject_(themes, { ThemePackId: "confidence-pro" }, {
-      ThemePackId: "confidence-pro",
-      ThemeName: "Confidence Pro",
-      Description: "Compact scoreboard-style Confidence game presentation.",
-      BaseThemeId: "app-default",
-      ThemeJSON: JSON.stringify({
-        density: "compact",
-        team: {
-          cityScale: "small",
-          nameScale: "large",
-          imageVariant: "logo",
-          selectedTreatment: "full-color",
-          unselectedTreatment: "grayscale"
-        },
-        result: {
-          correctTreatment: "green-outline",
-          incorrectTreatment: "red-outline"
-        },
-        row: {
-          corners: "soft",
-          spacing: "tight"
-        },
-        colors: {
-          accent: "#60a5fa",
-          surface: "#0f172a",
-          text: "#ffffff",
-          muted: "#94a3b8",
-          correct: "#22c55e",
-          incorrect: "#ef4444",
-          live: "#ef4444"
-        }
-      }),
-      Active: true,
-      IsDefault: false,
-      CreatedAt: now,
-      UpdatedAt: now
+    const missingBefore = specs.filter(function(spec) {
+      return !ss.getSheetByName(spec.name);
     });
-  }
 
-  return {
-    success: true,
-    message: "Appearance system ready.",
-    sheets: [
-      APPEARANCE_IMAGE_PACKS_SHEET,
-      APPEARANCE_IMAGE_ITEMS_SHEET,
-      APPEARANCE_THEME_PACKS_SHEET,
-      APPEARANCE_GAME_ASSIGNMENTS_SHEET,
-      APPEARANCE_OVERRIDES_SHEET
-    ]
-  };
+    if (singleStep && missingBefore.length) {
+      const spec = missingBefore[0];
+      appearanceEnsureSheet_(ss, spec.name, spec.headers);
+
+      const remaining = specs.filter(function(item) {
+        return !ss.getSheetByName(item.name);
+      }).map(function(item) { return item.name; });
+
+      if (remaining.length) {
+        return {
+          success: true,
+          setupComplete: false,
+          createdSheet: spec.name,
+          remainingSheets: remaining,
+          message: "Appearance setup created " + spec.name + "."
+        };
+      }
+      // The last storage sheet was just created. Fall through and seed the
+      // built-in image/theme packs in the same request before reporting ready.
+    }
+
+    specs.forEach(function(spec) {
+      appearanceEnsureSheet_(ss, spec.name, spec.headers);
+    });
+
+    const imagePacks = ss.getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
+    const themes = ss.getSheetByName(APPEARANCE_THEME_PACKS_SHEET);
+    const now = new Date();
+
+    if (!appearanceFindRow_(imagePacks, { PackId: "sports-default" })) {
+      appearanceUpsertObject_(imagePacks, { PackId: "sports-default" }, {
+        PackId: "sports-default",
+        PackName: "Sports Default Logos",
+        ScopeType: "sports",
+        ScopeValue: "",
+        Description: "Uses the existing sports/provider image unless a pack item or override is assigned.",
+        Active: true,
+        IsDefault: false,
+        CreatedAt: now,
+        UpdatedAt: now
+      });
+    }
+
+    if (!appearanceFindRow_(themes, { ThemePackId: "app-default" })) {
+      appearanceUpsertObject_(themes, { ThemePackId: "app-default" }, {
+        ThemePackId: "app-default",
+        ThemeName: "App Default",
+        Description: "Base Awards App appearance. Individual game types keep their current styling until a theme opts in.",
+        BaseThemeId: "",
+        ThemeJSON: "{}",
+        Active: true,
+        IsDefault: true,
+        CreatedAt: now,
+        UpdatedAt: now
+      });
+    }
+
+    if (!appearanceFindRow_(themes, { ThemePackId: "confidence-pro" })) {
+      appearanceUpsertObject_(themes, { ThemePackId: "confidence-pro" }, {
+        ThemePackId: "confidence-pro",
+        ThemeName: "Confidence Pro",
+        Description: "Compact scoreboard-style Confidence game presentation.",
+        BaseThemeId: "app-default",
+        ThemeJSON: JSON.stringify({
+          density: "compact",
+          team: {
+            cityScale: "small",
+            nameScale: "large",
+            imageVariant: "logo",
+            selectedTreatment: "full-color",
+            unselectedTreatment: "grayscale"
+          },
+          result: {
+            correctTreatment: "green-outline",
+            incorrectTreatment: "red-outline"
+          },
+          row: {
+            corners: "soft",
+            spacing: "tight"
+          },
+          colors: {
+            accent: "#60a5fa",
+            surface: "#0f172a",
+            text: "#ffffff",
+            muted: "#94a3b8",
+            correct: "#22c55e",
+            incorrect: "#ef4444",
+            live: "#ef4444"
+          }
+        }),
+        Active: true,
+        IsDefault: false,
+        CreatedAt: now,
+        UpdatedAt: now
+      });
+    }
+
+    return {
+      success: true,
+      setupComplete: true,
+      message: "Appearance system ready.",
+      sheets: specs.map(function(spec) { return spec.name; })
+    };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function appearanceIsActiveRow_(row) {
@@ -512,11 +572,12 @@ function appearanceGetEntityOverrideFromRows_(gameId, entityType, entityId, rows
 
 function appearanceGetRuntimeBundle(gameId) {
   const normalizedGameId = appearanceString_(gameId);
-  const imagePacks = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET);
-  const imagePackItems = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET);
-  const themePacks = appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET);
-  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
-  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET);
+  const ss = appearanceSpreadsheet_();
+  const imagePacks = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, ss);
+  const imagePackItems = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET, ss);
+  const themePacks = appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET, ss);
+  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET, ss);
+  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET, ss);
   const assignment = appearanceGetGameAssignmentFromRows_(normalizedGameId, assignments);
   const themeResult = appearanceResolveThemeFromRows_({
     themePacks: themePacks,
@@ -574,7 +635,7 @@ function appearanceResolveTheme(gameId, entityType, entityId) {
 
 function adminGetAppearanceDashboard(payload) {
   payload = payload || {};
-  const ss = SpreadsheetApp.getActive();
+  const ss = appearanceSpreadsheet_();
   const requiredSheets = [
     APPEARANCE_IMAGE_PACKS_SHEET,
     APPEARANCE_IMAGE_ITEMS_SHEET,
@@ -582,10 +643,10 @@ function adminGetAppearanceDashboard(payload) {
     APPEARANCE_GAME_ASSIGNMENTS_SHEET,
     APPEARANCE_OVERRIDES_SHEET
   ];
-  const setupComplete = requiredSheets.every(function(name) { return !!ss.getSheetByName(name); });
+  const sheetsComplete = requiredSheets.every(function(name) { return !!ss.getSheetByName(name); });
   const gameId = appearanceString_(payload.gameId);
 
-  if (!setupComplete) {
+  if (!sheetsComplete) {
     return {
       success: true,
       setupComplete: false,
@@ -597,15 +658,21 @@ function adminGetAppearanceDashboard(payload) {
     };
   }
 
-  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
-  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET);
+  const imagePacks = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, ss);
+  const imagePackItems = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET, ss);
+  const themePacks = appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET, ss);
+  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET, ss);
+  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET, ss);
+  const seedComplete = !!appearanceFindById_(imagePacks, "PackId", "sports-default") &&
+    !!appearanceFindById_(themePacks, "ThemePackId", "app-default") &&
+    !!appearanceFindById_(themePacks, "ThemePackId", "confidence-pro");
 
   return {
     success: true,
-    setupComplete: true,
-    imagePacks: appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET),
-    imagePackItems: appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET),
-    themePacks: appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET),
+    setupComplete: seedComplete,
+    imagePacks: imagePacks,
+    imagePackItems: imagePackItems,
+    themePacks: themePacks,
     gameAppearance: gameId ? appearanceGetGameAssignmentFromRows_(gameId, assignments) : {},
     overrides: gameId ? overrides.filter(function(row) {
       return appearanceNormalizeId_(row.GameId) === appearanceNormalizeId_(gameId);
@@ -616,7 +683,7 @@ function adminGetAppearanceDashboard(payload) {
 function adminSaveAppearanceImagePack(payload) {
   payload = payload || {};
   appearanceSetupSystem();
-  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
+  const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
   const packName = appearanceString_(payload.packName || payload.PackName);
   const packId = appearanceString_(payload.packId || payload.PackId) || appearanceSafeGeneratedId_("img", packName);
   if (!packName) throw new Error("Image pack name is required.");
@@ -641,7 +708,7 @@ function adminSaveAppearanceImagePack(payload) {
 function adminSaveAppearanceImagePackItem(payload) {
   payload = payload || {};
   appearanceSetupSystem();
-  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_IMAGE_ITEMS_SHEET);
+  const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_IMAGE_ITEMS_SHEET);
   const packId = appearanceString_(payload.packId || payload.PackId);
   const entityType = appearanceString_(payload.entityType || payload.EntityType);
   const entityId = appearanceString_(payload.entityId || payload.EntityId);
@@ -674,7 +741,7 @@ function adminSaveAppearanceImagePackItem(payload) {
 function adminSaveAppearanceThemePack(payload) {
   payload = payload || {};
   appearanceSetupSystem();
-  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_THEME_PACKS_SHEET);
+  const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_THEME_PACKS_SHEET);
   const themeName = appearanceString_(payload.themeName || payload.ThemeName);
   const themePackId = appearanceString_(payload.themePackId || payload.ThemePackId) || appearanceSafeGeneratedId_("theme", themeName);
   if (!themeName) throw new Error("Theme pack name is required.");
@@ -699,7 +766,7 @@ function adminSaveAppearanceThemePack(payload) {
 function adminSaveGameAppearance(payload) {
   payload = payload || {};
   appearanceSetupSystem();
-  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
+  const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
   const gameId = appearanceString_(payload.gameId || payload.GameId);
   if (!gameId) throw new Error("GameId is required.");
 
@@ -720,7 +787,7 @@ function adminSaveGameAppearance(payload) {
 function adminSaveAppearanceOverride(payload) {
   payload = payload || {};
   appearanceSetupSystem();
-  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_OVERRIDES_SHEET);
+  const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_OVERRIDES_SHEET);
   const gameId = appearanceString_(payload.gameId || payload.GameId);
   const entityType = appearanceString_(payload.entityType || payload.EntityType);
   const entityId = appearanceString_(payload.entityId || payload.EntityId);
