@@ -1,0 +1,11 @@
+CONFIDENCE_COMPACT_BATCH_V1_2_17A.md
+CHANGED_FILES_V1_2_17A.txt
+backend/Api.js
+backend/engines/PicksEngine.js
+backend/engines/SportsConfidenceBuilderEngine.js
+frontend/api.js
+frontend/js/api.js
+frontend/js/pages/picks.js
+frontend/css/picks.css
+frontend/sw.js
+tests/confidence_compact_batch_v1217a_tests.js

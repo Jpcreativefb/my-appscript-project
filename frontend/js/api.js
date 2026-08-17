@@ -675,6 +675,19 @@ async function apiSavePick(payload) {
 
 }
 
+async function apiSaveConfidencePicksBatch(payload) {
+
+  payload = payload || {};
+
+  return apiPost("saveConfidencePicksBatch", {
+    username: payload.username,
+    gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    picks: Array.isArray(payload.picks) ? payload.picks : []
+  });
+
+}
+
 async function apiGetRealityTvPlayerStats(gameId) {
 
   const session = getSession();

@@ -84,6 +84,27 @@ function doPost(e) {
       return json(apiSaveEditableProfile(body));
     }
 
+    if (action === "saveConfidencePicksBatch") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "makePicks",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(saveConfidencePicksBatch({
+        username: body.username,
+        gameId: postGameId,
+        picks: Array.isArray(body.picks) ? body.picks : []
+      }));
+    }
+
     if (action === "savePick") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -508,6 +529,7 @@ function doGet(e) {
       action === "saveUserProfile" ||
       action === "uploadProfileAvatar" ||
       action === "savePick" ||
+      action === "saveConfidencePicksBatch" ||
       action === "saveBet" ||
       action === "removeBet" ||
       action === "saveSeasonAnchorPick" ||

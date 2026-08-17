@@ -842,6 +842,502 @@ function isFixedPointPredictionEnabledForGame_(gameConfig) {
 
 }
 
+
+/* =========================================================
+   CONFIDENCE BATCH SAVE — v1.2.17a
+   Saves an entire Confidence card in one request so players
+   can rank the slate locally before committing it.
+========================================================= */
+
+function confidenceBatchUsesPoints_(categoryConfig, isConfidenceGame) {
+
+  categoryConfig = categoryConfig || {};
+
+  const scoreMode =
+    typeof normalizeCategoryScoreMode_ === "function"
+      ? normalizeCategoryScoreMode_(categoryConfig.scoreMode)
+      : normalizeLower_(categoryConfig.scoreMode || "correct-pick");
+
+  return (
+    scoreMode === "confidence-points" ||
+    (
+      isConfidenceGame === true &&
+      scoreMode === "correct-pick"
+    )
+  );
+
+}
+
+function confidenceBatchWriteExistingRows_(sheet, updates, columnCount) {
+
+  updates = Array.isArray(updates) ? updates.slice() : [];
+  if (!updates.length) return 0;
+
+  updates.sort(function(a, b) {
+    return Number(a.rowNumber || 0) - Number(b.rowNumber || 0);
+  });
+
+  let written = 0;
+  let index = 0;
+
+  while (index < updates.length) {
+
+    const first = updates[index];
+    const startRow = Number(first.rowNumber || 0);
+    const rows = [first.row];
+    let expectedRow = startRow + 1;
+    index++;
+
+    while (
+      index < updates.length &&
+      Number(updates[index].rowNumber || 0) === expectedRow
+    ) {
+      rows.push(updates[index].row);
+      expectedRow++;
+      index++;
+    }
+
+    sheet
+      .getRange(startRow, 1, rows.length, columnCount)
+      .setValues(rows);
+
+    written += rows.length;
+
+  }
+
+  return written;
+
+}
+
+function saveConfidencePicksBatch(payload) {
+
+  let lock = null;
+  let lockAcquired = false;
+
+  try {
+
+    payload = payload || {};
+
+    const username = normalizeString_(payload.username);
+    const gameId = normalizeString_(payload.gameId || getDefaultGameId());
+    const requested = Array.isArray(payload.picks) ? payload.picks : [];
+
+    if (!username || !gameId) {
+      return {
+        success: false,
+        message: "Username and gameId are required"
+      };
+    }
+
+    if (!requested.length) {
+      return {
+        success: false,
+        message: "No Confidence picks were supplied"
+      };
+    }
+
+    validateGameId(gameId);
+
+    const gameConfig =
+      typeof getGameRuntimeConfig === "function"
+        ? getGameRuntimeConfig(gameId)
+        : getGame(gameId);
+
+    const isConfidenceGame = !!(
+      gameConfig &&
+      (
+        normalizeLower_(gameConfig.type) === "confidence" ||
+        gameConfig.confidenceEnabled === true
+      )
+    );
+
+    if (!isConfidenceGame) {
+      return {
+        success: false,
+        message: "Confidence gameplay is not enabled for this game"
+      };
+    }
+
+    const settings =
+      typeof getCategorySettingsCached === "function"
+        ? getCategorySettingsCached(gameId)
+        : getCategorySettings(gameId);
+
+    const categories =
+      typeof getCategoriesCached === "function"
+        ? getCategoriesCached(gameId)
+        : getCategories(gameId);
+
+    const categoryMap = {};
+    (categories || []).forEach(function(category) {
+      categoryMap[normalizeLower_(category && category.id)] = category;
+    });
+
+    const resolutionMap =
+      typeof getCategoryResultsResolutionMap === "function"
+        ? getCategoryResultsResolutionMap(gameId)
+        : (
+            typeof getCategoryResultsWinnerMap === "function"
+              ? getCategoryResultsWinnerMap(gameId)
+              : {}
+          );
+
+    const normalizedItems = [];
+    const seenCategories = {};
+
+    requested.forEach(function(item) {
+
+      item = item || {};
+
+      const categoryId = normalizeLower_(item.categoryId);
+      const nomineeId = normalizeLower_(item.nomineeId);
+      const confidencePoints = normalizeConfidencePoints_(item.confidencePoints);
+
+      if (!categoryId || !nomineeId || confidencePoints <= 0) {
+        throw new Error(
+          "Every Confidence row must include categoryId, nomineeId, and confidencePoints"
+        );
+      }
+
+      if (seenCategories[categoryId]) {
+        throw new Error("Duplicate Confidence category in batch: " + categoryId);
+      }
+
+      seenCategories[categoryId] = true;
+      normalizedItems.push({
+        categoryId: categoryId,
+        nomineeId: nomineeId,
+        confidencePoints: confidencePoints
+      });
+
+    });
+
+    lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    lockAcquired = true;
+
+    const sheet = getPicksSheet_();
+    const data = sheet.getDataRange().getValues();
+
+    if (!data || !data.length) {
+      throw new Error("Picks sheet empty");
+    }
+
+    const headers = data[0];
+    const col = getPicksColumnMap_(headers);
+    validatePickColumns_(col);
+
+    if (col.confidencePoints === -1) {
+      throw new Error("Picks sheet is missing ConfidencePoints");
+    }
+
+    const userSearch = normalizeLower_(username);
+    const existingByCategory = {};
+
+    for (let rowIndex = 1; rowIndex < data.length; rowIndex++) {
+
+      const row = data[rowIndex];
+
+      if (normalizeString_(row[col.gameId]) !== gameId) continue;
+      if (normalizeLower_(row[col.username]) !== userSearch) continue;
+
+      const rowCategoryId = normalizeLower_(row[col.category]);
+      if (!rowCategoryId) continue;
+
+      existingByCategory[rowCategoryId] = {
+        rowNumber: rowIndex + 1,
+        row: row.slice()
+      };
+
+    }
+
+    /*
+      Build the final Confidence assignment before validating duplicates.
+      This is what allows a player to swap 16 and 15 in one Save All request;
+      sequential savePick() calls cannot safely perform that swap.
+    */
+    const finalConfidenceByCategory = {};
+
+    Object.keys(existingByCategory).forEach(function(categoryId) {
+
+      const categoryConfig = settings[categoryId] || {};
+      if (!confidenceBatchUsesPoints_(categoryConfig, true)) return;
+
+      const row = existingByCategory[categoryId].row;
+      const nomineeId = normalizeLower_(row[col.nominee]);
+      const confidencePoints = normalizeConfidencePoints_(row[col.confidencePoints]);
+
+      if (nomineeId && confidencePoints > 0) {
+        finalConfidenceByCategory[categoryId] = confidencePoints;
+      }
+
+    });
+
+    const validationMeta = {};
+
+    normalizedItems.forEach(function(item) {
+
+      const categoryId = item.categoryId;
+      const categoryConfig = settings[categoryId] || null;
+      const category = categoryMap[categoryId] || null;
+
+      if (!categoryConfig || !category) {
+        throw new Error("Invalid Confidence category: " + categoryId);
+      }
+
+      if (!confidenceBatchUsesPoints_(categoryConfig, true)) {
+        throw new Error("This question does not use Confidence points: " + categoryId);
+      }
+
+      const currentResolution =
+        typeof getHybridCategoryResolution_ === "function"
+          ? getHybridCategoryResolution_(categoryId, categoryConfig, resolutionMap)
+          : {
+              resolved: Boolean(categoryConfig.winnerNomineeId)
+            };
+
+      if (currentResolution.resolved) {
+        throw new Error("This question has already been settled: " + categoryId);
+      }
+
+      if (isCategoryConfigLocked_(categoryConfig)) {
+        throw new Error("This game has already started and is locked: " + categoryId);
+      }
+
+      const nomineeExists = (category.nominees || []).some(function(nominee) {
+        return normalizeLower_(nominee && nominee.id) === item.nomineeId;
+      });
+
+      if (!nomineeExists) {
+        throw new Error("Invalid nominee for Confidence category: " + categoryId);
+      }
+
+      const existing = existingByCategory[categoryId] || null;
+      const previousNominee = existing
+        ? normalizeLower_(existing.row[col.nominee])
+        : "";
+      const previousConfidencePoints = existing
+        ? normalizeConfidencePoints_(existing.row[col.confidencePoints])
+        : 0;
+      const originalNominee = existing
+        ? (
+            normalizeLower_(existing.row[col.original]) ||
+            previousNominee ||
+            item.nomineeId
+          )
+        : item.nomineeId;
+      const changeCount = existing
+        ? Number(existing.row[col.changes]) || 0
+        : 0;
+      const isChange = !!(
+        previousNominee &&
+        previousNominee !== item.nomineeId
+      );
+
+      // Confidence cards stay editable until the individual game's lock time.
+      // The kickoff lock, not MaxChanges, is the governing rule.
+
+      validationMeta[categoryId] = {
+        categoryConfig: categoryConfig,
+        existing: existing,
+        previousNominee: previousNominee,
+        previousConfidencePoints: previousConfidencePoints,
+        originalNominee: originalNominee,
+        changeCount: changeCount,
+        isChange: isChange
+      };
+
+      finalConfidenceByCategory[categoryId] = item.confidencePoints;
+
+    });
+
+    const confidenceOwner = {};
+
+    Object.keys(finalConfidenceByCategory).forEach(function(categoryId) {
+
+      const points = normalizeConfidencePoints_(finalConfidenceByCategory[categoryId]);
+      if (points <= 0) return;
+
+      if (
+        confidenceOwner[points] &&
+        confidenceOwner[points] !== categoryId
+      ) {
+        throw new Error(
+          "Confidence " + points + " is assigned more than once. Each number can only be used once."
+        );
+      }
+
+      confidenceOwner[points] = categoryId;
+
+    });
+
+    const now = new Date();
+    const existingUpdates = [];
+    const newRows = [];
+    const results = [];
+    let savedCount = 0;
+
+    normalizedItems.forEach(function(item) {
+
+      const meta = validationMeta[item.categoryId];
+      const existing = meta.existing;
+      const isSamePick = meta.previousNominee === item.nomineeId;
+      const isConfidenceChange =
+        meta.previousConfidencePoints !== item.confidencePoints;
+      const changed = !existing || !isSamePick || isConfidenceChange;
+      const finalChangeCount = meta.isChange
+        ? meta.changeCount + 1
+        : meta.changeCount;
+
+      if (existing && changed) {
+
+        const row = existing.row.slice();
+        row[col.nominee] = item.nomineeId;
+        row[col.lastUpdated] = now;
+        row[col.confidencePoints] = item.confidencePoints;
+
+        if (meta.isChange) {
+          row[col.changes] = finalChangeCount;
+        }
+
+        if (!normalizeLower_(row[col.original])) {
+          row[col.original] = meta.originalNominee;
+        }
+
+        existingUpdates.push({
+          rowNumber: existing.rowNumber,
+          row: row
+        });
+
+        savedCount++;
+
+      } else if (!existing) {
+
+        const row = new Array(headers.length).fill("");
+        row[col.gameId] = gameId;
+        row[col.timestamp] = now;
+        row[col.username] = username;
+        row[col.category] = item.categoryId;
+        row[col.nominee] = item.nomineeId;
+        row[col.points] = 0;
+        row[col.original] = item.nomineeId;
+        row[col.changes] = 0;
+        row[col.lastUpdated] = now;
+        row[col.confidencePoints] = item.confidencePoints;
+
+        if (col.stakePoints !== -1) row[col.stakePoints] = 0;
+
+        newRows.push(row);
+        savedCount++;
+
+      }
+
+      results.push({
+        success: true,
+        categoryId: item.categoryId,
+        nomineeId: item.nomineeId,
+        confidencePoints: item.confidencePoints,
+        originalNomineeId: meta.originalNominee,
+        changeCount: finalChangeCount,
+        pickMeta: buildPickMeta_(
+          item.categoryId,
+          item.nomineeId,
+          meta.categoryConfig,
+          finalChangeCount,
+          meta.originalNominee
+        )
+      });
+
+    });
+
+    confidenceBatchWriteExistingRows_(
+      sheet,
+      existingUpdates,
+      headers.length
+    );
+
+    let newStartRow = 0;
+
+    if (newRows.length) {
+
+      newStartRow = sheet.getLastRow() + 1;
+      sheet
+        .getRange(newStartRow, 1, newRows.length, headers.length)
+        .setValues(newRows);
+
+      if (
+        typeof normalizedStorageGetIndexEntry_ === "function" &&
+        typeof normalizedStorageUpsertIndexEntry_ === "function"
+      ) {
+        try {
+          const prior = normalizedStorageGetIndexEntry_("Picks", gameId);
+          const rowNumbers = prior && Array.isArray(prior.rowNumbers)
+            ? prior.rowNumbers.slice()
+            : [];
+
+          for (let index = 0; index < newRows.length; index++) {
+            const rowNumber = newStartRow + index;
+            if (rowNumbers.indexOf(rowNumber) === -1) rowNumbers.push(rowNumber);
+          }
+
+          normalizedStorageUpsertIndexEntry_({
+            entityType: "Picks",
+            gameId: gameId,
+            sheetName: PICKS_SHEET,
+            rowNumbers: rowNumbers
+          });
+        } catch (indexError) {
+          Logger.log("Confidence batch index update skipped: " + indexError);
+        }
+      }
+
+    }
+
+    SpreadsheetApp.flush();
+
+    if (lockAcquired) {
+      lock.releaseLock();
+      lockAcquired = false;
+    }
+
+    if (
+      typeof AppCache !== "undefined" &&
+      AppCache &&
+      typeof AppCache.clearPicksCaches === "function"
+    ) {
+      AppCache.clearPicksCaches(gameId, username);
+    } else if (typeof clearPicksCaches === "function") {
+      clearPicksCaches(gameId, username);
+    }
+
+    return {
+      success: true,
+      gameId: gameId,
+      savedCount: savedCount,
+      processedCount: results.length,
+      results: results
+    };
+
+  } catch (err) {
+
+    Logger.log(
+      "🚨 saveConfidencePicksBatch ERROR | " +
+      err.message
+    );
+
+    return {
+      success: false,
+      message: err.message
+    };
+
+  } finally {
+
+    if (lockAcquired && lock) lock.releaseLock();
+
+  }
+
+}
+
 function savePick(payload){
 
   let lock = null;

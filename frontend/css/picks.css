@@ -907,3 +907,422 @@
     flex-direction: column;
   }
 }
+
+/* =========================================================
+   COMPACT CONFIDENCE CARD — v1.2.17a
+   Dense weekly-slate workflow: draft locally, Save All once.
+========================================================= */
+
+.confidence-compact-toolbar {
+  position: sticky;
+  top: 8px;
+  z-index: 12;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 14px;
+  background: rgba(10, 15, 25, 0.96);
+  box-shadow: 0 10px 26px rgba(0,0,0,0.28);
+  backdrop-filter: blur(12px);
+}
+
+.confidence-toolbar-progress {
+  display: grid;
+  gap: 2px;
+}
+
+.confidence-toolbar-progress strong {
+  font-size: 0.9rem;
+  letter-spacing: 0.02em;
+}
+
+.confidence-toolbar-progress span,
+.confidence-toolbar-used {
+  color: rgba(255,255,255,0.7);
+  font-size: 0.74rem;
+  line-height: 1.25;
+}
+
+.confidence-toolbar-used {
+  max-width: 360px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.confidence-save-all-button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(96,165,250,0.85);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #2563eb, #1d4ed8);
+  color: #fff;
+  font-weight: 900;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.confidence-save-all-button:disabled {
+  border-color: rgba(148,163,184,0.25);
+  background: rgba(71,85,105,0.42);
+  color: rgba(255,255,255,0.55);
+  cursor: default;
+}
+
+.confidence-compact-slate {
+  display: grid;
+  gap: 7px;
+}
+
+.confidence-game-row {
+  overflow: hidden;
+  border: 1px solid rgba(148,163,184,0.22);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(30,41,59,0.96), rgba(15,23,42,0.96));
+  color: #fff;
+  box-shadow: 0 5px 14px rgba(0,0,0,0.18);
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.confidence-game-row.is-dirty {
+  border-color: rgba(96,165,250,0.58);
+}
+
+.confidence-game-row.correct {
+  border-color: rgba(34,197,94,0.95);
+  box-shadow: 0 0 0 1px rgba(34,197,94,0.18), 0 5px 14px rgba(0,0,0,0.18);
+}
+
+.confidence-game-row.wrong {
+  border-color: rgba(239,68,68,0.95);
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.18), 0 5px 14px rgba(0,0,0,0.18);
+}
+
+.confidence-game-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 32px minmax(0, 1fr) 92px;
+  gap: 7px;
+  align-items: stretch;
+  min-height: 72px;
+  padding: 7px;
+}
+
+.confidence-team-choice {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 42px;
+  grid-template-rows: auto auto;
+  column-gap: 7px;
+  align-items: center;
+  min-width: 0;
+  min-height: 58px;
+  padding: 6px 7px 6px 9px;
+  border: 1px solid rgba(255,255,255,0.14);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.055);
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease, background 120ms ease, opacity 120ms ease;
+}
+
+.confidence-team-choice:hover:not(:disabled) {
+  border-color: rgba(96,165,250,0.72);
+  background: rgba(59,130,246,0.12);
+}
+
+.confidence-team-choice.selected {
+  border-color: rgba(96,165,250,0.98);
+  background: linear-gradient(135deg, rgba(37,99,235,0.32), rgba(30,64,175,0.16));
+  box-shadow: inset 0 0 0 1px rgba(147,197,253,0.18);
+}
+
+.confidence-game-row.correct .confidence-team-choice.selected {
+  border-color: rgba(34,197,94,1);
+  box-shadow: inset 0 0 0 1px rgba(134,239,172,0.28);
+}
+
+.confidence-game-row.wrong .confidence-team-choice.selected {
+  border-color: rgba(239,68,68,1);
+  box-shadow: inset 0 0 0 1px rgba(252,165,165,0.24);
+}
+
+.confidence-team-choice.not-selected {
+  border-color: rgba(148,163,184,0.12);
+  background: rgba(15,23,42,0.52);
+  color: rgba(255,255,255,0.58);
+}
+
+.confidence-team-choice.not-selected .confidence-team-logo {
+  filter: grayscale(1);
+  opacity: 0.42;
+}
+
+.confidence-team-choice:disabled {
+  cursor: default;
+}
+
+.confidence-team-city {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: rgba(255,255,255,0.62);
+  font-size: 0.64rem;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confidence-team-nickname {
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.05;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confidence-team-visual {
+  position: relative;
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+}
+
+.confidence-team-logo {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+}
+
+.confidence-selected-mark {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  background: #2563eb;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 950;
+}
+
+.confidence-game-row.correct .confidence-selected-mark {
+  background: #16a34a;
+}
+
+.confidence-game-row.wrong .confidence-selected-mark {
+  background: #dc2626;
+}
+
+.confidence-versus {
+  display: grid;
+  place-items: center;
+  color: rgba(255,255,255,0.38);
+  font-size: 0.63rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.confidence-row-value {
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.confidence-row-value > span {
+  color: rgba(255,255,255,0.58);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.confidence-row-value select {
+  width: 100%;
+  min-height: 39px;
+  padding: 5px 7px;
+  border: 1px solid rgba(96,165,250,0.58);
+  border-radius: 8px;
+  background: #0b1220;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 950;
+  text-align: center;
+}
+
+.confidence-row-value select:disabled {
+  border-color: rgba(148,163,184,0.22);
+  color: rgba(255,255,255,0.62);
+  opacity: 1;
+}
+
+.confidence-game-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 9px;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 9px 5px;
+  border-top: 1px solid rgba(148,163,184,0.11);
+  color: rgba(255,255,255,0.56);
+  font-size: 0.66rem;
+  line-height: 1.15;
+}
+
+.confidence-game-question {
+  min-width: 0;
+  overflow: hidden;
+  text-align: center;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.confidence-game-meta strong {
+  color: #93c5fd;
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .confidence-compact-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 7px;
+  }
+
+  .confidence-toolbar-used {
+    display: none;
+  }
+
+  .confidence-game-main {
+    grid-template-columns: minmax(0, 1fr) 24px minmax(0, 1fr) 70px;
+    gap: 4px;
+    min-height: 66px;
+    padding: 5px;
+  }
+
+  .confidence-team-choice {
+    grid-template-columns: minmax(0, 1fr) 34px;
+    column-gap: 4px;
+    min-height: 54px;
+    padding: 5px 5px 5px 7px;
+  }
+
+  .confidence-team-city {
+    font-size: 0.56rem;
+  }
+
+  .confidence-team-nickname {
+    font-size: 0.82rem;
+  }
+
+  .confidence-team-visual {
+    width: 34px;
+    height: 34px;
+  }
+
+  .confidence-team-logo {
+    width: 31px;
+    height: 31px;
+  }
+
+  .confidence-row-value > span {
+    font-size: 0.49rem;
+  }
+
+  .confidence-row-value select {
+    min-height: 35px;
+    padding: 4px;
+    font-size: 0.9rem;
+  }
+
+  .confidence-game-question {
+    display: none;
+  }
+
+  .confidence-game-meta {
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 20px;
+    padding: 2px 7px 4px;
+    font-size: 0.6rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .confidence-compact-toolbar {
+    top: 4px;
+    padding: 8px;
+  }
+
+  .confidence-toolbar-progress span {
+    font-size: 0.65rem;
+  }
+
+  .confidence-save-all-button {
+    padding: 7px 9px;
+    font-size: 0.72rem;
+  }
+
+  .confidence-compact-slate {
+    gap: 5px;
+  }
+
+  .confidence-game-main {
+    grid-template-columns: minmax(0, 1fr) 18px minmax(0, 1fr) 60px;
+  }
+
+  .confidence-team-choice {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    border-radius: 7px;
+  }
+
+  .confidence-team-city {
+    font-size: 0.5rem;
+  }
+
+  .confidence-team-nickname {
+    font-size: 0.7rem;
+    letter-spacing: 0.01em;
+  }
+
+  .confidence-team-visual,
+  .confidence-team-logo {
+    width: 27px;
+    height: 27px;
+  }
+
+  .confidence-versus {
+    font-size: 0.5rem;
+  }
+
+  .confidence-row-value > span {
+    overflow: hidden;
+    font-size: 0;
+  }
+
+  .confidence-row-value > span::after {
+    content: "CONF";
+    font-size: 0.46rem;
+  }
+}

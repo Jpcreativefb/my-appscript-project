@@ -633,7 +633,7 @@ function sportsConfidenceSettingPayload_(score, awardsGameId, categoryId) {
     locked: false,
     winnerNomineeId: "",
     changePenalty: 0,
-    maxChanges: 0,
+    maxChanges: -1,
     lockDateTime: kickoff,
     displayOrder: kickoff ? new Date(kickoff).getTime() : 999,
     groupId: sportsConfidenceString_(score.League) || "sports",

@@ -28,6 +28,10 @@ const PICKS_PENDING_SAVES = {};
 let PICKS_AUTO_ADVANCE_TIMER = null;
 let PICKS_TEMP_OPEN_CATEGORY_ID = "";
 let PICKS_SEASON_ANCHOR_DRAFT_ID = "";
+let PICKS_CONFIDENCE_BASELINE_PICKS = {};
+let PICKS_CONFIDENCE_BASELINE_POINTS = {};
+let PICKS_CONFIDENCE_BASE_SIGNATURE = "";
+let PICKS_CONFIDENCE_BATCH_SAVING = false;
 
 
 function isHybridPicksGame_() {
@@ -459,6 +463,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   PICKS_PAGE_DATA.pickMeta =
     picksResponse.pickMeta || {};
 
+  initializeConfidenceDraft_();
+
   PICKS_PAGE_DATA.seasonAnchor =
     payload.seasonAnchor || null;
 
@@ -646,6 +652,488 @@ function hasStakedPointsCategories() {
   return (PICKS_PAGE_DATA.categories || []).some(
     category => isStakedPointsCategory(category)
   );
+}
+
+
+/* =========================
+   COMPACT CONFIDENCE CARD — v1.2.17a
+========================= */
+
+function getCompactConfidenceCategories_() {
+
+  return (PICKS_PAGE_DATA.categories || []).filter(function(category) {
+    return (
+      isPicksPageCategory(category) &&
+      !category.parentCategoryId &&
+      usesConfidencePointsCategory(category)
+    );
+  });
+
+}
+
+function shouldRenderCompactConfidenceSlate_() {
+
+  if (PICKS_PAGE_DATA.isConfidenceGame !== true) return false;
+  if (hasStakedPointsCategories()) return false;
+
+  const categories = getCompactConfidenceCategories_();
+
+  return !!(
+    categories.length &&
+    categories.every(function(category) {
+      return Array.isArray(category.nominees) && category.nominees.length === 2;
+    })
+  );
+
+}
+
+function confidenceSnapshotSignature_(picks, points) {
+
+  const rows = getCompactConfidenceCategories_()
+    .map(function(category) {
+      const categoryId = category.id;
+      return [
+        normalizeId(categoryId),
+        normalizeId((picks || {})[categoryId] || ""),
+        Number((points || {})[categoryId]) || 0
+      ];
+    })
+    .sort(function(a, b) {
+      return String(a[0]).localeCompare(String(b[0]));
+    });
+
+  return JSON.stringify(rows);
+
+}
+
+function confidenceDraftStorageKey_() {
+
+  const session = PICKS_PAGE_DATA.session || {};
+  return [
+    "awards-confidence-draft-v1217a",
+    String(PICKS_PAGE_DATA.gameId || ""),
+    String(session.username || "").trim().toLowerCase()
+  ].join("::");
+
+}
+
+function initializeConfidenceDraft_() {
+
+  PICKS_CONFIDENCE_BASELINE_PICKS = {};
+  PICKS_CONFIDENCE_BASELINE_POINTS = {};
+  PICKS_CONFIDENCE_BASE_SIGNATURE = "";
+  PICKS_CONFIDENCE_BATCH_SAVING = false;
+
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+
+  getCompactConfidenceCategories_().forEach(function(category) {
+    PICKS_CONFIDENCE_BASELINE_PICKS[category.id] =
+      PICKS_PAGE_DATA.picks[category.id] || "";
+    PICKS_CONFIDENCE_BASELINE_POINTS[category.id] =
+      Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
+  });
+
+  PICKS_CONFIDENCE_BASE_SIGNATURE = confidenceSnapshotSignature_(
+    PICKS_CONFIDENCE_BASELINE_PICKS,
+    PICKS_CONFIDENCE_BASELINE_POINTS
+  );
+
+  if (typeof window === "undefined" || !window.localStorage) return;
+
+  try {
+
+    const raw = window.localStorage.getItem(confidenceDraftStorageKey_());
+    if (!raw) return;
+
+    const draft = JSON.parse(raw);
+
+    if (!draft || draft.baseSignature !== PICKS_CONFIDENCE_BASE_SIGNATURE) {
+      window.localStorage.removeItem(confidenceDraftStorageKey_());
+      return;
+    }
+
+    const draftPicks = draft.picks || {};
+    const draftPoints = draft.confidencePoints || {};
+
+    getCompactConfidenceCategories_().forEach(function(category) {
+
+      if (isCategoryLocked(category)) return;
+
+      const categoryId = category.id;
+      const draftPick = draftPicks[categoryId];
+      const draftConfidence = Number(draftPoints[categoryId]) || 0;
+
+      if (draftPick) PICKS_PAGE_DATA.picks[categoryId] = draftPick;
+      if (draftConfidence > 0) {
+        PICKS_PAGE_DATA.confidencePoints[categoryId] = draftConfidence;
+      }
+
+    });
+
+  } catch (err) {
+    console.warn("Confidence draft restore skipped", err);
+  }
+
+}
+
+function confidenceCategoryIsDirty_(categoryId) {
+
+  return (
+    normalizeId(PICKS_PAGE_DATA.picks[categoryId] || "") !==
+      normalizeId(PICKS_CONFIDENCE_BASELINE_PICKS[categoryId] || "") ||
+    Number(PICKS_PAGE_DATA.confidencePoints[categoryId] || 0) !==
+      Number(PICKS_CONFIDENCE_BASELINE_POINTS[categoryId] || 0)
+  );
+
+}
+
+function getConfidenceDirtyCategories_() {
+
+  if (!shouldRenderCompactConfidenceSlate_()) return [];
+
+  return getCompactConfidenceCategories_().filter(function(category) {
+    return confidenceCategoryIsDirty_(category.id);
+  });
+
+}
+
+function persistConfidenceDraft_() {
+
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+  if (typeof window === "undefined" || !window.localStorage) return;
+
+  try {
+
+    const key = confidenceDraftStorageKey_();
+    const dirty = getConfidenceDirtyCategories_();
+
+    if (!dirty.length) {
+      window.localStorage.removeItem(key);
+      return;
+    }
+
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        baseSignature: PICKS_CONFIDENCE_BASE_SIGNATURE,
+        picks: Object.assign({}, PICKS_PAGE_DATA.picks || {}),
+        confidencePoints: Object.assign({}, PICKS_PAGE_DATA.confidencePoints || {}),
+        savedAt: new Date().toISOString()
+      })
+    );
+
+  } catch (err) {
+    console.warn("Confidence draft persistence skipped", err);
+  }
+
+}
+
+function splitConfidenceTeamName_(name) {
+
+  const words = String(name || "Team")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+
+  if (words.length <= 1) {
+    return {
+      city: "",
+      nickname: words[0] || "Team"
+    };
+  }
+
+  return {
+    city: words.slice(0, -1).join(" "),
+    nickname: words[words.length - 1]
+  };
+
+}
+
+function formatCompactConfidenceLock_(category) {
+
+  if (isCategoryLocked(category)) return "LOCKED";
+
+  const raw = category && category.lockDateTime;
+  if (!raw) return "Open for picks";
+
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return "Open for picks";
+
+  return "Locks " + date.toLocaleString([], {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+}
+
+function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, locked) {
+
+  const selected =
+    normalizeId(selectedNomineeId) === normalizeId(nominee && nominee.id);
+  const hasSelection = Boolean(selectedNomineeId);
+  const parts = splitConfidenceTeamName_(nominee && nominee.name);
+
+  return `
+    <button
+      type="button"
+      class="confidence-team-choice ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""}"
+      onclick="draftConfidenceNominee_('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
+      aria-pressed="${selected ? "true" : "false"}"
+      aria-label="Pick ${escapeAttr(nominee.name || "team")}"
+      ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
+    >
+      <span class="confidence-team-city">${escapeHtml(parts.city)}</span>
+      <strong class="confidence-team-nickname">${escapeHtml(parts.nickname)}</strong>
+      <span class="confidence-team-visual">
+        ${platformImgHtml(nominee.image, {
+          className: "confidence-team-logo",
+          variant: "thumb",
+          alt: nominee.name || "Team"
+        })}
+        ${selected ? `<span class="confidence-selected-mark">✓</span>` : ""}
+      </span>
+    </button>
+  `;
+
+}
+
+function renderCompactConfidenceRow_(category) {
+
+  const nominees = Array.isArray(category.nominees) ? category.nominees : [];
+
+  if (nominees.length !== 2) {
+    return renderCategoryCard(category, false);
+  }
+
+  const selectedNomineeId = PICKS_PAGE_DATA.picks[category.id] || "";
+  const confidencePoints = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
+  const locked = isCategoryLocked(category);
+  const status = getPickStatus(category, selectedNomineeId);
+  const dirty = confidenceCategoryIsDirty_(category.id);
+
+  return `
+    <article
+      class="confidence-game-row ${status.className || ""} ${dirty ? "is-dirty" : ""}"
+      data-category-id="${escapeAttr(category.id)}"
+      data-locked="${locked ? "true" : "false"}"
+    >
+      <div class="confidence-game-main">
+        ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked)}
+
+        <div class="confidence-versus" aria-hidden="true">VS</div>
+
+        ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked)}
+
+        <label class="confidence-row-value">
+          <span>Confidence</span>
+          <select
+            id="confidence-${escapeAttr(category.id)}"
+            onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
+            ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
+          >
+            <option value="">—</option>
+            ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
+          </select>
+        </label>
+      </div>
+
+      <div class="confidence-game-meta">
+        <span>${escapeHtml(formatCompactConfidenceLock_(category))}</span>
+        <span class="confidence-game-question">${escapeHtml(getCategoryDisplayTitle(category))}</span>
+        ${dirty ? `<strong>Unsaved</strong>` : locked ? `<strong>Locked</strong>` : ""}
+      </div>
+    </article>
+  `;
+
+}
+
+function renderCompactConfidenceSlate_() {
+
+  const categories = getCompactConfidenceCategories_();
+
+  return `
+    <div class="confidence-compact-slate">
+      ${categories.map(renderCompactConfidenceRow_).join("")}
+    </div>
+  `;
+
+}
+
+function renderCompactConfidenceToolbar_() {
+
+  const categories = getCompactConfidenceCategories_();
+  const used = getUsedConfidencePoints();
+  const dirty = getConfidenceDirtyCategories_();
+  const pickedCount = categories.filter(function(category) {
+    return Boolean(PICKS_PAGE_DATA.picks[category.id]);
+  }).length;
+  const rankedCount = categories.filter(function(category) {
+    return Number(PICKS_PAGE_DATA.confidencePoints[category.id]) > 0;
+  }).length;
+
+  return `
+    <div class="confidence-summary-bar confidence-compact-toolbar">
+      <div class="confidence-toolbar-progress">
+        <strong>Confidence Card</strong>
+        <span>${pickedCount}/${categories.length} winners · ${rankedCount}/${categories.length} ranked</span>
+      </div>
+
+      <div class="confidence-toolbar-used" title="Confidence values currently assigned">
+        Used: ${used.length ? used.join(", ") : "none"}
+      </div>
+
+      <button
+        type="button"
+        class="confidence-save-all-button"
+        onclick="saveConfidenceDraft_()"
+        ${PICKS_CONFIDENCE_BATCH_SAVING || !dirty.length ? "disabled" : ""}
+      >
+        ${
+          PICKS_CONFIDENCE_BATCH_SAVING
+            ? "Saving…"
+            : dirty.length
+              ? `Save All Picks (${dirty.length})`
+              : "All Picks Saved"
+        }
+      </button>
+    </div>
+  `;
+
+}
+
+function draftConfidenceNominee_(categoryId, nomineeId) {
+
+  if (!shouldRenderCompactConfidenceSlate_()) {
+    selectNominee(categoryId, nomineeId);
+    return;
+  }
+
+  const category = getCompactConfidenceCategories_().find(function(item) {
+    return normalizeId(item.id) === normalizeId(categoryId);
+  });
+
+  if (!category) {
+    showPicksMessage("Game not found.", true);
+    return;
+  }
+
+  if (isCategoryLocked(category)) {
+    showPicksMessage("This game has started and is locked.", true);
+    return;
+  }
+
+  PICKS_PAGE_DATA.picks[category.id] = nomineeId;
+  persistConfidenceDraft_();
+  refreshPicksPage();
+  showPicksMessage("Draft updated. Save the card when you are ready.", false);
+
+}
+
+async function saveConfidenceDraft_() {
+
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+  if (PICKS_CONFIDENCE_BATCH_SAVING) return;
+
+  const dirty = getConfidenceDirtyCategories_();
+
+  if (!dirty.length) {
+    showPicksMessage("All Confidence picks are already saved.", false);
+    return;
+  }
+
+  const incomplete = dirty.filter(function(category) {
+    return !PICKS_PAGE_DATA.picks[category.id] ||
+      Number(PICKS_PAGE_DATA.confidencePoints[category.id]) <= 0;
+  });
+
+  if (incomplete.length) {
+    showPicksMessage(
+      "Finish both the winner and confidence value for " +
+      incomplete.length +
+      " unsaved game" +
+      (incomplete.length === 1 ? "" : "s") +
+      " before saving.",
+      true
+    );
+    return;
+  }
+
+  const session = PICKS_PAGE_DATA.session || getSession();
+  const batch = dirty.map(function(category) {
+    return {
+      categoryId: category.id,
+      nomineeId: PICKS_PAGE_DATA.picks[category.id],
+      confidencePoints: Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0
+    };
+  });
+
+  PICKS_CONFIDENCE_BATCH_SAVING = true;
+  refreshPicksPage();
+  showPicksMessage("Saving your Confidence card…", false);
+
+  let result;
+
+  try {
+    result = await apiSaveConfidencePicksBatch({
+      username: session.username,
+      gameId: PICKS_PAGE_DATA.gameId,
+      picks: batch
+    });
+  } catch (err) {
+    result = {
+      success: false,
+      message: err && err.message ? err.message : "Could not save Confidence picks."
+    };
+  }
+
+  PICKS_CONFIDENCE_BATCH_SAVING = false;
+
+  if (!result || result.success !== true) {
+    refreshPicksPage();
+    showPicksMessage(
+      (result && (result.message || result.error)) || "Could not save Confidence picks.",
+      true
+    );
+    return;
+  }
+
+  (result.results || []).forEach(function(saved) {
+
+    const category = getCompactConfidenceCategories_().find(function(item) {
+      return normalizeId(item.id) === normalizeId(saved.categoryId);
+    });
+
+    if (!category) return;
+
+    PICKS_PAGE_DATA.picks[category.id] = saved.nomineeId;
+    PICKS_PAGE_DATA.confidencePoints[category.id] = Number(saved.confidencePoints) || 0;
+    PICKS_PAGE_DATA.changeCounts[category.id] = Number(saved.changeCount) || 0;
+    PICKS_PAGE_DATA.originalPicks[category.id] = saved.originalNomineeId || saved.nomineeId;
+    if (saved.pickMeta) PICKS_PAGE_DATA.pickMeta[category.id] = saved.pickMeta;
+
+    PICKS_CONFIDENCE_BASELINE_PICKS[category.id] = saved.nomineeId;
+    PICKS_CONFIDENCE_BASELINE_POINTS[category.id] = Number(saved.confidencePoints) || 0;
+
+  });
+
+  PICKS_CONFIDENCE_BASE_SIGNATURE = confidenceSnapshotSignature_(
+    PICKS_CONFIDENCE_BASELINE_PICKS,
+    PICKS_CONFIDENCE_BASELINE_POINTS
+  );
+
+  persistConfidenceDraft_();
+  clearStartupPayload();
+  refreshPicksPage();
+
+  showPicksMessage(
+    (Number(result.savedCount) || 0) +
+      " Confidence pick" +
+      ((Number(result.savedCount) || 0) === 1 ? "" : "s") +
+      " saved.",
+    false
+  );
+
 }
 
 function getStakedPointsRules(category) {
@@ -1039,6 +1527,10 @@ function renderStakedPointsControl(category, locked) {
 
 function renderConfidenceSummaryBar() {
 
+  if (shouldRenderCompactConfidenceSlate_()) {
+    return renderCompactConfidenceToolbar_();
+  }
+
   const used =
     getUsedConfidencePoints();
 
@@ -1204,6 +1696,7 @@ function renderRealityTvEpisodeSections_(categories) {
 }
 
 function renderPicksCategoryList() {
+  if (shouldRenderCompactConfidenceSlate_()) return renderCompactConfidenceSlate_();
   const categories = (PICKS_PAGE_DATA.categories || []).filter(function(category) { return isPicksPageCategory(category); });
   if (PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true) return renderRealityTvEpisodeSections_(categories);
   return renderPicksCategoryCards_(categories);
@@ -1646,7 +2139,7 @@ function getUsedConfidencePointsForOtherCategories(
         PICKS_PAGE_DATA.picks[otherCategoryId]
       );
 
-    if (!otherHasPick) {
+    if (!otherHasPick && !shouldRenderCompactConfidenceSlate_()) {
       return;
     }
 
@@ -1690,7 +2183,7 @@ function getUsedConfidencePoints() {
         PICKS_PAGE_DATA.picks[categoryId]
       );
 
-    if (!hasPick) {
+    if (!hasPick && !shouldRenderCompactConfidenceSlate_()) {
       return;
     }
 
@@ -1723,8 +2216,26 @@ function updateConfidenceForCategory(
   value
 ) {
 
-  PICKS_PAGE_DATA.confidencePoints[categoryId] =
-    Number(value) || 0;
+  const nextValue = Number(value) || 0;
+
+  if (
+    nextValue > 0 &&
+    getUsedConfidencePointsForOtherCategories(categoryId).includes(nextValue)
+  ) {
+    showPicksMessage(
+      "Confidence " + nextValue + " is already assigned to another game.",
+      true
+    );
+    refreshPicksPage();
+    return;
+  }
+
+  PICKS_PAGE_DATA.confidencePoints[categoryId] = nextValue;
+
+  if (shouldRenderCompactConfidenceSlate_()) {
+    persistConfidenceDraft_();
+    refreshPicksPage();
+  }
 
 }
 
