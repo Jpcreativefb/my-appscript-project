@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v1217a-confidence-compact";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v1217b-confidence-live";
 
 const APP_SHELL = [
   "./",

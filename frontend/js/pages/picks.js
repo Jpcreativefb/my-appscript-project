@@ -32,6 +32,19 @@ let PICKS_CONFIDENCE_BASELINE_PICKS = {};
 let PICKS_CONFIDENCE_BASELINE_POINTS = {};
 let PICKS_CONFIDENCE_BASE_SIGNATURE = "";
 let PICKS_CONFIDENCE_BATCH_SAVING = false;
+let PICKS_CONFIDENCE_SORT_MODE = "time";
+let PICKS_CONFIDENCE_SORT_ORDER = [];
+let PICKS_CONFIDENCE_SORT_STALE = false;
+let PICKS_CONFIDENCE_EXPANDED = new Set();
+let PICKS_CONFIDENCE_LIVE_TIMER = null;
+let PICKS_CONFIDENCE_LIVE_IN_FLIGHT = false;
+let PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
+let PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+
+const PICKS_CONFIDENCE_SPORTS_API_URL =
+  "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
+const PICKS_CONFIDENCE_LIVE_REFRESH_MS = 30000;
+const PICKS_CONFIDENCE_SPORTS_TIMEOUT_MS = 45000;
 
 
 function isHybridPicksGame_() {
@@ -463,6 +476,7 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   PICKS_PAGE_DATA.pickMeta =
     picksResponse.pickMeta || {};
 
+  resetConfidenceViewState_();
   initializeConfidenceDraft_();
 
   PICKS_PAGE_DATA.seasonAnchor =
@@ -687,6 +701,639 @@ function shouldRenderCompactConfidenceSlate_() {
 
 }
 
+function resetConfidenceViewState_() {
+
+  if (PICKS_CONFIDENCE_LIVE_TIMER) {
+    clearInterval(PICKS_CONFIDENCE_LIVE_TIMER);
+    PICKS_CONFIDENCE_LIVE_TIMER = null;
+  }
+
+  PICKS_CONFIDENCE_SORT_MODE = "time";
+  PICKS_CONFIDENCE_SORT_ORDER = [];
+  PICKS_CONFIDENCE_SORT_STALE = false;
+  PICKS_CONFIDENCE_EXPANDED = new Set();
+  PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
+  PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+
+}
+
+function confidenceSortTimestamp_(category) {
+
+  const raw = category && (category.lockDateTime || category.gameDateTime || "");
+  const date = raw ? new Date(raw) : null;
+  return date && !Number.isNaN(date.getTime()) ? date.getTime() : Number.MAX_SAFE_INTEGER;
+
+}
+
+function confidenceTimeSortedCategories_() {
+
+  return getCompactConfidenceCategories_().slice().sort(function(a, b) {
+    const diff = confidenceSortTimestamp_(a) - confidenceSortTimestamp_(b);
+    if (diff !== 0) return diff;
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  });
+
+}
+
+function buildConfidenceSortOrder_() {
+
+  return getCompactConfidenceCategories_().slice().sort(function(a, b) {
+    const aValue = Number(PICKS_PAGE_DATA.confidencePoints[a.id]) || 0;
+    const bValue = Number(PICKS_PAGE_DATA.confidencePoints[b.id]) || 0;
+
+    if (aValue !== bValue) return bValue - aValue;
+
+    const timeDiff = confidenceSortTimestamp_(a) - confidenceSortTimestamp_(b);
+    if (timeDiff !== 0) return timeDiff;
+
+    return String(a.id || "").localeCompare(String(b.id || ""));
+  }).map(function(category) {
+    return category.id;
+  });
+
+}
+
+function getCompactConfidenceDisplayCategories_() {
+
+  if (PICKS_CONFIDENCE_SORT_MODE !== "confidence") {
+    return confidenceTimeSortedCategories_();
+  }
+
+  if (!PICKS_CONFIDENCE_SORT_ORDER.length) {
+    PICKS_CONFIDENCE_SORT_ORDER = buildConfidenceSortOrder_();
+  }
+
+  const byId = {};
+  getCompactConfidenceCategories_().forEach(function(category) {
+    byId[normalizeId(category.id)] = category;
+  });
+
+  const ordered = [];
+  PICKS_CONFIDENCE_SORT_ORDER.forEach(function(categoryId) {
+    const category = byId[normalizeId(categoryId)];
+    if (!category) return;
+    ordered.push(category);
+    delete byId[normalizeId(categoryId)];
+  });
+
+  Object.keys(byId).forEach(function(key) {
+    ordered.push(byId[key]);
+  });
+
+  return ordered;
+
+}
+
+function setConfidenceSortMode_(mode) {
+
+  const nextMode = mode === "confidence" ? "confidence" : "time";
+
+  if (nextMode === "confidence") {
+    PICKS_CONFIDENCE_SORT_MODE = "confidence";
+    PICKS_CONFIDENCE_SORT_ORDER = buildConfidenceSortOrder_();
+    PICKS_CONFIDENCE_SORT_STALE = false;
+  } else {
+    PICKS_CONFIDENCE_SORT_MODE = "time";
+    PICKS_CONFIDENCE_SORT_ORDER = [];
+    PICKS_CONFIDENCE_SORT_STALE = false;
+  }
+
+  refreshPicksPage();
+
+}
+
+function normalizeConfidenceSportsKey_(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s_]+/g, "-");
+}
+
+function getConfidenceSportsPhase_(category) {
+
+  category = category || {};
+  const state = normalizeConfidenceSportsKey_(category.sportsState);
+  const status = normalizeConfidenceSportsKey_(category.sportsStatus);
+
+  if (
+    state === "post" ||
+    status.indexOf("final") !== -1 ||
+    status.indexOf("complete") !== -1
+  ) {
+    return "final";
+  }
+
+  if (
+    state === "in" ||
+    state === "live" ||
+    status.indexOf("in-progress") !== -1 ||
+    status.indexOf("inprogress") !== -1 ||
+    status.indexOf("live") !== -1
+  ) {
+    return "live";
+  }
+
+  return "pregame";
+
+}
+
+function isCompactConfidenceLocked_(category) {
+  const phase = getConfidenceSportsPhase_(category);
+  return isCategoryLocked(category) || phase === "live" || phase === "final";
+}
+
+function confidenceNomineeSide_(category, nominee) {
+
+  const selection = normalizeConfidenceSportsKey_(nominee && nominee.sportsSelection);
+  if (selection === "home" || selection === "away") return selection;
+
+  const name = normalizeConfidenceSportsKey_(nominee && (nominee.name || nominee.shortAnswer));
+  const home = normalizeConfidenceSportsKey_(category && category.homeTeam);
+  const away = normalizeConfidenceSportsKey_(category && category.awayTeam);
+
+  if (home && name === home) return "home";
+  if (away && name === away) return "away";
+  return "";
+
+}
+
+function confidenceNomineeForSide_(category, side) {
+  return (category.nominees || []).find(function(nominee) {
+    return confidenceNomineeSide_(category, nominee) === side;
+  }) || null;
+}
+
+function confidenceScoreValue_(category, side) {
+  const value = side === "home" ? category.homeScore : category.awayScore;
+  if (value === "" || value === null || value === undefined) return "";
+  return value;
+}
+
+function getConfidenceLiveResult_(category, selectedNomineeId) {
+
+  const settled = getPickStatus(category, selectedNomineeId);
+  if (settled.className === "correct" || settled.className === "wrong") {
+    const winners = getWinnerNominees(category);
+    return {
+      className: settled.className,
+      winnerNomineeId: winners.length === 1 ? winners[0].id : "",
+      final: true
+    };
+  }
+
+  if (getConfidenceSportsPhase_(category) !== "final") {
+    return { className: "pending", winnerNomineeId: "", final: false };
+  }
+
+  const home = Number(category.homeScore);
+  const away = Number(category.awayScore);
+  if (!Number.isFinite(home) || !Number.isFinite(away) || home === away) {
+    return { className: "pending", winnerNomineeId: "", final: true };
+  }
+
+  const winningSide = home > away ? "home" : "away";
+  const winner = confidenceNomineeForSide_(category, winningSide);
+  const winnerId = winner ? winner.id : "";
+
+  if (!winnerId || !selectedNomineeId) {
+    return { className: "pending", winnerNomineeId: winnerId, final: true };
+  }
+
+  return {
+    className: normalizeId(winnerId) === normalizeId(selectedNomineeId) ? "correct" : "wrong",
+    winnerNomineeId: winnerId,
+    final: true
+  };
+
+}
+
+function formatConfidenceSportsStatus_(category) {
+
+  const phase = getConfidenceSportsPhase_(category);
+
+  if (phase === "final") return "FINAL";
+
+  if (phase === "live") {
+    const pieces = ["LIVE"];
+    const period = String(category.sportsPeriod || "").trim();
+    const clock = String(category.sportsClock || "").trim();
+    if (period) pieces.push("Q" + period);
+    if (clock) pieces.push(clock);
+    return pieces.join(" · ");
+  }
+
+  const raw = category.lockDateTime || category.gameDateTime || "";
+  const date = raw ? new Date(raw) : null;
+  if (!date || Number.isNaN(date.getTime())) return "OPEN";
+
+  return date.toLocaleString([], {
+    weekday: "short",
+    hour: "numeric",
+    minute: "2-digit"
+  });
+
+}
+
+function confidenceResultPointsLabel_(category, result) {
+
+  if (!result || (result.className !== "correct" && result.className !== "wrong")) return "";
+  const value = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
+  if (!value) return "";
+  if (result.className === "correct") return "+" + value;
+  return PICKS_PAGE_DATA.confidenceScoringMode === "risk_penalty" ? "-" + value : "0";
+
+}
+
+function confidenceOddsToAmerican_(value) {
+
+  const number = Number(value);
+  if (!Number.isFinite(number) || number === 0) return "—";
+
+  if (Math.abs(number) >= 100) {
+    return number > 0 ? "+" + Math.round(number) : String(Math.round(number));
+  }
+
+  if (number <= 1) return String(number);
+
+  const american = number >= 2
+    ? Math.round((number - 1) * 100)
+    : Math.round(-100 / (number - 1));
+
+  return american > 0 ? "+" + american : String(american);
+
+}
+
+function confidenceSpreadLabel_(value) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return "—";
+  return number > 0 ? "+" + number : String(number);
+}
+
+function confidenceFavoriteName_(category, odds) {
+
+  odds = odds || {};
+
+  const homeSpread = Number(odds.homeSpread);
+  const awaySpread = Number(odds.awaySpread);
+  if (Number.isFinite(homeSpread) && Number.isFinite(awaySpread) && homeSpread !== awaySpread) {
+    if (homeSpread < 0) return category.homeTeam || "Home";
+    if (awaySpread < 0) return category.awayTeam || "Away";
+  }
+
+  const homeOdds = Number(odds.homeOdds);
+  const awayOdds = Number(odds.awayOdds);
+  if (homeOdds > 1 && awayOdds > 1 && homeOdds !== awayOdds) {
+    return homeOdds < awayOdds ? (category.homeTeam || "Home") : (category.awayTeam || "Away");
+  }
+
+  const configured = category.favoriteNomineeId;
+  if (configured) {
+    const nominee = (category.nominees || []).find(function(item) {
+      return normalizeId(item.id) === normalizeId(configured);
+    });
+    if (nominee) return nominee.name || nominee.shortAnswer || "";
+  }
+
+  return "—";
+
+}
+
+function confidenceFallbackOdds_(category) {
+
+  const result = { found: false };
+  (category.nominees || []).forEach(function(nominee) {
+    const side = confidenceNomineeSide_(category, nominee);
+    const value = nominee.bettingOdds !== undefined && nominee.bettingOdds !== ""
+      ? nominee.bettingOdds
+      : nominee.odds;
+    if (!side || value === undefined || value === "") return;
+    result[side + "Odds"] = value;
+    result.found = true;
+  });
+  return result;
+
+}
+
+function renderConfidenceDetails_(category, dirty, locked, phase) {
+
+  const odds = PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id] || confidenceFallbackOdds_(category);
+  const loading = PICKS_CONFIDENCE_ODDS_IN_FLIGHT[category.id] === true;
+  const home = category.homeTeam || (confidenceNomineeForSide_(category, "home") || {}).name || "Home";
+  const away = category.awayTeam || (confidenceNomineeForSide_(category, "away") || {}).name || "Away";
+  const favorite = confidenceFavoriteName_(category, odds);
+  const source = odds.bookmaker || odds.source || category.oddsSource || "";
+  const total = odds.totalPoints !== "" && odds.totalPoints !== undefined ? odds.totalPoints : "—";
+
+  return `
+    <details
+      class="confidence-game-details"
+      ${PICKS_CONFIDENCE_EXPANDED.has(category.id) ? "open" : ""}
+      ontoggle="toggleConfidenceDetails_('${escapeJs(category.id)}', this.open)"
+    >
+      <summary class="confidence-game-meta">
+        <strong class="confidence-live-status ${phase}">${escapeHtml(formatConfidenceSportsStatus_(category))}</strong>
+        <span class="confidence-game-question">${escapeHtml(getCategoryDisplayTitle(category))}</span>
+        <span class="confidence-details-prompt">Odds · Records · Favorite</span>
+        ${dirty ? `<strong>Unsaved</strong>` : locked ? `<strong>Locked</strong>` : `<span></span>`}
+      </summary>
+      <div class="confidence-details-grid">
+        <div class="confidence-detail-team">
+          <strong>${escapeHtml(away)}</strong>
+          <span>Record ${escapeHtml(category.awayRecord || "—")}</span>
+          <span>ML ${escapeHtml(confidenceOddsToAmerican_(odds.awayOdds))}</span>
+          <span>Spread ${escapeHtml(confidenceSpreadLabel_(odds.awaySpread))}</span>
+        </div>
+        <div class="confidence-detail-center">
+          <span>Favorite</span>
+          <strong>${escapeHtml(favorite)}</strong>
+          <small>O/U ${escapeHtml(String(total))}</small>
+          ${loading ? `<small>Loading odds…</small>` : source ? `<small>${escapeHtml(source)}</small>` : ""}
+        </div>
+        <div class="confidence-detail-team home">
+          <strong>${escapeHtml(home)}</strong>
+          <span>Record ${escapeHtml(category.homeRecord || "—")}</span>
+          <span>ML ${escapeHtml(confidenceOddsToAmerican_(odds.homeOdds))}</span>
+          <span>Spread ${escapeHtml(confidenceSpreadLabel_(odds.homeSpread))}</span>
+        </div>
+      </div>
+    </details>
+  `;
+
+}
+
+function confidenceSportsJsonp_(url) {
+
+  return new Promise(function(resolve, reject) {
+    const callbackName = "__confidenceSportsCallback_" + Date.now() + "_" + Math.floor(Math.random() * 1000000);
+    const script = document.createElement("script");
+    const separator = url.indexOf("?") === -1 ? "?" : "&";
+    let done = false;
+
+    function cleanup_(keepLateCallback) {
+      if (script.parentNode) script.parentNode.removeChild(script);
+      if (keepLateCallback) {
+        window[callbackName] = function() {};
+        setTimeout(function() {
+          try { delete window[callbackName]; } catch (err) { window[callbackName] = undefined; }
+        }, 60000);
+      } else {
+        try { delete window[callbackName]; } catch (err) { window[callbackName] = undefined; }
+      }
+    }
+
+    const timeout = setTimeout(function() {
+      if (done) return;
+      done = true;
+      cleanup_(true);
+      reject(new Error("Sports Scores Engine request timed out"));
+    }, PICKS_CONFIDENCE_SPORTS_TIMEOUT_MS);
+
+    window[callbackName] = function(data) {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      cleanup_(false);
+      resolve(data || {});
+    };
+
+    script.onerror = function() {
+      if (done) return;
+      done = true;
+      clearTimeout(timeout);
+      cleanup_(true);
+      reject(new Error("Sports Scores Engine request failed"));
+    };
+
+    script.src = url + separator + "callback=" + encodeURIComponent(callbackName) + "&_ts=" + Date.now();
+    document.body.appendChild(script);
+  });
+
+}
+
+function buildConfidenceSportsApiUrl_(action, params) {
+
+  const query = new URLSearchParams({ action: action });
+  Object.keys(params || {}).forEach(function(key) {
+    const value = params[key];
+    if (value === "" || value === null || value === undefined) return;
+    query.set(key, value);
+  });
+  return PICKS_CONFIDENCE_SPORTS_API_URL + "?" + query.toString();
+
+}
+
+function confidenceIsoDate_(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+}
+
+function confidenceDateOffset_(isoDate, days) {
+  if (!isoDate) return "";
+  const date = new Date(isoDate + "T12:00:00Z");
+  if (Number.isNaN(date.getTime())) return "";
+  date.setUTCDate(date.getUTCDate() + Number(days || 0));
+  return date.toISOString().slice(0, 10);
+}
+
+async function fetchConfidenceLiveScores_() {
+
+  const categories = getCompactConfidenceCategories_();
+  const groups = {};
+  const fallbackEvents = {};
+
+  categories.forEach(function(category) {
+    const league = String(category.sportsLeague || "").trim();
+    const date = confidenceIsoDate_(category.lockDateTime || category.gameDateTime || "");
+
+    if (league && date) {
+      if (!groups[league]) groups[league] = { minDate: date, maxDate: date };
+      if (date < groups[league].minDate) groups[league].minDate = date;
+      if (date > groups[league].maxDate) groups[league].maxDate = date;
+      return;
+    }
+
+    const eventId = String(category.espnEventId || "").trim();
+    if (eventId) fallbackEvents[eventId] = true;
+  });
+
+  const requests = [];
+  Object.keys(groups).forEach(function(league) {
+    const group = groups[league];
+    requests.push(confidenceSportsJsonp_(buildConfidenceSportsApiUrl_("getSportsScores", {
+      league: league,
+      dateFrom: confidenceDateOffset_(group.minDate, -1),
+      dateTo: confidenceDateOffset_(group.maxDate, 1)
+    })));
+  });
+
+  Object.keys(fallbackEvents).slice(0, 30).forEach(function(eventId) {
+    requests.push(confidenceSportsJsonp_(buildConfidenceSportsApiUrl_("getSportsScores", {
+      espnEventId: eventId
+    })));
+  });
+
+  if (!requests.length) return [];
+
+  const results = await Promise.allSettled(requests);
+  const scores = [];
+  const seen = {};
+
+  results.forEach(function(result) {
+    if (result.status !== "fulfilled" || !result.value || result.value.success === false) return;
+    (result.value.scores || []).forEach(function(score) {
+      const key = String(score.ESPNEventId || score.GameId || "").trim();
+      if (!key || seen[key]) return;
+      seen[key] = true;
+      scores.push(score);
+    });
+  });
+
+  return scores;
+
+}
+
+function applyConfidenceLiveScores_(scores) {
+
+  const byEvent = {};
+  const byGame = {};
+  (scores || []).forEach(function(score) {
+    const eventId = String(score.ESPNEventId || "").trim();
+    const gameId = String(score.GameId || "").trim();
+    if (eventId) byEvent[eventId] = score;
+    if (gameId) byGame[gameId] = score;
+  });
+
+  let changed = false;
+
+  getCompactConfidenceCategories_().forEach(function(category) {
+    const score = byEvent[String(category.espnEventId || "").trim()] || byGame[String(category.sportsGameId || "").trim()];
+    if (!score) return;
+
+    const before = JSON.stringify([
+      category.homeScore, category.awayScore, category.sportsStatus, category.sportsState,
+      category.sportsClock, category.sportsPeriod, category.homeRecord, category.awayRecord
+    ]);
+
+    category.homeTeam = score.HomeTeam || category.homeTeam || "";
+    category.awayTeam = score.AwayTeam || category.awayTeam || "";
+    category.homeScore = score.HomeScore !== undefined && score.HomeScore !== null ? score.HomeScore : category.homeScore;
+    category.awayScore = score.AwayScore !== undefined && score.AwayScore !== null ? score.AwayScore : category.awayScore;
+    category.sportsStatus = score.Status || category.sportsStatus || "";
+    category.sportsState = score.State || category.sportsState || "";
+    category.sportsClock = score.Clock || category.sportsClock || "";
+    category.sportsPeriod = score.Period !== undefined && score.Period !== null ? score.Period : category.sportsPeriod;
+    category.homeRecord = score.HomeRecord || category.homeRecord || "";
+    category.awayRecord = score.AwayRecord || category.awayRecord || "";
+    category.gameDateTime = score.GameDateTime || category.gameDateTime || category.lockDateTime || "";
+
+    (category.nominees || []).forEach(function(nominee) {
+      const side = confidenceNomineeSide_(category, nominee);
+      if (side === "home" && score.HomeLogo) nominee.image = score.HomeLogo;
+      if (side === "away" && score.AwayLogo) nominee.image = score.AwayLogo;
+    });
+
+    const after = JSON.stringify([
+      category.homeScore, category.awayScore, category.sportsStatus, category.sportsState,
+      category.sportsClock, category.sportsPeriod, category.homeRecord, category.awayRecord
+    ]);
+
+    if (before !== after) changed = true;
+  });
+
+  return changed;
+
+}
+
+function shouldConfidenceLiveRerenderNow_() {
+  const active = document.activeElement;
+  if (!active || active === document.body) return true;
+  if (typeof active.closest === "function" && active.closest(".confidence-game-row")) return false;
+  return true;
+}
+
+async function refreshConfidenceLiveSports_() {
+
+  if (PICKS_CONFIDENCE_LIVE_IN_FLIGHT || !shouldRenderCompactConfidenceSlate_()) return;
+  if (!document.querySelector(".picks-page")) return;
+
+  PICKS_CONFIDENCE_LIVE_IN_FLIGHT = true;
+  try {
+    const scores = await fetchConfidenceLiveScores_();
+    const changed = applyConfidenceLiveScores_(scores);
+    if (changed && shouldConfidenceLiveRerenderNow_()) refreshPicksPage();
+  } catch (err) {
+    console.warn("Confidence live scoreboard refresh skipped", err);
+  } finally {
+    PICKS_CONFIDENCE_LIVE_IN_FLIGHT = false;
+  }
+
+}
+
+function mountConfidenceLiveSports_() {
+
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+
+  if (!PICKS_CONFIDENCE_LIVE_TIMER) {
+    refreshConfidenceLiveSports_();
+    PICKS_CONFIDENCE_LIVE_TIMER = setInterval(function() {
+      if (!document.querySelector(".picks-page")) {
+        clearInterval(PICKS_CONFIDENCE_LIVE_TIMER);
+        PICKS_CONFIDENCE_LIVE_TIMER = null;
+        return;
+      }
+      refreshConfidenceLiveSports_();
+    }, PICKS_CONFIDENCE_LIVE_REFRESH_MS);
+  }
+
+}
+
+async function loadConfidenceOdds_(categoryId) {
+
+  const category = getCompactConfidenceCategories_().find(function(item) {
+    return normalizeId(item.id) === normalizeId(categoryId);
+  });
+
+  if (!category || PICKS_CONFIDENCE_ODDS_IN_FLIGHT[category.id]) return;
+  if (PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id]) return;
+
+  PICKS_CONFIDENCE_ODDS_IN_FLIGHT[category.id] = true;
+  refreshPicksPage();
+
+  try {
+    const result = await confidenceSportsJsonp_(buildConfidenceSportsApiUrl_("getSportsOdds", {
+      gameId: category.sportsGameId || "",
+      espnEventId: category.espnEventId || "",
+      league: category.sportsLeague || "",
+      homeTeam: category.homeTeam || "",
+      awayTeam: category.awayTeam || "",
+      gameDateTime: category.lockDateTime || category.gameDateTime || "",
+      market: "moneyline"
+    }));
+    PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id] = result || { success: false, found: false };
+  } catch (err) {
+    PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id] = { success: false, found: false, message: err.message || String(err) };
+  } finally {
+    PICKS_CONFIDENCE_ODDS_IN_FLIGHT[category.id] = false;
+    refreshPicksPage();
+  }
+
+}
+
+function toggleConfidenceDetails_(categoryId, open) {
+
+  const category = getCompactConfidenceCategories_().find(function(item) {
+    return normalizeId(item.id) === normalizeId(categoryId);
+  });
+  if (!category) return;
+
+  if (open) {
+    PICKS_CONFIDENCE_EXPANDED.add(category.id);
+    if (!PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id]) loadConfidenceOdds_(category.id);
+  } else {
+    PICKS_CONFIDENCE_EXPANDED.delete(category.id);
+  }
+
+}
+
 function confidenceSnapshotSignature_(picks, points) {
 
   const rows = getCompactConfidenceCategories_()
@@ -757,7 +1404,7 @@ function initializeConfidenceDraft_() {
 
     getCompactConfidenceCategories_().forEach(function(category) {
 
-      if (isCategoryLocked(category)) return;
+      if (isCompactConfidenceLocked_(category)) return;
 
       const categoryId = category.id;
       const draftPick = draftPicks[categoryId];
@@ -867,17 +1514,20 @@ function formatCompactConfidenceLock_(category) {
 
 }
 
-function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, locked) {
+function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, locked, result) {
 
-  const selected =
-    normalizeId(selectedNomineeId) === normalizeId(nominee && nominee.id);
+  const selected = normalizeId(selectedNomineeId) === normalizeId(nominee && nominee.id);
   const hasSelection = Boolean(selectedNomineeId);
   const parts = splitConfidenceTeamName_(nominee && nominee.name);
+  const side = confidenceNomineeSide_(category, nominee);
+  const score = confidenceScoreValue_(category, side);
+  const phase = getConfidenceSportsPhase_(category);
+  const actualWinner = Boolean(result && result.winnerNomineeId && normalizeId(result.winnerNomineeId) === normalizeId(nominee && nominee.id));
 
   return `
     <button
       type="button"
-      class="confidence-team-choice ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""}"
+      class="confidence-team-choice ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""} ${actualWinner ? "actual-winner" : ""}"
       onclick="draftConfidenceNominee_('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
       aria-pressed="${selected ? "true" : "false"}"
       aria-label="Pick ${escapeAttr(nominee.name || "team")}"
@@ -891,7 +1541,9 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
           variant: "thumb",
           alt: nominee.name || "Team"
         })}
+        ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score">${escapeHtml(String(score))}</strong>` : ""}
         ${selected ? `<span class="confidence-selected-mark">✓</span>` : ""}
+        ${actualWinner && phase === "final" ? `<span class="confidence-winner-mark">W</span>` : ""}
       </span>
     </button>
   `;
@@ -908,22 +1560,24 @@ function renderCompactConfidenceRow_(category) {
 
   const selectedNomineeId = PICKS_PAGE_DATA.picks[category.id] || "";
   const confidencePoints = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
-  const locked = isCategoryLocked(category);
-  const status = getPickStatus(category, selectedNomineeId);
+  const locked = isCompactConfidenceLocked_(category);
+  const result = getConfidenceLiveResult_(category, selectedNomineeId);
   const dirty = confidenceCategoryIsDirty_(category.id);
+  const phase = getConfidenceSportsPhase_(category);
+  const resultPoints = confidenceResultPointsLabel_(category, result);
 
   return `
     <article
-      class="confidence-game-row ${status.className || ""} ${dirty ? "is-dirty" : ""}"
+      class="confidence-game-row ${result.className || "pending"} phase-${phase} ${dirty ? "is-dirty" : ""}"
       data-category-id="${escapeAttr(category.id)}"
       data-locked="${locked ? "true" : "false"}"
     >
       <div class="confidence-game-main">
-        ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked)}
+        ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked, result)}
 
         <div class="confidence-versus" aria-hidden="true">VS</div>
 
-        ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked)}
+        ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked, result)}
 
         <label class="confidence-row-value">
           <span>Confidence</span>
@@ -935,14 +1589,11 @@ function renderCompactConfidenceRow_(category) {
             <option value="">—</option>
             ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
           </select>
+          ${resultPoints ? `<strong class="confidence-result-points ${result.className}">${escapeHtml(resultPoints)}</strong>` : ""}
         </label>
       </div>
 
-      <div class="confidence-game-meta">
-        <span>${escapeHtml(formatCompactConfidenceLock_(category))}</span>
-        <span class="confidence-game-question">${escapeHtml(getCategoryDisplayTitle(category))}</span>
-        ${dirty ? `<strong>Unsaved</strong>` : locked ? `<strong>Locked</strong>` : ""}
-      </div>
+      ${renderConfidenceDetails_(category, dirty, locked, phase)}
     </article>
   `;
 
@@ -950,7 +1601,7 @@ function renderCompactConfidenceRow_(category) {
 
 function renderCompactConfidenceSlate_() {
 
-  const categories = getCompactConfidenceCategories_();
+  const categories = getCompactConfidenceDisplayCategories_();
 
   return `
     <div class="confidence-compact-slate">
@@ -977,6 +1628,20 @@ function renderCompactConfidenceToolbar_() {
       <div class="confidence-toolbar-progress">
         <strong>Confidence Card</strong>
         <span>${pickedCount}/${categories.length} winners · ${rankedCount}/${categories.length} ranked</span>
+      </div>
+
+      <div class="confidence-toolbar-sort" aria-label="Sort Confidence games">
+        <span>Sort</span>
+        <button
+          type="button"
+          class="${PICKS_CONFIDENCE_SORT_MODE === "time" ? "active" : ""}"
+          onclick="setConfidenceSortMode_('time')"
+        >Game Time</button>
+        <button
+          type="button"
+          class="${PICKS_CONFIDENCE_SORT_MODE === "confidence" ? "active" : ""} ${PICKS_CONFIDENCE_SORT_STALE ? "stale" : ""}"
+          onclick="setConfidenceSortMode_('confidence')"
+        >${PICKS_CONFIDENCE_SORT_MODE === "confidence" && PICKS_CONFIDENCE_SORT_STALE ? "Re-sort Confidence" : "Confidence ↓"}</button>
       </div>
 
       <div class="confidence-toolbar-used" title="Confidence values currently assigned">
@@ -1018,7 +1683,7 @@ function draftConfidenceNominee_(categoryId, nomineeId) {
     return;
   }
 
-  if (isCategoryLocked(category)) {
+  if (isCompactConfidenceLocked_(category)) {
     showPicksMessage("This game has started and is locked.", true);
     return;
   }
@@ -2233,6 +2898,9 @@ function updateConfidenceForCategory(
   PICKS_PAGE_DATA.confidencePoints[categoryId] = nextValue;
 
   if (shouldRenderCompactConfidenceSlate_()) {
+    if (PICKS_CONFIDENCE_SORT_MODE === "confidence") {
+      PICKS_CONFIDENCE_SORT_STALE = true;
+    }
     persistConfidenceDraft_();
     refreshPicksPage();
   }
@@ -3074,6 +3742,9 @@ function mountPicksPage() {
   // Optional Reality TV statistics and Season Survivor details load after
   // the core questions and saved picks are already usable.
   hydratePicksEnhancements_();
+
+  // Confidence games keep the same dense weekly card in pregame, live, and final states.
+  mountConfidenceLiveSports_();
 
 }
 

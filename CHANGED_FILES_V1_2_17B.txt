@@ -1,0 +1,6 @@
+frontend/js/pages/picks.js
+frontend/css/picks.css
+frontend/sw.js
+tests/confidence_live_review_v1217b_tests.js
+CONFIDENCE_LIVE_REVIEW_V1_2_17B.md
+CHANGED_FILES_V1_2_17B.txt

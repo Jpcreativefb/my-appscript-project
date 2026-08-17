@@ -1326,3 +1326,339 @@
     font-size: 0.46rem;
   }
 }
+
+/* =========================================================
+   CONFIDENCE REVIEW + LIVE SCOREBOARD — v1.2.17b
+   Sort/re-sort without row jumping, live score states, on-demand
+   odds/records/favorite details, and final result treatments.
+========================================================= */
+
+.confidence-compact-toolbar {
+  grid-template-columns: minmax(0, 1fr) auto minmax(110px, auto) auto;
+}
+
+.confidence-toolbar-sort {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.confidence-toolbar-sort > span {
+  color: rgba(255,255,255,0.48);
+  font-size: 0.58rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.confidence-toolbar-sort button {
+  min-height: 30px;
+  padding: 5px 8px;
+  border: 1px solid rgba(148,163,184,0.25);
+  border-radius: 8px;
+  background: rgba(15,23,42,0.72);
+  color: rgba(255,255,255,0.72);
+  font-size: 0.68rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.confidence-toolbar-sort button:hover,
+.confidence-toolbar-sort button.active {
+  border-color: rgba(96,165,250,0.78);
+  background: rgba(37,99,235,0.18);
+  color: #fff;
+}
+
+.confidence-toolbar-sort button.stale {
+  border-color: rgba(250,204,21,0.72);
+  color: #fde68a;
+}
+
+.confidence-game-row.phase-live {
+  border-color: rgba(239,68,68,0.62);
+}
+
+.confidence-game-row.phase-live:not(.correct):not(.wrong) {
+  box-shadow: 0 0 0 1px rgba(239,68,68,0.09), 0 5px 14px rgba(0,0,0,0.18);
+}
+
+.confidence-team-visual {
+  overflow: visible;
+}
+
+.confidence-team-score {
+  position: absolute;
+  left: -4px;
+  bottom: -4px;
+  min-width: 21px;
+  padding: 2px 4px;
+  border: 2px solid #0f172a;
+  border-radius: 7px;
+  background: #e2e8f0;
+  color: #0f172a;
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+}
+
+.confidence-winner-mark {
+  position: absolute;
+  left: -4px;
+  top: -5px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  background: #16a34a;
+  color: #fff;
+  font-size: 0.58rem;
+  font-weight: 950;
+}
+
+.confidence-team-choice.not-selected.actual-winner {
+  border-color: rgba(34,197,94,0.85);
+  background: rgba(22,163,74,0.12);
+  color: #fff;
+}
+
+.confidence-team-choice.not-selected.actual-winner .confidence-team-logo {
+  filter: none;
+  opacity: 1;
+}
+
+.confidence-result-points {
+  display: block;
+  margin-top: -1px;
+  font-size: 0.68rem;
+  font-weight: 950;
+  line-height: 1;
+  text-align: center;
+}
+
+.confidence-result-points.correct {
+  color: #86efac;
+}
+
+.confidence-result-points.wrong {
+  color: #fca5a5;
+}
+
+.confidence-live-status {
+  color: rgba(255,255,255,0.72) !important;
+  letter-spacing: 0.025em !important;
+}
+
+.confidence-live-status.live {
+  color: #fca5a5 !important;
+}
+
+.confidence-live-status.final {
+  color: #e2e8f0 !important;
+}
+
+.confidence-game-details {
+  border-top: 1px solid rgba(148,163,184,0.1);
+  background: rgba(2,6,23,0.22);
+}
+
+.confidence-game-details > summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 24px;
+  padding: 3px 9px 5px;
+  color: rgba(255,255,255,0.5);
+  font-size: 0.61rem;
+  font-weight: 800;
+  letter-spacing: 0.025em;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.confidence-game-details > summary::-webkit-details-marker {
+  display: none;
+}
+
+.confidence-game-details > summary::before {
+  content: "▾";
+  margin-right: 6px;
+  color: #93c5fd;
+  transition: transform 120ms ease;
+}
+
+.confidence-game-details[open] > summary::before {
+  transform: rotate(180deg);
+}
+
+.confidence-game-details > summary:hover {
+  color: #fff;
+}
+
+.confidence-details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(110px, 0.7fr) minmax(0, 1fr);
+  gap: 8px;
+  padding: 7px 9px 9px;
+  border-top: 1px solid rgba(148,163,184,0.08);
+}
+
+.confidence-detail-team,
+.confidence-detail-center {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 0.65rem;
+}
+
+.confidence-detail-team strong,
+.confidence-detail-center strong {
+  overflow: hidden;
+  color: #fff;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.confidence-detail-team span,
+.confidence-detail-center span,
+.confidence-detail-center small {
+  color: rgba(255,255,255,0.62);
+}
+
+.confidence-detail-team.home {
+  text-align: right;
+}
+
+.confidence-detail-center {
+  place-content: center;
+  text-align: center;
+}
+
+@media (max-width: 900px) {
+  .confidence-compact-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .confidence-toolbar-used {
+    display: none;
+  }
+}
+
+@media (max-width: 620px) {
+  .confidence-compact-toolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .confidence-toolbar-sort {
+    grid-column: 1 / -1;
+    order: 3;
+    justify-content: center;
+  }
+
+  .confidence-toolbar-sort button {
+    flex: 1 1 0;
+  }
+
+  .confidence-details-grid {
+    grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);
+    gap: 5px;
+    padding: 6px 7px 8px;
+  }
+
+  .confidence-detail-team,
+  .confidence-detail-center {
+    font-size: 0.57rem;
+  }
+
+  .confidence-detail-team strong,
+  .confidence-detail-center strong {
+    font-size: 0.63rem;
+  }
+}
+
+@media (max-width: 430px) {
+  .confidence-toolbar-sort > span {
+    display: none;
+  }
+
+  .confidence-toolbar-sort button {
+    min-height: 28px;
+    padding: 4px 6px;
+    font-size: 0.61rem;
+  }
+
+  .confidence-team-score {
+    min-width: 18px;
+    padding: 2px 3px;
+    font-size: 0.62rem;
+  }
+
+  .confidence-game-details > summary {
+    min-height: 21px;
+    font-size: 0.56rem;
+  }
+
+  .confidence-details-grid {
+    grid-template-columns: minmax(0, 1fr) 76px minmax(0, 1fr);
+    gap: 3px;
+    padding: 5px 6px 7px;
+  }
+}
+
+/* Keep the collapsed details control inside the existing thin metadata strip. */
+.confidence-game-details > summary.confidence-game-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  justify-content: initial;
+  min-height: 23px;
+  padding: 3px 9px 5px;
+  text-align: initial;
+}
+
+.confidence-game-details > summary.confidence-game-meta::before {
+  display: none;
+}
+
+.confidence-details-prompt {
+  color: #93c5fd;
+  font-size: 0.6rem;
+  font-weight: 850;
+  white-space: nowrap;
+}
+
+.confidence-details-prompt::before {
+  content: "▾ ";
+}
+
+.confidence-game-details[open] .confidence-details-prompt::before {
+  content: "▴ ";
+}
+
+@media (max-width: 760px) {
+  .confidence-game-details > summary.confidence-game-meta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .confidence-game-details > summary.confidence-game-meta > strong:last-child,
+  .confidence-game-details > summary.confidence-game-meta > span:last-child:empty {
+    display: none;
+  }
+}
+
+@media (max-width: 430px) {
+  .confidence-game-details > summary.confidence-game-meta {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 20px;
+    padding: 2px 7px 4px;
+  }
+
+  .confidence-details-prompt {
+    font-size: 0.52rem;
+  }
+}
