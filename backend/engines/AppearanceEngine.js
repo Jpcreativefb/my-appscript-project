@@ -1,0 +1,767 @@
+/* =========================================================
+   APPEARANCE ENGINE — v1.2.17c
+
+   Shared appearance foundation for every Awards App game type.
+   Image resolution order:
+     1. Per-game/entity override
+     2. Assigned image pack
+     3. Existing/default image supplied by the game
+     4. Blank (frontend generic fallback)
+
+   Theme resolution order:
+     1. Default theme pack
+     2. Assigned theme pack (+ BaseThemeId chain)
+     3. Per-game theme override
+     4. Per-entity theme override
+========================================================= */
+
+const APPEARANCE_IMAGE_PACKS_SHEET = "AppearanceImagePacks";
+const APPEARANCE_IMAGE_ITEMS_SHEET = "AppearanceImagePackItems";
+const APPEARANCE_THEME_PACKS_SHEET = "AppearanceThemePacks";
+const APPEARANCE_GAME_ASSIGNMENTS_SHEET = "GameAppearance";
+const APPEARANCE_OVERRIDES_SHEET = "AppearanceOverrides";
+
+const APPEARANCE_IMAGE_PACK_HEADERS = [
+  "PackId",
+  "PackName",
+  "ScopeType",
+  "ScopeValue",
+  "Description",
+  "Active",
+  "IsDefault",
+  "CreatedAt",
+  "UpdatedAt"
+];
+
+const APPEARANCE_IMAGE_ITEM_HEADERS = [
+  "PackId",
+  "EntityType",
+  "EntityId",
+  "EntityName",
+  "Variant",
+  "ImageUrl",
+  "ImageFileId",
+  "AltText",
+  "Active",
+  "UpdatedAt"
+];
+
+const APPEARANCE_THEME_PACK_HEADERS = [
+  "ThemePackId",
+  "ThemeName",
+  "Description",
+  "BaseThemeId",
+  "ThemeJSON",
+  "Active",
+  "IsDefault",
+  "CreatedAt",
+  "UpdatedAt"
+];
+
+const APPEARANCE_GAME_ASSIGNMENT_HEADERS = [
+  "GameId",
+  "ImagePackId",
+  "ThemePackId",
+  "ImageMode",
+  "ThemeMode",
+  "ThemeOverrideJSON",
+  "Active",
+  "UpdatedAt"
+];
+
+const APPEARANCE_OVERRIDE_HEADERS = [
+  "GameId",
+  "EntityType",
+  "EntityId",
+  "ImageUrl",
+  "ImageFileId",
+  "ThemeOverrideJSON",
+  "Active",
+  "UpdatedAt"
+];
+
+function appearanceString_(value) {
+  return value == null ? "" : String(value).trim();
+}
+
+function appearanceNormalizeId_(value) {
+  return appearanceString_(value).toLowerCase();
+}
+
+function appearanceBool_(value, defaultValue) {
+  if (value === true || value === false) return value;
+  const normalized = appearanceString_(value).toLowerCase();
+  if (["true", "1", "yes", "y", "on"].indexOf(normalized) !== -1) return true;
+  if (["false", "0", "no", "n", "off"].indexOf(normalized) !== -1) return false;
+  return defaultValue === true;
+}
+
+function appearanceJsonObject_(value) {
+  if (!value) return {};
+  if (Object.prototype.toString.call(value) === "[object Object]") {
+    return value;
+  }
+  try {
+    const parsed = JSON.parse(String(value));
+    return parsed && Object.prototype.toString.call(parsed) === "[object Object]"
+      ? parsed
+      : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function appearanceJsonString_(value) {
+  if (!value) return "{}";
+  if (typeof value === "string") {
+    const parsed = appearanceJsonObject_(value);
+    return JSON.stringify(parsed);
+  }
+  return JSON.stringify(appearanceJsonObject_(value));
+}
+
+function appearanceMergeObjects_(base, overlay) {
+  const output = {};
+  const left = appearanceJsonObject_(base);
+  const right = appearanceJsonObject_(overlay);
+
+  Object.keys(left).forEach(function(key) {
+    const value = left[key];
+    if (value && Object.prototype.toString.call(value) === "[object Object]") {
+      output[key] = appearanceMergeObjects_(value, {});
+    } else {
+      output[key] = value;
+    }
+  });
+
+  Object.keys(right).forEach(function(key) {
+    const value = right[key];
+    if (
+      value &&
+      Object.prototype.toString.call(value) === "[object Object]" &&
+      output[key] &&
+      Object.prototype.toString.call(output[key]) === "[object Object]"
+    ) {
+      output[key] = appearanceMergeObjects_(output[key], value);
+    } else if (value && Object.prototype.toString.call(value) === "[object Object]") {
+      output[key] = appearanceMergeObjects_({}, value);
+    } else {
+      output[key] = value;
+    }
+  });
+
+  return output;
+}
+
+function appearanceSafeGeneratedId_(prefix, value) {
+  const clean = appearanceString_(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .substring(0, 80);
+  return appearanceString_(prefix || "appearance") + "-" + (clean || String(Date.now()));
+}
+
+function appearanceDriveThumbnailUrl_(fileId) {
+  const id = appearanceString_(fileId);
+  return id
+    ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w640"
+    : "";
+}
+
+function appearanceSheetRowsToObjects_(values) {
+  if (!values || values.length < 2) return [];
+  const headers = values[0].map(function(value) { return appearanceString_(value); });
+  return values.slice(1).filter(function(row) {
+    return row.some(function(value) { return appearanceString_(value) !== ""; });
+  }).map(function(row) {
+    const obj = {};
+    headers.forEach(function(header, index) {
+      if (header) obj[header] = row[index];
+    });
+    return obj;
+  });
+}
+
+function appearanceEnsureSheet_(spreadsheet, sheetName, headers) {
+  let sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = spreadsheet.insertSheet(sheetName);
+  }
+
+  if (sheet.getLastRow() === 0) {
+    sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sheet.setFrozenRows(1);
+    return sheet;
+  }
+
+  const lastColumn = Math.max(sheet.getLastColumn(), 1);
+  const existing = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]
+    .map(function(value) { return appearanceString_(value); });
+
+  const missing = headers.filter(function(header) {
+    return existing.indexOf(header) === -1;
+  });
+
+  if (missing.length) {
+    sheet.getRange(1, existing.length + 1, 1, missing.length).setValues([missing]);
+  }
+
+  sheet.setFrozenRows(1);
+  return sheet;
+}
+
+function appearanceReadObjects_(sheetName) {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
+  return appearanceSheetRowsToObjects_(
+    sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues()
+  );
+}
+
+function appearanceFindRow_(sheet, keyMap) {
+  if (!sheet || sheet.getLastRow() < 2) return null;
+  const values = sheet.getDataRange().getValues();
+  const headers = values[0].map(function(value) { return appearanceString_(value); });
+  const indexes = {};
+
+  Object.keys(keyMap).forEach(function(key) {
+    indexes[key] = headers.indexOf(key);
+  });
+
+  for (let r = 1; r < values.length; r++) {
+    let matches = true;
+    Object.keys(keyMap).forEach(function(key) {
+      const index = indexes[key];
+      if (index === -1 || appearanceNormalizeId_(values[r][index]) !== appearanceNormalizeId_(keyMap[key])) {
+        matches = false;
+      }
+    });
+    if (matches) {
+      return { rowNumber: r + 1, headers: headers, row: values[r] };
+    }
+  }
+
+  return null;
+}
+
+function appearanceUpsertObject_(sheet, keyMap, objectValue) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+    .map(function(value) { return appearanceString_(value); });
+  const existing = appearanceFindRow_(sheet, keyMap);
+  const current = existing ? existing.row.slice() : new Array(headers.length).fill("");
+
+  headers.forEach(function(header, index) {
+    if (Object.prototype.hasOwnProperty.call(objectValue, header)) {
+      current[index] = objectValue[header];
+    }
+  });
+
+  if (existing) {
+    sheet.getRange(existing.rowNumber, 1, 1, headers.length).setValues([current]);
+    return existing.rowNumber;
+  }
+
+  sheet.appendRow(current);
+  return sheet.getLastRow();
+}
+
+function appearanceSetupSystem() {
+  const ss = SpreadsheetApp.getActive();
+  const imagePacks = appearanceEnsureSheet_(ss, APPEARANCE_IMAGE_PACKS_SHEET, APPEARANCE_IMAGE_PACK_HEADERS);
+  appearanceEnsureSheet_(ss, APPEARANCE_IMAGE_ITEMS_SHEET, APPEARANCE_IMAGE_ITEM_HEADERS);
+  const themes = appearanceEnsureSheet_(ss, APPEARANCE_THEME_PACKS_SHEET, APPEARANCE_THEME_PACK_HEADERS);
+  appearanceEnsureSheet_(ss, APPEARANCE_GAME_ASSIGNMENTS_SHEET, APPEARANCE_GAME_ASSIGNMENT_HEADERS);
+  appearanceEnsureSheet_(ss, APPEARANCE_OVERRIDES_SHEET, APPEARANCE_OVERRIDE_HEADERS);
+
+  const now = new Date();
+
+  if (!appearanceFindRow_(imagePacks, { PackId: "sports-default" })) {
+    appearanceUpsertObject_(imagePacks, { PackId: "sports-default" }, {
+      PackId: "sports-default",
+      PackName: "Sports Default Logos",
+      ScopeType: "sports",
+      ScopeValue: "",
+      Description: "Uses the existing sports/provider image unless a pack item or override is assigned.",
+      Active: true,
+      IsDefault: false,
+      CreatedAt: now,
+      UpdatedAt: now
+    });
+  }
+
+  if (!appearanceFindRow_(themes, { ThemePackId: "app-default" })) {
+    appearanceUpsertObject_(themes, { ThemePackId: "app-default" }, {
+      ThemePackId: "app-default",
+      ThemeName: "App Default",
+      Description: "Base Awards App appearance. Individual game types keep their current styling until a theme opts in.",
+      BaseThemeId: "",
+      ThemeJSON: "{}",
+      Active: true,
+      IsDefault: true,
+      CreatedAt: now,
+      UpdatedAt: now
+    });
+  }
+
+  if (!appearanceFindRow_(themes, { ThemePackId: "confidence-pro" })) {
+    appearanceUpsertObject_(themes, { ThemePackId: "confidence-pro" }, {
+      ThemePackId: "confidence-pro",
+      ThemeName: "Confidence Pro",
+      Description: "Compact scoreboard-style Confidence game presentation.",
+      BaseThemeId: "app-default",
+      ThemeJSON: JSON.stringify({
+        density: "compact",
+        team: {
+          cityScale: "small",
+          nameScale: "large",
+          imageVariant: "logo",
+          selectedTreatment: "full-color",
+          unselectedTreatment: "grayscale"
+        },
+        result: {
+          correctTreatment: "green-outline",
+          incorrectTreatment: "red-outline"
+        },
+        row: {
+          corners: "soft",
+          spacing: "tight"
+        }
+      }),
+      Active: true,
+      IsDefault: false,
+      CreatedAt: now,
+      UpdatedAt: now
+    });
+  }
+
+  return {
+    success: true,
+    message: "Appearance system ready.",
+    sheets: [
+      APPEARANCE_IMAGE_PACKS_SHEET,
+      APPEARANCE_IMAGE_ITEMS_SHEET,
+      APPEARANCE_THEME_PACKS_SHEET,
+      APPEARANCE_GAME_ASSIGNMENTS_SHEET,
+      APPEARANCE_OVERRIDES_SHEET
+    ]
+  };
+}
+
+function appearanceIsActiveRow_(row) {
+  return appearanceBool_(row && row.Active, true);
+}
+
+function appearanceFindById_(rows, idField, idValue) {
+  const wanted = appearanceNormalizeId_(idValue);
+  return (rows || []).find(function(row) {
+    return appearanceIsActiveRow_(row) && appearanceNormalizeId_(row[idField]) === wanted;
+  }) || null;
+}
+
+function appearanceFindDefaultTheme_(themeRows) {
+  return (themeRows || []).find(function(row) {
+    return appearanceIsActiveRow_(row) && appearanceBool_(row.IsDefault, false);
+  }) || null;
+}
+
+function appearanceResolveThemeFromRows_(input) {
+  input = input || {};
+  const themeRows = input.themePacks || [];
+  const assignment = input.assignment || {};
+  const entityOverride = input.entityOverride || null;
+  const defaultTheme = appearanceFindDefaultTheme_(themeRows);
+  const selectedThemeId = appearanceString_(assignment.ThemePackId) || appearanceString_(defaultTheme && defaultTheme.ThemePackId);
+  const seen = {};
+
+  function resolvePack_(themeId, depth) {
+    if (!themeId || depth > 8 || seen[appearanceNormalizeId_(themeId)]) return {};
+    seen[appearanceNormalizeId_(themeId)] = true;
+    const row = appearanceFindById_(themeRows, "ThemePackId", themeId);
+    if (!row) return {};
+    const base = resolvePack_(appearanceString_(row.BaseThemeId), depth + 1);
+    return appearanceMergeObjects_(base, appearanceJsonObject_(row.ThemeJSON));
+  }
+
+  let theme = {};
+  if (defaultTheme) {
+    theme = appearanceMergeObjects_(theme, resolvePack_(defaultTheme.ThemePackId, 0));
+  }
+
+  // Reset cycle tracking so an assigned theme that inherits the default can resolve normally.
+  Object.keys(seen).forEach(function(key) { delete seen[key]; });
+  if (selectedThemeId) {
+    theme = appearanceMergeObjects_(theme, resolvePack_(selectedThemeId, 0));
+  }
+
+  theme = appearanceMergeObjects_(theme, appearanceJsonObject_(assignment.ThemeOverrideJSON));
+  if (entityOverride && appearanceIsActiveRow_(entityOverride)) {
+    theme = appearanceMergeObjects_(theme, appearanceJsonObject_(entityOverride.ThemeOverrideJSON));
+  }
+
+  return {
+    themePackId: selectedThemeId || "",
+    theme: theme
+  };
+}
+
+function appearanceFindImagePackItem_(items, packId, entityType, entityId, variant) {
+  const wantedPack = appearanceNormalizeId_(packId);
+  const wantedType = appearanceNormalizeId_(entityType);
+  const wantedId = appearanceNormalizeId_(entityId);
+  const wantedVariant = appearanceNormalizeId_(variant || "default");
+  let generic = null;
+
+  (items || []).forEach(function(row) {
+    if (!appearanceIsActiveRow_(row)) return;
+    if (appearanceNormalizeId_(row.PackId) !== wantedPack) return;
+    if (appearanceNormalizeId_(row.EntityType) !== wantedType) return;
+    if (appearanceNormalizeId_(row.EntityId) !== wantedId) return;
+    const rowVariant = appearanceNormalizeId_(row.Variant || "default");
+    if (rowVariant === wantedVariant) generic = row;
+    else if (!generic && (rowVariant === "default" || rowVariant === "")) generic = row;
+  });
+
+  return generic;
+}
+
+function appearanceResolveImageFromRows_(input) {
+  input = input || {};
+  const assignment = input.assignment || {};
+  const entityType = appearanceString_(input.entityType);
+  const entityId = appearanceString_(input.entityId);
+  const variant = appearanceString_(input.variant || "default");
+  const defaultImageUrl = appearanceString_(input.defaultImageUrl);
+  const override = input.entityOverride || null;
+
+  if (override && appearanceIsActiveRow_(override)) {
+    const overrideUrl = appearanceString_(override.ImageUrl) || appearanceDriveThumbnailUrl_(override.ImageFileId);
+    if (overrideUrl) {
+      return {
+        imageUrl: overrideUrl,
+        source: "override",
+        imagePackId: appearanceString_(assignment.ImagePackId),
+        entityType: entityType,
+        entityId: entityId,
+        variant: variant
+      };
+    }
+  }
+
+  const imagePackId = appearanceString_(assignment.ImagePackId);
+  if (imagePackId && appearanceNormalizeId_(assignment.ImageMode || "pack") !== "default") {
+    const packItem = appearanceFindImagePackItem_(
+      input.imagePackItems || [],
+      imagePackId,
+      entityType,
+      entityId,
+      variant
+    );
+    if (packItem) {
+      const packUrl = appearanceString_(packItem.ImageUrl) || appearanceDriveThumbnailUrl_(packItem.ImageFileId);
+      if (packUrl) {
+        return {
+          imageUrl: packUrl,
+          source: "image-pack",
+          imagePackId: imagePackId,
+          entityType: entityType,
+          entityId: entityId,
+          variant: appearanceString_(packItem.Variant || variant)
+        };
+      }
+    }
+  }
+
+  return {
+    imageUrl: defaultImageUrl,
+    source: defaultImageUrl ? "default" : "fallback",
+    imagePackId: imagePackId,
+    entityType: entityType,
+    entityId: entityId,
+    variant: variant
+  };
+}
+
+function appearanceGetGameAssignmentFromRows_(gameId, rows) {
+  const wanted = appearanceNormalizeId_(gameId);
+  return (rows || []).find(function(row) {
+    return appearanceIsActiveRow_(row) && appearanceNormalizeId_(row.GameId) === wanted;
+  }) || {};
+}
+
+function appearanceGetEntityOverrideFromRows_(gameId, entityType, entityId, rows) {
+  const wantedGame = appearanceNormalizeId_(gameId);
+  const wantedType = appearanceNormalizeId_(entityType);
+  const wantedId = appearanceNormalizeId_(entityId);
+  return (rows || []).find(function(row) {
+    return appearanceIsActiveRow_(row) &&
+      appearanceNormalizeId_(row.GameId) === wantedGame &&
+      appearanceNormalizeId_(row.EntityType) === wantedType &&
+      appearanceNormalizeId_(row.EntityId) === wantedId;
+  }) || null;
+}
+
+function appearanceGetRuntimeBundle(gameId) {
+  const normalizedGameId = appearanceString_(gameId);
+  const imagePacks = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET);
+  const imagePackItems = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET);
+  const themePacks = appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET);
+  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
+  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET);
+  const assignment = appearanceGetGameAssignmentFromRows_(normalizedGameId, assignments);
+  const themeResult = appearanceResolveThemeFromRows_({
+    themePacks: themePacks,
+    assignment: assignment
+  });
+  const assignedPackId = appearanceString_(assignment.ImagePackId);
+
+  return {
+    success: true,
+    gameId: normalizedGameId,
+    assignment: assignment,
+    themePackId: themeResult.themePackId,
+    theme: themeResult.theme,
+    imagePackId: assignedPackId,
+    imagePackItems: imagePackItems.filter(function(row) {
+      return appearanceIsActiveRow_(row) && appearanceNormalizeId_(row.PackId) === appearanceNormalizeId_(assignedPackId);
+    }),
+    overrides: overrides.filter(function(row) {
+      return appearanceIsActiveRow_(row) && appearanceNormalizeId_(row.GameId) === appearanceNormalizeId_(normalizedGameId);
+    })
+  };
+}
+
+function appearanceResolveImage(gameId, entityType, entityId, defaultImageUrl, variant) {
+  const bundle = appearanceGetRuntimeBundle(gameId);
+  const entityOverride = appearanceGetEntityOverrideFromRows_(
+    gameId,
+    entityType,
+    entityId,
+    bundle.overrides
+  );
+  return appearanceResolveImageFromRows_({
+    assignment: bundle.assignment,
+    imagePackItems: bundle.imagePackItems,
+    entityOverride: entityOverride,
+    entityType: entityType,
+    entityId: entityId,
+    variant: variant,
+    defaultImageUrl: defaultImageUrl
+  });
+}
+
+function appearanceResolveTheme(gameId, entityType, entityId) {
+  const bundle = appearanceGetRuntimeBundle(gameId);
+  const entityOverride = entityType && entityId
+    ? appearanceGetEntityOverrideFromRows_(gameId, entityType, entityId, bundle.overrides)
+    : null;
+  const themePacks = appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET);
+  return appearanceResolveThemeFromRows_({
+    themePacks: themePacks,
+    assignment: bundle.assignment,
+    entityOverride: entityOverride
+  });
+}
+
+function adminGetAppearanceDashboard(payload) {
+  payload = payload || {};
+  const ss = SpreadsheetApp.getActive();
+  const requiredSheets = [
+    APPEARANCE_IMAGE_PACKS_SHEET,
+    APPEARANCE_IMAGE_ITEMS_SHEET,
+    APPEARANCE_THEME_PACKS_SHEET,
+    APPEARANCE_GAME_ASSIGNMENTS_SHEET,
+    APPEARANCE_OVERRIDES_SHEET
+  ];
+  const setupComplete = requiredSheets.every(function(name) { return !!ss.getSheetByName(name); });
+  const gameId = appearanceString_(payload.gameId);
+
+  if (!setupComplete) {
+    return {
+      success: true,
+      setupComplete: false,
+      imagePacks: [],
+      imagePackItems: [],
+      themePacks: [],
+      gameAppearance: {},
+      overrides: []
+    };
+  }
+
+  const assignments = appearanceReadObjects_(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
+  const overrides = appearanceReadObjects_(APPEARANCE_OVERRIDES_SHEET);
+
+  return {
+    success: true,
+    setupComplete: true,
+    imagePacks: appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET),
+    imagePackItems: appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET),
+    themePacks: appearanceReadObjects_(APPEARANCE_THEME_PACKS_SHEET),
+    gameAppearance: gameId ? appearanceGetGameAssignmentFromRows_(gameId, assignments) : {},
+    overrides: gameId ? overrides.filter(function(row) {
+      return appearanceNormalizeId_(row.GameId) === appearanceNormalizeId_(gameId);
+    }) : overrides
+  };
+}
+
+function adminSaveAppearanceImagePack(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
+  const packName = appearanceString_(payload.packName || payload.PackName);
+  const packId = appearanceString_(payload.packId || payload.PackId) || appearanceSafeGeneratedId_("img", packName);
+  if (!packName) throw new Error("Image pack name is required.");
+  const existing = appearanceFindRow_(sheet, { PackId: packId });
+  const now = new Date();
+
+  appearanceUpsertObject_(sheet, { PackId: packId }, {
+    PackId: packId,
+    PackName: packName,
+    ScopeType: appearanceString_(payload.scopeType || payload.ScopeType || "all"),
+    ScopeValue: appearanceString_(payload.scopeValue || payload.ScopeValue),
+    Description: appearanceString_(payload.description || payload.Description),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    IsDefault: appearanceBool_(payload.isDefault != null ? payload.isDefault : payload.IsDefault, false),
+    CreatedAt: existing ? existing.row[existing.headers.indexOf("CreatedAt")] || now : now,
+    UpdatedAt: now
+  });
+
+  return { success: true, packId: packId };
+}
+
+function adminSaveAppearanceImagePackItem(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_IMAGE_ITEMS_SHEET);
+  const packId = appearanceString_(payload.packId || payload.PackId);
+  const entityType = appearanceString_(payload.entityType || payload.EntityType);
+  const entityId = appearanceString_(payload.entityId || payload.EntityId);
+  const variant = appearanceString_(payload.variant || payload.Variant || "default");
+  if (!packId || !entityType || !entityId) {
+    throw new Error("PackId, EntityType and EntityId are required.");
+  }
+
+  appearanceUpsertObject_(sheet, {
+    PackId: packId,
+    EntityType: entityType,
+    EntityId: entityId,
+    Variant: variant
+  }, {
+    PackId: packId,
+    EntityType: entityType,
+    EntityId: entityId,
+    EntityName: appearanceString_(payload.entityName || payload.EntityName),
+    Variant: variant,
+    ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
+    ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    AltText: appearanceString_(payload.altText || payload.AltText),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    UpdatedAt: new Date()
+  });
+
+  return { success: true, packId: packId, entityType: entityType, entityId: entityId, variant: variant };
+}
+
+function adminSaveAppearanceThemePack(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_THEME_PACKS_SHEET);
+  const themeName = appearanceString_(payload.themeName || payload.ThemeName);
+  const themePackId = appearanceString_(payload.themePackId || payload.ThemePackId) || appearanceSafeGeneratedId_("theme", themeName);
+  if (!themeName) throw new Error("Theme pack name is required.");
+  const existing = appearanceFindRow_(sheet, { ThemePackId: themePackId });
+  const now = new Date();
+
+  appearanceUpsertObject_(sheet, { ThemePackId: themePackId }, {
+    ThemePackId: themePackId,
+    ThemeName: themeName,
+    Description: appearanceString_(payload.description || payload.Description),
+    BaseThemeId: appearanceString_(payload.baseThemeId || payload.BaseThemeId),
+    ThemeJSON: appearanceJsonString_(payload.theme || payload.themeJSON || payload.ThemeJSON),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    IsDefault: appearanceBool_(payload.isDefault != null ? payload.isDefault : payload.IsDefault, false),
+    CreatedAt: existing ? existing.row[existing.headers.indexOf("CreatedAt")] || now : now,
+    UpdatedAt: now
+  });
+
+  return { success: true, themePackId: themePackId };
+}
+
+function adminSaveGameAppearance(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_GAME_ASSIGNMENTS_SHEET);
+  const gameId = appearanceString_(payload.gameId || payload.GameId);
+  if (!gameId) throw new Error("GameId is required.");
+
+  appearanceUpsertObject_(sheet, { GameId: gameId }, {
+    GameId: gameId,
+    ImagePackId: appearanceString_(payload.imagePackId || payload.ImagePackId),
+    ThemePackId: appearanceString_(payload.themePackId || payload.ThemePackId),
+    ImageMode: appearanceString_(payload.imageMode || payload.ImageMode || "pack"),
+    ThemeMode: appearanceString_(payload.themeMode || payload.ThemeMode || "pack"),
+    ThemeOverrideJSON: appearanceJsonString_(payload.themeOverride || payload.themeOverrideJSON || payload.ThemeOverrideJSON),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    UpdatedAt: new Date()
+  });
+
+  return { success: true, gameId: gameId };
+}
+
+function adminSaveAppearanceOverride(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const sheet = SpreadsheetApp.getActive().getSheetByName(APPEARANCE_OVERRIDES_SHEET);
+  const gameId = appearanceString_(payload.gameId || payload.GameId);
+  const entityType = appearanceString_(payload.entityType || payload.EntityType);
+  const entityId = appearanceString_(payload.entityId || payload.EntityId);
+  if (!gameId || !entityType || !entityId) {
+    throw new Error("GameId, EntityType and EntityId are required.");
+  }
+
+  appearanceUpsertObject_(sheet, { GameId: gameId, EntityType: entityType, EntityId: entityId }, {
+    GameId: gameId,
+    EntityType: entityType,
+    EntityId: entityId,
+    ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
+    ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    ThemeOverrideJSON: appearanceJsonString_(payload.themeOverride || payload.themeOverrideJSON || payload.ThemeOverrideJSON),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    UpdatedAt: new Date()
+  });
+
+  return { success: true, gameId: gameId, entityType: entityType, entityId: entityId };
+}
+
+function apiAdminSetupAppearanceSystem(payload) {
+  return appearanceSetupSystem(payload);
+}
+
+function apiAdminGetAppearanceDashboard(payload) {
+  return adminGetAppearanceDashboard(payload);
+}
+
+function apiAdminSaveAppearanceImagePack(payload) {
+  return adminSaveAppearanceImagePack(payload);
+}
+
+function apiAdminSaveAppearanceImagePackItem(payload) {
+  return adminSaveAppearanceImagePackItem(payload);
+}
+
+function apiAdminSaveAppearanceThemePack(payload) {
+  return adminSaveAppearanceThemePack(payload);
+}
+
+function apiAdminSaveGameAppearance(payload) {
+  return adminSaveGameAppearance(payload);
+}
+
+function apiAdminSaveAppearanceOverride(payload) {
+  return adminSaveAppearanceOverride(payload);
+}
+
+function apiGetGameAppearance(payload) {
+  payload = payload || {};
+  return appearanceGetRuntimeBundle(payload.gameId || "");
+}

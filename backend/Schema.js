@@ -71,6 +71,60 @@ const SCHEMA = {
       "NomineeId",
       "Rank"
     ]
+  },
+
+  AppearanceImagePacks: {
+    required: [
+      "PackId",
+      "PackName",
+      "ScopeType",
+      "Active",
+      "IsDefault"
+    ]
+  },
+
+  AppearanceImagePackItems: {
+    required: [
+      "PackId",
+      "EntityType",
+      "EntityId",
+      "Variant",
+      "ImageUrl",
+      "ImageFileId",
+      "Active"
+    ]
+  },
+
+  AppearanceThemePacks: {
+    required: [
+      "ThemePackId",
+      "ThemeName",
+      "ThemeJSON",
+      "Active",
+      "IsDefault"
+    ]
+  },
+
+  GameAppearance: {
+    required: [
+      "GameId",
+      "ImagePackId",
+      "ThemePackId",
+      "ThemeOverrideJSON",
+      "Active"
+    ]
+  },
+
+  AppearanceOverrides: {
+    required: [
+      "GameId",
+      "EntityType",
+      "EntityId",
+      "ImageUrl",
+      "ImageFileId",
+      "ThemeOverrideJSON",
+      "Active"
+    ]
   }
 
 };

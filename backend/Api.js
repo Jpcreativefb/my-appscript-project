@@ -377,6 +377,34 @@ function doPost(e) {
     }
 
     // =========================
+    // APPEARANCE PACK / THEME FOUNDATION
+    // =========================
+
+    if (action === "adminSetupAppearanceSystem") {
+      return json(apiAdminSetupAppearanceSystem(body));
+    }
+
+    if (action === "adminSaveAppearanceImagePack") {
+      return json(apiAdminSaveAppearanceImagePack(body));
+    }
+
+    if (action === "adminSaveAppearanceImagePackItem") {
+      return json(apiAdminSaveAppearanceImagePackItem(body));
+    }
+
+    if (action === "adminSaveAppearanceThemePack") {
+      return json(apiAdminSaveAppearanceThemePack(body));
+    }
+
+    if (action === "adminSaveGameAppearance") {
+      return json(apiAdminSaveGameAppearance(body));
+    }
+
+    if (action === "adminSaveAppearanceOverride") {
+      return json(apiAdminSaveAppearanceOverride(body));
+    }
+
+    // =========================
     // SPORTS CONFIDENCE BUILDER POST TRANSPORT
     // Keeps the full weekly selection out of JSONP/query-string URLs.
     // =========================
@@ -1027,6 +1055,16 @@ function doGet(e) {
           )
       });
 
+    }
+
+    if (action === "adminGetAppearanceDashboard") {
+      return json(apiAdminGetAppearanceDashboard(params));
+    }
+
+    if (action === "getGameAppearance") {
+      return json(apiGetGameAppearance({
+        gameId: params.gameId || gameId
+      }));
     }
 
     if (action === "adminSaveGame") {
