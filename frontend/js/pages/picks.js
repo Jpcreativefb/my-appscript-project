@@ -1657,7 +1657,9 @@ function confidenceThemePresentation_() {
 
   const unselected = confidenceThemeToken_(selection.unselectedTreatment || team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale");
   const imageFit = confidenceThemeToken_(images.fit, ["contain", "cover", "full-bleed"], "contain");
-  const imageLayer = confidenceThemeToken_(images.layer || (imageFit === "full-bleed" ? "background" : "inline"), ["inline", "background"], "inline");
+  const imageLayer = imageFit === "full-bleed"
+    ? "background"
+    : confidenceThemeToken_(images.layer, ["inline", "background"], "inline");
   const teamOrder = confidenceThemeToken_(layout.teamOrder, ["away-home", "home-away"], "away-home");
   const classes = [
     "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
@@ -1675,6 +1677,8 @@ function confidenceThemePresentation_() {
     sideLayout.separate === true ? "confidence-theme-side-layout-separate" : "confidence-theme-side-layout-shared",
     "confidence-theme-away-align-" + confidenceThemeToken_(awayLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
     "confidence-theme-home-align-" + confidenceThemeToken_(homeLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
+    "confidence-theme-away-vertical-" + confidenceThemeToken_(awayLayout.textVertical, ["top", "center", "bottom"], positioning.textVertical || "center"),
+    "confidence-theme-home-vertical-" + confidenceThemeToken_(homeLayout.textVertical, ["top", "center", "bottom"], positioning.textVertical || "center"),
     "confidence-theme-away-score-anchor-" + confidenceThemeToken_(awayLayout.scoreAnchor, ["top-left", "top-right", "bottom-left", "bottom-right"], positioning.scoreAnchor || "bottom-left"),
     "confidence-theme-home-score-anchor-" + confidenceThemeToken_(homeLayout.scoreAnchor, ["top-left", "top-right", "bottom-left", "bottom-right"], positioning.scoreAnchor || "bottom-left"),
     "confidence-theme-city-align-" + confidenceThemeToken_(positioning.cityAlign, ["left", "center", "right"], "left"),
@@ -1721,7 +1725,13 @@ function confidenceThemePresentation_() {
   const imageX = confidenceThemeNumber_(images.x, 0, 100, 50);
   const imageY = confidenceThemeNumber_(images.y, 0, 100, 50);
   const awayImageX = confidenceThemeNumber_(awayLayout.imageX, 0, 100, imageX);
+  const awayImageY = confidenceThemeNumber_(awayLayout.imageY, 0, 100, imageY);
   const homeImageX = confidenceThemeNumber_(homeLayout.imageX, 0, 100, imageX);
+  const homeImageY = confidenceThemeNumber_(homeLayout.imageY, 0, 100, imageY);
+  const awayTextOffsetX = confidenceThemeNumber_(awayLayout.textOffsetX, -40, 40, positioning.textOffsetX || 0);
+  const awayTextOffsetY = confidenceThemeNumber_(awayLayout.textOffsetY, -40, 40, positioning.textOffsetY || 0);
+  const homeTextOffsetX = confidenceThemeNumber_(homeLayout.textOffsetX, -40, 40, positioning.textOffsetX || 0);
+  const homeTextOffsetY = confidenceThemeNumber_(homeLayout.textOffsetY, -40, 40, positioning.textOffsetY || 0);
   const textOffsetX = confidenceThemeNumber_(positioning.textOffsetX, -30, 30, 0);
   const textOffsetY = confidenceThemeNumber_(positioning.textOffsetY, -30, 30, 0);
   const selectedBorderWidth = confidenceThemeNumber_(selection.selectedBorderWidth, 0, 10, 2);
@@ -1764,7 +1774,13 @@ function confidenceThemePresentation_() {
     "--confidence-image-x:" + imageX + "%",
     "--confidence-image-y:" + imageY + "%",
     "--confidence-away-image-x:" + awayImageX + "%",
+    "--confidence-away-image-y:" + awayImageY + "%",
     "--confidence-home-image-x:" + homeImageX + "%",
+    "--confidence-home-image-y:" + homeImageY + "%",
+    "--confidence-away-text-x:" + awayTextOffsetX + "px",
+    "--confidence-away-text-y:" + awayTextOffsetY + "px",
+    "--confidence-home-text-x:" + homeTextOffsetX + "px",
+    "--confidence-home-text-y:" + homeTextOffsetY + "px",
     "--confidence-text-offset-x:" + textOffsetX + "px",
     "--confidence-text-offset-y:" + textOffsetY + "px",
     "--confidence-selected-border:" + confidenceThemeSafeColor_(selection.selectedBorderColor || colors.accent, "#60a5fa"),
@@ -1786,6 +1802,8 @@ function confidenceThemePresentation_() {
     "--confidence-value-border:" + confidenceThemeSafeColor_(confidence.border || colors.accent, "#60a5fa"),
     "--confidence-value-radius:" + confidenceRadius + "px",
     "--confidence-locked-opacity:" + (lockedOpacity / 100),
+    "--confidence-mobile-arrow-size:" + confidenceThemeNumber_(confidence.mobileArrowSize, 0, 10, 4) + "px",
+    "--confidence-mobile-arrow-color:" + confidenceThemeSafeColor_(confidence.mobileArrowColor || colors.muted, "#94a3b8"),
     "--confidence-correct-city:" + confidenceThemeSafeColor_(correctType.city || colors.text, "#ffffff"),
     "--confidence-correct-name:" + confidenceThemeSafeColor_(correctType.teamName || colors.text, "#ffffff"),
     "--confidence-correct-score:" + confidenceThemeSafeColor_(correctType.score || colors.correct, "#22c55e"),

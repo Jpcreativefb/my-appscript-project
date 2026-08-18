@@ -2161,3 +2161,139 @@
 .confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-top-right .confidence-team-home .confidence-team-score { left:auto; right:4px; top:4px; bottom:auto; }
 .confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-bottom-left .confidence-team-home .confidence-team-score { left:4px; right:auto; top:auto; bottom:4px; }
 .confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-bottom-right .confidence-team-home .confidence-team-score { left:auto; right:4px; top:auto; bottom:4px; }
+
+
+/* =========================================================
+   v1.2.17n — Confidence Runtime Layout Repair
+========================================================= */
+.confidence-compact-slate {
+  --confidence-away-image-y:50%;
+  --confidence-home-image-y:50%;
+  --confidence-away-text-x:0px;
+  --confidence-away-text-y:0px;
+  --confidence-home-text-x:0px;
+  --confidence-home-text-y:0px;
+  --confidence-mobile-arrow-size:4px;
+  --confidence-mobile-arrow-color:#94a3b8;
+}
+
+/* Full Button/background artwork is now a real bottom layer covering the
+   entire button. No grid column, typography, score, or platform image max-width
+   can constrain it. */
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-choice,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-choice {
+  position:relative;
+  isolation:isolate;
+  overflow:hidden !important;
+  background:transparent;
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-visual,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-visual {
+  position:absolute !important;
+  inset:-1px !important;
+  z-index:0 !important;
+  display:block;
+  width:auto !important;
+  height:auto !important;
+  margin:0 !important;
+  padding:0 !important;
+  opacity:var(--confidence-image-opacity);
+  pointer-events:none;
+  transform:none !important;
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-logo {
+  display:block;
+  width:100% !important;
+  height:100% !important;
+  max-width:none !important;
+  margin:0 !important;
+  border-radius:inherit;
+  transform:scale(var(--confidence-image-zoom));
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo {
+  object-fit:cover !important;
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-choice::before,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-choice::before {
+  z-index:1;
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-city,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-nickname,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-selected-mark,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-winner-mark,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-city,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-nickname,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-selected-mark,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-winner-mark {
+  position:relative;
+  z-index:3;
+}
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-selected-mark,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-selected-mark,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-winner-mark,
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-winner-mark {
+  position:absolute;
+}
+
+/* Side-specific positioning has authority over the shared controls. Shared
+   typography still controls font family/size/weight/color, but cannot move a
+   separately positioned Home or Away side. */
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-city,
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-nickname {
+  transform:translate(var(--confidence-away-text-x),var(--confidence-away-text-y)) !important;
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-city,
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-nickname {
+  transform:translate(var(--confidence-home-text-x),var(--confidence-home-text-y)) !important;
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-vertical-top .confidence-team-away { align-content:start !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-vertical-center .confidence-team-away { align-content:center !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-vertical-bottom .confidence-team-away { align-content:end !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-vertical-top .confidence-team-home { align-content:start !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-vertical-center .confidence-team-home { align-content:center !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-vertical-bottom .confidence-team-home { align-content:end !important; }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-logo {
+  object-position:var(--confidence-away-image-x) var(--confidence-away-image-y) !important;
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-logo {
+  object-position:var(--confidence-home-image-x) var(--confidence-home-image-y) !important;
+}
+
+/* iPhone/Safari: remove the native select spinner/chevrons that shift the
+   confidence number off-center. A small theme-controlled arrow is drawn by the
+   label instead; 0px hides it. */
+@media (max-width:600px) {
+  .confidence-row-value { position:relative; }
+  .confidence-row-value select {
+    -webkit-appearance:none !important;
+    appearance:none !important;
+    background-image:none !important;
+    padding-left:10px !important;
+    padding-right:10px !important;
+    text-align:center !important;
+    text-align-last:center !important;
+  }
+  .confidence-row-value::after {
+    content:"";
+    position:absolute;
+    right:7px;
+    top:50%;
+    width:0;
+    height:0;
+    border-left:var(--confidence-mobile-arrow-size) solid transparent;
+    border-right:var(--confidence-mobile-arrow-size) solid transparent;
+    border-top:calc(var(--confidence-mobile-arrow-size) * .8) solid var(--confidence-mobile-arrow-color);
+    transform:translateY(3px);
+    pointer-events:none;
+    opacity:.9;
+  }
+  .confidence-game-row[data-locked="true"] .confidence-row-value::after,
+  .confidence-hide-confidenceValue-mobile .confidence-row-value::after {
+    display:none;
+  }
+}

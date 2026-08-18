@@ -1,0 +1,14 @@
+APPEARANCE_STUDIO_RUNTIME_LAYOUT_REPAIR_V1_2_17N.md
+CHANGED_FILES_V1_2_17N.txt
+frontend/app.html
+frontend/index.html
+frontend/app.js
+frontend/js/app.js
+frontend/js/pwa.js
+frontend/sw.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/appearance.css
+frontend/css/picks.css
+tests/appearance_studio_canvas_layers_v1217m_tests.js
+tests/appearance_studio_runtime_layout_v1217n_tests.js

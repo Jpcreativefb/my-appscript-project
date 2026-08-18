@@ -425,7 +425,7 @@ function adminAppearanceStudioDefaults_(theme) {
   const incorrectType = resultTypography.incorrect || {};
 
   return {
-    studioVersion: 3,
+    studioVersion: 4,
     density: theme.density || "compact",
     layout: {
       rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
@@ -453,7 +453,7 @@ function adminAppearanceStudioDefaults_(theme) {
       verticalAlign: images.verticalAlign || "center",
       oversize: images.oversize === true,
       fit: images.fit || "contain",
-      layer: images.layer || (images.fit === "full-bleed" ? "background" : "inline"),
+      layer: images.fit === "full-bleed" ? "background" : (images.layer || "inline"),
       zoom: adminAppearanceStudioClamp_(images.zoom, 50, 220, 100),
       x: adminAppearanceStudioClamp_(images.x, 0, 100, 50),
       y: adminAppearanceStudioClamp_(images.y, 0, 100, 50)
@@ -472,13 +472,21 @@ function adminAppearanceStudioDefaults_(theme) {
       separate: theme.sideLayout && theme.sideLayout.separate === true,
       away: {
         textAlign: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textAlign || positioning.nameAlign || "left",
+        textVertical: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textVertical || positioning.textVertical || "center",
+        textOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textOffsetX, -40, 40, positioning.textOffsetX == null ? 0 : positioning.textOffsetX),
+        textOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textOffsetY, -40, 40, positioning.textOffsetY == null ? 0 : positioning.textOffsetY),
         scoreAnchor: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.scoreAnchor || positioning.scoreAnchor || "bottom-left",
-        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageX, 0, 100, images.x == null ? 50 : images.x)
+        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageX, 0, 100, images.x == null ? 50 : images.x),
+        imageY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageY, 0, 100, images.y == null ? 50 : images.y)
       },
       home: {
         textAlign: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textAlign || positioning.nameAlign || "left",
+        textVertical: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textVertical || positioning.textVertical || "center",
+        textOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textOffsetX, -40, 40, positioning.textOffsetX == null ? 0 : positioning.textOffsetX),
+        textOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textOffsetY, -40, 40, positioning.textOffsetY == null ? 0 : positioning.textOffsetY),
         scoreAnchor: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.scoreAnchor || positioning.scoreAnchor || "bottom-left",
-        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageX, 0, 100, images.x == null ? 50 : images.x)
+        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageX, 0, 100, images.x == null ? 50 : images.x),
+        imageY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageY, 0, 100, images.y == null ? 50 : images.y)
       }
     },
     selection: {
@@ -554,7 +562,9 @@ function adminAppearanceStudioDefaults_(theme) {
       text: confidence.text || colors.text || "#ffffff",
       border: confidence.border || colors.accent || "#60a5fa",
       radius: adminAppearanceStudioClamp_(confidence.radius, 0, 28, 8),
-      lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 20, 100, 62)
+      lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 20, 100, 62),
+      mobileArrowSize: adminAppearanceStudioClamp_(confidence.mobileArrowSize, 0, 10, 4),
+      mobileArrowColor: confidence.mobileArrowColor || colors.muted || "#94a3b8"
     },
     colors: {
       accent: colors.accent || "#60a5fa",
@@ -705,13 +715,21 @@ function adminAppearanceThemeEditor_() {
             <div class="appearance-side-layout-grid">
               <fieldset><legend>Away</legend>
                 ${adminAppearanceStudioSelect_("appearanceThemeAwayTextAlign", "Text Alignment", theme.sideLayout.away.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeAwayTextVertical", "Text Vertical", theme.sideLayout.away.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayTextX", "Text X", theme.sideLayout.away.textOffsetX, -40, 40, 1, "px")}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayTextY", "Text Y", theme.sideLayout.away.textOffsetY, -40, 40, 1, "px")}
                 ${adminAppearanceStudioSelect_("appearanceThemeAwayScoreAnchor", "Score Position", theme.sideLayout.away.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayImageX", "Image X", theme.sideLayout.away.imageX, 0, 100, 1, "%")}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayImageY", "Image Y", theme.sideLayout.away.imageY, 0, 100, 1, "%")}
               </fieldset>
               <fieldset><legend>Home</legend>
                 ${adminAppearanceStudioSelect_("appearanceThemeHomeTextAlign", "Text Alignment", theme.sideLayout.home.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeHomeTextVertical", "Text Vertical", theme.sideLayout.home.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeTextX", "Text X", theme.sideLayout.home.textOffsetX, -40, 40, 1, "px")}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeTextY", "Text Y", theme.sideLayout.home.textOffsetY, -40, 40, 1, "px")}
                 ${adminAppearanceStudioSelect_("appearanceThemeHomeScoreAnchor", "Score Position", theme.sideLayout.home.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeImageX", "Image X", theme.sideLayout.home.imageX, 0, 100, 1, "%")}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeImageY", "Image Y", theme.sideLayout.home.imageY, 0, 100, 1, "%")}
               </fieldset>
             </div>
           </div></details>
@@ -770,6 +788,9 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioColor_("appearanceThemeConfidenceBorder", "Confidence Border", theme.confidence.border)}
             ${adminAppearanceStudioRange_("appearanceThemeConfidenceRadius", "Confidence Corners", theme.confidence.radius, 0, 24, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeLockedOpacity", "Locked Opacity", theme.confidence.lockedOpacity, 30, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeMobileArrowSize", "Mobile Selector Arrow", theme.confidence.mobileArrowSize, 0, 10, 1, "px")}
+            ${adminAppearanceStudioColor_("appearanceThemeMobileArrowColor", "Mobile Arrow Color", theme.confidence.mobileArrowColor)}
+            <div class="admin-sub appearance-studio-inline-note">Set Mobile Selector Arrow to 0px to hide it completely. The confidence number remains centered.</div>
           </div></details>
         </aside>
 
@@ -1353,7 +1374,7 @@ function adminAppearanceReadThemeControls_() {
     visibility.devices.mobile[key] = adminAppearanceStudioValue_("appearanceThemeVisMobile_" + key, true) === true;
   });
   return {
-    studioVersion: 3,
+    studioVersion: 4,
     density: density,
     layout: {
       rowHeight: adminAppearanceStudioNumber_("appearanceThemeRowHeight", 76),
@@ -1381,7 +1402,7 @@ function adminAppearanceReadThemeControls_() {
       verticalAlign: String(adminAppearanceStudioValue_("appearanceThemeImageAlign", "center")),
       oversize: adminAppearanceStudioValue_("appearanceThemeImageOversize", false) === true,
       fit: String(adminAppearanceStudioValue_("appearanceThemeImageFit", "contain")),
-      layer: String(adminAppearanceStudioValue_("appearanceThemeImageLayer", "inline")),
+      layer: String(adminAppearanceStudioValue_("appearanceThemeImageFit", "contain")) === "full-bleed" ? "background" : String(adminAppearanceStudioValue_("appearanceThemeImageLayer", "inline")),
       zoom: adminAppearanceStudioNumber_("appearanceThemeImageZoom", 100),
       x: adminAppearanceStudioNumber_("appearanceThemeImageX", 50),
       y: adminAppearanceStudioNumber_("appearanceThemeImageY", 50)
@@ -1400,13 +1421,21 @@ function adminAppearanceReadThemeControls_() {
       separate: adminAppearanceStudioValue_("appearanceThemeSeparateSides", false) === true,
       away: {
         textAlign: String(adminAppearanceStudioValue_("appearanceThemeAwayTextAlign", "left")),
+        textVertical: String(adminAppearanceStudioValue_("appearanceThemeAwayTextVertical", "center")),
+        textOffsetX: adminAppearanceStudioNumber_("appearanceThemeAwayTextX", 0),
+        textOffsetY: adminAppearanceStudioNumber_("appearanceThemeAwayTextY", 0),
         scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeAwayScoreAnchor", "bottom-left")),
-        imageX: adminAppearanceStudioNumber_("appearanceThemeAwayImageX", 50)
+        imageX: adminAppearanceStudioNumber_("appearanceThemeAwayImageX", 50),
+        imageY: adminAppearanceStudioNumber_("appearanceThemeAwayImageY", 50)
       },
       home: {
         textAlign: String(adminAppearanceStudioValue_("appearanceThemeHomeTextAlign", "left")),
+        textVertical: String(adminAppearanceStudioValue_("appearanceThemeHomeTextVertical", "center")),
+        textOffsetX: adminAppearanceStudioNumber_("appearanceThemeHomeTextX", 0),
+        textOffsetY: adminAppearanceStudioNumber_("appearanceThemeHomeTextY", 0),
         scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeHomeScoreAnchor", "bottom-left")),
-        imageX: adminAppearanceStudioNumber_("appearanceThemeHomeImageX", 50)
+        imageX: adminAppearanceStudioNumber_("appearanceThemeHomeImageX", 50),
+        imageY: adminAppearanceStudioNumber_("appearanceThemeHomeImageY", 50)
       }
     },
     selection: {
@@ -1482,7 +1511,9 @@ function adminAppearanceReadThemeControls_() {
       text: String(adminAppearanceStudioValue_("appearanceThemeConfidenceText", "#ffffff")),
       border: String(adminAppearanceStudioValue_("appearanceThemeConfidenceBorder", "#60a5fa")),
       radius: adminAppearanceStudioNumber_("appearanceThemeConfidenceRadius", 8),
-      lockedOpacity: adminAppearanceStudioNumber_("appearanceThemeLockedOpacity", 62)
+      lockedOpacity: adminAppearanceStudioNumber_("appearanceThemeLockedOpacity", 62),
+      mobileArrowSize: adminAppearanceStudioNumber_("appearanceThemeMobileArrowSize", 4),
+      mobileArrowColor: String(adminAppearanceStudioValue_("appearanceThemeMobileArrowColor", "#94a3b8"))
     },
     colors: {
       accent: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -1525,6 +1556,8 @@ function adminAppearanceUpdateThemePreview_() {
     theme.sideLayout.separate ? "side-layout-separate" : "side-layout-shared",
     "away-align-" + theme.sideLayout.away.textAlign,
     "home-align-" + theme.sideLayout.home.textAlign,
+    "away-vertical-" + theme.sideLayout.away.textVertical,
+    "home-vertical-" + theme.sideLayout.home.textVertical,
     "away-score-anchor-" + theme.sideLayout.away.scoreAnchor,
     "home-score-anchor-" + theme.sideLayout.home.scoreAnchor,
     "city-align-" + theme.positioning.cityAlign,
@@ -1563,7 +1596,13 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-image-x": theme.images.x + "%",
     "--ap-image-y": theme.images.y + "%",
     "--ap-away-image-x": theme.sideLayout.away.imageX + "%",
+    "--ap-away-image-y": theme.sideLayout.away.imageY + "%",
     "--ap-home-image-x": theme.sideLayout.home.imageX + "%",
+    "--ap-home-image-y": theme.sideLayout.home.imageY + "%",
+    "--ap-away-text-x": theme.sideLayout.away.textOffsetX + "px",
+    "--ap-away-text-y": theme.sideLayout.away.textOffsetY + "px",
+    "--ap-home-text-x": theme.sideLayout.home.textOffsetX + "px",
+    "--ap-home-text-y": theme.sideLayout.home.textOffsetY + "px",
     "--ap-text-offset-x": theme.positioning.textOffsetX + "px",
     "--ap-text-offset-y": theme.positioning.textOffsetY + "px",
     "--ap-selected-border": theme.selection.selectedBorderColor,
@@ -1592,6 +1631,8 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-confidence-border": theme.confidence.border,
     "--ap-confidence-radius": theme.confidence.radius + "px",
     "--ap-locked-opacity": theme.confidence.lockedOpacity / 100,
+    "--ap-mobile-arrow-size": theme.confidence.mobileArrowSize + "px",
+    "--ap-mobile-arrow-color": theme.confidence.mobileArrowColor,
     "--ap-correct-city": theme.resultTypography.correct.city,
     "--ap-correct-name": theme.resultTypography.correct.teamName,
     "--ap-correct-score": theme.resultTypography.correct.score,

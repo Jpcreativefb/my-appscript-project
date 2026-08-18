@@ -32,8 +32,9 @@ assert(appearanceCss.includes('grid-template-columns:minmax(220px,260px) minmax(
 
 // Images can be a true bottom layer with content above them.
 assert(manager.includes('appearanceThemeImageLayer'));
-assert(manager.includes('Bottom Layer · Text & Score on Top'));
-assert(manager.includes('layer: String(adminAppearanceStudioValue_("appearanceThemeImageLayer"'));
+assert(manager.includes('Background · Text & Score on Top') || manager.includes('Bottom Layer · Text & Score on Top'));
+assert(manager.includes('appearanceThemeImageLayer'));
+assert(manager.includes('full-bleed') && manager.includes('? "background"'));
 assert(picks.includes('confidence-theme-image-layer-'));
 assert(picksCss.includes('.confidence-theme-image-layer-background .confidence-team-visual'));
 assert(picksCss.includes('position:absolute;'));
