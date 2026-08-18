@@ -1,0 +1,13 @@
+frontend/app.html
+frontend/app.js
+frontend/index.html
+frontend/js/app.js
+frontend/js/pwa.js
+frontend/sw.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/appearance.css
+frontend/css/picks.css
+tests/appearance_studio_advanced_layout_v1217l_tests.js
+APPEARANCE_STUDIO_ADVANCED_LAYOUT_V1_2_17L.md
+CHANGED_FILES_V1_2_17L.txt

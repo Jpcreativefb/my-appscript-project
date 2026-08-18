@@ -12,6 +12,7 @@ let ADMIN_APPEARANCE_STATE = {
   selectedThemePackId: "",
   themeNewMode: false,
   themePreviewState: "pregame",
+  themePreviewDevice: "desktop",
   busy: false,
   message: ""
 };
@@ -366,6 +367,44 @@ function adminAppearanceStudioClamp_(value, min, max, fallback) {
   return Math.max(min, Math.min(max, number));
 }
 
+const ADMIN_APPEARANCE_VISIBILITY_ELEMENTS = [
+  ["city", "City"],
+  ["teamName", "Team Name"],
+  ["teamImage", "Team Image"],
+  ["score", "Score"],
+  ["versus", "VS Divider"],
+  ["gameTime", "Game Date / Time"],
+  ["liveBadge", "Live Badge"],
+  ["clock", "Quarter / Clock"],
+  ["finalBadge", "Final Badge"],
+  ["confidenceLabel", "Confidence Label"],
+  ["confidenceValue", "Confidence Number"],
+  ["points", "Points Earned"],
+  ["resultIndicator", "Pick / Result Indicator"],
+  ["detailsBar", "Expand / Details Bar"],
+  ["records", "Records"],
+  ["favorite", "Favorite"],
+  ["moneyline", "Moneyline"],
+  ["spread", "Spread"],
+  ["overUnder", "Over / Under"]
+];
+
+function adminAppearanceStudioVisibilityDefaults_(visibility) {
+  visibility = visibility || {};
+  const elements = visibility.elements || {};
+  const devices = visibility.devices || {};
+  const out = { elements: {}, devices: { desktop: {}, tablet: {}, mobile: {} } };
+  ADMIN_APPEARANCE_VISIBILITY_ELEMENTS.forEach(function(item) {
+    const key = item[0];
+    out.elements[key] = adminAppearanceBool_(elements[key], true);
+    ["desktop", "tablet", "mobile"].forEach(function(device) {
+      const source = devices[device] || {};
+      out.devices[device][key] = adminAppearanceBool_(source[key], true);
+    });
+  });
+  return out;
+}
+
 function adminAppearanceStudioDefaults_(theme) {
   theme = theme || {};
   const team = theme.team || {};
@@ -379,52 +418,106 @@ function adminAppearanceStudioDefaults_(theme) {
   const live = theme.live || {};
   const background = theme.background || {};
   const confidence = theme.confidence || {};
+  const positioning = theme.positioning || {};
+  const overlays = theme.overlays || {};
+  const resultTypography = theme.resultTypography || {};
+  const correctType = resultTypography.correct || {};
+  const incorrectType = resultTypography.incorrect || {};
 
   return {
-    studioVersion: 1,
+    studioVersion: 2,
     density: theme.density || "compact",
     layout: {
-      rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 140, 76),
-      rowPadding: adminAppearanceStudioClamp_(layout.rowPadding, 2, 20, 7),
-      teamGap: adminAppearanceStudioClamp_(layout.teamGap, 0, 24, 7),
-      versusWidth: adminAppearanceStudioClamp_(layout.versusWidth, 12, 48, 32),
-      confidenceWidth: adminAppearanceStudioClamp_(layout.confidenceWidth, 52, 140, 92)
+      rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
+      rowPadding: adminAppearanceStudioClamp_(layout.rowPadding, 0, 24, 7),
+      teamGap: adminAppearanceStudioClamp_(layout.teamGap, 0, 28, 7),
+      versusWidth: adminAppearanceStudioClamp_(layout.versusWidth, 0, 52, 32),
+      confidenceWidth: adminAppearanceStudioClamp_(layout.confidenceWidth, 44, 160, 92)
     },
     typography: {
-      citySize: adminAppearanceStudioClamp_(typography.citySize, 8, 18, team.cityScale === "medium" ? 12 : 10),
-      cityWeight: adminAppearanceStudioClamp_(typography.cityWeight, 400, 900, 700),
-      cityOpacity: adminAppearanceStudioClamp_(typography.cityOpacity, 20, 100, 62),
-      teamNameSize: adminAppearanceStudioClamp_(typography.teamNameSize, 11, 28, team.nameScale === "xlarge" ? 18 : team.nameScale === "medium" ? 14 : 16),
-      teamNameWeight: adminAppearanceStudioClamp_(typography.teamNameWeight, 500, 1000, 950),
-      teamNameSpacing: adminAppearanceStudioClamp_(typography.teamNameSpacing, -2, 12, 2.5),
+      citySize: adminAppearanceStudioClamp_(typography.citySize, 7, 24, team.cityScale === "medium" ? 12 : 10),
+      cityWeight: adminAppearanceStudioClamp_(typography.cityWeight, 300, 1000, 700),
+      cityOpacity: adminAppearanceStudioClamp_(typography.cityOpacity, 0, 100, 62),
+      teamNameSize: adminAppearanceStudioClamp_(typography.teamNameSize, 10, 36, team.nameScale === "xlarge" ? 18 : team.nameScale === "medium" ? 14 : 16),
+      teamNameWeight: adminAppearanceStudioClamp_(typography.teamNameWeight, 300, 1000, 950),
+      teamNameSpacing: adminAppearanceStudioClamp_(typography.teamNameSpacing, -3, 14, 2.5),
       uppercase: typography.uppercase !== false,
-      scoreSize: adminAppearanceStudioClamp_(typography.scoreSize, 10, 26, 12),
-      confidenceSize: adminAppearanceStudioClamp_(typography.confidenceSize, 12, 30, 16)
+      scoreSize: adminAppearanceStudioClamp_(typography.scoreSize, 9, 34, 12),
+      confidenceSize: adminAppearanceStudioClamp_(typography.confidenceSize, 11, 38, 16)
     },
     images: {
-      size: adminAppearanceStudioClamp_(images.size, 22, 92, 38),
-      opacity: adminAppearanceStudioClamp_(images.opacity, 20, 100, 100),
+      size: adminAppearanceStudioClamp_(images.size, 20, 140, 38),
+      opacity: adminAppearanceStudioClamp_(images.opacity, 0, 100, 100),
       shape: images.shape || "square",
       verticalAlign: images.verticalAlign || "center",
-      oversize: images.oversize === true
+      oversize: images.oversize === true,
+      fit: images.fit || "contain",
+      zoom: adminAppearanceStudioClamp_(images.zoom, 50, 220, 100),
+      x: adminAppearanceStudioClamp_(images.x, 0, 100, 50),
+      y: adminAppearanceStudioClamp_(images.y, 0, 100, 50)
+    },
+    positioning: {
+      cityAlign: positioning.cityAlign || "left",
+      nameAlign: positioning.nameAlign || "left",
+      textVertical: positioning.textVertical || "center",
+      textOffsetX: adminAppearanceStudioClamp_(positioning.textOffsetX, -30, 30, 0),
+      textOffsetY: adminAppearanceStudioClamp_(positioning.textOffsetY, -30, 30, 0),
+      scoreAnchor: positioning.scoreAnchor || "bottom-left",
+      confidenceVertical: positioning.confidenceVertical || "center",
+      statusAlign: positioning.statusAlign || "left"
     },
     selection: {
       selectedBorderColor: selection.selectedBorderColor || colors.accent || "#60a5fa",
-      selectedBorderWidth: adminAppearanceStudioClamp_(selection.selectedBorderWidth, 0, 8, 2),
+      selectedBorderWidth: adminAppearanceStudioClamp_(selection.selectedBorderWidth, 0, 10, 2),
       selectedTint: selection.selectedTint || colors.accent || "#2563eb",
-      selectedTintOpacity: adminAppearanceStudioClamp_(selection.selectedTintOpacity, 0, 70, 20),
+      selectedTintOpacity: adminAppearanceStudioClamp_(selection.selectedTintOpacity, 0, 80, 20),
       unselectedTreatment: selection.unselectedTreatment || team.unselectedTreatment || "grayscale",
       unselectedGrayscale: adminAppearanceStudioClamp_(selection.unselectedGrayscale, 0, 100, 100),
-      unselectedOpacity: adminAppearanceStudioClamp_(selection.unselectedOpacity, 10, 100, 48)
+      unselectedOpacity: adminAppearanceStudioClamp_(selection.unselectedOpacity, 0, 100, 48)
     },
     result: {
       correctTreatment: result.correctTreatment || "green-outline",
       incorrectTreatment: result.incorrectTreatment || "red-outline",
-      borderWidth: adminAppearanceStudioClamp_(result.borderWidth, 1, 8, 2)
+      borderWidth: adminAppearanceStudioClamp_(result.borderWidth, 0, 10, 2)
     },
+    resultTypography: {
+      correct: {
+        city: correctType.city || colors.text || "#ffffff",
+        teamName: correctType.teamName || colors.text || "#ffffff",
+        score: correctType.score || colors.correct || "#22c55e",
+        status: correctType.status || colors.correct || "#22c55e",
+        confidenceNumber: correctType.confidenceNumber || colors.correct || "#22c55e",
+        confidenceLabel: correctType.confidenceLabel || colors.muted || "#94a3b8",
+        points: correctType.points || colors.correct || "#22c55e"
+      },
+      incorrect: {
+        city: incorrectType.city || colors.text || "#ffffff",
+        teamName: incorrectType.teamName || colors.text || "#ffffff",
+        score: incorrectType.score || colors.incorrect || "#ef4444",
+        status: incorrectType.status || colors.incorrect || "#ef4444",
+        confidenceNumber: incorrectType.confidenceNumber || colors.incorrect || "#ef4444",
+        confidenceLabel: incorrectType.confidenceLabel || colors.muted || "#94a3b8",
+        points: incorrectType.points || colors.incorrect || "#ef4444"
+      }
+    },
+    overlays: {
+      selectedColor: overlays.selectedColor || selection.selectedTint || "#2563eb",
+      selectedOpacity: adminAppearanceStudioClamp_(overlays.selectedOpacity, 0, 80, selection.selectedTintOpacity == null ? 20 : selection.selectedTintOpacity),
+      unselectedColor: overlays.unselectedColor || "#020617",
+      unselectedOpacity: adminAppearanceStudioClamp_(overlays.unselectedOpacity, 0, 80, 12),
+      correctColor: overlays.correctColor || colors.correct || "#22c55e",
+      correctOpacity: adminAppearanceStudioClamp_(overlays.correctOpacity, 0, 80, 12),
+      incorrectColor: overlays.incorrectColor || colors.incorrect || "#ef4444",
+      incorrectOpacity: adminAppearanceStudioClamp_(overlays.incorrectOpacity, 0, 80, 12),
+      liveColor: overlays.liveColor || colors.live || "#ef4444",
+      liveOpacity: adminAppearanceStudioClamp_(overlays.liveOpacity, 0, 60, 0),
+      finalColor: overlays.finalColor || colors.final || "#e2e8f0",
+      finalOpacity: adminAppearanceStudioClamp_(overlays.finalOpacity, 0, 60, 0)
+    },
+    visibility: adminAppearanceStudioVisibilityDefaults_(theme.visibility),
     row: {
       corners: row.corners || "soft",
-      radius: adminAppearanceStudioClamp_(row.radius, 0, 28, row.corners === "rounded" ? 18 : row.corners === "square" ? 0 : 10),
+      radius: adminAppearanceStudioClamp_(row.radius, 0, 32, row.corners === "rounded" ? 18 : row.corners === "square" ? 0 : 10),
       spacing: row.spacing || "tight",
       shadow: row.shadow || "soft"
     },
@@ -445,8 +538,8 @@ function adminAppearanceStudioDefaults_(theme) {
       background: confidence.background || "#0b1220",
       text: confidence.text || colors.text || "#ffffff",
       border: confidence.border || colors.accent || "#60a5fa",
-      radius: adminAppearanceStudioClamp_(confidence.radius, 0, 24, 8),
-      lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 30, 100, 62)
+      radius: adminAppearanceStudioClamp_(confidence.radius, 0, 28, 8),
+      lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 20, 100, 62)
     },
     colors: {
       accent: colors.accent || "#60a5fa",
@@ -478,6 +571,36 @@ function adminAppearanceStudioColor_(id, label, value) {
 
 function adminAppearanceStudioSelect_(id, label, value, options) {
   return `<label><span>${label}</span><select id="${id}" class="input">${options.map(function(item) { const pair = Array.isArray(item) ? item : [item, item]; return '<option value="' + adminAppearanceEscape_(pair[0]) + '"' + (String(value) === String(pair[0]) ? ' selected' : '') + '>' + adminAppearanceEscape_(pair[1]) + '</option>'; }).join('')}</select></label>`;
+}
+
+function adminAppearanceStudioVisibilityMatrix_(theme) {
+  const visibility = adminAppearanceStudioVisibilityDefaults_(theme && theme.visibility);
+  return `<div class="appearance-visibility-matrix">
+    <div class="appearance-visibility-head"><span>Element</span><b>All</b><b>Desktop</b><b>Tablet</b><b>Mobile</b></div>
+    ${ADMIN_APPEARANCE_VISIBILITY_ELEMENTS.map(function(item) {
+      const key = item[0];
+      const label = item[1];
+      return `<div class="appearance-visibility-row">
+        <span>${adminAppearanceEscape_(label)}</span>
+        <input type="checkbox" id="appearanceThemeVis_${key}" ${visibility.elements[key] ? 'checked' : ''} aria-label="Show ${adminAppearanceEscape_(label)}">
+        <input type="checkbox" id="appearanceThemeVisDesktop_${key}" ${visibility.devices.desktop[key] ? 'checked' : ''} aria-label="Show ${adminAppearanceEscape_(label)} on desktop">
+        <input type="checkbox" id="appearanceThemeVisTablet_${key}" ${visibility.devices.tablet[key] ? 'checked' : ''} aria-label="Show ${adminAppearanceEscape_(label)} on tablet">
+        <input type="checkbox" id="appearanceThemeVisMobile_${key}" ${visibility.devices.mobile[key] ? 'checked' : ''} aria-label="Show ${adminAppearanceEscape_(label)} on mobile">
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function adminAppearanceStudioResultColors_(prefix, title, colors) {
+  return `<div class="appearance-result-color-group"><strong>${adminAppearanceEscape_(title)}</strong>
+    ${adminAppearanceStudioColor_(prefix + "City", "City", colors.city)}
+    ${adminAppearanceStudioColor_(prefix + "Name", "Team Name", colors.teamName)}
+    ${adminAppearanceStudioColor_(prefix + "Score", "Score", colors.score)}
+    ${adminAppearanceStudioColor_(prefix + "Status", "Status", colors.status)}
+    ${adminAppearanceStudioColor_(prefix + "Confidence", "Confidence #", colors.confidenceNumber)}
+    ${adminAppearanceStudioColor_(prefix + "Label", "Confidence Label", colors.confidenceLabel)}
+    ${adminAppearanceStudioColor_(prefix + "Points", "Points", colors.points)}
+  </div>`;
 }
 
 function adminAppearancePreviewEntities_() {
@@ -537,12 +660,27 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeConfidenceSize", "Confidence Number Size", theme.typography.confidenceSize, 12, 30, 1, "px")}
           </div></details>
 
-          <details open><summary>Images</summary><div class="appearance-studio-panel">
-            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Image Size", theme.images.size, 22, 92, 1, "px")}
-            ${adminAppearanceStudioRange_("appearanceThemeImageOpacity", "Image Opacity", theme.images.opacity, 20, 100, 1, "%")}
+          <details open><summary>Images & Full Image Mode</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Mode", theme.images.fit, [["contain","Contain"],["cover","Cover Frame"],["full-bleed","Full Image Button"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Image Size", theme.images.size, 20, 140, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeImageZoom", "Image Zoom", theme.images.zoom, 50, 220, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeImageX", "Image X Position", theme.images.x, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeImageY", "Image Y Position", theme.images.y, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeImageOpacity", "Image Opacity", theme.images.opacity, 0, 100, 1, "%")}
             ${adminAppearanceStudioSelect_("appearanceThemeImageShape", "Image Shape", theme.images.shape, [["square","Square"],["soft","Soft"],["round","Round"]])}
             ${adminAppearanceStudioSelect_("appearanceThemeImageAlign", "Vertical Align", theme.images.verticalAlign, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
             <label class="appearance-studio-check"><input id="appearanceThemeImageOversize" type="checkbox" ${theme.images.oversize ? 'checked' : ''}><span>Allow image to oversize panel</span></label>
+          </div></details>
+
+          <details open><summary>Element Positioning</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeCityAlign", "City Alignment", theme.positioning.cityAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeNameAlign", "Team Name Alignment", theme.positioning.nameAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeTextVertical", "Text Vertical", theme.positioning.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeTextOffsetX", "Text X Offset", theme.positioning.textOffsetX, -30, 30, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeTextOffsetY", "Text Y Offset", theme.positioning.textOffsetY, -30, 30, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeScoreAnchor", "Score Position", theme.positioning.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeConfidenceVertical", "Confidence Vertical", theme.positioning.confidenceVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeStatusAlign", "Status Alignment", theme.positioning.statusAlign, [["left","Left"],["center","Center"],["right","Right"]])}
           </div></details>
 
           <details open><summary>Selection & Results</summary><div class="appearance-studio-panel">
@@ -555,18 +693,37 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeUnselectedOpacity", "Unselected Opacity", theme.selection.unselectedOpacity, 10, 100, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeCorrect", "Correct Pick", theme.colors.correct)}
             ${adminAppearanceStudioColor_("appearanceThemeIncorrect", "Wrong Pick", theme.colors.incorrect)}
-            ${adminAppearanceStudioRange_("appearanceThemeResultBorderWidth", "Result Border Width", theme.result.borderWidth, 1, 8, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeResultBorderWidth", "Result Border Width", theme.result.borderWidth, 0, 10, 1, "px")}
+            ${adminAppearanceStudioResultColors_("appearanceThemeCorrectText", "Correct Pick Font Colors", theme.resultTypography.correct)}
+            ${adminAppearanceStudioResultColors_("appearanceThemeIncorrectText", "Incorrect Pick Font Colors", theme.resultTypography.incorrect)}
           </div></details>
 
-          <details><summary>Background & Overlay</summary><div class="appearance-studio-panel">
+          <details><summary>Background & Overlay Layers</summary><div class="appearance-studio-panel">
             ${adminAppearanceStudioSelect_("appearanceThemeBackgroundMode", "Background", theme.background.mode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeSurface", "Solid Surface", theme.background.solid)}
             ${adminAppearanceStudioColor_("appearanceThemeGradientStart", "Gradient Start", theme.background.gradientStart)}
             ${adminAppearanceStudioColor_("appearanceThemeGradientEnd", "Gradient End", theme.background.gradientEnd)}
             ${adminAppearanceStudioRange_("appearanceThemeGradientAngle", "Gradient Angle", theme.background.gradientAngle, 0, 360, 1, "°")}
-            ${adminAppearanceStudioRange_("appearanceThemeOverlayOpacity", "Dark Overlay", theme.background.overlayOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeOverlayOpacity", "Whole Row Dark Overlay", theme.background.overlayOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeSelectedOverlayColor", "Selected Overlay", theme.overlays.selectedColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeSelectedOverlayOpacity", "Selected Overlay Opacity", theme.overlays.selectedOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeUnselectedOverlayColor", "Unselected Overlay", theme.overlays.unselectedColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeUnselectedOverlayOpacity", "Unselected Overlay Opacity", theme.overlays.unselectedOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeCorrectOverlayColor", "Correct Overlay", theme.overlays.correctColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeCorrectOverlayOpacity", "Correct Overlay Opacity", theme.overlays.correctOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeIncorrectOverlayColor", "Incorrect Overlay", theme.overlays.incorrectColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeIncorrectOverlayOpacity", "Incorrect Overlay Opacity", theme.overlays.incorrectOpacity, 0, 80, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeLiveOverlayColor", "Live Row Tint", theme.overlays.liveColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeLiveOverlayOpacity", "Live Tint Opacity", theme.overlays.liveOpacity, 0, 60, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeFinalOverlayColor", "Final Row Tint", theme.overlays.finalColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeFinalOverlayOpacity", "Final Tint Opacity", theme.overlays.finalOpacity, 0, 60, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeText", "Primary Text", theme.colors.text)}
             ${adminAppearanceStudioColor_("appearanceThemeMuted", "Muted Text", theme.colors.muted)}
+          </div></details>
+
+          <details><summary>Element Visibility</summary><div class="appearance-studio-panel appearance-studio-visibility-panel">
+            <div class="admin-sub">Master switch plus independent Desktop / Tablet / Mobile visibility. Turning an element off never removes its game data.</div>
+            ${adminAppearanceStudioVisibilityMatrix_(theme)}
           </div></details>
 
           <details><summary>Scoreboard & Confidence</summary><div class="appearance-studio-panel">
@@ -608,25 +765,51 @@ function adminAppearanceThemePreview_(theme) {
     const image = entity.imageUrl
       ? '<img src="' + adminAppearanceEscape_(entity.imageUrl) + '" alt="">'
       : '<span class="appearance-preview-placeholder">★</span>';
-    return `<button type="button" class="appearance-preview-team ${selected ? 'selected' : 'muted'}"><small>${adminAppearanceEscape_(entity.city)}</small><strong>${adminAppearanceEscape_(entity.nickname)}</strong><span class="appearance-preview-image">${image}<b class="appearance-preview-score">21</b></span></button>`;
+    return `<button type="button" class="appearance-preview-team ${selected ? 'selected' : 'muted'}">
+      <small data-ap-element="city">${adminAppearanceEscape_(entity.city)}</small>
+      <strong data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
+      <span class="appearance-preview-image"><span class="appearance-preview-image-art" data-ap-element="teamImage">${image}</span><b class="appearance-preview-score" data-ap-element="score">21</b></span>
+      <span class="appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>
+    </button>`;
   }
   return `<div class="appearance-studio-preview-wrap">
-    <div class="appearance-studio-preview-tabs">
-      <button type="button" data-preview-state="pregame" onclick="adminAppearanceSetPreviewState_('pregame')">Pregame</button>
-      <button type="button" data-preview-state="live" onclick="adminAppearanceSetPreviewState_('live')">Live</button>
-      <button type="button" data-preview-state="final-win" onclick="adminAppearanceSetPreviewState_('final-win')">Final Win</button>
-      <button type="button" data-preview-state="final-loss" onclick="adminAppearanceSetPreviewState_('final-loss')">Final Loss</button>
-    </div>
-    <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame">
-      <div class="appearance-preview-main">
-        ${teamHtml(entities[0], true)}
-        <b class="appearance-preview-vs">VS</b>
-        ${teamHtml(entities[1], false)}
-        <div class="appearance-preview-confidence"><small>Confidence</small><strong>16</strong></div>
+    <div class="appearance-studio-preview-toolbar">
+      <div class="appearance-studio-preview-tabs">
+        <button type="button" data-preview-state="pregame" onclick="adminAppearanceSetPreviewState_('pregame')">Pregame</button>
+        <button type="button" data-preview-state="live" onclick="adminAppearanceSetPreviewState_('live')">Live</button>
+        <button type="button" data-preview-state="final-win" onclick="adminAppearanceSetPreviewState_('final-win')">Final Win</button>
+        <button type="button" data-preview-state="final-loss" onclick="adminAppearanceSetPreviewState_('final-loss')">Final Loss</button>
       </div>
-      <div class="appearance-preview-meta"><strong class="appearance-preview-status">SUN 12:00 PM</strong><span>Odds · Records · Favorite</span></div>
+      <div class="appearance-studio-device-tabs" aria-label="Preview size">
+        <button type="button" data-preview-device="desktop" onclick="adminAppearanceSetPreviewDevice_('desktop')">Desktop</button>
+        <button type="button" data-preview-device="tablet" onclick="adminAppearanceSetPreviewDevice_('tablet')">Tablet</button>
+        <button type="button" data-preview-device="mobile" onclick="adminAppearanceSetPreviewDevice_('mobile')">Mobile</button>
+      </div>
     </div>
-    <div class="appearance-studio-preview-note">Live preview uses the first two entities from the selected game when available.</div>
+    <div id="appearanceThemePreviewFrame" class="appearance-preview-device-frame preview-device-desktop">
+      <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame">
+        <div class="appearance-preview-main">
+          ${teamHtml(entities[0], true)}
+          <b class="appearance-preview-vs" data-ap-element="versus">VS</b>
+          ${teamHtml(entities[1], false)}
+          <div class="appearance-preview-confidence">
+            <small data-ap-element="confidenceLabel">Confidence</small>
+            <strong data-ap-element="confidenceValue">16</strong>
+            <em data-ap-element="points">+16</em>
+          </div>
+        </div>
+        <div class="appearance-preview-meta" data-ap-element="detailsBar">
+          <strong class="appearance-preview-status">
+            <span class="appearance-preview-game-time" data-ap-element="gameTime">SUN 12:00 PM</span>
+            <span class="appearance-preview-live-badge" data-ap-element="liveBadge">LIVE</span>
+            <span class="appearance-preview-clock" data-ap-element="clock">Q3 6:42</span>
+            <span class="appearance-preview-final-badge" data-ap-element="finalBadge">FINAL</span>
+          </strong>
+          <span class="appearance-preview-details-text"><span data-ap-element="moneyline">Odds</span> · <span data-ap-element="records">Records</span> · <span data-ap-element="favorite">Favorite</span></span>
+        </div>
+      </div>
+    </div>
+    <div class="appearance-studio-preview-note">Switch Desktop / Tablet / Mobile above. Live preview uses the first two entities from the selected game when available.</div>
   </div>`;
 }
 
@@ -1097,6 +1280,7 @@ function adminAppearanceMountThemePreview_() {
   editor.addEventListener("change", adminAppearanceUpdateThemePreview_);
   adminAppearanceUpdateThemePreview_();
   adminAppearanceSetPreviewState_(ADMIN_APPEARANCE_STATE.themePreviewState || "pregame");
+  adminAppearanceSetPreviewDevice_(ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop");
 }
 
 function adminAppearanceStudioValue_(id, fallback) {
@@ -1121,8 +1305,16 @@ function adminAppearanceStudioHexRgba_(hex, opacityPercent) {
 function adminAppearanceReadThemeControls_() {
   const unselected = String(adminAppearanceStudioValue_("appearanceThemeUnselected", "grayscale"));
   const density = String(adminAppearanceStudioValue_("appearanceThemeDensity", "compact"));
+  const visibility = { elements: {}, devices: { desktop: {}, tablet: {}, mobile: {} } };
+  ADMIN_APPEARANCE_VISIBILITY_ELEMENTS.forEach(function(item) {
+    const key = item[0];
+    visibility.elements[key] = adminAppearanceStudioValue_("appearanceThemeVis_" + key, true) === true;
+    visibility.devices.desktop[key] = adminAppearanceStudioValue_("appearanceThemeVisDesktop_" + key, true) === true;
+    visibility.devices.tablet[key] = adminAppearanceStudioValue_("appearanceThemeVisTablet_" + key, true) === true;
+    visibility.devices.mobile[key] = adminAppearanceStudioValue_("appearanceThemeVisMobile_" + key, true) === true;
+  });
   return {
-    studioVersion: 1,
+    studioVersion: 2,
     density: density,
     layout: {
       rowHeight: adminAppearanceStudioNumber_("appearanceThemeRowHeight", 76),
@@ -1147,7 +1339,21 @@ function adminAppearanceReadThemeControls_() {
       opacity: adminAppearanceStudioNumber_("appearanceThemeImageOpacity", 100),
       shape: String(adminAppearanceStudioValue_("appearanceThemeImageShape", "square")),
       verticalAlign: String(adminAppearanceStudioValue_("appearanceThemeImageAlign", "center")),
-      oversize: adminAppearanceStudioValue_("appearanceThemeImageOversize", false) === true
+      oversize: adminAppearanceStudioValue_("appearanceThemeImageOversize", false) === true,
+      fit: String(adminAppearanceStudioValue_("appearanceThemeImageFit", "contain")),
+      zoom: adminAppearanceStudioNumber_("appearanceThemeImageZoom", 100),
+      x: adminAppearanceStudioNumber_("appearanceThemeImageX", 50),
+      y: adminAppearanceStudioNumber_("appearanceThemeImageY", 50)
+    },
+    positioning: {
+      cityAlign: String(adminAppearanceStudioValue_("appearanceThemeCityAlign", "left")),
+      nameAlign: String(adminAppearanceStudioValue_("appearanceThemeNameAlign", "left")),
+      textVertical: String(adminAppearanceStudioValue_("appearanceThemeTextVertical", "center")),
+      textOffsetX: adminAppearanceStudioNumber_("appearanceThemeTextOffsetX", 0),
+      textOffsetY: adminAppearanceStudioNumber_("appearanceThemeTextOffsetY", 0),
+      scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeScoreAnchor", "bottom-left")),
+      confidenceVertical: String(adminAppearanceStudioValue_("appearanceThemeConfidenceVertical", "center")),
+      statusAlign: String(adminAppearanceStudioValue_("appearanceThemeStatusAlign", "left"))
     },
     selection: {
       selectedBorderColor: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -1163,6 +1369,41 @@ function adminAppearanceReadThemeControls_() {
       incorrectTreatment: "red-outline",
       borderWidth: adminAppearanceStudioNumber_("appearanceThemeResultBorderWidth", 2)
     },
+    resultTypography: {
+      correct: {
+        city: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextCity", "#ffffff")),
+        teamName: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextName", "#ffffff")),
+        score: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextScore", "#22c55e")),
+        status: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextStatus", "#22c55e")),
+        confidenceNumber: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextConfidence", "#22c55e")),
+        confidenceLabel: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextLabel", "#94a3b8")),
+        points: String(adminAppearanceStudioValue_("appearanceThemeCorrectTextPoints", "#22c55e"))
+      },
+      incorrect: {
+        city: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextCity", "#ffffff")),
+        teamName: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextName", "#ffffff")),
+        score: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextScore", "#ef4444")),
+        status: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextStatus", "#ef4444")),
+        confidenceNumber: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextConfidence", "#ef4444")),
+        confidenceLabel: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextLabel", "#94a3b8")),
+        points: String(adminAppearanceStudioValue_("appearanceThemeIncorrectTextPoints", "#ef4444"))
+      }
+    },
+    overlays: {
+      selectedColor: String(adminAppearanceStudioValue_("appearanceThemeSelectedOverlayColor", "#2563eb")),
+      selectedOpacity: adminAppearanceStudioNumber_("appearanceThemeSelectedOverlayOpacity", 20),
+      unselectedColor: String(adminAppearanceStudioValue_("appearanceThemeUnselectedOverlayColor", "#020617")),
+      unselectedOpacity: adminAppearanceStudioNumber_("appearanceThemeUnselectedOverlayOpacity", 12),
+      correctColor: String(adminAppearanceStudioValue_("appearanceThemeCorrectOverlayColor", "#22c55e")),
+      correctOpacity: adminAppearanceStudioNumber_("appearanceThemeCorrectOverlayOpacity", 12),
+      incorrectColor: String(adminAppearanceStudioValue_("appearanceThemeIncorrectOverlayColor", "#ef4444")),
+      incorrectOpacity: adminAppearanceStudioNumber_("appearanceThemeIncorrectOverlayOpacity", 12),
+      liveColor: String(adminAppearanceStudioValue_("appearanceThemeLiveOverlayColor", "#ef4444")),
+      liveOpacity: adminAppearanceStudioNumber_("appearanceThemeLiveOverlayOpacity", 0),
+      finalColor: String(adminAppearanceStudioValue_("appearanceThemeFinalOverlayColor", "#e2e8f0")),
+      finalOpacity: adminAppearanceStudioNumber_("appearanceThemeFinalOverlayOpacity", 0)
+    },
+    visibility: visibility,
     row: {
       corners: "custom",
       radius: adminAppearanceStudioNumber_("appearanceThemeRadius", 10),
@@ -1224,6 +1465,13 @@ function adminAppearanceUpdateThemePreview_() {
     "unselected-" + theme.selection.unselectedTreatment,
     "image-shape-" + theme.images.shape,
     "image-align-" + theme.images.verticalAlign,
+    "image-fit-" + theme.images.fit,
+    "city-align-" + theme.positioning.cityAlign,
+    "name-align-" + theme.positioning.nameAlign,
+    "text-vertical-" + theme.positioning.textVertical,
+    "score-anchor-" + theme.positioning.scoreAnchor,
+    "confidence-vertical-" + theme.positioning.confidenceVertical,
+    "status-align-" + theme.positioning.statusAlign,
     "shadow-" + theme.row.shadow,
     "background-" + theme.background.mode,
     "confidence-style-" + theme.confidence.style,
@@ -1250,6 +1498,11 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-confidence-size": theme.typography.confidenceSize + "px",
     "--ap-image-size": theme.images.size + "px",
     "--ap-image-opacity": theme.images.opacity / 100,
+    "--ap-image-zoom": theme.images.zoom / 100,
+    "--ap-image-x": theme.images.x + "%",
+    "--ap-image-y": theme.images.y + "%",
+    "--ap-text-offset-x": theme.positioning.textOffsetX + "px",
+    "--ap-text-offset-y": theme.positioning.textOffsetY + "px",
     "--ap-selected-border": theme.selection.selectedBorderColor,
     "--ap-selected-width": theme.selection.selectedBorderWidth + "px",
     "--ap-selected-bg": adminAppearanceStudioHexRgba_(theme.selection.selectedTint, theme.selection.selectedTintOpacity),
@@ -1261,6 +1514,12 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-surface": theme.background.solid,
     "--ap-gradient": "linear-gradient(" + theme.background.gradientAngle + "deg," + theme.background.gradientStart + "," + theme.background.gradientEnd + ")",
     "--ap-overlay": theme.background.overlayOpacity / 100,
+    "--ap-selected-overlay": adminAppearanceStudioHexRgba_(theme.overlays.selectedColor, theme.overlays.selectedOpacity),
+    "--ap-unselected-overlay": adminAppearanceStudioHexRgba_(theme.overlays.unselectedColor, theme.overlays.unselectedOpacity),
+    "--ap-correct-overlay": adminAppearanceStudioHexRgba_(theme.overlays.correctColor, theme.overlays.correctOpacity),
+    "--ap-incorrect-overlay": adminAppearanceStudioHexRgba_(theme.overlays.incorrectColor, theme.overlays.incorrectOpacity),
+    "--ap-live-overlay": adminAppearanceStudioHexRgba_(theme.overlays.liveColor, theme.overlays.liveOpacity),
+    "--ap-final-overlay": adminAppearanceStudioHexRgba_(theme.overlays.finalColor, theme.overlays.finalOpacity),
     "--ap-text": theme.colors.text,
     "--ap-muted": theme.colors.muted,
     "--ap-live": theme.colors.live,
@@ -1269,10 +1528,33 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-confidence-text": theme.confidence.text,
     "--ap-confidence-border": theme.confidence.border,
     "--ap-confidence-radius": theme.confidence.radius + "px",
-    "--ap-locked-opacity": theme.confidence.lockedOpacity / 100
+    "--ap-locked-opacity": theme.confidence.lockedOpacity / 100,
+    "--ap-correct-city": theme.resultTypography.correct.city,
+    "--ap-correct-name": theme.resultTypography.correct.teamName,
+    "--ap-correct-score": theme.resultTypography.correct.score,
+    "--ap-correct-status": theme.resultTypography.correct.status,
+    "--ap-correct-confidence": theme.resultTypography.correct.confidenceNumber,
+    "--ap-correct-label": theme.resultTypography.correct.confidenceLabel,
+    "--ap-correct-points": theme.resultTypography.correct.points,
+    "--ap-wrong-city": theme.resultTypography.incorrect.city,
+    "--ap-wrong-name": theme.resultTypography.incorrect.teamName,
+    "--ap-wrong-score": theme.resultTypography.incorrect.score,
+    "--ap-wrong-status": theme.resultTypography.incorrect.status,
+    "--ap-wrong-confidence": theme.resultTypography.incorrect.confidenceNumber,
+    "--ap-wrong-label": theme.resultTypography.incorrect.confidenceLabel,
+    "--ap-wrong-points": theme.resultTypography.incorrect.points
   };
   Object.keys(vars).forEach(function(key) { preview.style.setProperty(key, vars[key]); });
+
+  const device = ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop";
+  preview.querySelectorAll("[data-ap-element]").forEach(function(el) {
+    const key = el.dataset.apElement;
+    const visible = theme.visibility.elements[key] !== false && theme.visibility.devices[device][key] !== false;
+    el.classList.toggle("appearance-element-hidden", !visible);
+  });
+
   adminAppearanceSetPreviewState_(ADMIN_APPEARANCE_STATE.themePreviewState || "pregame", true);
+  adminAppearanceSetPreviewDevice_(device, true);
 }
 
 function adminAppearanceSetPreviewState_(state, skipUpdate) {
@@ -1282,22 +1564,29 @@ function adminAppearanceSetPreviewState_(state, skipUpdate) {
     ["pregame", "live", "final-win", "final-loss"].forEach(function(name) {
       preview.classList.toggle("appearance-studio-preview-state-" + name, name === ADMIN_APPEARANCE_STATE.themePreviewState);
     });
-    const status = preview.querySelector(".appearance-preview-status");
     const scores = preview.querySelectorAll(".appearance-preview-score");
-    if (status) {
-      if (state === "live") status.textContent = "Q3 6:42";
-      else if (state === "final-win" || state === "final-loss") status.textContent = "FINAL";
-      else status.textContent = "SUN 12:00 PM";
-    }
     scores.forEach(function(score, index) {
-      score.style.display = state === "pregame" ? "none" : "grid";
       score.textContent = state === "final-loss" ? (index === 0 ? "17" : "24") : (index === 0 ? "28" : "21");
+    });
+    preview.querySelectorAll(".appearance-preview-result-indicator").forEach(function(mark, index) {
+      mark.textContent = state === "final-loss" && index === 0 ? "✕" : "✓";
     });
   }
   document.querySelectorAll("[data-preview-state]").forEach(function(button) {
     button.classList.toggle("active", button.dataset.previewState === ADMIN_APPEARANCE_STATE.themePreviewState);
   });
   if (!skipUpdate && preview) adminAppearanceUpdateThemePreview_();
+}
+
+function adminAppearanceSetPreviewDevice_(device, skipUpdate) {
+  device = ["desktop", "tablet", "mobile"].indexOf(String(device || "")) !== -1 ? String(device) : "desktop";
+  ADMIN_APPEARANCE_STATE.themePreviewDevice = device;
+  const frame = document.getElementById("appearanceThemePreviewFrame");
+  if (frame) frame.className = "appearance-preview-device-frame preview-device-" + device;
+  document.querySelectorAll("[data-preview-device]").forEach(function(button) {
+    button.classList.toggle("active", button.dataset.previewDevice === device);
+  });
+  if (!skipUpdate) adminAppearanceUpdateThemePreview_();
 }
 
 async function adminAppearancePersistTheme_(options) {

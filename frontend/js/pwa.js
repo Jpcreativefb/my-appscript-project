@@ -1,7 +1,7 @@
 (function registerAwardsPwa() {
   if (!("serviceWorker" in navigator)) return;
 
-  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio";
+  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout";
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";

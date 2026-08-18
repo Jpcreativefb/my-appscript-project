@@ -1017,6 +1017,17 @@ function confidenceFallbackOdds_(category) {
 
 }
 
+function renderConfidenceStatusParts_(category, phase) {
+  const status = escapeHtml(formatConfidenceSportsStatus_(category));
+  if (phase === "live") {
+    return `<span class="confidence-live-badge">LIVE</span><span class="confidence-live-clock">${status}</span>`;
+  }
+  if (phase === "final") {
+    return `<span class="confidence-final-badge">FINAL</span>`;
+  }
+  return `<span class="confidence-game-time">${status}</span>`;
+}
+
 function renderConfidenceDetails_(category, dirty, locked, phase) {
 
   const odds = PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id] || confidenceFallbackOdds_(category);
@@ -1034,7 +1045,7 @@ function renderConfidenceDetails_(category, dirty, locked, phase) {
       ontoggle="toggleConfidenceDetails_('${escapeJs(category.id)}', this.open)"
     >
       <summary class="confidence-game-meta">
-        <strong class="confidence-live-status ${phase}">${escapeHtml(formatConfidenceSportsStatus_(category))}</strong>
+        <strong class="confidence-live-status ${phase}">${renderConfidenceStatusParts_(category, phase)}</strong>
         <span class="confidence-game-question">${escapeHtml(getCategoryDisplayTitle(category))}</span>
         <span class="confidence-details-prompt">Odds · Records · Favorite</span>
         ${dirty ? `<strong>Unsaved</strong>` : locked ? `<strong>Locked</strong>` : `<span></span>`}
@@ -1042,21 +1053,21 @@ function renderConfidenceDetails_(category, dirty, locked, phase) {
       <div class="confidence-details-grid">
         <div class="confidence-detail-team">
           <strong>${escapeHtml(away)}</strong>
-          <span>Record ${escapeHtml(category.awayRecord || "—")}</span>
-          <span>ML ${escapeHtml(confidenceOddsToAmerican_(odds.awayOdds))}</span>
-          <span>Spread ${escapeHtml(confidenceSpreadLabel_(odds.awaySpread))}</span>
+          <span class="confidence-detail-record">Record ${escapeHtml(category.awayRecord || "—")}</span>
+          <span class="confidence-detail-moneyline">ML ${escapeHtml(confidenceOddsToAmerican_(odds.awayOdds))}</span>
+          <span class="confidence-detail-spread">Spread ${escapeHtml(confidenceSpreadLabel_(odds.awaySpread))}</span>
         </div>
         <div class="confidence-detail-center">
-          <span>Favorite</span>
-          <strong>${escapeHtml(favorite)}</strong>
-          <small>O/U ${escapeHtml(String(total))}</small>
+          <span class="confidence-detail-favorite-label">Favorite</span>
+          <strong class="confidence-detail-favorite">${escapeHtml(favorite)}</strong>
+          <small class="confidence-detail-over-under">O/U ${escapeHtml(String(total))}</small>
           ${loading ? `<small>Loading odds…</small>` : source ? `<small>${escapeHtml(source)}</small>` : ""}
         </div>
         <div class="confidence-detail-team home">
           <strong>${escapeHtml(home)}</strong>
-          <span>Record ${escapeHtml(category.homeRecord || "—")}</span>
-          <span>ML ${escapeHtml(confidenceOddsToAmerican_(odds.homeOdds))}</span>
-          <span>Spread ${escapeHtml(confidenceSpreadLabel_(odds.homeSpread))}</span>
+          <span class="confidence-detail-record">Record ${escapeHtml(category.homeRecord || "—")}</span>
+          <span class="confidence-detail-moneyline">ML ${escapeHtml(confidenceOddsToAmerican_(odds.homeOdds))}</span>
+          <span class="confidence-detail-spread">Spread ${escapeHtml(confidenceSpreadLabel_(odds.homeSpread))}</span>
         </div>
       </div>
     </details>
@@ -1632,8 +1643,17 @@ function confidenceThemePresentation_() {
   const live = theme.live || {};
   const background = theme.background || {};
   const confidence = theme.confidence || {};
+  const positioning = theme.positioning || {};
+  const overlays = theme.overlays || {};
+  const visibility = theme.visibility || {};
+  const visElements = visibility.elements || {};
+  const visDevices = visibility.devices || {};
+  const resultTypography = theme.resultTypography || {};
+  const correctType = resultTypography.correct || {};
+  const wrongType = resultTypography.incorrect || {};
 
   const unselected = confidenceThemeToken_(selection.unselectedTreatment || team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale");
+  const imageFit = confidenceThemeToken_(images.fit, ["contain", "cover", "full-bleed"], "contain");
   const classes = [
     "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
     "confidence-theme-city-" + confidenceThemeToken_(team.cityScale, ["small", "medium"], "small"),
@@ -1644,6 +1664,13 @@ function confidenceThemePresentation_() {
     "confidence-theme-shadow-" + confidenceThemeToken_(row.shadow, ["none", "soft", "strong"], "soft"),
     "confidence-theme-image-shape-" + confidenceThemeToken_(images.shape, ["square", "soft", "round"], "square"),
     "confidence-theme-image-align-" + confidenceThemeToken_(images.verticalAlign, ["top", "center", "bottom"], "center"),
+    "confidence-theme-image-fit-" + imageFit,
+    "confidence-theme-city-align-" + confidenceThemeToken_(positioning.cityAlign, ["left", "center", "right"], "left"),
+    "confidence-theme-name-align-" + confidenceThemeToken_(positioning.nameAlign, ["left", "center", "right"], "left"),
+    "confidence-theme-text-vertical-" + confidenceThemeToken_(positioning.textVertical, ["top", "center", "bottom"], "center"),
+    "confidence-theme-score-anchor-" + confidenceThemeToken_(positioning.scoreAnchor, ["top-left", "top-right", "bottom-left", "bottom-right"], "bottom-left"),
+    "confidence-theme-confidence-vertical-" + confidenceThemeToken_(positioning.confidenceVertical, ["top", "center", "bottom"], "center"),
+    "confidence-theme-status-align-" + confidenceThemeToken_(positioning.statusAlign, ["left", "center", "right"], "left"),
     "confidence-theme-background-" + confidenceThemeToken_(background.mode, ["solid", "gradient"], "gradient"),
     "confidence-theme-confidence-" + confidenceThemeToken_(confidence.style, ["filled", "outline", "minimal"], "filled"),
     "confidence-theme-live-badge-" + confidenceThemeToken_(live.badgeStyle, ["text", "outline", "pill"], "text"),
@@ -1651,34 +1678,48 @@ function confidenceThemePresentation_() {
     typography.uppercase === false ? "confidence-theme-team-naturalcase" : "confidence-theme-team-uppercase"
   ];
 
+  const visibilityKeys = ["city","teamName","teamImage","score","versus","gameTime","liveBadge","clock","finalBadge","confidenceLabel","confidenceValue","points","resultIndicator","detailsBar","records","favorite","moneyline","spread","overUnder"];
+  visibilityKeys.forEach(function(key) {
+    if (visElements[key] === false) classes.push("confidence-hide-" + key);
+    ["desktop", "tablet", "mobile"].forEach(function(device) {
+      const deviceMap = visDevices[device] || {};
+      if (deviceMap[key] === false) classes.push("confidence-hide-" + key + "-" + device);
+    });
+  });
+
   if (images.oversize === true) classes.push("confidence-theme-image-oversize");
   if (Object.keys(colors).length || Number(theme.studioVersion) >= 1) classes.push("confidence-theme-custom-colors");
 
-  const rowHeight = confidenceThemeNumber_(layout.rowHeight, 60, 140, 76);
-  const rowPadding = confidenceThemeNumber_(layout.rowPadding, 2, 20, 7);
-  const teamGap = confidenceThemeNumber_(layout.teamGap, 0, 24, 7);
-  const versusWidth = confidenceThemeNumber_(layout.versusWidth, 12, 48, 32);
-  const confidenceWidth = confidenceThemeNumber_(layout.confidenceWidth, 52, 140, 92);
-  const citySize = confidenceThemeNumber_(typography.citySize, 8, 18, 10);
-  const cityWeight = confidenceThemeNumber_(typography.cityWeight, 400, 900, 700);
-  const cityOpacity = confidenceThemeNumber_(typography.cityOpacity, 20, 100, 62);
-  const nameSize = confidenceThemeNumber_(typography.teamNameSize, 11, 28, 16);
-  const nameWeight = confidenceThemeNumber_(typography.teamNameWeight, 500, 1000, 950);
-  const nameSpacing = confidenceThemeNumber_(typography.teamNameSpacing, -2, 12, 2.5);
-  const scoreSize = confidenceThemeNumber_(typography.scoreSize, 10, 26, 12);
-  const confidenceSize = confidenceThemeNumber_(typography.confidenceSize, 12, 30, 16);
-  const imageSize = confidenceThemeNumber_(images.size, 22, 92, 38);
-  const imageOpacity = confidenceThemeNumber_(images.opacity, 20, 100, 100);
-  const selectedBorderWidth = confidenceThemeNumber_(selection.selectedBorderWidth, 0, 8, 2);
-  const selectedTintOpacity = confidenceThemeNumber_(selection.selectedTintOpacity, 0, 70, 20);
+  const rowHeight = confidenceThemeNumber_(layout.rowHeight, 60, 160, 76);
+  const rowPadding = confidenceThemeNumber_(layout.rowPadding, 0, 24, 7);
+  const teamGap = confidenceThemeNumber_(layout.teamGap, 0, 28, 7);
+  const versusWidth = confidenceThemeNumber_(layout.versusWidth, 0, 52, 32);
+  const confidenceWidth = confidenceThemeNumber_(layout.confidenceWidth, 44, 160, 92);
+  const citySize = confidenceThemeNumber_(typography.citySize, 7, 24, 10);
+  const cityWeight = confidenceThemeNumber_(typography.cityWeight, 300, 1000, 700);
+  const cityOpacity = confidenceThemeNumber_(typography.cityOpacity, 0, 100, 62);
+  const nameSize = confidenceThemeNumber_(typography.teamNameSize, 10, 36, 16);
+  const nameWeight = confidenceThemeNumber_(typography.teamNameWeight, 300, 1000, 950);
+  const nameSpacing = confidenceThemeNumber_(typography.teamNameSpacing, -3, 14, 2.5);
+  const scoreSize = confidenceThemeNumber_(typography.scoreSize, 9, 34, 12);
+  const confidenceSize = confidenceThemeNumber_(typography.confidenceSize, 11, 38, 16);
+  const imageSize = confidenceThemeNumber_(images.size, 20, 140, 38);
+  const imageOpacity = confidenceThemeNumber_(images.opacity, 0, 100, 100);
+  const imageZoom = confidenceThemeNumber_(images.zoom, 50, 220, 100);
+  const imageX = confidenceThemeNumber_(images.x, 0, 100, 50);
+  const imageY = confidenceThemeNumber_(images.y, 0, 100, 50);
+  const textOffsetX = confidenceThemeNumber_(positioning.textOffsetX, -30, 30, 0);
+  const textOffsetY = confidenceThemeNumber_(positioning.textOffsetY, -30, 30, 0);
+  const selectedBorderWidth = confidenceThemeNumber_(selection.selectedBorderWidth, 0, 10, 2);
+  const selectedTintOpacity = confidenceThemeNumber_(selection.selectedTintOpacity, 0, 80, 20);
   const unselectedGray = confidenceThemeNumber_(selection.unselectedGrayscale, 0, 100, 100);
-  const unselectedOpacity = confidenceThemeNumber_(selection.unselectedOpacity, 10, 100, 48);
-  const resultWidth = confidenceThemeNumber_(result.borderWidth, 1, 8, 2);
-  const radius = confidenceThemeNumber_(row.radius, 0, 28, row.corners === "rounded" ? 18 : row.corners === "square" ? 0 : 10);
+  const unselectedOpacity = confidenceThemeNumber_(selection.unselectedOpacity, 0, 100, 48);
+  const resultWidth = confidenceThemeNumber_(result.borderWidth, 0, 10, 2);
+  const radius = confidenceThemeNumber_(row.radius, 0, 32, row.corners === "rounded" ? 18 : row.corners === "square" ? 0 : 10);
   const gradientAngle = confidenceThemeNumber_(background.gradientAngle, 0, 360, 180);
   const overlayOpacity = confidenceThemeNumber_(background.overlayOpacity, 0, 80, 0);
-  const confidenceRadius = confidenceThemeNumber_(confidence.radius, 0, 24, 8);
-  const lockedOpacity = confidenceThemeNumber_(confidence.lockedOpacity, 30, 100, 62);
+  const confidenceRadius = confidenceThemeNumber_(confidence.radius, 0, 28, 8);
+  const lockedOpacity = confidenceThemeNumber_(confidence.lockedOpacity, 20, 100, 62);
 
   const vars = [
     "--confidence-theme-accent:" + confidenceThemeSafeColor_(colors.accent || selection.selectedBorderColor, "#60a5fa"),
@@ -1705,6 +1746,11 @@ function confidenceThemePresentation_() {
     "--confidence-value-size:" + confidenceSize + "px",
     "--confidence-image-size:" + imageSize + "px",
     "--confidence-image-opacity:" + (imageOpacity / 100),
+    "--confidence-image-zoom:" + (imageZoom / 100),
+    "--confidence-image-x:" + imageX + "%",
+    "--confidence-image-y:" + imageY + "%",
+    "--confidence-text-offset-x:" + textOffsetX + "px",
+    "--confidence-text-offset-y:" + textOffsetY + "px",
     "--confidence-selected-border:" + confidenceThemeSafeColor_(selection.selectedBorderColor || colors.accent, "#60a5fa"),
     "--confidence-selected-width:" + selectedBorderWidth + "px",
     "--confidence-selected-bg:" + confidenceThemeHexRgba_(selection.selectedTint || colors.accent, selectedTintOpacity, "#2563eb"),
@@ -1713,11 +1759,31 @@ function confidenceThemePresentation_() {
     "--confidence-result-width:" + resultWidth + "px",
     "--confidence-gradient:" + "linear-gradient(" + gradientAngle + "deg," + confidenceThemeSafeColor_(background.gradientStart, "#1e293b") + "," + confidenceThemeSafeColor_(background.gradientEnd, "#0f172a") + ")",
     "--confidence-overlay-opacity:" + (overlayOpacity / 100),
+    "--confidence-selected-overlay:" + confidenceThemeHexRgba_(overlays.selectedColor || selection.selectedTint, confidenceThemeNumber_(overlays.selectedOpacity,0,80,20), "#2563eb"),
+    "--confidence-unselected-overlay:" + confidenceThemeHexRgba_(overlays.unselectedColor, confidenceThemeNumber_(overlays.unselectedOpacity,0,80,12), "#020617"),
+    "--confidence-correct-overlay:" + confidenceThemeHexRgba_(overlays.correctColor || colors.correct, confidenceThemeNumber_(overlays.correctOpacity,0,80,12), "#22c55e"),
+    "--confidence-incorrect-overlay:" + confidenceThemeHexRgba_(overlays.incorrectColor || colors.incorrect, confidenceThemeNumber_(overlays.incorrectOpacity,0,80,12), "#ef4444"),
+    "--confidence-live-overlay:" + confidenceThemeHexRgba_(overlays.liveColor || colors.live, confidenceThemeNumber_(overlays.liveOpacity,0,60,0), "#ef4444"),
+    "--confidence-final-overlay:" + confidenceThemeHexRgba_(overlays.finalColor || colors.final, confidenceThemeNumber_(overlays.finalOpacity,0,60,0), "#e2e8f0"),
     "--confidence-value-bg:" + confidenceThemeSafeColor_(confidence.background, "#0b1220"),
     "--confidence-value-text:" + confidenceThemeSafeColor_(confidence.text || colors.text, "#ffffff"),
     "--confidence-value-border:" + confidenceThemeSafeColor_(confidence.border || colors.accent, "#60a5fa"),
     "--confidence-value-radius:" + confidenceRadius + "px",
-    "--confidence-locked-opacity:" + (lockedOpacity / 100)
+    "--confidence-locked-opacity:" + (lockedOpacity / 100),
+    "--confidence-correct-city:" + confidenceThemeSafeColor_(correctType.city || colors.text, "#ffffff"),
+    "--confidence-correct-name:" + confidenceThemeSafeColor_(correctType.teamName || colors.text, "#ffffff"),
+    "--confidence-correct-score:" + confidenceThemeSafeColor_(correctType.score || colors.correct, "#22c55e"),
+    "--confidence-correct-status:" + confidenceThemeSafeColor_(correctType.status || colors.correct, "#22c55e"),
+    "--confidence-correct-value:" + confidenceThemeSafeColor_(correctType.confidenceNumber || colors.correct, "#22c55e"),
+    "--confidence-correct-label:" + confidenceThemeSafeColor_(correctType.confidenceLabel || colors.muted, "#94a3b8"),
+    "--confidence-correct-points:" + confidenceThemeSafeColor_(correctType.points || colors.correct, "#22c55e"),
+    "--confidence-wrong-city:" + confidenceThemeSafeColor_(wrongType.city || colors.text, "#ffffff"),
+    "--confidence-wrong-name:" + confidenceThemeSafeColor_(wrongType.teamName || colors.text, "#ffffff"),
+    "--confidence-wrong-score:" + confidenceThemeSafeColor_(wrongType.score || colors.incorrect, "#ef4444"),
+    "--confidence-wrong-status:" + confidenceThemeSafeColor_(wrongType.status || colors.incorrect, "#ef4444"),
+    "--confidence-wrong-value:" + confidenceThemeSafeColor_(wrongType.confidenceNumber || colors.incorrect, "#ef4444"),
+    "--confidence-wrong-label:" + confidenceThemeSafeColor_(wrongType.confidenceLabel || colors.muted, "#94a3b8"),
+    "--confidence-wrong-points:" + confidenceThemeSafeColor_(wrongType.points || colors.incorrect, "#ef4444")
   ];
 
   return { className: classes.join(" "), style: vars.join(";") };
@@ -1810,16 +1876,16 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
       aria-label="Pick ${escapeAttr(nominee.name || "team")}"
       ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
     >
-      <span class="confidence-team-city">${escapeHtml(parts.city)}</span>
-      <strong class="confidence-team-nickname">${escapeHtml(parts.nickname)}</strong>
-      <span class="confidence-team-visual">
+      <span class="confidence-team-city confidence-element-city">${escapeHtml(parts.city)}</span>
+      <strong class="confidence-team-nickname confidence-element-team-name">${escapeHtml(parts.nickname)}</strong>
+      <span class="confidence-team-visual confidence-element-team-image">
         ${platformImgHtml(appearanceImage.imageUrl, {
           className: "confidence-team-logo",
           variant: "thumb",
           alt: nominee.name || "Team"
         })}
-        ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score">${escapeHtml(String(score))}</strong>` : ""}
-        ${selected ? `<span class="confidence-selected-mark">✓</span>` : ""}
+        ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score confidence-element-score">${escapeHtml(String(score))}</strong>` : ""}
+        ${selected ? `<span class="confidence-selected-mark confidence-element-result-indicator">✓</span>` : ""}
         ${actualWinner && phase === "final" ? `<span class="confidence-winner-mark">W</span>` : ""}
       </span>
     </button>
@@ -1852,13 +1918,13 @@ function renderCompactConfidenceRow_(category) {
       <div class="confidence-game-main">
         ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked, result)}
 
-        <div class="confidence-versus" aria-hidden="true">VS</div>
+        <div class="confidence-versus confidence-element-versus" aria-hidden="true">VS</div>
 
         ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked, result)}
 
         <label class="confidence-row-value">
-          <span>Confidence</span>
-          <select
+          <span class="confidence-value-label">Confidence</span>
+          <select class="confidence-value-input"
             id="confidence-${escapeAttr(category.id)}"
             onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
             ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
@@ -1866,7 +1932,7 @@ function renderCompactConfidenceRow_(category) {
             <option value="">—</option>
             ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
           </select>
-          ${resultPoints ? `<strong class="confidence-result-points ${result.className}">${escapeHtml(resultPoints)}</strong>` : ""}
+          ${resultPoints ? `<strong class="confidence-result-points confidence-element-points ${result.className}">${escapeHtml(resultPoints)}</strong>` : ""}
         </label>
       </div>
 

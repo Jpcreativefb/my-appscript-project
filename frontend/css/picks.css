@@ -1896,3 +1896,190 @@
   .confidence-compact-slate .confidence-team-city { font-size:min(var(--confidence-city-size),11px); }
   .confidence-compact-slate .confidence-team-nickname { font-size:min(var(--confidence-name-size),18px); }
 }
+
+
+/* =========================================================
+   v1.2.17l — Advanced Layout + Full Image + Responsive Visibility
+========================================================= */
+.confidence-compact-slate {
+  --confidence-image-zoom:1;
+  --confidence-image-x:50%;
+  --confidence-image-y:50%;
+  --confidence-text-offset-x:0px;
+  --confidence-text-offset-y:0px;
+  --confidence-selected-overlay:rgba(37,99,235,.2);
+  --confidence-unselected-overlay:rgba(2,6,23,.12);
+  --confidence-correct-overlay:rgba(34,197,94,.12);
+  --confidence-incorrect-overlay:rgba(239,68,68,.12);
+  --confidence-live-overlay:rgba(239,68,68,0);
+  --confidence-final-overlay:rgba(226,232,240,0);
+  --confidence-correct-city:#fff;
+  --confidence-correct-name:#fff;
+  --confidence-correct-score:#22c55e;
+  --confidence-correct-status:#22c55e;
+  --confidence-correct-value:#22c55e;
+  --confidence-correct-label:#94a3b8;
+  --confidence-correct-points:#22c55e;
+  --confidence-wrong-city:#fff;
+  --confidence-wrong-name:#fff;
+  --confidence-wrong-score:#ef4444;
+  --confidence-wrong-status:#ef4444;
+  --confidence-wrong-value:#ef4444;
+  --confidence-wrong-label:#94a3b8;
+  --confidence-wrong-points:#ef4444;
+}
+.confidence-compact-slate .confidence-game-row.phase-live { box-shadow:inset 0 0 0 999px var(--confidence-live-overlay), 0 5px 14px rgba(0,0,0,.18); }
+.confidence-compact-slate .confidence-game-row.phase-final { box-shadow:inset 0 0 0 999px var(--confidence-final-overlay), 0 5px 14px rgba(0,0,0,.18); }
+.confidence-compact-slate .confidence-team-choice { isolation:isolate; overflow:hidden; }
+.confidence-compact-slate .confidence-team-choice::before { content:""; position:absolute; inset:0; z-index:1; pointer-events:none; background:transparent; }
+.confidence-compact-slate .confidence-team-choice.selected::before { background:var(--confidence-selected-overlay); }
+.confidence-compact-slate .confidence-team-choice.not-selected::before { background:var(--confidence-unselected-overlay); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected::before { background:var(--confidence-correct-overlay); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected::before { background:var(--confidence-incorrect-overlay); }
+.confidence-compact-slate .confidence-team-city,
+.confidence-compact-slate .confidence-team-nickname,
+.confidence-compact-slate .confidence-team-visual,
+.confidence-compact-slate .confidence-selected-mark,
+.confidence-compact-slate .confidence-winner-mark { position:relative; z-index:2; }
+.confidence-compact-slate .confidence-team-city,
+.confidence-compact-slate .confidence-team-nickname { transform:translate(var(--confidence-text-offset-x),var(--confidence-text-offset-y)); }
+.confidence-compact-slate.confidence-theme-city-align-center .confidence-team-city { text-align:center; }
+.confidence-compact-slate.confidence-theme-city-align-right .confidence-team-city { text-align:right; }
+.confidence-compact-slate.confidence-theme-name-align-center .confidence-team-nickname { text-align:center; }
+.confidence-compact-slate.confidence-theme-name-align-right .confidence-team-nickname { text-align:right; }
+.confidence-compact-slate.confidence-theme-text-vertical-top .confidence-team-choice { align-content:start; }
+.confidence-compact-slate.confidence-theme-text-vertical-center .confidence-team-choice { align-content:center; }
+.confidence-compact-slate.confidence-theme-text-vertical-bottom .confidence-team-choice { align-content:end; }
+.confidence-compact-slate .confidence-team-logo { object-position:var(--confidence-image-x) var(--confidence-image-y); transform:scale(var(--confidence-image-zoom)); }
+.confidence-compact-slate.confidence-theme-image-fit-cover .confidence-team-logo { object-fit:cover; }
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-choice { grid-template-columns:1fr; padding:8px 10px; }
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-visual { position:absolute; inset:0; width:100%; height:100%; z-index:0; overflow:hidden; }
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo { width:100%; height:100%; object-fit:cover; border-radius:0; }
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-city,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-nickname { text-shadow:0 1px 3px rgba(0,0,0,.85); }
+.confidence-compact-slate.confidence-theme-score-anchor-top-left .confidence-team-score { left:4px; top:4px; bottom:auto; right:auto; }
+.confidence-compact-slate.confidence-theme-score-anchor-top-right .confidence-team-score { left:auto; top:4px; bottom:auto; right:4px; }
+.confidence-compact-slate.confidence-theme-score-anchor-bottom-left .confidence-team-score { left:4px; top:auto; bottom:4px; right:auto; }
+.confidence-compact-slate.confidence-theme-score-anchor-bottom-right .confidence-team-score { left:auto; top:auto; bottom:4px; right:4px; }
+.confidence-compact-slate.confidence-theme-confidence-vertical-top .confidence-row-value { align-content:start; padding-top:4px; }
+.confidence-compact-slate.confidence-theme-confidence-vertical-bottom .confidence-row-value { align-content:end; padding-bottom:4px; }
+.confidence-compact-slate.confidence-theme-status-align-center .confidence-live-status { text-align:center; justify-self:center; }
+.confidence-compact-slate.confidence-theme-status-align-right .confidence-live-status { text-align:right; justify-self:end; }
+.confidence-live-badge { margin-right:5px; font-weight:950; }
+.confidence-live-clock { white-space:nowrap; }
+
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected .confidence-team-city { color:var(--confidence-correct-city); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected .confidence-team-nickname { color:var(--confidence-correct-name); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected .confidence-team-score { color:var(--confidence-correct-score); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-live-status { color:var(--confidence-correct-status); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-row-value select { color:var(--confidence-correct-value); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-value-label { color:var(--confidence-correct-label); }
+.confidence-compact-slate .confidence-game-row.correct .confidence-result-points { color:var(--confidence-correct-points); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected .confidence-team-city { color:var(--confidence-wrong-city); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected .confidence-team-nickname { color:var(--confidence-wrong-name); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected .confidence-team-score { color:var(--confidence-wrong-score); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-live-status { color:var(--confidence-wrong-status); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-row-value select { color:var(--confidence-wrong-value); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-value-label { color:var(--confidence-wrong-label); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-result-points { color:var(--confidence-wrong-points); }
+
+/* Master visibility */
+.confidence-hide-city .confidence-team-city,
+.confidence-hide-teamName .confidence-team-nickname,
+.confidence-hide-teamImage .confidence-team-logo,
+.confidence-hide-score .confidence-team-score,
+.confidence-hide-versus .confidence-versus,
+.confidence-hide-gameTime .confidence-game-time,
+.confidence-hide-liveBadge .confidence-live-badge,
+.confidence-hide-clock .confidence-live-clock,
+.confidence-hide-finalBadge .confidence-final-badge,
+.confidence-hide-confidenceLabel .confidence-value-label,
+.confidence-hide-confidenceValue .confidence-value-input,
+.confidence-hide-points .confidence-result-points,
+.confidence-hide-resultIndicator .confidence-selected-mark,
+.confidence-hide-resultIndicator .confidence-winner-mark,
+.confidence-hide-detailsBar .confidence-game-details,
+.confidence-hide-records .confidence-detail-record,
+.confidence-hide-favorite .confidence-detail-favorite,
+.confidence-hide-favorite .confidence-detail-favorite-label,
+.confidence-hide-moneyline .confidence-detail-moneyline,
+.confidence-hide-spread .confidence-detail-spread,
+.confidence-hide-overUnder .confidence-detail-over-under { display:none !important; }
+
+@media (min-width:901px) {
+  .confidence-hide-city-desktop .confidence-team-city,
+  .confidence-hide-teamName-desktop .confidence-team-nickname,
+  .confidence-hide-teamImage-desktop .confidence-team-logo,
+  .confidence-hide-score-desktop .confidence-team-score,
+  .confidence-hide-versus-desktop .confidence-versus,
+  .confidence-hide-gameTime-desktop .confidence-game-time,
+  .confidence-hide-liveBadge-desktop .confidence-live-badge,
+  .confidence-hide-clock-desktop .confidence-live-clock,
+  .confidence-hide-finalBadge-desktop .confidence-final-badge,
+  .confidence-hide-confidenceLabel-desktop .confidence-value-label,
+  .confidence-hide-confidenceValue-desktop .confidence-value-input,
+  .confidence-hide-points-desktop .confidence-result-points,
+  .confidence-hide-resultIndicator-desktop .confidence-selected-mark,
+  .confidence-hide-resultIndicator-desktop .confidence-winner-mark,
+  .confidence-hide-detailsBar-desktop .confidence-game-details,
+  .confidence-hide-records-desktop .confidence-detail-record,
+  .confidence-hide-favorite-desktop .confidence-detail-favorite,
+  .confidence-hide-favorite-desktop .confidence-detail-favorite-label,
+  .confidence-hide-moneyline-desktop .confidence-detail-moneyline,
+  .confidence-hide-spread-desktop .confidence-detail-spread,
+  .confidence-hide-overUnder-desktop .confidence-detail-over-under { display:none !important; }
+}
+@media (min-width:601px) and (max-width:900px) {
+  .confidence-hide-city-tablet .confidence-team-city,
+  .confidence-hide-teamName-tablet .confidence-team-nickname,
+  .confidence-hide-teamImage-tablet .confidence-team-logo,
+  .confidence-hide-score-tablet .confidence-team-score,
+  .confidence-hide-versus-tablet .confidence-versus,
+  .confidence-hide-gameTime-tablet .confidence-game-time,
+  .confidence-hide-liveBadge-tablet .confidence-live-badge,
+  .confidence-hide-clock-tablet .confidence-live-clock,
+  .confidence-hide-finalBadge-tablet .confidence-final-badge,
+  .confidence-hide-confidenceLabel-tablet .confidence-value-label,
+  .confidence-hide-confidenceValue-tablet .confidence-value-input,
+  .confidence-hide-points-tablet .confidence-result-points,
+  .confidence-hide-resultIndicator-tablet .confidence-selected-mark,
+  .confidence-hide-resultIndicator-tablet .confidence-winner-mark,
+  .confidence-hide-detailsBar-tablet .confidence-game-details,
+  .confidence-hide-records-tablet .confidence-detail-record,
+  .confidence-hide-favorite-tablet .confidence-detail-favorite,
+  .confidence-hide-favorite-tablet .confidence-detail-favorite-label,
+  .confidence-hide-moneyline-tablet .confidence-detail-moneyline,
+  .confidence-hide-spread-tablet .confidence-detail-spread,
+  .confidence-hide-overUnder-tablet .confidence-detail-over-under { display:none !important; }
+}
+@media (max-width:600px) {
+  .confidence-hide-city-mobile .confidence-team-city,
+  .confidence-hide-teamName-mobile .confidence-team-nickname,
+  .confidence-hide-teamImage-mobile .confidence-team-logo,
+  .confidence-hide-score-mobile .confidence-team-score,
+  .confidence-hide-versus-mobile .confidence-versus,
+  .confidence-hide-gameTime-mobile .confidence-game-time,
+  .confidence-hide-liveBadge-mobile .confidence-live-badge,
+  .confidence-hide-clock-mobile .confidence-live-clock,
+  .confidence-hide-finalBadge-mobile .confidence-final-badge,
+  .confidence-hide-confidenceLabel-mobile .confidence-value-label,
+  .confidence-hide-confidenceValue-mobile .confidence-value-input,
+  .confidence-hide-points-mobile .confidence-result-points,
+  .confidence-hide-resultIndicator-mobile .confidence-selected-mark,
+  .confidence-hide-resultIndicator-mobile .confidence-winner-mark,
+  .confidence-hide-detailsBar-mobile .confidence-game-details,
+  .confidence-hide-records-mobile .confidence-detail-record,
+  .confidence-hide-favorite-mobile .confidence-detail-favorite,
+  .confidence-hide-favorite-mobile .confidence-detail-favorite-label,
+  .confidence-hide-moneyline-mobile .confidence-detail-moneyline,
+  .confidence-hide-spread-mobile .confidence-detail-spread,
+  .confidence-hide-overUnder-mobile .confidence-detail-over-under { display:none !important; }
+}
+
+@media (max-width:600px) {
+  .confidence-compact-slate .confidence-game-main {
+    grid-template-columns:minmax(0,1fr) minmax(0,var(--confidence-versus-width)) minmax(0,1fr) minmax(46px,var(--confidence-value-width));
+    gap:max(3px,calc(var(--confidence-team-gap) * .6));
+  }
+  .confidence-compact-slate .confidence-versus { display:grid; }
+}
