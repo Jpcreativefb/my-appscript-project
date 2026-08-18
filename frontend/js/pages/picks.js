@@ -1494,11 +1494,23 @@ function confidenceAppearanceKey_(value) {
 }
 
 function confidenceAppearanceEntityType_(category, nominee) {
-  return String(
+  const explicit = String(
     nominee && nominee.entryType ||
     category && category.entryType ||
-    "nominee"
-  ).trim().toLowerCase() || "nominee";
+    ""
+  ).trim().toLowerCase();
+
+  if (explicit) return explicit;
+
+  const questionType = String(category && category.questionType || "").trim().toLowerCase();
+  const scoringEngine = String(category && category.scoringEngine || "").trim().toLowerCase();
+  const sportsGameId = String(category && category.sportsGameId || "").trim();
+
+  if (questionType === "team-matchup" || scoringEngine === "sports" || sportsGameId) {
+    return "team";
+  }
+
+  return "nominee";
 }
 
 function confidenceAppearanceDriveUrl_(fileId) {
@@ -1511,13 +1523,42 @@ function confidenceAppearanceResolvedImage_(category, nominee) {
   const assignment = bundle.assignment || {};
   const entityType = confidenceAppearanceEntityType_(category, nominee);
   const entityId = String(nominee && nominee.id || "").trim();
+  const entityName = String(nominee && nominee.name || "").trim();
   const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
 
-  const override = (bundle.overrides || []).find(function(row) {
-    return confidenceAppearanceBool_(row.Active, true) &&
-      confidenceAppearanceKey_(row.GameId || gameId) === confidenceAppearanceKey_(gameId) &&
-      confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
-      confidenceAppearanceKey_(row.EntityId) === confidenceAppearanceKey_(entityId);
+  function rowMatchesId_(row) {
+    return confidenceAppearanceKey_(row && row.EntityId) === confidenceAppearanceKey_(entityId);
+  }
+
+  function rowMatchesName_(row) {
+    return !!entityName &&
+      confidenceAppearanceKey_(row && row.EntityName) === confidenceAppearanceKey_(entityName);
+  }
+
+  function bestEntityMatch_(rows, extraMatch) {
+    const activeRows = (rows || []).filter(function(row) {
+      return confidenceAppearanceBool_(row && row.Active, true) &&
+        (!extraMatch || extraMatch(row));
+    });
+
+    let match = activeRows.find(function(row) {
+      return confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
+        rowMatchesId_(row);
+    });
+    if (match) return match;
+
+    match = activeRows.find(rowMatchesId_);
+    if (match) return match;
+
+    match = activeRows.find(function(row) {
+      return confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
+        rowMatchesName_(row);
+    });
+    return match || activeRows.find(rowMatchesName_) || null;
+  }
+
+  const override = bestEntityMatch_(bundle.overrides || [], function(row) {
+    return confidenceAppearanceKey_(row.GameId || gameId) === confidenceAppearanceKey_(gameId);
   });
 
   if (override) {
@@ -1529,12 +1570,9 @@ function confidenceAppearanceResolvedImage_(category, nominee) {
   const imageMode = confidenceAppearanceKey_(assignment.ImageMode || "pack");
 
   if (imagePackId && imageMode !== "default") {
-    const item = (bundle.imagePackItems || []).find(function(row) {
+    const item = bestEntityMatch_(bundle.imagePackItems || [], function(row) {
       const variant = confidenceAppearanceKey_(row.Variant || "default");
-      return confidenceAppearanceBool_(row.Active, true) &&
-        confidenceAppearanceKey_(row.PackId) === confidenceAppearanceKey_(imagePackId) &&
-        confidenceAppearanceKey_(row.EntityType) === confidenceAppearanceKey_(entityType) &&
-        confidenceAppearanceKey_(row.EntityId) === confidenceAppearanceKey_(entityId) &&
+      return confidenceAppearanceKey_(row.PackId) === confidenceAppearanceKey_(imagePackId) &&
         (variant === "default" || !variant);
     });
 
@@ -1544,7 +1582,17 @@ function confidenceAppearanceResolvedImage_(category, nominee) {
     }
   }
 
-  return { imageUrl: String(nominee && nominee.image || "").trim(), source: "default" };
+  return {
+    imageUrl: String(
+      nominee && (
+        nominee.image ||
+        nominee.img ||
+        nominee.imageUrl ||
+        nominee.logoUrl
+      ) || ""
+    ).trim(),
+    source: "default"
+  };
 }
 
 function confidenceThemeToken_(value, allowed, fallback) {

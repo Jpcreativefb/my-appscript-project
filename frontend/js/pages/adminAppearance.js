@@ -97,7 +97,12 @@ function adminAppearanceUniqueEntities_() {
 
   (setup.categories || []).forEach(function(category) {
     (category.nominees || []).forEach(function(nominee) {
-      const entityType = String(nominee.entryType || category.entryType || "nominee").trim().toLowerCase() || "nominee";
+      const explicitEntityType = String(nominee.entryType || category.entryType || "").trim().toLowerCase();
+      const questionType = String(category.questionType || category.settings && category.settings.questionType || "").trim().toLowerCase();
+      const scoringEngine = String(category.scoringEngine || category.settings && category.settings.scoringEngine || "").trim().toLowerCase();
+      const sportsGameId = String(category.sportsGameId || category.settings && category.settings.sportsGameId || "").trim();
+      const entityType = explicitEntityType ||
+        (questionType === "team-matchup" || scoringEngine === "sports" || sportsGameId ? "team" : "nominee");
       const entityId = String(nominee.id || nominee.nomineeId || "").trim();
       if (!entityId) return;
       const key = entityType + "::" + adminAppearanceKey_(entityId);
@@ -765,7 +770,7 @@ async function adminAppearanceUploadPackImage_(index) {
       entityId: entity.entityId,
       entityName: entity.entityName,
       variant: "default",
-      imageUrl: "",
+      imageUrl: upload.thumbnailUrl || "",
       imageFileId: upload.fileId || "",
       altText: entity.entityName,
       active: true
@@ -858,7 +863,7 @@ async function adminAppearanceUploadOverride_(index) {
       gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
       entityType: entity.entityType,
       entityId: entity.entityId,
-      imageUrl: "",
+      imageUrl: upload.thumbnailUrl || "",
       imageFileId: upload.fileId || "",
       active: true
     });

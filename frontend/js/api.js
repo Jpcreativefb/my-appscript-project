@@ -1730,7 +1730,10 @@ async function apiAdminSaveAppearanceOverride(payload) {
 }
 
 async function apiGetGameAppearance(gameId) {
-  return api("getGameAppearance", { gameId: gameId || getFrontendGameId() || "" });
+  return api("getGameAppearance", {
+    gameId: gameId || getFrontendGameId() || "",
+    appearanceNonce: Date.now()
+  });
 }
 
 /* ======================
