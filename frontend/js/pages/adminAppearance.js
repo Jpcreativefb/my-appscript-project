@@ -425,14 +425,15 @@ function adminAppearanceStudioDefaults_(theme) {
   const incorrectType = resultTypography.incorrect || {};
 
   return {
-    studioVersion: 2,
+    studioVersion: 3,
     density: theme.density || "compact",
     layout: {
       rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
       rowPadding: adminAppearanceStudioClamp_(layout.rowPadding, 0, 24, 7),
       teamGap: adminAppearanceStudioClamp_(layout.teamGap, 0, 28, 7),
       versusWidth: adminAppearanceStudioClamp_(layout.versusWidth, 0, 52, 32),
-      confidenceWidth: adminAppearanceStudioClamp_(layout.confidenceWidth, 44, 160, 92)
+      confidenceWidth: adminAppearanceStudioClamp_(layout.confidenceWidth, 44, 160, 92),
+      teamOrder: layout.teamOrder || "away-home"
     },
     typography: {
       citySize: adminAppearanceStudioClamp_(typography.citySize, 7, 24, team.cityScale === "medium" ? 12 : 10),
@@ -452,6 +453,7 @@ function adminAppearanceStudioDefaults_(theme) {
       verticalAlign: images.verticalAlign || "center",
       oversize: images.oversize === true,
       fit: images.fit || "contain",
+      layer: images.layer || (images.fit === "full-bleed" ? "background" : "inline"),
       zoom: adminAppearanceStudioClamp_(images.zoom, 50, 220, 100),
       x: adminAppearanceStudioClamp_(images.x, 0, 100, 50),
       y: adminAppearanceStudioClamp_(images.y, 0, 100, 50)
@@ -465,6 +467,19 @@ function adminAppearanceStudioDefaults_(theme) {
       scoreAnchor: positioning.scoreAnchor || "bottom-left",
       confidenceVertical: positioning.confidenceVertical || "center",
       statusAlign: positioning.statusAlign || "left"
+    },
+    sideLayout: {
+      separate: theme.sideLayout && theme.sideLayout.separate === true,
+      away: {
+        textAlign: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textAlign || positioning.nameAlign || "left",
+        scoreAnchor: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.scoreAnchor || positioning.scoreAnchor || "bottom-left",
+        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageX, 0, 100, images.x == null ? 50 : images.x)
+      },
+      home: {
+        textAlign: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textAlign || positioning.nameAlign || "left",
+        scoreAnchor: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.scoreAnchor || positioning.scoreAnchor || "bottom-left",
+        imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageX, 0, 100, images.x == null ? 50 : images.x)
+      }
     },
     selection: {
       selectedBorderColor: selection.selectedBorderColor || colors.accent || "#60a5fa",
@@ -644,11 +659,12 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeGap", "Team Gap", theme.layout.teamGap, 0, 24, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeVsWidth", "VS Width", theme.layout.versusWidth, 12, 48, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeConfidenceWidth", "Confidence Width", theme.layout.confidenceWidth, 52, 140, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeTeamOrder", "Team Order", theme.layout.teamOrder, [["away-home","Away Left · Home Right"],["home-away","Home Left · Away Right"]])}
             ${adminAppearanceStudioRange_("appearanceThemeRadius", "Row Corners", theme.row.radius, 0, 28, 1, "px")}
             ${adminAppearanceStudioSelect_("appearanceThemeShadow", "Shadow", theme.row.shadow, [["none","None"],["soft","Soft"],["strong","Strong"]])}
           </div></details>
 
-          <details open><summary>Typography</summary><div class="appearance-studio-panel">
+          <details><summary>Typography</summary><div class="appearance-studio-panel">
             ${adminAppearanceStudioRange_("appearanceThemeCitySize", "City Size", theme.typography.citySize, 8, 18, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeCityWeight", "City Weight", theme.typography.cityWeight, 400, 900, 100, "")}
             ${adminAppearanceStudioRange_("appearanceThemeCityOpacity", "City Opacity", theme.typography.cityOpacity, 20, 100, 1, "%")}
@@ -660,9 +676,10 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeConfidenceSize", "Confidence Number Size", theme.typography.confidenceSize, 12, 30, 1, "px")}
           </div></details>
 
-          <details open><summary>Images & Full Image Mode</summary><div class="appearance-studio-panel">
-            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Mode", theme.images.fit, [["contain","Contain"],["cover","Cover Frame"],["full-bleed","Full Image Button"]])}
-            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Image Size", theme.images.size, 20, 140, 1, "px")}
+          <details><summary>Images & Full Image Mode</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeImageLayer", "Image Layer", theme.images.layer, [["inline","Inline Logo/Image"],["background","Bottom Layer · Text & Score on Top"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Fit", theme.images.fit, [["contain","Contain"],["cover","Cover"],["full-bleed","Full Image Button"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Inline Image Size", theme.images.size, 20, 140, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeImageZoom", "Image Zoom", theme.images.zoom, 50, 220, 1, "%")}
             ${adminAppearanceStudioRange_("appearanceThemeImageX", "Image X Position", theme.images.x, 0, 100, 1, "%")}
             ${adminAppearanceStudioRange_("appearanceThemeImageY", "Image Y Position", theme.images.y, 0, 100, 1, "%")}
@@ -672,7 +689,7 @@ function adminAppearanceThemeEditor_() {
             <label class="appearance-studio-check"><input id="appearanceThemeImageOversize" type="checkbox" ${theme.images.oversize ? 'checked' : ''}><span>Allow image to oversize panel</span></label>
           </div></details>
 
-          <details open><summary>Element Positioning</summary><div class="appearance-studio-panel">
+          <details><summary>Element Positioning</summary><div class="appearance-studio-panel">
             ${adminAppearanceStudioSelect_("appearanceThemeCityAlign", "City Alignment", theme.positioning.cityAlign, [["left","Left"],["center","Center"],["right","Right"]])}
             ${adminAppearanceStudioSelect_("appearanceThemeNameAlign", "Team Name Alignment", theme.positioning.nameAlign, [["left","Left"],["center","Center"],["right","Right"]])}
             ${adminAppearanceStudioSelect_("appearanceThemeTextVertical", "Text Vertical", theme.positioning.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
@@ -683,7 +700,23 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioSelect_("appearanceThemeStatusAlign", "Status Alignment", theme.positioning.statusAlign, [["left","Left"],["center","Center"],["right","Right"]])}
           </div></details>
 
-          <details open><summary>Selection & Results</summary><div class="appearance-studio-panel">
+          <details><summary>Home / Away Layout</summary><div class="appearance-studio-panel">
+            <label class="appearance-studio-check"><input id="appearanceThemeSeparateSides" type="checkbox" ${theme.sideLayout.separate ? 'checked' : ''}><span>Use separate Home / Away positioning</span></label>
+            <div class="appearance-side-layout-grid">
+              <fieldset><legend>Away</legend>
+                ${adminAppearanceStudioSelect_("appearanceThemeAwayTextAlign", "Text Alignment", theme.sideLayout.away.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeAwayScoreAnchor", "Score Position", theme.sideLayout.away.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayImageX", "Image X", theme.sideLayout.away.imageX, 0, 100, 1, "%")}
+              </fieldset>
+              <fieldset><legend>Home</legend>
+                ${adminAppearanceStudioSelect_("appearanceThemeHomeTextAlign", "Text Alignment", theme.sideLayout.home.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeHomeScoreAnchor", "Score Position", theme.sideLayout.home.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeImageX", "Image X", theme.sideLayout.home.imageX, 0, 100, 1, "%")}
+              </fieldset>
+            </div>
+          </div></details>
+
+          <details><summary>Selection & Results</summary><div class="appearance-studio-panel">
             ${adminAppearanceStudioColor_("appearanceThemeSelectedBorder", "Selected Border", theme.selection.selectedBorderColor)}
             ${adminAppearanceStudioRange_("appearanceThemeSelectedBorderWidth", "Selected Border Width", theme.selection.selectedBorderWidth, 0, 8, 1, "px")}
             ${adminAppearanceStudioColor_("appearanceThemeSelectedTint", "Selected Tint", theme.selection.selectedTint)}
@@ -744,16 +777,16 @@ function adminAppearanceThemeEditor_() {
           ${adminAppearanceThemePreview_(theme)}
         </main>
 
-        <aside class="appearance-studio-actions">
-          <h3>Theme Actions</h3>
-          <button type="button" class="button" onclick="adminAppearanceSaveTheme_()">Save Theme</button>
-          <button type="button" class="button secondary" onclick="adminAppearanceDuplicateTheme_()">Duplicate Theme</button>
-          <button type="button" class="button secondary" onclick="adminAppearanceSaveThemeAsNew_()">Save As New</button>
-          <button type="button" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">Apply to This Game</button>
-          <button type="button" class="button secondary" onclick="adminAppearanceResetTheme_()">Reset Theme Controls</button>
-          <button type="button" class="button secondary" onclick="adminAppearanceNewTheme_()">+ Blank Theme</button>
-          <div class="admin-sub">Theme changes affect appearance only. Picks, scoring, schedules and Image Packs are untouched.</div>
-        </aside>
+      </div>
+      <div class="appearance-studio-actions appearance-studio-actions-bar">
+        <strong>Theme Actions</strong>
+        <button type="button" class="button" onclick="adminAppearanceSaveTheme_()">Save</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">Apply to Game</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceDuplicateTheme_()">Duplicate</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceSaveThemeAsNew_()">Save As New</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceResetTheme_()">Reset</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceNewTheme_()">+ Blank</button>
+        <small>Theme changes affect appearance only. Picks, scoring, schedules and Image Packs are untouched.</small>
       </div>
     </div>`;
 }
@@ -761,14 +794,15 @@ function adminAppearanceThemeEditor_() {
 function adminAppearanceThemePreview_(theme) {
   theme = adminAppearanceStudioDefaults_(theme);
   const entities = adminAppearancePreviewEntities_();
-  function teamHtml(entity, selected) {
+  function teamHtml(entity, selected, side) {
     const image = entity.imageUrl
       ? '<img src="' + adminAppearanceEscape_(entity.imageUrl) + '" alt="">'
       : '<span class="appearance-preview-placeholder">★</span>';
-    return `<button type="button" class="appearance-preview-team ${selected ? 'selected' : 'muted'}">
+    return `<button type="button" class="appearance-preview-team appearance-preview-team-${side} ${selected ? 'selected' : 'muted'}">
+      <span class="appearance-preview-image"><span class="appearance-preview-image-art" data-ap-element="teamImage">${image}</span></span>
       <small data-ap-element="city">${adminAppearanceEscape_(entity.city)}</small>
       <strong data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
-      <span class="appearance-preview-image"><span class="appearance-preview-image-art" data-ap-element="teamImage">${image}</span><b class="appearance-preview-score" data-ap-element="score">21</b></span>
+      <b class="appearance-preview-score" data-ap-element="score">21</b>
       <span class="appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>
     </button>`;
   }
@@ -780,18 +814,22 @@ function adminAppearanceThemePreview_(theme) {
         <button type="button" data-preview-state="final-win" onclick="adminAppearanceSetPreviewState_('final-win')">Final Win</button>
         <button type="button" data-preview-state="final-loss" onclick="adminAppearanceSetPreviewState_('final-loss')">Final Loss</button>
       </div>
-      <div class="appearance-studio-device-tabs" aria-label="Preview size">
-        <button type="button" data-preview-device="desktop" onclick="adminAppearanceSetPreviewDevice_('desktop')">Desktop</button>
-        <button type="button" data-preview-device="tablet" onclick="adminAppearanceSetPreviewDevice_('tablet')">Tablet</button>
-        <button type="button" data-preview-device="mobile" onclick="adminAppearanceSetPreviewDevice_('mobile')">Mobile</button>
+      <div class="appearance-studio-device-tools">
+        <div class="appearance-studio-device-tabs" aria-label="Preview size">
+          <button type="button" data-preview-device="desktop" onclick="adminAppearanceSetPreviewDevice_('desktop')">Desktop</button>
+          <button type="button" data-preview-device="tablet" onclick="adminAppearanceSetPreviewDevice_('tablet')">Tablet</button>
+          <button type="button" data-preview-device="mobile" onclick="adminAppearanceSetPreviewDevice_('mobile')">Mobile</button>
+        </div>
+        <button type="button" id="appearanceStudioFullPreviewButton" class="appearance-studio-full-preview" onclick="adminAppearanceToggleFullPreview_()">Full Preview</button>
       </div>
     </div>
-    <div id="appearanceThemePreviewFrame" class="appearance-preview-device-frame preview-device-desktop">
+    <div class="appearance-preview-stage">
+      <div id="appearanceThemePreviewFrame" class="appearance-preview-device-frame preview-device-desktop">
       <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame">
         <div class="appearance-preview-main">
-          ${teamHtml(entities[0], true)}
+          ${teamHtml(entities[0], true, "away")}
           <b class="appearance-preview-vs" data-ap-element="versus">VS</b>
-          ${teamHtml(entities[1], false)}
+          ${teamHtml(entities[1], false, "home")}
           <div class="appearance-preview-confidence">
             <small data-ap-element="confidenceLabel">Confidence</small>
             <strong data-ap-element="confidenceValue">16</strong>
@@ -808,8 +846,9 @@ function adminAppearanceThemePreview_(theme) {
           <span class="appearance-preview-details-text"><span data-ap-element="moneyline">Odds</span> · <span data-ap-element="records">Records</span> · <span data-ap-element="favorite">Favorite</span></span>
         </div>
       </div>
+      </div>
     </div>
-    <div class="appearance-studio-preview-note">Switch Desktop / Tablet / Mobile above. Live preview uses the first two entities from the selected game when available.</div>
+    <div class="appearance-studio-preview-note"><span id="appearancePreviewSizeLabel">Desktop · 1180px</span> · Live preview uses the first two entities from the selected game when available.</div>
   </div>`;
 }
 
@@ -1314,14 +1353,15 @@ function adminAppearanceReadThemeControls_() {
     visibility.devices.mobile[key] = adminAppearanceStudioValue_("appearanceThemeVisMobile_" + key, true) === true;
   });
   return {
-    studioVersion: 2,
+    studioVersion: 3,
     density: density,
     layout: {
       rowHeight: adminAppearanceStudioNumber_("appearanceThemeRowHeight", 76),
       rowPadding: adminAppearanceStudioNumber_("appearanceThemeRowPadding", 7),
       teamGap: adminAppearanceStudioNumber_("appearanceThemeGap", 7),
       versusWidth: adminAppearanceStudioNumber_("appearanceThemeVsWidth", 32),
-      confidenceWidth: adminAppearanceStudioNumber_("appearanceThemeConfidenceWidth", 92)
+      confidenceWidth: adminAppearanceStudioNumber_("appearanceThemeConfidenceWidth", 92),
+      teamOrder: String(adminAppearanceStudioValue_("appearanceThemeTeamOrder", "away-home"))
     },
     typography: {
       citySize: adminAppearanceStudioNumber_("appearanceThemeCitySize", 10),
@@ -1341,6 +1381,7 @@ function adminAppearanceReadThemeControls_() {
       verticalAlign: String(adminAppearanceStudioValue_("appearanceThemeImageAlign", "center")),
       oversize: adminAppearanceStudioValue_("appearanceThemeImageOversize", false) === true,
       fit: String(adminAppearanceStudioValue_("appearanceThemeImageFit", "contain")),
+      layer: String(adminAppearanceStudioValue_("appearanceThemeImageLayer", "inline")),
       zoom: adminAppearanceStudioNumber_("appearanceThemeImageZoom", 100),
       x: adminAppearanceStudioNumber_("appearanceThemeImageX", 50),
       y: adminAppearanceStudioNumber_("appearanceThemeImageY", 50)
@@ -1354,6 +1395,19 @@ function adminAppearanceReadThemeControls_() {
       scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeScoreAnchor", "bottom-left")),
       confidenceVertical: String(adminAppearanceStudioValue_("appearanceThemeConfidenceVertical", "center")),
       statusAlign: String(adminAppearanceStudioValue_("appearanceThemeStatusAlign", "left"))
+    },
+    sideLayout: {
+      separate: adminAppearanceStudioValue_("appearanceThemeSeparateSides", false) === true,
+      away: {
+        textAlign: String(adminAppearanceStudioValue_("appearanceThemeAwayTextAlign", "left")),
+        scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeAwayScoreAnchor", "bottom-left")),
+        imageX: adminAppearanceStudioNumber_("appearanceThemeAwayImageX", 50)
+      },
+      home: {
+        textAlign: String(adminAppearanceStudioValue_("appearanceThemeHomeTextAlign", "left")),
+        scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeHomeScoreAnchor", "bottom-left")),
+        imageX: adminAppearanceStudioNumber_("appearanceThemeHomeImageX", 50)
+      }
     },
     selection: {
       selectedBorderColor: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -1466,6 +1520,13 @@ function adminAppearanceUpdateThemePreview_() {
     "image-shape-" + theme.images.shape,
     "image-align-" + theme.images.verticalAlign,
     "image-fit-" + theme.images.fit,
+    "image-layer-" + theme.images.layer,
+    "team-order-" + theme.layout.teamOrder,
+    theme.sideLayout.separate ? "side-layout-separate" : "side-layout-shared",
+    "away-align-" + theme.sideLayout.away.textAlign,
+    "home-align-" + theme.sideLayout.home.textAlign,
+    "away-score-anchor-" + theme.sideLayout.away.scoreAnchor,
+    "home-score-anchor-" + theme.sideLayout.home.scoreAnchor,
     "city-align-" + theme.positioning.cityAlign,
     "name-align-" + theme.positioning.nameAlign,
     "text-vertical-" + theme.positioning.textVertical,
@@ -1501,6 +1562,8 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-image-zoom": theme.images.zoom / 100,
     "--ap-image-x": theme.images.x + "%",
     "--ap-image-y": theme.images.y + "%",
+    "--ap-away-image-x": theme.sideLayout.away.imageX + "%",
+    "--ap-home-image-x": theme.sideLayout.home.imageX + "%",
     "--ap-text-offset-x": theme.positioning.textOffsetX + "px",
     "--ap-text-offset-y": theme.positioning.textOffsetY + "px",
     "--ap-selected-border": theme.selection.selectedBorderColor,
@@ -1583,10 +1646,22 @@ function adminAppearanceSetPreviewDevice_(device, skipUpdate) {
   ADMIN_APPEARANCE_STATE.themePreviewDevice = device;
   const frame = document.getElementById("appearanceThemePreviewFrame");
   if (frame) frame.className = "appearance-preview-device-frame preview-device-" + device;
+  const sizeLabel = document.getElementById("appearancePreviewSizeLabel");
+  if (sizeLabel) sizeLabel.textContent = device === "desktop" ? "Desktop · 1180px" : device === "tablet" ? "Tablet · 820px" : "Mobile · 390px";
   document.querySelectorAll("[data-preview-device]").forEach(function(button) {
     button.classList.toggle("active", button.dataset.previewDevice === device);
   });
   if (!skipUpdate) adminAppearanceUpdateThemePreview_();
+}
+
+function adminAppearanceToggleFullPreview_() {
+  const editor = document.querySelector(".appearance-theme-editor");
+  if (!editor) return;
+  const active = !editor.classList.contains("appearance-studio-preview-only");
+  editor.classList.toggle("appearance-studio-preview-only", active);
+  const button = document.getElementById("appearanceStudioFullPreviewButton");
+  if (button) button.textContent = active ? "Show Controls" : "Full Preview";
+  window.setTimeout(function() { adminAppearanceUpdateThemePreview_(); }, 0);
 }
 
 async function adminAppearancePersistTheme_(options) {

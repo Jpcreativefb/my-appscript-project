@@ -584,3 +584,164 @@
 
 .appearance-preview-image-art { display:grid; place-items:center; width:100%; height:100%; }
 .appearance-preview-image-art img { width:100%; height:100%; }
+
+/* =========================================================
+   v1.2.17m — Studio Canvas, Image Layers & Home/Away Layout
+========================================================= */
+.appearance-studio-shell {
+  grid-template-columns:minmax(220px,260px) minmax(0,1fr);
+  gap:10px;
+}
+.appearance-studio-controls {
+  max-height:none;
+  overflow:visible;
+  gap:5px;
+  padding-right:0;
+}
+.appearance-studio-controls summary { padding:6px 8px; font-size:.76rem; }
+.appearance-studio-panel { gap:7px; padding:2px 8px 8px; }
+.appearance-studio-controls label { gap:3px; font-size:.72rem; }
+.appearance-studio-range output { font-size:.66rem; }
+.appearance-studio-color { grid-template-columns:1fr 38px; }
+.appearance-studio-color input[type="color"] { width:38px; height:28px; }
+.appearance-studio-topbar { grid-template-columns:repeat(4,minmax(130px,1fr)); gap:6px; }
+.appearance-studio-topbar label { font-size:.72rem; }
+.appearance-studio-topbar .input,
+.appearance-studio-controls .input { min-height:32px; padding:5px 7px; font-size:.75rem; }
+.appearance-studio-canvas { position:sticky; top:8px; min-width:0; }
+.appearance-studio-actions-bar {
+  position:static;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:5px;
+  margin-top:10px;
+  padding:7px 8px;
+  border:1px solid rgba(100,116,139,.22);
+  border-radius:9px;
+  background:rgba(15,23,42,.14);
+}
+.appearance-studio-actions-bar strong { margin-right:4px; font-size:.73rem; }
+.appearance-studio-actions-bar .button { width:auto; min-height:30px; padding:5px 9px; font-size:.7rem; }
+.appearance-studio-actions-bar small { margin-left:auto; opacity:.65; font-size:.65rem; }
+.appearance-studio-device-tools { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+.appearance-studio-full-preview {
+  border:1px solid rgba(96,165,250,.55);
+  border-radius:8px;
+  padding:6px 9px;
+  background:rgba(37,99,235,.14);
+  color:inherit;
+  font-size:.72rem;
+  font-weight:850;
+  cursor:pointer;
+}
+.appearance-preview-stage {
+  width:100%;
+  overflow:auto;
+  padding:8px 4px 12px;
+  border-radius:10px;
+  background:rgba(2,6,23,.16);
+}
+.appearance-preview-device-frame {
+  margin-inline:auto;
+  max-width:none !important;
+  transition:width .18s ease;
+}
+.appearance-preview-device-frame.preview-device-desktop { width:1180px; }
+.appearance-preview-device-frame.preview-device-tablet { width:820px; }
+.appearance-preview-device-frame.preview-device-mobile { width:390px; }
+.appearance-studio-preview-note { font-size:.66rem; opacity:.7; }
+.appearance-studio-preview-only .appearance-studio-topbar,
+.appearance-studio-preview-only .appearance-studio-controls,
+.appearance-studio-preview-only .appearance-studio-actions-bar { display:none !important; }
+.appearance-studio-preview-only .appearance-studio-shell { display:block; }
+.appearance-studio-preview-only .appearance-studio-canvas { position:static; width:100%; }
+.appearance-studio-preview-only .appearance-studio-preview-wrap { min-height:70vh; }
+.appearance-studio-preview-only .appearance-preview-stage { min-height:62vh; display:flex; align-items:flex-start; }
+
+.appearance-side-layout-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.appearance-side-layout-grid fieldset { min-width:0; margin:0; padding:6px; border:1px solid rgba(148,163,184,.18); border-radius:8px; }
+.appearance-side-layout-grid legend { padding:0 4px; font-size:.68rem; font-weight:900; }
+
+/* Team order is explicit, so Away can be placed on the right when desired. */
+.appearance-theme-preview .appearance-preview-team-away { grid-column:1; }
+.appearance-theme-preview .appearance-preview-vs { grid-column:2; }
+.appearance-theme-preview .appearance-preview-team-home { grid-column:3; }
+.appearance-theme-preview .appearance-preview-confidence { grid-column:4; }
+.appearance-theme-preview.team-order-home-away .appearance-preview-team-home { grid-column:1; }
+.appearance-theme-preview.team-order-home-away .appearance-preview-team-away { grid-column:3; }
+
+/* True image bottom layer: artwork reaches the team panel edges; text/scores remain above it. */
+.appearance-theme-preview.image-layer-background .appearance-preview-team,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-team { grid-template-columns:1fr; }
+.appearance-theme-preview.image-layer-background .appearance-preview-image,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image {
+  position:absolute;
+  inset:0;
+  z-index:0;
+  width:100%;
+  height:100%;
+  opacity:var(--ap-image-opacity);
+  overflow:hidden;
+  justify-self:stretch;
+}
+.appearance-theme-preview.image-layer-background .appearance-preview-image-art,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image-art { width:100%; height:100%; }
+.appearance-theme-preview.image-layer-background .appearance-preview-image img,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image img {
+  width:100%;
+  height:100%;
+  object-position:var(--ap-image-x) var(--ap-image-y);
+}
+.appearance-theme-preview.image-layer-background.image-fit-contain .appearance-preview-image img { object-fit:contain; }
+.appearance-theme-preview.image-layer-background.image-fit-cover .appearance-preview-image img,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image img { object-fit:cover; }
+.appearance-theme-preview .appearance-preview-team > small,
+.appearance-theme-preview .appearance-preview-team > strong,
+.appearance-theme-preview .appearance-preview-score,
+.appearance-theme-preview .appearance-preview-result-indicator { position:relative; z-index:2; }
+.appearance-theme-preview.image-layer-background .appearance-preview-team > small,
+.appearance-theme-preview.image-layer-background .appearance-preview-team > strong,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-team > small,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-team > strong { text-shadow:0 1px 4px rgba(0,0,0,.88); }
+.appearance-studio-preview-state-live .appearance-preview-score,
+.appearance-studio-preview-state-final-win .appearance-preview-score,
+.appearance-studio-preview-state-final-loss .appearance-preview-score { display:grid; }
+
+/* Separate Home / Away layout controls override shared positioning only when enabled. */
+.appearance-theme-preview.side-layout-separate.away-align-left .appearance-preview-team-away > small,
+.appearance-theme-preview.side-layout-separate.away-align-left .appearance-preview-team-away > strong { text-align:left; }
+.appearance-theme-preview.side-layout-separate.away-align-center .appearance-preview-team-away > small,
+.appearance-theme-preview.side-layout-separate.away-align-center .appearance-preview-team-away > strong { text-align:center; }
+.appearance-theme-preview.side-layout-separate.away-align-right .appearance-preview-team-away > small,
+.appearance-theme-preview.side-layout-separate.away-align-right .appearance-preview-team-away > strong { text-align:right; }
+.appearance-theme-preview.side-layout-separate.home-align-left .appearance-preview-team-home > small,
+.appearance-theme-preview.side-layout-separate.home-align-left .appearance-preview-team-home > strong { text-align:left; }
+.appearance-theme-preview.side-layout-separate.home-align-center .appearance-preview-team-home > small,
+.appearance-theme-preview.side-layout-separate.home-align-center .appearance-preview-team-home > strong { text-align:center; }
+.appearance-theme-preview.side-layout-separate.home-align-right .appearance-preview-team-home > small,
+.appearance-theme-preview.side-layout-separate.home-align-right .appearance-preview-team-home > strong { text-align:right; }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-away .appearance-preview-image img { object-position:var(--ap-away-image-x) var(--ap-image-y); }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-home .appearance-preview-image img { object-position:var(--ap-home-image-x) var(--ap-image-y); }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-top-left .appearance-preview-team-away .appearance-preview-score { left:4px; right:auto; top:4px; bottom:auto; }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-top-right .appearance-preview-team-away .appearance-preview-score { left:auto; right:4px; top:4px; bottom:auto; }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-bottom-left .appearance-preview-team-away .appearance-preview-score { left:4px; right:auto; top:auto; bottom:4px; }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-bottom-right .appearance-preview-team-away .appearance-preview-score { left:auto; right:4px; top:auto; bottom:4px; }
+.appearance-theme-preview.side-layout-separate.home-score-anchor-top-left .appearance-preview-team-home .appearance-preview-score { left:4px; right:auto; top:4px; bottom:auto; }
+.appearance-theme-preview.side-layout-separate.home-score-anchor-top-right .appearance-preview-team-home .appearance-preview-score { left:auto; right:4px; top:4px; bottom:auto; }
+.appearance-theme-preview.side-layout-separate.home-score-anchor-bottom-left .appearance-preview-team-home .appearance-preview-score { left:4px; right:auto; top:auto; bottom:4px; }
+.appearance-theme-preview.side-layout-separate.home-score-anchor-bottom-right .appearance-preview-team-home .appearance-preview-score { left:auto; right:4px; top:auto; bottom:4px; }
+
+@media (max-width:900px) {
+  .appearance-studio-shell { grid-template-columns:1fr; }
+  .appearance-studio-controls { order:2; }
+  .appearance-studio-canvas { order:1; position:static; }
+  .appearance-studio-topbar { grid-template-columns:1fr 1fr; }
+}
+@media (max-width:620px) {
+  .appearance-studio-topbar { grid-template-columns:1fr; }
+  .appearance-side-layout-grid { grid-template-columns:1fr; }
+  .appearance-preview-device-frame.preview-device-desktop { width:1180px; }
+  .appearance-preview-device-frame.preview-device-tablet { width:820px; }
+  .appearance-preview-device-frame.preview-device-mobile { width:390px; }
+}

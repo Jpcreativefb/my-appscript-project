@@ -1651,9 +1651,14 @@ function confidenceThemePresentation_() {
   const resultTypography = theme.resultTypography || {};
   const correctType = resultTypography.correct || {};
   const wrongType = resultTypography.incorrect || {};
+  const sideLayout = theme.sideLayout || {};
+  const awayLayout = sideLayout.away || {};
+  const homeLayout = sideLayout.home || {};
 
   const unselected = confidenceThemeToken_(selection.unselectedTreatment || team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale");
   const imageFit = confidenceThemeToken_(images.fit, ["contain", "cover", "full-bleed"], "contain");
+  const imageLayer = confidenceThemeToken_(images.layer || (imageFit === "full-bleed" ? "background" : "inline"), ["inline", "background"], "inline");
+  const teamOrder = confidenceThemeToken_(layout.teamOrder, ["away-home", "home-away"], "away-home");
   const classes = [
     "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
     "confidence-theme-city-" + confidenceThemeToken_(team.cityScale, ["small", "medium"], "small"),
@@ -1665,6 +1670,13 @@ function confidenceThemePresentation_() {
     "confidence-theme-image-shape-" + confidenceThemeToken_(images.shape, ["square", "soft", "round"], "square"),
     "confidence-theme-image-align-" + confidenceThemeToken_(images.verticalAlign, ["top", "center", "bottom"], "center"),
     "confidence-theme-image-fit-" + imageFit,
+    "confidence-theme-image-layer-" + imageLayer,
+    "confidence-theme-team-order-" + teamOrder,
+    sideLayout.separate === true ? "confidence-theme-side-layout-separate" : "confidence-theme-side-layout-shared",
+    "confidence-theme-away-align-" + confidenceThemeToken_(awayLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
+    "confidence-theme-home-align-" + confidenceThemeToken_(homeLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
+    "confidence-theme-away-score-anchor-" + confidenceThemeToken_(awayLayout.scoreAnchor, ["top-left", "top-right", "bottom-left", "bottom-right"], positioning.scoreAnchor || "bottom-left"),
+    "confidence-theme-home-score-anchor-" + confidenceThemeToken_(homeLayout.scoreAnchor, ["top-left", "top-right", "bottom-left", "bottom-right"], positioning.scoreAnchor || "bottom-left"),
     "confidence-theme-city-align-" + confidenceThemeToken_(positioning.cityAlign, ["left", "center", "right"], "left"),
     "confidence-theme-name-align-" + confidenceThemeToken_(positioning.nameAlign, ["left", "center", "right"], "left"),
     "confidence-theme-text-vertical-" + confidenceThemeToken_(positioning.textVertical, ["top", "center", "bottom"], "center"),
@@ -1708,6 +1720,8 @@ function confidenceThemePresentation_() {
   const imageZoom = confidenceThemeNumber_(images.zoom, 50, 220, 100);
   const imageX = confidenceThemeNumber_(images.x, 0, 100, 50);
   const imageY = confidenceThemeNumber_(images.y, 0, 100, 50);
+  const awayImageX = confidenceThemeNumber_(awayLayout.imageX, 0, 100, imageX);
+  const homeImageX = confidenceThemeNumber_(homeLayout.imageX, 0, 100, imageX);
   const textOffsetX = confidenceThemeNumber_(positioning.textOffsetX, -30, 30, 0);
   const textOffsetY = confidenceThemeNumber_(positioning.textOffsetY, -30, 30, 0);
   const selectedBorderWidth = confidenceThemeNumber_(selection.selectedBorderWidth, 0, 10, 2);
@@ -1749,6 +1763,8 @@ function confidenceThemePresentation_() {
     "--confidence-image-zoom:" + (imageZoom / 100),
     "--confidence-image-x:" + imageX + "%",
     "--confidence-image-y:" + imageY + "%",
+    "--confidence-away-image-x:" + awayImageX + "%",
+    "--confidence-home-image-x:" + homeImageX + "%",
     "--confidence-text-offset-x:" + textOffsetX + "px",
     "--confidence-text-offset-y:" + textOffsetY + "px",
     "--confidence-selected-border:" + confidenceThemeSafeColor_(selection.selectedBorderColor || colors.accent, "#60a5fa"),
@@ -1870,7 +1886,7 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
   return `
     <button
       type="button"
-      class="confidence-team-choice ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""} ${actualWinner ? "actual-winner" : ""}"
+      class="confidence-team-choice confidence-team-${side || "team"} ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""} ${actualWinner ? "actual-winner" : ""}"
       onclick="draftConfidenceNominee_('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
       aria-pressed="${selected ? "true" : "false"}"
       aria-label="Pick ${escapeAttr(nominee.name || "team")}"
@@ -1884,10 +1900,10 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
           variant: "thumb",
           alt: nominee.name || "Team"
         })}
-        ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score confidence-element-score">${escapeHtml(String(score))}</strong>` : ""}
-        ${selected ? `<span class="confidence-selected-mark confidence-element-result-indicator">✓</span>` : ""}
-        ${actualWinner && phase === "final" ? `<span class="confidence-winner-mark">W</span>` : ""}
       </span>
+      ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score confidence-element-score">${escapeHtml(String(score))}</strong>` : ""}
+      ${selected ? `<span class="confidence-selected-mark confidence-element-result-indicator">✓</span>` : ""}
+      ${actualWinner && phase === "final" ? `<span class="confidence-winner-mark">W</span>` : ""}
     </button>
   `;
 
