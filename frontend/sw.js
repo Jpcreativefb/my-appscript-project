@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217b-confidence-live-v1217f-appearance-setup";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217b-confidence-live-v1217f-appearance-setup";
 
 const APP_SHELL = [
   "./",
@@ -31,8 +31,12 @@ self.addEventListener("install", event => {
   event.waitUntil(
     caches
       .open(AWARDS_CACHE)
-      .then(cache => cache.addAll(APP_SHELL))
-      .catch(err => console.warn("Awards App cache install warning:", err))
+      .then(cache => Promise.all(APP_SHELL.map(asset =>
+        cache.add(asset).catch(err => {
+          console.warn("Awards App shell cache warning:", asset, err);
+          return null;
+        })
+      )))
   );
 });
 
@@ -43,7 +47,7 @@ self.addEventListener("activate", event => {
       .then(keys =>
         Promise.all(
           keys
-            .filter(key => key !== AWARDS_CACHE)
+            .filter(key => key.indexOf("awards-app-") === 0 && key !== AWARDS_CACHE)
             .map(key => caches.delete(key))
         )
       )
@@ -75,11 +79,19 @@ async function networkFirst(request) {
 
     return fresh;
   } catch (err) {
-    const cached = await cache.match(request);
+    let cached = await cache.match(request);
+
+    if (!cached) {
+      cached = await cache.match(request, { ignoreSearch: true });
+    }
 
     if (cached) return cached;
 
     if (request.mode === "navigate") {
+      const path = String(new URL(request.url).pathname || "").toLowerCase();
+      if (path.endsWith("/app.html") || path.endsWith("app.html")) {
+        return cache.match("./app.html");
+      }
       return cache.match("./index.html");
     }
 
@@ -101,3 +113,5 @@ async function networkFirst(request) {
 // v1.2.17d: Appearance Manager + Confidence Image/Theme integration.
 
 // v1.2.17f: Appearance setup transport/reliability hotfix.
+
+// v1.2.17g: iPhone/PWA startup recovery.

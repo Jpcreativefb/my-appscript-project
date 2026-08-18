@@ -373,8 +373,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d";
-const APP_ROUTE_HOTFIX_VERSION = "v1217d-appearance-manager";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery";
+const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
