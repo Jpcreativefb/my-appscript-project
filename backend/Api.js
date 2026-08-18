@@ -1071,6 +1071,29 @@ function doGet(e) {
       }));
     }
 
+    // Appearance metadata writes are intentionally allowed through the direct
+    // Apps Script GET/JSONP transport. These payloads are small and the
+    // frontend uses this path to avoid upload-proxy HTML/time-out responses.
+    if (action === "adminSaveAppearanceImagePack") {
+      return json(apiAdminSaveAppearanceImagePack(params));
+    }
+
+    if (action === "adminSaveAppearanceImagePackItem") {
+      return json(apiAdminSaveAppearanceImagePackItem(params));
+    }
+
+    if (action === "adminSaveAppearanceThemePack") {
+      return json(apiAdminSaveAppearanceThemePack(params));
+    }
+
+    if (action === "adminSaveGameAppearance") {
+      return json(apiAdminSaveGameAppearance(params));
+    }
+
+    if (action === "adminSaveAppearanceOverride") {
+      return json(apiAdminSaveAppearanceOverride(params));
+    }
+
     if (action === "adminSaveGame") {
 
       return json(
