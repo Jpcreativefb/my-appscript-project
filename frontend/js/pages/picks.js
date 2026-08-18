@@ -1605,31 +1605,119 @@ function confidenceThemeSafeColor_(value, fallback) {
   return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
 }
 
+function confidenceThemeNumber_(value, min, max, fallback) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.max(min, Math.min(max, number));
+}
+
+function confidenceThemeHexRgba_(value, opacityPercent, fallback) {
+  const color = confidenceThemeSafeColor_(value, fallback || "#2563eb");
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return "rgba(37,99,235," + (Number(opacityPercent || 0) / 100) + ")";
+  const parsed = parseInt(match[1], 16);
+  return "rgba(" + ((parsed >> 16) & 255) + "," + ((parsed >> 8) & 255) + "," + (parsed & 255) + "," + (Number(opacityPercent || 0) / 100) + ")";
+}
+
 function confidenceThemePresentation_() {
   const theme = (PICKS_PAGE_DATA.appearance && PICKS_PAGE_DATA.appearance.theme) || {};
   const team = theme.team || {};
   const row = theme.row || {};
   const colors = theme.colors || {};
+  const layout = theme.layout || {};
+  const typography = theme.typography || {};
+  const images = theme.images || {};
+  const selection = theme.selection || {};
+  const result = theme.result || {};
+  const live = theme.live || {};
+  const background = theme.background || {};
+  const confidence = theme.confidence || {};
 
+  const unselected = confidenceThemeToken_(selection.unselectedTreatment || team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale");
   const classes = [
     "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
     "confidence-theme-city-" + confidenceThemeToken_(team.cityScale, ["small", "medium"], "small"),
     "confidence-theme-name-" + confidenceThemeToken_(team.nameScale, ["medium", "large", "xlarge"], "large"),
-    "confidence-theme-unselected-" + confidenceThemeToken_(team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale"),
-    "confidence-theme-corners-" + confidenceThemeToken_(row.corners, ["square", "soft", "rounded"], "soft"),
-    "confidence-theme-spacing-" + confidenceThemeToken_(row.spacing, ["tight", "normal"], "tight")
+    "confidence-theme-unselected-" + unselected,
+    "confidence-theme-corners-" + confidenceThemeToken_(row.corners, ["square", "soft", "rounded", "custom"], "soft"),
+    "confidence-theme-spacing-" + confidenceThemeToken_(row.spacing, ["tight", "normal"], "tight"),
+    "confidence-theme-shadow-" + confidenceThemeToken_(row.shadow, ["none", "soft", "strong"], "soft"),
+    "confidence-theme-image-shape-" + confidenceThemeToken_(images.shape, ["square", "soft", "round"], "square"),
+    "confidence-theme-image-align-" + confidenceThemeToken_(images.verticalAlign, ["top", "center", "bottom"], "center"),
+    "confidence-theme-background-" + confidenceThemeToken_(background.mode, ["solid", "gradient"], "gradient"),
+    "confidence-theme-confidence-" + confidenceThemeToken_(confidence.style, ["filled", "outline", "minimal"], "filled"),
+    "confidence-theme-live-badge-" + confidenceThemeToken_(live.badgeStyle, ["text", "outline", "pill"], "text"),
+    "confidence-theme-final-badge-" + confidenceThemeToken_(live.finalBadgeStyle, ["text", "outline", "pill"], "text"),
+    typography.uppercase === false ? "confidence-theme-team-naturalcase" : "confidence-theme-team-uppercase"
   ];
 
-  if (Object.keys(colors).length) classes.push("confidence-theme-custom-colors");
+  if (images.oversize === true) classes.push("confidence-theme-image-oversize");
+  if (Object.keys(colors).length || Number(theme.studioVersion) >= 1) classes.push("confidence-theme-custom-colors");
+
+  const rowHeight = confidenceThemeNumber_(layout.rowHeight, 60, 140, 76);
+  const rowPadding = confidenceThemeNumber_(layout.rowPadding, 2, 20, 7);
+  const teamGap = confidenceThemeNumber_(layout.teamGap, 0, 24, 7);
+  const versusWidth = confidenceThemeNumber_(layout.versusWidth, 12, 48, 32);
+  const confidenceWidth = confidenceThemeNumber_(layout.confidenceWidth, 52, 140, 92);
+  const citySize = confidenceThemeNumber_(typography.citySize, 8, 18, 10);
+  const cityWeight = confidenceThemeNumber_(typography.cityWeight, 400, 900, 700);
+  const cityOpacity = confidenceThemeNumber_(typography.cityOpacity, 20, 100, 62);
+  const nameSize = confidenceThemeNumber_(typography.teamNameSize, 11, 28, 16);
+  const nameWeight = confidenceThemeNumber_(typography.teamNameWeight, 500, 1000, 950);
+  const nameSpacing = confidenceThemeNumber_(typography.teamNameSpacing, -2, 12, 2.5);
+  const scoreSize = confidenceThemeNumber_(typography.scoreSize, 10, 26, 12);
+  const confidenceSize = confidenceThemeNumber_(typography.confidenceSize, 12, 30, 16);
+  const imageSize = confidenceThemeNumber_(images.size, 22, 92, 38);
+  const imageOpacity = confidenceThemeNumber_(images.opacity, 20, 100, 100);
+  const selectedBorderWidth = confidenceThemeNumber_(selection.selectedBorderWidth, 0, 8, 2);
+  const selectedTintOpacity = confidenceThemeNumber_(selection.selectedTintOpacity, 0, 70, 20);
+  const unselectedGray = confidenceThemeNumber_(selection.unselectedGrayscale, 0, 100, 100);
+  const unselectedOpacity = confidenceThemeNumber_(selection.unselectedOpacity, 10, 100, 48);
+  const resultWidth = confidenceThemeNumber_(result.borderWidth, 1, 8, 2);
+  const radius = confidenceThemeNumber_(row.radius, 0, 28, row.corners === "rounded" ? 18 : row.corners === "square" ? 0 : 10);
+  const gradientAngle = confidenceThemeNumber_(background.gradientAngle, 0, 360, 180);
+  const overlayOpacity = confidenceThemeNumber_(background.overlayOpacity, 0, 80, 0);
+  const confidenceRadius = confidenceThemeNumber_(confidence.radius, 0, 24, 8);
+  const lockedOpacity = confidenceThemeNumber_(confidence.lockedOpacity, 30, 100, 62);
 
   const vars = [
-    "--confidence-theme-accent:" + confidenceThemeSafeColor_(colors.accent, "#60a5fa"),
-    "--confidence-theme-surface:" + confidenceThemeSafeColor_(colors.surface, "#0f172a"),
+    "--confidence-theme-accent:" + confidenceThemeSafeColor_(colors.accent || selection.selectedBorderColor, "#60a5fa"),
+    "--confidence-theme-surface:" + confidenceThemeSafeColor_(background.solid || colors.surface, "#0f172a"),
     "--confidence-theme-text:" + confidenceThemeSafeColor_(colors.text, "#ffffff"),
     "--confidence-theme-muted:" + confidenceThemeSafeColor_(colors.muted, "#94a3b8"),
     "--confidence-theme-correct:" + confidenceThemeSafeColor_(colors.correct, "#22c55e"),
     "--confidence-theme-incorrect:" + confidenceThemeSafeColor_(colors.incorrect, "#ef4444"),
-    "--confidence-theme-live:" + confidenceThemeSafeColor_(colors.live, "#ef4444")
+    "--confidence-theme-live:" + confidenceThemeSafeColor_(colors.live, "#ef4444"),
+    "--confidence-theme-final:" + confidenceThemeSafeColor_(colors.final, "#e2e8f0"),
+    "--confidence-row-height:" + rowHeight + "px",
+    "--confidence-row-padding:" + rowPadding + "px",
+    "--confidence-team-gap:" + teamGap + "px",
+    "--confidence-versus-width:" + versusWidth + "px",
+    "--confidence-value-width:" + confidenceWidth + "px",
+    "--confidence-row-radius:" + radius + "px",
+    "--confidence-city-size:" + citySize + "px",
+    "--confidence-city-weight:" + cityWeight,
+    "--confidence-city-opacity:" + (cityOpacity / 100),
+    "--confidence-name-size:" + nameSize + "px",
+    "--confidence-name-weight:" + nameWeight,
+    "--confidence-name-spacing:" + nameSpacing + "px",
+    "--confidence-score-size:" + scoreSize + "px",
+    "--confidence-value-size:" + confidenceSize + "px",
+    "--confidence-image-size:" + imageSize + "px",
+    "--confidence-image-opacity:" + (imageOpacity / 100),
+    "--confidence-selected-border:" + confidenceThemeSafeColor_(selection.selectedBorderColor || colors.accent, "#60a5fa"),
+    "--confidence-selected-width:" + selectedBorderWidth + "px",
+    "--confidence-selected-bg:" + confidenceThemeHexRgba_(selection.selectedTint || colors.accent, selectedTintOpacity, "#2563eb"),
+    "--confidence-unselected-gray:" + (unselectedGray / 100),
+    "--confidence-unselected-opacity:" + (unselectedOpacity / 100),
+    "--confidence-result-width:" + resultWidth + "px",
+    "--confidence-gradient:" + "linear-gradient(" + gradientAngle + "deg," + confidenceThemeSafeColor_(background.gradientStart, "#1e293b") + "," + confidenceThemeSafeColor_(background.gradientEnd, "#0f172a") + ")",
+    "--confidence-overlay-opacity:" + (overlayOpacity / 100),
+    "--confidence-value-bg:" + confidenceThemeSafeColor_(confidence.background, "#0b1220"),
+    "--confidence-value-text:" + confidenceThemeSafeColor_(confidence.text || colors.text, "#ffffff"),
+    "--confidence-value-border:" + confidenceThemeSafeColor_(confidence.border || colors.accent, "#60a5fa"),
+    "--confidence-value-radius:" + confidenceRadius + "px",
+    "--confidence-locked-opacity:" + (lockedOpacity / 100)
   ];
 
   return { className: classes.join(" "), style: vars.join(";") };

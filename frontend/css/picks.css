@@ -1737,3 +1737,162 @@
 .confidence-theme-spacing-normal .confidence-game-main { gap: 10px; padding-block: 8px; }
 .confidence-theme-density-comfortable .confidence-team-choice { min-height: 96px; }
 .confidence-theme-density-standard .confidence-team-choice { min-height: 82px; }
+
+/* =========================================================
+   v1.2.17k — Appearance Studio runtime controls
+========================================================= */
+.confidence-compact-slate {
+  --confidence-row-height:76px;
+  --confidence-row-padding:7px;
+  --confidence-team-gap:7px;
+  --confidence-versus-width:32px;
+  --confidence-value-width:92px;
+  --confidence-row-radius:10px;
+  --confidence-city-size:10px;
+  --confidence-city-weight:700;
+  --confidence-city-opacity:.62;
+  --confidence-name-size:16px;
+  --confidence-name-weight:950;
+  --confidence-name-spacing:2.5px;
+  --confidence-score-size:12px;
+  --confidence-value-size:16px;
+  --confidence-image-size:38px;
+  --confidence-image-opacity:1;
+  --confidence-selected-border:#60a5fa;
+  --confidence-selected-width:2px;
+  --confidence-selected-bg:rgba(37,99,235,.2);
+  --confidence-unselected-gray:1;
+  --confidence-unselected-opacity:.48;
+  --confidence-result-width:2px;
+  --confidence-gradient:linear-gradient(180deg,#1e293b,#0f172a);
+  --confidence-overlay-opacity:0;
+  --confidence-value-bg:#0b1220;
+  --confidence-value-text:#fff;
+  --confidence-value-border:#60a5fa;
+  --confidence-value-radius:8px;
+  --confidence-locked-opacity:.62;
+}
+.confidence-compact-slate .confidence-game-row {
+  position:relative;
+  border-radius:var(--confidence-row-radius);
+  background:linear-gradient(rgba(0,0,0,var(--confidence-overlay-opacity)),rgba(0,0,0,var(--confidence-overlay-opacity))),var(--confidence-gradient);
+}
+.confidence-compact-slate.confidence-theme-background-solid .confidence-game-row {
+  background:linear-gradient(rgba(0,0,0,var(--confidence-overlay-opacity)),rgba(0,0,0,var(--confidence-overlay-opacity))),var(--confidence-theme-surface);
+}
+.confidence-compact-slate .confidence-game-main {
+  grid-template-columns:minmax(0,1fr) var(--confidence-versus-width) minmax(0,1fr) var(--confidence-value-width);
+  gap:var(--confidence-team-gap);
+  min-height:var(--confidence-row-height);
+  padding:var(--confidence-row-padding);
+}
+.confidence-compact-slate .confidence-team-choice {
+  grid-template-columns:minmax(0,1fr) minmax(24px,var(--confidence-image-size));
+  min-height:calc(var(--confidence-row-height) - (var(--confidence-row-padding) * 2));
+  border-radius:calc(var(--confidence-row-radius) * .8);
+}
+.confidence-compact-slate .confidence-team-city {
+  font-size:var(--confidence-city-size);
+  font-weight:var(--confidence-city-weight);
+  opacity:var(--confidence-city-opacity);
+}
+.confidence-compact-slate .confidence-team-nickname {
+  font-size:var(--confidence-name-size);
+  font-weight:var(--confidence-name-weight);
+  letter-spacing:var(--confidence-name-spacing);
+}
+.confidence-compact-slate.confidence-theme-team-uppercase .confidence-team-nickname { text-transform:uppercase; }
+.confidence-compact-slate.confidence-theme-team-naturalcase .confidence-team-nickname { text-transform:none; }
+.confidence-compact-slate .confidence-team-visual {
+  width:var(--confidence-image-size);
+  height:var(--confidence-image-size);
+  justify-self:end;
+  align-self:center;
+  opacity:var(--confidence-image-opacity);
+}
+.confidence-compact-slate.confidence-theme-image-align-top .confidence-team-visual { align-self:start; }
+.confidence-compact-slate.confidence-theme-image-align-bottom .confidence-team-visual { align-self:end; }
+.confidence-compact-slate .confidence-team-logo {
+  width:100%;
+  height:100%;
+}
+.confidence-compact-slate.confidence-theme-image-shape-soft .confidence-team-logo { border-radius:10px; }
+.confidence-compact-slate.confidence-theme-image-shape-round .confidence-team-logo { border-radius:50%; }
+.confidence-compact-slate.confidence-theme-image-oversize .confidence-team-visual { transform:scale(1.16); }
+.confidence-compact-slate .confidence-team-score { font-size:var(--confidence-score-size); }
+.confidence-compact-slate .confidence-team-choice.selected {
+  border-color:var(--confidence-selected-border);
+  border-width:var(--confidence-selected-width);
+  background:var(--confidence-selected-bg);
+}
+.confidence-compact-slate.confidence-theme-unselected-grayscale .confidence-team-choice.not-selected:not(.actual-winner) {
+  opacity:1;
+}
+.confidence-compact-slate.confidence-theme-unselected-grayscale .confidence-team-choice.not-selected:not(.actual-winner) .confidence-team-logo {
+  filter:grayscale(var(--confidence-unselected-gray));
+  opacity:var(--confidence-unselected-opacity);
+}
+.confidence-compact-slate.confidence-theme-unselected-grayscale .confidence-team-choice.not-selected:not(.actual-winner) .confidence-team-city,
+.confidence-compact-slate.confidence-theme-unselected-grayscale .confidence-team-choice.not-selected:not(.actual-winner) .confidence-team-nickname {
+  opacity:var(--confidence-unselected-opacity);
+}
+.confidence-compact-slate.confidence-theme-unselected-dim .confidence-team-choice.not-selected:not(.actual-winner) {
+  opacity:var(--confidence-unselected-opacity);
+}
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected {
+  border-width:var(--confidence-result-width);
+  border-color:var(--confidence-theme-correct);
+}
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected {
+  border-width:var(--confidence-result-width);
+  border-color:var(--confidence-theme-incorrect);
+}
+.confidence-compact-slate .confidence-row-value select {
+  border-color:var(--confidence-value-border);
+  border-radius:var(--confidence-value-radius);
+  background:var(--confidence-value-bg);
+  color:var(--confidence-value-text);
+  font-size:var(--confidence-value-size);
+}
+.confidence-compact-slate.confidence-theme-confidence-outline .confidence-row-value select { background:transparent; }
+.confidence-compact-slate.confidence-theme-confidence-minimal .confidence-row-value select { border-color:transparent; background:transparent; }
+.confidence-compact-slate .confidence-row-value select:disabled { opacity:var(--confidence-locked-opacity); }
+.confidence-compact-slate.confidence-theme-shadow-none .confidence-game-row { box-shadow:none; }
+.confidence-compact-slate.confidence-theme-shadow-soft .confidence-game-row { box-shadow:0 5px 14px rgba(0,0,0,.18); }
+.confidence-compact-slate.confidence-theme-shadow-strong .confidence-game-row { box-shadow:0 12px 30px rgba(0,0,0,.34); }
+.confidence-compact-slate.confidence-theme-live-badge-outline .confidence-live-status.live,
+.confidence-compact-slate.confidence-theme-final-badge-outline .confidence-live-status.final {
+  padding:2px 6px;
+  border:1px solid currentColor;
+  border-radius:5px;
+}
+.confidence-compact-slate.confidence-theme-live-badge-pill .confidence-live-status.live,
+.confidence-compact-slate.confidence-theme-final-badge-pill .confidence-live-status.final {
+  padding:3px 7px;
+  border-radius:999px;
+  color:#fff !important;
+}
+.confidence-compact-slate.confidence-theme-live-badge-pill .confidence-live-status.live { background:var(--confidence-theme-live); }
+.confidence-compact-slate.confidence-theme-final-badge-pill .confidence-live-status.final { background:var(--confidence-theme-final); color:#0f172a !important; }
+.confidence-compact-slate .confidence-live-status.final { color:var(--confidence-theme-final) !important; }
+
+@media (max-width:760px) {
+  .confidence-compact-slate .confidence-game-main {
+    grid-template-columns:minmax(0,1fr) min(24px,var(--confidence-versus-width)) minmax(0,1fr) min(76px,var(--confidence-value-width));
+  }
+  .confidence-compact-slate .confidence-team-visual {
+    width:min(var(--confidence-image-size),52px);
+    height:min(var(--confidence-image-size),52px);
+  }
+}
+@media (max-width:430px) {
+  .confidence-compact-slate .confidence-game-main {
+    grid-template-columns:minmax(0,1fr) min(18px,var(--confidence-versus-width)) minmax(0,1fr) min(64px,var(--confidence-value-width));
+  }
+  .confidence-compact-slate .confidence-team-visual {
+    width:min(var(--confidence-image-size),42px);
+    height:min(var(--confidence-image-size),42px);
+  }
+  .confidence-compact-slate .confidence-team-city { font-size:min(var(--confidence-city-size),11px); }
+  .confidence-compact-slate .confidence-team-nickname { font-size:min(var(--confidence-name-size),18px); }
+}

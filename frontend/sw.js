@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217b-confidence-live-v1217f-appearance-setup";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217b-confidence-live-v1217f-appearance-setup";
 
 const APP_SHELL = [
   "./",
@@ -119,3 +119,5 @@ async function networkFirst(request) {
 // v1.2.17h: Appearance image upload + pack display reliability.
 
 // v1.2.17i: Confidence Image Pack runtime identity/cache compatibility hotfix.
+
+// v1.2.17k: Appearance Studio Core visual theme controls.
