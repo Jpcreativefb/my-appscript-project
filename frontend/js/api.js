@@ -1694,24 +1694,39 @@ async function apiAdminGetAppearanceDashboard(gameId) {
   return api("adminGetAppearanceDashboard", { gameId: gameId || "" });
 }
 
+function apiAppearanceDirectPayload_(payload) {
+  const next = { ...(payload || {}) };
+  if (next.theme && typeof next.theme === "object") {
+    next.themeJSON = JSON.stringify(next.theme);
+    delete next.theme;
+  }
+  if (next.themeOverride && typeof next.themeOverride === "object") {
+    next.themeOverrideJSON = JSON.stringify(next.themeOverride);
+    delete next.themeOverride;
+  }
+  return next;
+}
+
 async function apiAdminSaveAppearanceImagePack(payload) {
-  return apiPost("adminSaveAppearanceImagePack", payload || {});
+  // Appearance metadata writes are small. Send them directly to the live Apps
+  // Script deployment so they cannot get stranded behind the upload Worker.
+  return api("adminSaveAppearanceImagePack", apiAppearanceDirectPayload_(payload));
 }
 
 async function apiAdminSaveAppearanceImagePackItem(payload) {
-  return apiPost("adminSaveAppearanceImagePackItem", payload || {});
+  return api("adminSaveAppearanceImagePackItem", apiAppearanceDirectPayload_(payload));
 }
 
 async function apiAdminSaveAppearanceThemePack(payload) {
-  return apiPost("adminSaveAppearanceThemePack", payload || {});
+  return api("adminSaveAppearanceThemePack", apiAppearanceDirectPayload_(payload));
 }
 
 async function apiAdminSaveGameAppearance(payload) {
-  return apiPost("adminSaveGameAppearance", payload || {});
+  return api("adminSaveGameAppearance", apiAppearanceDirectPayload_(payload));
 }
 
 async function apiAdminSaveAppearanceOverride(payload) {
-  return apiPost("adminSaveAppearanceOverride", payload || {});
+  return api("adminSaveAppearanceOverride", apiAppearanceDirectPayload_(payload));
 }
 
 async function apiGetGameAppearance(gameId) {

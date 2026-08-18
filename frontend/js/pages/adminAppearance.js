@@ -311,8 +311,8 @@ function adminAppearanceEntityCard_(entity, index) {
   const resolved = adminAppearanceResolvedPreview_(entity);
   const disabledPack = !ADMIN_APPEARANCE_STATE.selectedImagePackId || ADMIN_APPEARANCE_STATE.selectedImagePackId === "sports-default";
   const imageHtml = resolved.url
-    ? '<img src="' + adminAppearanceEscape_(resolved.url) + '" alt="' + adminAppearanceEscape_(entity.entityName) + '">'
-    : '<div class="appearance-image-empty">No image</div>';
+    ? '<img id="appearanceEntityPreview_' + index + '" src="' + adminAppearanceEscape_(resolved.url) + '" alt="' + adminAppearanceEscape_(entity.entityName) + '">'
+    : '<div id="appearanceEntityPreview_' + index + '" class="appearance-image-empty">No image</div>';
 
   return `
     <div class="appearance-entity-card">
@@ -329,23 +329,25 @@ function adminAppearanceEntityCard_(entity, index) {
             <small>Reusable anywhere this same entity ID appears with this Image Pack.</small>
             ${disabledPack ? '<div class="admin-sub">Create/select a custom Image Pack to edit pack artwork.</div>' : `
               <input id="appearancePackUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(pack && pack.ImageUrl || "")}" placeholder="https://…">
-              <input id="appearancePackFile_${index}" class="input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+              <input id="appearancePackFile_${index}" class="input" type="file" accept="image/*">
               <div class="admin-actions compact">
                 <button class="admin-small-button" type="button" onclick="adminAppearanceSavePackImage_(${index})">Save URL</button>
-                <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadPackImage_(${index})">Upload</button>
+                <button id="appearancePackUpload_${index}" class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadPackImage_(${index})">Upload</button>
                 <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearPackImage_(${index})">Use Default</button>
-              </div>`}
+              </div>
+              <small id="appearancePackStatus_${index}" class="appearance-upload-status"></small>`}
           </div>
           <div>
             <b>This Game Only</b>
             <small>Overrides the selected Image Pack only for this game.</small>
             <input id="appearanceOverrideUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(override && override.ImageUrl || "")}" placeholder="https://…">
-            <input id="appearanceOverrideFile_${index}" class="input" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+            <input id="appearanceOverrideFile_${index}" class="input" type="file" accept="image/*">
             <div class="admin-actions compact">
               <button class="admin-small-button" type="button" onclick="adminAppearanceSaveOverride_(${index})">Save Override</button>
-              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadOverride_(${index})">Upload</button>
+              <button id="appearanceOverrideUpload_${index}" class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadOverride_(${index})">Upload</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearOverride_(${index})">Clear Override</button>
             </div>
+            <small id="appearanceOverrideStatus_${index}" class="appearance-upload-status"></small>
           </div>
         </div>
       </details>
@@ -576,16 +578,131 @@ function adminAppearanceEntityAt_(index) {
   return (ADMIN_APPEARANCE_STATE.entities || [])[Number(index)] || null;
 }
 
-function adminAppearanceReadFile_(file) {
+function adminAppearanceReadDataUrl_(fileOrBlob) {
   return new Promise(function(resolve, reject) {
     const reader = new FileReader();
-    reader.onload = function() {
-      const result = String(reader.result || "");
-      resolve(result.indexOf(",") !== -1 ? result.split(",").pop() : result);
-    };
+    reader.onload = function() { resolve(String(reader.result || "")); };
     reader.onerror = function() { reject(reader.error || new Error("Could not read image.")); };
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(fileOrBlob);
   });
+}
+
+function adminAppearanceBase64FromDataUrl_(value) {
+  const result = String(value || "");
+  return result.indexOf(",") !== -1 ? result.split(",").pop() : result;
+}
+
+function adminAppearanceReadImageElement_(dataUrl) {
+  return new Promise(function(resolve, reject) {
+    const image = new Image();
+    image.onload = function() { resolve(image); };
+    image.onerror = function() { reject(new Error("Could not decode the selected image.")); };
+    image.src = dataUrl;
+  });
+}
+
+function adminAppearanceCanvasBlob_(canvas, mimeType, quality) {
+  return new Promise(function(resolve) {
+    if (!canvas || typeof canvas.toBlob !== "function") {
+      resolve(null);
+      return;
+    }
+    canvas.toBlob(function(blob) { resolve(blob || null); }, mimeType, quality);
+  });
+}
+
+async function adminAppearancePrepareUpload_(file) {
+  const originalDataUrl = await adminAppearanceReadDataUrl_(file);
+  const original = {
+    base64: adminAppearanceBase64FromDataUrl_(originalDataUrl),
+    fileName: file.name || "image",
+    mimeType: file.type || "image/jpeg",
+    optimized: false,
+    originalBytes: Number(file.size || 0),
+    uploadBytes: Number(file.size || 0)
+  };
+
+  const supportedUploadTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+  const needsFormatConversion = supportedUploadTypes.indexOf(String(file.type || "").toLowerCase()) === -1;
+
+  // Small supported files already use the same proven upload path as Game
+  // images. Large camera photos and iPhone HEIC/HEIF selections are converted
+  // before base64 transport so the upload Worker receives a compact WebP.
+  if (!file || (!needsFormatConversion && file.type === "image/gif") || (!needsFormatConversion && Number(file.size || 0) <= 900000)) {
+    return original;
+  }
+
+  try {
+    const image = await adminAppearanceReadImageElement_(originalDataUrl);
+    const maxDimension = 1400;
+    const width = Number(image.naturalWidth || image.width || 0);
+    const height = Number(image.naturalHeight || image.height || 0);
+    if (!width || !height) return original;
+
+    const scale = Math.min(1, maxDimension / Math.max(width, height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(width * scale));
+    canvas.height = Math.max(1, Math.round(height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) return original;
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+    // WebP keeps transparency for logo art and substantially reduces large
+    // phone/photo uploads. Apps Script's image upload engine already accepts it.
+    const blob = await adminAppearanceCanvasBlob_(canvas, "image/webp", 0.88);
+    if (!blob || !blob.size || blob.size >= Number(file.size || 0)) return original;
+
+    const optimizedDataUrl = await adminAppearanceReadDataUrl_(blob);
+    const baseName = String(file.name || "image").replace(/\.[^.]+$/, "") || "image";
+    return {
+      base64: adminAppearanceBase64FromDataUrl_(optimizedDataUrl),
+      fileName: baseName + ".webp",
+      mimeType: "image/webp",
+      optimized: true,
+      originalBytes: Number(file.size || 0),
+      uploadBytes: Number(blob.size || 0)
+    };
+  } catch (err) {
+    console.warn("Appearance image optimization skipped", err);
+    if (needsFormatConversion) {
+      throw new Error("This image format could not be converted. Try a JPEG, PNG, or WebP image.");
+    }
+    return original;
+  }
+}
+
+function adminAppearanceUploadStatus_(index, kind, message, busy) {
+  const key = kind === "override" ? "Override" : "Pack";
+  const status = document.getElementById("appearance" + key + "Status_" + index);
+  const button = document.getElementById("appearance" + key + "Upload_" + index);
+  if (status) status.textContent = String(message || "");
+  if (button) button.disabled = busy === true;
+}
+
+function adminAppearancePreviewUpload_(index, url) {
+  const current = document.getElementById("appearanceEntityPreview_" + index);
+  if (!current || !url) return;
+  const separator = String(url).indexOf("?") === -1 ? "?" : "&";
+  const cacheBusted = String(url) + separator + "v=" + Date.now();
+  if (String(current.tagName || "").toLowerCase() === "img") {
+    current.src = cacheBusted;
+    return;
+  }
+  const img = document.createElement("img");
+  img.id = current.id;
+  img.src = cacheBusted;
+  img.alt = "Uploaded image";
+  current.replaceWith(img);
+}
+
+async function adminAppearanceReloadDashboardOnly_(message) {
+  const dashboard = await apiAdminGetAppearanceDashboard(ADMIN_APPEARANCE_STATE.selectedGameId);
+  if (!dashboard || dashboard.success === false) {
+    throw new Error(dashboard && (dashboard.message || dashboard.error) || "Could not reload appearance settings.");
+  }
+  ADMIN_APPEARANCE_STATE.dashboard = dashboard;
+  if (message) ADMIN_APPEARANCE_STATE.message = message;
+  adminAppearancePaint_();
 }
 
 async function adminAppearanceSavePackImage_(index) {
@@ -620,37 +737,54 @@ async function adminAppearanceUploadPackImage_(index) {
     adminAppearancePaint_();
     return;
   }
-  const base64 = await adminAppearanceReadFile_(file);
-  const upload = await apiAdminUploadImage({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
-    categoryId: "appearance-pack-" + ADMIN_APPEARANCE_STATE.selectedImagePackId,
-    nomineeId: entity.entityId,
-    fileName: file.name,
-    mimeType: file.type,
-    base64: base64
-  });
-  if (!upload || upload.success === false) {
-    ADMIN_APPEARANCE_STATE.message = upload && (upload.message || upload.error) || "Image upload failed.";
-    adminAppearancePaint_();
-    return;
+
+  adminAppearanceUploadStatus_(index, "pack", "Preparing image…", true);
+  try {
+    const prepared = await adminAppearancePrepareUpload_(file);
+    adminAppearanceUploadStatus_(index, "pack", prepared.optimized ? "Optimized. Uploading…" : "Uploading…", true);
+
+    const upload = await apiAdminUploadImage({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      categoryId: "appearance-pack-" + ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      nomineeId: entity.entityId,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
+      base64: prepared.base64
+    });
+    if (!upload || upload.success === false) {
+      throw new Error(upload && (upload.message || upload.error) || "Image upload failed.");
+    }
+
+    const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
+    adminAppearancePreviewUpload_(index, previewUrl);
+    adminAppearanceUploadStatus_(index, "pack", "Saving to Image Pack…", true);
+
+    const save = await apiAdminSaveAppearanceImagePackItem({
+      packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      entityName: entity.entityName,
+      variant: "default",
+      imageUrl: "",
+      imageFileId: upload.fileId || "",
+      altText: entity.entityName,
+      active: true
+    });
+    if (!save || save.success === false) {
+      throw new Error(save && (save.message || save.error) || "Image uploaded but pack assignment could not be saved.");
+    }
+
+    const sizeNote = prepared.optimized
+      ? " Image optimized for fast app loading."
+      : "";
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " uploaded to the Image Pack." + sizeNote);
+  } catch (err) {
+    adminAppearanceUploadStatus_(index, "pack", err.message || "Upload failed.", false);
+    ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
+  } finally {
+    const button = document.getElementById("appearancePackUpload_" + index);
+    if (button) button.disabled = false;
   }
-  const save = await apiAdminSaveAppearanceImagePackItem({
-    packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
-    entityType: entity.entityType,
-    entityId: entity.entityId,
-    entityName: entity.entityName,
-    variant: "default",
-    imageUrl: "",
-    imageFileId: upload.fileId || "",
-    altText: entity.entityName,
-    active: true
-  });
-  if (!save || save.success === false) {
-    ADMIN_APPEARANCE_STATE.message = save && (save.message || save.error) || "Image uploaded but pack assignment could not be saved.";
-    adminAppearancePaint_();
-    return;
-  }
-  await adminAppearanceRefresh_(entity.entityName + " uploaded to the Image Pack.");
 }
 
 async function adminAppearanceClearPackImage_(index) {
@@ -698,34 +832,49 @@ async function adminAppearanceUploadOverride_(index) {
     adminAppearancePaint_();
     return;
   }
-  const base64 = await adminAppearanceReadFile_(file);
-  const upload = await apiAdminUploadImage({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
-    categoryId: "appearance-override",
-    nomineeId: entity.entityId,
-    fileName: file.name,
-    mimeType: file.type,
-    base64: base64
-  });
-  if (!upload || upload.success === false) {
-    ADMIN_APPEARANCE_STATE.message = upload && (upload.message || upload.error) || "Image upload failed.";
-    adminAppearancePaint_();
-    return;
+
+  adminAppearanceUploadStatus_(index, "override", "Preparing image…", true);
+  try {
+    const prepared = await adminAppearancePrepareUpload_(file);
+    adminAppearanceUploadStatus_(index, "override", prepared.optimized ? "Optimized. Uploading…" : "Uploading…", true);
+
+    const upload = await apiAdminUploadImage({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      categoryId: "appearance-override",
+      nomineeId: entity.entityId,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
+      base64: prepared.base64
+    });
+    if (!upload || upload.success === false) {
+      throw new Error(upload && (upload.message || upload.error) || "Image upload failed.");
+    }
+
+    const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
+    adminAppearancePreviewUpload_(index, previewUrl);
+    adminAppearanceUploadStatus_(index, "override", "Saving game override…", true);
+
+    const save = await apiAdminSaveAppearanceOverride({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      imageUrl: "",
+      imageFileId: upload.fileId || "",
+      active: true
+    });
+    if (!save || save.success === false) {
+      throw new Error(save && (save.message || save.error) || "Image uploaded but override could not be saved.");
+    }
+
+    const sizeNote = prepared.optimized ? " Image optimized for fast app loading." : "";
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image uploaded." + sizeNote);
+  } catch (err) {
+    adminAppearanceUploadStatus_(index, "override", err.message || "Upload failed.", false);
+    ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
+  } finally {
+    const button = document.getElementById("appearanceOverrideUpload_" + index);
+    if (button) button.disabled = false;
   }
-  const save = await apiAdminSaveAppearanceOverride({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
-    entityType: entity.entityType,
-    entityId: entity.entityId,
-    imageUrl: "",
-    imageFileId: upload.fileId || "",
-    active: true
-  });
-  if (!save || save.success === false) {
-    ADMIN_APPEARANCE_STATE.message = save && (save.message || save.error) || "Image uploaded but override could not be saved.";
-    adminAppearancePaint_();
-    return;
-  }
-  await adminAppearanceRefresh_(entity.entityName + " game-only image uploaded.");
 }
 
 async function adminAppearanceClearOverride_(index) {

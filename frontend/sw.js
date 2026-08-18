@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217b-confidence-live-v1217f-appearance-setup";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217b-confidence-live-v1217f-appearance-setup";
 
 const APP_SHELL = [
   "./",
@@ -115,3 +115,5 @@ async function networkFirst(request) {
 // v1.2.17f: Appearance setup transport/reliability hotfix.
 
 // v1.2.17g: iPhone/PWA startup recovery.
+
+// v1.2.17h: Appearance image upload + pack display reliability.

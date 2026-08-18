@@ -1,0 +1,13 @@
+APPEARANCE_IMAGE_UPLOAD_HOTFIX_V1_2_17H.md
+CHANGED_FILES_V1_2_17H.txt
+frontend/api.js
+frontend/app.html
+frontend/app.js
+frontend/css/appearance.css
+frontend/index.html
+frontend/js/api.js
+frontend/js/app.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/appearance_image_upload_v1217h_tests.js
