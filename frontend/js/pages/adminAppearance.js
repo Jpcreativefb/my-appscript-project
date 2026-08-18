@@ -423,9 +423,20 @@ function adminAppearanceStudioDefaults_(theme) {
   const resultTypography = theme.resultTypography || {};
   const correctType = resultTypography.correct || {};
   const incorrectType = resultTypography.incorrect || {};
+  const storedStudioVersion = Number(theme.studioVersion) || 0;
+  const rawImageLayer = String(images.layer || "").trim().toLowerCase();
+  const allowedImageLayers = ["inline", "inline-background", "floating", "background"];
+  let normalizedImageLayer = allowedImageLayers.indexOf(rawImageLayer) !== -1 ? rawImageLayer : "inline";
+  // v1.2.17o stored "inline" while labeling it as Floating Art. Preserve the
+  // visual intent of already-saved v5 themes; newly-saved v6 themes use the
+  // four explicit modes below.
+  if (storedStudioVersion > 0 && storedStudioVersion < 6 && rawImageLayer === "inline") normalizedImageLayer = "floating";
+  if (String(images.fit || "").toLowerCase() === "full-bleed") normalizedImageLayer = "background";
+  const rawSideLayout = theme.sideLayout || {};
+  const mirrorSides = rawSideLayout.mirrored === true;
 
   return {
-    studioVersion: 5,
+    studioVersion: 6,
     density: theme.density || "compact",
     layout: {
       rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
@@ -453,7 +464,7 @@ function adminAppearanceStudioDefaults_(theme) {
       verticalAlign: images.verticalAlign || "center",
       oversize: images.oversize === true,
       fit: images.fit || "contain",
-      layer: images.fit === "full-bleed" ? "background" : (images.layer || "inline"),
+      layer: normalizedImageLayer,
       zoom: adminAppearanceStudioClamp_(images.zoom, 50, 220, 100),
       x: adminAppearanceStudioClamp_(images.x, 0, 100, 50),
       y: adminAppearanceStudioClamp_(images.y, 0, 100, 50)
@@ -471,7 +482,8 @@ function adminAppearanceStudioDefaults_(theme) {
       statusAlign: positioning.statusAlign || "left"
     },
     sideLayout: {
-      separate: theme.sideLayout && theme.sideLayout.separate === true,
+      separate: true,
+      mirrored: mirrorSides,
       away: {
         textAlign: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textAlign || positioning.nameAlign || "left",
         textVertical: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textVertical || positioning.textVertical || "center",
@@ -702,17 +714,28 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeConfidenceSize", "Confidence Number Size", theme.typography.confidenceSize, 12, 30, 1, "px")}
           </div></details>
 
-          <details><summary>Images & Full Image Mode</summary><div class="appearance-studio-panel">
-            ${adminAppearanceStudioSelect_("appearanceThemeImageLayer", "Image Canvas Mode", theme.images.layer, [["inline","Floating Art · Anywhere on Button"],["background","Full Button Background · Text & Score on Top"]])}
-            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Fit", theme.images.fit, [["contain","Contain"],["cover","Cover"],["full-bleed","Full Button Cover"]])}
-            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Floating Image Size", theme.images.size, 20, 220, 1, "px")}
-            ${adminAppearanceStudioRange_("appearanceThemeImageZoom", "Image Zoom", theme.images.zoom, 50, 220, 1, "%")}
-            ${adminAppearanceStudioRange_("appearanceThemeImageX", "Image X Position", theme.images.x, 0, 100, 1, "%")}
-            ${adminAppearanceStudioRange_("appearanceThemeImageY", "Image Y Position", theme.images.y, 0, 100, 1, "%")}
+          <details open><summary>Images & Canvas Mode</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeImageLayer", "Image Canvas Mode", theme.images.layer, [["inline","Inline Logo/Image"],["inline-background","Inline + Background Art"],["floating","Floating Art · Anywhere on Button"],["background","Full Button Background · Text & Score on Top"]])}
+            <div class="appearance-studio-inline-note">Four real renderers — not one image box with competing overrides. Full Button owns the whole button surface.</div>
+            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Image / Art Size", theme.images.size, 20, 220, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeImageOpacity", "Image Opacity", theme.images.opacity, 0, 100, 1, "%")}
-            ${adminAppearanceStudioSelect_("appearanceThemeImageShape", "Image Shape", theme.images.shape, [["square","Square"],["soft","Soft"],["round","Round"]])}
-            ${adminAppearanceStudioSelect_("appearanceThemeImageAlign", "Vertical Align", theme.images.verticalAlign, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
-            <label class="appearance-studio-check"><input id="appearanceThemeImageOversize" type="checkbox" ${theme.images.oversize ? 'checked' : ''}><span>Allow image to oversize panel</span></label>
+            <div data-image-modes="inline inline-background floating">
+              ${adminAppearanceStudioSelect_("appearanceThemeImageShape", "Image Shape", theme.images.shape, [["square","Square"],["soft","Soft"],["round","Round"]])}
+            </div>
+            <div data-image-modes="inline">
+              ${adminAppearanceStudioSelect_("appearanceThemeImageAlign", "Vertical Align", theme.images.verticalAlign, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
+              <div class="appearance-studio-inline-note">Inline uses Image / Art Size. X/Y and Zoom are intentionally not used in classic inline layout.</div>
+            </div>
+            <div data-image-modes="inline-background floating background">
+              ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Fit", theme.images.fit, [["contain","Contain"],["cover","Cover"],["full-bleed","Full Button Cover"]])}
+              ${adminAppearanceStudioRange_("appearanceThemeImageZoom", "Image Zoom", theme.images.zoom, 50, 300, 1, "%")}
+              ${adminAppearanceStudioRange_("appearanceThemeImageX", "Image X Position", theme.images.x, 0, 100, 1, "%")}
+              ${adminAppearanceStudioRange_("appearanceThemeImageY", "Image Y Position", theme.images.y, 0, 100, 1, "%")}
+            </div>
+            <div data-image-modes="inline-background floating">
+              <label class="appearance-studio-check"><input id="appearanceThemeImageOversize" type="checkbox" ${theme.images.oversize ? 'checked' : ''}><span>Allow artwork to oversize</span></label>
+            </div>
+            <div data-image-modes="background" class="appearance-studio-inline-note">Full Button ignores Image / Art Size. Fit + Zoom + X/Y frame the image across the entire button.</div>
           </div></details>
 
           <details><summary>Element Positioning</summary><div class="appearance-studio-panel">
@@ -729,9 +752,10 @@ function adminAppearanceThemeEditor_() {
           </div></details>
 
           <details><summary>Home / Away Layout</summary><div class="appearance-studio-panel">
-            <label class="appearance-studio-check"><input id="appearanceThemeSeparateSides" type="checkbox" ${theme.sideLayout.separate ? 'checked' : ''}><span>Use separate Home / Away positioning</span></label>
-            <div class="appearance-side-layout-grid">
-              <fieldset><legend>Away</legend>
+            <label class="appearance-studio-check"><input id="appearanceThemeMirrorSides" type="checkbox" ${theme.sideLayout.mirrored ? 'checked' : ''}><span>Mirror Home / Away layout</span></label>
+            <div class="appearance-studio-inline-note">Mirror ON: design Away once and Home automatically flips left/right, score anchor, X offsets and image X. Mirror OFF: Away and Home are edited independently.</div>
+            <div class="appearance-side-layout-grid" id="appearanceSideLayoutGrid">
+              <fieldset><legend id="appearanceAwayLayoutTitle">Away / Base Layout</legend>
                 ${adminAppearanceStudioSelect_("appearanceThemeAwayTextAlign", "Text Alignment", theme.sideLayout.away.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
                 ${adminAppearanceStudioSelect_("appearanceThemeAwayTextVertical", "Text Vertical", theme.sideLayout.away.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayTextX", "Text X", theme.sideLayout.away.textOffsetX, -40, 40, 1, "px")}
@@ -742,7 +766,7 @@ function adminAppearanceThemeEditor_() {
                 ${adminAppearanceStudioRange_("appearanceThemeAwayImageX", "Image X", theme.sideLayout.away.imageX, 0, 100, 1, "%")}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayImageY", "Image Y", theme.sideLayout.away.imageY, 0, 100, 1, "%")}
               </fieldset>
-              <fieldset><legend>Home</legend>
+              <fieldset id="appearanceHomeIndependentControls"><legend>Home · Independent</legend>
                 ${adminAppearanceStudioSelect_("appearanceThemeHomeTextAlign", "Text Alignment", theme.sideLayout.home.textAlign, [["left","Left"],["center","Center"],["right","Right"]])}
                 ${adminAppearanceStudioSelect_("appearanceThemeHomeTextVertical", "Text Vertical", theme.sideLayout.home.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeTextX", "Text X", theme.sideLayout.home.textOffsetX, -40, 40, 1, "px")}
@@ -1371,6 +1395,7 @@ function adminAppearanceMountThemePreview_() {
   editor.addEventListener("input", adminAppearanceUpdateThemePreview_);
   editor.addEventListener("change", adminAppearanceUpdateThemePreview_);
   adminAppearanceUpdateThemePreview_();
+  adminAppearanceUpdateModeControlVisibility_();
   adminAppearanceSetPreviewState_(ADMIN_APPEARANCE_STATE.themePreviewState || "pregame");
   adminAppearanceSetPreviewDevice_(ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop");
 }
@@ -1406,7 +1431,7 @@ function adminAppearanceReadThemeControls_() {
     visibility.devices.mobile[key] = adminAppearanceStudioValue_("appearanceThemeVisMobile_" + key, true) === true;
   });
   return {
-    studioVersion: 5,
+    studioVersion: 6,
     density: density,
     layout: {
       rowHeight: adminAppearanceStudioNumber_("appearanceThemeRowHeight", 76),
@@ -1452,7 +1477,8 @@ function adminAppearanceReadThemeControls_() {
       statusAlign: String(adminAppearanceStudioValue_("appearanceThemeStatusAlign", "left"))
     },
     sideLayout: {
-      separate: adminAppearanceStudioValue_("appearanceThemeSeparateSides", false) === true,
+      separate: true,
+      mirrored: adminAppearanceStudioValue_("appearanceThemeMirrorSides", false) === true,
       away: {
         textAlign: String(adminAppearanceStudioValue_("appearanceThemeAwayTextAlign", "left")),
         textVertical: String(adminAppearanceStudioValue_("appearanceThemeAwayTextVertical", "center")),
@@ -1583,10 +1609,66 @@ function adminAppearanceReadThemeControls_() {
   };
 }
 
+function adminAppearanceMirrorAlign_(value) {
+  value = String(value || "left");
+  return value === "left" ? "right" : value === "right" ? "left" : value;
+}
+
+function adminAppearanceMirrorScoreAnchor_(value) {
+  value = String(value || "inline-right");
+  const map = {
+    "inline-left":"inline-right", "inline-right":"inline-left",
+    "top-left":"top-right", "top-right":"top-left",
+    "bottom-left":"bottom-right", "bottom-right":"bottom-left"
+  };
+  return map[value] || value;
+}
+
+function adminAppearanceApplyMirroredSideLayout_(theme) {
+  if (!theme || !theme.sideLayout || theme.sideLayout.mirrored !== true) return theme;
+  const away = theme.sideLayout.away || {};
+  theme.sideLayout.separate = true;
+  theme.sideLayout.home = {
+    textAlign: adminAppearanceMirrorAlign_(away.textAlign),
+    textVertical: away.textVertical || "center",
+    textOffsetX: -Number(away.textOffsetX || 0),
+    textOffsetY: Number(away.textOffsetY || 0),
+    scoreAnchor: adminAppearanceMirrorScoreAnchor_(away.scoreAnchor),
+    scoreOffsetX: -Number(away.scoreOffsetX || 0),
+    scoreOffsetY: Number(away.scoreOffsetY || 0),
+    imageX: 100 - Number(away.imageX == null ? 50 : away.imageX),
+    imageY: Number(away.imageY == null ? 50 : away.imageY)
+  };
+  return theme;
+}
+
+function adminAppearanceUpdateModeControlVisibility_() {
+  const layerEl = document.getElementById("appearanceThemeImageLayer");
+  let mode = layerEl ? String(layerEl.value || "inline") : "inline";
+  const fitEl = document.getElementById("appearanceThemeImageFit");
+  if (fitEl && fitEl.value === "full-bleed" && mode !== "background") {
+    // Full Button Cover belongs only to the true background renderer. When the
+    // user changes to Inline/Floating, keep them in that mode and downgrade
+    // the stale fit value to Cover instead of snapping the mode back.
+    fitEl.value = "cover";
+  }
+  document.querySelectorAll("[data-image-modes]").forEach(function(el) {
+    const allowed = String(el.getAttribute("data-image-modes") || "").split(/\s+/).filter(Boolean);
+    el.hidden = allowed.indexOf(mode) === -1;
+  });
+  const mirror = document.getElementById("appearanceThemeMirrorSides");
+  const home = document.getElementById("appearanceHomeIndependentControls");
+  if (home) home.hidden = Boolean(mirror && mirror.checked);
+  const title = document.getElementById("appearanceAwayLayoutTitle");
+  if (title) title.textContent = mirror && mirror.checked ? "Away / Base Layout (Home mirrors this)" : "Away · Independent";
+}
+
 function adminAppearanceUpdateThemePreview_() {
   const preview = document.getElementById("appearanceThemePreview");
   if (!preview) return;
-  const theme = adminAppearanceReadThemeControls_();
+  adminAppearanceUpdateModeControlVisibility_();
+  let theme = adminAppearanceReadThemeControls_();
+  theme = adminAppearanceApplyMirroredSideLayout_(theme);
   document.querySelectorAll('.appearance-studio-range input[type="range"]').forEach(function(input) {
     const output = document.getElementById(input.dataset.output || "");
     if (output) output.textContent = input.value + String(input.dataset.suffix || "");
@@ -1777,11 +1859,13 @@ async function adminAppearancePersistTheme_(options) {
   }
   const themeIdEl = document.getElementById("appearanceThemeId");
   const baseEl = document.getElementById("appearanceThemeBase");
+  let themePayload = adminAppearanceReadThemeControls_();
+  themePayload = adminAppearanceApplyMirroredSideLayout_(themePayload);
   const result = await apiAdminSaveAppearanceThemePack({
     themePackId: options.newTheme ? "" : String(themeIdEl && themeIdEl.value || "").trim(),
     themeName: name,
     baseThemeId: String(baseEl && baseEl.value || ""),
-    theme: adminAppearanceReadThemeControls_(),
+    theme: themePayload,
     active: true
   });
   if (!result || result.success === false) {

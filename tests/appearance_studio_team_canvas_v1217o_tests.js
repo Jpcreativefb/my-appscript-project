@@ -9,7 +9,7 @@ const appCss = read('frontend/css/appearance.css');
 const picksCss = read('frontend/css/picks.css');
 
 const checks = [
-  [admin.includes('studioVersion: 5'), 'Studio theme schema advances to v5'],
+  [admin.includes('studioVersion: 6'), 'Studio theme schema advances to v6 while preserving the v17o canvas'],
   [admin.includes('Floating Art · Anywhere on Button'), 'Image canvas exposes floating full-button positioning'],
   [admin.includes('Full Button Background · Text & Score on Top'), 'Image canvas exposes full background mode'],
   [admin.includes('Inline Left') && admin.includes('Inline Right') && admin.includes('Center'), 'Score anchors include inline/center positions'],

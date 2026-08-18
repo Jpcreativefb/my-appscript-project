@@ -17,7 +17,7 @@ const html = read('frontend/app.html');
 assert.strictEqual(app, mirror, 'Frontend app mirrors must remain synchronized.');
 
 // Full Button is deterministic: full-bleed always resolves to the background layer.
-assert(manager.includes('layer: images.fit === "full-bleed" ? "background"'));
+assert(manager.includes('if (String(images.fit || "").toLowerCase() === "full-bleed") normalizedImageLayer = "background";'));
 assert(manager.includes('String(adminAppearanceStudioValue_("appearanceThemeImageFit", "contain")) === "full-bleed" ? "background"'));
 assert(picks.includes('const imageLayer = imageFit === "full-bleed"'));
 assert(appearanceCss.includes('inset:-1px !important;'));

@@ -2472,3 +2472,116 @@
 }
 .confidence-compact-slate .confidence-game-question,
 .confidence-compact-slate .confidence-details-prompt { color:var(--confidence-scoreboard-text); }
+
+
+/* =========================================================
+   v1.2.17p — Explicit Confidence Image Modes + Mirror Layout
+========================================================= */
+/* Inline Logo/Image restores the classic structured button. */
+.confidence-compact-slate.confidence-theme-image-layer-inline .confidence-team-choice {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(28px,var(--confidence-image-size)) auto !important;
+  grid-template-rows:auto auto !important;
+  column-gap:7px !important;
+  align-items:center !important;
+  padding:6px 7px 6px 9px !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline .confidence-team-visual {
+  position:relative !important; inset:auto !important;
+  grid-column:2 !important; grid-row:1 / span 2 !important;
+  width:var(--confidence-image-size) !important; height:var(--confidence-image-size) !important;
+  justify-self:end !important; align-self:center !important; opacity:var(--confidence-image-opacity);
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline .confidence-team-logo {
+  position:static !important; width:100% !important; height:100% !important;
+  transform:none !important; object-fit:contain !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline .confidence-team-text {
+  position:static !important; grid-column:1 !important; grid-row:1 / span 2 !important;
+  transform:none !important; align-self:center !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline .confidence-team-score {
+  position:static !important; grid-column:3 !important; grid-row:1 / span 2 !important;
+  transform:none !important; align-self:center !important; justify-self:end !important;
+}
+
+/* Inline + Background Art keeps the text stack and score easy to read while
+   the artwork moves anywhere behind them. */
+.confidence-compact-slate.confidence-theme-image-layer-inline-background .confidence-team-choice,
+.confidence-compact-slate.confidence-theme-image-layer-floating .confidence-team-choice {
+  display:block !important; position:relative !important; isolation:isolate; overflow:hidden !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline-background .confidence-team-visual,
+.confidence-compact-slate.confidence-theme-image-layer-floating .confidence-team-visual {
+  position:absolute !important; inset:0 !important; width:100% !important; height:100% !important;
+  z-index:0 !important; opacity:var(--confidence-image-opacity); overflow:visible !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline-background .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-layer-floating .confidence-team-logo {
+  position:absolute !important;
+  left:var(--confidence-image-x) !important; top:var(--confidence-image-y) !important;
+  width:var(--confidence-image-size) !important; height:var(--confidence-image-size) !important;
+  max-width:none !important; object-fit:contain;
+  transform:translate(-50%,-50%) scale(var(--confidence-image-zoom)) !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline-background.confidence-theme-image-fit-cover .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-layer-floating.confidence-theme-image-fit-cover .confidence-team-logo { object-fit:cover !important; }
+
+/* Full Button Background never uses floating image size. */
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-choice,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-choice {
+  display:block !important; position:relative !important; isolation:isolate; overflow:hidden !important; padding:0 !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-visual,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-visual {
+  position:absolute !important; inset:0 !important; width:100% !important; height:100% !important;
+  z-index:0 !important; opacity:var(--confidence-image-opacity); margin:0 !important; padding:0 !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo {
+  position:absolute !important; inset:0 !important; left:0 !important; top:0 !important;
+  width:100% !important; height:100% !important; max-width:none !important;
+  transform:scale(var(--confidence-image-zoom)) !important; transform-origin:center !important;
+  object-position:var(--confidence-image-x) var(--confidence-image-y) !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-background.confidence-theme-image-fit-contain .confidence-team-logo { object-fit:contain !important; }
+.confidence-compact-slate.confidence-theme-image-layer-background.confidence-theme-image-fit-cover .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-layer-background.confidence-theme-image-fit-full-bleed .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo { object-fit:cover !important; }
+
+/* Side-specific image coordinates apply to every free/background image mode. */
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away { --confidence-image-x:var(--confidence-away-image-x); --confidence-image-y:var(--confidence-away-image-y); }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home { --confidence-image-x:var(--confidence-home-image-x); --confidence-image-y:var(--confidence-home-image-y); }
+
+
+/* v1.2.17p inline score/mirror refinements. */
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-left .confidence-team-choice {
+  grid-template-columns:auto minmax(0,1fr) minmax(28px,var(--confidence-image-size)) !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-left .confidence-team-score { grid-column:1 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-left .confidence-team-text { grid-column:2 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-left .confidence-team-visual { grid-column:3 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-right .confidence-team-text { grid-column:1 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-right .confidence-team-visual { grid-column:2 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-inline-right .confidence-team-score { grid-column:3 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-left .confidence-team-away,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-left .confidence-team-home {
+  grid-template-columns:auto minmax(0,1fr) minmax(28px,var(--confidence-image-size)) !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-left .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-left .confidence-team-home .confidence-team-score { grid-column:1 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-left .confidence-team-away .confidence-team-text,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-left .confidence-team-home .confidence-team-text { grid-column:2 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-left .confidence-team-away .confidence-team-visual,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-left .confidence-team-home .confidence-team-visual { grid-column:3 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-right .confidence-team-away .confidence-team-text,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-right .confidence-team-home .confidence-team-text { grid-column:1 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-right .confidence-team-away .confidence-team-visual,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-right .confidence-team-home .confidence-team-visual { grid-column:2 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-right .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-right .confidence-team-home .confidence-team-score { grid-column:3 !important; }
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-top-left .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-top-right .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-bottom-left .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-bottom-right .confidence-team-score,
+.confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-center .confidence-team-score { position:absolute !important; grid-column:auto !important; }

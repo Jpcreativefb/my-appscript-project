@@ -40,7 +40,7 @@ assert(picksCss.includes('.confidence-theme-image-layer-background .confidence-t
 assert(picksCss.includes('position:absolute;'));
 
 // Home and Away can have independent layout and can swap sides.
-['appearanceThemeTeamOrder','appearanceThemeSeparateSides','appearanceThemeAwayTextAlign','appearanceThemeHomeTextAlign','appearanceThemeAwayScoreAnchor','appearanceThemeHomeScoreAnchor','appearanceThemeAwayImageX','appearanceThemeHomeImageX'].forEach(token => {
+['appearanceThemeTeamOrder','appearanceThemeMirrorSides','appearanceThemeAwayTextAlign','appearanceThemeHomeTextAlign','appearanceThemeAwayScoreAnchor','appearanceThemeHomeScoreAnchor','appearanceThemeAwayImageX','appearanceThemeHomeImageX'].forEach(token => {
   assert(manager.includes(token), `Missing Home/Away control ${token}`);
 });
 assert(picks.includes('confidence-team-${side || "team"}'));

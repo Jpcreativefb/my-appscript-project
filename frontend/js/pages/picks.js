@@ -1653,14 +1653,32 @@ function confidenceThemePresentation_() {
   const correctType = resultTypography.correct || {};
   const wrongType = resultTypography.incorrect || {};
   const sideLayout = theme.sideLayout || {};
-  const awayLayout = sideLayout.away || {};
-  const homeLayout = sideLayout.home || {};
+  const awayLayout = Object.assign({}, sideLayout.away || {});
+  let homeLayout = Object.assign({}, sideLayout.home || {});
+  if (sideLayout.mirrored === true) {
+    const mirrorAlign = function(value) { return value === "left" ? "right" : value === "right" ? "left" : (value || "center"); };
+    const mirrorScore = function(value) {
+      const map = {"inline-left":"inline-right","inline-right":"inline-left","top-left":"top-right","top-right":"top-left","bottom-left":"bottom-right","bottom-right":"bottom-left"};
+      return map[value] || value || "inline-left";
+    };
+    homeLayout = {
+      textAlign: mirrorAlign(awayLayout.textAlign || positioning.nameAlign || "left"),
+      textVertical: awayLayout.textVertical || positioning.textVertical || "center",
+      textOffsetX: -Number(awayLayout.textOffsetX || 0),
+      textOffsetY: Number(awayLayout.textOffsetY || 0),
+      scoreAnchor: mirrorScore(awayLayout.scoreAnchor || positioning.scoreAnchor || "inline-right"),
+      scoreOffsetX: -Number(awayLayout.scoreOffsetX || 0),
+      scoreOffsetY: Number(awayLayout.scoreOffsetY || 0),
+      imageX: 100 - Number(awayLayout.imageX == null ? (images.x == null ? 50 : images.x) : awayLayout.imageX),
+      imageY: Number(awayLayout.imageY == null ? (images.y == null ? 50 : images.y) : awayLayout.imageY)
+    };
+  }
 
   const unselected = confidenceThemeToken_(selection.unselectedTreatment || team.unselectedTreatment, ["grayscale", "dim", "none"], "grayscale");
   const imageFit = confidenceThemeToken_(images.fit, ["contain", "cover", "full-bleed"], "contain");
   const imageLayer = imageFit === "full-bleed"
     ? "background"
-    : confidenceThemeToken_(images.layer, ["inline", "background"], "inline");
+    : confidenceThemeToken_(images.layer, ["inline", "inline-background", "floating", "background"], "inline");
   const teamOrder = confidenceThemeToken_(layout.teamOrder, ["away-home", "home-away"], "away-home");
   const classes = [
     "confidence-theme-density-" + confidenceThemeToken_(theme.density, ["compact", "standard", "comfortable"], "compact"),
@@ -1675,7 +1693,8 @@ function confidenceThemePresentation_() {
     "confidence-theme-image-fit-" + imageFit,
     "confidence-theme-image-layer-" + imageLayer,
     "confidence-theme-team-order-" + teamOrder,
-    sideLayout.separate === true ? "confidence-theme-side-layout-separate" : "confidence-theme-side-layout-shared",
+    sideLayout.separate === true || sideLayout.mirrored === true ? "confidence-theme-side-layout-separate" : "confidence-theme-side-layout-shared",
+    sideLayout.mirrored === true ? "confidence-theme-side-layout-mirrored" : "confidence-theme-side-layout-independent",
     "confidence-theme-away-align-" + confidenceThemeToken_(awayLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
     "confidence-theme-home-align-" + confidenceThemeToken_(homeLayout.textAlign, ["left", "center", "right"], positioning.nameAlign || "left"),
     "confidence-theme-away-vertical-" + confidenceThemeToken_(awayLayout.textVertical, ["top", "center", "bottom"], positioning.textVertical || "center"),

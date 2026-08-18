@@ -1,0 +1,16 @@
+APPEARANCE_STUDIO_IMAGE_MODES_V1_2_17P.md
+CHANGED_FILES_V1_2_17P.txt
+frontend/app.html
+frontend/app.js
+frontend/index.html
+frontend/js/app.js
+frontend/js/pwa.js
+frontend/sw.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/appearance.css
+frontend/css/picks.css
+tests/appearance_studio_image_modes_v1217p_tests.js
+tests/appearance_studio_canvas_layers_v1217m_tests.js
+tests/appearance_studio_team_canvas_v1217o_tests.js
+tests/appearance_studio_runtime_layout_v1217n_tests.js

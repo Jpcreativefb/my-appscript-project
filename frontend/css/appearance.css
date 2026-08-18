@@ -1019,3 +1019,167 @@
 @media (max-width:900px) {
   .appearance-studio-canvas { position:relative !important; top:auto !important; }
 }
+
+
+/* =========================================================
+   v1.2.17p — Explicit Image Modes + Mirrored Layout + Scroll Rail
+========================================================= */
+@media (min-width:901px) {
+  .appearance-studio-shell {
+    height:calc(100vh - 96px);
+    min-height:560px;
+    overflow:hidden !important;
+    align-items:stretch !important;
+  }
+  .appearance-studio-controls {
+    position:relative !important;
+    top:auto !important;
+    height:100%;
+    max-height:none !important;
+    overflow-y:auto !important;
+    overflow-x:hidden !important;
+    overscroll-behavior:contain;
+    scrollbar-gutter:stable;
+    padding-right:6px;
+  }
+  .appearance-studio-canvas {
+    position:relative !important;
+    top:auto !important;
+    height:100%;
+    max-height:none !important;
+    overflow:hidden !important;
+    align-self:stretch !important;
+  }
+  .appearance-studio-canvas .appearance-studio-preview-wrap {
+    height:100%;
+    display:flex;
+    flex-direction:column;
+  }
+  .appearance-preview-stage {
+    flex:1 1 auto;
+    min-height:0;
+    overflow:auto !important;
+  }
+}
+.appearance-studio-controls [hidden] { display:none !important; }
+
+/* Four explicit image modes. */
+.appearance-theme-preview .appearance-preview-team { position:relative !important; isolation:isolate; overflow:hidden !important; }
+
+/* 1) Inline Logo/Image: classic structured layout. */
+.appearance-theme-preview.image-layer-inline .appearance-preview-team {
+  display:grid !important;
+  grid-template-columns:minmax(0,1fr) minmax(28px,var(--ap-image-size)) auto !important;
+  grid-template-rows:auto auto !important;
+  column-gap:7px !important;
+  align-items:center !important;
+  padding:6px 7px !important;
+}
+.appearance-theme-preview.image-layer-inline .appearance-preview-image {
+  position:relative !important;
+  inset:auto !important;
+  grid-column:2 !important;
+  grid-row:1 / span 2 !important;
+  width:var(--ap-image-size) !important;
+  height:var(--ap-image-size) !important;
+  justify-self:end !important;
+  opacity:var(--ap-image-opacity);
+}
+.appearance-theme-preview.image-layer-inline .appearance-preview-image-art,
+.appearance-theme-preview.image-layer-inline .appearance-preview-image img {
+  position:static !important;
+  width:100% !important;
+  height:100% !important;
+  transform:none !important;
+  object-fit:contain !important;
+}
+.appearance-theme-preview.image-layer-inline .appearance-preview-text {
+  position:static !important;
+  grid-column:1 !important;
+  grid-row:1 / span 2 !important;
+  transform:none !important;
+  align-self:center;
+}
+.appearance-theme-preview.image-layer-inline .appearance-preview-score {
+  position:static !important;
+  grid-column:3 !important;
+  grid-row:1 / span 2 !important;
+  transform:none !important;
+  align-self:center;
+  justify-self:end;
+}
+
+/* 2) Inline + Background Art: structured text/score, movable art behind. */
+.appearance-theme-preview.image-layer-inline-background .appearance-preview-team { display:block !important; padding:6px 8px !important; }
+.appearance-theme-preview.image-layer-inline-background .appearance-preview-image,
+.appearance-theme-preview.image-layer-floating .appearance-preview-image {
+  position:absolute !important; inset:0 !important; width:100% !important; height:100% !important; z-index:0 !important; opacity:var(--ap-image-opacity);
+}
+.appearance-theme-preview.image-layer-inline-background .appearance-preview-image img,
+.appearance-theme-preview.image-layer-floating .appearance-preview-image img {
+  position:absolute !important;
+  left:var(--ap-image-x) !important; top:var(--ap-image-y) !important;
+  width:var(--ap-image-size) !important; height:var(--ap-image-size) !important;
+  max-width:none !important;
+  object-fit:contain;
+  transform:translate(-50%,-50%) scale(var(--ap-image-zoom)) !important;
+}
+.appearance-theme-preview.image-layer-inline-background.image-fit-cover .appearance-preview-image img,
+.appearance-theme-preview.image-layer-floating.image-fit-cover .appearance-preview-image img { object-fit:cover; }
+
+/* 3) Floating uses free text/score layers from the canvas architecture. */
+.appearance-theme-preview.image-layer-floating .appearance-preview-team { display:block !important; padding:0 !important; }
+
+/* 4) Full Button Background: image owns the complete button surface. */
+.appearance-theme-preview.image-layer-background .appearance-preview-team { display:block !important; padding:0 !important; }
+.appearance-theme-preview.image-layer-background .appearance-preview-image { position:absolute !important; inset:0 !important; width:100% !important; height:100% !important; z-index:0 !important; opacity:var(--ap-image-opacity); }
+.appearance-theme-preview.image-layer-background .appearance-preview-image-art,
+.appearance-theme-preview.image-layer-background .appearance-preview-image img {
+  position:absolute !important; inset:0 !important;
+  width:100% !important; height:100% !important; max-width:none !important;
+  transform:scale(var(--ap-image-zoom)) !important;
+  transform-origin:center !important;
+  object-position:var(--ap-image-x) var(--ap-image-y) !important;
+}
+.appearance-theme-preview.image-layer-background.image-fit-contain .appearance-preview-image img { object-fit:contain !important; }
+.appearance-theme-preview.image-layer-background.image-fit-cover .appearance-preview-image img,
+.appearance-theme-preview.image-layer-background.image-fit-full-bleed .appearance-preview-image img { object-fit:cover !important; }
+.appearance-theme-preview.image-layer-background .appearance-preview-text,
+.appearance-theme-preview.image-layer-background .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline-background .appearance-preview-text,
+.appearance-theme-preview.image-layer-inline-background .appearance-preview-score,
+.appearance-theme-preview.image-layer-floating .appearance-preview-text,
+.appearance-theme-preview.image-layer-floating .appearance-preview-score { z-index:3 !important; }
+
+
+/* v1.2.17p inline score/mirror refinements. */
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-left .appearance-preview-team {
+  grid-template-columns:auto minmax(0,1fr) minmax(28px,var(--ap-image-size)) !important;
+}
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-left .appearance-preview-score { grid-column:1 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-left .appearance-preview-text { grid-column:2 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-left .appearance-preview-image { grid-column:3 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-right .appearance-preview-text { grid-column:1 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-right .appearance-preview-image { grid-column:2 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-inline-right .appearance-preview-score { grid-column:3 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-left .appearance-preview-team-away,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-left .appearance-preview-team-home {
+  grid-template-columns:auto minmax(0,1fr) minmax(28px,var(--ap-image-size)) !important;
+}
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-left .appearance-preview-team-away .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-left .appearance-preview-team-home .appearance-preview-score { grid-column:1 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-left .appearance-preview-team-away .appearance-preview-text,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-left .appearance-preview-team-home .appearance-preview-text { grid-column:2 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-left .appearance-preview-team-away .appearance-preview-image,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-left .appearance-preview-team-home .appearance-preview-image { grid-column:3 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-right .appearance-preview-team-away .appearance-preview-text,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-right .appearance-preview-team-home .appearance-preview-text { grid-column:1 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-right .appearance-preview-team-away .appearance-preview-image,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-right .appearance-preview-team-home .appearance-preview-image { grid-column:2 !important; }
+.appearance-theme-preview.image-layer-inline.side-layout-separate.away-score-anchor-inline-right .appearance-preview-team-away .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.side-layout-separate.home-score-anchor-inline-right .appearance-preview-team-home .appearance-preview-score { grid-column:3 !important; }
+.appearance-theme-preview.image-layer-inline.score-anchor-top-left .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.score-anchor-top-right .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.score-anchor-bottom-left .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.score-anchor-bottom-right .appearance-preview-score,
+.appearance-theme-preview.image-layer-inline.score-anchor-center .appearance-preview-score { position:absolute !important; grid-column:auto !important; }
