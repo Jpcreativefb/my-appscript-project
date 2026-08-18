@@ -1879,7 +1879,6 @@ function confidenceThemePresentation_() {
 }
 
 async function hydrateConfidenceAppearance_() {
-  if (!shouldRenderCompactConfidenceSlate_()) return;
   if (typeof apiGetGameAppearance !== "function") return;
 
   const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
@@ -2968,7 +2967,7 @@ function renderCategoryCard(category, isChild, parent) {
 
   return `
     <section
-      class="pick-category-card ${collapsedClass} ${childClass} ${status.className} ${savingClass}"
+      class="pick-category-card question-layout-${escapeAttr(picksResolvedQuestionLayout_(category))} ${collapsedClass} ${childClass} ${status.className} ${savingClass}"
       data-category-id="${escapeAttr(category.id)}"
       data-has-pick="${hasPick ? "true" : "false"}"
       data-locked="${locked ? "true" : "false"}"
@@ -3576,6 +3575,85 @@ function renderNomineeLiveProbability_(category, nominee) {
     escapeHtml(providerLabel) + " · " + escapeHtml(rounded) + "%</small>";
 }
 
+
+function picksAppearanceTheme_() {
+  return (PICKS_PAGE_DATA.appearance && PICKS_PAGE_DATA.appearance.theme) || {};
+}
+
+function picksQuestionSectionKey_(category) {
+  return String(category && (category.sectionId || category.SectionId || category.section || category.Section || category.groupName || category.GroupName || category.parentCategoryId || "Questions") || "Questions").trim();
+}
+
+function picksResolvedQuestionLayout_(category) {
+  const theme = picksAppearanceTheme_();
+  const questions = theme.questions || {};
+  const id = String(category && (category.id || category.categoryId) || "");
+  const override = questions.overrides && questions.overrides[id];
+  const section = picksQuestionSectionKey_(category);
+  const sectionOverride = questions.sectionOverrides && questions.sectionOverrides[section];
+  const chosen = [override, sectionOverride, questions.defaultLayout].find(function(value){ return value && value !== "inherit"; });
+  const original = String(category && category.layoutType || "image").toLowerCase();
+  const layout = String(chosen || original || "image").toLowerCase();
+  return ["text","compact","image","list","short-answer","wager"].indexOf(layout) !== -1 ? layout : original;
+}
+
+function picksAppearanceHexRgba_(hex, opacity, fallback) {
+  const value = /^#[0-9a-f]{6}$/i.test(String(hex||"")) ? String(hex) : (fallback || "#0f172a");
+  const parsed = parseInt(value.slice(1),16);
+  return "rgba("+((parsed>>16)&255)+","+((parsed>>8)&255)+","+(parsed&255)+","+(Number(opacity==null?100:opacity)/100)+")";
+}
+
+function picksAppearancePresentation_() {
+  const theme = picksAppearanceTheme_();
+  const page = theme.page || {}, q = theme.questions || {}, details = theme.details || {}, bars = theme.bars || {};
+  const style = [
+    "--picks-theme-page-bg:"+(page.background||"#020617"),
+    "--picks-theme-header-bg:"+(page.headerBackground||"#0f172a"),
+    "--picks-theme-header-text:"+(page.headerText||"#ffffff"),
+    "--picks-theme-header-muted:"+(page.headerMuted||"#94a3b8"),
+    "--picks-theme-header-radius:"+(Number(page.headerRadius)||16)+"px",
+    "--picks-theme-section-gap:"+(Number(page.sectionGap)||18)+"px",
+    "--picks-theme-question-bg:"+picksAppearanceHexRgba_(q.cardBackground,q.cardOpacity,"#0f172a"),
+    "--picks-theme-question-header-bg:"+picksAppearanceHexRgba_(q.headerBackground,q.headerOpacity,"#111111"),
+    "--picks-theme-question-title:"+(q.titleColor||"#ffffff"),
+    "--picks-theme-question-title-size:"+(Number(q.titleSize)||16)+"px",
+    "--picks-theme-answer-bg:"+(q.answerBackground||"#1e293b"),
+    "--picks-theme-answer-text:"+(q.answerText||"#ffffff"),
+    "--picks-theme-answer-border:"+(q.answerBorder||"#334155"),
+    "--picks-theme-selected-bg:"+(q.selectedBackground||"#854d0e"),
+    "--picks-theme-selected-text:"+(q.selectedText||"#fde68a"),
+    "--picks-theme-selected-border:"+(q.selectedBorder||"#facc15"),
+    "--picks-theme-question-radius:"+(Number(q.radius)||16)+"px",
+    "--picks-theme-question-gap:"+(Number(q.gap)||12)+"px",
+    "--picks-theme-text-columns:"+(Number(q.textColumns)||2),
+    "--picks-theme-compact-columns:"+(Number(q.compactColumns)||1),
+    "--picks-theme-compact-image:"+(Number(q.compactImageSize)||44)+"px",
+    "--picks-theme-image-columns:"+(Number(q.imageColumns)||4),
+    "--picks-theme-image-aspect:"+String(q.imageAspect||"2/3").replace("/"," / "),
+    "--picks-theme-image-fit:"+(q.imageFit||"cover"),
+    "--picks-theme-image-overlay:"+(Number(q.imageOverlayOpacity||35)/100),
+    "--picks-theme-wager-columns:"+(Number(q.wagerColumns)||2),
+    "--picks-theme-details-bg:"+picksAppearanceHexRgba_(details.background,details.opacity,"#0b1220"),
+    "--picks-theme-details-text:"+(details.text||"#cbd5e1"),
+    "--picks-theme-details-border:"+(details.border||"#334155"),
+    "--picks-theme-details-radius:"+(Number(details.radius)||10)+"px",
+    "--picks-theme-sort-bg:"+(bars.sortBackground||"#0f172a"),
+    "--picks-theme-sort-text:"+(bars.sortText||"#ffffff"),
+    "--picks-theme-save-bg:"+(bars.saveBackground||"#2563eb"),
+    "--picks-theme-save-text:"+(bars.saveText||"#ffffff"),
+    "--picks-theme-bar-radius:"+(Number(bars.buttonRadius)||9)+"px"
+  ].join(";");
+  return { style: style };
+}
+
+function applyPicksAppearanceToPage_() {
+  const page = document.querySelector(".picks-page");
+  if (!page) return;
+  const presentation = picksAppearancePresentation_();
+  page.setAttribute("style", presentation.style);
+  page.classList.toggle("picks-appearance-active", !!PICKS_PAGE_DATA.appearance);
+}
+
 function renderNomineeButton(
   category,
   nominee,
@@ -3587,9 +3665,7 @@ function renderNomineeButton(
     normalizeId(nominee.id) ===
     normalizeId(selectedNomineeId);
 
-  const layoutType =
-    String(category.layoutType || "image")
-      .toLowerCase();
+  const layoutType = picksResolvedQuestionLayout_(category);
 
   const existingStake =
     Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
@@ -3608,7 +3684,7 @@ function renderNomineeButton(
     return `
       <button
         type="button"
-        class="nominee-choice text-choice ${selected ? "selected" : ""}"
+        class="nominee-choice text-choice ${layoutType === "short-answer" ? "short-answer-choice" : ""} ${selected ? "selected" : ""}"
         onclick="selectNominee('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
         ${disabled}
       >
@@ -3642,6 +3718,15 @@ function renderNomineeButton(
       </button>
     `;
 
+  }
+
+  if (layoutType === "wager") {
+    return `
+      <button type="button" class="nominee-choice wager-choice ${selected ? "selected" : ""}" onclick="selectNominee('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')" ${disabled}>
+        <span>${escapeHtml(nominee.name)}</span>
+        <b>${escapeHtml(nominee.odds || nominee.liveOdds || nominee.moneyline || "Pick")}</b>
+        ${renderNomineeLiveProbability_(category, nominee)}
+      </button>`;
   }
 
   return `
@@ -4174,6 +4259,8 @@ function mountPicksPage() {
       1000
     );
 
+  applyPicksAppearanceToPage_();
+
   // Optional Reality TV statistics and Season Survivor details load after
   // the core questions and saved picks are already usable.
   hydratePicksEnhancements_();
@@ -4578,9 +4665,7 @@ function getLockLabel(category) {
 
 function getLayoutClass(category) {
 
-  const layout =
-    String(category.layoutType || "image")
-      .toLowerCase();
+  const layout = picksResolvedQuestionLayout_(category);
 
   if (
     layout === "text" ||
@@ -4589,12 +4674,8 @@ function getLayoutClass(category) {
     return "nominee-layout nominee-layout-text";
   }
 
-  if (
-    layout === "compact" ||
-    layout === "list"
-  ) {
-    return "nominee-layout nominee-layout-list";
-  }
+  if (layout === "compact" || layout === "list") return "nominee-layout nominee-layout-list nominee-layout-" + layout;
+  if (layout === "wager") return "nominee-layout nominee-layout-wager";
 
   return "nominee-layout nominee-layout-image";
 

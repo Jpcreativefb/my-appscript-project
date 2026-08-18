@@ -13,6 +13,7 @@ let ADMIN_APPEARANCE_STATE = {
   themeNewMode: false,
   themePreviewState: "pregame",
   themePreviewDevice: "desktop",
+  themePreviewSurface: "matchup",
   busy: false,
   message: ""
 };
@@ -405,6 +406,50 @@ function adminAppearanceStudioVisibilityDefaults_(visibility) {
   return out;
 }
 
+
+const ADMIN_APPEARANCE_QUESTION_LAYOUTS = [
+  ["inherit", "Use Question / Game Setting"],
+  ["text", "Text"],
+  ["compact", "Compact"],
+  ["image", "Image"],
+  ["list", "List"],
+  ["short-answer", "Short Answer"],
+  ["wager", "Wager / Market"]
+];
+
+function adminAppearanceQuestionSectionKey_(category) {
+  return String(category && (category.sectionId || category.SectionId || category.section || category.Section || category.groupName || category.GroupName || category.parentCategoryId || "Questions") || "Questions").trim();
+}
+
+function adminAppearanceQuestionLayoutRows_() {
+  return ((ADMIN_APPEARANCE_STATE.gameSetup || {}).categories || []).filter(function(category) {
+    return category && String(category.id || category.categoryId || "").trim();
+  });
+}
+
+function adminAppearanceQuestionOverridesHtml_(theme) {
+  const questions = theme.questions || {};
+  const overrides = questions.overrides || {};
+  const sectionOverrides = questions.sectionOverrides || {};
+  const rows = adminAppearanceQuestionLayoutRows_();
+  const sections = {};
+  rows.forEach(function(category) { sections[adminAppearanceQuestionSectionKey_(category)] = true; });
+  const optionHtml = function(value, allowInherit) {
+    const list = allowInherit ? ADMIN_APPEARANCE_QUESTION_LAYOUTS : ADMIN_APPEARANCE_QUESTION_LAYOUTS.filter(function(item){ return item[0] !== "inherit"; });
+    return list.map(function(item){ return '<option value="'+adminAppearanceEscape_(item[0])+'"'+(String(value||"")===item[0]?' selected':'')+'>'+adminAppearanceEscape_(item[1])+'</option>'; }).join('');
+  };
+  const sectionHtml = Object.keys(sections).map(function(key) {
+    return '<label class="appearance-question-override-row"><span>'+adminAppearanceEscape_(key)+'</span><select class="input" data-question-section-id="'+adminAppearanceEscape_(key)+'">'+optionHtml(sectionOverrides[key] || "inherit", true)+'</select></label>';
+  }).join('');
+  const questionHtml = rows.map(function(category) {
+    const id = String(category.id || category.categoryId || "");
+    const title = String(category.title || category.name || category.category || category.question || category.Question || id);
+    const current = overrides[id] || "inherit";
+    return '<label class="appearance-question-override-row"><span title="'+adminAppearanceEscape_(title)+'">'+adminAppearanceEscape_(title)+'</span><select class="input" data-question-layout-id="'+adminAppearanceEscape_(id)+'">'+optionHtml(current, true)+'</select></label>';
+  }).join('');
+  return '<div class="appearance-question-override-grid"><h4>Section Overrides</h4>'+(sectionHtml||'<small>No sections detected.</small>')+'<h4>Individual Question Overrides</h4>'+(questionHtml||'<small>No questions found in this game.</small>')+'</div>';
+}
+
 function adminAppearanceStudioDefaults_(theme) {
   theme = theme || {};
   const team = theme.team || {};
@@ -419,6 +464,10 @@ function adminAppearanceStudioDefaults_(theme) {
   const background = theme.background || {};
   const confidence = theme.confidence || {};
   const score = theme.score || {};
+  const page = theme.page || {};
+  const questions = theme.questions || {};
+  const details = theme.details || {};
+  const bars = theme.bars || {};
   const positioning = theme.positioning || {};
   const overlays = theme.overlays || {};
   const resultTypography = theme.resultTypography || {};
@@ -604,6 +653,58 @@ function adminAppearanceStudioDefaults_(theme) {
       height: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.height, 18, 64, 26),
       radius: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.radius, 0, 20, 0),
       fontSize: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.fontSize, 7, 20, 10)
+    },
+    page: {
+      background: page.background || "#020617",
+      headerBackground: page.headerBackground || "#0f172a",
+      headerText: page.headerText || "#ffffff",
+      headerMuted: page.headerMuted || "#94a3b8",
+      headerRadius: adminAppearanceStudioClamp_(page.headerRadius, 0, 32, 16),
+      sectionGap: adminAppearanceStudioClamp_(page.sectionGap, 4, 36, 18)
+    },
+    questions: {
+      defaultLayout: questions.defaultLayout || "inherit",
+      cardBackground: questions.cardBackground || "#0f172a",
+      cardOpacity: adminAppearanceStudioClamp_(questions.cardOpacity, 0, 100, 96),
+      headerBackground: questions.headerBackground || "#111111",
+      headerOpacity: adminAppearanceStudioClamp_(questions.headerOpacity, 0, 100, 100),
+      titleColor: questions.titleColor || "#ffffff",
+      titleSize: adminAppearanceStudioClamp_(questions.titleSize, 10, 28, 16),
+      answerBackground: questions.answerBackground || "#1e293b",
+      answerText: questions.answerText || "#ffffff",
+      answerBorder: questions.answerBorder || "#334155",
+      selectedBackground: questions.selectedBackground || "#854d0e",
+      selectedText: questions.selectedText || "#fde68a",
+      selectedBorder: questions.selectedBorder || "#facc15",
+      correctColor: questions.correctColor || "#22c55e",
+      incorrectColor: questions.incorrectColor || "#ef4444",
+      radius: adminAppearanceStudioClamp_(questions.radius, 0, 32, 16),
+      gap: adminAppearanceStudioClamp_(questions.gap, 2, 28, 12),
+      textColumns: adminAppearanceStudioClamp_(questions.textColumns, 1, 4, 2),
+      compactColumns: adminAppearanceStudioClamp_(questions.compactColumns, 1, 4, 1),
+      compactImageSize: adminAppearanceStudioClamp_(questions.compactImageSize, 0, 90, 44),
+      imageColumns: adminAppearanceStudioClamp_(questions.imageColumns, 1, 6, 4),
+      imageAspect: questions.imageAspect || "2/3",
+      imageFit: questions.imageFit || "cover",
+      imageTextOverlay: questions.imageTextOverlay === true,
+      imageOverlayOpacity: adminAppearanceStudioClamp_(questions.imageOverlayOpacity, 0, 90, 35),
+      wagerColumns: adminAppearanceStudioClamp_(questions.wagerColumns, 1, 3, 2),
+      overrides: Object.assign({}, questions.overrides || {}),
+      sectionOverrides: Object.assign({}, questions.sectionOverrides || {})
+    },
+    details: {
+      background: details.background || "#0b1220",
+      opacity: adminAppearanceStudioClamp_(details.opacity, 0, 100, 86),
+      text: details.text || "#cbd5e1",
+      border: details.border || "#334155",
+      radius: adminAppearanceStudioClamp_(details.radius, 0, 24, 10)
+    },
+    bars: {
+      sortBackground: bars.sortBackground || "#0f172a",
+      sortText: bars.sortText || "#ffffff",
+      saveBackground: bars.saveBackground || "#2563eb",
+      saveText: bars.saveText || "#ffffff",
+      buttonRadius: adminAppearanceStudioClamp_(bars.buttonRadius, 0, 24, 9)
     },
     colors: {
       accent: colors.accent || "#60a5fa",
@@ -869,6 +970,59 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioColor_("appearanceThemeMobileArrowColor", "Mobile Arrow Color", theme.confidence.mobileArrowColor)}
             <div class="admin-sub appearance-studio-inline-note">Set Mobile Selector Arrow to 0px to hide it completely. The confidence number remains centered.</div>
           </div></details>
+
+          <details open><summary>Page / Header / Bars</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioColor_("appearanceThemePageBg", "Page Background", theme.page.background)}
+            ${adminAppearanceStudioColor_("appearanceThemeHeaderBg", "Header Background", theme.page.headerBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeHeaderText", "Header Title", theme.page.headerText)}
+            ${adminAppearanceStudioColor_("appearanceThemeHeaderMuted", "Header Secondary Text", theme.page.headerMuted)}
+            ${adminAppearanceStudioRange_("appearanceThemeHeaderRadius", "Header Corners", theme.page.headerRadius, 0, 32, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeSectionGap", "Section Spacing", theme.page.sectionGap, 4, 36, 1, "px")}
+            ${adminAppearanceStudioColor_("appearanceThemeSortBg", "Sort / Toolbar Background", theme.bars.sortBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeSortText", "Sort / Toolbar Text", theme.bars.sortText)}
+            ${adminAppearanceStudioColor_("appearanceThemeSaveBg", "Save Button Background", theme.bars.saveBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeSaveText", "Save Button Text", theme.bars.saveText)}
+            ${adminAppearanceStudioRange_("appearanceThemeBarRadius", "Toolbar Button Corners", theme.bars.buttonRadius, 0, 24, 1, "px")}
+          </div></details>
+
+          <details open><summary>Question Area Designer</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeQuestionDefault", "Game Default Question Layout", theme.questions.defaultLayout, ADMIN_APPEARANCE_QUESTION_LAYOUTS)}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionCardBg", "Question Card Background", theme.questions.cardBackground)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionCardOpacity", "Question Card Opacity", theme.questions.cardOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionHeaderBg", "Question Header Background", theme.questions.headerBackground)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionHeaderOpacity", "Question Header Opacity", theme.questions.headerOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionTitle", "Question Title", theme.questions.titleColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionTitleSize", "Question Title Size", theme.questions.titleSize, 10, 28, 1, "px")}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerBg", "Answer Background", theme.questions.answerBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerText", "Answer Text", theme.questions.answerText)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerBorder", "Answer Border", theme.questions.answerBorder)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedBg", "Selected Answer Background", theme.questions.selectedBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedText", "Selected Answer Text", theme.questions.selectedText)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedBorder", "Selected Answer Border", theme.questions.selectedBorder)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionRadius", "Question / Answer Corners", theme.questions.radius, 0, 32, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionGap", "Answer Gap", theme.questions.gap, 2, 28, 1, "px")}
+          </div></details>
+
+          <details><summary>Question Layout Types</summary><div class="appearance-studio-panel">
+            <h4>Text</h4>${adminAppearanceStudioRange_("appearanceThemeTextColumns", "Columns", theme.questions.textColumns, 1, 4, 1, "")}
+            <h4>Compact</h4>${adminAppearanceStudioRange_("appearanceThemeCompactColumns", "Columns", theme.questions.compactColumns, 1, 4, 1, "")}${adminAppearanceStudioRange_("appearanceThemeCompactImage", "Image / Logo Size", theme.questions.compactImageSize, 0, 90, 1, "px")}
+            <h4>Image</h4>${adminAppearanceStudioRange_("appearanceThemeImageColumns", "Columns", theme.questions.imageColumns, 1, 6, 1, "")}${adminAppearanceStudioSelect_("appearanceThemeImageAspect", "Image Ratio", theme.questions.imageAspect, [["2/3","Portrait 2:3"],["1/1","Square"],["16/9","Landscape 16:9"],["4/3","Landscape 4:3"]])}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageFit", "Image Fit", theme.questions.imageFit, [["cover","Cover"],["contain","Contain"]])}<label class="appearance-studio-check"><input id="appearanceThemeImageTextOverlay" type="checkbox" ${theme.questions.imageTextOverlay ? 'checked' : ''}><span>Put answer text over image</span></label>${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay", "Text Overlay Darkness", theme.questions.imageOverlayOpacity, 0, 90, 1, "%")}
+            <h4>Wager / Market</h4>${adminAppearanceStudioRange_("appearanceThemeWagerColumns", "Columns", theme.questions.wagerColumns, 1, 3, 1, "")}
+            <div class="admin-sub">List and Short Answer reuse the shared answer styling. Changing layout here changes presentation only — scoring/play type stays untouched.</div>
+          </div></details>
+
+          <details><summary>Section / Question Layout Overrides</summary><div class="appearance-studio-panel">
+            <div class="admin-sub">Game Default → Section Override → Individual Question Override. Use “Question / Game Setting” to fall back without deleting the original question layout.</div>
+            ${adminAppearanceQuestionOverridesHtml_(theme)}
+          </div></details>
+
+          <details><summary>Expandable Details</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioColor_("appearanceThemeDetailsBg", "Details Background", theme.details.background)}
+            ${adminAppearanceStudioRange_("appearanceThemeDetailsOpacity", "Details Opacity", theme.details.opacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeDetailsText", "Details Text", theme.details.text)}
+            ${adminAppearanceStudioColor_("appearanceThemeDetailsBorder", "Details Border", theme.details.border)}
+            ${adminAppearanceStudioRange_("appearanceThemeDetailsRadius", "Details Corners", theme.details.radius, 0, 24, 1, "px")}
+          </div></details>
         </aside>
 
         <main class="appearance-studio-canvas">
@@ -908,6 +1062,13 @@ function adminAppearanceThemePreview_(theme) {
   }
   return `<div class="appearance-studio-preview-wrap">
     <div class="appearance-studio-preview-toolbar">
+      <div class="appearance-studio-preview-surface-tabs">
+        <button type="button" data-preview-surface="matchup" onclick="adminAppearanceSetPreviewSurface_('matchup')">Matchup</button>
+        <button type="button" data-preview-surface="text" onclick="adminAppearanceSetPreviewSurface_('text')">Text</button>
+        <button type="button" data-preview-surface="compact" onclick="adminAppearanceSetPreviewSurface_('compact')">Compact</button>
+        <button type="button" data-preview-surface="image" onclick="adminAppearanceSetPreviewSurface_('image')">Image</button>
+        <button type="button" data-preview-surface="wager" onclick="adminAppearanceSetPreviewSurface_('wager')">Wager</button>
+      </div>
       <div class="appearance-studio-preview-tabs">
         <button type="button" data-preview-state="pregame" onclick="adminAppearanceSetPreviewState_('pregame')">Pregame</button>
         <button type="button" data-preview-state="live" onclick="adminAppearanceSetPreviewState_('live')">Live</button>
@@ -945,6 +1106,10 @@ function adminAppearanceThemePreview_(theme) {
           </strong>
           <span class="appearance-preview-details-text"><span data-ap-element="moneyline">Odds</span> · <span data-ap-element="records">Records</span> · <span data-ap-element="favorite">Favorite</span></span>
         </div>
+        <section class="appearance-question-preview" data-question-preview="text"><header><strong>Who wins Best Picture?</strong><span>10 pts</span></header><div class="appearance-question-answers text"><button>Film Alpha</button><button class="selected">Film Bravo</button><button>Film Charlie</button><button>Film Delta</button></div></section>
+        <section class="appearance-question-preview" data-question-preview="compact"><header><strong>Who wins this matchup?</strong><span>5 pts</span></header><div class="appearance-question-answers compact"><button><i>KC</i><span>Kansas City Chiefs</span></button><button class="selected"><i>BUF</i><span>Buffalo Bills</span></button></div></section>
+        <section class="appearance-question-preview" data-question-preview="image"><header><strong>Choose the winner</strong><span>10 pts</span></header><div class="appearance-question-answers image"><button><i class="appearance-question-image-placeholder">A</i><span>Nominee Alpha</span></button><button class="selected"><i class="appearance-question-image-placeholder">B</i><span>Nominee Bravo</span></button><button><i class="appearance-question-image-placeholder">C</i><span>Nominee Charlie</span></button></div></section>
+        <section class="appearance-question-preview" data-question-preview="wager"><header><strong>Moneyline</strong><span>Market</span></header><div class="appearance-question-answers wager"><button><span>Chicago</span><b>-145</b></button><button class="selected"><span>Detroit</span><b>+125</b></button></div><div class="appearance-question-wager-bar">Risk <strong>25</strong> points</div></section>
       </div>
       </div>
     </div>
@@ -1421,6 +1586,7 @@ function adminAppearanceMountThemePreview_() {
   adminAppearanceUpdateModeControlVisibility_();
   adminAppearanceSetPreviewState_(ADMIN_APPEARANCE_STATE.themePreviewState || "pregame");
   adminAppearanceSetPreviewDevice_(ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop");
+  adminAppearanceSetPreviewSurface_(ADMIN_APPEARANCE_STATE.themePreviewSurface || "matchup", true);
 }
 
 function adminAppearanceStudioValue_(id, fallback) {
@@ -1621,6 +1787,61 @@ function adminAppearanceReadThemeControls_() {
       height: adminAppearanceStudioNumber_("appearanceThemeScoreboardHeight", 26),
       radius: adminAppearanceStudioNumber_("appearanceThemeScoreboardRadius", 0),
       fontSize: adminAppearanceStudioNumber_("appearanceThemeScoreboardFontSize", 10)
+    },
+    page: {
+      background: String(adminAppearanceStudioValue_("appearanceThemePageBg", "#020617")),
+      headerBackground: String(adminAppearanceStudioValue_("appearanceThemeHeaderBg", "#0f172a")),
+      headerText: String(adminAppearanceStudioValue_("appearanceThemeHeaderText", "#ffffff")),
+      headerMuted: String(adminAppearanceStudioValue_("appearanceThemeHeaderMuted", "#94a3b8")),
+      headerRadius: adminAppearanceStudioNumber_("appearanceThemeHeaderRadius", 16),
+      sectionGap: adminAppearanceStudioNumber_("appearanceThemeSectionGap", 18)
+    },
+    questions: (function(){
+      const overrides = {}, sectionOverrides = {};
+      document.querySelectorAll("[data-question-layout-id]").forEach(function(el){ overrides[String(el.dataset.questionLayoutId||"")] = String(el.value||"inherit"); });
+      document.querySelectorAll("[data-question-section-id]").forEach(function(el){ sectionOverrides[String(el.dataset.questionSectionId||"")] = String(el.value||"inherit"); });
+      return {
+        defaultLayout: String(adminAppearanceStudioValue_("appearanceThemeQuestionDefault", "inherit")),
+        cardBackground: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardBg", "#0f172a")),
+        cardOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionCardOpacity", 96),
+        headerBackground: String(adminAppearanceStudioValue_("appearanceThemeQuestionHeaderBg", "#111111")),
+        headerOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionHeaderOpacity", 100),
+        titleColor: String(adminAppearanceStudioValue_("appearanceThemeQuestionTitle", "#ffffff")),
+        titleSize: adminAppearanceStudioNumber_("appearanceThemeQuestionTitleSize", 16),
+        answerBackground: String(adminAppearanceStudioValue_("appearanceThemeAnswerBg", "#1e293b")),
+        answerText: String(adminAppearanceStudioValue_("appearanceThemeAnswerText", "#ffffff")),
+        answerBorder: String(adminAppearanceStudioValue_("appearanceThemeAnswerBorder", "#334155")),
+        selectedBackground: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedBg", "#854d0e")),
+        selectedText: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedText", "#fde68a")),
+        selectedBorder: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedBorder", "#facc15")),
+        correctColor: "#22c55e", incorrectColor: "#ef4444",
+        radius: adminAppearanceStudioNumber_("appearanceThemeQuestionRadius", 16),
+        gap: adminAppearanceStudioNumber_("appearanceThemeQuestionGap", 12),
+        textColumns: adminAppearanceStudioNumber_("appearanceThemeTextColumns", 2),
+        compactColumns: adminAppearanceStudioNumber_("appearanceThemeCompactColumns", 1),
+        compactImageSize: adminAppearanceStudioNumber_("appearanceThemeCompactImage", 44),
+        imageColumns: adminAppearanceStudioNumber_("appearanceThemeImageColumns", 4),
+        imageAspect: String(adminAppearanceStudioValue_("appearanceThemeImageAspect", "2/3")),
+        imageFit: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageFit", "cover")),
+        imageTextOverlay: adminAppearanceStudioValue_("appearanceThemeImageTextOverlay", false) === true,
+        imageOverlayOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlay", 35),
+        wagerColumns: adminAppearanceStudioNumber_("appearanceThemeWagerColumns", 2),
+        overrides: overrides, sectionOverrides: sectionOverrides
+      };
+    })(),
+    details: {
+      background: String(adminAppearanceStudioValue_("appearanceThemeDetailsBg", "#0b1220")),
+      opacity: adminAppearanceStudioNumber_("appearanceThemeDetailsOpacity", 86),
+      text: String(adminAppearanceStudioValue_("appearanceThemeDetailsText", "#cbd5e1")),
+      border: String(adminAppearanceStudioValue_("appearanceThemeDetailsBorder", "#334155")),
+      radius: adminAppearanceStudioNumber_("appearanceThemeDetailsRadius", 10)
+    },
+    bars: {
+      sortBackground: String(adminAppearanceStudioValue_("appearanceThemeSortBg", "#0f172a")),
+      sortText: String(adminAppearanceStudioValue_("appearanceThemeSortText", "#ffffff")),
+      saveBackground: String(adminAppearanceStudioValue_("appearanceThemeSaveBg", "#2563eb")),
+      saveText: String(adminAppearanceStudioValue_("appearanceThemeSaveText", "#ffffff")),
+      buttonRadius: adminAppearanceStudioNumber_("appearanceThemeBarRadius", 9)
     },
     colors: {
       accent: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -1829,6 +2050,33 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-wrong-label": theme.resultTypography.incorrect.confidenceLabel,
     "--ap-wrong-points": theme.resultTypography.incorrect.points
   };
+  Object.assign(vars, {
+    "--ap-page-bg": theme.page.background,
+    "--ap-question-card-bg": adminAppearanceStudioHexRgba_(theme.questions.cardBackground, theme.questions.cardOpacity),
+    "--ap-question-header-bg": adminAppearanceStudioHexRgba_(theme.questions.headerBackground, theme.questions.headerOpacity),
+    "--ap-question-title": theme.questions.titleColor,
+    "--ap-question-title-size": theme.questions.titleSize + "px",
+    "--ap-answer-bg": theme.questions.answerBackground,
+    "--ap-answer-text": theme.questions.answerText,
+    "--ap-answer-border": theme.questions.answerBorder,
+    "--ap-answer-selected-bg": theme.questions.selectedBackground,
+    "--ap-answer-selected-text": theme.questions.selectedText,
+    "--ap-answer-selected-border": theme.questions.selectedBorder,
+    "--ap-question-radius": theme.questions.radius + "px",
+    "--ap-question-gap": theme.questions.gap + "px",
+    "--ap-text-columns": theme.questions.textColumns,
+    "--ap-compact-columns": theme.questions.compactColumns,
+    "--ap-compact-image": theme.questions.compactImageSize + "px",
+    "--ap-image-columns": theme.questions.imageColumns,
+    "--ap-image-aspect": String(theme.questions.imageAspect || "2/3").replace("/", " / "),
+    "--ap-question-image-fit": theme.questions.imageFit,
+    "--ap-question-image-overlay": theme.questions.imageOverlayOpacity / 100,
+    "--ap-wager-columns": theme.questions.wagerColumns,
+    "--ap-details-bg": adminAppearanceStudioHexRgba_(theme.details.background, theme.details.opacity),
+    "--ap-details-text": theme.details.text,
+    "--ap-details-border": theme.details.border,
+    "--ap-details-radius": theme.details.radius + "px"
+  });
   Object.keys(vars).forEach(function(key) { preview.style.setProperty(key, vars[key]); });
 
   const device = ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop";
@@ -1840,6 +2088,19 @@ function adminAppearanceUpdateThemePreview_() {
 
   adminAppearanceSetPreviewState_(ADMIN_APPEARANCE_STATE.themePreviewState || "pregame", true);
   adminAppearanceSetPreviewDevice_(device, true);
+  adminAppearanceSetPreviewSurface_(ADMIN_APPEARANCE_STATE.themePreviewSurface || "matchup", true);
+}
+
+
+function adminAppearanceSetPreviewSurface_(surface, skipUpdate) {
+  surface = ["matchup","text","compact","image","wager"].indexOf(String(surface||"")) !== -1 ? String(surface) : "matchup";
+  ADMIN_APPEARANCE_STATE.themePreviewSurface = surface;
+  const preview = document.getElementById("appearanceThemePreview");
+  if (preview) preview.setAttribute("data-preview-surface", surface);
+  document.querySelectorAll("[data-preview-surface]").forEach(function(button){
+    if (button.tagName === "BUTTON") button.classList.toggle("active", button.dataset.previewSurface === surface);
+  });
+  if (!skipUpdate && preview) adminAppearanceUpdateThemePreview_();
 }
 
 function adminAppearanceSetPreviewState_(state, skipUpdate) {

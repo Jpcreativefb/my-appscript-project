@@ -1201,3 +1201,30 @@
 /* Final-result typography remains intentionally stronger than the normal score font color. */
 .appearance-studio-preview-state-final-win .appearance-preview-team.selected .appearance-preview-score { color:var(--ap-correct-score); }
 .appearance-studio-preview-state-final-loss .appearance-preview-team.selected .appearance-preview-score { color:var(--ap-wrong-score); }
+
+
+/* =========================================================
+   v1.2.17r — PAGE + QUESTION TEMPLATE PREVIEW
+========================================================= */
+.appearance-studio-preview-surface-tabs{display:flex;flex-wrap:wrap;gap:5px;}
+.appearance-studio-preview-surface-tabs button{border:1px solid rgba(148,163,184,.3);background:#111827;color:#cbd5e1;border-radius:7px;padding:5px 8px;font-size:.7rem;font-weight:800;cursor:pointer;}
+.appearance-studio-preview-surface-tabs button.active{background:#2563eb;color:#fff;border-color:#60a5fa;}
+.appearance-theme-preview[data-preview-surface]:not([data-preview-surface="matchup"]) .appearance-preview-main,
+.appearance-theme-preview[data-preview-surface]:not([data-preview-surface="matchup"]) .appearance-preview-meta{display:none!important;}
+.appearance-question-preview{display:none;padding:14px;background:var(--ap-question-card-bg,#0f172a);border-radius:var(--ap-question-radius,16px);color:var(--ap-answer-text,#fff);}
+.appearance-theme-preview[data-preview-surface="text"] [data-question-preview="text"],
+.appearance-theme-preview[data-preview-surface="compact"] [data-question-preview="compact"],
+.appearance-theme-preview[data-preview-surface="image"] [data-question-preview="image"],
+.appearance-theme-preview[data-preview-surface="wager"] [data-question-preview="wager"]{display:block;}
+.appearance-question-preview header{display:flex;justify-content:space-between;gap:12px;padding:10px 12px;margin:-14px -14px 12px;background:var(--ap-question-header-bg,#111);border-radius:var(--ap-question-radius,16px) var(--ap-question-radius,16px) 0 0;color:var(--ap-question-title,#fff);font-size:var(--ap-question-title-size,16px);}
+.appearance-question-answers{display:grid;gap:var(--ap-question-gap,12px);}
+.appearance-question-answers.text{grid-template-columns:repeat(var(--ap-text-columns,2),minmax(0,1fr));}
+.appearance-question-answers.compact{grid-template-columns:repeat(var(--ap-compact-columns,1),minmax(0,1fr));}
+.appearance-question-answers.image{grid-template-columns:repeat(var(--ap-image-columns,4),minmax(0,1fr));}
+.appearance-question-answers.wager{grid-template-columns:repeat(var(--ap-wager-columns,2),minmax(0,1fr));}
+.appearance-question-answers button{border:1px solid var(--ap-answer-border,#334155);background:var(--ap-answer-bg,#1e293b);color:var(--ap-answer-text,#fff);border-radius:var(--ap-question-radius,16px);padding:10px;font-weight:800;min-width:0;}
+.appearance-question-answers button.selected{background:var(--ap-answer-selected-bg,#854d0e);color:var(--ap-answer-selected-text,#fde68a);border-color:var(--ap-answer-selected-border,#facc15);}
+.appearance-question-answers.compact button{display:flex;align-items:center;gap:10px;text-align:left;}.appearance-question-answers.compact i{width:var(--ap-compact-image,44px);height:var(--ap-compact-image,44px);display:grid;place-items:center;border-radius:9px;background:#334155;font-style:normal;}
+.appearance-question-image-placeholder{display:grid;place-items:center;width:100%;aspect-ratio:var(--ap-image-aspect,2 / 3);background:linear-gradient(135deg,#334155,#0f172a);border-radius:10px;font-style:normal;font-size:2rem;margin-bottom:7px;}
+.appearance-question-answers.wager button{display:flex;justify-content:space-between;align-items:center;}.appearance-question-wager-bar{margin-top:12px;padding:9px 12px;border-radius:10px;background:rgba(255,255,255,.07);}
+.appearance-question-override-grid{display:grid;gap:7px;}.appearance-question-override-grid h4{margin:10px 0 2px;}.appearance-question-override-row{display:grid;grid-template-columns:minmax(0,1fr) 150px;gap:8px;align-items:center;font-size:.72rem;}.appearance-question-override-row span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
