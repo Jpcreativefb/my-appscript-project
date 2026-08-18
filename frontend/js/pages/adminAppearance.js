@@ -425,7 +425,7 @@ function adminAppearanceStudioDefaults_(theme) {
   const incorrectType = resultTypography.incorrect || {};
 
   return {
-    studioVersion: 4,
+    studioVersion: 5,
     density: theme.density || "compact",
     layout: {
       rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
@@ -465,6 +465,8 @@ function adminAppearanceStudioDefaults_(theme) {
       textOffsetX: adminAppearanceStudioClamp_(positioning.textOffsetX, -30, 30, 0),
       textOffsetY: adminAppearanceStudioClamp_(positioning.textOffsetY, -30, 30, 0),
       scoreAnchor: positioning.scoreAnchor || "bottom-left",
+      scoreOffsetX: adminAppearanceStudioClamp_(positioning.scoreOffsetX, -50, 50, 0),
+      scoreOffsetY: adminAppearanceStudioClamp_(positioning.scoreOffsetY, -50, 50, 0),
       confidenceVertical: positioning.confidenceVertical || "center",
       statusAlign: positioning.statusAlign || "left"
     },
@@ -476,6 +478,8 @@ function adminAppearanceStudioDefaults_(theme) {
         textOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textOffsetX, -40, 40, positioning.textOffsetX == null ? 0 : positioning.textOffsetX),
         textOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.textOffsetY, -40, 40, positioning.textOffsetY == null ? 0 : positioning.textOffsetY),
         scoreAnchor: theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.scoreAnchor || positioning.scoreAnchor || "bottom-left",
+        scoreOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.scoreOffsetX, -50, 50, positioning.scoreOffsetX == null ? 0 : positioning.scoreOffsetX),
+        scoreOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.scoreOffsetY, -50, 50, positioning.scoreOffsetY == null ? 0 : positioning.scoreOffsetY),
         imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageX, 0, 100, images.x == null ? 50 : images.x),
         imageY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.away && theme.sideLayout.away.imageY, 0, 100, images.y == null ? 50 : images.y)
       },
@@ -485,6 +489,8 @@ function adminAppearanceStudioDefaults_(theme) {
         textOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textOffsetX, -40, 40, positioning.textOffsetX == null ? 0 : positioning.textOffsetX),
         textOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.textOffsetY, -40, 40, positioning.textOffsetY == null ? 0 : positioning.textOffsetY),
         scoreAnchor: theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.scoreAnchor || positioning.scoreAnchor || "bottom-left",
+        scoreOffsetX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.scoreOffsetX, -50, 50, positioning.scoreOffsetX == null ? 0 : positioning.scoreOffsetX),
+        scoreOffsetY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.scoreOffsetY, -50, 50, positioning.scoreOffsetY == null ? 0 : positioning.scoreOffsetY),
         imageX: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageX, 0, 100, images.x == null ? 50 : images.x),
         imageY: adminAppearanceStudioClamp_(theme.sideLayout && theme.sideLayout.home && theme.sideLayout.home.imageY, 0, 100, images.y == null ? 50 : images.y)
       }
@@ -565,6 +571,16 @@ function adminAppearanceStudioDefaults_(theme) {
       lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 20, 100, 62),
       mobileArrowSize: adminAppearanceStudioClamp_(confidence.mobileArrowSize, 0, 10, 4),
       mobileArrowColor: confidence.mobileArrowColor || colors.muted || "#94a3b8"
+    },
+    scoreboard: {
+      background: theme.scoreboard && theme.scoreboard.background || "#0b1220",
+      backgroundOpacity: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.backgroundOpacity, 0, 100, 72),
+      text: theme.scoreboard && theme.scoreboard.text || colors.muted || "#94a3b8",
+      border: theme.scoreboard && theme.scoreboard.border || "#334155",
+      borderOpacity: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.borderOpacity, 0, 100, 32),
+      height: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.height, 18, 64, 26),
+      radius: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.radius, 0, 20, 0),
+      fontSize: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.fontSize, 7, 20, 10)
     },
     colors: {
       accent: colors.accent || "#60a5fa",
@@ -687,9 +703,9 @@ function adminAppearanceThemeEditor_() {
           </div></details>
 
           <details><summary>Images & Full Image Mode</summary><div class="appearance-studio-panel">
-            ${adminAppearanceStudioSelect_("appearanceThemeImageLayer", "Image Layer", theme.images.layer, [["inline","Inline Logo/Image"],["background","Bottom Layer · Text & Score on Top"]])}
-            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Fit", theme.images.fit, [["contain","Contain"],["cover","Cover"],["full-bleed","Full Image Button"]])}
-            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Inline Image Size", theme.images.size, 20, 140, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeImageLayer", "Image Canvas Mode", theme.images.layer, [["inline","Floating Art · Anywhere on Button"],["background","Full Button Background · Text & Score on Top"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeImageFit", "Image Fit", theme.images.fit, [["contain","Contain"],["cover","Cover"],["full-bleed","Full Button Cover"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeImageSize", "Floating Image Size", theme.images.size, 20, 220, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeImageZoom", "Image Zoom", theme.images.zoom, 50, 220, 1, "%")}
             ${adminAppearanceStudioRange_("appearanceThemeImageX", "Image X Position", theme.images.x, 0, 100, 1, "%")}
             ${adminAppearanceStudioRange_("appearanceThemeImageY", "Image Y Position", theme.images.y, 0, 100, 1, "%")}
@@ -705,7 +721,9 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioSelect_("appearanceThemeTextVertical", "Text Vertical", theme.positioning.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
             ${adminAppearanceStudioRange_("appearanceThemeTextOffsetX", "Text X Offset", theme.positioning.textOffsetX, -30, 30, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeTextOffsetY", "Text Y Offset", theme.positioning.textOffsetY, -30, 30, 1, "px")}
-            ${adminAppearanceStudioSelect_("appearanceThemeScoreAnchor", "Score Position", theme.positioning.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeScoreAnchor", "Score Position", theme.positioning.scoreAnchor, [["inline-left","Inline Left"],["inline-right","Inline Right"],["center","Center"],["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreOffsetX", "Score X Offset", theme.positioning.scoreOffsetX, -50, 50, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreOffsetY", "Score Y Offset", theme.positioning.scoreOffsetY, -50, 50, 1, "px")}
             ${adminAppearanceStudioSelect_("appearanceThemeConfidenceVertical", "Confidence Vertical", theme.positioning.confidenceVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
             ${adminAppearanceStudioSelect_("appearanceThemeStatusAlign", "Status Alignment", theme.positioning.statusAlign, [["left","Left"],["center","Center"],["right","Right"]])}
           </div></details>
@@ -718,7 +736,9 @@ function adminAppearanceThemeEditor_() {
                 ${adminAppearanceStudioSelect_("appearanceThemeAwayTextVertical", "Text Vertical", theme.sideLayout.away.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayTextX", "Text X", theme.sideLayout.away.textOffsetX, -40, 40, 1, "px")}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayTextY", "Text Y", theme.sideLayout.away.textOffsetY, -40, 40, 1, "px")}
-                ${adminAppearanceStudioSelect_("appearanceThemeAwayScoreAnchor", "Score Position", theme.sideLayout.away.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeAwayScoreAnchor", "Score Position", theme.sideLayout.away.scoreAnchor, [["inline-left","Inline Left"],["inline-right","Inline Right"],["center","Center"],["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayScoreX", "Score X", theme.sideLayout.away.scoreOffsetX, -50, 50, 1, "px")}
+                ${adminAppearanceStudioRange_("appearanceThemeAwayScoreY", "Score Y", theme.sideLayout.away.scoreOffsetY, -50, 50, 1, "px")}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayImageX", "Image X", theme.sideLayout.away.imageX, 0, 100, 1, "%")}
                 ${adminAppearanceStudioRange_("appearanceThemeAwayImageY", "Image Y", theme.sideLayout.away.imageY, 0, 100, 1, "%")}
               </fieldset>
@@ -727,7 +747,9 @@ function adminAppearanceThemeEditor_() {
                 ${adminAppearanceStudioSelect_("appearanceThemeHomeTextVertical", "Text Vertical", theme.sideLayout.home.textVertical, [["top","Top"],["center","Center"],["bottom","Bottom"]])}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeTextX", "Text X", theme.sideLayout.home.textOffsetX, -40, 40, 1, "px")}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeTextY", "Text Y", theme.sideLayout.home.textOffsetY, -40, 40, 1, "px")}
-                ${adminAppearanceStudioSelect_("appearanceThemeHomeScoreAnchor", "Score Position", theme.sideLayout.home.scoreAnchor, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioSelect_("appearanceThemeHomeScoreAnchor", "Score Position", theme.sideLayout.home.scoreAnchor, [["inline-left","Inline Left"],["inline-right","Inline Right"],["center","Center"],["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"]])}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeScoreX", "Score X", theme.sideLayout.home.scoreOffsetX, -50, 50, 1, "px")}
+                ${adminAppearanceStudioRange_("appearanceThemeHomeScoreY", "Score Y", theme.sideLayout.home.scoreOffsetY, -50, 50, 1, "px")}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeImageX", "Image X", theme.sideLayout.home.imageX, 0, 100, 1, "%")}
                 ${adminAppearanceStudioRange_("appearanceThemeHomeImageY", "Image Y", theme.sideLayout.home.imageY, 0, 100, 1, "%")}
               </fieldset>
@@ -782,6 +804,14 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioColor_("appearanceThemeFinal", "Final Color", theme.colors.final)}
             ${adminAppearanceStudioSelect_("appearanceThemeLiveBadge", "Live Badge", theme.live.badgeStyle, [["text","Text"],["outline","Outline"],["pill","Pill"]])}
             ${adminAppearanceStudioSelect_("appearanceThemeFinalBadge", "Final Badge", theme.live.finalBadgeStyle, [["text","Text"],["outline","Outline"],["pill","Pill"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeScoreboardBg", "Scoreboard Background", theme.scoreboard.background)}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreboardBgOpacity", "Scoreboard Background Opacity", theme.scoreboard.backgroundOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeScoreboardText", "Scoreboard Text", theme.scoreboard.text)}
+            ${adminAppearanceStudioColor_("appearanceThemeScoreboardBorder", "Scoreboard Border", theme.scoreboard.border)}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreboardBorderOpacity", "Scoreboard Border Opacity", theme.scoreboard.borderOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreboardHeight", "Scoreboard Height", theme.scoreboard.height, 18, 64, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreboardRadius", "Scoreboard Corners", theme.scoreboard.radius, 0, 20, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreboardFontSize", "Scoreboard Font Size", theme.scoreboard.fontSize, 7, 20, 1, "px")}
             ${adminAppearanceStudioSelect_("appearanceThemeConfidenceStyle", "Confidence Box", theme.confidence.style, [["filled","Filled"],["outline","Outline"],["minimal","Minimal"]])}
             ${adminAppearanceStudioColor_("appearanceThemeConfidenceBg", "Confidence Background", theme.confidence.background)}
             ${adminAppearanceStudioColor_("appearanceThemeConfidenceText", "Confidence Text", theme.confidence.text)}
@@ -821,8 +851,10 @@ function adminAppearanceThemePreview_(theme) {
       : '<span class="appearance-preview-placeholder">★</span>';
     return `<button type="button" class="appearance-preview-team appearance-preview-team-${side} ${selected ? 'selected' : 'muted'}">
       <span class="appearance-preview-image"><span class="appearance-preview-image-art" data-ap-element="teamImage">${image}</span></span>
-      <small data-ap-element="city">${adminAppearanceEscape_(entity.city)}</small>
-      <strong data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
+      <span class="appearance-preview-text">
+        <small data-ap-element="city">${adminAppearanceEscape_(entity.city)}</small>
+        <strong data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
+      </span>
       <b class="appearance-preview-score" data-ap-element="score">21</b>
       <span class="appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>
     </button>`;
@@ -1374,7 +1406,7 @@ function adminAppearanceReadThemeControls_() {
     visibility.devices.mobile[key] = adminAppearanceStudioValue_("appearanceThemeVisMobile_" + key, true) === true;
   });
   return {
-    studioVersion: 4,
+    studioVersion: 5,
     density: density,
     layout: {
       rowHeight: adminAppearanceStudioNumber_("appearanceThemeRowHeight", 76),
@@ -1414,6 +1446,8 @@ function adminAppearanceReadThemeControls_() {
       textOffsetX: adminAppearanceStudioNumber_("appearanceThemeTextOffsetX", 0),
       textOffsetY: adminAppearanceStudioNumber_("appearanceThemeTextOffsetY", 0),
       scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeScoreAnchor", "bottom-left")),
+      scoreOffsetX: adminAppearanceStudioNumber_("appearanceThemeScoreOffsetX", 0),
+      scoreOffsetY: adminAppearanceStudioNumber_("appearanceThemeScoreOffsetY", 0),
       confidenceVertical: String(adminAppearanceStudioValue_("appearanceThemeConfidenceVertical", "center")),
       statusAlign: String(adminAppearanceStudioValue_("appearanceThemeStatusAlign", "left"))
     },
@@ -1425,6 +1459,8 @@ function adminAppearanceReadThemeControls_() {
         textOffsetX: adminAppearanceStudioNumber_("appearanceThemeAwayTextX", 0),
         textOffsetY: adminAppearanceStudioNumber_("appearanceThemeAwayTextY", 0),
         scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeAwayScoreAnchor", "bottom-left")),
+        scoreOffsetX: adminAppearanceStudioNumber_("appearanceThemeAwayScoreX", 0),
+        scoreOffsetY: adminAppearanceStudioNumber_("appearanceThemeAwayScoreY", 0),
         imageX: adminAppearanceStudioNumber_("appearanceThemeAwayImageX", 50),
         imageY: adminAppearanceStudioNumber_("appearanceThemeAwayImageY", 50)
       },
@@ -1434,6 +1470,8 @@ function adminAppearanceReadThemeControls_() {
         textOffsetX: adminAppearanceStudioNumber_("appearanceThemeHomeTextX", 0),
         textOffsetY: adminAppearanceStudioNumber_("appearanceThemeHomeTextY", 0),
         scoreAnchor: String(adminAppearanceStudioValue_("appearanceThemeHomeScoreAnchor", "bottom-left")),
+        scoreOffsetX: adminAppearanceStudioNumber_("appearanceThemeHomeScoreX", 0),
+        scoreOffsetY: adminAppearanceStudioNumber_("appearanceThemeHomeScoreY", 0),
         imageX: adminAppearanceStudioNumber_("appearanceThemeHomeImageX", 50),
         imageY: adminAppearanceStudioNumber_("appearanceThemeHomeImageY", 50)
       }
@@ -1514,6 +1552,16 @@ function adminAppearanceReadThemeControls_() {
       lockedOpacity: adminAppearanceStudioNumber_("appearanceThemeLockedOpacity", 62),
       mobileArrowSize: adminAppearanceStudioNumber_("appearanceThemeMobileArrowSize", 4),
       mobileArrowColor: String(adminAppearanceStudioValue_("appearanceThemeMobileArrowColor", "#94a3b8"))
+    },
+    scoreboard: {
+      background: String(adminAppearanceStudioValue_("appearanceThemeScoreboardBg", "#0b1220")),
+      backgroundOpacity: adminAppearanceStudioNumber_("appearanceThemeScoreboardBgOpacity", 72),
+      text: String(adminAppearanceStudioValue_("appearanceThemeScoreboardText", "#94a3b8")),
+      border: String(adminAppearanceStudioValue_("appearanceThemeScoreboardBorder", "#334155")),
+      borderOpacity: adminAppearanceStudioNumber_("appearanceThemeScoreboardBorderOpacity", 32),
+      height: adminAppearanceStudioNumber_("appearanceThemeScoreboardHeight", 26),
+      radius: adminAppearanceStudioNumber_("appearanceThemeScoreboardRadius", 0),
+      fontSize: adminAppearanceStudioNumber_("appearanceThemeScoreboardFontSize", 10)
     },
     colors: {
       accent: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -1605,6 +1653,12 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-home-text-y": theme.sideLayout.home.textOffsetY + "px",
     "--ap-text-offset-x": theme.positioning.textOffsetX + "px",
     "--ap-text-offset-y": theme.positioning.textOffsetY + "px",
+    "--ap-score-x": theme.positioning.scoreOffsetX + "px",
+    "--ap-score-y": theme.positioning.scoreOffsetY + "px",
+    "--ap-away-score-x": theme.sideLayout.away.scoreOffsetX + "px",
+    "--ap-away-score-y": theme.sideLayout.away.scoreOffsetY + "px",
+    "--ap-home-score-x": theme.sideLayout.home.scoreOffsetX + "px",
+    "--ap-home-score-y": theme.sideLayout.home.scoreOffsetY + "px",
     "--ap-selected-border": theme.selection.selectedBorderColor,
     "--ap-selected-width": theme.selection.selectedBorderWidth + "px",
     "--ap-selected-bg": adminAppearanceStudioHexRgba_(theme.selection.selectedTint, theme.selection.selectedTintOpacity),
@@ -1633,6 +1687,12 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-locked-opacity": theme.confidence.lockedOpacity / 100,
     "--ap-mobile-arrow-size": theme.confidence.mobileArrowSize + "px",
     "--ap-mobile-arrow-color": theme.confidence.mobileArrowColor,
+    "--ap-scoreboard-bg": adminAppearanceStudioHexRgba_(theme.scoreboard.background, theme.scoreboard.backgroundOpacity),
+    "--ap-scoreboard-text": theme.scoreboard.text,
+    "--ap-scoreboard-border": adminAppearanceStudioHexRgba_(theme.scoreboard.border, theme.scoreboard.borderOpacity),
+    "--ap-scoreboard-height": theme.scoreboard.height + "px",
+    "--ap-scoreboard-radius": theme.scoreboard.radius + "px",
+    "--ap-scoreboard-font-size": theme.scoreboard.fontSize + "px",
     "--ap-correct-city": theme.resultTypography.correct.city,
     "--ap-correct-name": theme.resultTypography.correct.teamName,
     "--ap-correct-score": theme.resultTypography.correct.score,

@@ -864,3 +864,158 @@
     overflow:visible;
   }
 }
+
+
+/* =========================================================
+   v1.2.17o — Studio Canvas Architecture Repair
+========================================================= */
+.appearance-studio-shell { align-items:start; overflow:visible !important; }
+.appearance-studio-controls { min-width:0; }
+/* Keep preview visible while the document scrolls. Do not make the preview its
+   own vertical scrolling box; that was the source of the "sticky" confusion. */
+.appearance-studio-canvas {
+  position:sticky !important;
+  top:64px !important;
+  align-self:start !important;
+  max-height:none !important;
+  overflow:visible !important;
+  z-index:5;
+}
+.appearance-preview-stage { overflow-x:auto; overflow-y:visible; }
+
+.appearance-theme-preview {
+  --ap-score-x:0px;
+  --ap-score-y:0px;
+  --ap-away-score-x:0px;
+  --ap-away-score-y:0px;
+  --ap-home-score-x:0px;
+  --ap-home-score-y:0px;
+  --ap-scoreboard-bg:rgba(11,18,32,.72);
+  --ap-scoreboard-text:#94a3b8;
+  --ap-scoreboard-border:rgba(51,65,85,.32);
+  --ap-scoreboard-height:26px;
+  --ap-scoreboard-radius:0px;
+  --ap-scoreboard-font-size:10px;
+}
+.appearance-theme-preview .appearance-preview-team {
+  display:block !important;
+  position:relative !important;
+  isolation:isolate;
+  overflow:hidden !important;
+  padding:0 !important;
+}
+.appearance-theme-preview .appearance-preview-image {
+  position:absolute !important;
+  inset:0 !important;
+  z-index:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  opacity:var(--ap-image-opacity);
+  pointer-events:none;
+  overflow:visible !important;
+}
+.appearance-theme-preview .appearance-preview-image-art { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.appearance-theme-preview .appearance-preview-image img {
+  position:absolute;
+  left:var(--ap-image-x);
+  top:var(--ap-image-y);
+  width:var(--ap-image-size) !important;
+  height:var(--ap-image-size) !important;
+  max-width:none !important;
+  object-fit:contain;
+  object-position:center;
+  transform:translate(-50%,-50%) scale(var(--ap-image-zoom)) !important;
+  transform-origin:center;
+}
+.appearance-theme-preview.image-fit-cover .appearance-preview-image img { object-fit:cover; }
+.appearance-theme-preview.image-layer-background .appearance-preview-image img,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image img {
+  left:0 !important;
+  top:0 !important;
+  width:100% !important;
+  height:100% !important;
+  object-position:var(--ap-image-x) var(--ap-image-y);
+  transform:scale(var(--ap-image-zoom)) !important;
+}
+.appearance-theme-preview.image-layer-background.image-fit-contain .appearance-preview-image img { object-fit:contain !important; }
+.appearance-theme-preview.image-layer-background.image-fit-cover .appearance-preview-image img,
+.appearance-theme-preview.image-fit-full-bleed .appearance-preview-image img { object-fit:cover !important; }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-away .appearance-preview-image img { --ap-image-x:var(--ap-away-image-x); --ap-image-y:var(--ap-away-image-y); }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-home .appearance-preview-image img { --ap-image-x:var(--ap-home-image-x); --ap-image-y:var(--ap-home-image-y); }
+.appearance-theme-preview.side-layout-separate.image-layer-background .appearance-preview-team-away .appearance-preview-image img,
+.appearance-theme-preview.side-layout-separate.image-fit-full-bleed .appearance-preview-team-away .appearance-preview-image img { object-position:var(--ap-away-image-x) var(--ap-away-image-y) !important; }
+.appearance-theme-preview.side-layout-separate.image-layer-background .appearance-preview-team-home .appearance-preview-image img,
+.appearance-theme-preview.side-layout-separate.image-fit-full-bleed .appearance-preview-team-home .appearance-preview-image img { object-position:var(--ap-home-image-x) var(--ap-home-image-y) !important; }
+
+.appearance-theme-preview .appearance-preview-text {
+  position:absolute;
+  z-index:3;
+  left:8px;
+  right:8px;
+  top:50%;
+  display:grid;
+  gap:2px;
+  transform:translate(var(--ap-text-offset-x),calc(-50% + var(--ap-text-offset-y)));
+  pointer-events:none;
+}
+.appearance-theme-preview .appearance-preview-text > small,
+.appearance-theme-preview .appearance-preview-text > strong { position:static !important; width:100%; transform:none !important; }
+.appearance-theme-preview.city-align-center .appearance-preview-text > small { text-align:center; }
+.appearance-theme-preview.city-align-right .appearance-preview-text > small { text-align:right; }
+.appearance-theme-preview.name-align-center .appearance-preview-text > strong { text-align:center; }
+.appearance-theme-preview.name-align-right .appearance-preview-text > strong { text-align:right; }
+.appearance-theme-preview.text-vertical-top .appearance-preview-text { top:7px; transform:translate(var(--ap-text-offset-x),var(--ap-text-offset-y)); }
+.appearance-theme-preview.text-vertical-bottom .appearance-preview-text { top:auto; bottom:7px; transform:translate(var(--ap-text-offset-x),var(--ap-text-offset-y)); }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-away .appearance-preview-text { transform:translate(var(--ap-away-text-x),calc(-50% + var(--ap-away-text-y))); }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-home .appearance-preview-text { transform:translate(var(--ap-home-text-x),calc(-50% + var(--ap-home-text-y))); }
+.appearance-theme-preview.side-layout-separate.away-vertical-top .appearance-preview-team-away .appearance-preview-text { top:7px; bottom:auto; transform:translate(var(--ap-away-text-x),var(--ap-away-text-y)); }
+.appearance-theme-preview.side-layout-separate.away-vertical-bottom .appearance-preview-team-away .appearance-preview-text { top:auto; bottom:7px; transform:translate(var(--ap-away-text-x),var(--ap-away-text-y)); }
+.appearance-theme-preview.side-layout-separate.home-vertical-top .appearance-preview-team-home .appearance-preview-text { top:7px; bottom:auto; transform:translate(var(--ap-home-text-x),var(--ap-home-text-y)); }
+.appearance-theme-preview.side-layout-separate.home-vertical-bottom .appearance-preview-team-home .appearance-preview-text { top:auto; bottom:7px; transform:translate(var(--ap-home-text-x),var(--ap-home-text-y)); }
+.appearance-theme-preview.side-layout-separate.away-align-left .appearance-preview-team-away .appearance-preview-text,
+.appearance-theme-preview.side-layout-separate.home-align-left .appearance-preview-team-home .appearance-preview-text { text-align:left; }
+.appearance-theme-preview.side-layout-separate.away-align-center .appearance-preview-team-away .appearance-preview-text,
+.appearance-theme-preview.side-layout-separate.home-align-center .appearance-preview-team-home .appearance-preview-text { text-align:center; }
+.appearance-theme-preview.side-layout-separate.away-align-right .appearance-preview-team-away .appearance-preview-text,
+.appearance-theme-preview.side-layout-separate.home-align-right .appearance-preview-team-home .appearance-preview-text { text-align:right; }
+.appearance-theme-preview.side-layout-separate .appearance-preview-text > small,
+.appearance-theme-preview.side-layout-separate .appearance-preview-text > strong { text-align:inherit !important; }
+
+.appearance-theme-preview .appearance-preview-score {
+  position:absolute !important;
+  z-index:4 !important;
+  margin:0;
+  line-height:1;
+  transform:translate(var(--ap-score-x),var(--ap-score-y));
+}
+.appearance-theme-preview.score-anchor-inline-left .appearance-preview-score { left:7px; right:auto; top:50%; bottom:auto; transform:translate(var(--ap-score-x),calc(-50% + var(--ap-score-y))); }
+.appearance-theme-preview.score-anchor-inline-right .appearance-preview-score { left:auto; right:7px; top:50%; bottom:auto; transform:translate(var(--ap-score-x),calc(-50% + var(--ap-score-y))); }
+.appearance-theme-preview.score-anchor-center .appearance-preview-score { left:50%; right:auto; top:50%; bottom:auto; transform:translate(calc(-50% + var(--ap-score-x)),calc(-50% + var(--ap-score-y))); }
+.appearance-theme-preview.score-anchor-top-left .appearance-preview-score { left:7px; right:auto; top:7px; bottom:auto; }
+.appearance-theme-preview.score-anchor-top-right .appearance-preview-score { left:auto; right:7px; top:7px; bottom:auto; }
+.appearance-theme-preview.score-anchor-bottom-left .appearance-preview-score { left:7px; right:auto; top:auto; bottom:7px; }
+.appearance-theme-preview.score-anchor-bottom-right .appearance-preview-score { left:auto; right:7px; top:auto; bottom:7px; }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-away .appearance-preview-score { --ap-score-x:var(--ap-away-score-x); --ap-score-y:var(--ap-away-score-y); }
+.appearance-theme-preview.side-layout-separate .appearance-preview-team-home .appearance-preview-score { --ap-score-x:var(--ap-home-score-x); --ap-score-y:var(--ap-home-score-y); }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-inline-left .appearance-preview-team-away .appearance-preview-score,
+.appearance-theme-preview.side-layout-separate.home-score-anchor-inline-left .appearance-preview-team-home .appearance-preview-score { left:7px; right:auto; top:50%; bottom:auto; transform:translate(var(--ap-score-x),calc(-50% + var(--ap-score-y))); }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-inline-right .appearance-preview-team-away .appearance-preview-score,
+.appearance-theme-preview.side-layout-separate.home-score-anchor-inline-right .appearance-preview-team-home .appearance-preview-score { left:auto; right:7px; top:50%; bottom:auto; transform:translate(var(--ap-score-x),calc(-50% + var(--ap-score-y))); }
+.appearance-theme-preview.side-layout-separate.away-score-anchor-center .appearance-preview-team-away .appearance-preview-score,
+.appearance-theme-preview.side-layout-separate.home-score-anchor-center .appearance-preview-team-home .appearance-preview-score { left:50%; right:auto; top:50%; bottom:auto; transform:translate(calc(-50% + var(--ap-score-x)),calc(-50% + var(--ap-score-y))); }
+
+.appearance-theme-preview .appearance-preview-meta {
+  min-height:var(--ap-scoreboard-height);
+  background:var(--ap-scoreboard-bg);
+  color:var(--ap-scoreboard-text);
+  border-color:var(--ap-scoreboard-border);
+  border-radius:0 0 var(--ap-scoreboard-radius) var(--ap-scoreboard-radius);
+  font-size:var(--ap-scoreboard-font-size);
+}
+.appearance-theme-preview .appearance-preview-details-text { color:var(--ap-scoreboard-text); }
+
+@media (max-width:900px) {
+  .appearance-studio-canvas { position:relative !important; top:auto !important; }
+}

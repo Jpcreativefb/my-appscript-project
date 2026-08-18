@@ -2297,3 +2297,178 @@
     display:none;
   }
 }
+
+
+/* =========================================================
+   v1.2.17o — Team Button Canvas Architecture
+   Full-surface art + independent text + independent score.
+========================================================= */
+.confidence-compact-slate {
+  --confidence-score-offset-x:0px;
+  --confidence-score-offset-y:0px;
+  --confidence-away-score-x:0px;
+  --confidence-away-score-y:0px;
+  --confidence-home-score-x:0px;
+  --confidence-home-score-y:0px;
+  --confidence-scoreboard-bg:rgba(11,18,32,.72);
+  --confidence-scoreboard-text:#94a3b8;
+  --confidence-scoreboard-border:rgba(51,65,85,.32);
+  --confidence-scoreboard-height:26px;
+  --confidence-scoreboard-radius:0px;
+  --confidence-scoreboard-font-size:10px;
+}
+
+/* Each team button is now one canvas. Art, text, score and indicators are
+   independent layers instead of competing grid cells. */
+.confidence-compact-slate .confidence-team-choice {
+  display:block !important;
+  position:relative !important;
+  isolation:isolate;
+  overflow:hidden !important;
+  padding:0 !important;
+}
+.confidence-compact-slate .confidence-team-visual {
+  position:absolute !important;
+  inset:0 !important;
+  z-index:0 !important;
+  width:100% !important;
+  height:100% !important;
+  margin:0 !important;
+  padding:0 !important;
+  opacity:var(--confidence-image-opacity);
+  pointer-events:none;
+  transform:none !important;
+  overflow:visible !important;
+}
+.confidence-compact-slate .confidence-team-logo {
+  display:block;
+  position:absolute;
+  left:var(--confidence-image-x);
+  top:var(--confidence-image-y);
+  width:var(--confidence-image-size) !important;
+  height:var(--confidence-image-size) !important;
+  max-width:none !important;
+  object-fit:contain;
+  object-position:center;
+  transform:translate(-50%,-50%) scale(var(--confidence-image-zoom));
+  transform-origin:center;
+  margin:0 !important;
+}
+.confidence-compact-slate.confidence-theme-image-fit-cover .confidence-team-logo { object-fit:cover; }
+
+/* Background mode uses the same full canvas, but the image itself fills it. */
+.confidence-compact-slate.confidence-theme-image-layer-background .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo {
+  left:0 !important;
+  top:0 !important;
+  width:100% !important;
+  height:100% !important;
+  object-position:var(--confidence-image-x) var(--confidence-image-y);
+  transform:scale(var(--confidence-image-zoom)) !important;
+}
+.confidence-compact-slate.confidence-theme-image-layer-background.confidence-theme-image-fit-contain .confidence-team-logo { object-fit:contain !important; }
+.confidence-compact-slate.confidence-theme-image-layer-background.confidence-theme-image-fit-cover .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-image-fit-full-bleed .confidence-team-logo { object-fit:cover !important; }
+
+/* Separate side focal points apply across the entire button in both floating
+   and background modes. */
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-logo {
+  --confidence-image-x:var(--confidence-away-image-x);
+  --confidence-image-y:var(--confidence-away-image-y);
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-logo {
+  --confidence-image-x:var(--confidence-home-image-x);
+  --confidence-image-y:var(--confidence-home-image-y);
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-image-layer-background .confidence-team-away .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-image-fit-full-bleed .confidence-team-away .confidence-team-logo {
+  object-position:var(--confidence-away-image-x) var(--confidence-away-image-y) !important;
+}
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-image-layer-background .confidence-team-home .confidence-team-logo,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-image-fit-full-bleed .confidence-team-home .confidence-team-logo {
+  object-position:var(--confidence-home-image-x) var(--confidence-home-image-y) !important;
+}
+
+/* City + team name are one text layer so side positioning always moves both. */
+.confidence-compact-slate .confidence-team-text {
+  position:absolute;
+  z-index:3;
+  left:8px;
+  right:8px;
+  top:50%;
+  display:grid;
+  gap:2px;
+  min-width:0;
+  transform:translate(var(--confidence-text-offset-x),calc(-50% + var(--confidence-text-offset-y)));
+  pointer-events:none;
+}
+.confidence-compact-slate .confidence-team-text .confidence-team-city,
+.confidence-compact-slate .confidence-team-text .confidence-team-nickname {
+  position:static !important;
+  display:block;
+  width:100%;
+  transform:none !important;
+}
+.confidence-compact-slate.confidence-theme-text-vertical-top .confidence-team-text { top:7px; transform:translate(var(--confidence-text-offset-x),var(--confidence-text-offset-y)); }
+.confidence-compact-slate.confidence-theme-text-vertical-bottom .confidence-team-text { top:auto; bottom:7px; transform:translate(var(--confidence-text-offset-x),var(--confidence-text-offset-y)); }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-text { transform:translate(var(--confidence-away-text-x),calc(-50% + var(--confidence-away-text-y))); }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-text { transform:translate(var(--confidence-home-text-x),calc(-50% + var(--confidence-home-text-y))); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-vertical-top .confidence-team-away .confidence-team-text { top:7px; bottom:auto; transform:translate(var(--confidence-away-text-x),var(--confidence-away-text-y)); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-vertical-bottom .confidence-team-away .confidence-team-text { top:auto; bottom:7px; transform:translate(var(--confidence-away-text-x),var(--confidence-away-text-y)); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-vertical-top .confidence-team-home .confidence-team-text { top:7px; bottom:auto; transform:translate(var(--confidence-home-text-x),var(--confidence-home-text-y)); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-vertical-bottom .confidence-team-home .confidence-team-text { top:auto; bottom:7px; transform:translate(var(--confidence-home-text-x),var(--confidence-home-text-y)); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-align-left .confidence-team-away .confidence-team-text,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-align-left .confidence-team-home .confidence-team-text { text-align:left; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-align-center .confidence-team-away .confidence-team-text,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-align-center .confidence-team-home .confidence-team-text { text-align:center; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-align-right .confidence-team-away .confidence-team-text,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-align-right .confidence-team-home .confidence-team-text { text-align:right; }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-text .confidence-team-city,
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-text .confidence-team-nickname { text-align:inherit !important; }
+
+/* Score is a fully independent button layer. */
+.confidence-compact-slate .confidence-team-score {
+  position:absolute !important;
+  z-index:4 !important;
+  margin:0;
+  line-height:1;
+  pointer-events:none;
+  transform:translate(var(--confidence-score-offset-x),var(--confidence-score-offset-y));
+}
+.confidence-compact-slate.confidence-theme-score-anchor-inline-left .confidence-team-score { left:7px; right:auto; top:50%; bottom:auto; transform:translate(var(--confidence-score-offset-x),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-score-anchor-inline-right .confidence-team-score { left:auto; right:7px; top:50%; bottom:auto; transform:translate(var(--confidence-score-offset-x),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-score-anchor-center .confidence-team-score { left:50%; right:auto; top:50%; bottom:auto; transform:translate(calc(-50% + var(--confidence-score-offset-x)),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-score-anchor-top-left .confidence-team-score { left:7px; right:auto; top:7px; bottom:auto; }
+.confidence-compact-slate.confidence-theme-score-anchor-top-right .confidence-team-score { left:auto; right:7px; top:7px; bottom:auto; }
+.confidence-compact-slate.confidence-theme-score-anchor-bottom-left .confidence-team-score { left:7px; right:auto; top:auto; bottom:7px; }
+.confidence-compact-slate.confidence-theme-score-anchor-bottom-right .confidence-team-score { left:auto; right:7px; top:auto; bottom:7px; }
+
+/* Side score anchors/offsets override shared score positioning. */
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-away .confidence-team-score { --confidence-score-offset-x:var(--confidence-away-score-x); --confidence-score-offset-y:var(--confidence-away-score-y); }
+.confidence-compact-slate.confidence-theme-side-layout-separate .confidence-team-home .confidence-team-score { --confidence-score-offset-x:var(--confidence-home-score-x); --confidence-score-offset-y:var(--confidence-home-score-y); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-left .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-left .confidence-team-home .confidence-team-score { left:7px; right:auto; top:50%; bottom:auto; transform:translate(var(--confidence-score-offset-x),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-inline-right .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-inline-right .confidence-team-home .confidence-team-score { left:auto; right:7px; top:50%; bottom:auto; transform:translate(var(--confidence-score-offset-x),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-center .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-center .confidence-team-home .confidence-team-score { left:50%; right:auto; top:50%; bottom:auto; transform:translate(calc(-50% + var(--confidence-score-offset-x)),calc(-50% + var(--confidence-score-offset-y))); }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-top-left .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-top-left .confidence-team-home .confidence-team-score { left:7px; right:auto; top:7px; bottom:auto; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-top-right .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-top-right .confidence-team-home .confidence-team-score { left:auto; right:7px; top:7px; bottom:auto; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-bottom-left .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-bottom-left .confidence-team-home .confidence-team-score { left:7px; right:auto; top:auto; bottom:7px; }
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-away-score-anchor-bottom-right .confidence-team-away .confidence-team-score,
+.confidence-compact-slate.confidence-theme-side-layout-separate.confidence-theme-home-score-anchor-bottom-right .confidence-team-home .confidence-team-score { left:auto; right:7px; top:auto; bottom:7px; }
+
+/* Scoreboard/status strip is now themeable instead of hard-coded. */
+.confidence-compact-slate .confidence-game-details > summary.confidence-game-meta {
+  min-height:var(--confidence-scoreboard-height);
+  background:var(--confidence-scoreboard-bg);
+  color:var(--confidence-scoreboard-text);
+  border-top:1px solid var(--confidence-scoreboard-border);
+  border-radius:0 0 var(--confidence-scoreboard-radius) var(--confidence-scoreboard-radius);
+  font-size:var(--confidence-scoreboard-font-size);
+}
+.confidence-compact-slate .confidence-game-question,
+.confidence-compact-slate .confidence-details-prompt { color:var(--confidence-scoreboard-text); }

@@ -1,0 +1,13 @@
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/appearance.css
+frontend/css/picks.css
+frontend/app.html
+frontend/index.html
+frontend/app.js
+frontend/js/app.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/appearance_studio_team_canvas_v1217o_tests.js
+APPEARANCE_STUDIO_TEAM_CANVAS_V1_2_17O.md
+CHANGED_FILES_V1_2_17O.txt
