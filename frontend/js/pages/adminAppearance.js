@@ -418,6 +418,7 @@ function adminAppearanceStudioDefaults_(theme) {
   const live = theme.live || {};
   const background = theme.background || {};
   const confidence = theme.confidence || {};
+  const score = theme.score || {};
   const positioning = theme.positioning || {};
   const overlays = theme.overlays || {};
   const resultTypography = theme.resultTypography || {};
@@ -583,6 +584,16 @@ function adminAppearanceStudioDefaults_(theme) {
       lockedOpacity: adminAppearanceStudioClamp_(confidence.lockedOpacity, 20, 100, 62),
       mobileArrowSize: adminAppearanceStudioClamp_(confidence.mobileArrowSize, 0, 10, 4),
       mobileArrowColor: confidence.mobileArrowColor || colors.muted || "#94a3b8"
+    },
+    score: {
+      background: score.background || "#e2e8f0",
+      backgroundOpacity: adminAppearanceStudioClamp_(score.backgroundOpacity, 0, 100, 100),
+      text: score.text || "#0f172a",
+      border: score.border || "#0f172a",
+      borderOpacity: adminAppearanceStudioClamp_(score.borderOpacity, 0, 100, 100),
+      radius: adminAppearanceStudioClamp_(score.radius, 0, 24, 7),
+      paddingX: adminAppearanceStudioClamp_(score.paddingX, 0, 20, 4),
+      paddingY: adminAppearanceStudioClamp_(score.paddingY, 0, 14, 2)
     },
     scoreboard: {
       background: theme.scoreboard && theme.scoreboard.background || "#0b1220",
@@ -821,6 +832,18 @@ function adminAppearanceThemeEditor_() {
           <details><summary>Element Visibility</summary><div class="appearance-studio-panel appearance-studio-visibility-panel">
             <div class="admin-sub">Master switch plus independent Desktop / Tablet / Mobile visibility. Turning an element off never removes its game data.</div>
             ${adminAppearanceStudioVisibilityMatrix_(theme)}
+          </div></details>
+
+          <details><summary>Score Styling</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioColor_("appearanceThemeScoreBg", "Score Background", theme.score.background)}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreBgOpacity", "Score Background Opacity", theme.score.backgroundOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeScoreText", "Score Font Color", theme.score.text)}
+            ${adminAppearanceStudioColor_("appearanceThemeScoreBorder", "Score Border", theme.score.border)}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreBorderOpacity", "Score Border Opacity", theme.score.borderOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeScorePaddingX", "Score Horizontal Padding", theme.score.paddingX, 0, 20, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeScorePaddingY", "Score Vertical Padding", theme.score.paddingY, 0, 14, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeScoreRadius", "Score Corners", theme.score.radius, 0, 24, 1, "px")}
+            <div class="admin-sub appearance-studio-inline-note">Score font size remains under Typography. Correct / Incorrect score font colors still override this normal score color in final-result states.</div>
           </div></details>
 
           <details><summary>Scoreboard & Confidence</summary><div class="appearance-studio-panel">
@@ -1579,6 +1602,16 @@ function adminAppearanceReadThemeControls_() {
       mobileArrowSize: adminAppearanceStudioNumber_("appearanceThemeMobileArrowSize", 4),
       mobileArrowColor: String(adminAppearanceStudioValue_("appearanceThemeMobileArrowColor", "#94a3b8"))
     },
+    score: {
+      background: String(adminAppearanceStudioValue_("appearanceThemeScoreBg", "#e2e8f0")),
+      backgroundOpacity: adminAppearanceStudioNumber_("appearanceThemeScoreBgOpacity", 100),
+      text: String(adminAppearanceStudioValue_("appearanceThemeScoreText", "#0f172a")),
+      border: String(adminAppearanceStudioValue_("appearanceThemeScoreBorder", "#0f172a")),
+      borderOpacity: adminAppearanceStudioNumber_("appearanceThemeScoreBorderOpacity", 100),
+      radius: adminAppearanceStudioNumber_("appearanceThemeScoreRadius", 7),
+      paddingX: adminAppearanceStudioNumber_("appearanceThemeScorePaddingX", 4),
+      paddingY: adminAppearanceStudioNumber_("appearanceThemeScorePaddingY", 2)
+    },
     scoreboard: {
       background: String(adminAppearanceStudioValue_("appearanceThemeScoreboardBg", "#0b1220")),
       backgroundOpacity: adminAppearanceStudioNumber_("appearanceThemeScoreboardBgOpacity", 72),
@@ -1769,6 +1802,12 @@ function adminAppearanceUpdateThemePreview_() {
     "--ap-locked-opacity": theme.confidence.lockedOpacity / 100,
     "--ap-mobile-arrow-size": theme.confidence.mobileArrowSize + "px",
     "--ap-mobile-arrow-color": theme.confidence.mobileArrowColor,
+    "--ap-score-bg": adminAppearanceStudioHexRgba_(theme.score.background, theme.score.backgroundOpacity),
+    "--ap-score-text": theme.score.text,
+    "--ap-score-border": adminAppearanceStudioHexRgba_(theme.score.border, theme.score.borderOpacity),
+    "--ap-score-radius": theme.score.radius + "px",
+    "--ap-score-padding-x": theme.score.paddingX + "px",
+    "--ap-score-padding-y": theme.score.paddingY + "px",
     "--ap-scoreboard-bg": adminAppearanceStudioHexRgba_(theme.scoreboard.background, theme.scoreboard.backgroundOpacity),
     "--ap-scoreboard-text": theme.scoreboard.text,
     "--ap-scoreboard-border": adminAppearanceStudioHexRgba_(theme.scoreboard.border, theme.scoreboard.borderOpacity),

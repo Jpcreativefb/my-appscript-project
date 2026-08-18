@@ -2585,3 +2585,21 @@
 .confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-bottom-left .confidence-team-score,
 .confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-bottom-right .confidence-team-score,
 .confidence-compact-slate.confidence-theme-image-layer-inline.confidence-theme-score-anchor-center .confidence-team-score { position:absolute !important; grid-column:auto !important; }
+
+
+/* =========================================================
+   v1.2.17q — Independent Score Badge Styling
+========================================================= */
+.confidence-compact-slate .confidence-team-score {
+  background:var(--confidence-score-bg) !important;
+  color:var(--confidence-score-text);
+  border:1px solid var(--confidence-score-border) !important;
+  border-radius:var(--confidence-score-radius) !important;
+  padding:var(--confidence-score-padding-y) var(--confidence-score-padding-x) !important;
+  min-width:0;
+  box-sizing:border-box;
+  text-align:center;
+}
+/* Final-result score colors stay independent from the normal score badge font color. */
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected .confidence-team-score { color:var(--confidence-correct-score); }
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected .confidence-team-score { color:var(--confidence-wrong-score); }

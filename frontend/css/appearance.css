@@ -1183,3 +1183,21 @@
 .appearance-theme-preview.image-layer-inline.score-anchor-bottom-left .appearance-preview-score,
 .appearance-theme-preview.image-layer-inline.score-anchor-bottom-right .appearance-preview-score,
 .appearance-theme-preview.image-layer-inline.score-anchor-center .appearance-preview-score { position:absolute !important; grid-column:auto !important; }
+
+
+/* =========================================================
+   v1.2.17q — Independent Score Badge Styling
+========================================================= */
+.appearance-theme-preview .appearance-preview-score {
+  background:var(--ap-score-bg) !important;
+  color:var(--ap-score-text);
+  border:1px solid var(--ap-score-border);
+  border-radius:var(--ap-score-radius);
+  padding:var(--ap-score-padding-y) var(--ap-score-padding-x);
+  min-width:0;
+  box-sizing:border-box;
+  text-align:center;
+}
+/* Final-result typography remains intentionally stronger than the normal score font color. */
+.appearance-studio-preview-state-final-win .appearance-preview-team.selected .appearance-preview-score { color:var(--ap-correct-score); }
+.appearance-studio-preview-state-final-loss .appearance-preview-team.selected .appearance-preview-score { color:var(--ap-wrong-score); }

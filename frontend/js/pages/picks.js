@@ -1643,6 +1643,7 @@ function confidenceThemePresentation_() {
   const live = theme.live || {};
   const background = theme.background || {};
   const confidence = theme.confidence || {};
+  const score = theme.score || {};
   const scoreboard = theme.scoreboard || {};
   const positioning = theme.positioning || {};
   const overlays = theme.overlays || {};
@@ -1770,6 +1771,11 @@ function confidenceThemePresentation_() {
   const overlayOpacity = confidenceThemeNumber_(background.overlayOpacity, 0, 80, 0);
   const confidenceRadius = confidenceThemeNumber_(confidence.radius, 0, 28, 8);
   const lockedOpacity = confidenceThemeNumber_(confidence.lockedOpacity, 20, 100, 62);
+  const scoreBgOpacity = confidenceThemeNumber_(score.backgroundOpacity, 0, 100, 100);
+  const scoreBorderOpacity = confidenceThemeNumber_(score.borderOpacity, 0, 100, 100);
+  const scoreRadius = confidenceThemeNumber_(score.radius, 0, 24, 7);
+  const scorePaddingX = confidenceThemeNumber_(score.paddingX, 0, 20, 4);
+  const scorePaddingY = confidenceThemeNumber_(score.paddingY, 0, 14, 2);
   const scoreboardOpacity = confidenceThemeNumber_(scoreboard.backgroundOpacity, 0, 100, 72);
   const scoreboardBorderOpacity = confidenceThemeNumber_(scoreboard.borderOpacity, 0, 100, 32);
   const scoreboardHeight = confidenceThemeNumber_(scoreboard.height, 18, 64, 26);
@@ -1841,6 +1847,12 @@ function confidenceThemePresentation_() {
     "--confidence-locked-opacity:" + (lockedOpacity / 100),
     "--confidence-mobile-arrow-size:" + confidenceThemeNumber_(confidence.mobileArrowSize, 0, 10, 4) + "px",
     "--confidence-mobile-arrow-color:" + confidenceThemeSafeColor_(confidence.mobileArrowColor || colors.muted, "#94a3b8"),
+    "--confidence-score-bg:" + confidenceThemeHexRgba_(score.background || "#e2e8f0", scoreBgOpacity, "#e2e8f0"),
+    "--confidence-score-text:" + confidenceThemeSafeColor_(score.text || "#0f172a", "#0f172a"),
+    "--confidence-score-border:" + confidenceThemeHexRgba_(score.border || "#0f172a", scoreBorderOpacity, "#0f172a"),
+    "--confidence-score-radius:" + scoreRadius + "px",
+    "--confidence-score-padding-x:" + scorePaddingX + "px",
+    "--confidence-score-padding-y:" + scorePaddingY + "px",
     "--confidence-scoreboard-bg:" + confidenceThemeHexRgba_(scoreboard.background || "#0b1220", scoreboardOpacity, "#0b1220"),
     "--confidence-scoreboard-text:" + confidenceThemeSafeColor_(scoreboard.text || colors.muted, "#94a3b8"),
     "--confidence-scoreboard-border:" + confidenceThemeHexRgba_(scoreboard.border || "#334155", scoreboardBorderOpacity, "#334155"),
