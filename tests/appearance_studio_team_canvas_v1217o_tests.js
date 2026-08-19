@@ -14,7 +14,7 @@ const checks = [
   [admin.includes('Full Button Background · Text & Score on Top'), 'Image canvas exposes full background mode'],
   [admin.includes('Inline Left') && admin.includes('Inline Right') && admin.includes('Center'), 'Score anchors include inline/center positions'],
   [admin.includes('appearanceThemeScoreboardBg') && admin.includes('appearanceThemeScoreboardHeight'), 'Scoreboard styling controls exist'],
-  [admin.includes('appearance-preview-text'), 'Preview city/name use one movable text layer'],
+  [admin.includes('confidence-team-text'), 'Preview city/name use the runtime movable text layer'],
   [picks.includes('confidence-team-text'), 'Runtime city/name use one movable text layer'],
   [picks.includes('scoreOffsetX') && picks.includes('scoreOffsetY'), 'Runtime accepts independent score offsets'],
   [picks.includes('theme.scoreboard || {}'), 'Runtime consumes scoreboard theme settings'],

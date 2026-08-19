@@ -37,7 +37,7 @@ assert(manager.includes('adminAppearanceReadThemeControls_'));
 });
 assert(manager.includes('adminAppearanceSetPreviewState_'));
 assert(manager.includes('adminAppearancePreviewEntities_'));
-assert(manager.includes('Live preview uses the first two entities'));
+assert(manager.includes('Preview and live Picks page now use the same theme serializer'));
 
 // Theme actions support the edit workflow without changing gameplay logic.
 assert(manager.includes('adminAppearanceDuplicateTheme_'));

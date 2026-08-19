@@ -2630,3 +2630,30 @@
 .picks-page.picks-appearance-active .confidence-toolbar-sort button,.picks-page.picks-appearance-active .confidence-save-all-button{border-radius:var(--picks-theme-bar-radius,9px);}
 .picks-page.picks-appearance-active .confidence-save-all-button{background:var(--picks-theme-save-bg,#2563eb);color:var(--picks-theme-save-text,#fff);}
 @media(max-width:620px){.picks-page.picks-appearance-active .question-layout-image .nominee-layout{grid-template-columns:repeat(min(2,var(--picks-theme-image-columns,2)),minmax(0,1fr));}.picks-page.picks-appearance-active .question-layout-text .nominee-layout{grid-template-columns:1fr;}}
+
+/* v1.2.17s — Image-question overlay setting is shared by Studio and live Picks. */
+.picks-page.picks-appearance-active.picks-theme-image-text-overlay .question-layout-image .image-choice{
+  position:relative;
+  overflow:hidden;
+  padding:0;
+  min-height:0;
+}
+.picks-page.picks-appearance-active.picks-theme-image-text-overlay .question-layout-image .image-choice > img{
+  width:100%;
+  height:100%;
+  display:block;
+}
+.picks-page.picks-appearance-active.picks-theme-image-text-overlay .question-layout-image .image-choice > span:last-child{
+  position:absolute;
+  z-index:2;
+  left:0;
+  right:0;
+  bottom:0;
+  margin:0;
+  padding:18px 8px 8px;
+  color:var(--picks-theme-answer-text,#fff);
+  background:linear-gradient(to top,rgba(0,0,0,var(--picks-theme-image-overlay,.35)),transparent);
+}
+.picks-page.picks-appearance-active.picks-theme-image-text-overlay .question-layout-image .image-choice.selected > span:last-child{
+  color:var(--picks-theme-selected-text,#fde68a);
+}

@@ -1632,6 +1632,9 @@ function confidenceThemeHexRgba_(value, opacityPercent, fallback) {
 
 function confidenceThemePresentation_() {
   const theme = (PICKS_PAGE_DATA.appearance && PICKS_PAGE_DATA.appearance.theme) || {};
+  if (window.AppearanceThemeRuntime && typeof window.AppearanceThemeRuntime.confidencePresentation === "function") {
+    return window.AppearanceThemeRuntime.confidencePresentation(theme);
+  }
   const team = theme.team || {};
   const row = theme.row || {};
   const colors = theme.colors || {};
@@ -3605,6 +3608,9 @@ function picksAppearanceHexRgba_(hex, opacity, fallback) {
 
 function picksAppearancePresentation_() {
   const theme = picksAppearanceTheme_();
+  if (window.AppearanceThemeRuntime && typeof window.AppearanceThemeRuntime.pagePresentation === "function") {
+    return window.AppearanceThemeRuntime.pagePresentation(theme);
+  }
   const page = theme.page || {}, q = theme.questions || {}, details = theme.details || {}, bars = theme.bars || {};
   const style = [
     "--picks-theme-page-bg:"+(page.background||"#020617"),
@@ -3652,6 +3658,7 @@ function applyPicksAppearanceToPage_() {
   const presentation = picksAppearancePresentation_();
   page.setAttribute("style", presentation.style);
   page.classList.toggle("picks-appearance-active", !!PICKS_PAGE_DATA.appearance);
+  page.classList.toggle("picks-theme-image-text-overlay", String(presentation.className || "").split(/\s+/).indexOf("picks-theme-image-text-overlay") !== -1);
 }
 
 function renderNomineeButton(

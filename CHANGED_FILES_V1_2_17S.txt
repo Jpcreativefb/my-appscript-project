@@ -1,0 +1,16 @@
+APPEARANCE_STUDIO_PREVIEW_RUNTIME_SYNC_V1_2_17S.md
+CHANGED_FILES_V1_2_17S.txt
+frontend/app.html
+frontend/app.js
+frontend/index.html
+frontend/js/app.js
+frontend/js/pwa.js
+frontend/sw.js
+frontend/js/appearanceThemeRuntime.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/picks.js
+frontend/css/appearance.css
+frontend/css/picks.css
+tests/appearance_studio_core_v1217k_tests.js
+tests/appearance_studio_team_canvas_v1217o_tests.js
+tests/appearance_studio_preview_runtime_sync_v1217s_tests.js

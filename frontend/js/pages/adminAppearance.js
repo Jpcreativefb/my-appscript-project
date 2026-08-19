@@ -1046,20 +1046,47 @@ function adminAppearanceThemeEditor_() {
 function adminAppearanceThemePreview_(theme) {
   theme = adminAppearanceStudioDefaults_(theme);
   const entities = adminAppearancePreviewEntities_();
+  const imageHtml = function(entity) {
+    return entity && entity.imageUrl
+      ? '<img class="confidence-team-logo" src="' + adminAppearanceEscape_(entity.imageUrl) + '" alt="">'
+      : '<span class="appearance-preview-placeholder confidence-team-logo">★</span>';
+  };
   function teamHtml(entity, selected, side) {
-    const image = entity.imageUrl
-      ? '<img src="' + adminAppearanceEscape_(entity.imageUrl) + '" alt="">'
-      : '<span class="appearance-preview-placeholder">★</span>';
-    return `<button type="button" class="appearance-preview-team appearance-preview-team-${side} ${selected ? 'selected' : 'muted'}">
-      <span class="appearance-preview-image"><span class="appearance-preview-image-art" data-ap-element="teamImage">${image}</span></span>
-      <span class="appearance-preview-text">
-        <small data-ap-element="city">${adminAppearanceEscape_(entity.city)}</small>
-        <strong data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
+    return `<button type="button" class="confidence-team-choice confidence-team-${side} ${selected ? 'selected' : 'not-selected'}" aria-pressed="${selected ? 'true' : 'false'}">
+      <span class="confidence-team-visual confidence-element-team-image" data-ap-element="teamImage">${imageHtml(entity)}</span>
+      <span class="confidence-team-text">
+        <span class="confidence-team-city confidence-element-city" data-ap-element="city">${adminAppearanceEscape_(entity.city)}</span>
+        <strong class="confidence-team-nickname confidence-element-team-name" data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
       </span>
-      <b class="appearance-preview-score" data-ap-element="score">21</b>
-      <span class="appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>
+      <strong class="confidence-team-score confidence-element-score appearance-preview-score" data-ap-element="score">21</strong>
+      ${selected ? '<span class="confidence-selected-mark confidence-element-result-indicator appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>' : ''}
     </button>`;
   }
+  function questionCard(layout, title, answers) {
+    const layoutClass = layout === 'compact' || layout === 'list'
+      ? 'nominee-layout nominee-layout-list nominee-layout-' + layout
+      : layout === 'wager'
+        ? 'nominee-layout nominee-layout-wager'
+        : layout === 'image'
+          ? 'nominee-layout nominee-layout-image'
+          : 'nominee-layout nominee-layout-text';
+    return `<section class="pick-category-card question-layout-${layout} appearance-question-runtime-preview" data-question-preview="${layout}">
+      <button type="button" class="pick-card-header"><div class="pick-header-main"><div class="pick-header-topline"><div class="pick-title-wrap"><h2>${adminAppearanceEscape_(title)}</h2></div><div class="points-pill">10 pts</div></div></div></button>
+      <div class="pick-card-body"><div class="${layoutClass}">${answers}</div></div>
+    </section>`;
+  }
+  const textAnswers = '<button type="button" class="nominee-choice text-choice">Film Alpha</button><button type="button" class="nominee-choice text-choice selected">Film Bravo</button><button type="button" class="nominee-choice text-choice">Film Charlie</button><button type="button" class="nominee-choice text-choice">Film Delta</button>';
+  const compactAnswers = '<button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">KC</span><span>Kansas City Chiefs</span></button><button type="button" class="nominee-choice list-choice selected"><span class="appearance-question-thumb">BUF</span><span>Buffalo Bills</span></button>';
+  const listAnswers = '<button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">A</span><span>Nominee Alpha</span></button><button type="button" class="nominee-choice list-choice selected"><span class="appearance-question-thumb">B</span><span>Nominee Bravo</span></button><button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">C</span><span>Nominee Charlie</span></button>';
+  const shortAnswers = '<button type="button" class="nominee-choice text-choice short-answer-choice">Over</button><button type="button" class="nominee-choice text-choice short-answer-choice selected">Under</button>';
+  const img = entities[0] && entities[0].imageUrl ? adminAppearanceEscape_(entities[0].imageUrl) : '';
+  const imageCell = function(letter, name, selected) {
+    const art = img ? '<img class="nominee-card-image" src="'+img+'" alt="">' : '<span class="appearance-question-image-placeholder">'+letter+'</span>';
+    return '<button type="button" class="nominee-choice image-choice '+(selected?'selected':'')+'">'+art+'<span>'+name+'</span></button>';
+  };
+  const imageAnswers = imageCell('A','Nominee Alpha',false)+imageCell('B','Nominee Bravo',true)+imageCell('C','Nominee Charlie',false);
+  const wagerAnswers = '<button type="button" class="nominee-choice wager-choice"><span>Chicago</span><b>-145</b></button><button type="button" class="nominee-choice wager-choice selected"><span>Detroit</span><b>+125</b></button>';
+
   return `<div class="appearance-studio-preview-wrap">
     <div class="appearance-studio-preview-toolbar">
       <div class="appearance-studio-preview-surface-tabs">
@@ -1067,6 +1094,8 @@ function adminAppearanceThemePreview_(theme) {
         <button type="button" data-preview-surface="text" onclick="adminAppearanceSetPreviewSurface_('text')">Text</button>
         <button type="button" data-preview-surface="compact" onclick="adminAppearanceSetPreviewSurface_('compact')">Compact</button>
         <button type="button" data-preview-surface="image" onclick="adminAppearanceSetPreviewSurface_('image')">Image</button>
+        <button type="button" data-preview-surface="list" onclick="adminAppearanceSetPreviewSurface_('list')">List</button>
+        <button type="button" data-preview-surface="short-answer" onclick="adminAppearanceSetPreviewSurface_('short-answer')">Short</button>
         <button type="button" data-preview-surface="wager" onclick="adminAppearanceSetPreviewSurface_('wager')">Wager</button>
       </div>
       <div class="appearance-studio-preview-tabs">
@@ -1086,34 +1115,33 @@ function adminAppearanceThemePreview_(theme) {
     </div>
     <div class="appearance-preview-stage">
       <div id="appearanceThemePreviewFrame" class="appearance-preview-device-frame preview-device-desktop">
-      <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame">
-        <div class="appearance-preview-main">
-          ${teamHtml(entities[0], true, "away")}
-          <b class="appearance-preview-vs" data-ap-element="versus">VS</b>
-          ${teamHtml(entities[1], false, "home")}
-          <div class="appearance-preview-confidence">
-            <small data-ap-element="confidenceLabel">Confidence</small>
-            <strong data-ap-element="confidenceValue">16</strong>
-            <em data-ap-element="points">+16</em>
+        <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame" data-preview-surface="matchup">
+          <div id="appearancePagePreviewShell" class="picks-page picks-appearance-active appearance-preview-page-shell">
+            <header class="picks-page-header appearance-preview-page-header"><h1>Weekly Picks</h1><p>Make your picks, review the card, then save.</p></header>
+            <div class="confidence-compact-toolbar appearance-preview-sortbar"><strong>Week 3</strong><div class="confidence-toolbar-sort"><span>Sort</span><button type="button">Game Time</button><button type="button">Confidence</button></div></div>
+            <div id="appearanceRuntimeMatchupPreview" class="confidence-compact-slate appearance-runtime-matchup-preview" data-question-preview="matchup">
+              <article id="appearanceRuntimeGameRow" class="confidence-game-row phase-pregame pending">
+                <div class="confidence-game-main">
+                  ${teamHtml(entities[0], true, 'away')}
+                  <div class="confidence-versus confidence-element-versus" data-ap-element="versus">VS</div>
+                  ${teamHtml(entities[1], false, 'home')}
+                  <label class="confidence-row-value"><span class="confidence-value-label" data-ap-element="confidenceLabel">Confidence</span><select class="confidence-value-input" data-ap-element="confidenceValue"><option>16</option></select><strong class="confidence-result-points correct" data-ap-element="points">+16</strong></label>
+                </div>
+                <details class="confidence-game-details" open data-ap-element="detailsBar"><summary class="confidence-game-meta"><strong class="confidence-live-status"><span class="appearance-preview-game-time" data-ap-element="gameTime">SUN 12:00 PM</span><span class="appearance-preview-live-badge" data-ap-element="liveBadge"> LIVE</span><span class="appearance-preview-clock" data-ap-element="clock"> Q3 6:42</span><span class="appearance-preview-final-badge" data-ap-element="finalBadge"> FINAL</span></strong><span>Odds · Records · Favorite</span></summary><div class="confidence-details-grid"><div>CHI <strong data-ap-element="records">6-2</strong></div><div><strong data-ap-element="moneyline">-145</strong><br><span data-ap-element="favorite">Favorite</span></div><div>DET <strong>5-3</strong></div></div></details>
+              </article>
+            </div>
+            ${questionCard('text','Who wins Best Picture?',textAnswers)}
+            ${questionCard('compact','Who wins this matchup?',compactAnswers)}
+            ${questionCard('image','Choose the winner',imageAnswers)}
+            ${questionCard('list','Ranked nominees',listAnswers)}
+            ${questionCard('short-answer','Will the total go over?',shortAnswers)}
+            ${questionCard('wager','Moneyline',wagerAnswers)}
+            <div class="appearance-preview-savebar"><button type="button" class="confidence-save-all-button">Save Picks</button></div>
           </div>
         </div>
-        <div class="appearance-preview-meta" data-ap-element="detailsBar">
-          <strong class="appearance-preview-status">
-            <span class="appearance-preview-game-time" data-ap-element="gameTime">SUN 12:00 PM</span>
-            <span class="appearance-preview-live-badge" data-ap-element="liveBadge">LIVE</span>
-            <span class="appearance-preview-clock" data-ap-element="clock">Q3 6:42</span>
-            <span class="appearance-preview-final-badge" data-ap-element="finalBadge">FINAL</span>
-          </strong>
-          <span class="appearance-preview-details-text"><span data-ap-element="moneyline">Odds</span> · <span data-ap-element="records">Records</span> · <span data-ap-element="favorite">Favorite</span></span>
-        </div>
-        <section class="appearance-question-preview" data-question-preview="text"><header><strong>Who wins Best Picture?</strong><span>10 pts</span></header><div class="appearance-question-answers text"><button>Film Alpha</button><button class="selected">Film Bravo</button><button>Film Charlie</button><button>Film Delta</button></div></section>
-        <section class="appearance-question-preview" data-question-preview="compact"><header><strong>Who wins this matchup?</strong><span>5 pts</span></header><div class="appearance-question-answers compact"><button><i>KC</i><span>Kansas City Chiefs</span></button><button class="selected"><i>BUF</i><span>Buffalo Bills</span></button></div></section>
-        <section class="appearance-question-preview" data-question-preview="image"><header><strong>Choose the winner</strong><span>10 pts</span></header><div class="appearance-question-answers image"><button><i class="appearance-question-image-placeholder">A</i><span>Nominee Alpha</span></button><button class="selected"><i class="appearance-question-image-placeholder">B</i><span>Nominee Bravo</span></button><button><i class="appearance-question-image-placeholder">C</i><span>Nominee Charlie</span></button></div></section>
-        <section class="appearance-question-preview" data-question-preview="wager"><header><strong>Moneyline</strong><span>Market</span></header><div class="appearance-question-answers wager"><button><span>Chicago</span><b>-145</b></button><button class="selected"><span>Detroit</span><b>+125</b></button></div><div class="appearance-question-wager-bar">Risk <strong>25</strong> points</div></section>
-      </div>
       </div>
     </div>
-    <div class="appearance-studio-preview-note"><span id="appearancePreviewSizeLabel">Desktop · 1180px</span> · Live preview uses the first two entities from the selected game when available.</div>
+    <div class="appearance-studio-preview-note"><span id="appearancePreviewSizeLabel">Desktop · 1180px</span> · Preview and live Picks page now use the same theme serializer and runtime CSS.</div>
   </div>`;
 }
 
@@ -1917,12 +1945,35 @@ function adminAppearanceUpdateModeControlVisibility_() {
   if (title) title.textContent = mirror && mirror.checked ? "Away / Base Layout (Home mirrors this)" : "Away · Independent";
 }
 
-function adminAppearanceUpdateThemePreview_() {
+function adminAppearanceUpdateThemePreview_(event) {
   const preview = document.getElementById("appearanceThemePreview");
   if (!preview) return;
+  if (event && event.target && event.target.id === "appearanceThemeQuestionDefault") {
+    const requestedSurface = String(event.target.value || "");
+    if (["text","compact","image","list","short-answer","wager"].indexOf(requestedSurface) !== -1) {
+      ADMIN_APPEARANCE_STATE.themePreviewSurface = requestedSurface;
+    }
+  }
   adminAppearanceUpdateModeControlVisibility_();
   let theme = adminAppearanceReadThemeControls_();
   theme = adminAppearanceApplyMirroredSideLayout_(theme);
+
+  // v1.2.17s: drive the Studio with the same serializer used by the live Picks page.
+  // This removes the old preview-only interpretation that allowed the two views to drift.
+  if (window.AppearanceThemeRuntime) {
+    const runtimeMatchup = document.getElementById("appearanceRuntimeMatchupPreview");
+    if (runtimeMatchup && typeof window.AppearanceThemeRuntime.confidencePresentation === "function") {
+      const runtimePresentation = window.AppearanceThemeRuntime.confidencePresentation(theme);
+      runtimeMatchup.className = "confidence-compact-slate appearance-runtime-matchup-preview " + runtimePresentation.className;
+      runtimeMatchup.setAttribute("style", runtimePresentation.style);
+    }
+    const pageShell = document.getElementById("appearancePagePreviewShell");
+    if (pageShell && typeof window.AppearanceThemeRuntime.pagePresentation === "function") {
+      const pagePresentation = window.AppearanceThemeRuntime.pagePresentation(theme);
+      pageShell.className = "picks-page picks-appearance-active appearance-preview-page-shell " + String(pagePresentation.className || "");
+      pageShell.setAttribute("style", pagePresentation.style);
+    }
+  }
   document.querySelectorAll('.appearance-studio-range input[type="range"]').forEach(function(input) {
     const output = document.getElementById(input.dataset.output || "");
     if (output) output.textContent = input.value + String(input.dataset.suffix || "");
@@ -2093,7 +2144,7 @@ function adminAppearanceUpdateThemePreview_() {
 
 
 function adminAppearanceSetPreviewSurface_(surface, skipUpdate) {
-  surface = ["matchup","text","compact","image","wager"].indexOf(String(surface||"")) !== -1 ? String(surface) : "matchup";
+  surface = ["matchup","text","compact","image","list","short-answer","wager"].indexOf(String(surface||"")) !== -1 ? String(surface) : "matchup";
   ADMIN_APPEARANCE_STATE.themePreviewSurface = surface;
   const preview = document.getElementById("appearanceThemePreview");
   if (preview) preview.setAttribute("data-preview-surface", surface);
@@ -2117,6 +2168,22 @@ function adminAppearanceSetPreviewState_(state, skipUpdate) {
     preview.querySelectorAll(".appearance-preview-result-indicator").forEach(function(mark, index) {
       mark.textContent = state === "final-loss" && index === 0 ? "✕" : "✓";
     });
+    const row = document.getElementById("appearanceRuntimeGameRow");
+    if (row) {
+      row.classList.remove("phase-pregame", "phase-live", "phase-final", "pending", "correct", "wrong");
+      row.classList.add(state === "live" ? "phase-live" : (state === "final-win" || state === "final-loss") ? "phase-final" : "phase-pregame");
+      row.classList.add(state === "final-win" ? "correct" : state === "final-loss" ? "wrong" : "pending");
+    }
+    const gameTime = preview.querySelector(".appearance-preview-game-time");
+    const liveBadge = preview.querySelector(".appearance-preview-live-badge");
+    const clock = preview.querySelector(".appearance-preview-clock");
+    const finalBadge = preview.querySelector(".appearance-preview-final-badge");
+    if (gameTime) gameTime.style.display = state === "pregame" ? "" : "none";
+    if (liveBadge) liveBadge.style.display = state === "live" ? "" : "none";
+    if (clock) clock.style.display = state === "live" ? "" : "none";
+    if (finalBadge) finalBadge.style.display = state === "final-win" || state === "final-loss" ? "" : "none";
+    preview.querySelectorAll(".appearance-preview-score").forEach(function(score) { score.style.display = state === "pregame" ? "none" : ""; });
+    preview.querySelectorAll(".confidence-result-points").forEach(function(points) { points.style.display = state === "final-win" || state === "final-loss" ? "" : "none"; });
   }
   document.querySelectorAll("[data-preview-state]").forEach(function(button) {
     button.classList.toggle("active", button.dataset.previewState === ADMIN_APPEARANCE_STATE.themePreviewState);
