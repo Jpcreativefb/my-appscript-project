@@ -14,6 +14,7 @@ let ADMIN_APPEARANCE_STATE = {
   themePreviewState: "pregame",
   themePreviewDevice: "desktop",
   themePreviewSurface: "matchup",
+  themeActionState: "",
   busy: false,
   message: ""
 };
@@ -468,6 +469,8 @@ function adminAppearanceStudioDefaults_(theme) {
   const questions = theme.questions || {};
   const details = theme.details || {};
   const bars = theme.bars || {};
+  const textBackdrop = theme.textBackdrop || {};
+  const winner = theme.winner || {};
   const positioning = theme.positioning || {};
   const overlays = theme.overlays || {};
   const resultTypography = theme.resultTypography || {};
@@ -655,8 +658,17 @@ function adminAppearanceStudioDefaults_(theme) {
       fontSize: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.fontSize, 7, 20, 10)
     },
     page: {
+      backgroundMode: page.backgroundMode || "solid",
       background: page.background || "#020617",
+      gradientStart: page.gradientStart || page.background || "#020617",
+      gradientEnd: page.gradientEnd || "#0f172a",
+      gradientAngle: adminAppearanceStudioClamp_(page.gradientAngle, 0, 360, 180),
+      headerMode: page.headerMode || "solid",
       headerBackground: page.headerBackground || "#0f172a",
+      headerGradientStart: page.headerGradientStart || page.headerBackground || "#0f172a",
+      headerGradientEnd: page.headerGradientEnd || "#1e293b",
+      headerGradientAngle: adminAppearanceStudioClamp_(page.headerGradientAngle, 0, 360, 135),
+      headerOpacity: adminAppearanceStudioClamp_(page.headerOpacity, 0, 100, 100),
       headerText: page.headerText || "#ffffff",
       headerMuted: page.headerMuted || "#94a3b8",
       headerRadius: adminAppearanceStudioClamp_(page.headerRadius, 0, 32, 16),
@@ -664,16 +676,32 @@ function adminAppearanceStudioDefaults_(theme) {
     },
     questions: {
       defaultLayout: questions.defaultLayout || "inherit",
+      cardMode: questions.cardMode || "solid",
       cardBackground: questions.cardBackground || "#0f172a",
+      cardGradientStart: questions.cardGradientStart || questions.cardBackground || "#0f172a",
+      cardGradientEnd: questions.cardGradientEnd || "#1e293b",
+      cardGradientAngle: adminAppearanceStudioClamp_(questions.cardGradientAngle, 0, 360, 180),
       cardOpacity: adminAppearanceStudioClamp_(questions.cardOpacity, 0, 100, 96),
+      headerMode: questions.headerMode || "solid",
       headerBackground: questions.headerBackground || "#111111",
+      headerGradientStart: questions.headerGradientStart || questions.headerBackground || "#111111",
+      headerGradientEnd: questions.headerGradientEnd || "#1e293b",
+      headerGradientAngle: adminAppearanceStudioClamp_(questions.headerGradientAngle, 0, 360, 90),
       headerOpacity: adminAppearanceStudioClamp_(questions.headerOpacity, 0, 100, 100),
       titleColor: questions.titleColor || "#ffffff",
       titleSize: adminAppearanceStudioClamp_(questions.titleSize, 10, 28, 16),
+      answerMode: questions.answerMode || "solid",
       answerBackground: questions.answerBackground || "#1e293b",
+      answerGradientStart: questions.answerGradientStart || questions.answerBackground || "#1e293b",
+      answerGradientEnd: questions.answerGradientEnd || "#0f172a",
+      answerGradientAngle: adminAppearanceStudioClamp_(questions.answerGradientAngle, 0, 360, 180),
       answerText: questions.answerText || "#ffffff",
       answerBorder: questions.answerBorder || "#334155",
+      selectedMode: questions.selectedMode || "solid",
       selectedBackground: questions.selectedBackground || "#854d0e",
+      selectedGradientStart: questions.selectedGradientStart || questions.selectedBackground || "#854d0e",
+      selectedGradientEnd: questions.selectedGradientEnd || "#f59e0b",
+      selectedGradientAngle: adminAppearanceStudioClamp_(questions.selectedGradientAngle, 0, 360, 135),
       selectedText: questions.selectedText || "#fde68a",
       selectedBorder: questions.selectedBorder || "#facc15",
       correctColor: questions.correctColor || "#22c55e",
@@ -686,7 +714,16 @@ function adminAppearanceStudioDefaults_(theme) {
       imageColumns: adminAppearanceStudioClamp_(questions.imageColumns, 1, 6, 4),
       imageAspect: questions.imageAspect || "2/3",
       imageFit: questions.imageFit || "cover",
+      imageZoom: adminAppearanceStudioClamp_(questions.imageZoom, 50, 220, 100),
+      imageX: adminAppearanceStudioClamp_(questions.imageX, 0, 100, 50),
+      imageY: adminAppearanceStudioClamp_(questions.imageY, 0, 100, 50),
+      imageOpacity: adminAppearanceStudioClamp_(questions.imageOpacity, 0, 100, 100),
       imageTextOverlay: questions.imageTextOverlay === true,
+      imageOverlayMode: questions.imageOverlayMode || "gradient",
+      imageOverlayColor: questions.imageOverlayColor || "#000000",
+      imageOverlayColor2: questions.imageOverlayColor2 || "#000000",
+      imageOverlayAngle: adminAppearanceStudioClamp_(questions.imageOverlayAngle, 0, 360, 0),
+      imageOverlayPlacement: questions.imageOverlayPlacement || "bottom",
       imageOverlayOpacity: adminAppearanceStudioClamp_(questions.imageOverlayOpacity, 0, 90, 35),
       wagerColumns: adminAppearanceStudioClamp_(questions.wagerColumns, 1, 3, 2),
       overrides: Object.assign({}, questions.overrides || {}),
@@ -700,11 +737,41 @@ function adminAppearanceStudioDefaults_(theme) {
       radius: adminAppearanceStudioClamp_(details.radius, 0, 24, 10)
     },
     bars: {
+      sortMode: bars.sortMode || "solid",
       sortBackground: bars.sortBackground || "#0f172a",
+      sortGradientStart: bars.sortGradientStart || bars.sortBackground || "#0f172a",
+      sortGradientEnd: bars.sortGradientEnd || "#1e293b",
+      sortGradientAngle: adminAppearanceStudioClamp_(bars.sortGradientAngle, 0, 360, 90),
       sortText: bars.sortText || "#ffffff",
+      saveMode: bars.saveMode || "solid",
       saveBackground: bars.saveBackground || "#2563eb",
+      saveGradientStart: bars.saveGradientStart || bars.saveBackground || "#2563eb",
+      saveGradientEnd: bars.saveGradientEnd || "#1d4ed8",
+      saveGradientAngle: adminAppearanceStudioClamp_(bars.saveGradientAngle, 0, 360, 90),
       saveText: bars.saveText || "#ffffff",
       buttonRadius: adminAppearanceStudioClamp_(bars.buttonRadius, 0, 24, 9)
+    },
+    textBackdrop: {
+      enabled: textBackdrop.enabled === true,
+      mode: textBackdrop.mode || "gradient",
+      color: textBackdrop.color || "#000000",
+      color2: textBackdrop.color2 || "#000000",
+      opacity: adminAppearanceStudioClamp_(textBackdrop.opacity, 0, 100, 45),
+      angle: adminAppearanceStudioClamp_(textBackdrop.angle, 0, 360, 90),
+      padding: adminAppearanceStudioClamp_(textBackdrop.padding, 0, 24, 6),
+      radius: adminAppearanceStudioClamp_(textBackdrop.radius, 0, 24, 6)
+    },
+    winner: {
+      overlayType: winner.overlayType || "none",
+      color: winner.color || "#22c55e",
+      color2: winner.color2 || "#14532d",
+      opacity: adminAppearanceStudioClamp_(winner.opacity, 0, 100, 20),
+      angle: adminAppearanceStudioClamp_(winner.angle, 0, 360, 135),
+      placement: winner.placement || "full",
+      decoration: winner.decoration || "none",
+      decorationPosition: winner.decorationPosition || "top-right",
+      decorationSize: adminAppearanceStudioClamp_(winner.decorationSize, 12, 64, 28),
+      decorationColor: winner.decorationColor || "#facc15"
     },
     colors: {
       accent: colors.accent || "#60a5fa",
@@ -799,6 +866,14 @@ function adminAppearanceThemeEditor_() {
         <label>Theme ID<input id="appearanceThemeId" class="input" value="${adminAppearanceEscape_(themeId)}" placeholder="auto-generated" ${row ? 'readonly' : ''}></label>
         <label>Base Theme<select id="appearanceThemeBase" class="input">${adminAppearanceThemeOptions_(baseTheme, true)}</select></label>
       </div>
+      <div class="appearance-studio-presets">
+        <strong>Quick Presets</strong>
+        <button type="button" class="button secondary" onclick="adminAppearanceApplyPreset_('basic')">Basic</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceApplyPreset_('simple')">Simple</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceApplyPreset_('advanced')">Advanced</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceApplyPreset_('mobile')">Mobile Friendly</button>
+        <small>Presets change the visible controls only. Save when you like the result.</small>
+      </div>
 
       <div class="appearance-studio-shell">
         <aside class="appearance-studio-controls">
@@ -848,6 +923,18 @@ function adminAppearanceThemeEditor_() {
               <label class="appearance-studio-check"><input id="appearanceThemeImageOversize" type="checkbox" ${theme.images.oversize ? 'checked' : ''}><span>Allow artwork to oversize</span></label>
             </div>
             <div data-image-modes="background" class="appearance-studio-inline-note">Full Button ignores Image / Art Size. Fit + Zoom + X/Y frame the image across the entire button.</div>
+          </div></details>
+
+          <details><summary>Team Text Readability Overlay</summary><div class="appearance-studio-panel">
+            <label class="appearance-studio-check"><input id="appearanceThemeTextBackdropEnabled" type="checkbox" ${theme.textBackdrop.enabled ? 'checked' : ''}><span>Overlay behind City / Team text</span></label>
+            ${adminAppearanceStudioSelect_("appearanceThemeTextBackdropMode", "Overlay Type", theme.textBackdrop.mode, [["solid","Solid"],["gradient","Gradient"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeTextBackdropColor", "Overlay Color", theme.textBackdrop.color)}
+            ${adminAppearanceStudioColor_("appearanceThemeTextBackdropColor2", "Gradient Color 2", theme.textBackdrop.color2)}
+            ${adminAppearanceStudioRange_("appearanceThemeTextBackdropOpacity", "Overlay Opacity", theme.textBackdrop.opacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeTextBackdropAngle", "Gradient Angle", theme.textBackdrop.angle, 0, 360, 1, "°")}
+            ${adminAppearanceStudioRange_("appearanceThemeTextBackdropPadding", "Text Overlay Padding", theme.textBackdrop.padding, 0, 24, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeTextBackdropRadius", "Text Overlay Corners", theme.textBackdrop.radius, 0, 24, 1, "px")}
+            <div class="admin-sub">This layer sits in front of the team image but behind City / Team lettering.</div>
           </div></details>
 
           <details><summary>Element Positioning</summary><div class="appearance-studio-panel">
@@ -971,32 +1058,79 @@ function adminAppearanceThemeEditor_() {
             <div class="admin-sub appearance-studio-inline-note">Set Mobile Selector Arrow to 0px to hide it completely. The confidence number remains centered.</div>
           </div></details>
 
+          <details><summary>Winner Overlay / Decoration</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemeWinnerOverlayType", "Winning Pick Overlay", theme.winner.overlayType, [["none","None"],["solid","Solid"],["gradient","Gradient"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeWinnerColor", "Winner Overlay Color", theme.winner.color)}
+            ${adminAppearanceStudioColor_("appearanceThemeWinnerColor2", "Winner Gradient Color 2", theme.winner.color2)}
+            ${adminAppearanceStudioRange_("appearanceThemeWinnerOpacity", "Winner Overlay Opacity", theme.winner.opacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeWinnerAngle", "Winner Gradient Angle", theme.winner.angle, 0, 360, 1, "°")}
+            ${adminAppearanceStudioSelect_("appearanceThemeWinnerPlacement", "Overlay Placement", theme.winner.placement, [["full","Full Pick"],["top","Top Band"],["bottom","Bottom Band"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeWinnerDecoration", "Winner Element", theme.winner.decoration, [["none","None"],["trophy","Trophy"],["crown","Crown"],["medal","Medal"],["star","Star"],["check","Check"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeWinnerDecorationPosition", "Element Position", theme.winner.decorationPosition, [["top-left","Top Left"],["top-right","Top Right"],["bottom-left","Bottom Left"],["bottom-right","Bottom Right"],["center","Center"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeWinnerDecorationSize", "Element Size", theme.winner.decorationSize, 12, 64, 1, "px")}
+            ${adminAppearanceStudioColor_("appearanceThemeWinnerDecorationColor", "Element Color", theme.winner.decorationColor)}
+            <div class="admin-sub">Used for a correctly selected winner in Matchup and normal question layouts.</div>
+          </div></details>
+
           <details open><summary>Page / Header / Bars</summary><div class="appearance-studio-panel">
+            ${adminAppearanceStudioSelect_("appearanceThemePageBgMode", "Page Background Type", theme.page.backgroundMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemePageBg", "Page Background", theme.page.background)}
+            ${adminAppearanceStudioColor_("appearanceThemePageGradientStart", "Page Gradient Start", theme.page.gradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemePageGradientEnd", "Page Gradient End", theme.page.gradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemePageGradientAngle", "Page Gradient Angle", theme.page.gradientAngle, 0, 360, 1, "°")}
+            ${adminAppearanceStudioSelect_("appearanceThemeHeaderBgMode", "Header Background Type", theme.page.headerMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeHeaderBg", "Header Background", theme.page.headerBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeHeaderGradientStart", "Header Gradient Start", theme.page.headerGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeHeaderGradientEnd", "Header Gradient End", theme.page.headerGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeHeaderGradientAngle", "Header Gradient Angle", theme.page.headerGradientAngle, 0, 360, 1, "°")}
+            ${adminAppearanceStudioRange_("appearanceThemeHeaderOpacity", "Header Background Opacity", theme.page.headerOpacity, 0, 100, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeHeaderText", "Header Title", theme.page.headerText)}
             ${adminAppearanceStudioColor_("appearanceThemeHeaderMuted", "Header Secondary Text", theme.page.headerMuted)}
             ${adminAppearanceStudioRange_("appearanceThemeHeaderRadius", "Header Corners", theme.page.headerRadius, 0, 32, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeSectionGap", "Section Spacing", theme.page.sectionGap, 4, 36, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeSortBgMode", "Sort / Toolbar Background Type", theme.bars.sortMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeSortBg", "Sort / Toolbar Background", theme.bars.sortBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeSortGradientStart", "Sort Gradient Start", theme.bars.sortGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeSortGradientEnd", "Sort Gradient End", theme.bars.sortGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeSortGradientAngle", "Sort Gradient Angle", theme.bars.sortGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioColor_("appearanceThemeSortText", "Sort / Toolbar Text", theme.bars.sortText)}
+            ${adminAppearanceStudioSelect_("appearanceThemeSaveBgMode", "Save Button Background Type", theme.bars.saveMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeSaveBg", "Save Button Background", theme.bars.saveBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeSaveGradientStart", "Save Gradient Start", theme.bars.saveGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeSaveGradientEnd", "Save Gradient End", theme.bars.saveGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeSaveGradientAngle", "Save Gradient Angle", theme.bars.saveGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioColor_("appearanceThemeSaveText", "Save Button Text", theme.bars.saveText)}
             ${adminAppearanceStudioRange_("appearanceThemeBarRadius", "Toolbar Button Corners", theme.bars.buttonRadius, 0, 24, 1, "px")}
           </div></details>
 
           <details open><summary>Question Area Designer</summary><div class="appearance-studio-panel">
             ${adminAppearanceStudioSelect_("appearanceThemeQuestionDefault", "Game Default Question Layout", theme.questions.defaultLayout, ADMIN_APPEARANCE_QUESTION_LAYOUTS)}
+            ${adminAppearanceStudioSelect_("appearanceThemeQuestionCardMode", "Question Card Background Type", theme.questions.cardMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeQuestionCardBg", "Question Card Background", theme.questions.cardBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionCardGradientStart", "Question Card Gradient Start", theme.questions.cardGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionCardGradientEnd", "Question Card Gradient End", theme.questions.cardGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionCardGradientAngle", "Question Card Gradient Angle", theme.questions.cardGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioRange_("appearanceThemeQuestionCardOpacity", "Question Card Opacity", theme.questions.cardOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioSelect_("appearanceThemeQuestionHeaderMode", "Question Header Background Type", theme.questions.headerMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeQuestionHeaderBg", "Question Header Background", theme.questions.headerBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionHeaderGradientStart", "Question Header Gradient Start", theme.questions.headerGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeQuestionHeaderGradientEnd", "Question Header Gradient End", theme.questions.headerGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeQuestionHeaderGradientAngle", "Question Header Gradient Angle", theme.questions.headerGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioRange_("appearanceThemeQuestionHeaderOpacity", "Question Header Opacity", theme.questions.headerOpacity, 0, 100, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeQuestionTitle", "Question Title", theme.questions.titleColor)}
             ${adminAppearanceStudioRange_("appearanceThemeQuestionTitleSize", "Question Title Size", theme.questions.titleSize, 10, 28, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeAnswerMode", "Answer Background Type", theme.questions.answerMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerBg", "Answer Background", theme.questions.answerBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerGradientStart", "Answer Gradient Start", theme.questions.answerGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerGradientEnd", "Answer Gradient End", theme.questions.answerGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeAnswerGradientAngle", "Answer Gradient Angle", theme.questions.answerGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerText", "Answer Text", theme.questions.answerText)}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerBorder", "Answer Border", theme.questions.answerBorder)}
+            ${adminAppearanceStudioSelect_("appearanceThemeAnswerSelectedMode", "Selected Answer Background Type", theme.questions.selectedMode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedBg", "Selected Answer Background", theme.questions.selectedBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedGradientStart", "Selected Gradient Start", theme.questions.selectedGradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedGradientEnd", "Selected Gradient End", theme.questions.selectedGradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeAnswerSelectedGradientAngle", "Selected Gradient Angle", theme.questions.selectedGradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedText", "Selected Answer Text", theme.questions.selectedText)}
             ${adminAppearanceStudioColor_("appearanceThemeAnswerSelectedBorder", "Selected Answer Border", theme.questions.selectedBorder)}
             ${adminAppearanceStudioRange_("appearanceThemeQuestionRadius", "Question / Answer Corners", theme.questions.radius, 0, 32, 1, "px")}
@@ -1006,7 +1140,7 @@ function adminAppearanceThemeEditor_() {
           <details><summary>Question Layout Types</summary><div class="appearance-studio-panel">
             <h4>Text</h4>${adminAppearanceStudioRange_("appearanceThemeTextColumns", "Columns", theme.questions.textColumns, 1, 4, 1, "")}
             <h4>Compact</h4>${adminAppearanceStudioRange_("appearanceThemeCompactColumns", "Columns", theme.questions.compactColumns, 1, 4, 1, "")}${adminAppearanceStudioRange_("appearanceThemeCompactImage", "Image / Logo Size", theme.questions.compactImageSize, 0, 90, 1, "px")}
-            <h4>Image</h4>${adminAppearanceStudioRange_("appearanceThemeImageColumns", "Columns", theme.questions.imageColumns, 1, 6, 1, "")}${adminAppearanceStudioSelect_("appearanceThemeImageAspect", "Image Ratio", theme.questions.imageAspect, [["2/3","Portrait 2:3"],["1/1","Square"],["16/9","Landscape 16:9"],["4/3","Landscape 4:3"]])}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageFit", "Image Fit", theme.questions.imageFit, [["cover","Cover"],["contain","Contain"]])}<label class="appearance-studio-check"><input id="appearanceThemeImageTextOverlay" type="checkbox" ${theme.questions.imageTextOverlay ? 'checked' : ''}><span>Put answer text over image</span></label>${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay", "Text Overlay Darkness", theme.questions.imageOverlayOpacity, 0, 90, 1, "%")}
+            <h4>Image</h4>${adminAppearanceStudioRange_("appearanceThemeImageColumns", "Columns", theme.questions.imageColumns, 1, 6, 1, "")}${adminAppearanceStudioSelect_("appearanceThemeImageAspect", "Image Ratio", theme.questions.imageAspect, [["2/3","Portrait 2:3"],["1/1","Square"],["16/9","Landscape 16:9"],["4/3","Landscape 4:3"]])}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageFit", "Image Fit", theme.questions.imageFit, [["cover","Cover"],["contain","Contain"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageZoom", "Image Zoom", theme.questions.imageZoom, 50, 220, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageX", "Image X Position", theme.questions.imageX, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageY", "Image Y Position", theme.questions.imageY, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOpacity", "Image Opacity", theme.questions.imageOpacity, 0, 100, 1, "%")}<label class="appearance-studio-check"><input id="appearanceThemeImageTextOverlay" type="checkbox" ${theme.questions.imageTextOverlay ? 'checked' : ''}><span>Put answer text over image</span></label>${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayMode", "Text Overlay Type", theme.questions.imageOverlayMode, [["solid","Solid"],["gradient","Gradient"]])}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor", "Text Overlay Color", theme.questions.imageOverlayColor)}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor2", "Text Overlay Color 2", theme.questions.imageOverlayColor2)}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayPlacement", "Text Overlay Placement", theme.questions.imageOverlayPlacement, [["bottom","Bottom"],["top","Top"],["full","Full Image"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlayAngle", "Text Overlay Angle", theme.questions.imageOverlayAngle, 0, 360, 1, "°")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay", "Text Overlay Opacity", theme.questions.imageOverlayOpacity, 0, 90, 1, "%")}
             <h4>Wager / Market</h4>${adminAppearanceStudioRange_("appearanceThemeWagerColumns", "Columns", theme.questions.wagerColumns, 1, 3, 1, "")}
             <div class="admin-sub">List and Short Answer reuse the shared answer styling. Changing layout here changes presentation only — scoring/play type stays untouched.</div>
           </div></details>
@@ -1032,8 +1166,8 @@ function adminAppearanceThemeEditor_() {
       </div>
       <div class="appearance-studio-actions appearance-studio-actions-bar">
         <strong>Theme Actions</strong>
-        <button type="button" class="button" onclick="adminAppearanceSaveTheme_()">Save</button>
-        <button type="button" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">Apply to Game</button>
+        <button type="button" id="appearanceThemeSaveButton" class="button" onclick="adminAppearanceSaveTheme_()">${ADMIN_APPEARANCE_STATE.themeActionState === "saved" ? "Saved ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "saving" ? "Saving…" : "Save"}</button>
+        <button type="button" id="appearanceThemeApplyButton" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">${ADMIN_APPEARANCE_STATE.themeActionState === "applied" ? "Applied ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "applying" ? "Applying…" : "Apply to Game"}</button>
         <button type="button" class="button secondary" onclick="adminAppearanceDuplicateTheme_()">Duplicate</button>
         <button type="button" class="button secondary" onclick="adminAppearanceSaveThemeAsNew_()">Save As New</button>
         <button type="button" class="button secondary" onclick="adminAppearanceResetTheme_()">Reset</button>
@@ -1059,7 +1193,7 @@ function adminAppearanceThemePreview_(theme) {
         <strong class="confidence-team-nickname confidence-element-team-name" data-ap-element="teamName">${adminAppearanceEscape_(entity.nickname)}</strong>
       </span>
       <strong class="confidence-team-score confidence-element-score appearance-preview-score" data-ap-element="score">21</strong>
-      ${selected ? '<span class="confidence-selected-mark confidence-element-result-indicator appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span>' : ''}
+      ${selected ? '<span class="confidence-selected-mark confidence-element-result-indicator appearance-preview-result-indicator" data-ap-element="resultIndicator">✓</span><span class="confidence-winner-decoration" aria-hidden="true"></span>' : ''}
     </button>`;
   }
   function questionCard(layout, title, answers) {
@@ -1817,8 +1951,17 @@ function adminAppearanceReadThemeControls_() {
       fontSize: adminAppearanceStudioNumber_("appearanceThemeScoreboardFontSize", 10)
     },
     page: {
+      backgroundMode: String(adminAppearanceStudioValue_("appearanceThemePageBgMode", "solid")),
       background: String(adminAppearanceStudioValue_("appearanceThemePageBg", "#020617")),
+      gradientStart: String(adminAppearanceStudioValue_("appearanceThemePageGradientStart", "#020617")),
+      gradientEnd: String(adminAppearanceStudioValue_("appearanceThemePageGradientEnd", "#0f172a")),
+      gradientAngle: adminAppearanceStudioNumber_("appearanceThemePageGradientAngle", 180),
+      headerMode: String(adminAppearanceStudioValue_("appearanceThemeHeaderBgMode", "solid")),
       headerBackground: String(adminAppearanceStudioValue_("appearanceThemeHeaderBg", "#0f172a")),
+      headerGradientStart: String(adminAppearanceStudioValue_("appearanceThemeHeaderGradientStart", "#0f172a")),
+      headerGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeHeaderGradientEnd", "#1e293b")),
+      headerGradientAngle: adminAppearanceStudioNumber_("appearanceThemeHeaderGradientAngle", 135),
+      headerOpacity: adminAppearanceStudioNumber_("appearanceThemeHeaderOpacity", 100),
       headerText: String(adminAppearanceStudioValue_("appearanceThemeHeaderText", "#ffffff")),
       headerMuted: String(adminAppearanceStudioValue_("appearanceThemeHeaderMuted", "#94a3b8")),
       headerRadius: adminAppearanceStudioNumber_("appearanceThemeHeaderRadius", 16),
@@ -1830,16 +1973,32 @@ function adminAppearanceReadThemeControls_() {
       document.querySelectorAll("[data-question-section-id]").forEach(function(el){ sectionOverrides[String(el.dataset.questionSectionId||"")] = String(el.value||"inherit"); });
       return {
         defaultLayout: String(adminAppearanceStudioValue_("appearanceThemeQuestionDefault", "inherit")),
+        cardMode: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardMode", "solid")),
         cardBackground: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardBg", "#0f172a")),
+        cardGradientStart: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardGradientStart", "#0f172a")),
+        cardGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardGradientEnd", "#1e293b")),
+        cardGradientAngle: adminAppearanceStudioNumber_("appearanceThemeQuestionCardGradientAngle", 180),
         cardOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionCardOpacity", 96),
+        headerMode: String(adminAppearanceStudioValue_("appearanceThemeQuestionHeaderMode", "solid")),
         headerBackground: String(adminAppearanceStudioValue_("appearanceThemeQuestionHeaderBg", "#111111")),
+        headerGradientStart: String(adminAppearanceStudioValue_("appearanceThemeQuestionHeaderGradientStart", "#111111")),
+        headerGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeQuestionHeaderGradientEnd", "#1e293b")),
+        headerGradientAngle: adminAppearanceStudioNumber_("appearanceThemeQuestionHeaderGradientAngle", 90),
         headerOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionHeaderOpacity", 100),
         titleColor: String(adminAppearanceStudioValue_("appearanceThemeQuestionTitle", "#ffffff")),
         titleSize: adminAppearanceStudioNumber_("appearanceThemeQuestionTitleSize", 16),
+        answerMode: String(adminAppearanceStudioValue_("appearanceThemeAnswerMode", "solid")),
         answerBackground: String(adminAppearanceStudioValue_("appearanceThemeAnswerBg", "#1e293b")),
+        answerGradientStart: String(adminAppearanceStudioValue_("appearanceThemeAnswerGradientStart", "#1e293b")),
+        answerGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeAnswerGradientEnd", "#0f172a")),
+        answerGradientAngle: adminAppearanceStudioNumber_("appearanceThemeAnswerGradientAngle", 180),
         answerText: String(adminAppearanceStudioValue_("appearanceThemeAnswerText", "#ffffff")),
         answerBorder: String(adminAppearanceStudioValue_("appearanceThemeAnswerBorder", "#334155")),
+        selectedMode: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedMode", "solid")),
         selectedBackground: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedBg", "#854d0e")),
+        selectedGradientStart: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedGradientStart", "#854d0e")),
+        selectedGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedGradientEnd", "#f59e0b")),
+        selectedGradientAngle: adminAppearanceStudioNumber_("appearanceThemeAnswerSelectedGradientAngle", 135),
         selectedText: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedText", "#fde68a")),
         selectedBorder: String(adminAppearanceStudioValue_("appearanceThemeAnswerSelectedBorder", "#facc15")),
         correctColor: "#22c55e", incorrectColor: "#ef4444",
@@ -1851,7 +2010,16 @@ function adminAppearanceReadThemeControls_() {
         imageColumns: adminAppearanceStudioNumber_("appearanceThemeImageColumns", 4),
         imageAspect: String(adminAppearanceStudioValue_("appearanceThemeImageAspect", "2/3")),
         imageFit: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageFit", "cover")),
+        imageZoom: adminAppearanceStudioNumber_("appearanceThemeQuestionImageZoom", 100),
+        imageX: adminAppearanceStudioNumber_("appearanceThemeQuestionImageX", 50),
+        imageY: adminAppearanceStudioNumber_("appearanceThemeQuestionImageY", 50),
+        imageOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOpacity", 100),
         imageTextOverlay: adminAppearanceStudioValue_("appearanceThemeImageTextOverlay", false) === true,
+        imageOverlayMode: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageOverlayMode", "gradient")),
+        imageOverlayColor: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageOverlayColor", "#000000")),
+        imageOverlayColor2: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageOverlayColor2", "#000000")),
+        imageOverlayAngle: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlayAngle", 0),
+        imageOverlayPlacement: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageOverlayPlacement", "bottom")),
         imageOverlayOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlay", 35),
         wagerColumns: adminAppearanceStudioNumber_("appearanceThemeWagerColumns", 2),
         overrides: overrides, sectionOverrides: sectionOverrides
@@ -1865,11 +2033,41 @@ function adminAppearanceReadThemeControls_() {
       radius: adminAppearanceStudioNumber_("appearanceThemeDetailsRadius", 10)
     },
     bars: {
+      sortMode: String(adminAppearanceStudioValue_("appearanceThemeSortBgMode", "solid")),
       sortBackground: String(adminAppearanceStudioValue_("appearanceThemeSortBg", "#0f172a")),
+      sortGradientStart: String(adminAppearanceStudioValue_("appearanceThemeSortGradientStart", "#0f172a")),
+      sortGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeSortGradientEnd", "#1e293b")),
+      sortGradientAngle: adminAppearanceStudioNumber_("appearanceThemeSortGradientAngle", 90),
       sortText: String(adminAppearanceStudioValue_("appearanceThemeSortText", "#ffffff")),
+      saveMode: String(adminAppearanceStudioValue_("appearanceThemeSaveBgMode", "solid")),
       saveBackground: String(adminAppearanceStudioValue_("appearanceThemeSaveBg", "#2563eb")),
+      saveGradientStart: String(adminAppearanceStudioValue_("appearanceThemeSaveGradientStart", "#2563eb")),
+      saveGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeSaveGradientEnd", "#1d4ed8")),
+      saveGradientAngle: adminAppearanceStudioNumber_("appearanceThemeSaveGradientAngle", 90),
       saveText: String(adminAppearanceStudioValue_("appearanceThemeSaveText", "#ffffff")),
       buttonRadius: adminAppearanceStudioNumber_("appearanceThemeBarRadius", 9)
+    },
+    textBackdrop: {
+      enabled: adminAppearanceStudioValue_("appearanceThemeTextBackdropEnabled", false) === true,
+      mode: String(adminAppearanceStudioValue_("appearanceThemeTextBackdropMode", "gradient")),
+      color: String(adminAppearanceStudioValue_("appearanceThemeTextBackdropColor", "#000000")),
+      color2: String(adminAppearanceStudioValue_("appearanceThemeTextBackdropColor2", "#000000")),
+      opacity: adminAppearanceStudioNumber_("appearanceThemeTextBackdropOpacity", 45),
+      angle: adminAppearanceStudioNumber_("appearanceThemeTextBackdropAngle", 90),
+      padding: adminAppearanceStudioNumber_("appearanceThemeTextBackdropPadding", 6),
+      radius: adminAppearanceStudioNumber_("appearanceThemeTextBackdropRadius", 6)
+    },
+    winner: {
+      overlayType: String(adminAppearanceStudioValue_("appearanceThemeWinnerOverlayType", "none")),
+      color: String(adminAppearanceStudioValue_("appearanceThemeWinnerColor", "#22c55e")),
+      color2: String(adminAppearanceStudioValue_("appearanceThemeWinnerColor2", "#14532d")),
+      opacity: adminAppearanceStudioNumber_("appearanceThemeWinnerOpacity", 20),
+      angle: adminAppearanceStudioNumber_("appearanceThemeWinnerAngle", 135),
+      placement: String(adminAppearanceStudioValue_("appearanceThemeWinnerPlacement", "full")),
+      decoration: String(adminAppearanceStudioValue_("appearanceThemeWinnerDecoration", "none")),
+      decorationPosition: String(adminAppearanceStudioValue_("appearanceThemeWinnerDecorationPosition", "top-right")),
+      decorationSize: adminAppearanceStudioNumber_("appearanceThemeWinnerDecorationSize", 28),
+      decorationColor: String(adminAppearanceStudioValue_("appearanceThemeWinnerDecorationColor", "#facc15"))
     },
     colors: {
       accent: String(adminAppearanceStudioValue_("appearanceThemeSelectedBorder", "#60a5fa")),
@@ -2168,6 +2366,11 @@ function adminAppearanceSetPreviewState_(state, skipUpdate) {
     preview.querySelectorAll(".appearance-preview-result-indicator").forEach(function(mark, index) {
       mark.textContent = state === "final-loss" && index === 0 ? "✕" : "✓";
     });
+    preview.querySelectorAll(".appearance-question-runtime-preview").forEach(function(card) {
+      card.classList.remove("correct", "wrong");
+      if (state === "final-win") card.classList.add("correct");
+      if (state === "final-loss") card.classList.add("wrong");
+    });
     const row = document.getElementById("appearanceRuntimeGameRow");
     if (row) {
       row.classList.remove("phase-pregame", "phase-live", "phase-final", "pending", "correct", "wrong");
@@ -2214,6 +2417,55 @@ function adminAppearanceToggleFullPreview_() {
   window.setTimeout(function() { adminAppearanceUpdateThemePreview_(); }, 0);
 }
 
+
+function adminAppearanceSetThemeActionState_(state) {
+  ADMIN_APPEARANCE_STATE.themeActionState = String(state || "");
+  const save = document.getElementById("appearanceThemeSaveButton");
+  const apply = document.getElementById("appearanceThemeApplyButton");
+  if (save) {
+    save.dataset.state = state;
+    save.textContent = state === "saving" ? "Saving…" : state === "saved" ? "Saved ✓" : "Save";
+    save.disabled = state === "saving" || state === "applying";
+  }
+  if (apply) {
+    apply.dataset.state = state;
+    apply.textContent = state === "applying" ? "Applying…" : state === "applied" ? "Applied ✓" : "Apply to Game";
+    apply.disabled = state === "saving" || state === "applying";
+  }
+}
+
+function adminAppearanceClearThemeActionStateLater_() {
+  window.setTimeout(function() {
+    ADMIN_APPEARANCE_STATE.themeActionState = "";
+    adminAppearanceSetThemeActionState_("");
+  }, 2400);
+}
+
+function adminAppearanceSetControl_(id, value) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (el.type === "checkbox") el.checked = value === true;
+  else el.value = String(value);
+}
+
+function adminAppearanceApplyPreset_(preset) {
+  const values = {
+    basic: {appearanceThemeBackgroundMode:"solid",appearanceThemeImageLayer:"inline",appearanceThemeQuestionCardMode:"solid",appearanceThemeAnswerMode:"solid",appearanceThemeWinnerOverlayType:"none",appearanceThemeTextBackdropEnabled:false},
+    simple: {appearanceThemeDensity:"compact",appearanceThemeImageLayer:"inline-background",appearanceThemeImageFit:"contain",appearanceThemeQuestionCardMode:"solid",appearanceThemeAnswerMode:"solid",appearanceThemePageBgMode:"solid",appearanceThemeWinnerDecoration:"check",appearanceThemeWinnerOverlayType:"solid",appearanceThemeWinnerOpacity:10},
+    advanced: {appearanceThemeBackgroundMode:"gradient",appearanceThemeImageLayer:"background",appearanceThemeImageFit:"cover",appearanceThemeTextBackdropEnabled:true,appearanceThemeTextBackdropMode:"gradient",appearanceThemePageBgMode:"gradient",appearanceThemeHeaderBgMode:"gradient",appearanceThemeQuestionCardMode:"gradient",appearanceThemeQuestionHeaderMode:"gradient",appearanceThemeAnswerMode:"gradient",appearanceThemeAnswerSelectedMode:"gradient",appearanceThemeWinnerOverlayType:"gradient",appearanceThemeWinnerDecoration:"trophy"},
+    mobile: {appearanceThemeDensity:"compact",appearanceThemeRowHeight:64,appearanceThemeRowPadding:4,appearanceThemeGap:3,appearanceThemeVsWidth:12,appearanceThemeConfidenceWidth:58,appearanceThemeCitySize:8,appearanceThemeNameSize:13,appearanceThemeScoreSize:11,appearanceThemeConfidenceSize:15,appearanceThemeMobileArrowSize:0}
+  };
+  const selected = values[String(preset || "")] || values.basic;
+  Object.keys(selected).forEach(function(id) { adminAppearanceSetControl_(id, selected[id]); });
+  if (preset === "mobile") {
+    ["city","versus","confidenceLabel"].forEach(function(key) {
+      const el = document.getElementById("appearanceThemeVisMobile_" + key);
+      if (el) el.checked = false;
+    });
+  }
+  ADMIN_APPEARANCE_STATE.message = "Preset applied to the preview. Save to keep it.";
+  adminAppearanceUpdateThemePreview_();
+}
 async function adminAppearancePersistTheme_(options) {
   options = options || {};
   const nameEl = document.getElementById("appearanceThemeName");
@@ -2247,7 +2499,11 @@ async function adminAppearancePersistTheme_(options) {
 }
 
 async function adminAppearanceSaveTheme_() {
-  await adminAppearancePersistTheme_({ message: "Theme Pack saved. Preview and game runtime now share the same controls." });
+  adminAppearanceSetThemeActionState_("saving");
+  const saved = await adminAppearancePersistTheme_({ message: "Theme Pack saved. Preview and game runtime now share the same controls." });
+  if (!saved) { adminAppearanceSetThemeActionState_(""); return; }
+  adminAppearanceSetThemeActionState_("saved");
+  adminAppearanceClearThemeActionStateLater_();
 }
 
 async function adminAppearanceSaveThemeAsNew_() {
@@ -2263,8 +2519,9 @@ async function adminAppearanceDuplicateTheme_() {
 }
 
 async function adminAppearanceApplyThemeToGame_() {
+  adminAppearanceSetThemeActionState_("applying");
   const saved = await adminAppearancePersistTheme_({ message: "Theme saved. Applying it to this game…" });
-  if (!saved) return;
+  if (!saved) { adminAppearanceSetThemeActionState_(""); return; }
   const imagePack = document.getElementById("appearanceGameImagePack");
   const result = await apiAdminSaveGameAppearance({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
@@ -2276,10 +2533,14 @@ async function adminAppearanceApplyThemeToGame_() {
   });
   if (!result || result.success === false) {
     ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Theme saved but could not be assigned to the game.";
+    adminAppearanceSetThemeActionState_("");
     adminAppearancePaint_();
     return;
   }
+  ADMIN_APPEARANCE_STATE.themeActionState = "applied";
   await adminAppearanceRefresh_("Theme saved and applied to this game.");
+  adminAppearanceSetThemeActionState_("applied");
+  adminAppearanceClearThemeActionStateLater_();
 }
 
 function adminAppearanceResetTheme_() {

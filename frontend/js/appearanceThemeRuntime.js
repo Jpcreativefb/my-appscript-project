@@ -48,6 +48,8 @@
     const scoreboard = theme.scoreboard || {};
     const positioning = theme.positioning || {};
     const overlays = theme.overlays || {};
+    const textBackdrop = theme.textBackdrop || {};
+    const winner = theme.winner || {};
     const visibility = theme.visibility || {};
     const visElements = visibility.elements || {};
     const visDevices = visibility.devices || {};
@@ -113,6 +115,12 @@
       "confidence-theme-confidence-" + confidenceThemeToken_(confidence.style, ["filled", "outline", "minimal"], "filled"),
       "confidence-theme-live-badge-" + confidenceThemeToken_(live.badgeStyle, ["text", "outline", "pill"], "text"),
       "confidence-theme-final-badge-" + confidenceThemeToken_(live.finalBadgeStyle, ["text", "outline", "pill"], "text"),
+      textBackdrop.enabled === true ? "confidence-theme-text-backdrop" : "",
+      "confidence-theme-text-backdrop-" + confidenceThemeToken_(textBackdrop.mode, ["solid", "gradient"], "gradient"),
+      "confidence-theme-winner-overlay-" + confidenceThemeToken_(winner.overlayType, ["none", "solid", "gradient"], "none"),
+      "confidence-theme-winner-placement-" + confidenceThemeToken_(winner.placement, ["full", "top", "bottom"], "full"),
+      "confidence-theme-winner-decoration-" + confidenceThemeToken_(winner.decoration, ["none", "trophy", "crown", "medal", "star", "check"], "none"),
+      "confidence-theme-winner-decoration-position-" + confidenceThemeToken_(winner.decorationPosition, ["top-left", "top-right", "bottom-left", "bottom-right", "center"], "top-right"),
       typography.uppercase === false ? "confidence-theme-team-naturalcase" : "confidence-theme-team-uppercase"
     ];
   
@@ -260,6 +268,14 @@
       "--confidence-scoreboard-height:" + scoreboardHeight + "px",
       "--confidence-scoreboard-radius:" + scoreboardRadius + "px",
       "--confidence-scoreboard-font-size:" + scoreboardFontSize + "px",
+      "--confidence-text-backdrop-solid:" + confidenceThemeHexRgba_(textBackdrop.color || "#000000", confidenceThemeNumber_(textBackdrop.opacity,0,100,45), "#000000"),
+      "--confidence-text-backdrop-gradient:linear-gradient(" + confidenceThemeNumber_(textBackdrop.angle,0,360,90) + "deg," + confidenceThemeHexRgba_(textBackdrop.color || "#000000", confidenceThemeNumber_(textBackdrop.opacity,0,100,45), "#000000") + "," + confidenceThemeHexRgba_(textBackdrop.color2 || "#000000", confidenceThemeNumber_(textBackdrop.opacity,0,100,45), "#000000") + ")",
+      "--confidence-text-backdrop-padding:" + confidenceThemeNumber_(textBackdrop.padding,0,24,6) + "px",
+      "--confidence-text-backdrop-radius:" + confidenceThemeNumber_(textBackdrop.radius,0,24,6) + "px",
+      "--confidence-winner-solid:" + confidenceThemeHexRgba_(winner.color || colors.correct || "#22c55e", confidenceThemeNumber_(winner.opacity,0,100,20), "#22c55e"),
+      "--confidence-winner-gradient:linear-gradient(" + confidenceThemeNumber_(winner.angle,0,360,135) + "deg," + confidenceThemeHexRgba_(winner.color || "#22c55e", confidenceThemeNumber_(winner.opacity,0,100,20), "#22c55e") + "," + confidenceThemeHexRgba_(winner.color2 || "#14532d", confidenceThemeNumber_(winner.opacity,0,100,20), "#14532d") + ")",
+      "--confidence-winner-decoration-size:" + confidenceThemeNumber_(winner.decorationSize,12,64,28) + "px",
+      "--confidence-winner-decoration-color:" + confidenceThemeSafeColor_(winner.decorationColor || "#facc15", "#facc15"),
       "--confidence-correct-city:" + confidenceThemeSafeColor_(correctType.city || colors.text, "#ffffff"),
       "--confidence-correct-name:" + confidenceThemeSafeColor_(correctType.teamName || colors.text, "#ffffff"),
       "--confidence-correct-score:" + confidenceThemeSafeColor_(correctType.score || colors.correct, "#22c55e"),
@@ -287,22 +303,41 @@
 
   function pagePresentation(theme) {
     theme = theme || {};
-    const page = theme.page || {}, q = theme.questions || {}, details = theme.details || {}, bars = theme.bars || {};
+    const page = theme.page || {}, q = theme.questions || {}, details = theme.details || {}, bars = theme.bars || {}, winner = theme.winner || {};
+    const pageMode = confidenceThemeToken_(page.backgroundMode,["solid","gradient"],"solid");
+    const headerMode = confidenceThemeToken_(page.headerMode,["solid","gradient"],"solid");
+    const cardMode = confidenceThemeToken_(q.cardMode,["solid","gradient"],"solid");
+    const qHeaderMode = confidenceThemeToken_(q.headerMode,["solid","gradient"],"solid");
+    const answerMode = confidenceThemeToken_(q.answerMode,["solid","gradient"],"solid");
+    const selectedMode = confidenceThemeToken_(q.selectedMode,["solid","gradient"],"solid");
+    const sortMode = confidenceThemeToken_(bars.sortMode,["solid","gradient"],"solid");
+    const saveMode = confidenceThemeToken_(bars.saveMode,["solid","gradient"],"solid");
+    const winnerType = confidenceThemeToken_(winner.overlayType,["none","solid","gradient"],"none");
+    const winnerPlacement = confidenceThemeToken_(winner.placement,["full","top","bottom"],"full");
+    const winnerDecoration = confidenceThemeToken_(winner.decoration,["none","trophy","crown","medal","star","check"],"none");
+    const winnerDecorationPosition = confidenceThemeToken_(winner.decorationPosition,["top-left","top-right","bottom-left","bottom-right","center"],"top-right");
+    const headerOpacity = confidenceThemeNumber_(page.headerOpacity,0,100,100);
     const style = [
       "--picks-theme-page-bg:"+(page.background||"#020617"),
-      "--picks-theme-header-bg:"+(page.headerBackground||"#0f172a"),
+      "--picks-theme-page-gradient:linear-gradient("+confidenceThemeNumber_(page.gradientAngle,0,360,180)+"deg,"+confidenceThemeSafeColor_(page.gradientStart||page.background,"#020617")+","+confidenceThemeSafeColor_(page.gradientEnd,"#0f172a")+")",
+      "--picks-theme-header-bg:"+picksAppearanceHexRgba_(page.headerBackground,headerOpacity,"#0f172a"),
+      "--picks-theme-header-gradient:linear-gradient("+confidenceThemeNumber_(page.headerGradientAngle,0,360,135)+"deg,"+picksAppearanceHexRgba_(page.headerGradientStart||page.headerBackground,headerOpacity,"#0f172a")+","+picksAppearanceHexRgba_(page.headerGradientEnd,headerOpacity,"#1e293b")+")",
       "--picks-theme-header-text:"+(page.headerText||"#ffffff"),
       "--picks-theme-header-muted:"+(page.headerMuted||"#94a3b8"),
       "--picks-theme-header-radius:"+(Number(page.headerRadius)||16)+"px",
       "--picks-theme-section-gap:"+(Number(page.sectionGap)||18)+"px",
       "--picks-theme-question-bg:"+picksAppearanceHexRgba_(q.cardBackground,q.cardOpacity,"#0f172a"),
+      "--picks-theme-question-gradient:linear-gradient("+confidenceThemeNumber_(q.cardGradientAngle,0,360,180)+"deg,"+picksAppearanceHexRgba_(q.cardGradientStart||q.cardBackground,q.cardOpacity,"#0f172a")+","+picksAppearanceHexRgba_(q.cardGradientEnd,q.cardOpacity,"#1e293b")+")",
       "--picks-theme-question-header-bg:"+picksAppearanceHexRgba_(q.headerBackground,q.headerOpacity,"#111111"),
+      "--picks-theme-question-header-gradient:linear-gradient("+confidenceThemeNumber_(q.headerGradientAngle,0,360,90)+"deg,"+picksAppearanceHexRgba_(q.headerGradientStart||q.headerBackground,q.headerOpacity,"#111111")+","+picksAppearanceHexRgba_(q.headerGradientEnd,q.headerOpacity,"#1e293b")+")",
       "--picks-theme-question-title:"+(q.titleColor||"#ffffff"),
       "--picks-theme-question-title-size:"+(Number(q.titleSize)||16)+"px",
       "--picks-theme-answer-bg:"+(q.answerBackground||"#1e293b"),
+      "--picks-theme-answer-gradient:linear-gradient("+confidenceThemeNumber_(q.answerGradientAngle,0,360,180)+"deg,"+confidenceThemeSafeColor_(q.answerGradientStart||q.answerBackground,"#1e293b")+","+confidenceThemeSafeColor_(q.answerGradientEnd,"#0f172a")+")",
       "--picks-theme-answer-text:"+(q.answerText||"#ffffff"),
       "--picks-theme-answer-border:"+(q.answerBorder||"#334155"),
       "--picks-theme-selected-bg:"+(q.selectedBackground||"#854d0e"),
+      "--picks-theme-selected-gradient:linear-gradient("+confidenceThemeNumber_(q.selectedGradientAngle,0,360,135)+"deg,"+confidenceThemeSafeColor_(q.selectedGradientStart||q.selectedBackground,"#854d0e")+","+confidenceThemeSafeColor_(q.selectedGradientEnd,"#f59e0b")+")",
       "--picks-theme-selected-text:"+(q.selectedText||"#fde68a"),
       "--picks-theme-selected-border:"+(q.selectedBorder||"#facc15"),
       "--picks-theme-question-radius:"+(Number(q.radius)||16)+"px",
@@ -313,22 +348,51 @@
       "--picks-theme-image-columns:"+(Number(q.imageColumns)||4),
       "--picks-theme-image-aspect:"+String(q.imageAspect||"2/3").replace("/"," / "),
       "--picks-theme-image-fit:"+(q.imageFit||"cover"),
+      "--picks-theme-image-zoom:"+(confidenceThemeNumber_(q.imageZoom,50,220,100)/100),
+      "--picks-theme-image-x:"+confidenceThemeNumber_(q.imageX,0,100,50)+"%",
+      "--picks-theme-image-y:"+confidenceThemeNumber_(q.imageY,0,100,50)+"%",
+      "--picks-theme-image-opacity:"+(confidenceThemeNumber_(q.imageOpacity,0,100,100)/100),
       "--picks-theme-image-overlay:"+(Number(q.imageOverlayOpacity||35)/100),
+      "--picks-theme-image-overlay-color:"+confidenceThemeSafeColor_(q.imageOverlayColor,"#000000"),
+      "--picks-theme-image-overlay-color2:"+confidenceThemeSafeColor_(q.imageOverlayColor2,"#000000"),
+      "--picks-theme-image-overlay-solid:"+picksAppearanceHexRgba_(q.imageOverlayColor,q.imageOverlayOpacity,"#000000"),
+      "--picks-theme-image-overlay-gradient:linear-gradient("+confidenceThemeNumber_(q.imageOverlayAngle,0,360,0)+"deg,"+picksAppearanceHexRgba_(q.imageOverlayColor,q.imageOverlayOpacity,"#000000")+","+picksAppearanceHexRgba_(q.imageOverlayColor2,q.imageOverlayOpacity,"#000000")+")",
+      "--picks-theme-image-overlay-angle:"+confidenceThemeNumber_(q.imageOverlayAngle,0,360,0)+"deg",
       "--picks-theme-wager-columns:"+(Number(q.wagerColumns)||2),
       "--picks-theme-details-bg:"+picksAppearanceHexRgba_(details.background,details.opacity,"#0b1220"),
       "--picks-theme-details-text:"+(details.text||"#cbd5e1"),
       "--picks-theme-details-border:"+(details.border||"#334155"),
       "--picks-theme-details-radius:"+(Number(details.radius)||10)+"px",
       "--picks-theme-sort-bg:"+(bars.sortBackground||"#0f172a"),
+      "--picks-theme-sort-gradient:linear-gradient("+confidenceThemeNumber_(bars.sortGradientAngle,0,360,90)+"deg,"+confidenceThemeSafeColor_(bars.sortGradientStart||bars.sortBackground,"#0f172a")+","+confidenceThemeSafeColor_(bars.sortGradientEnd,"#1e293b")+")",
       "--picks-theme-sort-text:"+(bars.sortText||"#ffffff"),
       "--picks-theme-save-bg:"+(bars.saveBackground||"#2563eb"),
+      "--picks-theme-save-gradient:linear-gradient("+confidenceThemeNumber_(bars.saveGradientAngle,0,360,90)+"deg,"+confidenceThemeSafeColor_(bars.saveGradientStart||bars.saveBackground,"#2563eb")+","+confidenceThemeSafeColor_(bars.saveGradientEnd,"#1d4ed8")+")",
       "--picks-theme-save-text:"+(bars.saveText||"#ffffff"),
-      "--picks-theme-bar-radius:"+(Number(bars.buttonRadius)||9)+"px"
+      "--picks-theme-bar-radius:"+(Number(bars.buttonRadius)||9)+"px",
+      "--picks-theme-winner-solid:"+picksAppearanceHexRgba_(winner.color,winner.opacity,"#22c55e"),
+      "--picks-theme-winner-gradient:linear-gradient("+confidenceThemeNumber_(winner.angle,0,360,135)+"deg,"+picksAppearanceHexRgba_(winner.color,winner.opacity,"#22c55e")+","+picksAppearanceHexRgba_(winner.color2,winner.opacity,"#14532d")+")",
+      "--picks-theme-winner-decoration-size:"+confidenceThemeNumber_(winner.decorationSize,12,64,28)+"px",
+      "--picks-theme-winner-decoration-color:"+confidenceThemeSafeColor_(winner.decorationColor,"#facc15")
     ].join(";");
-    return {
-      style: style,
-      className: q.imageTextOverlay === true ? "picks-theme-image-text-overlay" : ""
-    };
+    const classes = [
+      q.imageTextOverlay === true ? "picks-theme-image-text-overlay" : "",
+      "picks-theme-page-bg-"+pageMode,
+      "picks-theme-header-bg-"+headerMode,
+      "picks-theme-question-bg-"+cardMode,
+      "picks-theme-question-header-bg-"+qHeaderMode,
+      "picks-theme-answer-bg-"+answerMode,
+      "picks-theme-selected-bg-"+selectedMode,
+      "picks-theme-sort-bg-"+sortMode,
+      "picks-theme-save-bg-"+saveMode,
+      "picks-theme-image-overlay-"+confidenceThemeToken_(q.imageOverlayMode,["solid","gradient"],"gradient"),
+      "picks-theme-image-overlay-placement-"+confidenceThemeToken_(q.imageOverlayPlacement,["bottom","top","full"],"bottom"),
+      "picks-theme-winner-overlay-"+winnerType,
+      "picks-theme-winner-placement-"+winnerPlacement,
+      "picks-theme-winner-decoration-"+winnerDecoration,
+      "picks-theme-winner-decoration-position-"+winnerDecorationPosition
+    ].filter(Boolean);
+    return {style:style,className:classes.join(" ")};
   }
 
   global.AppearanceThemeRuntime = {

@@ -505,7 +505,7 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   );
 
   return `
-    <div class="page picks-page">
+    <div class="page picks-page${PICKS_PAGE_DATA.appearance ? "" : " picks-appearance-loading"}">
 
       ${renderHybridPicksBackButton_()}
 
@@ -1882,7 +1882,11 @@ function confidenceThemePresentation_() {
 }
 
 async function hydrateConfidenceAppearance_() {
-  if (typeof apiGetGameAppearance !== "function") return;
+  if (typeof apiGetGameAppearance !== "function") {
+    const page = document.querySelector(".picks-page");
+    if (page) page.classList.remove("picks-appearance-loading");
+    return;
+  }
 
   const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
   if (!gameId) return;
@@ -1900,6 +1904,8 @@ async function hydrateConfidenceAppearance_() {
       }
     } catch (err) {
       console.warn("Confidence appearance load skipped", err);
+      const page = document.querySelector(".picks-page");
+      if (page) page.classList.remove("picks-appearance-loading");
     } finally {
       PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
     }
@@ -1979,7 +1985,7 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
         <strong class="confidence-team-nickname confidence-element-team-name">${escapeHtml(parts.nickname)}</strong>
       </span>
       ${phase !== "pregame" && score !== "" ? `<strong class="confidence-team-score confidence-element-score">${escapeHtml(String(score))}</strong>` : ""}
-      ${selected ? `<span class="confidence-selected-mark confidence-element-result-indicator">✓</span>` : ""}
+      ${selected ? `<span class="confidence-selected-mark confidence-element-result-indicator">✓</span><span class="confidence-winner-decoration" aria-hidden="true"></span>` : ""}
       ${actualWinner && phase === "final" ? `<span class="confidence-winner-mark">W</span>` : ""}
     </button>
   `;
@@ -3657,8 +3663,14 @@ function applyPicksAppearanceToPage_() {
   if (!page) return;
   const presentation = picksAppearancePresentation_();
   page.setAttribute("style", presentation.style);
+  Array.from(page.classList).forEach(function(name) {
+    if (name.indexOf("picks-theme-") === 0) page.classList.remove(name);
+  });
+  String(presentation.className || "").split(/\s+/).filter(Boolean).forEach(function(name) {
+    page.classList.add(name);
+  });
   page.classList.toggle("picks-appearance-active", !!PICKS_PAGE_DATA.appearance);
-  page.classList.toggle("picks-theme-image-text-overlay", String(presentation.className || "").split(/\s+/).indexOf("picks-theme-image-text-overlay") !== -1);
+  if (PICKS_PAGE_DATA.appearance) page.classList.remove("picks-appearance-loading");
 }
 
 function renderNomineeButton(

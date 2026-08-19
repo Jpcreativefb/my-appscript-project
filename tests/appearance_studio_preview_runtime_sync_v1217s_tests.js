@@ -31,7 +31,8 @@ assert(manager.includes('event.target.id === "appearanceThemeQuestionDefault"'))
 assert(css.includes('Studio preview uses the same page/card markup and theme CSS as runtime'));
 assert(css.includes('[data-preview-surface="short-answer"]'));
 assert(picksCss.includes('picks-theme-image-text-overlay'));
-assert(picks.includes('page.classList.toggle("picks-theme-image-text-overlay"'));
+assert(picks.includes('String(presentation.className || "").split(/\\s+/).filter(Boolean)'));
+assert(picks.includes('if (name.indexOf("picks-theme-") === 0) page.classList.remove(name)'));
 assert(html.includes('appearanceThemeRuntime.js?v=v1217s-preview-runtime-sync'));
 assert(sw.includes('./js/appearanceThemeRuntime.js'));
 assert(sw.includes('v1217s-preview-runtime-sync'));

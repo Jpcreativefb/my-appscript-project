@@ -1264,3 +1264,26 @@
 .appearance-preview-device-frame.preview-device-mobile .question-layout-image .nominee-layout{grid-template-columns:repeat(2,minmax(0,1fr))!important;}
 .appearance-preview-device-frame.preview-device-mobile .question-layout-text .nominee-layout,
 .appearance-preview-device-frame.preview-device-mobile .question-layout-short-answer .nominee-layout{grid-template-columns:1fr!important;}
+
+/* =========================================================
+   v1.2.17t — Studio refinement: visibility scroll + presets/actions
+========================================================= */
+.appearance-studio-presets{
+  display:flex; flex-wrap:wrap; align-items:center; gap:6px;
+  margin:0 0 10px; padding:7px 9px;
+  border:1px solid rgba(148,163,184,.16); border-radius:10px;
+  background:rgba(15,23,42,.18);
+}
+.appearance-studio-presets strong{font-size:.75rem;margin-right:2px;}
+.appearance-studio-presets .button{padding:5px 8px;min-height:28px;font-size:.7rem;}
+.appearance-studio-presets small{flex-basis:100%;opacity:.68;font-size:.65rem;}
+.appearance-studio-visibility-panel{overflow-x:auto !important; padding-bottom:8px; scrollbar-gutter:stable both-edges;}
+.appearance-visibility-matrix{min-width:360px;width:max-content;max-width:none;}
+.appearance-visibility-head,.appearance-visibility-row{grid-template-columns:130px 38px 58px 54px 54px;min-width:352px;}
+.appearance-studio-actions-bar #appearanceThemeSaveButton,
+.appearance-studio-actions-bar #appearanceThemeApplyButton{min-width:92px;transition:.16s ease;}
+.appearance-studio-actions-bar #appearanceThemeSaveButton[data-state="saved"],
+.appearance-studio-actions-bar #appearanceThemeApplyButton[data-state="applied"]{box-shadow:0 0 0 2px rgba(34,197,94,.25) inset;}
+@media(min-width:901px){
+  .appearance-studio-controls{overflow-x:auto !important;}
+}
