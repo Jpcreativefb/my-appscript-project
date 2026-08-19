@@ -2755,3 +2755,15 @@
 .confidence-compact-slate.confidence-theme-winner-overlay-gradient .confidence-game-row.correct .confidence-team-choice.selected::before{background:var(--confidence-winner-gradient)!important;}
 .confidence-compact-slate.confidence-theme-winner-placement-top .confidence-game-row.correct .confidence-team-choice.selected::before{inset:0 0 60% 0!important;}
 .confidence-compact-slate.confidence-theme-winner-placement-bottom .confidence-game-row.correct .confidence-team-choice.selected::before{inset:60% 0 0 0!important;}
+
+
+/* =========================================================
+   v1.2.17v — Confidence width containment + gradient results
+========================================================= */
+.confidence-compact-slate .confidence-game-main{grid-template-columns:minmax(0,1fr) minmax(0,var(--confidence-versus-width)) minmax(0,1fr) minmax(44px,min(var(--confidence-value-width),28%))!important;min-width:0!important;}
+.confidence-compact-slate .confidence-row-value{width:100%!important;max-width:100%!important;min-width:0!important;overflow:visible;justify-self:stretch!important;box-sizing:border-box;}
+.confidence-compact-slate .confidence-row-value select{width:100%!important;max-width:100%!important;box-sizing:border-box;}
+@media(max-width:600px){.confidence-compact-slate .confidence-game-main{grid-template-columns:minmax(0,1fr) minmax(0,var(--confidence-versus-width)) minmax(0,1fr) minmax(42px,min(var(--confidence-value-width),27%))!important;}}
+/* Correct/incorrect result overlay variables accept solid or gradient backgrounds. */
+.confidence-compact-slate .confidence-game-row.correct .confidence-team-choice.selected::before{background:var(--confidence-correct-overlay)!important;}
+.confidence-compact-slate .confidence-game-row.wrong .confidence-team-choice.selected::before{background:var(--confidence-incorrect-overlay)!important;}

@@ -489,7 +489,7 @@ function adminAppearanceStudioDefaults_(theme) {
   const mirrorSides = rawSideLayout.mirrored === true;
 
   return {
-    studioVersion: 6,
+    studioVersion: 7,
     density: theme.density || "compact",
     layout: {
       rowHeight: adminAppearanceStudioClamp_(layout.rowHeight, 60, 160, 76),
@@ -599,10 +599,18 @@ function adminAppearanceStudioDefaults_(theme) {
       selectedOpacity: adminAppearanceStudioClamp_(overlays.selectedOpacity, 0, 80, selection.selectedTintOpacity == null ? 20 : selection.selectedTintOpacity),
       unselectedColor: overlays.unselectedColor || "#020617",
       unselectedOpacity: adminAppearanceStudioClamp_(overlays.unselectedOpacity, 0, 80, 12),
+      correctMode: overlays.correctMode || "solid",
       correctColor: overlays.correctColor || colors.correct || "#22c55e",
-      correctOpacity: adminAppearanceStudioClamp_(overlays.correctOpacity, 0, 80, 12),
+      correctColor2: overlays.correctColor2 || "#14532d",
+      correctOpacity: adminAppearanceStudioClamp_(overlays.correctOpacity, 0, 100, 12),
+      correctOpacity2: adminAppearanceStudioClamp_(overlays.correctOpacity2, 0, 100, overlays.correctOpacity == null ? 12 : overlays.correctOpacity),
+      correctAngle: adminAppearanceStudioClamp_(overlays.correctAngle, 0, 360, 135),
+      incorrectMode: overlays.incorrectMode || "solid",
       incorrectColor: overlays.incorrectColor || colors.incorrect || "#ef4444",
-      incorrectOpacity: adminAppearanceStudioClamp_(overlays.incorrectOpacity, 0, 80, 12),
+      incorrectColor2: overlays.incorrectColor2 || "#7f1d1d",
+      incorrectOpacity: adminAppearanceStudioClamp_(overlays.incorrectOpacity, 0, 100, 12),
+      incorrectOpacity2: adminAppearanceStudioClamp_(overlays.incorrectOpacity2, 0, 100, overlays.incorrectOpacity == null ? 12 : overlays.incorrectOpacity),
+      incorrectAngle: adminAppearanceStudioClamp_(overlays.incorrectAngle, 0, 360, 135),
       liveColor: overlays.liveColor || colors.live || "#ef4444",
       liveOpacity: adminAppearanceStudioClamp_(overlays.liveOpacity, 0, 60, 0),
       finalColor: overlays.finalColor || colors.final || "#e2e8f0",
@@ -724,7 +732,8 @@ function adminAppearanceStudioDefaults_(theme) {
       imageOverlayColor2: questions.imageOverlayColor2 || "#000000",
       imageOverlayAngle: adminAppearanceStudioClamp_(questions.imageOverlayAngle, 0, 360, 0),
       imageOverlayPlacement: questions.imageOverlayPlacement || "bottom",
-      imageOverlayOpacity: adminAppearanceStudioClamp_(questions.imageOverlayOpacity, 0, 90, 35),
+      imageOverlayOpacity: adminAppearanceStudioClamp_(questions.imageOverlayOpacity, 0, 100, 35),
+      imageOverlayOpacity2: adminAppearanceStudioClamp_(questions.imageOverlayOpacity2, 0, 100, questions.imageOverlayOpacity == null ? 0 : questions.imageOverlayOpacity),
       wagerColumns: adminAppearanceStudioClamp_(questions.wagerColumns, 1, 3, 2),
       overrides: Object.assign({}, questions.overrides || {}),
       sectionOverrides: Object.assign({}, questions.sectionOverrides || {})
@@ -807,7 +816,7 @@ function adminAppearanceStudioSelect_(id, label, value, options) {
 
 function adminAppearanceStudioVisibilityMatrix_(theme) {
   const visibility = adminAppearanceStudioVisibilityDefaults_(theme && theme.visibility);
-  return `<div class="appearance-visibility-matrix">
+  return `<div class="appearance-visibility-scroll" tabindex="0" aria-label="Element visibility device columns. Scroll horizontally for Tablet and Mobile."><div class="appearance-visibility-matrix">
     <div class="appearance-visibility-head"><span>Element</span><b>All</b><b>Desktop</b><b>Tablet</b><b>Mobile</b></div>
     ${ADMIN_APPEARANCE_VISIBILITY_ELEMENTS.map(function(item) {
       const key = item[0];
@@ -820,7 +829,7 @@ function adminAppearanceStudioVisibilityMatrix_(theme) {
         <input type="checkbox" id="appearanceThemeVisMobile_${key}" ${visibility.devices.mobile[key] ? 'checked' : ''} aria-label="Show ${adminAppearanceEscape_(label)} on mobile">
       </div>`;
     }).join('')}
-  </div>`;
+  </div></div>`;
 }
 
 function adminAppearanceStudioResultColors_(prefix, title, colors) {
@@ -994,21 +1003,35 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioResultColors_("appearanceThemeIncorrectText", "Incorrect Pick Font Colors", theme.resultTypography.incorrect)}
           </div></details>
 
-          <details><summary>Background & Overlay Layers</summary><div class="appearance-studio-panel">
-            ${adminAppearanceStudioSelect_("appearanceThemeBackgroundMode", "Background", theme.background.mode, [["solid","Solid"],["gradient","Gradient"]])}
+          <!-- Compatibility marker: Background & Overlay -->
+          <details open><summary>Overlays — Background / Selected / Correct / Incorrect / Live</summary><div class="appearance-studio-panel">
+            <div class="admin-sub">Result overlays sit above team artwork and below City / Team / Score. Correct and Incorrect can be solid or two-color gradients with independent opacity.</div>
+            ${adminAppearanceStudioSelect_("appearanceThemeBackgroundMode", "Row Background", theme.background.mode, [["solid","Solid"],["gradient","Gradient"]])}
             ${adminAppearanceStudioColor_("appearanceThemeSurface", "Solid Surface", theme.background.solid)}
             ${adminAppearanceStudioColor_("appearanceThemeGradientStart", "Gradient Start", theme.background.gradientStart)}
             ${adminAppearanceStudioColor_("appearanceThemeGradientEnd", "Gradient End", theme.background.gradientEnd)}
             ${adminAppearanceStudioRange_("appearanceThemeGradientAngle", "Gradient Angle", theme.background.gradientAngle, 0, 360, 1, "°")}
             ${adminAppearanceStudioRange_("appearanceThemeOverlayOpacity", "Whole Row Dark Overlay", theme.background.overlayOpacity, 0, 80, 1, "%")}
+            <h4>Selection</h4>
             ${adminAppearanceStudioColor_("appearanceThemeSelectedOverlayColor", "Selected Overlay", theme.overlays.selectedColor)}
             ${adminAppearanceStudioRange_("appearanceThemeSelectedOverlayOpacity", "Selected Overlay Opacity", theme.overlays.selectedOpacity, 0, 80, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeUnselectedOverlayColor", "Unselected Overlay", theme.overlays.unselectedColor)}
             ${adminAppearanceStudioRange_("appearanceThemeUnselectedOverlayOpacity", "Unselected Overlay Opacity", theme.overlays.unselectedOpacity, 0, 80, 1, "%")}
-            ${adminAppearanceStudioColor_("appearanceThemeCorrectOverlayColor", "Correct Overlay", theme.overlays.correctColor)}
-            ${adminAppearanceStudioRange_("appearanceThemeCorrectOverlayOpacity", "Correct Overlay Opacity", theme.overlays.correctOpacity, 0, 80, 1, "%")}
-            ${adminAppearanceStudioColor_("appearanceThemeIncorrectOverlayColor", "Incorrect Overlay", theme.overlays.incorrectColor)}
-            ${adminAppearanceStudioRange_("appearanceThemeIncorrectOverlayOpacity", "Incorrect Overlay Opacity", theme.overlays.incorrectOpacity, 0, 80, 1, "%")}
+            <h4>Correct Result</h4>
+            ${adminAppearanceStudioSelect_("appearanceThemeCorrectOverlayMode", "Correct Overlay Type", theme.overlays.correctMode, [["solid","Solid"],["gradient","Gradient"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeCorrectOverlayColor", "Correct Color 1", theme.overlays.correctColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeCorrectOverlayOpacity", "Correct Color 1 Opacity", theme.overlays.correctOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeCorrectOverlayColor2", "Correct Color 2", theme.overlays.correctColor2)}
+            ${adminAppearanceStudioRange_("appearanceThemeCorrectOverlayOpacity2", "Correct Color 2 Opacity", theme.overlays.correctOpacity2, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeCorrectOverlayAngle", "Correct Gradient Angle", theme.overlays.correctAngle, 0, 360, 1, "°")}
+            <h4>Incorrect Result</h4>
+            ${adminAppearanceStudioSelect_("appearanceThemeIncorrectOverlayMode", "Incorrect Overlay Type", theme.overlays.incorrectMode, [["solid","Solid"],["gradient","Gradient"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeIncorrectOverlayColor", "Incorrect Color 1", theme.overlays.incorrectColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeIncorrectOverlayOpacity", "Incorrect Color 1 Opacity", theme.overlays.incorrectOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeIncorrectOverlayColor2", "Incorrect Color 2", theme.overlays.incorrectColor2)}
+            ${adminAppearanceStudioRange_("appearanceThemeIncorrectOverlayOpacity2", "Incorrect Color 2 Opacity", theme.overlays.incorrectOpacity2, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeIncorrectOverlayAngle", "Incorrect Gradient Angle", theme.overlays.incorrectAngle, 0, 360, 1, "°")}
+            <h4>Game State</h4>
             ${adminAppearanceStudioColor_("appearanceThemeLiveOverlayColor", "Live Row Tint", theme.overlays.liveColor)}
             ${adminAppearanceStudioRange_("appearanceThemeLiveOverlayOpacity", "Live Tint Opacity", theme.overlays.liveOpacity, 0, 60, 1, "%")}
             ${adminAppearanceStudioColor_("appearanceThemeFinalOverlayColor", "Final Row Tint", theme.overlays.finalColor)}
@@ -1140,7 +1163,7 @@ function adminAppearanceThemeEditor_() {
           <details><summary>Question Layout Types</summary><div class="appearance-studio-panel">
             <h4>Text</h4>${adminAppearanceStudioRange_("appearanceThemeTextColumns", "Columns", theme.questions.textColumns, 1, 4, 1, "")}
             <h4>Compact</h4>${adminAppearanceStudioRange_("appearanceThemeCompactColumns", "Columns", theme.questions.compactColumns, 1, 4, 1, "")}${adminAppearanceStudioRange_("appearanceThemeCompactImage", "Image / Logo Size", theme.questions.compactImageSize, 0, 90, 1, "px")}
-            <h4>Image</h4>${adminAppearanceStudioRange_("appearanceThemeImageColumns", "Columns", theme.questions.imageColumns, 1, 6, 1, "")}${adminAppearanceStudioSelect_("appearanceThemeImageAspect", "Image Ratio", theme.questions.imageAspect, [["2/3","Portrait 2:3"],["1/1","Square"],["16/9","Landscape 16:9"],["4/3","Landscape 4:3"]])}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageFit", "Image Fit", theme.questions.imageFit, [["cover","Cover"],["contain","Contain"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageZoom", "Image Zoom", theme.questions.imageZoom, 50, 220, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageX", "Image X Position", theme.questions.imageX, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageY", "Image Y Position", theme.questions.imageY, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOpacity", "Image Opacity", theme.questions.imageOpacity, 0, 100, 1, "%")}<label class="appearance-studio-check"><input id="appearanceThemeImageTextOverlay" type="checkbox" ${theme.questions.imageTextOverlay ? 'checked' : ''}><span>Put answer text over image</span></label>${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayMode", "Text Overlay Type", theme.questions.imageOverlayMode, [["solid","Solid"],["gradient","Gradient"]])}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor", "Text Overlay Color", theme.questions.imageOverlayColor)}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor2", "Text Overlay Color 2", theme.questions.imageOverlayColor2)}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayPlacement", "Text Overlay Placement", theme.questions.imageOverlayPlacement, [["bottom","Bottom"],["top","Top"],["full","Full Image"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlayAngle", "Text Overlay Angle", theme.questions.imageOverlayAngle, 0, 360, 1, "°")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay", "Text Overlay Opacity", theme.questions.imageOverlayOpacity, 0, 90, 1, "%")}
+            <h4>Image</h4>${adminAppearanceStudioRange_("appearanceThemeImageColumns", "Columns", theme.questions.imageColumns, 1, 6, 1, "")}${adminAppearanceStudioSelect_("appearanceThemeImageAspect", "Image Ratio", theme.questions.imageAspect, [["2/3","Portrait 2:3"],["1/1","Square"],["16/9","Landscape 16:9"],["4/3","Landscape 4:3"]])}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageFit", "Image Fit", theme.questions.imageFit, [["cover","Cover"],["contain","Contain"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageZoom", "Image Zoom", theme.questions.imageZoom, 50, 220, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageX", "Image X Position", theme.questions.imageX, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageY", "Image Y Position", theme.questions.imageY, 0, 100, 1, "%")}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOpacity", "Image Opacity", theme.questions.imageOpacity, 0, 100, 1, "%")}<label class="appearance-studio-check"><input id="appearanceThemeImageTextOverlay" type="checkbox" ${theme.questions.imageTextOverlay ? 'checked' : ''}><span>Put answer text over image</span></label>${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayMode", "Text Overlay Type", theme.questions.imageOverlayMode, [["solid","Solid"],["gradient","Gradient"]])}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor", "Text Overlay Color 1", theme.questions.imageOverlayColor)}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay", "Color 1 Opacity", theme.questions.imageOverlayOpacity, 0, 100, 1, "%")}${adminAppearanceStudioColor_("appearanceThemeQuestionImageOverlayColor2", "Text Overlay Color 2", theme.questions.imageOverlayColor2)}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlay2", "Color 2 Opacity", theme.questions.imageOverlayOpacity2, 0, 100, 1, "%")}${adminAppearanceStudioSelect_("appearanceThemeQuestionImageOverlayPlacement", "Text Overlay Placement", theme.questions.imageOverlayPlacement, [["bottom","Bottom"],["top","Top"],["full","Full Image"]])}${adminAppearanceStudioRange_("appearanceThemeQuestionImageOverlayAngle", "Text Overlay Angle", theme.questions.imageOverlayAngle, 0, 360, 1, "°")}
             <h4>Wager / Market</h4>${adminAppearanceStudioRange_("appearanceThemeWagerColumns", "Columns", theme.questions.wagerColumns, 1, 3, 1, "")}
             <div class="admin-sub">List and Short Answer reuse the shared answer styling. Changing layout here changes presentation only — scoring/play type stays untouched.</div>
           </div></details>
@@ -1892,10 +1915,18 @@ function adminAppearanceReadThemeControls_() {
       selectedOpacity: adminAppearanceStudioNumber_("appearanceThemeSelectedOverlayOpacity", 20),
       unselectedColor: String(adminAppearanceStudioValue_("appearanceThemeUnselectedOverlayColor", "#020617")),
       unselectedOpacity: adminAppearanceStudioNumber_("appearanceThemeUnselectedOverlayOpacity", 12),
+      correctMode: String(adminAppearanceStudioValue_("appearanceThemeCorrectOverlayMode", "solid")),
       correctColor: String(adminAppearanceStudioValue_("appearanceThemeCorrectOverlayColor", "#22c55e")),
+      correctColor2: String(adminAppearanceStudioValue_("appearanceThemeCorrectOverlayColor2", "#14532d")),
       correctOpacity: adminAppearanceStudioNumber_("appearanceThemeCorrectOverlayOpacity", 12),
+      correctOpacity2: adminAppearanceStudioNumber_("appearanceThemeCorrectOverlayOpacity2", 12),
+      correctAngle: adminAppearanceStudioNumber_("appearanceThemeCorrectOverlayAngle", 135),
+      incorrectMode: String(adminAppearanceStudioValue_("appearanceThemeIncorrectOverlayMode", "solid")),
       incorrectColor: String(adminAppearanceStudioValue_("appearanceThemeIncorrectOverlayColor", "#ef4444")),
+      incorrectColor2: String(adminAppearanceStudioValue_("appearanceThemeIncorrectOverlayColor2", "#7f1d1d")),
       incorrectOpacity: adminAppearanceStudioNumber_("appearanceThemeIncorrectOverlayOpacity", 12),
+      incorrectOpacity2: adminAppearanceStudioNumber_("appearanceThemeIncorrectOverlayOpacity2", 12),
+      incorrectAngle: adminAppearanceStudioNumber_("appearanceThemeIncorrectOverlayAngle", 135),
       liveColor: String(adminAppearanceStudioValue_("appearanceThemeLiveOverlayColor", "#ef4444")),
       liveOpacity: adminAppearanceStudioNumber_("appearanceThemeLiveOverlayOpacity", 0),
       finalColor: String(adminAppearanceStudioValue_("appearanceThemeFinalOverlayColor", "#e2e8f0")),
@@ -2021,6 +2052,7 @@ function adminAppearanceReadThemeControls_() {
         imageOverlayAngle: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlayAngle", 0),
         imageOverlayPlacement: String(adminAppearanceStudioValue_("appearanceThemeQuestionImageOverlayPlacement", "bottom")),
         imageOverlayOpacity: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlay", 35),
+        imageOverlayOpacity2: adminAppearanceStudioNumber_("appearanceThemeQuestionImageOverlay2", 0),
         wagerColumns: adminAppearanceStudioNumber_("appearanceThemeWagerColumns", 2),
         overrides: overrides, sectionOverrides: sectionOverrides
       };
@@ -2228,10 +2260,10 @@ function adminAppearanceUpdateThemePreview_(event) {
     "--ap-image-zoom": theme.images.zoom / 100,
     "--ap-image-x": theme.images.x + "%",
     "--ap-image-y": theme.images.y + "%",
-    "--ap-away-image-x": theme.sideLayout.away.imageX + "%",
-    "--ap-away-image-y": theme.sideLayout.away.imageY + "%",
-    "--ap-home-image-x": theme.sideLayout.home.imageX + "%",
-    "--ap-home-image-y": theme.sideLayout.home.imageY + "%",
+    "--ap-away-image-x": adminAppearanceStudioClamp_(theme.images.x + (theme.sideLayout.away.imageX - 50), 0, 100, theme.images.x) + "%",
+    "--ap-away-image-y": adminAppearanceStudioClamp_(theme.images.y + (theme.sideLayout.away.imageY - 50), 0, 100, theme.images.y) + "%",
+    "--ap-home-image-x": adminAppearanceStudioClamp_(theme.images.x + (theme.sideLayout.home.imageX - 50), 0, 100, theme.images.x) + "%",
+    "--ap-home-image-y": adminAppearanceStudioClamp_(theme.images.y + (theme.sideLayout.home.imageY - 50), 0, 100, theme.images.y) + "%",
     "--ap-away-text-x": theme.sideLayout.away.textOffsetX + "px",
     "--ap-away-text-y": theme.sideLayout.away.textOffsetY + "px",
     "--ap-home-text-x": theme.sideLayout.home.textOffsetX + "px",
@@ -2257,8 +2289,8 @@ function adminAppearanceUpdateThemePreview_(event) {
     "--ap-overlay": theme.background.overlayOpacity / 100,
     "--ap-selected-overlay": adminAppearanceStudioHexRgba_(theme.overlays.selectedColor, theme.overlays.selectedOpacity),
     "--ap-unselected-overlay": adminAppearanceStudioHexRgba_(theme.overlays.unselectedColor, theme.overlays.unselectedOpacity),
-    "--ap-correct-overlay": adminAppearanceStudioHexRgba_(theme.overlays.correctColor, theme.overlays.correctOpacity),
-    "--ap-incorrect-overlay": adminAppearanceStudioHexRgba_(theme.overlays.incorrectColor, theme.overlays.incorrectOpacity),
+    "--ap-correct-overlay": theme.overlays.correctMode === "gradient" ? "linear-gradient(" + theme.overlays.correctAngle + "deg," + adminAppearanceStudioHexRgba_(theme.overlays.correctColor, theme.overlays.correctOpacity) + "," + adminAppearanceStudioHexRgba_(theme.overlays.correctColor2, theme.overlays.correctOpacity2) + ")" : adminAppearanceStudioHexRgba_(theme.overlays.correctColor, theme.overlays.correctOpacity),
+    "--ap-incorrect-overlay": theme.overlays.incorrectMode === "gradient" ? "linear-gradient(" + theme.overlays.incorrectAngle + "deg," + adminAppearanceStudioHexRgba_(theme.overlays.incorrectColor, theme.overlays.incorrectOpacity) + "," + adminAppearanceStudioHexRgba_(theme.overlays.incorrectColor2, theme.overlays.incorrectOpacity2) + ")" : adminAppearanceStudioHexRgba_(theme.overlays.incorrectColor, theme.overlays.incorrectOpacity),
     "--ap-live-overlay": adminAppearanceStudioHexRgba_(theme.overlays.liveColor, theme.overlays.liveOpacity),
     "--ap-final-overlay": adminAppearanceStudioHexRgba_(theme.overlays.finalColor, theme.overlays.finalOpacity),
     "--ap-text": theme.colors.text,
@@ -2320,6 +2352,7 @@ function adminAppearanceUpdateThemePreview_(event) {
     "--ap-image-aspect": String(theme.questions.imageAspect || "2/3").replace("/", " / "),
     "--ap-question-image-fit": theme.questions.imageFit,
     "--ap-question-image-overlay": theme.questions.imageOverlayOpacity / 100,
+    "--ap-question-image-overlay2": theme.questions.imageOverlayOpacity2 / 100,
     "--ap-wager-columns": theme.questions.wagerColumns,
     "--ap-details-bg": adminAppearanceStudioHexRgba_(theme.details.background, theme.details.opacity),
     "--ap-details-text": theme.details.text,

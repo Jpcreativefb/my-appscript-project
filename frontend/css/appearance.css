@@ -1287,3 +1287,25 @@
 @media(min-width:901px){
   .appearance-studio-controls{overflow-x:auto !important;}
 }
+
+
+/* =========================================================
+   v1.2.17v — Studio control reliability + result gradients
+========================================================= */
+/* Give Element Visibility a dedicated, always-horizontal rail. */
+.appearance-studio-visibility-panel{overflow:visible!important;min-width:0;}
+.appearance-visibility-scroll{display:block;width:100%;max-width:100%;overflow-x:scroll!important;overflow-y:hidden;padding:0 0 12px;scrollbar-gutter:stable;overscroll-behavior-x:contain;}
+.appearance-visibility-scroll::-webkit-scrollbar{height:12px;}
+.appearance-visibility-scroll::-webkit-scrollbar-track{background:rgba(148,163,184,.12);border-radius:999px;}
+.appearance-visibility-scroll::-webkit-scrollbar-thumb{background:rgba(96,165,250,.75);border:2px solid transparent;background-clip:padding-box;border-radius:999px;}
+.appearance-visibility-matrix{min-width:520px!important;width:520px!important;}
+.appearance-visibility-head,.appearance-visibility-row{grid-template-columns:170px 52px 82px 82px 82px!important;min-width:520px!important;}
+
+/* Confidence Width sizes the confidence box inside the card and cannot push it outside. */
+.appearance-theme-preview .appearance-preview-main{grid-template-columns:minmax(0,1fr) minmax(0,var(--ap-vs-width)) minmax(0,1fr) minmax(44px,min(var(--ap-confidence-width),28%))!important;min-width:0!important;}
+.appearance-theme-preview .appearance-preview-confidence{width:100%!important;max-width:100%!important;min-width:0!important;box-sizing:border-box;justify-self:stretch!important;}
+.appearance-preview-device-frame.preview-device-mobile .appearance-preview-main{grid-template-columns:minmax(0,1fr) minmax(0,var(--ap-vs-width)) minmax(0,1fr) minmax(42px,min(var(--ap-confidence-width),27%))!important;}
+
+/* Result overlay vars may now be solid colors or gradients. */
+.appearance-studio-preview-state-final-win .appearance-preview-team.selected::before{background:var(--ap-correct-overlay)!important;}
+.appearance-studio-preview-state-final-loss .appearance-preview-team.selected::before{background:var(--ap-incorrect-overlay)!important;}

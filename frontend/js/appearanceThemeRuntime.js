@@ -1,5 +1,5 @@
 /*
- * Shared Appearance Theme Runtime — v1.2.17s
+ * Shared Appearance Theme Runtime — v1.2.17v
  * Canonical theme -> CSS/class serialization used by both Appearance Studio preview
  * and the real Picks/Confidence runtime. Keeping this path shared prevents the
  * Studio and live game from drifting apart again.
@@ -154,10 +154,16 @@
     const imageZoom = confidenceThemeNumber_(images.zoom, 50, 220, 100);
     const imageX = confidenceThemeNumber_(images.x, 0, 100, 50);
     const imageY = confidenceThemeNumber_(images.y, 0, 100, 50);
-    const awayImageX = confidenceThemeNumber_(awayLayout.imageX, 0, 100, imageX);
-    const awayImageY = confidenceThemeNumber_(awayLayout.imageY, 0, 100, imageY);
-    const homeImageX = confidenceThemeNumber_(homeLayout.imageX, 0, 100, imageX);
-    const homeImageY = confidenceThemeNumber_(homeLayout.imageY, 0, 100, imageY);
+    const awayImageXRaw = confidenceThemeNumber_(awayLayout.imageX, 0, 100, 50);
+    const awayImageYRaw = confidenceThemeNumber_(awayLayout.imageY, 0, 100, 50);
+    const homeImageXRaw = confidenceThemeNumber_(homeLayout.imageX, 0, 100, 50);
+    const homeImageYRaw = confidenceThemeNumber_(homeLayout.imageY, 0, 100, 50);
+    // Global Image X/Y is the base position for both teams. Side controls are
+    // relative adjustments around 50, so the main sliders always have a visible effect.
+    const awayImageX = confidenceThemeNumber_(imageX + (awayImageXRaw - 50), 0, 100, imageX);
+    const awayImageY = confidenceThemeNumber_(imageY + (awayImageYRaw - 50), 0, 100, imageY);
+    const homeImageX = confidenceThemeNumber_(imageX + (homeImageXRaw - 50), 0, 100, imageX);
+    const homeImageY = confidenceThemeNumber_(imageY + (homeImageYRaw - 50), 0, 100, imageY);
     const awayTextOffsetX = confidenceThemeNumber_(awayLayout.textOffsetX, -40, 40, positioning.textOffsetX || 0);
     const awayTextOffsetY = confidenceThemeNumber_(awayLayout.textOffsetY, -40, 40, positioning.textOffsetY || 0);
     const homeTextOffsetX = confidenceThemeNumber_(homeLayout.textOffsetX, -40, 40, positioning.textOffsetX || 0);
@@ -245,8 +251,8 @@
       "--confidence-overlay-opacity:" + (overlayOpacity / 100),
       "--confidence-selected-overlay:" + confidenceThemeHexRgba_(overlays.selectedColor || selection.selectedTint, confidenceThemeNumber_(overlays.selectedOpacity,0,80,20), "#2563eb"),
       "--confidence-unselected-overlay:" + confidenceThemeHexRgba_(overlays.unselectedColor, confidenceThemeNumber_(overlays.unselectedOpacity,0,80,12), "#020617"),
-      "--confidence-correct-overlay:" + confidenceThemeHexRgba_(overlays.correctColor || colors.correct, confidenceThemeNumber_(overlays.correctOpacity,0,80,12), "#22c55e"),
-      "--confidence-incorrect-overlay:" + confidenceThemeHexRgba_(overlays.incorrectColor || colors.incorrect, confidenceThemeNumber_(overlays.incorrectOpacity,0,80,12), "#ef4444"),
+      "--confidence-correct-overlay:" + (confidenceThemeToken_(overlays.correctMode,["solid","gradient"],"solid") === "gradient" ? "linear-gradient(" + confidenceThemeNumber_(overlays.correctAngle,0,360,135) + "deg," + confidenceThemeHexRgba_(overlays.correctColor || colors.correct, confidenceThemeNumber_(overlays.correctOpacity,0,100,12), "#22c55e") + "," + confidenceThemeHexRgba_(overlays.correctColor2 || "#14532d", confidenceThemeNumber_(overlays.correctOpacity2,0,100,overlays.correctOpacity == null ? 12 : overlays.correctOpacity), "#14532d") + ")" : confidenceThemeHexRgba_(overlays.correctColor || colors.correct, confidenceThemeNumber_(overlays.correctOpacity,0,100,12), "#22c55e")),
+      "--confidence-incorrect-overlay:" + (confidenceThemeToken_(overlays.incorrectMode,["solid","gradient"],"solid") === "gradient" ? "linear-gradient(" + confidenceThemeNumber_(overlays.incorrectAngle,0,360,135) + "deg," + confidenceThemeHexRgba_(overlays.incorrectColor || colors.incorrect, confidenceThemeNumber_(overlays.incorrectOpacity,0,100,12), "#ef4444") + "," + confidenceThemeHexRgba_(overlays.incorrectColor2 || "#7f1d1d", confidenceThemeNumber_(overlays.incorrectOpacity2,0,100,overlays.incorrectOpacity == null ? 12 : overlays.incorrectOpacity), "#7f1d1d") + ")" : confidenceThemeHexRgba_(overlays.incorrectColor || colors.incorrect, confidenceThemeNumber_(overlays.incorrectOpacity,0,100,12), "#ef4444")),
       "--confidence-live-overlay:" + confidenceThemeHexRgba_(overlays.liveColor || colors.live, confidenceThemeNumber_(overlays.liveOpacity,0,60,0), "#ef4444"),
       "--confidence-final-overlay:" + confidenceThemeHexRgba_(overlays.finalColor || colors.final, confidenceThemeNumber_(overlays.finalOpacity,0,60,0), "#e2e8f0"),
       "--confidence-value-bg:" + confidenceThemeSafeColor_(confidence.background, "#0b1220"),
@@ -352,11 +358,12 @@
       "--picks-theme-image-x:"+confidenceThemeNumber_(q.imageX,0,100,50)+"%",
       "--picks-theme-image-y:"+confidenceThemeNumber_(q.imageY,0,100,50)+"%",
       "--picks-theme-image-opacity:"+(confidenceThemeNumber_(q.imageOpacity,0,100,100)/100),
-      "--picks-theme-image-overlay:"+(Number(q.imageOverlayOpacity||35)/100),
+      "--picks-theme-image-overlay:"+(Number(q.imageOverlayOpacity == null ? 35 : q.imageOverlayOpacity)/100),
+      "--picks-theme-image-overlay2:"+(Number(q.imageOverlayOpacity2 == null ? q.imageOverlayOpacity == null ? 0 : q.imageOverlayOpacity : q.imageOverlayOpacity2)/100),
       "--picks-theme-image-overlay-color:"+confidenceThemeSafeColor_(q.imageOverlayColor,"#000000"),
       "--picks-theme-image-overlay-color2:"+confidenceThemeSafeColor_(q.imageOverlayColor2,"#000000"),
       "--picks-theme-image-overlay-solid:"+picksAppearanceHexRgba_(q.imageOverlayColor,q.imageOverlayOpacity,"#000000"),
-      "--picks-theme-image-overlay-gradient:linear-gradient("+confidenceThemeNumber_(q.imageOverlayAngle,0,360,0)+"deg,"+picksAppearanceHexRgba_(q.imageOverlayColor,q.imageOverlayOpacity,"#000000")+","+picksAppearanceHexRgba_(q.imageOverlayColor2,q.imageOverlayOpacity,"#000000")+")",
+      "--picks-theme-image-overlay-gradient:linear-gradient("+confidenceThemeNumber_(q.imageOverlayAngle,0,360,0)+"deg,"+picksAppearanceHexRgba_(q.imageOverlayColor,q.imageOverlayOpacity,"#000000")+","+picksAppearanceHexRgba_(q.imageOverlayColor2,q.imageOverlayOpacity2 == null ? q.imageOverlayOpacity : q.imageOverlayOpacity2,"#000000")+")",
       "--picks-theme-image-overlay-angle:"+confidenceThemeNumber_(q.imageOverlayAngle,0,360,0)+"deg",
       "--picks-theme-wager-columns:"+(Number(q.wagerColumns)||2),
       "--picks-theme-details-bg:"+picksAppearanceHexRgba_(details.background,details.opacity,"#0b1220"),
