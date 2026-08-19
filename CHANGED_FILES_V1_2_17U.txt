@@ -1,0 +1,10 @@
+ADMIN_HELP_QUALITY_V1_2_17U.md
+CHANGED_FILES_V1_2_17U.txt
+frontend/js/pages/adminUi.js
+frontend/css/styles.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/index.html
+frontend/sw.js
+tests/admin_help_quality_v1217u_tests.js

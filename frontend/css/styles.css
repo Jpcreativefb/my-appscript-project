@@ -6224,3 +6224,18 @@ button.is-saving {
     flex: 0 0 auto;
   }
 }
+
+/* Shared Admin Help cleanup — v1.2.17u */
+.admin-field-label-auto-host {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.admin-help-popover > strong,
+.admin-help-popover > span {
+  display: block;
+}
+.admin-help-popover > strong + span {
+  margin-top: 2px;
+}
