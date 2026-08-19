@@ -1309,3 +1309,75 @@
 /* Result overlay vars may now be solid colors or gradients. */
 .appearance-studio-preview-state-final-win .appearance-preview-team.selected::before{background:var(--ap-correct-overlay)!important;}
 .appearance-studio-preview-state-final-loss .appearance-preview-team.selected::before{background:var(--ap-incorrect-overlay)!important;}
+
+/* =========================================================
+   v1.2.17w — clear Theme/Image Pack management
+========================================================= */
+.appearance-editor-manager {
+  display:grid;
+  gap:9px;
+  margin-bottom:12px;
+  padding:11px;
+  border:1px solid rgba(100,116,139,.24);
+  border-radius:12px;
+  background:rgba(100,116,139,.055);
+}
+.appearance-editor-manager-main {
+  display:grid;
+  grid-template-columns:minmax(210px,.85fr) minmax(240px,1.15fr);
+  gap:9px;
+}
+.appearance-editor-manager-main label,
+.appearance-technical-grid label {
+  display:grid;
+  gap:5px;
+  font-weight:750;
+}
+.appearance-editor-mode-note {
+  padding:7px 9px;
+  border-radius:8px;
+  background:rgba(37,99,235,.08);
+  font-size:.75rem;
+  line-height:1.35;
+}
+.appearance-editor-manager-actions {
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  align-items:center;
+}
+.appearance-editor-manager-actions .button {
+  min-height:32px;
+  padding:6px 10px;
+  font-size:.74rem;
+}
+.appearance-technical-details {
+  border-top:1px solid rgba(100,116,139,.18);
+  padding-top:5px;
+}
+.appearance-technical-details > summary,
+.appearance-entity-technical > summary {
+  cursor:pointer;
+  font-size:.72rem;
+  font-weight:750;
+  opacity:.78;
+}
+.appearance-technical-grid {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(160px,1fr));
+  gap:8px;
+  margin-top:8px;
+}
+.appearance-technical-grid .input[readonly] {
+  opacity:.7;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:.72rem;
+}
+.appearance-entity-technical { margin-top:2px; }
+.appearance-entity-technical small { display:block; margin-top:5px; opacity:.68; line-height:1.35; overflow-wrap:anywhere; }
+.appearance-pack-manager { margin-bottom:10px; }
+@media (max-width:760px) {
+  .appearance-editor-manager-main,
+  .appearance-technical-grid { grid-template-columns:1fr; }
+  .appearance-editor-manager-actions .button { flex:1 1 150px; }
+}

@@ -177,6 +177,18 @@ function appearanceSafeGeneratedId_(prefix, value) {
   return appearanceString_(prefix || "appearance") + "-" + (clean || String(Date.now()));
 }
 
+function appearanceUniqueGeneratedId_(sheet, idColumn, prefix, value) {
+  const base = appearanceSafeGeneratedId_(prefix, value);
+  if (!sheet || !appearanceFindRow_(sheet, { [idColumn]: base })) return base;
+  let suffix = 2;
+  let candidate = base + "-" + suffix;
+  while (appearanceFindRow_(sheet, { [idColumn]: candidate })) {
+    suffix += 1;
+    candidate = base + "-" + suffix;
+  }
+  return candidate;
+}
+
 function appearanceDriveThumbnailUrl_(fileId) {
   const id = appearanceString_(fileId);
   return id
@@ -685,7 +697,7 @@ function adminSaveAppearanceImagePack(payload) {
   appearanceSetupSystem();
   const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
   const packName = appearanceString_(payload.packName || payload.PackName);
-  const packId = appearanceString_(payload.packId || payload.PackId) || appearanceSafeGeneratedId_("img", packName);
+  const packId = appearanceString_(payload.packId || payload.PackId) || appearanceUniqueGeneratedId_(sheet, "PackId", "img", packName);
   if (!packName) throw new Error("Image pack name is required.");
   const existing = appearanceFindRow_(sheet, { PackId: packId });
   const now = new Date();
@@ -703,6 +715,61 @@ function adminSaveAppearanceImagePack(payload) {
   });
 
   return { success: true, packId: packId };
+}
+
+function adminDuplicateAppearanceImagePack(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const ss = appearanceSpreadsheet_();
+  const packSheet = ss.getSheetByName(APPEARANCE_IMAGE_PACKS_SHEET);
+  const itemSheet = ss.getSheetByName(APPEARANCE_IMAGE_ITEMS_SHEET);
+  const sourcePackId = appearanceString_(payload.sourcePackId || payload.SourcePackId || payload.packId || payload.PackId);
+  const newName = appearanceString_(payload.newPackName || payload.NewPackName || payload.packName || payload.PackName);
+  if (!sourcePackId) throw new Error("Source Image Pack is required.");
+  if (!newName) throw new Error("New Image Pack name is required.");
+
+  const packs = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, ss);
+  const source = appearanceFindById_(packs, "PackId", sourcePackId);
+  if (!source) throw new Error("Source Image Pack was not found.");
+
+  const newPackId = appearanceUniqueGeneratedId_(packSheet, "PackId", "img", newName);
+  const now = new Date();
+  appearanceUpsertObject_(packSheet, { PackId: newPackId }, {
+    PackId: newPackId,
+    PackName: newName,
+    ScopeType: appearanceString_(payload.scopeType || payload.ScopeType || source.ScopeType || "all"),
+    ScopeValue: appearanceString_(payload.scopeValue || payload.ScopeValue || source.ScopeValue),
+    Description: appearanceString_(payload.description || payload.Description || source.Description),
+    Active: true,
+    IsDefault: false,
+    CreatedAt: now,
+    UpdatedAt: now
+  });
+
+  const items = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET, ss).filter(function(row) {
+    return appearanceNormalizeId_(row.PackId) === appearanceNormalizeId_(sourcePackId) && appearanceBool_(row.Active, true);
+  });
+  items.forEach(function(row) {
+    appearanceUpsertObject_(itemSheet, {
+      PackId: newPackId,
+      EntityType: appearanceString_(row.EntityType),
+      EntityId: appearanceString_(row.EntityId),
+      Variant: appearanceString_(row.Variant || "default")
+    }, {
+      PackId: newPackId,
+      EntityType: appearanceString_(row.EntityType),
+      EntityId: appearanceString_(row.EntityId),
+      EntityName: appearanceString_(row.EntityName),
+      Variant: appearanceString_(row.Variant || "default"),
+      ImageUrl: appearanceString_(row.ImageUrl),
+      ImageFileId: appearanceString_(row.ImageFileId),
+      AltText: appearanceString_(row.AltText),
+      Active: true,
+      UpdatedAt: now
+    });
+  });
+
+  return { success: true, packId: newPackId, copiedItems: items.length, sourcePackId: sourcePackId };
 }
 
 function adminSaveAppearanceImagePackItem(payload) {
@@ -743,7 +810,7 @@ function adminSaveAppearanceThemePack(payload) {
   appearanceSetupSystem();
   const sheet = appearanceSpreadsheet_().getSheetByName(APPEARANCE_THEME_PACKS_SHEET);
   const themeName = appearanceString_(payload.themeName || payload.ThemeName);
-  const themePackId = appearanceString_(payload.themePackId || payload.ThemePackId) || appearanceSafeGeneratedId_("theme", themeName);
+  const themePackId = appearanceString_(payload.themePackId || payload.ThemePackId) || appearanceUniqueGeneratedId_(sheet, "ThemePackId", "theme", themeName);
   if (!themeName) throw new Error("Theme pack name is required.");
   const existing = appearanceFindRow_(sheet, { ThemePackId: themePackId });
   const now = new Date();
@@ -823,6 +890,10 @@ function apiAdminSaveAppearanceImagePack(payload) {
 
 function apiAdminSaveAppearanceImagePackItem(payload) {
   return adminSaveAppearanceImagePackItem(payload);
+}
+
+function apiAdminDuplicateAppearanceImagePack(payload) {
+  return adminDuplicateAppearanceImagePack(payload);
 }
 
 function apiAdminSaveAppearanceThemePack(payload) {

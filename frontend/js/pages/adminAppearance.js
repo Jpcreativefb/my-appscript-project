@@ -15,6 +15,7 @@ let ADMIN_APPEARANCE_STATE = {
   themePreviewDevice: "desktop",
   themePreviewSurface: "matchup",
   themeActionState: "",
+  packActionState: "",
   busy: false,
   message: ""
 };
@@ -328,7 +329,8 @@ function adminAppearanceEntityCard_(entity, index) {
       <div class="appearance-entity-preview">${imageHtml}<small>${adminAppearanceEscape_(resolved.source)}</small></div>
       <div class="appearance-entity-copy">
         <strong>${adminAppearanceEscape_(entity.entityName)}</strong>
-        <span>${adminAppearanceEscape_(entity.entityType)} · ${adminAppearanceEscape_(entity.entityId)}</span>
+        <span>${pack ? 'Custom image in this pack' : 'Using fallback/default image'}</span>
+        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Entity type: ${adminAppearanceEscape_(entity.entityType)}<br>Entity ID: ${adminAppearanceEscape_(entity.entityId)}</small></details>
       </div>
       <details class="appearance-entity-editor">
         <summary>Change Image</summary>
@@ -869,11 +871,24 @@ function adminAppearanceThemeEditor_() {
 
   return `
     <div class="appearance-theme-editor appearance-studio" data-theme-id="${adminAppearanceEscape_(themeId)}">
-      <div class="appearance-studio-topbar">
-        <label>Theme to edit<select class="input" onchange="adminAppearanceSelectThemeEditor_(this.value)">${adminAppearanceThemeOptions_(selectedId, false)}</select></label>
-        <label>Theme Name<input id="appearanceThemeName" class="input" value="${adminAppearanceEscape_(themeName)}" placeholder="My Theme"></label>
-        <label>Theme ID<input id="appearanceThemeId" class="input" value="${adminAppearanceEscape_(themeId)}" placeholder="auto-generated" ${row ? 'readonly' : ''}></label>
-        <label>Base Theme<select id="appearanceThemeBase" class="input">${adminAppearanceThemeOptions_(baseTheme, true)}</select></label>
+      <div class="appearance-editor-manager">
+        <div class="appearance-editor-manager-main">
+          <label>Theme to Edit<select class="input" onchange="adminAppearanceSelectThemeEditor_(this.value)">${adminAppearanceThemeOptions_(selectedId, false)}</select></label>
+          <label>Theme Name<input id="appearanceThemeName" class="input" value="${adminAppearanceEscape_(themeName)}" placeholder="My Theme"></label>
+        </div>
+        <div class="appearance-editor-mode-note">${row ? 'Editing existing theme <strong>' + adminAppearanceEscape_(themeName || themeId) + '</strong>. <b>Save Changes</b> updates only this theme; changing its name keeps the same internal ID.' : 'Creating a new theme. Its internal ID will be generated automatically when saved.'}</div>
+        <div class="appearance-editor-manager-actions">
+          <button type="button" class="button secondary" onclick="adminAppearanceDuplicateTheme_()">Duplicate Theme</button>
+          <button type="button" class="button secondary" onclick="adminAppearanceCreateBlankTheme_()">Create New Theme</button>
+        </div>
+        <details class="appearance-technical-details">
+          <summary>Advanced / Technical Details</summary>
+          <div class="appearance-technical-grid">
+            <label>Theme ID<input id="appearanceThemeId" class="input" value="${adminAppearanceEscape_(themeId)}" placeholder="Generated automatically" readonly></label>
+            <label>Base Theme<select id="appearanceThemeBase" class="input">${adminAppearanceThemeOptions_(baseTheme, true)}</select></label>
+          </div>
+          <div class="admin-sub">The Theme ID is permanent. Renaming a theme changes its display name only. Duplicate/Create New generates a separate ID.</div>
+        </details>
       </div>
       <div class="appearance-studio-presets">
         <strong>Quick Presets</strong>
@@ -1189,13 +1204,10 @@ function adminAppearanceThemeEditor_() {
       </div>
       <div class="appearance-studio-actions appearance-studio-actions-bar">
         <strong>Theme Actions</strong>
-        <button type="button" id="appearanceThemeSaveButton" class="button" onclick="adminAppearanceSaveTheme_()">${ADMIN_APPEARANCE_STATE.themeActionState === "saved" ? "Saved ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "saving" ? "Saving…" : "Save"}</button>
-        <button type="button" id="appearanceThemeApplyButton" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">${ADMIN_APPEARANCE_STATE.themeActionState === "applied" ? "Applied ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "applying" ? "Applying…" : "Apply to Game"}</button>
-        <button type="button" class="button secondary" onclick="adminAppearanceDuplicateTheme_()">Duplicate</button>
-        <button type="button" class="button secondary" onclick="adminAppearanceSaveThemeAsNew_()">Save As New</button>
-        <button type="button" class="button secondary" onclick="adminAppearanceResetTheme_()">Reset</button>
-        <button type="button" class="button secondary" onclick="adminAppearanceNewTheme_()">+ Blank</button>
-        <small>Theme changes affect appearance only. Picks, scoring, schedules and Image Packs are untouched.</small>
+        <button type="button" id="appearanceThemeSaveButton" class="button" onclick="adminAppearanceSaveTheme_()">${ADMIN_APPEARANCE_STATE.themeActionState === "saved" ? "Saved Changes ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "saving" ? "Saving…" : "Save Changes"}</button>
+        <button type="button" id="appearanceThemeApplyButton" class="button secondary" onclick="adminAppearanceApplyThemeToGame_()">${ADMIN_APPEARANCE_STATE.themeActionState === "applied" ? "Applied to Game ✓" : ADMIN_APPEARANCE_STATE.themeActionState === "applying" ? "Applying…" : "Apply Theme to Game"}</button>
+        <button type="button" class="button secondary" onclick="adminAppearanceResetTheme_()">Reset Unsaved Changes</button>
+        <small><b>Save Changes</b> edits the selected Theme Pack. <b>Apply Theme to Game</b> only assigns that saved theme to the selected game. Theme changes affect appearance only. Picks, scoring, schedules and Image Packs are untouched.</small>
       </div>
     </div>`;
 }
@@ -1302,6 +1314,43 @@ function adminAppearanceThemePreview_(theme) {
   </div>`;
 }
 
+function adminAppearanceImagePackManager_(currentPack, scope) {
+  const row = adminAppearancePackById_(currentPack);
+  const isDefault = !row || adminAppearanceKey_(currentPack) === "sports-default";
+  const packName = row ? String(row.PackName || row.PackId || "") : "Sports Default Logos";
+  const packId = row ? String(row.PackId || "") : "";
+  const scopeType = row ? String(row.ScopeType || scope.scopeType || "all") : String(scope.scopeType || "all");
+  const scopeValue = row ? String(row.ScopeValue || scope.scopeValue || "") : String(scope.scopeValue || "");
+  const description = row ? String(row.Description || "") : "";
+  const actionLabel = ADMIN_APPEARANCE_STATE.packActionState === "saved" ? "Saved Changes ✓" : ADMIN_APPEARANCE_STATE.packActionState === "saving" ? "Saving…" : "Save Changes";
+  return `
+    <div class="appearance-editor-manager appearance-pack-manager">
+      <div class="appearance-editor-manager-main">
+        <label>Image Pack to Edit<select class="input" onchange="adminAppearanceSelectImagePack_(this.value)">${adminAppearanceImagePackOptions_(currentPack)}</select></label>
+        <label>Pack Name<input id="appearancePackName" class="input" value="${adminAppearanceEscape_(packName)}" ${isDefault ? 'readonly' : ''}></label>
+      </div>
+      <div class="appearance-editor-mode-note">${isDefault
+        ? 'Using the built-in <strong>Sports Default Logos</strong>. Duplicate it to make an editable custom pack; the original default is never changed.'
+        : 'Editing existing Image Pack <strong>' + adminAppearanceEscape_(packName) + '</strong>. <b>Save Changes</b> updates this pack only; changing its name keeps the same internal ID.'}</div>
+      <div class="appearance-editor-manager-actions">
+        ${isDefault ? '' : '<button id="appearancePackSaveButton" class="button" type="button" onclick="adminAppearanceSavePackMetadata_()">' + actionLabel + '</button>'}
+        <button class="button secondary" type="button" onclick="adminAppearanceDuplicatePack_()">Duplicate Pack</button>
+        <button class="button secondary" type="button" onclick="adminAppearanceCreateBlankPack_()">Create New Pack</button>
+        <small class="appearance-manager-example">Example: NFL Helmets 2026</small>
+      </div>
+      <details class="appearance-technical-details">
+        <summary>Advanced / Technical Details</summary>
+        <div class="appearance-technical-grid">
+          <label>Pack ID<input id="appearancePackId" class="input" value="${adminAppearanceEscape_(packId)}" placeholder="Generated automatically" readonly></label>
+          <label>Scope Type<input id="appearancePackScopeType" class="input" value="${adminAppearanceEscape_(scopeType)}" ${isDefault ? 'readonly' : ''}></label>
+          <label>League / Scope<input id="appearancePackScopeValue" class="input" value="${adminAppearanceEscape_(scopeValue)}" ${isDefault ? 'readonly' : ''}></label>
+          <label>Description<input id="appearancePackDescription" class="input" value="${adminAppearanceEscape_(description)}" ${isDefault ? 'readonly' : ''} placeholder="Optional description"></label>
+        </div>
+        <div class="admin-sub">The Pack ID is permanent. Renaming a pack changes its display name only. Duplicate/Create New generates a separate ID.</div>
+      </details>
+    </div>`;
+}
+
 function adminAppearanceBuildHtml_() {
   const dashboard = ADMIN_APPEARANCE_STATE.dashboard || {};
   const assignment = adminAppearanceAssignment_();
@@ -1327,23 +1376,15 @@ function adminAppearanceBuildHtml_() {
           <label>Image Pack<select id="appearanceGameImagePack" class="input">${adminAppearanceImagePackOptions_(assignment.ImagePackId || currentPack)}</select></label>
           <label>Theme Pack<select id="appearanceGameThemePack" class="input">${adminAppearanceThemeOptions_(assignment.ThemePackId || currentTheme, false)}</select></label>
         </div>
-        <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Save Game Appearance</button></div>
-        <div class="admin-sub">Image priority: Game override → Image Pack → existing game image. Changing appearance never rebuilds questions or schedules.</div>
+        <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Apply Selected Packs to Game</button></div>
+        <div class="admin-sub">This section assigns packs to the selected game; it does not edit the Theme Pack or Image Pack itself. Image priority: Game override → Image Pack → existing game image.</div>
       </section>
 
       <details class="card admin-collapsible-card appearance-pack-card" open>
         <summary><strong>Image Packs</strong><span>Reusable image sets + individual game overrides</span></summary>
         <div class="appearance-card-body">
-          <div class="appearance-pack-toolbar">
-            <label>Pack to edit<select class="input" onchange="adminAppearanceSelectImagePack_(this.value)">${adminAppearanceImagePackOptions_(currentPack)}</select></label>
-            <div class="appearance-new-pack">
-              <input id="appearanceNewPackName" class="input" placeholder="New pack name — e.g. NFL Helmets 2026">
-              <input id="appearanceNewPackScopeType" class="input" value="${adminAppearanceEscape_(scope.scopeType)}" placeholder="Scope type">
-              <input id="appearanceNewPackScopeValue" class="input" value="${adminAppearanceEscape_(scope.scopeValue)}" placeholder="League / scope (optional)">
-              <button class="button secondary" onclick="adminAppearanceCreatePack_()">+ Create Image Pack</button>
-            </div>
-          </div>
-          <div class="admin-sub">${entities.length} unique ${entities.length === 1 ? 'entity' : 'entities'} found in this game. Team/nominee IDs are reused by packs wherever the same IDs appear.</div>
+          ${adminAppearanceImagePackManager_(currentPack, scope)}
+          <div class="admin-sub">${entities.length} unique ${entities.length === 1 ? 'entity' : 'entities'} found in this game. Open <b>Advanced / Technical</b> only when you need IDs or source details.</div>
           <div class="appearance-entity-list">
             ${entities.length ? entities.map(adminAppearanceEntityCard_).join('') : '<div class="admin-sub">No nominees/teams were found in this game.</div>'}
           </div>
@@ -1385,6 +1426,7 @@ async function adminAppearanceSelectGame_(gameId) {
 
 function adminAppearanceSelectImagePack_(packId) {
   ADMIN_APPEARANCE_STATE.selectedImagePackId = String(packId || "");
+  ADMIN_APPEARANCE_STATE.packActionState = "";
   ADMIN_APPEARANCE_STATE.message = "";
   adminAppearancePaint_();
 }
@@ -1392,12 +1434,7 @@ function adminAppearanceSelectImagePack_(packId) {
 function adminAppearanceSelectThemeEditor_(themeId) {
   ADMIN_APPEARANCE_STATE.selectedThemePackId = String(themeId || "");
   ADMIN_APPEARANCE_STATE.themeNewMode = false;
-  adminAppearancePaint_();
-}
-
-function adminAppearanceNewTheme_() {
-  ADMIN_APPEARANCE_STATE.themeNewMode = true;
-  ADMIN_APPEARANCE_STATE.message = "Creating a new Theme Pack. Give it a name and save it.";
+  ADMIN_APPEARANCE_STATE.message = "";
   adminAppearancePaint_();
 }
 
@@ -1413,24 +1450,90 @@ async function adminAppearanceSaveGameAssignment_() {
     active: true
   });
   if (!result || result.success === false) {
-    ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not save game appearance.";
+    ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not apply game appearance.";
     adminAppearancePaint_();
     return;
   }
-  await adminAppearanceRefresh_("Game appearance saved. Player pages will use it on their next refresh.");
+  await adminAppearanceRefresh_("Selected Theme Pack and Image Pack were applied to this game.");
 }
 
-async function adminAppearanceCreatePack_() {
-  const name = String(document.getElementById("appearanceNewPackName") && document.getElementById("appearanceNewPackName").value || "").trim();
-  if (!name) {
-    ADMIN_APPEARANCE_STATE.message = "Enter an Image Pack name first.";
+async function adminAppearanceSavePackMetadata_() {
+  const row = adminAppearancePackById_(ADMIN_APPEARANCE_STATE.selectedImagePackId);
+  if (!row || adminAppearanceKey_(row.PackId) === "sports-default") {
+    ADMIN_APPEARANCE_STATE.message = "Duplicate the default pack before editing it.";
     adminAppearancePaint_();
     return;
   }
+  const name = String(document.getElementById("appearancePackName") && document.getElementById("appearancePackName").value || "").trim();
+  const scopeType = String(document.getElementById("appearancePackScopeType") && document.getElementById("appearancePackScopeType").value || row.ScopeType || "all");
+  const scopeValue = String(document.getElementById("appearancePackScopeValue") && document.getElementById("appearancePackScopeValue").value || row.ScopeValue || "");
+  const description = String(document.getElementById("appearancePackDescription") && document.getElementById("appearancePackDescription").value || row.Description || "");
+  if (!name) {
+    ADMIN_APPEARANCE_STATE.message = "Enter an Image Pack name.";
+    adminAppearancePaint_();
+    return;
+  }
+  ADMIN_APPEARANCE_STATE.packActionState = "saving";
+  adminAppearancePaint_();
   const result = await apiAdminSaveAppearanceImagePack({
+    packId: row.PackId,
     packName: name,
-    scopeType: document.getElementById("appearanceNewPackScopeType").value || "all",
-    scopeValue: document.getElementById("appearanceNewPackScopeValue").value || "",
+    scopeType: scopeType,
+    scopeValue: scopeValue,
+    description: description,
+    active: true
+  });
+  if (!result || result.success === false) {
+    ADMIN_APPEARANCE_STATE.packActionState = "";
+    ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not save Image Pack changes.";
+    adminAppearancePaint_();
+    return;
+  }
+  ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || row.PackId;
+  ADMIN_APPEARANCE_STATE.packActionState = "saved";
+  await adminAppearanceRefresh_("Image Pack saved. Existing pack ID was preserved.");
+  ADMIN_APPEARANCE_STATE.packActionState = "saved";
+  setTimeout(function() {
+    ADMIN_APPEARANCE_STATE.packActionState = "";
+    const button = document.getElementById("appearancePackSaveButton");
+    if (button) button.textContent = "Save Changes";
+  }, 1800);
+}
+
+async function adminAppearanceDuplicatePack_() {
+  const sourceId = ADMIN_APPEARANCE_STATE.selectedImagePackId || "sports-default";
+  const source = adminAppearancePackById_(sourceId);
+  const sourceName = String(source && source.PackName || "Sports Default Logos").trim();
+  const newName = window.prompt("Name for the duplicated Image Pack. The original will not be changed.", sourceName + " Copy");
+  if (newName == null) return;
+  const cleanName = String(newName || "").trim();
+  if (!cleanName) {
+    ADMIN_APPEARANCE_STATE.message = "Duplicate cancelled: enter a name for the new Image Pack.";
+    adminAppearancePaint_();
+    return;
+  }
+  ADMIN_APPEARANCE_STATE.message = "Duplicating Image Pack…";
+  adminAppearancePaint_();
+  const result = await apiAdminDuplicateAppearanceImagePack({ sourcePackId: sourceId, newPackName: cleanName });
+  if (!result || result.success === false) {
+    ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not duplicate Image Pack.";
+    adminAppearancePaint_();
+    return;
+  }
+  ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || "";
+  await adminAppearanceRefresh_("Created \"" + cleanName + "\" with " + Number(result.copiedItems || 0) + " copied image mappings. Original pack was not changed.");
+}
+
+async function adminAppearanceCreateBlankPack_() {
+  const inferred = adminAppearanceInferScope_();
+  const newName = window.prompt("Name for the new blank Image Pack.", "New Image Pack");
+  if (newName == null) return;
+  const cleanName = String(newName || "").trim();
+  if (!cleanName) return;
+  const result = await apiAdminSaveAppearanceImagePack({
+    packName: cleanName,
+    scopeType: inferred.scopeType || "all",
+    scopeValue: inferred.scopeValue || "",
     active: true
   });
   if (!result || result.success === false) {
@@ -1439,9 +1542,7 @@ async function adminAppearanceCreatePack_() {
     return;
   }
   ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || "";
-  await adminAppearanceRefresh_("Image Pack created. Add images below, then assign it to a game.");
-  ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || "";
-  adminAppearancePaint_();
+  await adminAppearanceRefresh_("Created new blank Image Pack \"" + cleanName + "\". Its internal ID was generated automatically.");
 }
 
 function adminAppearanceEntityAt_(index) {
@@ -2539,16 +2640,37 @@ async function adminAppearanceSaveTheme_() {
   adminAppearanceClearThemeActionStateLater_();
 }
 
-async function adminAppearanceSaveThemeAsNew_() {
-  const name = String(document.getElementById("appearanceThemeName") && document.getElementById("appearanceThemeName").value || "").trim();
-  const nextName = name ? name + " Copy" : "New Theme";
-  await adminAppearancePersistTheme_({ newTheme: true, name: nextName, message: "Saved as a new Theme Pack." });
-}
-
 async function adminAppearanceDuplicateTheme_() {
   const row = adminAppearanceThemeById_(ADMIN_APPEARANCE_STATE.selectedThemePackId);
   const baseName = String(row && row.ThemeName || document.getElementById("appearanceThemeName") && document.getElementById("appearanceThemeName").value || "Theme").trim();
-  await adminAppearancePersistTheme_({ newTheme: true, name: baseName + " Copy", message: "Theme duplicated. You can keep editing the copy." });
+  const newName = window.prompt("Name for the duplicated Theme Pack. The original will not be changed.", baseName + " Copy");
+  if (newName == null) return;
+  const cleanName = String(newName || "").trim();
+  if (!cleanName) return;
+  const saved = await adminAppearancePersistTheme_({ newTheme: true, name: cleanName, message: "Created \"" + cleanName + "\". Original theme was not changed." });
+  if (saved) ADMIN_APPEARANCE_STATE.message = "Created \"" + cleanName + "\". Original theme was not changed.";
+}
+
+async function adminAppearanceCreateBlankTheme_() {
+  const newName = window.prompt("Name for the new Theme Pack.", "New Theme");
+  if (newName == null) return;
+  const cleanName = String(newName || "").trim();
+  if (!cleanName) return;
+  const blankTheme = adminAppearanceStudioDefaults_({});
+  const result = await apiAdminSaveAppearanceThemePack({
+    themeName: cleanName,
+    baseThemeId: "app-default",
+    theme: blankTheme,
+    active: true
+  });
+  if (!result || result.success === false) {
+    ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not create Theme Pack.";
+    adminAppearancePaint_();
+    return;
+  }
+  ADMIN_APPEARANCE_STATE.selectedThemePackId = result.themePackId || "";
+  ADMIN_APPEARANCE_STATE.themeNewMode = false;
+  await adminAppearanceRefresh_("Created new Theme Pack \"" + cleanName + "\". Its internal ID was generated automatically.");
 }
 
 async function adminAppearanceApplyThemeToGame_() {
@@ -2587,3 +2709,8 @@ function adminAppearanceResetTheme_() {
   adminAppearancePaint_();
 }
 
+
+// v1.2.17w compatibility aliases retained for older admin regression contracts.
+function adminAppearanceCreatePack_() { return adminAppearanceCreateBlankPack_(); }
+function adminAppearanceNewTheme_() { return adminAppearanceCreateBlankTheme_(); }
+function adminAppearanceSaveThemeAsNew_() { return adminAppearanceDuplicateTheme_(); }

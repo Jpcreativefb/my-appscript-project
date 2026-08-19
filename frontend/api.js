@@ -1717,6 +1717,10 @@ async function apiAdminSaveAppearanceImagePackItem(payload) {
   return api("adminSaveAppearanceImagePackItem", apiAppearanceDirectPayload_(payload));
 }
 
+async function apiAdminDuplicateAppearanceImagePack(payload) {
+  return api("adminDuplicateAppearanceImagePack", apiAppearanceDirectPayload_(payload));
+}
+
 async function apiAdminSaveAppearanceThemePack(payload) {
   return api("adminSaveAppearanceThemePack", apiAppearanceDirectPayload_(payload));
 }

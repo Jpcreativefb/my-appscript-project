@@ -1,0 +1,11 @@
+backend/Api.js
+backend/engines/AppearanceEngine.js
+frontend/api.js
+frontend/js/api.js
+frontend/js/pages/adminAppearance.js
+frontend/css/appearance.css
+frontend/js/pwa.js
+frontend/sw.js
+tests/appearance_pack_management_v1217w_tests.js
+APPEARANCE_PACK_MANAGEMENT_V1_2_17W.md
+CHANGED_FILES_V1_2_17W.txt
