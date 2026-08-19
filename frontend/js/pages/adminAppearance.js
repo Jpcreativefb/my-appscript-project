@@ -16,6 +16,7 @@ let ADMIN_APPEARANCE_STATE = {
   themePreviewSurface: "matchup",
   themeActionState: "",
   packActionState: "",
+  pendingGameImagePackId: "",
   busy: false,
   message: ""
 };
@@ -265,10 +266,20 @@ function adminAppearanceGameOptions_() {
 function adminAppearanceImagePackOptions_(selectedId) {
   const rows = adminAppearanceActiveRows_(ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.imagePacks);
   const options = ['<option value=""' + (!selectedId ? ' selected' : '') + '>Use existing / default images</option>'];
+  let selectedFound = !selectedId;
   rows.forEach(function(row) {
     const selected = adminAppearanceKey_(row.PackId) === adminAppearanceKey_(selectedId) ? " selected" : "";
+    if (selected) selectedFound = true;
     options.push('<option value="' + adminAppearanceEscape_(row.PackId) + '"' + selected + '>' + adminAppearanceEscape_(row.PackName || row.PackId) + '</option>');
   });
+  // Defensive fallback: a freshly created pack is adopted locally before the
+  // follow-up dashboard read completes. Never let that pack disappear from a
+  // selector during the confirmation round-trip.
+  if (selectedId && !selectedFound) {
+    const pending = ADMIN_APPEARANCE_STATE.pendingImagePackRow || {};
+    const label = String(pending.PackName || pending.packName || selectedId);
+    options.push('<option value="' + adminAppearanceEscape_(selectedId) + '" selected>' + adminAppearanceEscape_(label) + ' · newly created</option>');
+  }
   return options.join("");
 }
 
@@ -1397,11 +1408,12 @@ function adminAppearanceBuildHtml_() {
         <h2>Game Appearance</h2>
         <div class="appearance-assignment-grid">
           <label>Game<select id="appearanceGameSelect" class="input" onchange="adminAppearanceSelectGame_(this.value)">${adminAppearanceGameOptions_()}</select></label>
-          <label>Image Pack<select id="appearanceGameImagePack" class="input">${adminAppearanceImagePackOptions_(assignment.ImagePackId || currentPack)}</select></label>
+          <label>Image Pack<select id="appearanceGameImagePack" class="input">${adminAppearanceImagePackOptions_(ADMIN_APPEARANCE_STATE.pendingGameImagePackId || assignment.ImagePackId || currentPack)}</select></label>
           <label>Theme Pack<select id="appearanceGameThemePack" class="input">${adminAppearanceThemeOptions_(assignment.ThemePackId || currentTheme, false)}</select></label>
         </div>
         <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Apply Selected Packs to Game</button></div>
         <div class="admin-sub">This section assigns packs to the selected game; it does not edit the Theme Pack or Image Pack itself. Image priority: Game override → Image Pack → existing game image.</div>
+        ${ADMIN_APPEARANCE_STATE.pendingGameImagePackId ? '<div class="appearance-pack-pending-note">New Image Pack is selected here but <b>has not been applied to the game yet</b>. Click <b>Apply Selected Packs to Game</b> when you are ready.</div>' : ''}
       </section>
 
       <details class="card admin-collapsible-card appearance-pack-card" open>
@@ -1449,7 +1461,11 @@ async function adminAppearanceSelectGame_(gameId) {
 }
 
 function adminAppearanceSelectImagePack_(packId) {
-  ADMIN_APPEARANCE_STATE.selectedImagePackId = String(packId || "");
+  const id = String(packId || "");
+  ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
+  if (adminAppearanceKey_(id) !== adminAppearanceKey_(ADMIN_APPEARANCE_STATE.pendingGameImagePackId)) {
+    ADMIN_APPEARANCE_STATE.pendingImagePackRow = null;
+  }
   ADMIN_APPEARANCE_STATE.packActionState = "";
   ADMIN_APPEARANCE_STATE.message = "";
   adminAppearancePaint_();
@@ -1478,6 +1494,8 @@ async function adminAppearanceSaveGameAssignment_() {
     adminAppearancePaint_();
     return;
   }
+  ADMIN_APPEARANCE_STATE.pendingGameImagePackId = "";
+  ADMIN_APPEARANCE_STATE.pendingImagePackRow = null;
   await adminAppearanceRefresh_("Selected Theme Pack and Image Pack were applied to this game.");
 }
 
@@ -1524,7 +1542,7 @@ async function adminAppearanceSavePackMetadata_() {
   }, 1800);
 }
 
-function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedItems) {
+function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedItems, savedPackRow) {
   const id = String(packId || "").trim();
   if (!id) return;
   const dashboard = ADMIN_APPEARANCE_STATE.dashboard || {};
@@ -1535,8 +1553,9 @@ function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedI
 
   const nextPack = {
     ...source,
+    ...(savedPackRow || {}),
     PackId: id,
-    PackName: String(packName || id),
+    PackName: String((savedPackRow && savedPackRow.PackName) || packName || id),
     IsDefault: false,
     Active: true
   };
@@ -1557,6 +1576,8 @@ function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedI
 
   ADMIN_APPEARANCE_STATE.dashboard = dashboard;
   ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
+  ADMIN_APPEARANCE_STATE.pendingGameImagePackId = id;
+  ADMIN_APPEARANCE_STATE.pendingImagePackRow = nextPack;
   ADMIN_APPEARANCE_STATE.packActionState = "";
   ADMIN_APPEARANCE_STATE.message = 'Created \"' + String(packName || id) + '\"' +
     (copiedItems != null ? " with " + Number(copiedItems || 0) + " copied image mappings." : ".") +
@@ -1566,21 +1587,35 @@ function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedI
 
 async function adminAppearanceSyncSelectedPack_(packId, fallbackMessage) {
   const id = String(packId || "").trim();
-  if (!id) return;
-  try {
-    const dashboard = await apiAdminGetAppearanceDashboard(ADMIN_APPEARANCE_STATE.selectedGameId, true);
-    if (!dashboard || dashboard.success === false) return;
-    const exists = (dashboard.imagePacks || []).some(function(row) {
-      return adminAppearanceKey_(row && row.PackId) === adminAppearanceKey_(id);
-    });
-    if (!exists) return;
-    ADMIN_APPEARANCE_STATE.dashboard = dashboard;
-    ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
-    if (fallbackMessage) ADMIN_APPEARANCE_STATE.message = fallbackMessage;
-    adminAppearancePaint_();
-  } catch (err) {
-    // Keep the locally adopted pack visible/editable if the refresh is delayed.
+  if (!id) return false;
+
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      const dashboard = await apiAdminGetAppearanceDashboard(ADMIN_APPEARANCE_STATE.selectedGameId, true);
+      if (dashboard && dashboard.success !== false) {
+        const pack = (dashboard.imagePacks || []).find(function(row) {
+          return adminAppearanceKey_(row && row.PackId) === adminAppearanceKey_(id);
+        });
+        if (pack) {
+          ADMIN_APPEARANCE_STATE.dashboard = dashboard;
+          ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
+          ADMIN_APPEARANCE_STATE.pendingGameImagePackId = id;
+          ADMIN_APPEARANCE_STATE.pendingImagePackRow = pack;
+          if (fallbackMessage) ADMIN_APPEARANCE_STATE.message = fallbackMessage;
+          adminAppearancePaint_();
+          return true;
+        }
+      }
+    } catch (err) {
+      // Retry below; keep the locally adopted pack visible in the meantime.
+    }
+    if (attempt < 3) await new Promise(function(resolve) { setTimeout(resolve, 250 * (attempt + 1)); });
   }
+
+  ADMIN_APPEARANCE_STATE.message = (fallbackMessage ? fallbackMessage + " " : "") +
+    "The pack is visible locally, but the server list has not confirmed it yet. Refresh Appearance Manager before adding images.";
+  adminAppearancePaint_();
+  return false;
 }
 
 async function adminAppearanceDuplicatePack_() {
@@ -1604,7 +1639,7 @@ async function adminAppearanceDuplicatePack_() {
     return;
   }
   const newPackId = String(result.packId || "").trim();
-  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, sourceId, result.copiedItems);
+  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, sourceId, result.copiedItems, result.pack || null);
   await adminAppearanceSyncSelectedPack_(newPackId,
     'Created \"' + cleanName + '\" with ' + Number(result.copiedItems || 0) + ' copied image mappings. It is selected and ready to edit.');
 }
@@ -1627,7 +1662,7 @@ async function adminAppearanceCreateBlankPack_() {
     return;
   }
   const newPackId = String(result.packId || "").trim();
-  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, "", null);
+  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, "", null, result.pack || null);
   await adminAppearanceSyncSelectedPack_(newPackId,
     "Created new blank Image Pack \"" + cleanName + "\". It is selected and ready to edit.");
 }

@@ -718,7 +718,14 @@ function adminSaveAppearanceImagePack(payload) {
     UpdatedAt: now
   });
 
-  return { success: true, packId: packId };
+  SpreadsheetApp.flush();
+  const savedPack = appearanceFindById_(appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, appearanceSpreadsheet_()), "PackId", packId) || {
+    PackId: packId,
+    PackName: packName,
+    Active: true,
+    IsDefault: false
+  };
+  return { success: true, packId: packId, pack: savedPack };
 }
 
 function adminDuplicateAppearanceImagePack(payload) {
@@ -775,7 +782,14 @@ function adminDuplicateAppearanceImagePack(payload) {
     });
   });
 
-  return { success: true, packId: newPackId, copiedItems: items.length, sourcePackId: sourcePackId };
+  SpreadsheetApp.flush();
+  const savedPack = appearanceFindById_(appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, ss), "PackId", newPackId) || {
+    PackId: newPackId,
+    PackName: newName,
+    Active: true,
+    IsDefault: false
+  };
+  return { success: true, packId: newPackId, copiedItems: items.length, sourcePackId: sourcePackId, pack: savedPack };
 }
 
 function adminSaveAppearanceImagePackItem(payload) {
