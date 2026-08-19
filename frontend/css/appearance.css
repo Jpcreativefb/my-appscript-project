@@ -1381,3 +1381,46 @@
   .appearance-technical-grid { grid-template-columns:1fr; }
   .appearance-editor-manager-actions .button { flex:1 1 150px; }
 }
+
+
+/* v1.2.17x — compact pack actions + clear image source workflow */
+.appearance-manager-page .button {
+  min-height:26px;
+  padding:4px 8px;
+  border-radius:7px;
+  font-size:.68rem;
+  line-height:1.08;
+}
+.appearance-manager-page .appearance-page-heading .button { min-height:27px; padding:4px 8px; }
+.appearance-editor-manager-actions { gap:5px; }
+.appearance-editor-manager-actions .button,
+.appearance-studio-actions-bar .button,
+.appearance-studio-presets .button,
+.appearance-manager-page .admin-actions .button {
+  width:auto;
+  min-height:25px;
+  padding:4px 7px;
+  font-size:.66rem;
+  border-radius:6px;
+}
+.appearance-studio-actions-bar { gap:5px; padding:6px 7px; }
+.appearance-manager-example { font-size:.62rem; }
+.appearance-hidden-file {
+  position:absolute !important;
+  width:1px !important;
+  height:1px !important;
+  opacity:0 !important;
+  pointer-events:none !important;
+  overflow:hidden !important;
+}
+.appearance-media-url-label { display:grid; gap:4px; margin-top:7px; font-size:.72rem; font-weight:700; }
+.appearance-media-actions { display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; }
+.appearance-media-actions .admin-small-button { min-height:25px; padding:4px 7px; font-size:.65rem; }
+.appearance-media-help { display:block; margin-top:6px; color:var(--muted,#64748b); font-size:.64rem; line-height:1.25; }
+.appearance-source-row { display:flex; flex-wrap:wrap; gap:4px; margin-top:5px; }
+.appearance-source-chip { display:inline-flex; align-items:center; padding:2px 6px; border:1px solid rgba(148,163,184,.35); border-radius:999px; font-size:.6rem; line-height:1.2; color:var(--muted,#64748b); background:rgba(148,163,184,.08); }
+@media (max-width:760px) {
+  .appearance-manager-page .button { min-height:29px; font-size:.7rem; }
+  .appearance-editor-manager-actions .button { flex:0 1 auto; min-width:0; }
+  .appearance-media-actions .admin-small-button { flex:1 1 116px; }
+}

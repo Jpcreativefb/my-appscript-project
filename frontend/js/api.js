@@ -1690,8 +1690,10 @@ async function apiAdminSetupAppearanceSystem() {
   return api("adminSetupAppearanceSystem", { singleStep: "true" });
 }
 
-async function apiAdminGetAppearanceDashboard(gameId) {
-  return api("adminGetAppearanceDashboard", { gameId: gameId || "" });
+async function apiAdminGetAppearanceDashboard(gameId, forceFresh) {
+  const payload = { gameId: gameId || "" };
+  if (forceFresh) payload._fresh = String(Date.now());
+  return api("adminGetAppearanceDashboard", payload);
 }
 
 function apiAppearanceDirectPayload_(payload) {

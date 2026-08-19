@@ -301,16 +301,29 @@ function adminAppearanceGameOverride_(entity) {
   }) || null;
 }
 
+function adminAppearanceSourceLabel_(row, prefix) {
+  row = row || {};
+  const raw = adminAppearanceKey_(row.SourceType || row.sourceType || "");
+  let label = "";
+  if (raw === "drive-upload") label = "Drive Upload";
+  else if (raw === "drive-import") label = "Drive Import";
+  else if (raw === "external-url") label = "External URL";
+  else if (String(row.ImageFileId || "").trim()) label = "Drive Image";
+  else if (String(row.ImageUrl || "").trim()) label = "External URL";
+  else label = "Default";
+  return prefix ? prefix + " · " + label : label;
+}
+
 function adminAppearanceResolvedPreview_(entity) {
   const override = adminAppearanceGameOverride_(entity);
   if (override) {
     const url = String(override.ImageUrl || "").trim() || adminAppearanceDriveUrl_(override.ImageFileId, "w360");
-    if (url) return { url: url, source: "Game override" };
+    if (url) return { url: url, source: adminAppearanceSourceLabel_(override, "Game override") };
   }
   const item = adminAppearanceSelectedPackItem_(entity);
   if (item) {
     const url = String(item.ImageUrl || "").trim() || adminAppearanceDriveUrl_(item.ImageFileId, "w360");
-    if (url) return { url: url, source: "Image pack" };
+    if (url) return { url: url, source: adminAppearanceSourceLabel_(item, "Image pack") };
   }
   return { url: entity.defaultImageUrl || "", source: "Existing game image" };
 }
@@ -323,6 +336,8 @@ function adminAppearanceEntityCard_(entity, index) {
   const imageHtml = resolved.url
     ? '<img id="appearanceEntityPreview_' + index + '" src="' + adminAppearanceEscape_(resolved.url) + '" alt="' + adminAppearanceEscape_(entity.entityName) + '">'
     : '<div id="appearanceEntityPreview_' + index + '" class="appearance-image-empty">No image</div>';
+  const packSource = pack ? adminAppearanceSourceLabel_(pack, "") : "Default";
+  const overrideSource = override ? adminAppearanceSourceLabel_(override, "") : "None";
 
   return `
     <div class="appearance-entity-card">
@@ -330,7 +345,8 @@ function adminAppearanceEntityCard_(entity, index) {
       <div class="appearance-entity-copy">
         <strong>${adminAppearanceEscape_(entity.entityName)}</strong>
         <span>${pack ? 'Custom image in this pack' : 'Using fallback/default image'}</span>
-        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Entity type: ${adminAppearanceEscape_(entity.entityType)}<br>Entity ID: ${adminAppearanceEscape_(entity.entityId)}</small></details>
+        <div class="appearance-source-row"><span class="appearance-source-chip">Pack: ${adminAppearanceEscape_(packSource)}</span><span class="appearance-source-chip">Game: ${adminAppearanceEscape_(overrideSource)}</span></div>
+        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Entity type: ${adminAppearanceEscape_(entity.entityType)}<br>Entity ID: ${adminAppearanceEscape_(entity.entityId)}${pack && pack.SourceUrl ? '<br>Pack source URL: ' + adminAppearanceEscape_(pack.SourceUrl) : ''}${override && override.SourceUrl ? '<br>Override source URL: ' + adminAppearanceEscape_(override.SourceUrl) : ''}</small></details>
       </div>
       <details class="appearance-entity-editor">
         <summary>Change Image</summary>
@@ -339,25 +355,33 @@ function adminAppearanceEntityCard_(entity, index) {
             <b>Image Pack Image</b>
             <small>Reusable anywhere this same entity ID appears with this Image Pack.</small>
             ${disabledPack ? '<div class="admin-sub">Create/select a custom Image Pack to edit pack artwork.</div>' : `
-              <input id="appearancePackUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(pack && pack.ImageUrl || "")}" placeholder="https://…">
-              <input id="appearancePackFile_${index}" class="input" type="file" accept="image/*">
-              <div class="admin-actions compact">
-                <button class="admin-small-button" type="button" onclick="adminAppearanceSavePackImage_(${index})">Save URL</button>
-                <button id="appearancePackUpload_${index}" class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadPackImage_(${index})">Upload</button>
+              <label class="appearance-media-url-label">External image URL<input id="appearancePackUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(pack && pack.SourceType === 'external-url' ? pack.ImageUrl : pack && pack.SourceUrl || pack && !pack.ImageFileId ? pack.ImageUrl : '')}" placeholder="https://…"></label>
+              <input id="appearancePackFile_${index}" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadPackImage_(${index}, 'appearancePackFile_${index}')">
+              <input id="appearancePackCamera_${index}" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadPackImage_(${index}, 'appearancePackCamera_${index}')">
+              <div class="appearance-media-actions">
+                <button class="admin-small-button" type="button" onclick="adminAppearanceSavePackImage_(${index})">Use External URL</button>
+                <button class="admin-small-button secondary" type="button" onclick="adminAppearanceImportPackUrl_(${index})">Import URL to Drive</button>
+                <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearancePackFile_${index}')">Choose Photo</button>
+                <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearancePackCamera_${index}')">Take Photo</button>
                 <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearPackImage_(${index})">Use Default</button>
               </div>
+              <small class="appearance-media-help">External URL stays on the source website. Import/Choose/Take saves a copy in the Awards App Google Drive image folder.</small>
               <small id="appearancePackStatus_${index}" class="appearance-upload-status"></small>`}
           </div>
           <div>
             <b>This Game Only</b>
             <small>Overrides the selected Image Pack only for this game.</small>
-            <input id="appearanceOverrideUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(override && override.ImageUrl || "")}" placeholder="https://…">
-            <input id="appearanceOverrideFile_${index}" class="input" type="file" accept="image/*">
-            <div class="admin-actions compact">
-              <button class="admin-small-button" type="button" onclick="adminAppearanceSaveOverride_(${index})">Save Override</button>
-              <button id="appearanceOverrideUpload_${index}" class="admin-small-button secondary" type="button" onclick="adminAppearanceUploadOverride_(${index})">Upload</button>
+            <label class="appearance-media-url-label">External image URL<input id="appearanceOverrideUrl_${index}" class="input" type="url" value="${adminAppearanceEscape_(override && override.SourceType === 'external-url' ? override.ImageUrl : override && override.SourceUrl || override && !override.ImageFileId ? override.ImageUrl : '')}" placeholder="https://…"></label>
+            <input id="appearanceOverrideFile_${index}" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadOverride_(${index}, 'appearanceOverrideFile_${index}')">
+            <input id="appearanceOverrideCamera_${index}" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadOverride_(${index}, 'appearanceOverrideCamera_${index}')">
+            <div class="appearance-media-actions">
+              <button class="admin-small-button" type="button" onclick="adminAppearanceSaveOverride_(${index})">Use External URL</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceImportOverrideUrl_(${index})">Import URL to Drive</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceOverrideFile_${index}')">Choose Photo</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceOverrideCamera_${index}')">Take Photo</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearOverride_(${index})">Clear Override</button>
             </div>
+            <small class="appearance-media-help">Use a URL temporarily, or import/upload/capture it to keep a Drive-owned copy.</small>
             <small id="appearanceOverrideStatus_${index}" class="appearance-upload-status"></small>
           </div>
         </div>
@@ -1500,6 +1524,65 @@ async function adminAppearanceSavePackMetadata_() {
   }, 1800);
 }
 
+function adminAppearanceAdoptNewPackLocally_(packId, packName, sourceId, copiedItems) {
+  const id = String(packId || "").trim();
+  if (!id) return;
+  const dashboard = ADMIN_APPEARANCE_STATE.dashboard || {};
+  const packs = Array.isArray(dashboard.imagePacks) ? dashboard.imagePacks.slice() : [];
+  const items = Array.isArray(dashboard.imagePackItems) ? dashboard.imagePackItems.slice() : [];
+  const source = adminAppearancePackById_(sourceId) || {};
+  const sourceKey = adminAppearanceKey_(sourceId);
+
+  const nextPack = {
+    ...source,
+    PackId: id,
+    PackName: String(packName || id),
+    IsDefault: false,
+    Active: true
+  };
+  dashboard.imagePacks = packs.filter(function(row) {
+    return adminAppearanceKey_(row && row.PackId) !== adminAppearanceKey_(id);
+  }).concat([nextPack]);
+
+  if (sourceKey) {
+    const cloned = items.filter(function(row) {
+      return adminAppearanceKey_(row && row.PackId) === sourceKey;
+    }).map(function(row) {
+      return { ...row, PackId: id, Active: true };
+    });
+    dashboard.imagePackItems = items.filter(function(row) {
+      return adminAppearanceKey_(row && row.PackId) !== adminAppearanceKey_(id);
+    }).concat(cloned);
+  }
+
+  ADMIN_APPEARANCE_STATE.dashboard = dashboard;
+  ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
+  ADMIN_APPEARANCE_STATE.packActionState = "";
+  ADMIN_APPEARANCE_STATE.message = 'Created \"' + String(packName || id) + '\"' +
+    (copiedItems != null ? " with " + Number(copiedItems || 0) + " copied image mappings." : ".") +
+    " It is now open for editing; Original pack was not changed.";
+  adminAppearancePaint_();
+}
+
+async function adminAppearanceSyncSelectedPack_(packId, fallbackMessage) {
+  const id = String(packId || "").trim();
+  if (!id) return;
+  try {
+    const dashboard = await apiAdminGetAppearanceDashboard(ADMIN_APPEARANCE_STATE.selectedGameId, true);
+    if (!dashboard || dashboard.success === false) return;
+    const exists = (dashboard.imagePacks || []).some(function(row) {
+      return adminAppearanceKey_(row && row.PackId) === adminAppearanceKey_(id);
+    });
+    if (!exists) return;
+    ADMIN_APPEARANCE_STATE.dashboard = dashboard;
+    ADMIN_APPEARANCE_STATE.selectedImagePackId = id;
+    if (fallbackMessage) ADMIN_APPEARANCE_STATE.message = fallbackMessage;
+    adminAppearancePaint_();
+  } catch (err) {
+    // Keep the locally adopted pack visible/editable if the refresh is delayed.
+  }
+}
+
 async function adminAppearanceDuplicatePack_() {
   const sourceId = ADMIN_APPEARANCE_STATE.selectedImagePackId || "sports-default";
   const source = adminAppearancePackById_(sourceId);
@@ -1520,8 +1603,10 @@ async function adminAppearanceDuplicatePack_() {
     adminAppearancePaint_();
     return;
   }
-  ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || "";
-  await adminAppearanceRefresh_("Created \"" + cleanName + "\" with " + Number(result.copiedItems || 0) + " copied image mappings. Original pack was not changed.");
+  const newPackId = String(result.packId || "").trim();
+  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, sourceId, result.copiedItems);
+  await adminAppearanceSyncSelectedPack_(newPackId,
+    'Created \"' + cleanName + '\" with ' + Number(result.copiedItems || 0) + ' copied image mappings. It is selected and ready to edit.');
 }
 
 async function adminAppearanceCreateBlankPack_() {
@@ -1541,8 +1626,10 @@ async function adminAppearanceCreateBlankPack_() {
     adminAppearancePaint_();
     return;
   }
-  ADMIN_APPEARANCE_STATE.selectedImagePackId = result.packId || "";
-  await adminAppearanceRefresh_("Created new blank Image Pack \"" + cleanName + "\". Its internal ID was generated automatically.");
+  const newPackId = String(result.packId || "").trim();
+  adminAppearanceAdoptNewPackLocally_(newPackId, cleanName, "", null);
+  await adminAppearanceSyncSelectedPack_(newPackId,
+    "Created new blank Image Pack \"" + cleanName + "\". It is selected and ready to edit.");
 }
 
 function adminAppearanceEntityAt_(index) {
@@ -1676,18 +1763,31 @@ async function adminAppearanceReloadDashboardOnly_(message) {
   adminAppearancePaint_();
 }
 
+function adminAppearanceChooseMedia_(inputId) {
+  const input = document.getElementById(String(inputId || ""));
+  if (input) input.click();
+}
+
 async function adminAppearanceSavePackImage_(index) {
   const entity = adminAppearanceEntityAt_(index);
   if (!entity || !ADMIN_APPEARANCE_STATE.selectedImagePackId) return;
   const input = document.getElementById("appearancePackUrl_" + index);
+  const url = input ? input.value.trim() : "";
+  if (!url) {
+    ADMIN_APPEARANCE_STATE.message = "Paste an external image URL first.";
+    adminAppearancePaint_();
+    return;
+  }
   const result = await apiAdminSaveAppearanceImagePackItem({
     packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     entityName: entity.entityName,
     variant: "default",
-    imageUrl: input ? input.value.trim() : "",
+    imageUrl: url,
     imageFileId: "",
+    sourceType: "external-url",
+    sourceUrl: url,
     altText: entity.entityName,
     active: true
   });
@@ -1696,12 +1796,53 @@ async function adminAppearanceSavePackImage_(index) {
     adminAppearancePaint_();
     return;
   }
-  await adminAppearanceRefresh_(entity.entityName + " pack image saved.");
+  await adminAppearanceReloadDashboardOnly_(entity.entityName + " is using an External URL. The source website still owns that image.");
 }
 
-async function adminAppearanceUploadPackImage_(index) {
+async function adminAppearanceImportPackUrl_(index) {
   const entity = adminAppearanceEntityAt_(index);
-  const input = document.getElementById("appearancePackFile_" + index);
+  const input = document.getElementById("appearancePackUrl_" + index);
+  const url = input ? input.value.trim() : "";
+  if (!entity || !ADMIN_APPEARANCE_STATE.selectedImagePackId || !url) {
+    ADMIN_APPEARANCE_STATE.message = "Paste an image URL to import first.";
+    adminAppearancePaint_();
+    return;
+  }
+  adminAppearanceUploadStatus_(index, "pack", "Importing URL to Drive…", true);
+  try {
+    const upload = await apiAdminImportImageFromUrl({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      categoryId: "appearance-pack-" + ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      nomineeId: entity.entityId,
+      imageUrl: url
+    });
+    if (!upload || upload.success === false) throw new Error(upload && (upload.message || upload.error) || "Image import failed.");
+    const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
+    adminAppearancePreviewUpload_(index, previewUrl);
+    const save = await apiAdminSaveAppearanceImagePackItem({
+      packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      entityName: entity.entityName,
+      variant: "default",
+      imageUrl: upload.thumbnailUrl || "",
+      imageFileId: upload.fileId || "",
+      sourceType: "drive-import",
+      sourceUrl: url,
+      altText: entity.entityName,
+      active: true
+    });
+    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image imported but pack assignment could not be saved.");
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " imported to Drive and saved to the Image Pack.");
+  } catch (err) {
+    adminAppearanceUploadStatus_(index, "pack", err.message || "Import failed.", false);
+    ADMIN_APPEARANCE_STATE.message = err.message || "Image import failed.";
+  }
+}
+
+async function adminAppearanceUploadPackImage_(index, inputId) {
+  const entity = adminAppearanceEntityAt_(index);
+  const input = document.getElementById(inputId || ("appearancePackFile_" + index));
   const file = input && input.files && input.files[0];
   if (!entity || !file || !ADMIN_APPEARANCE_STATE.selectedImagePackId) {
     ADMIN_APPEARANCE_STATE.message = "Choose an image file first.";
@@ -1738,6 +1879,8 @@ async function adminAppearanceUploadPackImage_(index) {
       variant: "default",
       imageUrl: upload.thumbnailUrl || "",
       imageFileId: upload.fileId || "",
+      sourceType: "drive-upload",
+      sourceUrl: "",
       altText: entity.entityName,
       active: true
     });
@@ -1753,8 +1896,7 @@ async function adminAppearanceUploadPackImage_(index) {
     adminAppearanceUploadStatus_(index, "pack", err.message || "Upload failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
   } finally {
-    const button = document.getElementById("appearancePackUpload_" + index);
-    if (button) button.disabled = false;
+    if (input) input.value = "";
   }
 }
 
@@ -1769,6 +1911,8 @@ async function adminAppearanceClearPackImage_(index) {
     variant: "default",
     imageUrl: "",
     imageFileId: "",
+    sourceType: "",
+    sourceUrl: "",
     active: false
   });
   await adminAppearanceRefresh_(entity.entityName + " reset to its existing/default image.");
@@ -1777,13 +1921,21 @@ async function adminAppearanceClearPackImage_(index) {
 async function adminAppearanceSaveOverride_(index) {
   const entity = adminAppearanceEntityAt_(index);
   const input = document.getElementById("appearanceOverrideUrl_" + index);
+  const url = input ? input.value.trim() : "";
   if (!entity) return;
+  if (!url) {
+    ADMIN_APPEARANCE_STATE.message = "Paste an external image URL first.";
+    adminAppearancePaint_();
+    return;
+  }
   const result = await apiAdminSaveAppearanceOverride({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
     entityType: entity.entityType,
     entityId: entity.entityId,
-    imageUrl: input ? input.value.trim() : "",
+    imageUrl: url,
     imageFileId: "",
+    sourceType: "external-url",
+    sourceUrl: url,
     active: true
   });
   if (!result || result.success === false) {
@@ -1791,12 +1943,50 @@ async function adminAppearanceSaveOverride_(index) {
     adminAppearancePaint_();
     return;
   }
-  await adminAppearanceRefresh_(entity.entityName + " game-only image override saved.");
+  await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image is using an External URL.");
 }
 
-async function adminAppearanceUploadOverride_(index) {
+async function adminAppearanceImportOverrideUrl_(index) {
   const entity = adminAppearanceEntityAt_(index);
-  const input = document.getElementById("appearanceOverrideFile_" + index);
+  const input = document.getElementById("appearanceOverrideUrl_" + index);
+  const url = input ? input.value.trim() : "";
+  if (!entity || !url) {
+    ADMIN_APPEARANCE_STATE.message = "Paste an image URL to import first.";
+    adminAppearancePaint_();
+    return;
+  }
+  adminAppearanceUploadStatus_(index, "override", "Importing URL to Drive…", true);
+  try {
+    const upload = await apiAdminImportImageFromUrl({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      categoryId: "appearance-override",
+      nomineeId: entity.entityId,
+      imageUrl: url
+    });
+    if (!upload || upload.success === false) throw new Error(upload && (upload.message || upload.error) || "Image import failed.");
+    const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
+    adminAppearancePreviewUpload_(index, previewUrl);
+    const save = await apiAdminSaveAppearanceOverride({
+      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      entityType: entity.entityType,
+      entityId: entity.entityId,
+      imageUrl: upload.thumbnailUrl || "",
+      imageFileId: upload.fileId || "",
+      sourceType: "drive-import",
+      sourceUrl: url,
+      active: true
+    });
+    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image imported but game override could not be saved.");
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image imported to Drive.");
+  } catch (err) {
+    adminAppearanceUploadStatus_(index, "override", err.message || "Import failed.", false);
+    ADMIN_APPEARANCE_STATE.message = err.message || "Image import failed.";
+  }
+}
+
+async function adminAppearanceUploadOverride_(index, inputId) {
+  const entity = adminAppearanceEntityAt_(index);
+  const input = document.getElementById(inputId || ("appearanceOverrideFile_" + index));
   const file = input && input.files && input.files[0];
   if (!entity || !file) {
     ADMIN_APPEARANCE_STATE.message = "Choose an image file first.";
@@ -1831,6 +2021,8 @@ async function adminAppearanceUploadOverride_(index) {
       entityId: entity.entityId,
       imageUrl: upload.thumbnailUrl || "",
       imageFileId: upload.fileId || "",
+      sourceType: "drive-upload",
+      sourceUrl: "",
       active: true
     });
     if (!save || save.success === false) {
@@ -1843,8 +2035,7 @@ async function adminAppearanceUploadOverride_(index) {
     adminAppearanceUploadStatus_(index, "override", err.message || "Upload failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
   } finally {
-    const button = document.getElementById("appearanceOverrideUpload_" + index);
-    if (button) button.disabled = false;
+    if (input) input.value = "";
   }
 }
 
@@ -1857,6 +2048,8 @@ async function adminAppearanceClearOverride_(index) {
     entityId: entity.entityId,
     imageUrl: "",
     imageFileId: "",
+    sourceType: "",
+    sourceUrl: "",
     active: false
   });
   await adminAppearanceRefresh_(entity.entityName + " game-only override cleared.");

@@ -56,6 +56,8 @@ const APPEARANCE_IMAGE_ITEM_HEADERS = [
   "Variant",
   "ImageUrl",
   "ImageFileId",
+  "SourceType",
+  "SourceUrl",
   "AltText",
   "Active",
   "UpdatedAt"
@@ -90,6 +92,8 @@ const APPEARANCE_OVERRIDE_HEADERS = [
   "EntityId",
   "ImageUrl",
   "ImageFileId",
+  "SourceType",
+  "SourceUrl",
   "ThemeOverrideJSON",
   "Active",
   "UpdatedAt"
@@ -763,6 +767,8 @@ function adminDuplicateAppearanceImagePack(payload) {
       Variant: appearanceString_(row.Variant || "default"),
       ImageUrl: appearanceString_(row.ImageUrl),
       ImageFileId: appearanceString_(row.ImageFileId),
+      SourceType: appearanceString_(row.SourceType),
+      SourceUrl: appearanceString_(row.SourceUrl),
       AltText: appearanceString_(row.AltText),
       Active: true,
       UpdatedAt: now
@@ -797,6 +803,8 @@ function adminSaveAppearanceImagePackItem(payload) {
     Variant: variant,
     ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
     ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    SourceType: appearanceString_(payload.sourceType || payload.SourceType),
+    SourceUrl: appearanceString_(payload.sourceUrl || payload.SourceUrl),
     AltText: appearanceString_(payload.altText || payload.AltText),
     Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
     UpdatedAt: new Date()
@@ -868,6 +876,8 @@ function adminSaveAppearanceOverride(payload) {
     EntityId: entityId,
     ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
     ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    SourceType: appearanceString_(payload.sourceType || payload.SourceType),
+    SourceUrl: appearanceString_(payload.sourceUrl || payload.SourceUrl),
     ThemeOverrideJSON: appearanceJsonString_(payload.themeOverride || payload.themeOverrideJSON || payload.ThemeOverrideJSON),
     Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
     UpdatedAt: new Date()
