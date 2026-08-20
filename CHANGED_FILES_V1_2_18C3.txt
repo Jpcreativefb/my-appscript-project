@@ -1,0 +1,11 @@
+frontend/js/pages/adminAppearance.js
+frontend/css/appearance.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/index.html
+frontend/js/pwa.js
+frontend/sw.js
+tests/hub_appearance_feedback_v1218c3_tests.js
+HOME_HUB_APPEARANCE_FEEDBACK_V1_2_18C3.md
+CHANGED_FILES_V1_2_18C3.txt

@@ -169,27 +169,46 @@ function adminAppearanceHubManager_() {
   const iconPreview = iconUrl
     ? '<img src="' + adminAppearanceEscape_(iconUrl) + '" alt="Hub icon">'
     : '<span>' + adminAppearanceEscape_(row.IconText || "★") + '</span>';
+  const previewName = String(row.DisplayName || row.HubGroup || adminAppearanceHubGroupLabel_(row) || "Hub");
+  const imageSourceLabel = adminAppearanceHubSourceLabel_(row.ImageSourceType, !!imageUrl);
+  const iconSourceLabel = adminAppearanceHubSourceLabel_(row.IconSourceType, !!iconUrl);
 
   return `
     <details class="card admin-collapsible-card appearance-hub-editor" open>
       <summary><strong>Hub + Navigation Appearance</strong><span>Gradients, hub artwork, league/show logos and bottom-nav icons</span></summary>
       <div class="appearance-card-body">
         <div class="admin-sub">Pick a main hub or one of its subhubs. Every image area can use a web image directly, import that web image into your Google Drive, choose a photo/file, or take a photo. Main hub icon changes also feed the phone bottom navigation.</div>
+
+        <div class="appearance-hub-live-preview" id="appearanceHubLivePreview">
+          <div class="appearance-hub-live-fill" id="appearanceHubLiveFill" style="background:${adminAppearanceEscape_(previewBackground)}"></div>
+          ${imageUrl ? '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" src="' + adminAppearanceEscape_(imageUrl) + '" alt="Hub preview">' : '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" alt="Hub preview" hidden>'}
+          <div class="appearance-hub-live-shade"></div>
+          <div class="appearance-hub-live-content">
+            <div class="appearance-hub-live-icon" id="appearanceHubLiveIcon">${iconPreview}</div>
+            <div class="appearance-hub-live-copy">
+              <small>LIVE PREVIEW</small>
+              <strong id="appearanceHubLiveName">${adminAppearanceEscape_(previewName)}</strong>
+              <span id="appearanceHubLiveMeta">${adminAppearanceEscape_(colorMode === "gradient" ? "Gradient " + gradientAngle + "°" : "Solid " + color)}</span>
+            </div>
+          </div>
+          <span class="appearance-hub-save-state is-saved" id="appearanceHubSaveState">✓ Saved</span>
+        </div>
+
         <div class="appearance-hub-editor-grid">
           <label>Area to Edit
             <select id="appearanceHubSettingSelect" class="input" onchange="adminAppearanceSelectHubSetting_(this.value)">${adminAppearanceHubOptions_()}</select>
           </label>
           <label>Display Name
-            <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}">
+            <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}" oninput="adminAppearanceMarkHubDirty_();adminAppearanceUpdateHubLivePreview_()">
           </label>
           <label>Color Style
-            <select id="appearanceHubColorMode" class="input" onchange="adminAppearancePreviewHubColor_()">
+            <select id="appearanceHubColorMode" class="input" onchange="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubColor_()">
               <option value="solid" ${colorMode === "solid" ? "selected" : ""}>Solid</option>
               <option value="gradient" ${colorMode === "gradient" ? "selected" : ""}>Gradient</option>
             </select>
           </label>
           <label>Fallback Icon / Emoji
-            <input id="appearanceHubIconText" class="input" maxlength="8" value="${adminAppearanceEscape_(row.IconText || "")}" placeholder="🏈">
+            <input id="appearanceHubIconText" class="input" maxlength="8" value="${adminAppearanceEscape_(row.IconText || "")}" placeholder="🏈" oninput="adminAppearanceMarkHubDirty_();adminAppearanceUpdateHubLivePreview_()">
           </label>
         </div>
 
@@ -204,7 +223,7 @@ function adminAppearanceHubManager_() {
             <div class="appearance-hub-color-row"><input id="appearanceHubGradientEnd" type="color" value="${adminAppearanceEscape_(gradientEnd)}" oninput="adminAppearanceSyncHubGradientPicker_('end',this.value)"><input id="appearanceHubGradientEndText" class="input" value="${adminAppearanceEscape_(gradientEnd)}" oninput="adminAppearanceSyncHubGradientText_('end',this.value)"></div>
           </label>
           <label>Gradient Angle
-            <div class="appearance-hub-angle-row"><input id="appearanceHubGradientAngle" type="range" min="0" max="360" step="1" value="${gradientAngle}" oninput="adminAppearancePreviewHubColor_()"><output id="appearanceHubGradientAngleValue">${gradientAngle}°</output></div>
+            <div class="appearance-hub-angle-row"><input id="appearanceHubGradientAngle" type="range" min="0" max="360" step="1" value="${gradientAngle}" oninput="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubColor_()"><output id="appearanceHubGradientAngleValue">${gradientAngle}°</output></div>
           </label>
         </div>
 
@@ -213,8 +232,9 @@ function adminAppearanceHubManager_() {
         <div class="appearance-hub-media-grid">
           <div class="appearance-hub-media-card">
             <strong>Hub / League Image</strong>
-            <div class="appearance-hub-image-preview" style="background:${adminAppearanceEscape_(previewBackground)}">${imagePreview}</div>
-            <label class="appearance-hub-url-label">Web Image URL<input id="appearanceHubImageUrlInput" class="input" value="${adminAppearanceEscape_(row.ImageSourceUrl || (row.ImageSourceType === "external-url" ? row.ImageUrl : "") || "")}" placeholder="https://example.com/image.jpg"></label>
+            <div class="appearance-hub-image-preview" id="appearanceHubImagePreview" style="background:${adminAppearanceEscape_(previewBackground)}">${imagePreview}</div>
+            <div class="appearance-hub-asset-state is-saved" id="appearanceHubImageState">✓ Saved · ${adminAppearanceEscape_(imageSourceLabel)}</div>
+            <label class="appearance-hub-url-label">Web Image URL<input id="appearanceHubImageUrlInput" class="input" value="${adminAppearanceEscape_(row.ImageSourceUrl || (row.ImageSourceType === "external-url" ? row.ImageUrl : "") || "")}" placeholder="https://example.com/image.jpg" oninput="adminAppearancePreviewHubUrl_('image',this.value)"></label>
             <input id="appearanceHubImageFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageFile')">
             <input id="appearanceHubImageCamera" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageCamera')">
             <div class="appearance-compact-action-row appearance-hub-media-actions">
@@ -227,8 +247,9 @@ function adminAppearanceHubManager_() {
           </div>
           <div class="appearance-hub-media-card">
             <strong>Hub / Bottom Nav Icon</strong>
-            <div class="appearance-hub-icon-preview">${iconPreview}</div>
-            <label class="appearance-hub-url-label">Web Icon URL<input id="appearanceHubIconUrlInput" class="input" value="${adminAppearanceEscape_(row.IconSourceUrl || (row.IconSourceType === "external-url" ? row.IconUrl : "") || "")}" placeholder="https://example.com/icon.png"></label>
+            <div class="appearance-hub-icon-preview" id="appearanceHubIconPreview">${iconPreview}</div>
+            <div class="appearance-hub-asset-state is-saved" id="appearanceHubIconState">✓ Saved · ${adminAppearanceEscape_(iconSourceLabel)}</div>
+            <label class="appearance-hub-url-label">Web Icon URL<input id="appearanceHubIconUrlInput" class="input" value="${adminAppearanceEscape_(row.IconSourceUrl || (row.IconSourceType === "external-url" ? row.IconUrl : "") || "")}" placeholder="https://example.com/icon.png" oninput="adminAppearancePreviewHubUrl_('icon',this.value)"></label>
             <input id="appearanceHubIconFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('icon', 'appearanceHubIconFile')">
             <input id="appearanceHubIconCamera" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadHubAsset_('icon', 'appearanceHubIconCamera')">
             <div class="appearance-compact-action-row appearance-hub-media-actions">
@@ -241,11 +262,119 @@ function adminAppearanceHubManager_() {
           </div>
         </div>
 
-        ${topNav ? `<label class="appearance-hub-label-toggle"><input id="appearanceHubShowNavLabel" type="checkbox" ${adminAppearanceBool_(row.ShowNavLabel, true) ? 'checked' : ''}><span>Show the name under this icon in the bottom navigation</span></label>` : ''}
+        ${topNav ? `<label class="appearance-hub-label-toggle"><input id="appearanceHubShowNavLabel" type="checkbox" ${adminAppearanceBool_(row.ShowNavLabel, true) ? 'checked' : ''} onchange="adminAppearanceMarkHubDirty_()"><span>Show the name under this icon in the bottom navigation</span></label>` : ''}
         <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Setting ID: ${adminAppearanceEscape_(row.SettingKey || "")}<br>Hub: ${adminAppearanceEscape_(row.HubCategory || "")}${row.HubGroup ? '<br>Subhub: ' + adminAppearanceEscape_(row.HubGroup) : ''}<br>Image source: ${adminAppearanceEscape_(row.ImageSourceType || "default")}<br>Icon source: ${adminAppearanceEscape_(row.IconSourceType || "default")}</small></details>
-        <div class="admin-actions appearance-compact-actions"><button class="admin-small-button" type="button" onclick="adminAppearanceSaveHubSetting_()">Save Hub Appearance</button></div>
+        <div class="admin-actions appearance-compact-actions"><button class="admin-small-button" id="appearanceHubSaveButton" type="button" onclick="adminAppearanceSaveHubSetting_()">Save Changes</button></div>
       </div>
     </details>`;
+}
+
+function adminAppearanceHubSourceLabel_(sourceType, hasAsset) {
+  const type = String(sourceType || "").toLowerCase();
+  if (type === "drive-upload") return "Google Drive upload";
+  if (type === "drive-import") return "Google Drive import";
+  if (type === "external-url") return "External web URL";
+  return hasAsset ? "Saved image" : "Default / fallback";
+}
+
+function adminAppearanceSetHubStatus_(message, state) {
+  const el = document.getElementById("appearanceHubSaveState");
+  if (!el) return;
+  const mode = state || "dirty";
+  el.className = "appearance-hub-save-state is-" + mode;
+  el.textContent = String(message || "");
+}
+
+function adminAppearanceSetHubAssetState_(kind, message, state) {
+  const el = document.getElementById(kind === "icon" ? "appearanceHubIconState" : "appearanceHubImageState");
+  if (!el) return;
+  const mode = state || "dirty";
+  el.className = "appearance-hub-asset-state is-" + mode;
+  el.textContent = String(message || "");
+}
+
+function adminAppearanceMarkHubDirty_() {
+  adminAppearanceSetHubStatus_("Unsaved changes", "dirty");
+}
+
+function adminAppearanceUpdateHubLivePreview_() {
+  const name = document.getElementById("appearanceHubLiveName");
+  const display = document.getElementById("appearanceHubDisplayName");
+  if (name && display) name.textContent = String(display.value || "Hub").trim() || "Hub";
+
+  const iconHost = document.getElementById("appearanceHubLiveIcon");
+  const iconPreview = document.getElementById("appearanceHubIconPreview");
+  if (iconHost && iconPreview) iconHost.innerHTML = iconPreview.innerHTML;
+
+  const mode = String(document.getElementById("appearanceHubColorMode") && document.getElementById("appearanceHubColorMode").value || "solid");
+  const solid = adminAppearanceValidHubHex_(document.getElementById("appearanceHubColorText") && document.getElementById("appearanceHubColorText").value, "#354785");
+  const start = adminAppearanceValidHubHex_(document.getElementById("appearanceHubGradientStartText") && document.getElementById("appearanceHubGradientStartText").value, solid);
+  const end = adminAppearanceValidHubHex_(document.getElementById("appearanceHubGradientEndText") && document.getElementById("appearanceHubGradientEndText").value, solid);
+  const angle = Math.max(0, Math.min(360, Number(document.getElementById("appearanceHubGradientAngle") && document.getElementById("appearanceHubGradientAngle").value) || 135));
+  const meta = document.getElementById("appearanceHubLiveMeta");
+  if (meta) meta.textContent = mode === "gradient" ? "Gradient " + angle + "° · " + start + " → " + end : "Solid · " + solid;
+}
+
+function adminAppearanceSetHubAssetPreview_(kind, url) {
+  const isIcon = kind === "icon";
+  const preview = document.getElementById(isIcon ? "appearanceHubIconPreview" : "appearanceHubImagePreview");
+  const liveImage = document.getElementById("appearanceHubLiveImage");
+  const value = String(url || "").trim();
+
+  if (preview) {
+    preview.innerHTML = "";
+    if (value) {
+      const img = document.createElement("img");
+      img.src = value;
+      img.alt = isIcon ? "Hub icon preview" : "Hub image preview";
+      preview.appendChild(img);
+    } else if (isIcon) {
+      const span = document.createElement("span");
+      const iconText = document.getElementById("appearanceHubIconText");
+      span.textContent = String(iconText && iconText.value || "★");
+      preview.appendChild(span);
+    } else {
+      const span = document.createElement("span");
+      span.className = "appearance-hub-preview-fallback";
+      span.textContent = "No hub image";
+      preview.appendChild(span);
+    }
+  }
+
+  if (!isIcon && liveImage) {
+    if (value) {
+      liveImage.src = value;
+      liveImage.hidden = false;
+    } else {
+      liveImage.removeAttribute("src");
+      liveImage.hidden = true;
+    }
+  }
+  adminAppearanceUpdateHubLivePreview_();
+}
+
+function adminAppearancePreviewHubUrl_(kind, value) {
+  const url = String(value || "").trim();
+  if (!url) return;
+  if (!/^https?:\/\//i.test(url)) return;
+  adminAppearanceSetHubAssetPreview_(kind, url);
+  adminAppearanceSetHubAssetState_(kind, "Preview only · choose Use Web URL or Import to Drive to save", "dirty");
+  adminAppearanceSetHubStatus_("Image preview is not saved yet", "dirty");
+}
+
+function adminAppearancePreviewHubLocalFile_(kind, file) {
+  if (!file || typeof FileReader === "undefined") return;
+  const reader = new FileReader();
+  reader.onload = function() {
+    adminAppearanceSetHubAssetPreview_(kind, String(reader.result || ""));
+  };
+  reader.readAsDataURL(file);
+}
+
+function adminAppearanceUpdateLocalHubRow_(savedSetting) {
+  if (!savedSetting) return;
+  const current = adminAppearanceHubRow_();
+  if (current) Object.assign(current, savedSetting);
 }
 
 function adminAppearanceSelectHubSetting_(settingKey) {
@@ -263,18 +392,21 @@ function adminAppearanceSyncHubColor_(value) {
   const picker = document.getElementById("appearanceHubColor");
   const text = String(value || "").trim();
   if (picker && /^#[0-9a-f]{6}$/i.test(text)) picker.value = text;
+  adminAppearanceMarkHubDirty_();
   adminAppearancePreviewHubColor_();
 }
 
 function adminAppearanceSyncHubColorPicker_(value) {
   const text = document.getElementById("appearanceHubColorText");
   if (text) text.value = String(value || "");
+  adminAppearanceMarkHubDirty_();
   adminAppearancePreviewHubColor_();
 }
 
 function adminAppearanceSyncHubGradientPicker_(which, value) {
   const text = document.getElementById(which === "end" ? "appearanceHubGradientEndText" : "appearanceHubGradientStartText");
   if (text) text.value = String(value || "");
+  adminAppearanceMarkHubDirty_();
   adminAppearancePreviewHubColor_();
 }
 
@@ -282,6 +414,7 @@ function adminAppearanceSyncHubGradientText_(which, value) {
   const picker = document.getElementById(which === "end" ? "appearanceHubGradientEnd" : "appearanceHubGradientStart");
   const text = String(value || "").trim();
   if (picker && /^#[0-9a-f]{6}$/i.test(text)) picker.value = text;
+  adminAppearanceMarkHubDirty_();
   adminAppearancePreviewHubColor_();
 }
 
@@ -299,6 +432,9 @@ function adminAppearancePreviewHubColor_() {
   const background = mode === "gradient" ? "linear-gradient(" + angle + "deg," + start + "," + end + ")" : solid;
   if (preview) preview.style.background = background;
   if (imagePreview && !imagePreview.querySelector("img")) imagePreview.style.background = background;
+  const liveFill = document.getElementById("appearanceHubLiveFill");
+  if (liveFill) liveFill.style.background = background;
+  adminAppearanceUpdateHubLivePreview_();
 }
 
 function adminAppearanceCollectHubSetting_() {
@@ -338,14 +474,22 @@ function adminAppearanceCollectHubSetting_() {
 }
 
 async function adminAppearanceSaveHubSetting_() {
+  const button = document.getElementById("appearanceHubSaveButton");
   try {
     const payload = adminAppearanceCollectHubSetting_();
+    adminAppearanceSetHubStatus_("Saving…", "loading");
+    if (button) { button.disabled = true; button.textContent = "Saving…"; }
     const result = await apiAdminSaveAppearanceHubSetting(payload);
     if (!result || result.success === false) throw new Error(result && (result.message || result.error) || "Could not save hub appearance.");
-    await adminAppearanceRefresh_((payload.displayName || "Hub") + " appearance saved.");
+    adminAppearanceUpdateLocalHubRow_(result.setting || payload);
+    adminAppearanceSetHubStatus_("✓ Saved", "saved");
+    if (button) button.textContent = "Saved ✓";
+    window.setTimeout(function() { if (button) button.textContent = "Save Changes"; }, 1400);
   } catch (err) {
+    adminAppearanceSetHubStatus_("Save failed", "error");
     ADMIN_APPEARANCE_STATE.message = err.message || String(err);
-    adminAppearancePaint_();
+  } finally {
+    if (button) button.disabled = false;
   }
 }
 
@@ -353,15 +497,15 @@ async function adminAppearanceUseHubAssetUrl_(kind, importToDrive) {
   const input = document.getElementById(kind === "icon" ? "appearanceHubIconUrlInput" : "appearanceHubImageUrlInput");
   const url = String(input && input.value || "").trim();
   if (!/^https?:\/\//i.test(url)) {
-    ADMIN_APPEARANCE_STATE.message = "Enter a full http:// or https:// image URL first.";
-    adminAppearancePaint_();
+    adminAppearanceSetHubAssetState_(kind, "Enter a full http:// or https:// image URL first", "error");
     return;
   }
   const payload = adminAppearanceCollectHubSetting_();
   const current = adminAppearanceHubRow_() || {};
   try {
-    ADMIN_APPEARANCE_STATE.message = importToDrive ? "Importing web image to Google Drive…" : "Saving external web image…";
-    adminAppearancePaint_();
+    adminAppearanceSetHubAssetPreview_(kind, url);
+    adminAppearanceSetHubAssetState_(kind, importToDrive ? "Importing to Google Drive…" : "Saving external URL…", "loading");
+    adminAppearanceSetHubStatus_("Saving image…", "loading");
     let savedUrl = url;
     let fileId = "";
     let sourceType = "external-url";
@@ -390,10 +534,13 @@ async function adminAppearanceUseHubAssetUrl_(kind, importToDrive) {
     }
     const save = await apiAdminSaveAppearanceHubSetting(payload);
     if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image was prepared but could not be assigned to the hub.");
-    await adminAppearanceRefresh_((payload.displayName || "Hub") + (importToDrive ? " web image imported to Drive." : " external web image saved."));
+    adminAppearanceUpdateLocalHubRow_(save.setting || payload);
+    adminAppearanceSetHubAssetPreview_(kind, savedUrl);
+    adminAppearanceSetHubAssetState_(kind, importToDrive ? "✓ Saved to Google Drive" : "✓ External URL saved", "saved");
+    adminAppearanceSetHubStatus_("✓ Saved", "saved");
   } catch (err) {
-    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
-    adminAppearancePaint_();
+    adminAppearanceSetHubAssetState_(kind, "Save failed · " + (err.message || String(err)), "error");
+    adminAppearanceSetHubStatus_("Save failed", "error");
   }
 }
 
@@ -403,8 +550,9 @@ async function adminAppearanceUploadHubAsset_(kind, inputId) {
   if (!file) return;
   const formPayload = adminAppearanceCollectHubSetting_();
   try {
-    ADMIN_APPEARANCE_STATE.message = kind === "icon" ? "Uploading hub icon to Google Drive…" : "Uploading hub image to Google Drive…";
-    adminAppearancePaint_();
+    adminAppearancePreviewHubLocalFile_(kind, file);
+    adminAppearanceSetHubAssetState_(kind, "Uploading to Google Drive…", "loading");
+    adminAppearanceSetHubStatus_("Uploading image…", "loading");
     const prepared = await adminAppearancePrepareUpload_(file);
     const current = adminAppearanceHubRow_() || {};
     const upload = await apiAdminUploadImage({
@@ -431,10 +579,13 @@ async function adminAppearanceUploadHubAsset_(kind, inputId) {
     }
     const save = await apiAdminSaveAppearanceHubSetting(payload);
     if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Hub asset uploaded but could not be assigned.");
-    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon saved to Drive." : " image saved to Drive."));
+    adminAppearanceUpdateLocalHubRow_(save.setting || payload);
+    adminAppearanceSetHubAssetPreview_(kind, url);
+    adminAppearanceSetHubAssetState_(kind, "✓ Uploaded + saved to Google Drive", "saved");
+    adminAppearanceSetHubStatus_("✓ Saved", "saved");
   } catch (err) {
-    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
-    adminAppearancePaint_();
+    adminAppearanceSetHubAssetState_(kind, "Upload failed · " + (err.message || String(err)), "error");
+    adminAppearanceSetHubStatus_("Upload failed", "error");
   } finally {
     if (input) input.value = "";
   }
@@ -443,6 +594,7 @@ async function adminAppearanceUploadHubAsset_(kind, inputId) {
 async function adminAppearanceClearHubAsset_(kind) {
   try {
     const payload = adminAppearanceCollectHubSetting_();
+    adminAppearanceSetHubAssetState_(kind, "Saving fallback…", "loading");
     if (kind === "icon") {
       payload.iconUrl = "";
       payload.iconFileId = "";
@@ -456,10 +608,13 @@ async function adminAppearanceClearHubAsset_(kind) {
     }
     const save = await apiAdminSaveAppearanceHubSetting(payload);
     if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Could not clear hub asset.");
-    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon reset to fallback." : " image cleared."));
+    adminAppearanceUpdateLocalHubRow_(save.setting || payload);
+    adminAppearanceSetHubAssetPreview_(kind, "");
+    adminAppearanceSetHubAssetState_(kind, kind === "icon" ? "✓ Fallback icon saved" : "✓ Image cleared", "saved");
+    adminAppearanceSetHubStatus_("✓ Saved", "saved");
   } catch (err) {
-    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
-    adminAppearancePaint_();
+    adminAppearanceSetHubAssetState_(kind, "Save failed · " + (err.message || String(err)), "error");
+    adminAppearanceSetHubStatus_("Save failed", "error");
   }
 }
 
