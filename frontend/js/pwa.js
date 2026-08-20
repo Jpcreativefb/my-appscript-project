@@ -1,7 +1,7 @@
 (function registerAwardsPwa() {
   if (!("serviceWorker" in navigator)) return;
 
-  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs";
+  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub";
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
@@ -91,3 +91,5 @@
 })();
 
 // v1.2.18a1: repair Sign Up / Reset PIN auth-tab navigation.
+
+// v1.2.18b: home hub with career stats, featured game, league standings, and trophy-room foundation.

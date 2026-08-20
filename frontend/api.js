@@ -785,6 +785,18 @@ async function apiGetLeaderboard(gameId) {
 
 }
 
+async function apiGetLeaderboardForLeague(gameId, leagueId) {
+
+  const session = getSession ? getSession() : {};
+
+  return api("leaderboard", {
+    username: session && session.username ? session.username : "",
+    gameId: gameId,
+    leagueId: leagueId || ""
+  });
+
+}
+
 async function apiLiveLeaderboard(gameId) {
 
   const session = getSession ? getSession() : {};

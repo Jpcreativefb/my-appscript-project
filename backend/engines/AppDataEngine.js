@@ -300,12 +300,15 @@ function apiGetDashboardGamesHub(payload) {
 
   });
 
+  const defaultGameId =
+    getDefaultGameId();
+
   const profileGameId =
     activeGames.length
       ? activeGames[0].gameId
       : pastGames.length
         ? pastGames[0].gameId
-        : getDefaultGameId();
+        : defaultGameId;
 
   const includeProfile =
     payload.includeProfile === true ||
@@ -342,6 +345,7 @@ function apiGetDashboardGamesHub(payload) {
   return {
     success: true,
     username: username,
+    defaultGameId: defaultGameId,
     profileGameId: profileGameId,
     profile: profile,
     profileHistory: profileHistory,
