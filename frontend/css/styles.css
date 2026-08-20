@@ -6351,3 +6351,13 @@ button.is-saving {
   .bottom-nav button { flex-direction:row; gap:7px; }
   .bottom-nav-label { font-size:13px; }
 }
+
+/* v1.2.18c1 configurable hub/nav icons */
+.bottom-nav button { --bottom-nav-accent:#64748b; }
+.bottom-nav button.active {
+  background:color-mix(in srgb,var(--bottom-nav-accent,#64748b) 28%,transparent);
+  box-shadow:inset 0 3px 0 var(--bottom-nav-accent,#64748b);
+}
+.bottom-nav-icon { width:24px; height:24px; display:grid; place-items:center; overflow:hidden; }
+.bottom-nav-custom-icon { width:22px; height:22px; object-fit:contain; display:block; }
+.bottom-nav-label[hidden] { display:none !important; }

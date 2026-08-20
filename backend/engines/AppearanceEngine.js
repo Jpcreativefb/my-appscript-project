@@ -20,6 +20,7 @@ const APPEARANCE_IMAGE_ITEMS_SHEET = "AppearanceImagePackItems";
 const APPEARANCE_THEME_PACKS_SHEET = "AppearanceThemePacks";
 const APPEARANCE_GAME_ASSIGNMENTS_SHEET = "GameAppearance";
 const APPEARANCE_OVERRIDES_SHEET = "AppearanceOverrides";
+const APPEARANCE_HUB_SETTINGS_SHEET = "AppearanceHubSettings";
 
 function appearanceSpreadsheet_() {
   let lastError = null;
@@ -98,6 +99,111 @@ const APPEARANCE_OVERRIDE_HEADERS = [
   "Active",
   "UpdatedAt"
 ];
+
+const APPEARANCE_HUB_SETTING_HEADERS = [
+  "SettingKey",
+  "HubCategory",
+  "HubGroup",
+  "DisplayName",
+  "Color",
+  "ImageUrl",
+  "ImageFileId",
+  "IconText",
+  "IconUrl",
+  "IconFileId",
+  "ShowNavLabel",
+  "Active",
+  "UpdatedAt"
+];
+
+function appearanceHubDefaultRows_() {
+  return [
+    { SettingKey: "home", HubCategory: "home", HubGroup: "", DisplayName: "Home", Color: "#20284a", IconText: "⌂", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports", HubCategory: "sports", HubGroup: "", DisplayName: "Sports", Color: "#1f5f45", IconText: "🏈", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality", HubCategory: "reality", HubGroup: "", DisplayName: "Reality", Color: "#6d3aa8", IconText: "📺", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards", HubCategory: "awards", HubGroup: "", DisplayName: "Awards", Color: "#9a6a13", IconText: "🏆", ShowNavLabel: true, Active: true },
+    { SettingKey: "general", HubCategory: "general", HubGroup: "", DisplayName: "General Games", Color: "#4452a4", IconText: "🎲", ShowNavLabel: true, Active: true },
+    { SettingKey: "more", HubCategory: "more", HubGroup: "", DisplayName: "More", Color: "#374151", IconText: "•••", ShowNavLabel: true, Active: true },
+
+    { SettingKey: "sports:nfl", HubCategory: "sports", HubGroup: "NFL", DisplayName: "NFL", Color: "#24456f", IconText: "🏈", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:mlb", HubCategory: "sports", HubGroup: "MLB", DisplayName: "MLB", Color: "#8c2f39", IconText: "⚾", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:nba", HubCategory: "sports", HubGroup: "NBA", DisplayName: "NBA", Color: "#a85518", IconText: "🏀", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:nhl", HubCategory: "sports", HubGroup: "NHL", DisplayName: "NHL", Color: "#334155", IconText: "🏒", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:ncaa", HubCategory: "sports", HubGroup: "NCAA", DisplayName: "NCAA", Color: "#344b77", IconText: "🎓", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:nascar", HubCategory: "sports", HubGroup: "NASCAR", DisplayName: "NASCAR", Color: "#991b1b", IconText: "🏁", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:formula-1", HubCategory: "sports", HubGroup: "Formula 1", DisplayName: "Formula 1", Color: "#b91c1c", IconText: "🏎️", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:soccer", HubCategory: "sports", HubGroup: "Soccer", DisplayName: "Soccer", Color: "#276749", IconText: "⚽", ShowNavLabel: true, Active: true },
+    { SettingKey: "sports:other-sports", HubCategory: "sports", HubGroup: "Other Sports", DisplayName: "Other Sports", Color: "#315b4b", IconText: "🏟️", ShowNavLabel: true, Active: true },
+
+    { SettingKey: "reality:survivor", HubCategory: "reality", HubGroup: "Survivor", DisplayName: "Survivor", Color: "#4d7c0f", IconText: "🔥", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:masterchef", HubCategory: "reality", HubGroup: "MasterChef", DisplayName: "MasterChef", Color: "#9f1239", IconText: "🍽️", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:top-chef", HubCategory: "reality", HubGroup: "Top Chef", DisplayName: "Top Chef", Color: "#7c2d12", IconText: "👨‍🍳", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:the-traitors", HubCategory: "reality", HubGroup: "The Traitors", DisplayName: "The Traitors", Color: "#4c1d95", IconText: "🗡️", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:the-amazing-race", HubCategory: "reality", HubGroup: "The Amazing Race", DisplayName: "Amazing Race", Color: "#0369a1", IconText: "✈️", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:dancing-with-the-stars", HubCategory: "reality", HubGroup: "Dancing with the Stars", DisplayName: "DWTS", Color: "#9d174d", IconText: "💃", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:big-brother", HubCategory: "reality", HubGroup: "Big Brother", DisplayName: "Big Brother", Color: "#4338ca", IconText: "👁️", ShowNavLabel: true, Active: true },
+    { SettingKey: "reality:other-reality", HubCategory: "reality", HubGroup: "Other Reality", DisplayName: "Other Reality", Color: "#6d3aa8", IconText: "📺", ShowNavLabel: true, Active: true },
+
+    { SettingKey: "awards:oscars", HubCategory: "awards", HubGroup: "Oscars", DisplayName: "Oscars", Color: "#8a6914", IconText: "🏆", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards:emmys", HubCategory: "awards", HubGroup: "Emmys", DisplayName: "Emmys", Color: "#a16207", IconText: "📺", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards:grammys", HubCategory: "awards", HubGroup: "Grammys", DisplayName: "Grammys", Color: "#854d0e", IconText: "🎵", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards:golden-globes", HubCategory: "awards", HubGroup: "Golden Globes", DisplayName: "Golden Globes", Color: "#92400e", IconText: "🌐", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards:tony-awards", HubCategory: "awards", HubGroup: "Tony Awards", DisplayName: "Tony Awards", Color: "#7e22ce", IconText: "🎭", ShowNavLabel: true, Active: true },
+    { SettingKey: "awards:other-awards", HubCategory: "awards", HubGroup: "Other Awards", DisplayName: "Other Awards", Color: "#9a6a13", IconText: "🏅", ShowNavLabel: true, Active: true }
+  ];
+}
+
+function appearanceHubSettingKey_(category, group) {
+  const cat = appearanceString_(category || "general").toLowerCase();
+  const grp = appearanceString_(group).toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return grp ? cat + ":" + grp : cat;
+}
+
+function appearanceGetHubAppearanceRows_(spreadsheet) {
+  const cache = !spreadsheet && typeof CacheService !== "undefined" ? CacheService.getScriptCache() : null;
+  if (cache) {
+    try {
+      const cached = cache.get("appearance-hub-settings-v1218c1");
+      if (cached) return JSON.parse(cached);
+    } catch (err) {}
+  }
+
+  const defaults = appearanceHubDefaultRows_();
+  const byKey = {};
+  defaults.forEach(function(row) {
+    byKey[appearanceNormalizeId_(row.SettingKey)] = Object.assign({}, row);
+  });
+
+  const ss = spreadsheet || appearanceSpreadsheet_();
+  const sheet = ss.getSheetByName(APPEARANCE_HUB_SETTINGS_SHEET);
+  if (sheet) {
+    appearanceReadObjects_(APPEARANCE_HUB_SETTINGS_SHEET, ss).forEach(function(row) {
+      const key = appearanceNormalizeId_(row.SettingKey || appearanceHubSettingKey_(row.HubCategory, row.HubGroup));
+      if (!key) return;
+      byKey[key] = Object.assign({}, byKey[key] || {}, row, { SettingKey: row.SettingKey || key });
+    });
+  }
+
+  const rows = Object.keys(byKey).map(function(key) {
+    const row = byKey[key];
+    if (!appearanceString_(row.ImageUrl) && appearanceString_(row.ImageFileId)) {
+      row.ImageUrl = appearanceDriveThumbnailUrl_(row.ImageFileId);
+    }
+    if (!appearanceString_(row.IconUrl) && appearanceString_(row.IconFileId)) {
+      row.IconUrl = appearanceDriveThumbnailUrl_(row.IconFileId);
+    }
+    row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
+    row.Active = appearanceBool_(row.Active, true);
+    return row;
+  });
+
+  if (cache) {
+    try { cache.put("appearance-hub-settings-v1218c1", JSON.stringify(rows), 300); } catch (err) {}
+  }
+  return rows;
+}
 
 function appearanceString_(value) {
   return value == null ? "" : String(value).trim();
@@ -318,7 +424,8 @@ function appearanceSetupSystem(payload) {
       { name: APPEARANCE_IMAGE_ITEMS_SHEET, headers: APPEARANCE_IMAGE_ITEM_HEADERS },
       { name: APPEARANCE_THEME_PACKS_SHEET, headers: APPEARANCE_THEME_PACK_HEADERS },
       { name: APPEARANCE_GAME_ASSIGNMENTS_SHEET, headers: APPEARANCE_GAME_ASSIGNMENT_HEADERS },
-      { name: APPEARANCE_OVERRIDES_SHEET, headers: APPEARANCE_OVERRIDE_HEADERS }
+      { name: APPEARANCE_OVERRIDES_SHEET, headers: APPEARANCE_OVERRIDE_HEADERS },
+      { name: APPEARANCE_HUB_SETTINGS_SHEET, headers: APPEARANCE_HUB_SETTING_HEADERS }
     ];
 
     const missingBefore = specs.filter(function(spec) {
@@ -657,7 +764,8 @@ function adminGetAppearanceDashboard(payload) {
     APPEARANCE_IMAGE_ITEMS_SHEET,
     APPEARANCE_THEME_PACKS_SHEET,
     APPEARANCE_GAME_ASSIGNMENTS_SHEET,
-    APPEARANCE_OVERRIDES_SHEET
+    APPEARANCE_OVERRIDES_SHEET,
+    APPEARANCE_HUB_SETTINGS_SHEET
   ];
   const sheetsComplete = requiredSheets.every(function(name) { return !!ss.getSheetByName(name); });
   const gameId = appearanceString_(payload.gameId);
@@ -670,7 +778,8 @@ function adminGetAppearanceDashboard(payload) {
       imagePackItems: [],
       themePacks: [],
       gameAppearance: {},
-      overrides: []
+      overrides: [],
+      hubAppearance: appearanceGetHubAppearanceRows_(ss)
     };
   }
 
@@ -690,6 +799,7 @@ function adminGetAppearanceDashboard(payload) {
     imagePackItems: imagePackItems,
     themePacks: themePacks,
     gameAppearance: gameId ? appearanceGetGameAssignmentFromRows_(gameId, assignments) : {},
+    hubAppearance: appearanceGetHubAppearanceRows_(ss),
     overrides: gameId ? overrides.filter(function(row) {
       return appearanceNormalizeId_(row.GameId) === appearanceNormalizeId_(gameId);
     }) : overrides
@@ -827,6 +937,39 @@ function adminSaveAppearanceImagePackItem(payload) {
   return { success: true, packId: packId, entityType: entityType, entityId: entityId, variant: variant };
 }
 
+function adminSaveAppearanceHubSetting(payload) {
+  payload = payload || {};
+  appearanceSetupSystem();
+  const ss = appearanceSpreadsheet_();
+  const sheet = ss.getSheetByName(APPEARANCE_HUB_SETTINGS_SHEET);
+  const category = appearanceString_(payload.hubCategory || payload.HubCategory || "general").toLowerCase();
+  const group = appearanceString_(payload.hubGroup || payload.HubGroup);
+  const settingKey = appearanceString_(payload.settingKey || payload.SettingKey) || appearanceHubSettingKey_(category, group);
+  if (!settingKey) throw new Error("Hub appearance setting key is required.");
+
+  appearanceUpsertObject_(sheet, { SettingKey: settingKey }, {
+    SettingKey: settingKey,
+    HubCategory: category,
+    HubGroup: group,
+    DisplayName: appearanceString_(payload.displayName || payload.DisplayName),
+    Color: appearanceString_(payload.color || payload.Color || "#354785"),
+    ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
+    ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    IconText: appearanceString_(payload.iconText || payload.IconText),
+    IconUrl: appearanceString_(payload.iconUrl || payload.IconUrl),
+    IconFileId: appearanceString_(payload.iconFileId || payload.IconFileId),
+    ShowNavLabel: appearanceBool_(payload.showNavLabel != null ? payload.showNavLabel : payload.ShowNavLabel, true),
+    Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
+    UpdatedAt: new Date()
+  });
+  SpreadsheetApp.flush();
+  try { CacheService.getScriptCache().remove("appearance-hub-settings-v1218c1"); } catch (err) {}
+  const saved = appearanceGetHubAppearanceRows_(ss).find(function(row) {
+    return appearanceNormalizeId_(row.SettingKey) === appearanceNormalizeId_(settingKey);
+  }) || {};
+  return { success: true, settingKey: settingKey, setting: saved };
+}
+
 function adminSaveAppearanceThemePack(payload) {
   payload = payload || {};
   appearanceSetupSystem();
@@ -918,6 +1061,10 @@ function apiAdminSaveAppearanceImagePackItem(payload) {
 
 function apiAdminDuplicateAppearanceImagePack(payload) {
   return adminDuplicateAppearanceImagePack(payload);
+}
+
+function apiAdminSaveAppearanceHubSetting(payload) {
+  return adminSaveAppearanceHubSetting(payload);
 }
 
 function apiAdminSaveAppearanceThemePack(payload) {

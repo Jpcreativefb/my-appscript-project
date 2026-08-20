@@ -332,6 +332,15 @@ function apiGetDashboardGamesHub(payload) {
 
   }
 
+  let hubAppearance = [];
+  try {
+    hubAppearance = typeof appearanceGetHubAppearanceRows_ === "function"
+      ? appearanceGetHubAppearanceRows_()
+      : [];
+  } catch (err) {
+    hubAppearance = [];
+  }
+
   return {
     success: true,
     username: username,
@@ -339,6 +348,7 @@ function apiGetDashboardGamesHub(payload) {
     profileGameId: profileGameId,
     profile: profile,
     profileHistory: profileHistory,
+    hubAppearance: hubAppearance,
     activeGames: activeGames,
     pastGames: pastGames
   };

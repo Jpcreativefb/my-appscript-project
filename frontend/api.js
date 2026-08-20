@@ -1770,6 +1770,10 @@ async function apiAdminDuplicateAppearanceImagePack(payload) {
   return api("adminDuplicateAppearanceImagePack", apiAppearanceDirectPayload_(payload));
 }
 
+async function apiAdminSaveAppearanceHubSetting(payload) {
+  return api("adminSaveAppearanceHubSetting", apiAppearanceDirectPayload_(payload));
+}
+
 async function apiAdminSaveAppearanceThemePack(payload) {
   return api("adminSaveAppearanceThemePack", apiAppearanceDirectPayload_(payload));
 }

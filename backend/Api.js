@@ -402,6 +402,10 @@ function doPost(e) {
       return json(apiAdminDuplicateAppearanceImagePack(body));
     }
 
+    if (action === "adminSaveAppearanceHubSetting") {
+      return json(apiAdminSaveAppearanceHubSetting(body));
+    }
+
     if (action === "adminSaveAppearanceThemePack") {
       return json(apiAdminSaveAppearanceThemePack(body));
     }
@@ -1095,6 +1099,10 @@ function doGet(e) {
 
     if (action === "adminDuplicateAppearanceImagePack") {
       return json(apiAdminDuplicateAppearanceImagePack(params));
+    }
+
+    if (action === "adminSaveAppearanceHubSetting") {
+      return json(apiAdminSaveAppearanceHubSetting(params));
     }
 
     if (action === "adminSaveAppearanceThemePack") {

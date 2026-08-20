@@ -17,6 +17,7 @@ let ADMIN_APPEARANCE_STATE = {
   themeActionState: "",
   packActionState: "",
   pendingGameImagePackId: "",
+  selectedHubSettingKey: "sports",
   busy: false,
   message: ""
 };
@@ -94,6 +95,220 @@ function adminAppearanceThemeById_(themeId) {
 
 function adminAppearanceAssignment_() {
   return ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.gameAppearance || {};
+}
+
+function adminAppearanceHubRows_() {
+  return adminAppearanceActiveRows_(ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.hubAppearance);
+}
+
+function adminAppearanceHubRow_(settingKey) {
+  const key = adminAppearanceKey_(settingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports");
+  return adminAppearanceHubRows_().find(function(row) {
+    return adminAppearanceKey_(row.SettingKey) === key;
+  }) || null;
+}
+
+function adminAppearanceHubAssetUrl_(row, kind) {
+  row = row || {};
+  if (kind === "icon") {
+    return String(row.IconUrl || "").trim() || adminAppearanceDriveUrl_(row.IconFileId, "w240");
+  }
+  return String(row.ImageUrl || "").trim() || adminAppearanceDriveUrl_(row.ImageFileId, "w900");
+}
+
+function adminAppearanceHubGroupLabel_(row) {
+  row = row || {};
+  const category = String(row.HubCategory || "").trim().toLowerCase();
+  const group = String(row.HubGroup || "").trim();
+  if (!group) {
+    if (category === "home") return "Navigation — Home";
+    if (category === "more") return "Navigation — More";
+    return "Main Hub — " + String(row.DisplayName || category || "Hub");
+  }
+  const parent = category === "sports" ? "Sports" : category === "reality" ? "Reality" : category === "awards" ? "Awards" : "General";
+  return parent + " — " + group;
+}
+
+function adminAppearanceHubOptions_() {
+  const selected = adminAppearanceKey_(ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports");
+  const rows = adminAppearanceHubRows_().slice().sort(function(a, b) {
+    const ak = String(a.SettingKey || "");
+    const bk = String(b.SettingKey || "");
+    const order = { home: 0, sports: 1, reality: 2, awards: 3, general: 4, more: 5 };
+    const ao = Object.prototype.hasOwnProperty.call(order, ak) ? order[ak] : 50;
+    const bo = Object.prototype.hasOwnProperty.call(order, bk) ? order[bk] : 50;
+    if (ao !== bo) return ao - bo;
+    return adminAppearanceHubGroupLabel_(a).localeCompare(adminAppearanceHubGroupLabel_(b));
+  });
+  return rows.map(function(row) {
+    const key = String(row.SettingKey || "");
+    return '<option value="' + adminAppearanceEscape_(key) + '"' + (adminAppearanceKey_(key) === selected ? ' selected' : '') + '>' + adminAppearanceEscape_(adminAppearanceHubGroupLabel_(row)) + '</option>';
+  }).join("");
+}
+
+function adminAppearanceHubManager_() {
+  const row = adminAppearanceHubRow_() || adminAppearanceHubRows_()[0] || {};
+  if (!ADMIN_APPEARANCE_STATE.selectedHubSettingKey && row.SettingKey) {
+    ADMIN_APPEARANCE_STATE.selectedHubSettingKey = String(row.SettingKey);
+  }
+  const category = String(row.HubCategory || "").toLowerCase();
+  const topNav = ["home", "sports", "reality", "awards", "more"].indexOf(category) !== -1 && !String(row.HubGroup || "").trim();
+  const imageUrl = adminAppearanceHubAssetUrl_(row, "image");
+  const iconUrl = adminAppearanceHubAssetUrl_(row, "icon");
+  const color = String(row.Color || "#354785");
+  const imagePreview = imageUrl
+    ? '<img src="' + adminAppearanceEscape_(imageUrl) + '" alt="Hub background">'
+    : '<span class="appearance-hub-preview-fallback">No hub image</span>';
+  const iconPreview = iconUrl
+    ? '<img src="' + adminAppearanceEscape_(iconUrl) + '" alt="Hub icon">'
+    : '<span>' + adminAppearanceEscape_(row.IconText || "★") + '</span>';
+
+  return `
+    <details class="card admin-collapsible-card appearance-hub-editor" open>
+      <summary><strong>Hub + Navigation Appearance</strong><span>Colors, hub artwork, league/show logos and bottom-nav icons</span></summary>
+      <div class="appearance-card-body">
+        <div class="admin-sub">Pick a main hub or one of its subhubs. Main hub icon changes also feed the phone bottom navigation. Nothing here changes scoring or game setup.</div>
+        <div class="appearance-hub-editor-grid">
+          <label>Area to Edit
+            <select id="appearanceHubSettingSelect" class="input" onchange="adminAppearanceSelectHubSetting_(this.value)">${adminAppearanceHubOptions_()}</select>
+          </label>
+          <label>Display Name
+            <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}">
+          </label>
+          <label>Color
+            <div class="appearance-hub-color-row"><input id="appearanceHubColor" type="color" value="${adminAppearanceEscape_(color)}"><input id="appearanceHubColorText" class="input" value="${adminAppearanceEscape_(color)}" oninput="adminAppearanceSyncHubColor_(this.value)"></div>
+          </label>
+          <label>Fallback Icon / Emoji
+            <input id="appearanceHubIconText" class="input" maxlength="8" value="${adminAppearanceEscape_(row.IconText || "")}" placeholder="🏈">
+          </label>
+        </div>
+
+        <div class="appearance-hub-media-grid">
+          <div class="appearance-hub-media-card">
+            <strong>Hub / League Image</strong>
+            <div class="appearance-hub-image-preview" style="--appearance-hub-preview-color:${adminAppearanceEscape_(color)}">${imagePreview}</div>
+            <input id="appearanceHubImageFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageFile')">
+            <div class="appearance-compact-action-row">
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubImageFile')">Choose Image</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearHubAsset_('image')">Clear</button>
+            </div>
+          </div>
+          <div class="appearance-hub-media-card">
+            <strong>Hub / Bottom Nav Icon</strong>
+            <div class="appearance-hub-icon-preview">${iconPreview}</div>
+            <input id="appearanceHubIconFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('icon', 'appearanceHubIconFile')">
+            <div class="appearance-compact-action-row">
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubIconFile')">Choose Icon</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearHubAsset_('icon')">Use Fallback</button>
+            </div>
+          </div>
+        </div>
+
+        ${topNav ? `<label class="appearance-hub-label-toggle"><input id="appearanceHubShowNavLabel" type="checkbox" ${adminAppearanceBool_(row.ShowNavLabel, true) ? 'checked' : ''}><span>Show the name under this icon in the bottom navigation</span></label>` : ''}
+        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Setting ID: ${adminAppearanceEscape_(row.SettingKey || "")}<br>Hub: ${adminAppearanceEscape_(row.HubCategory || "")}${row.HubGroup ? '<br>Subhub: ' + adminAppearanceEscape_(row.HubGroup) : ''}</small></details>
+        <div class="admin-actions appearance-compact-actions"><button class="admin-small-button" type="button" onclick="adminAppearanceSaveHubSetting_()">Save Hub Appearance</button></div>
+      </div>
+    </details>`;
+}
+
+function adminAppearanceSelectHubSetting_(settingKey) {
+  ADMIN_APPEARANCE_STATE.selectedHubSettingKey = String(settingKey || "sports");
+  ADMIN_APPEARANCE_STATE.message = "";
+  adminAppearancePaint_();
+}
+
+function adminAppearanceSyncHubColor_(value) {
+  const picker = document.getElementById("appearanceHubColor");
+  const text = String(value || "").trim();
+  if (picker && /^#[0-9a-f]{6}$/i.test(text)) picker.value = text;
+}
+
+function adminAppearanceCollectHubSetting_() {
+  const row = adminAppearanceHubRow_() || {};
+  const colorPicker = document.getElementById("appearanceHubColor");
+  const colorText = document.getElementById("appearanceHubColorText");
+  const display = document.getElementById("appearanceHubDisplayName");
+  const iconText = document.getElementById("appearanceHubIconText");
+  const showLabel = document.getElementById("appearanceHubShowNavLabel");
+  return {
+    settingKey: String(row.SettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports"),
+    hubCategory: String(row.HubCategory || "general"),
+    hubGroup: String(row.HubGroup || ""),
+    displayName: String(display && display.value || row.DisplayName || "").trim(),
+    color: String(colorText && colorText.value || colorPicker && colorPicker.value || row.Color || "#354785").trim(),
+    imageUrl: String(row.ImageUrl || ""),
+    imageFileId: String(row.ImageFileId || ""),
+    iconText: String(iconText && iconText.value || row.IconText || "").trim(),
+    iconUrl: String(row.IconUrl || ""),
+    iconFileId: String(row.IconFileId || ""),
+    showNavLabel: showLabel ? showLabel.checked : adminAppearanceBool_(row.ShowNavLabel, true),
+    active: true
+  };
+}
+
+async function adminAppearanceSaveHubSetting_() {
+  try {
+    const payload = adminAppearanceCollectHubSetting_();
+    const result = await apiAdminSaveAppearanceHubSetting(payload);
+    if (!result || result.success === false) throw new Error(result && (result.message || result.error) || "Could not save hub appearance.");
+    await adminAppearanceRefresh_((payload.displayName || "Hub") + " appearance saved.");
+  } catch (err) {
+    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
+    adminAppearancePaint_();
+  }
+}
+
+async function adminAppearanceUploadHubAsset_(kind, inputId) {
+  const input = document.getElementById(inputId);
+  const file = input && input.files && input.files[0];
+  if (!file) return;
+  const formPayload = adminAppearanceCollectHubSetting_();
+  try {
+    ADMIN_APPEARANCE_STATE.message = kind === "icon" ? "Uploading hub icon…" : "Uploading hub image…";
+    adminAppearancePaint_();
+    const prepared = await adminAppearancePrepareUpload_(file);
+    const current = adminAppearanceHubRow_() || {};
+    const upload = await apiAdminUploadImage({
+      gameId: "hub-appearance",
+      categoryId: String(current.SettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "hub"),
+      nomineeId: kind,
+      fileName: prepared.fileName,
+      mimeType: prepared.mimeType,
+      base64: prepared.base64
+    });
+    if (!upload || upload.success === false) throw new Error(upload && (upload.message || upload.error) || "Hub image upload failed.");
+    const payload = formPayload;
+    const url = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, kind === "icon" ? "w240" : "w900");
+    if (kind === "icon") {
+      payload.iconUrl = url;
+      payload.iconFileId = upload.fileId || "";
+    } else {
+      payload.imageUrl = url;
+      payload.imageFileId = upload.fileId || "";
+    }
+    const save = await apiAdminSaveAppearanceHubSetting(payload);
+    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Hub asset uploaded but could not be assigned.");
+    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon saved." : " image saved."));
+  } catch (err) {
+    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
+    adminAppearancePaint_();
+  } finally {
+    if (input) input.value = "";
+  }
+}
+
+async function adminAppearanceClearHubAsset_(kind) {
+  try {
+    const payload = adminAppearanceCollectHubSetting_();
+    if (kind === "icon") { payload.iconUrl = ""; payload.iconFileId = ""; }
+    else { payload.imageUrl = ""; payload.imageFileId = ""; }
+    const save = await apiAdminSaveAppearanceHubSetting(payload);
+    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Could not clear hub asset.");
+    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon reset to fallback." : " image cleared."));
+  } catch (err) {
+    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
+    adminAppearancePaint_();
+  }
 }
 
 function adminAppearanceUniqueEntities_() {
@@ -1404,6 +1619,8 @@ function adminAppearanceBuildHtml_() {
 
       ${ADMIN_APPEARANCE_STATE.message ? '<div class="admin-message appearance-message">' + adminAppearanceEscape_(ADMIN_APPEARANCE_STATE.message) + '</div>' : ''}
 
+      ${adminAppearanceHubManager_()}
+
       <section class="card appearance-assignment-card">
         <h2>Game Appearance</h2>
         <div class="appearance-assignment-grid">
@@ -1439,10 +1656,12 @@ async function adminAppearanceRefresh_(message) {
   const imagePackId = ADMIN_APPEARANCE_STATE.selectedImagePackId;
   const themePackId = ADMIN_APPEARANCE_STATE.selectedThemePackId;
   const themeNewMode = ADMIN_APPEARANCE_STATE.themeNewMode;
+  const selectedHubSettingKey = ADMIN_APPEARANCE_STATE.selectedHubSettingKey;
   await adminAppearanceLoadGame_(id);
   if (imagePackId !== undefined) ADMIN_APPEARANCE_STATE.selectedImagePackId = imagePackId;
   if (themePackId) ADMIN_APPEARANCE_STATE.selectedThemePackId = themePackId;
   ADMIN_APPEARANCE_STATE.themeNewMode = themeNewMode;
+  ADMIN_APPEARANCE_STATE.selectedHubSettingKey = selectedHubSettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports";
   if (message) ADMIN_APPEARANCE_STATE.message = message;
   adminAppearancePaint_();
 }

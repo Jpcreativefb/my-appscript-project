@@ -62,6 +62,7 @@ async function renderDashboardPage() {
   const profile = profileRaw.profile || profileRaw || {};
   const activeGames = Array.isArray(payload.activeGames) ? payload.activeGames : [];
   const pastGames = Array.isArray(payload.pastGames) ? payload.pastGames : [];
+  dashboardCacheHubAppearance_(payload.hubAppearance || []);
 
   const displayName =
     profile.displayName ||
@@ -102,7 +103,12 @@ async function renderDashboardPage() {
   return `
     <div class="page dashboard-page dashboard-games-hub-page dashboard-home-v1218c">
 
-      <section class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};">
+      <div id="dashboardPlayerSticky" class="dashboard-player-sticky" aria-hidden="true">
+        ${renderDashboardProfileAvatar_(profile, displayName)}
+        <strong>${escapeHtml(displayName)}</strong>
+      </div>
+
+      <section id="dashboardPlayerCard" class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};">
         <div class="dashboard-snark-line">${escapeHtml(snark)}</div>
 
         <div class="dashboard-player-main">
@@ -110,17 +116,16 @@ async function renderDashboardPage() {
           <div class="dashboard-player-copy">
             <h1>${escapeHtml(displayName)}</h1>
             ${bio ? `<p class="dashboard-player-note">${escapeHtml(bio)}</p>` : ""}
+            <div class="dashboard-player-quick-actions">
+              <button type="button" class="dashboard-profile-mini-button" onclick="navigate('profile')">Profile</button>
+              <button type="button" class="dashboard-trophy-button" onclick="navigate('trophy-room')">🏆 Trophy Room</button>
+            </div>
           </div>
-          <button type="button" class="dashboard-profile-mini-button" onclick="navigate('profile')">Profile</button>
         </div>
 
-        <div class="dashboard-player-actions">
-          <details class="dashboard-career-details">
-            <summary>Career Stats</summary>
-            ${renderDashboardCareerStatsShell_()}
-          </details>
-          <button type="button" class="dashboard-trophy-button" onclick="navigate('trophy-room')">🏆 Trophy Room</button>
-        </div>
+        <details class="dashboard-career-details">
+          ${renderDashboardCareerStatsShell_()}
+        </details>
       </section>
 
       ${attentionGames.length ? `
@@ -218,6 +223,141 @@ function renderDashboardProfileAvatar_(profile, displayName) {
   return `<div class="dashboard-profile-photo dashboard-profile-photo-fallback"><span>${escapeHtml(initials)}</span></div>`;
 }
 
+function dashboardCacheHubAppearance_(rows) {
+  const list = Array.isArray(rows) ? rows : [];
+  const map = {};
+  list.forEach(function(row) {
+    const key = String(row && row.SettingKey || "").trim().toLowerCase();
+    if (key) map[key] = row;
+  });
+  if (typeof APP_STATE !== "undefined") {
+    APP_STATE.dashboardHubAppearanceRows = list;
+    APP_STATE.dashboardHubAppearanceMap = map;
+  }
+  return map;
+}
+
+function dashboardHubSettingKey_(category, group) {
+  const cat = String(category || "general").trim().toLowerCase();
+  const grp = String(group || "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return grp ? cat + ":" + grp : cat;
+}
+
+function dashboardHubSetting_(category, group) {
+  const map = typeof APP_STATE !== "undefined" && APP_STATE.dashboardHubAppearanceMap
+    ? APP_STATE.dashboardHubAppearanceMap
+    : {};
+  const exact = map[dashboardHubSettingKey_(category, group)];
+  if (exact) return exact;
+  return map[dashboardHubSettingKey_(category, "")] || {};
+}
+
+function dashboardAppearanceAssetUrl_(row, kind) {
+  row = row || {};
+  const fileId = String(kind === "icon" ? row.IconFileId || "" : row.ImageFileId || "").trim();
+  const explicit = String(kind === "icon" ? row.IconUrl || "" : row.ImageUrl || "").trim();
+  if (explicit) return explicit;
+  if (!fileId) return "";
+  return "https://drive.google.com/thumbnail?id=" + encodeURIComponent(fileId) + "&sz=" + (kind === "icon" ? "w240" : "w1200");
+}
+
+function dashboardHubIconHtml_(category, group, className) {
+  const row = dashboardHubSetting_(category, group);
+  const url = dashboardAppearanceAssetUrl_(row, "icon");
+  const fallback = String(row.IconText || dashboardHubIcon_(category) || "★");
+  if (url) {
+    return platformImgHtml(url, {
+      className: (className || "dashboard-hub-custom-icon") + " dashboard-hub-custom-icon",
+      variant: "logo",
+      eager: true,
+      alt: row.DisplayName || group || dashboardHubDisplayName_(category)
+    });
+  }
+  return '<span class="' + escapeAttr(className || "dashboard-hub-icon-text") + '">' + escapeHtml(fallback) + '</span>';
+}
+
+function dashboardApplyHubAppearance_() {
+  const navMap = {
+    dashboard: "home",
+    "hub:sports": "sports",
+    "hub:reality": "reality",
+    "hub:awards": "awards",
+    more: "more"
+  };
+  Object.keys(navMap).forEach(function(page) {
+    const button = document.querySelector('.bottom-nav button[data-page="' + page + '"]');
+    if (!button) return;
+    const key = navMap[page];
+    const row = dashboardHubSetting_(key, "");
+    if (!row || !Object.keys(row).length) return;
+    const icon = button.querySelector(".bottom-nav-icon");
+    const label = button.querySelector(".bottom-nav-label");
+    const iconUrl = dashboardAppearanceAssetUrl_(row, "icon");
+    if (icon) {
+      icon.innerHTML = iconUrl
+        ? platformImgHtml(iconUrl, { className: "bottom-nav-custom-icon", variant: "logo", eager: true, alt: row.DisplayName || key })
+        : escapeHtml(String(row.IconText || icon.textContent || "•"));
+    }
+    if (label) {
+      label.textContent = String(row.DisplayName || label.textContent || "");
+      label.hidden = row.ShowNavLabel === false || String(row.ShowNavLabel).toLowerCase() === "false";
+    }
+    button.style.setProperty("--bottom-nav-accent", String(row.Color || "#354785"));
+  });
+  if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
+    window.PlatformImageEngine.process(document.querySelector(".bottom-nav") || document);
+  }
+}
+
+function dashboardMountStickyPlayer_() {
+  const card = document.getElementById("dashboardPlayerCard");
+  const sticky = document.getElementById("dashboardPlayerSticky");
+  if (!card || !sticky) return;
+
+  if (typeof APP_STATE !== "undefined" && typeof APP_STATE.dashboardStickyCleanup === "function") {
+    APP_STATE.dashboardStickyCleanup();
+  }
+
+  const update = function() {
+    if (typeof APP_STATE !== "undefined" && APP_STATE.currentPage !== "dashboard") return;
+    const rect = card.getBoundingClientRect();
+    const active = rect.top < 12;
+    sticky.classList.toggle("active", active);
+    sticky.setAttribute("aria-hidden", active ? "false" : "true");
+  };
+
+  window.addEventListener("scroll", update, { passive: true });
+  window.addEventListener("resize", update, { passive: true });
+  update();
+
+  if (typeof APP_STATE !== "undefined") {
+    APP_STATE.dashboardStickyCleanup = function() {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }
+}
+
+function dashboardGameCardAttrs_(game, cssVariable) {
+  game = game || {};
+  const heroFileId = String(game.heroImageFileId || "").trim();
+  const heroImage = String(
+    game.heroImage ||
+    game.heroImageUrl ||
+    (heroFileId ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(heroFileId) + "&sz=w1200" : "")
+  ).trim();
+  const color = String(game.themeColor || "#354785").trim() || "#354785";
+  const attrs = heroImage ? platformBackgroundAttrs(heroImage, { variant: "hero", cssVariable: cssVariable || "--dashboard-game-card-image" }) : "";
+  return {
+    heroImage: heroImage,
+    className: heroImage ? " has-game-image" : "",
+    attrs: attrs,
+    style: "--game-theme-color:" + escapeAttr(color) + ";" + (cssVariable || "--dashboard-game-card-image") + ":none;"
+  };
+}
+
 function dashboardIsUserActiveGame_(game, allGames) {
   if (!game) return false;
   if (game.hasStarted === true || Number(game.madeCount) > 0) return true;
@@ -312,10 +452,11 @@ function renderDashboardAttentionGame_(game) {
     (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
     ""
   );
+  const card = dashboardGameCardAttrs_(game, "--dashboard-game-card-image");
 
   return `
-    <article class="dashboard-attention-card">
-      <div>
+    <article class="dashboard-attention-card dashboard-colored-game-card${card.className}" ${card.attrs} style="${card.style}">
+      <div class="dashboard-colored-game-copy">
         <span class="dashboard-attention-badge">${remaining} ${noun} remaining</span>
         <h3>${escapeHtml(game.name || game.gameId || "Game")}</h3>
         <p>${escapeHtml(game.lockLabel || game.statusLabel || "Picks open")}</p>
@@ -333,10 +474,11 @@ function renderDashboardDiscoverGame_(game) {
     ""
   );
   const disabled = game.disableEnter === true || game.available === false;
+  const card = dashboardGameCardAttrs_(game, "--dashboard-game-card-image");
 
   return `
-    <article class="dashboard-discover-game">
-      <div>
+    <article class="dashboard-discover-game dashboard-colored-game-card${card.className}" ${card.attrs} style="${card.style}">
+      <div class="dashboard-colored-game-copy">
         <span>${escapeHtml(dashboardHubDisplayName_(game.hubCategory || "general"))} · ${escapeHtml(game.hubGroup || game.typeLabel || "Game")}</span>
         <strong>${escapeHtml(game.name || game.gameId || "Game")}</strong>
         <small>${escapeHtml(game.lockLabel || game.statusLabel || "Open")}</small>
@@ -365,10 +507,14 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
           const archived = past.filter(function(game) { return (game.hubCategory || "general") === category; });
           const playing = dashboardGetPlayingGames_(current);
           const offered = current.filter(function(game) { return playing.indexOf(game) === -1; });
+          const setting = dashboardHubSetting_(category, "");
+          const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
+          const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-hub-image" }) : "";
+          const color = String(setting.Color || "#354785");
           return `
-            <details class="dashboard-hub-launcher-card">
+            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(color)};--dashboard-hub-image:none;">
               <summary>
-                <span class="dashboard-hub-icon">${dashboardHubIcon_(category)}</span>
+                <span class="dashboard-hub-icon">${dashboardHubIconHtml_(category, "", "dashboard-hub-icon-custom")}</span>
                 <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
                 <b>›</b>
               </summary>
@@ -388,12 +534,17 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
 }
 
 function dashboardHubDisplayName_(category) {
+  const key = String(category || "general");
+  const setting = dashboardHubSetting_(key, "");
+  if (setting && String(setting.DisplayName || "").trim()) return String(setting.DisplayName).trim();
   return ({
     sports: "Sports",
     reality: "Reality Shows",
     awards: "Awards Shows",
-    general: "General Games"
-  })[String(category || "general")] || "General Games";
+    general: "General Games",
+    home: "Home",
+    more: "More"
+  })[key] || "General Games";
 }
 
 function dashboardHubIcon_(category) {
@@ -416,6 +567,7 @@ async function loadDashboardHubPayload_() {
   const payload = await apiGetDashboardGamesHub();
   if (typeof APP_STATE !== "undefined" && payload && payload.success !== false) {
     APP_STATE.dashboardHomePayload = payload;
+    dashboardCacheHubAppearance_(payload.hubAppearance || []);
   }
   return payload;
 }
@@ -426,6 +578,8 @@ async function renderDashboardHubPage_(category) {
   if (!payload || payload.success === false) {
     return `<div class="page"><h1>${escapeHtml(dashboardHubDisplayName_(category))}</h1>${renderErrorCard("Could not load hub", payload && (payload.error || payload.message) || "Hub data unavailable.")}</div>`;
   }
+  dashboardCacheHubAppearance_(payload.hubAppearance || []);
+  setTimeout(function() { dashboardApplyHubAppearance_(); }, 0);
 
   const active = (Array.isArray(payload.activeGames) ? payload.activeGames : []).filter(function(game) {
     return (game.hubCategory || "general") === category;
@@ -441,12 +595,17 @@ async function renderDashboardHubPage_(category) {
   });
   groupNames.sort();
 
+  const setting = dashboardHubSetting_(category, "");
+  const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
+  const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-domain-image" }) : "";
+  const color = String(setting.Color || "#354785");
+
   return `
     <div class="page dashboard-domain-hub dashboard-domain-${escapeAttr(category)}">
-      <header class="dashboard-domain-header">
+      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(color)};--dashboard-domain-image:none;">
         <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
         <div class="dashboard-domain-title-row">
-          <span>${dashboardHubIcon_(category)}</span>
+          <span>${dashboardHubIconHtml_(category, "", "dashboard-domain-custom-icon")}</span>
           <div><p>Game Hub</p><h1>${escapeHtml(dashboardHubDisplayName_(category))}</h1></div>
         </div>
         <p>${escapeHtml(dashboardHubDescription_(category))}</p>
@@ -467,16 +626,22 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames) {
   const playing = dashboardGetPlayingGames_(current);
   const attention = dashboardGetAttentionGames_(playing);
   const offered = current.filter(function(game) { return playing.indexOf(game) === -1; });
+  const setting = dashboardHubSetting_(category, group);
+  const image = dashboardAppearanceAssetUrl_(setting, "image");
+  const attrs = image ? platformBackgroundAttrs(image, { variant: "hero", cssVariable: "--dashboard-subhub-image" }) : "";
+  const color = String(setting.Color || dashboardHubSetting_(category, "").Color || "#354785");
+  const display = String(setting.DisplayName || group);
 
   return `
-    <details class="dashboard-subhub" open>
+    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(color)};--dashboard-subhub-image:none;" open>
       <summary>
-        <span><strong>${escapeHtml(group)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>
+        <span class="dashboard-subhub-heading-icon">${dashboardHubIconHtml_(category, group, "dashboard-subhub-custom-icon")}</span>
+        <span><strong>${escapeHtml(display)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>
         <b>⌄</b>
       </summary>
       <div class="dashboard-subhub-body">
         ${attention.length ? `<div class="dashboard-subhub-block"><h3>Needs Attention</h3><div class="dashboard-attention-grid">${attention.map(renderDashboardAttentionGame_).join("")}</div></div>` : ""}
-        <div class="dashboard-subhub-block"><h3>My Active Games</h3><div class="dashboard-home-active-grid">${playing.length ? playing.map(renderDashboardCompactActiveGame_).join("") : `<div class="dashboard-home-muted-card">No games started in ${escapeHtml(group)} yet.</div>`}</div></div>
+        <div class="dashboard-subhub-block"><h3>My Active Games</h3><div class="dashboard-home-active-grid">${playing.length ? playing.map(renderDashboardCompactActiveGame_).join("") : `<div class="dashboard-home-muted-card">No games started in ${escapeHtml(display)} yet.</div>`}</div></div>
         <div class="dashboard-subhub-block"><h3>Available to Play</h3><div class="dashboard-discover-grid">${offered.length ? offered.map(renderDashboardDiscoverGame_).join("") : `<div class="dashboard-home-muted-card">No additional games available right now.</div>`}</div></div>
         <details class="dashboard-subhub-archive">
           <summary>Past / Archived Games <strong>${archived.length}</strong></summary>
@@ -545,31 +710,20 @@ async function renderDashboardTrophyRoomPage_() {
 }
 
 function renderDashboardCareerStatsShell_() {
-  const stats = [
-    ["—", "Games"],
-    ["—", "Wins"],
-    ["—", "Top 3"],
-    ["—", "Avg Finish"],
-    ["—", "Accuracy"]
-  ];
-
   return `
-    <section class="dashboard-home-stats-shell" aria-label="Career stats">
-      <div class="dashboard-home-stats-heading">
-        <span>Career</span>
-        <small id="dashboardCareerStatsStatus">Loading archived standings…</small>
-      </div>
-      <div id="dashboardCareerStatsBar" class="dashboard-home-stats-bar">
-        ${stats.map(function(stat, index) {
-          return `
-            <div class="dashboard-home-stat" data-career-stat-index="${index}">
-              <strong>${stat[0]}</strong>
-              <span>${stat[1]}</span>
-            </div>
-          `;
-        }).join("")}
-      </div>
-    </section>
+    <summary class="dashboard-career-summary">
+      <span class="dashboard-career-title">Career Stats</span>
+      <span id="dashboardCareerStatsBar" class="dashboard-career-primary dashboard-home-stats-bar">
+        <span><strong data-career-stat="games">—</strong><small>Games</small></span>
+        <span><strong data-career-stat="wins">—</strong><small>Wins</small></span>
+        <span><strong data-career-stat="top3">—</strong><small>Top 3</small></span>
+      </span>
+      <span class="dashboard-career-more">⌄<small>more</small></span>
+    </summary>
+    <div class="dashboard-career-extra">
+      <span><strong data-career-stat="avg">—</strong><small>Avg Finish</small></span>
+      <span><strong data-career-stat="accuracy">—</strong><small>Accuracy</small></span>
+    </div>
   `;
 }
 
@@ -652,19 +806,15 @@ function renderDashboardCompactActiveGame_(game) {
   const progressValue = Math.max(0, Math.min(100, Number(game.progressValue) || 0));
   const actionLabel = getDashboardGameActionLabel_(game, false, progressValue);
   const enterDisabled = game.disableEnter === true || game.available === false;
-  const heroImage = String(game.heroImage || game.heroImageUrl || "").trim();
   const preferredLeagueId = String(
     game.leagueId ||
     (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
     ""
   );
+  const card = dashboardGameCardAttrs_(game, "--compact-game-image");
 
   return `
-    <article
-      class="dashboard-compact-game ${heroImage ? "has-image" : ""}"
-      ${heroImage ? platformBackgroundAttrs(heroImage, { variant: "hero", cssVariable: "--compact-game-image" }) : ""}
-      style="--game-theme-color:${escapeAttr(game.themeColor || "#354785")};--compact-game-image:none;"
-    >
+    <article class="dashboard-compact-game${card.className}" ${card.attrs} style="${card.style}">
       <div class="dashboard-compact-game-art">
         <span>${escapeHtml(game.lockLabel || game.statusLabel || "Open")}</span>
         <div>
@@ -689,9 +839,10 @@ function renderDashboardCompactActiveGame_(game) {
 
 function renderDashboardPastGameCompact_(game) {
   game = game || {};
+  const card = dashboardGameCardAttrs_(game, "--dashboard-past-game-image");
   return `
-    <article class="dashboard-past-compact">
-      <div>
+    <article class="dashboard-past-compact dashboard-colored-game-card${card.className}" ${card.attrs} style="${card.style}">
+      <div class="dashboard-colored-game-copy">
         <strong>${escapeHtml(game.name || game.gameId || "Game")}</strong>
         <span>${escapeHtml(game.typeLabel || game.subtitle || "Finished")}</span>
       </div>
@@ -723,6 +874,9 @@ function renderDashboardTrophyRoomShell_() {
 
 async function hydrateDashboardHomeExtras_() {
   if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") return;
+
+  dashboardApplyHubAppearance_();
+  dashboardMountStickyPlayer_();
 
   const hydrationId = APP_STATE.dashboardHomeHydrationId || "";
   const payload = APP_STATE.dashboardHomePayload || {};
@@ -768,20 +922,19 @@ function hydrateDashboardCareerStats_(response) {
     (Number(summary.accuracy) || 0) + "%"
   ];
 
-  const bar = document.getElementById("dashboardCareerStatsBar");
-  if (bar) {
-    Array.from(bar.querySelectorAll(".dashboard-home-stat")).forEach(function(node, index) {
-      const strong = node.querySelector("strong");
-      if (strong) strong.textContent = values[index] !== undefined ? values[index] : "—";
-    });
-  }
-
-  const status = document.getElementById("dashboardCareerStatsStatus");
-  if (status) {
-    status.textContent = Number(summary.archivedGames) > 0
-      ? "Verified from archived game standings"
-      : "Career stats begin as games are archived";
-  }
+  const statValues = {
+    games: values[0],
+    wins: values[1],
+    top3: values[2],
+    avg: values[3],
+    accuracy: values[4]
+  };
+  document.querySelectorAll("[data-career-stat]").forEach(function(node) {
+    const key = node.getAttribute("data-career-stat");
+    if (Object.prototype.hasOwnProperty.call(statValues, key)) {
+      node.textContent = statValues[key];
+    }
+  });
 
   const trophy = document.getElementById("dashboardTrophyPreviewStats");
   if (trophy) {
@@ -850,9 +1003,10 @@ function renderDashboardLeagueStandingCard_(league, game, standings, index) {
   const rank = userRow ? Number(userRow.rank || userRow.Rank) || (rows.indexOf(userRow) + 1) : 0;
   const score = userRow ? dashboardLeaderboardScore_(userRow) : "—";
   const leaderScore = leader ? dashboardLeaderboardScore_(leader) : "—";
+  const card = game ? dashboardGameCardAttrs_(game, "--dashboard-league-game-image") : { className: "", attrs: "", style: "--game-theme-color:#354785;--dashboard-league-game-image:none;" };
 
   return `
-    <article id="dashboardLeagueStanding-${index}" class="dashboard-league-home-card">
+    <article id="dashboardLeagueStanding-${index}" class="dashboard-league-home-card${card.className}" ${card.attrs} style="${card.style}">
       <div class="dashboard-league-home-topline">
         <div>
           <strong>${escapeHtml(league.leagueName || league.leagueId || "League")}</strong>
