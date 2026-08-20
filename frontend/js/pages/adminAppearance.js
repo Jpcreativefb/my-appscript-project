@@ -120,6 +120,9 @@ function adminAppearanceHubGroupLabel_(row) {
   row = row || {};
   const category = String(row.HubCategory || "").trim().toLowerCase();
   const group = String(row.HubGroup || "").trim();
+  if (category === "league") {
+    return "League Card — " + String(row.DisplayName || group || "League");
+  }
   if (!group) {
     if (category === "home") return "Navigation — Home";
     if (category === "more") return "Navigation — More";
@@ -152,6 +155,7 @@ function adminAppearanceHubManager_() {
     ADMIN_APPEARANCE_STATE.selectedHubSettingKey = String(row.SettingKey);
   }
   const category = String(row.HubCategory || "").toLowerCase();
+  const isLeagueCard = category === "league";
   const topNav = ["home", "sports", "reality", "awards", "more"].indexOf(category) !== -1 && !String(row.HubGroup || "").trim();
   const imageUrl = adminAppearanceHubAssetUrl_(row, "image");
   const iconUrl = adminAppearanceHubAssetUrl_(row, "icon");
@@ -160,6 +164,8 @@ function adminAppearanceHubManager_() {
   const gradientStart = String(row.GradientStart || color || "#354785");
   const gradientEnd = String(row.GradientEnd || color || "#20284a");
   const gradientAngle = Math.max(0, Math.min(360, Number(row.GradientAngle) || 135));
+  const imageOpacity = Math.max(0, Math.min(100, row.ImageOpacity == null || row.ImageOpacity === "" ? 100 : Number(row.ImageOpacity)));
+  const imageDarken = Math.max(0, Math.min(100, row.ImageDarken == null || row.ImageDarken === "" ? 35 : Number(row.ImageDarken)));
   const previewBackground = colorMode === "gradient"
     ? "linear-gradient(" + gradientAngle + "deg," + gradientStart + "," + gradientEnd + ")"
     : color;
@@ -175,14 +181,14 @@ function adminAppearanceHubManager_() {
 
   return `
     <details class="card admin-collapsible-card appearance-hub-editor" open>
-      <summary><strong>Hub + Navigation Appearance</strong><span>Gradients, hub artwork, league/show logos and bottom-nav icons</span></summary>
+      <summary><strong>Hub + Navigation Appearance</strong><span>Hubs, league cards, gradients, artwork and bottom-nav icons</span></summary>
       <div class="appearance-card-body">
         <div class="admin-sub">Pick a main hub or one of its subhubs. Every image area can use a web image directly, import that web image into your Google Drive, choose a photo/file, or take a photo. Main hub icon changes also feed the phone bottom navigation.</div>
 
         <div class="appearance-hub-live-preview" id="appearanceHubLivePreview">
           <div class="appearance-hub-live-fill" id="appearanceHubLiveFill" style="background:${adminAppearanceEscape_(previewBackground)}"></div>
-          ${imageUrl ? '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" src="' + adminAppearanceEscape_(imageUrl) + '" alt="Hub preview">' : '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" alt="Hub preview" hidden>'}
-          <div class="appearance-hub-live-shade"></div>
+          ${imageUrl ? '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" src="' + adminAppearanceEscape_(imageUrl) + '" alt="Hub preview" style="opacity:' + (imageOpacity / 100) + '">' : '<img id="appearanceHubLiveImage" class="appearance-hub-live-image" alt="Hub preview" hidden style="opacity:' + (imageOpacity / 100) + '">'}
+          <div class="appearance-hub-live-shade" id="appearanceHubLiveShade" style="background:rgba(0,0,0,${imageDarken / 100})"></div>
           <div class="appearance-hub-live-content">
             <div class="appearance-hub-live-icon" id="appearanceHubLiveIcon">${iconPreview}</div>
             <div class="appearance-hub-live-copy">
@@ -198,8 +204,9 @@ function adminAppearanceHubManager_() {
           <label>Area to Edit
             <select id="appearanceHubSettingSelect" class="input" onchange="adminAppearanceSelectHubSetting_(this.value)">${adminAppearanceHubOptions_()}</select>
           </label>
-          <label>Display Name
+          <label>${isLeagueCard ? "League Card Label" : "Display Name"}
             <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}" oninput="adminAppearanceMarkHubDirty_();adminAppearanceUpdateHubLivePreview_()">
+            ${isLeagueCard ? '<span class="admin-sub">Appearance label only — this does not rename the league.</span>' : ''}
           </label>
           <label>Color Style
             <select id="appearanceHubColorMode" class="input" onchange="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubColor_()">
@@ -232,7 +239,15 @@ function adminAppearanceHubManager_() {
         <div class="appearance-hub-media-grid">
           <div class="appearance-hub-media-card">
             <strong>Hub / League Image</strong>
-            <div class="appearance-hub-image-preview" id="appearanceHubImagePreview" style="background:${adminAppearanceEscape_(previewBackground)}">${imagePreview}</div>
+            <div class="appearance-hub-image-preview" id="appearanceHubImagePreview" style="background:${adminAppearanceEscape_(previewBackground)};--appearance-hub-image-opacity:${imageOpacity / 100};--appearance-hub-image-darken:${imageDarken / 100}">${imagePreview}<span class="appearance-hub-image-darken-layer" aria-hidden="true"></span></div>
+            <div class="appearance-hub-image-controls">
+              <label>Image Opacity <span class="admin-sub">0% invisible · 100% full image</span>
+                <div class="appearance-hub-angle-row"><input id="appearanceHubImageOpacity" type="range" min="0" max="100" step="1" value="${imageOpacity}" oninput="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubImageTone_()"><output id="appearanceHubImageOpacityValue">${imageOpacity}%</output></div>
+              </label>
+              <label>Darken Image <span class="admin-sub">Adds a dark layer behind the text</span>
+                <div class="appearance-hub-angle-row"><input id="appearanceHubImageDarken" type="range" min="0" max="100" step="1" value="${imageDarken}" oninput="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubImageTone_()"><output id="appearanceHubImageDarkenValue">${imageDarken}%</output></div>
+              </label>
+            </div>
             <div class="appearance-hub-asset-state is-saved" id="appearanceHubImageState">✓ Saved · ${adminAppearanceEscape_(imageSourceLabel)}</div>
             <label class="appearance-hub-url-label">Web Image URL<input id="appearanceHubImageUrlInput" class="input" value="${adminAppearanceEscape_(row.ImageSourceUrl || (row.ImageSourceType === "external-url" ? row.ImageUrl : "") || "")}" placeholder="https://example.com/image.jpg" oninput="adminAppearancePreviewHubUrl_('image',this.value)"></label>
             <input id="appearanceHubImageFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageFile')">
@@ -350,6 +365,7 @@ function adminAppearanceSetHubAssetPreview_(kind, url) {
       liveImage.hidden = true;
     }
   }
+  adminAppearancePreviewHubImageTone_();
   adminAppearanceUpdateHubLivePreview_();
 }
 
@@ -437,6 +453,26 @@ function adminAppearancePreviewHubColor_() {
   adminAppearanceUpdateHubLivePreview_();
 }
 
+function adminAppearancePreviewHubImageTone_() {
+  const opacityInput = document.getElementById("appearanceHubImageOpacity");
+  const darkenInput = document.getElementById("appearanceHubImageDarken");
+  const opacity = Math.max(0, Math.min(100, Number(opacityInput && opacityInput.value != null ? opacityInput.value : 100)));
+  const darken = Math.max(0, Math.min(100, Number(darkenInput && darkenInput.value != null ? darkenInput.value : 35)));
+  const opacityValue = document.getElementById("appearanceHubImageOpacityValue");
+  const darkenValue = document.getElementById("appearanceHubImageDarkenValue");
+  if (opacityValue) opacityValue.textContent = opacity + "%";
+  if (darkenValue) darkenValue.textContent = darken + "%";
+  const liveImage = document.getElementById("appearanceHubLiveImage");
+  const liveShade = document.getElementById("appearanceHubLiveShade");
+  if (liveImage) liveImage.style.opacity = String(opacity / 100);
+  if (liveShade) liveShade.style.background = "rgba(0,0,0," + (darken / 100) + ")";
+  const imagePreview = document.getElementById("appearanceHubImagePreview");
+  if (imagePreview) {
+    imagePreview.style.setProperty("--appearance-hub-image-opacity", String(opacity / 100));
+    imagePreview.style.setProperty("--appearance-hub-image-darken", String(darken / 100));
+  }
+}
+
 function adminAppearanceCollectHubSetting_() {
   const row = adminAppearanceHubRow_() || {};
   const colorPicker = document.getElementById("appearanceHubColor");
@@ -445,6 +481,8 @@ function adminAppearanceCollectHubSetting_() {
   const gradientStart = document.getElementById("appearanceHubGradientStartText");
   const gradientEnd = document.getElementById("appearanceHubGradientEndText");
   const gradientAngle = document.getElementById("appearanceHubGradientAngle");
+  const imageOpacity = document.getElementById("appearanceHubImageOpacity");
+  const imageDarken = document.getElementById("appearanceHubImageDarken");
   const display = document.getElementById("appearanceHubDisplayName");
   const iconText = document.getElementById("appearanceHubIconText");
   const showLabel = document.getElementById("appearanceHubShowNavLabel");
@@ -463,6 +501,8 @@ function adminAppearanceCollectHubSetting_() {
     imageFileId: String(row.ImageFileId || ""),
     imageSourceType: String(row.ImageSourceType || ""),
     imageSourceUrl: String(row.ImageSourceUrl || ""),
+    imageOpacity: Math.max(0, Math.min(100, Number(imageOpacity && imageOpacity.value != null ? imageOpacity.value : (row.ImageOpacity == null || row.ImageOpacity === "" ? 100 : row.ImageOpacity)))),
+    imageDarken: Math.max(0, Math.min(100, Number(imageDarken && imageDarken.value != null ? imageDarken.value : (row.ImageDarken == null || row.ImageDarken === "" ? 35 : row.ImageDarken)))),
     iconText: String(iconText && iconText.value || row.IconText || "").trim(),
     iconUrl: String(row.IconUrl || ""),
     iconFileId: String(row.IconFileId || ""),

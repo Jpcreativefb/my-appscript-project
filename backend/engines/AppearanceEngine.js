@@ -114,6 +114,8 @@ const APPEARANCE_HUB_SETTING_HEADERS = [
   "ImageFileId",
   "ImageSourceType",
   "ImageSourceUrl",
+  "ImageOpacity",
+  "ImageDarken",
   "IconText",
   "IconUrl",
   "IconFileId",
@@ -169,22 +171,76 @@ function appearanceHubSettingKey_(category, group) {
   return grp ? cat + ":" + grp : cat;
 }
 
+function appearanceLeagueDefaultRows_(spreadsheet) {
+  const ss = spreadsheet || appearanceSpreadsheet_();
+  const sheet = ss && ss.getSheetByName ? ss.getSheetByName("Leagues") : null;
+  if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
+
+  const rows = appearanceSheetRowsToObjects_(
+    sheet.getRange(1, 1, sheet.getLastRow(), sheet.getLastColumn()).getValues()
+  ).filter(function(row) {
+    return appearanceBool_(row.Active, true) && !!appearanceString_(row.LeagueId);
+  });
+
+  const palette = [
+    ["#315a8a", "#1d3454"],
+    ["#7c3f72", "#4a2545"],
+    ["#34735a", "#1f4938"],
+    ["#9a5b24", "#5f3715"],
+    ["#6550a7", "#392b68"],
+    ["#a13d4b", "#5d2430"],
+    ["#287188", "#174754"],
+    ["#5f6f2d", "#38421a"]
+  ];
+
+  function paletteIndex(value) {
+    const text = appearanceString_(value).toLowerCase();
+    let hash = 0;
+    for (let i = 0; i < text.length; i++) {
+      hash = ((hash << 5) - hash) + text.charCodeAt(i);
+      hash |= 0;
+    }
+    return Math.abs(hash) % palette.length;
+  }
+
+  return rows.map(function(league) {
+    const leagueId = appearanceString_(league.LeagueId);
+    const pair = palette[paletteIndex(leagueId)];
+    return {
+      SettingKey: appearanceHubSettingKey_("league", leagueId),
+      HubCategory: "league",
+      HubGroup: leagueId,
+      DisplayName: appearanceString_(league.LeagueName || leagueId),
+      Color: pair[0],
+      ColorMode: "gradient",
+      GradientStart: pair[0],
+      GradientEnd: pair[1],
+      GradientAngle: 135,
+      ImageOpacity: 100,
+      ImageDarken: 35,
+      IconText: "🏅",
+      ShowNavLabel: true,
+      Active: true
+    };
+  });
+}
+
 function appearanceGetHubAppearanceRows_(spreadsheet) {
   const cache = !spreadsheet && typeof CacheService !== "undefined" ? CacheService.getScriptCache() : null;
   if (cache) {
     try {
-      const cached = cache.get("appearance-hub-settings-v1218c2");
+      const cached = cache.get("appearance-hub-settings-v1218c4");
       if (cached) return JSON.parse(cached);
     } catch (err) {}
   }
 
-  const defaults = appearanceHubDefaultRows_();
+  const ss = spreadsheet || appearanceSpreadsheet_();
+  const defaults = appearanceHubDefaultRows_().concat(appearanceLeagueDefaultRows_(ss));
   const byKey = {};
   defaults.forEach(function(row) {
     byKey[appearanceNormalizeId_(row.SettingKey)] = Object.assign({}, row);
   });
 
-  const ss = spreadsheet || appearanceSpreadsheet_();
   const sheet = ss.getSheetByName(APPEARANCE_HUB_SETTINGS_SHEET);
   if (sheet) {
     appearanceReadObjects_(APPEARANCE_HUB_SETTINGS_SHEET, ss).forEach(function(row) {
@@ -208,13 +264,17 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
     row.GradientEnd = appearanceString_(row.GradientEnd || row.Color || "#20284a") || "#20284a";
     const angle = Number(row.GradientAngle);
     row.GradientAngle = isFinite(angle) ? Math.max(0, Math.min(360, angle)) : 135;
+    const imageOpacity = Number(row.ImageOpacity);
+    const imageDarken = Number(row.ImageDarken);
+    row.ImageOpacity = isFinite(imageOpacity) ? Math.max(0, Math.min(100, imageOpacity)) : 100;
+    row.ImageDarken = isFinite(imageDarken) ? Math.max(0, Math.min(100, imageDarken)) : 35;
     row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
     row.Active = appearanceBool_(row.Active, true);
     return row;
   });
 
   if (cache) {
-    try { cache.put("appearance-hub-settings-v1218c2", JSON.stringify(rows), 300); } catch (err) {}
+    try { cache.put("appearance-hub-settings-v1218c4", JSON.stringify(rows), 300); } catch (err) {}
   }
   return rows;
 }
@@ -975,6 +1035,8 @@ function adminSaveAppearanceHubSetting(payload) {
     ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
     ImageSourceType: appearanceString_(payload.imageSourceType || payload.ImageSourceType),
     ImageSourceUrl: appearanceString_(payload.imageSourceUrl || payload.ImageSourceUrl),
+    ImageOpacity: Math.max(0, Math.min(100, Number(payload.imageOpacity != null ? payload.imageOpacity : (payload.ImageOpacity != null ? payload.ImageOpacity : 100)))),
+    ImageDarken: Math.max(0, Math.min(100, Number(payload.imageDarken != null ? payload.imageDarken : (payload.ImageDarken != null ? payload.ImageDarken : 35)))),
     IconText: appearanceString_(payload.iconText || payload.IconText),
     IconUrl: appearanceString_(payload.iconUrl || payload.IconUrl),
     IconFileId: appearanceString_(payload.iconFileId || payload.IconFileId),
@@ -985,7 +1047,11 @@ function adminSaveAppearanceHubSetting(payload) {
     UpdatedAt: new Date()
   });
   SpreadsheetApp.flush();
-  try { CacheService.getScriptCache().remove("appearance-hub-settings-v1218c2"); } catch (err) {}
+  try {
+    const cache = CacheService.getScriptCache();
+    cache.remove("appearance-hub-settings-v1218c2");
+    cache.remove("appearance-hub-settings-v1218c4");
+  } catch (err) {}
   const saved = appearanceGetHubAppearanceRows_(ss).find(function(row) {
     return appearanceNormalizeId_(row.SettingKey) === appearanceNormalizeId_(settingKey);
   }) || {};

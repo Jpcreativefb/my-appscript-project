@@ -277,6 +277,16 @@ function dashboardHubColorSpec_(row, fallback) {
   };
 }
 
+function dashboardHubImageTone_(row) {
+  row = row || {};
+  const rawOpacity = Number(row.ImageOpacity);
+  const rawDarken = Number(row.ImageDarken);
+  return {
+    opacity: isFinite(rawOpacity) ? Math.max(0, Math.min(100, rawOpacity)) / 100 : 1,
+    darken: isFinite(rawDarken) ? Math.max(0, Math.min(100, rawDarken)) / 100 : 0.35
+  };
+}
+
 function dashboardAppearanceAssetUrl_(row, kind) {
   row = row || {};
   const fileId = String(kind === "icon" ? row.IconFileId || "" : row.ImageFileId || "").trim();
@@ -380,6 +390,41 @@ function dashboardGameCardAttrs_(game, cssVariable) {
     className: heroImage ? " has-game-image" : "",
     attrs: attrs,
     style: "--game-theme-color:" + escapeAttr(color) + ";" + (cssVariable || "--dashboard-game-card-image") + ":none;"
+  };
+}
+
+function dashboardLeagueCardAppearance_(league, game) {
+  league = league || {};
+  game = game || null;
+  const leagueId = String(league.leagueId || league.LeagueId || "").trim();
+  const setting = leagueId ? dashboardHubSetting_("league", leagueId) : {};
+  const fallbackColor = String(game && game.themeColor || "#354785").trim() || "#354785";
+  const colors = dashboardHubColorSpec_(setting, fallbackColor);
+  const tone = dashboardHubImageTone_(setting);
+  const leagueImage = dashboardAppearanceAssetUrl_(setting, "image");
+  const gameFileId = String(game && game.heroImageFileId || "").trim();
+  const gameImage = String(
+    game && (
+      game.heroImage ||
+      game.heroImageUrl ||
+      (gameFileId ? "https://drive.google.com/thumbnail?id=" + encodeURIComponent(gameFileId) + "&sz=w1200" : "")
+    ) || ""
+  ).trim();
+  const image = leagueImage || gameImage;
+  const attrs = image ? platformBackgroundAttrs(image, { variant: "hero", cssVariable: "--dashboard-league-card-image" }) : "";
+  return {
+    setting: setting,
+    colors: colors,
+    image: image,
+    className: image ? " has-league-image" : "",
+    attrs: attrs,
+    style: [
+      "--dashboard-league-color:" + escapeAttr(colors.color),
+      "--dashboard-league-fill:" + escapeAttr(colors.fill),
+      "--dashboard-league-card-image:none",
+      "--dashboard-league-image-opacity:" + tone.opacity,
+      "--dashboard-league-image-darken:" + tone.darken
+    ].join(";") + ";"
   };
 }
 
@@ -536,8 +581,9 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
           const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
           const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-hub-image" }) : "";
           const colors = dashboardHubColorSpec_(setting, "#354785");
+          const tone = dashboardHubImageTone_(setting);
           return `
-            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;">
+            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;--dashboard-hub-image-opacity:${tone.opacity};--dashboard-hub-image-darken:${tone.darken};">
               <summary>
                 <span class="dashboard-hub-icon">${dashboardHubIconHtml_(category, "", "dashboard-hub-icon-custom")}</span>
                 <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
@@ -573,7 +619,7 @@ function dashboardHubDisplayName_(category) {
 }
 
 function dashboardHubIcon_(category) {
-  return ({ sports: "🏈", reality: "📺", awards: "🏆", general: "🎲" })[String(category || "general")] || "🎲";
+  return ({ sports: "🏈", reality: "📺", awards: "🏆", general: "🎲", league: "🏅" })[String(category || "general")] || "🎲";
 }
 
 function dashboardHubDescription_(category) {
@@ -624,10 +670,11 @@ async function renderDashboardHubPage_(category) {
   const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
   const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-domain-image" }) : "";
   const colors = dashboardHubColorSpec_(setting, "#354785");
+  const tone = dashboardHubImageTone_(setting);
 
   return `
     <div class="page dashboard-domain-hub dashboard-domain-${escapeAttr(category)}">
-      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(colors.color)};--dashboard-domain-fill:${escapeAttr(colors.fill)};--dashboard-domain-image:none;">
+      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(colors.color)};--dashboard-domain-fill:${escapeAttr(colors.fill)};--dashboard-domain-image:none;--dashboard-domain-image-opacity:${tone.opacity};--dashboard-domain-image-darken:${tone.darken};">
         <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
         <div class="dashboard-domain-title-row">
           <span>${dashboardHubIconHtml_(category, "", "dashboard-domain-custom-icon")}</span>
@@ -656,10 +703,11 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames) {
   const attrs = image ? platformBackgroundAttrs(image, { variant: "hero", cssVariable: "--dashboard-subhub-image" }) : "";
   const parentSetting = dashboardHubSetting_(category, "");
   const colors = dashboardHubColorSpec_(setting, String(parentSetting.Color || "#354785"));
+  const tone = dashboardHubImageTone_(setting);
   const display = String(setting.DisplayName || group);
 
   return `
-    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-image:none;" open>
+    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-image:none;--dashboard-subhub-image-opacity:${tone.opacity};--dashboard-subhub-image-darken:${tone.darken};" open>
       <summary>
         <span class="dashboard-subhub-heading-icon">${dashboardHubIconHtml_(category, group, "dashboard-subhub-custom-icon")}</span>
         <span><strong>${escapeHtml(display)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>
@@ -1029,14 +1077,21 @@ function renderDashboardLeagueStandingCard_(league, game, standings, index) {
   const rank = userRow ? Number(userRow.rank || userRow.Rank) || (rows.indexOf(userRow) + 1) : 0;
   const score = userRow ? dashboardLeaderboardScore_(userRow) : "—";
   const leaderScore = leader ? dashboardLeaderboardScore_(leader) : "—";
-  const card = game ? dashboardGameCardAttrs_(game, "--dashboard-league-game-image") : { className: "", attrs: "", style: "--game-theme-color:#354785;--dashboard-league-game-image:none;" };
+  const card = dashboardLeagueCardAppearance_(league, game);
+  const leagueId = String(league.leagueId || league.LeagueId || "");
+  const leagueSetting = card.setting || {};
+  const leagueDisplayName = String(leagueSetting.DisplayName || league.leagueName || league.leagueId || "League");
+  const leagueIcon = leagueId ? dashboardHubIconHtml_("league", leagueId, "dashboard-league-card-icon") : "";
 
   return `
     <article id="dashboardLeagueStanding-${index}" class="dashboard-league-home-card${card.className}" ${card.attrs} style="${card.style}">
       <div class="dashboard-league-home-topline">
-        <div>
-          <strong>${escapeHtml(league.leagueName || league.leagueId || "League")}</strong>
-          <span>${escapeHtml(league.role || "member")}</span>
+        <div class="dashboard-league-title-wrap">
+          ${leagueIcon ? `<span class="dashboard-league-card-icon-wrap">${leagueIcon}</span>` : ""}
+          <span class="dashboard-league-title-copy">
+            <strong>${escapeHtml(leagueDisplayName)}</strong>
+            <span>${escapeHtml(league.role || "member")}</span>
+          </span>
         </div>
         ${rank ? `<b>#${rank}</b>` : `<b>—</b>`}
       </div>
