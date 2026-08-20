@@ -31,15 +31,23 @@ function showAuthView(view){
     "reset"
   ];
 
+  const viewIds = {
+    login: "loginForm",
+    signup: "signupView",
+    reset: "resetView"
+  };
+
+  if (views.indexOf(view) < 0) view = "login";
+
   views.forEach(name => {
 
-    document
-      .getElementById(name + "View")
-      .classList
-      .toggle(
-        "hidden",
-        name !== view
-      );
+    const panel = document.getElementById(viewIds[name]);
+    if (!panel) return;
+
+    panel.classList.toggle(
+      "hidden",
+      name !== view
+    );
 
   });
 
@@ -47,9 +55,16 @@ function showAuthView(view){
     .querySelectorAll(".auth-tab")
     .forEach((tab, index) => {
 
+      const tabView = tab.getAttribute("data-auth-view") || views[index];
+
       tab.classList.toggle(
         "active",
-        views[index] === view
+        tabView === view
+      );
+
+      tab.setAttribute(
+        "aria-selected",
+        tabView === view ? "true" : "false"
       );
 
     });
@@ -475,7 +490,17 @@ function bindAuthLoginForm_() {
   }
 }
 
+function bindAuthTabs_() {
+  document.querySelectorAll(".auth-tab[data-auth-view]").forEach(function(tab) {
+    tab.addEventListener("click", function(event) {
+      event.preventDefault();
+      showAuthView(tab.getAttribute("data-auth-view") || "login");
+    });
+  });
+}
+
 document.addEventListener("DOMContentLoaded", function() {
   bindAuthLoginForm_();
+  bindAuthTabs_();
   redirectRememberedSession_();
 });

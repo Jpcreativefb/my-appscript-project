@@ -1,0 +1,8 @@
+frontend/index.html
+frontend/js/auth.js
+frontend/js/pages/auth.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/auth_tab_navigation_v1218a1_tests.js
+AUTH_TAB_NAVIGATION_V1_2_18A1.md
+CHANGED_FILES_V1_2_18A1.txt
