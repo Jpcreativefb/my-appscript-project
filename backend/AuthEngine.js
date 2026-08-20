@@ -59,7 +59,9 @@ function authAllowResetRequest_(identifier){
 function loginUser(
   username,
   pin,
-  rememberMe
+  rememberMe,
+  deviceId,
+  deviceLabel
 ){
 
   username =
@@ -152,14 +154,25 @@ function loginUser(
 
   const sessionHours =
     keepSignedIn
-      ? 24 * 30
+      ? 24 * 90
       : 24;
 
-  const sessionExpiresAt =
+  let sessionExpiresAt =
     new Date(
       Date.now() +
       sessionHours * 60 * 60 * 1000
     ).toISOString();
+
+  if (typeof authCreateDeviceSession_ === "function") {
+    const deviceSession = authCreateDeviceSession_(
+      canonicalUsername,
+      token,
+      keepSignedIn,
+      deviceId,
+      deviceLabel
+    );
+    sessionExpiresAt = deviceSession.expiresAt || sessionExpiresAt;
+  }
 
   CacheService
     .getScriptCache()
@@ -199,6 +212,7 @@ function loginUser(
     token: token,
     username: canonicalUsername,
     rememberMe: keepSignedIn,
+    deviceId: String(deviceId || "").trim(),
     expiresAt: sessionExpiresAt,
     realName: record.user["RealName"] || "",
     displayName: record.user["DisplayName"] || record.user["RealName"] || canonicalUsername,
@@ -258,7 +272,7 @@ function getUsernameFromSessionToken_(token){
 
 }
 
-function findUserRecordBySessionToken_(token){
+function findLegacyUserRecordBySessionToken_(token){
 
   token =
     String(token || "").trim();
@@ -326,11 +340,29 @@ function findUserRecordBySessionToken_(token){
     }
 
     return record;
-
   }
 
   return null;
+}
 
+function findUserRecordBySessionToken_(token){
+
+  token =
+    String(token || "").trim();
+
+  if (!token) {
+    return null;
+  }
+
+  if (typeof authFindDeviceSession_ === "function") {
+    const deviceSession = authFindDeviceSession_(token);
+    if (deviceSession && deviceSession.userRecord) {
+      return deviceSession.userRecord;
+    }
+  }
+
+  // Backward compatibility for sessions created before v1.2.18a.
+  return findLegacyUserRecordBySessionToken_(token);
 }
 
 function validateSessionToken(token){
@@ -338,18 +370,24 @@ function validateSessionToken(token){
   token =
     String(token || "").trim();
 
-  let record =
-    findUserRecordBySessionToken_(
-      token
-    );
+  let deviceSession = null;
+  if (typeof authFindDeviceSession_ === "function") {
+    deviceSession = authFindDeviceSession_(token);
+  }
+
+  let record = deviceSession && deviceSession.userRecord
+    ? deviceSession.userRecord
+    : findLegacyUserRecordBySessionToken_(token);
 
   if (!record) {
-
     return {
       success: false,
       message: "Invalid or expired session"
     };
+  }
 
+  if (deviceSession && typeof authTouchDeviceSession_ === "function") {
+    deviceSession = authTouchDeviceSession_(deviceSession) || deviceSession;
   }
 
   const user =
@@ -358,10 +396,17 @@ function validateSessionToken(token){
   const col =
     record.col;
 
-  const expiresAt =
-    col.sessionExpiresAt > -1
-      ? record.row[col.sessionExpiresAt]
-      : "";
+  const expiresAt = deviceSession
+    ? deviceSession.expiresAt
+    : (
+        col.sessionExpiresAt > -1
+          ? record.row[col.sessionExpiresAt]
+          : ""
+      );
+
+  const rememberMe = deviceSession
+    ? deviceSession.rememberMe === true
+    : true;
 
   const isAdminUser =
     user["IsAdmin"] === true ||
@@ -392,10 +437,44 @@ function validateSessionToken(token){
         .toLowerCase() === "true",
     notificationChannel:
       user["NotificationChannel"] || "none",
+    rememberMe: rememberMe,
+    deviceId: deviceSession ? deviceSession.deviceId : "",
     expiresAt: expiresAt,
-    createdAt: Date.now()
+    createdAt: Date.now(),
+    validatedAt: Date.now()
   };
+}
 
+function logoutSessionToken(token){
+  token = String(token || "").trim();
+
+  if (!token) {
+    return { success: true, revoked: false };
+  }
+
+  if (typeof authRevokeDeviceSession_ === "function") {
+    const result = authRevokeDeviceSession_(token);
+    if (result && result.revoked) {
+      return result;
+    }
+  }
+
+  // Legacy single-token session cleanup.
+  const legacyRecord = findLegacyUserRecordBySessionToken_(token);
+  if (legacyRecord) {
+    updateUserFields_(legacyRecord.rowNumber, {
+      sessionToken: "",
+      sessionExpiresAt: "",
+      lastUpdated: new Date().toISOString()
+    });
+  }
+
+  CacheService.getScriptCache().remove(token);
+
+  return {
+    success: true,
+    revoked: !!legacyRecord
+  };
 }
 
 function requireUserFromToken_(token){

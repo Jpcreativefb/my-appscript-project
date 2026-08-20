@@ -63,6 +63,22 @@ const SCHEMA = {
     ]
   },
 
+  UserSessions: {
+    required: [
+      "SessionId",
+      "Username",
+      "TokenHash",
+      "DeviceId",
+      "DeviceLabel",
+      "RememberMe",
+      "CreatedAt",
+      "LastUsedAt",
+      "ExpiresAt",
+      "RevokedAt",
+      "LastUpdated"
+    ]
+  },
+
   Votes: {
     required: [
       "Timestamp",

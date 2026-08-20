@@ -34,49 +34,42 @@ document.addEventListener("DOMContentLoaded", async () => {
     typeof apiValidateSession === "function"
   ) {
 
-    updateLoaderProgress(14, "Validating account access…");
+    const recentlyValidated =
+      Number(session.validatedAt || 0) > 0 &&
+      Date.now() - Number(session.validatedAt || 0) < 5 * 60 * 1000;
 
-    const validation =
-      await apiValidateSession(
-        session.token
-      );
-
-    if (
-      !validation ||
-      !validation.success
-    ) {
-
-      const message =
-        validation && validation.message
-          ? String(validation.message)
-          : "";
-
-      if (
-        message
-          .toLowerCase()
-          .indexOf("network") > -1
-      ) {
-
-        setSession(session);
-
-      } else {
-
-        clearSession();
-
-        window.location.href =
-          "./index.html";
-
-        return;
-
-      }
-
+    if (recentlyValidated) {
+      setSession(session);
     } else {
+      updateLoaderProgress(14, "Validating this device…");
 
-      setSession({
-        ...session,
-        ...validation
-      });
+      try {
+        const validation = await apiValidateSession(session.token);
 
+        if (!validation || !validation.success) {
+          clearSession();
+          window.location.replace("./index.html");
+          return;
+        }
+
+        setSession({
+          ...session,
+          ...validation,
+          validatedAt: Date.now()
+        });
+      } catch (err) {
+        console.warn("Session validation temporarily unavailable", err);
+
+        // Do not bounce a locally unexpired remembered device back to login
+        // because Apps Script or the network had a transient startup error.
+        if (isSessionValid(session)) {
+          setSession(session);
+        } else {
+          clearSession();
+          window.location.replace("./index.html");
+          return;
+        }
+      }
     }
 
   } else {
@@ -359,12 +352,20 @@ function clearStartupPayload() {
    LOGOUT
 ====================== */
 
-function logout() {
+async function logout() {
 
-  clearSession();
+  const session = typeof getSession === "function" ? getSession() : null;
 
-  window.location.href =
-    "./index.html";
+  try {
+    if (session && session.token && typeof apiLogout === "function") {
+      await apiLogout(session.token);
+    }
+  } catch (err) {
+    console.warn("Logout revoke warning", err);
+  } finally {
+    clearSession();
+    window.location.replace("./index.html");
+  }
 
 }
 
@@ -373,8 +374,8 @@ function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility";
-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login";
+const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {

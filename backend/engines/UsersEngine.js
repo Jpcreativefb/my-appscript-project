@@ -982,6 +982,10 @@ function resetPin(identifier, resetCode, newPin){
     }
   );
 
+  if (typeof authRevokeAllDeviceSessionsForUser_ === "function") {
+    authRevokeAllDeviceSessionsForUser_(record.user["Username"] || identifier);
+  }
+
   return {
     success: true,
     message: "PIN reset successfully"

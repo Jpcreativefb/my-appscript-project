@@ -502,6 +502,33 @@ async function apiPost(action, payload = {}) {
    LOGIN
 ====================== */
 
+function apiGetOrCreateDeviceId_() {
+  const key = "awardsDeviceId";
+  try {
+    let id = localStorage.getItem(key) || "";
+    if (!id) {
+      id = (window.crypto && typeof window.crypto.randomUUID === "function")
+        ? window.crypto.randomUUID()
+        : "device-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+      localStorage.setItem(key, id);
+    }
+    return id;
+  } catch (err) {
+    return "device-session";
+  }
+}
+
+function apiGetDeviceLabel_() {
+  try {
+    const nav = window.navigator || {};
+    const standalone = window.matchMedia && window.matchMedia("(display-mode: standalone)").matches;
+    const platform = String(nav.userAgentData && nav.userAgentData.platform || nav.platform || "Device");
+    return (standalone ? "App · " : "Browser · ") + platform;
+  } catch (err) {
+    return "Awards App device";
+  }
+}
+
 async function apiLogin(username, pin, rememberMe) {
 
   return apiPost("login", {
@@ -510,9 +537,17 @@ async function apiLogin(username, pin, rememberMe) {
     rememberMe:
       rememberMe === false
         ? "false"
-        : "true"
+        : "true",
+    deviceId: apiGetOrCreateDeviceId_(),
+    deviceLabel: apiGetDeviceLabel_()
   });
 
+}
+
+async function apiLogout(token) {
+  return apiPost("logout", {
+    token: String(token || "").trim()
+  });
 }
 
 async function apiValidateSession(token) {

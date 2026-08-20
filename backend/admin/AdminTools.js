@@ -865,6 +865,10 @@ function apiAdminResetUserPin(payload) {
       .setValue(hashUserPinForStorage_(pin));
   }
 
+  if (typeof authRevokeAllDeviceSessionsForUser_ === "function") {
+    authRevokeAllDeviceSessionsForUser_(targetUsername);
+  }
+
   if (
     typeof clearAppCaches ===
     "function"
@@ -998,6 +1002,10 @@ function apiAdminToggleUserActive(payload) {
         found.col.active + 1
       )
       .setValue(nextActive);
+  }
+
+  if (!nextActive && typeof authRevokeAllDeviceSessionsForUser_ === "function") {
+    authRevokeAllDeviceSessionsForUser_(targetUsername);
   }
 
   if (

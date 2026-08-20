@@ -16,6 +16,11 @@ function setAuthMessage(message, type){
     type === "success"
   );
 
+  el.classList.toggle(
+    "status",
+    type === "status"
+  );
+
 }
 
 function showAuthView(view){
@@ -75,89 +80,84 @@ function getSelectedSignupContactMethod(){
 
 }
 
+let AUTH_LOGIN_IN_FLIGHT = false;
+
+function setLoginBusy_(busy, label) {
+  const button = document.getElementById("loginButton");
+  const loginView = document.getElementById("loginView");
+  AUTH_LOGIN_IN_FLIGHT = !!busy;
+
+  if (button) {
+    button.disabled = !!busy;
+    button.classList.toggle("is-loading", !!busy);
+    const text = button.querySelector(".auth-button-text");
+    if (text) text.textContent = label || (busy ? "Signing in…" : "Sign In");
+  }
+
+  if (loginView) {
+    loginView.setAttribute("aria-busy", busy ? "true" : "false");
+  }
+}
+
+function showLoginCard_(message) {
+  const boot = document.getElementById("authBoot");
+  const card = document.getElementById("authCard");
+  if (boot) boot.classList.add("hidden");
+  if (card) card.classList.remove("auth-card-hidden");
+  document.body.classList.remove("auth-booting");
+  if (message) setAuthMessage(message);
+}
+
+function setAuthBoot_(title, detail) {
+  const titleEl = document.getElementById("authBootTitle");
+  const detailEl = document.getElementById("authBootDetail");
+  if (titleEl) titleEl.textContent = title || "Opening PATTC Predicts";
+  if (detailEl) detailEl.textContent = detail || "Checking this device…";
+}
+
 async function login(){
 
-  const username =
-    document
-      .getElementById("username")
-      .value
-      .trim();
+  if (AUTH_LOGIN_IN_FLIGHT) return;
 
-  const pin =
-    document
-      .getElementById("pin")
-      .value
-      .trim();
-
-  const rememberInput =
-    document.getElementById(
-      "rememberDevice"
-    );
-
-  const rememberMe =
-    rememberInput
-      ? rememberInput.checked
-      : true;
+  const username = document.getElementById("username").value.trim();
+  const pin = document.getElementById("pin").value.trim();
+  const rememberInput = document.getElementById("rememberDevice");
+  const rememberMe = rememberInput ? rememberInput.checked : true;
 
   setAuthMessage("");
 
   if(!username || !pin){
-
-    setAuthMessage(
-      "Enter your username, email, or phone and PIN"
-    );
-
+    setAuthMessage("Enter your username, email, or phone and PIN");
     return;
-
   }
+
+  setLoginBusy_(true, "Signing in…");
+  setAuthMessage("Securely checking your account…", "status");
 
   try{
-
-    const res =
-      await apiLogin(
-        username,
-        pin,
-        rememberMe
-      );
+    const res = await apiLogin(username, pin, rememberMe);
 
     if(!res.success){
-
-      setAuthMessage(
-        res.message || "Invalid login"
-      );
-
+      setAuthMessage(res.message || res.error || "Invalid login");
+      setLoginBusy_(false, "Sign In");
       return;
-
     }
 
-    if (
-      typeof setSession === "function"
-    ) {
-
-      setSession(res);
-
+    if (typeof setSession === "function") {
+      setSession({ ...res, rememberMe: rememberMe, validatedAt: Date.now() });
     } else {
-
-      localStorage.setItem(
-        "session",
-        JSON.stringify(res)
-      );
-
+      localStorage.setItem("session", JSON.stringify({ ...res, rememberMe, createdAt: Date.now(), validatedAt: Date.now() }));
     }
 
-    window.location.href =
-      "./app.html";
+    setAuthMessage("Signed in ✓ Opening app…", "success");
+    setLoginBusy_(true, "Signed in ✓");
+    window.location.replace("./app.html");
 
   }catch(err){
-
     console.error(err);
-
-    setAuthMessage(
-      "Connection error"
-    );
-
+    setAuthMessage("Could not reach the app. Check your connection and try again.");
+    setLoginBusy_(false, "Sign In");
   }
-
 }
 
 async function signup(){
@@ -410,95 +410,72 @@ async function resetPin(){
 }
 
 
+
+
 /* =========================
-   REMEMBERED LOGIN
+   REMEMBERED DEVICE LOGIN — v1.2.18a
 ========================= */
 
 async function redirectRememberedSession_(){
-
-  if (
-    typeof getSession !== "function"
-  ) {
+  if (typeof getSession !== "function") {
+    showLoginCard_();
     return;
   }
 
-  const session =
-    getSession();
+  const session = getSession();
 
-  if (
-    !session ||
-    !session.token
-  ) {
+  if (!session || !session.token) {
+    showLoginCard_();
     return;
   }
 
-  if (
-    typeof apiValidateSession !== "function"
-  ) {
+  const name = session.displayName || session.realName || session.username || "";
+  setAuthBoot_(name ? "Welcome back, " + name : "Welcome back", "Checking this device…");
 
-    window.location.href =
-      "./app.html";
-
+  // A just-validated session coming back from app.html does not need another
+  // round-trip just because the user refreshed the login URL.
+  if (session.validatedAt && Date.now() - Number(session.validatedAt) < 5 * 60 * 1000) {
+    window.location.replace("./app.html");
     return;
-
   }
 
   try {
+    const res = await apiValidateSession(session.token);
 
-    const res =
-      await apiValidateSession(
-        session.token
-      );
-
-    if (
-      res &&
-      res.success
-    ) {
-
-      setSession({
-        ...session,
-        ...res
-      });
-
-      window.location.href =
-        "./app.html";
-
+    if (res && res.success) {
+      setSession({ ...session, ...res, validatedAt: Date.now() });
+      window.location.replace("./app.html");
       return;
-
-    }
-
-    const message =
-      res && res.message
-        ? String(res.message)
-        : "";
-
-    if (
-      message
-        .toLowerCase()
-        .indexOf("network") > -1
-    ) {
-
-      window.location.href =
-        "./app.html";
-
-      return;
-
     }
 
     clearSession();
-
+    showLoginCard_(res && res.message ? res.message : "Your saved sign-in expired. Sign in again.");
   } catch (err) {
+    console.warn("Remembered login validation failed", err);
 
-    console.warn(
-      "Remembered login validation failed",
-      err
-    );
+    // A temporary network/Apps Script hiccup should not force an otherwise
+    // unexpired remembered device back through the PIN screen.
+    if (typeof isSessionValid === "function" && isSessionValid(session)) {
+      window.location.replace("./app.html");
+      return;
+    }
 
+    clearSession();
+    showLoginCard_("Could not restore your saved sign-in. Please sign in again.");
   }
-
 }
 
-document.addEventListener(
-  "DOMContentLoaded",
-  redirectRememberedSession_
-);
+function bindAuthLoginForm_() {
+  const form = document.getElementById("loginForm");
+  if (form) {
+    form.addEventListener("submit", function(event) {
+      event.preventDefault();
+      login();
+    });
+  }
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  bindAuthLoginForm_();
+  redirectRememberedSession_();
+});

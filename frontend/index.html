@@ -75,19 +75,28 @@
 
 <link
   rel="stylesheet"
-  href="./css/styles.css?v=311-external-results-inbox"
+  href="./css/styles.css?v=v1218a-device-login"
 >
 
 </head>
 
-<body>
+<body class="auth-booting">
 
 <div class="login-page">
 
-  <div class="login-card">
+  <div id="authBoot" class="auth-boot-screen" aria-live="polite">
+    <img class="auth-boot-icon" src="./icons/icon-192-v2.png" alt="">
+    <div id="authBootTitle" class="auth-boot-title">Opening PATTC Predicts</div>
+    <div id="authBootDetail" class="auth-boot-detail">Checking this device…</div>
+    <div class="auth-boot-spinner" aria-hidden="true"></div>
+  </div>
 
-    <div class="login-title">
-      🏆 PATTC Predicts 🏆
+  <div id="authCard" class="login-card auth-card-hidden">
+
+    <div class="login-brand">
+      <img class="login-app-icon" src="./icons/icon-192-v2.png" alt="">
+      <div class="login-title">PATTC Predicts</div>
+      <div class="login-tagline">Play • Predict • Compete</div>
     </div>
 
     <div class="login-sub" id="authSubtitle">
@@ -100,23 +109,32 @@
       <button class="auth-tab" onclick="showAuthView('reset')">Reset PIN</button>
     </div>
 
-    <div id="loginView" class="auth-view">
+    <form id="loginForm" class="auth-view" novalidate>
 
-      <input
-        id="username"
-        class="input"
-        placeholder="Username, email, or phone"
-        autocomplete="username"
-      >
+      <label class="auth-field">
+        <span>Username, email, or phone</span>
+        <input
+          id="username"
+          class="input"
+          placeholder="Enter your account"
+          autocomplete="username"
+          autocapitalize="none"
+          spellcheck="false"
+        >
+      </label>
 
-      <input
-        id="pin"
-        class="input"
-        placeholder="PIN"
-        inputmode="numeric"
-        maxlength="4"
-        type="password"
-      >
+      <label class="auth-field">
+        <span>PIN</span>
+        <input
+          id="pin"
+          class="input"
+          placeholder="4-digit PIN"
+          inputmode="numeric"
+          autocomplete="current-password"
+          maxlength="4"
+          type="password"
+        >
+      </label>
 
       <label class="remember-row">
         <input
@@ -124,17 +142,22 @@
           type="checkbox"
           checked
         >
-        <span>Keep me signed in on this device</span>
+        <span>
+          <strong>Keep me signed in on this device</strong>
+          <small>Stay signed in until you log out or this device session expires.</small>
+        </span>
       </label>
 
       <button
-        class="button"
-        onclick="login()"
+        id="loginButton"
+        class="button auth-login-button"
+        type="submit"
       >
-        Login
+        <span class="auth-button-spinner" aria-hidden="true"></span>
+        <span class="auth-button-text">Sign In</span>
       </button>
 
-    </div>
+    </form>
 
     <div id="signupView" class="auth-view hidden">
 
@@ -268,18 +291,18 @@
 <script src="./js/config.js"></script>
 <script src="./assets/images/image-manifest.js?v=311-external-results-inbox"></script>
 <script src="./js/imageEngine.js?v=311-external-results-inbox"></script>
-<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility"></script>
-<script src="./js/state.js"></script>
-<script src="./js/auth.js"></script>
+<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login"></script>
+<script src="./js/state.js?v=v1218a-device-login"></script>
+<script src="./js/auth.js?v=v1218a-device-login"></script>
 
 <!-- =========================
      PWA SERVICE WORKER
 ========================= -->
-<script src="./js/pwa.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility"></script>
+<script src="./js/pwa.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login"></script>
 
 </body>
 </html>
 
-<!-- route-hotfix:v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility -->
+<!-- route-hotfix:v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login -->
 
-<!-- asset-version:327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility -->
+<!-- asset-version:327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a-device-login -->

@@ -49,8 +49,14 @@ function doPost(e) {
       return json(loginUser(
         body.username,
         body.pin,
-        body.rememberMe
+        body.rememberMe,
+        body.deviceId,
+        body.deviceLabel
       ));
+    }
+
+    if (action === "logout") {
+      return json(logoutSessionToken(body.token));
     }
 
     if (action === "signup") {
@@ -554,6 +560,7 @@ function doGet(e) {
 
     if (
       action === "login" ||
+      action === "logout" ||
       action === "signup" ||
       action === "requestPinReset" ||
       action === "resetPin" ||

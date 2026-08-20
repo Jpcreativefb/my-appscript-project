@@ -34,109 +34,295 @@
   }
   
   /* ======================
-     LOGIN
+     LOGIN / DEVICE SESSION — v1.2.18a
   ====================== */
-  
+
   .login-page{
     min-height:100vh;
-  
+    min-height:100dvh;
     display:flex;
     align-items:center;
     justify-content:center;
-  
-    padding:20px;
+    padding:
+      max(18px, env(safe-area-inset-top))
+      max(18px, env(safe-area-inset-right))
+      max(18px, env(safe-area-inset-bottom))
+      max(18px, env(safe-area-inset-left));
+    background:
+      radial-gradient(circle at 50% -12%, rgba(250,204,21,.20), transparent 34%),
+      radial-gradient(circle at 12% 80%, rgba(59,130,246,.13), transparent 30%),
+      linear-gradient(160deg,#020617 0%,#0f172a 56%,#111827 100%);
   }
-  
-  .login-card{
-  
-    width:100%;
-    max-width:420px;
-  
-    background:#111827;
-  
-    border-radius:20px;
-  
-    padding:28px;
-  
-    box-shadow:
-      0 10px 30px rgba(0,0,0,.3);
-  }
-  
-  .login-title{
-    font-size:32px;
-    font-weight:700;
-  
+
+  .auth-boot-screen{
+    width:min(360px,calc(100vw - 40px));
+    display:grid;
+    justify-items:center;
+    gap:12px;
     text-align:center;
-  
-    margin-bottom:10px;
+    color:#f8fafc;
   }
-  
+
+  .auth-boot-icon,
+  .login-app-icon{
+    width:82px;
+    height:82px;
+    border-radius:22px;
+    box-shadow:0 18px 55px rgba(0,0,0,.38),0 0 0 1px rgba(250,204,21,.28);
+  }
+
+  .auth-boot-title{
+    margin-top:4px;
+    font-size:22px;
+    font-weight:900;
+    letter-spacing:.01em;
+  }
+
+  .auth-boot-detail{
+    color:#cbd5e1;
+    font-size:14px;
+  }
+
+  .auth-boot-spinner,
+  .auth-button-spinner{
+    width:20px;
+    height:20px;
+    border:2px solid rgba(250,204,21,.22);
+    border-top-color:#facc15;
+    border-radius:999px;
+    animation:authSpin .75s linear infinite;
+  }
+
+  .auth-boot-spinner{
+    width:28px;
+    height:28px;
+    margin-top:4px;
+  }
+
+  @keyframes authSpin{to{transform:rotate(360deg)}}
+
+  .login-card{
+    width:100%;
+    max-width:430px;
+    background:linear-gradient(180deg,rgba(17,24,39,.97),rgba(8,15,29,.98));
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:24px;
+    padding:26px;
+    box-shadow:0 28px 80px rgba(0,0,0,.46),0 0 0 1px rgba(250,204,21,.06) inset;
+    transition:opacity .18s ease,transform .18s ease;
+  }
+
+  .auth-card-hidden{
+    position:absolute;
+    opacity:0;
+    pointer-events:none;
+    transform:translateY(8px) scale(.985);
+  }
+
+  .login-brand{
+    display:grid;
+    justify-items:center;
+    gap:7px;
+    margin-bottom:14px;
+  }
+
+  .login-app-icon{
+    width:68px;
+    height:68px;
+    border-radius:19px;
+    margin-bottom:3px;
+  }
+
+  .login-title{
+    font-size:30px;
+    line-height:1;
+    font-weight:900;
+    text-align:center;
+    letter-spacing:-.025em;
+  }
+
+  .login-tagline{
+    color:#facc15;
+    font-size:12px;
+    font-weight:800;
+    letter-spacing:.12em;
+    text-transform:uppercase;
+  }
+
   .login-sub{
     text-align:center;
-    opacity:.7;
-  
-    margin-bottom:28px;
+    color:#94a3b8;
+    margin-bottom:18px;
+    font-size:14px;
   }
-  
-  .input{
-    width:100%;
-  
-    height:56px;
-  
-    border:none;
+
+  .auth-tabs{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:6px;
+    padding:5px;
+    margin-bottom:20px;
     border-radius:14px;
-  
-    padding:0 16px;
-  
-    font-size:18px;
-  
-    margin-bottom:16px;
+    background:rgba(255,255,255,.045);
+    border:1px solid rgba(255,255,255,.07);
   }
-  
-  .button{
-  
-    width:100%;
-    height:56px;
-    min-height: 44px;
-    min-width: 44px;
-  
-    border:none;
-    border-radius:14px;
-  
-    background:#facc15;
-    color:black;
-  
-    font-size:18px;
-    font-weight:700;
-  
+
+  .auth-tab{
+    min-height:38px;
+    border:0;
+    border-radius:10px;
+    background:transparent;
+    color:#94a3b8;
+    font-size:13px;
+    font-weight:800;
     cursor:pointer;
   }
-  
-  .button:active{
-    transform:scale(.98);
+
+  .auth-tab.active{
+    background:#1e293b;
+    color:#fff;
+    box-shadow:0 4px 14px rgba(0,0,0,.24);
   }
 
-  button,
-  input,
-  select,
-  textarea {
-
-    font-size: 16px;
-
-    -webkit-tap-highlight-color:
-      transparent;
+  .auth-view{
+    display:grid;
+    gap:13px;
   }
-  
+
+  .auth-field{
+    display:grid;
+    gap:7px;
+    color:#cbd5e1;
+    font-size:12px;
+    font-weight:800;
+  }
+
+  .input{
+    width:100%;
+    height:52px;
+    border:1px solid rgba(255,255,255,.12);
+    border-radius:13px;
+    padding:0 15px;
+    margin:0;
+    background:#f8fafc;
+    color:#0f172a;
+    font-size:17px;
+    outline:none;
+    box-shadow:0 1px 0 rgba(255,255,255,.05) inset;
+  }
+
+  .input:focus{
+    border-color:#facc15;
+    box-shadow:0 0 0 3px rgba(250,204,21,.15);
+  }
+
+  .remember-row{
+    display:grid;
+    grid-template-columns:20px 1fr;
+    gap:10px;
+    align-items:start;
+    padding:11px 12px;
+    border-radius:12px;
+    background:rgba(255,255,255,.035);
+    color:#e2e8f0;
+    cursor:pointer;
+  }
+
+  .remember-row input{
+    width:18px;
+    height:18px;
+    margin:2px 0 0;
+    accent-color:#facc15;
+  }
+
+  .remember-row span{
+    display:grid;
+    gap:3px;
+    font-size:13px;
+    line-height:1.3;
+  }
+
+  .remember-row small{
+    color:#94a3b8;
+    font-size:11px;
+    font-weight:500;
+  }
+
+  .button{
+    width:100%;
+    height:54px;
+    min-height:44px;
+    min-width:44px;
+    border:none;
+    border-radius:13px;
+    background:#facc15;
+    color:#111827;
+    font-size:17px;
+    font-weight:900;
+    cursor:pointer;
+  }
+
+  .button:active{transform:scale(.985)}
+  .button:disabled{cursor:wait;opacity:.78;transform:none}
+
+  .auth-login-button{
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    gap:9px;
+    margin-top:2px;
+  }
+
+  .auth-button-spinner{display:none}
+  .auth-login-button.is-loading .auth-button-spinner{display:inline-block}
+
   .error{
-    color:#f87171;
+    color:#fca5a5;
     text-align:center;
-    margin-top:16px;
+    margin-top:14px;
+    font-size:13px;
+    line-height:1.4;
   }
-  
-  .hidden{
-    display:none !important;
+
+  .error.success{color:#86efac}
+  .error.status{color:#cbd5e1}
+
+  .auth-note{
+    color:#94a3b8;
+    font-size:12px;
+    line-height:1.45;
   }
-  
+
+  .preference-card{
+    padding:12px;
+    border:1px solid rgba(255,255,255,.09);
+    border-radius:13px;
+    background:rgba(255,255,255,.025);
+  }
+
+  .preference-title{font-weight:800;margin-bottom:8px}
+  .radio-row{display:flex;gap:8px;padding:6px 0;color:#cbd5e1;font-size:12px;line-height:1.35}
+  .secondary-button{background:#334155;color:#f8fafc}
+
+  .hidden{display:none !important}
+
+  @media (max-width:520px){
+    .login-page{align-items:stretch;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+    .login-card{
+      max-width:none;
+      min-height:100dvh;
+      border-radius:0;
+      border-left:0;
+      border-right:0;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      padding:clamp(18px,5vw,28px);
+    }
+    .auth-boot-screen{align-self:center;margin:auto}
+    .login-title{font-size:28px}
+  }
+
   /* ======================
      APP
   ====================== */
@@ -1978,83 +2164,6 @@ details[open] > summary .admin-collapse-icon {
   border: none;
 }
 
-/* Add near the LOGIN section in frontend/css/styles.css */
-
-.auth-tabs{
-  display:grid;
-  grid-template-columns:repeat(3,1fr);
-  gap:8px;
-  margin-bottom:18px;
-}
-
-.auth-tab{
-  border:none;
-  border-radius:12px;
-  padding:10px 8px;
-  background:#1f2937;
-  color:white;
-  font-weight:700;
-  cursor:pointer;
-}
-
-.auth-tab.active{
-  background:#facc15;
-  color:black;
-}
-
-.auth-view{
-  width:100%;
-}
-
-.preference-card{
-  border:1px solid rgba(255,255,255,.14);
-  border-radius:16px;
-  padding:14px;
-  margin:0 0 14px;
-  background:rgba(255,255,255,.05);
-}
-
-.preference-title{
-  font-weight:800;
-  margin-bottom:10px;
-  color:#f8fafc;
-}
-
-.radio-row{
-  display:flex;
-  align-items:flex-start;
-  gap:10px;
-  line-height:1.35;
-  margin:0 0 10px;
-  color:#e5e7eb;
-  font-size:14px;
-}
-
-.radio-row:last-child{
-  margin-bottom:0;
-}
-
-.radio-row input{
-  margin-top:3px;
-}
-
-.auth-note{
-  color:#cbd5e1;
-  font-size:13px;
-  line-height:1.4;
-  margin:0 0 16px;
-}
-
-.secondary-button{
-  background:#334155;
-  color:white;
-  margin-bottom:16px;
-}
-
-.error.success{
-  color:#86efac;
-}
-
 /* ======================
    DASHBOARD GAMES HUB
    Game images + game colors restored
@@ -2388,21 +2497,6 @@ details[open] > summary .admin-collapse-icon {
 }
 
 
-
-.remember-row {
-  align-items: center;
-  color: #d1d5db;
-  display: flex;
-  font-size: 0.92rem;
-  gap: 0.5rem;
-  justify-content: flex-start;
-  margin: 0.35rem 0 0.8rem;
-}
-
-.remember-row input {
-  height: 1rem;
-  width: 1rem;
-}
 
 /* ======================
    Admin save progress states

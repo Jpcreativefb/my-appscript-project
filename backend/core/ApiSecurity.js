@@ -44,9 +44,9 @@ function apiSecurityRequireSession_(payload) {
     throw new Error("Authentication required");
   }
 
-  // Deliberately validate against the Users sheet instead of trusting
-  // CacheService as an authentication authority. This makes deactivation,
-  // PIN resets and token replacement take effect immediately.
+  // Deliberately validate against the persisted device-session store instead
+  // of trusting CacheService as an authentication authority. This makes
+  // logout, deactivation and PIN resets take effect immediately.
   const record =
     typeof findUserRecordBySessionToken_ === "function"
       ? findUserRecordBySessionToken_(token)

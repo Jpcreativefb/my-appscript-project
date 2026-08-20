@@ -34,8 +34,8 @@ function getSessionTtlMs() {
     typeof CONFIG !== "undefined"
       ? Number(
           CONFIG.SESSION_TTL_HOURS
-        ) || 168
-      : 168;
+        ) || 2160
+      : 2160;
 
   return (
     hours *
@@ -50,87 +50,66 @@ function getSessionTtlMs() {
    SESSION STORAGE
 ====================== */
 
+function readSessionStorageValue_(storage) {
+  try {
+    return storage ? storage.getItem("session") : null;
+  } catch (err) {
+    return null;
+  }
+}
+
 function getSession() {
 
   try {
 
-    const raw =
-      localStorage.getItem(
-        "session"
-      );
+    // Remembered sessions live in localStorage. Session-only logins live in
+    // sessionStorage so the checkbox finally controls persistence.
+    const localRaw = readSessionStorageValue_(window.localStorage);
+    const tabRaw = readSessionStorageValue_(window.sessionStorage);
+    const raw = localRaw || tabRaw;
 
     if (!raw) {
       return null;
     }
 
-    const session =
-      JSON.parse(raw);
+    const session = JSON.parse(raw);
 
-    if (
-      !session ||
-      !session.username
-    ) {
-
+    if (!session || !session.username) {
       clearSession();
-
       return null;
-
     }
 
     if (!session.createdAt) {
-
-      session.createdAt =
-        Date.now();
-
-      localStorage.setItem(
-        "session",
-        JSON.stringify(session)
-      );
-
+      session.createdAt = Date.now();
+      const storage = session.rememberMe === false ? window.sessionStorage : window.localStorage;
+      storage.setItem("session", JSON.stringify(session));
     }
 
-    if (
-      !isSessionValid(session)
-    ) {
-
+    if (!isSessionValid(session)) {
       clearSession();
-
       return null;
-
     }
 
     return session;
 
   } catch (e) {
-
     clearSession();
-
     return null;
-
   }
-
 }
 
 function setSession(session) {
 
-  if (
-    !session ||
-    !session.username
-  ) {
-
+  if (!session || !session.username) {
     clearSession();
-
     return null;
-
   }
 
   const normalizedSession = {
     ...session,
-
-    createdAt:
-      session.createdAt ||
-      Date.now(),
-
+    rememberMe: session.rememberMe !== false,
+    createdAt: session.createdAt || Date.now(),
+    validatedAt: session.validatedAt || 0,
     expiresAt:
       session.expiresAt ||
       session.sessionExpiresAt ||
@@ -138,66 +117,52 @@ function setSession(session) {
       ""
   };
 
-  APP_STATE.session =
-    normalizedSession;
-
+  APP_STATE.session = normalizedSession;
   APP_STATE.user = {
-    username:
-      normalizedSession.username,
-
+    username: normalizedSession.username,
     displayName:
       normalizedSession.displayName ||
       normalizedSession.DisplayName ||
       normalizedSession.realName ||
       normalizedSession.RealName ||
       normalizedSession.username,
-
     isAdmin:
       normalizedSession.isAdmin !== undefined
         ? normalizedSession.isAdmin
         : normalizedSession.IsAdmin
   };
 
-  if (
-    normalizedSession.gameId &&
-    !APP_STATE.gameId
-  ) {
-
-    APP_STATE.gameId =
-      normalizedSession.gameId;
-
+  if (normalizedSession.gameId && !APP_STATE.gameId) {
+    APP_STATE.gameId = normalizedSession.gameId;
   }
 
-  localStorage.setItem(
-    "session",
-    JSON.stringify(
-      normalizedSession
-    )
-  );
+  try {
+    window.localStorage.removeItem("session");
+    window.sessionStorage.removeItem("session");
+    const storage = normalizedSession.rememberMe === false
+      ? window.sessionStorage
+      : window.localStorage;
+    storage.setItem("session", JSON.stringify(normalizedSession));
+  } catch (err) {
+    // Storage restrictions should not crash a successful login.
+  }
 
   return normalizedSession;
-
 }
 
 function clearSession() {
 
-  if (
-    typeof APP_STATE !== "undefined"
-  ) {
-
+  if (typeof APP_STATE !== "undefined") {
     APP_STATE.session = null;
     APP_STATE.user = null;
     APP_STATE.picks = {};
     APP_STATE.startupPayload = null;
     APP_STATE.profile = null;
     APP_STATE.profileData = null;
-
   }
 
-  localStorage.removeItem(
-    "session"
-  );
-
+  try { window.localStorage.removeItem("session"); } catch (err) {}
+  try { window.sessionStorage.removeItem("session"); } catch (err) {}
 }
 
 /* ======================
