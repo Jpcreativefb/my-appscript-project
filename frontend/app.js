@@ -177,7 +177,6 @@ function setupAdminNav(session) {
     document.getElementById("adminNavButton");
 
   if (!adminButton) {
-    console.warn("Admin nav button missing");
     return;
   }
 
@@ -374,8 +373,8 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub";
-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs";
+const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -389,6 +388,9 @@ const APP_PAGE_SCRIPT_BASE_URL = APP_MAIN_SCRIPT_URL.pathname.indexOf("/js/app.j
 
 const APP_PAGE_MODULES = {
   "dashboard": ["dashboard"],
+  "hub": ["dashboard"],
+  "trophy-room": ["dashboard"],
+  "more": ["dashboard"],
   "picks": ["picks"],
   "game-hub": ["gameModeHub"],
   "betting": ["betting"],
@@ -406,9 +408,10 @@ const APP_PAGE_MODULES = {
 };
 
 function pageModuleKey_(page) {
-  return String(page || "").indexOf("admin-game-setup:") === 0
-    ? "admin-game-setup"
-    : String(page || "");
+  const value = String(page || "");
+  if (value.indexOf("admin-game-setup:") === 0) return "admin-game-setup";
+  if (value.indexOf("hub:") === 0) return "hub";
+  return value;
 }
 
 function appPageScriptUrl_(name, retryToken) {
@@ -576,13 +579,14 @@ async function navigate(page, options) {
 
 function setActiveNav(page) {
 
-  const navPage =
-    page === "admin-games" ||
-    page === "admin-awards" ||
-    page === "admin-reality-tv" ||
-    page.indexOf("admin-game-setup:") === 0
-      ? "admin"
-      : page;
+  let navPage = page;
+
+  if (page === "profile" || page === "leagues" || page === "trophy-room" || page === "more" ||
+      page === "admin" || page === "admin-games" || page === "admin-awards" ||
+      page === "admin-reality-tv" || page === "admin-appearance" ||
+      page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
+    navPage = "more";
+  }
 
   document
     .querySelectorAll(".bottom-nav button")
@@ -885,6 +889,12 @@ async function renderPage(page) {
 
   }
 
+  if (page.indexOf("hub:") === 0) {
+    const hubCategory = page.split(":")[1] || "general";
+    app.innerHTML = await renderDashboardHubPage_(hubCategory);
+    return;
+  }
+
   switch (page) {
 
     case "dashboard":
@@ -900,6 +910,14 @@ async function renderPage(page) {
         }, 0);
       }
 
+      break;
+
+    case "trophy-room":
+      app.innerHTML = await renderDashboardTrophyRoomPage_();
+      break;
+
+    case "more":
+      app.innerHTML = await renderDashboardMorePage_();
       break;
 
     case "picks":

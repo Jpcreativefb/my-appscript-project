@@ -4,56 +4,36 @@
 
 async function renderDashboardPage() {
 
-  const username =
-    getCurrentUsername();
+  const username = getCurrentUsername();
 
   if (!username) {
-
     return `
       <div class="page">
         <h1>Dashboard</h1>
-        <div class="card">
-          You must be logged in.
-        </div>
+        <div class="card">You must be logged in.</div>
       </div>
     `;
-
   }
 
   let payload;
-
   setPageLoadStep(50, "Loading games dashboard…");
 
   try {
-
-    payload =
-      await apiGetDashboardGamesHub();
-
+    payload = await apiGetDashboardGamesHub();
   } catch (err) {
-
-    console.error(
-      "DASHBOARD GAMES HUB ERROR",
-      err
-    );
-
+    console.error("DASHBOARD GAMES HUB ERROR", err);
     return `
       <div class="page dashboard-page">
         <h1>Home</h1>
         ${renderErrorCard(
           "Could not load games",
-          err.message ||
-          "The games dashboard failed to load. Please refresh and try again."
+          err.message || "The games dashboard failed to load. Please refresh and try again."
         )}
       </div>
     `;
-
   }
 
-  if (
-    !payload ||
-    payload.success === false
-  ) {
-
+  if (!payload || payload.success === false) {
     return `
       <div class="page dashboard-page">
         <h1>Home</h1>
@@ -65,38 +45,23 @@ async function renderDashboardPage() {
         )}
       </div>
     `;
-
   }
 
   setPageLoadStep(82, "Building your home screen…");
 
-  const activeProfile =
-    (
-      typeof APP_STATE !== "undefined" &&
-      APP_STATE.profile
-    )
-      ? APP_STATE.profile
-      : {};
+  const activeProfile = (
+    typeof APP_STATE !== "undefined" &&
+    APP_STATE.profile &&
+    Object.keys(APP_STATE.profile).length
+  ) ? APP_STATE.profile : {};
 
-  const profileRaw =
-    Object.keys(activeProfile).length
-      ? activeProfile
-      : payload.profile || {};
+  const profileRaw = Object.keys(activeProfile).length
+    ? activeProfile
+    : (payload.profile || {});
 
-  const profile =
-    profileRaw.profile ||
-    profileRaw ||
-    {};
-
-  const activeGames =
-    Array.isArray(payload.activeGames)
-      ? payload.activeGames
-      : [];
-
-  const pastGames =
-    Array.isArray(payload.pastGames)
-      ? payload.pastGames
-      : [];
+  const profile = profileRaw.profile || profileRaw || {};
+  const activeGames = Array.isArray(payload.activeGames) ? payload.activeGames : [];
+  const pastGames = Array.isArray(payload.pastGames) ? payload.pastGames : [];
 
   const displayName =
     profile.displayName ||
@@ -112,66 +77,77 @@ async function renderDashboardPage() {
     profile.ThemeColor ||
     "#354785";
 
-  const defaultGameId =
-    String(payload.defaultGameId || "").trim();
+  const bio = String(profile.bio || profile.Bio || "").trim();
+  const playingGames = dashboardGetPlayingGames_(activeGames);
+  const attentionGames = dashboardGetAttentionGames_(playingGames);
+  const offeredGames = activeGames.filter(function(game) {
+    return playingGames.indexOf(game) === -1;
+  });
 
-  const featuredGame =
-    activeGames.find(function(game) {
-      return defaultGameId && String(game.gameId || "") === defaultGameId;
-    }) ||
-    activeGames[0] ||
-    null;
-
-  const otherActiveGames =
-    featuredGame
-      ? activeGames.filter(function(game) {
-          return String(game.gameId || "") !== String(featuredGame.gameId || "");
-        })
-      : activeGames;
+  const snark = dashboardGetSnarkMessage_(
+    attentionGames,
+    playingGames,
+    offeredGames,
+    username
+  );
 
   if (typeof APP_STATE !== "undefined") {
     APP_STATE.dashboardHomePayload = payload;
     APP_STATE.dashboardHomeHydrationId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+    if (!APP_STATE.profile || !Object.keys(APP_STATE.profile).length) {
+      APP_STATE.profile = profile;
+    }
   }
 
   return `
-    <div class="page dashboard-page dashboard-games-hub-page dashboard-home-v1218b">
+    <div class="page dashboard-page dashboard-games-hub-page dashboard-home-v1218c">
 
-      <section
-        class="dashboard-home-hero"
-        style="--profile-theme-color: ${escapeAttr(themeColor)};"
-      >
-        <div class="dashboard-home-hero-copy">
-          <p class="dashboard-kicker">Welcome back</p>
-          <h1>${escapeHtml(displayName)}</h1>
-          <p class="dashboard-home-hero-subtitle">
-            Your games, standings and accomplishments in one place.
-          </p>
+      <section class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};">
+        <div class="dashboard-snark-line">${escapeHtml(snark)}</div>
+
+        <div class="dashboard-player-main">
+          ${renderDashboardProfileAvatar_(profile, displayName)}
+          <div class="dashboard-player-copy">
+            <h1>${escapeHtml(displayName)}</h1>
+            ${bio ? `<p class="dashboard-player-note">${escapeHtml(bio)}</p>` : ""}
+          </div>
+          <button type="button" class="dashboard-profile-mini-button" onclick="navigate('profile')">Profile</button>
         </div>
 
-        <button
-          type="button"
-          class="dashboard-home-profile-button"
-          onclick="navigate('profile')"
-        >
-          Profile
-        </button>
+        <div class="dashboard-player-actions">
+          <details class="dashboard-career-details">
+            <summary>Career Stats</summary>
+            ${renderDashboardCareerStatsShell_()}
+          </details>
+          <button type="button" class="dashboard-trophy-button" onclick="navigate('trophy-room')">🏆 Trophy Room</button>
+        </div>
       </section>
 
-      ${renderDashboardCareerStatsShell_()}
-
-      ${featuredGame ? renderDashboardFeaturedGame_(featuredGame) : `
-        <section class="dashboard-home-empty card">
-          <strong>No active games right now.</strong>
-          <span>Your next playable game will appear here.</span>
+      ${attentionGames.length ? `
+        <section class="dashboard-home-section dashboard-attention-section">
+          <div class="dashboard-home-section-heading">
+            <div>
+              <p class="dashboard-kicker dark">Needs Your Attention</p>
+              <h2>What to do next</h2>
+            </div>
+            <span class="dashboard-section-count alert">${attentionGames.length}</span>
+          </div>
+          <div class="dashboard-attention-grid">
+            ${attentionGames.map(renderDashboardAttentionGame_).join("")}
+          </div>
+        </section>
+      ` : `
+        <section class="dashboard-caught-up-banner">
+          <strong>✓ You're caught up.</strong>
+          <span>We'll flag games here when picks or questions need your attention.</span>
         </section>
       `}
 
-      <section id="dashboardLeagueHomeSection" class="dashboard-home-section" hidden>
+      <section id="dashboardLeagueHomeSection" class="dashboard-home-section" aria-label="Current Standings" hidden>
         <div class="dashboard-home-section-heading">
           <div>
             <p class="dashboard-kicker dark">My Leagues</p>
-            <h2>Current Standings</h2>
+            <h2>Current Scoreboard</h2>
           </div>
           <button type="button" class="dashboard-home-text-button" onclick="navigate('leagues')">All Leagues</button>
         </div>
@@ -181,44 +157,391 @@ async function renderDashboardPage() {
       <section class="dashboard-home-section">
         <div class="dashboard-home-section-heading">
           <div>
-            <p class="dashboard-kicker dark">Play Now</p>
-            <h2>${featuredGame ? "More Active Games" : "Active Games"}</h2>
+            <p class="dashboard-kicker dark">My Games</p>
+            <h2>Games You're Playing</h2>
           </div>
-          <span class="dashboard-section-count">${otherActiveGames.length}</span>
+          <span class="dashboard-section-count">${playingGames.length}</span>
         </div>
-
-        <div class="dashboard-home-active-grid">
-          ${
-            otherActiveGames.length
-              ? otherActiveGames.map(renderDashboardCompactActiveGame_).join("")
-              : `<div class="dashboard-home-muted-card">${featuredGame ? "Your featured game is the only active game right now." : "No active games are available right now."}</div>`
-          }
+        <div class="dashboard-home-active-grid dashboard-user-games-grid">
+          ${playingGames.length
+            ? playingGames.map(renderDashboardCompactActiveGame_).join("")
+            : `<div class="dashboard-home-muted-card">You haven't started an active game yet. Pick something from New Games below.</div>`}
         </div>
       </section>
 
-      ${renderDashboardTrophyRoomShell_()}
+      ${renderDashboardHubLauncher_(activeGames, pastGames)}
 
-      <details class="dashboard-home-past-section">
-        <summary>
-          <span>
-            <small>Archive</small>
-            Past Games
-          </span>
-          <strong>${pastGames.length}</strong>
-        </summary>
-
-        <div class="dashboard-home-past-grid">
-          ${
-            pastGames.length
-              ? pastGames.map(renderDashboardPastGameCompact_).join("")
-              : `<div class="dashboard-home-muted-card">Finished or archived games will appear here.</div>`
-          }
+      <section class="dashboard-home-section dashboard-discover-section">
+        <div class="dashboard-home-section-heading">
+          <div>
+            <p class="dashboard-kicker dark">Discover</p>
+            <h2>New Games Available</h2>
+          </div>
+          <span class="dashboard-section-count">${offeredGames.length}</span>
         </div>
-      </details>
+        <div class="dashboard-discover-grid">
+          ${offeredGames.length
+            ? offeredGames.map(renderDashboardDiscoverGame_).join("")
+            : `<div class="dashboard-home-muted-card">You've already started every active game currently offered.</div>`}
+        </div>
+      </section>
 
     </div>
   `;
+}
 
+function renderDashboardProfileAvatar_(profile, displayName) {
+  profile = profile || {};
+  const type = String(profile.avatarType || profile.AvatarType || "initials").trim().toLowerCase();
+  const url = String(profile.avatarUrl || profile.AvatarUrl || "").trim();
+  const emoji = String(profile.avatarEmoji || profile.AvatarEmoji || "🏆").trim();
+  const initials = String(
+    profile.avatarInitials ||
+    profile.AvatarInitials ||
+    String(displayName || "P")
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map(function(part) { return part.charAt(0).toUpperCase(); })
+      .join("") ||
+    "P"
+  );
+
+  if ((type === "url" || type === "upload") && url) {
+    return `<div class="dashboard-profile-photo">${platformImgHtml(url, { className: "dashboard-profile-photo-img", variant: "avatar", alt: displayName || "Profile photo" })}</div>`;
+  }
+
+  if (type === "emoji") {
+    return `<div class="dashboard-profile-photo dashboard-profile-photo-fallback"><span>${escapeHtml(emoji || "🏆")}</span></div>`;
+  }
+
+  return `<div class="dashboard-profile-photo dashboard-profile-photo-fallback"><span>${escapeHtml(initials)}</span></div>`;
+}
+
+function dashboardIsUserActiveGame_(game, allGames) {
+  if (!game) return false;
+  if (game.hasStarted === true || Number(game.madeCount) > 0) return true;
+
+  if (game.gameRole === "parent") {
+    return (Array.isArray(allGames) ? allGames : []).some(function(candidate) {
+      return String(candidate.parentGameId || "") === String(game.gameId || "") &&
+        (candidate.hasStarted === true || Number(candidate.madeCount) > 0);
+    });
+  }
+
+  return false;
+}
+
+function dashboardGetPlayingGames_(activeGames) {
+  const games = Array.isArray(activeGames) ? activeGames : [];
+  return games.filter(function(game) {
+    return dashboardIsUserActiveGame_(game, games);
+  });
+}
+
+function dashboardGetAttentionGames_(playingGames) {
+  return (Array.isArray(playingGames) ? playingGames : []).filter(function(game) {
+    if (game.disableEnter === true || game.available === false) return false;
+    const total = Number(game.totalCount) || 0;
+    const made = Number(game.madeCount) || 0;
+    return game.progressAvailable === true && total > 0 && made < total;
+  });
+}
+
+function dashboardGetSnarkMessage_(attentionGames, playingGames, offeredGames, username) {
+  const attention = Array.isArray(attentionGames) ? attentionGames : [];
+  const playing = Array.isArray(playingGames) ? playingGames : [];
+  const offered = Array.isArray(offeredGames) ? offeredGames : [];
+
+  let situation = "quiet";
+  let choices;
+
+  if (attention.length) {
+    situation = "attention";
+    choices = [
+      "New picks are waiting. Apparently they still won't make themselves.",
+      "You've got unfinished picks. Your future bragging rights are at stake.",
+      "Fresh decisions required. Try to make the good ones this time.",
+      "The board changed. Time to pretend you knew this was coming.",
+      "Picks need attention. Confidence is optional. Submitting them is not."
+    ];
+  } else if (playing.length) {
+    situation = "caught-up";
+    choices = [
+      "You're actually caught up. Suspicious, but we'll allow it.",
+      "Nothing due right now. Enjoy this rare moment of competence.",
+      "All caught up. Go ahead and admire the standings.",
+      "Your picks are in. Now comes the easy part: blaming bad luck.",
+      "No homework right now. The scoreboard can do the stressing for you."
+    ];
+  } else if (offered.length) {
+    situation = "new-games";
+    choices = [
+      "Fresh games are open. Surely one of them needs your questionable expertise.",
+      "Nothing started yet. That's a lot of untapped bragging potential.",
+      "New games are waiting. Choose your next bad decision wisely.",
+      "The lobby is stocked. Time to put some opinions on the record."
+    ];
+  } else {
+    choices = [
+      "Nothing demanding your expertise right now. Enjoy the silence.",
+      "The game board is quiet. It won't stay that way.",
+      "No active business at the moment. Your reputation is safe for now."
+    ];
+  }
+
+  const dayKey = new Date().toISOString().slice(0, 10);
+  const seedText = [username || "player", dayKey, situation].join("|");
+  let seed = 0;
+  for (let i = 0; i < seedText.length; i++) {
+    seed = ((seed << 5) - seed) + seedText.charCodeAt(i);
+    seed |= 0;
+  }
+
+  return choices[Math.abs(seed) % choices.length];
+}
+
+function renderDashboardAttentionGame_(game) {
+  game = game || {};
+  const total = Number(game.totalCount) || 0;
+  const made = Number(game.madeCount) || 0;
+  const remaining = Math.max(0, total - made);
+  const noun = remaining === 1 ? "pick" : "picks";
+  const preferredLeagueId = String(
+    game.leagueId ||
+    (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
+    ""
+  );
+
+  return `
+    <article class="dashboard-attention-card">
+      <div>
+        <span class="dashboard-attention-badge">${remaining} ${noun} remaining</span>
+        <h3>${escapeHtml(game.name || game.gameId || "Game")}</h3>
+        <p>${escapeHtml(game.lockLabel || game.statusLabel || "Picks open")}</p>
+      </div>
+      <button type="button" onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')">Make Picks</button>
+    </article>
+  `;
+}
+
+function renderDashboardDiscoverGame_(game) {
+  game = game || {};
+  const preferredLeagueId = String(
+    game.leagueId ||
+    (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
+    ""
+  );
+  const disabled = game.disableEnter === true || game.available === false;
+
+  return `
+    <article class="dashboard-discover-game">
+      <div>
+        <span>${escapeHtml(dashboardHubDisplayName_(game.hubCategory || "general"))} · ${escapeHtml(game.hubGroup || game.typeLabel || "Game")}</span>
+        <strong>${escapeHtml(game.name || game.gameId || "Game")}</strong>
+        <small>${escapeHtml(game.lockLabel || game.statusLabel || "Open")}</small>
+      </div>
+      <button type="button" ${disabled ? "disabled" : `onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')"`}>${escapeHtml(disabled ? (game.availabilityLabel || "Unavailable") : "Play")}</button>
+    </article>
+  `;
+}
+
+function renderDashboardHubLauncher_(activeGames, pastGames) {
+  const hubs = ["sports", "reality", "awards", "general"];
+  const active = Array.isArray(activeGames) ? activeGames : [];
+  const past = Array.isArray(pastGames) ? pastGames : [];
+
+  return `
+    <section class="dashboard-home-section dashboard-hub-launcher-section">
+      <div class="dashboard-home-section-heading">
+        <div>
+          <p class="dashboard-kicker dark">Game Hubs</p>
+          <h2>Everything in its lane</h2>
+        </div>
+      </div>
+      <div class="dashboard-hub-launcher-grid">
+        ${hubs.map(function(category) {
+          const current = active.filter(function(game) { return (game.hubCategory || "general") === category; });
+          const archived = past.filter(function(game) { return (game.hubCategory || "general") === category; });
+          const playing = dashboardGetPlayingGames_(current);
+          const offered = current.filter(function(game) { return playing.indexOf(game) === -1; });
+          return `
+            <details class="dashboard-hub-launcher-card">
+              <summary>
+                <span class="dashboard-hub-icon">${dashboardHubIcon_(category)}</span>
+                <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
+                <b>›</b>
+              </summary>
+              <div class="dashboard-hub-launcher-body">
+                ${current.slice(0, 3).map(function(game) {
+                  return `<span>${escapeHtml(game.name || game.gameId || "Game")}</span>`;
+                }).join("") || `<span>No active games right now.</span>`}
+                ${archived.length ? `<small>${archived.length} archived in this hub</small>` : ""}
+                <button type="button" onclick="navigate('hub:${category}')">Open ${escapeHtml(dashboardHubDisplayName_(category))}</button>
+              </div>
+            </details>
+          `;
+        }).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function dashboardHubDisplayName_(category) {
+  return ({
+    sports: "Sports",
+    reality: "Reality Shows",
+    awards: "Awards Shows",
+    general: "General Games"
+  })[String(category || "general")] || "General Games";
+}
+
+function dashboardHubIcon_(category) {
+  return ({ sports: "🏈", reality: "📺", awards: "🏆", general: "🎲" })[String(category || "general")] || "🎲";
+}
+
+function dashboardHubDescription_(category) {
+  return ({
+    sports: "Sports games organized by league, with current games, available games and history together.",
+    reality: "Reality-show seasons and episode games organized by show.",
+    awards: "Awards-show games organized by event, with current and historical games together.",
+    general: "Prediction games, special events and anything that doesn't belong in another hub."
+  })[String(category || "general")] || "Games and history.";
+}
+
+async function loadDashboardHubPayload_() {
+  if (typeof APP_STATE !== "undefined" && APP_STATE.dashboardHomePayload) {
+    return APP_STATE.dashboardHomePayload;
+  }
+  const payload = await apiGetDashboardGamesHub();
+  if (typeof APP_STATE !== "undefined" && payload && payload.success !== false) {
+    APP_STATE.dashboardHomePayload = payload;
+  }
+  return payload;
+}
+
+async function renderDashboardHubPage_(category) {
+  category = String(category || "general").toLowerCase();
+  const payload = await loadDashboardHubPayload_();
+  if (!payload || payload.success === false) {
+    return `<div class="page"><h1>${escapeHtml(dashboardHubDisplayName_(category))}</h1>${renderErrorCard("Could not load hub", payload && (payload.error || payload.message) || "Hub data unavailable.")}</div>`;
+  }
+
+  const active = (Array.isArray(payload.activeGames) ? payload.activeGames : []).filter(function(game) {
+    return (game.hubCategory || "general") === category;
+  });
+  const past = (Array.isArray(payload.pastGames) ? payload.pastGames : []).filter(function(game) {
+    return (game.hubCategory || "general") === category;
+  });
+
+  const groupNames = [];
+  active.concat(past).forEach(function(game) {
+    const group = String(game.hubGroup || "Other").trim() || "Other";
+    if (groupNames.indexOf(group) === -1) groupNames.push(group);
+  });
+  groupNames.sort();
+
+  return `
+    <div class="page dashboard-domain-hub dashboard-domain-${escapeAttr(category)}">
+      <header class="dashboard-domain-header">
+        <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
+        <div class="dashboard-domain-title-row">
+          <span>${dashboardHubIcon_(category)}</span>
+          <div><p>Game Hub</p><h1>${escapeHtml(dashboardHubDisplayName_(category))}</h1></div>
+        </div>
+        <p>${escapeHtml(dashboardHubDescription_(category))}</p>
+      </header>
+
+      ${groupNames.length ? groupNames.map(function(group) {
+        return renderDashboardSubHub_(category, group, active, past);
+      }).join("") : `
+        <div class="dashboard-home-muted-card">No ${escapeHtml(dashboardHubDisplayName_(category).toLowerCase())} are available yet.</div>
+      `}
+    </div>
+  `;
+}
+
+function renderDashboardSubHub_(category, group, activeGames, pastGames) {
+  const current = activeGames.filter(function(game) { return String(game.hubGroup || "Other") === group; });
+  const archived = pastGames.filter(function(game) { return String(game.hubGroup || "Other") === group; });
+  const playing = dashboardGetPlayingGames_(current);
+  const attention = dashboardGetAttentionGames_(playing);
+  const offered = current.filter(function(game) { return playing.indexOf(game) === -1; });
+
+  return `
+    <details class="dashboard-subhub" open>
+      <summary>
+        <span><strong>${escapeHtml(group)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>
+        <b>⌄</b>
+      </summary>
+      <div class="dashboard-subhub-body">
+        ${attention.length ? `<div class="dashboard-subhub-block"><h3>Needs Attention</h3><div class="dashboard-attention-grid">${attention.map(renderDashboardAttentionGame_).join("")}</div></div>` : ""}
+        <div class="dashboard-subhub-block"><h3>My Active Games</h3><div class="dashboard-home-active-grid">${playing.length ? playing.map(renderDashboardCompactActiveGame_).join("") : `<div class="dashboard-home-muted-card">No games started in ${escapeHtml(group)} yet.</div>`}</div></div>
+        <div class="dashboard-subhub-block"><h3>Available to Play</h3><div class="dashboard-discover-grid">${offered.length ? offered.map(renderDashboardDiscoverGame_).join("") : `<div class="dashboard-home-muted-card">No additional games available right now.</div>`}</div></div>
+        <details class="dashboard-subhub-archive">
+          <summary>Past / Archived Games <strong>${archived.length}</strong></summary>
+          <div class="dashboard-home-past-grid">${archived.length ? archived.map(renderDashboardPastGameCompact_).join("") : `<div class="dashboard-home-muted-card">No archived games yet.</div>`}</div>
+        </details>
+      </div>
+    </details>
+  `;
+}
+
+async function renderDashboardMorePage_() {
+  const session = typeof getSession === "function" ? getSession() : {};
+  const isAdmin = typeof isAdminSession === "function" && isAdminSession(session);
+  return `
+    <div class="page dashboard-more-page">
+      <header class="dashboard-domain-header">
+        <div class="dashboard-domain-title-row"><span>•••</span><div><p>Awards App</p><h1>More</h1></div></div>
+        <p>General games, your player tools and app controls.</p>
+      </header>
+      <div class="dashboard-more-grid">
+        <button type="button" onclick="navigate('hub:general')"><span>🎲</span><strong>General Games</strong><small>Prediction games, special events and oddball games.</small></button>
+        <button type="button" onclick="navigate('trophy-room')"><span>🏆</span><strong>Trophy Room</strong><small>Wins, podiums and future admin-created awards.</small></button>
+        <button type="button" onclick="navigate('profile')"><span>👤</span><strong>Profile</strong><small>Photo, display name, note and game-specific profiles.</small></button>
+        <button type="button" onclick="navigate('leagues')"><span>📊</span><strong>My Leagues</strong><small>League memberships and standings.</small></button>
+        ${isAdmin ? `<button type="button" onclick="navigate('admin')"><span>⚙️</span><strong>Admin</strong><small>Manage games, results and app settings.</small></button>` : ""}
+        <button type="button" class="dashboard-more-logout" onclick="logout()"><span>↪</span><strong>Log Out</strong><small>Sign out on this device.</small></button>
+      </div>
+    </div>
+  `;
+}
+
+async function renderDashboardTrophyRoomPage_() {
+  const username = getCurrentUsername();
+  let history = null;
+  try {
+    history = typeof apiGetUserProfileHistory === "function"
+      ? await apiGetUserProfileHistory(username, "")
+      : null;
+  } catch (err) {
+    history = null;
+  }
+  const summary = history && history.success !== false ? (history.summary || {}) : {};
+  const games = Array.isArray(summary.games) ? summary.games : [];
+  const ranked = games.filter(function(game) { return Number(game.rank) > 0; });
+  const wins = Number(summary.firstPlaceFinishes) || 0;
+  const podiums = Number(summary.topThreeFinishes) || 0;
+
+  return `
+    <div class="page dashboard-trophy-page">
+      <header class="dashboard-domain-header trophy-header">
+        <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
+        <div class="dashboard-domain-title-row"><span>🏆</span><div><p>Player Collection</p><h1>Trophy Room</h1></div></div>
+        <p>Your game accomplishments live here. Custom admin-created awards are the next Trophy Room phase.</p>
+      </header>
+      <div class="dashboard-trophy-summary-grid">
+        <div><strong>${wins}</strong><span>Game Wins</span></div>
+        <div><strong>${podiums}</strong><span>Podiums</span></div>
+        <div><strong>${ranked.length}</strong><span>Ranked Finishes</span></div>
+      </div>
+      <section class="dashboard-trophy-future card">
+        <span class="dashboard-trophy-big">🏅</span>
+        <div><h2>Admin Awards</h2><p>Coming next: custom accomplishments created and awarded by an admin, then displayed here alongside game wins.</p></div>
+      </section>
+    </div>
+  `;
 }
 
 function renderDashboardCareerStatsShell_() {

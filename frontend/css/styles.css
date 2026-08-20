@@ -6333,3 +6333,21 @@ button.is-saving {
 .admin-help-popover > strong + span {
   margin-top: 2px;
 }
+
+/* v1.2.18c compact hub navigation */
+.bottom-nav button {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  min-width:0;
+  padding:6px 3px calc(5px + env(safe-area-inset-bottom, 0px));
+}
+.bottom-nav-icon { font-size:18px; line-height:1; }
+.bottom-nav-label { font-size:10px; line-height:1; font-weight:800; }
+.bottom-nav button.active { background:rgba(255,255,255,.1); }
+@media (min-width: 761px) {
+  .bottom-nav button { flex-direction:row; gap:7px; }
+  .bottom-nav-label { font-size:13px; }
+}

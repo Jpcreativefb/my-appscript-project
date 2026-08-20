@@ -2102,3 +2102,303 @@
     padding: 9px 5px;
   }
 }
+
+/* =====================================================
+   v1.2.18c — Player Home + Game Hubs
+===================================================== */
+.dashboard-home-v1218c {
+  display: grid;
+  gap: 18px;
+}
+
+.dashboard-player-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 24px;
+  padding: clamp(16px, 3vw, 24px);
+  color: #fff;
+  background:
+    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--profile-theme-color) 78%, #fff 22%) 0, transparent 38%),
+    linear-gradient(145deg, #111827 0%, #1f2937 58%, color-mix(in srgb, var(--profile-theme-color) 68%, #111827 32%) 100%);
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .2);
+}
+
+.dashboard-snark-line {
+  margin-bottom: 14px;
+  font-size: clamp(13px, 1.7vw, 15px);
+  font-weight: 700;
+  color: rgba(255,255,255,.82);
+}
+
+.dashboard-player-main {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+}
+
+.dashboard-profile-photo {
+  width: clamp(62px, 10vw, 82px);
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 2px solid rgba(255,255,255,.7);
+  background: rgba(255,255,255,.12);
+  box-shadow: 0 9px 24px rgba(0,0,0,.18);
+}
+
+.dashboard-profile-photo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dashboard-profile-photo-fallback {
+  display: grid;
+  place-items: center;
+  font-size: clamp(24px, 5vw, 34px);
+  font-weight: 900;
+}
+
+.dashboard-player-copy {
+  min-width: 0;
+}
+
+.dashboard-player-copy h1 {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 38px);
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+
+.dashboard-player-note {
+  margin: 6px 0 0;
+  max-width: 58ch;
+  font-size: 11px;
+  line-height: 1.35;
+  color: rgba(255,255,255,.7);
+}
+
+.dashboard-profile-mini-button,
+.dashboard-trophy-button {
+  min-height: 36px;
+  border-radius: 11px;
+  border: 1px solid rgba(255,255,255,.25);
+  background: rgba(255,255,255,.12);
+  color: #fff;
+  padding: 8px 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dashboard-profile-mini-button:hover,
+.dashboard-trophy-button:hover {
+  background: rgba(255,255,255,.2);
+}
+
+.dashboard-player-actions {
+  margin-top: 14px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.dashboard-career-details {
+  flex: 1 1 540px;
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 14px;
+  background: rgba(15,23,42,.25);
+}
+
+.dashboard-career-details > summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.dashboard-career-details > summary::-webkit-details-marker { display: none; }
+.dashboard-career-details > summary::after { content: " +"; opacity: .7; }
+.dashboard-career-details[open] > summary::after { content: " −"; }
+.dashboard-career-details .dashboard-home-stats-shell { margin: 0; border: 0; box-shadow: none; background: rgba(255,255,255,.07); }
+.dashboard-career-details .dashboard-home-stats-heading { color: rgba(255,255,255,.7); }
+.dashboard-career-details .dashboard-home-stat strong,
+.dashboard-career-details .dashboard-home-stat span { color: #fff; }
+
+.dashboard-caught-up-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 15px;
+  border: 1px solid #bbf7d0;
+  border-radius: 15px;
+  background: #f0fdf4;
+  color: #166534;
+}
+.dashboard-caught-up-banner span { font-size: 12px; color: #4b5563; }
+
+.dashboard-attention-grid,
+.dashboard-discover-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.dashboard-attention-card,
+.dashboard-discover-game {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 13px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+}
+
+.dashboard-attention-card {
+  border-color: #fecaca;
+  background: linear-gradient(135deg, #fff 0%, #fff7f7 100%);
+}
+.dashboard-attention-card h3,
+.dashboard-discover-game strong { margin: 5px 0 2px; display: block; color: #111827; }
+.dashboard-attention-card p,
+.dashboard-discover-game small { margin: 0; color: #6b7280; font-size: 11px; }
+.dashboard-attention-badge { font-size: 10px; font-weight: 900; text-transform: uppercase; color: #b91c1c; }
+.dashboard-attention-card button,
+.dashboard-discover-game button {
+  flex: 0 0 auto;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 11px;
+  background: #111827;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.dashboard-discover-game > div > span { font-size: 10px; font-weight: 800; color: #6b7280; text-transform: uppercase; letter-spacing: .04em; }
+.dashboard-discover-game button:disabled { opacity: .45; cursor: default; }
+
+.dashboard-section-count.alert { background: #fee2e2; color: #b91c1c; }
+
+.dashboard-hub-launcher-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.dashboard-hub-launcher-card {
+  border: 1px solid #e5e7eb;
+  border-radius: 17px;
+  overflow: hidden;
+  background: #fff;
+}
+.dashboard-hub-launcher-card > summary {
+  list-style: none;
+  cursor: pointer;
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 13px;
+}
+.dashboard-hub-launcher-card > summary::-webkit-details-marker { display: none; }
+.dashboard-hub-launcher-card > summary span:nth-child(2) { display: grid; gap: 2px; }
+.dashboard-hub-launcher-card > summary small { color: #6b7280; font-size: 11px; }
+.dashboard-hub-launcher-card[open] > summary b { transform: rotate(90deg); }
+.dashboard-hub-icon { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 11px; background: #f3f4f6; font-size: 20px; }
+.dashboard-hub-launcher-body { border-top: 1px solid #f3f4f6; padding: 11px 13px 13px; display: grid; gap: 7px; }
+.dashboard-hub-launcher-body span { font-size: 12px; color: #374151; }
+.dashboard-hub-launcher-body small { font-size: 10px; color: #9ca3af; }
+.dashboard-hub-launcher-body button { justify-self: start; border: 0; border-radius: 9px; background: #111827; color: #fff; padding: 7px 10px; font-weight: 800; cursor: pointer; }
+
+.dashboard-domain-hub,
+.dashboard-more-page,
+.dashboard-trophy-page { display: grid; gap: 16px; }
+.dashboard-domain-header {
+  border-radius: 22px;
+  padding: clamp(17px, 3vw, 25px);
+  background: linear-gradient(145deg,#111827,#25334f);
+  color: #fff;
+}
+.dashboard-domain-header > p { margin: 10px 0 0; color: rgba(255,255,255,.7); max-width: 70ch; }
+.dashboard-domain-title-row { display: flex; align-items: center; gap: 12px; }
+.dashboard-domain-title-row > span { font-size: 32px; }
+.dashboard-domain-title-row p { margin: 0 0 2px; font-size: 10px; text-transform: uppercase; letter-spacing: .12em; color: rgba(255,255,255,.6); }
+.dashboard-domain-title-row h1 { margin: 0; font-size: clamp(27px, 4vw, 40px); }
+.dashboard-hub-back { margin-bottom: 12px; border: 1px solid rgba(255,255,255,.18); border-radius: 9px; background: rgba(255,255,255,.09); color: #fff; padding: 7px 10px; cursor: pointer; }
+
+.dashboard-subhub {
+  border: 1px solid #e5e7eb;
+  border-radius: 18px;
+  background: #fff;
+  overflow: hidden;
+}
+.dashboard-subhub > summary { list-style: none; cursor: pointer; display: flex; justify-content: space-between; gap: 12px; padding: 14px 16px; background: #f9fafb; }
+.dashboard-subhub > summary::-webkit-details-marker { display:none; }
+.dashboard-subhub > summary span { display: grid; gap: 2px; }
+.dashboard-subhub > summary small { color:#6b7280; font-size:11px; }
+.dashboard-subhub-body { display:grid; gap:16px; padding:16px; }
+.dashboard-subhub-block h3 { margin:0 0 8px; font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; }
+.dashboard-subhub-archive { border-top:1px solid #e5e7eb; padding-top:10px; }
+.dashboard-subhub-archive > summary { cursor:pointer; font-weight:800; color:#374151; display:flex; justify-content:space-between; }
+.dashboard-subhub-archive .dashboard-home-past-grid { margin-top:10px; }
+
+.dashboard-more-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.dashboard-more-grid > button {
+  min-height: 110px;
+  text-align:left;
+  display:grid;
+  grid-template-columns:auto 1fr;
+  grid-template-rows:auto auto;
+  column-gap:10px;
+  align-content:center;
+  border:1px solid #e5e7eb;
+  border-radius:17px;
+  background:#fff;
+  padding:14px;
+  cursor:pointer;
+}
+.dashboard-more-grid > button > span { grid-row:1 / span 2; font-size:25px; }
+.dashboard-more-grid > button strong { color:#111827; }
+.dashboard-more-grid > button small { color:#6b7280; line-height:1.35; }
+.dashboard-more-grid > button.dashboard-more-logout { border-color:#fecaca; background:#fffafa; }
+
+.dashboard-trophy-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+.dashboard-trophy-summary-grid > div { padding:18px; border:1px solid #e5e7eb; border-radius:16px; background:#fff; text-align:center; }
+.dashboard-trophy-summary-grid strong { display:block; font-size:30px; color:#111827; }
+.dashboard-trophy-summary-grid span { font-size:11px; color:#6b7280; font-weight:800; text-transform:uppercase; }
+.dashboard-trophy-future { display:flex; gap:14px; align-items:center; }
+.dashboard-trophy-future h2,.dashboard-trophy-future p { margin:0; }
+.dashboard-trophy-future p { color:#6b7280; margin-top:4px; }
+.dashboard-trophy-big { font-size:44px; }
+
+@media (max-width: 760px) {
+  .dashboard-player-card { border-radius: 19px; }
+  .dashboard-player-main { grid-template-columns: auto minmax(0,1fr); }
+  .dashboard-profile-mini-button { grid-column: 1 / -1; justify-self: start; padding: 6px 10px; min-height: 32px; }
+  .dashboard-player-actions { display:grid; grid-template-columns:1fr auto; align-items:start; }
+  .dashboard-career-details { min-width:0; }
+  .dashboard-trophy-button { white-space:nowrap; }
+  .dashboard-hub-launcher-grid,
+  .dashboard-more-grid { grid-template-columns: 1fr; }
+  .dashboard-attention-grid,
+  .dashboard-discover-grid { grid-template-columns:1fr; }
+  .dashboard-attention-card,
+  .dashboard-discover-game { align-items:flex-start; }
+  .dashboard-caught-up-banner { align-items:flex-start; flex-direction:column; gap:3px; }
+  .dashboard-trophy-summary-grid { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .dashboard-trophy-summary-grid > div { padding:13px 6px; }
+  .dashboard-trophy-summary-grid strong { font-size:23px; }
+}
+
+@media (max-width: 430px) {
+  .dashboard-player-actions { grid-template-columns:1fr; }
+  .dashboard-trophy-button { justify-self:start; }
+  .dashboard-profile-photo { width:64px; border-radius:15px; }
+  .dashboard-player-copy h1 { font-size:26px; }
+  .dashboard-subhub-body { padding:12px; }
+}

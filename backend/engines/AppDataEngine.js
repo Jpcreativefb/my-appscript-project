@@ -310,35 +310,25 @@ function apiGetDashboardGamesHub(payload) {
         ? pastGames[0].gameId
         : defaultGameId;
 
-  const includeProfile =
-    payload.includeProfile === true ||
-    String(payload.includeProfile || "")
-      .trim()
-      .toLowerCase() === "true";
-
+  // Home's player card needs only the small general profile record. Keep it
+  // inside this existing Dashboard request so the browser does not make a
+  // second blocking network call just to render the avatar/name/note.
   let profile = {};
   let profileHistory = [];
 
-  if (profileGameId && includeProfile) {
+  try {
 
-    try {
-
-      profile =
-        getUserProfile(
-          username,
-          profileGameId
-        ) || {};
-
-      // Keep the dashboard hub lightweight. Full profile history can be
-      // loaded from the profile page instead of blocking app startup.
-      profileHistory = [];
-
-    } catch (err) {
-
-      profile = {};
-      profileHistory = [];
-
+    if (typeof apiGetEditableProfile === "function") {
+      const profileResult = apiGetEditableProfile(username, "") || {};
+      profile = profileResult.success === false
+        ? {}
+        : (profileResult.generalProfile || profileResult.profile || {});
     }
+
+  } catch (err) {
+
+    // Profile decoration must never prevent Home from opening.
+    profile = {};
 
   }
 
@@ -472,6 +462,12 @@ function buildDashboardGameHubItemLite_(
         game,
         mode
       ),
+
+    hubCategory:
+      getDashboardHubPlacement_(game, mode).category,
+
+    hubGroup:
+      getDashboardHubPlacement_(game, mode).group,
 
     gameRole:
       game.gameRole || "standalone",
@@ -1234,6 +1230,12 @@ function buildDashboardGameHubItem_(
         mode
       ),
 
+    hubCategory:
+      getDashboardHubPlacement_(game, mode).category,
+
+    hubGroup:
+      getDashboardHubPlacement_(game, mode).group,
+
     gameRole:
       game.gameRole || "standalone",
 
@@ -1434,6 +1436,107 @@ function getDashboardGameMode_(game) {
   }
 
   return "prediction";
+
+}
+
+function getDashboardHubPlacement_(game, mode) {
+
+  game = game || {};
+
+  const name = String(game.name || game.gameId || "").trim();
+  const haystack = [
+    name,
+    game.gameId || "",
+    game.type || "",
+    game.typeLabel || "",
+    game.description || "",
+    game.racingLeague || ""
+  ].join(" ").toLowerCase();
+
+  function hasAny_(values) {
+    return values.some(function(value) {
+      return haystack.indexOf(value) !== -1;
+    });
+  }
+
+  const sportsGroups = [
+    ["NFL", ["nfl", "football"]],
+    ["MLB", ["mlb", "baseball"]],
+    ["NBA", ["nba", "basketball"]],
+    ["NHL", ["nhl", "hockey"]],
+    ["NCAA", ["ncaa", "college football", "college basketball"]],
+    ["NASCAR", ["nascar", "cup series", "xfinity", "truck series"]],
+    ["Formula 1", ["formula 1", "formula one", " f1 "]],
+    ["Soccer", ["soccer", "premier league", "mls", "champions league"]]
+  ];
+
+  for (let i = 0; i < sportsGroups.length; i++) {
+    if (hasAny_(sportsGroups[i][1])) {
+      return { category: "sports", group: sportsGroups[i][0] };
+    }
+  }
+
+  if (
+    mode === "racing-wager" ||
+    String(game.racingLeague || "").trim()
+  ) {
+    return {
+      category: "sports",
+      group: String(game.racingLeague || "Racing").trim() || "Racing"
+    };
+  }
+
+  const realityGroups = [
+    ["Survivor", ["survivor"]],
+    ["MasterChef", ["masterchef"]],
+    ["Top Chef", ["top chef"]],
+    ["The Traitors", ["traitors"]],
+    ["The Amazing Race", ["amazing race"]],
+    ["Dancing with the Stars", ["dancing with the stars", "dwts"]],
+    ["Big Brother", ["big brother"]]
+  ];
+
+  for (let i = 0; i < realityGroups.length; i++) {
+    if (hasAny_(realityGroups[i][1])) {
+      return { category: "reality", group: realityGroups[i][0] };
+    }
+  }
+
+  if (hasAny_(["reality tv", "reality-tv", "episode", "tribal council"])) {
+    return { category: "reality", group: "Other Reality" };
+  }
+
+  const awardGroups = [
+    ["Oscars", ["oscar", "academy awards"]],
+    ["Emmys", ["emmy"]],
+    ["Grammys", ["grammy"]],
+    ["Golden Globes", ["golden globe"]],
+    ["Tony Awards", ["tony award"]]
+  ];
+
+  for (let i = 0; i < awardGroups.length; i++) {
+    if (hasAny_(awardGroups[i][1])) {
+      return { category: "awards", group: awardGroups[i][0] };
+    }
+  }
+
+  if (hasAny_(["awards", "award show", "ceremony"])) {
+    return { category: "awards", group: "Other Awards" };
+  }
+
+  // Confidence/head-to-head games are overwhelmingly sports in this app, but
+  // only classify them as Sports when the name/description identifies a sport.
+  if (
+    (mode === "confidence" || mode === "head-to-head" || mode === "wager") &&
+    hasAny_(["week ", "season", "spread", "moneyline", "touchdown", "home team", "away team"])
+  ) {
+    return { category: "sports", group: "Other Sports" };
+  }
+
+  return {
+    category: "general",
+    group: getDashboardGameTypeLabel_(game, mode) || "General Games"
+  };
 
 }
 
