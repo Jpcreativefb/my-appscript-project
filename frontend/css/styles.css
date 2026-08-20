@@ -6355,7 +6355,7 @@ button.is-saving {
 /* v1.2.18c1 configurable hub/nav icons */
 .bottom-nav button { --bottom-nav-accent:#64748b; }
 .bottom-nav button.active {
-  background:color-mix(in srgb,var(--bottom-nav-accent,#64748b) 28%,transparent);
+  background:var(--bottom-nav-accent-bg, color-mix(in srgb,var(--bottom-nav-accent,#64748b) 28%,transparent));
   box-shadow:inset 0 3px 0 var(--bottom-nav-accent,#64748b);
 }
 .bottom-nav-icon { width:24px; height:24px; display:grid; place-items:center; overflow:hidden; }

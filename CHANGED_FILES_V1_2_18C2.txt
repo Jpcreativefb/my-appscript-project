@@ -1,0 +1,15 @@
+backend/engines/AppearanceEngine.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/dashboard.js
+frontend/css/appearance.css
+frontend/css/pages.css
+frontend/css/styles.css
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/index.html
+frontend/js/pwa.js
+frontend/sw.js
+tests/hub_media_gradients_v1218c2_tests.js
+HOME_HUB_MEDIA_GRADIENTS_V1_2_18C2.md
+CHANGED_FILES_V1_2_18C2.txt

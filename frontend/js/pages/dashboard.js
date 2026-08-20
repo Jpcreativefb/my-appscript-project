@@ -254,6 +254,29 @@ function dashboardHubSetting_(category, group) {
   return map[dashboardHubSettingKey_(category, "")] || {};
 }
 
+
+function dashboardHubColorSpec_(row, fallback) {
+  row = row || {};
+  const validHex = function(value, defaultValue) {
+    const text = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(text) ? text : defaultValue;
+  };
+  const color = validHex(row.Color, fallback || "#354785");
+  const start = validHex(row.GradientStart, color);
+  const end = validHex(row.GradientEnd, color);
+  const rawAngle = Number(row.GradientAngle);
+  const angle = isFinite(rawAngle) ? Math.max(0, Math.min(360, rawAngle)) : 135;
+  const mode = String(row.ColorMode || "solid").toLowerCase() === "gradient" ? "gradient" : "solid";
+  return {
+    color: color,
+    mode: mode,
+    start: start,
+    end: end,
+    angle: angle,
+    fill: mode === "gradient" ? "linear-gradient(" + angle + "deg," + start + "," + end + ")" : color
+  };
+}
+
 function dashboardAppearanceAssetUrl_(row, kind) {
   row = row || {};
   const fileId = String(kind === "icon" ? row.IconFileId || "" : row.ImageFileId || "").trim();
@@ -304,7 +327,9 @@ function dashboardApplyHubAppearance_() {
       label.textContent = String(row.DisplayName || label.textContent || "");
       label.hidden = row.ShowNavLabel === false || String(row.ShowNavLabel).toLowerCase() === "false";
     }
-    button.style.setProperty("--bottom-nav-accent", String(row.Color || "#354785"));
+    const colors = dashboardHubColorSpec_(row, "#354785");
+    button.style.setProperty("--bottom-nav-accent", colors.color);
+    button.style.setProperty("--bottom-nav-accent-bg", colors.fill);
   });
   if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
     window.PlatformImageEngine.process(document.querySelector(".bottom-nav") || document);
@@ -510,9 +535,9 @@ function renderDashboardHubLauncher_(activeGames, pastGames) {
           const setting = dashboardHubSetting_(category, "");
           const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
           const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-hub-image" }) : "";
-          const color = String(setting.Color || "#354785");
+          const colors = dashboardHubColorSpec_(setting, "#354785");
           return `
-            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(color)};--dashboard-hub-image:none;">
+            <details class="dashboard-hub-launcher-card${hubImage ? ' has-hub-image' : ''}" ${attrs} style="--dashboard-hub-color:${escapeAttr(colors.color)};--dashboard-hub-fill:${escapeAttr(colors.fill)};--dashboard-hub-image:none;">
               <summary>
                 <span class="dashboard-hub-icon">${dashboardHubIconHtml_(category, "", "dashboard-hub-icon-custom")}</span>
                 <span><strong>${escapeHtml(dashboardHubDisplayName_(category))}</strong><small>${playing.length} playing · ${offered.length} available</small></span>
@@ -598,11 +623,11 @@ async function renderDashboardHubPage_(category) {
   const setting = dashboardHubSetting_(category, "");
   const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
   const attrs = hubImage ? platformBackgroundAttrs(hubImage, { variant: "hero", cssVariable: "--dashboard-domain-image" }) : "";
-  const color = String(setting.Color || "#354785");
+  const colors = dashboardHubColorSpec_(setting, "#354785");
 
   return `
     <div class="page dashboard-domain-hub dashboard-domain-${escapeAttr(category)}">
-      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(color)};--dashboard-domain-image:none;">
+      <header class="dashboard-domain-header${hubImage ? ' has-domain-image' : ''}" ${attrs} style="--dashboard-domain-color:${escapeAttr(colors.color)};--dashboard-domain-fill:${escapeAttr(colors.fill)};--dashboard-domain-image:none;">
         <button type="button" class="dashboard-hub-back" onclick="navigate('dashboard')">← Home</button>
         <div class="dashboard-domain-title-row">
           <span>${dashboardHubIconHtml_(category, "", "dashboard-domain-custom-icon")}</span>
@@ -629,11 +654,12 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames) {
   const setting = dashboardHubSetting_(category, group);
   const image = dashboardAppearanceAssetUrl_(setting, "image");
   const attrs = image ? platformBackgroundAttrs(image, { variant: "hero", cssVariable: "--dashboard-subhub-image" }) : "";
-  const color = String(setting.Color || dashboardHubSetting_(category, "").Color || "#354785");
+  const parentSetting = dashboardHubSetting_(category, "");
+  const colors = dashboardHubColorSpec_(setting, String(parentSetting.Color || "#354785"));
   const display = String(setting.DisplayName || group);
 
   return `
-    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(color)};--dashboard-subhub-image:none;" open>
+    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-image:none;" open>
       <summary>
         <span class="dashboard-subhub-heading-icon">${dashboardHubIconHtml_(category, group, "dashboard-subhub-custom-icon")}</span>
         <span><strong>${escapeHtml(display)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>

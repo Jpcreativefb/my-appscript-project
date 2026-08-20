@@ -106,11 +106,19 @@ const APPEARANCE_HUB_SETTING_HEADERS = [
   "HubGroup",
   "DisplayName",
   "Color",
+  "ColorMode",
+  "GradientStart",
+  "GradientEnd",
+  "GradientAngle",
   "ImageUrl",
   "ImageFileId",
+  "ImageSourceType",
+  "ImageSourceUrl",
   "IconText",
   "IconUrl",
   "IconFileId",
+  "IconSourceType",
+  "IconSourceUrl",
   "ShowNavLabel",
   "Active",
   "UpdatedAt"
@@ -165,7 +173,7 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
   const cache = !spreadsheet && typeof CacheService !== "undefined" ? CacheService.getScriptCache() : null;
   if (cache) {
     try {
-      const cached = cache.get("appearance-hub-settings-v1218c1");
+      const cached = cache.get("appearance-hub-settings-v1218c2");
       if (cached) return JSON.parse(cached);
     } catch (err) {}
   }
@@ -194,13 +202,19 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
     if (!appearanceString_(row.IconUrl) && appearanceString_(row.IconFileId)) {
       row.IconUrl = appearanceDriveThumbnailUrl_(row.IconFileId);
     }
+    row.Color = appearanceString_(row.Color || "#354785") || "#354785";
+    row.ColorMode = appearanceString_(row.ColorMode || "solid").toLowerCase() === "gradient" ? "gradient" : "solid";
+    row.GradientStart = appearanceString_(row.GradientStart || row.Color || "#354785") || "#354785";
+    row.GradientEnd = appearanceString_(row.GradientEnd || row.Color || "#20284a") || "#20284a";
+    const angle = Number(row.GradientAngle);
+    row.GradientAngle = isFinite(angle) ? Math.max(0, Math.min(360, angle)) : 135;
     row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
     row.Active = appearanceBool_(row.Active, true);
     return row;
   });
 
   if (cache) {
-    try { cache.put("appearance-hub-settings-v1218c1", JSON.stringify(rows), 300); } catch (err) {}
+    try { cache.put("appearance-hub-settings-v1218c2", JSON.stringify(rows), 300); } catch (err) {}
   }
   return rows;
 }
@@ -953,17 +967,25 @@ function adminSaveAppearanceHubSetting(payload) {
     HubGroup: group,
     DisplayName: appearanceString_(payload.displayName || payload.DisplayName),
     Color: appearanceString_(payload.color || payload.Color || "#354785"),
+    ColorMode: appearanceString_(payload.colorMode || payload.ColorMode || "solid").toLowerCase() === "gradient" ? "gradient" : "solid",
+    GradientStart: appearanceString_(payload.gradientStart || payload.GradientStart || payload.color || payload.Color || "#354785"),
+    GradientEnd: appearanceString_(payload.gradientEnd || payload.GradientEnd || payload.color || payload.Color || "#20284a"),
+    GradientAngle: Math.max(0, Math.min(360, Number(payload.gradientAngle != null ? payload.gradientAngle : payload.GradientAngle) || 135)),
     ImageUrl: appearanceString_(payload.imageUrl || payload.ImageUrl),
     ImageFileId: appearanceString_(payload.imageFileId || payload.ImageFileId),
+    ImageSourceType: appearanceString_(payload.imageSourceType || payload.ImageSourceType),
+    ImageSourceUrl: appearanceString_(payload.imageSourceUrl || payload.ImageSourceUrl),
     IconText: appearanceString_(payload.iconText || payload.IconText),
     IconUrl: appearanceString_(payload.iconUrl || payload.IconUrl),
     IconFileId: appearanceString_(payload.iconFileId || payload.IconFileId),
+    IconSourceType: appearanceString_(payload.iconSourceType || payload.IconSourceType),
+    IconSourceUrl: appearanceString_(payload.iconSourceUrl || payload.IconSourceUrl),
     ShowNavLabel: appearanceBool_(payload.showNavLabel != null ? payload.showNavLabel : payload.ShowNavLabel, true),
     Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
     UpdatedAt: new Date()
   });
   SpreadsheetApp.flush();
-  try { CacheService.getScriptCache().remove("appearance-hub-settings-v1218c1"); } catch (err) {}
+  try { CacheService.getScriptCache().remove("appearance-hub-settings-v1218c2"); } catch (err) {}
   const saved = appearanceGetHubAppearanceRows_(ss).find(function(row) {
     return appearanceNormalizeId_(row.SettingKey) === appearanceNormalizeId_(settingKey);
   }) || {};

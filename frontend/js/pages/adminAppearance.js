@@ -156,6 +156,13 @@ function adminAppearanceHubManager_() {
   const imageUrl = adminAppearanceHubAssetUrl_(row, "image");
   const iconUrl = adminAppearanceHubAssetUrl_(row, "icon");
   const color = String(row.Color || "#354785");
+  const colorMode = String(row.ColorMode || "solid").toLowerCase() === "gradient" ? "gradient" : "solid";
+  const gradientStart = String(row.GradientStart || color || "#354785");
+  const gradientEnd = String(row.GradientEnd || color || "#20284a");
+  const gradientAngle = Math.max(0, Math.min(360, Number(row.GradientAngle) || 135));
+  const previewBackground = colorMode === "gradient"
+    ? "linear-gradient(" + gradientAngle + "deg," + gradientStart + "," + gradientEnd + ")"
+    : color;
   const imagePreview = imageUrl
     ? '<img src="' + adminAppearanceEscape_(imageUrl) + '" alt="Hub background">'
     : '<span class="appearance-hub-preview-fallback">No hub image</span>';
@@ -165,9 +172,9 @@ function adminAppearanceHubManager_() {
 
   return `
     <details class="card admin-collapsible-card appearance-hub-editor" open>
-      <summary><strong>Hub + Navigation Appearance</strong><span>Colors, hub artwork, league/show logos and bottom-nav icons</span></summary>
+      <summary><strong>Hub + Navigation Appearance</strong><span>Gradients, hub artwork, league/show logos and bottom-nav icons</span></summary>
       <div class="appearance-card-body">
-        <div class="admin-sub">Pick a main hub or one of its subhubs. Main hub icon changes also feed the phone bottom navigation. Nothing here changes scoring or game setup.</div>
+        <div class="admin-sub">Pick a main hub or one of its subhubs. Every image area can use a web image directly, import that web image into your Google Drive, choose a photo/file, or take a photo. Main hub icon changes also feed the phone bottom navigation.</div>
         <div class="appearance-hub-editor-grid">
           <label>Area to Edit
             <select id="appearanceHubSettingSelect" class="input" onchange="adminAppearanceSelectHubSetting_(this.value)">${adminAppearanceHubOptions_()}</select>
@@ -175,37 +182,67 @@ function adminAppearanceHubManager_() {
           <label>Display Name
             <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}">
           </label>
-          <label>Color
-            <div class="appearance-hub-color-row"><input id="appearanceHubColor" type="color" value="${adminAppearanceEscape_(color)}"><input id="appearanceHubColorText" class="input" value="${adminAppearanceEscape_(color)}" oninput="adminAppearanceSyncHubColor_(this.value)"></div>
+          <label>Color Style
+            <select id="appearanceHubColorMode" class="input" onchange="adminAppearancePreviewHubColor_()">
+              <option value="solid" ${colorMode === "solid" ? "selected" : ""}>Solid</option>
+              <option value="gradient" ${colorMode === "gradient" ? "selected" : ""}>Gradient</option>
+            </select>
           </label>
           <label>Fallback Icon / Emoji
             <input id="appearanceHubIconText" class="input" maxlength="8" value="${adminAppearanceEscape_(row.IconText || "")}" placeholder="🏈">
           </label>
         </div>
 
+        <div class="appearance-hub-gradient-grid">
+          <label>Solid / Accent Color
+            <div class="appearance-hub-color-row"><input id="appearanceHubColor" type="color" value="${adminAppearanceEscape_(color)}" oninput="adminAppearanceSyncHubColorPicker_(this.value)"><input id="appearanceHubColorText" class="input" value="${adminAppearanceEscape_(color)}" oninput="adminAppearanceSyncHubColor_(this.value)"></div>
+          </label>
+          <label>Gradient Start
+            <div class="appearance-hub-color-row"><input id="appearanceHubGradientStart" type="color" value="${adminAppearanceEscape_(gradientStart)}" oninput="adminAppearanceSyncHubGradientPicker_('start',this.value)"><input id="appearanceHubGradientStartText" class="input" value="${adminAppearanceEscape_(gradientStart)}" oninput="adminAppearanceSyncHubGradientText_('start',this.value)"></div>
+          </label>
+          <label>Gradient End
+            <div class="appearance-hub-color-row"><input id="appearanceHubGradientEnd" type="color" value="${adminAppearanceEscape_(gradientEnd)}" oninput="adminAppearanceSyncHubGradientPicker_('end',this.value)"><input id="appearanceHubGradientEndText" class="input" value="${adminAppearanceEscape_(gradientEnd)}" oninput="adminAppearanceSyncHubGradientText_('end',this.value)"></div>
+          </label>
+          <label>Gradient Angle
+            <div class="appearance-hub-angle-row"><input id="appearanceHubGradientAngle" type="range" min="0" max="360" step="1" value="${gradientAngle}" oninput="adminAppearancePreviewHubColor_()"><output id="appearanceHubGradientAngleValue">${gradientAngle}°</output></div>
+          </label>
+        </div>
+
+        <div class="appearance-hub-color-preview" id="appearanceHubColorPreview" style="background:${adminAppearanceEscape_(previewBackground)}">Color / gradient preview</div>
+
         <div class="appearance-hub-media-grid">
           <div class="appearance-hub-media-card">
             <strong>Hub / League Image</strong>
-            <div class="appearance-hub-image-preview" style="--appearance-hub-preview-color:${adminAppearanceEscape_(color)}">${imagePreview}</div>
+            <div class="appearance-hub-image-preview" style="background:${adminAppearanceEscape_(previewBackground)}">${imagePreview}</div>
+            <label class="appearance-hub-url-label">Web Image URL<input id="appearanceHubImageUrlInput" class="input" value="${adminAppearanceEscape_(row.ImageSourceUrl || (row.ImageSourceType === "external-url" ? row.ImageUrl : "") || "")}" placeholder="https://example.com/image.jpg"></label>
             <input id="appearanceHubImageFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageFile')">
-            <div class="appearance-compact-action-row">
+            <input id="appearanceHubImageCamera" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadHubAsset_('image', 'appearanceHubImageCamera')">
+            <div class="appearance-compact-action-row appearance-hub-media-actions">
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUseHubAssetUrl_('image', false)">Use Web URL</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUseHubAssetUrl_('image', true)">Import URL to Drive</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubImageFile')">Choose Image</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubImageCamera')">Take Photo</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearHubAsset_('image')">Clear</button>
             </div>
           </div>
           <div class="appearance-hub-media-card">
             <strong>Hub / Bottom Nav Icon</strong>
             <div class="appearance-hub-icon-preview">${iconPreview}</div>
+            <label class="appearance-hub-url-label">Web Icon URL<input id="appearanceHubIconUrlInput" class="input" value="${adminAppearanceEscape_(row.IconSourceUrl || (row.IconSourceType === "external-url" ? row.IconUrl : "") || "")}" placeholder="https://example.com/icon.png"></label>
             <input id="appearanceHubIconFile" class="appearance-hidden-file" type="file" accept="image/*" onchange="adminAppearanceUploadHubAsset_('icon', 'appearanceHubIconFile')">
-            <div class="appearance-compact-action-row">
+            <input id="appearanceHubIconCamera" class="appearance-hidden-file" type="file" accept="image/*" capture="environment" onchange="adminAppearanceUploadHubAsset_('icon', 'appearanceHubIconCamera')">
+            <div class="appearance-compact-action-row appearance-hub-media-actions">
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUseHubAssetUrl_('icon', false)">Use Web URL</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceUseHubAssetUrl_('icon', true)">Import URL to Drive</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubIconFile')">Choose Icon</button>
+              <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearanceHubIconCamera')">Take Photo</button>
               <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearHubAsset_('icon')">Use Fallback</button>
             </div>
           </div>
         </div>
 
         ${topNav ? `<label class="appearance-hub-label-toggle"><input id="appearanceHubShowNavLabel" type="checkbox" ${adminAppearanceBool_(row.ShowNavLabel, true) ? 'checked' : ''}><span>Show the name under this icon in the bottom navigation</span></label>` : ''}
-        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Setting ID: ${adminAppearanceEscape_(row.SettingKey || "")}<br>Hub: ${adminAppearanceEscape_(row.HubCategory || "")}${row.HubGroup ? '<br>Subhub: ' + adminAppearanceEscape_(row.HubGroup) : ''}</small></details>
+        <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Setting ID: ${adminAppearanceEscape_(row.SettingKey || "")}<br>Hub: ${adminAppearanceEscape_(row.HubCategory || "")}${row.HubGroup ? '<br>Subhub: ' + adminAppearanceEscape_(row.HubGroup) : ''}<br>Image source: ${adminAppearanceEscape_(row.ImageSourceType || "default")}<br>Icon source: ${adminAppearanceEscape_(row.IconSourceType || "default")}</small></details>
         <div class="admin-actions appearance-compact-actions"><button class="admin-small-button" type="button" onclick="adminAppearanceSaveHubSetting_()">Save Hub Appearance</button></div>
       </div>
     </details>`;
@@ -217,30 +254,84 @@ function adminAppearanceSelectHubSetting_(settingKey) {
   adminAppearancePaint_();
 }
 
+function adminAppearanceValidHubHex_(value, fallback) {
+  const text = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : String(fallback || "#354785");
+}
+
 function adminAppearanceSyncHubColor_(value) {
   const picker = document.getElementById("appearanceHubColor");
   const text = String(value || "").trim();
   if (picker && /^#[0-9a-f]{6}$/i.test(text)) picker.value = text;
+  adminAppearancePreviewHubColor_();
+}
+
+function adminAppearanceSyncHubColorPicker_(value) {
+  const text = document.getElementById("appearanceHubColorText");
+  if (text) text.value = String(value || "");
+  adminAppearancePreviewHubColor_();
+}
+
+function adminAppearanceSyncHubGradientPicker_(which, value) {
+  const text = document.getElementById(which === "end" ? "appearanceHubGradientEndText" : "appearanceHubGradientStartText");
+  if (text) text.value = String(value || "");
+  adminAppearancePreviewHubColor_();
+}
+
+function adminAppearanceSyncHubGradientText_(which, value) {
+  const picker = document.getElementById(which === "end" ? "appearanceHubGradientEnd" : "appearanceHubGradientStart");
+  const text = String(value || "").trim();
+  if (picker && /^#[0-9a-f]{6}$/i.test(text)) picker.value = text;
+  adminAppearancePreviewHubColor_();
+}
+
+function adminAppearancePreviewHubColor_() {
+  const preview = document.getElementById("appearanceHubColorPreview");
+  const imagePreview = document.querySelector(".appearance-hub-image-preview");
+  const mode = String(document.getElementById("appearanceHubColorMode") && document.getElementById("appearanceHubColorMode").value || "solid");
+  const solid = adminAppearanceValidHubHex_(document.getElementById("appearanceHubColorText") && document.getElementById("appearanceHubColorText").value, "#354785");
+  const start = adminAppearanceValidHubHex_(document.getElementById("appearanceHubGradientStartText") && document.getElementById("appearanceHubGradientStartText").value, solid);
+  const end = adminAppearanceValidHubHex_(document.getElementById("appearanceHubGradientEndText") && document.getElementById("appearanceHubGradientEndText").value, solid);
+  const angleInput = document.getElementById("appearanceHubGradientAngle");
+  const angle = Math.max(0, Math.min(360, Number(angleInput && angleInput.value) || 135));
+  const angleValue = document.getElementById("appearanceHubGradientAngleValue");
+  if (angleValue) angleValue.textContent = angle + "°";
+  const background = mode === "gradient" ? "linear-gradient(" + angle + "deg," + start + "," + end + ")" : solid;
+  if (preview) preview.style.background = background;
+  if (imagePreview && !imagePreview.querySelector("img")) imagePreview.style.background = background;
 }
 
 function adminAppearanceCollectHubSetting_() {
   const row = adminAppearanceHubRow_() || {};
   const colorPicker = document.getElementById("appearanceHubColor");
   const colorText = document.getElementById("appearanceHubColorText");
+  const colorMode = document.getElementById("appearanceHubColorMode");
+  const gradientStart = document.getElementById("appearanceHubGradientStartText");
+  const gradientEnd = document.getElementById("appearanceHubGradientEndText");
+  const gradientAngle = document.getElementById("appearanceHubGradientAngle");
   const display = document.getElementById("appearanceHubDisplayName");
   const iconText = document.getElementById("appearanceHubIconText");
   const showLabel = document.getElementById("appearanceHubShowNavLabel");
+  const solid = adminAppearanceValidHubHex_(String(colorText && colorText.value || colorPicker && colorPicker.value || row.Color || "#354785"), row.Color || "#354785");
   return {
     settingKey: String(row.SettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports"),
     hubCategory: String(row.HubCategory || "general"),
     hubGroup: String(row.HubGroup || ""),
     displayName: String(display && display.value || row.DisplayName || "").trim(),
-    color: String(colorText && colorText.value || colorPicker && colorPicker.value || row.Color || "#354785").trim(),
+    color: solid,
+    colorMode: String(colorMode && colorMode.value || row.ColorMode || "solid") === "gradient" ? "gradient" : "solid",
+    gradientStart: adminAppearanceValidHubHex_(String(gradientStart && gradientStart.value || row.GradientStart || solid), solid),
+    gradientEnd: adminAppearanceValidHubHex_(String(gradientEnd && gradientEnd.value || row.GradientEnd || solid), solid),
+    gradientAngle: Math.max(0, Math.min(360, Number(gradientAngle && gradientAngle.value != null ? gradientAngle.value : row.GradientAngle) || 135)),
     imageUrl: String(row.ImageUrl || ""),
     imageFileId: String(row.ImageFileId || ""),
+    imageSourceType: String(row.ImageSourceType || ""),
+    imageSourceUrl: String(row.ImageSourceUrl || ""),
     iconText: String(iconText && iconText.value || row.IconText || "").trim(),
     iconUrl: String(row.IconUrl || ""),
     iconFileId: String(row.IconFileId || ""),
+    iconSourceType: String(row.IconSourceType || ""),
+    iconSourceUrl: String(row.IconSourceUrl || ""),
     showNavLabel: showLabel ? showLabel.checked : adminAppearanceBool_(row.ShowNavLabel, true),
     active: true
   };
@@ -258,13 +349,61 @@ async function adminAppearanceSaveHubSetting_() {
   }
 }
 
+async function adminAppearanceUseHubAssetUrl_(kind, importToDrive) {
+  const input = document.getElementById(kind === "icon" ? "appearanceHubIconUrlInput" : "appearanceHubImageUrlInput");
+  const url = String(input && input.value || "").trim();
+  if (!/^https?:\/\//i.test(url)) {
+    ADMIN_APPEARANCE_STATE.message = "Enter a full http:// or https:// image URL first.";
+    adminAppearancePaint_();
+    return;
+  }
+  const payload = adminAppearanceCollectHubSetting_();
+  const current = adminAppearanceHubRow_() || {};
+  try {
+    ADMIN_APPEARANCE_STATE.message = importToDrive ? "Importing web image to Google Drive…" : "Saving external web image…";
+    adminAppearancePaint_();
+    let savedUrl = url;
+    let fileId = "";
+    let sourceType = "external-url";
+    if (importToDrive) {
+      const imported = await apiAdminImportImageFromUrl({
+        gameId: "hub-appearance",
+        categoryId: String(current.SettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "hub"),
+        nomineeId: kind,
+        imageUrl: url
+      });
+      if (!imported || imported.success === false) throw new Error(imported && (imported.message || imported.error) || "Could not import the web image to Google Drive.");
+      fileId = String(imported.fileId || "");
+      savedUrl = String(imported.thumbnailUrl || adminAppearanceDriveUrl_(fileId, kind === "icon" ? "w240" : "w900"));
+      sourceType = "drive-import";
+    }
+    if (kind === "icon") {
+      payload.iconUrl = savedUrl;
+      payload.iconFileId = fileId;
+      payload.iconSourceType = sourceType;
+      payload.iconSourceUrl = url;
+    } else {
+      payload.imageUrl = savedUrl;
+      payload.imageFileId = fileId;
+      payload.imageSourceType = sourceType;
+      payload.imageSourceUrl = url;
+    }
+    const save = await apiAdminSaveAppearanceHubSetting(payload);
+    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image was prepared but could not be assigned to the hub.");
+    await adminAppearanceRefresh_((payload.displayName || "Hub") + (importToDrive ? " web image imported to Drive." : " external web image saved."));
+  } catch (err) {
+    ADMIN_APPEARANCE_STATE.message = err.message || String(err);
+    adminAppearancePaint_();
+  }
+}
+
 async function adminAppearanceUploadHubAsset_(kind, inputId) {
   const input = document.getElementById(inputId);
   const file = input && input.files && input.files[0];
   if (!file) return;
   const formPayload = adminAppearanceCollectHubSetting_();
   try {
-    ADMIN_APPEARANCE_STATE.message = kind === "icon" ? "Uploading hub icon…" : "Uploading hub image…";
+    ADMIN_APPEARANCE_STATE.message = kind === "icon" ? "Uploading hub icon to Google Drive…" : "Uploading hub image to Google Drive…";
     adminAppearancePaint_();
     const prepared = await adminAppearancePrepareUpload_(file);
     const current = adminAppearanceHubRow_() || {};
@@ -282,13 +421,17 @@ async function adminAppearanceUploadHubAsset_(kind, inputId) {
     if (kind === "icon") {
       payload.iconUrl = url;
       payload.iconFileId = upload.fileId || "";
+      payload.iconSourceType = "drive-upload";
+      payload.iconSourceUrl = "";
     } else {
       payload.imageUrl = url;
       payload.imageFileId = upload.fileId || "";
+      payload.imageSourceType = "drive-upload";
+      payload.imageSourceUrl = "";
     }
     const save = await apiAdminSaveAppearanceHubSetting(payload);
     if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Hub asset uploaded but could not be assigned.");
-    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon saved." : " image saved."));
+    await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon saved to Drive." : " image saved to Drive."));
   } catch (err) {
     ADMIN_APPEARANCE_STATE.message = err.message || String(err);
     adminAppearancePaint_();
@@ -300,8 +443,17 @@ async function adminAppearanceUploadHubAsset_(kind, inputId) {
 async function adminAppearanceClearHubAsset_(kind) {
   try {
     const payload = adminAppearanceCollectHubSetting_();
-    if (kind === "icon") { payload.iconUrl = ""; payload.iconFileId = ""; }
-    else { payload.imageUrl = ""; payload.imageFileId = ""; }
+    if (kind === "icon") {
+      payload.iconUrl = "";
+      payload.iconFileId = "";
+      payload.iconSourceType = "";
+      payload.iconSourceUrl = "";
+    } else {
+      payload.imageUrl = "";
+      payload.imageFileId = "";
+      payload.imageSourceType = "";
+      payload.imageSourceUrl = "";
+    }
     const save = await apiAdminSaveAppearanceHubSetting(payload);
     if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Could not clear hub asset.");
     await adminAppearanceRefresh_((payload.displayName || "Hub") + (kind === "icon" ? " icon reset to fallback." : " image cleared."));
