@@ -463,19 +463,68 @@ function notificationGetOrCreateSheet_(name, headers) {
     return sh;
   }
 
-  const lastColumn = Math.max(sh.getLastColumn(), 1);
-  const existing = sh.getRange(1, 1, 1, lastColumn).getValues()[0]
-    .map(function(value) { return String(value || "").trim(); });
+  notificationRepairCanonicalHeaderRow_(sh, headers);
+  sh.setFrozenRows(1);
+  return sh;
+}
 
-  headers.forEach(function(header) {
-    if (existing.indexOf(header) === -1) {
-      sh.getRange(1, sh.getLastColumn() + 1).setValue(header);
-      existing.push(header);
+/*
+  v1.2.18f4 durability repair. Earlier notification writers created a new
+  record by appendRow(["", ...]) and then used getLastRow(). A fully blank
+  appended row is not a safe row locator in Google Sheets; it can leave
+  getLastRow() pointing at row 1 and allow the following field writes to
+  overwrite the header row. If that happened in production, preserve the
+  first row as a candidate data row and restore the canonical headers.
+*/
+function notificationRepairCanonicalHeaderRow_(sh, headers) {
+  const width = Math.max(Number(sh.getLastColumn() || 0), headers.length, 1);
+  const firstRow = sh.getRange(1, 1, 1, width).getValues()[0];
+  const canonical = firstRow.slice(0, headers.length).map(function(value) {
+    return String(value === undefined || value === null ? "" : value).trim();
+  });
+
+  const healthy = headers.every(function(header, index) {
+    return canonical[index] === header;
+  });
+  if (healthy) return false;
+
+  const nonBlank = canonical.filter(function(value) { return value !== ""; }).length;
+  const headerMatches = canonical.filter(function(value) {
+    return headers.indexOf(value) !== -1;
+  }).length;
+  const looksLikeData = nonBlank > 0 && headerMatches < Math.ceil(headers.length / 2);
+
+  if (looksLikeData) {
+    sh.insertRowAfter(1);
+    sh.getRange(2, 1, 1, headers.length).setValues([firstRow.slice(0, headers.length)]);
+  }
+
+  sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+  if (width > headers.length) {
+    sh.getRange(1, headers.length + 1, 1, width - headers.length).clearContent();
+  }
+  SpreadsheetApp.flush();
+  return true;
+}
+
+function notificationNextDataRow_(sh) {
+  return Math.max(2, Number(sh.getLastRow() || 0) + 1);
+}
+
+function notificationWriteObjectRow_(sh, headers, rowIndex, values) {
+  const col = notificationColumnMap_(headers);
+  let row = new Array(headers.length).fill("");
+  if (rowIndex <= sh.getLastRow()) {
+    row = sh.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  }
+
+  Object.keys(values || {}).forEach(function(header) {
+    if (col[header] !== undefined) {
+      row[col[header]] = values[header];
     }
   });
 
-  sh.setFrozenRows(1);
-  return sh;
+  sh.getRange(rowIndex, 1, 1, headers.length).setValues([row]);
 }
 
 function notificationColumnMap_(headers) {
@@ -560,8 +609,7 @@ function apiSaveNotificationPreferences(payload) {
   });
 
   if (rowIndex === -1) {
-    sh.appendRow(new Array(headers.length).fill(""));
-    rowIndex = sh.getLastRow();
+    rowIndex = notificationNextDataRow_(sh);
   }
 
   const values = {
@@ -574,12 +622,7 @@ function apiSaveNotificationPreferences(payload) {
     UpdatedAt: new Date().toISOString()
   };
 
-  Object.keys(values).forEach(function(header) {
-    if (col[header] !== undefined) {
-      sh.getRange(rowIndex, col[header] + 1).setValue(values[header]);
-    }
-  });
-
+  notificationWriteObjectRow_(sh, headers, rowIndex, values);
   SpreadsheetApp.flush();
 
   return {
@@ -881,8 +924,7 @@ function notificationPushSetSystemSetting_(key, value, adminUsername) {
   }
 
   if (rowIndex === -1) {
-    sh.appendRow(new Array(headers.length).fill(""));
-    rowIndex = sh.getLastRow();
+    rowIndex = notificationNextDataRow_(sh);
   }
 
   const values = {
@@ -892,12 +934,7 @@ function notificationPushSetSystemSetting_(key, value, adminUsername) {
     UpdatedBy: String(adminUsername || "").trim()
   };
 
-  Object.keys(values).forEach(function(header) {
-    if (col[header] !== undefined) {
-      sh.getRange(rowIndex, col[header] + 1).setValue(values[header]);
-    }
-  });
-
+  notificationWriteObjectRow_(sh, headers, rowIndex, values);
   SpreadsheetApp.flush();
 }
 
@@ -949,8 +986,7 @@ function notificationPushSaveGameSetting_(payload, adminUsername) {
   }
 
   if (rowIndex === -1) {
-    sh.appendRow(new Array(headers.length).fill(""));
-    rowIndex = sh.getLastRow();
+    rowIndex = notificationNextDataRow_(sh);
   }
 
   const values = {
@@ -962,12 +998,7 @@ function notificationPushSaveGameSetting_(payload, adminUsername) {
     UpdatedBy: String(adminUsername || "").trim()
   };
 
-  Object.keys(values).forEach(function(header) {
-    if (col[header] !== undefined) {
-      sh.getRange(rowIndex, col[header] + 1).setValue(values[header]);
-    }
-  });
-
+  notificationWriteObjectRow_(sh, headers, rowIndex, values);
   SpreadsheetApp.flush();
 
   return {
@@ -1090,8 +1121,7 @@ function apiRegisterPushSubscription(payload) {
   }
 
   if (rowIndex === -1) {
-    sh.appendRow(new Array(headers.length).fill(""));
-    rowIndex = sh.getLastRow();
+    rowIndex = notificationNextDataRow_(sh);
   }
 
   const now = new Date().toISOString();
@@ -1113,14 +1143,44 @@ function apiRegisterPushSubscription(payload) {
     DisabledAt: ""
   };
 
-  Object.keys(values).forEach(function(header) {
-    if (col[header] !== undefined) {
-      sh.getRange(rowIndex, col[header] + 1).setValue(values[header]);
-    }
-  });
-
+  notificationWriteObjectRow_(sh, headers, rowIndex, values);
   SpreadsheetApp.flush();
-  return { success: true, subscriptionId: id, enabled: true };
+
+  // Verify the same row inside this write execution. A registration is not
+  // reported as successful unless the exact user/device/endpoint is durable.
+  const stored = sh.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
+  const storedId = String(stored[col.SubscriptionId] || "").trim();
+  const storedUser = String(stored[col.Username] || "").trim().toLowerCase();
+  const storedDeviceId = String(stored[col.DeviceId] || "").trim();
+  const storedEndpoint = String(stored[col.Endpoint] || "").trim();
+  const storedEnabled = notificationBool_(stored[col.Enabled], false);
+  const expectedUser = String(username || "").trim().toLowerCase();
+  const expectedDeviceId = String(payload.deviceId || "").trim().slice(0, 120);
+
+  const verified =
+    storedId === id &&
+    storedUser === expectedUser &&
+    storedEndpoint === endpoint &&
+    storedEnabled &&
+    (!expectedDeviceId || storedDeviceId === expectedDeviceId);
+
+  if (!verified) {
+    throw new Error(
+      "Push subscription write could not be verified in PushSubscriptions. " +
+      "The notification sheet was repaired, but the device row did not read back correctly."
+    );
+  }
+
+  const summary = apiGetPushSubscriptionSummary(payload.token, expectedDeviceId, endpoint);
+  return {
+    success: true,
+    subscriptionId: id,
+    enabled: true,
+    verified: summary && summary.thisDeviceActive === true,
+    thisDeviceActive: summary && summary.thisDeviceActive === true,
+    activeDevices: summary ? Number(summary.activeDevices || 0) : 0,
+    matchedBy: summary ? String(summary.matchedBy || "") : ""
+  };
 }
 
 function apiRemovePushSubscription(payload) {
