@@ -1542,3 +1542,29 @@
 }
 
 @media (max-width:760px){ .appearance-hub-image-controls { grid-template-columns:1fr; } }
+
+
+/* v1.2.18c6 — explicit subhub-card appearance controls */
+.appearance-subhub-panel-control {
+  display:grid;
+  gap:8px;
+  padding:10px 12px;
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:12px;
+  background:rgba(248,250,252,.72);
+}
+.appearance-subhub-panel-preview {
+  min-height:48px;
+  display:grid;
+  place-items:center;
+  border-radius:10px;
+  padding:10px;
+  font-size:11px;
+  font-weight:800;
+  color:#111827;
+  background:color-mix(
+    in srgb,
+    var(--appearance-subhub-panel-color,#354785) var(--appearance-subhub-panel-tint,18%),
+    #fff
+  );
+}

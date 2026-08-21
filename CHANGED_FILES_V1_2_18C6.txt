@@ -1,0 +1,14 @@
+backend/engines/AppearanceEngine.js
+frontend/app.html
+frontend/app.js
+frontend/css/appearance.css
+frontend/css/pages.css
+frontend/index.html
+frontend/js/app.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/dashboard.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/home_hub_navigation_v1218c6_tests.js
+HOME_HUB_NAVIGATION_V1_2_18C6.md
+CHANGED_FILES_V1_2_18C6.txt

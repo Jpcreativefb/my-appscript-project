@@ -373,8 +373,8 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards";
-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup";
+const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -704,6 +704,132 @@ async function renderGameSwitcher() {
 
 
 /* ======================
+   GAME-SPECIFIC PROFILE PROMPT
+====================== */
+
+function gameProfilePromptCacheKey_(gameId) {
+  let username = "";
+  try {
+    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
+  } catch (err) {
+    username = "";
+  }
+  return "gameProfilePrompt:" + String(username || "").trim().toLowerCase() + ":" + String(gameId || "").trim();
+}
+
+function gameProfileDashboardRow_(gameId) {
+  const payload = typeof APP_STATE !== "undefined" ? APP_STATE.dashboardHomePayload : null;
+  if (!payload) return null;
+  const games = []
+    .concat(Array.isArray(payload.activeGames) ? payload.activeGames : [])
+    .concat(Array.isArray(payload.pastGames) ? payload.pastGames : []);
+  return games.find(function(game) {
+    return String(game && game.gameId || "").trim() === String(gameId || "").trim();
+  }) || null;
+}
+
+function showGameProfileChoiceModal_(gameId, profile) {
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("gameProfileChoiceModal");
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    const name = String(profile && profile.displayName || "your regular profile").trim();
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `
+      <div id="gameProfileChoiceModal" class="game-profile-choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="gameProfileChoiceTitle">
+        <div class="game-profile-choice-card">
+          <button type="button" class="game-profile-choice-close" data-choice="later" aria-label="Close">×</button>
+          <div class="game-profile-choice-kicker">NEW GAME</div>
+          <h2 id="gameProfileChoiceTitle">Use a different profile for this game?</h2>
+          <p>You can keep <strong>${escapeHtmlForApp_(name)}</strong>, or use a different display name/photo just for this game.</p>
+          <div class="game-profile-choice-note">Scores, career stats and trophies still stay attached to your account username.</div>
+          <div class="game-profile-choice-actions">
+            <button type="button" class="button" data-choice="general">Use Regular Profile</button>
+            <button type="button" class="button secondary" data-choice="custom">Customize for This Game</button>
+            <button type="button" class="game-profile-choice-later" data-choice="later">Not now</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    const modal = wrapper.firstElementChild;
+    document.body.appendChild(modal);
+    document.body.classList.add("game-profile-choice-open");
+
+    function finish(choice) {
+      document.body.classList.remove("game-profile-choice-open");
+      if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+      resolve(choice || "later");
+    }
+
+    modal.addEventListener("click", function(event) {
+      if (event.target === modal) {
+        finish("later");
+        return;
+      }
+      const button = event.target.closest("[data-choice]");
+      if (button) finish(button.getAttribute("data-choice"));
+    });
+  });
+}
+
+async function maybeOfferGameProfile_(gameId) {
+  gameId = String(gameId || "").trim();
+  if (!gameId || typeof apiGetEditableProfile !== "function") return "continue";
+
+  const cacheKey = gameProfilePromptCacheKey_(gameId);
+  try {
+    if (localStorage.getItem(cacheKey) === "done") return "continue";
+  } catch (err) {}
+
+  // Do not retroactively interrupt games the player has already started.
+  const dashboardGame = gameProfileDashboardRow_(gameId);
+  if (dashboardGame && dashboardGame.hasStarted === true) {
+    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    return "continue";
+  }
+
+  let username = "";
+  try {
+    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
+  } catch (err) {}
+  if (!username) return "continue";
+
+  let result = null;
+  try {
+    result = await apiGetEditableProfile(username, gameId);
+  } catch (err) {
+    return "continue";
+  }
+
+  if (!result || result.success === false) return "continue";
+  if (result.gameProfilePromptCompleted === true) {
+    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    return "continue";
+  }
+
+  const choice = await showGameProfileChoiceModal_(gameId, result.profile || result.generalProfile || {});
+  if (choice === "later") return "continue";
+
+  try {
+    if (typeof apiSetGameProfilePromptChoice === "function") {
+      const saved = await apiSetGameProfilePromptChoice(gameId, choice === "custom" ? "custom" : "general");
+      if (!saved || saved.success === false) return "continue";
+    }
+    localStorage.setItem(cacheKey, "done");
+  } catch (err) {
+    return "continue";
+  }
+
+  if (choice === "custom") {
+    try { localStorage.setItem("profileOpenGameSpecific", gameId); } catch (err) {}
+    return "custom";
+  }
+
+  return "continue";
+}
+
+/* ======================
    GAME CARD ACTIONS
 ====================== */
 
@@ -759,6 +885,12 @@ async function enterGame(
   );
 
   clearStartupPayload();
+
+  const profileChoice = await maybeOfferGameProfile_(gameId);
+  if (profileChoice === "custom") {
+    await navigate("profile");
+    return;
+  }
 
   if (gameRole === "parent") {
     localStorage.setItem("seasonHubMode", hubMode || "playable-aggregate");
@@ -890,8 +1022,24 @@ async function renderPage(page) {
   }
 
   if (page.indexOf("hub:") === 0) {
-    const hubCategory = page.split(":")[1] || "general";
+    const hubCategory = String(page.split(":")[1] || "general").toLowerCase();
     app.innerHTML = await renderDashboardHubPage_(hubCategory);
+
+    if (typeof dashboardHydrateGameStandings_ === "function") {
+      window.setTimeout(function() {
+        const payload = typeof APP_STATE !== "undefined" ? APP_STATE.dashboardHomePayload : null;
+        const active = payload && Array.isArray(payload.activeGames) ? payload.activeGames : [];
+        const hubGames = active.filter(function(game) {
+          return String(game && (game.hubCategory || "general") || "general").toLowerCase() === hubCategory;
+        });
+        dashboardHydrateGameStandings_(
+          typeof dashboardGetPlayingGames_ === "function" ? dashboardGetPlayingGames_(hubGames) : hubGames,
+          "hub:" + hubCategory
+        ).catch(function(err) {
+          console.warn("Hub standings could not be loaded", err);
+        });
+      }, 0);
+    }
     return;
   }
 

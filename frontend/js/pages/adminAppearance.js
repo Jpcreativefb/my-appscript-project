@@ -129,7 +129,7 @@ function adminAppearanceHubGroupLabel_(row) {
     return "Main Hub — " + String(row.DisplayName || category || "Hub");
   }
   const parent = category === "sports" ? "Sports" : category === "reality" ? "Reality" : category === "awards" ? "Awards" : "General";
-  return parent + " — " + group;
+  return "Subhub Card — " + parent + " / " + group;
 }
 
 function adminAppearanceHubOptions_() {
@@ -156,6 +156,7 @@ function adminAppearanceHubManager_() {
   }
   const category = String(row.HubCategory || "").toLowerCase();
   const isLeagueCard = category === "league";
+  const isSubhub = !isLeagueCard && !!String(row.HubGroup || "").trim();
   const topNav = ["home", "sports", "reality", "awards", "more"].indexOf(category) !== -1 && !String(row.HubGroup || "").trim();
   const imageUrl = adminAppearanceHubAssetUrl_(row, "image");
   const iconUrl = adminAppearanceHubAssetUrl_(row, "icon");
@@ -166,6 +167,7 @@ function adminAppearanceHubManager_() {
   const gradientAngle = Math.max(0, Math.min(360, Number(row.GradientAngle) || 135));
   const imageOpacity = Math.max(0, Math.min(100, row.ImageOpacity == null || row.ImageOpacity === "" ? 100 : Number(row.ImageOpacity)));
   const imageDarken = Math.max(0, Math.min(100, row.ImageDarken == null || row.ImageDarken === "" ? 35 : Number(row.ImageDarken)));
+  const panelTint = Math.max(0, Math.min(70, row.PanelTint == null || row.PanelTint === "" ? 18 : Number(row.PanelTint)));
   const previewBackground = colorMode === "gradient"
     ? "linear-gradient(" + gradientAngle + "deg," + gradientStart + "," + gradientEnd + ")"
     : color;
@@ -181,9 +183,9 @@ function adminAppearanceHubManager_() {
 
   return `
     <details class="card admin-collapsible-card appearance-hub-editor" open>
-      <summary><strong>Hub + Navigation Appearance</strong><span>Hubs, league cards, gradients, artwork and bottom-nav icons</span></summary>
+      <summary><strong>Hub + Navigation Appearance</strong><span>Main hubs, subhub cards, gradients, artwork and bottom-nav icons</span></summary>
       <div class="appearance-card-body">
-        <div class="admin-sub">Pick a main hub or one of its subhubs. Every image area can use a web image directly, import that web image into your Google Drive, choose a photo/file, or take a photo. Main hub icon changes also feed the phone bottom navigation.</div>
+        <div class="admin-sub">Pick a main hub or a Subhub Card such as Sports / NFL or Reality / Survivor. The color/gradient controls change the collapsed card itself; Subhub Cards also have an Expanded Area Tint control. Every image area can use a web image directly, import it into Google Drive, choose a photo/file, or take a photo.</div>
 
         <div class="appearance-hub-live-preview" id="appearanceHubLivePreview">
           <div class="appearance-hub-live-fill" id="appearanceHubLiveFill" style="background:${adminAppearanceEscape_(previewBackground)}"></div>
@@ -192,7 +194,7 @@ function adminAppearanceHubManager_() {
           <div class="appearance-hub-live-content">
             <div class="appearance-hub-live-icon" id="appearanceHubLiveIcon">${iconPreview}</div>
             <div class="appearance-hub-live-copy">
-              <small>LIVE PREVIEW</small>
+              <small>${isSubhub ? "SUBHUB CARD PREVIEW" : "LIVE PREVIEW"}</small>
               <strong id="appearanceHubLiveName">${adminAppearanceEscape_(previewName)}</strong>
               <span id="appearanceHubLiveMeta">${adminAppearanceEscape_(colorMode === "gradient" ? "Gradient " + gradientAngle + "°" : "Solid " + color)}</span>
             </div>
@@ -206,9 +208,9 @@ function adminAppearanceHubManager_() {
           </label>
           <label>${isLeagueCard ? "League Card Label" : "Display Name"}
             <input id="appearanceHubDisplayName" class="input" value="${adminAppearanceEscape_(row.DisplayName || "")}" oninput="adminAppearanceMarkHubDirty_();adminAppearanceUpdateHubLivePreview_()">
-            ${isLeagueCard ? '<span class="admin-sub">Appearance label only — this does not rename the league.</span>' : ''}
+            ${isLeagueCard ? '<span class="admin-sub">Appearance label only — this does not rename the league.</span>' : isSubhub ? '<span class="admin-sub">This is the label players see on the collapsed subhub card.</span>' : ''}
           </label>
-          <label>Color Style
+          <label>${isSubhub ? "Subhub Card Color Style" : "Color Style"}
             <select id="appearanceHubColorMode" class="input" onchange="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubColor_()">
               <option value="solid" ${colorMode === "solid" ? "selected" : ""}>Solid</option>
               <option value="gradient" ${colorMode === "gradient" ? "selected" : ""}>Gradient</option>
@@ -234,11 +236,20 @@ function adminAppearanceHubManager_() {
           </label>
         </div>
 
-        <div class="appearance-hub-color-preview" id="appearanceHubColorPreview" style="background:${adminAppearanceEscape_(previewBackground)}">Color / gradient preview</div>
+        <div class="appearance-hub-color-preview" id="appearanceHubColorPreview" style="background:${adminAppearanceEscape_(previewBackground)}">${isSubhub ? "Collapsed subhub card color / gradient" : "Color / gradient preview"}</div>
+
+        ${isSubhub ? `
+          <div class="appearance-subhub-panel-control">
+            <label>Expanded Area Tint <span class="admin-sub">0% is nearly clear · higher values pull more of the subhub color into the expanded sections</span>
+              <div class="appearance-hub-angle-row"><input id="appearanceHubPanelTint" type="range" min="0" max="70" step="1" value="${panelTint}" oninput="adminAppearanceMarkHubDirty_();adminAppearancePreviewHubPanelTint_()"><output id="appearanceHubPanelTintValue">${panelTint}%</output></div>
+            </label>
+            <div id="appearanceHubPanelTintPreview" class="appearance-subhub-panel-preview" style="--appearance-subhub-panel-color:${adminAppearanceEscape_(color)};--appearance-subhub-panel-tint:${panelTint}%">Expanded section preview</div>
+          </div>
+        ` : ""}
 
         <div class="appearance-hub-media-grid">
           <div class="appearance-hub-media-card">
-            <strong>Hub / League Image</strong>
+            <strong>${isSubhub ? "Subhub Card Image" : isLeagueCard ? "League Card Image" : "Hub Image"}</strong>
             <div class="appearance-hub-image-preview" id="appearanceHubImagePreview" style="background:${adminAppearanceEscape_(previewBackground)};--appearance-hub-image-opacity:${imageOpacity / 100};--appearance-hub-image-darken:${imageDarken / 100}">${imagePreview}<span class="appearance-hub-image-darken-layer" aria-hidden="true"></span></div>
             <div class="appearance-hub-image-controls">
               <label>Image Opacity <span class="admin-sub">0% invisible · 100% full image</span>
@@ -261,7 +272,7 @@ function adminAppearanceHubManager_() {
             </div>
           </div>
           <div class="appearance-hub-media-card">
-            <strong>Hub / Bottom Nav Icon</strong>
+            <strong>${isSubhub ? "Subhub Card Icon / Logo" : isLeagueCard ? "League Card Icon / Logo" : "Hub / Bottom Nav Icon"}</strong>
             <div class="appearance-hub-icon-preview" id="appearanceHubIconPreview">${iconPreview}</div>
             <div class="appearance-hub-asset-state is-saved" id="appearanceHubIconState">✓ Saved · ${adminAppearanceEscape_(iconSourceLabel)}</div>
             <label class="appearance-hub-url-label">Web Icon URL<input id="appearanceHubIconUrlInput" class="input" value="${adminAppearanceEscape_(row.IconSourceUrl || (row.IconSourceType === "external-url" ? row.IconUrl : "") || "")}" placeholder="https://example.com/icon.png" oninput="adminAppearancePreviewHubUrl_('icon',this.value)"></label>
@@ -450,7 +461,24 @@ function adminAppearancePreviewHubColor_() {
   if (imagePreview && !imagePreview.querySelector("img")) imagePreview.style.background = background;
   const liveFill = document.getElementById("appearanceHubLiveFill");
   if (liveFill) liveFill.style.background = background;
+  adminAppearancePreviewHubPanelTint_();
   adminAppearanceUpdateHubLivePreview_();
+}
+
+function adminAppearancePreviewHubPanelTint_() {
+  const input = document.getElementById("appearanceHubPanelTint");
+  const value = Math.max(0, Math.min(70, Number(input && input.value != null ? input.value : 18)));
+  const output = document.getElementById("appearanceHubPanelTintValue");
+  if (output) output.textContent = value + "%";
+  const preview = document.getElementById("appearanceHubPanelTintPreview");
+  const color = adminAppearanceValidHubHex_(
+    document.getElementById("appearanceHubColorText") && document.getElementById("appearanceHubColorText").value,
+    "#354785"
+  );
+  if (preview) {
+    preview.style.setProperty("--appearance-subhub-panel-color", color);
+    preview.style.setProperty("--appearance-subhub-panel-tint", value + "%");
+  }
 }
 
 function adminAppearancePreviewHubImageTone_() {
@@ -483,6 +511,7 @@ function adminAppearanceCollectHubSetting_() {
   const gradientAngle = document.getElementById("appearanceHubGradientAngle");
   const imageOpacity = document.getElementById("appearanceHubImageOpacity");
   const imageDarken = document.getElementById("appearanceHubImageDarken");
+  const panelTint = document.getElementById("appearanceHubPanelTint");
   const display = document.getElementById("appearanceHubDisplayName");
   const iconText = document.getElementById("appearanceHubIconText");
   const showLabel = document.getElementById("appearanceHubShowNavLabel");
@@ -503,6 +532,7 @@ function adminAppearanceCollectHubSetting_() {
     imageSourceUrl: String(row.ImageSourceUrl || ""),
     imageOpacity: Math.max(0, Math.min(100, Number(imageOpacity && imageOpacity.value != null ? imageOpacity.value : (row.ImageOpacity == null || row.ImageOpacity === "" ? 100 : row.ImageOpacity)))),
     imageDarken: Math.max(0, Math.min(100, Number(imageDarken && imageDarken.value != null ? imageDarken.value : (row.ImageDarken == null || row.ImageDarken === "" ? 35 : row.ImageDarken)))),
+    panelTint: Math.max(0, Math.min(70, Number(panelTint && panelTint.value != null ? panelTint.value : (row.PanelTint == null || row.PanelTint === "" ? 18 : row.PanelTint)))),
     iconText: String(iconText && iconText.value || row.IconText || "").trim(),
     iconUrl: String(row.IconUrl || ""),
     iconFileId: String(row.IconFileId || ""),

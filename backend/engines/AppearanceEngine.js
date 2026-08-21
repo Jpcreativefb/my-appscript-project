@@ -116,6 +116,7 @@ const APPEARANCE_HUB_SETTING_HEADERS = [
   "ImageSourceUrl",
   "ImageOpacity",
   "ImageDarken",
+  "PanelTint",
   "IconText",
   "IconUrl",
   "IconFileId",
@@ -229,7 +230,7 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
   const cache = !spreadsheet && typeof CacheService !== "undefined" ? CacheService.getScriptCache() : null;
   if (cache) {
     try {
-      const cached = cache.get("appearance-hub-settings-v1218c4");
+      const cached = cache.get("appearance-hub-settings-v1218c6");
       if (cached) return JSON.parse(cached);
     } catch (err) {}
   }
@@ -268,13 +269,15 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
     const imageDarken = Number(row.ImageDarken);
     row.ImageOpacity = isFinite(imageOpacity) ? Math.max(0, Math.min(100, imageOpacity)) : 100;
     row.ImageDarken = isFinite(imageDarken) ? Math.max(0, Math.min(100, imageDarken)) : 35;
+    const panelTint = Number(row.PanelTint);
+    row.PanelTint = isFinite(panelTint) ? Math.max(0, Math.min(70, panelTint)) : 18;
     row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
     row.Active = appearanceBool_(row.Active, true);
     return row;
   });
 
   if (cache) {
-    try { cache.put("appearance-hub-settings-v1218c4", JSON.stringify(rows), 300); } catch (err) {}
+    try { cache.put("appearance-hub-settings-v1218c6", JSON.stringify(rows), 300); } catch (err) {}
   }
   return rows;
 }
@@ -1037,6 +1040,7 @@ function adminSaveAppearanceHubSetting(payload) {
     ImageSourceUrl: appearanceString_(payload.imageSourceUrl || payload.ImageSourceUrl),
     ImageOpacity: Math.max(0, Math.min(100, Number(payload.imageOpacity != null ? payload.imageOpacity : (payload.ImageOpacity != null ? payload.ImageOpacity : 100)))),
     ImageDarken: Math.max(0, Math.min(100, Number(payload.imageDarken != null ? payload.imageDarken : (payload.ImageDarken != null ? payload.ImageDarken : 35)))),
+    PanelTint: Math.max(0, Math.min(70, Number(payload.panelTint != null ? payload.panelTint : (payload.PanelTint != null ? payload.PanelTint : 18)))),
     IconText: appearanceString_(payload.iconText || payload.IconText),
     IconUrl: appearanceString_(payload.iconUrl || payload.IconUrl),
     IconFileId: appearanceString_(payload.iconFileId || payload.IconFileId),
@@ -1051,6 +1055,7 @@ function adminSaveAppearanceHubSetting(payload) {
     const cache = CacheService.getScriptCache();
     cache.remove("appearance-hub-settings-v1218c2");
     cache.remove("appearance-hub-settings-v1218c4");
+    cache.remove("appearance-hub-settings-v1218c6");
   } catch (err) {}
   const saved = appearanceGetHubAppearanceRows_(ss).find(function(row) {
     return appearanceNormalizeId_(row.SettingKey) === appearanceNormalizeId_(settingKey);

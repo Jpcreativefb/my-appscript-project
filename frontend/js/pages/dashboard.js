@@ -81,6 +81,9 @@ async function renderDashboardPage() {
   const bio = String(profile.bio || profile.Bio || "").trim();
   const playingGames = dashboardGetPlayingGames_(activeGames);
   const attentionGames = dashboardGetAttentionGames_(playingGames);
+  const currentGames = playingGames.filter(function(game) {
+    return attentionGames.indexOf(game) === -1;
+  });
   const offeredGames = activeGames.filter(function(game) {
     return playingGames.indexOf(game) === -1;
   });
@@ -148,48 +151,54 @@ async function renderDashboardPage() {
         </section>
       `}
 
-      <section id="dashboardLeagueHomeSection" class="dashboard-home-section" aria-label="Current Standings" hidden>
-        <div class="dashboard-home-section-heading">
+      <details id="dashboardLeagueHomeSection" class="dashboard-home-section dashboard-home-collapsible" aria-label="Current Standings" hidden>
+        <summary class="dashboard-home-section-heading dashboard-home-summary">
           <div>
             <p class="dashboard-kicker dark">My Leagues</p>
             <h2>Current Scoreboard</h2>
           </div>
-          <button type="button" class="dashboard-home-text-button" onclick="navigate('leagues')">All Leagues</button>
+          <span class="dashboard-home-summary-side"><span class="dashboard-home-summary-more">show</span><b>⌄</b></span>
+        </summary>
+        <div class="dashboard-home-collapsible-body">
+          <div class="dashboard-home-inline-actions"><button type="button" class="dashboard-home-text-button" onclick="navigate('leagues')">All Leagues</button></div>
+          <div id="dashboardLeagueHomeCards" class="dashboard-league-home-strip"></div>
         </div>
-        <div id="dashboardLeagueHomeCards" class="dashboard-league-home-strip"></div>
-      </section>
+      </details>
 
-      <section class="dashboard-home-section">
-        <div class="dashboard-home-section-heading">
-          <div>
-            <p class="dashboard-kicker dark">My Games</p>
-            <h2>Games You're Playing</h2>
+      ${currentGames.length ? `
+        <!-- v1.2.18c compatibility: Games You're Playing now means My Current Games only. -->
+        <section class="dashboard-home-section">
+          <div class="dashboard-home-section-heading">
+            <div>
+              <p class="dashboard-kicker dark">My Games</p>
+              <h2>My Current Games</h2>
+            </div>
+            <span class="dashboard-section-count">${currentGames.length}</span>
           </div>
-          <span class="dashboard-section-count">${playingGames.length}</span>
-        </div>
-        <div class="dashboard-home-active-grid dashboard-user-games-grid">
-          ${playingGames.length
-            ? playingGames.map(renderDashboardCompactActiveGame_).join("")
-            : `<div class="dashboard-home-muted-card">You haven't started an active game yet. Pick something from New Games below.</div>`}
-        </div>
-      </section>
+          <div class="dashboard-home-active-grid dashboard-user-games-grid dashboard-current-games-carousel">
+            ${currentGames.map(renderDashboardCompactActiveGame_).join("")}
+          </div>
+        </section>
+      ` : ""}
 
       ${renderDashboardHubLauncher_(activeGames, pastGames)}
 
-      <section class="dashboard-home-section dashboard-discover-section">
-        <div class="dashboard-home-section-heading">
-          <div>
-            <p class="dashboard-kicker dark">Discover</p>
-            <h2>New Games Available</h2>
+      ${offeredGames.length ? `
+        <details class="dashboard-home-section dashboard-home-collapsible dashboard-discover-section">
+          <summary class="dashboard-home-section-heading dashboard-home-summary">
+            <div>
+              <p class="dashboard-kicker dark">Discover</p>
+              <h2>New Games Available</h2>
+            </div>
+            <span class="dashboard-home-summary-side"><span class="dashboard-section-count">${offeredGames.length}</span><b>⌄</b></span>
+          </summary>
+          <div class="dashboard-home-collapsible-body">
+            <div class="dashboard-discover-grid">
+              ${offeredGames.map(renderDashboardDiscoverGame_).join("")}
+            </div>
           </div>
-          <span class="dashboard-section-count">${offeredGames.length}</span>
-        </div>
-        <div class="dashboard-discover-grid">
-          ${offeredGames.length
-            ? offeredGames.map(renderDashboardDiscoverGame_).join("")
-            : `<div class="dashboard-home-muted-card">You've already started every active game currently offered.</div>`}
-        </div>
-      </section>
+        </details>
+      ` : ""}
 
     </div>
   `;
@@ -275,6 +284,53 @@ function dashboardHubColorSpec_(row, fallback) {
     angle: angle,
     fill: mode === "gradient" ? "linear-gradient(" + angle + "deg," + start + "," + end + ")" : color
   };
+}
+
+function dashboardHexRgba_(hex, opacity) {
+  const text = String(hex || "").trim();
+  const match = /^#([0-9a-f]{6})$/i.exec(text);
+  if (!match) return "rgba(53,71,133," + opacity + ")";
+  const value = parseInt(match[1], 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return "rgba(" + r + "," + g + "," + b + "," + opacity + ")";
+}
+
+function dashboardSubHubBodyFill_(colors) {
+  colors = colors || {};
+  if (colors.mode === "gradient") {
+    return "linear-gradient(" + (Number(colors.angle) || 135) + "deg," +
+      dashboardHexRgba_(colors.start || colors.color, 0.22) + "," +
+      dashboardHexRgba_(colors.end || colors.color, 0.12) + ")";
+  }
+  return dashboardHexRgba_(colors.color || "#354785", 0.15);
+}
+
+function dashboardSubHubRunningScore_(group, activeGames) {
+  const current = (Array.isArray(activeGames) ? activeGames : []).filter(function(game) {
+    return String(game && game.hubGroup || "Other") === String(group || "Other");
+  });
+  if (!current.length) return 0;
+
+  const playing = dashboardGetPlayingGames_(current);
+  const attention = dashboardGetAttentionGames_(playing);
+  if (attention.length) return 5000 + attention.length * 20 + current.length;
+
+  const hasLive = current.some(function(game) {
+    const status = String(game && (game.status || game.statusLabel || game.lockLabel) || "").toLowerCase();
+    return /\b(live|running|in progress|underway)\b/.test(status);
+  });
+  if (hasLive) return 4000 + current.length;
+
+  if (playing.length) return 3000 + playing.length * 10 + current.length;
+  if (current.some(function(game) { return game && game.available !== false; })) return 2000 + current.length;
+  return 1000 + current.length;
+}
+
+function dashboardSubHubPanelTint_(row) {
+  const value = Number(row && row.PanelTint);
+  return isFinite(value) ? Math.max(0, Math.min(70, value)) : 18;
 }
 
 function dashboardHubImageTone_(row) {
@@ -458,6 +514,82 @@ function dashboardGetAttentionGames_(playingGames) {
   });
 }
 
+function dashboardGameStageLabel_(game) {
+  game = game || {};
+  const explicit = [
+    game.stageLabel,
+    game.currentStageLabel,
+    game.currentEpisodeLabel,
+    game.episodeLabel,
+    game.weekLabel
+  ].map(function(value) { return String(value || "").trim(); }).find(Boolean);
+  if (explicit) return explicit;
+
+  const haystack = [
+    game.name,
+    game.subtitle,
+    game.statusLabel,
+    game.status
+  ].join(" ");
+
+  const episode = haystack.match(/\bepisode\s*(\d{1,3})\b/i);
+  if (episode) return "Episode " + episode[1];
+
+  const week = haystack.match(/\bweek\s*(\d{1,2})\b/i);
+  if (week) return "Week " + week[1];
+
+  const round = haystack.match(/\b(round|race|day)\s*(\d{1,3})\b/i);
+  if (round) return round[1].charAt(0).toUpperCase() + round[1].slice(1).toLowerCase() + " " + round[2];
+
+  return "";
+}
+
+function dashboardGameActivityLabel_(game) {
+  game = game || {};
+  if (game.isPast === true || game.archived === true) return "Final";
+
+  const raw = String([
+    game.status,
+    game.statusLabel,
+    game.lockLabel
+  ].join(" ")).toLowerCase();
+
+  if (/\b(live|in progress|running|underway)\b/.test(raw)) return /\blive\b/.test(raw) ? "Live" : "In Progress";
+  if (/\b(final|finished|complete|completed|closed)\b/.test(raw)) return "Final";
+
+  const total = Number(game.totalCount) || 0;
+  const made = Number(game.madeCount) || 0;
+  if (game.progressAvailable === true && total > 0 && made < total) return "Picks Open";
+  if (/\blocked\b/.test(raw)) return "Picks Locked";
+  if (game.progressAvailable === true && total > 0 && made >= total) return "Caught Up";
+  if (game.available === false) return String(game.availabilityLabel || game.statusLabel || "Unavailable");
+  return "Open";
+}
+
+function dashboardGameStatusLine_(game) {
+  const stage = dashboardGameStageLabel_(game);
+  const activity = dashboardGameActivityLabel_(game);
+  if (!stage) return activity;
+  if (activity && stage.toLowerCase() !== activity.toLowerCase()) return stage + " · " + activity;
+  return stage || activity;
+}
+
+function dashboardPreferredLeagueId_(game) {
+  game = game || {};
+  return String(
+    game.leagueId ||
+    (Array.isArray(game.leagues) && game.leagues[0] && (game.leagues[0].leagueId || game.leagues[0].LeagueId)) ||
+    ""
+  );
+}
+
+function dashboardStandingsShell_(game) {
+  if (!game || game.showLeaderboard === false) return "";
+  return '<div class="dashboard-inline-standings" data-dashboard-standing-game="' +
+    escapeAttr(String(game.gameId || "")) +
+    '"><span>Standings loading…</span></div>';
+}
+
 function dashboardGetSnarkMessage_(attentionGames, playingGames, offeredGames, username) {
   const attention = Array.isArray(attentionGames) ? attentionGames : [];
   const playing = Array.isArray(playingGames) ? playingGames : [];
@@ -517,11 +649,7 @@ function renderDashboardAttentionGame_(game) {
   const made = Number(game.madeCount) || 0;
   const remaining = Math.max(0, total - made);
   const noun = remaining === 1 ? "pick" : "picks";
-  const preferredLeagueId = String(
-    game.leagueId ||
-    (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
-    ""
-  );
+  const preferredLeagueId = dashboardPreferredLeagueId_(game);
   const card = dashboardGameCardAttrs_(game, "--dashboard-game-card-image");
 
   return `
@@ -529,9 +657,13 @@ function renderDashboardAttentionGame_(game) {
       <div class="dashboard-colored-game-copy">
         <span class="dashboard-attention-badge">${remaining} ${noun} remaining</span>
         <h3>${escapeHtml(game.name || game.gameId || "Game")}</h3>
-        <p>${escapeHtml(game.lockLabel || game.statusLabel || "Picks open")}</p>
+        <p>${escapeHtml(dashboardGameStatusLine_(game))}</p>
+        ${dashboardStandingsShell_(game)}
       </div>
-      <button type="button" onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')">Make Picks</button>
+      <div class="dashboard-game-card-actions">
+        <button type="button" class="dashboard-card-primary" onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')">Finish Picks</button>
+        ${game.showLeaderboard === false ? "" : `<button type="button" class="dashboard-card-secondary" onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}')">Standings</button>`}
+      </div>
     </article>
   `;
 }
@@ -551,7 +683,7 @@ function renderDashboardDiscoverGame_(game) {
       <div class="dashboard-colored-game-copy">
         <span>${escapeHtml(dashboardHubDisplayName_(game.hubCategory || "general"))} · ${escapeHtml(game.hubGroup || game.typeLabel || "Game")}</span>
         <strong>${escapeHtml(game.name || game.gameId || "Game")}</strong>
-        <small>${escapeHtml(game.lockLabel || game.statusLabel || "Open")}</small>
+        <small>${escapeHtml(dashboardGameStatusLine_(game))}</small>
       </div>
       <button type="button" ${disabled ? "disabled" : `onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')"`}>${escapeHtml(disabled ? (game.availabilityLabel || "Unavailable") : "Play")}</button>
     </article>
@@ -664,7 +796,10 @@ async function renderDashboardHubPage_(category) {
     const group = String(game.hubGroup || "Other").trim() || "Other";
     if (groupNames.indexOf(group) === -1) groupNames.push(group);
   });
-  groupNames.sort();
+  groupNames.sort(function(a, b) {
+    const scoreDiff = dashboardSubHubRunningScore_(b, active) - dashboardSubHubRunningScore_(a, active);
+    return scoreDiff || String(a).localeCompare(String(b));
+  });
 
   const setting = dashboardHubSetting_(category, "");
   const hubImage = dashboardAppearanceAssetUrl_(setting, "image");
@@ -683,8 +818,10 @@ async function renderDashboardHubPage_(category) {
         <p>${escapeHtml(dashboardHubDescription_(category))}</p>
       </header>
 
-      ${groupNames.length ? groupNames.map(function(group) {
-        return renderDashboardSubHub_(category, group, active, past);
+      ${groupNames.length ? groupNames.map(function(group, index) {
+        return renderDashboardSubHub_(category, group, active, past, {
+          openByDefault: index === 0
+        });
       }).join("") : `
         <div class="dashboard-home-muted-card">No ${escapeHtml(dashboardHubDisplayName_(category).toLowerCase())} are available yet.</div>
       `}
@@ -692,11 +829,13 @@ async function renderDashboardHubPage_(category) {
   `;
 }
 
-function renderDashboardSubHub_(category, group, activeGames, pastGames) {
+function renderDashboardSubHub_(category, group, activeGames, pastGames, options) {
+  options = options || {};
   const current = activeGames.filter(function(game) { return String(game.hubGroup || "Other") === group; });
   const archived = pastGames.filter(function(game) { return String(game.hubGroup || "Other") === group; });
   const playing = dashboardGetPlayingGames_(current);
   const attention = dashboardGetAttentionGames_(playing);
+  const currentPlaying = playing.filter(function(game) { return attention.indexOf(game) === -1; });
   const offered = current.filter(function(game) { return playing.indexOf(game) === -1; });
   const setting = dashboardHubSetting_(category, group);
   const image = dashboardAppearanceAssetUrl_(setting, "image");
@@ -704,23 +843,53 @@ function renderDashboardSubHub_(category, group, activeGames, pastGames) {
   const parentSetting = dashboardHubSetting_(category, "");
   const colors = dashboardHubColorSpec_(setting, String(parentSetting.Color || "#354785"));
   const tone = dashboardHubImageTone_(setting);
+  const panelTint = dashboardSubHubPanelTint_(setting);
   const display = String(setting.DisplayName || group);
+  const bodyFill = dashboardSubHubBodyFill_(colors);
+  const runningNow = current.length > 0;
+  // v1.2.18c5 compatibility marker: the old rule was runningNow ? 'open' : ''.
+  // c6 intentionally opens attention areas plus only the highest-priority running subhub.
+  const openSubhub = attention.length > 0 || (options.openByDefault === true && runningNow);
+  const liveCount = current.filter(function(game) {
+    return /\b(live|running|in progress|underway)\b/i.test(String(game.status || game.statusLabel || ""));
+  }).length;
+  const activityLabel = attention.length
+    ? attention.length + " need attention"
+    : liveCount
+      ? liveCount + " in progress"
+      : currentPlaying.length
+        ? currentPlaying.length + " current"
+        : offered.length
+          ? offered.length + " available"
+          : archived.length + " archived";
 
   return `
-    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-image:none;--dashboard-subhub-image-opacity:${tone.opacity};--dashboard-subhub-image-darken:${tone.darken};" open>
+    <details class="dashboard-subhub${image ? ' has-subhub-image' : ''}${runningNow ? ' is-running' : ' is-offseason'}" ${attrs} style="--dashboard-subhub-color:${escapeAttr(colors.color)};--dashboard-subhub-fill:${escapeAttr(colors.fill)};--dashboard-subhub-body-fill:${escapeAttr(bodyFill)};--dashboard-subhub-panel-tint:${panelTint}%;--dashboard-subhub-image:none;--dashboard-subhub-image-opacity:${tone.opacity};--dashboard-subhub-image-darken:${tone.darken};" ${openSubhub ? 'open' : ''}>
       <summary>
         <span class="dashboard-subhub-heading-icon">${dashboardHubIconHtml_(category, group, "dashboard-subhub-custom-icon")}</span>
-        <span><strong>${escapeHtml(display)}</strong><small>${playing.length} playing · ${offered.length} available · ${archived.length} archived</small></span>
+        <span><strong>${escapeHtml(display)}</strong><small>${escapeHtml(activityLabel)}${archived.length && runningNow ? " · " + archived.length + " archived" : ""}</small></span>
         <b>⌄</b>
       </summary>
       <div class="dashboard-subhub-body">
-        ${attention.length ? `<div class="dashboard-subhub-block"><h3>Needs Attention</h3><div class="dashboard-attention-grid">${attention.map(renderDashboardAttentionGame_).join("")}</div></div>` : ""}
-        <div class="dashboard-subhub-block"><h3>My Active Games</h3><div class="dashboard-home-active-grid">${playing.length ? playing.map(renderDashboardCompactActiveGame_).join("") : `<div class="dashboard-home-muted-card">No games started in ${escapeHtml(display)} yet.</div>`}</div></div>
-        <div class="dashboard-subhub-block"><h3>Available to Play</h3><div class="dashboard-discover-grid">${offered.length ? offered.map(renderDashboardDiscoverGame_).join("") : `<div class="dashboard-home-muted-card">No additional games available right now.</div>`}</div></div>
-        <details class="dashboard-subhub-archive">
-          <summary>Past / Archived Games <strong>${archived.length}</strong></summary>
-          <div class="dashboard-home-past-grid">${archived.length ? archived.map(renderDashboardPastGameCompact_).join("") : `<div class="dashboard-home-muted-card">No archived games yet.</div>`}</div>
-        </details>
+        ${attention.length ? `<div class="dashboard-subhub-block dashboard-subhub-attention-block"><h3>What Needs Your Attention</h3><div class="dashboard-attention-grid">${attention.map(renderDashboardAttentionGame_).join("")}</div></div>` : ""}
+        ${currentPlaying.length ? `
+          <details class="dashboard-subhub-section dashboard-subhub-current" ${attention.length ? "" : "open"}>
+            <summary><span>My Current ${escapeHtml(display)} Games</span><strong>${currentPlaying.length}</strong></summary>
+            <div class="dashboard-subhub-section-body"><div class="dashboard-home-active-grid dashboard-current-games-carousel">${currentPlaying.map(renderDashboardCompactActiveGame_).join("")}</div></div>
+          </details>
+        ` : ""}
+        ${offered.length ? `
+          <details class="dashboard-subhub-section dashboard-subhub-available">
+            <summary><span>Available to Play</span><strong>${offered.length}</strong></summary>
+            <div class="dashboard-subhub-section-body"><div class="dashboard-discover-grid">${offered.map(renderDashboardDiscoverGame_).join("")}</div></div>
+          </details>
+        ` : ""}
+        ${archived.length ? `
+          <details class="dashboard-subhub-section dashboard-subhub-archive">
+            <summary><span>Past / Archived Games</span><strong>${archived.length}</strong></summary>
+            <div class="dashboard-subhub-section-body"><div class="dashboard-home-past-grid">${archived.map(renderDashboardPastGameCompact_).join("")}</div></div>
+          </details>
+        ` : ""}
       </div>
     </details>
   `;
@@ -880,32 +1049,34 @@ function renderDashboardCompactActiveGame_(game) {
   const progressValue = Math.max(0, Math.min(100, Number(game.progressValue) || 0));
   const actionLabel = getDashboardGameActionLabel_(game, false, progressValue);
   const enterDisabled = game.disableEnter === true || game.available === false;
-  const preferredLeagueId = String(
-    game.leagueId ||
-    (Array.isArray(game.leagues) && game.leagues[0] && game.leagues[0].leagueId) ||
-    ""
-  );
+  const preferredLeagueId = dashboardPreferredLeagueId_(game);
   const card = dashboardGameCardAttrs_(game, "--compact-game-image");
 
   return `
     <article class="dashboard-compact-game${card.className}" ${card.attrs} style="${card.style}">
       <div class="dashboard-compact-game-art">
-        <span>${escapeHtml(game.lockLabel || game.statusLabel || "Open")}</span>
+        <span>${escapeHtml(dashboardGameStatusLine_(game))}</span>
         <div>
           <h3>${escapeHtml(game.name || game.gameId || "Game")}</h3>
           <p>${escapeHtml(game.typeLabel || game.subtitle || "Game")}</p>
         </div>
       </div>
       <div class="dashboard-compact-game-body">
-        <div class="dashboard-compact-progress">
-          <span>${escapeHtml(game.progressLabel || "Ready to play")}</span>
-          <strong>${game.progressAvailable === true ? progressValue + "%" : "—"}</strong>
+        ${dashboardStandingsShell_(game)}
+        <div class="dashboard-game-card-actions dashboard-compact-actions">
+          <button
+            type="button"
+            class="dashboard-compact-play-button dashboard-card-primary"
+            ${enterDisabled ? "disabled" : `onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')"`}
+          >${escapeHtml(enterDisabled ? (game.availabilityLabel || actionLabel) : actionLabel)}</button>
+          ${game.showLeaderboard === false ? "" : `
+            <button
+              type="button"
+              class="dashboard-card-secondary"
+              onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}')"
+            >Standings</button>
+          `}
         </div>
-        <button
-          type="button"
-          class="dashboard-compact-play-button"
-          ${enterDisabled ? "disabled" : `onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')"`}
-        >${escapeHtml(enterDisabled ? (game.availabilityLabel || actionLabel) : actionLabel)}</button>
       </div>
     </article>
   `;
@@ -927,6 +1098,58 @@ function renderDashboardPastGameCompact_(game) {
     </article>
   `;
 }
+
+
+async function dashboardHydrateGameStandings_(games, expectedPage) {
+  const source = Array.isArray(games) ? games : [];
+  const username = String(getCurrentUsername() || "").toLowerCase();
+  if (!username || !source.length || typeof apiGetLeaderboardForLeague !== "function") return;
+
+  const unique = [];
+  const seen = {};
+  source.forEach(function(game) {
+    const id = String(game && game.gameId || "");
+    if (!id || seen[id] || game.showLeaderboard === false) return;
+    seen[id] = true;
+    unique.push(game);
+  });
+
+  const jobs = unique.slice(0, 20).map(async function(game) {
+    const leagueId = dashboardPreferredLeagueId_(game);
+    try {
+      const standings = await apiGetLeaderboardForLeague(game.gameId, leagueId);
+      if (
+        expectedPage &&
+        typeof APP_STATE !== "undefined" &&
+        String(APP_STATE.currentPage || "") !== String(expectedPage)
+      ) return;
+
+      const rows = standings && Array.isArray(standings.leaderboard) ? standings.leaderboard : [];
+      const userRow = rows.find(function(row) {
+        return String(row.username || row.user || row.Username || "").toLowerCase() === username;
+      }) || null;
+      const leader = rows[0] || null;
+      const rank = userRow ? Number(userRow.rank || userRow.Rank) || (rows.indexOf(userRow) + 1) : 0;
+      const score = userRow ? dashboardLeaderboardScore_(userRow) : "—";
+      const leaderScore = leader ? dashboardLeaderboardScore_(leader) : "—";
+      const leaderName = leader ? String(leader.displayName || leader.DisplayName || leader.username || "Leader") : "";
+      const html = rows.length
+        ? `<strong>${rank ? "#" + rank + " of " + rows.length : "Not ranked yet"}</strong><span>${rank ? escapeHtml(score) + " pts" : ""}</span>${leader ? `<small>Leader ${escapeHtml(leaderName)} · ${escapeHtml(leaderScore)}</small>` : ""}`
+        : `<span>No standings yet</span>`;
+
+      document.querySelectorAll("[data-dashboard-standing-game]").forEach(function(node) {
+        if (String(node.getAttribute("data-dashboard-standing-game") || "") === String(game.gameId || "")) {
+          node.innerHTML = html;
+        }
+      });
+    } catch (err) {
+      console.warn("Game standings unavailable", game && game.gameId, err);
+    }
+  });
+
+  await Promise.allSettled(jobs);
+}
+
 
 function renderDashboardTrophyRoomShell_() {
   return `
@@ -977,7 +1200,13 @@ async function hydrateDashboardHomeExtras_() {
   const leagues = results[1].status === "fulfilled" ? results[1].value : null;
 
   hydrateDashboardCareerStats_(career);
-  await hydrateDashboardLeagueStandings_(leagues, payload, hydrationId);
+  await Promise.allSettled([
+    hydrateDashboardLeagueStandings_(leagues, payload, hydrationId),
+    dashboardHydrateGameStandings_(
+      dashboardGetPlayingGames_(Array.isArray(payload.activeGames) ? payload.activeGames : []),
+      "dashboard"
+    )
+  ]);
 }
 
 function hydrateDashboardCareerStats_(response) {
