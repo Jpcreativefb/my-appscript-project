@@ -1094,6 +1094,7 @@ function adminAppearanceStudioDefaults_(theme) {
   const background = theme.background || {};
   const confidence = theme.confidence || {};
   const score = theme.score || {};
+  const leaderboard = theme.leaderboard || {};
   const page = theme.page || {};
   const questions = theme.questions || {};
   const details = theme.details || {};
@@ -1293,6 +1294,50 @@ function adminAppearanceStudioDefaults_(theme) {
       height: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.height, 18, 64, 26),
       radius: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.radius, 0, 20, 0),
       fontSize: adminAppearanceStudioClamp_(theme.scoreboard && theme.scoreboard.fontSize, 7, 20, 10)
+    },
+    leaderboard: {
+      layout: leaderboard.layout || "cards",
+      density: leaderboard.density || "standard",
+      cardMode: leaderboard.cardMode || "gradient",
+      cardBackground: leaderboard.cardBackground || "#20284a",
+      gradientStart: leaderboard.gradientStart || leaderboard.cardBackground || "#20284a",
+      gradientEnd: leaderboard.gradientEnd || "#354785",
+      gradientAngle: adminAppearanceStudioClamp_(leaderboard.gradientAngle, 0, 360, 135),
+      cardOpacity: adminAppearanceStudioClamp_(leaderboard.cardOpacity, 20, 100, 100),
+      text: leaderboard.text || "#ffffff",
+      muted: leaderboard.muted || "#cbd5e1",
+      border: leaderboard.border || "#475569",
+      borderOpacity: adminAppearanceStudioClamp_(leaderboard.borderOpacity, 0, 100, 30),
+      radius: adminAppearanceStudioClamp_(leaderboard.radius, 0, 32, 18),
+      rowGap: adminAppearanceStudioClamp_(leaderboard.rowGap, 0, 28, 12),
+      rankStyle: leaderboard.rankStyle || "circle",
+      rankBackground: leaderboard.rankBackground || "#ffffff",
+      rankOpacity: adminAppearanceStudioClamp_(leaderboard.rankOpacity, 0, 100, 16),
+      rankText: leaderboard.rankText || "#ffffff",
+      showAvatar: leaderboard.showAvatar !== false,
+      avatarShape: leaderboard.avatarShape || "round",
+      avatarSize: adminAppearanceStudioClamp_(leaderboard.avatarSize, 24, 72, 42),
+      showCareerLink: leaderboard.showCareerLink !== false,
+      showCompare: leaderboard.showCompare !== false,
+      highlightTopThree: leaderboard.highlightTopThree !== false,
+      gold: leaderboard.gold || "#facc15",
+      silver: leaderboard.silver || "#cbd5e1",
+      bronze: leaderboard.bronze || "#d97706",
+      highlightCurrent: leaderboard.highlightCurrent !== false,
+      currentColor: leaderboard.currentColor || colors.accent || "#60a5fa",
+      currentOpacity: adminAppearanceStudioClamp_(leaderboard.currentOpacity, 0, 100, 18),
+      showScore: leaderboard.showScore !== false,
+      showRemaining: leaderboard.showRemaining !== false,
+      showWinChance: leaderboard.showWinChance !== false,
+      showStatues: leaderboard.showStatues !== false,
+      showWagerStats: leaderboard.showWagerStats !== false,
+      showMiniGames: leaderboard.showMiniGames !== false,
+      showSeasonPick: leaderboard.showSeasonPick !== false,
+      miniPanelMode: leaderboard.miniPanelMode || "gradient",
+      miniPanelBackground: leaderboard.miniPanelBackground || "#0f172a",
+      miniPanelGradientStart: leaderboard.miniPanelGradientStart || "#0f172a",
+      miniPanelGradientEnd: leaderboard.miniPanelGradientEnd || "#1e293b",
+      miniPanelAngle: adminAppearanceStudioClamp_(leaderboard.miniPanelAngle, 0, 360, 135)
     },
     page: {
       backgroundMode: page.backgroundMode || "solid",
@@ -1721,6 +1766,64 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeMobileArrowSize", "Mobile Selector Arrow", theme.confidence.mobileArrowSize, 0, 10, 1, "px")}
             ${adminAppearanceStudioColor_("appearanceThemeMobileArrowColor", "Mobile Arrow Color", theme.confidence.mobileArrowColor)}
             <div class="admin-sub appearance-studio-inline-note">Set Mobile Selector Arrow to 0px to hide it completely. The confidence number remains centered.</div>
+          </div></details>
+
+          <details open><summary>Leaderboard / Standings</summary><div class="appearance-studio-panel appearance-leaderboard-editor-panel">
+            <div class="admin-sub">One reusable standings style for the full Leaderboard page, Wager standings, compact Reality standings, and the small league scoreboard on Home. Public rows use game-specific Display Names; usernames remain internal for scoring and career history.</div>
+            ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardLayout", "Leaderboard Layout", theme.leaderboard.layout, [["cards","Cards"],["compact","Compact Rows"],["table","Table-Like Rows"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardDensity", "Density", theme.leaderboard.density, [["compact","Compact"],["standard","Standard"],["comfortable","Comfortable"]])}
+            ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardCardMode", "Row Background", theme.leaderboard.cardMode, [["solid","Solid"],["gradient","Gradient"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardCardBg", "Solid Background", theme.leaderboard.cardBackground)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardGradientStart", "Gradient Start", theme.leaderboard.gradientStart)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardGradientEnd", "Gradient End", theme.leaderboard.gradientEnd)}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardGradientAngle", "Gradient Angle", theme.leaderboard.gradientAngle, 0, 360, 1, "°")}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardCardOpacity", "Row Background Opacity", theme.leaderboard.cardOpacity, 20, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardText", "Main Text", theme.leaderboard.text)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardMuted", "Secondary Text", theme.leaderboard.muted)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardBorder", "Border", theme.leaderboard.border)}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardBorderOpacity", "Border Opacity", theme.leaderboard.borderOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardRadius", "Row Corners", theme.leaderboard.radius, 0, 32, 1, "px")}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardGap", "Row Spacing", theme.leaderboard.rowGap, 0, 28, 1, "px")}
+            ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardRankStyle", "Rank Style", theme.leaderboard.rankStyle, [["circle","Circle"],["pill","Pill"],["plain","Plain Number"]])}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardRankBg", "Rank Background", theme.leaderboard.rankBackground)}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardRankOpacity", "Rank Background Opacity", theme.leaderboard.rankOpacity, 0, 100, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardRankText", "Rank Text", theme.leaderboard.rankText)}
+            <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowAvatar" type="checkbox" ${theme.leaderboard.showAvatar ? 'checked' : ''}><span>Show player photo/avatar</span></label>
+            ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardAvatarShape", "Player Photo Shape", theme.leaderboard.avatarShape, [["round","Round"],["soft","Soft Square"],["square","Square"]])}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardAvatarSize", "Player Photo Size", theme.leaderboard.avatarSize, 24, 72, 1, "px")}
+            <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardCareer" type="checkbox" ${theme.leaderboard.showCareerLink ? 'checked' : ''}><span>Show Career Stats link</span></label>
+            <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardCompare" type="checkbox" ${theme.leaderboard.showCompare ? 'checked' : ''}><span>Show Compare / Pick + Wager button</span></label>
+            <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardTopThree" type="checkbox" ${theme.leaderboard.highlightTopThree ? 'checked' : ''}><span>Highlight Top 3</span></label>
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardGold", "1st Place", theme.leaderboard.gold)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardSilver", "2nd Place", theme.leaderboard.silver)}
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardBronze", "3rd Place", theme.leaderboard.bronze)}
+            <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardCurrent" type="checkbox" ${theme.leaderboard.highlightCurrent ? 'checked' : ''}><span>Highlight the current player</span></label>
+            ${adminAppearanceStudioColor_("appearanceThemeLeaderboardCurrentColor", "Current Player Highlight", theme.leaderboard.currentColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeLeaderboardCurrentOpacity", "Current Player Highlight Opacity", theme.leaderboard.currentOpacity, 0, 100, 1, "%")}
+            <div class="appearance-leaderboard-stat-options">
+              <strong>Stats to Show</strong>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowScore" type="checkbox" ${theme.leaderboard.showScore ? 'checked' : ''}><span>Score / Bankroll</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowRemaining" type="checkbox" ${theme.leaderboard.showRemaining ? 'checked' : ''}><span>Remaining / Max</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowWinChance" type="checkbox" ${theme.leaderboard.showWinChance ? 'checked' : ''}><span>Win Chance</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowStatues" type="checkbox" ${theme.leaderboard.showStatues ? 'checked' : ''}><span>Statues / Awards</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowWager" type="checkbox" ${theme.leaderboard.showWagerStats ? 'checked' : ''}><span>Wager Stats</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowMini" type="checkbox" ${theme.leaderboard.showMiniGames ? 'checked' : ''}><span>Mini Games Counted</span></label>
+              <label class="appearance-studio-check"><input id="appearanceThemeLeaderboardShowSeason" type="checkbox" ${theme.leaderboard.showSeasonPick ? 'checked' : ''}><span>Season / Survivor Pick Stats</span></label>
+            </div>
+            <div class="appearance-leaderboard-mini-panel-controls">
+              <strong>Home / Hub Mini Scoreboard</strong>
+              ${adminAppearanceStudioSelect_("appearanceThemeLeaderboardMiniMode", "Mini Scoreboard Background", theme.leaderboard.miniPanelMode, [["solid","Solid"],["gradient","Gradient"]])}
+              ${adminAppearanceStudioColor_("appearanceThemeLeaderboardMiniBg", "Solid Background", theme.leaderboard.miniPanelBackground)}
+              ${adminAppearanceStudioColor_("appearanceThemeLeaderboardMiniStart", "Gradient Start", theme.leaderboard.miniPanelGradientStart)}
+              ${adminAppearanceStudioColor_("appearanceThemeLeaderboardMiniEnd", "Gradient End", theme.leaderboard.miniPanelGradientEnd)}
+              ${adminAppearanceStudioRange_("appearanceThemeLeaderboardMiniAngle", "Gradient Angle", theme.leaderboard.miniPanelAngle, 0, 360, 1, "°")}
+            </div>
+            <div id="appearanceLeaderboardPreview" class="appearance-leaderboard-preview">
+              <div class="leaderboard-list">
+                <div class="leaderboard-card lb-top-1 lb-current-user"><div class="leaderboard-rank">#1</div><div class="leaderboard-main"><div class="leaderboard-top-row"><div class="leaderboard-user"><span class="leaderboard-avatar">JM</span><div class="leaderboard-user-text"><h2 class="leaderboard-name">Sunday Hero</h2><span class="leaderboard-career-link">Career stats</span></div></div><button class="leaderboard-compare-btn" type="button">Compare</button></div><div class="leaderboard-stats-grid"><p class="leaderboard-stat leaderboard-stat-score">Score: <strong>94</strong></p><p class="leaderboard-stat leaderboard-stat-remaining">Remaining: 12 / 106</p><p class="leaderboard-stat leaderboard-stat-statues">Statues: 3</p><p class="leaderboard-stat leaderboard-stat-winchance">Win Chance: 62%</p></div></div></div>
+                <div class="leaderboard-card lb-top-2"><div class="leaderboard-rank">#2</div><div class="leaderboard-main"><div class="leaderboard-top-row"><div class="leaderboard-user"><span class="leaderboard-avatar">🏈</span><div class="leaderboard-user-text"><h2 class="leaderboard-name">Da Bears Guy</h2><span class="leaderboard-career-link">Career stats</span></div></div></div><div class="leaderboard-stats-grid"><p class="leaderboard-stat leaderboard-stat-score">Score: <strong>88</strong></p><p class="leaderboard-stat leaderboard-stat-remaining">Remaining: 8 / 96</p></div></div></div>
+              </div>
+            </div>
           </div></details>
 
           <details><summary>Winner Overlay / Decoration</summary><div class="appearance-studio-panel">
@@ -2906,6 +3009,50 @@ function adminAppearanceReadThemeControls_() {
       radius: adminAppearanceStudioNumber_("appearanceThemeScoreboardRadius", 0),
       fontSize: adminAppearanceStudioNumber_("appearanceThemeScoreboardFontSize", 10)
     },
+    leaderboard: {
+      layout: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardLayout", "cards")),
+      density: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardDensity", "standard")),
+      cardMode: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardCardMode", "gradient")),
+      cardBackground: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardCardBg", "#20284a")),
+      gradientStart: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardGradientStart", "#20284a")),
+      gradientEnd: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardGradientEnd", "#354785")),
+      gradientAngle: adminAppearanceStudioNumber_("appearanceThemeLeaderboardGradientAngle", 135),
+      cardOpacity: adminAppearanceStudioNumber_("appearanceThemeLeaderboardCardOpacity", 100),
+      text: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardText", "#ffffff")),
+      muted: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardMuted", "#cbd5e1")),
+      border: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardBorder", "#475569")),
+      borderOpacity: adminAppearanceStudioNumber_("appearanceThemeLeaderboardBorderOpacity", 30),
+      radius: adminAppearanceStudioNumber_("appearanceThemeLeaderboardRadius", 18),
+      rowGap: adminAppearanceStudioNumber_("appearanceThemeLeaderboardGap", 12),
+      rankStyle: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardRankStyle", "circle")),
+      rankBackground: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardRankBg", "#ffffff")),
+      rankOpacity: adminAppearanceStudioNumber_("appearanceThemeLeaderboardRankOpacity", 16),
+      rankText: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardRankText", "#ffffff")),
+      showAvatar: !!(document.getElementById("appearanceThemeLeaderboardShowAvatar") && document.getElementById("appearanceThemeLeaderboardShowAvatar").checked),
+      avatarShape: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardAvatarShape", "round")),
+      avatarSize: adminAppearanceStudioNumber_("appearanceThemeLeaderboardAvatarSize", 42),
+      showCareerLink: !!(document.getElementById("appearanceThemeLeaderboardCareer") && document.getElementById("appearanceThemeLeaderboardCareer").checked),
+      showCompare: !!(document.getElementById("appearanceThemeLeaderboardCompare") && document.getElementById("appearanceThemeLeaderboardCompare").checked),
+      highlightTopThree: !!(document.getElementById("appearanceThemeLeaderboardTopThree") && document.getElementById("appearanceThemeLeaderboardTopThree").checked),
+      gold: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardGold", "#facc15")),
+      silver: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardSilver", "#cbd5e1")),
+      bronze: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardBronze", "#d97706")),
+      highlightCurrent: !!(document.getElementById("appearanceThemeLeaderboardCurrent") && document.getElementById("appearanceThemeLeaderboardCurrent").checked),
+      currentColor: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardCurrentColor", "#60a5fa")),
+      currentOpacity: adminAppearanceStudioNumber_("appearanceThemeLeaderboardCurrentOpacity", 18),
+      showScore: !!(document.getElementById("appearanceThemeLeaderboardShowScore") && document.getElementById("appearanceThemeLeaderboardShowScore").checked),
+      showRemaining: !!(document.getElementById("appearanceThemeLeaderboardShowRemaining") && document.getElementById("appearanceThemeLeaderboardShowRemaining").checked),
+      showWinChance: !!(document.getElementById("appearanceThemeLeaderboardShowWinChance") && document.getElementById("appearanceThemeLeaderboardShowWinChance").checked),
+      showStatues: !!(document.getElementById("appearanceThemeLeaderboardShowStatues") && document.getElementById("appearanceThemeLeaderboardShowStatues").checked),
+      showWagerStats: !!(document.getElementById("appearanceThemeLeaderboardShowWager") && document.getElementById("appearanceThemeLeaderboardShowWager").checked),
+      showMiniGames: !!(document.getElementById("appearanceThemeLeaderboardShowMini") && document.getElementById("appearanceThemeLeaderboardShowMini").checked),
+      showSeasonPick: !!(document.getElementById("appearanceThemeLeaderboardShowSeason") && document.getElementById("appearanceThemeLeaderboardShowSeason").checked),
+      miniPanelMode: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardMiniMode", "gradient")),
+      miniPanelBackground: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardMiniBg", "#0f172a")),
+      miniPanelGradientStart: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardMiniStart", "#0f172a")),
+      miniPanelGradientEnd: String(adminAppearanceStudioValue_("appearanceThemeLeaderboardMiniEnd", "#1e293b")),
+      miniPanelAngle: adminAppearanceStudioNumber_("appearanceThemeLeaderboardMiniAngle", 135)
+    },
     page: {
       backgroundMode: String(adminAppearanceStudioValue_("appearanceThemePageBgMode", "solid")),
       background: String(adminAppearanceStudioValue_("appearanceThemePageBg", "#020617")),
@@ -3285,6 +3432,13 @@ function adminAppearanceUpdateThemePreview_(event) {
     "--ap-details-radius": theme.details.radius + "px"
   });
   Object.keys(vars).forEach(function(key) { preview.style.setProperty(key, vars[key]); });
+
+  const leaderboardPreview = document.getElementById("appearanceLeaderboardPreview");
+  if (leaderboardPreview && window.AppearanceThemeRuntime && typeof window.AppearanceThemeRuntime.leaderboardPresentation === "function") {
+    const lbPresentation = window.AppearanceThemeRuntime.leaderboardPresentation(theme);
+    leaderboardPreview.className = "appearance-leaderboard-preview leaderboard-appearance-root " + String(lbPresentation.className || "");
+    leaderboardPreview.setAttribute("style", lbPresentation.style || "");
+  }
 
   const device = ADMIN_APPEARANCE_STATE.themePreviewDevice || "desktop";
   preview.querySelectorAll("[data-ap-element]").forEach(function(el) {

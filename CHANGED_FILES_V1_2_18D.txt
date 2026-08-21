@@ -1,0 +1,14 @@
+SCOREBOARD_LEADERBOARD_APPEARANCE_V1_2_18D.md
+CHANGED_FILES_V1_2_18D.txt
+frontend/app.html
+frontend/app.js
+frontend/css/pages.css
+frontend/index.html
+frontend/js/app.js
+frontend/js/appearanceThemeRuntime.js
+frontend/js/pages/adminAppearance.js
+frontend/js/pages/dashboard.js
+frontend/js/pages/leaderboard.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/scoreboard_leaderboard_appearance_v1218d_tests.js

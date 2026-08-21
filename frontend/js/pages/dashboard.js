@@ -1276,14 +1276,19 @@ async function hydrateDashboardLeagueStandings_(response, payload, hydrationId) 
   const jobs = leagueItems.map(async function(item, index) {
     if (!item.game || typeof apiGetLeaderboardForLeague !== "function") return;
     try {
-      const standings = await apiGetLeaderboardForLeague(item.game.gameId, item.league.leagueId || "");
+      const results = await Promise.all([
+        apiGetLeaderboardForLeague(item.game.gameId, item.league.leagueId || ""),
+        typeof apiGetGameAppearance === "function" ? apiGetGameAppearance(item.game.gameId).catch(function(){ return null; }) : Promise.resolve(null)
+      ]);
+      const standings = results[0];
+      const appearance = results[1];
       if (
         typeof APP_STATE === "undefined" ||
         APP_STATE.currentPage !== "dashboard" ||
         APP_STATE.dashboardHomeHydrationId !== hydrationId
       ) return;
       const node = document.getElementById("dashboardLeagueStanding-" + index);
-      if (node) node.outerHTML = renderDashboardLeagueStandingCard_(item.league, item.game, standings, index);
+      if (node) node.outerHTML = renderDashboardLeagueStandingCard_(item.league, item.game, standings, index, appearance);
     } catch (err) {
       console.warn("Dashboard league standings unavailable", err);
     }
@@ -1292,7 +1297,7 @@ async function hydrateDashboardLeagueStandings_(response, payload, hydrationId) 
   await Promise.allSettled(jobs);
 }
 
-function renderDashboardLeagueStandingCard_(league, game, standings, index) {
+function renderDashboardLeagueStandingCard_(league, game, standings, index, appearance) {
   league = league || {};
   game = game || null;
   const rows = standings && Array.isArray(standings.leaderboard)
@@ -1311,6 +1316,10 @@ function renderDashboardLeagueStandingCard_(league, game, standings, index) {
   const leagueSetting = card.setting || {};
   const leagueDisplayName = String(leagueSetting.DisplayName || league.leagueName || league.leagueId || "League");
   const leagueIcon = leagueId ? dashboardHubIconHtml_("league", leagueId, "dashboard-league-card-icon") : "";
+  let scoreboardAppearance = { className: "", style: "" };
+  if (appearance && window.AppearanceThemeRuntime && typeof window.AppearanceThemeRuntime.leaderboardPresentation === "function") {
+    scoreboardAppearance = window.AppearanceThemeRuntime.leaderboardPresentation(appearance.theme || {});
+  }
 
   return `
     <article id="dashboardLeagueStanding-${index}" class="dashboard-league-home-card${card.className}" ${card.attrs} style="${card.style}">
@@ -1329,7 +1338,7 @@ function renderDashboardLeagueStandingCard_(league, game, standings, index) {
         ${game ? escapeHtml(game.name || game.gameId || "Current game") : "No active league game"}
       </div>
 
-      <div class="dashboard-league-scoreboard">
+      <div class="dashboard-league-scoreboard leaderboard-mini-appearance ${escapeHtml(scoreboardAppearance.className || "")}" style="${escapeHtml(scoreboardAppearance.style || "")}">
         <div>
           <span>Your Standing</span>
           <strong>${rank ? "#" + rank + " of " + rows.length : (game ? "Loading / no score yet" : "—")}</strong>

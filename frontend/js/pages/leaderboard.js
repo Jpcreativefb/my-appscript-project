@@ -2,6 +2,43 @@
    LEADERBOARD PAGE
 ====================== */
 
+let LEADERBOARD_APPEARANCE = { theme: {}, presentation: { className: "", style: "" } };
+
+function leaderboardAppearanceLoad_(gameId) {
+  if (typeof apiGetGameAppearance !== "function") return Promise.resolve(null);
+  return apiGetGameAppearance(gameId).catch(function(err) {
+    console.warn("Leaderboard appearance unavailable", err);
+    return null;
+  });
+}
+
+function leaderboardAppearanceSet_(bundle) {
+  const theme = bundle && bundle.theme || {};
+  let presentation = { className: "", style: "" };
+  if (window.AppearanceThemeRuntime && typeof window.AppearanceThemeRuntime.leaderboardPresentation === "function") {
+    presentation = window.AppearanceThemeRuntime.leaderboardPresentation(theme);
+  }
+  LEADERBOARD_APPEARANCE = { theme: theme, presentation: presentation || { className: "", style: "" } };
+}
+
+function leaderboardPageAttrs_() {
+  const p = LEADERBOARD_APPEARANCE.presentation || {};
+  return 'class="page leaderboard-appearance-root ' + escapeLeaderboardAttr_(p.className || "") + '" style="' + escapeLeaderboardAttr_(p.style || "") + '"';
+}
+
+function leaderboardRowUsername_(row) {
+  return String(row && (row.username || row.user || row.Username || row.User) || "").trim();
+}
+
+function leaderboardCardClasses_(row, index) {
+  const classes = [];
+  const place = Number(row && (row.rank || row.Rank)) || (Number(index) + 1);
+  if (place >= 1 && place <= 3) classes.push("lb-top-" + place);
+  const current = typeof getCurrentUsername === "function" ? String(getCurrentUsername() || "").trim().toLowerCase() : "";
+  if (current && leaderboardRowUsername_(row).toLowerCase() === current) classes.push("lb-current-user");
+  return classes.join(" ");
+}
+
 function isHybridLeaderboardGame_() {
 
   const type =
@@ -63,6 +100,7 @@ async function renderLeaderboardPage() {
     leaderboardMode === "betting";
 
   let res;
+  const appearancePromise = leaderboardAppearanceLoad_(gameId);
 
   try {
 
@@ -76,7 +114,7 @@ async function renderLeaderboardPage() {
     console.error("LEADERBOARD API ERROR", err);
 
     return `
-      <div class="page">
+      <div ${leaderboardPageAttrs_()}>
         ${renderHybridLeaderboardBackButton_()}
         <h1>Leaderboard</h1>
         ${renderErrorCard(
@@ -87,6 +125,8 @@ async function renderLeaderboardPage() {
     `;
 
   }
+
+  leaderboardAppearanceSet_(await appearancePromise);
 
   debugLog(
     "LEADERBOARD API RESPONSE",
@@ -101,7 +141,7 @@ async function renderLeaderboardPage() {
   if (!res || res.success === false) {
 
     return `
-      <div class="page">
+      <div ${leaderboardPageAttrs_()}>
         ${renderHybridLeaderboardBackButton_()}
         <h1>Leaderboard</h1>
         ${renderErrorCard(
@@ -123,7 +163,7 @@ async function renderLeaderboardPage() {
   if (!rows.length) {
 
     return `
-      <div class="page">
+      <div ${leaderboardPageAttrs_()}>
         ${renderHybridLeaderboardBackButton_()}
         <h1>${isWagerLeaderboard ? "Wager Leaderboard" : "Leaderboard"}</h1>
         <div class="leaderboard-subtitle">
@@ -163,7 +203,7 @@ function renderStandardLeaderboardPage_(gameId, rows, leagueId) {
   }
 
   return `
-    <div class="page">
+    <div ${leaderboardPageAttrs_()}>
 
       ${renderHybridLeaderboardBackButton_()}
 
@@ -231,7 +271,7 @@ function renderSeparatePredictionLeaderboards_(gameId, rows, leagueId) {
     });
 
   return `
-    <div class="page">
+    <div ${leaderboardPageAttrs_()}>
 
       ${renderHybridLeaderboardBackButton_()}
 
@@ -355,7 +395,7 @@ function renderStandardLeaderboardCards_(rows, metricMode) {
           : "Total";
 
     return `
-      <div class="card leaderboard-card ${displayTotal < 0 ? "negative-score" : ""}">
+      <div class="card leaderboard-card ${displayTotal < 0 ? "negative-score" : ""} ${leaderboardCardClasses_(row, index)}">
 
         <div class="leaderboard-rank">
           #${index + 1}
@@ -367,10 +407,6 @@ function renderStandardLeaderboardCards_(rows, metricMode) {
             ${renderLeaderboardUser_(row)}
             ${renderPickWagerCompareButton_(username)}
           </div>
-
-          <p class="leaderboard-username">
-            @${escapeHtml(username)}
-          </p>
 
           ${
             scoringMode === "confidence"
@@ -404,69 +440,69 @@ function renderStandardLeaderboardCards_(rows, metricMode) {
 
           <div class="leaderboard-stats-grid">
 
-            <p>
+            <p class="leaderboard-stat leaderboard-stat-score">
               ${metricLabel}:
               <strong>${displayTotal}</strong>
             </p>
 
-            <p>
+            <p class="leaderboard-stat leaderboard-stat-remaining">
               Remaining:
               ${remaining} / ${max}
             </p>
 
-            <p>
+            <p class="leaderboard-stat leaderboard-stat-statues">
               Statues:
               ${Number(row.statues) || 0}
             </p>
 
-            <p>
+            <p class="leaderboard-stat leaderboard-stat-winchance">
               Win Chance:
               ${Number(row.winChance) || 0}%
             </p>
 
             ${hasStakedScoring ? `
               ${metricMode !== "fixed" ? `
-                <p>
+                <p class="leaderboard-stat leaderboard-stat-wager">
                   Fixed Points:
                   ${fixedPoints}
                 </p>
               ` : ""}
 
               ${metricMode !== "staked" ? `
-                <p>
+                <p class="leaderboard-stat leaderboard-stat-wager">
                   Stake Balance:
                   ${stakedBalance}
                 </p>
               ` : ""}
 
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-wager">
                 Stake Net:
                 ${(Number(row.stakedNet) || 0) >= 0 ? "+" : ""}${Number(row.stakedNet) || 0}
               </p>
 
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-wager">
                 Pending Stakes:
                 ${Number(row.pendingStakes) || 0}
               </p>
             ` : ""}
 
             ${Number(row.miniGamesCounted) > 0 ? `
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-mini">
                 Mini Games Counted:
                 ${Number(row.miniGamesCounted) || 0}
               </p>
             ` : ""}
 
             ${row.seasonAnchorCurrentEntityName || Number(row.seasonAnchorBonus) || Number(row.seasonAnchorPenalty) ? `
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-season">
                 Survivor Pick:
                 ${escapeHtml(row.seasonAnchorCurrentEntityName || "Needs new pick")}
               </p>
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-season">
                 Survivor Streak:
                 ${Number(row.seasonAnchorCurrentStreak) || 0} · ${Number(row.seasonAnchorCurrentMultiplier || 0).toFixed(2)}x
               </p>
-              <p>
+              <p class="leaderboard-stat leaderboard-stat-season">
                 Survivor Adjustment:
                 ${(Number(row.seasonAnchorNet) || 0) >= 0 ? "+" : ""}${Number(row.seasonAnchorNet) || 0}
               </p>
@@ -493,7 +529,7 @@ function renderStandardLeaderboardCards_(rows, metricMode) {
 function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
 
   return `
-    <div class="page">
+    <div ${leaderboardPageAttrs_()}>
 
       ${renderHybridLeaderboardBackButton_()}
 
@@ -520,7 +556,7 @@ function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
             "";
 
           return `
-            <div class="card leaderboard-card">
+            <div class="card leaderboard-card ${leaderboardCardClasses_(row, index)}">
 
               <div class="leaderboard-rank">
                 #${index + 1}
@@ -533,28 +569,24 @@ function renderWagerLeaderboardPage_(gameId, rows, leagueId) {
                   ${renderPickWagerCompareButton_(username)}
                 </div>
 
-                <p class="leaderboard-username">
-                  @${escapeHtml(username)}
-                </p>
-
                 <div class="leaderboard-stats-grid">
 
-                  <p>
+                  <p class="leaderboard-stat leaderboard-stat-score leaderboard-stat-wager">
                     Bankroll:
                     <strong>${bankroll}</strong>
                   </p>
 
-                  <p>
+                  <p class="leaderboard-stat leaderboard-stat-remaining leaderboard-stat-wager">
                     Max Bankroll:
                     ${maxBankroll}
                   </p>
 
-                  <p>
+                  <p class="leaderboard-stat leaderboard-stat-wager">
                     Total Staked:
                     ${Number(row.totalStaked) || 0}
                   </p>
 
-                  <p>
+                  <p class="leaderboard-stat leaderboard-stat-wager">
                     Bets:
                     ${Number(row.wonBets) || 0} won
                     ·

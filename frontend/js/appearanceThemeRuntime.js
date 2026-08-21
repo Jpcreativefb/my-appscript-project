@@ -399,11 +399,74 @@
       "picks-theme-winner-decoration-"+winnerDecoration,
       "picks-theme-winner-decoration-position-"+winnerDecorationPosition
     ].filter(Boolean);
-    return {style:style,className:classes.join(" ")};
+    const leaderboardRuntime = leaderboardPresentation(theme);
+    return {
+      style: style + (leaderboardRuntime.style ? ";" + leaderboardRuntime.style : ""),
+      className: classes.concat(String(leaderboardRuntime.className || "").split(/\s+/).filter(Boolean)).join(" ")
+    };
+  }
+
+  function leaderboardPresentation(theme) {
+    theme = theme || {};
+    const lb = theme.leaderboard || {};
+    const colors = theme.colors || {};
+    const layout = confidenceThemeToken_(lb.layout, ["cards","compact","table"], "cards");
+    const density = confidenceThemeToken_(lb.density, ["compact","standard","comfortable"], "standard");
+    const cardMode = confidenceThemeToken_(lb.cardMode, ["solid","gradient"], "gradient");
+    const rankStyle = confidenceThemeToken_(lb.rankStyle, ["circle","pill","plain"], "circle");
+    const avatarShape = confidenceThemeToken_(lb.avatarShape, ["round","soft","square"], "round");
+    const miniMode = confidenceThemeToken_(lb.miniPanelMode, ["solid","gradient"], "gradient");
+    const cardOpacity = confidenceThemeNumber_(lb.cardOpacity, 20, 100, 100);
+    const borderOpacity = confidenceThemeNumber_(lb.borderOpacity, 0, 100, 30);
+    const rankOpacity = confidenceThemeNumber_(lb.rankOpacity, 0, 100, 16);
+    const currentOpacity = confidenceThemeNumber_(lb.currentOpacity, 0, 100, 18);
+    const gradientAngle = confidenceThemeNumber_(lb.gradientAngle, 0, 360, 135);
+    const miniAngle = confidenceThemeNumber_(lb.miniPanelAngle, 0, 360, 135);
+    const style = [
+      "--lb-card-bg:" + confidenceThemeHexRgba_(lb.cardBackground || "#20284a", cardOpacity, "#20284a"),
+      "--lb-card-gradient:linear-gradient(" + gradientAngle + "deg," + confidenceThemeHexRgba_(lb.gradientStart || lb.cardBackground || "#20284a", cardOpacity, "#20284a") + "," + confidenceThemeHexRgba_(lb.gradientEnd || "#354785", cardOpacity, "#354785") + ")",
+      "--lb-text:" + confidenceThemeSafeColor_(lb.text || colors.text, "#ffffff"),
+      "--lb-muted:" + confidenceThemeSafeColor_(lb.muted || colors.muted, "#cbd5e1"),
+      "--lb-border:" + confidenceThemeHexRgba_(lb.border || "#475569", borderOpacity, "#475569"),
+      "--lb-radius:" + confidenceThemeNumber_(lb.radius, 0, 32, 18) + "px",
+      "--lb-gap:" + confidenceThemeNumber_(lb.rowGap, 0, 28, 12) + "px",
+      "--lb-rank-bg:" + confidenceThemeHexRgba_(lb.rankBackground || "#ffffff", rankOpacity, "#ffffff"),
+      "--lb-rank-text:" + confidenceThemeSafeColor_(lb.rankText || "#ffffff", "#ffffff"),
+      "--lb-avatar-size:" + confidenceThemeNumber_(lb.avatarSize, 24, 72, 42) + "px",
+      "--lb-gold:" + confidenceThemeSafeColor_(lb.gold || "#facc15", "#facc15"),
+      "--lb-silver:" + confidenceThemeSafeColor_(lb.silver || "#cbd5e1", "#cbd5e1"),
+      "--lb-bronze:" + confidenceThemeSafeColor_(lb.bronze || "#d97706", "#d97706"),
+      "--lb-current:" + confidenceThemeHexRgba_(lb.currentColor || colors.accent || "#60a5fa", currentOpacity, "#60a5fa"),
+      "--lb-current-line:" + confidenceThemeSafeColor_(lb.currentColor || colors.accent, "#60a5fa"),
+      "--lb-mini-bg:" + confidenceThemeSafeColor_(lb.miniPanelBackground || "#0f172a", "#0f172a"),
+      "--lb-mini-gradient:linear-gradient(" + miniAngle + "deg," + confidenceThemeSafeColor_(lb.miniPanelGradientStart || "#0f172a", "#0f172a") + "," + confidenceThemeSafeColor_(lb.miniPanelGradientEnd || "#1e293b", "#1e293b") + ")"
+    ].join(";");
+    const classes = [
+      "lb-layout-" + layout,
+      "lb-density-" + density,
+      "lb-card-mode-" + cardMode,
+      "lb-rank-" + rankStyle,
+      "lb-avatar-" + avatarShape,
+      "lb-mini-mode-" + miniMode,
+      lb.showAvatar === false ? "lb-hide-avatar" : "",
+      lb.showCareerLink === false ? "lb-hide-career" : "",
+      lb.showCompare === false ? "lb-hide-compare" : "",
+      lb.highlightTopThree === false ? "lb-no-top-three" : "",
+      lb.highlightCurrent === false ? "lb-no-current" : "",
+      lb.showScore === false ? "lb-hide-score" : "",
+      lb.showRemaining === false ? "lb-hide-remaining" : "",
+      lb.showWinChance === false ? "lb-hide-winchance" : "",
+      lb.showStatues === false ? "lb-hide-statues" : "",
+      lb.showWagerStats === false ? "lb-hide-wager" : "",
+      lb.showMiniGames === false ? "lb-hide-mini" : "",
+      lb.showSeasonPick === false ? "lb-hide-season" : ""
+    ].filter(Boolean);
+    return {style: style, className: classes.join(" ")};
   }
 
   global.AppearanceThemeRuntime = {
     confidencePresentation: confidencePresentation,
-    pagePresentation: pagePresentation
+    pagePresentation: pagePresentation,
+    leaderboardPresentation: leaderboardPresentation
   };
 })(window);
