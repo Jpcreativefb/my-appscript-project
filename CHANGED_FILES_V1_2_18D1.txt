@@ -1,0 +1,11 @@
+HOME_CAREER_STATS_CLEANUP_V1_2_18D1.md
+CHANGED_FILES_V1_2_18D1.txt
+frontend/js/pages/dashboard.js
+frontend/css/pages.css
+frontend/app.html
+frontend/index.html
+frontend/js/app.js
+frontend/app.js
+frontend/js/pwa.js
+frontend/sw.js
+tests/home_career_stats_cleanup_v1218d1_tests.js

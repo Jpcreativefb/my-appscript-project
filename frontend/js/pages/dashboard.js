@@ -126,6 +126,7 @@ async function renderDashboardPage() {
           </div>
         </div>
 
+        <div class="dashboard-career-fixed-title">Career Stats</div>
         <details class="dashboard-career-details">
           ${renderDashboardCareerStatsShell_()}
         </details>
@@ -955,13 +956,12 @@ async function renderDashboardTrophyRoomPage_() {
 function renderDashboardCareerStatsShell_() {
   return `
     <summary class="dashboard-career-summary">
-      <span class="dashboard-career-title">Career Stats</span>
       <span id="dashboardCareerStatsBar" class="dashboard-career-primary dashboard-home-stats-bar">
         <span><strong data-career-stat="games">—</strong><small>Games</small></span>
         <span><strong data-career-stat="wins">—</strong><small>Wins</small></span>
         <span><strong data-career-stat="top3">—</strong><small>Top 3</small></span>
       </span>
-      <span class="dashboard-career-more">⌄<small>more</small></span>
+      <span class="dashboard-career-more" aria-label="Show more career stats"><b>⌄</b><small>more</small></span>
     </summary>
     <div class="dashboard-career-extra">
       <span><strong data-career-stat="avg">—</strong><small>Avg Finish</small></span>
