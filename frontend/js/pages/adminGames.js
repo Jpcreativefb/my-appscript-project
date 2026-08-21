@@ -812,6 +812,50 @@ function renderAdminGameDashboardSettings(game) {
             >
           </label>
 
+          <label>
+            Player Profile Scope
+
+            <select
+              id="adminGamePlayerProfileScope_${domId}"
+              class="input admin-input"
+              onchange="adminUpdatePlayerProfileScopeVisibility_('${adminGamesEscapeJs(rawGameId)}')"
+            >
+              <option value="general" ${(game.playerProfileScope || "game") === "general" ? "selected" : ""}>General profile only</option>
+              <option value="season" ${(game.playerProfileScope || "game") === "season" ? "selected" : ""}>League / season shared profile</option>
+              <option value="game" ${(game.playerProfileScope || "game") === "game" ? "selected" : ""}>Game-specific profile</option>
+            </select>
+
+            <span class="admin-help-text">
+              Controls whether players keep their normal profile, share one profile across a league/season, or customize this game only.
+            </span>
+          </label>
+
+          <label id="adminGamePlayerProfileGroupKeyWrap_${domId}" class="${(game.playerProfileScope || "game") === "season" ? "" : "hidden"}">
+            League / Season Profile Key
+
+            <input
+              id="adminGamePlayerProfileGroupKey_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.playerProfileGroupKey || "")}"
+              placeholder="nfl-2026"
+            >
+
+            <span class="admin-help-text">
+              Use the exact same key on every game that should share one player profile.
+            </span>
+          </label>
+
+          <label id="adminGamePlayerProfileGroupLabelWrap_${domId}" class="${(game.playerProfileScope || "game") === "season" ? "" : "hidden"}">
+            League / Season Profile Name
+
+            <input
+              id="adminGamePlayerProfileGroupLabel_${domId}"
+              class="input admin-input"
+              value="${adminGamesEscapeHtml(game.playerProfileGroupLabel || "")}"
+              placeholder="NFL 2026"
+            >
+          </label>
+
           <label class="admin-wide-field">
             Description
 
@@ -953,6 +997,22 @@ function adminPreviewGameHeroImage(gameId) {
 
 }
 
+function adminUpdatePlayerProfileScopeVisibility_(gameId) {
+
+  const domId = adminGameDomId_(gameId);
+  const scope = adminGetInputValue_("adminGamePlayerProfileScope_" + domId) || "game";
+  const showSeason = scope === "season";
+
+  [
+    "adminGamePlayerProfileGroupKeyWrap_" + domId,
+    "adminGamePlayerProfileGroupLabelWrap_" + domId
+  ].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle("hidden", !showSeason);
+  });
+
+}
+
 async function adminSaveGameDashboardSettings(gameId) {
 
   const domId =
@@ -1017,7 +1077,22 @@ async function adminSaveGameDashboardSettings(gameId) {
     heroImagePosition:
       adminGetInputValue_(
         "adminGameHeroImagePosition_" + domId
-      ) || "center center"
+      ) || "center center",
+
+    playerProfileScope:
+      adminGetInputValue_(
+        "adminGamePlayerProfileScope_" + domId
+      ) || "game",
+
+    playerProfileGroupKey:
+      adminGetInputValue_(
+        "adminGamePlayerProfileGroupKey_" + domId
+      ),
+
+    playerProfileGroupLabel:
+      adminGetInputValue_(
+        "adminGamePlayerProfileGroupLabel_" + domId
+      )
   };
 
   const res =

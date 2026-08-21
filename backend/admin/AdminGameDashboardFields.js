@@ -9,7 +9,10 @@ const GAME_DASHBOARD_FIELD_HEADERS = [
   "AvailableFrom",
   "AvailableUntil",
   "HeroImageFileID",
-  "HeroImagePosition"
+  "HeroImagePosition",
+  "PlayerProfileScope",
+  "PlayerProfileGroupKey",
+  "PlayerProfileGroupLabel"
 ];
 
 function setupGameDashboardColumns() {

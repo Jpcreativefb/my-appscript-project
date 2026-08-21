@@ -653,7 +653,7 @@ function renderLeaderboardUser_(row) {
       ${username ? `data-leaderboard-action="career" data-username="${escapeLeaderboardAttr_(username)}"` : "disabled"}
       aria-label="View career history for ${escapeLeaderboardAttr_(displayName)}"
     >
-      ${renderLeaderboardAvatar_(avatar, color)}
+      ${renderLeaderboardAvatar_(avatar, color, leaderboardProfileBackground_(row))}
       <div class="leaderboard-user-text">
         <h2 class="leaderboard-name">
           ${escapeHtml(displayName)}
@@ -666,7 +666,21 @@ function renderLeaderboardUser_(row) {
 }
 
 
-function renderLeaderboardAvatar_(avatar, color) {
+function leaderboardProfileBackground_(profile) {
+  profile = profile || {};
+  const color1 = /^#[0-9a-fA-F]{6}$/.test(String(profile.profileColor || profile.themeColor || ""))
+    ? String(profile.profileColor || profile.themeColor)
+    : "#354785";
+  const color2 = /^#[0-9a-fA-F]{6}$/.test(String(profile.profileColor2 || ""))
+    ? String(profile.profileColor2)
+    : color1;
+  const angle = Math.max(0, Math.min(360, Number(profile.profileGradientAngle || 135)));
+  return String(profile.profileColorMode || "solid").toLowerCase() === "gradient"
+    ? `linear-gradient(${angle}deg, ${color1}, ${color2})`
+    : color1;
+}
+
+function renderLeaderboardAvatar_(avatar, color, profileBackground) {
 
   avatar =
     String(avatar || "👤").trim();
@@ -676,9 +690,16 @@ function renderLeaderboardAvatar_(avatar, color) {
       ? color
       : "";
 
+  const safeBackground = String(profileBackground || "");
+  const background =
+    /^#[0-9a-fA-F]{6}$/.test(safeBackground) ||
+    /^linear-gradient\([0-9.]+deg, #[0-9a-fA-F]{6}, #[0-9a-fA-F]{6}\)$/.test(safeBackground)
+      ? safeBackground
+      : safeColor;
+
   const style =
-    safeColor
-      ? ` style="background:${escapeLeaderboardAttr_(safeColor)};"`
+    background
+      ? ` style="background:${escapeLeaderboardAttr_(background)};"`
       : "";
 
   const isImage =
@@ -1404,7 +1425,8 @@ function renderCompareProfile_(profile, fallbackLabel) {
         "👤",
         profile.themeColor ||
         profile.profileColor ||
-        ""
+        "",
+        leaderboardProfileBackground_(profile)
       )}
       <div>
         <strong>${escapeHtml(name)}</strong>

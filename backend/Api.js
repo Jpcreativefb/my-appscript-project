@@ -90,6 +90,23 @@ function doPost(e) {
       return json(apiSaveEditableProfile(body));
     }
 
+    if (action === "setGameProfilePromptChoice") {
+      validateUserSession_(body.username, body.token);
+      return json(apiSetGameProfilePromptChoice(body));
+    }
+
+    if (action === "saveNotificationPreferences") {
+      return json(apiSaveNotificationPreferences(body));
+    }
+
+    if (action === "markNotificationRead") {
+      return json(apiMarkNotificationRead(body));
+    }
+
+    if (action === "markAllNotificationsRead") {
+      return json(apiMarkAllNotificationsRead(body));
+    }
+
     if (action === "saveConfidencePicksBatch") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -577,6 +594,9 @@ function doGet(e) {
       action === "removeBet" ||
       action === "saveSeasonAnchorPick" ||
       action === "setNotificationPreference" ||
+      action === "saveNotificationPreferences" ||
+      action === "markNotificationRead" ||
+      action === "markAllNotificationsRead" ||
       action === "createLeague" ||
       action === "addLeagueMember" ||
       action === "removeLeagueMember" ||
@@ -658,6 +678,15 @@ function doGet(e) {
       );
 
     }
+
+    if (action === "getReusableProfiles") {
+      return json(
+        apiGetReusableProfiles(
+          params.username
+        )
+      );
+    }
+
 
     if (action === "saveEditableProfile") {
 
@@ -1939,6 +1968,24 @@ function doGet(e) {
       );
 
     }
+
+    if (action === "getNotificationPreferences") {
+      return json(
+        apiGetNotificationPreferences(
+          e.parameter.token
+        )
+      );
+    }
+
+    if (action === "getUserNotifications") {
+      return json(
+        apiGetUserNotifications(
+          e.parameter.token,
+          e.parameter.limit
+        )
+      );
+    }
+
 
     if (action === "setNotificationPreference") {
 

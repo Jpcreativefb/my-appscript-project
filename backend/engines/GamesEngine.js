@@ -553,7 +553,16 @@ function getGamesColumnMap_(headers) {
       headers.indexOf("HeroImageFileID"),
 
     heroImagePosition:
-      headers.indexOf("HeroImagePosition")
+      headers.indexOf("HeroImagePosition"),
+
+    playerProfileScope:
+      headers.indexOf("PlayerProfileScope"),
+
+    playerProfileGroupKey:
+      headers.indexOf("PlayerProfileGroupKey"),
+
+    playerProfileGroupLabel:
+      headers.indexOf("PlayerProfileGroupLabel")
   };
 
 }
@@ -1334,7 +1343,34 @@ function buildGameObjectFromRow_(
           col.heroImagePosition,
           "center center"
         )
-      ) || "center center"
+      ) || "center center",
+
+    playerProfileScope:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.playerProfileScope,
+          "game"
+        )
+      ).toLowerCase() || "game",
+
+    playerProfileGroupKey:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.playerProfileGroupKey,
+          ""
+        )
+      ),
+
+    playerProfileGroupLabel:
+      normalizeGameValue_(
+        getGameCell_(
+          row,
+          col.playerProfileGroupLabel,
+          ""
+        )
+      )
   };
 
 }
@@ -1614,6 +1650,15 @@ function getPublicActiveGames() {
 
       status:
         game.status || "",
+
+      playerProfileScope:
+        game.playerProfileScope || "game",
+
+      playerProfileGroupKey:
+        game.playerProfileGroupKey || "",
+
+      playerProfileGroupLabel:
+        game.playerProfileGroupLabel || "",
 
       lockAllPicks:
         game.lockAllPicks === true

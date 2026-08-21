@@ -909,6 +909,7 @@ async function renderDashboardMorePage_() {
         <button type="button" onclick="navigate('hub:general')"><span>🎲</span><strong>General Games</strong><small>Prediction games, special events and oddball games.</small></button>
         <button type="button" onclick="navigate('trophy-room')"><span>🏆</span><strong>Trophy Room</strong><small>Wins, podiums and future admin-created awards.</small></button>
         <button type="button" onclick="navigate('profile')"><span>👤</span><strong>Profile</strong><small>Photo, display name, note and game-specific profiles.</small></button>
+        <button type="button" onclick="navigate('notifications')"><span>🔔</span><strong>Notification Center</strong><small>Pick reminders, lock warnings, results and new-game alerts.</small></button>
         <button type="button" onclick="navigate('leagues')"><span>📊</span><strong>My Leagues</strong><small>League memberships and standings.</small></button>
         ${isAdmin ? `<button type="button" onclick="navigate('admin')"><span>⚙️</span><strong>Admin</strong><small>Manage games, results and app settings.</small></button>` : ""}
         <button type="button" class="dashboard-more-logout" onclick="logout()"><span>↪</span><strong>Log Out</strong><small>Sign out on this device.</small></button>

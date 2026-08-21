@@ -3341,8 +3341,21 @@ function getBettingLeaderboardData(gameId, options){
         bankroll + pendingPotentialReturn
       );
 
+      const profile =
+        typeof getLeaderboardUserProfile_ === "function"
+          ? (getLeaderboardUserProfile_(user.username, gameId) || {})
+          : {};
+
       return {
         user: user.username,
+        username: user.username,
+        displayName: profile.displayName || user.username,
+        avatar: profile.avatar || "👤",
+        themeColor: profile.themeColor || profile.profileColor || "#354785",
+        profileColor: profile.profileColor || profile.themeColor || "#354785",
+        profileColorMode: profile.profileColorMode || "solid",
+        profileColor2: profile.profileColor2 || "#354785",
+        profileGradientAngle: profile.profileGradientAngle || "135",
         bankroll: bankroll,
         maxBankroll: maxBankroll,
         startingBankroll: config.startingBankroll,

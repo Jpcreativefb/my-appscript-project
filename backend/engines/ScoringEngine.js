@@ -703,6 +703,18 @@ function getLeaderboardData(
           profile.profileColor ||
           "#354785",
 
+        profileColor:
+          profile.profileColor || profile.themeColor || "#354785",
+
+        profileColorMode:
+          profile.profileColorMode || "solid",
+
+        profileColor2:
+          profile.profileColor2 || "#354785",
+
+        profileGradientAngle:
+          profile.profileGradientAngle || "135",
+
         total:
           total,
 

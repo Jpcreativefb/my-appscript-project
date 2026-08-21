@@ -288,8 +288,12 @@ async function signup(){
 
       }
 
+      try {
+        localStorage.setItem("profileOnboardingGeneral", "1");
+      } catch (err) {}
+
       window.location.href =
-        "./app.html";
+        "./app.html#profile";
 
       return;
 

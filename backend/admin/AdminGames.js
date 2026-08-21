@@ -219,7 +219,10 @@ function adminNormalizeGameId_(value) {
       "AvailableFrom",
       "AvailableUntil",
       "HeroImageFileID",
-      "HeroImagePosition"
+      "HeroImagePosition",
+      "PlayerProfileScope",
+      "PlayerProfileGroupKey",
+      "PlayerProfileGroupLabel"
     ];
 
     const lastColumn =
@@ -1077,6 +1080,33 @@ function adminNormalizeGameId_(value) {
         payload.heroImagePosition || "center center"
       )
     );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "playerProfileScope",
+      adminNormalizeValue_(
+        payload.playerProfileScope || "game"
+      ).toLowerCase()
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "playerProfileGroupKey",
+      adminNormalizeValue_(
+        payload.playerProfileGroupKey
+      )
+    );
+
+    adminSetIfColumnExists_(
+      row,
+      col,
+      "playerProfileGroupLabel",
+      adminNormalizeValue_(
+        payload.playerProfileGroupLabel
+      )
+    );
   
     adminSetIfColumnExists_(
       row,
@@ -1922,6 +1952,33 @@ function adminSaveGame(payload) {
           )
         );
 
+      }
+
+      if ("playerProfileScope" in payload) {
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "playerProfileScope",
+          adminNormalizeValue_(payload.playerProfileScope || "game").toLowerCase()
+        );
+      }
+
+      if ("playerProfileGroupKey" in payload) {
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "playerProfileGroupKey",
+          adminNormalizeValue_(payload.playerProfileGroupKey)
+        );
+      }
+
+      if ("playerProfileGroupLabel" in payload) {
+        adminSetIfColumnExists_(
+          row,
+          col,
+          "playerProfileGroupLabel",
+          adminNormalizeValue_(payload.playerProfileGroupLabel)
+        );
       }
   
       if ("icon" in payload) {

@@ -646,6 +646,15 @@ async function apiSaveEditableProfile(profile) {
 
 }
 
+async function apiSetGameProfilePromptChoice(gameId, choice) {
+
+  return apiPost("setGameProfilePromptChoice", {
+    gameId: gameId,
+    choice: choice || "general"
+  });
+
+}
+
 async function apiUploadProfileAvatar(payload) {
 
   return apiPost(
@@ -654,6 +663,36 @@ async function apiUploadProfileAvatar(payload) {
   );
 
 }
+
+async function apiGetReusableProfiles(username) {
+  return api("getReusableProfiles", { username: username || "" });
+}
+
+async function apiGetNotificationPreferences() {
+  const session = typeof getSession === "function" ? (getSession() || {}) : {};
+  return api("getNotificationPreferences", { token: session.token || "" });
+}
+
+async function apiSaveNotificationPreferences(payload) {
+  return apiPost("saveNotificationPreferences", payload || {});
+}
+
+async function apiGetUserNotifications(limit) {
+  const session = typeof getSession === "function" ? (getSession() || {}) : {};
+  return api("getUserNotifications", {
+    token: session.token || "",
+    limit: limit || 50
+  });
+}
+
+async function apiMarkNotificationRead(notificationId) {
+  return apiPost("markNotificationRead", { notificationId: notificationId || "" });
+}
+
+async function apiMarkAllNotificationsRead() {
+  return apiPost("markAllNotificationsRead", {});
+}
+
 
 /* ======================
    CATEGORIES

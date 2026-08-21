@@ -421,3 +421,312 @@ function adminGetPhoneNotificationList(token){
   };
 
 }
+
+
+/* =========================================================
+   v1.2.18e IN-APP NOTIFICATION CENTER + PREFERENCES
+========================================================= */
+
+const USER_NOTIFICATION_PREFS_SHEET = "NotificationPreferences";
+const USER_NOTIFICATION_CENTER_SHEET = "UserNotifications";
+
+const USER_NOTIFICATION_PREF_HEADERS = [
+  "Username",
+  "AppNotificationsEnabled",
+  "NotifyMakePicks",
+  "NotifyLockApproaching",
+  "NotifyFinalResults",
+  "NotifyNewGames",
+  "UpdatedAt"
+];
+
+const USER_NOTIFICATION_CENTER_HEADERS = [
+  "NotificationId",
+  "Username",
+  "Type",
+  "Title",
+  "Message",
+  "GameId",
+  "Route",
+  "IsRead",
+  "CreatedAt",
+  "ReadAt"
+];
+
+function notificationGetOrCreateSheet_(name, headers) {
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(name);
+  if (!sh) {
+    sh = ss.insertSheet(name);
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    sh.setFrozenRows(1);
+    return sh;
+  }
+
+  const lastColumn = Math.max(sh.getLastColumn(), 1);
+  const existing = sh.getRange(1, 1, 1, lastColumn).getValues()[0]
+    .map(function(value) { return String(value || "").trim(); });
+
+  headers.forEach(function(header) {
+    if (existing.indexOf(header) === -1) {
+      sh.getRange(1, sh.getLastColumn() + 1).setValue(header);
+      existing.push(header);
+    }
+  });
+
+  sh.setFrozenRows(1);
+  return sh;
+}
+
+function notificationColumnMap_(headers) {
+  const map = {};
+  headers.forEach(function(header, index) {
+    map[String(header || "").trim()] = index;
+  });
+  return map;
+}
+
+function notificationBool_(value, fallback) {
+  if (value === true || value === false) return value;
+  const text = String(value === undefined || value === null ? "" : value).trim().toLowerCase();
+  if (!text) return fallback === true;
+  return ["true", "1", "yes", "y", "on"].indexOf(text) !== -1;
+}
+
+function notificationPrefsDefaults_(username) {
+  return {
+    username: username,
+    appNotificationsEnabled: true,
+    notifyMakePicks: true,
+    notifyLockApproaching: true,
+    notifyFinalResults: true,
+    notifyNewGames: true
+  };
+}
+
+function apiGetNotificationPreferences(token) {
+  const username = requireUserFromToken_(token);
+  const defaults = notificationPrefsDefaults_(username);
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_PREFS_SHEET,
+    USER_NOTIFICATION_PREF_HEADERS
+  );
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { success: true, preferences: defaults };
+  }
+
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  const row = data.slice(1).find(function(r) {
+    return String(r[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase();
+  });
+
+  if (!row) {
+    return { success: true, preferences: defaults };
+  }
+
+  return {
+    success: true,
+    preferences: {
+      username: username,
+      appNotificationsEnabled: notificationBool_(row[col.AppNotificationsEnabled], true),
+      notifyMakePicks: notificationBool_(row[col.NotifyMakePicks], true),
+      notifyLockApproaching: notificationBool_(row[col.NotifyLockApproaching], true),
+      notifyFinalResults: notificationBool_(row[col.NotifyFinalResults], true),
+      notifyNewGames: notificationBool_(row[col.NotifyNewGames], true)
+    }
+  };
+}
+
+function apiSaveNotificationPreferences(payload) {
+  payload = payload || {};
+  const username = requireUserFromToken_(payload.token);
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_PREFS_SHEET,
+    USER_NOTIFICATION_PREF_HEADERS
+  );
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  let rowIndex = -1;
+
+  data.slice(1).some(function(row, index) {
+    if (String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase()) {
+      rowIndex = index + 2;
+      return true;
+    }
+    return false;
+  });
+
+  if (rowIndex === -1) {
+    sh.appendRow(new Array(headers.length).fill(""));
+    rowIndex = sh.getLastRow();
+  }
+
+  const values = {
+    Username: username,
+    AppNotificationsEnabled: notificationBool_(payload.appNotificationsEnabled, true),
+    NotifyMakePicks: notificationBool_(payload.notifyMakePicks, true),
+    NotifyLockApproaching: notificationBool_(payload.notifyLockApproaching, true),
+    NotifyFinalResults: notificationBool_(payload.notifyFinalResults, true),
+    NotifyNewGames: notificationBool_(payload.notifyNewGames, true),
+    UpdatedAt: new Date().toISOString()
+  };
+
+  Object.keys(values).forEach(function(header) {
+    if (col[header] !== undefined) {
+      sh.getRange(rowIndex, col[header] + 1).setValue(values[header]);
+    }
+  });
+
+  SpreadsheetApp.flush();
+
+  return {
+    success: true,
+    preferences: {
+      username: username,
+      appNotificationsEnabled: values.AppNotificationsEnabled,
+      notifyMakePicks: values.NotifyMakePicks,
+      notifyLockApproaching: values.NotifyLockApproaching,
+      notifyFinalResults: values.NotifyFinalResults,
+      notifyNewGames: values.NotifyNewGames
+    }
+  };
+}
+
+function createUserNotification_(entry) {
+  entry = entry || {};
+  const username = String(entry.username || "").trim().toLowerCase();
+  if (!username) return { success: false, message: "Missing username" };
+
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_CENTER_SHEET,
+    USER_NOTIFICATION_CENTER_HEADERS
+  );
+
+  const id = String(entry.notificationId || Utilities.getUuid()).trim();
+  sh.appendRow([
+    id,
+    username,
+    String(entry.type || "info").trim(),
+    String(entry.title || "Awards App").trim(),
+    String(entry.message || "").trim(),
+    String(entry.gameId || "").trim(),
+    String(entry.route || "").trim(),
+    false,
+    new Date().toISOString(),
+    ""
+  ]);
+
+  return { success: true, notificationId: id };
+}
+
+function apiGetUserNotifications(token, limit) {
+  const username = requireUserFromToken_(token);
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_CENTER_SHEET,
+    USER_NOTIFICATION_CENTER_HEADERS
+  );
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) {
+    return { success: true, notifications: [], unreadCount: 0 };
+  }
+
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  const max = Math.max(1, Math.min(100, Number(limit || 50)));
+
+  const rows = data.slice(1)
+    .filter(function(row) {
+      return String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase();
+    })
+    .map(function(row) {
+      return {
+        notificationId: String(row[col.NotificationId] || "").trim(),
+        type: String(row[col.Type] || "info").trim(),
+        title: String(row[col.Title] || "").trim(),
+        message: String(row[col.Message] || "").trim(),
+        gameId: String(row[col.GameId] || "").trim(),
+        route: String(row[col.Route] || "").trim(),
+        isRead: notificationBool_(row[col.IsRead], false),
+        createdAt: row[col.CreatedAt] || "",
+        readAt: row[col.ReadAt] || ""
+      };
+    })
+    .sort(function(a, b) {
+      return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+    })
+    .slice(0, max);
+
+  return {
+    success: true,
+    notifications: rows,
+    unreadCount: rows.filter(function(item) { return item.isRead !== true; }).length
+  };
+}
+
+function apiMarkNotificationRead(payload) {
+  payload = payload || {};
+  const username = requireUserFromToken_(payload.token);
+  const id = String(payload.notificationId || "").trim();
+  if (!id) return { success: false, message: "Missing notificationId" };
+
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_CENTER_SHEET,
+    USER_NOTIFICATION_CENTER_HEADERS
+  );
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+
+  let updated = false;
+  data.slice(1).some(function(row, index) {
+    if (
+      String(row[col.NotificationId] || "").trim() === id &&
+      String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase()
+    ) {
+      const rowIndex = index + 2;
+      sh.getRange(rowIndex, col.IsRead + 1).setValue(true);
+      sh.getRange(rowIndex, col.ReadAt + 1).setValue(new Date().toISOString());
+      updated = true;
+      return true;
+    }
+    return false;
+  });
+
+  if (updated) SpreadsheetApp.flush();
+  return { success: updated, notificationId: id };
+}
+
+function apiMarkAllNotificationsRead(payload) {
+  payload = payload || {};
+  const username = requireUserFromToken_(payload.token);
+  const sh = notificationGetOrCreateSheet_(
+    USER_NOTIFICATION_CENTER_SHEET,
+    USER_NOTIFICATION_CENTER_HEADERS
+  );
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return { success: true, updated: 0 };
+
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  let updated = 0;
+  const now = new Date().toISOString();
+
+  data.slice(1).forEach(function(row, index) {
+    if (
+      String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase() &&
+      !notificationBool_(row[col.IsRead], false)
+    ) {
+      const rowIndex = index + 2;
+      sh.getRange(rowIndex, col.IsRead + 1).setValue(true);
+      sh.getRange(rowIndex, col.ReadAt + 1).setValue(now);
+      updated++;
+    }
+  });
+
+  if (updated) SpreadsheetApp.flush();
+  return { success: true, updated: updated };
+}
+

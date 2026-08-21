@@ -126,11 +126,20 @@ function initApp(session) {
     setupAdminNav(getSession());
   }, 250);
 
+  setTimeout(function() {
+    refreshNotificationBadge_();
+  }, 350);
+
   const hash =
     window.location.hash
       .replace("#", "");
 
-  navigate(hash || "dashboard");
+  let onboardingProfile = false;
+  try {
+    onboardingProfile = localStorage.getItem("profileOnboardingGeneral") === "1";
+  } catch (err) {}
+
+  navigate(onboardingProfile ? "profile" : (hash || "dashboard"));
 
 }
 
@@ -347,6 +356,21 @@ function clearStartupPayload() {
 
 }
 
+async function refreshNotificationBadge_() {
+
+  const badge = document.getElementById("headerNotificationBadge");
+  if (!badge || typeof apiGetUserNotifications !== "function") return;
+
+  try {
+    const res = await apiGetUserNotifications(25);
+    const count = Number(res && res.unreadCount) || 0;
+    badge.textContent = count > 99 ? "99+" : String(count);
+    badge.classList.toggle("hidden", count <= 0);
+  } catch (err) {
+    // Badge failure should never block app navigation.
+  }
+}
+
 /* ======================
    LOGOUT
 ====================== */
@@ -373,8 +397,8 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup";
-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications";
+const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications";
 const APP_LOADED_SCRIPTS = {};
 
 const APP_MAIN_SCRIPT_URL = (function() {
@@ -404,6 +428,7 @@ const APP_PAGE_MODULES = {
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
   "admin-appearance": ["admin", "adminUi", "adminAppearance"],
   "profile": ["profile"],
+  "notifications": ["notifications"],
   "history": ["archiveHistory"]
 };
 
@@ -581,7 +606,7 @@ function setActiveNav(page) {
 
   let navPage = page;
 
-  if (page === "profile" || page === "leagues" || page === "trophy-room" || page === "more" ||
+  if (page === "profile" || page === "notifications" || page === "leagues" || page === "trophy-room" || page === "more" ||
       page === "admin" || page === "admin-games" || page === "admin-awards" ||
       page === "admin-reality-tv" || page === "admin-appearance" ||
       page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
@@ -728,24 +753,27 @@ function gameProfileDashboardRow_(gameId) {
   }) || null;
 }
 
-function showGameProfileChoiceModal_(gameId, profile) {
+function showGameProfileChoiceModal_(gameId, profile, profileMode, profileScopeLabel) {
   return new Promise(function(resolve) {
     const existing = document.getElementById("gameProfileChoiceModal");
     if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
 
     const name = String(profile && profile.displayName || "your regular profile").trim();
+    profileMode = String(profileMode || "game").toLowerCase();
+    const isSeasonProfile = profileMode === "season";
+    const scopeLabel = String(profileScopeLabel || "").trim();
     const wrapper = document.createElement("div");
     wrapper.innerHTML = `
       <div id="gameProfileChoiceModal" class="game-profile-choice-backdrop" role="dialog" aria-modal="true" aria-labelledby="gameProfileChoiceTitle">
         <div class="game-profile-choice-card">
           <button type="button" class="game-profile-choice-close" data-choice="later" aria-label="Close">×</button>
           <div class="game-profile-choice-kicker">NEW GAME</div>
-          <h2 id="gameProfileChoiceTitle">Use a different profile for this game?</h2>
-          <p>You can keep <strong>${escapeHtmlForApp_(name)}</strong>, or use a different display name/photo just for this game.</p>
+          <h2 id="gameProfileChoiceTitle">${isSeasonProfile ? "Use a profile for this league / season?" : "Use a different profile for this game?"}</h2>
+          <p>You can keep <strong>${escapeHtmlForApp_(name)}</strong>, or ${isSeasonProfile ? "create/reuse one profile for " + escapeHtmlForApp_(scopeLabel || "this league / season") : "use a different display name/photo just for this game"}.</p>
           <div class="game-profile-choice-note">Scores, career stats and trophies still stay attached to your account username.</div>
           <div class="game-profile-choice-actions">
             <button type="button" class="button" data-choice="general">Use Regular Profile</button>
-            <button type="button" class="button secondary" data-choice="custom">Customize for This Game</button>
+            <button type="button" class="button secondary" data-choice="custom">${isSeasonProfile ? "Customize League / Season Profile" : "Customize for This Game"}</button>
             <button type="button" class="game-profile-choice-later" data-choice="later">Not now</button>
           </div>
         </div>
@@ -803,27 +831,41 @@ async function maybeOfferGameProfile_(gameId) {
   }
 
   if (!result || result.success === false) return "continue";
+
+  if (String(result.profileMode || "game").toLowerCase() === "general") {
+    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    return "continue";
+  }
+
   if (result.gameProfilePromptCompleted === true) {
     try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
     return "continue";
   }
 
-  const choice = await showGameProfileChoiceModal_(gameId, result.profile || result.generalProfile || {});
+  const choice = await showGameProfileChoiceModal_(
+    gameId,
+    result.profile || result.generalProfile || {},
+    result.profileMode || "game",
+    result.profileScopeLabel || ""
+  );
   if (choice === "later") return "continue";
+
+  if (choice === "custom") {
+    // Do not mark the prompt complete until the player actually saves the
+    // custom profile. If they leave Profile without saving, offer it again
+    // the next time they enter this new game.
+    try { localStorage.setItem("profileOpenGameSpecific", gameId); } catch (err) {}
+    return "custom";
+  }
 
   try {
     if (typeof apiSetGameProfilePromptChoice === "function") {
-      const saved = await apiSetGameProfilePromptChoice(gameId, choice === "custom" ? "custom" : "general");
+      const saved = await apiSetGameProfilePromptChoice(gameId, "general");
       if (!saved || saved.success === false) return "continue";
     }
     localStorage.setItem(cacheKey, "done");
   } catch (err) {
     return "continue";
-  }
-
-  if (choice === "custom") {
-    try { localStorage.setItem("profileOpenGameSpecific", gameId); } catch (err) {}
-    return "custom";
   }
 
   return "continue";
@@ -888,6 +930,18 @@ async function enterGame(
 
   const profileChoice = await maybeOfferGameProfile_(gameId);
   if (profileChoice === "custom") {
+    try {
+      localStorage.setItem(
+        "profileEditContext",
+        JSON.stringify({
+          gameId: gameId,
+          gameType: gameType,
+          leagueId: leagueId === undefined ? "" : leagueId,
+          gameRole: gameRole,
+          hubMode: hubMode
+        })
+      );
+    } catch (err) {}
     await navigate("profile");
     return;
   }
@@ -1182,6 +1236,17 @@ async function renderPage(page) {
 
       app.innerHTML =
         await renderProfilePage();
+
+      break;
+
+    case "notifications":
+
+      if (typeof renderNotificationsPage !== "function") {
+        throw new Error("Notification Center script is not loaded.");
+      }
+
+      app.innerHTML =
+        await renderNotificationsPage();
 
       break;
 

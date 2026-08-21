@@ -10,6 +10,7 @@
 
 const PROFILE_ENGINE_USERS_SHEET = "Users";
 const PROFILE_ENGINE_GAME_PROFILE_SHEET = "UserGameProfiles";
+const PROFILE_ENGINE_SCOPED_PROFILE_SHEET = "UserProfileScopes";
 const PROFILE_ENGINE_AVATAR_FOLDER_NAME = "Awards App Profile Avatars";
 const PROFILE_ENGINE_MAX_AVATAR_BYTES = 2 * 1024 * 1024;
 
@@ -22,6 +23,9 @@ const PROFILE_ENGINE_USER_PROFILE_HEADERS = [
   "AvatarUrl",
   "AvatarFileId",
   "ProfileColor",
+  "ProfileColorMode",
+  "ProfileColor2",
+  "ProfileGradientAngle",
   "Bio",
   "ProfileUpdatedAt"
 ];
@@ -37,7 +41,31 @@ const PROFILE_ENGINE_GAME_PROFILE_HEADERS = [
   "AvatarUrl",
   "AvatarFileId",
   "ProfileColor",
+  "ProfileColorMode",
+  "ProfileColor2",
+  "ProfileGradientAngle",
   "Bio",
+  "ProfilePromptCompleted",
+  "UpdatedAt"
+];
+
+const PROFILE_ENGINE_SCOPED_PROFILE_HEADERS = [
+  "ProfileScopeKey",
+  "Username",
+  "ProfileScopeLabel",
+  "DisplayName",
+  "RealName",
+  "AvatarType",
+  "AvatarInitials",
+  "AvatarEmoji",
+  "AvatarUrl",
+  "AvatarFileId",
+  "ProfileColor",
+  "ProfileColorMode",
+  "ProfileColor2",
+  "ProfileGradientAngle",
+  "Bio",
+  "ProfilePromptCompleted",
   "UpdatedAt"
 ];
 
@@ -75,6 +103,18 @@ const PROFILE_ENGINE_FIELD_MAP = [
     header: "ProfileColor"
   },
   {
+    key: "profileColorMode",
+    header: "ProfileColorMode"
+  },
+  {
+    key: "profileColor2",
+    header: "ProfileColor2"
+  },
+  {
+    key: "profileGradientAngle",
+    header: "ProfileGradientAngle"
+  },
+  {
     key: "bio",
     header: "Bio"
   }
@@ -89,53 +129,60 @@ function apiGetEditableProfile(
   gameId
 ) {
 
-  username =
-    profileNormalizeUsername_(
-      username
-    );
-
-  gameId =
-    profileNormalizeGameId_(
-      gameId
-    );
+  username = profileNormalizeUsername_(username);
+  gameId = profileNormalizeGameId_(gameId);
 
   if (!username) {
-
-    return {
-      success: false,
-      message: "Missing username"
-    };
-
+    return { success: false, message: "Missing username" };
   }
 
   profileEnsureSchema_();
 
-  const generalProfile =
-    profileGetGeneralProfile_(
-      username
-    );
+  const generalProfile = profileGetGeneralProfile_(username);
+  const config = profileGetGameProfileConfig_(gameId);
 
-  const gameProfile =
-    gameId
-      ? profileGetGameProfile_(
-          username,
-          gameId
-        )
-      : {};
+  let gameProfile = {};
+  let scopedProfile = {};
+  let promptCompleted = true;
 
-  const profile =
-    profileMergeProfiles_(
-      username,
-      gameId,
-      generalProfile,
-      gameProfile
-    );
+  if (gameId && config.mode === "game") {
+    gameProfile = profileGetGameProfile_(username, gameId);
+    promptCompleted = profileGamePromptCompleted_(gameProfile);
+  } else if (gameId && config.mode === "season") {
+    scopedProfile = profileGetScopedProfile_(username, config.scopeKey);
+    promptCompleted = profileScopedPromptCompleted_(scopedProfile);
+  }
+
+  const effectiveOverride =
+    config.mode === "game"
+      ? gameProfile
+      : config.mode === "season"
+        ? scopedProfile
+        : {};
+
+  const profile = profileMergeProfiles_(
+    username,
+    gameId,
+    generalProfile,
+    effectiveOverride
+  );
+
+  profile.profileMode = config.mode;
+  profile.profileScopeKey = config.scopeKey || "";
+  profile.profileScopeLabel = config.scopeLabel || "";
 
   return {
     success: true,
     profile: profile,
     generalProfile: generalProfile,
-    gameProfile: gameProfile
+    gameProfile: gameProfile,
+    scopedProfile: scopedProfile,
+    profileMode: config.mode,
+    profileScopeKey: config.scopeKey || "",
+    profileScopeLabel: config.scopeLabel || "",
+    profileScopeLocked: config.mode === "general",
+    gameProfilePromptCompleted: promptCompleted,
+    reusableProfiles: profileGetReusableProfiles_(username)
   };
 
 }
@@ -144,104 +191,104 @@ function apiSaveEditableProfile(
   payload
 ) {
 
-  payload =
-    payload || {};
+  payload = payload || {};
 
-  const username =
-    profileNormalizeUsername_(
-      payload.username
-    );
-
-  const gameId =
-    profileNormalizeGameId_(
-      payload.gameId
-    );
-
-  const scope =
-    String(
-      payload.scope || "general"
-    )
-      .trim()
-      .toLowerCase();
+  const username = profileNormalizeUsername_(payload.username);
+  const gameId = profileNormalizeGameId_(payload.gameId);
+  const scope = String(payload.scope || "general").trim().toLowerCase();
+  const scopeKey = profileNormalizeScopeKey_(payload.profileScopeKey);
 
   if (!username) {
-
-    return {
-      success: false,
-      message: "Missing username"
-    };
-
+    return { success: false, message: "Missing username" };
   }
 
-  if (
-    scope !== "general" &&
-    scope !== "game"
-  ) {
-
-    return {
-      success: false,
-      message: "Invalid profile scope"
-    };
-
+  if (["general", "game", "season"].indexOf(scope) === -1) {
+    return { success: false, message: "Invalid profile scope" };
   }
 
-  if (
-    scope === "game" &&
-    !gameId
-  ) {
+  if (scope === "game" && !gameId) {
+    return { success: false, message: "Missing gameId for game profile" };
+  }
 
-    return {
-      success: false,
-      message: "Missing gameId for game profile"
-    };
-
+  if (scope === "season" && !scopeKey) {
+    return { success: false, message: "Missing league / season profile key" };
   }
 
   profileEnsureSchema_();
 
-  const cleanProfile =
-    profileCleanInput_(
-      payload
-    );
+  const cleanProfile = profileCleanInput_(payload);
 
   if (scope === "general") {
-
-    const updated =
-      profileSaveGeneralProfile_(
-        username,
-        cleanProfile
-      );
-
-    if (!updated.success) {
-      return updated;
-    }
-
-  }
-
-  if (scope === "game") {
-
-    profileSaveGameProfile_(
+    const updated = profileSaveGeneralProfile_(username, cleanProfile);
+    if (!updated.success) return updated;
+  } else if (scope === "game") {
+    profileSaveGameProfile_(username, gameId, cleanProfile);
+    profileSetGamePromptCompleted_(username, gameId, true);
+  } else {
+    profileSaveScopedProfile_(
       username,
-      gameId,
+      scopeKey,
+      profileLimit_(payload.profileScopeLabel, 80),
       cleanProfile
     );
-
+    profileSetScopedPromptCompleted_(username, scopeKey, true);
   }
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-
+  if (typeof clearAppCaches === "function") {
     clearAppCaches();
-
   }
 
-  return apiGetEditableProfile(
-    username,
-    gameId
-  );
+  return apiGetEditableProfile(username, gameId);
 
+}
+
+function apiSetGameProfilePromptChoice(
+  payload
+) {
+
+  payload = payload || {};
+
+  const username = profileNormalizeUsername_(payload.username);
+  const gameId = profileNormalizeGameId_(payload.gameId);
+  const choice = String(payload.choice || "general").trim().toLowerCase();
+
+  if (!username) return { success: false, message: "Missing username" };
+  if (!gameId) return { success: false, message: "Missing gameId" };
+  if (["general", "custom"].indexOf(choice) === -1) {
+    return { success: false, message: "Invalid profile choice" };
+  }
+
+  profileEnsureSchema_();
+
+  const config = profileGetGameProfileConfig_(gameId);
+
+  if (config.mode === "game") {
+    profileSetGamePromptCompleted_(username, gameId, true);
+  } else if (config.mode === "season" && config.scopeKey) {
+    profileSetScopedPromptCompleted_(username, config.scopeKey, true);
+  }
+
+  return {
+    success: true,
+    gameId: gameId,
+    username: username,
+    choice: choice,
+    profileMode: config.mode,
+    profileScopeKey: config.scopeKey || "",
+    profileScopeLabel: config.scopeLabel || "",
+    promptCompleted: true
+  };
+
+}
+
+function apiGetReusableProfiles(username) {
+  username = profileNormalizeUsername_(username);
+  if (!username) return { success: false, message: "Missing username", profiles: [] };
+  profileEnsureSchema_();
+  return {
+    success: true,
+    profiles: profileGetReusableProfiles_(username)
+  };
 }
 
 function apiUploadProfileAvatar(
@@ -454,6 +501,279 @@ function profileDoPost(
 
 }
 
+
+function profileGetGameProfileConfig_(gameId) {
+
+  gameId = profileNormalizeGameId_(gameId);
+
+  if (!gameId || typeof getGame !== "function") {
+    return {
+      mode: "general",
+      scopeKey: "",
+      scopeLabel: "General Profile"
+    };
+  }
+
+  const game = getGame(gameId) || {};
+  let mode = String(
+    game.playerProfileScope ||
+    game.profileScope ||
+    "game"
+  ).trim().toLowerCase();
+
+  if (["general", "season", "game"].indexOf(mode) === -1) {
+    mode = "game";
+  }
+
+  const scopeKey = mode === "season"
+    ? profileNormalizeScopeKey_(
+        game.playerProfileGroupKey ||
+        game.profileScopeKey ||
+        game.parentGameId ||
+        ""
+      )
+    : "";
+
+  const scopeLabel = mode === "season"
+    ? String(
+        game.playerProfileGroupLabel ||
+        game.profileScopeLabel ||
+        game.playerProfileGroupKey ||
+        game.name ||
+        "League / Season Profile"
+      ).trim()
+    : mode === "game"
+      ? String(game.name || game.gameId || "Game Profile").trim()
+      : "General Profile";
+
+  // A season scope without a shared key cannot actually share across games.
+  if (mode === "season" && !scopeKey) {
+    mode = "game";
+  }
+
+  return {
+    mode: mode,
+    scopeKey: mode === "season" ? scopeKey : "",
+    scopeLabel: scopeLabel
+  };
+}
+
+function profileNormalizeScopeKey_(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9:_\-\.]/g, "")
+    .slice(0, 120);
+}
+
+function profileGetScopedProfilesSheet_() {
+  return profileGetOrCreateSheet_(
+    PROFILE_ENGINE_SCOPED_PROFILE_SHEET,
+    PROFILE_ENGINE_SCOPED_PROFILE_HEADERS
+  );
+}
+
+function profileGetScopedProfile_(username, scopeKey) {
+
+  username = profileNormalizeUsername_(username);
+  scopeKey = profileNormalizeScopeKey_(scopeKey);
+
+  if (!username || !scopeKey) return {};
+
+  const sh = profileGetScopedProfilesSheet_();
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return {};
+
+  const headers = profileHeaders_(data[0]);
+  const col = profileColumnMap_(headers);
+
+  const row = data.slice(1).find(function(r) {
+    return (
+      profileNormalizeUsername_(r[col.Username]) === username &&
+      profileNormalizeScopeKey_(r[col.ProfileScopeKey]) === scopeKey
+    );
+  });
+
+  if (!row) return {};
+
+  const profile = profileRowToProfile_(row, col);
+  profile.username = username;
+  profile.scope = "season";
+  profile.profileScopeKey = scopeKey;
+  profile.profileScopeLabel =
+    col.ProfileScopeLabel > -1
+      ? String(row[col.ProfileScopeLabel] || "").trim()
+      : "";
+  profile.promptCompleted =
+    col.ProfilePromptCompleted > -1
+      ? profileBoolean_(row[col.ProfilePromptCompleted])
+      : false;
+
+  return profile;
+}
+
+function profileScopedPromptCompleted_(profile) {
+  profile = profile || {};
+  if (profile.promptCompleted === true) return true;
+  return PROFILE_ENGINE_FIELD_MAP.some(function(field) {
+    return String(profile[field.key] || "").trim() !== "";
+  });
+}
+
+function profileSetScopedPromptCompleted_(username, scopeKey, completed) {
+
+  username = profileNormalizeUsername_(username);
+  scopeKey = profileNormalizeScopeKey_(scopeKey);
+  if (!username || !scopeKey) return;
+
+  const sh = profileGetScopedProfilesSheet_();
+  const data = sh.getDataRange().getValues();
+  const headers = profileHeaders_(data[0]);
+  const col = profileColumnMap_(headers);
+  let rowIndex = -1;
+
+  if (data.length > 1) {
+    data.slice(1).some(function(row, index) {
+      if (
+        profileNormalizeUsername_(row[col.Username]) === username &&
+        profileNormalizeScopeKey_(row[col.ProfileScopeKey]) === scopeKey
+      ) {
+        rowIndex = index + 2;
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (rowIndex === -1) {
+    const row = new Array(headers.length).fill("");
+    row[col.ProfileScopeKey] = scopeKey;
+    row[col.Username] = username;
+    sh.appendRow(row);
+    rowIndex = sh.getLastRow();
+  }
+
+  if (col.ProfilePromptCompleted > -1) {
+    sh.getRange(rowIndex, col.ProfilePromptCompleted + 1).setValue(completed === true);
+  }
+  if (col.UpdatedAt > -1) {
+    sh.getRange(rowIndex, col.UpdatedAt + 1).setValue(new Date());
+  }
+
+  SpreadsheetApp.flush();
+}
+
+function profileSaveScopedProfile_(username, scopeKey, scopeLabel, profile) {
+
+  const sh = profileGetScopedProfilesSheet_();
+  const data = sh.getDataRange().getValues();
+  const headers = profileHeaders_(data[0]);
+  const col = profileColumnMap_(headers);
+  let rowIndex = -1;
+
+  if (data.length > 1) {
+    data.slice(1).some(function(row, index) {
+      if (
+        profileNormalizeUsername_(row[col.Username]) === username &&
+        profileNormalizeScopeKey_(row[col.ProfileScopeKey]) === scopeKey
+      ) {
+        rowIndex = index + 2;
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (rowIndex === -1) {
+    const row = new Array(headers.length).fill("");
+    row[col.ProfileScopeKey] = scopeKey;
+    row[col.Username] = username;
+    sh.appendRow(row);
+    rowIndex = sh.getLastRow();
+  }
+
+  if (col.ProfileScopeLabel > -1) {
+    sh.getRange(rowIndex, col.ProfileScopeLabel + 1).setValue(scopeLabel || scopeKey);
+  }
+
+  profileSetProfileFields_(sh, rowIndex, col, profile);
+
+  if (col.UpdatedAt > -1) {
+    sh.getRange(rowIndex, col.UpdatedAt + 1).setValue(new Date());
+  }
+
+  SpreadsheetApp.flush();
+}
+
+function profileGetReusableProfiles_(username) {
+
+  username = profileNormalizeUsername_(username);
+  const profiles = [];
+
+  const general = profileGetGeneralProfile_(username);
+  profiles.push({
+    sourceType: "general",
+    sourceKey: "general",
+    label: "My General Profile",
+    profile: general
+  });
+
+  const scopedSheet = profileGetScopedProfilesSheet_();
+  const scopedData = scopedSheet.getDataRange().getValues();
+  if (scopedData.length > 1) {
+    const headers = profileHeaders_(scopedData[0]);
+    const col = profileColumnMap_(headers);
+
+    scopedData.slice(1).forEach(function(row) {
+      if (profileNormalizeUsername_(row[col.Username]) !== username) return;
+      const profile = profileRowToProfile_(row, col);
+      const key = profileNormalizeScopeKey_(row[col.ProfileScopeKey]);
+      const label =
+        col.ProfileScopeLabel > -1
+          ? String(row[col.ProfileScopeLabel] || key || "League / Season Profile").trim()
+          : key;
+      profiles.push({
+        sourceType: "season",
+        sourceKey: key,
+        label: label || key,
+        profile: profile
+      });
+    });
+  }
+
+  const gameSheet = profileGetGameProfilesSheet_();
+  const gameData = gameSheet.getDataRange().getValues();
+  if (gameData.length > 1) {
+    const headers = profileHeaders_(gameData[0]);
+    const col = profileColumnMap_(headers);
+
+    gameData.slice(1).forEach(function(row) {
+      if (profileNormalizeUsername_(row[col.Username]) !== username) return;
+      const gameId = profileNormalizeGameId_(row[col.GameId]);
+      const profile = profileRowToProfile_(row, col);
+      if (!PROFILE_ENGINE_FIELD_MAP.some(function(field) {
+        return String(profile[field.key] || "").trim() !== "";
+      })) return;
+
+      let label = gameId;
+      try {
+        const game = typeof getGame === "function" ? getGame(gameId) : null;
+        label = game && game.name ? game.name : gameId;
+      } catch (err) {}
+
+      profiles.push({
+        sourceType: "game",
+        sourceKey: gameId,
+        label: label || gameId,
+        profile: profile
+      });
+    });
+  }
+
+  return profiles;
+}
+
 /* =====================================================
    READ PROFILES
 ===================================================== */
@@ -612,9 +932,78 @@ function profileGetGameProfile_(
   profile.username = username;
   profile.gameId = gameId;
   profile.scope = "game";
+  profile.promptCompleted =
+    col.ProfilePromptCompleted > -1
+      ? profileBoolean_(row[col.ProfilePromptCompleted])
+      : false;
 
   return profile;
 
+}
+
+function profileGamePromptCompleted_(gameProfile) {
+
+  gameProfile = gameProfile || {};
+
+  if (gameProfile.promptCompleted === true) {
+    return true;
+  }
+
+  // Existing game-specific profiles predate the first-play prompt. If a
+  // player already customized anything for this game, treat that choice as
+  // complete instead of interrupting them with a retroactive prompt.
+  return PROFILE_ENGINE_FIELD_MAP.some(function(field) {
+    return String(gameProfile[field.key] || "").trim() !== "";
+  });
+
+}
+
+function profileSetGamePromptCompleted_(username, gameId, completed) {
+
+  const sh = profileGetGameProfilesSheet_();
+  const data = sh.getDataRange().getValues();
+  const headers = profileHeaders_(data[0]);
+  const col = profileColumnMap_(headers);
+
+  let rowIndex = -1;
+
+  if (data.length > 1) {
+    data.slice(1).some(function(row, index) {
+      if (
+        profileNormalizeUsername_(row[col.Username]) === username &&
+        profileNormalizeGameId_(row[col.GameId]) === gameId
+      ) {
+        rowIndex = index + 2;
+        return true;
+      }
+      return false;
+    });
+  }
+
+  if (rowIndex === -1) {
+    const row = new Array(headers.length).fill("");
+    row[col.GameId] = gameId;
+    row[col.Username] = username;
+    sh.appendRow(row);
+    rowIndex = sh.getLastRow();
+  }
+
+  if (col.ProfilePromptCompleted > -1) {
+    sh.getRange(rowIndex, col.ProfilePromptCompleted + 1).setValue(completed === true);
+  }
+
+  if (col.UpdatedAt > -1) {
+    sh.getRange(rowIndex, col.UpdatedAt + 1).setValue(new Date());
+  }
+
+  SpreadsheetApp.flush();
+
+}
+
+function profileBoolean_(value) {
+  if (value === true || value === false) return value;
+  const text = String(value || "").trim().toLowerCase();
+  return ["true", "1", "yes", "y", "on"].indexOf(text) !== -1;
 }
 
 /* =====================================================
@@ -825,6 +1214,17 @@ function profileEnsureSchema_() {
     PROFILE_ENGINE_GAME_PROFILE_HEADERS
   );
 
+  const scopedProfilesSheet =
+    profileGetOrCreateSheet_(
+      PROFILE_ENGINE_SCOPED_PROFILE_SHEET,
+      PROFILE_ENGINE_SCOPED_PROFILE_HEADERS
+    );
+
+  profileEnsureColumns_(
+    scopedProfilesSheet,
+    PROFILE_ENGINE_SCOPED_PROFILE_HEADERS
+  );
+
 }
 
 function profileGetUsersSheet_() {
@@ -996,6 +1396,9 @@ function profileDefaultProfile_(
     avatarUrl: "",
     avatarFileId: "",
     profileColor: "#facc15",
+    profileColorMode: "solid",
+    profileColor2: "#354785",
+    profileGradientAngle: "135",
     bio: "",
     scope: "default"
   };
@@ -1106,6 +1509,22 @@ function profileApplyDefaults_(
     profile.profileColor = "#facc15";
   }
 
+  if (!profile.profileColorMode) {
+    profile.profileColorMode = "solid";
+  }
+
+  if (["solid", "gradient"].indexOf(String(profile.profileColorMode).toLowerCase()) === -1) {
+    profile.profileColorMode = "solid";
+  }
+
+  if (!profile.profileColor2) {
+    profile.profileColor2 = "#354785";
+  }
+
+  if (!profile.profileGradientAngle && profile.profileGradientAngle !== 0) {
+    profile.profileGradientAngle = "135";
+  }
+
   if (!profile.avatarInitials) {
 
     profile.avatarInitials =
@@ -1192,6 +1611,19 @@ function profileCleanInput_(
       profileSafeColor_(
         payload.profileColor
       ),
+
+    profileColorMode:
+      String(payload.profileColorMode || "solid").trim().toLowerCase() === "gradient"
+        ? "gradient"
+        : "solid",
+
+    profileColor2:
+      profileSafeColor_(
+        payload.profileColor2
+      ) || "#354785",
+
+    profileGradientAngle:
+      String(Math.max(0, Math.min(360, Number(payload.profileGradientAngle || 135)))),
 
     bio:
       profileLimit_(
@@ -1287,7 +1719,13 @@ function profileColumnMap_(
     "AvatarUrl",
     "AvatarFileId",
     "ProfileColor",
+    "ProfileColorMode",
+    "ProfileColor2",
+    "ProfileGradientAngle",
+    "ProfileScopeKey",
+    "ProfileScopeLabel",
     "Bio",
+    "ProfilePromptCompleted",
     "UpdatedAt",
     "ProfileUpdatedAt"
   ].forEach(header => {

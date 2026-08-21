@@ -3399,3 +3399,50 @@ body.game-profile-choice-open { overflow:hidden; }
     font-size: 8px;
   }
 }
+
+/* =========================================================
+   v1.2.18e — Notification Center
+========================================================= */
+.notification-center-page { display:grid; gap:14px; }
+.notification-center-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  gap:14px;
+  padding:16px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,.1);
+  background:linear-gradient(135deg,rgba(53,71,133,.5),rgba(17,24,39,.92));
+}
+.notification-center-header h1 { margin:2px 0 0; }
+.notification-center-header p { margin:3px 0 0; color:rgba(255,255,255,.65); font-size:11px; }
+.notification-center-kicker { margin:0!important; text-transform:uppercase; letter-spacing:.09em; font-size:9px!important; font-weight:900; color:#facc15!important; }
+.notification-center-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; }
+.notification-center-actions .button { padding:7px 10px; min-height:32px; font-size:10px; }
+.notification-center-list { display:grid; gap:8px; }
+.notification-center-item { border-radius:14px; border:1px solid rgba(255,255,255,.1); overflow:hidden; background:rgba(15,23,42,.68); }
+.notification-center-item.is-unread { border-color:rgba(250,204,21,.34); background:linear-gradient(100deg,rgba(250,204,21,.08),rgba(15,23,42,.74)); }
+.notification-center-item-button { width:100%; border:0; color:inherit; background:transparent; text-align:left; display:grid; grid-template-columns:36px minmax(0,1fr) 10px; gap:10px; align-items:center; padding:12px; cursor:pointer; }
+.notification-center-icon { width:36px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; background:rgba(255,255,255,.07); }
+.notification-center-copy { min-width:0; display:grid; gap:3px; }
+.notification-center-copy strong { font-size:12px; }
+.notification-center-copy > span { font-size:10px; color:rgba(255,255,255,.72); line-height:1.35; }
+.notification-center-copy small { font-size:8px; color:rgba(255,255,255,.48); }
+.notification-center-unread-dot { width:7px; height:7px; border-radius:50%; background:#facc15; }
+.notification-center-empty { text-align:center; padding:30px 18px; }
+.notification-center-empty > span { font-size:34px; }
+.notification-center-empty h2 { margin:8px 0 4px; }
+.notification-center-empty p { margin:0; color:rgba(255,255,255,.62); }
+
+/* 18e: secondary career stats should be half-height, not another large block. */
+.dashboard-career-extra {
+  padding:5px 10px 6px!important;
+  min-height:0!important;
+}
+.dashboard-career-extra > span {
+  min-height:22px!important;
+  gap:0!important;
+}
+.dashboard-career-extra strong { font-size:14px!important; line-height:1!important; }
+.dashboard-career-extra small { font-size:7px!important; line-height:1!important; }
+.dashboard-career-extra > span + span::before { top:2px!important; bottom:2px!important; }

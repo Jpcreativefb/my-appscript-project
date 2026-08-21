@@ -15,61 +15,51 @@ async function renderProfilePage() {
 
   setPageLoadStep(50, "Loading profile and history…");
 
-  const session =
-    getSessionSafe_();
+  const session = getSessionSafe_();
+  const username = session && session.username ? session.username : "";
+  const editContext = getProfileEditContext_();
 
-  const username =
-    session && session.username
-      ? session.username
-      : "";
-
-  const playableGames =
-    await loadProfilePlayableGames_();
+  const playableGames = await loadProfilePlayableGames_();
 
   const currentGameId =
-    getProfileGameId_(
-      playableGames
-    );
+    editContext.gameId ||
+    getProfileGameId_(playableGames);
 
-  const profileRequests =
-    await Promise.all([
-      apiGetEditableProfile(
-        username,
-        currentGameId
-      ),
-      username
-        ? apiGetUserProfileHistory(username, "")
-        : Promise.resolve({
-            success: true,
-            summary: { archivedGames: 0 },
-            games: []
-          })
-    ]);
+  const profileRequests = await Promise.all([
+    apiGetEditableProfile(username, currentGameId),
+    username
+      ? apiGetUserProfileHistory(username, "")
+      : Promise.resolve({
+          success: true,
+          summary: { archivedGames: 0 },
+          games: []
+        }),
+    typeof apiGetNotificationPreferences === "function"
+      ? apiGetNotificationPreferences().catch(function() {
+          return { success: true, preferences: null };
+        })
+      : Promise.resolve({ success: true, preferences: null })
+  ]);
 
-  const res =
-    profileRequests[0];
+  const res = profileRequests[0];
+  const historyRes = profileRequests[1] || {
+    success: true,
+    summary: { archivedGames: 0 },
+    games: []
+  };
+  const notificationRes = profileRequests[2] || {
+    success: true,
+    preferences: null
+  };
 
-  const historyRes =
-    profileRequests[1] || {
-      success: true,
-      summary: { archivedGames: 0 },
-      games: []
-    };
-
-  APP_STATE.profileHistory =
-    historyRes;
+  APP_STATE.profileHistory = historyRes;
 
   const profile =
     res && res.success
       ? res.profile
-      : getProfileFallback_(
-          username,
-          currentGameId
-        );
+      : getProfileFallback_(username, currentGameId);
 
-  APP_STATE.profile =
-    profile;
-
+  APP_STATE.profile = profile;
   APP_STATE.profileData =
     res && res.success
       ? res
@@ -77,30 +67,83 @@ async function renderProfilePage() {
           success: true,
           profile: profile,
           generalProfile: profile,
-          gameProfile: {}
+          gameProfile: {},
+          scopedProfile: {},
+          profileMode: "game",
+          reusableProfiles: []
         };
 
-  APP_STATE.profileGames =
-    playableGames;
+  APP_STATE.profileGames = playableGames;
+  APP_STATE.notificationPreferences =
+    notificationRes && notificationRes.preferences
+      ? notificationRes.preferences
+      : {
+          appNotificationsEnabled: true,
+          notifyMakePicks: true,
+          notifyLockApproaching: true,
+          notifyFinalResults: true,
+          notifyNewGames: true
+        };
 
-  applyProfileColor_(
-    profile.profileColor
-  );
+  const selectedGame = profileFindGame_(playableGames, currentGameId);
+  const selectedGameName = selectedGame
+    ? getGameNameFromGame_(selectedGame)
+    : currentGameId || "Selected game";
 
-  setTimeout(() => {
+  const profileMode =
+    editContext.onboarding
+      ? "general"
+      : String(APP_STATE.profileData.profileMode || "game").toLowerCase();
 
-    populateProfileGameSelect_(
-      playableGames,
-      currentGameId
-    );
+  const profileScope =
+    editContext.onboarding
+      ? "general"
+      : editContext.gameId
+        ? (profileMode === "season" ? "season" : profileMode === "general" ? "general" : "game")
+        : "general";
 
-    populateProfileForm_(
-      APP_STATE.profileData.generalProfile || profile,
-      true
-    );
+  const isLockedContext =
+    editContext.onboarding === true ||
+    Boolean(editContext.gameId);
+
+  const saveLabel =
+    editContext.gameId
+      ? "Save & Continue to " + selectedGameName
+      : "Save Profile & Return Home";
+
+  applyProfileColor_(profile.profileColor);
+
+  setTimeout(function() {
+
+    populateProfileGameSelect_(playableGames, currentGameId);
+
+    const scopeSelect = document.getElementById("profileScope");
+    if (scopeSelect) scopeSelect.value = profileScope;
+
+    if (editContext.gameId) {
+      const gameSelect = document.getElementById("profileGameId");
+      if (gameSelect) gameSelect.value = currentGameId;
+    }
 
     updateProfileGameVisibility_();
+
+    const data = APP_STATE.profileData || {};
+    let selectedProfile = data.generalProfile || profile;
+
+    if (profileScope === "game") {
+      selectedProfile = data.gameProfile || {};
+    } else if (profileScope === "season") {
+      selectedProfile = data.scopedProfile || {};
+    }
+
+    populateProfileForm_(
+      selectedProfile,
+      profileScope === "general"
+    );
+
     updateProfilePreview();
+    updateProfileSaveButtonLabel_();
+    updateNotificationPreferenceVisibility_();
 
   }, 0);
 
@@ -109,17 +152,33 @@ async function renderProfilePage() {
 
       <div class="profile-page-title-row">
         <div>
-          <h1>Profile</h1>
+          <h1>${editContext.onboarding ? "Set Up Your Profile" : "Profile"}</h1>
           <p class="profile-page-subtitle">
-            Edit your default profile or create a profile just for one game.
+            ${
+              editContext.onboarding
+                ? "Choose how you want to appear in the app. You can change this later."
+                : editContext.gameId
+                  ? "You are editing the profile used for " + escapeProfileHtml_(selectedGameName) + "."
+                  : "Edit your default identity or choose how you appear in a specific game."
+            }
           </p>
         </div>
-        <button class="button secondary" type="button" onclick="navigate('history')">
-          Archived Games
-        </button>
+        ${
+          editContext.onboarding
+            ? ""
+            : `
+              <button class="button secondary profile-title-history-button" type="button" onclick="navigate('history')">
+                Archived Games
+              </button>
+            `
+        }
       </div>
 
-      <div class="profile-card-preview">
+      <div
+        id="profileCardPreview"
+        class="profile-card-preview"
+        style="--profile-color:${escapeProfileAttr_(profile.profileColor || PROFILE_DEFAULT_COLOR)};"
+      >
 
         <div
           id="profilePreviewAvatar"
@@ -134,56 +193,106 @@ async function renderProfilePage() {
             ${escapeProfileHtml_(profile.displayName || username || "Player")}
           </div>
 
-          <div id="profilePreviewSub" class="profile-preview-sub">
-            ${escapeProfileHtml_(profile.realName || username || "")}
-          </div>
-
-          <div id="profilePreviewBio" class="profile-preview-bio">
+          <div id="profilePreviewBio" class="profile-preview-bio ${profile.bio ? "" : "hidden"}">
             ${escapeProfileHtml_(profile.bio || "")}
           </div>
         </div>
 
       </div>
 
-      ${renderProfileHistorySection_(historyRes, username)}
+      <div class="profile-preview-variants" aria-label="Profile previews">
+        <div class="profile-preview-variant">
+          <span class="profile-preview-variant-label">App</span>
+          <div id="profileAppPreviewMini" class="profile-mini-app-preview"></div>
+        </div>
+        <div class="profile-preview-variant">
+          <span class="profile-preview-variant-label">Leaderboard</span>
+          <div id="profileLeaderboardPreviewMini" class="profile-mini-leaderboard-preview"></div>
+        </div>
+        <div class="profile-preview-variant">
+          <span class="profile-preview-variant-label">Compact</span>
+          <div id="profileCompactPreviewMini" class="profile-mini-compact-preview"></div>
+        </div>
+      </div>
 
       <div class="card profile-form-card">
 
-        <label class="profile-label" for="profileScope">
-          Profile to edit
-        </label>
-
-        <select
-          id="profileScope"
-          class="input profile-input"
-          onchange="onProfileScopeChange()"
-        >
-          <option value="general">General profile</option>
-          <option value="game">Game-specific profile</option>
-        </select>
-
-        <div class="profile-help">
-          General is your default across every game. Game-specific profile overrides the default only for the selected game. Blank game fields fall back to your general profile.
-        </div>
-
-        <div
-          id="profileGameSelectWrap"
-          class="profile-game-select-wrap hidden"
-        >
-          <label class="profile-label" for="profileGameId">
-            Game
-          </label>
-
-          <select
-            id="profileGameId"
-            class="input profile-input"
-            onchange="onProfileGameChange()"
-          ></select>
-
-          <div class="profile-help">
-            This list shows playable games from the active games endpoint.
+        <div class="profile-editor-heading">
+          <div>
+            <h2>Profile to Edit</h2>
+            <p>
+              ${
+                editContext.onboarding
+                  ? "General Profile"
+                  : editContext.gameId
+                    ? escapeProfileHtml_(
+                        profileScope === "season"
+                          ? (APP_STATE.profileData.profileScopeLabel || selectedGameName)
+                          : profileScope === "general"
+                            ? "General Profile"
+                            : selectedGameName
+                      )
+                    : "Choose General or a game below."
+              }
+            </p>
           </div>
+          ${
+            editContext.gameId
+              ? `<span class="profile-context-badge">${escapeProfileHtml_(profileScope === "season" ? "League / Season" : profileScope === "general" ? "General" : "Game")}</span>`
+              : ""
+          }
         </div>
+
+        ${
+          isLockedContext
+            ? `
+              <input id="profileScope" type="hidden" value="${escapeProfileAttr_(profileScope)}">
+              ${
+                editContext.gameId
+                  ? `<input id="profileGameId" type="hidden" value="${escapeProfileAttr_(currentGameId)}">`
+                  : ""
+              }
+            `
+            : `
+              <label class="profile-label" for="profileScope">
+                Profile level
+              </label>
+
+              <select
+                id="profileScope"
+                class="input profile-input"
+                onchange="onProfileScopeChange()"
+              >
+                <option value="general">General profile</option>
+                <option value="game">Game / league profile</option>
+              </select>
+
+              <div class="profile-help">
+                The app will use the profile rules selected by the Admin for each game.
+              </div>
+
+              <div
+                id="profileGameSelectWrap"
+                class="profile-game-select-wrap hidden"
+              >
+                <label class="profile-label" for="profileGameId">
+                  Game
+                </label>
+
+                <select
+                  id="profileGameId"
+                  class="input profile-input"
+                  onchange="onProfileGameChange()"
+                ></select>
+              </div>
+            `
+        }
+
+        ${
+          !editContext.onboarding
+            ? renderProfileReuseSection_(APP_STATE.profileData.reusableProfiles || [])
+            : ""
+        }
 
         <label class="profile-label" for="profileDisplayName">
           Display name
@@ -192,7 +301,7 @@ async function renderProfilePage() {
           id="profileDisplayName"
           class="input profile-input"
           maxlength="40"
-          placeholder="Name shown in the app"
+          placeholder="Name shown in the app and leaderboards"
           oninput="updateProfilePreview()"
         >
 
@@ -203,12 +312,12 @@ async function renderProfilePage() {
           id="profileRealName"
           class="input profile-input"
           maxlength="60"
-          placeholder="Optional real name"
+          placeholder="Optional — never required on leaderboards"
           oninput="updateProfilePreview()"
         >
 
         <label class="profile-label" for="profileAvatarType">
-          Avatar style
+          Profile image
         </label>
         <select
           id="profileAvatarType"
@@ -216,37 +325,24 @@ async function renderProfilePage() {
           onchange="onProfileAvatarTypeChange()"
         >
           <option value="initials">Initials</option>
-          <option value="emoji">Emoji / generic icon</option>
+          <option value="emoji">Emoji / icon</option>
           <option value="url">Image from internet</option>
           <option value="upload">Upload photo</option>
         </select>
 
-        <div
-          id="profileAvatarInitialsWrap"
-          class="profile-avatar-option"
-        >
-          <label class="profile-label" for="profileAvatarInitials">
-            Initials
-          </label>
+        <div id="profileAvatarInitialsWrap" class="profile-avatar-option">
+          <label class="profile-label" for="profileAvatarInitials">Initials</label>
           <input
             id="profileAvatarInitials"
             class="input profile-input"
             maxlength="4"
-            placeholder="Auto from first and last name"
+            placeholder="Auto from name"
             oninput="updateProfilePreview()"
           >
-          <div class="profile-help">
-            Leave blank to auto-create from your first and last name.
-          </div>
         </div>
 
-        <div
-          id="profileAvatarEmojiWrap"
-          class="profile-avatar-option"
-        >
-          <label class="profile-label" for="profileAvatarEmoji">
-            Avatar emoji / generic icon
-          </label>
+        <div id="profileAvatarEmojiWrap" class="profile-avatar-option">
+          <label class="profile-label" for="profileAvatarEmoji">Avatar emoji / icon</label>
           <input
             id="profileAvatarEmoji"
             class="input profile-input"
@@ -256,59 +352,86 @@ async function renderProfilePage() {
           >
         </div>
 
-        <div
-          id="profileAvatarUrlWrap"
-          class="profile-avatar-option"
-        >
-          <label class="profile-label" for="profileAvatarUrl">
-            Avatar image URL
-          </label>
+        <div id="profileAvatarUrlWrap" class="profile-avatar-option">
+          <label class="profile-label" for="profileAvatarUrl">Avatar image URL</label>
           <input
             id="profileAvatarUrl"
             class="input profile-input"
             placeholder="https://example.com/photo.jpg"
             oninput="updateProfilePreview()"
           >
-          <div class="profile-help">
-            Use a public https image URL.
-          </div>
         </div>
 
-        <div
-          id="profileAvatarUploadWrap"
-          class="profile-avatar-option"
-        >
-          <label class="profile-label" for="profileAvatarFile">
-            Upload photo
-          </label>
+        <div id="profileAvatarUploadWrap" class="profile-avatar-option">
+          <label class="profile-label" for="profileAvatarFile">Upload photo</label>
           <input
             id="profileAvatarFile"
             class="input profile-input"
             type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
+            accept="image/*"
             onchange="onProfileUploadPreview()"
           >
-          <input
-            id="profileAvatarFileId"
-            type="hidden"
-          >
+          <input id="profileAvatarFileId" type="hidden">
           <div class="profile-help">
-            JPG, PNG, WEBP, or GIF. Keep it under 2 MB.
+            On a phone, the image picker can use your Photo Library or camera.
           </div>
         </div>
 
-        <label class="profile-label" for="profileColor">
-          Profile color
-        </label>
-        <input
-          id="profileColor"
-          class="input profile-color-input"
-          type="color"
-          value="${escapeProfileAttr_(profile.profileColor || PROFILE_DEFAULT_COLOR)}"
-          oninput="updateProfilePreview()"
-        >
-        <div class="profile-help">
-          This changes the initials avatar color, profile preview accent, and header profile chip.
+        <div class="profile-style-section">
+          <div class="profile-style-heading">
+            <h3>Profile Style</h3>
+            <span>Used on profile surfaces and as your player accent.</span>
+          </div>
+
+          <label class="profile-label" for="profileColorMode">Background</label>
+          <select
+            id="profileColorMode"
+            class="input profile-input"
+            onchange="updateProfileStyleVisibility_(); updateProfilePreview();"
+          >
+            <option value="solid">Solid</option>
+            <option value="gradient">Gradient</option>
+          </select>
+
+          <div class="profile-color-grid">
+            <label>
+              Color 1
+              <input
+                id="profileColor"
+                class="input profile-color-input"
+                type="color"
+                value="${escapeProfileAttr_(profile.profileColor || PROFILE_DEFAULT_COLOR)}"
+                oninput="updateProfilePreview()"
+              >
+            </label>
+
+            <label id="profileColor2Wrap">
+              Color 2
+              <input
+                id="profileColor2"
+                class="input profile-color-input"
+                type="color"
+                value="${escapeProfileAttr_(profile.profileColor2 || "#354785")}"
+                oninput="updateProfilePreview()"
+              >
+            </label>
+          </div>
+
+          <label id="profileGradientAngleWrap" class="profile-gradient-angle">
+            Gradient Angle
+            <div class="profile-range-line">
+              <input
+                id="profileGradientAngle"
+                type="range"
+                min="0"
+                max="360"
+                step="5"
+                value="${escapeProfileAttr_(profile.profileGradientAngle || "135")}"
+                oninput="updateProfileGradientAngleLabel_(); updateProfilePreview();"
+              >
+              <span id="profileGradientAngleLabel">135°</span>
+            </div>
+          </label>
         </div>
 
         <label class="profile-label" for="profileBio">
@@ -318,53 +441,273 @@ async function renderProfilePage() {
           id="profileBio"
           class="input profile-textarea"
           maxlength="160"
-          placeholder="Example: Awards nerd, risky bettor, movie lover."
+          placeholder="Optional. Leave blank and it will not be shown."
           oninput="updateProfilePreview()"
         ></textarea>
 
         <button
+          id="profileSaveButton"
           class="button profile-save-button"
           onclick="saveProfileForm()"
         >
-          Save Profile
+          ${escapeProfileHtml_(saveLabel)}
         </button>
 
-        <div
-          id="profileMessage"
-          class="profile-message hidden"
-        ></div>
+        <div id="profileMessage" class="profile-message hidden"></div>
 
       </div>
+
+      ${renderProfileHistorySection_(historyRes, username)}
+
+      ${renderProfileNotificationPreferences_(APP_STATE.notificationPreferences)}
 
     </div>
   `;
 
 }
 
+function getProfileEditContext_() {
+
+  let context = {
+    gameId: "",
+    gameType: "",
+    leagueId: "",
+    gameRole: "",
+    hubMode: "",
+    onboarding: false
+  };
+
+  try {
+    const raw = localStorage.getItem("profileEditContext");
+    if (raw) {
+      context = Object.assign(context, JSON.parse(raw) || {});
+    }
+    if (localStorage.getItem("profileOnboardingGeneral") === "1") {
+      context.onboarding = true;
+      context.gameId = "";
+    }
+  } catch (err) {}
+
+  context.gameId = String(context.gameId || "").trim();
+  context.gameType = String(context.gameType || "").trim();
+  context.leagueId = String(context.leagueId || "").trim();
+  context.gameRole = String(context.gameRole || "").trim();
+  context.hubMode = String(context.hubMode || "").trim();
+
+  return context;
+}
+
+function clearProfileEditContext_() {
+  try {
+    localStorage.removeItem("profileEditContext");
+    localStorage.removeItem("profileOpenGameSpecific");
+    localStorage.removeItem("profileOnboardingGeneral");
+  } catch (err) {}
+}
+
+function profileFindGame_(games, gameId) {
+  games = Array.isArray(games) ? games : [];
+  return games.find(function(game) {
+    return String(getGameIdFromGame_(game)) === String(gameId || "");
+  }) || null;
+}
+
+function renderProfileReuseSection_(profiles) {
+
+  profiles = Array.isArray(profiles) ? profiles : [];
+  if (!profiles.length) return "";
+
+  return `
+    <details class="profile-reuse-section">
+      <summary>
+        <span>Reuse an Old Profile</span>
+        <small>Copy a previous look into this profile</small>
+      </summary>
+
+      <div class="profile-reuse-body">
+        <select id="profileReuseSelect" class="input profile-input">
+          ${profiles.map(function(item, index) {
+            return `
+              <option value="${index}">
+                ${escapeProfileHtml_(item.label || "Saved Profile")}
+              </option>
+            `;
+          }).join("")}
+        </select>
+
+        <button class="button secondary profile-small-action" type="button" onclick="applyReusableProfile_()">
+          Use This Profile
+        </button>
+
+        <div class="profile-help">
+          This copies the name, image, note and colors. It does not permanently link the profiles.
+        </div>
+      </div>
+    </details>
+  `;
+}
+
+function applyReusableProfile_() {
+
+  const select = document.getElementById("profileReuseSelect");
+  const profiles = APP_STATE.profileData && Array.isArray(APP_STATE.profileData.reusableProfiles)
+    ? APP_STATE.profileData.reusableProfiles
+    : [];
+
+  if (!select || !profiles.length) return;
+
+  const item = profiles[Number(select.value || 0)] || profiles[0];
+  if (!item || !item.profile) return;
+
+  populateProfileForm_(item.profile, true);
+  showProfileMessage_("Profile copied. Review it, then Save.", "success");
+  updateProfilePreview();
+}
+
+function renderProfileNotificationPreferences_(prefs) {
+
+  prefs = prefs || {};
+
+  return `
+    <section class="card profile-notification-card">
+      <div class="profile-notification-heading">
+        <div>
+          <h2>Notifications</h2>
+          <p>Choose which Awards App updates you want. Phone push delivery will use these choices when the Cloudflare sender is enabled.</p>
+        </div>
+        <button class="button secondary profile-small-action" type="button" onclick="navigate('notifications')">
+          Notification Center
+        </button>
+      </div>
+
+      <label class="profile-notification-master">
+        <input
+          id="profileNotifyEnabled"
+          type="checkbox"
+          ${prefs.appNotificationsEnabled !== false ? "checked" : ""}
+          onchange="updateNotificationPreferenceVisibility_()"
+        >
+        <span>
+          <strong>Receive app notifications</strong>
+          <small>Controls the notification categories below.</small>
+        </span>
+      </label>
+
+      <div id="profileNotificationChoices" class="profile-notification-options">
+        <label><input id="profileNotifyPicks" type="checkbox" ${prefs.notifyMakePicks !== false ? "checked" : ""}> Make your picks / new questions</label>
+        <label><input id="profileNotifyLock" type="checkbox" ${prefs.notifyLockApproaching !== false ? "checked" : ""}> Game lock time approaching</label>
+        <label><input id="profileNotifyFinal" type="checkbox" ${prefs.notifyFinalResults !== false ? "checked" : ""}> Final results available</label>
+        <label><input id="profileNotifyNewGames" type="checkbox" ${prefs.notifyNewGames !== false ? "checked" : ""}> New games added</label>
+      </div>
+
+      <div class="profile-device-notification-status">
+        <strong>Phone push:</strong>
+        <span id="profilePushStatus">${profileBrowserNotificationStatus_()}</span>
+      </div>
+
+      <button class="button secondary profile-notification-save" type="button" onclick="saveProfileNotificationPreferences_()">
+        Save Notification Preferences
+      </button>
+
+      <div id="profileNotificationMessage" class="profile-message hidden"></div>
+    </section>
+  `;
+}
+
+function profileBrowserNotificationStatus_() {
+  if (typeof Notification === "undefined") return "Not supported in this browser";
+  if (Notification.permission === "granted") return "Permission granted — sender setup pending";
+  if (Notification.permission === "denied") return "Blocked on this device";
+  return "Not enabled on this device yet";
+}
+
+function updateNotificationPreferenceVisibility_() {
+  const enabled = document.getElementById("profileNotifyEnabled");
+  const choices = document.getElementById("profileNotificationChoices");
+  if (choices) {
+    choices.classList.toggle("is-disabled", enabled ? !enabled.checked : false);
+  }
+}
+
+async function saveProfileNotificationPreferences_() {
+
+  if (typeof apiSaveNotificationPreferences !== "function") return;
+
+  const button = document.querySelector(".profile-notification-save");
+  const message = document.getElementById("profileNotificationMessage");
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Saving…";
+  }
+
+  try {
+    const res = await apiSaveNotificationPreferences({
+      appNotificationsEnabled: !!(document.getElementById("profileNotifyEnabled") || {}).checked,
+      notifyMakePicks: !!(document.getElementById("profileNotifyPicks") || {}).checked,
+      notifyLockApproaching: !!(document.getElementById("profileNotifyLock") || {}).checked,
+      notifyFinalResults: !!(document.getElementById("profileNotifyFinal") || {}).checked,
+      notifyNewGames: !!(document.getElementById("profileNotifyNewGames") || {}).checked
+    });
+
+    if (!res || res.success === false) throw new Error(res && (res.message || res.error) || "Could not save preferences.");
+
+    APP_STATE.notificationPreferences = res.preferences || APP_STATE.notificationPreferences;
+    if (message) {
+      message.textContent = "Notification preferences saved ✓";
+      message.className = "profile-message success";
+    }
+  } catch (err) {
+    if (message) {
+      message.textContent = err.message || "Could not save notification preferences.";
+      message.className = "profile-message error";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Save Notification Preferences";
+    }
+  }
+}
+
 /* ======================
    PROFILE SCOPE / GAME
 ====================== */
+
+function getProfileEffectiveScope_() {
+
+  const raw = getProfileInputValue_("profileScope") || "general";
+
+  if (raw === "general") return "general";
+
+  const mode = String(
+    APP_STATE.profileData && APP_STATE.profileData.profileMode
+      ? APP_STATE.profileData.profileMode
+      : "game"
+  ).toLowerCase();
+
+  if (mode === "season") return "season";
+  if (mode === "general") return "general";
+  return "game";
+}
 
 function onProfileScopeChange() {
 
   updateProfileGameVisibility_();
 
-  const scope =
-    getProfileInputValue_(
-      "profileScope"
-    ) || "general";
-
-  const data =
-    APP_STATE.profileData || {};
+  const scope = getProfileEffectiveScope_();
+  const data = APP_STATE.profileData || {};
 
   const selectedProfile =
     scope === "game"
       ? (data.gameProfile || {})
-      : (data.generalProfile || data.profile || {});
+      : scope === "season"
+        ? (data.scopedProfile || {})
+        : (data.generalProfile || data.profile || {});
 
   populateProfileForm_(
     selectedProfile,
-    scope !== "game"
+    scope === "general"
   );
 
   updateProfilePreview();
@@ -412,19 +755,18 @@ async function onProfileGameChange() {
 
   }
 
-  APP_STATE.profileData =
-    res;
+  APP_STATE.profileData = res;
 
-  const scope =
-    getProfileInputValue_(
-      "profileScope"
-    ) || "general";
+  const rawScope = getProfileInputValue_("profileScope") || "general";
+  const scope = rawScope === "general" ? "general" : getProfileEffectiveScope_();
 
   populateProfileForm_(
     scope === "game"
       ? (res.gameProfile || {})
-      : (res.generalProfile || res.profile || {}),
-    scope !== "game"
+      : scope === "season"
+        ? (res.scopedProfile || {})
+        : (res.generalProfile || res.profile || {}),
+    scope === "general"
   );
 
   updateProfilePreview();
@@ -434,10 +776,7 @@ async function onProfileGameChange() {
 
 function updateProfileGameVisibility_() {
 
-  const scope =
-    getProfileInputValue_(
-      "profileScope"
-    ) || "general";
+  const rawScope = getProfileInputValue_("profileScope") || "general";
 
   const wrap =
     document.getElementById(
@@ -447,7 +786,7 @@ function updateProfileGameVisibility_() {
   if (wrap) {
     wrap.classList.toggle(
       "hidden",
-      scope !== "game"
+      rawScope === "general"
     );
   }
 
@@ -575,90 +914,38 @@ function onProfileUploadPreview() {
 
 async function saveProfileForm() {
 
-  const session =
-    getSessionSafe_();
-
-  const username =
-    session && session.username
-      ? session.username
-      : "";
-
-  const scope =
-    getProfileInputValue_(
-      "profileScope"
-    ) || "general";
-
+  const session = getSessionSafe_();
+  const username = session && session.username ? session.username : "";
+  const scope = getProfileEffectiveScope_();
   const gameId =
-    scope === "game"
-      ? getProfileSelectedGameId_()
-      : getProfileGameId_(
-          APP_STATE.profileGames || []
-        );
+    scope === "general"
+      ? getProfileGameId_(APP_STATE.profileGames || [])
+      : getProfileSelectedGameId_();
 
   if (!username) {
-
-    showProfileMessage_(
-      "Missing username. Please log in again.",
-      "error"
-    );
-
+    showProfileMessage_("Missing username. Please log in again.", "error");
     return;
-
   }
 
-  if (scope === "game" && !gameId) {
-
-    showProfileMessage_(
-      "Choose a game for this game-specific profile.",
-      "error"
-    );
-
+  if ((scope === "game" || scope === "season") && !gameId) {
+    showProfileMessage_("Choose a game for this profile.", "error");
     return;
-
   }
 
-  const avatarType =
-    getProfileInputValue_(
-      "profileAvatarType"
-    ) || "initials";
-
+  const avatarType = getProfileInputValue_("profileAvatarType") || "initials";
   clearProfileMessage_();
 
-  let avatarUrl =
-    getProfileInputValue_(
-      "profileAvatarUrl"
-    );
+  let avatarUrl = getProfileInputValue_("profileAvatarUrl");
+  let avatarFileId = getProfileInputValue_("profileAvatarFileId");
 
-  let avatarFileId =
-    getProfileInputValue_(
-      "profileAvatarFileId"
-    );
-
-  if (avatarType === "url") {
-
-    if (
-      avatarUrl &&
-      !/^https:\/\//i.test(avatarUrl)
-    ) {
-
-      showProfileMessage_(
-        "Internet image must start with https://",
-        "error"
-      );
-
-      return;
-
-    }
-
+  if (avatarType === "url" && avatarUrl && !/^https:\/\//i.test(avatarUrl)) {
+    showProfileMessage_("Internet image must start with https://", "error");
+    return;
   }
 
   if (avatarType === "upload") {
 
-    const fileInput =
-      document.getElementById(
-        "profileAvatarFile"
-      );
-
+    const fileInput = document.getElementById("profileAvatarFile");
     const file =
       fileInput && fileInput.files && fileInput.files[0]
         ? fileInput.files[0]
@@ -666,133 +953,189 @@ async function saveProfileForm() {
 
     if (file) {
 
-      showProfileMessage_(
-        "Uploading avatar...",
-        "success"
-      );
+      showProfileMessage_("Uploading avatar…", "success");
 
-      const dataUrl =
-        await readProfileFileAsDataUrl_(
-          file
-        );
-
-      const uploadRes =
-        await apiUploadProfileAvatar({
-          username: username,
-          gameId: gameId,
-          scope: scope,
-          fileName: file.name,
-          mimeType: file.type,
-          dataUrl: dataUrl
-        });
+      const dataUrl = await readProfileFileAsDataUrl_(file);
+      const uploadRes = await apiUploadProfileAvatar({
+        username: username,
+        gameId: gameId,
+        scope: scope,
+        profileScopeKey:
+          APP_STATE.profileData && APP_STATE.profileData.profileScopeKey
+            ? APP_STATE.profileData.profileScopeKey
+            : "",
+        fileName: file.name,
+        mimeType: file.type,
+        dataUrl: dataUrl
+      });
 
       if (!uploadRes || !uploadRes.success) {
-
         showProfileMessage_(
           uploadRes && (uploadRes.message || uploadRes.error)
             ? (uploadRes.message || uploadRes.error)
             : "Could not upload avatar.",
           "error"
         );
-
         return;
-
       }
 
-      avatarUrl =
-        uploadRes.avatarUrl || "";
+      avatarUrl = uploadRes.avatarUrl || "";
+      avatarFileId = uploadRes.avatarFileId || "";
 
-      avatarFileId =
-        uploadRes.avatarFileId || "";
-
-      setProfileInputValue_(
-        "profileAvatarUrl",
-        avatarUrl
-      );
-
-      setProfileInputValue_(
-        "profileAvatarFileId",
-        avatarFileId
-      );
-
+      setProfileInputValue_("profileAvatarUrl", avatarUrl);
+      setProfileInputValue_("profileAvatarFileId", avatarFileId);
     }
 
     if (!avatarUrl || !/^https:\/\//i.test(avatarUrl)) {
-
       showProfileMessage_(
         "Choose a photo to upload, or select Initials, Emoji, or Image from internet.",
         "error"
       );
-
       return;
-
     }
-
   }
 
   const payload = {
     username: username,
     gameId: gameId,
     scope: scope,
+    profileScopeKey:
+      scope === "season" &&
+      APP_STATE.profileData &&
+      APP_STATE.profileData.profileScopeKey
+        ? APP_STATE.profileData.profileScopeKey
+        : "",
+    profileScopeLabel:
+      scope === "season" &&
+      APP_STATE.profileData &&
+      APP_STATE.profileData.profileScopeLabel
+        ? APP_STATE.profileData.profileScopeLabel
+        : "",
     displayName: getProfileInputValue_("profileDisplayName"),
     realName: getProfileInputValue_("profileRealName"),
     avatarType: avatarType,
     avatarInitials: getProfileInputValue_("profileAvatarInitials"),
     avatarEmoji: getProfileInputValue_("profileAvatarEmoji"),
-    avatarUrl: avatarType === "url" || avatarType === "upload"
-      ? avatarUrl
-      : "",
-    avatarFileId: avatarType === "upload"
-      ? avatarFileId
-      : "",
+    avatarUrl:
+      avatarType === "url" || avatarType === "upload"
+        ? avatarUrl
+        : "",
+    avatarFileId:
+      avatarType === "upload"
+        ? avatarFileId
+        : "",
     profileColor: getProfileInputValue_("profileColor") || PROFILE_DEFAULT_COLOR,
+    profileColorMode: getProfileInputValue_("profileColorMode") || "solid",
+    profileColor2: getProfileInputValue_("profileColor2") || "#354785",
+    profileGradientAngle: getProfileInputValue_("profileGradientAngle") || "135",
     bio: getProfileInputValue_("profileBio")
   };
 
-  showProfileMessage_(
-    "Saving profile...",
-    "success"
-  );
+  const saveButton = document.getElementById("profileSaveButton");
+  if (saveButton) {
+    saveButton.disabled = true;
+    saveButton.textContent = "Saving…";
+  }
 
-  const res =
-    await apiSaveEditableProfile(
-      payload
-    );
+  showProfileMessage_("Saving profile…", "success");
 
-  if (!res || !res.success) {
+  try {
+
+    const res = await apiSaveEditableProfile(payload);
+
+    if (!res || !res.success) {
+      throw new Error(
+        res && (res.message || res.error)
+          ? (res.message || res.error)
+          : "Could not save profile."
+      );
+    }
+
+    APP_STATE.profile = res.profile;
+    APP_STATE.profileData = res;
+
+    applyProfileColor_(res.profile && res.profile.profileColor);
+    updateHeaderProfile(res.profile);
 
     showProfileMessage_(
-      res && (res.message || res.error)
-        ? (res.message || res.error)
-        : "Could not save profile.",
+      scope === "general"
+        ? "General profile saved ✓"
+        : scope === "season"
+          ? "League / season profile saved ✓"
+          : "Game profile saved ✓",
+      "success"
+    );
+
+    const context = getProfileEditContext_();
+
+    if (scope === "general" || context.onboarding) {
+      clearProfileEditContext_();
+      window.setTimeout(function() {
+        navigate("dashboard");
+      }, 260);
+      return;
+    }
+
+    if (context.gameId) {
+      try {
+        const promptKey =
+          "gameProfilePrompt:" +
+          String(username || "").trim().toLowerCase() +
+          ":" +
+          String(context.gameId || "").trim();
+        localStorage.setItem(promptKey, "done");
+      } catch (err) {}
+
+      clearProfileEditContext_();
+      window.setTimeout(function() {
+        if (typeof enterGame === "function") {
+          enterGame(
+            context.gameId,
+            context.gameType,
+            context.leagueId,
+            context.gameRole,
+            context.hubMode
+          );
+        } else {
+          navigate("dashboard");
+        }
+      }, 260);
+      return;
+    }
+
+    window.setTimeout(function() {
+      navigate("dashboard");
+    }, 260);
+
+  } catch (err) {
+
+    showProfileMessage_(
+      err && err.message ? err.message : "Could not save profile.",
       "error"
     );
 
-    return;
-
+    if (saveButton) {
+      saveButton.disabled = false;
+      updateProfileSaveButtonLabel_();
+    }
   }
 
-  APP_STATE.profile =
-    res.profile;
+}
 
-  APP_STATE.profileData =
-    res;
+function updateProfileSaveButtonLabel_() {
 
-  applyProfileColor_(
-    res.profile && res.profile.profileColor
-  );
+  const button = document.getElementById("profileSaveButton");
+  if (!button) return;
 
-  updateHeaderProfile(
-    res.profile
-  );
+  const context = getProfileEditContext_();
 
-  showProfileMessage_(
-    scope === "game"
-      ? "Game profile saved."
-      : "General profile saved.",
-    "success"
-  );
-
+  if (context.gameId) {
+    const game = profileFindGame_(APP_STATE.profileGames || [], context.gameId);
+    const name = game ? getGameNameFromGame_(game) : context.gameId;
+    button.textContent = "Save & Continue to " + (name || "Game");
+  } else {
+    button.textContent = "Save Profile & Return Home";
+  }
 }
 
 /* ======================
@@ -851,6 +1194,21 @@ function populateProfileForm_(
   );
 
   setProfileInputValue_(
+    "profileColorMode",
+    profile.profileColorMode || "solid"
+  );
+
+  setProfileInputValue_(
+    "profileColor2",
+    profile.profileColor2 || "#354785"
+  );
+
+  setProfileInputValue_(
+    "profileGradientAngle",
+    profile.profileGradientAngle || "135"
+  );
+
+  setProfileInputValue_(
     "profileBio",
     profile.bio || ""
   );
@@ -865,6 +1223,8 @@ function populateProfileForm_(
   }
 
   updateAvatarOptionVisibility_();
+  updateProfileStyleVisibility_();
+  updateProfileGradientAngleLabel_();
   updateProfilePreview();
 
 }
@@ -901,6 +1261,37 @@ function updateAvatarOptionVisibility_() {
 
 }
 
+function updateProfileStyleVisibility_() {
+
+  const mode = getProfileInputValue_("profileColorMode") || "solid";
+  const color2 = document.getElementById("profileColor2Wrap");
+  const angle = document.getElementById("profileGradientAngleWrap");
+
+  if (color2) color2.classList.toggle("hidden", mode !== "gradient");
+  if (angle) angle.classList.toggle("hidden", mode !== "gradient");
+}
+
+function updateProfileGradientAngleLabel_() {
+  const input = document.getElementById("profileGradientAngle");
+  const label = document.getElementById("profileGradientAngleLabel");
+  if (input && label) label.textContent = String(input.value || "135") + "°";
+}
+
+function profilePreviewBackground_(profile) {
+  profile = profile || {};
+  const color1 = /^#[0-9a-f]{6}$/i.test(String(profile.profileColor || ""))
+    ? profile.profileColor
+    : PROFILE_DEFAULT_COLOR;
+  const color2 = /^#[0-9a-f]{6}$/i.test(String(profile.profileColor2 || ""))
+    ? profile.profileColor2
+    : "#354785";
+  const angle = Math.max(0, Math.min(360, Number(profile.profileGradientAngle || 135)));
+
+  return String(profile.profileColorMode || "solid").toLowerCase() === "gradient"
+    ? "linear-gradient(" + angle + "deg, " + color1 + ", " + color2 + ")"
+    : color1;
+}
+
 function updateProfilePreview() {
 
   const formProfile = {
@@ -914,19 +1305,19 @@ function updateProfilePreview() {
     avatarUrl: getProfileInputValue_("profileAvatarUrl"),
     avatarFileId: getProfileInputValue_("profileAvatarFileId"),
     profileColor: getProfileInputValue_("profileColor") || PROFILE_DEFAULT_COLOR,
+    profileColorMode: getProfileInputValue_("profileColorMode") || "solid",
+    profileColor2: getProfileInputValue_("profileColor2") || "#354785",
+    profileGradientAngle: getProfileInputValue_("profileGradientAngle") || "135",
     bio: getProfileInputValue_("profileBio")
   };
 
-  const scope =
-    getProfileInputValue_(
-      "profileScope"
-    ) || "general";
+  const scope = getProfileEffectiveScope_();
 
   const data =
     APP_STATE.profileData || {};
 
   const profile =
-    scope === "game"
+    scope === "game" || scope === "season"
       ? mergeProfilePreview_(
           data.generalProfile || data.profile || getProfileFallback_(formProfile.username, formProfile.gameId),
           formProfile
@@ -936,58 +1327,56 @@ function updateProfilePreview() {
           formProfile
         );
 
-  const name =
-    document.getElementById(
-      "profilePreviewName"
-    );
-
-  const sub =
-    document.getElementById(
-      "profilePreviewSub"
-    );
-
-  const bio =
-    document.getElementById(
-      "profilePreviewBio"
-    );
-
-  const avatar =
-    document.getElementById(
-      "profilePreviewAvatar"
-    );
+  const name = document.getElementById("profilePreviewName");
+  const bio = document.getElementById("profilePreviewBio");
+  const avatar = document.getElementById("profilePreviewAvatar");
+  const card = document.getElementById("profileCardPreview");
 
   if (name) {
-    name.innerText =
-      profile.displayName || profile.username || "Profile";
-  }
-
-  if (sub) {
-    sub.innerText =
-      profile.realName || profile.username || "";
+    name.innerText = profile.displayName || profile.username || "Profile";
   }
 
   if (bio) {
-    bio.innerText =
-      profile.bio || "";
+    bio.innerText = profile.bio || "";
+    bio.classList.toggle("hidden", !profile.bio);
   }
 
   if (avatar) {
-
-    avatar.style.setProperty(
-      "--profile-color",
-      profile.profileColor || PROFILE_DEFAULT_COLOR
-    );
-
-    avatar.innerHTML =
-      renderProfileAvatar_(
-        profile
-      );
-
+    avatar.style.setProperty("--profile-color", profile.profileColor || PROFILE_DEFAULT_COLOR);
+    avatar.style.background = profilePreviewBackground_(profile);
+    avatar.innerHTML = renderProfileAvatar_(profile);
   }
 
-  applyProfileColor_(
-    profile.profileColor
-  );
+  if (card) {
+    card.style.background = profilePreviewBackground_(profile);
+  }
+
+  const miniAvatar = `
+    <span class="profile-mini-avatar" style="background:${escapeProfileAttr_(profilePreviewBackground_(profile))}">
+      ${renderProfileAvatar_(profile)}
+    </span>
+  `;
+
+  const displayName = escapeProfileHtml_(profile.displayName || profile.username || "Player");
+  const note = profile.bio ? `<small>${escapeProfileHtml_(profile.bio)}</small>` : "";
+
+  const appPreview = document.getElementById("profileAppPreviewMini");
+  if (appPreview) {
+    appPreview.innerHTML = `${miniAvatar}<span><strong>${displayName}</strong>${note}</span>`;
+    appPreview.style.background = profilePreviewBackground_(profile);
+  }
+
+  const leaderboardPreview = document.getElementById("profileLeaderboardPreviewMini");
+  if (leaderboardPreview) {
+    leaderboardPreview.innerHTML = `<span class="profile-preview-rank">#3</span>${miniAvatar}<span><strong>${displayName}</strong><small>84 pts</small></span>`;
+  }
+
+  const compactPreview = document.getElementById("profileCompactPreviewMini");
+  if (compactPreview) {
+    compactPreview.innerHTML = `${miniAvatar}<strong>${displayName}</strong>`;
+  }
+
+  applyProfileColor_(profile.profileColor);
 
 }
 
@@ -1013,6 +1402,9 @@ function mergeProfilePreview_(
     "avatarUrl",
     "avatarFileId",
     "profileColor",
+    "profileColorMode",
+    "profileColor2",
+    "profileGradientAngle",
     "bio"
   ].forEach(key => {
 
@@ -1041,6 +1433,18 @@ function mergeProfilePreview_(
 
   if (!merged.profileColor) {
     merged.profileColor = PROFILE_DEFAULT_COLOR;
+  }
+
+  if (!merged.profileColorMode) {
+    merged.profileColorMode = "solid";
+  }
+
+  if (!merged.profileColor2) {
+    merged.profileColor2 = "#354785";
+  }
+
+  if (!merged.profileGradientAngle) {
+    merged.profileGradientAngle = "135";
   }
 
   if (!merged.avatarInitials) {

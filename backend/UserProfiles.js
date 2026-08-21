@@ -190,6 +190,29 @@ function normalizeLeaderboardProfileResult_(
       profileColor ||
       "#354785",
 
+    profileColorMode:
+      String(
+        profile.profileColorMode ||
+        profile.ProfileColorMode ||
+        "solid"
+      ).trim().toLowerCase() === "gradient"
+        ? "gradient"
+        : "solid",
+
+    profileColor2:
+      String(
+        profile.profileColor2 ||
+        profile.ProfileColor2 ||
+        "#354785"
+      ).trim() || "#354785",
+
+    profileGradientAngle:
+      String(
+        profile.profileGradientAngle ||
+        profile.ProfileGradientAngle ||
+        "135"
+      ).trim() || "135",
+
     avatarType:
       profile.avatarType ||
       profile.AvatarType ||
@@ -349,7 +372,13 @@ function getLeaderboardProfileFallback_(
     themeColor:
       "#354785",
     profileColor:
-      "#354785"
+      "#354785",
+    profileColorMode:
+      "solid",
+    profileColor2:
+      "#354785",
+    profileGradientAngle:
+      "135"
   };
 
 }
@@ -715,7 +744,13 @@ function decorateLeaderboardRowsWithProfiles_(
         profileColor:
           profile.profileColor ||
           profile.themeColor ||
-          "#354785"
+          "#354785",
+        profileColorMode:
+          profile.profileColorMode || "solid",
+        profileColor2:
+          profile.profileColor2 || "#354785",
+        profileGradientAngle:
+          profile.profileGradientAngle || "135"
       }
     );
 

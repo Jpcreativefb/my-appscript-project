@@ -6361,3 +6361,36 @@ button.is-saving {
 .bottom-nav-icon { width:24px; height:24px; display:grid; place-items:center; overflow:hidden; }
 .bottom-nav-custom-icon { width:22px; height:22px; object-fit:contain; display:block; }
 .bottom-nav-label[hidden] { display:none !important; }
+
+/* v1.2.18e — Header Notification Center */
+.header-right { display:flex; align-items:center; gap:7px; }
+.header-notification-button {
+  position:relative;
+  width:34px;
+  height:34px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.055);
+  color:inherit;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  cursor:pointer;
+}
+.header-notification-badge {
+  position:absolute;
+  right:-3px;
+  top:-4px;
+  min-width:16px;
+  height:16px;
+  padding:0 4px;
+  border-radius:999px;
+  background:#ef4444;
+  color:#fff;
+  font-size:8px;
+  font-weight:900;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid #111827;
+}
