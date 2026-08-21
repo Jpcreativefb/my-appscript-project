@@ -115,6 +115,16 @@ function doPost(e) {
       return json(apiRemovePushSubscription(body));
     }
 
+    if (action === "getPushSubscriptionSummary") {
+      return json(
+        apiGetPushSubscriptionSummary(
+          body.token,
+          body.deviceId,
+          body.endpoint
+        )
+      );
+    }
+
     if (action === "adminSavePushGatewayConfig") {
       return json(apiAdminSavePushGatewayConfig(body));
     }
@@ -2020,7 +2030,8 @@ function doGet(e) {
       return json(
         apiGetPushSubscriptionSummary(
           e.parameter.token,
-          e.parameter.deviceId
+          e.parameter.deviceId,
+          e.parameter.endpoint
         )
       );
     }

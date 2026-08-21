@@ -3,7 +3,8 @@ const APPS_SCRIPT_API_URL =
 
 const ALLOWED_ACTIONS = new Set([
   "registerPushSubscription",
-  "removePushSubscription"
+  "removePushSubscription",
+  "getPushSubscriptionSummary"
 ]);
 
 function jsonResponse(payload, status = 200) {

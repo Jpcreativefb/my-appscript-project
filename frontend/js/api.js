@@ -693,11 +693,10 @@ async function apiMarkAllNotificationsRead() {
   return apiPost("markAllNotificationsRead", {});
 }
 
-async function apiGetPushSubscriptionSummary(deviceId) {
-  const session = typeof getSession === "function" ? (getSession() || {}) : {};
-  return api("getPushSubscriptionSummary", {
-    token: session.token || "",
-    deviceId: deviceId || (typeof apiGetOrCreateDeviceId_ === "function" ? apiGetOrCreateDeviceId_() : "")
+async function apiGetPushSubscriptionSummary(deviceId, endpoint) {
+  return apiPushSubscriptionPost_("getPushSubscriptionSummary", {
+    deviceId: deviceId || (typeof apiGetOrCreateDeviceId_ === "function" ? apiGetOrCreateDeviceId_() : ""),
+    endpoint: endpoint || ""
   });
 }
 

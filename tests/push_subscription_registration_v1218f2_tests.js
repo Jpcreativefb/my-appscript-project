@@ -31,8 +31,8 @@ assert(bridge.includes('"removePushSubscription"'), 'bridge must allow removal')
 assert(bridge.includes('text/plain;charset=utf-8'), 'bridge must use Apps Script POST-compatible content type');
 assert(bridge.includes('AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo'), 'bridge must target existing production Apps Script deployment');
 
-assert(backendApi.includes('e.parameter.deviceId'), 'push summary route must pass device id');
-assert(engine.includes('function apiGetPushSubscriptionSummary(token, deviceId)'), 'backend summary must accept device id');
+assert(backendApi.includes('e.parameter.deviceId'), 'push summary GET route must pass device id');
+assert(engine.includes('function apiGetPushSubscriptionSummary(token, deviceId, endpoint)'), 'backend summary must accept device id and endpoint');
 assert(engine.includes('thisDeviceActive: thisDeviceActive'), 'backend summary must report this exact device');
 
 assert(pwa.includes('awardsPushBackendDeviceStatus_'), 'PWA must reconcile browser and backend status');

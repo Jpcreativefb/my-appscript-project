@@ -1153,13 +1153,19 @@ function apiRemovePushSubscription(payload) {
   return { success: true, updated: updated };
 }
 
-function apiGetPushSubscriptionSummary(token, deviceId) {
+function apiGetPushSubscriptionSummary(token, deviceId, endpoint) {
   const username = requireUserFromToken_(token);
   const requestedDeviceId = String(deviceId || "").trim();
+  const requestedEndpoint = String(endpoint || "").trim();
   const sh = notificationPushSubscriptionsSheet_();
   const data = sh.getDataRange().getValues();
   if (data.length <= 1) {
-    return { success: true, activeDevices: 0, thisDeviceActive: false };
+    return {
+      success: true,
+      activeDevices: 0,
+      thisDeviceActive: false,
+      matchedBy: ""
+    };
   }
   const headers = data[0].map(String);
   const col = notificationColumnMap_(headers);
@@ -1167,15 +1173,27 @@ function apiGetPushSubscriptionSummary(token, deviceId) {
     return String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase() &&
       notificationBool_(row[col.Enabled], false);
   });
-  const thisDeviceActive = requestedDeviceId
-    ? activeRows.some(function(row) {
-        return String(row[col.DeviceId] || "").trim() === requestedDeviceId;
-      })
-    : false;
+
+  let matchedBy = "";
+  const thisDeviceActive = activeRows.some(function(row) {
+    const rowDeviceId = String(row[col.DeviceId] || "").trim();
+    const rowEndpoint = String(row[col.Endpoint] || "").trim();
+    if (requestedEndpoint && rowEndpoint === requestedEndpoint) {
+      matchedBy = "endpoint";
+      return true;
+    }
+    if (requestedDeviceId && rowDeviceId === requestedDeviceId) {
+      matchedBy = "deviceId";
+      return true;
+    }
+    return false;
+  });
+
   return {
     success: true,
     activeDevices: activeRows.length,
-    thisDeviceActive: thisDeviceActive
+    thisDeviceActive: thisDeviceActive,
+    matchedBy: matchedBy
   };
 }
 

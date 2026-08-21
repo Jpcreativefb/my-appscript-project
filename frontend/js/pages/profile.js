@@ -636,6 +636,8 @@ function renderProfileNotificationPreferences_(prefs) {
   `;
 }
 
+let PROFILE_PUSH_STATUS_REQUEST_ = 0;
+
 function profileBrowserNotificationStatus_() {
   if (typeof awardsPushSupported_ === "function" && !awardsPushSupported_()) {
     return "Not available here — on iPhone, open the installed Home Screen app";
@@ -647,6 +649,7 @@ function profileBrowserNotificationStatus_() {
 }
 
 async function refreshProfilePushStatus_() {
+  const requestId = ++PROFILE_PUSH_STATUS_REQUEST_;
   const status = document.getElementById("profilePushStatus");
   const enableButton = document.getElementById("profileEnablePushButton");
   const disableButton = document.getElementById("profileDisablePushButton");
@@ -659,6 +662,7 @@ async function refreshProfilePushStatus_() {
 
   try {
     const device = await awardsPushGetDeviceStatus_();
+    if (requestId !== PROFILE_PUSH_STATUS_REQUEST_) return;
     const fullyRegistered = device.subscribed === true && device.registered === true;
     status.textContent = device.label || profileBrowserNotificationStatus_();
     if (enableButton) {
@@ -672,11 +676,14 @@ async function refreshProfilePushStatus_() {
       disableButton.style.display = device.subscribed ? "" : "none";
     }
   } catch (err) {
+    if (requestId !== PROFILE_PUSH_STATUS_REQUEST_) return;
     status.textContent = err.message || "Could not check push status";
   }
 }
 
 async function enableProfilePushOnThisDevice_() {
+  // Invalidate any older status request before registration starts.
+  PROFILE_PUSH_STATUS_REQUEST_++;
   const status = document.getElementById("profilePushStatus");
   const button = document.getElementById("profileEnablePushButton");
   const message = document.getElementById("profileNotificationMessage");
