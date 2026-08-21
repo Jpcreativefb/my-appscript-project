@@ -144,6 +144,7 @@ async function renderProfilePage() {
     updateProfilePreview();
     updateProfileSaveButtonLabel_();
     updateNotificationPreferenceVisibility_();
+    refreshProfilePushStatus_();
 
   }, 0);
 
@@ -611,8 +612,19 @@ function renderProfileNotificationPreferences_(prefs) {
       </div>
 
       <div class="profile-device-notification-status">
-        <strong>Phone push:</strong>
-        <span id="profilePushStatus">${profileBrowserNotificationStatus_()}</span>
+        <div>
+          <strong>Push on this device:</strong>
+          <span id="profilePushStatus">Checking…</span>
+        </div>
+        <div class="profile-push-device-actions">
+          <button id="profileEnablePushButton" class="button" type="button" onclick="enableProfilePushOnThisDevice_()">
+            Enable Push on This Device
+          </button>
+          <button id="profileDisablePushButton" class="button secondary" type="button" onclick="disableProfilePushOnThisDevice_()" style="display:none;">
+            Disable on This Device
+          </button>
+        </div>
+        <small>On iPhone/iPad, push works from the Awards App installed on the Home Screen. The permission prompt only appears after you tap Enable.</small>
       </div>
 
       <button class="button secondary profile-notification-save" type="button" onclick="saveProfileNotificationPreferences_()">
@@ -625,10 +637,102 @@ function renderProfileNotificationPreferences_(prefs) {
 }
 
 function profileBrowserNotificationStatus_() {
+  if (typeof awardsPushSupported_ === "function" && !awardsPushSupported_()) {
+    return "Not available here — on iPhone, open the installed Home Screen app";
+  }
   if (typeof Notification === "undefined") return "Not supported in this browser";
-  if (Notification.permission === "granted") return "Permission granted — sender setup pending";
   if (Notification.permission === "denied") return "Blocked on this device";
+  if (Notification.permission === "granted") return "Checking subscription…";
   return "Not enabled on this device yet";
+}
+
+async function refreshProfilePushStatus_() {
+  const status = document.getElementById("profilePushStatus");
+  const enableButton = document.getElementById("profileEnablePushButton");
+  const disableButton = document.getElementById("profileDisablePushButton");
+  if (!status) return;
+
+  if (typeof awardsPushGetDeviceStatus_ !== "function") {
+    status.textContent = profileBrowserNotificationStatus_();
+    return;
+  }
+
+  try {
+    const device = await awardsPushGetDeviceStatus_();
+    status.textContent = device.label || profileBrowserNotificationStatus_();
+    if (enableButton) {
+      enableButton.style.display = device.subscribed ? "none" : "";
+      enableButton.disabled = device.supported === false || device.permission === "denied";
+    }
+    if (disableButton) {
+      disableButton.style.display = device.subscribed ? "" : "none";
+    }
+  } catch (err) {
+    status.textContent = err.message || "Could not check push status";
+  }
+}
+
+async function enableProfilePushOnThisDevice_() {
+  const status = document.getElementById("profilePushStatus");
+  const button = document.getElementById("profileEnablePushButton");
+  const message = document.getElementById("profileNotificationMessage");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Enabling…";
+  }
+  if (status) status.textContent = "Requesting permission…";
+
+  try {
+    if (typeof awardsPushEnableOnThisDevice_ !== "function") {
+      throw new Error("Push setup is not loaded.");
+    }
+    const res = await awardsPushEnableOnThisDevice_();
+    if (message) {
+      message.textContent = res.message || "Push enabled on this device ✓";
+      message.className = "profile-message success";
+    }
+  } catch (err) {
+    if (message) {
+      message.textContent = err.message || "Could not enable push on this device.";
+      message.className = "profile-message error";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Enable Push on This Device";
+    }
+    refreshProfilePushStatus_();
+  }
+}
+
+async function disableProfilePushOnThisDevice_() {
+  const button = document.getElementById("profileDisablePushButton");
+  const message = document.getElementById("profileNotificationMessage");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Disabling…";
+  }
+  try {
+    if (typeof awardsPushDisableOnThisDevice_ !== "function") {
+      throw new Error("Push setup is not loaded.");
+    }
+    const res = await awardsPushDisableOnThisDevice_();
+    if (message) {
+      message.textContent = res.message || "Push disabled on this device.";
+      message.className = "profile-message success";
+    }
+  } catch (err) {
+    if (message) {
+      message.textContent = err.message || "Could not disable push on this device.";
+      message.className = "profile-message error";
+    }
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = "Disable on This Device";
+    }
+    refreshProfilePushStatus_();
+  }
 }
 
 function updateNotificationPreferenceVisibility_() {

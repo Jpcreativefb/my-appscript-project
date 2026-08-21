@@ -37,10 +37,15 @@ function notificationCenterTime_(value) {
   }
 }
 
+const NOTIFICATION_ADMIN_STATE = {
+  control: null
+};
+
 async function renderNotificationsPage() {
   setPageLoadStep(50, "Loading notifications…");
 
   let res = null;
+  let adminControl = null;
   try {
     res = typeof apiGetUserNotifications === "function"
       ? await apiGetUserNotifications(75)
@@ -49,11 +54,30 @@ async function renderNotificationsPage() {
     res = null;
   }
 
+  const adminSession = typeof isAdminSession === "function" && isAdminSession(getSession ? getSession() : null);
+  if (adminSession && typeof apiAdminGetPushControlCenter === "function") {
+    try {
+      adminControl = await apiAdminGetPushControlCenter();
+      if (!adminControl || adminControl.success === false) adminControl = null;
+    } catch (err) {
+      adminControl = null;
+    }
+  }
+
+  NOTIFICATION_ADMIN_STATE.control = adminControl;
+
   const notifications = res && Array.isArray(res.notifications)
     ? res.notifications
     : [];
 
   const unreadCount = Number(res && res.unreadCount) || 0;
+
+  setTimeout(function() {
+    if (adminControl) notificationAdminApplySelectedGame_();
+    if (typeof refreshNotificationCenterPushStatus_ === "function") {
+      refreshNotificationCenterPushStatus_();
+    }
+  }, 0);
 
   return `
     <div class="page notification-center-page">
@@ -69,6 +93,8 @@ async function renderNotificationsPage() {
         </div>
       </header>
 
+      ${adminControl ? renderNotificationAdminControlCenter_(adminControl) : ""}
+
       ${notifications.length ? `
         <div class="notification-center-list">
           ${notifications.map(renderNotificationCenterItem_).join("")}
@@ -82,6 +108,224 @@ async function renderNotificationsPage() {
       `}
     </div>
   `;
+}
+
+function renderNotificationAdminControlCenter_(control) {
+  control = control || {};
+  const games = Array.isArray(control.games) ? control.games : [];
+  const gateway = control.gateway || {};
+  const stats = control.subscriptionStats || {};
+  const recent = Array.isArray(control.recent) ? control.recent : [];
+  const firstGame = games[0] || {};
+  const defaultGatewayUrl = gateway.url || (
+    typeof window !== "undefined" && window.location && window.location.origin
+      ? window.location.origin.replace(/\/$/, "") + "/api/push-send"
+      : ""
+  );
+
+  return `
+    <section class="notification-admin-panel card">
+      <div class="notification-admin-title-row">
+        <div>
+          <p class="notification-center-kicker">Admin Push Controls</p>
+          <h2>Push Notification System</h2>
+          <p>OFF blocks everything. TEST sends only to your signed-in admin account. LIVE uses the selected audience and each player's preferences.</p>
+        </div>
+        <div class="notification-admin-status ${String(control.globalMode || "OFF").toLowerCase()}">
+          ${notificationCenterEscape_(control.globalMode || "OFF")}
+        </div>
+      </div>
+
+      <div class="notification-admin-grid">
+        <div class="notification-admin-box">
+          <h3>1. Global Safety Switch</h3>
+          <label>
+            <span>Global mode</span>
+            <select id="notificationGlobalMode">
+              <option value="OFF" ${control.globalMode === "OFF" ? "selected" : ""}>OFF — send nothing</option>
+              <option value="TEST" ${control.globalMode === "TEST" ? "selected" : ""}>TEST — admin only</option>
+              <option value="LIVE" ${control.globalMode === "LIVE" ? "selected" : ""}>LIVE — normal delivery</option>
+            </select>
+          </label>
+          <button class="button" type="button" onclick="saveNotificationGlobalMode_()">Save Global Mode</button>
+          <small>${Number(stats.activeUsers || 0)} user(s) · ${Number(stats.activeSubscriptions || 0)} active device subscription(s)</small>
+        </div>
+
+        <div class="notification-admin-box">
+          <h3>2. Cloudflare Gateway</h3>
+          <p class="notification-admin-inline-status ${gateway.configured ? "ready" : "not-ready"}">
+            ${gateway.configured ? "Configured ✓" : "Not configured yet"}
+          </p>
+          <label>
+            <span>Gateway URL</span>
+            <input id="notificationGatewayUrl" type="url" value="${notificationCenterEscape_(defaultGatewayUrl)}" placeholder="https://your-app-domain/api/push-send">
+          </label>
+          <label>
+            <span>Gateway token ${gateway.hasToken ? "(leave blank to keep current token)" : ""}</span>
+            <input id="notificationGatewayToken" type="password" autocomplete="new-password" placeholder="Paste PUSH_GATEWAY_TOKEN">
+          </label>
+          <button class="button secondary" type="button" onclick="saveNotificationGateway_()">Save Cloudflare Gateway</button>
+        </div>
+
+        <div class="notification-admin-box">
+          <h3>3. Per-Game Controls</h3>
+          ${games.length ? `
+            <label>
+              <span>Game</span>
+              <select id="notificationGameSelect" onchange="notificationAdminApplySelectedGame_()">
+                ${games.map(function(game) {
+                  return `<option value="${notificationCenterEscape_(game.gameId)}">${notificationCenterEscape_(game.gameName || game.gameId)}</option>`;
+                }).join("")}
+              </select>
+            </label>
+            <label class="notification-admin-check"><input id="notificationGameEnabled" type="checkbox"> <span><strong>Notifications ON for this game</strong><small>Must be on before this game can send.</small></span></label>
+            <label class="notification-admin-check"><input id="notificationGamePaused" type="checkbox"> <span><strong>Pause this game</strong><small>Temporary stop without losing settings.</small></span></label>
+            <label class="notification-admin-check"><input id="notificationGameTestOnly" type="checkbox"> <span><strong>Test only</strong><small>Forces delivery to the signed-in admin only even when global mode is LIVE.</small></span></label>
+            <button class="button secondary" type="button" onclick="saveNotificationGameSettings_()">Save Game Controls</button>
+          ` : `<p>No games are available.</p>`}
+        </div>
+
+        <div class="notification-admin-box notification-admin-compose">
+          <h3>4. Send / Test Notification</h3>
+          <label>
+            <span>Game</span>
+            <select id="notificationComposeGame">
+              <option value="">No specific game</option>
+              ${games.map(function(game) {
+                return `<option value="${notificationCenterEscape_(game.gameId)}" ${firstGame.gameId === game.gameId ? "" : ""}>${notificationCenterEscape_(game.gameName || game.gameId)}</option>`;
+              }).join("")}
+            </select>
+          </label>
+          <label>
+            <span>Audience</span>
+            <select id="notificationComposeAudience">
+              <option value="self">Just me / admin test</option>
+              <option value="game">Players in this game only</option>
+              <option value="all">All Awards App users</option>
+            </select>
+          </label>
+          <label>
+            <span>Type</span>
+            <select id="notificationComposeType">
+              <option value="custom">Custom announcement</option>
+              <option value="make_picks">Make picks / new questions</option>
+              <option value="lock">Lock approaching</option>
+              <option value="results">Results available</option>
+              <option value="new_game">New game</option>
+            </select>
+          </label>
+          <label><span>Title</span><input id="notificationComposeTitle" maxlength="120" value="Awards App"></label>
+          <label><span>Message</span><textarea id="notificationComposeMessage" maxlength="500" rows="3" placeholder="Type the notification message…"></textarea></label>
+          <button class="button" type="button" onclick="sendAdminPushNotification_()">Send Notification</button>
+          <div id="notificationAdminMessage" class="profile-message hidden"></div>
+        </div>
+      </div>
+
+      ${recent.length ? `
+        <details class="notification-admin-history">
+          <summary>Recent Push History</summary>
+          <div class="notification-admin-history-list">
+            ${recent.map(function(item) {
+              return `<div><strong>${notificationCenterEscape_(item.title || "Notification")}</strong><span>${notificationCenterEscape_(notificationCenterTime_(item.timestamp))} · ${notificationCenterEscape_(item.globalMode || "")} · ${Number(item.sent || 0)} sent / ${Number(item.failed || 0)} failed</span></div>`;
+            }).join("")}
+          </div>
+        </details>
+      ` : ""}
+    </section>
+  `;
+}
+
+function notificationAdminShowMessage_(text, isError) {
+  const el = document.getElementById("notificationAdminMessage");
+  if (!el) return;
+  el.textContent = text || "";
+  el.className = "profile-message " + (isError ? "error" : "success");
+}
+
+function notificationAdminSelectedGame_() {
+  const control = NOTIFICATION_ADMIN_STATE.control || {};
+  const games = Array.isArray(control.games) ? control.games : [];
+  const select = document.getElementById("notificationGameSelect");
+  const gameId = select ? String(select.value || "") : "";
+  return games.find(function(game) { return String(game.gameId || "") === gameId; }) || games[0] || null;
+}
+
+function notificationAdminApplySelectedGame_() {
+  const game = notificationAdminSelectedGame_();
+  if (!game) return;
+  const enabled = document.getElementById("notificationGameEnabled");
+  const paused = document.getElementById("notificationGamePaused");
+  const testOnly = document.getElementById("notificationGameTestOnly");
+  if (enabled) enabled.checked = game.enabled === true;
+  if (paused) paused.checked = game.paused === true;
+  if (testOnly) testOnly.checked = game.testOnly !== false;
+}
+
+async function saveNotificationGlobalMode_() {
+  const select = document.getElementById("notificationGlobalMode");
+  const mode = select ? String(select.value || "OFF") : "OFF";
+  const res = await apiAdminSavePushSystemMode(mode);
+  if (!res || res.success === false) {
+    notificationAdminShowMessage_(res && (res.message || res.error) || "Could not save global mode.", true);
+    return;
+  }
+  notificationAdminShowMessage_("Global notification mode saved: " + mode + " ✓", false);
+  navigate("notifications", { suppressLoader: true });
+}
+
+async function saveNotificationGateway_() {
+  const url = String((document.getElementById("notificationGatewayUrl") || {}).value || "").trim();
+  const token = String((document.getElementById("notificationGatewayToken") || {}).value || "").trim();
+  const res = await apiAdminSavePushGatewayConfig(url, token);
+  if (!res || res.success === false) {
+    notificationAdminShowMessage_(res && (res.message || res.error) || "Could not save Cloudflare gateway.", true);
+    return;
+  }
+  notificationAdminShowMessage_("Cloudflare gateway saved ✓", false);
+  navigate("notifications", { suppressLoader: true });
+}
+
+async function saveNotificationGameSettings_() {
+  const game = notificationAdminSelectedGame_();
+  if (!game) return;
+  const payload = {
+    gameId: game.gameId,
+    enabled: !!(document.getElementById("notificationGameEnabled") || {}).checked,
+    paused: !!(document.getElementById("notificationGamePaused") || {}).checked,
+    testOnly: !!(document.getElementById("notificationGameTestOnly") || {}).checked
+  };
+  const res = await apiAdminSaveGameNotificationSettings(payload);
+  if (!res || res.success === false) {
+    notificationAdminShowMessage_(res && (res.message || res.error) || "Could not save game controls.", true);
+    return;
+  }
+  notificationAdminShowMessage_("Game notification controls saved ✓", false);
+  navigate("notifications", { suppressLoader: true });
+}
+
+async function sendAdminPushNotification_() {
+  const payload = {
+    gameId: String((document.getElementById("notificationComposeGame") || {}).value || "").trim(),
+    audience: String((document.getElementById("notificationComposeAudience") || {}).value || "self").trim(),
+    type: String((document.getElementById("notificationComposeType") || {}).value || "custom").trim(),
+    title: String((document.getElementById("notificationComposeTitle") || {}).value || "").trim(),
+    message: String((document.getElementById("notificationComposeMessage") || {}).value || "").trim(),
+    route: "notifications"
+  };
+  notificationAdminShowMessage_("Sending…", false);
+  const res = await apiAdminSendPushNotification(payload);
+  if (!res || res.success === false) {
+    notificationAdminShowMessage_(res && (res.message || res.error) || "Push could not be sent.", true);
+    return;
+  }
+  notificationAdminShowMessage_(res.message || "Notification sent ✓", false);
+  if (typeof refreshNotificationBadge_ === "function") refreshNotificationBadge_();
+}
+
+async function refreshNotificationCenterPushStatus_() {
+  // Reserved for a compact device-state chip in the Notification Center.
+  // Profile remains the canonical place for enabling/disabling this device.
+  return true;
 }
 
 function renderNotificationCenterItem_(item) {

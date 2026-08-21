@@ -107,6 +107,30 @@ function doPost(e) {
       return json(apiMarkAllNotificationsRead(body));
     }
 
+    if (action === "registerPushSubscription") {
+      return json(apiRegisterPushSubscription(body));
+    }
+
+    if (action === "removePushSubscription") {
+      return json(apiRemovePushSubscription(body));
+    }
+
+    if (action === "adminSavePushGatewayConfig") {
+      return json(apiAdminSavePushGatewayConfig(body));
+    }
+
+    if (action === "adminSavePushSystemMode") {
+      return json(apiAdminSavePushSystemMode(body));
+    }
+
+    if (action === "adminSaveGameNotificationSettings") {
+      return json(apiAdminSaveGameNotificationSettings(body));
+    }
+
+    if (action === "adminSendPushNotification") {
+      return json(apiAdminSendPushNotification(body));
+    }
+
     if (action === "saveConfidencePicksBatch") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -597,6 +621,12 @@ function doGet(e) {
       action === "saveNotificationPreferences" ||
       action === "markNotificationRead" ||
       action === "markAllNotificationsRead" ||
+      action === "registerPushSubscription" ||
+      action === "removePushSubscription" ||
+      action === "adminSavePushGatewayConfig" ||
+      action === "adminSavePushSystemMode" ||
+      action === "adminSaveGameNotificationSettings" ||
+      action === "adminSendPushNotification" ||
       action === "createLeague" ||
       action === "addLeagueMember" ||
       action === "removeLeagueMember" ||
@@ -1982,6 +2012,22 @@ function doGet(e) {
         apiGetUserNotifications(
           e.parameter.token,
           e.parameter.limit
+        )
+      );
+    }
+
+    if (action === "getPushSubscriptionSummary") {
+      return json(
+        apiGetPushSubscriptionSummary(
+          e.parameter.token
+        )
+      );
+    }
+
+    if (action === "adminGetPushControlCenter") {
+      return json(
+        apiAdminGetPushControlCenter(
+          e.parameter.token
         )
       );
     }

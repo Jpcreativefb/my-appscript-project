@@ -1,7 +1,9 @@
 {
   "version": 1,
   "include": [
-    "/api/espn-proxy"
+    "/api/espn-proxy",
+    "/api/push-public-key",
+    "/api/push-send"
   ],
   "exclude": []
 }

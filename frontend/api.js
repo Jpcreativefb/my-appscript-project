@@ -693,6 +693,51 @@ async function apiMarkAllNotificationsRead() {
   return apiPost("markAllNotificationsRead", {});
 }
 
+async function apiGetPushSubscriptionSummary() {
+  const session = typeof getSession === "function" ? (getSession() || {}) : {};
+  return api("getPushSubscriptionSummary", { token: session.token || "" });
+}
+
+async function apiRegisterPushSubscription(subscription, deviceId, deviceLabel) {
+  return apiPost("registerPushSubscription", {
+    subscription: subscription || {},
+    deviceId: deviceId || "",
+    deviceLabel: deviceLabel || "",
+    userAgent: typeof navigator !== "undefined" ? String(navigator.userAgent || "") : ""
+  });
+}
+
+async function apiRemovePushSubscription(endpoint, deviceId) {
+  return apiPost("removePushSubscription", {
+    endpoint: endpoint || "",
+    deviceId: deviceId || ""
+  });
+}
+
+async function apiAdminGetPushControlCenter() {
+  const session = typeof getSession === "function" ? (getSession() || {}) : {};
+  return api("adminGetPushControlCenter", { token: session.token || "" });
+}
+
+async function apiAdminSavePushGatewayConfig(gatewayUrl, gatewayToken) {
+  return apiPost("adminSavePushGatewayConfig", {
+    gatewayUrl: gatewayUrl || "",
+    gatewayToken: gatewayToken || ""
+  });
+}
+
+async function apiAdminSavePushSystemMode(mode) {
+  return apiPost("adminSavePushSystemMode", { mode: mode || "OFF" });
+}
+
+async function apiAdminSaveGameNotificationSettings(payload) {
+  return apiPost("adminSaveGameNotificationSettings", payload || {});
+}
+
+async function apiAdminSendPushNotification(payload) {
+  return apiPost("adminSendPushNotification", payload || {});
+}
+
 
 /* ======================
    CATEGORIES

@@ -1,5 +1,5 @@
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1217b-confidence-live-v1217f-appearance-setup";
+const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1217b-confidence-live-v1217f-appearance-setup";
 
 const APP_SHELL = [
   "./",
@@ -132,3 +132,78 @@ async function networkFirst(request) {
 // v1.2.18d: reusable Scoreboard / Leaderboard Appearance system.
 
 // v1.2.18e: player identity onboarding + notification center foundation.
+
+/* ==============================
+   v1.2.18f WEB PUSH DELIVERY
+============================== */
+
+self.addEventListener("push", event => {
+  let payload = {};
+
+  try {
+    payload = event.data ? event.data.json() : {};
+  } catch (err) {
+    try {
+      payload = { title: "Awards App", body: event.data ? event.data.text() : "" };
+    } catch (innerErr) {
+      payload = { title: "Awards App", body: "You have a new notification." };
+    }
+  }
+
+  const title = String(payload.title || "Awards App");
+  const data = payload.data && typeof payload.data === "object" ? payload.data : {};
+  const options = {
+    body: String(payload.body || payload.message || ""),
+    icon: payload.icon || "./icons/icon-192.png",
+    badge: payload.badge || "./icons/icon-192.png",
+    tag: payload.tag || "awards-app-notification",
+    renotify: payload.renotify === true,
+    requireInteraction: payload.requireInteraction === true,
+    data: {
+      url: data.url || "./app.html#notifications",
+      route: data.route || "notifications",
+      gameId: data.gameId || "",
+      type: data.type || "custom"
+    }
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+self.addEventListener("notificationclick", event => {
+  event.notification.close();
+
+  const data = event.notification && event.notification.data
+    ? event.notification.data
+    : {};
+
+  const targetUrl = new URL(
+    data.url || "./app.html#notifications",
+    self.registration.scope
+  ).href;
+
+  event.waitUntil(
+    clients.matchAll({ type: "window", includeUncontrolled: true })
+      .then(windowClients => {
+        for (const client of windowClients) {
+          try {
+            const clientUrl = new URL(client.url);
+            const target = new URL(targetUrl);
+            if (clientUrl.origin === target.origin && "focus" in client) {
+              if ("navigate" in client) {
+                return client.navigate(targetUrl).then(() => client.focus());
+              }
+              return client.focus();
+            }
+          } catch (err) {}
+        }
+
+        if (clients.openWindow) {
+          return clients.openWindow(targetUrl);
+        }
+        return null;
+      })
+  );
+});
+
+// v1.2.18f: push event always produces a user-visible notification.
