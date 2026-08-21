@@ -1593,7 +1593,7 @@ function profileCleanInput_(
     avatarEmoji:
       profileLimit_(
         payload.avatarEmoji,
-        8
+        32
       ),
 
     avatarUrl:

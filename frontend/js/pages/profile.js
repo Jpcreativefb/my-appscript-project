@@ -111,7 +111,7 @@ async function renderProfilePage() {
       ? "Save & Continue to " + selectedGameName
       : "Save Profile & Return Home";
 
-  applyProfileColor_(profile.profileColor);
+  applyProfileColor_(profile);
 
   setTimeout(function() {
 
@@ -346,10 +346,13 @@ async function renderProfilePage() {
           <input
             id="profileAvatarEmoji"
             class="input profile-input"
-            maxlength="8"
+            maxlength="32"
             placeholder="🏆"
             oninput="updateProfilePreview()"
           >
+          <div class="profile-help profile-help-callout">
+            Use emoji just like texting. Phone/tablet: open the emoji keyboard. Mac: Control + Command + Space. Windows: Windows + .
+          </div>
         </div>
 
         <div id="profileAvatarUrlWrap" class="profile-avatar-option">
@@ -360,6 +363,9 @@ async function renderProfilePage() {
             placeholder="https://example.com/photo.jpg"
             oninput="updateProfilePreview()"
           >
+          <div class="profile-help profile-help-callout">
+            Paste a direct HTTPS image link. On a website, open the image itself or use Copy Image Address / Copy Image Link, then paste it here. The profile preview above updates automatically. If it stays blank, try a different direct image link.
+          </div>
         </div>
 
         <div id="profileAvatarUploadWrap" class="profile-avatar-option">
@@ -372,8 +378,12 @@ async function renderProfilePage() {
             onchange="onProfileUploadPreview()"
           >
           <input id="profileAvatarFileId" type="hidden">
-          <div class="profile-help">
-            On a phone, the image picker can use your Photo Library or camera.
+          <div class="profile-help profile-help-callout">
+            On a phone, tap Choose File to use the normal device picker. Depending on your phone it can offer Take Photo / Camera, Photo Library, or Choose File / Files. Large photos are resized automatically before upload.
+          </div>
+          <div id="profileUploadStatus" class="profile-upload-status hidden" role="status" aria-live="polite"></div>
+          <div id="profileUploadPreviewWrap" class="profile-upload-full-preview hidden">
+            <div id="profileUploadFullPreview"></div>
           </div>
         </div>
 
@@ -457,9 +467,9 @@ async function renderProfilePage() {
 
       </div>
 
-      ${renderProfileHistorySection_(historyRes, username)}
-
       ${renderProfileNotificationPreferences_(APP_STATE.notificationPreferences)}
+
+      ${renderProfileHistorySection_(historyRes, username)}
 
     </div>
   `;
@@ -858,54 +868,180 @@ function onProfileAvatarTypeChange() {
 
 }
 
-function onProfileUploadPreview() {
+async function onProfileUploadPreview() {
 
-  const fileInput =
-    document.getElementById(
-      "profileAvatarFile"
-    );
-
+  const fileInput = document.getElementById("profileAvatarFile");
   const file =
     fileInput && fileInput.files && fileInput.files[0]
       ? fileInput.files[0]
       : null;
 
+  APP_STATE.profilePreparedAvatar = null;
+
   if (!file) {
+    profileSetUploadStatus_("", "");
+    profileSetUploadPreview_("");
     updateProfilePreview();
     return;
   }
 
-  if (file.size > 2 * 1024 * 1024) {
-
-    showProfileMessage_(
-      "Avatar image must be 2 MB or smaller.",
-      "error"
-    );
-
+  if (!String(file.type || "").toLowerCase().startsWith("image/")) {
+    profileSetUploadStatus_("Please choose an image file.", "error");
     fileInput.value = "";
     return;
-
   }
 
-  const reader =
-    new FileReader();
+  profileSetUploadStatus_("Preparing photo…", "working");
+  clearProfileMessage_();
 
-  reader.onload =
-    function(event) {
+  try {
+    const prepared = await prepareProfileAvatarFile_(file);
+    APP_STATE.profilePreparedAvatar = prepared;
 
-      setProfileInputValue_(
-        "profileAvatarUrl",
-        event.target.result
-      );
+    setProfileInputValue_("profileAvatarUrl", prepared.dataUrl);
+    setProfileInputValue_("profileAvatarFileId", "");
+    profileSetUploadPreview_(prepared.dataUrl);
 
-      updateProfilePreview();
+    const beforeKb = Math.max(1, Math.round((file.size || 0) / 1024));
+    const afterKb = Math.max(1, Math.round((prepared.sizeBytes || 0) / 1024));
+    const detail = prepared.optimized
+      ? "Photo ready ✓ Resized from " + beforeKb + " KB to " + afterKb + " KB."
+      : "Photo ready ✓ " + afterKb + " KB.";
 
+    profileSetUploadStatus_(detail, "success");
+    updateProfilePreview();
+  } catch (err) {
+    APP_STATE.profilePreparedAvatar = null;
+    fileInput.value = "";
+    profileSetUploadPreview_("");
+    profileSetUploadStatus_(
+      err && err.message ? err.message : "Could not prepare that photo.",
+      "error"
+    );
+  }
+}
+
+function profileSetUploadStatus_(message, state) {
+  const el = document.getElementById("profileUploadStatus");
+  if (!el) return;
+  const text = String(message || "");
+  el.textContent = text;
+  el.className = "profile-upload-status" +
+    (text ? " " + (state || "working") : " hidden");
+}
+
+function profileSetUploadPreview_(src) {
+  const wrap = document.getElementById("profileUploadPreviewWrap");
+  const slot = document.getElementById("profileUploadFullPreview");
+  if (!wrap || !slot) return;
+
+  const value = String(src || "");
+  wrap.classList.toggle("hidden", !value);
+  slot.innerHTML = value
+    ? platformImgHtml(value, {
+        className: "profile-upload-full-preview-image",
+        variant: "profile",
+        alt: "Selected profile photo preview",
+        critical: true
+      })
+    : "";
+}
+
+function profileDataUrlBytes_(dataUrl) {
+  const value = String(dataUrl || "");
+  const comma = value.indexOf(",");
+  if (comma < 0) return 0;
+  const base64 = value.slice(comma + 1).replace(/\s/g, "");
+  return Math.floor(base64.length * 3 / 4);
+}
+
+function loadProfileImageFromDataUrl_(dataUrl) {
+  return new Promise(function(resolve, reject) {
+    const image = new Image();
+    image.onload = function() { resolve(image); };
+    image.onerror = function() { reject(new Error("This image format could not be prepared. Try JPG, PNG, WEBP, or a different photo.")); };
+    image.src = dataUrl;
+  });
+}
+
+async function prepareProfileAvatarFile_(file) {
+  const sourceDataUrl = await readProfileFileAsDataUrl_(file);
+  const sourceType = String(file && file.type || "").toLowerCase();
+  const maxServerBytes = 2 * 1024 * 1024;
+  const targetBytes = 1600 * 1024;
+
+  // Preserve animated GIFs; resizing through canvas would remove animation.
+  if (sourceType === "image/gif") {
+    if ((file.size || 0) > maxServerBytes) {
+      throw new Error("Animated GIFs must be 2 MB or smaller. Choose a smaller GIF or a photo.");
+    }
+    return {
+      dataUrl: sourceDataUrl,
+      mimeType: "image/gif",
+      fileName: file.name || "profile.gif",
+      sizeBytes: file.size || profileDataUrlBytes_(sourceDataUrl),
+      optimized: false
     };
+  }
 
-  reader.readAsDataURL(
-    file
-  );
+  const image = await loadProfileImageFromDataUrl_(sourceDataUrl);
+  const sourceWidth = image.naturalWidth || image.width || 1;
+  const sourceHeight = image.naturalHeight || image.height || 1;
+  const sourceMax = Math.max(sourceWidth, sourceHeight);
 
+  if (sourceMax <= 1200 && (file.size || 0) <= targetBytes &&
+      /^(image\/(jpeg|png|webp))$/i.test(sourceType)) {
+    return {
+      dataUrl: sourceDataUrl,
+      mimeType: sourceType === "image/jpg" ? "image/jpeg" : sourceType,
+      fileName: file.name || "profile-photo",
+      sizeBytes: file.size || profileDataUrlBytes_(sourceDataUrl),
+      optimized: false
+    };
+  }
+
+  const maxDimensions = [1200, 1000, 850];
+  const qualities = [0.86, 0.76, 0.66, 0.56];
+  let best = null;
+
+  for (let d = 0; d < maxDimensions.length; d += 1) {
+    const maxDimension = Math.min(maxDimensions[d], sourceMax);
+    const scale = Math.min(1, maxDimension / sourceMax);
+    const width = Math.max(1, Math.round(sourceWidth * scale));
+    const height = Math.max(1, Math.round(sourceHeight * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("This browser could not resize the photo.");
+    ctx.drawImage(image, 0, 0, width, height);
+
+    for (let q = 0; q < qualities.length; q += 1) {
+      let mimeType = "image/webp";
+      let dataUrl = canvas.toDataURL(mimeType, qualities[q]);
+      if (!/^data:image\/webp;base64,/i.test(dataUrl)) {
+        mimeType = "image/jpeg";
+        dataUrl = canvas.toDataURL(mimeType, qualities[q]);
+      }
+      const sizeBytes = profileDataUrlBytes_(dataUrl);
+      best = { dataUrl: dataUrl, mimeType: mimeType, sizeBytes: sizeBytes };
+      if (sizeBytes <= targetBytes) break;
+    }
+    if (best && best.sizeBytes <= targetBytes) break;
+  }
+
+  if (!best || best.sizeBytes > maxServerBytes) {
+    throw new Error("That photo is still too large after resizing. Try another photo.");
+  }
+
+  const extension = best.mimeType === "image/webp" ? ".webp" : ".jpg";
+  return {
+    dataUrl: best.dataUrl,
+    mimeType: best.mimeType,
+    fileName: "profile-photo" + extension,
+    sizeBytes: best.sizeBytes,
+    optimized: true
+  };
 }
 
 /* ======================
@@ -953,9 +1089,16 @@ async function saveProfileForm() {
 
     if (file) {
 
-      showProfileMessage_("Uploading avatar…", "success");
+      let prepared = APP_STATE.profilePreparedAvatar;
+      if (!prepared || !prepared.dataUrl) {
+        profileSetUploadStatus_("Preparing photo…", "working");
+        prepared = await prepareProfileAvatarFile_(file);
+        APP_STATE.profilePreparedAvatar = prepared;
+      }
 
-      const dataUrl = await readProfileFileAsDataUrl_(file);
+      showProfileMessage_("Uploading photo…", "success");
+      profileSetUploadStatus_("Uploading photo…", "working");
+
       const uploadRes = await apiUploadProfileAvatar({
         username: username,
         gameId: gameId,
@@ -964,9 +1107,9 @@ async function saveProfileForm() {
           APP_STATE.profileData && APP_STATE.profileData.profileScopeKey
             ? APP_STATE.profileData.profileScopeKey
             : "",
-        fileName: file.name,
-        mimeType: file.type,
-        dataUrl: dataUrl
+        fileName: prepared.fileName || file.name,
+        mimeType: prepared.mimeType || file.type,
+        dataUrl: prepared.dataUrl
       });
 
       if (!uploadRes || !uploadRes.success) {
@@ -984,6 +1127,8 @@ async function saveProfileForm() {
 
       setProfileInputValue_("profileAvatarUrl", avatarUrl);
       setProfileInputValue_("profileAvatarFileId", avatarFileId);
+      profileSetUploadPreview_(avatarUrl);
+      profileSetUploadStatus_("Photo uploaded ✓", "success");
     }
 
     if (!avatarUrl || !/^https:\/\//i.test(avatarUrl)) {
@@ -1054,7 +1199,7 @@ async function saveProfileForm() {
     APP_STATE.profile = res.profile;
     APP_STATE.profileData = res;
 
-    applyProfileColor_(res.profile && res.profile.profileColor);
+    applyProfileColor_(res.profile || {});
     updateHeaderProfile(res.profile);
 
     showProfileMessage_(
@@ -1221,6 +1366,13 @@ function populateProfileForm_(
   if (fileInput) {
     fileInput.value = "";
   }
+  APP_STATE.profilePreparedAvatar = null;
+  profileSetUploadStatus_("", "");
+  profileSetUploadPreview_(
+    String(profile.avatarType || "").toLowerCase() === "upload"
+      ? (profile.avatarUrl || "")
+      : ""
+  );
 
   updateAvatarOptionVisibility_();
   updateProfileStyleVisibility_();
@@ -1376,7 +1528,7 @@ function updateProfilePreview() {
     compactPreview.innerHTML = `${miniAvatar}<strong>${displayName}</strong>`;
   }
 
-  applyProfileColor_(profile.profileColor);
+  applyProfileColor_(profile);
 
 }
 
@@ -1487,9 +1639,7 @@ function updateHeaderProfile(
       profile
     );
 
-  applyProfileColor_(
-    resolvedProfile.profileColor
-  );
+  applyProfileColor_(resolvedProfile);
 
   headerUser.classList.add(
     "header-user-profiled"
@@ -1499,11 +1649,15 @@ function updateHeaderProfile(
     "--profile-color",
     resolvedProfile.profileColor || PROFILE_DEFAULT_COLOR
   );
+  headerUser.style.setProperty(
+    "--profile-background",
+    profilePreviewBackground_(resolvedProfile)
+  );
 
   headerUser.innerHTML = `
     <span
       class="header-profile-avatar"
-      style="--profile-color:${escapeProfileAttr_(resolvedProfile.profileColor || PROFILE_DEFAULT_COLOR)};"
+      style="--profile-color:${escapeProfileAttr_(resolvedProfile.profileColor || PROFILE_DEFAULT_COLOR)};background:${escapeProfileAttr_(profilePreviewBackground_(resolvedProfile))};"
     >
       ${renderProfileAvatar_(resolvedProfile)}
     </span>
@@ -1592,22 +1746,31 @@ async function loadActiveProfile() {
 
 }
 
-function applyProfileColor_(
-  color
-) {
+function applyProfileColor_(profileOrColor) {
 
-  const safeColor =
-    /^#[0-9a-f]{6}$/i.test(
-      String(color || "")
-    )
-      ? color
-      : PROFILE_DEFAULT_COLOR;
+  const profile =
+    profileOrColor && typeof profileOrColor === "object"
+      ? profileOrColor
+      : { profileColor: profileOrColor };
 
-  document.documentElement.style.setProperty(
-    "--profile-color",
-    safeColor
-  );
+  const safeColor = /^#[0-9a-f]{6}$/i.test(String(profile.profileColor || ""))
+    ? profile.profileColor
+    : PROFILE_DEFAULT_COLOR;
+  const safeColor2 = /^#[0-9a-f]{6}$/i.test(String(profile.profileColor2 || ""))
+    ? profile.profileColor2
+    : "#354785";
+  const angle = Math.max(0, Math.min(360, Number(profile.profileGradientAngle || 135)));
+  const mode = String(profile.profileColorMode || "solid").toLowerCase() === "gradient"
+    ? "gradient"
+    : "solid";
+  const background = mode === "gradient"
+    ? "linear-gradient(" + angle + "deg, " + safeColor + ", " + safeColor2 + ")"
+    : safeColor;
 
+  document.documentElement.style.setProperty("--profile-color", safeColor);
+  document.documentElement.style.setProperty("--profile-color2", safeColor2);
+  document.documentElement.style.setProperty("--profile-gradient-angle", angle + "deg");
+  document.documentElement.style.setProperty("--profile-background", background);
 }
 
 /* ======================

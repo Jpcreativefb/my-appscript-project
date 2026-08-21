@@ -2118,8 +2118,8 @@
   padding: clamp(16px, 3vw, 24px);
   color: #fff;
   background:
-    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--profile-theme-color) 78%, #fff 22%) 0, transparent 38%),
-    linear-gradient(145deg, #111827 0%, #1f2937 58%, color-mix(in srgb, var(--profile-theme-color) 68%, #111827 32%) 100%);
+    linear-gradient(145deg, rgba(2,6,23,.26), rgba(15,23,42,.58)),
+    var(--profile-theme-fill, var(--profile-theme-color, #354785));
   box-shadow: 0 18px 44px rgba(15, 23, 42, .2);
 }
 
@@ -2409,8 +2409,8 @@
 .dashboard-player-card {
   padding: clamp(14px, 2.4vw, 20px);
   background:
-    radial-gradient(circle at 92% 0%, color-mix(in srgb, var(--profile-theme-color) 52%, transparent) 0, transparent 40%),
-    linear-gradient(145deg, rgba(17,24,39,.92) 0%, rgba(31,41,55,.88) 58%, color-mix(in srgb, var(--profile-theme-color) 52%, #111827 48%) 100%);
+    linear-gradient(145deg, rgba(2,6,23,.24), rgba(15,23,42,.55)),
+    var(--profile-theme-fill, var(--profile-theme-color, #354785));
 }
 
 .dashboard-snark-line {
@@ -2492,7 +2492,9 @@
   padding:5px 9px;
   border:1px solid rgba(255,255,255,.10);
   border-radius:13px;
-  background:rgba(17,24,39,.86);
+  background:
+    linear-gradient(rgba(17,24,39,.68), rgba(17,24,39,.68)),
+    var(--profile-theme-fill, #111827);
   color:#fff;
   box-shadow:0 8px 24px rgba(0,0,0,.18);
   backdrop-filter:blur(12px);

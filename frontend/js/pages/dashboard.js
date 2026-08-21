@@ -71,12 +71,8 @@ async function renderDashboardPage() {
     profile.RealName ||
     username;
 
-  const themeColor =
-    profile.profileColor ||
-    profile.ProfileColor ||
-    profile.themeColor ||
-    profile.ThemeColor ||
-    "#354785";
+  const profileStyle = dashboardProfileColorSpec_(profile);
+  const themeColor = profileStyle.color;
 
   const bio = String(profile.bio || profile.Bio || "").trim();
   const playingGames = dashboardGetPlayingGames_(activeGames);
@@ -106,12 +102,12 @@ async function renderDashboardPage() {
   return `
     <div class="page dashboard-page dashboard-games-hub-page dashboard-home-v1218c">
 
-      <div id="dashboardPlayerSticky" class="dashboard-player-sticky" aria-hidden="true">
+      <div id="dashboardPlayerSticky" class="dashboard-player-sticky" aria-hidden="true" style="--profile-theme-color:${escapeAttr(profileStyle.color)};--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
         ${renderDashboardProfileAvatar_(profile, displayName)}
         <strong>${escapeHtml(displayName)}</strong>
       </div>
 
-      <section id="dashboardPlayerCard" class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};">
+      <section id="dashboardPlayerCard" class="dashboard-player-card" style="--profile-theme-color:${escapeAttr(themeColor)};--profile-theme-color2:${escapeAttr(profileStyle.color2)};--profile-theme-angle:${escapeAttr(String(profileStyle.angle))}deg;--profile-theme-fill:${escapeAttr(profileStyle.fill)};">
         <div class="dashboard-snark-line">${escapeHtml(snark)}</div>
 
         <div class="dashboard-player-main">
@@ -231,6 +227,33 @@ function renderDashboardProfileAvatar_(profile, displayName) {
   }
 
   return `<div class="dashboard-profile-photo dashboard-profile-photo-fallback"><span>${escapeHtml(initials)}</span></div>`;
+}
+
+function dashboardProfileColorSpec_(profile) {
+  profile = profile || {};
+  const validHex = function(value, fallback) {
+    const text = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+  };
+  const color = validHex(
+    profile.profileColor || profile.ProfileColor || profile.themeColor || profile.ThemeColor,
+    "#354785"
+  );
+  const color2 = validHex(profile.profileColor2 || profile.ProfileColor2, "#354785");
+  const rawAngle = Number(profile.profileGradientAngle || profile.ProfileGradientAngle || 135);
+  const angle = isFinite(rawAngle) ? Math.max(0, Math.min(360, rawAngle)) : 135;
+  const mode = String(profile.profileColorMode || profile.ProfileColorMode || "solid").toLowerCase() === "gradient"
+    ? "gradient"
+    : "solid";
+  return {
+    color: color,
+    color2: color2,
+    angle: angle,
+    mode: mode,
+    fill: mode === "gradient"
+      ? "linear-gradient(" + angle + "deg," + color + "," + color2 + ")"
+      : color
+  };
 }
 
 function dashboardCacheHubAppearance_(rows) {

@@ -6394,3 +6394,19 @@ button.is-saving {
   justify-content:center;
   border:2px solid #111827;
 }
+
+
+/* v1.2.18e1 — global bottom breathing room above fixed navigation */
+#app {
+  padding-bottom:calc(118px + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width:900px) {
+  #app { padding-bottom:140px; }
+}
+@media (max-width:768px) {
+  #app {
+    padding-left:12px;
+    padding-right:12px;
+    padding-bottom:calc(118px + env(safe-area-inset-bottom, 0px));
+  }
+}
