@@ -3,7 +3,8 @@
   "include": [
     "/api/espn-proxy",
     "/api/push-public-key",
-    "/api/push-send"
+    "/api/push-send",
+    "/api/push-subscription"
   ],
   "exclude": []
 }

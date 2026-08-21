@@ -659,10 +659,14 @@ async function refreshProfilePushStatus_() {
 
   try {
     const device = await awardsPushGetDeviceStatus_();
+    const fullyRegistered = device.subscribed === true && device.registered === true;
     status.textContent = device.label || profileBrowserNotificationStatus_();
     if (enableButton) {
-      enableButton.style.display = device.subscribed ? "none" : "";
+      enableButton.style.display = fullyRegistered ? "none" : "";
       enableButton.disabled = device.supported === false || device.permission === "denied";
+      enableButton.textContent = device.subscribed && !device.registered
+        ? "Repair Push Registration"
+        : "Enable Push on This Device";
     }
     if (disableButton) {
       disableButton.style.display = device.subscribed ? "" : "none";
@@ -701,7 +705,7 @@ async function enableProfilePushOnThisDevice_() {
       button.disabled = false;
       button.textContent = "Enable Push on This Device";
     }
-    refreshProfilePushStatus_();
+    await refreshProfilePushStatus_();
   }
 }
 

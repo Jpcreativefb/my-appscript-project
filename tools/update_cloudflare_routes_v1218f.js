@@ -5,7 +5,7 @@ const path = require('path');
 
 const repo = process.cwd();
 const routePath = path.join(repo, 'frontend', '_routes.json');
-const wanted = ['/api/push-public-key', '/api/push-send'];
+const wanted = ['/api/push-public-key', '/api/push-send', '/api/push-subscription'];
 
 let config = { version: 1, include: [], exclude: [] };
 if (fs.existsSync(routePath)) {
@@ -23,7 +23,7 @@ config.version = Number(config.version || 1);
 if (!Array.isArray(config.include)) config.include = [];
 if (!Array.isArray(config.exclude)) config.exclude = [];
 
-// Keep every existing route and add only the Awards App push endpoints.
+// Keep every existing route and add only the Awards App push endpoints, including the device-registration bridge.
 for (const route of wanted) {
   if (!config.include.includes(route)) config.include.push(route);
 }

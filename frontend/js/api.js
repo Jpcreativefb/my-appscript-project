@@ -693,13 +693,63 @@ async function apiMarkAllNotificationsRead() {
   return apiPost("markAllNotificationsRead", {});
 }
 
-async function apiGetPushSubscriptionSummary() {
+async function apiGetPushSubscriptionSummary(deviceId) {
   const session = typeof getSession === "function" ? (getSession() || {}) : {};
-  return api("getPushSubscriptionSummary", { token: session.token || "" });
+  return api("getPushSubscriptionSummary", {
+    token: session.token || "",
+    deviceId: deviceId || (typeof apiGetOrCreateDeviceId_ === "function" ? apiGetOrCreateDeviceId_() : "")
+  });
+}
+
+async function apiPushSubscriptionPost_(action, payload = {}) {
+  const attached = apiAttachSession_(action, payload || {});
+
+  try {
+    const response = await fetch("./api/push-subscription", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json"
+      },
+      cache: "no-store",
+      body: JSON.stringify({
+        action: action,
+        ...attached
+      })
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (err) {
+      data = null;
+    }
+
+    if (!response.ok || !data) {
+      return {
+        success: false,
+        status: response.status,
+        message: data && (data.message || data.error)
+          ? data.message || data.error
+          : "Push registration bridge returned an invalid response.",
+        error: data && (data.error || data.message)
+          ? data.error || data.message
+          : "Push registration bridge returned an invalid response."
+      };
+    }
+
+    return data;
+  } catch (err) {
+    return {
+      success: false,
+      error: err && err.message ? err.message : "Push registration network error",
+      message: err && err.message ? err.message : "Push registration network error"
+    };
+  }
 }
 
 async function apiRegisterPushSubscription(subscription, deviceId, deviceLabel) {
-  return apiPost("registerPushSubscription", {
+  return apiPushSubscriptionPost_("registerPushSubscription", {
     subscription: subscription || {},
     deviceId: deviceId || "",
     deviceLabel: deviceLabel || "",
@@ -708,7 +758,7 @@ async function apiRegisterPushSubscription(subscription, deviceId, deviceLabel) 
 }
 
 async function apiRemovePushSubscription(endpoint, deviceId) {
-  return apiPost("removePushSubscription", {
+  return apiPushSubscriptionPost_("removePushSubscription", {
     endpoint: endpoint || "",
     deviceId: deviceId || ""
   });

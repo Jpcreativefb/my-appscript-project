@@ -1,7 +1,7 @@
 (function registerAwardsPwa() {
   if (!("serviceWorker" in navigator)) return;
 
-  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence";
+  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration";
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
@@ -159,12 +159,43 @@ function awardsPushDeviceLabel_() {
     : "Awards App device";
 }
 
+async function awardsPushBackendDeviceStatus_(deviceId) {
+  if (typeof apiGetPushSubscriptionSummary !== "function") {
+    return { checked: false, registered: false, activeDevices: 0 };
+  }
+
+  try {
+    const summary = await apiGetPushSubscriptionSummary(deviceId || awardsPushDeviceId_());
+    if (!summary || summary.success === false) {
+      return {
+        checked: false,
+        registered: false,
+        activeDevices: 0,
+        error: summary && (summary.message || summary.error) ? summary.message || summary.error : ""
+      };
+    }
+    return {
+      checked: true,
+      registered: summary.thisDeviceActive === true,
+      activeDevices: Number(summary.activeDevices || 0)
+    };
+  } catch (err) {
+    return {
+      checked: false,
+      registered: false,
+      activeDevices: 0,
+      error: err && err.message ? err.message : String(err || "")
+    };
+  }
+}
+
 async function awardsPushGetDeviceStatus_() {
   if (!awardsPushSupported_()) {
     return {
       supported: false,
       permission: typeof Notification !== "undefined" ? Notification.permission : "unsupported",
       subscribed: false,
+      registered: false,
       label: "Push is not available in this browser. On iPhone, open the installed Home Screen app."
     };
   }
@@ -178,18 +209,48 @@ async function awardsPushGetDeviceStatus_() {
   }
 
   const permission = Notification.permission;
+  const backend = subscription
+    ? await awardsPushBackendDeviceStatus_(awardsPushDeviceId_())
+    : { checked: true, registered: false, activeDevices: 0 };
+
   let label = "Not enabled on this device";
-  if (permission === "denied") label = "Blocked in this device's notification settings";
-  else if (permission === "granted" && subscription) label = "Push enabled on this device ✓";
-  else if (permission === "granted") label = "Permission granted — finish device setup";
+  if (permission === "denied") {
+    label = "Blocked in this device's notification settings";
+  } else if (permission === "granted" && subscription && backend.registered) {
+    label = "Push enabled and registered on this device ✓";
+  } else if (permission === "granted" && subscription) {
+    label = backend.checked
+      ? "Browser subscribed — repair Awards App registration"
+      : "Browser subscribed — Awards App registration could not be verified";
+  } else if (permission === "granted") {
+    label = "Permission granted — finish device setup";
+  }
 
   return {
     supported: true,
     permission: permission,
     subscribed: !!subscription,
+    registered: backend.registered === true,
+    backendChecked: backend.checked === true,
+    activeDevices: Number(backend.activeDevices || 0),
     endpoint: subscription ? String(subscription.endpoint || "") : "",
     label: label
   };
+}
+
+async function awardsPushVerifyBackendRegistration_(deviceId) {
+  const waits = [0, 250, 700];
+  let last = null;
+
+  for (let i = 0; i < waits.length; i++) {
+    if (waits[i] > 0) {
+      await new Promise(function(resolve) { setTimeout(resolve, waits[i]); });
+    }
+    last = await awardsPushBackendDeviceStatus_(deviceId);
+    if (last && last.registered === true) return last;
+  }
+
+  return last || { checked: false, registered: false, activeDevices: 0 };
 }
 
 async function awardsPushEnableOnThisDevice_() {
@@ -222,9 +283,10 @@ async function awardsPushEnableOnThisDevice_() {
     throw new Error("Awards App push registration API is not loaded.");
   }
 
+  const deviceId = awardsPushDeviceId_();
   const result = await apiRegisterPushSubscription(
     subscription.toJSON ? subscription.toJSON() : subscription,
-    awardsPushDeviceId_(),
+    deviceId,
     awardsPushDeviceLabel_()
   );
 
@@ -236,7 +298,19 @@ async function awardsPushEnableOnThisDevice_() {
     );
   }
 
-  return { success: true, subscription: subscription, message: "Push enabled on this device ✓" };
+  const verified = await awardsPushVerifyBackendRegistration_(deviceId);
+  if (!verified || verified.registered !== true) {
+    throw new Error(
+      "Your browser is subscribed, but Awards App could not verify the stored device registration. Tap Repair Push Registration to retry."
+    );
+  }
+
+  return {
+    success: true,
+    subscription: subscription,
+    activeDevices: Number(verified.activeDevices || 1),
+    message: "Push enabled and registered on this device ✓"
+  };
 }
 
 async function awardsPushDisableOnThisDevice_() {

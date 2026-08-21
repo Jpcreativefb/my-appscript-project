@@ -2019,7 +2019,8 @@ function doGet(e) {
     if (action === "getPushSubscriptionSummary") {
       return json(
         apiGetPushSubscriptionSummary(
-          e.parameter.token
+          e.parameter.token,
+          e.parameter.deviceId
         )
       );
     }

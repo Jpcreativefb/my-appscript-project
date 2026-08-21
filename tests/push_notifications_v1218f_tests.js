@@ -15,6 +15,7 @@ const profile = read('frontend/js/pages/profile.js');
 const notifications = read('frontend/js/pages/notifications.js');
 const pushSend = read('functions/api/push-send.js');
 const pushKey = read('functions/api/push-public-key.js');
+const pushSubscription = read('functions/api/push-subscription.js');
 const pkg = JSON.parse(read('package.json'));
 const routeHelper = read('tools/update_cloudflare_routes_v1218f.js');
 
@@ -90,11 +91,15 @@ assert(fs.existsSync(path.join(root, 'tools/generate_push_cloudflare_setup.js'))
 
 assert(routeHelper.includes('/api/push-public-key'), 'Cloudflare route helper missing public-key route');
 assert(routeHelper.includes('/api/push-send'), 'Cloudflare route helper missing push-send route');
+assert(routeHelper.includes('/api/push-subscription'), 'Cloudflare route helper missing push-subscription route');
+assert(pushSubscription.includes('registerPushSubscription'), 'push subscription bridge missing register action');
+assert(pushSubscription.includes('removePushSubscription'), 'push subscription bridge missing remove action');
 const routeFile = path.join(root, 'frontend/_routes.json');
 if (fs.existsSync(routeFile)) {
   const routes = JSON.parse(fs.readFileSync(routeFile, 'utf8'));
   assert(Array.isArray(routes.include) && routes.include.includes('/api/push-public-key'), 'frontend/_routes.json missing public-key route');
   assert(routes.include.includes('/api/push-send'), 'frontend/_routes.json missing push-send route');
+  assert(routes.include.includes('/api/push-subscription'), 'frontend/_routes.json missing push-subscription route');
 }
 
 

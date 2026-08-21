@@ -1153,18 +1153,30 @@ function apiRemovePushSubscription(payload) {
   return { success: true, updated: updated };
 }
 
-function apiGetPushSubscriptionSummary(token) {
+function apiGetPushSubscriptionSummary(token, deviceId) {
   const username = requireUserFromToken_(token);
+  const requestedDeviceId = String(deviceId || "").trim();
   const sh = notificationPushSubscriptionsSheet_();
   const data = sh.getDataRange().getValues();
-  if (data.length <= 1) return { success: true, activeDevices: 0 };
+  if (data.length <= 1) {
+    return { success: true, activeDevices: 0, thisDeviceActive: false };
+  }
   const headers = data[0].map(String);
   const col = notificationColumnMap_(headers);
-  const active = data.slice(1).filter(function(row) {
+  const activeRows = data.slice(1).filter(function(row) {
     return String(row[col.Username] || "").trim().toLowerCase() === String(username || "").trim().toLowerCase() &&
       notificationBool_(row[col.Enabled], false);
-  }).length;
-  return { success: true, activeDevices: active };
+  });
+  const thisDeviceActive = requestedDeviceId
+    ? activeRows.some(function(row) {
+        return String(row[col.DeviceId] || "").trim() === requestedDeviceId;
+      })
+    : false;
+  return {
+    success: true,
+    activeDevices: activeRows.length,
+    thisDeviceActive: thisDeviceActive
+  };
 }
 
 function notificationPushGetActiveSubscriptionsForUsers_(usernames) {
