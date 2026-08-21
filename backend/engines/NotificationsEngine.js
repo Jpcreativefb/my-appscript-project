@@ -841,6 +841,16 @@ function notificationPushDeliveryLogSheet_() {
 }
 
 function notificationPushGetSystemMode_() {
+  // Script Properties are the canonical runtime setting. They are a better fit
+  // for a single global safety switch than a spreadsheet row and avoid stale or
+  // duplicated sheet rows ever turning TEST/LIVE back to OFF after a save.
+  const props = PropertiesService.getScriptProperties();
+  const stored = String(props.getProperty("PUSH_GLOBAL_MODE") || "").trim();
+  if (stored) {
+    return notificationPushNormalizeMode_(stored);
+  }
+
+  // Backward-compatible fallback for the initial v1.2.18f sheet-backed value.
   const sh = notificationPushSystemSettingsSheet_();
   const data = sh.getDataRange().getValues();
   if (data.length <= 1) return "OFF";
@@ -848,7 +858,9 @@ function notificationPushGetSystemMode_() {
   const col = notificationColumnMap_(headers);
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][col.Key] || "").trim() === "GlobalMode") {
-      return notificationPushNormalizeMode_(data[i][col.Value]);
+      const mode = notificationPushNormalizeMode_(data[i][col.Value]);
+      props.setProperty("PUSH_GLOBAL_MODE", mode);
+      return mode;
     }
   }
   return "OFF";
@@ -1009,8 +1021,25 @@ function apiAdminSavePushSystemMode(payload) {
   payload = payload || {};
   const adminUsername = requireAdminFromToken_(payload.token);
   const mode = notificationPushNormalizeMode_(payload.mode);
+
+  // Canonical write first. The sheet remains a readable admin/audit mirror.
+  PropertiesService.getScriptProperties().setProperty("PUSH_GLOBAL_MODE", mode);
   notificationPushSetSystemSetting_("GlobalMode", mode, adminUsername);
-  return { success: true, mode: mode };
+
+  const persistedMode = notificationPushGetSystemMode_();
+  if (persistedMode !== mode) {
+    throw new Error(
+      "Global notification mode did not persist. Requested " + mode +
+      " but server read back " + persistedMode + "."
+    );
+  }
+
+  return {
+    success: true,
+    mode: persistedMode,
+    persistedMode: persistedMode,
+    message: "Global notification mode saved: " + persistedMode
+  };
 }
 
 function apiAdminSaveGameNotificationSettings(payload) {

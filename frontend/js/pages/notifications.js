@@ -263,14 +263,61 @@ function notificationAdminApplySelectedGame_() {
 
 async function saveNotificationGlobalMode_() {
   const select = document.getElementById("notificationGlobalMode");
-  const mode = select ? String(select.value || "OFF") : "OFF";
-  const res = await apiAdminSavePushSystemMode(mode);
-  if (!res || res.success === false) {
-    notificationAdminShowMessage_(res && (res.message || res.error) || "Could not save global mode.", true);
-    return;
+  const requestedMode = select ? String(select.value || "OFF").trim().toUpperCase() : "OFF";
+  const button = select && select.closest(".notification-admin-box")
+    ? select.closest(".notification-admin-box").querySelector("button")
+    : null;
+
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Saving…";
   }
-  notificationAdminShowMessage_("Global notification mode saved: " + mode + " ✓", false);
-  navigate("notifications", { suppressLoader: true });
+
+  try {
+    const res = await apiAdminSavePushSystemMode(requestedMode);
+    if (!res || res.success === false) {
+      notificationAdminShowMessage_(res && (res.message || res.error) || "Could not save global mode.", true);
+      return;
+    }
+
+    const persistedMode = String(res.persistedMode || res.mode || "").trim().toUpperCase();
+    if (persistedMode !== requestedMode) {
+      notificationAdminShowMessage_(
+        "Mode was not saved. Requested " + requestedMode + " but server returned " + (persistedMode || "no mode") + ".",
+        true
+      );
+      if (select && persistedMode) select.value = persistedMode;
+      return;
+    }
+
+    if (select) select.value = persistedMode;
+    const badge = document.querySelector(".notification-admin-status");
+    if (badge) {
+      badge.textContent = persistedMode;
+      badge.classList.remove("off", "test", "live");
+      badge.classList.add(persistedMode.toLowerCase());
+    }
+    notificationAdminShowMessage_("Global notification mode saved: " + persistedMode + " ✓", false);
+
+    // Read the control center back from the server before repainting so a save
+    // can never appear successful and then silently fall back to OFF.
+    const verify = await apiAdminGetPushControlCenter();
+    const verifiedMode = String(verify && verify.globalMode || "").trim().toUpperCase();
+    if (!verify || verify.success === false || verifiedMode !== persistedMode) {
+      notificationAdminShowMessage_(
+        "Saved " + persistedMode + ", but verification read back " + (verifiedMode || "no mode") + ". Please retry.",
+        true
+      );
+      return;
+    }
+
+    await navigate("notifications", { suppressLoader: true });
+  } finally {
+    if (button && document.body.contains(button)) {
+      button.disabled = false;
+      button.textContent = "Save Global Mode";
+    }
+  }
 }
 
 async function saveNotificationGateway_() {
