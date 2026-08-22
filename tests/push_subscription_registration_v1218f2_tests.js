@@ -38,7 +38,7 @@ assert(engine.includes('thisDeviceActive: thisDeviceActive'), 'backend summary m
 assert(pwa.includes('awardsPushBackendDeviceStatus_'), 'PWA must reconcile browser and backend status');
 assert(pwa.includes('awardsPushVerifyBackendRegistration_'), 'PWA must verify registration after save');
 assert(pwa.includes('backend.registered'), 'PWA must not treat browser-only subscription as complete');
-assert(pwa.includes('Browser subscribed — repair Awards App registration'), 'PWA must explain repair state');
+assert(pwa.includes('Browser subscribed — repair PATTC Predicts registration'), 'PWA must explain repair state');
 assert(pwa.includes('Push enabled and registered on this device ✓'), 'PWA success must require stored registration');
 
 assert(profile.includes('const fullyRegistered = device.subscribed === true && device.registered === true'), 'Profile must only hide enable/repair button after backend registration');

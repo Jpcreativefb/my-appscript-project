@@ -230,7 +230,7 @@ function awardsAdminRenderCreateAnswersPreview_() {
 
   preview.innerHTML = `
     <div class="admin-sub" style="margin-bottom:8px;">
-      One Awards App question will be created with one answer per selected provider market.
+      One PATTC Predicts question will be created with one answer per selected provider market.
       Edit any answer name before saving.
     </div>
 
@@ -337,12 +337,12 @@ async function renderAdminAwardsPage() {
           <div class="admin-collapsible-body awards-section-body">
             <div class="awards-section-help">
               <strong>What this section does:</strong>
-              Pick the Awards App game once. Set the official results site, player display style, market-odds visibility, pick-change rule, points, section, and starting order. These defaults are copied into every event you load.
+              Pick the PATTC Predicts game once. Set the official results site, player display style, market-odds visibility, pick-change rule, points, section, and starting order. These defaults are copied into every event you load.
             </div>
 
             <div class="admin-control-grid">
               <label class="admin-field">
-                <span>Awards App Game</span>
+                <span>PATTC Predicts Game</span>
                 <select id="awardsBatchGame" onchange="adminAwardsSyncBatchModeForGame_(this.value)">
                   ${awardsAdminGameOptions_("")}
                 </select>
@@ -505,7 +505,7 @@ async function renderAdminAwardsPage() {
           <summary class="admin-card-summary awards-section-summary">
             <div>
               <h2>3. Review, Sort & Build Questions</h2>
-              <div class="admin-sub">This is the final queue. Reorder questions here, edit only what you need, then build them into the selected Awards App game.</div>
+              <div class="admin-sub">This is the final queue. Reorder questions here, edit only what you need, then build them into the selected PATTC Predicts game.</div>
             </div>
             <div class="awards-summary-right">
               <span id="awardsLoadedCount" class="admin-pill">0 loaded</span>
@@ -1402,7 +1402,7 @@ async function adminAwardsLoadSelectedEvents(button) {
   });
 
   if (!defaults.gameId) {
-    if (status) { status.className = "admin-message warning"; status.textContent = "Choose the Awards App game in Section 1 first."; }
+    if (status) { status.className = "admin-message warning"; status.textContent = "Choose the PATTC Predicts game in Section 1 first."; }
     return;
   }
   if (!selected.length) {
@@ -1775,7 +1775,7 @@ function awardsAdminBuildPayloadForRow_(row) {
   const gameId = defaults.gameId;
   const markets = Array.isArray(row.detail && row.detail.markets) ? row.detail.markets : [];
   const includedAnswers = (row.answers || []).filter(function(answer) { return answer.include && String(answer.label || "").trim(); });
-  if (!gameId) throw new Error("Choose the Awards App game in Section 1.");
+  if (!gameId) throw new Error("Choose the PATTC Predicts game in Section 1.");
   if (!row.question || !String(row.question).trim()) throw new Error("Question text is required.");
   if (includedAnswers.length < 2) throw new Error("Select at least two markets/answers.");
   if (!markets.length) throw new Error("No live markets are loaded for this event.");
@@ -1846,7 +1846,7 @@ async function adminAwardsBuildLoadedQuestions(button) {
   });
 
   if (!defaults.gameId) {
-    if (status) { status.className = "admin-message warning"; status.textContent = "Choose the Awards App game in Section 1 first."; }
+    if (status) { status.className = "admin-message warning"; status.textContent = "Choose the PATTC Predicts game in Section 1 first."; }
     return;
   }
   if (!rows.length) {
@@ -2014,10 +2014,10 @@ function awardsAdminRenderCompactEventEditor_(eventIndex, event, detail, existin
 
       <details class="awards-subdetails awards-existing-link-tools">
         <summary>Advanced Tool: Link Provider Market to an Existing Question</summary>
-        <div class="admin-sub">Use this only when the Awards App question already exists and you want to attach a K/P market to it. Normal new questions should use Section 3 Build All instead.</div>
+        <div class="admin-sub">Use this only when the PATTC Predicts question already exists and you want to attach a K/P market to it. Normal new questions should use Section 3 Build All instead.</div>
         <div class="admin-control-grid awards-advanced-grid">
           <label class="admin-field"><span>Provider Market</span><select id="awardsLinkMarket" onchange="adminAwardsSelectLinkMarket_(this.value)">${(detail.markets || []).map(function(item, index) { return `<option value="${index}">${awardsAdminEsc_(awardsAdminProviderBadge_(item.provider))} · ${awardsAdminEsc_(item.marketQuestion || item.externalMarketId)}</option>`; }).join("")}</select></label>
-          <label class="admin-field"><span>Awards App Game</span><select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">${awardsAdminGameOptions_(awardsAdminCurrentDefaults_().gameId)}</select></label>
+          <label class="admin-field"><span>PATTC Predicts Game</span><select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">${awardsAdminGameOptions_(awardsAdminCurrentDefaults_().gameId)}</select></label>
           <label class="admin-field"><span>Existing Question</span><select id="awardsLinkQuestion" onchange="adminAwardsRenderOutcomeMap()"><option value="">Choose game first…</option></select></label>
         </div>
         <div id="awardsOutcomeMap"></div>
@@ -2068,7 +2068,7 @@ function awardsAdminRenderEventBuilder_() {
 
     <div class="admin-control-grid" style="margin-top:12px;">
       <label class="admin-field">
-        <span>Awards App Game</span>
+        <span>PATTC Predicts Game</span>
         <select id="awardsCreateGame" onchange="adminAwardsSyncQuestionModeForGame_()">${awardsAdminGameOptions_(presetGameId)}</select>
         <span id="awardsCreateGameTypeNote" class="admin-sub"></span>
       </label>
@@ -2155,10 +2155,10 @@ function awardsAdminRenderEventBuilder_() {
 
     <details style="margin-top:12px;">
       <summary style="cursor:pointer;font-weight:800;">Link Provider Market to an Existing Question</summary>
-      <div class="admin-sub" style="margin-top:6px;">Choose one provider market, then map its outcomes to answers that already exist in the selected Awards App question.</div>
+      <div class="admin-sub" style="margin-top:6px;">Choose one provider market, then map its outcomes to answers that already exist in the selected PATTC Predicts question.</div>
       <div class="admin-control-grid" style="margin-top:10px;">
         <label class="admin-field"><span>Provider Market</span><select id="awardsLinkMarket" onchange="adminAwardsSelectLinkMarket_(this.value)">${markets.map(function(item, index) { return `<option value="${index}">${awardsAdminEsc_(awardsAdminProviderBadge_(item.provider))} · ${awardsAdminEsc_(item.marketQuestion || item.externalMarketId)}</option>`; }).join("")}</select></label>
-        <label class="admin-field"><span>Awards App Game</span><select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">${awardsAdminGameOptions_(presetGameId)}</select></label>
+        <label class="admin-field"><span>PATTC Predicts Game</span><select id="awardsLinkGame" onchange="adminAwardsLoadGameQuestions(this.value)">${awardsAdminGameOptions_(presetGameId)}</select></label>
         <label class="admin-field"><span>Existing Question</span><select id="awardsLinkQuestion" onchange="adminAwardsRenderOutcomeMap()"><option value="">${presetGameId ? "Loading questions…" : "Choose game first…"}</option></select></label>
       </div>
       <div id="awardsOutcomeMap"></div>
@@ -2523,7 +2523,7 @@ async function adminAwardsLinkMarket(button) {
   if (!Object.keys(outcomeMap).length) {
     if (status) {
       status.className = "admin-message warning";
-      status.textContent = "Map at least one provider outcome to an Awards App answer.";
+      status.textContent = "Map at least one provider outcome to an PATTC Predicts answer.";
     }
     return;
   }

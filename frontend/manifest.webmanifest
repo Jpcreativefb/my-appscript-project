@@ -1,6 +1,6 @@
 {
   "name": "PATTC Predicts",
-  "short_name": "PATTC",
+  "short_name": "PATTC Predicts",
   "description": "Private awards game app for friends.",
   "start_url": "./index.html",
   "scope": "./",

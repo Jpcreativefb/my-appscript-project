@@ -256,7 +256,7 @@ async function renderAdminPage() {
           <h2>External Results Inbox</h2>
 
           <div class="admin-sub">
-            Approved Awards, Reality TV, Kalshi, and Polymarket results arrive here before the Awards App changes scoring. Sports and racing never use this inbox. Automatic apply is off while we verify the bridge.
+            Approved Awards, Reality TV, Kalshi, and Polymarket results arrive here before the PATTC Predicts changes scoring. Sports and racing never use this inbox. Automatic apply is off while we verify the bridge.
           </div>
 
           <div id="adminExternalResultsInboxStatus" class="admin-message">Checking External Results Inbox…</div>

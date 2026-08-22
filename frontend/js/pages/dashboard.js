@@ -925,7 +925,7 @@ async function renderDashboardMorePage_() {
   return `
     <div class="page dashboard-more-page">
       <header class="dashboard-domain-header">
-        <div class="dashboard-domain-title-row"><span>•••</span><div><p>Awards App</p><h1>More</h1></div></div>
+        <div class="dashboard-domain-title-row"><span>•••</span><div><p>PATTC Predicts</p><h1>More</h1></div></div>
         <p>General games, your player tools and app controls.</p>
       </header>
       <div class="dashboard-more-grid">

@@ -1895,7 +1895,7 @@ function showSportsGamePickerModal_(
         <h3>${escapeSportsHtml(options.title || "Create Wager In Game")}</h3>
 
         <p>
-          ${escapeSportsHtml(options.description || "Choose which Awards App game should receive this wager category.")}
+          ${escapeSportsHtml(options.description || "Choose which PATTC Predicts game should receive this wager category.")}
         </p>
 
         <select id="sportsGamePickerSelect">
@@ -5388,7 +5388,7 @@ async function createSportsAdvancedQuestion_(context) {
     if (!optionData || optionData.success === false) {
       throw new Error(
         (optionData && (optionData.error || optionData.message || optionData.reason)) ||
-        "Could not load advanced sports stat options. Confirm the latest Awards App and Sports Scores Engine deployments are active."
+        "Could not load advanced sports stat options. Confirm the latest PATTC Predicts and Sports Scores Engine deployments are active."
       );
     }
 

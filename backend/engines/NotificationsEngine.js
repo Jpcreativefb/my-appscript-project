@@ -653,7 +653,7 @@ function createUserNotification_(entry) {
     id,
     username,
     String(entry.type || "info").trim(),
-    String(entry.title || "Awards App").trim(),
+    String(entry.title || "PATTC Predicts").trim(),
     String(entry.message || "").trim(),
     String(entry.gameId || "").trim(),
     String(entry.route || "").trim(),
@@ -1458,7 +1458,7 @@ function apiAdminSendPushNotification(payload) {
   const gameId = String(payload.gameId || "").trim();
   const audience = String(payload.audience || "self").trim().toLowerCase();
   const type = notificationPushNormalizeType_(payload.type);
-  const title = String(payload.title || "Awards App").trim().slice(0, 120);
+  const title = String(payload.title || "PATTC Predicts").trim().slice(0, 120);
   const message = String(payload.message || "").trim().slice(0, 500);
   const route = String(payload.route || "notifications").trim().slice(0, 80);
 
@@ -1536,6 +1536,12 @@ function apiAdminSendPushNotification(payload) {
   const sent = Number(gatewayResult.sent || results.filter(function(item) { return item.ok === true; }).length || 0);
   const failed = Number(gatewayResult.failed || results.filter(function(item) { return item.ok !== true; }).length || 0);
   const expired = Number(gatewayResult.expired || results.filter(function(item) { return item.expired === true; }).length || 0);
+  const failureDetails = results.filter(function(item) { return item && item.ok !== true; }).slice(0, 3).map(function(item) {
+    const statusCode = Number(item.statusCode || 0);
+    const error = String(item.error || "").trim();
+    return (statusCode ? "HTTP " + statusCode + (error ? ": " : "") : "") + (error || "Push delivery failed.");
+  });
+  const failureSummary = failureDetails.join(" | ").slice(0, 500);
 
   notificationPushLogBatch_({
     adminUsername: adminUsername,
@@ -1550,8 +1556,10 @@ function apiAdminSendPushNotification(payload) {
     sent: sent,
     failed: failed,
     expired: expired,
-    status: gatewayResult.success === false ? "FAILED" : "COMPLETE",
-    error: gatewayResult.success === false ? String(gatewayResult.message || gatewayResult.error || "") : ""
+    status: gatewayResult.success === false || failed > 0 ? "FAILED" : "COMPLETE",
+    error: gatewayResult.success === false
+      ? String(gatewayResult.message || gatewayResult.error || "")
+      : failureSummary
   });
 
   if (gatewayResult.success === false) {
@@ -1572,8 +1580,11 @@ function apiAdminSendPushNotification(payload) {
     sent: sent,
     failed: failed,
     expired: expired,
+    failureDetails: failureDetails,
     message: subscriptions.length
-      ? "Push complete: " + sent + " sent, " + failed + " failed."
+      ? (failed > 0 && failureSummary
+          ? "Push complete: " + sent + " sent, " + failed + " failed. " + failureSummary
+          : "Push complete: " + sent + " sent, " + failed + " failed.")
       : "In-app notification created, but no active push subscription matched the audience."
   };
 }

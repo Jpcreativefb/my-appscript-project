@@ -584,7 +584,7 @@ function renderProfileNotificationPreferences_(prefs) {
       <div class="profile-notification-heading">
         <div>
           <h2>Notifications</h2>
-          <p>Choose which Awards App updates you want. Phone push delivery will use these choices when the Cloudflare sender is enabled.</p>
+          <p>Choose which PATTC Predicts updates you want. Phone push delivery will use these choices when the Cloudflare sender is enabled.</p>
         </div>
         <button class="button secondary profile-small-action" type="button" onclick="navigate('notifications')">
           Notification Center
@@ -624,7 +624,7 @@ function renderProfileNotificationPreferences_(prefs) {
             Disable on This Device
           </button>
         </div>
-        <small>On iPhone/iPad, push works from the Awards App installed on the Home Screen. The permission prompt only appears after you tap Enable.</small>
+        <small>On iPhone/iPad, push works from the PATTC Predicts installed on the Home Screen. The permission prompt only appears after you tap Enable.</small>
       </div>
 
       <button class="button secondary profile-notification-save" type="button" onclick="saveProfileNotificationPreferences_()">

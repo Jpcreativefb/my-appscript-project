@@ -201,7 +201,7 @@ function renderNotificationAdminControlCenter_(control) {
             <select id="notificationComposeAudience">
               <option value="self">Just me / admin test</option>
               <option value="game">Players in this game only</option>
-              <option value="all">All Awards App users</option>
+              <option value="all">All PATTC Predicts users</option>
             </select>
           </label>
           <label>
@@ -214,7 +214,7 @@ function renderNotificationAdminControlCenter_(control) {
               <option value="new_game">New game</option>
             </select>
           </label>
-          <label><span>Title</span><input id="notificationComposeTitle" maxlength="120" value="Awards App"></label>
+          <label><span>Title</span><input id="notificationComposeTitle" maxlength="120" value="PATTC Predicts"></label>
           <label><span>Message</span><textarea id="notificationComposeMessage" maxlength="500" rows="3" placeholder="Type the notification message…"></textarea></label>
           <button class="button" type="button" onclick="sendAdminPushNotification_()">Send Notification</button>
           <div id="notificationAdminMessage" class="profile-message hidden"></div>
@@ -365,7 +365,13 @@ async function sendAdminPushNotification_() {
     notificationAdminShowMessage_(res && (res.message || res.error) || "Push could not be sent.", true);
     return;
   }
-  notificationAdminShowMessage_(res.message || "Notification sent ✓", false);
+  const detail = Array.isArray(res.failureDetails) && res.failureDetails.length
+    ? res.failureDetails.join(" | ")
+    : "";
+  notificationAdminShowMessage_(
+    res.message || (detail ? "Push failed: " + detail : "Notification sent ✓"),
+    Number(res.failed || 0) > 0
+  );
   if (typeof refreshNotificationBadge_ === "function") refreshNotificationBadge_();
 }
 
@@ -389,7 +395,7 @@ function renderNotificationCenterItem_(item) {
       >
         <span class="notification-center-icon">${notificationCenterIcon_(item.type)}</span>
         <span class="notification-center-copy">
-          <strong>${notificationCenterEscape_(item.title || "Awards App")}</strong>
+          <strong>${notificationCenterEscape_(item.title || "PATTC Predicts")}</strong>
           ${item.message ? `<span>${notificationCenterEscape_(item.message)}</span>` : ""}
           <small>${notificationCenterEscape_(notificationCenterTime_(item.createdAt))}</small>
         </span>

@@ -1,7 +1,7 @@
 (function registerAwardsPwa() {
   if (!("serviceWorker" in navigator)) return;
 
-  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair";
+  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts";
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
@@ -67,14 +67,14 @@
     navigator.serviceWorker
       .register(SW_URL)
       .then(function(registration) {
-        console.log("Awards App PWA ready", PWA_VERSION);
+        console.log("PATTC Predicts PWA ready", PWA_VERSION);
 
         // Force an update check now instead of waiting for Safari's normal
         // service-worker refresh interval. This is especially important for
         // iPhone home-screen installs after a production asset change.
         if (registration && typeof registration.update === "function") {
           registration.update().catch(function(err) {
-            console.warn("Awards App PWA update check warning", err);
+            console.warn("PATTC Predicts PWA update check warning", err);
           });
         }
 
@@ -85,7 +85,7 @@
         }
       })
       .catch(function(err) {
-        console.warn("Awards App PWA registration failed", err);
+        console.warn("PATTC Predicts PWA registration failed", err);
       });
   });
 })();
@@ -125,6 +125,39 @@ function awardsPushBase64UrlToUint8Array_(base64String) {
   return outputArray;
 }
 
+function awardsPushArrayBufferToBase64Url_(value) {
+  if (!value) return "";
+  try {
+    const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    return window.btoa(binary)
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  } catch (err) {
+    return "";
+  }
+}
+
+function awardsPushSubscriptionServerKey_(subscription) {
+  try {
+    return awardsPushArrayBufferToBase64Url_(
+      subscription && subscription.options
+        ? subscription.options.applicationServerKey
+        : null
+    );
+  } catch (err) {
+    return "";
+  }
+}
+
+function awardsPushKeyMatches_(subscription, publicKey) {
+  const existing = awardsPushSubscriptionServerKey_(subscription);
+  if (!existing) return null;
+  return existing === String(publicKey || "").trim();
+}
+
 async function awardsPushGetPublicKey_() {
   const response = await fetch("./api/push-public-key", {
     method: "GET",
@@ -156,7 +189,7 @@ function awardsPushDeviceId_() {
 function awardsPushDeviceLabel_() {
   return typeof apiGetDeviceLabel_ === "function"
     ? apiGetDeviceLabel_()
-    : "Awards App device";
+    : "PATTC Predicts device";
 }
 
 async function awardsPushBackendDeviceStatus_(deviceId, endpoint) {
@@ -212,6 +245,16 @@ async function awardsPushGetDeviceStatus_() {
   }
 
   const permission = Notification.permission;
+  let keyMatches = null;
+  if (subscription) {
+    try {
+      const canonicalPublicKey = await awardsPushGetPublicKey_();
+      keyMatches = awardsPushKeyMatches_(subscription, canonicalPublicKey);
+    } catch (err) {
+      keyMatches = null;
+    }
+  }
+
   const backend = subscription
     ? await awardsPushBackendDeviceStatus_(
         awardsPushDeviceId_(),
@@ -219,15 +262,18 @@ async function awardsPushGetDeviceStatus_() {
       )
     : { checked: true, registered: false, activeDevices: 0 };
 
+  const registrationUsable = backend.registered === true && keyMatches !== false;
   let label = "Not enabled on this device";
   if (permission === "denied") {
     label = "Blocked in this device's notification settings";
-  } else if (permission === "granted" && subscription && backend.registered) {
+  } else if (permission === "granted" && subscription && keyMatches === false) {
+    label = "Push security key changed — repair this device";
+  } else if (permission === "granted" && subscription && registrationUsable) {
     label = "Push enabled and registered on this device ✓";
   } else if (permission === "granted" && subscription) {
     label = backend.checked
-      ? "Browser subscribed — repair Awards App registration"
-      : "Browser subscribed — Awards App registration could not be verified";
+      ? "Browser subscribed — repair PATTC Predicts registration"
+      : "Browser subscribed — PATTC Predicts registration could not be verified";
   } else if (permission === "granted") {
     label = "Permission granted — finish device setup";
   }
@@ -236,7 +282,8 @@ async function awardsPushGetDeviceStatus_() {
     supported: true,
     permission: permission,
     subscribed: !!subscription,
-    registered: backend.registered === true,
+    registered: registrationUsable,
+    vapidKeyMatches: keyMatches,
     backendChecked: backend.checked === true,
     activeDevices: Number(backend.activeDevices || 0),
     endpoint: subscription ? String(subscription.endpoint || "") : "",
@@ -261,7 +308,7 @@ async function awardsPushVerifyBackendRegistration_(deviceId, endpoint) {
 
 async function awardsPushEnableOnThisDevice_() {
   if (!awardsPushSupported_()) {
-    throw new Error("Push is not available here. On iPhone, install/open the Awards App from the Home Screen first.");
+    throw new Error("Push is not available here. On iPhone, install/open the PATTC Predicts from the Home Screen first.");
   }
 
   // Permission must be requested directly from the user's button tap.
@@ -277,6 +324,26 @@ async function awardsPushEnableOnThisDevice_() {
   const publicKey = await awardsPushGetPublicKey_();
   const registration = await navigator.serviceWorker.ready;
   let subscription = await registration.pushManager.getSubscription();
+  const deviceId = awardsPushDeviceId_();
+
+  // If Cloudflare's canonical VAPID key differs from the key used to create an
+  // existing browser subscription, that subscription can never receive pushes.
+  // Repair it in one tap instead of asking the user to edit cryptographic values.
+  if (subscription && awardsPushKeyMatches_(subscription, publicKey) === false) {
+    const oldEndpoint = String(subscription.endpoint || "");
+    if (typeof apiRemovePushSubscription === "function") {
+      try {
+        await apiRemovePushSubscription(oldEndpoint, deviceId);
+      } catch (err) {
+        // Browser re-subscription is authoritative; stale backend rows are safe
+        // to leave disabled/replace on the next successful registration.
+      }
+    }
+    try {
+      await subscription.unsubscribe();
+    } catch (err) {}
+    subscription = null;
+  }
 
   if (!subscription) {
     subscription = await registration.pushManager.subscribe({
@@ -286,10 +353,9 @@ async function awardsPushEnableOnThisDevice_() {
   }
 
   if (typeof apiRegisterPushSubscription !== "function") {
-    throw new Error("Awards App push registration API is not loaded.");
+    throw new Error("PATTC Predicts push registration API is not loaded.");
   }
 
-  const deviceId = awardsPushDeviceId_();
   const result = await apiRegisterPushSubscription(
     subscription.toJSON ? subscription.toJSON() : subscription,
     deviceId,
@@ -310,7 +376,7 @@ async function awardsPushEnableOnThisDevice_() {
   );
   if (!verified || verified.registered !== true) {
     throw new Error(
-      "Your browser is subscribed, but Awards App could not verify the stored device registration. Tap Repair Push Registration to retry."
+      "Your browser is subscribed, but PATTC Predicts could not verify the stored device registration. Tap Repair Push Registration to retry."
     );
   }
 

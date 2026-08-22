@@ -76,7 +76,7 @@ function showAuthView(view){
   };
 
   document.getElementById("authSubtitle").innerText =
-    subtitles[view] || "Awards App";
+    subtitles[view] || "PATTC Predicts";
 
   setAuthMessage("");
 

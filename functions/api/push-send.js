@@ -21,7 +21,7 @@ function cleanNotification(input) {
   const nestedData = data.data && typeof data.data === "object" ? data.data : {};
 
   return {
-    title: String(data.title || "Awards App").trim().slice(0, 120),
+    title: String(data.title || "PATTC Predicts").trim().slice(0, 120),
     body: String(data.body || data.message || "").trim().slice(0, 500),
     icon: String(data.icon || "/icons/icon-192.png").trim().slice(0, 400),
     badge: String(data.badge || "/icons/icon-192.png").trim().slice(0, 400),
@@ -67,7 +67,8 @@ async function sendOne(item, privateJWK, adminContact, notification) {
     let error = "";
     if (!ok) {
       try {
-        error = String(await response.text()).slice(0, 300);
+        error = String(await response.text()).trim().slice(0, 300);
+        if (!error) error = "Push service returned HTTP " + response.status;
       } catch (err) {
         error = "Push service returned HTTP " + response.status;
       }
@@ -106,14 +107,20 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, message: "Unauthorized push gateway request." }, 401);
   }
 
-  const publicKey = String(context.env.VAPID_PUBLIC_KEY || "").trim();
   const privateJwkText = String(context.env.VAPID_PRIVATE_JWK || "").trim();
   const adminContact = String(context.env.VAPID_SUBJECT || "").trim();
 
-  if (!publicKey || !privateJwkText || !adminContact) {
+  if (!privateJwkText || !adminContact) {
     return jsonResponse({
       success: false,
-      message: "Cloudflare VAPID settings are incomplete."
+      message: "Cloudflare VAPID_PRIVATE_JWK and VAPID_SUBJECT are required."
+    }, 503);
+  }
+
+  if (!/^(mailto:|https:\/\/)/i.test(adminContact) || /YOUR_EMAIL_ADDRESS_HERE/i.test(adminContact)) {
+    return jsonResponse({
+      success: false,
+      message: "Cloudflare VAPID_SUBJECT must be a real mailto: email address or https:// URL."
     }, 503);
   }
 
@@ -158,7 +165,7 @@ export async function onRequestPost(context) {
 }
 
 export async function onRequestGet() {
-  return jsonResponse({ success: true, service: "Awards App Push Gateway", method: "POST required" });
+  return jsonResponse({ success: true, service: "PATTC Predicts Push Gateway", method: "POST required" });
 }
 
 export async function onRequestOptions() {

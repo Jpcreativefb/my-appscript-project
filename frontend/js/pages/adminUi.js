@@ -57,7 +57,7 @@ const ADMIN_UI_HELP_EXACT = {
   "comparison": "Comparison rule applied to the imported/current value and the configured threshold.",
 
   // Awards Manager.
-  "awards app game": "Destination Awards App game for questions built or linked from this Awards Manager session.",
+  "awards app game": "Destination PATTC Predicts game for questions built or linked from this Awards Manager session.",
   "default play type": "Default scoring/play behavior assigned to newly built questions. Individual questions can still override it.",
   "official website url": "Official event or organization page shown as the primary non-market source for the awards event.",
   "question display": "Default visual layout for questions built from the selected event. This does not change scoring behavior.",
@@ -75,14 +75,14 @@ const ADMIN_UI_HELP_EXACT = {
   "play type": "Scoring/play behavior for this question. Appearance layout is configured separately.",
   "market odds display": "Controls whether live market probability/odds are displayed for this specific question.",
   "provider market": "External provider market linked to this question for probability display and/or result mapping.",
-  "existing question": "Existing Awards App question that should receive a provider link instead of creating a duplicate question.",
+  "existing question": "Existing PATTC Predicts question that should receive a provider link instead of creating a duplicate question.",
   "question play type": "Scoring/play behavior for this question. It is intentionally separate from Text/Compact/Image visual layout.",
   "probability display": "Controls whether provider probabilities appear to players and where supported how they are formatted.",
   "number of changes": "Maximum number of times a player may revise this pick before lock. Leave unlimited only when that matches the game rules.",
   "change penalty": "Optional point cost charged when a player changes an already-saved pick.",
   "advanced search": "Extra provider-search filters. Start simple and use these only when normal event search returns too many unrelated results.",
   "advanced settings": "Less-common question/build options. Defaults are designed for the normal workflow; change them only when the game needs different behavior.",
-  "advanced tool: link provider market to an existing question": "Links an external market to an existing Awards App question without rebuilding or duplicating the question.",
+  "advanced tool: link provider market to an existing question": "Links an external market to an existing PATTC Predicts question without rebuilding or duplicating the question.",
 
   // Sports controls/builders.
   "league": "League whose stored schedule/teams/players should be used for this build or comparison.",

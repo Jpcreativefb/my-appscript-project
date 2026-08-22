@@ -968,7 +968,7 @@ function adminAppearanceEntityCard_(entity, index) {
                 <button class="admin-small-button secondary" type="button" onclick="adminAppearanceChooseMedia_('appearancePackCamera_${index}')">Take Photo</button>
                 <button class="admin-small-button secondary" type="button" onclick="adminAppearanceClearPackImage_(${index})">Use Default</button>
               </div>
-              <small class="appearance-media-help">External URL stays on the source website. Import/Choose/Take saves a copy in the Awards App Google Drive image folder.</small>
+              <small class="appearance-media-help">External URL stays on the source website. Import/Choose/Take saves a copy in the PATTC Predicts Google Drive image folder.</small>
               <small id="appearancePackStatus_${index}" class="appearance-upload-status"></small>`}
           </div>
           <div>

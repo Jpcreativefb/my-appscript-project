@@ -525,7 +525,7 @@ function apiGetDeviceLabel_() {
     const platform = String(nav.userAgentData && nav.userAgentData.platform || nav.platform || "Device");
     return (standalone ? "App · " : "Browser · ") + platform;
   } catch (err) {
-    return "Awards App device";
+    return "PATTC Predicts device";
   }
 }
 
