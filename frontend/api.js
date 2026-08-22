@@ -502,6 +502,59 @@ async function apiPost(action, payload = {}) {
 }
 
 /* ======================
+   TEAM FANTASY POST BRIDGE — v1.2.18j2
+   Repo-owned Cloudflare Pages proxy. Falls back to the legacy
+   generic POST bridge only while a new Pages deployment is unavailable.
+====================== */
+async function apiTeamFantasyPost_(action, payload = {}) {
+  const attached = apiAttachSession_(action, payload || {});
+  try {
+    const response = await fetch("./api/team-fantasy", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Accept": "application/json"
+      },
+      cache: "no-store",
+      body: JSON.stringify({ action: action, ...attached })
+    });
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (err) {
+      data = null;
+    }
+
+    if ((response.status === 404 || response.status === 405) && typeof apiPost === "function") {
+      return apiPost(action, payload || {});
+    }
+    if (!response.ok || !data) {
+      return {
+        success: false,
+        status: response.status,
+        message: data && (data.message || data.error)
+          ? data.message || data.error
+          : "Team Fantasy bridge returned an invalid response.",
+        error: data && (data.error || data.message)
+          ? data.error || data.message
+          : "Team Fantasy bridge returned an invalid response."
+      };
+    }
+    return data;
+  } catch (err) {
+    if (typeof apiPost === "function") {
+      return apiPost(action, payload || {});
+    }
+    return {
+      success: false,
+      error: err && err.message ? err.message : "Team Fantasy network error",
+      message: err && err.message ? err.message : "Team Fantasy network error"
+    };
+  }
+}
+
+/* ======================
    LOGIN
 ====================== */
 

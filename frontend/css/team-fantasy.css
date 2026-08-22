@@ -1,3 +1,36 @@
 /* Team Fantasy Football — v1.2.18j */
 .tf-page,.tf-admin-page{max-width:1180px;margin:0 auto;padding-bottom:40px}.tf-hero,.tf-admin-header{display:flex;gap:24px;align-items:flex-start;justify-content:space-between}.tf-hero h1,.tf-admin-header h1{margin:.15rem 0}.tf-eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;opacity:.7}.tf-muted{opacity:.72;font-size:.9rem}.tf-card-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:12px}.tf-card-heading h2,.tf-lineup-card h2{margin:0}.tf-lineup-actions,.tf-action-row,.tf-inline-form,.tf-h2h-controls,.tf-chip-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.tf-button{border:0;border-radius:10px;padding:10px 14px;font:inherit;font-weight:750;cursor:pointer;background:var(--accent-color,#276ef1);color:#fff}.tf-button.secondary{background:transparent;color:inherit;border:1px solid rgba(127,127,127,.36)}.tf-field{display:flex;flex-direction:column;gap:6px;font-size:.9rem}.tf-field span{font-weight:700}.tf-field input,.tf-field select,.tf-inline-form input,.tf-inline-form select,.tf-team-select,.tf-h2h-controls select,.tf-admin-page select{min-height:42px;border:1px solid rgba(127,127,127,.35);border-radius:9px;padding:8px 10px;background:var(--card-bg,transparent);color:inherit;font:inherit}.tf-league-picker{min-width:220px}.tf-progress-row{display:flex;justify-content:space-between;margin-top:8px}.tf-progress{height:9px;border-radius:999px;background:rgba(127,127,127,.18);overflow:hidden;margin:7px 0}.tf-progress span{display:block;height:100%;background:currentColor;opacity:.75}.tf-complete{font-weight:750;margin-top:5px}.tf-missing-copy{margin-top:5px}.tf-slot-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:16px}.tf-slot{border:1px solid rgba(127,127,127,.24);border-radius:12px;padding:12px}.tf-slot.needs-pick{border-style:dashed}.tf-slot.is-locked{opacity:.8}.tf-slot-title{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px}.tf-lock{font-size:.75rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.tf-team-select{width:100%}.tf-selected-team{font-size:1.05rem;font-weight:800}.tf-picked-note{font-size:.86rem;margin-top:6px}.tf-status{min-height:20px;margin:8px 2px;font-weight:700}.tf-status.is-error,.tf-warning{color:#b42318}.tf-table-wrap{overflow-x:auto}.tf-table{width:100%;border-collapse:collapse;font-size:.9rem}.tf-table th,.tf-table td{text-align:left;padding:9px 8px;border-bottom:1px solid rgba(127,127,127,.2);white-space:nowrap}.tf-playoff-block{margin-top:18px}.tf-h2h-summary{display:flex;gap:18px;align-items:baseline;margin:14px 0}.tf-h2h-summary strong{font-size:1.5rem}.tf-admin-launcher{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:12px}.tf-admin-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.tf-check-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:16px 0}.tf-check{display:flex;gap:8px;align-items:center}.tf-chip{border:1px solid rgba(127,127,127,.25);border-radius:999px;padding:6px 10px;font-size:.85rem}.tf-reminder-preview{margin-top:12px;padding:12px;border:1px solid rgba(127,127,127,.24);border-radius:10px}.tf-reminder-preview>div{margin-top:5px}.tf-rules-table input[type=number]{width:90px;min-height:36px;border-radius:7px;border:1px solid rgba(127,127,127,.3);padding:5px;background:transparent;color:inherit}
 @media(max-width:760px){.tf-hero,.tf-admin-header,.tf-card-heading{flex-direction:column}.tf-slot-grid,.tf-admin-grid,.tf-check-grid{grid-template-columns:1fr}.tf-lineup-actions,.tf-action-row{width:100%}.tf-button{min-height:44px}.tf-admin-launcher{align-items:flex-start;flex-direction:column}.tf-h2h-controls{align-items:stretch;flex-direction:column}.tf-h2h-controls span{text-align:center}}
+
+/* v1.2.18j2 admin action verification */
+.tf-system-status {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(127, 127, 127, 0.28);
+  border-radius: 12px;
+}
+.tf-system-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.tf-system-grid > div {
+  min-width: 0;
+}
+.tf-system-grid strong {
+  display: block;
+  margin-bottom: 3px;
+}
+.tf-action-row button:disabled {
+  opacity: 0.62;
+  cursor: progress;
+}
+#adminTfActionStatus:not(:empty) {
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+@media (max-width: 760px) {
+  .tf-system-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

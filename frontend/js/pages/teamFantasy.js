@@ -7,7 +7,7 @@
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218j', script).href : './css/team-fantasy.css?v=1218j';
+  link.href = script ? new URL('../../css/team-fantasy.css?v=1218j2', script).href : './css/team-fantasy.css?v=1218j2';
   link.dataset.teamFantasyCss = '1';
   document.head.appendChild(link);
 })();
@@ -213,7 +213,7 @@ async function teamFantasySaveSlot_(entryId, position, teamAbbr) {
   if (!teamAbbr) return;
   const state = window.TEAM_FANTASY_STATE || {};
   teamFantasySetStatus_('Saving ' + position + '…', false);
-  const res = await apiPost('saveTeamFantasyPick', { gameId: state.gameId, week: state.week, entryId: entryId, position: position, teamAbbr: teamAbbr, pickMethod: 'manual' });
+  const res = await apiTeamFantasyPost_('saveTeamFantasyPick', { gameId: state.gameId, week: state.week, entryId: entryId, position: position, teamAbbr: teamAbbr, pickMethod: 'manual' });
   if (!res || res.success === false) {
     teamFantasySetStatus_(res && (res.message || res.error) || 'Could not save that pick.', true);
     return;
@@ -235,7 +235,7 @@ async function teamFantasyFill_(entryId, randomOnly) {
   const state = window.TEAM_FANTASY_STATE || {};
   teamFantasySetStatus_(randomOnly ? 'Randomizing open positions…' : 'Building ranked Auto Pick lineup…', false);
   const action = randomOnly ? 'randomTeamFantasyPicks' : 'autoPickTeamFantasy';
-  const res = await apiPost(action, { gameId: state.gameId, week: state.week, entryId: entryId });
+  const res = await apiTeamFantasyPost_(action, { gameId: state.gameId, week: state.week, entryId: entryId });
   if (!res || res.success === false) {
     teamFantasySetStatus_(res && (res.message || res.error) || 'Could not fill lineup.', true);
     return;

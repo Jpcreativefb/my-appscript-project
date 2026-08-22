@@ -1,11 +1,11 @@
 /* =========================================================
-   SPORTS TEAM FANTASY FOOTBALL ENGINE — v1.2.18j
+   SPORTS TEAM FANTASY FOOTBALL ENGINE — v1.2.18j2
 
    Team-based weekly NFL fantasy game. Users choose NFL teams
    for position groups instead of individual players.
 ========================================================= */
 
-var TEAM_FANTASY_VERSION = "1.2.18j";
+var TEAM_FANTASY_VERSION = "1.2.18j2";
 var TEAM_FANTASY_POSITIONS = ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"];
 var TEAM_FANTASY_POSITION_LABELS = {
   QB: "QB",
@@ -37,7 +37,7 @@ TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.SETTINGS] = [
   "AllowRandomPick", "AllowSmartAutoPick", "RegularSeasonEndWeek", "PostseasonScoringMode",
   "PlayoffUsageMode", "OverallPlayoffTeams", "SubleaguePlayoffDefault", "RankingsMode",
   "ReminderEnabled", "ReminderThursday", "ReminderSunday", "ReminderFinalWindow",
-  "SyncTriggerEnabled", "UpdatedAt", "UpdatedBy"
+  "SyncTriggerEnabled", "LastSyncAt", "LastSyncStatus", "LastSyncMessage", "UpdatedAt", "UpdatedBy"
 ];
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.RULES] = [
   "GameId", "RuleId", "Position", "StatKey", "Label", "RuleType", "PointsPerUnit",
@@ -258,6 +258,9 @@ function teamFantasyDefaultSettings_(gameId) {
     ReminderSunday: true,
     ReminderFinalWindow: true,
     SyncTriggerEnabled: false,
+    LastSyncAt: "",
+    LastSyncStatus: "never",
+    LastSyncMessage: "",
     UpdatedAt: teamFantasyNowIso_(),
     UpdatedBy: "system"
   };
@@ -300,7 +303,12 @@ function teamFantasyNormalizeSettings_(row) {
     reminderThursday: teamFantasyBool_(row.ReminderThursday, true),
     reminderSunday: teamFantasyBool_(row.ReminderSunday, true),
     reminderFinalWindow: teamFantasyBool_(row.ReminderFinalWindow, true),
-    syncTriggerEnabled: teamFantasyBool_(row.SyncTriggerEnabled, false)
+    syncTriggerEnabled: teamFantasyBool_(row.SyncTriggerEnabled, false),
+    lastSyncAt: teamFantasyString_(row.LastSyncAt),
+    lastSyncStatus: teamFantasyString_(row.LastSyncStatus) || "never",
+    lastSyncMessage: teamFantasyString_(row.LastSyncMessage),
+    updatedAt: teamFantasyString_(row.UpdatedAt),
+    updatedBy: teamFantasyNormalizeUsername_(row.UpdatedBy)
   };
 }
 
@@ -1220,7 +1228,7 @@ function teamFantasyRefreshAndScoreWeek_(gameId, week) {
   });
   teamFantasyRefreshWeekScores_(gameId, week, weekClosed);
   SpreadsheetApp.flush();
-  return { success: errors.length === 0, gameId: gameId, week: week, weekClosed: weekClosed, picks: picks.length, scored: scored, pending: pending, errors: errors };
+  return { success: errors.length === 0, gameId: gameId, week: week, weekClosed: weekClosed, scheduleGames: schedule.games.length, picks: picks.length, scored: scored, pending: pending, errors: errors };
 }
 
 function teamFantasyLeagueRow_(gameId, leagueId) {
@@ -1568,16 +1576,51 @@ function apiAdminSendTeamFantasyReminder(payload) {
   return { success: errors.length === 0, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek, recipientUsers: users, sent: sent, failed: failed, errors: errors };
 }
 
+function teamFantasySyncTriggerStatus_() {
+  let count = 0;
+  try {
+    ScriptApp.getProjectTriggers().forEach(function(trigger) {
+      if (trigger.getHandlerFunction() === "teamFantasySyncTriggerHandler") count++;
+    });
+    return { available: true, active: count > 0, count: count, handler: "teamFantasySyncTriggerHandler" };
+  } catch (err) {
+    return { available: false, active: false, count: 0, handler: "teamFantasySyncTriggerHandler", error: err && err.message ? err.message : String(err) };
+  }
+}
+
+function teamFantasyRecordSyncStatus_(gameId, status, message, username) {
+  const now = teamFantasyNowIso_();
+  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.SETTINGS, function(row) {
+    return teamFantasyString_(row.GameId) === gameId;
+  }, {
+    GameId: gameId,
+    LastSyncAt: now,
+    LastSyncStatus: teamFantasyString_(status) || "unknown",
+    LastSyncMessage: teamFantasyString_(message),
+    UpdatedAt: now,
+    UpdatedBy: teamFantasyNormalizeUsername_(username) || "system"
+  });
+  return now;
+}
+
 function teamFantasySyncTriggerHandler() {
   const settingsRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.SETTINGS);
   const results = [];
   settingsRows.forEach(function(row) {
     const settings = teamFantasyNormalizeSettings_(row);
     if (!settings.syncTriggerEnabled || !teamFantasyIsGame_(settings.gameId)) return;
-    try { results.push(teamFantasyRefreshAndScoreWeek_(settings.gameId, settings.currentWeek)); }
-    catch (err) { results.push({ success: false, gameId: settings.gameId, error: err && err.message ? err.message : String(err) }); }
+    try {
+      const result = teamFantasyRefreshAndScoreWeek_(settings.gameId, settings.currentWeek);
+      const message = "Week " + settings.currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + Number((result.errors || []).length) + " errors.";
+      result.lastSyncAt = teamFantasyRecordSyncStatus_(settings.gameId, result.success === false ? "error" : "success", message, "system");
+      results.push(result);
+    } catch (err) {
+      const error = err && err.message ? err.message : String(err);
+      teamFantasyRecordSyncStatus_(settings.gameId, "error", error, "system");
+      results.push({ success: false, gameId: settings.gameId, error: error });
+    }
   });
-  return { success: true, results: results };
+  return { success: true, triggerStatus: teamFantasySyncTriggerStatus_(), results: results };
 }
 
 function teamFantasyInstallSyncTrigger_() {
@@ -1585,26 +1628,49 @@ function teamFantasyInstallSyncTrigger_() {
     if (trigger.getHandlerFunction() === "teamFantasySyncTriggerHandler") ScriptApp.deleteTrigger(trigger);
   });
   ScriptApp.newTrigger("teamFantasySyncTriggerHandler").timeBased().everyMinutes(15).create();
+  const status = teamFantasySyncTriggerStatus_();
+  if (!status.active) throw new Error("The Team Fantasy 15-minute trigger was not found after installation.");
+  return status;
 }
 
 function apiAdminInstallTeamFantasySyncTrigger(payload) {
   payload = payload || {};
   if (typeof requireAdminFromToken_ === "function") requireAdminFromToken_(payload.token);
   const gameId = teamFantasyString_(payload.gameId);
-  const settings = teamFantasyGetSettings_(gameId);
-  teamFantasyInstallSyncTrigger_();
+  if (!gameId || !teamFantasyIsGame_(gameId)) throw new Error("Choose a saved Team Fantasy game first.");
+  teamFantasyGetSettings_(gameId);
+  const triggerStatus = teamFantasyInstallSyncTrigger_();
   teamFantasyUpsert_(TEAM_FANTASY_SHEETS.SETTINGS, function(row) { return teamFantasyString_(row.GameId) === gameId; }, {
     GameId: gameId, SyncTriggerEnabled: true, UpdatedAt: teamFantasyNowIso_(), UpdatedBy: teamFantasyNormalizeUsername_(payload.username)
   });
-  return { success: true, message: "Team Fantasy sports sync trigger installed for every 15 minutes.", settings: settings };
+  return {
+    success: true,
+    message: "15-minute Team Fantasy sync is active.",
+    triggerStatus: triggerStatus,
+    settings: teamFantasyGetSettings_(gameId)
+  };
 }
 
 function apiAdminRunTeamFantasySync(payload) {
   payload = payload || {};
-  if (typeof requireAdminFromToken_ === "function") requireAdminFromToken_(payload.token);
+  const adminUsername = typeof requireAdminFromToken_ === "function" ? requireAdminFromToken_(payload.token) : teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
+  if (!gameId || !teamFantasyIsGame_(gameId)) throw new Error("Choose a saved Team Fantasy game first.");
   const settings = teamFantasyGetSettings_(gameId);
-  return teamFantasyRefreshAndScoreWeek_(gameId, Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek))));
+  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
+  try {
+    const result = teamFantasyRefreshAndScoreWeek_(gameId, week);
+    const errorCount = Number((result.errors || []).length);
+    const message = "Week " + week + ": checked " + Number(result.scheduleGames || 0) + " NFL games; " + Number(result.picks || 0) + " lineup picks; " + Number(result.scored || 0) + " final; " + Number(result.pending || 0) + " pending; " + errorCount + " errors.";
+    result.lastSyncAt = teamFantasyRecordSyncStatus_(gameId, result.success === false ? "error" : "success", message, adminUsername);
+    result.message = message;
+    result.triggerStatus = teamFantasySyncTriggerStatus_();
+    return result;
+  } catch (err) {
+    const error = err && err.message ? err.message : String(err);
+    const lastSyncAt = teamFantasyRecordSyncStatus_(gameId, "error", error, adminUsername);
+    return { success: false, gameId: gameId, week: week, lastSyncAt: lastSyncAt, error: error, message: error, triggerStatus: teamFantasySyncTriggerStatus_() };
+  }
 }
 
 function apiAdminSaveTeamFantasySettings(payload) {
@@ -1637,6 +1703,9 @@ function apiAdminSaveTeamFantasySettings(payload) {
     ReminderSunday: teamFantasyBool_(payload.reminderSunday, current.reminderSunday),
     ReminderFinalWindow: teamFantasyBool_(payload.reminderFinalWindow, current.reminderFinalWindow),
     SyncTriggerEnabled: current.syncTriggerEnabled,
+    LastSyncAt: current.lastSyncAt,
+    LastSyncStatus: current.lastSyncStatus,
+    LastSyncMessage: current.lastSyncMessage,
     UpdatedAt: teamFantasyNowIso_(),
     UpdatedBy: adminUsername
   };
@@ -1718,10 +1787,25 @@ function apiAdminGetTeamFantasyDashboard(payload) {
   const entries = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).filter(function(row) { return teamFantasyString_(row.GameId) === gameId && teamFantasyBool_(row.Active, true); }).map(teamFantasyPublicEntry_);
   const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) { return teamFantasyString_(row.GameId) === gameId; }).map(function(row) { return { leagueId: teamFantasyString_(row.LeagueId), entryId: teamFantasyString_(row.EntryId), username: teamFantasyNormalizeUsername_(row.Username) }; });
   const reminders = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
+  const triggerStatus = teamFantasySyncTriggerStatus_();
   return {
     success: true, version: TEAM_FANTASY_VERSION, gameId: gameId, settings: settings,
     rules: teamFantasyRules_(gameId), leagues: leagues, entries: entries, memberships: memberships,
     reminderSummary: reminders,
+    systemStatus: {
+      gameSaved: teamFantasyIsGame_(gameId),
+      settingsSaved: !!settings.gameId,
+      triggerConfigured: settings.syncTriggerEnabled === true,
+      triggerActive: triggerStatus.active === true,
+      triggerCount: Number(triggerStatus.count || 0),
+      triggerHandler: triggerStatus.handler || "teamFantasySyncTriggerHandler",
+      triggerError: triggerStatus.error || "",
+      lastSyncAt: settings.lastSyncAt || "",
+      lastSyncStatus: settings.lastSyncStatus || "never",
+      lastSyncMessage: settings.lastSyncMessage || "",
+      settingsUpdatedAt: settings.updatedAt || "",
+      settingsUpdatedBy: settings.updatedBy || ""
+    },
     standings: teamFantasyBuildStandings_(gameId, "complete")
   };
 }

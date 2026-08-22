@@ -1,0 +1,13 @@
+backend/engines/SportsTeamFantasyEngine.js
+frontend/js/api.js
+frontend/api.js
+frontend/js/pages/teamFantasy.js
+frontend/js/pages/adminTeamFantasy.js
+frontend/css/team-fantasy.css
+frontend/sw.js
+functions/api/team-fantasy.js
+tests/team_fantasy_admin_controls_v1218j2_tests.js
+tools/apply_team_fantasy_admin_controls_v1218j2.py
+tools/install_team_fantasy_admin_controls_v1218j2.sh
+docs/TEAM_FANTASY_ADMIN_CONTROLS_V1_2_18J2.md
+CHANGED_FILES_V1_2_18J2.txt

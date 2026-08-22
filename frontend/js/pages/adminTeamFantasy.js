@@ -1,5 +1,5 @@
 /* =========================================================
-   TEAM FANTASY FOOTBALL ADMIN — v1.2.18j
+   TEAM FANTASY FOOTBALL ADMIN — v1.2.18j2
 ========================================================= */
 
 (function teamFantasyAdminLoadCss_() {
@@ -7,7 +7,7 @@
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218j', script).href : './css/team-fantasy.css?v=1218j';
+  link.href = script ? new URL('../../css/team-fantasy.css?v=1218j2', script).href : './css/team-fantasy.css?v=1218j2';
   link.dataset.teamFantasyCss = '1';
   document.head.appendChild(link);
 })();
@@ -44,6 +44,58 @@ function adminTfStatus_(message, error) {
   if (!el) return;
   el.textContent = message || '';
   el.className = 'tf-status ' + (error ? 'is-error' : 'is-ok');
+}
+
+function adminTfActionStatus_(message, error) {
+  adminTfStatus_(message, error);
+  const el = document.getElementById('adminTfActionStatus');
+  if (!el) return;
+  el.textContent = message || '';
+  el.className = 'tf-status ' + (error ? 'is-error' : 'is-ok');
+}
+
+function adminTfFormatTime_(value) {
+  if (!value) return 'Never';
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? String(value) : d.toLocaleString();
+}
+
+function adminTfSystemStatusHtml_(dash) {
+  const sys = dash && dash.systemStatus ? dash.systemStatus : {};
+  const gameSaved = sys.gameSaved === true;
+  const settingsSaved = sys.settingsSaved === true;
+  const triggerActive = sys.triggerActive === true;
+  const configured = sys.triggerConfigured === true;
+  const lastStatus = String(sys.lastSyncStatus || 'never');
+  const lastClass = lastStatus === 'error' ? 'is-error' : 'is-ok';
+  return `
+    <div class="tf-system-grid">
+      <div><strong>Game saved</strong><div>${gameSaved ? '✅ Yes' : '❌ No'}</div></div>
+      <div><strong>Rules/settings</strong><div>${settingsSaved ? '✅ Saved' : '❌ Missing'}</div></div>
+      <div><strong>15-min sync</strong><div>${triggerActive ? '✅ Active (' + Number(sys.triggerCount || 0) + ')' : (configured ? '⚠️ Configured, trigger missing' : 'Off')}</div></div>
+      <div class="${lastClass}"><strong>Last sync</strong><div>${adminTfEscape_(adminTfFormatTime_(sys.lastSyncAt))} · ${adminTfEscape_(lastStatus)}</div></div>
+    </div>
+    ${sys.lastSyncMessage ? `<div class="tf-muted" style="margin-top:8px;">${adminTfEscape_(sys.lastSyncMessage)}</div>` : ''}
+  `;
+}
+
+function adminTfSetBusy_(buttonId, busy, busyText, normalText) {
+  const button = document.getElementById(buttonId);
+  if (!button) return;
+  button.disabled = !!busy;
+  button.textContent = busy ? busyText : normalText;
+}
+
+async function adminTfRefreshSystemStatus_() {
+  const gameId = String((typeof getFrontendGameId === 'function' && getFrontendGameId()) || '');
+  if (!gameId) return null;
+  const dash = await api('adminGetTeamFantasyDashboard', { gameId: gameId });
+  if (dash && dash.success !== false) {
+    window.ADMIN_TEAM_FANTASY_DASH = dash;
+    const el = document.getElementById('adminTfSystemStatus');
+    if (el) el.innerHTML = adminTfSystemStatusHtml_(dash);
+  }
+  return dash;
 }
 
 async function adminTfGetGames_() {
@@ -109,7 +161,9 @@ async function renderAdminTeamFantasyPage() {
           ${adminTfCheck_('adminTfSunday','Sunday reminder',s.reminderSunday)}
           ${adminTfCheck_('adminTfFinal','Final-window reminder',s.reminderFinalWindow)}
         </div>
-        <div class="tf-action-row"><button class="tf-button" onclick="adminTfSaveSettings_()">Save Game Rules</button><button class="tf-button secondary" onclick="adminTfRunSync_()">Run Sports Sync Now</button><button class="tf-button secondary" onclick="adminTfInstallTrigger_()">Install 15-min Sync</button></div>
+        <div id="adminTfSystemStatus" class="tf-system-status">${adminTfSystemStatusHtml_(dash)}</div>
+        <div id="adminTfActionStatus" class="tf-status" aria-live="polite"></div>
+        <div class="tf-action-row"><button id="adminTfSaveButton" class="tf-button" onclick="adminTfSaveSettings_()">Save Game Rules</button><button id="adminTfSyncButton" class="tf-button secondary" onclick="adminTfRunSync_()">Run Team Fantasy Sync Now</button><button id="adminTfTriggerButton" class="tf-button secondary" onclick="adminTfInstallTrigger_()">Install 15-min Sync</button></div>
       </section>
       <section class="card">
         <div class="tf-card-heading"><div><h2>Position Scoring</h2><div class="tf-muted">Turn any stat on/off and change its point value. Bonus rows use Threshold + Bonus.</div></div></div>
@@ -139,18 +193,148 @@ function adminTfCheck_(id,label,value){return `<label class="tf-check"><input id
 
 async function adminTfSwitchGame_(gameId){ if(typeof setFrontendGameId==='function') setFrontendGameId(gameId); await navigate('admin-team-fantasy',{skipUnsavedCheck:true}); }
 
-async function adminTfSaveSettings_(){
-  const gameId=String(getFrontendGameId()||''); adminTfStatus_('Saving Team Fantasy rules…',false);
-  const res=await apiPost('adminSaveTeamFantasySettings',{gameId:gameId,seasonYear:adminTfValue_('adminTfSeasonYear'),currentWeek:adminTfValue_('adminTfWeek'),entryMode:adminTfValue_('adminTfEntryMode'),teamUseLimit:adminTfValue_('adminTfUseLimit'),completeLeagueEnabled:adminTfChecked_('adminTfComplete'),standingMode:adminTfValue_('adminTfStandingMode'),sameEntryMultipleLeagues:adminTfChecked_('adminTfMultiLeague'),allowRandomPick:adminTfChecked_('adminTfRandom'),allowSmartAutoPick:adminTfChecked_('adminTfAuto'),regularSeasonEndWeek:adminTfValue_('adminTfRegEnd'),postseasonScoringMode:adminTfValue_('adminTfPostMode'),playoffUsageMode:adminTfValue_('adminTfUsagePlayoff'),overallPlayoffTeams:adminTfValue_('adminTfOverallPlayoff'),subleaguePlayoffDefault:adminTfValue_('adminTfSubPlayoff'),reminderEnabled:adminTfChecked_('adminTfReminders'),reminderThursday:adminTfChecked_('adminTfThursday'),reminderSunday:adminTfChecked_('adminTfSunday'),reminderFinalWindow:adminTfChecked_('adminTfFinal')});
-  if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Save failed.',true);return;} adminTfStatus_('Game rules saved.',false); await navigate('admin-team-fantasy',{skipUnsavedCheck:true});
+async function adminTfSaveSettings_() {
+  const gameId = String((typeof getFrontendGameId === 'function' && getFrontendGameId()) || '');
+  if (!gameId) { adminTfActionStatus_('Choose a saved Team Fantasy game first.', true); return; }
+  adminTfSetBusy_('adminTfSaveButton', true, 'Saving…', 'Save Game Rules');
+  adminTfActionStatus_('Saving Team Fantasy rules…', false);
+  try {
+    const res = await apiTeamFantasyPost_('adminSaveTeamFantasySettings', {
+      gameId: gameId,
+      seasonYear: adminTfValue_('adminTfSeasonYear'),
+      currentWeek: adminTfValue_('adminTfWeek'),
+      entryMode: adminTfValue_('adminTfEntryMode'),
+      teamUseLimit: adminTfValue_('adminTfUseLimit'),
+      completeLeagueEnabled: adminTfChecked_('adminTfComplete'),
+      standingMode: adminTfValue_('adminTfStandingMode'),
+      sameEntryMultipleLeagues: adminTfChecked_('adminTfMultiLeague'),
+      allowRandomPick: adminTfChecked_('adminTfRandom'),
+      allowSmartAutoPick: adminTfChecked_('adminTfAuto'),
+      regularSeasonEndWeek: adminTfValue_('adminTfRegEnd'),
+      postseasonScoringMode: adminTfValue_('adminTfPostMode'),
+      playoffUsageMode: adminTfValue_('adminTfUsagePlayoff'),
+      overallPlayoffTeams: adminTfValue_('adminTfOverallPlayoff'),
+      subleaguePlayoffDefault: adminTfValue_('adminTfSubPlayoff'),
+      reminderEnabled: adminTfChecked_('adminTfReminders'),
+      reminderThursday: adminTfChecked_('adminTfThursday'),
+      reminderSunday: adminTfChecked_('adminTfSunday'),
+      reminderFinalWindow: adminTfChecked_('adminTfFinal')
+    });
+    if (!res || res.success === false) {
+      adminTfActionStatus_(res && (res.error || res.message) || 'Save failed.', true);
+      return;
+    }
+    const saved = res.settings || {};
+    adminTfActionStatus_('✅ Saved — ' + Number(saved.seasonYear || adminTfValue_('adminTfSeasonYear')) + ' Week ' + Number(saved.currentWeek || adminTfValue_('adminTfWeek')) + '.', false);
+    await adminTfRefreshSystemStatus_();
+  } catch (err) {
+    adminTfActionStatus_(err && err.message ? err.message : 'Save failed.', true);
+  } finally {
+    adminTfSetBusy_('adminTfSaveButton', false, 'Saving…', 'Save Game Rules');
+  }
 }
 
-async function adminTfSaveRules_(){
-  const dash=window.ADMIN_TEAM_FANTASY_DASH||{}; const base=Array.isArray(dash.rules)?dash.rules:[]; const trs=Array.from(document.querySelectorAll('.tf-rules-table tbody tr')); const rules=trs.map(function(tr,i){const r=base[i]||{};return {ruleId:r.ruleId,position:r.position,statKey:r.statKey,label:r.label,ruleType:r.ruleType,pointsPerUnit:tr.querySelector('.tf-rule-points').value,threshold:tr.querySelector('.tf-rule-threshold').value,bonusPoints:tr.querySelector('.tf-rule-bonus').value,active:tr.querySelector('.tf-rule-active').checked};});
-  adminTfStatus_('Saving scoring rules…',false); const res=await apiPost('adminSaveTeamFantasyRules',{gameId:getFrontendGameId(),rules:rules}); if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Scoring save failed.',true);return;} adminTfStatus_('Scoring saved.',false);
+async function adminTfSaveRules_() {
+  const dash = window.ADMIN_TEAM_FANTASY_DASH || {};
+  const base = Array.isArray(dash.rules) ? dash.rules : [];
+  const trs = Array.from(document.querySelectorAll('.tf-rules-table tbody tr'));
+  const rules = trs.map(function(tr, i) {
+    const r = base[i] || {};
+    return {
+      ruleId: r.ruleId, position: r.position, statKey: r.statKey, label: r.label, ruleType: r.ruleType,
+      pointsPerUnit: tr.querySelector('.tf-rule-points').value,
+      threshold: tr.querySelector('.tf-rule-threshold').value,
+      bonusPoints: tr.querySelector('.tf-rule-bonus').value,
+      active: tr.querySelector('.tf-rule-active').checked
+    };
+  });
+  adminTfActionStatus_('Saving scoring rules…', false);
+  const res = await apiTeamFantasyPost_('adminSaveTeamFantasyRules', { gameId: getFrontendGameId(), rules: rules });
+  if (!res || res.success === false) { adminTfActionStatus_(res && (res.error || res.message) || 'Scoring save failed.', true); return; }
+  adminTfActionStatus_('✅ Scoring rules saved.', false);
 }
-async function adminTfRunSync_(){adminTfStatus_('Refreshing NFL Team Fantasy scores…',false);const res=await apiPost('adminRunTeamFantasySync',{gameId:getFrontendGameId(),week:adminTfValue_('adminTfWeek')});if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Sync failed.',true);return;}adminTfStatus_('Sync complete: '+Number(res.scored||0)+' final unit scores, '+Number(res.pending||0)+' pending.',false);await navigate('admin-team-fantasy',{skipUnsavedCheck:true});}
-async function adminTfInstallTrigger_(){adminTfStatus_('Installing Team Fantasy sync trigger…',false);const res=await apiPost('adminInstallTeamFantasySyncTrigger',{gameId:getFrontendGameId()});if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Trigger install failed.',true);return;}adminTfStatus_('15-minute Team Fantasy sync installed.',false);}
-async function adminTfCreateLeague_(){const name=adminTfValue_('adminTfLeagueName').trim();if(!name){adminTfStatus_('Enter a league name.',true);return;}const res=await apiPost('adminCreateTeamFantasyLeague',{gameId:getFrontendGameId(),leagueName:name,playoffTeams:adminTfValue_('adminTfLeaguePlayoffs'),standingMode:adminTfValue_('adminTfLeagueStanding')});if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Could not create league.',true);return;}adminTfStatus_('League created.',false);await navigate('admin-team-fantasy',{skipUnsavedCheck:true});}
-async function adminTfAssignMember_(){const username=adminTfValue_('adminTfMemberUser').trim();const leagueId=adminTfValue_('adminTfMemberLeague');if(!username||!leagueId){adminTfStatus_('Choose a league and enter a username.',true);return;}const res=await apiPost('adminAssignTeamFantasyLeagueMember',{gameId:getFrontendGameId(),leagueId:leagueId,memberUsername:username});if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Could not add user.',true);return;}adminTfStatus_('Added '+Number(res.added||0)+' entry/entries to the league.',false);await navigate('admin-team-fantasy',{skipUnsavedCheck:true});}
-async function adminTfReminder_(previewOnly){adminTfStatus_(previewOnly?'Building reminder preview…':'Sending reminders…',false);const res=await apiPost('adminSendTeamFantasyReminder',{gameId:getFrontendGameId(),previewOnly:!!previewOnly});if(!res||res.success===false){adminTfStatus_(res&&(res.error||res.message)||'Reminder action failed.',true);return;}if(previewOnly){const out=document.getElementById('adminTfReminderPreview');if(out)out.innerHTML=`<div class="tf-reminder-preview"><strong>${Number(res.missingUsers||0)} users missing picks</strong>${(res.details||[]).filter(function(d){return d.missingCount>0;}).map(function(d){return `<div>${adminTfEscape_(d.username)} — ${d.picked}/${d.required}: ${adminTfEscape_((d.missing||[]).join(', '))}</div>`;}).join('')}</div>`;adminTfStatus_('Preview ready.',false);}else adminTfStatus_('Reminder send complete: '+Number(res.sent||0)+' sent, '+Number(res.failed||0)+' failed.',Number(res.failed||0)>0);}
+
+async function adminTfRunSync_() {
+  const gameId = String((typeof getFrontendGameId === 'function' && getFrontendGameId()) || '');
+  if (!gameId) { adminTfActionStatus_('Choose a saved Team Fantasy game first.', true); return; }
+  adminTfSetBusy_('adminTfSyncButton', true, 'Running sync…', 'Run Team Fantasy Sync Now');
+  adminTfActionStatus_('Checking the NFL week and refreshing Team Fantasy scores…', false);
+  try {
+    const res = await apiTeamFantasyPost_('adminRunTeamFantasySync', { gameId: gameId, week: adminTfValue_('adminTfWeek') });
+    if (!res || res.success === false) {
+      adminTfActionStatus_('❌ ' + (res && (res.error || res.message) || 'Sync failed.'), true);
+      await adminTfRefreshSystemStatus_();
+      return;
+    }
+    const errors = Array.isArray(res.errors) ? res.errors.length : 0;
+    adminTfActionStatus_(
+      '✅ Sync complete — ' + Number(res.scheduleGames || 0) + ' NFL games checked · ' +
+      Number(res.picks || 0) + ' lineup picks · ' + Number(res.scored || 0) + ' final · ' +
+      Number(res.pending || 0) + ' pending' + (errors ? ' · ' + errors + ' errors' : '') + '.',
+      errors > 0
+    );
+    await adminTfRefreshSystemStatus_();
+  } catch (err) {
+    adminTfActionStatus_(err && err.message ? err.message : 'Sync failed.', true);
+  } finally {
+    adminTfSetBusy_('adminTfSyncButton', false, 'Running sync…', 'Run Team Fantasy Sync Now');
+  }
+}
+
+async function adminTfInstallTrigger_() {
+  const gameId = String((typeof getFrontendGameId === 'function' && getFrontendGameId()) || '');
+  if (!gameId) { adminTfActionStatus_('Choose a saved Team Fantasy game first.', true); return; }
+  adminTfSetBusy_('adminTfTriggerButton', true, 'Installing…', 'Install 15-min Sync');
+  adminTfActionStatus_('Installing and verifying the 15-minute Team Fantasy sync…', false);
+  try {
+    const res = await apiTeamFantasyPost_('adminInstallTeamFantasySyncTrigger', { gameId: gameId });
+    if (!res || res.success === false) {
+      adminTfActionStatus_('❌ ' + (res && (res.error || res.message) || 'Trigger install failed.'), true);
+      return;
+    }
+    const trigger = res.triggerStatus || {};
+    if (trigger.active !== true) {
+      adminTfActionStatus_('❌ Apps Script did not report an active Team Fantasy trigger after installation.', true);
+      return;
+    }
+    adminTfActionStatus_('✅ 15-minute sync installed and verified — active trigger count: ' + Number(trigger.count || 1) + '.', false);
+    await adminTfRefreshSystemStatus_();
+  } catch (err) {
+    adminTfActionStatus_(err && err.message ? err.message : 'Trigger install failed.', true);
+  } finally {
+    adminTfSetBusy_('adminTfTriggerButton', false, 'Installing…', 'Install 15-min Sync');
+  }
+}
+
+async function adminTfCreateLeague_() {
+  const name = adminTfValue_('adminTfLeagueName').trim();
+  if (!name) { adminTfActionStatus_('Enter a league name.', true); return; }
+  const res = await apiTeamFantasyPost_('adminCreateTeamFantasyLeague', { gameId: getFrontendGameId(), leagueName: name, playoffTeams: adminTfValue_('adminTfLeaguePlayoffs'), standingMode: adminTfValue_('adminTfLeagueStanding') });
+  if (!res || res.success === false) { adminTfActionStatus_(res && (res.error || res.message) || 'Could not create league.', true); return; }
+  adminTfActionStatus_('✅ League created.', false);
+  await navigate('admin-team-fantasy', { skipUnsavedCheck: true });
+}
+
+async function adminTfAssignMember_() {
+  const username = adminTfValue_('adminTfMemberUser').trim();
+  const leagueId = adminTfValue_('adminTfMemberLeague');
+  if (!username || !leagueId) { adminTfActionStatus_('Choose a league and enter a username.', true); return; }
+  const res = await apiTeamFantasyPost_('adminAssignTeamFantasyLeagueMember', { gameId: getFrontendGameId(), leagueId: leagueId, memberUsername: username });
+  if (!res || res.success === false) { adminTfActionStatus_(res && (res.error || res.message) || 'Could not add user.', true); return; }
+  adminTfActionStatus_('✅ Added ' + Number(res.added || 0) + ' entry/entries to the league.', false);
+  await navigate('admin-team-fantasy', { skipUnsavedCheck: true });
+}
+
+async function adminTfReminder_(previewOnly) {
+  adminTfActionStatus_(previewOnly ? 'Building reminder preview…' : 'Sending reminders…', false);
+  const res = await apiTeamFantasyPost_('adminSendTeamFantasyReminder', { gameId: getFrontendGameId(), previewOnly: !!previewOnly });
+  if (!res || res.success === false) { adminTfActionStatus_(res && (res.error || res.message) || 'Reminder action failed.', true); return; }
+  if (previewOnly) {
+    const out = document.getElementById('adminTfReminderPreview');
+    if (out) out.innerHTML = `<div class="tf-reminder-preview"><strong>${Number(res.missingUsers || 0)} users missing picks</strong>${(res.details || []).filter(function(d){ return d.missingCount > 0; }).map(function(d){ return `<div>${adminTfEscape_(d.username)} — ${d.picked}/${d.required}: ${adminTfEscape_((d.missing || []).join(', '))}</div>`; }).join('')}</div>`;
+    adminTfActionStatus_('✅ Preview ready.', false);
+  } else {
+    adminTfActionStatus_('Reminder send complete: ' + Number(res.sent || 0) + ' sent, ' + Number(res.failed || 0) + ' failed.', Number(res.failed || 0) > 0);
+  }
+}
+
