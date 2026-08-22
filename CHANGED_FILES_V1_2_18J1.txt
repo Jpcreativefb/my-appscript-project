@@ -1,0 +1,7 @@
+CHANGED_FILES_V1_2_18J1.txt
+docs/TEAM_FANTASY_CREATE_GAME_HOTFIX_V1_2_18J1.md
+frontend/js/pages/admin.js
+frontend/sw.js
+tests/team_fantasy_game_type_create_v1218j1_tests.js
+tools/apply_team_fantasy_game_type_create_v1218j1.py
+tools/install_team_fantasy_game_type_create_v1218j1.sh

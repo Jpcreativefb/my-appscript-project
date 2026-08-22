@@ -1321,6 +1321,10 @@ function adminGameTypeSummaryText_(type, flags) {
     return "Rankings: ON • Predictions: OFF • Sports Wagers: OFF";
   }
 
+  if (type === "team-fantasy") {
+    return "Team Fantasy Engine: ON • Normal Predictions/Wagers: OFF";
+  }
+
   if (type === "mixed") {
     const enabled = [];
     if (flags.fixedPointsEnabled) enabled.push("Standard Predictions (Fixed Points)");
@@ -2709,6 +2713,7 @@ function renderGameTypeOptions_(
     ["ranking", "Ranking Game"],
     ["head-to-head", "Head-to-Head Game"],
     ["survivor", "Survivor / Elimination Game"],
+    ["team-fantasy", "Team Fantasy Football"],
     ["mixed", "Hybrid Game"]
   ];
 
@@ -3427,6 +3432,12 @@ function adminApplyGameTypeDefaults(
   setChecked("wagerEnabled", false);
   setChecked("fixedPointsEnabled", false);
   setChecked("stakedPointsEnabled", false);
+
+  /* TEAM_FANTASY_V1218J1 DEFAULTS */
+  if (type === "team-fantasy") {
+    // Team Fantasy uses SportsTeamFantasyEngine rather than generic questions.
+    // The common reset above intentionally leaves all generic scoring flags off.
+  }
 
   if (["prediction", "head-to-head", "survivor"].indexOf(type) !== -1) {
     setChecked("predictionEnabled", true);
