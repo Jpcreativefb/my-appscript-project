@@ -204,9 +204,11 @@ function renderNotificationAdminControlCenter_(control) {
             <select id="notificationComposeAudience" onchange="previewAdminPushAudience_()">
               <option value="self">Just me / admin test</option>
               <option value="game">Players in this game only</option>
+              <option value="missing_picks">Players who still owe picks</option>
               <option value="all">All PATTC Predicts users</option>
             </select>
           </label>
+          <small class="notification-admin-compose-help">“Players who still owe picks” excludes players who already completed every currently open pick question.</small>
           <label>
             <span>Type</span>
             <select id="notificationComposeType" onchange="previewAdminPushAudience_()">
@@ -365,7 +367,7 @@ async function previewAdminPushAudience_() {
     type: String((document.getElementById("notificationComposeType") || {}).value || "custom").trim(),
     title: "Audience preview",
     message: "Preview only",
-    route: "notifications",
+    route: String((document.getElementById("notificationComposeAudience") || {}).value || "") === "missing_picks" ? "picks" : "notifications",
     previewOnly: true
   };
 
@@ -396,7 +398,7 @@ async function sendAdminPushNotification_() {
     type: String((document.getElementById("notificationComposeType") || {}).value || "custom").trim(),
     title: String((document.getElementById("notificationComposeTitle") || {}).value || "").trim(),
     message: String((document.getElementById("notificationComposeMessage") || {}).value || "").trim(),
-    route: "notifications"
+    route: String((document.getElementById("notificationComposeAudience") || {}).value || "") === "missing_picks" ? "picks" : "notifications"
   };
   notificationAdminShowMessage_("Sending…", false);
   const res = await apiAdminSendPushNotification(payload);
@@ -408,7 +410,14 @@ async function sendAdminPushNotification_() {
     ? res.failureDetails.join(" | ")
     : "";
   let resultMessage = res.message || (detail ? "Push failed: " + detail : "Notification sent ✓");
-  if (payload.audience === "game") {
+  if (payload.audience === "missing_picks") {
+    resultMessage += " Pick reminder: " + Number(res.requiredPickQuestions || 0) +
+      " open question(s), " + Number(res.noPicksUsers || 0) +
+      " no picks, " + Number(res.incompletePicksUsers || 0) +
+      " incomplete, " + Number(res.missingPicksUsers || 0) +
+      " still owe picks, " + Number(res.missingPicksActiveDevices || 0) +
+      " active device(s).";
+  } else if (payload.audience === "game") {
     resultMessage += " Game audience: " + Number(res.gameParticipants || 0) +
       " player(s), " + Number(res.gameEligibleUsers || 0) +
       " eligible, " + Number(res.gameActiveDevices || 0) + " active device(s).";

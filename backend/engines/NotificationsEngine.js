@@ -1375,6 +1375,266 @@ function notificationPushUniqueUsernames_(usernames) {
   return Object.keys(unique);
 }
 
+
+/* =========================================================
+   v1.2.18h OUTSTANDING PICK REMINDER TARGETING
+========================================================= */
+
+function notificationPushNormalizeKey_(value) {
+  return String(value === undefined || value === null ? "" : value)
+    .trim()
+    .toLowerCase();
+}
+
+
+function notificationPushUniqueIds_(values) {
+  const seen = {};
+  const result = [];
+  (values || []).forEach(function(value) {
+    const text = String(value || "").trim();
+    const key = text.toLowerCase();
+    if (!text || seen[key]) return;
+    seen[key] = true;
+    result.push(text);
+  });
+  return result;
+}
+
+function notificationPushColumnIndex_(headers, names) {
+  const normalized = {};
+  (headers || []).forEach(function(header, index) {
+    normalized[notificationPushNormalizeKey_(header)] = index;
+  });
+  for (let i = 0; i < (names || []).length; i++) {
+    const key = notificationPushNormalizeKey_(names[i]);
+    if (Object.prototype.hasOwnProperty.call(normalized, key)) {
+      return normalized[key];
+    }
+  }
+  return -1;
+}
+
+function notificationPushValueFalse_(value) {
+  if (value === false) return true;
+  const text = notificationPushNormalizeKey_(value);
+  return text === "false" || text === "0" || text === "no" || text === "off";
+}
+
+function notificationPushValueTrue_(value) {
+  if (value === true) return true;
+  const text = notificationPushNormalizeKey_(value);
+  return text === "true" || text === "1" || text === "yes" || text === "on";
+}
+
+function notificationPushCategoryId_(category) {
+  category = category || {};
+  return String(
+    category.categoryId ||
+    category.CategoryId ||
+    category.id ||
+    category.Id ||
+    ""
+  ).trim();
+}
+
+function notificationPushCategoryScoreMode_(category, setting) {
+  category = category || {};
+  setting = setting || {};
+  const nested = category.settings || category.Settings || {};
+  let raw = notificationPushNormalizeKey_(
+    setting.scoreMode ||
+    setting.ScoreMode ||
+    nested.scoreMode ||
+    nested.ScoreMode ||
+    category.scoreMode ||
+    category.ScoreMode ||
+    "correct-pick"
+  ).replace(/_/g, "-");
+
+  if (raw === "wager-odds" || raw === "sports-wager") raw = "wager";
+  if (raw === "ranked") raw = "ranking";
+  if (raw === "staked" || raw === "stake") raw = "staked-points";
+  if (raw === "confidence" || raw === "confidence-pool") raw = "confidence-points";
+  return raw;
+}
+
+function notificationPushCategoryIsLocked_(category, setting, nowMs) {
+  category = category || {};
+  setting = setting || {};
+  const nested = category.settings || category.Settings || {};
+
+  if (
+    notificationPushValueTrue_(setting.locked) ||
+    notificationPushValueTrue_(setting.Locked) ||
+    notificationPushValueTrue_(nested.locked) ||
+    notificationPushValueTrue_(nested.Locked) ||
+    notificationPushValueTrue_(category.locked) ||
+    notificationPushValueTrue_(category.Locked)
+  ) {
+    return true;
+  }
+
+  const lockValue =
+    setting.lockDateTime ||
+    setting.LockDateTime ||
+    nested.lockDateTime ||
+    nested.LockDateTime ||
+    category.lockDateTime ||
+    category.LockDateTime ||
+    "";
+
+  if (lockValue) {
+    const parsed = new Date(lockValue).getTime();
+    if (!isNaN(parsed) && parsed <= Number(nowMs || Date.now())) return true;
+  }
+
+  return false;
+}
+
+function notificationPushGamePicksClosed_(gameId) {
+  try {
+    if (typeof getGameById_ !== "function") return false;
+    const game = getGameById_(gameId);
+    if (!game) return false;
+    if (
+      notificationPushValueTrue_(game.lockAllPicks) ||
+      notificationPushValueTrue_(game.LockAllPicks) ||
+      notificationPushValueTrue_(game.archived) ||
+      notificationPushValueTrue_(game.Archived)
+    ) {
+      return true;
+    }
+    const status = notificationPushNormalizeKey_(game.status || game.Status || "");
+    return ["finished", "complete", "completed", "closed", "archived"].indexOf(status) !== -1;
+  } catch (err) {
+    return false;
+  }
+}
+
+function notificationPushOpenPickQuestionIds_(gameId) {
+  gameId = String(gameId || "").trim();
+  if (!gameId || notificationPushGamePicksClosed_(gameId)) return [];
+
+  const categories = typeof getCategories === "function" ? (getCategories(gameId) || []) : [];
+  const settings = typeof getCategorySettings === "function" ? (getCategorySettings(gameId) || {}) : {};
+  const nowMs = Date.now();
+  const ids = [];
+
+  (categories || []).forEach(function(category) {
+    category = category || {};
+    const categoryId = notificationPushCategoryId_(category);
+    if (!categoryId) return;
+    const setting = settings[categoryId] || {};
+
+    if (
+      notificationPushValueFalse_(category.active) ||
+      notificationPushValueFalse_(category.Active) ||
+      notificationPushValueTrue_(category.archived) ||
+      notificationPushValueTrue_(category.Archived) ||
+      notificationPushValueTrue_(setting.archived) ||
+      notificationPushValueTrue_(setting.Archived)
+    ) {
+      return;
+    }
+
+    if (notificationPushCategoryIsLocked_(category, setting, nowMs)) return;
+
+    const scoreMode = notificationPushCategoryScoreMode_(category, setting);
+    if (scoreMode === "wager" || scoreMode === "ranking") return;
+
+    const nominees = category.nominees || category.Nominees || [];
+    const hasActiveChoice = (nominees || []).some(function(nominee) {
+      nominee = nominee || {};
+      if (notificationPushValueFalse_(nominee.active) || notificationPushValueFalse_(nominee.Active)) {
+        return false;
+      }
+      return !!String(
+        nominee.nomineeId || nominee.NomineeId || nominee.id || nominee.Id || nominee.nominee || nominee.name || ""
+      ).trim();
+    });
+    if (!hasActiveChoice) return;
+
+    ids.push(categoryId);
+  });
+
+  return notificationPushUniqueIds_(ids);
+}
+
+function notificationPushPickedQuestionMapByUser_(gameId) {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName("Picks");
+  if (!sh) return {};
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return {};
+  const headers = data[0].map(function(value) { return String(value || "").trim(); });
+  const gameCol = notificationPushColumnIndex_(headers, ["GameId"]);
+  const userCol = notificationPushColumnIndex_(headers, ["Username"]);
+  const categoryCol = notificationPushColumnIndex_(headers, ["CategoryId", "QuestionId"]);
+  const nomineeCol = notificationPushColumnIndex_(headers, ["NomineeId", "AnswerId", "PickId", "Nominee"]);
+  if (gameCol < 0 || userCol < 0 || categoryCol < 0) return {};
+
+  const wantedGame = String(gameId || "").trim();
+  const result = {};
+
+  data.slice(1).forEach(function(row) {
+    if (String(row[gameCol] || "").trim() !== wantedGame) return;
+    const username = notificationPushNormalizeKey_(row[userCol]);
+    const categoryId = String(row[categoryCol] || "").trim();
+    if (!username || !categoryId) return;
+    if (nomineeCol >= 0 && !String(row[nomineeCol] || "").trim()) return;
+    if (!result[username]) result[username] = {};
+    result[username][categoryId] = true;
+  });
+
+  return result;
+}
+
+function notificationPushOutstandingPickSummary_(gameId, participants) {
+  const roster = notificationPushUniqueUsernames_(participants || []);
+  const requiredIds = notificationPushOpenPickQuestionIds_(gameId);
+  const pickedByUser = notificationPushPickedQuestionMapByUser_(gameId);
+  const missingUsers = [];
+  const noPicksUsers = [];
+  const incompleteUsers = [];
+  const completeUsers = [];
+  const details = {};
+
+  roster.forEach(function(username) {
+    const picked = pickedByUser[username] || {};
+    let answered = 0;
+    requiredIds.forEach(function(categoryId) {
+      if (picked[categoryId]) answered++;
+    });
+    const missing = Math.max(0, requiredIds.length - answered);
+    details[username] = {
+      answered: answered,
+      required: requiredIds.length,
+      missing: missing
+    };
+
+    if (!requiredIds.length || missing === 0) {
+      completeUsers.push(username);
+    } else if (answered === 0) {
+      noPicksUsers.push(username);
+      missingUsers.push(username);
+    } else {
+      incompleteUsers.push(username);
+      missingUsers.push(username);
+    }
+  });
+
+  return {
+    requiredQuestionIds: requiredIds,
+    requiredQuestions: requiredIds.length,
+    rosterUsers: roster.length,
+    noPicksUsers: noPicksUsers,
+    incompleteUsers: incompleteUsers,
+    completeUsers: completeUsers,
+    missingUsers: missingUsers,
+    details: details
+  };
+}
+
 function notificationPushAudienceResolution_(options) {
   options = options || {};
   const adminUsername = String(options.adminUsername || "").trim().toLowerCase();
@@ -1393,8 +1653,28 @@ function notificationPushAudienceResolution_(options) {
   const gameActiveUsers = {};
   gameSubscriptions.forEach(function(item) { gameActiveUsers[item.username] = true; });
 
+  const pickReminder = gameId
+    ? notificationPushOutstandingPickSummary_(gameId, gameParticipants)
+    : {
+        requiredQuestionIds: [],
+        requiredQuestions: 0,
+        rosterUsers: 0,
+        noPicksUsers: [],
+        incompleteUsers: [],
+        completeUsers: [],
+        missingUsers: [],
+        details: {}
+      };
+  const missingPickEligible = pickReminder.missingUsers.filter(function(username) {
+    return notificationPushUserAllowsType_(username, type, preferences);
+  });
+  const missingPickSubscriptions = notificationPushGetActiveSubscriptionsForUsers_(missingPickEligible);
+  const missingPickActiveUsers = {};
+  missingPickSubscriptions.forEach(function(item) { missingPickActiveUsers[item.username] = true; });
+
   let requestedRecipients = [];
   if (audience === "game") requestedRecipients = gameParticipants;
+  else if (audience === "missing_picks") requestedRecipients = pickReminder.missingUsers;
   else if (audience === "all") requestedRecipients = notificationPushAllUsernames_();
   else requestedRecipients = [adminUsername];
 
@@ -1416,6 +1696,14 @@ function notificationPushAudienceResolution_(options) {
     gameEligibleUsers: gameEligible.length,
     gameActiveUsers: Object.keys(gameActiveUsers).length,
     gameActiveDevices: gameSubscriptions.length,
+    requiredPickQuestions: pickReminder.requiredQuestions,
+    noPicksUsers: pickReminder.noPicksUsers.length,
+    incompletePicksUsers: pickReminder.incompleteUsers.length,
+    completePicksUsers: pickReminder.completeUsers.length,
+    missingPicksUsers: pickReminder.missingUsers.length,
+    missingPicksEligibleUsers: missingPickEligible.length,
+    missingPicksActiveUsers: Object.keys(missingPickActiveUsers).length,
+    missingPicksActiveDevices: missingPickSubscriptions.length,
     recipientUsers: recipients.length,
     activeUsers: Object.keys(activeUsers).length,
     activeDevices: subscriptions.length,
@@ -1547,8 +1835,13 @@ function apiAdminSendPushNotification(payload) {
   const route = String(payload.route || "notifications").trim().slice(0, 80);
   const previewOnly = payload.previewOnly === true;
 
-  if (audience === "game" && !gameId) {
-    return { success: false, message: "Choose a game for the Game Players audience." };
+  if ((audience === "game" || audience === "missing_picks") && !gameId) {
+    return {
+      success: false,
+      message: audience === "missing_picks"
+        ? "Choose a game for the Players Missing Picks audience."
+        : "Choose a game for the Game Players audience."
+    };
   }
 
   let gameSetting = null;
@@ -1570,7 +1863,21 @@ function apiAdminSendPushNotification(payload) {
 
   if (previewOnly) {
     let previewMessage = "";
-    if (audience === "game") {
+    if (audience === "missing_picks") {
+      previewMessage = resolution.gameParticipants + " player(s) · " +
+        resolution.requiredPickQuestions + " open pick question(s) · " +
+        resolution.noPicksUsers + " no picks · " +
+        resolution.incompletePicksUsers + " incomplete · " +
+        resolution.completePicksUsers + " complete · " +
+        resolution.missingPicksUsers + " still owe picks · " +
+        resolution.missingPicksEligibleUsers + " eligible for this alert · " +
+        resolution.missingPicksActiveDevices + " active device(s).";
+      if (resolution.requiredPickQuestions === 0) {
+        previewMessage += " No currently open pick questions need a reminder.";
+      } else if (resolution.missingPicksUsers === 0) {
+        previewMessage += " Everyone is caught up.";
+      }
+    } else if (audience === "game") {
       previewMessage = resolution.gameParticipants + " player(s) entered · " +
         resolution.gameEligibleUsers + " eligible for this alert · " +
         resolution.gameActiveDevices + " active device(s).";
@@ -1596,6 +1903,14 @@ function apiAdminSendPushNotification(payload) {
       gameEligibleUsers: resolution.gameEligibleUsers,
       gameActiveUsers: resolution.gameActiveUsers,
       gameActiveDevices: resolution.gameActiveDevices,
+      requiredPickQuestions: resolution.requiredPickQuestions,
+      noPicksUsers: resolution.noPicksUsers,
+      incompletePicksUsers: resolution.incompletePicksUsers,
+      completePicksUsers: resolution.completePicksUsers,
+      missingPicksUsers: resolution.missingPicksUsers,
+      missingPicksEligibleUsers: resolution.missingPicksEligibleUsers,
+      missingPicksActiveUsers: resolution.missingPicksActiveUsers,
+      missingPicksActiveDevices: resolution.missingPicksActiveDevices,
       recipients: resolution.recipientUsers,
       activeUsers: resolution.activeUsers,
       subscriptions: resolution.activeDevices,
@@ -1609,8 +1924,29 @@ function apiAdminSendPushNotification(payload) {
   if (!title || !message) {
     return { success: false, message: "Title and message are required." };
   }
-  if (audience === "game" && resolution.gameParticipants === 0) {
+  if ((audience === "game" || audience === "missing_picks") && resolution.gameParticipants === 0) {
     return { success: false, blocked: true, message: "No players have entered this game yet." };
+  }
+  if (audience === "missing_picks" && resolution.requiredPickQuestions === 0) {
+    return {
+      success: false,
+      blocked: true,
+      message: "There are no currently open pick questions that need a reminder."
+    };
+  }
+  if (audience === "missing_picks" && resolution.missingPicksUsers === 0) {
+    return {
+      success: false,
+      blocked: true,
+      message: "Everyone in this game has completed the currently open picks."
+    };
+  }
+  if (audience === "missing_picks" && !forceTestRecipient && resolution.recipientUsers === 0) {
+    return {
+      success: false,
+      blocked: true,
+      message: "Players still owe picks, but none are eligible for this alert based on notification preferences."
+    };
   }
   if (audience === "game" && !forceTestRecipient && resolution.recipientUsers === 0) {
     return {
@@ -1641,7 +1977,7 @@ function apiAdminSendPushNotification(payload) {
     badge: "/icons/icon-192.png",
     tag: gameId ? "awards-" + gameId + "-" + type : "awards-" + type,
     data: {
-      url: "./app.html#notifications",
+      url: "./app.html#" + (route || "notifications"),
       route: route,
       gameId: gameId,
       type: type
@@ -1690,6 +2026,13 @@ function apiAdminSendPushNotification(payload) {
       gameParticipants: resolution.gameParticipants,
       gameEligibleUsers: resolution.gameEligibleUsers,
       gameActiveDevices: resolution.gameActiveDevices,
+      requiredPickQuestions: resolution.requiredPickQuestions,
+      noPicksUsers: resolution.noPicksUsers,
+      incompletePicksUsers: resolution.incompletePicksUsers,
+      completePicksUsers: resolution.completePicksUsers,
+      missingPicksUsers: resolution.missingPicksUsers,
+      missingPicksEligibleUsers: resolution.missingPicksEligibleUsers,
+      missingPicksActiveDevices: resolution.missingPicksActiveDevices,
       message: gatewayResult.message || "Push gateway failed."
     };
   }
@@ -1704,6 +2047,14 @@ function apiAdminSendPushNotification(payload) {
     gameEligibleUsers: resolution.gameEligibleUsers,
     gameActiveUsers: resolution.gameActiveUsers,
     gameActiveDevices: resolution.gameActiveDevices,
+    requiredPickQuestions: resolution.requiredPickQuestions,
+    noPicksUsers: resolution.noPicksUsers,
+    incompletePicksUsers: resolution.incompletePicksUsers,
+    completePicksUsers: resolution.completePicksUsers,
+    missingPicksUsers: resolution.missingPicksUsers,
+    missingPicksEligibleUsers: resolution.missingPicksEligibleUsers,
+    missingPicksActiveUsers: resolution.missingPicksActiveUsers,
+    missingPicksActiveDevices: resolution.missingPicksActiveDevices,
     recipients: recipients.length,
     activeUsers: resolution.activeUsers,
     subscriptions: subscriptions.length,

@@ -36,13 +36,18 @@ assert.strictEqual(app, appMirror, 'frontend app mirrors must stay synchronized'
 ].forEach(text => assert(notifications.includes(text), 'Notification Center missing v1.2.18g preview: ' + text));
 
 assert(app.includes('name === "notifications"'), 'Notification page module-specific cache buster missing');
-assert(app.includes('v1218g-game-player-targeting'), 'v1.2.18g notification module cache marker missing');
+assert(app.includes('v1218h-missing-pick-reminders'), 'notification module cache marker must include the current v1.2.18h reminder release');
 
 // Runtime-check the audience resolver without touching Sheets.
 const context = vm.createContext({ console });
 vm.runInContext(engine, context);
 vm.runInContext(`
   notificationPushGameParticipants_ = function(){ return ["Alice", "bob", "alice"]; };
+  notificationPushOutstandingPickSummary_ = function(){ return {
+    requiredQuestionIds:["q1"], requiredQuestions:1, rosterUsers:2,
+    noPicksUsers:["alice"], incompleteUsers:[], completeUsers:["bob"],
+    missingUsers:["alice"], details:{}
+  }; };
   notificationPushAllUsernames_ = function(){ return ["alice", "bob", "carol"]; };
   notificationPushPreferenceSnapshot_ = function(){ return { bob: { app: true, lock: false } }; };
   notificationPushUserAllowsType_ = function(username, type, prefs){
