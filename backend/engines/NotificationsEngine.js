@@ -1635,6 +1635,209 @@ function notificationPushOutstandingPickSummary_(gameId, participants) {
   };
 }
 
+
+/* =========================================================
+   v1.2.18i NOTIFICATION TEST LAB
+   Dry-run helpers. These functions never write Picks or create
+   synthetic users/subscriptions in the spreadsheet.
+========================================================= */
+
+function notificationPushTestLabState_(answered, required) {
+  answered = Math.max(0, Number(answered || 0));
+  required = Math.max(0, Number(required || 0));
+  if (!required) return "no_open_questions";
+  if (answered <= 0) return "no_picks";
+  if (answered >= required) return "complete";
+  return "incomplete";
+}
+
+function notificationPushTestLabRow_(options) {
+  options = options || {};
+  const required = Math.max(0, Number(options.required || 0));
+  const answered = Math.min(required, Math.max(0, Number(options.answered || 0)));
+  const missing = Math.max(0, required - answered);
+  const allowsAlert = options.allowsAlert !== false;
+  const activeDevices = Math.max(0, Number(options.activeDevices || 0));
+  const state = notificationPushTestLabState_(answered, required);
+  const owesPicks = required > 0 && missing > 0;
+  const reminderEligible = owesPicks && allowsAlert;
+  const wouldReceiveLive = reminderEligible && activeDevices > 0;
+
+  let reason = "";
+  if (!required) reason = "No open pick questions to remind about.";
+  else if (!owesPicks) reason = "Excluded — picks complete.";
+  else if (!allowsAlert) reason = "Excluded — player disabled Make Picks alerts.";
+  else if (!activeDevices) reason = "Eligible — but no active push device is registered.";
+  else if (state === "no_picks") reason = "Included — no picks have been made.";
+  else reason = "Included — picks are incomplete.";
+
+  return {
+    username: String(options.username || "").trim(),
+    label: String(options.label || options.username || "Test player").trim(),
+    answered: answered,
+    required: required,
+    missing: missing,
+    state: state,
+    allowsAlert: allowsAlert,
+    activeDevices: activeDevices,
+    reminderEligible: reminderEligible,
+    wouldReceiveLive: wouldReceiveLive,
+    reason: reason
+  };
+}
+
+function notificationPushTestLabSummary_(rows, requiredQuestions, mode, gameId) {
+  rows = Array.isArray(rows) ? rows : [];
+  const count = function(test) {
+    return rows.filter(test).length;
+  };
+  const activeDevices = rows.reduce(function(total, row) {
+    return total + Number(row.activeDevices || 0);
+  }, 0);
+  const liveDevices = rows.reduce(function(total, row) {
+    return total + (row.wouldReceiveLive ? Number(row.activeDevices || 0) : 0);
+  }, 0);
+
+  return {
+    success: true,
+    testLab: true,
+    mode: String(mode || "real"),
+    gameId: String(gameId || ""),
+    requiredPickQuestions: Math.max(0, Number(requiredQuestions || 0)),
+    players: rows.length,
+    noPicksUsers: count(function(row) { return row.state === "no_picks"; }),
+    incompletePicksUsers: count(function(row) { return row.state === "incomplete"; }),
+    completePicksUsers: count(function(row) { return row.state === "complete"; }),
+    reminderEligibleUsers: count(function(row) { return row.reminderEligible; }),
+    wouldReceiveLiveUsers: count(function(row) { return row.wouldReceiveLive; }),
+    activeDevices: activeDevices,
+    wouldReceiveLiveDevices: liveDevices,
+    rows: rows
+  };
+}
+
+function notificationPushTestLabSynthetic_(requiredCount) {
+  const required = Math.max(1, Math.min(50, Math.round(Number(requiredCount || 5))));
+  const partial = required > 1 ? Math.max(1, Math.floor(required / 2)) : 0;
+  const rows = [
+    notificationPushTestLabRow_({
+      username: "synthetic-no-picks",
+      label: "Synthetic — No picks",
+      answered: 0,
+      required: required,
+      allowsAlert: true,
+      activeDevices: 1
+    }),
+    notificationPushTestLabRow_({
+      username: "synthetic-incomplete",
+      label: "Synthetic — Incomplete",
+      answered: partial,
+      required: required,
+      allowsAlert: true,
+      activeDevices: 1
+    }),
+    notificationPushTestLabRow_({
+      username: "synthetic-complete",
+      label: "Synthetic — Complete",
+      answered: required,
+      required: required,
+      allowsAlert: true,
+      activeDevices: 1
+    }),
+    notificationPushTestLabRow_({
+      username: "synthetic-no-device",
+      label: "Synthetic — Missing picks / no device",
+      answered: partial,
+      required: required,
+      allowsAlert: true,
+      activeDevices: 0
+    }),
+    notificationPushTestLabRow_({
+      username: "synthetic-opted-out",
+      label: "Synthetic — Missing picks / alerts off",
+      answered: partial,
+      required: required,
+      allowsAlert: false,
+      activeDevices: 1
+    })
+  ];
+
+  const result = notificationPushTestLabSummary_(rows, required, "synthetic", "");
+  result.message =
+    "Synthetic dry run: " + result.players + " test players · " +
+    result.requiredPickQuestions + " required pick(s) · " +
+    result.reminderEligibleUsers + " reminder-eligible · " +
+    result.wouldReceiveLiveUsers + " would receive LIVE push · " +
+    result.wouldReceiveLiveDevices + " target device(s).";
+  return result;
+}
+
+function notificationPushTestLabReal_(gameId) {
+  gameId = String(gameId || "").trim();
+  if (!gameId) {
+    return { success: false, testLab: true, message: "Choose a game for the real-game dry run." };
+  }
+
+  const participants = notificationPushUniqueUsernames_(notificationPushGameParticipants_(gameId));
+  const pickSummary = notificationPushOutstandingPickSummary_(gameId, participants);
+  const preferences = notificationPushPreferenceSnapshot_();
+  const subscriptions = notificationPushGetActiveSubscriptionsForUsers_(participants);
+  const devicesByUser = {};
+  subscriptions.forEach(function(item) {
+    const key = notificationPushNormalizeKey_(item.username);
+    if (!key) return;
+    devicesByUser[key] = Number(devicesByUser[key] || 0) + 1;
+  });
+
+  const rows = participants.map(function(username) {
+    const detail = pickSummary.details[username] || {
+      answered: 0,
+      required: pickSummary.requiredQuestions,
+      missing: pickSummary.requiredQuestions
+    };
+    return notificationPushTestLabRow_({
+      username: username,
+      label: username,
+      answered: detail.answered,
+      required: detail.required,
+      allowsAlert: notificationPushUserAllowsType_(username, "make_picks", preferences),
+      activeDevices: Number(devicesByUser[username] || 0)
+    });
+  });
+
+  const result = notificationPushTestLabSummary_(rows, pickSummary.requiredQuestions, "real", gameId);
+  result.requiredQuestionIds = pickSummary.requiredQuestionIds || [];
+  result.message =
+    "Real-game dry run: " + result.players + " player(s) · " +
+    result.requiredPickQuestions + " open pick question(s) · " +
+    result.noPicksUsers + " no picks · " +
+    result.incompletePicksUsers + " incomplete · " +
+    result.completePicksUsers + " complete · " +
+    result.reminderEligibleUsers + " reminder-eligible · " +
+    result.wouldReceiveLiveUsers + " would receive LIVE push on " +
+    result.wouldReceiveLiveDevices + " device(s).";
+  if (!result.players) result.message += " No players are currently attached to this game.";
+  if (!result.requiredPickQuestions) result.message += " No currently open pick questions are available yet.";
+  return result;
+}
+
+function notificationPushTestLabPreview_(payload, globalMode, gameSetting) {
+  payload = payload || {};
+  const mode = notificationPushNormalizeKey_(payload.testLabMode || "real");
+  const result = mode === "synthetic"
+    ? notificationPushTestLabSynthetic_(payload.syntheticRequiredPicks)
+    : notificationPushTestLabReal_(payload.gameId);
+
+  result.globalMode = String(globalMode || "OFF");
+  result.gameEnabled = gameSetting ? gameSetting.enabled === true : null;
+  result.gamePaused = gameSetting ? gameSetting.paused === true : null;
+  result.gameTestOnly = gameSetting ? gameSetting.testOnly === true : null;
+  result.dryRunOnly = true;
+  result.wrotePicks = false;
+  result.sentPush = false;
+  return result;
+}
+
 function notificationPushAudienceResolution_(options) {
   options = options || {};
   const adminUsername = String(options.adminUsername || "").trim().toLowerCase();
@@ -1834,6 +2037,23 @@ function apiAdminSendPushNotification(payload) {
   const message = String(payload.message || "").trim().slice(0, 500);
   const route = String(payload.route || "notifications").trim().slice(0, 80);
   const previewOnly = payload.previewOnly === true;
+  const testLabPreview = payload.testLabPreview === true;
+  const testLabSendToSelf = payload.testLabSendToSelf === true;
+
+  let gameSetting = null;
+  if (gameId) gameSetting = notificationPushGetGameSetting_(gameId);
+
+  if (testLabPreview) {
+    return notificationPushTestLabPreview_(payload, globalMode, gameSetting);
+  }
+
+  if (testLabSendToSelf && globalMode !== "TEST") {
+    return {
+      success: false,
+      blocked: true,
+      message: "Test Lab phone delivery requires Global Mode = TEST."
+    };
+  }
 
   if ((audience === "game" || audience === "missing_picks") && !gameId) {
     return {
@@ -1844,10 +2064,7 @@ function apiAdminSendPushNotification(payload) {
     };
   }
 
-  let gameSetting = null;
-  if (gameId) gameSetting = notificationPushGetGameSetting_(gameId);
-
-  const forceTestRecipient = globalMode === "TEST" || (gameSetting && gameSetting.testOnly === true);
+  const forceTestRecipient = testLabSendToSelf || globalMode === "TEST" || (gameSetting && gameSetting.testOnly === true);
   const resolution = notificationPushAudienceResolution_({
     adminUsername: adminUsername,
     gameId: gameId,
@@ -1858,8 +2075,8 @@ function apiAdminSendPushNotification(payload) {
 
   let blockedMessage = "";
   if (globalMode === "OFF") blockedMessage = "Global notifications are OFF.";
-  else if (gameSetting && !gameSetting.enabled) blockedMessage = "Notifications are OFF for this game.";
-  else if (gameSetting && gameSetting.paused) blockedMessage = "Notifications are paused for this game.";
+  else if (!testLabSendToSelf && gameSetting && !gameSetting.enabled) blockedMessage = "Notifications are OFF for this game.";
+  else if (!testLabSendToSelf && gameSetting && gameSetting.paused) blockedMessage = "Notifications are paused for this game.";
 
   if (previewOnly) {
     let previewMessage = "";

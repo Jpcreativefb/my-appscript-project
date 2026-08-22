@@ -1,6 +1,6 @@
 /* ======================
    NOTIFICATION CENTER
-   v1.2.18g
+   v1.2.18i
 ====================== */
 
 function notificationCenterEscape_(value) {
@@ -76,6 +76,7 @@ async function renderNotificationsPage() {
     if (adminControl) {
       notificationAdminApplySelectedGame_();
       if (typeof previewAdminPushAudience_ === "function") previewAdminPushAudience_();
+      if (typeof notificationTestLabModeChanged_ === "function") notificationTestLabModeChanged_();
     }
     if (typeof refreshNotificationCenterPushStatus_ === "function") {
       refreshNotificationCenterPushStatus_();
@@ -224,6 +225,40 @@ function renderNotificationAdminControlCenter_(control) {
           <div id="notificationAudiencePreview" class="notification-admin-inline-status">Checking audience…</div>
           <button class="button" type="button" onclick="sendAdminPushNotification_()">Send Notification</button>
           <div id="notificationAdminMessage" class="profile-message hidden"></div>
+        </div>
+
+        <div class="notification-admin-box notification-test-lab" style="grid-column:1 / -1;">
+          <h3>5. Notification Test Lab</h3>
+          <p>Dry-run reminder targeting without changing Picks or notifying real players. Use Synthetic mode when a game or user base is not ready yet.</p>
+          <div class="notification-admin-grid">
+            <label>
+              <span>Test mode</span>
+              <select id="notificationTestLabMode" onchange="notificationTestLabModeChanged_()">
+                <option value="synthetic">Synthetic 5-player simulation</option>
+                <option value="real">Real game dry run</option>
+              </select>
+            </label>
+            <label>
+              <span>Game for real dry run / test deep-link</span>
+              <select id="notificationTestLabGame">
+                <option value="">No specific game</option>
+                ${games.map(function(game) {
+                  return `<option value="${notificationCenterEscape_(game.gameId)}">${notificationCenterEscape_(game.gameName || game.gameId)}</option>`;
+                }).join("")}
+              </select>
+            </label>
+            <label id="notificationTestLabRequiredWrap">
+              <span>Synthetic required picks</span>
+              <input id="notificationTestLabRequired" type="text" inputmode="numeric" value="5">
+            </label>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+            <button class="button secondary" type="button" onclick="runNotificationTestLab_()">Run Dry Test</button>
+            <button class="button" type="button" onclick="sendNotificationTestLabPush_()">Send TEST Push to Me</button>
+          </div>
+          <small>Send TEST Push to Me works only while Global Mode is TEST. It never sends to the simulated or real-game audience.</small>
+          <div id="notificationTestLabResult" class="notification-admin-inline-status" style="display:block;margin-top:12px;white-space:normal;">Run a dry test to see who would be included and why.</div>
+          <div id="notificationTestLabRows" class="notification-admin-history-list"></div>
         </div>
       </div>
 
@@ -428,6 +463,120 @@ async function sendAdminPushNotification_() {
   );
   if (typeof refreshNotificationBadge_ === "function") refreshNotificationBadge_();
   if (typeof previewAdminPushAudience_ === "function") await previewAdminPushAudience_();
+}
+
+
+function notificationTestLabModeChanged_() {
+  const mode = String((document.getElementById("notificationTestLabMode") || {}).value || "synthetic").trim();
+  const requiredWrap = document.getElementById("notificationTestLabRequiredWrap");
+  if (requiredWrap) requiredWrap.style.display = mode === "synthetic" ? "grid" : "none";
+}
+
+function notificationTestLabStateLabel_(row) {
+  row = row || {};
+  if (row.state === "no_picks") return "No picks";
+  if (row.state === "incomplete") return "Incomplete";
+  if (row.state === "complete") return "Complete";
+  if (row.state === "no_open_questions") return "No open questions";
+  return row.state || "Unknown";
+}
+
+function renderNotificationTestLabRows_(rows) {
+  const host = document.getElementById("notificationTestLabRows");
+  if (!host) return;
+  rows = Array.isArray(rows) ? rows : [];
+  if (!rows.length) {
+    host.innerHTML = '<div><strong>No test players to display.</strong><span>Use Synthetic mode or attach players to the selected game.</span></div>';
+    return;
+  }
+
+  host.innerHTML = rows.map(function(row) {
+    const result = row.wouldReceiveLive
+      ? "INCLUDE"
+      : row.reminderEligible
+        ? "ELIGIBLE / NO DEVICE"
+        : "EXCLUDE";
+    return `<div>
+      <strong>${notificationCenterEscape_(row.label || row.username || "Player")}</strong>
+      <span>${Number(row.answered || 0)}/${Number(row.required || 0)} picks · ${notificationCenterEscape_(notificationTestLabStateLabel_(row))} · ${Number(row.activeDevices || 0)} device(s) · ${result}<br>${notificationCenterEscape_(row.reason || "")}</span>
+    </div>`;
+  }).join("");
+}
+
+async function runNotificationTestLab_() {
+  const resultEl = document.getElementById("notificationTestLabResult");
+  const mode = String((document.getElementById("notificationTestLabMode") || {}).value || "synthetic").trim();
+  const gameId = String((document.getElementById("notificationTestLabGame") || {}).value || "").trim();
+  const required = Number((document.getElementById("notificationTestLabRequired") || {}).value || 5);
+
+  if (resultEl) {
+    resultEl.textContent = "Running dry test…";
+    resultEl.className = "notification-admin-inline-status";
+  }
+
+  try {
+    const res = await apiAdminSendPushNotification({
+      testLabPreview: true,
+      testLabMode: mode,
+      syntheticRequiredPicks: required,
+      gameId: gameId,
+      type: "make_picks",
+      audience: "missing_picks",
+      title: "PATTC Predicts Test Lab",
+      message: "Dry run only",
+      route: "picks"
+    });
+
+    if (!res || res.success === false) {
+      if (resultEl) {
+        resultEl.textContent = res && (res.message || res.error) || "Test Lab dry run failed.";
+        resultEl.classList.add("not-ready");
+      }
+      renderNotificationTestLabRows_([]);
+      return;
+    }
+
+    if (resultEl) {
+      resultEl.textContent = (res.message || "Dry run complete.") +
+        " No Picks rows were changed and no push was sent.";
+      resultEl.classList.add("ready");
+    }
+    renderNotificationTestLabRows_(res.rows || []);
+  } catch (err) {
+    if (resultEl) {
+      resultEl.textContent = "Test Lab dry run failed.";
+      resultEl.classList.add("not-ready");
+    }
+    renderNotificationTestLabRows_([]);
+  }
+}
+
+async function sendNotificationTestLabPush_() {
+  const gameId = String((document.getElementById("notificationTestLabGame") || {}).value || "").trim();
+  notificationAdminShowMessage_("Sending Test Lab push to your signed-in admin device…", false);
+
+  const res = await apiAdminSendPushNotification({
+    testLabSendToSelf: true,
+    gameId: gameId,
+    audience: "self",
+    type: "make_picks",
+    title: "PATTC Predicts Test Lab",
+    message: "Test reminder: you still have picks to make.",
+    route: "picks"
+  });
+
+  if (!res || res.success === false) {
+    notificationAdminShowMessage_(
+      res && (res.message || res.error) || "Test Lab push could not be sent.",
+      true
+    );
+    return;
+  }
+
+  notificationAdminShowMessage_(
+    (res.message || "Test push sent ✓") + " TEST Lab delivery was restricted to your admin account.",
+    Number(res.failed || 0) > 0
+  );
 }
 
 async function refreshNotificationCenterPushStatus_() {

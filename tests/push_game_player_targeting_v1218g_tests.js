@@ -36,7 +36,7 @@ assert.strictEqual(app, appMirror, 'frontend app mirrors must stay synchronized'
 ].forEach(text => assert(notifications.includes(text), 'Notification Center missing v1.2.18g preview: ' + text));
 
 assert(app.includes('name === "notifications"'), 'Notification page module-specific cache buster missing');
-assert(app.includes('v1218h-missing-pick-reminders'), 'notification module cache marker must include the current v1.2.18h reminder release');
+assert(app.includes('v1218i-notification-test-lab'), 'notification module cache marker must include the current v1.2.18i Test Lab release');
 
 // Runtime-check the audience resolver without touching Sheets.
 const context = vm.createContext({ console });
