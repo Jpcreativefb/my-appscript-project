@@ -317,7 +317,7 @@ function adminRunGamePreflight(payload) {
       return category && category.active !== false;
     });
 
-  if (!categories.length && !leaderboardOnlyParent) {
+  if (!categories.length && !leaderboardOnlyParent && gameType !== "team-fantasy") {
 
     adminPreflightAddIssue_(
       issues,
@@ -325,6 +325,13 @@ function adminRunGamePreflight(payload) {
       "Game has no categories/questions."
     );
 
+  }
+
+  /* TEAM FANTASY v1.2.18j PREFLIGHT */
+  if (gameType === "team-fantasy" && typeof teamFantasyPreflightIssues_ === "function") {
+    teamFantasyPreflightIssues_(gameId).forEach(function(issue) {
+      adminPreflightAddIssue_(issues, issue.severity || "warning", issue.message || "Team Fantasy readiness issue.");
+    });
   }
 
   if (leaderboardOnlyParent) {

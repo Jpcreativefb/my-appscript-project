@@ -96,6 +96,19 @@ function getSupportedGameTypes() {
       mixedGame: false
     },
     {
+      id: "team-fantasy",
+      label: "Team Fantasy Football",
+      description: "Weekly NFL team-unit fantasy with configurable scoring, leagues, All-Play standings and playoffs.",
+      predictionEnabled: false,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
+    },
+    {
       id: "mixed",
       label: "Hybrid Game",
       description: "Combines standard predictions, confidence, staked predictions, sports wagers, racing wagers, and props in one game.",

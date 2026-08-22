@@ -549,6 +549,18 @@ function doPost(e) {
       return json(apiAdminUpdateRealityTvEpisodeSchedule(body));
     }
 
+    /* TEAM FANTASY v1.2.18j POST ROUTES */
+    if (action === "saveTeamFantasyPick") return json(apiSaveTeamFantasyPick(body));
+    if (action === "randomTeamFantasyPicks") return json(apiRandomTeamFantasyPicks(body));
+    if (action === "autoPickTeamFantasy") return json(apiAutoPickTeamFantasy(body));
+    if (action === "adminSaveTeamFantasySettings") return json(apiAdminSaveTeamFantasySettings(body));
+    if (action === "adminSaveTeamFantasyRules") return json(apiAdminSaveTeamFantasyRules(body));
+    if (action === "adminCreateTeamFantasyLeague") return json(apiAdminCreateTeamFantasyLeague(body));
+    if (action === "adminAssignTeamFantasyLeagueMember") return json(apiAdminAssignTeamFantasyLeagueMember(body));
+    if (action === "adminRunTeamFantasySync") return json(apiAdminRunTeamFantasySync(body));
+    if (action === "adminInstallTeamFantasySyncTrigger") return json(apiAdminInstallTeamFantasySyncTrigger(body));
+    if (action === "adminSendTeamFantasyReminder") return json(apiAdminSendTeamFantasyReminder(body));
+
     return json({
       success:
         false,
@@ -637,6 +649,17 @@ function doGet(e) {
       action === "adminSavePushSystemMode" ||
       action === "adminSaveGameNotificationSettings" ||
       action === "adminSendPushNotification" ||
+      /* TEAM FANTASY v1.2.18j POST-ONLY ACTIONS */
+      action === "saveTeamFantasyPick" ||
+      action === "randomTeamFantasyPicks" ||
+      action === "autoPickTeamFantasy" ||
+      action === "adminSaveTeamFantasySettings" ||
+      action === "adminSaveTeamFantasyRules" ||
+      action === "adminCreateTeamFantasyLeague" ||
+      action === "adminAssignTeamFantasyLeagueMember" ||
+      action === "adminRunTeamFantasySync" ||
+      action === "adminInstallTeamFantasySyncTrigger" ||
+      action === "adminSendTeamFantasyReminder" ||
       action === "createLeague" ||
       action === "addLeagueMember" ||
       action === "removeLeagueMember" ||
@@ -4633,6 +4656,12 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
       });
 
     }
+
+    /* TEAM FANTASY v1.2.18j GET ROUTES */
+    if (action === "getTeamFantasyState") return json(apiGetTeamFantasyState(params));
+    if (action === "getTeamFantasyStandings") return json(apiGetTeamFantasyStandings(params));
+    if (action === "getTeamFantasyHeadToHead") return json(apiGetTeamFantasyHeadToHead(params));
+    if (action === "adminGetTeamFantasyDashboard") return json(apiAdminGetTeamFantasyDashboard(params));
 
     /* =========================
        UNKNOWN ACTION

@@ -418,14 +418,16 @@ const APP_PAGE_MODULES = {
   "picks": ["picks"],
   "game-hub": ["gameModeHub"],
   "betting": ["betting"],
+  "team-fantasy": ["teamFantasy"],
   "leaderboard": ["leaderboard"],
   "season-hub": ["seasonHub"],
   "leagues": ["leagues"],
-  "admin": ["admin", "adminUi"],
+  "admin": ["admin", "adminUi", "adminTeamFantasy"],
   "admin-games": ["admin", "adminUi", "adminGames"],
   "admin-awards": ["admin", "adminUi", "adminAwards"],
   "admin-game-setup": ["admin", "adminUi", "adminGameSetup"],
   "admin-reality-tv": ["admin", "adminUi", "adminRealityTv"],
+  "admin-team-fantasy": ["admin", "adminUi", "adminTeamFantasy"],
   "admin-appearance": ["admin", "adminUi", "adminAppearance"],
   "profile": ["profile"],
   "notifications": ["notifications"],
@@ -953,6 +955,12 @@ async function enterGame(
     return;
   }
 
+  /* TEAM FANTASY v1.2.18j GAME ROUTE */
+  if (gameType === "team-fantasy") {
+    await navigate("team-fantasy");
+    return;
+  }
+
   if (
     gameType === "wager" ||
     gameType === "betting" ||
@@ -1137,6 +1145,11 @@ async function renderPage(page) {
 
       break;
 
+    case "team-fantasy":
+      if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
+      app.innerHTML = await renderTeamFantasyPage();
+      break;
+
     case "betting":
 
       app.innerHTML =
@@ -1176,6 +1189,10 @@ async function renderPage(page) {
       if (typeof adminUiEnhancePage === "function") {
         setTimeout(function() { adminUiEnhancePage(app); }, 0);
       }
+      /* TEAM FANTASY v1.2.18j ADMIN LAUNCHER */
+      if (typeof teamFantasyEnhanceAdminLanding_ === "function") {
+        setTimeout(function() { teamFantasyEnhanceAdminLanding_(); }, 0);
+      }
 
       break;
  
@@ -1196,6 +1213,11 @@ async function renderPage(page) {
         await renderAdminAwardsPage();
 
       break;
+    case "admin-team-fantasy":
+      if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
+      app.innerHTML = await renderAdminTeamFantasyPage();
+      break;
+
     case "admin-reality-tv":
 
       if (typeof renderAdminRealityTvPage !== "function") {

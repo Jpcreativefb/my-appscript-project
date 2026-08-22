@@ -1317,6 +1317,10 @@ function notificationPushCollectUsernamesFromSheet_(sheetName, gameId) {
 
 function notificationPushGameParticipants_(gameId) {
   const unique = {};
+  /* TEAM FANTASY v1.2.18j PARTICIPANTS */
+  if (typeof teamFantasyIsGame_ === "function" && teamFantasyIsGame_(gameId) && typeof teamFantasyParticipantUsernames_ === "function") {
+    teamFantasyParticipantUsernames_(gameId).forEach(function(username) { unique[String(username || "").trim().toLowerCase()] = true; });
+  }
   ["UserGameProfiles", "Picks", "Bets"].forEach(function(sheetName) {
     notificationPushCollectUsernamesFromSheet_(sheetName, gameId).forEach(function(username) {
       unique[username] = true;
@@ -1590,6 +1594,10 @@ function notificationPushPickedQuestionMapByUser_(gameId) {
 }
 
 function notificationPushOutstandingPickSummary_(gameId, participants) {
+  /* TEAM FANTASY v1.2.18j MISSING PICKS */
+  if (typeof teamFantasyIsGame_ === "function" && teamFantasyIsGame_(gameId) && typeof teamFantasyNotificationOutstandingSummary_ === "function") {
+    return teamFantasyNotificationOutstandingSummary_(gameId, participants);
+  }
   const roster = notificationPushUniqueUsernames_(participants || []);
   const requiredIds = notificationPushOpenPickQuestionIds_(gameId);
   const pickedByUser = notificationPushPickedQuestionMapByUser_(gameId);
