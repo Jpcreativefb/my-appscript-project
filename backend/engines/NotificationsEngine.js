@@ -1269,22 +1269,33 @@ function notificationPushGetActiveSubscriptionsForUsers_(usernames) {
   if (data.length <= 1) return [];
   const headers = data[0].map(String);
   const col = notificationColumnMap_(headers);
+  const seenEndpoints = {};
+  const subscriptions = [];
 
-  return data.slice(1).map(function(row, index) {
-    const username = String(row[col.Username] || "").trim().toLowerCase();
-    if (!wanted[username] || !notificationBool_(row[col.Enabled], false)) return null;
+  // Newest row owns an endpoint even if it belongs to a different user or
+  // is disabled. This prevents a stale older registration from receiving a
+  // notification after the same browser/device has been reassigned.
+  for (let index = data.length - 1; index >= 1; index--) {
+    const row = data[index];
     const endpoint = String(row[col.Endpoint] || "").trim();
+    if (!endpoint || seenEndpoints[endpoint]) continue;
+    seenEndpoints[endpoint] = true;
+
+    const username = String(row[col.Username] || "").trim().toLowerCase();
+    if (!wanted[username] || !notificationBool_(row[col.Enabled], false)) continue;
     const p256dh = String(row[col.P256dh] || "").trim();
     const auth = String(row[col.Auth] || "").trim();
-    if (!endpoint || !p256dh || !auth) return null;
-    return {
-      rowIndex: index + 2,
+    if (!p256dh || !auth) continue;
+    subscriptions.push({
+      rowIndex: index + 1,
       subscriptionId: String(row[col.SubscriptionId] || "").trim(),
       username: username,
       endpoint: endpoint,
       keys: { p256dh: p256dh, auth: auth }
-    };
-  }).filter(Boolean);
+    });
+  }
+
+  return subscriptions.reverse();
 }
 
 function notificationPushCollectUsernamesFromSheet_(sheetName, gameId) {
@@ -1320,24 +1331,97 @@ function notificationPushAllUsernames_() {
   }).filter(Boolean);
 }
 
-function notificationPushUserAllowsType_(username, type) {
+function notificationPushPreferenceSnapshot_() {
   const sh = notificationGetOrCreateSheet_(USER_NOTIFICATION_PREFS_SHEET, USER_NOTIFICATION_PREF_HEADERS);
   const data = sh.getDataRange().getValues();
-  if (data.length <= 1) return true;
+  if (data.length <= 1) return {};
   const headers = data[0].map(String);
   const col = notificationColumnMap_(headers);
-  const key = String(username || "").trim().toLowerCase();
+  const snapshot = {};
 
-  for (let i = 1; i < data.length; i++) {
-    if (String(data[i][col.Username] || "").trim().toLowerCase() !== key) continue;
-    if (!notificationBool_(data[i][col.AppNotificationsEnabled], true)) return false;
-    if (type === "make_picks") return notificationBool_(data[i][col.NotifyMakePicks], true);
-    if (type === "lock") return notificationBool_(data[i][col.NotifyLockApproaching], true);
-    if (type === "results") return notificationBool_(data[i][col.NotifyFinalResults], true);
-    if (type === "new_game") return notificationBool_(data[i][col.NotifyNewGames], true);
-    return true;
-  }
+  data.slice(1).forEach(function(row) {
+    const username = String(row[col.Username] || "").trim().toLowerCase();
+    if (!username) return;
+    snapshot[username] = {
+      app: notificationBool_(row[col.AppNotificationsEnabled], true),
+      makePicks: notificationBool_(row[col.NotifyMakePicks], true),
+      lock: notificationBool_(row[col.NotifyLockApproaching], true),
+      results: notificationBool_(row[col.NotifyFinalResults], true),
+      newGame: notificationBool_(row[col.NotifyNewGames], true)
+    };
+  });
+
+  return snapshot;
+}
+
+function notificationPushUserAllowsType_(username, type, preferenceSnapshot) {
+  const key = String(username || "").trim().toLowerCase();
+  const prefs = preferenceSnapshot && preferenceSnapshot[key];
+  if (!prefs) return true;
+  if (prefs.app === false) return false;
+  if (type === "make_picks") return prefs.makePicks !== false;
+  if (type === "lock") return prefs.lock !== false;
+  if (type === "results") return prefs.results !== false;
+  if (type === "new_game") return prefs.newGame !== false;
   return true;
+}
+
+function notificationPushUniqueUsernames_(usernames) {
+  const unique = {};
+  (usernames || []).forEach(function(username) {
+    const key = String(username || "").trim().toLowerCase();
+    if (key) unique[key] = true;
+  });
+  return Object.keys(unique);
+}
+
+function notificationPushAudienceResolution_(options) {
+  options = options || {};
+  const adminUsername = String(options.adminUsername || "").trim().toLowerCase();
+  const gameId = String(options.gameId || "").trim();
+  const audience = String(options.audience || "self").trim().toLowerCase();
+  const type = notificationPushNormalizeType_(options.type);
+  const forceTestRecipient = options.forceTestRecipient === true;
+  const preferences = notificationPushPreferenceSnapshot_();
+  const gameParticipants = gameId
+    ? notificationPushUniqueUsernames_(notificationPushGameParticipants_(gameId))
+    : [];
+  const gameEligible = gameParticipants.filter(function(username) {
+    return notificationPushUserAllowsType_(username, type, preferences);
+  });
+  const gameSubscriptions = notificationPushGetActiveSubscriptionsForUsers_(gameEligible);
+  const gameActiveUsers = {};
+  gameSubscriptions.forEach(function(item) { gameActiveUsers[item.username] = true; });
+
+  let requestedRecipients = [];
+  if (audience === "game") requestedRecipients = gameParticipants;
+  else if (audience === "all") requestedRecipients = notificationPushAllUsernames_();
+  else requestedRecipients = [adminUsername];
+
+  requestedRecipients = notificationPushUniqueUsernames_(requestedRecipients).filter(function(username) {
+    return notificationPushUserAllowsType_(username, type, preferences);
+  });
+
+  const recipients = forceTestRecipient
+    ? notificationPushUniqueUsernames_([adminUsername])
+    : requestedRecipients;
+  const subscriptions = notificationPushGetActiveSubscriptionsForUsers_(recipients);
+  const activeUsers = {};
+  subscriptions.forEach(function(item) { activeUsers[item.username] = true; });
+
+  return {
+    requestedAudience: audience,
+    effectiveAudience: forceTestRecipient ? "self-test" : audience,
+    gameParticipants: gameParticipants.length,
+    gameEligibleUsers: gameEligible.length,
+    gameActiveUsers: Object.keys(gameActiveUsers).length,
+    gameActiveDevices: gameSubscriptions.length,
+    recipientUsers: recipients.length,
+    activeUsers: Object.keys(activeUsers).length,
+    activeDevices: subscriptions.length,
+    recipients: recipients,
+    subscriptions: subscriptions
+  };
 }
 
 function notificationPushMarkDeliveryResult_(result) {
@@ -1461,46 +1545,83 @@ function apiAdminSendPushNotification(payload) {
   const title = String(payload.title || "PATTC Predicts").trim().slice(0, 120);
   const message = String(payload.message || "").trim().slice(0, 500);
   const route = String(payload.route || "notifications").trim().slice(0, 80);
+  const previewOnly = payload.previewOnly === true;
 
-  if (globalMode === "OFF") {
-    return { success: false, blocked: true, message: "Global notifications are OFF." };
+  if (audience === "game" && !gameId) {
+    return { success: false, message: "Choose a game for the Game Players audience." };
+  }
+
+  let gameSetting = null;
+  if (gameId) gameSetting = notificationPushGetGameSetting_(gameId);
+
+  const forceTestRecipient = globalMode === "TEST" || (gameSetting && gameSetting.testOnly === true);
+  const resolution = notificationPushAudienceResolution_({
+    adminUsername: adminUsername,
+    gameId: gameId,
+    audience: audience,
+    type: type,
+    forceTestRecipient: forceTestRecipient
+  });
+
+  let blockedMessage = "";
+  if (globalMode === "OFF") blockedMessage = "Global notifications are OFF.";
+  else if (gameSetting && !gameSetting.enabled) blockedMessage = "Notifications are OFF for this game.";
+  else if (gameSetting && gameSetting.paused) blockedMessage = "Notifications are paused for this game.";
+
+  if (previewOnly) {
+    let previewMessage = "";
+    if (audience === "game") {
+      previewMessage = resolution.gameParticipants + " player(s) entered · " +
+        resolution.gameEligibleUsers + " eligible for this alert · " +
+        resolution.gameActiveDevices + " active device(s).";
+    } else {
+      previewMessage = resolution.recipientUsers + " eligible user(s) · " +
+        resolution.activeDevices + " active device(s).";
+    }
+    if (forceTestRecipient) {
+      previewMessage += " TEST delivery will go only to your signed-in admin account.";
+    }
+    if (blockedMessage) previewMessage += " Currently blocked: " + blockedMessage;
+
+    return {
+      success: true,
+      preview: true,
+      blocked: !!blockedMessage,
+      blockReason: blockedMessage,
+      globalMode: globalMode,
+      testDelivery: forceTestRecipient,
+      requestedAudience: resolution.requestedAudience,
+      effectiveAudience: resolution.effectiveAudience,
+      gameParticipants: resolution.gameParticipants,
+      gameEligibleUsers: resolution.gameEligibleUsers,
+      gameActiveUsers: resolution.gameActiveUsers,
+      gameActiveDevices: resolution.gameActiveDevices,
+      recipients: resolution.recipientUsers,
+      activeUsers: resolution.activeUsers,
+      subscriptions: resolution.activeDevices,
+      message: previewMessage
+    };
+  }
+
+  if (blockedMessage) {
+    return { success: false, blocked: true, message: blockedMessage };
   }
   if (!title || !message) {
     return { success: false, message: "Title and message are required." };
   }
-
-  let gameSetting = null;
-  if (gameId) {
-    gameSetting = notificationPushGetGameSetting_(gameId);
-    if (!gameSetting.enabled) {
-      return { success: false, blocked: true, message: "Notifications are OFF for this game." };
-    }
-    if (gameSetting.paused) {
-      return { success: false, blocked: true, message: "Notifications are paused for this game." };
-    }
+  if (audience === "game" && resolution.gameParticipants === 0) {
+    return { success: false, blocked: true, message: "No players have entered this game yet." };
+  }
+  if (audience === "game" && !forceTestRecipient && resolution.recipientUsers === 0) {
+    return {
+      success: false,
+      blocked: true,
+      message: "Players have entered this game, but none are eligible for this alert based on notification preferences."
+    };
   }
 
-  let recipients = [];
-  const forceTestRecipient = globalMode === "TEST" || (gameSetting && gameSetting.testOnly === true);
-  if (forceTestRecipient || audience === "self") {
-    recipients = [adminUsername];
-  } else if (audience === "game") {
-    if (!gameId) return { success: false, message: "Choose a game for the Game Players audience." };
-    recipients = notificationPushGameParticipants_(gameId);
-  } else if (audience === "all") {
-    recipients = notificationPushAllUsernames_();
-  } else {
-    recipients = [adminUsername];
-  }
-
-  const unique = {};
-  recipients.forEach(function(username) {
-    const key = String(username || "").trim().toLowerCase();
-    if (key) unique[key] = true;
-  });
-  recipients = Object.keys(unique).filter(function(username) {
-    return forceTestRecipient || notificationPushUserAllowsType_(username, type);
-  });
+  const recipients = resolution.recipients;
+  const subscriptions = resolution.subscriptions;
 
   recipients.forEach(function(username) {
     createUserNotification_({
@@ -1513,7 +1634,6 @@ function apiAdminSendPushNotification(payload) {
     });
   });
 
-  const subscriptions = notificationPushGetActiveSubscriptionsForUsers_(recipients);
   const notification = {
     title: title,
     body: message,
@@ -1547,7 +1667,7 @@ function apiAdminSendPushNotification(payload) {
     adminUsername: adminUsername,
     globalMode: globalMode,
     gameId: gameId,
-    audience: forceTestRecipient ? "self-test" : audience,
+    audience: resolution.effectiveAudience,
     type: type,
     title: title,
     message: message,
@@ -1567,6 +1687,9 @@ function apiAdminSendPushNotification(payload) {
       success: false,
       recipients: recipients.length,
       subscriptions: subscriptions.length,
+      gameParticipants: resolution.gameParticipants,
+      gameEligibleUsers: resolution.gameEligibleUsers,
+      gameActiveDevices: resolution.gameActiveDevices,
       message: gatewayResult.message || "Push gateway failed."
     };
   }
@@ -1575,7 +1698,14 @@ function apiAdminSendPushNotification(payload) {
     success: true,
     globalMode: globalMode,
     testDelivery: forceTestRecipient,
+    requestedAudience: resolution.requestedAudience,
+    effectiveAudience: resolution.effectiveAudience,
+    gameParticipants: resolution.gameParticipants,
+    gameEligibleUsers: resolution.gameEligibleUsers,
+    gameActiveUsers: resolution.gameActiveUsers,
+    gameActiveDevices: resolution.gameActiveDevices,
     recipients: recipients.length,
+    activeUsers: resolution.activeUsers,
     subscriptions: subscriptions.length,
     sent: sent,
     failed: failed,

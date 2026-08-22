@@ -1,6 +1,6 @@
 /* ======================
    NOTIFICATION CENTER
-   v1.2.18e
+   v1.2.18g
 ====================== */
 
 function notificationCenterEscape_(value) {
@@ -73,7 +73,10 @@ async function renderNotificationsPage() {
   const unreadCount = Number(res && res.unreadCount) || 0;
 
   setTimeout(function() {
-    if (adminControl) notificationAdminApplySelectedGame_();
+    if (adminControl) {
+      notificationAdminApplySelectedGame_();
+      if (typeof previewAdminPushAudience_ === "function") previewAdminPushAudience_();
+    }
     if (typeof refreshNotificationCenterPushStatus_ === "function") {
       refreshNotificationCenterPushStatus_();
     }
@@ -189,7 +192,7 @@ function renderNotificationAdminControlCenter_(control) {
           <h3>4. Send / Test Notification</h3>
           <label>
             <span>Game</span>
-            <select id="notificationComposeGame">
+            <select id="notificationComposeGame" onchange="previewAdminPushAudience_()">
               <option value="">No specific game</option>
               ${games.map(function(game) {
                 return `<option value="${notificationCenterEscape_(game.gameId)}" ${firstGame.gameId === game.gameId ? "" : ""}>${notificationCenterEscape_(game.gameName || game.gameId)}</option>`;
@@ -198,7 +201,7 @@ function renderNotificationAdminControlCenter_(control) {
           </label>
           <label>
             <span>Audience</span>
-            <select id="notificationComposeAudience">
+            <select id="notificationComposeAudience" onchange="previewAdminPushAudience_()">
               <option value="self">Just me / admin test</option>
               <option value="game">Players in this game only</option>
               <option value="all">All PATTC Predicts users</option>
@@ -206,7 +209,7 @@ function renderNotificationAdminControlCenter_(control) {
           </label>
           <label>
             <span>Type</span>
-            <select id="notificationComposeType">
+            <select id="notificationComposeType" onchange="previewAdminPushAudience_()">
               <option value="custom">Custom announcement</option>
               <option value="make_picks">Make picks / new questions</option>
               <option value="lock">Lock approaching</option>
@@ -216,6 +219,7 @@ function renderNotificationAdminControlCenter_(control) {
           </label>
           <label><span>Title</span><input id="notificationComposeTitle" maxlength="120" value="PATTC Predicts"></label>
           <label><span>Message</span><textarea id="notificationComposeMessage" maxlength="500" rows="3" placeholder="Type the notification message…"></textarea></label>
+          <div id="notificationAudiencePreview" class="notification-admin-inline-status">Checking audience…</div>
           <button class="button" type="button" onclick="sendAdminPushNotification_()">Send Notification</button>
           <div id="notificationAdminMessage" class="profile-message hidden"></div>
         </div>
@@ -350,6 +354,41 @@ async function saveNotificationGameSettings_() {
   navigate("notifications", { suppressLoader: true });
 }
 
+
+async function previewAdminPushAudience_() {
+  const el = document.getElementById("notificationAudiencePreview");
+  if (!el || typeof apiAdminSendPushNotification !== "function") return;
+
+  const payload = {
+    gameId: String((document.getElementById("notificationComposeGame") || {}).value || "").trim(),
+    audience: String((document.getElementById("notificationComposeAudience") || {}).value || "self").trim(),
+    type: String((document.getElementById("notificationComposeType") || {}).value || "custom").trim(),
+    title: "Audience preview",
+    message: "Preview only",
+    route: "notifications",
+    previewOnly: true
+  };
+
+  el.textContent = "Checking audience…";
+  el.className = "notification-admin-inline-status";
+
+  try {
+    const res = await apiAdminSendPushNotification(payload);
+    if (!res || res.success === false) {
+      el.textContent = res && (res.message || res.error) || "Could not preview this audience.";
+      el.classList.add("not-ready");
+      return;
+    }
+
+    el.textContent = res.message || "Audience preview ready.";
+    if (res.blocked) el.classList.add("not-ready");
+    else el.classList.add("ready");
+  } catch (err) {
+    el.textContent = "Could not preview this audience.";
+    el.classList.add("not-ready");
+  }
+}
+
 async function sendAdminPushNotification_() {
   const payload = {
     gameId: String((document.getElementById("notificationComposeGame") || {}).value || "").trim(),
@@ -368,11 +407,18 @@ async function sendAdminPushNotification_() {
   const detail = Array.isArray(res.failureDetails) && res.failureDetails.length
     ? res.failureDetails.join(" | ")
     : "";
+  let resultMessage = res.message || (detail ? "Push failed: " + detail : "Notification sent ✓");
+  if (payload.audience === "game") {
+    resultMessage += " Game audience: " + Number(res.gameParticipants || 0) +
+      " player(s), " + Number(res.gameEligibleUsers || 0) +
+      " eligible, " + Number(res.gameActiveDevices || 0) + " active device(s).";
+  }
   notificationAdminShowMessage_(
-    res.message || (detail ? "Push failed: " + detail : "Notification sent ✓"),
+    resultMessage,
     Number(res.failed || 0) > 0
   );
   if (typeof refreshNotificationBadge_ === "function") refreshNotificationBadge_();
+  if (typeof previewAdminPushAudience_ === "function") await previewAdminPushAudience_();
 }
 
 async function refreshNotificationCenterPushStatus_() {
