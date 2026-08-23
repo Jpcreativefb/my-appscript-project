@@ -281,6 +281,70 @@ function adminRunGamePreflight(payload) {
 
   }
 
+  /* =====================================================
+     TEAM_FANTASY_V1218P_FAST_PREFLIGHT
+
+     Team Fantasy is category-free by design. Do not call the generic
+     adminGetGameSetup() loader for this game type; that loader scans the
+     normal Categories/Question setup and can be slow enough to time out.
+     Validate only Team Fantasy's saved settings + scoring rules here.
+  ===================================================== */
+  if (adminPreflightGameType_(game) === "team-fantasy") {
+    if (typeof teamFantasyPreflightIssues_ !== "function") {
+      adminPreflightAddIssue_(
+        issues,
+        "error",
+        "Team Fantasy preflight validator is unavailable."
+      );
+    } else {
+      const teamFantasyIssues =
+        teamFantasyPreflightIssues_(gameId) || [];
+
+      teamFantasyIssues.forEach(function(issue) {
+        adminPreflightAddIssue_(
+          issues,
+          issue && issue.severity ? issue.severity : "warning",
+          issue && issue.message
+            ? issue.message
+            : "Team Fantasy preflight reported an unspecified issue."
+        );
+      });
+    }
+
+    const teamFantasyStatus =
+      adminPreflightNormalize_(game.status);
+    const teamFantasyErrorCount =
+      issues.filter(function(issue) {
+        return issue.severity === "error";
+      }).length;
+    const teamFantasyWarningCount =
+      issues.filter(function(issue) {
+        return issue.severity === "warning";
+      }).length;
+
+    return {
+      success: true,
+      ready: teamFantasyErrorCount === 0,
+      gameId: gameId,
+      gameType: "team-fantasy",
+      status: teamFantasyStatus || "",
+      realityTvManaged: false,
+      canRepairRealityTv: false,
+      categoryModeCounts: {
+        picks: 0,
+        confidence: 0,
+        staked: 0,
+        wagers: 0,
+        rankings: 0
+      },
+      errorCount: teamFantasyErrorCount,
+      warningCount: teamFantasyWarningCount,
+      issueCount: issues.length,
+      issues: issues,
+      fastPath: true
+    };
+  }
+
   /* =========================
      SETUP CHECKS
   ========================= */
