@@ -618,61 +618,26 @@ function teamFantasyHttpJson_(url) {
   return JSON.parse(response.getContentText() || "{}");
 }
 
-function teamFantasyNormalizeScheduleRow_(row) {
-  const homeAbbr = teamFantasyNormalizeTeam_(row.HomeAbbreviation || row.homeAbbreviation || row.HomeTeamAbbr || row.homeTeamAbbr || "");
-  const awayAbbr = teamFantasyNormalizeTeam_(row.AwayAbbreviation || row.awayAbbreviation || row.AwayTeamAbbr || row.awayTeamAbbr || "");
-  return {
-    eventId: teamFantasyString_(row.ESPNEventId || row.espnEventId || row.EventId || row.eventId || row.GameId || row.gameId).replace(/^nfl_/, ""),
-    sportsGameId: teamFantasyString_(row.GameId || row.gameId),
-    gameDateTime: teamFantasyString_(row.GameDateTime || row.gameDateTime || row.Date || row.date),
-    homeTeam: teamFantasyString_(row.HomeTeam || row.homeTeam),
-    awayTeam: teamFantasyString_(row.AwayTeam || row.awayTeam),
-    homeAbbr: homeAbbr,
-    awayAbbr: awayAbbr,
-    homeTeamId: teamFantasyString_(row.HomeTeamId || row.homeTeamId),
-    awayTeamId: teamFantasyString_(row.AwayTeamId || row.awayTeamId),
-    status: teamFantasyString_(row.Status || row.status),
-    state: teamFantasyKey_(row.State || row.state),
-    completed: teamFantasyBool_(row.Completed !== undefined ? row.Completed : row.completed, false) ||
-      teamFantasyKey_(row.State || row.state) === "post" ||
-      teamFantasyKey_(row.Status || row.status).indexOf("final") !== -1,
-    seasonYear: Number(row.SeasonYear || row.seasonYear || 0),
-    seasonType: Number(row.SeasonType || row.seasonType || 0),
-    week: Number(row.Week || row.week || 0)
-  };
-}
-
-function teamFantasyFetchScheduleFromSportsEngine_(settings, week) {
+function teamFantasySportsEngineJson_(action, params) {
   const base = teamFantasySportsApiUrl_();
-  if (!base) return [];
-  try {
-    const separator = base.indexOf("?") === -1 ? "?" : "&";
-    const url = base + separator + "action=getSportsScores&sport=football&league=nfl&_ts=" + Date.now();
-    const parsed = teamFantasyHttpJson_(url);
-    const rows = Array.isArray(parsed) ? parsed : (parsed.scores || parsed.games || parsed.rows || []);
-    const wantedType = teamFantasyScheduleSeasonType_(settings, week);
-    const wantedWeek = teamFantasyScheduleWeek_(settings, week);
-    return rows.map(teamFantasyNormalizeScheduleRow_).filter(function(row) {
-      if (row.seasonYear && row.seasonYear !== settings.seasonYear) return false;
-      if (row.seasonType && row.seasonType !== wantedType) return false;
-      if (row.week && row.week !== wantedWeek) return false;
-      return row.eventId && row.gameDateTime;
-    });
-  } catch (err) {
-    return [];
+  if (!base) throw new Error("Sports Scores Engine URL is not configured.");
+  const query = ["action=" + encodeURIComponent(String(action || ""))];
+  Object.keys(params || {}).forEach(function(key) {
+    const value = params[key];
+    if (value === undefined || value === null || value === "") return;
+    query.push(encodeURIComponent(key) + "=" + encodeURIComponent(String(value)));
+  });
+  query.push("_ts=" + Date.now());
+  const url = base + (base.indexOf("?") === -1 ? "?" : "&") + query.join("&");
+  const parsed = teamFantasyHttpJson_(url);
+  if (parsed && parsed.success === false) {
+    throw new Error(teamFantasyString_(parsed.error || parsed.message) || "Sports Scores Engine request failed.");
   }
+  return parsed || {};
 }
 
-function teamFantasyFetchScheduleFromEspn_(settings, week) {
-  const seasonType = teamFantasyScheduleSeasonType_(settings, week);
-  const sourceWeek = teamFantasyScheduleWeek_(settings, week);
-  const url = "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?" +
-    "dates=" + encodeURIComponent(String(settings.seasonYear)) +
-    "&seasontype=" + encodeURIComponent(String(seasonType)) +
-    "&week=" + encodeURIComponent(String(sourceWeek)) +
-    "&limit=100";
-  const parsed = teamFantasyHttpJson_(url);
-  return (parsed.events || []).map(function(event) {
+function teamFantasyScheduleRowsFromEspnEvents_(events, settings, seasonType, sourceWeek) {
+  return (Array.isArray(events) ? events : []).map(function(event) {
     const competition = event.competitions && event.competitions[0] ? event.competitions[0] : {};
     const competitors = competition.competitors || [];
     let home = null;
@@ -702,6 +667,77 @@ function teamFantasyFetchScheduleFromEspn_(settings, week) {
       week: sourceWeek
     };
   }).filter(function(row) { return row.eventId && row.gameDateTime; });
+}
+
+function teamFantasyNormalizeScheduleRow_(row) {
+  const homeAbbr = teamFantasyNormalizeTeam_(row.HomeAbbreviation || row.homeAbbreviation || row.HomeTeamAbbr || row.homeTeamAbbr || "");
+  const awayAbbr = teamFantasyNormalizeTeam_(row.AwayAbbreviation || row.awayAbbreviation || row.AwayTeamAbbr || row.awayTeamAbbr || "");
+  return {
+    eventId: teamFantasyString_(row.ESPNEventId || row.espnEventId || row.EventId || row.eventId || row.GameId || row.gameId).replace(/^nfl_/, ""),
+    sportsGameId: teamFantasyString_(row.GameId || row.gameId),
+    gameDateTime: teamFantasyString_(row.GameDateTime || row.gameDateTime || row.Date || row.date),
+    homeTeam: teamFantasyString_(row.HomeTeam || row.homeTeam),
+    awayTeam: teamFantasyString_(row.AwayTeam || row.awayTeam),
+    homeAbbr: homeAbbr,
+    awayAbbr: awayAbbr,
+    homeTeamId: teamFantasyString_(row.HomeTeamId || row.homeTeamId),
+    awayTeamId: teamFantasyString_(row.AwayTeamId || row.awayTeamId),
+    status: teamFantasyString_(row.Status || row.status),
+    state: teamFantasyKey_(row.State || row.state),
+    completed: teamFantasyBool_(row.Completed !== undefined ? row.Completed : row.completed, false) ||
+      teamFantasyKey_(row.State || row.state) === "post" ||
+      teamFantasyKey_(row.Status || row.status).indexOf("final") !== -1,
+    seasonYear: Number(row.SeasonYear || row.seasonYear || 0),
+    seasonType: Number(row.SeasonType || row.seasonType || 0),
+    week: Number(row.Week || row.week || 0)
+  };
+}
+
+function teamFantasyFetchScheduleFromSportsEngine_(settings, week) {
+  const seasonType = teamFantasyScheduleSeasonType_(settings, week);
+  const sourceWeek = teamFantasyScheduleWeek_(settings, week);
+
+  // Preferred path: ask the separate Sports Scores Engine to fetch the exact
+  // NFL week through its authenticated Cloudflare ESPN proxy. This works for
+  // historical weeks as well as the live season.
+  try {
+    const parsed = teamFantasySportsEngineJson_("getTeamFantasyNflSchedule", {
+      seasonYear: settings.seasonYear,
+      seasonType: seasonType,
+      week: sourceWeek
+    });
+    const rows = teamFantasyScheduleRowsFromEspnEvents_(parsed.events || (parsed.data && parsed.data.events) || [], settings, seasonType, sourceWeek);
+    if (rows.length) return rows;
+  } catch (err) {
+    // Compatibility fallback below can still use rows already stored by the
+    // Sports Scores Engine while deployments are rolling forward.
+  }
+
+  const base = teamFantasySportsApiUrl_();
+  if (!base) return [];
+  try {
+    const separator = base.indexOf("?") === -1 ? "?" : "&";
+    const url = base + separator + "action=getSportsScores&sport=football&league=nfl&_ts=" + Date.now();
+    const parsed = teamFantasyHttpJson_(url);
+    const rows = Array.isArray(parsed) ? parsed : (parsed.scores || parsed.games || parsed.rows || []);
+    return rows.map(teamFantasyNormalizeScheduleRow_).filter(function(row) {
+      if (row.seasonYear && row.seasonYear !== settings.seasonYear) return false;
+      if (row.seasonType && row.seasonType !== seasonType) return false;
+      if (row.week && row.week !== sourceWeek) return false;
+      return row.eventId && row.gameDateTime;
+    });
+  } catch (err2) {
+    return [];
+  }
+}
+
+function teamFantasyFetchScheduleFromEspn_(settings, week) {
+  // ESPN blocks Google Apps Script UrlFetchApp with HTTP 403. Team Fantasy
+  // deliberately does not call ESPN directly; the separate Sports Scores
+  // Engine owns the authenticated Cloudflare ESPN proxy.
+  const rows = teamFantasyFetchScheduleFromSportsEngine_(settings, week);
+  if (rows.length) return rows;
+  throw new Error("NFL schedule unavailable from Sports Scores Engine. Direct ESPN fetch is disabled because ESPN blocks Google Apps Script with HTTP 403.");
 }
 
 function teamFantasyFetchWeekSchedule_(gameId, week) {
@@ -982,7 +1018,10 @@ function teamFantasyParseMadeAttempted_(value) {
 function teamFantasyFetchEspnSummary_(eventId) {
   eventId = teamFantasyString_(eventId).replace(/^nfl_/, "");
   if (!eventId) throw new Error("ESPN event id is required");
-  return teamFantasyHttpJson_("https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=" + encodeURIComponent(eventId));
+  const parsed = teamFantasySportsEngineJson_("getTeamFantasyNflSummary", { eventId: eventId });
+  const data = parsed && parsed.data ? parsed.data : parsed;
+  if (!data || typeof data !== "object") throw new Error("Sports Scores Engine returned an invalid NFL game summary.");
+  return data;
 }
 
 function teamFantasyPlayerPositionAllowed_(unit, abbr) {

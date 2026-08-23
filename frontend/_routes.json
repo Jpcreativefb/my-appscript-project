@@ -2,6 +2,7 @@
   "version": 1,
   "include": [
     "/api/espn-proxy",
+    "/api/team-fantasy",
     "/api/push-public-key",
     "/api/push-send",
     "/api/push-subscription"

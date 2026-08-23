@@ -1934,6 +1934,13 @@ else if (action === "removeSportsOddsHybridTrigger") {
       payload = apiGetSportsPlayerStatusAdmin_(params);
     }
 
+    else if (action === "getTeamFantasyNflSchedule") {
+      payload = apiGetTeamFantasyNflSchedule_(params);
+    }
+    else if (action === "getTeamFantasyNflSummary") {
+      payload = apiGetTeamFantasyNflSummary_(params);
+    }
+
     else if (action === "getSportsTeamGameStats") {
       payload = apiGetSportsTeamGameStats_(params);
     }
@@ -2016,6 +2023,63 @@ else if (action === "removeSportsOddsHybridTrigger") {
  API OUTPUT
  Supports normal JSON and JSONP.
 ************************************/
+
+
+/************************************
+ TEAM FANTASY NFL DATA BRIDGE — v1.2.18o
+ Keeps ESPN access inside the Sports Scores Engine so the existing
+ authenticated Cloudflare ESPN proxy is reused by Team Fantasy.
+************************************/
+function sportsTeamFantasyFetchJson_(url) {
+  const response = sportsEspnFetch_(url, {
+    method: "get",
+    muteHttpExceptions: true,
+    followRedirects: true
+  });
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) {
+    throw new Error("Team Fantasy ESPN source returned HTTP " + code);
+  }
+  return JSON.parse(response.getContentText() || "{}");
+}
+
+function apiGetTeamFantasyNflSchedule_(params) {
+  params = params || {};
+  const seasonYear = Math.floor(Number(params.seasonYear || params.year || 0));
+  const seasonType = Math.floor(Number(params.seasonType || params.seasontype || 2));
+  const week = Math.floor(Number(params.week || 0));
+  if (seasonYear < 2000 || seasonYear > 2100) throw new Error("Valid NFL seasonYear is required.");
+  if ([1, 2, 3].indexOf(seasonType) === -1) throw new Error("NFL seasonType must be 1, 2, or 3.");
+  if (week < 1 || week > 25) throw new Error("Valid NFL week is required.");
+  const url =
+    "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?" +
+    "dates=" + encodeURIComponent(String(seasonYear)) +
+    "&seasontype=" + encodeURIComponent(String(seasonType)) +
+    "&week=" + encodeURIComponent(String(week)) +
+    "&limit=100";
+  const data = sportsTeamFantasyFetchJson_(url);
+  return {
+    success: true,
+    seasonYear: seasonYear,
+    seasonType: seasonType,
+    week: week,
+    events: Array.isArray(data.events) ? data.events : []
+  };
+}
+
+function apiGetTeamFantasyNflSummary_(params) {
+  params = params || {};
+  const eventId = String(params.eventId || params.espnEventId || "").trim().replace(/^nfl_/, "");
+  if (!/^\d{6,20}$/.test(eventId)) throw new Error("Valid ESPN eventId is required.");
+  const url =
+    "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=" +
+    encodeURIComponent(eventId);
+  return {
+    success: true,
+    eventId: eventId,
+    data: sportsTeamFantasyFetchJson_(url)
+  };
+}
 
 function sportsApiOutput_(payload, callback) {
   const json =
