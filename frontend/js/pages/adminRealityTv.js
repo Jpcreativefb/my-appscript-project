@@ -2053,6 +2053,17 @@ function adminRealityTvSeasonBody_(bundle) {
         </div>
         <div id="realityTvBulkPreview_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-bulk-preview"></div>
       </div>
+
+      <div class="reality-tv-existing-bulk-add reality-tv-cast-sheet-card">
+        <h4>Reality Cast Import Sheet</h4>
+        <div class="admin-sub">Best for building a season roster over time. The main spreadsheet gets a <strong>RealityCastImport</strong> staging tab with show-aware guidance, source links, Import checkboxes, preview, and safe create/update handling.</div>
+        <div class="admin-actions reality-tv-bulk-actions">
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPrepareCastSheet_('${adminRealityTvEscape_(season.SeasonId)}')">Prepare / Open Cast Sheet</button>
+          <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewCastSheet_('${adminRealityTvEscape_(season.SeasonId)}')">Preview Sheet</button>
+          <button type="button" class="admin-small-button" onclick="adminRealityTvImportCastSheet_('${adminRealityTvEscape_(season.SeasonId)}')">Import Selected Rows</button>
+        </div>
+        <div id="realityTvCastImportMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </div>
       <div class="admin-sub">New participants or teams are added to the season roster. Existing questions are not changed; they appear in the next newly created period.</div>
     </details>
 
@@ -3265,6 +3276,103 @@ async function adminRealityTvAddContestant(seasonId) {
   }
 }
 
+
+function adminRealityTvCastImportMessage_(seasonId, html, tone) {
+  const target = document.getElementById("realityTvCastImportMessage_" + seasonId);
+  if (!target) return;
+  target.className = "admin-message" + (tone ? " " + tone : "");
+  target.innerHTML = html || "";
+}
+
+function adminRealityTvCastImportLink_(url, label) {
+  if (!url) return "";
+  return ` <a href="${adminRealityTvEscape_(url)}" target="_blank" rel="noopener">${adminRealityTvEscape_(label || "Open RealityCastImport")}</a>`;
+}
+
+async function adminRealityTvPrepareCastSheet_(seasonId) {
+  adminRealityTvCastImportMessage_(seasonId, "Preparing RealityCastImport…", "info");
+  try {
+    const res = await apiAdminPrepareRealityCastImport({ seasonId: seasonId });
+    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not prepare cast sheet.");
+    const profile = res.profile || {};
+    const help = profile.help ? `<div class="admin-sub" style="margin-top:6px">${adminRealityTvEscape_(profile.help)}</div>` : "";
+    adminRealityTvCastImportMessage_(seasonId,
+      adminRealityTvEscape_(res.message || "Cast sheet ready.") + adminRealityTvCastImportLink_(res.sheetUrl, "Open RealityCastImport") + help,
+      "success");
+  } catch (err) {
+    adminRealityTvCastImportMessage_(seasonId, adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
+
+function adminRealityTvCastPreviewHtml_(res) {
+  const items = Array.isArray(res && res.items) ? res.items : [];
+  const profile = (res && res.profile) || {};
+  const summary = `${Number(res.selectedCount || 0)} selected · ${Number(res.createCount || 0)} new · ${Number(res.updateCount || 0)} updates · ${Number(res.errorCount || 0)} errors`;
+  const rows = items.slice(0, 30).map(function(item) {
+    const issues = (item.errors || []).concat(item.warnings || []).join(" ");
+    return `<tr>
+      <td>${item.selected ? "✓" : ""}</td>
+      <td>${adminRealityTvEscape_(item.name || "")}</td>
+      <td>${adminRealityTvEscape_([item.member1, item.member2].filter(Boolean).join(" / "))}</td>
+      <td>${adminRealityTvEscape_(item.teamOrTribe || "")}</td>
+      <td><strong>${adminRealityTvEscape_(item.action || "")}</strong></td>
+      <td>${adminRealityTvEscape_(issues)}</td>
+    </tr>`;
+  }).join("");
+  return `<div><strong>${adminRealityTvEscape_(profile.label || "Cast")}: ${adminRealityTvEscape_(summary)}</strong></div>
+    ${profile.help ? `<div class="admin-sub" style="margin:6px 0">${adminRealityTvEscape_(profile.help)}</div>` : ""}
+    ${adminRealityTvCastImportLink_(res.sheetUrl, "Open RealityCastImport")}
+    <div class="reality-tv-bulk-preview-table-wrap" style="margin-top:8px">
+      <table class="reality-tv-bulk-preview-table"><thead><tr><th>Import</th><th>Name / Team</th><th>Members</th><th>Tribe / Group</th><th>Action</th><th>Notes</th></tr></thead><tbody>${rows}</tbody></table>
+    </div>
+    ${items.length > 30 ? `<div class="admin-sub">Showing the first 30 of ${items.length} prepared rows.</div>` : ""}`;
+}
+
+async function adminRealityTvPreviewCastSheet_(seasonId) {
+  adminRealityTvCastImportMessage_(seasonId, "Reading RealityCastImport…", "info");
+  try {
+    const res = await apiAdminPreviewRealityCastImport({ seasonId: seasonId });
+    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not preview cast sheet.");
+    adminRealityTvCastImportMessage_(seasonId, adminRealityTvCastPreviewHtml_(res), Number(res.errorCount || 0) ? "warning" : "success");
+  } catch (err) {
+    adminRealityTvCastImportMessage_(seasonId, adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
+
+async function adminRealityTvImportCastSheet_(seasonId) {
+  let preview;
+  try {
+    preview = await apiAdminPreviewRealityCastImport({ seasonId: seasonId });
+    if (!preview || preview.success === false) throw new Error((preview && (preview.error || preview.message)) || "Could not preview cast sheet.");
+  } catch (err) {
+    adminRealityTvCastImportMessage_(seasonId, adminRealityTvEscape_(err.message || String(err)), "error");
+    return;
+  }
+  if (!Number(preview.selectedCount || 0)) {
+    adminRealityTvCastImportMessage_(seasonId,
+      `No rows are selected. Open the sheet and check <strong>Import</strong> beside the contestants/teams you want.${adminRealityTvCastImportLink_(preview.sheetUrl, "Open RealityCastImport")}`,
+      "warning");
+    return;
+  }
+  if (Number(preview.errorCount || 0)) {
+    adminRealityTvCastImportMessage_(seasonId,
+      `Fix the staging-sheet errors before importing.${adminRealityTvCastImportLink_(preview.sheetUrl, "Open RealityCastImport")}`,
+      "warning");
+    return;
+  }
+  if (!confirm(`Import ${preview.selectedCount} selected cast row(s)? This will create ${preview.createCount} and update ${preview.updateCount}. Existing elimination/status history will be preserved.`)) return;
+  adminRealityTvCastImportMessage_(seasonId, "Importing selected cast rows…", "info");
+  try {
+    const res = await apiAdminImportRealityCastImport({ seasonId: seasonId });
+    if (!res || res.success === false) throw new Error((res && (res.error || res.message)) || "Could not import cast sheet.");
+    adminRealityTvCastImportMessage_(seasonId,
+      adminRealityTvEscape_(res.message || "Cast import complete.") + adminRealityTvCastImportLink_(res.sheetUrl, "Open RealityCastImport"),
+      Number(res.errorCount || 0) ? "warning" : "success");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvCastImportMessage_" + seasonId });
+  } catch (err) {
+    adminRealityTvCastImportMessage_(seasonId, adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
 
 async function adminRealityTvBulkAddToSeason(seasonId) {
   const parsed = adminRealityTvPreviewBulk_(seasonId);

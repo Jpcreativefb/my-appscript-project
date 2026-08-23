@@ -1,0 +1,15 @@
+PATTC Predicts v1.2.18k — Reality Cast Import Staging
+
+Download/save this ZIP as:
+  awards-app-v1.2.18k-reality-cast-import-staging.zip
+
+The terminal installer will accept the ZIP from either:
+  ~/Awards-App-Updates/
+or
+  ~/Downloads/
+
+It moves the ZIP into ~/Awards-App-Updates when needed, applies the update to the current architecture-cleanup branch, runs the Reality contract test and full production checks, commits, pushes Apps Script, creates/deploys a new Apps Script version, then pushes GitHub to trigger Cloudflare.
+
+See REALITY_TV_CAST_IMPORT_V1_2_18K.md for the admin workflow.
+
+Required production baseline: fe116abe3b48f595b8831f0d105189a7655fa4e4

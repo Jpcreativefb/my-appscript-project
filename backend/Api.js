@@ -508,6 +508,15 @@ function doPost(e) {
     if (action === "adminBulkAddRealityTvContestants") {
       return json(apiAdminBulkAddRealityTvContestants(body));
     }
+    if (action === "adminPrepareRealityCastImport") {
+      return json(apiAdminPrepareRealityCastImport(body));
+    }
+    if (action === "adminPreviewRealityCastImport") {
+      return json(apiAdminPreviewRealityCastImport(body));
+    }
+    if (action === "adminImportRealityCastImport") {
+      return json(apiAdminImportRealityCastImport(body));
+    }
 
     if (action === "adminUpdateRealityTvQuestionPack") {
       return json(apiAdminUpdateRealityTvQuestionPack(body));

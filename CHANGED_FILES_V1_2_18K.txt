@@ -1,0 +1,23 @@
+tools/apply_reality_cast_import_v1218k.js
+tools/finalize_reality_cast_import_v1218k.sh
+tools/reality_cast_frontend_v1218k.snippet
+tests/reality_tv_cast_import_v1218k_tests.js
+REALITY_TV_CAST_IMPORT_V1_2_18K.md
+CHANGED_FILES_V1_2_18K.txt
+INSTALL_V1_2_18K.txt
+
+Runtime patch modifies the current versions of:
+backend/engines/RealityTvSeasonEngine.js
+backend/Api.js
+frontend/js/api.js
+frontend/api.js
+frontend/js/pages/adminRealityTv.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html (only when it contains the exact current APP_ASSET_VERSION)
+frontend/index.html (only when it contains the exact current APP_ASSET_VERSION)
+frontend/sw.js
+and regression tests only when they contain the exact current APP_ASSET_VERSION or exact current AWARDS_CACHE value.
+
+Required production baseline:
+fe116abe3b48f595b8831f0d105189a7655fa4e4
