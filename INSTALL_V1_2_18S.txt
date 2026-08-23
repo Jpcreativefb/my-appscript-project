@@ -1,0 +1,7 @@
+PATTC Predicts v1.2.18s — Team Fantasy Compact Game-Day UX
+
+Use the release-control terminal block supplied with the ZIP.
+The installer must start from exact production baseline:
+  f99f9a172e23c7e0d9369206aa1626c974ef5fff
+
+It verifies local Git == GitHub, applies only the 18s runtime files transactionally, runs the 18s tests plus the existing Team Fantasy / Notification / Reality regression chain and full production checks, then commits, pushes Apps Script, creates/parses the actual Apps Script version, deploys production, pushes GitHub/Cloudflare, verifies the SHA, and runs final production checks.

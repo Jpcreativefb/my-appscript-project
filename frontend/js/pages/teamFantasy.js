@@ -7,7 +7,7 @@
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218r', script).href : './css/team-fantasy.css?v=1218r';
+  link.href = script ? new URL('../../css/team-fantasy.css?v=1218s', script).href : './css/team-fantasy.css?v=1218s';
   link.dataset.teamFantasyCss = '1';
   document.head.appendChild(link);
 })();
@@ -74,36 +74,85 @@ function teamFantasyOptionLabel_(team) {
   return rank + team.name + (opponent ? ' — ' + opponent : '') + ' — ' + usage + reason;
 }
 
+
+
+/* TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s */
+function teamFantasyTeamLogoUrl_(abbr) {
+  const key = String(abbr || '').toUpperCase();
+  const slug = key === 'WAS' ? 'wsh' : key.toLowerCase();
+  return key ? 'https://a.espncdn.com/i/teamlogos/nfl/500/' + encodeURIComponent(slug) + '.png' : '';
+}
+
+function teamFantasyPickMethodTag_(method) {
+  const key = String(method || '').toLowerCase();
+  if (key === 'random' || key === 'r') return 'R';
+  if (key === 'auto' || key === 'autopick' || key === 'auto-pick' || key === 'ap') return 'AP';
+  return '';
+}
+
+function teamFantasyOpponentText_(team) {
+  const game = team && team.game || {};
+  const abbr = String(team && team.abbr || '').toUpperCase();
+  if (String(game.homeAbbr || '').toUpperCase() === abbr) return game.awayAbbr ? 'vs ' + game.awayAbbr : '';
+  if (String(game.awayAbbr || '').toUpperCase() === abbr) return game.homeAbbr ? '@ ' + game.homeAbbr : '';
+  return '';
+}
+
+function teamFantasyFindSlot_(entryId, position) {
+  const state = window.TEAM_FANTASY_STATE || {};
+  const lineup = (state.lineups || []).filter(function(item){ return String(item.entry && item.entry.entryId || '') === String(entryId || ''); })[0] || null;
+  return lineup ? (lineup.slots || []).filter(function(slot){ return String(slot.position || '') === String(position || ''); })[0] || null : null;
+}
+
+function teamFantasyPickerTeams_(slot) {
+  const current = slot && slot.pick ? String(slot.pick.teamAbbr || '') : '';
+  return (slot && slot.teams || []).filter(function(team){ return team.eligible === true || String(team.abbr || '') === current; });
+}
+
+function teamFantasyCloseTeamPicker_() {
+  const old = document.getElementById('tfTeamPickerOverlay');
+  if (old) old.remove();
+}
+
+function teamFantasyOpenTeamPicker_(entryId, position) {
+  const slot = teamFantasyFindSlot_(entryId, position);
+  if (!slot || slot.locked) return;
+  const teams = teamFantasyPickerTeams_(slot);
+  const current = slot.pick ? String(slot.pick.teamAbbr || '') : '';
+  teamFantasyCloseTeamPicker_();
+  const rows = teams.map(function(team) {
+    const usageLimit = Number(team.uses || 0) + Number(team.usesRemaining || 0);
+    const usage = usageLimit > 0 ? `<span class="tf-picker-usage">${Number(team.uses || 0)}/${usageLimit}</span>` : '';
+    const selected = current === String(team.abbr || '') ? ' is-selected' : '';
+    return `<button type="button" class="tf-picker-team${selected}" onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><strong>${teamFantasyEscape_(team.abbr)}</strong><span class="tf-picker-opponent">${teamFantasyEscape_(teamFantasyOpponentText_(team))}</span>${usage}</button>`;
+  }).join('');
+  document.body.insertAdjacentHTML('beforeend', `<div id="tfTeamPickerOverlay" class="tf-picker-overlay" role="presentation" onclick="if(event.target===this)teamFantasyCloseTeamPicker_()"><section class="tf-picker-sheet" role="dialog" aria-modal="true" aria-label="Choose ${teamFantasyEscape_(slot.label || position)} team"><div class="tf-picker-head"><div><strong>${teamFantasyEscape_(slot.label || position)}</strong><span>${teams.length} available</span></div><button type="button" class="tf-picker-close" onclick="teamFantasyCloseTeamPicker_()" aria-label="Close">×</button></div><div class="tf-picker-list">${rows || '<div class="tf-muted">No teams available.</div>'}</div></section></div>`);
+}
+
+async function teamFantasyChooseTeam_(entryId, position, teamAbbr) {
+  teamFantasyCloseTeamPicker_();
+  await teamFantasySaveSlot_(entryId, position, teamAbbr);
+}
+
+function teamFantasyCompareLeaguePicker_() {
+  const state = window.TEAM_FANTASY_STATE || {};
+  const leagues = Array.isArray(state.leagues) ? state.leagues : [];
+  if (leagues.length <= 1) return `<span class="tf-compare-league-name">${teamFantasyEscape_(window.TEAM_FANTASY_GAME_DAY && window.TEAM_FANTASY_GAME_DAY.leagueName || leagues[0] && leagues[0].leagueName || 'League')}</span>`;
+  return `<label class="tf-compare-league"><span>League</span><select onchange="teamFantasyChangeLeague_(this.value)">${leagues.map(function(league){ return `<option value="${teamFantasyEscape_(league.leagueId)}" ${league.leagueId===state.selectedLeagueId?'selected':''}>${teamFantasyEscape_(league.leagueName)}</option>`; }).join('')}</select></label>`;
+}
+
 function teamFantasyRenderSlot_(state, lineup, slot) {
   const entry = lineup.entry || {};
   const pick = slot.pick || null;
-  const current = pick ? pick.teamAbbr : '';
-  const eligibleCount = (slot.teams || []).filter(function(team) { return team.eligible; }).length;
   const slotId = 'tf-' + String(entry.entryId || '').replace(/[^a-z0-9_-]/gi, '-') + '-' + slot.position;
+  const method = pick ? teamFantasyPickMethodTag_(pick.pickMethod) : '';
+  const logo = pick ? teamFantasyTeamLogoUrl_(pick.teamAbbr) : '';
+  const selectedTeam = pick ? (slot.teams || []).filter(function(team){ return String(team.abbr || '') === String(pick.teamAbbr || ''); })[0] || null : null;
+  const opponent = selectedTeam ? teamFantasyOpponentText_(selectedTeam) : '';
   if (slot.locked && pick) {
-    return `
-      <div class="tf-slot is-locked" id="${slotId}" data-missing="false">
-        <div class="tf-slot-title"><strong>${teamFantasyEscape_(slot.label)}</strong><span class="tf-lock">Locked</span></div>
-        <div class="tf-selected-team">${teamFantasyEscape_(pick.teamName || pick.teamAbbr)}</div>
-        <div class="tf-muted">${teamFantasyEscape_(pick.teamAbbr)} · NFL game started</div>
-      </div>`;
+    return `<div class="tf-slot tf-slot-compact is-locked" id="${slotId}" data-missing="false"><strong class="tf-slot-position">${teamFantasyEscape_(slot.label)}</strong><div class="tf-pick-compact"><img src="${teamFantasyEscape_(logo)}" alt=""><span class="tf-pick-abbr">${teamFantasyEscape_(pick.teamAbbr)}</span>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}<span class="tf-pick-opponent">${teamFantasyEscape_(opponent)}</span></div><span class="tf-lock">🔒</span></div>`;
   }
-  return `
-    <div class="tf-slot ${pick ? 'has-pick' : 'needs-pick'}" id="${slotId}" data-missing="${pick ? 'false' : 'true'}">
-      <div class="tf-slot-title">
-        <strong>${teamFantasyEscape_(slot.label)}</strong>
-        <span class="tf-muted">${eligibleCount} eligible</span>
-      </div>
-      <select class="tf-team-select" aria-label="${teamFantasyEscape_(slot.label)} team" onchange="teamFantasySaveSlot_('${teamFantasyEscape_(entry.entryId)}','${teamFantasyEscape_(slot.position)}',this.value)">
-        <option value="">${pick ? 'Change team…' : 'Choose team…'}</option>
-        ${(slot.teams || []).map(function(team) {
-          const selected = current === team.abbr ? 'selected' : '';
-          const disabled = !team.eligible && current !== team.abbr ? 'disabled' : '';
-          return `<option value="${teamFantasyEscape_(team.abbr)}" ${selected} ${disabled}>${teamFantasyEscape_(teamFantasyOptionLabel_(team))}</option>`;
-        }).join('')}
-      </select>
-      ${pick ? `<div class="tf-picked-note">Current: <strong>${teamFantasyEscape_(pick.teamName || pick.teamAbbr)}</strong>${pick.pickMethod && pick.pickMethod !== 'manual' ? ` · ${teamFantasyEscape_(pick.pickMethod)}` : ''}</div>` : ''}
-    </div>`;
+  return `<div class="tf-slot tf-slot-compact ${pick?'has-pick':'needs-pick'}" id="${slotId}" data-missing="${pick?'false':'true'}"><strong class="tf-slot-position">${teamFantasyEscape_(slot.label)}</strong><button type="button" class="tf-team-picker-button ${pick?'has-team':''}" onclick="teamFantasyOpenTeamPicker_('${teamFantasyEscape_(entry.entryId)}','${teamFantasyEscape_(slot.position)}')">${pick?`<img src="${teamFantasyEscape_(logo)}" alt=""><span class="tf-pick-abbr">${teamFantasyEscape_(pick.teamAbbr)}</span>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}<span class="tf-pick-opponent">${teamFantasyEscape_(opponent)}</span>`:'<span class="tf-pick-empty">Choose team</span>'}<span class="tf-picker-chevron">⌄</span></button></div>`;
 }
 
 function teamFantasyRenderLineup_(state, lineup) {
@@ -349,13 +398,16 @@ function teamFantasyCompareDefaultSelection_(data) {
 function teamFantasyRenderCompareSlot_(slot) {
   const status = slot && slot.status ? slot.status : 'upcoming';
   const label = slot && slot.label ? slot.label : '';
+  const statusTitle = teamFantasyStatusLabel_(status);
   if (slot && slot.hidden) {
-    return `<div class="tf-compare-slot is-${teamFantasyEscape_(status)}"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><div class="tf-hidden-pick">🔒</div><div class="tf-compare-small">Hidden until kickoff</div><div class="tf-status-badge">${teamFantasyEscape_(teamFantasyStatusLabel_(status))}</div></div>`;
+    return `<div class="tf-compare-slot is-${teamFantasyEscape_(status)}" title="${teamFantasyEscape_(statusTitle)}"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><div class="tf-hidden-pick">🔒</div><span class="sr-only">Hidden until kickoff · ${teamFantasyEscape_(statusTitle)}</span></div>`;
   }
   if (!slot || slot.empty || !slot.teamAbbr) {
-    return `<div class="tf-compare-slot is-upcoming"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><div class="tf-empty-logo">—</div><div class="tf-compare-small">No pick yet</div><div class="tf-status-badge">UPCOMING</div></div>`;
+    return `<div class="tf-compare-slot is-upcoming" title="Upcoming"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><div class="tf-empty-logo">—</div><span class="sr-only">No pick yet · Upcoming</span></div>`;
   }
-  return `<div class="tf-compare-slot is-${teamFantasyEscape_(status)}"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><img class="tf-team-logo" src="${teamFantasyEscape_(slot.logoUrl || '')}" alt="${teamFantasyEscape_(slot.teamAbbr)}" onerror="this.style.visibility='hidden'"><strong class="tf-team-abbr">${teamFantasyEscape_(slot.teamAbbr)}</strong><div class="tf-slot-points">${teamFantasyScore_(slot.fantasyPoints)} pts</div><div class="tf-status-badge">${teamFantasyEscape_(teamFantasyStatusLabel_(status))}</div></div>`;
+  const rank = Number(slot.weekRank || 0) > 0 ? ` <span class="tf-slot-rank">(#${Number(slot.weekRank)})</span>` : '';
+  const method = teamFantasyPickMethodTag_(slot.pickMethod);
+  return `<div class="tf-compare-slot is-${teamFantasyEscape_(status)}" title="${teamFantasyEscape_(statusTitle)}"><div class="tf-compare-pos">${teamFantasyEscape_(label)}</div><img class="tf-team-logo" src="${teamFantasyEscape_(slot.logoUrl || '')}" alt="${teamFantasyEscape_(slot.teamAbbr)}"><div class="tf-team-line"><strong class="tf-team-abbr">${teamFantasyEscape_(slot.teamAbbr)}</strong>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}</div><div class="tf-slot-points">${teamFantasyScore_(slot.fantasyPoints)} pts${rank}</div><span class="sr-only">${teamFantasyEscape_(statusTitle)}</span></div>`;
 }
 
 function teamFantasyRenderCompareBoard_(data, selectedIds) {
@@ -363,8 +415,9 @@ function teamFantasyRenderCompareBoard_(data, selectedIds) {
   const selected = competitors.filter(function(c){ return selectedIds.indexOf(c.entryId) !== -1; });
   if (selected.length < 2) return `<div class="tf-warning">Choose at least 2 teams to compare.</div>`;
   return `<div class="tf-compare-scroll"><div class="tf-compare-board">${selected.map(function(c){
-    const counts = c.counts || {};
-    return `<article class="tf-compare-team"><div class="tf-compare-team-head"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${c.isViewer ? '<span class="tf-you-badge">YOU</span>' : ''}<div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-small">${Number(counts.final||0)} Final · ${Number(counts.live||0)} Live · ${Number(counts.upcoming||0)} Upcoming</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
+    const record = c.record || { wins:0, losses:0, ties:0 };
+    const rank = Number(c.leagueRank || 0) > 0 ? '#' + Number(c.leagueRank) : '#—';
+    return `<article class="tf-compare-team"><div class="tf-compare-team-head"><div class="tf-team-head-name"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${c.isViewer?'<span class="tf-you-badge">YOU</span>':''}</div><div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-record">${rank} · ${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
   }).join('')}</div></div>`;
 }
 
@@ -378,7 +431,7 @@ function teamFantasyRenderGameDayIntoMount_() {
     return;
   }
   const selected = teamFantasyCompareDefaultSelection_(data);
-  mount.innerHTML = `<div class="tf-compare-controls"><div><strong>Compare 2–6 teams</strong><div class="tf-muted">Cached fantasy points refresh every 5 minutes on game day.</div></div><div class="tf-action-row"><button class="tf-button secondary" onclick="teamFantasyComparePreset_(2)">Head-to-Head</button><button class="tf-button secondary" onclick="teamFantasyComparePreset_(6)">Up to 6</button></div></div><div class="tf-compare-picker">${competitors.map(function(c){ return `<label class="tf-compare-choice"><input type="checkbox" value="${teamFantasyEscape_(c.entryId)}" ${selected.indexOf(c.entryId)!==-1?'checked':''} onchange="teamFantasyCompareToggle_(this)"><span>${teamFantasyEscape_(c.label || c.entryId)}</span></label>`; }).join('')}</div><div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div><div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`;
+  mount.innerHTML = `<div class="tf-compare-controls"><div class="tf-compare-control-main"><strong>Compare 2–6 teams</strong><div class="tf-compare-subline">${teamFantasyCompareLeaguePicker_()}<span>· cached scores refresh every 5 min</span></div></div><div class="tf-action-row"><button class="tf-button secondary" onclick="teamFantasyComparePreset_(2)">H2H</button><button class="tf-button secondary" onclick="teamFantasyComparePreset_(6)">2–6</button></div></div><div class="tf-status-legend" aria-label="Game status colors"><span class="is-live"></span>Live <span class="is-final"></span>Final <span class="is-upcoming"></span>Upcoming</div><div class="tf-compare-picker">${competitors.map(function(c){ return `<label class="tf-compare-choice"><input type="checkbox" value="${teamFantasyEscape_(c.entryId)}" ${selected.indexOf(c.entryId)!==-1?'checked':''} onchange="teamFantasyCompareToggle_(this)"><span>${teamFantasyEscape_(c.label || c.entryId)}</span></label>`; }).join('')}</div><div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div><div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`;
 }
 
 function teamFantasyCompareToggle_(checkbox) {

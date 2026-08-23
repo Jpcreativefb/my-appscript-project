@@ -6,7 +6,8 @@
    Team Fantasy scorer remains the only live-data writer.
 ========================================================= */
 
-var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18r";
+var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18s";
+/* TEAM_FANTASY_COMPACT_GAME_DAY_BACKEND_v1218s */
 var TEAM_FANTASY_GAME_DAY_POLL_MS = 5 * 60 * 1000;
 
 function teamFantasyGameDayString_(value) {
@@ -85,6 +86,60 @@ function teamFantasyGameDayStatus_(pick, score, nowMs) {
   return "upcoming";
 }
 
+
+function teamFantasyGameDayPickMethod_(value) {
+  var key = teamFantasyGameDayKey_(value);
+  if (key === "random") return "R";
+  if (key === "auto" || key === "autopick" || key === "auto-pick") return "AP";
+  return "";
+}
+
+function teamFantasyGameDayApplyPositionRanks_(competitors) {
+  teamFantasyGameDayPositions_().forEach(function(position) {
+    var ranked = [];
+    (competitors || []).forEach(function(competitor) {
+      var slot = (competitor.slots || []).filter(function(item) { return item.position === position; })[0] || null;
+      if (!slot || slot.hidden || slot.empty || slot.status === "upcoming") return;
+      ranked.push({ competitor: competitor, slot: slot, points: Number(slot.fantasyPoints || 0) });
+    });
+    ranked.sort(function(a, b) {
+      if (b.points !== a.points) return b.points - a.points;
+      return teamFantasyGameDayString_(a.competitor.entryId).localeCompare(teamFantasyGameDayString_(b.competitor.entryId));
+    });
+    var lastPoints = null;
+    var lastRank = 0;
+    ranked.forEach(function(item, index) {
+      if (lastPoints === null || item.points !== lastPoints) lastRank = index + 1;
+      item.slot.weekRank = lastRank;
+      item.slot.weekRankFieldSize = ranked.length;
+      lastPoints = item.points;
+    });
+  });
+  return competitors;
+}
+
+function teamFantasyGameDayAttachStandings_(compare, standings) {
+  compare = compare || {};
+  standings = standings && standings.success !== false ? standings : null;
+  compare.leagueName = standings && standings.league ? teamFantasyGameDayString_(standings.league.leagueName) : "";
+  compare.leagueStandingMode = standings && standings.league ? teamFantasyGameDayString_(standings.league.standingMode) : "";
+  var rows = standings && Array.isArray(standings.rows) ? standings.rows : [];
+  (compare.competitors || []).forEach(function(competitor) {
+    var row = rows.filter(function(item) {
+      var entryId = teamFantasyGameDayString_(item.entryId);
+      var username = teamFantasyGameDayKey_(item.username);
+      return entryId ? entryId === competitor.entryId : username === teamFantasyGameDayKey_(competitor.username);
+    })[0] || null;
+    competitor.leagueRank = row ? Number(row.rank || 0) : 0;
+    competitor.record = {
+      wins: row ? Number(row.regularWins || 0) : 0,
+      losses: row ? Number(row.regularLosses || 0) : 0,
+      ties: row ? Number(row.regularTies || 0) : 0
+    };
+  });
+  return compare;
+}
+
 function teamFantasyGameDayBuildCompare_(input) {
   input = input || {};
   var positions = teamFantasyGameDayPositions_();
@@ -149,6 +204,7 @@ function teamFantasyGameDayBuildCompare_(input) {
         teamName: teamFantasyGameDayString_(pick.TeamName || pick.teamName) || team,
         logoUrl: teamFantasyGameDayLogoUrl_(team),
         fantasyPoints: points,
+        pickMethod: teamFantasyGameDayPickMethod_(pick.PickMethod || pick.pickMethod),
         gameDateTime: teamFantasyGameDayString_(pick.GameDateTime || pick.gameDateTime),
         final: status === "final"
       };
@@ -165,6 +221,8 @@ function teamFantasyGameDayBuildCompare_(input) {
       slots: slots
     };
   });
+
+  teamFantasyGameDayApplyPositionRanks_(competitors);
 
   competitors.sort(function(a, b) {
     if (a.isViewer !== b.isViewer) return a.isViewer ? -1 : 1;
@@ -241,6 +299,8 @@ function apiGetTeamFantasyGameDayState(payload) {
     scores: scores,
     nowMs: Date.now()
   });
+  var standings = typeof teamFantasyBuildStandings_ === "function" ? teamFantasyBuildStandings_(gameId, selectedLeagueId) : null;
+  teamFantasyGameDayAttachStandings_(out, standings);
   out.username = username;
   out.seasonYear = settings.seasonYear;
   out.generatedAt = new Date().toISOString();
@@ -261,7 +321,8 @@ function teamFantasyBuildSyntheticGameDayLab_() {
       var team = teams[(p * 3 + index) % teams.length];
       var phase = index <= 2 ? "final" : (index <= 5 ? "live" : "upcoming");
       var kickoff = phase === "final" ? now - (5 - index) * 3600000 : (phase === "live" ? now - (index - 2) * 1800000 : now + (index - 5) * 3600000);
-      picks.push({ EntryId: entryId, Position: position, TeamAbbr: team, TeamName: team + " Test", GameDateTime: new Date(kickoff).toISOString() });
+      var pickMethod = index % 3 === 0 ? "auto" : (index % 3 === 1 ? "random" : "manual");
+      picks.push({ EntryId: entryId, Position: position, TeamAbbr: team, TeamName: team + " Test", PickMethod: pickMethod, GameDateTime: new Date(kickoff).toISOString() });
       if (phase !== "upcoming") {
         scores.push({
           EntryId: entryId,
@@ -284,6 +345,10 @@ function teamFantasyBuildSyntheticGameDayLab_() {
     scores: scores,
     nowMs: now
   });
+  var fakeStandingRows = entries.map(function(entry, index) {
+    return { entryId: entry.EntryId, username: entry.Username, rank: index + 1, regularWins: 10 - index, regularLosses: 3 + index, regularTies: index % 2 };
+  });
+  teamFantasyGameDayAttachStandings_(compare, { success: true, league: { leagueId: "synthetic-six", leagueName: "Synthetic Six", standingMode: "entries" }, rows: fakeStandingRows });
 
   var usageRows = [
     { Position: "QB", TeamAbbr: "BUF" },
@@ -299,6 +364,8 @@ function teamFantasyBuildSyntheticGameDayLab_() {
   var opponentUpcoming = opponent.slots.filter(function(s) { return s.status === "upcoming"; });
   var opponentLive = opponent.slots.filter(function(s) { return s.status === "live"; });
   var viewerUpcoming = viewer.slots.filter(function(s) { return s.status === "upcoming"; });
+  var rankedSlots = compare.competitors.reduce(function(all, c) { return all.concat(c.slots.filter(function(s){ return s.status !== "upcoming" && !s.hidden; })); }, []);
+  var methodSlots = compare.competitors.reduce(function(all, c) { return all.concat(c.slots.filter(function(s){ return s.pickMethod === "AP" || s.pickMethod === "R"; })); }, []);
   var totalCheck = compare.competitors.every(function(c) {
     var sum = c.slots.reduce(function(acc, slot) { return acc + Number(slot.fantasyPoints || 0); }, 0);
     return Math.abs(teamFantasyGameDayRound_(sum) - Number(c.totalPoints || 0)) < 0.01;
@@ -322,6 +389,9 @@ function teamFantasyBuildSyntheticGameDayLab_() {
     { name: "Viewer can see own upcoming picks", passed: viewerUpcoming.length > 0 && viewerUpcoming.every(function(s){ return s.hidden === false && !!s.teamAbbr; }), detail: viewerUpcoming.length + " own upcoming slots visible" },
     { name: "Opponent picks reveal after kickoff", passed: opponentLive.length > 0 && opponentLive.every(function(s){ return s.hidden === false && !!s.teamAbbr; }), detail: opponentLive.length + " live slots revealed" },
     { name: "Live totals equal slot points", passed: totalCheck, detail: "All six totals reconciled" },
+    { name: "Weekly position ranks are calculated", passed: rankedSlots.length > 0 && rankedSlots.every(function(s){ return Number(s.weekRank || 0) >= 1; }), detail: "Live/final slots carry current league position rank" },
+    { name: "League rank and record are attached", passed: compare.competitors.every(function(c){ return Number(c.leagueRank || 0) >= 1 && c.record; }), detail: "Each fake team has league rank + W-L-T" },
+    { name: "Auto/Random method tags are preserved", passed: methodSlots.length > 0, detail: "AP and R tags available after picks reveal" },
     { name: "Upcoming / Live / Final states are present", passed: compare.competitors.every(function(c){ return c.counts.upcoming > 0 && c.counts.live > 0 && c.counts.final > 0; }), detail: "All status states exercised" },
     { name: "Comparison supports 2–6 teams", passed: compare.competitors.length >= 6, detail: "Head-to-head through six-team view" }
   ];

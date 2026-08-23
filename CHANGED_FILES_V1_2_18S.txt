@@ -1,0 +1,9 @@
+CHANGED_FILES_V1_2_18S.txt
+INSTALL_V1_2_18S.txt
+backend/engines/SportsTeamFantasyGameDayEngine.js
+frontend/js/pages/teamFantasy.js
+frontend/css/team-fantasy.css
+docs/TEAM_FANTASY_COMPACT_GAME_DAY_V1_2_18S.md
+tests/team_fantasy_compact_game_day_v1218s_tests.js
+tools/apply_team_fantasy_compact_game_day_v1218s.py
+tools/install_team_fantasy_compact_game_day_v1218s.sh
