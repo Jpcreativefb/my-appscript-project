@@ -4684,6 +4684,8 @@ if (action === "adminRemoveSportsOddsHybridTrigger") {
 
     /* TEAM FANTASY v1.2.18j GET ROUTES */
     if (action === "getTeamFantasyState") return json(apiGetTeamFantasyState(params));
+    if (action === "getTeamFantasyGameDayState") return json(apiGetTeamFantasyGameDayState(params));
+    if (action === "adminGetTeamFantasyTestLab") return json(apiAdminGetTeamFantasyTestLab(params));
     if (action === "getTeamFantasyStandings") return json(apiGetTeamFantasyStandings(params));
     if (action === "getTeamFantasyHeadToHead") return json(apiGetTeamFantasyHeadToHead(params));
     if (action === "adminGetTeamFantasyDashboard") return json(apiAdminGetTeamFantasyDashboard(params));

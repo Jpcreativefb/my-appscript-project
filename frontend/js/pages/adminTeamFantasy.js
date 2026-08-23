@@ -163,7 +163,7 @@ async function renderAdminTeamFantasyPage() {
         </div>
         <div id="adminTfSystemStatus" class="tf-system-status">${adminTfSystemStatusHtml_(dash)}</div>
         <div id="adminTfActionStatus" class="tf-status" aria-live="polite"></div>
-        <div class="tf-action-row"><button id="adminTfSaveButton" class="tf-button" onclick="adminTfSaveSettings_()">Save Game Rules</button><button id="adminTfSyncButton" class="tf-button secondary" onclick="adminTfRunSync_()">Run Team Fantasy Sync Now</button><button id="adminTfTriggerButton" class="tf-button secondary" onclick="adminTfInstallTrigger_()">Install 15-min Sync</button></div>
+        <div class="tf-action-row"><button id="adminTfSaveButton" class="tf-button" onclick="adminTfSaveSettings_()">Save Game Rules</button><button id="adminTfSyncButton" class="tf-button secondary" onclick="adminTfRunSync_()">Run Team Fantasy Sync Now</button><button id="adminTfTriggerButton" class="tf-button secondary" onclick="adminTfInstallTrigger_()">Install / Update 5-min Sync</button></div>
       </section>
       <section class="card">
         <div class="tf-card-heading"><div><h2>Position Scoring</h2><div class="tf-muted">Turn any stat on/off and change its point value. Bonus rows use Threshold + Bonus.</div></div></div>
@@ -284,8 +284,8 @@ async function adminTfRunSync_() {
 async function adminTfInstallTrigger_() {
   const gameId = String((typeof getFrontendGameId === 'function' && getFrontendGameId()) || '');
   if (!gameId) { adminTfActionStatus_('Choose a saved Team Fantasy game first.', true); return; }
-  adminTfSetBusy_('adminTfTriggerButton', true, 'Installing…', 'Install 15-min Sync');
-  adminTfActionStatus_('Installing and verifying the 15-minute Team Fantasy sync…', false);
+  adminTfSetBusy_('adminTfTriggerButton', true, 'Installing…', 'Install / Update 5-min Sync');
+  adminTfActionStatus_('Installing and verifying the 5-minute Team Fantasy game-day sync…', false);
   try {
     const res = await apiTeamFantasyPost_('adminInstallTeamFantasySyncTrigger', { gameId: gameId });
     if (!res || res.success === false) {
@@ -297,12 +297,12 @@ async function adminTfInstallTrigger_() {
       adminTfActionStatus_('❌ Apps Script did not report an active Team Fantasy trigger after installation.', true);
       return;
     }
-    adminTfActionStatus_('✅ 15-minute sync installed and verified — active trigger count: ' + Number(trigger.count || 1) + '.', false);
+    adminTfActionStatus_('✅ 5-minute game-day sync installed and verified — active trigger count: ' + Number(trigger.count || 1) + '.', false);
     await adminTfRefreshSystemStatus_();
   } catch (err) {
     adminTfActionStatus_(err && err.message ? err.message : 'Trigger install failed.', true);
   } finally {
-    adminTfSetBusy_('adminTfTriggerButton', false, 'Installing…', 'Install 15-min Sync');
+    adminTfSetBusy_('adminTfTriggerButton', false, 'Installing…', 'Install / Update 5-min Sync');
   }
 }
 

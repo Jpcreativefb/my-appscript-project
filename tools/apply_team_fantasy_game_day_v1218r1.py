@@ -1,112 +1,179 @@
-/* =========================================================
-   TEAM FANTASY FOOTBALL PLAYER PAGE — v1.2.18r1
-========================================================= */
+#!/usr/bin/env python3
+from pathlib import Path
+import shutil, sys
 
-(function teamFantasyLoadCss_() {
-  if (document.querySelector('link[data-team-fantasy-css="1"]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218r', script).href : './css/team-fantasy.css?v=1218r';
-  link.dataset.teamFantasyCss = '1';
-  document.head.appendChild(link);
-})();
+RELEASE = 'v1.2.18r1'
+MARKER = 'v1.2.18r1 game-day compare + synthetic Test Lab'
 
-function teamFantasyEscape_(value) {
-  return String(value === undefined || value === null ? '' : value)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
-}
 
-function teamFantasyCurrentUser_() {
-  try {
-    const s = typeof getSession === 'function' ? (getSession() || {}) : {};
-    return String(s.username || '').trim();
-  } catch (err) {
-    return '';
-  }
-}
+def find_function(text, name):
+    needle = f'function {name}('
+    start = text.find(needle)
+    if start < 0:
+        raise RuntimeError(f'Could not find function {name}')
+    # Include an async prefix when the target is declared as `async function`.
+    if start >= 6 and text[start-6:start] == 'async ':
+        start -= 6
+    brace = text.find('{', start)
+    if brace < 0:
+        raise RuntimeError(f'Could not find opening brace for {name}')
+    depth = 0; i = brace
+    in_s = in_d = in_t = False; esc = False; line = block = False
+    while i < len(text):
+        c = text[i]; n = text[i+1] if i+1 < len(text) else ''
+        if line:
+            if c == '\n': line = False
+            i += 1; continue
+        if block:
+            if c == '*' and n == '/': block = False; i += 2; continue
+            i += 1; continue
+        if in_s:
+            if esc: esc = False
+            elif c == '\\': esc = True
+            elif c == "'": in_s = False
+            i += 1; continue
+        if in_d:
+            if esc: esc = False
+            elif c == '\\': esc = True
+            elif c == '"': in_d = False
+            i += 1; continue
+        if in_t:
+            if esc: esc = False
+            elif c == '\\': esc = True
+            elif c == '`': in_t = False
+            i += 1; continue
+        if c == '/' and n == '/': line = True; i += 2; continue
+        if c == '/' and n == '*': block = True; i += 2; continue
+        if c == "'": in_s = True; i += 1; continue
+        if c == '"': in_d = True; i += 1; continue
+        if c == '`': in_t = True; i += 1; continue
+        if c == '{': depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0: return start, i + 1
+        i += 1
+    raise RuntimeError(f'Could not find closing brace for {name}')
 
-function teamFantasyScore_(value) {
-  const n = Number(value || 0);
-  return Number.isFinite(n) ? n.toFixed(1).replace(/\.0$/, '') : '0';
-}
 
-function teamFantasyPct_(value) {
-  const n = Number(value || 0);
-  return (n * 100).toFixed(1).replace(/\.0$/, '') + '%';
-}
+def replace_function(text, name, replacement):
+    start, end = find_function(text, name)
+    return text[:start] + replacement.rstrip() + text[end:]
 
-function teamFantasyLeagueSelect_(state) {
-  const leagues = Array.isArray(state.leagues) ? state.leagues : [];
-  if (!leagues.length) return '';
-  return `
-    <label class="tf-field tf-league-picker">
-      <span>League</span>
-      <select id="teamFantasyLeagueSelect" onchange="teamFantasyChangeLeague_(this.value)">
-        ${leagues.map(function(league) {
-          return `<option value="${teamFantasyEscape_(league.leagueId)}" ${league.leagueId === state.selectedLeagueId ? 'selected' : ''}>${teamFantasyEscape_(league.leagueName)}</option>`;
-        }).join('')}
-      </select>
-    </label>`;
-}
 
-function teamFantasyRenderProgress_(lineup) {
-  const required = Number(lineup.required || 0);
-  const picked = Number(lineup.picked || 0);
-  const pct = required ? Math.round((picked / required) * 100) : 0;
-  return `
-    <div class="tf-progress-row">
-      <strong>${picked}/${required} complete</strong>
-      <span>${pct}%</span>
-    </div>
-    <div class="tf-progress"><span style="width:${pct}%"></span></div>
-    ${lineup.missing && lineup.missing.length ? `<div class="tf-muted tf-missing-copy">Still open: ${teamFantasyEscape_(lineup.missing.join(', '))}</div>` : `<div class="tf-complete">Lineup complete</div>`}
-  `;
-}
+def function_text(text, name):
+    start, end = find_function(text, name)
+    return text[start:end]
 
-function teamFantasyOptionLabel_(team) {
-  const game = team.game || {};
-  const rank = team.rank ? '#' + team.rank + ' ' : '';
-  const opponent = game.homeAbbr === team.abbr ? ('vs ' + game.awayAbbr) : (game.awayAbbr === team.abbr ? ('@ ' + game.homeAbbr) : '');
-  const usage = 'Uses ' + Number(team.uses || 0) + '/' + (Number(team.uses || 0) + Number(team.usesRemaining || 0));
-  const reason = team.eligible ? '' : ' — ' + (team.reason || 'Unavailable');
-  return rank + team.name + (opponent ? ' — ' + opponent : '') + ' — ' + usage + reason;
-}
 
-function teamFantasyRenderSlot_(state, lineup, slot) {
-  const entry = lineup.entry || {};
-  const pick = slot.pick || null;
-  const current = pick ? pick.teamAbbr : '';
-  const eligibleCount = (slot.teams || []).filter(function(team) { return team.eligible; }).length;
-  const slotId = 'tf-' + String(entry.entryId || '').replace(/[^a-z0-9_-]/gi, '-') + '-' + slot.position;
-  if (slot.locked && pick) {
-    return `
-      <div class="tf-slot is-locked" id="${slotId}" data-missing="false">
-        <div class="tf-slot-title"><strong>${teamFantasyEscape_(slot.label)}</strong><span class="tf-lock">Locked</span></div>
-        <div class="tf-selected-team">${teamFantasyEscape_(pick.teamName || pick.teamAbbr)}</div>
-        <div class="tf-muted">${teamFantasyEscape_(pick.teamAbbr)} · NFL game started</div>
-      </div>`;
-  }
-  return `
-    <div class="tf-slot ${pick ? 'has-pick' : 'needs-pick'}" id="${slotId}" data-missing="${pick ? 'false' : 'true'}">
-      <div class="tf-slot-title">
-        <strong>${teamFantasyEscape_(slot.label)}</strong>
-        <span class="tf-muted">${eligibleCount} eligible</span>
-      </div>
-      <select class="tf-team-select" aria-label="${teamFantasyEscape_(slot.label)} team" onchange="teamFantasySaveSlot_('${teamFantasyEscape_(entry.entryId)}','${teamFantasyEscape_(slot.position)}',this.value)">
-        <option value="">${pick ? 'Change team…' : 'Choose team…'}</option>
-        ${(slot.teams || []).map(function(team) {
-          const selected = current === team.abbr ? 'selected' : '';
-          const disabled = !team.eligible && current !== team.abbr ? 'disabled' : '';
-          return `<option value="${teamFantasyEscape_(team.abbr)}" ${selected} ${disabled}>${teamFantasyEscape_(teamFantasyOptionLabel_(team))}</option>`;
-        }).join('')}
-      </select>
-      ${pick ? `<div class="tf-picked-note">Current: <strong>${teamFantasyEscape_(pick.teamName || pick.teamAbbr)}</strong>${pick.pickMethod && pick.pickMethod !== 'manual' ? ` · ${teamFantasyEscape_(pick.pickMethod)}` : ''}</div>` : ''}
-    </div>`;
-}
+def patch_core(path):
+    text = path.read_text()
+    if 'TEAM_FANTASY_GAME_DAY_CORE_PATCH_v1218r1' in text:
+        return
+    text = text.replace('var TEAM_FANTASY_VERSION = "1.2.18j2";', 'var TEAM_FANTASY_VERSION = "1.2.18r";', 1)
 
-function teamFantasyRenderLineup_(state, lineup) {
+    save = function_text(text, 'teamFantasySavePick_')
+    if 'payload._deferFlush' not in save:
+        if '  SpreadsheetApp.flush();\n  return { success: true' not in save:
+            raise RuntimeError('Could not find Team Fantasy save flush marker')
+        save = save.replace('  SpreadsheetApp.flush();\n  return { success: true', '  if (payload._deferFlush !== true) SpreadsheetApp.flush();\n  return { success: true', 1)
+        text = replace_function(text, 'teamFantasySavePick_', save)
+
+    auto = function_text(text, 'teamFantasyAutoPick_')
+    if '_deferFlush: true' not in auto:
+        needle = '        _entries: entries,\n        _schedule: schedule\n      }));'
+        repl = '        _entries: entries,\n        _schedule: schedule,\n        _deferFlush: true\n      }));'
+        if needle not in auto:
+            raise RuntimeError('Could not find Team Fantasy Auto Pick save marker')
+        auto = auto.replace(needle, repl, 1)
+    if 'TEAM_FANTASY_GAME_DAY_BATCH_FLUSH_v1218r1' not in auto:
+        needle = '  return { success: true, random: !!randomOnly, saved: results.length, results: results };'
+        repl = '  /* TEAM_FANTASY_GAME_DAY_BATCH_FLUSH_v1218r1 */\n  SpreadsheetApp.flush();\n' + needle
+        if needle not in auto:
+            raise RuntimeError('Could not find Team Fantasy Auto Pick return marker')
+        auto = auto.replace(needle, repl, 1)
+    text = replace_function(text, 'teamFantasyAutoPick_', auto)
+
+    trigger = '''function teamFantasySyncTriggerHandler() {
+  const settingsRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.SETTINGS);
+  const results = [];
+  settingsRows.forEach(function(row) {
+    const settings = teamFantasyNormalizeSettings_(row);
+    if (!settings.syncTriggerEnabled || !teamFantasyIsGame_(settings.gameId)) return;
+    try {
+      /* TEAM_FANTASY_GAME_DAY_CORE_PATCH_v1218r1 */
+      const gate = typeof teamFantasyGameDayTriggerWindow_ === "function"
+        ? teamFantasyGameDayTriggerWindow_(settings.gameId, settings.currentWeek, Date.now())
+        : { active: true, reason: "compatibility" };
+      if (!gate.active) {
+        results.push({ success: true, skipped: true, gameId: settings.gameId, week: settings.currentWeek, reason: gate.reason || "outside NFL game window" });
+        return;
+      }
+      const result = teamFantasyRefreshAndScoreWeek_(settings.gameId, settings.currentWeek);
+      const message = "Week " + settings.currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + Number((result.errors || []).length) + " errors.";
+      result.lastSyncAt = teamFantasyRecordSyncStatus_(settings.gameId, result.success === false ? "error" : "success", message, "system");
+      results.push(result);
+    } catch (err) {
+      const error = err && err.message ? err.message : String(err);
+      teamFantasyRecordSyncStatus_(settings.gameId, "error", error, "system");
+      results.push({ success: false, gameId: settings.gameId, error: error });
+    }
+  });
+  return { success: true, triggerStatus: teamFantasySyncTriggerStatus_(), results: results };
+}'''
+    text = replace_function(text, 'teamFantasySyncTriggerHandler', trigger)
+
+    install = '''function teamFantasyInstallSyncTrigger_() {
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === "teamFantasySyncTriggerHandler") ScriptApp.deleteTrigger(trigger);
+  });
+  ScriptApp.newTrigger("teamFantasySyncTriggerHandler").timeBased().everyMinutes(5).create();
+  const status = teamFantasySyncTriggerStatus_();
+  if (!status.active) throw new Error("The Team Fantasy 5-minute trigger was not found after installation.");
+  return status;
+}'''
+    text = replace_function(text, 'teamFantasyInstallSyncTrigger_', install)
+
+    admin_install = '''function apiAdminInstallTeamFantasySyncTrigger(payload) {
+  payload = payload || {};
+  if (typeof requireAdminFromToken_ === "function") requireAdminFromToken_(payload.token);
+  const gameId = teamFantasyString_(payload.gameId);
+  if (!gameId || !teamFantasyIsGame_(gameId)) throw new Error("Choose a saved Team Fantasy game first.");
+  teamFantasyGetSettings_(gameId);
+  const triggerStatus = teamFantasyInstallSyncTrigger_();
+  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.SETTINGS, function(row) { return teamFantasyString_(row.GameId) === gameId; }, {
+    GameId: gameId, SyncTriggerEnabled: true, UpdatedAt: teamFantasyNowIso_(), UpdatedBy: teamFantasyNormalizeUsername_(payload.username)
+  });
+  return {
+    success: true,
+    message: "5-minute Team Fantasy game-day sync is active.",
+    syncMinutes: 5,
+    triggerStatus: triggerStatus,
+    settings: teamFantasyGetSettings_(gameId)
+  };
+}'''
+    text = replace_function(text, 'apiAdminInstallTeamFantasySyncTrigger', admin_install)
+    path.write_text(text)
+
+
+def patch_api(path):
+    text = path.read_text()
+    if 'getTeamFantasyGameDayState' not in text:
+        anchor = '    if (action === "getTeamFantasyState") return json(apiGetTeamFantasyState(params));\n'
+        if anchor not in text:
+            raise RuntimeError('Could not find Team Fantasy GET API anchor')
+        addition = anchor + '    if (action === "getTeamFantasyGameDayState") return json(apiGetTeamFantasyGameDayState(params));\n    if (action === "adminGetTeamFantasyTestLab") return json(apiAdminGetTeamFantasyTestLab(params));\n'
+        text = text.replace(anchor, addition, 1)
+    path.write_text(text)
+
+
+def patch_player(path):
+    text = path.read_text()
+    if 'TEAM_FANTASY_GAME_DAY_UI_v1218r1' in text:
+        return
+    text = text.replace('TEAM FANTASY FOOTBALL PLAYER PAGE — v1.2.18j', 'TEAM FANTASY FOOTBALL PLAYER PAGE — v1.2.18r1', 1)
+    text = text.replace('team-fantasy.css?v=1218j2', 'team-fantasy.css?v=1218r', 2)
+
+    lineup = '''function teamFantasyRenderLineup_(state, lineup) {
   const entry = lineup.entry || {};
   const settings = state.settings || {};
   const conferenceLabel = entry.conference && entry.conference !== 'ALL' ? entry.conference + ' Entry' : (entry.entryName || 'Entry');
@@ -133,47 +200,10 @@ function teamFantasyRenderLineup_(state, lineup) {
         ${(lineup.slots || []).map(function(slot) { return teamFantasyRenderSlot_(state, lineup, slot); }).join('')}
       </div>
     </section>`;
-}
+}'''
+    text = replace_function(text, 'teamFantasyRenderLineup_', lineup)
 
-function teamFantasyRenderStandings_(standings, phase) {
-  if (!standings || !Array.isArray(standings.rows)) return `<div class="card"><h2>Standings</h2><div class="tf-muted">No standings yet.</div></div>`;
-  const playoff = phase === 'postseason' && Array.isArray(standings.playoffStandings) ? standings.playoffStandings : [];
-  return `
-    <section class="card tf-standings-card">
-      <div class="tf-card-heading"><div><h2>${teamFantasyEscape_(standings.league && standings.league.leagueName || 'Standings')}</h2><div class="tf-muted">All-Play regular-season record</div></div></div>
-      <div class="tf-table-wrap"><table class="tf-table"><thead><tr><th>#</th><th>Entry</th><th>W</th><th>L</th><th>T</th><th>Win %</th><th>Pts</th><th>Playoffs</th></tr></thead><tbody>
-        ${standings.rows.map(function(row) {
-          const label = row.entryId ? row.entryId : row.username;
-          return `<tr><td>${row.rank}</td><td>${teamFantasyEscape_(label)}</td><td>${row.regularWins}</td><td>${row.regularLosses}</td><td>${row.regularTies}</td><td>${teamFantasyPct_(row.winPct)}</td><td>${teamFantasyScore_(row.regularPoints)}</td><td>${row.playoffQualified ? '✓' : ''}</td></tr>`;
-        }).join('') || `<tr><td colspan="8">No completed weeks yet.</td></tr>`}
-      </tbody></table></div>
-      ${playoff.length ? `<div class="tf-playoff-block"><h3>${standings.postseasonScoringMode === 'fresh-round' ? 'Current Postseason Round' : 'Cumulative Postseason'}</h3><div class="tf-muted">${standings.postseasonScoringMode === 'fresh-round' ? 'Only the latest completed playoff round is used.' : 'Super Bowl points add to the postseason total instead of becoming a one-game tiebreak.'}</div><div class="tf-table-wrap"><table class="tf-table"><thead><tr><th>#</th><th>Entry</th><th>Postseason Pts</th></tr></thead><tbody>${playoff.map(function(row){return `<tr><td>${row.playoffRank}</td><td>${teamFantasyEscape_(row.entryId || row.username)}</td><td>${teamFantasyScore_(row.playoffScore !== undefined ? row.playoffScore : row.postseasonPoints)}</td></tr>`;}).join('')}</tbody></table></div></div>` : ''}
-    </section>`;
-}
-
-function teamFantasyCompetitors_(standings) {
-  return standings && Array.isArray(standings.rows) ? standings.rows.map(function(row) {
-    return { id: row.competitorId, label: row.entryId || row.username || row.competitorId };
-  }) : [];
-}
-
-function teamFantasyRenderH2H_(state) {
-  const competitors = teamFantasyCompetitors_(state.standings);
-  if (competitors.length < 2) return '';
-  return `
-    <section class="card tf-h2h-card">
-      <div class="tf-card-heading"><div><h2>True Head to Head</h2><div class="tf-muted">Compare only the weeks these two competitors faced the same scoring field.</div></div></div>
-      <div class="tf-h2h-controls">
-        <select id="tfH2HA">${competitors.map(function(c, i){return `<option value="${teamFantasyEscape_(c.id)}" ${i===0?'selected':''}>${teamFantasyEscape_(c.label)}</option>`;}).join('')}</select>
-        <span>vs</span>
-        <select id="tfH2HB">${competitors.map(function(c, i){return `<option value="${teamFantasyEscape_(c.id)}" ${i===1?'selected':''}>${teamFantasyEscape_(c.label)}</option>`;}).join('')}</select>
-        <button class="tf-button" onclick="teamFantasyLoadH2H_()">View Record</button>
-      </div>
-      <div id="tfH2HResults" class="tf-h2h-results"></div>
-    </section>`;
-}
-
-async function renderTeamFantasyPage() {
+    render = '''async function renderTeamFantasyPage() {
   const gameId = typeof getFrontendGameId === 'function' ? getFrontendGameId() : '';
   const leagueId = typeof getFrontendLeagueId === 'function' ? getFrontendLeagueId() : '';
   const username = teamFantasyCurrentUser_();
@@ -201,27 +231,16 @@ async function renderTeamFantasyPage() {
       ${teamFantasyRenderStandings_(res.standings, res.phase)}
       ${teamFantasyRenderH2H_(res)}
     </div>`;
-}
+}'''
+    text = replace_function(text, 'renderTeamFantasyPage', render)
 
-function teamFantasySetStatus_(message, error) {
-  const el = document.getElementById('teamFantasyStatus');
-  if (!el) return;
-  el.textContent = message || '';
-  el.className = 'tf-status ' + (error ? 'is-error' : 'is-ok');
-}
-
-async function teamFantasyReload_(options) {
+    reload_fn = '''async function teamFantasyReload_(options) {
   options = options || {};
   await navigate('team-fantasy', { skipUnsavedCheck: true, suppressLoader: options.showGlobalLoader === true ? false : true });
-}
+}'''
+    text = replace_function(text, 'teamFantasyReload_', reload_fn)
 
-async function teamFantasyChangeLeague_(leagueId) {
-  if (typeof setFrontendLeagueId === 'function') setFrontendLeagueId(leagueId);
-  else localStorage.setItem('leagueId', leagueId || '');
-  await teamFantasyReload_();
-}
-
-async function teamFantasySaveSlot_(entryId, position, teamAbbr) {
+    save_slot = '''async function teamFantasySaveSlot_(entryId, position, teamAbbr) {
   if (!teamAbbr) return;
   const state = window.TEAM_FANTASY_STATE || {};
   teamFantasySetStatus_('Saving ' + position + '…', false);
@@ -232,18 +251,10 @@ async function teamFantasySaveSlot_(entryId, position, teamAbbr) {
   }
   teamFantasySetStatus_('Saved ' + position + '.', false);
   await teamFantasyReload_({ showGlobalLoader: false });
-}
+}'''
+    text = replace_function(text, 'teamFantasySaveSlot_', save_slot)
 
-function teamFantasyContinuePicks_(entryId) {
-  const card = document.querySelector('.tf-lineup-card[data-entry-id="' + String(entryId).replace(/[^a-zA-Z0-9_-]/g, '') + '"]');
-  const target = card && card.querySelector('.tf-slot[data-missing="true"]');
-  if (!target) { teamFantasySetStatus_('This lineup is complete.', false); return; }
-  target.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  const select = target.querySelector('select');
-  if (select) setTimeout(function(){ select.focus(); }, 350);
-}
-
-async function teamFantasyFill_(entryId, randomOnly) {
+    fill = '''async function teamFantasyFill_(entryId, randomOnly) {
   const state = window.TEAM_FANTASY_STATE || {};
   const progress = teamFantasyStartFillProgress_(entryId, randomOnly ? 'Randomizing open positions…' : 'Building ranked Auto Pick lineup…');
   teamFantasySetStatus_(randomOnly ? 'Randomizing open positions…' : 'Building ranked Auto Pick lineup…', false);
@@ -264,24 +275,10 @@ async function teamFantasyFill_(entryId, randomOnly) {
     teamFantasyFinishFillProgress_(progress, err && err.message ? err.message : 'Could not fill lineup.', true);
     teamFantasySetStatus_(err && err.message ? err.message : 'Could not fill lineup.', true);
   }
-}
+}'''
+    text = replace_function(text, 'teamFantasyFill_', fill)
 
-async function teamFantasyLoadH2H_() {
-  const state = window.TEAM_FANTASY_STATE || {};
-  const a = document.getElementById('tfH2HA');
-  const b = document.getElementById('tfH2HB');
-  const out = document.getElementById('tfH2HResults');
-  if (!a || !b || !out) return;
-  if (a.value === b.value) { out.innerHTML = '<div class="tf-warning">Choose two different competitors.</div>'; return; }
-  out.innerHTML = '<div class="tf-muted">Loading head-to-head history…</div>';
-  const res = await api('getTeamFantasyHeadToHead', { gameId: state.gameId, leagueId: state.selectedLeagueId, competitorA: a.value, competitorB: b.value });
-  if (!res || res.success === false) { out.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(res && (res.error || res.message) || 'Could not load record.')}</div>`; return; }
-  out.innerHTML = `
-    <div class="tf-h2h-summary"><strong>${res.aWins}-${res.bWins}-${res.ties}</strong><span>${teamFantasyScore_(res.aAverage)} avg vs ${teamFantasyScore_(res.bAverage)} avg</span></div>
-    <div class="tf-table-wrap"><table class="tf-table"><thead><tr><th>Week</th><th>A</th><th>B</th><th>Winner</th></tr></thead><tbody>
-      ${(res.history || []).map(function(row){return `<tr><td>${row.week}</td><td>${teamFantasyScore_(row.scoreA)}</td><td>${teamFantasyScore_(row.scoreB)}</td><td>${teamFantasyEscape_(row.winner === 'tie' ? 'Tie' : row.winner)}</td></tr>`;}).join('') || '<tr><td colspan="4">No completed common weeks yet.</td></tr>'}
-    </tbody></table></div>`;
-}
+    helpers = r'''
 
 /* TEAM_FANTASY_GAME_DAY_UI_v1218r1 */
 function teamFantasySafeDomId_(value) {
@@ -449,3 +446,97 @@ async function teamFantasyRunTestLab_() {
     mount.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(err && err.message ? err.message : 'Test Lab failed.')}</div>`;
   }
 }
+'''
+    text = (text.rstrip() + helpers).rstrip() + '\n'
+    path.write_text(text)
+
+
+def patch_admin(path):
+    text = path.read_text()
+    text = text.replace('Install 15-min Sync', 'Install / Update 5-min Sync')
+    text = text.replace('15-minute Team Fantasy sync', '5-minute Team Fantasy game-day sync')
+    text = text.replace('15-minute sync installed and verified', '5-minute game-day sync installed and verified')
+    path.write_text(text)
+
+
+def patch_css(path):
+    text = path.read_text()
+    if MARKER in text: return
+    addition = r'''
+
+/* v1.2.18r1 game-day compare + synthetic Test Lab */
+.tf-fill-progress{margin:12px 0;padding:10px 12px;border:1px solid rgba(127,127,127,.24);border-radius:10px}.tf-fill-progress-copy{font-weight:750;margin-bottom:6px}.tf-fill-meter span{width:38%;animation:tfFillSweep 1.15s ease-in-out infinite}.tf-fill-progress.is-complete .tf-fill-meter span{width:100%;animation:none}.tf-fill-progress.is-error{border-color:#b42318}@keyframes tfFillSweep{0%{transform:translateX(-110%)}50%{transform:translateX(80%)}100%{transform:translateX(240%)}}
+.tf-game-day-card{overflow:hidden}.tf-compare-controls{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;margin-bottom:10px}.tf-compare-picker{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}.tf-compare-choice{display:flex;align-items:center;gap:6px;border:1px solid rgba(127,127,127,.25);border-radius:999px;padding:6px 10px;font-size:.86rem}.tf-compare-scroll{overflow-x:auto;padding-bottom:6px}.tf-compare-board{display:flex;gap:10px;min-width:max-content}.tf-compare-team{width:190px;border:1px solid rgba(127,127,127,.25);border-radius:13px;padding:10px;background:var(--card-bg,transparent)}.tf-compare-team-head{min-height:92px}.tf-compare-total{font-size:1.35rem;font-weight:850;margin-top:5px}.tf-compare-small{font-size:.72rem;opacity:.72;line-height:1.2}.tf-you-badge,.tf-status-badge{font-size:.62rem;font-weight:850;letter-spacing:.05em;border:1px solid currentColor;border-radius:999px;padding:2px 5px;margin-left:5px}.tf-compare-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.tf-compare-slot{position:relative;min-height:112px;border:2px solid #94a3b8;border-radius:10px;padding:7px;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}.tf-compare-slot.is-live{border-color:#22c55e}.tf-compare-slot.is-final{border-color:#64748b;opacity:.88}.tf-compare-slot.is-upcoming{border-color:#94a3b8;border-style:dashed}.tf-compare-pos{position:absolute;top:5px;left:6px;font-size:.65rem;font-weight:850}.tf-team-logo{width:36px;height:36px;object-fit:contain;margin-top:10px}.tf-team-abbr{font-size:.76rem}.tf-slot-points{font-size:.72rem;font-weight:800}.tf-status-badge{margin:1px 0 0;font-size:.54rem}.tf-hidden-pick,.tf-empty-logo{font-size:1.45rem;margin-top:12px}.tf-privacy-note{margin-top:10px}.tf-test-lab-output{margin-top:12px}.tf-test-summary{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:10px;border-radius:10px;margin-bottom:10px}.tf-test-summary.is-pass{border:1px solid #22c55e}.tf-test-summary.is-fail{border:1px solid #b42318}.tf-test-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-bottom:14px}.tf-test-check{border:1px solid rgba(127,127,127,.24);border-radius:9px;padding:8px;display:flex;flex-direction:column;gap:3px}.tf-test-check.is-pass strong{color:#15803d}.tf-test-check.is-fail strong{color:#b42318}.tf-test-check span{font-size:.75rem;opacity:.75}
+@media(max-width:760px){.tf-compare-controls{flex-direction:column}.tf-compare-team{width:164px}.tf-compare-slots{grid-template-columns:1fr}.tf-test-checks{grid-template-columns:1fr}.tf-test-summary{align-items:flex-start;flex-direction:column}}
+'''
+    path.write_text((text.rstrip() + addition).rstrip() + '\n')
+
+
+
+def patch_legacy_j2_test(path):
+    text = path.read_text()
+    old = 'assert(engine.includes(\'TEAM_FANTASY_VERSION = "1.2.18j2"\'), \'engine version marker missing\');'
+    new = 'assert(engine.includes(\'TEAM_FANTASY_VERSION = "1.2.18r"\'), \'current Team Fantasy engine version marker missing\');'
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise RuntimeError('Could not update j2 version regression contract')
+    old = 'assert(engine.includes(\'The Team Fantasy 15-minute trigger was not found after installation.\'), \'trigger install is not verified\');'
+    new = 'assert(engine.includes(\'The Team Fantasy 5-minute trigger was not found after installation.\'), \'5-minute trigger install is not verified\');'
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise RuntimeError('Could not update j2 trigger cadence regression contract')
+    old = 'assert(admin.includes(\'15-minute sync installed and verified\'), \'trigger verification success message missing\');'
+    new = 'assert(admin.includes(\'5-minute game-day sync installed and verified\'), \'5-minute trigger verification success message missing\');'
+    if old in text:
+        text = text.replace(old, new, 1)
+    elif new not in text:
+        raise RuntimeError('Could not update j2 admin trigger regression contract')
+    path.write_text(text)
+
+def main():
+    if len(sys.argv) < 2: raise RuntimeError('Repository root argument is required.')
+    repo = Path(sys.argv[1]).resolve()
+    package = Path(__file__).resolve().parents[1]
+    required = [
+        repo/'backend/engines/SportsTeamFantasyEngine.js', repo/'backend/Api.js',
+        repo/'frontend/js/pages/teamFantasy.js', repo/'frontend/js/pages/adminTeamFantasy.js', repo/'frontend/css/team-fantasy.css',
+        repo/'tests/team_fantasy_admin_controls_v1218j2_tests.js'
+    ]
+    for p in required:
+        if not p.exists(): raise RuntimeError(f'Required file not found: {p}')
+    game_day_src = package/'backend/engines/SportsTeamFantasyGameDayEngine.js'
+    if not game_day_src.exists(): raise RuntimeError('Package is missing SportsTeamFantasyGameDayEngine.js')
+    game_day_dst = repo/'backend/engines/SportsTeamFantasyGameDayEngine.js'
+    originals = {p: p.read_bytes() for p in required}
+    game_day_existed = game_day_dst.exists()
+    game_day_original = game_day_dst.read_bytes() if game_day_existed else None
+    try:
+        shutil.copy2(game_day_src, game_day_dst)
+        patch_core(repo/'backend/engines/SportsTeamFantasyEngine.js')
+        patch_api(repo/'backend/Api.js')
+        patch_player(repo/'frontend/js/pages/teamFantasy.js')
+        patch_admin(repo/'frontend/js/pages/adminTeamFantasy.js')
+        patch_css(repo/'frontend/css/team-fantasy.css')
+        patch_legacy_j2_test(repo/'tests/team_fantasy_admin_controls_v1218j2_tests.js')
+    except Exception:
+        for target, content in originals.items():
+            target.write_bytes(content)
+        if game_day_existed:
+            game_day_dst.write_bytes(game_day_original)
+        elif game_day_dst.exists():
+            game_day_dst.unlink()
+        raise
+    print('Team Fantasy v1.2.18r1 game-day + Test Lab applied.')
+    print('- Synthetic 6-team Test Lab writes no Team Fantasy Sheet rows')
+    print('- 2–6 team live comparison uses cached Team Fantasy scores')
+    print('- Opponent picks remain hidden until kickoff')
+    print('- Auto/Random Pick uses inline progress and one final flush')
+    print('- Sync installer now installs a 5-minute, game-window-gated trigger')
+
+if __name__ == '__main__':
+    try: main()
+    except Exception as exc:
+        print('ERROR:', exc, file=sys.stderr)
+        sys.exit(1)

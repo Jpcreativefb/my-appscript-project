@@ -1,0 +1,344 @@
+/* =========================================================
+   TEAM FANTASY GAME DAY + TEST LAB — v1.2.18r1
+
+   Lightweight cached comparison state for 2–6 player game-day
+   viewing. No ESPN calls are made here. The existing central
+   Team Fantasy scorer remains the only live-data writer.
+========================================================= */
+
+var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18r";
+var TEAM_FANTASY_GAME_DAY_POLL_MS = 5 * 60 * 1000;
+
+function teamFantasyGameDayString_(value) {
+  return String(value === undefined || value === null ? "" : value).trim();
+}
+
+function teamFantasyGameDayKey_(value) {
+  return teamFantasyGameDayString_(value).toLowerCase();
+}
+
+function teamFantasyGameDayBool_(value) {
+  if (value === true || value === false) return value;
+  var key = teamFantasyGameDayKey_(value);
+  return key === "true" || key === "yes" || key === "1" || key === "on";
+}
+
+function teamFantasyGameDayRound_(value) {
+  return Math.round((Number(value) || 0) * 100) / 100;
+}
+
+function teamFantasyGameDayNormalizePosition_(value) {
+  var key = teamFantasyGameDayKey_(value).replace(/[\/_ -]/g, "");
+  if (key === "wrte" || key === "tewr" || key === "receiver") return "WRTE";
+  var upper = teamFantasyGameDayString_(value).toUpperCase();
+  return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"].indexOf(upper) !== -1 ? upper : "";
+}
+
+function teamFantasyGameDayNormalizeTeam_(value) {
+  var abbr = teamFantasyGameDayString_(value).toUpperCase().replace(/[^A-Z0-9]/g, "");
+  if (abbr === "WSH") abbr = "WAS";
+  if (abbr === "JAC") abbr = "JAX";
+  if (abbr === "OAK") abbr = "LV";
+  if (abbr === "SD") abbr = "LAC";
+  if (abbr === "STL") abbr = "LAR";
+  return abbr;
+}
+
+function teamFantasyGameDayLogoUrl_(teamAbbr) {
+  var abbr = teamFantasyGameDayNormalizeTeam_(teamAbbr);
+  var slug = abbr === "WAS" ? "wsh" : abbr.toLowerCase();
+  return abbr ? "https://a.espncdn.com/i/teamlogos/nfl/500/" + encodeURIComponent(slug) + ".png" : "";
+}
+
+function teamFantasyGameDayPositions_() {
+  return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"];
+}
+
+function teamFantasyGameDayPositionLabel_(position) {
+  return position === "WRTE" ? "WR/TE" : position;
+}
+
+function teamFantasyGameDayUsageMatrix_(rows) {
+  var matrix = {};
+  teamFantasyGameDayPositions_().forEach(function(position) { matrix[position] = {}; });
+  (rows || []).forEach(function(row) {
+    var position = teamFantasyGameDayNormalizePosition_(row.Position || row.position);
+    var team = teamFantasyGameDayNormalizeTeam_(row.TeamAbbr || row.teamAbbr);
+    if (!position || !team) return;
+    matrix[position][team] = (matrix[position][team] || 0) + 1;
+  });
+  return matrix;
+}
+
+function teamFantasyGameDayUsageAllowed_(matrix, position, teamAbbr, limit) {
+  position = teamFantasyGameDayNormalizePosition_(position);
+  teamAbbr = teamFantasyGameDayNormalizeTeam_(teamAbbr);
+  var used = matrix[position] && matrix[position][teamAbbr] ? Number(matrix[position][teamAbbr]) : 0;
+  return { allowed: used < Number(limit || 0), used: used, remaining: Math.max(0, Number(limit || 0) - used) };
+}
+
+function teamFantasyGameDayStatus_(pick, score, nowMs) {
+  if (score && teamFantasyGameDayBool_(score.Final !== undefined ? score.Final : score.final)) return "final";
+  var kickoffText = pick ? (pick.GameDateTime || pick.gameDateTime) : "";
+  var kickoff = kickoffText ? new Date(kickoffText).getTime() : NaN;
+  if (score || (!isNaN(kickoff) && kickoff <= nowMs)) return "live";
+  return "upcoming";
+}
+
+function teamFantasyGameDayBuildCompare_(input) {
+  input = input || {};
+  var positions = teamFantasyGameDayPositions_();
+  var nowMs = Number(input.nowMs || Date.now());
+  var viewerIds = input.viewerEntryIds || {};
+  var picks = Array.isArray(input.picks) ? input.picks : [];
+  var scores = Array.isArray(input.scores) ? input.scores : [];
+  var entries = Array.isArray(input.entries) ? input.entries : [];
+  var pickMap = {};
+  var scoreMap = {};
+
+  picks.forEach(function(row) {
+    var entryId = teamFantasyGameDayString_(row.EntryId || row.entryId);
+    var position = teamFantasyGameDayNormalizePosition_(row.Position || row.position);
+    if (!entryId || !position) return;
+    pickMap[entryId + "|" + position] = row;
+  });
+  scores.forEach(function(row) {
+    var entryId = teamFantasyGameDayString_(row.EntryId || row.entryId);
+    var position = teamFantasyGameDayNormalizePosition_(row.Position || row.position);
+    var team = teamFantasyGameDayNormalizeTeam_(row.TeamAbbr || row.teamAbbr);
+    if (!entryId || !position || !team) return;
+    scoreMap[entryId + "|" + position + "|" + team] = row;
+  });
+
+  var competitors = entries.map(function(entry) {
+    var entryId = teamFantasyGameDayString_(entry.EntryId || entry.entryId);
+    var username = teamFantasyGameDayString_(entry.Username || entry.username);
+    var entryName = teamFantasyGameDayString_(entry.EntryName || entry.entryName);
+    var isViewer = viewerIds[entryId] === true;
+    var counts = { final: 0, live: 0, upcoming: 0 };
+    var total = 0;
+    var updatedAt = "";
+    var slots = positions.map(function(position) {
+      var pick = pickMap[entryId + "|" + position] || null;
+      if (!pick) {
+        if (!isViewer) {
+          counts.upcoming++;
+          return { position: position, label: teamFantasyGameDayPositionLabel_(position), hidden: true, status: "upcoming", fantasyPoints: 0 };
+        }
+        return { position: position, label: teamFantasyGameDayPositionLabel_(position), hidden: false, empty: true, status: "upcoming", fantasyPoints: 0 };
+      }
+      var team = teamFantasyGameDayNormalizeTeam_(pick.TeamAbbr || pick.teamAbbr);
+      var score = scoreMap[entryId + "|" + position + "|" + team] || null;
+      var status = teamFantasyGameDayStatus_(pick, score, nowMs);
+      counts[status] = (counts[status] || 0) + 1;
+      var points = score ? teamFantasyGameDayRound_(score.FantasyPoints !== undefined ? score.FantasyPoints : score.fantasyPoints) : 0;
+      total += points;
+      var scoreUpdated = score ? teamFantasyGameDayString_(score.UpdatedAt || score.updatedAt) : "";
+      if (scoreUpdated && (!updatedAt || scoreUpdated > updatedAt)) updatedAt = scoreUpdated;
+      var reveal = isViewer || status !== "upcoming";
+      if (!reveal) {
+        return { position: position, label: teamFantasyGameDayPositionLabel_(position), hidden: true, status: status, fantasyPoints: 0 };
+      }
+      return {
+        position: position,
+        label: teamFantasyGameDayPositionLabel_(position),
+        hidden: false,
+        empty: false,
+        status: status,
+        teamAbbr: team,
+        teamName: teamFantasyGameDayString_(pick.TeamName || pick.teamName) || team,
+        logoUrl: teamFantasyGameDayLogoUrl_(team),
+        fantasyPoints: points,
+        gameDateTime: teamFantasyGameDayString_(pick.GameDateTime || pick.gameDateTime),
+        final: status === "final"
+      };
+    });
+    return {
+      entryId: entryId,
+      username: username,
+      label: entryName || entryId || username,
+      conference: teamFantasyGameDayString_(entry.Conference || entry.conference),
+      isViewer: isViewer,
+      totalPoints: teamFantasyGameDayRound_(total),
+      counts: counts,
+      updatedAt: updatedAt,
+      slots: slots
+    };
+  });
+
+  competitors.sort(function(a, b) {
+    if (a.isViewer !== b.isViewer) return a.isViewer ? -1 : 1;
+    if (b.totalPoints !== a.totalPoints) return b.totalPoints - a.totalPoints;
+    return a.label.localeCompare(b.label);
+  });
+
+  return {
+    success: true,
+    version: TEAM_FANTASY_GAME_DAY_VERSION,
+    gameId: teamFantasyGameDayString_(input.gameId),
+    week: Number(input.week || 0),
+    leagueId: teamFantasyGameDayString_(input.leagueId),
+    pollAfterMs: TEAM_FANTASY_GAME_DAY_POLL_MS,
+    privacy: "Opponent picks remain hidden until that NFL team's game kicks off.",
+    competitors: competitors
+  };
+}
+
+function teamFantasyGameDayTriggerWindow_(gameId, week, nowMs) {
+  nowMs = Number(nowMs || Date.now());
+  var schedule = teamFantasyFetchWeekSchedule_(gameId, week);
+  var games = schedule && Array.isArray(schedule.games) ? schedule.games : [];
+  if (!games.length) return { active: false, reason: "No NFL games found for this week." };
+  var pregameMs = 30 * 60 * 1000;
+  var postgameMs = 8 * 60 * 60 * 1000;
+  var active = games.some(function(game) {
+    var state = teamFantasyGameDayKey_(game && game.state);
+    var status = teamFantasyGameDayKey_(game && game.status);
+    if (state === "in" || status.indexOf("in progress") !== -1 || status.indexOf("halftime") !== -1) return true;
+    var kickoff = new Date(game && game.gameDateTime || 0).getTime();
+    if (isNaN(kickoff)) return false;
+    return nowMs >= kickoff - pregameMs && nowMs <= kickoff + postgameMs;
+  });
+  return { active: active, reason: active ? "NFL game window active." : "Outside NFL game window.", scheduleGames: games.length };
+}
+
+function apiGetTeamFantasyGameDayState(payload) {
+  payload = payload || {};
+  var username = typeof teamFantasyNormalizeUsername_ === "function" ? teamFantasyNormalizeUsername_(payload.username) : teamFantasyGameDayKey_(payload.username);
+  var gameId = teamFantasyGameDayString_(payload.gameId);
+  if (!username || !gameId) throw new Error("User and game are required.");
+  if (typeof teamFantasyIsGame_ === "function" && !teamFantasyIsGame_(gameId)) throw new Error("This game is not configured as Team Fantasy Football.");
+
+  var settings = teamFantasyGetSettings_(gameId);
+  var week = Math.max(1, Math.floor(Number(payload.week || settings.currentWeek || 1)));
+  var viewerEntries = teamFantasyEnsureEntriesForUser_(gameId, username);
+  var viewerIds = {};
+  viewerEntries.forEach(function(entry) { viewerIds[teamFantasyGameDayString_(entry.entryId || entry.EntryId)] = true; });
+
+  var leagues = teamFantasyLeaguesForEntries_(gameId, viewerEntries);
+  var requested = teamFantasyGameDayString_(payload.leagueId);
+  var selectedLeagueId = requested && leagues.some(function(league) { return teamFantasyGameDayString_(league.leagueId || league.LeagueId) === requested; })
+    ? requested
+    : (leagues[0] ? teamFantasyGameDayString_(leagues[0].leagueId || leagues[0].LeagueId) : "complete");
+
+  var allowed = teamFantasyLeagueEntryIds_(gameId, selectedLeagueId);
+  var entries = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).filter(function(row) {
+    var entryId = teamFantasyGameDayString_(row.EntryId);
+    return teamFantasyGameDayString_(row.GameId) === gameId && allowed[entryId] && teamFantasyBool_(row.Active, true);
+  });
+  var picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, "");
+  var scores = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES).filter(function(row) {
+    return teamFantasyGameDayString_(row.GameId) === gameId && Number(row.SeasonYear) === Number(settings.seasonYear) && Number(row.Week) === week && allowed[teamFantasyGameDayString_(row.EntryId)];
+  });
+
+  var out = teamFantasyGameDayBuildCompare_({
+    gameId: gameId,
+    week: week,
+    leagueId: selectedLeagueId,
+    viewerEntryIds: viewerIds,
+    entries: entries,
+    picks: picks,
+    scores: scores,
+    nowMs: Date.now()
+  });
+  out.username = username;
+  out.seasonYear = settings.seasonYear;
+  out.generatedAt = new Date().toISOString();
+  return out;
+}
+
+function teamFantasyBuildSyntheticGameDayLab_() {
+  var positions = teamFantasyGameDayPositions_();
+  var teams = ["BUF", "MIA", "KC", "PHI", "DET", "SF", "BAL", "GB", "CHI", "DAL", "SEA", "HOU", "LAR", "MIN", "TB", "CIN"];
+  var now = Date.now();
+  var entries = [];
+  var picks = [];
+  var scores = [];
+  for (var p = 0; p < 6; p++) {
+    var entryId = "test-player-" + (p + 1);
+    entries.push({ EntryId: entryId, Username: "test" + (p + 1), EntryName: "Test Team " + (p + 1), Conference: "ALL", Active: true });
+    positions.forEach(function(position, index) {
+      var team = teams[(p * 3 + index) % teams.length];
+      var phase = index <= 2 ? "final" : (index <= 5 ? "live" : "upcoming");
+      var kickoff = phase === "final" ? now - (5 - index) * 3600000 : (phase === "live" ? now - (index - 2) * 1800000 : now + (index - 5) * 3600000);
+      picks.push({ EntryId: entryId, Position: position, TeamAbbr: team, TeamName: team + " Test", GameDateTime: new Date(kickoff).toISOString() });
+      if (phase !== "upcoming") {
+        scores.push({
+          EntryId: entryId,
+          Position: position,
+          TeamAbbr: team,
+          FantasyPoints: teamFantasyGameDayRound_((p + 1) * 2.25 + (index + 1) * 1.35),
+          Final: phase === "final",
+          UpdatedAt: new Date(now - 60000).toISOString()
+        });
+      }
+    });
+  }
+  var compare = teamFantasyGameDayBuildCompare_({
+    gameId: "TEAM_FANTASY_TEST_LAB",
+    week: 99,
+    leagueId: "synthetic-six",
+    viewerEntryIds: { "test-player-1": true },
+    entries: entries,
+    picks: picks,
+    scores: scores,
+    nowMs: now
+  });
+
+  var usageRows = [
+    { Position: "QB", TeamAbbr: "BUF" },
+    { Position: "QB", TeamAbbr: "BUF" },
+    { Position: "QB", TeamAbbr: "BUF" },
+    { Position: "RB", TeamAbbr: "BUF" }
+  ];
+  var usage = teamFantasyGameDayUsageMatrix_(usageRows);
+  var qb = teamFantasyGameDayUsageAllowed_(usage, "QB", "BUF", 3);
+  var rb = teamFantasyGameDayUsageAllowed_(usage, "RB", "BUF", 3);
+  var viewer = compare.competitors.filter(function(c) { return c.entryId === "test-player-1"; })[0];
+  var opponent = compare.competitors.filter(function(c) { return c.entryId === "test-player-2"; })[0];
+  var opponentUpcoming = opponent.slots.filter(function(s) { return s.status === "upcoming"; });
+  var opponentLive = opponent.slots.filter(function(s) { return s.status === "live"; });
+  var viewerUpcoming = viewer.slots.filter(function(s) { return s.status === "upcoming"; });
+  var totalCheck = compare.competitors.every(function(c) {
+    var sum = c.slots.reduce(function(acc, slot) { return acc + Number(slot.fantasyPoints || 0); }, 0);
+    return Math.abs(teamFantasyGameDayRound_(sum) - Number(c.totalPoints || 0)) < 0.01;
+  });
+
+  var scoringProbe = { points: 0 };
+  if (typeof teamFantasyScoreStats_ === "function") {
+    scoringProbe = teamFantasyScoreStats_([
+      { active: true, position: "QB", statKey: "passingYards", ruleType: "unit", pointsPerUnit: 0.04, threshold: null, bonusPoints: 0, ruleId: "lab-yd", label: "Passing yards" },
+      { active: true, position: "QB", statKey: "passingTouchdowns", ruleType: "unit", pointsPerUnit: 4, threshold: null, bonusPoints: 0, ruleId: "lab-td", label: "Passing TD" },
+      { active: true, position: "QB", statKey: "passingYards", ruleType: "bonus", pointsPerUnit: 0, threshold: 300, bonusPoints: 3, ruleId: "lab-300", label: "300+ yards" }
+    ], "QB", { passingYards: 325, passingTouchdowns: 3 });
+  }
+
+  var checks = [
+    { name: "Synthetic league has 6 players", passed: compare.competitors.length === 6, detail: compare.competitors.length + " players" },
+    { name: "Real scoring engine probe passes", passed: Number(scoringProbe.points || 0) === 28, detail: "325 pass yds + 3 pass TD + 300-yard bonus = 28 pts" },
+    { name: "Every lineup has all 8 positions", passed: compare.competitors.every(function(c){ return c.slots.length === 8; }), detail: "QB, RB, WR/TE, K, OL, DL, LB, DB" },
+    { name: "Team-use limit is per position", passed: qb.allowed === false && qb.used === 3 && rb.allowed === true && rb.used === 1, detail: "BUF QB 3/3 blocked; BUF RB 1/3 still allowed" },
+    { name: "Opponent upcoming picks stay hidden", passed: opponentUpcoming.length > 0 && opponentUpcoming.every(function(s){ return s.hidden === true && !s.teamAbbr; }), detail: opponentUpcoming.length + " upcoming slots hidden" },
+    { name: "Viewer can see own upcoming picks", passed: viewerUpcoming.length > 0 && viewerUpcoming.every(function(s){ return s.hidden === false && !!s.teamAbbr; }), detail: viewerUpcoming.length + " own upcoming slots visible" },
+    { name: "Opponent picks reveal after kickoff", passed: opponentLive.length > 0 && opponentLive.every(function(s){ return s.hidden === false && !!s.teamAbbr; }), detail: opponentLive.length + " live slots revealed" },
+    { name: "Live totals equal slot points", passed: totalCheck, detail: "All six totals reconciled" },
+    { name: "Upcoming / Live / Final states are present", passed: compare.competitors.every(function(c){ return c.counts.upcoming > 0 && c.counts.live > 0 && c.counts.final > 0; }), detail: "All status states exercised" },
+    { name: "Comparison supports 2–6 teams", passed: compare.competitors.length >= 6, detail: "Head-to-head through six-team view" }
+  ];
+  return {
+    success: true,
+    synthetic: true,
+    writesSheets: false,
+    version: TEAM_FANTASY_GAME_DAY_VERSION,
+    allPassed: checks.every(function(check){ return check.passed === true; }),
+    checks: checks,
+    compare: compare,
+    usageExample: { team: "BUF", QB: qb, RB: rb }
+  };
+}
+
+function apiAdminGetTeamFantasyTestLab(payload) {
+  payload = payload || {};
+  if (typeof requireAdminFromToken_ === "function") requireAdminFromToken_(payload.token);
+  return teamFantasyBuildSyntheticGameDayLab_();
+}

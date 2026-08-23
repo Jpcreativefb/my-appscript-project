@@ -13,14 +13,14 @@ const admin = read('frontend/js/pages/adminTeamFantasy.js');
 const bridge = read('functions/api/team-fantasy.js');
 const sw = read('frontend/sw.js');
 
-assert(engine.includes('TEAM_FANTASY_VERSION = "1.2.18j2"'), 'engine version marker missing');
+assert(engine.includes('TEAM_FANTASY_VERSION = "1.2.18r"'), 'current Team Fantasy engine version marker missing');
 ['LastSyncAt','LastSyncStatus','LastSyncMessage'].forEach((name) => assert(engine.includes('"' + name + '"'), 'missing settings audit header ' + name));
 assert(engine.includes('function teamFantasySyncTriggerStatus_()'), 'trigger verification helper missing');
 assert(engine.includes('function teamFantasyRecordSyncStatus_('), 'sync audit helper missing');
 assert(engine.includes('scheduleGames: schedule.games.length'), 'manual sync does not report schedule count');
 assert(engine.includes('triggerActive: triggerStatus.active === true'), 'dashboard trigger status missing');
 assert(engine.includes('lastSyncMessage: settings.lastSyncMessage'), 'dashboard last-sync audit missing');
-assert(engine.includes('The Team Fantasy 15-minute trigger was not found after installation.'), 'trigger install is not verified');
+assert(engine.includes('The Team Fantasy 5-minute trigger was not found after installation.'), '5-minute trigger install is not verified');
 
 assert(api.includes('function apiTeamFantasyPost_('), 'dedicated Team Fantasy POST helper missing');
 assert(api.includes('fetch("./api/team-fantasy"'), 'Team Fantasy helper is not using repo-owned bridge');
@@ -32,7 +32,7 @@ assert(player.includes('apiTeamFantasyPost_('), 'player Team Fantasy page does n
 assert(admin.includes('apiTeamFantasyPost_('), 'admin Team Fantasy page does not use dedicated bridge');
 assert(admin.includes('Run Team Fantasy Sync Now'), 'sync button label not clarified');
 assert(admin.includes('adminTfSystemStatus'), 'admin system status panel missing');
-assert(admin.includes('15-minute sync installed and verified'), 'trigger verification success message missing');
+assert(admin.includes('5-minute game-day sync installed and verified'), '5-minute trigger verification success message missing');
 assert(admin.includes('NFL games checked'), 'sync result does not visibly report schedule check');
 assert(admin.includes('✅ Saved'), 'save persistence confirmation missing');
 
