@@ -508,6 +508,22 @@ function doPost(e) {
     if (action === "adminBulkAddRealityTvContestants") {
       return json(apiAdminBulkAddRealityTvContestants(body));
     }
+
+    if (action === "adminPrepareRealityCastDraft") {
+      return json(apiAdminPrepareRealityCastDraft(body));
+    }
+    if (action === "adminPreviewRealityCastDraft") {
+      return json(apiAdminPreviewRealityCastDraft(body));
+    }
+    if (action === "adminLoadRealityCastDraft") {
+      return json(apiAdminLoadRealityCastDraft(body));
+    }
+    if (action === "adminBulkUpdateRealityTvContestantGroups") {
+      return json(apiAdminBulkUpdateRealityTvContestantGroups(body));
+    }
+    if (action === "adminSetRealityTvIndividualPlay") {
+      return json(apiAdminSetRealityTvIndividualPlay(body));
+    }
     if (action === "adminPrepareRealityCastImport") {
       return json(apiAdminPrepareRealityCastImport(body));
     }

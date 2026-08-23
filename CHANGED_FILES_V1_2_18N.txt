@@ -1,0 +1,26 @@
+PATTC Predicts v1.2.18n — Reality TV Production Automation
+
+Runtime files may be patched idempotently:
+backend/Api.js
+backend/engines/RealityTvQuestionPackEngine.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/app.html
+frontend/index.html
+frontend/app.js
+frontend/js/api.js
+frontend/js/app.js
+frontend/js/pages/adminRealityTv.js
+frontend/sw.js
+
+Release/support files:
+tools/apply_reality_cast_foundation_v1218n.js
+tools/reality_cast_frontend_foundation_v1218n.snippet
+tools/apply_reality_production_automation_v1218n.js
+tools/reality_group_controls_v1218n.snippet
+tools/reality_exit_reason_helpers_v1218n.snippet
+tools/finalize_reality_production_automation_v1218n.sh
+tests/reality_tv_production_automation_v1218n_tests.js
+REALITY_TV_PRODUCTION_AUTOMATION_V1_2_18N.md
+CHANGED_FILES_V1_2_18N.txt
+INSTALL_V1_2_18N.txt

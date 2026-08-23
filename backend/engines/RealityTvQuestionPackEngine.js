@@ -111,6 +111,7 @@ function realityTvStandardQuestionDefinitions_() {
     { templateId: "tribal-attendee", formats: ["survivor-tribal"], label: "Tribe going to Tribal Council", help: "Created only while two or more active tribes remain.", questionTemplate: "Which tribe will go to Tribal Council in Episode {episode}?", answerSource: "active-groups", resultKey: "tribal-attendee", displayOrder: 30, includeNoOutcome: true, noOutcomeLabel: "No Tribal Council" },
     { templateId: "reward-winner", formats: ["survivor-tribal"], label: "Reward winner", help: "Uses tribes before the merge and participants after the merge.", questionTemplate: "Who will win the reward in {period} {episode}?", answerSource: "groups-or-participants", resultKey: "reward-winner", displayOrder: 40, includeNoOutcome: true, noOutcomeLabel: "No reward challenge" },
     { templateId: "idol-finder", formats: ["survivor-tribal"], label: "Immunity idol finder", help: "Active contestants plus a No one option.", questionTemplate: "Who will find a hidden immunity idol in Episode {episode}?", answerSource: "active-participants", resultKey: "idol-finder", displayOrder: 50, includeNoOutcome: true, noOutcomeLabel: "No one" },
+    { templateId: "fire-making-winner", formats: ["survivor-tribal"], label: "Fire-making challenge winner", help: "Use for a Survivor fire-making challenge or finale stage.", questionTemplate: "Who will win the fire-making challenge in {period} {episode}?", answerSource: "active-participants", resultKey: "fire-making-winner", displayOrder: 60, includeNoOutcome: true, noOutcomeLabel: "No fire-making challenge" },
 
     { templateId: "individual-challenge-winner", formats: ["cooking", "general-elimination"], label: "Individual challenge winner", help: "Selects from the active participants.", questionTemplate: "Who will win the individual challenge in {period} {episode}?", answerSource: "active-participants", resultKey: "individual-challenge-winner", displayOrder: 20, includeNoOutcome: true, noOutcomeLabel: "No individual challenge" },
     { templateId: "team-challenge-winner", formats: ["cooking", "team-competition"], label: "Team challenge winner", help: "Uses active teams or groups.", questionTemplate: "Which team will win the team challenge in {period} {episode}?", answerSource: "active-groups", resultKey: "team-challenge-winner", displayOrder: 30, includeNoOutcome: true, noOutcomeLabel: "No team challenge" },
@@ -827,14 +828,17 @@ function realityTvAnswerOptionsForTemplate_(season, template, episode, context) 
     return contestants || realityTvContestantAnswerOptions_(season.SeasonId, episodeNumber);
   };
   const individualStart = Math.max(0, realityTvNumber_(season.IndividualPlayStartsEpisode, 0));
-  const isIndividualPeriod = individualStart > 0 && episodeNumber >= individualStart;
+  const automaticIndividualPlay = individualStart === 0 && groups.length < 2;
+  const isIndividualPeriod = (individualStart > 0 && episodeNumber >= individualStart) || automaticIndividualPlay;
   let options = [];
   if (source === "active-groups" || source === "active-tribes") {
     if (isIndividualPeriod) {
       return {
         options: [],
         skipped: true,
-        reason: "This group-based question is pre-merge only. Individual play starts in " + realityTvString_(season.PeriodLabel || "Episode") + " " + individualStart + "."
+        reason: individualStart > 0
+          ? "This group-based question is pre-merge only. Individual play starts in " + realityTvString_(season.PeriodLabel || "Episode") + " " + individualStart + "."
+          : "This group-based question was skipped automatically because Team / Tribe information is incomplete: fewer than two active groups remain."
       };
     }
     options = groups;

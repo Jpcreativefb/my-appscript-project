@@ -2102,6 +2102,27 @@ async function apiAdminBulkAddRealityTvContestants(payload) {
   return apiAdminRealityTvPostRequest_("adminBulkAddRealityTvContestants", payload || {});
 }
 
+
+
+async function apiAdminPrepareRealityCastDraft(payload) {
+  return apiAdminRealityTvPostRequest_("adminPrepareRealityCastDraft", payload || {});
+}
+
+async function apiAdminPreviewRealityCastDraft(payload) {
+  return apiAdminRealityTvPostRequest_("adminPreviewRealityCastDraft", payload || {});
+}
+
+async function apiAdminLoadRealityCastDraft(payload) {
+  return apiAdminRealityTvPostRequest_("adminLoadRealityCastDraft", payload || {});
+}
+
+async function apiAdminBulkUpdateRealityTvContestantGroups(payload) {
+  return apiAdminRealityTvPostRequest_("adminBulkUpdateRealityTvContestantGroups", payload || {});
+}
+
+async function apiAdminSetRealityTvIndividualPlay(payload) {
+  return apiAdminRealityTvPostRequest_("adminSetRealityTvIndividualPlay", payload || {});
+}
 async function apiAdminPrepareRealityCastImport(payload) {
   return apiAdminRealityTvPostRequest_("adminPrepareRealityCastImport", payload || {});
 }

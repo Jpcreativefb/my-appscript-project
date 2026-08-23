@@ -1,0 +1,29 @@
+      <div class="reality-tv-existing-bulk-add reality-tv-group-automation-card">
+        <h4>Bulk Group / Tribe Change</h4>
+        <div class="admin-sub">Move several contestants to the same tribe/team in one action. The previous assignments stay in history and old episode questions are not rewritten.</div>
+        <div class="admin-form-grid">
+          <label>Destination ${adminRealityTvEscape_(season.GroupLabel || "Group")}<input id="realityTvBulkGroupName_${adminRealityTvEscape_(season.SeasonId)}" class="input" list="${listId}" placeholder="New tribe / team"></label>
+          <label>Effective ${adminRealityTvEscape_(season.PeriodLabel || "Episode")}<input id="realityTvBulkGroupEpisode_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="1" step="1" value="${defaultEpisode}"></label>
+          <label>Reason / note<input id="realityTvBulkGroupNotes_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Tribe swap, merge split, team reassignment"></label>
+        </div>
+        <div class="reality-tv-result-contestants">
+          ${contestants.filter(function(item) { return item.Active === true || String(item.Active || "").toLowerCase() === "true"; }).map(function(item) {
+            return `<label class="reality-tv-result-choice"><input class="rt-bulk-group-select-${adminRealityTvEscape_(season.SeasonId)}" type="checkbox" value="${adminRealityTvEscape_(item.ContestantId)}"><span>${adminRealityTvEscape_(item.Name)}</span><small>${adminRealityTvEscape_(item.CurrentGroup || item.TeamOrTribe || "Unassigned")}</small></label>`;
+          }).join("")}
+        </div>
+        <div class="admin-actions"><button class="admin-small-button" onclick="adminRealityTvBulkGroupChange('${adminRealityTvEscape_(season.SeasonId)}')">Move Selected Participants</button></div>
+        <div id="realityTvBulkGroupMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </div>
+      <div class="reality-tv-existing-bulk-add reality-tv-individual-play-card">
+        <h4>Team / Tribe → Individual Play</h4>
+        <div class="admin-sub">Current setting: <strong>${Number(season.IndividualPlayStartsEpisode || 0) ? `${adminRealityTvEscape_(season.PeriodLabel || "Episode")} ${Number(season.IndividualPlayStartsEpisode)}` : "Automatic"}</strong>. Automatic mode switches group-aware questions to individuals when fewer than two active groups remain.</div>
+        <div class="admin-form-grid">
+          <label>Individual play starts<input id="realityTvIndividualAutomation_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="1" value="${Number(season.IndividualPlayStartsEpisode || 0)}"><small>0 = automatic</small></label>
+        </div>
+        <div class="admin-actions">
+          <button class="admin-small-button secondary" onclick="adminRealityTvSetIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}',0)">Automatic</button>
+          <button class="admin-small-button secondary" onclick="adminRealityTvSetIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}',${Math.max(1, Number(season.CurrentEpisodeNumber || 1) + 1)})">Start Next ${adminRealityTvEscape_(season.PeriodLabel || "Episode")}</button>
+          <button class="admin-small-button" onclick="adminRealityTvSaveIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}')">Save Planned Start</button>
+        </div>
+        <div id="realityTvIndividualPlayMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </div>

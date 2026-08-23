@@ -1,0 +1,4 @@
+PATTC Predicts v1.2.18n - Reality TV Production Automation
+
+Use only the release-control Terminal block supplied with this ZIP.
+Do not deploy the older v1.2.18m candidate directly.

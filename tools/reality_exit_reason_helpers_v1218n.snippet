@@ -1,0 +1,39 @@
+
+function adminRealityTvExitReasonOptions_(selected) {
+  const options = [
+    ["standard-elimination", "Standard elimination"],
+    ["voted-out", "Voted out"],
+    ["fire-making-loss", "Fire-making loss"],
+    ["banished", "Banished"],
+    ["murdered", "Murdered"],
+    ["race-elimination", "Race elimination"],
+    ["judges-elimination", "Judges' elimination"],
+    ["challenge-elimination", "Challenge elimination"],
+    ["finale-cut", "Finale cut"],
+    ["failed-task", "Failed task"],
+    ["medical-withdrawal", "Medical withdrawal"],
+    ["quit", "Quit / voluntary withdrawal"],
+    ["disqualified", "Disqualified"],
+    ["other", "Other"]
+  ];
+  return options.map(function(item) { return `<option value="${item[0]}" ${String(selected || "") === item[0] ? "selected" : ""}>${adminRealityTvEscape_(item[1])}</option>`; }).join("");
+}
+
+function adminRealityTvExitReasonSummary_(queue, contestants) {
+  let reasons = {};
+  try { reasons = JSON.parse(queue && queue.ExitReasonsJSON || "{}"); } catch (err) { reasons = {}; }
+  const selected = (() => { try { return JSON.parse(queue && queue.SelectedContestantIds || "[]"); } catch (err) { return []; } })();
+  const byId = {};
+  (contestants || []).forEach(function(item) { byId[String(item.ContestantId || "").toLowerCase()] = item.Name || item.ContestantId; });
+  const labels = {
+    "standard-elimination": "Standard elimination", "voted-out": "Voted out", "fire-making-loss": "Fire-making loss",
+    "banished": "Banished", "murdered": "Murdered", "race-elimination": "Race elimination", "judges-elimination": "Judges' elimination",
+    "challenge-elimination": "Challenge elimination", "finale-cut": "Finale cut", "failed-task": "Failed task",
+    "medical-withdrawal": "Medical withdrawal", "quit": "Quit / withdrawal", "disqualified": "Disqualified", "other": "Other"
+  };
+  return selected.map(function(id) {
+    const key = String(id || "").toLowerCase();
+    const reason = reasons[key] || reasons[id] || "standard-elimination";
+    return (byId[key] || id) + " — " + (labels[reason] || reason);
+  }).join("; ");
+}

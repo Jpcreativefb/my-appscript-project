@@ -6,6 +6,7 @@
 let ADMIN_REALITY_TV_DASHBOARD = null;
 let ADMIN_REALITY_TV_ROSTER_ROW = 0;
 let ADMIN_REALITY_TV_BULK_PREVIEW = {};
+let ADMIN_REALITY_TV_CREATE_CAST_DRAFT = null;
 let ADMIN_REALITY_TV_APPROVAL_TIMERS = {};
 let ADMIN_REALITY_TV_APPROVAL_POLLERS = {};
 /* Backward-compatible UI labels retained for deployment tests and search:
@@ -418,6 +419,7 @@ function adminRealityTvPresetQuestionTypes_() {
     { id: "tribal-attendee", formats: ["survivor-tribal"], label: "Tribe going to Tribal Council", help: "Only available while multiple tribes remain." },
     { id: "reward-winner", formats: ["survivor-tribal"], label: "Reward winner", help: "Tribe or individual reward winner." },
     { id: "idol-finder", formats: ["survivor-tribal"], label: "Immunity idol finder", help: "Includes a No one outcome." },
+    { id: "fire-making-winner", formats: ["survivor-tribal"], label: "Fire-making challenge winner", help: "Optional finale/twist question using active contestants." },
     { id: "individual-challenge-winner", formats: ["cooking", "general-elimination"], label: "Individual challenge winner", help: "Active participant who wins the main challenge." },
     { id: "team-challenge-winner", formats: ["cooking", "team-competition"], label: "Team challenge winner", help: "Uses the active team/group names." },
     { id: "safety-winner", formats: ["cooking", "general-elimination"], label: "Safety / immunity winner", help: "Participant protected from elimination." },
@@ -1736,6 +1738,46 @@ function adminRealityTvEpisodeSchedulePanel_(bundle) {
   </details>`;
 }
 
+
+function adminRealityTvExitReasonOptions_(selected) {
+  const options = [
+    ["standard-elimination", "Standard elimination"],
+    ["voted-out", "Voted out"],
+    ["fire-making-loss", "Fire-making loss"],
+    ["banished", "Banished"],
+    ["murdered", "Murdered"],
+    ["race-elimination", "Race elimination"],
+    ["judges-elimination", "Judges' elimination"],
+    ["challenge-elimination", "Challenge elimination"],
+    ["finale-cut", "Finale cut"],
+    ["failed-task", "Failed task"],
+    ["medical-withdrawal", "Medical withdrawal"],
+    ["quit", "Quit / voluntary withdrawal"],
+    ["disqualified", "Disqualified"],
+    ["other", "Other"]
+  ];
+  return options.map(function(item) { return `<option value="${item[0]}" ${String(selected || "") === item[0] ? "selected" : ""}>${adminRealityTvEscape_(item[1])}</option>`; }).join("");
+}
+
+function adminRealityTvExitReasonSummary_(queue, contestants) {
+  let reasons = {};
+  try { reasons = JSON.parse(queue && queue.ExitReasonsJSON || "{}"); } catch (err) { reasons = {}; }
+  const selected = (() => { try { return JSON.parse(queue && queue.SelectedContestantIds || "[]"); } catch (err) { return []; } })();
+  const byId = {};
+  (contestants || []).forEach(function(item) { byId[String(item.ContestantId || "").toLowerCase()] = item.Name || item.ContestantId; });
+  const labels = {
+    "standard-elimination": "Standard elimination", "voted-out": "Voted out", "fire-making-loss": "Fire-making loss",
+    "banished": "Banished", "murdered": "Murdered", "race-elimination": "Race elimination", "judges-elimination": "Judges' elimination",
+    "challenge-elimination": "Challenge elimination", "finale-cut": "Finale cut", "failed-task": "Failed task",
+    "medical-withdrawal": "Medical withdrawal", "quit": "Quit / withdrawal", "disqualified": "Disqualified", "other": "Other"
+  };
+  return selected.map(function(id) {
+    const key = String(id || "").toLowerCase();
+    const reason = reasons[key] || reasons[id] || "standard-elimination";
+    return (byId[key] || id) + " — " + (labels[reason] || reason);
+  }).join("; ");
+}
+// Backward-compatible finalizer label: Approve All &amp; Finalize Episode
 function adminRealityTvResultPanel_(bundle) {
   const season = bundle.season;
   const approvalInProgress = (bundle.queue || []).find(function(item) {
@@ -1779,6 +1821,7 @@ function adminRealityTvResultPanel_(bundle) {
         <div class="reality-tv-result-summary">
           <span><b>Result type:</b> ${adminRealityTvEscape_(pending.OutcomeType)}</span>
           <span><b>${adminRealityTvEscape_(season.ParticipantLabel || "Participant")}:</b> ${adminRealityTvEscape_(selectedNames.join(", ") || "No elimination")}</span>
+          ${adminRealityTvExitReasonSummary_(pending, bundle.contestants) ? `<span><b>Exit details:</b> ${adminRealityTvEscape_(adminRealityTvExitReasonSummary_(pending, bundle.contestants))}</span>` : ""}
           ${pending.ErrorMessage ? `<span class="admin-message error"><b>Last error:</b> ${adminRealityTvEscape_(pending.ErrorMessage)}</span>` : ""}
           ${pending.EvidenceUrl ? `<span><b>Evidence:</b> <a href="${adminRealityTvEscape_(pending.EvidenceUrl)}" target="_blank" rel="noopener">Open source</a></span>` : ""}
           ${pending.Notes ? `<span><b>Notes:</b> ${adminRealityTvEscape_(pending.Notes)}</span>` : ""}
@@ -1796,7 +1839,7 @@ function adminRealityTvResultPanel_(bundle) {
         <div class="admin-actions">
           ${isApproving
             ? `<button class="button admin-button" disabled>Finalizing automatically…</button>`
-            : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve All &amp; Finalize Episode</button>`}
+            : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve, Finalize &amp; Advance</button>`}
           ${!isApproving ? `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject Main Result</button>` : ""}
         </div>
         ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than seven minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
@@ -1849,9 +1892,10 @@ function adminRealityTvResultPanel_(bundle) {
       <div id="realityTvSelections_${adminRealityTvEscape_(season.SeasonId)}" class="reality-tv-result-contestants">
         ${activeContestants.map(function(item) {
           return `
-            <label class="reality-tv-result-choice">
+            <label class="reality-tv-result-choice" data-exit-choice="${adminRealityTvEscape_(item.ContestantId)}">
               <input type="checkbox" value="${adminRealityTvEscape_(item.ContestantId)}" onchange="adminRealityTvContestantChecked('${adminRealityTvEscape_(season.SeasonId)}', this)">
               <span>${adminRealityTvEscape_(item.Name)}</span>
+              <select class="input rt-exit-reason" data-exit-reason-for="${adminRealityTvEscape_(item.ContestantId)}" disabled onclick="event.stopPropagation()">${adminRealityTvExitReasonOptions_("standard-elimination")}</select>
             </label>
           `;
         }).join("")}
@@ -1951,6 +1995,50 @@ async function adminRealityTvSaveGroups(seasonId) {
 }
 
 
+
+
+async function adminRealityTvBulkGroupChange(seasonId) {
+  const group = document.getElementById("realityTvBulkGroupName_" + seasonId);
+  const episode = document.getElementById("realityTvBulkGroupEpisode_" + seasonId);
+  const notes = document.getElementById("realityTvBulkGroupNotes_" + seasonId);
+  const selected = Array.from(document.querySelectorAll(".rt-bulk-group-select-" + seasonId + ":checked"));
+  if (!group || !group.value.trim()) return adminRealityTvSetMessage_("realityTvBulkGroupMessage_" + seasonId, "Enter the destination group / tribe.", "error");
+  if (!selected.length) return adminRealityTvSetMessage_("realityTvBulkGroupMessage_" + seasonId, "Select at least one participant.", "error");
+  if (!confirm("Move " + selected.length + " selected participant(s) to " + group.value.trim() + " beginning in episode/period " + (episode ? episode.value : "") + "? Earlier group history will be preserved.")) return;
+  adminRealityTvSetMessage_("realityTvBulkGroupMessage_" + seasonId, "Saving group changes…", "info");
+  try {
+    const result = await apiAdminBulkUpdateRealityTvContestantGroups({
+      seasonId: seasonId,
+      effectiveEpisode: episode ? episode.value : 1,
+      notes: notes ? notes.value.trim() : "",
+      assignmentType: "SWAP",
+      assignmentsJSON: JSON.stringify(selected.map(function(box) { return { contestantId: box.value, groupName: group.value.trim() }; }))
+    });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save the group changes."));
+    adminRealityTvSetMessage_("realityTvBulkGroupMessage_" + seasonId, result.message || "Group changes saved.", "success");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvBulkGroupMessage_" + seasonId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvBulkGroupMessage_" + seasonId, err.message || String(err), "error");
+  }
+}
+
+async function adminRealityTvSetIndividualPlay(seasonId, startEpisode) {
+  if (Number(startEpisode || 0) > 0 && !confirm("Set the first individual-play period to " + startEpisode + "? New group-aware questions from that period forward will use individual contestants. Already-built historical questions are not rewritten.")) return;
+  adminRealityTvSetMessage_("realityTvIndividualPlayMessage_" + seasonId, "Saving individual-play setting…", "info");
+  try {
+    const result = await apiAdminSetRealityTvIndividualPlay({ seasonId: seasonId, startEpisode: startEpisode });
+    if (!result || result.success === false) throw new Error(adminRealityTvResponseError_(result, "Could not save individual play."));
+    adminRealityTvSetMessage_("realityTvIndividualPlayMessage_" + seasonId, result.message || "Individual-play setting saved.", "success");
+    await adminRealityTvRefreshSeasonDetails_(seasonId, { focusElementId: "realityTvIndividualPlayMessage_" + seasonId });
+  } catch (err) {
+    adminRealityTvSetMessage_("realityTvIndividualPlayMessage_" + seasonId, err.message || String(err), "error");
+  }
+}
+
+function adminRealityTvSaveIndividualPlay(seasonId) {
+  const input = document.getElementById("realityTvIndividualAutomation_" + seasonId);
+  return adminRealityTvSetIndividualPlay(seasonId, input ? Number(input.value || 0) : 0);
+}
 function adminRealityTvGroupHistoryPanel_(bundle) {
   const season = bundle.season || {};
   const groups = bundle.groups || [];
@@ -1962,6 +2050,35 @@ function adminRealityTvGroupHistoryPanel_(bundle) {
       <summary>Participant Group / Tribe History ${adminRealityTvHelp_("Group history", "Use this when a contestant changes tribes, teams, houses, or groups. Choose the first episode where the new assignment applies. Earlier questions and picks remain unchanged.")}</summary>
       <div class="admin-sub">Starting, later, and final groups are retained in each participant bio. Group-based questions use the assignment that was active for that specific episode.</div>
       <datalist id="${listId}">${groups.map(function(group) { return `<option value="${adminRealityTvEscape_(group.GroupName || group.name || "")}"></option>`; }).join("")}</datalist>
+      <div class="reality-tv-existing-bulk-add reality-tv-group-automation-card">
+        <h4>Bulk Group / Tribe Change</h4>
+        <div class="admin-sub">Move several contestants to the same tribe/team in one action. The previous assignments stay in history and old episode questions are not rewritten.</div>
+        <div class="admin-form-grid">
+          <label>Destination ${adminRealityTvEscape_(season.GroupLabel || "Group")}<input id="realityTvBulkGroupName_${adminRealityTvEscape_(season.SeasonId)}" class="input" list="${listId}" placeholder="New tribe / team"></label>
+          <label>Effective ${adminRealityTvEscape_(season.PeriodLabel || "Episode")}<input id="realityTvBulkGroupEpisode_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="1" step="1" value="${defaultEpisode}"></label>
+          <label>Reason / note<input id="realityTvBulkGroupNotes_${adminRealityTvEscape_(season.SeasonId)}" class="input" placeholder="Tribe swap, merge split, team reassignment"></label>
+        </div>
+        <div class="reality-tv-result-contestants">
+          ${contestants.filter(function(item) { return item.Active === true || String(item.Active || "").toLowerCase() === "true"; }).map(function(item) {
+            return `<label class="reality-tv-result-choice"><input class="rt-bulk-group-select-${adminRealityTvEscape_(season.SeasonId)}" type="checkbox" value="${adminRealityTvEscape_(item.ContestantId)}"><span>${adminRealityTvEscape_(item.Name)}</span><small>${adminRealityTvEscape_(item.CurrentGroup || item.TeamOrTribe || "Unassigned")}</small></label>`;
+          }).join("")}
+        </div>
+        <div class="admin-actions"><button class="admin-small-button" onclick="adminRealityTvBulkGroupChange('${adminRealityTvEscape_(season.SeasonId)}')">Move Selected Participants</button></div>
+        <div id="realityTvBulkGroupMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </div>
+      <div class="reality-tv-existing-bulk-add reality-tv-individual-play-card">
+        <h4>Team / Tribe → Individual Play</h4>
+        <div class="admin-sub">Current setting: <strong>${Number(season.IndividualPlayStartsEpisode || 0) ? `${adminRealityTvEscape_(season.PeriodLabel || "Episode")} ${Number(season.IndividualPlayStartsEpisode)}` : "Automatic"}</strong>. Automatic mode switches group-aware questions to individuals when fewer than two active groups remain.</div>
+        <div class="admin-form-grid">
+          <label>Individual play starts<input id="realityTvIndividualAutomation_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="0" step="1" value="${Number(season.IndividualPlayStartsEpisode || 0)}"><small>0 = automatic</small></label>
+        </div>
+        <div class="admin-actions">
+          <button class="admin-small-button secondary" onclick="adminRealityTvSetIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}',0)">Automatic</button>
+          <button class="admin-small-button secondary" onclick="adminRealityTvSetIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}',${Math.max(1, Number(season.CurrentEpisodeNumber || 1) + 1)})">Start Next ${adminRealityTvEscape_(season.PeriodLabel || "Episode")}</button>
+          <button class="admin-small-button" onclick="adminRealityTvSaveIndividualPlay('${adminRealityTvEscape_(season.SeasonId)}')">Save Planned Start</button>
+        </div>
+        <div id="realityTvIndividualPlayMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
+      </div>
       <div class="reality-tv-group-history-list">
         ${contestants.map(function(item) {
           const history = Array.isArray(item.GroupHistory) ? item.GroupHistory : [];
@@ -2293,6 +2410,11 @@ function adminRealityTvRosterRowHtml_(contestant) {
           <input class="input rt-roster-member1-image" placeholder="Member 1 image URL" value="${adminRealityTvValue_(contestant.member1ImageUrl)}">
           <input class="input rt-roster-member2-image" placeholder="Member 2 image URL" value="${adminRealityTvValue_(contestant.member2ImageUrl)}">
           <input class="input rt-roster-team-color" placeholder="Team color" value="${adminRealityTvValue_(contestant.teamColor)}">
+          <input class="input rt-roster-known-for" placeholder="Known for" value="${adminRealityTvValue_(contestant.knownFor)}">
+          <input class="input rt-roster-original-show" placeholder="Original show / sport" value="${adminRealityTvValue_(contestant.originalShowOrSport)}">
+          <input class="input rt-roster-recruit-number" placeholder="Recruit number" value="${adminRealityTvValue_(contestant.recruitNumber)}">
+          <input class="input rt-roster-source-url" placeholder="Official bio / source URL" value="${adminRealityTvValue_(contestant.sourceUrl)}">
+          <input class="input rt-roster-image-source-url" placeholder="Image source URL" value="${adminRealityTvValue_(contestant.imageSourceUrl)}">
           <textarea class="input rt-roster-biography" rows="2" placeholder="Biography / notes">${adminRealityTvValue_(contestant.biography)}</textarea>
         </div>
       </details>
@@ -2390,7 +2512,12 @@ function adminRealityTvParseBulkContestants_(text) {
     relationship: ["relationship", "teamrelationship"],
     member1ImageUrl: ["member1image", "member1imageurl", "partner1image"],
     member2ImageUrl: ["member2image", "member2imageurl", "partner2image"],
-    teamColor: ["teamcolor", "color"]
+    teamColor: ["teamcolor", "color"],
+    knownFor: ["knownfor", "famousfor", "background"],
+    originalShowOrSport: ["originalshoworsport", "originalshow", "show", "sport", "franchise"],
+    recruitNumber: ["recruitnumber", "recruit", "number"],
+    sourceUrl: ["sourceurl", "source", "biourl", "officialbio"],
+    imageSourceUrl: ["imagesourceurl", "imagesource", "photosource"]
   };
   const normalizedHeaders = rows[0].map(adminRealityTvNormalizeBulkHeader_);
   const columnMap = {};
@@ -2403,7 +2530,7 @@ function adminRealityTvParseBulkContestants_(text) {
   if (columnMap.name === undefined && columnMap.fullName !== undefined) columnMap.name = columnMap.fullName;
   result.hasHeader = rows.length > 1 && columnMap.name !== undefined && Object.keys(columnMap).length >= 1;
 
-  const positional = ["name", "fullName", "imageUrl", "teamOrTribe", "age", "hometown", "occupation", "biography", "externalSubjectId", "member1", "member2", "relationship", "member1ImageUrl", "member2ImageUrl", "teamColor"];
+  const positional = ["name", "fullName", "imageUrl", "teamOrTribe", "age", "hometown", "occupation", "biography", "externalSubjectId", "member1", "member2", "relationship", "member1ImageUrl", "member2ImageUrl", "teamColor", "knownFor", "originalShowOrSport", "recruitNumber", "sourceUrl", "imageSourceUrl"];
   const dataRows = result.hasHeader ? rows.slice(1) : rows;
   const seen = {};
   dataRows.forEach(function(cells, rowIndex) {
@@ -2623,6 +2750,18 @@ async function renderAdminRealityTvPage() {
                   <div id="realityTvBulkPreview_create" class="reality-tv-bulk-preview"></div>
                 </details>
 
+
+
+                <div class="reality-tv-existing-bulk-add reality-tv-cast-sheet-card">
+                  <h4>New Season Cast Sheet</h4>
+                  <div class="admin-sub"><strong>Recommended:</strong> prepare the cast before creating the game. This uses the same <strong>RealityCastImport</strong> staging sheet, but it is tied to this new-season draft until you press Create Season &amp; Episode 1.</div>
+                  <div class="admin-actions reality-tv-bulk-actions">
+                    <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPrepareCreateCastSheet_()">Prepare / Open New Season Cast Sheet</button>
+                    <button type="button" class="admin-small-button secondary" onclick="adminRealityTvPreviewCreateCastSheet_()">Preview New Season Cast</button>
+                    <button type="button" class="admin-small-button" onclick="adminRealityTvLoadCreateCastSheet_()">Load Selected Cast Into Season</button>
+                  </div>
+                  <div id="realityTvCreateCastMessage" class="admin-message"></div>
+                </div>
                 <div class="reality-tv-roster-column-labels">
                   <span>Name</span><span>Image URL</span><span>Team / Tribe</span><span>Age</span><span></span>
                 </div>
@@ -2665,6 +2804,78 @@ async function renderAdminRealityTvPage() {
   }
 }
 
+
+
+function adminRealityTvCreateCastDraftPayload_() {
+  const showName = document.getElementById("realityTvShowName");
+  const seasonName = document.getElementById("realityTvSeasonName");
+  const showFormat = document.getElementById("realityTvShowFormat");
+  const gameId = document.getElementById("realityTvGameId");
+  return {
+    draftSeasonId: ADMIN_REALITY_TV_CREATE_CAST_DRAFT && ADMIN_REALITY_TV_CREATE_CAST_DRAFT.draftSeasonId || "",
+    showName: showName ? showName.value.trim() : "",
+    seasonName: seasonName ? seasonName.value.trim() : "",
+    seasonNumber: document.getElementById("realityTvSeasonNumber") ? document.getElementById("realityTvSeasonNumber").value : "",
+    year: document.getElementById("realityTvYear") ? document.getElementById("realityTvYear").value : "",
+    gameId: gameId ? gameId.value.trim() : "",
+    showFormat: showFormat ? showFormat.value : "survivor-tribal",
+    participantType: document.getElementById("realityTvParticipantType") ? document.getElementById("realityTvParticipantType").value : "individual",
+    participantLabel: document.getElementById("realityTvParticipantLabel") ? document.getElementById("realityTvParticipantLabel").value.trim() : "Contestant",
+    groupLabel: document.getElementById("realityTvGroupLabel") ? document.getElementById("realityTvGroupLabel").value.trim() : "Group",
+    periodLabel: document.getElementById("realityTvPeriodLabel") ? document.getElementById("realityTvPeriodLabel").value.trim() : "Episode"
+  };
+}
+
+function adminRealityTvCreateCastMessage_(html, tone) {
+  const target = document.getElementById("realityTvCreateCastMessage");
+  if (!target) return;
+  target.className = "admin-message" + (tone ? " " + tone : "");
+  target.innerHTML = html || "";
+}
+
+async function adminRealityTvPrepareCreateCastSheet_() {
+  const payload = adminRealityTvCreateCastDraftPayload_();
+  if (!payload.showName || !payload.seasonName) return adminRealityTvCreateCastMessage_("Enter Show name and Season name first.", "warning");
+  adminRealityTvCreateCastMessage_("Preparing new-season cast staging…", "info");
+  try {
+    const res = await apiAdminPrepareRealityCastDraft(payload);
+    if (!res || res.success === false) throw new Error(adminRealityTvResponseError_(res, "Could not prepare the new-season cast sheet."));
+    ADMIN_REALITY_TV_CREATE_CAST_DRAFT = { draftSeasonId: res.draftSeasonId, sheetUrl: res.sheetUrl };
+    adminRealityTvCreateCastMessage_(adminRealityTvEscape_(res.message || "Cast sheet ready.") + adminRealityTvCastImportLink_(res.sheetUrl, "Open RealityCastImport"), "success");
+  } catch (err) {
+    adminRealityTvCreateCastMessage_(adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
+
+async function adminRealityTvPreviewCreateCastSheet_() {
+  const payload = adminRealityTvCreateCastDraftPayload_();
+  if (!payload.showName || !payload.seasonName) return adminRealityTvCreateCastMessage_("Enter Show name and Season name first.", "warning");
+  adminRealityTvCreateCastMessage_("Reading new-season cast staging…", "info");
+  try {
+    const res = await apiAdminPreviewRealityCastDraft(payload);
+    if (!res || res.success === false) throw new Error(adminRealityTvResponseError_(res, "Could not preview the new-season cast."));
+    ADMIN_REALITY_TV_CREATE_CAST_DRAFT = { draftSeasonId: res.draftSeasonId, sheetUrl: res.sheetUrl };
+    adminRealityTvCreateCastMessage_(adminRealityTvCastPreviewHtml_(res), Number(res.errorCount || 0) ? "warning" : "success");
+  } catch (err) {
+    adminRealityTvCreateCastMessage_(adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
+
+async function adminRealityTvLoadCreateCastSheet_() {
+  const payload = adminRealityTvCreateCastDraftPayload_();
+  if (!payload.showName || !payload.seasonName) return adminRealityTvCreateCastMessage_("Enter Show name and Season name first.", "warning");
+  adminRealityTvCreateCastMessage_("Loading selected cast rows into the new season…", "info");
+  try {
+    const res = await apiAdminLoadRealityCastDraft(payload);
+    if (!res || res.success === false) throw new Error(adminRealityTvResponseError_(res, "Could not load the selected cast."));
+    ADMIN_REALITY_TV_CREATE_CAST_DRAFT = { draftSeasonId: res.draftSeasonId, sheetUrl: res.sheetUrl };
+    const container = document.getElementById("realityTvRosterRows");
+    if (container) container.innerHTML = (res.contestants || []).map(adminRealityTvRosterRowHtml_).join("");
+    adminRealityTvCreateCastMessage_(adminRealityTvEscape_(res.message || "Cast loaded.") + " You can still edit any row below before creating the season.", "success");
+  } catch (err) {
+    adminRealityTvCreateCastMessage_(adminRealityTvEscape_(err.message || String(err)), "error");
+  }
+}
 async function adminRealityTvSetupSystem() {
   try {
     const res = await apiAdminSetupRealityTvSystem();
@@ -2697,7 +2908,12 @@ function adminRealityTvCollectRoster_() {
       relationship: row.querySelector(".rt-roster-relationship").value.trim(),
       member1ImageUrl: row.querySelector(".rt-roster-member1-image").value.trim(),
       member2ImageUrl: row.querySelector(".rt-roster-member2-image").value.trim(),
-      teamColor: row.querySelector(".rt-roster-team-color").value.trim()
+      teamColor: row.querySelector(".rt-roster-team-color").value.trim(),
+      knownFor: row.querySelector(".rt-roster-known-for").value.trim(),
+      originalShowOrSport: row.querySelector(".rt-roster-original-show").value.trim(),
+      recruitNumber: row.querySelector(".rt-roster-recruit-number").value.trim(),
+      sourceUrl: row.querySelector(".rt-roster-source-url").value.trim(),
+      imageSourceUrl: row.querySelector(".rt-roster-image-source-url").value.trim()
     };
   }).filter(function(item) { return item.name; });
 }
@@ -2885,7 +3101,8 @@ async function adminRealityTvCreateSeason() {
     enabledQuestionTypesJSON: JSON.stringify(Array.from(document.querySelectorAll(".rt-create-question-type:checked")).map(function(box) { return box.value; })),
     questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_("create")),
     questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_("create")),
-    contestantsJSON: JSON.stringify(roster)
+    contestantsJSON: JSON.stringify(roster),
+    castDraftSeasonId: ADMIN_REALITY_TV_CREATE_CAST_DRAFT && ADMIN_REALITY_TV_CREATE_CAST_DRAFT.draftSeasonId || ""
   };
 
   if (!payload.showName || !payload.seasonName) {
@@ -3058,9 +3275,9 @@ function adminRealityTvOutcomeChanged(seasonId) {
   if (!container) return;
   const checkboxes = Array.from(container.querySelectorAll('input[type="checkbox"]'));
   if (outcome === "no-elimination") {
-    checkboxes.forEach(function(box) { box.checked = false; box.disabled = true; });
+    checkboxes.forEach(function(box) { box.checked = false; box.disabled = true; const reason = container.querySelector('[data-exit-reason-for="' + box.value + '"]'); if (reason) reason.disabled = true; });
   } else {
-    checkboxes.forEach(function(box) { box.disabled = false; });
+    checkboxes.forEach(function(box) { box.disabled = false; const reason = container.querySelector('[data-exit-reason-for="' + box.value + '"]'); if (reason) reason.disabled = !box.checked; });
     if (["double-elimination", "multiple-elimination"].indexOf(outcome) === -1) {
       let found = false;
       checkboxes.forEach(function(box) {
@@ -3073,10 +3290,15 @@ function adminRealityTvOutcomeChanged(seasonId) {
 
 function adminRealityTvContestantChecked(seasonId, changed) {
   const outcome = document.getElementById("realityTvOutcome_" + seasonId).value;
+  const container = document.getElementById("realityTvSelections_" + seasonId);
+  if (container) {
+    const changedReason = container.querySelector('[data-exit-reason-for="' + changed.value + '"]');
+    if (changedReason) changedReason.disabled = !changed.checked;
+  }
   if (["double-elimination", "multiple-elimination"].indexOf(outcome) !== -1) return;
   if (changed.checked) {
     document.querySelectorAll("#realityTvSelections_" + seasonId + ' input[type="checkbox"]').forEach(function(box) {
-      if (box !== changed) box.checked = false;
+      if (box !== changed) { box.checked = false; const reason = container && container.querySelector('[data-exit-reason-for="' + box.value + '"]'); if (reason) reason.disabled = true; }
     });
   }
 }
@@ -3091,7 +3313,12 @@ async function adminRealityTvSubmitResult(seasonId, episodeId) {
   if (outcome === "double-elimination" && selected.length !== 2) return alert("Select exactly two contestants.");
   if (outcome === "multiple-elimination" && selected.length < 2) return alert("Select at least two contestants.");
 
-  const summary = outcome === "no-elimination" ? "No elimination" : selected.join(", ");
+  const exitReasons = {};
+  selected.forEach(function(id) {
+    const reason = document.querySelector('#realityTvSelections_' + seasonId + ' [data-exit-reason-for="' + id + '"]');
+    exitReasons[String(id || "").toLowerCase()] = reason ? reason.value : (outcome === "medical-withdrawal" ? "medical-withdrawal" : outcome === "quit" ? "quit" : "standard-elimination");
+  });
+  const summary = outcome === "no-elimination" ? "No elimination" : selected.map(function(id) { return id + " — " + (exitReasons[String(id).toLowerCase()] || "standard-elimination"); }).join("\n");
   if (!confirm("Submit this FINAL result for administrator review?\n\n" + summary)) return;
 
   adminRealityTvSetMessage_("realityTvMessage_" + seasonId, "Submitting result for review…", "info");
@@ -3101,6 +3328,7 @@ async function adminRealityTvSubmitResult(seasonId, episodeId) {
       episodeId: episodeId,
       outcomeType: outcome,
       selectedContestantIdsJSON: JSON.stringify(selected),
+      exitReasonsJSON: JSON.stringify(exitReasons),
       evidenceUrl: document.getElementById("realityTvEvidence_" + seasonId).value.trim(),
       notes: document.getElementById("realityTvNotes_" + seasonId).value.trim()
     });
@@ -3122,7 +3350,7 @@ function adminRealityTvResponseError_(response, fallback) {
 
 async function adminRealityTvFinalizeEpisode(queueId, seasonId) {
   if (!queueId) return alert("Main elimination result is missing. Submit it first.");
-  if (!confirm("Approve ALL submitted results and finalize this episode?\n\nThe server will settle every Extra Question, settle the elimination, finalize scoring and roster changes, then prepare the next episode separately. You may leave the page after it starts.")) return;
+  if (!confirm("Approve ALL submitted results, finalize this episode, update the active roster, and advance the season?\n\nThe server will settle every Extra Question, apply all selected exits/reasons, finalize scoring and roster changes, then queue the next episode separately when automatic next-period creation is enabled. You may leave the page after it starts.")) return;
   try {
     const state = await apiAdminFinalizeRealityTvEpisode(queueId);
     if (!state || state.success === false) {
