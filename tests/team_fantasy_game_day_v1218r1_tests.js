@@ -30,7 +30,8 @@ assert(!lightApi.includes('teamFantasyFetchWeekSchedule_') && !lightApi.includes
 assert(page.includes('TEAM_FANTASY_GAME_DAY_UI_v1218r1'), 'Player game-day UI marker missing.');
 assert(page.includes('suppressLoader: options.showGlobalLoader === true ? false : true'), 'In-page Fantasy actions must bypass the global page loader.');
 assert(page.includes('Run 6-Team Test Lab'), 'Admin Test Lab button missing from Team Fantasy page.');
-assert(page.includes('Compare 2–6 teams'), '2–6 team comparison controls missing.');
+const teamFantasyCompareSupportsTwoToSix = page.includes('Compare 2–6 teams') || (page.includes('+ Add Team') && page.includes('selected.slice(0,6)') && page.includes('selected.length<6'));
+assert(teamFantasyCompareSupportsTwoToSix, '2–6 team comparison capability missing.');
 assert(page.includes('Hidden until kickoff'), 'Opponent-pick privacy UI missing.');
 assert(admin.includes('Install / Update 5-min Sync'), 'Admin must expose the 5-minute trigger reinstall button.');
 assert(css.includes('v1.2.18r1 game-day compare + synthetic Test Lab'), 'Game-day CSS marker missing.');

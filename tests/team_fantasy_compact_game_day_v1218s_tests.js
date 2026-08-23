@@ -13,7 +13,8 @@ assert(gameDay.includes('teamFantasyGameDayApplyPositionRanks_'), 'Weekly positi
 assert(gameDay.includes('teamFantasyGameDayAttachStandings_'), 'League rank/record helper missing.');
 assert(gameDay.includes('pickMethod: teamFantasyGameDayPickMethod_'), 'AP/R method must be preserved in game-day slots.');
 assert(page.includes('TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s'), '18s player UI marker missing.');
-assert(page.includes('team-fantasy.css?v=1218s'), 'Team Fantasy CSS cache marker must be bumped for 18s.');
+const teamFantasyCssCacheMatch = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
+assert(teamFantasyCssCacheMatch && teamFantasyCssCacheMatch[1] !== '1218r1', 'Team Fantasy CSS cache marker must remain cache-busted for 18s or a later release.');
 assert(page.includes('teamFantasyOpenTeamPicker_'), 'Logo/abbreviation team picker missing.');
 assert(page.includes('team.eligible === true || String(team.abbr || \'\') === current'), 'Picker must omit unavailable/exhausted teams except current selection.');
 assert(page.includes('tf-pick-method'), 'AP/R pick-method badge missing.');

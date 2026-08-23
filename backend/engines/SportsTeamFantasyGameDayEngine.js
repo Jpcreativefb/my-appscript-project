@@ -6,7 +6,8 @@
    Team Fantasy scorer remains the only live-data writer.
 ========================================================= */
 
-var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18s";
+var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18t";
+/* TEAM_FANTASY_WEEKLY_HUB_BACKEND_v1218t2 */
 /* TEAM_FANTASY_COMPACT_GAME_DAY_BACKEND_v1218s */
 var TEAM_FANTASY_GAME_DAY_POLL_MS = 5 * 60 * 1000;
 
@@ -242,6 +243,48 @@ function teamFantasyGameDayBuildCompare_(input) {
   };
 }
 
+function teamFantasyGameDayBuildWeeklyLeaderboard_(compare) {
+  compare = compare || {};
+  var rows = (compare.competitors || []).map(function(c) {
+    return {
+      entryId: teamFantasyGameDayString_(c.entryId),
+      username: teamFantasyGameDayString_(c.username),
+      label: teamFantasyGameDayString_(c.label || c.entryId || c.username),
+      isViewer: c.isViewer === true,
+      points: teamFantasyGameDayRound_(c.totalPoints || 0),
+      counts: c.counts || { final: 0, live: 0, upcoming: 0 },
+      record: c.record || { wins: 0, losses: 0, ties: 0 },
+      seasonRank: Number(c.leagueRank || 0)
+    };
+  });
+  rows.sort(function(a, b) {
+    if (b.points !== a.points) return b.points - a.points;
+    return a.label.localeCompare(b.label);
+  });
+  var leader = rows.length ? Number(rows[0].points || 0) : 0;
+  var lastPoints = null;
+  var lastRank = 0;
+  rows.forEach(function(row, index) {
+    if (lastPoints === null || Number(row.points) !== Number(lastPoints)) lastRank = index + 1;
+    row.weekRank = lastRank;
+    row.pointsBehindLeader = teamFantasyGameDayRound_(Math.max(0, leader - Number(row.points || 0)));
+    var above = null;
+    for (var a = index - 1; a >= 0; a--) {
+      if (Number(rows[a].points) > Number(row.points)) { above = rows[a]; break; }
+    }
+    var below = null;
+    for (var b = index + 1; b < rows.length; b++) {
+      if (Number(rows[b].points) < Number(row.points)) { below = rows[b]; break; }
+    }
+    row.pointsToMoveUp = above ? teamFantasyGameDayRound_(Math.max(0.01, Number(above.points) - Number(row.points) + 0.01)) : 0;
+    row.moveUpRank = above ? Number(above.weekRank || index) : 0;
+    row.cushionOverBelow = below ? teamFantasyGameDayRound_(Math.max(0, Number(row.points) - Number(below.points))) : 0;
+    row.belowRank = below ? Number(below.weekRank || index + 2) : 0;
+    lastPoints = row.points;
+  });
+  return { rows: rows, leaderPoints: leader, week: Number(compare.week || 0), leagueId: teamFantasyGameDayString_(compare.leagueId), leagueName: teamFantasyGameDayString_(compare.leagueName) };
+}
+
 function teamFantasyGameDayTriggerWindow_(gameId, week, nowMs) {
   nowMs = Number(nowMs || Date.now());
   var schedule = teamFantasyFetchWeekSchedule_(gameId, week);
@@ -301,6 +344,11 @@ function apiGetTeamFantasyGameDayState(payload) {
   });
   var standings = typeof teamFantasyBuildStandings_ === "function" ? teamFantasyBuildStandings_(gameId, selectedLeagueId) : null;
   teamFantasyGameDayAttachStandings_(out, standings);
+  out.leagues = leagues.map(function(league) {
+    return { leagueId: teamFantasyGameDayString_(league.leagueId || league.LeagueId), leagueName: teamFantasyGameDayString_(league.leagueName || league.LeagueName), leagueType: teamFantasyGameDayString_(league.leagueType || league.LeagueType) };
+  });
+  out.selectedLeagueId = selectedLeagueId;
+  out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out);
   out.username = username;
   out.seasonYear = settings.seasonYear;
   out.generatedAt = new Date().toISOString();
@@ -349,6 +397,12 @@ function teamFantasyBuildSyntheticGameDayLab_() {
     return { entryId: entry.EntryId, username: entry.Username, rank: index + 1, regularWins: 10 - index, regularLosses: 3 + index, regularTies: index % 2 };
   });
   teamFantasyGameDayAttachStandings_(compare, { success: true, league: { leagueId: "synthetic-six", leagueName: "Synthetic Six", standingMode: "entries" }, rows: fakeStandingRows });
+  compare.leagues = [
+    { leagueId: "synthetic-six", leagueName: "Complete League", leagueType: "complete" },
+    { leagueId: "synthetic-east", leagueName: "Synthetic East", leagueType: "subleague" }
+  ];
+  compare.selectedLeagueId = "synthetic-six";
+  compare.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(compare);
 
   var usageRows = [
     { Position: "QB", TeamAbbr: "BUF" },
@@ -391,6 +445,9 @@ function teamFantasyBuildSyntheticGameDayLab_() {
     { name: "Live totals equal slot points", passed: totalCheck, detail: "All six totals reconciled" },
     { name: "Weekly position ranks are calculated", passed: rankedSlots.length > 0 && rankedSlots.every(function(s){ return Number(s.weekRank || 0) >= 1; }), detail: "Live/final slots carry current league position rank" },
     { name: "League rank and record are attached", passed: compare.competitors.every(function(c){ return Number(c.leagueRank || 0) >= 1 && c.record; }), detail: "Each fake team has league rank + W-L-T" },
+    { name: "Weekly league race ranks all six teams", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows && compare.weeklyLeaderboard.rows.length === 6 && compare.weeklyLeaderboard.rows[0].weekRank === 1, detail: "Weekly leaderboard uses accumulated live points" },
+    { name: "Points-behind and move-up math is available", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows.slice(1).every(function(r){ return Number(r.pointsBehindLeader || 0) >= 0 && Number(r.pointsToMoveUp || 0) > 0; }), detail: "Behind leader + exact pass target calculated" },
+    { name: "Complete/subleague switch options are present", passed: compare.leagues && compare.leagues.length === 2 && compare.leagues.some(function(l){ return l.leagueType === "subleague"; }), detail: "Complete League + Synthetic East" },
     { name: "Auto/Random method tags are preserved", passed: methodSlots.length > 0, detail: "AP and R tags available after picks reveal" },
     { name: "Upcoming / Live / Final states are present", passed: compare.competitors.every(function(c){ return c.counts.upcoming > 0 && c.counts.live > 0 && c.counts.final > 0; }), detail: "All status states exercised" },
     { name: "Comparison supports 2–6 teams", passed: compare.competitors.length >= 6, detail: "Head-to-head through six-team view" }

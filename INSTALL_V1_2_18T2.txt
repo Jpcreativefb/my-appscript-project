@@ -1,0 +1,8 @@
+PATTC Predicts v1.2.18t2 — Team Fantasy Weekly Hub
+
+Requires a clean architecture-cleanup branch matching GitHub with v1.2.18s already installed.
+The controlled installer verifies the current 18s markers, applies transactionally, runs 18t + 18s + 18r1 + cross-feature regression checks and the full production suite before commit/deploy.
+
+Release-control repair: the historical v1.2.18s CSS-cache regression now accepts later cache-busted Team Fantasy stylesheet versions while still rejecting the pre-18s 1218r1 marker.
+
+Release-control repair: historical v1.2.18r1 comparison regression now accepts the single + Add Team flow while still requiring a hard cap of six teams.

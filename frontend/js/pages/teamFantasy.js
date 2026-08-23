@@ -7,7 +7,7 @@
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218s', script).href : './css/team-fantasy.css?v=1218s';
+  link.href = script ? new URL('../../css/team-fantasy.css?v=1218t2', script).href : './css/team-fantasy.css?v=1218t2';
   link.dataset.teamFantasyCss = '1';
   document.head.appendChild(link);
 })();
@@ -77,6 +77,7 @@ function teamFantasyOptionLabel_(team) {
 
 
 /* TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s */
+/* TEAM_FANTASY_WEEKLY_HUB_UI_v1218t2 */
 function teamFantasyTeamLogoUrl_(abbr) {
   const key = String(abbr || '').toUpperCase();
   const slug = key === 'WAS' ? 'wsh' : key.toLowerCase();
@@ -160,26 +161,26 @@ function teamFantasyRenderLineup_(state, lineup) {
   const settings = state.settings || {};
   const conferenceLabel = entry.conference && entry.conference !== 'ALL' ? entry.conference + ' Entry' : (entry.entryName || 'Entry');
   const safeId = teamFantasySafeDomId_(entry.entryId);
+  const complete = teamFantasyLineupComplete_(lineup);
+  const collapsed = teamFantasyLineupCollapsed_(lineup);
   return `
-    <section class="card tf-lineup-card" data-entry-id="${teamFantasyEscape_(entry.entryId)}">
-      <div class="tf-card-heading">
-        <div>
-          <h2>${teamFantasyEscape_(conferenceLabel)}</h2>
-          <div class="tf-muted">Week ${Number(state.week || 0)} · ${teamFantasyEscape_(state.phase || '')}</div>
-        </div>
+    <section class="card tf-lineup-card ${complete?'is-complete':''} ${collapsed?'is-collapsed':''}" data-entry-id="${teamFantasyEscape_(entry.entryId)}">
+      <div class="tf-weekly-picks-head">
+        <div><h2>Weekly Picks</h2><div class="tf-weekly-picks-sub">${teamFantasyEscape_(conferenceLabel)} · Week ${Number(state.week || 0)}</div></div>
+        <button class="tf-collapse-button" data-tf-collapse type="button" onclick="teamFantasyToggleLineup_('${teamFantasyEscape_(entry.entryId)}')">${collapsed?'Show':'Hide'}</button>
+      </div>
+      <div class="tf-lineup-collapsible">
         <div class="tf-lineup-actions">
           <button class="tf-button secondary" onclick="teamFantasyContinuePicks_('${teamFantasyEscape_(entry.entryId)}')">Continue Picks</button>
           ${settings.allowRandomPick ? `<button class="tf-button secondary" data-tf-fill-button="1" onclick="teamFantasyFill_('${teamFantasyEscape_(entry.entryId)}',true)">Random</button>` : ''}
           ${settings.allowSmartAutoPick ? `<button class="tf-button" data-tf-fill-button="1" onclick="teamFantasyFill_('${teamFantasyEscape_(entry.entryId)}',false)">Auto Pick</button>` : ''}
         </div>
-      </div>
-      ${teamFantasyRenderProgress_(lineup)}
-      <div id="tfFillProgress_${safeId}" class="tf-fill-progress" hidden aria-live="polite">
-        <div class="tf-fill-progress-copy">Building lineup…</div>
-        <div class="tf-progress tf-fill-meter"><span></span></div>
-      </div>
-      <div class="tf-slot-grid">
-        ${(lineup.slots || []).map(function(slot) { return teamFantasyRenderSlot_(state, lineup, slot); }).join('')}
+        ${teamFantasyRenderProgress_(lineup)}
+        <div id="tfFillProgress_${safeId}" class="tf-fill-progress" hidden aria-live="polite">
+          <div class="tf-fill-progress-copy">Building lineup…</div>
+          <div class="tf-progress tf-fill-meter"><span></span></div>
+        </div>
+        <div class="tf-slot-grid">${(lineup.slots || []).map(function(slot) { return teamFantasyRenderSlot_(state, lineup, slot); }).join('')}</div>
       </div>
     </section>`;
 }
@@ -229,27 +230,16 @@ async function renderTeamFantasyPage() {
   if (!gameId || !username) return `<div class="page"><div class="card">Open a Team Fantasy game after signing in.</div></div>`;
   if (typeof setPageLoadStep === 'function') setPageLoadStep(48, 'Loading Team Fantasy lineup…');
   const res = await api('getTeamFantasyState', { gameId: gameId, username: username, leagueId: leagueId });
-  if (!res || res.success === false) {
-    return `<div class="page tf-page"><div class="card"><h1>Team Fantasy Football</h1><div>${teamFantasyEscape_(res && (res.message || res.error) || 'Could not load Team Fantasy.')}</div></div></div>`;
-  }
+  if (!res || res.success === false) return `<div class="page tf-page"><div class="card"><h1>Team Fantasy Football</h1><div>${teamFantasyEscape_(res && (res.message || res.error) || 'Could not load Team Fantasy.')}</div></div></div>`;
   window.TEAM_FANTASY_STATE = res;
   setTimeout(function(){ teamFantasyLoadGameDay_(false); }, 60);
-  return `
-    <div class="page tf-page">
-      <header class="tf-hero card">
-        <div><div class="tf-eyebrow">NFL TEAM FANTASY</div><h1>Week ${Number(res.week || 0)}</h1><p>One lineup per entry. Team-use limits are tracked <strong>per NFL team, per position, for the season</strong>.</p></div>
-        ${teamFantasyLeagueSelect_(res)}
-      </header>
-      <div id="teamFantasyStatus" class="tf-status" aria-live="polite"></div>
-      ${(res.lineups || []).map(function(lineup) { return teamFantasyRenderLineup_(res, lineup); }).join('')}
-      <section class="card tf-game-day-card">
-        <div class="tf-card-heading"><div><h2>Compare Lineups</h2><div class="tf-muted">Head-to-head or compare up to 6 teams. Opponent picks stay hidden until their NFL game kicks off.</div></div><button class="tf-button secondary" onclick="teamFantasyLoadGameDay_(true)">Refresh</button></div>
-        <div id="tfGameDayMount"><div class="tf-muted">Loading cached game-day scores…</div></div>
-      </section>
-      ${teamFantasyIsAdmin_() ? `<section class="card tf-test-lab-card"><div class="tf-card-heading"><div><h2>Team Fantasy Test Lab</h2><div class="tf-muted">Six fake players · no Sheet writes · tests privacy, usage limits, totals and game states.</div></div><button class="tf-button" onclick="teamFantasyRunTestLab_()">Run 6-Team Test Lab</button></div><div id="tfTestLabMount" class="tf-test-lab-output"></div></section>` : ''}
-      ${teamFantasyRenderStandings_(res.standings, res.phase)}
-      ${teamFantasyRenderH2H_(res)}
-    </div>`;
+  return `<div class="page tf-page">
+    <header class="tf-hero card"><div><div class="tf-eyebrow">NFL TEAM FANTASY</div><h1>Week ${Number(res.week || 0)}</h1><p>Team-use limits are tracked <strong>per NFL team, per position, for the season</strong>.</p></div>${teamFantasyLeagueSelect_(res)}</header>
+    <div id="teamFantasyStatus" class="tf-status" aria-live="polite"></div>
+    ${(res.lineups || []).map(function(lineup) { return teamFantasyRenderLineup_(res, lineup); }).join('')}
+    <section class="card tf-game-day-card"><div class="tf-game-day-title"><div><h2>Weekly League</h2><div class="tf-muted">Live weekly race or lineup comparison. Opponent picks stay hidden until kickoff.</div></div></div><div id="tfGameDayMount"><div class="tf-muted">Loading cached game-day scores…</div></div></section>
+    ${teamFantasyIsAdmin_() ? `<section class="card tf-test-lab-card"><div class="tf-card-heading"><div><h2>Team Fantasy Test Lab</h2><div class="tf-muted">Six fake players · no Sheet writes · tests privacy, usage limits, weekly race math and game states.</div></div><button class="tf-button" onclick="teamFantasyRunTestLab_()">Run 6-Team Test Lab</button></div><div id="tfTestLabMount" class="tf-test-lab-output"></div></section>` : ''}
+  </div>`;
 }
 
 function teamFantasySetStatus_(message, error) {
@@ -379,6 +369,103 @@ function teamFantasyStatusLabel_(status) {
   return String(status || '').toUpperCase();
 }
 
+function teamFantasyLineupComplete_(lineup) {
+  const slots = Array.isArray(lineup && lineup.slots) ? lineup.slots : [];
+  return slots.length > 0 && slots.every(function(slot){ return !!slot.pick; });
+}
+
+function teamFantasyLineupCollapsed_(lineup) {
+  const entryId = lineup && lineup.entry ? lineup.entry.entryId : '';
+  window.TEAM_FANTASY_LINEUP_OPEN = window.TEAM_FANTASY_LINEUP_OPEN || {};
+  if (window.TEAM_FANTASY_LINEUP_OPEN[entryId] === true) return false;
+  if (window.TEAM_FANTASY_LINEUP_OPEN[entryId] === false) return true;
+  return teamFantasyLineupComplete_(lineup);
+}
+
+function teamFantasyToggleLineup_(entryId) {
+  const card = document.querySelector('.tf-lineup-card[data-entry-id="' + String(entryId).replace(/[^a-zA-Z0-9_-]/g, '') + '"]');
+  if (!card) return;
+  const collapsed = card.classList.toggle('is-collapsed');
+  window.TEAM_FANTASY_LINEUP_OPEN = window.TEAM_FANTASY_LINEUP_OPEN || {};
+  window.TEAM_FANTASY_LINEUP_OPEN[entryId] = !collapsed;
+  const button = card.querySelector('[data-tf-collapse]');
+  if (button) button.textContent = collapsed ? 'Show' : 'Hide';
+}
+
+function teamFantasyGameDayView_() {
+  return window.TEAM_FANTASY_GAME_DAY_VIEW === 'compare' ? 'compare' : 'league';
+}
+
+function teamFantasySetGameDayView_(view) {
+  window.TEAM_FANTASY_GAME_DAY_VIEW = view === 'compare' ? 'compare' : 'league';
+  teamFantasyRenderGameDayIntoMount_();
+}
+
+function teamFantasyGameDayLeaguePicker_(data) {
+  const leagues = Array.isArray(data && data.leagues) ? data.leagues : [];
+  if (!leagues.length) return '';
+  const selected = data.selectedLeagueId || data.leagueId || leagues[0].leagueId;
+  return `<label class="tf-week-league-picker"><span>League</span><select onchange="teamFantasyGameDaySelectLeague_(this.value)">${leagues.map(function(league){ return `<option value="${teamFantasyEscape_(league.leagueId)}" ${league.leagueId===selected?'selected':''}>${teamFantasyEscape_(league.leagueName || (league.leagueType==='complete'?'Complete League':'League'))}</option>`; }).join('')}</select></label>`;
+}
+
+async function teamFantasyGameDaySelectLeague_(leagueId) {
+  const state = window.TEAM_FANTASY_STATE || {};
+  const mount = document.getElementById('tfGameDayMount');
+  if (mount) mount.innerHTML = '<div class="tf-muted">Loading league…</div>';
+  try {
+    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: state.week, leagueId: leagueId });
+    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load league.');
+    window.TEAM_FANTASY_GAME_DAY = res;
+    state.selectedLeagueId = res.selectedLeagueId || leagueId;
+    teamFantasyRenderGameDayIntoMount_();
+  } catch (err) {
+    if (mount) mount.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(err && err.message ? err.message : 'Could not load league.')}</div>`;
+  }
+}
+
+function teamFantasyRenderWeeklyLeague_(data) {
+  const board = data && data.weeklyLeaderboard ? data.weeklyLeaderboard : { rows: [] };
+  const rows = Array.isArray(board.rows) ? board.rows : [];
+  if (!rows.length) return `<div class="tf-muted">No weekly league points yet.</div>`;
+  return `<div class="tf-week-board">${rows.map(function(row){
+    const counts = row.counts || { final:0, live:0, upcoming:0 };
+    const record = row.record || { wins:0, losses:0, ties:0 };
+    const behind = Number(row.pointsBehindLeader || 0);
+    const move = Number(row.pointsToMoveUp || 0);
+    const cushion = Number(row.cushionOverBelow || 0);
+    const gap = Number(row.weekRank||0) === 1 ? 'Leader' : `${teamFantasyScore_(behind)} behind · ${teamFantasyScore_(move)} to #${Number(row.moveUpRank||1)}`;
+    const lower = Number(row.belowRank||0) > 0 ? `${teamFantasyScore_(cushion)} cushion` : '—';
+    return `<div class="tf-week-row ${row.isViewer?'is-you':''}"><div class="tf-week-rank">#${Number(row.weekRank||0)}</div><div class="tf-week-name"><strong>${teamFantasyEscape_(row.label || row.entryId)}</strong>${row.isViewer?'<span class="tf-you-badge">YOU</span>':''}<span class="tf-week-record">${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</span></div><div class="tf-week-points">${teamFantasyScore_(row.points)}<span>pts</span></div><div class="tf-week-counts"><span class="is-final">${Number(counts.final||0)}F</span><span class="is-live">${Number(counts.live||0)}L</span><span class="is-upcoming">${Number(counts.upcoming||0)}U</span></div><div class="tf-week-gap">${teamFantasyEscape_(gap)}<span>${teamFantasyEscape_(lower)}</span></div></div>`;
+  }).join('')}</div>`;
+}
+
+function teamFantasyCompareAddTeam_(entryId) {
+  const data = window.TEAM_FANTASY_GAME_DAY || {};
+  const selected = teamFantasyCompareDefaultSelection_(data).slice();
+  if (selected.indexOf(entryId) === -1 && selected.length < 6) selected.push(entryId);
+  window.TEAM_FANTASY_COMPARE_SELECTED = selected;
+  window.TEAM_FANTASY_COMPARE_ADD_OPEN = false;
+  teamFantasyRenderGameDayIntoMount_();
+}
+
+function teamFantasyCompareRemoveTeam_(entryId) {
+  const data = window.TEAM_FANTASY_GAME_DAY || {};
+  let selected = teamFantasyCompareDefaultSelection_(data).filter(function(id){ return id !== entryId; });
+  const viewer = (data.competitors || []).filter(function(c){ return c.isViewer; })[0];
+  if (viewer && selected.indexOf(viewer.entryId) === -1) selected.unshift(viewer.entryId);
+  if (selected.length < 2) {
+    const other = (data.competitors || []).filter(function(c){ return selected.indexOf(c.entryId) === -1; })[0];
+    if (other) selected.push(other.entryId);
+  }
+  window.TEAM_FANTASY_COMPARE_SELECTED = selected.slice(0,6);
+  teamFantasyRenderGameDayIntoMount_();
+}
+
+function teamFantasyToggleAddTeamMenu_() {
+  window.TEAM_FANTASY_COMPARE_ADD_OPEN = !window.TEAM_FANTASY_COMPARE_ADD_OPEN;
+  teamFantasyRenderGameDayIntoMount_();
+}
+
 function teamFantasyCompareDefaultSelection_(data) {
   const competitors = Array.isArray(data && data.competitors) ? data.competitors : [];
   let ids = Array.isArray(window.TEAM_FANTASY_COMPARE_SELECTED) ? window.TEAM_FANTASY_COMPARE_SELECTED.slice() : [];
@@ -417,7 +504,7 @@ function teamFantasyRenderCompareBoard_(data, selectedIds) {
   return `<div class="tf-compare-scroll"><div class="tf-compare-board">${selected.map(function(c){
     const record = c.record || { wins:0, losses:0, ties:0 };
     const rank = Number(c.leagueRank || 0) > 0 ? '#' + Number(c.leagueRank) : '#—';
-    return `<article class="tf-compare-team"><div class="tf-compare-team-head"><div class="tf-team-head-name"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${c.isViewer?'<span class="tf-you-badge">YOU</span>':''}</div><div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-record">${rank} · ${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
+    return `<article class="tf-compare-team"><div class="tf-compare-team-head"><div class="tf-team-head-name"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${c.isViewer?'<span class="tf-you-badge">YOU</span>':''}${!c.isViewer?`<button class="tf-remove-team" type="button" title="Remove" onclick="teamFantasyCompareRemoveTeam_('${teamFantasyEscape_(c.entryId)}')">×</button>`:''}</div><div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-record">${rank} · ${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
   }).join('')}</div></div>`;
 }
 
@@ -426,12 +513,11 @@ function teamFantasyRenderGameDayIntoMount_() {
   const data = window.TEAM_FANTASY_GAME_DAY;
   if (!mount || !data) return;
   const competitors = Array.isArray(data.competitors) ? data.competitors : [];
-  if (competitors.length < 2) {
-    mount.innerHTML = `<div class="tf-muted">At least two league entries are needed for live comparison. Use the Test Lab below to prove the 2–6 team view now.</div>`;
-    return;
-  }
+  const view = teamFantasyGameDayView_();
   const selected = teamFantasyCompareDefaultSelection_(data);
-  mount.innerHTML = `<div class="tf-compare-controls"><div class="tf-compare-control-main"><strong>Compare 2–6 teams</strong><div class="tf-compare-subline">${teamFantasyCompareLeaguePicker_()}<span>· cached scores refresh every 5 min</span></div></div><div class="tf-action-row"><button class="tf-button secondary" onclick="teamFantasyComparePreset_(2)">H2H</button><button class="tf-button secondary" onclick="teamFantasyComparePreset_(6)">2–6</button></div></div><div class="tf-status-legend" aria-label="Game status colors"><span class="is-live"></span>Live <span class="is-final"></span>Final <span class="is-upcoming"></span>Upcoming</div><div class="tf-compare-picker">${competitors.map(function(c){ return `<label class="tf-compare-choice"><input type="checkbox" value="${teamFantasyEscape_(c.entryId)}" ${selected.indexOf(c.entryId)!==-1?'checked':''} onchange="teamFantasyCompareToggle_(this)"><span>${teamFantasyEscape_(c.label || c.entryId)}</span></label>`; }).join('')}</div><div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div><div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`;
+  const available = competitors.filter(function(c){ return selected.indexOf(c.entryId) === -1; });
+  const addMenu = view === 'compare' && window.TEAM_FANTASY_COMPARE_ADD_OPEN && selected.length < 6 ? `<div class="tf-add-team-menu">${available.map(function(c){ return `<button type="button" onclick="teamFantasyCompareAddTeam_('${teamFantasyEscape_(c.entryId)}')">${teamFantasyEscape_(c.label || c.entryId)}</button>`; }).join('') || '<span>No more teams available.</span>'}</div>` : '';
+  mount.innerHTML = `<div class="tf-game-day-sticky"><div class="tf-game-day-tabs"><button class="${view==='league'?'is-active':''}" onclick="teamFantasySetGameDayView_('league')">League View</button><button class="${view==='compare'?'is-active':''}" onclick="teamFantasySetGameDayView_('compare')">Compare</button></div>${teamFantasyGameDayLeaguePicker_(data)}<button class="tf-refresh-mini" onclick="teamFantasyLoadGameDay_(true)" title="Refresh cached scores">↻</button></div><div class="tf-mini-status-legend"><span class="is-final"></span>F <span class="is-live"></span>L <span class="is-upcoming"></span>U</div>${view==='league'?teamFantasyRenderWeeklyLeague_(data):`<div class="tf-compare-add-row"><span>${selected.length} team${selected.length===1?'':'s'} selected</span>${selected.length<6?'<button class="tf-button secondary" onclick="teamFantasyToggleAddTeamMenu_()">+ Add Team</button>':''}</div>${addMenu}${competitors.length<2?'<div class="tf-muted">At least two league entries are needed for comparison.</div>':`<div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div>`}<div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`}`;
 }
 
 function teamFantasyCompareToggle_(checkbox) {
@@ -496,8 +582,9 @@ async function teamFantasyRunTestLab_() {
     const res = await api('adminGetTeamFantasyTestLab', { gameId: state.gameId });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Test Lab failed.');
     const checks = Array.isArray(res.checks) ? res.checks : [];
+    window.TEAM_FANTASY_GAME_DAY_TEST = res.compare || {};
     const testIds = (res.compare && res.compare.competitors || []).slice(0, 6).map(function(c){ return c.entryId; });
-    mount.innerHTML = `<div class="tf-test-summary ${res.allPassed?'is-pass':'is-fail'}"><strong>${res.allPassed?'ALL TEST LAB CHECKS PASSED':'TEST LAB FOUND A FAILURE'}</strong><span>${res.writesSheets===false?'No real Team Fantasy rows were written.':''}</span></div><div class="tf-test-checks">${checks.map(function(check){ return `<div class="tf-test-check ${check.passed?'is-pass':'is-fail'}"><strong>${check.passed?'✓':'✕'} ${teamFantasyEscape_(check.name)}</strong><span>${teamFantasyEscape_(check.detail||'')}</span></div>`; }).join('')}</div><h3>Six-Team Synthetic Game Day</h3>${teamFantasyRenderCompareBoard_(res.compare || {}, testIds)}<div class="tf-muted">Usage proof: BUF at QB is ${Number(res.usageExample && res.usageExample.QB && res.usageExample.QB.used || 0)}/3 and blocked; BUF at RB is ${Number(res.usageExample && res.usageExample.RB && res.usageExample.RB.used || 0)}/3 and still available.</div>`;
+    mount.innerHTML = `<div class="tf-test-summary ${res.allPassed?'is-pass':'is-fail'}"><strong>${res.allPassed?'ALL TEST LAB CHECKS PASSED':'TEST LAB FOUND A FAILURE'}</strong><span>${res.writesSheets===false?'No real Team Fantasy rows were written.':''}</span></div><div class="tf-test-checks">${checks.map(function(check){ return `<div class="tf-test-check ${check.passed?'is-pass':'is-fail'}"><strong>${check.passed?'✓':'✕'} ${teamFantasyEscape_(check.name)}</strong><span>${teamFantasyEscape_(check.detail||'')}</span></div>`; }).join('')}</div><h3>Synthetic Weekly League Race</h3>${teamFantasyRenderWeeklyLeague_(res.compare || {})}<h3>Six-Team Synthetic Compare</h3>${teamFantasyRenderCompareBoard_(res.compare || {}, testIds)}<div class="tf-muted">Usage proof: BUF at QB is ${Number(res.usageExample && res.usageExample.QB && res.usageExample.QB.used || 0)}/3 and blocked; BUF at RB is ${Number(res.usageExample && res.usageExample.RB && res.usageExample.RB.used || 0)}/3 and still available.</div>`;
   } catch (err) {
     mount.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(err && err.message ? err.message : 'Test Lab failed.')}</div>`;
   }

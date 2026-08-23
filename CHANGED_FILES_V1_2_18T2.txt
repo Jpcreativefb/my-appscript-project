@@ -1,0 +1,11 @@
+CHANGED_FILES_V1_2_18T2.txt
+INSTALL_V1_2_18T2.txt
+backend/engines/SportsTeamFantasyGameDayEngine.js
+frontend/js/pages/teamFantasy.js
+frontend/css/team-fantasy.css
+docs/TEAM_FANTASY_WEEKLY_HUB_V1_2_18T2.md
+tests/team_fantasy_compact_game_day_v1218s_tests.js
+tests/team_fantasy_game_day_v1218r1_tests.js
+tests/team_fantasy_weekly_hub_v1218t2_tests.js
+tools/apply_team_fantasy_weekly_hub_v1218t2.py
+tools/install_team_fantasy_weekly_hub_v1218t2.sh
