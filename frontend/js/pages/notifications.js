@@ -1,6 +1,6 @@
 /* ======================
    NOTIFICATION CENTER
-   v1.2.18i
+   v1.2.18j
 ====================== */
 
 function notificationCenterEscape_(value) {
@@ -120,6 +120,7 @@ function renderNotificationAdminControlCenter_(control) {
   const gateway = control.gateway || {};
   const stats = control.subscriptionStats || {};
   const recent = Array.isArray(control.recent) ? control.recent : [];
+  const reminderScheduler = control.reminderScheduler || {};
   const firstGame = games[0] || {};
   const defaultGatewayUrl = gateway.url || (
     typeof window !== "undefined" && window.location && window.location.origin
@@ -185,6 +186,15 @@ function renderNotificationAdminControlCenter_(control) {
             <label class="notification-admin-check"><input id="notificationGameEnabled" type="checkbox"> <span><strong>Notifications ON for this game</strong><small>Must be on before this game can send.</small></span></label>
             <label class="notification-admin-check"><input id="notificationGamePaused" type="checkbox"> <span><strong>Pause this game</strong><small>Temporary stop without losing settings.</small></span></label>
             <label class="notification-admin-check"><input id="notificationGameTestOnly" type="checkbox"> <span><strong>Test only</strong><small>Forces delivery to the signed-in admin only even when global mode is LIVE.</small></span></label>
+            <label class="notification-admin-check"><input id="notificationGameAutoReminder" type="checkbox" onchange="previewNotificationReminderSchedule_()"> <span><strong>Automatic outstanding-pick reminders</strong><small>Re-checks the game hourly and only reminds players who still owe open picks.</small></span></label>
+            <label>
+              <span>Reminder hours before lock</span>
+              <input id="notificationGameReminderOffsets" type="text" inputmode="decimal" value="24,2" placeholder="24,2" onchange="previewNotificationReminderSchedule_()">
+            </label>
+            <small>Default: 24 and 2 hours. Automatic delivery requires Global LIVE + Game ON + not paused + Test only OFF.</small>
+            <div id="notificationReminderSchedulerStatus" class="notification-admin-inline-status ${reminderScheduler.installed ? "ready" : ""}">${reminderScheduler.installed ? "Hourly reminder checker installed ✓" : "The hourly checker installs automatically when automatic reminders are enabled."}${reminderScheduler.lastRunAt ? " Last run: " + notificationCenterEscape_(notificationCenterTime_(reminderScheduler.lastRunAt)) + "." : ""}</div>
+            <div id="notificationReminderSchedulePreview" class="notification-admin-inline-status">Select a game to preview the next automatic reminder.</div>
+            <button class="button secondary" type="button" onclick="previewNotificationReminderSchedule_()">Preview Reminder Timing</button>
             <button class="button secondary" type="button" onclick="saveNotificationGameSettings_()">Save Game Controls</button>
           ` : `<p>No games are available.</p>`}
         </div>
@@ -297,9 +307,16 @@ function notificationAdminApplySelectedGame_() {
   const enabled = document.getElementById("notificationGameEnabled");
   const paused = document.getElementById("notificationGamePaused");
   const testOnly = document.getElementById("notificationGameTestOnly");
+  const autoReminder = document.getElementById("notificationGameAutoReminder");
+  const offsets = document.getElementById("notificationGameReminderOffsets");
   if (enabled) enabled.checked = game.enabled === true;
   if (paused) paused.checked = game.paused === true;
   if (testOnly) testOnly.checked = game.testOnly !== false;
+  if (autoReminder) autoReminder.checked = game.autoReminderEnabled === true;
+  if (offsets) offsets.value = game.reminderOffsetsText || (Array.isArray(game.reminderOffsetsHours) ? game.reminderOffsetsHours.join(",") : "24,2");
+  if (typeof previewNotificationReminderSchedule_ === "function") {
+    setTimeout(function() { previewNotificationReminderSchedule_(); }, 0);
+  }
 }
 
 async function saveNotificationGlobalMode_() {
@@ -380,7 +397,9 @@ async function saveNotificationGameSettings_() {
     gameId: game.gameId,
     enabled: !!(document.getElementById("notificationGameEnabled") || {}).checked,
     paused: !!(document.getElementById("notificationGamePaused") || {}).checked,
-    testOnly: !!(document.getElementById("notificationGameTestOnly") || {}).checked
+    testOnly: !!(document.getElementById("notificationGameTestOnly") || {}).checked,
+    autoReminderEnabled: !!(document.getElementById("notificationGameAutoReminder") || {}).checked,
+    reminderOffsetsHours: String((document.getElementById("notificationGameReminderOffsets") || {}).value || "24,2").trim()
   };
   const res = await apiAdminSaveGameNotificationSettings(payload);
   if (!res || res.success === false) {
@@ -391,6 +410,51 @@ async function saveNotificationGameSettings_() {
   navigate("notifications", { suppressLoader: true });
 }
 
+
+
+async function previewNotificationReminderSchedule_() {
+  const el = document.getElementById("notificationReminderSchedulePreview");
+  const game = notificationAdminSelectedGame_();
+  if (!el || !game || typeof apiAdminSendPushNotification !== "function") return;
+
+  el.textContent = "Checking next pick lock…";
+  el.className = "notification-admin-inline-status";
+
+  try {
+    const res = await apiAdminSendPushNotification({
+      schedulePreview: true,
+      gameId: game.gameId,
+      autoReminderEnabled: !!(document.getElementById("notificationGameAutoReminder") || {}).checked,
+      reminderOffsetsHours: String((document.getElementById("notificationGameReminderOffsets") || {}).value || "24,2").trim(),
+      audience: "missing_picks",
+      type: "make_picks",
+      previewOnly: true
+    });
+
+    if (!res || res.success === false) {
+      el.textContent = res && (res.message || res.error) || "Could not preview reminder timing.";
+      el.classList.add("not-ready");
+      return;
+    }
+
+    const lockText = res.lockDateTime
+      ? notificationCenterTime_(res.lockDateTime)
+      : "No future lock yet";
+    const hours = res.hoursUntilLock === null || res.hoursUntilLock === undefined
+      ? ""
+      : " · about " + Math.max(0, Number(res.hoursUntilLock || 0)).toFixed(1) + "h away";
+    const offsetsInput = String((document.getElementById("notificationGameReminderOffsets") || {}).value || res.reminderOffsetsText || "24,2").trim();
+    const enabled = !!(document.getElementById("notificationGameAutoReminder") || {}).checked;
+
+    el.textContent = "Next lock: " + lockText + hours + " · reminder plan: " + offsetsInput + " hour(s) before lock" +
+      (enabled ? "." : ". Automatic reminders are currently OFF for this game.");
+    if (!res.lockDateTime) el.classList.add("not-ready");
+    else el.classList.add("ready");
+  } catch (err) {
+    el.textContent = "Could not preview reminder timing.";
+    el.classList.add("not-ready");
+  }
+}
 
 async function previewAdminPushAudience_() {
   const el = document.getElementById("notificationAudiencePreview");

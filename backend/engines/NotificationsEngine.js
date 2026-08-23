@@ -786,6 +786,7 @@ const PUSH_SUBSCRIPTIONS_SHEET = "PushSubscriptions";
 const PUSH_SYSTEM_SETTINGS_SHEET = "NotificationSystemSettings";
 const PUSH_GAME_SETTINGS_SHEET = "GameNotificationSettings";
 const PUSH_DELIVERY_LOG_SHEET = "PushDeliveryLog";
+const PUSH_REMINDER_LOG_SHEET = "PushReminderLog";
 
 const PUSH_SUBSCRIPTION_HEADERS = [
   "SubscriptionId",
@@ -817,6 +818,8 @@ const PUSH_GAME_SETTING_HEADERS = [
   "Enabled",
   "Paused",
   "TestOnly",
+  "AutoReminderEnabled",
+  "ReminderOffsetsHours",
   "UpdatedAt",
   "UpdatedBy"
 ];
@@ -836,6 +839,20 @@ const PUSH_DELIVERY_LOG_HEADERS = [
   "Failed",
   "Expired",
   "Status",
+  "Error"
+];
+
+const PUSH_REMINDER_LOG_HEADERS = [
+  "ReminderKey",
+  "Timestamp",
+  "GameId",
+  "LockDateTime",
+  "OffsetHours",
+  "Status",
+  "RecipientUsers",
+  "SubscriptionsAttempted",
+  "Sent",
+  "Failed",
   "Error"
 ];
 
@@ -880,6 +897,13 @@ function notificationPushDeliveryLogSheet_() {
   return notificationGetOrCreateSheet_(
     PUSH_DELIVERY_LOG_SHEET,
     PUSH_DELIVERY_LOG_HEADERS
+  );
+}
+
+function notificationPushReminderLogSheet_() {
+  return notificationGetOrCreateSheet_(
+    PUSH_REMINDER_LOG_SHEET,
+    PUSH_REMINDER_LOG_HEADERS
   );
 }
 
@@ -944,7 +968,10 @@ function notificationPushGetGameSetting_(gameId) {
     gameId: gameId,
     enabled: false,
     paused: false,
-    testOnly: true
+    testOnly: true,
+    autoReminderEnabled: false,
+    reminderOffsetsHours: [24, 2],
+    reminderOffsetsText: "24,2"
   };
   if (!gameId) return defaults;
 
@@ -956,11 +983,19 @@ function notificationPushGetGameSetting_(gameId) {
 
   for (let i = 1; i < data.length; i++) {
     if (String(data[i][col.GameId] || "").trim() === gameId) {
+      const offsets = notificationPushReminderOffsets_(
+        col.ReminderOffsetsHours === undefined ? "24,2" : data[i][col.ReminderOffsetsHours]
+      );
       return {
         gameId: gameId,
         enabled: notificationBool_(data[i][col.Enabled], false),
         paused: notificationBool_(data[i][col.Paused], false),
-        testOnly: notificationBool_(data[i][col.TestOnly], true)
+        testOnly: notificationBool_(data[i][col.TestOnly], true),
+        autoReminderEnabled: col.AutoReminderEnabled === undefined
+          ? false
+          : notificationBool_(data[i][col.AutoReminderEnabled], false),
+        reminderOffsetsHours: offsets,
+        reminderOffsetsText: offsets.join(",")
       };
     }
   }
@@ -994,6 +1029,10 @@ function notificationPushSaveGameSetting_(payload, adminUsername) {
     Enabled: notificationBool_(payload.enabled, false),
     Paused: notificationBool_(payload.paused, false),
     TestOnly: notificationBool_(payload.testOnly, true),
+    AutoReminderEnabled: notificationBool_(payload.autoReminderEnabled, false),
+    ReminderOffsetsHours: notificationPushReminderOffsets_(
+      payload.reminderOffsetsHours || payload.reminderOffsetsText || "24,2"
+    ).join(","),
     UpdatedAt: new Date().toISOString(),
     UpdatedBy: String(adminUsername || "").trim()
   };
@@ -1001,11 +1040,15 @@ function notificationPushSaveGameSetting_(payload, adminUsername) {
   notificationWriteObjectRow_(sh, headers, rowIndex, values);
   SpreadsheetApp.flush();
 
+  const offsets = notificationPushReminderOffsets_(values.ReminderOffsetsHours);
   return {
     gameId: gameId,
     enabled: values.Enabled,
     paused: values.Paused,
-    testOnly: values.TestOnly
+    testOnly: values.TestOnly,
+    autoReminderEnabled: values.AutoReminderEnabled,
+    reminderOffsetsHours: offsets,
+    reminderOffsetsText: offsets.join(",")
   };
 }
 
@@ -1077,7 +1120,8 @@ function apiAdminSaveGameNotificationSettings(payload) {
   payload = payload || {};
   const adminUsername = requireAdminFromToken_(payload.token);
   const setting = notificationPushSaveGameSetting_(payload, adminUsername);
-  return { success: true, setting: setting };
+  const scheduler = notificationPushSyncReminderTrigger_();
+  return { success: true, setting: setting, reminderScheduler: scheduler };
 }
 
 function notificationPushSubscriptionId_(username, endpoint) {
@@ -1846,6 +1890,539 @@ function notificationPushTestLabPreview_(payload, globalMode, gameSetting) {
   return result;
 }
 
+
+/* =========================================================
+   v1.2.18j AUTOMATIC OUTSTANDING-PICK REMINDER SCHEDULING
+   - One hourly Apps Script trigger.
+   - Default offsets: 24h + 2h before the next pick lock.
+   - LIVE + game ON + not paused + TestOnly OFF are all required.
+   - Audience is recalculated at send time.
+   - Reminder log prevents duplicates for the same game/lock/offset.
+========================================================= */
+
+function notificationPushReminderOffsets_(value) {
+  let raw = [];
+  if (Array.isArray(value)) raw = value;
+  else raw = String(value === undefined || value === null ? "" : value)
+    .split(/[,;\s]+/);
+
+  const seen = {};
+  const result = [];
+  raw.forEach(function(item) {
+    const n = Number(item);
+    if (!isFinite(n) || n <= 0 || n > 168) return;
+    const rounded = Math.round(n * 4) / 4;
+    const key = String(rounded);
+    if (seen[key]) return;
+    seen[key] = true;
+    result.push(rounded);
+  });
+
+  if (!result.length) result.push(24, 2);
+  result.sort(function(a, b) { return b - a; });
+  return result.slice(0, 6);
+}
+
+function notificationPushReminderTriggerStatus_() {
+  const props = PropertiesService.getScriptProperties();
+  let installed = false;
+  if (typeof ScriptApp !== "undefined" && ScriptApp.getProjectTriggers) {
+    installed = ScriptApp.getProjectTriggers().some(function(trigger) {
+      return trigger.getHandlerFunction &&
+        trigger.getHandlerFunction() === "notificationPushRunScheduledPickReminders";
+    });
+  }
+  return {
+    installed: installed,
+    cadence: "hourly",
+    lastRunAt: String(props.getProperty("PUSH_REMINDER_LAST_RUN_AT") || ""),
+    lastRunSummary: String(props.getProperty("PUSH_REMINDER_LAST_RUN_SUMMARY") || "")
+  };
+}
+
+function notificationPushAnyAutoReminderEnabled_() {
+  const sh = notificationPushGameSettingsSheet_();
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return false;
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  if (col.AutoReminderEnabled === undefined) return false;
+  return data.slice(1).some(function(row) {
+    return notificationBool_(row[col.AutoReminderEnabled], false);
+  });
+}
+
+function notificationPushSyncReminderTrigger_() {
+  if (typeof ScriptApp === "undefined" || !ScriptApp.getProjectTriggers) {
+    return { installed: false, cadence: "hourly", unavailable: true };
+  }
+
+  const triggers = ScriptApp.getProjectTriggers().filter(function(trigger) {
+    return trigger.getHandlerFunction &&
+      trigger.getHandlerFunction() === "notificationPushRunScheduledPickReminders";
+  });
+  const needed = notificationPushAnyAutoReminderEnabled_();
+
+  if (needed && !triggers.length) {
+    ScriptApp.newTrigger("notificationPushRunScheduledPickReminders")
+      .timeBased()
+      .everyHours(1)
+      .create();
+  } else if (!needed && triggers.length) {
+    triggers.forEach(function(trigger) {
+      ScriptApp.deleteTrigger(trigger);
+    });
+  } else if (triggers.length > 1) {
+    triggers.slice(1).forEach(function(trigger) {
+      ScriptApp.deleteTrigger(trigger);
+    });
+  }
+
+  return notificationPushReminderTriggerStatus_();
+}
+
+function notificationPushDateMs_(value) {
+  if (!value) return 0;
+  if (Object.prototype.toString.call(value) === "[object Date]") {
+    const direct = value.getTime();
+    return isNaN(direct) ? 0 : direct;
+  }
+  const parsed = new Date(value).getTime();
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+function notificationPushGameRecord_(gameId) {
+  try {
+    if (typeof getGameById_ === "function") {
+      const game = getGameById_(gameId);
+      if (game) return game;
+    }
+  } catch (err) {}
+
+  try {
+    if (typeof getGames === "function") {
+      const wanted = String(gameId || "").trim();
+      return (getGames() || []).find(function(game) {
+        return String(game.gameId || game.GameId || game.id || "").trim() === wanted;
+      }) || null;
+    }
+  } catch (err) {}
+  return null;
+}
+
+function notificationPushGameName_(gameId) {
+  const game = notificationPushGameRecord_(gameId) || {};
+  return String(
+    game.gameName || game.GameName || game.name || game.Name || game.title || game.Title || gameId || "PATTC Predicts"
+  ).trim();
+}
+
+function notificationPushLockValue_(category, setting) {
+  category = category || {};
+  setting = setting || {};
+  const nested = category.settings || category.Settings || {};
+  return setting.lockDateTime || setting.LockDateTime ||
+    nested.lockDateTime || nested.LockDateTime ||
+    category.lockDateTime || category.LockDateTime || "";
+}
+
+function notificationPushUpcomingLock_(gameId, nowMs) {
+  nowMs = Number(nowMs || Date.now());
+  const game = notificationPushGameRecord_(gameId) || {};
+  const gameCandidates = [
+    game.picksLockDateTime, game.PicksLockDateTime,
+    game.pickLockDateTime, game.PickLockDateTime,
+    game.lockDateTime, game.LockDateTime,
+    game.picksLockAt, game.PicksLockAt,
+    game.pickDeadline, game.PickDeadline
+  ];
+
+  for (let i = 0; i < gameCandidates.length; i++) {
+    const ms = notificationPushDateMs_(gameCandidates[i]);
+    if (ms > nowMs) {
+      return { lockAtMs: ms, lockDateTime: new Date(ms).toISOString(), source: "game" };
+    }
+  }
+
+  const categories = typeof getCategories === "function" ? (getCategories(gameId) || []) : [];
+  const settings = typeof getCategorySettings === "function" ? (getCategorySettings(gameId) || {}) : {};
+  let earliest = 0;
+
+  (categories || []).forEach(function(category) {
+    const categoryId = notificationPushCategoryId_(category);
+    if (!categoryId) return;
+    const setting = settings[categoryId] || {};
+    if (notificationPushCategoryIsLocked_(category, setting, nowMs)) return;
+    const scoreMode = notificationPushCategoryScoreMode_(category, setting);
+    if (scoreMode === "wager" || scoreMode === "ranking") return;
+    const lockMs = notificationPushDateMs_(notificationPushLockValue_(category, setting));
+    if (lockMs > nowMs && (!earliest || lockMs < earliest)) earliest = lockMs;
+  });
+
+  return earliest
+    ? { lockAtMs: earliest, lockDateTime: new Date(earliest).toISOString(), source: "question" }
+    : { lockAtMs: 0, lockDateTime: "", source: "none" };
+}
+
+function notificationPushReminderKey_(gameId, lockDateTime, offsetHours) {
+  return String(gameId || "").trim() + "|" +
+    String(lockDateTime || "").trim() + "|" +
+    String(Number(offsetHours || 0));
+}
+
+function notificationPushReminderTerminalOffsetsForLock_(gameId, lockDateTime) {
+  const sh = notificationPushReminderLogSheet_();
+  const data = sh.getDataRange().getValues();
+  const result = {};
+  if (data.length <= 1) return result;
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+
+  data.slice(1).forEach(function(row) {
+    if (String(row[col.GameId] || "").trim() !== String(gameId || "").trim()) return;
+    if (String(row[col.LockDateTime] || "").trim() !== String(lockDateTime || "").trim()) return;
+    const offset = Number(row[col.OffsetHours] || 0);
+    if (offset > 0) result[String(offset)] = String(row[col.Status] || "").trim() || "RECORDED";
+  });
+  return result;
+}
+
+function notificationPushReminderSelectDueOffset_(offsets, hoursUntilLock, terminalOffsets) {
+  const clean = notificationPushReminderOffsets_(offsets);
+  const hours = Number(hoursUntilLock);
+  terminalOffsets = terminalOffsets || {};
+  if (!isFinite(hours) || hours <= 0) return { offsetHours: 0, superseded: [] };
+
+  const due = clean.filter(function(offset) {
+    return hours <= Number(offset) && !terminalOffsets[String(Number(offset))];
+  });
+  if (!due.length) return { offsetHours: 0, superseded: [] };
+
+  const chosen = Math.min.apply(Math, due);
+  return {
+    offsetHours: chosen,
+    superseded: due.filter(function(offset) { return Number(offset) > chosen; })
+  };
+}
+
+function notificationPushReminderLog_(entry) {
+  entry = entry || {};
+  notificationPushReminderLogSheet_().appendRow([
+    entry.reminderKey || notificationPushReminderKey_(entry.gameId, entry.lockDateTime, entry.offsetHours),
+    new Date().toISOString(),
+    entry.gameId || "",
+    entry.lockDateTime || "",
+    Number(entry.offsetHours || 0),
+    entry.status || "",
+    Number(entry.recipientUsers || 0),
+    Number(entry.subscriptionsAttempted || 0),
+    Number(entry.sent || 0),
+    Number(entry.failed || 0),
+    String(entry.error || "").slice(0, 500)
+  ]);
+}
+
+function notificationPushRecentCompletedReminderForGame_(gameId, lockDateTime, nowMs) {
+  const sh = notificationPushReminderLogSheet_();
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return false;
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  const cutoff = Number(nowMs || Date.now()) - (6 * 60 * 60 * 1000);
+
+  return data.slice(1).some(function(row) {
+    if (String(row[col.GameId] || "").trim() !== String(gameId || "").trim()) return false;
+    if (String(row[col.LockDateTime] || "").trim() === String(lockDateTime || "").trim()) return false;
+    const status = String(row[col.Status] || "").trim();
+    if (status.indexOf("COMPLETE") !== 0) return false;
+    const timestamp = notificationPushDateMs_(row[col.Timestamp]);
+    return timestamp >= cutoff;
+  });
+}
+
+function notificationPushReminderSchedulePreview_(gameId, setting, nowMs) {
+  gameId = String(gameId || "").trim();
+  if (!gameId) return { success: false, schedulePreview: true, message: "Choose a game to preview reminder timing." };
+
+  setting = setting || notificationPushGetGameSetting_(gameId);
+  nowMs = Number(nowMs || Date.now());
+  const lock = notificationPushUpcomingLock_(gameId, nowMs);
+  const offsets = notificationPushReminderOffsets_(setting.reminderOffsetsHours || setting.reminderOffsetsText);
+  const hoursUntilLock = lock.lockAtMs ? (lock.lockAtMs - nowMs) / 3600000 : 0;
+  const terminal = lock.lockDateTime
+    ? notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime)
+    : {};
+  const due = lock.lockDateTime
+    ? notificationPushReminderSelectDueOffset_(offsets, hoursUntilLock, terminal)
+    : { offsetHours: 0, superseded: [] };
+
+  return {
+    success: true,
+    schedulePreview: true,
+    gameId: gameId,
+    gameName: notificationPushGameName_(gameId),
+    autoReminderEnabled: setting.autoReminderEnabled === true,
+    reminderOffsetsHours: offsets,
+    reminderOffsetsText: offsets.join(","),
+    lockDateTime: lock.lockDateTime,
+    lockSource: lock.source,
+    hoursUntilLock: lock.lockAtMs ? Math.max(0, hoursUntilLock) : null,
+    dueOffsetHours: due.offsetHours,
+    globalMode: notificationPushGetSystemMode_(),
+    gameEnabled: setting.enabled === true,
+    paused: setting.paused === true,
+    testOnly: setting.testOnly === true,
+    scheduler: notificationPushReminderTriggerStatus_(),
+    message: !lock.lockDateTime
+      ? "No future pick lock is available yet. Automatic reminders will wait until the game has a lock time."
+      : "Next pick lock: " + lock.lockDateTime + " · reminders: " + offsets.join("h, ") + "h."
+  };
+}
+
+function notificationPushListAutoReminderSettings_() {
+  const sh = notificationPushGameSettingsSheet_();
+  const data = sh.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  const headers = data[0].map(String);
+  const col = notificationColumnMap_(headers);
+  if (col.AutoReminderEnabled === undefined) return [];
+
+  return data.slice(1).map(function(row) {
+    const gameId = String(row[col.GameId] || "").trim();
+    const offsets = notificationPushReminderOffsets_(
+      col.ReminderOffsetsHours === undefined ? "24,2" : row[col.ReminderOffsetsHours]
+    );
+    return {
+      gameId: gameId,
+      enabled: notificationBool_(row[col.Enabled], false),
+      paused: notificationBool_(row[col.Paused], false),
+      testOnly: notificationBool_(row[col.TestOnly], true),
+      autoReminderEnabled: notificationBool_(row[col.AutoReminderEnabled], false),
+      reminderOffsetsHours: offsets,
+      reminderOffsetsText: offsets.join(",")
+    };
+  }).filter(function(setting) {
+    return setting.gameId && setting.autoReminderEnabled;
+  });
+}
+
+function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDateTime) {
+  const resolution = notificationPushAudienceResolution_({
+    adminUsername: "scheduler",
+    gameId: gameId,
+    audience: "missing_picks",
+    type: "make_picks",
+    forceTestRecipient: false
+  });
+
+  let skipStatus = "";
+  let skipMessage = "";
+  if (resolution.gameParticipants === 0) {
+    skipStatus = "SKIPPED_NO_PLAYERS";
+    skipMessage = "No players have entered this game yet.";
+  } else if (resolution.requiredPickQuestions === 0) {
+    skipStatus = "SKIPPED_NO_OPEN_PICKS";
+    skipMessage = "No open pick questions need a reminder.";
+  } else if (resolution.missingPicksUsers === 0) {
+    skipStatus = "SKIPPED_COMPLETE";
+    skipMessage = "Everyone completed the open picks.";
+  } else if (resolution.recipientUsers === 0) {
+    skipStatus = "SKIPPED_NO_ELIGIBLE_USERS";
+    skipMessage = "Players owe picks, but none allow Make Picks alerts.";
+  }
+
+  if (skipStatus) {
+    return {
+      status: skipStatus,
+      recipientUsers: 0,
+      subscriptionsAttempted: 0,
+      sent: 0,
+      failed: 0,
+      error: skipMessage
+    };
+  }
+
+  const gameName = notificationPushGameName_(gameId);
+  const urgent = Number(offsetHours) <= 2;
+  const title = urgent ? gameName + ": Final pick reminder" : gameName + ": Pick reminder";
+  const message = urgent
+    ? "Final reminder: you still have picks to make. Picks begin locking in about " + Number(offsetHours) + " hour(s)."
+    : "You still have picks to make. Picks begin locking in about " + Number(offsetHours) + " hour(s).";
+  const recipients = resolution.recipients;
+  const subscriptions = resolution.subscriptions;
+
+  recipients.forEach(function(username) {
+    createUserNotification_({
+      username: username,
+      type: "make_picks",
+      title: title,
+      message: message,
+      gameId: gameId,
+      route: "picks"
+    });
+  });
+
+  const notification = {
+    title: title,
+    body: message,
+    icon: "/icons/icon-192.png",
+    badge: "/icons/icon-192.png",
+    tag: "awards-" + gameId + "-automatic-pick-reminder-" + String(offsetHours),
+    data: {
+      url: "./app.html#picks",
+      route: "picks",
+      gameId: gameId,
+      type: "make_picks"
+    }
+  };
+
+  const gatewayResult = subscriptions.length
+    ? notificationPushGatewaySend_(subscriptions, notification)
+    : { success: true, sent: 0, failed: 0, expired: 0, results: [] };
+  const results = Array.isArray(gatewayResult.results) ? gatewayResult.results : [];
+  results.forEach(notificationPushMarkDeliveryResult_);
+  if (results.length) SpreadsheetApp.flush();
+
+  const sent = Number(gatewayResult.sent || results.filter(function(item) { return item.ok === true; }).length || 0);
+  const failed = Number(gatewayResult.failed || results.filter(function(item) { return item.ok !== true; }).length || 0);
+  const expired = Number(gatewayResult.expired || results.filter(function(item) { return item.expired === true; }).length || 0);
+  const error = gatewayResult.success === false
+    ? String(gatewayResult.message || gatewayResult.error || "Push gateway failed.")
+    : "";
+
+  notificationPushLogBatch_({
+    adminUsername: "scheduler",
+    globalMode: "LIVE",
+    gameId: gameId,
+    audience: "missing_picks",
+    type: "make_picks",
+    title: title,
+    message: message,
+    recipientUsers: recipients.length,
+    subscriptionsAttempted: subscriptions.length,
+    sent: sent,
+    failed: failed,
+    expired: expired,
+    status: gatewayResult.success === false || failed > 0 ? "FAILED" : "COMPLETE",
+    error: error
+  });
+
+  return {
+    status: gatewayResult.success === false || failed > 0 ? "FAILED" : "COMPLETE",
+    recipientUsers: recipients.length,
+    subscriptionsAttempted: subscriptions.length,
+    sent: sent,
+    failed: failed,
+    error: error
+  };
+}
+
+function notificationPushProcessScheduledGame_(setting, nowMs) {
+  setting = setting || {};
+  const gameId = String(setting.gameId || "").trim();
+  if (!gameId || !setting.autoReminderEnabled || !setting.enabled || setting.paused || setting.testOnly) {
+    return { gameId: gameId, status: "SKIPPED_SAFETY" };
+  }
+
+  const lock = notificationPushUpcomingLock_(gameId, nowMs);
+  if (!lock.lockAtMs || lock.lockAtMs <= nowMs) {
+    return { gameId: gameId, status: "WAITING_FOR_LOCK" };
+  }
+
+  const hoursUntilLock = (lock.lockAtMs - nowMs) / 3600000;
+  const terminal = notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime);
+  const due = notificationPushReminderSelectDueOffset_(setting.reminderOffsetsHours, hoursUntilLock, terminal);
+  if (!due.offsetHours) {
+    return { gameId: gameId, status: "NOT_DUE", lockDateTime: lock.lockDateTime };
+  }
+
+  if (notificationPushRecentCompletedReminderForGame_(gameId, lock.lockDateTime, nowMs)) {
+    return { gameId: gameId, status: "COOLDOWN", lockDateTime: lock.lockDateTime };
+  }
+
+  due.superseded.forEach(function(offset) {
+    notificationPushReminderLog_({
+      gameId: gameId,
+      lockDateTime: lock.lockDateTime,
+      offsetHours: offset,
+      status: "SKIPPED_SUPERSEDED",
+      error: "A more urgent reminder window was already due."
+    });
+  });
+
+  const result = notificationPushDeliverScheduledReminder_(gameId, due.offsetHours, lock.lockDateTime);
+  notificationPushReminderLog_({
+    gameId: gameId,
+    lockDateTime: lock.lockDateTime,
+    offsetHours: due.offsetHours,
+    status: result.status,
+    recipientUsers: result.recipientUsers,
+    subscriptionsAttempted: result.subscriptionsAttempted,
+    sent: result.sent,
+    failed: result.failed,
+    error: result.error
+  });
+
+  result.gameId = gameId;
+  result.lockDateTime = lock.lockDateTime;
+  result.offsetHours = due.offsetHours;
+  return result;
+}
+
+function notificationPushRunScheduledPickReminders() {
+  const props = PropertiesService.getScriptProperties();
+  const nowMs = Date.now();
+  const nowIso = new Date(nowMs).toISOString();
+  let lock = null;
+
+  if (typeof LockService !== "undefined" && LockService.getScriptLock) {
+    lock = LockService.getScriptLock();
+    if (!lock.tryLock(5000)) {
+      return { success: false, message: "Another automatic reminder check is already running." };
+    }
+  }
+
+  try {
+    const globalMode = notificationPushGetSystemMode_();
+    const settings = notificationPushListAutoReminderSettings_();
+    const results = [];
+
+    if (globalMode === "LIVE") {
+      settings.forEach(function(setting) {
+        try {
+          results.push(notificationPushProcessScheduledGame_(setting, nowMs));
+        } catch (err) {
+          results.push({
+            gameId: setting.gameId,
+            status: "ERROR",
+            error: String(err && err.message || err || "Unknown scheduler error")
+          });
+        }
+      });
+    }
+
+    const summary = {
+      success: true,
+      globalMode: globalMode,
+      checkedGames: settings.length,
+      processedGames: results.length,
+      sentBatches: results.filter(function(item) { return item.status === "COMPLETE"; }).length,
+      results: results
+    };
+
+    props.setProperty("PUSH_REMINDER_LAST_RUN_AT", nowIso);
+    props.setProperty(
+      "PUSH_REMINDER_LAST_RUN_SUMMARY",
+      globalMode === "LIVE"
+        ? (summary.sentBatches + " reminder batch(es) sent across " + settings.length + " configured game(s).")
+        : ("Automatic reminders are waiting because Global Mode is " + globalMode + ".")
+    );
+    return summary;
+  } finally {
+    if (lock) lock.releaseLock();
+  }
+}
+
 function notificationPushAudienceResolution_(options) {
   options = options || {};
   const adminUsername = String(options.adminUsername || "").trim().toLowerCase();
@@ -2053,6 +2630,18 @@ function apiAdminSendPushNotification(payload) {
 
   if (testLabPreview) {
     return notificationPushTestLabPreview_(payload, globalMode, gameSetting);
+  }
+
+  if (payload.schedulePreview === true) {
+    const previewSetting = Object.assign({}, gameSetting || notificationPushGetGameSetting_(gameId));
+    if (payload.reminderOffsetsHours !== undefined) {
+      previewSetting.reminderOffsetsHours = notificationPushReminderOffsets_(payload.reminderOffsetsHours);
+      previewSetting.reminderOffsetsText = previewSetting.reminderOffsetsHours.join(",");
+    }
+    if (payload.autoReminderEnabled !== undefined) {
+      previewSetting.autoReminderEnabled = notificationBool_(payload.autoReminderEnabled, false);
+    }
+    return notificationPushReminderSchedulePreview_(gameId, previewSetting, Date.now());
   }
 
   if (testLabSendToSelf && globalMode !== "TEST") {
@@ -2351,6 +2940,7 @@ function apiAdminGetPushControlCenter(token) {
       activeSubscriptions: activeSubscriptions,
       activeUsers: Object.keys(activeUsers).length
     },
+    reminderScheduler: notificationPushReminderTriggerStatus_(),
     games: games.map(function(game) {
       const gameId = String(game.gameId || game.id || "").trim();
       const setting = notificationPushGetGameSetting_(gameId);
@@ -2359,7 +2949,10 @@ function apiAdminGetPushControlCenter(token) {
         gameName: String(game.gameName || game.name || game.title || gameId).trim(),
         enabled: setting.enabled,
         paused: setting.paused,
-        testOnly: setting.testOnly
+        testOnly: setting.testOnly,
+        autoReminderEnabled: setting.autoReminderEnabled,
+        reminderOffsetsHours: setting.reminderOffsetsHours,
+        reminderOffsetsText: setting.reminderOffsetsText
       };
     }).filter(function(game) { return !!game.gameId; }),
     recent: notificationPushRecentLog_()
