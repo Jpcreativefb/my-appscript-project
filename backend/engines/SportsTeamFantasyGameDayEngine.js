@@ -6,8 +6,9 @@
    Team Fantasy scorer remains the only live-data writer.
 ========================================================= */
 
-var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18t";
+var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18u1";
 /* TEAM_FANTASY_WEEKLY_HUB_BACKEND_v1218t2 */
+/* TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_BACKEND_v1218u1 */
 /* TEAM_FANTASY_COMPACT_GAME_DAY_BACKEND_v1218s */
 var TEAM_FANTASY_GAME_DAY_POLL_MS = 5 * 60 * 1000;
 
@@ -349,6 +350,10 @@ function apiGetTeamFantasyGameDayState(payload) {
   });
   out.selectedLeagueId = selectedLeagueId;
   out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out);
+  var maxWeek = Math.max(1, Math.floor(Number(settings.currentWeek || week || 1)));
+  out.availableWeeks = [];
+  for (var availableWeek = 1; availableWeek <= maxWeek; availableWeek++) out.availableWeeks.push(availableWeek);
+  out.currentWeek = maxWeek;
   out.username = username;
   out.seasonYear = settings.seasonYear;
   out.generatedAt = new Date().toISOString();
@@ -403,6 +408,8 @@ function teamFantasyBuildSyntheticGameDayLab_() {
   ];
   compare.selectedLeagueId = "synthetic-six";
   compare.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(compare);
+  compare.availableWeeks = [97, 98, 99];
+  compare.currentWeek = 99;
 
   var usageRows = [
     { Position: "QB", TeamAbbr: "BUF" },
@@ -448,6 +455,7 @@ function teamFantasyBuildSyntheticGameDayLab_() {
     { name: "Weekly league race ranks all six teams", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows && compare.weeklyLeaderboard.rows.length === 6 && compare.weeklyLeaderboard.rows[0].weekRank === 1, detail: "Weekly leaderboard uses accumulated live points" },
     { name: "Points-behind and move-up math is available", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows.slice(1).every(function(r){ return Number(r.pointsBehindLeader || 0) >= 0 && Number(r.pointsToMoveUp || 0) > 0; }), detail: "Behind leader + exact pass target calculated" },
     { name: "Complete/subleague switch options are present", passed: compare.leagues && compare.leagues.length === 2 && compare.leagues.some(function(l){ return l.leagueType === "subleague"; }), detail: "Complete League + Synthetic East" },
+    { name: "Past-week comparison selector is available", passed: compare.availableWeeks && compare.availableWeeks.length === 3 && compare.availableWeeks[0] === 97 && compare.availableWeeks[2] === 99, detail: "Synthetic history exposes Weeks 97–99" },
     { name: "Auto/Random method tags are preserved", passed: methodSlots.length > 0, detail: "AP and R tags available after picks reveal" },
     { name: "Upcoming / Live / Final states are present", passed: compare.competitors.every(function(c){ return c.counts.upcoming > 0 && c.counts.live > 0 && c.counts.final > 0; }), detail: "All status states exercised" },
     { name: "Comparison supports 2–6 teams", passed: compare.competitors.length >= 6, detail: "Head-to-head through six-team view" }

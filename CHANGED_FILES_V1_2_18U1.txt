@@ -1,0 +1,12 @@
+backend/engines/SportsTeamFantasyGameDayEngine.js
+frontend/css/team-fantasy.css
+frontend/js/pages/teamFantasy.js
+tests/team_fantasy_compact_game_day_v1218s_tests.js
+tests/team_fantasy_weekly_hub_v1218t2_tests.js
+CHANGED_FILES_V1_2_18U1.txt
+INSTALL_V1_2_18U1.txt
+docs/TEAM_FANTASY_WEEK_HISTORY_COMPARE_V1_2_18U1.md
+tests/team_fantasy_week_history_compare_v1218u1_tests.js
+tools/apply_team_fantasy_week_history_compare_v1218u1.py
+tools/patches/team_fantasy_week_history_compare_v1218u1.patch
+tools/install_team_fantasy_week_history_compare_v1218u1.sh

@@ -16,7 +16,11 @@ assert(page.includes('TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s'), '18s player UI 
 const teamFantasyCssCacheMatch = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
 assert(teamFantasyCssCacheMatch && teamFantasyCssCacheMatch[1] !== '1218r1', 'Team Fantasy CSS cache marker must remain cache-busted for 18s or a later release.');
 assert(page.includes('teamFantasyOpenTeamPicker_'), 'Logo/abbreviation team picker missing.');
-assert(page.includes('team.eligible === true || String(team.abbr || \'\') === current'), 'Picker must omit unavailable/exhausted teams except current selection.');
+const pickerStart = page.indexOf('function teamFantasyPickerTeams_');
+const pickerEnd = page.indexOf('function teamFantasyCloseTeamPicker_', pickerStart);
+const pickerBlock = page.slice(pickerStart, pickerEnd);
+assert(pickerBlock.includes('team.eligible !== true') && pickerBlock.includes('teamFantasyPickerRemaining_(team) > 0'), 'Picker must continue to omit exhausted/unavailable selectable teams.');
+assert(pickerBlock.includes('teamFantasyPickerIsBye_(team)'), 'Later releases may preserve BYE teams as disabled/ghosted picker references.');
 assert(page.includes('tf-pick-method'), 'AP/R pick-method badge missing.');
 assert(page.includes('tf-slot-rank'), 'Weekly position rank display missing.');
 assert(page.includes('tf-compare-record'), 'League rank/record display missing.');

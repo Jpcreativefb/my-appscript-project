@@ -20,7 +20,8 @@ assert(backend.includes('out.leagues = leagues.map'), 'game-day league list miss
 assert(backend.includes('out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out)'), 'weekly leaderboard not attached to API');
 assert(css.includes('.tf-weekly-picks-head') && css.includes('background:#0f172a') && css.includes('color:#f8fafc'), 'high-contrast Weekly Picks header missing');
 assert(css.includes('.tf-compare-team-head{background:#0f172a!important;color:#f8fafc!important'), 'high-contrast compare header missing');
-assert(page.includes('team-fantasy.css?v=1218t2'), '18t2 CSS cache marker missing');
+const t2CssCache = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
+assert(t2CssCache && !['1218r1','1218s'].includes(t2CssCache[1]), '18t2-or-later CSS cache marker missing');
 
 const sandbox = { console };
 vm.createContext(sandbox);

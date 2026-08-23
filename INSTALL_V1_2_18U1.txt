@@ -1,0 +1,17 @@
+PATTC Predicts v1.2.18u1
+Team Fantasy Dark Surfaces + Usage Picker + Week History
+
+Requires exact production baseline:
+4e4cce9bb43d95ef7bd35becb6d960e7b0acf70a (v1.2.18t2)
+
+Adds:
+- dark navy selection surfaces and league rows with white borders
+- picker usage palette: 3+ left dark blue, 2 left medium blue, 1 left lighter blue
+- exhausted (0 left) teams removed from the picker
+- BYE teams visible but ghosted and disabled for the selected week
+- viewer blue border with no YOU label
+- sticky viewer Compare column plus sticky Compare headers
+- past-week League View / Compare selection
+- Week History restored as the final player-page section
+
+Installer runs regression/production checks before commit and deploys only after all gates pass.

@@ -1,0 +1,332 @@
+diff --git a/backend/engines/SportsTeamFantasyGameDayEngine.js b/backend/engines/SportsTeamFantasyGameDayEngine.js
+index b706855..2fcce95 100644
+--- a/backend/engines/SportsTeamFantasyGameDayEngine.js
++++ b/backend/engines/SportsTeamFantasyGameDayEngine.js
+@@ -6,8 +6,9 @@
+    Team Fantasy scorer remains the only live-data writer.
+ ========================================================= */
+ 
+-var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18t";
++var TEAM_FANTASY_GAME_DAY_VERSION = "1.2.18u1";
+ /* TEAM_FANTASY_WEEKLY_HUB_BACKEND_v1218t2 */
++/* TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_BACKEND_v1218u1 */
+ /* TEAM_FANTASY_COMPACT_GAME_DAY_BACKEND_v1218s */
+ var TEAM_FANTASY_GAME_DAY_POLL_MS = 5 * 60 * 1000;
+ 
+@@ -349,6 +350,10 @@ function apiGetTeamFantasyGameDayState(payload) {
+   });
+   out.selectedLeagueId = selectedLeagueId;
+   out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out);
++  var maxWeek = Math.max(1, Math.floor(Number(settings.currentWeek || week || 1)));
++  out.availableWeeks = [];
++  for (var availableWeek = 1; availableWeek <= maxWeek; availableWeek++) out.availableWeeks.push(availableWeek);
++  out.currentWeek = maxWeek;
+   out.username = username;
+   out.seasonYear = settings.seasonYear;
+   out.generatedAt = new Date().toISOString();
+@@ -403,6 +408,8 @@ function teamFantasyBuildSyntheticGameDayLab_() {
+   ];
+   compare.selectedLeagueId = "synthetic-six";
+   compare.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(compare);
++  compare.availableWeeks = [97, 98, 99];
++  compare.currentWeek = 99;
+ 
+   var usageRows = [
+     { Position: "QB", TeamAbbr: "BUF" },
+@@ -448,6 +455,7 @@ function teamFantasyBuildSyntheticGameDayLab_() {
+     { name: "Weekly league race ranks all six teams", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows && compare.weeklyLeaderboard.rows.length === 6 && compare.weeklyLeaderboard.rows[0].weekRank === 1, detail: "Weekly leaderboard uses accumulated live points" },
+     { name: "Points-behind and move-up math is available", passed: compare.weeklyLeaderboard && compare.weeklyLeaderboard.rows.slice(1).every(function(r){ return Number(r.pointsBehindLeader || 0) >= 0 && Number(r.pointsToMoveUp || 0) > 0; }), detail: "Behind leader + exact pass target calculated" },
+     { name: "Complete/subleague switch options are present", passed: compare.leagues && compare.leagues.length === 2 && compare.leagues.some(function(l){ return l.leagueType === "subleague"; }), detail: "Complete League + Synthetic East" },
++    { name: "Past-week comparison selector is available", passed: compare.availableWeeks && compare.availableWeeks.length === 3 && compare.availableWeeks[0] === 97 && compare.availableWeeks[2] === 99, detail: "Synthetic history exposes Weeks 97–99" },
+     { name: "Auto/Random method tags are preserved", passed: methodSlots.length > 0, detail: "AP and R tags available after picks reveal" },
+     { name: "Upcoming / Live / Final states are present", passed: compare.competitors.every(function(c){ return c.counts.upcoming > 0 && c.counts.live > 0 && c.counts.final > 0; }), detail: "All status states exercised" },
+     { name: "Comparison supports 2–6 teams", passed: compare.competitors.length >= 6, detail: "Head-to-head through six-team view" }
+diff --git a/frontend/css/team-fantasy.css b/frontend/css/team-fantasy.css
+index f8cc517..d5d9ac0 100644
+--- a/frontend/css/team-fantasy.css
++++ b/frontend/css/team-fantasy.css
+@@ -55,3 +55,21 @@
+ .tf-week-board{display:flex;flex-direction:column;gap:4px}.tf-week-row{display:grid;grid-template-columns:30px minmax(90px,1.6fr) 58px 72px minmax(100px,1fr);align-items:center;gap:5px;border:1px solid rgba(127,127,127,.18);border-radius:8px;padding:5px 6px;background:var(--card-bg,#fff);color:var(--text,#111827)}.tf-week-row.is-you{outline:2px solid rgba(37,99,235,.35)}.tf-week-rank{font-weight:900;font-size:.8rem}.tf-week-name{min-width:0;display:flex;align-items:center;gap:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.75rem}.tf-week-name strong{overflow:hidden;text-overflow:ellipsis}.tf-week-record{font-size:.58rem;opacity:.65}.tf-week-points{font-size:.85rem;font-weight:900;text-align:right}.tf-week-points span{display:block;font-size:.52rem;opacity:.62}.tf-week-counts{display:flex;justify-content:center;gap:3px;font-size:.61rem;font-weight:850}.tf-week-counts span{border:1px solid #94a3b8;border-radius:5px;padding:2px 3px}.tf-week-counts .is-final{border-color:#2563eb}.tf-week-counts .is-live{border-color:#16a34a}.tf-week-counts .is-upcoming{border-color:#94a3b8}.tf-week-gap{font-size:.62rem;line-height:1.15;text-align:right}.tf-week-gap span{display:block;opacity:.68;margin-top:1px}
+ .tf-compare-team-head{background:#0f172a!important;color:#f8fafc!important;border-bottom-color:rgba(255,255,255,.2)!important;border-radius:7px 7px 4px 4px;padding-left:5px!important;padding-right:5px!important}.tf-compare-team-head strong,.tf-compare-total,.tf-compare-record{color:inherit!important}.tf-compare-record{opacity:.82}.tf-remove-team{float:right;border:0;background:transparent;color:#cbd5e1;font-size:1rem;line-height:1;padding:0 2px}.tf-compare-add-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:4px 0 5px;font-size:.7rem}.tf-add-team-menu{display:flex;flex-wrap:wrap;gap:4px;border:1px solid rgba(127,127,127,.2);border-radius:8px;padding:5px;margin-bottom:6px}.tf-add-team-menu button{border:1px solid rgba(127,127,127,.25);border-radius:999px;background:transparent;color:inherit;padding:4px 7px;font:inherit;font-size:.68rem}.tf-status-legend{display:none!important}
+ @media(max-width:760px){.tf-weekly-picks-head{margin:-10px -10px 6px}.tf-game-day-sticky{top:0;padding:5px;gap:4px}.tf-game-day-tabs button{padding:5px 6px;font-size:.65rem}.tf-week-league-picker span{display:none}.tf-week-league-picker select{max-width:112px;font-size:.62rem}.tf-week-row{grid-template-columns:25px minmax(70px,1.4fr) 47px 62px minmax(78px,1fr);padding:4px;gap:3px}.tf-week-name{font-size:.66rem}.tf-week-record{display:none}.tf-week-points{font-size:.75rem}.tf-week-counts{font-size:.54rem;gap:2px}.tf-week-gap{font-size:.54rem}.tf-game-day-card{padding:8px}.tf-game-day-title{margin-bottom:5px}.tf-game-day-title h2{font-size:1rem}.tf-compare-team-head{min-height:58px}.tf-compare-total{font-size:1rem}.tf-compare-record{font-size:.61rem}}
++
++/* v1.2.18u1 dark pickers + sticky viewer compare + week history */
++.tf-team-picker-button{background:#0b1f3a!important;color:#fff!important;border:1px solid rgba(255,255,255,.78)!important}
++.tf-picker-sheet{background:#0b1f3a!important;color:#fff!important;border:1px solid rgba(255,255,255,.78)}.tf-picker-head{background:#0b1f3a!important;border-bottom-color:rgba(255,255,255,.45)}.tf-picker-head span,.tf-picker-opponent,.tf-picker-usage{color:#dbeafe!important;opacity:.9}.tf-picker-close{color:#fff!important}.tf-picker-list{background:#0b1f3a}.tf-picker-team{background:#102a43!important;color:#fff!important;border:1px solid rgba(255,255,255,.7)!important;border-radius:9px;margin-bottom:5px}.tf-picker-team.is-selected{background:#1d4ed8!important;border-color:#bfdbfe!important}.tf-add-team-menu{background:#0b1f3a!important;color:#fff!important;border:1px solid #fff!important}.tf-add-team-menu button{background:#102a43!important;color:#fff!important;border:1px solid rgba(255,255,255,.72)!important}.tf-league-picker select,.tf-week-league-picker select,.tf-week-picker select{background:#0b1f3a!important;color:#fff!important;border:1px solid rgba(255,255,255,.78)!important}
++.tf-week-row{background:#102a43!important;color:#fff!important;border:1px solid rgba(255,255,255,.82)!important}.tf-week-row.is-you{outline:3px solid #3b82f6!important;outline-offset:-2px;box-shadow:0 0 0 1px rgba(59,130,246,.25)}.tf-week-name strong,.tf-week-points,.tf-week-rank,.tf-week-gap{color:#fff!important}.tf-week-record,.tf-week-gap span{color:#dbeafe!important;opacity:.9}.tf-you-badge{display:none!important}
++.tf-game-day-filters{display:flex;align-items:center;gap:5px}.tf-week-picker{display:flex;align-items:center;gap:4px;font-size:.67rem}.tf-week-picker span{color:#cbd5e1}.tf-week-picker select{max-width:92px;min-height:28px;border-radius:7px;padding:2px 5px;font:inherit;font-size:.68rem}
++.tf-compare-scroll{position:relative;isolation:isolate}.tf-compare-team{background:#0b1f3a!important;color:#fff!important;border:1px solid rgba(255,255,255,.75)!important}.tf-compare-slot{background:#102a43;color:#fff}.tf-compare-team.is-viewer{position:sticky;left:0;z-index:7;border:3px solid #3b82f6!important;box-shadow:7px 0 14px rgba(0,0,0,.24)}.tf-compare-team.is-viewer .tf-compare-team-head{z-index:11}.tf-compare-team-head{position:sticky!important;top:0!important;z-index:8!important;background:#0f172a!important;color:#fff!important}
++.tf-week-history-card{margin-top:12px}.tf-history-table th{background:#0f172a;color:#fff;position:sticky;top:0}.tf-history-table tbody tr{background:#102a43;color:#fff}.tf-history-table td{border-bottom-color:rgba(255,255,255,.22)}
++@media(max-width:760px){.tf-game-day-sticky{flex-wrap:wrap}.tf-game-day-filters{margin-left:auto}.tf-week-picker span{display:none}.tf-week-picker select{max-width:78px;font-size:.62rem}.tf-compare-team.is-viewer{left:0}.tf-week-history-card .tf-table{font-size:.72rem}.tf-week-history-card .tf-table th,.tf-week-history-card .tf-table td{padding:6px 5px}}
++
++/* v1.2.18u1 picker remaining-use palette + bye handling */
++.tf-picker-team.uses-left-full{background:#0b2f57!important}
++.tf-picker-team.uses-left-2{background:#174f82!important}
++.tf-picker-team.uses-left-1{background:#3b78ad!important}
++.tf-picker-team.is-selected{border-color:#fff!important;box-shadow:inset 0 0 0 2px #bfdbfe,0 0 0 1px rgba(255,255,255,.18)!important}
++.tf-picker-team.is-bye{display:grid!important;background:#26384c!important;color:#d7e1ec!important;border:1px dashed rgba(255,255,255,.55)!important;opacity:.42;filter:grayscale(.72);cursor:not-allowed}
++.tf-picker-team.is-bye img{filter:grayscale(1);opacity:.65}.tf-picker-team.is-bye .tf-picker-opponent,.tf-picker-team.is-bye .tf-picker-usage{color:#d7e1ec!important}
++.tf-picker-bye-label{font-weight:900;letter-spacing:.05em}.tf-picker-team:disabled{pointer-events:none}
+diff --git a/frontend/js/pages/teamFantasy.js b/frontend/js/pages/teamFantasy.js
+index 8f375ba..972d2c4 100644
+--- a/frontend/js/pages/teamFantasy.js
++++ b/frontend/js/pages/teamFantasy.js
+@@ -7,7 +7,7 @@
+   const link = document.createElement('link');
+   link.rel = 'stylesheet';
+   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
+-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218t2', script).href : './css/team-fantasy.css?v=1218t2';
++  link.href = script ? new URL('../../css/team-fantasy.css?v=1218u1', script).href : './css/team-fantasy.css?v=1218u1';
+   link.dataset.teamFantasyCss = '1';
+   document.head.appendChild(link);
+ })();
+@@ -78,6 +78,7 @@ function teamFantasyOptionLabel_(team) {
+ 
+ /* TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s */
+ /* TEAM_FANTASY_WEEKLY_HUB_UI_v1218t2 */
++/* TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_UI_v1218u1 */
+ function teamFantasyTeamLogoUrl_(abbr) {
+   const key = String(abbr || '').toUpperCase();
+   const slug = key === 'WAS' ? 'wsh' : key.toLowerCase();
+@@ -105,9 +106,30 @@ function teamFantasyFindSlot_(entryId, position) {
+   return lineup ? (lineup.slots || []).filter(function(slot){ return String(slot.position || '') === String(position || ''); })[0] || null : null;
+ }
+ 
++function teamFantasyPickerIsBye_(team) {
++  const reason = String(team && team.reason || '').toUpperCase();
++  return reason.indexOf('BYE') !== -1 || (!team.game && reason.indexOf('NOT SCHEDULED') !== -1);
++}
++
++function teamFantasyPickerRemaining_(team) {
++  return Math.max(0, Math.floor(Number(team && team.usesRemaining || 0)));
++}
++
++function teamFantasyPickerAvailabilityClass_(team) {
++  if (teamFantasyPickerIsBye_(team)) return 'is-bye';
++  const left = teamFantasyPickerRemaining_(team);
++  if (left <= 0) return 'is-exhausted';
++  if (left === 1) return 'uses-left-1';
++  if (left === 2) return 'uses-left-2';
++  return 'uses-left-full';
++}
++
+ function teamFantasyPickerTeams_(slot) {
+-  const current = slot && slot.pick ? String(slot.pick.teamAbbr || '') : '';
+-  return (slot && slot.teams || []).filter(function(team){ return team.eligible === true || String(team.abbr || '') === current; });
++  return (slot && slot.teams || []).filter(function(team){
++    if (teamFantasyPickerIsBye_(team)) return true;
++    if (team.eligible !== true) return false;
++    return teamFantasyPickerRemaining_(team) > 0;
++  });
+ }
+ 
+ function teamFantasyCloseTeamPicker_() {
+@@ -121,13 +143,20 @@ function teamFantasyOpenTeamPicker_(entryId, position) {
+   const teams = teamFantasyPickerTeams_(slot);
+   const current = slot.pick ? String(slot.pick.teamAbbr || '') : '';
+   teamFantasyCloseTeamPicker_();
++  const selectableCount = teams.filter(function(team){ return !teamFantasyPickerIsBye_(team) && team.eligible === true && teamFantasyPickerRemaining_(team) > 0; }).length;
++  const byeCount = teams.filter(teamFantasyPickerIsBye_).length;
+   const rows = teams.map(function(team) {
+-    const usageLimit = Number(team.uses || 0) + Number(team.usesRemaining || 0);
+-    const usage = usageLimit > 0 ? `<span class="tf-picker-usage">${Number(team.uses || 0)}/${usageLimit}</span>` : '';
++    const bye = teamFantasyPickerIsBye_(team);
++    const left = teamFantasyPickerRemaining_(team);
++    const availabilityClass = teamFantasyPickerAvailabilityClass_(team);
++    const usage = bye ? '<span class="tf-picker-usage tf-picker-bye-label">BYE</span>' : `<span class="tf-picker-usage">${left} left</span>`;
+     const selected = current === String(team.abbr || '') ? ' is-selected' : '';
+-    return `<button type="button" class="tf-picker-team${selected}" onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><strong>${teamFantasyEscape_(team.abbr)}</strong><span class="tf-picker-opponent">${teamFantasyEscape_(teamFantasyOpponentText_(team))}</span>${usage}</button>`;
++    const disabled = bye ? ' disabled aria-disabled="true"' : '';
++    const action = bye ? '' : ` onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"`;
++    return `<button type="button" class="tf-picker-team ${availabilityClass}${selected}"${disabled}${action}><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><strong>${teamFantasyEscape_(team.abbr)}</strong><span class="tf-picker-opponent">${teamFantasyEscape_(bye ? 'Bye week' : teamFantasyOpponentText_(team))}</span>${usage}</button>`;
+   }).join('');
+-  document.body.insertAdjacentHTML('beforeend', `<div id="tfTeamPickerOverlay" class="tf-picker-overlay" role="presentation" onclick="if(event.target===this)teamFantasyCloseTeamPicker_()"><section class="tf-picker-sheet" role="dialog" aria-modal="true" aria-label="Choose ${teamFantasyEscape_(slot.label || position)} team"><div class="tf-picker-head"><div><strong>${teamFantasyEscape_(slot.label || position)}</strong><span>${teams.length} available</span></div><button type="button" class="tf-picker-close" onclick="teamFantasyCloseTeamPicker_()" aria-label="Close">×</button></div><div class="tf-picker-list">${rows || '<div class="tf-muted">No teams available.</div>'}</div></section></div>`);
++  const pickerSummary = selectableCount + ' selectable' + (byeCount ? ' · ' + byeCount + ' bye' : '');
++  document.body.insertAdjacentHTML('beforeend', `<div id="tfTeamPickerOverlay" class="tf-picker-overlay" role="presentation" onclick="if(event.target===this)teamFantasyCloseTeamPicker_()"><section class="tf-picker-sheet" role="dialog" aria-modal="true" aria-label="Choose ${teamFantasyEscape_(slot.label || position)} team"><div class="tf-picker-head"><div><strong>${teamFantasyEscape_(slot.label || position)}</strong><span>${teamFantasyEscape_(pickerSummary)}</span></div><button type="button" class="tf-picker-close" onclick="teamFantasyCloseTeamPicker_()" aria-label="Close">×</button></div><div class="tf-picker-list">${rows || '<div class="tf-muted">No teams available.</div>'}</div></section></div>`);
+ }
+ 
+ async function teamFantasyChooseTeam_(entryId, position, teamAbbr) {
+@@ -239,6 +268,7 @@ async function renderTeamFantasyPage() {
+     ${(res.lineups || []).map(function(lineup) { return teamFantasyRenderLineup_(res, lineup); }).join('')}
+     <section class="card tf-game-day-card"><div class="tf-game-day-title"><div><h2>Weekly League</h2><div class="tf-muted">Live weekly race or lineup comparison. Opponent picks stay hidden until kickoff.</div></div></div><div id="tfGameDayMount"><div class="tf-muted">Loading cached game-day scores…</div></div></section>
+     ${teamFantasyIsAdmin_() ? `<section class="card tf-test-lab-card"><div class="tf-card-heading"><div><h2>Team Fantasy Test Lab</h2><div class="tf-muted">Six fake players · no Sheet writes · tests privacy, usage limits, weekly race math and game states.</div></div><button class="tf-button" onclick="teamFantasyRunTestLab_()">Run 6-Team Test Lab</button></div><div id="tfTestLabMount" class="tf-test-lab-output"></div></section>` : ''}
++    ${teamFantasyRenderWeekHistory_(res)}
+   </div>`;
+ }
+ 
+@@ -401,6 +431,75 @@ function teamFantasySetGameDayView_(view) {
+   teamFantasyRenderGameDayIntoMount_();
+ }
+ 
++function teamFantasyGameDayWeekPicker_(data) {
++  const state = window.TEAM_FANTASY_STATE || {};
++  let weeks = Array.isArray(data && data.availableWeeks) ? data.availableWeeks.map(Number).filter(function(w){ return w > 0; }) : [];
++  if (!weeks.length) {
++    const maxWeek = Math.max(1, Number(state.week || data && data.week || 1));
++    for (let w = 1; w <= maxWeek; w++) weeks.push(w);
++  }
++  weeks = Array.from(new Set(weeks)).sort(function(a,b){ return a-b; });
++  const selected = Number(data && data.week || window.TEAM_FANTASY_GAME_DAY_WEEK || state.week || weeks[weeks.length-1] || 1);
++  return `<label class="tf-week-picker"><span>Week</span><select onchange="teamFantasyGameDaySelectWeek_(this.value)">${weeks.map(function(week){ return `<option value="${week}" ${Number(week)===selected?'selected':''}>Week ${week}</option>`; }).join('')}</select></label>`;
++}
++
++async function teamFantasyGameDaySelectWeek_(week) {
++  const state = window.TEAM_FANTASY_STATE || {};
++  const data = window.TEAM_FANTASY_GAME_DAY || {};
++  const selectedWeek = Math.max(1, Math.floor(Number(week || state.week || 1)));
++  const leagueId = data.selectedLeagueId || state.selectedLeagueId;
++  const mount = document.getElementById('tfGameDayMount');
++  window.TEAM_FANTASY_GAME_DAY_WEEK = selectedWeek;
++  if (mount) mount.innerHTML = '<div class="tf-muted">Loading Week ' + selectedWeek + '…</div>';
++  try {
++    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: selectedWeek, leagueId: leagueId });
++    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load that week.');
++    window.TEAM_FANTASY_GAME_DAY = res;
++    window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || selectedWeek);
++    teamFantasyRenderGameDayIntoMount_();
++    teamFantasyStartGameDayPolling_(Number(res.pollAfterMs || 300000));
++  } catch (err) {
++    if (mount) mount.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(err && err.message ? err.message : 'Could not load that week.')}</div>`;
++  }
++}
++
++function teamFantasyViewerWeekHistory_(state) {
++  state = state || {};
++  const standings = state.standings || {};
++  const rows = Array.isArray(standings.rows) ? standings.rows : [];
++  const username = String(state.username || teamFantasyCurrentUser_() || '').trim().toLowerCase();
++  const viewerEntryIds = {};
++  (state.entries || []).forEach(function(entry){ viewerEntryIds[String(entry.entryId || entry.EntryId || '')] = true; });
++  const viewerRows = rows.filter(function(row){
++    const entryId = String(row.entryId || '');
++    const rowUser = String(row.username || '').trim().toLowerCase();
++    return (entryId && viewerEntryIds[entryId]) || (!!username && rowUser === username);
++  });
++  const history = [];
++  viewerRows.forEach(function(row){
++    (row.weekly || []).forEach(function(item){
++      const week = Number(item.week || 0);
++      const score = Number(item.score || 0);
++      const fieldScores = rows.map(function(r){
++        const found = (r.weekly || []).filter(function(w){ return Number(w.week) === week; })[0];
++        return found ? Number(found.score || 0) : null;
++      }).filter(function(v){ return v !== null; });
++      const rank = fieldScores.length ? 1 + fieldScores.filter(function(v){ return v > score; }).length : 0;
++      history.push({ week: week, score: score, rank: rank, fieldSize: fieldScores.length, entryId: row.entryId || '', label: row.entryId || row.username || 'Entry' });
++    });
++  });
++  history.sort(function(a,b){ if (b.week !== a.week) return b.week-a.week; return String(a.label).localeCompare(String(b.label)); });
++  return history;
++}
++
++function teamFantasyRenderWeekHistory_(state) {
++  const rows = teamFantasyViewerWeekHistory_(state);
++  if (!rows.length) return `<section class="card tf-week-history-card"><div class="tf-card-heading"><div><h2>Week History</h2><div class="tf-muted">Completed weekly scores will appear here.</div></div></div></section>`;
++  const multipleEntries = new Set(rows.map(function(row){ return row.entryId || row.label; })).size > 1;
++  const regularEnd = Number(state && state.settings && state.settings.regularSeasonEndWeek || 18);
++  return `<section class="card tf-week-history-card"><div class="tf-card-heading"><div><h2>Week History</h2><div class="tf-muted">Your completed Team Fantasy weeks.</div></div></div><div class="tf-table-wrap"><table class="tf-table tf-history-table"><thead><tr><th>Week</th>${multipleEntries?'<th>Entry</th>':''}<th>Pts</th><th>Week Rank</th><th>Phase</th></tr></thead><tbody>${rows.map(function(row){ return `<tr><td>Week ${Number(row.week||0)}</td>${multipleEntries?`<td>${teamFantasyEscape_(row.label)}</td>`:''}<td>${teamFantasyScore_(row.score)}</td><td>${row.rank?'#'+row.rank+(row.fieldSize?' / '+row.fieldSize:''):'—'}</td><td>${Number(row.week||0) <= regularEnd ? 'Regular' : 'Postseason'}</td></tr>`; }).join('')}</tbody></table></div></section>`;
++}
++
+ function teamFantasyGameDayLeaguePicker_(data) {
+   const leagues = Array.isArray(data && data.leagues) ? data.leagues : [];
+   if (!leagues.length) return '';
+@@ -413,7 +512,7 @@ async function teamFantasyGameDaySelectLeague_(leagueId) {
+   const mount = document.getElementById('tfGameDayMount');
+   if (mount) mount.innerHTML = '<div class="tf-muted">Loading league…</div>';
+   try {
+-    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: state.week, leagueId: leagueId });
++    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: Number((window.TEAM_FANTASY_GAME_DAY && window.TEAM_FANTASY_GAME_DAY.week) || window.TEAM_FANTASY_GAME_DAY_WEEK || state.week), leagueId: leagueId });
+     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load league.');
+     window.TEAM_FANTASY_GAME_DAY = res;
+     state.selectedLeagueId = res.selectedLeagueId || leagueId;
+@@ -435,7 +534,7 @@ function teamFantasyRenderWeeklyLeague_(data) {
+     const cushion = Number(row.cushionOverBelow || 0);
+     const gap = Number(row.weekRank||0) === 1 ? 'Leader' : `${teamFantasyScore_(behind)} behind · ${teamFantasyScore_(move)} to #${Number(row.moveUpRank||1)}`;
+     const lower = Number(row.belowRank||0) > 0 ? `${teamFantasyScore_(cushion)} cushion` : '—';
+-    return `<div class="tf-week-row ${row.isViewer?'is-you':''}"><div class="tf-week-rank">#${Number(row.weekRank||0)}</div><div class="tf-week-name"><strong>${teamFantasyEscape_(row.label || row.entryId)}</strong>${row.isViewer?'<span class="tf-you-badge">YOU</span>':''}<span class="tf-week-record">${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</span></div><div class="tf-week-points">${teamFantasyScore_(row.points)}<span>pts</span></div><div class="tf-week-counts"><span class="is-final">${Number(counts.final||0)}F</span><span class="is-live">${Number(counts.live||0)}L</span><span class="is-upcoming">${Number(counts.upcoming||0)}U</span></div><div class="tf-week-gap">${teamFantasyEscape_(gap)}<span>${teamFantasyEscape_(lower)}</span></div></div>`;
++    return `<div class="tf-week-row ${row.isViewer?'is-you':''}"><div class="tf-week-rank">#${Number(row.weekRank||0)}</div><div class="tf-week-name"><strong>${teamFantasyEscape_(row.label || row.entryId)}</strong><span class="tf-week-record">${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</span></div><div class="tf-week-points">${teamFantasyScore_(row.points)}<span>pts</span></div><div class="tf-week-counts"><span class="is-final">${Number(counts.final||0)}F</span><span class="is-live">${Number(counts.live||0)}L</span><span class="is-upcoming">${Number(counts.upcoming||0)}U</span></div><div class="tf-week-gap">${teamFantasyEscape_(gap)}<span>${teamFantasyEscape_(lower)}</span></div></div>`;
+   }).join('')}</div>`;
+ }
+ 
+@@ -499,12 +598,15 @@ function teamFantasyRenderCompareSlot_(slot) {
+ 
+ function teamFantasyRenderCompareBoard_(data, selectedIds) {
+   const competitors = Array.isArray(data && data.competitors) ? data.competitors : [];
+-  const selected = competitors.filter(function(c){ return selectedIds.indexOf(c.entryId) !== -1; });
++  const selected = competitors.filter(function(c){ return selectedIds.indexOf(c.entryId) !== -1; }).sort(function(a,b){
++    if (a.isViewer !== b.isViewer) return a.isViewer ? -1 : 1;
++    return selectedIds.indexOf(a.entryId) - selectedIds.indexOf(b.entryId);
++  });
+   if (selected.length < 2) return `<div class="tf-warning">Choose at least 2 teams to compare.</div>`;
+   return `<div class="tf-compare-scroll"><div class="tf-compare-board">${selected.map(function(c){
+     const record = c.record || { wins:0, losses:0, ties:0 };
+     const rank = Number(c.leagueRank || 0) > 0 ? '#' + Number(c.leagueRank) : '#—';
+-    return `<article class="tf-compare-team"><div class="tf-compare-team-head"><div class="tf-team-head-name"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${c.isViewer?'<span class="tf-you-badge">YOU</span>':''}${!c.isViewer?`<button class="tf-remove-team" type="button" title="Remove" onclick="teamFantasyCompareRemoveTeam_('${teamFantasyEscape_(c.entryId)}')">×</button>`:''}</div><div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-record">${rank} · ${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
++    return `<article class="tf-compare-team ${c.isViewer?'is-viewer':''}"><div class="tf-compare-team-head"><div class="tf-team-head-name"><strong>${teamFantasyEscape_(c.label || c.entryId)}</strong>${!c.isViewer?`<button class="tf-remove-team" type="button" title="Remove" onclick="teamFantasyCompareRemoveTeam_('${teamFantasyEscape_(c.entryId)}')">×</button>`:''}</div><div class="tf-compare-total">${teamFantasyScore_(c.totalPoints)} pts</div><div class="tf-compare-record">${rank} · ${Number(record.wins||0)}-${Number(record.losses||0)}-${Number(record.ties||0)}</div></div><div class="tf-compare-slots">${(c.slots||[]).map(teamFantasyRenderCompareSlot_).join('')}</div></article>`;
+   }).join('')}</div></div>`;
+ }
+ 
+@@ -517,7 +619,7 @@ function teamFantasyRenderGameDayIntoMount_() {
+   const selected = teamFantasyCompareDefaultSelection_(data);
+   const available = competitors.filter(function(c){ return selected.indexOf(c.entryId) === -1; });
+   const addMenu = view === 'compare' && window.TEAM_FANTASY_COMPARE_ADD_OPEN && selected.length < 6 ? `<div class="tf-add-team-menu">${available.map(function(c){ return `<button type="button" onclick="teamFantasyCompareAddTeam_('${teamFantasyEscape_(c.entryId)}')">${teamFantasyEscape_(c.label || c.entryId)}</button>`; }).join('') || '<span>No more teams available.</span>'}</div>` : '';
+-  mount.innerHTML = `<div class="tf-game-day-sticky"><div class="tf-game-day-tabs"><button class="${view==='league'?'is-active':''}" onclick="teamFantasySetGameDayView_('league')">League View</button><button class="${view==='compare'?'is-active':''}" onclick="teamFantasySetGameDayView_('compare')">Compare</button></div>${teamFantasyGameDayLeaguePicker_(data)}<button class="tf-refresh-mini" onclick="teamFantasyLoadGameDay_(true)" title="Refresh cached scores">↻</button></div><div class="tf-mini-status-legend"><span class="is-final"></span>F <span class="is-live"></span>L <span class="is-upcoming"></span>U</div>${view==='league'?teamFantasyRenderWeeklyLeague_(data):`<div class="tf-compare-add-row"><span>${selected.length} team${selected.length===1?'':'s'} selected</span>${selected.length<6?'<button class="tf-button secondary" onclick="teamFantasyToggleAddTeamMenu_()">+ Add Team</button>':''}</div>${addMenu}${competitors.length<2?'<div class="tf-muted">At least two league entries are needed for comparison.</div>':`<div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div>`}<div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`}`;
++  mount.innerHTML = `<div class="tf-game-day-sticky"><div class="tf-game-day-tabs"><button class="${view==='league'?'is-active':''}" onclick="teamFantasySetGameDayView_('league')">League View</button><button class="${view==='compare'?'is-active':''}" onclick="teamFantasySetGameDayView_('compare')">Compare</button></div><div class="tf-game-day-filters">${teamFantasyGameDayLeaguePicker_(data)}${teamFantasyGameDayWeekPicker_(data)}</div><button class="tf-refresh-mini" onclick="teamFantasyLoadGameDay_(true)" title="Refresh cached scores">↻</button></div><div class="tf-mini-status-legend"><span class="is-final"></span>F <span class="is-live"></span>L <span class="is-upcoming"></span>U</div>${view==='league'?teamFantasyRenderWeeklyLeague_(data):`<div class="tf-compare-add-row"><span>${selected.length} team${selected.length===1?'':'s'} selected</span>${selected.length<6?'<button class="tf-button secondary" onclick="teamFantasyToggleAddTeamMenu_()">+ Add Team</button>':''}</div>${addMenu}${competitors.length<2?'<div class="tf-muted">At least two league entries are needed for comparison.</div>':`<div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div>`}<div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`}`;
+ }
+ 
+ function teamFantasyCompareToggle_(checkbox) {
+@@ -550,9 +652,11 @@ async function teamFantasyLoadGameDay_(manual) {
+   if (!state.gameId || !mount) return;
+   if (manual) mount.innerHTML = '<div class="tf-muted">Refreshing cached game-day scores…</div>';
+   try {
+-    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: state.week, leagueId: state.selectedLeagueId });
++    const requestedWeek = Math.max(1, Math.floor(Number(window.TEAM_FANTASY_GAME_DAY_WEEK || state.week || 1)));
++    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: requestedWeek, leagueId: state.selectedLeagueId });
+     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load game-day comparison.');
+     window.TEAM_FANTASY_GAME_DAY = res;
++    window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || requestedWeek);
+     teamFantasyRenderGameDayIntoMount_();
+     teamFantasyStartGameDayPolling_(Number(res.pollAfterMs || 300000));
+   } catch (err) {
+@@ -562,6 +666,10 @@ async function teamFantasyLoadGameDay_(manual) {
+ 
+ function teamFantasyStartGameDayPolling_(delay) {
+   if (window.TEAM_FANTASY_GAME_DAY_TIMER) clearInterval(window.TEAM_FANTASY_GAME_DAY_TIMER);
++  window.TEAM_FANTASY_GAME_DAY_TIMER = null;
++  const state = window.TEAM_FANTASY_STATE || {};
++  const data = window.TEAM_FANTASY_GAME_DAY || {};
++  if (Number(data.week || 0) !== Number(state.week || 0)) return;
+   delay = Math.max(60000, Number(delay || 300000));
+   window.TEAM_FANTASY_GAME_DAY_TIMER = setInterval(function(){
+     if (String(window.location.hash || '').indexOf('team-fantasy') === -1) {
+diff --git a/tests/team_fantasy_compact_game_day_v1218s_tests.js b/tests/team_fantasy_compact_game_day_v1218s_tests.js
+index e5b3fb3..930ae59 100644
+--- a/tests/team_fantasy_compact_game_day_v1218s_tests.js
++++ b/tests/team_fantasy_compact_game_day_v1218s_tests.js
+@@ -16,7 +16,11 @@ assert(page.includes('TEAM_FANTASY_COMPACT_GAME_DAY_UI_v1218s'), '18s player UI
+ const teamFantasyCssCacheMatch = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
+ assert(teamFantasyCssCacheMatch && teamFantasyCssCacheMatch[1] !== '1218r1', 'Team Fantasy CSS cache marker must remain cache-busted for 18s or a later release.');
+ assert(page.includes('teamFantasyOpenTeamPicker_'), 'Logo/abbreviation team picker missing.');
+-assert(page.includes('team.eligible === true || String(team.abbr || \'\') === current'), 'Picker must omit unavailable/exhausted teams except current selection.');
++const pickerStart = page.indexOf('function teamFantasyPickerTeams_');
++const pickerEnd = page.indexOf('function teamFantasyCloseTeamPicker_', pickerStart);
++const pickerBlock = page.slice(pickerStart, pickerEnd);
++assert(pickerBlock.includes('team.eligible !== true') && pickerBlock.includes('teamFantasyPickerRemaining_(team) > 0'), 'Picker must continue to omit exhausted/unavailable selectable teams.');
++assert(pickerBlock.includes('teamFantasyPickerIsBye_(team)'), 'Later releases may preserve BYE teams as disabled/ghosted picker references.');
+ assert(page.includes('tf-pick-method'), 'AP/R pick-method badge missing.');
+ assert(page.includes('tf-slot-rank'), 'Weekly position rank display missing.');
+ assert(page.includes('tf-compare-record'), 'League rank/record display missing.');
+diff --git a/tests/team_fantasy_weekly_hub_v1218t2_tests.js b/tests/team_fantasy_weekly_hub_v1218t2_tests.js
+index e2e74f3..1ffd5bd 100644
+--- a/tests/team_fantasy_weekly_hub_v1218t2_tests.js
++++ b/tests/team_fantasy_weekly_hub_v1218t2_tests.js
+@@ -20,7 +20,8 @@ assert(backend.includes('out.leagues = leagues.map'), 'game-day league list miss
+ assert(backend.includes('out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out)'), 'weekly leaderboard not attached to API');
+ assert(css.includes('.tf-weekly-picks-head') && css.includes('background:#0f172a') && css.includes('color:#f8fafc'), 'high-contrast Weekly Picks header missing');
+ assert(css.includes('.tf-compare-team-head{background:#0f172a!important;color:#f8fafc!important'), 'high-contrast compare header missing');
+-assert(page.includes('team-fantasy.css?v=1218t2'), '18t2 CSS cache marker missing');
++const t2CssCache = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
++assert(t2CssCache && !['1218r1','1218s'].includes(t2CssCache[1]), '18t2-or-later CSS cache marker missing');
+ 
+ const sandbox = { console };
+ vm.createContext(sandbox);

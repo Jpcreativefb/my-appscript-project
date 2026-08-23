@@ -1,0 +1,63 @@
+const fs = require('fs');
+const vm = require('vm');
+const assert = require('assert');
+const path = require('path');
+const root = process.argv[2] || path.resolve(__dirname, '..');
+const page = fs.readFileSync(path.join(root,'frontend/js/pages/teamFantasy.js'),'utf8');
+const css = fs.readFileSync(path.join(root,'frontend/css/team-fantasy.css'),'utf8');
+const core = fs.readFileSync(path.join(root,'backend/engines/SportsTeamFantasyEngine.js'),'utf8');
+const backend = fs.readFileSync(path.join(root,'backend/engines/SportsTeamFantasyGameDayEngine.js'),'utf8');
+
+assert(page.includes('TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_UI_v1218u1'), '18u UI marker missing');
+assert(backend.includes('TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_BACKEND_v1218u1'), '18u backend marker missing');
+assert(page.includes('team-fantasy.css?v=1218u1'), '18u CSS cache marker missing');
+assert(page.includes('teamFantasyGameDayWeekPicker_') && page.includes('teamFantasyGameDaySelectWeek_'), 'past-week selector missing');
+assert(page.includes('TEAM_FANTASY_GAME_DAY_WEEK'), 'selected compare week state missing');
+assert(page.includes("if (Number(data.week || 0) !== Number(state.week || 0)) return;"), 'historical weeks must not keep live polling');
+assert(backend.includes('out.availableWeeks = []') && backend.includes('out.currentWeek = maxWeek'), 'backend available-week list missing');
+assert(page.includes('teamFantasyRenderWeekHistory_') && page.includes('<h2>Week History</h2>'), 'Week History card missing');
+const renderStart = page.indexOf('async function renderTeamFantasyPage');
+const renderEnd = page.indexOf('function teamFantasySetStatus_', renderStart);
+const renderBlock = page.slice(renderStart, renderEnd);
+assert(renderBlock.lastIndexOf('teamFantasyRenderWeekHistory_(res)') > renderBlock.lastIndexOf('tf-test-lab-card'), 'Week History must be the final section');
+
+const weeklyStart = page.indexOf('function teamFantasyRenderWeeklyLeague_');
+const weeklyEnd = page.indexOf('function teamFantasyCompareAddTeam_', weeklyStart);
+assert(!page.slice(weeklyStart, weeklyEnd).includes('tf-you-badge'), 'Weekly league must not print YOU badge');
+const compareStart = page.indexOf('function teamFantasyRenderCompareBoard_');
+const compareEnd = page.indexOf('function teamFantasyRenderGameDayIntoMount_', compareStart);
+const compareBlock = page.slice(compareStart, compareEnd);
+assert(compareBlock.includes("c.isViewer?'is-viewer':''"), 'viewer compare column marker missing');
+assert(!compareBlock.includes('tf-you-badge'), 'Compare must not print YOU badge');
+assert(compareBlock.includes('if (a.isViewer !== b.isViewer) return a.isViewer ? -1 : 1'), 'viewer column must be ordered first');
+
+assert(css.includes('.tf-team-picker-button{background:#0b1f3a!important;color:#fff!important'), 'closed team picker button must use dark navy background');
+assert(css.includes('.tf-picker-sheet{background:#0b1f3a!important;color:#fff!important'), 'team picker must use dark navy background');
+assert(css.includes('.tf-week-row{background:#102a43!important;color:#fff!important;border:1px solid rgba(255,255,255,.82)!important'), 'weekly league rows must be dark with white border');
+assert(css.includes('.tf-week-row.is-you{outline:3px solid #3b82f6!important'), 'viewer weekly row blue border missing');
+assert(css.includes('.tf-compare-team.is-viewer{position:sticky;left:0;z-index:7;border:3px solid #3b82f6!important'), 'viewer compare column must be sticky left with blue border');
+assert(css.includes('.tf-compare-team-head{position:sticky!important;top:0!important'), 'compare team headers must stay frozen');
+assert(css.includes('.tf-add-team-menu{background:#0b1f3a!important;color:#fff!important'), 'Add Team menu must be dark navy');
+assert(css.includes('.tf-history-table th{background:#0f172a;color:#fff;position:sticky;top:0}'), 'Week History header styling missing');
+
+assert(page.includes('function teamFantasyPickerIsBye_') && page.includes("reason.indexOf('BYE') !== -1"), 'bye-team picker detection missing');
+assert(page.includes('return teamFantasyPickerRemaining_(team) > 0;'), 'exhausted teams must be removed from picker');
+assert(page.includes("if (teamFantasyPickerIsBye_(team)) return true;"), 'bye teams must remain visible in picker');
+assert(page.includes('disabled aria-disabled=\"true\"'), 'bye teams must be disabled');
+assert(page.includes("' selectable' + (byeCount ? ' · ' + byeCount + ' bye' : '')"), 'picker summary must count selectable teams separately from byes');
+assert(page.includes("${left} left</span>"), 'picker remaining-use label missing');
+assert(css.includes('.tf-picker-team.uses-left-full{background:#0b2f57!important}'), 'full-availability dark blue missing');
+assert(css.includes('.tf-picker-team.uses-left-2{background:#174f82!important}'), '2-left medium blue missing');
+assert(css.includes('.tf-picker-team.uses-left-1{background:#3b78ad!important}'), '1-left light blue missing');
+assert(css.includes('.tf-picker-team.is-bye{display:grid!important;background:#26384c!important'), 'bye ghost styling missing');
+assert(css.includes('filter:grayscale(.72);cursor:not-allowed'), 'bye teams must be ghosted and non-selectable');
+
+const context = { console, Date, Math, JSON, encodeURIComponent };
+vm.createContext(context);
+vm.runInContext(core, context, { filename:'SportsTeamFantasyEngine.js' });
+vm.runInContext(backend, context, { filename:'SportsTeamFantasyGameDayEngine.js' });
+const lab = context.teamFantasyBuildSyntheticGameDayLab_();
+assert.strictEqual(lab.allPassed, true, 'synthetic Test Lab must still pass');
+assert.deepStrictEqual(JSON.parse(JSON.stringify(lab.compare.availableWeeks)), [97,98,99], 'synthetic past-week list must be present');
+assert(lab.checks.some(c => c.name === 'Past-week comparison selector is available' && c.passed), 'past-week Test Lab check missing');
+console.log('Team Fantasy v1.2.18u1 dark surfaces + sticky compare + Week History tests passed.');
