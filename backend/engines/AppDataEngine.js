@@ -418,7 +418,7 @@ function buildDashboardGameHubItemLite_(
       }
     );
 
-  const lockLabel =
+  let lockLabel =
     availability.statusLabel ||
     String(
       game.lockLabel ||
@@ -433,6 +433,10 @@ function buildDashboardGameHubItemLite_(
           ? "Finished"
           : "Open / Lock time TBD"
     );
+
+  if (mode === "team-fantasy") {
+    lockLabel = "Locks by NFL kickoff";
+  }
 
   const enterLabel =
     availability.available === false
@@ -622,6 +626,19 @@ function getDashboardGameProgressLite_(
   mode,
   options
 ) {
+
+  if (mode === "team-fantasy") {
+    return {
+      madeCount: 0,
+      totalCount: 0,
+      progressAvailable: false,
+      progressLabel: "Weekly lineup",
+      progressValue: 0,
+      userSummary: "Open Team Fantasy lineup",
+      summary: {}
+    };
+  }
+
 
   game =
     game || {};
@@ -1405,6 +1422,7 @@ function getDashboardGameMode_(game) {
     "head-to-head",
     "survivor",
     "ranking",
+    "team-fantasy",
     "prediction"
   ];
 
@@ -1450,6 +1468,11 @@ function getDashboardGameMode_(game) {
 }
 
 function getDashboardHubPlacement_(game, mode) {
+
+  if (mode === "team-fantasy") {
+    return { category: "sports", group: "NFL" };
+  }
+
 
   game = game || {};
 
@@ -1554,6 +1577,11 @@ function getDashboardGameTypeLabel_(
   game,
   mode
 ) {
+
+  if (mode === "team-fantasy") {
+    return "Team Fantasy Football";
+  }
+
 
   if (game.typeLabel) {
     return game.typeLabel;
@@ -1725,6 +1753,12 @@ function getDashboardEnterLabel_(
   const made =
     Number(progress.madeCount) || 0;
 
+  if (mode === "team-fantasy") {
+    return made > 0
+      ? "Continue Lineup"
+      : "Make Lineup";
+  }
+
   const total =
     Number(progress.totalCount) || 0;
 
@@ -1762,6 +1796,11 @@ function getDashboardGameDescription_(
   mode
 ) {
 
+  if (mode === "team-fantasy") {
+    return "Build an eight-slot NFL team lineup each week. Picks lock individually when that NFL team's game starts.";
+  }
+
+
   const description =
     String(
       game.description ||
@@ -1793,6 +1832,11 @@ function getDashboardLockLabel_(
   game,
   isPast
 ) {
+
+  if (getDashboardGameMode_(game) === "team-fantasy") {
+    return "Locks by NFL kickoff";
+  }
+
 
   if (isPast) {
     return "Finished";
@@ -1893,6 +1937,19 @@ function getDashboardGameProgress_(
   username,
   mode
 ) {
+
+  if (mode === "team-fantasy") {
+    return {
+      madeCount: 0,
+      totalCount: 0,
+      progressAvailable: false,
+      progressLabel: "Weekly lineup",
+      progressValue: 0,
+      userSummary: "Open Team Fantasy lineup",
+      summary: {}
+    };
+  }
+
 
   const gameId =
     game.gameId;
