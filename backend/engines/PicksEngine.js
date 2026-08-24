@@ -1338,6 +1338,277 @@ function saveConfidencePicksBatch(payload) {
 
 }
 
+
+function savePicksBatch(payload) {
+
+  let lock = null;
+  let lockAcquired = false;
+
+  try {
+    payload = payload || {};
+
+    const username = normalizeString_(payload.username);
+    const gameId = normalizeString_(payload.gameId || getDefaultGameId());
+    const requested = Array.isArray(payload.picks) ? payload.picks : [];
+
+    if (!username || !gameId) return { success: false, message: "Username and gameId are required" };
+    if (!requested.length) return { success: false, message: "No picks were supplied" };
+    if (requested.length > 100) return { success: false, message: "Too many picks in one batch" };
+
+    validateGameId(gameId);
+
+    const gameConfig = typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
+    const settings = typeof getCategorySettingsCached === "function"
+      ? getCategorySettingsCached(gameId)
+      : getCategorySettings(gameId);
+
+    const categories = typeof getCategoriesCached === "function"
+      ? getCategoriesCached(gameId)
+      : getCategories(gameId);
+
+    const categoryMap = {};
+    (categories || []).forEach(function(category) {
+      categoryMap[normalizeLower_(category && category.id)] = category;
+    });
+
+    const resolutionMap = typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : (typeof getCategoryResultsWinnerMap === "function" ? getCategoryResultsWinnerMap(gameId) : {});
+
+    const normalizedItems = [];
+    const seen = {};
+
+    requested.forEach(function(item) {
+      item = item || {};
+      const categoryId = normalizeLower_(item.categoryId);
+      const nomineeId = normalizeLower_(item.nomineeId);
+      if (!categoryId || !nomineeId) throw new Error("Every pick must include categoryId and nomineeId");
+      if (seen[categoryId]) throw new Error("Duplicate category in pick batch: " + categoryId);
+      seen[categoryId] = true;
+
+      const config = settings[categoryId] || null;
+      const category = categoryMap[categoryId] || null;
+      if (!config || !category) throw new Error("Invalid categoryId: " + categoryId);
+
+      const mode = typeof normalizeCategoryScoreMode_ === "function"
+        ? normalizeCategoryScoreMode_(config.scoreMode)
+        : normalizeLower_(config.scoreMode || "correct-pick");
+
+      const confidenceMode = mode === "confidence-points" ||
+        (gameConfig && gameConfig.confidenceEnabled === true && mode === "correct-pick");
+
+      if (mode === "wager" || mode === "ranking" || mode === "staked-points" || confidenceMode) {
+        throw new Error("This batch route only saves standard prediction picks: " + categoryId);
+      }
+
+      if (!isFixedPointPredictionEnabledForGame_(gameConfig)) {
+        throw new Error("Fixed-point predictions are not enabled for this game");
+      }
+
+      const resolution = typeof getHybridCategoryResolution_ === "function"
+        ? getHybridCategoryResolution_(categoryId, config, resolutionMap)
+        : { resolved: Boolean(config.winnerNomineeId) };
+
+      if (resolution.resolved) throw new Error("This question has already been settled: " + categoryId);
+      if (isCategoryConfigLocked_(config)) throw new Error("Category is locked: " + categoryId);
+
+      const nomineeExists = (category.nominees || []).some(function(nominee) {
+        return normalizeLower_(nominee && nominee.id) === nomineeId;
+      });
+      if (!nomineeExists) throw new Error("Invalid nomineeId for category: " + categoryId);
+
+      normalizedItems.push({ categoryId: categoryId, nomineeId: nomineeId, config: config });
+    });
+
+    lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+    lock.waitLock(2500);
+    lockAcquired = true;
+
+    const sheet = getPicksSheet_();
+    const lastColumn = sheet.getLastColumn();
+    if (lastColumn <= 0) throw new Error("Picks sheet empty");
+
+    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+    const col = getPicksColumnMap_(headers);
+    validatePickColumns_(col);
+
+    // Read only rows indexed to this game. The prior batch prototype used
+    // getDataRange(), which would make a popular app slower as Picks history grew.
+    let gameRowNumbers = [];
+    if (typeof normalizedStorageGetIndexEntry_ === "function") {
+      const entry = normalizedStorageGetIndexEntry_("Picks", gameId);
+      if (entry && Array.isArray(entry.rowNumbers)) gameRowNumbers = entry.rowNumbers.slice();
+    }
+    if (!gameRowNumbers.length && typeof normalizedStorageFindRowsByGame_ === "function") {
+      gameRowNumbers = normalizedStorageFindRowsByGame_(sheet, gameId);
+      if (typeof normalizedStorageUpsertIndexEntry_ === "function") {
+        normalizedStorageUpsertIndexEntry_({
+          entityType: "Picks",
+          gameId: gameId,
+          sheetName: PICKS_SHEET,
+          rowNumbers: gameRowNumbers
+        });
+      }
+    }
+
+    const userKey = normalizeLower_(username);
+    const existingByCategory = {};
+    const sortedRows = gameRowNumbers.map(Number).filter(function(value) { return value > 1; }).sort(function(a,b){ return a-b; });
+    let readIndex = 0;
+    while (readIndex < sortedRows.length) {
+      const startRow = sortedRows[readIndex];
+      let count = 1;
+      while (readIndex + count < sortedRows.length && sortedRows[readIndex + count] === startRow + count) count++;
+      const rows = sheet.getRange(startRow, 1, count, headers.length).getValues();
+      rows.forEach(function(row, offset) {
+        if (normalizeString_(row[col.gameId]) !== gameId) return;
+        if (normalizeLower_(row[col.username]) !== userKey) return;
+        const categoryId = normalizeLower_(row[col.category]);
+        if (!categoryId) return;
+        existingByCategory[categoryId] = { rowNumber: startRow + offset, row: row.slice() };
+      });
+      readIndex += count;
+    }
+
+    const now = new Date();
+    const updates = [];
+    const newRows = [];
+    const results = [];
+
+    normalizedItems.forEach(function(item) {
+      const existing = existingByCategory[item.categoryId] || null;
+      const previousNominee = existing ? normalizeLower_(existing.row[col.nominee]) : "";
+      const originalNominee = existing
+        ? (normalizeLower_(existing.row[col.original]) || previousNominee || item.nomineeId)
+        : item.nomineeId;
+      const changeCount = existing ? Number(existing.row[col.changes]) || 0 : 0;
+      const isChange = !!(previousNominee && previousNominee !== item.nomineeId);
+      const maxChanges = getMaxChanges_(item.config);
+
+      if (isChange && maxChanges >= 0 && changeCount >= maxChanges) {
+        throw new Error("Change limit reached: " + item.categoryId);
+      }
+
+      const finalChangeCount = isChange ? changeCount + 1 : changeCount;
+
+      if (existing) {
+        if (previousNominee !== item.nomineeId) {
+          const row = existing.row.slice();
+          row[col.nominee] = item.nomineeId;
+          row[col.lastUpdated] = now;
+          if (isChange) row[col.changes] = finalChangeCount;
+          if (!normalizeLower_(row[col.original])) row[col.original] = originalNominee;
+          if (col.confidencePoints !== -1) row[col.confidencePoints] = 0;
+          if (col.stakePoints !== -1) row[col.stakePoints] = 0;
+          updates.push({ rowNumber: existing.rowNumber, row: row });
+        }
+      } else {
+        const row = new Array(headers.length).fill("");
+        row[col.gameId] = gameId;
+        row[col.timestamp] = now;
+        row[col.username] = username;
+        row[col.category] = item.categoryId;
+        row[col.nominee] = item.nomineeId;
+        row[col.points] = 0;
+        row[col.original] = item.nomineeId;
+        row[col.changes] = 0;
+        row[col.lastUpdated] = now;
+        if (col.confidencePoints !== -1) row[col.confidencePoints] = 0;
+        if (col.stakePoints !== -1) row[col.stakePoints] = 0;
+        newRows.push({ categoryId: item.categoryId, row: row });
+      }
+
+      results.push({
+        success: true,
+        categoryId: item.categoryId,
+        nomineeId: item.nomineeId,
+        originalNomineeId: originalNominee,
+        changeCount: finalChangeCount,
+        pickMeta: buildPickMeta_(item.categoryId, item.nomineeId, item.config, finalChangeCount, originalNominee)
+      });
+    });
+
+    // Existing rows are grouped into contiguous writes to keep Sheet RPC count low.
+    updates.sort(function(a, b) { return a.rowNumber - b.rowNumber; });
+    let index = 0;
+    while (index < updates.length) {
+      const start = updates[index].rowNumber;
+      const rows = [updates[index].row];
+      let next = index + 1;
+      while (next < updates.length && updates[next].rowNumber === start + rows.length) {
+        rows.push(updates[next].row);
+        next++;
+      }
+      sheet.getRange(start, 1, rows.length, headers.length).setValues(rows);
+      index = next;
+    }
+
+    const cacheUpdates = updates.map(function(update) {
+      return { rowNumber: update.rowNumber, row: update.row };
+    });
+
+    if (newRows.length) {
+      const startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, newRows.length, headers.length)
+        .setValues(newRows.map(function(item) { return item.row; }));
+
+      const prior = typeof normalizedStorageGetIndexEntry_ === "function"
+        ? normalizedStorageGetIndexEntry_("Picks", gameId)
+        : null;
+      const rowNumbers = prior && Array.isArray(prior.rowNumbers) ? prior.rowNumbers.slice() : [];
+
+      newRows.forEach(function(item, offset) {
+        const rowNumber = startRow + offset;
+        cacheUpdates.push({ rowNumber: rowNumber, row: item.row });
+        if (rowNumbers.indexOf(rowNumber) === -1) rowNumbers.push(rowNumber);
+      });
+
+      if (typeof normalizedStorageUpsertIndexEntry_ === "function") {
+        normalizedStorageUpsertIndexEntry_({
+          entityType: "Picks",
+          gameId: gameId,
+          sheetName: PICKS_SHEET,
+          rowNumbers: rowNumbers
+        });
+      }
+    }
+
+    SpreadsheetApp.flush();
+
+    if (lockAcquired) {
+      lock.releaseLock();
+      lockAcquired = false;
+    }
+
+    // Clear only derived/user results and keep a warm whole-Picks cache coherent.
+    if (typeof AppCache !== "undefined" && AppCache) {
+      if (typeof AppCache.clearPlayerActionCaches === "function") {
+        AppCache.clearPlayerActionCaches(gameId, [], username);
+      }
+      if (typeof AppCache.syncSheetRows === "function") {
+        AppCache.syncSheetRows(PICKS_SHEET, cacheUpdates);
+      }
+    }
+
+    return {
+      success: true,
+      gameId: gameId,
+      savedCount: updates.length + newRows.length,
+      processedCount: results.length,
+      results: results
+    };
+
+  } catch (err) {
+    Logger.log("savePicksBatch ERROR | " + err.message);
+    return { success: false, message: err.message };
+  } finally {
+    if (lockAcquired && lock) lock.releaseLock();
+  }
+}
+
 function savePick(payload){
 
   let lock = null;

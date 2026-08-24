@@ -19,12 +19,14 @@ let PICKS_PAGE_DATA = {
   seasonAnchor: null,
   episodeComparison: null,
   realityTvView: null,
-  appearance: null
+  appearance: null,
+  liveProbabilitiesDeferred: false
 };
 
 let PICKS_COUNTDOWN_TIMER = null;
 let PICKS_ENHANCEMENTS_REQUEST = null;
 const PICKS_ENHANCEMENTS_CACHE = {};
+const PICKS_APPEARANCE_CACHE = {};
 const PICKS_PENDING_SAVES = {};
 let PICKS_AUTO_ADVANCE_TIMER = null;
 let PICKS_TEMP_OPEN_CATEGORY_ID = "";
@@ -43,6 +45,11 @@ let PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
 let PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
 let PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
 let PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
+let PICKS_STANDARD_AUTOSAVE_TIMER = null;
+let PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
+const PICKS_STANDARD_AUTOSAVE_QUEUE = {};
+const PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS = 1800;
+let PICKS_LIVE_PROBABILITY_REQUEST = null;
 
 const PICKS_CONFIDENCE_SPORTS_API_URL =
   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
@@ -488,6 +495,9 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   PICKS_PAGE_DATA.realityTvView =
     payload.realityTvView || null;
 
+  PICKS_PAGE_DATA.liveProbabilitiesDeferred =
+    payload.liveProbabilitiesDeferred === true;
+
   const enhancementKey = picksEnhancementKey_();
   const cachedEnhancements = PICKS_ENHANCEMENTS_CACHE[enhancementKey] || null;
   if (cachedEnhancements) {
@@ -719,7 +729,7 @@ function resetConfidenceViewState_() {
   PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
   PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
   PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
-  PICKS_PAGE_DATA.appearance = null;
+  PICKS_PAGE_DATA.appearance = PICKS_APPEARANCE_CACHE[String(PICKS_PAGE_DATA.gameId || "")] || null;
 
 }
 
@@ -1891,6 +1901,21 @@ async function hydrateConfidenceAppearance_() {
   const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
   if (!gameId) return;
 
+  if (!PICKS_PAGE_DATA.appearance) {
+    let cachedAppearance = PICKS_APPEARANCE_CACHE[gameId] || null;
+    if (!cachedAppearance) {
+      try {
+        const raw = sessionStorage.getItem("pattcGameAppearance:" + gameId);
+        if (raw) cachedAppearance = JSON.parse(raw);
+      } catch (err) {}
+    }
+    if (cachedAppearance) {
+      PICKS_APPEARANCE_CACHE[gameId] = cachedAppearance;
+      PICKS_PAGE_DATA.appearance = cachedAppearance;
+      applyPicksAppearanceToPage_();
+    }
+  }
+
   if (PICKS_PAGE_DATA.appearance && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return;
   if (PICKS_CONFIDENCE_APPEARANCE_REQUEST && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return PICKS_CONFIDENCE_APPEARANCE_REQUEST;
 
@@ -1899,8 +1924,12 @@ async function hydrateConfidenceAppearance_() {
     try {
       const result = await apiGetGameAppearance(gameId);
       if (result && result.success !== false && String(PICKS_PAGE_DATA.gameId || "") === gameId) {
+        PICKS_APPEARANCE_CACHE[gameId] = result;
         PICKS_PAGE_DATA.appearance = result;
-        refreshPicksPage();
+        try { sessionStorage.setItem("pattcGameAppearance:" + gameId, JSON.stringify(result)); } catch (err) {}
+        // The page is already usable. Apply the theme without replacing the
+        // whole question DOM just because style metadata arrived later.
+        applyPicksAppearanceToPage_();
       }
     } catch (err) {
       console.warn("Confidence appearance load skipped", err);
@@ -3768,14 +3797,192 @@ function renderNomineeButton(
 
 }
 
+function picksStandardQueueStorageKey_() {
+  const session = PICKS_PAGE_DATA.session || getSession() || {};
+  return "pattcPendingStandardPicks:" +
+    String(session.username || "").trim().toLowerCase() + ":" +
+    String(PICKS_PAGE_DATA.gameId || "").trim();
+}
+
+function picksPersistStandardQueue_() {
+  try {
+    const rows = Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).map(function(categoryId) {
+      const item = PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] || {};
+      return { categoryId: categoryId, nomineeId: item.nomineeId || "" };
+    }).filter(function(item) { return item.categoryId && item.nomineeId; });
+    const key = picksStandardQueueStorageKey_();
+    if (rows.length) localStorage.setItem(key, JSON.stringify(rows));
+    else localStorage.removeItem(key);
+  } catch (err) {}
+}
+
+function picksPatchStartupPayload_(result) {
+  if (!result || typeof APP_STATE === "undefined" || !APP_STATE.startupPayload) return;
+  if (String(APP_STATE.startupPayload.gameId || "") !== String(PICKS_PAGE_DATA.gameId || "")) return;
+  const payloadPicks = APP_STATE.startupPayload.picks || (APP_STATE.startupPayload.picks = {});
+  payloadPicks.picks = payloadPicks.picks || {};
+  payloadPicks.changeCounts = payloadPicks.changeCounts || {};
+  payloadPicks.originalPicks = payloadPicks.originalPicks || {};
+  payloadPicks.pickMeta = payloadPicks.pickMeta || {};
+  payloadPicks.picks[result.categoryId] = result.nomineeId;
+  payloadPicks.changeCounts[result.categoryId] = Number(result.changeCount) || 0;
+  payloadPicks.originalPicks[result.categoryId] = result.originalNomineeId || result.nomineeId;
+  if (result.pickMeta) payloadPicks.pickMeta[result.categoryId] = result.pickMeta;
+}
+
+function picksScheduleStandardAutosave_() {
+  if (PICKS_STANDARD_AUTOSAVE_TIMER) clearTimeout(PICKS_STANDARD_AUTOSAVE_TIMER);
+  if (Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).length >= 4) {
+    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, 50);
+  } else {
+    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS);
+  }
+}
+
+async function picksFlushStandardAutosave_() {
+  if (PICKS_STANDARD_AUTOSAVE_IN_FLIGHT) return;
+  if (PICKS_STANDARD_AUTOSAVE_TIMER) {
+    clearTimeout(PICKS_STANDARD_AUTOSAVE_TIMER);
+    PICKS_STANDARD_AUTOSAVE_TIMER = null;
+  }
+
+  const categoryIds = Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE);
+  if (!categoryIds.length) return;
+
+  const session = PICKS_PAGE_DATA.session || getSession() || {};
+  const batch = categoryIds.map(function(categoryId) {
+    return {
+      categoryId: categoryId,
+      nomineeId: PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId].nomineeId
+    };
+  });
+
+  PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = true;
+  categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "sending"; });
+  showPicksMessage("Syncing " + batch.length + " pick" + (batch.length === 1 ? "" : "s") + "…", false);
+
+  let response = null;
+  try {
+    response = await apiSavePicksBatch({
+      username: session.username,
+      gameId: PICKS_PAGE_DATA.gameId,
+      picks: batch
+    });
+  } catch (err) {
+    response = { success: false, message: err && err.message ? err.message : "Could not sync picks." };
+  }
+
+  if (response && response.success) {
+    (response.results || []).forEach(function(result) {
+      const categoryId = result.categoryId;
+      const queued = PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId];
+      if (queued && normalizeId(queued.nomineeId) === normalizeId(result.nomineeId)) {
+        delete PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId];
+        delete PICKS_PENDING_SAVES[categoryId];
+      }
+      PICKS_PAGE_DATA.picks[categoryId] = result.nomineeId;
+      PICKS_PAGE_DATA.changeCounts[categoryId] = Number(result.changeCount) || 0;
+      PICKS_PAGE_DATA.originalPicks[categoryId] = result.originalNomineeId || result.nomineeId;
+      if (result.pickMeta) PICKS_PAGE_DATA.pickMeta[categoryId] = result.pickMeta;
+      picksPatchStartupPayload_(result);
+    });
+    picksPersistStandardQueue_();
+    refreshPicksPage();
+    showPicksMessage(batch.length === 1 ? "Pick saved." : batch.length + " picks saved.", false);
+  } else {
+    categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "queued"; });
+    picksPersistStandardQueue_();
+    showPicksMessage((response && (response.message || response.error)) || "Picks are still waiting to sync. They will retry automatically.", true);
+  }
+
+  PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
+
+  if (Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).length) {
+    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, response && response.success ? 250 : 2500);
+  }
+}
+
+function picksQueueStandardSave_(categoryId, nomineeId) {
+  PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] = { nomineeId: nomineeId };
+  PICKS_PENDING_SAVES[categoryId] = "queued";
+  picksPersistStandardQueue_();
+  picksScheduleStandardAutosave_();
+}
+
+function picksRestoreStandardQueue_() {
+  let rows = [];
+  try {
+    rows = JSON.parse(localStorage.getItem(picksStandardQueueStorageKey_()) || "[]");
+  } catch (err) { rows = []; }
+  if (!Array.isArray(rows) || !rows.length) return;
+
+  rows.forEach(function(item) {
+    const categoryId = normalizeId(item && item.categoryId);
+    const nomineeId = normalizeId(item && item.nomineeId);
+    const category = (PICKS_PAGE_DATA.categories || []).find(function(candidate) {
+      return normalizeId(candidate && candidate.id) === categoryId;
+    });
+    if (!category || !nomineeId || isCategoryLocked(category)) return;
+    PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] = { nomineeId: nomineeId };
+    PICKS_PENDING_SAVES[categoryId] = "queued";
+    PICKS_PAGE_DATA.picks[categoryId] = nomineeId;
+  });
+  picksScheduleStandardAutosave_();
+}
+
+async function hydratePicksLiveProbabilities_() {
+  if (PICKS_PAGE_DATA.liveProbabilitiesDeferred !== true || typeof apiGetGameLiveProbabilities !== "function") return;
+  const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
+  if (!gameId) return;
+  if (PICKS_LIVE_PROBABILITY_REQUEST && PICKS_LIVE_PROBABILITY_REQUEST.gameId === gameId) {
+    return PICKS_LIVE_PROBABILITY_REQUEST.promise;
+  }
+
+  const promise = (async function() {
+  try {
+    const response = await apiGetGameLiveProbabilities(gameId);
+    if (!response || response.success === false || String(PICKS_PAGE_DATA.gameId || "") !== gameId) return;
+    const lookup = {};
+    (response.probabilities || []).forEach(function(item) {
+      lookup[normalizeId(item.categoryId) + "|" + normalizeId(item.nomineeId)] = item;
+    });
+    (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
+      (category.nominees || []).forEach(function(nominee) {
+        const item = lookup[normalizeId(category.id) + "|" + normalizeId(nominee.id)];
+        if (!item) return;
+        nominee.liveProbability = item.liveProbability;
+        nominee.liveProbabilityProvider = item.liveProbabilityProvider || "";
+        nominee.liveProbabilityUpdatedAt = item.liveProbabilityUpdatedAt || "";
+        nominee.liveProbabilityMarketId = item.liveProbabilityMarketId || "";
+        nominee.liveProbabilityOutcome = item.liveProbabilityOutcome || "";
+        nominee.liveProbabilitySourceUrl = item.liveProbabilitySourceUrl || "";
+      });
+    });
+    PICKS_PAGE_DATA.liveProbabilitiesDeferred = false;
+    refreshPicksPage();
+  } catch (err) {
+    console.warn("Live market probabilities loaded later or were skipped:", err);
+  }
+  })();
+
+  PICKS_LIVE_PROBABILITY_REQUEST = { gameId: gameId, promise: promise };
+  try {
+    await promise;
+  } finally {
+    if (PICKS_LIVE_PROBABILITY_REQUEST && PICKS_LIVE_PROBABILITY_REQUEST.gameId === gameId) {
+      PICKS_LIVE_PROBABILITY_REQUEST = null;
+    }
+  }
+}
+
 /* =========================
    PICK ACTIONS
 ========================= */
 
 async function selectNominee(categoryId, nomineeId) {
 
-  if (PICKS_PENDING_SAVES[categoryId]) {
-    showPicksMessage("This pick is already saving…", false);
+  if (PICKS_PENDING_SAVES[categoryId] === true || PICKS_PENDING_SAVES[categoryId] === "sending") {
+    showPicksMessage("This pick is syncing now…", false);
     return;
   }
 
@@ -3960,6 +4167,22 @@ async function selectNominee(categoryId, nomineeId) {
       );
       return;
     }
+  }
+
+  const standardBatchEligible =
+    !usesConfidencePointsCategory(category) &&
+    !isStakedPointsCategory(category) &&
+    normalizePicksScoreMode_(category && category.scoreMode) !== "wager" &&
+    normalizePicksScoreMode_(category && category.scoreMode) !== "ranking";
+
+  if (standardBatchEligible) {
+    PICKS_TEMP_OPEN_CATEGORY_ID = categoryId;
+    PICKS_PAGE_DATA.picks[categoryId] = nomineeId;
+    picksQueueStandardSave_(categoryId, nomineeId);
+    refreshPicksPage();
+    showPicksMessage("Pick selected · syncing automatically…", false);
+    scheduleRealityTvPickAutoAdvance_(categoryId);
+    return;
   }
 
   const optimisticPreviousPick = previousPick || "";
@@ -4283,6 +4506,9 @@ function mountPicksPage() {
   // Optional Reality TV statistics and Season Survivor details load after
   // the core questions and saved picks are already usable.
   hydratePicksEnhancements_();
+
+  picksRestoreStandardQueue_();
+  hydratePicksLiveProbabilities_();
 
   // Confidence games keep the same dense weekly card in pregame, live, and final states.
   mountConfidenceLiveSports_();

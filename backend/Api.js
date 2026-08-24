@@ -141,6 +141,20 @@ function doPost(e) {
       return json(apiAdminSendPushNotification(body));
     }
 
+    if (action === "savePicksBatch") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(savePicksBatch({
+        username: body.username,
+        gameId: postGameId,
+        picks: Array.isArray(body.picks) ? body.picks : []
+      }));
+    }
+
     if (action === "saveConfidencePicksBatch") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -698,6 +712,7 @@ function doGet(e) {
       action === "saveUserProfile" ||
       action === "uploadProfileAvatar" ||
       action === "savePick" ||
+      action === "savePicksBatch" ||
       action === "saveRanking" ||
       action === "saveSurvivorPick" ||
       action === "adminSaveRankingResults" ||
@@ -2215,6 +2230,17 @@ function doGet(e) {
     
     }
     
+    if (action === "getGameLiveProbabilities") {
+      return json(
+        apiGetGameLiveProbabilities({
+          username: params.username,
+          token: params.token,
+          gameId: gameId,
+          leagueId: leagueId
+        })
+      );
+    }
+
     /* =========================
        DASHBOARD GAMES HUB
     ========================= */

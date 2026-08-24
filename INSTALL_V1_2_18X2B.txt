@@ -1,0 +1,7 @@
+PATTC Predicts v1.2.18x2b
+Fast Navigation + Batched Picks — Exact Baseline Installer
+
+Requires exact clean v1.2.18x1b commit:
+1b1043d2c5bf83d2289f4a567f4548031596eb89
+
+Use the supplied install_fast_navigation_batched_picks_v1218x2b.sh through the one-block release command.

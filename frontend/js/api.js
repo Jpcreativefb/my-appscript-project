@@ -945,6 +945,19 @@ async function apiSavePick(payload) {
 
 }
 
+async function apiSavePicksBatch(payload) {
+
+  payload = payload || {};
+
+  return apiPost("savePicksBatch", {
+    username: payload.username,
+    gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    picks: Array.isArray(payload.picks) ? payload.picks : []
+  });
+
+}
+
 async function apiSaveConfidencePicksBatch(payload) {
 
   payload = payload || {};
@@ -1123,6 +1136,19 @@ async function apiGetArchivedGamesHistory() {
 
   return api("getArchivedGamesHistory", {
     token: session && session.token ? session.token : ""
+  });
+
+}
+
+async function apiGetGameLiveProbabilities(gameId) {
+
+  const session = getSession();
+
+  return api("getGameLiveProbabilities", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
   });
 
 }

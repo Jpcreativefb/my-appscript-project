@@ -53,10 +53,12 @@ assert(manager.includes('Saved ✓'));
 assert(manager.includes('Applied ✓'));
 assert(manager.includes('adminAppearanceSetThemeActionState_'));
 
-// Presets and no base-game flash while appearance resolves.
+// Presets and non-blocking appearance hydration while saved styling resolves.
 ['basic','simple','advanced','mobile'].forEach(preset => assert(manager.includes(`adminAppearanceApplyPreset_('${preset}')`)));
 assert(picks.includes('picks-appearance-loading'));
-assert(picksCss.includes('Loading game style…'));
+assert(picksCss.includes('.picks-page.picks-appearance-loading > *{visibility:visible;}'));
+assert(picksCss.includes('.picks-page.picks-appearance-loading::after{display:none;'));
+assert(!picksCss.includes('Loading game style…')); // v1.2.18x2: styling may not hide playable questions
 
 // All page theme classes from the shared serializer are applied to the live page, not only image overlay.
 assert(picks.includes('if (name.indexOf("picks-theme-") === 0) page.classList.remove(name)'));

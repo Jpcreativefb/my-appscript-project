@@ -327,6 +327,51 @@ function getLeaderboardCached(
 
 }
 
+
+function appCacheUsernameKey_(username){
+  return String(username || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9_.-]+/g, "_")
+    .slice(0, 120);
+}
+
+function appDashboardCacheKey_(username){
+  const userKey = appCacheUsernameKey_(username);
+  return userKey ? "dashboard_hub_v2_" + userKey : "";
+}
+
+/* Keep a warm whole-sheet cache coherent after a targeted batch write instead
+   of deleting it and forcing the next request to re-read the entire Sheet. */
+function appCacheSyncSheetRows_(sheetName, rowUpdates){
+  sheetName = String(sheetName || "").trim();
+  if (!sheetName || !Array.isArray(rowUpdates) || !rowUpdates.length) return false;
+
+  const cache = CacheService.getScriptCache();
+  const key = "sheet_" + sheetName;
+  let raw = null;
+  try { raw = cache.get(key); } catch (err) { raw = null; }
+  if (!raw) return false;
+
+  try {
+    const data = JSON.parse(raw);
+    rowUpdates.forEach(function(update){
+      const rowNumber = Number(update && update.rowNumber || 0);
+      const row = update && Array.isArray(update.row) ? update.row.slice() : null;
+      if (!rowNumber || !row) return;
+      while (data.length < rowNumber) data.push([]);
+      data[rowNumber - 1] = row;
+    });
+    safeScriptCachePut_(cache, key, JSON.stringify(data), CACHE_TTL);
+    APP_RUNTIME_CACHE[key] = data;
+    return true;
+  } catch (err) {
+    try { cache.remove(key); } catch (removeError) {}
+    delete APP_RUNTIME_CACHE[key];
+    return false;
+  }
+}
+
 /* =========================
    CACHE INVALIDATION HELPERS
    v1.2.18x1b
@@ -406,6 +451,9 @@ function clearPlayerActionCaches(gameId, sheetNames, username){
       keys.push("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
     }
   }
+
+  const dashboardKey = appDashboardCacheKey_(username);
+  if (dashboardKey) keys.push(dashboardKey);
 
   appCacheRemoveKeys_(cache, keys);
 }
@@ -570,6 +618,8 @@ var AppCache = {
   clearPlayerActionCaches,
   clearGameDataCaches,
   clearAppCaches,
-  clearGameCaches
+  clearGameCaches,
+  syncSheetRows: appCacheSyncSheetRows_,
+  dashboardCacheKey: appDashboardCacheKey_
 
 };

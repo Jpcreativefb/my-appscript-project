@@ -397,7 +397,7 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks";
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -522,8 +522,10 @@ async function ensurePageModules_(page) {
 ====================== */
 
 const APP_PAGE_SNAPSHOT_CACHE = {};
-const APP_PAGE_SNAPSHOT_FRESH_MS = 30 * 1000;
-const APP_PAGE_SNAPSHOT_MAX_MS = 5 * 60 * 1000;
+const APP_PAGE_SNAPSHOT_FRESH_MS = 45 * 1000;
+const APP_PAGE_SNAPSHOT_MAX_MS = 10 * 60 * 1000;
+const APP_PAGE_SNAPSHOT_STORAGE_PREFIX = "pattcPageSnapshot:";
+const APP_PAGE_SNAPSHOT_STORAGE_MAX_CHARS = 700000;
 
 function appPageSnapshotEligible_(page) {
   page = String(page || "");
@@ -546,35 +548,84 @@ function appPageSnapshotEligible_(page) {
 function appPageSnapshotKey_(page) {
   const session = typeof getSession === "function" ? getSession() : null;
   const username = String(session && session.username || "").trim().toLowerCase();
+  const pageName = String(page || "");
+
+  // Home/hub pages are account views, not game views. Keying Home by the
+  // currently selected game made a perfectly good snapshot miss after a game
+  // switch and forced another Dashboard rebuild.
+  if (
+    pageName === "dashboard" ||
+    pageName === "more" ||
+    pageName === "trophy-room" ||
+    pageName.indexOf("hub:") === 0
+  ) {
+    return [username, "account", pageName].join("|");
+  }
+
   const gameId = typeof getFrontendGameId === "function" ? String(getFrontendGameId() || "").trim() : String(APP_STATE.gameId || "").trim();
   const leagueId = typeof getFrontendLeagueId === "function" ? String(getFrontendLeagueId() || "").trim() : "";
   const mode = String(localStorage.getItem("gameMode") || "").trim().toLowerCase();
-  return [username, gameId, leagueId, mode, String(page || "")].join("|");
+  return [username, gameId, leagueId, mode, pageName].join("|");
 }
 
+function appPageSnapshotStorageKey_(key) {
+  return APP_PAGE_SNAPSHOT_STORAGE_PREFIX + encodeURIComponent(String(key || ""));
+}
 function appCapturePageSnapshot_(page, app) {
   if (!app || !appPageSnapshotEligible_(page)) return;
   const html = String(app.innerHTML || "");
   if (!html || html.indexOf("Page failed to load") !== -1) return;
-  APP_PAGE_SNAPSHOT_CACHE[appPageSnapshotKey_(page)] = {
-    html: html,
-    savedAt: Date.now()
-  };
-}
+  const key = appPageSnapshotKey_(page);
+  const item = { html: html, savedAt: Date.now() };
+  APP_PAGE_SNAPSHOT_CACHE[key] = item;
 
+  // sessionStorage survives hash/full-shell navigation in the same tab/PWA
+  // session, so a browser repaint cannot destroy the fast return path.
+  if (html.length <= APP_PAGE_SNAPSHOT_STORAGE_MAX_CHARS) {
+    try {
+      sessionStorage.setItem(appPageSnapshotStorageKey_(key), JSON.stringify(item));
+    } catch (err) {}
+    if (String(page || "") === "dashboard" || String(page || "").indexOf("hub:") === 0) {
+      try { localStorage.setItem(appPageSnapshotStorageKey_(key), JSON.stringify(item)); } catch (err) {}
+    }
+  }
+}
 function appReadPageSnapshot_(page) {
   if (!appPageSnapshotEligible_(page)) return null;
   const key = appPageSnapshotKey_(page);
-  const item = APP_PAGE_SNAPSHOT_CACHE[key] || null;
+  let item = APP_PAGE_SNAPSHOT_CACHE[key] || null;
+
+  if (!item) {
+    try {
+      const raw = sessionStorage.getItem(appPageSnapshotStorageKey_(key));
+      if (raw) {
+        item = JSON.parse(raw);
+        if (item && item.html) APP_PAGE_SNAPSHOT_CACHE[key] = item;
+      }
+    } catch (err) {
+      item = null;
+    }
+  }
+
+  if (!item && (String(page || "") === "dashboard" || String(page || "").indexOf("hub:") === 0)) {
+    try {
+      const raw = localStorage.getItem(appPageSnapshotStorageKey_(key));
+      if (raw) {
+        item = JSON.parse(raw);
+        if (item && item.html) APP_PAGE_SNAPSHOT_CACHE[key] = item;
+      }
+    } catch (err) { item = null; }
+  }
+
   if (!item) return null;
   const age = Date.now() - Number(item.savedAt || 0);
   if (age > APP_PAGE_SNAPSHOT_MAX_MS) {
     delete APP_PAGE_SNAPSHOT_CACHE[key];
+    try { sessionStorage.removeItem(appPageSnapshotStorageKey_(key)); } catch (err) {}
     return null;
   }
   return { key: key, html: item.html, age: age };
 }
-
 function invalidateAppPageSnapshots(gameId) {
   gameId = String(gameId || "").trim();
   Object.keys(APP_PAGE_SNAPSHOT_CACHE).forEach(function(key) {
@@ -647,6 +698,7 @@ async function navigate(page, options) {
     app.classList.remove("page-enter");
     app.classList.add("page-enter-active");
     setActiveNav(page);
+    if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
 
     // Fresh snapshots return immediately. Stale-but-valid snapshots remain
     // visible while the page refreshes quietly, avoiding another full-screen loader.

@@ -72,7 +72,7 @@ console.log('Global performance / lock contention v1.2.18x1b tests passed.');
 
 const app = read('frontend/js/app.js');
 ok(app.includes('-v1218x1b-performance'), 'App runtime asset marker must be bumped for x1b');
-ok(/const APP_ASSET_VERSION\s*=\s*"[^"]*-v1218x1b-performance";/.test(app), 'Production one-line APP_ASSET_VERSION must update safely');
+ok(/const APP_ASSET_VERSION\s*=\s*"[^"]*-v1218x1b-performance(?:-[^"]+)?";/.test(app), 'Production one-line APP_ASSET_VERSION must retain the x1b marker when later hotfixes append a suffix');
 ok(app.includes('APP_PAGE_SNAPSHOT_CACHE'), 'Public navigation must keep in-session page snapshots');
 ok(app.includes('APP_PAGE_SNAPSHOT_FRESH_MS'), 'Page snapshot freshness window missing');
 ok(app.includes('appRefreshSnapshotQuietly_'), 'Cached pages must refresh quietly instead of blocking navigation');

@@ -52,14 +52,35 @@ function apiGetStartupPayload(payload) {
       ? getCategoriesCached(gameId)
       : getCategories(gameId);
 
+  let liveProbabilitiesDeferred = false;
+
+  // Do not block the core Picks payload opening a second spreadsheet just to
+  // decorate Awards answers with live P/K probabilities. Reuse a warm lookup
+  // when one exists; otherwise render the questions first and hydrate prices
+  // with a separate non-blocking request from the browser.
   if (
-    typeof externalResultsBridgeEnrichCategoriesWithLiveProbabilities_ === "function"
+    typeof externalResultsBridgeCategoryShowsLiveProbabilities_ === "function" &&
+    Array.isArray(categories)
   ) {
-    categories =
-      externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
-        gameId,
-        categories
-      );
+    const needsExternalPrices = categories.some(function(category) {
+      return externalResultsBridgeCategoryShowsLiveProbabilities_(category);
+    });
+
+    if (needsExternalPrices) {
+      const cachedLookup =
+        typeof externalResultsBridgeReadLiveProbabilityCache_ === "function"
+          ? externalResultsBridgeReadLiveProbabilityCache_(gameId)
+          : null;
+
+      if (
+        cachedLookup !== null &&
+        typeof externalResultsBridgeApplyLiveProbabilityLookup_ === "function"
+      ) {
+        categories = externalResultsBridgeApplyLiveProbabilityLookup_(categories, cachedLookup);
+      } else {
+        liveProbabilitiesDeferred = true;
+      }
+    }
   }
 
   const picks =
@@ -142,9 +163,55 @@ function apiGetStartupPayload(payload) {
     },
 
     realityTvView:
-      realityTvView
+      realityTvView,
+
+    liveProbabilitiesDeferred:
+      liveProbabilitiesDeferred
   };
 
+}
+
+function apiGetGameLiveProbabilities(payload) {
+
+  payload = payload || {};
+
+  const username = String(payload.username || "").trim();
+  const token = String(payload.token || "").trim();
+  const gameId = normalizeGameId_(payload.gameId || getDefaultGameId());
+
+  if (!username || !token) throw new Error("Session expired. Please log in again.");
+
+  validateUserSession_(username, token);
+  requireGameFeatureAccess_(username, gameId, "viewGame", payload.leagueId || "");
+
+  const categories = typeof getCategoriesCached === "function"
+    ? getCategoriesCached(gameId)
+    : getCategories(gameId);
+
+  if (typeof externalResultsBridgeEnrichCategoriesWithLiveProbabilities_ !== "function") {
+    return { success: true, gameId: gameId, probabilities: [] };
+  }
+
+  const enriched = externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(gameId, categories || []);
+  const probabilities = [];
+
+  (enriched || []).forEach(function(category) {
+    (category.nominees || []).forEach(function(nominee) {
+      if (nominee.liveProbability === undefined || nominee.liveProbability === null || nominee.liveProbability === "") return;
+      probabilities.push({
+        categoryId: category.id,
+        nomineeId: nominee.id,
+        liveProbability: nominee.liveProbability,
+        liveProbabilityProvider: nominee.liveProbabilityProvider || "",
+        liveProbabilityUpdatedAt: nominee.liveProbabilityUpdatedAt || "",
+        liveProbabilityMarketId: nominee.liveProbabilityMarketId || "",
+        liveProbabilityOutcome: nominee.liveProbabilityOutcome || "",
+        liveProbabilitySourceUrl: nominee.liveProbabilitySourceUrl || ""
+      });
+    });
+  });
+
+  return { success: true, gameId: gameId, probabilities: probabilities };
 }
 
 /* =========================
@@ -226,6 +293,22 @@ function apiGetDashboardGamesHub(payload) {
     username,
     token
   );
+
+  const dashboardCache = CacheService.getScriptCache();
+  const dashboardCacheKey = typeof appDashboardCacheKey_ === "function"
+    ? appDashboardCacheKey_(username)
+    : "dashboard_hub_v2_" + username.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 120);
+
+  if (dashboardCacheKey) {
+    try {
+      const cachedDashboard = dashboardCache.get(dashboardCacheKey);
+      if (cachedDashboard) {
+        const parsedDashboard = JSON.parse(cachedDashboard);
+        parsedDashboard.cached = true;
+        return parsedDashboard;
+      }
+    } catch (cacheError) {}
+  }
 
   const games =
     typeof filterGamesForUser_ === "function"
@@ -341,7 +424,7 @@ function apiGetDashboardGamesHub(payload) {
     hubAppearance = [];
   }
 
-  return {
+  const dashboardPayload = {
     success: true,
     username: username,
     defaultGameId: defaultGameId,
@@ -352,6 +435,14 @@ function apiGetDashboardGamesHub(payload) {
     activeGames: activeGames,
     pastGames: pastGames
   };
+
+  if (dashboardCacheKey) {
+    try {
+      safeScriptCachePut_(dashboardCache, dashboardCacheKey, JSON.stringify(dashboardPayload), 120);
+    } catch (cacheError) {}
+  }
+
+  return dashboardPayload;
 
 }
 

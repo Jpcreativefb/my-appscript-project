@@ -2662,13 +2662,9 @@
    v1.2.17t — Page gradients, winner treatments, loading shell
 ========================================================= */
 .picks-page.picks-appearance-loading{position:relative;min-height:320px;}
-.picks-page.picks-appearance-loading > *{visibility:hidden;}
-.picks-page.picks-appearance-loading::after{
-  content:"Loading game style…"; visibility:visible; position:absolute; inset:32px 16px auto;
-  display:grid; place-items:center; min-height:180px; border-radius:14px;
-  color:#cbd5e1; background:linear-gradient(135deg,#0f172a,#020617);
-  border:1px solid rgba(148,163,184,.18); font-weight:800; letter-spacing:.02em;
-}
+/* v1.2.18x2: style metadata is decorative, never a reason to hide playable UI. */
+.picks-page.picks-appearance-loading > *{visibility:visible;}
+.picks-page.picks-appearance-loading::after{display:none;content:"";}
 .picks-page.picks-appearance-active.picks-theme-page-bg-gradient{background:var(--picks-theme-page-gradient,var(--picks-theme-page-bg,#020617));}
 .picks-page.picks-appearance-active.picks-theme-header-bg-gradient .picks-page-header{background:var(--picks-theme-header-gradient,var(--picks-theme-header-bg,#0f172a));}
 .picks-page.picks-appearance-active.picks-theme-question-bg-gradient .pick-category-card{background:var(--picks-theme-question-gradient,var(--picks-theme-question-bg,#0f172a));}

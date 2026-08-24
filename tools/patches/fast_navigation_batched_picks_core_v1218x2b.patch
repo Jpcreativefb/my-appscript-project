@@ -1,0 +1,1101 @@
+diff --git a/backend/Api.js b/backend/Api.js
+index de1cbf48e98272ac9cca4f35731ceb04afb09d57..d9006199de11e01bc2103d0506d6088a668f6466 100644
+--- a/backend/Api.js
++++ b/backend/Api.js
+@@ -141,6 +141,20 @@ function doPost(e) {
+       return json(apiAdminSendPushNotification(body));
+     }
+ 
++    if (action === "savePicksBatch") {
++      const postGameId = body.gameId || getDefaultGameId();
++      const postLeagueId = typeof normalizeLeagueId_ === "function"
++        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
++        : String(body.leagueId || body.activeLeagueId || "").trim();
++      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
++      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
++      return json(savePicksBatch({
++        username: body.username,
++        gameId: postGameId,
++        picks: Array.isArray(body.picks) ? body.picks : []
++      }));
++    }
++
+     if (action === "saveConfidencePicksBatch") {
+       const postGameId = body.gameId || getDefaultGameId();
+       const postLeagueId = typeof normalizeLeagueId_ === "function"
+@@ -698,6 +712,7 @@ function doGet(e) {
+       action === "saveUserProfile" ||
+       action === "uploadProfileAvatar" ||
+       action === "savePick" ||
++      action === "savePicksBatch" ||
+       action === "saveRanking" ||
+       action === "saveSurvivorPick" ||
+       action === "adminSaveRankingResults" ||
+@@ -2215,6 +2230,17 @@ function doGet(e) {
+     
+     }
+     
++    if (action === "getGameLiveProbabilities") {
++      return json(
++        apiGetGameLiveProbabilities({
++          username: params.username,
++          token: params.token,
++          gameId: gameId,
++          leagueId: leagueId
++        })
++      );
++    }
++
+     /* =========================
+        DASHBOARD GAMES HUB
+     ========================= */
+diff --git a/backend/engines/AppDataEngine.js b/backend/engines/AppDataEngine.js
+index 260aab75c0266307ebbaa2a876341d956c775a3c..2e592687d1a4a72ff252b7785f34db0b935bb1f0 100644
+--- a/backend/engines/AppDataEngine.js
++++ b/backend/engines/AppDataEngine.js
+@@ -52,14 +52,35 @@ function apiGetStartupPayload(payload) {
+       ? getCategoriesCached(gameId)
+       : getCategories(gameId);
+ 
++  let liveProbabilitiesDeferred = false;
++
++  // Do not block the core Picks payload opening a second spreadsheet just to
++  // decorate Awards answers with live P/K probabilities. Reuse a warm lookup
++  // when one exists; otherwise render the questions first and hydrate prices
++  // with a separate non-blocking request from the browser.
+   if (
+-    typeof externalResultsBridgeEnrichCategoriesWithLiveProbabilities_ === "function"
++    typeof externalResultsBridgeCategoryShowsLiveProbabilities_ === "function" &&
++    Array.isArray(categories)
+   ) {
+-    categories =
+-      externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
+-        gameId,
+-        categories
+-      );
++    const needsExternalPrices = categories.some(function(category) {
++      return externalResultsBridgeCategoryShowsLiveProbabilities_(category);
++    });
++
++    if (needsExternalPrices) {
++      const cachedLookup =
++        typeof externalResultsBridgeReadLiveProbabilityCache_ === "function"
++          ? externalResultsBridgeReadLiveProbabilityCache_(gameId)
++          : null;
++
++      if (
++        cachedLookup !== null &&
++        typeof externalResultsBridgeApplyLiveProbabilityLookup_ === "function"
++      ) {
++        categories = externalResultsBridgeApplyLiveProbabilityLookup_(categories, cachedLookup);
++      } else {
++        liveProbabilitiesDeferred = true;
++      }
++    }
+   }
+ 
+   const picks =
+@@ -142,11 +163,57 @@ function apiGetStartupPayload(payload) {
+     },
+ 
+     realityTvView:
+-      realityTvView
++      realityTvView,
++
++    liveProbabilitiesDeferred:
++      liveProbabilitiesDeferred
+   };
+ 
+ }
+ 
++function apiGetGameLiveProbabilities(payload) {
++
++  payload = payload || {};
++
++  const username = String(payload.username || "").trim();
++  const token = String(payload.token || "").trim();
++  const gameId = normalizeGameId_(payload.gameId || getDefaultGameId());
++
++  if (!username || !token) throw new Error("Session expired. Please log in again.");
++
++  validateUserSession_(username, token);
++  requireGameFeatureAccess_(username, gameId, "viewGame", payload.leagueId || "");
++
++  const categories = typeof getCategoriesCached === "function"
++    ? getCategoriesCached(gameId)
++    : getCategories(gameId);
++
++  if (typeof externalResultsBridgeEnrichCategoriesWithLiveProbabilities_ !== "function") {
++    return { success: true, gameId: gameId, probabilities: [] };
++  }
++
++  const enriched = externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(gameId, categories || []);
++  const probabilities = [];
++
++  (enriched || []).forEach(function(category) {
++    (category.nominees || []).forEach(function(nominee) {
++      if (nominee.liveProbability === undefined || nominee.liveProbability === null || nominee.liveProbability === "") return;
++      probabilities.push({
++        categoryId: category.id,
++        nomineeId: nominee.id,
++        liveProbability: nominee.liveProbability,
++        liveProbabilityProvider: nominee.liveProbabilityProvider || "",
++        liveProbabilityUpdatedAt: nominee.liveProbabilityUpdatedAt || "",
++        liveProbabilityMarketId: nominee.liveProbabilityMarketId || "",
++        liveProbabilityOutcome: nominee.liveProbabilityOutcome || "",
++        liveProbabilitySourceUrl: nominee.liveProbabilitySourceUrl || ""
++      });
++    });
++  });
++
++  return { success: true, gameId: gameId, probabilities: probabilities };
++}
++
+ /* =========================
+    SESSION VALIDATION
+ ========================= */
+@@ -227,6 +294,22 @@ function apiGetDashboardGamesHub(payload) {
+     token
+   );
+ 
++  const dashboardCache = CacheService.getScriptCache();
++  const dashboardCacheKey = typeof appDashboardCacheKey_ === "function"
++    ? appDashboardCacheKey_(username)
++    : "dashboard_hub_v2_" + username.toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 120);
++
++  if (dashboardCacheKey) {
++    try {
++      const cachedDashboard = dashboardCache.get(dashboardCacheKey);
++      if (cachedDashboard) {
++        const parsedDashboard = JSON.parse(cachedDashboard);
++        parsedDashboard.cached = true;
++        return parsedDashboard;
++      }
++    } catch (cacheError) {}
++  }
++
+   const games =
+     typeof filterGamesForUser_ === "function"
+       ? filterGamesForUser_(
+@@ -341,7 +424,7 @@ function apiGetDashboardGamesHub(payload) {
+     hubAppearance = [];
+   }
+ 
+-  return {
++  const dashboardPayload = {
+     success: true,
+     username: username,
+     defaultGameId: defaultGameId,
+@@ -353,6 +436,14 @@ function apiGetDashboardGamesHub(payload) {
+     pastGames: pastGames
+   };
+ 
++  if (dashboardCacheKey) {
++    try {
++      safeScriptCachePut_(dashboardCache, dashboardCacheKey, JSON.stringify(dashboardPayload), 120);
++    } catch (cacheError) {}
++  }
++
++  return dashboardPayload;
++
+ }
+ 
+ function isDashboardPastGame_(game) {
+diff --git a/backend/engines/PicksEngine.js b/backend/engines/PicksEngine.js
+index 04f3edbd57066ac50d9c595e3bd34de365729246..4a9af4e24ca0579072fba503b1c43eed6ce1bd52 100644
+--- a/backend/engines/PicksEngine.js
++++ b/backend/engines/PicksEngine.js
+@@ -1338,6 +1338,277 @@ function saveConfidencePicksBatch(payload) {
+ 
+ }
+ 
++
++function savePicksBatch(payload) {
++
++  let lock = null;
++  let lockAcquired = false;
++
++  try {
++    payload = payload || {};
++
++    const username = normalizeString_(payload.username);
++    const gameId = normalizeString_(payload.gameId || getDefaultGameId());
++    const requested = Array.isArray(payload.picks) ? payload.picks : [];
++
++    if (!username || !gameId) return { success: false, message: "Username and gameId are required" };
++    if (!requested.length) return { success: false, message: "No picks were supplied" };
++    if (requested.length > 100) return { success: false, message: "Too many picks in one batch" };
++
++    validateGameId(gameId);
++
++    const gameConfig = typeof getGameRuntimeConfig === "function"
++      ? getGameRuntimeConfig(gameId)
++      : getGame(gameId);
++
++    const settings = typeof getCategorySettingsCached === "function"
++      ? getCategorySettingsCached(gameId)
++      : getCategorySettings(gameId);
++
++    const categories = typeof getCategoriesCached === "function"
++      ? getCategoriesCached(gameId)
++      : getCategories(gameId);
++
++    const categoryMap = {};
++    (categories || []).forEach(function(category) {
++      categoryMap[normalizeLower_(category && category.id)] = category;
++    });
++
++    const resolutionMap = typeof getCategoryResultsResolutionMap === "function"
++      ? getCategoryResultsResolutionMap(gameId)
++      : (typeof getCategoryResultsWinnerMap === "function" ? getCategoryResultsWinnerMap(gameId) : {});
++
++    const normalizedItems = [];
++    const seen = {};
++
++    requested.forEach(function(item) {
++      item = item || {};
++      const categoryId = normalizeLower_(item.categoryId);
++      const nomineeId = normalizeLower_(item.nomineeId);
++      if (!categoryId || !nomineeId) throw new Error("Every pick must include categoryId and nomineeId");
++      if (seen[categoryId]) throw new Error("Duplicate category in pick batch: " + categoryId);
++      seen[categoryId] = true;
++
++      const config = settings[categoryId] || null;
++      const category = categoryMap[categoryId] || null;
++      if (!config || !category) throw new Error("Invalid categoryId: " + categoryId);
++
++      const mode = typeof normalizeCategoryScoreMode_ === "function"
++        ? normalizeCategoryScoreMode_(config.scoreMode)
++        : normalizeLower_(config.scoreMode || "correct-pick");
++
++      const confidenceMode = mode === "confidence-points" ||
++        (gameConfig && gameConfig.confidenceEnabled === true && mode === "correct-pick");
++
++      if (mode === "wager" || mode === "ranking" || mode === "staked-points" || confidenceMode) {
++        throw new Error("This batch route only saves standard prediction picks: " + categoryId);
++      }
++
++      if (!isFixedPointPredictionEnabledForGame_(gameConfig)) {
++        throw new Error("Fixed-point predictions are not enabled for this game");
++      }
++
++      const resolution = typeof getHybridCategoryResolution_ === "function"
++        ? getHybridCategoryResolution_(categoryId, config, resolutionMap)
++        : { resolved: Boolean(config.winnerNomineeId) };
++
++      if (resolution.resolved) throw new Error("This question has already been settled: " + categoryId);
++      if (isCategoryConfigLocked_(config)) throw new Error("Category is locked: " + categoryId);
++
++      const nomineeExists = (category.nominees || []).some(function(nominee) {
++        return normalizeLower_(nominee && nominee.id) === nomineeId;
++      });
++      if (!nomineeExists) throw new Error("Invalid nomineeId for category: " + categoryId);
++
++      normalizedItems.push({ categoryId: categoryId, nomineeId: nomineeId, config: config });
++    });
++
++    lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
++    lock.waitLock(2500);
++    lockAcquired = true;
++
++    const sheet = getPicksSheet_();
++    const lastColumn = sheet.getLastColumn();
++    if (lastColumn <= 0) throw new Error("Picks sheet empty");
++
++    const headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
++    const col = getPicksColumnMap_(headers);
++    validatePickColumns_(col);
++
++    // Read only rows indexed to this game. The prior batch prototype used
++    // getDataRange(), which would make a popular app slower as Picks history grew.
++    let gameRowNumbers = [];
++    if (typeof normalizedStorageGetIndexEntry_ === "function") {
++      const entry = normalizedStorageGetIndexEntry_("Picks", gameId);
++      if (entry && Array.isArray(entry.rowNumbers)) gameRowNumbers = entry.rowNumbers.slice();
++    }
++    if (!gameRowNumbers.length && typeof normalizedStorageFindRowsByGame_ === "function") {
++      gameRowNumbers = normalizedStorageFindRowsByGame_(sheet, gameId);
++      if (typeof normalizedStorageUpsertIndexEntry_ === "function") {
++        normalizedStorageUpsertIndexEntry_({
++          entityType: "Picks",
++          gameId: gameId,
++          sheetName: PICKS_SHEET,
++          rowNumbers: gameRowNumbers
++        });
++      }
++    }
++
++    const userKey = normalizeLower_(username);
++    const existingByCategory = {};
++    const sortedRows = gameRowNumbers.map(Number).filter(function(value) { return value > 1; }).sort(function(a,b){ return a-b; });
++    let readIndex = 0;
++    while (readIndex < sortedRows.length) {
++      const startRow = sortedRows[readIndex];
++      let count = 1;
++      while (readIndex + count < sortedRows.length && sortedRows[readIndex + count] === startRow + count) count++;
++      const rows = sheet.getRange(startRow, 1, count, headers.length).getValues();
++      rows.forEach(function(row, offset) {
++        if (normalizeString_(row[col.gameId]) !== gameId) return;
++        if (normalizeLower_(row[col.username]) !== userKey) return;
++        const categoryId = normalizeLower_(row[col.category]);
++        if (!categoryId) return;
++        existingByCategory[categoryId] = { rowNumber: startRow + offset, row: row.slice() };
++      });
++      readIndex += count;
++    }
++
++    const now = new Date();
++    const updates = [];
++    const newRows = [];
++    const results = [];
++
++    normalizedItems.forEach(function(item) {
++      const existing = existingByCategory[item.categoryId] || null;
++      const previousNominee = existing ? normalizeLower_(existing.row[col.nominee]) : "";
++      const originalNominee = existing
++        ? (normalizeLower_(existing.row[col.original]) || previousNominee || item.nomineeId)
++        : item.nomineeId;
++      const changeCount = existing ? Number(existing.row[col.changes]) || 0 : 0;
++      const isChange = !!(previousNominee && previousNominee !== item.nomineeId);
++      const maxChanges = getMaxChanges_(item.config);
++
++      if (isChange && maxChanges >= 0 && changeCount >= maxChanges) {
++        throw new Error("Change limit reached: " + item.categoryId);
++      }
++
++      const finalChangeCount = isChange ? changeCount + 1 : changeCount;
++
++      if (existing) {
++        if (previousNominee !== item.nomineeId) {
++          const row = existing.row.slice();
++          row[col.nominee] = item.nomineeId;
++          row[col.lastUpdated] = now;
++          if (isChange) row[col.changes] = finalChangeCount;
++          if (!normalizeLower_(row[col.original])) row[col.original] = originalNominee;
++          if (col.confidencePoints !== -1) row[col.confidencePoints] = 0;
++          if (col.stakePoints !== -1) row[col.stakePoints] = 0;
++          updates.push({ rowNumber: existing.rowNumber, row: row });
++        }
++      } else {
++        const row = new Array(headers.length).fill("");
++        row[col.gameId] = gameId;
++        row[col.timestamp] = now;
++        row[col.username] = username;
++        row[col.category] = item.categoryId;
++        row[col.nominee] = item.nomineeId;
++        row[col.points] = 0;
++        row[col.original] = item.nomineeId;
++        row[col.changes] = 0;
++        row[col.lastUpdated] = now;
++        if (col.confidencePoints !== -1) row[col.confidencePoints] = 0;
++        if (col.stakePoints !== -1) row[col.stakePoints] = 0;
++        newRows.push({ categoryId: item.categoryId, row: row });
++      }
++
++      results.push({
++        success: true,
++        categoryId: item.categoryId,
++        nomineeId: item.nomineeId,
++        originalNomineeId: originalNominee,
++        changeCount: finalChangeCount,
++        pickMeta: buildPickMeta_(item.categoryId, item.nomineeId, item.config, finalChangeCount, originalNominee)
++      });
++    });
++
++    // Existing rows are grouped into contiguous writes to keep Sheet RPC count low.
++    updates.sort(function(a, b) { return a.rowNumber - b.rowNumber; });
++    let index = 0;
++    while (index < updates.length) {
++      const start = updates[index].rowNumber;
++      const rows = [updates[index].row];
++      let next = index + 1;
++      while (next < updates.length && updates[next].rowNumber === start + rows.length) {
++        rows.push(updates[next].row);
++        next++;
++      }
++      sheet.getRange(start, 1, rows.length, headers.length).setValues(rows);
++      index = next;
++    }
++
++    const cacheUpdates = updates.map(function(update) {
++      return { rowNumber: update.rowNumber, row: update.row };
++    });
++
++    if (newRows.length) {
++      const startRow = sheet.getLastRow() + 1;
++      sheet.getRange(startRow, 1, newRows.length, headers.length)
++        .setValues(newRows.map(function(item) { return item.row; }));
++
++      const prior = typeof normalizedStorageGetIndexEntry_ === "function"
++        ? normalizedStorageGetIndexEntry_("Picks", gameId)
++        : null;
++      const rowNumbers = prior && Array.isArray(prior.rowNumbers) ? prior.rowNumbers.slice() : [];
++
++      newRows.forEach(function(item, offset) {
++        const rowNumber = startRow + offset;
++        cacheUpdates.push({ rowNumber: rowNumber, row: item.row });
++        if (rowNumbers.indexOf(rowNumber) === -1) rowNumbers.push(rowNumber);
++      });
++
++      if (typeof normalizedStorageUpsertIndexEntry_ === "function") {
++        normalizedStorageUpsertIndexEntry_({
++          entityType: "Picks",
++          gameId: gameId,
++          sheetName: PICKS_SHEET,
++          rowNumbers: rowNumbers
++        });
++      }
++    }
++
++    SpreadsheetApp.flush();
++
++    if (lockAcquired) {
++      lock.releaseLock();
++      lockAcquired = false;
++    }
++
++    // Clear only derived/user results and keep a warm whole-Picks cache coherent.
++    if (typeof AppCache !== "undefined" && AppCache) {
++      if (typeof AppCache.clearPlayerActionCaches === "function") {
++        AppCache.clearPlayerActionCaches(gameId, [], username);
++      }
++      if (typeof AppCache.syncSheetRows === "function") {
++        AppCache.syncSheetRows(PICKS_SHEET, cacheUpdates);
++      }
++    }
++
++    return {
++      success: true,
++      gameId: gameId,
++      savedCount: updates.length + newRows.length,
++      processedCount: results.length,
++      results: results
++    };
++
++  } catch (err) {
++    Logger.log("savePicksBatch ERROR | " + err.message);
++    return { success: false, message: err.message };
++  } finally {
++    if (lockAcquired && lock) lock.releaseLock();
++  }
++}
++
+ function savePick(payload){
+ 
+   let lock = null;
+diff --git a/backend/services/AppCache.js b/backend/services/AppCache.js
+index bc5c3a19af2f0bdbb801fea9239fee4c66717807..cb94c950b4e14408fc97e98061ae4a5cf48c4874 100644
+--- a/backend/services/AppCache.js
++++ b/backend/services/AppCache.js
+@@ -327,6 +327,51 @@ function getLeaderboardCached(
+ 
+ }
+ 
++
++function appCacheUsernameKey_(username){
++  return String(username || "")
++    .trim()
++    .toLowerCase()
++    .replace(/[^a-z0-9_.-]+/g, "_")
++    .slice(0, 120);
++}
++
++function appDashboardCacheKey_(username){
++  const userKey = appCacheUsernameKey_(username);
++  return userKey ? "dashboard_hub_v2_" + userKey : "";
++}
++
++/* Keep a warm whole-sheet cache coherent after a targeted batch write instead
++   of deleting it and forcing the next request to re-read the entire Sheet. */
++function appCacheSyncSheetRows_(sheetName, rowUpdates){
++  sheetName = String(sheetName || "").trim();
++  if (!sheetName || !Array.isArray(rowUpdates) || !rowUpdates.length) return false;
++
++  const cache = CacheService.getScriptCache();
++  const key = "sheet_" + sheetName;
++  let raw = null;
++  try { raw = cache.get(key); } catch (err) { raw = null; }
++  if (!raw) return false;
++
++  try {
++    const data = JSON.parse(raw);
++    rowUpdates.forEach(function(update){
++      const rowNumber = Number(update && update.rowNumber || 0);
++      const row = update && Array.isArray(update.row) ? update.row.slice() : null;
++      if (!rowNumber || !row) return;
++      while (data.length < rowNumber) data.push([]);
++      data[rowNumber - 1] = row;
++    });
++    safeScriptCachePut_(cache, key, JSON.stringify(data), CACHE_TTL);
++    APP_RUNTIME_CACHE[key] = data;
++    return true;
++  } catch (err) {
++    try { cache.remove(key); } catch (removeError) {}
++    delete APP_RUNTIME_CACHE[key];
++    return false;
++  }
++}
++
+ /* =========================
+    CACHE INVALIDATION HELPERS
+    v1.2.18x1b
+@@ -407,6 +452,9 @@ function clearPlayerActionCaches(gameId, sheetNames, username){
+     }
+   }
+ 
++  const dashboardKey = appDashboardCacheKey_(username);
++  if (dashboardKey) keys.push(dashboardKey);
++
+   appCacheRemoveKeys_(cache, keys);
+ }
+ 
+@@ -570,6 +618,8 @@ var AppCache = {
+   clearPlayerActionCaches,
+   clearGameDataCaches,
+   clearAppCaches,
+-  clearGameCaches
++  clearGameCaches,
++  syncSheetRows: appCacheSyncSheetRows_,
++  dashboardCacheKey: appDashboardCacheKey_
+ 
+ };
+\ No newline at end of file
+diff --git a/frontend/api.js b/frontend/api.js
+index 09c1bd085fab74666b1252674e20c4a3b537b23d..0f2801c57db715f4822b182a9dab366710b82262 100644
+--- a/frontend/api.js
++++ b/frontend/api.js
+@@ -945,6 +945,19 @@ async function apiSavePick(payload) {
+ 
+ }
+ 
++async function apiSavePicksBatch(payload) {
++
++  payload = payload || {};
++
++  return apiPost("savePicksBatch", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    picks: Array.isArray(payload.picks) ? payload.picks : []
++  });
++
++}
++
+ async function apiSaveConfidencePicksBatch(payload) {
+ 
+   payload = payload || {};
+@@ -1127,6 +1140,19 @@ async function apiGetArchivedGamesHistory() {
+ 
+ }
+ 
++async function apiGetGameLiveProbabilities(gameId) {
++
++  const session = getSession();
++
++  return api("getGameLiveProbabilities", {
++    username: session && session.username ? session.username : "",
++    token: session && session.token ? session.token : "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++
++}
++
+ async function apiGetStartupPayload() {
+ 
+   const session =
+diff --git a/frontend/css/picks.css b/frontend/css/picks.css
+index eecc3f7ce07fca668114ff9897c37f7f3edd2aa0..7cdd4a531870aaa7da4389854f50b12d4dd74b2c 100644
+--- a/frontend/css/picks.css
++++ b/frontend/css/picks.css
+@@ -2662,13 +2662,9 @@
+    v1.2.17t — Page gradients, winner treatments, loading shell
+ ========================================================= */
+ .picks-page.picks-appearance-loading{position:relative;min-height:320px;}
+-.picks-page.picks-appearance-loading > *{visibility:hidden;}
+-.picks-page.picks-appearance-loading::after{
+-  content:"Loading game style…"; visibility:visible; position:absolute; inset:32px 16px auto;
+-  display:grid; place-items:center; min-height:180px; border-radius:14px;
+-  color:#cbd5e1; background:linear-gradient(135deg,#0f172a,#020617);
+-  border:1px solid rgba(148,163,184,.18); font-weight:800; letter-spacing:.02em;
+-}
++/* v1.2.18x2: style metadata is decorative, never a reason to hide playable UI. */
++.picks-page.picks-appearance-loading > *{visibility:visible;}
++.picks-page.picks-appearance-loading::after{display:none;content:"";}
+ .picks-page.picks-appearance-active.picks-theme-page-bg-gradient{background:var(--picks-theme-page-gradient,var(--picks-theme-page-bg,#020617));}
+ .picks-page.picks-appearance-active.picks-theme-header-bg-gradient .picks-page-header{background:var(--picks-theme-header-gradient,var(--picks-theme-header-bg,#0f172a));}
+ .picks-page.picks-appearance-active.picks-theme-question-bg-gradient .pick-category-card{background:var(--picks-theme-question-gradient,var(--picks-theme-question-bg,#0f172a));}
+diff --git a/frontend/js/api.js b/frontend/js/api.js
+index 09c1bd085fab74666b1252674e20c4a3b537b23d..0f2801c57db715f4822b182a9dab366710b82262 100644
+--- a/frontend/js/api.js
++++ b/frontend/js/api.js
+@@ -945,6 +945,19 @@ async function apiSavePick(payload) {
+ 
+ }
+ 
++async function apiSavePicksBatch(payload) {
++
++  payload = payload || {};
++
++  return apiPost("savePicksBatch", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    picks: Array.isArray(payload.picks) ? payload.picks : []
++  });
++
++}
++
+ async function apiSaveConfidencePicksBatch(payload) {
+ 
+   payload = payload || {};
+@@ -1127,6 +1140,19 @@ async function apiGetArchivedGamesHistory() {
+ 
+ }
+ 
++async function apiGetGameLiveProbabilities(gameId) {
++
++  const session = getSession();
++
++  return api("getGameLiveProbabilities", {
++    username: session && session.username ? session.username : "",
++    token: session && session.token ? session.token : "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++
++}
++
+ async function apiGetStartupPayload() {
+ 
+   const session =
+diff --git a/frontend/js/pages/picks.js b/frontend/js/pages/picks.js
+index 96f31b414ef9f2a431422c8a5a0d51048f08e51e..8e49adfb8eda39e3487d74a9e15c3affe0b3b2ca 100644
+--- a/frontend/js/pages/picks.js
++++ b/frontend/js/pages/picks.js
+@@ -19,12 +19,14 @@ let PICKS_PAGE_DATA = {
+   seasonAnchor: null,
+   episodeComparison: null,
+   realityTvView: null,
+-  appearance: null
++  appearance: null,
++  liveProbabilitiesDeferred: false
+ };
+ 
+ let PICKS_COUNTDOWN_TIMER = null;
+ let PICKS_ENHANCEMENTS_REQUEST = null;
+ const PICKS_ENHANCEMENTS_CACHE = {};
++const PICKS_APPEARANCE_CACHE = {};
+ const PICKS_PENDING_SAVES = {};
+ let PICKS_AUTO_ADVANCE_TIMER = null;
+ let PICKS_TEMP_OPEN_CATEGORY_ID = "";
+@@ -43,6 +45,11 @@ let PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
+ let PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+ let PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
+ let PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
++let PICKS_STANDARD_AUTOSAVE_TIMER = null;
++let PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
++const PICKS_STANDARD_AUTOSAVE_QUEUE = {};
++const PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS = 1800;
++let PICKS_LIVE_PROBABILITY_REQUEST = null;
+ 
+ const PICKS_CONFIDENCE_SPORTS_API_URL =
+   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
+@@ -488,6 +495,9 @@ PICKS_PAGE_DATA.confidenceScoringMode =
+   PICKS_PAGE_DATA.realityTvView =
+     payload.realityTvView || null;
+ 
++  PICKS_PAGE_DATA.liveProbabilitiesDeferred =
++    payload.liveProbabilitiesDeferred === true;
++
+   const enhancementKey = picksEnhancementKey_();
+   const cachedEnhancements = PICKS_ENHANCEMENTS_CACHE[enhancementKey] || null;
+   if (cachedEnhancements) {
+@@ -719,7 +729,7 @@ function resetConfidenceViewState_() {
+   PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
+   PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
+   PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
+-  PICKS_PAGE_DATA.appearance = null;
++  PICKS_PAGE_DATA.appearance = PICKS_APPEARANCE_CACHE[String(PICKS_PAGE_DATA.gameId || "")] || null;
+ 
+ }
+ 
+@@ -1891,6 +1901,21 @@ async function hydrateConfidenceAppearance_() {
+   const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
+   if (!gameId) return;
+ 
++  if (!PICKS_PAGE_DATA.appearance) {
++    let cachedAppearance = PICKS_APPEARANCE_CACHE[gameId] || null;
++    if (!cachedAppearance) {
++      try {
++        const raw = sessionStorage.getItem("pattcGameAppearance:" + gameId);
++        if (raw) cachedAppearance = JSON.parse(raw);
++      } catch (err) {}
++    }
++    if (cachedAppearance) {
++      PICKS_APPEARANCE_CACHE[gameId] = cachedAppearance;
++      PICKS_PAGE_DATA.appearance = cachedAppearance;
++      applyPicksAppearanceToPage_();
++    }
++  }
++
+   if (PICKS_PAGE_DATA.appearance && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return;
+   if (PICKS_CONFIDENCE_APPEARANCE_REQUEST && PICKS_CONFIDENCE_APPEARANCE_GAME_ID === gameId) return PICKS_CONFIDENCE_APPEARANCE_REQUEST;
+ 
+@@ -1899,8 +1924,12 @@ async function hydrateConfidenceAppearance_() {
+     try {
+       const result = await apiGetGameAppearance(gameId);
+       if (result && result.success !== false && String(PICKS_PAGE_DATA.gameId || "") === gameId) {
++        PICKS_APPEARANCE_CACHE[gameId] = result;
+         PICKS_PAGE_DATA.appearance = result;
+-        refreshPicksPage();
++        try { sessionStorage.setItem("pattcGameAppearance:" + gameId, JSON.stringify(result)); } catch (err) {}
++        // The page is already usable. Apply the theme without replacing the
++        // whole question DOM just because style metadata arrived later.
++        applyPicksAppearanceToPage_();
+       }
+     } catch (err) {
+       console.warn("Confidence appearance load skipped", err);
+@@ -3768,14 +3797,192 @@ function renderNomineeButton(
+ 
+ }
+ 
++function picksStandardQueueStorageKey_() {
++  const session = PICKS_PAGE_DATA.session || getSession() || {};
++  return "pattcPendingStandardPicks:" +
++    String(session.username || "").trim().toLowerCase() + ":" +
++    String(PICKS_PAGE_DATA.gameId || "").trim();
++}
++
++function picksPersistStandardQueue_() {
++  try {
++    const rows = Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).map(function(categoryId) {
++      const item = PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] || {};
++      return { categoryId: categoryId, nomineeId: item.nomineeId || "" };
++    }).filter(function(item) { return item.categoryId && item.nomineeId; });
++    const key = picksStandardQueueStorageKey_();
++    if (rows.length) localStorage.setItem(key, JSON.stringify(rows));
++    else localStorage.removeItem(key);
++  } catch (err) {}
++}
++
++function picksPatchStartupPayload_(result) {
++  if (!result || typeof APP_STATE === "undefined" || !APP_STATE.startupPayload) return;
++  if (String(APP_STATE.startupPayload.gameId || "") !== String(PICKS_PAGE_DATA.gameId || "")) return;
++  const payloadPicks = APP_STATE.startupPayload.picks || (APP_STATE.startupPayload.picks = {});
++  payloadPicks.picks = payloadPicks.picks || {};
++  payloadPicks.changeCounts = payloadPicks.changeCounts || {};
++  payloadPicks.originalPicks = payloadPicks.originalPicks || {};
++  payloadPicks.pickMeta = payloadPicks.pickMeta || {};
++  payloadPicks.picks[result.categoryId] = result.nomineeId;
++  payloadPicks.changeCounts[result.categoryId] = Number(result.changeCount) || 0;
++  payloadPicks.originalPicks[result.categoryId] = result.originalNomineeId || result.nomineeId;
++  if (result.pickMeta) payloadPicks.pickMeta[result.categoryId] = result.pickMeta;
++}
++
++function picksScheduleStandardAutosave_() {
++  if (PICKS_STANDARD_AUTOSAVE_TIMER) clearTimeout(PICKS_STANDARD_AUTOSAVE_TIMER);
++  if (Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).length >= 4) {
++    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, 50);
++  } else {
++    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS);
++  }
++}
++
++async function picksFlushStandardAutosave_() {
++  if (PICKS_STANDARD_AUTOSAVE_IN_FLIGHT) return;
++  if (PICKS_STANDARD_AUTOSAVE_TIMER) {
++    clearTimeout(PICKS_STANDARD_AUTOSAVE_TIMER);
++    PICKS_STANDARD_AUTOSAVE_TIMER = null;
++  }
++
++  const categoryIds = Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE);
++  if (!categoryIds.length) return;
++
++  const session = PICKS_PAGE_DATA.session || getSession() || {};
++  const batch = categoryIds.map(function(categoryId) {
++    return {
++      categoryId: categoryId,
++      nomineeId: PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId].nomineeId
++    };
++  });
++
++  PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = true;
++  categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "sending"; });
++  showPicksMessage("Syncing " + batch.length + " pick" + (batch.length === 1 ? "" : "s") + "…", false);
++
++  let response = null;
++  try {
++    response = await apiSavePicksBatch({
++      username: session.username,
++      gameId: PICKS_PAGE_DATA.gameId,
++      picks: batch
++    });
++  } catch (err) {
++    response = { success: false, message: err && err.message ? err.message : "Could not sync picks." };
++  }
++
++  if (response && response.success) {
++    (response.results || []).forEach(function(result) {
++      const categoryId = result.categoryId;
++      const queued = PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId];
++      if (queued && normalizeId(queued.nomineeId) === normalizeId(result.nomineeId)) {
++        delete PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId];
++        delete PICKS_PENDING_SAVES[categoryId];
++      }
++      PICKS_PAGE_DATA.picks[categoryId] = result.nomineeId;
++      PICKS_PAGE_DATA.changeCounts[categoryId] = Number(result.changeCount) || 0;
++      PICKS_PAGE_DATA.originalPicks[categoryId] = result.originalNomineeId || result.nomineeId;
++      if (result.pickMeta) PICKS_PAGE_DATA.pickMeta[categoryId] = result.pickMeta;
++      picksPatchStartupPayload_(result);
++    });
++    picksPersistStandardQueue_();
++    refreshPicksPage();
++    showPicksMessage(batch.length === 1 ? "Pick saved." : batch.length + " picks saved.", false);
++  } else {
++    categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "queued"; });
++    picksPersistStandardQueue_();
++    showPicksMessage((response && (response.message || response.error)) || "Picks are still waiting to sync. They will retry automatically.", true);
++  }
++
++  PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
++
++  if (Object.keys(PICKS_STANDARD_AUTOSAVE_QUEUE).length) {
++    PICKS_STANDARD_AUTOSAVE_TIMER = setTimeout(picksFlushStandardAutosave_, response && response.success ? 250 : 2500);
++  }
++}
++
++function picksQueueStandardSave_(categoryId, nomineeId) {
++  PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] = { nomineeId: nomineeId };
++  PICKS_PENDING_SAVES[categoryId] = "queued";
++  picksPersistStandardQueue_();
++  picksScheduleStandardAutosave_();
++}
++
++function picksRestoreStandardQueue_() {
++  let rows = [];
++  try {
++    rows = JSON.parse(localStorage.getItem(picksStandardQueueStorageKey_()) || "[]");
++  } catch (err) { rows = []; }
++  if (!Array.isArray(rows) || !rows.length) return;
++
++  rows.forEach(function(item) {
++    const categoryId = normalizeId(item && item.categoryId);
++    const nomineeId = normalizeId(item && item.nomineeId);
++    const category = (PICKS_PAGE_DATA.categories || []).find(function(candidate) {
++      return normalizeId(candidate && candidate.id) === categoryId;
++    });
++    if (!category || !nomineeId || isCategoryLocked(category)) return;
++    PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId] = { nomineeId: nomineeId };
++    PICKS_PENDING_SAVES[categoryId] = "queued";
++    PICKS_PAGE_DATA.picks[categoryId] = nomineeId;
++  });
++  picksScheduleStandardAutosave_();
++}
++
++async function hydratePicksLiveProbabilities_() {
++  if (PICKS_PAGE_DATA.liveProbabilitiesDeferred !== true || typeof apiGetGameLiveProbabilities !== "function") return;
++  const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
++  if (!gameId) return;
++  if (PICKS_LIVE_PROBABILITY_REQUEST && PICKS_LIVE_PROBABILITY_REQUEST.gameId === gameId) {
++    return PICKS_LIVE_PROBABILITY_REQUEST.promise;
++  }
++
++  const promise = (async function() {
++  try {
++    const response = await apiGetGameLiveProbabilities(gameId);
++    if (!response || response.success === false || String(PICKS_PAGE_DATA.gameId || "") !== gameId) return;
++    const lookup = {};
++    (response.probabilities || []).forEach(function(item) {
++      lookup[normalizeId(item.categoryId) + "|" + normalizeId(item.nomineeId)] = item;
++    });
++    (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
++      (category.nominees || []).forEach(function(nominee) {
++        const item = lookup[normalizeId(category.id) + "|" + normalizeId(nominee.id)];
++        if (!item) return;
++        nominee.liveProbability = item.liveProbability;
++        nominee.liveProbabilityProvider = item.liveProbabilityProvider || "";
++        nominee.liveProbabilityUpdatedAt = item.liveProbabilityUpdatedAt || "";
++        nominee.liveProbabilityMarketId = item.liveProbabilityMarketId || "";
++        nominee.liveProbabilityOutcome = item.liveProbabilityOutcome || "";
++        nominee.liveProbabilitySourceUrl = item.liveProbabilitySourceUrl || "";
++      });
++    });
++    PICKS_PAGE_DATA.liveProbabilitiesDeferred = false;
++    refreshPicksPage();
++  } catch (err) {
++    console.warn("Live market probabilities loaded later or were skipped:", err);
++  }
++  })();
++
++  PICKS_LIVE_PROBABILITY_REQUEST = { gameId: gameId, promise: promise };
++  try {
++    await promise;
++  } finally {
++    if (PICKS_LIVE_PROBABILITY_REQUEST && PICKS_LIVE_PROBABILITY_REQUEST.gameId === gameId) {
++      PICKS_LIVE_PROBABILITY_REQUEST = null;
++    }
++  }
++}
++
+ /* =========================
+    PICK ACTIONS
+ ========================= */
+ 
+ async function selectNominee(categoryId, nomineeId) {
+ 
+-  if (PICKS_PENDING_SAVES[categoryId]) {
+-    showPicksMessage("This pick is already saving…", false);
++  if (PICKS_PENDING_SAVES[categoryId] === true || PICKS_PENDING_SAVES[categoryId] === "sending") {
++    showPicksMessage("This pick is syncing now…", false);
+     return;
+   }
+ 
+@@ -3962,6 +4169,22 @@ async function selectNominee(categoryId, nomineeId) {
+     }
+   }
+ 
++  const standardBatchEligible =
++    !usesConfidencePointsCategory(category) &&
++    !isStakedPointsCategory(category) &&
++    normalizePicksScoreMode_(category && category.scoreMode) !== "wager" &&
++    normalizePicksScoreMode_(category && category.scoreMode) !== "ranking";
++
++  if (standardBatchEligible) {
++    PICKS_TEMP_OPEN_CATEGORY_ID = categoryId;
++    PICKS_PAGE_DATA.picks[categoryId] = nomineeId;
++    picksQueueStandardSave_(categoryId, nomineeId);
++    refreshPicksPage();
++    showPicksMessage("Pick selected · syncing automatically…", false);
++    scheduleRealityTvPickAutoAdvance_(categoryId);
++    return;
++  }
++
+   const optimisticPreviousPick = previousPick || "";
+   const optimisticPreviousConfidence = Number(PICKS_PAGE_DATA.confidencePoints[categoryId]) || 0;
+   const optimisticPreviousStake = Number(PICKS_PAGE_DATA.stakePoints[categoryId]) || 0;
+@@ -4284,6 +4507,9 @@ function mountPicksPage() {
+   // the core questions and saved picks are already usable.
+   hydratePicksEnhancements_();
+ 
++  picksRestoreStandardQueue_();
++  hydratePicksLiveProbabilities_();
++
+   // Confidence games keep the same dense weekly card in pregame, live, and final states.
+   mountConfidenceLiveSports_();
+   hydrateConfidenceAppearance_();
+diff --git a/tests/appearance_studio_refinement_v1217t_tests.js b/tests/appearance_studio_refinement_v1217t_tests.js
+index c5c11c16576ba2257987fa94c5eeb4e91fde5738..444d1bb9bebb01ba8fd77a0f24dbfe305be7a6b1 100644
+--- a/tests/appearance_studio_refinement_v1217t_tests.js
++++ b/tests/appearance_studio_refinement_v1217t_tests.js
+@@ -53,10 +53,12 @@ assert(manager.includes('Saved ✓'));
+ assert(manager.includes('Applied ✓'));
+ assert(manager.includes('adminAppearanceSetThemeActionState_'));
+ 
+-// Presets and no base-game flash while appearance resolves.
++// Presets and non-blocking appearance hydration while saved styling resolves.
+ ['basic','simple','advanced','mobile'].forEach(preset => assert(manager.includes(`adminAppearanceApplyPreset_('${preset}')`)));
+ assert(picks.includes('picks-appearance-loading'));
+-assert(picksCss.includes('Loading game style…'));
++assert(picksCss.includes('.picks-page.picks-appearance-loading > *{visibility:visible;}'));
++assert(picksCss.includes('.picks-page.picks-appearance-loading::after{display:none;'));
++assert(!picksCss.includes('Loading game style…')); // v1.2.18x2: styling may not hide playable questions
+ 
+ // All page theme classes from the shared serializer are applied to the live page, not only image overlay.
+ assert(picks.includes('if (name.indexOf("picks-theme-") === 0) page.classList.remove(name)'));
+diff --git a/tests/global_performance_lock_v1218x1b_tests.js b/tests/global_performance_lock_v1218x1b_tests.js
+index a5d821d0b4d94eb178f60e81c913b7216dfdb6ef..48c5b71930e0682ad85d9c37c07fbd9eba578101 100644
+--- a/tests/global_performance_lock_v1218x1b_tests.js
++++ b/tests/global_performance_lock_v1218x1b_tests.js
+@@ -72,7 +72,7 @@ console.log('Global performance / lock contention v1.2.18x1b tests passed.');
+ 
+ const app = read('frontend/js/app.js');
+ ok(app.includes('-v1218x1b-performance'), 'App runtime asset marker must be bumped for x1b');
+-ok(/const APP_ASSET_VERSION\s*=\s*"[^"]*-v1218x1b-performance";/.test(app), 'Production one-line APP_ASSET_VERSION must update safely');
++ok(/const APP_ASSET_VERSION\s*=\s*"[^"]*-v1218x1b-performance(?:-[^"]+)?";/.test(app), 'Production one-line APP_ASSET_VERSION must retain the x1b marker when later hotfixes append a suffix');
+ ok(app.includes('APP_PAGE_SNAPSHOT_CACHE'), 'Public navigation must keep in-session page snapshots');
+ ok(app.includes('APP_PAGE_SNAPSHOT_FRESH_MS'), 'Page snapshot freshness window missing');
+ ok(app.includes('appRefreshSnapshotQuietly_'), 'Cached pages must refresh quietly instead of blocking navigation');
+diff --git a/tests/navigation_batch_pick_performance_v1218x2_tests.js b/tests/navigation_batch_pick_performance_v1218x2_tests.js
+new file mode 100644
+index 0000000000000000000000000000000000000000..0f5f2a8dbf9e054364888f4ef4a236516a874cd7
+--- /dev/null
++++ b/tests/navigation_batch_pick_performance_v1218x2_tests.js
+@@ -0,0 +1,77 @@
++const fs = require('fs');
++const path = require('path');
++const root = process.argv[2] ? path.resolve(process.argv[2]) : path.resolve(__dirname, '..');
++function read(rel){ return fs.readFileSync(path.join(root, rel), 'utf8'); }
++function ok(cond,msg){ if(!cond) throw new Error(msg); }
++function fnSlice(src,name){
++  const start = src.indexOf('function ' + name + '(');
++  ok(start >= 0, 'Missing function: ' + name);
++  const next = src.indexOf('\nfunction ', start + 10);
++  return src.slice(start, next >= 0 ? next : src.length);
++}
++
++const app = read('frontend/js/app.js');
++ok(app.includes('APP_PAGE_SNAPSHOT_STORAGE_PREFIX'), 'Snapshots must persist for the current tab/PWA session');
++ok(app.includes('sessionStorage.setItem(appPageSnapshotStorageKey_(key)'), 'Rendered pages must be stored in sessionStorage');
++ok(app.includes('sessionStorage.getItem(appPageSnapshotStorageKey_(key)'), 'Navigation must restore session snapshots');
++const snapshotKey = fnSlice(app, 'appPageSnapshotKey_');
++ok(snapshotKey.includes('[username, "account", pageName]'), 'Home/hub snapshots must not be keyed by selected game');
++ok(app.includes('-v1218x2-fast-nav-batch-picks'), 'x2 asset marker missing');
++
++const appHtml = read('frontend/app.html');
++const sw = read('frontend/sw.js');
++ok(appHtml.includes('-v1218x2-fast-nav-batch-picks'), 'App shell must request x2 assets');
++ok(sw.includes('-v1218x2-fast-nav-batch-picks'), 'Service worker must use x2 cache namespace');
++
++const picksFrontend = read('frontend/js/pages/picks.js');
++ok(picksFrontend.includes('PICKS_STANDARD_AUTOSAVE_QUEUE'), 'Standard pick autosave queue missing');
++ok(picksFrontend.includes('PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS = 1800'), 'Standard pick batching debounce missing');
++ok(picksFrontend.includes('localStorage.setItem(key, JSON.stringify(rows))'), 'Pending picks must survive transient navigation/network failure');
++ok(picksFrontend.includes('apiSavePicksBatch({'), 'Standard picks must use batch API');
++ok(picksFrontend.includes('Pick selected · syncing automatically'), 'Pick UI must update without waiting for server round trip');
++ok(picksFrontend.includes('scheduleRealityTvPickAutoAdvance_(categoryId);\n    return;'), 'Reality/Awards question flow must advance immediately after local selection');
++ok(picksFrontend.includes('hydratePicksLiveProbabilities_();'), 'Deferred market probabilities must hydrate after core page render');
++ok(picksFrontend.includes('PICKS_LIVE_PROBABILITY_REQUEST'), 'Deferred probability request must be deduplicated');
++
++const picksCss = read('frontend/css/picks.css');
++ok(!picksCss.includes('.picks-page.picks-appearance-loading > *{visibility:hidden;}'), 'Appearance loading must not hide already-rendered questions');
++ok(picksCss.includes('.picks-page.picks-appearance-loading::after{display:none;'), 'Appearance loader overlay must stay disabled during deferred styling');
++ok(picksFrontend.includes('PICKS_APPEARANCE_CACHE'), 'Game appearance should be cached in the current session');
++ok(picksFrontend.includes('pattcGameAppearance:'), 'Game appearance should persist in sessionStorage');
++const hydrateAppearance = fnSlice(picksFrontend, 'hydrateConfidenceAppearance_');
++ok(hydrateAppearance.includes('applyPicksAppearanceToPage_()'), 'Deferred appearance should apply in place');
++ok(!hydrateAppearance.includes('refreshPicksPage()'), 'Deferred appearance must not rerender the full picks page');
++ok(app.includes('localStorage.setItem(appPageSnapshotStorageKey_(key)'), 'Home/hub snapshots should survive PWA shell restarts for the short TTL');
++
++const apiFrontend = read('frontend/js/api.js');
++ok(apiFrontend.includes('async function apiSavePicksBatch'), 'Frontend batch API helper missing');
++ok(apiFrontend.includes('async function apiGetGameLiveProbabilities'), 'Deferred probability API helper missing');
++
++const picksBackend = read('backend/engines/PicksEngine.js');
++const saveBatch = fnSlice(picksBackend, 'savePicksBatch');
++ok(saveBatch.includes('lock.waitLock(2500)'), 'Batch pick lock wait must stay below 5 seconds');
++ok(!saveBatch.includes('.getDataRange('), 'Batch route must not full-read the Picks sheet');
++ok(saveBatch.includes('normalizedStorageGetIndexEntry_'), 'Batch route must use the game-indexed Picks row lookup');
++ok(saveBatch.includes('setValues(newRows.map'), 'New picks must be written in one batch');
++ok(saveBatch.includes('AppCache.syncSheetRows'), 'Batch save must keep warm Picks cache coherent');
++ok(!saveBatch.includes('clearPicksCaches('), 'Batch save must not dump the whole Picks cache');
++ok(saveBatch.includes('AppCache.clearPlayerActionCaches'), 'Batch save must still invalidate derived user/game results');
++
++const cache = read('backend/services/AppCache.js');
++ok(cache.includes('function appCacheSyncSheetRows_'), 'Warm sheet cache synchronization helper missing');
++ok(cache.includes('function appDashboardCacheKey_'), 'Dashboard cache helper missing');
++ok(cache.includes('dashboard_hub_v2_'), 'Dashboard response cache namespace missing');
++
++const appData = read('backend/engines/AppDataEngine.js');
++const startup = fnSlice(appData, 'apiGetStartupPayload');
++ok(startup.includes('liveProbabilitiesDeferred'), 'Startup payload must mark deferred live probabilities');
++ok(!startup.includes('externalResultsBridgeEnrichCategoriesWithLiveProbabilities_('), 'Cold External Results Hub reads must not block core startup payload');
++const livePrices = fnSlice(appData, 'apiGetGameLiveProbabilities');
++ok(livePrices.includes('externalResultsBridgeEnrichCategoriesWithLiveProbabilities_'), 'Deferred price route must still load live probabilities');
++ok(appData.includes('cachedDashboard = dashboardCache.get(dashboardCacheKey)'), 'Dashboard should reuse a short server-side payload cache');
++
++const api = read('backend/Api.js');
++ok(api.includes('action === "savePicksBatch"'), 'Backend savePicksBatch route missing');
++ok(api.includes('action === "getGameLiveProbabilities"'), 'Backend deferred probability route missing');
++
++console.log('navigation-batch-pick-performance-v1218x2-tests: PASS');
