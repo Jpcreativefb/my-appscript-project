@@ -1337,7 +1337,11 @@ function adminGameTypeSummaryText_(type, flags) {
   }
 
   if (type === "ranking") {
-    return "Rankings: ON • Predictions: OFF • Sports Wagers: OFF";
+    return "Prediction Rankings: ON • Predictions: OFF • Sports Wagers: OFF";
+  }
+
+  if (type === "voting") {
+    return "Participant Entries + Community Voting • Legacy movie/awards voting remains separate";
   }
 
   if (type === "team-fantasy") {
@@ -2951,7 +2955,8 @@ function renderGameTypeOptions_(
     ["confidence", "Confidence Pool"],
     ["wager", "Sports Wager Game"],
     ["racing-wager", "Racing Wager Game"],
-    ["ranking", "Ranking Game"],
+    ["voting", "Voting / Competition Game"],
+    ["ranking", "Ranking Prediction Game"],
     ["head-to-head", "Head-to-Head Game"],
     ["survivor", "Survivor / Elimination Game"],
     ["team-fantasy", "Team Fantasy Football"],
@@ -3852,6 +3857,10 @@ function adminApplyGameTypeDefaults(
 
   if (type === "ranking") {
     setChecked("rankingEnabled", true);
+  }
+
+  if (type === "voting") {
+    // Voting / Competition uses VotingCompetitionEngine rather than generic question scoring.
   }
 
   if (type === "mixed") {

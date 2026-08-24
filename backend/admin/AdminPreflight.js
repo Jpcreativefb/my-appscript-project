@@ -381,7 +381,7 @@ function adminRunGamePreflight(payload) {
       return category && category.active !== false;
     });
 
-  if (!categories.length && !leaderboardOnlyParent && gameType !== "team-fantasy") {
+  if (!categories.length && !leaderboardOnlyParent && gameType !== "team-fantasy" && gameType !== "voting") {
 
     adminPreflightAddIssue_(
       issues,
@@ -501,6 +501,13 @@ function adminRunGamePreflight(payload) {
       "error",
       "Ranking Game requires RankingEnabled."
     );
+  }
+
+
+  if (gameType === "voting" && typeof votingCompetitionPreflightIssues_ === "function") {
+    votingCompetitionPreflightIssues_(gameId).forEach(function(issue) {
+      adminPreflightAddIssue_(issues, issue.severity || "warning", issue.message || "Voting / Competition readiness issue.");
+    });
   }
 
   if (gameType === "mixed") {

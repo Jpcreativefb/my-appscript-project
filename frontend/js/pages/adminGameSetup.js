@@ -1060,6 +1060,290 @@ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
   `;
 }
 
+
+/* =====================================================
+   VOTING / COMPETITION ADMIN v1.2.18z
+===================================================== */
+
+function adminVotingFieldRow_(field, index) {
+  field = field || {};
+  var type = String(field.type || "short-text");
+  var options = Array.isArray(field.options) ? field.options.join(", ") : String(field.options || "");
+  return `
+    <div class="admin-voting-custom-field-row" data-voting-field-row="${index}">
+      <label class="admin-field">
+        <span>Field Label</span>
+        <input type="text" data-voting-field-label value="${adminSetupEscapeHtml(field.label || "")}" placeholder="Example: Heat Level">
+      </label>
+      <label class="admin-field">
+        <span>Type</span>
+        <select data-voting-field-type>
+          <option value="short-text" ${type === "short-text" ? "selected" : ""}>Short Text</option>
+          <option value="long-text" ${type === "long-text" ? "selected" : ""}>Long Text</option>
+          <option value="number" ${type === "number" ? "selected" : ""}>Number</option>
+          <option value="select" ${type === "select" ? "selected" : ""}>Dropdown</option>
+          <option value="checkbox" ${type === "checkbox" ? "selected" : ""}>Checkbox</option>
+          <option value="yes-no" ${type === "yes-no" ? "selected" : ""}>Yes / No</option>
+        </select>
+      </label>
+      <label class="admin-field">
+        <span>Dropdown Options</span>
+        <input type="text" data-voting-field-options value="${adminSetupEscapeHtml(options)}" placeholder="Mild, Medium, Hot">
+      </label>
+      <label class="admin-checkbox">
+        <input type="checkbox" data-voting-field-required ${field.required ? "checked" : ""}>
+        <span>Required</span>
+      </label>
+      <label class="admin-checkbox">
+        <input type="checkbox" data-voting-field-visible ${field.voterVisible !== false ? "checked" : ""}>
+        <span>Show on voting card</span>
+      </label>
+      <button type="button" class="admin-small-button danger" onclick="adminVotingRemoveCustomField_(this)">Remove</button>
+    </div>
+  `;
+}
+
+function adminVotingAddCustomField_() {
+  var list = document.getElementById("adminVotingCustomFields");
+  if (!list) return;
+  var wrapper = document.createElement("div");
+  wrapper.innerHTML = adminVotingFieldRow_({ label: "", type: "short-text", required: false, voterVisible: true, options: [] }, list.querySelectorAll("[data-voting-field-row]").length);
+  var row = wrapper.firstElementChild;
+  if (row) list.appendChild(row);
+}
+
+function adminVotingRemoveCustomField_(button) {
+  var row = button && button.closest ? button.closest("[data-voting-field-row]") : null;
+  if (row) row.remove();
+}
+
+function adminVotingCollectCustomFields_() {
+  return Array.from(document.querySelectorAll("#adminVotingCustomFields [data-voting-field-row]")).map(function(row, index) {
+    var label = row.querySelector("[data-voting-field-label]");
+    var type = row.querySelector("[data-voting-field-type]");
+    var options = row.querySelector("[data-voting-field-options]");
+    var required = row.querySelector("[data-voting-field-required]");
+    var visible = row.querySelector("[data-voting-field-visible]");
+    var labelValue = String(label && label.value || "").trim();
+    return {
+      id: adminSetupSlugify(labelValue) || ("field-" + (index + 1)),
+      label: labelValue,
+      type: String(type && type.value || "short-text"),
+      options: String(options && options.value || "").split(",").map(function(value) { return value.trim(); }).filter(Boolean),
+      required: Boolean(required && required.checked),
+      voterVisible: Boolean(visible && visible.checked)
+    };
+  }).filter(function(field) { return Boolean(field.label); });
+}
+
+function adminVotingValue_(id) {
+  var el = document.getElementById(id);
+  return el ? String(el.value || "").trim() : "";
+}
+
+function adminVotingChecked_(id) {
+  var el = document.getElementById(id);
+  return Boolean(el && el.checked);
+}
+
+async function adminVotingSaveSettings_(gameId) {
+  var message = document.getElementById("adminVotingMessage");
+  var points = adminVotingValue_("adminVotingPointValues").split(",").map(function(value) { return Number(String(value || "").trim()); }).filter(function(value) { return Number.isFinite(value) && value >= 0; });
+  if (message) { message.textContent = "Saving Voting / Competition settings…"; message.classList.remove("error"); }
+  try {
+    var res = await apiAdminSaveVotingCompetitionSettings({
+      gameId: gameId,
+      entryLabel: adminVotingValue_("adminVotingEntryLabel"),
+      registrationEnabled: adminVotingChecked_("adminVotingRegistrationEnabled"),
+      approvalRequired: adminVotingChecked_("adminVotingApprovalRequired"),
+      allowParticipantEdits: adminVotingChecked_("adminVotingAllowEdits"),
+      registrationLocked: adminVotingChecked_("adminVotingRegistrationLocked"),
+      votingLocked: adminVotingChecked_("adminVotingVotingLocked"),
+      votingMethod: adminVotingValue_("adminVotingMethod"),
+      rankingUi: adminVotingValue_("adminVotingRankingUi"),
+      rankLimit: Number(adminVotingValue_("adminVotingRankLimit") || 5),
+      scoringMode: adminVotingValue_("adminVotingScoringMode"),
+      pointValues: points,
+      resultsVisibility: adminVotingValue_("adminVotingResultsVisibility"),
+      showParticipantNames: adminVotingChecked_("adminVotingShowParticipantNames"),
+      showPhoto: adminVotingChecked_("adminVotingShowPhoto"),
+      showDescription: adminVotingChecked_("adminVotingShowDescription"),
+      showIngredients: adminVotingChecked_("adminVotingShowIngredients"),
+      numberAssignment: adminVotingValue_("adminVotingNumberAssignment"),
+      colorAssignment: adminVotingValue_("adminVotingColorAssignment"),
+      instructions: adminVotingValue_("adminVotingInstructions"),
+      customFields: adminVotingCollectCustomFields_()
+    });
+    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || "Could not save competition settings.");
+    if (message) message.textContent = "Voting / Competition settings saved ✓";
+    window.setTimeout(function() { navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true }); }, 350);
+  } catch (err) {
+    if (message) { message.textContent = err && err.message ? err.message : "Could not save competition settings."; message.classList.add("error"); }
+  }
+}
+
+async function adminVotingSaveParticipant_(gameId, entryId) {
+  var message = document.getElementById("adminVotingParticipantMessage_" + entryId);
+  function field(name) { var el = document.getElementById("adminVotingParticipant_" + name + "_" + entryId); return el; }
+  if (message) { message.textContent = "Saving…"; message.classList.remove("error"); }
+  try {
+    var publishedEl = field("published");
+    var res = await apiAdminUpdateVotingParticipant({
+      gameId: gameId,
+      entryId: entryId,
+      participantName: field("participantName") ? field("participantName").value : "",
+      entryName: field("entryName") ? field("entryName").value : "",
+      displayNumber: field("displayNumber") ? field("displayNumber").value : "",
+      displayColor: field("displayColor") ? field("displayColor").value : "",
+      status: field("status") ? field("status").value : "submitted",
+      published: Boolean(publishedEl && publishedEl.checked),
+      adminNotes: field("adminNotes") ? field("adminNotes").value : ""
+    });
+    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || "Could not update participant.");
+    if (message) message.textContent = "Saved ✓";
+    window.setTimeout(function() { navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true }); }, 300);
+  } catch (err) {
+    if (message) { message.textContent = err && err.message ? err.message : "Could not update participant."; message.classList.add("error"); }
+  }
+}
+
+function adminVotingParticipantsHtml_(dashboard) {
+  var participants = dashboard && Array.isArray(dashboard.participants) ? dashboard.participants : [];
+  if (!participants.length) return '<div class="admin-info-box">No participant entries have been submitted yet.</div>';
+  return '<div class="admin-voting-participant-list">' + participants.map(function(entry) {
+    var safeId = adminSetupEscapeHtml(entry.entryId || "");
+    return `
+      <details class="admin-voting-participant-card" ${entry.status === "submitted" ? "open" : ""}>
+        <summary>
+          <div>
+            <strong>${adminSetupEscapeHtml(entry.entryName || "Unnamed Entry")}</strong>
+            <span>${adminSetupEscapeHtml(entry.displayNumber ? "#" + entry.displayNumber : "No number")} · ${adminSetupEscapeHtml(entry.displayColor || "No color")} · ${adminSetupEscapeHtml(entry.username || "")}</span>
+          </div>
+          <span class="admin-voting-status ${adminSetupEscapeHtml(entry.status || "submitted")}">${adminSetupEscapeHtml(entry.status || "submitted")}</span>
+        </summary>
+        <div class="admin-voting-participant-body">
+          ${entry.imageUrl ? platformImgHtml(entry.imageUrl, { className: "admin-voting-participant-image", variant: "thumb", alt: entry.entryName || "Participant entry" }) : ""}
+          <div class="admin-control-grid">
+            <label class="admin-field"><span>Participant / Team</span><input id="adminVotingParticipant_participantName_${safeId}" value="${adminSetupEscapeHtml(entry.participantName || "")}"></label>
+            <label class="admin-field"><span>Entry Name</span><input id="adminVotingParticipant_entryName_${safeId}" value="${adminSetupEscapeHtml(entry.entryName || "")}"></label>
+            <label class="admin-field"><span>Display Number</span><input id="adminVotingParticipant_displayNumber_${safeId}" value="${adminSetupEscapeHtml(entry.displayNumber || "")}"></label>
+            <label class="admin-field"><span>Display Color</span><input id="adminVotingParticipant_displayColor_${safeId}" value="${adminSetupEscapeHtml(entry.displayColor || "")}"></label>
+            <label class="admin-field"><span>Status</span><select id="adminVotingParticipant_status_${safeId}">
+              <option value="submitted" ${entry.status === "submitted" ? "selected" : ""}>Submitted / Pending</option>
+              <option value="approved" ${entry.status === "approved" ? "selected" : ""}>Approved</option>
+              <option value="rejected" ${entry.status === "rejected" ? "selected" : ""}>Rejected / Needs Attention</option>
+            </select></label>
+            <label class="admin-checkbox"><input id="adminVotingParticipant_published_${safeId}" type="checkbox" ${entry.published ? "checked" : ""}><span>Published to ballot</span></label>
+          </div>
+          <label class="admin-field"><span>Admin Note to Participant</span><textarea id="adminVotingParticipant_adminNotes_${safeId}" rows="2">${adminSetupEscapeHtml(entry.adminNotes || "")}</textarea></label>
+          <div class="admin-voting-participant-preview">
+            ${entry.description ? `<p><strong>Description:</strong> ${adminSetupEscapeHtml(entry.description)}</p>` : ""}
+            ${entry.ingredients ? `<p><strong>Ingredients / Info:</strong> ${adminSetupEscapeHtml(entry.ingredients)}</p>` : ""}
+          </div>
+          <div class="admin-card-actions"><button type="button" class="admin-small-button" onclick="adminVotingSaveParticipant_('${adminSetupEscapeHtml(dashboard.gameId)}','${safeId}')">Save Participant</button><span id="adminVotingParticipantMessage_${safeId}" class="admin-message"></span></div>
+        </div>
+      </details>
+    `;
+  }).join("") + '</div>';
+}
+
+function adminVotingResultsHtml_(dashboard) {
+  var rows = dashboard && Array.isArray(dashboard.results) ? dashboard.results : [];
+  if (!rows.length) return '<div class="admin-info-box">No competition results yet.</div>';
+  return '<div class="admin-voting-results-table"><div class="admin-voting-result-head"><span>Place</span><span>Entry</span><span>Points</span><span>1st</span><span>Top 3</span></div>' + rows.map(function(row) {
+    return `<div class="admin-voting-result-row"><strong>#${adminSetupEscapeHtml(row.position)}</strong><span>${adminSetupEscapeHtml(row.displayNumber ? "#" + row.displayNumber + " · " : "")}${adminSetupEscapeHtml(row.entryName || "")}</span><strong>${adminSetupEscapeHtml(row.totalPoints)}</strong><span>${adminSetupEscapeHtml(row.firstPlaceVotes)}</span><span>${adminSetupEscapeHtml(row.topThreeVotes)}</span></div>`;
+  }).join("") + '</div>';
+}
+
+function adminSetupRenderVotingCompetition_(gameId, dashboard) {
+  if (!dashboard || dashboard.success === false) {
+    return `<div class="card admin-card error-card"><h2>Voting / Competition Setup</h2><p>${adminSetupEscapeHtml(dashboard && (dashboard.error || dashboard.message) || "Could not load competition settings.")}</p></div>`;
+  }
+  var settings = dashboard.settings || {};
+  var fields = Array.isArray(settings.customFields) ? settings.customFields : [];
+  var points = Array.isArray(settings.pointValues) ? settings.pointValues.join(", ") : "10, 7, 5, 3, 1";
+  return `
+    <details class="card admin-card admin-collapsible-card admin-voting-competition-card" open>
+      <summary class="admin-card-summary">
+        <div><h2>Voting / Competition Setup</h2><div class="admin-sub">Participant self-entry, display cards, ballot style, scoring, approvals, and results.</div></div>
+        <span class="admin-collapse-icon">▾</span>
+      </summary>
+      <div class="admin-collapsible-body">
+        <div class="admin-info-box"><strong>This is separate from legacy movie/awards voting.</strong> Existing Votes/Ballot features remain untouched. This competition uses dedicated participant and ballot sheets.</div>
+
+        <h3>Participant Registration</h3>
+        <div class="admin-control-grid">
+          <label class="admin-field"><span>Entry Label</span><input id="adminVotingEntryLabel" value="${adminSetupEscapeHtml(settings.entryLabel || "Entry")}" placeholder="Dish, Chili, Car, Photo, Contestant"></label>
+          <label class="admin-checkbox"><input id="adminVotingRegistrationEnabled" type="checkbox" ${settings.registrationEnabled !== false ? "checked" : ""}><span>Participant registration enabled</span></label>
+          <label class="admin-checkbox"><input id="adminVotingApprovalRequired" type="checkbox" ${settings.approvalRequired !== false ? "checked" : ""}><span>Admin approval required before publishing</span></label>
+          <label class="admin-checkbox"><input id="adminVotingAllowEdits" type="checkbox" ${settings.allowParticipantEdits !== false ? "checked" : ""}><span>Participants may edit submitted entry</span></label>
+          <label class="admin-checkbox"><input id="adminVotingRegistrationLocked" type="checkbox" ${settings.registrationLocked ? "checked" : ""}><span>Lock participant registration / changes</span></label>
+        </div>
+
+        <h3>Assigned Display Card</h3>
+        <div class="admin-control-grid">
+          <label class="admin-field"><span>Dish / Entry Number</span><select id="adminVotingNumberAssignment">
+            <option value="auto-sequential" ${settings.numberAssignment === "auto-sequential" ? "selected" : ""}>Assign automatically 1, 2, 3…</option>
+            <option value="admin" ${settings.numberAssignment === "admin" ? "selected" : ""}>Admin assigns</option>
+            <option value="participant" ${settings.numberAssignment === "participant" ? "selected" : ""}>Participant enters</option>
+          </select></label>
+          <label class="admin-field"><span>Display Color</span><select id="adminVotingColorAssignment">
+            <option value="auto-palette" ${settings.colorAssignment === "auto-palette" ? "selected" : ""}>Assign automatically from palette</option>
+            <option value="admin" ${settings.colorAssignment === "admin" ? "selected" : ""}>Admin assigns</option>
+            <option value="participant" ${settings.colorAssignment === "participant" ? "selected" : ""}>Participant enters</option>
+            <option value="none" ${settings.colorAssignment === "none" ? "selected" : ""}>No display color</option>
+          </select></label>
+          <label class="admin-checkbox"><input id="adminVotingShowParticipantNames" type="checkbox" ${settings.showParticipantNames ? "checked" : ""}><span>Show participant/team name to voters</span></label>
+          <label class="admin-checkbox"><input id="adminVotingShowPhoto" type="checkbox" ${settings.showPhoto !== false ? "checked" : ""}><span>Show uploaded photo</span></label>
+          <label class="admin-checkbox"><input id="adminVotingShowDescription" type="checkbox" ${settings.showDescription !== false ? "checked" : ""}><span>Show description</span></label>
+          <label class="admin-checkbox"><input id="adminVotingShowIngredients" type="checkbox" ${settings.showIngredients !== false ? "checked" : ""}><span>Show ingredients / useful info</span></label>
+        </div>
+
+        <h3>Additional Participant Fields</h3>
+        <div id="adminVotingCustomFields" class="admin-voting-custom-fields">${fields.map(adminVotingFieldRow_).join("")}</div>
+        <button type="button" class="admin-small-button secondary" onclick="adminVotingAddCustomField_()">+ Add Participant Field</button>
+
+        <h3>Voting Method</h3>
+        <div class="admin-control-grid">
+          <label class="admin-field"><span>Ballot Method</span><select id="adminVotingMethod">
+            <option value="top-n" ${settings.votingMethod === "top-n" ? "selected" : ""}>Rank Top N</option>
+            <option value="rank-all" ${settings.votingMethod === "rank-all" ? "selected" : ""}>Rank All Entries</option>
+            <option value="favorite" ${settings.votingMethod === "favorite" ? "selected" : ""}>Pick Favorite Only</option>
+          </select></label>
+          <label class="admin-field"><span>How Many to Rank</span><input id="adminVotingRankLimit" type="number" min="1" max="100" value="${adminSetupEscapeHtml(settings.rankLimit || 5)}"></label>
+          <label class="admin-field"><span>Ranking Interface</span><select id="adminVotingRankingUi">
+            <option value="auto" ${settings.rankingUi === "auto" ? "selected" : ""}>Auto — Drag desktop / Arrows mobile</option>
+            <option value="numbered" ${settings.rankingUi === "numbered" ? "selected" : ""}>Numbered</option>
+            <option value="drag" ${settings.rankingUi === "drag" ? "selected" : ""}>Drag & Drop</option>
+            <option value="arrows" ${settings.rankingUi === "arrows" ? "selected" : ""}>Up / Down Arrows</option>
+          </select></label>
+          <label class="admin-field"><span>Scoring</span><select id="adminVotingScoringMode">
+            <option value="custom-points" ${settings.scoringMode !== "borda" ? "selected" : ""}>Custom Points by Rank</option>
+            <option value="borda" ${settings.scoringMode === "borda" ? "selected" : ""}>Borda — N, N-1, N-2…</option>
+          </select></label>
+          <label class="admin-field"><span>Points for 1st, 2nd, 3rd…</span><input id="adminVotingPointValues" value="${adminSetupEscapeHtml(points)}" placeholder="10, 7, 5, 3, 1"></label>
+          <label class="admin-field"><span>Results Visibility</span><select id="adminVotingResultsVisibility">
+            <option value="after-close" ${settings.resultsVisibility === "after-close" ? "selected" : ""}>Show after voting closes</option>
+            <option value="live" ${settings.resultsVisibility === "live" ? "selected" : ""}>Show live</option>
+            <option value="hidden" ${settings.resultsVisibility === "hidden" ? "selected" : ""}>Keep hidden</option>
+          </select></label>
+          <label class="admin-checkbox"><input id="adminVotingVotingLocked" type="checkbox" ${settings.votingLocked ? "checked" : ""}><span>Voting closed / locked</span></label>
+        </div>
+        <label class="admin-field"><span>Voting Instructions</span><textarea id="adminVotingInstructions" rows="3">${adminSetupEscapeHtml(settings.instructions || "")}</textarea></label>
+        <div class="admin-card-actions"><button type="button" class="admin-small-button" onclick="adminVotingSaveSettings_('${adminSetupEscapeHtml(gameId)}')">Save Voting / Competition Setup</button><span id="adminVotingMessage" class="admin-message"></span></div>
+
+        <hr>
+        <div class="admin-voting-section-title"><div><h3>Participants</h3><div class="admin-sub">${dashboard.participants.length} submitted · approve and publish entries here.</div></div></div>
+        ${adminVotingParticipantsHtml_(dashboard)}
+
+        <hr>
+        <div class="admin-voting-section-title"><div><h3>Voting Results Preview</h3><div class="admin-sub">${adminSetupEscapeHtml(dashboard.ballotCount || 0)} ballots submitted.</div></div></div>
+        ${adminVotingResultsHtml_(dashboard)}
+      </div>
+    </details>
+  `;
+}
+
 async function renderAdminGameSetupPage(gameId) {
 
   setPageLoadStep(50, "Loading game questions, answers, and settings…");
@@ -1124,6 +1408,18 @@ async function renderAdminGameSetupPage(gameId) {
       predictionEnabled: true,
       fixedPointsEnabled: true
     };
+
+  let votingCompetitionDashboard = null;
+  if (String(game.type || "").trim().toLowerCase() === "voting") {
+    try {
+      votingCompetitionDashboard = await apiAdminGetVotingCompetitionDashboard(safeGameId);
+    } catch (err) {
+      votingCompetitionDashboard = { success: false, error: err && err.message ? err.message : "Could not load Voting / Competition setup." };
+    }
+  }
+
+  const isVotingCompetition =
+    String(game.type || "").trim().toLowerCase() === "voting";
 
   const isLeaderboardOnlyHub =
     game.gameRole === "parent" &&
@@ -1212,6 +1508,8 @@ async function renderAdminGameSetupPage(gameId) {
 
       <div class="admin-section">
 
+        ${isVotingCompetition ? adminSetupRenderVotingCompetition_(safeGameId, votingCompetitionDashboard) : ""}
+
         ${isLeaderboardOnlyHub ? `
           <div class="card admin-card admin-season-hub-notice">
             <h2>Leaderboard-Only Season Hub</h2>
@@ -1219,6 +1517,11 @@ async function renderAdminGameSetupPage(gameId) {
               This hub combines mini-game standings and links. It does not accept parent-level categories or questions.
               Change Hub Mode to <strong>Playable + Aggregate</strong> in Manage Games to add season-long questions.
             </p>
+          </div>
+        ` : isVotingCompetition ? `
+          <div class="card admin-card admin-voting-legacy-note">
+            <strong>Competition entries replace normal prediction questions.</strong>
+            <div class="admin-sub">Use Voting / Competition Setup above for registration, entry cards, ballots, and results. Existing legacy Categories / Questions below are preserved for compatibility but are not required for this game.</div>
           </div>
         ` : renderAdminSetupAddCategoryCard(safeGameId, game, categories)}
 
@@ -1230,10 +1533,10 @@ async function renderAdminGameSetupPage(gameId) {
           <summary class="admin-card-summary">
 
             <div>
-              <h2>${isLeaderboardOnlyHub ? "Stored Categories / Questions" : "Categories / Questions"}</h2>
+              <h2>${isVotingCompetition ? "Advanced / Legacy Categories & Questions" : (isLeaderboardOnlyHub ? "Stored Categories / Questions" : "Categories / Questions")}</h2>
 
               <div class="admin-sub">
-                ${categories.length} categories/questions configured.${isLeaderboardOnlyHub ? " Stored parent questions are excluded from the hub standings." : ""}
+                ${categories.length} categories/questions configured.${isVotingCompetition ? " Not needed for normal Competition voting; retained so older voting/movie workflows are not removed." : (isLeaderboardOnlyHub ? " Stored parent questions are excluded from the hub standings." : "")}
               </div>
             </div>
 

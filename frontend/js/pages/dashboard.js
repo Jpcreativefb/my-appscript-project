@@ -1838,6 +1838,10 @@ function getDashboardGameActionLabel_(
     return "Open Rankings";
   }
 
+  if (type === "voting") {
+    return "Open Voting";
+  }
+
   return complete
     ? "View Picks"
     : "Continue Picks";

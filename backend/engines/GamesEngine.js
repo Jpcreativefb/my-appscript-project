@@ -149,6 +149,19 @@ function getSupportedGameTypes() {
       mixedGame: false
     },
     {
+      id: "voting",
+      label: "Voting / Competition Game",
+      description: "Participants submit entries and the community ranks or votes on published competition entries.",
+      predictionEnabled: false,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: false,
+      racingEnabled: false,
+      mixedGame: false
+    },
+    {
       id: "ranking",
       label: "Ranking Game",
       description: "Users rank nominees or answers in order.",

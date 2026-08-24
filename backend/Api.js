@@ -191,6 +191,47 @@ function doPost(e) {
       }));
     }
 
+    if (action === "saveVotingParticipant") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      body.gameId = postGameId;
+      return json(votingCompetitionSaveParticipant_(body));
+    }
+
+    if (action === "uploadVotingParticipantImage") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      body.gameId = postGameId;
+      return json(votingCompetitionUploadParticipantImage_(body));
+    }
+
+    if (action === "saveVotingCompetitionBallot") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      body.gameId = postGameId;
+      return json(votingCompetitionSaveBallot_(body));
+    }
+
+    if (action === "adminSaveVotingCompetitionSettings") {
+      return json(votingCompetitionSaveSettings_(body.gameId, body));
+    }
+
+    if (action === "adminUpdateVotingParticipant") {
+      return json(votingCompetitionAdminUpdateParticipant_(body));
+    }
+
     if (action === "saveSurvivorPick") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -729,6 +770,11 @@ function doGet(e) {
       action === "savePick" ||
       action === "savePicksBatch" ||
       action === "saveRanking" ||
+      action === "saveVotingParticipant" ||
+      action === "uploadVotingParticipantImage" ||
+      action === "saveVotingCompetitionBallot" ||
+      action === "adminSaveVotingCompetitionSettings" ||
+      action === "adminUpdateVotingParticipant" ||
       action === "saveSurvivorPick" ||
       action === "adminBuildSportsSurvivorWeek" ||
       action === "adminRunSportsSurvivor" ||
@@ -2335,6 +2381,19 @@ function doGet(e) {
     /* =========================
        PICKS
     ========================= */
+
+    if (action === "getVotingCompetitionState") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetVotingCompetitionState_({
+        username: params.username,
+        gameId: gameId
+      }));
+    }
+
+    if (action === "adminGetVotingCompetitionDashboard") {
+      return json(adminGetVotingCompetitionDashboard_({ gameId: gameId }));
+    }
 
     if (action === "getRankingState") {
       const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);

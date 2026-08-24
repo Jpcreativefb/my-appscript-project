@@ -1,0 +1,30 @@
+PATTC Predicts v1.2.18z — Voting / Competition
+
+This is a controlled update for the exact full project ZIP supplied on August 24, 2026.
+
+The installer:
+1. Requires the architecture-cleanup branch and a clean working tree.
+2. Verifies local HEAD matches origin/architecture-cleanup.
+3. Verifies SHA-256 hashes for every existing file this release changes.
+4. Copies only the controlled v1.2.18z payload.
+5. Synchronizes frontend API/app mirrors.
+6. Runs targeted Voting / Competition tests and the full production suite.
+7. Commits the release.
+8. Pushes Apps Script, creates a version, deploys the existing production deployment.
+9. Pushes GitHub (which preserves the normal frontend deployment workflow).
+10. Re-runs production checks.
+
+New feature highlights:
+- Voting / Competition standalone game type
+- Participant self-entry
+- Phone camera / photo upload
+- Dish/entry name, description, ingredients/info
+- Admin-defined participant fields
+- Display number and color assignment
+- Approval and publish workflow
+- Numbered / Drag & Drop / Arrow ranking interfaces
+- Top-N / Rank-All / Favorite voting
+- Custom rank points or Borda scoring
+- Live / after-close / hidden results
+- Legacy movie/awards voting preserved
+- Prediction Ranking engine preserved

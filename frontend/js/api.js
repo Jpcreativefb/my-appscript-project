@@ -874,6 +874,40 @@ async function apiGetMyPicks(username, gameId) {
 
 }
 
+async function apiGetVotingCompetitionState(gameId) {
+  return api("getVotingCompetitionState", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiSaveVotingParticipant(payload) {
+  payload = payload || {};
+  return apiPost("saveVotingParticipant", payload);
+}
+
+async function apiUploadVotingParticipantImage(payload) {
+  payload = payload || {};
+  return apiPost("uploadVotingParticipantImage", payload);
+}
+
+async function apiSaveVotingCompetitionBallot(payload) {
+  payload = payload || {};
+  return apiPost("saveVotingCompetitionBallot", payload);
+}
+
+async function apiAdminGetVotingCompetitionDashboard(gameId) {
+  return api("adminGetVotingCompetitionDashboard", { gameId: gameId || "" });
+}
+
+async function apiAdminSaveVotingCompetitionSettings(payload) {
+  return apiPost("adminSaveVotingCompetitionSettings", payload || {});
+}
+
+async function apiAdminUpdateVotingParticipant(payload) {
+  return apiPost("adminUpdateVotingParticipant", payload || {});
+}
+
 async function apiGetRankingState(gameId) {
   const session = getSession ? (getSession() || {}) : {};
   return api("getRankingState", {

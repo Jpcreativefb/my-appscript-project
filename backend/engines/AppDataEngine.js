@@ -1711,7 +1711,11 @@ function getDashboardGameTypeLabel_(
   }
 
   if (mode === "ranking") {
-    return "Ranking Game";
+    return "Ranking Prediction Game";
+  }
+
+  if (mode === "voting") {
+    return "Voting / Competition Game";
   }
 
   return "Prediction Game";
