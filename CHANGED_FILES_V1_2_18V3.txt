@@ -1,0 +1,16 @@
+backend/Api.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/js/api.js
+frontend/app.html
+frontend/css/team-fantasy.css
+frontend/js/pages/teamFantasy.js
+tests/team_fantasy_weekly_selection_help_v1218v1_tests.js
+CHANGED_FILES_V1_2_18V3.txt
+INSTALL_V1_2_18V3.txt
+docs/REALITY_FORWARD_TEAM_FANTASY_COMPARE_V1_2_18V3.md
+tests/reality_tv_cast_forward_compat_v1218v3_tests.js
+tests/team_fantasy_compare_restore_v1218v3_tests.js
+tools/apply_reality_cast_forwardfix_v1218v2.js
+tools/apply_team_fantasy_compare_restore_v1218v3.py
+tools/install_reality_forward_team_fantasy_compare_v1218v3.sh

@@ -7,7 +7,7 @@
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   const script = document.currentScript && document.currentScript.src ? new URL(document.currentScript.src) : null;
-  link.href = script ? new URL('../../css/team-fantasy.css?v=1218v1', script).href : './css/team-fantasy.css?v=1218v1';
+  link.href = script ? new URL('../../css/team-fantasy.css?v=1218v3', script).href : './css/team-fantasy.css?v=1218v1';
   link.dataset.teamFantasyCss = '1';
   document.head.appendChild(link);
 })();
@@ -80,6 +80,7 @@ function teamFantasyOptionLabel_(team) {
 /* TEAM_FANTASY_WEEKLY_HUB_UI_v1218t2 */
 /* TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_UI_v1218u1 */
 /* TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1 */
+/* TEAM_FANTASY_COMPARE_RESTORE_UI_v1218v3 */
 function teamFantasyTeamLogoUrl_(abbr) {
   const key = String(abbr || '').toUpperCase();
   const slug = key === 'WAS' ? 'wsh' : key.toLowerCase();
@@ -327,7 +328,7 @@ async function renderTeamFantasyPage() {
     <header class="tf-hero card"><div><div class="tf-eyebrow">NFL TEAM FANTASY</div><h1>Week ${Number(res.week || 0)}</h1><p>Team-use limits are tracked <strong>per NFL team, per position, for the season</strong>.</p></div>${teamFantasyLeagueSelect_(res)}</header>
     <div id="teamFantasyStatus" class="tf-status" aria-live="polite"></div>
     ${(res.lineups || []).map(function(lineup) { return teamFantasyRenderLineup_(res, lineup); }).join('')}
-    <section class="card tf-game-day-card"><div class="tf-game-day-title"><div><h2>Weekly Standings</h2><div class="tf-muted">Live weekly standings. Use the Week selector to review past results.</div></div></div><div id="tfGameDayMount"><div class="tf-muted">Loading cached game-day scores…</div></div></section>
+    <section class="card tf-game-day-card"><div class="tf-game-day-title"><div><h2>Weekly Standings</h2><div class="tf-muted">Weekly standings and lineup comparison. Opponent picks stay hidden until kickoff.</div></div></div><div id="tfGameDayMount"><div class="tf-muted">Loading cached game-day scores…</div></div></section>
     ${teamFantasyIsAdmin_() ? `<section class="card tf-test-lab-card"><div class="tf-card-heading"><div><h2>Team Fantasy Test Lab</h2><div class="tf-muted">In-memory test players · no Sheet writes · tests privacy, usage limits, weekly race math and game states.</div></div><button class="tf-button" onclick="teamFantasyRunTestLab_()">Run Team Fantasy Test Lab</button></div><div id="tfTestLabMount" class="tf-test-lab-output"></div></section>` : ''}
     ${teamFantasyRenderWeekHistory_(res)}
   </div>`;
@@ -675,8 +676,12 @@ function teamFantasyRenderGameDayIntoMount_() {
   const mount = document.getElementById('tfGameDayMount');
   const data = window.TEAM_FANTASY_GAME_DAY;
   if (!mount || !data) return;
-  window.TEAM_FANTASY_GAME_DAY_VIEW = 'league';
-  mount.innerHTML = `<div class="tf-game-day-sticky"><strong class="tf-game-day-label">Weekly Standings</strong><div class="tf-game-day-filters">${teamFantasyGameDayLeaguePicker_(data)}${teamFantasyGameDayWeekPicker_(data)}</div><button class="tf-refresh-mini" onclick="teamFantasyLoadGameDay_(true)" title="Refresh cached scores">↻</button></div><div class="tf-mini-status-legend"><span class="is-final"></span>F <span class="is-live"></span>L <span class="is-upcoming"></span>U</div>${teamFantasyRenderWeeklyLeague_(data)}`;
+  const view = window.TEAM_FANTASY_GAME_DAY_VIEW || 'league';
+  const competitors = Array.isArray(data.competitors) ? data.competitors : [];
+  const selected = teamFantasyCompareDefaultSelection_(data);
+  const available = competitors.filter(function(c){ return selected.indexOf(c.entryId) === -1; });
+  const addMenu = view === 'compare' && window.TEAM_FANTASY_COMPARE_ADD_OPEN && selected.length < 6 ? `<div class="tf-add-team-menu">${available.map(function(c){ return `<button type="button" onclick="teamFantasyCompareAddTeam_('${teamFantasyEscape_(c.entryId)}')">${teamFantasyEscape_(c.label || c.entryId)}</button>`; }).join('') || '<span>No more teams available.</span>'}</div>` : '';
+  mount.innerHTML = `<div class="tf-game-day-sticky"><div class="tf-game-day-tabs"><button class="${view==='league'?'is-active':''}" onclick="teamFantasySetGameDayView_('league')">Weekly Standings</button><button class="${view==='compare'?'is-active':''}" onclick="teamFantasySetGameDayView_('compare')">Compare</button></div><div class="tf-game-day-filters">${teamFantasyGameDayLeaguePicker_(data)}${teamFantasyGameDayWeekPicker_(data)}</div><button class="tf-refresh-mini" onclick="teamFantasyLoadGameDay_(true)" title="Refresh cached scores">↻</button></div><div class="tf-mini-status-legend"><span class="is-final"></span>F <span class="is-live"></span>L <span class="is-upcoming"></span>U</div>${view==='league'?teamFantasyRenderWeeklyLeague_(data):`<div class="tf-compare-add-row"><span>${selected.length} team${selected.length===1?'':'s'} selected</span>${selected.length<6?'<button class="tf-button secondary" onclick="teamFantasyToggleAddTeamMenu_()">+ Add Team</button>':''}</div>${addMenu}${competitors.length<2?'<div class="tf-muted">At least two league entries are needed for comparison.</div>':`<div id="tfCompareBoard">${teamFantasyRenderCompareBoard_(data, selected)}</div>`}<div class="tf-muted tf-privacy-note">${teamFantasyEscape_(data.privacy || '')}</div>`}`;
 }
 
 function teamFantasyCompareToggle_(checkbox) {

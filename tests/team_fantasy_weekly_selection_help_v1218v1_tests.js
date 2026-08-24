@@ -19,7 +19,8 @@ function fnBlock(source, name) {
 
 assert(page.includes('TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1'), '18v1 UI marker missing');
 assert(backend.includes('TEAM_FANTASY_WEEKLY_SELECTION_HELP_BACKEND_v1218v1'), '18v1 backend marker missing');
-assert(page.includes('team-fantasy.css?v=1218v1'), '18v1 CSS cache marker missing');
+const v1CssCache = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
+assert(v1CssCache && !['1218r1','1218s','1218t2','1218u1'].includes(v1CssCache[1]), '18v1-or-later CSS cache marker missing');
 assert(css.includes('v1.2.18v1 weekly selection rules + scoring + position layout'), '18v1 CSS marker missing');
 
 assert(backend.includes('scoringRules: teamFantasyRules_(gameId).filter(function(rule) { return rule.active; })'), 'Active scoring rules are not returned with Team Fantasy state');
@@ -40,8 +41,9 @@ assert(css.includes('.tf-lineup-card .tf-slot[id$="-OL"]{grid-area:ol}'), 'OL gr
 
 const gameDay = fnBlock(page, 'teamFantasyRenderGameDayIntoMount_');
 assert(gameDay.includes('Weekly Standings'), 'Weekly Standings label missing');
-assert(!gameDay.includes('>Compare<'), 'Player-facing Compare tab must be retired');
-assert(!gameDay.includes('+ Add Team'), 'Player-facing Add Team compare control must be retired');
+assert(gameDay.includes('>Compare<'), 'Player-facing Compare tab must remain available');
+assert(gameDay.includes('+ Add Team'), 'Player-facing Add Team compare control must remain available');
+assert(gameDay.includes('teamFantasyRenderCompareBoard_'), 'Compare board renderer must remain wired');
 assert(gameDay.includes('teamFantasyGameDayWeekPicker_'), 'Past-week selector must remain available');
 
 const testLab = fnBlock(page, 'teamFantasyRunTestLab_');
@@ -49,7 +51,7 @@ assert(!testLab.includes('Six-Team Synthetic Compare'), 'Six-Team Synthetic Comp
 assert(!testLab.includes('Synthetic Weekly League Race'), 'Synthetic weekly race wording must be retired');
 assert(testLab.includes('Weekly League Test Race'), 'Weekly League Test Race output missing');
 assert(page.includes('Run Team Fantasy Test Lab'), 'Admin Team Fantasy Test Lab button must remain available');
-assert(historicalR1.includes('Run Team Fantasy Test Lab') && historicalR1.includes('TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1'), 'Historical 18r1 Test Lab/Compare regression was not updated for intentional 18v1 player-view retirement');
+assert(historicalR1.includes('Run Team Fantasy Test Lab'), 'Admin Test Lab compatibility must remain available while Compare is restored');
 
 assert(page.includes('teamFantasyRenderWeekHistory_(res)'), 'Week History must remain on the player page');
 assert(page.includes('teamFantasyPickerRemaining_'), 'Usage-limit picker behavior missing');
