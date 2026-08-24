@@ -199,6 +199,13 @@ function survivorSortStandings_(rows) {
 
 function apiGetSurvivorState_(payload) {
   payload = payload || {};
+  const routedGameId = survivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
+  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(routedGameId) && typeof apiGetKingOfHillState_ === "function") {
+    return apiGetKingOfHillState_(Object.assign({}, payload, { gameId: routedGameId }));
+  }
+  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(routedGameId) && typeof apiGetSportsSurvivorState_ === "function") {
+    return apiGetSportsSurvivorState_(Object.assign({}, payload, { gameId: routedGameId }));
+  }
   const gameId = survivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
   const username = survivorString_(payload.username);
   if (!gameId || !username) throw new Error("Username and GameId are required.");
@@ -259,6 +266,13 @@ function apiGetSurvivorState_(payload) {
 
 function saveSurvivorPick_(payload) {
   payload = payload || {};
+  const routedGameId = survivorString_(payload.gameId);
+  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(routedGameId)) {
+    throw new Error("King of the Hill is automatic. There is no weekly KOTH pick to submit.");
+  }
+  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(routedGameId) && typeof sportsSurvivorSavePick_ === "function") {
+    return sportsSurvivorSavePick_(payload);
+  }
   const gameId = survivorString_(payload.gameId);
   const username = survivorString_(payload.username);
   const categoryId = survivorKey_(payload.categoryId);
@@ -287,6 +301,12 @@ function saveSurvivorPick_(payload) {
 }
 
 function survivorLeaderboardData_(gameId, extraUsernames) {
+  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(gameId) && typeof kingOfHillLeaderboardData_ === "function") {
+    return kingOfHillLeaderboardData_(gameId, extraUsernames);
+  }
+  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(gameId) && typeof sportsSurvivorStandings_ === "function") {
+    return sportsSurvivorStandings_(gameId, extraUsernames);
+  }
   const categories = survivorGameCategories_(gameId);
   const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
   const pickMaps = survivorAllPickMaps_(gameId);
@@ -337,6 +357,12 @@ function survivorLeaderboardData_(gameId, extraUsernames) {
 }
 
 function survivorUserScoring_(username, gameId) {
+  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(gameId) && typeof kingOfHillUserScoring_ === "function") {
+    return kingOfHillUserScoring_(username, gameId);
+  }
+  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(gameId) && typeof sportsSurvivorUserScoring_ === "function") {
+    return sportsSurvivorUserScoring_(username, gameId);
+  }
   const categories = survivorGameCategories_(gameId);
   const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
   const pickMaps = survivorAllPickMaps_(gameId);

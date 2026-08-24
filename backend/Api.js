@@ -202,7 +202,10 @@ function doPost(e) {
         username: body.username,
         gameId: postGameId,
         categoryId: body.categoryId,
-        nomineeId: body.nomineeId
+        nomineeId: body.nomineeId,
+        nomineeIds: Array.isArray(body.nomineeIds) ? body.nomineeIds : [],
+        nomineeIdsJSON: body.nomineeIdsJSON || "",
+        confidencePoints: body.confidencePoints || 0
       }));
     }
 
@@ -538,6 +541,18 @@ function doPost(e) {
       return json(apiAdminCreateSportsConfidenceQuestionsBulk(body));
     }
 
+    if (action === "adminBuildSportsSurvivorWeek") {
+      return json(apiAdminBuildSportsSurvivorWeek_(body));
+    }
+
+    if (action === "adminRunSportsSurvivor") {
+      return json(apiAdminRunSportsSurvivor_(body));
+    }
+
+    if (action === "adminInstallSportsSurvivorAutomation") {
+      return json(apiAdminInstallSportsSurvivorAutomation_(body));
+    }
+
     // =========================
     // AWARDS MANAGER WRITES
     // =========================
@@ -715,6 +730,9 @@ function doGet(e) {
       action === "savePicksBatch" ||
       action === "saveRanking" ||
       action === "saveSurvivorPick" ||
+      action === "adminBuildSportsSurvivorWeek" ||
+      action === "adminRunSportsSurvivor" ||
+      action === "adminInstallSportsSurvivorAutomation" ||
       action === "adminSaveRankingResults" ||
       action === "saveConfidencePicksBatch" ||
       action === "saveBet" ||
@@ -2328,6 +2346,12 @@ function doGet(e) {
       const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
       if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
       return json(apiGetSurvivorState_({ username: params.username, gameId: gameId }));
+    }
+
+    if (action === "getSurvivorTeamSchedule") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetSportsSurvivorTeamSchedule_({ username: params.username, gameId: gameId, team: params.team }));
     }
 
     if (action === "getMyPicks") {

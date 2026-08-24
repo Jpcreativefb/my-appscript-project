@@ -1416,6 +1416,7 @@ function adminUpdateGameTypeSections(form) {
   });
 
   adminUpdateHybridScoringSections(form);
+  if (typeof adminUpdateSurvivorRuleFields === "function") adminUpdateSurvivorRuleFields(form);
   adminUpdateGameTypeSummary_(form);
   adminUpdateHeroSource(form);
 }
@@ -2019,6 +2020,19 @@ function renderAdminGameForm(
   const hubMode = game.hubMode || (isNew ? "leaderboard-only" : "playable-aggregate");
   const isLeaderboardOnlyHub = isParentGame && hubMode === "leaderboard-only";
   const canonicalType = adminCanonicalGameType_(game.type);
+  const survivorSettings = Object.assign({
+    mode: "manual-elimination", sport: "football", league: "nfl", seasonYear: currentYear, seasonType: "2", seasonPhase: "regular",
+    startWeek: 1, endWeek: 18, resultMode: "straight-up", lossesAllowed: 0, teamUseLimit: 1, pickLockMode: "team-kickoff",
+    missedPickRule: "loss", pushRule: "survive", endMode: "sole-survivor", showRecords: true, showOdds: true, showOpponent: true, showSchedule: true,
+    oddsFreezeMode: "weekly-lock", kothBasePoints: 10, kothMultiplierStep: 1, kothMaxMultiplier: 5, kothLossBehavior: "reset",
+    earnLifeEnabled: false, earnLifeWinStreak: 5, maxEarnedLives: 1, safeWeeks: "", atsWeeks: "", underdogWeeks: "", roadOnlyWeeks: "",
+    divisionWeeks: "", doublePickWeeks: "", secondChanceWeeks: "", redemptionWeeks: "", confidenceWeeks: "", maxConfidenceRisk: 10,
+    autoSettle: true, autoBuildNextWeek: true, autoRefreshOdds: true, automationEnabled: true,
+    kothSourceGameIds: [], kothCombineMode: "sum", kothEntryAggregation: "sum", kothStrikeLimit: 3,
+    kothPacingMode: "automatic", kothFixedRecipients: 3, kothCustomSchedule: "", kothTieRule: "include-all",
+    kothMinRecipients: 1, kothMaxRecipients: 0, kothStartMode: "start-fresh", kothAutoProcess: true
+  }, game.survivorSettings || {});
+  const kothSourceGameIds = Array.isArray(survivorSettings.kothSourceGameIds) ? survivorSettings.kothSourceGameIds.map(String) : [];
   const workflowStatus = adminCanonicalGameStatus_(game.status, game.active, game.archived);
   const isLiveStatus = workflowStatus === "Active";
 
@@ -2238,6 +2252,214 @@ function renderAdminGameForm(
               <div class="admin-hub-mode-note" data-hub-mode-note="playable-aggregate" ${isLeaderboardOnlyHub ? "hidden" : ""}>
                 This hub can contain season-long questions while also combining results from its mini games.
               </div>
+            </div>
+          </details>
+
+          <details class="admin-form-section admin-form-section-details" data-game-types="survivor" ${canonicalType === "survivor" ? "open" : "hidden"}>
+            <summary class="admin-section-heading admin-form-section-summary">
+              <div>
+                <h4>Survivor / Elimination Rules</h4>
+                <div class="admin-sub">Use manual elimination for Reality TV, active Sports Survivor / Streak Survivor picks, or passive King of the Hill score strikes.</div>
+              </div>
+              <span class="admin-collapse-icon">▾</span>
+            </summary>
+
+            <div class="form-grid">
+              <label class="admin-field">
+                ${adminFieldLabel_("Survivor Mode", "Manual keeps the existing elimination-question behavior. Sports Survivor uses weekly team picks. Streak Survivor adds the consecutive-win multiplier. King of the Hill is the passive lowest-score strike game.")}
+                <select name="survivorMode" onchange="adminUpdateSurvivorRuleFields(this.form)">
+                  <option value="manual-elimination" ${survivorSettings.mode === "manual-elimination" ? "selected" : ""}>Manual / Reality Elimination</option>
+                  <option value="sports-survivor" ${survivorSettings.mode === "sports-survivor" ? "selected" : ""}>Sports Survivor / Last Team Standing</option>
+                  <option value="streak-survivor" ${survivorSettings.mode === "streak-survivor" ? "selected" : ""}>Streak Survivor / Win Multiplier</option>
+                  <option value="king-of-the-hill" ${survivorSettings.mode === "king-of-the-hill" ? "selected" : ""}>King of the Hill — Score Strikes</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("League", "Sports Scores Engine league code. NFL is the default, but this engine can also be used for other supported leagues.")}
+                <select name="survivorLeague">
+                  ${[["nfl","NFL"],["college-football","College Football"],["nba","NBA"],["mlb","MLB"],["nhl","NHL"]].map(function(row) { return `<option value="${row[0]}" ${String(survivorSettings.league || "nfl") === row[0] ? "selected" : ""}>${row[1]}</option>`; }).join("")}
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Season Year", "Year sent to the Sports Scores Engine when loading weekly games and schedules.")}
+                <input name="survivorSeasonYear" type="number" min="2000" max="2100" value="${escapeHtml_(survivorSettings.seasonYear || currentYear)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Start Week", "First league week included in this Survivor contest.")}
+                <input name="survivorStartWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.startWeek || 1)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("End Week", "Last league week the automation may build.")}
+                <input name="survivorEndWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.endWeek || 18)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Win Condition", "Straight Up uses the final score. Against the Spread uses the spread snapshot selected by the Freeze Line rule.")}
+                <select name="survivorResultMode">
+                  <option value="straight-up" ${survivorSettings.resultMode === "spread" ? "" : "selected"}>Straight Up</option>
+                  <option value="spread" ${survivorSettings.resultMode === "spread" ? "selected" : ""}>Against the Spread</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Allowed Losses / Lives", "0 is traditional one-loss-and-out Survivor. A player is eliminated only after losses exceed this allowance.")}
+                <input name="survivorLossesAllowed" type="number" min="0" max="99" value="${escapeHtml_(survivorSettings.lossesAllowed || 0)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Maximum Uses Per Team", "1 means a player can use each team only once. 0 means unlimited reuse.")}
+                <input name="survivorTeamUseLimit" type="number" min="0" max="99" value="${escapeHtml_(survivorSettings.teamUseLimit === undefined ? 1 : survivorSettings.teamUseLimit)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Pick Lock", "Team Kickoff lets later games remain selectable after early games start. First Game locks the whole week when the first matchup begins.")}
+                <select name="survivorPickLockMode">
+                  <option value="team-kickoff" ${survivorSettings.pickLockMode === "first-game" ? "" : "selected"}>Each Team at Its Kickoff</option>
+                  <option value="first-game" ${survivorSettings.pickLockMode === "first-game" ? "selected" : ""}>Whole Week at First Kickoff</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Freeze Spread / Odds", "Weekly Lock gives everyone the same line when refreshed before lock. Pick Time stores each player's exact line snapshot. Closing uses the latest synchronized line.")}
+                <select name="survivorOddsFreezeMode">
+                  <option value="weekly-lock" ${survivorSettings.oddsFreezeMode === "weekly-lock" ? "selected" : ""}>Weekly Lock</option>
+                  <option value="pick" ${survivorSettings.oddsFreezeMode === "pick" ? "selected" : ""}>At Pick Time</option>
+                  <option value="build" ${survivorSettings.oddsFreezeMode === "build" ? "selected" : ""}>When Week Is Built</option>
+                  <option value="closing" ${survivorSettings.oddsFreezeMode === "closing" ? "selected" : ""}>Latest / Closing</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Missed Pick", "Choose whether failing to submit uses a loss, immediately eliminates the player, or produces no result.")}
+                <select name="survivorMissedPickRule">
+                  <option value="loss" ${survivorSettings.missedPickRule === "loss" ? "selected" : ""}>Use a Loss / Life</option>
+                  <option value="eliminate" ${survivorSettings.missedPickRule === "eliminate" ? "selected" : ""}>Immediate Elimination</option>
+                  <option value="no-result" ${survivorSettings.missedPickRule === "no-result" ? "selected" : ""}>No Result</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Tie / ATS Push", "Survive keeps the player alive without a win. Loss consumes a life. No Result ignores the week for that pick.")}
+                <select name="survivorPushRule">
+                  <option value="survive" ${survivorSettings.pushRule === "survive" ? "selected" : ""}>Survive</option>
+                  <option value="loss" ${survivorSettings.pushRule === "loss" ? "selected" : ""}>Counts as Loss</option>
+                  <option value="no-result" ${survivorSettings.pushRule === "no-result" ? "selected" : ""}>No Result</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Game Ends", "Sole Survivor can declare the last active player the winner before the configured end week.")}
+                <select name="survivorEndMode">
+                  <option value="sole-survivor" ${survivorSettings.endMode === "sole-survivor" ? "selected" : ""}>When One Sole Survivor Remains</option>
+                  <option value="end-week" ${survivorSettings.endMode === "end-week" ? "selected" : ""}>At Configured End Week</option>
+                  <option value="season-end" ${survivorSettings.endMode === "season-end" ? "selected" : ""}>End of Season</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="admin-checkbox-row" data-survivor-sports-field>
+              ${renderAdminCheckboxWithHelp_("survivorShowRecords", "Show Team + Opponent Records", survivorSettings.showRecords !== false, "Shows both records on the weekly selection card.")}
+              ${renderAdminCheckboxWithHelp_("survivorShowOdds", "Show Odds / Spread", survivorSettings.showOdds !== false, "Shows available moneyline/spread information on the team card.")}
+              ${renderAdminCheckboxWithHelp_("survivorShowOpponent", "Show Opponent + Home/Away", survivorSettings.showOpponent !== false, "Shows the matchup and whether the selected team is home or away.")}
+              ${renderAdminCheckboxWithHelp_("survivorShowSchedule", "Expandable Team Schedule", survivorSettings.showSchedule !== false, "Players can expand a team to inspect its season schedule before selecting it.")}
+            </div>
+
+            <div class="admin-survivor-subsection" data-survivor-streak-field>
+              <h5>Streak Survivor Scoring</h5>
+              <div class="form-grid">
+                <label class="admin-field">${adminFieldLabel_("Base Points", "Points awarded for a win before the streak multiplier.")}<input name="survivorKothBasePoints" type="number" min="0" step="1" value="${escapeHtml_(survivorSettings.kothBasePoints || 10)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Multiplier Step", "1 creates 1x, 2x, 3x... on consecutive wins. 0.5 creates 1x, 1.5x, 2x...")}<input name="survivorKothMultiplierStep" type="number" min="0" step="0.1" value="${escapeHtml_(survivorSettings.kothMultiplierStep === undefined ? 1 : survivorSettings.kothMultiplierStep)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Maximum Multiplier", "0 means no cap.")}<input name="survivorKothMaxMultiplier" type="number" min="0" step="0.5" value="${escapeHtml_(survivorSettings.kothMaxMultiplier === undefined ? 5 : survivorSettings.kothMaxMultiplier)}"></label>
+                <label class="admin-field">${adminFieldLabel_("On Loss", "Controls what happens to the active win streak.")}<select name="survivorKothLossBehavior"><option value="reset" ${survivorSettings.kothLossBehavior === "reset" ? "selected" : ""}>Reset to 0</option><option value="drop-one" ${survivorSettings.kothLossBehavior === "drop-one" ? "selected" : ""}>Drop Streak by 1</option><option value="half" ${survivorSettings.kothLossBehavior === "half" ? "selected" : ""}>Cut Streak in Half</option></select></label>
+              </div>
+            </div>
+
+            <div class="admin-survivor-subsection" data-survivor-koth-field>
+              <h5>King of the Hill — Score Strikes</h5>
+              <div class="admin-sub">Passive side game: players make no extra pick. Final weekly scores from the selected source game or games are combined, the lowest scores receive strikes, and the last active player wins.</div>
+              <div class="form-grid">
+                <label class="admin-field">${adminFieldLabel_("Start Week", "Start Fresh begins with the first processed finalized week. Backfill processes stored finalized weekly scores beginning here.")}<input name="kothStartWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.startWeek || 1)}"></label>
+                <label class="admin-field">${adminFieldLabel_("End Week", "Last week used for automatic strike pacing.")}<input name="kothEndWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.endWeek || 18)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Strikes to Eliminate", "Normally 3. A player is removed from KOTH when this strike count is reached.")}<input name="kothStrikeLimit" type="number" min="1" max="99" value="${escapeHtml_(survivorSettings.kothStrikeLimit || 3)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Combine Multiple Games", "How selected source-game weekly values become the one KOTH value for each user.")}<select name="kothCombineMode"><option value="sum" ${survivorSettings.kothCombineMode === "sum" ? "selected" : ""}>Sum</option><option value="average" ${survivorSettings.kothCombineMode === "average" ? "selected" : ""}>Average</option><option value="highest" ${survivorSettings.kothCombineMode === "highest" ? "selected" : ""}>Highest Source Score</option><option value="lowest" ${survivorSettings.kothCombineMode === "lowest" ? "selected" : ""}>Lowest Source Score</option></select></label>
+                <label class="admin-field">${adminFieldLabel_("Multiple Entries in One Source", "If a user has more than one entry in a Team Fantasy source, choose how those entries become that source game's KOTH value.")}<select name="kothEntryAggregation"><option value="sum" ${survivorSettings.kothEntryAggregation === "sum" ? "selected" : ""}>Sum Entries</option><option value="average" ${survivorSettings.kothEntryAggregation === "average" ? "selected" : ""}>Average Entries</option><option value="highest" ${survivorSettings.kothEntryAggregation === "highest" ? "selected" : ""}>Best Entry</option><option value="lowest" ${survivorSettings.kothEntryAggregation === "lowest" ? "selected" : ""}>Lowest Entry</option></select></label>
+                <label class="admin-field">${adminFieldLabel_("Start Behavior", "Start Fresh begins from the most recently finalized native weekly score. Backfill starts at the configured Start Week.")}<select name="kothStartMode"><option value="start-fresh" ${survivorSettings.kothStartMode === "backfill" ? "" : "selected"}>Start Fresh</option><option value="backfill" ${survivorSettings.kothStartMode === "backfill" ? "selected" : ""}>Backfill Previous Weeks</option></select></label>
+              </div>
+              <div class="admin-koth-source-list">
+                <strong>Score Source Game(s)</strong>
+                <div class="admin-sub">Select one or several. Team Fantasy sources automate from finalized weekly totals. Other game types can be captured with Run Now after their weekly scoring is final.</div>
+                ${(allGames || []).filter(function(candidate) { return candidate && candidate.gameId && candidate.gameId !== game.gameId; }).map(function(candidate) { const sourceId = String(candidate.gameId || ""); const checked = kothSourceGameIds.indexOf(sourceId) !== -1; return `<label class="admin-koth-source-option"><input type="checkbox" name="kothSourceGameId" value="${escapeHtml_(sourceId)}" ${checked ? "checked" : ""}><span><strong>${escapeHtml_(candidate.name || sourceId)}</strong><small>${escapeHtml_(candidate.type || "game")} · ${escapeHtml_(sourceId)}</small></span></label>`; }).join("") || '<div class="admin-sub">Save another game first, then return here to select it as a KOTH score source.</div>'}
+              </div>
+              <h6>Strike Pacing</h6>
+              <div class="form-grid">
+                <label class="admin-field">${adminFieldLabel_("Distribution", "Automatic recalculates from players remaining, strikes already held, and weeks remaining. Fixed and Custom remain available for manual control.")}<select name="kothPacingMode"><option value="automatic" ${survivorSettings.kothPacingMode === "automatic" ? "selected" : ""}>Automatic — Recommended</option><option value="fixed" ${survivorSettings.kothPacingMode === "fixed" ? "selected" : ""}>Fixed Recipients Each Week</option><option value="custom" ${survivorSettings.kothPacingMode === "custom" ? "selected" : ""}>Custom Weekly Schedule</option></select></label>
+                <label class="admin-field">${adminFieldLabel_("Fixed Recipients", "Used only with Fixed distribution.")}<input name="kothFixedRecipients" type="number" min="1" value="${escapeHtml_(survivorSettings.kothFixedRecipients || 3)}"></label>
+                <label class="admin-field admin-wide-field">${adminFieldLabel_("Custom Schedule", "Example: 1-4:4, 5-8:3, 9-12:2, 13-17:1")}<input name="kothCustomSchedule" value="${escapeHtml_(survivorSettings.kothCustomSchedule || "")}" placeholder="1-4:4, 5-8:3, 9-12:2, 13-17:1"></label>
+                <label class="admin-field">${adminFieldLabel_("Tie at Strike Line", "Include All Ties can award an extra strike. In the final stretch, KOTH automatically breaks a cutoff tie when needed to avoid multiple eliminations.")}<select name="kothTieRule"><option value="include-all" ${survivorSettings.kothTieRule === "include-all" ? "selected" : ""}>Include All Ties</option><option value="previous-week" ${survivorSettings.kothTieRule === "previous-week" ? "selected" : ""}>Lower Previous-Week Score</option><option value="season-average" ${survivorSettings.kothTieRule === "season-average" ? "selected" : ""}>Lower Season Average</option></select></label>
+                <label class="admin-field">${adminFieldLabel_("Minimum Strike Recipients", "Floor used by automatic pacing early in the season.")}<input name="kothMinRecipients" type="number" min="1" value="${escapeHtml_(survivorSettings.kothMinRecipients || 1)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Maximum Strike Recipients", "0 means no manual cap; automatic pacing still protects the final survivor.")}<input name="kothMaxRecipients" type="number" min="0" value="${escapeHtml_(survivorSettings.kothMaxRecipients || 0)}"></label>
+              </div>
+              <div class="admin-checkbox-row">
+                ${renderAdminCheckboxWithHelp_("kothAutoProcess", "Auto Process Final Weeks", survivorSettings.kothAutoProcess !== false, "The 15-minute Survivor automation checks selected native weekly score sources and processes each finalized KOTH week once.")}
+                ${renderAdminCheckboxWithHelp_("kothAutomationEnabled", "15-Minute Automation", survivorSettings.automationEnabled !== false, "Uses the shared Survivor automation trigger. Duplicate-week protection prevents repeated strikes.")}
+              </div>
+              <div class="admin-action-row">
+                <label class="admin-inline-field">Week <input name="kothProcessWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.startWeek || 1)}"></label>
+                <button type="button" class="secondary" onclick="adminProcessKothWeek(this.form, this)">Process / Recheck KOTH Week</button>
+                <button type="button" class="secondary" onclick="adminRunSportsSurvivorAutomation(this.form, this)">Run KOTH Automation Now</button>
+                <button type="button" class="secondary" onclick="adminInstallSportsSurvivorAutomation(this.form, this)">Install 15-Minute Automation</button>
+              </div>
+              <div class="admin-sub">Automatic pacing uses current strike totals, not just the original player count, so the weekly strike rate corrects itself as the season develops.</div>
+              <div class="admin-sub" data-koth-action-status></div>
+            </div>
+
+            <div class="admin-survivor-subsection" data-survivor-sports-field>
+              <h5>Lives & Earned Chances</h5>
+              <div class="admin-checkbox-row">
+                ${renderAdminCheckboxWithHelp_("survivorEarnLifeEnabled", "Earn Extra Life", survivorSettings.earnLifeEnabled === true, "Award an extra loss allowance after a configured consecutive-win streak.")}
+              </div>
+              <div class="form-grid">
+                <label class="admin-field">${adminFieldLabel_("Wins to Earn Life", "Example: 5 means every 5 consecutive wins earns one life, up to the maximum.")}<input name="survivorEarnLifeWinStreak" type="number" min="1" value="${escapeHtml_(survivorSettings.earnLifeWinStreak || 5)}"></label>
+                <label class="admin-field">${adminFieldLabel_("Maximum Earned Lives", "Caps lives gained from win streaks.")}<input name="survivorMaxEarnedLives" type="number" min="0" value="${escapeHtml_(survivorSettings.maxEarnedLives === undefined ? 1 : survivorSettings.maxEarnedLives)}"></label>
+              </div>
+            </div>
+
+            <div class="admin-survivor-subsection" data-survivor-sports-field>
+              <h5>Weekly Twists</h5>
+              <div class="admin-sub">Enter week numbers separated by commas. Leave blank to disable a twist. Twists can overlap.</div>
+              <div class="form-grid">
+                <label class="admin-field">${adminFieldLabel_("Safe Weeks", "A losing pick does not consume a life or eliminate the player.")}<input name="survivorSafeWeeks" value="${escapeHtml_(survivorSettings.safeWeeks || "")}" placeholder="8, 14"></label>
+                <label class="admin-field">${adminFieldLabel_("ATS Weeks", "Overrides Straight Up and grades that week against the spread.")}<input name="survivorATSWeeks" value="${escapeHtml_(survivorSettings.atsWeeks || "")}" placeholder="4, 12"></label>
+                <label class="admin-field">${adminFieldLabel_("Underdogs Only Weeks", "Only teams with a positive spread are eligible.")}<input name="survivorUnderdogWeeks" value="${escapeHtml_(survivorSettings.underdogWeeks || "")}" placeholder="10"></label>
+                <label class="admin-field">${adminFieldLabel_("Road Teams Only Weeks", "Only away teams are eligible.")}<input name="survivorRoadOnlyWeeks" value="${escapeHtml_(survivorSettings.roadOnlyWeeks || "")}" placeholder="6"></label>
+                <label class="admin-field">${adminFieldLabel_("Division Weeks", "Restricts picks to matchups marked as divisional by the sports data source.")}<input name="survivorDivisionWeeks" value="${escapeHtml_(survivorSettings.divisionWeeks || "")}" placeholder="15"></label>
+                <label class="admin-field">${adminFieldLabel_("Double Pick Weeks", "Player must select two teams and both must succeed.")}<input name="survivorDoublePickWeeks" value="${escapeHtml_(survivorSettings.doublePickWeeks || "")}" placeholder="13, 17"></label>
+                <label class="admin-field">${adminFieldLabel_("Redemption Weeks", "Player selects two teams; either successful pick saves the week.")}<input name="survivorRedemptionWeeks" value="${escapeHtml_(survivorSettings.redemptionWeeks || "")}" placeholder="9"></label>
+                <label class="admin-field">${adminFieldLabel_("Second Chance Weeks", "Players eliminated earlier are restored when this week is reached.")}<input name="survivorSecondChanceWeeks" value="${escapeHtml_(survivorSettings.secondChanceWeeks || "")}" placeholder="11"></label>
+                <label class="admin-field">${adminFieldLabel_("Confidence / Risk Weeks", "Adds a player-selected risk amount to a win and subtracts it on a Streak Survivor loss.")}<input name="survivorConfidenceWeeks" value="${escapeHtml_(survivorSettings.confidenceWeeks || "")}" placeholder="16"></label>
+                <label class="admin-field">${adminFieldLabel_("Maximum Confidence Risk", "Largest selectable bonus/risk amount on a Confidence Week.")}<input name="survivorMaxConfidenceRisk" type="number" min="0" value="${escapeHtml_(survivorSettings.maxConfidenceRisk || 10)}"></label>
+              </div>
+            </div>
+
+            <div class="admin-survivor-subsection" data-survivor-sports-field>
+              <h5>Automation</h5>
+              <div class="admin-checkbox-row">
+                ${renderAdminCheckboxWithHelp_("survivorAutoSettle", "Auto Grade Final Scores", survivorSettings.autoSettle !== false, "Uses Sports Scores Engine finals to grade picks automatically.")}
+                ${renderAdminCheckboxWithHelp_("survivorAutoBuildNextWeek", "Auto Build Next Week", survivorSettings.autoBuildNextWeek !== false, "When all built weeks are settled, the next configured week is added automatically.")}
+                ${renderAdminCheckboxWithHelp_("survivorAutoRefreshOdds", "Refresh Odds", survivorSettings.autoRefreshOdds !== false, "Refreshes available line data during Survivor automation.")}
+                ${renderAdminCheckboxWithHelp_("survivorAutomationEnabled", "15-Minute Automation", survivorSettings.automationEnabled !== false, "Keeps results and future weeks moving without manual admin work.")}
+              </div>
+              <div class="admin-action-row">
+                <label class="admin-inline-field">Week <input name="survivorBuildWeek" type="number" min="1" value="${escapeHtml_(survivorSettings.startWeek || 1)}"></label>
+                <button type="button" class="secondary" onclick="adminBuildSportsSurvivorWeek(this.form, this)">Build / Refresh Week</button>
+                <button type="button" class="secondary" onclick="adminRunSportsSurvivorAutomation(this.form, this)">Run Survivor Automation Now</button>
+                <button type="button" class="secondary" onclick="adminInstallSportsSurvivorAutomation(this.form, this)">Install 15-Minute Automation</button>
+              </div>
+              <div class="admin-sub" data-survivor-action-status></div>
             </div>
           </details>
 
@@ -3179,6 +3401,64 @@ function adminGetGamePayloadFromForm_(
     type:
       form.type.value,
 
+    survivorSettingsJSON:
+      JSON.stringify({
+        mode: form.survivorMode ? form.survivorMode.value : "manual-elimination",
+        sport: "football",
+        league: form.survivorLeague ? form.survivorLeague.value : "nfl",
+        seasonYear: form.survivorSeasonYear ? form.survivorSeasonYear.value : new Date().getFullYear(),
+        seasonType: "2", seasonPhase: "regular",
+        startWeek: form.survivorMode && form.survivorMode.value === "king-of-the-hill" ? (form.kothStartWeek ? form.kothStartWeek.value : 1) : (form.survivorStartWeek ? form.survivorStartWeek.value : 1),
+        endWeek: form.survivorMode && form.survivorMode.value === "king-of-the-hill" ? (form.kothEndWeek ? form.kothEndWeek.value : 18) : (form.survivorEndWeek ? form.survivorEndWeek.value : 18),
+        resultMode: form.survivorResultMode ? form.survivorResultMode.value : "straight-up",
+        lossesAllowed: form.survivorLossesAllowed ? form.survivorLossesAllowed.value : 0,
+        teamUseLimit: form.survivorTeamUseLimit ? form.survivorTeamUseLimit.value : 1,
+        pickLockMode: form.survivorPickLockMode ? form.survivorPickLockMode.value : "team-kickoff",
+        missedPickRule: form.survivorMissedPickRule ? form.survivorMissedPickRule.value : "loss",
+        pushRule: form.survivorPushRule ? form.survivorPushRule.value : "survive",
+        endMode: form.survivorEndMode ? form.survivorEndMode.value : "sole-survivor",
+        showRecords: !!(form.survivorShowRecords && form.survivorShowRecords.checked),
+        showOdds: !!(form.survivorShowOdds && form.survivorShowOdds.checked),
+        showOpponent: !!(form.survivorShowOpponent && form.survivorShowOpponent.checked),
+        showSchedule: !!(form.survivorShowSchedule && form.survivorShowSchedule.checked),
+        oddsFreezeMode: form.survivorOddsFreezeMode ? form.survivorOddsFreezeMode.value : "weekly-lock",
+        kothBasePoints: form.survivorKothBasePoints ? form.survivorKothBasePoints.value : 10,
+        kothMultiplierStep: form.survivorKothMultiplierStep ? form.survivorKothMultiplierStep.value : 1,
+        kothMaxMultiplier: form.survivorKothMaxMultiplier ? form.survivorKothMaxMultiplier.value : 5,
+        kothLossBehavior: form.survivorKothLossBehavior ? form.survivorKothLossBehavior.value : "reset",
+        kothSourceGameIds: Array.from(form.querySelectorAll('input[name="kothSourceGameId"]:checked')).map(function(input) { return input.value; }),
+        kothCombineMode: form.kothCombineMode ? form.kothCombineMode.value : "sum",
+        kothEntryAggregation: form.kothEntryAggregation ? form.kothEntryAggregation.value : "sum",
+        kothStrikeLimit: form.kothStrikeLimit ? form.kothStrikeLimit.value : 3,
+        kothPacingMode: form.kothPacingMode ? form.kothPacingMode.value : "automatic",
+        kothFixedRecipients: form.kothFixedRecipients ? form.kothFixedRecipients.value : 3,
+        kothCustomSchedule: form.kothCustomSchedule ? form.kothCustomSchedule.value.trim() : "",
+        kothTieRule: form.kothTieRule ? form.kothTieRule.value : "include-all",
+        kothMinRecipients: form.kothMinRecipients ? form.kothMinRecipients.value : 1,
+        kothMaxRecipients: form.kothMaxRecipients ? form.kothMaxRecipients.value : 0,
+        kothStartMode: form.kothStartMode ? form.kothStartMode.value : "start-fresh",
+        kothAutoProcess: !!(form.kothAutoProcess && form.kothAutoProcess.checked),
+        earnLifeEnabled: !!(form.survivorEarnLifeEnabled && form.survivorEarnLifeEnabled.checked),
+        earnLifeWinStreak: form.survivorEarnLifeWinStreak ? form.survivorEarnLifeWinStreak.value : 5,
+        maxEarnedLives: form.survivorMaxEarnedLives ? form.survivorMaxEarnedLives.value : 1,
+        safeWeeks: form.survivorSafeWeeks ? form.survivorSafeWeeks.value.trim() : "",
+        atsWeeks: form.survivorATSWeeks ? form.survivorATSWeeks.value.trim() : "",
+        underdogWeeks: form.survivorUnderdogWeeks ? form.survivorUnderdogWeeks.value.trim() : "",
+        roadOnlyWeeks: form.survivorRoadOnlyWeeks ? form.survivorRoadOnlyWeeks.value.trim() : "",
+        divisionWeeks: form.survivorDivisionWeeks ? form.survivorDivisionWeeks.value.trim() : "",
+        doublePickWeeks: form.survivorDoublePickWeeks ? form.survivorDoublePickWeeks.value.trim() : "",
+        secondChanceWeeks: form.survivorSecondChanceWeeks ? form.survivorSecondChanceWeeks.value.trim() : "",
+        redemptionWeeks: form.survivorRedemptionWeeks ? form.survivorRedemptionWeeks.value.trim() : "",
+        confidenceWeeks: form.survivorConfidenceWeeks ? form.survivorConfidenceWeeks.value.trim() : "",
+        maxConfidenceRisk: form.survivorMaxConfidenceRisk ? form.survivorMaxConfidenceRisk.value : 10,
+        autoSettle: !!(form.survivorAutoSettle && form.survivorAutoSettle.checked),
+        autoBuildNextWeek: !!(form.survivorAutoBuildNextWeek && form.survivorAutoBuildNextWeek.checked),
+        autoRefreshOdds: !!(form.survivorAutoRefreshOdds && form.survivorAutoRefreshOdds.checked),
+        automationEnabled: form.survivorMode && form.survivorMode.value === "king-of-the-hill"
+          ? !!(form.kothAutomationEnabled && form.kothAutomationEnabled.checked)
+          : !!(form.survivorAutomationEnabled && form.survivorAutomationEnabled.checked)
+      }),
+
     active:
       form.active.checked,
 
@@ -3399,6 +3679,99 @@ function adminGetGamePayloadFromForm_(
         : false
   };
 
+}
+
+function adminUpdateSurvivorRuleFields(form) {
+  if (!form) return;
+  const mode = form.survivorMode ? form.survivorMode.value : "manual-elimination";
+  const activePickMode = mode === "sports-survivor" || mode === "streak-survivor";
+  form.querySelectorAll("[data-survivor-sports-field]").forEach(function(el) { el.hidden = !activePickMode; });
+  form.querySelectorAll("[data-survivor-streak-field]").forEach(function(el) { el.hidden = mode !== "streak-survivor"; });
+  form.querySelectorAll("[data-survivor-koth-field]").forEach(function(el) { el.hidden = mode !== "king-of-the-hill"; });
+}
+
+async function adminProcessKothWeek(form, button) {
+  if (!form) return;
+  const gameId = form.gameId.value.trim();
+  if (!gameId) { alert("Save the game first so it has a Game ID."); return; }
+  const status = form.querySelector("[data-koth-action-status]");
+  if (status) status.textContent = "Checking finalized source scores and processing KOTH…";
+  if (button) button.disabled = true;
+  try {
+    const saved = await apiAdminSaveGame(adminGetGamePayloadFromForm_(form));
+    if (!saved || saved.success === false) throw new Error(saved && saved.error || "Could not save King of the Hill settings.");
+    const res = await apiAdminBuildSportsSurvivorWeek({ gameId: gameId, week: form.kothProcessWeek ? form.kothProcessWeek.value : "" });
+    if (!res || res.success === false) throw new Error(res && res.error || "Could not process King of the Hill week.");
+    if (status) status.textContent = res.duplicate
+      ? `Week ${res.week} was already processed; no duplicate strikes were added.`
+      : `Week ${res.week} processed: ${res.actualRecipients || 0} strike recipient${Number(res.actualRecipients || 0) === 1 ? "" : "s"}${res.soleSurvivor ? ` · Sole Survivor: ${res.soleSurvivor}` : ""}.`;
+    adminMarkGameFormClean_(form);
+  } catch (err) {
+    if (status) status.textContent = err.message || String(err);
+    alert(err.message || err);
+  } finally { if (button) button.disabled = false; }
+}
+
+async function adminBuildSportsSurvivorWeek(form, button) {
+  if (!form) return;
+  const gameId = form.gameId.value.trim();
+  if (!gameId) { alert("Save the game first so it has a Game ID."); return; }
+  const status = form.querySelector("[data-survivor-action-status]");
+  if (status) status.textContent = "Building Survivor week…";
+  if (button) button.disabled = true;
+  try {
+    // Save rule changes before the builder reads them.
+    const saved = await apiAdminSaveGame(adminGetGamePayloadFromForm_(form));
+    if (!saved || saved.success === false) throw new Error(saved && saved.error || "Could not save Survivor settings.");
+    const res = await apiAdminBuildSportsSurvivorWeek({ gameId: gameId, week: form.survivorBuildWeek ? form.survivorBuildWeek.value : "" });
+    if (!res || res.success === false) throw new Error(res && res.error || "Could not build Survivor week.");
+    if (status) status.textContent = res.duplicate ? `Week ${res.week} already exists; current sports data was refreshed.` : `Week ${res.week} built with ${res.teams || 0} teams.`;
+    adminMarkGameFormClean_(form);
+  } catch (err) {
+    if (status) status.textContent = err.message || String(err);
+    alert(err.message || err);
+  } finally { if (button) button.disabled = false; }
+}
+
+async function adminRunSportsSurvivorAutomation(form, button) {
+  if (!form) return;
+  const gameId = form.gameId.value.trim();
+  const isKoth = !!(form.survivorMode && form.survivorMode.value === "king-of-the-hill");
+  const status = form.querySelector(isKoth ? "[data-koth-action-status]" : "[data-survivor-action-status]");
+  if (status) status.textContent = isKoth ? "Checking finalized source scores and KOTH strike pacing…" : "Syncing scores, grading, and checking the next week…";
+  if (button) button.disabled = true;
+  try {
+    const saved = await apiAdminSaveGame(adminGetGamePayloadFromForm_(form));
+    if (!saved || saved.success === false) throw new Error(saved && saved.error || "Could not save Survivor settings.");
+    const res = await apiAdminRunSportsSurvivor({ gameId: gameId });
+    if (!res || res.success === false) throw new Error(res && res.error || (isKoth ? "King of the Hill automation failed." : "Survivor automation failed."));
+    if (status) {
+      if (isKoth) {
+        const processed = Array.isArray(res.results) ? res.results.filter(function(row) { return row && row.success && !row.duplicate; }).length : 0;
+        const pending = Array.isArray(res.results) ? res.results.find(function(row) { return row && row.pending; }) : null;
+        status.textContent = res.soleSurvivor
+          ? `King of the Hill complete · Sole Survivor: ${res.soleSurvivor}`
+          : (pending ? (pending.error || "Waiting for finalized KOTH source scores.") : `King of the Hill automation completed (${processed} week${processed === 1 ? "" : "s"} processed).`);
+      } else {
+        status.textContent = `Survivor automation completed (${(res.actions || []).length} action${(res.actions || []).length === 1 ? "" : "s"}).`;
+      }
+    }
+    adminMarkGameFormClean_(form);
+  } catch (err) { if (status) status.textContent = err.message || String(err); alert(err.message || err); }
+  finally { if (button) button.disabled = false; }
+}
+
+async function adminInstallSportsSurvivorAutomation(form, button) {
+  if (!form) return;
+  const isKoth = !!(form.survivorMode && form.survivorMode.value === "king-of-the-hill");
+  const status = form.querySelector(isKoth ? "[data-koth-action-status]" : "[data-survivor-action-status]");
+  if (button) button.disabled = true;
+  try {
+    const res = await apiAdminInstallSportsSurvivorAutomation({ gameId: form.gameId.value.trim() });
+    if (!res || res.success === false) throw new Error(res && res.error || "Could not install Survivor automation.");
+    if (status) status.textContent = res.installed ? "15-minute Survivor automation installed." : "15-minute Survivor automation is already active.";
+  } catch (err) { if (status) status.textContent = err.message || String(err); alert(err.message || err); }
+  finally { if (button) button.disabled = false; }
 }
 
 function adminToggleGameAdvanced(

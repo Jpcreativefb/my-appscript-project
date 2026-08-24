@@ -836,7 +836,12 @@ function adminRunGamePreflight(payload) {
   }
 
   if (gameType === "survivor" && activeCategories.length < 2) {
-    adminPreflightAddIssue_(issues, "warning", "Survivor works best with two or more ordered rounds/questions.");
+    const survivorMode = typeof survivorGetSettings_ === "function"
+      ? String((survivorGetSettings_(gameId) || {}).mode || "manual-elimination").trim().toLowerCase()
+      : "manual-elimination";
+    if (survivorMode === "manual-elimination") {
+      adminPreflightAddIssue_(issues, "warning", "Manual Survivor works best with two or more ordered rounds/questions.");
+    }
   }
 
   if (gameType === "mixed") {

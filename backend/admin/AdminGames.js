@@ -1256,9 +1256,18 @@ function adminGetGames() {
 
   adminEnsureGameOptionalHeaders_();
 
+  const games = (getGames() || []).map(function(game) {
+    if (typeof survivorGetSettings_ !== "function") return game;
+    const type = String(game && (game.type || game.Type) || "").trim().toLowerCase();
+    if (type !== "survivor") return game;
+    return Object.assign({}, game, {
+      survivorSettings: survivorGetSettings_(game.gameId || game.GameId || "")
+    });
+  });
+
   return {
     success: true,
-    games: getGames(),
+    games: games,
     gameTypes:
       typeof getSupportedGameTypes === "function"
         ? getSupportedGameTypes()
@@ -1408,6 +1417,15 @@ function adminGetGameTypes() {
         );
   
       sh.appendRow(row);
+
+      const survivorType = typeof normalizeGameType_ === "function"
+        ? normalizeGameType_(safePayload.type || "prediction")
+        : adminNormalizeValue_(safePayload.type || "prediction").toLowerCase();
+      if (survivorType === "survivor" && typeof survivorSaveSettings_ === "function") {
+        survivorSaveSettings_(gameId, typeof sportsSurvivorSettingsFromPayload_ === "function"
+          ? sportsSurvivorSettingsFromPayload_(payload)
+          : (payload.survivorSettings || {}));
+      }
   
       adminClearCaches_();
   
@@ -2139,6 +2157,12 @@ if ("votingLocked" in payload) {
       ).setValues([
         row
       ]);
+
+      if (resolvedType === "survivor" && typeof survivorSaveSettings_ === "function") {
+        survivorSaveSettings_(gameId, typeof sportsSurvivorSettingsFromPayload_ === "function"
+          ? sportsSurvivorSettingsFromPayload_(payload)
+          : (payload.survivorSettings || {}));
+      }
   
       adminClearCaches_();
   

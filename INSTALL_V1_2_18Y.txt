@@ -1,0 +1,11 @@
+PATTC Predicts v1.2.18y — Sports Survivor + King of the Hill Score Strikes
+
+This package is built from the full project ZIP supplied Aug. 24, 2026 at commit:
+2e7dac0426bfa81c42cca9a4721d6117c48f048e
+
+It extends the existing Survivor / Elimination game without replacing classic Survivor:
+- Sports Survivor: weekly team picks, no-repeat limits, lives, ATS, records/odds/opponent/schedule, twists, automation.
+- Streak Survivor: the previously discussed consecutive-win multiplier variation.
+- King of the Hill — Score Strikes: passive weekly score elimination with configurable one/multiple source games, automatic strike pacing, ties, backfill/start-fresh, and duplicate-week protection.
+
+Use the included installer from the downloaded package. It verifies the exact GitHub/source baseline before changing files, runs targeted tests and the full production suite, commits, deploys Apps Script, and pushes GitHub for the frontend deployment.

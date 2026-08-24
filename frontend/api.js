@@ -910,8 +910,33 @@ async function apiSaveSurvivorPick(payload) {
     gameId: payload.gameId,
     leagueId: payload.leagueId || getApiLeagueId_(),
     categoryId: payload.categoryId,
-    nomineeId: payload.nomineeId
+    nomineeId: payload.nomineeId,
+    nomineeIds: Array.isArray(payload.nomineeIds) ? payload.nomineeIds : [],
+    nomineeIdsJSON: payload.nomineeIdsJSON || "",
+    confidencePoints: payload.confidencePoints || 0
   });
+}
+
+async function apiGetSurvivorTeamSchedule(gameId, team) {
+  const session = getSession ? (getSession() || {}) : {};
+  return api("getSurvivorTeamSchedule", {
+    username: session.username || "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_(),
+    team: team || ""
+  });
+}
+
+async function apiAdminBuildSportsSurvivorWeek(payload) {
+  return apiPost("adminBuildSportsSurvivorWeek", payload || {});
+}
+
+async function apiAdminRunSportsSurvivor(payload) {
+  return apiPost("adminRunSportsSurvivor", payload || {});
+}
+
+async function apiAdminInstallSportsSurvivorAutomation(payload) {
+  return apiPost("adminInstallSportsSurvivorAutomation", payload || {});
 }
 
 async function apiAdminSaveRankingResults(payload) {
