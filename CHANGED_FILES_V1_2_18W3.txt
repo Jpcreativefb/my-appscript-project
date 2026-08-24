@@ -1,0 +1,5 @@
+CHANGED_FILES_V1_2_18W3.txt
+backend/engines/RankingGameEngine.js
+docs/RANKING_SHEET_INIT_HOTFIX_V1_2_18W3.md
+tests/ranking_sheet_init_v1218w3_tests.js
+tools/install_ranking_sheet_init_v1218w3.sh

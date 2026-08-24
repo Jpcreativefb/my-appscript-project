@@ -1,5 +1,5 @@
 /* =====================================================
-   RANKING GAME ENGINE v1.2.18w
+   RANKING GAME ENGINE v1.2.18w3
 
    Game-native ordered ballots for Ranking games.
    - Stores one row per ranked nominee in RankingEntries.
@@ -40,7 +40,31 @@ function rankingBool_(value) {
 function rankingEnsureSheet_() {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
-  if (!sh) sh = ss.insertSheet(RANKING_ENTRIES_SHEET);
+
+  // Opening the Ranking page can start multiple API reads at nearly the same
+  // time. Make first-use sheet creation atomic so two requests cannot both see
+  // a missing sheet and race to insert the same tab.
+  if (!sh) {
+    const lock = LockService.getScriptLock();
+    let locked = false;
+    try {
+      lock.waitLock(10000);
+      locked = true;
+      sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
+      if (!sh) {
+        try {
+          sh = ss.insertSheet(RANKING_ENTRIES_SHEET);
+        } catch (error) {
+          // Defensive fallback: another execution may have completed creation
+          // between the re-check and insertSheet call.
+          sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
+          if (!sh) throw error;
+        }
+      }
+    } finally {
+      if (locked) lock.releaseLock();
+    }
+  }
 
   const lastColumn = Math.max(sh.getLastColumn(), 1);
   let headers = sh.getLastRow() >= 1
