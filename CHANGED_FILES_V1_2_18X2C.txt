@@ -1,0 +1,12 @@
+frontend/js/pages/picks.js
+frontend/js/app.js
+frontend/app.js
+frontend/app.html
+frontend/sw.js
+frontend/js/pwa.js
+CHANGED_FILES_V1_2_18X2C.txt
+INSTALL_V1_2_18X2C.txt
+docs/CONFIDENCE_APPEARANCE_PWA_REFRESH_V1_2_18X2C.md
+tests/confidence_appearance_pwa_refresh_v1218x2c_tests.js
+tools/apply_confidence_appearance_pwa_refresh_v1218x2c.py
+tools/install_confidence_appearance_pwa_refresh_v1218x2c.sh

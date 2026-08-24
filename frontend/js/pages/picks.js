@@ -1891,6 +1891,31 @@ function confidenceThemePresentation_() {
   return { className: classes.join(" "), style: vars.join(";") };
 }
 
+function refreshConfidenceAppearanceUi_() {
+  if (!shouldRenderCompactConfidenceSlate_()) return;
+
+  const list = document.getElementById("picksCategoryList");
+  if (!list) return;
+
+  // Confidence presentation classes, per-side image placement, visibility,
+  // score anchors, and several layout variables are calculated while the
+  // slate HTML is rendered. Rebuild only the Confidence slate when deferred
+  // appearance data arrives; never hide or replace the whole Picks page.
+  list.innerHTML = renderCompactConfidenceSlate_();
+
+  const summary = document.querySelector(".confidence-summary-bar");
+  if (summary && hasConfidencePointsCategories()) {
+    summary.outerHTML = renderConfidenceSummaryBar();
+  }
+
+  if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
+    window.PlatformImageEngine.process(list);
+  }
+
+  mountConfidenceLiveSports_();
+  updateCountdowns();
+}
+
 async function hydrateConfidenceAppearance_() {
   if (typeof apiGetGameAppearance !== "function") {
     const page = document.querySelector(".picks-page");
@@ -1913,6 +1938,7 @@ async function hydrateConfidenceAppearance_() {
       PICKS_APPEARANCE_CACHE[gameId] = cachedAppearance;
       PICKS_PAGE_DATA.appearance = cachedAppearance;
       applyPicksAppearanceToPage_();
+      refreshConfidenceAppearanceUi_();
     }
   }
 
@@ -1927,9 +1953,11 @@ async function hydrateConfidenceAppearance_() {
         PICKS_APPEARANCE_CACHE[gameId] = result;
         PICKS_PAGE_DATA.appearance = result;
         try { sessionStorage.setItem("pattcGameAppearance:" + gameId, JSON.stringify(result)); } catch (err) {}
-        // The page is already usable. Apply the theme without replacing the
-        // whole question DOM just because style metadata arrived later.
+        // The page is already usable. Apply page-level theme values first,
+        // then redraw only the compact Confidence slate because its per-team
+        // layout/classes/images are calculated from appearance at render time.
         applyPicksAppearanceToPage_();
+        refreshConfidenceAppearanceUi_();
       }
     } catch (err) {
       console.warn("Confidence appearance load skipped", err);

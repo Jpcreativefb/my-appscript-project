@@ -1,0 +1,4 @@
+PATTC Predicts v1.2.18x2c
+Confidence Appearance + PWA Refresh
+Exact baseline: ebfb0ef17afec9434acf2a7e5b25385b1f8e0c9c (v1.2.18x2b)
+Use the included controlled installer. It patches only the Confidence late-appearance redraw and frontend cache/version markers, then runs targeted and full production checks before deployment.
