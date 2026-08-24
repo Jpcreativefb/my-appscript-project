@@ -1,0 +1,11 @@
+backend/engines/RealityTvSeasonEngine.js
+frontend/app.js
+frontend/js/app.js
+frontend/app.html
+frontend/sw.js
+CHANGED_FILES_V1_2_18V4.txt
+INSTALL_V1_2_18V4.txt
+docs/REALITY_TV_CAST_DRAFT_SWITCH_V1_2_18V4.md
+tests/reality_tv_cast_draft_switch_v1218v4_tests.js
+tools/apply_reality_cast_draft_switch_v1218v4.py
+tools/finalize_reality_cast_draft_switch_v1218v4.sh

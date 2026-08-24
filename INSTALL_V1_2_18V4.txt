@@ -1,0 +1,5 @@
+PATTC Predicts v1.2.18v4 — Reality Cast Draft Switching
+
+Use the normal one-paste installer. It preserves the current Team Fantasy code and only patches Reality cast draft identity/deep-link behavior plus frontend cache markers.
+
+After deployment, fully close/reopen PATTC Predicts, then create Survivor Test and press Prepare / Open New Season Cast Sheet.

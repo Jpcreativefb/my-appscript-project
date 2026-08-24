@@ -3773,8 +3773,10 @@ function realityTvCastImportProfile_(season) {
   };
 }
 
-function realityTvCastImportSheetUrl_(spreadsheet, sheet) {
-  return spreadsheet.getUrl() + "#gid=" + sheet.getSheetId();
+/* REALITY CAST DRAFT SWITCH v1.2.18v4 */
+function realityTvCastImportSheetUrl_(spreadsheet, sheet, rangeA1) {
+  const rangePart = realityTvString_(rangeA1);
+  return spreadsheet.getUrl() + "#gid=" + sheet.getSheetId() + (rangePart ? "&range=" + encodeURIComponent(rangePart) : "");
 }
 
 /* REALITY CAST STAGING FORWARD FIX v1.2.18v2 */
@@ -3923,12 +3925,18 @@ function realityTvPrepareCastImportSheet_(season) {
     });
   }
 
+  const firstPreparedRow = seasonRows.length
+    ? seasonRows.reduce(function(first, row) { return Math.min(first, realityTvNumber_(row.__rowNumber, first)); }, realityTvNumber_(seasonRows[0].__rowNumber, 2))
+    : 2;
+  try { sheet.setActiveRange(sheet.getRange(firstPreparedRow, 1)); } catch (ignore) { /* deep link below is enough */ }
+
   return {
     sheet: sheet,
-    sheetUrl: realityTvCastImportSheetUrl_(ss, sheet),
+    sheetUrl: realityTvCastImportSheetUrl_(ss, sheet, "A" + firstPreparedRow),
     profile: profile,
     adoptedCount: adoptedCount,
-    preparedRowCount: seasonRows.length
+    preparedRowCount: seasonRows.length,
+    firstPreparedRow: firstPreparedRow
   };
 }
 
@@ -4100,7 +4108,27 @@ function realityTvCastDraftSeason_(payload) {
     ? realityTvShowFormatDefinition_(payload.showFormat || "survivor-tribal")
     : { id: realityTvString_(payload.showFormat || "survivor-tribal"), participantType: "individual", participantLabel: "Contestant", groupLabel: "Group", periodLabel: "Episode" };
   const gameId = realityTvSlug_(payload.gameId || (showName + "-" + seasonName + "-" + year));
-  const draftSeasonId = realityTvString_(payload.draftSeasonId) || ("draft-" + gameId);
+
+  // v1.2.18v4: a new show/season must never inherit the prior create-form draft id.
+  // Reuse a staging block only when its server-owned routing metadata matches
+  // the current Game + Show + Season + Format; otherwise create a deterministic
+  // show-aware draft id. This also lets an admin switch back to a prior draft.
+  const generatedDraftSeasonId = "draft-" + realityTvSlug_([gameId, showName, seasonName, year, format.id].join("-"));
+  let draftSeasonId = generatedDraftSeasonId;
+  try {
+    const rows = realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_CAST_IMPORT_SHEET);
+    const existingDraft = rows.find(function(row) {
+      const rowSeasonId = realityTvString_(row.SeasonId);
+      if (realityTvKey_(rowSeasonId).indexOf("draft-") !== 0) return false;
+      return realityTvKey_(row.GameId) === realityTvKey_(gameId) &&
+        realityTvKey_(row.ShowName) === realityTvKey_(showName) &&
+        realityTvKey_(row.SeasonName) === realityTvKey_(seasonName) &&
+        realityTvKey_(row.ShowFormat) === realityTvKey_(format.id);
+    });
+    if (existingDraft) draftSeasonId = realityTvString_(existingDraft.SeasonId) || generatedDraftSeasonId;
+  } catch (ignore) {
+    draftSeasonId = generatedDraftSeasonId;
+  }
   return {
     SeasonId: draftSeasonId,
     GameId: gameId,
