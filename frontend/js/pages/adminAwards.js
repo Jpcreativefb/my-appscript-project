@@ -94,7 +94,7 @@ function awardsAdminScoreModeOptions_(selected) {
     ["confidence-points", "Confidence Points"],
     ["staked-points", "Staked Prediction"],
     ["wager", "Wager / Chips"],
-    ["ranking", "Ranking (engine still in development)"]
+    ["ranking", "Ranking"]
   ];
   return rows.map(function(row) {
     return `<option value="${row[0]}" ${value === row[0] ? "selected" : ""}>${row[1]}</option>`;
@@ -2200,7 +2200,7 @@ function adminAwardsSyncQuestionModeForGame_() {
   }
   if (note) {
     note.textContent = "Game Type: " + awardsAdminGameTypeLabel_(game) +
-      (type === "ranking" ? " · Ranking creation is available, but the Ranking player engine is still being finished." : "");
+      (type === "ranking" ? " · Ranking uses ordered ballots with partial credit for near-miss positions." : "");
   }
 }
 

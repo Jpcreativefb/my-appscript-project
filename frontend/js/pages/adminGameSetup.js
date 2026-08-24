@@ -573,7 +573,7 @@ function adminSetupUpdateQuestionFieldVisibility(root) {
   const card = root.closest(".admin-collapsible-body") || root.closest(".admin-category-edit-panel") || root.parentElement;
   if (card) {
     card.querySelectorAll("[data-question-points-field]").forEach(function(field) {
-      field.hidden = ["fixed-points", "confidence-points"].indexOf(scoreMode) === -1;
+      field.hidden = ["fixed-points", "confidence-points", "ranking"].indexOf(scoreMode) === -1;
     });
   }
 
@@ -840,7 +840,7 @@ function adminSetupReadQuestionEngineFields_(prefix, suffix) {
 
 function renderAdminSetupAddCategoryCard(gameId, game, categories) {
   const defaultScoreMode = adminSetupDefaultScoreMode_(game);
-  const showPoints = ["fixed-points", "confidence-points"].indexOf(defaultScoreMode) !== -1;
+  const showPoints = ["fixed-points", "confidence-points", "ranking"].indexOf(defaultScoreMode) !== -1;
 
   return `
     <details
@@ -879,7 +879,7 @@ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
           </label>
 
           <label class="admin-field" data-question-points-field ${showPoints ? "" : "hidden"}>
-            ${adminSetupFieldLabel_("Points", "Used by fixed-point and confidence questions. Staked and wager questions calculate results from the player's stake or wager.")}
+            ${adminSetupFieldLabel_("Points", "Used by fixed-point, confidence, and ranking questions. Ranking points are the maximum value of a perfectly ordered ballot; staked and wager questions calculate from the player's stake or wager.")}
 
             <input
               type="number"
@@ -3201,7 +3201,7 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
               >
             </label>
 
-            <label class="admin-field" data-question-points-field ${["fixed-points", "confidence-points", "correct-pick"].indexOf(String(settings.scoreMode || "fixed-points").toLowerCase().replace(/_/g, "-")) !== -1 ? "" : "hidden"}>
+            <label class="admin-field" data-question-points-field ${["fixed-points", "confidence-points", "correct-pick", "ranking"].indexOf(String(settings.scoreMode || "fixed-points").toLowerCase().replace(/_/g, "-")) !== -1 ? "" : "hidden"}>
               ${adminSetupFieldLabel_("Points", "Used only by fixed-point and confidence questions.")}
 
               <input
@@ -3399,7 +3399,7 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
 
         ${renderAdminSetupCloneCategoryPanel_(category, categories)}
 
-        ${renderAdminResultsPanel(category, nominees, settings)}
+        ${renderAdminResultsPanel(category, nominees, settings, game)}
 
         <details
           id="answersPanel_${categoryId}"
@@ -3456,187 +3456,127 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
    RESULTS / WINNERS PANEL
 ====================== */
 
-function renderAdminResultsPanel(category, nominees, settings) {
-  const gameId =
-    adminSetupEscapeHtml(category.gameId);
+function renderAdminResultsPanel(category, nominees, settings, game) {
+  const gameId = adminSetupEscapeHtml(category.gameId);
+  const categoryId = adminSetupEscapeHtml(category.categoryId);
+  const gameType = String(game && game.type || "").trim().toLowerCase();
+  const scoreMode = String(settings && settings.scoreMode || "fixed-points").trim().toLowerCase().replace(/_/g, "-");
+  const isRanking = gameType === "ranking" || scoreMode === "ranking";
+  const isSurvivor = gameType === "survivor";
 
-  const categoryId =
-    adminSetupEscapeHtml(category.categoryId);
+  if (isRanking) {
+    const activeNominees = nominees.filter(nominee => nominee.active !== false);
+    const rankingRows = activeNominees.map((nominee, index) => {
+      const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
+      const nomineeName = adminSetupEscapeHtml(nominee.nominee || nominee.nomineeId);
+      const rankValue = Number(nominee.finalRank) > 0 ? Number(nominee.finalRank) : "";
+      return `
+        <div class="admin-ranking-result-row" data-ranking-result-row data-nominee-id="${nomineeId}">
+          <label class="admin-field">
+            <span>${nomineeName}</span>
+            <input
+              type="number"
+              id="rankingResult_${categoryId}_${nomineeId}"
+              data-ranking-result-rank
+              min="1"
+              max="${activeNominees.length}"
+              step="1"
+              value="${rankValue}"
+              placeholder="${index + 1}"
+            >
+          </label>
+        </div>`;
+    }).join("");
 
-  const winnerNomineeId =
-    String(settings.winnerNomineeId || "").trim();
+    return `
+      <details class="admin-results-panel">
+        <summary class="admin-results-summary">
+          <div class="admin-results-head">
+            <div>
+              <h3>Official Ranking Result</h3>
+              <div class="admin-sub">Enter every final position from 1 through ${activeNominees.length}. Rank 1 is also stored as the compatibility winner.</div>
+            </div>
+          </div>
+          <span class="admin-collapse-icon">▾</span>
+        </summary>
+        <div class="admin-collapsible-body">
+          ${activeNominees.length ? `
+            <div class="admin-ranking-results-grid" id="rankingResults_${categoryId}">${rankingRows}</div>
+            <div class="admin-card-actions">
+              <button class="admin-small-button" onclick="adminSetupSaveRankingResults('${gameId}', '${categoryId}')">Save Official Ranking</button>
+            </div>
+          ` : `<div class="admin-sub">Add nominees before setting the official ranking.</div>`}
+          <div id="resultMessage_${categoryId}" class="admin-message"></div>
+        </div>
+      </details>`;
+  }
 
-  const settlementStatus =
-    String(settings.settlementStatus || "")
-      .trim()
-      .toLowerCase();
+  const winnerNomineeId = String(settings.winnerNomineeId || "").trim();
+  const settlementStatus = String(settings.settlementStatus || "").trim().toLowerCase();
+  const resultStatus = settlementStatus === "push" || settlementStatus === "pushed" || settlementStatus === "void"
+    ? "push"
+    : settlementStatus === "cancelled" || settlementStatus === "canceled"
+      ? "cancelled"
+      : winnerNomineeId ? "winner" : "pending";
+  const favoriteNomineeId = String(settings.favoriteNomineeId || "").trim();
 
-  const resultStatus =
-    settlementStatus === "push" ||
-    settlementStatus === "pushed" ||
-    settlementStatus === "void"
-      ? "push"
-      : settlementStatus === "cancelled" ||
-        settlementStatus === "canceled"
-        ? "cancelled"
-        : winnerNomineeId
-          ? "winner"
-          : "pending";
+  const nomineeOptions = nominees.filter(nominee => nominee.active !== false).map(nominee => {
+    const nomineeId = String(nominee.nomineeId || "").trim();
+    const nomineeName = nominee.nominee || nominee.nomineeId;
+    return `<option value="${adminSetupEscapeHtml(nomineeId)}" ${nomineeId === winnerNomineeId ? "selected" : ""}>${adminSetupEscapeHtml(nomineeName)}</option>`;
+  }).join("");
 
-  const favoriteNomineeId =
-    String(settings.favoriteNomineeId || "").trim();
+  const favoriteOptions = nominees.filter(nominee => nominee.active !== false).map(nominee => {
+    const nomineeId = String(nominee.nomineeId || "").trim();
+    const nomineeName = nominee.nominee || nominee.nomineeId;
+    return `<option value="${adminSetupEscapeHtml(nomineeId)}" ${nomineeId === favoriteNomineeId ? "selected" : ""}>${adminSetupEscapeHtml(nomineeName)}</option>`;
+  }).join("");
 
-  const nomineeOptions =
-    nominees
-      .filter(nominee => nominee.active !== false)
-      .map(nominee => {
-        const nomineeId =
-          String(nominee.nomineeId || "").trim();
-
-        const nomineeName =
-          nominee.nominee || nominee.nomineeId;
-
-        return `
-          <option
-            value="${adminSetupEscapeHtml(nomineeId)}"
-            ${nomineeId === winnerNomineeId ? "selected" : ""}
-          >
-            ${adminSetupEscapeHtml(nomineeName)}
-          </option>
-        `;
-      })
-      .join("");
-
-  const favoriteOptions =
-    nominees
-      .filter(nominee => nominee.active !== false)
-      .map(nominee => {
-        const nomineeId =
-          String(nominee.nomineeId || "").trim();
-
-        const nomineeName =
-          nominee.nominee || nominee.nomineeId;
-
-        return `
-          <option
-            value="${adminSetupEscapeHtml(nomineeId)}"
-            ${nomineeId === favoriteNomineeId ? "selected" : ""}
-          >
-            ${adminSetupEscapeHtml(nomineeName)}
-          </option>
-        `;
-      })
-      .join("");
+  const title = isSurvivor ? "Elimination Result" : "Results / Winners";
+  const helper = isSurvivor
+    ? "Select the entry eliminated in this round. That entry knocks out players who selected it."
+    : "Select the actual winner and optional favorite/projection.";
+  const winnerLabel = isSurvivor ? "Eliminated Entry" : "Winner Nominee";
+  const finalLabel = isSurvivor ? "Final — Eliminated Entry Selected" : "Final — Winner Selected";
 
   return `
     <details class="admin-results-panel">
-
       <summary class="admin-results-summary">
-
         <div class="admin-results-head">
-
           <div>
-            <h3>Results / Winners</h3>
-
-            <div class="admin-sub">
-              Select the actual winner and optional favorite/projection.
-            </div>
+            <h3>${title}</h3>
+            <div class="admin-sub">${helper}</div>
           </div>
-
         </div>
-
-        <span class="admin-collapse-icon">
-          ▾
-        </span>
-
+        <span class="admin-collapse-icon">▾</span>
       </summary>
-
       <div class="admin-collapsible-body">
-
-        ${
-          nominees.length
-            ? `
-              <div class="admin-control-grid">
-
-                <label class="admin-field">
-                  <span>Result Status</span>
-
-                  <select
-                    id="resultStatus_${categoryId}"
-                    onchange="adminSetupToggleWinnerControl('${categoryId}')"
-                  >
-                    <option value="pending" ${resultStatus === "pending" ? "selected" : ""}>
-                      Pending / Not Settled
-                    </option>
-                    <option value="winner" ${resultStatus === "winner" ? "selected" : ""}>
-                      Final — Winner Selected
-                    </option>
-                    <option value="push" ${resultStatus === "push" ? "selected" : ""}>
-                      Push — Return Stakes
-                    </option>
-                    <option value="cancelled" ${resultStatus === "cancelled" ? "selected" : ""}>
-                      Cancelled / No Contest — Return Stakes
-                    </option>
-                  </select>
-                </label>
-
-                <label class="admin-field">
-                  <span>Winner Nominee</span>
-
-                  <select
-                    id="resultWinner_${categoryId}"
-                    ${resultStatus === "winner" ? "" : "disabled"}
-                  >
-                    <option value="">Not selected</option>
-                    ${nomineeOptions}
-                  </select>
-                </label>
-
-                <label class="admin-field">
-                  <span>Favorite Nominee</span>
-
-                  <select id="resultFavorite_${categoryId}">
-                    <option value="">Not selected</option>
-                    ${favoriteOptions}
-                  </select>
-                </label>
-
-              </div>
-
-              <div class="admin-card-actions">
-
-                <button
-                  class="admin-small-button"
-                  onclick="adminSetupSaveResults('${gameId}', '${categoryId}')"
-                >
-                  Save Results
-                </button>
-
-                <button
-                  class="admin-danger-button"
-                  onclick="adminSetupClearResults('${gameId}', '${categoryId}')"
-                >
-                  Clear Results
-                </button>
-
-              </div>
-            `
-            : `
-              <div class="admin-sub">
-                Add nominees before setting results.
-              </div>
-            `
-        }
-
-        <div
-          id="resultMessage_${categoryId}"
-          class="admin-message"
-        ></div>
-
+        ${nominees.length ? `
+          <div class="admin-control-grid">
+            <label class="admin-field">
+              <span>Result Status</span>
+              <select id="resultStatus_${categoryId}" onchange="adminSetupToggleWinnerControl('${categoryId}')">
+                <option value="pending" ${resultStatus === "pending" ? "selected" : ""}>Pending / Not Settled</option>
+                <option value="winner" ${resultStatus === "winner" ? "selected" : ""}>${finalLabel}</option>
+                ${isSurvivor ? "" : `<option value="push" ${resultStatus === "push" ? "selected" : ""}>Push — Return Stakes</option><option value="cancelled" ${resultStatus === "cancelled" ? "selected" : ""}>Cancelled / No Contest — Return Stakes</option>`}
+              </select>
+            </label>
+            <label class="admin-field">
+              <span>${winnerLabel}</span>
+              <select id="resultWinner_${categoryId}" ${resultStatus === "winner" ? "" : "disabled"}>
+                <option value="">Not selected</option>${nomineeOptions}
+              </select>
+            </label>
+            ${isSurvivor ? "" : `<label class="admin-field"><span>Favorite Nominee</span><select id="resultFavorite_${categoryId}"><option value="">Not selected</option>${favoriteOptions}</select></label>`}
+          </div>
+          <div class="admin-card-actions">
+            <button class="admin-small-button" onclick="adminSetupSaveResults('${gameId}', '${categoryId}', ${isSurvivor ? "true" : "false"})">Save Results</button>
+            <button class="admin-danger-button" onclick="adminSetupClearResults('${gameId}', '${categoryId}')">Clear Results</button>
+          </div>
+        ` : `<div class="admin-sub">Add nominees before setting results.</div>`}
+        <div id="resultMessage_${categoryId}" class="admin-message"></div>
       </div>
-
-    </details>
-  `;
+    </details>`;
 }
 
 /* ======================
@@ -5447,7 +5387,41 @@ async function adminSetupArchiveNominee(gameId, categoryId, nomineeId) {
    SAVE RESULTS / WINNERS
 ====================== */
 
-async function adminSetupSaveResults(gameId, categoryId) {
+async function adminSetupSaveRankingResults(gameId, categoryId) {
+  const root = document.getElementById("rankingResults_" + categoryId);
+  const rows = root ? Array.from(root.querySelectorAll("[data-ranking-result-row]")) : [];
+  const order = rows.map(row => ({
+    nomineeId: String(row.dataset.nomineeId || "").trim(),
+    rank: Number((row.querySelector("[data-ranking-result-rank]") || {}).value)
+  }));
+
+  if (!order.length) {
+    adminSetupSetMessage("resultMessage_" + categoryId, "Add nominees before setting the official ranking.", true);
+    return;
+  }
+
+  const ranks = order.map(item => item.rank);
+  const required = Array.from({ length: order.length }, (_, index) => index + 1);
+  const valid = order.every(item => item.nomineeId && Number.isInteger(item.rank) && item.rank >= 1 && item.rank <= order.length) &&
+    new Set(ranks).size === order.length && required.every(rank => ranks.indexOf(rank) !== -1);
+
+  if (!valid) {
+    adminSetupSetMessage("resultMessage_" + categoryId, "Use every rank exactly once from 1 through " + order.length + ".", true);
+    return;
+  }
+
+  adminSetupSetMessage("resultMessage_" + categoryId, "Saving official ranking...", false);
+  const res = await apiAdminSaveRankingResults({ gameId, categoryId, rankings: order });
+  if (!res || res.success === false) {
+    adminSetupSetMessage("resultMessage_" + categoryId, res && (res.message || res.error) ? res.message || res.error : "Could not save the official ranking.", true);
+    return;
+  }
+
+  adminSetupApplyLockState_(categoryId, true);
+  adminSetupSetMessage("resultMessage_" + categoryId, "Official ranking saved. Player ranking scores and standings are updated.", false);
+}
+
+async function adminSetupSaveResults(gameId, categoryId, isSurvivor) {
 
   const statusInput =
     document.getElementById(
@@ -5480,7 +5454,7 @@ async function adminSetupSaveResults(gameId, categoryId) {
   ) {
     adminSetupSetMessage(
       "resultMessage_" + categoryId,
-      "Select the winning nominee before saving a final result.",
+      isSurvivor ? "Select the eliminated entry before saving this round." : "Select the winning nominee before saving a final result.",
       true
     );
     return;

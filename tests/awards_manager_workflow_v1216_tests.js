@@ -17,7 +17,7 @@ assert(adminAwards.includes('adminAwardsBatchCreateSelected'), 'Awards Manager b
 assert(adminAwards.includes('awardsInlineWorkspace-'), 'View Event must render an inline event workspace.');
 assert(adminAwards.includes('Pick Changes') && adminAwards.includes('Unlimited until lock'), 'Awards Manager pick-change control missing.');
 assert(adminAwards.includes('Default Play Type') && adminAwards.includes('Question Display'), 'Awards Manager play/display controls missing.');
-assert(adminAwards.includes('Ranking (engine still in development)'), 'Ranking must be visibly marked as in development.');
+assert(adminAwards.includes('Ranking') && !adminAwards.includes('Ranking (engine still in development)'), 'Ranking must be available without the old development warning.');
 assert(awardsEngine.includes('awardsManagerDecimalOddsFromProbability_'), 'Awards provider probability to wager odds conversion missing.');
 assert(awardsEngine.includes('maxChangesRaw') && awardsEngine.includes('? -1'), 'Awards-created questions must default to changeable picks.');
 assert(awardsEngine.includes('scoreMode: resolvedScoreMode'), 'Awards questions must inherit/use target game score mode.');

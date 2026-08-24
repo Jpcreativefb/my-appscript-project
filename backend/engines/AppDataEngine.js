@@ -1782,7 +1782,7 @@ function getDashboardEnterLabel_(
   }
 
   if (mode === "ranking") {
-    return "Check Status";
+    return "Open Rankings";
   }
 
   return complete

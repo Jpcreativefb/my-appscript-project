@@ -2060,6 +2060,23 @@ function adminGetGameSetup(payload) {
     });
   }
 
+  if (typeof getCategoryResultsRows_ === "function") {
+    try {
+      getCategoryResultsRows_(gameId).forEach(function(result) {
+        const categoryId = adminCatNormalizeId_(result.categoryId);
+        const nomineeId = adminCatNormalizeId_(result.nomineeId);
+        const finalRank = Number(result.finalRank || result.finalPosition) || 0;
+        if (!categoryId || !nomineeId || finalRank <= 0 || !map[categoryId]) return;
+        const nominee = (map[categoryId].nominees || []).find(function(item) {
+          return adminCatNormalizeId_(item.nomineeId) === nomineeId;
+        });
+        if (nominee) nominee.finalRank = finalRank;
+      });
+    } catch (ignore) {
+      /* Ranking result decoration is helpful UI metadata, never a setup load blocker. */
+    }
+  }
+
   Object.keys(map).forEach(function(categoryId) {
     map[categoryId].cloneInfo = cloneInfoByCategory[categoryId] || null;
   });

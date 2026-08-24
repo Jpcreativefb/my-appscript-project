@@ -292,6 +292,14 @@ const survivorResult = runPreflight(
   { ...baseGame, type: 'survivor' },
   [category('survivor', 'correct-pick', 2)]
 );
-assert(survivorResult.issues.some(issue => issue.message.includes('Survivor publishing is blocked')));
+assert(!survivorResult.issues.some(issue => issue.message.includes('Survivor publishing is blocked')));
+assert.strictEqual(survivorResult.ready, true);
+
+const rankingResult = runPreflight(
+  { ...baseGame, type: 'ranking', predictionEnabled: false, rankingEnabled: true, fixedPointsEnabled: false },
+  [category('ranking', 'ranking', 5)]
+);
+assert.strictEqual(rankingResult.ready, true);
+assert(!rankingResult.issues.some(issue => issue.message.includes('Ranking publishing is blocked')));
 
 console.log('games-phase1-integration-tests: PASS');

@@ -874,6 +874,50 @@ async function apiGetMyPicks(username, gameId) {
 
 }
 
+async function apiGetRankingState(gameId) {
+  const session = getSession ? (getSession() || {}) : {};
+  return api("getRankingState", {
+    username: session.username || "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiSaveRanking(payload) {
+  payload = payload || {};
+  return apiPost("saveRanking", {
+    username: payload.username,
+    gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    categoryId: payload.categoryId,
+    rankings: Array.isArray(payload.rankings) ? payload.rankings : []
+  });
+}
+
+async function apiGetSurvivorState(gameId) {
+  const session = getSession ? (getSession() || {}) : {};
+  return api("getSurvivorState", {
+    username: session.username || "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiSaveSurvivorPick(payload) {
+  payload = payload || {};
+  return apiPost("saveSurvivorPick", {
+    username: payload.username,
+    gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    categoryId: payload.categoryId,
+    nomineeId: payload.nomineeId
+  });
+}
+
+async function apiAdminSaveRankingResults(payload) {
+  return apiPost("adminSaveRankingResults", payload || {});
+}
+
 async function apiSavePick(payload) {
 
   return apiPost("savePick", {

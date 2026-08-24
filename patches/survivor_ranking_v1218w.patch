@@ -1,0 +1,2634 @@
+diff --git a/CHANGED_FILES_V1_2_18W.txt b/CHANGED_FILES_V1_2_18W.txt
+new file mode 100644
+index 0000000..bd51ec5
+--- /dev/null
++++ b/CHANGED_FILES_V1_2_18W.txt
+@@ -0,0 +1,27 @@
++CHANGED_FILES_V1_2_18W.txt
++INSTALL_V1_2_18W.txt
++docs/SURVIVOR_RANKING_GAMES_V1_2_18W.md
++patches/survivor_ranking_v1218w.patch
++tools/install_survivor_ranking_v1218w.sh
++backend/Api.js
++backend/admin/AdminCategories.js
++backend/admin/AdminPreflight.js
++backend/engines/AppDataEngine.js
++backend/engines/RankingGameEngine.js
++backend/engines/ScoringEngine.js
++backend/engines/SurvivorGameEngine.js
++frontend/api.js
++frontend/app.html
++frontend/app.js
++frontend/css/pages.css
++frontend/js/api.js
++frontend/js/app.js
++frontend/js/pages/adminAwards.js
++frontend/js/pages/adminGameSetup.js
++frontend/js/pages/dashboard.js
++frontend/js/pages/ranking.js
++frontend/js/pages/survivor.js
++frontend/sw.js
++tests/awards_manager_workflow_v1216_tests.js
++tests/games_phase1_integration_tests.js
++tests/survivor_ranking_games_v1218w_tests.js
+diff --git a/INSTALL_V1_2_18W.txt b/INSTALL_V1_2_18W.txt
+new file mode 100644
+index 0000000..aac5516
+--- /dev/null
++++ b/INSTALL_V1_2_18W.txt
+@@ -0,0 +1,19 @@
++PATTC Predicts v1.2.18w — Survivor + Ranking Games
++
++Use the supplied update ZIP and run the installer from your Awards App repository.
++The installer:
++- requires branch architecture-cleanup
++- requires a clean repository
++- synchronizes the branch with origin/architecture-cleanup when a safe fast-forward is possible
++- verifies the current Reality + Team Fantasy foundations
++- applies the Survivor + Ranking patch
++- synchronizes frontend mirrors
++- runs Survivor/Ranking tests and the full production suite
++- commits the exact release files
++- pushes Apps Script
++- creates a new Apps Script version
++- updates the existing production Apps Script deployment
++- pushes GitHub (which continues the normal Cloudflare deployment workflow)
++- verifies GitHub and runs the production suite again
++
++No manual file copying inside the repository is required.
+diff --git a/backend/Api.js b/backend/Api.js
+index 442ace6..de1cbf4 100644
+--- a/backend/Api.js
++++ b/backend/Api.js
+@@ -162,6 +162,44 @@ function doPost(e) {
+       }));
+     }
+ 
++    if (action === "saveRanking") {
++      const postGameId = body.gameId || getDefaultGameId();
++      const postLeagueId = typeof normalizeLeagueId_ === "function"
++        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
++        : String(body.leagueId || body.activeLeagueId || "").trim();
++      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
++      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
++      return json(saveRankingBallot_({
++        username: body.username,
++        gameId: postGameId,
++        categoryId: body.categoryId,
++        rankings: Array.isArray(body.rankings) ? body.rankings : []
++      }));
++    }
++
++    if (action === "saveSurvivorPick") {
++      const postGameId = body.gameId || getDefaultGameId();
++      const postLeagueId = typeof normalizeLeagueId_ === "function"
++        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
++        : String(body.leagueId || body.activeLeagueId || "").trim();
++      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
++      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
++      return json(saveSurvivorPick_({
++        username: body.username,
++        gameId: postGameId,
++        categoryId: body.categoryId,
++        nomineeId: body.nomineeId
++      }));
++    }
++
++    if (action === "adminSaveRankingResults") {
++      return json(adminSaveRankingResults_({
++        gameId: body.gameId,
++        categoryId: body.categoryId,
++        rankings: Array.isArray(body.rankings) ? body.rankings : (Array.isArray(body.order) ? body.order : [])
++      }));
++    }
++
+     if (action === "savePick") {
+       const postGameId = body.gameId || getDefaultGameId();
+       const postLeagueId = typeof normalizeLeagueId_ === "function"
+@@ -660,6 +698,9 @@ function doGet(e) {
+       action === "saveUserProfile" ||
+       action === "uploadProfileAvatar" ||
+       action === "savePick" ||
++      action === "saveRanking" ||
++      action === "saveSurvivorPick" ||
++      action === "adminSaveRankingResults" ||
+       action === "saveConfidencePicksBatch" ||
+       action === "saveBet" ||
+       action === "removeBet" ||
+@@ -2251,6 +2292,18 @@ function doGet(e) {
+        PICKS
+     ========================= */
+ 
++    if (action === "getRankingState") {
++      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
++      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
++      return json(apiGetRankingState_({ username: params.username, gameId: gameId }));
++    }
++
++    if (action === "getSurvivorState") {
++      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
++      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
++      return json(apiGetSurvivorState_({ username: params.username, gameId: gameId }));
++    }
++
+     if (action === "getMyPicks") {
+ 
+       const access =
+diff --git a/backend/admin/AdminCategories.js b/backend/admin/AdminCategories.js
+index 4c85e22..b23a25f 100644
+--- a/backend/admin/AdminCategories.js
++++ b/backend/admin/AdminCategories.js
+@@ -2060,6 +2060,23 @@ function adminGetGameSetup(payload) {
+     });
+   }
+ 
++  if (typeof getCategoryResultsRows_ === "function") {
++    try {
++      getCategoryResultsRows_(gameId).forEach(function(result) {
++        const categoryId = adminCatNormalizeId_(result.categoryId);
++        const nomineeId = adminCatNormalizeId_(result.nomineeId);
++        const finalRank = Number(result.finalRank || result.finalPosition) || 0;
++        if (!categoryId || !nomineeId || finalRank <= 0 || !map[categoryId]) return;
++        const nominee = (map[categoryId].nominees || []).find(function(item) {
++          return adminCatNormalizeId_(item.nomineeId) === nomineeId;
++        });
++        if (nominee) nominee.finalRank = finalRank;
++      });
++    } catch (ignore) {
++      /* Ranking result decoration is helpful UI metadata, never a setup load blocker. */
++    }
++  }
++
+   Object.keys(map).forEach(function(categoryId) {
+     map[categoryId].cloneInfo = cloneInfoByCategory[categoryId] || null;
+   });
+diff --git a/backend/admin/AdminPreflight.js b/backend/admin/AdminPreflight.js
+index 60d23c1..442f34f 100644
+--- a/backend/admin/AdminPreflight.js
++++ b/backend/admin/AdminPreflight.js
+@@ -531,22 +531,6 @@ function adminRunGamePreflight(payload) {
+ 
+   }
+ 
+-  if (gameType === "survivor") {
+-    adminPreflightAddIssue_(
+-      issues,
+-      "error",
+-      "Survivor publishing is blocked until round advancement, elimination, and survivor-specific standings are completed."
+-    );
+-  }
+-
+-  if (gameType === "ranking") {
+-    adminPreflightAddIssue_(
+-      issues,
+-      "error",
+-      "Ranking publishing is blocked until ranking entry and ranking scoring are completed."
+-    );
+-  }
+-
+   const displayOrders = {};
+   const categoryIds = {};
+   const categoryModeCounts = {
+@@ -843,6 +827,18 @@ function adminRunGamePreflight(payload) {
+     );
+   }
+ 
++  if (gameType === "ranking" && categoryModeCounts.rankings === 0) {
++    adminPreflightAddIssue_(issues, "error", "Ranking games need at least one active ranking question.");
++  }
++
++  if (gameType === "ranking" && categoryModeCounts.rankings > 0 && categoryModeCounts.rankings !== activeCategories.length) {
++    adminPreflightAddIssue_(issues, "error", "Every active question in a Ranking game must use Ranking score mode.");
++  }
++
++  if (gameType === "survivor" && activeCategories.length < 2) {
++    adminPreflightAddIssue_(issues, "warning", "Survivor works best with two or more ordered rounds/questions.");
++  }
++
+   if (gameType === "mixed") {
+ 
+     if (
+@@ -882,13 +878,13 @@ function adminRunGamePreflight(payload) {
+       adminPreflightAddIssue_(
+         issues,
+         "error",
+-        "Hybrid game contains ranking questions, but ranking entry/scoring is not production-ready yet."
++        "Hybrid games cannot publish Ranking questions in the combined leaderboard yet. Use a standalone Ranking game for ordered ballots."
+       );
+     } else if (game.rankingEnabled === true) {
+       adminPreflightAddIssue_(
+         issues,
+         "warning",
+-        "Ranking is enabled but no ranking questions exist. Turn Ranking off until the ranking workflow is completed."
++        "Ranking is enabled but no ranking questions exist."
+       );
+     }
+ 
+diff --git a/backend/engines/AppDataEngine.js b/backend/engines/AppDataEngine.js
+index 642a5d7..260aab7 100644
+--- a/backend/engines/AppDataEngine.js
++++ b/backend/engines/AppDataEngine.js
+@@ -1782,7 +1782,7 @@ function getDashboardEnterLabel_(
+   }
+ 
+   if (mode === "ranking") {
+-    return "Check Status";
++    return "Open Rankings";
+   }
+ 
+   return complete
+diff --git a/backend/engines/RankingGameEngine.js b/backend/engines/RankingGameEngine.js
+new file mode 100644
+index 0000000..a91af27
+--- /dev/null
++++ b/backend/engines/RankingGameEngine.js
+@@ -0,0 +1,540 @@
++/* =====================================================
++   RANKING GAME ENGINE v1.2.18w
++
++   Game-native ordered ballots for Ranking games.
++   - Stores one row per ranked nominee in RankingEntries.
++   - Uses CategoryResults.FinalRank as the official order.
++   - Scores each question against its configured Points value.
++   - Exact position = 100%; each position away loses 20% credit.
++===================================================== */
++
++const RANKING_ENTRIES_SHEET = "RankingEntries";
++const RANKING_ENTRIES_HEADERS = [
++  "Timestamp",
++  "UpdatedAt",
++  "GameId",
++  "Username",
++  "CategoryId",
++  "NomineeId",
++  "Rank",
++  "Locked"
++];
++
++function rankingString_(value) {
++  return String(value === undefined || value === null ? "" : value).trim();
++}
++
++function rankingKey_(value) {
++  return rankingString_(value).toLowerCase();
++}
++
++function rankingNumber_(value, fallback) {
++  const number = Number(value);
++  return Number.isFinite(number) ? number : (fallback === undefined ? 0 : fallback);
++}
++
++function rankingBool_(value) {
++  return value === true || rankingKey_(value) === "true" || rankingString_(value) === "1";
++}
++
++function rankingEnsureSheet_() {
++  const ss = SpreadsheetApp.getActive();
++  let sh = ss.getSheetByName(RANKING_ENTRIES_SHEET);
++  if (!sh) sh = ss.insertSheet(RANKING_ENTRIES_SHEET);
++
++  const lastColumn = Math.max(sh.getLastColumn(), 1);
++  let headers = sh.getLastRow() >= 1
++    ? sh.getRange(1, 1, 1, lastColumn).getValues()[0].map(rankingString_)
++    : [];
++
++  if (!headers.some(Boolean)) {
++    sh.getRange(1, 1, 1, RANKING_ENTRIES_HEADERS.length).setValues([RANKING_ENTRIES_HEADERS]);
++    headers = RANKING_ENTRIES_HEADERS.slice();
++  }
++
++  const missing = RANKING_ENTRIES_HEADERS.filter(function(header) {
++    return headers.indexOf(header) === -1;
++  });
++  if (missing.length) {
++    sh.getRange(1, headers.length + 1, 1, missing.length).setValues([missing]);
++  }
++
++  return sh;
++}
++
++function rankingHeaderMap_(headers) {
++  const map = {};
++  (headers || []).forEach(function(header, index) {
++    const key = rankingKey_(header);
++    if (key && map[key] === undefined) map[key] = index;
++  });
++  return map;
++}
++
++function rankingReadRows_(gameId) {
++  gameId = rankingString_(gameId);
++  const sh = rankingEnsureSheet_();
++  if (sh.getLastRow() <= 1) return [];
++
++  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(rankingString_);
++  const col = rankingHeaderMap_(headers);
++  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, headers.length).getValues();
++
++  return rows.map(function(row, index) {
++    return {
++      rowNumber: index + 2,
++      timestamp: row[col.timestamp],
++      updatedAt: row[col.updatedat],
++      gameId: rankingString_(row[col.gameid]),
++      username: rankingString_(row[col.username]),
++      categoryId: rankingKey_(row[col.categoryid]),
++      nomineeId: rankingKey_(row[col.nomineeid]),
++      rank: rankingNumber_(row[col.rank], 0),
++      locked: rankingBool_(row[col.locked])
++    };
++  }).filter(function(row) {
++    return !gameId || row.gameId === gameId;
++  });
++}
++
++function rankingGetEntriesByUser_(gameId) {
++  const map = {};
++  rankingReadRows_(gameId).forEach(function(row) {
++    if (!row.username || !row.categoryId || !row.nomineeId || row.rank <= 0) return;
++    if (!map[row.username]) map[row.username] = {};
++    if (!map[row.username][row.categoryId]) map[row.username][row.categoryId] = [];
++    map[row.username][row.categoryId].push({ nomineeId: row.nomineeId, rank: row.rank });
++  });
++
++  Object.keys(map).forEach(function(username) {
++    Object.keys(map[username]).forEach(function(categoryId) {
++      map[username][categoryId].sort(function(a, b) { return a.rank - b.rank; });
++    });
++  });
++  return map;
++}
++
++function rankingGetUserEntries_(username, gameId) {
++  username = rankingString_(username);
++  const byUser = rankingGetEntriesByUser_(gameId);
++  return byUser[username] || {};
++}
++
++function rankingGameCategories_(gameId) {
++  const game = typeof getGameRuntimeConfig === "function"
++    ? getGameRuntimeConfig(gameId)
++    : getGame(gameId);
++  const categories = typeof getCategoriesCached === "function"
++    ? getCategoriesCached(gameId)
++    : getCategories(gameId);
++
++  return (categories || []).filter(function(category) {
++    const mode = typeof normalizeCategoryScoreMode_ === "function"
++      ? normalizeCategoryScoreMode_(category.scoreMode || "")
++      : rankingKey_(category.scoreMode || "").replace(/_/g, "-");
++    return mode === "ranking" || rankingKey_(game && game.type) === "ranking";
++  }).sort(function(a, b) {
++    const sectionCompare = rankingString_(a.section).localeCompare(rankingString_(b.section));
++    if (sectionCompare) return sectionCompare;
++    return rankingNumber_(a.displayOrder, 999) - rankingNumber_(b.displayOrder, 999);
++  });
++}
++
++function rankingCategoryLocked_(game, category) {
++  if (!game || !category) return true;
++  if (game.lockAllPicks === true || game.votingLocked === true || category.locked === true) return true;
++  const lockDateTime = category.lockDateTime ? new Date(category.lockDateTime) : null;
++  return !!(lockDateTime && !isNaN(lockDateTime.getTime()) && Date.now() >= lockDateTime.getTime());
++}
++
++function rankingFinalRanksForGame_(gameId) {
++  const rows = typeof getCategoryResultsRows_ === "function" ? getCategoryResultsRows_(gameId) : [];
++  const map = {};
++  (rows || []).forEach(function(row) {
++    const categoryId = rankingKey_(row.categoryId);
++    const nomineeId = rankingKey_(row.nomineeId);
++    const rank = rankingNumber_(row.finalRank || row.finalPosition, 0);
++    const status = rankingKey_(row.resultStatus);
++    if (!categoryId || !nomineeId || rank <= 0) return;
++    if (["pending", "open", "cleared", "unsettled", "push", "pushed", "void", "cancelled", "canceled"].indexOf(status) !== -1) return;
++    if (!map[categoryId]) map[categoryId] = {};
++    map[categoryId][nomineeId] = rank;
++  });
++  return map;
++}
++
++function rankingFinalOrderComplete_(category, finalRanks) {
++  const nominees = (category && category.nominees || []).filter(function(nominee) {
++    return nominee && nominee.id;
++  });
++  if (!nominees.length) return false;
++  const ranks = nominees.map(function(nominee) {
++    return rankingNumber_(finalRanks && finalRanks[rankingKey_(nominee.id)], 0);
++  }).sort(function(a, b) { return a - b; });
++  if (ranks.length !== nominees.length || ranks.some(function(rank) { return rank <= 0; })) return false;
++  return ranks.every(function(rank, index) { return rank === index + 1; });
++}
++
++function rankingPositionCredit_(distance) {
++  return Math.max(0, 1 - (Math.abs(rankingNumber_(distance, 0)) * 0.20));
++}
++
++function rankingScoreBallot_(category, ballot, finalRanks) {
++  const maxPoints = Math.max(0, rankingNumber_(category && category.points, 0));
++  const nominees = (category && category.nominees || []).filter(function(nominee) {
++    return nominee && nominee.id;
++  });
++  const resolved = rankingFinalOrderComplete_(category, finalRanks || {});
++  const ballotMap = {};
++  (ballot || []).forEach(function(row) {
++    const nomineeId = rankingKey_(row.nomineeId);
++    const rank = rankingNumber_(row.rank, 0);
++    if (nomineeId && rank > 0) ballotMap[nomineeId] = rank;
++  });
++
++  if (!resolved) {
++    return {
++      resolved: false,
++      earnedPoints: 0,
++      remainingPoints: ballot && ballot.length ? maxPoints : 0,
++      maxPoints: maxPoints,
++      accuracyPercent: 0,
++      exactCount: 0
++    };
++  }
++
++  if (!ballot || ballot.length !== nominees.length) {
++    return {
++      resolved: true,
++      earnedPoints: 0,
++      remainingPoints: 0,
++      maxPoints: maxPoints,
++      accuracyPercent: 0,
++      exactCount: 0
++    };
++  }
++
++  let creditTotal = 0;
++  let exactCount = 0;
++  nominees.forEach(function(nominee) {
++    const nomineeId = rankingKey_(nominee.id);
++    const predicted = rankingNumber_(ballotMap[nomineeId], 0);
++    const actual = rankingNumber_(finalRanks[nomineeId], 0);
++    if (predicted <= 0 || actual <= 0) return;
++    const distance = Math.abs(predicted - actual);
++    const credit = rankingPositionCredit_(distance);
++    creditTotal += credit;
++    if (distance === 0) exactCount++;
++  });
++
++  const accuracy = nominees.length ? creditTotal / nominees.length : 0;
++  return {
++    resolved: true,
++    earnedPoints: Math.round(maxPoints * accuracy * 100) / 100,
++    remainingPoints: 0,
++    maxPoints: maxPoints,
++    accuracyPercent: Math.round(accuracy * 1000) / 10,
++    exactCount: exactCount
++  };
++}
++
++function rankingValidateBallot_(category, rankings) {
++  const nominees = (category && category.nominees || []).filter(function(nominee) {
++    return nominee && nominee.id;
++  });
++  const nomineeSet = {};
++  nominees.forEach(function(nominee) { nomineeSet[rankingKey_(nominee.id)] = true; });
++
++  if (!Array.isArray(rankings) || rankings.length !== nominees.length) {
++    throw new Error("Rank every answer before saving this question.");
++  }
++
++  const usedNominees = {};
++  const usedRanks = {};
++  rankings.forEach(function(item) {
++    const nomineeId = rankingKey_(item && item.nomineeId);
++    const rank = rankingNumber_(item && item.rank, 0);
++    if (!nomineeSet[nomineeId]) throw new Error("Invalid answer in ranking ballot: " + nomineeId);
++    if (usedNominees[nomineeId]) throw new Error("Each answer can only appear once in a ranking ballot.");
++    if (rank < 1 || rank > nominees.length || Math.floor(rank) !== rank) throw new Error("Ranking positions must be 1 through " + nominees.length + ".");
++    if (usedRanks[rank]) throw new Error("Each ranking position can only be used once.");
++    usedNominees[nomineeId] = true;
++    usedRanks[rank] = true;
++  });
++}
++
++function apiGetRankingState_(payload) {
++  payload = payload || {};
++  const gameId = rankingString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
++  const username = rankingString_(payload.username);
++  if (!gameId) throw new Error("GameId is required.");
++  if (!username) throw new Error("Username is required.");
++
++  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
++  if (!game || (rankingKey_(game.type) !== "ranking" && game.rankingEnabled !== true)) {
++    throw new Error("This game is not configured for Ranking play.");
++  }
++
++  const categories = rankingGameCategories_(gameId);
++  const ballots = rankingGetUserEntries_(username, gameId);
++  const finalRanks = rankingFinalRanksForGame_(gameId);
++
++  return {
++    success: true,
++    gameId: gameId,
++    gameName: game.name || gameId,
++    rules: {
++      exact: 100,
++      oneAway: 80,
++      twoAway: 60,
++      threeAway: 40,
++      fourAway: 20,
++      farther: 0
++    },
++    categories: categories.map(function(category) {
++      const categoryId = rankingKey_(category.id);
++      const ballot = ballots[categoryId] || [];
++      const categoryFinalRanks = finalRanks[categoryId] || {};
++      const score = rankingScoreBallot_(category, ballot, categoryFinalRanks);
++      return {
++        id: category.id,
++        name: category.name,
++        section: category.section || "Main",
++        displayOrder: category.displayOrder,
++        points: rankingNumber_(category.points, 0),
++        locked: rankingCategoryLocked_(game, category) || score.resolved,
++        lockDateTime: category.lockDateTime || "",
++        resolved: score.resolved,
++        earnedPoints: score.earnedPoints,
++        remainingPoints: score.remainingPoints,
++        accuracyPercent: score.accuracyPercent,
++        exactCount: score.exactCount,
++        ballot: ballot,
++        officialOrder: Object.keys(categoryFinalRanks).map(function(nomineeId) {
++          return { nomineeId: nomineeId, rank: categoryFinalRanks[nomineeId] };
++        }).sort(function(a, b) { return a.rank - b.rank; }),
++        nominees: (category.nominees || []).map(function(nominee) {
++          return {
++            id: nominee.id,
++            name: nominee.name,
++            shortAnswer: nominee.shortAnswer || nominee.name,
++            image: nominee.image || "",
++            movie: nominee.movie || "",
++            person: nominee.person || ""
++          };
++        })
++      };
++    })
++  };
++}
++
++function saveRankingBallot_(payload) {
++  payload = payload || {};
++  const gameId = rankingString_(payload.gameId);
++  const username = rankingString_(payload.username);
++  const categoryId = rankingKey_(payload.categoryId);
++  const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
++  if (!gameId || !username || !categoryId) throw new Error("Username, GameId, and CategoryId are required.");
++
++  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
++  if (!game || (rankingKey_(game.type) !== "ranking" && game.rankingEnabled !== true)) {
++    throw new Error("Ranking is not enabled for this game.");
++  }
++
++  const category = rankingGameCategories_(gameId).find(function(item) {
++    return rankingKey_(item.id) === categoryId;
++  });
++  if (!category) throw new Error("Ranking question not found.");
++  if (rankingCategoryLocked_(game, category)) throw new Error("This ranking question is locked.");
++
++  const finalRanks = rankingFinalRanksForGame_(gameId)[categoryId] || {};
++  if (rankingFinalOrderComplete_(category, finalRanks)) throw new Error("This ranking question has already been settled.");
++  rankingValidateBallot_(category, rankings);
++
++  const lock = LockService.getScriptLock();
++  lock.waitLock(10000);
++  try {
++    const sh = rankingEnsureSheet_();
++    const data = sh.getDataRange().getValues();
++    const headers = data[0].map(rankingString_);
++    const col = rankingHeaderMap_(headers);
++    const keep = [];
++    for (let i = 1; i < data.length; i++) {
++      const same = rankingString_(data[i][col.gameid]) === gameId &&
++        rankingString_(data[i][col.username]) === username &&
++        rankingKey_(data[i][col.categoryid]) === categoryId;
++      if (!same) keep.push(data[i]);
++    }
++
++    const now = new Date();
++    const newRows = rankings.map(function(item) {
++      const row = new Array(headers.length).fill("");
++      row[col.timestamp] = now;
++      row[col.updatedat] = now;
++      row[col.gameid] = gameId;
++      row[col.username] = username;
++      row[col.categoryid] = categoryId;
++      row[col.nomineeid] = rankingKey_(item.nomineeId);
++      row[col.rank] = rankingNumber_(item.rank, 0);
++      row[col.locked] = false;
++      return row;
++    });
++
++    const output = [headers].concat(keep, newRows);
++    sh.clearContents();
++    sh.getRange(1, 1, output.length, headers.length).setValues(output);
++    if (typeof clearAppCaches === "function") clearAppCaches();
++    return { success: true, gameId: gameId, categoryId: categoryId, saved: newRows.length };
++  } finally {
++    lock.releaseLock();
++  }
++}
++
++function adminSaveRankingResults_(payload) {
++  payload = payload || {};
++  const gameId = rankingString_(payload.gameId);
++  const categoryId = rankingKey_(payload.categoryId);
++  const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
++  if (!gameId || !categoryId) throw new Error("GameId and CategoryId are required.");
++
++  const category = rankingGameCategories_(gameId).find(function(item) {
++    return rankingKey_(item.id) === categoryId;
++  });
++  if (!category) throw new Error("Ranking question not found.");
++  rankingValidateBallot_(category, rankings);
++
++  const now = new Date();
++  const payloads = rankings.map(function(item) {
++    const rank = rankingNumber_(item.rank, 0);
++    return {
++      timestamp: now,
++      settledAt: now,
++      gameId: gameId,
++      categoryId: categoryId,
++      nomineeId: rankingKey_(item.nomineeId),
++      resultStatus: "settled",
++      isWinner: rank === 1,
++      finalRank: rank,
++      finalPosition: rank,
++      resultValue: rank,
++      resultSource: "manual-ranking",
++      notes: "Official Ranking result saved from Manage Games."
++    };
++  });
++
++  const result = upsertCategoryResultsBulk_(payloads);
++
++  if (typeof adminUpdateCategory === "function") {
++    const winner = rankings.find(function(item) { return rankingNumber_(item.rank, 0) === 1; });
++    adminUpdateCategory({
++      gameId: gameId,
++      categoryId: categoryId,
++      winnerNomineeId: winner ? rankingKey_(winner.nomineeId) : "",
++      settlementStatus: "settled",
++      locked: true,
++      notes: "Ranking result finalized."
++    });
++    // adminUpdateCategory may mirror the winner into CategoryResults; write the
++    // complete rank set one more time so every final position remains canonical.
++    upsertCategoryResultsBulk_(payloads);
++  }
++
++  if (typeof clearAppCaches === "function") clearAppCaches();
++  return {
++    success: true,
++    gameId: gameId,
++    categoryId: categoryId,
++    saved: rankings.length,
++    updated: result && result.updated || 0,
++    appended: result && result.appended || 0
++  };
++}
++
++function rankingLeaderboardData_(gameId) {
++  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
++  const categories = rankingGameCategories_(gameId);
++  const entriesByUser = rankingGetEntriesByUser_(gameId);
++  const finalRanks = rankingFinalRanksForGame_(gameId);
++  const rows = [];
++
++  Object.keys(entriesByUser).forEach(function(username) {
++    let total = 0;
++    let remaining = 0;
++    let exactCount = 0;
++    let resolvedQuestions = 0;
++    Object.keys(entriesByUser[username]).forEach(function(categoryId) {
++      const category = categories.find(function(item) { return rankingKey_(item.id) === categoryId; });
++      if (!category) return;
++      const score = rankingScoreBallot_(category, entriesByUser[username][categoryId], finalRanks[categoryId] || {});
++      total += score.earnedPoints;
++      remaining += score.remainingPoints;
++      exactCount += score.exactCount;
++      if (score.resolved) resolvedQuestions++;
++    });
++
++    const profile = typeof getLeaderboardUserProfile_ === "function" ? (getLeaderboardUserProfile_(username, gameId) || {}) : {};
++    rows.push({
++      user: username,
++      username: username,
++      displayName: profile.displayName || username,
++      avatar: profile.avatar || "👤",
++      themeColor: profile.themeColor || profile.profileColor || "#354785",
++      profileColor: profile.profileColor || profile.themeColor || "#354785",
++      profileColorMode: profile.profileColorMode || "solid",
++      profileColor2: profile.profileColor2 || "#354785",
++      profileGradientAngle: profile.profileGradientAngle || "135",
++      total: Math.round(total * 100) / 100,
++      remaining: Math.round(remaining * 100) / 100,
++      max: Math.round((total + remaining) * 100) / 100,
++      statues: 0,
++      fixedPointsEnabled: false,
++      fixedPoints: Math.round(total * 100) / 100,
++      fixedRemaining: Math.round(remaining * 100) / 100,
++      rankingExactCount: exactCount,
++      rankingResolvedQuestions: resolvedQuestions,
++      eliminated: false,
++      winChance: 0,
++      scoringMode: "ranking",
++      leaderboardScoreMode: "ranking"
++    });
++  });
++
++  rows.sort(function(a, b) {
++    if (b.total !== a.total) return b.total - a.total;
++    if (b.rankingExactCount !== a.rankingExactCount) return b.rankingExactCount - a.rankingExactCount;
++    return rankingString_(a.displayName).localeCompare(rankingString_(b.displayName));
++  });
++  return rows;
++}
++
++function rankingUserScoring_(username, gameId) {
++  const categories = rankingGameCategories_(gameId);
++  const ballots = rankingGetUserEntries_(username, gameId);
++  const finalRanks = rankingFinalRanksForGame_(gameId);
++  const scoring = {};
++
++  categories.forEach(function(category) {
++    const categoryId = rankingKey_(category.id);
++    const ballot = ballots[categoryId] || [];
++    const score = rankingScoreBallot_(category, ballot, finalRanks[categoryId] || {});
++    scoring[categoryId] = {
++      shortName: category.shortName || category.name,
++      nomineeId: ballot.length ? "ranking-ballot" : "",
++      winnerNomineeId: "",
++      earnedPoints: score.earnedPoints,
++      remainingPoints: score.remainingPoints,
++      finalPointsAvailable: score.maxPoints,
++      locked: rankingCategoryLocked_(typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId), category),
++      resolved: score.resolved,
++      correct: score.resolved && score.accuracyPercent === 100,
++      wrong: false,
++      push: false,
++      status: score.resolved ? "ranked" : (ballot.length ? "pending" : "no-pick"),
++      scoringMode: "ranking",
++      confidenceScoringMode: "",
++      rankingAccuracyPercent: score.accuracyPercent,
++      rankingExactCount: score.exactCount
++    };
++  });
++  return scoring;
++}
+diff --git a/backend/engines/ScoringEngine.js b/backend/engines/ScoringEngine.js
+index 13ac864..16beb4c 100644
+--- a/backend/engines/ScoringEngine.js
++++ b/backend/engines/ScoringEngine.js
+@@ -301,6 +301,16 @@ function getLeaderboardData(
+       ? getGameRuntimeConfig(gameId)
+       : getGame(gameId);
+ 
++  const gameType = String(game && game.type || "").trim().toLowerCase();
++
++  if (gameType === "survivor" && typeof survivorLeaderboardData_ === "function") {
++    return survivorLeaderboardData_(gameId);
++  }
++
++  if (gameType === "ranking" && typeof rankingLeaderboardData_ === "function") {
++    return rankingLeaderboardData_(gameId);
++  }
++
+   const isConfidenceGame =
+     isConfidenceScoringGame_(
+       gameId
+@@ -949,6 +959,16 @@ function getUserScoring(
+       ? getGameRuntimeConfig(gameId)
+       : getGame(gameId);
+ 
++  const gameType = String(game && game.type || "").trim().toLowerCase();
++
++  if (gameType === "survivor" && typeof survivorUserScoring_ === "function") {
++    return survivorUserScoring_(username, gameId);
++  }
++
++  if (gameType === "ranking" && typeof rankingUserScoring_ === "function") {
++    return rankingUserScoring_(username, gameId);
++  }
++
+   const isConfidenceGame =
+     isConfidenceScoringGame_(
+       gameId
+diff --git a/backend/engines/SurvivorGameEngine.js b/backend/engines/SurvivorGameEngine.js
+new file mode 100644
+index 0000000..ef85e05
+--- /dev/null
++++ b/backend/engines/SurvivorGameEngine.js
+@@ -0,0 +1,320 @@
++/* =====================================================
++   SURVIVOR / ELIMINATION GAME ENGINE v1.2.18w
++
++   Each ordered question is a Survivor round.
++   The player selects an entry they believe will survive the round.
++   The admin records the eliminated entry as the category winner/result.
++   Picking that eliminated entry, or missing a settled round, eliminates
++   the player from subsequent rounds.
++===================================================== */
++
++function survivorString_(value) {
++  return String(value === undefined || value === null ? "" : value).trim();
++}
++
++function survivorKey_(value) {
++  return survivorString_(value).toLowerCase();
++}
++
++function survivorNumber_(value, fallback) {
++  const number = Number(value);
++  return Number.isFinite(number) ? number : (fallback === undefined ? 0 : fallback);
++}
++
++function survivorGameCategories_(gameId) {
++  const categories = typeof getCategoriesCached === "function" ? getCategoriesCached(gameId) : getCategories(gameId);
++  return (categories || []).slice().sort(function(a, b) {
++    const aRound = survivorNumber_(a.roundNumber, 0);
++    const bRound = survivorNumber_(b.roundNumber, 0);
++    if (aRound > 0 && bRound > 0 && aRound !== bRound) return aRound - bRound;
++    return survivorNumber_(a.displayOrder, 999) - survivorNumber_(b.displayOrder, 999);
++  });
++}
++
++function survivorCategoryLocked_(game, category) {
++  if (!game || !category) return true;
++  if (game.lockAllPicks === true || category.locked === true) return true;
++  const lockDateTime = category.lockDateTime ? new Date(category.lockDateTime) : null;
++  return !!(lockDateTime && !isNaN(lockDateTime.getTime()) && Date.now() >= lockDateTime.getTime());
++}
++
++function survivorEvaluateUser_(username, gameId, pickMap, categories, resolutions) {
++  const rounds = [];
++  const eliminatedNomineeIds = {};
++  let alive = true;
++  let eliminatedRound = 0;
++  let eliminatedReason = "";
++  let roundsSurvived = 0;
++  let totalPoints = 0;
++  let currentRoundIndex = -1;
++
++  (categories || []).forEach(function(category, index) {
++    const categoryId = survivorKey_(category.id);
++    const pick = pickMap && pickMap[categoryId] ? survivorKey_(pickMap[categoryId].nomineeId || pickMap[categoryId]) : "";
++    const resolution = resolutions && resolutions[categoryId] ? resolutions[categoryId] : null;
++    const rawResolved = !!(resolution && resolution.resolved === true && resolution.result === "winner");
++    // Survivor rounds advance in order. If an earlier round is still open,
++    // ignore any later result until that gap is settled so players cannot be
++    // eliminated by an accidentally finalized future round.
++    const resolved = rawResolved && currentRoundIndex === -1;
++    const eliminatedIds = resolved
++      ? (Array.isArray(resolution.winnerNomineeIds) && resolution.winnerNomineeIds.length
++          ? resolution.winnerNomineeIds.map(survivorKey_).filter(Boolean)
++          : [survivorKey_(resolution.winnerNomineeId)].filter(Boolean))
++      : [];
++
++    if (!resolved && currentRoundIndex === -1) currentRoundIndex = index;
++
++    let status = "upcoming";
++    let survived = false;
++    let eliminated = false;
++    let missed = false;
++    let earnedPoints = 0;
++
++    if (resolved) {
++      eliminatedIds.forEach(function(id) { eliminatedNomineeIds[id] = true; });
++      if (alive) {
++        if (!pick) {
++          alive = false;
++          eliminated = true;
++          missed = true;
++          eliminatedRound = index + 1;
++          eliminatedReason = "missed";
++          status = "missed";
++        } else if (eliminatedIds.indexOf(pick) !== -1) {
++          alive = false;
++          eliminated = true;
++          eliminatedRound = index + 1;
++          eliminatedReason = "picked-eliminated-entry";
++          status = "eliminated";
++        } else {
++          survived = true;
++          roundsSurvived++;
++          earnedPoints = Math.max(0, survivorNumber_(category.points, 1));
++          totalPoints += earnedPoints;
++          status = "survived";
++        }
++      } else {
++        status = "after-elimination";
++      }
++    } else if (alive && index === currentRoundIndex) {
++      status = pick ? "picked" : "open";
++    } else if (alive) {
++      status = "upcoming";
++    } else {
++      status = "after-elimination";
++    }
++
++    rounds.push({
++      round: index + 1,
++      categoryId: category.id,
++      name: category.name,
++      points: Math.max(0, survivorNumber_(category.points, 1)),
++      resolved: resolved,
++      pickNomineeId: pick,
++      eliminatedNomineeIds: eliminatedIds,
++      survived: survived,
++      eliminated: eliminated,
++      missed: missed,
++      earnedPoints: earnedPoints,
++      status: status
++    });
++  });
++
++  return {
++    username: username,
++    alive: alive,
++    eliminatedRound: eliminatedRound,
++    eliminatedReason: eliminatedReason,
++    roundsSurvived: roundsSurvived,
++    totalPoints: totalPoints,
++    currentRoundIndex: currentRoundIndex,
++    rounds: rounds,
++    eliminatedNomineeIds: eliminatedNomineeIds
++  };
++}
++
++function survivorAllPickMaps_(gameId) {
++  if (typeof buildUserPicksMap_ === "function") return buildUserPicksMap_(gameId);
++  const map = {};
++  const picks = typeof getPicksCached === "function" ? getPicksCached() : [];
++  (picks || []).forEach(function(row) {
++    if (survivorString_(row.gameId) !== survivorString_(gameId)) return;
++    const username = survivorString_(row.username);
++    const categoryId = survivorKey_(row.categoryId);
++    if (!username || !categoryId) return;
++    if (!map[username]) map[username] = {};
++    map[username][categoryId] = row;
++  });
++  return map;
++}
++
++function apiGetSurvivorState_(payload) {
++  payload = payload || {};
++  const gameId = survivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
++  const username = survivorString_(payload.username);
++  if (!gameId || !username) throw new Error("Username and GameId are required.");
++
++  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
++  if (!game || survivorKey_(game.type) !== "survivor") throw new Error("This game is not a Survivor / Elimination game.");
++
++  const categories = survivorGameCategories_(gameId);
++  const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
++  const pickResponse = apiGetMyPicks(username, gameId) || {};
++  const userPickMap = {};
++  Object.keys(pickResponse.picks || {}).forEach(function(categoryId) {
++    userPickMap[survivorKey_(categoryId)] = { nomineeId: pickResponse.picks[categoryId] };
++  });
++  const evaluation = survivorEvaluateUser_(username, gameId, userPickMap, categories, resolutions);
++  const currentIndex = evaluation.currentRoundIndex;
++  const currentCategory = currentIndex >= 0 ? categories[currentIndex] : null;
++  const currentRound = currentIndex >= 0 ? evaluation.rounds[currentIndex] : null;
++  const eliminatedSet = evaluation.eliminatedNomineeIds || {};
++
++  return {
++    success: true,
++    gameId: gameId,
++    gameName: game.name || gameId,
++    alive: evaluation.alive,
++    eliminatedRound: evaluation.eliminatedRound,
++    eliminatedReason: evaluation.eliminatedReason,
++    roundsSurvived: evaluation.roundsSurvived,
++    totalPoints: evaluation.totalPoints,
++    complete: currentIndex === -1,
++    currentRound: currentCategory ? {
++      round: currentIndex + 1,
++      categoryId: currentCategory.id,
++      name: currentCategory.name,
++      points: Math.max(0, survivorNumber_(currentCategory.points, 1)),
++      locked: survivorCategoryLocked_(game, currentCategory),
++      lockDateTime: currentCategory.lockDateTime || "",
++      pickNomineeId: currentRound ? currentRound.pickNomineeId : "",
++      canPick: evaluation.alive && !survivorCategoryLocked_(game, currentCategory),
++      nominees: (currentCategory.nominees || []).filter(function(nominee) {
++        return nominee && nominee.id && !eliminatedSet[survivorKey_(nominee.id)];
++      }).map(function(nominee) {
++        return {
++          id: nominee.id,
++          name: nominee.name,
++          shortAnswer: nominee.shortAnswer || nominee.name,
++          image: nominee.image || "",
++          movie: nominee.movie || "",
++          person: nominee.person || ""
++        };
++      })
++    } : null,
++    rounds: evaluation.rounds,
++    standings: survivorLeaderboardData_(gameId)
++  };
++}
++
++function saveSurvivorPick_(payload) {
++  payload = payload || {};
++  const gameId = survivorString_(payload.gameId);
++  const username = survivorString_(payload.username);
++  const categoryId = survivorKey_(payload.categoryId);
++  const nomineeId = survivorKey_(payload.nomineeId);
++  if (!gameId || !username || !categoryId || !nomineeId) throw new Error("Username, GameId, round, and survivor selection are required.");
++
++  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
++  if (!game || survivorKey_(game.type) !== "survivor") throw new Error("This game is not configured for Survivor play.");
++
++  const state = apiGetSurvivorState_({ username: username, gameId: gameId });
++  if (!state.alive) throw new Error("Your Survivor entry has already been eliminated.");
++  if (!state.currentRound) throw new Error("There is no open Survivor round.");
++  if (survivorKey_(state.currentRound.categoryId) !== categoryId) throw new Error("Only the current Survivor round can be picked.");
++  if (!state.currentRound.canPick) throw new Error("The current Survivor round is locked.");
++  const valid = (state.currentRound.nominees || []).some(function(nominee) { return survivorKey_(nominee.id) === nomineeId; });
++  if (!valid) throw new Error("That entry is no longer available in this Survivor game.");
++
++  return savePick({
++    username: username,
++    gameId: gameId,
++    categoryId: categoryId,
++    nomineeId: nomineeId,
++    confidencePoints: 0,
++    stakePoints: 0
++  });
++}
++
++function survivorLeaderboardData_(gameId) {
++  const categories = survivorGameCategories_(gameId);
++  const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
++  const pickMaps = survivorAllPickMaps_(gameId);
++  const rows = [];
++
++  Object.keys(pickMaps).forEach(function(username) {
++    const evaluation = survivorEvaluateUser_(username, gameId, pickMaps[username], categories, resolutions);
++    const unresolvedPoints = evaluation.alive
++      ? categories.reduce(function(sum, category, index) {
++          const round = evaluation.rounds[index];
++          return sum + (round && !round.resolved ? Math.max(0, survivorNumber_(category.points, 1)) : 0);
++        }, 0)
++      : 0;
++    const profile = typeof getLeaderboardUserProfile_ === "function" ? (getLeaderboardUserProfile_(username, gameId) || {}) : {};
++
++    rows.push({
++      user: username,
++      username: username,
++      displayName: profile.displayName || username,
++      avatar: profile.avatar || "👤",
++      themeColor: profile.themeColor || profile.profileColor || "#354785",
++      profileColor: profile.profileColor || profile.themeColor || "#354785",
++      profileColorMode: profile.profileColorMode || "solid",
++      profileColor2: profile.profileColor2 || "#354785",
++      profileGradientAngle: profile.profileGradientAngle || "135",
++      total: evaluation.totalPoints,
++      remaining: unresolvedPoints,
++      max: evaluation.totalPoints + unresolvedPoints,
++      statues: 0,
++      fixedPointsEnabled: true,
++      fixedPoints: evaluation.totalPoints,
++      fixedRemaining: unresolvedPoints,
++      survivorAlive: evaluation.alive,
++      survivorRoundsSurvived: evaluation.roundsSurvived,
++      survivorEliminatedRound: evaluation.eliminatedRound,
++      survivorEliminatedReason: evaluation.eliminatedReason,
++      eliminated: !evaluation.alive,
++      winChance: 0,
++      scoringMode: "survivor",
++      leaderboardScoreMode: "survivor"
++    });
++  });
++
++  rows.sort(function(a, b) {
++    if (a.survivorAlive !== b.survivorAlive) return a.survivorAlive ? -1 : 1;
++    if (b.survivorRoundsSurvived !== a.survivorRoundsSurvived) return b.survivorRoundsSurvived - a.survivorRoundsSurvived;
++    if (b.total !== a.total) return b.total - a.total;
++    return survivorString_(a.displayName).localeCompare(survivorString_(b.displayName));
++  });
++  return rows;
++}
++
++function survivorUserScoring_(username, gameId) {
++  const categories = survivorGameCategories_(gameId);
++  const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
++  const pickMaps = survivorAllPickMaps_(gameId);
++  const evaluation = survivorEvaluateUser_(username, gameId, pickMaps[username] || {}, categories, resolutions);
++  const scoring = {};
++
++  evaluation.rounds.forEach(function(round, index) {
++    const category = categories[index];
++    scoring[survivorKey_(round.categoryId)] = {
++      shortName: category && (category.shortName || category.name) || round.name,
++      nomineeId: round.pickNomineeId || "",
++      winnerNomineeId: round.eliminatedNomineeIds && round.eliminatedNomineeIds[0] || "",
++      earnedPoints: round.earnedPoints,
++      remainingPoints: round.resolved || !evaluation.alive ? 0 : Math.max(0, survivorNumber_(round.points, 1)),
++      finalPointsAvailable: Math.max(0, survivorNumber_(round.points, 1)),
++      locked: round.resolved,
++      resolved: round.resolved,
++      correct: round.survived,
++      wrong: round.eliminated,
++      push: false,
++      status: round.status,
++      scoringMode: "survivor",
++      confidenceScoringMode: ""
++    };
++  });
++  return scoring;
++}
+diff --git a/docs/SURVIVOR_RANKING_GAMES_V1_2_18W.md b/docs/SURVIVOR_RANKING_GAMES_V1_2_18W.md
+new file mode 100644
+index 0000000..e018fb2
+--- /dev/null
++++ b/docs/SURVIVOR_RANKING_GAMES_V1_2_18W.md
+@@ -0,0 +1,47 @@
++# PATTC Predicts v1.2.18w — Survivor + Ranking Games
++
++This release completes the two remaining generic game types that were previously blocked from production publishing.
++
++## Survivor / Elimination
++
++- Survivor games now open a dedicated player page instead of the generic Picks page.
++- Ordered categories/questions act as rounds.
++- A player chooses one currently available entry they expect to survive the round.
++- The admin records the entry eliminated in that round.
++- Picking the eliminated entry, or missing a settled round, eliminates the player from later rounds.
++- Safe picks earn the configured question/round points.
++- Survivor standings put active players first, then order eliminated players by rounds survived and points.
++- Previously eliminated choices are removed from later-round choices.
++- Future-round results are ignored until all earlier rounds are settled, preventing accidental out-of-order elimination.
++- Manage Game Setup relabels the result control as **Elimination Result / Eliminated Entry** for Survivor games.
++
++## Ranking
++
++- Ranking games now open a dedicated ordered-ballot player page.
++- Players must rank every active answer exactly once from 1 through N.
++- Ballots can be changed until the question locks or is settled.
++- Manage Game Setup now accepts the complete official final order.
++- Rank 1 is also mirrored as the compatibility winner while all ranks are stored in CategoryResults FinalRank / FinalPosition.
++- Scoring uses the configured question Points as the maximum score:
++  - exact position: 100% credit
++  - 1 position away: 80%
++  - 2 positions away: 60%
++  - 3 positions away: 40%
++  - 4 positions away: 20%
++  - 5+ positions away: 0%
++- Position credits are averaged across the full ballot and multiplied by the question's Points value.
++- Ranking has its own leaderboard scoring and user scoring details.
++
++## Admin / production readiness
++
++- Removed the old unconditional Survivor and Ranking Run Check blockers.
++- Ranking Run Check now requires at least one active Ranking-mode question and requires every active question in a pure Ranking game to use Ranking score mode.
++- Ranking is production-ready as a standalone game type; Hybrid games with Ranking questions remain blocked until combined Ranking + Picks/Wagers leaderboard math is added.
++- Survivor Run Check warns when fewer than two rounds exist but no longer blocks publishing.
++- Ranking point fields are available in Game Setup.
++- Awards Manager no longer labels Ranking as an unfinished engine.
++- App routes, API routes, cache markers, and PWA assets are updated for the new pages.
++
++## Regression coverage
++
++`tests/survivor_ranking_games_v1218w_tests.js` verifies routing, API contracts, admin controls, scoring integration, Ranking partial-credit math, Survivor elimination logic, out-of-order round safety, mirrors, and release markers.
+diff --git a/frontend/api.js b/frontend/api.js
+index a25527d..09c1bd0 100644
+--- a/frontend/api.js
++++ b/frontend/api.js
+@@ -874,6 +874,50 @@ async function apiGetMyPicks(username, gameId) {
+ 
+ }
+ 
++async function apiGetRankingState(gameId) {
++  const session = getSession ? (getSession() || {}) : {};
++  return api("getRankingState", {
++    username: session.username || "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++}
++
++async function apiSaveRanking(payload) {
++  payload = payload || {};
++  return apiPost("saveRanking", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    categoryId: payload.categoryId,
++    rankings: Array.isArray(payload.rankings) ? payload.rankings : []
++  });
++}
++
++async function apiGetSurvivorState(gameId) {
++  const session = getSession ? (getSession() || {}) : {};
++  return api("getSurvivorState", {
++    username: session.username || "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++}
++
++async function apiSaveSurvivorPick(payload) {
++  payload = payload || {};
++  return apiPost("saveSurvivorPick", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    categoryId: payload.categoryId,
++    nomineeId: payload.nomineeId
++  });
++}
++
++async function apiAdminSaveRankingResults(payload) {
++  return apiPost("adminSaveRankingResults", payload || {});
++}
++
+ async function apiSavePick(payload) {
+ 
+   return apiPost("savePick", {
+diff --git a/frontend/app.html b/frontend/app.html
+index fbad005..ef0ebe0 100644
+--- a/frontend/app.html
++++ b/frontend/app.html
+@@ -65,9 +65,9 @@
+   href="./icons/icon-512.png"
+ >
+ 
+-<link rel="stylesheet" href="./css/styles.css?v=313-external-results-hub-end-to-end-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts">
++<link rel="stylesheet" href="./css/styles.css?v=313-external-results-hub-end-to-end-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts-v1218w-survivor-ranking">
+ <link rel="stylesheet" href="./css/components.css?brand=v1218f6-pattc-predicts">
+-<link rel="stylesheet" href="./css/pages.css?v=v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts">
++<link rel="stylesheet" href="./css/pages.css?v=v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218w-survivor-ranking&brand=v1218f6-pattc-predicts">
+ <link rel="stylesheet" href="./css/picks.css?v=v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes&brand=v1218f6-pattc-predicts">
+ <link rel="stylesheet" href="./css/appearance.css?v=328-appearance-manager-v1217d-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts">
+ <link rel="stylesheet" href="./css/betting.css?v=219-sports-live-comparisons&brand=v1218f6-pattc-predicts">
+@@ -159,15 +159,15 @@
+ </div>
+ 
+ <script src="./js/config.js?brand=v1218f6-pattc-predicts"></script>
+-<script src="./assets/images/image-manifest.js?v=324-awards-mobile-workflow-v1216&brand=v1218f6-pattc-predicts"></script>
++<script src="./assets/images/image-manifest.js?v=324-awards-mobile-workflow-v1216&brand=v1218f6-pattc-predicts-v1218w-survivor-ranking"></script>
+ <script src="./js/imageEngine.js?v=324-awards-mobile-workflow-v1216&brand=v1218f6-pattc-predicts"></script>
+ <script src="./js/utils.js?brand=v1218f6-pattc-predicts"></script>
+-<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218v2-reality-cast-forward&brand=v1218f6-pattc-predicts"></script>
++<script src="./js/api.js?v=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217x-pack-selection-compact-actions-v1217y-pack-visibility-v1218a-device-login-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218v2-reality-cast-forward-v1218w-survivor-ranking&brand=v1218f6-pattc-predicts"></script>
+ <script src="./js/state.js?v=v1218a-device-login&brand=v1218f6-pattc-predicts"></script>
+ <script src="./js/appearanceThemeRuntime.js?v=v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment&brand=v1218f6-pattc-predicts"></script>
+ 
+ <!-- Page modules are loaded only when their route opens. -->
+-<script src="./js/app.js?v=327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation&hotfix=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation"></script>
++<script src="./js/app.js?v=327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218w-survivor-ranking&hotfix=v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation-v1218w-survivor-ranking"></script>
+ 
+ <!-- =========================
+      PWA SERVICE WORKER
+@@ -181,6 +181,8 @@
+   Lazy route module manifest (loaded by frontend/js/app.js):
+   ./js/pages/dashboard.js
+   ./js/pages/picks.js
++  ./js/pages/survivor.js
++  ./js/pages/ranking.js
+   ./js/pages/gameModeHub.js
+   ./js/pages/betting.js
+   ./js/pages/leaderboard.js
+diff --git a/frontend/app.js b/frontend/app.js
+index 399dbeb..fa92eb5 100644
+--- a/frontend/app.js
++++ b/frontend/app.js
+@@ -397,8 +397,8 @@ async function logout() {
+    ROUTE-BASED PAGE MODULES
+ ====================== */
+ 
+-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation";
+-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
++const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218w-survivor-ranking";
++const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation-v1218w-survivor-ranking";
+ const APP_LOADED_SCRIPTS = {};
+ 
+ const APP_MAIN_SCRIPT_URL = (function() {
+@@ -416,6 +416,8 @@ const APP_PAGE_MODULES = {
+   "trophy-room": ["dashboard"],
+   "more": ["dashboard"],
+   "picks": ["picks"],
++  "survivor": ["survivor"],
++  "ranking": ["ranking"],
+   "game-hub": ["gameModeHub"],
+   "betting": ["betting"],
+   "team-fantasy": ["teamFantasy"],
+@@ -992,8 +994,7 @@ async function enterGame(
+     gameType === "prediction" ||
+     gameType === "confidence" ||
+     gameType === "head-to-head" ||
+-    gameType === "staked-prediction" ||
+-    gameType === "survivor"
++    gameType === "staked-prediction"
+   ) {
+ 
+     await navigate("picks");
+@@ -1001,11 +1002,14 @@ async function enterGame(
+ 
+   }
+ 
+-  if (gameType === "ranking") {
+-
+-    await navigate("leaderboard");
++  if (gameType === "survivor") {
++    await navigate("survivor");
+     return;
++  }
+ 
++  if (gameType === "ranking") {
++    await navigate("ranking");
++    return;
+   }
+ 
+   await navigate("dashboard");
+@@ -1145,6 +1149,16 @@ async function renderPage(page) {
+ 
+       break;
+ 
++    case "survivor":
++      if (typeof renderSurvivorPage !== "function") throw new Error("Survivor page script is not loaded.");
++      app.innerHTML = await renderSurvivorPage();
++      break;
++
++    case "ranking":
++      if (typeof renderRankingPage !== "function") throw new Error("Ranking page script is not loaded.");
++      app.innerHTML = await renderRankingPage();
++      break;
++
+     case "team-fantasy":
+       if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
+       app.innerHTML = await renderTeamFantasyPage();
+diff --git a/frontend/css/pages.css b/frontend/css/pages.css
+index 58000cc..ce97907 100644
+--- a/frontend/css/pages.css
++++ b/frontend/css/pages.css
+@@ -3625,3 +3625,43 @@ body.game-profile-choice-open { overflow:hidden; }
+     text-align: left;
+   }
+ }
++
++
++/* v1.2.18w Survivor + Ranking games */
++.ranking-page,
++.survivor-page { max-width: 980px; margin: 0 auto; padding-bottom: 48px; }
++.ranking-page-header,
++.survivor-page-header { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
++.ranking-question-card,
++.survivor-round-card,
++.survivor-history-card,
++.survivor-standings-card { border-radius: 18px; padding: 18px; margin-bottom: 16px; background: var(--surface, #17191f); border: 1px solid var(--border, rgba(255,255,255,.12)); }
++.ranking-order-list { display: grid; gap: 9px; margin: 14px 0; }
++.ranking-entry { display: grid; grid-template-columns: 42px 46px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border, rgba(255,255,255,.12)); }
++.ranking-position { font-weight: 800; text-align: center; }
++.ranking-entry-media { width: 42px; height: 42px; display: grid; place-items: center; overflow: hidden; border-radius: 10px; }
++.ranking-entry-media img { width: 100%; height: 100%; object-fit: cover; }
++.ranking-move-buttons { display: flex; gap: 6px; }
++.ranking-move-buttons button { min-width: 42px; min-height: 40px; }
++.ranking-official { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border, rgba(255,255,255,.12)); }
++.survivor-status { display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 10px; font-weight: 800; }
++.survivor-status.alive, .survivor-status-badge.alive { background: rgba(42, 179, 106, .16); }
++.survivor-status.out, .survivor-status-badge.out { background: rgba(224, 67, 67, .16); }
++.survivor-status-badge { display: inline-flex; flex-direction: column; gap: 2px; border-radius: 14px; padding: 10px 12px; font-weight: 800; }
++.survivor-status-badge small { font-weight: 500; opacity: .8; }
++.survivor-card-head { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
++.survivor-round-status { border-radius: 999px; padding: 5px 9px; font-weight: 800; }
++.survivor-choice.selected { outline: 2px solid currentColor; }
++.survivor-choice img, .survivor-choice-placeholder { width: 38px; height: 38px; object-fit: cover; border-radius: 9px; display: grid; place-items: center; }
++.survivor-choice-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 14px 0; }
++.survivor-choice { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 12px; border-radius: 12px; border: 1px solid var(--border, rgba(255,255,255,.12)); cursor: pointer; }
++.survivor-choice input { flex: 0 0 auto; }
++.survivor-history-list, .survivor-standings-list { display: grid; gap: 8px; }
++.survivor-history-row, .survivor-standing-row { display: flex; justify-content: space-between; gap: 12px; }
++.admin-ranking-results-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-bottom: 12px; }
++@media (max-width: 640px) {
++  .ranking-page-header, .survivor-page-header { flex-direction: column; }
++  .ranking-entry { grid-template-columns: 34px 42px minmax(0, 1fr); }
++  .ranking-move-buttons { grid-column: 1 / -1; justify-content: flex-end; }
++  .survivor-choice-grid { grid-template-columns: 1fr; }
++}
+diff --git a/frontend/js/api.js b/frontend/js/api.js
+index a25527d..09c1bd0 100644
+--- a/frontend/js/api.js
++++ b/frontend/js/api.js
+@@ -874,6 +874,50 @@ async function apiGetMyPicks(username, gameId) {
+ 
+ }
+ 
++async function apiGetRankingState(gameId) {
++  const session = getSession ? (getSession() || {}) : {};
++  return api("getRankingState", {
++    username: session.username || "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++}
++
++async function apiSaveRanking(payload) {
++  payload = payload || {};
++  return apiPost("saveRanking", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    categoryId: payload.categoryId,
++    rankings: Array.isArray(payload.rankings) ? payload.rankings : []
++  });
++}
++
++async function apiGetSurvivorState(gameId) {
++  const session = getSession ? (getSession() || {}) : {};
++  return api("getSurvivorState", {
++    username: session.username || "",
++    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
++    leagueId: getApiLeagueId_()
++  });
++}
++
++async function apiSaveSurvivorPick(payload) {
++  payload = payload || {};
++  return apiPost("saveSurvivorPick", {
++    username: payload.username,
++    gameId: payload.gameId,
++    leagueId: payload.leagueId || getApiLeagueId_(),
++    categoryId: payload.categoryId,
++    nomineeId: payload.nomineeId
++  });
++}
++
++async function apiAdminSaveRankingResults(payload) {
++  return apiPost("adminSaveRankingResults", payload || {});
++}
++
+ async function apiSavePick(payload) {
+ 
+   return apiPost("savePick", {
+diff --git a/frontend/js/app.js b/frontend/js/app.js
+index 399dbeb..fa92eb5 100644
+--- a/frontend/js/app.js
++++ b/frontend/js/app.js
+@@ -397,8 +397,8 @@ async function logout() {
+    ROUTE-BASED PAGE MODULES
+ ====================== */
+ 
+-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation";
+-const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
++const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218w-survivor-ranking";
++const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation-v1218w-survivor-ranking";
+ const APP_LOADED_SCRIPTS = {};
+ 
+ const APP_MAIN_SCRIPT_URL = (function() {
+@@ -416,6 +416,8 @@ const APP_PAGE_MODULES = {
+   "trophy-room": ["dashboard"],
+   "more": ["dashboard"],
+   "picks": ["picks"],
++  "survivor": ["survivor"],
++  "ranking": ["ranking"],
+   "game-hub": ["gameModeHub"],
+   "betting": ["betting"],
+   "team-fantasy": ["teamFantasy"],
+@@ -992,8 +994,7 @@ async function enterGame(
+     gameType === "prediction" ||
+     gameType === "confidence" ||
+     gameType === "head-to-head" ||
+-    gameType === "staked-prediction" ||
+-    gameType === "survivor"
++    gameType === "staked-prediction"
+   ) {
+ 
+     await navigate("picks");
+@@ -1001,11 +1002,14 @@ async function enterGame(
+ 
+   }
+ 
+-  if (gameType === "ranking") {
+-
+-    await navigate("leaderboard");
++  if (gameType === "survivor") {
++    await navigate("survivor");
+     return;
++  }
+ 
++  if (gameType === "ranking") {
++    await navigate("ranking");
++    return;
+   }
+ 
+   await navigate("dashboard");
+@@ -1145,6 +1149,16 @@ async function renderPage(page) {
+ 
+       break;
+ 
++    case "survivor":
++      if (typeof renderSurvivorPage !== "function") throw new Error("Survivor page script is not loaded.");
++      app.innerHTML = await renderSurvivorPage();
++      break;
++
++    case "ranking":
++      if (typeof renderRankingPage !== "function") throw new Error("Ranking page script is not loaded.");
++      app.innerHTML = await renderRankingPage();
++      break;
++
+     case "team-fantasy":
+       if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
+       app.innerHTML = await renderTeamFantasyPage();
+diff --git a/frontend/js/pages/adminAwards.js b/frontend/js/pages/adminAwards.js
+index fc9c027..940e962 100644
+--- a/frontend/js/pages/adminAwards.js
++++ b/frontend/js/pages/adminAwards.js
+@@ -94,7 +94,7 @@ function awardsAdminScoreModeOptions_(selected) {
+     ["confidence-points", "Confidence Points"],
+     ["staked-points", "Staked Prediction"],
+     ["wager", "Wager / Chips"],
+-    ["ranking", "Ranking (engine still in development)"]
++    ["ranking", "Ranking"]
+   ];
+   return rows.map(function(row) {
+     return `<option value="${row[0]}" ${value === row[0] ? "selected" : ""}>${row[1]}</option>`;
+@@ -2200,7 +2200,7 @@ function adminAwardsSyncQuestionModeForGame_() {
+   }
+   if (note) {
+     note.textContent = "Game Type: " + awardsAdminGameTypeLabel_(game) +
+-      (type === "ranking" ? " · Ranking creation is available, but the Ranking player engine is still being finished." : "");
++      (type === "ranking" ? " · Ranking uses ordered ballots with partial credit for near-miss positions." : "");
+   }
+ }
+ 
+diff --git a/frontend/js/pages/adminGameSetup.js b/frontend/js/pages/adminGameSetup.js
+index 5eb5515..9d83319 100644
+--- a/frontend/js/pages/adminGameSetup.js
++++ b/frontend/js/pages/adminGameSetup.js
+@@ -573,7 +573,7 @@ function adminSetupUpdateQuestionFieldVisibility(root) {
+   const card = root.closest(".admin-collapsible-body") || root.closest(".admin-category-edit-panel") || root.parentElement;
+   if (card) {
+     card.querySelectorAll("[data-question-points-field]").forEach(function(field) {
+-      field.hidden = ["fixed-points", "confidence-points"].indexOf(scoreMode) === -1;
++      field.hidden = ["fixed-points", "confidence-points", "ranking"].indexOf(scoreMode) === -1;
+     });
+   }
+ 
+@@ -840,7 +840,7 @@ function adminSetupReadQuestionEngineFields_(prefix, suffix) {
+ 
+ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
+   const defaultScoreMode = adminSetupDefaultScoreMode_(game);
+-  const showPoints = ["fixed-points", "confidence-points"].indexOf(defaultScoreMode) !== -1;
++  const showPoints = ["fixed-points", "confidence-points", "ranking"].indexOf(defaultScoreMode) !== -1;
+ 
+   return `
+     <details
+@@ -879,7 +879,7 @@ function renderAdminSetupAddCategoryCard(gameId, game, categories) {
+           </label>
+ 
+           <label class="admin-field" data-question-points-field ${showPoints ? "" : "hidden"}>
+-            ${adminSetupFieldLabel_("Points", "Used by fixed-point and confidence questions. Staked and wager questions calculate results from the player's stake or wager.")}
++            ${adminSetupFieldLabel_("Points", "Used by fixed-point, confidence, and ranking questions. Ranking points are the maximum value of a perfectly ordered ballot; staked and wager questions calculate from the player's stake or wager.")}
+ 
+             <input
+               type="number"
+@@ -3201,7 +3201,7 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
+               >
+             </label>
+ 
+-            <label class="admin-field" data-question-points-field ${["fixed-points", "confidence-points", "correct-pick"].indexOf(String(settings.scoreMode || "fixed-points").toLowerCase().replace(/_/g, "-")) !== -1 ? "" : "hidden"}>
++            <label class="admin-field" data-question-points-field ${["fixed-points", "confidence-points", "correct-pick", "ranking"].indexOf(String(settings.scoreMode || "fixed-points").toLowerCase().replace(/_/g, "-")) !== -1 ? "" : "hidden"}>
+               ${adminSetupFieldLabel_("Points", "Used only by fixed-point and confidence questions.")}
+ 
+               <input
+@@ -3399,7 +3399,7 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
+ 
+         ${renderAdminSetupCloneCategoryPanel_(category, categories)}
+ 
+-        ${renderAdminResultsPanel(category, nominees, settings)}
++        ${renderAdminResultsPanel(category, nominees, settings, game)}
+ 
+         <details
+           id="answersPanel_${categoryId}"
+@@ -3456,187 +3456,127 @@ function renderAdminSetupCategoryCard(category, game, categories, uiAction) {
+    RESULTS / WINNERS PANEL
+ ====================== */
+ 
+-function renderAdminResultsPanel(category, nominees, settings) {
+-  const gameId =
+-    adminSetupEscapeHtml(category.gameId);
+-
+-  const categoryId =
+-    adminSetupEscapeHtml(category.categoryId);
+-
+-  const winnerNomineeId =
+-    String(settings.winnerNomineeId || "").trim();
+-
+-  const settlementStatus =
+-    String(settings.settlementStatus || "")
+-      .trim()
+-      .toLowerCase();
+-
+-  const resultStatus =
+-    settlementStatus === "push" ||
+-    settlementStatus === "pushed" ||
+-    settlementStatus === "void"
+-      ? "push"
+-      : settlementStatus === "cancelled" ||
+-        settlementStatus === "canceled"
+-        ? "cancelled"
+-        : winnerNomineeId
+-          ? "winner"
+-          : "pending";
++function renderAdminResultsPanel(category, nominees, settings, game) {
++  const gameId = adminSetupEscapeHtml(category.gameId);
++  const categoryId = adminSetupEscapeHtml(category.categoryId);
++  const gameType = String(game && game.type || "").trim().toLowerCase();
++  const scoreMode = String(settings && settings.scoreMode || "fixed-points").trim().toLowerCase().replace(/_/g, "-");
++  const isRanking = gameType === "ranking" || scoreMode === "ranking";
++  const isSurvivor = gameType === "survivor";
++
++  if (isRanking) {
++    const activeNominees = nominees.filter(nominee => nominee.active !== false);
++    const rankingRows = activeNominees.map((nominee, index) => {
++      const nomineeId = adminSetupEscapeHtml(nominee.nomineeId);
++      const nomineeName = adminSetupEscapeHtml(nominee.nominee || nominee.nomineeId);
++      const rankValue = Number(nominee.finalRank) > 0 ? Number(nominee.finalRank) : "";
++      return `
++        <div class="admin-ranking-result-row" data-ranking-result-row data-nominee-id="${nomineeId}">
++          <label class="admin-field">
++            <span>${nomineeName}</span>
++            <input
++              type="number"
++              id="rankingResult_${categoryId}_${nomineeId}"
++              data-ranking-result-rank
++              min="1"
++              max="${activeNominees.length}"
++              step="1"
++              value="${rankValue}"
++              placeholder="${index + 1}"
++            >
++          </label>
++        </div>`;
++    }).join("");
+ 
+-  const favoriteNomineeId =
+-    String(settings.favoriteNomineeId || "").trim();
+-
+-  const nomineeOptions =
+-    nominees
+-      .filter(nominee => nominee.active !== false)
+-      .map(nominee => {
+-        const nomineeId =
+-          String(nominee.nomineeId || "").trim();
+-
+-        const nomineeName =
+-          nominee.nominee || nominee.nomineeId;
+-
+-        return `
+-          <option
+-            value="${adminSetupEscapeHtml(nomineeId)}"
+-            ${nomineeId === winnerNomineeId ? "selected" : ""}
+-          >
+-            ${adminSetupEscapeHtml(nomineeName)}
+-          </option>
+-        `;
+-      })
+-      .join("");
+-
+-  const favoriteOptions =
+-    nominees
+-      .filter(nominee => nominee.active !== false)
+-      .map(nominee => {
+-        const nomineeId =
+-          String(nominee.nomineeId || "").trim();
+-
+-        const nomineeName =
+-          nominee.nominee || nominee.nomineeId;
+-
+-        return `
+-          <option
+-            value="${adminSetupEscapeHtml(nomineeId)}"
+-            ${nomineeId === favoriteNomineeId ? "selected" : ""}
+-          >
+-            ${adminSetupEscapeHtml(nomineeName)}
+-          </option>
+-        `;
+-      })
+-      .join("");
++    return `
++      <details class="admin-results-panel">
++        <summary class="admin-results-summary">
++          <div class="admin-results-head">
++            <div>
++              <h3>Official Ranking Result</h3>
++              <div class="admin-sub">Enter every final position from 1 through ${activeNominees.length}. Rank 1 is also stored as the compatibility winner.</div>
++            </div>
++          </div>
++          <span class="admin-collapse-icon">▾</span>
++        </summary>
++        <div class="admin-collapsible-body">
++          ${activeNominees.length ? `
++            <div class="admin-ranking-results-grid" id="rankingResults_${categoryId}">${rankingRows}</div>
++            <div class="admin-card-actions">
++              <button class="admin-small-button" onclick="adminSetupSaveRankingResults('${gameId}', '${categoryId}')">Save Official Ranking</button>
++            </div>
++          ` : `<div class="admin-sub">Add nominees before setting the official ranking.</div>`}
++          <div id="resultMessage_${categoryId}" class="admin-message"></div>
++        </div>
++      </details>`;
++  }
++
++  const winnerNomineeId = String(settings.winnerNomineeId || "").trim();
++  const settlementStatus = String(settings.settlementStatus || "").trim().toLowerCase();
++  const resultStatus = settlementStatus === "push" || settlementStatus === "pushed" || settlementStatus === "void"
++    ? "push"
++    : settlementStatus === "cancelled" || settlementStatus === "canceled"
++      ? "cancelled"
++      : winnerNomineeId ? "winner" : "pending";
++  const favoriteNomineeId = String(settings.favoriteNomineeId || "").trim();
++
++  const nomineeOptions = nominees.filter(nominee => nominee.active !== false).map(nominee => {
++    const nomineeId = String(nominee.nomineeId || "").trim();
++    const nomineeName = nominee.nominee || nominee.nomineeId;
++    return `<option value="${adminSetupEscapeHtml(nomineeId)}" ${nomineeId === winnerNomineeId ? "selected" : ""}>${adminSetupEscapeHtml(nomineeName)}</option>`;
++  }).join("");
++
++  const favoriteOptions = nominees.filter(nominee => nominee.active !== false).map(nominee => {
++    const nomineeId = String(nominee.nomineeId || "").trim();
++    const nomineeName = nominee.nominee || nominee.nomineeId;
++    return `<option value="${adminSetupEscapeHtml(nomineeId)}" ${nomineeId === favoriteNomineeId ? "selected" : ""}>${adminSetupEscapeHtml(nomineeName)}</option>`;
++  }).join("");
++
++  const title = isSurvivor ? "Elimination Result" : "Results / Winners";
++  const helper = isSurvivor
++    ? "Select the entry eliminated in this round. That entry knocks out players who selected it."
++    : "Select the actual winner and optional favorite/projection.";
++  const winnerLabel = isSurvivor ? "Eliminated Entry" : "Winner Nominee";
++  const finalLabel = isSurvivor ? "Final — Eliminated Entry Selected" : "Final — Winner Selected";
+ 
+   return `
+     <details class="admin-results-panel">
+-
+       <summary class="admin-results-summary">
+-
+         <div class="admin-results-head">
+-
+           <div>
+-            <h3>Results / Winners</h3>
+-
+-            <div class="admin-sub">
+-              Select the actual winner and optional favorite/projection.
+-            </div>
++            <h3>${title}</h3>
++            <div class="admin-sub">${helper}</div>
+           </div>
+-
+         </div>
+-
+-        <span class="admin-collapse-icon">
+-          ▾
+-        </span>
+-
++        <span class="admin-collapse-icon">▾</span>
+       </summary>
+-
+       <div class="admin-collapsible-body">
+-
+-        ${
+-          nominees.length
+-            ? `
+-              <div class="admin-control-grid">
+-
+-                <label class="admin-field">
+-                  <span>Result Status</span>
+-
+-                  <select
+-                    id="resultStatus_${categoryId}"
+-                    onchange="adminSetupToggleWinnerControl('${categoryId}')"
+-                  >
+-                    <option value="pending" ${resultStatus === "pending" ? "selected" : ""}>
+-                      Pending / Not Settled
+-                    </option>
+-                    <option value="winner" ${resultStatus === "winner" ? "selected" : ""}>
+-                      Final — Winner Selected
+-                    </option>
+-                    <option value="push" ${resultStatus === "push" ? "selected" : ""}>
+-                      Push — Return Stakes
+-                    </option>
+-                    <option value="cancelled" ${resultStatus === "cancelled" ? "selected" : ""}>
+-                      Cancelled / No Contest — Return Stakes
+-                    </option>
+-                  </select>
+-                </label>
+-
+-                <label class="admin-field">
+-                  <span>Winner Nominee</span>
+-
+-                  <select
+-                    id="resultWinner_${categoryId}"
+-                    ${resultStatus === "winner" ? "" : "disabled"}
+-                  >
+-                    <option value="">Not selected</option>
+-                    ${nomineeOptions}
+-                  </select>
+-                </label>
+-
+-                <label class="admin-field">
+-                  <span>Favorite Nominee</span>
+-
+-                  <select id="resultFavorite_${categoryId}">
+-                    <option value="">Not selected</option>
+-                    ${favoriteOptions}
+-                  </select>
+-                </label>
+-
+-              </div>
+-
+-              <div class="admin-card-actions">
+-
+-                <button
+-                  class="admin-small-button"
+-                  onclick="adminSetupSaveResults('${gameId}', '${categoryId}')"
+-                >
+-                  Save Results
+-                </button>
+-
+-                <button
+-                  class="admin-danger-button"
+-                  onclick="adminSetupClearResults('${gameId}', '${categoryId}')"
+-                >
+-                  Clear Results
+-                </button>
+-
+-              </div>
+-            `
+-            : `
+-              <div class="admin-sub">
+-                Add nominees before setting results.
+-              </div>
+-            `
+-        }
+-
+-        <div
+-          id="resultMessage_${categoryId}"
+-          class="admin-message"
+-        ></div>
+-
++        ${nominees.length ? `
++          <div class="admin-control-grid">
++            <label class="admin-field">
++              <span>Result Status</span>
++              <select id="resultStatus_${categoryId}" onchange="adminSetupToggleWinnerControl('${categoryId}')">
++                <option value="pending" ${resultStatus === "pending" ? "selected" : ""}>Pending / Not Settled</option>
++                <option value="winner" ${resultStatus === "winner" ? "selected" : ""}>${finalLabel}</option>
++                ${isSurvivor ? "" : `<option value="push" ${resultStatus === "push" ? "selected" : ""}>Push — Return Stakes</option><option value="cancelled" ${resultStatus === "cancelled" ? "selected" : ""}>Cancelled / No Contest — Return Stakes</option>`}
++              </select>
++            </label>
++            <label class="admin-field">
++              <span>${winnerLabel}</span>
++              <select id="resultWinner_${categoryId}" ${resultStatus === "winner" ? "" : "disabled"}>
++                <option value="">Not selected</option>${nomineeOptions}
++              </select>
++            </label>
++            ${isSurvivor ? "" : `<label class="admin-field"><span>Favorite Nominee</span><select id="resultFavorite_${categoryId}"><option value="">Not selected</option>${favoriteOptions}</select></label>`}
++          </div>
++          <div class="admin-card-actions">
++            <button class="admin-small-button" onclick="adminSetupSaveResults('${gameId}', '${categoryId}', ${isSurvivor ? "true" : "false"})">Save Results</button>
++            <button class="admin-danger-button" onclick="adminSetupClearResults('${gameId}', '${categoryId}')">Clear Results</button>
++          </div>
++        ` : `<div class="admin-sub">Add nominees before setting results.</div>`}
++        <div id="resultMessage_${categoryId}" class="admin-message"></div>
+       </div>
+-
+-    </details>
+-  `;
++    </details>`;
+ }
+ 
+ /* ======================
+@@ -5447,7 +5387,41 @@ async function adminSetupArchiveNominee(gameId, categoryId, nomineeId) {
+    SAVE RESULTS / WINNERS
+ ====================== */
+ 
+-async function adminSetupSaveResults(gameId, categoryId) {
++async function adminSetupSaveRankingResults(gameId, categoryId) {
++  const root = document.getElementById("rankingResults_" + categoryId);
++  const rows = root ? Array.from(root.querySelectorAll("[data-ranking-result-row]")) : [];
++  const order = rows.map(row => ({
++    nomineeId: String(row.dataset.nomineeId || "").trim(),
++    rank: Number((row.querySelector("[data-ranking-result-rank]") || {}).value)
++  }));
++
++  if (!order.length) {
++    adminSetupSetMessage("resultMessage_" + categoryId, "Add nominees before setting the official ranking.", true);
++    return;
++  }
++
++  const ranks = order.map(item => item.rank);
++  const required = Array.from({ length: order.length }, (_, index) => index + 1);
++  const valid = order.every(item => item.nomineeId && Number.isInteger(item.rank) && item.rank >= 1 && item.rank <= order.length) &&
++    new Set(ranks).size === order.length && required.every(rank => ranks.indexOf(rank) !== -1);
++
++  if (!valid) {
++    adminSetupSetMessage("resultMessage_" + categoryId, "Use every rank exactly once from 1 through " + order.length + ".", true);
++    return;
++  }
++
++  adminSetupSetMessage("resultMessage_" + categoryId, "Saving official ranking...", false);
++  const res = await apiAdminSaveRankingResults({ gameId, categoryId, rankings: order });
++  if (!res || res.success === false) {
++    adminSetupSetMessage("resultMessage_" + categoryId, res && (res.message || res.error) ? res.message || res.error : "Could not save the official ranking.", true);
++    return;
++  }
++
++  adminSetupApplyLockState_(categoryId, true);
++  adminSetupSetMessage("resultMessage_" + categoryId, "Official ranking saved. Player ranking scores and standings are updated.", false);
++}
++
++async function adminSetupSaveResults(gameId, categoryId, isSurvivor) {
+ 
+   const statusInput =
+     document.getElementById(
+@@ -5480,7 +5454,7 @@ async function adminSetupSaveResults(gameId, categoryId) {
+   ) {
+     adminSetupSetMessage(
+       "resultMessage_" + categoryId,
+-      "Select the winning nominee before saving a final result.",
++      isSurvivor ? "Select the eliminated entry before saving this round." : "Select the winning nominee before saving a final result.",
+       true
+     );
+     return;
+diff --git a/frontend/js/pages/dashboard.js b/frontend/js/pages/dashboard.js
+index 2dc445a..c29a69a 100644
+--- a/frontend/js/pages/dashboard.js
++++ b/frontend/js/pages/dashboard.js
+@@ -1835,7 +1835,7 @@ function getDashboardGameActionLabel_(
+   }
+ 
+   if (type === "ranking") {
+-    return "Check Status";
++    return "Open Rankings";
+   }
+ 
+   return complete
+diff --git a/frontend/js/pages/ranking.js b/frontend/js/pages/ranking.js
+new file mode 100644
+index 0000000..948eddf
+--- /dev/null
++++ b/frontend/js/pages/ranking.js
+@@ -0,0 +1,128 @@
++/* =====================================================
++   RANKING GAME PLAYER PAGE v1.2.18w
++===================================================== */
++
++var RANKING_PAGE_STATE = RANKING_PAGE_STATE || { gameId: "", payload: null };
++
++function rankingPageEscape_(value) {
++  if (typeof escapeHtml === "function") return escapeHtml(value);
++  return String(value === undefined || value === null ? "" : value)
++    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
++}
++
++function rankingPageCategoryOrder_(category) {
++  var ballot = Array.isArray(category.ballot) ? category.ballot.slice() : [];
++  var nominees = Array.isArray(category.nominees) ? category.nominees.slice() : [];
++  var byId = {};
++  nominees.forEach(function(nominee) { byId[String(nominee.id || "").toLowerCase()] = nominee; });
++  if (ballot.length === nominees.length) {
++    return ballot.sort(function(a, b) { return Number(a.rank || 0) - Number(b.rank || 0); })
++      .map(function(row) { return byId[String(row.nomineeId || "").toLowerCase()]; })
++      .filter(Boolean);
++  }
++  return nominees;
++}
++
++function rankingPageOfficialOrder_(category) {
++  var byId = {};
++  (category.nominees || []).forEach(function(nominee) { byId[String(nominee.id || "").toLowerCase()] = nominee; });
++  var rows = (category.officialOrder || []).map(function(row) {
++    return { rank: Number(row.rank || 0), nominee: byId[String(row.nomineeId || "").toLowerCase()] };
++  }).filter(function(row) { return row.rank > 0 && row.nominee; });
++  if (!rows.length) return "";
++  return '<div class="ranking-official"><h3>Official Final Order</h3>' + rows.map(function(row) {
++    return '<div class="ranking-official-row"><span>#' + row.rank + '</span><strong>' + rankingPageEscape_(row.nominee.name || row.nominee.shortAnswer || row.nominee.id) + '</strong></div>';
++  }).join("") + '</div>';
++}
++
++function rankingPageCard_(category) {
++  var ordered = rankingPageCategoryOrder_(category);
++  var locked = category.locked === true;
++  var scoreText = category.resolved
++    ? (rankingPageEscape_(category.earnedPoints) + ' / ' + rankingPageEscape_(category.points) + ' pts · ' + rankingPageEscape_(category.accuracyPercent) + '% accuracy')
++    : (category.ballot && category.ballot.length ? 'Saved ranking · ' + rankingPageEscape_(category.points) + ' pts available' : rankingPageEscape_(category.points) + ' pts available');
++
++  return '<section class="card ranking-question-card" data-ranking-category="' + rankingPageEscape_(category.id) + '">' +
++    '<div class="ranking-question-head"><div><span class="ranking-eyebrow">' + rankingPageEscape_(category.section || 'Main') + '</span><h2>' + rankingPageEscape_(category.name) + '</h2><div class="ranking-score-note">' + scoreText + '</div></div>' +
++    '<span class="ranking-status ' + (category.resolved ? 'settled' : (locked ? 'locked' : 'open')) + '">' + (category.resolved ? 'Final' : (locked ? 'Locked' : 'Open')) + '</span></div>' +
++    '<div class="ranking-order-list" id="rankingList_' + rankingPageEscape_(category.id) + '">' +
++      ordered.map(function(nominee, index) {
++        var image = '<div class="ranking-entry-media">' + (nominee.image ? '<img src="' + rankingPageEscape_(nominee.image) + '" alt="" loading="lazy">' : '<span>★</span>') + '</div>';
++        return '<div class="ranking-entry" data-nominee-id="' + rankingPageEscape_(nominee.id) + '">' +
++          '<div class="ranking-position">#<span>' + (index + 1) + '</span></div>' + image +
++          '<div class="ranking-entry-name"><strong>' + rankingPageEscape_(nominee.name || nominee.shortAnswer || nominee.id) + '</strong>' +
++            ((nominee.movie || nominee.person) ? '<small>' + rankingPageEscape_([nominee.movie, nominee.person].filter(Boolean).join(' · ')) + '</small>' : '') + '</div>' +
++          (!locked ? '<div class="ranking-move-buttons"><button type="button" aria-label="Move up" onclick="rankingMove_(\'' + rankingPageEscape_(category.id) + '\',\'' + rankingPageEscape_(nominee.id) + '\',-1)">↑</button><button type="button" aria-label="Move down" onclick="rankingMove_(\'' + rankingPageEscape_(category.id) + '\',\'' + rankingPageEscape_(nominee.id) + '\',1)">↓</button></div>' : '') +
++        '</div>';
++      }).join('') +
++    '</div>' +
++    (!locked ? '<div class="ranking-save-row"><button class="button ranking-save-button" type="button" onclick="rankingSaveCategory_(\'' + rankingPageEscape_(category.id) + '\')">Save Ranking</button><span id="rankingMessage_' + rankingPageEscape_(category.id) + '" class="ranking-message"></span></div>' : '') +
++    rankingPageOfficialOrder_(category) +
++  '</section>';
++}
++
++function rankingRenumber_(categoryId) {
++  var list = document.getElementById('rankingList_' + categoryId);
++  if (!list) return;
++  Array.from(list.querySelectorAll('.ranking-entry')).forEach(function(row, index) {
++    var span = row.querySelector('.ranking-position span');
++    if (span) span.textContent = String(index + 1);
++  });
++}
++
++function rankingMove_(categoryId, nomineeId, direction) {
++  var list = document.getElementById('rankingList_' + categoryId);
++  if (!list) return;
++  var rows = Array.from(list.querySelectorAll('.ranking-entry'));
++  var row = rows.find(function(item) { return String(item.dataset.nomineeId || '') === String(nomineeId || ''); });
++  if (!row) return;
++  var index = rows.indexOf(row);
++  var target = index + Number(direction || 0);
++  if (target < 0 || target >= rows.length) return;
++  if (direction < 0) list.insertBefore(row, rows[target]);
++  else list.insertBefore(rows[target], row);
++  rankingRenumber_(categoryId);
++}
++
++async function rankingSaveCategory_(categoryId) {
++  var list = document.getElementById('rankingList_' + categoryId);
++  var message = document.getElementById('rankingMessage_' + categoryId);
++  if (!list) return;
++  var session = typeof getSession === 'function' ? (getSession() || {}) : {};
++  var rankings = Array.from(list.querySelectorAll('.ranking-entry')).map(function(row, index) {
++    return { nomineeId: row.dataset.nomineeId || '', rank: index + 1 };
++  });
++  if (message) { message.textContent = 'Saving…'; message.classList.remove('error'); }
++  try {
++    var res = await apiSaveRanking({
++      username: session.username || '',
++      gameId: RANKING_PAGE_STATE.gameId,
++      categoryId: categoryId,
++      rankings: rankings
++    });
++    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save ranking.');
++    if (message) message.textContent = 'Saved ✓';
++    window.setTimeout(function() { navigate('ranking', { skipUnsavedCheck: true }); }, 350);
++  } catch (err) {
++    if (message) { message.textContent = err && err.message ? err.message : 'Could not save ranking.'; message.classList.add('error'); }
++  }
++}
++
++async function renderRankingPage() {
++  var gameId = typeof APP_STATE !== 'undefined' ? String(APP_STATE.gameId || '').trim() : '';
++  if (!gameId) return '<div class="page"><div class="card error-card">Choose a Ranking game first.</div></div>';
++  setPageLoadStep(55, 'Loading your ranking ballot…');
++  var payload = await apiGetRankingState(gameId);
++  if (!payload || payload.success === false) {
++    return '<div class="page"><div class="card error-card">' + rankingPageEscape_(payload && (payload.error || payload.message) || 'Could not load Ranking game.') + '</div></div>';
++  }
++  RANKING_PAGE_STATE.gameId = gameId;
++  RANKING_PAGE_STATE.payload = payload;
++  var categories = Array.isArray(payload.categories) ? payload.categories : [];
++  return '<div class="page ranking-page">' +
++    '<header class="ranking-page-header"><div><span class="ranking-eyebrow">Ranking Game</span><h1>' + rankingPageEscape_(payload.gameName || 'Ranking Game') + '</h1><p>Put every answer in order, then save each question.</p></div><button class="button secondary" type="button" onclick="navigate(\'leaderboard\')">Standings</button></header>' +
++    '<section class="card ranking-rules-card"><h2>Scoring</h2><p>The question’s point value is your maximum score. Each answer earns credit based on how close your position is to the official order: <strong>exact 100%</strong>, <strong>±1 80%</strong>, <strong>±2 60%</strong>, <strong>±3 40%</strong>, <strong>±4 20%</strong>, farther away 0%. The credits are averaged across the full list.</p></section>' +
++    (categories.length ? categories.map(rankingPageCard_).join('') : '<div class="card">No Ranking questions have been created yet.</div>') +
++  '</div>';
++}
+diff --git a/frontend/js/pages/survivor.js b/frontend/js/pages/survivor.js
+new file mode 100644
+index 0000000..155a28f
+--- /dev/null
++++ b/frontend/js/pages/survivor.js
+@@ -0,0 +1,110 @@
++/* =====================================================
++   SURVIVOR / ELIMINATION PLAYER PAGE v1.2.18w
++===================================================== */
++
++var SURVIVOR_PAGE_STATE = SURVIVOR_PAGE_STATE || { gameId: "", payload: null, selected: "" };
++
++function survivorPageEscape_(value) {
++  if (typeof escapeHtml === "function") return escapeHtml(value);
++  return String(value === undefined || value === null ? "" : value)
++    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
++    .replace(/"/g, "&quot;").replace(/'/g, "&#039;");
++}
++
++function survivorPickOption_(nominee, selected, disabled) {
++  var isSelected = String(selected || '') === String(nominee.id || '');
++  return '<button type="button" class="survivor-choice ' + (isSelected ? 'selected' : '') + '" data-survivor-id="' + survivorPageEscape_(nominee.id) + '" ' + (disabled ? 'disabled' : '') + ' onclick="survivorSelect_(\'' + survivorPageEscape_(nominee.id) + '\')">' +
++    (nominee.image ? '<img src="' + survivorPageEscape_(nominee.image) + '" alt="" loading="lazy">' : '<span class="survivor-choice-placeholder">★</span>') +
++    '<span>' + survivorPageEscape_(nominee.name || nominee.shortAnswer || nominee.id) + '</span>' +
++  '</button>';
++}
++
++function survivorSelect_(nomineeId) {
++  var round = SURVIVOR_PAGE_STATE.payload && SURVIVOR_PAGE_STATE.payload.currentRound;
++  if (!round || !round.canPick) return;
++  SURVIVOR_PAGE_STATE.selected = nomineeId;
++  document.querySelectorAll('.survivor-choice').forEach(function(button) {
++    button.classList.toggle('selected', String(button.dataset.survivorId || '') === String(nomineeId || ''));
++  });
++  var save = document.getElementById('survivorSaveButton');
++  if (save) save.disabled = !nomineeId;
++}
++
++async function survivorSaveCurrent_() {
++  var payload = SURVIVOR_PAGE_STATE.payload || {};
++  var round = payload.currentRound;
++  var nomineeId = SURVIVOR_PAGE_STATE.selected;
++  var message = document.getElementById('survivorSaveMessage');
++  if (!round || !nomineeId) return;
++  var session = typeof getSession === 'function' ? (getSession() || {}) : {};
++  if (message) { message.textContent = 'Saving…'; message.classList.remove('error'); }
++  try {
++    var res = await apiSaveSurvivorPick({
++      username: session.username || '',
++      gameId: SURVIVOR_PAGE_STATE.gameId,
++      categoryId: round.categoryId,
++      nomineeId: nomineeId
++    });
++    if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not save Survivor pick.');
++    if (message) message.textContent = 'Saved ✓';
++    window.setTimeout(function() { navigate('survivor', { skipUnsavedCheck: true }); }, 350);
++  } catch (err) {
++    if (message) { message.textContent = err && err.message ? err.message : 'Could not save Survivor pick.'; message.classList.add('error'); }
++  }
++}
++
++function survivorHistory_(payload) {
++  var rounds = Array.isArray(payload.rounds) ? payload.rounds : [];
++  if (!rounds.length) return '';
++  var labels = {
++    survived: 'Survived', eliminated: 'Eliminated', missed: 'Missed — Eliminated',
++    picked: 'Pick Saved', open: 'Open', upcoming: 'Upcoming', 'after-elimination': 'Out'
++  };
++  return '<section class="card survivor-history-card"><h2>Round History</h2><div class="survivor-history-list">' + rounds.map(function(round) {
++    var status = labels[round.status] || round.status || 'Upcoming';
++    return '<div class="survivor-history-row ' + survivorPageEscape_(round.status || '') + '"><span>Round ' + survivorPageEscape_(round.round) + '</span><strong>' + survivorPageEscape_(round.name) + '</strong><em>' + survivorPageEscape_(status) + '</em>' + (round.earnedPoints ? '<b>+' + survivorPageEscape_(round.earnedPoints) + '</b>' : '') + '</div>';
++  }).join('') + '</div></section>';
++}
++
++function survivorStandings_(payload) {
++  var rows = Array.isArray(payload.standings) ? payload.standings : [];
++  if (!rows.length) return '<section class="card"><h2>Standings</h2><p>No Survivor entries yet.</p></section>';
++  return '<section class="card survivor-standings-card"><div class="survivor-card-head"><h2>Survivor Standings</h2><button class="button secondary" type="button" onclick="navigate(\'leaderboard\')">Full Standings</button></div><div class="survivor-standings-list">' + rows.slice(0, 8).map(function(row, index) {
++    return '<div class="survivor-standing-row ' + (row.survivorAlive ? 'alive' : 'out') + '"><span>#' + (index + 1) + '</span><strong>' + survivorPageEscape_(row.displayName || row.username) + '</strong><em>' + (row.survivorAlive ? 'ALIVE' : 'OUT R' + survivorPageEscape_(row.survivorEliminatedRound || '')) + '</em><b>' + survivorPageEscape_(row.total || 0) + ' pts</b></div>';
++  }).join('') + '</div></section>';
++}
++
++async function renderSurvivorPage() {
++  var gameId = typeof APP_STATE !== 'undefined' ? String(APP_STATE.gameId || '').trim() : '';
++  if (!gameId) return '<div class="page"><div class="card error-card">Choose a Survivor game first.</div></div>';
++  setPageLoadStep(55, 'Checking the current Survivor round…');
++  var payload = await apiGetSurvivorState(gameId);
++  if (!payload || payload.success === false) {
++    return '<div class="page"><div class="card error-card">' + survivorPageEscape_(payload && (payload.error || payload.message) || 'Could not load Survivor game.') + '</div></div>';
++  }
++  SURVIVOR_PAGE_STATE.gameId = gameId;
++  SURVIVOR_PAGE_STATE.payload = payload;
++  SURVIVOR_PAGE_STATE.selected = payload.currentRound && payload.currentRound.pickNomineeId || '';
++
++  var headline = payload.alive ? (payload.complete ? 'You Survived' : 'You Are Still Alive') : 'Your Entry Is Eliminated';
++  var sub = payload.alive
++    ? (payload.complete ? 'All Survivor rounds have been settled.' : 'Pick one entry to survive the current round. If that entry is eliminated, your Survivor run ends.')
++    : ('Eliminated in Round ' + survivorPageEscape_(payload.eliminatedRound || '') + (payload.eliminatedReason === 'missed' ? ' because no pick was saved.' : '.'));
++  var round = payload.currentRound;
++
++  var roundHtml = '';
++  if (round && payload.alive) {
++    roundHtml = '<section class="card survivor-current-card"><div class="survivor-card-head"><div><span class="survivor-eyebrow">Current Round ' + survivorPageEscape_(round.round) + '</span><h2>' + survivorPageEscape_(round.name) + '</h2><p>' + survivorPageEscape_(round.points) + ' survival point' + (Number(round.points) === 1 ? '' : 's') + '</p></div><span class="survivor-round-status ' + (round.canPick ? 'open' : 'locked') + '">' + (round.canPick ? 'Open' : 'Locked') + '</span></div>' +
++      '<div class="survivor-choice-grid">' + (round.nominees || []).map(function(nominee) { return survivorPickOption_(nominee, SURVIVOR_PAGE_STATE.selected, !round.canPick); }).join('') + '</div>' +
++      (round.canPick ? '<div class="survivor-save-row"><button id="survivorSaveButton" class="button" type="button" onclick="survivorSaveCurrent_()" ' + (SURVIVOR_PAGE_STATE.selected ? '' : 'disabled') + '>' + (round.pickNomineeId ? 'Update Survivor Pick' : 'Save Survivor Pick') + '</button><span id="survivorSaveMessage" class="survivor-save-message"></span></div>' : '<p class="survivor-locked-note">This round is locked. Your saved pick is final.</p>') +
++    '</section>';
++  } else if (!round && payload.alive) {
++    roundHtml = '<section class="card survivor-current-card"><h2>All rounds settled</h2><p>Your Survivor run is complete.</p></section>';
++  }
++
++  return '<div class="page survivor-page">' +
++    '<header class="survivor-page-header"><div><span class="survivor-eyebrow">Survivor / Elimination</span><h1>' + survivorPageEscape_(payload.gameName || 'Survivor Game') + '</h1><p>' + sub + '</p></div><div class="survivor-status-badge ' + (payload.alive ? 'alive' : 'out') + '">' + headline + '<small>' + survivorPageEscape_(payload.roundsSurvived || 0) + ' rounds survived · ' + survivorPageEscape_(payload.totalPoints || 0) + ' pts</small></div></header>' +
++    '<section class="card survivor-rules-card"><h2>How Survivor Works</h2><p>Pick one entry you believe will <strong>survive</strong> the current round. The admin records the entry that was eliminated. If your pick is that eliminated entry—or you miss a settled round—you are out. Survive the round and earn that round’s points.</p></section>' +
++    roundHtml + survivorHistory_(payload) + survivorStandings_(payload) +
++  '</div>';
++}
+diff --git a/frontend/sw.js b/frontend/sw.js
+index 24e43e3..c8c6418 100644
+--- a/frontend/sw.js
++++ b/frontend/sw.js
+@@ -1,5 +1,5 @@
+ // Previous cache: awards-app-v313-external-results-hub-end-to-end
+-const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218j-team-fantasy-v1218j1-team-fantasy-create-v1218j2-team-fantasy-controls";
++const AWARDS_CACHE = "awards-app-v327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218w-survivor-ranking-v1218j-team-fantasy-v1218j1-team-fantasy-create-v1218j2-team-fantasy-controls";
+ 
+ const APP_SHELL = [
+   "./",
+diff --git a/tests/awards_manager_workflow_v1216_tests.js b/tests/awards_manager_workflow_v1216_tests.js
+index b3589ca..8ba54a6 100644
+--- a/tests/awards_manager_workflow_v1216_tests.js
++++ b/tests/awards_manager_workflow_v1216_tests.js
+@@ -17,7 +17,7 @@ assert(adminAwards.includes('adminAwardsBatchCreateSelected'), 'Awards Manager b
+ assert(adminAwards.includes('awardsInlineWorkspace-'), 'View Event must render an inline event workspace.');
+ assert(adminAwards.includes('Pick Changes') && adminAwards.includes('Unlimited until lock'), 'Awards Manager pick-change control missing.');
+ assert(adminAwards.includes('Default Play Type') && adminAwards.includes('Question Display'), 'Awards Manager play/display controls missing.');
+-assert(adminAwards.includes('Ranking (engine still in development)'), 'Ranking must be visibly marked as in development.');
++assert(adminAwards.includes('Ranking') && !adminAwards.includes('Ranking (engine still in development)'), 'Ranking must be available without the old development warning.');
+ assert(awardsEngine.includes('awardsManagerDecimalOddsFromProbability_'), 'Awards provider probability to wager odds conversion missing.');
+ assert(awardsEngine.includes('maxChangesRaw') && awardsEngine.includes('? -1'), 'Awards-created questions must default to changeable picks.');
+ assert(awardsEngine.includes('scoreMode: resolvedScoreMode'), 'Awards questions must inherit/use target game score mode.');
+diff --git a/tests/games_phase1_integration_tests.js b/tests/games_phase1_integration_tests.js
+index e8699fc..92fdade 100644
+--- a/tests/games_phase1_integration_tests.js
++++ b/tests/games_phase1_integration_tests.js
+@@ -292,6 +292,14 @@ const survivorResult = runPreflight(
+   { ...baseGame, type: 'survivor' },
+   [category('survivor', 'correct-pick', 2)]
+ );
+-assert(survivorResult.issues.some(issue => issue.message.includes('Survivor publishing is blocked')));
++assert(!survivorResult.issues.some(issue => issue.message.includes('Survivor publishing is blocked')));
++assert.strictEqual(survivorResult.ready, true);
++
++const rankingResult = runPreflight(
++  { ...baseGame, type: 'ranking', predictionEnabled: false, rankingEnabled: true, fixedPointsEnabled: false },
++  [category('ranking', 'ranking', 5)]
++);
++assert.strictEqual(rankingResult.ready, true);
++assert(!rankingResult.issues.some(issue => issue.message.includes('Ranking publishing is blocked')));
+ 
+ console.log('games-phase1-integration-tests: PASS');
+diff --git a/tests/survivor_ranking_games_v1218w_tests.js b/tests/survivor_ranking_games_v1218w_tests.js
+new file mode 100644
+index 0000000..886a635
+--- /dev/null
++++ b/tests/survivor_ranking_games_v1218w_tests.js
+@@ -0,0 +1,130 @@
++const assert = require('assert');
++const fs = require('fs');
++const path = require('path');
++const vm = require('vm');
++
++const root = path.resolve(__dirname, '..');
++const read = relative => fs.readFileSync(path.join(root, relative), 'utf8');
++
++const rankingEngine = read('backend/engines/RankingGameEngine.js');
++const survivorEngine = read('backend/engines/SurvivorGameEngine.js');
++const api = read('backend/Api.js');
++const scoring = read('backend/engines/ScoringEngine.js');
++const preflight = read('backend/admin/AdminPreflight.js');
++const adminSetup = read('frontend/js/pages/adminGameSetup.js');
++const adminCategories = read('backend/admin/AdminCategories.js');
++const rankingPage = read('frontend/js/pages/ranking.js');
++const survivorPage = read('frontend/js/pages/survivor.js');
++const app = read('frontend/js/app.js');
++const appMirror = read('frontend/app.js');
++const apiClient = read('frontend/js/api.js');
++const apiMirror = read('frontend/api.js');
++const css = read('frontend/css/pages.css');
++const html = read('frontend/app.html');
++const sw = read('frontend/sw.js');
++
++assert(app.includes('"survivor": ["survivor"]'));
++assert(app.includes('"ranking": ["ranking"]'));
++assert(app.includes('await navigate("survivor")'));
++assert(app.includes('await navigate("ranking")'));
++assert(app.includes('case "survivor":'));
++assert(app.includes('case "ranking":'));
++assert.strictEqual(app, appMirror, 'frontend app mirror must stay synchronized');
++
++for (const action of ['getRankingState', 'saveRanking', 'getSurvivorState', 'saveSurvivorPick', 'adminSaveRankingResults']) {
++  assert(api.includes(`action === "${action}"`), `Missing backend API route: ${action}`);
++}
++assert(apiClient.includes('function apiGetRankingState'));
++assert(apiClient.includes('function apiSaveRanking'));
++assert(apiClient.includes('function apiGetSurvivorState'));
++assert(apiClient.includes('function apiSaveSurvivorPick'));
++assert(apiClient.includes('function apiAdminSaveRankingResults'));
++assert.strictEqual(apiClient, apiMirror, 'frontend API mirror must stay synchronized');
++
++assert(scoring.includes('survivorLeaderboardData_(gameId)'));
++assert(scoring.includes('rankingLeaderboardData_(gameId)'));
++assert(scoring.includes('survivorUserScoring_(username, gameId)'));
++assert(scoring.includes('rankingUserScoring_(username, gameId)'));
++
++assert(!preflight.includes('Survivor publishing is blocked'));
++assert(!preflight.includes('Ranking publishing is blocked'));
++assert(!preflight.includes('ranking entry/scoring is not production-ready yet'));
++assert(preflight.includes('Ranking games need at least one active ranking question.'));
++
++assert(adminSetup.includes('Official Ranking Result'));
++assert(adminSetup.includes('adminSetupSaveRankingResults'));
++assert(adminSetup.includes('Elimination Result'));
++assert(adminSetup.includes('Eliminated Entry'));
++assert(adminSetup.includes('"ranking"].indexOf(scoreMode)'));
++assert(adminCategories.includes('nominee.finalRank = finalRank'));
++
++assert(rankingPage.includes('Exact') || rankingPage.includes('exact 100%'));
++assert(rankingPage.includes('Save Ranking'));
++assert(survivorPage.includes('You Are Still Alive'));
++assert(survivorPage.includes('Save Survivor Pick'));
++assert(css.includes('v1.2.18w Survivor + Ranking games'));
++assert(html.includes('v1218w-survivor-ranking'));
++assert(sw.includes('v1218w-survivor-ranking'));
++
++const context = { console, Date, JSON, Math, Number, String, Array, Object, Boolean, RegExp, Set, isFinite, parseInt, parseFloat };
++vm.createContext(context);
++vm.runInContext(rankingEngine, context);
++vm.runInContext(survivorEngine, context);
++
++assert.strictEqual(context.rankingPositionCredit_(0), 1);
++assert.strictEqual(context.rankingPositionCredit_(1), 0.8);
++assert.strictEqual(context.rankingPositionCredit_(2), 0.6);
++assert(Math.abs(context.rankingPositionCredit_(3) - 0.4) < 1e-9);
++assert(Math.abs(context.rankingPositionCredit_(4) - 0.2) < 1e-9);
++assert.strictEqual(context.rankingPositionCredit_(5), 0);
++
++const rankCategory = {
++  id: 'final-order',
++  points: 10,
++  nominees: [{ id: 'a' }, { id: 'b' }, { id: 'c' }]
++};
++const perfect = context.rankingScoreBallot_(rankCategory, [
++  { nomineeId: 'a', rank: 1 }, { nomineeId: 'b', rank: 2 }, { nomineeId: 'c', rank: 3 }
++], { a: 1, b: 2, c: 3 });
++assert.strictEqual(perfect.earnedPoints, 10);
++assert.strictEqual(perfect.accuracyPercent, 100);
++
++const near = context.rankingScoreBallot_(rankCategory, [
++  { nomineeId: 'a', rank: 2 }, { nomineeId: 'b', rank: 1 }, { nomineeId: 'c', rank: 3 }
++], { a: 1, b: 2, c: 3 });
++assert.strictEqual(near.earnedPoints, 8.67);
++assert.strictEqual(near.exactCount, 1);
++
++const survivorCategories = [
++  { id: 'r1', name: 'Round 1', points: 2 },
++  { id: 'r2', name: 'Round 2', points: 3 },
++  { id: 'r3', name: 'Round 3', points: 4 }
++];
++const survivorEvaluation = context.survivorEvaluateUser_('player', 'game', {
++  r1: { nomineeId: 'safe' },
++  r2: { nomineeId: 'gone' }
++}, survivorCategories, {
++  r1: { resolved: true, result: 'winner', winnerNomineeId: 'out1', winnerNomineeIds: ['out1'] },
++  r2: { resolved: true, result: 'winner', winnerNomineeId: 'gone', winnerNomineeIds: ['gone'] }
++});
++assert.strictEqual(survivorEvaluation.alive, false);
++assert.strictEqual(survivorEvaluation.eliminatedRound, 2);
++assert.strictEqual(survivorEvaluation.roundsSurvived, 1);
++assert.strictEqual(survivorEvaluation.totalPoints, 2);
++assert.strictEqual(survivorEvaluation.rounds[0].status, 'survived');
++assert.strictEqual(survivorEvaluation.rounds[1].status, 'eliminated');
++
++const missed = context.survivorEvaluateUser_('player', 'game', {}, [survivorCategories[0]], {
++  r1: { resolved: true, result: 'winner', winnerNomineeId: 'out1', winnerNomineeIds: ['out1'] }
++});
++assert.strictEqual(missed.alive, false);
++assert.strictEqual(missed.eliminatedReason, 'missed');
++
++const outOfOrder = context.survivorEvaluateUser_('player', 'game', {}, survivorCategories.slice(0, 2), {
++  r2: { resolved: true, result: 'winner', winnerNomineeId: 'gone', winnerNomineeIds: ['gone'] }
++});
++assert.strictEqual(outOfOrder.alive, true, 'A future round result must not eliminate a player while an earlier round is open.');
++assert.strictEqual(outOfOrder.currentRoundIndex, 0);
++assert.strictEqual(outOfOrder.rounds[1].resolved, false);
++
++console.log('survivor-ranking-games-v1218w-tests: PASS');
+diff --git a/tools/install_survivor_ranking_v1218w.sh b/tools/install_survivor_ranking_v1218w.sh
+new file mode 100755
+index 0000000..b156e8b
+--- /dev/null
++++ b/tools/install_survivor_ranking_v1218w.sh
+@@ -0,0 +1,223 @@
++#!/usr/bin/env bash
++set -euo pipefail
++
++REPO="${1:-$(git rev-parse --show-toplevel)}"
++PKG_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
++PATCH="$PKG_ROOT/patches/survivor_ranking_v1218w.patch"
++CHANGED="$PKG_ROOT/CHANGED_FILES_V1_2_18W.txt"
++BRANCH="architecture-cleanup"
++DEPLOYMENT_ID="AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo"
++RELEASE="v1.2.18w Survivor + Ranking Games"
++COMMITTED=0
++
++cd "$REPO"
++
++rollback_precommit(){
++  local code=$?
++  if [ "$COMMITTED" -eq 0 ]; then
++    echo ""
++    echo "===== SAFE ROLLBACK ====="
++    echo "A pre-deployment check stopped v1.2.18w. Restoring the starting repository..."
++    git reset --hard HEAD >/dev/null 2>&1 || true
++    if [ -f "$CHANGED" ]; then
++      while IFS= read -r FILE; do
++        [ -z "$FILE" ] && continue
++        if ! git cat-file -e "HEAD:$FILE" 2>/dev/null; then
++          rm -rf -- "$FILE"
++        fi
++      done < "$CHANGED"
++    fi
++    echo "Repository restored after failed pre-deployment check."
++    git status --short
++  fi
++  exit "$code"
++}
++trap rollback_precommit ERR
++
++printf '\n==========================================\n'
++printf ' PATTC Predicts v1.2.18w\n'
++printf ' Survivor + Ranking Games\n'
++printf '==========================================\n'
++printf 'Project: %s\n' "$REPO"
++
++[ -f "$PATCH" ] || { echo "STOP: Release patch is missing: $PATCH"; exit 1; }
++[ -f "$CHANGED" ] || { echo "STOP: Changed-files manifest is missing: $CHANGED"; exit 1; }
++
++if [ "$(git branch --show-current)" != "$BRANCH" ]; then
++  echo "STOP: Expected $BRANCH branch."
++  exit 1
++fi
++
++echo ""
++echo "===== VERIFY CLEAN REPOSITORY ====="
++DIRTY="$(git status --porcelain | grep -v '^?? update-project$' || true)"
++if [ -n "$DIRTY" ]; then
++  echo "STOP: Repository has unfinished changes. Nothing was applied."
++  git status --short
++  exit 1
++fi
++echo "Repository clean."
++
++echo ""
++echo "===== SYNC CURRENT GITHUB BASELINE ====="
++git fetch origin "$BRANCH"
++LOCAL_SHA="$(git rev-parse HEAD)"
++REMOTE_SHA="$(git rev-parse "origin/$BRANCH")"
++echo "Local:  $LOCAL_SHA"
++echo "Remote: $REMOTE_SHA"
++if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
++  if git merge-base --is-ancestor "$LOCAL_SHA" "$REMOTE_SHA"; then
++    echo "Local branch is behind GitHub; fast-forwarding automatically..."
++    git merge --ff-only "origin/$BRANCH"
++  else
++    echo "STOP: Local branch is not a clean ancestor of GitHub. Nothing was applied."
++    exit 1
++  fi
++fi
++echo "GITHUB BASELINE SYNCHRONIZED: $(git rev-parse --short HEAD)"
++
++echo ""
++echo "===== VERIFY CURRENT PROJECT FOUNDATION ====="
++for CHECK in \
++  "backend/engines/GamesEngine.js:id: \"survivor\"" \
++  "backend/engines/GamesEngine.js:id: \"ranking\"" \
++  "backend/engines/CategoryResultsEngine.js:FinalRank" \
++  "frontend/js/pages/teamFantasy.js:TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1" \
++  "backend/engines/RealityTvSeasonEngine.js:function realityTvPrepareCastImportSheet_" \
++  "tests/reality_tv_cast_forward_compat_v1218v3_tests.js:"
++do
++  FILE="${CHECK%%:*}"; NEEDLE="${CHECK#*:}"
++  [ -f "$FILE" ] || { echo "STOP: Required current-production file missing: $FILE"; exit 1; }
++  if [ -n "$NEEDLE" ] && ! grep -Fq "$NEEDLE" "$FILE"; then
++    echo "STOP: Required production prerequisite missing: $FILE :: $NEEDLE"
++    exit 1
++  fi
++done
++echo "Current Reality, Team Fantasy, and universal result foundations verified."
++
++echo ""
++echo "===== VERIFY PATCH ====="
++git apply --check "$PATCH"
++echo "Patch matches this baseline."
++
++echo ""
++echo "===== APPLY SURVIVOR + RANKING RELEASE ====="
++git apply "$PATCH"
++mkdir -p patches
++cp "$PATCH" patches/survivor_ranking_v1218w.patch
++bash tools/sync_frontend_mirrors.sh .
++chmod +x tools/install_survivor_ranking_v1218w.sh
++
++echo ""
++echo "===== SURVIVOR + RANKING REGRESSION ====="
++node tests/survivor_ranking_games_v1218w_tests.js
++node tests/games_phase1_integration_tests.js
++node tests/awards_manager_workflow_v1216_tests.js
++
++echo ""
++echo "===== PRESERVE REALITY + TEAM FANTASY ====="
++for TEST in \
++  tests/reality_tv_cast_forward_compat_v1218v3_tests.js \
++  tests/reality_tv_production_automation_v1218n_tests.js \
++  tests/team_fantasy_weekly_selection_help_v1218v1_tests.js \
++  tests/team_fantasy_week_history_compare_v1218u1_tests.js \
++  tests/team_fantasy_game_day_v1218r1_tests.js
++do
++  [ -f "$TEST" ] && node "$TEST"
++done
++
++echo ""
++echo "===== DIFF CHECK ====="
++git diff --check
++
++echo ""
++echo "===== FULL PRODUCTION CHECKS ====="
++bash tools/run_production_checks.sh
++
++echo ""
++echo "===== STAGE EXACT v1.2.18w FILES ====="
++while IFS= read -r FILE; do
++  [ -n "$FILE" ] && git add -A -- "$FILE"
++done < CHANGED_FILES_V1_2_18W.txt
++git status --short
++if git diff --cached --quiet; then
++  echo "STOP: Nothing staged for v1.2.18w."
++  exit 1
++fi
++
++echo ""
++echo "===== COMMIT ====="
++git commit -m "Finish Survivor and Ranking games v1.2.18w"
++COMMITTED=1
++trap - ERR
++
++clasp_cmd(){
++  if command -v clasp >/dev/null 2>&1; then clasp "$@";
++  elif command -v npx >/dev/null 2>&1; then npx --yes @google/clasp "$@";
++  else echo "STOP: Neither clasp nor npx is available."; return 1; fi
++}
++
++echo ""
++echo "===== PUSH APPS SCRIPT ====="
++clasp_cmd push
++
++echo ""
++echo "===== CREATE APPS SCRIPT VERSION ====="
++VERSION_OUTPUT="$(clasp_cmd version "$RELEASE")"
++echo "$VERSION_OUTPUT"
++VERSION_NUMBER="$(printf '%s\n' "$VERSION_OUTPUT" | sed -nE 's/.*Created version ([0-9]+).*/\1/p' | tail -1)"
++if ! [[ "$VERSION_NUMBER" =~ ^[0-9]+$ ]]; then
++  echo "STOP: Could not determine Apps Script version."
++  exit 1
++fi
++
++echo ""
++echo "===== DEPLOY PRODUCTION WEB APP ====="
++clasp_cmd deploy -i "$DEPLOYMENT_ID" -V "$VERSION_NUMBER" -d "$RELEASE"
++
++echo ""
++echo "===== PUSH GITHUB / CLOUDFLARE ====="
++git push origin "$BRANCH"
++
++echo ""
++echo "===== VERIFY GITHUB ====="
++git fetch origin "$BRANCH"
++LOCAL_SHA="$(git rev-parse HEAD)"; REMOTE_SHA="$(git rev-parse "origin/$BRANCH")"
++if [ "$LOCAL_SHA" != "$REMOTE_SHA" ]; then
++  echo "STOP: GitHub verification failed."
++  exit 1
++fi
++echo "GITHUB VERIFIED: $REMOTE_SHA"
++
++echo ""
++echo "===== VERIFY APPS SCRIPT ====="
++clasp_cmd deployments
++
++echo ""
++echo "===== FINAL PRODUCTION CHECK ====="
++bash tools/run_production_checks.sh
++
++echo ""
++echo "===== FINAL GIT STATUS ====="
++git status --short
++
++echo ""
++echo "===== CURRENT COMMIT ====="
++git log -1 --oneline
++
++echo ""
++echo "=========================================="
++echo " PATTC Predicts v1.2.18w COMPLETE"
++echo ""
++echo " Survivor round/elimination play LIVE"
++echo " Survivor-specific standings LIVE"
++echo " Ranking ordered ballots LIVE"
++echo " Ranking official-order results LIVE"
++echo " Ranking partial-credit scoring LIVE"
++echo " Run Check blockers removed/replaced"
++echo " Reality + Team Fantasy preserved"
++echo " GitHub VERIFIED"
++echo " Apps Script deployed"
++echo " Production checks passed"
++echo " Apps Script version: $VERSION_NUMBER"
++echo "=========================================="

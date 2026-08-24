@@ -1,0 +1,19 @@
+PATTC Predicts v1.2.18w — Survivor + Ranking Games
+
+Use the supplied update ZIP and run the installer from your Awards App repository.
+The installer:
+- requires branch architecture-cleanup
+- requires a clean repository
+- synchronizes the branch with origin/architecture-cleanup when a safe fast-forward is possible
+- verifies the current Reality + Team Fantasy foundations
+- applies the Survivor + Ranking patch
+- synchronizes frontend mirrors
+- runs Survivor/Ranking tests and the full production suite
+- commits the exact release files
+- pushes Apps Script
+- creates a new Apps Script version
+- updates the existing production Apps Script deployment
+- pushes GitHub (which continues the normal Cloudflare deployment workflow)
+- verifies GitHub and runs the production suite again
+
+No manual file copying inside the repository is required.

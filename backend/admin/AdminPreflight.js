@@ -531,22 +531,6 @@ function adminRunGamePreflight(payload) {
 
   }
 
-  if (gameType === "survivor") {
-    adminPreflightAddIssue_(
-      issues,
-      "error",
-      "Survivor publishing is blocked until round advancement, elimination, and survivor-specific standings are completed."
-    );
-  }
-
-  if (gameType === "ranking") {
-    adminPreflightAddIssue_(
-      issues,
-      "error",
-      "Ranking publishing is blocked until ranking entry and ranking scoring are completed."
-    );
-  }
-
   const displayOrders = {};
   const categoryIds = {};
   const categoryModeCounts = {
@@ -843,6 +827,18 @@ function adminRunGamePreflight(payload) {
     );
   }
 
+  if (gameType === "ranking" && categoryModeCounts.rankings === 0) {
+    adminPreflightAddIssue_(issues, "error", "Ranking games need at least one active ranking question.");
+  }
+
+  if (gameType === "ranking" && categoryModeCounts.rankings > 0 && categoryModeCounts.rankings !== activeCategories.length) {
+    adminPreflightAddIssue_(issues, "error", "Every active question in a Ranking game must use Ranking score mode.");
+  }
+
+  if (gameType === "survivor" && activeCategories.length < 2) {
+    adminPreflightAddIssue_(issues, "warning", "Survivor works best with two or more ordered rounds/questions.");
+  }
+
   if (gameType === "mixed") {
 
     if (
@@ -882,13 +878,13 @@ function adminRunGamePreflight(payload) {
       adminPreflightAddIssue_(
         issues,
         "error",
-        "Hybrid game contains ranking questions, but ranking entry/scoring is not production-ready yet."
+        "Hybrid games cannot publish Ranking questions in the combined leaderboard yet. Use a standalone Ranking game for ordered ballots."
       );
     } else if (game.rankingEnabled === true) {
       adminPreflightAddIssue_(
         issues,
         "warning",
-        "Ranking is enabled but no ranking questions exist. Turn Ranking off until the ranking workflow is completed."
+        "Ranking is enabled but no ranking questions exist."
       );
     }
 

@@ -1835,7 +1835,7 @@ function getDashboardGameActionLabel_(
   }
 
   if (type === "ranking") {
-    return "Check Status";
+    return "Open Rankings";
   }
 
   return complete

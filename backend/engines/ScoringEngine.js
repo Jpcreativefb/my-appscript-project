@@ -301,6 +301,16 @@ function getLeaderboardData(
       ? getGameRuntimeConfig(gameId)
       : getGame(gameId);
 
+  const gameType = String(game && game.type || "").trim().toLowerCase();
+
+  if (gameType === "survivor" && typeof survivorLeaderboardData_ === "function") {
+    return survivorLeaderboardData_(gameId);
+  }
+
+  if (gameType === "ranking" && typeof rankingLeaderboardData_ === "function") {
+    return rankingLeaderboardData_(gameId);
+  }
+
   const isConfidenceGame =
     isConfidenceScoringGame_(
       gameId
@@ -948,6 +958,16 @@ function getUserScoring(
     typeof getGameRuntimeConfig === "function"
       ? getGameRuntimeConfig(gameId)
       : getGame(gameId);
+
+  const gameType = String(game && game.type || "").trim().toLowerCase();
+
+  if (gameType === "survivor" && typeof survivorUserScoring_ === "function") {
+    return survivorUserScoring_(username, gameId);
+  }
+
+  if (gameType === "ranking" && typeof rankingUserScoring_ === "function") {
+    return rankingUserScoring_(username, gameId);
+  }
 
   const isConfidenceGame =
     isConfidenceScoringGame_(

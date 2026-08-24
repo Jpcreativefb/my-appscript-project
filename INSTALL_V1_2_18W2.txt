@@ -1,0 +1,11 @@
+PATTC Predicts v1.2.18w2 — Survivor + Ranking Rebased Release
+
+This is the corrected v1.2.18w release package for the newer production branch that
+contains the Reality TV v1.2.18v4 draft-switch frontend updates.
+
+The installer preserves the current frontend files, applies the non-conflicting
+Survivor/Ranking release patch, then adds only the Survivor/Ranking routes and cache
+markers using an anchor-based rebase helper.
+
+It retains the normal controlled release flow: clean-repo check, GitHub sync, tests,
+commit, Apps Script push/version/deploy, GitHub push, verification, and final checks.

@@ -162,6 +162,44 @@ function doPost(e) {
       }));
     }
 
+    if (action === "saveRanking") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(saveRankingBallot_({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId,
+        rankings: Array.isArray(body.rankings) ? body.rankings : []
+      }));
+    }
+
+    if (action === "saveSurvivorPick") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(saveSurvivorPick_({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId,
+        nomineeId: body.nomineeId
+      }));
+    }
+
+    if (action === "adminSaveRankingResults") {
+      return json(adminSaveRankingResults_({
+        gameId: body.gameId,
+        categoryId: body.categoryId,
+        rankings: Array.isArray(body.rankings) ? body.rankings : (Array.isArray(body.order) ? body.order : [])
+      }));
+    }
+
     if (action === "savePick") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -660,6 +698,9 @@ function doGet(e) {
       action === "saveUserProfile" ||
       action === "uploadProfileAvatar" ||
       action === "savePick" ||
+      action === "saveRanking" ||
+      action === "saveSurvivorPick" ||
+      action === "adminSaveRankingResults" ||
       action === "saveConfidencePicksBatch" ||
       action === "saveBet" ||
       action === "removeBet" ||
@@ -2250,6 +2291,18 @@ function doGet(e) {
     /* =========================
        PICKS
     ========================= */
+
+    if (action === "getRankingState") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetRankingState_({ username: params.username, gameId: gameId }));
+    }
+
+    if (action === "getSurvivorState") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetSurvivorState_({ username: params.username, gameId: gameId }));
+    }
 
     if (action === "getMyPicks") {
 
