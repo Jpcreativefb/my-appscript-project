@@ -10,7 +10,8 @@ const backend = fs.readFileSync(path.join(root,'backend/engines/SportsTeamFantas
 
 assert(page.includes('TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_UI_v1218u1'), '18u UI marker missing');
 assert(backend.includes('TEAM_FANTASY_WEEKLY_HISTORY_COMPARE_BACKEND_v1218u1'), '18u backend marker missing');
-assert(page.includes('team-fantasy.css?v=1218u1'), '18u CSS cache marker missing');
+const u1CssCache = page.match(/team-fantasy\.css\?v=([A-Za-z0-9._-]+)/);
+assert(u1CssCache && !['1218r1','1218s','1218t2'].includes(u1CssCache[1]), '18u-or-later CSS cache marker missing');
 assert(page.includes('teamFantasyGameDayWeekPicker_') && page.includes('teamFantasyGameDaySelectWeek_'), 'past-week selector missing');
 assert(page.includes('TEAM_FANTASY_GAME_DAY_WEEK'), 'selected compare week state missing');
 assert(page.includes("if (Number(data.week || 0) !== Number(state.week || 0)) return;"), 'historical weeks must not keep live polling');

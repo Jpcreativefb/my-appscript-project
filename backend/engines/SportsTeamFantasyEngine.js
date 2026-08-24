@@ -1478,6 +1478,7 @@ function apiGetTeamFantasyHeadToHead(payload) {
   };
 }
 
+/* TEAM_FANTASY_WEEKLY_SELECTION_HELP_BACKEND_v1218v1 */
 function apiGetTeamFantasyState(payload) {
   payload = payload || {};
   setupSportsTeamFantasySystem();
@@ -1509,7 +1510,8 @@ function apiGetTeamFantasyState(payload) {
     selectedLeagueId: selectedLeagueId,
     standings: standings.success ? standings : null,
     scheduleGames: schedule.games,
-    positionLabels: TEAM_FANTASY_POSITION_LABELS
+    positionLabels: TEAM_FANTASY_POSITION_LABELS,
+    scoringRules: teamFantasyRules_(gameId).filter(function(rule) { return rule.active; })
   };
 }
 

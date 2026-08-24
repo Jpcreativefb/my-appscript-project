@@ -1,0 +1,16 @@
+PATTC Predicts v1.2.18v1 — Team Fantasy Weekly Selection Help
+
+Expected baseline:
+  ae6c8c5f24f200145e939a97fde9d8f188f6a531
+
+Install with the included release-control installer. It verifies the clean architecture-cleanup branch and exact GitHub baseline, applies the update, runs syntax/regression/production checks, commits, pushes Apps Script, creates a version, updates the production deployment, and pushes GitHub/Cloudflare.
+
+Player-facing changes:
+- Rules button at top of Weekly Picks
+- Scoring & Position Stats button at top of Weekly Picks
+- Live scoring-rule values supplied by TeamFantasyScoringRules
+- OL above K in one-column layout
+- Two-column offense left; K/defense right
+- Compare / Six-Team Synthetic Compare retired from the weekly player view
+- Weekly Standings, past-week review, usage limits, BYE handling and Week History retained
+- Admin Team Fantasy Test Lab remains available for in-memory verification; the retired feature is the player-facing Compare mode.

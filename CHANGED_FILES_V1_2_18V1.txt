@@ -1,0 +1,12 @@
+CHANGED_FILES_V1_2_18V1.txt
+INSTALL_V1_2_18V1.txt
+backend/engines/SportsTeamFantasyEngine.js
+docs/TEAM_FANTASY_WEEKLY_SELECTION_HELP_V1_2_18V1.md
+frontend/css/team-fantasy.css
+frontend/js/pages/teamFantasy.js
+tests/team_fantasy_game_day_v1218r1_tests.js
+tests/team_fantasy_week_history_compare_v1218u1_tests.js
+tests/team_fantasy_weekly_hub_v1218t2_tests.js
+tests/team_fantasy_weekly_selection_help_v1218v1_tests.js
+tools/apply_team_fantasy_weekly_selection_help_v1218v1.py
+tools/install_team_fantasy_weekly_selection_help_v1218v1.sh

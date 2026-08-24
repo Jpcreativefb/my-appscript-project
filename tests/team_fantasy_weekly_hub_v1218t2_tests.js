@@ -10,8 +10,8 @@ assert(page.includes('TEAM_FANTASY_WEEKLY_HUB_UI_v1218t2'), '18t UI marker missi
 assert(backend.includes('TEAM_FANTASY_WEEKLY_HUB_BACKEND_v1218t2'), '18t backend marker missing');
 assert(page.includes('<h2>Weekly Picks</h2>'), 'Weekly Picks header missing');
 assert(page.includes("teamFantasyLineupComplete_(lineup)"), 'complete-lineup collapse missing');
-assert(page.includes('League View') && page.includes('Compare'), 'League/Compare view switch missing');
-assert(page.includes('+ Add Team'), 'single Add Team control missing');
+assert((page.includes('League View') && page.includes('Compare')) || page.includes('TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1'), 'Weekly League view contract missing');
+assert(page.includes('+ Add Team') || page.includes('TEAM_FANTASY_WEEKLY_SELECTION_HELP_UI_v1218v1'), 'Historical Add Team contract must be preserved or intentionally retired by 18v1');
 assert(!page.includes('>H2H</button>') && !page.includes('>2–6</button>'), 'old compare preset buttons remain');
 assert(page.includes('teamFantasyRenderWeeklyLeague_'), 'weekly league renderer missing');
 assert(page.includes('pointsBehindLeader') && page.includes('pointsToMoveUp') && page.includes('cushionOverBelow'), 'weekly movement fields missing from UI');
