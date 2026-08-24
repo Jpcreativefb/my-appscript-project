@@ -2105,15 +2105,15 @@ async function apiAdminBulkAddRealityTvContestants(payload) {
 
 
 async function apiAdminPrepareRealityCastDraft(payload) {
-  return apiAdminRealityTvPostRequest_("adminPrepareRealityCastDraft", payload || {});
+  return apiAdminRealityTvRequest_("adminPrepareRealityCastDraft", payload || {});
 }
 
 async function apiAdminPreviewRealityCastDraft(payload) {
-  return apiAdminRealityTvPostRequest_("adminPreviewRealityCastDraft", payload || {});
+  return apiAdminRealityTvRequest_("adminPreviewRealityCastDraft", payload || {});
 }
 
 async function apiAdminLoadRealityCastDraft(payload) {
-  return apiAdminRealityTvPostRequest_("adminLoadRealityCastDraft", payload || {});
+  return apiAdminRealityTvRequest_("adminLoadRealityCastDraft", payload || {});
 }
 
 async function apiAdminBulkUpdateRealityTvContestantGroups(payload) {
@@ -2124,15 +2124,15 @@ async function apiAdminSetRealityTvIndividualPlay(payload) {
   return apiAdminRealityTvPostRequest_("adminSetRealityTvIndividualPlay", payload || {});
 }
 async function apiAdminPrepareRealityCastImport(payload) {
-  return apiAdminRealityTvPostRequest_("adminPrepareRealityCastImport", payload || {});
+  return apiAdminRealityTvRequest_("adminPrepareRealityCastImport", payload || {});
 }
 
 async function apiAdminPreviewRealityCastImport(payload) {
-  return apiAdminRealityTvPostRequest_("adminPreviewRealityCastImport", payload || {});
+  return apiAdminRealityTvRequest_("adminPreviewRealityCastImport", payload || {});
 }
 
 async function apiAdminImportRealityCastImport(payload) {
-  return apiAdminRealityTvPostRequest_("adminImportRealityCastImport", payload || {});
+  return apiAdminRealityTvRequest_("adminImportRealityCastImport", payload || {});
 }
 
 async function apiAdminSubmitRealityTvResult(payload) {

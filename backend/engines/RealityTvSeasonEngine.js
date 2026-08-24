@@ -3777,6 +3777,54 @@ function realityTvCastImportSheetUrl_(spreadsheet, sheet) {
   return spreadsheet.getUrl() + "#gid=" + sheet.getSheetId();
 }
 
+/* REALITY CAST STAGING FORWARD FIX v1.2.18v2 */
+function realityTvCastImportIdentityPresent_(row) {
+  return !!(
+    realityTvString_(row && row.Name) ||
+    realityTvString_(row && row.FullName) ||
+    realityTvString_(row && row.Member1) ||
+    realityTvString_(row && row.Member2)
+  );
+}
+
+function realityTvCastImportSystemFields_(season, profile) {
+  return {
+    SeasonId: season.SeasonId,
+    GameId: season.GameId,
+    ShowProfile: profile.label,
+    ShowFormat: season.ShowFormat,
+    ShowName: season.ShowName,
+    SeasonName: season.SeasonName,
+    LastError: ""
+  };
+}
+
+function realityTvAdoptUnscopedCastRows_(season, profile) {
+  const ss = SpreadsheetApp.getActive();
+  const sheet = ss.getSheetByName(REALITY_TV_CAST_IMPORT_SHEET);
+  if (!sheet) return 0;
+  const rows = realityTvReadObjects_(ss, REALITY_TV_CAST_IMPORT_SHEET);
+  let adopted = 0;
+  rows.forEach(function(row) {
+    if (realityTvString_(row.SeasonId) || realityTvString_(row.GameId)) return;
+    if (!realityTvBool_(row.Import)) return;
+    if (!realityTvCastImportIdentityPresent_(row)) return;
+    realityTvUpdateObjectRow_(sheet, row.__rowNumber, realityTvCastImportSystemFields_(season, profile));
+    adopted += 1;
+  });
+  return adopted;
+}
+
+function realityTvCastImportLastMeaningfulRow_(rows) {
+  return (rows || []).reduce(function(last, row) {
+    const meaningful = Object.keys(row || {}).some(function(header) {
+      if (header === "__rowNumber" || header === "Import") return false;
+      return realityTvString_(row[header]) !== "";
+    });
+    return meaningful ? Math.max(last, realityTvNumber_(row.__rowNumber, 1)) : last;
+  }, 1);
+}
+
 function realityTvPrepareCastImportSheet_(season) {
   const ss = SpreadsheetApp.getActive();
   const sheet = realityTvGetOrCreateSheet_(ss, REALITY_TV_CAST_IMPORT_SHEET, REALITY_TV_CAST_IMPORT_HEADERS);
@@ -3785,15 +3833,25 @@ function realityTvPrepareCastImportSheet_(season) {
   const headerRange = sheet.getRange(1, 1, 1, schema.headers.length);
   headerRange.setFontWeight("bold").setWrap(true);
   sheet.setFrozenRows(1);
-  sheet.setFrozenColumns(Math.min(8, schema.headers.length));
+  sheet.setFrozenColumns(Math.min(2, schema.headers.length));
+
+  // Server-owned routing fields stay available to the importer but are hidden
+  // from normal editing so the cast sheet reads like a staging worksheet.
+  if (schema.headers.length >= 8) {
+    try { sheet.hideColumns(3, 6); } catch (err) { /* already hidden is fine */ }
+  }
 
   const notes = {
-    Import: "Check the rows you want Import Selected Rows to create or update.",
+    Import: "Check the rows you want Preview / Import to use.",
     ImportStatus: "Filled automatically after import: IMPORTED, UPDATED, SKIPPED, or ERROR.",
-    SeasonId: "Filled automatically by Prepare Cast Sheet. Do not change for this season block.",
-    ShowProfile: "Friendly show template selected automatically from the Reality TV season.",
-    Name: "Playable display name. Amazing Race can leave this blank and it will be built from Member 1 & Member 2.",
-    ImageUrl: "Image used by the app. A stable Awards App asset URL is preferred when available.",
+    SeasonId: "System field. Filled automatically; do not enter it manually.",
+    GameId: "System field. Filled automatically; do not enter it manually.",
+    ShowProfile: "System field. Selected automatically from the show format.",
+    ShowFormat: "System field. Filled automatically from Reality TV Season Manager.",
+    ShowName: "System field. Filled automatically from Reality TV Season Manager.",
+    SeasonName: "System field. Filled automatically from Reality TV Season Manager.",
+    Name: "Playable display name. Survivor/Traitors/Special Forces require this. Amazing Race can auto-build it from Member 1 & Member 2.",
+    ImageUrl: "Image used by the app. Blank is allowed during staging and produces only a preview warning.",
     TeamOrTribe: "Starting tribe/team/group. For Survivor this is the starting tribe.",
     TeamColor: "Optional color name or hex value for tribe/team display.",
     Member1: "Amazing Race racer 1 or DWTS celebrity.",
@@ -3802,17 +3860,12 @@ function realityTvPrepareCastImportSheet_(season) {
     OriginalShowOrSport: "Prior show/franchise or sport, especially useful for Traitors and Special Forces.",
     RecruitNumber: "Optional Special Forces recruit number.",
     SourceUrl: "Official cast/bio page or other source used to verify the contestant information.",
-    ImageSourceUrl: "Page where the original image was obtained. Keep this even if ImageUrl later becomes an asset: URL.",
+    ImageSourceUrl: "Page where the original image was obtained.",
     AdminNotes: "Staging-only notes. These are NOT copied to the player-facing RealityContestants table."
   };
   schema.headers.forEach(function(header, index) {
     if (notes[header]) sheet.getRange(1, index + 1).setNote(notes[header]);
   });
-
-  const importCol = schema.map.Import;
-  if (importCol !== undefined && sheet.getMaxRows() > 1) {
-    sheet.getRange(2, importCol + 1, sheet.getMaxRows() - 1, 1).insertCheckboxes();
-  }
 
   const widths = {
     Import: 70, ImportStatus: 115, SeasonId: 180, GameId: 180, ShowProfile: 130, ShowFormat: 130,
@@ -3826,38 +3879,56 @@ function realityTvPrepareCastImportSheet_(season) {
     if (widths[header]) sheet.setColumnWidth(index + 1, widths[header]);
   });
 
-  const rows = realityTvReadObjects_(ss, REALITY_TV_CAST_IMPORT_SHEET);
-  const seasonRows = rows.filter(function(row) {
+  // Recover rows typed into the old blank checkbox area. A checked row with a
+  // cast identity and no routing metadata belongs to the season/draft currently
+  // being prepared.
+  const adoptedCount = realityTvAdoptUnscopedCastRows_(season, profile);
+
+  let rows = realityTvReadObjects_(ss, REALITY_TV_CAST_IMPORT_SHEET);
+  let seasonRows = rows.filter(function(row) {
     return realityTvKey_(row.SeasonId) === realityTvKey_(season.SeasonId);
   });
-  if (!seasonRows.length) {
-    const templateRows = [];
-    for (let i = 0; i < 24; i += 1) {
-      templateRows.push({
-        Import: false,
-        ImportStatus: "",
-        SeasonId: season.SeasonId,
-        GameId: season.GameId,
-        ShowProfile: profile.label,
-        ShowFormat: season.ShowFormat,
-        ShowName: season.ShowName,
-        SeasonName: season.SeasonName
-      });
-    }
-    const startRow = sheet.getLastRow() + 1;
-    const values = templateRows.map(function(payload) {
-      return schema.headers.map(function(header) {
+
+  // Maintain a visible 24-row working block. Checkbox-only FALSE rows do not
+  // count as meaningful placement and therefore cannot push the template far
+  // down the sheet.
+  const blankSeasonRows = seasonRows.filter(function(row) {
+    return !realityTvCastImportIdentityPresent_(row) && !realityTvString_(row.ImportStatus);
+  });
+  const blanksNeeded = Math.max(0, 24 - blankSeasonRows.length);
+  if (blanksNeeded) {
+    const startRow = realityTvCastImportLastMeaningfulRow_(rows) + 1;
+    const systemFields = realityTvCastImportSystemFields_(season, profile);
+    const values = [];
+    for (let i = 0; i < blanksNeeded; i += 1) {
+      const payload = Object.assign({ Import: false, ImportStatus: "" }, systemFields);
+      values.push(schema.headers.map(function(header) {
         return Object.prototype.hasOwnProperty.call(payload, header) ? payload[header] : "";
-      });
-    });
+      }));
+    }
     sheet.getRange(startRow, 1, values.length, schema.headers.length).setValues(values);
-    if (importCol !== undefined) sheet.getRange(startRow, importCol + 1, values.length, 1).insertCheckboxes();
+  }
+
+  // Apply checkbox validation only to rows owned by this season/draft. Using a
+  // data-validation rule preserves TRUE values already selected by the admin.
+  rows = realityTvReadObjects_(ss, REALITY_TV_CAST_IMPORT_SHEET);
+  seasonRows = rows.filter(function(row) {
+    return realityTvKey_(row.SeasonId) === realityTvKey_(season.SeasonId);
+  });
+  const importCol = schema.map.Import;
+  if (importCol !== undefined && typeof SpreadsheetApp.newDataValidation === "function") {
+    const checkboxRule = SpreadsheetApp.newDataValidation().requireCheckbox().build();
+    seasonRows.forEach(function(row) {
+      sheet.getRange(row.__rowNumber, importCol + 1).setDataValidation(checkboxRule);
+    });
   }
 
   return {
     sheet: sheet,
     sheetUrl: realityTvCastImportSheetUrl_(ss, sheet),
-    profile: profile
+    profile: profile,
+    adoptedCount: adoptedCount,
+    preparedRowCount: seasonRows.length
   };
 }
 

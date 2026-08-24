@@ -1402,6 +1402,26 @@ function doGet(e) {
       return json(apiAdminBulkAddRealityTvContestants(params));
     }
 
+    /* REALITY CAST FORWARD FIXES v1.2.18v2 */
+    if (action === "adminPrepareRealityCastDraft") {
+      return json(apiAdminPrepareRealityCastDraft(params));
+    }
+    if (action === "adminPreviewRealityCastDraft") {
+      return json(apiAdminPreviewRealityCastDraft(params));
+    }
+    if (action === "adminLoadRealityCastDraft") {
+      return json(apiAdminLoadRealityCastDraft(params));
+    }
+    if (action === "adminPrepareRealityCastImport") {
+      return json(apiAdminPrepareRealityCastImport(params));
+    }
+    if (action === "adminPreviewRealityCastImport") {
+      return json(apiAdminPreviewRealityCastImport(params));
+    }
+    if (action === "adminImportRealityCastImport") {
+      return json(apiAdminImportRealityCastImport(params));
+    }
+
     if (action === "adminSubmitRealityTvResult") {
       return json(apiAdminSubmitRealityTvResult(params));
     }

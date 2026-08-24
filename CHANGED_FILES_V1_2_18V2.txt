@@ -1,0 +1,11 @@
+backend/Api.js
+backend/engines/RealityTvSeasonEngine.js
+frontend/api.js
+frontend/js/api.js
+frontend/app.html
+CHANGED_FILES_V1_2_18V2.txt
+INSTALL_V1_2_18V2.txt
+docs/REALITY_TV_CAST_FORWARD_FIXES_V1_2_18V2.md
+tests/reality_tv_cast_forwardfix_v1218v2_tests.js
+tools/apply_reality_cast_forwardfix_v1218v2.js
+tools/finalize_reality_cast_forwardfix_v1218v2.sh

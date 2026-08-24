@@ -1,0 +1,11 @@
+PATTC Predicts v1.2.18v2 — Reality Cast Forward Fixes
+
+Use the single Terminal block supplied with the download. The installer:
+- verifies/synchronizes the architecture-cleanup branch when safe,
+- carries forward the Reality cast direct-transport fix,
+- repairs staging-row placement/recovery,
+- runs Reality + compatibility tests,
+- runs full production checks,
+- commits, pushes Apps Script, creates/deploys a version,
+- pushes GitHub to trigger Cloudflare,
+- verifies GitHub and production checks.
