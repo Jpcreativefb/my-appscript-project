@@ -397,7 +397,7 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
-const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases";
+const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance";
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -512,6 +512,96 @@ async function ensurePageModules_(page) {
 }
 
 /* ======================
+   FAST PAGE SNAPSHOTS
+   v1.2.18x1b
+
+   Public play pages are expensive because their server payloads aggregate
+   several Sheets. Keep the most recently rendered DOM in memory so normal
+   back-and-forth navigation paints immediately. Fresh snapshots are reused
+   directly; older snapshots paint first and refresh quietly in the background.
+====================== */
+
+const APP_PAGE_SNAPSHOT_CACHE = {};
+const APP_PAGE_SNAPSHOT_FRESH_MS = 30 * 1000;
+const APP_PAGE_SNAPSHOT_MAX_MS = 5 * 60 * 1000;
+
+function appPageSnapshotEligible_(page) {
+  page = String(page || "");
+  if (!page) return false;
+  if (page.indexOf("admin") === 0) return false;
+  return page === "dashboard" ||
+    page.indexOf("hub:") === 0 ||
+    page === "picks" ||
+    page === "game-hub" ||
+    page === "survivor" ||
+    page === "ranking" ||
+    page === "team-fantasy" ||
+    page === "betting" ||
+    page === "leaderboard" ||
+    page === "season-hub" ||
+    page === "trophy-room" ||
+    page === "more";
+}
+
+function appPageSnapshotKey_(page) {
+  const session = typeof getSession === "function" ? getSession() : null;
+  const username = String(session && session.username || "").trim().toLowerCase();
+  const gameId = typeof getFrontendGameId === "function" ? String(getFrontendGameId() || "").trim() : String(APP_STATE.gameId || "").trim();
+  const leagueId = typeof getFrontendLeagueId === "function" ? String(getFrontendLeagueId() || "").trim() : "";
+  const mode = String(localStorage.getItem("gameMode") || "").trim().toLowerCase();
+  return [username, gameId, leagueId, mode, String(page || "")].join("|");
+}
+
+function appCapturePageSnapshot_(page, app) {
+  if (!app || !appPageSnapshotEligible_(page)) return;
+  const html = String(app.innerHTML || "");
+  if (!html || html.indexOf("Page failed to load") !== -1) return;
+  APP_PAGE_SNAPSHOT_CACHE[appPageSnapshotKey_(page)] = {
+    html: html,
+    savedAt: Date.now()
+  };
+}
+
+function appReadPageSnapshot_(page) {
+  if (!appPageSnapshotEligible_(page)) return null;
+  const key = appPageSnapshotKey_(page);
+  const item = APP_PAGE_SNAPSHOT_CACHE[key] || null;
+  if (!item) return null;
+  const age = Date.now() - Number(item.savedAt || 0);
+  if (age > APP_PAGE_SNAPSHOT_MAX_MS) {
+    delete APP_PAGE_SNAPSHOT_CACHE[key];
+    return null;
+  }
+  return { key: key, html: item.html, age: age };
+}
+
+function invalidateAppPageSnapshots(gameId) {
+  gameId = String(gameId || "").trim();
+  Object.keys(APP_PAGE_SNAPSHOT_CACHE).forEach(function(key) {
+    if (!gameId || key.indexOf("|" + gameId + "|") !== -1) {
+      delete APP_PAGE_SNAPSHOT_CACHE[key];
+    }
+  });
+}
+
+function appRefreshSnapshotQuietly_(page, snapshotKey) {
+  window.setTimeout(async function() {
+    try {
+      await ensurePageModules_(page);
+      if (APP_STATE.currentPage !== page || appPageSnapshotKey_(page) !== snapshotKey) return;
+      const app = document.getElementById("app");
+      if (!app) return;
+      await renderPage(page);
+      if (APP_STATE.currentPage !== page || appPageSnapshotKey_(page) !== snapshotKey) return;
+      appCapturePageSnapshot_(page, app);
+      if (isAdminPage_(page) && typeof adminUiEnhancePage === "function") adminUiEnhancePage(app);
+    } catch (err) {
+      console.warn("Quiet page refresh skipped", page, err);
+    }
+  }, 0);
+}
+
+/* ======================
    NAVIGATION CORE
 ====================== */
 
@@ -539,10 +629,33 @@ async function navigate(page, options) {
     return;
   }
 
+  const previousPage = APP_STATE.currentPage;
+  if (previousPage && previousPage !== page) {
+    appCapturePageSnapshot_(previousPage, app);
+  }
+
   app.classList.add("page-enter");
 
   APP_STATE.currentPage = page;
+  const snapshot = options.forceRefresh === true ? null : appReadPageSnapshot_(page);
   const usePageLoader = options.suppressLoader !== true;
+
+  window.location.hash = page;
+
+  if (snapshot) {
+    app.innerHTML = snapshot.html;
+    app.classList.remove("page-enter");
+    app.classList.add("page-enter-active");
+    setActiveNav(page);
+
+    // Fresh snapshots return immediately. Stale-but-valid snapshots remain
+    // visible while the page refreshes quietly, avoiding another full-screen loader.
+    if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
+      appRefreshSnapshotQuietly_(page, snapshot.key);
+    }
+    return;
+  }
+
   if (usePageLoader) {
     showLoader({
       percent: 8,
@@ -550,8 +663,6 @@ async function navigate(page, options) {
       detail: isAdminPage_(page) ? "Preparing " + page.replace(/[-:]/g, " ") + "…" : ""
     });
   }
-
-  window.location.hash = page;
 
   try {
 
@@ -563,6 +674,7 @@ async function navigate(page, options) {
     if (isAdminPage_(page) && typeof adminUiEnhancePage === "function") {
       adminUiEnhancePage(app);
     }
+    appCapturePageSnapshot_(page, app);
     setPageLoadStep(94, isAdminPage_(page) ? "Finishing page layout…" : "");
 
   } catch (err) {

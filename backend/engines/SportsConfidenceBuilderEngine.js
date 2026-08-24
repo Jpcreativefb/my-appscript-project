@@ -423,7 +423,11 @@ function createSportsConfidenceQuestionFromScore(payload) {
     sportsConfidencePatchCategoryRows_(score, awardsGameId, categoryId);
 
     SpreadsheetApp.flush();
-    if (typeof clearAppCaches === "function") clearAppCaches();
+    if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "Questions", "QuestionOptions"]);
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(awardsGameId);
+    }
 
     return {
       success: true,
@@ -1057,14 +1061,12 @@ function sportsConfidenceWriteBatch_(awardsGameId, records) {
 
     SpreadsheetApp.flush();
 
-    if (typeof normalizedStorageClearCaches_ === "function") {
-      normalizedStorageClearCaches_();
-    }
     if (typeof adminCatClearCaches_ === "function") {
-      adminCatClearCaches_();
-    }
-    if (typeof clearAppCaches === "function") {
-      clearAppCaches();
+      adminCatClearCaches_(awardsGameId);
+    } else if (typeof normalizedStorageClearCaches_ === "function") {
+      normalizedStorageClearCaches_(awardsGameId);
+    } else if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "Questions", "QuestionOptions"]);
     }
 
     return {
@@ -1140,11 +1142,11 @@ function apiAdminCreateSportsConfidenceQuestionsBulk(payload) {
     typeof LockService !== "undefined" &&
     LockService &&
     typeof LockService.getScriptLock === "function"
-      ? LockService.getScriptLock()
+      ? ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock())
       : null;
 
   if (lock) {
-    lock.waitLock(20000);
+    lock.waitLock(5000);
   }
 
   try {

@@ -2333,25 +2333,29 @@ function getCategoriesDataForGameScoped_(gameId, options) {
   return normalizedStorageReadLegacyCategoriesByGame_(gameId, {});
 }
 
-function normalizedStorageClearCaches_() {
+function normalizedStorageClearCaches_(gameId) {
   NORMALIZED_STORAGE_RUNTIME_CACHE = {};
+
+  gameId = normalizedStorageString_(gameId);
+  if (gameId && typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(gameId, [QUESTIONS_SHEET, QUESTION_OPTIONS_SHEET, DATA_INDEX_SHEET]);
+    return;
+  }
 
   try {
     const cache = CacheService.getScriptCache();
-    [
+    const keys = [
       "sheet_" + QUESTIONS_SHEET,
       "sheet_" + QUESTION_OPTIONS_SHEET,
       "sheet_" + DATA_INDEX_SHEET
-    ].forEach(function(key) {
-      cache.remove(key);
-    });
+    ];
+    if (typeof appCacheRemoveKeys_ === "function") appCacheRemoveKeys_(cache, keys);
+    else keys.forEach(function(key) { cache.remove(key); });
   } catch (err) {
     Logger.log("Normalized cache clear warning: " + err);
   }
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
-  }
+  if (typeof clearAppCaches === "function") clearAppCaches();
 }
 
 function normalizedStorageGetSheetStats_(sheetName) {
@@ -3894,7 +3898,7 @@ function normalizedStorageStartArchiveJob_(payload) {
     };
   }
 
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   const gotLock = lock.tryLock(5000);
 
   if (!gotLock) {
@@ -3983,7 +3987,7 @@ function normalizedStorageStartArchiveJob_(payload) {
 
 function normalizedStorageRunArchiveJobStep_(payload) {
   payload = payload || {};
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   const gotLock = lock.tryLock(30000);
 
   if (!gotLock) {
@@ -4367,7 +4371,7 @@ function normalizedStorageManifestRowByArchiveId_(
 
 function normalizedStorageFinalizeArchiveJob_(payload) {
   payload = payload || {};
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   const gotLock = lock.tryLock(30000);
 
   if (!gotLock) {
@@ -4635,7 +4639,7 @@ function archiveGameData(payload) {
     };
   }
 
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   const gotLock = lock.tryLock(30000);
 
   if (!gotLock) {

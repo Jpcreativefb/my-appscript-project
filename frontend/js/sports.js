@@ -269,6 +269,14 @@ const LEAGUE_META = {
 ************************************/
 
 document.addEventListener("DOMContentLoaded", function() {
+  const session = getSportsStoredSession_();
+  if (!sportsSessionIsAdmin_(session)) {
+    const main = document.querySelector("main.page");
+    if (main) {
+      main.innerHTML = '<section class="status-box"><strong>Admin access required.</strong><br>Open Sports Scores & Game Builder from the PATTC Predicts Admin page after signing in as an administrator.</section>';
+    }
+    return;
+  }
   bindSportsEvents();
   initSportsPage();
 });

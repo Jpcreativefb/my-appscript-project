@@ -959,8 +959,10 @@ function createRacingWagerFromRace(payload) {
 
     SpreadsheetApp.flush();
 
-    if (typeof clearAppCaches === "function") {
-      clearAppCaches();
+    if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(awardsGameId);
     }
 
     return {
@@ -1092,8 +1094,10 @@ function refreshRacingWagerScores(payload) {
 
   }
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
+  if (typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  } else if (typeof clearGameCaches === "function") {
+    clearGameCaches(awardsGameId);
   }
 
   return {
@@ -1313,8 +1317,10 @@ function settleRacingWagers(payload) {
 
   SpreadsheetApp.flush();
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
+  if (typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  } else if (typeof clearGameCaches === "function") {
+    clearGameCaches(awardsGameId);
   }
 
   return {

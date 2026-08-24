@@ -1,0 +1,15 @@
+PATTC Predicts v1.2.18x1b — Global Performance + Lock Contention Recovery
+
+Purpose:
+- Stop 20–30 second global ScriptLock contention from background Sports and reminder jobs.
+- Narrow player/admin write locks and cap interactive contention waits below 5 seconds.
+- Replace broad whole-app cache flushes with game/data scoped invalidation.
+- Extend shared data cache lifetime from 2 to 10 minutes.
+- Reuse recently rendered public pages instantly in-session and refresh stale snapshots quietly.
+- Restore Sports Scores & Game Builder as an admin-only workspace.
+
+Required production baseline:
+1a4378fad4732df1d9f81bb22d7d9087e5e882e5 (v1.2.18w4)
+
+Use tools/install_global_performance_lock_v1218x1b.sh through the supplied controlled-release command.
+The installer runs targeted compatibility tests and the complete production test suite before commit/deploy.

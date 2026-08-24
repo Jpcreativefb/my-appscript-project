@@ -1012,8 +1012,8 @@ function saveConfidencePicksBatch(payload) {
 
     });
 
-    lock = LockService.getScriptLock();
-    lock.waitLock(10000);
+    lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+    lock.waitLock(3500);
     lockAcquired = true;
 
     const sheet = getPicksSheet_();
@@ -1728,8 +1728,8 @@ function savePick(payload){
       }
     }
 
-    lock = LockService.getScriptLock();
-    lock.waitLock(5000);
+    lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+    lock.waitLock(3000);
     lockAcquired = true;
 
     const directPick =

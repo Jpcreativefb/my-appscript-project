@@ -2369,17 +2369,53 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
   return result;
 }
 
+const PUSH_REMINDER_RUN_LEASE_KEY = "PUSH_REMINDER_RUN_LEASE_V1218X1";
+const PUSH_REMINDER_RUN_LEASE_MS = 15 * 60 * 1000;
+
+function notificationPushAcquireReminderLease_() {
+  const props = PropertiesService.getScriptProperties();
+  const now = Date.now();
+  const token = "reminder|" + now + "|" + Math.random().toString(36).slice(2);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(300)) return { acquired: false, busy: true };
+  try {
+    let current = null;
+    try { current = JSON.parse(props.getProperty(PUSH_REMINDER_RUN_LEASE_KEY) || "null"); } catch (ignore) {}
+    if (current && Number(current.expiresAt || 0) > now) {
+      return { acquired: false, busy: true, owner: current.owner || "reminder" };
+    }
+    const lease = { acquired: true, token: token, owner: "automatic-reminders", startedAt: now, expiresAt: now + PUSH_REMINDER_RUN_LEASE_MS };
+    props.setProperty(PUSH_REMINDER_RUN_LEASE_KEY, JSON.stringify(lease));
+    return lease;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function notificationPushReleaseReminderLease_(lease) {
+  if (!lease || !lease.token) return;
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(300)) return;
+  try {
+    let current = null;
+    try { current = JSON.parse(props.getProperty(PUSH_REMINDER_RUN_LEASE_KEY) || "null"); } catch (ignore) {}
+    if (current && current.token === lease.token) {
+      if (typeof props.deleteProperty === "function") props.deleteProperty(PUSH_REMINDER_RUN_LEASE_KEY);
+      else props.setProperty(PUSH_REMINDER_RUN_LEASE_KEY, "");
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 function notificationPushRunScheduledPickReminders() {
   const props = PropertiesService.getScriptProperties();
   const nowMs = Date.now();
   const nowIso = new Date(nowMs).toISOString();
-  let lock = null;
-
-  if (typeof LockService !== "undefined" && LockService.getScriptLock) {
-    lock = LockService.getScriptLock();
-    if (!lock.tryLock(5000)) {
-      return { success: false, message: "Another automatic reminder check is already running." };
-    }
+  const lease = notificationPushAcquireReminderLease_();
+  if (!lease.acquired) {
+    return { success: true, skipped: true, message: "Another automatic reminder check is already running." };
   }
 
   try {
@@ -2419,7 +2455,7 @@ function notificationPushRunScheduledPickReminders() {
     );
     return summary;
   } finally {
-    if (lock) lock.releaseLock();
+    notificationPushReleaseReminderLease_(lease);
   }
 }
 

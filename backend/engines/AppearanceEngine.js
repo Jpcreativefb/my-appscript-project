@@ -484,9 +484,9 @@ function appearanceUpsertObject_(sheet, keyMap, objectValue) {
 function appearanceSetupSystem(payload) {
   payload = payload || {};
   const singleStep = appearanceBool_(payload.singleStep, false);
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
-  if (!lock.tryLock(10000)) {
+  if (!lock.tryLock(4000)) {
     return {
       success: false,
       setupComplete: false,

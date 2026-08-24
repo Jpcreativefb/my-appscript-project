@@ -375,19 +375,21 @@ function saveRankingBallot_(payload) {
   if (rankingFinalOrderComplete_(category, finalRanks)) throw new Error("This ranking question has already been settled.");
   rankingValidateBallot_(category, rankings);
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  if (!lock.tryLock(2500)) {
+    throw new Error("Could not save ranking: another write is finishing. Please try once more.");
+  }
   try {
     const sh = rankingEnsureSheet_();
     const data = sh.getDataRange().getValues();
     const headers = data[0].map(rankingString_);
     const col = rankingHeaderMap_(headers);
-    const keep = [];
+    const matchingRows = [];
     for (let i = 1; i < data.length; i++) {
       const same = rankingString_(data[i][col.gameid]) === gameId &&
         rankingString_(data[i][col.username]) === username &&
         rankingKey_(data[i][col.categoryid]) === categoryId;
-      if (!same) keep.push(data[i]);
+      if (same) matchingRows.push(i + 1);
     }
 
     const now = new Date();
@@ -404,10 +406,28 @@ function saveRankingBallot_(payload) {
       return row;
     });
 
-    const output = [headers].concat(keep, newRows);
-    sh.clearContents();
-    sh.getRange(1, 1, output.length, headers.length).setValues(output);
-    if (typeof clearAppCaches === "function") clearAppCaches();
+    const reuseCount = Math.min(matchingRows.length, newRows.length);
+    for (let i = 0; i < reuseCount; i++) {
+      sh.getRange(matchingRows[i], 1, 1, headers.length).setValues([newRows[i]]);
+    }
+
+    if (newRows.length > reuseCount) {
+      const appendRows = newRows.slice(reuseCount);
+      sh.getRange(sh.getLastRow() + 1, 1, appendRows.length, headers.length).setValues(appendRows);
+    }
+
+    if (matchingRows.length > newRows.length) {
+      matchingRows.slice(newRows.length).sort(function(a, b) { return b - a; }).forEach(function(rowNumber) {
+        sh.deleteRow(rowNumber);
+      });
+    }
+
+    SpreadsheetApp.flush();
+    if (typeof clearPlayerActionCaches === "function") {
+      clearPlayerActionCaches(gameId, [RANKING_ENTRIES_SHEET], username);
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(gameId);
+    }
     return { success: true, gameId: gameId, categoryId: categoryId, saved: newRows.length };
   } finally {
     lock.releaseLock();
@@ -463,7 +483,11 @@ function adminSaveRankingResults_(payload) {
     upsertCategoryResultsBulk_(payloads);
   }
 
-  if (typeof clearAppCaches === "function") clearAppCaches();
+  if (typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(gameId, ["CategoryResults", "CategorySettings"]);
+  } else if (typeof clearGameCaches === "function") {
+    clearGameCaches(gameId);
+  }
   return {
     success: true,
     gameId: gameId,

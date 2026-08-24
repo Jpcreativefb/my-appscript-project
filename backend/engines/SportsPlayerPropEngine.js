@@ -670,7 +670,8 @@ function createSportsPlayerProp(payload) {
   const categoryRows = sportsPlayerPropAppendCategoryRows_(config);
   const settingRow = sportsPlayerPropAppendSettingsRow_(config);
   SpreadsheetApp.flush();
-  if (typeof clearAppCaches === "function") clearAppCaches();
+  if (typeof clearGameDataCaches === "function") clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  else if (typeof clearGameCaches === "function") clearGameCaches(awardsGameId);
 
   return {
     success: true,
@@ -1006,7 +1007,8 @@ function createSportsPlayerMatchup(payload) {
   const categoryRows = sportsPlayerMatchupAppendCategoryRows_(config);
   const settingRow = sportsPlayerMatchupAppendSettingsRow_(config);
   SpreadsheetApp.flush();
-  if (typeof clearAppCaches === "function") clearAppCaches();
+  if (typeof clearGameDataCaches === "function") clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  else if (typeof clearGameCaches === "function") clearGameCaches(awardsGameId);
 
   return {
     success: true,

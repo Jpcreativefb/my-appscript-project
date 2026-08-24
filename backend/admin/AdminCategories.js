@@ -164,32 +164,36 @@ function adminCatSetIfColumnExists_(
 
 }
 
-function adminCatClearCaches_() {
+function adminCatClearCaches_(gameId) {
 
   /*
     Game Setup writes update normalized Questions / QuestionOptions as well
-    as compatibility rows. Clear both cache layers so an immediate reopen
-    cannot display the pre-save wording.
+    as compatibility rows. Invalidate only the affected game instead of
+    dumping every active game's warm cache after each admin field save.
   */
-  if (
-    typeof normalizedStorageClearCaches_ ===
-    "function"
-  ) {
+  if (typeof NORMALIZED_STORAGE_RUNTIME_CACHE !== "undefined") {
+    NORMALIZED_STORAGE_RUNTIME_CACHE = {};
+  }
 
+  gameId = adminCatNormalizeGameId_(gameId);
+  if (gameId && typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(gameId, [
+      typeof QUESTIONS_SHEET !== "undefined" ? QUESTIONS_SHEET : "Questions",
+      typeof QUESTION_OPTIONS_SHEET !== "undefined" ? QUESTION_OPTIONS_SHEET : "QuestionOptions",
+      typeof DATA_INDEX_SHEET !== "undefined" ? DATA_INDEX_SHEET : "DataIndex",
+      typeof CATEGORIES_SHEET !== "undefined" ? CATEGORIES_SHEET : "Categories",
+      typeof CATEGORY_SETTINGS_SHEET !== "undefined" ? CATEGORY_SETTINGS_SHEET : "CategorySettings",
+      typeof CATEGORY_RESULTS_SHEET !== "undefined" ? CATEGORY_RESULTS_SHEET : "CategoryResults"
+    ]);
+    return;
+  }
+
+  if (typeof normalizedStorageClearCaches_ === "function") {
     normalizedStorageClearCaches_();
     return;
-
   }
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-
-    clearAppCaches();
-
-  }
-
+  if (typeof clearAppCaches === "function") clearAppCaches();
 }
 
 function adminCatEnsureHybridHeaders_() {
@@ -2208,11 +2212,10 @@ function adminCreateCategory(payload) {
     );
 
   const lock =
-    LockService
-      .getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   lock.waitLock(
-    10000
+    4000
   );
 
   try {
@@ -2459,7 +2462,7 @@ function adminCreateCategory(payload) {
 
     SpreadsheetApp.flush();
 
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success:
@@ -2587,11 +2590,10 @@ function adminUpdateCategory(payload) {
       : "";
 
   const lock =
-    LockService
-      .getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   lock.waitLock(
-    10000
+    4000
   );
 
   try {
@@ -3117,7 +3119,7 @@ function adminUpdateCategory(payload) {
 
     SpreadsheetApp.flush();
 
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success:
@@ -3331,7 +3333,7 @@ function adminCatPersistQuestionOrder_(gameId, orderedCategoryIds) {
   });
 
   SpreadsheetApp.flush();
-  adminCatClearCaches_();
+  adminCatClearCaches_(safeGameId);
 }
 
 function adminSetQuestionOrder(payload) {
@@ -3352,8 +3354,8 @@ function adminSetQuestionOrder(payload) {
 
   validateGameId(gameId);
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  lock.waitLock(4000);
 
   try {
     const setup = adminGetGameSetup({ gameId: gameId });
@@ -3404,8 +3406,8 @@ function adminReorderQuestion(payload) {
 
   validateGameId(gameId);
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(15000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  lock.waitLock(4000);
 
   try {
     const setup = adminGetGameSetup({ gameId: gameId });
@@ -3575,8 +3577,8 @@ function adminDeleteCategory(payload) {
     };
   }
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  lock.waitLock(4000);
 
   try {
     const deleted = {};
@@ -3609,7 +3611,7 @@ function adminDeleteCategory(payload) {
     }
 
     SpreadsheetApp.flush();
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success: true,
@@ -3808,8 +3810,8 @@ function adminDeleteNominee(payload) {
     };
   }
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(10000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  lock.waitLock(4000);
 
   try {
     const deleted = {};
@@ -3878,7 +3880,7 @@ function adminDeleteNominee(payload) {
     }
 
     SpreadsheetApp.flush();
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success: true,
@@ -4002,11 +4004,10 @@ function adminCreateNominee(payload) {
   }
 
   const lock =
-    LockService
-      .getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   lock.waitLock(
-    10000
+    4000
   );
 
   try {
@@ -4171,7 +4172,7 @@ function adminCreateNominee(payload) {
 
     SpreadsheetApp.flush();
 
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success:
@@ -4256,11 +4257,10 @@ function adminUpdateNominee(payload) {
   );
 
   const lock =
-    LockService
-      .getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   lock.waitLock(
-    10000
+    4000
   );
 
   try {
@@ -4427,7 +4427,7 @@ function adminUpdateNominee(payload) {
 
     SpreadsheetApp.flush();
 
-    adminCatClearCaches_();
+    adminCatClearCaches_(gameId);
 
     return {
       success:
@@ -4727,7 +4727,7 @@ function adminCloneCategory(payload) {
       }),
       sourceSystem: "admin-clone"
     });
-    adminCatClearCaches_();
+    adminCatClearCaches_(targetGameId);
   }
 
   const copyNominees = payload.copyNominees === undefined
@@ -4799,8 +4799,8 @@ function adminBulkCreateNominees(payload) {
 
   validateGameId(gameId);
 
-  const lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  lock.waitLock(4000);
 
   try {
     const setup = adminGetGameSetup({ gameId: gameId });
@@ -4943,7 +4943,7 @@ function adminBulkCreateNominees(payload) {
       }
 
       SpreadsheetApp.flush();
-      adminCatClearCaches_();
+      adminCatClearCaches_(gameId);
     }
 
     return {

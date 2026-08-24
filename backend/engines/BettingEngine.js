@@ -2393,17 +2393,8 @@ function deleteBetRowsDescending_(sheet, rowNumbers){
 
 function saveBet(payload){
 
-  const lock = LockService.getScriptLock();
-
-  const gotLock =
-    lock.tryLock(8000);
-
-  if (!gotLock) {
-    return {
-      success: false,
-      message: "Could not save wager: another save is still running. Please try again."
-    };
-  }
+  let lock = null;
+  let lockAcquired = false;
 
   try {
 
@@ -2584,6 +2575,19 @@ function saveBet(payload){
 
     }
 
+    // All static validation is complete. Only serialize the bankroll check and
+    // actual Bets row mutation; do not hold a shared lock while loading game
+    // config, questions, settings, or odds.
+    lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+    const gotLock = lock.tryLock(2500);
+    lockAcquired = gotLock;
+    if (!gotLock) {
+      return {
+        success: false,
+        message: "Could not save wager: another write is finishing. Please try once more."
+      };
+    }
+
     const currentSummary = getUserBettingSummary(
       username,
       gameId
@@ -2702,8 +2706,22 @@ function saveBet(payload){
 
     SpreadsheetApp.flush();
 
-    if (typeof clearAppCaches === "function") {
-      clearAppCaches();
+    // The spreadsheet mutation is complete. Release the write lock before
+    // cache invalidation and summary reconstruction so one wager cannot block
+    // unrelated interactive saves.
+    if (lockAcquired) {
+      lock.releaseLock();
+      lockAcquired = false;
+    }
+
+    if (typeof clearPlayerActionCaches === "function") {
+      clearPlayerActionCaches(
+        gameId,
+        [typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"],
+        username
+      );
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(gameId);
     }
 
     return {
@@ -2738,7 +2756,7 @@ function saveBet(payload){
 
   } finally {
 
-    lock.releaseLock();
+    if (lockAcquired && lock) lock.releaseLock();
 
   }
 
@@ -2825,7 +2843,7 @@ function previewDuplicateBetsCleanup(){
 
 function cleanupDuplicateBets(){
 
-  const lock = LockService.getScriptLock();
+  const lock = ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   if (!lock.tryLock(10000)) {
     return {
@@ -2937,7 +2955,9 @@ function cleanupDuplicateBets(){
 
     SpreadsheetApp.flush();
 
-    if (typeof clearAppCaches === "function") {
+    if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches("", [typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"]);
+    } else if (typeof clearAppCaches === "function") {
       clearAppCaches();
     }
 
@@ -2968,10 +2988,13 @@ function cleanupDuplicateBets(){
 function removeBet(payload){
 
   const lock =
-    LockService.getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
+  let lockAcquired = false;
 
   const gotLock =
-    lock.tryLock(8000);
+    lock.tryLock(5000);
+
+  lockAcquired = gotLock;
 
   if (!gotLock) {
     return {
@@ -3213,13 +3236,19 @@ function removeBet(payload){
 
     SpreadsheetApp.flush();
 
-    if (
-      typeof clearAppCaches ===
-      "function"
-    ) {
+    if (lockAcquired) {
+      lock.releaseLock();
+      lockAcquired = false;
+    }
 
-      clearAppCaches();
-
+    if (typeof clearPlayerActionCaches === "function") {
+      clearPlayerActionCaches(
+        gameId,
+        [typeof BETS_SHEET !== "undefined" ? BETS_SHEET : "Bets"],
+        username
+      );
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(gameId);
     }
 
     return {
@@ -3257,7 +3286,7 @@ function removeBet(payload){
 
   } finally {
 
-    lock.releaseLock();
+    if (lockAcquired && lock) lock.releaseLock();
 
   }
 

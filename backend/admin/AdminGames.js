@@ -1298,7 +1298,7 @@ function adminGetGameTypes() {
     }
   
     const lock =
-      LockService.getScriptLock();
+      ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
   
     const gotLock =
       lock.tryLock(5000);
@@ -2604,7 +2604,7 @@ function adminCloneGameSetup(payload) {
     );
 
   const lock =
-    LockService.getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
   const gotLock =
     lock.tryLock(5000);

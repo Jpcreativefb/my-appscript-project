@@ -851,7 +851,8 @@ function createSportsAdvancedQuestion(payload) {
   const categoryWrite = sportsAdvancedQuestionAppendCategoryRows_(config);
   const settingWrite = sportsAdvancedQuestionAppendSettingsRow_(config, categoryWrite.nominees);
   SpreadsheetApp.flush();
-  if (typeof clearAppCaches === "function") clearAppCaches();
+  if (typeof clearGameDataCaches === "function") clearGameDataCaches(awardsGameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  else if (typeof clearGameCaches === "function") clearGameCaches(awardsGameId);
 
   return {
     success: true,
@@ -1223,7 +1224,8 @@ function settleSportsAdvancedQuestions(payload) {
   });
 
   SpreadsheetApp.flush();
-  if (typeof clearAppCaches === "function") clearAppCaches();
+  if (typeof clearGameDataCaches === "function") clearGameDataCaches(awardsGameId, ["CategorySettings", "CategoryResults"]);
+  else if (typeof clearGameCaches === "function") clearGameCaches(awardsGameId);
   summary.success = summary.errors.length === 0;
   return summary;
 }

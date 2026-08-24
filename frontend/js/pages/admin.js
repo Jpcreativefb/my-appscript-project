@@ -168,6 +168,25 @@ async function renderAdminPage() {
 
         <div class="card admin-card">
 
+          <h2>Sports Scores & Game Builder</h2>
+
+          <div class="admin-sub">
+            Open the admin-only Sports Scores workspace to review schedules, scores and records, then build Sports Wagers, Confidence games, player props, matchups, and advanced sports prediction questions.
+          </div>
+
+          <div class="admin-actions">
+            <button
+              class="button admin-button"
+              onclick="window.location.href='./sports.html'"
+            >
+              Open Sports Scores & Builder
+            </button>
+          </div>
+
+        </div>
+
+        <div class="card admin-card">
+
           <h2>League Access</h2>
 
           <div class="admin-sub">

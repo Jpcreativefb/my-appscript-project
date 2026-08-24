@@ -5141,7 +5141,7 @@ function createSportsWagerFromScore(payload) {
     LockService.getScriptLock();
 
   const gotLock =
-    lock.tryLock(30000);
+    lock.tryLock(5000);
 
   if (!gotLock) {
 
@@ -5314,11 +5314,8 @@ function createSportsWagerFromScore(payload) {
     This keeps the locked spreadsheet section shorter.
   */
 
-  if (
-    shouldClearCaches &&
-    typeof clearAppCaches === "function"
-  ) {
-    clearAppCaches();
+  if (shouldClearCaches) {
+    sportsWagerClearCachesForGames_([awardsGameId]);
   }
 
   return result;
@@ -7318,13 +7315,8 @@ function settleSportsWagers(payload) {
 
   SpreadsheetApp.flush();
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-
-    clearAppCaches();
-
+  if (payload.skipCacheClear !== true) {
+    sportsWagerClearCachesForGames_([awardsGameId]);
   }
 
   return summary;
@@ -7826,11 +7818,8 @@ function refreshSportsWagerScores(payload) {
 
   SpreadsheetApp.flush();
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-    clearAppCaches();
+  if (payload.skipCacheClear !== true) {
+    sportsWagerClearCachesForGames_([awardsGameId]);
   }
 
   return summary;
@@ -8017,9 +8006,7 @@ function finalizeSportsWagerResultsFromCategories_(
 
   SpreadsheetApp.flush();
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
-  }
+  sportsWagerClearCachesForGames_([awardsGameId]);
 
   return summary;
 
@@ -8162,9 +8149,7 @@ function finalizeSportsWagerResultsFromCategoriesForAllGames_(force) {
 
   });
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
-  }
+  sportsWagerClearCachesForGames_(gameIds);
 
   return summary;
 
@@ -8670,10 +8655,9 @@ function finalizeSportsWagerResultsFromSourceScores_(payload) {
   SpreadsheetApp.flush();
 
   if (
-    payload.skipCacheClear !== true &&
-    typeof clearAppCaches === "function"
+    payload.skipCacheClear !== true
   ) {
-    clearAppCaches();
+    sportsWagerClearCachesForGames_([awardsGameId]);
   }
 
   return summary;
@@ -8730,9 +8714,7 @@ function finalizeSportsWagerResultsFromSourceScoresForAllGames_(force) {
 
   });
 
-  if (typeof clearAppCaches === "function") {
-    clearAppCaches();
-  }
+  sportsWagerClearCachesForGames_(gameIds);
 
   return summary;
 
@@ -8887,12 +8869,7 @@ function refreshAndSettleSportsWagers(payload) {
         })
       : null;
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-    clearAppCaches();
-  }
+  sportsWagerClearCachesForGames_([awardsGameId]);
 
   return {
     success: true,
@@ -9666,11 +9643,8 @@ function autoSetSportsWagerOdds(payload) {
 
   SpreadsheetApp.flush();
 
-  if (
-    typeof clearAppCaches ===
-    "function"
-  ) {
-    clearAppCaches();
+  if (payload.skipCacheClear !== true) {
+    sportsWagerClearCachesForGames_([awardsGameId]);
   }
 
   return summary;
@@ -9701,15 +9675,74 @@ function apiAdminAutoSetSportsWagerOdds(payload) {
 const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
   "runSportsWagerScoreRefresh";
 
+const SPORTS_WAGER_AUTOMATION_LEASE_KEY =
+  "SPORTS_WAGER_AUTOMATION_LEASE_V1218X1";
+const SPORTS_WAGER_AUTOMATION_LEASE_MS =
+  20 * 60 * 1000;
+
+function sportsWagerAcquireAutomationLease_(owner) {
+  const props = PropertiesService.getScriptProperties();
+  const now = Date.now();
+  const token = String(owner || "sports") + "|" + now + "|" + Math.random().toString(36).slice(2);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(300)) return { acquired: false, busy: true };
+  try {
+    let current = null;
+    try { current = JSON.parse(props.getProperty(SPORTS_WAGER_AUTOMATION_LEASE_KEY) || "null"); } catch (ignore) {}
+    if (current && Number(current.expiresAt || 0) > now) {
+      return { acquired: false, busy: true, owner: current.owner || "sports-automation" };
+    }
+    const lease = { acquired: true, token: token, owner: String(owner || "sports-automation"), startedAt: now, expiresAt: now + SPORTS_WAGER_AUTOMATION_LEASE_MS };
+    props.setProperty(SPORTS_WAGER_AUTOMATION_LEASE_KEY, JSON.stringify(lease));
+    return lease;
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sportsWagerReleaseAutomationLease_(lease) {
+  if (!lease || !lease.token) return;
+  const props = PropertiesService.getScriptProperties();
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(300)) return;
+  try {
+    let current = null;
+    try { current = JSON.parse(props.getProperty(SPORTS_WAGER_AUTOMATION_LEASE_KEY) || "null"); } catch (ignore) {}
+    if (current && current.token === lease.token) {
+      if (typeof props.deleteProperty === "function") props.deleteProperty(SPORTS_WAGER_AUTOMATION_LEASE_KEY);
+      else props.setProperty(SPORTS_WAGER_AUTOMATION_LEASE_KEY, "");
+    }
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function sportsWagerClearCachesForGames_(gameIds) {
+  const ids = {};
+  (gameIds || []).forEach(function(gameId) {
+    gameId = sportsWagerNormalizeGameId_(gameId);
+    if (gameId) ids[gameId] = true;
+  });
+
+  Object.keys(ids).forEach(function(gameId) {
+    if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches(gameId, ["Categories", "CategorySettings", "CategoryResults"]);
+    } else if (typeof clearGameCaches === "function") {
+      clearGameCaches(gameId);
+    }
+  });
+}
+
   function runSportsWagerScoreRefresh() {
 
-  const lock =
-    LockService.getScriptLock();
+  const lease =
+    sportsWagerAcquireAutomationLease_("score-refresh");
 
-  if (!lock.tryLock(30000)) {
+  if (!lease.acquired) {
     return {
-      success: false,
-      message: "Sports wager score refresh already running"
+      success: true,
+      skipped: true,
+      message: "Sports wager automation already running"
     };
   }
 
@@ -9773,7 +9806,8 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
         const refresh =
           refreshSportsWagerScores({
-            gameId: gameId
+            gameId: gameId,
+            skipCacheClear: true
           });
 
         const autoOdds =
@@ -9782,14 +9816,16 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
             force: false,
             oddsMode: "real",
             skipFinal: true,
-            refreshOddsIfStale: false
+            refreshOddsIfStale: false,
+            skipCacheClear: true
           });
 
         const settle =
           settleSportsWagers({
             gameId: gameId,
             skipRefresh: true,
-            force: true
+            force: true,
+            skipCacheClear: true
           });
 
         results.push({
@@ -9815,6 +9851,8 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
     });
 
+    sportsWagerClearCachesForGames_(gameIds);
+
     return {
       success: true,
       sourceRefresh:
@@ -9827,7 +9865,7 @@ const SPORTS_WAGER_SCORE_REFRESH_TRIGGER_FUNCTION =
 
   } finally {
 
-    lock.releaseLock();
+    sportsWagerReleaseAutomationLease_(lease);
 
   }
 
@@ -11109,14 +11147,14 @@ function runSportsWagerSmartAutomation(payload) {
   payload =
     payload || {};
 
-  const lock =
-    LockService.getScriptLock();
+  const lease =
+    sportsWagerAcquireAutomationLease_("smart-automation");
 
-  if (!lock.tryLock(30000)) {
+  if (!lease.acquired) {
     return {
-      success: false,
+      success: true,
       skipped: true,
-      message: "Smart sports automation already running"
+      message: "Sports wager automation already running"
     };
   }
 
@@ -11224,7 +11262,8 @@ function runSportsWagerSmartAutomation(payload) {
         const refresh =
           refreshSportsWagerScores({
             gameId: gameId,
-            refreshEngineFirst: false
+            refreshEngineFirst: false,
+            skipCacheClear: true
           });
 
         const autoOdds =
@@ -11234,14 +11273,16 @@ function runSportsWagerSmartAutomation(payload) {
             oddsMode: "real",
             skipFinal: true,
             refreshOddsIfStale: false,
-            refreshOddsEngineFirst: false
+            refreshOddsEngineFirst: false,
+            skipCacheClear: true
           });
 
         const settle =
           settleSportsWagers({
             gameId: gameId,
             skipRefresh: true,
-            force: true
+            force: true,
+            skipCacheClear: true
           });
 
         const categoryResultsFinalizer =
@@ -11344,14 +11385,12 @@ function runSportsWagerSmartAutomation(payload) {
     summary.finishedAt =
       new Date();
 
-    if (typeof clearAppCaches === "function") {
-      clearAppCaches();
-    }
+    sportsWagerClearCachesForGames_(gameIds);
 
     return summary;
 
   } finally {
-    lock.releaseLock();
+    sportsWagerReleaseAutomationLease_(lease);
   }
 
 }

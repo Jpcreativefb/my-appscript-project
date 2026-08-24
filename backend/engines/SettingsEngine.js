@@ -890,9 +890,9 @@ function saveCategorySettings(
   }
 
   const lock =
-    LockService.getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
-  lock.waitLock(10000);
+  lock.waitLock(4000);
 
   try {
 
@@ -1219,9 +1219,9 @@ function updateCategorySetting(
   }
 
   const lock =
-    LockService.getScriptLock();
+    ((typeof LockService.getDocumentLock === "function" ? LockService.getDocumentLock() : null) || LockService.getScriptLock());
 
-  lock.waitLock(10000);
+  lock.waitLock(4000);
 
   try {
 

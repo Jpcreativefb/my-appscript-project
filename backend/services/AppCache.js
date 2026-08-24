@@ -2,7 +2,7 @@
    APP CACHE HELPERS
 ========================= */
 
-const CACHE_TTL = 120;
+const CACHE_TTL = 600;
 
 // Fast per-execution cache. Apps Script startup and Sheet reads are expensive;
 // this avoids re-reading/re-parsing the same sheet several times during one API call.
@@ -328,6 +328,110 @@ function getLeaderboardCached(
 }
 
 /* =========================
+   CACHE INVALIDATION HELPERS
+   v1.2.18x1b
+========================= */
+
+function appCacheRemoveKeys_(cache, keys){
+
+  if (!cache) return;
+
+  const seen = {};
+  const clean = (keys || []).map(function(key) {
+    return String(key || "").trim();
+  }).filter(function(key) {
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  });
+
+  if (!clean.length) return;
+
+  // CacheService.removeAll is substantially cheaper than dozens of
+  // individual remote cache operations. Keep batches conservative.
+  if (typeof cache.removeAll === "function") {
+    for (let i = 0; i < clean.length; i += 75) {
+      cache.removeAll(clean.slice(i, i + 75));
+    }
+    return;
+  }
+
+  clean.forEach(function(key) {
+    cache.remove(key);
+  });
+}
+
+function appGameCacheKeys_(gameId, username){
+
+  gameId = String(gameId || "").trim();
+  username = String(username || "").trim();
+  if (!gameId) return [];
+
+  const keys = [
+    "categories_" + gameId,
+    "settings_" + gameId,
+    "leaderboard_" + gameId,
+    "projected_" + gameId,
+    "normalized_sync_" + gameId,
+    "external_live_probabilities_v1_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 120),
+    "normalized_question_game_map_v1",
+    "rtv_season_game_ids_v1"
+  ];
+
+  if (username && typeof realityTvSlug_ === "function") {
+    keys.push("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
+  }
+
+  return keys;
+}
+
+function clearPlayerActionCaches(gameId, sheetNames, username){
+
+  APP_RUNTIME_CACHE = {};
+
+  gameId = String(gameId || "").trim();
+  username = String(username || "").trim();
+  const cache = CacheService.getScriptCache();
+  const keys = [];
+
+  (sheetNames || []).forEach(function(sheetName) {
+    sheetName = String(sheetName || "").trim();
+    if (sheetName) keys.push("sheet_" + sheetName);
+  });
+
+  if (gameId) {
+    keys.push("leaderboard_" + gameId);
+    keys.push("projected_" + gameId);
+    if (username && typeof realityTvSlug_ === "function") {
+      keys.push("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
+    }
+  }
+
+  appCacheRemoveKeys_(cache, keys);
+}
+
+function clearGameDataCaches(gameId, sheetNames, username){
+
+  APP_RUNTIME_CACHE = {};
+
+  if (typeof NORMALIZED_STORAGE_RUNTIME_CACHE !== "undefined") {
+    delete NORMALIZED_STORAGE_RUNTIME_CACHE["question-game-map:all"];
+    delete NORMALIZED_STORAGE_RUNTIME_CACHE["data-index:all"];
+  }
+
+  gameId = String(gameId || "").trim();
+  const cache = CacheService.getScriptCache();
+  const keys = appGameCacheKeys_(gameId, username);
+
+  (sheetNames || []).forEach(function(sheetName) {
+    sheetName = String(sheetName || "").trim();
+    if (sheetName) keys.push("sheet_" + sheetName);
+  });
+
+  appCacheRemoveKeys_(cache, keys);
+}
+
+/* =========================
    CLEAR GAME CACHE
 ========================= */
 
@@ -349,29 +453,8 @@ function clearGameCaches(
   const cache =
     CacheService.getScriptCache();
 
-  const keys = [
-
-    "categories_" + gameId,
-
-    "settings_" + gameId,
-
-    "leaderboard_" + gameId,
-
-    "projected_" + gameId,
-
-    "normalized_sync_" + gameId,
-
-    "external_live_probabilities_v1_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 120),
-
-    "normalized_question_game_map_v1",
-
-    "rtv_season_game_ids_v1"
-
-  ];
-
-  keys.forEach(key =>
-    cache.remove(key)
-  );
+  const keys = appGameCacheKeys_(gameId);
+  appCacheRemoveKeys_(cache, keys);
 
   Logger.log(
     "Game caches cleared: " +
@@ -395,6 +478,14 @@ function clearAppCaches(){
   const cache =
     CacheService
       .getScriptCache();
+
+  // Snapshot the current game list BEFORE invalidating the Games cache.
+  // The old implementation removed sheet_Games first and immediately forced
+  // another full Games sheet read just to discover cache keys to delete.
+  const games =
+    typeof getGames === "function"
+      ? getGames()
+      : [];
 
   /* =========================
      RAW SHEETS
@@ -426,25 +517,19 @@ function clearAppCaches(){
 
   ];
 
-  baseKeys.forEach(key =>
-    cache.remove(key)
-  );
-
   /* =========================
      GAME CACHES
   ========================= */
 
-  const games =
-    getGames();
+  const keys = baseKeys.slice();
 
-  games.forEach(game => {
-
-    clearGameCaches(
-      game.gameId
-    );
-
+  (games || []).forEach(function(game) {
+    appGameCacheKeys_(game && game.gameId).forEach(function(key) {
+      keys.push(key);
+    });
   });
 
+  appCacheRemoveKeys_(cache, keys);
   clearGamesCache();
 
   Logger.log(
@@ -463,11 +548,10 @@ function clearPicksCaches(gameId, username){
   username = String(username || "").trim();
 
   if (gameId) {
-    cache.remove("leaderboard_" + gameId);
-    cache.remove("projected_" + gameId);
-    if (typeof realityTvSlug_ === "function") {
-      if (username) cache.remove("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
+    if (username && typeof realityTvSlug_ === "function") {
+      cache.remove("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
     }
+    clearPlayerActionCaches(gameId, [], "");
     return;
   }
 
@@ -483,6 +567,8 @@ function clearPicksCaches(gameId, username){
 var AppCache = {
 
   clearPicksCaches,
+  clearPlayerActionCaches,
+  clearGameDataCaches,
   clearAppCaches,
   clearGameCaches
 
