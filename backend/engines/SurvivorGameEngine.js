@@ -1,5 +1,5 @@
 /* =====================================================
-   SURVIVOR / ELIMINATION GAME ENGINE v1.2.18w
+   SURVIVOR / ELIMINATION GAME ENGINE v1.2.18w4
 
    Each ordered question is a Survivor round.
    The player selects an entry they believe will survive the round.
@@ -121,9 +121,13 @@ function survivorEvaluateUser_(username, gameId, pickMap, categories, resolution
     });
   });
 
+  const complete = (categories || []).length > 0 && currentRoundIndex === -1;
+
   return {
     username: username,
     alive: alive,
+    winner: alive && complete,
+    complete: complete,
     eliminatedRound: eliminatedRound,
     eliminatedReason: eliminatedReason,
     roundsSurvived: roundsSurvived,
@@ -147,6 +151,50 @@ function survivorAllPickMaps_(gameId) {
     map[username][categoryId] = row;
   });
   return map;
+}
+
+function survivorPickMapForUser_(pickMaps, username) {
+  const maps = pickMaps || {};
+  if (maps[username]) return maps[username];
+  const wanted = survivorKey_(username);
+  const match = Object.keys(maps).find(function(key) { return survivorKey_(key) === wanted; });
+  return match ? maps[match] : {};
+}
+
+function survivorParticipantUsernames_(gameId, pickMaps, extraUsernames) {
+  const usernames = {};
+  function add(value) {
+    const username = survivorString_(value);
+    const key = survivorKey_(username);
+    if (key && !usernames[key]) usernames[key] = username;
+  }
+
+  Object.keys(pickMaps || {}).forEach(add);
+  (extraUsernames || []).forEach(add);
+
+  if (typeof notificationPushGameParticipants_ === "function") {
+    try {
+      (notificationPushGameParticipants_(gameId) || []).forEach(add);
+    } catch (err) {
+      // Survivor standings must still work if notification/participant lookup is unavailable.
+    }
+  }
+
+  return Object.keys(usernames).map(function(key) { return usernames[key]; });
+}
+
+function survivorSortStandings_(rows) {
+  return (rows || []).sort(function(a, b) {
+    if (!!a.survivorWinner !== !!b.survivorWinner) return a.survivorWinner ? -1 : 1;
+    if (!!a.survivorAlive !== !!b.survivorAlive) return a.survivorAlive ? -1 : 1;
+    if (survivorNumber_(b.survivorRoundsSurvived, 0) !== survivorNumber_(a.survivorRoundsSurvived, 0)) {
+      return survivorNumber_(b.survivorRoundsSurvived, 0) - survivorNumber_(a.survivorRoundsSurvived, 0);
+    }
+    if (survivorNumber_(b.total, 0) !== survivorNumber_(a.total, 0)) {
+      return survivorNumber_(b.total, 0) - survivorNumber_(a.total, 0);
+    }
+    return survivorString_(a.displayName).localeCompare(survivorString_(b.displayName));
+  });
 }
 
 function apiGetSurvivorState_(payload) {
@@ -176,11 +224,12 @@ function apiGetSurvivorState_(payload) {
     gameId: gameId,
     gameName: game.name || gameId,
     alive: evaluation.alive,
+    winner: evaluation.winner,
     eliminatedRound: evaluation.eliminatedRound,
     eliminatedReason: evaluation.eliminatedReason,
     roundsSurvived: evaluation.roundsSurvived,
     totalPoints: evaluation.totalPoints,
-    complete: currentIndex === -1,
+    complete: evaluation.complete,
     currentRound: currentCategory ? {
       round: currentIndex + 1,
       categoryId: currentCategory.id,
@@ -204,7 +253,7 @@ function apiGetSurvivorState_(payload) {
       })
     } : null,
     rounds: evaluation.rounds,
-    standings: survivorLeaderboardData_(gameId)
+    standings: survivorLeaderboardData_(gameId, [username])
   };
 }
 
@@ -237,14 +286,15 @@ function saveSurvivorPick_(payload) {
   });
 }
 
-function survivorLeaderboardData_(gameId) {
+function survivorLeaderboardData_(gameId, extraUsernames) {
   const categories = survivorGameCategories_(gameId);
   const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
   const pickMaps = survivorAllPickMaps_(gameId);
   const rows = [];
+  const participants = survivorParticipantUsernames_(gameId, pickMaps, extraUsernames);
 
-  Object.keys(pickMaps).forEach(function(username) {
-    const evaluation = survivorEvaluateUser_(username, gameId, pickMaps[username], categories, resolutions);
+  participants.forEach(function(username) {
+    const evaluation = survivorEvaluateUser_(username, gameId, survivorPickMapForUser_(pickMaps, username), categories, resolutions);
     const unresolvedPoints = evaluation.alive
       ? categories.reduce(function(sum, category, index) {
           const round = evaluation.rounds[index];
@@ -271,6 +321,8 @@ function survivorLeaderboardData_(gameId) {
       fixedPoints: evaluation.totalPoints,
       fixedRemaining: unresolvedPoints,
       survivorAlive: evaluation.alive,
+      survivorWinner: evaluation.winner,
+      survivorComplete: evaluation.complete,
       survivorRoundsSurvived: evaluation.roundsSurvived,
       survivorEliminatedRound: evaluation.eliminatedRound,
       survivorEliminatedReason: evaluation.eliminatedReason,
@@ -281,20 +333,14 @@ function survivorLeaderboardData_(gameId) {
     });
   });
 
-  rows.sort(function(a, b) {
-    if (a.survivorAlive !== b.survivorAlive) return a.survivorAlive ? -1 : 1;
-    if (b.survivorRoundsSurvived !== a.survivorRoundsSurvived) return b.survivorRoundsSurvived - a.survivorRoundsSurvived;
-    if (b.total !== a.total) return b.total - a.total;
-    return survivorString_(a.displayName).localeCompare(survivorString_(b.displayName));
-  });
-  return rows;
+  return survivorSortStandings_(rows);
 }
 
 function survivorUserScoring_(username, gameId) {
   const categories = survivorGameCategories_(gameId);
   const resolutions = typeof getCategoryResultsResolutionMap === "function" ? getCategoryResultsResolutionMap(gameId) : {};
   const pickMaps = survivorAllPickMaps_(gameId);
-  const evaluation = survivorEvaluateUser_(username, gameId, pickMaps[username] || {}, categories, resolutions);
+  const evaluation = survivorEvaluateUser_(username, gameId, survivorPickMapForUser_(pickMaps, username), categories, resolutions);
   const scoring = {};
 
   evaluation.rounds.forEach(function(round, index) {

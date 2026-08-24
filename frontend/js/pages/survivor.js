@@ -1,5 +1,5 @@
 /* =====================================================
-   SURVIVOR / ELIMINATION PLAYER PAGE v1.2.18w
+   SURVIVOR / ELIMINATION PLAYER PAGE v1.2.18w4
 ===================================================== */
 
 var SURVIVOR_PAGE_STATE = SURVIVOR_PAGE_STATE || { gameId: "", payload: null, selected: "" };
@@ -70,7 +70,8 @@ function survivorStandings_(payload) {
   var rows = Array.isArray(payload.standings) ? payload.standings : [];
   if (!rows.length) return '<section class="card"><h2>Standings</h2><p>No Survivor entries yet.</p></section>';
   return '<section class="card survivor-standings-card"><div class="survivor-card-head"><h2>Survivor Standings</h2><button class="button secondary" type="button" onclick="navigate(\'leaderboard\')">Full Standings</button></div><div class="survivor-standings-list">' + rows.slice(0, 8).map(function(row, index) {
-    return '<div class="survivor-standing-row ' + (row.survivorAlive ? 'alive' : 'out') + '"><span>#' + (index + 1) + '</span><strong>' + survivorPageEscape_(row.displayName || row.username) + '</strong><em>' + (row.survivorAlive ? 'ALIVE' : 'OUT R' + survivorPageEscape_(row.survivorEliminatedRound || '')) + '</em><b>' + survivorPageEscape_(row.total || 0) + ' pts</b></div>';
+    var standingLabel = row.survivorWinner ? 'WINNER' : (row.survivorAlive ? 'ALIVE' : 'OUT R' + survivorPageEscape_(row.survivorEliminatedRound || ''));
+    return '<div class="survivor-standing-row ' + (row.survivorAlive ? 'alive' : 'out') + '"><span>#' + (index + 1) + '</span><strong>' + survivorPageEscape_(row.displayName || row.username) + '</strong><em>' + standingLabel + '</em><b>' + survivorPageEscape_(row.total || 0) + ' pts</b></div>';
   }).join('') + '</div></section>';
 }
 
@@ -86,9 +87,9 @@ async function renderSurvivorPage() {
   SURVIVOR_PAGE_STATE.payload = payload;
   SURVIVOR_PAGE_STATE.selected = payload.currentRound && payload.currentRound.pickNomineeId || '';
 
-  var headline = payload.alive ? (payload.complete ? 'You Survived' : 'You Are Still Alive') : 'Your Entry Is Eliminated';
+  var headline = payload.winner ? 'You Won Survivor' : (payload.alive ? 'You Are Still Alive' : 'Your Entry Is Eliminated');
   var sub = payload.alive
-    ? (payload.complete ? 'All Survivor rounds have been settled.' : 'Pick one entry to survive the current round. If that entry is eliminated, your Survivor run ends.')
+    ? (payload.complete ? 'All Survivor rounds have been settled. You survived every round.' : 'Pick one entry to survive the current round. If that entry is eliminated, your Survivor run ends.')
     : ('Eliminated in Round ' + survivorPageEscape_(payload.eliminatedRound || '') + (payload.eliminatedReason === 'missed' ? ' because no pick was saved.' : '.'));
   var round = payload.currentRound;
 
@@ -99,7 +100,7 @@ async function renderSurvivorPage() {
       (round.canPick ? '<div class="survivor-save-row"><button id="survivorSaveButton" class="button" type="button" onclick="survivorSaveCurrent_()" ' + (SURVIVOR_PAGE_STATE.selected ? '' : 'disabled') + '>' + (round.pickNomineeId ? 'Update Survivor Pick' : 'Save Survivor Pick') + '</button><span id="survivorSaveMessage" class="survivor-save-message"></span></div>' : '<p class="survivor-locked-note">This round is locked. Your saved pick is final.</p>') +
     '</section>';
   } else if (!round && payload.alive) {
-    roundHtml = '<section class="card survivor-current-card"><h2>All rounds settled</h2><p>Your Survivor run is complete.</p></section>';
+    roundHtml = '<section class="card survivor-current-card"><h2>All rounds settled</h2><p>' + (payload.winner ? 'You survived every round and finished as a Survivor winner.' : 'Your Survivor run is complete.') + '</p></section>';
   }
 
   return '<div class="page survivor-page">' +
