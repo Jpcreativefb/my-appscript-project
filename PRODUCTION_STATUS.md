@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc6 — Admin Question UX Performance Certification**
+Current release candidate: **v1.2.19-rc7 — Pick Lock Integrity Certification**
 
-Release asset marker: **v1219rc6-admin-question-ux-performance**
+Release asset marker: **v1219rc7-pick-lock-integrity**
 
 ## Status
 
@@ -164,3 +164,17 @@ Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/
 ## Release rule until launch
 
 No new game modes or large architecture rewrites. Only launch blockers, measured performance fixes, UI simplification and production reliability fixes should enter this candidate.
+
+
+## v1.2.19-rc7 pick lock integrity certification
+
+Functional certification found a production-critical lock/state defect after a Standard Prediction game was switched from Live/Open to Live/Locked: the player page could restore an older device snapshot that showed no saved pick, and the standard batched save path did not enforce the game-wide `LockAllPicks` control on the server. RC7 repairs that integrity boundary without changing scoring rules:
+
+- Server-side single-pick, batched standard-pick, and Confidence batch writes reject game-wide locked, Draft, Setup, Preview, archived, or finalized states.
+- The Picks UI treats the game-wide Player Entries lock as authoritative in addition to each question's own lock time.
+- Home/dashboard now carries `lockAllPicks`, allowing a newly locked game to override a warm Picks snapshot before rendering controls.
+- Successful standard autosaves persist the updated pick into the durable startup snapshot, preventing an older no-pick snapshot from reappearing after navigation.
+- The durable startup snapshot namespace is advanced for RC7 so pre-fix snapshots are retired once.
+- Choosing the regular display profile is dismissed locally before its server round-trip, preventing the new-game profile prompt from immediately reopening on a slow request.
+
+Live certification must re-test: saved pick remains visible after locking, locked controls cannot be changed, a locked save attempt cannot mutate the Picks sheet, unlocking restores editability, and the regular-profile prompt stays dismissed.

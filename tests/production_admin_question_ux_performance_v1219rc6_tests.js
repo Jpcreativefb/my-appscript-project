@@ -22,7 +22,7 @@ function body(source, functionName, nextFunctionName) {
   return source.slice(start, end);
 }
 
-assert.strictEqual(pkg.version, '1.2.19-rc.6', 'package version must identify rc6');
+assert(['1.2.19-rc.6', '1.2.19-rc.7'].includes(pkg.version), 'package version must be rc6 or a certified successor');
 assert(appHtml.includes('v1219rc6-admin-question-ux-performance'), 'app shell must bust cache for rc6');
 assert(sw.includes('v1219rc6-admin-question-ux-performance'), 'service worker must bust cache for rc6');
 

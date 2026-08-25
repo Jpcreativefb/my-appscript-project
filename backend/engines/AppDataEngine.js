@@ -645,6 +645,9 @@ function buildDashboardGameHubItemLite_(
     status:
       game.status || "",
 
+    lockAllPicks:
+      game.lockAllPicks === true,
+
     statusLabel:
       lockLabel,
 

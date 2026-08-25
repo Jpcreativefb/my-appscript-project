@@ -424,6 +424,23 @@ const game =
   payload.gameConfig ||
   null;
 
+// A stored startup snapshot is intentionally allowed to outlive a page visit,
+// but the Home dashboard may have a newer admin lock state. Merge that one
+// authoritative control before rendering so a just-locked game cannot look
+// editable merely because its content snapshot is warm.
+try {
+  const dashboardGame =
+    typeof gameProfileDashboardRow_ === "function"
+      ? gameProfileDashboardRow_(gameId)
+      : null;
+
+  if (game && dashboardGame && typeof dashboardGame.lockAllPicks === "boolean") {
+    game.lockAllPicks = dashboardGame.lockAllPicks === true;
+    if (payload.game) payload.game.lockAllPicks = game.lockAllPicks;
+    if (payload.gameConfig) payload.gameConfig.lockAllPicks = game.lockAllPicks;
+  }
+} catch (err) {}
+
 const isConfidenceGame =
   !!(
     game &&
@@ -3856,6 +3873,41 @@ function picksPatchStartupPayload_(result) {
   payloadPicks.changeCounts[result.categoryId] = Number(result.changeCount) || 0;
   payloadPicks.originalPicks[result.categoryId] = result.originalNomineeId || result.nomineeId;
   if (result.pickMeta) payloadPicks.pickMeta[result.categoryId] = result.pickMeta;
+
+  // RC4 introduced durable startup snapshots. Keep the durable copy in sync
+  // with a successful autosave; otherwise leaving and reopening the game can
+  // resurrect the pre-pick snapshot even though the Picks sheet is correct.
+  try {
+    if (typeof appStoreStartupPayload_ === "function") {
+      appStoreStartupPayload_(APP_STATE.startupPayload);
+    }
+  } catch (err) {}
+}
+
+async function picksRecoverStandardSaveFailure_(message) {
+  const text = String(message || "").toLowerCase();
+  const session = PICKS_PAGE_DATA.session || getSession() || {};
+
+  if (text.includes("locked") && PICKS_PAGE_DATA.game) {
+    PICKS_PAGE_DATA.game.lockAllPicks = true;
+  }
+
+  try {
+    if (typeof apiGetMyPicks === "function" && session.username) {
+      const fresh = await apiGetMyPicks(session.username, PICKS_PAGE_DATA.gameId);
+      if (fresh && fresh.success !== false) {
+        PICKS_PAGE_DATA.picks = fresh.picks || {};
+        PICKS_PAGE_DATA.changeCounts = fresh.changeCounts || {};
+        PICKS_PAGE_DATA.originalPicks = fresh.originalPicks || {};
+        PICKS_PAGE_DATA.confidencePoints = fresh.confidencePoints || {};
+        PICKS_PAGE_DATA.stakePoints = fresh.stakePoints || {};
+        PICKS_PAGE_DATA.stakeSummary = fresh.stakeSummary || {};
+        PICKS_PAGE_DATA.pickMeta = fresh.pickMeta || {};
+      }
+    }
+  } catch (err) {}
+
+  refreshPicksPage();
 }
 
 function picksScheduleStandardAutosave_() {
@@ -3918,9 +3970,22 @@ async function picksFlushStandardAutosave_() {
     refreshPicksPage();
     showPicksMessage(batch.length === 1 ? "Pick saved." : batch.length + " picks saved.", false);
   } else {
-    categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "queued"; });
-    picksPersistStandardQueue_();
-    showPicksMessage((response && (response.message || response.error)) || "Picks are still waiting to sync. They will retry automatically.", true);
+    const failureMessage = (response && (response.message || response.error)) || "Picks are still waiting to sync. They will retry automatically.";
+    const permanentFailure = /locked|already been settled|resolved|change limit reached|not enabled/i.test(failureMessage);
+
+    if (permanentFailure) {
+      categoryIds.forEach(function(categoryId) {
+        delete PICKS_STANDARD_AUTOSAVE_QUEUE[categoryId];
+        delete PICKS_PENDING_SAVES[categoryId];
+      });
+      picksPersistStandardQueue_();
+      await picksRecoverStandardSaveFailure_(failureMessage);
+    } else {
+      categoryIds.forEach(function(categoryId) { PICKS_PENDING_SAVES[categoryId] = "queued"; });
+      picksPersistStandardQueue_();
+    }
+
+    showPicksMessage(failureMessage, true);
   }
 
   PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
@@ -4895,6 +4960,14 @@ function getThirdLineText(
 }
 
 function isCategoryLocked(category) {
+
+  if (
+    PICKS_PAGE_DATA &&
+    PICKS_PAGE_DATA.game &&
+    PICKS_PAGE_DATA.game.lockAllPicks === true
+  ) {
+    return true;
+  }
 
   const resultStatus =
     getCategoryResultStatus(category);

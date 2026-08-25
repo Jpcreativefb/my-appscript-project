@@ -1,0 +1,9 @@
+PATTC Predicts v1.2.19-rc7 — Pick Lock Integrity Certification
+
+Expected baseline: architecture-cleanup @ 93787a6 (v1.2.19-rc6)
+
+Use the bundled installer from the package root:
+
+  bash tools/install_production_pick_lock_integrity_v1219rc7.sh
+
+The installer verifies a clean/synchronized RC6 baseline, verifies baseline file hashes, copies only controlled RC7 files, runs the full production gate, commits, deploys Apps Script, pushes GitHub/Cloudflare, and reruns the gate.

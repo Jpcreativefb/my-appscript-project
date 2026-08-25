@@ -70,6 +70,23 @@ function normalizeLower_(value){
 
 }
 
+function isGamePickEntryLocked_(gameConfig) {
+
+  gameConfig = gameConfig || {};
+
+  if (gameConfig.lockAllPicks === true) return true;
+  if (gameConfig.resultsFinalized === true) return true;
+
+  const status = normalizeLower_(gameConfig.status || gameConfig.gameStatus || "");
+
+  return status === "draft" ||
+    status === "setup" ||
+    status === "preview" ||
+    status === "archived" ||
+    status === "archive";
+
+}
+
 function normalizePickNumber_(
   value,
   fallback
@@ -998,6 +1015,13 @@ function saveConfidencePicksBatch(payload) {
       };
     }
 
+    if (isGamePickEntryLocked_(gameConfig)) {
+      return {
+        success: false,
+        message: "Picks are locked for this game"
+      };
+    }
+
     const settings =
       typeof getCategorySettingsCached === "function"
         ? getCategorySettingsCached(gameId)
@@ -1401,6 +1425,10 @@ function savePicksBatch(payload) {
       ? getGameRuntimeConfig(gameId)
       : getGame(gameId);
 
+    if (isGamePickEntryLocked_(gameConfig)) {
+      return { success: false, message: "Picks are locked for this game" };
+    }
+
     const settings = typeof getCategorySettingsCached === "function"
       ? getCategorySettingsCached(gameId)
       : getCategorySettings(gameId);
@@ -1734,6 +1762,13 @@ function savePick(payload){
         message:"Missing required fields"
       };
 
+    }
+
+    if (isGamePickEntryLocked_(gameConfig)) {
+      return {
+        success: false,
+        message: "Picks are locked for this game"
+      };
     }
 
     /* =========================
