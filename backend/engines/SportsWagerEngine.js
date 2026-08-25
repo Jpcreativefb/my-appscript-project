@@ -5222,6 +5222,17 @@ function createSportsWagerFromScore(payload) {
           existingOddsStatus.source || "pending-real-odds"
       };
 
+      /*
+        A duplicate create is also a repair opportunity. Sports builders write
+        the compatibility Categories rows first, while the modern Admin/player
+        readers use Questions + QuestionOptions. Force those stores back into
+        sync so a previously partial wager cannot remain visible with zero
+        answers.
+      */
+      if (typeof sportsWagerRepairSetupIntegrity_ === "function") {
+        sportsWagerRepairSetupIntegrity_(awardsGameId);
+      }
+
       return result;
 
     }
@@ -5315,7 +5326,11 @@ function createSportsWagerFromScore(payload) {
   */
 
   if (shouldClearCaches) {
-    sportsWagerClearCachesForGames_([awardsGameId]);
+    if (typeof sportsWagerRepairSetupIntegrity_ === "function") {
+      sportsWagerRepairSetupIntegrity_(awardsGameId);
+    } else {
+      sportsWagerClearCachesForGames_([awardsGameId]);
+    }
   }
 
   return result;
@@ -9717,6 +9732,107 @@ function sportsWagerReleaseAutomationLease_(lease) {
   }
 }
 
+function sportsWagerRepairDuplicateDisplayOrders_(gameId) {
+  gameId = sportsWagerNormalizeGameId_(gameId);
+
+  if (!gameId) {
+    return { repaired: 0 };
+  }
+
+  const sh = sportsWagerGetSheet_(CATEGORY_SETTINGS_SHEET);
+  const data = sh.getDataRange().getValues();
+
+  if (data.length <= 1) {
+    return { repaired: 0 };
+  }
+
+  const headers = data[0].map(function(header) {
+    return String(header || "").trim();
+  });
+  const col = sportsWagerHeaderMap_(headers);
+
+  if (col.CategoryId === undefined || col.DisplayOrder === undefined) {
+    return { repaired: 0 };
+  }
+
+  const used = {};
+  let repaired = 0;
+
+  for (let i = 1; i < data.length; i++) {
+    const rowGameId = col.GameId !== undefined
+      ? sportsWagerNormalizeGameId_(data[i][col.GameId])
+      : gameId;
+
+    if (rowGameId && rowGameId !== gameId) {
+      continue;
+    }
+
+    const categoryId = sportsWagerKey_(data[i][col.CategoryId]);
+    if (!categoryId) {
+      continue;
+    }
+
+    let order = Number(data[i][col.DisplayOrder]);
+    if (!isFinite(order) || order <= 0) {
+      order = i;
+    }
+
+    while (used[String(order)]) {
+      order += 1;
+    }
+
+    used[String(order)] = true;
+
+    if (Number(data[i][col.DisplayOrder]) !== order) {
+      data[i][col.DisplayOrder] = order;
+      repaired++;
+    }
+  }
+
+  if (repaired > 0) {
+    const values = data.slice(1).map(function(row) {
+      return [row[col.DisplayOrder]];
+    });
+    sh.getRange(2, col.DisplayOrder + 1, values.length, 1).setValues(values);
+  }
+
+  return { repaired: repaired };
+}
+
+function sportsWagerRepairSetupIntegrity_(gameId) {
+  gameId = sportsWagerNormalizeGameId_(gameId);
+
+  if (!gameId) {
+    return { success: false, message: "GameId is required" };
+  }
+
+  /*
+    Invalidate the old Sports/player caches and the normalized legacy-sync
+    marker BEFORE synchronizing. The force-sync below then writes the canonical
+    Questions / QuestionOptions rows and leaves a fresh sync marker behind.
+  */
+  sportsWagerClearCachesForGames_([gameId]);
+
+  let normalized = null;
+  if (typeof normalizedStorageSyncGameFromLegacy_ === "function") {
+    normalized = normalizedStorageSyncGameFromLegacy_(gameId, { force: true });
+  }
+
+  const displayOrderRepair = sportsWagerRepairDuplicateDisplayOrders_(gameId);
+
+  /* DisplayOrder repair touches CategorySettings after the normalized sync. */
+  if (typeof clearGameDataCaches === "function") {
+    clearGameDataCaches(gameId, ["Categories", "CategorySettings", "CategoryResults"]);
+  }
+
+  return {
+    success: true,
+    gameId: gameId,
+    normalized: normalized,
+    displayOrdersRepaired: Number(displayOrderRepair.repaired || 0)
+  };
+}
+
 function sportsWagerClearCachesForGames_(gameIds) {
   const ids = {};
   (gameIds || []).forEach(function(gameId) {
@@ -9725,6 +9841,12 @@ function sportsWagerClearCachesForGames_(gameIds) {
   });
 
   Object.keys(ids).forEach(function(gameId) {
+    try {
+      CacheService.getScriptCache().remove("normalized_sync_" + gameId);
+    } catch (cacheErr) {
+      Logger.log("Sports wager cache marker warning: " + cacheErr);
+    }
+
     if (typeof clearGameDataCaches === "function") {
       clearGameDataCaches(gameId, ["Categories", "CategorySettings", "CategoryResults"]);
     } else if (typeof clearGameCaches === "function") {

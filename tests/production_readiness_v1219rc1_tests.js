@@ -19,7 +19,7 @@ const sw = read('frontend/sw.js');
 const html = read('frontend/app.html');
 const status = read('PRODUCTION_STATUS.md');
 
-assert(/^1\.2\.19-rc\.[1234567]$/.test(pkg.version), 'package version must identify the v1.2.19 production candidate');
+assert(/^1\.2\.19-rc\.[12345678]$/.test(pkg.version), 'package version must identify the v1.2.19 production candidate');
 assert(/v1219rc[123456]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance|admin-question-ux-performance)/.test(app), 'app asset marker must include production candidate');
 assert(/v1219rc[123456]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance|admin-question-ux-performance)/.test(sw), 'service worker marker must include production candidate');
 assert(/prod=v1219rc[123456]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance|admin-question-ux-performance)/.test(html), 'app shell must force-refresh production candidate API/PWA assets');

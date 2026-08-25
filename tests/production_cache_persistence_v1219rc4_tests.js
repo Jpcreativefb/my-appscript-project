@@ -21,7 +21,7 @@ const reality = read('backend/engines/RealityTvSeasonEngine.js');
 const auth = read('backend/AuthEngine.js');
 const routes = JSON.parse(read('frontend/_routes.json'));
 
-assert(['1.2.19-rc.4', '1.2.19-rc.5', '1.2.19-rc.6', '1.2.19-rc.7'].includes(pkg.version), 'package version must identify rc4 or its certified successor');
+assert(['1.2.19-rc.4', '1.2.19-rc.5', '1.2.19-rc.6', '1.2.19-rc.7', '1.2.19-rc.8'].includes(pkg.version), 'package version must identify rc4 or its certified successor');
 assert.strictEqual(app, appMirror, 'frontend app mirrors must remain synchronized');
 assert(appHtml.includes('v1219rc4-cache-persistence') || appHtml.includes('v1219rc5-admin-question-performance') || appHtml.includes('v1219rc6-admin-question-ux-performance'), 'app shell marker must identify rc4 or its certified successor');
 assert(sw.includes('v1219rc4-cache-persistence') || sw.includes('v1219rc5-admin-question-performance') || sw.includes('v1219rc6-admin-question-ux-performance'), 'service worker marker must identify rc4 or its certified successor');

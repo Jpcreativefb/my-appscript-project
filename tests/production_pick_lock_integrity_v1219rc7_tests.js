@@ -20,7 +20,7 @@ function body(source, functionName, nextFunctionName) {
   return source.slice(start, end);
 }
 
-assert.strictEqual(pkg.version, '1.2.19-rc.7', 'package version must identify rc7');
+assert(['1.2.19-rc.7', '1.2.19-rc.8'].includes(pkg.version), 'package version must identify rc7 or a certified successor');
 assert(routes.include.includes('/api/app'), 'Cloudflare /api/app route must remain enabled');
 assert.strictEqual(app, appMirror, 'frontend app mirrors must remain synchronized');
 assert(appHtml.includes('v1219rc7-pick-lock-integrity'), 'app shell must bust cache for rc7');

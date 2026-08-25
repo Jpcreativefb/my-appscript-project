@@ -18,7 +18,7 @@ const app = read('frontend/js/app.js');
 const appMirror = read('frontend/app.js');
 const sw = read('frontend/sw.js');
 
-assert(/^1\.2\.19-rc\.[34567]$/.test(pkg.version), 'package version must remain rc3/rc4 compatible');
+assert(/^1\.2\.19-rc\.[345678]$/.test(pkg.version), 'package version must remain rc3/rc4 compatible');
 assert(app.includes('v1219rc3-final-performance'), 'app asset marker must identify rc3');
 assert(sw.includes('v1219rc3-final-performance'), 'service worker marker must identify rc3');
 assert.strictEqual(app, appMirror, 'frontend app mirrors must remain synchronized');

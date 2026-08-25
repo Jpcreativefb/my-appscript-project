@@ -178,3 +178,16 @@ Functional certification found a production-critical lock/state defect after a S
 - Choosing the regular display profile is dismissed locally before its server round-trip, preventing the new-game profile prompt from immediately reopening on a slow request.
 
 Live certification must re-test: saved pick remains visible after locking, locked controls cannot be changed, a locked save attempt cannot mutate the Picks sheet, unlocking restores editability, and the regular-profile prompt stays dismissed.
+
+
+## v1.2.19-rc8 sports wager integrity certification
+
+Functional certification found that Sports → Create Wager could create the legacy Categories rows and CategorySettings row while the normalized Questions / QuestionOptions view remained behind a recent legacy-sync cache marker. Run Check then saw the wager category but reported zero active answers. RC8 repairs the Sports Wager storage boundary without changing wager math or settlement rules:
+
+- Sports wager creation now immediately synchronizes the newly created legacy wager rows into normalized Questions / QuestionOptions before returning.
+- Re-running Create Wager on an existing market acts as a repair path for partial historical wager categories.
+- Sports wager cache invalidation also clears the normalized legacy-sync marker for the affected game.
+- Wager preflight runs a narrow integrity repair before validation so existing partial markets are repaired by Run Check instead of requiring spreadsheet edits.
+- Duplicate CategorySettings DisplayOrder values inside the wager game are repaired deterministically while preserving other games.
+
+Live certification must re-run Run Check on `Production Test - Wager`; the two sports moneyline categories should expose active answers and the duplicate DisplayOrder warning should disappear. Pending real odds may remain a warning/non-wagerable state until numeric odds are available.

@@ -18,7 +18,7 @@ const routes = JSON.parse(read('frontend/_routes.json'));
 const sw = read('frontend/sw.js');
 const status = read('PRODUCTION_STATUS.md');
 
-assert(/^1\.2\.19-rc\.[234567]$/.test(pkg.version), 'package version must identify rc2 or a certified successor');
+assert(/^1\.2\.19-rc\.[2345678]$/.test(pkg.version), 'package version must identify rc2 or a certified successor');
 assert(routes.include.includes('/api/app'), 'Cloudflare /api/app route must remain enabled');
 assert(/v1219rc(2-performance-certification|3-final-performance|4-cache-persistence|5-admin-question-performance|admin-question-ux-performance)/.test(app), 'app asset marker must identify rc2 or its successor');
 assert(/v1219rc(2-performance-certification|3-final-performance|4-cache-persistence|5-admin-question-performance|admin-question-ux-performance)/.test(sw), 'service worker cache must identify rc2 or its successor');

@@ -1,0 +1,5 @@
+PATTC Predicts v1.2.19-rc8 Sports Wager Integrity Certification
+
+Requires exact production baseline: efd13a2 on architecture-cleanup.
+Run tools/install_production_sports_wager_integrity_v1219rc8.sh from inside the repository.
+The installer verifies the baseline, copies only controlled RC8 files, runs all production checks, deploys Apps Script, pushes GitHub/Cloudflare, and verifies the final state.

@@ -349,6 +349,33 @@ function adminRunGamePreflight(payload) {
      SETUP CHECKS
   ========================= */
 
+  const gameType =
+    adminPreflightGameType_(game);
+
+  /*
+    Sports Wager builders historically wrote their compatibility Categories
+    rows before the normalized Questions / QuestionOptions projection. If a
+    recent admin read left a legacy-sync cache marker behind, Run Check could
+    see the wager question but report zero active answers. Repair that narrow
+    storage contract before validating a wager game. This is intentionally not
+    applied to every game type.
+  */
+  if (
+    ["wager", "racing-wager"].indexOf(gameType) !== -1 &&
+    typeof sportsWagerRepairSetupIntegrity_ === "function"
+  ) {
+    try {
+      sportsWagerRepairSetupIntegrity_(gameId);
+    } catch (repairErr) {
+      adminPreflightAddIssue_(
+        issues,
+        "warning",
+        "Sports wager setup repair could not complete: " +
+          (repairErr && repairErr.message ? repairErr.message : String(repairErr))
+      );
+    }
+  }
+
   const setup =
     adminGetGameSetup({
       gameId: gameId
@@ -358,9 +385,6 @@ function adminRunGamePreflight(payload) {
     Array.isArray(setup.categories)
       ? setup.categories
       : [];
-
-  const gameType =
-    adminPreflightGameType_(game);
 
   const gameRole =
     adminPreflightNormalizeId_(

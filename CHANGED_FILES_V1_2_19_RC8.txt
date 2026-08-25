@@ -1,0 +1,17 @@
+BASELINE_HASHES_V1_2_19_RC8.txt
+CHANGED_FILES_V1_2_19_RC8.txt
+INSTALL_V1_2_19_RC8.txt
+PRODUCTION_STATUS.md
+backend/admin/AdminPreflight.js
+backend/engines/SportsWagerEngine.js
+docs/PRODUCTION_SPORTS_WAGER_INTEGRITY_V1_2_19_RC8.md
+package.json
+tests/production_admin_question_ux_performance_v1219rc6_tests.js
+tests/production_cache_persistence_v1219rc4_tests.js
+tests/production_final_performance_v1219rc3_tests.js
+tests/production_performance_v1219rc2_tests.js
+tests/production_pick_lock_integrity_v1219rc7_tests.js
+tests/production_readiness_v1219rc1_tests.js
+tests/production_sports_wager_integrity_v1219rc8_tests.js
+tools/install_production_sports_wager_integrity_v1219rc8.sh
+tools/run_production_checks.sh
