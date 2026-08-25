@@ -421,7 +421,7 @@ function getCategorySettingsDataForGameScoped_(gameId) {
     sh,
     gameId,
     Object.keys(allowed),
-    normalizedStorageBuildQuestionGameMap_()
+    null
   );
 
   if (scoped.error || scoped.ambiguousCount > 0) {

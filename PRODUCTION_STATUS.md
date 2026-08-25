@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc5 — Admin Question Performance Certification**
+Current release candidate: **v1.2.19-rc6 — Admin Question UX Performance Certification**
 
-Release asset marker: **v1219rc5-admin-question-performance**
+Release asset marker: **v1219rc6-admin-question-ux-performance**
 
 ## Status
 
@@ -114,6 +114,13 @@ The final live timing test exposed a deterministic ten-minute browser fast-path 
 - Keeps session authorization caching short (five minutes) and preserves explicit revocation cleanup.
 - No scheduled cache-warmer trigger is added; the fix reduces Apps Script work rather than adding another recurring job.
 
+
+## v1.2.19-rc6 Admin question UX performance certification
+
+Live RC5 retest still measured 19 seconds to open Categories / Questions, 27 seconds to create a question, and 23–24 seconds to add an answer. RC6 removes the mandatory full Game Setup reload after successful question/answer creates and removes remaining global compatibility work from ordinary game-scoped Admin setup paths. New questions/answers render in the open editor immediately; backend reads now defer legacy map work, scope question-mode invalidation, skip ranking-only result decoration for non-ranking games, and avoid forced flushes on ordinary creates.
+
+Production gate: 142 JavaScript files, 184 regression tests, and ten release contracts must pass before deployment.
+
 ## v1.2.19-rc5 admin question performance certification
 
 Functional production testing exposed a separate Admin Game Setup bottleneck even after player navigation was fast: opening Categories / Questions / Nominees took more than 20 seconds, creating one question took about 30 seconds, and adding a single answer could take about 75 seconds. RC5 targets only that administrative CRUD path:
@@ -148,6 +155,7 @@ The gate checks:
 7. v1.2.19-rc3 final-performance contract.
 8. v1.2.19-rc4 cache-persistence contract.
 9. v1.2.19-rc5 admin-question-performance contract.
+10. v1.2.19-rc6 admin-question-UX-performance contract.
 
 ## What remains before declaring LIVE
 

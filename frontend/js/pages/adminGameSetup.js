@@ -4,6 +4,7 @@
 let adminSetupCategoryIdTouched = false;
 let adminSetupNomineeIdTouched = false;
 let adminSetupShortAnswerTouched = false;
+let adminSetupPageState = null;
 
 const ADMIN_SETUP_UI_ACTION_KEY = "adminGameSetupUiActionV1";
 
@@ -121,6 +122,93 @@ function adminSetupScheduleUiActionReveal_(action) {
       sessionStorage.removeItem(ADMIN_SETUP_UI_ACTION_KEY);
     } catch (ignore) {}
   }, 80);
+}
+
+function adminSetupSetPageState_(gameId, game, categories) {
+  adminSetupPageState = {
+    gameId: String(gameId || "").trim(),
+    game: Object.assign({}, game || {}),
+    categories: (Array.isArray(categories) ? categories : []).map(function(category) {
+      return Object.assign({}, category || {}, {
+        settings: Object.assign({}, category && category.settings || {}),
+        nominees: (Array.isArray(category && category.nominees) ? category.nominees : []).map(function(nominee) {
+          return Object.assign({}, nominee || {});
+        })
+      });
+    })
+  };
+  return adminSetupPageState;
+}
+
+function adminSetupGetPageState_(gameId) {
+  if (!adminSetupPageState) return null;
+  if (String(adminSetupPageState.gameId || "").trim() !== String(gameId || "").trim()) return null;
+  return adminSetupPageState;
+}
+
+function adminSetupFindStateCategory_(gameId, categoryId) {
+  const state = adminSetupGetPageState_(gameId);
+  if (!state) return null;
+  const target = String(categoryId || "").trim().toLowerCase();
+  return (state.categories || []).find(function(category) {
+    return String(category && category.categoryId || "").trim().toLowerCase() === target;
+  }) || null;
+}
+
+function adminSetupRenderQuestionListFromState_(gameId, uiAction) {
+  const state = adminSetupGetPageState_(gameId);
+  const list = document.getElementById("adminSetupQuestionList");
+  if (!state || !list) return false;
+
+  const categories = state.categories || [];
+  list.innerHTML = categories.length
+    ? categories.map(function(category) {
+        return renderAdminSetupCategoryCard(category, state.game, categories, uiAction || null);
+      }).join("")
+    : '<div class="admin-sub" id="adminSetupEmptyQuestions">No categories found yet. Add your first category above.</div>';
+
+  const count = document.getElementById("adminSetupQuestionCount");
+  if (count) {
+    count.textContent = categories.length + " categories/questions configured.";
+  }
+
+  if (typeof adminSetupRefreshQuestionOrderUi_ === "function") {
+    adminSetupRefreshQuestionOrderUi_();
+  }
+  if (uiAction) {
+    adminSetupScheduleUiActionReveal_(uiAction);
+  }
+
+  return true;
+}
+
+function adminSetupAddStateCategory_(gameId, category) {
+  const state = adminSetupGetPageState_(gameId);
+  if (!state || !category) return false;
+  const target = String(category.categoryId || "").trim().toLowerCase();
+  if (!target) return false;
+
+  state.categories = (state.categories || []).filter(function(item) {
+    return String(item && item.categoryId || "").trim().toLowerCase() !== target;
+  });
+  state.categories.push(category);
+  state.categories.sort(function(a, b) {
+    const aOrder = Number(a && a.settings && a.settings.displayOrder) || 999;
+    const bOrder = Number(b && b.settings && b.settings.displayOrder) || 999;
+    return aOrder - bOrder;
+  });
+  return true;
+}
+
+function adminSetupAddStateNominee_(gameId, categoryId, nominee) {
+  const category = adminSetupFindStateCategory_(gameId, categoryId);
+  if (!category || !nominee) return false;
+  const target = String(nominee.nomineeId || "").trim().toLowerCase();
+  category.nominees = (Array.isArray(category.nominees) ? category.nominees : []).filter(function(item) {
+    return String(item && item.nomineeId || "").trim().toLowerCase() !== target;
+  });
+  category.nominees.push(nominee);
+  return true;
 }
 
 function adminSetupEscapeHtml(value) {
@@ -1409,6 +1497,8 @@ async function renderAdminGameSetupPage(gameId) {
       fixedPointsEnabled: true
     };
 
+  adminSetupSetPageState_(safeGameId, game, categories);
+
   let votingCompetitionDashboard = null;
   if (String(game.type || "").trim().toLowerCase() === "voting") {
     try {
@@ -1535,7 +1625,7 @@ async function renderAdminGameSetupPage(gameId) {
             <div>
               <h2>${isVotingCompetition ? "Advanced / Legacy Categories & Questions" : (isLeaderboardOnlyHub ? "Stored Categories / Questions" : "Categories / Questions")}</h2>
 
-              <div class="admin-sub">
+              <div class="admin-sub" id="adminSetupQuestionCount">
                 ${categories.length} categories/questions configured.${isVotingCompetition ? " Not needed for normal Competition voting; retained so older voting/movie workflows are not removed." : (isLeaderboardOnlyHub ? " Stored parent questions are excluded from the hub standings." : "")}
               </div>
             </div>
@@ -1891,23 +1981,21 @@ async function renderAdminGameSetupPage(gameId) {
 
         </details>
 
-            ${
-              categories.length
-                ? `
-                  <div class="admin-list admin-category-list">
-                    ${categories
+            <div id="adminSetupQuestionList" class="admin-list admin-category-list">
+              ${
+                categories.length
+                  ? categories
                       .map(category =>
                         renderAdminSetupCategoryCard(category, game, categories, uiAction)
                       )
-                      .join("")}
-                  </div>
-                `
-                : `
-                  <div class="admin-sub">
-                    No categories found yet. Add your first category above.
-                  </div>
-                `
-            }
+                      .join("")
+                  : `
+                    <div class="admin-sub" id="adminSetupEmptyQuestions">
+                      No categories found yet. Add your first category above.
+                    </div>
+                  `
+              }
+            </div>
 
           </div>
 
@@ -4777,10 +4865,11 @@ async function adminSetupCreateCategory(gameId) {
   adminSetupSetMessage("setupAddCategoryMessage", "Question added.", false);
 
   adminSetupCategoryIdTouched = false;
-  adminSetupRememberUiAction_({
+  const createdCategoryId = res.categoryId || categoryId;
+  const createdUiAction = adminSetupRememberUiAction_({
     type: "create-question",
     gameId: gameId,
-    categoryId: res.categoryId || categoryId,
+    categoryId: createdCategoryId,
     nomineeIds: createdAnswerIds,
     openAnswers: true,
     message: createdAnswerIds.length
@@ -4788,7 +4877,43 @@ async function adminSetupCreateCategory(gameId) {
       : "Question created. Add answers in the open section below."
   });
 
-  navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
+  const createdCategory = {
+    gameId: gameId,
+    categoryId: createdCategoryId,
+    category: categoryName,
+    section: sectionInput ? sectionInput.value.trim() : "Main",
+    categoryImage: "",
+    active: true,
+    predictionGame: true,
+    communityRank: false,
+    nominees: presetItems.map(function(item) {
+      return {
+        nomineeId: item.nomineeId,
+        nominee: item.nominee,
+        shortAnswer: item.shortAnswer || item.nominee,
+        fileId: item.fileId || "",
+        active: true
+      };
+    }),
+    settings: Object.assign({
+      points: pointsInput ? Number(pointsInput.value || 1) : 1,
+      locked: lockedInput ? lockedInput.checked : false,
+      maxChanges: maxChanges,
+      lockDateTime: lockDateTimeInput ? lockDateTimeInput.value : "",
+      displayOrder: displayOrderInput ? Number(displayOrderInput.value || 999) : 999,
+      groupId: groupIdInput && groupIdInput.value.trim() ? groupIdInput.value.trim() : "default",
+      parentCategoryId: parentCategoryIdInput ? adminSetupSlugify(parentCategoryIdInput.value.trim()) : "",
+      followUpCategoryId: followUpCategoryIdInput ? adminSetupSlugify(followUpCategoryIdInput.value.trim()) : "",
+      followUpMapJSON: followUpMapJSON,
+      layoutType: layoutTypeInput ? layoutTypeInput.value : "image",
+      countsAsStatue: countsAsStatueInput ? countsAsStatueInput.checked : true
+    }, questionEngineFields)
+  };
+
+  adminSetupAddStateCategory_(gameId, createdCategory);
+  if (!adminSetupRenderQuestionListFromState_(gameId, createdUiAction)) {
+    navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
+  }
 }
 
 /* ======================
@@ -4865,16 +4990,29 @@ async function adminSetupCreateNominee(gameId) {
 
   adminSetupNomineeIdTouched = false;
   adminSetupShortAnswerTouched = false;
-  adminSetupRememberUiAction_({
+  const createdNomineeId = res.nomineeId || nomineeId;
+  const createdUiAction = adminSetupRememberUiAction_({
     type: "add-answer",
     gameId: gameId,
     categoryId: categoryId,
-    nomineeIds: [res.nomineeId || nomineeId],
+    nomineeIds: [createdNomineeId],
     openAnswers: true,
     message: "The new answer is highlighted below."
   });
 
-  navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
+  adminSetupAddStateNominee_(gameId, categoryId, {
+    nomineeId: createdNomineeId,
+    nominee: nomineeName,
+    shortAnswer: shortAnswerInput && shortAnswerInput.value.trim()
+      ? shortAnswerInput.value.trim()
+      : nomineeName,
+    fileId: fileIdInput ? fileIdInput.value.trim() : "",
+    active: true
+  });
+
+  if (!adminSetupRenderQuestionListFromState_(gameId, createdUiAction)) {
+    navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
+  }
 }
 
 function adminSetupAutoFillInlineNomineeFields(categoryId) {
@@ -5050,20 +5188,33 @@ async function adminSetupCreateInlineNominee(
     false
   );
 
-  adminSetupRememberUiAction_({
+  const createdNomineeId = res.nomineeId || nomineeId;
+  const createdUiAction = adminSetupRememberUiAction_({
     type: "add-answer",
     gameId: gameId,
     categoryId: categoryId,
-    nomineeIds: [res.nomineeId || nomineeId],
+    nomineeIds: [createdNomineeId],
     openAnswers: true,
     message: "The new answer is highlighted below."
   });
 
-  navigate(
-    "admin-game-setup:" +
-    gameId,
-    { skipUnsavedCheck: true, suppressLoader: true }
-  );
+  adminSetupAddStateNominee_(gameId, categoryId, {
+    nomineeId: createdNomineeId,
+    nominee: nomineeName,
+    shortAnswer: shortAnswerInput && shortAnswerInput.value.trim()
+      ? shortAnswerInput.value.trim()
+      : nomineeName,
+    fileId: fileIdInput ? fileIdInput.value.trim() : "",
+    active: true
+  });
+
+  if (!adminSetupRenderQuestionListFromState_(gameId, createdUiAction)) {
+    navigate(
+      "admin-game-setup:" +
+      gameId,
+      { skipUnsavedCheck: true, suppressLoader: true }
+    );
+  }
 
 }
 

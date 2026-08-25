@@ -454,16 +454,51 @@ function normalizedStorageBuildQuestionGameMap_() {
         CacheService.getScriptCache(),
         scriptCacheKey,
         serialized,
-        typeof CACHE_TTL !== "undefined" ? CACHE_TTL : 120
+        900
       );
     } else if (serialized.length < 90000) {
-      CacheService.getScriptCache().put(scriptCacheKey, serialized, 120);
+      CacheService.getScriptCache().put(scriptCacheKey, serialized, 900);
     }
   } catch (cacheWriteError) {
     Logger.log("Question/game map cache write skipped: " + cacheWriteError);
   }
 
   return map;
+}
+
+function normalizedStorageRememberQuestionGame_(questionId, gameId) {
+  questionId = normalizedStorageKey_(questionId);
+  gameId = normalizedStorageString_(gameId);
+
+  if (!questionId || !gameId) return;
+
+  const runtimeKey = "question-game-map:all";
+  const scriptCacheKey = "normalized_question_game_map_v1";
+  let map = NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey] || null;
+
+  if (!map) {
+    try {
+      const cached = CacheService.getScriptCache().get(scriptCacheKey);
+      map = cached ? JSON.parse(cached) : null;
+    } catch (ignore) {
+      map = null;
+    }
+  }
+
+  // If the map has never been built, do not pay a whole-sheet rebuild during
+  // a single admin write. The lazy reader will build it only for legacy rows.
+  if (!map) return;
+
+  if (!map[questionId]) map[questionId] = {};
+  map[questionId][gameId] = true;
+  NORMALIZED_STORAGE_RUNTIME_CACHE[runtimeKey] = map;
+
+  try {
+    const serialized = JSON.stringify(map);
+    if (serialized.length < 90000) {
+      CacheService.getScriptCache().put(scriptCacheKey, serialized, 900);
+    }
+  } catch (ignore) {}
 }
 
 function normalizedStorageBackfillCategorySettingsGameIds_() {
@@ -1866,7 +1901,10 @@ function normalizedStorageUpsertQuestion_(payload) {
           rowNumbers: rowNumbers,
           dataVersion: NORMALIZED_STORAGE_VERSION
         });
-        normalizedStorageClearCaches_(gameId);
+        normalizedStorageRememberQuestionGame_(questionId, gameId);
+        if (payload.deferCacheClear !== true) {
+          normalizedStorageClearCaches_(gameId);
+        }
         return object;
       }
     }
@@ -1888,7 +1926,10 @@ function normalizedStorageUpsertQuestion_(payload) {
     rowNumbers: questionRows,
     dataVersion: NORMALIZED_STORAGE_VERSION
   });
-  normalizedStorageClearCaches_(gameId);
+  normalizedStorageRememberQuestionGame_(questionId, gameId);
+  if (payload.deferCacheClear !== true) {
+    normalizedStorageClearCaches_(gameId);
+  }
 
   return object;
 }
@@ -1951,7 +1992,9 @@ function normalizedStorageUpsertOption_(payload) {
           rowNumbers: rowNumbers,
           dataVersion: NORMALIZED_STORAGE_VERSION
         });
-        normalizedStorageClearCaches_(gameId);
+        if (payload.deferCacheClear !== true) {
+          normalizedStorageClearCaches_(gameId);
+        }
         return object;
       }
     }
@@ -1973,7 +2016,9 @@ function normalizedStorageUpsertOption_(payload) {
     rowNumbers: optionRows,
     dataVersion: NORMALIZED_STORAGE_VERSION
   });
-  normalizedStorageClearCaches_(gameId);
+  if (payload.deferCacheClear !== true) {
+    normalizedStorageClearCaches_(gameId);
+  }
 
   return object;
 }
@@ -4951,6 +4996,10 @@ function normalizedStorageReadSettingsRowsForGame_(
   }
 
   if (!rowNumbers.length) {
+    if (!questionGameMap && typeof normalizedStorageBuildQuestionGameMap_ === "function") {
+      questionGameMap = normalizedStorageBuildQuestionGameMap_();
+    }
+
     const questionValues = sheet.getRange(
       2,
       col.CategoryId + 1,

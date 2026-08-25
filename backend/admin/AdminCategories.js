@@ -204,6 +204,14 @@ function adminCatEnsureHybridHeaders_() {
     return;
   }
 
+  const schemaCacheKey = "admin_cat_hybrid_headers_v1219rc6";
+
+  try {
+    if (CacheService.getScriptCache().get(schemaCacheKey)) {
+      return;
+    }
+  } catch (ignore) {}
+
   categoryResultsEnsureColumns_(
     CATEGORY_SETTINGS_SHEET,
     [
@@ -245,6 +253,10 @@ function adminCatEnsureHybridHeaders_() {
       "SourceConfigJSON"
     ]
   );
+
+  try {
+    CacheService.getScriptCache().put(schemaCacheKey, "1", 21600);
+  } catch (ignore) {}
 
 }
 
@@ -764,7 +776,7 @@ function adminCatUpsertCategorySettings_(
       sh,
       adminCatNormalizeGameId_(payload.gameId),
       [adminCatNormalizeId_(payload.categoryId)],
-      normalizedStorageBuildQuestionGameMap_()
+      null
     );
 
     headers = (scoped.headers || []).map(function(header) {
@@ -1458,6 +1470,11 @@ function adminGetGameSetup(payload) {
     gameId
   );
 
+  const adminGame =
+    typeof getGame === "function"
+      ? getGame(gameId)
+      : null;
+
   const categoryData =
     typeof getAdminCategoriesDataForGameScoped_ === "function"
       ? getAdminCategoriesDataForGameScoped_(gameId)
@@ -2106,7 +2123,14 @@ function adminGetGameSetup(payload) {
     });
   }
 
-  if (typeof getCategoryResultsRows_ === "function") {
+  const adminGameType = adminCatNormalizeValue_(
+    adminGame && (adminGame.type || adminGame.gameType)
+  ).toLowerCase();
+
+  if (
+    adminGameType === "ranking" &&
+    typeof getCategoryResultsRows_ === "function"
+  ) {
     try {
       getCategoryResultsRows_(gameId).forEach(function(result) {
         const categoryId = adminCatNormalizeId_(result.categoryId);
@@ -2154,9 +2178,7 @@ function adminGetGameSetup(payload) {
       gameId,
 
     game:
-      typeof getGame === "function"
-        ? getGame(gameId)
-        : null,
+      adminGame,
 
     categories:
       categories
@@ -2314,7 +2336,8 @@ function adminCreateCategory(payload) {
         sportsGameId: payload.sportsGameId || "",
         espnEventId: payload.espnEventId || "",
         sportsMarket: payload.sportsMarket || "",
-        sourceSystem: "admin-normalized"
+        sourceSystem: "admin-normalized",
+        deferCacheClear: true
       });
     } else {
       adminCatAppendCategoryRow_({
@@ -2505,8 +2528,6 @@ function adminCreateCategory(payload) {
         "admin-create-question"
       );
     }
-
-    SpreadsheetApp.flush();
 
     adminCatClearCaches_(gameId);
 
@@ -4232,11 +4253,10 @@ function adminCreateNominee(payload) {
         movie: payload.movie || "",
         person: payload.person || "",
         active: "active" in payload ? payload.active : true,
-        sourceSystem: "admin-normalized"
+        sourceSystem: "admin-normalized",
+        deferCacheClear: true
       });
     }
-
-    SpreadsheetApp.flush();
 
     adminCatClearCaches_(gameId);
 

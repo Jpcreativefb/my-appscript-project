@@ -419,7 +419,8 @@ function appGameCacheKeys_(gameId, username){
     "projected_" + gameId,
     "normalized_sync_" + gameId,
     "external_live_probabilities_v1_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_-]+/g, "_").slice(0, 120),
-    "normalized_question_game_map_v1",
+    // Global question-to-game compatibility metadata is updated separately.
+    // Do not discard it after every game-scoped question/answer mutation.
     "rtv_season_game_ids_v1"
   ];
 

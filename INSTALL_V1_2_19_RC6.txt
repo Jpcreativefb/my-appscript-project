@@ -1,0 +1,11 @@
+PATTC Predicts v1.2.19-rc6 — Admin Question UX Performance Certification
+
+Required baseline:
+  branch: architecture-cleanup
+  commit: 723af5d (v1.2.19-rc5)
+
+Install from the repository with:
+
+  bash <package>/tools/install_production_admin_question_ux_performance_v1219rc6.sh
+
+The installer verifies the clean Git/GitHub baseline and SHA-256 hashes, copies only controlled RC6 files, runs all production checks, creates a Git commit, deploys a new Apps Script production version, pushes GitHub/Cloudflare, then re-runs the checks.

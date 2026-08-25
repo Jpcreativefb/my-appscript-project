@@ -116,10 +116,21 @@ function questionModeEnsureSheet_() {
   return sh;
 }
 
+function questionModeCacheKey_(gameId) {
+  return "question_modes_v1219rc6_" +
+    questionModeKey_(gameId).replace(/[^a-z0-9_-]+/g, "_").slice(0, 120);
+}
+
 function questionModeReadMapForGame_(gameId) {
   gameId = questionModeString_(gameId);
   const map = {};
   if (!gameId) return map;
+
+  const cacheKey = questionModeCacheKey_(gameId);
+  try {
+    const cached = CacheService.getScriptCache().get(cacheKey);
+    if (cached) return JSON.parse(cached);
+  } catch (ignore) {}
 
   const sh = questionModeEnsureSheet_();
   if (sh.getLastRow() <= 1) return map;
@@ -128,17 +139,26 @@ function questionModeReadMapForGame_(gameId) {
     .getValues()[0]
     .map(questionModeString_);
   const col = questionModeHeaderMap_(headers);
-  const rows = sh.getRange(2, 1, sh.getLastRow() - 1, headers.length)
-    .getValues();
+  const rowCount = sh.getLastRow() - 1;
 
-  rows.forEach(function(row) {
-    if (questionModeString_(row[col.gameid]) !== gameId) return;
+  const matches = sh
+    .getRange(2, col.gameid + 1, rowCount, 1)
+    .createTextFinder(gameId)
+    .matchEntireCell(true)
+    .findAll();
+
+  matches.forEach(function(range) {
+    const row = sh.getRange(range.getRow(), 1, 1, headers.length).getValues()[0];
     const questionId = questionModeKey_(row[col.questionid]);
     const scoreMode = questionModeNormalize_(row[col.scoremode]);
     if (questionId && questionModeIsRecognized_(scoreMode)) {
       map[questionId] = scoreMode;
     }
   });
+
+  try {
+    CacheService.getScriptCache().put(cacheKey, JSON.stringify(map), 600);
+  } catch (ignore) {}
 
   return map;
 }
@@ -177,15 +197,20 @@ function questionModeUpsert_(gameId, questionId, scoreMode, source) {
 
   let matched = 0;
   if (sh.getLastRow() > 1) {
-    const rows = sh.getRange(2, 1, sh.getLastRow() - 1, headers.length)
-      .getValues();
+    const matches = sh
+      .getRange(2, col.gameid + 1, sh.getLastRow() - 1, 1)
+      .createTextFinder(gameId)
+      .matchEntireCell(true)
+      .findAll();
 
-    rows.forEach(function(row, index) {
-      if (
-        questionModeString_(row[col.gameid]) === gameId &&
-        questionModeKey_(row[col.questionid]) === questionId
-      ) {
-        sh.getRange(index + 2, 1, 1, headers.length).setValues([values]);
+    matches.forEach(function(range) {
+      const rowNumber = range.getRow();
+      const rowQuestionId = questionModeKey_(
+        sh.getRange(rowNumber, col.questionid + 1).getValue()
+      );
+
+      if (rowQuestionId === questionId) {
+        sh.getRange(rowNumber, 1, 1, headers.length).setValues([values]);
         matched++;
       }
     });
@@ -194,9 +219,9 @@ function questionModeUpsert_(gameId, questionId, scoreMode, source) {
   if (!matched) sh.appendRow(values);
 
   try {
-    if (typeof clearAppCaches === "function") clearAppCaches();
-    if (typeof normalizedStorageClearCaches_ === "function") {
-      normalizedStorageClearCaches_();
+    CacheService.getScriptCache().remove(questionModeCacheKey_(gameId));
+    if (typeof clearGameDataCaches === "function") {
+      clearGameDataCaches(gameId, [QUESTION_MODES_SHEET]);
     }
   } catch (err) {
     Logger.log("Question Mode cache clear warning: " + err);
