@@ -4788,7 +4788,7 @@ async function adminSetupCreateCategory(gameId) {
       : "Question created. Add answers in the open section below."
   });
 
-  navigate("admin-game-setup:" + gameId);
+  navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
 }
 
 /* ======================
@@ -4874,7 +4874,7 @@ async function adminSetupCreateNominee(gameId) {
     message: "The new answer is highlighted below."
   });
 
-  navigate("admin-game-setup:" + gameId);
+  navigate("admin-game-setup:" + gameId, { skipUnsavedCheck: true, suppressLoader: true });
 }
 
 function adminSetupAutoFillInlineNomineeFields(categoryId) {
@@ -5061,7 +5061,8 @@ async function adminSetupCreateInlineNominee(
 
   navigate(
     "admin-game-setup:" +
-    gameId
+    gameId,
+    { skipUnsavedCheck: true, suppressLoader: true }
   );
 
 }

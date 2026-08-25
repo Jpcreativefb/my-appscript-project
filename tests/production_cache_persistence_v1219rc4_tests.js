@@ -21,11 +21,11 @@ const reality = read('backend/engines/RealityTvSeasonEngine.js');
 const auth = read('backend/AuthEngine.js');
 const routes = JSON.parse(read('frontend/_routes.json'));
 
-assert.strictEqual(pkg.version, '1.2.19-rc.4', 'package version must identify rc4');
+assert(['1.2.19-rc.4', '1.2.19-rc.5'].includes(pkg.version), 'package version must identify rc4 or its certified successor');
 assert.strictEqual(app, appMirror, 'frontend app mirrors must remain synchronized');
-assert(appHtml.includes('v1219rc4-cache-persistence'), 'app shell marker must identify rc4');
-assert(sw.includes('v1219rc4-cache-persistence'), 'service worker marker must identify rc4');
-assert(pwa.includes('v1219rc4-cache-persistence'), 'PWA registration marker must identify rc4');
+assert(appHtml.includes('v1219rc4-cache-persistence') || appHtml.includes('v1219rc5-admin-question-performance'), 'app shell marker must identify rc4 or its certified successor');
+assert(sw.includes('v1219rc4-cache-persistence') || sw.includes('v1219rc5-admin-question-performance'), 'service worker marker must identify rc4 or its certified successor');
+assert(pwa.includes('v1219rc4-cache-persistence') || pwa.includes('v1219rc5-admin-question-performance'), 'PWA registration marker must identify rc4 or its certified successor');
 assert(routes.include.includes('/api/app'), 'Cloudflare /api/app route must remain enabled');
 
 assert(app.includes('APP_STARTUP_PAYLOAD_MAX_AGE_MS = 6 * 60 * 60 * 1000'), 'device startup cache should survive the 10-minute failure window');

@@ -1829,8 +1829,8 @@ function normalizedStorageUpsertQuestion_(payload) {
 
   const sh = normalizedStorageEnsureSheet_(QUESTIONS_SHEET, QUESTIONS_HEADERS);
   const data = normalizedStorageReadQuestionsByGame_(gameId, {
-    bypassRuntimeCache: true,
-    trustIndex: false
+    bypassRuntimeCache: false,
+    trustIndex: true
   });
   const objects = normalizedStorageRowsToObjects_(data);
   const existing = objects.find(function(question) {
@@ -1859,16 +1859,36 @@ function normalizedStorageUpsertQuestion_(payload) {
       if (rowQuestionId === questionId) {
         sh.getRange(rowNumber, 1, 1, headers.length)
           .setValues([normalizedStorageObjectRow_(headers, object)]);
-        normalizedStorageRebuildIndexForSheet_(QUESTIONS_SHEET, "Questions");
-        normalizedStorageClearCaches_();
+        normalizedStorageUpsertIndexEntry_({
+          entityType: "Questions",
+          gameId: gameId,
+          sheetName: QUESTIONS_SHEET,
+          rowNumbers: rowNumbers,
+          dataVersion: NORMALIZED_STORAGE_VERSION
+        });
+        normalizedStorageClearCaches_(gameId);
         return object;
       }
     }
   }
 
   sh.appendRow(normalizedStorageObjectRow_(QUESTIONS_HEADERS, object));
-  normalizedStorageRebuildIndexForSheet_(QUESTIONS_SHEET, "Questions");
-  normalizedStorageClearCaches_();
+  const questionIndex = normalizedStorageGetIndexEntry_("Questions", gameId);
+  const questionRows = questionIndex && Array.isArray(questionIndex.rowNumbers)
+    ? questionIndex.rowNumbers.slice()
+    : [];
+  const appendedQuestionRow = sh.getLastRow();
+  if (questionRows.indexOf(appendedQuestionRow) === -1) {
+    questionRows.push(appendedQuestionRow);
+  }
+  normalizedStorageUpsertIndexEntry_({
+    entityType: "Questions",
+    gameId: gameId,
+    sheetName: QUESTIONS_SHEET,
+    rowNumbers: questionRows,
+    dataVersion: NORMALIZED_STORAGE_VERSION
+  });
+  normalizedStorageClearCaches_(gameId);
 
   return object;
 }
@@ -1887,8 +1907,8 @@ function normalizedStorageUpsertOption_(payload) {
     QUESTION_OPTIONS_HEADERS
   );
   const data = normalizedStorageReadOptionsByGame_(gameId, {
-    bypassRuntimeCache: true,
-    trustIndex: false
+    bypassRuntimeCache: false,
+    trustIndex: true
   });
   const objects = normalizedStorageRowsToObjects_(data);
   const existing = objects.find(function(option) {
@@ -1924,22 +1944,36 @@ function normalizedStorageUpsertOption_(payload) {
       if (rowQuestionId === questionId && rowOptionId === optionId) {
         sh.getRange(rowNumber, 1, 1, headers.length)
           .setValues([normalizedStorageObjectRow_(headers, object)]);
-        normalizedStorageRebuildIndexForSheet_(
-          QUESTION_OPTIONS_SHEET,
-          "QuestionOptions"
-        );
-        normalizedStorageClearCaches_();
+        normalizedStorageUpsertIndexEntry_({
+          entityType: "QuestionOptions",
+          gameId: gameId,
+          sheetName: QUESTION_OPTIONS_SHEET,
+          rowNumbers: rowNumbers,
+          dataVersion: NORMALIZED_STORAGE_VERSION
+        });
+        normalizedStorageClearCaches_(gameId);
         return object;
       }
     }
   }
 
   sh.appendRow(normalizedStorageObjectRow_(QUESTION_OPTIONS_HEADERS, object));
-  normalizedStorageRebuildIndexForSheet_(
-    QUESTION_OPTIONS_SHEET,
-    "QuestionOptions"
-  );
-  normalizedStorageClearCaches_();
+  const optionIndex = normalizedStorageGetIndexEntry_("QuestionOptions", gameId);
+  const optionRows = optionIndex && Array.isArray(optionIndex.rowNumbers)
+    ? optionIndex.rowNumbers.slice()
+    : [];
+  const appendedOptionRow = sh.getLastRow();
+  if (optionRows.indexOf(appendedOptionRow) === -1) {
+    optionRows.push(appendedOptionRow);
+  }
+  normalizedStorageUpsertIndexEntry_({
+    entityType: "QuestionOptions",
+    gameId: gameId,
+    sheetName: QUESTION_OPTIONS_SHEET,
+    rowNumbers: optionRows,
+    dataVersion: NORMALIZED_STORAGE_VERSION
+  });
+  normalizedStorageClearCaches_(gameId);
 
   return object;
 }
@@ -2192,9 +2226,12 @@ function getAdminCategoriesDataForGameScoped_(gameId) {
     canonical Questions and QuestionOptions rows that were just saved.
   */
   const normalized = normalizedStorageGetQuestionSetup_(gameId, {
-    syncLegacy: true,
-    bypassRuntimeCache: true,
-    trustIndex: false
+    // Normalized Questions/QuestionOptions are the admin source of truth.
+    // Every admin mutation clears these caches, so indexed scoped reads are
+    // both current and dramatically faster than a forced legacy rescan.
+    syncLegacy: false,
+    bypassRuntimeCache: false,
+    trustIndex: true
   });
   const questionMap = {};
   const optionsByQuestion = {};
@@ -4897,41 +4934,59 @@ function normalizedStorageReadSettingsRowsForGame_(
   }
 
   const rowCount = sheet.getLastRow() - 1;
-  const questionValues = sheet.getRange(
-    2,
-    col.CategoryId + 1,
-    rowCount,
-    1
-  ).getValues();
-  const gameValues = col.GameId === undefined
-    ? new Array(rowCount).fill([""])
-    : sheet.getRange(2, col.GameId + 1, rowCount, 1).getValues();
 
-  for (let i = 0; i < rowCount; i++) {
-    const questionId = normalizedStorageKey_(questionValues[i][0]);
-    const rowGameId = normalizedStorageString_(gameValues[i][0]);
+  // Current CategorySettings rows carry GameId. Use TextFinder first so a
+  // setup page reads only this game's settings instead of two entire columns.
+  // The legacy blank-GameId compatibility scan remains as a fallback.
+  if (col.GameId !== undefined) {
+    const directMatches = sheet
+      .getRange(2, col.GameId + 1, rowCount, 1)
+      .createTextFinder(normalizedStorageString_(gameId))
+      .matchEntireCell(true)
+      .findAll();
 
-    if (rowGameId) {
-      if (rowGameId === gameId) {
+    directMatches.forEach(function(range) {
+      rowNumbers.push(range.getRow());
+    });
+  }
+
+  if (!rowNumbers.length) {
+    const questionValues = sheet.getRange(
+      2,
+      col.CategoryId + 1,
+      rowCount,
+      1
+    ).getValues();
+    const gameValues = col.GameId === undefined
+      ? new Array(rowCount).fill([""])
+      : sheet.getRange(2, col.GameId + 1, rowCount, 1).getValues();
+
+    for (let i = 0; i < rowCount; i++) {
+      const questionId = normalizedStorageKey_(questionValues[i][0]);
+      const rowGameId = normalizedStorageString_(gameValues[i][0]);
+
+      if (rowGameId) {
+        if (rowGameId === gameId) {
+          rowNumbers.push(i + 2);
+        }
+        continue;
+      }
+
+      if (!questionId || !allowed[questionId]) {
+        continue;
+      }
+
+      const gameMap = (questionGameMap || {})[questionId] || {};
+      const gameIds = Object.keys(gameMap);
+
+      if (gameIds.length > 1) {
+        ambiguousCount += 1;
+        continue;
+      }
+
+      if (gameIds.length === 1 && gameIds[0] === gameId) {
         rowNumbers.push(i + 2);
       }
-      continue;
-    }
-
-    if (!questionId || !allowed[questionId]) {
-      continue;
-    }
-
-    const gameMap = (questionGameMap || {})[questionId] || {};
-    const gameIds = Object.keys(gameMap);
-
-    if (gameIds.length > 1) {
-      ambiguousCount += 1;
-      continue;
-    }
-
-    if (gameIds.length === 1 && gameIds[0] === gameId) {
-      rowNumbers.push(i + 2);
     }
   }
 

@@ -19,10 +19,10 @@ const sw = read('frontend/sw.js');
 const html = read('frontend/app.html');
 const status = read('PRODUCTION_STATUS.md');
 
-assert(/^1\.2\.19-rc\.[1234]$/.test(pkg.version), 'package version must identify the v1.2.19 production candidate');
-assert(/v1219rc[1234]-(production-readiness|performance-certification|final-performance|cache-persistence)/.test(app), 'app asset marker must include production candidate');
-assert(/v1219rc[1234]-(production-readiness|performance-certification|final-performance|cache-persistence)/.test(sw), 'service worker marker must include production candidate');
-assert(/prod=v1219rc[1234]-(production-readiness|performance-certification|final-performance|cache-persistence)/.test(html), 'app shell must force-refresh production candidate API/PWA assets');
+assert(/^1\.2\.19-rc\.[12345]$/.test(pkg.version), 'package version must identify the v1.2.19 production candidate');
+assert(/v1219rc[12345]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance)/.test(app), 'app asset marker must include production candidate');
+assert(/v1219rc[12345]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance)/.test(sw), 'service worker marker must include production candidate');
+assert(/prod=v1219rc[12345]-(production-readiness|performance-certification|final-performance|cache-persistence|admin-question-performance)/.test(html), 'app shell must force-refresh production candidate API/PWA assets');
 
 assert(api.includes('const API_APP_PROXY = "./api/app";'), 'frontend must use repo-owned generic POST bridge');
 assert(api.includes('const API_GET_SAFE_ACTIONS_ = new Set([\n  "health"'), 'only health may use the public GET helper');

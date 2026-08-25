@@ -1,0 +1,11 @@
+PATTC Predicts v1.2.19-rc5 — Admin Question Performance Certification
+
+Required baseline: GitHub architecture-cleanup at 9f93ec1 (RC4).
+
+Run the included installer from the repository. It verifies the clean baseline and file hashes, copies only controlled RC5 files, runs all production checks, commits, deploys Apps Script, pushes GitHub/Cloudflare, and verifies the final state.
+
+Live acceptance test after deployment:
+- Open Production Test - Standard Prediction > Categories / Questions / Nominees.
+- Create one new question.
+- Add two answers individually.
+- Confirm ordinary operations complete in a few seconds and same-page saves do not take over the screen with the full loader.

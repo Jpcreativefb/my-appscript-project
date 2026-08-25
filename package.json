@@ -1,8 +1,8 @@
 {
   "name": "awards-app-cloudflare-functions",
   "private": true,
-  "version": "1.2.19-rc.4",
-  "description": "Cloudflare Pages Functions dependencies for PATTC Predicts cache persistence candidate",
+  "version": "1.2.19-rc.5",
+  "description": "Cloudflare Pages Functions dependencies for PATTC Predicts admin question performance candidate",
   "dependencies": {
     "@pushforge/builder": "2.0.5"
   }

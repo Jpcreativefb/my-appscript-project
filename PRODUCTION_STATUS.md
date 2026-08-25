@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc4 — Cache Persistence Certification**
+Current release candidate: **v1.2.19-rc5 — Admin Question Performance Certification**
 
-Release asset marker: **v1219rc4-cache-persistence**
+Release asset marker: **v1219rc5-admin-question-performance**
 
 ## Status
 
@@ -114,6 +114,21 @@ The final live timing test exposed a deterministic ten-minute browser fast-path 
 - Keeps session authorization caching short (five minutes) and preserves explicit revocation cleanup.
 - No scheduled cache-warmer trigger is added; the fix reduces Apps Script work rather than adding another recurring job.
 
+## v1.2.19-rc5 admin question performance certification
+
+Functional production testing exposed a separate Admin Game Setup bottleneck even after player navigation was fast: opening Categories / Questions / Nominees took more than 20 seconds, creating one question took about 30 seconds, and adding a single answer could take about 75 seconds. RC5 targets only that administrative CRUD path:
+
+- Admin Game Setup now reads CategorySettings with the existing game-scoped reader instead of loading the entire settings sheet.
+- Normalized Questions / QuestionOptions use their maintained DataIndex for normal admin reads instead of forcing a full GameId rescan on every page load.
+- The Admin setup projection no longer runs legacy-to-normalized synchronization on every editor open; normalized storage is already the canonical admin source and all admin writes invalidate the affected caches.
+- Creating a question checks normalized Questions directly instead of building the entire Admin Game Setup payload just to detect duplicates.
+- Adding an answer checks the normalized question/options directly and reads only the Categories header row before appending the legacy compatibility row.
+- Single question/answer upserts update only that game’s DataIndex entry instead of rebuilding the index for every game in the Questions or QuestionOptions sheet.
+- Current CategorySettings rows use an exact GameId TextFinder fast path; the older blank-GameId compatibility scan remains available only as a fallback.
+- After a question or answer save, the existing setup page remains visible while the refreshed editor is fetched; the full-screen Admin loader no longer takes over for these same-page saves.
+
+Game rules, scoring, picks, results, and player-facing cache behavior are unchanged.
+
 ## Automated release gate
 
 Run:
@@ -132,10 +147,11 @@ The gate checks:
 6. v1.2.19-rc2 performance-certification contract.
 7. v1.2.19-rc3 final-performance contract.
 8. v1.2.19-rc4 cache-persistence contract.
+9. v1.2.19-rc5 admin-question-performance contract.
 
 ## What remains before declaring LIVE
 
-Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC4 10+ minute cache-persistence retest and do not declare the release production-certified until its P0/P1 sections pass.
+Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC4 10+ minute cache-persistence retest and the RC5 Admin question/answer CRUD timing check and do not declare the release production-certified until its P0/P1 sections pass.
 
 ## Release rule until launch
 

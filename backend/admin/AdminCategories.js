@@ -752,22 +752,70 @@ function adminCatUpsertCategorySettings_(
   const sh =
     getCategorySettingsSheet_();
 
-  const data =
-    sh.getDataRange()
-      .getValues();
+  let headers = [];
+  let rowIndexes = [];
+  const rowDataByIndex = {};
 
-  if (!data.length) {
+  if (
+    typeof normalizedStorageReadSettingsRowsForGame_ === "function" &&
+    typeof normalizedStorageBuildQuestionGameMap_ === "function"
+  ) {
+    const scoped = normalizedStorageReadSettingsRowsForGame_(
+      sh,
+      adminCatNormalizeGameId_(payload.gameId),
+      [adminCatNormalizeId_(payload.categoryId)],
+      normalizedStorageBuildQuestionGameMap_()
+    );
 
+    headers = (scoped.headers || []).map(function(header) {
+      return String(header || "").trim();
+    });
+    const scopedCol = getCategorySettingsColumnMap_(headers);
+    const targetCategoryId = adminCatNormalizeId_(payload.categoryId);
+    (scoped.rows || []).forEach(function(row, index) {
+      if (
+        scopedCol.categoryId !== -1 &&
+        adminCatNormalizeId_(row[scopedCol.categoryId]) === targetCategoryId &&
+        Number((scoped.rowNumbers || [])[index]) > 1
+      ) {
+        const rowIndex = Number(scoped.rowNumbers[index]);
+        rowIndexes.push(rowIndex);
+        rowDataByIndex[rowIndex] = row.slice();
+      }
+    });
+  } else {
+    const data = sh.getDataRange().getValues();
+
+    if (!data.length) {
+      throw new Error(
+        "CategorySettings sheet is empty"
+      );
+    }
+
+    headers = data[0].map(function(header) {
+      return String(header || "").trim();
+    });
+
+    const fallbackCol = getCategorySettingsColumnMap_(headers);
+    validateCategorySettingsColumns_(fallbackCol);
+    rowIndexes = adminCatFindSettingsRows_(
+      data,
+      fallbackCol,
+      payload.gameId,
+      payload.categoryId
+    );
+    rowIndexes.forEach(function(rowIndex) {
+      if (data[rowIndex - 1]) {
+        rowDataByIndex[rowIndex] = data[rowIndex - 1].slice();
+      }
+    });
+  }
+
+  if (!headers.length) {
     throw new Error(
       "CategorySettings sheet is empty"
     );
-
   }
-
-  const headers =
-    data[0].map(h =>
-      String(h || "").trim()
-    );
 
   const col =
     getCategorySettingsColumnMap_(
@@ -777,14 +825,6 @@ function adminCatUpsertCategorySettings_(
   validateCategorySettingsColumns_(
     col
   );
-
-  const rowIndexes =
-    adminCatFindSettingsRows_(
-      data,
-      col,
-      payload.gameId,
-      payload.categoryId
-    );
 
   if (!rowIndexes.length) {
 
@@ -857,9 +897,9 @@ function adminCatUpsertCategorySettings_(
 
   rowIndexes.forEach(function(rowIndex) {
 
-    const row =
-      data[rowIndex - 1]
-        .slice();
+    const row = rowDataByIndex[rowIndex]
+      ? rowDataByIndex[rowIndex].slice()
+      : sh.getRange(rowIndex, 1, 1, headers.length).getValues()[0];
 
     keys.forEach(key => {
 
@@ -1447,9 +1487,11 @@ function adminGetGameSetup(payload) {
     cannot safely display a stale Locked or settlement state.
   */
   const settingsData =
-    getCategorySettingsSheet_()
-      .getDataRange()
-      .getValues();
+    typeof getCategorySettingsDataForGameScoped_ === "function"
+      ? getCategorySettingsDataForGameScoped_(gameId)
+      : getCategorySettingsSheet_()
+          .getDataRange()
+          .getValues();
 
   const settingsHeaders =
     settingsData[0].map(h =>
@@ -1477,8 +1519,8 @@ function adminGetGameSetup(payload) {
     try {
       const normalizedSetup = normalizedStorageGetQuestionSetup_(gameId, {
         syncLegacy: false,
-        bypassRuntimeCache: true,
-        trustIndex: false
+        bypassRuntimeCache: false,
+        trustIndex: true
       });
 
       (normalizedSetup.questions || []).forEach(function(question) {
@@ -2220,18 +2262,22 @@ function adminCreateCategory(payload) {
 
   try {
 
-    const setup =
-      adminGetGameSetup({
-        gameId:
-          gameId
-      });
+    const questionSetup =
+      typeof normalizedStorageGetQuestionSetup_ === "function"
+        ? normalizedStorageGetQuestionSetup_(gameId, {
+            syncLegacy: false,
+            bypassRuntimeCache: false,
+            trustIndex: true
+          })
+        : null;
 
-    const exists =
-      setup.categories.some(c =>
-        adminCatNormalizeId_(
-          c.categoryId
-        ) === categoryId
-      );
+    const exists = questionSetup
+      ? (questionSetup.questions || []).some(function(question) {
+          return adminCatNormalizeId_(question.QuestionId) === categoryId;
+        })
+      : adminGetGameSetup({ gameId: gameId }).categories.some(function(category) {
+          return adminCatNormalizeId_(category.categoryId) === categoryId;
+        });
 
     if (exists) {
 
@@ -4012,34 +4058,56 @@ function adminCreateNominee(payload) {
 
   try {
 
-    const setup =
-      adminGetGameSetup({
-        gameId:
-          gameId
+    let category = null;
+    let existingNominees = [];
+
+    if (typeof normalizedStorageGetQuestionSetup_ === "function") {
+      const questionSetup = normalizedStorageGetQuestionSetup_(gameId, {
+        syncLegacy: false,
+        bypassRuntimeCache: false,
+        trustIndex: true
+      });
+      const question = (questionSetup.questions || []).find(function(item) {
+        return adminCatNormalizeId_(item.QuestionId) === categoryId;
       });
 
-    const category =
-      setup.categories.find(c =>
-        adminCatNormalizeId_(
-          c.categoryId
-        ) === categoryId
-      );
+      if (question) {
+        category = {
+          category: adminCatNormalizeValue_(question.Question),
+          section: adminCatNormalizeValue_(question.Section) || "Other",
+          categoryImage: adminCatNormalizeValue_(question.CategoryImage),
+          predictionGame: question.PredictionGame !== false,
+          communityRank: adminCatToBoolean_(question.CommunityRank)
+        };
+        existingNominees = (questionSetup.options || []).filter(function(option) {
+          return adminCatNormalizeId_(option.QuestionId) === categoryId;
+        }).map(function(option) {
+          return { nomineeId: adminCatNormalizeId_(option.OptionId) };
+        });
+      }
+    }
 
     if (!category) {
+      const setup = adminGetGameSetup({ gameId: gameId });
+      category = setup.categories.find(function(item) {
+        return adminCatNormalizeId_(item.categoryId) === categoryId;
+      });
+      existingNominees = category && Array.isArray(category.nominees)
+        ? category.nominees
+        : [];
+    }
 
+    if (!category) {
       throw new Error(
         "Category not found: " +
         categoryId
       );
-
     }
 
     const duplicate =
-      category.nominees.some(n =>
-        adminCatNormalizeId_(
-          n.nomineeId
-        ) === nomineeId
-      );
+      existingNominees.some(function(n) {
+        return adminCatNormalizeId_(n.nomineeId) === nomineeId;
+      });
 
     if (duplicate) {
 
@@ -4053,14 +4121,12 @@ function adminCreateNominee(payload) {
     const sh =
       getCategoriesSheet_();
 
-    const data =
-      sh.getDataRange()
-        .getValues();
-
     const headers =
-      data[0].map(h =>
-        String(h || "").trim()
-      );
+      sh.getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
+        .getValues()[0]
+        .map(h =>
+          String(h || "").trim()
+        );
 
     const col =
       getCategoriesColumnMap_(
@@ -4813,10 +4879,12 @@ function adminBulkCreateNominees(payload) {
     }
 
     const sh = getCategoriesSheet_();
-    const data = sh.getDataRange().getValues();
-    const headers = data[0].map(function(header) {
-      return String(header || "").trim();
-    });
+    const headers = sh
+      .getRange(1, 1, 1, Math.max(sh.getLastColumn(), 1))
+      .getValues()[0]
+      .map(function(header) {
+        return String(header || "").trim();
+      });
     const col = getCategoriesColumnMap_(headers);
     validateCategoriesColumns_(col);
 
