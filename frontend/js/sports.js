@@ -1559,7 +1559,8 @@ function getAwardsApiUrlForSportsWager_() {
 
 }
 
-const SPORTS_AWARDS_POST_PROXY_URL =
+const SPORTS_AWARDS_POST_PROXY_URL = "./api/app";
+const SPORTS_AWARDS_LEGACY_POST_PROXY_URL =
   "https://awards-upload-proxy.jpcreativefb.workers.dev";
 
 async function sportsAwardsPost_(action, payload) {
@@ -1574,17 +1575,34 @@ async function sportsAwardsPost_(action, payload) {
       : null;
 
   try {
-    const response = await fetch(
+    const requestBody = JSON.stringify(Object.assign({ action: action }, payload || {}));
+    let response = await fetch(
       SPORTS_AWARDS_POST_PROXY_URL,
       {
         method: "POST",
         headers: {
-          "Content-Type": "text/plain;charset=utf-8"
+          "Content-Type": "application/json; charset=utf-8",
+          "Accept": "application/json"
         },
+        cache: "no-store",
         body: JSON.stringify(Object.assign({ action: action }, payload || {})),
         signal: controller ? controller.signal : undefined
       }
     );
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(
+        SPORTS_AWARDS_LEGACY_POST_PROXY_URL,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "text/plain;charset=utf-8",
+            "Accept": "application/json"
+          },
+          body: requestBody,
+          signal: controller ? controller.signal : undefined
+        }
+      );
+    }
 
     if (timeout) clearTimeout(timeout);
 
@@ -1614,52 +1632,9 @@ async function sportsAwardsPost_(action, payload) {
 }
 
 async function sportsAwardsApi_(action, params) {
-
-  const url =
-    new URL(
-      getAwardsApiUrlForSportsWager_()
-    );
-
-  url.searchParams.set(
-    "action",
-    action
-  );
-
-  Object.keys(params || {})
-    .forEach(function(key) {
-
-      const value =
-        params[key];
-
-      if (
-        value === undefined ||
-        value === null ||
-        value === ""
-      ) {
-        return;
-      }
-
-      url.searchParams.set(
-        key,
-        value
-      );
-
-    });
-
-  // The Sports page is hosted on Cloudflare while the Awards backend is
-  // an Apps Script web app. Use JSONP here instead of cross-origin fetch so
-  // player props, matchups, stat questions, usage, and wager creation all
-  // use the same browser-safe transport.
-  return sportsJsonp(
-    url.toString(),
-    {
-      timeoutMs:
-        SPORTS_JSONP_LONG_TIMEOUT_MS,
-      callbackPrefix:
-        "sportsAwardsJsonpCallback_"
-    }
-  );
-
+  // All Awards App calls from the standalone Sports page use POST. This keeps
+  // admin session tokens out of JSONP URLs while preserving the same router.
+  return sportsAwardsPost_(action, params || {});
 }
 
 async function refreshSportsScoreWindowFromSportsPage_() {

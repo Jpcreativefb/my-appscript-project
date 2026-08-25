@@ -50,162 +50,172 @@ function requireAdmin_(payload) {
    ADMIN SUMMARY API
 ========================= */
 
+function adminQuickSheetRowCount_(sheetName) {
+
+  try {
+    const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+    if (!sheet) return 0;
+    return Math.max(0, Number(sheet.getLastRow() || 0) - 1);
+  } catch (err) {
+    return 0;
+  }
+
+}
+
+function adminQuickGameRowCount_(sheetName, gameId) {
+
+  try {
+    const sheet = SpreadsheetApp.getActive().getSheetByName(sheetName);
+    if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return 0;
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function(value) { return String(value || "").trim(); });
+    const gameIdCol = headers.indexOf("GameId");
+    if (gameIdCol < 0) return 0;
+
+    const wanted = normalizeGameId_(gameId);
+    const rowCount = sheet.getLastRow() - 1;
+    const values = sheet.getRange(2, gameIdCol + 1, rowCount, 1).getValues();
+    let count = 0;
+    values.forEach(function(row) {
+      if (normalizeGameId_(row[0]) === wanted) count++;
+    });
+    return count;
+  } catch (err) {
+    return 0;
+  }
+
+}
+
+function adminQuickLockedCategoryCount_(gameId) {
+
+  try {
+    const sheet = SpreadsheetApp.getActive().getSheetByName(CATEGORY_SETTINGS_SHEET);
+    if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return 0;
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
+      .map(function(value) { return String(value || "").trim(); });
+    const gameIdCol = headers.indexOf("GameId");
+    let lockedCol = headers.indexOf("Locked");
+    if (lockedCol < 0) lockedCol = headers.indexOf("IsLocked");
+    if (gameIdCol < 0 || lockedCol < 0) return 0;
+
+    const firstCol = Math.min(gameIdCol, lockedCol);
+    const lastCol = Math.max(gameIdCol, lockedCol);
+    const rowCount = sheet.getLastRow() - 1;
+    const values = sheet.getRange(2, firstCol + 1, rowCount, lastCol - firstCol + 1).getValues();
+    const wanted = normalizeGameId_(gameId);
+    let count = 0;
+
+    values.forEach(function(row) {
+      const rowGame = row[gameIdCol - firstCol];
+      const locked = row[lockedCol - firstCol];
+      const isLocked = locked === true || String(locked || "").trim().toLowerCase() === "true" || String(locked || "").trim().toLowerCase() === "yes" || Number(locked) === 1;
+      if (normalizeGameId_(rowGame) === wanted && isLocked) count++;
+    });
+
+    return count;
+  } catch (err) {
+    return 0;
+  }
+
+}
+
+function adminBuildCategoryDetails_(gameId) {
+
+  const categories = getCategories(gameId);
+  const settings = getCategorySettings(gameId);
+
+  return categories.map(function(c) {
+    const categoryId = c.id || c.categoryId || "";
+    const setting = settings[categoryId] || {};
+    const settlementStatus = String(setting.settlementStatus || "").trim().toLowerCase();
+    const wagerResultType = String(setting.wagerResultType || "").trim().toLowerCase();
+    let resultStatus = "pending";
+
+    if (
+      settlementStatus === "push" || settlementStatus === "pushed" || settlementStatus === "void" || settlementStatus === "refund" ||
+      wagerResultType === "push" || wagerResultType === "void" || wagerResultType === "refund"
+    ) {
+      resultStatus = "push";
+    } else if (
+      settlementStatus === "cancelled" || settlementStatus === "canceled" || settlementStatus === "no-contest" || settlementStatus === "no_contest" ||
+      wagerResultType === "cancelled" || wagerResultType === "canceled" || wagerResultType === "no-contest" || wagerResultType === "no_contest"
+    ) {
+      resultStatus = "cancelled";
+    } else if (String(setting.winnerNomineeId || "").trim()) {
+      resultStatus = "winner";
+    }
+
+    return {
+      id: categoryId,
+      name: c.name || c.category || c.Category || categoryId,
+      nomineesCount: c.nominees ? c.nominees.length : 0,
+      nominees: (c.nominees || []).map(function(n) {
+        return {
+          id: n.id || n.nomineeId || n.NomineeId || "",
+          name: n.name || n.nominee || n.Nominee || n.title || ""
+        };
+      }),
+      locked: setting.locked === true,
+      points: setting.points || 0,
+      winnerNomineeId: setting.winnerNomineeId || "",
+      settlementStatus: settlementStatus,
+      wagerResultType: wagerResultType,
+      resultStatus: resultStatus
+    };
+  });
+
+}
+
 function apiAdminSummary(payload) {
 
   requireAdmin_(payload);
+  payload = payload || {};
 
-  const gameId =
-    normalizeGameId_(
-      payload.gameId ||
-      getDefaultGameId()
-    );
-
+  const gameId = normalizeGameId_(payload.gameId || getDefaultGameId());
   validateGameId(gameId);
 
-  const game =
-    getGame(gameId);
+  // One game-table read is enough for both the current game and game count.
+  // Heavy user/category/nominee data is loaded only when the admin explicitly
+  // opens those panels.
+  const games = getGames();
+  const game = (games || []).filter(function(item) {
+    return normalizeGameId_(item.gameId || item.GameId || item.id || "") === gameId;
+  })[0] || getGame(gameId);
 
-  const games =
-    getGames();
+  const includeDetails = payload.includeDetails === true || String(payload.includeDetails || "").trim().toLowerCase() === "true";
+  const counts = {
+    users: adminQuickSheetRowCount_(USERS_SHEET),
+    games: (games || []).length,
+    categories: adminQuickGameRowCount_(CATEGORIES_SHEET, gameId),
+    lockedCategories: adminQuickLockedCategoryCount_(gameId)
+  };
 
-  const users =
-    adminGetUsers_();
-
-  const categories =
-    getCategories(gameId);
-
-  const settings =
-    getCategorySettings(gameId);
-
-  const settingsList =
-    Object.keys(settings || {})
-      .map(id => settings[id]);
-
-  const lockedCount =
-    settingsList.filter(s =>
-      s.locked === true
-    ).length;
-
-  return {
+  const result = {
     success: true,
-
     gameId: gameId,
-
     game: game,
+    counts: counts,
+    detailsLoaded: includeDetails
+  };
 
-    counts: {
-      users: users.length,
-      games: games.length,
-      categories: categories.length,
-      lockedCategories: lockedCount
-    },
+  if (!includeDetails) {
+    return result;
+  }
 
-    games: games,
-
-    users: users.map(u => ({
+  const users = adminGetUsers_();
+  result.games = games;
+  result.users = users.map(function(u) {
+    return {
       username: u.username,
       isAdmin: u.isAdmin,
       active: u.active !== false
-    })),
+    };
+  });
+  result.categories = adminBuildCategoryDetails_(gameId);
 
-    categories: categories.map(c => {
-
-      const categoryId =
-        c.id || c.categoryId || "";
-
-      const setting =
-        settings[categoryId] || {};
-
-      const settlementStatus =
-        String(setting.settlementStatus || "")
-          .trim()
-          .toLowerCase();
-
-      const wagerResultType =
-        String(setting.wagerResultType || "")
-          .trim()
-          .toLowerCase();
-
-      let resultStatus = "pending";
-
-      if (
-        settlementStatus === "push" ||
-        settlementStatus === "pushed" ||
-        settlementStatus === "void" ||
-        settlementStatus === "refund" ||
-        wagerResultType === "push" ||
-        wagerResultType === "void" ||
-        wagerResultType === "refund"
-      ) {
-        resultStatus = "push";
-      } else if (
-        settlementStatus === "cancelled" ||
-        settlementStatus === "canceled" ||
-        settlementStatus === "no-contest" ||
-        settlementStatus === "no_contest" ||
-        wagerResultType === "cancelled" ||
-        wagerResultType === "canceled" ||
-        wagerResultType === "no-contest" ||
-        wagerResultType === "no_contest"
-      ) {
-        resultStatus = "cancelled";
-      } else if (
-        String(setting.winnerNomineeId || "").trim()
-      ) {
-        resultStatus = "winner";
-      }
-
-      return {
-        id: categoryId,
-
-        name:
-          c.name ||
-          c.category ||
-          c.Category ||
-          categoryId,
-
-        nomineesCount:
-          c.nominees
-            ? c.nominees.length
-            : 0,
-
-        nominees:
-          (c.nominees || []).map(n => ({
-            id:
-              n.id ||
-              n.nomineeId ||
-              n.NomineeId ||
-              "",
-
-            name:
-              n.name ||
-              n.nominee ||
-              n.Nominee ||
-              n.title ||
-              ""
-          })),
-
-        locked:
-          setting.locked === true,
-
-        points:
-          setting.points || 0,
-
-        winnerNomineeId:
-          setting.winnerNomineeId || "",
-
-        settlementStatus:
-          settlementStatus,
-
-        wagerResultType:
-          wagerResultType,
-
-        resultStatus:
-          resultStatus
-      };
-
-    })
-  };
+  return result;
 
 }
 

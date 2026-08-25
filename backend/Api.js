@@ -1,4 +1,5 @@
 var API_JSON_CALLBACK_ = "";
+var API_INTERNAL_POST_ROUTE_ = false;
 
 /* =========================
    API POST
@@ -682,6 +683,9 @@ function doPost(e) {
       return json(apiAdminUpdateRealityTvEpisodeSchedule(body));
     }
 
+    if (action === "adminGetAutomationHealth") return json(apiAdminGetAutomationHealth(body));
+    if (action === "adminCleanupDuplicateAutomationTriggers") return json(apiAdminCleanupDuplicateAutomationTriggers(body));
+
     /* TEAM FANTASY v1.2.18j POST ROUTES */
     if (action === "saveTeamFantasyPick") return json(apiSaveTeamFantasyPick(body));
     if (action === "randomTeamFantasyPicks") return json(apiRandomTeamFantasyPicks(body));
@@ -694,13 +698,15 @@ function doPost(e) {
     if (action === "adminInstallTeamFantasySyncTrigger") return json(apiAdminInstallTeamFantasySyncTrigger(body));
     if (action === "adminSendTeamFantasyReminder") return json(apiAdminSendTeamFantasyReminder(body));
 
-    return json({
-      success:
-        false,
-
-      error:
-        "Unknown POST action: " + action
-    });
+    // Reuse the established route table for actions that are semantically
+    // reads or legacy admin operations. The request is still an HTTP POST;
+    // this server-only flag prevents the public GET method guard from firing.
+    API_INTERNAL_POST_ROUTE_ = true;
+    try {
+      return doGet({ parameter: body });
+    } finally {
+      API_INTERNAL_POST_ROUTE_ = false;
+    }
 
   } catch (err) {
 
@@ -745,6 +751,14 @@ function doGet(e) {
       e && e.parameter
         ? e.parameter
         : {};
+
+    if (!API_INTERNAL_POST_ROUTE_ && !apiSecurityAllowsGet_(action)) {
+      API_JSON_CALLBACK_ = String(params.callback || params.jsonp || "").trim();
+      return json({
+        success: false,
+        error: "This action requires POST."
+      });
+    }
 
     API_JSON_CALLBACK_ =
       String(
@@ -2841,6 +2855,14 @@ if (action === "compareUserPicks") {
     /* =========================
        ADMIN: SUMMARY / CACHE
     ========================= */
+
+    if (action === "adminGetAutomationHealth") {
+      return json(apiAdminGetAutomationHealth(params));
+    }
+
+    if (action === "adminCleanupDuplicateAutomationTriggers") {
+      return json(apiAdminCleanupDuplicateAutomationTriggers(params));
+    }
 
     if (action === "adminSummary") {
 

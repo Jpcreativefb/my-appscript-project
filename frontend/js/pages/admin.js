@@ -2,619 +2,301 @@ async function renderAdminPage() {
 
   setPageLoadStep(50, "Loading administrator dashboard…");
 
-  const session =
-    getSession();
-
-  const isAdmin =
-    isAdminSession(session);
-
-  console.log(
-    "ADMIN PAGE CHECK:",
-    isAdmin,
-    session
-  );
+  const session = getSession();
+  const isAdmin = isAdminSession(session);
 
   if (!isAdmin) {
     return `
       <div class="page admin-page">
         <h1>Admin</h1>
-
-        <div class="card admin-card">
-          You do not have admin access.
-        </div>
+        <div class="card admin-card">You do not have admin access.</div>
       </div>
     `;
   }
 
-  const res =
-    await apiAdminSummary();
+  // Production dashboard intentionally requests only compact counts. Heavy
+  // user/category/nominee data is loaded when an admin opens those controls.
+  const res = await apiAdminSummary(false);
 
-  if (!res.success) {
+  if (!res || !res.success) {
     return `
       <div class="page admin-page">
         <h1>Admin</h1>
-
         <div class="card admin-card error-card">
-          ${res.error || res.message || "Failed to load admin data"}
+          ${(res && (res.error || res.message)) || "Failed to load admin data"}
         </div>
       </div>
     `;
   }
 
-  const counts =
-    res.counts || {};
+  ADMIN_LAZY_DETAILS_CACHE_ = null;
+  const counts = res.counts || {};
+  const currentGameName = res.game && res.game.name ? res.game.name : res.gameId;
 
   return `
     <div class="page admin-page">
-
-      <h1>Admin</h1>
-
-      <div class="admin-section">
+      <div class="admin-section" data-admin-organized="1">
 
         <div class="card admin-card">
-          <div class="admin-label">
-            Current Game
-          </div>
+          <div class="admin-label">Current Game</div>
+          <div class="admin-value">${escapeHtml_(currentGameName || "No default game")}</div>
+          <div class="admin-sub">${escapeHtml_(res.gameId || "")}</div>
 
-          <div class="admin-value">
-            ${res.game && res.game.name
-              ? res.game.name
-              : res.gameId}
-          </div>
-
-          <div class="admin-sub">
-            ${res.gameId}
-          </div>
-        </div>
-
-        <div class="admin-grid">
-
-          <div class="card admin-stat">
-            <div class="admin-label">Users</div>
-            <div class="admin-number">${counts.users || 0}</div>
-          </div>
-
-          <div class="card admin-stat">
-            <div class="admin-label">Games</div>
-            <div class="admin-number">${counts.games || 0}</div>
-          </div>
-
-          <div class="card admin-stat">
-            <div class="admin-label">Categories</div>
-            <div class="admin-number">${counts.categories || 0}</div>
-          </div>
-
-          <div class="card admin-stat">
-            <div class="admin-label">Locked</div>
-            <div class="admin-number">${counts.lockedCategories || 0}</div>
-          </div>
-
-        </div>
-
-        <div class="card">
-
-          <h2>Tools</h2>
-
-          <button
-            class="button admin-button"
-            onclick="adminClearCaches()"
-          >
-            Clear App Caches
-          </button>
-
-          <button
-            class="button admin-button secondary"
-            onclick="adminSetupLiveResultsSystem()"
-          >
-            Setup Live Results
-          </button>
-
-          <button
-            class="button admin-button secondary"
-            onclick="adminSetupNormalizedStorage()"
-          >
-            Setup / Migrate Storage
-          </button>
-
-          <button
-            class="button admin-button secondary"
-            onclick="adminCheckStorageHealth('${escapeJs(res.gameId || "")}')"
-          >
-            Check Storage Health
-          </button>
-
-          <div
-            id="adminMessage"
-            class="admin-message"
-          ></div>
-
-          <div
-            id="adminStorageHealth"
-            class="admin-storage-health"
-          ></div>
-
-        </div>
-
-                <div class="card admin-card">
-
-          <h2>Sports Engine Controls</h2>
-
-          <div class="admin-sub">
-            One button checks the Sports Controls setup, opens the dashboard, and keeps the full sync controls in one place.
+          <div class="admin-grid">
+            <div class="card admin-stat"><div class="admin-label">Users</div><div class="admin-number">${Number(counts.users || 0)}</div></div>
+            <div class="card admin-stat"><div class="admin-label">Games</div><div class="admin-number">${Number(counts.games || 0)}</div></div>
+            <div class="card admin-stat"><div class="admin-label">Questions</div><div class="admin-number">${Number(counts.categories || 0)}</div></div>
+            <div class="card admin-stat"><div class="admin-label">Locked</div><div class="admin-number">${Number(counts.lockedCategories || 0)}</div></div>
           </div>
 
           <div class="admin-actions">
-
-            <button
-              class="button admin-button"
-              onclick="adminOpenSportsControls()"
-            >
-              Open Sports Controls
-            </button>
-
+            <button class="button admin-button" onclick="navigate('admin-games')">Manage Games</button>
+            <button class="button admin-button secondary" onclick="adminLoadAutomationHealth()">System Health</button>
           </div>
-
-          <div
-            id="adminSportsControlMessage"
-            class="admin-message"
-          ></div>
-
-          <div
-            id="adminSportsControlPanel"
-            class="admin-list"
-          ></div>
-
+          <div id="adminMessage" class="admin-message"></div>
         </div>
 
-        <div class="card admin-card">
-
-          <h2>Sports Scores & Game Builder</h2>
-
-          <div class="admin-sub">
-            Open the admin-only Sports Scores workspace to review schedules, scores and records, then build Sports Wagers, Confidence games, player props, matchups, and advanced sports prediction questions.
-          </div>
-
-          <div class="admin-actions">
-            <button
-              class="button admin-button"
-              onclick="window.location.href='./sports.html'"
-            >
-              Open Sports Scores & Builder
-            </button>
-          </div>
-
-        </div>
-
-        <div class="card admin-card">
-
-          <h2>League Access</h2>
-
-          <div class="admin-sub">
-            Create leagues, add members, assign private games, and set feature access.
-          </div>
-
-          <button
-            class="button admin-button"
-            onclick="navigate('leagues')"
-          >
-            Open League Manager
-          </button>
-
-        </div>
-
-        <div class="card admin-card">
-
-         <h2>Manage Games</h2>
-
-         <div class="admin-sub">
-            Create draft games, clone previous games, archive games, and open game setup.
-         </div>
-
-         <button
-            class="button admin-button"
-            onclick="navigate('admin-games')"
-         >
-             Open Manage Games
-         </button>
-
-        </div>
-
-        <div class="card admin-card">
-
-          <h2>Appearance Manager</h2>
-
-          <div class="admin-sub">
-            Build reusable Image Packs and Theme Packs, assign them to any game, and override individual team or nominee artwork without rebuilding the game.
-          </div>
-
-          <button
-            class="button admin-button"
-            onclick="navigate('admin-appearance')"
-          >
-            Open Appearance Manager
-          </button>
-
-        </div>
-
-        <div class="card admin-card">
-
-          <h2>Awards Manager</h2>
-          <div class="admin-sub">
-            Build awards questions, search Kalshi and Polymarket live, attach market probabilities,
-            and queue selected mappings to the External Results Hub for administrator-reviewed results.
-          </div>
-
-          <button
-            class="button admin-button"
-            onclick="navigate('admin-awards')"
-          >
-            Open Awards Manager
-          </button>
-
-        </div>
-
-        <div class="card admin-card">
-
-          <h2>Reality TV Season Manager</h2>
-
-          <div class="admin-sub">
-            Create a season from one contestant roster, record weekly eliminations, require administrator approval, and automatically build the next episode.
-          </div>
-
-          <button
-            class="button admin-button"
-            onclick="navigate('admin-reality-tv')"
-          >
-            Open Reality TV Manager
-          </button>
-
-        </div>
-
-        <div class="card admin-card">
-
-          <h2>External Results Inbox</h2>
-
-          <div class="admin-sub">
-            Approved Awards, Reality TV, Kalshi, and Polymarket results arrive here before the PATTC Predicts changes scoring. Sports and racing never use this inbox. Automatic apply is off while we verify the bridge.
-          </div>
-
-          <div id="adminExternalResultsInboxStatus" class="admin-message">Checking External Results Inbox…</div>
-
-          <div class="admin-actions">
-            <button class="button admin-button secondary" onclick="adminExternalResultsInboxRefresh(this)">Refresh Status</button>
-            <button class="button admin-button secondary" onclick="adminExternalResultsInboxReconcile(this)">Sync Reality Status</button>
-            <button class="button admin-button secondary" onclick="adminExternalResultsInboxValidate(this)">Validate Ready</button>
-            <button class="button admin-button" onclick="adminExternalResultsInboxApply(this)">Apply Validated</button>
-            <button class="button admin-button secondary" onclick="adminExternalResultsInboxRetry(this)">Retry Errors</button>
-          </div>
-
-          <div id="adminExternalResultsInboxBatches" class="admin-list"></div>
-
-        </div>
-
-        <div class="card">
-
-          <h2>Category Controls</h2>
-
-          <div class="admin-list">
-
-            ${(res.categories || []).map(cat => `
-              <div class="admin-category-card">
-
-                <div class="admin-category-header">
-
-                  <div>
-                    <strong>
-                      ${cat.name || cat.id}
-                    </strong>
-
-                    <div class="admin-sub">
-                      ${cat.id}
-                      ·
-                      ${(cat.nominees || []).length} nominees
-                    </div>
-                  </div>
-
-                  <div class="admin-pill ${cat.locked ? "locked" : ""}">
-                    ${cat.locked ? "Locked" : "Open"}
-                  </div>
-
-                </div>
-
-                <div class="admin-control-grid">
-
-                  <label class="admin-field">
-                    <span>Points</span>
-
-                    <input
-                      type="number"
-                      id="points-${cat.id}"
-                      value="${cat.points || 0}"
-                      min="0"
-                    >
-                  </label>
-
-                  <label class="admin-field">
-                    <span>Result Status</span>
-
-                    <select
-                      id="result-status-${cat.id}"
-                      onchange="adminToggleCategoryResultStatus('${cat.id}')"
-                    >
-                      <option
-                        value="pending"
-                        ${cat.resultStatus === "pending" ? "selected" : ""}
-                      >
-                        Pending / Not Settled
-                      </option>
-
-                      <option
-                        value="winner"
-                        ${cat.resultStatus === "winner" ? "selected" : ""}
-                      >
-                        Final — Winner Selected
-                      </option>
-
-                      <option
-                        value="push"
-                        ${cat.resultStatus === "push" ? "selected" : ""}
-                      >
-                        Push — Return Stakes
-                      </option>
-
-                      <option
-                        value="cancelled"
-                        ${cat.resultStatus === "cancelled" ? "selected" : ""}
-                      >
-                        Cancelled / No Contest
-                      </option>
-                    </select>
-                  </label>
-
-                  <label class="admin-field">
-                    <span>Winner Nominee</span>
-
-                    <select
-                      id="winner-${cat.id}"
-                      ${cat.resultStatus === "winner" ? "" : "disabled"}
-                    >
-                      <option value="">
-                        No winner selected
-                      </option>
-
-                      ${(cat.nominees || []).map(nominee => `
-                        <option
-                          value="${nominee.id}"
-                          ${
-                            String(nominee.id || "")
-                              .trim()
-                              .toLowerCase() ===
-                            String(cat.winnerNomineeId || "")
-                              .trim()
-                              .toLowerCase()
-                              ? "selected"
-                              : ""
-                          }
-                        >
-                          ${nominee.name || nominee.id}
-                        </option>
-                      `).join("")}
-                    </select>
-                  </label>
-
-                </div>
-
-                <div class="admin-actions">
-
-                  <button
-                    class="admin-small-button"
-                    onclick="adminSaveCategory('${cat.id}')"
-                  >
-                    Save
-                  </button>
-
-                  <button
-                    class="admin-small-button secondary"
-                    onclick="adminToggleCategoryLock('${cat.id}', ${cat.locked ? "false" : "true"})"
-                  >
-                    ${cat.locked ? "Unlock" : "Lock"}
-                  </button>
-
-                  <button
-                    class="admin-small-button danger"
-                    onclick="adminClearWinner('${cat.id}')"
-                  >
-                    Reset to Pending
-                  </button>
-
-                </div>
-
-              </div>
-            `).join("")}
-
-          </div>
-
-        </div>
-
-        <div class="card">
-
-          <h2>User Controls</h2>
-
-          <div class="admin-user-create">
-
-            <h3>Create User</h3>
-
-            <div class="admin-control-grid">
-
-              <label class="admin-field">
-                <span>Username</span>
-
-                <input
-                  type="text"
-                  id="newUserUsername"
-                  placeholder="username"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>PIN</span>
-
-                <input
-                  type="text"
-                  id="newUserPin"
-                  placeholder="1234"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>Avatar</span>
-
-                <input
-                  type="text"
-                  id="newUserAvatar"
-                  value="avatar1"
-                >
-              </label>
-
-              <label class="admin-field">
-                <span>Theme Color</span>
-
-                <input
-                  type="text"
-                  id="newUserThemeColor"
-                  value="#ffcc00"
-                >
-              </label>
-
+        <details class="card admin-card admin-collapsible-card" open>
+          <summary class="admin-card-summary">
+            <div><h2>🎮 Games & Design</h2><div class="admin-sub">Create, configure, test, style and launch games.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-actions">
+              <button class="button admin-button" onclick="navigate('admin-games')">Manage Games & Templates</button>
+              <button class="button admin-button secondary" onclick="navigate('admin-appearance')">Appearance Manager</button>
+              <button class="button admin-button secondary" onclick="navigate('admin-awards')">Awards Manager</button>
+              <button class="button admin-button secondary" onclick="navigate('admin-reality-tv')">Reality TV Manager</button>
+              <button class="button admin-button secondary" onclick="window.location.href='./sports.html'">Sports Scores & Game Builder</button>
+              <button class="button admin-button secondary" onclick="adminOpenSportsControls()">Sports Engine Controls</button>
             </div>
-
-            <label class="admin-check-row">
-              <input
-                type="checkbox"
-                id="newUserIsAdmin"
-              >
-
-              <span>
-                Make admin
-              </span>
-            </label>
-
-            <button
-              class="admin-small-button"
-              onclick="adminCreateUser()"
-            >
-              Create User
-            </button>
-
+            <div id="adminSportsControlMessage" class="admin-message"></div>
+            <div id="adminSportsControlPanel" class="admin-list"></div>
           </div>
+        </details>
 
-          <hr class="admin-divider">
-
-          <h3>Existing Users</h3>
-
-          <div class="admin-list">
-
-            ${(res.users || []).map(user => `
-              <div class="admin-user-card">
-
-                <div class="admin-user-header">
-
-                  <div>
-                    <strong>
-                      ${user.username}
-                    </strong>
-
-                    <div class="admin-sub">
-                      ${user.isAdmin ? "Administrator" : "Player"}
-                      ·
-                      ${user.active === false ? "Inactive" : "Active"}
-                    </div>
-                  </div>
-
-                  <div class="admin-pill ${user.active === false ? "inactive" : user.isAdmin ? "admin" : ""}">
-                    ${user.active === false ? "Inactive" : user.isAdmin ? "Admin" : "Player"}
-                  </div>
-
-                </div>
-
-                <div class="admin-actions">
-
-                  <button
-                    class="admin-small-button secondary"
-                    onclick="adminPromptResetPin('${user.username}')"
-                  >
-                    Reset PIN
-                  </button>
-
-                  <button
-                    class="admin-small-button ${user.isAdmin ? "danger" : "secondary"}"
-                    onclick="adminToggleUserAdmin('${user.username}', ${user.isAdmin ? "false" : "true"})"
-                  >
-                    ${user.isAdmin ? "Remove Admin" : "Make Admin"}
-                  </button>
-
-                  <button
-                    class="admin-small-button ${user.active === false ? "secondary" : "danger"}"
-                    onclick="adminToggleUserActive('${user.username}', ${user.active === false ? "true" : "false"})"
-                  >
-                    ${user.active === false ? "Reactivate" : "Deactivate"}
-                  </button>
-
-                </div>
-
-              </div>
-            `).join("")}
-
+        <details class="card admin-card admin-collapsible-card">
+          <summary class="admin-card-summary">
+            <div><h2>🏆 Results & Scoring</h2><div class="admin-sub">Approve external results or open manual result controls only when needed.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-actions">
+              <button class="button admin-button" onclick="adminExternalResultsInboxRefresh(this)">Load External Results Inbox</button>
+              <button class="button admin-button secondary" onclick="adminLoadLegacyControls_('categories')">Manual Category Results</button>
+            </div>
+            <div id="adminExternalResultsInboxStatus" class="admin-message">Status not loaded.</div>
+            <div class="admin-actions">
+              <button class="button admin-button secondary" onclick="adminExternalResultsInboxReconcile(this)">Sync Reality Status</button>
+              <button class="button admin-button secondary" onclick="adminExternalResultsInboxValidate(this)">Validate Ready</button>
+              <button class="button admin-button" onclick="adminExternalResultsInboxApply(this)">Apply Validated</button>
+              <button class="button admin-button secondary" onclick="adminExternalResultsInboxRetry(this)">Retry Errors</button>
+            </div>
+            <div id="adminExternalResultsInboxBatches" class="admin-list"></div>
+            <div id="adminLazyCategoryControls" class="admin-list"></div>
           </div>
+        </details>
 
-        </div>
+        <details class="card admin-card admin-collapsible-card">
+          <summary class="admin-card-summary">
+            <div><h2>👥 Players & Leagues</h2><div class="admin-sub">Manage players, admins, access and private leagues.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-actions">
+              <button class="button admin-button" onclick="navigate('leagues')">League Manager</button>
+              <button class="button admin-button secondary" onclick="adminLoadLegacyControls_('users')">Load User Controls</button>
+            </div>
+            <div id="adminLazyUserControls" class="admin-list"></div>
+          </div>
+        </details>
+
+        <details class="card admin-card admin-collapsible-card" id="adminSystemHealthSection">
+          <summary class="admin-card-summary">
+            <div><h2>⚙️ System & Automation</h2><div class="admin-sub">Trigger usage, automation health, storage and caches.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-actions">
+              <button class="button admin-button" onclick="adminLoadAutomationHealth()">Check Automation Health</button>
+              <button class="button admin-button secondary" onclick="adminCheckStorageHealth('${escapeJs(res.gameId || "")}')">Check Storage Health</button>
+              <button class="button admin-button secondary" onclick="adminClearCaches()">Clear App Caches</button>
+            </div>
+            <div id="adminAutomationHealth" class="admin-storage-health"></div>
+            <div id="adminStorageHealth" class="admin-storage-health"></div>
+          </div>
+        </details>
+
+        <details class="card admin-card admin-collapsible-card">
+          <summary class="admin-card-summary">
+            <div><h2>🛠 Advanced / Repair</h2><div class="admin-sub">Setup, migrations and repair tools. Normal game administration should not require these.</div></div>
+            <span class="admin-collapse-icon">▾</span>
+          </summary>
+          <div class="admin-collapsible-body">
+            <div class="admin-actions">
+              <button class="button admin-button secondary" onclick="adminSetupLiveResultsSystem()">Setup Live Results</button>
+              <button class="button admin-button secondary" onclick="adminSetupNormalizedStorage()">Setup / Migrate Storage</button>
+            </div>
+          </div>
+        </details>
 
       </div>
-
     </div>
   `;
+}
 
+var ADMIN_LAZY_DETAILS_CACHE_ = null;
+
+function adminCategoryControlsHtml_(categories) {
+  categories = Array.isArray(categories) ? categories : [];
+  if (!categories.length) return `<div class="admin-sub">No questions/categories found for the current game.</div>`;
+
+  return `
+    <h3>Manual Category Results</h3>
+    ${categories.map(function(cat) {
+      return `
+        <div class="admin-category-card">
+          <div class="admin-category-header">
+            <div><strong>${escapeHtml_(cat.name || cat.id)}</strong><div class="admin-sub">${escapeHtml_(cat.id || "")} · ${(cat.nominees || []).length} nominees</div></div>
+            <div class="admin-pill ${cat.locked ? "locked" : ""}">${cat.locked ? "Locked" : "Open"}</div>
+          </div>
+          <div class="admin-control-grid">
+            <label class="admin-field"><span>Points</span><input type="number" id="points-${escapeHtml_(cat.id)}" value="${Number(cat.points || 0)}" min="0"></label>
+            <label class="admin-field"><span>Result Status</span>
+              <select id="result-status-${escapeHtml_(cat.id)}" onchange="adminToggleCategoryResultStatus('${escapeJs(cat.id)}')">
+                <option value="pending" ${cat.resultStatus === "pending" ? "selected" : ""}>Pending / Not Settled</option>
+                <option value="winner" ${cat.resultStatus === "winner" ? "selected" : ""}>Final — Winner Selected</option>
+                <option value="push" ${cat.resultStatus === "push" ? "selected" : ""}>Push — Return Stakes</option>
+                <option value="cancelled" ${cat.resultStatus === "cancelled" ? "selected" : ""}>Cancelled / No Contest</option>
+              </select>
+            </label>
+            <label class="admin-field"><span>Winner Nominee</span>
+              <select id="winner-${escapeHtml_(cat.id)}" ${cat.resultStatus === "winner" ? "" : "disabled"}>
+                <option value="">No winner selected</option>
+                ${(cat.nominees || []).map(function(nominee) {
+                  const selected = String(nominee.id || "").trim().toLowerCase() === String(cat.winnerNomineeId || "").trim().toLowerCase();
+                  return `<option value="${escapeHtml_(nominee.id || "")}" ${selected ? "selected" : ""}>${escapeHtml_(nominee.name || nominee.id)}</option>`;
+                }).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="admin-actions">
+            <button class="admin-small-button" onclick="adminSaveCategory('${escapeJs(cat.id)}')">Save</button>
+            <button class="admin-small-button secondary" onclick="adminToggleCategoryLock('${escapeJs(cat.id)}', ${cat.locked ? "false" : "true"})">${cat.locked ? "Unlock" : "Lock"}</button>
+            <button class="admin-small-button danger" onclick="adminClearWinner('${escapeJs(cat.id)}')">Reset to Pending</button>
+          </div>
+        </div>`;
+    }).join("")}
+  `;
+}
+
+function adminUserControlsHtml_(users) {
+  users = Array.isArray(users) ? users : [];
+  return `
+    <div class="admin-user-create">
+      <h3>Create User</h3>
+      <div class="admin-control-grid">
+        <label class="admin-field"><span>Username</span><input type="text" id="newUserUsername" placeholder="username"></label>
+        <label class="admin-field"><span>PIN</span><input type="text" id="newUserPin" placeholder="1234"></label>
+        <label class="admin-field"><span>Avatar</span><input type="text" id="newUserAvatar" value="avatar1"></label>
+        <label class="admin-field"><span>Theme Color</span><input type="text" id="newUserThemeColor" value="#ffcc00"></label>
+      </div>
+      <label class="admin-check-row"><input type="checkbox" id="newUserIsAdmin"><span>Make admin</span></label>
+      <button class="admin-small-button" onclick="adminCreateUser()">Create User</button>
+    </div>
+    <hr class="admin-divider">
+    <h3>Existing Users</h3>
+    ${users.length ? users.map(function(user) {
+      return `
+        <div class="admin-user-card">
+          <div class="admin-user-header">
+            <div><strong>${escapeHtml_(user.username || "")}</strong><div class="admin-sub">${user.isAdmin ? "Administrator" : "Player"} · ${user.active === false ? "Inactive" : "Active"}</div></div>
+            <div class="admin-pill ${user.active === false ? "inactive" : user.isAdmin ? "admin" : ""}">${user.active === false ? "Inactive" : user.isAdmin ? "Admin" : "Player"}</div>
+          </div>
+          <div class="admin-actions">
+            <button class="admin-small-button secondary" onclick="adminPromptResetPin('${escapeJs(user.username)}')">Reset PIN</button>
+            <button class="admin-small-button ${user.isAdmin ? "danger" : "secondary"}" onclick="adminToggleUserAdmin('${escapeJs(user.username)}', ${user.isAdmin ? "false" : "true"})">${user.isAdmin ? "Remove Admin" : "Make Admin"}</button>
+            <button class="admin-small-button ${user.active === false ? "secondary" : "danger"}" onclick="adminToggleUserActive('${escapeJs(user.username)}', ${user.active === false ? "true" : "false"})">${user.active === false ? "Reactivate" : "Deactivate"}</button>
+          </div>
+        </div>`;
+    }).join("") : `<div class="admin-sub">No users found.</div>`}
+  `;
+}
+
+async function adminLoadLegacyControls_(target) {
+  const categoryHost = document.getElementById("adminLazyCategoryControls");
+  const userHost = document.getElementById("adminLazyUserControls");
+  const host = target === "users" ? userHost : categoryHost;
+  if (!host) return;
+  host.innerHTML = `<div class="admin-sub">Loading…</div>`;
+
+  try {
+    if (!ADMIN_LAZY_DETAILS_CACHE_) {
+      const details = await apiAdminSummary(true);
+      if (!details || details.success === false) throw new Error((details && (details.error || details.message)) || "Could not load admin controls.");
+      ADMIN_LAZY_DETAILS_CACHE_ = details;
+    }
+    if (target === "users") userHost.innerHTML = adminUserControlsHtml_(ADMIN_LAZY_DETAILS_CACHE_.users || []);
+    else categoryHost.innerHTML = adminCategoryControlsHtml_(ADMIN_LAZY_DETAILS_CACHE_.categories || []);
+  } catch (err) {
+    host.innerHTML = `<div class="admin-message error">${escapeHtml_(err && err.message ? err.message : String(err))}</div>`;
+  }
+}
+
+function adminAutomationHealthRender_(res) {
+  const host = document.getElementById("adminAutomationHealth");
+  if (!host) return;
+  if (!res || res.success === false) {
+    host.innerHTML = `<div class="admin-message error">${escapeHtml_((res && (res.error || res.message)) || "Could not read automation health.")}</div>`;
+    return;
+  }
+
+  const level = String(res.level || "healthy");
+  const duplicates = Array.isArray(res.duplicates) ? res.duplicates : [];
+  const durable = Array.isArray(res.durableTriggers) ? res.durableTriggers : [];
+  const transient = Array.isArray(res.transientTriggers) ? res.transientTriggers : [];
+  const others = Array.isArray(res.otherTriggers) ? res.otherTriggers : [];
+
+  host.innerHTML = `
+    <div class="admin-message ${level === "critical" ? "error" : level === "warning" ? "warning" : "success"}">
+      <b>${Number(res.totalTriggers || 0)} / ${Number(res.triggerLimit || 20)}</b> Apps Script trigger slots used · <b>${Number(res.remainingSlots || 0)}</b> available.
+      ${Number(res.duplicateDurableCount || 0) ? ` ${Number(res.duplicateDurableCount)} durable worker(s) have duplicates.` : " No duplicate durable workers detected."}
+    </div>
+    <div class="admin-list">
+      ${durable.concat(transient).concat(others).map(function(row) {
+        return `<div class="admin-list-row"><div><b>${escapeHtml_(row.label || row.handler)}</b><div class="admin-sub">${escapeHtml_(row.handler || "")} · ${escapeHtml_(row.kind || "")}</div></div><span class="admin-pill">${escapeHtml_(row.eventType || "Trigger")}</span></div>`;
+      }).join("") || `<div class="admin-sub">No project triggers installed.</div>`}
+    </div>
+    ${duplicates.some(function(item) { return item.removable; }) ? `<button class="button admin-button secondary" onclick="adminCleanupAutomationDuplicates()">Remove Safe Duplicate Triggers</button>` : ""}
+  `;
+}
+
+async function adminLoadAutomationHealth() {
+  const section = document.getElementById("adminSystemHealthSection");
+  if (section) section.open = true;
+  const host = document.getElementById("adminAutomationHealth");
+  if (host) host.innerHTML = `<div class="admin-sub">Checking automation health…</div>`;
+  const res = await apiAdminGetAutomationHealth();
+  adminAutomationHealthRender_(res);
+}
+
+async function adminCleanupAutomationDuplicates() {
+  if (!confirm("Remove duplicate durable automation triggers while keeping one copy of each worker? Temporary Reality TV continuation triggers will not be touched.")) return;
+  const res = await apiAdminCleanupDuplicateAutomationTriggers();
+  adminAutomationHealthRender_(res);
+}
+
+function adminEnhanceMainAdminSections() {
+  // v1.2.19-rc1 renders a purpose-built organized dashboard. Do not wrap its
+  // cards again and do not auto-poll heavy result services on page startup.
+  const root = document.querySelector(".admin-page > .admin-section");
+  if (!root || root.dataset.adminOrganized === "1") return;
 }
 
 /* =========================
    ADMIN GAMES PANEL
 ========================= */
 
-
-function adminEnhanceMainAdminSections() {
-  const root = document.querySelector(".admin-page > .admin-section");
-  if (!root) return;
-
-  Array.from(root.children).forEach(function(child) {
-    if (!child || !child.classList || !child.classList.contains("card")) return;
-    if (child.closest("details.admin-main-section-card")) return;
-
-    const heading = child.querySelector(":scope > h2");
-    if (!heading) return;
-
-    const details = document.createElement("details");
-    details.className = "card admin-card admin-collapsible-card admin-main-section-card";
-
-    const summary = document.createElement("summary");
-    summary.className = "admin-card-summary";
-    summary.innerHTML = `
-      <div>
-        <h2>${escapeHtml_(heading.textContent || "Admin Section")}</h2>
-      </div>
-      <span class="admin-collapse-icon">▾</span>
-    `;
-
-    child.parentNode.insertBefore(details, child);
-    details.appendChild(summary);
-    child.classList.add("admin-main-section-content");
-    heading.remove();
-    details.appendChild(child);
-  });
-
-  if (typeof adminExternalResultsInboxRefresh === "function") {
-    setTimeout(function() { adminExternalResultsInboxRefresh(null, true); }, 0);
-  }
-}
 
 function adminExternalResultsInboxCount_(counts, key) {
   return Number((counts || {})[key] || 0);
@@ -1242,6 +924,55 @@ if (typeof document !== "undefined" && !window.__adminHelpDismissBound) {
 function adminCanonicalGameType_(value) {
   const type = String(value || "prediction").trim().toLowerCase();
   return (type === "combo" || type === "hybrid") ? "mixed" : type;
+}
+
+function adminBuiltInGameTemplates_() {
+  return [
+    { id: "prediction", label: "Standard Prediction", type: "prediction", scoringEngine: "manual" },
+    { id: "confidence-nfl", label: "NFL Confidence Pool", type: "confidence", scoringEngine: "sports", league: "nfl" },
+    { id: "sports-wager", label: "Sports Wager", type: "wager", scoringEngine: "sports" },
+    { id: "ranking", label: "Ranking Game", type: "ranking", scoringEngine: "manual" },
+    { id: "survivor-manual", label: "Manual Survivor / Elimination", type: "survivor", scoringEngine: "manual", survivorMode: "manual-elimination" },
+    { id: "survivor-nfl", label: "NFL Survivor", type: "survivor", scoringEngine: "sports", survivorMode: "sports-survivor", league: "nfl" },
+    { id: "streak-nfl", label: "NFL Streak Survivor", type: "survivor", scoringEngine: "sports", survivorMode: "streak-survivor", league: "nfl" },
+    { id: "koth", label: "King of the Hill", type: "survivor", scoringEngine: "sports", survivorMode: "king-of-the-hill", league: "nfl" },
+    { id: "team-fantasy", label: "Team Fantasy Football", type: "team-fantasy", scoringEngine: "sports", league: "nfl" },
+    { id: "voting", label: "Voting / Competition", type: "voting", scoringEngine: "manual" },
+    { id: "awards", label: "Awards Show", type: "prediction", scoringEngine: "internet" },
+    { id: "reality", label: "Reality Competition", type: "prediction", scoringEngine: "internet" },
+    { id: "hybrid", label: "Hybrid / Multi-Mode", type: "mixed", scoringEngine: "mixed" }
+  ];
+}
+
+function renderAdminGameTemplateOptions_() {
+  return `<option value="">Start from Game Type</option>` + adminBuiltInGameTemplates_().map(function(template) {
+    return `<option value="${escapeHtml_(template.id)}">${escapeHtml_(template.label)}</option>`;
+  }).join("");
+}
+
+function adminApplyGameTemplate(select) {
+  const form = select && select.form;
+  if (!form || !select.value) return;
+  const template = adminBuiltInGameTemplates_().filter(function(item) { return item.id === select.value; })[0];
+  if (!template) return;
+
+  if (form.type) form.type.value = template.type;
+  adminApplyGameTypeDefaults(form);
+  if (form.scoringEngine && template.scoringEngine) form.scoringEngine.value = template.scoringEngine;
+  if (form.survivorMode && template.survivorMode) form.survivorMode.value = template.survivorMode;
+  if (form.survivorLeague && template.league) form.survivorLeague.value = template.league;
+  if (form.survivorSport && template.league === "nfl") form.survivorSport.value = "football";
+
+  if (template.id === "awards" && form.description && !form.description.value) {
+    form.description.value = "Awards prediction game — build questions in Awards Manager.";
+  }
+  if (template.id === "reality" && form.description && !form.description.value) {
+    form.description.value = "Reality competition game — manage cast and episodes in Reality TV Manager.";
+  }
+
+  if (typeof adminUpdateSurvivorRuleFields === "function") adminUpdateSurvivorRuleFields(form);
+  adminUpdateGameTypeSections(form);
+  adminMarkGameFormDirty(form);
 }
 
 function adminCanonicalGameStatus_(value, active, archived) {
@@ -2135,6 +1866,15 @@ function renderAdminGameForm(
                   ${renderAdminYearOptions_(game.year || currentYear)}
                 </select>
               </label>
+
+              ${isNew ? `
+              <label class="admin-field">
+                ${adminFieldLabel_("Start From Template", "Applies safe defaults for a common game. You can change every setting after the template is applied.")}
+                <select name="gameTemplate" onchange="adminApplyGameTemplate(this)">
+                  ${renderAdminGameTemplateOptions_()}
+                </select>
+              </label>
+              ` : ""}
 
               <label class="admin-field">
                 ${adminFieldLabel_("Game Type", "Controls which scoring and question settings are available. Hybrid is the only type that exposes multiple scoring systems.")}
@@ -4573,6 +4313,31 @@ async function adminClearWinner(categoryId) {
 
 }
   
+async function adminCreateUser() {
+  const username = String((document.getElementById("newUserUsername") || {}).value || "").trim();
+  const pin = String((document.getElementById("newUserPin") || {}).value || "").trim();
+  const avatar = String((document.getElementById("newUserAvatar") || {}).value || "avatar1").trim() || "avatar1";
+  const themeColor = String((document.getElementById("newUserThemeColor") || {}).value || "#ffcc00").trim() || "#ffcc00";
+  const isAdmin = !!((document.getElementById("newUserIsAdmin") || {}).checked);
+  const message = document.getElementById("adminMessage");
+
+  if (!username || !pin) {
+    if (message) message.innerText = "Username and PIN are required.";
+    return;
+  }
+
+  if (message) message.innerText = "Creating user...";
+  const res = await apiAdminCreateUser({ username: username, pin: pin, isAdmin: isAdmin, avatar: avatar, themeColor: themeColor });
+  if (!res || res.success === false) {
+    if (message) message.innerText = (res && (res.error || res.message)) || "Unable to create user.";
+    return;
+  }
+
+  ADMIN_LAZY_DETAILS_CACHE_ = null;
+  if (message) message.innerText = "User created.";
+  await navigate("admin");
+}
+
 async function adminPromptResetPin(username) {
   
     const pin =

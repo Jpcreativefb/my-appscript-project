@@ -1,124 +1,101 @@
-# Awards App Production Status
+# PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.16 — Fall Production Hardening**
+Current release candidate: **v1.2.19-rc1 — Production Readiness**
 
-Release asset marker: **sports-live-score-fetch-hotfix-v1216**
+Release asset marker: **v1219rc1-production-readiness**
 
-## Release state
+## Status
 
-v1.2.16 is the first release candidate focused primarily on production engineering rather than adding another game mode. It is intended to become the stable Fall 2026 baseline after deployment and smoke testing.
+**Code gate: PASS. Live certification: REQUIRED AFTER DEPLOYMENT.**
 
-### Ready for Fall smoke testing
+This release freezes new gameplay development and focuses on production hardening of the complete current feature set. No game engine is intentionally removed.
 
-- Standard prediction games
-- Head-to-head games
-- Confidence games
-- Staked prediction games
-- Wager / chips games
+### Production-candidate game systems
+
+- Standard Prediction / Head-to-Head
+- Confidence
+- Staked Prediction
+- Sports Wager and Racing Wager
 - Hybrid games
-- Awards Manager v1.2.16 batch builder with event-first provider search, Official Website references, per-market answer controls, and Hub mapping
-- Reality TV seasons, episodes, extra questions, contestant/tribe workflows, durable approvals, historical results, and Season Survivor picks
-- Sports score/wager integrations
-- Racing score/wager integrations
-- Private leagues, profiles, archives, leaderboards, and career/history surfaces
-- External Results Hub review-first settlement flow
+- Ranking
+- Manual Survivor / Elimination
+- Sports Survivor
+- Streak Survivor
+- King of the Hill
+- Team Fantasy Football
+- Voting / Competition participant entry and ballots
+- Awards Manager workflows
+- Reality TV seasons, cast, episodes, approvals and automation
+- Parent / mini-game season hubs, private leagues, profiles, leaderboards and archives
 
-### Deliberately not production-enabled yet
+## v1.2.19-rc1 hardening
 
-- Generic **Ranking** game mode
-- Generic **Survivor / Elimination** game mode
+### API and session transport
 
-Those two modes remain blocked by production preflight until their dedicated entry/scoring/advancement workflows are finished. The specialized Reality TV Survivor workflow is separate and remains available.
+- Adds repo-owned Cloudflare Pages Function `/api/app` as the primary generic POST bridge.
+- Authenticated frontend reads and all writes use POST so session tokens do not need to appear in URLs.
+- All state-changing actions are POST-only. Legacy authenticated read-only GET routes remain temporarily accepted for mixed-deployment/backward compatibility, while the current frontend sends authenticated reads by POST so steady-state session tokens stay out of URLs.
+- `doPost` safely reuses the established Apps Script route table internally, avoiding a risky duplicate router.
+- Standalone Sports admin calls now use the same POST bridge instead of authenticated JSONP.
+- The legacy external POST Worker remains only as a short mixed-deployment compatibility fallback when `/api/app` returns 404/405.
 
-## v1.2.16 hardening completed in code
+### Admin simplification and startup performance
 
-- Added a centralized API authorization boundary in `backend/core/ApiSecurity.js`.
-- Every `admin...` API action is now classified as administrator-only automatically.
-- Player-owned API actions derive the acting username from the authenticated session instead of trusting a browser-supplied username.
-- Credential actions (`login`, `signup`, PIN reset request, PIN reset) require POST.
-- Player writes (picks, bets, profile changes, Reality TV Season Survivor picks), notification preferences, and league-management writes use POST.
-- Frontend API helpers automatically attach the current session to authenticated GET and POST requests.
-- PINs are stored using versioned salted HMAC-SHA256 credentials instead of new plaintext values.
-- Persisted session tokens are stored as hashes rather than new raw bearer tokens.
-- Existing legacy PIN/session values migrate in place without requiring users to change their PIN.
-- Login failure throttling and PIN-reset request throttling were added.
-- Deactivating a user revokes their current session.
-- User Active / AccountStatus compatibility was normalized.
-- Dashboard/Home progress now reads the logged-in user’s actual saved picks/wagers and tells players how many selections remain.
-- Awards Manager `View Event` now scrolls/focuses the Build/Link workspace with visible loading/error feedback so provider-event selection cannot appear to do nothing.
-- Awards Manager now supports a preferred Official Website URL, auto-detects non-provider settlement URLs when available, and preserves Kalshi/Polymarket as secondary market-data references.
-- Awards Manager uses a staged batch builder: choose game/source defaults once, multi-select events, load them into an editable question grid, choose individual markets/answers, then build all selected questions. `View Event` still expands Build/Link inline under the event.
-- Awards-created questions inherit the target Game Type scoring; Hybrid games can choose Fixed, Confidence, Staked, Wager, or Ranking per question.
-- New Awards pick questions default to unlimited changes until lock, and admins can choose a fixed change limit.
-- Non-Reality-TV games no longer render the deferred Season Survivor placeholder.
-- External probability labels use `K` / `P`; admins can hide probabilities game-wide, per question, or per answer without discarding market data. Awards Wager questions persist provider-derived decimal odds per answer.
-- Awards question display now supports Text, Compact, and Image plus explicit question order, section, points, and pick-change controls in the batch grid.
-- Awards Manager now uses collapsible, mobile-first sections with a compact event editor, touch-friendly question ordering, provider category choices, clearer contextual help, and staged build progress.
-- Awards Manager Review/Sort now uses the same question position model as Manage Games: visible # position, direct jump, ↑/↓, desktop drag/drop, and collapse/expand-all controls.
-- Saved pick cards explicitly surface the change affordance (`Tap to change until lock` or remaining changes) so unlimited/fixed change settings are visible to players.
-- Manage Games now shows a canonical question position and supports ↑/↓ plus direct moves to any position (for example #29 → #4), with atomic backend renumbering. Question cards can be collapsed to a compact title-only list. Nominee/answer reordering remains deferred pending a migration-safe legacy/normalized storage implementation.
-- Game startup performance now reuses per-game settings, caches the global question/game compatibility map, reads normalized DataIndex once per execution, and caches compact K/P probability lookups so game switching does not repeatedly rescan growing project sheets/Hub data.
-- Normal player/game reads no longer run legacy→normalized synchronization; non-Reality games also use a cached season-existence check before touching Reality TV support data.
-- Manage Games question ordering now uses one atomic backend reorder operation, and question Settings exposes Pick Changes Before Lock (Unlimited / None / numeric limit) beside Lock Date / Time.
-- Disabled Awards markets/outcomes are excluded from both created answers and External Results Hub mappings.
-- Release/cache markers are unified at v1.2.16.
-- Brittle old version-marker regression assertions were replaced with a current-release contract.
-- GitHub Actions production checks were added.
-- Repository release-note clutter is archived under `docs/archive/releases/` rather than deleted.
+- Admin Home is reorganized into five areas: Games & Design, Results & Scoring, Players & Leagues, System & Automation, and Advanced / Repair.
+- Admin Home requests a compact summary instead of loading every user, category and nominee during startup.
+- User controls and manual category result controls load only when explicitly opened.
+- External Results Inbox no longer auto-polls merely because Admin Home opened.
+- Existing advanced features remain reachable; they are no longer all displayed at once.
 
+### Game templates
 
-### Sports Live Score Fetch Hotfix
+Create New Game includes built-in starting templates for:
 
-- External Sports Scores Engine live polling is date-scoped (yesterday/today/tomorrow) rather than season-wide.
-- Professional live score requests omit the broad `season=...&limit=500` pattern that returned ESPN HTTP 403 from Apps Script on August 15, 2026.
-- This requires a separate deployment of `external-engines/sports-scoring-engine/src/SportsScoresEngine.js`; updating the main Awards App deployment alone does not deploy it.
+- Standard Prediction
+- NFL Confidence Pool
+- Sports Wager
+- Ranking
+- Manual Survivor / Elimination
+- NFL Survivor
+- NFL Streak Survivor
+- King of the Hill
+- Team Fantasy Football
+- Voting / Competition
+- Awards Show
+- Reality Competition
+- Hybrid / Multi-Mode
+
+Templates configure the existing engines; they do not create parallel copies of gameplay code.
+
+### Automation health
+
+- Adds a central Apps Script trigger inventory.
+- Displays trigger-slot usage against the 20-trigger project limit.
+- Separates durable workers, temporary Reality TV continuation workers and other triggers.
+- Detects duplicates.
+- Offers safe duplicate cleanup only for durable workers that are designed to have one installed trigger.
+- Temporary Reality TV continuation triggers are never removed by duplicate cleanup.
 
 ## Automated release gate
 
 Run:
 
 ```bash
-./tools/run_production_checks.sh
+bash tools/run_production_checks.sh
 ```
 
-Expected v1.2.16 result before packaging/deployment:
+The gate checks:
 
-```txt
-PASS: 117 JavaScript files
-PASS: API/app mirrors synchronized
-PASS: 93 regression tests
-PASS: v1.2.16 release/security contract
-ALL PRODUCTION CHECKS PASSED
-```
+1. JavaScript syntax across backend, frontend, external engines and Cloudflare Functions.
+2. Frontend compatibility mirrors.
+3. Complete regression suite.
+4. Legacy production-hardening/security regression contract.
+5. v1.2.19-rc1 production-readiness contract.
 
-## Deployment requirement
+## What remains before declaring LIVE
 
-This release changes both backend API authorization and frontend request behavior. Stage the Apps Script files/version first (`clasp push` + `clasp version`), publish the frontend, then immediately redeploy the existing Apps Script production deployment to that staged version. This minimizes the short mixed-version window without changing the web-app URL.
+Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_19_RC1.md` and do not declare the release production-certified until its P0/P1 sections pass.
 
-After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_16.md` before declaring v1.2.16 the production baseline.
+## Release rule until launch
 
-## Next development phase after v1.2.16 validation
-
-1. Finish and certify generic Survivor / Elimination games.
-2. Finish and certify Ranking games.
-3. Build reusable Fall game templates for football, Emmys/awards, and recurring Reality TV seasons.
-4. Continue reducing normal admin workflows to Create → Configure → Test → Activate → Approve Results → Archive while keeping repair tools under Advanced/Diagnostics.
-
-### Awards Batch Builder Runtime Hotfix
-- Fixed normalized storage `optionPayload` scope failure that blocked Awards batch question creation.
-- Runtime regression coverage added for question/option odds projection.
-
-
-- Home Dashboard startup now batches active-game question/pick/wager progress and skips live archive progress (`HOME_DASHBOARD_STARTUP_PERFORMANCE_HOTFIX_V1_2_16.md`).
-
-
-## v1.2.16 Question Drag / Order Reliability Hotfix
-
-- Question ordering now persists through `adminSetQuestionOrder` using one final ordered ID list.
-- Manage Games supports desktop drag/drop plus mobile direct-position and arrow fallback.
-- Awards Manager staging uses the same simplified ordering controls.
-- Production gate: 117 JavaScript syntax checks and 92 regression/behavior tests passing.
-
-### Sports ESPN CDN fallback
-- Date-scoped NFL/MLB live score requests can fall back to ESPN CDN when `site.api.espn.com` returns HTTP 403 from Cloudflare/Apps Script.
-- Secure token and strict proxy allowlist remain required.
+No new game modes or large architecture rewrites. Only launch blockers, measured performance fixes, UI simplification and production reliability fixes should enter this candidate.

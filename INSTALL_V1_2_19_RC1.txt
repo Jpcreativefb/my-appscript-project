@@ -1,0 +1,34 @@
+PATTC Predicts v1.2.19-rc1 — Production Readiness
+
+This controlled update is built for the exact full project ZIP supplied on August 24, 2026.
+It is a production-hardening release, not a new gameplay-feature release.
+
+What this release does:
+1. Makes every state-changing API action POST-only and moves normal authenticated frontend traffic to POST.
+2. Adds a repo-owned Cloudflare Pages Function at /api/app as the primary generic POST bridge.
+3. Keeps legacy authenticated read-only GET routes temporarily compatible during mixed frontend/backend deployment.
+4. Replaces the heavy Admin landing load with a compact summary and lazy detail loading.
+5. Organizes Admin into Games & Design, Results & Scoring, Players & Leagues, System & Automation, and Advanced / Repair.
+6. Stops automatic External Results Inbox polling just because Admin opens.
+7. Adds built-in Create New Game templates for the current production game engines.
+8. Adds Automation Health with trigger inventory, warnings, and safe duplicate durable-trigger cleanup.
+9. Updates release/cache markers to v1.2.19-rc1.
+10. Expands the production gate to include the new production-readiness security contract.
+11. Adds a current live smoke/performance certification checklist.
+
+Installer safeguards:
+- Requires branch architecture-cleanup.
+- Requires a clean repository.
+- Requires local HEAD to match origin/architecture-cleanup.
+- Verifies SHA-256 hashes against the exact uploaded baseline before changing anything.
+- Copies only the controlled release payload.
+- Runs mirror sync, syntax checks, targeted contracts, and the complete production suite before commit/deploy.
+- Commits the release.
+- Deploys Apps Script first for mixed-deployment compatibility.
+- Pushes GitHub second to trigger the normal Cloudflare frontend/functions deployment.
+- Re-runs the full production checks after deployment.
+
+IMPORTANT AFTER INSTALL:
+The local/static production gate can certify code contracts, but it cannot prove live Google Sheets latency,
+concurrent-user behavior, Cloudflare propagation, mobile/PWA cache refresh, or real trigger runtime.
+Run PRODUCTION_SMOKE_TEST_V1_2_19_RC1.md against the deployed app before changing status from RC to LIVE.

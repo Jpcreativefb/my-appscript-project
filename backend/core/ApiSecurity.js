@@ -32,6 +32,45 @@ function apiSecurityIsAdminAction_(action) {
   return /^admin/.test(String(action || ""));
 }
 
+// Production transport contract. Every mutation requires POST. Read-only GET
+// remains accepted by the backend for rollout/backward compatibility with an
+// already-open old frontend tab, but the current frontend sends authenticated
+// reads through POST so bearer tokens are not placed in URLs in steady state.
+var API_EXPLICIT_POST_ACTIONS_ = {
+  login: true, logout: true, signup: true, requestPinReset: true, resetPin: true,
+  saveEditableProfile: true, saveUserProfile: true, uploadProfileAvatar: true,
+  setGameProfilePromptChoice: true, setNotificationPreference: true,
+  saveNotificationPreferences: true, markNotificationRead: true, markAllNotificationsRead: true,
+  registerPushSubscription: true, removePushSubscription: true,
+  savePick: true, savePicksBatch: true, saveConfidencePicksBatch: true, saveRanking: true,
+  saveVotingParticipant: true, uploadVotingParticipantImage: true, saveVotingCompetitionBallot: true,
+  saveSurvivorPick: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,
+  saveTeamFantasyPick: true, randomTeamFantasyPicks: true, autoPickTeamFantasy: true,
+  createLeague: true, addLeagueMember: true, removeLeagueMember: true, assignGameToLeague: true,
+  saveLeagueFeatureAccess: true, setGameLeagueVisibility: true, removeGameFromLeague: true, updateLeague: true
+};
+
+function apiSecurityAdminReadAction_(action) {
+  action = String(action || "").trim();
+  return action === "adminSummary" ||
+    /^adminGet/.test(action) ||
+    /^adminAwardsGet/.test(action) ||
+    /^adminAwardsSearch/.test(action) ||
+    /^adminPreview/.test(action) ||
+    /^adminParse/.test(action);
+}
+
+function apiSecurityRequiresPost_(action) {
+  action = String(action || "").trim();
+  if (API_EXPLICIT_POST_ACTIONS_[action] === true) return true;
+  if (apiSecurityIsAdminAction_(action)) return !apiSecurityAdminReadAction_(action);
+  return false;
+}
+
+function apiSecurityAllowsGet_(action) {
+  return !apiSecurityRequiresPost_(action);
+}
+
 function apiSecurityNormalizeUsername_(value) {
   return String(value || "").trim().toLowerCase();
 }

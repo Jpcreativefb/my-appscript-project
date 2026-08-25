@@ -1,8 +1,13 @@
 const API_BASE =
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
+const API_APP_PROXY = "./api/app";
+
+// Temporary compatibility fallback. All normal production traffic uses the
+// repo-owned Pages Function above; the legacy Worker is only used during a
+// mixed frontend deployment where /api/app is not available yet.
 const API_UPLOAD_PROXY =
-  "https://awards-upload-proxy.jpcreativefb.workers.dev";  
+  "https://awards-upload-proxy.jpcreativefb.workers.dev";
 
 function getApiLeagueId_() {
 
@@ -28,6 +33,13 @@ const API_NO_SESSION_ACTIONS_ = new Set([
   "signup",
   "requestPinReset",
   "resetPin"
+]);
+
+// Only truly public, credential-free reads may use JSONP/GET. Authenticated
+// reads and every write use the repo-owned POST bridge so bearer tokens never
+// appear in query strings, browser history, proxy logs, or referrers.
+const API_GET_SAFE_ACTIONS_ = new Set([
+  "health"
 ]);
 
 function apiAttachSession_(action, params) {
@@ -382,17 +394,20 @@ async function apiRaw_(action, params = {}) {
 
 async function api(action, params = {}) {
   params = apiAttachSession_(action, params);
+  const method = API_GET_SAFE_ACTIONS_.has(String(action || "")) ? "GET" : "POST";
   const requestId = apiRequestId_(action);
-  apiDispatchEvent_("awards:api-start", { requestId: requestId, action: action, method: "GET" });
+  apiDispatchEvent_("awards:api-start", { requestId: requestId, action: action, method: method });
   let result = null;
   try {
-    result = await apiRaw_(action, params);
+    result = method === "GET"
+      ? await apiRaw_(action, params)
+      : await apiPostRaw_(action, params);
     return result;
   } finally {
     apiDispatchEvent_("awards:api-end", {
       requestId: requestId,
       action: action,
-      method: "GET",
+      method: method,
       success: !!(result && result.success !== false),
       result: result
     });
@@ -409,27 +424,39 @@ async function apiPostRaw_(action, payload = {}) {
 
   try {
 
-    const response =
-      await fetch(
+    const requestBody = JSON.stringify({
+      action: action,
+      ...payload
+    });
+
+    let response = await fetch(
+      API_APP_PROXY,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Accept": "application/json"
+        },
+        cache: "no-store",
+        body: requestBody
+      }
+    );
+
+    // This fallback exists only so an Apps Script deployment can safely land
+    // immediately before Cloudflare finishes publishing the same Git commit.
+    if (response.status === 404 || response.status === 405) {
+      response = await fetch(
         API_UPLOAD_PROXY,
         {
-          method:
-            "POST",
-
+          method: "POST",
           headers: {
-            "Content-Type":
-              "text/plain;charset=utf-8"
+            "Content-Type": "text/plain;charset=utf-8",
+            "Accept": "application/json"
           },
-
-          body:
-            JSON.stringify({
-              action:
-                action,
-
-              ...payload
-            })
+          body: requestBody
         }
       );
+    }
 
     const text = await response.text();
     let parsed = null;
@@ -1465,7 +1492,7 @@ async function apiUpdateLeague(payload) {
    ADMIN
 ====================== */
 
-async function apiAdminSummary() {
+async function apiAdminSummary(includeDetails) {
 
   const session =
     getSession();
@@ -1474,9 +1501,26 @@ async function apiAdminSummary() {
     username: session.username,
     token: session.token,
     gameId: APP_STATE.gameId || "",
-    leagueId: getApiLeagueId_()
+    leagueId: getApiLeagueId_(),
+    includeDetails: includeDetails === true
   });
 
+}
+
+async function apiAdminGetAutomationHealth() {
+  const session = getSession();
+  return api("adminGetAutomationHealth", {
+    username: session.username,
+    token: session.token
+  });
+}
+
+async function apiAdminCleanupDuplicateAutomationTriggers() {
+  const session = getSession();
+  return apiPost("adminCleanupDuplicateAutomationTriggers", {
+    username: session.username,
+    token: session.token
+  });
 }
 
 async function apiAdminClearCaches() {

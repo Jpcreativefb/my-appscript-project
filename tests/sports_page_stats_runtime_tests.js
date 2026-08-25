@@ -13,6 +13,7 @@ function assert(condition, message) {
 const timers = [];
 let appendedScript = null;
 let timerId = 0;
+const fetchCalls = [];
 
 const documentStub = {
   addEventListener: () => {},
@@ -56,6 +57,14 @@ const context = {
   Promise,
   alert: () => {},
   confirm: () => true,
+  async fetch(url, options) {
+    fetchCalls.push({ url: String(url), options: options || {} });
+    return {
+      ok: true,
+      status: 200,
+      async text() { return JSON.stringify({ success: true, players: [] }); }
+    };
+  },
   setTimeout(fn, delay) {
     const id = ++timerId;
     timers.push({ id, fn, delay, cleared: false });
@@ -123,19 +132,18 @@ vm.runInContext(source, context);
   );
   windowStub[timeoutCallback]({ success: true });
 
-  const awardsPromise = context.sportsAwardsApi_(
+  const awardsResult = await context.sportsAwardsApi_(
     'adminGetSportsPlayerPropPlayers',
     { username: 'admin', token: 'token', league: 'mlb', sport: 'baseball' }
   );
-  const awardsUrl = new URL(appendedScript.src);
-  assert(
-    awardsUrl.searchParams.get('action') === 'adminGetSportsPlayerPropPlayers',
-    'Awards Sports API action was not sent through JSONP'
-  );
-  const awardsCallback = awardsUrl.searchParams.get('callback');
-  windowStub[awardsCallback]({ success: true, players: [] });
-  const awardsResult = await awardsPromise;
-  assert(awardsResult.success === true, 'Awards Sports JSONP request failed');
+  const awardsCall = fetchCalls[fetchCalls.length - 1];
+  assert(awardsCall && awardsCall.url === './api/app', 'Awards Sports API did not use the repo-owned POST bridge');
+  assert(awardsCall.options && awardsCall.options.method === 'POST', 'Awards Sports API was not sent with POST');
+  const awardsBody = JSON.parse(awardsCall.options.body || '{}');
+  assert(awardsBody.action === 'adminGetSportsPlayerPropPlayers', 'Awards Sports API action missing from POST body');
+  assert(awardsBody.token === 'token', 'Awards Sports API session token missing from POST body');
+  assert(!awardsCall.url.includes('token='), 'Awards Sports API leaked the session token into the URL');
+  assert(awardsResult.success === true, 'Awards Sports POST request failed');
 
   console.log('Sports page stats runtime tests passed.');
 })().catch((error) => {
