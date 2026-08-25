@@ -1,0 +1,5 @@
+PATTC Predicts v1.2.19-rc4 — Cache Persistence Certification
+
+Install only on the clean architecture-cleanup baseline at GitHub commit 47f06a3.
+Run tools/install_production_cache_persistence_v1219rc4.sh from the package.
+The installer verifies hashes, runs 182 regression tests, creates/deploys the next Apps Script version, pushes GitHub/Cloudflare, and runs the production gate again.

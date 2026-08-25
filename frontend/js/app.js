@@ -310,7 +310,186 @@ function hideLoader() {
 
 /* ======================
    STARTUP PAYLOAD CACHE
+   v1.2.19-rc4
+
+   Apps Script CacheService is intentionally best-effort and the old browser
+   fast path expired after ten minutes. Keep the last few successful game
+   startup payloads on the player device so returning to an active game paints
+   immediately, then refresh quietly in the background. Server-side save/lock
+   validation remains authoritative.
 ====================== */
+
+const APP_STARTUP_PAYLOAD_STORAGE_PREFIX = "pattcStartupPayload:v1219rc4:";
+const APP_STARTUP_PAYLOAD_INDEX_KEY = "pattcStartupPayload:v1219rc4:index";
+const APP_STARTUP_PAYLOAD_MAX_AGE_MS = 6 * 60 * 60 * 1000;
+const APP_STARTUP_PAYLOAD_REFRESH_AFTER_MS = 5 * 60 * 1000;
+const APP_STARTUP_PAYLOAD_STORAGE_MAX_CHARS = 650000;
+const APP_STARTUP_PAYLOAD_STORAGE_MAX_ENTRIES = 3;
+const APP_STARTUP_PAYLOAD_REFRESHES = {};
+let APP_STARTUP_PAYLOAD_LOCAL_GENERATION = 0;
+
+function appStartupPayloadIdentity_() {
+  const session = typeof getSession === "function" ? getSession() : null;
+  const username = String(session && session.username || "").trim().toLowerCase();
+  const gameId = typeof getFrontendGameId === "function"
+    ? String(getFrontendGameId() || APP_STATE.gameId || "").trim()
+    : String(APP_STATE.gameId || "").trim();
+  const leagueId = typeof getFrontendLeagueId === "function"
+    ? String(getFrontendLeagueId() || "").trim()
+    : "";
+  const rawKey = [username, gameId, leagueId].join("|");
+  return {
+    username: username,
+    gameId: gameId,
+    leagueId: leagueId,
+    key: username && gameId
+      ? APP_STARTUP_PAYLOAD_STORAGE_PREFIX + encodeURIComponent(rawKey)
+      : ""
+  };
+}
+
+function appStartupPayloadReadIndex_() {
+  if (typeof window === "undefined" || !window.localStorage) return [];
+  try {
+    const value = JSON.parse(window.localStorage.getItem(APP_STARTUP_PAYLOAD_INDEX_KEY) || "[]");
+    return Array.isArray(value) ? value : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function appStartupPayloadWriteIndex_(keys) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  try {
+    window.localStorage.setItem(APP_STARTUP_PAYLOAD_INDEX_KEY, JSON.stringify(keys || []));
+  } catch (err) {}
+}
+
+function appStoreStartupPayload_(payload, identity) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  identity = identity || appStartupPayloadIdentity_();
+  if (!identity.key || !payload || payload.success === false) return;
+  if (String(payload.gameId || identity.gameId) !== identity.gameId) return;
+
+  const item = {
+    savedAt: Date.now(),
+    username: identity.username,
+    gameId: identity.gameId,
+    leagueId: identity.leagueId,
+    payload: payload
+  };
+
+  try {
+    const serialized = JSON.stringify(item);
+    if (serialized.length > APP_STARTUP_PAYLOAD_STORAGE_MAX_CHARS) return;
+    window.localStorage.setItem(identity.key, serialized);
+
+    let index = appStartupPayloadReadIndex_().filter(function(key) {
+      return key && key !== identity.key;
+    });
+    index.unshift(identity.key);
+    while (index.length > APP_STARTUP_PAYLOAD_STORAGE_MAX_ENTRIES) {
+      const expiredKey = index.pop();
+      try { window.localStorage.removeItem(expiredKey); } catch (err) {}
+    }
+    appStartupPayloadWriteIndex_(index);
+  } catch (err) {}
+}
+
+function appReadStoredStartupPayload_() {
+  if (typeof window === "undefined" || !window.localStorage) return null;
+  const identity = appStartupPayloadIdentity_();
+  if (!identity.key) return null;
+
+  try {
+    const raw = window.localStorage.getItem(identity.key);
+    if (!raw) return null;
+    const item = JSON.parse(raw);
+    const age = Date.now() - Number(item && item.savedAt || 0);
+    if (
+      !item ||
+      !item.payload ||
+      item.payload.success === false ||
+      String(item.username || "") !== identity.username ||
+      String(item.gameId || "") !== identity.gameId ||
+      age < 0 ||
+      age > APP_STARTUP_PAYLOAD_MAX_AGE_MS
+    ) {
+      window.localStorage.removeItem(identity.key);
+      return null;
+    }
+    return { identity: identity, payload: item.payload, age: age };
+  } catch (err) {
+    return null;
+  }
+}
+
+function appRemoveStoredStartupPayload_(identity) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  identity = identity || appStartupPayloadIdentity_();
+  if (!identity.key) return;
+  try { window.localStorage.removeItem(identity.key); } catch (err) {}
+  appStartupPayloadWriteIndex_(appStartupPayloadReadIndex_().filter(function(key) {
+    return key !== identity.key;
+  }));
+}
+
+function appClearStoredStartupPayloadsForUser_(username) {
+  if (typeof window === "undefined" || !window.localStorage) return;
+  username = String(username || "").trim().toLowerCase();
+  if (!username) return;
+  const keep = [];
+  appStartupPayloadReadIndex_().forEach(function(key) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      const item = raw ? JSON.parse(raw) : null;
+      if (item && String(item.username || "").trim().toLowerCase() === username) {
+        window.localStorage.removeItem(key);
+      } else if (key) {
+        keep.push(key);
+      }
+    } catch (err) {}
+  });
+  appStartupPayloadWriteIndex_(keep);
+}
+
+function appRefreshStartupPayloadQuietly_(cached) {
+  cached = cached || null;
+  if (!cached || !cached.identity || !cached.identity.key) return;
+  const identity = cached.identity;
+  const localGeneration = APP_STARTUP_PAYLOAD_LOCAL_GENERATION;
+  if (APP_STARTUP_PAYLOAD_REFRESHES[identity.key]) return;
+  APP_STARTUP_PAYLOAD_REFRESHES[identity.key] = true;
+
+  window.setTimeout(async function() {
+    try {
+      const currentIdentity = appStartupPayloadIdentity_();
+      if (currentIdentity.key !== identity.key) return;
+      const session = typeof getSession === "function" ? getSession() : null;
+      if (!session || !session.username || !session.token) return;
+
+      const res = await api("getStartupPayload", {
+        username: session.username,
+        token: session.token,
+        gameId: identity.gameId,
+        leagueId: identity.leagueId
+      });
+      if (!res || res.success === false) return;
+      if (APP_STARTUP_PAYLOAD_LOCAL_GENERATION !== localGeneration) return;
+
+      appStoreStartupPayload_(res, identity);
+      const stillCurrent = appStartupPayloadIdentity_();
+      if (stillCurrent.key === identity.key) {
+        APP_STATE.startupPayload = res;
+        APP_STATE.gameId = res.gameId || APP_STATE.gameId;
+      }
+    } catch (err) {
+      console.warn("Quiet startup refresh skipped", err);
+    } finally {
+      delete APP_STARTUP_PAYLOAD_REFRESHES[identity.key];
+    }
+  }, 800);
+}
 
 async function loadStartupPayload(forceRefresh) {
 
@@ -319,6 +498,18 @@ async function loadStartupPayload(forceRefresh) {
     forceRefresh !== true
   ) {
     return APP_STATE.startupPayload;
+  }
+
+  if (forceRefresh !== true) {
+    const cached = appReadStoredStartupPayload_();
+    if (cached) {
+      APP_STATE.startupPayload = cached.payload;
+      APP_STATE.gameId = cached.payload.gameId || APP_STATE.gameId;
+      if (cached.age >= APP_STARTUP_PAYLOAD_REFRESH_AFTER_MS) {
+        appRefreshStartupPayloadQuietly_(cached);
+      }
+      return cached.payload;
+    }
   }
 
   const res =
@@ -339,6 +530,8 @@ async function loadStartupPayload(forceRefresh) {
     res.gameId ||
     APP_STATE.gameId;
 
+  appStoreStartupPayload_(res);
+
   return res;
 
 }
@@ -349,10 +542,15 @@ function getStartupPayload() {
 
 }
 
-function clearStartupPayload() {
+function clearStartupPayload(invalidateStored) {
 
+  const identity = appStartupPayloadIdentity_();
   APP_STATE.startupPayload =
     null;
+  if (invalidateStored === true) {
+    APP_STARTUP_PAYLOAD_LOCAL_GENERATION += 1;
+    appRemoveStoredStartupPayload_(identity);
+  }
 
 }
 
@@ -386,6 +584,9 @@ async function logout() {
   } catch (err) {
     console.warn("Logout revoke warning", err);
   } finally {
+    if (session && session.username) {
+      appClearStoredStartupPayloadsForUser_(session.username);
+    }
     clearSession();
     window.location.replace("./index.html");
   }

@@ -1616,7 +1616,7 @@ function leagueReadSheetObjects_(sheetName, headers) {
   if (data.length <= 1) {
     LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = [];
     if (typeof CacheService !== "undefined") {
-      try { CacheService.getScriptCache().put(scriptCacheKey, "[]", 300); } catch (cacheWriteError) {}
+      try { CacheService.getScriptCache().put(scriptCacheKey, "[]", 900); } catch (cacheWriteError) {}
     }
     return [];
   }
@@ -1639,7 +1639,7 @@ function leagueReadSheetObjects_(sheetName, headers) {
     try {
       const serialized = JSON.stringify(rows);
       if (serialized.length < 95000) {
-        CacheService.getScriptCache().put(scriptCacheKey, serialized, 300);
+        CacheService.getScriptCache().put(scriptCacheKey, serialized, 900);
       }
     } catch (cacheWriteError) {}
   }

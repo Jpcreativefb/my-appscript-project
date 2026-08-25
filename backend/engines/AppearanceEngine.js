@@ -835,7 +835,7 @@ function appearanceGetRuntimeBundle(gameId) {
   if (typeof CacheService !== "undefined") {
     try {
       const serialized = JSON.stringify(bundle);
-      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 300);
+      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 1800);
     } catch (cacheWriteError) {}
   }
 

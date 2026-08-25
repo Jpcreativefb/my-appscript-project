@@ -320,7 +320,7 @@ async function saveSeasonAnchorPick_() {
   try {
     const response = await apiSaveSeasonAnchorPick(PICKS_PAGE_DATA.gameId, entityId);
     if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not finalize the Sole Survivor pick.");
-    clearStartupPayload();
+    clearStartupPayload(true);
     PICKS_SEASON_ANCHOR_DRAFT_ID = "";
     if (response.seasonAnchor) PICKS_PAGE_DATA.seasonAnchor = response.seasonAnchor;
     const key = picksEnhancementKey_();
@@ -2288,7 +2288,7 @@ async function saveConfidenceDraft_() {
   );
 
   persistConfidenceDraft_();
-  clearStartupPayload();
+  clearStartupPayload(true);
   refreshPicksPage();
 
   showPicksMessage(
@@ -4254,7 +4254,7 @@ async function selectNominee(categoryId, nomineeId) {
     return;
   }
 
-  clearStartupPayload();
+  clearStartupPayload(true);
 
   PICKS_PAGE_DATA.picks[categoryId] =
     nomineeId;

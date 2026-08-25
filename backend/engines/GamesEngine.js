@@ -1499,7 +1499,7 @@ function getGames() {
     cache,
     GAMES_CACHE_KEY,
     JSON.stringify(games),
-    300
+    1800
   );
 
   GAMES_RUNTIME_CACHE[GAMES_CACHE_KEY] = games;

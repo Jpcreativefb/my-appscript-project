@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc3 — Final Performance Certification**
+Current release candidate: **v1.2.19-rc4 — Cache Persistence Certification**
 
-Release asset marker: **v1219rc3-final-performance**
+Release asset marker: **v1219rc4-cache-persistence**
 
 ## Status
 
@@ -101,6 +101,19 @@ RC3 is the final measured performance pass before the production tag. It keeps a
 - Optional Reality TV comparison/stats enhancements wait until the core picks page has had five seconds to become usable, and their safe read caches are extended to 15 minutes.
 - Admin renders its complete navigation/control shell immediately and hydrates informational counts in the background. The compact Admin summary also has a short server cache.
 
+
+## v1.2.19-rc4 cache persistence certification
+
+The final live timing test exposed a deterministic ten-minute browser fast-path expiry: standard games returned to 14 seconds and Reality TV to 18 seconds after the page snapshot aged out. RC4 fixes that specific production blocker without changing game rules:
+
+- Stores only the last three successful per-player game startup payloads on the device, capped by size and cleared for that user on logout.
+- A stored startup payload can paint the real Picks renderer for up to six hours; after five minutes it refreshes quietly in the background rather than blocking navigation.
+- Successful pick and Sole Survivor writes remove the stored startup payload immediately, so a changed pick is never restored from the old device snapshot.
+- Keeps Games, categories, user picks, appearance and Reality TV read caches warm longer only where matching write invalidation already exists.
+- Extends the cheap Reality TV season-detection cache from two minutes to thirty minutes so non-Reality games do not repeatedly reopen the Reality TV season sheet.
+- Keeps session authorization caching short (five minutes) and preserves explicit revocation cleanup.
+- No scheduled cache-warmer trigger is added; the fix reduces Apps Script work rather than adding another recurring job.
+
 ## Automated release gate
 
 Run:
@@ -118,10 +131,11 @@ The gate checks:
 5. v1.2.19-rc1 production-readiness contract.
 6. v1.2.19-rc2 performance-certification contract.
 7. v1.2.19-rc3 final-performance contract.
+8. v1.2.19-rc4 cache-persistence contract.
 
 ## What remains before declaring LIVE
 
-Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC3 final performance retest and do not declare the release production-certified until its P0/P1 sections pass.
+Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC4 10+ minute cache-persistence retest and do not declare the release production-certified until its P0/P1 sections pass.
 
 ## Release rule until launch
 

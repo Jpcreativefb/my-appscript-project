@@ -2332,7 +2332,7 @@ function realityTvHasSeasonForGameCached_(gameId) {
 
     if (typeof CacheService !== "undefined") {
       try {
-        CacheService.getScriptCache().put(cacheKey, JSON.stringify(lookup), 120);
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify(lookup), 1800);
       } catch (ignoreCacheWrite) {}
     }
   }
@@ -2553,7 +2553,7 @@ function realityTvUserGameViewPayload_(gameId, username, options) {
       try {
         const serialized = JSON.stringify(corePayload);
         if (serialized.length < 95000) {
-          CacheService.getScriptCache().put(coreCacheKey, serialized, 900);
+          CacheService.getScriptCache().put(coreCacheKey, serialized, 1800);
         }
       } catch (cacheWriteError) {
         Logger.log("Reality TV user core cache write skipped: " + cacheWriteError);
@@ -2606,7 +2606,7 @@ function apiGetRealityTvPlayerStats(payload) {
   if (typeof CacheService !== "undefined") {
     try {
       const serialized = JSON.stringify(stats || {});
-      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 900);
+      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 1800);
     } catch (cacheWriteError) {
       Logger.log("Reality TV player stats cache write skipped: " + cacheWriteError);
     }

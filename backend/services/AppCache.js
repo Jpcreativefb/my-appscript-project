@@ -255,7 +255,7 @@ function getCategoriesCached(
     cache,
     key,
     JSON.stringify(categories),
-    CACHE_TTL
+    1800
   );
 
   return categories;

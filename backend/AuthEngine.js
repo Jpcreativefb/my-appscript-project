@@ -76,9 +76,9 @@ function authCacheSessionUsername_(tokenOrHash, username){
   username = String(username || "").trim();
   if (!key || !username) return;
   try {
-    // Two minutes covers one navigation burst without allowing a long stale
+    // Five minutes covers normal navigation bursts without allowing a long stale
     // authorization window if an account/session is changed elsewhere.
-    CacheService.getScriptCache().put(key, username, 120);
+    CacheService.getScriptCache().put(key, username, 300);
   } catch (err) {}
 }
 

@@ -618,7 +618,7 @@ function getUserPicks(username, gameId){
       picksCache,
       picksCacheKey,
       JSON.stringify(result),
-      300
+      1800
     );
   } catch (cacheWriteError) {}
 
