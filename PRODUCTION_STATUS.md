@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc2 — Performance Certification**
+Current release candidate: **v1.2.19-rc3 — Final Performance Certification**
 
-Release asset marker: **v1219rc2-performance-certification**
+Release asset marker: **v1219rc3-final-performance**
 
 ## Status
 
@@ -89,6 +89,18 @@ Measured live testing found Home rendering in under one second but game navigati
 - Game appearance runtime bundles use a generation-based cache and invalidate when appearance rows change.
 - Reality TV core/player-stat caches are extended to five minutes; existing player-action/game invalidation continues to clear the affected player stats.
 
+
+## v1.2.19-rc3 final performance certification
+
+RC3 is the final measured performance pass before the production tag. It keeps all game rules unchanged and targets the remaining live bottlenecks measured after RC2:
+
+- `getStartupPayload` is protected by a short user/game response cache and a separately invalidated user-picks cache so repeat game navigation does not rebuild the same payload.
+- Pick saves invalidate both caches immediately, preserving current-pick correctness.
+- Home reuses its already-loaded Games Hub payload for two minutes rather than quietly starting another expensive `getDashboardGamesHub` request during navigation.
+- Home career/archive history is moved to the end of optional hydration and delayed again; the measured 30+ second archive request no longer competes with game or Admin navigation.
+- Optional Reality TV comparison/stats enhancements wait until the core picks page has had five seconds to become usable, and their safe read caches are extended to 15 minutes.
+- Admin renders its complete navigation/control shell immediately and hydrates informational counts in the background. The compact Admin summary also has a short server cache.
+
 ## Automated release gate
 
 Run:
@@ -105,10 +117,11 @@ The gate checks:
 4. Legacy production-hardening/security regression contract.
 5. v1.2.19-rc1 production-readiness contract.
 6. v1.2.19-rc2 performance-certification contract.
+7. v1.2.19-rc3 final-performance contract.
 
 ## What remains before declaring LIVE
 
-Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC2 performance retest and do not declare the release production-certified until its P0/P1 sections pass.
+Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC3 final performance retest and do not declare the release production-certified until its P0/P1 sections pass.
 
 ## Release rule until launch
 

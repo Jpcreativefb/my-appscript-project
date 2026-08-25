@@ -484,6 +484,24 @@ function buildPickMeta_(
    GET USER PICKS
 ========================================================= */
 
+function getUserPicksCacheKey_(username, gameId) {
+
+  const raw = [
+    normalizeLower_(username),
+    normalizeString_(gameId)
+  ].join("|");
+
+  const digest = Utilities
+    .computeDigest(Utilities.DigestAlgorithm.MD5, raw)
+    .map(function(byte) {
+      return (byte + 256).toString(16).slice(-2);
+    })
+    .join("");
+
+  return "user_picks_v1_" + digest;
+
+}
+
 function getUserPicks(username, gameId){
 
   if (!username) return [];
@@ -491,6 +509,17 @@ function getUserPicks(username, gameId){
   gameId =
     gameId ||
     getDefaultGameId();
+
+  const picksCache = CacheService.getScriptCache();
+  const picksCacheKey = getUserPicksCacheKey_(username, gameId);
+
+  try {
+    const cachedPicks = picksCache.get(picksCacheKey);
+    if (cachedPicks) {
+      const parsedPicks = JSON.parse(cachedPicks);
+      if (Array.isArray(parsedPicks)) return parsedPicks;
+    }
+  } catch (cacheReadError) {}
 
   const data =
     typeof PicksRepo.getPicksForGame === "function"
@@ -582,7 +611,18 @@ function getUserPicks(username, gameId){
 
   }
 
-  return Object.values(latest);
+  const result = Object.values(latest);
+
+  try {
+    safeScriptCachePut_(
+      picksCache,
+      picksCacheKey,
+      JSON.stringify(result),
+      300
+    );
+  } catch (cacheWriteError) {}
+
+  return result;
 
 }
 

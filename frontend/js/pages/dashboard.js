@@ -18,8 +18,18 @@ async function renderDashboardPage() {
   let payload;
   setPageLoadStep(50, "Loading games dashboard…");
 
+  const cachedDashboard = (
+    typeof APP_STATE !== "undefined" &&
+    APP_STATE.dashboardHomePayload &&
+    Number(APP_STATE.dashboardHomePayloadLoadedAt || 0) > 0 &&
+    Date.now() - Number(APP_STATE.dashboardHomePayloadLoadedAt || 0) < 120000
+  ) ? APP_STATE.dashboardHomePayload : null;
+
   try {
-    payload = await apiGetDashboardGamesHub();
+    payload = cachedDashboard || await apiGetDashboardGamesHub();
+    if (!cachedDashboard && typeof APP_STATE !== "undefined" && payload && payload.success !== false) {
+      APP_STATE.dashboardHomePayloadLoadedAt = Date.now();
+    }
   } catch (err) {
     console.error("DASHBOARD GAMES HUB ERROR", err);
     return `
@@ -1213,26 +1223,20 @@ async function hydrateDashboardHomeExtras_() {
   const username = getCurrentUsername();
   if (!username) return;
 
-  const careerPromise = typeof apiGetUserProfileHistory === "function"
-    ? apiGetUserProfileHistory(username, "")
-    : Promise.resolve(null);
-
-  const leaguesPromise = typeof apiGetMyLeagues === "function"
-    ? apiGetMyLeagues("")
-    : Promise.resolve(null);
-
-  const results = await Promise.allSettled([careerPromise, leaguesPromise]);
+  let leagues = null;
+  if (typeof apiGetMyLeagues === "function") {
+    try {
+      leagues = await apiGetMyLeagues("");
+    } catch (leagueError) {
+      leagues = null;
+    }
+  }
 
   if (
     typeof APP_STATE === "undefined" ||
     APP_STATE.currentPage !== "dashboard" ||
     APP_STATE.dashboardHomeHydrationId !== hydrationId
   ) return;
-
-  const career = results[0].status === "fulfilled" ? results[0].value : null;
-  const leagues = results[1].status === "fulfilled" ? results[1].value : null;
-
-  hydrateDashboardCareerStats_(career);
 
   // Optional Home decorations are deliberately serialized. The old version
   // started league cards plus up to 20 game leaderboards together, which
@@ -1247,6 +1251,33 @@ async function hydrateDashboardHomeExtras_() {
     dashboardGetPlayingGames_(Array.isArray(payload.activeGames) ? payload.activeGames : []),
     "dashboard"
   );
+
+  // Career history can traverse archived workbooks and was observed taking
+  // 30+ seconds. It is decorative on Home, so it is intentionally last and
+  // never competes with opening a game or Admin.
+  if (
+    typeof APP_STATE === "undefined" ||
+    APP_STATE.currentPage !== "dashboard" ||
+    APP_STATE.dashboardHomeHydrationId !== hydrationId
+  ) return;
+
+  if (typeof apiGetUserProfileHistory === "function") {
+    window.setTimeout(async function() {
+      if (
+        typeof APP_STATE === "undefined" ||
+        APP_STATE.currentPage !== "dashboard" ||
+        APP_STATE.dashboardHomeHydrationId !== hydrationId
+      ) return;
+      try {
+        const career = await apiGetUserProfileHistory(username, "");
+        if (
+          typeof APP_STATE !== "undefined" &&
+          APP_STATE.currentPage === "dashboard" &&
+          APP_STATE.dashboardHomeHydrationId === hydrationId
+        ) hydrateDashboardCareerStats_(career);
+      } catch (careerError) {}
+    }, 5000);
+  }
 }
 
 function hydrateDashboardCareerStats_(response) {

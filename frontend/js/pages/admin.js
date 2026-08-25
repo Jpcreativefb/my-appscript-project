@@ -14,24 +14,19 @@ async function renderAdminPage() {
     `;
   }
 
-  // Production dashboard intentionally requests only compact counts. Heavy
-  // user/category/nominee data is loaded when an admin opens those controls.
-  const res = await apiAdminSummary(false);
-
-  if (!res || !res.success) {
-    return `
-      <div class="page admin-page">
-        <h1>Admin</h1>
-        <div class="card admin-card error-card">
-          ${(res && (res.error || res.message)) || "Failed to load admin data"}
-        </div>
-      </div>
-    `;
-  }
+  // Render the Admin controls immediately. Summary counts are informational and
+  // hydrate in the background so a slow Sheets read never blocks Admin use.
+  const startup = typeof getStartupPayload === "function" ? (getStartupPayload() || {}) : {};
+  const startupGame = startup.game || {};
+  const currentGameId = String((typeof APP_STATE !== "undefined" && APP_STATE.gameId) || startup.gameId || "").trim();
+  const currentGameName = String(startupGame.name || currentGameId || "Loading…");
 
   ADMIN_LAZY_DETAILS_CACHE_ = null;
-  const counts = res.counts || {};
-  const currentGameName = res.game && res.game.name ? res.game.name : res.gameId;
+  window.setTimeout(function() {
+    adminHydrateSummary_().catch(function(err) {
+      console.warn("Admin summary loaded later or was skipped", err);
+    });
+  }, 0);
 
   return `
     <div class="page admin-page">
@@ -40,13 +35,13 @@ async function renderAdminPage() {
         <div class="card admin-card">
           <div class="admin-label">Current Game</div>
           <div class="admin-value">${escapeHtml_(currentGameName || "No default game")}</div>
-          <div class="admin-sub">${escapeHtml_(res.gameId || "")}</div>
+          <div class="admin-sub"><span id="adminSummaryGameId">${escapeHtml_(currentGameId || "")}</span></div>
 
           <div class="admin-grid">
-            <div class="card admin-stat"><div class="admin-label">Users</div><div class="admin-number">${Number(counts.users || 0)}</div></div>
-            <div class="card admin-stat"><div class="admin-label">Games</div><div class="admin-number">${Number(counts.games || 0)}</div></div>
-            <div class="card admin-stat"><div class="admin-label">Questions</div><div class="admin-number">${Number(counts.categories || 0)}</div></div>
-            <div class="card admin-stat"><div class="admin-label">Locked</div><div class="admin-number">${Number(counts.lockedCategories || 0)}</div></div>
+            <div class="card admin-stat"><div class="admin-label">Users</div><div class="admin-number"><span id="adminSummaryUsers">—</span></div></div>
+            <div class="card admin-stat"><div class="admin-label">Games</div><div class="admin-number"><span id="adminSummaryGames">—</span></div></div>
+            <div class="card admin-stat"><div class="admin-label">Questions</div><div class="admin-number"><span id="adminSummaryCategories">—</span></div></div>
+            <div class="card admin-stat"><div class="admin-label">Locked</div><div class="admin-number"><span id="adminSummaryLocked">—</span></div></div>
           </div>
 
           <div class="admin-actions">
@@ -119,7 +114,7 @@ async function renderAdminPage() {
           <div class="admin-collapsible-body">
             <div class="admin-actions">
               <button class="button admin-button" onclick="adminLoadAutomationHealth()">Check Automation Health</button>
-              <button class="button admin-button secondary" onclick="adminCheckStorageHealth('${escapeJs(res.gameId || "")}')">Check Storage Health</button>
+              <button class="button admin-button secondary" onclick="adminCheckStorageHealth('${escapeJs(currentGameId || "")}')">Check Storage Health</button>
               <button class="button admin-button secondary" onclick="adminClearCaches()">Clear App Caches</button>
             </div>
             <div id="adminAutomationHealth" class="admin-storage-health"></div>
@@ -143,6 +138,31 @@ async function renderAdminPage() {
       </div>
     </div>
   `;
+}
+
+async function adminHydrateSummary_() {
+  const res = await apiAdminSummary(false);
+  if (!res || res.success === false) return res;
+
+  const counts = res.counts || {};
+  const gameName = res.game && res.game.name ? res.game.name : (res.gameId || "No default game");
+
+  const valueNode = document.querySelector(".admin-page .admin-value");
+  if (valueNode) valueNode.textContent = gameName;
+
+  const map = {
+    adminSummaryGameId: res.gameId || "",
+    adminSummaryUsers: Number(counts.users || 0),
+    adminSummaryGames: Number(counts.games || 0),
+    adminSummaryCategories: Number(counts.categories || 0),
+    adminSummaryLocked: Number(counts.lockedCategories || 0)
+  };
+  Object.keys(map).forEach(function(id) {
+    const node = document.getElementById(id);
+    if (node) node.textContent = String(map[id]);
+  });
+
+  return res;
 }
 
 var ADMIN_LAZY_DETAILS_CACHE_ = null;

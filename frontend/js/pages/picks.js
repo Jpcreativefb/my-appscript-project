@@ -4531,9 +4531,13 @@ function mountPicksPage() {
 
   applyPicksAppearanceToPage_();
 
-  // Optional Reality TV statistics and Season Survivor details load after
-  // the core questions and saved picks are already usable.
-  hydratePicksEnhancements_();
+  // Optional Reality TV statistics and Season Survivor details are intentionally
+  // delayed so a 10-30 second statistics/archive request never competes with
+  // the core game-open path.
+  window.setTimeout(function() {
+    if (typeof APP_STATE !== "undefined" && APP_STATE.currentPage !== "picks") return;
+    hydratePicksEnhancements_();
+  }, 5000);
 
   picksRestoreStandardQueue_();
   hydratePicksLiveProbabilities_();

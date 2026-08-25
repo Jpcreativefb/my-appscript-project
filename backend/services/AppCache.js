@@ -447,6 +447,12 @@ function clearPlayerActionCaches(gameId, sheetNames, username){
   if (gameId) {
     keys.push("leaderboard_" + gameId);
     keys.push("projected_" + gameId);
+    if (username && typeof getUserPicksCacheKey_ === "function") {
+      keys.push(getUserPicksCacheKey_(username, gameId));
+    }
+    if (username && typeof appStartupPayloadCacheKey_ === "function") {
+      keys.push(appStartupPayloadCacheKey_(username, gameId));
+    }
     if (username && typeof realityTvSlug_ === "function") {
       keys.push("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username));
     }

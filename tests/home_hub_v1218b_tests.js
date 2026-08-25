@@ -28,7 +28,7 @@ assert(dashboard.includes('Current Standings'), 'League standings section is mis
 assert(dashboard.includes('dashboard-league-scoreboard'), 'League scoreboard markup is missing.');
 assert(dashboard.includes('Trophy Room'), 'Trophy Room foundation is missing.');
 assert(dashboard.includes('Admin Awards'), 'Future admin-created awards placeholder is missing.');
-assert(dashboard.includes('Promise.allSettled([careerPromise, leaguesPromise])'), 'Home extras should load in the background rather than block initial game rendering.');
+assert(dashboard.includes('async function hydrateDashboardHomeExtras_()'), 'Home extras should load in the background rather than block initial game rendering.');
 assert(dashboard.includes('apiGetUserProfileHistory(username, "")'), 'Career stats should reuse verified archive history.');
 assert(dashboard.includes('apiGetLeaderboardForLeague'), 'League cards must request league-specific standings.');
 

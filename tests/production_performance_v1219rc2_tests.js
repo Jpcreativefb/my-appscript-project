@@ -18,10 +18,10 @@ const routes = JSON.parse(read('frontend/_routes.json'));
 const sw = read('frontend/sw.js');
 const status = read('PRODUCTION_STATUS.md');
 
-assert.strictEqual(pkg.version, '1.2.19-rc.2', 'package version must identify rc2');
+assert(/^1\.2\.19-rc\.[23]$/.test(pkg.version), 'package version must identify rc2 or its final-performance successor');
 assert(routes.include.includes('/api/app'), 'Cloudflare /api/app route must remain enabled');
-assert(app.includes('v1219rc2-performance-certification'), 'app asset marker must identify rc2');
-assert(sw.includes('v1219rc2-performance-certification'), 'service worker cache must identify rc2');
+assert(/v1219rc(2-performance-certification|3-final-performance)/.test(app), 'app asset marker must identify rc2 or its successor');
+assert(/v1219rc(2-performance-certification|3-final-performance)/.test(sw), 'service worker cache must identify rc2 or its successor');
 assert.strictEqual(app, appMirror, 'frontend app compatibility mirror must remain synchronized');
 
 assert(auth.includes('function authGetCachedSessionUsername_'), 'short-lived session lookup cache missing');
@@ -40,15 +40,15 @@ assert(appearance.includes('appearanceInvalidateRuntimeCache_'), 'appearance cac
 assert(appearance.includes('appearance-runtime-v1219rc2-'), 'appearance runtime bundle cache key missing');
 assert(appearance.includes('CacheService.getScriptCache().put(cacheKey, serialized, 300)'), 'appearance bundle should use bounded cache');
 
-assert(reality.includes('CacheService.getScriptCache().put(coreCacheKey, serialized, 300)'), 'Reality TV core cache should be five minutes');
-assert(reality.includes('CacheService.getScriptCache().put(cacheKey, serialized, 300)'), 'Reality TV player-stat cache should be five minutes');
+assert(/CacheService\.getScriptCache\(\)\.put\(coreCacheKey, serialized, (300|900)\)/.test(reality), 'Reality TV core cache should remain bounded');
+assert(/CacheService\.getScriptCache\(\)\.put\(cacheKey, serialized, (300|900)\)/.test(reality), 'Reality TV player-stat cache should remain bounded');
 
-assert(app.includes('}, 1800);'), 'Home optional hydration must be delayed');
+assert(/\}, (1800|6500)\);/.test(app), 'Home optional hydration must be delayed');
 assert(dashboard.includes('Do not launch 20 independent Apps Script executions at once'), 'dashboard standings serialization guard missing');
 assert(!dashboard.includes('const jobs = unique.slice(0, 20).map'), 'dashboard must not fan out 20 leaderboard calls');
 assert(!dashboard.includes('await Promise.allSettled([\n    hydrateDashboardLeagueStandings_'), 'Home league/game standings must not hydrate concurrently');
 assert(!dashboard.includes('const jobs = leagueItems.map'), 'league cards must not fan out concurrent Apps Script calls');
 
-assert(status.includes('v1.2.19-rc2 — Performance Certification'), 'production status must identify rc2');
+assert(/v1\.2\.19-rc(2|3)/.test(status), 'production status must identify rc2 or its successor');
 
 console.log('production-performance-v1.2.19-rc2-tests: PASS');

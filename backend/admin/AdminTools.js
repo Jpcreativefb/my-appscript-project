@@ -176,6 +176,21 @@ function apiAdminSummary(payload) {
   const gameId = normalizeGameId_(payload.gameId || getDefaultGameId());
   validateGameId(gameId);
 
+  const includeDetails = payload.includeDetails === true || String(payload.includeDetails || "").trim().toLowerCase() === "true";
+  const liteCache = CacheService.getScriptCache();
+  const liteCacheKey = "admin_summary_lite_v1219rc3_" + String(gameId || "").toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 100);
+
+  if (!includeDetails) {
+    try {
+      const cachedLite = liteCache.get(liteCacheKey);
+      if (cachedLite) {
+        const parsedLite = JSON.parse(cachedLite);
+        parsedLite.cached = true;
+        return parsedLite;
+      }
+    } catch (cacheReadError) {}
+  }
+
   // One game-table read is enough for both the current game and game count.
   // Heavy user/category/nominee data is loaded only when the admin explicitly
   // opens those panels.
@@ -184,7 +199,6 @@ function apiAdminSummary(payload) {
     return normalizeGameId_(item.gameId || item.GameId || item.id || "") === gameId;
   })[0] || getGame(gameId);
 
-  const includeDetails = payload.includeDetails === true || String(payload.includeDetails || "").trim().toLowerCase() === "true";
   const counts = {
     users: adminQuickSheetRowCount_(USERS_SHEET),
     games: (games || []).length,
@@ -201,6 +215,9 @@ function apiAdminSummary(payload) {
   };
 
   if (!includeDetails) {
+    try {
+      safeScriptCachePut_(liteCache, liteCacheKey, JSON.stringify(result), 60);
+    } catch (cacheWriteError) {}
     return result;
   }
 

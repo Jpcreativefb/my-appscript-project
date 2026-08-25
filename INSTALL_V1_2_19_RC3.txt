@@ -1,0 +1,9 @@
+PATTC Predicts v1.2.19-rc3 — Final Performance Certification
+
+Baseline required: GitHub architecture-cleanup commit b1ffc28 (v1.2.19-rc2).
+
+Run from the Awards App repository:
+
+  bash <extracted-package>/tools/install_production_final_performance_v1219rc3.sh
+
+The installer verifies the exact RC2 baseline, copies only controlled files, runs all production checks, commits, creates/deploys a new Apps Script version, pushes GitHub/Cloudflare, and runs the full gate again.

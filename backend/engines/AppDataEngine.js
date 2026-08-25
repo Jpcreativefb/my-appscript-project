@@ -3,6 +3,14 @@
    One-call dashboard/home app payload
 ========================================================= */
 
+function appStartupPayloadCacheKey_(username, gameId) {
+  const userKey = String(username || "")
+    .trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 80);
+  const gameKey = String(gameId || "")
+    .trim().toLowerCase().replace(/[^a-z0-9_.-]+/g, "_").slice(0, 100);
+  return userKey && gameKey ? "startup_payload_v1_" + userKey + "_" + gameKey : "";
+}
+
 function apiGetStartupPayload(payload) {
 
   payload =
@@ -43,6 +51,20 @@ function apiGetStartupPayload(payload) {
     "viewGame",
     payload.leagueId || ""
   );
+
+  const startupCache = CacheService.getScriptCache();
+  const startupCacheKey = appStartupPayloadCacheKey_(username, gameId);
+
+  if (startupCacheKey) {
+    try {
+      const cachedStartup = startupCache.get(startupCacheKey);
+      if (cachedStartup) {
+        const parsedStartup = JSON.parse(cachedStartup);
+        parsedStartup.cached = true;
+        return parsedStartup;
+      }
+    } catch (cacheReadError) {}
+  }
 
   const game =
     getGame(gameId);
@@ -124,7 +146,7 @@ function apiGetStartupPayload(payload) {
     });
   }
 
-  return {
+  const startupPayload = {
     success: true,
 
     optimized:
@@ -168,6 +190,19 @@ function apiGetStartupPayload(payload) {
     liveProbabilitiesDeferred:
       liveProbabilitiesDeferred
   };
+
+  if (startupCacheKey) {
+    try {
+      safeScriptCachePut_(
+        startupCache,
+        startupCacheKey,
+        JSON.stringify(startupPayload),
+        45
+      );
+    } catch (cacheWriteError) {}
+  }
+
+  return startupPayload;
 
 }
 
@@ -438,7 +473,7 @@ function apiGetDashboardGamesHub(payload) {
 
   if (dashboardCacheKey) {
     try {
-      safeScriptCachePut_(dashboardCache, dashboardCacheKey, JSON.stringify(dashboardPayload), 120);
+      safeScriptCachePut_(dashboardCache, dashboardCacheKey, JSON.stringify(dashboardPayload), 300);
     } catch (cacheError) {}
   }
 
