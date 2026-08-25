@@ -1,6 +1,7 @@
 {
   "version": 1,
   "include": [
+    "/api/app",
     "/api/espn-proxy",
     "/api/team-fantasy",
     "/api/push-public-key",
