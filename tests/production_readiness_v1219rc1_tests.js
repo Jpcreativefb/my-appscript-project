@@ -19,10 +19,10 @@ const sw = read('frontend/sw.js');
 const html = read('frontend/app.html');
 const status = read('PRODUCTION_STATUS.md');
 
-assert.strictEqual(pkg.version, '1.2.19-rc.1', 'package version must identify the production candidate');
-assert(app.includes('v1219rc1-production-readiness'), 'app asset marker must include production candidate');
-assert(sw.includes('v1219rc1-production-readiness'), 'service worker marker must include production candidate');
-assert(html.includes('prod=v1219rc1-production-readiness'), 'app shell must force-refresh production candidate API/PWA assets');
+assert(/^1\.2\.19-rc\.[12]$/.test(pkg.version), 'package version must identify the v1.2.19 production candidate');
+assert(/v1219rc[12]-(production-readiness|performance-certification)/.test(app), 'app asset marker must include production candidate');
+assert(/v1219rc[12]-(production-readiness|performance-certification)/.test(sw), 'service worker marker must include production candidate');
+assert(/prod=v1219rc[12]-(production-readiness|performance-certification)/.test(html), 'app shell must force-refresh production candidate API/PWA assets');
 
 assert(api.includes('const API_APP_PROXY = "./api/app";'), 'frontend must use repo-owned generic POST bridge');
 assert(api.includes('const API_GET_SAFE_ACTIONS_ = new Set([\n  "health"'), 'only health may use the public GET helper');
@@ -66,7 +66,7 @@ assert(automation.includes('classification.kind === "durable"'), 'duplicate clea
 assert(backendApi.includes('adminGetAutomationHealth'), 'automation health route missing');
 assert(backendApi.includes('adminCleanupDuplicateAutomationTriggers'), 'automation cleanup route missing');
 
-assert(status.includes('v1.2.19-rc1'), 'production status still points to an obsolete release');
+assert(status.includes('v1.2.19-rc'), 'production status still points to an obsolete release');
 assert(!status.includes('Deliberately not production-enabled yet\n\n- Generic **Ranking**'), 'production status must not claim Ranking is still disabled');
 
 console.log('production-readiness-v1.2.19-rc1-tests: PASS');

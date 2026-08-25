@@ -474,10 +474,12 @@ function appearanceUpsertObject_(sheet, keyMap, objectValue) {
 
   if (existing) {
     sheet.getRange(existing.rowNumber, 1, 1, headers.length).setValues([current]);
+    if (typeof appearanceInvalidateRuntimeCache_ === "function") appearanceInvalidateRuntimeCache_();
     return existing.rowNumber;
   }
 
   sheet.appendRow(current);
+  if (typeof appearanceInvalidateRuntimeCache_ === "function") appearanceInvalidateRuntimeCache_();
   return sheet.getLastRow();
 }
 
@@ -770,8 +772,38 @@ function appearanceGetEntityOverrideFromRows_(gameId, entityType, entityId, rows
   }) || null;
 }
 
+function appearanceRuntimeCacheGeneration_() {
+  if (typeof CacheService === "undefined") return "1";
+  try {
+    return String(CacheService.getScriptCache().get("appearance-runtime-generation-v1219rc2") || "1");
+  } catch (err) {
+    return "1";
+  }
+}
+
+function appearanceInvalidateRuntimeCache_() {
+  if (typeof CacheService === "undefined") return;
+  try {
+    CacheService.getScriptCache().put(
+      "appearance-runtime-generation-v1219rc2",
+      String(Date.now()),
+      21600
+    );
+  } catch (err) {}
+}
+
 function appearanceGetRuntimeBundle(gameId) {
   const normalizedGameId = appearanceString_(gameId);
+  const generation = appearanceRuntimeCacheGeneration_();
+  const cacheKey = "appearance-runtime-v1219rc2-" + generation + "-" + appearanceNormalizeId_(normalizedGameId);
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    } catch (cacheReadError) {}
+  }
+
   const ss = appearanceSpreadsheet_();
   const imagePacks = appearanceReadObjects_(APPEARANCE_IMAGE_PACKS_SHEET, ss);
   const imagePackItems = appearanceReadObjects_(APPEARANCE_IMAGE_ITEMS_SHEET, ss);
@@ -785,7 +817,7 @@ function appearanceGetRuntimeBundle(gameId) {
   });
   const assignedPackId = appearanceString_(assignment.ImagePackId);
 
-  return {
+  const bundle = {
     success: true,
     gameId: normalizedGameId,
     assignment: assignment,
@@ -799,6 +831,15 @@ function appearanceGetRuntimeBundle(gameId) {
       return appearanceIsActiveRow_(row) && appearanceNormalizeId_(row.GameId) === appearanceNormalizeId_(normalizedGameId);
     })
   };
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const serialized = JSON.stringify(bundle);
+      if (serialized.length < 95000) CacheService.getScriptCache().put(cacheKey, serialized, 300);
+    } catch (cacheWriteError) {}
+  }
+
+  return bundle;
 }
 
 function appearanceResolveImage(gameId, entityType, entityId, defaultImageUrl, variant) {

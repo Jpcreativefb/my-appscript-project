@@ -1138,7 +1138,18 @@ async function dashboardHydrateGameStandings_(games, expectedPage) {
     unique.push(game);
   });
 
-  const jobs = unique.slice(0, 20).map(async function(game) {
+  // Do not launch 20 independent Apps Script executions at once. Hydrate the
+  // same cards one at a time and stop immediately when the user leaves this
+  // page. This preserves standings while keeping game navigation responsive.
+  const queue = unique.slice(0, 20);
+  for (let index = 0; index < queue.length; index += 1) {
+    if (
+      expectedPage &&
+      typeof APP_STATE !== "undefined" &&
+      String(APP_STATE.currentPage || "") !== String(expectedPage)
+    ) return;
+
+    const game = queue[index];
     const leagueId = dashboardPreferredLeagueId_(game);
     try {
       const standings = await apiGetLeaderboardForLeague(game.gameId, leagueId);
@@ -1169,9 +1180,7 @@ async function dashboardHydrateGameStandings_(games, expectedPage) {
     } catch (err) {
       console.warn("Game standings unavailable", game && game.gameId, err);
     }
-  });
-
-  await Promise.allSettled(jobs);
+  }
 }
 
 
@@ -1224,13 +1233,20 @@ async function hydrateDashboardHomeExtras_() {
   const leagues = results[1].status === "fulfilled" ? results[1].value : null;
 
   hydrateDashboardCareerStats_(career);
-  await Promise.allSettled([
-    hydrateDashboardLeagueStandings_(leagues, payload, hydrationId),
-    dashboardHydrateGameStandings_(
-      dashboardGetPlayingGames_(Array.isArray(payload.activeGames) ? payload.activeGames : []),
-      "dashboard"
-    )
-  ]);
+
+  // Optional Home decorations are deliberately serialized. The old version
+  // started league cards plus up to 20 game leaderboards together, which
+  // could occupy many Apps Script executions just as the player opened a game.
+  await hydrateDashboardLeagueStandings_(leagues, payload, hydrationId);
+  if (
+    typeof APP_STATE === "undefined" ||
+    APP_STATE.currentPage !== "dashboard" ||
+    APP_STATE.dashboardHomeHydrationId !== hydrationId
+  ) return;
+  await dashboardHydrateGameStandings_(
+    dashboardGetPlayingGames_(Array.isArray(payload.activeGames) ? payload.activeGames : []),
+    "dashboard"
+  );
 }
 
 function hydrateDashboardCareerStats_(response) {
@@ -1297,15 +1313,28 @@ async function hydrateDashboardLeagueStandings_(response, payload, hydrationId) 
     return renderDashboardLeagueStandingCard_(item.league, item.game, null, index);
   }).join("");
 
-  const jobs = leagueItems.map(async function(item, index) {
-    if (!item.game || typeof apiGetLeaderboardForLeague !== "function") return;
+  for (let index = 0; index < leagueItems.length; index += 1) {
+    if (
+      typeof APP_STATE === "undefined" ||
+      APP_STATE.currentPage !== "dashboard" ||
+      APP_STATE.dashboardHomeHydrationId !== hydrationId
+    ) return;
+
+    const item = leagueItems[index];
+    if (!item.game || typeof apiGetLeaderboardForLeague !== "function") continue;
     try {
-      const results = await Promise.all([
-        apiGetLeaderboardForLeague(item.game.gameId, item.league.leagueId || ""),
-        typeof apiGetGameAppearance === "function" ? apiGetGameAppearance(item.game.gameId).catch(function(){ return null; }) : Promise.resolve(null)
-      ]);
-      const standings = results[0];
-      const appearance = results[1];
+      // Fetch standings first. Appearance is optional decoration and is only
+      // requested after the card has useful scoring data.
+      const standings = await apiGetLeaderboardForLeague(item.game.gameId, item.league.leagueId || "");
+      if (
+        typeof APP_STATE === "undefined" ||
+        APP_STATE.currentPage !== "dashboard" ||
+        APP_STATE.dashboardHomeHydrationId !== hydrationId
+      ) return;
+      let appearance = null;
+      if (typeof apiGetGameAppearance === "function") {
+        try { appearance = await apiGetGameAppearance(item.game.gameId); } catch (appearanceErr) {}
+      }
       if (
         typeof APP_STATE === "undefined" ||
         APP_STATE.currentPage !== "dashboard" ||
@@ -1316,9 +1345,7 @@ async function hydrateDashboardLeagueStandings_(response, payload, hydrationId) 
     } catch (err) {
       console.warn("Dashboard league standings unavailable", err);
     }
-  });
-
-  await Promise.allSettled(jobs);
+  }
 }
 
 function renderDashboardLeagueStandingCard_(league, game, standings, index, appearance) {

@@ -1,8 +1,8 @@
 # PATTC Predicts / Awards App — Production Status
 
-Current release candidate: **v1.2.19-rc1 — Production Readiness**
+Current release candidate: **v1.2.19-rc2 — Performance Certification**
 
-Release asset marker: **v1219rc1-production-readiness**
+Release asset marker: **v1219rc2-performance-certification**
 
 ## Status
 
@@ -76,6 +76,19 @@ Templates configure the existing engines; they do not create parallel copies of 
 - Offers safe duplicate cleanup only for durable workers that are designed to have one installed trigger.
 - Temporary Reality TV continuation triggers are never removed by duplicate cleanup.
 
+
+## v1.2.19-rc2 performance certification
+
+Measured live testing found Home rendering in under one second but game navigation was being delayed by optional Home background work. RC2 keeps the same features while reducing Apps Script contention:
+
+- Home waits briefly before starting optional career, league and standings hydration so a player can enter a game without competing requests.
+- Dashboard standings hydrate serially and stop when the player leaves Home instead of launching up to 20 leaderboard executions at once.
+- League cards no longer launch leaderboard and appearance requests in parallel across every league.
+- Session username validation uses a short, revocation-aware cache during a navigation burst instead of re-reading UserSessions and Users on every API request.
+- League access sheets use a short cross-execution cache and invalidate on league/access writes.
+- Game appearance runtime bundles use a generation-based cache and invalidate when appearance rows change.
+- Reality TV core/player-stat caches are extended to five minutes; existing player-action/game invalidation continues to clear the affected player stats.
+
 ## Automated release gate
 
 Run:
@@ -91,10 +104,11 @@ The gate checks:
 3. Complete regression suite.
 4. Legacy production-hardening/security regression contract.
 5. v1.2.19-rc1 production-readiness contract.
+6. v1.2.19-rc2 performance-certification contract.
 
 ## What remains before declaring LIVE
 
-Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete `PRODUCTION_SMOKE_TEST_V1_2_19_RC1.md` and do not declare the release production-certified until its P0/P1 sections pass.
+Local tests cannot prove Google Sheets latency, Cloudflare propagation, browser/PWA caching, real trigger execution or concurrent-user behavior. After deployment, complete the v1.2.19 production smoke test, including the RC2 performance retest and do not declare the release production-certified until its P0/P1 sections pass.
 
 ## Release rule until launch
 

@@ -45,6 +45,54 @@ function authClearLoginFailures_(identifier){
   );
 }
 
+/* =========================================================
+   SHORT-LIVED SESSION LOOKUP CACHE — v1.2.19-rc2
+   Avoid re-reading UserSessions + Users for every API call in
+   the same page load. The cache is deliberately short and is
+   cleared on explicit session revocation.
+========================================================= */
+
+function authSessionUsernameCacheKey_(tokenOrHash){
+  const value = String(tokenOrHash || "").trim();
+  if (!value) return "";
+  const tokenHash = value.indexOf("sha256$") === 0
+    ? value
+    : hashSessionTokenForStorage_(value);
+  return "auth-session-user-v1219rc2:" + String(tokenHash || "").replace(/^sha256\$/, "");
+}
+
+function authGetCachedSessionUsername_(token){
+  const key = authSessionUsernameCacheKey_(token);
+  if (!key) return "";
+  try {
+    return String(CacheService.getScriptCache().get(key) || "").trim();
+  } catch (err) {
+    return "";
+  }
+}
+
+function authCacheSessionUsername_(tokenOrHash, username){
+  const key = authSessionUsernameCacheKey_(tokenOrHash);
+  username = String(username || "").trim();
+  if (!key || !username) return;
+  try {
+    // Two minutes covers one navigation burst without allowing a long stale
+    // authorization window if an account/session is changed elsewhere.
+    CacheService.getScriptCache().put(key, username, 120);
+  } catch (err) {}
+}
+
+function authClearCachedSessionToken_(tokenOrHash){
+  const key = authSessionUsernameCacheKey_(tokenOrHash);
+  try {
+    const cache = CacheService.getScriptCache();
+    if (key) cache.remove(key);
+    // Clean up the pre-RC2 raw-token key as well.
+    const raw = String(tokenOrHash || "").trim();
+    if (raw && raw.indexOf("sha256$") !== 0) cache.remove(raw);
+  } catch (err) {}
+}
+
 function authAllowResetRequest_(identifier){
   const cache = CacheService.getScriptCache();
   const key = authRateLimitKey_("auth-reset", identifier);
@@ -174,13 +222,7 @@ function loginUser(
     sessionExpiresAt = deviceSession.expiresAt || sessionExpiresAt;
   }
 
-  CacheService
-    .getScriptCache()
-    .put(
-      token,
-      canonicalUsername,
-      60 * 60 * 6
-    );
+  authCacheSessionUsername_(token, canonicalUsername);
 
   const loginUpdates = {
     sessionToken: hashSessionTokenForStorage_(token),
@@ -243,6 +285,11 @@ function getUsernameFromSessionToken_(token){
     return "";
   }
 
+  const cachedUsername = authGetCachedSessionUsername_(token);
+  if (cachedUsername) {
+    return cachedUsername;
+  }
+
   const record =
     findUserRecordBySessionToken_(
       token
@@ -257,15 +304,7 @@ function getUsernameFromSessionToken_(token){
       .trim();
 
   if (username) {
-
-    CacheService
-      .getScriptCache()
-      .put(
-        token,
-        username,
-        60 * 60 * 6
-      );
-
+    authCacheSessionUsername_(token, username);
   }
 
   return username;
@@ -469,7 +508,7 @@ function logoutSessionToken(token){
     });
   }
 
-  CacheService.getScriptCache().remove(token);
+  authClearCachedSessionToken_(token);
 
   return {
     success: true,

@@ -1,0 +1,7 @@
+PATTC Predicts v1.2.19-rc2 — Performance Certification
+
+Baseline required:
+  Git commit 86bf1e9 (RC1 + Cloudflare /api/app route fix)
+
+Install with the packaged tools/install_production_performance_v1219rc2.sh script.
+The installer verifies a clean repository and exact GitHub baseline, copies only controlled files, runs all production checks, commits, deploys Apps Script, pushes GitHub/Cloudflare, and verifies the final state.

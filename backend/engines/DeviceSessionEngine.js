@@ -199,7 +199,11 @@ function authRevokeDeviceSession_(token) {
   session.sheet.getRange(session.rowNumber, session.col.LastUpdated + 1).setValue(now);
   SpreadsheetApp.flush();
 
-  CacheService.getScriptCache().remove(String(token || "").trim());
+  if (typeof authClearCachedSessionToken_ === "function") {
+    authClearCachedSessionToken_(token);
+  } else {
+    CacheService.getScriptCache().remove(String(token || "").trim());
+  }
 
   return {
     success: true,
@@ -223,6 +227,9 @@ function authRevokeAllDeviceSessionsForUser_(username) {
 
     data.sheet.getRange(index + 2, data.col.RevokedAt + 1).setValue(now);
     data.sheet.getRange(index + 2, data.col.LastUpdated + 1).setValue(now);
+    if (typeof authClearCachedSessionToken_ === "function" && data.col.TokenHash !== undefined) {
+      authClearCachedSessionToken_(row[data.col.TokenHash]);
+    }
     count += 1;
   });
 

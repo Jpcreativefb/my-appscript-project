@@ -1585,12 +1585,29 @@ function leagueReadSheetObjects_(sheetName, headers) {
 
   const cacheKey =
     "league_sheet_objects_" + sheetName;
+  const scriptCacheKey =
+    "league_sheet_v1219rc2_" + String(sheetName || "").replace(/[^a-z0-9_-]+/gi, "_");
 
   if (
     LEAGUE_ACCESS_RUNTIME_CACHE &&
-    LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey]
+    Object.prototype.hasOwnProperty.call(LEAGUE_ACCESS_RUNTIME_CACHE, cacheKey)
   ) {
     return LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey];
+  }
+
+  // The old runtime cache only survived one Apps Script execution. Home, game
+  // startup and leaderboard calls therefore re-read the same four league
+  // sheets repeatedly. Keep a short cross-execution copy and invalidate it on
+  // every league/access write.
+  if (typeof CacheService !== "undefined") {
+    try {
+      const cached = CacheService.getScriptCache().get(scriptCacheKey);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = Array.isArray(parsed) ? parsed : [];
+        return LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey];
+      }
+    } catch (cacheReadError) {}
   }
 
   const sh = leagueEnsureSheet_(sheetName, headers);
@@ -1598,6 +1615,9 @@ function leagueReadSheetObjects_(sheetName, headers) {
 
   if (data.length <= 1) {
     LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = [];
+    if (typeof CacheService !== "undefined") {
+      try { CacheService.getScriptCache().put(scriptCacheKey, "[]", 300); } catch (cacheWriteError) {}
+    }
     return [];
   }
 
@@ -1614,6 +1634,15 @@ function leagueReadSheetObjects_(sheetName, headers) {
   });
 
   LEAGUE_ACCESS_RUNTIME_CACHE[cacheKey] = rows;
+
+  if (typeof CacheService !== "undefined") {
+    try {
+      const serialized = JSON.stringify(rows);
+      if (serialized.length < 95000) {
+        CacheService.getScriptCache().put(scriptCacheKey, serialized, 300);
+      }
+    } catch (cacheWriteError) {}
+  }
 
   return rows;
 
@@ -1648,17 +1677,24 @@ function clearLeagueAccessRuntimeCache_(sheetName) {
 
   if (!LEAGUE_ACCESS_RUNTIME_CACHE) {
     LEAGUE_ACCESS_RUNTIME_CACHE = {};
-    return;
   }
+
+  const clearScriptKey = function(name) {
+    if (typeof CacheService === "undefined") return;
+    const key = "league_sheet_v1219rc2_" + String(name || "").replace(/[^a-z0-9_-]+/gi, "_");
+    try { CacheService.getScriptCache().remove(key); } catch (err) {}
+  };
 
   if (!sheetName) {
     LEAGUE_ACCESS_RUNTIME_CACHE = {};
+    [LEAGUES_SHEET, LEAGUE_MEMBERS_SHEET, LEAGUE_GAMES_SHEET, GAME_FEATURE_ACCESS_SHEET].forEach(clearScriptKey);
     return;
   }
 
   delete LEAGUE_ACCESS_RUNTIME_CACHE[
     "league_sheet_objects_" + sheetName
   ];
+  clearScriptKey(sheetName);
 
 }
 
