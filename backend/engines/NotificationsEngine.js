@@ -2028,6 +2028,9 @@ function notificationPushLockValue_(category, setting) {
 
 function notificationPushUpcomingLock_(gameId, nowMs) {
   nowMs = Number(nowMs || Date.now());
+  if (typeof teamFantasyIsGame_ === "function" && teamFantasyIsGame_(gameId) && typeof teamFantasyUpcomingReminderLock_ === "function") {
+    return teamFantasyUpcomingReminderLock_(gameId, nowMs);
+  }
   const game = notificationPushGameRecord_(gameId) || {};
   const gameCandidates = [
     game.picksLockDateTime, game.PicksLockDateTime,
@@ -2324,19 +2327,31 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
     return { gameId: gameId, status: "SKIPPED_SAFETY" };
   }
 
+  const teamFantasyReminderGame = typeof teamFantasyIsGame_ === "function" && teamFantasyIsGame_(gameId);
+  if (teamFantasyReminderGame && typeof teamFantasyReminderPolicy_ === "function") {
+    const tfPolicy = teamFantasyReminderPolicy_(gameId);
+    if (!tfPolicy.enabled) {
+      return { gameId: gameId, status: "SKIPPED_TEAM_FANTASY_DISABLED", message: tfPolicy.message };
+    }
+  }
+
   const lock = notificationPushUpcomingLock_(gameId, nowMs);
   if (!lock.lockAtMs || lock.lockAtMs <= nowMs) {
-    return { gameId: gameId, status: "WAITING_FOR_LOCK" };
+    return { gameId: gameId, status: "WAITING_FOR_LOCK", lockSource: lock.source || "none", reminderWindow: lock.reminderWindow || "" };
   }
 
   const hoursUntilLock = (lock.lockAtMs - nowMs) / 3600000;
   const terminal = notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime);
   const due = notificationPushReminderSelectDueOffset_(setting.reminderOffsetsHours, hoursUntilLock, terminal);
   if (!due.offsetHours) {
-    return { gameId: gameId, status: "NOT_DUE", lockDateTime: lock.lockDateTime };
+    return { gameId: gameId, status: "NOT_DUE", lockDateTime: lock.lockDateTime, lockSource: lock.source || "", reminderWindow: lock.reminderWindow || "" };
   }
 
-  if (notificationPushRecentCompletedReminderForGame_(gameId, lock.lockDateTime, nowMs)) {
+  // Team Fantasy has explicit Thursday/Sunday/final kickoff windows. Those
+  // window toggles are intentional, so do not let the generic cross-lock
+  // cooldown suppress a distinct enabled kickoff window. Per-lock/offset log
+  // keys still prevent duplicate delivery for the same Team Fantasy window.
+  if (!teamFantasyReminderGame && notificationPushRecentCompletedReminderForGame_(gameId, lock.lockDateTime, nowMs)) {
     return { gameId: gameId, status: "COOLDOWN", lockDateTime: lock.lockDateTime };
   }
 
@@ -2366,6 +2381,8 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
   result.gameId = gameId;
   result.lockDateTime = lock.lockDateTime;
   result.offsetHours = due.offsetHours;
+  result.lockSource = lock.source || "";
+  result.reminderWindow = lock.reminderWindow || "";
   return result;
 }
 

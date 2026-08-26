@@ -72,11 +72,20 @@ function adminTfSystemStatusHtml_(dash) {
     <div class="tf-system-grid">
       <div><strong>Game saved</strong><div>${gameSaved ? '✅ Yes' : '❌ No'}</div></div>
       <div><strong>Rules/settings</strong><div>${settingsSaved ? '✅ Saved' : '❌ Missing'}</div></div>
-      <div><strong>15-min sync</strong><div>${triggerActive ? '✅ Active (' + Number(sys.triggerCount || 0) + ')' : (configured ? '⚠️ Configured, trigger missing' : 'Off')}</div></div>
+      <div><strong>5-min sync</strong><div>${triggerActive ? '✅ Active (' + Number(sys.triggerCount || 0) + ')' : (configured ? '⚠️ Configured, trigger missing' : 'Off')}</div></div>
       <div class="${lastClass}"><strong>Last sync</strong><div>${adminTfEscape_(adminTfFormatTime_(sys.lastSyncAt))} · ${adminTfEscape_(lastStatus)}</div></div>
     </div>
     ${sys.lastSyncMessage ? `<div class="tf-muted" style="margin-top:8px;">${adminTfEscape_(sys.lastSyncMessage)}</div>` : ''}
   `;
+}
+
+function adminTfNotificationPolicyHtml_(dash) {
+  const center = dash && dash.notificationCenter ? dash.notificationCenter : {};
+  const game = center.game || {};
+  const policy = center.policy || {};
+  const active = policy.enabled === true && game.enabled === true && game.autoReminderEnabled === true && game.paused !== true;
+  const testOnly = String(center.globalMode || '').toUpperCase() === 'TEST' || game.testOnly === true;
+  return `<div class="tf-muted" style="margin-bottom:10px;"><strong>Automatic reminder status:</strong> ${active ? 'Enabled' : 'Not active'} · Global ${adminTfEscape_(center.globalMode || 'unknown')} · Notification Center auto ${game.autoReminderEnabled === true ? 'ON' : 'OFF'} · Team Fantasy gate ${policy.enabled === true ? 'ON' : 'OFF'}${testOnly ? ' · TEST only' : ''}</div>`;
 }
 
 function adminTfSetBusy_(buttonId, busy, busyText, normalText) {
@@ -179,7 +188,8 @@ async function renderAdminTeamFantasyPage() {
         <div class="tf-inline-form"><input id="adminTfMemberUser" placeholder="username"><select id="adminTfMemberLeague">${leagues.filter(function(l){return String(l.LeagueId||l.leagueId)!=='complete';}).map(function(l){return `<option value="${adminTfEscape_(l.LeagueId||l.leagueId)}">${adminTfEscape_(l.LeagueName||l.leagueName)}</option>`;}).join('')}</select><button class="tf-button secondary" onclick="adminTfAssignMember_()">Add User's Entry/Entries</button></div>
       </section>
       <section class="card">
-        <div class="tf-card-heading"><div><h2>Weekly Reminders</h2><div class="tf-muted">Only players with open eligible lineup slots are targeted.</div></div></div>
+        <div class="tf-card-heading"><div><h2>Weekly Reminders</h2><div class="tf-muted">Only players with open eligible lineup slots are targeted. Team Fantasy Missing-pick reminders is the master gate; Notification Center must also have this game enabled with Automatic Reminders on. The 24h/2h offsets follow enabled kickoff windows: Thursday first kickoff, Sunday first kickoff, and the week's final kickoff.</div></div></div>
+        ${adminTfNotificationPolicyHtml_(dash)}
         <div class="tf-action-row"><button class="tf-button secondary" onclick="adminTfReminder_(true)">Preview Missing Picks</button><button class="tf-button" onclick="adminTfReminder_(false)">Send Reminder Now</button></div>
         <div id="adminTfReminderPreview"></div>
       </section>
@@ -334,7 +344,7 @@ async function adminTfReminder_(previewOnly) {
     if (out) out.innerHTML = `<div class="tf-reminder-preview"><strong>${Number(res.missingUsers || 0)} users missing picks</strong>${(res.details || []).filter(function(d){ return d.missingCount > 0; }).map(function(d){ return `<div>${adminTfEscape_(d.username)} — ${d.picked}/${d.required}: ${adminTfEscape_((d.missing || []).join(', '))}</div>`; }).join('')}</div>`;
     adminTfActionStatus_('✅ Preview ready.', false);
   } else {
-    adminTfActionStatus_('Reminder send complete: ' + Number(res.sent || 0) + ' sent, ' + Number(res.failed || 0) + ' failed.', Number(res.failed || 0) > 0);
+    adminTfActionStatus_((res.testDelivery ? 'TEST reminder complete — admin only: ' : 'Reminder send complete: ') + Number(res.sent || 0) + ' sent, ' + Number(res.failed || 0) + ' failed.', Number(res.failed || 0) > 0);
   }
 }
 

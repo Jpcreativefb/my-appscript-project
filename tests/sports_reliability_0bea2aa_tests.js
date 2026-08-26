@@ -89,6 +89,29 @@ assert.strictEqual(
   'Provider HTTP errors must preserve provider code/message'
 );
 
+const oddsUrlCtx = runFunctions(odds, ['sportsOddsUtcTimestamp_', 'buildSportsOddsApiUrl_'], {
+  getSportsOddsApiKey_: () => 'TEST_KEY_NOT_REAL',
+  SPORTS_ODDS_API_BASE: 'https://api.the-odds-api.com/v4/sports',
+  SPORTS_ODDS_REGIONS: 'us',
+  SPORTS_ODDS_MARKETS: 'h2h',
+  SPORTS_ODDS_FORMAT: 'decimal',
+  SPORTS_ODDS_DATE_FORMAT: 'iso'
+});
+const generatedOddsUrl = oddsUrlCtx.buildSportsOddsApiUrl_(
+  'baseball_mlb',
+  'h2h',
+  'us',
+  {
+    commenceTimeFrom: '2026-08-26T21:17:34.987Z',
+    commenceTimeTo: '2026-09-09T21:17:34.123Z'
+  }
+);
+const generatedOddsParams = new URL(generatedOddsUrl).searchParams;
+assert.strictEqual(generatedOddsParams.get('commenceTimeFrom'), '2026-08-26T21:17:34Z', 'Generated Odds URL must use second-precision UTC commenceTimeFrom');
+assert.strictEqual(generatedOddsParams.get('commenceTimeTo'), '2026-09-09T21:17:34Z', 'Generated Odds URL must use second-precision UTC commenceTimeTo');
+assert(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(generatedOddsParams.get('commenceTimeFrom')), 'commenceTimeFrom must exactly match YYYY-MM-DDTHH:MM:SSZ');
+assert(!generatedOddsUrl.includes('.987Z') && !generatedOddsUrl.includes('.123Z'), 'Outgoing Odds API URL must not contain timestamp milliseconds');
+
 const oddsFetchCtx = runFunctions(odds, ['fetchSportsOddsApiJsonWithLog_'], {
   UrlFetchApp: {
     fetch: () => ({
@@ -107,6 +130,25 @@ assert.deepStrictEqual(Array.from(loggedButNonfatal.payload), [], 'Successful pr
 assert.strictEqual(loggedButNonfatal.usage.requestsRemaining, '476');
 assert(loggedButNonfatal.usage.logWarning.includes('SportsOddsApiLog'), 'Diagnostic log lock failure must be retained only as a warning');
 
+const odds422Ctx = runFunctions(odds, ['sportsOddsProviderErrorMessage_', 'fetchSportsOddsApiJsonWithLog_'], {
+  sportsOddsString_: (v) => v == null ? '' : String(v).trim(),
+  UrlFetchApp: {
+    fetch: () => ({
+      getResponseCode: () => 422,
+      getContentText: () => JSON.stringify({ error_code: 'INVALID_COMMENCE_TIME', message: 'commenceTimeFrom must be ISO UTC seconds' }),
+      getHeaders: () => ({})
+    })
+  },
+  sportsOddsHeaderValue_: () => '',
+  sportsOddsLogApiCall_: () => { throw new Error('Could not lock script while setting up sheet: SportsOddsApiLog'); },
+  SPORTS_ODDS_LAST_API_USAGE_: null
+});
+assert.throws(
+  () => odds422Ctx.fetchSportsOddsApiJsonWithLog_('https://example.invalid/odds', { league: 'MLB' }),
+  /Odds API HTTP 422: INVALID_COMMENCE_TIME: commenceTimeFrom must be ISO UTC seconds/,
+  'Provider HTTP 422 must remain the operational error even when SportsOddsApiLog diagnostics also fail'
+);
+
 const oddsSetupCtx = runFunctions(odds, ['setupSportsOddsSystem'], {
   SPORTS_ODDS_SHEET: 'SportsOdds',
   SPORTS_ODDS_HEADERS: ['A'],
@@ -123,7 +165,11 @@ assert.strictEqual(oddsSetup.warnings.length, 2, 'Both diagnostic log setup fail
 const controlledOddsFn = functionSource(admin, 'refreshSportsOddsForLeagueControlled_');
 assert(!controlledOddsFn.includes('setupSportsAdminControlSystem()'), 'Controlled odds refresh must not run full Admin setup under the odds path');
 assert(controlledOddsFn.includes('sportsAdminPrepareOddsRefresh_()'), 'Controlled odds refresh must use narrow operational preparation');
-assert(controlledOddsFn.includes('Diagnostic logging warning (refresh still succeeded)'), 'Diagnostic logging failures must be persisted as an OK warning, not Last ERROR');
+assert(controlledOddsFn.includes('\"RUNNING\"'), 'Every operational odds attempt must clear stale Last ERROR before provider/usage work starts');
+assert(controlledOddsFn.includes('diagnosticWarning: diagnosticLogWarning'), 'Diagnostic logging warnings must be returned separately from operational LastRefreshMessage');
+assert(!controlledOddsFn.includes('Diagnostic logging warning (refresh still succeeded)'), 'Diagnostic logging warnings must not be persisted into operational LastRefreshMessage');
+assert(controlledOddsFn.indexOf('\"RUNNING\"') < controlledOddsFn.indexOf('refreshSportsOddsForLeagueWithOptions('), 'Operational RUNNING status must replace stale diagnostic errors before the provider request begins');
+assert(controlledOddsFn.indexOf('sportsOddsIncrementUsage_(') < controlledOddsFn.indexOf('\"RUNNING\"'), 'Daily usage accounting must run before RUNNING changes LastRefreshDate so prior-day counters reset correctly');
 
 // 3) Manual Smart Sync must only queue work.
 let queueCalls = 0;
@@ -152,6 +198,10 @@ assert(
 );
 assert(queuedMessageFn.includes('Queueing Smart Sports Sync...'), 'First Smart Sync click must immediately show queue acknowledgement');
 assert(queuedMessageFn.includes('requestAnimationFrame'), 'Smart Sync must yield a paint before waiting on Apps Script');
+assert(queuedMessageFn.includes('adminSportsHoldActionProgress_'), 'Smart Sync final result must be held near the action button');
+assert(queuedMessageFn.includes('15000'), 'Smart Sync final status must remain visible for about 15 seconds');
+const holdProgressFn = functionSource(adminPage, 'adminSportsHoldActionProgress_');
+assert(holdProgressFn.includes('Math.max(10000'), 'Action-result hold must never be shorter than 10 seconds');
 assert.strictEqual(adminSportsProgressLabelTest_(), 'Queueing sync...', 'Smart Sync button progress text must say it is queueing');
 
 function adminSportsProgressLabelTest_() {
@@ -214,6 +264,33 @@ const rosterOrderedSummary = {
 };
 assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOrderedSummary, 'home').name, 'Home Ordered Starter', 'ESPN roster[0] without side metadata must resolve as home');
 assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOrderedSummary, 'away').name, 'Away Ordered Starter', 'ESPN roster[1] without side metadata must resolve as away');
+
+// RC13 live follow-up: ESPN's current MLB scoreboard exposes probables on each
+// competition competitor. Preserve that data on SportsScores so Builder is not
+// dependent on a second summary request for names already present upstream.
+const scoreboardProbableCtx = runFunctions(scoresEngine, ['sportsScoreboardProbablePitcherName_']);
+const liveScoreboardCompetitorFixture = {
+  homeAway: 'away',
+  probables: [{
+    name: 'probableStartingPitcher',
+    displayName: 'Probable Starting Pitcher',
+    abbreviation: 'SP',
+    playerId: 39825,
+    athlete: {
+      id: '39825',
+      fullName: 'Freddy Peralta',
+      displayName: 'Freddy Peralta',
+      position: 'SP'
+    }
+  }]
+};
+assert.strictEqual(scoreboardProbableCtx.sportsScoreboardProbablePitcherName_(liveScoreboardCompetitorFixture), 'Freddy Peralta', 'Live ESPN scoreboard probableStartingPitcher shape must resolve directly');
+const teamNormalizerFn = functionSource(scoresEngine, 'normalizeESPNTeamEvent_');
+assert(teamNormalizerFn.includes('HomeProbablePitcher') && teamNormalizerFn.includes('AwayProbablePitcher'), 'SportsScores normalization must preserve scoreboard probable pitcher names');
+assert(functionSource(scoresEngine, 'sportsV13ScoresExtraHeaders_').includes('HomeProbablePitcher'), 'SportsScores sheet must persist probable pitcher columns');
+const detailLoadFn = functionSource(sportsPage, 'loadSportsGameDetailsForScores_');
+assert(detailLoadFn.includes('AwayProbablePitcher') && detailLoadFn.includes('HomeProbablePitcher'), 'Builder should skip supplemental summary calls when scoreboard already supplied both probables');
+assert(sportsPage.includes('parser candidates H/A'), 'Admin TBD trace must expose parser candidate counts for live diagnosis');
 
 
 // 5b) Starting-pitcher summary transport must go through the Sports Engine proxy bridge.

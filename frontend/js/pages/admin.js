@@ -5049,6 +5049,22 @@ function adminSportsSetActionProgress_(button, message) {
 
 }
 
+function adminSportsHoldActionProgress_(button, message, holdMs) {
+  if (!button) return;
+
+  const wrap = button.closest
+    ? button.closest(".sports-action-wrap")
+    : null;
+  const holdUntil = Date.now() + Math.max(10000, Number(holdMs || 15000));
+  button.setAttribute("data-sports-hold-status-until", String(holdUntil));
+
+  if (!wrap) return;
+  const text = wrap.querySelector("[data-sports-status-text]");
+  const status = wrap.querySelector(".sports-action-status");
+  if (text) text.textContent = message || "Done.";
+  if (status) status.removeAttribute("hidden");
+}
+
 function adminSportsClearActionProgress_(button) {
 
   const wrap =
@@ -5079,11 +5095,27 @@ function adminSportsClearActionProgress_(button) {
   const status =
     wrap.querySelector(".sports-action-status");
 
+  const holdUntil = Number(
+    button.getAttribute("data-sports-hold-status-until") || 0
+  );
+  const remaining = holdUntil - Date.now();
+
+  wrap.classList.remove("is-working");
+
+  if (remaining > 0) {
+    setTimeout(function() {
+      if (!document.body.contains(button)) return;
+      button.removeAttribute("data-sports-hold-status-until");
+      adminSportsClearActionProgress_(button);
+    }, remaining);
+    return;
+  }
+
+  button.removeAttribute("data-sports-hold-status-until");
+
   if (status) {
     status.setAttribute("hidden", "hidden");
   }
-
-  wrap.classList.remove("is-working");
 
 }
 
@@ -8609,6 +8641,10 @@ async function adminRefreshSportsScoresNow() {
 
 async function adminRunFullSportsSyncNow() {
 
+  const smartSyncButton = document.querySelector(
+    '[data-sports-click^="adminRunFullSportsSyncNow("]'
+  );
+
   adminSportsMessage_(
     "Queueing Smart Sports Sync...",
     false
@@ -8646,6 +8682,11 @@ async function adminRunFullSportsSyncNow() {
         false
       );
 
+      adminSportsHoldActionProgress_(
+        smartSyncButton,
+        "Queued — background Sports sync will run shortly.",
+        15000
+      );
       adminSportsMarkDashboardStale_();
       return;
 
@@ -8701,6 +8742,11 @@ async function adminRunFullSportsSyncNow() {
       false
     );
 
+    adminSportsHoldActionProgress_(
+      smartSyncButton,
+      "Smart Sports Sync complete.",
+      15000
+    );
     adminSportsMarkDashboardStale_();
 
   } catch (err) {
@@ -8710,6 +8756,12 @@ async function adminRunFullSportsSyncNow() {
         ? err.message
         : "Unable to run full sports sync.",
       true
+    );
+
+    adminSportsHoldActionProgress_(
+      smartSyncButton,
+      "Smart Sports Sync failed — see message above.",
+      15000
     );
 
   }

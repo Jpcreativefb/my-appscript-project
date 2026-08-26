@@ -1734,6 +1734,137 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
   };
 }
 
+function teamFantasyDashboardProgress_(gameId, username) {
+  gameId = teamFantasyString_(gameId);
+  username = teamFantasyNormalizeUsername_(username);
+  if (!gameId || !username) return { madeCount: 0, totalCount: 0, remainingCount: 0, progressAvailable: false };
+  const settings = teamFantasyGetSettings_(gameId);
+  let entries = teamFantasyEntriesForUser_(gameId, username);
+  const week = settings.currentWeek;
+
+  // Home must stay read-only and must not depend on a live Sports endpoint call.
+  // Before the player first opens Team Fantasy, infer the required lineup count
+  // from the configured entry mode without creating entry rows.
+  if (!entries.length && week <= settings.regularSeasonEndWeek) {
+    const inferredEntries = settings.entryMode === "afc-nfc" ? 2 : 1;
+    const total = TEAM_FANTASY_POSITIONS.length * inferredEntries;
+    return {
+      madeCount: 0,
+      totalCount: total,
+      remainingCount: total,
+      progressAvailable: true,
+      progressLabel: "Weekly lineup",
+      progressValue: 0,
+      userSummary: total + " pick" + (total === 1 ? "" : "s") + " remaining",
+      summary: { week: week, phase: teamFantasyPhaseForWeek_(settings, week), entries: inferredEntries, remaining: total }
+    };
+  }
+
+  const eligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
+  entries = entries.filter(function(entry) { return eligibility[entry.entryId] !== false; });
+  const totalCount = entries.length * TEAM_FANTASY_POSITIONS.length;
+  const entryIds = {};
+  entries.forEach(function(entry) { entryIds[entry.entryId] = true; });
+  const picked = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== settings.seasonYear || Number(row.Week) !== week) return;
+    const entryId = teamFantasyString_(row.EntryId);
+    const position = teamFantasyNormalizePosition_(row.Position);
+    if (!entryIds[entryId] || !position || !teamFantasyNormalizeTeam_(row.TeamAbbr)) return;
+    picked[entryId + "|" + position] = true;
+  });
+  const madeCount = Object.keys(picked).length;
+  const remainingCount = Math.max(0, totalCount - madeCount);
+  const postseasonComplete = week > settings.regularSeasonEndWeek && totalCount === 0;
+  return {
+    madeCount: madeCount,
+    totalCount: totalCount,
+    remainingCount: remainingCount,
+    progressAvailable: true,
+    progressLabel: postseasonComplete ? "Postseason complete" : "Weekly lineup",
+    progressValue: totalCount ? madeCount / totalCount : 1,
+    userSummary: postseasonComplete
+      ? "Postseason Complete"
+      : remainingCount + " pick" + (remainingCount === 1 ? "" : "s") + " remaining",
+    summary: { week: week, phase: teamFantasyPhaseForWeek_(settings, week), entries: entries.length, remaining: remainingCount, postseasonComplete: postseasonComplete }
+  };
+}
+
+function teamFantasyReminderDayCode_(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (isNaN(date.getTime())) return "";
+  try {
+    const timezone = typeof Session !== "undefined" && Session.getScriptTimeZone ? Session.getScriptTimeZone() : "America/Chicago";
+    if (typeof Utilities !== "undefined" && Utilities.formatDate) return String(Utilities.formatDate(date, timezone || "America/Chicago", "EEE") || "").toLowerCase();
+  } catch (err) {}
+  return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][date.getUTCDay()] || "";
+}
+
+function teamFantasyReminderPolicy_(gameId) {
+  const settings = teamFantasyGetSettings_(gameId);
+  return {
+    enabled: settings.reminderEnabled === true,
+    thursday: settings.reminderThursday === true,
+    sunday: settings.reminderSunday === true,
+    finalWindow: settings.reminderFinalWindow === true,
+    currentWeek: settings.currentWeek,
+    message: settings.reminderEnabled === true
+      ? "Team Fantasy reminders require both this game toggle and Notification Center automatic reminders."
+      : "Team Fantasy missing-pick reminders are disabled for this game."
+  };
+}
+
+function teamFantasyReminderKickoffWindows_(gameId, nowMs) {
+  const settings = teamFantasyGetSettings_(gameId);
+  const policy = teamFantasyReminderPolicy_(gameId);
+  if (!policy.enabled) return { enabled: false, policy: policy, windows: [] };
+  const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek);
+  const games = (schedule.games || []).map(function(game) {
+    const ms = new Date(game.gameDateTime).getTime();
+    return { game: game, ms: ms, day: teamFantasyReminderDayCode_(ms) };
+  }).filter(function(item) { return !isNaN(item.ms); });
+  if (!games.length) return { enabled: true, policy: policy, windows: [] };
+
+  const byMs = {};
+  function addWindow(item, kind, label) {
+    if (!item) return;
+    const key = String(item.ms);
+    if (!byMs[key]) byMs[key] = { lockAtMs: item.ms, lockDateTime: new Date(item.ms).toISOString(), source: "team-fantasy-kickoff", kinds: [], labels: [] };
+    if (byMs[key].kinds.indexOf(kind) === -1) byMs[key].kinds.push(kind);
+    if (byMs[key].labels.indexOf(label) === -1) byMs[key].labels.push(label);
+  }
+  const sorted = games.slice().sort(function(a, b) { return a.ms - b.ms; });
+  if (policy.thursday) addWindow(sorted.find(function(item) { return item.day === "thu"; }), "thursday", "Thursday first kickoff");
+  if (policy.sunday) addWindow(sorted.find(function(item) { return item.day === "sun"; }), "sunday", "Sunday first kickoff");
+  if (policy.finalWindow) addWindow(sorted[sorted.length - 1], "final", "Final kickoff window");
+
+  const windows = Object.keys(byMs).map(function(key) {
+    const row = byMs[key];
+    row.window = row.kinds.join("+");
+    row.label = row.labels.join(" / ");
+    delete row.kinds;
+    delete row.labels;
+    return row;
+  }).sort(function(a, b) { return a.lockAtMs - b.lockAtMs; });
+  return { enabled: true, policy: policy, windows: windows, scheduleGames: games.length, nowMs: Number(nowMs || Date.now()) };
+}
+
+function teamFantasyUpcomingReminderLock_(gameId, nowMs) {
+  nowMs = Number(nowMs || Date.now());
+  const result = teamFantasyReminderKickoffWindows_(gameId, nowMs);
+  if (!result.enabled) return { lockAtMs: 0, lockDateTime: "", source: "team-fantasy-disabled", reminderPolicy: result.policy };
+  const next = result.windows.find(function(window) { return window.lockAtMs > nowMs; });
+  if (!next) return { lockAtMs: 0, lockDateTime: "", source: "team-fantasy-kickoff", reminderPolicy: result.policy };
+  return {
+    lockAtMs: next.lockAtMs,
+    lockDateTime: next.lockDateTime,
+    source: next.source,
+    reminderWindow: next.window,
+    reminderWindowLabel: next.label,
+    reminderPolicy: result.policy
+  };
+}
+
 function apiAdminSendTeamFantasyReminder(payload) {
   payload = payload || {};
   const adminUsername = typeof requireAdminFromToken_ === "function" ? requireAdminFromToken_(payload.token) : teamFantasyNormalizeUsername_(payload.username);
@@ -1743,17 +1874,49 @@ function apiAdminSendTeamFantasyReminder(payload) {
   if (!settings.reminderEnabled) return { success: false, message: "Team Fantasy reminders are disabled for this game." };
   const summary = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
   const previewOnly = payload.previewOnly === true;
-  if (previewOnly) {
-    return { success: true, preview: true, gameId: gameId, week: settings.currentWeek, missingUsers: summary.missingUsers.length, details: summary.details };
-  }
   if (typeof notificationPushGetSystemMode_ !== "function" || typeof notificationPushGatewaySend_ !== "function") {
-    return { success: false, message: "Push notification engine is not available." };
+    return previewOnly
+      ? { success: true, preview: true, gameId: gameId, week: settings.currentWeek, missingUsers: summary.missingUsers.length, details: summary.details, message: "Push notification engine is not available; preview only." }
+      : { success: false, message: "Push notification engine is not available." };
   }
   const globalMode = notificationPushGetSystemMode_();
   const gameSetting = notificationPushGetGameSetting_(gameId);
+  const forceTestRecipient = globalMode === "TEST" || (gameSetting && gameSetting.testOnly === true);
   if (globalMode === "OFF") return { success: false, message: "Global notifications are OFF." };
   if (gameSetting && (!gameSetting.enabled || gameSetting.paused)) return { success: false, message: gameSetting.paused ? "Notifications are paused for this game." : "Notifications are OFF for this game." };
+  if (previewOnly) {
+    return {
+      success: true, preview: true, gameId: gameId, week: settings.currentWeek,
+      missingUsers: summary.missingUsers.length, details: summary.details,
+      globalMode: globalMode, gameTestOnly: !!(gameSetting && gameSetting.testOnly), testDelivery: forceTestRecipient,
+      message: forceTestRecipient ? "TEST delivery will go only to the signed-in admin account." : "LIVE delivery will target only players missing Team Fantasy picks."
+    };
+  }
+
   const prefs = typeof notificationPushPreferenceSnapshot_ === "function" ? notificationPushPreferenceSnapshot_() : {};
+  if (forceTestRecipient) {
+    const subscriptions = notificationPushGetActiveSubscriptionsForUsers_([adminUsername]);
+    const title = "TEST · Team Fantasy Week " + settings.currentWeek;
+    const message = summary.missingUsers.length + " player(s) currently owe Team Fantasy picks. TEST delivery only — no player was contacted.";
+    const response = subscriptions.length ? notificationPushGatewaySend_(subscriptions, {
+      title: title, body: message, message: message, route: "team-fantasy",
+      data: { route: "team-fantasy", gameId: gameId, week: settings.currentWeek, type: "make_picks", testDelivery: true }
+    }) : { success: true, sent: 0, failed: 0, results: [] };
+    (response.results || []).forEach(function(result) {
+      if (typeof notificationPushMarkDeliveryResult_ === "function") notificationPushMarkDeliveryResult_(result);
+    });
+    teamFantasyAppendObject_(TEAM_FANTASY_SHEETS.REMINDER_LOG, {
+      SentAt: teamFantasyNowIso_(), GameId: gameId, SeasonYear: settings.seasonYear, Week: settings.currentWeek,
+      Username: adminUsername, EntryId: "TEST", MissingPositionsJSON: JSON.stringify([]), Title: title, Message: message,
+      Sent: Number(response.sent || 0), Failed: Number(response.failed || 0), Error: response.success === false ? teamFantasyString_(response.message || response.error) : ""
+    });
+    return {
+      success: response.success !== false, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek,
+      testDelivery: true, requestedMissingUsers: summary.missingUsers.length, recipientUsers: adminUsername ? 1 : 0,
+      sent: Number(response.sent || 0), failed: Number(response.failed || 0), errors: response.success === false ? [teamFantasyString_(response.message || response.error)] : []
+    };
+  }
+
   let sent = 0, failed = 0, users = 0;
   const errors = [];
   summary.details.filter(function(item) { return item.missingCount > 0; }).forEach(function(item) {
@@ -1765,10 +1928,7 @@ function apiAdminSendTeamFantasyReminder(payload) {
     const title = "Team Fantasy Week " + settings.currentWeek;
     const message = item.picked + "/" + item.required + " complete — " + missingText + " still open.";
     const response = notificationPushGatewaySend_(subscriptions, {
-      title: title,
-      body: message,
-      message: message,
-      route: "team-fantasy",
+      title: title, body: message, message: message, route: "team-fantasy",
       data: { route: "team-fantasy", gameId: gameId, week: settings.currentWeek, type: "make_picks" }
     });
     (response.results || []).forEach(function(result) {
@@ -1783,7 +1943,7 @@ function apiAdminSendTeamFantasyReminder(payload) {
       Title: title, Message: message, Sent: Number(response.sent || 0), Failed: Number(response.failed || 0), Error: response.success === false ? teamFantasyString_(response.message || response.error) : ""
     });
   });
-  return { success: errors.length === 0, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek, recipientUsers: users, sent: sent, failed: failed, errors: errors };
+  return { success: errors.length === 0, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek, testDelivery: false, recipientUsers: users, sent: sent, failed: failed, errors: errors };
 }
 
 function teamFantasySyncTriggerStatus_() {
@@ -2040,10 +2200,13 @@ function apiAdminGetTeamFantasyDashboard(payload) {
   const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) { return teamFantasyString_(row.GameId) === gameId; }).map(function(row) { return { leagueId: teamFantasyString_(row.LeagueId), entryId: teamFantasyString_(row.EntryId), username: teamFantasyNormalizeUsername_(row.Username) }; });
   const reminders = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
   const triggerStatus = teamFantasySyncTriggerStatus_();
+  const notificationCenter = typeof notificationPushGetGameSetting_ === "function" ? notificationPushGetGameSetting_(gameId) : null;
+  const notificationGlobalMode = typeof notificationPushGetSystemMode_ === "function" ? notificationPushGetSystemMode_() : "UNAVAILABLE";
   return {
     success: true, version: TEAM_FANTASY_VERSION, gameId: gameId, settings: settings,
     rules: teamFantasyRules_(gameId), leagues: leagues, entries: entries, memberships: memberships,
     reminderSummary: reminders,
+    notificationCenter: { globalMode: notificationGlobalMode, game: notificationCenter, policy: teamFantasyReminderPolicy_(gameId) },
     systemStatus: {
       gameSaved: teamFantasyIsGame_(gameId),
       settingsSaved: !!settings.gameId,

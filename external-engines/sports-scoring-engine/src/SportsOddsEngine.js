@@ -47,6 +47,25 @@ const SPORTS_ODDS_DATE_FORMAT =
 const SPORTS_ODDS_CACHE_MINUTES =
   30;
 
+function sportsOddsUtcTimestamp_(value) {
+
+  const date =
+    value instanceof Date
+      ? new Date(value.getTime())
+      : new Date(value);
+
+  if (isNaN(date.getTime())) {
+    throw new Error("Invalid Odds API commence time: " + value);
+  }
+
+  // The Odds API expects second precision UTC timestamps. JavaScript
+  // toISOString() includes milliseconds, so strip them deterministically.
+  return date
+    .toISOString()
+    .slice(0, 19) + "Z";
+
+}
+
 function sportsOddsIsoTimePlusDays_(daysForward) {
 
   const days =
@@ -62,7 +81,7 @@ function sportsOddsIsoTimePlusDays_(daysForward) {
     date.getUTCDate() + days
   );
 
-  return date.toISOString();
+  return sportsOddsUtcTimestamp_(date);
 
 }
 
@@ -2258,12 +2277,16 @@ function buildSportsOddsApiUrl_(
 
   if (options.commenceTimeFrom) {
     params.commenceTimeFrom =
-      options.commenceTimeFrom;
+      sportsOddsUtcTimestamp_(
+        options.commenceTimeFrom
+      );
   }
 
   if (options.commenceTimeTo) {
     params.commenceTimeTo =
-      options.commenceTimeTo;
+      sportsOddsUtcTimestamp_(
+        options.commenceTimeTo
+      );
   }
 
   const query =
@@ -2393,13 +2416,17 @@ function fetchSportsOddsEventsForLeagueWithOptions_(
     );
 
   const commenceTimeFrom =
-    options.commenceTimeFrom ||
-    new Date().toISOString();
+    sportsOddsUtcTimestamp_(
+      options.commenceTimeFrom ||
+      new Date()
+    );
 
   const commenceTimeTo =
-    options.commenceTimeTo ||
-    sportsOddsIsoTimePlusDays_(
-      daysForward
+    sportsOddsUtcTimestamp_(
+      options.commenceTimeTo ||
+      sportsOddsIsoTimePlusDays_(
+        daysForward
+      )
     );
 
   const url =

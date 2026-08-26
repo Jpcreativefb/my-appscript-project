@@ -774,9 +774,15 @@ function getDashboardGameProgressLite_(
 ) {
 
   if (mode === "team-fantasy") {
+    try {
+      if (typeof teamFantasyDashboardProgress_ === "function") {
+        return teamFantasyDashboardProgress_(String(game && (game.gameId || game.GameId) || ""), username);
+      }
+    } catch (err) {}
     return {
       madeCount: 0,
       totalCount: 0,
+      remainingCount: 0,
       progressAvailable: false,
       progressLabel: "Weekly lineup",
       progressValue: 0,
@@ -2098,9 +2104,15 @@ function getDashboardGameProgress_(
 ) {
 
   if (mode === "team-fantasy") {
+    try {
+      if (typeof teamFantasyDashboardProgress_ === "function") {
+        return teamFantasyDashboardProgress_(String(game && (game.gameId || game.GameId) || ""), username);
+      }
+    } catch (err) {}
     return {
       madeCount: 0,
       totalCount: 0,
+      remainingCount: 0,
       progressAvailable: false,
       progressLabel: "Weekly lineup",
       progressValue: 0,

@@ -1131,7 +1131,11 @@ function renderSportsStartingPitchers_(game) {
         ? `<div class="sports-starters-status">ESPN summary loaded; probable pitchers are not available upstream yet.${sportsSessionIsAdmin_(getSportsStoredSession_())
             ? " Event " + escapeSportsHtml(String(game.ESPNEventId || "unknown")) +
               (details.proxySource ? " · source " + escapeSportsHtml(String(details.proxySource)) : "") +
-              (details.upstreamHttpStatus ? " · HTTP " + escapeSportsHtml(String(details.upstreamHttpStatus)) : "")
+              (details.upstreamHttpStatus ? " · HTTP " + escapeSportsHtml(String(details.upstreamHttpStatus)) : "") +
+              (details.proxyFallbackFromStatus ? " · fallback from " + escapeSportsHtml(String(details.proxyFallbackFromStatus)) : "") +
+              (details.pitcherDiagnostic
+                ? " · parser candidates H/A " + escapeSportsHtml(String(details.pitcherDiagnostic.homeCandidates || 0)) + "/" + escapeSportsHtml(String(details.pitcherDiagnostic.awayCandidates || 0))
+                : "")
             : ""}</div>`
         : ''}
     </div>
@@ -1140,8 +1144,15 @@ function renderSportsStartingPitchers_(game) {
 
 async function loadSportsGameDetailsForScores_(scores) {
   const mlbGames = (scores || []).filter(function(game) {
-    return String(game && game.League || "").trim().toLowerCase() === "mlb" &&
-      String(game && game.ESPNEventId || "").trim();
+    if (String(game && game.League || "").trim().toLowerCase() !== "mlb") return false;
+    if (!String(game && game.ESPNEventId || "").trim()) return false;
+
+    // ESPN scoreboard already includes current probable starters. When both
+    // were preserved on SportsScores, do not make the slower summary lookup.
+    return !(
+      String(game && game.AwayProbablePitcher || "").trim() &&
+      String(game && game.HomeProbablePitcher || "").trim()
+    );
   }).slice(0, 30);
 
   if (!mlbGames.length) {

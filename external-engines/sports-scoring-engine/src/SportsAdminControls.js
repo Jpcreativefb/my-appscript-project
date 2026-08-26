@@ -2534,13 +2534,23 @@ function refreshSportsOddsForLeagueControlled_(
         )
       : 1;
 
-  const newUsage =
-    sportsOddsIncrementUsage_(
-      league,
-      estimatedCost
-    );
+  let newUsage = null;
 
   try {
+
+    newUsage =
+      sportsOddsIncrementUsage_(
+        league,
+        estimatedCost
+      );
+
+    // Clear any stale historical/diagnostic error immediately before the paid
+    // provider request. Usage accounting above also performs the daily reset.
+    updateSportsOddsRefreshStatus_(
+      league,
+      "RUNNING",
+      "Odds refresh started. Waiting for provider response."
+    );
 
     const result =
       typeof refreshSportsOddsForLeagueWithOptions === "function"
@@ -2584,10 +2594,7 @@ function refreshSportsOddsForLeagueControlled_(
       league,
       "OK",
       "Refresh complete. Usable odds rows: " +
-        result.usable +
-        (diagnosticLogWarning
-          ? ". Diagnostic logging warning (refresh still succeeded): " + diagnosticLogWarning
-          : "")
+        result.usable
     );
 
     return {
@@ -2595,7 +2602,8 @@ function refreshSportsOddsForLeagueControlled_(
       league: league,
       reason: reason,
       usage: newUsage,
-      result: result
+      result: result,
+      diagnosticWarning: diagnosticLogWarning
     };
 
   } catch (err) {

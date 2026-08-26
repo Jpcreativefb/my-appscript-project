@@ -4933,7 +4933,9 @@ function sportsV13ScoresExtraHeaders_() {
     "HomeAbbreviation",
     "AwayAbbreviation",
     "HomeConferenceName",
-    "AwayConferenceName"
+    "AwayConferenceName",
+    "HomeProbablePitcher",
+    "AwayProbablePitcher"
   ];
 }
 
@@ -7107,6 +7109,38 @@ function sportsV17TeamEventWinner_(
 }
 
 // Final override: baseball-aware normalization.
+function sportsScoreboardProbablePitcherName_(competitor) {
+  competitor = competitor || {};
+
+  const probables = Array.isArray(competitor.probables)
+    ? competitor.probables
+    : [];
+
+  const probable =
+    probables.find(function(item) {
+      const key = String(
+        item && (item.name || item.abbreviation || item.displayName) || ""
+      ).trim().toLowerCase();
+      return key === "probablestartingpitcher" ||
+        key === "sp" ||
+        key.indexOf("probable starting pitcher") !== -1;
+    }) ||
+    probables[0] ||
+    null;
+
+  if (!probable) return "";
+
+  const athlete = probable.athlete || probable.player || probable;
+  return String(
+    athlete.displayName ||
+    athlete.fullName ||
+    athlete.shortName ||
+    athlete.name ||
+    probable.displayName ||
+    ""
+  ).trim();
+}
+
 function normalizeESPNTeamEvent_(event, sport, league) {
 
   const competition =
@@ -7218,7 +7252,11 @@ function normalizeESPNTeamEvent_(event, sport, league) {
     HomeRecord:
       getESPNTeamRecord_(home),
     AwayRecord:
-      getESPNTeamRecord_(away)
+      getESPNTeamRecord_(away),
+    HomeProbablePitcher:
+      sportsScoreboardProbablePitcherName_(home),
+    AwayProbablePitcher:
+      sportsScoreboardProbablePitcherName_(away)
   };
 
 }
