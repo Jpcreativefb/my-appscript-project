@@ -1,17 +1,11 @@
 /************************************
  SPORTS SCORES FRONTEND
- Reads Sports Scores Engine API
- using JSONP to avoid Apps Script CORS.
+ Reads the separate Sports Scores Engine through the authenticated Awards App
+ server bridge. Browser JSONP/script loading is intentionally not used.
 ************************************/
 
-/************************************
- IMPORTANT:
- Replace this with your deployed
- Sports Scores Apps Script Web App URL.
-************************************/
-
-const SPORTS_API_URL =
-  "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
+const SPORTS_SERVER_TIMEOUT_MS =
+  120000;
 
 const SPORTS_WAGER_AWARDS_GAME_ID =
   "sports-wagers";  
@@ -560,18 +554,6 @@ function buildSportsFiltersFromControls() {
 }
 
 async function initSportsPage() {
-  if (
-    !SPORTS_API_URL ||
-    SPORTS_API_URL.includes("PASTE_YOUR")
-  ) {
-    showSportsError(
-      "Replace SPORTS_API_URL in js/sports.js with your deployed Sports Scores Web App URL."
-    );
-
-    setSportsStatus("Missing API URL.");
-    return;
-  }
-
   setSportsDateFiltersToToday();
 
   await loadSportsLeagues();
@@ -582,174 +564,8 @@ async function initSportsPage() {
 }
 
 /************************************
- JSONP HELPER
+ SPORTS ENGINE SERVER BRIDGE
 ************************************/
-
-const SPORTS_JSONP_TIMEOUT_MS =
-  90000;
-
-const SPORTS_JSONP_LONG_TIMEOUT_MS =
-  120000;
-
-const SPORTS_JSONP_LATE_CALLBACK_MS =
-  120000;
-
-function sportsJsonp(url, options) {
-
-  options =
-    options || {};
-
-  const timeoutMs =
-    Math.max(
-      1000,
-      Number(options.timeoutMs) ||
-      SPORTS_JSONP_TIMEOUT_MS
-    );
-
-  const callbackPrefix =
-    String(
-      options.callbackPrefix ||
-      "sportsJsonpCallback_"
-    )
-      .replace(/[^A-Za-z0-9_$]/g, "") ||
-    "sportsJsonpCallback_";
-
-  return new Promise(function(resolve, reject) {
-
-    const callbackName =
-      callbackPrefix +
-      Date.now() +
-      "_" +
-      Math.floor(Math.random() * 1000000);
-
-    const separator =
-      url.indexOf("?") >= 0 ? "&" : "?";
-
-    const script =
-      document.createElement("script");
-
-    let finished =
-      false;
-
-    function removeScript_() {
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
-    }
-
-    function deleteCallback_() {
-      try {
-        delete window[callbackName];
-      } catch (err) {
-        window[callbackName] = undefined;
-      }
-    }
-
-    function keepLateCallback_() {
-
-      // Apps Script can finish after the UI timeout or after a transient
-      // script load error. Keep a harmless callback temporarily so the
-      // delayed JSONP response does not throw "callback is not defined".
-      window[callbackName] =
-        function() {};
-
-      setTimeout(function() {
-        deleteCallback_();
-      }, SPORTS_JSONP_LATE_CALLBACK_MS);
-    }
-
-    function cleanup_(keepLateCallback) {
-      removeScript_();
-
-      if (keepLateCallback) {
-        keepLateCallback_();
-        return;
-      }
-
-      deleteCallback_();
-    }
-
-    const timeout =
-      setTimeout(function() {
-
-        if (finished) {
-          return;
-        }
-
-        finished = true;
-        cleanup_(true);
-
-        reject(
-          new Error(
-            "Sports API request timed out after " +
-            Math.round(timeoutMs / 1000) +
-            " seconds"
-          )
-        );
-
-      }, timeoutMs);
-
-    window[callbackName] =
-      function(data) {
-
-        if (finished) {
-          return;
-        }
-
-        finished = true;
-        clearTimeout(timeout);
-        cleanup_(false);
-        resolve(data);
-      };
-
-    script.onerror =
-      function() {
-
-        if (finished) {
-          return;
-        }
-
-        finished = true;
-        clearTimeout(timeout);
-        cleanup_(true);
-
-        reject(
-          new Error("Sports API script failed to load")
-        );
-      };
-
-    script.src =
-      url +
-      separator +
-      "callback=" +
-      encodeURIComponent(callbackName) +
-      "&_ts=" +
-      Date.now();
-
-    document.body.appendChild(script);
-  });
-}
-
-function buildSportsApiUrl(action, params) {
-  const query =
-    new URLSearchParams({
-      action: action
-    });
-
-  Object.keys(params || {}).forEach(function(key) {
-    const value = params[key];
-
-    if (
-      value !== "" &&
-      value !== null &&
-      value !== undefined
-    ) {
-      query.set(key, value);
-    }
-  });
-
-  return SPORTS_API_URL + "?" + query.toString();
-}
 
 /************************************
  LEAGUES
@@ -761,11 +577,9 @@ async function loadSportsLeagues() {
 
   try {
     const data =
-      await sportsJsonp(
-        buildSportsApiUrl(
-          "getSportsLeagues",
-          {}
-        )
+      await sportsScoresEngineApi_(
+        "adminGetSportsEngineLeagues",
+        {}
       );
 
     if (!data.success) {
@@ -1049,11 +863,9 @@ async function loadSportsScores(filters) {
 
   try {
     const data =
-      await sportsJsonp(
-        buildSportsApiUrl(
-          "getSportsScores",
-          requestFilters
-        )
+      await sportsScoresEngineApi_(
+        "adminGetSportsEngineScores",
+        requestFilters
       );
 
     if (!data.success) {
@@ -1571,7 +1383,7 @@ async function sportsAwardsPost_(action, payload) {
 
   const timeout =
     controller
-      ? setTimeout(function() { controller.abort(); }, SPORTS_JSONP_LONG_TIMEOUT_MS)
+      ? setTimeout(function() { controller.abort(); }, SPORTS_SERVER_TIMEOUT_MS)
       : null;
 
   try {
@@ -1635,6 +1447,30 @@ async function sportsAwardsApi_(action, params) {
   // All Awards App calls from the standalone Sports page use POST. This keeps
   // admin session tokens out of JSONP URLs while preserving the same router.
   return sportsAwardsPost_(action, params || {});
+}
+
+async function sportsScoresEngineApi_(action, params) {
+
+  const session =
+    getSportsStoredSession_();
+
+  if (!sportsSessionIsAdmin_(session)) {
+    throw new Error(
+      "Only admins can load the Sports Scores & Game Builder."
+    );
+  }
+
+  return sportsAwardsPost_(
+    action,
+    Object.assign(
+      {
+        username: session.username,
+        token: session.token
+      },
+      params || {}
+    )
+  );
+
 }
 
 async function refreshSportsScoreWindowFromSportsPage_() {
@@ -4996,9 +4832,9 @@ async function sportsAdvancedLoadGamesForContext_(context) {
     params.dateTo = context.dateTo || context.dateFrom;
   }
 
-  const data = await sportsJsonp(
-    buildSportsApiUrl("getSportsScores", params),
-    { timeoutMs: SPORTS_JSONP_LONG_TIMEOUT_MS }
+  const data = await sportsScoresEngineApi_(
+    "adminGetSportsEngineScores",
+    params
   );
   if (!data || data.success === false) {
     throw new Error((data && data.error) || "Could not load games for the comparison builder.");
@@ -5494,13 +5330,11 @@ async function loadSportsSnapshots(gameId) {
 
   try {
     const data =
-      await sportsJsonp(
-        buildSportsApiUrl(
-          "getSportsSnapshots",
-          {
-            gameId: gameId
-          }
-        )
+      await sportsScoresEngineApi_(
+        "adminGetSportsEngineSnapshots",
+        {
+          gameId: gameId
+        }
       );
 
     if (!data.success) {

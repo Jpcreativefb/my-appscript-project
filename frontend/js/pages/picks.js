@@ -157,9 +157,55 @@ function realityTvMovementHtml_(value) {
   return `<span class="reality-stat-movement even">—</span>`;
 }
 
+function renderRealityTvSpoilerShield_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true) return "";
+  const state = view.spoilerShield || { enabled: false, hiddenEpisodeIds: [], hasHiddenResults: false };
+  const hidden = {};
+  (state.hiddenEpisodeIds || []).forEach(function(id) { hidden[normalizeId(id)] = true; });
+  const hiddenEpisodes = (view.episodes || []).filter(function(episode) {
+    return hidden[normalizeId(episode && episode.episodeId)];
+  }).sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
+  const latestHidden = hiddenEpisodes.length ? hiddenEpisodes[0] : null;
+  return `<section class="reality-player-summary-card reality-spoiler-shield-card">
+    <div class="reality-player-summary-heading"><div><span class="season-anchor-eyebrow">Spoiler Shield</span><h2>Watch on your schedule</h2></div></div>
+    <label class="reality-tv-inline-option"><input type="checkbox" ${state.enabled === true ? "checked" : ""} onchange="saveRealityTvSpoilerPreference_(this.checked)"><span>Hide Reality results until I reveal each episode</span></label>
+    ${latestHidden ? `<div class="admin-message info">${escapeHtml(latestHidden.episodeName || ("Episode " + Number(latestHidden.episodeNumber || 0)))} has settled, but its results, points, and standings changes are hidden for you.</div><button type="button" class="button primary" onclick="revealRealityTvEpisode_('${escapeJs(latestHidden.episodeId || "")}')">I’ve Watched — Show Episode Results</button>` : state.enabled === true ? `<div class="admin-message success">No unrevealed episode results are waiting.</div>` : ""}
+  </section>`;
+}
+
+async function saveRealityTvSpoilerPreference_(enabled) {
+  showPicksMessage("Saving Spoiler Shield preference…", false);
+  try {
+    const response = await apiSaveRealityTvSpoilerPreference(PICKS_PAGE_DATA.gameId, enabled === true);
+    if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not save Spoiler Shield preference.");
+    clearStartupPayload(Boolean(true));
+    window.location.reload();
+  } catch (err) {
+    showPicksMessage(err.message || String(err), true);
+  }
+}
+
+async function revealRealityTvEpisode_(episodeId) {
+  if (!episodeId) return;
+  showPicksMessage("Revealing this episode…", false);
+  try {
+    const response = await apiRevealRealityTvEpisode(PICKS_PAGE_DATA.gameId, episodeId);
+    if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not reveal this episode.");
+    clearStartupPayload(Boolean(true));
+    window.location.reload();
+  } catch (err) {
+    showPicksMessage(err.message || String(err), true);
+  }
+}
+
 function renderRealityTvPlayerSummary_() {
   const view = PICKS_PAGE_DATA.realityTvView || {};
-  if (view.enabled !== true || !view.playerStats || !view.playerStats.overall) return "";
+  if (view.enabled !== true) return "";
+  if (view.playerStatsHiddenBySpoiler === true || (view.spoilerShield && view.spoilerShield.hasHiddenResults === true)) {
+    return `<section class="reality-player-summary-card"><div class="reality-player-summary-heading"><div><span class="season-anchor-eyebrow">Spoiler Shield</span><h2>Score & Standings Hidden</h2></div></div><p>Your current score, episode point change, and standings movement will appear after you reveal the settled episode.</p></section>`;
+  }
+  if (!view.playerStats || !view.playerStats.overall) return "";
   const overall = view.playerStats.overall || {};
   const rows = Array.isArray(view.playerStats.compactLeaderboard) ? view.playerStats.compactLeaderboard : [];
   const leaderboard = rows.length ? `<div class="reality-compact-leaderboard">${rows.map(function(row) {
@@ -229,6 +275,11 @@ function renderSeasonAnchorPickCard_() {
   if (anchor && anchor.deferred === true) {
     return `<section class="season-anchor-card loading" aria-live="polite">
       <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>Season Survivor Pick</h2><p>Loading the current survivor selection and active participants…</p></div><span class="season-anchor-status open">Loading</span></div>
+    </section>`;
+  }
+  if (anchor && anchor.hiddenBySpoiler === true) {
+    return `<section class="season-anchor-card loading" aria-live="polite">
+      <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Spoiler Shield</span><h2>Sole Survivor status hidden</h2><p>Your current anchor result, replacement state, multiplier, and season adjustment stay hidden until you reveal the settled episode above.</p></div><span class="season-anchor-status locked">Hidden</span></div>
     </section>`;
   }
   if (!anchor || anchor.enabled !== true) return "";
@@ -554,6 +605,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
         ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
 
       </div>
+
+      <div id="realityTvSpoilerShieldMount">${renderRealityTvSpoilerShield_()}</div>
 
       <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
 
@@ -4475,6 +4528,9 @@ function picksEnhancementKey_() {
 }
 
 function refreshPicksEnhancementUi_() {
+  const spoilerMount = document.getElementById("realityTvSpoilerShieldMount");
+  if (spoilerMount) spoilerMount.innerHTML = renderRealityTvSpoilerShield_();
+
   const summaryMount = document.getElementById("realityTvPlayerSummaryMount");
   if (summaryMount) summaryMount.innerHTML = renderRealityTvPlayerSummary_();
 

@@ -25,7 +25,7 @@ const checks = [
   ['workbook 10M capacity guard exists', scores.includes('SPORTS_WORKBOOK_CELL_LIMIT_V48_ = 10000000')],
   ['SportsLogs retention cap exists', scores.includes('SPORTS_LOG_MAX_DATA_ROWS_V48_ = 20000')],
   ['capacity maintenance runs during score updates', scores.includes('sportsWorkbookMaintenance_({ source: "runSportsScoresUpdate" })')],
-  ['capacity report is exposed to admin dashboard', admin.includes('workbookCapacity: typeof sportsWorkbookCapacityReport_')],
+  ['capacity report remains available while first-paint dashboard defers the expensive scan', scores.includes('function sportsWorkbookCapacityReport_') && admin.includes('workbookCapacity: { success: true, deferred: true }')],
   ['checkpoint capture pauses before the 10M wall', advanced.includes('capacity.percentUsed >= 90') && advanced.includes('checkpoint capture paused')],
   ['score sheets can re-expand after safe grid trimming', scores.includes('expand columns for') && scores.includes('insertColumnsAfter')],
   ['player sheets can re-expand after safe grid trimming', players.includes('expand player sheet columns') && players.includes('insertColumnsAfter')]

@@ -1,6 +1,17 @@
 var API_JSON_CALLBACK_ = "";
 var API_INTERNAL_POST_ROUTE_ = false;
 
+function apiRealityTvSpoilerGuard_(username, gameId) {
+  if (!username || !gameId || typeof realityTvSpoilerStateForGame_ !== "function") return null;
+  try {
+    const state = realityTvSpoilerStateForGame_(username, gameId);
+    return state && state.hasHiddenResults === true ? state : null;
+  } catch (err) {
+    // A presentation preference must never break ordinary API availability.
+    return null;
+  }
+}
+
 /* =========================
    API POST
 ========================= */
@@ -349,6 +360,24 @@ function doPost(e) {
       }));
     }
 
+    if (action === "saveRealityTvSpoilerPreference") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", body.leagueId || "");
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiSaveRealityTvSpoilerPreference({
+        username: body.username, token: body.token, gameId: postGameId, enabled: body.enabled
+      }));
+    }
+
+    if (action === "revealRealityTvEpisode") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", body.leagueId || "");
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiRevealRealityTvEpisode({
+        username: body.username, token: body.token, gameId: postGameId, episodeId: body.episodeId
+      }));
+    }
+
     if (action === "saveUserProfile") {
       return json(saveUserProfile({
         username: body.username,
@@ -579,6 +608,18 @@ function doPost(e) {
       return json(apiAdminGetSportsConfidenceBuilderScores(body));
     }
 
+    if (action === "adminGetSportsEngineLeagues") {
+      return json(apiAdminGetSportsEngineLeagues(body));
+    }
+
+    if (action === "adminGetSportsEngineScores") {
+      return json(apiAdminGetSportsEngineScores(body));
+    }
+
+    if (action === "adminGetSportsEngineSnapshots") {
+      return json(apiAdminGetSportsEngineSnapshots(body));
+    }
+
     if (action === "adminCreateSportsConfidenceQuestionsBulk") {
       return json(apiAdminCreateSportsConfidenceQuestionsBulk(body));
     }
@@ -798,6 +839,8 @@ function doGet(e) {
       action === "saveBet" ||
       action === "removeBet" ||
       action === "saveSeasonAnchorPick" ||
+      action === "saveRealityTvSpoilerPreference" ||
+      action === "revealRealityTvEpisode" ||
       action === "setNotificationPreference" ||
       action === "saveNotificationPreferences" ||
       action === "markNotificationRead" ||
@@ -2568,6 +2611,20 @@ function doGet(e) {
         });
       }
 
+      const spoilerGuard = apiRealityTvSpoilerGuard_(params.username || "", gameId);
+      if (spoilerGuard) {
+        return json({
+          success: true,
+          gameId: gameId,
+          leagueId: access.leagueId || leagueId || "",
+          leagueName: access.leagueName || "",
+          leaderboard: [],
+          spoilerShieldHidden: true,
+          spoilerShield: spoilerGuard,
+          message: "Standings are hidden until you reveal the settled Reality episode."
+        });
+      }
+
       const filteredLeaderboard =
         filterLeaderboardRowsForLeague_(
           leaderboard,
@@ -2605,6 +2662,18 @@ function doGet(e) {
           success: false,
           error: "Access denied: " + access.reason,
           gameId: gameId
+        });
+      }
+
+      const spoilerGuard = apiRealityTvSpoilerGuard_(params.username || "", gameId);
+      if (spoilerGuard) {
+        return json({
+          success: true,
+          gameId: gameId,
+          leaderboard: [],
+          spoilerShieldHidden: true,
+          spoilerShield: spoilerGuard,
+          message: "Live standings are hidden until you reveal the settled Reality episode."
         });
       }
 
@@ -2652,6 +2721,11 @@ function doGet(e) {
         });
       }
 
+      const spoilerGuard = apiRealityTvSpoilerGuard_(params.username || "", gameId);
+      if (spoilerGuard) {
+        return json({ success: true, gameId: gameId, results: [], spoilerShieldHidden: true, spoilerShield: spoilerGuard, message: "Results are hidden until you reveal the settled Reality episode." });
+      }
+
       return json(
         apiGetLiveResults({
           gameId:
@@ -2676,6 +2750,11 @@ function doGet(e) {
           success: false,
           error: "Access denied: " + access.reason
         });
+      }
+
+      const spoilerGuard = apiRealityTvSpoilerGuard_(params.username || "", gameId);
+      if (spoilerGuard) {
+        return json({ success: true, gameId: gameId, spoilerShieldHidden: true, spoilerShield: spoilerGuard, message: "Live result state is hidden until you reveal the settled Reality episode." });
       }
 
       return json(
@@ -3668,6 +3747,47 @@ if (action === "compareUserPicks") {
       );
 
     }
+
+    if (action === "adminGetSportsEngineLeagues") {
+      return json(
+        apiAdminGetSportsEngineLeagues({
+          username: params.username,
+          token: params.token
+        })
+      );
+    }
+
+    if (action === "adminGetSportsEngineScores") {
+      return json(
+        apiAdminGetSportsEngineScores({
+          username: params.username,
+          token: params.token,
+          sport: params.sport,
+          league: params.league,
+          state: params.state,
+          completed: params.completed,
+          dateFrom: params.dateFrom,
+          dateTo: params.dateTo,
+          team: params.team,
+          gameId: params.gameId,
+          espnEventId: params.espnEventId || params.ESPNEventId,
+          seasonYear: params.seasonYear,
+          seasonType: params.seasonType,
+          week: params.week
+        })
+      );
+    }
+
+    if (action === "adminGetSportsEngineSnapshots") {
+      return json(
+        apiAdminGetSportsEngineSnapshots({
+          username: params.username,
+          token: params.token,
+          gameId: params.gameId || params.sportsGameId
+        })
+      );
+    }
+
 
     if (action === "adminAutoSetSportsWagerOdds") {
 

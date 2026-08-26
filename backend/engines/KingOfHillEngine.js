@@ -254,6 +254,48 @@ function kothRecipientCount_(players, week, settings) {
   return kothAutomaticRecipientCount_(players, week, settings.endWeek, settings.kothStrikeLimit, settings.kothMinRecipients, settings.kothMaxRecipients);
 }
 
+function kothProjectedAliveCount_(activePlayers, selection, strikeLimit) {
+  var selected = {};
+  (selection && selection.recipients || []).forEach(function(player) { selected[kothKey_(player.username)] = true; });
+  return (activePlayers || []).filter(function(player) {
+    if (!selected[kothKey_(player.username)]) return true;
+    return Math.max(0, Math.floor(kothNumber_(player.strikes, 0))) + 1 < strikeLimit;
+  }).length;
+}
+
+function kothWeekPlan_(activePlayers, week, settings, historyRows) {
+  var recipientTarget = kothRecipientCount_(activePlayers, week, settings);
+  var selection = kothSelectRecipients_(activePlayers, recipientTarget, settings, historyRows, week);
+  var terminalFinish = false;
+
+  // Automatic pacing must finish the configured season with exactly one
+  // survivor. Score rotation can otherwise spread strikes too evenly, leaving
+  // two or more players below the strike limit after the final scheduled week.
+  // On the final week only, accelerate the minimum number of lowest-ranked
+  // players needed to leave one survivor. The all-field protection in
+  // kothSelectRecipients_ guarantees that one player remains.
+  if (settings.kothPacingMode === "automatic" && week >= settings.endWeek && activePlayers.length > 1 &&
+      kothProjectedAliveCount_(activePlayers, selection, settings.kothStrikeLimit) > 1) {
+    recipientTarget = activePlayers.length - 1;
+    selection = kothSelectRecipients_(activePlayers, recipientTarget, settings, historyRows, week);
+    if (selection.recipients.length >= activePlayers.length) {
+      selection.recipients = selection.recipients.slice(0, activePlayers.length - 1);
+      selection.tieApplied = true;
+    }
+    selection.finalStretch = true;
+    terminalFinish = true;
+  }
+
+  return { recipientTarget: recipientTarget, selection: selection, terminalFinish: terminalFinish };
+}
+
+function kothStrikeCountAfter_(player, receivesStrike, settings, terminalFinish) {
+  var before = Math.max(0, Math.floor(kothNumber_(player && player.strikes, 0)));
+  if (!receivesStrike) return before;
+  if (terminalFinish) return Math.max(settings.kothStrikeLimit, before + 1);
+  return before + 1;
+}
+
 function kothSourceGame_(gameId) {
   if (typeof getGameRuntimeConfig === "function") return getGameRuntimeConfig(gameId);
   return typeof getGame === "function" ? getGame(gameId) : null;
@@ -551,8 +593,9 @@ function kothProcessWeek_(gameId, week, options) {
     return { success: true, complete: true, gameId: gameId, week: week, soleSurvivor: activePlayers.length ? activePlayers[0].username : "", standings: kingOfHillLeaderboardData_(gameId) };
   }
 
-  var recipientTarget = kothRecipientCount_(activePlayers, week, settings);
-  var selection = kothSelectRecipients_(activePlayers, recipientTarget, settings, historyRows, week);
+  var plan = kothWeekPlan_(activePlayers, week, settings, historyRows);
+  var recipientTarget = plan.recipientTarget;
+  var selection = plan.selection;
   var recipientSet = {};
   selection.recipients.forEach(function(player) { recipientSet[kothKey_(player.username)] = true; });
 
@@ -568,7 +611,7 @@ function kothProcessWeek_(gameId, week, options) {
   activePlayers.forEach(function(player) {
     var key = kothKey_(player.username);
     var strike = recipientSet[key] === true;
-    var strikesAfter = player.strikes + (strike ? 1 : 0);
+    var strikesAfter = kothStrikeCountAfter_(player, strike, settings, plan.terminalFinish);
     var eliminated = strikesAfter >= settings.kothStrikeLimit;
     kothAppendObject_(historySheet, {
       GameId: gameId,
@@ -580,7 +623,7 @@ function kothProcessWeek_(gameId, week, options) {
       StrikesBefore: player.strikes,
       StrikeAwarded: strike,
       StrikeCountAfter: strikesAfter,
-      Status: eliminated ? "ELIMINATED" : (strike ? "STRIKE" : "SAFE"),
+      Status: eliminated ? (plan.terminalFinish ? "FINAL-ELIMINATED" : "ELIMINATED") : (strike ? "STRIKE" : "SAFE"),
       Eliminated: eliminated,
       EliminatedWeek: eliminated ? week : "",
       SourceScoresJSON: JSON.stringify(player.sourceScores || {}),
@@ -588,7 +631,7 @@ function kothProcessWeek_(gameId, week, options) {
       ActualRecipients: selection.recipients.length,
       CutoffScore: selection.cutoffScore,
       TieApplied: selection.tieApplied,
-      FinalStretch: selection.finalStretch,
+      FinalStretch: selection.finalStretch || plan.terminalFinish,
       ProcessedAt: now
     });
   });
@@ -604,7 +647,8 @@ function kothProcessWeek_(gameId, week, options) {
     actualRecipients: selection.recipients.length,
     recipients: selection.recipients.map(function(player) { return player.username; }),
     tieApplied: selection.tieApplied,
-    finalStretch: selection.finalStretch,
+    finalStretch: selection.finalStretch || plan.terminalFinish,
+    terminalFinish: plan.terminalFinish,
     complete: standings.length > 1 && alive.length === 1,
     soleSurvivor: standings.length > 1 && alive.length === 1 ? alive[0].username : "",
     standings: standings

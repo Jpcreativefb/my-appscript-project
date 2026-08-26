@@ -1101,6 +1101,28 @@ async function apiSaveSeasonAnchorPick(gameId, entityId) {
   });
 }
 
+async function apiSaveRealityTvSpoilerPreference(gameId, enabled) {
+  const session = getSession ? getSession() : {};
+  return apiPost("saveRealityTvSpoilerPreference", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    enabled: !!enabled,
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiRevealRealityTvEpisode(gameId, episodeId) {
+  const session = getSession ? getSession() : {};
+  return apiPost("revealRealityTvEpisode", {
+    username: session.username || "",
+    token: session.token || "",
+    gameId: gameId,
+    episodeId: episodeId,
+    leagueId: getApiLeagueId_()
+  });
+}
+
 /* ======================
    LEADERBOARD
 ====================== */

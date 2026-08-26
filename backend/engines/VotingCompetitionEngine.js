@@ -217,6 +217,26 @@ function votingCompetitionNormalizeScoringMode_(value) {
   return mode === "borda" ? "borda" : "custom-points";
 }
 
+function votingCompetitionScoringContract_(settings) {
+  settings = settings || {};
+  return {
+    votingMethod: votingCompetitionNormalizeVotingMethod_(settings.votingMethod),
+    rankLimit: Math.max(1, Math.floor(votingCompetitionNumber_(settings.rankLimit, 1))),
+    scoringMode: votingCompetitionNormalizeScoringMode_(settings.scoringMode),
+    pointValues: (Array.isArray(settings.pointValues) ? settings.pointValues : [])
+      .map(function(value) { return Math.max(0, votingCompetitionNumber_(value, 0)); })
+  };
+}
+
+function votingCompetitionScoringContractChanged_(before, after) {
+  const left = votingCompetitionScoringContract_(before);
+  const right = votingCompetitionScoringContract_(after);
+  return left.votingMethod !== right.votingMethod ||
+    left.rankLimit !== right.rankLimit ||
+    left.scoringMode !== right.scoringMode ||
+    JSON.stringify(left.pointValues) !== JSON.stringify(right.pointValues);
+}
+
 function votingCompetitionNormalizeAssignment_(value, kind) {
   const mode = votingCompetitionKey_(value).replace(/_/g, "-");
   const allowed = kind === "number"
@@ -331,6 +351,12 @@ function votingCompetitionSaveSettings_(gameId, payload) {
 
   if (!settings.pointValues.length) settings.pointValues = [10, 7, 5, 3, 1];
   if (settings.votingMethod === "favorite") settings.rankLimit = 1;
+
+  const existingSettings = votingCompetitionGetSettings_(gameId);
+  const existingBallots = votingCompetitionReadBallots_(gameId);
+  if (existingBallots.length && votingCompetitionScoringContractChanged_(existingSettings, settings)) {
+    throw new Error("Voting scoring settings cannot change after the first ballot is saved. Voting Method, Rank Limit, Scoring Mode, and Point Values are locked once voting begins.");
+  }
 
   const sh = votingCompetitionEnsureSheet_(VOTING_COMPETITION_SETTINGS_SHEET, VOTING_COMPETITION_SETTINGS_HEADERS);
   const data = sh.getDataRange().getValues();

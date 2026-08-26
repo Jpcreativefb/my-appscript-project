@@ -2647,6 +2647,16 @@ function notificationPushLogBatch_(entry) {
   ]);
 }
 
+function notificationPushRealitySpoilerPresentation_(username, gameId, type, shieldMap) {
+  if (notificationPushNormalizeType_(type) !== "results" || !gameId) return null;
+  const key = notificationPushNormalizeKey_(username);
+  if (!shieldMap || shieldMap[key] !== true) return null;
+  return {
+    title: "Reality results are ready",
+    message: "A Reality episode has settled. Open PATTC Predicts when you are ready to reveal the episode results."
+  };
+}
+
 function apiAdminSendPushNotification(payload) {
   payload = payload || {};
   const adminUsername = String(requireAdminFromToken_(payload.token) || "").trim().toLowerCase();
@@ -2808,13 +2818,17 @@ function apiAdminSendPushNotification(payload) {
 
   const recipients = resolution.recipients;
   const subscriptions = resolution.subscriptions;
+  const spoilerShieldMap = type === "results" && gameId && typeof realityTvSpoilerPreferenceMap_ === "function"
+    ? realityTvSpoilerPreferenceMap_(recipients, gameId)
+    : {};
 
   recipients.forEach(function(username) {
+    const safe = notificationPushRealitySpoilerPresentation_(username, gameId, type, spoilerShieldMap);
     createUserNotification_({
       username: username,
       type: type,
-      title: title,
-      message: message,
+      title: safe ? safe.title : title,
+      message: safe ? safe.message : message,
       gameId: gameId,
       route: route
     });
@@ -2834,7 +2848,34 @@ function apiAdminSendPushNotification(payload) {
     }
   };
 
-  const gatewayResult = notificationPushGatewaySend_(subscriptions, notification);
+  const shieldedSubscriptions = subscriptions.filter(function(item) {
+    return !!notificationPushRealitySpoilerPresentation_(item.username, gameId, type, spoilerShieldMap);
+  });
+  const normalSubscriptions = subscriptions.filter(function(item) {
+    return !notificationPushRealitySpoilerPresentation_(item.username, gameId, type, spoilerShieldMap);
+  });
+  const safeNotification = Object.assign({}, notification, {
+    title: "Reality results are ready",
+    body: "A Reality episode has settled. Open PATTC Predicts when you are ready to reveal the episode results."
+  });
+  const normalGateway = normalSubscriptions.length
+    ? notificationPushGatewaySend_(normalSubscriptions, notification)
+    : { success: true, sent: 0, failed: 0, expired: 0, results: [] };
+  const shieldGateway = shieldedSubscriptions.length
+    ? notificationPushGatewaySend_(shieldedSubscriptions, safeNotification)
+    : { success: true, sent: 0, failed: 0, expired: 0, results: [] };
+  const gatewayResult = {
+    success: normalGateway.success !== false && shieldGateway.success !== false,
+    sent: Number(normalGateway.sent || 0) + Number(shieldGateway.sent || 0),
+    failed: Number(normalGateway.failed || 0) + Number(shieldGateway.failed || 0),
+    expired: Number(normalGateway.expired || 0) + Number(shieldGateway.expired || 0),
+    results: (Array.isArray(normalGateway.results) ? normalGateway.results : []).concat(Array.isArray(shieldGateway.results) ? shieldGateway.results : []),
+    message: normalGateway.success === false
+      ? (normalGateway.message || normalGateway.error || "Push gateway failed.")
+      : shieldGateway.success === false
+        ? (shieldGateway.message || shieldGateway.error || "Push gateway failed.")
+        : ""
+  };
   const results = Array.isArray(gatewayResult.results) ? gatewayResult.results : [];
   results.forEach(notificationPushMarkDeliveryResult_);
   if (results.length) SpreadsheetApp.flush();

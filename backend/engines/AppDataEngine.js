@@ -146,6 +146,23 @@ function apiGetStartupPayload(payload) {
     });
   }
 
+  // Spoiler Shield only changes the player-facing representation. Authoritative
+  // CategoryResults remain settled and available to the scoring engine.
+  if (realityTvView && realityTvView.enabled === true && typeof realityTvSpoilerHiddenCategoryIds_ === "function") {
+    const hiddenCategoryIds = realityTvSpoilerHiddenCategoryIds_(realityTvView);
+    categories = (categories || []).map(function(category) {
+      const categoryId = String(category && category.id || "").trim().toLowerCase();
+      if (!hiddenCategoryIds[categoryId]) return category;
+      const copy = Object.assign({}, category);
+      copy.winnerNomineeId = "";
+      copy.winnerNomineeIds = [];
+      copy.resultStatus = "hidden";
+      copy.resultResolved = false;
+      copy.spoilerShieldHidden = true;
+      return copy;
+    });
+  }
+
   const startupPayload = {
     success: true,
 
@@ -784,10 +801,17 @@ function getDashboardGameProgressLite_(
   const progressGameKey =
     dashboardProgressGameKey_(gameId);
 
-  const totalCategories =
+  const baseTotalCategories =
     progressContext && progressContext.totalCategoriesByGame
       ? Number(progressContext.totalCategoriesByGame[progressGameKey] || 0)
       : getDashboardTotalCategories_(gameId);
+
+  // The season-long Reality anchor is a virtual pick requirement. It is not a
+  // Categories row, so include it explicitly without affecting other games.
+  const anchorProgress = typeof seasonAnchorDashboardProgress_ === "function"
+    ? seasonAnchorDashboardProgress_(username, gameId)
+    : { required: 0, made: 0 };
+  const totalCategories = baseTotalCategories + Math.max(0, Number(anchorProgress.required || 0));
 
   if (
     options.suppressProgress === true ||
@@ -898,6 +922,8 @@ function getDashboardGameProgressLite_(
       summary: {}
     };
   }
+
+  madeCount += Math.max(0, Number(anchorProgress.made || 0));
 
   madeCount =
     Math.min(

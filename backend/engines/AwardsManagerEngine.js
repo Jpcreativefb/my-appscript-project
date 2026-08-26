@@ -1654,7 +1654,7 @@ function awardsManagerMappingId_(gameId, categoryId, nomineeId, provider, market
     awardsManagerSlug_(marketId).slice(-40), awardsManagerSlug_(outcome)
   ].filter(Boolean).join("-").slice(0, 220);
 }
-function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap, officialSourceUrl) {
+function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap, officialSourceUrl, staleMappings) {
   if (typeof externalResultsBridgeEnqueue_ !== "function") {
     throw new Error("External Results Hub bridge is unavailable.");
   }
@@ -1701,6 +1701,9 @@ function awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap,
     });
   });
   if (!mappings.length) throw new Error("Map at least one provider outcome.");
+  (Array.isArray(staleMappings) ? staleMappings : []).forEach(function(row) {
+    if (row && awardsManagerString_(row.MappingId)) mappings.push(row);
+  });
 
   return externalResultsBridgeEnqueue_(
     "UPSERT_EXTERNAL_MARKET_MAPPING",
@@ -1962,6 +1965,54 @@ function awardsManagerVerifyResumeTarget_(existing, question, market, grouped) {
   }
 }
 
+function awardsManagerResumeSourceConfig_(existing) {
+  if (!existing) return {};
+  const settings = existing.settings || existing.Settings || {};
+  const raw = existing.sourceConfigJSON || existing.SourceConfigJSON || settings.sourceConfigJSON || settings.SourceConfigJSON || existing.sourceConfig || settings.sourceConfig || {};
+  return typeof raw === "object" && raw !== null ? raw : awardsManagerParseJson_(raw, {});
+}
+
+function awardsManagerSameKeySet_(left, right) {
+  const a = (Array.isArray(left) ? left : []).map(awardsManagerKey_).filter(Boolean).sort();
+  const b = (Array.isArray(right) ? right : []).map(awardsManagerKey_).filter(Boolean).sort();
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) if (a[i] !== b[i]) return false;
+  return true;
+}
+
+function awardsManagerVerifyResumeScope_(existing, grouped, markets, selectedOutcomes, answerItems) {
+  if (!existing) return;
+  const config = awardsManagerResumeSourceConfig_(existing);
+  if (grouped) {
+    const priorMarketIds = Array.isArray(config.marketIds) ? config.marketIds : [];
+    const requestedMarketIds = (markets || []).map(function(item) { return item && item.externalMarketId; }).filter(Boolean);
+    if (priorMarketIds.length && !awardsManagerSameKeySet_(priorMarketIds, requestedMarketIds)) {
+      throw new Error("Question ID already exists for a different grouped Awards market set. Choose a different Question ID instead of resuming this build.");
+    }
+  } else {
+    const priorOutcomes = Array.isArray(config.selectedOutcomes) ? config.selectedOutcomes : [];
+    if (priorOutcomes.length && !awardsManagerSameKeySet_(priorOutcomes, selectedOutcomes || [])) {
+      throw new Error("Question ID already exists with a different selected Awards outcome set. Choose a different Question ID instead of resuming this build.");
+    }
+  }
+
+  const desiredIds = {};
+  const desiredLabels = {};
+  (answerItems || []).forEach(function(item) {
+    desiredIds[awardsManagerKey_(item && item.nomineeId)] = true;
+    desiredLabels[awardsManagerKey_(item && item.nominee)] = true;
+  });
+  const nominees = Array.isArray(existing.nominees) ? existing.nominees : [];
+  const incompatible = nominees.some(function(nominee) {
+    const id = awardsManagerKey_(nominee && (nominee.nomineeId || nominee.id));
+    const label = awardsManagerKey_(nominee && (nominee.nominee || nominee.name || nominee.shortAnswer));
+    return !!((id || label) && !desiredIds[id] && !desiredLabels[label]);
+  });
+  if (incompatible) {
+    throw new Error("Question ID already contains Awards answers outside this retry request. Choose a different Question ID to avoid mixing answer sets.");
+  }
+}
+
 function awardsManagerEnsureQuestionAnswers_(gameId, categoryId, question, section, answerItems, existingCategory) {
   const resolvedIds = new Array((answerItems || []).length);
   const missing = [];
@@ -2179,6 +2230,7 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
 
   const existingCategory = awardsManagerExistingQuestion_(gameId, categoryId);
   awardsManagerVerifyResumeTarget_(existingCategory, question, market, grouped);
+  awardsManagerVerifyResumeScope_(existingCategory, grouped, markets, selectedOutcomes, answerItems);
   const resumed = !!existingCategory;
   const categoryResult = resumed
     ? adminUpdateCategory(Object.assign({}, categoryPayload, { skipCategoryResultWrite: true }))
@@ -2241,6 +2293,66 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
   };
 }
 
+function awardsManagerExistingOutcomeMap_(category) {
+  category = category || {};
+  const config = awardsManagerResumeSourceConfig_(category);
+  if (config.outcomeMap && typeof config.outcomeMap === "object" && !Array.isArray(config.outcomeMap)) {
+    return config.outcomeMap;
+  }
+  const outcomes = Array.isArray(config.selectedOutcomes) ? config.selectedOutcomes : [];
+  const nominees = Array.isArray(category.nominees) ? category.nominees : [];
+  const fallback = {};
+  outcomes.forEach(function(outcome, index) {
+    const nominee = nominees[index] || {};
+    const nomineeId = awardsManagerString_(nominee.nomineeId || nominee.id);
+    if (awardsManagerString_(outcome) && nomineeId) fallback[outcome] = nomineeId;
+  });
+  return fallback;
+}
+
+function awardsManagerStaleRelinkMappings_(category, gameId, categoryId, nextMarket, nextOutcomeMap) {
+  category = category || {};
+  const config = awardsManagerResumeSourceConfig_(category);
+  const priorMap = awardsManagerExistingOutcomeMap_(category);
+  const priorProvider = awardsManagerString_(config.provider || category.resultProvider || category.ResultProvider);
+  const priorMarketId = awardsManagerString_(config.externalMarketId || (Array.isArray(config.marketIds) && config.marketIds.length === 1 ? config.marketIds[0] : "") || category.externalMarketId || category.ExternalMarketId);
+  const priorEventId = awardsManagerString_(config.externalEventId || category.externalEventId || category.ExternalEventId);
+  if (!priorProvider || !priorMarketId || !Object.keys(priorMap).length) return [];
+
+  const now = new Date();
+  const stale = [];
+  Object.keys(priorMap).forEach(function(outcome) {
+    const nomineeId = awardsManagerString_(priorMap[outcome]);
+    if (!nomineeId) return;
+    const unchanged = awardsManagerKey_(priorProvider) === awardsManagerKey_(nextMarket && nextMarket.provider) &&
+      awardsManagerKey_(priorMarketId) === awardsManagerKey_(nextMarket && nextMarket.externalMarketId) &&
+      awardsManagerKey_((nextOutcomeMap || {})[outcome]) === awardsManagerKey_(nomineeId);
+    if (unchanged) return;
+    stale.push({
+      MappingId: awardsManagerMappingId_(gameId, categoryId, nomineeId, priorProvider, priorMarketId, outcome),
+      AppGameId: gameId,
+      CategoryId: categoryId,
+      NomineeId: nomineeId,
+      Provider: priorProvider,
+      ExternalEventId: priorEventId,
+      ExternalMarketId: priorMarketId,
+      ExternalSubjectId: "",
+      ResultKey: "winning-outcome",
+      ComparisonOperator: "",
+      Threshold: "",
+      ExpectedOutcome: outcome,
+      AutoSettle: false,
+      RequireAdminReview: true,
+      SourceUrl: awardsManagerString_(category.sourceUrl || category.SourceUrl),
+      SourceConfigJSON: awardsManagerCompactJson_({ source: "awards-manager", relinkRetired: true }),
+      Active: false,
+      CreatedAt: now,
+      UpdatedAt: now
+    });
+  });
+  return stale;
+}
+
 function apiAdminAwardsLinkMarket(payload) {
   awardsManagerRequireAdmin_(payload);
   payload = payload || {};
@@ -2275,6 +2387,7 @@ function apiAdminAwardsLinkMarket(payload) {
     safeMap[outcome] = nomineeId;
   });
   if (!Object.keys(safeMap).length) throw new Error("Map at least one provider outcome.");
+  const staleMappings = awardsManagerStaleRelinkMappings_(category, gameId, categoryId, market, safeMap);
 
   adminUpdateCategory({
     gameId: gameId,
@@ -2291,6 +2404,11 @@ function apiAdminAwardsLinkMarket(payload) {
       source: "awards-manager",
       version: AWARDS_MANAGER_VERSION,
       provider: market.provider,
+      externalEventId: market.externalEventId,
+      externalMarketId: market.externalMarketId,
+      marketIds: [market.externalMarketId],
+      selectedOutcomes: Object.keys(safeMap),
+      outcomeMap: safeMap,
       marketQuestion: market.marketQuestion,
       resolutionSource: market.resolutionSource,
       officialSourceUrl: officialSourceUrl || "",
@@ -2300,7 +2418,7 @@ function apiAdminAwardsLinkMarket(payload) {
     skipCategoryResultWrite: true
   });
 
-  const bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, safeMap, officialSourceUrl);
+  const bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, safeMap, officialSourceUrl, staleMappings);
   return {
     success: true,
     message: "Provider market linked and queued to the External Results Hub.",

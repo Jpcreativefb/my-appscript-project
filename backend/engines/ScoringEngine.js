@@ -408,21 +408,26 @@ function getLeaderboardData(
                     )
                 };
 
-          const projectedWinnerId =
+          const projectedWinnerIds =
             resolution.result === "winner"
-              ? normalizeScoreString_(
-                  resolution.winnerNomineeId ||
-                  ""
+              ? (
+                  Array.isArray(resolution.winnerNomineeIds) && resolution.winnerNomineeIds.length
+                    ? resolution.winnerNomineeIds.map(function(value) {
+                        return normalizeScoreString_(value);
+                      }).filter(Boolean)
+                    : [normalizeScoreString_(resolution.winnerNomineeId || "")].filter(Boolean)
                 )
               : (
                   projected &&
                   !resolution.resolved
-                    ? normalizeScoreString_(
-                        config.favoriteNomineeId ||
-                        ""
-                      )
-                    : ""
+                    ? [normalizeScoreString_(config.favoriteNomineeId || "")].filter(Boolean)
+                    : []
                 );
+
+          const projectedWinnerId =
+            projectedWinnerIds.length
+              ? projectedWinnerIds[0]
+              : "";
 
           const normalizedScoreMode =
             typeof normalizeCategoryScoreMode_ === "function"
@@ -488,9 +493,9 @@ function getLeaderboardData(
             if (projectedWinnerId) {
 
               const isCorrect =
-                normalizeScoreString_(
-                  pick.nomineeId
-                ) === projectedWinnerId;
+                projectedWinnerIds.indexOf(
+                  normalizeScoreString_(pick.nomineeId)
+                ) !== -1;
 
               if (isCorrect) {
 
@@ -590,9 +595,9 @@ function getLeaderboardData(
           if (projectedWinnerId) {
 
             const isCorrect =
-              normalizeScoreString_(
-                pick.nomineeId
-              ) === projectedWinnerId;
+              projectedWinnerIds.indexOf(
+                normalizeScoreString_(pick.nomineeId)
+              ) !== -1;
 
             if (isCorrect) {
 

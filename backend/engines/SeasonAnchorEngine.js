@@ -459,7 +459,22 @@ function apiGetSeasonAnchor(payload) {
   if (!username || !gameId) throw new Error("Username and Game ID are required.");
   if (!token) throw new Error("Session expired. Please log in again.");
   if (typeof validateUserSession_ === "function") validateUserSession_(username, token);
-  return { success: true, seasonAnchor: seasonAnchorUserPayload_(username, gameId) };
+  const view = seasonAnchorUserPayload_(username, gameId);
+  const spoiler = typeof realityTvSpoilerStateForGame_ === "function"
+    ? realityTvSpoilerStateForGame_(username, gameId)
+    : { hasHiddenResults: false };
+  if (view && view.enabled === true && spoiler && spoiler.hasHiddenResults === true) {
+    return {
+      success: true,
+      seasonAnchor: {
+        enabled: true,
+        hiddenBySpoiler: true,
+        spoilerShield: spoiler,
+        message: "Sole Survivor status is hidden until you reveal the settled episode."
+      }
+    };
+  }
+  return { success: true, seasonAnchor: view };
 }
 
 function apiSaveSeasonAnchorPick(payload) {
@@ -471,6 +486,12 @@ function apiSaveSeasonAnchorPick(payload) {
   if (!username || !gameId || !entityId) throw new Error("Username, Game ID, and selection are required.");
   if (!token) throw new Error("Session expired. Please log in again.");
   if (typeof validateUserSession_ === "function") validateUserSession_(username, token);
+  const spoiler = typeof realityTvSpoilerStateForGame_ === "function"
+    ? realityTvSpoilerStateForGame_(username, gameId)
+    : { hasHiddenResults: false };
+  if (spoiler && spoiler.hasHiddenResults === true) {
+    throw new Error("Reveal the settled Reality episode before changing the Sole Survivor selection.");
+  }
 
   const view = seasonAnchorUserPayload_(username, gameId);
   if (!view.enabled) throw new Error(view.message || "Season Survivor Pick is not enabled for this game.");
@@ -534,7 +555,8 @@ function seasonAnchorEpisodeCategoryIds_(seasonId, episodeId) {
   if (typeof REALITY_TV_EPISODE_QUESTIONS_SHEET !== "undefined") {
     realityTvReadObjects_(SpreadsheetApp.getActive(), REALITY_TV_EPISODE_QUESTIONS_SHEET).forEach(function(row) {
       if (seasonAnchorKey_(row.SeasonId) === seasonAnchorKey_(seasonId) &&
-          seasonAnchorKey_(row.EpisodeId) === seasonAnchorKey_(episodeId) && row.CategoryId) {
+          seasonAnchorKey_(row.EpisodeId) === seasonAnchorKey_(episodeId) && row.CategoryId &&
+          (row.Enabled === "" || row.Enabled === undefined || seasonAnchorBool_(row.Enabled))) {
         ids.push(seasonAnchorKey_(row.CategoryId));
       }
     });
@@ -565,7 +587,10 @@ function seasonAnchorUserFixedPointsForCategories_(gameId, username, categoryIds
       ? getHybridCategoryResolution_(categoryId, config, resolutions)
       : { resolved: !!resolutions[categoryId], result: "winner", winnerNomineeId: resolutions[categoryId] || config.winnerNomineeId || "" };
     if (!resolution || !resolution.resolved || resolution.result !== "winner") return;
-    if (seasonAnchorKey_(pick.nomineeId) !== seasonAnchorKey_(resolution.winnerNomineeId)) return;
+    const winnerIds = Array.isArray(resolution.winnerNomineeIds) && resolution.winnerNomineeIds.length
+      ? resolution.winnerNomineeIds.map(seasonAnchorKey_).filter(Boolean)
+      : [seasonAnchorKey_(resolution.winnerNomineeId)].filter(Boolean);
+    if (winnerIds.indexOf(seasonAnchorKey_(pick.nomineeId)) === -1) return;
     const base = seasonAnchorNumber_(config.points, 0);
     const penalty = seasonAnchorNumber_(config.changePenalty, 0);
     const changes = seasonAnchorNumber_(pick.changeCount, 0);
@@ -668,17 +693,52 @@ function seasonAnchorSettleRealityEpisode_(season, episode, selectedIds, outcome
       UpdatedAt: now
     };
     seasonAnchorUpsert_(SEASON_ANCHOR_HISTORY_SHEET, SEASON_ANCHOR_HISTORY_HEADERS, ["HistoryId"], history);
-    seasonAnchorUpdateObjectRow_(userSheet, user.__rowNumber, {
+    const userPatch = {
       Streak: streakAfter,
       CurrentMultiplier: seasonAnchorRound_(nextMultiplier),
       Status: status,
       LastSettledEpisodeId: episode.EpisodeId,
       LastSettledEpisodeNumber: episode.EpisodeNumber,
       UpdatedAt: now
-    });
+    };
+    if (entityLost) {
+      // History retains the eliminated/withdrawn selection. Clearing the live
+      // selection makes the replacement state unambiguous to the player UI,
+      // dashboard progress, and cached payloads.
+      userPatch.CurrentEntityId = "";
+      userPatch.CurrentEntityName = "";
+    }
+    seasonAnchorUpdateObjectRow_(userSheet, user.__rowNumber, userPatch);
   });
   seasonAnchorRecalculateEpisodeScores_(season.GameId, season.SeasonId, episode.EpisodeId);
   return { success: true, usersSettled: users.length };
+}
+
+function seasonAnchorDashboardProgress_(username, gameId) {
+  const settings = seasonAnchorGetSettings_(gameId);
+  if (!settings || !settings.Enabled || settings.SourceType !== "reality-tv") {
+    return { required: 0, made: 0, outstanding: 0, finalized: false };
+  }
+  const user = seasonAnchorGetUserRow_(gameId, username);
+  if (!user) return { required: 1, made: 0, outstanding: 1, finalized: false };
+  const needsPick = seasonAnchorKey_(user.Status || "needs_pick") === "needs_pick" || !seasonAnchorString_(user.CurrentEntityId);
+  const finalized = !needsPick && seasonAnchorKey_(user.Status || "active") === "active";
+  const spoiler = typeof realityTvSpoilerStateForGame_ === "function"
+    ? realityTvSpoilerStateForGame_(username, gameId)
+    : { hasHiddenResults: false };
+  // Do not let the Home Hub announce that a finalized anchor was eliminated
+  // before this player reveals the episode. A player who never selected an
+  // anchor still remains outstanding as before.
+  const wasPreviouslyFinalized = !!seasonAnchorString_(user.CurrentEntityId) || seasonAnchorNumber_(user.LastSettledEpisodeNumber, 0) > 0;
+  const concealReopen = spoiler && spoiler.hasHiddenResults === true && wasPreviouslyFinalized;
+  const made = finalized || concealReopen ? 1 : 0;
+  return {
+    required: 1,
+    made: made,
+    outstanding: made ? 0 : 1,
+    finalized: finalized,
+    hiddenBySpoiler: concealReopen
+  };
 }
 
 function seasonAnchorAdjustmentsForGame_(gameId) {

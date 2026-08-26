@@ -249,6 +249,41 @@ function sportsLiveDisplayCompetitorSideMap_(summary) {
   return map;
 }
 
+function sportsLiveDisplayAppendProbableCandidates_(candidates, value, side) {
+  if (!value) return;
+
+  if (Array.isArray(value)) {
+    value.forEach(function(item) {
+      sportsLiveDisplayAppendProbableCandidates_(candidates, item, side);
+    });
+    return;
+  }
+
+  if (typeof value === "object") {
+    // ESPN probable-pitcher containers can be side keyed instead of rows with
+    // homeAway metadata: { home: {...}, away: {...} }. Select the requested
+    // side before attempting athlete normalization.
+    if (value.home || value.away) {
+      if (value[side]) {
+        sportsLiveDisplayAppendProbableCandidates_(
+          candidates,
+          value[side],
+          side
+        );
+      }
+      return;
+    }
+  }
+
+  const rowSide = sportsLiveDisplayKey_(
+    value.homeAway || value.side || value.teamSide
+  );
+
+  if (!rowSide || rowSide === side) {
+    candidates.push(value);
+  }
+}
+
 function sportsLiveDisplayProbableCandidates_(summary, side) {
   const candidates = [];
   const competition = sportsLiveDisplayHeaderCompetition_(summary);
@@ -259,18 +294,58 @@ function sportsLiveDisplayProbableCandidates_(summary, side) {
   competitors.forEach(function(competitor) {
     if (sportsLiveDisplayKey_(competitor.homeAway) !== side) return;
     [competitor.probables, competitor.probablePitchers, competitor.probablePitcher].forEach(function(value) {
-      if (Array.isArray(value)) candidates.push.apply(candidates, value);
-      else if (value) candidates.push(value);
+      sportsLiveDisplayAppendProbableCandidates_(candidates, value, side);
     });
   });
 
   const gameInfo = summary && summary.gameInfo || {};
-  [gameInfo.probables, gameInfo.probablePitchers, competition && competition.probables].forEach(function(value) {
-    if (!value) return;
-    const rows = Array.isArray(value) ? value : [value];
-    rows.forEach(function(row) {
-      const rowSide = sportsLiveDisplayKey_(row.homeAway || row.side || row.teamSide);
-      if (!rowSide || rowSide === side) candidates.push(row);
+  [
+    gameInfo.probables,
+    gameInfo.probablePitchers,
+    summary && summary.probables,
+    summary && summary.probablePitchers,
+    competition && competition.probables,
+    competition && competition.probablePitchers
+  ].forEach(function(value) {
+    sportsLiveDisplayAppendProbableCandidates_(candidates, value, side);
+  });
+
+  // Some ESPN MLB summaries expose the announced starter only in a roster
+  // block. Use it as a conservative fallback: the roster must resolve to the
+  // requested side, the row must be marked starter, and the athlete position
+  // must be pitcher/SP/P. This avoids treating ordinary lineup starters as the
+  // probable pitcher.
+  const sideMap = sportsLiveDisplayCompetitorSideMap_(summary);
+  const rosters = summary && Array.isArray(summary.rosters) ? summary.rosters : [];
+  rosters.forEach(function(rosterBlock) {
+    rosterBlock = rosterBlock || {};
+    const team = rosterBlock.team || {};
+    const teamId = sportsLiveDisplayString_(team.id || rosterBlock.teamId);
+    const teamName = sportsLiveDisplayString_(team.displayName || team.shortDisplayName || team.name);
+    const rosterSide =
+      sportsLiveDisplayKey_(rosterBlock.homeAway || rosterBlock.side) ||
+      sideMap[teamId] ||
+      sideMap[sportsLiveDisplayKey_(teamName)] ||
+      "";
+    if (rosterSide !== side) return;
+
+    const rows =
+      rosterBlock.roster ||
+      rosterBlock.athletes ||
+      rosterBlock.players ||
+      [];
+
+    (Array.isArray(rows) ? rows : []).forEach(function(row) {
+      row = row || {};
+      if (row.starter !== true) return;
+      const athlete = row.athlete || row.player || row;
+      const position = sportsLiveDisplayKey_(
+        athlete && athlete.position && (athlete.position.abbreviation || athlete.position.name || athlete.position.displayName) ||
+        row.position && (row.position.abbreviation || row.position.name || row.position.displayName) ||
+        ""
+      );
+      if (["p", "sp", "pitcher", "starting pitcher"].indexOf(position) === -1) return;
+      candidates.push(row);
     });
   });
 

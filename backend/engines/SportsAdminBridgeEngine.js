@@ -229,8 +229,11 @@ function sportsAdminBridgeCall_(
     return {
       success: false,
       error:
-        "Sports Scores Engine HTTP " +
-        code,
+        sportsAdminBridgeString_(
+          parsed && (parsed.error || parsed.message)
+        ) ||
+        ("Sports Scores Engine HTTP " + code),
+      statusCode: code,
       response:
         parsed
     };
@@ -300,6 +303,70 @@ function apiAdminGetSportsControlDashboard(payload) {
 }
 
 /* =====================================================
+   READ-ONLY SPORTS SCORES / BUILDER TRANSPORT
+===================================================== */
+
+function apiAdminGetSportsEngineLeagues(payload) {
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "getSportsLeagues",
+    {}
+  );
+
+}
+
+function apiAdminGetSportsEngineScores(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "getSportsScores",
+    {
+      sport: payload.sport || "",
+      league: payload.league || "",
+      state: payload.state || "",
+      completed: payload.completed === undefined ? "" : payload.completed,
+      dateFrom: payload.dateFrom || "",
+      dateTo: payload.dateTo || "",
+      team: payload.team || "",
+      gameId: payload.gameId || "",
+      espnEventId: payload.espnEventId || payload.ESPNEventId || "",
+      seasonYear: payload.seasonYear || "",
+      seasonType: payload.seasonType || "",
+      week: payload.week || ""
+    }
+  );
+
+}
+
+function apiAdminGetSportsEngineSnapshots(payload) {
+
+  payload =
+    payload || {};
+
+  sportsAdminBridgeRequireAdmin_(
+    payload
+  );
+
+  return sportsAdminBridgeCall_(
+    "getSportsSnapshots",
+    {
+      gameId: payload.gameId || payload.sportsGameId || ""
+    }
+  );
+
+}
+
+/* =====================================================
    PLAYER CONTROLS
 ===================================================== */
 
@@ -311,7 +378,9 @@ function apiAdminGetSportsPlayerStatus(payload) {
 
   return sportsAdminBridgeCall_(
     "getSportsPlayerStatusAdmin",
-    {}
+    {
+      force: payload && payload.force === true
+    }
   );
 
 }
@@ -435,7 +504,9 @@ function apiAdminGetSportsAdvancedStatsStatus(payload) {
 
   return sportsAdminBridgeCall_(
     "getSportsAdvancedStatsStatusAdmin",
-    {}
+    {
+      force: payload && payload.force === true
+    }
   );
 
 }

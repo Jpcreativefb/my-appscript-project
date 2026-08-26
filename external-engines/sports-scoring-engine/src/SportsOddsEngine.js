@@ -2096,6 +2096,47 @@ function sportsOddsCountApiPayload_(payload) {
 
 /* Removed earlier duplicate function sportsOddsLogApiCall_ during production cleanup; final definition retained later in file. */
 
+function sportsOddsProviderErrorMessage_(code, body, parsed) {
+
+  parsed =
+    parsed && !parsed.parseError
+      ? parsed
+      : null;
+
+  const providerCode =
+    sportsOddsString_(
+      parsed && (
+        parsed.error_code ||
+        parsed.errorCode ||
+        parsed.code
+      )
+    );
+
+  const providerMessage =
+    sportsOddsString_(
+      parsed && (
+        parsed.message ||
+        parsed.error ||
+        parsed.detail
+      )
+    );
+
+  let detail =
+    [providerCode, providerMessage]
+      .filter(function(value) { return !!value; })
+      .join(": ");
+
+  if (!detail) {
+    detail = sportsOddsString_(body).slice(0, 300);
+  }
+
+  return (
+    "Odds API HTTP " +
+    code +
+    (detail ? ": " + detail : "")
+  );
+
+}
 
 function fetchSportsOddsApiJsonWithLog_(
   url,
@@ -2148,10 +2189,11 @@ function fetchSportsOddsApiJsonWithLog_(
     code >= 300
   ) {
     throw new Error(
-      "Odds API failed. HTTP " +
-      code +
-      ": " +
-      body.slice(0, 300)
+      sportsOddsProviderErrorMessage_(
+        code,
+        body,
+        parsed
+      )
     );
   }
 

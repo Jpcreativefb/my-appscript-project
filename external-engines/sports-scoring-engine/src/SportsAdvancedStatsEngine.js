@@ -1275,7 +1275,33 @@ function cleanupCompletedSportsCheckpointBackfill() {
   return result;
 }
 
-function getSportsAdvancedStatsStatus_() {
+const SPORTS_ADVANCED_STATUS_CACHE_SECONDS = 300;
+
+function getSportsAdvancedStatsStatus_(options) {
+  options = options || {};
+
+  const force =
+    options.force === true ||
+    String(options.force || "").trim().toLowerCase() === "true";
+  const cacheKey = "sports-advanced-status-v1";
+  let cache = null;
+
+  try {
+    if (typeof CacheService !== "undefined") {
+      cache = CacheService.getScriptCache();
+      if (!force) {
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          parsed.cached = true;
+          return parsed;
+        }
+      }
+    }
+  } catch (err) {
+    cache = null;
+  }
+
   const teams = readSportsTeamGameStatsRows_();
   const checkpoints = readSportsStatCheckpointRows_();
   const leagues = {};
@@ -1321,14 +1347,29 @@ function getSportsAdvancedStatsStatus_() {
     if (!isNaN(date.getTime()) && date > current) item.lastCheckpointCaptured = date;
   });
 
-  return {
+  const result = {
     success: true,
     version: "1.2.0",
     teamStatRowCount: teams.length,
     checkpointRowCount: checkpoints.length,
     leagues: Object.keys(leagues).sort().map(function(key) { return leagues[key]; }),
-    checkedAt: new Date()
+    checkedAt: new Date(),
+    cached: false
   };
+
+  if (cache) {
+    try {
+      cache.put(
+        cacheKey,
+        JSON.stringify(result),
+        SPORTS_ADVANCED_STATUS_CACHE_SECONDS
+      );
+    } catch (err) {
+      // Status caching is best-effort only.
+    }
+  }
+
+  return result;
 }
 
 function apiGetSportsTeamGameStats_(params) {
@@ -1396,8 +1437,13 @@ function apiRefreshSportsAdvancedStatsAdmin_(params) {
 }
 
 function apiGetSportsAdvancedStatsStatusAdmin_(params) {
-  assertSportsAdmin_(params || {});
-  return getSportsAdvancedStatsStatus_();
+  params = params || {};
+  assertSportsAdmin_(params);
+  return getSportsAdvancedStatsStatus_({
+    force:
+      params.force === true ||
+      String(params.force || "").trim().toLowerCase() === "true"
+  });
 }
 
 function testSetupSportsAdvancedStatsSystem() {

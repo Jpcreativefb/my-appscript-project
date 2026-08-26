@@ -5766,6 +5766,14 @@ async function adminOpenSportsControls() {
     false
   );
 
+  // First paint is intentionally read-only and lightweight. Setup/migrations
+  // remain an explicit admin action instead of blocking every dashboard open.
+  await adminLoadSportsControls();
+
+}
+
+async function adminSetupSportsControls() {
+
   const panel =
     document.getElementById(
       "adminSportsControlPanel"
@@ -5773,48 +5781,45 @@ async function adminOpenSportsControls() {
 
   adminSportsSetPanelLoading_(
     panel,
-    "Opening Sports Controls",
-    "Checking the Sports Engine setup before loading the dashboard...",
-    10
+    "Setting Up Sports Controls",
+    "Checking sheets and applying safe Sports Engine migrations...",
+    25
+  );
+
+  adminSportsMessage_(
+    "Checking Sports Engine setup...",
+    false
   );
 
   let setupRes = null;
 
   try {
-
-    setupRes =
-      await apiAdminSetupSportsControls();
-
+    setupRes = await apiAdminSetupSportsControls();
   } catch (err) {
-
     setupRes = {
       success: false,
       error: err && err.message
         ? err.message
         : String(err || "Setup check failed")
     };
-
   }
 
   if (!setupRes || setupRes.success === false) {
-
     adminSportsMessage_(
       (setupRes && (setupRes.error || setupRes.message))
-        ? "Sports setup check failed; trying to load existing controls. " +
-          (setupRes.error || setupRes.message)
-        : "Sports setup check failed; trying to load existing controls.",
+        ? "Sports setup failed. " + (setupRes.error || setupRes.message)
+        : "Sports setup failed.",
       true
     );
-
+    await adminLoadSportsControls({ preserveOpen: true });
+    return;
   }
 
-  await adminLoadSportsControls();
-
-}
-
-async function adminSetupSportsControls() {
-
-  await adminOpenSportsControls();
+  adminSportsMessage_(
+    "Sports Engine setup checked. Reloading controls...",
+    false
+  );
+  await adminLoadSportsControls({ preserveOpen: true });
 
 }
 
@@ -5953,8 +5958,76 @@ async function adminLoadSportsControls(options) {
   adminSportsInitInfoHandlers_();
 
   adminSportsMessage_(
-    "Sports Controls loaded.",
+    "Sports Controls loaded. Loading player/stat diagnostics in the background...",
     false
+  );
+
+  // Player-game statistics and advanced checkpoint summaries can span large
+  // sheets. Load them after first paint so they cannot hold the dashboard open.
+  adminLoadSportsSupplementalStatus_(res, loadSequence);
+
+}
+
+async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
+
+  const panel =
+    document.getElementById(
+      "adminSportsControlPanel"
+    );
+
+  if (!panel || !dashboard) return;
+
+  const openLeagueKeys =
+    adminSportsGetOpenLeagueKeys_();
+
+  const results =
+    await Promise.all([
+      apiAdminGetSportsPlayerStatus()
+        .catch(function(err) {
+          return {
+            success: false,
+            error: err && err.message ? err.message : String(err || "Player status failed")
+          };
+        }),
+      apiAdminGetSportsAdvancedStatsStatus()
+        .catch(function(err) {
+          return {
+            success: false,
+            error: err && err.message ? err.message : String(err || "Advanced status failed")
+          };
+        })
+    ]);
+
+  if (loadSequence !== adminSportsLoadSequence_) return;
+
+  const playerStatus = results[0];
+  const advancedStatus = results[1];
+
+  if (playerStatus && playerStatus.success !== false) {
+    dashboard.players = playerStatus;
+  }
+
+  if (advancedStatus && advancedStatus.success !== false) {
+    dashboard.advancedStats = advancedStatus;
+  }
+
+  panel.innerHTML =
+    adminRenderSportsControlDashboard_(
+      dashboard,
+      openLeagueKeys
+    );
+
+  adminSportsInitInfoHandlers_();
+
+  const errors = [playerStatus, advancedStatus]
+    .filter(function(item) { return item && item.success === false; })
+    .map(function(item) { return item.error || item.message || "diagnostic status failed"; });
+
+  adminSportsMessage_(
+    errors.length
+      ? "Sports Controls loaded. Some background diagnostics were unavailable: " + errors.join(" · ")
+      : "Sports Controls loaded.",
+    errors.length > 0
   );
 
 }
@@ -7112,6 +7185,20 @@ function adminRenderScoreLeagueControls_(
   advancedStats =
     advancedStats || {};
 
+  const playerDiagnosticsDeferred =
+    playersStatus.deferred === true;
+
+  const advancedDiagnosticsDeferred =
+    advancedStats.deferred === true;
+
+  const playerSummaryValue = function(value) {
+    return playerDiagnosticsDeferred ? "loading…" : (value || 0);
+  };
+
+  const advancedSummaryValue = function(value) {
+    return advancedDiagnosticsDeferred ? "loading…" : (value || 0);
+  };
+
   const healthByLeague = {};
 
   (leagueHealth.leagues || []).forEach(function(item) {
@@ -7192,10 +7279,10 @@ function adminRenderScoreLeagueControls_(
             Live scores: ${totals.liveScores || 0}
             · Odds rows: ${totals.liveOdds || 0}
             · Snapshots: ${totals.liveSnapshots || 0}
-            · Players: ${playersStatus.playerCount || 0}
-            · Player stat rows: ${playersStatus.statRowCount || 0}
-            · Team stat rows: ${advancedStats.teamStatRowCount || 0}
-            · Checkpoint rows: ${advancedStats.checkpointRowCount || 0}
+            · Players: ${playerSummaryValue(playersStatus.playerCount)}
+            · Player stat rows: ${playerSummaryValue(playersStatus.statRowCount)}
+            · Team stat rows: ${advancedSummaryValue(advancedStats.teamStatRowCount)}
+            · Checkpoint rows: ${advancedSummaryValue(advancedStats.checkpointRowCount)}
             · Logs: ${totals.logs || 0}
             · Score archive candidates: ${totals.scoreArchiveCandidates || 0}
           </div>
@@ -7321,7 +7408,7 @@ function adminRenderScoreLeagueControls_(
             oddsUsage.CallsThisMonth || oddsUsage.callsThisMonth || oddsUsage.requestsThisMonth || 0;
 
           const oddsBudget =
-            oddsUsage.MonthlyBudget || oddsUsage.monthlyBudget || league.oddsMonthlyMaxPulls || 30;
+            oddsUsage.MonthlyBudget || oddsUsage.monthlyBudget || league.oddsMonthlyMaxPulls || 100;
 
           const leagueOn =
             enabled;
@@ -7365,12 +7452,12 @@ function adminRenderScoreLeagueControls_(
           const oddsDailyLimit =
             oddsUsage.MaxRefreshesPerDay ||
             league.oddsDailyMaxPulls ||
-            1;
+            5;
 
           const oddsMonthlyBudget =
             oddsUsage.MonthlyBudget ||
             league.oddsMonthlyMaxPulls ||
-            30;
+            100;
 
           const oddsMarkets =
             oddsUsage.DefaultMarkets ||
@@ -7379,6 +7466,17 @@ function adminRenderScoreLeagueControls_(
           const oddsWindow =
             String(oddsUsage.OddsWindow || "STANDARD")
               .toUpperCase();
+
+          const oddsLastStatus =
+            String(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never").trim();
+
+          const oddsLastMessage =
+            String(oddsUsage.LastRefreshMessage || "").trim();
+
+          const oddsLastDisplay =
+            String(oddsUsage.LastRefreshStatus || "").toUpperCase() === "ERROR" && oddsLastMessage
+              ? oddsLastStatus + ": " + oddsLastMessage
+              : oddsLastStatus;
 
           /*
             Keep league settings editable even when the league is OFF.
@@ -7546,15 +7644,17 @@ function adminRenderScoreLeagueControls_(
           const playersBody = `
             <div class="admin-sub" style="margin-bottom:8px;">
               ${playerSupported
-                ? `Roster: ${activePlayerCount} active / ${playerCount} total
-                  · Player stat rows: ${playerStatRowCount}
-                  · Team stat rows: ${teamStatRowCount}
-                  · Checkpoints: ${checkpointCount} (${checkpointRowCount} rows)
-                  · Last roster: ${adminSportsEscape_(lastPlayerUpdated || "Never")}
-                  · Last player stats: ${adminSportsEscape_(lastPlayerStatsUpdated || "Never")}
-                  · Last team stats: ${adminSportsEscape_(lastTeamStatsUpdated || "Never")}
-                  · Last checkpoint: ${adminSportsEscape_(lastCheckpointCaptured || "Never")}
-                  ${playerActionsEnabled ? "" : " · Turn League ON to run player/team actions."}`
+                ? (playerDiagnosticsDeferred || advancedDiagnosticsDeferred
+                    ? `Player/stat diagnostics are loading in the background. Controls are ready now.${playerActionsEnabled ? "" : " · Turn League ON to run player/team actions."}`
+                    : `Roster: ${activePlayerCount} active / ${playerCount} total
+                      · Player stat rows: ${playerStatRowCount}
+                      · Team stat rows: ${teamStatRowCount}
+                      · Checkpoints: ${checkpointCount} (${checkpointRowCount} rows)
+                      · Last roster: ${adminSportsEscape_(lastPlayerUpdated || "Never")}
+                      · Last player stats: ${adminSportsEscape_(lastPlayerStatsUpdated || "Never")}
+                      · Last team stats: ${adminSportsEscape_(lastTeamStatsUpdated || "Never")}
+                      · Last checkpoint: ${adminSportsEscape_(lastCheckpointCaptured || "Never")}
+                      ${playerActionsEnabled ? "" : " · Turn League ON to run player/team actions."}`)
                 : "Player sync is not enabled for this sport. Racing and combat sports use separate result engines."}
             </div>
 
@@ -7611,13 +7711,13 @@ function adminRenderScoreLeagueControls_(
               · Month ${oddsMonth}/${oddsMonthlyBudget}
               · API left ${oddsUsage.LastApiRemaining || "—"}
               · Window ${adminSportsEscape_(adminSportsOddsWindowLabel_(oddsWindow))}
-              · Last ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "Never")}
+              · Last ${adminSportsEscape_(oddsLastDisplay)}
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
               ${adminRenderSportsCheckboxField_("Auto refresh", "sportsOddsAuto", leagueCode, oddsAutoEnabled, "runHybridOdds", oddsControlsDisabled)}
-              ${adminRenderSportsNumberField_("Daily limit", "sportsOddsDaily", leagueCode, oddsDailyLimit, 1, 0, 24, "oddsDaily", oddsControlsDisabled)}
-              ${adminRenderSportsNumberField_("Monthly budget", "sportsOddsMonthly", leagueCode, oddsMonthlyBudget, 30, 0, 500, "oddsMonthly", oddsControlsDisabled)}
+              ${adminRenderSportsNumberField_("Daily limit", "sportsOddsDaily", leagueCode, oddsDailyLimit, 5, 0, 24, "oddsDaily", oddsControlsDisabled)}
+              ${adminRenderSportsNumberField_("Monthly budget", "sportsOddsMonthly", leagueCode, oddsMonthlyBudget, 100, 0, 500, "oddsMonthly", oddsControlsDisabled)}
               ${adminRenderSportsSelectField_("Odds Window", "sportsOddsWindow", leagueCode, oddsWindow, adminSportsOddsWindowOptions_(), "oddsWindow", oddsControlsDisabled)}
             </div>
 
@@ -7727,7 +7827,7 @@ function adminRenderScoreLeagueControls_(
                 Last score ${adminSportsEscape_(health.lastScoreRefresh || "") || "Never"}
                 · Last roster ${adminSportsEscape_(lastPlayerUpdated || "") || "Never"}
                 · Last player stats ${adminSportsEscape_(lastPlayerStatsUpdated || "") || "Never"}
-                · Last odds ${adminSportsEscape_(health.lastOddsRefresh || oddsUsage.LastRefreshStatus || "") || "Never"}
+                · Last odds ${adminSportsEscape_(oddsLastDisplay) || "Never"}
               </div>
 
               ${adminSportsSection_("Season", "seasonSection", leagueCode, seasonBody, true)}
@@ -7934,7 +8034,11 @@ function adminRenderOddsControls_(
                     ·
                     Month: ${setting.CallsThisMonth || 0}/${setting.MonthlyBudget || 0}
                     ·
-                    Last: ${setting.LastRefreshStatus || "NEVER"}
+                    Last: ${adminSportsEscape_(
+                      String(setting.LastRefreshStatus || "NEVER").toUpperCase() === "ERROR" && setting.LastRefreshMessage
+                        ? String(setting.LastRefreshStatus || "ERROR") + ": " + String(setting.LastRefreshMessage)
+                        : String(setting.LastRefreshStatus || "NEVER")
+                    )}
                   </div>
                 </div>
 

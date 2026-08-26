@@ -841,7 +841,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     const nomineeIds = Array.isArray(pick.nomineeIds) ? pick.nomineeIds.map(sportsSurvivorKey_).filter(Boolean) : [];
     nomineeIds.forEach(function(id) { usage[id] = (usage[id] || 0) + 1; });
     const sourceResolved = sportsSurvivorCategoryResolved_(categoryId, optionMeta, resultMap);
-    const resolved = roundEligible && sourceResolved;
+    let resolved = roundEligible && sourceResolved;
     if (roundEligible && !sourceResolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
     let status = resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming");
     let outcome = "pending";
@@ -872,6 +872,8 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           selectionResults.push(sportsSurvivorGradeSelection_(snapshot, currentMeta, resultMap[categoryId] || {}, rules.resultMode, settings.oddsFreezeMode));
         });
         if (selectionResults.some(function(row) { return !row.resolved; })) {
+          resolved = false;
+          if (currentRoundIndex === -1 && alive) currentRoundIndex = index;
           status = "pending";
         } else {
           const outcomes = selectionResults.map(function(row) { return row.outcome; });
@@ -947,14 +949,14 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       missed: missed, rules: rules, confidencePoints: sportsSurvivorNumber_(pick.confidencePoints, 0)
     });
 
-    if (roundEligible && !sourceResolved) blockedByEarlierUnresolved = true;
+    if (roundEligible && !resolved) blockedByEarlierUnresolved = true;
   });
 
   const lastBuiltWeek = (categories || []).reduce(function(maxWeek, category, index) {
     return Math.max(maxWeek, sportsSurvivorRoundWeek_(category, index));
   }, 0);
-  const complete = (categories || []).length > 0 && lastBuiltWeek >= settings.endWeek && categories.every(function(category) {
-    return sportsSurvivorCategoryResolved_(category.id, optionMeta, resultMap);
+  const complete = (categories || []).length > 0 && lastBuiltWeek >= settings.endWeek && rounds.every(function(round) {
+    return round.resolved === true;
   });
   return {
     username: username, alive: settings.mode === "streak-survivor" ? true : alive,

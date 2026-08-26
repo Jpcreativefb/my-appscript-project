@@ -1561,26 +1561,34 @@ function readSportsOddsAdminSettings_() {
 }
 
 function apiGetSportsOddsAdminSettings_(params) {
+  params = params || {};
   assertSportsAdmin_(params);
   seedSportsOddsAdminSettingsFromSportsSettings_();
   cleanSportsOddsSettingsForUserFriendlyAdmin_();
 
-  const counts = sportsOddsApiRequestCountsByLeague_();
+  /*
+    The full API-log aggregation can be large. Dashboard first paint uses the
+    counters already persisted on SportsOddsSettings and defers the historical
+    log scan. Explicit odds-status reads still receive cached aggregate counts.
+  */
+  const lightweight = sportsAdminBoolean_(params.lightweight, false);
+  const counts = lightweight ? {} : sportsOddsApiRequestCountsByLeague_();
   const settings = readSportsOddsAdminSettings_().map(function(row) {
-    const stats = counts[row.League] || {
-      requestsToday: 0,
-      requestsThisMonth: 0,
-      requestsAllTime: 0,
-      requestCostThisMonth: 0
-    };
-    row.ApiRequestsToday = stats.requestsToday;
-    row.ApiRequestsThisMonth = stats.requestsThisMonth;
-    row.ApiRequestsAllTime = stats.requestsAllTime;
-    row.ApiRequestCostThisMonth = stats.requestCostThisMonth;
+    const stats = counts[row.League] || null;
+    row.ApiRequestsToday = stats ? stats.requestsToday : row.CallsToday;
+    row.ApiRequestsThisMonth = stats ? stats.requestsThisMonth : row.CallsThisMonth;
+    row.ApiRequestsAllTime = stats ? stats.requestsAllTime : null;
+    row.ApiRequestCostThisMonth = stats ? stats.requestCostThisMonth : null;
+    row.ApiUsageDeferred = lightweight;
     return row;
   });
 
-  return { success: true, settings: settings, usage: ensureSportsOddsUsageMonth_() };
+  return {
+    success: true,
+    settings: settings,
+    usage: ensureSportsOddsUsageMonth_(),
+    apiUsageDeferred: lightweight
+  };
 }
 
 function apiUpdateSportsOddsAdminSetting_(params) {
@@ -2895,7 +2903,25 @@ function apiInstallSportsOddsHybridTrigger_(params) {
    SPORTS CONTROLS v12 - UNIFIED AUTOMATION / ARCHIVE / USAGE
 ===================================================== */
 
-function sportsOddsApiRequestCountsByLeague_() {
+const SPORTS_ODDS_ADMIN_USAGE_CACHE_SECONDS = 300;
+
+function sportsOddsApiRequestCountsByLeague_(options) {
+  options = options || {};
+  const today = sportsAdminToday_();
+  const month = sportsAdminMonthKey_();
+  const cacheKey = "sports-admin-odds-usage:" + today + ":" + month;
+  let cache = null;
+
+  try {
+    cache = CacheService.getScriptCache();
+    if (!options.force) {
+      const cached = cache.get(cacheKey);
+      if (cached) return JSON.parse(cached);
+    }
+  } catch (cacheErr) {
+    cache = null;
+  }
+
   const result = {};
   const sh = SpreadsheetApp.getActive().getSheetByName("SportsOddsApiLog");
   if (!sh || sh.getLastRow() <= 1) return result;
@@ -2903,8 +2929,6 @@ function sportsOddsApiRequestCountsByLeague_() {
   const data = sh.getDataRange().getValues();
   const headers = data[0].map(function(header) { return sportsAdminString_(header); });
   const col = sportsAdminHeaderMap_(headers);
-  const today = sportsAdminToday_();
-  const month = sportsAdminMonthKey_();
 
   for (let i = 1; i < data.length; i++) {
     const league = sportsAdminString_(data[i][col.League]).toUpperCase();
@@ -2923,6 +2947,14 @@ function sportsOddsApiRequestCountsByLeague_() {
     if (monthKey === month) {
       result[league].requestsThisMonth++;
       result[league].requestCostThisMonth += cost;
+    }
+  }
+
+  if (cache) {
+    try {
+      cache.put(cacheKey, JSON.stringify(result), SPORTS_ODDS_ADMIN_USAGE_CACHE_SECONDS);
+    } catch (cacheErr) {
+      // Diagnostics cache is best-effort only.
     }
   }
 
@@ -3188,22 +3220,32 @@ function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
 }
 
 function apiGetSportsAdminDashboard_(params) {
+  params = params || {};
   assertSportsAdmin_(params);
-  setupSportsAdminControlSystem();
-  cleanSportsOddsSettingsForUserFriendlyAdmin_();
+
+  /*
+    Reliability checkpoint: first paint must not scan the large player-stat,
+    checkpoint, workbook-capacity, engine-log, or odds-API-log datasets. Those
+    diagnostics are fetched lazily by the Awards App after the controls render.
+    Setup/migrations remain an explicit admin action rather than an open-time job.
+  */
+  const lightweightOddsParams = {};
+  Object.keys(params).forEach(function(key) { lightweightOddsParams[key] = params[key]; });
+  lightweightOddsParams.lightweight = true;
 
   return {
     success: true,
-    version: "15-advanced-stats-v1",
+    version: "16-lightweight-dashboard-v1",
     checkedAt: new Date(),
+    diagnosticsDeferred: true,
     smartAutomation: getSmartSportsAutomationStatus_(),
     sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
-    odds: apiGetSportsOddsAdminSettings_(params),
+    odds: apiGetSportsOddsAdminSettings_(lightweightOddsParams),
     archive: getSportsArchiveStatus_(),
-    players: typeof getSportsPlayersStatus_ === "function" ? getSportsPlayersStatus_() : null,
-    advancedStats: typeof getSportsAdvancedStatsStatus_ === "function" ? getSportsAdvancedStatsStatus_() : null,
-    engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
-    workbookCapacity: typeof sportsWorkbookCapacityReport_ === "function" ? sportsWorkbookCapacityReport_() : null,
+    players: { success: true, deferred: true, leagues: [] },
+    advancedStats: { success: true, deferred: true, leagues: [] },
+    engineStatus: { success: true, deferred: true },
+    workbookCapacity: { success: true, deferred: true },
     scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
     scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],
     seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],

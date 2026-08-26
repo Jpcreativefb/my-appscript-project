@@ -498,8 +498,12 @@ function adminRealityTvQuestionReadiness_(bundle) {
   });
   const states = adminRealityTvQuestionPackTypes_(season.ShowFormat || "survivor-tribal", (bundle && bundle.questionTemplates) || []).map(function(item) {
     const template = ((bundle && bundle.questionTemplates) || []).find(function(row) { return String(row.TemplateId || "") === String(item.id); }) || {};
-    const selected = template.Enabled === true || String(template.Enabled || "").toLowerCase() === "true";
+    const seasonDefaultEnabled = template.Enabled === true || String(template.Enabled || "").toLowerCase() === "true";
     const question = currentQuestions[item.id] || null;
+    const episodeEnabled = question && question.Enabled !== undefined && question.Enabled !== ""
+      ? (question.Enabled === true || String(question.Enabled).toLowerCase() === "true")
+      : seasonDefaultEnabled;
+    const selected = episodeEnabled;
     let options = [];
     try { options = question ? JSON.parse(question.AnswerOptionsJSON || "[]") : []; } catch (err) { options = []; }
     const ready = !!question && Array.isArray(options) && options.length >= 2;
@@ -508,6 +512,9 @@ function adminRealityTvQuestionReadiness_(bundle) {
       label: item.label,
       templateSource: item.custom ? "custom" : "preset",
       selected: selected,
+      seasonDefaultEnabled: seasonDefaultEnabled,
+      episodeEnabled: episodeEnabled,
+      episodeDisplayOrder: Math.max(1, Number(question && question.DisplayOrder || template.DisplayOrder || item.displayOrder || 50)),
       inserted: !!question,
       answersVerified: ready,
       state: selected ? (ready ? "READY" : "NEEDS_BUILD") : "AVAILABLE",
@@ -593,10 +600,12 @@ function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, in
   statusById = statusById || {};
   preservedDisplay = preservedDisplay || {};
   const scope = seasonId || "create";
+  const isSeasonEditor = inputClass === "rt-season-question-type" && !!seasonId;
   const templateMap = {};
   (templates || []).forEach(function(item) { templateMap[String(item.TemplateId || "")] = item; });
   return adminRealityTvQuestionPackTypes_(formatId, templates).map(function(item) {
     const stored = templateMap[item.id] || {};
+    const status = statusById[item.id] || {};
     const pointValue = Object.prototype.hasOwnProperty.call(preservedPoints, item.id)
       ? preservedPoints[item.id]
       : Number(stored.Points !== undefined && stored.Points !== "" ? stored.Points : (defaultPoints === undefined ? 1 : defaultPoints));
@@ -604,14 +613,31 @@ function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, in
     const layoutType = String(display.layoutType || stored.LayoutType || "auto").toLowerCase();
     const imageSource = String(display.imageSource || stored.ImageSource || "auto").toLowerCase();
     const optionTitle = item.label + (item.custom ? " · Custom" : "");
+    const seasonEnabled = !!enabled[item.id];
+    const episodeEnabled = status.episodeEnabled === undefined ? seasonEnabled : status.episodeEnabled === true;
+    const seasonOrder = Math.max(1, Number(stored.DisplayOrder || item.displayOrder || 50));
+    const episodeOrder = Math.max(1, Number(status.episodeDisplayOrder || seasonOrder));
+    const toggleHtml = isSeasonEditor
+      ? `<div class="reality-tv-question-pack-toggle-pair">
+          <label class="reality-tv-question-pack-toggle"><input type="checkbox" class="rt-season-question-type" data-season-id="${adminRealityTvEscape_(seasonId)}" value="${adminRealityTvEscape_(item.id)}" ${seasonEnabled ? "checked" : ""}><span><b>Season default</b> · Future episodes</span></label>
+          <label class="reality-tv-question-pack-toggle"><input type="checkbox" class="rt-episode-question-type" data-season-id="${adminRealityTvEscape_(seasonId)}" value="${adminRealityTvEscape_(item.id)}" ${episodeEnabled ? "checked" : ""}><span><b>Use This Episode</b> · Current episode only</span></label>
+        </div>`
+      : `<label class="reality-tv-question-pack-toggle">
+          <input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${seasonEnabled ? "checked" : ""}>
+          <span class="reality-tv-question-option-copy"><span class="reality-tv-question-option-title"><b>${adminRealityTvEscape_(optionTitle)}</b>${adminRealityTvHelp_(optionTitle, item.help || "Creates this question for each new period and sends the result through administrator review.")}</span></span>
+        </label>`;
+    const orderHtml = isSeasonEditor
+      ? `<div class="reality-tv-question-order-controls">
+          <label>${adminRealityTvFieldTitle_("Episode order", "Controls only this episode. Lower numbers appear first. The elimination question defaults to the end.")}<input type="number" min="1" step="1" class="input rt-episode-question-order" data-order-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(episodeOrder)}"></label>
+          <label>${adminRealityTvFieldTitle_("Season order", "Explicitly changes the template order used by future episodes when you save season defaults.")}<input type="number" min="1" step="1" class="input rt-season-question-order" data-order-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(seasonOrder)}"></label>
+        </div>`
+      : "";
     return `<div class="reality-tv-question-pack-choice ${item.custom ? "custom" : ""}">
       <div class="reality-tv-question-pack-choice-main">
-        <label class="reality-tv-question-pack-toggle">
-          <input type="checkbox" class="${inputClass}" ${seasonId ? `data-season-id="${adminRealityTvEscape_(seasonId)}"` : ""} value="${adminRealityTvEscape_(item.id)}" ${enabled[item.id] ? "checked" : ""}>
-          <span class="reality-tv-question-option-copy"><span class="reality-tv-question-option-title"><b>${adminRealityTvEscape_(optionTitle)}</b>${adminRealityTvHelp_(optionTitle, item.help || "Creates this question for each new period and sends the result through administrator review.")}</span></span>
-        </label>
-        <label class="reality-tv-question-points-control"><span class="reality-tv-question-points-title">Points${adminRealityTvHelp_("Question points", "Points awarded when a user selects the correct answer. This applies to the current open question and future periods; finalized history is preserved.")}</span><input type="number" min="0" step="0.5" class="input rt-question-points" data-points-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(Number.isFinite(pointValue) ? pointValue : 1)}"></label>
+        <div><span class="reality-tv-question-option-title"><b>${adminRealityTvEscape_(optionTitle)}</b>${adminRealityTvHelp_(optionTitle, item.help || "Creates this question for each new period and sends the result through administrator review.")}</span>${toggleHtml}</div>
+        <label class="reality-tv-question-points-control"><span class="reality-tv-question-points-title">Points${adminRealityTvHelp_("Question points", "Points awarded when a user selects the correct answer. Update This Episode Only applies the shown value only now; Save Season Defaults changes future episodes.")}</span><input type="number" min="0" step="0.5" class="input rt-question-points" data-points-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}" value="${adminRealityTvEscape_(Number.isFinite(pointValue) ? pointValue : 1)}"></label>
       </div>
+      ${orderHtml}
       <details class="reality-tv-question-display-settings">
         <summary>Display & Images ${adminRealityTvHelp_("Display and images", "Choose how answers look to users and where answer images come from. Automatic uses roster or group images when available and falls back to text.")}</summary>
         <div class="reality-tv-question-display-grid">
@@ -619,7 +645,7 @@ function adminRealityTvQuestionPackChoicesHtml_(formatId, enabled, templates, in
           <label>${adminRealityTvFieldTitle_("Image source", "Roster reuses participant/team images. Group uses tribe/team images. Custom uses images stored with manual answers. No images forces text-only answers.")}<select class="input rt-question-image-source" data-display-scope="${adminRealityTvEscape_(scope)}" data-template-id="${adminRealityTvEscape_(item.id)}"><option value="auto" ${imageSource === "auto" ? "selected" : ""}>Automatic</option><option value="roster" ${imageSource === "roster" ? "selected" : ""}>Participant / team roster</option><option value="group" ${imageSource === "group" ? "selected" : ""}>Group / tribe image</option><option value="custom" ${imageSource === "custom" ? "selected" : ""}>Custom answer images</option><option value="none" ${imageSource === "none" ? "selected" : ""}>No images</option></select></label>
         </div>
       </details>
-      ${adminRealityTvQuestionStatusHtml_(statusById[item.id])}
+      ${adminRealityTvQuestionStatusHtml_(status)}
     </div>`;
   }).join("") || `<div class="admin-message warning">No preset extra questions are selected for this format. Add a custom question below or use only the elimination question.</div>`;
 }
@@ -643,6 +669,18 @@ function adminRealityTvCollectQuestionDisplay_(scope) {
     if (!id) return;
     const image = document.querySelector('.rt-question-image-source[data-display-scope="' + scope + '"][data-template-id="' + id + '"]');
     result[id] = { layoutType: select.value || "auto", imageSource: image ? image.value : "auto" };
+  });
+  return result;
+}
+
+function adminRealityTvCollectQuestionOrder_(scope, kind) {
+  const result = {};
+  const className = kind === "season" ? "rt-season-question-order" : "rt-episode-question-order";
+  document.querySelectorAll('.' + className + '[data-order-scope="' + scope + '"]').forEach(function(input) {
+    const id = String(input.dataset.templateId || "");
+    if (!id) return;
+    const value = Number(input.value);
+    if (Number.isFinite(value)) result[id] = Math.max(1, Math.floor(value));
   });
   return result;
 }
@@ -927,7 +965,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
   });
   const readiness = adminRealityTvQuestionReadiness_(bundle);
   (readiness.questionStates || []).forEach(function(item) {
-    statusById[String(item.templateId || "")] = { status: item.state, message: item.message };
+    statusById[String(item.templateId || "")] = Object.assign({}, item, { status: item.state });
   });
   (bundle.episodeQuestions || []).filter(function(item) {
     return current && String(item.EpisodeId || "") === String(current.EpisodeId || "");
@@ -940,7 +978,7 @@ function adminRealityTvQuestionPackPanel_(bundle) {
     };
   });
   const build = bundle.questionBuild && !bundle.questionBuild.complete ? bundle.questionBuild : null;
-  const buildLabel = build ? "Resume Build (" + Number(build.currentIndex || 0) + "/" + Number(build.totalCount || 0) + ")" : "Save Format & Build Current " + (season.PeriodLabel || "Episode");
+  const buildLabel = build ? "Resume Build (" + Number(build.currentIndex || 0) + "/" + Number(build.totalCount || 0) + ")" : "Save Season Defaults & Build Current " + (season.PeriodLabel || "Episode");
   const buildAction = build
     ? `adminRealityTvResumeQuestionPackBuild('${adminRealityTvEscape_(build.buildId)}','${adminRealityTvEscape_(season.SeasonId)}')`
     : `adminRealityTvSaveQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')`;
@@ -1009,11 +1047,12 @@ function adminRealityTvQuestionPackPanel_(bundle) {
         ${missingEpisodeNotice}
         ${buildStatus}
         ${completedSummary}
+        <div class="admin-form-grid"><label>${adminRealityTvFieldTitle_("Elimination episode order", "The main elimination/exit question defaults to 990 so it appears last. Change this for the current episode only.")}<input id="realityTvEliminationEpisodeOrder_${adminRealityTvEscape_(season.SeasonId)}" class="input" type="number" min="1" step="1" value="${adminRealityTvValue_(bundle.currentEpisodeEliminationDisplayOrder || 990)}"></label></div>
         <div class="admin-actions">
           <button class="admin-small-button" onclick="${buildAction}">${adminRealityTvEscape_(buildLabel)}</button>
           <button class="admin-small-button secondary" onclick="adminRealityTvApplyEpisodeQuestionPlan_('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Update This Episode Only</button>
           <button class="admin-small-button secondary" onclick="adminRealityTvRepairQuestionPack('${adminRealityTvEscape_(season.SeasonId)}','${adminRealityTvEscape_(current ? current.EpisodeId : "")}')">Verify & Repair Extra Questions</button>
-          ${adminRealityTvHelp_("This Episode Only", "Uses the checked questions and current point/display values only for this open episode. Unchecked questions are removed only when no picks or results depend on them. Season defaults for future episodes remain unchanged.")}
+          ${adminRealityTvHelp_("This Episode Only", "Use This Episode and Episode order change only the current open episode. A question with picks/results is protected from disabling. Season default controls are saved separately and drive future episodes.")}
           ${adminRealityTvHelp_("Verify & Repair", "Use this when a question says built or verified but is missing from the game, has no answers, or the build counter will not finish. It reuses existing rows and repairs only missing questions or answers.")}
         </div>
         <div id="realityTvQuestionPackMessage_${adminRealityTvEscape_(season.SeasonId)}" class="admin-message"></div>
@@ -1073,6 +1112,10 @@ function adminRealityTvApplyExistingFormatPreset_(seasonId, preserveSelection) {
   const currentEpisode = bundle ? adminRealityTvCurrentEpisode_(bundle) : null;
   const summary = bundle && bundle.questionBuildSummary ? bundle.questionBuildSummary : null;
   (summary && summary.results ? summary.results : []).forEach(function(item) { statusById[String(item.templateId || "")] = item; });
+  const currentReadiness = adminRealityTvQuestionReadiness_(bundle || {});
+  (currentReadiness.questionStates || []).forEach(function(item) {
+    statusById[String(item.templateId || "")] = Object.assign({}, item, { status: item.state });
+  });
   ((bundle && bundle.episodeQuestions) || []).filter(function(item) {
     return currentEpisode && String(item.EpisodeId || "") === String(currentEpisode.EpisodeId || "");
   }).forEach(function(item) {
@@ -3699,10 +3742,10 @@ async function adminRealityTvSavePickRules(seasonId) {
 
 async function adminRealityTvApplyEpisodeQuestionPlan_(seasonId, episodeId) {
   if (!episodeId) return adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Create or repair the current episode first.", "error");
-  const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
+  const selected = Array.from(document.querySelectorAll('.rt-episode-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
     return box.value;
   });
-  if (!confirm("Update Extra Questions for this episode only?\n\nChecked questions will be built or updated with the point and display values shown. Unchecked questions will be removed only when no picks or results depend on them. Future episode defaults will not change.")) return;
+  if (!confirm("Update questions for this episode only?\n\nUse This Episode controls availability now. Disabled questions are hidden from players and do not require results. Questions with picks/results are protected. Future episode defaults will not change.")) return;
   adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Updating only this episode's Extra Questions…", "info");
   try {
     const state = await apiAdminApplyRealityTvEpisodeQuestionPlan({
@@ -3710,7 +3753,9 @@ async function adminRealityTvApplyEpisodeQuestionPlan_(seasonId, episodeId) {
       episodeId: episodeId,
       enabledQuestionTypesJSON: JSON.stringify(selected),
       questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_(seasonId)),
-      questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_(seasonId))
+      questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_(seasonId)),
+      questionOrderJSON: JSON.stringify(adminRealityTvCollectQuestionOrder_(seasonId, "episode")),
+      eliminationDisplayOrder: (document.getElementById("realityTvEliminationEpisodeOrder_" + seasonId) || {}).value || 990
     });
     if (!state || state.success === false) throw new Error(adminRealityTvResponseError_(state, "Could not update this episode's questions."));
     alert(state.message || "This episode's Extra Questions were updated.");
@@ -3724,7 +3769,7 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
   const selected = Array.from(document.querySelectorAll('.rt-season-question-type[data-season-id="' + seasonId + '"]:checked')).map(function(box) {
     return box.value;
   });
-  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Saving the question pack and starting a staged build…", "info");
+  adminRealityTvSetMessage_("realityTvQuestionPackMessage_" + seasonId, "Saving season question defaults and starting the current-episode build…", "info");
   try {
     let state = await apiAdminUpdateRealityTvQuestionPack({
       seasonId: seasonId,
@@ -3744,6 +3789,7 @@ async function adminRealityTvSaveQuestionPack(seasonId, episodeId) {
       eliminationImageSource: document.getElementById("realityTvEliminationImageSource_" + seasonId).value,
       questionPointsJSON: JSON.stringify(adminRealityTvCollectQuestionPoints_(seasonId)),
       questionDisplayJSON: JSON.stringify(adminRealityTvCollectQuestionDisplay_(seasonId)),
+      questionOrderJSON: JSON.stringify(adminRealityTvCollectQuestionOrder_(seasonId, "season")),
       enabledQuestionTypesJSON: JSON.stringify(selected),
       buildCurrentEpisode: true
     });

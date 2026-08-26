@@ -10228,39 +10228,12 @@ function apiAdminRunSportsFullSync(payload) {
   );
 
   /*
-    Browser/web-app requests can timeout before a full ESPN + odds + sheet sync
-    completes. Run the no-ESPN finalizer immediately, then queue the heavy sync
-    as a time trigger so it can finish outside the browser request.
+    Manual Smart Sync must acknowledge the browser request quickly. The queued
+    trigger already runs source refreshes, odds refreshes, finalizers, prop /
+    matchup / advanced settlement, and payout work. Doing any of those here
+    duplicates work and can make Apps Script reject the request before the
+    trigger is even created.
   */
-  const immediateFinalizer =
-    finalizeSportsWagerResultsFromSourceScoresForAllGames_(
-      true
-    );
-
-  const immediatePlayerProps =
-    typeof settleSportsPlayerPropsForAllGames_ === "function"
-      ? settleSportsPlayerPropsForAllGames_({
-          force: true,
-          refreshStats: false
-        })
-      : null;
-
-  const immediatePlayerMatchups =
-    typeof settleSportsPlayerMatchupsForAllGames_ === "function"
-      ? settleSportsPlayerMatchupsForAllGames_({
-          force: true,
-          refreshStats: false
-        })
-      : null;
-
-  const immediateAdvancedQuestions =
-    typeof settleSportsAdvancedQuestionsForAllGames_ === "function"
-      ? settleSportsAdvancedQuestionsForAllGames_({
-          force: true,
-          refreshStats: false
-        })
-      : null;
-
   const queued =
     queueSportsWagerSmartAutomationNow_(
       "manual-full-sync"
@@ -10270,15 +10243,9 @@ function apiAdminRunSportsFullSync(payload) {
     success: true,
     queued: true,
     message:
-      "Smart Sports Sync queued. Finished-game finalizer ran now; source scores/odds sync will run in the background trigger shortly.",
-    immediateFinalizer: immediateFinalizer,
-    immediatePlayerProps: immediatePlayerProps,
-    immediatePlayerMatchups: immediatePlayerMatchups,
-    immediateAdvancedQuestions: immediateAdvancedQuestions,
+      "Smart Sports Sync queued. Scores, odds, settlement, and payout processing will run in the background trigger shortly.",
     sync: {
       queued: true,
-      preFinalizer: immediateFinalizer,
-      postFinalizer: null,
       results: []
     },
     trigger: queued
