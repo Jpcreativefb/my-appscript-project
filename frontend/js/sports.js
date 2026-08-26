@@ -23,7 +23,8 @@ let sportsScoresState = {
   creatingPlayerMatchup: false,
   creatingAdvancedQuestion: false,
   gameDetailsByEventId: {},
-  gameDetailsLoading: false
+  gameDetailsLoading: false,
+  gameDetailsError: ""
 };
 
 let sportsUsageByGameId = {};
@@ -881,6 +882,7 @@ async function loadSportsScores(filters) {
 
     await loadSportsUsageForScores_();
 
+    sportsScoresState.gameDetailsError = "";
     sportsScoresState.gameDetailsLoading =
       sportsScoresState.scores.some(function(game) {
         return String(game && game.League || "").trim().toLowerCase() === "mlb";
@@ -1053,16 +1055,50 @@ function renderSportsStartingPitchers_(game) {
   const details = sportsGameDetailsFor_(game);
   const awayStarter = details && details.awayStarter || sportsStarterFallback_(game, "away");
   const homeStarter = details && details.homeStarter || sportsStarterFallback_(game, "home");
+  const transportError = String(
+    details && (details.error || details.pitcherError) ||
+    sportsScoresState.gameDetailsError ||
+    ""
+  ).trim();
+  const transportFailed = Boolean(
+    transportError ||
+    details && (
+      details.transportStatus === "error" ||
+      details.pitcherTransportStatus === "error" ||
+      details.pitcherStatus === "transport-error"
+    )
+  );
 
   if (!awayStarter && !homeStarter && sportsScoresState.gameDetailsLoading) {
     return '<div class="sports-starters sports-starters-loading">Checking probable starting pitchers…</div>';
   }
+
+  if (transportFailed) {
+    return `
+      <div class="sports-starters sports-starters-error">
+        <div class="sports-starters-title">Starting Pitchers</div>
+        <strong>Pitcher lookup transport error</strong>
+        <span>${escapeSportsHtml(transportError || "ESPN pitcher data could not be reached.")}</span>
+        <span>This is a data-transport failure, not an upstream TBD.</span>
+      </div>
+    `;
+  }
+
+  const upstreamTbd = Boolean(
+    details &&
+    details.pitcherStatus === "upstream-tbd" &&
+    !awayStarter &&
+    !homeStarter
+  );
 
   return `
     <div class="sports-starters">
       <div class="sports-starters-title">Starting Pitchers</div>
       ${renderSportsStarterRow_(game.AwayTeam || "Away", awayStarter)}
       ${renderSportsStarterRow_(game.HomeTeam || "Home", homeStarter)}
+      ${upstreamTbd
+        ? '<div class="sports-starters-status">ESPN summary loaded; probable pitchers are not available upstream yet.</div>'
+        : ''}
     </div>
   `;
 }
@@ -1075,6 +1111,7 @@ async function loadSportsGameDetailsForScores_(scores) {
 
   if (!mlbGames.length) {
     sportsScoresState.gameDetailsLoading = false;
+    sportsScoresState.gameDetailsError = "";
     return;
   }
 
@@ -1097,6 +1134,7 @@ async function loadSportsGameDetailsForScores_(scores) {
     );
 
     if (result && result.success !== false && result.gameDetails) {
+      sportsScoresState.gameDetailsError = "";
       sportsScoresState.gameDetailsByEventId = Object.assign(
         {},
         sportsScoresState.gameDetailsByEventId || {},
@@ -1104,6 +1142,10 @@ async function loadSportsGameDetailsForScores_(scores) {
       );
     }
   } catch (error) {
+    sportsScoresState.gameDetailsError =
+      error && error.message
+        ? error.message
+        : String(error || "Could not load MLB starting pitchers.");
     console.warn("Could not load MLB starting pitchers.", error);
   } finally {
     sportsScoresState.gameDetailsLoading = false;

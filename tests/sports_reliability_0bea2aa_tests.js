@@ -16,6 +16,7 @@ const live = read('backend/engines/SportsLiveDisplayEngine.js');
 const betting = read('backend/engines/BettingEngine.js');
 const bridge = read('backend/engines/SportsAdminBridgeEngine.js');
 const api = read('backend/Api.js');
+const scoresEngine = read('external-engines/sports-scoring-engine/src/SportsScoresEngine.js');
 
 function functionSource(source, name) {
   const marker = `function ${name}(`;
@@ -98,6 +99,12 @@ assert.strictEqual(queueCalls, 1, 'Manual Smart Sync must create/coalesce exactl
 assert.strictEqual(queued.success, true);
 assert.strictEqual(queued.queued, true);
 assert.deepStrictEqual(Array.from(queued.sync.results), [], 'Manual Smart Sync response must not contain synchronous settlement work');
+const queuedMessageFn = functionSource(adminPage, 'adminRunFullSportsSyncNow');
+assert(!queuedMessageFn.includes('Finished-game finalizer ran now'), 'Queued Smart Sync success wording must not claim an inline finalizer ran');
+assert(
+  queuedMessageFn.includes('Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly'),
+  'Queued Smart Sync success wording must describe background processing'
+);
 
 // 4) Sports Scores & Game Builder transport must be server-side, not browser JSONP.
 assert(!sportsPage.includes('function sportsJsonp('), 'Browser JSONP helper must be removed');
@@ -140,6 +147,85 @@ const rosterOnlySummary = {
   ]
 };
 assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOnlySummary, 'home').name, 'Home Roster Starter');
+
+
+// 5b) Starting-pitcher summary transport must go through the Sports Engine proxy bridge.
+const summaryFetchFn = functionSource(live, 'sportsLiveDisplayFetchEspnSummaries_');
+assert(summaryFetchFn.includes('"getSportsMlbSummary"'), 'Awards App pitcher lookup must call the Sports Engine MLB summary endpoint');
+assert(!summaryFetchFn.includes('site.api.espn.com'), 'Primary Awards App pitcher lookup must not fetch ESPN directly');
+const summaryEngineFn = functionSource(scoresEngine, 'apiGetSportsMlbSummary_');
+assert(summaryEngineFn.includes('sportsEspnFetch_('), 'Sports Engine MLB summary endpoint must reuse the authenticated ESPN transport helper');
+assert(!summaryEngineFn.includes('UrlFetchApp.fetch('), 'Sports Engine MLB summary endpoint must not bypass its proxy-aware ESPN helper');
+assert(scoresEngine.includes('action === "getSportsMlbSummary"'), 'Sports Engine API dispatcher must expose the authenticated MLB summary action');
+
+let summaryFetchUrl = '';
+const safeToken = 'SPORTS-SECRET-TOKEN-DO-NOT-RETURN-1234567890';
+const summaryEngineCtx = runFunctions(scoresEngine, [
+  'sportsEspnPublicErrorMessage_',
+  'apiGetSportsMlbSummary_'
+], {
+  assertSportsAdmin_: () => true,
+  sportsEspnProxyBaseUrl_: () => 'https://example.pages.dev/api/espn-proxy',
+  sportsEspnProxyToken_: () => safeToken,
+  sportsEspnFetch_: (url) => {
+    summaryFetchUrl = url;
+    return {
+      getResponseCode: () => 200,
+      getContentText: () => JSON.stringify({ header: { competitions: [] } })
+    };
+  }
+});
+const summaryTransport = summaryEngineCtx.apiGetSportsMlbSummary_({ espnEventId: '401234567' });
+assert(summaryFetchUrl.includes('/baseball/mlb/summary?event=401234567'), 'Sports Engine must request the ESPN MLB summary for the requested event');
+assert.strictEqual(summaryTransport.success, true);
+assert.strictEqual(summaryTransport.transport, 'espn-proxy');
+assert.strictEqual(summaryTransport.transportStatus, 'ok');
+assert(!JSON.stringify(summaryTransport).includes(safeToken), 'Sports Engine summary success payload must never expose the proxy token');
+
+const summaryFailureCtx = runFunctions(scoresEngine, [
+  'sportsEspnPublicErrorMessage_',
+  'apiGetSportsMlbSummary_'
+], {
+  assertSportsAdmin_: () => true,
+  sportsEspnProxyBaseUrl_: () => 'https://example.pages.dev/api/espn-proxy',
+  sportsEspnProxyToken_: () => safeToken,
+  sportsEspnFetch_: () => {
+    throw new Error('proxy request failed ' + safeToken + ' x-awards-sports-token=' + safeToken);
+  }
+});
+const summaryTransportFailure = summaryFailureCtx.apiGetSportsMlbSummary_({ espnEventId: '401234567' });
+assert.strictEqual(summaryTransportFailure.success, false);
+assert.strictEqual(summaryTransportFailure.transportError, true);
+assert.strictEqual(summaryTransportFailure.transportStatus, 'error');
+assert(!JSON.stringify(summaryTransportFailure).includes(safeToken), 'Sports Engine summary errors must redact proxy secrets/tokens');
+assert(JSON.stringify(summaryTransportFailure).includes('[redacted]'), 'Sports Engine summary errors should explicitly redact sensitive token material');
+
+const pitcherStatusCtx = runFunctions(live, [
+  'sportsLiveDisplaySummarySuccess_',
+  'sportsLiveDisplaySummaryFailure_'
+], {
+  sportsLiveDisplayParseGameSummary_: () => ({
+    espnEventId: '401234567',
+    homeStarter: null,
+    awayStarter: null,
+    startersAvailable: false
+  }),
+  sportsLiveDisplayString_: (v) => v == null ? '' : String(v).trim(),
+  sportsLiveDisplayNumber_: (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback
+});
+const legitimateTbd = pitcherStatusCtx.sportsLiveDisplaySummarySuccess_('401234567', {}, 'espn-proxy');
+assert.strictEqual(legitimateTbd.transportStatus, 'ok');
+assert.strictEqual(legitimateTbd.pitcherStatus, 'upstream-tbd', 'Successful ESPN summary with no pitcher must be a legitimate upstream TBD');
+const visibleTransportFailure = pitcherStatusCtx.sportsLiveDisplaySummaryFailure_('401234567', 'ESPN HTTP 403', 'espn-proxy', 403);
+assert.strictEqual(visibleTransportFailure.transportStatus, 'error');
+assert.strictEqual(visibleTransportFailure.pitcherStatus, 'transport-error', 'Transport failure must not collapse into upstream TBD');
+assert.strictEqual(visibleTransportFailure.httpStatus, 403);
+
+assert(sportsPage.includes('Pitcher lookup transport error'), 'Admin Sports Builder must display pitcher transport failures');
+assert(sportsPage.includes('not an upstream TBD'), 'Admin Sports Builder must distinguish transport failures from genuine TBD');
+assert(sportsPage.includes('ESPN summary loaded; probable pitchers are not available upstream yet.'), 'Admin Sports Builder must label genuine upstream TBD separately');
+const engineSummaryParserFn = functionSource(live, 'sportsLiveDisplayEngineSummaryResponse_');
+assert(engineSummaryParserFn.includes('Unknown action:'), 'Direct ESPN fallback must be limited to rolling deployment compatibility when the Sports Engine action is unavailable');
 
 // 6) Sports Wager certification: market creation + real-odds ingestion.
 const marketCtx = runFunctions(sportsWager, [

@@ -474,10 +474,157 @@ function sportsLiveDisplayParseGameSummary_(eventId, summary) {
   };
 }
 
+function sportsLiveDisplaySummarySuccess_(eventId, summary, transport) {
+  const parsed = sportsLiveDisplayParseGameSummary_(eventId, summary || {});
+  parsed.transportStatus = "ok";
+  parsed.transport = sportsLiveDisplayString_(transport || "sports-engine");
+  parsed.pitcherStatus = parsed.startersAvailable
+    ? "available"
+    : "upstream-tbd";
+  parsed.error = "";
+  return parsed;
+}
+
+function sportsLiveDisplaySummaryFailure_(eventId, error, transport, httpStatus) {
+  return {
+    espnEventId: sportsLiveDisplayString_(eventId),
+    homeStarter: null,
+    awayStarter: null,
+    startersAvailable: false,
+    pitcherStatus: "transport-error",
+    transportStatus: "error",
+    transport: sportsLiveDisplayString_(transport || "sports-engine"),
+    httpStatus: sportsLiveDisplayNumber_(httpStatus, 0),
+    error: sportsLiveDisplayString_(error || "MLB pitcher summary transport failed")
+  };
+}
+
+function sportsLiveDisplayEngineSummaryResponse_(eventId, response) {
+  const code = response.getResponseCode();
+  const body = response.getContentText();
+  let payload;
+
+  try {
+    payload = JSON.parse(body || "{}");
+  } catch (error) {
+    return {
+      fallbackDirect: false,
+      result: sportsLiveDisplaySummaryFailure_(
+        eventId,
+        "Sports Engine MLB summary endpoint returned non-JSON HTTP " + code,
+        "sports-engine",
+        code
+      )
+    };
+  }
+
+  const message = sportsLiveDisplayString_(
+    payload && (payload.error || payload.message || payload.reason)
+  );
+
+  if (
+    code >= 200 &&
+    code < 300 &&
+    payload &&
+    payload.success === false &&
+    /^Unknown action:\s*getSportsMlbSummary\b/i.test(message)
+  ) {
+    // Rolling-deployment compatibility only. Once the Sports Engine endpoint is
+    // deployed, all summary traffic stays on its authenticated ESPN proxy path.
+    return {
+      fallbackDirect: true,
+      result: null
+    };
+  }
+
+  if (
+    code < 200 ||
+    code >= 300 ||
+    !payload ||
+    payload.success === false
+  ) {
+    return {
+      fallbackDirect: false,
+      result: sportsLiveDisplaySummaryFailure_(
+        eventId,
+        message || "Sports Engine MLB summary request failed with HTTP " + code,
+        payload && payload.transport || "sports-engine",
+        payload && payload.httpStatus !== undefined
+          ? payload.httpStatus
+          : code
+      )
+    };
+  }
+
+  if (!payload.summary || typeof payload.summary !== "object") {
+    return {
+      fallbackDirect: false,
+      result: sportsLiveDisplaySummaryFailure_(
+        eventId,
+        "Sports Engine MLB summary response did not include an ESPN summary payload",
+        payload.transport || "sports-engine",
+        payload.httpStatus || code
+      )
+    };
+  }
+
+  return {
+    fallbackDirect: false,
+    result: sportsLiveDisplaySummarySuccess_(
+      eventId,
+      payload.summary,
+      payload.transport || "sports-engine"
+    )
+  };
+}
+
+function sportsLiveDisplayDirectSummaryRequest_(eventId) {
+  return {
+    url:
+      "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=" +
+      encodeURIComponent(eventId),
+    method: "get",
+    followRedirects: true,
+    muteHttpExceptions: true,
+    headers: {
+      "User-Agent": "Mozilla/5.0 AwardsAppSports/1.0"
+    }
+  };
+}
+
+function sportsLiveDisplayDirectSummaryResponse_(eventId, response) {
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) {
+    return sportsLiveDisplaySummaryFailure_(
+      eventId,
+      "Sports Engine summary endpoint is not deployed and direct ESPN fallback returned HTTP " + code,
+      "direct-fallback",
+      code
+    );
+  }
+
+  try {
+    return sportsLiveDisplaySummarySuccess_(
+      eventId,
+      JSON.parse(response.getContentText() || "{}"),
+      "direct-fallback"
+    );
+  } catch (error) {
+    return sportsLiveDisplaySummaryFailure_(
+      eventId,
+      "Sports Engine summary endpoint is not deployed and direct ESPN fallback returned invalid JSON",
+      "direct-fallback",
+      code
+    );
+  }
+}
+
 function sportsLiveDisplayFetchEspnSummaries_(eventIds) {
   const result = {};
   const requests = [];
   const requestMeta = [];
+  const fallbackRequests = [];
+  const fallbackMeta = [];
 
   (eventIds || []).forEach(function(eventId) {
     const cacheKey = "sports-summary:mlb:" + eventId;
@@ -486,35 +633,86 @@ function sportsLiveDisplayFetchEspnSummaries_(eventIds) {
       result[eventId] = cached;
       return;
     }
+
     requests.push({
-      url: "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=" + encodeURIComponent(eventId),
+      url: sportsLiveDisplayBuildEngineUrl_(
+        "getSportsMlbSummary",
+        { espnEventId: eventId }
+      ),
       method: "get",
       followRedirects: true,
-      muteHttpExceptions: true,
-      headers: { "User-Agent": "Mozilla/5.0 AwardsAppSports/1.0" }
+      muteHttpExceptions: true
     });
     requestMeta.push({ eventId: eventId, cacheKey: cacheKey });
   });
 
   if (requests.length) {
-    const responses = UrlFetchApp.fetchAll(requests);
+    let responses;
+    try {
+      responses = UrlFetchApp.fetchAll(requests);
+    } catch (error) {
+      requestMeta.forEach(function(meta) {
+        result[meta.eventId] = sportsLiveDisplaySummaryFailure_(
+          meta.eventId,
+          "Sports Engine MLB summary transport failed: " +
+            (error && error.message ? error.message : String(error)),
+          "sports-engine",
+          0
+        );
+      });
+      responses = [];
+    }
+
     responses.forEach(function(response, index) {
       const meta = requestMeta[index];
-      try {
-        const code = response.getResponseCode();
-        if (code < 200 || code >= 300) throw new Error("ESPN summary HTTP " + code);
-        const summary = JSON.parse(response.getContentText());
-        const parsed = sportsLiveDisplayParseGameSummary_(meta.eventId, summary);
-        result[meta.eventId] = parsed;
-        sportsLiveDisplayCachePut_(meta.cacheKey, parsed, SPORTS_LIVE_DISPLAY_SUMMARY_CACHE_SECONDS);
-      } catch (error) {
-        result[meta.eventId] = {
-          espnEventId: meta.eventId,
-          homeStarter: null,
-          awayStarter: null,
-          startersAvailable: false,
-          error: error && error.message ? error.message : String(error)
-        };
+      const parsed = sportsLiveDisplayEngineSummaryResponse_(meta.eventId, response);
+
+      if (parsed.fallbackDirect) {
+        fallbackRequests.push(
+          sportsLiveDisplayDirectSummaryRequest_(meta.eventId)
+        );
+        fallbackMeta.push(meta);
+        return;
+      }
+
+      result[meta.eventId] = parsed.result;
+      if (parsed.result && parsed.result.transportStatus === "ok") {
+        sportsLiveDisplayCachePut_(
+          meta.cacheKey,
+          parsed.result,
+          SPORTS_LIVE_DISPLAY_SUMMARY_CACHE_SECONDS
+        );
+      }
+    });
+  }
+
+  if (fallbackRequests.length) {
+    let fallbackResponses;
+    try {
+      fallbackResponses = UrlFetchApp.fetchAll(fallbackRequests);
+    } catch (error) {
+      fallbackMeta.forEach(function(meta) {
+        result[meta.eventId] = sportsLiveDisplaySummaryFailure_(
+          meta.eventId,
+          "Sports Engine summary endpoint is not deployed and direct ESPN fallback failed: " +
+            (error && error.message ? error.message : String(error)),
+          "direct-fallback",
+          0
+        );
+      });
+      fallbackResponses = [];
+    }
+
+    fallbackResponses.forEach(function(response, index) {
+      const meta = fallbackMeta[index];
+      const parsed = sportsLiveDisplayDirectSummaryResponse_(meta.eventId, response);
+      result[meta.eventId] = parsed;
+      if (parsed.transportStatus === "ok") {
+        sportsLiveDisplayCachePut_(
+          meta.cacheKey,
+          parsed,
+          SPORTS_LIVE_DISPLAY_SUMMARY_CACHE_SECONDS
+        );
       }
     });
   }
@@ -812,6 +1010,18 @@ function sportsLiveDisplayBuildGameDetails_(eventIds, eventLeagues, engineData, 
       homeStarter: summary.homeStarter || null,
       awayStarter: summary.awayStarter || null,
       startersAvailable: Boolean(summary.homeStarter || summary.awayStarter),
+      pitcherStatus:
+        summary.pitcherStatus ||
+        (summary.homeStarter || summary.awayStarter ? "available" : "upstream-tbd"),
+      pitcherTransportStatus:
+        summary.transportStatus ||
+        "ok",
+      pitcherTransport:
+        summary.transport ||
+        "",
+      pitcherError:
+        summary.error ||
+        "",
       errors: eventData.errors || []
     };
   });

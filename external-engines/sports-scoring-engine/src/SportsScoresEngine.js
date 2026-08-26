@@ -143,6 +143,131 @@ function clearSportsEspnProxyToken() {
   return getSportsEspnProxyStatus();
 }
 
+/************************************
+ MLB SUMMARY / STARTING-PITCHER BRIDGE
+ Keeps ESPN summary traffic inside the Sports Scores Engine so the existing
+ authenticated Cloudflare ESPN proxy is reused. If the proxy is not configured,
+ the historical direct ESPN fetch remains as a compatibility fallback.
+************************************/
+function sportsEspnPublicErrorMessage_(error) {
+  let message = String(
+    error && error.message
+      ? error.message
+      : error || "Sports ESPN request failed"
+  );
+
+  const token = sportsEspnProxyToken_();
+  if (token) {
+    message = message.split(token).join("[redacted]");
+  }
+
+  message = message.replace(
+    /x-awards-sports-token\s*[:=]\s*[^\s,;]+/ig,
+    "x-awards-sports-token=[redacted]"
+  );
+
+  return message.slice(0, 300);
+}
+
+function apiGetSportsMlbSummary_(params) {
+  params = params || {};
+
+  if (typeof assertSportsAdmin_ !== "function") {
+    throw new Error("Sports admin security is unavailable.");
+  }
+  assertSportsAdmin_(params);
+
+  const eventId = String(
+    params.espnEventId ||
+    params.eventId ||
+    ""
+  ).trim();
+
+  if (!eventId || !/^[A-Za-z0-9_-]+$/.test(eventId)) {
+    throw new Error("Valid espnEventId is required.");
+  }
+
+  const directUrl =
+    "https://site.api.espn.com/apis/site/v2/sports/baseball/mlb/summary?event=" +
+    encodeURIComponent(eventId);
+
+  const proxyConfigured = !!sportsEspnProxyBaseUrl_();
+  const transport = proxyConfigured
+    ? "espn-proxy"
+    : "direct-fallback";
+
+  let response;
+  try {
+    response = sportsEspnFetch_(directUrl, {
+      method: "get",
+      muteHttpExceptions: true,
+      followRedirects: true,
+      headers: {
+        "User-Agent": "Mozilla/5.0 PATTC-Sports-Engine/1.0"
+      }
+    });
+  } catch (error) {
+    return {
+      success: false,
+      transportError: true,
+      transportStatus: "error",
+      transport: transport,
+      espnEventId: eventId,
+      httpStatus: 0,
+      error:
+        "MLB pitcher summary transport failed via " +
+        transport +
+        ": " +
+        sportsEspnPublicErrorMessage_(error)
+    };
+  }
+
+  const code = response.getResponseCode();
+  if (code < 200 || code >= 300) {
+    return {
+      success: false,
+      transportError: true,
+      transportStatus: "error",
+      transport: transport,
+      espnEventId: eventId,
+      httpStatus: code,
+      error:
+        "MLB pitcher summary transport failed via " +
+        transport +
+        ": ESPN HTTP " +
+        code
+    };
+  }
+
+  let summary;
+  try {
+    summary = JSON.parse(response.getContentText() || "{}");
+  } catch (error) {
+    return {
+      success: false,
+      transportError: true,
+      transportStatus: "error",
+      transport: transport,
+      espnEventId: eventId,
+      httpStatus: code,
+      error:
+        "MLB pitcher summary transport failed via " +
+        transport +
+        ": ESPN returned invalid JSON"
+    };
+  }
+
+  return {
+    success: true,
+    transportError: false,
+    transportStatus: "ok",
+    transport: transport,
+    espnEventId: eventId,
+    httpStatus: code,
+    summary: summary
+  };
+}
+
 const SPORTS_SHEETS = {
   GAMES: "SportsGames",
   SCORES: "SportsScores",
@@ -1639,6 +1764,15 @@ function doGet(e) {
 
       payload =
         apiGetSportsScores_(
+          params
+        );
+
+    }
+
+    else if (action === "getSportsMlbSummary") {
+
+      payload =
+        apiGetSportsMlbSummary_(
           params
         );
 

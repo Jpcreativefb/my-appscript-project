@@ -8631,17 +8631,8 @@ async function adminRunFullSportsSyncNow() {
 
     if (res.queued || sync.queued) {
 
-      const immediateFinalizer =
-        res.immediateFinalizer ||
-        sync.preFinalizer ||
-        {};
-
       adminSportsMessage_(
-        "Smart Sports Sync queued. Finished-game finalizer ran now: finalized " +
-        (immediateFinalizer.finalized || 0) +
-        ", checked " +
-        (immediateFinalizer.checked || 0) +
-        ". Source scores/odds will finish in the background shortly; reload Sports Controls in a minute.",
+        "Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly; reload Sports Controls in about a minute.",
         false
       );
 
