@@ -2176,13 +2176,32 @@ function fetchSportsOddsApiJsonWithLog_(
 
   }
 
-  const usage =
-    sportsOddsLogApiCall_(
+  // Provider usage headers belong to the paid request itself. Diagnostic
+  // logging is best-effort and must never turn a successful provider response
+  // into a failed odds refresh, even if log-sheet setup is contended.
+  let usage = {
+    costLast: sportsOddsHeaderValue_(response.getHeaders(), "x-requests-last"),
+    requestsUsed: sportsOddsHeaderValue_(response.getHeaders(), "x-requests-used"),
+    requestsRemaining: sportsOddsHeaderValue_(response.getHeaders(), "x-requests-remaining")
+  };
+
+  try {
+    const loggedUsage = sportsOddsLogApiCall_(
       meta,
       url,
       response,
       parsed
     );
+    if (loggedUsage) usage = loggedUsage;
+  } catch (logError) {
+    usage.logWarning = logError && logError.message
+      ? logError.message
+      : String(logError || "Odds API diagnostic logging failed");
+    SPORTS_ODDS_LAST_API_USAGE_ = usage;
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("Sports odds diagnostic log warning: " + usage.logWarning);
+    }
+  }
 
   if (
     code < 200 ||
@@ -2972,14 +2991,39 @@ function sportsOddsLogApiCall_(meta, url, response, payload) {
     sportsOddsAppendApiLogRow_(row);
   } catch (logError) {
     usage.logWarning = logError && logError.message ? logError.message : String(logError);
+    if (typeof console !== "undefined" && console.warn) {
+      console.warn("Sports odds diagnostic log warning: " + usage.logWarning);
+    }
   }
   return usage;
 }
 
 function setupSportsOddsSystem() {
   const odds = sportsOddsEnsureHeaderSheetSafe_(SPORTS_ODDS_SHEET, SPORTS_ODDS_HEADERS);
-  const apiLog = sportsOddsEnsureHeaderSheetSafe_(SPORTS_ODDS_API_LOG_SHEET, SPORTS_ODDS_API_LOG_HEADERS);
-  const aliasLog = sportsOddsEnsureHeaderSheetSafe_("OddsApiLog", SPORTS_ODDS_API_LOG_HEADERS);
+  let apiLog = { added: [] };
+  let aliasLog = { added: [] };
+  const warnings = [];
+
+  // The odds cache is operational; API logs are diagnostic. Do not make normal
+  // odds reads/writes fail merely because a diagnostic sheet cannot obtain its
+  // setup lock while another sports automation is active.
+  try {
+    apiLog = sportsOddsEnsureHeaderSheetSafe_(SPORTS_ODDS_API_LOG_SHEET, SPORTS_ODDS_API_LOG_HEADERS);
+  } catch (error) {
+    warnings.push(
+      "SportsOddsApiLog setup skipped: " +
+      (error && error.message ? error.message : String(error))
+    );
+  }
+  try {
+    aliasLog = sportsOddsEnsureHeaderSheetSafe_("OddsApiLog", SPORTS_ODDS_API_LOG_HEADERS);
+  } catch (error) {
+    warnings.push(
+      "OddsApiLog setup skipped: " +
+      (error && error.message ? error.message : String(error))
+    );
+  }
+
   return {
     success: true,
     sheet: SPORTS_ODDS_SHEET,
@@ -2988,7 +3032,10 @@ function setupSportsOddsSystem() {
     apiLogAdded: apiLog.added || [],
     aliasLogSheet: "OddsApiLog",
     aliasLogAdded: aliasLog.added || [],
-    message: "SportsOdds setup complete. API log sheets are ready. Racing odds are managed separately."
+    warnings: warnings,
+    message: warnings.length
+      ? "SportsOdds setup complete. Diagnostic API log setup was deferred."
+      : "SportsOdds setup complete. API log sheets are ready. Racing odds are managed separately."
   };
 }
 

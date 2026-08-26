@@ -17,6 +17,7 @@ const betting = read('backend/engines/BettingEngine.js');
 const bridge = read('backend/engines/SportsAdminBridgeEngine.js');
 const api = read('backend/Api.js');
 const scoresEngine = read('external-engines/sports-scoring-engine/src/SportsScoresEngine.js');
+const espnProxy = read('functions/api/espn-proxy.js');
 
 function functionSource(source, name) {
   const marker = `function ${name}(`;
@@ -66,6 +67,14 @@ assert(adminPage.includes('function adminLoadSportsSupplementalStatus_'), 'Playe
 assert(players.includes('SPORTS_PLAYERS_STATUS_CACHE_SECONDS = 300') && players.includes('CacheService.getScriptCache()'), 'Player status must use a short diagnostic cache');
 assert(advanced.includes('SPORTS_ADVANCED_STATUS_CACHE_SECONDS = 300') && advanced.includes('CacheService.getScriptCache()'), 'Advanced/checkpoint status must use a short diagnostic cache');
 assert(admin.includes('SPORTS_ODDS_ADMIN_USAGE_CACHE_SECONDS = 300'), 'Odds API-log aggregation must be cached');
+const oddsSettingsReadFn = functionSource(admin, 'apiGetSportsOddsAdminSettings_');
+assert(oddsSettingsReadFn.includes('if (!lightweight)'), 'Lightweight odds dashboard reads must skip seed/cleanup writes');
+assert(oddsSettingsReadFn.includes('readSportsOddsAdminSettings_({ skipSetup: lightweight })'), 'Lightweight odds read must avoid setup work');
+const sportsSettingsReadFn = functionSource(admin, 'apiGetSportsSettingsAdmin_');
+assert(sportsSettingsReadFn.includes('params.lightweight'), 'Lightweight SportsSettings read must avoid column migrations');
+const controlsLoadFn = functionSource(adminPage, 'adminLoadSportsControls');
+assert(!controlsLoadFn.includes('await apiAdminGetSmartSportsAutomationStatus()'), 'Sports Controls first paint must not wait for Awards wager-trigger status');
+assert(functionSource(admin, 'apiGetSportsAdminDashboard_').includes('dashboardTriggers = ScriptApp.getProjectTriggers()'), 'Sports dashboard must snapshot project triggers once');
 
 // 2) Odds error observability + v48 limits, without making a provider call.
 assert(adminPage.includes('oddsUsage.LastRefreshMessage'), 'Odds status must surface the persisted provider/engine error message');
@@ -79,6 +88,42 @@ assert.strictEqual(
   'Odds API HTTP 422: INVALID_MARKETS: Unsupported market',
   'Provider HTTP errors must preserve provider code/message'
 );
+
+const oddsFetchCtx = runFunctions(odds, ['fetchSportsOddsApiJsonWithLog_'], {
+  UrlFetchApp: {
+    fetch: () => ({
+      getResponseCode: () => 200,
+      getContentText: () => '[]',
+      getHeaders: () => ({ 'x-requests-last': '1', 'x-requests-used': '24', 'x-requests-remaining': '476' })
+    })
+  },
+  sportsOddsHeaderValue_: (headers, key) => headers[key] || '',
+  sportsOddsLogApiCall_: () => { throw new Error('Could not lock script while setting up sheet: SportsOddsApiLog'); },
+  sportsOddsProviderErrorMessage_: () => 'provider failed',
+  SPORTS_ODDS_LAST_API_USAGE_: null
+});
+const loggedButNonfatal = oddsFetchCtx.fetchSportsOddsApiJsonWithLog_('https://example.invalid/odds', { league: 'MLB' });
+assert.deepStrictEqual(Array.from(loggedButNonfatal.payload), [], 'Successful provider payload must survive diagnostic log failure');
+assert.strictEqual(loggedButNonfatal.usage.requestsRemaining, '476');
+assert(loggedButNonfatal.usage.logWarning.includes('SportsOddsApiLog'), 'Diagnostic log lock failure must be retained only as a warning');
+
+const oddsSetupCtx = runFunctions(odds, ['setupSportsOddsSystem'], {
+  SPORTS_ODDS_SHEET: 'SportsOdds',
+  SPORTS_ODDS_HEADERS: ['A'],
+  SPORTS_ODDS_API_LOG_SHEET: 'SportsOddsApiLog',
+  SPORTS_ODDS_API_LOG_HEADERS: ['A'],
+  sportsOddsEnsureHeaderSheetSafe_: (name) => {
+    if (name === 'SportsOdds') return { added: [] };
+    throw new Error('diagnostic lock busy: ' + name);
+  }
+});
+const oddsSetup = oddsSetupCtx.setupSportsOddsSystem();
+assert.strictEqual(oddsSetup.success, true, 'Diagnostic API-log setup failure must not abort the operational SportsOdds sheet');
+assert.strictEqual(oddsSetup.warnings.length, 2, 'Both diagnostic log setup failures should be reported as warnings');
+const controlledOddsFn = functionSource(admin, 'refreshSportsOddsForLeagueControlled_');
+assert(!controlledOddsFn.includes('setupSportsAdminControlSystem()'), 'Controlled odds refresh must not run full Admin setup under the odds path');
+assert(controlledOddsFn.includes('sportsAdminPrepareOddsRefresh_()'), 'Controlled odds refresh must use narrow operational preparation');
+assert(controlledOddsFn.includes('Diagnostic logging warning (refresh still succeeded)'), 'Diagnostic logging failures must be persisted as an OK warning, not Last ERROR');
 
 // 3) Manual Smart Sync must only queue work.
 let queueCalls = 0;
@@ -105,6 +150,14 @@ assert(
   queuedMessageFn.includes('Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly'),
   'Queued Smart Sync success wording must describe background processing'
 );
+assert(queuedMessageFn.includes('Queueing Smart Sports Sync...'), 'First Smart Sync click must immediately show queue acknowledgement');
+assert(queuedMessageFn.includes('requestAnimationFrame'), 'Smart Sync must yield a paint before waiting on Apps Script');
+assert.strictEqual(adminSportsProgressLabelTest_(), 'Queueing sync...', 'Smart Sync button progress text must say it is queueing');
+
+function adminSportsProgressLabelTest_() {
+  const ctx = runFunctions(adminPage, ['adminSportsActionProgressText_']);
+  return ctx.adminSportsActionProgressText_({ textContent: 'Run Smart Sports Sync Now' });
+}
 
 // 4) Sports Scores & Game Builder transport must be server-side, not browser JSONP.
 assert(!sportsPage.includes('function sportsJsonp('), 'Browser JSONP helper must be removed');
@@ -112,6 +165,11 @@ assert(!sportsPage.includes('SPORTS_API_URL'), 'Browser must not call the separa
 assert(sportsPage.includes('adminGetSportsEngineScores') && sportsPage.includes('sportsScoresEngineApi_'), 'Sports page must use Awards POST server bridge');
 assert(bridge.includes('function apiAdminGetSportsEngineLeagues') && bridge.includes('function apiAdminGetSportsEngineScores') && bridge.includes('function apiAdminGetSportsEngineSnapshots'), 'Server bridge read wrappers are incomplete');
 assert(api.includes('action === "adminGetSportsEngineScores"') && api.includes('action === "adminGetSportsEngineSnapshots"'), 'Awards API routes for Sports Engine reads are missing');
+const sportsInitFn = functionSource(sportsPage, 'initSportsPage');
+assert(sportsInitFn.includes('Promise.all(['), 'Builder must load leagues and scores concurrently');
+const sportsScoresLoadFn = functionSource(sportsPage, 'loadSportsScores');
+assert(!sportsScoresLoadFn.includes('await loadSportsUsageForScores_()'), 'Builder first paint must not block on Awards usage scan');
+assert(sportsScoresLoadFn.indexOf('renderSportsScores(') < sportsScoresLoadFn.indexOf('loadSportsUsageForScores_()'), 'Score cards must render before supplemental usage lookup');
 
 // 5) Starting-pitcher ingestion: ESPN side-keyed probable containers must resolve correctly.
 const liveCtx = runFunctions(live, [
@@ -147,6 +205,15 @@ const rosterOnlySummary = {
   ]
 };
 assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOnlySummary, 'home').name, 'Home Roster Starter');
+const rosterOrderedSummary = {
+  header: probableSummary.header,
+  rosters: [
+    { roster: [{ starter: true, athlete: { id: '41', displayName: 'Home Ordered Starter', position: { abbreviation: 'SP' } } }] },
+    { roster: [{ starter: true, athlete: { id: '42', displayName: 'Away Ordered Starter', position: { abbreviation: 'SP' } } }] }
+  ]
+};
+assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOrderedSummary, 'home').name, 'Home Ordered Starter', 'ESPN roster[0] without side metadata must resolve as home');
+assert.strictEqual(liveCtx.sportsLiveDisplayFindProbable_(rosterOrderedSummary, 'away').name, 'Away Ordered Starter', 'ESPN roster[1] without side metadata must resolve as away');
 
 
 // 5b) Starting-pitcher summary transport must go through the Sports Engine proxy bridge.
@@ -157,11 +224,18 @@ const summaryEngineFn = functionSource(scoresEngine, 'apiGetSportsMlbSummary_');
 assert(summaryEngineFn.includes('sportsEspnFetch_('), 'Sports Engine MLB summary endpoint must reuse the authenticated ESPN transport helper');
 assert(!summaryEngineFn.includes('UrlFetchApp.fetch('), 'Sports Engine MLB summary endpoint must not bypass its proxy-aware ESPN helper');
 assert(scoresEngine.includes('action === "getSportsMlbSummary"'), 'Sports Engine API dispatcher must expose the authenticated MLB summary action');
+assert(scoresEngine.includes('ESPNEventId: String(event.id || "")'), 'Sports score rows must preserve the raw ESPN event ID used by summary?event=');
+assert(espnProxy.includes('WEB_API_HOST = "site.web.api.espn.com"'), 'Cloudflare proxy must define the MLB summary web-API fallback host');
+assert(espnProxy.includes('function mlbSummaryWebFallbackUrl'), 'Cloudflare proxy must have a narrow MLB summary fallback');
+assert(espnProxy.includes('target.pathname !== "/apis/site/v2/sports/baseball/mlb/summary"'), 'MLB summary fallback must be endpoint-scoped');
+assert(espnProxy.includes('x-awards-sports-fallback-from-status'), 'Proxy must expose safe fallback trace status');
 
 let summaryFetchUrl = '';
 const safeToken = 'SPORTS-SECRET-TOKEN-DO-NOT-RETURN-1234567890';
 const summaryEngineCtx = runFunctions(scoresEngine, [
   'sportsEspnPublicErrorMessage_',
+  'sportsEspnResponseHeader_',
+  'sportsEspnResponseTrace_',
   'apiGetSportsMlbSummary_'
 ], {
   assertSportsAdmin_: () => true,
@@ -171,7 +245,8 @@ const summaryEngineCtx = runFunctions(scoresEngine, [
     summaryFetchUrl = url;
     return {
       getResponseCode: () => 200,
-      getContentText: () => JSON.stringify({ header: { competitions: [] } })
+      getContentText: () => JSON.stringify({ header: { competitions: [] } }),
+      getHeaders: () => ({ 'x-awards-sports-source': 'site.web.api.espn.com', 'x-upstream-status': '200', 'x-awards-sports-fallback-from-status': '403' })
     };
   }
 });
@@ -180,10 +255,14 @@ assert(summaryFetchUrl.includes('/baseball/mlb/summary?event=401234567'), 'Sport
 assert.strictEqual(summaryTransport.success, true);
 assert.strictEqual(summaryTransport.transport, 'espn-proxy');
 assert.strictEqual(summaryTransport.transportStatus, 'ok');
+assert.strictEqual(summaryTransport.proxySource, 'site.web.api.espn.com', 'Sports Engine must return the actual proxy source');
+assert.strictEqual(summaryTransport.proxyFallbackFromStatus, '403', 'Sports Engine must expose safe proxy fallback status');
 assert(!JSON.stringify(summaryTransport).includes(safeToken), 'Sports Engine summary success payload must never expose the proxy token');
 
 const summaryFailureCtx = runFunctions(scoresEngine, [
   'sportsEspnPublicErrorMessage_',
+  'sportsEspnResponseHeader_',
+  'sportsEspnResponseTrace_',
   'apiGetSportsMlbSummary_'
 ], {
   assertSportsAdmin_: () => true,
@@ -208,7 +287,8 @@ const pitcherStatusCtx = runFunctions(live, [
     espnEventId: '401234567',
     homeStarter: null,
     awayStarter: null,
-    startersAvailable: false
+    startersAvailable: false,
+    summaryRecognized: true
   }),
   sportsLiveDisplayString_: (v) => v == null ? '' : String(v).trim(),
   sportsLiveDisplayNumber_: (v, fallback) => Number.isFinite(Number(v)) ? Number(v) : fallback
@@ -222,6 +302,9 @@ assert.strictEqual(visibleTransportFailure.pitcherStatus, 'transport-error', 'Tr
 assert.strictEqual(visibleTransportFailure.httpStatus, 403);
 
 assert(sportsPage.includes('Pitcher lookup transport error'), 'Admin Sports Builder must display pitcher transport failures');
+assert(sportsPage.includes('Pitcher lookup parser error'), 'Admin Sports Builder must distinguish parser/schema failure from upstream TBD');
+assert(sportsPage.includes('has no ESPN event ID'), 'MLB rows missing an ESPN event ID must show lookup failure instead of plain TBD');
+assert(sportsPage.includes('Event ${escapeSportsHtml(String(game.ESPNEventId'), 'Admin pitcher status must expose the event ID used for summary lookup');
 assert(sportsPage.includes('not an upstream TBD'), 'Admin Sports Builder must distinguish transport failures from genuine TBD');
 assert(sportsPage.includes('ESPN summary loaded; probable pitchers are not available upstream yet.'), 'Admin Sports Builder must label genuine upstream TBD separately');
 const engineSummaryParserFn = functionSource(live, 'sportsLiveDisplayEngineSummaryResponse_');

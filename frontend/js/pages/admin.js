@@ -4976,6 +4976,10 @@ function adminSportsActionProgressText_(button) {
       .trim()
       .toLowerCase();
 
+  if (label.indexOf("smart sports sync") >= 0) {
+    return "Queueing sync...";
+  }
+
   if (label.indexOf("save") >= 0) {
     return "Saving...";
   }
@@ -5878,26 +5882,9 @@ async function adminLoadSportsControls(options) {
   }
 
   if (res && res.success !== false) {
-
-    adminSportsSetPanelLoading_(
-      panel,
-      "Loading Sports Controls",
-      "Step 2 of 3: checking automation status...",
-      65
-    );
-
-    try {
-      const wagerSyncStatus =
-        await apiAdminGetSmartSportsAutomationStatus();
-
-      res.wagerAutoSyncTriggers =
-        wagerSyncStatus && wagerSyncStatus.success
-          ? wagerSyncStatus.triggers || []
-          : [];
-    } catch (err) {
-      res.wagerAutoSyncTriggers = [];
-    }
-
+    // Render the Sports Engine dashboard immediately. Awards App wager-trigger
+    // status is supplemental and must not hold first paint open.
+    res.wagerAutoSyncTriggers = res.wagerAutoSyncTriggers || [];
   }
 
   if (loadSequence !== adminSportsLoadSequence_) {
@@ -5945,7 +5932,7 @@ async function adminLoadSportsControls(options) {
   adminSportsSetPanelLoading_(
     panel,
     "Loading Sports Controls",
-    "Step 3 of 3: drawing league controls...",
+    "Drawing league controls...",
     90
   );
 
@@ -5995,6 +5982,13 @@ async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
             success: false,
             error: err && err.message ? err.message : String(err || "Advanced status failed")
           };
+        }),
+      apiAdminGetSmartSportsAutomationStatus()
+        .catch(function(err) {
+          return {
+            success: false,
+            error: err && err.message ? err.message : String(err || "Wager automation status failed")
+          };
         })
     ]);
 
@@ -6002,6 +5996,7 @@ async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
 
   const playerStatus = results[0];
   const advancedStatus = results[1];
+  const wagerSyncStatus = results[2];
 
   if (playerStatus && playerStatus.success !== false) {
     dashboard.players = playerStatus;
@@ -6009,6 +6004,10 @@ async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
 
   if (advancedStatus && advancedStatus.success !== false) {
     dashboard.advancedStats = advancedStatus;
+  }
+
+  if (wagerSyncStatus && wagerSyncStatus.success !== false) {
+    dashboard.wagerAutoSyncTriggers = wagerSyncStatus.triggers || [];
   }
 
   panel.innerHTML =
@@ -6019,7 +6018,7 @@ async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
 
   adminSportsInitInfoHandlers_();
 
-  const errors = [playerStatus, advancedStatus]
+  const errors = [playerStatus, advancedStatus, wagerSyncStatus]
     .filter(function(item) { return item && item.success === false; })
     .map(function(item) { return item.error || item.message || "diagnostic status failed"; });
 
@@ -8611,8 +8610,19 @@ async function adminRefreshSportsScoresNow() {
 async function adminRunFullSportsSyncNow() {
 
   adminSportsMessage_(
-    "Running smart sports sync for due wager leagues..."
+    "Queueing Smart Sports Sync...",
+    false
   );
+
+  // Give the browser one paint before the server request. On slower Apps Script
+  // connections this makes the first click visibly acknowledge immediately.
+  await new Promise(function(resolve) {
+    if (typeof window !== "undefined" && typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(function() { resolve(); });
+    } else {
+      setTimeout(resolve, 0);
+    }
+  });
 
   try {
 

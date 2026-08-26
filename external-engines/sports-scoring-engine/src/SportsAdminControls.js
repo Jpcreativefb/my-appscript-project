@@ -334,6 +334,15 @@ function setupSportsAdminControlSystem() {
   };
 }
 
+function sportsAdminPrepareOddsRefresh_() {
+  // Normal odds pulls need the operational settings/usage sheets, not the full
+  // Admin setup/migration/player/log workflow. Keeping this path narrow avoids
+  // nested setup locks when Smart Sports automation and an odds pull overlap.
+  setupSportsOddsAdminSettingsSheet_();
+  setupSportsOddsUsageSheet_();
+  return upgradeSportsOddsOperationalDefaultsV48_();
+}
+
 
 /**
  * v48 operational defaults migration.
@@ -1389,9 +1398,12 @@ function setupSportsOddsUserFriendlyAdmin() {
    ODDS SETTINGS READ / UPDATE
 ===================================================== */
 
-function readSportsOddsAdminSettings_() {
+function readSportsOddsAdminSettings_(options) {
 
-  setupSportsOddsAdminSettingsSheet_();
+  options = options || {};
+  if (!options.skipSetup) {
+    setupSportsOddsAdminSettingsSheet_();
+  }
 
   const sh =
     SpreadsheetApp
@@ -1399,6 +1411,10 @@ function readSportsOddsAdminSettings_() {
       .getSheetByName(
         SPORTS_ODDS_SETTINGS_SHEET
       );
+
+  if (!sh) {
+    return [];
+  }
 
   const data =
     sh.getDataRange()
@@ -1560,20 +1576,62 @@ function readSportsOddsAdminSettings_() {
 
 }
 
+function sportsAdminReadOddsUsageMonthLightweight_() {
+  const sh = SpreadsheetApp.getActive().getSheetByName(SPORTS_ODDS_USAGE_SHEET);
+  if (!sh || sh.getLastRow() <= 1) {
+    return {
+      rowNumber: 0,
+      month: sportsAdminMonthKey_(),
+      totalCallsUsed: 0,
+      warnAt: 400,
+      hardCap: 500,
+      deferredSetup: true
+    };
+  }
+
+  const data = sh.getDataRange().getValues();
+  const headers = data[0].map(function(header) { return sportsAdminString_(header); });
+  const col = sportsAdminHeaderMap_(headers);
+  const month = sportsAdminMonthKey_();
+  for (let i = 1; i < data.length; i++) {
+    if (sportsAdminString_(data[i][col.Month]) !== month) continue;
+    return {
+      rowNumber: i + 1,
+      month: month,
+      totalCallsUsed: sportsAdminNumber_(data[i][col.TotalCallsUsed], 0),
+      warnAt: sportsAdminNumber_(data[i][col.WarnAt], 400),
+      hardCap: sportsAdminNumber_(data[i][col.HardCap], 500),
+      deferredSetup: false
+    };
+  }
+
+  return {
+    rowNumber: 0,
+    month: month,
+    totalCallsUsed: 0,
+    warnAt: 400,
+    hardCap: 500,
+    deferredSetup: true
+  };
+}
+
 function apiGetSportsOddsAdminSettings_(params) {
   params = params || {};
   assertSportsAdmin_(params);
-  seedSportsOddsAdminSettingsFromSportsSettings_();
-  cleanSportsOddsSettingsForUserFriendlyAdmin_();
+
+  const lightweight = sportsAdminBoolean_(params.lightweight, false);
+  if (!lightweight) {
+    seedSportsOddsAdminSettingsFromSportsSettings_();
+    cleanSportsOddsSettingsForUserFriendlyAdmin_();
+  }
 
   /*
     The full API-log aggregation can be large. Dashboard first paint uses the
     counters already persisted on SportsOddsSettings and defers the historical
     log scan. Explicit odds-status reads still receive cached aggregate counts.
   */
-  const lightweight = sportsAdminBoolean_(params.lightweight, false);
   const counts = lightweight ? {} : sportsOddsApiRequestCountsByLeague_();
-  const settings = readSportsOddsAdminSettings_().map(function(row) {
+  const settings = readSportsOddsAdminSettings_({ skipSetup: lightweight }).map(function(row) {
     const stats = counts[row.League] || null;
     row.ApiRequestsToday = stats ? stats.requestsToday : row.CallsToday;
     row.ApiRequestsThisMonth = stats ? stats.requestsThisMonth : row.CallsThisMonth;
@@ -1586,7 +1644,9 @@ function apiGetSportsOddsAdminSettings_(params) {
   return {
     success: true,
     settings: settings,
-    usage: ensureSportsOddsUsageMonth_(),
+    usage: lightweight
+      ? sportsAdminReadOddsUsageMonthLightweight_()
+      : ensureSportsOddsUsageMonth_(),
     apiUsageDeferred: lightweight
   };
 }
@@ -2261,7 +2321,7 @@ function refreshSportsOddsForLeagueControlled_(
     );
   }
 
-  setupSportsAdminControlSystem();
+  sportsAdminPrepareOddsRefresh_();
 
   const setting =
     getSportsOddsSettingForLeague_(
@@ -2515,11 +2575,19 @@ function refreshSportsOddsForLeagueControlled_(
       );
     }
 
+    const diagnosticLogWarning =
+      result && result.apiUsage && result.apiUsage.logWarning
+        ? sportsAdminString_(result.apiUsage.logWarning)
+        : "";
+
     updateSportsOddsRefreshStatus_(
       league,
       "OK",
       "Refresh complete. Usable odds rows: " +
-        result.usable
+        result.usable +
+        (diagnosticLogWarning
+          ? ". Diagnostic logging warning (refresh still succeeded): " + diagnosticLogWarning
+          : "")
     );
 
     return {
@@ -2585,7 +2653,7 @@ function runSportsOddsHybridRefresh() {
 
   try {
 
-    setupSportsAdminControlSystem();
+    sportsAdminPrepareOddsRefresh_();
 
     const settings =
       readSportsOddsAdminSettings_();
@@ -3016,8 +3084,11 @@ function sportsAdminV13SettingFields_() {
 }
 
 function apiGetSportsSettingsAdmin_(params) {
+  params = params || {};
   assertSportsAdmin_(params);
-  ensureSportsControlsV12SettingsColumns_();
+  if (!sportsAdminBoolean_(params.lightweight, false)) {
+    ensureSportsControlsV12SettingsColumns_();
+  }
 
   const today = normalizeSportsDateOnly_(new Date());
   const rows = readAllSportsSettingsRows_().map(function(row) {
@@ -3219,6 +3290,43 @@ function apiRemoveSportsScoresWindowTriggerAdmin_(params) {
   return removeSportsScoresWindowTriggers();
 }
 
+function sportsAdminDashboardTriggerRows_(triggers, handler) {
+  return (triggers || [])
+    .filter(function(trigger) {
+      return trigger && trigger.getHandlerFunction && trigger.getHandlerFunction() === handler;
+    })
+    .map(function(trigger) {
+      return {
+        handler: trigger.getHandlerFunction(),
+        eventType: String(trigger.getEventType()),
+        source: String(trigger.getTriggerSource())
+      };
+    });
+}
+
+function sportsAdminDashboardAutomationStatus_(triggers) {
+  function count_(handler) {
+    return sportsAdminDashboardTriggerRows_(triggers, handler).length;
+  }
+
+  const details = {
+    scoreUpdater: count_(SPORTS_TRIGGER_FUNCTION),
+    scoreWindow: count_(sportsScoresWindowTriggerFunction_()),
+    scheduleReconcile: count_(SPORTS_SCHEDULE_RECONCILE_TRIGGER_FUNCTION),
+    seasonLoader: count_(SPORTS_SEASON_BATCH_TRIGGER_FUNCTION),
+    oddsUpdater: count_(SPORTS_ODDS_HYBRID_TRIGGER_FUNCTION),
+    archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
+  };
+  const fullyEnabled = Object.keys(details).every(function(key) { return details[key] > 0; });
+  const anyEnabled = Object.keys(details).some(function(key) { return details[key] > 0; });
+  return {
+    enabled: fullyEnabled,
+    fullyEnabled: fullyEnabled,
+    partiallyEnabled: anyEnabled && !fullyEnabled,
+    details: details
+  };
+}
+
 function apiGetSportsAdminDashboard_(params) {
   params = params || {};
   assertSportsAdmin_(params);
@@ -3233,23 +3341,27 @@ function apiGetSportsAdminDashboard_(params) {
   Object.keys(params).forEach(function(key) { lightweightOddsParams[key] = params[key]; });
   lightweightOddsParams.lightweight = true;
 
+  // Script trigger enumeration is a service call. Snapshot once for all trigger
+  // cards instead of asking Apps Script for the same list five separate times.
+  const dashboardTriggers = ScriptApp.getProjectTriggers();
+
   return {
     success: true,
     version: "16-lightweight-dashboard-v1",
     checkedAt: new Date(),
     diagnosticsDeferred: true,
-    smartAutomation: getSmartSportsAutomationStatus_(),
-    sportsSettings: apiGetSportsSettingsAdmin_(params).leagues,
+    smartAutomation: sportsAdminDashboardAutomationStatus_(dashboardTriggers),
+    sportsSettings: apiGetSportsSettingsAdmin_(lightweightOddsParams).leagues,
     odds: apiGetSportsOddsAdminSettings_(lightweightOddsParams),
-    archive: getSportsArchiveStatus_(),
+    archive: getSportsArchiveStatus_({ lightweight: true }),
     players: { success: true, deferred: true, leagues: [] },
     advancedStats: { success: true, deferred: true, leagues: [] },
     engineStatus: { success: true, deferred: true },
     workbookCapacity: { success: true, deferred: true },
-    scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
-    scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],
-    seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],
-    archiveTriggers: typeof checkSportsArchiveTriggers === "function" ? checkSportsArchiveTriggers() : []
+    scoreTriggers: sportsAdminDashboardTriggerRows_(dashboardTriggers, SPORTS_TRIGGER_FUNCTION),
+    scoreWindowTriggers: sportsAdminDashboardTriggerRows_(dashboardTriggers, sportsScoresWindowTriggerFunction_()),
+    seasonBatchTriggers: sportsAdminDashboardTriggerRows_(dashboardTriggers, SPORTS_SEASON_BATCH_TRIGGER_FUNCTION),
+    archiveTriggers: sportsAdminDashboardTriggerRows_(dashboardTriggers, SPORTS_ARCHIVE_TRIGGER_FUNCTION)
   };
 }
 

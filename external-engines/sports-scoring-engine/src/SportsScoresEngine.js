@@ -169,6 +169,29 @@ function sportsEspnPublicErrorMessage_(error) {
   return message.slice(0, 300);
 }
 
+function sportsEspnResponseHeader_(response, name) {
+  if (!response || typeof response.getHeaders !== "function") return "";
+  let headers = {};
+  try {
+    headers = response.getHeaders() || {};
+  } catch (error) {
+    return "";
+  }
+  const target = String(name || "").toLowerCase();
+  const key = Object.keys(headers).find(function(item) {
+    return String(item || "").toLowerCase() === target;
+  });
+  return key ? String(headers[key] === undefined ? "" : headers[key]).trim() : "";
+}
+
+function sportsEspnResponseTrace_(response) {
+  return {
+    proxySource: sportsEspnResponseHeader_(response, "x-awards-sports-source"),
+    upstreamHttpStatus: sportsEspnResponseHeader_(response, "x-upstream-status"),
+    proxyFallbackFromStatus: sportsEspnResponseHeader_(response, "x-awards-sports-fallback-from-status")
+  };
+}
+
 function apiGetSportsMlbSummary_(params) {
   params = params || {};
 
@@ -223,6 +246,7 @@ function apiGetSportsMlbSummary_(params) {
   }
 
   const code = response.getResponseCode();
+  const trace = sportsEspnResponseTrace_(response);
   if (code < 200 || code >= 300) {
     return {
       success: false,
@@ -231,11 +255,16 @@ function apiGetSportsMlbSummary_(params) {
       transport: transport,
       espnEventId: eventId,
       httpStatus: code,
+      proxySource: trace.proxySource,
+      upstreamHttpStatus: trace.upstreamHttpStatus,
+      proxyFallbackFromStatus: trace.proxyFallbackFromStatus,
       error:
         "MLB pitcher summary transport failed via " +
         transport +
         ": ESPN HTTP " +
-        code
+        code +
+        (trace.proxySource ? " · source " + trace.proxySource : "") +
+        (trace.upstreamHttpStatus ? " · upstream " + trace.upstreamHttpStatus : "")
     };
   }
 
@@ -250,6 +279,9 @@ function apiGetSportsMlbSummary_(params) {
       transport: transport,
       espnEventId: eventId,
       httpStatus: code,
+      proxySource: trace.proxySource,
+      upstreamHttpStatus: trace.upstreamHttpStatus,
+      proxyFallbackFromStatus: trace.proxyFallbackFromStatus,
       error:
         "MLB pitcher summary transport failed via " +
         transport +
@@ -264,6 +296,9 @@ function apiGetSportsMlbSummary_(params) {
     transport: transport,
     espnEventId: eventId,
     httpStatus: code,
+    proxySource: trace.proxySource,
+    upstreamHttpStatus: trace.upstreamHttpStatus,
+    proxyFallbackFromStatus: trace.proxyFallbackFromStatus,
     summary: summary
   };
 }
@@ -4829,16 +4864,21 @@ function checkSportsArchiveTriggers() {
   });
 }
 
-function getSportsArchiveStatus_() {
-  setupSportsArchiveSystem_();
+function getSportsArchiveStatus_(options) {
+  options = options || {};
+  const lightweight = options.lightweight === true || String(options.lightweight || "").toLowerCase() === "true";
+  if (!lightweight) {
+    setupSportsArchiveSystem_();
+  }
   const ss = SpreadsheetApp.getActive();
   const scoresArchive = ss.getSheetByName(SPORTS_SCORES_ARCHIVE_SHEET);
   const snapshotsArchive = ss.getSheetByName(SPORTS_SNAPSHOTS_ARCHIVE_SHEET);
   return {
     success: true,
-    scoreArchiveRows: Math.max(0, scoresArchive.getLastRow() - 1),
-    snapshotArchiveRows: Math.max(0, snapshotsArchive.getLastRow() - 1),
-    triggers: checkSportsArchiveTriggers()
+    scoreArchiveRows: scoresArchive ? Math.max(0, scoresArchive.getLastRow() - 1) : 0,
+    snapshotArchiveRows: snapshotsArchive ? Math.max(0, snapshotsArchive.getLastRow() - 1) : 0,
+    triggers: lightweight ? [] : checkSportsArchiveTriggers(),
+    diagnosticsDeferred: lightweight
   };
 }
 

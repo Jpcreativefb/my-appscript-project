@@ -41,3 +41,11 @@ assert(proxy.includes('target.searchParams.get("dates")'), 'CDN fallback must be
 assert(proxy.includes('/scoreboard?xhr=1&limit=50'), 'CDN fallback must use the real-time scoreboard endpoint.');
 assert(proxy.includes('x-awards-sports-fallback-from-status'), 'Proxy should expose when the primary ESPN host was rejected.');
 assert(scores.includes('payload.content.sbData') && scores.includes('payload.content.sbData.events'), 'Sports Engine must parse CDN scoreboard events.');
+
+// RC11 live reliability: MLB summary requests need their own fallback. The
+// scoreboard CDN fallback is not a summary substitute.
+assert(proxy.includes('WEB_API_HOST = "site.web.api.espn.com"'), 'Proxy must define the ESPN web API summary fallback host.');
+assert(proxy.includes('function mlbSummaryWebFallbackUrl'), 'Proxy must implement MLB summary-specific fallback routing.');
+assert(proxy.includes('/apis/site/v2/sports/baseball/mlb/summary'), 'MLB summary fallback must be pinned to the summary endpoint.');
+assert(proxy.includes('summaryFallback = await fetchUpstream(summaryUrl)'), 'A site.api 403 must retry MLB summary through the web API host.');
+assert(proxy.includes('responseFromUpstream(summaryFallback, WEB_API_HOST, primary.status)'), 'Summary fallback must preserve safe source/upstream trace headers.');

@@ -317,16 +317,24 @@ function sportsLiveDisplayProbableCandidates_(summary, side) {
   // probable pitcher.
   const sideMap = sportsLiveDisplayCompetitorSideMap_(summary);
   const rosters = summary && Array.isArray(summary.rosters) ? summary.rosters : [];
-  rosters.forEach(function(rosterBlock) {
+  rosters.forEach(function(rosterBlock, rosterIndex) {
     rosterBlock = rosterBlock || {};
     const team = rosterBlock.team || {};
     const teamId = sportsLiveDisplayString_(team.id || rosterBlock.teamId);
     const teamName = sportsLiveDisplayString_(team.displayName || team.shortDisplayName || team.name);
-    const rosterSide =
+    const explicitRosterSide =
       sportsLiveDisplayKey_(rosterBlock.homeAway || rosterBlock.side) ||
       sideMap[teamId] ||
       sideMap[sportsLiveDisplayKey_(teamName)] ||
       "";
+
+    // ESPN MLB summary roster blocks commonly omit team/homeAway metadata.
+    // In that schema the documented/order observed by Gamecast is home first,
+    // away second. Use array order only when explicit side resolution is absent;
+    // the row still must be starter=true and a pitcher position below.
+    const rosterSide =
+      explicitRosterSide ||
+      (rosterIndex === 0 ? "home" : rosterIndex === 1 ? "away" : "");
     if (rosterSide !== side) return;
 
     const rows =
@@ -462,30 +470,55 @@ function sportsLiveDisplayTeamFromSummary_(summary, side) {
 }
 
 function sportsLiveDisplayParseGameSummary_(eventId, summary) {
+  summary = summary || {};
+  const homeCandidates = sportsLiveDisplayProbableCandidates_(summary, "home");
+  const awayCandidates = sportsLiveDisplayProbableCandidates_(summary, "away");
   const homeStarter = sportsLiveDisplayFindStartingPitcher_(summary, "home") || sportsLiveDisplayFindProbable_(summary, "home");
   const awayStarter = sportsLiveDisplayFindStartingPitcher_(summary, "away") || sportsLiveDisplayFindProbable_(summary, "away");
+  const summaryRecognized = Boolean(
+    summary.header ||
+    summary.gameInfo ||
+    summary.boxscore ||
+    (Array.isArray(summary.rosters) && summary.rosters.length)
+  );
   return {
     espnEventId: sportsLiveDisplayString_(eventId),
     homeTeam: sportsLiveDisplayTeamFromSummary_(summary, "home"),
     awayTeam: sportsLiveDisplayTeamFromSummary_(summary, "away"),
     homeStarter: homeStarter,
     awayStarter: awayStarter,
-    startersAvailable: Boolean(homeStarter || awayStarter)
+    startersAvailable: Boolean(homeStarter || awayStarter),
+    summaryRecognized: summaryRecognized,
+    pitcherDiagnostic: {
+      rosterBlocks: Array.isArray(summary.rosters) ? summary.rosters.length : 0,
+      homeCandidates: homeCandidates.length,
+      awayCandidates: awayCandidates.length
+    }
   };
 }
 
-function sportsLiveDisplaySummarySuccess_(eventId, summary, transport) {
+function sportsLiveDisplaySummarySuccess_(eventId, summary, transport, trace) {
   const parsed = sportsLiveDisplayParseGameSummary_(eventId, summary || {});
+  trace = trace || {};
   parsed.transportStatus = "ok";
   parsed.transport = sportsLiveDisplayString_(transport || "sports-engine");
-  parsed.pitcherStatus = parsed.startersAvailable
-    ? "available"
-    : "upstream-tbd";
-  parsed.error = "";
+  parsed.proxySource = sportsLiveDisplayString_(trace.proxySource || "");
+  parsed.upstreamHttpStatus = sportsLiveDisplayString_(trace.upstreamHttpStatus || "");
+  parsed.proxyFallbackFromStatus = sportsLiveDisplayString_(trace.proxyFallbackFromStatus || "");
+  if (!parsed.summaryRecognized) {
+    parsed.pitcherStatus = "parser-error";
+    parsed.error = "ESPN summary loaded but did not contain expected MLB game structures.";
+  } else {
+    parsed.pitcherStatus = parsed.startersAvailable
+      ? "available"
+      : "upstream-tbd";
+    parsed.error = "";
+  }
   return parsed;
 }
 
-function sportsLiveDisplaySummaryFailure_(eventId, error, transport, httpStatus) {
+function sportsLiveDisplaySummaryFailure_(eventId, error, transport, httpStatus, trace) {
+  trace = trace || {};
   return {
     espnEventId: sportsLiveDisplayString_(eventId),
     homeStarter: null,
@@ -495,6 +528,9 @@ function sportsLiveDisplaySummaryFailure_(eventId, error, transport, httpStatus)
     transportStatus: "error",
     transport: sportsLiveDisplayString_(transport || "sports-engine"),
     httpStatus: sportsLiveDisplayNumber_(httpStatus, 0),
+    proxySource: sportsLiveDisplayString_(trace.proxySource || ""),
+    upstreamHttpStatus: sportsLiveDisplayString_(trace.upstreamHttpStatus || ""),
+    proxyFallbackFromStatus: sportsLiveDisplayString_(trace.proxyFallbackFromStatus || ""),
     error: sportsLiveDisplayString_(error || "MLB pitcher summary transport failed")
   };
 }
@@ -551,7 +587,12 @@ function sportsLiveDisplayEngineSummaryResponse_(eventId, response) {
         payload && payload.transport || "sports-engine",
         payload && payload.httpStatus !== undefined
           ? payload.httpStatus
-          : code
+          : code,
+        {
+          proxySource: payload && payload.proxySource,
+          upstreamHttpStatus: payload && payload.upstreamHttpStatus,
+          proxyFallbackFromStatus: payload && payload.proxyFallbackFromStatus
+        }
       )
     };
   }
@@ -573,7 +614,12 @@ function sportsLiveDisplayEngineSummaryResponse_(eventId, response) {
     result: sportsLiveDisplaySummarySuccess_(
       eventId,
       payload.summary,
-      payload.transport || "sports-engine"
+      payload.transport || "sports-engine",
+      {
+        proxySource: payload.proxySource,
+        upstreamHttpStatus: payload.upstreamHttpStatus,
+        proxyFallbackFromStatus: payload.proxyFallbackFromStatus
+      }
     )
   };
 }

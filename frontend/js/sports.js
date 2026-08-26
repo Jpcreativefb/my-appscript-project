@@ -557,11 +557,14 @@ function buildSportsFiltersFromControls() {
 async function initSportsPage() {
   setSportsDateFiltersToToday();
 
-  await loadSportsLeagues();
-
-  await loadSportsScores(
-    buildSportsFiltersFromControls()
-  );
+  // Leagues and score rows are independent server reads. Run them together so
+  // Builder first paint pays one network window instead of two serial ones.
+  await Promise.all([
+    loadSportsLeagues(),
+    loadSportsScores(
+      buildSportsFiltersFromControls()
+    )
+  ]);
 }
 
 /************************************
@@ -880,17 +883,23 @@ async function loadSportsScores(filters) {
         return sportsPageGameMatchesTeamSearch_(game, teamTokens);
       });
 
-    await loadSportsUsageForScores_();
-
     sportsScoresState.gameDetailsError = "";
     sportsScoresState.gameDetailsLoading =
       sportsScoresState.scores.some(function(game) {
         return String(game && game.League || "").trim().toLowerCase() === "mlb";
       });
 
+    // Scores are the primary Builder content. Paint them immediately; usage
+    // annotations and MLB pitcher details are supplemental and load afterward.
     renderSportsScores(
       sportsScoresState.scores
     );
+
+    loadSportsUsageForScores_()
+      .then(function() {
+        renderSportsScores(sportsScoresState.scores || []);
+      })
+      .catch(function() {});
 
     loadSportsGameDetailsForScores_(
       sportsScoresState.scores
@@ -1052,6 +1061,18 @@ function renderSportsStartingPitchers_(game) {
   const league = String(game && game.League || "").trim().toLowerCase();
   if (league !== "mlb") return "";
 
+  const eventId = String(game && game.ESPNEventId || "").trim();
+  if (!eventId) {
+    return `
+      <div class="sports-starters sports-starters-error">
+        <div class="sports-starters-title">Starting Pitchers</div>
+        <strong>Pitcher lookup failed</strong>
+        <span>This MLB score row has no ESPN event ID, so a game summary cannot be requested.</span>
+        <span>This is a lookup/input failure, not an upstream TBD.</span>
+      </div>
+    `;
+  }
+
   const details = sportsGameDetailsFor_(game);
   const awayStarter = details && details.awayStarter || sportsStarterFallback_(game, "away");
   const homeStarter = details && details.homeStarter || sportsStarterFallback_(game, "home");
@@ -1060,12 +1081,14 @@ function renderSportsStartingPitchers_(game) {
     sportsScoresState.gameDetailsError ||
     ""
   ).trim();
-  const transportFailed = Boolean(
+  const pitcherStatus = String(details && details.pitcherStatus || "").trim().toLowerCase();
+  const lookupFailed = Boolean(
     transportError ||
     details && (
       details.transportStatus === "error" ||
       details.pitcherTransportStatus === "error" ||
-      details.pitcherStatus === "transport-error"
+      pitcherStatus === "transport-error" ||
+      pitcherStatus === "parser-error"
     )
   );
 
@@ -1073,13 +1096,21 @@ function renderSportsStartingPitchers_(game) {
     return '<div class="sports-starters sports-starters-loading">Checking probable starting pitchers…</div>';
   }
 
-  if (transportFailed) {
+  if (lookupFailed) {
+    const isParserFailure = pitcherStatus === "parser-error";
+    const source = String(details && details.proxySource || details && details.transport || "").trim();
+    const upstreamStatus = String(details && details.upstreamHttpStatus || details && details.httpStatus || "").trim();
     return `
       <div class="sports-starters sports-starters-error">
         <div class="sports-starters-title">Starting Pitchers</div>
-        <strong>Pitcher lookup transport error</strong>
-        <span>${escapeSportsHtml(transportError || "ESPN pitcher data could not be reached.")}</span>
-        <span>This is a data-transport failure, not an upstream TBD.</span>
+        <strong>${isParserFailure ? "Pitcher lookup parser error" : "Pitcher lookup transport error"}</strong>
+        <span>${escapeSportsHtml(transportError || (isParserFailure
+          ? "ESPN summary loaded but the MLB pitcher structure was not recognized."
+          : "ESPN pitcher data could not be reached."))}</span>
+        <span>This is a pitcher lookup failure, not an upstream TBD.</span>
+        ${sportsSessionIsAdmin_(getSportsStoredSession_())
+          ? `<span>Event ${escapeSportsHtml(String(game.ESPNEventId || "unknown"))}${source ? " · source " + escapeSportsHtml(source) : ""}${upstreamStatus ? " · HTTP " + escapeSportsHtml(upstreamStatus) : ""}</span>`
+          : ""}
       </div>
     `;
   }
@@ -1097,7 +1128,11 @@ function renderSportsStartingPitchers_(game) {
       ${renderSportsStarterRow_(game.AwayTeam || "Away", awayStarter)}
       ${renderSportsStarterRow_(game.HomeTeam || "Home", homeStarter)}
       ${upstreamTbd
-        ? '<div class="sports-starters-status">ESPN summary loaded; probable pitchers are not available upstream yet.</div>'
+        ? `<div class="sports-starters-status">ESPN summary loaded; probable pitchers are not available upstream yet.${sportsSessionIsAdmin_(getSportsStoredSession_())
+            ? " Event " + escapeSportsHtml(String(game.ESPNEventId || "unknown")) +
+              (details.proxySource ? " · source " + escapeSportsHtml(String(details.proxySource)) : "") +
+              (details.upstreamHttpStatus ? " · HTTP " + escapeSportsHtml(String(details.upstreamHttpStatus)) : "")
+            : ""}</div>`
         : ''}
     </div>
   `;

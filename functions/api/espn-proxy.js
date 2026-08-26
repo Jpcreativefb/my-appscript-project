@@ -1,6 +1,7 @@
 const ALLOWED_HOST = "site.api.espn.com";
 const ALLOWED_PATH_PREFIX = "/apis/site/v2/sports/";
 const CDN_HOST = "cdn.espn.com";
+const WEB_API_HOST = "site.web.api.espn.com";
 
 const LIVE_CDN_LEAGUES = Object.freeze({
   nfl: "nfl",
@@ -26,6 +27,22 @@ function upstreamHeaders() {
     "referer": "https://www.espn.com/",
     "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
   };
+}
+
+function mlbSummaryWebFallbackUrl(target) {
+  if (
+    target.pathname !== "/apis/site/v2/sports/baseball/mlb/summary" ||
+    !target.searchParams.get("event")
+  ) {
+    return "";
+  }
+
+  const fallback = new URL(`https://${WEB_API_HOST}${target.pathname}`);
+  fallback.searchParams.set("region", target.searchParams.get("region") || "us");
+  fallback.searchParams.set("lang", target.searchParams.get("lang") || "en");
+  fallback.searchParams.set("contentorigin", target.searchParams.get("contentorigin") || "espn");
+  fallback.searchParams.set("event", target.searchParams.get("event"));
+  return fallback.toString();
 }
 
 function liveCdnFallbackUrl(target) {
@@ -105,6 +122,16 @@ export async function onRequestGet(context) {
   const primary = await fetchUpstream(target.toString());
   if (primary.status !== 403) {
     return responseFromUpstream(primary, ALLOWED_HOST, 0);
+  }
+
+  // ESPN sometimes rejects the site.api host from Cloudflare for MLB summary
+  // requests even though the browser-facing site.web.api host serves the same
+  // event package. Keep the incoming allowlist pinned to site.api, then perform
+  // this narrow server-side fallback only for MLB summary?event= requests.
+  const summaryUrl = mlbSummaryWebFallbackUrl(target);
+  if (summaryUrl) {
+    const summaryFallback = await fetchUpstream(summaryUrl);
+    return responseFromUpstream(summaryFallback, WEB_API_HOST, primary.status);
   }
 
   const cdnUrl = liveCdnFallbackUrl(target);
