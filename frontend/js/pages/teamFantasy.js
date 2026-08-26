@@ -248,6 +248,15 @@ function teamFantasyRenderLineup_(state, lineup) {
   const settings = state.settings || {};
   const conferenceLabel = entry.conference && entry.conference !== 'ALL' ? entry.conference + ' Entry' : (entry.entryName || 'Entry');
   const safeId = teamFantasySafeDomId_(entry.entryId);
+  if (lineup.postseasonEligible === false) {
+    return `
+      <section class="card tf-lineup-card" data-entry-id="${teamFantasyEscape_(entry.entryId)}">
+        <div class="tf-weekly-picks-head">
+          <div><h2>Postseason Complete</h2><div class="tf-weekly-picks-sub">${teamFantasyEscape_(conferenceLabel)} · Week ${Number(state.week || 0)}</div></div>
+        </div>
+        <div class="tf-muted">This entry did not qualify for the postseason in any active Team Fantasy league, so there are no outstanding picks for this week.</div>
+      </section>`;
+  }
   const complete = teamFantasyLineupComplete_(lineup);
   const collapsed = teamFantasyLineupCollapsed_(lineup);
   return `

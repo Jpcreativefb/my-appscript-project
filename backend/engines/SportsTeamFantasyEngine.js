@@ -431,7 +431,22 @@ function teamFantasyIsGame_(gameId) {
 
 function teamFantasyEnsureCompleteLeague_(gameId, settingsLike) {
   const settings = settingsLike && settingsLike.gameId ? settingsLike : teamFantasyNormalizeSettings_(settingsLike || teamFantasyDefaultSettings_(gameId));
-  if (!settings.completeLeagueEnabled) return;
+  if (!settings.completeLeagueEnabled) {
+    const existing = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).filter(function(row) {
+      return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === "complete";
+    })[0] || null;
+    if (existing && teamFantasyBool_(existing.Active, true)) {
+      teamFantasyUpsert_(TEAM_FANTASY_SHEETS.LEAGUES, function(row) {
+        return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === "complete";
+      }, {
+        GameId: gameId,
+        LeagueId: "complete",
+        Active: false,
+        UpdatedAt: teamFantasyNowIso_()
+      });
+    }
+    return;
+  }
   teamFantasyUpsert_(TEAM_FANTASY_SHEETS.LEAGUES, function(row) {
     return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === "complete";
   }, {
@@ -445,6 +460,53 @@ function teamFantasyEnsureCompleteLeague_(gameId, settingsLike) {
     CreatedAt: teamFantasyNowIso_(),
     UpdatedAt: teamFantasyNowIso_()
   });
+}
+
+function teamFantasyGameHasActivity_(gameId) {
+  gameId = teamFantasyString_(gameId);
+  if (!gameId) return false;
+  return [TEAM_FANTASY_SHEETS.PICKS, TEAM_FANTASY_SHEETS.UNIT_SCORES, TEAM_FANTASY_SHEETS.WEEK_SCORES].some(function(sheetName) {
+    return teamFantasyReadRows_(sheetName).some(function(row) { return teamFantasyString_(row.GameId) === gameId; });
+  });
+}
+
+function teamFantasyReconcileEntriesForMode_(gameId, username, entryMode) {
+  username = teamFantasyNormalizeUsername_(username);
+  entryMode = teamFantasyKey_(entryMode);
+  if (!gameId || !username) return;
+  if (entryMode !== "single" && entryMode !== "afc-nfc") return;
+  const rows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).filter(function(row) {
+    return teamFantasyString_(row.GameId) === gameId && teamFantasyNormalizeUsername_(row.Username) === username && teamFantasyBool_(row.Active, true);
+  });
+  const kept = {};
+  rows.forEach(function(row) {
+    const conference = teamFantasyString_(row.Conference).toUpperCase() || "ALL";
+    const allowed = entryMode === "single" ? conference === "ALL" : (conference === "AFC" || conference === "NFC");
+    const key = entryMode === "single" ? "ALL" : conference;
+    if (allowed && !kept[key]) {
+      kept[key] = true;
+      return;
+    }
+    teamFantasyUpsert_(TEAM_FANTASY_SHEETS.ENTRIES, function(candidate) {
+      return teamFantasyString_(candidate.GameId) === gameId && teamFantasyString_(candidate.EntryId) === teamFantasyString_(row.EntryId);
+    }, {
+      GameId: gameId,
+      EntryId: teamFantasyString_(row.EntryId),
+      Active: false,
+      UpdatedAt: teamFantasyNowIso_()
+    });
+  });
+}
+
+function teamFantasyReconcileAllEntriesForMode_(gameId, entryMode) {
+  if (teamFantasyGameHasActivity_(gameId)) return;
+  const users = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || !teamFantasyBool_(row.Active, true)) return;
+    const username = teamFantasyNormalizeUsername_(row.Username);
+    if (username) users[username] = true;
+  });
+  Object.keys(users).forEach(function(username) { teamFantasyReconcileEntriesForMode_(gameId, username, entryMode); });
 }
 
 function teamFantasyEntriesForUser_(gameId, username) {
@@ -571,6 +633,38 @@ function teamFantasyLeaguesForEntries_(gameId, entries) {
         playoffTeams: Math.max(2, Math.floor(teamFantasyNumber_(row.PlayoffTeams, 4)))
       };
     });
+}
+
+function teamFantasyPostseasonEligibility_(gameId, settings, week, entries) {
+  const result = {};
+  (entries || []).forEach(function(entry) { result[entry.entryId] = Number(week) <= settings.regularSeasonEndWeek; });
+  if (Number(week) <= settings.regularSeasonEndWeek || !(entries || []).length) return result;
+  const entryIds = {};
+  (entries || []).forEach(function(entry) { entryIds[entry.entryId] = true; });
+  const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) {
+    return teamFantasyString_(row.GameId) === gameId && entryIds[teamFantasyString_(row.EntryId)];
+  });
+  const leagueIds = {};
+  memberships.forEach(function(row) { leagueIds[teamFantasyString_(row.LeagueId)] = true; });
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).forEach(function(league) {
+    const leagueId = teamFantasyString_(league.LeagueId);
+    if (teamFantasyString_(league.GameId) !== gameId || !leagueIds[leagueId] || !teamFantasyBool_(league.Active, true)) return;
+    const standings = teamFantasyBuildStandings_(gameId, leagueId);
+    if (!standings || standings.success === false) return;
+    const qualifiers = {};
+    (standings.qualifiers || []).forEach(function(id) { qualifiers[teamFantasyString_(id)] = true; });
+    const standingMode = standings.league && standings.league.standingMode === "entries" ? "entries" : "combined-user";
+    const leagueEntryIds = {};
+    memberships.forEach(function(row) {
+      if (teamFantasyString_(row.LeagueId) === leagueId) leagueEntryIds[teamFantasyString_(row.EntryId)] = true;
+    });
+    (entries || []).forEach(function(entry) {
+      if (!leagueEntryIds[entry.entryId]) return;
+      const competitorId = standingMode === "entries" ? "entry:" + entry.entryId : "user:" + teamFantasyNormalizeUsername_(entry.username);
+      if (qualifiers[competitorId]) result[entry.entryId] = true;
+    });
+  });
+  return result;
 }
 
 function teamFantasyPhaseForWeek_(settings, week) {
@@ -768,7 +862,7 @@ function teamFantasyUsageCounts_(gameId, settings, entryId, currentWeek) {
     if (teamFantasyString_(row.GameId) !== gameId || teamFantasyString_(row.EntryId) !== entryId) return;
     if (Number(row.SeasonYear) !== settings.seasonYear) return;
     const rowWeek = Number(row.Week) || 0;
-    if (rowWeek === Number(currentWeek)) return;
+    if (rowWeek >= Number(currentWeek)) return;
     if (Number(currentWeek) <= settings.regularSeasonEndWeek) {
       if (rowWeek < 1 || rowWeek > settings.regularSeasonEndWeek) return;
     } else if (settings.playoffUsageMode === "reset") {
@@ -781,15 +875,24 @@ function teamFantasyUsageCounts_(gameId, settings, entryId, currentWeek) {
   return counts;
 }
 
-function teamFantasyRankings_(gameId, position, beforeWeek) {
+function teamFantasyRankings_(gameId, position, beforeWeek, seasonYear) {
   position = teamFantasyNormalizePosition_(position);
   const totals = {};
+  const uniqueScores = {};
   teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES).forEach(function(row) {
     if (teamFantasyString_(row.GameId) !== gameId || teamFantasyNormalizePosition_(row.Position) !== position) return;
     if (!teamFantasyBool_(row.Final, false)) return;
     if (Number(row.Week) >= Number(beforeWeek)) return;
+    if (seasonYear && Number(row.SeasonYear) !== Number(seasonYear)) return;
     const team = teamFantasyNormalizeTeam_(row.TeamAbbr);
     if (!team) return;
+    const sourceKey = [Number(row.SeasonYear) || 0, Number(row.Week) || 0, position, team, teamFantasyString_(row.ESPNEventId)].join("|");
+    const current = uniqueScores[sourceKey];
+    if (!current || teamFantasyString_(row.UpdatedAt) >= teamFantasyString_(current.UpdatedAt)) uniqueScores[sourceKey] = row;
+  });
+  Object.keys(uniqueScores).forEach(function(sourceKey) {
+    const row = uniqueScores[sourceKey];
+    const team = teamFantasyNormalizeTeam_(row.TeamAbbr);
     if (!totals[team]) totals[team] = { points: 0, games: 0 };
     totals[team].points += teamFantasyNumber_(row.FantasyPoints, 0);
     totals[team].games++;
@@ -810,7 +913,7 @@ function teamFantasyRankings_(gameId, position, beforeWeek) {
 function teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, currentPick) {
   const now = new Date().getTime();
   const usage = teamFantasyUsageCounts_(gameId, settings, entry.entryId, week);
-  const ranking = teamFantasyRankings_(gameId, position, week);
+  const ranking = teamFantasyRankings_(gameId, position, week, settings.seasonYear);
   const result = [];
   TEAM_FANTASY_NFL_TEAMS.forEach(function(team) {
     if (entry.conference !== "ALL" && entry.conference !== team.conference) return;
@@ -859,7 +962,8 @@ function teamFantasyEligibleTeams_(gameId, settings, entry, position, week, sche
   return result;
 }
 
-function teamFantasyLineupState_(gameId, settings, entry, week, schedule) {
+function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postseasonEligible) {
+  postseasonEligible = postseasonEligible !== false;
   const picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, entry.entryId);
   const byPosition = {};
   picks.forEach(function(row) { byPosition[teamFantasyNormalizePosition_(row.Position)] = row; });
@@ -883,11 +987,12 @@ function teamFantasyLineupState_(gameId, settings, entry, week, schedule) {
         pickMethod: teamFantasyString_(pick.PickMethod)
       } : null,
       locked: locked,
-      teams: teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, pick)
+      teams: postseasonEligible ? teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, pick) : []
     };
   });
   return {
     entry: entry,
+    postseasonEligible: postseasonEligible,
     required: slots.length,
     picked: slots.filter(function(slot) { return !!slot.pick; }).length,
     complete: slots.every(function(slot) { return !!slot.pick; }),
@@ -911,6 +1016,8 @@ function teamFantasySavePick_(payload) {
   const entries = payload._entries || teamFantasyEnsureEntriesForUser_(gameId, username);
   const entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
   if (!entry) throw new Error("Entry does not belong to the signed-in user.");
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
+  if (postseasonEligibility[entry.entryId] === false) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
   const schedule = payload._schedule || teamFantasyFetchWeekSchedule_(gameId, week);
   const currentRows = teamFantasyPickRows_(gameId, settings.seasonYear, week, entryId);
   const current = currentRows.filter(function(row) { return teamFantasyNormalizePosition_(row.Position) === position; })[0] || null;
@@ -964,11 +1071,15 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
   const wantedEntryId = teamFantasyString_(payload.entryId);
-  const targets = wantedEntryId ? entries.filter(function(entry) { return entry.entryId === wantedEntryId; }) : entries;
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
+  const targets = (wantedEntryId ? entries.filter(function(entry) { return entry.entryId === wantedEntryId; }) : entries).filter(function(entry) {
+    return postseasonEligibility[entry.entryId] !== false;
+  });
+  if (wantedEntryId && !targets.length) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
   const results = [];
   const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
   targets.forEach(function(entry) {
-    const lineup = teamFantasyLineupState_(gameId, settings, entry, week, schedule);
+    const lineup = teamFantasyLineupState_(gameId, settings, entry, week, schedule, true);
     lineup.slots.forEach(function(slot) {
       if (slot.pick || slot.locked) return;
       const eligible = slot.teams.filter(function(team) { return team.eligible; });
@@ -1140,6 +1251,31 @@ function teamFantasyStatsForTeamUnit_(summary, teamAbbr, position) {
   return teamFantasyPlayerStatsForUnit_(summary, teamAbbr, position);
 }
 
+function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
+  teamAbbr = teamFantasyNormalizeTeam_(teamAbbr);
+  position = teamFantasyNormalizePosition_(position);
+  if (!teamFantasySummaryFinal_(summary)) return { ready: true, reason: "" };
+  if (!summary || !summary.boxscore) return { ready: false, reason: "Final NFL summary has no box score yet." };
+  if (position === "OL") {
+    const teams = Array.isArray(summary.boxscore.teams) ? summary.boxscore.teams : [];
+    const teamBlock = teams.filter(function(item) {
+      return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
+    })[0] || null;
+    if (!teamBlock || !Array.isArray(teamBlock.statistics) || !teamBlock.statistics.length) {
+      return { ready: false, reason: "Final NFL summary is missing team statistics for " + teamAbbr + " OL." };
+    }
+    return { ready: true, reason: "" };
+  }
+  const players = Array.isArray(summary.boxscore.players) ? summary.boxscore.players : [];
+  const playerBlock = players.filter(function(item) {
+    return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
+  })[0] || null;
+  if (!playerBlock || !Array.isArray(playerBlock.statistics) || !playerBlock.statistics.length) {
+    return { ready: false, reason: "Final NFL summary is missing player statistics for " + teamAbbr + " " + TEAM_FANTASY_POSITION_LABELS[position] + "." };
+  }
+  return { ready: true, reason: "" };
+}
+
 function teamFantasySummaryFinal_(summary) {
   try {
     const status = summary.header.competitions[0].status.type;
@@ -1181,11 +1317,23 @@ function teamFantasyRefreshWeekScores_(gameId, week, weekClosed) {
   const entries = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).filter(function(row) {
     return teamFantasyString_(row.GameId) === gameId && teamFantasyBool_(row.Active, true);
   }).map(teamFantasyPublicEntry_);
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
   const unitRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES).filter(function(row) {
     return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear && Number(row.Week) === Number(week);
   });
   const pickRows = teamFantasyPickRows_(gameId, settings.seasonYear, week, "");
   entries.forEach(function(entry) {
+    if (postseasonEligibility[entry.entryId] === false) {
+      teamFantasyUpsert_(TEAM_FANTASY_SHEETS.WEEK_SCORES, function(row) {
+        return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear &&
+          Number(row.Week) === Number(week) && teamFantasyString_(row.EntryId) === entry.entryId;
+      }, {
+        GameId: gameId, SeasonYear: settings.seasonYear, Week: week, Phase: teamFantasyPhaseForWeek_(settings, week),
+        EntryId: entry.entryId, Username: entry.username, Conference: entry.conference,
+        FantasyPoints: 0, Final: false, MissingPositionsJSON: "[]", ScoreDetailJSON: "[]", UpdatedAt: teamFantasyNowIso_()
+      });
+      return;
+    }
     const units = unitRows.filter(function(row) { return teamFantasyString_(row.EntryId) === entry.entryId; });
     const picks = pickRows.filter(function(row) { return teamFantasyString_(row.EntryId) === entry.entryId; });
     const pickedMap = {};
@@ -1244,6 +1392,12 @@ function teamFantasyRefreshAndScoreWeek_(gameId, week) {
       const summary = byEvent[eventId];
       const position = teamFantasyNormalizePosition_(pick.Position);
       const team = teamFantasyNormalizeTeam_(pick.TeamAbbr);
+      const readiness = teamFantasyFinalUnitStatsReady_(summary, team, position);
+      if (!readiness.ready) {
+        pending++;
+        errors.push({ entryId: pick.EntryId, position: pick.Position, team: pick.TeamAbbr, error: readiness.reason });
+        return;
+      }
       const stats = teamFantasyStatsForTeamUnit_(summary, team, position);
       const scoredStats = teamFantasyScoreStats_(rules, position, stats);
       const final = teamFantasySummaryFinal_(summary);
@@ -1442,6 +1596,9 @@ function apiGetTeamFantasyHeadToHead(payload) {
   const username = teamFantasyNormalizeUsername_(payload.username);
   if (!teamFantasyUserCanViewLeague_(gameId, username, leagueId)) return { success: false, error: "You are not a member of that Team Fantasy league." };
   const settings = teamFantasyGetSettings_(gameId);
+  const standings = teamFantasyBuildStandings_(gameId, leagueId);
+  const qualified = {};
+  (standings && standings.qualifiers || []).forEach(function(id) { qualified[teamFantasyString_(id)] = true; });
   const standingMode = teamFantasyKey_(league.StandingMode) === "entries" ? "entries" : settings.standingMode;
   const aId = teamFantasyString_(payload.competitorA);
   const bId = teamFantasyString_(payload.competitorB);
@@ -1453,6 +1610,7 @@ function apiGetTeamFantasyHeadToHead(payload) {
     const a = byWeek[week][aId];
     const b = byWeek[week][bId];
     if (!a || !b || !a.final || !b.final) return;
+    if (week > settings.regularSeasonEndWeek && (!qualified[aId] || !qualified[bId])) return;
     let winner = "tie";
     if (a.score > b.score) { winner = aId; aWins++; }
     else if (b.score > a.score) { winner = bId; bWins++; }
@@ -1490,7 +1648,8 @@ function apiGetTeamFantasyState(payload) {
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
   const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
-  const lineups = entries.map(function(entry) { return teamFantasyLineupState_(gameId, settings, entry, week, schedule); });
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
+  const lineups = entries.map(function(entry) { return teamFantasyLineupState_(gameId, settings, entry, week, schedule, postseasonEligibility[entry.entryId] !== false); });
   const leagues = teamFantasyLeaguesForEntries_(gameId, entries);
   const requestedLeagueId = teamFantasyString_(payload.leagueId);
   const requestedAllowed = requestedLeagueId && leagues.some(function(league) { return league.leagueId === requestedLeagueId; });
@@ -1527,14 +1686,21 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
   const incompleteUsers = [];
   const completeUsers = [];
   const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek);
+  const entriesByUser = {};
+  let allEntries = [];
   Object.keys(usernames).forEach(function(username) {
-    const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
+    entriesByUser[username] = teamFantasyEnsureEntriesForUser_(gameId, username);
+    allEntries = allEntries.concat(entriesByUser[username]);
+  });
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, settings.currentWeek, allEntries);
+  Object.keys(usernames).forEach(function(username) {
+    const entries = (entriesByUser[username] || []).filter(function(entry) { return postseasonEligibility[entry.entryId] !== false; });
     let required = 0;
     let picked = 0;
     let openRequired = 0;
     const missing = [];
     entries.forEach(function(entry) {
-      const lineup = teamFantasyLineupState_(gameId, settings, entry, settings.currentWeek, schedule);
+      const lineup = teamFantasyLineupState_(gameId, settings, entry, settings.currentWeek, schedule, true);
       required += lineup.required;
       picked += lineup.picked;
       lineup.slots.forEach(function(slot) {
@@ -1663,7 +1829,9 @@ function teamFantasySyncTriggerHandler() {
         return;
       }
       const result = teamFantasyRefreshAndScoreWeek_(settings.gameId, settings.currentWeek);
-      const message = "Week " + settings.currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + Number((result.errors || []).length) + " errors.";
+      const errorCount = Number((result.errors || []).length);
+      const firstError = errorCount ? teamFantasyString_(result.errors[0] && result.errors[0].error) : "";
+      const message = "Week " + settings.currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + errorCount + " errors." + (firstError ? " First error: " + firstError : "");
       result.lastSyncAt = teamFantasyRecordSyncStatus_(settings.gameId, result.success === false ? "error" : "success", message, "system");
       results.push(result);
     } catch (err) {
@@ -1714,7 +1882,8 @@ function apiAdminRunTeamFantasySync(payload) {
   try {
     const result = teamFantasyRefreshAndScoreWeek_(gameId, week);
     const errorCount = Number((result.errors || []).length);
-    const message = "Week " + week + ": checked " + Number(result.scheduleGames || 0) + " NFL games; " + Number(result.picks || 0) + " lineup picks; " + Number(result.scored || 0) + " final; " + Number(result.pending || 0) + " pending; " + errorCount + " errors.";
+    const firstError = errorCount ? teamFantasyString_(result.errors[0] && result.errors[0].error) : "";
+    const message = "Week " + week + ": checked " + Number(result.scheduleGames || 0) + " NFL games; " + Number(result.picks || 0) + " lineup picks; " + Number(result.scored || 0) + " final; " + Number(result.pending || 0) + " pending; " + errorCount + " errors." + (firstError ? " First error: " + firstError : "");
     result.lastSyncAt = teamFantasyRecordSyncStatus_(gameId, result.success === false ? "error" : "success", message, adminUsername);
     result.message = message;
     result.triggerStatus = teamFantasySyncTriggerStatus_();
@@ -1733,9 +1902,16 @@ function apiAdminSaveTeamFantasySettings(payload) {
   if (!gameId) throw new Error("Game is required.");
   const current = teamFantasyGetSettings_(gameId);
   const entryMode = ["single", "afc-nfc", "multiple"].indexOf(teamFantasyKey_(payload.entryMode)) !== -1 ? teamFantasyKey_(payload.entryMode) : current.entryMode;
+  const seasonYear = Math.max(2000, Math.floor(teamFantasyNumber_(payload.seasonYear, current.seasonYear)));
+  const regularSeasonEndWeek = Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(payload.regularSeasonEndWeek, current.regularSeasonEndWeek))));
+  if (teamFantasyGameHasActivity_(gameId)) {
+    if (seasonYear !== current.seasonYear) throw new Error("Season year cannot change after Team Fantasy picks or scores exist.");
+    if (entryMode !== current.entryMode) throw new Error("Entry mode cannot change after Team Fantasy picks or scores exist.");
+    if (regularSeasonEndWeek !== current.regularSeasonEndWeek) throw new Error("Regular-season end week cannot change after Team Fantasy picks or scores exist.");
+  }
   const values = {
     GameId: gameId,
-    SeasonYear: Math.max(2000, Math.floor(teamFantasyNumber_(payload.seasonYear, current.seasonYear))),
+    SeasonYear: seasonYear,
     CurrentWeek: Math.max(1, Math.floor(teamFantasyNumber_(payload.currentWeek, current.currentWeek))),
     EntryMode: entryMode,
     MaxEntriesPerUser: entryMode === "afc-nfc" ? 2 : Math.max(1, Math.min(10, Math.floor(teamFantasyNumber_(payload.maxEntriesPerUser, entryMode === "single" ? 1 : current.maxEntriesPerUser)))),
@@ -1745,7 +1921,7 @@ function apiAdminSaveTeamFantasySettings(payload) {
     SameEntryMultipleLeagues: teamFantasyBool_(payload.sameEntryMultipleLeagues, current.sameEntryMultipleLeagues),
     AllowRandomPick: teamFantasyBool_(payload.allowRandomPick, current.allowRandomPick),
     AllowSmartAutoPick: teamFantasyBool_(payload.allowSmartAutoPick, current.allowSmartAutoPick),
-    RegularSeasonEndWeek: Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(payload.regularSeasonEndWeek, current.regularSeasonEndWeek)))),
+    RegularSeasonEndWeek: regularSeasonEndWeek,
     PostseasonScoringMode: teamFantasyKey_(payload.postseasonScoringMode) === "fresh-round" ? "fresh-round" : "cumulative",
     PlayoffUsageMode: teamFantasyKey_(payload.playoffUsageMode) === "carry" ? "carry" : "reset",
     OverallPlayoffTeams: Math.max(2, Math.min(32, Math.floor(teamFantasyNumber_(payload.overallPlayoffTeams, current.overallPlayoffTeams)))),
@@ -1763,6 +1939,7 @@ function apiAdminSaveTeamFantasySettings(payload) {
     UpdatedBy: adminUsername
   };
   teamFantasyUpsert_(TEAM_FANTASY_SHEETS.SETTINGS, function(row) { return teamFantasyString_(row.GameId) === gameId; }, values);
+  teamFantasyReconcileAllEntriesForMode_(gameId, entryMode);
   teamFantasyEnsureCompleteLeague_(gameId, teamFantasyNormalizeSettings_(values));
   return { success: true, settings: teamFantasyGetSettings_(gameId) };
 }
@@ -1815,9 +1992,31 @@ function apiAdminAssignTeamFantasyLeagueMember(payload) {
   const leagueId = teamFantasyString_(payload.leagueId);
   const username = teamFantasyNormalizeUsername_(payload.memberUsername || payload.targetUsername);
   if (!gameId || !leagueId || !username) throw new Error("Game, league and user are required.");
+  const league = teamFantasyLeagueRow_(gameId, leagueId);
+  if (!league) throw new Error("Choose an active Team Fantasy league.");
+  const settings = teamFantasyGetSettings_(gameId);
+  if (teamFantasyString_(league.LeagueType) === "complete" && !settings.completeLeagueEnabled) throw new Error("Complete League is disabled for this game.");
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
   const requestedEntry = teamFantasyString_(payload.entryId);
   const targets = requestedEntry ? entries.filter(function(entry) { return entry.entryId === requestedEntry; }) : entries;
+  if (!targets.length) throw new Error("The requested Team Fantasy entry was not found for that user.");
+  if (!settings.sameEntryMultipleLeagues && leagueId !== "complete") {
+    const activeSubleagueIds = {};
+    teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).forEach(function(row) {
+      if (teamFantasyString_(row.GameId) !== gameId || !teamFantasyBool_(row.Active, true)) return;
+      if (teamFantasyString_(row.LeagueType) === "complete") return;
+      activeSubleagueIds[teamFantasyString_(row.LeagueId)] = true;
+    });
+    const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS);
+    targets.forEach(function(entry) {
+      const conflict = memberships.filter(function(row) {
+        const existingLeagueId = teamFantasyString_(row.LeagueId);
+        return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.EntryId) === entry.entryId &&
+          existingLeagueId !== leagueId && activeSubleagueIds[existingLeagueId];
+      })[0] || null;
+      if (conflict) throw new Error("This entry is already assigned to another subleague. Enable multiple-league membership to add it here too.");
+    });
+  }
   targets.forEach(function(entry) {
     teamFantasyUpsert_(TEAM_FANTASY_SHEETS.MEMBERSHIPS, function(row) {
       return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === leagueId && teamFantasyString_(row.EntryId) === entry.entryId;
@@ -1871,11 +2070,29 @@ function teamFantasyPreflightIssues_(gameId) {
     if (!rules.length) issues.push({ severity: "error", message: "Team Fantasy has no active scoring rules." });
     TEAM_FANTASY_POSITIONS.forEach(function(position) {
       if (!rules.some(function(rule) { return rule.position === position; })) {
-        issues.push({ severity: "warning", message: "Team Fantasy " + TEAM_FANTASY_POSITION_LABELS[position] + " has no active scoring rule." });
+        issues.push({ severity: "error", message: "Team Fantasy " + TEAM_FANTASY_POSITION_LABELS[position] + " has no active scoring rule." });
       }
     });
     if (settings.teamUseLimit < 1) issues.push({ severity: "error", message: "Team Fantasy team-use limit must be at least 1." });
     if (settings.entryMode === "afc-nfc" && settings.maxEntriesPerUser !== 2) issues.push({ severity: "warning", message: "AFC + NFC mode will use exactly two controlled entries per user." });
+    if (!teamFantasySportsApiUrl_()) issues.push({ severity: "error", message: "Team Fantasy Sports Scores Engine URL is not configured." });
+    if (!settings.sameEntryMultipleLeagues) {
+      const activeSubleagueIds = {};
+      teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).forEach(function(row) {
+        if (teamFantasyString_(row.GameId) === gameId && teamFantasyBool_(row.Active, true) && teamFantasyString_(row.LeagueType) !== "complete") {
+          activeSubleagueIds[teamFantasyString_(row.LeagueId)] = true;
+        }
+      });
+      const perEntry = {};
+      teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).forEach(function(row) {
+        if (teamFantasyString_(row.GameId) !== gameId || !activeSubleagueIds[teamFantasyString_(row.LeagueId)]) return;
+        const entryId = teamFantasyString_(row.EntryId);
+        if (entryId) perEntry[entryId] = (perEntry[entryId] || 0) + 1;
+      });
+      if (Object.keys(perEntry).some(function(entryId) { return perEntry[entryId] > 1; })) {
+        issues.push({ severity: "error", message: "One or more Team Fantasy entries belong to multiple subleagues while multiple-league membership is disabled." });
+      }
+    }
   } catch (err) {
     issues.push({ severity: "error", message: "Team Fantasy setup error: " + (err && err.message ? err.message : String(err)) });
   }
