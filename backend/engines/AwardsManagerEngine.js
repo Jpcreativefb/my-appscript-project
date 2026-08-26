@@ -1918,6 +1918,100 @@ function awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMa
   );
 }
 
+function awardsManagerValidateUniqueAnswerItems_(answerItems) {
+  const seenIds = {};
+  const seenLabels = {};
+  (answerItems || []).forEach(function(item) {
+    const label = awardsManagerString_(item && item.nominee);
+    const id = awardsManagerKey_(item && item.nomineeId);
+    const labelKey = awardsManagerKey_(label);
+    if (!label || !id) throw new Error("Every answer needs a unique label and answer ID.");
+    if (seenIds[id] || seenLabels[labelKey]) {
+      throw new Error("Awards answer labels must be unique. Two selected answers resolve to the same answer ID: " + id + ".");
+    }
+    seenIds[id] = true;
+    seenLabels[labelKey] = true;
+  });
+}
+
+function awardsManagerExistingQuestion_(gameId, categoryId) {
+  if (typeof adminGetGameSetup !== "function") return null;
+  const setup = adminGetGameSetup({ gameId: gameId }) || {};
+  return (setup.categories || []).find(function(item) {
+    return awardsManagerKey_(item.categoryId || item.id) === awardsManagerKey_(categoryId);
+  }) || null;
+}
+
+function awardsManagerVerifyResumeTarget_(existing, question, market, grouped) {
+  if (!existing) return;
+  const existingQuestion = awardsManagerString_(existing.category || existing.question || existing.name);
+  if (existingQuestion && awardsManagerKey_(existingQuestion) !== awardsManagerKey_(question)) {
+    throw new Error("Question ID already exists for a different question. Choose a different Question ID before building this Awards market.");
+  }
+  const provider = awardsManagerKey_(existing.resultProvider || existing.ResultProvider);
+  if (provider && provider !== awardsManagerKey_(market.provider)) {
+    throw new Error("Question ID already exists for a different Awards provider.");
+  }
+  const eventId = awardsManagerKey_(existing.externalEventId || existing.ExternalEventId);
+  if (eventId && awardsManagerKey_(market.externalEventId) && eventId !== awardsManagerKey_(market.externalEventId)) {
+    throw new Error("Question ID already exists for a different Awards event.");
+  }
+  const marketId = awardsManagerKey_(existing.externalMarketId || existing.ExternalMarketId);
+  if (!grouped && marketId && awardsManagerKey_(market.externalMarketId) && marketId !== awardsManagerKey_(market.externalMarketId)) {
+    throw new Error("Question ID already exists for a different Awards market.");
+  }
+}
+
+function awardsManagerEnsureQuestionAnswers_(gameId, categoryId, question, section, answerItems, existingCategory) {
+  const resolvedIds = new Array((answerItems || []).length);
+  const missing = [];
+  const existing = existingCategory && Array.isArray(existingCategory.nominees) ? existingCategory.nominees : [];
+
+  (answerItems || []).forEach(function(item, index) {
+    const desiredId = awardsManagerKey_(item.nomineeId);
+    const desiredLabel = awardsManagerKey_(item.nominee);
+    const match = existing.find(function(nominee) {
+      return awardsManagerKey_(nominee.nomineeId || nominee.id) === desiredId ||
+        awardsManagerKey_(nominee.nominee || nominee.name || nominee.shortAnswer) === desiredLabel;
+    });
+    if (match) {
+      resolvedIds[index] = awardsManagerString_(match.nomineeId || match.id);
+    } else {
+      missing.push({ index: index, item: item });
+    }
+  });
+
+  let createdResult = { success: true, createdCount: 0, created: [] };
+  if (missing.length) {
+    if (typeof adminBulkCreateNominees !== "function") throw new Error("Bulk answer creation is unavailable.");
+    createdResult = adminBulkCreateNominees({
+      gameId: gameId,
+      categoryId: categoryId,
+      category: question,
+      section: section,
+      itemsJSON: JSON.stringify(missing.map(function(entry) { return entry.item; }))
+    }) || {};
+    const created = Array.isArray(createdResult.created) ? createdResult.created : [];
+    if (created.length !== missing.length) {
+      throw new Error("Awards question build could not confirm every missing answer. Retry the build; existing answers will be preserved.");
+    }
+    missing.forEach(function(entry, createdIndex) {
+      resolvedIds[entry.index] = awardsManagerString_(created[createdIndex] && created[createdIndex].nomineeId);
+    });
+  }
+
+  if (resolvedIds.some(function(id) { return !id; })) {
+    throw new Error("Awards question build could not resolve every answer ID.");
+  }
+  return {
+    success: true,
+    createdCount: Number(createdResult.createdCount || 0),
+    existingCount: (answerItems || []).length - missing.length,
+    created: Array.isArray(createdResult.created) ? createdResult.created : [],
+    resolvedNomineeIds: resolvedIds
+  };
+}
+
 function apiAdminAwardsCreateQuestionFromMarket(payload) {
   awardsManagerRequireAdmin_(payload);
   payload = payload || {};
@@ -2037,6 +2131,7 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
   }
 
   if (answerItems.length < 2) throw new Error("At least two answers are required.");
+  awardsManagerValidateUniqueAnswerItems_(answerItems);
 
   const sourceConfig = {
     source: "awards-manager",
@@ -2056,7 +2151,7 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     probabilityDisplayBySourceKey: probabilityDisplayBySourceKey
   };
 
-  const categoryResult = adminCreateCategory({
+  const categoryPayload = {
     gameId: gameId,
     categoryId: categoryId,
     category: question,
@@ -2080,32 +2175,35 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
     requireAdminReview: true,
     sourceUrl: officialSourceUrl || market.sourceUrl,
     sourceConfigJSON: awardsManagerCompactJson_(sourceConfig)
-  });
+  };
 
-  if (typeof adminBulkCreateNominees !== "function") throw new Error("Bulk answer creation is unavailable.");
+  const existingCategory = awardsManagerExistingQuestion_(gameId, categoryId);
+  awardsManagerVerifyResumeTarget_(existingCategory, question, market, grouped);
+  const resumed = !!existingCategory;
+  const categoryResult = resumed
+    ? adminUpdateCategory(Object.assign({}, categoryPayload, { skipCategoryResultWrite: true }))
+    : adminCreateCategory(categoryPayload);
 
-  const nomineeResult = adminBulkCreateNominees({
-    gameId: gameId,
-    categoryId: categoryId,
-    category: question,
-    section: section,
-    itemsJSON: JSON.stringify(answerItems)
-  });
-  if (!nomineeResult || nomineeResult.createdCount < 1) throw new Error("No answers were created.");
+  const nomineeResult = awardsManagerEnsureQuestionAnswers_(
+    gameId,
+    categoryId,
+    question,
+    section,
+    answerItems,
+    existingCategory
+  );
 
   let bridge = null;
   if (grouped) {
     const nomineeByMarketId = {};
     markets.forEach(function(item, index) {
-      const created = nomineeResult.created && nomineeResult.created[index];
-      if (created && created.nomineeId) nomineeByMarketId[awardsManagerString_(item.externalMarketId)] = created.nomineeId;
+      nomineeByMarketId[awardsManagerString_(item.externalMarketId)] = nomineeResult.resolvedNomineeIds[index];
     });
     bridge = awardsManagerQueueMarketGroup_(markets, gameId, categoryId, nomineeByMarketId, officialSourceUrl);
   } else {
     const outcomeMap = {};
     selectedOutcomes.forEach(function(outcome, index) {
-      const created = nomineeResult.created && nomineeResult.created[index];
-      if (created && created.nomineeId) outcomeMap[outcome] = created.nomineeId;
+      outcomeMap[outcome] = nomineeResult.resolvedNomineeIds[index];
     });
     bridge = awardsManagerQueueMarketBundle_(market, gameId, categoryId, outcomeMap, officialSourceUrl);
   }
@@ -2113,9 +2211,12 @@ function apiAdminAwardsCreateQuestionFromMarket(payload) {
   return {
     success: true,
     grouped: grouped,
-    message: grouped
-      ? nomineeResult.createdCount + " answers created from " + markets.length + " selected markets; Hub group queued."
-      : nomineeResult.createdCount + " selected answers created and provider market queued to the External Results Hub.",
+    resumed: resumed,
+    message: resumed
+      ? "Existing Awards question resumed safely; answers were reused and the provider mapping was queued again."
+      : (grouped
+        ? nomineeResult.createdCount + " answers created from " + markets.length + " selected markets; Hub group queued."
+        : nomineeResult.createdCount + " selected answers created and provider market queued to the External Results Hub."),
     gameId: gameId,
     categoryId: categoryId,
     categoryResult: categoryResult,

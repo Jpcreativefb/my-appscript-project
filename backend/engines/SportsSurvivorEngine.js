@@ -821,6 +821,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
   let bestStreak = 0;
   let totalPoints = 0;
   let currentRoundIndex = -1;
+  let blockedByEarlierUnresolved = false;
   const usage = {};
   const rounds = [];
 
@@ -828,7 +829,8 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     const categoryId = sportsSurvivorKey_(category.id);
     const week = sportsSurvivorRoundWeek_(category, index);
     const rules = sportsSurvivorRoundRules_(settings, week);
-    if (!alive && rules.secondChance) {
+    const roundEligible = !blockedByEarlierUnresolved;
+    if (roundEligible && !alive && rules.secondChance) {
       alive = true;
       eliminatedRound = 0;
       eliminatedReason = "";
@@ -838,8 +840,9 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     const pick = userPicks[categoryId] || { nomineeIds: [], snapshots: [], confidencePoints: 0 };
     const nomineeIds = Array.isArray(pick.nomineeIds) ? pick.nomineeIds.map(sportsSurvivorKey_).filter(Boolean) : [];
     nomineeIds.forEach(function(id) { usage[id] = (usage[id] || 0) + 1; });
-    const resolved = sportsSurvivorCategoryResolved_(categoryId, optionMeta, resultMap);
-    if (!resolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
+    const sourceResolved = sportsSurvivorCategoryResolved_(categoryId, optionMeta, resultMap);
+    const resolved = roundEligible && sourceResolved;
+    if (roundEligible && !sourceResolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
     let status = resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming");
     let outcome = "pending";
     let earnedPoints = 0;
@@ -943,6 +946,8 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       earnedLives: earnedLives, lifeEarned: lifeEarned, safeApplied: safeApplied, lossApplied: lossApplied,
       missed: missed, rules: rules, confidencePoints: sportsSurvivorNumber_(pick.confidencePoints, 0)
     });
+
+    if (roundEligible && !sourceResolved) blockedByEarlierUnresolved = true;
   });
 
   const lastBuiltWeek = (categories || []).reduce(function(maxWeek, category, index) {

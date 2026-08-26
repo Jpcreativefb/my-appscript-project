@@ -1391,6 +1391,12 @@ function runSportsScoresUpdate(forceRefresh) {
   };
 
   try {
+    try {
+      summary.capacityMaintenance = sportsWorkbookMaintenance_({ source: "runSportsScoresUpdate" });
+    } catch (capacityError) {
+      summary.capacityWarning = capacityError && capacityError.message ? capacityError.message : String(capacityError);
+    }
+
     const settings = readEnabledSportsSettings_();
     const previousScores = readLatestSportsScoresMap_();
 
@@ -3863,17 +3869,19 @@ function getSportsScoreDateOnly_(value) {
     return formatSportsApiDateOnly_(value);
   }
 
-  const raw =
-    String(value)
-      .trim();
+  const raw = String(value).trim();
 
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    return raw.slice(0, 10);
+  /*
+    v48: GameDateTime is commonly stored as an ISO UTC timestamp. Slicing the
+    first 10 characters treated a 7:00 PM Chicago game as the next UTC day,
+    so an Aug 25 filter could visibly include Aug 24 games. Parse timestamps
+    with a time component and format them in the spreadsheet/script timezone.
+  */
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
   }
 
-  const parsed =
-    new Date(raw);
-
+  const parsed = new Date(raw);
   if (isNaN(parsed.getTime())) {
     return "";
   }
@@ -3882,17 +3890,49 @@ function getSportsScoreDateOnly_(value) {
 }
 
 function formatSportsApiDateOnly_(date) {
-  const yyyy =
-    date.getFullYear();
+  if (!(date instanceof Date) || isNaN(date.getTime())) return "";
 
-  const mm =
-    String(date.getMonth() + 1)
-      .padStart(2, "0");
+  let timeZone = "America/Chicago";
+  try {
+    const ss = SpreadsheetApp.getActive();
+    if (ss && ss.getSpreadsheetTimeZone()) {
+      timeZone = ss.getSpreadsheetTimeZone();
+    } else if (typeof Session !== "undefined" && Session.getScriptTimeZone) {
+      timeZone = Session.getScriptTimeZone() || timeZone;
+    }
+  } catch (timezoneError) {
+    try {
+      if (typeof Session !== "undefined" && Session.getScriptTimeZone) {
+        timeZone = Session.getScriptTimeZone() || timeZone;
+      }
+    } catch (ignored) {}
+  }
 
-  const dd =
-    String(date.getDate())
-      .padStart(2, "0");
+  // Apps Script has Utilities.formatDate. Node-based regression tests do not,
+  // so keep an Intl fallback that preserves the same timezone-aware behavior.
+  if (typeof Utilities !== "undefined" && Utilities.formatDate) {
+    return Utilities.formatDate(date, timeZone, "yyyy-MM-dd");
+  }
 
+  try {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: timeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(date);
+    const values = {};
+    parts.forEach(function (part) {
+      if (part.type !== "literal") values[part.type] = part.value;
+    });
+    if (values.year && values.month && values.day) {
+      return values.year + "-" + values.month + "-" + values.day;
+    }
+  } catch (intlError) {}
+
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
   return yyyy + "-" + mm + "-" + dd;
 }
 
@@ -4818,6 +4858,17 @@ function sportsV13EnsureSheetHeaders_(sheetName, headers) {
 
   const readWidth = Math.max(1, Math.min(Math.max(lastColumn, headers.length), 250));
 
+  const maxColumns = sh.getMaxColumns();
+  if (maxColumns < readWidth) {
+    sportsV13SpreadsheetRetry_(
+      "expand columns for " + sheetName,
+      function() {
+        sh.insertColumnsAfter(maxColumns, readWidth - maxColumns);
+        return true;
+      }
+    );
+  }
+
   const existing = sportsV13SpreadsheetRetry_(
     "read headers for " + sheetName,
     function() {
@@ -4858,6 +4909,10 @@ function sportsV13EnsureSheetHeaders_(sheetName, headers) {
 
   if (missing.length) {
     const appendColumn = Math.max(lastColumn, existing.filter(Boolean).length) + 1;
+    const requiredMaxColumn = appendColumn + missing.length - 1;
+    if (sh.getMaxColumns() < requiredMaxColumn) {
+      sh.insertColumnsAfter(sh.getMaxColumns(), requiredMaxColumn - sh.getMaxColumns());
+    }
 
     sportsV13SpreadsheetRetry_(
       "append headers for " + sheetName,
@@ -7884,6 +7939,138 @@ function setSmartSportsAutomationEnabled_(enabled, oddsHour, archiveHour) {
   };
 }
 
+
+/************************************
+ V48 WORKBOOK CAPACITY PROTECTION
+
+ Google Sheets has a 10,000,000-cell workbook limit. SportsLogs previously
+ grew to 172k+ rows while keeping 26 allocated columns even though only five
+ were used, leaving the workbook at 9,999,993 cells. This maintenance is
+ deliberately conservative: it prunes diagnostic logs, trims only blank grid
+ space, and never deletes sports score/stat/checkpoint records.
+************************************/
+const SPORTS_WORKBOOK_CELL_LIMIT_V48_ = 10000000;
+const SPORTS_WORKBOOK_MAINTENANCE_PROPERTY_V48_ = "SPORTS_WORKBOOK_MAINTENANCE_LAST_V48";
+const SPORTS_LOG_MAX_DATA_ROWS_V48_ = 20000;
+const SPORTS_ODDS_LOG_MAX_DATA_ROWS_V48_ = 5000;
+
+function sportsWorkbookCapacityReport_() {
+  const ss = SpreadsheetApp.getActive();
+  const sheets = ss.getSheets().map(function(sh) {
+    const maxRows = sh.getMaxRows();
+    const maxColumns = sh.getMaxColumns();
+    const lastRow = sh.getLastRow();
+    const lastColumn = sh.getLastColumn();
+    return {
+      sheet: sh.getName(),
+      maxRows: maxRows,
+      maxColumns: maxColumns,
+      lastRow: lastRow,
+      lastColumn: lastColumn,
+      allocatedCells: maxRows * maxColumns,
+      usedRectangleCells: Math.max(1, lastRow) * Math.max(1, lastColumn)
+    };
+  });
+
+  sheets.sort(function(a, b) { return b.allocatedCells - a.allocatedCells; });
+  const totalAllocatedCells = sheets.reduce(function(sum, item) { return sum + item.allocatedCells; }, 0);
+  const percent = totalAllocatedCells / SPORTS_WORKBOOK_CELL_LIMIT_V48_ * 100;
+  const level = percent >= 95 ? "CRITICAL" : percent >= 85 ? "HIGH" : percent >= 75 ? "WARN" : "GOOD";
+
+  return {
+    success: true,
+    totalAllocatedCells: totalAllocatedCells,
+    cellLimit: SPORTS_WORKBOOK_CELL_LIMIT_V48_,
+    remainingCells: Math.max(0, SPORTS_WORKBOOK_CELL_LIMIT_V48_ - totalAllocatedCells),
+    percentUsed: Math.round(percent * 10) / 10,
+    level: level,
+    sheets: sheets
+  };
+}
+
+function sportsPruneDiagnosticSheetV48_(sheetName, maxDataRows) {
+  const sh = SpreadsheetApp.getActive().getSheetByName(sheetName);
+  if (!sh) return { sheet: sheetName, deletedRows: 0, missing: true };
+  const dataRows = Math.max(0, sh.getLastRow() - 1);
+  const deleteCount = Math.max(0, dataRows - maxDataRows);
+  if (deleteCount > 0) {
+    sh.deleteRows(2, deleteCount);
+  }
+  return { sheet: sheetName, deletedRows: deleteCount, retainedDataRows: Math.min(dataRows, maxDataRows) };
+}
+
+function sportsTrimBlankGridV48_(sh) {
+  const lastRow = Math.max(1, sh.getLastRow());
+  const lastColumn = Math.max(1, sh.getLastColumn());
+  const rowBuffer = 25;
+  const columnBuffer = 2;
+  const keepRows = Math.min(sh.getMaxRows(), lastRow + rowBuffer);
+  const keepColumns = Math.min(sh.getMaxColumns(), lastColumn + columnBuffer);
+  let deletedRows = 0;
+  let deletedColumns = 0;
+
+  if (sh.getMaxRows() > keepRows) {
+    deletedRows = sh.getMaxRows() - keepRows;
+    sh.deleteRows(keepRows + 1, deletedRows);
+  }
+  if (sh.getMaxColumns() > keepColumns) {
+    deletedColumns = sh.getMaxColumns() - keepColumns;
+    sh.deleteColumns(keepColumns + 1, deletedColumns);
+  }
+
+  return { sheet: sh.getName(), deletedRows: deletedRows, deletedColumns: deletedColumns };
+}
+
+function sportsWorkbookMaintenance_(options) {
+  options = options || {};
+  const force = options.force === true;
+  const properties = PropertiesService.getScriptProperties();
+  const lastRun = Number(properties.getProperty(SPORTS_WORKBOOK_MAINTENANCE_PROPERTY_V48_) || 0);
+  const now = Date.now();
+  if (!force && lastRun && now - lastRun < 6 * 60 * 60 * 1000) {
+    return { success: true, skipped: true, reason: "Capacity maintenance ran within the last 6 hours" };
+  }
+
+  const lock = LockService.getDocumentLock();
+  if (lock && !lock.tryLock(5000)) {
+    return { success: true, skipped: true, reason: "Spreadsheet maintenance is already running" };
+  }
+
+  try {
+    const before = sportsWorkbookCapacityReport_();
+    const pruned = [
+      sportsPruneDiagnosticSheetV48_(SPORTS_SHEETS.LOGS, SPORTS_LOG_MAX_DATA_ROWS_V48_),
+      sportsPruneDiagnosticSheetV48_("SportsOddsApiLog", SPORTS_ODDS_LOG_MAX_DATA_ROWS_V48_),
+      sportsPruneDiagnosticSheetV48_("OddsApiLog", SPORTS_ODDS_LOG_MAX_DATA_ROWS_V48_)
+    ];
+
+    const ss = SpreadsheetApp.getActive();
+    const trimmed = ss.getSheets().map(function(sh) {
+      return sportsTrimBlankGridV48_(sh);
+    });
+
+    const after = sportsWorkbookCapacityReport_();
+    properties.setProperty(SPORTS_WORKBOOK_MAINTENANCE_PROPERTY_V48_, String(now));
+
+    return {
+      success: true,
+      source: String(options.source || ""),
+      before: before,
+      after: after,
+      reclaimedCells: Math.max(0, before.totalAllocatedCells - after.totalAllocatedCells),
+      pruned: pruned,
+      trimmed: trimmed,
+      warning: after.level === "GOOD" ? "" : "Sports workbook capacity is " + after.level + " at " + after.percentUsed + "%"
+    };
+  } finally {
+    if (lock) lock.releaseLock();
+  }
+}
+
+function runSportsWorkbookMaintenanceNow() {
+  return sportsWorkbookMaintenance_({ source: "manual", force: true });
+}
+
 // Final override: retry-safe setup. Each sheet is upgraded only once per run.
 function setupSportsScoresSheet() {
   const results = {};
@@ -7970,6 +8157,12 @@ function setupSportsScoresSheet() {
   try { results.expandedSoccerSettings = addMmaAndSoccerSettings(); } catch (error) { results.expandedSoccerSettingsWarning = error.message || String(error); }
 
   sportsScoresDisableRacingSettingsRows_();
+
+  try {
+    results.capacityMaintenance = sportsWorkbookMaintenance_({ source: "setupSportsScoresSheet", force: true });
+  } catch (capacityError) {
+    results.capacityWarning = capacityError && capacityError.message ? capacityError.message : String(capacityError);
+  }
 
   logSports_(
     "INFO",

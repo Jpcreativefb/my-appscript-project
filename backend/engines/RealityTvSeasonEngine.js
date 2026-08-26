@@ -4011,6 +4011,19 @@ function realityTvCastImportExisting_(existing, item) {
   return existing.find(function(row) { return realityTvKey_(row.Name) === realityTvKey_(item.name); }) || null;
 }
 
+function realityTvCastImportMergedValue_(incoming, existing) {
+  const value = realityTvString_(incoming);
+  return value ? value : realityTvString_(existing);
+}
+
+function realityTvCastImportTargetKey_(existingMatch, item) {
+  if (existingMatch && realityTvString_(existingMatch.ContestantId)) {
+    return "contestant:" + realityTvKey_(existingMatch.ContestantId);
+  }
+  const identity = realityTvKey_(item && (item.externalSubjectId || item.name));
+  return identity ? "new:" + identity : "";
+}
+
 function realityTvCastImportPreview_(season) {
   const prepared = realityTvPrepareCastImportSheet_(season);
   const ss = SpreadsheetApp.getActive();
@@ -4023,10 +4036,10 @@ function realityTvCastImportPreview_(season) {
   const items = rows.map(function(row) {
     const item = realityTvNormalizeCastImportRow_(row, season, prepared.profile);
     const validation = realityTvCastImportValidation_(item, prepared.profile);
-    const key = realityTvKey_(item.externalSubjectId || item.name);
-    if (key && seen[key]) validation.errors.push("Duplicate staging row for " + item.name + ".");
-    if (key) seen[key] = true;
     const match = item.name ? realityTvCastImportExisting_(existing, item) : null;
+    const key = realityTvCastImportTargetKey_(match, item);
+    if (key && seen[key]) validation.errors.push("Duplicate staging row targeting " + item.name + ".");
+    if (key) seen[key] = true;
     return {
       rowNumber: item.__rowNumber,
       selected: item.selected,
@@ -4459,8 +4472,9 @@ function apiAdminImportRealityCastImport(payload) {
   allRows.forEach(function(row) {
     const item = realityTvNormalizeCastImportRow_(row, season, prepared.profile);
     const validation = realityTvCastImportValidation_(item, prepared.profile);
-    const duplicateKey = realityTvKey_(item.externalSubjectId || item.name);
-    if (duplicateKey && seen[duplicateKey]) validation.errors.push("Duplicate selected staging row.");
+    const match = realityTvCastImportExisting_(existing, item);
+    const duplicateKey = realityTvCastImportTargetKey_(match, item);
+    if (duplicateKey && seen[duplicateKey]) validation.errors.push("Duplicate selected staging row targeting the same cast entry.");
     if (duplicateKey) seen[duplicateKey] = true;
     if (validation.errors.length) {
       errorCount += 1;
@@ -4468,7 +4482,6 @@ function apiAdminImportRealityCastImport(payload) {
       return;
     }
 
-    let match = realityTvCastImportExisting_(existing, item);
     let contestantId;
     if (match) {
       contestantId = realityTvString_(match.ContestantId);
@@ -4488,22 +4501,22 @@ function apiAdminImportRealityCastImport(payload) {
       ContestantId: contestantId,
       Name: item.name,
       FullName: item.fullName || item.name,
-      ImageUrl: item.imageUrl,
-      Member1: item.member1,
-      Member2: item.member2,
-      Relationship: item.relationship,
-      Member1ImageUrl: item.member1ImageUrl,
-      Member2ImageUrl: item.member2ImageUrl,
-      TeamColor: item.teamColor,
-      Age: item.age,
-      Hometown: item.hometown,
-      Occupation: item.occupation,
-      Biography: item.biography,
-      KnownFor: item.knownFor,
-      OriginalShowOrSport: item.originalShowOrSport,
-      RecruitNumber: item.recruitNumber,
-      SourceUrl: item.sourceUrl,
-      ImageSourceUrl: item.imageSourceUrl,
+      ImageUrl: realityTvCastImportMergedValue_(item.imageUrl, base.ImageUrl),
+      Member1: realityTvCastImportMergedValue_(item.member1, base.Member1),
+      Member2: realityTvCastImportMergedValue_(item.member2, base.Member2),
+      Relationship: realityTvCastImportMergedValue_(item.relationship, base.Relationship),
+      Member1ImageUrl: realityTvCastImportMergedValue_(item.member1ImageUrl, base.Member1ImageUrl),
+      Member2ImageUrl: realityTvCastImportMergedValue_(item.member2ImageUrl, base.Member2ImageUrl),
+      TeamColor: realityTvCastImportMergedValue_(item.teamColor, base.TeamColor),
+      Age: realityTvCastImportMergedValue_(item.age, base.Age),
+      Hometown: realityTvCastImportMergedValue_(item.hometown, base.Hometown),
+      Occupation: realityTvCastImportMergedValue_(item.occupation, base.Occupation),
+      Biography: realityTvCastImportMergedValue_(item.biography, base.Biography),
+      KnownFor: realityTvCastImportMergedValue_(item.knownFor, base.KnownFor),
+      OriginalShowOrSport: realityTvCastImportMergedValue_(item.originalShowOrSport, base.OriginalShowOrSport),
+      RecruitNumber: realityTvCastImportMergedValue_(item.recruitNumber, base.RecruitNumber),
+      SourceUrl: realityTvCastImportMergedValue_(item.sourceUrl, base.SourceUrl),
+      ImageSourceUrl: realityTvCastImportMergedValue_(item.imageSourceUrl, base.ImageSourceUrl),
       ExternalSubjectId: item.externalSubjectId || realityTvString_(base.ExternalSubjectId) || contestantId,
       UpdatedAt: now
     });
@@ -4576,6 +4589,44 @@ function apiAdminImportRealityCastImport(payload) {
   };
 }
 
+function realityTvValidateEpisodeResultSelection_(season, episode, outcomeType, selectedIds, contestants) {
+  const type = realityTvKey_(outcomeType || "elimination");
+  const ids = (Array.isArray(selectedIds) ? selectedIds : []).map(realityTvKey_).filter(Boolean);
+  const uniqueIds = ids.filter(function(id, index, all) { return all.indexOf(id) === index; });
+  if (uniqueIds.length !== ids.length) {
+    throw new Error("The same contestant cannot be selected more than once in an episode result.");
+  }
+
+  const validTypes = ["elimination", "double-elimination", "multiple-elimination", "no-elimination", "medical-withdrawal", "quit"];
+  if (validTypes.indexOf(type) === -1) throw new Error("Unsupported outcome type.");
+  if (type === "no-elimination" && uniqueIds.length) throw new Error("No Elimination cannot include a contestant.");
+  if (["elimination", "medical-withdrawal", "quit"].indexOf(type) !== -1 && uniqueIds.length !== 1) {
+    throw new Error("Select exactly one contestant for this result type.");
+  }
+  if (type === "double-elimination" && uniqueIds.length !== 2) {
+    throw new Error("Select exactly two contestants for a double elimination.");
+  }
+  if (type === "multiple-elimination" && uniqueIds.length < 2) {
+    throw new Error("Select at least two contestants for a multiple elimination.");
+  }
+
+  const rows = Array.isArray(contestants) ? contestants : realityTvContestantsForSeason_(season.SeasonId);
+  const byId = {};
+  rows.forEach(function(row) { byId[realityTvKey_(row.ContestantId)] = row; });
+  const selected = uniqueIds.map(function(id) { return byId[id] || null; });
+  if (selected.some(function(row) { return !row; })) throw new Error("One or more selected contestants were not found.");
+
+  const eligibleLookup = {};
+  realityTvContestantsEligibleFromRows_(rows, realityTvNumber_(episode && episode.EpisodeNumber, 1)).forEach(function(row) {
+    eligibleLookup[realityTvKey_(row.ContestantId)] = true;
+  });
+  const ineligible = selected.filter(function(row) { return !eligibleLookup[realityTvKey_(row.ContestantId)]; });
+  if (ineligible.length) {
+    throw new Error("One or more selected contestants are not eligible for this episode result.");
+  }
+  return { outcomeType: type, selectedIds: uniqueIds, selected: selected };
+}
+
 function apiAdminSubmitRealityTvResult(payload) {
   requireAdmin_(payload || {});
   realityTvEnsureSystem_();
@@ -4586,32 +4637,18 @@ function apiAdminSubmitRealityTvResult(payload) {
     throw new Error("This episode is already finalized.");
   }
 
-  const outcomeType = realityTvKey_(payload.outcomeType || "elimination");
-  const selectedIds = realityTvParseJson_(payload.selectedContestantIdsJSON || payload.selectedContestantIds, [])
-    .map(realityTvKey_).filter(Boolean);
+  const requestedOutcomeType = realityTvKey_(payload.outcomeType || "elimination");
+  const requestedIds = realityTvParseJson_(payload.selectedContestantIdsJSON || payload.selectedContestantIds, []);
+  const contestants = realityTvContestantsForSeason_(season.SeasonId);
+  const selection = realityTvValidateEpisodeResultSelection_(season, episode, requestedOutcomeType, requestedIds, contestants);
+  const outcomeType = selection.outcomeType;
+  const selectedIds = selection.selectedIds;
+  const selected = selection.selected;
   const exitReasonsInput = realityTvParseJson_(payload.exitReasonsJSON || payload.exitReasons, {});
   const exitReasons = {};
   selectedIds.forEach(function(id) {
     exitReasons[id] = realityTvNormalizeExitReason_(exitReasonsInput && exitReasonsInput[id], outcomeType);
   });
-  const validTypes = ["elimination", "double-elimination", "multiple-elimination", "no-elimination", "medical-withdrawal", "quit"];
-  if (validTypes.indexOf(outcomeType) === -1) throw new Error("Unsupported outcome type.");
-  if (outcomeType === "no-elimination" && selectedIds.length) throw new Error("No Elimination cannot include a contestant.");
-  if (["elimination", "medical-withdrawal", "quit"].indexOf(outcomeType) !== -1 && selectedIds.length !== 1) {
-    throw new Error("Select exactly one contestant for this result type.");
-  }
-  if (outcomeType === "double-elimination" && selectedIds.length !== 2) {
-    throw new Error("Select exactly two contestants for a double elimination.");
-  }
-  if (outcomeType === "multiple-elimination" && selectedIds.length < 2) {
-    throw new Error("Select at least two contestants for a multiple elimination.");
-  }
-
-  const contestants = realityTvContestantsForSeason_(season.SeasonId);
-  const selected = selectedIds.map(function(id) {
-    return contestants.find(function(row) { return realityTvKey_(row.ContestantId) === id; });
-  });
-  if (selected.some(function(row) { return !row; })) throw new Error("One or more selected contestants were not found.");
 
   const existingPending = realityTvQueueForSeason_(season.SeasonId).find(function(row) {
     return realityTvKey_(row.EpisodeId) === realityTvKey_(episode.EpisodeId) && realityTvKey_(row.ReviewStatus) === "pending";
@@ -4658,13 +4695,18 @@ function apiAdminSubmitRealityTvResult(payload) {
 }
 
 function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
-  const selectedIds = realityTvParseJson_(queue.SelectedContestantIds, []).map(realityTvKey_);
   const outcomeType = realityTvKey_(queue.OutcomeType);
   const exitReasons = realityTvParseJson_(queue.ExitReasonsJSON, {});
   const contestants = realityTvContestantsForSeason_(season.SeasonId);
-  const selected = contestants.filter(function(row) {
-    return selectedIds.indexOf(realityTvKey_(row.ContestantId)) !== -1;
-  });
+  const selection = realityTvValidateEpisodeResultSelection_(
+    season,
+    episode,
+    outcomeType,
+    realityTvParseJson_(queue.SelectedContestantIds, []),
+    contestants
+  );
+  const selectedIds = selection.selectedIds;
+  const selected = selection.selected;
   const setup = adminGetGameSetup({ gameId: season.GameId });
   const category = (setup.categories || []).find(function(item) {
     return realityTvKey_(item.categoryId) === realityTvKey_(episode.CategoryId);

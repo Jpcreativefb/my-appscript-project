@@ -421,6 +421,16 @@ function sportsPlayersEnsureSheet_(sheetName, requiredHeaders) {
     Math.min(Math.max(lastColumn, requiredHeaders.length), 100)
   );
 
+  if (sh.getMaxColumns() < readWidth) {
+    sportsPlayersSpreadsheetRetry_(
+      "expand player sheet columns " + sheetName,
+      function() {
+        sh.insertColumnsAfter(sh.getMaxColumns(), readWidth - sh.getMaxColumns());
+        return true;
+      }
+    );
+  }
+
   const headers = sportsPlayersSpreadsheetRetry_(
     "read player sheet headers " + sheetName,
     function() {
@@ -449,6 +459,10 @@ function sportsPlayersEnsureSheet_(sheetName, requiredHeaders) {
 
     if (missing.length) {
       const appendColumn = Math.max(lastColumn, headers.filter(Boolean).length) + 1;
+      const requiredMaxColumn = appendColumn + missing.length - 1;
+      if (sh.getMaxColumns() < requiredMaxColumn) {
+        sh.insertColumnsAfter(sh.getMaxColumns(), requiredMaxColumn - sh.getMaxColumns());
+      }
 
       sportsPlayersSpreadsheetRetry_(
         "append player sheet headers " + sheetName,

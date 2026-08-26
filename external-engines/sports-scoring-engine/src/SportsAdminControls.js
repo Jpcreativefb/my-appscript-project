@@ -321,6 +321,7 @@ function setupSportsAdminControlSystem() {
   setupSportsOddsUsageSheet_();
   seedSportsOddsAdminSettingsFromSportsSettings_();
   cleanSportsOddsSettingsForUserFriendlyAdmin_();
+  const operationalDefaultsUpgrade = upgradeSportsOddsOperationalDefaultsV48_();
   if (typeof setupSportsPlayersSystem === "function") setupSportsPlayersSystem();
 
   return {
@@ -328,8 +329,79 @@ function setupSportsAdminControlSystem() {
     version: "12",
     message: "Sports admin control system v12 setup complete",
     upgrade: upgrade,
+    operationalDefaultsUpgrade: operationalDefaultsUpgrade,
     sheets: [SPORTS_ODDS_SETTINGS_SHEET, SPORTS_ODDS_USAGE_SHEET, SPORTS_SCORES_ARCHIVE_SHEET, SPORTS_SNAPSHOTS_ARCHIVE_SHEET, "SportsPlayers", "SportsPlayerGameStats"]
   };
+}
+
+
+/**
+ * v48 operational defaults migration.
+ *
+ * Older builds seeded 1 odds refresh/day and 30/month. That made one failed
+ * request able to block a league for the rest of the day and silently stopped
+ * MLB after only 30 calls even when the provider quota still had capacity.
+ * Migrate only the legacy values, once, so later admin choices are respected.
+ */
+function upgradeSportsOddsOperationalDefaultsV48_() {
+  const properties = PropertiesService.getScriptProperties();
+  const key = "SPORTS_ODDS_OPERATIONAL_DEFAULTS_V48_APPLIED";
+  if (properties.getProperty(key) === "1") {
+    return { success: true, skipped: true, message: "v48 odds defaults already applied" };
+  }
+
+  const result = { success: true, oddsRows: 0, sportsRows: 0 };
+  const ss = SpreadsheetApp.getActive();
+
+  const oddsSheet = ss.getSheetByName(SPORTS_ODDS_SETTINGS_SHEET);
+  if (oddsSheet && oddsSheet.getLastRow() > 1) {
+    const data = oddsSheet.getDataRange().getValues();
+    const headers = data[0].map(function(header) { return sportsAdminString_(header); });
+    const col = sportsAdminHeaderMap_(headers);
+    for (let i = 1; i < data.length; i++) {
+      let changed = false;
+      if (col.MaxRefreshesPerDay !== undefined && sportsAdminNumber_(data[i][col.MaxRefreshesPerDay], 0) === 1) {
+        data[i][col.MaxRefreshesPerDay] = 5;
+        changed = true;
+      }
+      if (col.MonthlyBudget !== undefined && sportsAdminNumber_(data[i][col.MonthlyBudget], 0) === 30) {
+        data[i][col.MonthlyBudget] = 100;
+        changed = true;
+      }
+      if (changed) result.oddsRows++;
+    }
+    if (result.oddsRows) {
+      oddsSheet.getRange(2, 1, data.length - 1, data[0].length).setValues(data.slice(1));
+    }
+  }
+
+  const sportsSheet = ss.getSheetByName(SPORTS_SHEETS.SETTINGS);
+  if (sportsSheet && sportsSheet.getLastRow() > 1) {
+    const data = sportsSheet.getDataRange().getValues();
+    const headers = data[0].map(function(header) { return sportsAdminString_(header); });
+    const col = sportsAdminHeaderMap_(headers);
+    if (col.OddsDailyMaxPulls !== undefined || col.OddsMonthlyMaxPulls !== undefined) {
+      for (let i = 1; i < data.length; i++) {
+        let changed = false;
+        if (col.OddsDailyMaxPulls !== undefined && sportsAdminNumber_(data[i][col.OddsDailyMaxPulls], 0) === 1) {
+          data[i][col.OddsDailyMaxPulls] = 5;
+          changed = true;
+        }
+        if (col.OddsMonthlyMaxPulls !== undefined && sportsAdminNumber_(data[i][col.OddsMonthlyMaxPulls], 0) === 30) {
+          data[i][col.OddsMonthlyMaxPulls] = 100;
+          changed = true;
+        }
+        if (changed) result.sportsRows++;
+      }
+      if (result.sportsRows) {
+        sportsSheet.getRange(2, 1, data.length - 1, data[0].length).setValues(data.slice(1));
+      }
+    }
+  }
+
+  properties.setProperty(key, "1");
+  result.message = "v48 odds defaults applied: 5/day and 100/month for legacy 1/30 rows";
+  return result;
 }
 
 function apiSetupSportsAdminControls_(params) {
@@ -788,9 +860,9 @@ function seedSportsOddsAdminSettingsFromSportsSettings_() {
       AutoRefreshEnabled: false,
       ManualRefreshEnabled: true,
       MaxRefreshesPerDay:
-        Math.max(0, sportsAdminNumber_(setting.OddsDailyMaxPulls, 1)),
+        Math.max(0, sportsAdminNumber_(setting.OddsDailyMaxPulls, 5)),
       MonthlyBudget:
-        Math.max(0, sportsAdminNumber_(setting.OddsMonthlyMaxPulls, 30)),
+        Math.max(0, sportsAdminNumber_(setting.OddsMonthlyMaxPulls, 100)),
       StopAtMonthlyCalls: 450,
       DefaultMarkets:
         typeof sportsOddsGetMarketsForLeague_ === "function"
@@ -1389,13 +1461,13 @@ function readSportsOddsAdminSettings_() {
       obj.MaxRefreshesPerDay =
         sportsAdminNumber_(
           obj.MaxRefreshesPerDay,
-          1
+          5
         );
 
       obj.MonthlyBudget =
         sportsAdminNumber_(
           obj.MonthlyBudget,
-          30
+          100
         );
 
       obj.StopAtMonthlyCalls =
@@ -1588,8 +1660,8 @@ function apiUpdateSportsOddsAdminSetting_(params) {
       OddsEnabled: false,
       AutoRefreshEnabled: false,
       ManualRefreshEnabled: true,
-      MaxRefreshesPerDay: 1,
-      MonthlyBudget: 30,
+      MaxRefreshesPerDay: 5,
+      MonthlyBudget: 100,
       StopAtMonthlyCalls: 450,
       DefaultMarkets:
         typeof sportsOddsGetMarketsForLeague_ === "function"
@@ -1671,7 +1743,7 @@ function apiUpdateSportsOddsAdminSetting_(params) {
     patch.MaxRefreshesPerDay =
       sportsAdminNumber_(
         params.maxRefreshesPerDay,
-        1
+        5
       );
   }
 
@@ -1679,7 +1751,7 @@ function apiUpdateSportsOddsAdminSetting_(params) {
     patch.MonthlyBudget =
       sportsAdminNumber_(
         params.monthlyBudget,
-        30
+        100
       );
   }
 
@@ -3131,6 +3203,7 @@ function apiGetSportsAdminDashboard_(params) {
     players: typeof getSportsPlayersStatus_ === "function" ? getSportsPlayersStatus_() : null,
     advancedStats: typeof getSportsAdvancedStatsStatus_ === "function" ? getSportsAdvancedStatsStatus_() : null,
     engineStatus: typeof checkSportsEngineStatus === "function" ? checkSportsEngineStatus() : null,
+    workbookCapacity: typeof sportsWorkbookCapacityReport_ === "function" ? sportsWorkbookCapacityReport_() : null,
     scoreTriggers: typeof checkSportsScoresTriggers === "function" ? checkSportsScoresTriggers() : [],
     scoreWindowTriggers: typeof checkSportsScoresWindowTriggers === "function" ? checkSportsScoresWindowTriggers() : [],
     seasonBatchTriggers: typeof checkSportsSeasonBatchTriggers === "function" ? checkSportsSeasonBatchTriggers() : [],

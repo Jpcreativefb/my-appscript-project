@@ -427,7 +427,14 @@ function votingCompetitionValidateCustomData_(settings, customData) {
     if (field.type === "checkbox" || field.type === "yes-no") {
       value = votingCompetitionBool_(value, false);
     } else if (field.type === "number") {
-      value = votingCompetitionString_(value) === "" ? "" : votingCompetitionNumber_(value, 0);
+      const numericText = votingCompetitionString_(value);
+      if (numericText === "") {
+        value = "";
+      } else {
+        const numericValue = Number(numericText);
+        if (!Number.isFinite(numericValue)) throw new Error(field.label + " must be a number.");
+        value = numericValue;
+      }
     } else {
       value = votingCompetitionString_(value);
     }
@@ -625,10 +632,12 @@ function votingCompetitionValidateBallot_(rankings, entries, settings) {
   const usedRanks = {};
   rankings.forEach(function(item) {
     const entryId = votingCompetitionString_(item && item.entryId);
-    const rank = Math.floor(votingCompetitionNumber_(item && item.rank, 0));
+    const rank = votingCompetitionNumber_(item && item.rank, NaN);
     if (!allowed[entryId]) throw new Error("Invalid competition entry in ballot.");
     if (usedEntries[entryId]) throw new Error("Each entry can only appear once on your ballot.");
-    if (rank < 1 || rank > limit || usedRanks[rank]) throw new Error("Ranks must be unique and run from 1 through " + limit + ".");
+    if (!Number.isFinite(rank) || Math.floor(rank) !== rank || rank < 1 || rank > limit || usedRanks[rank]) {
+      throw new Error("Ranks must be whole numbers, unique, and run from 1 through " + limit + ".");
+    }
     usedEntries[entryId] = true;
     usedRanks[rank] = true;
   });
@@ -671,7 +680,7 @@ function votingCompetitionSaveBallot_(payload) {
       row[col.gameid] = gameId;
       row[col.username] = username;
       row[col.entryid] = votingCompetitionString_(item.entryId);
-      row[col.rank] = Math.floor(votingCompetitionNumber_(item.rank, 0));
+      row[col.rank] = votingCompetitionNumber_(item.rank, 0);
       row[col.points] = votingCompetitionPointsForRank_(item.rank, settings, limit);
       row[col.locked] = false;
       return row;

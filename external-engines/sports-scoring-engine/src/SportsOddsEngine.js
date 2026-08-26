@@ -443,7 +443,7 @@ function sportsOddsBuildId_(
     sportsOddsKey_(league),
     sportsOddsNormalizeTeam_(awayTeam),
     sportsOddsNormalizeTeam_(homeTeam),
-    sportsOddsString_(commenceTime).slice(0, 10)
+    sportsOddsDateOnly_(commenceTime)
   ].join("|");
 
 }
@@ -1359,24 +1359,13 @@ function sportsOddsDateOnly_(value) {
     return "";
   }
 
-  if (value instanceof Date) {
-    return [
-      value.getFullYear(),
-      String(value.getMonth() + 1).padStart(2, "0"),
-      String(value.getDate()).padStart(2, "0")
-    ].join("-");
+  const raw = value instanceof Date ? "" : sportsOddsString_(value);
+
+  if (raw && /^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+    return raw;
   }
 
-  const raw =
-    sportsOddsString_(
-      value
-    );
-
-  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) {
-    return raw.slice(0, 10);
-  }
-
-  if (/^\d{8}$/.test(raw)) {
+  if (raw && /^\d{8}$/.test(raw)) {
     return (
       raw.slice(0, 4) +
       "-" +
@@ -1386,18 +1375,21 @@ function sportsOddsDateOnly_(value) {
     );
   }
 
-  const parsed =
-    new Date(raw);
+  const parsed = value instanceof Date ? value : new Date(raw);
 
   if (isNaN(parsed.getTime())) {
     return "";
   }
 
-  return [
-    parsed.getFullYear(),
-    String(parsed.getMonth() + 1).padStart(2, "0"),
-    String(parsed.getDate()).padStart(2, "0")
-  ].join("-");
+  let timeZone = "America/Chicago";
+  try {
+    const ss = SpreadsheetApp.getActive();
+    timeZone = (ss && ss.getSpreadsheetTimeZone()) || Session.getScriptTimeZone() || timeZone;
+  } catch (timezoneError) {
+    try { timeZone = Session.getScriptTimeZone() || timeZone; } catch (ignored) {}
+  }
+
+  return Utilities.formatDate(parsed, timeZone, "yyyy-MM-dd");
 
 }
 
@@ -2712,15 +2704,21 @@ function sportsOddsEnsureHeaderSheetSafe_(
   requiredHeaders
 ) {
 
+  /*
+    v48: use a document lock for sheet/header setup. High-level odds refreshes
+    already use the script lock. Re-acquiring the same script lock from inside
+    API logging is not re-entrant and caused successful provider requests to
+    end as "Could not lock script while setting up sheet: SportsOddsApiLog".
+  */
   const lock =
-    LockService.getScriptLock();
+    LockService.getDocumentLock();
 
   const locked =
-    lock.tryLock(10000);
+    !lock || lock.tryLock(10000);
 
   if (!locked) {
     throw new Error(
-      "Could not lock script while setting up sheet: " +
+      "Could not lock spreadsheet while setting up sheet: " +
       sheetName
     );
   }
@@ -2753,6 +2751,13 @@ function sportsOddsEnsureHeaderSheetSafe_(
 
         const lastColumn =
           sh.getLastColumn();
+
+        if (sh.getMaxColumns() < requiredHeaders.length) {
+          sh.insertColumnsAfter(
+            sh.getMaxColumns(),
+            requiredHeaders.length - sh.getMaxColumns()
+          );
+        }
 
         let existingHeaders = [];
 
@@ -2810,10 +2815,18 @@ function sportsOddsEnsureHeaderSheetSafe_(
           });
 
         if (missing.length) {
+          const appendColumn = sh.getLastColumn() + 1;
+          const requiredMaxColumn = appendColumn + missing.length - 1;
+          if (sh.getMaxColumns() < requiredMaxColumn) {
+            sh.insertColumnsAfter(
+              sh.getMaxColumns(),
+              requiredMaxColumn - sh.getMaxColumns()
+            );
+          }
           sh
             .getRange(
               1,
-              sh.getLastColumn() + 1,
+              appendColumn,
               1,
               missing.length
             )
@@ -2839,7 +2852,7 @@ function sportsOddsEnsureHeaderSheetSafe_(
     );
 
   } finally {
-    lock.releaseLock();
+    if (lock) lock.releaseLock();
   }
 
 }
@@ -2908,7 +2921,16 @@ function sportsOddsLogApiCall_(meta, url, response, payload) {
     sportsOddsSanitizeApiUrl_(url)
   ];
 
-  sportsOddsAppendApiLogRow_(row);
+  /*
+    API logging is diagnostic only. A full/locked/transiently unavailable log
+    sheet must never turn a successful paid provider response into a failed
+    odds refresh.
+  */
+  try {
+    sportsOddsAppendApiLogRow_(row);
+  } catch (logError) {
+    usage.logWarning = logError && logError.message ? logError.message : String(logError);
+  }
   return usage;
 }
 

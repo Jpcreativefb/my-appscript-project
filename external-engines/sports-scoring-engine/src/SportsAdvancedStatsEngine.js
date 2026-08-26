@@ -137,6 +137,12 @@ function sportsAdvancedEnsureSheet_(sheetName, requiredHeaders) {
   }
 
   const lastColumn = Math.max(1, sheet.getLastColumn());
+  if (sheet.getMaxColumns() < requiredHeaders.length) {
+    sportsAdvancedRetry_("expand " + sheetName + " columns", function() {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredHeaders.length - sheet.getMaxColumns());
+      return true;
+    });
+  }
   let headers = [];
 
   if (sheet.getLastRow() > 0) {
@@ -160,8 +166,13 @@ function sportsAdvancedEnsureSheet_(sheetName, requiredHeaders) {
   });
 
   if (missing.length) {
+    const appendColumn = sheet.getLastColumn() + 1;
+    const requiredMaxColumn = appendColumn + missing.length - 1;
+    if (sheet.getMaxColumns() < requiredMaxColumn) {
+      sheet.insertColumnsAfter(sheet.getMaxColumns(), requiredMaxColumn - sheet.getMaxColumns());
+    }
     sportsAdvancedRetry_("append " + sheetName + " headers", function() {
-      sheet.getRange(1, sheet.getLastColumn() + 1, 1, missing.length).setValues([missing]);
+      sheet.getRange(1, appendColumn, 1, missing.length).setValues([missing]);
       return true;
     });
   }
@@ -272,6 +283,26 @@ function upsertSportsTeamGameStatsRows_(rows) {
 }
 
 function upsertSportsStatCheckpointRows_(rows) {
+  /*
+    v48 hard stop: checkpoint history is useful but nonessential compared with
+    keeping scores, odds and admin controls alive. If the workbook reaches 90%
+    capacity, pause new checkpoint rows instead of allowing Google Sheets to
+    hit the 10M-cell wall and disable the entire Sports Engine.
+  */
+  if (typeof sportsWorkbookCapacityReport_ === "function") {
+    const capacity = sportsWorkbookCapacityReport_();
+    if (capacity && capacity.percentUsed >= 90) {
+      return {
+        inserted: 0,
+        updated: 0,
+        count: 0,
+        skipped: true,
+        reason: "Workbook capacity guard: checkpoint capture paused at " + capacity.percentUsed + "%",
+        capacity: capacity
+      };
+    }
+  }
+
   return sportsAdvancedUpsertRows_(
     SPORTS_STAT_CHECKPOINTS_SHEET,
     SPORTS_STAT_CHECKPOINTS_HEADERS,

@@ -209,6 +209,7 @@ function rankingScoreBallot_(category, ballot, finalRanks) {
     return nominee && nominee.id;
   });
   const resolved = rankingFinalOrderComplete_(category, finalRanks || {});
+  const ballotValid = rankingBallotValid_(category, ballot);
   const ballotMap = {};
   (ballot || []).forEach(function(row) {
     const nomineeId = rankingKey_(row.nomineeId);
@@ -220,21 +221,23 @@ function rankingScoreBallot_(category, ballot, finalRanks) {
     return {
       resolved: false,
       earnedPoints: 0,
-      remainingPoints: ballot && ballot.length ? maxPoints : 0,
+      remainingPoints: ballotValid ? maxPoints : 0,
       maxPoints: maxPoints,
       accuracyPercent: 0,
-      exactCount: 0
+      exactCount: 0,
+      validBallot: ballotValid
     };
   }
 
-  if (!ballot || ballot.length !== nominees.length) {
+  if (!ballotValid) {
     return {
       resolved: true,
       earnedPoints: 0,
       remainingPoints: 0,
       maxPoints: maxPoints,
       accuracyPercent: 0,
-      exactCount: 0
+      exactCount: 0,
+      validBallot: false
     };
   }
 
@@ -258,8 +261,18 @@ function rankingScoreBallot_(category, ballot, finalRanks) {
     remainingPoints: 0,
     maxPoints: maxPoints,
     accuracyPercent: Math.round(accuracy * 1000) / 10,
-    exactCount: exactCount
+    exactCount: exactCount,
+    validBallot: true
   };
+}
+
+function rankingBallotValid_(category, rankings) {
+  try {
+    rankingValidateBallot_(category, rankings);
+    return true;
+  } catch (err) {
+    return false;
+  }
 }
 
 function rankingValidateBallot_(category, rankings) {
