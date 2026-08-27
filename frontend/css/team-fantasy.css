@@ -80,3 +80,24 @@
 @media(max-width:760px){.tf-weekly-help-row{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:5px}.tf-help-button{min-height:32px;padding:5px 8px;font-size:.68rem}.tf-lineup-card .tf-slot-grid{grid-template-columns:1fr!important;grid-template-areas:"qb" "rb" "wrte" "ol" "k" "dl" "lb" "db"!important}.tf-score-grid{grid-template-columns:1fr}.tf-info-overlay{padding:8px}.tf-info-sheet{max-height:90vh}.tf-info-body{padding:11px}.tf-game-day-label{font-size:.7rem}}
 /* v1.2.18v3 compare restore + frozen viewer header repair */
 .tf-compare-scroll{position:relative;isolation:isolate;overflow-x:auto!important}.tf-compare-team{position:relative;z-index:1}.tf-compare-team-head{position:sticky!important;top:0!important;z-index:8!important}.tf-compare-team.is-viewer{position:sticky!important;left:0!important;z-index:20!important}.tf-compare-team.is-viewer .tf-compare-team-head{position:sticky!important;left:0!important;top:0!important;z-index:30!important;background:#0f172a!important;isolation:isolate}.tf-compare-team.is-viewer .tf-compare-slots{position:relative;z-index:21;background:#0b1f3a}.tf-compare-team:not(.is-viewer) .tf-compare-team-head{z-index:8!important}
+
+/* TEAM_FANTASY_RC14_LIVE_UX_v1219rc14tfux1 */
+.tf-team-picker-button{min-height:46px!important;padding-top:7px!important;padding-bottom:7px!important}
+.tf-picker-team{min-height:52px!important;padding-top:8px!important;padding-bottom:8px!important}
+.tf-slot.is-editable{border-color:#3b82f6!important;box-shadow:inset 0 0 0 1px rgba(59,130,246,.18)}
+.tf-slot.is-editable .tf-team-picker-button{cursor:pointer}
+.tf-edit-label{margin-left:auto;font-size:.62rem;font-weight:900;letter-spacing:.04em;text-transform:uppercase;color:#bfdbfe}
+.tf-slot.is-saving{position:relative;opacity:.8;pointer-events:none}
+.tf-saving-label{font-size:.68rem;font-weight:900;color:#93c5fd;white-space:nowrap}
+.tf-lock{font-weight:850;white-space:nowrap}
+.tf-weekly-title-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.tf-lineup-set-badge{display:inline-flex;align-items:center;border-radius:999px;background:#15803d;color:#fff;padding:3px 8px;font-size:.67rem;font-weight:950;letter-spacing:.03em;text-transform:uppercase}
+.tf-lineup-set{font-weight:950;color:#16a34a;font-size:.86rem}
+.tf-lineup-card.is-change-mode .tf-slot.is-locked{display:none!important}
+.tf-picker-fill-actions{position:sticky;bottom:0;display:flex;gap:7px;align-items:center;padding:9px;border-top:1px solid rgba(255,255,255,.28);background:#0b1f3a;z-index:3}
+.tf-picker-fill-actions .tf-button{flex:1;min-height:42px}
+.tf-picker-fill-actions .tf-help-button{min-width:42px;padding:6px}
+.tf-protection-card{margin-top:10px}
+.tf-protection-grid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(190px,1.2fr) minmax(180px,1fr) auto;gap:8px;align-items:end}
+.tf-protection-grid .tf-field{margin:0}.tf-protection-grid input,.tf-protection-grid select{width:100%;min-height:42px}
+@media(max-width:760px){.tf-team-picker-button{min-height:42px!important;padding-top:6px!important;padding-bottom:6px!important}.tf-picker-team{min-height:48px!important;padding-top:7px!important;padding-bottom:7px!important}.tf-protection-grid{grid-template-columns:1fr}.tf-picker-fill-actions{display:grid;grid-template-columns:1fr 1fr auto}.tf-picker-fill-actions .tf-button{min-height:44px;font-size:.72rem}.tf-edit-label{font-size:.58rem}}

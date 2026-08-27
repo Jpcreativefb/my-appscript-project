@@ -2417,6 +2417,12 @@ function readSportsScoresRows_() {
       return String(header).trim();
     });
 
+  const hasHomeProbablePitcherColumn =
+    headers.indexOf("HomeProbablePitcher") !== -1;
+
+  const hasAwayProbablePitcherColumn =
+    headers.indexOf("AwayProbablePitcher") !== -1;
+
   const rows = [];
 
   for (let i = 1; i < data.length; i++) {
@@ -2444,6 +2450,29 @@ function readSportsScoresRows_() {
       normalizeSportsBoolean_(
         row.Completed
       );
+
+    if (String(row.League || "").trim().toLowerCase() === "mlb") {
+      const homeProbable = String(row.HomeProbablePitcher || "").trim();
+      const awayProbable = String(row.AwayProbablePitcher || "").trim();
+
+      if (!hasHomeProbablePitcherColumn || !hasAwayProbablePitcherColumn) {
+        row.PitcherPersistenceStatus = "schema-missing";
+        row.PitcherPersistenceDetail =
+          "SportsScores probable-pitcher columns are missing.";
+      } else if (homeProbable && awayProbable) {
+        row.PitcherPersistenceStatus = "stored";
+        row.PitcherPersistenceDetail =
+          "Both probable pitchers are stored on SportsScores.";
+      } else if (homeProbable || awayProbable) {
+        row.PitcherPersistenceStatus = "partial";
+        row.PitcherPersistenceDetail =
+          "Only one probable pitcher is stored on SportsScores.";
+      } else {
+        row.PitcherPersistenceStatus = "stored-empty";
+        row.PitcherPersistenceDetail =
+          "SportsScores probable-pitcher columns exist but this row has no stored names.";
+      }
+    }
 
     rows.push(row);
   }
@@ -5693,11 +5722,24 @@ function upsertLatestSportsScores_(games) {
     const headerMap = getSportsHeaderMap_(data[0]);
     for (let i = 1; i < data.length; i++) {
       const gameId = String(data[i][headerMap.GameId] || "").trim();
-      if (gameId) existingRowsByGameId[gameId] = i + 1;
+      if (!gameId) continue;
+
+      const existingValues = {};
+      actualHeaders.forEach(function(header, index) {
+        existingValues[header] = data[i][index];
+      });
+
+      existingRowsByGameId[gameId] = {
+        rowNumber: i + 1,
+        values: existingValues
+      };
     }
   }
 
   games.forEach(function(game) {
+    const existing = existingRowsByGameId[game.GameId] || null;
+    const existingValues = existing && existing.values || {};
+
     const row = actualHeaders.map(function(header) {
       if (header === "HomeRecord" || header === "AwayRecord") {
         return cleanSportsRecordValue_(game[header]);
@@ -5705,11 +5747,24 @@ function upsertLatestSportsScores_(games) {
       if (header === "Clock" || header === "SportsClock") {
         return cleanSportsClockDisplayValue_(game[header]);
       }
+
+      if (header === "HomeProbablePitcher" || header === "AwayProbablePitcher") {
+        const incomingPitcher = String(game[header] || "").trim();
+        const storedPitcher = String(existingValues[header] || "").trim();
+
+        // ESPN schedule/scoreboard responses are not equally rich at every
+        // stage of a game. Once a probable starter has been learned, a later
+        // partial response must not erase it merely because `probables` was
+        // omitted from that response. A new nonblank value still replaces the
+        // stored value normally.
+        return incomingPitcher || storedPitcher || "";
+      }
+
       return game[header] !== undefined ? game[header] : "";
     });
-    const existingRow = existingRowsByGameId[game.GameId];
-    if (existingRow) {
-      sh.getRange(existingRow, 1, 1, actualHeaders.length).setValues([row]);
+
+    if (existing) {
+      sh.getRange(existing.rowNumber, 1, 1, actualHeaders.length).setValues([row]);
     } else {
       sh.appendRow(row);
     }

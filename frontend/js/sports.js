@@ -1122,6 +1122,12 @@ function renderSportsStartingPitchers_(game) {
     !homeStarter
   );
 
+  const persistenceStatus =
+    String(game && game.PitcherPersistenceStatus || "").trim();
+
+  const persistenceDetail =
+    String(game && game.PitcherPersistenceDetail || "").trim();
+
   return `
     <div class="sports-starters">
       <div class="sports-starters-title">Starting Pitchers</div>
@@ -1135,6 +1141,9 @@ function renderSportsStartingPitchers_(game) {
               (details.proxyFallbackFromStatus ? " · fallback from " + escapeSportsHtml(String(details.proxyFallbackFromStatus)) : "") +
               (details.pitcherDiagnostic
                 ? " · parser candidates H/A " + escapeSportsHtml(String(details.pitcherDiagnostic.homeCandidates || 0)) + "/" + escapeSportsHtml(String(details.pitcherDiagnostic.awayCandidates || 0))
+                : "") +
+              (persistenceStatus
+                ? " · SportsScores " + escapeSportsHtml(persistenceStatus) + (persistenceDetail ? " (" + escapeSportsHtml(persistenceDetail) + ")" : "")
                 : "")
             : ""}</div>`
         : ''}

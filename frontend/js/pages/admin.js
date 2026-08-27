@@ -5688,6 +5688,44 @@ function adminSportsSetLeagueStatus_(
 
 }
 
+function adminSportsSetOddsLastStatus_(league, status, message) {
+
+  const key =
+    adminSportsKey_(
+      league || ""
+    );
+
+  if (!key) {
+    return;
+  }
+
+  const nodes =
+    Array.from(
+      document.querySelectorAll(
+        '[data-sports-odds-last="' + key + '"]'
+      ) || []
+    );
+
+  if (!nodes.length) {
+    return;
+  }
+
+  const statusText =
+    String(status || "").trim().toUpperCase();
+
+  const messageText =
+    String(message || "").trim();
+
+  const display =
+    statusText +
+    (messageText ? ": " + messageText : "");
+
+  nodes.forEach(function(el) {
+    el.textContent = display;
+  });
+
+}
+
 function adminSportsArchiveStatusId_(league) {
 
   return "sportsArchiveRunStatus_" +
@@ -7742,7 +7780,7 @@ function adminRenderScoreLeagueControls_(
               · Month ${oddsMonth}/${oddsMonthlyBudget}
               · API left ${oddsUsage.LastApiRemaining || "—"}
               · Window ${adminSportsEscape_(adminSportsOddsWindowLabel_(oddsWindow))}
-              · Last ${adminSportsEscape_(oddsLastDisplay)}
+              · Last <span data-sports-odds-last="${adminSportsEscape_(adminSportsKey_(leagueCode))}">${adminSportsEscape_(oddsLastDisplay)}</span>
             </div>
 
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(138px, 1fr)); gap:8px;">
@@ -7858,7 +7896,7 @@ function adminRenderScoreLeagueControls_(
                 Last score ${adminSportsEscape_(health.lastScoreRefresh || "") || "Never"}
                 · Last roster ${adminSportsEscape_(lastPlayerUpdated || "") || "Never"}
                 · Last player stats ${adminSportsEscape_(lastPlayerStatsUpdated || "") || "Never"}
-                · Last odds ${adminSportsEscape_(oddsLastDisplay) || "Never"}
+                · Last odds <span data-sports-odds-last="${adminSportsEscape_(leagueKey)}">${adminSportsEscape_(oddsLastDisplay) || "Never"}</span>
               </div>
 
               ${adminSportsSection_("Season", "seasonSection", leagueCode, seasonBody, true)}
@@ -8065,11 +8103,11 @@ function adminRenderOddsControls_(
                     ·
                     Month: ${setting.CallsThisMonth || 0}/${setting.MonthlyBudget || 0}
                     ·
-                    Last: ${adminSportsEscape_(
+                    Last: <span data-sports-odds-last="${adminSportsEscape_(adminSportsKey_(setting.League || setting.league))}">${adminSportsEscape_(
                       String(setting.LastRefreshStatus || "NEVER").toUpperCase() === "ERROR" && setting.LastRefreshMessage
                         ? String(setting.LastRefreshStatus || "ERROR") + ": " + String(setting.LastRefreshMessage)
                         : String(setting.LastRefreshStatus || "NEVER")
-                    )}
+                    )}</span>
                   </div>
                 </div>
 
@@ -9636,6 +9674,31 @@ async function adminRefreshSportsOddsLeague(
     message,
     isWarning
   );
+
+  // The Sports Engine persists RUNNING -> OK/ERROR, but this dashboard is
+  // intentionally not reloaded after a paid odds call. Reflect the returned
+  // operational result immediately so a successful refresh cannot leave an
+  // old provider error visible until the next full Controls reload.
+  if (res && res.success && !res.skipped && !res.blocked) {
+    const usable =
+      res.result && res.result.usable !== undefined
+        ? res.result.usable
+        : "";
+
+    adminSportsSetOddsLastStatus_(
+      league,
+      "OK",
+      usable !== ""
+        ? "Refresh complete. Usable odds rows: " + usable
+        : "Refresh complete."
+    );
+  } else if (res && res.success === false && !res.skipped && !res.blocked) {
+    adminSportsSetOddsLastStatus_(
+      league,
+      "ERROR",
+      res.error || res.message || res.reason || "Odds refresh failed."
+    );
+  }
 
   adminSportsMarkDashboardStale_(
     "Odds status changed. Use Reload Sports Controls when you want fresh counts/status.",

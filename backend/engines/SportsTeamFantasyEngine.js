@@ -27,7 +27,8 @@ var TEAM_FANTASY_SHEETS = {
   PICKS: "TeamFantasyPicks",
   UNIT_SCORES: "TeamFantasyUnitScores",
   WEEK_SCORES: "TeamFantasyWeekScores",
-  REMINDER_LOG: "TeamFantasyReminderLog"
+  REMINDER_LOG: "TeamFantasyReminderLog",
+  PLAYER_SETTINGS: "TeamFantasyPlayerSettings"
 };
 
 var TEAM_FANTASY_HEADERS = {};
@@ -69,6 +70,9 @@ TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.WEEK_SCORES] = [
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.REMINDER_LOG] = [
   "SentAt", "GameId", "SeasonYear", "Week", "Username", "EntryId", "MissingPositionsJSON",
   "Title", "Message", "Sent", "Failed", "Error"
+];
+TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.PLAYER_SETTINGS] = [
+  "GameId", "Username", "AutoFillMode", "AutoFillWindow", "CustomLeadMinutes", "UpdatedAt"
 ];
 
 var TEAM_FANTASY_NFL_TEAMS = [
@@ -834,16 +838,49 @@ function teamFantasyFetchScheduleFromEspn_(settings, week) {
   throw new Error("NFL schedule unavailable from Sports Scores Engine. Direct ESPN fetch is disabled because ESPN blocks Google Apps Script with HTTP 403.");
 }
 
-function teamFantasyFetchWeekSchedule_(gameId, week) {
-  const settings = teamFantasyGetSettings_(gameId);
-  let rows = teamFantasyFetchScheduleFromSportsEngine_(settings, week);
-  if (!rows.length) rows = teamFantasyFetchScheduleFromEspn_(settings, week);
+function teamFantasyScheduleCacheKey_(gameId, settings, week) {
+  return ["tf-schedule", teamFantasySlug_(gameId), Number(settings && settings.seasonYear || 0), Number(week || 0)].join(":");
+}
+
+function teamFantasyScheduleFromRows_(rows) {
   const byTeam = {};
-  rows.forEach(function(game) {
+  (rows || []).forEach(function(game) {
     if (game.homeAbbr) byTeam[game.homeAbbr] = game;
     if (game.awayAbbr) byTeam[game.awayAbbr] = game;
   });
-  return { games: rows, byTeam: byTeam };
+  return { games: rows || [], byTeam: byTeam };
+}
+
+function teamFantasyScheduleCacheGet_(gameId, settings, week) {
+  try {
+    if (typeof CacheService === "undefined" || !CacheService.getScriptCache) return null;
+    const raw = CacheService.getScriptCache().get(teamFantasyScheduleCacheKey_(gameId, settings, week));
+    if (!raw) return null;
+    const rows = JSON.parse(raw);
+    return Array.isArray(rows) && rows.length ? teamFantasyScheduleFromRows_(rows) : null;
+  } catch (err) { return null; }
+}
+
+function teamFantasyScheduleCachePut_(gameId, settings, week, schedule) {
+  try {
+    if (typeof CacheService === "undefined" || !CacheService.getScriptCache) return;
+    const rows = schedule && Array.isArray(schedule.games) ? schedule.games : [];
+    if (rows.length) CacheService.getScriptCache().put(teamFantasyScheduleCacheKey_(gameId, settings, week), JSON.stringify(rows), 300);
+  } catch (err) {}
+}
+
+function teamFantasyFetchWeekSchedule_(gameId, week, suppliedSettings, options) {
+  const settings = suppliedSettings || teamFantasyGetSettings_(gameId);
+  options = options || {};
+  if (options.force !== true) {
+    const cached = teamFantasyScheduleCacheGet_(gameId, settings, week);
+    if (cached) return cached;
+  }
+  let rows = teamFantasyFetchScheduleFromSportsEngine_(settings, week);
+  if (!rows.length) rows = teamFantasyFetchScheduleFromEspn_(settings, week);
+  const schedule = teamFantasyScheduleFromRows_(rows);
+  teamFantasyScheduleCachePut_(gameId, settings, week, schedule);
+  return schedule;
 }
 
 function teamFantasyPickRows_(gameId, seasonYear, week, entryId) {
@@ -875,11 +912,11 @@ function teamFantasyUsageCounts_(gameId, settings, entryId, currentWeek) {
   return counts;
 }
 
-function teamFantasyRankings_(gameId, position, beforeWeek, seasonYear) {
+function teamFantasyRankingsFromRows_(rows, gameId, position, beforeWeek, seasonYear) {
   position = teamFantasyNormalizePosition_(position);
   const totals = {};
   const uniqueScores = {};
-  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES).forEach(function(row) {
+  (rows || []).forEach(function(row) {
     if (teamFantasyString_(row.GameId) !== gameId || teamFantasyNormalizePosition_(row.Position) !== position) return;
     if (!teamFantasyBool_(row.Final, false)) return;
     if (Number(row.Week) >= Number(beforeWeek)) return;
@@ -904,10 +941,36 @@ function teamFantasyRankings_(gameId, position, beforeWeek, seasonYear) {
     return a.team.localeCompare(b.team);
   });
   const map = {};
-  ranked.forEach(function(item, index) {
-    map[item.team] = { rank: index + 1, average: teamFantasyRound_(item.average), games: item.games };
-  });
+  ranked.forEach(function(item, index) { map[item.team] = { rank: index + 1, average: teamFantasyRound_(item.average), games: item.games }; });
   return map;
+}
+
+function teamFantasyRankings_(gameId, position, beforeWeek, seasonYear) {
+  return teamFantasyRankingsFromRows_(teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES), gameId, position, beforeWeek, seasonYear);
+}
+
+function teamFantasyEligibleTeamsFromRows_(gameId, settings, entry, position, week, schedule, currentPick, pickRows, ranking) {
+  const now = Date.now();
+  const result = [];
+  ranking = ranking || {};
+  TEAM_FANTASY_NFL_TEAMS.forEach(function(team) {
+    if (entry.conference !== "ALL" && entry.conference !== team.conference) return;
+    const game = schedule.byTeam[team.abbr];
+    const usesBefore = teamFantasyUsageCountFromRows_(pickRows, gameId, settings, entry.entryId, position, team.abbr, week);
+    const isCurrent = currentPick && teamFantasyNormalizeTeam_(currentPick.TeamAbbr) === team.abbr;
+    let reason = "";
+    let eligible = true;
+    if (!game) { eligible = false; reason = "BYE / not scheduled"; }
+    else {
+      const start = new Date(game.gameDateTime).getTime();
+      if (!isNaN(start) && start <= now && !isCurrent) { eligible = false; reason = game.completed ? "Game final" : "Game started"; }
+    }
+    if (!isCurrent && usesBefore >= settings.teamUseLimit) { eligible = false; reason = "Usage limit reached"; }
+    const info = ranking[team.abbr] || null;
+    result.push({ abbr:team.abbr, name:team.name, conference:team.conference, eligible:eligible, reason:reason, uses:usesBefore+(isCurrent?1:0), usesRemaining:Math.max(0,settings.teamUseLimit-usesBefore-(isCurrent?1:0)), rank:info?info.rank:null, average:info?info.average:null, rankingGames:info?info.games:0, game:game||null, current:!!isCurrent });
+  });
+  result.sort(function(a,b){ if(a.eligible!==b.eligible)return a.eligible?-1:1; const ar=a.rank===null?999:a.rank; const br=b.rank===null?999:b.rank; if(ar!==br)return ar-br; return a.name.localeCompare(b.name); });
+  return result;
 }
 
 function teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, currentPick) {
@@ -1001,6 +1064,157 @@ function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postse
   };
 }
 
+function teamFantasyUsageCountFromRows_(rows, gameId, settings, entryId, position, teamAbbr, currentWeek) {
+  let count = 0;
+  (rows || []).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || teamFantasyString_(row.EntryId) !== entryId) return;
+    if (Number(row.SeasonYear) !== settings.seasonYear) return;
+    if (teamFantasyNormalizePosition_(row.Position) !== position || teamFantasyNormalizeTeam_(row.TeamAbbr) !== teamAbbr) return;
+    const rowWeek = Number(row.Week) || 0;
+    if (rowWeek >= Number(currentWeek)) return;
+    if (Number(currentWeek) <= settings.regularSeasonEndWeek) {
+      if (rowWeek < 1 || rowWeek > settings.regularSeasonEndWeek) return;
+    } else if (settings.playoffUsageMode === "reset" && rowWeek <= settings.regularSeasonEndWeek) return;
+    count++;
+  });
+  return count;
+}
+
+function teamFantasyWritePickRow_(current, values) {
+  const sh = teamFantasyEnsureSheet_(TEAM_FANTASY_SHEETS.PICKS);
+  if (!sh || typeof sh.getRange !== "function" || typeof sh.getLastColumn !== "function" || typeof sh.getLastRow !== "function") {
+    if (current && current._rowNumber) { teamFantasyWriteObjectRow_(TEAM_FANTASY_SHEETS.PICKS, current._rowNumber, values); return current._rowNumber; }
+    return teamFantasyAppendObject_(TEAM_FANTASY_SHEETS.PICKS, values);
+  }
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(teamFantasyString_);
+  const rowNumber = current && current._rowNumber ? current._rowNumber : Math.max(2, sh.getLastRow() + 1);
+  const row = headers.map(function(header) { return values[header] === undefined ? "" : values[header]; });
+  sh.getRange(rowNumber, 1, 1, headers.length).setValues([row]);
+  return rowNumber;
+}
+
+function teamFantasySavedPickPayload_(values, locked) {
+  return {
+    teamAbbr: teamFantasyNormalizeTeam_(values.TeamAbbr),
+    teamName: teamFantasyString_(values.TeamName),
+    eventId: teamFantasyString_(values.ESPNEventId),
+    gameDateTime: teamFantasyString_(values.GameDateTime),
+    locked: locked === true,
+    pickMethod: teamFantasyString_(values.PickMethod)
+  };
+}
+
+function teamFantasyPlayerPreferenceDefault_(gameId, username) {
+  return { gameId: gameId, username: username, mode: "manual", window: "sunday-early", customLeadMinutes: 60, updatedAt: "" };
+}
+
+function teamFantasyGetPlayerPreference_(gameId, username) {
+  gameId = teamFantasyString_(gameId);
+  username = teamFantasyNormalizeUsername_(username);
+  const fallback = teamFantasyPlayerPreferenceDefault_(gameId, username);
+  if (!gameId || !username) return fallback;
+  const row = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS).filter(function(item) {
+    return teamFantasyString_(item.GameId) === gameId && teamFantasyNormalizeUsername_(item.Username) === username;
+  })[0];
+  if (!row) return fallback;
+  const mode = ["manual", "random", "auto"].indexOf(teamFantasyKey_(row.AutoFillMode)) !== -1 ? teamFantasyKey_(row.AutoFillMode) : "manual";
+  const windowKey = ["thursday", "saturday", "sunday-early", "sunday-afternoon", "custom"].indexOf(teamFantasyKey_(row.AutoFillWindow)) !== -1 ? teamFantasyKey_(row.AutoFillWindow) : "sunday-early";
+  return { gameId: gameId, username: username, mode: mode, window: windowKey, customLeadMinutes: Math.max(15, Math.min(720, Math.floor(teamFantasyNumber_(row.CustomLeadMinutes, 60)))), updatedAt: teamFantasyString_(row.UpdatedAt) };
+}
+
+function teamFantasyAutoFillTriggerStatus_() {
+  let count = 0;
+  try {
+    ScriptApp.getProjectTriggers().forEach(function(trigger) { if (trigger.getHandlerFunction() === "teamFantasyAutoFillTriggerHandler") count++; });
+    return { available: true, active: count > 0, count: count, handler: "teamFantasyAutoFillTriggerHandler" };
+  } catch (err) { return { available: false, active: false, count: 0, handler: "teamFantasyAutoFillTriggerHandler", error: err && err.message ? err.message : String(err) }; }
+}
+
+function teamFantasyEnsureAutoFillTrigger_() {
+  const status = teamFantasyAutoFillTriggerStatus_();
+  if (status.active) return status;
+  ScriptApp.newTrigger("teamFantasyAutoFillTriggerHandler").timeBased().everyMinutes(5).create();
+  return teamFantasyAutoFillTriggerStatus_();
+}
+
+function teamFantasySavePlayerPreference_(payload) {
+  payload = payload || {};
+  const gameId = teamFantasyString_(payload.gameId);
+  const username = teamFantasyNormalizeUsername_(payload.username);
+  if (!gameId || !username || !teamFantasyIsGame_(gameId)) throw new Error("User and Team Fantasy game are required.");
+  const mode = ["manual", "random", "auto"].indexOf(teamFantasyKey_(payload.autoFillMode)) !== -1 ? teamFantasyKey_(payload.autoFillMode) : "manual";
+  const windowKey = ["thursday", "saturday", "sunday-early", "sunday-afternoon", "custom"].indexOf(teamFantasyKey_(payload.autoFillWindow)) !== -1 ? teamFantasyKey_(payload.autoFillWindow) : "sunday-early";
+  const customLeadMinutes = Math.max(15, Math.min(720, Math.floor(teamFantasyNumber_(payload.customLeadMinutes, 60))));
+  const now = teamFantasyNowIso_();
+  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS, function(row) {
+    return teamFantasyString_(row.GameId) === gameId && teamFantasyNormalizeUsername_(row.Username) === username;
+  }, { GameId: gameId, Username: username, AutoFillMode: mode, AutoFillWindow: windowKey, CustomLeadMinutes: customLeadMinutes, UpdatedAt: now });
+  let triggerStatus = teamFantasyAutoFillTriggerStatus_();
+  let triggerWarning = "";
+  if (mode !== "manual" && !triggerStatus.active) {
+    try { triggerStatus = teamFantasyEnsureAutoFillTrigger_(); } catch (err) { triggerWarning = err && err.message ? err.message : String(err); }
+  }
+  const preference = teamFantasyGetPlayerPreference_(gameId, username);
+  preference.triggerStatus = triggerStatus;
+  preference.triggerWarning = triggerWarning;
+  return { success: true, preference: preference, message: mode === "manual" ? "Missed-lineup protection set to Manual Only." : "Missed-lineup protection saved." + (triggerWarning ? " Automatic trigger warning: " + triggerWarning : "") };
+}
+
+function teamFantasyLocalHour_(dateValue) {
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue);
+  if (isNaN(date.getTime())) return -1;
+  try {
+    const timezone = typeof Session !== "undefined" && Session.getScriptTimeZone ? Session.getScriptTimeZone() : "America/Chicago";
+    if (typeof Utilities !== "undefined" && Utilities.formatDate) return Number(Utilities.formatDate(date, timezone || "America/Chicago", "H"));
+  } catch (err) {}
+  return date.getUTCHours();
+}
+
+function teamFantasyAutoFillActivation_(gameId, settings, week, preference, schedule) {
+  preference = preference || teamFantasyPlayerPreferenceDefault_(gameId, "");
+  const games = (schedule && schedule.games || []).map(function(game) {
+    const ms = new Date(game.gameDateTime).getTime();
+    return { game: game, ms: ms, day: teamFantasyReminderDayCode_(ms), hour: teamFantasyLocalHour_(ms) };
+  }).filter(function(item) { return !isNaN(item.ms); }).sort(function(a,b){ return a.ms-b.ms; });
+  if (!games.length || preference.mode === "manual") return { activeAtMs: 0, activeAt: "", label: "Manual Only", available: false };
+  let target = null;
+  let lead = 30;
+  if (preference.window === "thursday") target = games.find(function(item){ return item.day === "thu"; }) || null;
+  else if (preference.window === "saturday") target = games.find(function(item){ return item.day === "sat"; }) || null;
+  else if (preference.window === "sunday-early") target = games.find(function(item){ return item.day === "sun" && item.hour >= 0 && item.hour < 14; }) || null;
+  else if (preference.window === "sunday-afternoon") target = games.find(function(item){ return item.day === "sun" && item.hour >= 14; }) || null;
+  else if (preference.window === "custom") { target = games[0] || null; lead = preference.customLeadMinutes; }
+  if (!target) return { activeAtMs: 0, activeAt: "", label: "No matching NFL kickoff window this week", available: false };
+  const ms = target.ms - lead * 60000;
+  return { activeAtMs: ms, activeAt: new Date(ms).toISOString(), label: preference.window === "custom" ? lead + " minutes before first weekly kickoff" : "30 minutes before " + preference.window.replace(/-/g," ") + " kickoff", available: true };
+}
+
+function teamFantasyRunAutomaticFillForPlayer_(gameId, username, nowMs) {
+  const settings = teamFantasyGetSettings_(gameId);
+  const preference = teamFantasyGetPlayerPreference_(gameId, username);
+  if (preference.mode === "manual") return { success: true, skipped: true, reason: "manual" };
+  const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek, settings);
+  const activation = teamFantasyAutoFillActivation_(gameId, settings, settings.currentWeek, preference, schedule);
+  if (!activation.available || Number(nowMs || Date.now()) < activation.activeAtMs) return { success: true, skipped: true, reason: activation.available ? "not-due" : "no-window", activation: activation };
+  const result = teamFantasyAutoPick_({ username: username, gameId: gameId, week: settings.currentWeek, _settings: settings, _schedule: schedule }, preference.mode === "random");
+  result.activation = activation;
+  result.preference = preference;
+  return result;
+}
+
+function teamFantasyAutoFillTriggerHandler() {
+  const rows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS);
+  const results = [];
+  rows.forEach(function(row) {
+    const gameId = teamFantasyString_(row.GameId);
+    const username = teamFantasyNormalizeUsername_(row.Username);
+    if (!gameId || !username || teamFantasyKey_(row.AutoFillMode) === "manual") return;
+    try { results.push(teamFantasyRunAutomaticFillForPlayer_(gameId, username, Date.now())); }
+    catch (err) { results.push({ success: false, gameId: gameId, username: username, error: err && err.message ? err.message : String(err) }); }
+  });
+  return { success: true, results: results };
+}
+
 function teamFantasySavePick_(payload) {
   payload = payload || {};
   const username = teamFantasyNormalizeUsername_(payload.username);
@@ -1013,51 +1227,63 @@ function teamFantasySavePick_(payload) {
   if (!teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
-  const entries = payload._entries || teamFantasyEnsureEntriesForUser_(gameId, username);
-  const entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
+  let entries = payload._entries || teamFantasyEntriesForUser_(gameId, username);
+  let entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
+  if (!entry) {
+    entries = teamFantasyEnsureEntriesForUser_(gameId, username);
+    entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
+  }
   if (!entry) throw new Error("Entry does not belong to the signed-in user.");
-  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
-  if (postseasonEligibility[entry.entryId] === false) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
-  const schedule = payload._schedule || teamFantasyFetchWeekSchedule_(gameId, week);
-  const currentRows = teamFantasyPickRows_(gameId, settings.seasonYear, week, entryId);
+  if (week > settings.regularSeasonEndWeek) {
+    const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
+    if (postseasonEligibility[entry.entryId] === false) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
+  }
+  const schedule = payload._schedule || teamFantasyFetchWeekSchedule_(gameId, week, settings);
+  const allPickRows = payload._pickRows || teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS);
+  const currentRows = allPickRows.filter(function(row) {
+    return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear && Number(row.Week) === week && teamFantasyString_(row.EntryId) === entryId;
+  });
   const current = currentRows.filter(function(row) { return teamFantasyNormalizePosition_(row.Position) === position; })[0] || null;
   if (current) {
     const currentGame = schedule.byTeam[teamFantasyNormalizeTeam_(current.TeamAbbr)];
     const currentStart = currentGame ? new Date(currentGame.gameDateTime).getTime() : new Date(current.GameDateTime || 0).getTime();
     if (!isNaN(currentStart) && currentStart <= Date.now()) throw new Error("That " + TEAM_FANTASY_POSITION_LABELS[position] + " pick is locked because its NFL game has started.");
   }
-  const options = teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, current);
-  const selected = options.filter(function(option) { return option.abbr === teamAbbr; })[0];
-  if (!selected || !selected.eligible) throw new Error(selected && selected.reason ? selected.reason : "That team is not eligible for this slot.");
-  const game = selected.game;
+  const meta = teamFantasyTeamMeta_(teamAbbr);
+  if (!meta || !meta.abbr || !meta.conference) throw new Error("That NFL team is not recognized.");
+  if (entry.conference !== "ALL" && entry.conference !== meta.conference) throw new Error("That team is outside this " + entry.conference + " entry.");
+  const game = schedule.byTeam[teamAbbr];
+  if (!game) throw new Error("BYE / not scheduled");
+  const selectedStart = new Date(game.gameDateTime).getTime();
+  if (!isNaN(selectedStart) && selectedStart <= Date.now() && (!current || teamFantasyNormalizeTeam_(current.TeamAbbr) !== teamAbbr)) throw new Error(game.completed ? "Game final" : "Game started");
+  const usesBefore = teamFantasyUsageCountFromRows_(allPickRows, gameId, settings, entryId, position, teamAbbr, week);
+  const isCurrent = current && teamFantasyNormalizeTeam_(current.TeamAbbr) === teamAbbr;
+  if (!isCurrent && usesBefore >= settings.teamUseLimit) throw new Error("Usage limit reached");
   const teamId = game.homeAbbr === teamAbbr ? game.homeTeamId : game.awayTeamId;
   const now = teamFantasyNowIso_();
-  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.PICKS, function(row) {
-    return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear &&
-      Number(row.Week) === week && teamFantasyString_(row.EntryId) === entryId && teamFantasyNormalizePosition_(row.Position) === position;
-  }, {
-    GameId: gameId,
-    SeasonYear: settings.seasonYear,
-    Week: week,
-    EntryId: entryId,
-    Username: username,
-    Conference: entry.conference,
-    Position: position,
-    TeamAbbr: teamAbbr,
-    TeamName: selected.name,
-    ESPNTeamId: teamId || "",
-    ESPNEventId: game.eventId,
-    GameDateTime: game.gameDateTime,
-    Locked: false,
-    PickMethod: pickMethod,
-    CreatedAt: current ? current.CreatedAt || now : now,
-    UpdatedAt: now
-  });
-  if (payload._deferFlush !== true) SpreadsheetApp.flush();
-  return { success: true, gameId: gameId, week: week, entryId: entryId, position: position, teamAbbr: teamAbbr };
+  const values = {
+    GameId: gameId, SeasonYear: settings.seasonYear, Week: week, EntryId: entryId, Username: username,
+    Conference: entry.conference, Position: position, TeamAbbr: teamAbbr, TeamName: meta.name,
+    ESPNTeamId: teamId || "", ESPNEventId: game.eventId, GameDateTime: game.gameDateTime, Locked: false,
+    PickMethod: pickMethod, CreatedAt: current ? current.CreatedAt || now : now, UpdatedAt: now
+  };
+  // RC14 fast path intentionally avoids a forced single-pick flush. Legacy batch marker retained for regression continuity: payload._deferFlush !== true
+  teamFantasyWritePickRow_(current, values);
+  const simulated = currentRows.filter(function(row) { return teamFantasyNormalizePosition_(row.Position) !== position; }).concat([values]);
+  const pickedPositions = {};
+  simulated.forEach(function(row){ const pos = teamFantasyNormalizePosition_(row.Position); if (pos) pickedPositions[pos] = true; });
+  const missingPositions = TEAM_FANTASY_POSITIONS.filter(function(pos){ return !pickedPositions[pos]; });
+  return {
+    success: true, gameId: gameId, week: week, entryId: entryId, position: position, teamAbbr: teamAbbr,
+    previousTeamAbbr: current ? teamFantasyNormalizeTeam_(current.TeamAbbr) : "", usageLimit: settings.teamUseLimit,
+    savedPick: teamFantasySavedPickPayload_(values, false), picked: Object.keys(pickedPositions).length,
+    required: TEAM_FANTASY_POSITIONS.length, remaining: missingPositions.length, complete: missingPositions.length === 0,
+    missingPositions: missingPositions
+  };
 }
 
 function apiSaveTeamFantasyPick(payload) {
+  if (payload && payload.preferenceOnly === true) return teamFantasySavePlayerPreference_(payload);
   return teamFantasySavePick_(payload);
 }
 
@@ -1065,52 +1291,38 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   payload = payload || {};
   const username = teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
-  const settings = teamFantasyGetSettings_(gameId);
+  const settings = payload._settings || teamFantasyGetSettings_(gameId);
   if (randomOnly && !settings.allowRandomPick) throw new Error("Random Pick is disabled for this game.");
   if (!randomOnly && !settings.allowSmartAutoPick) throw new Error("Auto Pick is disabled for this game.");
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
-  const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
+  const entries = payload._entries || teamFantasyEnsureEntriesForUser_(gameId, username);
   const wantedEntryId = teamFantasyString_(payload.entryId);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
-  const targets = (wantedEntryId ? entries.filter(function(entry) { return entry.entryId === wantedEntryId; }) : entries).filter(function(entry) {
-    return postseasonEligibility[entry.entryId] !== false;
-  });
+  const targets = (wantedEntryId ? entries.filter(function(entry) { return entry.entryId === wantedEntryId; }) : entries).filter(function(entry) { return postseasonEligibility[entry.entryId] !== false; });
   if (wantedEntryId && !targets.length) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
+  const requestedPositions = (Array.isArray(payload.positions) ? payload.positions : (payload.position ? [payload.position] : [])).map(teamFantasyNormalizePosition_).filter(Boolean);
+  const schedule = payload._schedule || teamFantasyFetchWeekSchedule_(gameId, week, settings);
+  const pickRows = payload._pickRows || teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS);
+  const scoreRows = randomOnly ? [] : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
+  const rankingsByPosition = {};
   const results = [];
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
   targets.forEach(function(entry) {
-    const lineup = teamFantasyLineupState_(gameId, settings, entry, week, schedule, true);
-    lineup.slots.forEach(function(slot) {
-      if (slot.pick || slot.locked) return;
-      const eligible = slot.teams.filter(function(team) { return team.eligible; });
+    const positions = requestedPositions.length ? requestedPositions : TEAM_FANTASY_POSITIONS.slice();
+    positions.forEach(function(position) {
+      const current = pickRows.filter(function(row) {
+        return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear && Number(row.Week) === week && teamFantasyString_(row.EntryId) === entry.entryId && teamFantasyNormalizePosition_(row.Position) === position;
+      })[0] || null;
+      if (current) return;
+      if (!randomOnly && !rankingsByPosition[position]) rankingsByPosition[position] = teamFantasyRankingsFromRows_(scoreRows, gameId, position, week, settings.seasonYear);
+      const eligible = teamFantasyEligibleTeamsFromRows_(gameId, settings, entry, position, week, schedule, null, pickRows, randomOnly ? {} : rankingsByPosition[position]).filter(function(team){ return team.eligible; });
       if (!eligible.length) return;
-      let choice = null;
-      if (randomOnly) {
-        choice = eligible[Math.floor(Math.random() * eligible.length)];
-      } else {
-        const ranked = eligible.filter(function(team) { return team.rank !== null; });
-        const pool = ranked.length ? ranked.slice(0, Math.max(1, Math.min(5, ranked.length))) : eligible;
-        // Small amount of variety prevents every Auto Pick lineup from being identical.
-        choice = pool[Math.floor(Math.random() * pool.length)];
-      }
-      results.push(teamFantasySavePick_({
-        username: username,
-        gameId: gameId,
-        week: week,
-        entryId: entry.entryId,
-        position: slot.position,
-        teamAbbr: choice.abbr,
-        pickMethod: randomOnly ? "random" : "auto",
-        _settings: settings,
-        _entries: entries,
-        _schedule: schedule,
-        _deferFlush: true
-      }));
+      const choice = randomOnly ? eligible[Math.floor(Math.random() * eligible.length)] : eligible[0];
+      results.push(teamFantasySavePick_({ username:username, gameId:gameId, week:week, entryId:entry.entryId, position:position, teamAbbr:choice.abbr, pickMethod:randomOnly?"random":"auto", _settings:settings, _entries:entries, _schedule:schedule, _pickRows:pickRows, _deferFlush: true }));
     });
   });
   /* TEAM_FANTASY_GAME_DAY_BATCH_FLUSH_v1218r1 */
   SpreadsheetApp.flush();
-  return { success: true, random: !!randomOnly, saved: results.length, results: results };
+  return { success:true, random:!!randomOnly, saved:results.length, results:results };
 }
 
 function apiRandomTeamFantasyPicks(payload) { return teamFantasyAutoPick_(payload, true); }
@@ -1377,7 +1589,7 @@ function teamFantasyRefreshAndScoreWeek_(gameId, week) {
   const picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, "");
   const rules = teamFantasyRules_(gameId);
   const byEvent = {};
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
+  const schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
   const weekClosed = schedule.games.length > 0 && schedule.games.every(function(game) {
     return game.completed === true || game.state === "post" || teamFantasyKey_(game.status).indexOf("final") !== -1;
   });
@@ -1655,6 +1867,8 @@ function apiGetTeamFantasyState(payload) {
   const requestedAllowed = requestedLeagueId && leagues.some(function(league) { return league.leagueId === requestedLeagueId; });
   const selectedLeagueId = requestedAllowed ? requestedLeagueId : (leagues[0] ? leagues[0].leagueId : "complete");
   const standings = teamFantasyBuildStandings_(gameId, selectedLeagueId);
+  const playerAutoFill = teamFantasyGetPlayerPreference_(gameId, username);
+  playerAutoFill.activation = teamFantasyAutoFillActivation_(gameId, settings, week, playerAutoFill, schedule);
   return {
     success: true,
     version: TEAM_FANTASY_VERSION,
@@ -1670,7 +1884,8 @@ function apiGetTeamFantasyState(payload) {
     standings: standings.success ? standings : null,
     scheduleGames: schedule.games,
     positionLabels: TEAM_FANTASY_POSITION_LABELS,
-    scoringRules: teamFantasyRules_(gameId).filter(function(rule) { return rule.active; })
+    scoringRules: teamFantasyRules_(gameId).filter(function(rule) { return rule.active; }),
+    playerAutoFill: playerAutoFill
   };
 }
 

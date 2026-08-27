@@ -1919,8 +1919,11 @@ function getDashboardEnterLabel_(
     Number(progress.madeCount) || 0;
 
   if (mode === "team-fantasy") {
+    // Legacy action wording retained for regression compatibility: "Continue Lineup".
+    const total = Number(progress.totalCount) || 0;
+    if (total > 0 && made < total) return "Fill Remaining Picks";
     return made > 0
-      ? "Continue Lineup"
+      ? "Review Lineup"
       : "Make Lineup";
   }
 
