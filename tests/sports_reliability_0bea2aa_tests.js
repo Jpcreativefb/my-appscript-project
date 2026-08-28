@@ -439,7 +439,7 @@ assert.strictEqual(winSettlement.wagerResultType, 'win');
 // 9) Bankroll / payout behavior used by Sports Wagers.
 const betCtx = runFunctions(betting, [
   'normalizeBetString_', 'normalizeBetKey_', 'normalizeBetGameId_', 'roundBetMoney_', 'slugifyBet_',
-  'getBetResolution_', 'getUserBettingSummary'
+  'getBetResolution_', 'buildUserBettingSummary_', 'getUserBettingSummary'
 ], {
   getDefaultGameId: () => 'sports-wagers',
   validateGameId: () => true,

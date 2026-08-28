@@ -655,6 +655,18 @@ function doPost(e) {
       return json(apiAdminCreateRealityTvSeason(body));
     }
 
+    if (action === "adminUpdateRealityTvContestant") {
+      return json(apiAdminUpdateRealityTvContestant(body));
+    }
+
+    if (action === "adminSaveRealityTvSeasonSettings") {
+      return json(apiAdminSaveRealityTvSeasonSettings(body));
+    }
+
+    if (action === "adminResumeRealityTvSeasonSetup") {
+      return json(apiAdminResumeRealityTvSeasonSetup(body));
+    }
+
     if (action === "adminBulkAddRealityTvContestants") {
       return json(apiAdminBulkAddRealityTvContestants(body));
     }
@@ -1421,6 +1433,16 @@ function doGet(e) {
 
     }
 
+    if (action === "adminFinalizeGamePublication") {
+
+      return json(
+        adminFinalizeGamePublication(
+          params
+        )
+      );
+
+    }
+
     if (action === "adminCreateGame") {
 
       return json(
@@ -1569,6 +1591,18 @@ function doGet(e) {
 
     if (action === "adminCreateRealityTvSeason") {
       return json(apiAdminCreateRealityTvSeason(params));
+    }
+
+    if (action === "adminUpdateRealityTvContestant") {
+      return json(apiAdminUpdateRealityTvContestant(params));
+    }
+
+    if (action === "adminSaveRealityTvSeasonSettings") {
+      return json(apiAdminSaveRealityTvSeasonSettings(params));
+    }
+
+    if (action === "adminResumeRealityTvSeasonSetup") {
+      return json(apiAdminResumeRealityTvSeasonSetup(params));
     }
 
     if (action === "adminAddRealityTvContestant") {

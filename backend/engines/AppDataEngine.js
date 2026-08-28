@@ -1700,6 +1700,17 @@ function getDashboardHubPlacement_(game, mode) {
     return { category: "reality", group: "Other Reality" };
   }
 
+  // A Reality-managed game does not have to contain a known show name in its
+  // title. Use the authoritative season link as the fallback so disposable,
+  // custom, and future Reality shows still appear in the Reality Hub once the
+  // game is published.
+  if (
+    typeof realityTvHasSeasonForGameCached_ === "function" &&
+    realityTvHasSeasonForGameCached_(game.gameId)
+  ) {
+    return { category: "reality", group: "Other Reality" };
+  }
+
   const awardGroups = [
     ["Oscars", ["oscar", "academy awards"]],
     ["Emmys", ["emmy"]],

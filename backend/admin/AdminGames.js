@@ -1448,6 +1448,201 @@ function adminGetGameTypes() {
    Creates if missing, updates if existing.
 ========================================================= */
 
+function adminPublicationStateSnapshot_(gameId) {
+
+  if (typeof clearGamesCache === "function") {
+    clearGamesCache();
+  }
+
+  const game =
+    typeof getGame === "function"
+      ? getGame(gameId)
+      : null;
+
+  if (!game) {
+    return null;
+  }
+
+  return {
+    gameId: game.gameId || gameId,
+    status: adminNormalizeValue_(game.status),
+    active: game.active === true,
+    archived: game.archived === true,
+    defaultGame: game.defaultGame === true,
+    lockAllPicks: game.lockAllPicks === true,
+    showLeaderboard: game.showLeaderboard !== false
+  };
+
+}
+
+function adminSetPublicationSetupState_(gameId) {
+
+  return adminUpdateGame({
+    gameId: gameId,
+    status: "Setup",
+    active: false,
+    archived: false,
+    defaultGame: false,
+    lockAllPicks: true
+  });
+
+}
+
+/* =========================================================
+   FINALIZE GAME PUBLICATION AFTER PREFLIGHT
+   Warning approval is explicit and the final persisted state is read back
+   before success is returned to the browser.
+========================================================= */
+
+function adminFinalizeGamePublication(payload) {
+
+  payload = payload || {};
+
+  const gameId =
+    adminNormalizeGameId_(payload.gameId);
+
+  if (!gameId) {
+    return {
+      success: false,
+      error: "GameId is required"
+    };
+  }
+
+  const warningsApproved =
+    adminToBoolean_(payload.warningsApproved);
+
+  let preflight = null;
+
+  try {
+    preflight =
+      typeof adminRunGamePreflight === "function"
+        ? adminRunGamePreflight({ gameId: gameId })
+        : null;
+  } catch (err) {
+    adminSetPublicationSetupState_(gameId);
+    return {
+      success: false,
+      blocked: true,
+      setupOnly: true,
+      error: "Game setup was saved, but the production check could not run. The game remains in Setup and locked.",
+      detail: err && err.message ? err.message : String(err),
+      game: adminPublicationStateSnapshot_(gameId)
+    };
+  }
+
+  if (!preflight || preflight.success === false) {
+    adminSetPublicationSetupState_(gameId);
+    return {
+      success: false,
+      blocked: true,
+      setupOnly: true,
+      error: preflight && (preflight.error || preflight.message)
+        ? preflight.error || preflight.message
+        : "Game setup was saved, but the production check could not run. The game remains in Setup and locked.",
+      preflight: preflight,
+      game: adminPublicationStateSnapshot_(gameId)
+    };
+  }
+
+  const errorCount =
+    Math.max(0, Number(preflight.errorCount) || 0);
+
+  const warningCount =
+    Math.max(0, Number(preflight.warningCount) || 0);
+
+  if (errorCount > 0) {
+    adminSetPublicationSetupState_(gameId);
+    return {
+      success: false,
+      blocked: true,
+      setupOnly: true,
+      error: "Game setup was saved, but it was not activated because the production check found " + errorCount + " error(s). Run Check in Manage Games for details.",
+      preflight: preflight,
+      game: adminPublicationStateSnapshot_(gameId)
+    };
+  }
+
+  if (warningCount > 0 && !warningsApproved) {
+    adminSetPublicationSetupState_(gameId);
+    return {
+      success: true,
+      activated: false,
+      setupOnly: true,
+      message: "Game setup was saved. Activation was cancelled, so the game remains in Setup and locked.",
+      preflight: preflight,
+      game: adminPublicationStateSnapshot_(gameId)
+    };
+  }
+
+  adminUpdateGame({
+    gameId: gameId,
+    status: "Active",
+    active: true,
+    archived: false,
+    defaultGame: adminToBoolean_(payload.defaultGame),
+    lockAllPicks: adminToBoolean_(payload.lockAllPicks)
+  });
+
+  if (
+    typeof clearPlayerActionCaches === "function" &&
+    adminNormalizeValue_(payload.username)
+  ) {
+    clearPlayerActionCaches(
+      gameId,
+      ["Games"],
+      adminNormalizeValue_(payload.username)
+    );
+  }
+
+  const stored =
+    adminPublicationStateSnapshot_(gameId);
+
+  const expectedDefault =
+    adminToBoolean_(payload.defaultGame);
+
+  const expectedLock =
+    adminToBoolean_(payload.lockAllPicks);
+
+  const persistedLive =
+    stored &&
+    stored.status.toLowerCase() === "active" &&
+    stored.active === true &&
+    stored.archived !== true &&
+    stored.defaultGame === expectedDefault &&
+    stored.lockAllPicks === expectedLock;
+
+  if (!persistedLive) {
+    adminSetPublicationSetupState_(gameId);
+    return {
+      success: false,
+      blocked: true,
+      setupOnly: true,
+      error: "Activation did not persist the requested LIVE state. The game was returned to Setup and locked instead of reporting a false success.",
+      preflight: preflight,
+      requested: {
+        status: "Active",
+        active: true,
+        archived: false,
+        defaultGame: expectedDefault,
+        lockAllPicks: expectedLock
+      },
+      game: adminPublicationStateSnapshot_(gameId)
+    };
+  }
+
+  return {
+    success: true,
+    activated: true,
+    setupOnly: false,
+    message: warningCount > 0
+      ? "Game published LIVE with " + warningCount + " approved warning(s)."
+      : "Game published LIVE.",
+    preflight: preflight,
+    game: stored
+  };
+
+}
+
 function adminSaveGame(payload) {
 
   if (!payload) {

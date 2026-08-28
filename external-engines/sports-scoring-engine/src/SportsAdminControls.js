@@ -2597,11 +2597,28 @@ function refreshSportsOddsForLeagueControlled_(
         result.usable
     );
 
+    const refreshedSetting =
+      getSportsOddsSettingForLeague_(league) || {};
+
     return {
       success: true,
       league: league,
       reason: reason,
       usage: newUsage,
+      displayUsage: {
+        callsToday: Number(refreshedSetting.CallsToday || 0),
+        maxRefreshesPerDay: Number(refreshedSetting.MaxRefreshesPerDay || 0),
+        callsThisMonth: Number(refreshedSetting.CallsThisMonth || 0),
+        monthlyBudget: Number(refreshedSetting.MonthlyBudget || 0),
+        apiRemaining:
+          refreshedSetting.LastApiRemaining !== undefined &&
+          refreshedSetting.LastApiRemaining !== null &&
+          refreshedSetting.LastApiRemaining !== ""
+            ? Number(refreshedSetting.LastApiRemaining)
+            : (result && result.apiUsage && result.apiUsage.requestsRemaining !== undefined
+                ? Number(result.apiUsage.requestsRemaining)
+                : "")
+      },
       result: result,
       diagnosticWarning: diagnosticLogWarning
     };

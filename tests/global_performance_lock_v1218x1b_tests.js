@@ -56,7 +56,7 @@ const betting = read('backend/engines/BettingEngine.js');
 const saveBet = fnSlice(betting, 'saveBet');
 ok(saveBet.includes('getDocumentLock'), 'Bet saves must use interactive document lock domain');
 ok(!saveBet.includes('clearAppCaches'), 'Bet save must not globally clear caches');
-ok(saveBet.indexOf('lock.releaseLock()') < saveBet.lastIndexOf('getUserBettingSummary'), 'Bet save must release write lock before summary reconstruction');
+ok(saveBet.indexOf('lock.releaseLock()') < saveBet.lastIndexOf('buildUserBettingSummary_'), 'Bet save must release write lock before post-save summary reconstruction');
 
 const picks = read('backend/engines/PicksEngine.js');
 ok(picks.includes('typeof LockService.getDocumentLock === "function"'), 'Pick saves must prefer document lock with safe fallback');

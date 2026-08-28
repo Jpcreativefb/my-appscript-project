@@ -1774,7 +1774,7 @@ function getLatestBetsByUser_(gameId){
 
 }
 
-function getLatestBetsForSingleUser_(username, gameId){
+function getLatestBetsForSingleUserFromData_(username, gameId, data){
 
   const userKey = normalizeBetKey_(username);
 
@@ -1786,7 +1786,7 @@ function getLatestBetsForSingleUser_(username, gameId){
     gameId || getDefaultGameId()
   );
 
-  const data = getAllBetsData_();
+  data = Array.isArray(data) ? data : [];
 
   if (data.length <= 1) {
     return {};
@@ -1876,6 +1876,16 @@ function getLatestBetsForSingleUser_(username, gameId){
   }
 
   return bets;
+
+}
+
+function getLatestBetsForSingleUser_(username, gameId){
+
+  return getLatestBetsForSingleUserFromData_(
+    username,
+    gameId,
+    getAllBetsData_()
+  );
 
 }
 
@@ -2002,17 +2012,11 @@ function getBetResolution_(bet, settings){
    SUMMARY
 ===================================================== */
 
-function getUserBettingSummary(username, gameId){
+function buildUserBettingSummary_(username, gameId, config, settings, bets){
 
-  gameId = normalizeBetGameId_(
-    gameId || getDefaultGameId()
-  );
-
-  validateGameId(gameId);
-
-  const config = getBettingGameConfig(gameId);
-  const settings = getCategorySettings(gameId);
-  const bets = getUserBets(username, gameId);
+  bets = Array.isArray(bets) ? bets : [];
+  config = config || {};
+  settings = settings || {};
 
   let totalStaked = 0;
   let pendingStake = 0;
@@ -2100,6 +2104,28 @@ function getUserBettingSummary(username, gameId){
     totalBets: bets.length,
     bets: resolvedBets
   };
+
+}
+
+function getUserBettingSummary(username, gameId){
+
+  gameId = normalizeBetGameId_(
+    gameId || getDefaultGameId()
+  );
+
+  validateGameId(gameId);
+
+  const config = getBettingGameConfig(gameId);
+  const settings = getCategorySettings(gameId);
+  const bets = getUserBets(username, gameId);
+
+  return buildUserBettingSummary_(
+    username,
+    gameId,
+    config,
+    settings,
+    bets
+  );
 
 }
 
@@ -2588,15 +2614,36 @@ function saveBet(payload){
       };
     }
 
-    const currentSummary = getUserBettingSummary(
+    // Read Bets once while the write lock is held. Reuse that same snapshot for
+    // bankroll validation, duplicate detection, and the post-save summary. The
+    // older path rebuilt the full user summary both before and after the write,
+    // which made an interactive wager wait on multiple full
+    // sheet scans even though config/settings/odds were already loaded above.
+    const data = getAllBetsData_();
+
+    const latestBetsByCategory =
+      getLatestBetsForSingleUserFromData_(
+        username,
+        gameId,
+        data
+      );
+
+    const currentBets = Object
+      .values(latestBetsByCategory)
+      .sort(function(a, b) {
+        return a.categoryId.localeCompare(b.categoryId);
+      });
+
+    const currentSummary = buildUserBettingSummary_(
       username,
-      gameId
+      gameId,
+      config,
+      settings,
+      currentBets
     );
 
-    const currentBetForCategory = (currentSummary.bets || [])
-      .find(function(bet) {
-        return normalizeBetKey_(bet.categoryId) === categoryId;
-      });
+    const currentBetForCategory =
+      latestBetsByCategory[categoryId] || null;
 
     const existingAmountForCategory = currentBetForCategory
       ? Number(currentBetForCategory.betAmount || 0)
@@ -2618,8 +2665,6 @@ function saveBet(payload){
     }
 
     const odds = selectedOdds;
-
-    const data = getAllBetsData_();
 
     const headers = data[0]
       .map(h => String(h || "").trim());
@@ -2724,6 +2769,38 @@ function saveBet(payload){
       clearGameCaches(gameId);
     }
 
+    const potentialReturn = roundBetMoney_(
+      betAmount * odds
+    );
+
+    const savedBet = {
+      username: username,
+      categoryId: categoryId,
+      nomineeId: nomineeId,
+      betAmount: betAmount,
+      odds: odds,
+      potentialReturn: potentialReturn,
+      timestamp: now
+    };
+
+    const nextBets = currentBets
+      .filter(function(bet) {
+        return normalizeBetKey_(bet.categoryId) !== categoryId;
+      });
+
+    nextBets.push(savedBet);
+    nextBets.sort(function(a, b) {
+      return a.categoryId.localeCompare(b.categoryId);
+    });
+
+    const nextSummary = buildUserBettingSummary_(
+      username,
+      gameId,
+      config,
+      settings,
+      nextBets
+    );
+
     return {
       success: true,
       gameId: gameId,
@@ -2733,13 +2810,8 @@ function saveBet(payload){
       odds: odds,
       action: saveAction,
       duplicatesRemoved: duplicatesRemoved,
-      potentialReturn: roundBetMoney_(
-        betAmount * odds
-      ),
-      summary: getUserBettingSummary(
-        username,
-        gameId
-      )
+      potentialReturn: potentialReturn,
+      summary: nextSummary
     };
 
   } catch (err) {

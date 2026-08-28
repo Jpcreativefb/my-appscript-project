@@ -2339,6 +2339,31 @@ function realityTvSetEpisodeQuestionEnabled_(season, question, enabled) {
   return { changed: true, preserved: false, enabled: targetEnabled };
 }
 
+function realityTvSetEpisodeQuestionDisplayOrder_(season, episode, question, displayOrder, setup) {
+  if (!season || !episode || !question) return { changed: false, order: 0 };
+  const order = Math.max(1, realityTvNumber_(displayOrder, realityTvNumber_(question.DisplayOrder, 50)));
+  const sheet = SpreadsheetApp.getActive().getSheetByName(REALITY_TV_EPISODE_QUESTIONS_SHEET);
+  if (!sheet) throw new Error("Reality episode questions sheet not found.");
+  realityTvUpdateObjectRow_(sheet, question.__rowNumber, { DisplayOrder: order, UpdatedAt: new Date() });
+  question.DisplayOrder = order;
+
+  // Display order is episode metadata, not a side effect of rebuilding answers.
+  // Update the playable category when it exists, but keep the episode row
+  // authoritative even when a supplemental question build is skipped/deferred.
+  const categories = setup && Array.isArray(setup.categories) ? setup.categories : [];
+  const hasCategory = categories.some(function(item) {
+    return realityTvKey_(item.categoryId || item.id) === realityTvKey_(question.CategoryId);
+  });
+  if (hasCategory && question.CategoryId) {
+    adminUpdateCategory({
+      gameId: season.GameId,
+      categoryId: question.CategoryId,
+      displayOrder: (realityTvNumber_(episode.EpisodeNumber, 0) * 100) + order
+    });
+  }
+  return { changed: true, order: order, categoryUpdated: hasCategory };
+}
+
 function realityTvDeleteEpisodeQuestionForPlan_(season, question) {
   if (!question) return { removed: false, preserved: false };
   if (realityTvString_(question.Status).toUpperCase() === "FINAL") {
@@ -2412,6 +2437,17 @@ function apiAdminApplyRealityTvEpisodeQuestionPlan(payload) {
   });
   const selectedLookup = {};
   selectedIds.forEach(function(id) { selectedLookup[id] = true; });
+  const setup = adminGetGameSetup({ gameId: season.GameId });
+
+  // Persist current-episode order independently from question materialization.
+  // A build may legitimately skip (for example, temporarily insufficient answer
+  // options); that must not roll an explicit episode-only order back on reload.
+  existingQuestions.forEach(function(question) {
+    const id = realityTvKey_(question.TemplateId || question.QuestionType);
+    if (!Object.prototype.hasOwnProperty.call(orderById, id)) return;
+    realityTvSetEpisodeQuestionDisplayOrder_(season, episode, question, orderById[id], setup);
+  });
+
   let disabled = 0;
   const preserved = [];
   existingQuestions.forEach(function(question) {
@@ -2439,7 +2475,6 @@ function apiAdminApplyRealityTvEpisodeQuestionPlan(payload) {
   let built = 0;
   let skipped = 0;
   const results = [];
-  const setup = adminGetGameSetup({ gameId: season.GameId });
   selectedIds.forEach(function(id) {
     const template = Object.assign({}, templatesById[id]);
     if (Object.prototype.hasOwnProperty.call(pointsById, id)) template.Points = pointsById[id];

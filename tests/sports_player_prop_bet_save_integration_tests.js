@@ -47,6 +47,7 @@ vm.runInContext(bettingEngine, context);
 context.getBettingGameConfig = function() {
   return {
     enabled: true,
+    startingBankroll: 1000,
     minBet: 1,
     maxBet: 100,
     minWager: 1,

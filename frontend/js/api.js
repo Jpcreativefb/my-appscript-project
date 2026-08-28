@@ -1872,6 +1872,18 @@ async function apiAdminUpdateGame(payload) {
 
 }
 
+async function apiAdminFinalizeGamePublication(payload) {
+
+  return apiAdminGameSaveRequest_(
+    "adminFinalizeGamePublication",
+    Object.assign(
+      {},
+      payload || {}
+    )
+  );
+
+}
+
 async function apiAdminArchiveGame(gameId) {
 
   return api(
@@ -2287,6 +2299,18 @@ async function apiAdminSaveSeasonAnchorSettings(payload) {
 
 async function apiAdminCreateRealityTvSeason(payload) {
   return apiAdminRealityTvPostRequest_("adminCreateRealityTvSeason", payload || {});
+}
+
+async function apiAdminUpdateRealityTvContestant(payload) {
+  return apiAdminRealityTvPostRequest_("adminUpdateRealityTvContestant", payload || {});
+}
+
+async function apiAdminSaveRealityTvSeasonSettings(payload) {
+  return apiAdminRealityTvPostRequest_("adminSaveRealityTvSeasonSettings", payload || {});
+}
+
+async function apiAdminResumeRealityTvSeasonSetup(payload) {
+  return apiAdminRealityTvPostRequest_("adminResumeRealityTvSeasonSetup", payload || {});
 }
 
 async function apiAdminAddRealityTvContestant(payload) {

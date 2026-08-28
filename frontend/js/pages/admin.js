@@ -3033,21 +3033,23 @@ async function adminSaveGameFromForm(
             " warning(s). Publish this game as LIVE anyway?"
           );
 
-        if (!continueWithWarnings) {
+        res = await apiAdminFinalizeGamePublication({
+          gameId: game.gameId,
+          warningsApproved: continueWithWarnings === true,
+          defaultGame: publishAsDefault,
+          lockAllPicks: game.lockAllPicks === true
+        });
+
+        if (
+          continueWithWarnings === true &&
+          res &&
+          res.success !== false &&
+          res.activated !== true
+        ) {
           res = {
-            success: true,
-            setupOnly: true,
-            message: "Game setup was saved. Activation was cancelled, so the game remains in Setup and locked."
+            success: false,
+            error: "Activation did not return a confirmed persisted LIVE state. The game remains in Setup and locked."
           };
-        } else {
-          res = await apiAdminUpdateGame({
-            gameId: game.gameId,
-            status: "Active",
-            active: true,
-            archived: false,
-            defaultGame: publishAsDefault,
-            lockAllPicks: game.lockAllPicks === true
-          });
         }
 
       }
@@ -5649,6 +5651,38 @@ function adminSportsMessage_(
 
 }
 
+function adminSportsSmartSyncStatus_(message, isError, holdMs) {
+
+  const el =
+    document.getElementById(
+      "adminSportsSmartSyncMessage"
+    );
+
+  if (!el) {
+    adminSportsMessage_(message, isError);
+    return;
+  }
+
+  if (window.__adminSportsSmartSyncTimer) {
+    clearTimeout(window.__adminSportsSmartSyncTimer);
+    window.__adminSportsSmartSyncTimer = null;
+  }
+
+  el.textContent = message || "";
+  el.hidden = !message;
+  el.classList.toggle("error-card", !!isError);
+
+  const duration = Number(holdMs || 0);
+  if (message && duration > 0) {
+    window.__adminSportsSmartSyncTimer = setTimeout(function() {
+      el.hidden = true;
+      el.textContent = "";
+      window.__adminSportsSmartSyncTimer = null;
+    }, duration);
+  }
+
+}
+
 function adminSportsLeagueStatusId_(league) {
 
   return "sportsLeagueSaveStatus_" +
@@ -5722,6 +5756,38 @@ function adminSportsSetOddsLastStatus_(league, status, message) {
 
   nodes.forEach(function(el) {
     el.textContent = display;
+  });
+
+}
+
+function adminSportsSetOddsUsage_(league, usage) {
+
+  const key = adminSportsKey_(league || "");
+  usage = usage || {};
+
+  if (!key) {
+    return;
+  }
+
+  const values = {
+    today: usage.callsToday,
+    month: usage.callsThisMonth,
+    apiLeft: usage.apiRemaining
+  };
+
+  Object.keys(values).forEach(function(name) {
+    const value = values[name];
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
+
+    document
+      .querySelectorAll(
+        '[data-sports-odds-' + name.replace(/[A-Z]/g, function(ch) { return "-" + ch.toLowerCase(); }) + '="' + key + '"]'
+      )
+      .forEach(function(el) {
+        el.textContent = String(value);
+      });
   });
 
 }
@@ -6479,6 +6545,8 @@ function adminRenderSportsTriggerControls_(
           "runSmartSync",
           "global"
         )}
+
+        <span id="adminSportsSmartSyncMessage" class="sports-league-save-status" hidden></span>
 
         ${adminSportsActionButton_(
           "Refresh ESPN Scores Now",
@@ -7776,9 +7844,9 @@ function adminRenderScoreLeagueControls_(
             <div class="admin-sub" style="margin-bottom:8px;">
               ${adminSportsLabel_("Odds status", "oddsUsage", leagueCode)}
               ${adminSportsEscape_(oddsStatusText)}
-              · Today ${oddsToday}/${oddsDailyLimit}
-              · Month ${oddsMonth}/${oddsMonthlyBudget}
-              · API left ${oddsUsage.LastApiRemaining || "—"}
+              · Today <span data-sports-odds-today="${adminSportsEscape_(adminSportsKey_(leagueCode))}">${oddsToday}</span>/${oddsDailyLimit}
+              · Month <span data-sports-odds-month="${adminSportsEscape_(adminSportsKey_(leagueCode))}">${oddsMonth}</span>/${oddsMonthlyBudget}
+              · API left <span data-sports-odds-api-left="${adminSportsEscape_(adminSportsKey_(leagueCode))}">${oddsUsage.LastApiRemaining || "—"}</span>
               · Window ${adminSportsEscape_(adminSportsOddsWindowLabel_(oddsWindow))}
               · Last <span data-sports-odds-last="${adminSportsEscape_(adminSportsKey_(leagueCode))}">${adminSportsEscape_(oddsLastDisplay)}</span>
             </div>
@@ -8099,9 +8167,11 @@ function adminRenderOddsControls_(
                     ·
                     Manual: ${manualEnabled ? "ON" : "OFF"}
                     ·
-                    Calls today: ${setting.CallsToday || 0}
+                    Calls today: <span data-sports-odds-today="${adminSportsEscape_(adminSportsKey_(setting.League || setting.league))}">${setting.CallsToday || 0}</span>
                     ·
-                    Month: ${setting.CallsThisMonth || 0}/${setting.MonthlyBudget || 0}
+                    Month: <span data-sports-odds-month="${adminSportsEscape_(adminSportsKey_(setting.League || setting.league))}">${setting.CallsThisMonth || 0}</span>/${setting.MonthlyBudget || 0}
+                    ·
+                    API left: <span data-sports-odds-api-left="${adminSportsEscape_(adminSportsKey_(setting.League || setting.league))}">${setting.LastApiRemaining || "—"}</span>
                     ·
                     Last: <span data-sports-odds-last="${adminSportsEscape_(adminSportsKey_(setting.League || setting.league))}">${adminSportsEscape_(
                       String(setting.LastRefreshStatus || "NEVER").toUpperCase() === "ERROR" && setting.LastRefreshMessage
@@ -8683,9 +8753,10 @@ async function adminRunFullSportsSyncNow() {
     '[data-sports-click^="adminRunFullSportsSyncNow("]'
   );
 
-  adminSportsMessage_(
+  adminSportsSmartSyncStatus_(
     "Queueing Smart Sports Sync...",
-    false
+    false,
+    0
   );
 
   // Give the browser one paint before the server request. On slower Apps Script
@@ -8715,9 +8786,10 @@ async function adminRunFullSportsSyncNow() {
 
     if (res.queued || sync.queued) {
 
-      adminSportsMessage_(
-        "Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly; reload Sports Controls in about a minute.",
-        false
+      adminSportsSmartSyncStatus_(
+        "Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly.",
+        false,
+        15000
       );
 
       adminSportsHoldActionProgress_(
@@ -8764,7 +8836,7 @@ async function adminRunFullSportsSyncNow() {
       (preFinalizer.finalized || 0) +
       (postFinalizer.finalized || 0);
 
-    adminSportsMessage_(
+    adminSportsSmartSyncStatus_(
       "Smart sports sync complete. Score rows: " +
       totals.updated +
       ", odds rows: " +
@@ -8777,7 +8849,8 @@ async function adminRunFullSportsSyncNow() {
       finalized +
       ", skipped settlements: " +
       totals.skipped,
-      false
+      false,
+      15000
     );
 
     adminSportsHoldActionProgress_(
@@ -8789,11 +8862,12 @@ async function adminRunFullSportsSyncNow() {
 
   } catch (err) {
 
-    adminSportsMessage_(
+    adminSportsSmartSyncStatus_(
       err && err.message
         ? err.message
         : "Unable to run full sports sync.",
-      true
+      true,
+      15000
     );
 
     adminSportsHoldActionProgress_(
@@ -9692,6 +9766,11 @@ async function adminRefreshSportsOddsLeague(
         ? "Refresh complete. Usable odds rows: " + usable
         : "Refresh complete."
     );
+
+    adminSportsSetOddsUsage_(
+      league,
+      res.displayUsage || {}
+    );
   } else if (res && res.success === false && !res.skipped && !res.blocked) {
     adminSportsSetOddsLastStatus_(
       league,
@@ -9701,7 +9780,7 @@ async function adminRefreshSportsOddsLeague(
   }
 
   adminSportsMarkDashboardStale_(
-    "Odds status changed. Use Reload Sports Controls when you want fresh counts/status.",
+    "Odds refresh changed Sports data. Current odds status and counters are already updated in place.",
     { localOnly: true }
   );
 

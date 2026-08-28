@@ -147,12 +147,13 @@ async function renderAdminTeamFantasyPage() {
         <select id="adminTfGame" onchange="adminTfSwitchGame_(this.value)">${found.games.map(function(g){const id=String(g.gameId||g.GameId||'');return `<option value="${adminTfEscape_(id)}" ${id===gameId?'selected':''}>${adminTfEscape_(g.name||g.gameName||id)}</option>`;}).join('')}</select>
       </section>
       <section class="card">
-        <div class="tf-card-heading"><div><h2>Game Rules</h2><div class="tf-muted">Admin controls entry structure, usage limits, auto-pick and playoff behavior.</div></div></div>
+        <div class="tf-card-heading"><div><h2>Game Rules</h2><div class="tf-muted">Admin controls entry structure, usage limits, auto-pick and playoff behavior. Auto Pick penalties default to 0 for existing games and apply once per Auto Picked position.</div></div></div>
         <div class="tf-admin-grid">
           ${adminTfField_('adminTfSeasonYear','Season year','number',s.seasonYear)}
           ${adminTfField_('adminTfWeek','Current NFL week','number',s.currentWeek)}
           ${adminTfSelect_('adminTfEntryMode','Entry mode',s.entryMode,[['single','Single Entry'],['afc-nfc','AFC + NFC Entries']])}
           ${adminTfField_('adminTfUseLimit','Same team uses / position','number',s.teamUseLimit)}
+          ${adminTfField_('adminTfAutoPenalty','Auto Pick Penalty Per Position','number',Number(s.autoPickPenaltyPerPosition||0))}
           ${adminTfField_('adminTfRegEnd','Regular season end week','number',s.regularSeasonEndWeek)}
           ${adminTfSelect_('adminTfStandingMode','Complete League standings',s.standingMode,[['combined-user','Combine AFC + NFC by Player'],['entries','Show Entries Separately']])}
           ${adminTfSelect_('adminTfPostMode','Postseason scoring',s.postseasonScoringMode,[['cumulative','Cumulative Postseason'],['fresh-round','Fresh Each Round']])}
@@ -193,6 +194,7 @@ async function renderAdminTeamFantasyPage() {
         <div class="tf-action-row"><button class="tf-button secondary" onclick="adminTfReminder_(true)">Preview Missing Picks</button><button class="tf-button" onclick="adminTfReminder_(false)">Send Reminder Now</button></div>
         <div id="adminTfReminderPreview"></div>
       </section>
+      <section class="card"><div class="tf-card-heading"><div><h2>Current Week Auto Pick Penalties</h2><div class="tf-muted">Recorded by saved position and applied exactly once to weekly Team Fantasy scores.</div></div></div><div class="tf-chip-row">${(dash.currentWeekAutoPickPenalties||[]).filter(function(item){return Number(item.points||0)>0;}).map(function(item){return `<span class="tf-chip">${adminTfEscape_(item.entryId)} · -${Number(item.points||0).toFixed(1)} pts (${Number(item.positions||0)} position${Number(item.positions||0)===1?'':'s'})</span>`;}).join('')||'<span class="tf-muted">No Auto Pick penalties this week.</span>'}</div></section>
       <section class="card"><h2>Complete League Preview</h2><div class="tf-table-wrap"><table class="tf-table"><thead><tr><th>#</th><th>Entry</th><th>W</th><th>L</th><th>T</th><th>Win %</th><th>Pts</th></tr></thead><tbody>${standings.map(function(r){return `<tr><td>${r.rank}</td><td>${adminTfEscape_(r.entryId||r.username)}</td><td>${r.regularWins}</td><td>${r.regularLosses}</td><td>${r.regularTies}</td><td>${(Number(r.winPct||0)*100).toFixed(1)}%</td><td>${Number(r.regularPoints||0).toFixed(1)}</td></tr>`;}).join('')||'<tr><td colspan="7">No completed weeks yet.</td></tr>'}</tbody></table></div></section>
     </div>`;
 }
@@ -220,6 +222,7 @@ async function adminTfSaveSettings_() {
       sameEntryMultipleLeagues: adminTfChecked_('adminTfMultiLeague'),
       allowRandomPick: adminTfChecked_('adminTfRandom'),
       allowSmartAutoPick: adminTfChecked_('adminTfAuto'),
+      autoPickPenaltyPerPosition: adminTfValue_('adminTfAutoPenalty'),
       regularSeasonEndWeek: adminTfValue_('adminTfRegEnd'),
       postseasonScoringMode: adminTfValue_('adminTfPostMode'),
       playoffUsageMode: adminTfValue_('adminTfUsagePlayoff'),

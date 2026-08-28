@@ -63,6 +63,7 @@ function teamFantasyRenderProgress_(lineup) {
     </div>
     <div class="tf-progress"><span style="width:${pct}%"></span></div>
     ${lineup.missing && lineup.missing.length ? `<div class="tf-muted tf-missing-copy">Still open: ${teamFantasyEscape_(lineup.missing.join(', '))}</div>` : `<div class="tf-complete tf-lineup-set">✓ Lineup Set</div>`}
+    ${Number(lineup.autoPickPenalty || 0) > 0 ? `<div class="tf-auto-penalty">Auto Pick penalty: -${teamFantasyScore_(lineup.autoPickPenalty)} points (${Number(lineup.autoPickPositions || 0)} position${Number(lineup.autoPickPositions || 0)===1?'':'s'})</div>` : ''}
   `;
 }
 
@@ -186,7 +187,8 @@ function teamFantasyRenderSlot_(state, lineup, slot) {
   if (slot.locked && pick) {
     return `<div class="tf-slot tf-slot-compact is-locked" id="${slotId}" data-entry-id="${teamFantasyEscape_(entry.entryId)}" data-position="${teamFantasyEscape_(slot.position)}" data-missing="false"><strong class="tf-slot-position">${teamFantasyEscape_(slot.label)}</strong><div class="tf-pick-compact"><img src="${teamFantasyEscape_(logo)}" alt=""><span class="tf-pick-abbr">${teamFantasyEscape_(pick.teamAbbr)}</span>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}<span class="tf-pick-opponent">${teamFantasyEscape_(opponent)}</span></div><span class="tf-lock">🔒 Locked</span></div>`;
   }
-  return `<div class="tf-slot tf-slot-compact ${pick?'has-pick is-editable':'needs-pick'}" id="${slotId}" data-entry-id="${teamFantasyEscape_(entry.entryId)}" data-position="${teamFantasyEscape_(slot.position)}" data-missing="${pick?'false':'true'}"><strong class="tf-slot-position">${teamFantasyEscape_(slot.label)}</strong><button type="button" class="tf-team-picker-button ${pick?'has-team':''}" onclick="teamFantasyOpenTeamPicker_('${teamFantasyEscape_(entry.entryId)}','${teamFantasyEscape_(slot.position)}')">${pick?`<img src="${teamFantasyEscape_(logo)}" alt=""><span class="tf-pick-abbr">${teamFantasyEscape_(pick.teamAbbr)}</span>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}<span class="tf-pick-opponent">${teamFantasyEscape_(opponent)}</span><span class="tf-edit-label">Edit</span>`:'<span class="tf-pick-empty">Choose team</span>'}<span class="tf-picker-chevron">⌄</span></button></div>`;
+  const selectForFill = !pick ? `<label class="tf-bulk-select" title="Include ${teamFantasyEscape_(slot.label)} in Random/Auto Fill Selected"><input type="checkbox" data-tf-bulk-position="1" data-entry-id="${teamFantasyEscape_(entry.entryId)}" data-position="${teamFantasyEscape_(slot.position)}" checked><span>Fill</span></label>` : '';
+  return `<div class="tf-slot tf-slot-compact ${pick?'has-pick is-editable':'needs-pick'}" id="${slotId}" data-entry-id="${teamFantasyEscape_(entry.entryId)}" data-position="${teamFantasyEscape_(slot.position)}" data-missing="${pick?'false':'true'}"><strong class="tf-slot-position">${teamFantasyEscape_(slot.label)}</strong>${selectForFill}<button type="button" class="tf-team-picker-button ${pick?'has-team':''}" onclick="teamFantasyOpenTeamPicker_('${teamFantasyEscape_(entry.entryId)}','${teamFantasyEscape_(slot.position)}')">${pick?`<img src="${teamFantasyEscape_(logo)}" alt=""><span class="tf-pick-abbr">${teamFantasyEscape_(pick.teamAbbr)}</span>${method?`<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>`:''}<span class="tf-pick-opponent">${teamFantasyEscape_(opponent)}</span><span class="tf-edit-label">Edit · Make Changes Before Kickoff</span>`:'<span class="tf-pick-empty">Choose team</span>'}<span class="tf-picker-chevron">⌄</span></button></div>`;
 }
 
 function teamFantasyPositionDisplayOrder_() {
@@ -246,7 +248,9 @@ function teamFantasyOpenRules_() {
 }
 
 function teamFantasyOpenFillHelp_() {
-  teamFantasyInfoOpen_('Random Pick vs Auto Pick', `<div class="tf-rules-copy"><p><strong>Random Pick</strong> chooses a random valid NFL team for the position you selected. It still obeys conference rules, usage limits, BYEs and kickoff locks.</p><p><strong>Auto Pick</strong> chooses the highest-ranked valid available team using Team Fantasy's existing historical position ranking. If no ranking history exists yet, it uses the first valid eligible team deterministically.</p><p>Neither action silently chooses a position. Open the position you want first, then confirm the fill.</p></div>`);
+  const state = window.TEAM_FANTASY_STATE || {};
+  const penalty = Math.max(0, Number(state.settings && state.settings.autoPickPenaltyPerPosition || 0));
+  teamFantasyInfoOpen_('Random Pick vs Auto Pick', `<div class="tf-rules-copy"><p><strong>Random Pick</strong> chooses a random valid NFL team from the eligible list. It obeys conference rules, position usage limits, BYEs, already-started games and all Team Fantasy restrictions. <strong>No points are deducted.</strong></p><p><strong>Auto Pick — Top Ranked Team Selected.</strong> <strong>Auto Pick</strong> chooses the highest-ranked valid available team using Team Fantasy's existing historical position ranking. If no ranking history exists yet, it uses the first valid eligible team deterministically.</p><p>Current Auto Pick penalty: <strong>-${teamFantasyNumberLabel_(penalty)} point${penalty === 1 ? '' : 's'} per Auto Picked position</strong>.</p><p>Choose the exact position(s) first. Random/Auto never silently fills an unspecified position from the player controls.</p></div>`);
 }
 
 function teamFantasyProtectionWindowLabel_(key) {
@@ -284,6 +288,16 @@ async function teamFantasySaveProtection_() {
   } catch (err) { if (status) status.textContent = err && err.message ? err.message : 'Could not save protection.'; }
 }
 
+function teamFantasyRenderTopFillControls_(state, lineup) {
+  if (!lineup || lineup.complete || lineup.postseasonEligible === false) return '';
+  const entry = lineup.entry || {};
+  const settings = state.settings || {};
+  const open = (lineup.slots || []).filter(function(slot){ return !slot.pick && !slot.locked; });
+  if (!open.length) return '';
+  const available = open.reduce(function(max, slot){ return Math.max(max, (slot.teams || []).filter(function(team){ return team.eligible === true; }).length); }, 0);
+  return `<div class="tf-top-fill"><div class="tf-muted"><strong>${open.length}</strong> open position${open.length===1?'':'s'} · up to ${available} eligible teams</div><div class="tf-lineup-actions">${settings.allowRandomPick ? `<button type="button" class="tf-button secondary" data-tf-fill-button="1" onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',true)">Random Fill Selected</button>` : ''}${settings.allowSmartAutoPick ? `<button type="button" class="tf-button" data-tf-fill-button="1" onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',false)">Auto Pick Selected</button>` : ''}<button type="button" class="tf-help-button" onclick="teamFantasyOpenFillHelp_()">?</button></div></div>`;
+}
+
 function teamFantasyRenderLineup_(state, lineup) {
   const entry = lineup.entry || {};
   const settings = state.settings || {};
@@ -296,7 +310,7 @@ function teamFantasyRenderLineup_(state, lineup) {
   const collapsed = teamFantasyLineupCollapsed_(lineup);
   const changeMode = !!((window.TEAM_FANTASY_LINEUP_CHANGE_MODE||{})[entry.entryId]);
   const editableCount = (lineup.slots||[]).filter(function(slot){ return !slot.locked; }).length;
-  return `<section class="card tf-lineup-card ${complete?'is-complete':''} ${collapsed?'is-collapsed':''} ${changeMode?'is-change-mode':''}" data-entry-id="${teamFantasyEscape_(entry.entryId)}"><div class="tf-weekly-picks-head"><div><div class="tf-weekly-title-line"><h2>Weekly Picks</h2>${complete?'<span class="tf-lineup-set-badge">Lineup Set</span>':''}</div><div class="tf-weekly-picks-sub">${teamFantasyEscape_(conferenceLabel)} · Week ${Number(state.week || 0)}</div></div>${complete?`<button class="tf-collapse-button" data-tf-collapse type="button" onclick="teamFantasyToggleLineup_('${teamFantasyEscape_(entry.entryId)}')">${collapsed?'Show':'Hide'}</button>`:''}</div><div class="tf-lineup-collapsible"><div class="tf-weekly-help-row"><button type="button" class="tf-help-button" onclick="teamFantasyOpenRules_()">📖 Rules</button><button type="button" class="tf-help-button" onclick="teamFantasyOpenScoring_()">ⓘ Scoring &amp; Position Stats</button><button type="button" class="tf-help-button" onclick="teamFantasyOpenFillHelp_()">? Random / Auto</button></div>${complete?`<div class="tf-lineup-actions"><button class="tf-button" onclick="teamFantasyOpenChanges_('${teamFantasyEscape_(entry.entryId)}')">Make changes before kickoff</button></div>`:`<div class="tf-lineup-actions"><button class="tf-button secondary" onclick="teamFantasyContinuePicks_('${teamFantasyEscape_(entry.entryId)}')">Continue Picks</button></div>`}${teamFantasyRenderProgress_(lineup)}${changeMode && editableCount===0?'<div class="tf-muted">All positions are already locked by kickoff.</div>':''}<div id="tfFillProgress_${safeId}" class="tf-fill-progress" hidden aria-live="polite"><div class="tf-fill-progress-copy">Building lineup…</div><div class="tf-progress tf-fill-meter"><span></span></div></div><div class="tf-slot-grid">${(lineup.slots || []).map(function(slot) { return teamFantasyRenderSlot_(state, lineup, slot); }).join('')}</div></div></section>`;
+  return `<section class="card tf-lineup-card ${complete?'is-complete':''} ${collapsed?'is-collapsed':''} ${changeMode?'is-change-mode':''}" data-entry-id="${teamFantasyEscape_(entry.entryId)}"><div class="tf-weekly-picks-head"><div><div class="tf-weekly-title-line"><h2>Weekly Picks</h2>${complete?'<span class="tf-lineup-set-badge">Lineup Set</span>':''}</div><div class="tf-weekly-picks-sub">${teamFantasyEscape_(conferenceLabel)} · Week ${Number(state.week || 0)}</div></div>${complete?`<button class="tf-collapse-button" data-tf-collapse type="button" onclick="teamFantasyToggleLineup_('${teamFantasyEscape_(entry.entryId)}')">${collapsed?'Show':'Hide'}</button>`:''}</div><div class="tf-lineup-collapsible">${teamFantasyRenderTopFillControls_(state, lineup)}<div class="tf-weekly-help-row"><button type="button" class="tf-help-button" onclick="teamFantasyOpenRules_()">📖 Rules</button><button type="button" class="tf-help-button" onclick="teamFantasyOpenScoring_()">ⓘ Scoring &amp; Position Stats</button><button type="button" class="tf-help-button" onclick="teamFantasyOpenFillHelp_()">? Random / Auto</button></div>${complete?`<div class="tf-lineup-actions"><button class="tf-button" onclick="teamFantasyOpenChanges_('${teamFantasyEscape_(entry.entryId)}')">Make changes before kickoff</button></div>`:`<div class="tf-lineup-actions"><button class="tf-button secondary" onclick="teamFantasyContinuePicks_('${teamFantasyEscape_(entry.entryId)}')">Continue Picks</button></div>`}${teamFantasyRenderProgress_(lineup)}${changeMode && editableCount===0?'<div class="tf-muted">All positions are already locked by kickoff.</div>':''}<div id="tfFillProgress_${safeId}" class="tf-fill-progress" hidden aria-live="polite"><div class="tf-fill-progress-copy">Building lineup…</div><div class="tf-progress tf-fill-meter"><span></span></div></div><div class="tf-slot-grid">${(lineup.slots || []).map(function(slot) { return teamFantasyRenderSlot_(state, lineup, slot); }).join('')}</div></div></section>`;
 }
 
 function teamFantasyRenderStandings_(standings, phase) {
@@ -445,18 +459,26 @@ async function teamFantasyFillPosition_(entryId, position, randomOnly) {
   const slot = teamFantasyFindSlot_(entryId, position);
   if (!slot || slot.pick || slot.locked) { teamFantasySetStatus_('Choose an open, unlocked position to fill.', true); return; }
   const label = slot.label || position;
-  const actionName = randomOnly ? 'Random Fill' : 'Auto Pick';
-  if (typeof window.confirm === 'function' && !window.confirm(actionName + ' ' + label + '? Only this position will be filled.')) return;
+  const penalty = Math.max(0, Number(state.settings && state.settings.autoPickPenaltyPerPosition || 0));
+  const confirmText = randomOnly
+    ? `You are about to select RANDOM. This will automatically pick any eligible team from the available list. No points are deducted.
+
+Position: ${label}\nOnly this position will be filled.`
+    : `You are about to select AUTO PICK. This will automatically select the top-ranked eligible team available. Auto Pick carries a points penalty.
+
+Position: ${label}
+Penalty: -${teamFantasyNumberLabel_(penalty)} point${penalty===1?'':'s'}`;
+  if (typeof window.confirm === 'function' && !window.confirm(confirmText)) return;
   teamFantasyCloseTeamPicker_();
   teamFantasySetSlotSaving_(entryId, position, true);
-  teamFantasySetStatus_(actionName + ' ' + label + '…', false);
+  teamFantasySetStatus_((randomOnly ? 'Random Pick' : 'Auto Pick') + ' ' + label + '…', false);
   try {
     const action = randomOnly ? 'randomTeamFantasyPicks' : 'autoPickTeamFantasy';
     const res = await apiTeamFantasyPost_(action, { gameId:state.gameId, week:state.week, entryId:entryId, positions:[position] });
     if (!res || res.success === false || Number(res.saved||0) < 1) throw new Error(res && (res.message || res.error) || 'No valid team was available for ' + label + '.');
     (res.results || []).forEach(teamFantasyApplySavedPickResponse_);
     teamFantasyRefreshLineupCard_(entryId);
-    teamFantasySetStatus_(actionName + ' saved for ' + label + '.', false);
+    teamFantasySetStatus_((randomOnly ? 'Random Pick' : 'Auto Pick') + ' saved for ' + label + '.', false);
   } catch (err) {
     teamFantasySetSlotSaving_(entryId, position, false);
     teamFantasySetStatus_(err && err.message ? err.message : 'Could not fill ' + label + '.', true);
@@ -472,27 +494,53 @@ function teamFantasyContinuePicks_(entryId) {
   if (select) setTimeout(function(){ select.focus(); }, 350);
 }
 
-async function teamFantasyFill_(entryId, randomOnly) {
+function teamFantasySelectedOpenPositions_(entryId) {
+  const lineup = teamFantasyFindLineup_(entryId);
+  const selected = [];
+  document.querySelectorAll('[data-tf-bulk-position="1"][data-entry-id="' + String(entryId).replace(/"/g,'') + '"]:checked').forEach(function(input){
+    const position = String(input.getAttribute('data-position') || '');
+    const slot = lineup && (lineup.slots || []).find(function(item){ return item.position === position; });
+    if (slot && !slot.pick && !slot.locked && selected.indexOf(position) === -1) selected.push(position);
+  });
+  return selected;
+}
+
+async function teamFantasyFillSelected_(entryId, randomOnly) {
   const state = window.TEAM_FANTASY_STATE || {};
-  const progress = teamFantasyStartFillProgress_(entryId, randomOnly ? 'Randomizing open positions…' : 'Building ranked Auto Pick lineup…');
-  teamFantasySetStatus_(randomOnly ? 'Randomizing open positions…' : 'Building ranked Auto Pick lineup…', false);
+  const positions = teamFantasySelectedOpenPositions_(entryId);
+  if (!positions.length) { teamFantasySetStatus_('Select at least one open position first.', true); return; }
+  const lineup = teamFantasyFindLineup_(entryId);
+  const labels = positions.map(function(pos){ const slot=(lineup.slots||[]).find(function(item){return item.position===pos;}); return slot ? slot.label : pos; });
+  const penalty = Math.max(0, Number(state.settings && state.settings.autoPickPenaltyPerPosition || 0));
+  const totalPenalty = penalty * positions.length;
+  const text = randomOnly
+    ? `You are about to select RANDOM. This will automatically pick any eligible team from the available list. No points are deducted.
+
+Positions: ${labels.join(', ')}`
+    : `You are about to select AUTO PICK. This will automatically select the top-ranked eligible team available. Auto Pick carries a points penalty.
+
+Positions: ${labels.join(', ')}
+${positions.length} positions × ${teamFantasyNumberLabel_(penalty)} points = -${teamFantasyNumberLabel_(totalPenalty)} points`;
+  if (typeof window.confirm === 'function' && !window.confirm(text)) return;
+  const progress = teamFantasyStartFillProgress_(entryId, randomOnly ? 'Randomizing selected positions…' : 'Building ranked Auto Picks…');
+  teamFantasySetStatus_(randomOnly ? 'Randomizing selected positions…' : 'Building ranked Auto Picks…', false);
   const action = randomOnly ? 'randomTeamFantasyPicks' : 'autoPickTeamFantasy';
   try {
-    const res = await apiTeamFantasyPost_(action, { gameId: state.gameId, week: state.week, entryId: entryId });
-    if (!res || res.success === false) {
-      teamFantasyFinishFillProgress_(progress, res && (res.message || res.error) || 'Could not fill lineup.', true);
-      teamFantasySetStatus_(res && (res.message || res.error) || 'Could not fill lineup.', true);
-      return;
-    }
+    const res = await apiTeamFantasyPost_(action, { gameId: state.gameId, week: state.week, entryId: entryId, positions: positions });
+    if (!res || res.success === false) throw new Error(res && (res.message || res.error) || 'Could not fill selected positions.');
+    (res.results || []).forEach(teamFantasyApplySavedPickResponse_);
+    teamFantasyRefreshLineupCard_(entryId);
     const saved = Number(res.saved || 0);
-    teamFantasyFinishFillProgress_(progress, 'Saved ' + saved + ' open position' + (saved === 1 ? '' : 's') + '.', false);
-    teamFantasySetStatus_('Saved ' + saved + ' open positions.', false);
-    await new Promise(function(resolve){ setTimeout(resolve, 250); });
-    await teamFantasyReload_({ showGlobalLoader: false });
+    teamFantasyFinishFillProgress_(progress, 'Saved ' + saved + ' selected position' + (saved === 1 ? '' : 's') + '.', false);
+    teamFantasySetStatus_('Saved ' + saved + ' selected position' + (saved === 1 ? '' : 's') + '.', false);
   } catch (err) {
-    teamFantasyFinishFillProgress_(progress, err && err.message ? err.message : 'Could not fill lineup.', true);
-    teamFantasySetStatus_(err && err.message ? err.message : 'Could not fill lineup.', true);
+    teamFantasyFinishFillProgress_(progress, err && err.message ? err.message : 'Could not fill selected positions.', true);
+    teamFantasySetStatus_(err && err.message ? err.message : 'Could not fill selected positions.', true);
   }
+}
+
+async function teamFantasyFill_(entryId, randomOnly) {
+  return teamFantasyFillSelected_(entryId, randomOnly);
 }
 
 async function teamFantasyLoadH2H_() {
@@ -613,7 +661,7 @@ function teamFantasyGameDayWeekPicker_(data) {
   }
   weeks = Array.from(new Set(weeks)).sort(function(a,b){ return b-a; });
   const selected = Number(data && data.week || window.TEAM_FANTASY_GAME_DAY_WEEK || state.week || weeks[weeks.length-1] || 1);
-  return `<label class="tf-week-picker"><span>Week</span><select onchange="teamFantasyGameDaySelectWeek_(this.value)">${weeks.map(function(week){ return `<option value="${week}" ${Number(week)===selected?'selected':''}>Week ${week}</option>`; }).join('')}</select></label>`;
+  return `<label class="tf-week-picker"><span>Week</span><select onchange="teamFantasyGameDaySelectWeek_(this.value)">${weeks.map(function(week){ const label = Number(week)===Number((window.TEAM_FANTASY_STATE||{}).week) ? `Week ${week} — CURRENT WEEK` : `Week ${week}`; return `<option value="${week}" ${Number(week)===selected?'selected':''}>${label}</option>`; }).join('')}</select></label>`;
 }
 
 async function teamFantasyGameDaySelectWeek_(week) {

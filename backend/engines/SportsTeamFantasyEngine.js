@@ -35,7 +35,7 @@ var TEAM_FANTASY_HEADERS = {};
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.SETTINGS] = [
   "GameId", "SeasonYear", "CurrentWeek", "EntryMode", "MaxEntriesPerUser",
   "TeamUseLimit", "CompleteLeagueEnabled", "StandingMode", "SameEntryMultipleLeagues",
-  "AllowRandomPick", "AllowSmartAutoPick", "RegularSeasonEndWeek", "PostseasonScoringMode",
+  "AllowRandomPick", "AllowSmartAutoPick", "AutoPickPenaltyPerPosition", "RegularSeasonEndWeek", "PostseasonScoringMode",
   "PlayoffUsageMode", "OverallPlayoffTeams", "SubleaguePlayoffDefault", "RankingsMode",
   "ReminderEnabled", "ReminderThursday", "ReminderSunday", "ReminderFinalWindow",
   "SyncTriggerEnabled", "LastSyncAt", "LastSyncStatus", "LastSyncMessage", "UpdatedAt", "UpdatedBy"
@@ -57,7 +57,7 @@ TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.MEMBERSHIPS] = [
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.PICKS] = [
   "GameId", "SeasonYear", "Week", "EntryId", "Username", "Conference", "Position",
   "TeamAbbr", "TeamName", "ESPNTeamId", "ESPNEventId", "GameDateTime", "Locked",
-  "PickMethod", "CreatedAt", "UpdatedAt"
+  "PickMethod", "AutoPickPenalty", "CreatedAt", "UpdatedAt"
 ];
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.UNIT_SCORES] = [
   "GameId", "SeasonYear", "Week", "EntryId", "Username", "Conference", "Position",
@@ -251,6 +251,7 @@ function teamFantasyDefaultSettings_(gameId) {
     SameEntryMultipleLeagues: true,
     AllowRandomPick: true,
     AllowSmartAutoPick: true,
+    AutoPickPenaltyPerPosition: 0,
     RegularSeasonEndWeek: 18,
     PostseasonScoringMode: "cumulative",
     PlayoffUsageMode: "reset",
@@ -297,6 +298,7 @@ function teamFantasyNormalizeSettings_(row) {
     sameEntryMultipleLeagues: teamFantasyBool_(row.SameEntryMultipleLeagues, true),
     allowRandomPick: teamFantasyBool_(row.AllowRandomPick, true),
     allowSmartAutoPick: teamFantasyBool_(row.AllowSmartAutoPick, true),
+    autoPickPenaltyPerPosition: Math.max(0, teamFantasyNumber_(row.AutoPickPenaltyPerPosition, 0)),
     regularSeasonEndWeek: Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(row.RegularSeasonEndWeek, 18)))),
     postseasonScoringMode: teamFantasyKey_(row.PostseasonScoringMode) === "fresh-round" ? "fresh-round" : "cumulative",
     playoffUsageMode: teamFantasyKey_(row.PlayoffUsageMode) === "carry" ? "carry" : "reset",
@@ -1047,15 +1049,20 @@ function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postse
         eventId: teamFantasyString_(pick.ESPNEventId),
         gameDateTime: teamFantasyString_(pick.GameDateTime),
         locked: locked,
-        pickMethod: teamFantasyString_(pick.PickMethod)
+        pickMethod: teamFantasyString_(pick.PickMethod),
+        autoPickPenalty: Math.max(0, teamFantasyNumber_(pick.AutoPickPenalty, 0))
       } : null,
       locked: locked,
       teams: postseasonEligible ? teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, pick) : []
     };
   });
+  const autoPickPenalty = picks.reduce(function(sum, row) { return sum + Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)); }, 0);
+  const autoPickPositions = picks.filter(function(row) { return Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)) > 0; }).length;
   return {
     entry: entry,
     postseasonEligible: postseasonEligible,
+    autoPickPenalty: teamFantasyRound_(autoPickPenalty),
+    autoPickPositions: autoPickPositions,
     required: slots.length,
     picked: slots.filter(function(slot) { return !!slot.pick; }).length,
     complete: slots.every(function(slot) { return !!slot.pick; }),
@@ -1100,7 +1107,8 @@ function teamFantasySavedPickPayload_(values, locked) {
     eventId: teamFantasyString_(values.ESPNEventId),
     gameDateTime: teamFantasyString_(values.GameDateTime),
     locked: locked === true,
-    pickMethod: teamFantasyString_(values.PickMethod)
+    pickMethod: teamFantasyString_(values.PickMethod),
+    autoPickPenalty: Math.max(0, teamFantasyNumber_(values.AutoPickPenalty, 0))
   };
 }
 
@@ -1224,7 +1232,7 @@ function teamFantasySavePick_(payload) {
   const teamAbbr = teamFantasyNormalizeTeam_(payload.teamAbbr);
   const pickMethod = teamFantasyKey_(payload.pickMethod) || "manual";
   if (!username || !gameId || !entryId || !position || !teamAbbr) throw new Error("Game, entry, position and team are required.");
-  if (!teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
+  if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
   let entries = payload._entries || teamFantasyEntriesForUser_(gameId, username);
@@ -1265,10 +1273,12 @@ function teamFantasySavePick_(payload) {
     GameId: gameId, SeasonYear: settings.seasonYear, Week: week, EntryId: entryId, Username: username,
     Conference: entry.conference, Position: position, TeamAbbr: teamAbbr, TeamName: meta.name,
     ESPNTeamId: teamId || "", ESPNEventId: game.eventId, GameDateTime: game.gameDateTime, Locked: false,
-    PickMethod: pickMethod, CreatedAt: current ? current.CreatedAt || now : now, UpdatedAt: now
+    PickMethod: pickMethod, AutoPickPenalty: pickMethod === "auto" ? Math.max(0, settings.autoPickPenaltyPerPosition) : 0,
+    CreatedAt: current ? current.CreatedAt || now : now, UpdatedAt: now
   };
-  // RC14 fast path intentionally avoids a forced single-pick flush. Legacy batch marker retained for regression continuity: payload._deferFlush !== true
-  teamFantasyWritePickRow_(current, values);
+  // RC15 Auto/Random planning can validate several open positions first and commit them in one sheet write.
+  // Compatibility contract retained: payload._deferFlush !== true. RC14+ manual saves do not force a flush; batch callers still identify deferred writes explicitly.
+  if (payload._collectOnly !== true) teamFantasyWritePickRow_(current, values);
   const simulated = currentRows.filter(function(row) { return teamFantasyNormalizePosition_(row.Position) !== position; }).concat([values]);
   const pickedPositions = {};
   simulated.forEach(function(row){ const pos = teamFantasyNormalizePosition_(row.Position); if (pos) pickedPositions[pos] = true; });
@@ -1278,7 +1288,9 @@ function teamFantasySavePick_(payload) {
     previousTeamAbbr: current ? teamFantasyNormalizeTeam_(current.TeamAbbr) : "", usageLimit: settings.teamUseLimit,
     savedPick: teamFantasySavedPickPayload_(values, false), picked: Object.keys(pickedPositions).length,
     required: TEAM_FANTASY_POSITIONS.length, remaining: missingPositions.length, complete: missingPositions.length === 0,
-    missingPositions: missingPositions
+    missingPositions: missingPositions,
+    autoPickPenalty: Math.max(0, teamFantasyNumber_(values.AutoPickPenalty, 0)),
+    _rowValues: values
   };
 }
 
@@ -1287,10 +1299,29 @@ function apiSaveTeamFantasyPick(payload) {
   return teamFantasySavePick_(payload);
 }
 
+function teamFantasyAppendPickRowsBatch_(valuesList) {
+  valuesList = Array.isArray(valuesList) ? valuesList.filter(Boolean) : [];
+  if (!valuesList.length) return 0;
+  const sh = teamFantasyEnsureSheet_(TEAM_FANTASY_SHEETS.PICKS);
+  if (!sh || typeof sh.getRange !== "function" || typeof sh.getLastColumn !== "function" || typeof sh.getLastRow !== "function") {
+    valuesList.forEach(function(values) { teamFantasyAppendObject_(TEAM_FANTASY_SHEETS.PICKS, values); });
+    return valuesList.length;
+  }
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0].map(teamFantasyString_);
+  const startRow = Math.max(2, sh.getLastRow() + 1);
+  const rows = valuesList.map(function(values) {
+    return headers.map(function(header) { return values[header] === undefined ? "" : values[header]; });
+  });
+  sh.getRange(startRow, 1, rows.length, headers.length).setValues(rows);
+  return rows.length;
+}
+
 function teamFantasyAutoPick_(payload, randomOnly) {
   payload = payload || {};
   const username = teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
+  if (!username || !gameId) throw new Error("User and game are required.");
+  if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   if (randomOnly && !settings.allowRandomPick) throw new Error("Random Pick is disabled for this game.");
   if (!randomOnly && !settings.allowSmartAutoPick) throw new Error("Auto Pick is disabled for this game.");
@@ -1300,12 +1331,13 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
   const targets = (wantedEntryId ? entries.filter(function(entry) { return entry.entryId === wantedEntryId; }) : entries).filter(function(entry) { return postseasonEligibility[entry.entryId] !== false; });
   if (wantedEntryId && !targets.length) throw new Error("This entry did not qualify for the postseason in any active Team Fantasy league.");
-  const requestedPositions = (Array.isArray(payload.positions) ? payload.positions : (payload.position ? [payload.position] : [])).map(teamFantasyNormalizePosition_).filter(Boolean);
+  const requestedPositions = (Array.isArray(payload.positions) ? payload.positions : (payload.position ? [payload.position] : [])).map(teamFantasyNormalizePosition_).filter(function(pos, index, arr) { return !!pos && arr.indexOf(pos) === index; });
   const schedule = payload._schedule || teamFantasyFetchWeekSchedule_(gameId, week, settings);
-  const pickRows = payload._pickRows || teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS);
+  const pickRows = (payload._pickRows || teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS)).slice();
   const scoreRows = randomOnly ? [] : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   const rankingsByPosition = {};
   const results = [];
+  const plannedRows = [];
   targets.forEach(function(entry) {
     const positions = requestedPositions.length ? requestedPositions : TEAM_FANTASY_POSITIONS.slice();
     positions.forEach(function(position) {
@@ -1317,12 +1349,19 @@ function teamFantasyAutoPick_(payload, randomOnly) {
       const eligible = teamFantasyEligibleTeamsFromRows_(gameId, settings, entry, position, week, schedule, null, pickRows, randomOnly ? {} : rankingsByPosition[position]).filter(function(team){ return team.eligible; });
       if (!eligible.length) return;
       const choice = randomOnly ? eligible[Math.floor(Math.random() * eligible.length)] : eligible[0];
-      results.push(teamFantasySavePick_({ username:username, gameId:gameId, week:week, entryId:entry.entryId, position:position, teamAbbr:choice.abbr, pickMethod:randomOnly?"random":"auto", _settings:settings, _entries:entries, _schedule:schedule, _pickRows:pickRows, _deferFlush: true }));
+      const result = teamFantasySavePick_({ username:username, gameId:gameId, week:week, entryId:entry.entryId, position:position, teamAbbr:choice.abbr, pickMethod:randomOnly?"random":"auto", _settings:settings, _entries:entries, _schedule:schedule, _pickRows:pickRows, _validatedGame:true, _collectOnly:true, _deferFlush: true });
+      plannedRows.push(result._rowValues);
+      pickRows.push(result._rowValues);
+      delete result._rowValues;
+      results.push(result);
     });
   });
+  teamFantasyAppendPickRowsBatch_(plannedRows);
   /* TEAM_FANTASY_GAME_DAY_BATCH_FLUSH_v1218r1 */
-  SpreadsheetApp.flush();
-  return { success:true, random:!!randomOnly, saved:results.length, results:results };
+  if (plannedRows.length && SpreadsheetApp && typeof SpreadsheetApp.flush === "function") SpreadsheetApp.flush();
+  const penaltyPerPosition = randomOnly ? 0 : Math.max(0, settings.autoPickPenaltyPerPosition);
+  const totalPenalty = teamFantasyRound_(plannedRows.reduce(function(sum, row) { return sum + Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)); }, 0));
+  return { success:true, random:!!randomOnly, saved:results.length, results:results, positions:results.map(function(item){ return item.position; }), penaltyPerPosition:penaltyPerPosition, totalPenalty:totalPenalty };
 }
 
 function apiRandomTeamFantasyPicks(payload) { return teamFantasyAutoPick_(payload, true); }
@@ -1553,13 +1592,20 @@ function teamFantasyRefreshWeekScores_(gameId, week, weekClosed) {
     const unitMap = {};
     units.forEach(function(row) { unitMap[teamFantasyNormalizePosition_(row.Position)] = row; });
     const missing = TEAM_FANTASY_POSITIONS.filter(function(position) { return !pickedMap[position]; });
-    const total = units.reduce(function(sum, row) { return sum + teamFantasyNumber_(row.FantasyPoints, 0); }, 0);
+    const pickByPosition = {};
+    picks.forEach(function(row) { pickByPosition[teamFantasyNormalizePosition_(row.Position)] = row; });
+    const baseTotal = units.reduce(function(sum, row) { return sum + teamFantasyNumber_(row.FantasyPoints, 0); }, 0);
+    const autoPickPenalty = picks.reduce(function(sum, row) { return sum + Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)); }, 0);
+    const total = baseTotal - autoPickPenalty;
     const allScoredFinal = TEAM_FANTASY_POSITIONS.filter(function(position) { return pickedMap[position]; }).every(function(position) {
       return unitMap[position] && teamFantasyBool_(unitMap[position].Final, false);
     });
     const detail = TEAM_FANTASY_POSITIONS.map(function(position) {
       const row = unitMap[position];
-      return { position: position, points: row ? teamFantasyNumber_(row.FantasyPoints, 0) : 0, final: row ? teamFantasyBool_(row.Final, false) : false };
+      const pick = pickByPosition[position];
+      const penalty = pick ? Math.max(0, teamFantasyNumber_(pick.AutoPickPenalty, 0)) : 0;
+      const basePoints = row ? teamFantasyNumber_(row.FantasyPoints, 0) : 0;
+      return { position: position, points: basePoints, autoPickPenalty: penalty, netPoints: teamFantasyRound_(basePoints - penalty), final: row ? teamFantasyBool_(row.Final, false) : false };
     });
     teamFantasyUpsert_(TEAM_FANTASY_SHEETS.WEEK_SCORES, function(row) {
       return teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === settings.seasonYear &&
@@ -1949,6 +1995,20 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
   };
 }
 
+function teamFantasyFilledPositionKeys_(rows, gameId, seasonYear, week, entryIds) {
+  const filled = {};
+  (rows || []).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(seasonYear) || Number(row.Week) !== Number(week)) return;
+    const entryId = teamFantasyString_(row.EntryId);
+    const position = teamFantasyNormalizePosition_(row.Position);
+    const teamAbbr = teamFantasyNormalizeTeam_(row.TeamAbbr);
+    if (!entryIds[entryId] || !position || !teamAbbr) return;
+    // PickMethod is intentionally ignored: manual, Random and Auto are equally filled.
+    filled[entryId + "|" + position] = true;
+  });
+  return filled;
+}
+
 function teamFantasyDashboardProgress_(gameId, username) {
   gameId = teamFantasyString_(gameId);
   username = teamFantasyNormalizeUsername_(username);
@@ -1980,14 +2040,7 @@ function teamFantasyDashboardProgress_(gameId, username) {
   const totalCount = entries.length * TEAM_FANTASY_POSITIONS.length;
   const entryIds = {};
   entries.forEach(function(entry) { entryIds[entry.entryId] = true; });
-  const picked = {};
-  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS).forEach(function(row) {
-    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== settings.seasonYear || Number(row.Week) !== week) return;
-    const entryId = teamFantasyString_(row.EntryId);
-    const position = teamFantasyNormalizePosition_(row.Position);
-    if (!entryIds[entryId] || !position || !teamFantasyNormalizeTeam_(row.TeamAbbr)) return;
-    picked[entryId + "|" + position] = true;
-  });
+  const picked = teamFantasyFilledPositionKeys_(teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS), gameId, settings.seasonYear, week, entryIds);
   const madeCount = Object.keys(picked).length;
   const remainingCount = Math.max(0, totalCount - madeCount);
   const postseasonComplete = week > settings.regularSeasonEndWeek && totalCount === 0;
@@ -2296,6 +2349,7 @@ function apiAdminSaveTeamFantasySettings(payload) {
     SameEntryMultipleLeagues: teamFantasyBool_(payload.sameEntryMultipleLeagues, current.sameEntryMultipleLeagues),
     AllowRandomPick: teamFantasyBool_(payload.allowRandomPick, current.allowRandomPick),
     AllowSmartAutoPick: teamFantasyBool_(payload.allowSmartAutoPick, current.allowSmartAutoPick),
+    AutoPickPenaltyPerPosition: Math.max(0, teamFantasyNumber_(payload.autoPickPenaltyPerPosition, current.autoPickPenaltyPerPosition)),
     RegularSeasonEndWeek: regularSeasonEndWeek,
     PostseasonScoringMode: teamFantasyKey_(payload.postseasonScoringMode) === "fresh-round" ? "fresh-round" : "cumulative",
     PlayoffUsageMode: teamFantasyKey_(payload.playoffUsageMode) === "carry" ? "carry" : "reset",
@@ -2415,12 +2469,22 @@ function apiAdminGetTeamFantasyDashboard(payload) {
   const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) { return teamFantasyString_(row.GameId) === gameId; }).map(function(row) { return { leagueId: teamFantasyString_(row.LeagueId), entryId: teamFantasyString_(row.EntryId), username: teamFantasyNormalizeUsername_(row.Username) }; });
   const reminders = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
   const triggerStatus = teamFantasySyncTriggerStatus_();
+  const currentPenaltyByEntry = {};
+  teamFantasyPickRows_(gameId, settings.seasonYear, settings.currentWeek, "").forEach(function(row) {
+    const entryId = teamFantasyString_(row.EntryId);
+    if (!entryId) return;
+    if (!currentPenaltyByEntry[entryId]) currentPenaltyByEntry[entryId] = { entryId: entryId, username: teamFantasyNormalizeUsername_(row.Username), positions: 0, points: 0 };
+    const penalty = Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0));
+    if (penalty > 0) currentPenaltyByEntry[entryId].positions++;
+    currentPenaltyByEntry[entryId].points += penalty;
+  });
   const notificationCenter = typeof notificationPushGetGameSetting_ === "function" ? notificationPushGetGameSetting_(gameId) : null;
   const notificationGlobalMode = typeof notificationPushGetSystemMode_ === "function" ? notificationPushGetSystemMode_() : "UNAVAILABLE";
   return {
     success: true, version: TEAM_FANTASY_VERSION, gameId: gameId, settings: settings,
     rules: teamFantasyRules_(gameId), leagues: leagues, entries: entries, memberships: memberships,
     reminderSummary: reminders,
+    currentWeekAutoPickPenalties: Object.keys(currentPenaltyByEntry).map(function(key) { const item = currentPenaltyByEntry[key]; item.points = teamFantasyRound_(item.points); return item; }),
     notificationCenter: { globalMode: notificationGlobalMode, game: notificationCenter, policy: teamFantasyReminderPolicy_(gameId) },
     systemStatus: {
       gameSaved: teamFantasyIsGame_(gameId),

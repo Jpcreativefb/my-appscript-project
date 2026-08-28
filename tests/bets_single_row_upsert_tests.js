@@ -103,6 +103,7 @@ context.getAllBetsData_ = cloneData;
 context.appendBetRow_ = row => sheet.appendRow(row);
 context.getBettingGameConfig = () => ({
   enabled: true,
+  startingBankroll: 1000,
   minBet: 1,
   maxBet: 100,
   minWager: 1,
