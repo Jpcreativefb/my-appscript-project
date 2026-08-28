@@ -336,9 +336,33 @@ function appCacheUsernameKey_(username){
     .slice(0, 120);
 }
 
+function appDashboardRevision_(){
+  try {
+    if (typeof PropertiesService !== "undefined" && PropertiesService.getScriptProperties) {
+      return String(
+        PropertiesService.getScriptProperties().getProperty("DASHBOARD_HUB_REVISION") || "0"
+      ).replace(/[^a-zA-Z0-9_.-]+/g, "_").slice(0, 80) || "0";
+    }
+  } catch (err) {}
+  return "0";
+}
+
+function appDashboardBumpRevision_(){
+  const revision = String(Date.now()) + "_" + String(Math.floor(Math.random() * 1000000));
+  try {
+    if (typeof PropertiesService !== "undefined" && PropertiesService.getScriptProperties) {
+      PropertiesService.getScriptProperties().setProperty("DASHBOARD_HUB_REVISION", revision);
+    }
+  } catch (err) {
+    // Games cache clearing still runs even when Script Properties is temporarily unavailable.
+  }
+  return revision;
+}
+
 function appDashboardCacheKey_(username){
   const userKey = appCacheUsernameKey_(username);
-  return userKey ? "dashboard_hub_v2_" + userKey : "";
+  const revision = appDashboardRevision_();
+  return userKey ? "dashboard_hub_v2_" + revision + "_" + userKey : "";
 }
 
 /* Keep a warm whole-sheet cache coherent after a targeted batch write instead

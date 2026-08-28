@@ -228,6 +228,10 @@ assert.strictEqual(tbaMainCategory.settings.lockDateTime, '', 'TBA episodes shou
 
 const episodeSheet = main.getSheetByName('RealityEpisodes');
 context.realityTvUpdateObjectRow_(episodeSheet, context.realityTvGetEpisode_(episode1.EpisodeId).__rowNumber, { Status: 'FINAL', UpdatedAt: new Date() });
+// This fixture validates vote-detail visibility, so explicitly opt this viewer
+// out of the new default-on Spoiler Shield. Default-hidden behavior is covered
+// by the RC16 Results Ready regression.
+context.apiSaveRealityTvSpoilerPreference({ username: 'viewer', token: 'viewer-token', gameId: created.gameId, enabled: false });
 const publicView = context.realityTvUserGameViewPayload_(created.gameId, 'viewer', { includePlayerStats: false });
 const publicEpisode1 = publicView.episodes.find(row => row.episodeId === episode1.EpisodeId);
 const publicEpisode2 = publicView.episodes.find(row => row.episodeId === episode2.EpisodeId);

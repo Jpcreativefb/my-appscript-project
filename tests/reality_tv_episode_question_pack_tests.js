@@ -124,10 +124,10 @@ const contestantA = bundle.contestants.find(c => c.Name === 'A');
 context.apiAdminSubmitRealityTvResult({ seasonId: bundle.season.SeasonId, episodeId: episode1.EpisodeId, outcomeType: 'elimination', selectedContestantIdsJSON: JSON.stringify([contestantA.ContestantId]) });
 dashboard = context.apiAdminGetRealityTvDashboard({});
 bundle = dashboard.seasons[0];
-const eliminationState = completeElimination(bundle.queue.find(q => q.ReviewStatus === 'PENDING').QueueId);
-let episode2Build = eliminationState.questionBuild || null;
-for (let i = 0; episode2Build && !episode2Build.complete && i < 50; i++) episode2Build = context.apiAdminContinueRealityTvQuestionPackBuild({ buildId: episode2Build.buildId });
-if (episode2Build) assert.strictEqual(episode2Build.complete, true);
+completeElimination(bundle.queue.find(q => q.ReviewStatus === 'PENDING').QueueId);
+// RC16 Results Ready finalizes Episode 1 first and prepares Episode 2 through
+// the separate durable next-episode worker instead of the approval response.
+for (let i = 0; i < 12; i++) context.realityTvContinueNextEpisodeJobs();
 dashboard = context.apiAdminGetRealityTvDashboard({});
 bundle = dashboard.seasons[0];
 assert.strictEqual(bundle.episodes.length, 2);

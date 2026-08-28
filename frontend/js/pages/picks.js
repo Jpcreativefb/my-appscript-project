@@ -31,6 +31,7 @@ const PICKS_PENDING_SAVES = {};
 let PICKS_AUTO_ADVANCE_TIMER = null;
 let PICKS_TEMP_OPEN_CATEGORY_ID = "";
 let PICKS_SEASON_ANCHOR_DRAFT_ID = "";
+let PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT = false;
 let PICKS_CONFIDENCE_BASELINE_PICKS = {};
 let PICKS_CONFIDENCE_BASELINE_POINTS = {};
 let PICKS_CONFIDENCE_BASE_SIGNATURE = "";
@@ -157,21 +158,109 @@ function realityTvMovementHtml_(value) {
   return `<span class="reality-stat-movement even">—</span>`;
 }
 
+function realityTvHiddenEpisodes_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const state = view.spoilerShield || { hiddenEpisodeIds: [] };
+  const hidden = {};
+  (state.hiddenEpisodeIds || []).forEach(function(id) { hidden[normalizeId(id)] = true; });
+  return (view.episodes || []).filter(function(episode) {
+    return hidden[normalizeId(episode && episode.episodeId)];
+  }).sort(function(a, b) { return Number(a.episodeNumber || 0) - Number(b.episodeNumber || 0); });
+}
+
+function realityTvBlockingHiddenEpisode_() {
+  const hidden = realityTvHiddenEpisodes_();
+  return hidden.length ? hidden[0] : null;
+}
+
+function realityTvCurrentEpisode_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const episodes = (view.episodes || []).slice().sort(function(a, b) {
+    return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0);
+  });
+  return episodes.find(function(episode) {
+    return ["FINAL", "CLOSED"].indexOf(String(episode.status || "").toUpperCase()) === -1;
+  }) || (episodes.length ? episodes[0] : null);
+}
+
+function realityTvFinalizedAtText_(episode) {
+  const value = episode && (episode.finalizedAt || episode.airDateTime);
+  if (!value) return "Finalized";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Finalized " + String(value);
+  return "Finalized " + date.toLocaleString([], {
+    month: "short", day: "numeric", hour: "numeric", minute: "2-digit"
+  });
+}
+
+function realityTvSpoilerBlockMessage_() {
+  const blocking = realityTvBlockingHiddenEpisode_();
+  const current = realityTvCurrentEpisode_();
+  if (!blocking || !current || Number(current.episodeNumber || 0) <= Number(blocking.episodeNumber || 0)) return "";
+  return "Episode " + Number(blocking.episodeNumber || 0) + " results are ready. Reveal them before making Episode " + Number(current.episodeNumber || 0) + " picks.";
+}
+
 function renderRealityTvSpoilerShield_() {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   if (view.enabled !== true) return "";
-  const state = view.spoilerShield || { enabled: false, hiddenEpisodeIds: [], hasHiddenResults: false };
-  const hidden = {};
-  (state.hiddenEpisodeIds || []).forEach(function(id) { hidden[normalizeId(id)] = true; });
-  const hiddenEpisodes = (view.episodes || []).filter(function(episode) {
-    return hidden[normalizeId(episode && episode.episodeId)];
-  }).sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
-  const latestHidden = hiddenEpisodes.length ? hiddenEpisodes[0] : null;
-  return `<section class="reality-player-summary-card reality-spoiler-shield-card">
-    <div class="reality-player-summary-heading"><div><span class="season-anchor-eyebrow">Spoiler Shield</span><h2>Watch on your schedule</h2></div></div>
-    <label class="reality-tv-inline-option"><input type="checkbox" ${state.enabled === true ? "checked" : ""} onchange="saveRealityTvSpoilerPreference_(this.checked)"><span>Hide Reality results until I reveal each episode</span></label>
-    ${latestHidden ? `<div class="admin-message info">${escapeHtml(latestHidden.episodeName || ("Episode " + Number(latestHidden.episodeNumber || 0)))} has settled, but its results, points, and standings changes are hidden for you.</div><button type="button" class="button primary" onclick="revealRealityTvEpisode_('${escapeJs(latestHidden.episodeId || "")}')">I’ve Watched — Show Episode Results</button>` : state.enabled === true ? `<div class="admin-message success">No unrevealed episode results are waiting.</div>` : ""}
-  </section>`;
+  const state = view.spoilerShield || { enabled: true, hiddenEpisodeIds: [], hasHiddenResults: false };
+  const current = realityTvCurrentEpisode_();
+  const blocking = realityTvBlockingHiddenEpisode_();
+  const periodLabel = String((view.season && view.season.periodLabel) || "Episode");
+  const currentLabel = current
+    ? String(current.episodeName || (periodLabel + " " + Number(current.episodeNumber || 0)))
+    : "Not scheduled";
+  const blockedMessage = realityTvSpoilerBlockMessage_();
+  return `<div class="reality-player-top-stack">
+    <section class="reality-current-episode-card">
+      <span class="season-anchor-eyebrow">Current Episode</span>
+      <h2>${escapeHtml(currentLabel)}</h2>
+      ${current ? `<p>${escapeHtml(realityTvEpisodeScheduleText_(current))}</p>` : `<p>No current episode is scheduled.</p>`}
+      ${blockedMessage ? `<div class="reality-current-episode-lock">${escapeHtml(blockedMessage)}</div>` : ""}
+    </section>
+    ${blocking ? `<section class="reality-results-ready-card" aria-live="polite">
+      <span class="season-anchor-eyebrow">Results Ready</span>
+      <h2>Episode ${Number(blocking.episodeNumber || 0)} Results Ready</h2>
+      <p>${escapeHtml(realityTvFinalizedAtText_(blocking))}</p>
+      <button type="button" class="button primary reality-results-ready-button" onclick="revealRealityTvEpisode_('${escapeJs(blocking.episodeId || "")}')">SHOW EPISODE ${Number(blocking.episodeNumber || 0)} RESULTS</button>
+    </section>` : ""}
+    <details class="reality-spoiler-settings">
+      <summary>Spoiler Shield: ${state.enabled === true ? "On" : "Off"}</summary>
+      <label class="reality-tv-inline-option"><input type="checkbox" ${state.enabled === true ? "checked" : ""} onchange="saveRealityTvSpoilerPreference_(this.checked)"><span>Protect new episode results until I reveal them</span></label>
+      <p>${state.enabled === true ? "New Reality results stay hidden per episode until you choose Show Results." : "New Reality results will appear immediately after settlement."}</p>
+    </details>
+  </div>`;
+}
+
+function applyFreshPicksStartupPayload_(payload) {
+  payload = payload || {};
+  PICKS_PAGE_DATA.game = payload.game || payload.gameConfig || PICKS_PAGE_DATA.game;
+  PICKS_PAGE_DATA.categories = Array.isArray(payload.categories) ? payload.categories : [];
+  const picksResponse = payload.picks || {};
+  PICKS_PAGE_DATA.picks = picksResponse.picks || {};
+  PICKS_PAGE_DATA.changeCounts = picksResponse.changeCounts || {};
+  PICKS_PAGE_DATA.originalPicks = picksResponse.originalPicks || {};
+  PICKS_PAGE_DATA.confidencePoints = picksResponse.confidencePoints || {};
+  PICKS_PAGE_DATA.stakePoints = picksResponse.stakePoints || {};
+  PICKS_PAGE_DATA.stakeSummary = picksResponse.stakeSummary || {};
+  PICKS_PAGE_DATA.pickMeta = picksResponse.pickMeta || {};
+  PICKS_PAGE_DATA.realityTvView = payload.realityTvView || null;
+  PICKS_PAGE_DATA.seasonAnchor = payload.seasonAnchor || null;
+  PICKS_PAGE_DATA.episodeComparison = null;
+}
+
+async function refreshRealityTvAfterSpoilerChange_() {
+  // Spoiler reveal/preference changes invalidate the same startup snapshot, but
+  // this is not a pick-write invalidation site covered by the RC4 pick contract.
+  clearStartupPayload(true /* spoiler presentation changed */);
+  const key = picksEnhancementKey_();
+  delete PICKS_ENHANCEMENTS_CACHE[key];
+  PICKS_ENHANCEMENTS_REQUEST = null;
+  const payload = await loadStartupPayload(true);
+  applyFreshPicksStartupPayload_(payload);
+  refreshPicksEnhancementUi_();
+  refreshPicksPage();
+  await hydratePicksEnhancements_();
 }
 
 async function saveRealityTvSpoilerPreference_(enabled) {
@@ -179,8 +268,8 @@ async function saveRealityTvSpoilerPreference_(enabled) {
   try {
     const response = await apiSaveRealityTvSpoilerPreference(PICKS_PAGE_DATA.gameId, enabled === true);
     if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not save Spoiler Shield preference.");
-    clearStartupPayload(Boolean(true));
-    window.location.reload();
+    await refreshRealityTvAfterSpoilerChange_();
+    showPicksMessage(enabled === true ? "Spoiler Shield is on." : "Spoiler Shield is off.", false);
   } catch (err) {
     showPicksMessage(err.message || String(err), true);
   }
@@ -192,8 +281,8 @@ async function revealRealityTvEpisode_(episodeId) {
   try {
     const response = await apiRevealRealityTvEpisode(PICKS_PAGE_DATA.gameId, episodeId);
     if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not reveal this episode.");
-    clearStartupPayload(Boolean(true));
-    window.location.reload();
+    await refreshRealityTvAfterSpoilerChange_();
+    showPicksMessage("Episode results revealed. The next episode is now available.", false);
   } catch (err) {
     showPicksMessage(err.message || String(err), true);
   }
@@ -272,25 +361,25 @@ function previewSeasonAnchorPick_(entityId) {
 
 function renderSeasonAnchorPickCard_() {
   const anchor = PICKS_PAGE_DATA.seasonAnchor;
-  if (anchor && anchor.deferred === true) {
+  if (!anchor || (anchor && anchor.deferred === true)) {
     return `<section class="season-anchor-card loading" aria-live="polite">
       <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>Season Survivor Pick</h2><p>Loading the current survivor selection and active participants…</p></div><span class="season-anchor-status open">Loading</span></div>
     </section>`;
   }
-  if (anchor && anchor.hiddenBySpoiler === true) {
+  if (anchor.hiddenBySpoiler === true) {
     return `<section class="season-anchor-card loading" aria-live="polite">
       <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Spoiler Shield</span><h2>Sole Survivor status hidden</h2><p>Your current anchor result, replacement state, multiplier, and season adjustment stay hidden until you reveal the settled episode above.</p></div><span class="season-anchor-status locked">Hidden</span></div>
     </section>`;
   }
-  if (!anchor || anchor.enabled !== true) return "";
+  if (anchor.enabled !== true) return "";
 
   const settings = anchor.settings || {};
   const user = anchor.user || null;
+  const stats = anchor.stats || {};
   const entities = Array.isArray(anchor.entities) ? anchor.entities : [];
   const currentId = user ? String(user.currentEntityId || "") : "";
-  const currentProfile = anchor.currentEntity || seasonAnchorEntityById_(currentId);
-  const stats = anchor.stats || {};
-  const needsPick = !user || String(user.status || "NEEDS_PICK").toUpperCase() === "NEEDS_PICK" || !currentId || user.currentEntityActive === false;
+  const currentProfile = anchor.currentEntity || (currentId ? seasonAnchorEntityById_(currentId) : null);
+  const needsPick = !user || String(user.status || "NEEDS_PICK").toUpperCase() === "NEEDS_PICK" || !currentId || (user.currentEntityActive === false);
   const finalized = !needsPick && !!currentId;
   const locked = anchor.locked === true;
   const canChoose = anchor.canChoose === true && needsPick && !locked;
@@ -307,6 +396,12 @@ function renderSeasonAnchorPickCard_() {
   const growth = Number(settings.GrowthPerSuccess || 0);
   const cap = Number(settings.MaxMultiplier || currentMultiplier);
   const nextMultiplier = Math.min(cap, currentMultiplier + growth);
+  const recentStats = Array.isArray(stats.recent) ? stats.recent : [];
+  const latestStat = recentStats.length ? recentStats[0] : null;
+  const currentBonus = Number(latestStat && latestStat.bonus || 0);
+  const currentPenalty = Number(latestStat && latestStat.penalty || 0);
+  const episodeLabel = String((anchor.season && anchor.season.periodLabel) || "Episode");
+  const episodeName = anchor.episode ? String(anchor.episode.episodeName || (episodeLabel + " " + Number(anchor.episode.episodeNumber || 0))) : "Not scheduled";
 
   const optionHtml = entities.map(function(item) {
     return `<option value="${escapeAttr(item.id)}" ${String(item.id) === draftId ? "selected" : ""}>${escapeHtml(item.name)}${item.teamOrTribe ? " — " + escapeHtml(item.teamOrTribe) : ""}</option>`;
@@ -315,7 +410,7 @@ function renderSeasonAnchorPickCard_() {
   const statusText = locked ? "Locked" : finalized ? "Finalized" : "Open";
   const statusClass = locked ? "locked" : finalized ? "finalized" : "open";
   const summaryHtml = finalized
-    ? `<div class="season-anchor-current-pick"><span class="season-anchor-label">Finalized pick</span><strong>${escapeHtml(user.currentEntityName || currentId)}</strong><span>This selection stays active until the contestant is eliminated.</span></div>`
+    ? `<div class="season-anchor-current-pick finalized-copy"><strong>Finalized Pick: ${escapeHtml(user.currentEntityName || currentId)}</strong><span>You cannot choose again unless this contestant is eliminated.</span></div>`
     : currentWasEliminated && !draftProfile
       ? `<div class="season-anchor-current-pick needs-pick"><span class="season-anchor-label">Eliminated pick</span><strong>${escapeHtml(user.currentEntityName || currentId)}</strong><span>Select a remaining contestant below and finalize a new pick.</span></div>`
       : `<div class="season-anchor-current-pick needs-pick"><span class="season-anchor-label">${draftProfile ? "Ready to finalize" : "New selection needed"}</span><strong>${escapeHtml(previewProfile ? previewProfile.name : "Choose an active contestant")}</strong><span>${draftProfile ? "Review the bio, then finalize this pick." : "Choose from the dropdown or browse the bios below."}</span></div>`;
@@ -324,50 +419,122 @@ function renderSeasonAnchorPickCard_() {
     <label for="seasonAnchorEntitySelect">Choose your Sole Survivor pick</label>
     <div class="season-anchor-picker-row">
       <select id="seasonAnchorEntitySelect" class="input" onchange="previewSeasonAnchorPick_(this.value)"><option value="">Choose an active contestant…</option>${optionHtml}</select>
-      <button type="button" class="button season-anchor-finalize-button" onclick="saveSeasonAnchorPick_()" ${draftId ? "" : "disabled"}>Finalize Pick</button>
+      <button id="seasonAnchorFinalizeButton" type="button" class="button season-anchor-finalize-button" onclick="saveSeasonAnchorPick_()" ${draftId && !PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT ? "" : "disabled"}>${PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT ? "Finalizing…" : "Finalize Pick"}</button>
     </div>
     <small>Once finalized, this selector disappears. It returns only after the pick is eliminated.</small>
   </div>` : finalized
-    ? `<div class="season-anchor-locked-note finalized">Your Sole Survivor pick is finalized. You can choose again only if this contestant is eliminated.</div>`
+    ? ""
     : `<div class="season-anchor-locked-note">${locked ? "The Sole Survivor selection window is closed for this episode." : "A new selection is not available yet."}</div>`;
 
-  return `<section class="season-anchor-card ${needsPick ? "needs-pick" : "active"}">
-    <div class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2><p>Finalize one active contestant. The pick remains until that contestant is eliminated.</p></div><span class="season-anchor-status ${statusClass}">${statusText}</span></div>
-    <div class="season-anchor-feature-grid">
-      <div class="season-anchor-profile ${previewIsEliminated ? "is-eliminated" : ""}" style="--reality-team-color:${escapeAttr(color)}">
-        ${seasonAnchorImageHtml_(previewProfile, previewIsEliminated)}
-        ${pickerHtml}
-        ${summaryHtml}
-        ${previewProfile ? `<details class="reality-profile-details" ${draftProfile ? "open" : ""}><summary>Bio & details</summary>${realityTvProfileDetailsHtml_(previewProfile)}</details>` : ""}
+  const recentHistoryHtml = recentStats.length ? `<div class="season-anchor-recent-history"><strong>Recent history</strong>${recentStats.map(function(item) {
+    return `<div><span>${escapeHtml(episodeLabel)} ${Number(item.episodeNumber || 0)} · ${escapeHtml(item.entityName || "—")}</span><span>${escapeHtml(String(item.outcome || "—"))} · ${formatSeasonAnchorMultiplier_(item.multiplier || 1)} · ${Number(item.net || 0) >= 0 ? "+" : ""}${Number(item.net || 0).toLocaleString()} pts</span></div>`;
+  }).join("")}</div>` : "";
+
+  // A required pick opens automatically. After finalization the card returns
+  // to normal user-controlled details behavior and starts collapsed.
+  return `<details class="season-anchor-card ${needsPick ? "needs-pick" : "active"}" ${needsPick ? "open" : ""}>
+    <summary class="season-anchor-card-header"><div><span class="season-anchor-eyebrow">Pinned season feature</span><h2>${escapeHtml(settings.DisplayLabel || "Season Survivor Pick")}</h2><p>Finalize one active contestant. The pick remains until that contestant is eliminated.</p></div><span class="season-anchor-status ${statusClass}">${statusText}</span></summary>
+    <div class="season-anchor-card-body">
+      <div class="season-anchor-current-episode-primary">
+        <span>Current ${escapeHtml(episodeLabel)}</span>
+        <strong>${escapeHtml(episodeName)}</strong>
+        <small>${escapeHtml(formatSeasonAnchorLock_(anchor.episode && anchor.episode.lockDateTime))}</small>
       </div>
-      <div class="season-anchor-summary-grid">
-        <div><span>Current multiplier</span><strong>${formatSeasonAnchorMultiplier_(currentMultiplier)}</strong></div>
-        <div><span>Next survival</span><strong>${formatSeasonAnchorMultiplier_(nextMultiplier)}</strong></div>
+      <div class="season-anchor-primary-stats">
         <div><span>Current streak</span><strong>${Number(user && user.streak || 0)}</strong></div>
-        <div><span>Longest streak</span><strong>${Number(stats.longestStreak || 0)}</strong></div>
-        <div><span>Total bonus</span><strong>+${Number(stats.totalBonus || 0).toLocaleString()} pts</strong></div>
-        <div><span>Total penalties</span><strong>-${Number(stats.totalPenalty || 0).toLocaleString()} pts</strong></div>
-        <div><span>Net adjustment</span><strong>${Number(stats.netAdjustment || 0) >= 0 ? "+" : ""}${Number(stats.netAdjustment || 0).toLocaleString()} pts</strong></div>
-        <div><span>Maximum weekly bonus</span><strong>${Number(anchor.maxWeeklyBonus || 0).toLocaleString()} pts</strong></div>
-        <div class="season-anchor-current-episode"><span>Current ${escapeHtml((anchor.season && anchor.season.periodLabel) || "Episode")}: ${escapeHtml(anchor.episode ? anchor.episode.episodeName : "Not scheduled")}</span><strong>${escapeHtml(formatSeasonAnchorLock_(anchor.episode && anchor.episode.lockDateTime))}</strong></div>
+        <div><span>Current bonus / multiplier</span><strong>+${currentBonus.toLocaleString()} pts · ${formatSeasonAnchorMultiplier_(currentMultiplier)}</strong></div>
+        ${currentPenalty > 0 ? `<div class="has-penalty"><span>Penalty</span><strong>-${currentPenalty.toLocaleString()} pts</strong></div>` : ""}
       </div>
+      <div class="season-anchor-feature-grid">
+        <div class="season-anchor-profile ${previewIsEliminated ? "is-eliminated" : ""}" style="--reality-team-color:${escapeAttr(color)}">
+          ${seasonAnchorImageHtml_(previewProfile, previewIsEliminated)}
+          ${pickerHtml}
+          ${summaryHtml}
+          ${previewProfile ? `<details class="reality-profile-details" ${draftProfile ? "open" : ""}><summary>Bio & details</summary>${realityTvProfileDetailsHtml_(previewProfile)}</details>` : ""}
+        </div>
+        <details class="season-anchor-more-stats">
+          <summary>More Stats / Details</summary>
+          <div class="season-anchor-summary-grid secondary">
+            <div><span>Next survival</span><strong>${formatSeasonAnchorMultiplier_(nextMultiplier)}</strong></div>
+            <div><span>Longest streak</span><strong>${Number(stats.longestStreak || 0)}</strong></div>
+            <div><span>Total bonus</span><strong>+${Number(stats.totalBonus || 0).toLocaleString()} pts</strong></div>
+            <div><span>Total penalties</span><strong>-${Number(stats.totalPenalty || 0).toLocaleString()} pts</strong></div>
+            <div><span>Net adjustment</span><strong>${Number(stats.netAdjustment || 0) >= 0 ? "+" : ""}${Number(stats.netAdjustment || 0).toLocaleString()} pts</strong></div>
+            <div><span>Maximum weekly bonus</span><strong>${Number(anchor.maxWeeklyBonus || 0).toLocaleString()} pts</strong></div>
+          </div>
+          <div class="season-anchor-rules-line">Growth: +${Number(settings.GrowthPerSuccess || 0).toFixed(2)}x · Cap: ${formatSeasonAnchorMultiplier_(settings.MaxMultiplier || 1)} · Eligible points cap: ${Number(settings.EligiblePointsCap || 0)} · Loss penalty: -${Number(settings.LossPenalty || 0)}</div>
+          ${recentHistoryHtml}
+        </details>
+      </div>
+      ${canChoose ? seasonAnchorActiveBioBrowserHtml_(entities) : ""}
     </div>
-    ${canChoose ? seasonAnchorActiveBioBrowserHtml_(entities) : ""}
-    <div class="season-anchor-rules-line">Growth: +${Number(settings.GrowthPerSuccess || 0).toFixed(2)}x · Cap: ${formatSeasonAnchorMultiplier_(settings.MaxMultiplier || 1)} · Eligible points cap: ${Number(settings.EligiblePointsCap || 0)} · Loss penalty: -${Number(settings.LossPenalty || 0)}</div>
-  </section>`;
+  </details>`;
+}
+
+function setSeasonAnchorFinalizeBusy_(busy) {
+  PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT = busy === true;
+  const button = document.getElementById("seasonAnchorFinalizeButton");
+  if (!button) return;
+  button.disabled = PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT || !String(PICKS_SEASON_ANCHOR_DRAFT_ID || "");
+  button.textContent = PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT ? "Finalizing…" : "Finalize Pick";
+}
+
+function showSeasonAnchorFinalizeConfirmation_(profile) {
+  return new Promise(function(resolve) {
+    const existing = document.getElementById("seasonAnchorFinalizeConfirm");
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+
+    const name = String(profile && profile.name || "this contestant");
+    const wrapper = document.createElement("div");
+    wrapper.innerHTML = `<div id="seasonAnchorFinalizeConfirm" class="season-anchor-confirm-backdrop" role="dialog" aria-modal="true" aria-labelledby="seasonAnchorFinalizeTitle">
+      <div class="season-anchor-confirm-card">
+        <span class="season-anchor-eyebrow">Sole Survivor</span>
+        <h2 id="seasonAnchorFinalizeTitle">Finalize ${escapeHtml(name)}?</h2>
+        <p>You cannot choose again unless this contestant is eliminated.</p>
+        <div class="season-anchor-confirm-actions">
+          <button type="button" class="button secondary" data-anchor-confirm="cancel">CANCEL</button>
+          <button type="button" class="button season-anchor-finalize-button" data-anchor-confirm="finalize">FINALIZE PICK</button>
+        </div>
+      </div>
+    </div>`;
+    const modal = wrapper.firstElementChild;
+    document.body.appendChild(modal);
+
+    let done = false;
+    function finish(approved) {
+      if (done) return;
+      done = true;
+      if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
+      resolve(approved === true);
+    }
+
+    modal.addEventListener("click", function(event) {
+      if (event.target === modal) {
+        finish(false);
+        return;
+      }
+      const button = event.target.closest("[data-anchor-confirm]");
+      if (!button) return;
+      finish(button.getAttribute("data-anchor-confirm") === "finalize");
+    });
+  });
 }
 
 async function saveSeasonAnchorPick_() {
-  const anchor = PICKS_PAGE_DATA.seasonAnchor || {};
+  if (PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT) return;
+
   const entityId = String(PICKS_SEASON_ANCHOR_DRAFT_ID || (document.getElementById("seasonAnchorEntitySelect") || {}).value || "");
   if (!entityId) {
     showPicksMessage("Choose a contestant before finalizing.", true);
     return;
   }
   const profile = seasonAnchorEntityById_(entityId);
-  if (!window.confirm("Finalize " + (profile && profile.name ? profile.name : "this contestant") + " as your Sole Survivor pick?\n\nYou cannot change this pick unless the contestant is eliminated.")) return;
+  const approved = await showSeasonAnchorFinalizeConfirmation_(profile);
+  if (!approved) return;
 
-  showPicksMessage("Finalizing Sole Survivor pick…", false);
+  // Give feedback before starting the network request and prevent repeat taps.
+  setSeasonAnchorFinalizeBusy_(true);
+  showPicksMessage("Finalizing…", false);
   try {
     const response = await apiSaveSeasonAnchorPick(PICKS_PAGE_DATA.gameId, entityId);
     if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not finalize the Sole Survivor pick.");
@@ -376,10 +543,12 @@ async function saveSeasonAnchorPick_() {
     if (response.seasonAnchor) PICKS_PAGE_DATA.seasonAnchor = response.seasonAnchor;
     const key = picksEnhancementKey_();
     PICKS_ENHANCEMENTS_CACHE[key] = Object.assign({}, PICKS_ENHANCEMENTS_CACHE[key] || {}, { seasonAnchor: PICKS_PAGE_DATA.seasonAnchor });
+    PICKS_SEASON_ANCHOR_SAVE_IN_FLIGHT = false;
     refreshPicksEnhancementUi_();
-    showPicksMessage(response.message || "Sole Survivor pick finalized.", false);
+    showPicksMessage(response.message || ("Finalized Pick: " + String(profile && profile.name || entityId)), false);
   } catch (err) {
-    showPicksMessage(err.message || String(err), true);
+    setSeasonAnchorFinalizeBusy_(false);
+    showPicksMessage(err && err.message ? err.message : String(err), true);
   }
 }
 
@@ -608,17 +777,17 @@ PICKS_PAGE_DATA.confidenceScoringMode =
 
       <div id="realityTvSpoilerShieldMount">${renderRealityTvSpoilerShield_()}</div>
 
-      <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
-
       <div id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
-
-      <div id="realityTvEpisodeComparisonMount">${renderRealityTvEpisodeComparison_()}</div>
 
       <div id="picksPageMessage" class="picks-message hidden"></div>
 
       <div id="picksCategoryList" class="picks-category-list">
         ${renderPicksCategoryList()}
       </div>
+
+      <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
+
+      <div id="realityTvEpisodeComparisonMount">${renderRealityTvEpisodeComparison_()}</div>
 
     </div>
   `;
@@ -2914,20 +3083,56 @@ function renderRealityTvEpisodeSections_(categories) {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const episodes = (view.episodes || []).slice().sort(function(a, b) { return Number(b.episodeNumber || 0) - Number(a.episodeNumber || 0); });
   const categoryMap = realityTvEpisodeCategoryMap_();
+  const current = realityTvCurrentEpisode_();
+  const blocking = realityTvBlockingHiddenEpisode_();
+  const hiddenIds = {};
+  (view.spoilerShield && view.spoilerShield.hiddenEpisodeIds || []).forEach(function(id) { hiddenIds[normalizeId(id)] = true; });
   const used = {};
-  const sections = episodes.map(function(episode, index) {
-    const items = categories.filter(function(category) {
+  const itemsForEpisode = function(episode) {
+    return categories.filter(function(category) {
       const match = categoryMap[normalizeId(category.id)] === Number(episode.episodeNumber || 0);
       if (match) used[normalizeId(category.id)] = true;
       return match;
     });
-    if (!items.length) return "";
-    const latest = index === 0;
+  };
+
+  let currentHtml = "";
+  if (current) {
+    const currentItems = itemsForEpisode(current);
+    const currentNumber = Number(current.episodeNumber || 0);
+    const blocked = !!(blocking && currentNumber > Number(blocking.episodeNumber || 0));
+    if (blocked) {
+      currentHtml = `<section class="reality-episode-picks-section current blocked-by-spoiler"><div class="reality-episode-picks-body"><div class="reality-spoiler-pick-block"><strong>${escapeHtml(realityTvSpoilerBlockMessage_())}</strong><span>The next roster and answer choices stay hidden until you reveal the prior episode.</span></div></div></section>`;
+    } else if (hiddenIds[normalizeId(current.episodeId)]) {
+      currentHtml = `<section class="reality-episode-picks-section current results-ready"><div class="reality-episode-picks-body"><div class="reality-spoiler-pick-block"><strong>Episode ${currentNumber} results are ready above.</strong><span>Reveal the episode to see its finalized result presentation.</span></div></div></section>`;
+    } else if (currentItems.length) {
+      const picked = currentItems.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
+      currentHtml = `<section class="reality-episode-picks-section current"><div class="reality-current-question-heading"><div><span class="reality-episode-kicker">Current ${(view.season && view.season.periodLabel) || "Episode"}</span><h2>${escapeHtml(current.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + currentNumber)}</h2></div>${realityTvEpisodeHeaderStats_(current, currentItems.length, picked)}</div><div class="reality-episode-picks-body">${renderPicksCategoryCards_(currentItems)}</div></section>`;
+    }
+  }
+
+  // Hidden finalized episodes are intentionally not rendered, but their
+  // categories must still be consumed here. Otherwise they can fall through
+  // into the generic Season Questions bucket and leak the hidden result.
+  episodes.forEach(function(episode) {
+    if (!hiddenIds[normalizeId(episode.episodeId)]) return;
+    itemsForEpisode(episode);
+  });
+
+  const previous = episodes.filter(function(episode) {
+    if (current && normalizeId(episode.episodeId) === normalizeId(current.episodeId)) return false;
+    if (hiddenIds[normalizeId(episode.episodeId)]) return false;
+    return ["FINAL", "CLOSED"].indexOf(String(episode.status || "").toUpperCase()) !== -1;
+  });
+  const previousHtml = previous.length ? `<details class="reality-previous-episodes"><summary><span><strong>Previous Episodes</strong><small>${previous.length} revealed episode${previous.length === 1 ? "" : "s"}</small></span></summary><div class="reality-previous-episodes-body">${previous.map(function(episode) {
+    const items = itemsForEpisode(episode);
     const picked = items.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
-    return `<details class="reality-episode-picks-section ${latest ? "latest" : ""}" ${latest ? "open" : ""}><summary><div class="reality-episode-summary-title"><span class="reality-episode-kicker">${latest ? "Latest" : "Previous"} ${escapeHtml((view.season && view.season.periodLabel) || "Episode")}</span><h2>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h2><span>${escapeHtml(realityTvEpisodeScheduleText_(episode))}</span>${episode.scheduleNotes ? `<small>${escapeHtml(episode.scheduleNotes)}</small>` : ""}</div>${realityTvEpisodeHeaderStats_(episode, items.length, picked)}<span class="reality-episode-status">${escapeHtml(episode.status || "OPEN")}</span></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}${realityTvEpisodeVoteDetailsHtml_(episode)}</div></details>`;
-  }).join("");
+    return `<details class="reality-episode-picks-section previous"><summary><div class="reality-episode-summary-title"><span class="reality-episode-kicker">Previous ${(view.season && view.season.periodLabel) || "Episode"}</span><h3>${escapeHtml(episode.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + episode.episodeNumber)}</h3><span>${escapeHtml(realityTvFinalizedAtText_(episode))}</span></div>${realityTvEpisodeHeaderStats_(episode, items.length, picked)}</summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(items)}${realityTvEpisodeVoteDetailsHtml_(episode)}</div></details>`;
+  }).join("")}</div></details>` : "";
+
   const remaining = categories.filter(function(category) { return !used[normalizeId(category.id)]; });
-  return sections + (remaining.length ? `<details class="reality-episode-picks-section other" open><summary><div><span class="reality-episode-kicker">Other</span><h2>Season Questions</h2><span>${remaining.length} question${remaining.length === 1 ? "" : "s"}</span></div></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(remaining)}</div></details>` : "");
+  const otherHtml = remaining.length ? `<details class="reality-episode-picks-section other"><summary><div><span class="reality-episode-kicker">Other</span><h2>Season Questions</h2><span>${remaining.length} question${remaining.length === 1 ? "" : "s"}</span></div></summary><div class="reality-episode-picks-body">${renderPicksCategoryCards_(remaining)}</div></details>` : "";
+  return currentHtml + previousHtml + otherHtml;
 }
 
 function renderPicksCategoryList() {

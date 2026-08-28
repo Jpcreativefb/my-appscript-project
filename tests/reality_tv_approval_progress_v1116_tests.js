@@ -29,7 +29,8 @@ assert(questions.includes('ApprovalStageStartedAt: now'), 'Question approval sta
 ['Settle result', 'Create next episode', 'Build Extra Questions', 'Finalize', 'Ready'].forEach(label => {
   assert(ui.includes(label), `Main approval step missing: ${label}`);
 });
-assert(/completedStages < (?:60|120)/.test(ui), 'Main approval loop must allow enough calls for large question packs');
+assert(!/completedStages < (?:60|120)/.test(ui), 'RC16 settlement must not browser-drive a long approval loop');
+assert(ui.includes('adminRealityTvStartApprovalPoller_'), 'RC16 settlement must use lightweight read-only approval polling');
 assert(css.includes('.reality-tv-approval-progress-track'), 'Approval progress-bar styles are missing');
 assert(css.includes('@keyframes realityTvApprovalShimmer'), 'Working animation is missing');
 assert.strictEqual(app, appCompat, 'Both app loader copies must match');

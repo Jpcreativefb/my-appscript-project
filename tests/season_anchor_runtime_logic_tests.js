@@ -114,6 +114,8 @@ const created = context.apiAdminCreateRealityTvSeason({
 });
 assert.strictEqual(created.success, true);
 const gameId = created.gameId;
+context.apiSaveRealityTvSpoilerPreference({ username: 'alice', token: 'token', gameId, enabled: false });
+context.apiSaveRealityTvSpoilerPreference({ username: 'bob', token: 'token', gameId, enabled: false });
 const dash1 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' }).seasons[0];
 const ep1 = dash1.episodes[0];
 const a = dash1.contestants.find(c => c.Name === 'A');
@@ -134,6 +136,9 @@ let submitted = context.apiAdminSubmitRealityTvResult({ username: 'admin', token
 let state = context.apiAdminApproveRealityTvResult({ username: 'admin', token: 'x', queueId: submitted.queueId });
 for (let i = 0; i < 5 && !state.complete; i++) state = context.apiAdminContinueRealityTvApproval({ username: 'admin', token: 'x', queueId: submitted.queueId });
 assert.strictEqual(state.complete, true);
+// RC16 Results Ready keeps next-episode construction off the approval request.
+// Drive the durable background job explicitly in this local runtime fixture.
+for (let i = 0; i < 5; i++) context.realityTvContinueNextEpisodeJobs();
 
 let alice = context.apiGetSeasonAnchor({ username: 'alice', token: 'token', gameId }).seasonAnchor.user;
 let bob = context.apiGetSeasonAnchor({ username: 'bob', token: 'token', gameId }).seasonAnchor.user;

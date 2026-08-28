@@ -150,15 +150,31 @@ function apiGetStartupPayload(payload) {
   // CategoryResults remain settled and available to the scoring engine.
   if (realityTvView && realityTvView.enabled === true && typeof realityTvSpoilerHiddenCategoryIds_ === "function") {
     const hiddenCategoryIds = realityTvSpoilerHiddenCategoryIds_(realityTvView);
+    const blockedFutureCategoryIds = typeof realityTvSpoilerBlockedCategoryIds_ === "function"
+      ? realityTvSpoilerBlockedCategoryIds_(realityTvView)
+      : {};
     categories = (categories || []).map(function(category) {
       const categoryId = String(category && category.id || "").trim().toLowerCase();
-      if (!hiddenCategoryIds[categoryId]) return category;
+      const hiddenResult = !!hiddenCategoryIds[categoryId];
+      const blockedEpisodeNumber = Number(blockedFutureCategoryIds[categoryId] || 0);
+      if (!hiddenResult && !blockedEpisodeNumber) return category;
       const copy = Object.assign({}, category);
-      copy.winnerNomineeId = "";
-      copy.winnerNomineeIds = [];
-      copy.resultStatus = "hidden";
-      copy.resultResolved = false;
-      copy.spoilerShieldHidden = true;
+      if (hiddenResult) {
+        copy.winnerNomineeId = "";
+        copy.winnerNomineeIds = [];
+        copy.resultStatus = "hidden";
+        copy.resultResolved = false;
+        copy.spoilerShieldHidden = true;
+      }
+      if (blockedEpisodeNumber) {
+        // Do not send the post-elimination answer roster for a future episode
+        // until the preceding hidden result has been revealed.
+        copy.nominees = [];
+        copy.locked = true;
+        copy.spoilerShieldBlocked = true;
+        copy.spoilerShieldBlockedEpisodeNumber = blockedEpisodeNumber;
+        copy.spoilerShieldBlockedByEpisodeNumber = Number(realityTvView.spoilerShield && realityTvView.spoilerShield.blockingEpisodeNumber || 0);
+      }
       return copy;
     });
   }
@@ -504,7 +520,7 @@ function isDashboardPastGame_(game) {
     return false;
   }
 
-  if (game.archived === true) {
+  if (game.archived === true || game.resultsFinalized === true) {
     return true;
   }
 
@@ -586,7 +602,7 @@ function buildDashboardGameHubItemLite_(
       ? availability.actionLabel
       : isSeasonHub
         ? "Open Season Hub"
-        : getDashboardEnterLabel_(
+        : progress.actionLabel || getDashboardEnterLabel_(
             mode,
             progress,
             isPast
@@ -714,7 +730,7 @@ function buildDashboardGameHubItemLite_(
       isPast === true,
 
     hasStarted:
-      Number(progress.madeCount) > 0,
+      progress.hasStarted === true || Number(progress.madeCount) > 0,
 
     madeCount:
       Number(progress.madeCount) || 0,
@@ -766,6 +782,191 @@ function buildDashboardGameHubItemLite_(
 
 }
 
+function dashboardProgressResult_(made, total, label, summary, extra) {
+  made = Math.max(0, Number(made) || 0);
+  total = Math.max(made, Number(total) || 0);
+  const remaining = Math.max(0, total - made);
+  const result = {
+    madeCount: made,
+    totalCount: total,
+    remainingCount: remaining,
+    progressAvailable: true,
+    progressLabel: label || (remaining ? remaining + " action" + (remaining === 1 ? "" : "s") + " left" : "Complete"),
+    progressValue: total ? getDashboardProgressPercent_(made, total) : 0,
+    userSummary: summary || "Game progress",
+    summary: {}
+  };
+  Object.keys(extra || {}).forEach(function(key) { result[key] = extra[key]; });
+  return result;
+}
+
+function dashboardSpecialGameProgress_(game, username, mode) {
+  game = game || {};
+  const gameId = String(game.gameId || game.GameId || "").trim();
+  const normalizedMode = String(mode || "").trim().toLowerCase();
+  if (!gameId || !username) return null;
+
+  if (normalizedMode === "survivor") {
+    try {
+      if (typeof apiGetSurvivorState_ !== "function") return null;
+      const state = apiGetSurvivorState_({ gameId: gameId, username: username }) || {};
+
+      if (state.passiveKoth === true || String(state.mode || "").toLowerCase() === "king-of-the-hill") {
+        const history = Array.isArray(state.history) ? state.history : [];
+        return dashboardProgressResult_(0, 0, "Automatic — no weekly pick required", "King of the Hill", {
+          hasStarted: history.length > 0 || Number(state.latestWeek || 0) > 0,
+          actionLabel: "View KOTH",
+          summary: { passive: true, latestWeek: Number(state.latestWeek || 0) }
+        });
+      }
+
+      const rounds = Array.isArray(state.rounds) ? state.rounds : [];
+      const hasStarted = rounds.some(function(round) {
+        return !!String(round && (round.pickNomineeId || "")).trim() ||
+          (Array.isArray(round && round.nomineeIds) && round.nomineeIds.length > 0) ||
+          (Array.isArray(round && round.pickNomineeIds) && round.pickNomineeIds.length > 0);
+      }) || Number(state.roundsSurvived || 0) > 0 || Number(state.eliminatedRound || 0) > 0;
+
+      const current = state.currentRound || null;
+      const selected = current ? (
+        !!String(current.pickNomineeId || "").trim() ||
+        (Array.isArray(current.pickNomineeIds) && current.pickNomineeIds.length > 0)
+      ) : false;
+      const actionableMissing = !!(current && current.canPick === true && !selected);
+      const total = selected || actionableMissing ? 1 : 0;
+      const made = selected ? 1 : 0;
+      const label = selected
+        ? "Current Survivor pick set"
+        : actionableMissing
+          ? "1 Survivor pick left"
+          : state.complete === true || state.winner === true
+            ? "Survivor complete"
+            : state.alive === false
+              ? "Survivor entry eliminated"
+              : "No actionable Survivor pick";
+      return dashboardProgressResult_(made, total, label, "Survivor", {
+        hasStarted: hasStarted,
+        actionLabel: actionableMissing ? "Make Survivor Pick" : "Review Survivor",
+        summary: { alive: state.alive !== false, complete: state.complete === true }
+      });
+    } catch (err) {
+      return null;
+    }
+  }
+
+  if (normalizedMode === "ranking") {
+    try {
+      if (typeof apiGetRankingState_ !== "function") return null;
+      const state = apiGetRankingState_({ gameId: gameId, username: username }) || {};
+      const categories = Array.isArray(state.categories) ? state.categories : [];
+      let made = 0;
+      let total = 0;
+      let hasStarted = false;
+      categories.forEach(function(category) {
+        const ballot = Array.isArray(category && category.ballot) ? category.ballot : [];
+        const nominees = Array.isArray(category && category.nominees) ? category.nominees : [];
+        const complete = nominees.length > 0 && ballot.length === nominees.length;
+        if (ballot.length) hasStarted = true;
+        if (complete) {
+          made++;
+          total++;
+        } else if (category && category.locked !== true && nominees.length > 0) {
+          total++;
+        }
+      });
+      const remaining = Math.max(0, total - made);
+      return dashboardProgressResult_(made, total,
+        remaining ? remaining + " ranking" + (remaining === 1 ? "" : "s") + " left" : (made ? "Rankings complete" : "No actionable rankings"),
+        "Ranking ballots",
+        {
+          hasStarted: hasStarted,
+          actionLabel: remaining ? "Finish Rankings" : "Review Rankings",
+          summary: { categories: categories.length, completed: made }
+        }
+      );
+    } catch (err) {
+      return null;
+    }
+  }
+
+  if (normalizedMode === "voting") {
+    try {
+      if (typeof apiGetVotingCompetitionState_ !== "function") return null;
+      const state = apiGetVotingCompetitionState_({ gameId: gameId, username: username }) || {};
+      const ballot = Array.isArray(state.ballot) ? state.ballot : [];
+      const ballotLimit = Math.max(0, Number(state.ballotLimit) || 0);
+      const complete = ballotLimit > 0 && ballot.length === ballotLimit;
+      const actionableMissing = state.votingOpen === true && ballotLimit > 0 && !complete;
+      const total = complete || actionableMissing ? 1 : 0;
+      const made = complete ? 1 : 0;
+      const hasStarted = ballot.length > 0 || !!state.ownEntry;
+      return dashboardProgressResult_(made, total,
+        complete ? "Vote complete" : actionableMissing ? "1 vote left" : "No actionable vote",
+        "Voting ballot",
+        {
+          hasStarted: hasStarted,
+          actionLabel: actionableMissing ? "Vote Now" : "Review Vote",
+          summary: { ballotLimit: ballotLimit, savedRanks: ballot.length }
+        }
+      );
+    } catch (err) {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function dashboardCategoryIsActionable_(game, setting) {
+  if (game && game.lockAllPicks === true) return false;
+  setting = setting || {};
+  if (setting.locked === true) return false;
+  const rawLock = setting.lockDateTime || setting.LockDateTime || "";
+  if (!rawLock) return true;
+  const lockDate = new Date(rawLock);
+  return isNaN(lockDate.getTime()) || Date.now() < lockDate.getTime();
+}
+
+function dashboardActionablePickTotals_(game, gameId, categoryIds, pickCategoryIds) {
+  categoryIds = Array.isArray(categoryIds) ? categoryIds : [];
+  pickCategoryIds = Array.isArray(pickCategoryIds) ? pickCategoryIds : [];
+  const completed = {};
+  pickCategoryIds.forEach(function(categoryId) {
+    const key = String(categoryId || "").trim().toLowerCase();
+    if (key) completed[key] = true;
+  });
+
+  let settings = {};
+  try {
+    settings = typeof getCategorySettingsCached === "function"
+      ? (getCategorySettingsCached(gameId) || {})
+      : typeof getCategorySettings === "function"
+        ? (getCategorySettings(gameId) || {})
+        : {};
+  } catch (err) {
+    settings = {};
+  }
+
+  let made = 0;
+  let actionableMissing = 0;
+  categoryIds.forEach(function(categoryId) {
+    const key = String(categoryId || "").trim().toLowerCase();
+    if (!key) return;
+    if (completed[key]) {
+      made++;
+      return;
+    }
+    const setting = settings[key] || settings[categoryId] || {};
+    if (dashboardCategoryIsActionable_(game, setting)) actionableMissing++;
+  });
+
+  return {
+    madeCount: made,
+    totalCount: made + actionableMissing,
+    actionableMissing: actionableMissing
+  };
+}
+
 function getDashboardGameProgressLite_(
   game,
   username,
@@ -773,7 +974,10 @@ function getDashboardGameProgressLite_(
   options
 ) {
 
-  if (mode === "team-fantasy") {
+  game = game || {};
+  options = options || {};
+
+  if (options.suppressProgress !== true && mode === "team-fantasy") {
     try {
       if (typeof teamFantasyDashboardProgress_ === "function") {
         return teamFantasyDashboardProgress_(String(game && (game.gameId || game.GameId) || ""), username);
@@ -791,12 +995,10 @@ function getDashboardGameProgressLite_(
     };
   }
 
-
-  game =
-    game || {};
-
-  options =
-    options || {};
+  if (options.suppressProgress !== true) {
+    const specialized = dashboardSpecialGameProgress_(game, username, mode);
+    if (specialized) return specialized;
+  }
 
   const gameId =
     String(game.gameId || "").trim();
@@ -871,14 +1073,23 @@ function getDashboardGameProgressLite_(
       .toLowerCase();
 
   let madeCount = 0;
+  let effectiveTotalCategories = totalCategories;
   let noun = "pick";
   let userSummary = "Prediction picks";
+
+  const categoryIds = progressContext && progressContext.categoryIdsByGame
+    ? (progressContext.categoryIdsByGame[progressGameKey] || [])
+    : (typeof getCategories === "function"
+        ? (getCategories(gameId) || []).map(function(category) { return category && category.id; }).filter(Boolean)
+        : []);
 
   if (
     normalizedMode === "wager" ||
     normalizedMode === "racing-wager"
   ) {
-    madeCount = betCount;
+    const actionableTotals = dashboardActionablePickTotals_(game, gameId, categoryIds, betCategoryIds);
+    madeCount = actionableTotals.madeCount;
+    effectiveTotalCategories = actionableTotals.totalCount + Math.max(0, Number(anchorProgress.required || 0));
     noun = "wager";
     userSummary = "Wagers";
   } else if (
@@ -896,8 +1107,10 @@ function getDashboardGameProgressLite_(
       completed[categoryId] = true;
     });
 
-    madeCount =
-      Object.keys(completed).length;
+    const completedCategoryIds = Object.keys(completed);
+    const actionableTotals = dashboardActionablePickTotals_(game, gameId, categoryIds, completedCategoryIds);
+    madeCount = actionableTotals.madeCount;
+    effectiveTotalCategories = actionableTotals.totalCount + Math.max(0, Number(anchorProgress.required || 0));
 
     noun = "selection";
     userSummary = "Hybrid picks & wagers";
@@ -907,7 +1120,9 @@ function getDashboardGameProgressLite_(
     normalizedMode === "staked-prediction" ||
     normalizedMode === "head-to-head"
   ) {
-    madeCount = pickCount;
+    const actionableTotals = dashboardActionablePickTotals_(game, gameId, categoryIds, pickCategoryIds);
+    madeCount = actionableTotals.madeCount;
+    effectiveTotalCategories = actionableTotals.totalCount + Math.max(0, Number(anchorProgress.required || 0));
     noun = "pick";
     userSummary =
       normalizedMode === "confidence"
@@ -933,20 +1148,20 @@ function getDashboardGameProgressLite_(
 
   madeCount =
     Math.min(
-      totalCategories,
+      effectiveTotalCategories,
       Math.max(0, madeCount)
     );
 
   const remaining =
     Math.max(
       0,
-      totalCategories - madeCount
+      effectiveTotalCategories - madeCount
     );
 
   const progressValue =
     getDashboardProgressPercent_(
       madeCount,
-      totalCategories
+      effectiveTotalCategories
     );
 
   const pluralNoun =
@@ -957,17 +1172,18 @@ function getDashboardGameProgressLite_(
         : "picks";
 
   const progressLabel =
-    madeCount >= totalCategories
-      ? "All " + totalCategories + " " + pluralNoun + " complete"
+    madeCount >= effectiveTotalCategories
+      ? "All " + effectiveTotalCategories + " " + pluralNoun + " complete"
       : remaining +
         (remaining === 1
           ? " " + noun + " left"
           : " " + pluralNoun + " left") +
-        " · " + madeCount + " / " + totalCategories + " complete";
+        " · " + madeCount + " / " + effectiveTotalCategories + " complete";
 
   return {
     madeCount: madeCount,
-    totalCount: totalCategories,
+    totalCount: effectiveTotalCategories,
+    remainingCount: remaining,
     progressAvailable: true,
     progressLabel: progressLabel,
     progressValue: progressValue,
@@ -976,7 +1192,7 @@ function getDashboardGameProgressLite_(
       picksMade: pickCount,
       wagersMade: betCount,
       completedCount: madeCount,
-      totalCategories: totalCategories
+      totalCategories: effectiveTotalCategories
     }
   };
 
@@ -1007,6 +1223,7 @@ function buildDashboardProgressContext_(
 
   const context = {
     totalCategoriesByGame: {},
+    categoryIdsByGame: {},
     pickCategoryIdsByGame: {},
     betCategoryIdsByGame: {}
   };
@@ -1015,6 +1232,7 @@ function buildDashboardProgressContext_(
 
   requestedKeys.forEach(function(key) {
     context.totalCategoriesByGame[key] = 0;
+    context.categoryIdsByGame[key] = [];
     context.pickCategoryIdsByGame[key] = [];
     context.betCategoryIdsByGame[key] = [];
   });
@@ -1035,6 +1253,10 @@ function buildDashboardCategoryTotalsIntoContext_(
   context,
   requestedGames
 ) {
+
+  context = context || {};
+  if (!context.categoryIdsByGame) context.categoryIdsByGame = {};
+  if (!context.totalCategoriesByGame) context.totalCategoriesByGame = {};
 
   if (typeof getAllCategoriesData_ !== "function") {
     return;
@@ -1080,8 +1302,9 @@ function buildDashboardCategoryTotalsIntoContext_(
     }
 
     Object.keys(seenByGame).forEach(function(gameKey) {
-      context.totalCategoriesByGame[gameKey] =
-        Object.keys(seenByGame[gameKey]).length;
+      const categoryIds = Object.keys(seenByGame[gameKey]);
+      context.categoryIdsByGame[gameKey] = categoryIds;
+      context.totalCategoriesByGame[gameKey] = categoryIds.length;
     });
 
   } catch (err) {
@@ -1583,6 +1806,7 @@ function getDashboardGameMode_(game) {
     "head-to-head",
     "survivor",
     "ranking",
+    "voting",
     "team-fantasy",
     "prediction"
   ];
@@ -2134,6 +2358,9 @@ function getDashboardGameProgress_(
       summary: {}
     };
   }
+
+  const specialized = dashboardSpecialGameProgress_(game, username, mode);
+  if (specialized) return specialized;
 
 
   const gameId =

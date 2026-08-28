@@ -286,6 +286,7 @@ function adminRealityTvStopApprovalTicker_(queueId) {
 function adminRealityTvStopApprovalPoller_(queueId) {
   const key = String(queueId || "");
   if (ADMIN_REALITY_TV_APPROVAL_POLLERS[key]) {
+    clearTimeout(ADMIN_REALITY_TV_APPROVAL_POLLERS[key]);
     clearInterval(ADMIN_REALITY_TV_APPROVAL_POLLERS[key]);
     delete ADMIN_REALITY_TV_APPROVAL_POLLERS[key];
   }
@@ -366,19 +367,30 @@ function adminRealityTvStartApprovalTicker_(queueId, state, kind) {
 
 function adminRealityTvStartApprovalPoller_(queueId) {
   adminRealityTvStopApprovalPoller_(queueId);
+  const key = String(queueId || "");
   let inFlight = false;
-  ADMIN_REALITY_TV_APPROVAL_POLLERS[String(queueId)] = setInterval(async function() {
+  let finished = false;
+
+  const poll = async function() {
     if (!document.getElementById("realityTvApprovalProgress_" + queueId)) {
       adminRealityTvStopApprovalPoller_(queueId);
       return;
     }
-    if (inFlight) return;
+    if (inFlight) {
+      ADMIN_REALITY_TV_APPROVAL_POLLERS[key] = setTimeout(poll, 1000);
+      return;
+    }
     inFlight = true;
+    let nextDelay = 3000;
     try {
       const state = await apiAdminGetRealityTvApprovalState(queueId);
       if (!state || state.success === false) return;
       adminRealityTvStartApprovalTicker_(queueId, state, "episode");
+      // A queued approval is intentionally quiet; active settlement can update
+      // a little faster without the browser driving any continuation work.
+      nextDelay = state.waiting ? 3000 : 2000;
       if (state.complete) {
+        finished = true;
         adminRealityTvStopApprovalPoller_(queueId);
         adminRealityTvStopApprovalTicker_(queueId);
         adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
@@ -389,10 +401,16 @@ function adminRealityTvStartApprovalPoller_(queueId) {
       }
     } catch (err) {
       // The main approval request may temporarily occupy Apps Script. Poll again.
+      nextDelay = 3000;
     } finally {
       inFlight = false;
+      if (!finished && ADMIN_REALITY_TV_APPROVAL_POLLERS[key] !== undefined) {
+        ADMIN_REALITY_TV_APPROVAL_POLLERS[key] = setTimeout(poll, nextDelay);
+      }
     }
-  }, 3000);
+  };
+
+  ADMIN_REALITY_TV_APPROVAL_POLLERS[key] = setTimeout(poll, 1200);
 }
 
 
@@ -2030,7 +2048,7 @@ function adminRealityTvResultPanel_(bundle) {
             : `<button class="button admin-button" onclick="adminRealityTvFinalizeEpisode('${adminRealityTvEscape_(pending.QueueId)}','${adminRealityTvEscape_(season.SeasonId)}')" ${finalizeReadiness.ready ? "" : "disabled"}>Approve, Finalize &amp; Advance</button>`}
           ${!isApproving ? `<button class="admin-small-button danger" onclick="adminRealityTvRejectResult('${adminRealityTvEscape_(pending.QueueId)}')">Reject Main Result</button>` : ""}
         </div>
-        ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than seven minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
+        ${isApproving && approvalProgress.stalled ? `<details class="reality-tv-recovery-tools"><summary>Emergency recovery — normally not needed</summary><div class="admin-sub">The watchdog should reclaim this stage automatically. Use this only if there has been no checkpoint for more than seven minutes after deploying the current version.</div><div class="admin-actions"><button class="admin-small-button secondary" title="Reset Stuck Approval" aria-label="Reset Stuck Approval — Force Recovery" onclick="adminRealityTvResetApproval('${adminRealityTvEscape_(pending.QueueId)}')">Force Recovery</button></div></details>` : ""}
       </div>
     `;
   }
@@ -3541,8 +3559,10 @@ async function adminRealityTvFinalizeEpisode(queueId, seasonId) {
     }
     adminRealityTvStartApprovalTicker_(queueId, state, "episode");
     adminRealityTvStartApprovalPoller_(queueId);
-    await adminRealityTvRefreshSeasonDetails_(seasonId || state.seasonId || "", { focusElementId: "realityTvResultPanel_" + (seasonId || "") });
-    alert("Episode finalization is running automatically. You can leave this page; Resume Approval is no longer required for the normal workflow.");
+    // Do not reload the full season dashboard here. The request has durably
+    // queued settlement; the lightweight poller will refresh once Episode N is
+    // complete while Episode N+1 preparation continues in its separate job.
+    alert("Episode finalization queued. You can leave this page. After settlement, you’ll see: Episode finalized — next episode is being prepared…");
   } catch (err) {
     alert(err && err.message ? err.message : String(err));
   }
@@ -3554,63 +3574,21 @@ async function adminRealityTvApproveResult(queueId) {
     .find(function(item) { return String(item.QueueId || "") === String(queueId || ""); });
   const resuming = existing && String(existing.ReviewStatus || "").toUpperCase() === "APPROVING";
 
-  if (!resuming && !confirm("Approve this result?\n\nThis will settle the episode, update CategoryResults, remove the selected participant(s), and build the next episode.")) return;
+  if (!resuming && !confirm("Approve this result?\n\nThis queues durable episode settlement. After Episode N is final, next-episode preparation continues separately in the background.")) return;
   try {
-    let state = await apiAdminApproveRealityTvResult(queueId);
+    const state = await apiAdminApproveRealityTvResult(queueId);
     if (!state || state.success === false) {
       throw new Error(adminRealityTvResponseError_(state, "Could not start the approval."));
     }
     adminRealityTvStartApprovalTicker_(queueId, state, "episode");
     adminRealityTvStartApprovalPoller_(queueId);
-
-    let transientFailures = 0;
-    let busyResponses = 0;
-    let completedStages = 0;
-    while (completedStages < 120 && !state.complete && busyResponses < 300) {
-      await adminRealityTvSleep_(state.waiting ? 3000 : (state.busy ? 1400 : 500));
-      const next = await apiAdminContinueRealityTvApproval(queueId);
-      if (!next || next.success === false) {
-        const message = adminRealityTvResponseError_(next, "Could not continue the approval.");
-        if (/timeout|network|524|invalid response|service spreadsheets|lock timeout/i.test(message) && transientFailures < 4) {
-          transientFailures += 1;
-          await adminRealityTvSleep_(1800);
-          continue;
-        }
-        throw new Error(message);
-      }
-      state = next;
-      adminRealityTvStartApprovalTicker_(queueId, state, "episode");
-      if (state.busy) {
-        busyResponses += 1;
-        continue;
-      }
-      busyResponses = 0;
-      completedStages += 1;
-    }
-
-    adminRealityTvStopApprovalPoller_(queueId);
-    adminRealityTvStopApprovalTicker_(queueId);
-    adminRealityTvUpdateApprovalProgress_(queueId, state, "episode");
-    if (!state.complete) {
-      alert("This approval is still queued on the server. It will continue automatically. Reopen this season to see its latest checkpoint; use Reset Stuck Approval only if the heartbeat is older than two minutes.");
-    } else {
-      alert((state.message || "Result approved.") + (state.warning ? "\n\nHub warning: " + state.warning : "") + (state.questionBuild ? "\n\n" + adminRealityTvBuildCompletionMessage_(state.questionBuild) : ""));
-    }
-    if (existing && existing.SeasonId) {
-      await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId });
-    } else {
-      navigate("admin-reality-tv", { suppressLoader: true });
-    }
+    alert(state.complete
+      ? "Episode finalized."
+      : "Episode finalization queued. You may leave this page; the server will continue automatically and prepare the next episode separately.");
   } catch (err) {
     adminRealityTvStopApprovalPoller_(queueId);
     adminRealityTvStopApprovalTicker_(queueId);
     alert((err && err.message ? err.message : String(err)) + "\n\nThe server watchdog will keep retrying durable stages automatically. Use Force Recovery only if the saved checkpoint remains stale for more than five minutes.");
-    if (existing && existing.SeasonId) {
-      try { await adminRealityTvRefreshSeasonDetails_(existing.SeasonId, { focusElementId: "realityTvResultPanel_" + existing.SeasonId }); }
-      catch (refreshErr) { navigate("admin-reality-tv", { suppressLoader: true }); }
-    } else {
-      navigate("admin-reality-tv", { suppressLoader: true });
-    }
   }
 }
 

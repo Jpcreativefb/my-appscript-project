@@ -54,9 +54,17 @@ const serviceWorker = read('frontend/sw.js');
 [
   'market === "player-prop"',
   'settleSportsPlayerProps({',
-  'settleSportsPlayerPropsForAllGames_({',
-  'sportsPlayerPropRefreshStatsForLeagues_'
+  'settleSportsPlayerPropsForAllGames_({'
 ].forEach((expected) => requireText(wagerEngine, expected, 'Sports Wager integration'));
+
+requireText(playerPropEngine, 'function sportsPlayerPropRefreshStatsForLeagues_(', 'Sports Player Prop Engine');
+const smartWagerStart = wagerEngine.indexOf('function runSportsWagerSmartAutomation(payload)');
+const smartWagerEnd = wagerEngine.indexOf('function removeSportsWagerSmartAutomationQueuedTriggers_', smartWagerStart);
+const smartWagerSource = wagerEngine.slice(smartWagerStart, smartWagerEnd);
+assert(
+  !smartWagerSource.includes('sportsPlayerPropRefreshStatsForLeagues_('),
+  'Awards Smart Wager automation must not duplicate Sports Engine player-stat/data refresh work'
+);
 
 [
   'data-create-player-prop-game-id',

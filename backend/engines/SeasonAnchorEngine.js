@@ -477,6 +477,40 @@ function apiGetSeasonAnchor(payload) {
   return { success: true, seasonAnchor: view };
 }
 
+function seasonAnchorPersistUserPick_(existing, row) {
+  const spreadsheet = SpreadsheetApp.getActive();
+  // apiSaveSeasonAnchorPick reaches this helper only after the authoritative
+  // Season Anchor payload/read path has ensured the system sheets. Reuse the
+  // already-existing users sheet so finalization does not pay another header
+  // inspection/formatting pass. Fall back to ensure only for defensive direct
+  // calls or a newly repaired workbook.
+  const sheet = spreadsheet.getSheetByName(SEASON_ANCHOR_USERS_SHEET) ||
+    seasonAnchorGetOrCreateSheet_(spreadsheet, SEASON_ANCHOR_USERS_SHEET, SEASON_ANCHOR_USER_HEADERS);
+  if (existing && existing.__rowNumber) {
+    seasonAnchorUpdateObjectRow_(sheet, existing.__rowNumber, row);
+    return existing.__rowNumber;
+  }
+  return seasonAnchorAppendObject_(sheet, row);
+}
+
+function seasonAnchorSavedView_(view, row, entity) {
+  const next = Object.assign({}, view || {});
+  next.user = {
+    currentEntityId: seasonAnchorString_(row.CurrentEntityId),
+    currentEntityName: seasonAnchorString_(row.CurrentEntityName),
+    streak: seasonAnchorNumber_(row.Streak, 0),
+    currentMultiplier: seasonAnchorNumber_(row.CurrentMultiplier, 1),
+    status: seasonAnchorString_(row.Status || "ACTIVE").toUpperCase(),
+    selectedEpisodeNumber: seasonAnchorNumber_(row.SelectedEpisodeNumber, 0),
+    lastSettledEpisodeNumber: seasonAnchorNumber_(row.LastSettledEpisodeNumber, 0),
+    currentEntityActive: true
+  };
+  next.currentEntity = entity || null;
+  next.finalized = true;
+  next.canChoose = false;
+  return next;
+}
+
 function apiSaveSeasonAnchorPick(payload) {
   payload = payload || {};
   const username = seasonAnchorString_(payload.username);
@@ -493,6 +527,9 @@ function apiSaveSeasonAnchorPick(payload) {
     throw new Error("Reveal the settled Reality episode before changing the Sole Survivor selection.");
   }
 
+  // Build the authoritative view once. This is the expensive Reality/Season
+  // Anchor read; the successful response below projects the saved user state
+  // onto this already-loaded view instead of rebuilding the same payload.
   const view = seasonAnchorUserPayload_(username, gameId);
   if (!view.enabled) throw new Error(view.message || "Season Survivor Pick is not enabled for this game.");
   if (view.locked) throw new Error("The Season Survivor selection is locked for this episode.");
@@ -501,49 +538,68 @@ function apiSaveSeasonAnchorPick(payload) {
   });
   if (!entity) throw new Error("Choose an active contestant.");
 
-  const settings = view.settings;
-  const existing = seasonAnchorGetUserRow_(gameId, username);
-  const changing = existing && existing.CurrentEntityId && seasonAnchorKey_(existing.CurrentEntityId) !== seasonAnchorKey_(entity.id);
-  const existingStillActive = !!(existing && seasonAnchorKey_(existing.Status) === "active" && (view.entities || []).some(function(item) {
-    return seasonAnchorKey_(item.id) === seasonAnchorKey_(existing.CurrentEntityId);
-  }));
-  if (changing && existingStillActive) {
-    throw new Error("This Sole Survivor pick is finalized. You can choose again only after the contestant is eliminated.");
-  }
-  if (existingStillActive && !changing) {
+  let userLock = null;
+  try {
+    if (typeof LockService !== "undefined" && LockService && typeof LockService.getUserLock === "function") {
+      userLock = LockService.getUserLock();
+      if (userLock && typeof userLock.tryLock === "function" && !userLock.tryLock(2000)) {
+        throw new Error("Your Sole Survivor pick is already being finalized. Please wait for the current save to finish.");
+      }
+    }
+
+    const settings = view.settings;
+    const existing = seasonAnchorGetUserRow_(gameId, username);
+    const changing = existing && existing.CurrentEntityId && seasonAnchorKey_(existing.CurrentEntityId) !== seasonAnchorKey_(entity.id);
+    const existingStillActive = !!(existing && seasonAnchorKey_(existing.Status) === "active" && (view.entities || []).some(function(item) {
+      return seasonAnchorKey_(item.id) === seasonAnchorKey_(existing.CurrentEntityId);
+    }));
+    if (changing && existingStillActive) {
+      throw new Error("This Sole Survivor pick is finalized. You can choose again only after the contestant is eliminated.");
+    }
+    if (existingStillActive && !changing) {
+      return {
+        success: true,
+        message: "Finalized Pick: " + seasonAnchorString_(existing.CurrentEntityName || entity.name),
+        alreadyFinalized: true,
+        seasonAnchor: view
+      };
+    }
+
+    const reset = !existing || changing || seasonAnchorKey_(existing.Status) === "needs_pick" || !existingStillActive;
+    const now = new Date();
+    const row = {
+      GameId: gameId,
+      SeasonId: view.season.seasonId,
+      Username: username,
+      CurrentEntityId: entity.id,
+      CurrentEntityName: entity.name,
+      SelectedEpisodeId: view.episode.episodeId,
+      SelectedEpisodeNumber: view.episode.episodeNumber,
+      Streak: reset ? 0 : seasonAnchorNumber_(existing.Streak, 0),
+      CurrentMultiplier: reset ? settings.StartMultiplier : seasonAnchorNumber_(existing.CurrentMultiplier, settings.StartMultiplier),
+      Status: "ACTIVE",
+      PickedAt: now,
+      LastSettledEpisodeId: existing ? existing.LastSettledEpisodeId : "",
+      LastSettledEpisodeNumber: existing ? existing.LastSettledEpisodeNumber : "",
+      Active: true,
+      CreatedAt: existing && existing.CreatedAt ? existing.CreatedAt : now,
+      UpdatedAt: now
+    };
+
+    // The existing row was already located above. Write that exact row (or
+    // append once) instead of scanning SeasonAnchorUsers again through upsert.
+    seasonAnchorPersistUserPick_(existing, row);
+
     return {
       success: true,
-      message: "This Sole Survivor pick is already finalized.",
-      seasonAnchor: view
+      message: "Finalized Pick: " + seasonAnchorString_(entity.name),
+      seasonAnchor: seasonAnchorSavedView_(view, row, entity)
     };
+  } finally {
+    if (userLock && typeof userLock.releaseLock === "function") {
+      try { userLock.releaseLock(); } catch (err) {}
+    }
   }
-
-  const reset = !existing || changing || seasonAnchorKey_(existing.Status) === "needs_pick" || !existingStillActive;
-  const now = new Date();
-  const row = {
-    GameId: gameId,
-    SeasonId: view.season.seasonId,
-    Username: username,
-    CurrentEntityId: entity.id,
-    CurrentEntityName: entity.name,
-    SelectedEpisodeId: view.episode.episodeId,
-    SelectedEpisodeNumber: view.episode.episodeNumber,
-    Streak: reset ? 0 : seasonAnchorNumber_(existing.Streak, 0),
-    CurrentMultiplier: reset ? settings.StartMultiplier : seasonAnchorNumber_(existing.CurrentMultiplier, settings.StartMultiplier),
-    Status: "ACTIVE",
-    PickedAt: now,
-    LastSettledEpisodeId: existing ? existing.LastSettledEpisodeId : "",
-    LastSettledEpisodeNumber: existing ? existing.LastSettledEpisodeNumber : "",
-    Active: true,
-    CreatedAt: existing && existing.CreatedAt ? existing.CreatedAt : now,
-    UpdatedAt: now
-  };
-  seasonAnchorUpsert_(SEASON_ANCHOR_USERS_SHEET, SEASON_ANCHOR_USER_HEADERS, ["GameId", "Username"], row);
-  return {
-    success: true,
-    message: "Sole Survivor pick finalized.",
-    seasonAnchor: seasonAnchorUserPayload_(username, gameId)
-  };
 }
 
 function seasonAnchorEpisodeCategoryIds_(seasonId, episodeId) {

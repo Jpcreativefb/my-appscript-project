@@ -50,7 +50,8 @@ assert(page.includes('Approve All &amp; Finalize Episode'), 'One-click episode f
 assert(page.includes('Resume Approval'), 'Retry-safe approval UI is missing');
 assert(page.includes('Reset Stuck Approval'), 'Stuck approval reset UI is missing');
 assert(page.includes('Update This Episode Only'), 'Episode-only Extra Question controls are missing');
-assert(page.includes('apiAdminContinueRealityTvApproval'), 'Staged approval client loop is missing');
+assert(!page.includes('apiAdminContinueRealityTvApproval(queueId)'), 'RC16 must not browser-drive the staged approval loop');
+assert(page.includes('adminRealityTvStartApprovalPoller_'), 'Read-only staged approval poller is missing');
 assert(page.includes('Contestant Roster'), 'Contestant roster builder is missing');
 assert(page.includes('Mass Enter Contestants'), 'Mass contestant entry UI is missing');
 assert(page.includes('each is a winner'), 'Multiple-elimination winner behavior is missing');

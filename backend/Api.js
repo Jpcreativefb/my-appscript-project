@@ -12,6 +12,27 @@ function apiRealityTvSpoilerGuard_(username, gameId) {
   }
 }
 
+function apiRealityTvSpoilerPickGuard_(username, gameId, categoryId) {
+  if (!username || !gameId || !categoryId || typeof realityTvSpoilerBlocksCategory_ !== "function") return null;
+  try {
+    const blocked = realityTvSpoilerBlocksCategory_(username, gameId, categoryId);
+    if (!blocked || blocked.blocked !== true) return null;
+    const prior = Number(blocked.blockingEpisodeNumber || 0);
+    const next = Number(blocked.episodeNumber || 0);
+    return {
+      success: false,
+      code: "REALITY_REVEAL_REQUIRED",
+      error: "Episode " + prior + " results are ready. Reveal them before making Episode " + next + " picks.",
+      blockingEpisodeNumber: prior,
+      episodeNumber: next
+    };
+  } catch (err) {
+    // If the guard cannot resolve category ownership, preserve the existing
+    // save path rather than turning a presentation check into an outage.
+    return null;
+  }
+}
+
 /* =========================
    API POST
 ========================= */
@@ -160,10 +181,15 @@ function doPost(e) {
         : String(body.leagueId || body.activeLeagueId || "").trim();
       const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
       if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      const batchPicks = Array.isArray(body.picks) ? body.picks : [];
+      for (let batchIndex = 0; batchIndex < batchPicks.length; batchIndex += 1) {
+        const guard = apiRealityTvSpoilerPickGuard_(body.username, postGameId, batchPicks[batchIndex] && batchPicks[batchIndex].categoryId);
+        if (guard) return json(guard);
+      }
       return json(savePicksBatch({
         username: body.username,
         gameId: postGameId,
-        picks: Array.isArray(body.picks) ? body.picks : []
+        picks: batchPicks
       }));
     }
 
@@ -181,10 +207,15 @@ function doPost(e) {
       if (!access.allowed) {
         return json({ success: false, error: "Access denied: " + access.reason });
       }
+      const confidenceBatchPicks = Array.isArray(body.picks) ? body.picks : [];
+      for (let confidenceIndex = 0; confidenceIndex < confidenceBatchPicks.length; confidenceIndex += 1) {
+        const guard = apiRealityTvSpoilerPickGuard_(body.username, postGameId, confidenceBatchPicks[confidenceIndex] && confidenceBatchPicks[confidenceIndex].categoryId);
+        if (guard) return json(guard);
+      }
       return json(saveConfidencePicksBatch({
         username: body.username,
         gameId: postGameId,
-        picks: Array.isArray(body.picks) ? body.picks : []
+        picks: confidenceBatchPicks
       }));
     }
 
@@ -284,6 +315,8 @@ function doPost(e) {
       if (!access.allowed) {
         return json({ success: false, error: "Access denied: " + access.reason });
       }
+      const spoilerPickGuard = apiRealityTvSpoilerPickGuard_(body.username, postGameId, body.categoryId);
+      if (spoilerPickGuard) return json(spoilerPickGuard);
       return json(savePick({
         username: body.username,
         gameId: postGameId,
@@ -2546,6 +2579,9 @@ function doGet(e) {
           error: "Access denied: " + access.reason
         });
       }
+
+      const spoilerPickGuard = apiRealityTvSpoilerPickGuard_(params.username, gameId, params.categoryId);
+      if (spoilerPickGuard) return json(spoilerPickGuard);
 
       return json(
         savePick({

@@ -1246,6 +1246,17 @@ function adminNormalizeGameId_(value) {
 
     adminClearGamesOnlyCaches_();
 
+    // Home discovery is cached per player. Bump one global revision whenever
+    // Admin changes game publication/lifecycle metadata so every player's next
+    // Dashboard request bypasses the prior per-user payload immediately.
+    if (typeof appDashboardBumpRevision_ === "function") {
+      try {
+        appDashboardBumpRevision_();
+      } catch (err) {
+        Logger.log("Could not bump Dashboard publication revision: " + err);
+      }
+    }
+
   }
 
  /* =========================================================

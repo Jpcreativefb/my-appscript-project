@@ -6144,6 +6144,7 @@ async function adminLoadSportsSupplementalStatus_(dashboard, loadSequence) {
 
   if (wagerSyncStatus && wagerSyncStatus.success !== false) {
     dashboard.wagerAutoSyncTriggers = wagerSyncStatus.triggers || [];
+    dashboard.wagerAutomationStatus = wagerSyncStatus;
   }
 
   panel.innerHTML =
@@ -6203,7 +6204,8 @@ function adminRenderSportsControlDashboard_(
       seasonBatchTriggers,
       usage,
       wagerAutoSyncTriggers,
-      data.smartAutomation || {}
+      data.smartAutomation || {},
+      data.wagerAutomationStatus || {}
     )}
 
     ${adminRenderScoreLeagueControls_(
@@ -6224,7 +6226,8 @@ function adminRenderSportsTriggerControls_(
   seasonBatchTriggers,
   usage,
   wagerAutoSyncTriggers,
-  smartAutomation
+  smartAutomation,
+  wagerAutomationStatus
 ) {
 
   scoreWindowTriggers =
@@ -6236,11 +6239,15 @@ function adminRenderSportsTriggerControls_(
   smartAutomation =
     smartAutomation || {};
 
+  wagerAutomationStatus =
+    wagerAutomationStatus || {};
+
   const externalDetails =
     smartAutomation.details || {};
 
   const externalTriggerCount =
     Number(externalDetails.scoreUpdater || 0) +
+    Number(externalDetails.scoreWindow || 0) +
     Number(externalDetails.seasonLoader || 0) +
     Number(externalDetails.scheduleReconcile || 0) +
     Number(externalDetails.oddsUpdater || 0) +
@@ -6255,6 +6262,18 @@ function adminRenderSportsTriggerControls_(
 
   const smartPartial =
     !!smartAutomation.partiallyEnabled;
+
+  const smartDuplicates =
+    !!smartAutomation.hasDuplicates;
+
+  const wagerTriggerDuplicates =
+    !!wagerAutomationStatus.hasDuplicates ||
+    wagerAutoSyncTriggers.length > 1;
+
+  const wagerLegacyConflicts =
+    Array.isArray(wagerAutomationStatus.legacyConflicts)
+      ? wagerAutomationStatus.legacyConflicts.length
+      : 0;
 
   return `
     <div class="admin-category-card sports-controls-root">
@@ -6522,10 +6541,10 @@ function adminRenderSportsTriggerControls_(
           </strong>
 
           <div class="admin-sub">
-            Smart automation: ${smartEnabled ? "Enabled" : "Disabled"}${smartPartial ? " / partial" : ""}
+            Smart automation: ${smartEnabled ? "Enabled" : "Disabled"}${smartPartial ? " / partial" : ""}${smartDuplicates ? " / ⚠ duplicate Engine triggers" : ""}
             · Live score triggers: ${scoreTriggers.length || 0}
             · Score window triggers: ${scoreWindowTriggers.length || 0}
-            · Wager smart triggers: ${wagerAutoSyncTriggers.length || 0}
+            · Wager settlement triggers: ${wagerAutoSyncTriggers.length || 0}${wagerTriggerDuplicates ? " ⚠ duplicate" : ""}${wagerLegacyConflicts ? " ⚠ legacy conflicts " + wagerLegacyConflicts : ""}
             · Schedule batch triggers: ${seasonBatchTriggers.length || 0}
             · Schedule reconcile: ${(smartAutomation.details && smartAutomation.details.scheduleReconcile) || 0}
             · Odds calls this month: ${usage.totalCallsUsed || 0} / ${usage.hardCap || 500}
@@ -6534,7 +6553,7 @@ function adminRenderSportsTriggerControls_(
       </div>
 
       <div class="admin-sub">
-        Use <strong>Recheck Schedule Now</strong> when postponed games, rescheduled games, or playoff/TBD teams may have changed. Use <strong>Run Smart Sports Sync Now</strong> when odds, scores, or settlements look stale.
+        Sports Engine owns score, schedule, Odds, season, and archive automation. Use <strong>Recheck Schedule Now</strong> for schedule changes and <strong>Run Smart Sports Sync Now</strong> for wager settlement from cached Sports Engine data.
       </div>
 
       <div class="admin-actions">
@@ -7910,7 +7929,6 @@ function adminRenderScoreLeagueControls_(
             <div class="admin-control-grid" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap:8px;">
               ${adminRenderSportsNumberField_("Archive days", "sportsArchiveDays", leagueCode, league.archiveAfterDays || health.archiveAfterDays, 30, 1, 365, "archiveDays", controlsDisabled)}
               ${adminRenderSportsSelectField_("Archive mode", "sportsArchiveMode", leagueCode, league.archiveMode || "MOVE", [{ value: "MOVE", label: "Move" }, { value: "COPY", label: "Copy" }], "archiveMode", controlsDisabled)}
-              ${adminRenderSportsNumberField_("Log days", "sportsLogDays", leagueCode, league.keepLogsDays || health.keepLogsDays, 14, 1, 365, "logDays", controlsDisabled)}
             </div>
 
             <div class="sports-league-actions">
@@ -8344,8 +8362,7 @@ async function adminSaveSportsScoreLeagueSettings(
         archiveEnabled: leagueChecked_("sportsArchiveEnabled", false),
         archiveAfterDays: leagueValue_("sportsArchiveDays", 30),
         archiveMode: leagueValue_("sportsArchiveMode", "MOVE"),
-        keepSnapshotsDays: leagueValue_("sportsSnapshotDays", 14),
-        keepLogsDays: leagueValue_("sportsLogDays", 14)
+        keepSnapshotsDays: leagueValue_("sportsSnapshotDays", 14)
       }
     );
 
@@ -8526,8 +8543,7 @@ function adminApplySportsLeagueDefaults(
     sportsOddsMonthly: 30,
     sportsOddsWindow: "STANDARD",
     sportsArchiveDays: 30,
-    sportsSnapshotDays: 14,
-    sportsLogDays: 14
+    sportsSnapshotDays: 14
   };
 
   Object.keys(defaults).forEach(function(prefix) {
@@ -8787,14 +8803,14 @@ async function adminRunFullSportsSyncNow() {
     if (res.queued || sync.queued) {
 
       adminSportsSmartSyncStatus_(
-        "Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly.",
+        "Wager settlement sync queued. It will use cached Sports Engine scores/odds; no provider refresh is started here.",
         false,
         15000
       );
 
       adminSportsHoldActionProgress_(
         smartSyncButton,
-        "Queued — background Sports sync will run shortly.",
+        "Queued — wager settlement sync will run shortly.",
         15000
       );
       adminSportsMarkDashboardStale_();
@@ -8837,11 +8853,11 @@ async function adminRunFullSportsSyncNow() {
       (postFinalizer.finalized || 0);
 
     adminSportsSmartSyncStatus_(
-      "Smart sports sync complete. Score rows: " +
+      "Wager settlement sync complete. Transported score rows: " +
       totals.updated +
-      ", odds rows: " +
+      ", cached odds rows: " +
       totals.oddsUpdated +
-      ", protected odds: " +
+      ", protected cached odds: " +
       totals.protected +
       ", settled from engine: " +
       totals.settled +
@@ -8855,7 +8871,7 @@ async function adminRunFullSportsSyncNow() {
 
     adminSportsHoldActionProgress_(
       smartSyncButton,
-      "Smart Sports Sync complete.",
+      "Wager settlement sync complete.",
       15000
     );
     adminSportsMarkDashboardStale_();
@@ -8872,7 +8888,7 @@ async function adminRunFullSportsSyncNow() {
 
     adminSportsHoldActionProgress_(
       smartSyncButton,
-      "Smart Sports Sync failed — see message above.",
+      "Wager settlement sync failed — see message above.",
       15000
     );
 
@@ -9326,12 +9342,33 @@ async function adminRunSportsSeasonBatch() {
   const res =
     await apiAdminRunSportsSeasonBatch();
 
+  const seasonErrors =
+    res && Array.isArray(res.errors)
+      ? res.errors
+      : [];
+
+  const firstSeasonError =
+    seasonErrors.length
+      ? seasonErrors[0]
+      : null;
+
+  const firstSeasonErrorText =
+    firstSeasonError
+      ? (firstSeasonError.league ? String(firstSeasonError.league).toUpperCase() + ": " : "") +
+        (firstSeasonError.date ? firstSeasonError.date + " · " : "") +
+        (firstSeasonError.error || "Season schedule fetch error")
+      : "";
+
   adminSportsMessage_(
     res && res.success
-      ? "Season batch complete."
+      ? (seasonErrors.length
+        ? "Season batch completed with " + seasonErrors.length +
+          " fetch error(s). Review SportsSeasonJobs Errors before launch/rollover." +
+          (firstSeasonErrorText ? " First: " + firstSeasonErrorText : "")
+        : "Season batch complete with no fetch errors.")
       : (res && (res.error || res.message)) ||
         "Season batch failed.",
-    !(res && res.success)
+    !(res && res.success) || seasonErrors.length > 0
   );
 
   adminSportsMarkDashboardStale_();

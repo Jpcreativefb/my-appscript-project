@@ -193,8 +193,8 @@ assert.deepStrictEqual(Array.from(queued.sync.results), [], 'Manual Smart Sync r
 const queuedMessageFn = functionSource(adminPage, 'adminRunFullSportsSyncNow');
 assert(!queuedMessageFn.includes('Finished-game finalizer ran now'), 'Queued Smart Sync success wording must not claim an inline finalizer ran');
 assert(
-  queuedMessageFn.includes('Smart Sports Sync queued. Scores, odds, wager settlement, and finalization will run in the background shortly'),
-  'Queued Smart Sync success wording must describe background processing'
+  queuedMessageFn.includes('Wager settlement sync queued. It will use cached Sports Engine scores/odds; no provider refresh is started here'),
+  'Queued Smart Sync wording must describe settlement-only background processing'
 );
 assert(queuedMessageFn.includes('Queueing Smart Sports Sync...'), 'First Smart Sync click must immediately show queue acknowledgement');
 assert(queuedMessageFn.includes('requestAnimationFrame'), 'Smart Sync must yield a paint before waiting on Apps Script');

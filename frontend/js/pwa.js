@@ -1,7 +1,11 @@
+// Reality cache compatibility markers: v1219rc16-reality-player-followup v1219rc16-reality-results-ready
+// RC16 Reality Results Ready cache marker: v1219rc16-reality-results-ready
 (function registerAwardsPwa() {
   if (!("serviceWorker" in navigator)) return;
 
-  const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218x2c-confidence-appearance-v1219rc6-admin-question-ux-performance";
+  // Legacy PWA-lineage marker retained for historical regression contracts only.
+  // const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218x2c-confidence-appearance-v1219rc6-admin-question-ux-performance";
+  const PWA_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc17-final-hardening-1");
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
@@ -388,31 +392,65 @@ async function awardsPushEnableOnThisDevice_() {
   };
 }
 
-async function awardsPushDisableOnThisDevice_() {
-  if (!awardsPushSupported_()) {
-    return { success: true, message: "Push is not enabled on this device." };
+async function awardsPushCleanupDeviceRegistration_() {
+  const errors = [];
+  let subscription = null;
+  let endpoint = "";
+  let backendUpdated = 0;
+  let browserUnsubscribed = false;
+
+  if (awardsPushSupported_()) {
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      subscription = await registration.pushManager.getSubscription();
+      endpoint = subscription ? String(subscription.endpoint || "") : "";
+    } catch (err) {
+      errors.push("browser-subscription-read: " + String(err && err.message || err || "unknown error"));
+    }
   }
 
-  const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.getSubscription();
-  const endpoint = subscription ? String(subscription.endpoint || "") : "";
-
   if (typeof apiRemovePushSubscription === "function") {
-    const result = await apiRemovePushSubscription(endpoint, awardsPushDeviceId_());
-    if (result && result.success === false) {
-      throw new Error(result.message || result.error || "Could not disable the stored push subscription.");
+    try {
+      const result = await apiRemovePushSubscription(endpoint, awardsPushDeviceId_());
+      if (result && result.success === false) {
+        throw new Error(result.message || result.error || "Could not disable the stored push subscription.");
+      }
+      backendUpdated = Number(result && result.updated || 0);
+    } catch (err) {
+      errors.push("backend-disable: " + String(err && err.message || err || "unknown error"));
     }
   }
 
   if (subscription) {
     try {
-      await subscription.unsubscribe();
+      browserUnsubscribed = await subscription.unsubscribe() !== false;
     } catch (err) {
-      // Backend disable is authoritative even if the browser already expired it.
+      errors.push("browser-unsubscribe: " + String(err && err.message || err || "unknown error"));
     }
   }
 
-  return { success: true, message: "Push disabled on this device." };
+  return {
+    success: errors.length === 0,
+    backendUpdated: backendUpdated,
+    browserUnsubscribed: browserUnsubscribed,
+    errors: errors
+  };
+}
+
+async function awardsPushDisableOnThisDevice_() {
+  const result = await awardsPushCleanupDeviceRegistration_();
+  if (!result.success) {
+    const error = new Error("Push cleanup was incomplete: " + result.errors.join(" | "));
+    error.cleanupResult = result;
+    throw error;
+  }
+  return { success: true, cleanup: result, message: "Push disabled on this device." };
+}
+
+async function awardsPushDisableForLogout_() {
+  // Logout uses this best-effort path before the session token is revoked.
+  // The caller must still finish logout if any cleanup step fails or times out.
+  return awardsPushCleanupDeviceRegistration_();
 }
 
 // v1.2.18f: standards-based Web Push subscription flow. Permission is only

@@ -15,6 +15,7 @@ var AUTOMATION_HEALTH_DURABLE_HANDLERS_ = {
   runSportsWagerSmartAutomation: "Smart Sports Automation",
   notificationPushRunScheduledPickReminders: "Pick Reminder Notifications",
   teamFantasySyncTriggerHandler: "Team Fantasy Sync",
+  teamFantasyAutoFillTriggerHandler: "Team Fantasy Auto-Fill",
   survivorSportsAutomationTick: "Survivor / KOTH Automation"
 };
 
@@ -82,11 +83,18 @@ function automationHealthSnapshot_() {
     }
   });
 
+  let teamFantasyAutoFill = null;
+  if (typeof teamFantasyAutoFillTriggerStatus_ === "function") {
+    try { teamFantasyAutoFill = teamFantasyAutoFillTriggerStatus_(); }
+    catch (err) { teamFantasyAutoFill = { available: false, error: err && err.message ? err.message : String(err) }; }
+  }
+
   const total = rows.length;
   const remaining = Math.max(0, AUTOMATION_HEALTH_TRIGGER_LIMIT_ - total);
   let level = "healthy";
+  const staleAutoFill = !!(teamFantasyAutoFill && teamFantasyAutoFill.active && teamFantasyAutoFill.required === false);
   if (total >= AUTOMATION_HEALTH_TRIGGER_LIMIT_) level = "critical";
-  else if (total >= 16 || duplicateHandlers.some(function(item) { return item.removable; })) level = "warning";
+  else if (total >= 16 || duplicateHandlers.some(function(item) { return item.removable; }) || staleAutoFill) level = "warning";
 
   return {
     success: true,
@@ -99,6 +107,7 @@ function automationHealthSnapshot_() {
     otherTriggers: rows.filter(function(row) { return row.kind === "other"; }),
     duplicates: duplicateHandlers,
     duplicateDurableCount: duplicateHandlers.filter(function(item) { return item.removable; }).length,
+    teamFantasyAutoFill: teamFantasyAutoFill,
     checkedAt: new Date().toISOString()
   };
 }
@@ -128,7 +137,22 @@ function apiAdminCleanupDuplicateAutomationTriggers(payload) {
     removedHandlers[handler] = Number(removedHandlers[handler] || 0) + 1;
   });
 
+  let teamFantasyAutoFill = null;
+  if (typeof teamFantasyReconcileAutoFillTrigger_ === "function") {
+    try {
+      teamFantasyAutoFill = teamFantasyReconcileAutoFillTrigger_();
+      removed += Number(teamFantasyAutoFill.removed || 0);
+      if (Number(teamFantasyAutoFill.removed || 0) > 0) {
+        removedHandlers.teamFantasyAutoFillTriggerHandler =
+          Number(removedHandlers.teamFantasyAutoFillTriggerHandler || 0) + Number(teamFantasyAutoFill.removed || 0);
+      }
+    } catch (err) {
+      teamFantasyAutoFill = { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  }
+
   const snapshot = automationHealthSnapshot_();
+  snapshot.teamFantasyAutoFill = teamFantasyAutoFill;
   snapshot.removed = removed;
   snapshot.removedHandlers = removedHandlers;
   snapshot.message = removed

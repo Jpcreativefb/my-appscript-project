@@ -1933,12 +1933,15 @@ function getBetResolution_(bet, settings){
       ""
     );
 
+  const normalizedWagerResultType =
+    slugifyBet_(wagerResultType);
+
   /*
     Normal 2-option moneyline tie:
     WinnerNomineeId is intentionally "draw" so the wager is finalized,
     but payout must still be a half-refund.
   */
-  if (wagerResultType === "half-refund") {
+  if (normalizedWagerResultType === "half-refund") {
 
     return {
       status: "half-refund",
@@ -1954,9 +1957,12 @@ function getBetResolution_(bet, settings){
   }
 
   if (
-    wagerResultType === "refund" ||
-    wagerResultType === "push" ||
-    wagerResultType === "void"
+    normalizedWagerResultType === "refund" ||
+    normalizedWagerResultType === "push" ||
+    normalizedWagerResultType === "void" ||
+    normalizedWagerResultType === "canceled" ||
+    normalizedWagerResultType === "cancelled" ||
+    normalizedWagerResultType === "no-contest"
   ) {
 
     return {

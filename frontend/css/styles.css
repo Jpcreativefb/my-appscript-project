@@ -6410,3 +6410,230 @@ button.is-saving {
     padding-bottom:calc(118px + env(safe-area-inset-bottom, 0px));
   }
 }
+
+/* RC16 Reality player follow-up — Sole Survivor required-pick UX */
+details.season-anchor-card {
+  padding: 0;
+  overflow: hidden;
+}
+.season-anchor-card > summary.season-anchor-card-header {
+  padding: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+.season-anchor-card > summary.season-anchor-card-header::-webkit-details-marker { display: none; }
+.season-anchor-card > summary.season-anchor-card-header::after {
+  content: '+';
+  margin-left: 8px;
+  color: #93c5fd;
+  font-size: 1.35rem;
+  font-weight: 900;
+}
+.season-anchor-card[open] > summary.season-anchor-card-header::after { content: '−'; }
+.season-anchor-card > summary.season-anchor-card-header .season-anchor-status { margin-left: auto; }
+.season-anchor-card-body { padding: 0 18px 18px; }
+.season-anchor-current-episode-primary {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(96,165,250,.3);
+  border-radius: 12px;
+  background: rgba(59,130,246,.08);
+}
+.season-anchor-current-episode-primary span,
+.season-anchor-primary-stats span {
+  color: rgba(226,232,240,.7);
+  font-size: .74rem;
+  font-weight: 750;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.season-anchor-current-episode-primary strong { color: #fff; font-size: 1.03rem; }
+.season-anchor-current-episode-primary small { color: rgba(226,232,240,.68); }
+.season-anchor-primary-stats {
+  display: grid;
+  grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.season-anchor-primary-stats > div {
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 11px;
+  background: rgba(255,255,255,.045);
+}
+.season-anchor-primary-stats span,
+.season-anchor-primary-stats strong { display:block; }
+.season-anchor-primary-stats strong { margin-top:4px; color:#fff; }
+.season-anchor-primary-stats .has-penalty {
+  border-color: rgba(248,113,113,.45);
+  background: rgba(127,29,29,.18);
+}
+.season-anchor-primary-stats .has-penalty strong { color:#fca5a5; }
+.season-anchor-more-stats {
+  align-self: start;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 14px;
+  background: rgba(255,255,255,.035);
+}
+.season-anchor-more-stats > summary {
+  cursor: pointer;
+  color:#bfdbfe;
+  font-weight:850;
+}
+.season-anchor-more-stats .season-anchor-summary-grid.secondary { margin:12px 0 0; }
+.season-anchor-recent-history { display:grid; gap:7px; margin-top:12px; }
+.season-anchor-recent-history > strong { color:#e2e8f0; }
+.season-anchor-recent-history > div {
+  display:flex;
+  justify-content:space-between;
+  gap:12px;
+  padding:8px 0;
+  border-top:1px solid rgba(255,255,255,.08);
+  color:rgba(226,232,240,.78);
+  font-size:.8rem;
+}
+.season-anchor-current-pick.finalized-copy { display:grid; gap:4px; margin-top:10px; }
+.season-anchor-current-pick.finalized-copy strong { color:#86efac; }
+.season-anchor-current-pick.finalized-copy span { color:rgba(226,232,240,.76); }
+
+.season-anchor-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(2,6,23,.78);
+  backdrop-filter: blur(4px);
+}
+.season-anchor-confirm-card {
+  width: min(100%, 460px);
+  padding: 20px;
+  border: 1px solid rgba(96,165,250,.45);
+  border-radius: 18px;
+  background: #0f172a;
+  color: #f8fafc;
+  box-shadow: 0 22px 55px rgba(0,0,0,.38);
+}
+.season-anchor-confirm-card h2 { margin:0 0 8px; }
+.season-anchor-confirm-card p { margin:0; color:rgba(226,232,240,.78); }
+.season-anchor-confirm-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:18px;
+}
+@media (max-width: 600px) {
+  .season-anchor-primary-stats { grid-template-columns:1fr; }
+  .season-anchor-confirm-actions { flex-direction:column-reverse; }
+  .season-anchor-confirm-actions .button { width:100%; }
+  .season-anchor-recent-history > div { flex-direction:column; gap:3px; }
+}
+
+/* RC16 Reality Results Ready — spoiler-safe episode progression */
+.reality-player-top-stack {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.reality-current-episode-card,
+.reality-results-ready-card {
+  padding: 16px 18px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 16px;
+  background: rgba(15,23,42,.72);
+}
+.reality-current-episode-card h2,
+.reality-results-ready-card h2 {
+  margin: 3px 0 5px;
+  color: #fff;
+}
+.reality-current-episode-card p,
+.reality-results-ready-card p { margin: 0; color: rgba(226,232,240,.72); }
+.reality-current-episode-lock,
+.reality-spoiler-pick-block {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(251,191,36,.38);
+  border-radius: 12px;
+  background: rgba(120,53,15,.18);
+  color: #fde68a;
+}
+.reality-results-ready-card {
+  border-color: rgba(96,165,250,.48);
+  background: linear-gradient(135deg, rgba(30,64,175,.24), rgba(15,23,42,.82));
+  box-shadow: 0 12px 30px rgba(15,23,42,.2);
+}
+.reality-results-ready-button {
+  width: 100%;
+  margin-top: 13px;
+  min-height: 46px;
+  font-weight: 900;
+  letter-spacing: .025em;
+}
+.reality-spoiler-settings {
+  padding: 10px 13px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 13px;
+  background: rgba(255,255,255,.035);
+}
+.reality-spoiler-settings > summary {
+  cursor: pointer;
+  color: #bfdbfe;
+  font-weight: 800;
+}
+.reality-spoiler-settings p { margin: 8px 0 0; color: rgba(226,232,240,.68); font-size: .86rem; }
+.reality-spoiler-pick-block {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+.reality-spoiler-pick-block strong { color: #fff7d6; }
+.reality-spoiler-pick-block span { color: rgba(254,243,199,.76); font-size: .9rem; }
+.reality-current-question-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 2px 0 12px;
+}
+.reality-current-question-heading h2 { margin: 2px 0 0; }
+.reality-previous-episodes {
+  margin-top: 16px;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 15px;
+  background: rgba(255,255,255,.025);
+  overflow: hidden;
+}
+.reality-previous-episodes > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.reality-previous-episodes > summary::-webkit-details-marker { display: none; }
+.reality-previous-episodes > summary::after {
+  content: '+';
+  color: #93c5fd;
+  font-size: 1.25rem;
+  font-weight: 900;
+}
+.reality-previous-episodes[open] > summary::after { content: '−'; }
+.reality-previous-episodes > summary span { display: grid; gap: 2px; }
+.reality-previous-episodes > summary small { color: rgba(226,232,240,.62); font-weight: 600; }
+.reality-previous-episodes-body { padding: 0 12px 12px; }
+.reality-previous-episodes .reality-episode-picks-section.previous { margin-top: 9px; }
+.reality-episode-picks-section.current.blocked-by-spoiler,
+.reality-episode-picks-section.current.results-ready { border-color: rgba(251,191,36,.22); }
+
+@media (max-width: 680px) {
+  .reality-current-episode-card,
+  .reality-results-ready-card { padding: 14px; }
+  .reality-current-question-heading { display: grid; }
+  .reality-results-ready-button { min-height: 50px; }
+}

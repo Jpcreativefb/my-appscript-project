@@ -2740,8 +2740,16 @@ function runSportsScoresDateWindowUpdate_(
   };
 
   try {
-    const settings =
+    const enabledSettings =
       readEnabledSportsSettings_();
+
+    const settings =
+      enabledSettings.filter(function(setting) {
+        return setting.SeasonActive === true;
+      });
+
+    summary.leaguesSkippedInactive =
+      Math.max(0, enabledSettings.length - settings.length);
 
     const previousScores =
       readLatestSportsScoresMap_();
@@ -6952,7 +6960,8 @@ function checkSportsEngineStatus() {
     checkedAt: new Date(),
     triggers: { liveUpdater: 0, scoreWindow: 0, seasonBatch: 0, archive: 0 },
     sheets: {},
-    seasonJobs: { active: 0, complete: 0, error: 0, paused: 0 },
+    seasonJobs: { active: 0, complete: 0, error: 0, paused: 0, withErrors: 0 },
+    seasonJobErrors: [],
     latestLogs: []
   };
 
@@ -6975,10 +6984,24 @@ function checkSportsEngineStatus() {
     const col = getSportsHeaderMap_(data[0]);
     for (let i = 1; i < data.length; i++) {
       const rowStatus = String(data[i][col.Status] || "").trim().toUpperCase();
+      const rowErrors = col.Errors === undefined
+        ? ""
+        : String(data[i][col.Errors] || "").trim();
       if (rowStatus === "ACTIVE") status.seasonJobs.active++;
       else if (rowStatus === "COMPLETE") status.seasonJobs.complete++;
       else if (rowStatus === "ERROR") status.seasonJobs.error++;
       else if (rowStatus === "PAUSED") status.seasonJobs.paused++;
+      if (rowErrors) {
+        status.seasonJobs.withErrors++;
+        if (status.seasonJobErrors.length < 10) {
+          status.seasonJobErrors.push({
+            jobId: col.JobId === undefined ? "" : String(data[i][col.JobId] || ""),
+            league: col.League === undefined ? "" : String(data[i][col.League] || ""),
+            status: rowStatus,
+            errors: rowErrors
+          });
+        }
+      }
     }
   }
 
@@ -7950,8 +7973,16 @@ function runSportsScheduleReconcileUpdate(targetLeague, daysBack, daysForward) {
   try {
     setupSportsScoresSheet();
 
-    let settings =
+    const enabledSettings =
       readEnabledSportsSettings_();
+
+    let settings =
+      enabledSettings.filter(function(setting) {
+        return setting.SeasonActive === true;
+      });
+
+    summary.leaguesSkippedInactive =
+      Math.max(0, enabledSettings.length - settings.length);
 
     if (leagueFilter) {
       settings =
@@ -8132,13 +8163,16 @@ function apiRemoveSportsScheduleReconcileTriggerAdmin_(params) {
   return removeSportsScheduleReconcileTriggers();
 }
 
-// Final override: include schedule reconcile in smart automation status.
-function getSmartSportsAutomationStatus_() {
-  const triggers = ScriptApp.getProjectTriggers();
+// Canonical production topology: the Sports Engine owns all recurring sports-data
+// automation. Health requires exactly one instance of every intended handler.
+function sportsSmartAutomationStatusFromTriggers_(triggers) {
+  triggers = triggers || [];
 
   function count_(handler) {
     return triggers.filter(function(trigger) {
-      return trigger.getHandlerFunction() === handler;
+      return trigger &&
+        typeof trigger.getHandlerFunction === "function" &&
+        trigger.getHandlerFunction() === handler;
     }).length;
   }
 
@@ -8151,26 +8185,41 @@ function getSmartSportsAutomationStatus_() {
     archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
   };
 
-  const fullyEnabled =
-    details.scoreUpdater > 0 &&
-    details.scoreWindow > 0 &&
-    details.scheduleReconcile > 0 &&
-    details.seasonLoader > 0 &&
-    details.oddsUpdater > 0 &&
-    details.archiveUpdater > 0;
-
-  const anyEnabled =
-    Object.keys(details)
-      .some(function(key) {
-        return details[key] > 0;
-      });
+  const keys = Object.keys(details);
+  const missingHandlers = keys.filter(function(key) {
+    return details[key] === 0;
+  });
+  const duplicateHandlers = keys
+    .filter(function(key) {
+      return details[key] > 1;
+    })
+    .map(function(key) {
+      return { key: key, count: details[key] };
+    });
+  const anyEnabled = keys.some(function(key) {
+    return details[key] > 0;
+  });
+  const allPresent = missingHandlers.length === 0;
+  const healthy = allPresent && duplicateHandlers.length === 0;
 
   return {
-    enabled: fullyEnabled,
-    fullyEnabled: fullyEnabled,
-    partiallyEnabled: anyEnabled && !fullyEnabled,
+    enabled: allPresent,
+    fullyEnabled: healthy,
+    healthy: healthy,
+    partiallyEnabled: anyEnabled && !allPresent,
+    hasDuplicates: duplicateHandlers.length > 0,
+    missingHandlers: missingHandlers,
+    duplicateHandlers: duplicateHandlers,
+    topology: "SPORTS_ENGINE_DATA_AUTOMATION",
     details: details
   };
+}
+
+// Final override: include schedule reconcile in smart automation status.
+function getSmartSportsAutomationStatus_() {
+  return sportsSmartAutomationStatusFromTriggers_(
+    ScriptApp.getProjectTriggers()
+  );
 }
 
 // Final override: Smart Sports Automation also manages schedule reconcile.

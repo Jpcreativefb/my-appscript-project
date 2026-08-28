@@ -2395,14 +2395,17 @@ function realityTvSpoilerPreference_(username, gameId) {
   const row = realityTvSpoilerRowsForUser_(username, gameId).find(function(item) {
     return realityTvKey_(item.RecordType) === "preference";
   });
-  return row ? realityTvBool_(row.ShieldEnabled) : false;
+  // Reality Spoiler Shield is protective by default for a new player/game.
+  // An existing explicit preference row remains authoritative, including an
+  // explicit opt-out (ShieldEnabled=false).
+  return row ? realityTvBool_(row.ShieldEnabled) : true;
 }
 
 function realityTvSpoilerPreferenceMap_(usernames, gameId) {
   const wanted = {};
   (usernames || []).forEach(function(username) {
     const key = realityTvKey_(username);
-    if (key) wanted[key] = false;
+    if (key) wanted[key] = true;
   });
   if (!Object.keys(wanted).length || !gameId) return wanted;
   const ss = SpreadsheetApp.getActive();
@@ -2422,11 +2425,14 @@ function realityTvSpoilerStateFromRows_(username, gameId, seasonId, episodes, ro
     return realityTvKey_(row.Username) === realityTvKey_(username) && realityTvKey_(row.GameId) === realityTvKey_(gameId);
   });
   const preference = userRows.find(function(row) { return realityTvKey_(row.RecordType) === "preference"; });
-  const enabled = preference ? realityTvBool_(preference.ShieldEnabled) : false;
-  // EpisodeNumber on the preference row is the latest already-final episode
-  // when the shield was enabled. This prevents enabling the preference today
-  // from retroactively hiding an entire previously watched season.
-  const hideAfterEpisodeNumber = enabled ? Math.max(0, realityTvNumber_(preference && preference.EpisodeNumber, 0)) : 0;
+  const enabled = preference ? realityTvBool_(preference.ShieldEnabled) : true;
+  // EpisodeNumber on an explicit preference row is the latest already-final
+  // episode when the shield was enabled. A player with no preference row is
+  // a new/default-on player and therefore protects every unrevealed final
+  // episode for this game (hideAfter=0). Explicit opt-out remains authoritative.
+  const hideAfterEpisodeNumber = enabled && preference
+    ? Math.max(0, realityTvNumber_(preference.EpisodeNumber, 0))
+    : 0;
   const revealed = {};
   userRows.forEach(function(row) {
     if (realityTvKey_(row.RecordType) !== "reveal" || !realityTvBool_(row.Revealed)) return;
@@ -2440,11 +2446,19 @@ function realityTvSpoilerStateFromRows_(username, gameId, seasonId, episodes, ro
     const id = realityTvKey_(episode.episodeId || episode.EpisodeId);
     if (id && !revealed[id]) hiddenEpisodeIds.push(id);
   });
+  const hiddenEpisodeNumbers = (episodes || []).filter(function(episode) {
+    return hiddenEpisodeIds.indexOf(realityTvKey_(episode.episodeId || episode.EpisodeId)) !== -1;
+  }).map(function(episode) {
+    return realityTvNumber_(episode.episodeNumber !== undefined ? episode.episodeNumber : episode.EpisodeNumber, 0);
+  }).filter(function(number) { return number > 0; }).sort(function(a, b) { return a - b; });
   return {
     enabled: enabled,
+    explicitPreference: !!preference,
     seasonId: realityTvString_(seasonId),
     hideAfterEpisodeNumber: hideAfterEpisodeNumber,
     hiddenEpisodeIds: hiddenEpisodeIds,
+    hiddenEpisodeNumbers: hiddenEpisodeNumbers,
+    blockingEpisodeNumber: hiddenEpisodeNumbers.length ? hiddenEpisodeNumbers[0] : 0,
     hasHiddenResults: hiddenEpisodeIds.length > 0
   };
 }
@@ -2479,7 +2493,7 @@ function realityTvSpoilerHiddenCategoryIds_(view) {
 }
 
 function realityTvApplySpoilerShield_(payload, spoilerState) {
-  payload.spoilerShield = spoilerState || { enabled: false, hiddenEpisodeIds: [], hasHiddenResults: false };
+  payload.spoilerShield = spoilerState || { enabled: true, hiddenEpisodeIds: [], hasHiddenResults: false };
   const hidden = {};
   (payload.spoilerShield.hiddenEpisodeIds || []).forEach(function(id) { hidden[realityTvKey_(id)] = true; });
   (payload.episodes || []).forEach(function(episode) {
@@ -2494,7 +2508,47 @@ function realityTvApplySpoilerShield_(payload, spoilerState) {
       question.status = "HIDDEN";
     }
   });
+  if (payload.spoilerShield.hasHiddenResults === true) {
+    // The core participant list reflects the newest authoritative roster. Do
+    // not send that changed roster while an earlier elimination is hidden;
+    // doing so would reveal the result before the player chooses to reveal it.
+    payload.participants = [];
+    payload.rosterHiddenBySpoiler = true;
+  }
   return payload;
+}
+
+function realityTvSpoilerBlockedCategoryIds_(view) {
+  const state = view && view.spoilerShield || {};
+  const blockingEpisodeNumber = realityTvNumber_(state.blockingEpisodeNumber, 0);
+  const blocked = {};
+  if (!blockingEpisodeNumber || state.hasHiddenResults !== true) return blocked;
+  (view.episodes || []).forEach(function(episode) {
+    if (realityTvNumber_(episode.episodeNumber, 0) > blockingEpisodeNumber && episode.categoryId) {
+      blocked[realityTvKey_(episode.categoryId)] = realityTvNumber_(episode.episodeNumber, 0);
+    }
+  });
+  (view.episodeQuestions || []).forEach(function(question) {
+    if (realityTvNumber_(question.episodeNumber, 0) > blockingEpisodeNumber && question.categoryId) {
+      blocked[realityTvKey_(question.categoryId)] = realityTvNumber_(question.episodeNumber, 0);
+    }
+  });
+  return blocked;
+}
+
+function realityTvSpoilerBlocksCategory_(username, gameId, categoryId) {
+  if (!username || !gameId || !categoryId) return null;
+  const view = realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false });
+  if (!view || view.enabled !== true || !(view.spoilerShield && view.spoilerShield.hasHiddenResults === true)) return null;
+  const blocked = realityTvSpoilerBlockedCategoryIds_(view);
+  const episodeNumber = blocked[realityTvKey_(categoryId)] || 0;
+  if (!episodeNumber) return null;
+  return {
+    blocked: true,
+    episodeNumber: episodeNumber,
+    blockingEpisodeNumber: realityTvNumber_(view.spoilerShield.blockingEpisodeNumber, 0),
+    spoilerShield: view.spoilerShield
+  };
 }
 
 function realityTvClearSpoilerUserCaches_(username, gameId) {
@@ -2528,9 +2582,15 @@ function apiSaveRealityTvSpoilerPreference(payload) {
       ? Math.max(maxValue, realityTvNumber_(episode.EpisodeNumber, 0))
       : maxValue;
   }, 0);
-  const priorEnabled = prior ? realityTvBool_(prior.ShieldEnabled) : false;
-  const hideAfterEpisodeNumber = enabled && priorEnabled
+  // No preference row means the player is already protected by the new
+  // default-on contract. Saving On for the first time must not silently mark
+  // already-hidden episodes as watched/revealed.
+  const priorEnabled = prior ? realityTvBool_(prior.ShieldEnabled) : true;
+  const priorHideAfterEpisodeNumber = prior
     ? Math.max(0, realityTvNumber_(prior.EpisodeNumber, latestFinalEpisodeNumber))
+    : 0;
+  const hideAfterEpisodeNumber = enabled && priorEnabled
+    ? priorHideAfterEpisodeNumber
     : latestFinalEpisodeNumber;
   const now = new Date();
   realityTvUpsertObject_(SpreadsheetApp.getActive(), REALITY_TV_SPOILER_SHEET, REALITY_TV_SPOILER_HEADERS,
@@ -2706,6 +2766,7 @@ function realityTvUserGameViewPayload_(gameId, username, options) {
         scheduleNotes: realityTvString_(row.ScheduleNotes),
         categoryId: realityTvString_(row.CategoryId),
         status: realityTvString_(row.Status || "OPEN").toUpperCase(),
+        finalizedAt: isFinal ? (row.UpdatedAt || row.AirDateTime || "") : "",
         voteDetails: isFinal && voteRows.length ? {
           rows: voteRows,
           tallies: Object.keys(voteTallies).map(function(key) { return voteTallies[key]; }).sort(function(a, b) {
@@ -5385,9 +5446,7 @@ function realityTvApprovalProgress_(queue) {
   if (reviewStatus === "APPROVED" || stage === "COMPLETE") {
     percent = 100;
     label = "Episode finalization complete";
-    detail = realityTvString_(queue.EpisodeFinalizeMode).toUpperCase() === "ALL_RESULTS"
-      ? "The current episode results, scoring, and roster are final. Next-episode preparation runs separately."
-      : "The episode result, roster, next episode, and enabled questions are ready.";
+    detail = "The current episode results, scoring, and roster are final. Next-episode preparation runs separately.";
   } else if (stage === "SETTLE_QUESTIONS") {
     const ratio = settleTotal > 0 ? settleDone / settleTotal : 1;
     percent = settleTotal > 0 ? Math.min(42, 10 + Math.round(ratio * 32)) : 42;
@@ -6329,12 +6388,14 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
         return realityTvApprovalState_(currentAfterSettlement);
       }
 
-      const allResultsMode = realityTvString_(queue.EpisodeFinalizeMode).toUpperCase() === "ALL_RESULTS";
       realityTvSpreadsheetRetry_("Advance Reality TV episode approval", function() {
         const now = new Date();
         realityTvUpdateObjectRow_(queueSheet, queue.__rowNumber, {
           PushStatus: "EPISODE SETTLED",
-          ApprovalStage: allResultsMode ? "FINALIZE_CURRENT" : "BUILD_NEXT",
+          // Episode N settlement is the browser-facing durability boundary.
+          // Next-episode construction always runs through the separate durable
+          // RealityNextEpisodeJobs queue instead of holding this approval open.
+          ApprovalStage: "FINALIZE_CURRENT",
           ApprovalStageStartedAt: now,
           ApprovalHeartbeatAt: now,
           ErrorMessage: "",
@@ -6344,7 +6405,7 @@ function realityTvContinueRealityTvApprovalInternal_(payload) {
       realityTvScheduleApprovalContinuation_();
       const state = realityTvApprovalState_(realityTvGetQueue_(queue.QueueId));
       state.remainingCount = settlement.remainingCount;
-      state.message = allResultsMode ? "Current episode settled. Saving the final episode record now." : "Episode settled. Preparing the next episode.";
+      state.message = "Episode finalized — next episode is being prepared…";
       return state;
     }
 
@@ -6588,7 +6649,7 @@ function apiAdminResetRealityTvApproval(payload) {
       : 0;
     stage = enabledQuestionCount && (!nextBuild || !nextBuild.complete) ? "BUILD_QUESTIONS" : "FINALIZE";
   } else if (realityTvBool_(season.AutoCreateNextEpisode) && remaining.length > 1) {
-    stage = "BUILD_NEXT";
+    stage = "FINALIZE_CURRENT";
   } else {
     stage = "FINALIZE";
   }
@@ -6623,8 +6684,8 @@ function apiAdminResetRealityTvApproval(payload) {
             ? "Approval reset. Elimination settlement will resume automatically."
         : (stage === "FINALIZE_CURRENT"
             ? "Approval reset. The episode is already settled; final episode records will resume automatically."
-            : (stage === "BUILD_NEXT"
-                ? "Approval reset. The episode is already settled; next-episode creation will resume."
+            : (stage === "FINALIZE_CURRENT"
+                ? "Approval reset. The episode is already settled; final approval will queue next-episode preparation separately."
                 : (stage === "BUILD_QUESTIONS"
                     ? "Approval reset. The episode and next episode already exist; Extra Question building will resume."
                     : "Approval reset. Final approval records will resume.")))));

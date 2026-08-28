@@ -695,7 +695,7 @@ function renderDashboardAttentionGame_(game) {
         ${dashboardStandingsShell_(game)}
       </div>
       <div class="dashboard-game-card-actions">
-        <button type="button" class="dashboard-card-primary" onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')">Finish Picks</button>
+        <button type="button" class="dashboard-card-primary" onclick="enterGame('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}', '${escapeJs(game.gameRole || 'standalone')}', '${escapeJs(game.hubMode || 'playable-aggregate')}')">${escapeHtml(game.actionLabel || game.enterLabel || "Finish Picks")}</button>
         ${game.showLeaderboard === false ? "" : `<button type="button" class="dashboard-card-secondary" onclick="viewGameLeaderboard('${escapeJs(game.gameId)}', '${escapeJs(game.type)}', '${escapeJs(preferredLeagueId)}')">Standings</button>`}
       </div>
     </article>

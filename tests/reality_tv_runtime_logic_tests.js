@@ -146,6 +146,9 @@ function completeApproval(queueId) {
     state = context.apiAdminContinueRealityTvApproval({ username: 'admin', token: 'x', queueId });
   }
   assert.strictEqual(state.complete, true, `Approval did not complete; stage=${state.stage}`);
+  // RC16 settlement returns after Episode N is durable. Exercise the separate
+  // next-episode watchdog explicitly in this in-memory runtime.
+  for (let i = 0; i < 12; i++) context.realityTvContinueNextEpisodeJobs();
   return state;
 }
 
@@ -187,7 +190,7 @@ const pending = dashboard2.seasons[0].queue.find(q => q.ReviewStatus === 'PENDIN
 assert(pending, 'Expected pending review queue item');
 const approved = completeApproval(pending.QueueId);
 assert.strictEqual(approved.success, true);
-assert(approved.nextEpisode || approved.nextEpisodeId, 'Expected Episode 2 to be created');
+assert(approved.nextEpisodeJob, 'Expected Episode 2 preparation to be queued durably');
 
 const dashboard3 = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' });
 const finalBundle = dashboard3.seasons[0];
@@ -214,7 +217,7 @@ const dashNoElim = context.apiAdminGetRealityTvDashboard({ username: 'admin', to
 const pendingNoElim = dashNoElim.seasons[0].queue.find(q => q.EpisodeId === episode2.EpisodeId && q.ReviewStatus === 'PENDING');
 assert(pendingNoElim, 'Expected no-elimination result to require review');
 const approveNoElim = completeApproval(pendingNoElim.QueueId);
-assert(approveNoElim.nextEpisode || approveNoElim.nextEpisodeId, 'Expected Episode 3 after a no-elimination result');
+assert(approveNoElim.nextEpisodeJob, 'Expected Episode 3 preparation to be queued after a no-elimination result');
 const finalNoElim = context.apiAdminGetRealityTvDashboard({ username: 'admin', token: 'x' }).seasons[0];
 assert.strictEqual(finalNoElim.episodes.length, 3);
 assert.strictEqual(finalNoElim.contestants.filter(c => c.Active === true).length, 2);

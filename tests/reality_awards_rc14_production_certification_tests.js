@@ -337,6 +337,13 @@ function assertIncludes(text, fragment, message) {
     if (found) Object.assign(found,row);
     else list.push({...row,__rowNumber:list.length+2});
   };
+  // RC16 player-finalization optimization bypasses the generic upsert for the
+  // already-located user row. Keep this fixture focused on the scoring contract
+  // while modeling the direct write/append helper.
+  c.seasonAnchorPersistUserPick_ = (existing,row) => {
+    if (existing) Object.assign(existing,row);
+    else users.push({...row,__rowNumber:users.length+2});
+  };
   c.seasonAnchorEpisodeCategoryIds_ = () => ['ordinary'];
   c.seasonAnchorUserFixedPointsForCategories_ = () => 10;
   c.clearGameCaches = () => {};

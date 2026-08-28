@@ -1130,19 +1130,125 @@ function teamFantasyGetPlayerPreference_(gameId, username) {
   return { gameId: gameId, username: username, mode: mode, window: windowKey, customLeadMinutes: Math.max(15, Math.min(720, Math.floor(teamFantasyNumber_(row.CustomLeadMinutes, 60)))), updatedAt: teamFantasyString_(row.UpdatedAt) };
 }
 
+function teamFantasyAutoFillRequirement_() {
+  const rows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS);
+  const enabled = [];
+  rows.forEach(function(row) {
+    const gameId = teamFantasyString_(row.GameId);
+    const username = teamFantasyNormalizeUsername_(row.Username);
+    const mode = teamFantasyKey_(row.AutoFillMode);
+    if (!gameId || !username || ["random", "auto"].indexOf(mode) === -1) return;
+    if (typeof teamFantasyIsGame_ === "function" && !teamFantasyIsGame_(gameId)) return;
+    if (typeof getGame === "function") {
+      const game = getGame(gameId);
+      const status = teamFantasyKey_(game && (game.status || game.gameStatus));
+      if (game && (
+        game.archived === true ||
+        game.resultsFinalized === true ||
+        ["complete", "completed", "finished", "final", "finalized", "archived", "closed"].indexOf(status) !== -1
+      )) return;
+    }
+    enabled.push({ gameId: gameId, username: username, mode: mode });
+  });
+  return {
+    required: enabled.length > 0,
+    configuredPlayers: enabled.length,
+    configurations: enabled
+  };
+}
+
+function teamFantasyAutoFillTriggers_() {
+  const triggers = [];
+  ScriptApp.getProjectTriggers().forEach(function(trigger) {
+    if (trigger.getHandlerFunction() === "teamFantasyAutoFillTriggerHandler") triggers.push(trigger);
+  });
+  return triggers;
+}
+
 function teamFantasyAutoFillTriggerStatus_() {
-  let count = 0;
   try {
-    ScriptApp.getProjectTriggers().forEach(function(trigger) { if (trigger.getHandlerFunction() === "teamFantasyAutoFillTriggerHandler") count++; });
-    return { available: true, active: count > 0, count: count, handler: "teamFantasyAutoFillTriggerHandler" };
-  } catch (err) { return { available: false, active: false, count: 0, handler: "teamFantasyAutoFillTriggerHandler", error: err && err.message ? err.message : String(err) }; }
+    const triggers = teamFantasyAutoFillTriggers_();
+    const requirement = teamFantasyAutoFillRequirement_();
+    return {
+      available: true,
+      active: triggers.length > 0,
+      count: triggers.length,
+      required: requirement.required,
+      configuredPlayers: requirement.configuredPlayers,
+      handler: "teamFantasyAutoFillTriggerHandler"
+    };
+  } catch (err) {
+    return {
+      available: false,
+      active: false,
+      count: 0,
+      required: false,
+      configuredPlayers: 0,
+      handler: "teamFantasyAutoFillTriggerHandler",
+      error: err && err.message ? err.message : String(err)
+    };
+  }
+}
+
+function teamFantasyReconcileAutoFillTrigger_() {
+  let lock = null;
+  let locked = false;
+  try {
+    if (typeof LockService !== "undefined" && LockService && typeof LockService.getScriptLock === "function") {
+      lock = LockService.getScriptLock();
+      if (lock && typeof lock.waitLock === "function") {
+        lock.waitLock(5000);
+        locked = true;
+      } else if (lock && typeof lock.tryLock === "function") {
+        locked = lock.tryLock(5000) !== false;
+      }
+    }
+
+    const requirement = teamFantasyAutoFillRequirement_();
+    let triggers = teamFantasyAutoFillTriggers_();
+    let removed = 0;
+    let created = false;
+
+    if (!requirement.required) {
+      triggers.forEach(function(trigger) {
+        ScriptApp.deleteTrigger(trigger);
+        removed++;
+      });
+      triggers = [];
+    } else {
+      // Durable one-worker contract: preserve exactly one Auto-Fill trigger and
+      // never touch the independent Team Fantasy sync worker.
+      triggers.slice(1).forEach(function(trigger) {
+        ScriptApp.deleteTrigger(trigger);
+        removed++;
+      });
+      triggers = triggers.slice(0, 1);
+      if (!triggers.length) {
+        ScriptApp.newTrigger("teamFantasyAutoFillTriggerHandler").timeBased().everyMinutes(5).create();
+        created = true;
+        triggers = teamFantasyAutoFillTriggers_();
+      }
+    }
+
+    return {
+      available: true,
+      active: triggers.length > 0,
+      count: triggers.length,
+      required: requirement.required,
+      configuredPlayers: requirement.configuredPlayers,
+      removed: removed,
+      created: created,
+      handler: "teamFantasyAutoFillTriggerHandler"
+    };
+  } finally {
+    if (locked && lock && typeof lock.releaseLock === "function") {
+      try { lock.releaseLock(); } catch (ignore) {}
+    }
+  }
 }
 
 function teamFantasyEnsureAutoFillTrigger_() {
-  const status = teamFantasyAutoFillTriggerStatus_();
-  if (status.active) return status;
-  ScriptApp.newTrigger("teamFantasyAutoFillTriggerHandler").timeBased().everyMinutes(5).create();
-  return teamFantasyAutoFillTriggerStatus_();
+  return teamFantasyReconcileAutoFillTrigger_();
 }
 
 function teamFantasySavePlayerPreference_(payload) {
@@ -1159,8 +1265,10 @@ function teamFantasySavePlayerPreference_(payload) {
   }, { GameId: gameId, Username: username, AutoFillMode: mode, AutoFillWindow: windowKey, CustomLeadMinutes: customLeadMinutes, UpdatedAt: now });
   let triggerStatus = teamFantasyAutoFillTriggerStatus_();
   let triggerWarning = "";
-  if (mode !== "manual" && !triggerStatus.active) {
-    try { triggerStatus = teamFantasyEnsureAutoFillTrigger_(); } catch (err) { triggerWarning = err && err.message ? err.message : String(err); }
+  try {
+    triggerStatus = teamFantasyReconcileAutoFillTrigger_();
+  } catch (err) {
+    triggerWarning = err && err.message ? err.message : String(err);
   }
   const preference = teamFantasyGetPlayerPreference_(gameId, username);
   preference.triggerStatus = triggerStatus;
@@ -1211,16 +1319,28 @@ function teamFantasyRunAutomaticFillForPlayer_(gameId, username, nowMs) {
 }
 
 function teamFantasyAutoFillTriggerHandler() {
+  let triggerStatus = null;
+  try {
+    triggerStatus = teamFantasyReconcileAutoFillTrigger_();
+    if (!triggerStatus.required) {
+      return { success: true, skipped: true, reason: "no-auto-fill-configurations", triggerStatus: triggerStatus, results: [] };
+    }
+  } catch (err) {
+    triggerStatus = { available: false, error: err && err.message ? err.message : String(err) };
+  }
+
   const rows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS);
   const results = [];
   rows.forEach(function(row) {
     const gameId = teamFantasyString_(row.GameId);
     const username = teamFantasyNormalizeUsername_(row.Username);
-    if (!gameId || !username || teamFantasyKey_(row.AutoFillMode) === "manual") return;
+    const mode = teamFantasyKey_(row.AutoFillMode);
+    if (!gameId || !username || ["random", "auto"].indexOf(mode) === -1) return;
+    if (typeof teamFantasyIsGame_ === "function" && !teamFantasyIsGame_(gameId)) return;
     try { results.push(teamFantasyRunAutomaticFillForPlayer_(gameId, username, Date.now())); }
     catch (err) { results.push({ success: false, gameId: gameId, username: username, error: err && err.message ? err.message : String(err) }); }
   });
-  return { success: true, results: results };
+  return { success: true, triggerStatus: triggerStatus, results: results };
 }
 
 function teamFantasySavePick_(payload) {

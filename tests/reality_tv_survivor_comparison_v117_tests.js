@@ -24,7 +24,7 @@ assert(picks.includes('PICKS_SEASON_ANCHOR_DRAFT_ID'));
 assert(picks.includes('function previewSeasonAnchorPick_'));
 assert(picks.includes('onchange="previewSeasonAnchorPick_(this.value)"'));
 assert(picks.includes('Finalize Pick'));
-assert(picks.includes('You cannot change this pick unless the contestant is eliminated.'));
+assert(picks.includes('You cannot choose again unless this contestant is eliminated.'));
 assert(picks.includes('Browse contestant bios before finalizing'));
 assert(picks.includes('realityTvProfileDetailsHtml_'));
 assert(picks.includes('reality-eliminated-overlay'));
@@ -34,7 +34,7 @@ assert(!picks.includes('draftProfile || currentProfile || entities[0]'), 'The ca
 assert(anchor.includes('finalized:'));
 assert(anchor.includes('canChoose: !locked'));
 assert(anchor.includes('This Sole Survivor pick is finalized. You can choose again only after the contestant is eliminated.'));
-assert(anchor.includes('Sole Survivor pick finalized.'));
+assert(anchor.includes('Finalized Pick: '));
 assert(!anchor.slice(anchor.indexOf('function apiSaveSeasonAnchorPick'), anchor.indexOf('function seasonAnchorEpisodeCategoryIds_')).includes('ManualSwitchAllowed'), 'Manual switching must not bypass finalized-pick behavior.');
 
 // Image containment, eliminated state, and condensed stats.

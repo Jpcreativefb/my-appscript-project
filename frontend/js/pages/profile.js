@@ -516,6 +516,61 @@ function clearProfileEditContext_() {
   } catch (err) {}
 }
 
+function continueAfterProfileSave_(scope, context, username) {
+  context = Object.assign({
+    gameId: "",
+    gameType: "",
+    leagueId: "",
+    gameRole: "",
+    hubMode: "",
+    onboarding: false
+  }, context || {});
+
+  // A profile edit that started from game entry always returns to that game,
+  // even when the Admin configured the game to use the general profile scope.
+  // This prevents the first-entry profile flow from bouncing back Home and
+  // reopening the same prompt on the next attempt.
+  if (context.gameId) {
+    try {
+      const promptKey =
+        "gameProfilePrompt:" +
+        String(username || "").trim().toLowerCase() +
+        ":" +
+        String(context.gameId || "").trim();
+      localStorage.setItem(promptKey, "done");
+    } catch (err) {}
+
+    clearProfileEditContext_();
+    window.setTimeout(function() {
+      if (typeof enterGame === "function") {
+        enterGame(
+          context.gameId,
+          context.gameType,
+          context.leagueId,
+          context.gameRole,
+          context.hubMode
+        );
+      } else {
+        navigate("dashboard");
+      }
+    }, 260);
+    return "game";
+  }
+
+  if (scope === "general" || context.onboarding) {
+    clearProfileEditContext_();
+    window.setTimeout(function() {
+      navigate("dashboard");
+    }, 260);
+    return "dashboard";
+  }
+
+  window.setTimeout(function() {
+    navigate("dashboard");
+  }, 260);
+  return "dashboard";
+}
+
 function profileFindGame_(games, gameId) {
   games = Array.isArray(games) ? games : [];
   return games.find(function(game) {
@@ -1327,45 +1382,8 @@ async function saveProfileForm() {
     );
 
     const context = getProfileEditContext_();
-
-    if (scope === "general" || context.onboarding) {
-      clearProfileEditContext_();
-      window.setTimeout(function() {
-        navigate("dashboard");
-      }, 260);
-      return;
-    }
-
-    if (context.gameId) {
-      try {
-        const promptKey =
-          "gameProfilePrompt:" +
-          String(username || "").trim().toLowerCase() +
-          ":" +
-          String(context.gameId || "").trim();
-        localStorage.setItem(promptKey, "done");
-      } catch (err) {}
-
-      clearProfileEditContext_();
-      window.setTimeout(function() {
-        if (typeof enterGame === "function") {
-          enterGame(
-            context.gameId,
-            context.gameType,
-            context.leagueId,
-            context.gameRole,
-            context.hubMode
-          );
-        } else {
-          navigate("dashboard");
-        }
-      }, 260);
-      return;
-    }
-
-    window.setTimeout(function() {
-      navigate("dashboard");
-    }, 260);
+    continueAfterProfileSave_(scope, context, username);
+    return;
 
   } catch (err) {
 

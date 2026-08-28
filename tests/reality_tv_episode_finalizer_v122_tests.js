@@ -21,7 +21,8 @@ assert(season.includes('function realityTvSettleEpisodeQuestionQueues_'), 'Batch
 assert(season.includes('skipScoreRecalc: true'), 'Batch settlement should defer repeated score recalculation');
 assert(questions.includes('options.setup || adminGetGameSetup'), 'Supplemental settlement must reuse one Game Setup read during batch finalization');
 assert(questions.includes('!options.skipScoreRecalc'), 'Supplemental settlement must support one final score recalculation');
-assert(season.includes('ApprovalStage: allResultsMode ? "FINALIZE_CURRENT" : "BUILD_NEXT"'), 'Current episode must finalize before next-episode preparation in one-click mode');
+assert(season.includes('ApprovalStage: "FINALIZE_CURRENT"'), 'Current episode must finalize durably before next-episode preparation');
+assert(season.includes('Episode finalized — next episode is being prepared…'), 'Current-episode durability boundary message is missing');
 assert(season.includes('realityTvQueueNextEpisodePreparation_(season, episode, reviewer)'), 'Current finalization must queue next episode separately');
 assert(season.includes('function realityTvContinueNextEpisodeJobs'), 'Server-owned next-episode worker is missing');
 assert(season.includes('ScriptApp.newTrigger("realityTvContinueNextEpisodeJobs")'), 'Next-episode worker trigger is missing');

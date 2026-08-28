@@ -52,6 +52,7 @@ const SPORTS_ODDS_SETTINGS_HEADERS = [
   "EstimatedCostPerRefresh",
   "CallsToday",
   "CallsThisMonth",
+  "UsageMonth",
   "LastRefreshDate",
   "LastRefreshAt",
   "LastRefreshStatus",
@@ -202,6 +203,17 @@ function sportsAdminMonthKey_() {
     String(d.getMonth() + 1)
       .padStart(2, "0")
   );
+
+}
+
+function sportsAdminMonthKeyFromDate_(value) {
+
+  const normalized =
+    normalizeSportsDateOnly_(value);
+
+  return normalized && normalized.length >= 7
+    ? normalized.slice(0, 7)
+    : "";
 
 }
 
@@ -895,6 +907,7 @@ function seedSportsOddsAdminSettingsFromSportsSettings_() {
           : 1,
       CallsToday: 0,
       CallsThisMonth: 0,
+      UsageMonth: sportsAdminMonthKey_(),
       LastRefreshDate: "",
       LastRefreshAt: "",
       LastRefreshStatus: "NEVER",
@@ -1429,8 +1442,16 @@ function readSportsOddsAdminSettings_(options) {
       return sportsAdminString_(header);
     });
 
+  const col =
+    sportsAdminHeaderMap_(
+      headers
+    );
+
   const today =
     sportsAdminToday_();
+
+  const currentMonth =
+    sportsAdminMonthKey_();
 
   return data
     .slice(1)
@@ -1559,6 +1580,36 @@ function readSportsOddsAdminSettings_(options) {
         normalizeSportsDateOnly_(
           obj.LastRefreshDate
         );
+
+      const storedUsageMonth =
+        sportsAdminString_(
+          obj.UsageMonth
+        );
+
+      const inferredUsageMonth =
+        storedUsageMonth ||
+        sportsAdminMonthKeyFromDate_(obj.LastRefreshDate) ||
+        currentMonth;
+
+      const monthChanged =
+        inferredUsageMonth !== currentMonth;
+
+      if (monthChanged) {
+        obj.CallsThisMonth = 0;
+      }
+
+      obj.UsageMonth =
+        currentMonth;
+
+      if (
+        col.UsageMonth !== undefined &&
+        (storedUsageMonth !== currentMonth || monthChanged)
+      ) {
+        sh.getRange(index + 2, col.UsageMonth + 1).setValue(currentMonth);
+        if (monthChanged && col.CallsThisMonth !== undefined) {
+          sh.getRange(index + 2, col.CallsThisMonth + 1).setValue(0);
+        }
+      }
 
       if (
         obj.LastRefreshDate &&
@@ -1753,6 +1804,7 @@ function apiUpdateSportsOddsAdminSetting_(params) {
           : 1,
       CallsToday: 0,
       CallsThisMonth: 0,
+      UsageMonth: sportsAdminMonthKey_(),
       LastRefreshDate: "",
       LastRefreshAt: "",
       LastRefreshStatus: "NEVER",
@@ -2024,6 +2076,9 @@ function incrementSportsOddsLeagueUsage_(
   const today =
     sportsAdminToday_();
 
+  const currentMonth =
+    sportsAdminMonthKey_();
+
   for (let i = 1; i < data.length; i++) {
 
     const rowLeague =
@@ -2058,17 +2113,28 @@ function incrementSportsOddsLeagueUsage_(
         callsToday + amount
       );
 
+    const storedUsageMonth =
+      col.UsageMonth === undefined
+        ? sportsAdminMonthKeyFromDate_(lastDate)
+        : sportsAdminString_(data[i][col.UsageMonth]);
+
+    const callsThisMonth =
+      storedUsageMonth === currentMonth
+        ? sportsAdminNumber_(data[i][col.CallsThisMonth], 0)
+        : 0;
+
     sh
       .getRange(
         i + 1,
         col.CallsThisMonth + 1
       )
       .setValue(
-        sportsAdminNumber_(
-          data[i][col.CallsThisMonth],
-          0
-        ) + amount
+        callsThisMonth + amount
       );
+
+    if (col.UsageMonth !== undefined) {
+      sh.getRange(i + 1, col.UsageMonth + 1).setValue(currentMonth);
+    }
 
     sh
       .getRange(
@@ -3330,6 +3396,10 @@ function sportsAdminDashboardTriggerRows_(triggers, handler) {
 }
 
 function sportsAdminDashboardAutomationStatus_(triggers) {
+  if (typeof sportsSmartAutomationStatusFromTriggers_ === "function") {
+    return sportsSmartAutomationStatusFromTriggers_(triggers || []);
+  }
+
   function count_(handler) {
     return sportsAdminDashboardTriggerRows_(triggers, handler).length;
   }
@@ -3342,12 +3412,23 @@ function sportsAdminDashboardAutomationStatus_(triggers) {
     oddsUpdater: count_(SPORTS_ODDS_HYBRID_TRIGGER_FUNCTION),
     archiveUpdater: count_(SPORTS_ARCHIVE_TRIGGER_FUNCTION)
   };
-  const fullyEnabled = Object.keys(details).every(function(key) { return details[key] > 0; });
-  const anyEnabled = Object.keys(details).some(function(key) { return details[key] > 0; });
+  const keys = Object.keys(details);
+  const missingHandlers = keys.filter(function(key) { return details[key] === 0; });
+  const duplicateHandlers = keys
+    .filter(function(key) { return details[key] > 1; })
+    .map(function(key) { return { key: key, count: details[key] }; });
+  const anyEnabled = keys.some(function(key) { return details[key] > 0; });
+  const allPresent = missingHandlers.length === 0;
+  const healthy = allPresent && duplicateHandlers.length === 0;
   return {
-    enabled: fullyEnabled,
-    fullyEnabled: fullyEnabled,
-    partiallyEnabled: anyEnabled && !fullyEnabled,
+    enabled: allPresent,
+    fullyEnabled: healthy,
+    healthy: healthy,
+    partiallyEnabled: anyEnabled && !allPresent,
+    hasDuplicates: duplicateHandlers.length > 0,
+    missingHandlers: missingHandlers,
+    duplicateHandlers: duplicateHandlers,
+    topology: "SPORTS_ENGINE_DATA_AUTOMATION",
     details: details
   };
 }

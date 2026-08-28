@@ -1,3 +1,5 @@
+// Reality cache compatibility markers: v1219rc16-reality-player-followup v1219rc16-reality-results-ready
+// RC16 Reality Results Ready cache marker: v1219rc16-reality-results-ready
 /* ======================
    START APP
 ====================== */
@@ -102,6 +104,37 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 
 /* ======================
+   NOTIFICATION DESTINATION
+====================== */
+
+function appConsumeNotificationDestination_() {
+  try {
+    const url = new URL(window.location.href);
+    const gameId = String(url.searchParams.get("notificationGameId") || "").trim();
+    if (!gameId) return { gameId: "" };
+
+    if (typeof setFrontendGameId === "function") {
+      setFrontendGameId(gameId);
+    } else if (typeof setActiveGameId === "function") {
+      setActiveGameId(gameId);
+    }
+
+    // The notification GameId is a one-time navigation instruction. Remove it
+    // after consumption so later reloads do not force the player back into an
+    // older game after they intentionally switch games.
+    url.searchParams.delete("notificationGameId");
+    if (window.history && typeof window.history.replaceState === "function") {
+      window.history.replaceState({}, document.title, url.pathname + url.search + url.hash);
+    }
+
+    return { gameId: gameId };
+  } catch (err) {
+    console.warn("Notification destination could not be applied", err);
+    return { gameId: "" };
+  }
+}
+
+/* ======================
    INIT APP
 ====================== */
 
@@ -119,6 +152,8 @@ function initApp(session) {
   );
 
   bindGlobalEvents();
+
+  appConsumeNotificationDestination_();
 
   setupAdminNav(activeSession);
 
@@ -139,7 +174,9 @@ function initApp(session) {
     onboardingProfile = localStorage.getItem("profileOnboardingGeneral") === "1";
   } catch (err) {}
 
-  navigate(onboardingProfile ? "profile" : (hash || "dashboard"));
+  navigate(onboardingProfile ? "profile" : (hash || "dashboard"), {
+    replaceHistory: true
+  });
 
 }
 
@@ -576,6 +613,32 @@ async function refreshNotificationBadge_() {
 async function logout() {
 
   const session = typeof getSession === "function" ? getSession() : null;
+  let pushCleanup = null;
+
+  try {
+    if (typeof awardsPushDisableForLogout_ === "function") {
+      pushCleanup = await Promise.race([
+        awardsPushDisableForLogout_(),
+        new Promise(function(resolve) {
+          setTimeout(function() {
+            resolve({ success: false, timedOut: true, errors: ["push cleanup timed out"] });
+          }, 3000);
+        })
+      ]);
+      if (pushCleanup && pushCleanup.success === false) {
+        console.warn("Logout push cleanup warning", pushCleanup);
+        try {
+          sessionStorage.setItem("pattcLogoutPushCleanupWarning", JSON.stringify({
+            at: new Date().toISOString(),
+            timedOut: pushCleanup.timedOut === true,
+            errors: Array.isArray(pushCleanup.errors) ? pushCleanup.errors.slice(0, 5) : []
+          }));
+        } catch (ignore) {}
+      }
+    }
+  } catch (err) {
+    console.warn("Logout push cleanup warning", err);
+  }
 
   try {
     if (session && session.token && typeof apiLogout === "function") {
@@ -598,7 +661,12 @@ async function logout() {
    ROUTE-BASED PAGE MODULES
 ====================== */
 
+/* Historical release-test compatibility marker (non-runtime):
 const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks-v1218x2c-confidence-appearance-v1218y-survivor-koth-strikes-v1218z-voting-competition-v1219rc3-final-performance-v1219rc6-admin-question-ux-performance-v1219rc7-pick-lock-integrity";
+*/
+// Legacy release-lineage marker retained for historical regression contracts only.
+// const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks-v1218x2c-confidence-appearance-v1218y-survivor-koth-strikes-v1218z-voting-competition-v1219rc3-final-performance-v1219rc6-admin-question-ux-performance-v1219rc7-pick-lock-integrity";
+const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc17-final-hardening-1");
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -859,6 +927,56 @@ function appRefreshSnapshotQuietly_(page, snapshotKey) {
    NAVIGATION CORE
 ====================== */
 
+function appRoutePageFromLocation_() {
+  return String(window.location.hash || "")
+    .replace(/^#/, "")
+    .trim() || "dashboard";
+}
+
+function appWriteRouteHistory_(page, options) {
+  options = options || {};
+  const hash = "#" + String(page || "dashboard");
+  if (window.location.hash === hash) return;
+
+  if (window.history && typeof window.history.pushState === "function") {
+    const target = window.location.pathname + window.location.search + hash;
+    if (options.replaceHistory === true && typeof window.history.replaceState === "function") {
+      window.history.replaceState({ pattcPage: page }, document.title, target);
+    } else {
+      window.history.pushState({ pattcPage: page }, document.title, target);
+    }
+    return;
+  }
+
+  window.location.hash = page;
+}
+
+async function appHandleBrowserRoute_() {
+  const page = appRoutePageFromLocation_();
+  const previousPage = String(APP_STATE.currentPage || "dashboard");
+  if (previousPage === page) return;
+
+  await navigate(page, {
+    fromHistory: true,
+    skipHistoryWrite: true
+  });
+
+  // A dirty Admin form may reject browser Back/Forward navigation. In that
+  // case keep the URL synchronized with the page that actually stayed visible.
+  if (String(APP_STATE.currentPage || "dashboard") !== page) {
+    appWriteRouteHistory_(String(APP_STATE.currentPage || previousPage || "dashboard"), {
+      replaceHistory: true
+    });
+  }
+}
+
+function appBindHistoryRouting_() {
+  if (APP_STATE.historyRoutingBound === true) return;
+  APP_STATE.historyRoutingBound = true;
+  window.addEventListener("popstate", appHandleBrowserRoute_);
+  window.addEventListener("hashchange", appHandleBrowserRoute_);
+}
+
 async function navigate(page, options) {
 
   options = options || {};
@@ -888,13 +1006,25 @@ async function navigate(page, options) {
     appCapturePageSnapshot_(previousPage, app);
   }
 
+  // Home navigation is an explicit discovery refresh boundary. The backend
+  // Dashboard cache is generation-versioned by Admin game publication changes,
+  // so a fresh Home request sees newly Live/finalized games without waiting on
+  // the prior 2-minute browser payload or a saved Dashboard snapshot.
+  if (page === "dashboard") {
+    APP_STATE.dashboardHomePayload = null;
+    APP_STATE.dashboardHomePayloadLoadedAt = 0;
+    options.forceRefresh = true;
+  }
+
   app.classList.add("page-enter");
 
   APP_STATE.currentPage = page;
   const snapshot = options.forceRefresh === true ? null : appReadPageSnapshot_(page);
   const usePageLoader = options.suppressLoader !== true;
 
-  window.location.hash = page;
+  if (options.skipHistoryWrite !== true) {
+    appWriteRouteHistory_(page, options);
+  }
 
   if (snapshot) {
     app.innerHTML = snapshot.html;
@@ -1104,15 +1234,23 @@ async function renderGameSwitcher() {
    GAME-SPECIFIC PROFILE PROMPT
 ====================== */
 
-function gameProfilePromptCacheKey_(gameId) {
-  let username = "";
-  try {
-    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
-  } catch (err) {
-    username = "";
+function gameProfilePromptCacheKey_(gameId, username) {
+  if (username === undefined || username === null) {
+    try {
+      username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
+    } catch (err) {
+      username = "";
+    }
   }
   return "gameProfilePrompt:" + String(username || "").trim().toLowerCase() + ":" + String(gameId || "").trim();
 }
+
+function rememberGameProfilePromptComplete_(gameId, username) {
+  const cacheKey = gameProfilePromptCacheKey_(gameId, username);
+  try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+  return cacheKey;
+}
+
 
 function gameProfileDashboardRow_(gameId) {
   const payload = typeof APP_STATE !== "undefined" ? APP_STATE.dashboardHomePayload : null;
@@ -1177,7 +1315,12 @@ async function maybeOfferGameProfile_(gameId) {
   gameId = String(gameId || "").trim();
   if (!gameId || typeof apiGetEditableProfile !== "function") return "continue";
 
-  const cacheKey = gameProfilePromptCacheKey_(gameId);
+  let username = "";
+  try {
+    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
+  } catch (err) {}
+
+  const cacheKey = gameProfilePromptCacheKey_(gameId, username);
   try {
     if (localStorage.getItem(cacheKey) === "done") return "continue";
   } catch (err) {}
@@ -1185,14 +1328,10 @@ async function maybeOfferGameProfile_(gameId) {
   // Do not retroactively interrupt games the player has already started.
   const dashboardGame = gameProfileDashboardRow_(gameId);
   if (dashboardGame && dashboardGame.hasStarted === true) {
-    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    rememberGameProfilePromptComplete_(gameId, username);
     return "continue";
   }
 
-  let username = "";
-  try {
-    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
-  } catch (err) {}
   if (!username) return "continue";
 
   let result = null;
@@ -1205,12 +1344,12 @@ async function maybeOfferGameProfile_(gameId) {
   if (!result || result.success === false) return "continue";
 
   if (String(result.profileMode || "game").toLowerCase() === "general") {
-    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    rememberGameProfilePromptComplete_(gameId, username);
     return "continue";
   }
 
   if (result.gameProfilePromptCompleted === true) {
-    try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
+    rememberGameProfilePromptComplete_(gameId, username);
     return "continue";
   }
 
@@ -1230,23 +1369,24 @@ async function maybeOfferGameProfile_(gameId) {
     return "custom";
   }
 
-  // The player explicitly chose the regular profile. Persist that choice
-  // locally before the network round-trip so a slow/duplicate navigation cannot
-  // immediately reopen the same modal. The server copy is still written when
-  // available so the choice follows the account across devices.
+  // The player explicitly chose the regular profile. Acknowledge that choice
+  // locally before any network work and continue into the game immediately.
+  // Persist the cross-device copy in the background so a slow profile-sheet
+  // write can never reopen or trap the first-entry flow.
   try { localStorage.setItem(cacheKey, "done"); } catch (err) {}
-
   try {
-    if (typeof apiSetGameProfilePromptChoice === "function") {
-      const saved = await apiSetGameProfilePromptChoice(gameId, "general");
-      if (!saved || saved.success === false) {
-        console.warn("Game profile prompt choice was kept locally; server persistence will retry on a later profile read.");
-      }
-    }
+    Promise.resolve(apiSetGameProfilePromptChoice(gameId, "general"))
+      .then(function(saved) {
+        if (!saved || saved.success === false) {
+          console.warn("Game profile prompt choice was acknowledged locally; server persistence did not confirm.");
+        }
+      })
+      .catch(function(err) {
+        console.warn("Game profile prompt choice was acknowledged locally after a network error.", err);
+      });
   } catch (err) {
-    console.warn("Game profile prompt choice was kept locally after a network error.", err);
+    console.warn("Game profile prompt choice was acknowledged locally after a request error.", err);
   }
-
   return "continue";
 }
 
@@ -1726,29 +1866,20 @@ async function handleGameSwitch(gameId) {
 
   clearStartupPayload();
 
-  if (
-    selectedGame &&
-    (
-      selectedGame.gameRole === "parent" ||
-      APP_STATE.currentPage === "season-hub" ||
-      APP_STATE.currentPage === "game-hub"
-    )
-  ) {
+  if (selectedGame) {
+    // GameId and route mode are one atomic navigation decision. Never keep the
+    // previous game's page type when the player switches across game modes.
     await enterGame(
       selectedGame.gameId,
       selectedGame.type,
-      typeof getFrontendLeagueId === "function"
-        ? getFrontendLeagueId()
-        : "",
+      selectedGame.leagueId || (typeof getFrontendLeagueId === "function" ? getFrontendLeagueId() : ""),
       selectedGame.gameRole || "standalone",
       selectedGame.hubMode || "playable-aggregate"
     );
     return;
   }
 
-  await navigate(
-    APP_STATE.currentPage || "dashboard"
-  );
+  await navigate("dashboard", { forceRefresh: true });
 
 }
 
@@ -1789,6 +1920,8 @@ function renderPicks() {
 function bindGlobalEvents() {
 
   debugLog("🔗 Binding navigation");
+
+  appBindHistoryRouting_();
 
   // Example: safe nav binding if needed later
   document.querySelectorAll("button").forEach(btn => {

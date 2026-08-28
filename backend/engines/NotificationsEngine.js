@@ -853,8 +853,15 @@ const PUSH_REMINDER_LOG_HEADERS = [
   "SubscriptionsAttempted",
   "Sent",
   "Failed",
-  "Error"
+  "Error",
+  "AttemptNumber",
+  "SuccessfulSubscriptionIdsJSON",
+  "RetryableSubscriptionIdsJSON",
+  "PermanentSubscriptionIdsJSON"
 ];
+
+const PUSH_REMINDER_MAX_ATTEMPTS_ = 3;
+const PUSH_REMINDER_RETRY_BACKOFF_MS_ = 5 * 60 * 1000;
 
 function notificationPushNormalizeMode_(value) {
   const mode = String(value || "OFF").trim().toUpperCase();
@@ -2073,21 +2080,107 @@ function notificationPushReminderKey_(gameId, lockDateTime, offsetHours) {
     String(Number(offsetHours || 0));
 }
 
-function notificationPushReminderTerminalOffsetsForLock_(gameId, lockDateTime) {
+function notificationPushReminderIdList_(value) {
+  if (Array.isArray(value)) return value.map(String).filter(Boolean);
+  const text = String(value || "").trim();
+  if (!text) return [];
+  try {
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed.map(String).filter(Boolean) : [];
+  } catch (err) {
+    return [];
+  }
+}
+
+function notificationPushReminderStatesForLock_(gameId, lockDateTime, nowMs) {
   const sh = notificationPushReminderLogSheet_();
   const data = sh.getDataRange().getValues();
-  const result = {};
-  if (data.length <= 1) return result;
+  const states = {};
+  if (data.length <= 1) return states;
   const headers = data[0].map(String);
   const col = notificationColumnMap_(headers);
+  const wantedGame = String(gameId || "").trim();
+  const wantedLock = String(lockDateTime || "").trim();
+  const now = Number(nowMs || Date.now());
 
   data.slice(1).forEach(function(row) {
-    if (String(row[col.GameId] || "").trim() !== String(gameId || "").trim()) return;
-    if (String(row[col.LockDateTime] || "").trim() !== String(lockDateTime || "").trim()) return;
+    if (String(row[col.GameId] || "").trim() !== wantedGame) return;
+    if (String(row[col.LockDateTime] || "").trim() !== wantedLock) return;
     const offset = Number(row[col.OffsetHours] || 0);
-    if (offset > 0) result[String(offset)] = String(row[col.Status] || "").trim() || "RECORDED";
+    if (!(offset > 0)) return;
+    const key = String(offset);
+    states[key] = states[key] || { rows: [], attempts: 0, retryableSubscriptionIds: [], terminal: false, terminalStatus: "" };
+    states[key].rows.push({
+      status: String(row[col.Status] || "").trim() || "RECORDED",
+      timestampMs: notificationPushDateMs_(row[col.Timestamp]),
+      attemptNumber: col.AttemptNumber === undefined ? 0 : Number(row[col.AttemptNumber] || 0),
+      sent: Number(row[col.Sent] || 0),
+      successfulSubscriptionIds: col.SuccessfulSubscriptionIdsJSON === undefined ? [] : notificationPushReminderIdList_(row[col.SuccessfulSubscriptionIdsJSON]),
+      retryableSubscriptionIds: col.RetryableSubscriptionIdsJSON === undefined ? [] : notificationPushReminderIdList_(row[col.RetryableSubscriptionIdsJSON]),
+      permanentSubscriptionIds: col.PermanentSubscriptionIdsJSON === undefined ? [] : notificationPushReminderIdList_(row[col.PermanentSubscriptionIdsJSON])
+    });
+  });
+
+  Object.keys(states).forEach(function(key) {
+    const state = states[key];
+    state.rows.sort(function(a, b) { return Number(a.timestampMs || 0) - Number(b.timestampMs || 0); });
+    let retryAttempts = 0;
+    state.rows.forEach(function(item) {
+      const status = String(item.status || "").toUpperCase();
+      if (status.indexOf("COMPLETE") === 0 || status.indexOf("SKIPPED") === 0 || status === "FAILED_PERMANENT" || status === "FAILED_MAX_RETRIES") {
+        state.terminal = true;
+        state.terminalStatus = status;
+      }
+      if (status === "FAILED_RETRYABLE" || status === "FAILED") {
+        retryAttempts = Math.max(retryAttempts + 1, Number(item.attemptNumber || 0));
+      }
+    });
+    state.attempts = retryAttempts;
+    const latest = state.rows.length ? state.rows[state.rows.length - 1] : null;
+    if (!latest || state.terminal) return;
+    const latestStatus = String(latest.status || "").toUpperCase();
+    if (latestStatus !== "FAILED_RETRYABLE" && latestStatus !== "FAILED") return;
+
+    // Legacy partial failures do not have per-subscription retry data. Do not
+    // resend to already-successful devices when their identities are unknown.
+    if (latestStatus === "FAILED" && latest.sent > 0 && !latest.retryableSubscriptionIds.length) {
+      state.terminal = true;
+      state.terminalStatus = "FAILED_LEGACY_PARTIAL";
+      return;
+    }
+    if (state.attempts >= PUSH_REMINDER_MAX_ATTEMPTS_) {
+      state.terminal = true;
+      state.terminalStatus = "FAILED_MAX_RETRIES";
+      return;
+    }
+    if (latest.timestampMs && now < latest.timestampMs + PUSH_REMINDER_RETRY_BACKOFF_MS_) {
+      state.terminal = true;
+      state.terminalStatus = "RETRY_BACKOFF";
+      return;
+    }
+    state.retryableSubscriptionIds = latest.retryableSubscriptionIds.slice();
+  });
+
+  return states;
+}
+
+function notificationPushReminderTerminalOffsetsForLock_(gameId, lockDateTime, nowMs) {
+  const states = notificationPushReminderStatesForLock_(gameId, lockDateTime, nowMs);
+  const result = {};
+  Object.keys(states).forEach(function(offset) {
+    if (states[offset].terminal) result[offset] = states[offset].terminalStatus || "RECORDED";
   });
   return result;
+}
+
+function notificationPushReminderRetryStateForOffset_(gameId, lockDateTime, offsetHours, nowMs) {
+  try {
+    const states = notificationPushReminderStatesForLock_(gameId, lockDateTime, nowMs);
+    const state = states[String(Number(offsetHours || 0))] || null;
+    return state || { rows: [], attempts: 0, retryableSubscriptionIds: [], terminal: false, terminalStatus: "" };
+  } catch (err) {
+    return { rows: [], attempts: 0, retryableSubscriptionIds: [], terminal: false, terminalStatus: "", unavailable: true };
+  }
 }
 
 function notificationPushReminderSelectDueOffset_(offsets, hoursUntilLock, terminalOffsets) {
@@ -2121,7 +2214,11 @@ function notificationPushReminderLog_(entry) {
     Number(entry.subscriptionsAttempted || 0),
     Number(entry.sent || 0),
     Number(entry.failed || 0),
-    String(entry.error || "").slice(0, 500)
+    String(entry.error || "").slice(0, 500),
+    Number(entry.attemptNumber || 0),
+    JSON.stringify(entry.successfulSubscriptionIds || []),
+    JSON.stringify(entry.retryableSubscriptionIds || []),
+    JSON.stringify(entry.permanentSubscriptionIds || [])
   ]);
 }
 
@@ -2153,7 +2250,7 @@ function notificationPushReminderSchedulePreview_(gameId, setting, nowMs) {
   const offsets = notificationPushReminderOffsets_(setting.reminderOffsetsHours || setting.reminderOffsetsText);
   const hoursUntilLock = lock.lockAtMs ? (lock.lockAtMs - nowMs) / 3600000 : 0;
   const terminal = lock.lockDateTime
-    ? notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime)
+    ? notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime, nowMs)
     : {};
   const due = lock.lockDateTime
     ? notificationPushReminderSelectDueOffset_(offsets, hoursUntilLock, terminal)
@@ -2209,7 +2306,8 @@ function notificationPushListAutoReminderSettings_() {
   });
 }
 
-function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDateTime) {
+function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDateTime, retryOptions) {
+  retryOptions = retryOptions || {};
   const resolution = notificationPushAudienceResolution_({
     adminUsername: "scheduler",
     gameId: gameId,
@@ -2241,7 +2339,10 @@ function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDate
       subscriptionsAttempted: 0,
       sent: 0,
       failed: 0,
-      error: skipMessage
+      error: skipMessage,
+      successfulSubscriptionIds: [],
+      retryableSubscriptionIds: [],
+      permanentSubscriptionIds: []
     };
   }
 
@@ -2252,18 +2353,51 @@ function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDate
     ? "Final reminder: you still have picks to make. Picks begin locking in about " + Number(offsetHours) + " hour(s)."
     : "You still have picks to make. Picks begin locking in about " + Number(offsetHours) + " hour(s).";
   const recipients = resolution.recipients;
-  const subscriptions = resolution.subscriptions;
-
-  recipients.forEach(function(username) {
-    createUserNotification_({
-      username: username,
-      type: "make_picks",
-      title: title,
-      message: message,
-      gameId: gameId,
-      route: "picks"
-    });
+  let subscriptions = resolution.subscriptions;
+  const onlySubscriptionIds = {};
+  (retryOptions.onlySubscriptionIds || []).forEach(function(id) {
+    const key = String(id || "").trim();
+    if (key) onlySubscriptionIds[key] = true;
   });
+  if (Object.keys(onlySubscriptionIds).length) {
+    subscriptions = subscriptions.filter(function(item) {
+      return !!onlySubscriptionIds[String(item.subscriptionId || "").trim()];
+    });
+  }
+  const attemptNumber = Math.max(1, Number(retryOptions.attemptNumber || 1));
+  // Ordinary reminder compatibility contract: route: "picks". Team Fantasy
+  // overrides that destination explicitly so push taps never land in Picks.
+  const reminderRoute = typeof teamFantasyIsGame_ === "function" && teamFantasyIsGame_(gameId)
+    ? "team-fantasy"
+    : "picks";
+  const destination = notificationPushGameDestination_(gameId, reminderRoute);
+
+  if (attemptNumber === 1) {
+    recipients.forEach(function(username) {
+      createUserNotification_({
+        username: username,
+        type: "make_picks",
+        title: title,
+        message: message,
+        gameId: gameId,
+        route: destination.route
+      });
+    });
+  }
+
+  if (attemptNumber > 1 && !subscriptions.length) {
+    return {
+      status: "COMPLETE_NO_RETRYABLE_SUBSCRIPTIONS",
+      recipientUsers: recipients.length,
+      subscriptionsAttempted: 0,
+      sent: 0,
+      failed: 0,
+      error: "Previously failed subscriptions are no longer active.",
+      successfulSubscriptionIds: [],
+      retryableSubscriptionIds: [],
+      permanentSubscriptionIds: []
+    };
+  }
 
   const notification = {
     title: title,
@@ -2272,9 +2406,9 @@ function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDate
     badge: "/icons/icon-192.png",
     tag: "awards-" + gameId + "-automatic-pick-reminder-" + String(offsetHours),
     data: {
-      url: "./app.html#picks",
-      route: "picks",
-      gameId: gameId,
+      url: destination.url,
+      route: destination.route,
+      gameId: destination.gameId,
       type: "make_picks"
     }
   };
@@ -2286,12 +2420,40 @@ function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDate
   results.forEach(notificationPushMarkDeliveryResult_);
   if (results.length) SpreadsheetApp.flush();
 
-  const sent = Number(gatewayResult.sent || results.filter(function(item) { return item.ok === true; }).length || 0);
-  const failed = Number(gatewayResult.failed || results.filter(function(item) { return item.ok !== true; }).length || 0);
-  const expired = Number(gatewayResult.expired || results.filter(function(item) { return item.expired === true; }).length || 0);
+  let successfulSubscriptionIds = [];
+  let retryableSubscriptionIds = [];
+  let permanentSubscriptionIds = [];
+  const attemptedIds = subscriptions.map(function(item) { return String(item.subscriptionId || "").trim(); }).filter(Boolean);
+  const representedIds = {};
+  results.forEach(function(item) {
+    const id = String(item && item.subscriptionId || "").trim();
+    if (!id) return;
+    representedIds[id] = true;
+    if (item.ok === true) successfulSubscriptionIds.push(id);
+    else if (item.expired === true || Number(item.statusCode) === 404 || Number(item.statusCode) === 410) permanentSubscriptionIds.push(id);
+    else retryableSubscriptionIds.push(id);
+  });
+  if (gatewayResult.success === false) {
+    // If the gateway failed before returning a result for every attempted
+    // subscription, keep the unrepresented attempts retryable. Never infer a
+    // success for an omitted result, and never resend IDs already reported OK.
+    attemptedIds.forEach(function(id) {
+      if (!representedIds[id]) retryableSubscriptionIds.push(id);
+    });
+  }
+  successfulSubscriptionIds = notificationPushReminderIdList_(successfulSubscriptionIds);
+  retryableSubscriptionIds = notificationPushReminderIdList_(retryableSubscriptionIds);
+  permanentSubscriptionIds = notificationPushReminderIdList_(permanentSubscriptionIds);
+
+  const sent = Number(gatewayResult.sent || successfulSubscriptionIds.length || 0);
+  const failed = Number(gatewayResult.failed || results.filter(function(item) { return item.ok !== true; }).length || (gatewayResult.success === false ? attemptedIds.length : 0));
+  const expired = Number(gatewayResult.expired || permanentSubscriptionIds.length || 0);
   const error = gatewayResult.success === false
     ? String(gatewayResult.message || gatewayResult.error || "Push gateway failed.")
     : "";
+  let status = "COMPLETE";
+  if (retryableSubscriptionIds.length) status = "FAILED_RETRYABLE";
+  else if (permanentSubscriptionIds.length) status = "COMPLETE_WITH_EXPIRED";
 
   notificationPushLogBatch_({
     adminUsername: "scheduler",
@@ -2306,17 +2468,20 @@ function notificationPushDeliverScheduledReminder_(gameId, offsetHours, lockDate
     sent: sent,
     failed: failed,
     expired: expired,
-    status: gatewayResult.success === false || failed > 0 ? "FAILED" : "COMPLETE",
+    status: status,
     error: error
   });
 
   return {
-    status: gatewayResult.success === false || failed > 0 ? "FAILED" : "COMPLETE",
+    status: status,
     recipientUsers: recipients.length,
     subscriptionsAttempted: subscriptions.length,
     sent: sent,
     failed: failed,
-    error: error
+    error: error,
+    successfulSubscriptionIds: successfulSubscriptionIds,
+    retryableSubscriptionIds: retryableSubscriptionIds,
+    permanentSubscriptionIds: permanentSubscriptionIds
   };
 }
 
@@ -2341,7 +2506,7 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
   }
 
   const hoursUntilLock = (lock.lockAtMs - nowMs) / 3600000;
-  const terminal = notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime);
+  const terminal = notificationPushReminderTerminalOffsetsForLock_(gameId, lock.lockDateTime, nowMs);
   const due = notificationPushReminderSelectDueOffset_(setting.reminderOffsetsHours, hoursUntilLock, terminal);
   if (!due.offsetHours) {
     return { gameId: gameId, status: "NOT_DUE", lockDateTime: lock.lockDateTime, lockSource: lock.source || "", reminderWindow: lock.reminderWindow || "" };
@@ -2365,7 +2530,15 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
     });
   });
 
-  const result = notificationPushDeliverScheduledReminder_(gameId, due.offsetHours, lock.lockDateTime);
+  const retryState = notificationPushReminderRetryStateForOffset_(gameId, lock.lockDateTime, due.offsetHours, nowMs);
+  const attemptNumber = Math.max(1, Number(retryState.attempts || 0) + 1);
+  const result = notificationPushDeliverScheduledReminder_(gameId, due.offsetHours, lock.lockDateTime, {
+    attemptNumber: attemptNumber,
+    onlySubscriptionIds: retryState.attempts > 0 ? retryState.retryableSubscriptionIds : []
+  });
+  if (result.status === "FAILED_RETRYABLE" && attemptNumber >= PUSH_REMINDER_MAX_ATTEMPTS_) {
+    result.status = "FAILED_MAX_RETRIES";
+  }
   notificationPushReminderLog_({
     gameId: gameId,
     lockDateTime: lock.lockDateTime,
@@ -2375,7 +2548,11 @@ function notificationPushProcessScheduledGame_(setting, nowMs) {
     subscriptionsAttempted: result.subscriptionsAttempted,
     sent: result.sent,
     failed: result.failed,
-    error: result.error
+    error: result.error,
+    attemptNumber: attemptNumber,
+    successfulSubscriptionIds: result.successfulSubscriptionIds || [],
+    retryableSubscriptionIds: result.retryableSubscriptionIds || [],
+    permanentSubscriptionIds: result.permanentSubscriptionIds || []
   });
 
   result.gameId = gameId;
@@ -2585,7 +2762,50 @@ function notificationPushMarkDeliveryResult_(result) {
   }
 }
 
+function notificationPushCanonicalGameRoute_(gameId, route) {
+  gameId = String(gameId || "").trim();
+  route = String(route || "").trim().toLowerCase();
+  if (!route) route = "notifications";
+  if (!/^[a-z0-9:_-]+$/.test(route)) route = "notifications";
+  return route;
+}
+
+function notificationPushGameDestination_(gameId, route) {
+  gameId = String(gameId || "").trim();
+  route = notificationPushCanonicalGameRoute_(gameId, route);
+  let url = "./app.html";
+  if (gameId) {
+    url += "?notificationGameId=" + encodeURIComponent(gameId);
+  }
+  url += "#" + route;
+  return {
+    url: url,
+    route: route,
+    gameId: gameId
+  };
+}
+
+function notificationPushCanonicalizeDestination_(notification) {
+  notification = notification && typeof notification === "object"
+    ? Object.assign({}, notification)
+    : {};
+  const data = notification.data && typeof notification.data === "object"
+    ? Object.assign({}, notification.data)
+    : {};
+  const gameId = String(data.gameId || notification.gameId || "").trim();
+  const route = String(data.route || notification.route || "notifications").trim();
+  if (gameId) {
+    const destination = notificationPushGameDestination_(gameId, route);
+    data.url = destination.url;
+    data.route = destination.route;
+    data.gameId = destination.gameId;
+  }
+  notification.data = data;
+  return notification;
+}
+
 function notificationPushGatewaySend_(subscriptions, notification) {
+  notification = notificationPushCanonicalizeDestination_(notification);
   const gateway = notificationPushGetGatewayConfig_();
   if (!gateway.configured) {
     return {
