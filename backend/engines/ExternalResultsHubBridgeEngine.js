@@ -65,6 +65,18 @@ const EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS = {
     "WinningOutcome", "EvidenceUrl", "ReviewStatus", "ReviewedBy",
     "ReviewedAt", "ReviewNotes", "PushStatus", "PushedAt",
     "PushMessage", "CreatedAt", "UpdatedAt"
+  ],
+  ResultSourcePolicies: [
+    "PolicyId", "AppGameId", "CategoryId", "ExternalEventId", "Domain",
+    "ResultSource", "SourceTier", "MonitorAutomatically", "RequireAdminApproval",
+    "AutoApplyWhenVerified", "VerificationMode", "ExpectedWinnerCount",
+    "OfficialSourceUrl", "OfficialCategoryName", "OfficialCeremonyYear",
+    "ExpectedNomineeCount", "StableChecksRequired", "StaleAfterMinutes",
+    "LastChecked", "LastError", "SourceHealth", "DetectedResult",
+    "DetectedResultJSON", "DetectedFingerprint", "StableCheckCount",
+    "SourceAgreement", "Confidence", "Finalized", "FinalizedAt",
+    "FinalizedEvidenceUrl", "FinalizedFingerprint", "LastAutoAction",
+    "CreatedAt", "UpdatedAt"
   ]
 };
 
@@ -680,6 +692,16 @@ function externalResultsBridgeApplyJob_(hub, job) {
       writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ReviewQueue", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ReviewQueue,
         ["ReviewId"], [payload.review]));
     }
+    if (payload.policy) {
+      externalResultsBridgeRequireKey_(payload.policy, ["PolicyId"], "Result Source Policy update");
+      const policySheet = externalResultsBridgeEnsureSheet_(hub, "ResultSourcePolicies", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ResultSourcePolicies);
+      const policyExists = externalResultsBridgeReadObjects_(policySheet).some(function(row) {
+        return externalResultsBridgeKey_(row.PolicyId) === externalResultsBridgeKey_(payload.policy.PolicyId);
+      });
+      if (!policyExists) throw new Error("Hub dependency not ready: ResultSourcePolicies row has not been created yet.");
+      writes.push(externalResultsBridgeVerifiedUpsert_(hub, "ResultSourcePolicies", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ResultSourcePolicies,
+        ["PolicyId"], [payload.policy]));
+    }
     if (payload.importedResult) {
       externalResultsBridgeRequireKey_(payload.importedResult, ["ImportedResultId"], "Imported result update");
       const resultSheet = externalResultsBridgeEnsureSheet_(hub, "ImportedResults", EXTERNAL_RESULTS_BRIDGE_HUB_HEADERS.ImportedResults);
@@ -780,11 +802,14 @@ function externalResultsProcessHubOutbox() {
         failed += 1;
       }
     });
+    const autoResults = typeof externalResultsInboxAutoApplyWorker === "function"
+      ? externalResultsInboxAutoApplyWorker()
+      : { success: true, skipped: true };
     const remaining = externalResultsBridgeReadObjects_(sheet).filter(function(job) {
       return ["QUEUED", "RETRY"].indexOf(externalResultsBridgeString_(job.Status).toUpperCase()) !== -1;
     }).length;
     if (remaining) externalResultsBridgeSchedule_();
-    return { success: true, processed: jobs.length, completed: completed, failed: failed, waitingOnDependencies: waiting, remaining: remaining };
+    return { success: autoResults.success !== false, processed: jobs.length, completed: completed, failed: failed, waitingOnDependencies: waiting, remaining: remaining, automaticResults: autoResults };
   } finally {
     lock.releaseLock();
   }
@@ -962,7 +987,7 @@ function apiAdminRetryExternalResultsBridgeFailures(payload) {
 ===================================================== */
 
 const EXTERNAL_RESULTS_INBOX_ALLOWED_PROVIDERS = [
-  "manual-awards", "manual-reality-tv", "kalshi", "polymarket"
+  "manual-awards", "manual-reality-tv", "kalshi", "polymarket", "official-academy"
 ];
 
 function externalResultsInboxProviderAllowed_(provider) {
@@ -1396,7 +1421,18 @@ function externalResultsInboxQueueHubAck_(rows, message) {
   const first = (rows || [])[0] || {};
   if (!first.ReviewId || typeof externalResultsBridgeEnqueue_ !== "function") return { skipped: true };
   const now = new Date();
+  const sourceConfig = externalResultsBridgeParseJson_(first.SourceConfigJSON, {});
+  const policyUpdate = sourceConfig.policyId ? {
+    PolicyId: sourceConfig.policyId,
+    Finalized: true,
+    FinalizedAt: now,
+    FinalizedEvidenceUrl: externalResultsBridgeString_(first.EvidenceUrl),
+    FinalizedFingerprint: externalResultsBridgeString_(sourceConfig.evidenceFingerprint),
+    LastAutoAction: message || "Applied by Awards App from ExternalResultsInbox.",
+    UpdatedAt: now
+  } : null;
   return externalResultsBridgeEnqueue_("UPDATE_REVIEW", first.ReviewId, first.Provider, {
+    policy: policyUpdate,
     review: {
       ReviewId: first.ReviewId, ImportedResultId: first.ImportedResultId, Provider: first.Provider,
       ReviewStatus: "APPROVED", ReviewedBy: "Awards App", ReviewedAt: now,
@@ -1930,6 +1966,10 @@ function externalResultsBridgeEnrichCategoriesWithLiveProbabilities_(
 function externalResultsInboxApplyGeneric_(validation, rows, username) {
   const category = validation.category;
   const first = rows[0] || {};
+  const sourceConfig = externalResultsBridgeParseJson_(first.SourceConfigJSON, {});
+  const policyAutoApplied = sourceConfig.autoApplyWhenVerified === true &&
+    sourceConfig.requireAdminApproval === false &&
+    ["OFFICIAL", "TRUSTED_STRUCTURED"].indexOf(externalResultsBridgeString_(sourceConfig.sourceTier).toUpperCase()) !== -1;
   const winnerLookup = {};
   validation.winnerIds.forEach(function(id) { winnerLookup[externalResultsBridgeKey_(id)] = true; });
   const now = new Date();
@@ -1964,8 +2004,8 @@ function externalResultsInboxApplyGeneric_(validation, rows, username) {
     externalEventId: externalResultsBridgeString_(first.ExternalEventId),
     externalMarketId: externalResultsBridgeString_(first.ExternalMarketId),
     statKey: externalResultsBridgeString_(first.ResultKey),
-    autoSettle: false,
-    requireAdminReview: true,
+    autoSettle: policyAutoApplied,
+    requireAdminReview: !policyAutoApplied,
     skipCategoryResultWrite: true,
     username: username || "administrator",
     notes: "Applied from approved External Results Hub delivery " + externalResultsBridgeString_(first.DeliveryBatchId)
@@ -1984,6 +2024,21 @@ function externalResultsInboxApplyGeneric_(validation, rows, username) {
   };
 }
 
+
+function externalResultsInboxAutoConfig_(rows) {
+  const first=(rows||[])[0]||{}, cfg=externalResultsBridgeParseJson_(first.SourceConfigJSON,{});
+  const tier=externalResultsBridgeString_(cfg.sourceTier).toUpperCase(), mode=externalResultsBridgeString_(cfg.verificationMode).toUpperCase();
+  const provider=externalResultsBridgeKey_(first.Provider);
+  const eligibleProvider = tier === "OFFICIAL" || tier === "TRUSTED_STRUCTURED";
+  const marketOnly = provider === "kalshi" || provider === "polymarket";
+  return {eligible:cfg.autoApplyWhenVerified===true && cfg.requireAdminApproval===false && eligibleProvider && !marketOnly && (mode==="AUTO_APPROVE_WHEN_VERIFIED"||mode==="MULTI_SOURCE_AUTO_APPROVE") && externalResultsBridgeString_(cfg.sourceHealth).toUpperCase()==="HEALTHY", cfg:cfg};
+}
+function externalResultsInboxAutoApplyWorker() {
+  externalResultsBridgeEnsureSystem_();
+  const groups=externalResultsInboxGroups_(["READY","VALIDATED"]); let validated=0,applied=0,skipped=0,errors=0;
+  Object.keys(groups).forEach(function(key){const rows=groups[key],auto=externalResultsInboxAutoConfig_(rows);if(!auto.eligible){skipped+=1;return;}let validation=externalResultsInboxValidateGroup_(rows);if(!validation.ok){externalResultsInboxPatchRows_(rows,{Status:"ERROR",ErrorMessage:validation.error||"Automatic validation failed.",LastAttemptAt:new Date(),UpdatedAt:new Date()});errors+=1;return;}if(validation.route!=="GENERIC"){skipped+=1;return;}if(validation.alreadyApplied){externalResultsInboxPatchRows_(rows,{Status:"APPLIED",AppliedAt:new Date(),ErrorMessage:"Already settled locally with the same result; automatic worker confirmed idempotently.",UpdatedAt:new Date()});externalResultsInboxQueueHubAck_(rows,"Automatic Results policy confirmed an already-applied result.");applied+=1;return;}if(externalResultsInboxNormalizeStatus_((rows[0]||{}).Status)!=="VALIDATED"){externalResultsInboxPatchRows_(rows,{Status:"VALIDATED",ErrorMessage:"",LastAttemptAt:new Date(),UpdatedAt:new Date()});validated+=1;validation=externalResultsInboxValidateGroup_(rows);}try{externalResultsInboxApplyGeneric_(validation,rows,"automatic-results-policy");externalResultsInboxPatchRows_(rows,{Status:"APPLIED",AppliedAt:new Date(),ErrorMessage:"",UpdatedAt:new Date()});applied+=1;}catch(err){externalResultsInboxPatchRows_(rows,{Status:"ERROR",AttemptCount:Number((rows[0]||{}).AttemptCount||0)+1,LastAttemptAt:new Date(),ErrorMessage:err.message||String(err),UpdatedAt:new Date()});errors+=1;}});
+  return {success:errors===0,validated:validated,applied:applied,skipped:skipped,errors:errors};
+}
 function externalResultsInboxSummary_() {
   externalResultsBridgeEnsureSystem_();
   const reconciliation = externalResultsInboxReconcileReality_();
@@ -2015,7 +2070,7 @@ function externalResultsInboxSummary_() {
   }).sort(function(a, b) {
     return String(b.deliveryBatchId || "").localeCompare(String(a.deliveryBatchId || ""));
   });
-  return { success: true, counts: counts, totalRows: rows.length, batches: groupSummary.slice(0, 25), autoApply: false, reconciliation: reconciliation };
+  return { success: true, counts: counts, totalRows: rows.length, batches: groupSummary.slice(0, 25), autoApply: externalResultsBridgeHasTrigger_(), reconciliation: reconciliation };
 }
 
 function apiAdminGetExternalResultsInboxStatus(payload) {

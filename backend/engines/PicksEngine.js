@@ -778,7 +778,51 @@ function apiGetMyPicks(username, gameId) {
    USER BREAKDOWN
 ========================================================= */
 
-function getUserBreakdown(username, gameId){
+function userBreakdownGameLocked_(gameId) {
+
+  if (typeof isLeaderboardCompareGameLocked_ === "function") {
+    return isLeaderboardCompareGameLocked_(gameId);
+  }
+
+  try {
+    const game =
+      typeof getGameRuntimeConfig === "function"
+        ? getGameRuntimeConfig(gameId)
+        : typeof getGame === "function"
+          ? getGame(gameId)
+          : null;
+
+    return !!(
+      game && (
+        game.lockAllPicks === true ||
+        String(game.lockAllPicks || "").trim().toLowerCase() === "true" ||
+        game.LockAllPicks === true ||
+        String(game.LockAllPicks || "").trim().toLowerCase() === "true"
+      )
+    );
+  } catch (err) {
+    return false;
+  }
+
+}
+
+function userBreakdownCategoryLocked_(config, meta) {
+
+  if (meta && meta.locked === true) {
+    return true;
+  }
+
+  if (typeof isLeaderboardCompareCategoryLocked_ === "function") {
+    return isLeaderboardCompareCategoryLocked_(config || {}, {});
+  }
+
+  return false;
+
+}
+
+function getUserBreakdown(username, gameId, options){
+
+  options = options || {};
 
   if (!username) {
     return [];
@@ -794,6 +838,14 @@ function getUserBreakdown(username, gameId){
   const settings =
     getCategorySettings(gameId);
 
+  const hideUnlockedSelections =
+    options.hideUnlockedSelections === true;
+
+  const gameLocked =
+    hideUnlockedSelections
+      ? userBreakdownGameLocked_(gameId)
+      : true;
+
   return picks.map(p => {
 
     const config =
@@ -808,24 +860,35 @@ function getUserBreakdown(username, gameId){
         p.originalNomineeId
       );
 
+    const selectionVisible =
+      !hideUnlockedSelections ||
+      gameLocked ||
+      userBreakdownCategoryLocked_(config, meta);
+
     return {
       category:
         p.categoryId,
 
       pick:
-        p.nomineeId,
+        selectionVisible
+          ? p.nomineeId
+          : "",
 
       winner:
         config.winnerNomineeId || "",
 
       status:
-        meta.status,
+        selectionVisible
+          ? meta.status
+          : "hidden",
 
       points:
         meta.basePoints,
 
       adjustedPoints:
-        meta.adjustedPoints,
+        selectionVisible
+          ? meta.adjustedPoints
+          : 0,
 
       changePenalty:
         meta.changePenalty,
@@ -834,13 +897,19 @@ function getUserBreakdown(username, gameId){
         meta.maxChanges,
 
       changesLeft:
-        meta.changesLeft,
+        selectionVisible
+          ? meta.changesLeft
+          : null,
 
       originalNomineeId:
-        p.originalNomineeId || "",
+        selectionVisible
+          ? (p.originalNomineeId || "")
+          : "",
 
       changeCount:
-        p.changeCount || 0,
+        selectionVisible
+          ? (p.changeCount || 0)
+          : 0,
 
       locked:
         meta.locked,
@@ -851,10 +920,17 @@ function getUserBreakdown(username, gameId){
           : normalizeLower_(config.scoreMode || "correct-pick"),
 
       confidencePoints:
-        p.confidencePoints || 0,
+        selectionVisible
+          ? (p.confidencePoints || 0)
+          : 0,
 
       stakePoints:
-        p.stakePoints || 0
+        selectionVisible
+          ? (p.stakePoints || 0)
+          : 0,
+
+      selectionHidden:
+        !selectionVisible
     };
 
   });

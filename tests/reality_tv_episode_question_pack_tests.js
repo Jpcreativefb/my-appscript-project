@@ -124,6 +124,20 @@ const contestantA = bundle.contestants.find(c => c.Name === 'A');
 context.apiAdminSubmitRealityTvResult({ seasonId: bundle.season.SeasonId, episodeId: episode1.EpisodeId, outcomeType: 'elimination', selectedContestantIdsJSON: JSON.stringify([contestantA.ContestantId]) });
 dashboard = context.apiAdminGetRealityTvDashboard({});
 bundle = dashboard.seasons[0];
+const mainPending = bundle.queue.find(q => q.ReviewStatus === 'PENDING');
+const blocked = context.apiAdminApproveRealityTvResult({ queueId: mainPending.QueueId, username: 'admin' });
+assert.strictEqual(blocked.success, false, 'main elimination approval must not bypass unresolved Extra Questions');
+assert.strictEqual(blocked.code, 'MISSING_EPISODE_RESULTS');
+assert.strictEqual(blocked.missingCount, 3, 'the three still-OPEN Extra Questions are explicit blockers');
+
+// Push the remaining three questions. They stay PENDING so one-click episode
+// finalization can settle all four question outcomes through the durable batch.
+bundle.episodeQuestions.filter(q => String(q.Status).toUpperCase() !== 'FINAL').forEach(q => {
+  const submitted = context.apiAdminSubmitRealityTvQuestionResult({ episodeQuestionId: q.EpisodeQuestionId, resultMode: 'push' });
+  assert.strictEqual(submitted.success, true);
+});
+dashboard = context.apiAdminGetRealityTvDashboard({});
+bundle = dashboard.seasons[0];
 completeElimination(bundle.queue.find(q => q.ReviewStatus === 'PENDING').QueueId);
 // RC16 Results Ready finalizes Episode 1 first and prepares Episode 2 through
 // the separate durable next-episode worker instead of the approval response.

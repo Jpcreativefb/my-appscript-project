@@ -32,7 +32,7 @@ function functionSource(source, name) {
 }
 
 assert(bridge.includes('const EXTERNAL_RESULTS_INBOX_ALLOWED_PROVIDERS'), 'Inbox provider allow-list is missing');
-['manual-awards', 'manual-reality-tv', 'kalshi', 'polymarket'].forEach(provider => {
+['manual-awards', 'manual-reality-tv', 'kalshi', 'polymarket', 'official-academy'].forEach(provider => {
   assert(bridge.includes(`"${provider}"`), `${provider} must be allowed in the External Results Inbox`);
 });
 assert(functionSource(bridge, 'externalResultsInboxValidateGroup_').includes('Sports and racing must use their native engines'), 'Sports/racing exclusion is missing');
@@ -44,7 +44,8 @@ assert(functionSource(bridge, 'externalResultsInboxApplyGeneric_').includes('ups
 assert(functionSource(bridge, 'externalResultsInboxApplyGeneric_').includes('adminUpdateCategory'), 'Awards/prediction results must update normal category settlement state');
 assert(functionSource(bridge, 'externalResultsInboxApplyGeneric_').includes('external-results-hub:'), 'Applied result provenance is missing');
 assert(functionSource(bridge, 'apiAdminApplyExternalResultsInbox').includes('STAGED_REALITY'), 'Reality TV inbox results must remain staged until native finalization');
-assert(functionSource(bridge, 'externalResultsInboxSummary_').includes('autoApply: false'), 'Automatic inbound apply must remain off in v1.2.6');
+assert(functionSource(bridge, 'externalResultsInboxSummary_').includes('autoApply: externalResultsBridgeHasTrigger_()'), 'Automatic inbound status must reflect the existing permanent Hub worker');
+assert(functionSource(bridge, 'externalResultsInboxAutoApplyWorker').includes('validation.route!=="GENERIC"'), 'Automatic apply must skip native Reality routes');
 
 ['adminGetExternalResultsInboxStatus', 'adminValidateExternalResultsInbox', 'adminApplyExternalResultsInbox', 'adminRetryExternalResultsInboxErrors'].forEach(action => {
   assert(api.includes(`"${action}"`), `${action} API action is missing`);
@@ -54,7 +55,7 @@ assert.strictEqual(frontendApi, frontendApiCompat, 'Both frontend API copies mus
 assert(admin.includes('External Results Inbox'), 'Main Admin External Results Inbox card is missing');
 assert(admin.includes('Validate Ready'), 'Inbox validation button is missing');
 assert(admin.includes('Apply Validated'), 'Inbox apply button is missing');
-assert(admin.includes('Automatic apply OFF'), 'Inbox UI must clearly show automatic apply is disabled');
+assert(admin.includes('Automatic eligible Awards apply'), 'Inbox UI must clearly show automatic eligible Awards status');
 assertCurrentReleaseMarkers(assert, app, html, sw);
 assert.strictEqual(app, appCompat, 'Both app-loader copies must match');
 

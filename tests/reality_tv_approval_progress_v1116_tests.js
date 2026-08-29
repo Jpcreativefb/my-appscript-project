@@ -19,11 +19,11 @@ assert(season.includes('realityTvMaterializeEpisodeQuestionPackBulk_(season, nex
 assert(season.includes('checkpoint: checkpoint'), 'Bulk Extra Question work must publish real checkpoints');
 assert(season.includes('ApprovalStage: "FINALIZE"'), 'Successful bulk question materialization must advance to finalization');
 assert(season.includes('if (realityTvGetHubId_())'), 'Unconfigured External Results Hub must be skipped without delaying local approval');
-assert(season.includes('stalledAfterSeconds: 420'), 'Main approval stalled threshold is missing');
+assert(season.includes('stalledAfterSeconds: 120'), 'RC17 live hotfix must recover a stale approval after two minutes, not seven');
 assert(questions.includes('progressLabel: label'), 'Supplemental question approvals must return progress data');
 assert(questions.includes('ApprovalStageStartedAt: now'), 'Question approval stage timing is missing');
 
-['adminRealityTvApprovalProgressHtml_', 'adminRealityTvStartApprovalTicker_', 'adminRealityTvUpdateApprovalProgress_', 'Estimated remaining: about', 'Taking longer than estimated'].forEach(token => {
+['adminRealityTvApprovalProgressHtml_', 'adminRealityTvStartApprovalTicker_', 'adminRealityTvUpdateApprovalProgress_', 'Waiting for next durable checkpoint', 'In progress'].forEach(token => {
   assert(ui.includes(token), `Approval progress UI missing: ${token}`);
 });
 ['Settle result', 'Create next episode', 'Build Extra Questions', 'Finalize', 'Ready'].forEach(label => {
@@ -65,11 +65,13 @@ assert(building.estimatedRemainingSeconds > 0, 'Question build should return an 
 const stale = runtime.realityTvApprovalProgress_({
   QueueId: 'q2', SeasonId: 's1', ReviewStatus: 'APPROVING', ApprovalStage: 'SETTLE',
   PushStatus: 'SETTLING EPISODE', ApprovalStartedAt: new Date(Date.now() - 500000),
-  ApprovalStageStartedAt: new Date(Date.now() - 500000), ApprovalHeartbeatAt: new Date(Date.now() - 430000)
+  ApprovalStageStartedAt: new Date(Date.now() - 500000), ApprovalHeartbeatAt: new Date(Date.now() - 130000)
 });
 assert.strictEqual(stale.stalled, true, 'Approval should be marked stalled after the heartbeat threshold');
 
 const complete = runtime.realityTvApprovalProgress_({ ReviewStatus: 'APPROVED', ApprovalStage: 'COMPLETE' });
 assert.strictEqual(complete.percent, 100, 'Completed approvals must report 100 percent');
+assert.strictEqual(complete.determinate, true, 'Only completed or count-backed stages should expose determinate percent');
+assert.strictEqual(building.determinate, false, 'Heuristic next-episode build percentages must not be presented as determinate');
 
 console.log('Reality TV staged approval progress v1.1.16 tests passed.');

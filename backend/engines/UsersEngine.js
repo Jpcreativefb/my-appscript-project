@@ -60,6 +60,7 @@ function getUsersColumnMap_(headers){
     resetCodeHash: idx(["ResetCodeHash"]),
     resetCodeExpiresAt: idx(["ResetCodeExpiresAt"]),
     resetRequestedAt: idx(["ResetRequestedAt"]),
+    resetCodeFailedAttempts: idx(["ResetCodeFailedAttempts"]),
 
     sessionToken: idx(["SessionToken"]),
     sessionExpiresAt: idx(["SessionExpiresAt"]),
@@ -99,6 +100,7 @@ function getUsersFieldIndex_(col, field){
     resetCodeHash: col.resetCodeHash,
     resetCodeExpiresAt: col.resetCodeExpiresAt,
     resetRequestedAt: col.resetRequestedAt,
+    resetCodeFailedAttempts: col.resetCodeFailedAttempts,
     sessionToken: col.sessionToken,
     sessionExpiresAt: col.sessionExpiresAt,
     lastLogin: col.lastLogin,
@@ -489,6 +491,36 @@ function hashResetCode_(email, code){
 
 }
 
+function generatePinResetCode_(){
+
+  // Apps Script does not expose a Web Crypto random-int helper. Build the
+  // short-lived numeric code from UUID entropy and SHA-256 instead of
+  // the legacy pseudo-random generator, then constrain it to the existing six-digit format.
+  const entropy =
+    String(Utilities.getUuid() || "") +
+    ":" +
+    String(Utilities.getUuid() || "");
+
+  const bytes =
+    Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      entropy
+    );
+
+  let value = 0;
+
+  for (let i = 0; i < Math.min(bytes.length, 8); i++) {
+    const byte = bytes[i] < 0 ? bytes[i] + 256 : bytes[i];
+    value = ((value * 256) + byte) % 900000;
+  }
+
+  return String(100000 + value);
+
+}
+
+var PIN_RESET_MAX_FAILED_ATTEMPTS_ = 5;
+
+
 function getUsers(){
 
   const records =
@@ -696,16 +728,18 @@ function createUser(
 
     ensureUsersColumns_();
 
+    const duplicateIdentityResponse = {
+      success: false,
+      message: "Unable to create account with those details. Try signing in or PIN recovery."
+    };
+
     if (
       findUserRecordByUsername_(
         username
       )
     ) {
 
-      return {
-        success: false,
-        message: "Username already exists"
-      };
+      return duplicateIdentityResponse;
 
     }
 
@@ -716,10 +750,7 @@ function createUser(
       )
     ) {
 
-      return {
-        success: false,
-        message: "Email already has an account"
-      };
+      return duplicateIdentityResponse;
 
     }
 
@@ -730,10 +761,7 @@ function createUser(
       )
     ) {
 
-      return {
-        success: false,
-        message: "Phone number already has an account"
-      };
+      return duplicateIdentityResponse;
 
     }
 
@@ -860,11 +888,7 @@ function requestPinReset(identifier){
   }
 
   const code =
-    String(
-      Math.floor(
-        100000 + Math.random() * 900000
-      )
-    );
+    generatePinResetCode_();
 
   const expiresAt =
     new Date(
@@ -877,6 +901,7 @@ function requestPinReset(identifier){
       resetCodeHash: hashResetCode_(email, code),
       resetCodeExpiresAt: expiresAt,
       resetRequestedAt: new Date().toISOString(),
+      resetCodeFailedAttempts: 0,
       lastUpdated: new Date().toISOString()
     }
   );
@@ -904,6 +929,11 @@ function resetPin(identifier, resetCode, newPin){
   newPin =
     String(newPin || "").trim();
 
+  const genericInvalidResponse = {
+    success: false,
+    message: "Invalid or expired reset code"
+  };
+
   if (!identifier || !resetCode || !newPin) {
 
     return {
@@ -922,73 +952,116 @@ function resetPin(identifier, resetCode, newPin){
 
   }
 
-  const record =
-    findUserRecordByIdentifier_(
-      identifier
+  const lock =
+    LockService.getScriptLock();
+
+  lock.waitLock(10000);
+
+  try {
+
+    // Re-read after acquiring the lock so concurrent guesses cannot race the
+    // persisted five-attempt ceiling for the same issued reset code.
+    const record =
+      findUserRecordByIdentifier_(
+        identifier
+      );
+
+    if (!record) {
+      return genericInvalidResponse;
+    }
+
+    const col =
+      record.col;
+
+    const email =
+      col.email > -1
+        ? normalizeEmail_(record.row[col.email])
+        : "";
+
+    const expiresAt =
+      col.resetCodeExpiresAt > -1
+        ? new Date(record.row[col.resetCodeExpiresAt]).getTime()
+        : 0;
+
+    const storedHash =
+      col.resetCodeHash > -1
+        ? String(record.row[col.resetCodeHash] || "").trim()
+        : "";
+
+    const failedAttempts =
+      col.resetCodeFailedAttempts > -1
+        ? Math.max(0, Number(record.row[col.resetCodeFailedAttempts]) || 0)
+        : 0;
+
+    if (
+      !email ||
+      !storedHash ||
+      !expiresAt ||
+      Date.now() > expiresAt ||
+      failedAttempts >= PIN_RESET_MAX_FAILED_ATTEMPTS_
+    ) {
+      return genericInvalidResponse;
+    }
+
+    const candidateHash =
+      hashResetCode_(email, resetCode);
+
+    const codeMatches =
+      typeof authConstantTimeEquals_ === "function"
+        ? authConstantTimeEquals_(storedHash, candidateHash)
+        : storedHash === candidateHash;
+
+    if (!codeMatches) {
+
+      const nextFailedAttempts =
+        failedAttempts + 1;
+
+      const failureFields = {
+        resetCodeFailedAttempts: nextFailedAttempts,
+        lastUpdated: new Date().toISOString()
+      };
+
+      if (nextFailedAttempts >= PIN_RESET_MAX_FAILED_ATTEMPTS_) {
+        // The fifth wrong guess consumes the issued code immediately. A new
+        // request is required before any further verification can succeed.
+        failureFields.resetCodeHash = "";
+        failureFields.resetCodeExpiresAt = "";
+        failureFields.resetRequestedAt = "";
+      }
+
+      updateUserFields_(
+        record.rowNumber,
+        failureFields
+      );
+
+      return genericInvalidResponse;
+    }
+
+    updateUserFields_(
+      record.rowNumber,
+      {
+        pin: hashUserPinForStorage_(newPin),
+        sessionToken: "",
+        sessionExpiresAt: "",
+        resetCodeHash: "",
+        resetCodeExpiresAt: "",
+        resetRequestedAt: "",
+        resetCodeFailedAttempts: 0,
+        lastUpdated: new Date().toISOString()
+      }
     );
 
-  if (!record) {
-
-    return {
-      success: false,
-      message: "Invalid or expired reset code"
-    };
-
-  }
-
-  const col =
-    record.col;
-
-  const email =
-    col.email > -1
-      ? normalizeEmail_(record.row[col.email])
-      : "";
-
-  const expiresAt =
-    col.resetCodeExpiresAt > -1
-      ? new Date(record.row[col.resetCodeExpiresAt]).getTime()
-      : 0;
-
-  const storedHash =
-    col.resetCodeHash > -1
-      ? String(record.row[col.resetCodeHash] || "").trim()
-      : "";
-
-  if (
-    !email ||
-    !storedHash ||
-    !expiresAt ||
-    Date.now() > expiresAt ||
-    storedHash !== hashResetCode_(email, resetCode)
-  ) {
-
-    return {
-      success: false,
-      message: "Invalid or expired reset code"
-    };
-
-  }
-
-  updateUserFields_(
-    record.rowNumber,
-    {
-      pin: hashUserPinForStorage_(newPin),
-      sessionToken: "",
-      sessionExpiresAt: "",
-      resetCodeHash: "",
-      resetCodeExpiresAt: "",
-      resetRequestedAt: "",
-      lastUpdated: new Date().toISOString()
+    if (typeof authRevokeAllDeviceSessionsForUser_ === "function") {
+      authRevokeAllDeviceSessionsForUser_(record.user["Username"] || identifier);
     }
-  );
 
-  if (typeof authRevokeAllDeviceSessionsForUser_ === "function") {
-    authRevokeAllDeviceSessionsForUser_(record.user["Username"] || identifier);
+    return {
+      success: true,
+      message: "PIN reset successfully"
+    };
+
+  } finally {
+    lock.releaseLock();
   }
-
-  return {
-    success: true,
-    message: "PIN reset successfully"
-  };
 
 }

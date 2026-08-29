@@ -6,7 +6,7 @@
    approval. No provider can settle the Awards App directly.
 ===================================================== */
 
-const ERH_SCHEMA_VERSION = "2.2.0";
+const ERH_SCHEMA_VERSION = "2.3.1";
 const ERH_MAIN_APP_SPREADSHEET_ID_PROPERTY = "ERH_MAIN_APP_SPREADSHEET_ID";
 const ERH_REVIEW_REQUIRED_FOR_ALL_IMPORTS = true;
 
@@ -19,7 +19,8 @@ const ERH_SHEETS = {
   RESULTS: "ImportedResults",
   REVIEW: "ReviewQueue",
   SYNC_LOG: "SyncLog",
-  MANUAL: "ManualEntry"
+  MANUAL: "ManualEntry",
+  POLICIES: "ResultSourcePolicies"
 };
 
 const ERH_HEADERS = {};
@@ -40,6 +41,12 @@ ERH_HEADERS[ERH_SHEETS.PROVIDERS] = [
   "LastSyncStartedAt",
   "LastSyncFinishedAt",
   "Notes",
+  "SourceTier",
+  "SourceHealth",
+  "ConsecutiveFailures",
+  "BackoffUntil",
+  "LastCheckedAt",
+  "StaleAfterMinutes",
   "UpdatedAt"
 ];
 
@@ -167,6 +174,20 @@ ERH_HEADERS[ERH_SHEETS.SYNC_LOG] = [
   "DetailsJSON"
 ];
 
+
+ERH_HEADERS[ERH_SHEETS.POLICIES] = [
+  "PolicyId", "AppGameId", "CategoryId", "ExternalEventId", "Domain",
+  "ResultSource", "SourceTier", "MonitorAutomatically", "RequireAdminApproval",
+  "AutoApplyWhenVerified", "VerificationMode", "ExpectedWinnerCount",
+  "OfficialSourceUrl", "OfficialCategoryName", "OfficialCeremonyYear",
+  "ExpectedNomineeCount", "StableChecksRequired", "StaleAfterMinutes",
+  "LastChecked", "LastError", "SourceHealth", "DetectedResult",
+  "DetectedResultJSON", "DetectedFingerprint", "LastObservationId", "StableCheckCount",
+  "SourceAgreement", "Confidence", "Finalized", "FinalizedAt",
+  "FinalizedEvidenceUrl", "FinalizedFingerprint", "LastAutoAction",
+  "CreatedAt", "UpdatedAt"
+];
+
 ERH_HEADERS[ERH_SHEETS.MANUAL] = [
   "EntryId",
   "Provider",
@@ -197,6 +218,7 @@ function onOpen() {
     .createMenu("External Results Hub")
     .addItem("1. Setup / Repair Hub", "setupExternalResultsHub")
     .addItem("Open Mapping Manager", "showExternalResultsMappingManager")
+    .addItem("Automatic Results Sources", "showAutomaticResultsSourcesManager")
     .addSeparator()
     .addItem("Import Manual Entries", "importManualResultsNow")
     .addItem("Sync Kalshi Discovery", "syncKalshiNow")
@@ -206,6 +228,7 @@ function onOpen() {
     .addItem("Sync Mapped Kalshi Results", "syncMappedKalshiNow")
     .addItem("Sync Mapped Polymarket Results", "syncMappedPolymarketNow")
     .addItem("Sync All Mapped Results", "syncMappedExternalProvidersNow")
+    .addItem("Sync Automatic Result Sources", "syncAutomaticResultSourcesNow")
     .addItem("Install Hourly Mapped Result Watch", "installExternalResultsProviderWatch")
     .addItem("Remove Mapped Result Watch", "removeExternalResultsProviderWatch")
     .addSeparator()
@@ -249,7 +272,7 @@ function erhEnsureHubReady_() {
   });
 
   const providers = erhReadObjects_(ERH_SHEETS.PROVIDERS);
-  const required = ["manual-awards", "manual-reality-tv", "kalshi", "polymarket"];
+  const required = ["manual-awards", "manual-reality-tv", "kalshi", "polymarket", "official-academy"];
   const existing = {};
   providers.forEach(function(provider) {
     existing[erhKey_(provider.ProviderId)] = true;
@@ -317,6 +340,7 @@ function erhSeedProviders_() {
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
       Notes: "Manual awards result entry. Administrator approval is mandatory.",
+      SourceTier: "MANUAL", SourceHealth: "HEALTHY", ConsecutiveFailures: 0, BackoffUntil: "", LastCheckedAt: "", StaleAfterMinutes: 0,
       UpdatedAt: now
     },
     {
@@ -335,6 +359,7 @@ function erhSeedProviders_() {
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
       Notes: "Manual reality TV result entry. Administrator approval is mandatory.",
+      SourceTier: "MANUAL", SourceHealth: "HEALTHY", ConsecutiveFailures: 0, BackoffUntil: "", LastCheckedAt: "", StaleAfterMinutes: 0,
       UpdatedAt: now
     },
     {
@@ -362,6 +387,7 @@ function erhSeedProviders_() {
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
       Notes: "Read-only public market discovery. Hourly watch polls only active mapped markets; no trading or automatic settlement.",
+      SourceTier: "CORROBORATION", SourceHealth: "UNKNOWN", ConsecutiveFailures: 0, BackoffUntil: "", LastCheckedAt: "", StaleAfterMinutes: 180,
       UpdatedAt: now
     },
     {
@@ -391,6 +417,23 @@ function erhSeedProviders_() {
       LastSyncStartedAt: "",
       LastSyncFinishedAt: "",
       Notes: "Read-only Gamma API discovery. Hourly watch polls only active mapped markets; no CLOB trading actions are used.",
+      SourceTier: "CORROBORATION", SourceHealth: "UNKNOWN", ConsecutiveFailures: 0, BackoffUntil: "", LastCheckedAt: "", StaleAfterMinutes: 180,
+      UpdatedAt: now
+    },
+    {
+      ProviderId: "official-academy",
+      ProviderType: "official-awards",
+      DisplayName: "Academy Awards / Oscars (Official)",
+      Enabled: true,
+      ReadOnly: true,
+      PollingIntervalMinutes: 60,
+      BaseUrl: "https://www.oscars.org/oscars/ceremonies",
+      DiscoveryConfigJSON: JSON.stringify({ parserVersion: "academy-ceremony-v1" }),
+      LastSuccessfulSync: "", LastError: "",
+      AutoSettlementAllowed: false, RequireAdminReview: true,
+      LastSyncStartedAt: "", LastSyncFinishedAt: "",
+      Notes: "Tier 1 official Awards source. Automatic approval is permitted only by a fail-closed Result Source Policy after stable verification.",
+      SourceTier: "OFFICIAL", SourceHealth: "UNKNOWN", ConsecutiveFailures: 0, BackoffUntil: "", LastCheckedAt: "", StaleAfterMinutes: 180,
       UpdatedAt: now
     }
   ];
@@ -818,6 +861,7 @@ function erhApplySheetFormatting_() {
   colors[ERH_SHEETS.REVIEW] = "#c00000";
   colors[ERH_SHEETS.SYNC_LOG] = "#7f6000";
   colors[ERH_SHEETS.MANUAL] = "#008c95";
+  colors[ERH_SHEETS.POLICIES] = "#3f51b5";
 
   Object.keys(ERH_HEADERS).forEach(function(sheetName) {
     const sh = ss.getSheetByName(sheetName);

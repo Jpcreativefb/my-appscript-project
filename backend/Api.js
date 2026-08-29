@@ -2857,10 +2857,20 @@ function doGet(e) {
         });
       }
 
+      const breakdownTarget =
+        params.targetUsername || params.username;
+
       return json(
         getUserBreakdown(
-          params.targetUsername || params.username,
-          gameId
+          breakdownTarget,
+          gameId,
+          {
+            viewerUsername: params.username,
+            hideUnlockedSelections:
+              apiSecurityNormalizeUsername_(breakdownTarget) !==
+                apiSecurityNormalizeUsername_(params.username) &&
+              !isAdmin(params.username)
+          }
         )
       );
 

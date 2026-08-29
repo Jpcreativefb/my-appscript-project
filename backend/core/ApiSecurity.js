@@ -37,7 +37,7 @@ function apiSecurityIsAdminAction_(action) {
 // already-open old frontend tab, but the current frontend sends authenticated
 // reads through POST so bearer tokens are not placed in URLs in steady state.
 var API_EXPLICIT_POST_ACTIONS_ = {
-  login: true, logout: true, signup: true, requestPinReset: true, resetPin: true,
+  login: true, logout: true, signup: true, requestPinReset: true, resetPin: true, validateSession: true,
   saveEditableProfile: true, saveUserProfile: true, uploadProfileAvatar: true,
   setGameProfilePromptChoice: true, setNotificationPreference: true,
   saveNotificationPreferences: true, markNotificationRead: true, markAllNotificationsRead: true,

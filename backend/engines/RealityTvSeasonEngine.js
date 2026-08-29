@@ -195,10 +195,10 @@ function realityTvApprovalProcessingFresh_(queue, processingStatus) {
   );
   if (!compatible) return false;
   const heartbeatAt = new Date(queue && (queue.ApprovalHeartbeatAt || queue.UpdatedAt || queue.ApprovalStartedAt) || 0).getTime();
-  // A full Apps Script stage can legitimately run for several minutes. Keep the
-  // lease longer than the old two-minute window so the watchdog cannot start a
-  // second worker while the first worker is still alive.
-  const processingLeaseMs = 420000;
+  // A claimed stage must not hold the queue hostage after an Apps Script execution
+  // is killed. Two minutes is long enough for a healthy durable unit to checkpoint,
+  // while attempt fencing + idempotent settlement protect recovery after a crash.
+  const processingLeaseMs = 120000;
   return Number.isFinite(heartbeatAt) && heartbeatAt > 0 && (Date.now() - heartbeatAt) < processingLeaseMs;
 }
 
@@ -238,7 +238,7 @@ function realityTvApprovalQueueOwner_() {
         const pushStatus = realityTvString_(row.PushStatus).toUpperCase();
         if (realityTvApprovalIsProcessingStatus_(pushStatus)) {
           const heartbeat = new Date(row.ApprovalHeartbeatAt || row.UpdatedAt || row.ApprovalStartedAt || 0).getTime();
-          return heartbeat && (now - heartbeat) < 180000 ? 0 : 2;
+          return heartbeat && (now - heartbeat) < 120000 ? 0 : 2;
         }
         return 1; // queued/waiting work comes before stale abandoned processing
       };
@@ -5171,12 +5171,50 @@ function apiAdminSubmitRealityTvResult(payload) {
     Status: "REVIEW",
     UpdatedAt: now
   });
-  return { success: true, message: "Result submitted for administrator review.", queueId: queue.QueueId };
+  return {
+    success: true,
+    message: "Result submitted for administrator review.",
+    queueId: queue.QueueId,
+    reviewStatus: "PENDING",
+    episodeStatus: "REVIEW",
+    queue: Object.assign({}, queue)
+  };
 }
 
 function realityTvSettleEpisodeOnly_(season, episode, queue, reviewer) {
   const outcomeType = realityTvKey_(queue.OutcomeType);
   const exitReasons = realityTvParseJson_(queue.ExitReasonsJSON, {});
+  const queuedSelectedIds = realityTvParseJson_(queue.SelectedContestantIds || "[]", []).map(realityTvKey_).filter(Boolean).sort();
+  const freshEpisode = realityTvGetEpisode_(episode.EpisodeId) || episode;
+  const freshStatus = realityTvString_(freshEpisode.Status).toUpperCase();
+
+  // Episode FINAL is the durable settlement boundary. If a worker completed the
+  // settlement but died before it advanced the approval queue, resume without
+  // writing CategoryResults or mutating the roster a second time. Sole Survivor
+  // settlement is safe to replay because it fences on LastSettledEpisodeNumber.
+  if (["FINAL", "CLOSED"].indexOf(freshStatus) !== -1) {
+    const settledSelectedIds = realityTvParseJson_(freshEpisode.EliminatedContestantIds || "[]", []).map(realityTvKey_).filter(Boolean).sort();
+    const sameSelection = JSON.stringify(settledSelectedIds) === JSON.stringify(queuedSelectedIds);
+    const sameOutcome = realityTvKey_(freshEpisode.OutcomeType) === outcomeType;
+    if (!sameSelection || !sameOutcome) {
+      throw new Error("Episode is already FINAL with a different result. Automatic recovery stopped to prevent duplicate roster mutation.");
+    }
+    if (typeof seasonAnchorSettleRealityEpisode_ === "function") {
+      seasonAnchorSettleRealityEpisode_(season, freshEpisode, queuedSelectedIds, outcomeType, reviewer);
+    }
+    const remainingAfterReplay = realityTvContestantsForSeason_(season.SeasonId).filter(function(row) {
+      return realityTvBool_(row.Active) && realityTvKey_(row.Status) === "active";
+    });
+    return {
+      remainingCount: remainingAfterReplay.length,
+      selectedIds: queuedSelectedIds,
+      winnerId: outcomeType === "no-elimination" || queuedSelectedIds.length !== 1 ? "" : queuedSelectedIds[0],
+      winnerIds: outcomeType === "no-elimination" ? [] : queuedSelectedIds,
+      isPush: outcomeType === "no-elimination",
+      alreadySettled: true
+    };
+  }
+
   const contestants = realityTvContestantsForSeason_(season.SeasonId);
   const selection = realityTvValidateRemainingContestantsAfterResult_(
     realityTvValidateEpisodeResultSelection_(
@@ -5439,16 +5477,19 @@ function realityTvApprovalProgress_(queue) {
   const currentQuestion = realityTvString_(queue.ApprovalCurrentQuestionLabel);
 
   let percent = 5;
+  let determinate = false;
   let label = "Queued for approval";
   let detail = "Waiting to begin episode settlement.";
   let estimatedRemainingSeconds = 0;
 
   if (reviewStatus === "APPROVED" || stage === "COMPLETE") {
     percent = 100;
+    determinate = true;
     label = "Episode finalization complete";
     detail = "The current episode results, scoring, and roster are final. Next-episode preparation runs separately.";
   } else if (stage === "SETTLE_QUESTIONS") {
     const ratio = settleTotal > 0 ? settleDone / settleTotal : 1;
+    determinate = settleTotal > 0;
     percent = settleTotal > 0 ? Math.min(42, 10 + Math.round(ratio * 32)) : 42;
     label = settleTotal > 0 ? "Settling Extra Questions " + settleDone + " of " + settleTotal : "Extra Questions ready";
     detail = currentQuestion
@@ -5498,11 +5539,11 @@ function realityTvApprovalProgress_(queue) {
 
   const complete = percent >= 100 || reviewStatus === "APPROVED";
   const queuedOrWaiting = pushStatus === "QUEUED" || pushStatus === "WAITING";
-  const stalled = !complete && !queuedOrWaiting && reviewStatus === "APPROVING" && heartbeatAgeSeconds >= 420;
+  const stalled = !complete && !queuedOrWaiting && reviewStatus === "APPROVING" && heartbeatAgeSeconds >= 120;
   return {
-    stage: stage, label: label, detail: detail, percent: Math.max(0, Math.min(100, percent)),
+    stage: stage, label: label, detail: detail, percent: Math.max(0, Math.min(100, percent)), determinate: determinate,
     elapsedSeconds: elapsedSeconds, stageElapsedSeconds: stageElapsedSeconds, heartbeatAgeSeconds: heartbeatAgeSeconds,
-    estimatedRemainingSeconds: estimatedRemainingSeconds, stalled: stalled, stalledAfterSeconds: 420,
+    estimatedRemainingSeconds: estimatedRemainingSeconds, stalled: stalled, stalledAfterSeconds: 120,
     questionBuild: questionBuild, questionDone: questionDone, questionTotal: questionTotal,
     settledQuestionDone: settleDone, settledQuestionTotal: settleTotal, settledQuestionRemaining: settleRemaining
   };
@@ -5512,6 +5553,12 @@ function realityTvApprovalState_(queue) {
   const status = realityTvString_(queue.ReviewStatus).toUpperCase();
   const stage = realityTvString_(queue.ApprovalStage || (status === "APPROVED" ? "COMPLETE" : "SETTLE")).toUpperCase();
   const progress = realityTvApprovalProgress_(queue);
+  let terminalEpisode = null;
+  let terminalNextJob = null;
+  if (status === "APPROVED" || stage === "COMPLETE") {
+    terminalEpisode = queue.EpisodeId ? realityTvGetEpisode_(queue.EpisodeId) : null;
+    terminalNextJob = queue.NextEpisodeJobId ? realityTvGetNextEpisodeJob_(queue.NextEpisodeJobId) : null;
+  }
   return {
     success: true,
     queueId: queue.QueueId,
@@ -5523,9 +5570,13 @@ function realityTvApprovalState_(queue) {
     stage: stage,
     pushStatus: realityTvString_(queue.PushStatus),
     nextEpisodeId: realityTvString_(queue.NextEpisodeId),
+    episodeNumber: realityTvNumber_(queue.EpisodeNumber, 0),
+    episodeStatus: terminalEpisode ? realityTvString_(terminalEpisode.Status) : "",
+    nextEpisodeJob: terminalNextJob ? realityTvNextEpisodeJobState_(terminalNextJob) : null,
     complete: status === "APPROVED" || stage === "COMPLETE",
     error: realityTvString_(queue.ErrorMessage),
     progressPercent: progress.percent,
+    progressDeterminate: progress.determinate,
     progressLabel: progress.label,
     progressDetail: progress.detail,
     elapsedSeconds: progress.elapsedSeconds,
@@ -5538,7 +5589,8 @@ function realityTvApprovalState_(queue) {
     questionBuild: progress.questionBuild,
     settledQuestionDone: progress.settledQuestionDone,
     settledQuestionTotal: progress.settledQuestionTotal,
-    approvalWatchdog: realityTvString_(queue.ReviewStatus).toUpperCase() === "APPROVING"
+    approvalWatchdog: realityTvString_(queue.ReviewStatus).toUpperCase() === "APPROVING" &&
+      (realityTvHasApprovalTrigger_() || realityTvHasApprovalKickTrigger_())
   };
 }
 
@@ -5591,6 +5643,7 @@ function realityTvEpisodeFinalizeReadiness_(seasonId, episodeId) {
     finalCount: finalCount,
     pendingCount: readyQueues.filter(function(row) { return realityTvString_(row.ReviewStatus).toUpperCase() !== "APPROVED"; }).length,
     questionQueueIds: readyQueues.map(function(row) { return row.QueueId; }),
+    missingCount: missing.length,
     missing: missing
   };
 }
@@ -5725,6 +5778,7 @@ function realityTvNextEpisodeJobState_(job) {
     status: status,
     stage: stage,
     percent: percent,
+    determinate: status === "COMPLETE",
     label: label,
     detail: detail,
     attemptCount: realityTvNumber_(job.AttemptCount, 0),
@@ -6069,7 +6123,8 @@ function apiAdminFinalizeRealityTvEpisode(payload) {
     return {
       success: false,
       code: "MISSING_EPISODE_RESULTS",
-      message: "Enter a result or Push for every Extra Question before finalizing the episode.",
+      message: "Cannot finalize Episode " + realityTvNumber_(episode.EpisodeNumber, 0) + " yet — " + readiness.missing.length + " Episode Question result" + (readiness.missing.length === 1 ? "" : "s") + " still need results or Push.",
+      missingCount: readiness.missing.length,
       missingResults: readiness.missing,
       readiness: readiness
     };
@@ -6123,47 +6178,19 @@ function apiAdminFinalizeRealityTvEpisode(payload) {
 }
 
 function apiAdminApproveRealityTvResult(payload) {
+  // Keep this legacy endpoint lock-safe, but route it through the same all-results
+  // finalizer contract so it can never bypass unresolved Extra Questions.
   requireAdmin_(payload || {});
   realityTvEnsureSystem_();
   const queue = realityTvGetQueue_(payload.queueId);
   if (!queue) throw new Error("Review queue item not found.");
-
   const status = realityTvString_(queue.ReviewStatus).toUpperCase();
   if (status === "REJECTED") throw new Error("This result was rejected. Submit a corrected result.");
   if (status === "APPROVED") return realityTvApprovalState_(queue);
-  if (status !== "PENDING" && status !== "APPROVING") {
+  if (["PENDING", "APPROVING"].indexOf(status) === -1) {
     throw new Error("This result cannot be approved from its current status: " + status + ".");
   }
-
-  if (status === "PENDING") {
-    const now = new Date();
-    const reviewer = realityTvString_(payload.username || "administrator");
-    realityTvSpreadsheetRetry_("Queue Reality TV episode approval", function() {
-      realityTvUpdateObjectRow_(
-        SpreadsheetApp.getActive().getSheetByName(REALITY_TV_RESULTS_QUEUE_SHEET),
-        queue.__rowNumber,
-        {
-          ReviewStatus: "APPROVING",
-          ReviewedBy: reviewer,
-          ReviewedAt: now,
-          PushStatus: "QUEUED",
-          ApprovalStage: "SETTLE",
-          ApprovalStartedAt: now,
-          ApprovalCompletedAt: "",
-          ApprovalAttemptCount: realityTvNumber_(queue.ApprovalAttemptCount, 0),
-          ApprovalStageStartedAt: now,
-          ApprovalHeartbeatAt: now,
-          ApprovalQuestionBuildId: "",
-          ErrorMessage: "",
-          UpdatedAt: now
-        }
-      );
-    }, 4);
-  }
-  realityTvScheduleApprovalContinuation_();
-  const refreshed = realityTvGetQueue_(payload.queueId);
-  const waitingFor = realityTvApprovalWaitingFor_(refreshed);
-  return waitingFor ? realityTvApprovalWaitingState_(refreshed, waitingFor) : realityTvApprovalState_(refreshed);
+  return apiAdminFinalizeRealityTvEpisode(payload);
 }
 
 function apiAdminGetRealityTvApprovalState(payload) {
@@ -6203,7 +6230,7 @@ function apiAdminGetRealityTvApprovalState(payload) {
     const durableFieldsMissing = realityTvString_(queue.ApprovalQuestionTotalCount) === "";
     const heartbeatMs = new Date(queue.ApprovalHeartbeatAt || queue.UpdatedAt || queue.ApprovalStartedAt || 0).getTime();
     const staleLegacyStage = stage === "SETTLE_QUESTIONS" && durableFieldsMissing &&
-      (!heartbeatMs || (Date.now() - heartbeatMs) >= 150000);
+      (!heartbeatMs || (Date.now() - heartbeatMs) >= 120000);
 
     if (staleLegacyStage) {
       // Upgrade an already-stuck v1.2.2/v1.2.3 approval in place. No Reset button required.

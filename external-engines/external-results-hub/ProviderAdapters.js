@@ -265,6 +265,44 @@ function syncPolymarketNow() {
   });
 }
 
+function erhProviderBackoffDelayMinutes_(failureCount) {
+  const n = Math.max(1, Number(failureCount || 1));
+  return Math.min(360, 5 * Math.pow(2, Math.min(n - 1, 6)));
+}
+
+function erhProviderBackoffActive_(provider, now) {
+  const until = provider && provider.BackoffUntil ? new Date(provider.BackoffUntil) : null;
+  return !!(until && !isNaN(until.getTime()) && until.getTime() > (now || new Date()).getTime());
+}
+
+function erhProviderRetryableHttpStatus_(status) {
+  return Number(status) === 429 || [500, 502, 503, 504].indexOf(Number(status)) !== -1;
+}
+
+function erhFetchWithRetry_(url, options, stats) {
+  const maxAttempts = 3;
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    if (stats) stats.apiCalls += 1;
+    let response;
+    try {
+      response = UrlFetchApp.fetch(url, options);
+    } catch (err) {
+      lastError = err;
+      if (attempt >= maxAttempts) throw err;
+      if (typeof Utilities !== "undefined" && Utilities.sleep) Utilities.sleep(500 * Math.pow(2, attempt - 1));
+      continue;
+    }
+    const status = response.getResponseCode();
+    if (status >= 200 && status < 300) return response;
+    const text = response.getContentText();
+    lastError = new Error("HTTP " + status + " from " + url + ": " + text.slice(0, 300));
+    if (!erhProviderRetryableHttpStatus_(status) || attempt >= maxAttempts) throw lastError;
+    if (typeof Utilities !== "undefined" && Utilities.sleep) Utilities.sleep(1000 * Math.pow(2, attempt - 1));
+  }
+  throw lastError || new Error("Provider request failed: " + url);
+}
+
 function erhRunProviderSync_(providerId, callback) {
   const provider = erhGetProviderSetting_(providerId);
   if (!provider) throw new Error("Provider not configured: " + providerId);
@@ -276,9 +314,13 @@ function erhRunProviderSync_(providerId, callback) {
   }
 
   const startedAt = new Date();
+  if (erhProviderBackoffActive_(provider, startedAt)) {
+    return { success: true, skipped: true, provider: providerId, backoff: true, backoffUntil: provider.BackoffUntil, message: "Provider is in safety backoff." };
+  }
   const syncId = Utilities.getUuid();
   const config = erhParseJson_(provider.DiscoveryConfigJSON, {});
   const stats = {
+    observationId: providerId + ":" + syncId,
     eventsUpserted: 0,
     marketsUpserted: 0,
     subjectsUpserted: 0,
@@ -309,14 +351,19 @@ function erhRunProviderSync_(providerId, callback) {
       QueueRowsCreated: stats.queueRowsCreated,
       ApiCalls: stats.apiCalls,
       ErrorMessage: "",
-      DetailsJSON: JSON.stringify({ config: config })
+      DetailsJSON: JSON.stringify({ config: config, observationId: stats.observationId })
     });
 
     erhUpdateProviderState_(providerId, {
       LastSuccessfulSync: finishedAt,
       LastSyncFinishedAt: finishedAt,
-      LastError: ""
+      LastCheckedAt: finishedAt,
+      LastError: "",
+      SourceHealth: "HEALTHY",
+      ConsecutiveFailures: 0,
+      BackoffUntil: ""
     });
+    if (typeof erhPolicyMarkProviderHealth_ === "function") erhPolicyMarkProviderHealth_(providerId, "HEALTHY", "", finishedAt);
 
     return Object.assign({ success: true, provider: providerId }, stats);
   } catch (error) {
@@ -337,10 +384,17 @@ function erhRunProviderSync_(providerId, callback) {
       DetailsJSON: JSON.stringify({ config: config, stack: error.stack || "" })
     });
 
+    const failures = Math.max(0, Number(provider.ConsecutiveFailures || 0)) + 1;
+    const backoffUntil = new Date(finishedAt.getTime() + erhProviderBackoffDelayMinutes_(failures) * 60000);
     erhUpdateProviderState_(providerId, {
       LastSyncFinishedAt: finishedAt,
-      LastError: error.message
+      LastCheckedAt: finishedAt,
+      LastError: error.message,
+      SourceHealth: "BACKOFF",
+      ConsecutiveFailures: failures,
+      BackoffUntil: backoffUntil
     });
+    if (typeof erhPolicyMarkProviderHealth_ === "function") erhPolicyMarkProviderHealth_(providerId, "BACKOFF", error.message, finishedAt);
 
     SpreadsheetApp.getActive().toast(
       providerId + " sync failed: " + error.message,
@@ -365,16 +419,15 @@ function erhAppendSyncLog_(object) {
 }
 
 function erhFetchJson_(url, stats) {
-  if (stats) stats.apiCalls += 1;
-  const response = UrlFetchApp.fetch(url, {
+  const response = erhFetchWithRetry_(url, {
     method: "get",
     muteHttpExceptions: true,
     followRedirects: true,
     headers: {
       Accept: "application/json",
-      "User-Agent": "Awards-App-External-Results-Hub/2.0"
+      "User-Agent": "Awards-App-External-Results-Hub/2.3"
     }
-  });
+  }, stats);
 
   const status = response.getResponseCode();
   const text = response.getContentText();
@@ -796,6 +849,19 @@ function erhScheduledMappedProviderSync() {
     result.ran.push(run);
     if (run && run.success === false) result.success = false;
   });
+  const officialProvider = providers.find(function(row) { return erhKey_(row.ProviderId) === "official-academy"; });
+  if (typeof syncOfficialAcademyResultsNow === "function" && erhProviderSyncDue_(officialProvider, now)) {
+    const officialRun = syncOfficialAcademyResultsNow();
+    result.ran.push(officialRun);
+    if (officialRun && officialRun.success === false) result.success = false;
+  } else if (officialProvider) {
+    result.skipped.push("official-academy");
+  }
+  if (typeof erhRunAutomaticResultPipelineNow_ === "function") {
+    const pipeline = erhRunAutomaticResultPipelineNow_();
+    result.pipeline = pipeline;
+    if (pipeline && pipeline.success === false) result.success = false;
+  }
   return result;
 }
 
@@ -807,7 +873,7 @@ function installExternalResultsProviderWatch() {
     .everyHours(1)
     .create();
   SpreadsheetApp.getActive().toast(
-    "Hourly watch installed. Only active mapped Kalshi/Polymarket markets are polled.",
+    "Hourly watch installed. Active mapped markets and monitored Official result policies are checked.",
     "External Results Hub",
     8
   );

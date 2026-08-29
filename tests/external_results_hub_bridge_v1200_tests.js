@@ -58,7 +58,7 @@ assert(pushFn.includes('Status: "READY"'), 'Inbound deliveries must be staged as
 assert(pushFn.includes('"DELIVERED"'), 'Hub review rows must be marked DELIVERED');
 assert(!pushFn.includes('CategoryResults'), 'Hub must not write directly to CategoryResults');
 assert(hubBridge.includes('function erhWinningOutcomeList_'), 'Multiple-winner normalization is missing');
-assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.2.0"'), 'Hub schema version was not advanced');
+assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.3.1"'), 'Hub schema version was not advanced');
 assert(hubCore.includes('Deliver Approved Results to App Inbox'), 'Hub menu still describes direct settlement');
 assert(hubDiagnostics.includes('mainAppInboxReady'), 'Hub health must verify the Awards App inbox');
 

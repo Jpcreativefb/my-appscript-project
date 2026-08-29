@@ -334,7 +334,7 @@ function adminExternalResultsInboxRender_(res) {
   const rejected = adminExternalResultsInboxCount_(counts, "REJECTED");
   const errors = adminExternalResultsInboxCount_(counts, "ERROR");
   status.className = "admin-message " + (errors || rejected ? "warning" : (ready || validated || staged ? "" : "success"));
-  status.innerHTML = `<b>${ready}</b> ready · <b>${validated}</b> validated · <b>${staged}</b> staged to Reality TV · <b>${applied}</b> applied · <b>${rejected}</b> rejected · <b>${errors}</b> errors · Automatic apply OFF`;
+  status.innerHTML = `<b>${ready}</b> ready · <b>${validated}</b> validated · <b>${staged}</b> staged to Reality TV · <b>${applied}</b> applied · <b>${rejected}</b> rejected · <b>${errors}</b> errors · Automatic eligible Awards apply ${res.autoApply ? "ON" : "OFF"}`;
   if (!batches) return;
   const rows = Array.isArray(res.batches) ? res.batches.slice(0, 12) : [];
   batches.innerHTML = rows.length ? rows.map(function(row) {

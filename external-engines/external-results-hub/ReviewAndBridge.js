@@ -188,6 +188,16 @@ function pushApprovedExternalResultsNow() {
       const deliveryId = batchId + "-" + erhMappingDeliveryKey_(mapping);
       if (existingDeliveryIds[erhKey_(deliveryId)]) return;
       const now = new Date();
+      let sourceConfig = erhParseJson_(mapping.SourceConfigJSON, {});
+      if (typeof erhPolicyForResult_ === "function") {
+        const policy = erhPolicyForResult_(result);
+        if (policy) sourceConfig = Object.assign({}, sourceConfig, {
+          policyId: erhString_(policy.PolicyId), sourceTier: erhNormalizeSourceTier_(policy.SourceTier),
+          verificationMode: erhNormalizeVerificationMode_(policy.VerificationMode), requireAdminApproval: erhBoolean_(policy.RequireAdminApproval, true),
+          autoApplyWhenVerified: erhBoolean_(policy.AutoApplyWhenVerified, false), sourceAgreement: erhString_(policy.SourceAgreement),
+          sourceHealth: erhString_(policy.SourceHealth), evidenceFingerprint: erhString_(policy.DetectedFingerprint), domain: erhString_(policy.Domain)
+        });
+      }
       const rowObject = {
         DeliveryId: deliveryId,
         DeliveryBatchId: batchId,
@@ -207,7 +217,7 @@ function pushApprovedExternalResultsNow() {
         IsWinner: evaluation.isWinner,
         Finality: "FINAL",
         EvidenceUrl: result.EvidenceUrl || review.EvidenceUrl || "",
-        SourceConfigJSON: mapping.SourceConfigJSON || "{}",
+        SourceConfigJSON: JSON.stringify(sourceConfig),
         Status: "READY",
         AttemptCount: 0,
         LastAttemptAt: "",

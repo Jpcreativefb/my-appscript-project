@@ -76,6 +76,7 @@ function ensureUsersColumns_(){
     "ResetCodeHash",
     "ResetCodeExpiresAt",
     "ResetRequestedAt",
+    "ResetCodeFailedAttempts",
     "SessionToken",
     "SessionExpiresAt",
     "LastLogin",

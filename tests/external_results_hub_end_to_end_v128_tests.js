@@ -89,7 +89,7 @@ assert.strictEqual(pendingPatch.NativeStatus, 'ERROR');
 assert(!Object.prototype.hasOwnProperty.call(pendingPatch, 'Status'), 'Native ERROR must not cause a second Inbox staging attempt');
 
 // Mapped-only provider watching.
-assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.2.0"'), 'Hub schema must be v2.2.0');
+assert(hubCore.includes('const ERH_SCHEMA_VERSION = "2.3.1"'), 'Hub schema must be v2.3.1');
 ['Sync Mapped Kalshi Results', 'Sync Mapped Polymarket Results', 'Sync All Mapped Results', 'Install Hourly Mapped Result Watch'].forEach(label => {
   assert(hubCore.includes(label), `Hub menu item missing: ${label}`);
 });
