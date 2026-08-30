@@ -27,6 +27,7 @@ const APP_SHELL = [
   "./css/styles.css",
   "./css/components.css",
   "./css/pages.css",
+  "./css/rc19-mobile-pwa.css",
   "./css/team-fantasy.css",
   "./css/picks.css",
   "./css/appearance.css",

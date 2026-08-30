@@ -1,0 +1,126 @@
+/*
+ * RC19 Mobile/PWA + navigation performance correction.
+ *
+ * This file is loaded after the legacy page styles on purpose. Keep the
+ * mobile containment fix local to Home; do not hide horizontal overflow on
+ * the document root because some game rails are intentionally scrollable.
+ */
+
+.dashboard-games-hub-page,
+.dashboard-home-v1218c,
+.dashboard-home-v1218c .dashboard-home-section,
+.dashboard-home-v1218c .dashboard-home-section-heading,
+.dashboard-home-v1218c .dashboard-home-active-grid,
+.dashboard-home-v1218c .dashboard-user-games-grid {
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.dashboard-home-v1218c .dashboard-home-section {
+  width: 100%;
+}
+
+/*
+ * My Current Games is a local horizontal rail. The old grid/min-content
+ * sizing was allowed to contribute all cards to the page's scroll width,
+ * making iPhone Safari scale the entire Home page down to a desktop-like
+ * canvas. The rail now owns its own scrolling instead of widening Home.
+ */
+.dashboard-home-v1218c .dashboard-current-games-carousel {
+  display: flex;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-inline: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+}
+
+.dashboard-home-v1218c .dashboard-current-games-carousel > .dashboard-compact-game {
+  box-sizing: border-box;
+  flex: 0 0 min(82%, 320px);
+  width: auto;
+  min-width: 0;
+  max-width: 320px;
+  scroll-snap-align: start;
+}
+
+@media (max-width: 640px) {
+  .dashboard-home-v1218c .dashboard-current-games-carousel {
+    padding-inline-end: 12px;
+  }
+
+  .dashboard-home-v1218c .dashboard-current-games-carousel > .dashboard-compact-game {
+    flex-basis: min(84%, 310px);
+    max-width: 310px;
+  }
+}
+
+/* Fast route handoff: show the destination identity immediately while the
+ * critical payload is still arriving. This replaces the prior page behind a
+ * full-screen 90% loader without pretending the data is ready. */
+.app-route-loading-shell {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  padding-block: 12px 28px;
+}
+
+.app-route-loading-shell-card {
+  width: 100%;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: rgba(17, 24, 39, 0.78);
+}
+
+.app-route-loading-shell-title {
+  margin: 0 0 8px;
+  font-size: clamp(24px, 7vw, 36px);
+  line-height: 1.1;
+}
+
+.app-route-loading-shell-copy {
+  margin: 0;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.app-route-loading-shell-track {
+  height: 8px;
+  margin-top: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(148, 163, 184, 0.18);
+}
+
+.app-route-loading-shell-track::after {
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: inherit;
+  background: rgba(212, 175, 55, 0.78);
+  content: "";
+  animation: pattcRouteLoading 1.1s ease-in-out infinite alternate;
+}
+
+@keyframes pattcRouteLoading {
+  from { transform: translateX(-15%); }
+  to { transform: translateX(155%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-route-loading-shell-track::after {
+    width: 100%;
+    animation: none;
+    opacity: 0.55;
+  }
+}

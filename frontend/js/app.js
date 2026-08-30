@@ -354,6 +354,7 @@ const APP_STARTUP_PAYLOAD_REFRESH_AFTER_MS = 5 * 60 * 1000;
 const APP_STARTUP_PAYLOAD_STORAGE_MAX_CHARS = 650000;
 const APP_STARTUP_PAYLOAD_STORAGE_MAX_ENTRIES = 3;
 const APP_STARTUP_PAYLOAD_REFRESHES = {};
+const APP_STARTUP_PAYLOAD_REQUESTS = {};
 let APP_STARTUP_PAYLOAD_LOCAL_GENERATION = 0;
 
 function appStartupPayloadIdentity_() {
@@ -540,27 +541,56 @@ async function loadStartupPayload(forceRefresh) {
     }
   }
 
-  const res =
-    await apiGetStartupPayload();
-
-  if (!res.success) {
-    throw new Error(
-      res.error ||
-      res.message ||
-      "Failed to load startup payload"
-    );
+  // A first game entry can prewarm the startup payload while the optional
+  // profile prompt is being checked. Reuse that exact request when the route
+  // renderer asks for the same payload instead of issuing a duplicate Apps
+  // Script call.
+  const identity = appStartupPayloadIdentity_();
+  if (
+    forceRefresh !== true &&
+    identity.key &&
+    APP_STARTUP_PAYLOAD_REQUESTS[identity.key]
+  ) {
+    return APP_STARTUP_PAYLOAD_REQUESTS[identity.key];
   }
 
-  APP_STATE.startupPayload =
-    res;
+  const request = (async function() {
+    const res = await apiGetStartupPayload();
 
-  APP_STATE.gameId =
-    res.gameId ||
-    APP_STATE.gameId;
+    if (!res || res.success === false) {
+      throw new Error(
+        res && (res.error || res.message) ||
+        "Failed to load startup payload"
+      );
+    }
 
-  appStoreStartupPayload_(res);
+    // Always persist the response under the identity that launched the
+    // request, but do not let a late response from a previous game replace
+    // the currently selected game's in-memory state.
+    appStoreStartupPayload_(res, identity);
+    const currentIdentity = appStartupPayloadIdentity_();
+    if (!identity.key || currentIdentity.key === identity.key) {
+      APP_STATE.startupPayload = res;
+      APP_STATE.gameId = res.gameId || APP_STATE.gameId;
+    }
 
-  return res;
+    return res;
+  })();
+
+  if (forceRefresh !== true && identity.key) {
+    APP_STARTUP_PAYLOAD_REQUESTS[identity.key] = request;
+  }
+
+  try {
+    return await request;
+  } finally {
+    if (
+      identity.key &&
+      APP_STARTUP_PAYLOAD_REQUESTS[identity.key] === request
+    ) {
+      delete APP_STARTUP_PAYLOAD_REQUESTS[identity.key];
+    }
+  }
 
 }
 
@@ -657,7 +687,7 @@ const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager
 */
 // Legacy release-lineage marker retained for historical regression contracts only.
 // const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks-v1218x2c-confidence-appearance-v1218y-survivor-koth-strikes-v1218z-voting-competition-v1219rc3-final-performance-v1219rc6-admin-question-ux-performance-v1219rc7-pick-lock-integrity";
-const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc18-security-auto-results-reality-finalization-1");
+const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc19-mobile-pwa-performance-1");
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -968,6 +998,74 @@ function appBindHistoryRouting_() {
   window.addEventListener("hashchange", appHandleBrowserRoute_);
 }
 
+function appProgressiveRouteLabel_(page) {
+  const labels = {
+    "dashboard": "Home",
+    "picks": "Make Your Picks",
+    "game-hub": "Game Sections",
+    "survivor": "Survivor",
+    "voting": "Voting",
+    "ranking": "Ranking",
+    "team-fantasy": "Team Fantasy",
+    "betting": "Wagers",
+    "leaderboard": "Leaderboard",
+    "season-hub": "Season Hub",
+    "trophy-room": "Trophy Room",
+    "more": "More"
+  };
+  if (String(page || "").indexOf("hub:") === 0) return "Game Hub";
+  return labels[String(page || "")] || "Loading page";
+}
+
+function appProgressiveRouteShell_(page) {
+  if (!appPageSnapshotEligible_(page) || isAdminPage_(page)) return "";
+  const title = appProgressiveRouteLabel_(page);
+  return `
+    <div class="page app-route-loading-shell" data-route-loading="${escapeHtmlForApp_(page)}" aria-busy="true">
+      <div class="app-route-loading-shell-card">
+        <h1 class="app-route-loading-shell-title">${escapeHtmlForApp_(title)}</h1>
+        <p class="app-route-loading-shell-copy">Loading the latest game data…</p>
+        <div class="app-route-loading-shell-track" aria-hidden="true"></div>
+      </div>
+    </div>
+  `;
+}
+
+function appPaintProgressiveRouteShell_(page, app) {
+  const html = appProgressiveRouteShell_(page);
+  if (!html || !app) return Promise.resolve(false);
+  app.innerHTML = html;
+  app.classList.remove("page-enter");
+  app.classList.add("page-enter-active");
+  setActiveNav(page);
+
+  // Give Safari/PWA a real paint opportunity before route data waits on an
+  // Apps Script response. The destination identity is visible immediately
+  // instead of leaving the previous page behind a 90% overlay.
+  return new Promise(function(resolve) {
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() { resolve(true); });
+    });
+  });
+}
+
+function appScheduleDashboardRefreshAfterSnapshot_(snapshotKey) {
+  window.setTimeout(async function() {
+    try {
+      if (APP_STATE.currentPage !== "dashboard") return;
+      if (appPageSnapshotKey_("dashboard") !== snapshotKey) return;
+      await ensurePageModules_("dashboard");
+      if (APP_STATE.currentPage !== "dashboard") return;
+      if (appPageSnapshotKey_("dashboard") !== snapshotKey) return;
+      if (typeof dashboardRefreshHomePayloadInBackground_ === "function") {
+        await dashboardRefreshHomePayloadInBackground_(snapshotKey);
+      }
+    } catch (err) {
+      console.warn("Dashboard background refresh skipped", err);
+    }
+  }, 3500);
+}
+
 async function navigate(page, options) {
 
   options = options || {};
@@ -997,16 +1095,6 @@ async function navigate(page, options) {
     appCapturePageSnapshot_(previousPage, app);
   }
 
-  // Home navigation is an explicit discovery refresh boundary. The backend
-  // Dashboard cache is generation-versioned by Admin game publication changes,
-  // so a fresh Home request sees newly Live/finalized games without waiting on
-  // the prior 2-minute browser payload or a saved Dashboard snapshot.
-  if (page === "dashboard") {
-    APP_STATE.dashboardHomePayload = null;
-    APP_STATE.dashboardHomePayloadLoadedAt = 0;
-    options.forceRefresh = true;
-  }
-
   app.classList.add("page-enter");
 
   APP_STATE.currentPage = page;
@@ -1024,20 +1112,30 @@ async function navigate(page, options) {
     setActiveNav(page);
     if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
 
-    // Fresh snapshots return immediately. Stale-but-valid snapshots remain
-    // visible while the page refreshes quietly, avoiding another full-screen loader.
-    if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
+    // Home is an account-level view. Paint its valid snapshot immediately,
+    // then check for publication/dashboard changes after a short idle window.
+    // If the player opens a game first, the refresh is skipped so it cannot
+    // compete with game startup for Apps Script execution time.
+    if (page === "dashboard") {
+      appScheduleDashboardRefreshAfterSnapshot_(snapshot.key);
+    } else if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
       appRefreshSnapshotQuietly_(page, snapshot.key);
     }
     return;
   }
 
-  if (usePageLoader) {
+  const progressiveShell = appProgressiveRouteShell_(page);
+  const useOverlayLoader = usePageLoader && !progressiveShell;
+
+  if (useOverlayLoader) {
     showLoader({
       percent: 8,
       title: isAdminPage_(page) ? "Loading Admin Tools" : "Loading",
       detail: isAdminPage_(page) ? "Preparing " + page.replace(/[-:]/g, " ") + "…" : ""
     });
+  } else if (progressiveShell) {
+    if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
+    await appPaintProgressiveRouteShell_(page, app);
   }
 
   try {
@@ -1081,7 +1179,9 @@ async function navigate(page, options) {
 
       app.classList.add("page-enter-active");
 
-      if (usePageLoader) hideLoader();
+      if (useOverlayLoader) {
+        if (usePageLoader) hideLoader();
+      }
 
       setActiveNav(page);
 
@@ -1437,6 +1537,28 @@ async function enterGame(
   );
 
   clearStartupPayload();
+
+  // Prediction-style games share the startup payload used by the Picks page.
+  // Start the page module and data request now so the optional first-game
+  // profile lookup does not serialize another network round trip in front of
+  // navigation. loadStartupPayload() deduplicates the route renderer's request.
+  if (
+    gameType === "prediction" ||
+    gameType === "confidence" ||
+    gameType === "head-to-head" ||
+    gameType === "staked-prediction"
+  ) {
+    try {
+      Promise.resolve(ensurePageModules_("picks")).catch(function(err) {
+        console.warn("Picks module prewarm skipped", err);
+      });
+      Promise.resolve(loadStartupPayload()).catch(function(err) {
+        console.warn("Game startup prewarm skipped", err);
+      });
+    } catch (err) {
+      console.warn("Game startup prewarm skipped", err);
+    }
+  }
 
   const profileChoice = await maybeOfferGameProfile_(gameId);
   if (profileChoice === "custom") {

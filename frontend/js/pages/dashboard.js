@@ -2,6 +2,77 @@
    DASHBOARD / GAMES HUB
 ====================== */
 
+let DASHBOARD_HOME_REFRESH_REQUEST = null;
+
+async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey) {
+  if (DASHBOARD_HOME_REFRESH_REQUEST) return DASHBOARD_HOME_REFRESH_REQUEST;
+
+  const request = (async function() {
+    const payload = await apiGetDashboardGamesHub();
+    if (!payload || payload.success === false) return null;
+
+    if (typeof APP_STATE !== "undefined") {
+      APP_STATE.dashboardHomePayload = payload;
+      APP_STATE.dashboardHomePayloadLoadedAt = Date.now();
+    }
+
+    // The refresh is allowed to warm Home while the user is elsewhere, but it
+    // must never replace the DOM after the player has navigated away.
+    if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") {
+      return payload;
+    }
+    if (
+      expectedSnapshotKey &&
+      typeof appPageSnapshotKey_ === "function" &&
+      appPageSnapshotKey_("dashboard") !== expectedSnapshotKey
+    ) {
+      return payload;
+    }
+
+    const html = await renderDashboardPage();
+
+    if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") {
+      return payload;
+    }
+    if (
+      expectedSnapshotKey &&
+      typeof appPageSnapshotKey_ === "function" &&
+      appPageSnapshotKey_("dashboard") !== expectedSnapshotKey
+    ) {
+      return payload;
+    }
+
+    const app = document.getElementById("app");
+    if (!app) return payload;
+    app.innerHTML = html;
+    if (typeof appCapturePageSnapshot_ === "function") {
+      appCapturePageSnapshot_("dashboard", app);
+    }
+    if (typeof setActiveNav === "function") setActiveNav("dashboard");
+
+    // Standings/career enrichment stays off the route critical path.
+    if (typeof hydrateDashboardHomeExtras_ === "function") {
+      window.setTimeout(function() {
+        if (typeof APP_STATE !== "undefined" && APP_STATE.currentPage !== "dashboard") return;
+        hydrateDashboardHomeExtras_().catch(function(err) {
+          console.warn("Dashboard extras could not be loaded", err);
+        });
+      }, 6500);
+    }
+
+    return payload;
+  })();
+
+  DASHBOARD_HOME_REFRESH_REQUEST = request;
+  try {
+    return await request;
+  } finally {
+    if (DASHBOARD_HOME_REFRESH_REQUEST === request) {
+      DASHBOARD_HOME_REFRESH_REQUEST = null;
+    }
+  }
+}
+
 async function renderDashboardPage() {
 
   const username = getCurrentUsername();
