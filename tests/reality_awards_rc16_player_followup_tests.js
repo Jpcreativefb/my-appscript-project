@@ -75,9 +75,11 @@ function makeStorage() {
     'gameProfilePromptCacheKey_',
     'rememberGameProfilePromptComplete_',
     'gameProfileDashboardRow_',
+    'maybeOfferGameProfileOnce_',
     'maybeOfferGameProfile_'
   ], {
     localStorage: storage,
+    APP_GAME_PROFILE_PROMPT_INFLIGHT: new Map(),
     APP_STATE: { dashboardHomePayload: { activeGames: [], pastGames: [] } },
     getCurrentUsername: () => 'cert-user',
     apiGetEditableProfile: async () => {
@@ -109,9 +111,11 @@ function makeStorage() {
     'gameProfilePromptCacheKey_',
     'rememberGameProfilePromptComplete_',
     'gameProfileDashboardRow_',
+    'maybeOfferGameProfileOnce_',
     'maybeOfferGameProfile_'
   ], {
     localStorage: storage2,
+    APP_GAME_PROFILE_PROMPT_INFLIGHT: new Map(),
     APP_STATE: { dashboardHomePayload: { activeGames: [], pastGames: [] } },
     getCurrentUsername: () => 'cert-user-2',
     apiGetEditableProfile: async () => ({ success: true, profileMode: 'game', gameProfilePromptCompleted: true, profile: {} }),

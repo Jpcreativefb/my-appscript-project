@@ -36,7 +36,11 @@ assert(frontendApi.includes('async function apiGetLeaderboardForLeague'), 'Leagu
 assert(frontendApi.includes('leagueId: leagueId || ""'), 'League-specific leaderboard request must send an explicit league ID.');
 assert.strictEqual(frontendApi, frontendApiMirror, 'Frontend API mirrors are out of sync.');
 
-assert(app.includes('hydrateDashboardHomeExtras_().catch'), 'Dashboard post-render hydration hook is missing.');
+assert(
+  app.includes('hydrateDashboardHomeExtras_().catch') ||
+    (app.includes('dashboardScheduleHomeEnrichment_') && dashboard.includes('await hydrateDashboardHomeExtras_();')),
+  'Dashboard post-render hydration hook is missing.'
+);
 assert.strictEqual(app, appMirror, 'Frontend app mirrors are out of sync.');
 assert(appData.includes('defaultGameId: defaultGameId'), 'Dashboard payload must identify the default game for the featured card.');
 

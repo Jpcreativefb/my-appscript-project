@@ -3,63 +3,48 @@
 ====================== */
 
 let DASHBOARD_HOME_REFRESH_REQUEST = null;
+let DASHBOARD_HOME_ENRICHMENT_TIMER = null;
+let DASHBOARD_HOME_ENRICHMENT_CONTEXT = "";
 
-async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey) {
+function dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId) {
+  if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") return false;
+  if (String(APP_STATE.dashboardHomeHydrationId || "") !== String(expectedHydrationId || "")) return false;
+  if (
+    expectedSnapshotKey &&
+    typeof appPageSnapshotKey_ === "function" &&
+    appPageSnapshotKey_("dashboard") !== expectedSnapshotKey
+  ) return false;
+  return true;
+}
+
+async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey, expectedHydrationId) {
   if (DASHBOARD_HOME_REFRESH_REQUEST) return DASHBOARD_HOME_REFRESH_REQUEST;
+  if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return null;
 
   const request = (async function() {
-    const payload = await apiGetDashboardGamesHub();
+    // IMPORTANT: the still-on-Home check happens before this expensive request.
+    const payload = await apiGetDashboardGamesHub({ fastStartup: false });
     if (!payload || payload.success === false) return null;
+    if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return payload;
 
-    if (typeof APP_STATE !== "undefined") {
-      APP_STATE.dashboardHomePayload = payload;
-      APP_STATE.dashboardHomePayloadLoadedAt = Date.now();
-    }
+    APP_STATE.dashboardHomePayload = payload;
+    APP_STATE.dashboardHomePayloadLoadedAt = Date.now();
 
-    // The refresh is allowed to warm Home while the user is elsewhere, but it
-    // must never replace the DOM after the player has navigated away.
-    if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") {
-      return payload;
-    }
-    if (
-      expectedSnapshotKey &&
-      typeof appPageSnapshotKey_ === "function" &&
-      appPageSnapshotKey_("dashboard") !== expectedSnapshotKey
-    ) {
-      return payload;
-    }
-
-    const html = await renderDashboardPage();
-
-    if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") {
-      return payload;
-    }
-    if (
-      expectedSnapshotKey &&
-      typeof appPageSnapshotKey_ === "function" &&
-      appPageSnapshotKey_("dashboard") !== expectedSnapshotKey
-    ) {
-      return payload;
-    }
+    const html = await renderDashboardPage({ preserveHydrationId: true });
+    if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return payload;
 
     const app = document.getElementById("app");
     if (!app) return payload;
     app.innerHTML = html;
-    if (typeof appCapturePageSnapshot_ === "function") {
-      appCapturePageSnapshot_("dashboard", app);
-    }
+    if (typeof appCapturePageSnapshot_ === "function") appCapturePageSnapshot_("dashboard", app);
     if (typeof setActiveNav === "function") setActiveNav("dashboard");
 
-    // Standings/career enrichment stays off the route critical path.
-    if (typeof hydrateDashboardHomeExtras_ === "function") {
-      window.setTimeout(function() {
-        if (typeof APP_STATE !== "undefined" && APP_STATE.currentPage !== "dashboard") return;
-        hydrateDashboardHomeExtras_().catch(function(err) {
-          console.warn("Dashboard extras could not be loaded", err);
-        });
-      }, 6500);
+    // Career/league/standings enrichment belongs to this same chain, after the
+    // authoritative Dashboard payload has replaced the compact classification.
+    if (dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId) && typeof hydrateDashboardHomeExtras_ === "function") {
+      try { await hydrateDashboardHomeExtras_(); }
+      catch (err) { console.warn("Dashboard extras could not be loaded", err); }
     }
-
     return payload;
   })();
 
@@ -67,13 +52,59 @@ async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey) {
   try {
     return await request;
   } finally {
-    if (DASHBOARD_HOME_REFRESH_REQUEST === request) {
-      DASHBOARD_HOME_REFRESH_REQUEST = null;
-    }
+    if (DASHBOARD_HOME_REFRESH_REQUEST === request) DASHBOARD_HOME_REFRESH_REQUEST = null;
   }
 }
 
-async function renderDashboardPage() {
+function dashboardScheduleHomeEnrichment_(expectedSnapshotKey, expectedHydrationId) {
+  const contextKey = String(expectedSnapshotKey || "") + "|" + String(expectedHydrationId || "");
+  if (DASHBOARD_HOME_REFRESH_REQUEST) return;
+  if (DASHBOARD_HOME_ENRICHMENT_TIMER) {
+    if (DASHBOARD_HOME_ENRICHMENT_CONTEXT === contextKey) return;
+    window.clearTimeout(DASHBOARD_HOME_ENRICHMENT_TIMER);
+    DASHBOARD_HOME_ENRICHMENT_TIMER = null;
+  }
+  DASHBOARD_HOME_ENRICHMENT_CONTEXT = contextKey;
+  DASHBOARD_HOME_ENRICHMENT_TIMER = window.setTimeout(function() {
+    DASHBOARD_HOME_ENRICHMENT_TIMER = null;
+    DASHBOARD_HOME_ENRICHMENT_CONTEXT = "";
+    if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return;
+    dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey, expectedHydrationId)
+      .catch(function(err) { console.warn("Deferred Home enrichment skipped", err); });
+  }, 6500);
+}
+
+function dashboardClassifyHomeGames_(payload) {
+  payload = payload || {};
+  const activeGames = Array.isArray(payload.activeGames) ? payload.activeGames : [];
+
+  // A compact response intentionally has no progress. Treat every active game
+  // as immediately usable Current Games until authoritative enrichment arrives.
+  // Do not temporarily claim Attention, completion, or Discover/new-game state.
+  if (payload.fastStartup === true || payload.classificationDeferred === true) {
+    return {
+      playingGames: activeGames.slice(),
+      attentionGames: [],
+      currentGames: activeGames.slice(),
+      offeredGames: [],
+      classificationDeferred: true
+    };
+  }
+
+  const playingGames = dashboardGetPlayingGames_(activeGames);
+  const attentionGames = dashboardGetAttentionGames_(playingGames);
+  return {
+    playingGames: playingGames,
+    attentionGames: attentionGames,
+    currentGames: playingGames.filter(function(game) { return attentionGames.indexOf(game) === -1; }),
+    offeredGames: activeGames.filter(function(game) { return playingGames.indexOf(game) === -1; }),
+    classificationDeferred: false
+  };
+}
+
+async function renderDashboardPage(options) {
+
+  options = options || {};
 
   const username = getCurrentUsername();
 
@@ -97,7 +128,7 @@ async function renderDashboardPage() {
   ) ? APP_STATE.dashboardHomePayload : null;
 
   try {
-    payload = cachedDashboard || await apiGetDashboardGamesHub();
+    payload = cachedDashboard || await apiGetDashboardGamesHub({ fastStartup: true });
     if (!cachedDashboard && typeof APP_STATE !== "undefined" && payload && payload.success !== false) {
       APP_STATE.dashboardHomePayloadLoadedAt = Date.now();
     }
@@ -156,25 +187,26 @@ async function renderDashboardPage() {
   const themeColor = profileStyle.color;
 
   const bio = String(profile.bio || profile.Bio || "").trim();
-  const playingGames = dashboardGetPlayingGames_(activeGames);
-  const attentionGames = dashboardGetAttentionGames_(playingGames);
-  const currentGames = playingGames.filter(function(game) {
-    return attentionGames.indexOf(game) === -1;
-  });
-  const offeredGames = activeGames.filter(function(game) {
-    return playingGames.indexOf(game) === -1;
-  });
+  const homeClassification = dashboardClassifyHomeGames_(payload);
+  const playingGames = homeClassification.playingGames;
+  const attentionGames = homeClassification.attentionGames;
+  const currentGames = homeClassification.currentGames;
+  const offeredGames = homeClassification.offeredGames;
 
-  const snark = dashboardGetSnarkMessage_(
-    attentionGames,
-    playingGames,
-    offeredGames,
-    username
-  );
+  const snark = homeClassification.classificationDeferred
+    ? "Your games are ready. Progress and standings are catching up in the background."
+    : dashboardGetSnarkMessage_(
+        attentionGames,
+        playingGames,
+        offeredGames,
+        username
+      );
 
   if (typeof APP_STATE !== "undefined") {
     APP_STATE.dashboardHomePayload = payload;
-    APP_STATE.dashboardHomeHydrationId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+    if (options.preserveHydrationId !== true || !APP_STATE.dashboardHomeHydrationId) {
+      APP_STATE.dashboardHomeHydrationId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
+    }
     if (!APP_STATE.profile || !Object.keys(APP_STATE.profile).length) {
       APP_STATE.profile = profile;
     }
@@ -209,7 +241,7 @@ async function renderDashboardPage() {
         </details>
       </section>
 
-      ${attentionGames.length ? `
+      ${homeClassification.classificationDeferred ? "" : (attentionGames.length ? `
         <section class="dashboard-home-section dashboard-attention-section">
           <div class="dashboard-home-section-heading">
             <div>
@@ -227,7 +259,7 @@ async function renderDashboardPage() {
           <strong>✓ You're caught up.</strong>
           <span>We'll flag games here when picks or questions need your attention.</span>
         </section>
-      `}
+      `)}
 
       <details id="dashboardLeagueHomeSection" class="dashboard-home-section dashboard-home-collapsible" aria-label="Current Standings" hidden>
         <summary class="dashboard-home-section-heading dashboard-home-summary">

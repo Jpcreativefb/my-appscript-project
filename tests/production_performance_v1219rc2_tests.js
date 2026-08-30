@@ -43,7 +43,11 @@ assert(/CacheService\.getScriptCache\(\)\.put\(cacheKey, serialized, (300|1800)\
 assert(/CacheService\.getScriptCache\(\)\.put\(coreCacheKey, serialized, (300|900|1800)\)/.test(reality), 'Reality TV core cache should remain bounded');
 assert(/CacheService\.getScriptCache\(\)\.put\(cacheKey, serialized, (300|900|1800)\)/.test(reality), 'Reality TV player-stat cache should remain bounded');
 
-assert(/\}, (1800|6500)\);/.test(app), 'Home optional hydration must be delayed');
+assert(
+  /\}, (1800|6500)\);/.test(app) ||
+    (app.includes('dashboardScheduleHomeEnrichment_') && dashboard.includes('}, 6500);')),
+  'Home optional hydration must be delayed'
+);
 assert(dashboard.includes('Do not launch 20 independent Apps Script executions at once'), 'dashboard standings serialization guard missing');
 assert(!dashboard.includes('const jobs = unique.slice(0, 20).map'), 'dashboard must not fan out 20 leaderboard calls');
 assert(!dashboard.includes('await Promise.allSettled([\n    hydrateDashboardLeagueStandings_'), 'Home league/game standings must not hydrate concurrently');

@@ -351,14 +351,41 @@ function teamFantasyRenderH2H_(state) {
     </section>`;
 }
 
+const TEAM_FANTASY_STATE_REQUESTS = Object.create(null);
+
+function teamFantasyStateRequestKey_(gameId, username, leagueId) {
+  return [
+    String(username || "").trim().toLowerCase(),
+    String(gameId || "").trim(),
+    String(leagueId || "").trim()
+  ].join("|");
+}
+
+function teamFantasyLoadState_(gameId, username, leagueId) {
+  const key = teamFantasyStateRequestKey_(gameId, username, leagueId);
+  if (TEAM_FANTASY_STATE_REQUESTS[key]) return TEAM_FANTASY_STATE_REQUESTS[key];
+  const request = Promise.resolve(api("getTeamFantasyState", { gameId: gameId, username: username, leagueId: leagueId }));
+  TEAM_FANTASY_STATE_REQUESTS[key] = request;
+  request.finally(function() {
+    if (TEAM_FANTASY_STATE_REQUESTS[key] === request) delete TEAM_FANTASY_STATE_REQUESTS[key];
+  });
+  return request;
+}
+
+function teamFantasyPrewarmState_(gameId, leagueId) {
+  const username = teamFantasyCurrentUser_();
+  if (!gameId || !username) return Promise.resolve(null);
+  return teamFantasyLoadState_(gameId, username, leagueId);
+}
+
 async function renderTeamFantasyPage() {
   const gameId = typeof getFrontendGameId === 'function' ? getFrontendGameId() : '';
   const leagueId = typeof getFrontendLeagueId === 'function' ? getFrontendLeagueId() : '';
   const username = teamFantasyCurrentUser_();
   if (!gameId || !username) return `<div class="page"><div class="card">Open a Team Fantasy game after signing in.</div></div>`;
   if (typeof setPageLoadStep === 'function') setPageLoadStep(48, 'Loading Team Fantasy lineup…');
-  const res = await api('getTeamFantasyState', { gameId: gameId, username: username, leagueId: leagueId });
-  if (!res || res.success === false) return `<div class="page tf-page"><div class="card"><h1>Team Fantasy Football</h1><div>${teamFantasyEscape_(res && (res.message || res.error) || 'Could not load Team Fantasy.')}</div></div></div>`;
+  const res = await teamFantasyLoadState_(gameId, username, leagueId);
+  if (!res || res.success === false) return `<div class="page tf-page" data-page-load-failed="true"><div class="card"><h1>Team Fantasy Football</h1><div>${teamFantasyEscape_(res && (res.message || res.error) || 'Could not load Team Fantasy.')}</div></div></div>`;
   window.TEAM_FANTASY_STATE = res;
   window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || 1);
   window.TEAM_FANTASY_GAME_DAY = null;

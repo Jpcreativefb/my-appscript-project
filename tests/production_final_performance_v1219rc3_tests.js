@@ -33,7 +33,11 @@ assert(cache.includes('keys.push(appStartupPayloadCacheKey_(username, gameId))')
 assert(dashboard.includes('dashboardHomePayloadLoadedAt'), 'Dashboard core payload client reuse missing');
 assert(dashboard.includes('< 120000'), 'Dashboard client cache must be bounded');
 assert(dashboard.includes('Career history can traverse archived workbooks'), 'career history must remain off the Home critical path');
-assert(app.includes('}, 6500);'), 'Home optional hydration should wait long enough for game navigation');
+assert(
+  app.includes('}, 6500);') ||
+    (app.includes('dashboardScheduleHomeEnrichment_') && dashboard.includes('}, 6500);')),
+  'Home optional hydration should wait long enough for game navigation'
+);
 
 assert(admin.includes('adminHydrateSummary_().catch'), 'Admin summary must hydrate after the shell renders');
 assert(admin.includes('adminSummaryUsers">—</span>'), 'Admin shell should render count placeholders immediately');

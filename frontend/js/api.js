@@ -1279,12 +1279,14 @@ async function apiGetStartupPayload() {
    DASHBOARD GAMES HUB
 ====================== */
 
-async function apiGetDashboardGamesHub() {
+async function apiGetDashboardGamesHub(options) {
 
+  options = options || {};
   const session =
     getSession();
 
   return api("getDashboardGamesHub", {
+    fastStartup: options.fastStartup === true,
     username:
       session && session.username
         ? session.username

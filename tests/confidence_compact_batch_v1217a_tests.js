@@ -75,7 +75,7 @@ const settings = {
   'cat-a': {
     scoreMode: 'confidence-points',
     locked: false,
-    lockDateTime: '2026-08-30T17:00:00Z',
+    lockDateTime: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     maxChanges: 0,
     points: 1,
     changePenalty: 0,
@@ -84,7 +84,7 @@ const settings = {
   'cat-b': {
     scoreMode: 'confidence-points',
     locked: false,
-    lockDateTime: '2026-08-30T20:00:00Z',
+    lockDateTime: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
     maxChanges: 0,
     points: 1,
     changePenalty: 0,

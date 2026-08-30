@@ -55,7 +55,9 @@ const flushAutosave = body(picksUi, 'picksFlushStandardAutosave_()', 'picksQueue
 assert(flushAutosave.includes('permanentFailure'), 'permanent lock failures must not remain in the retry queue');
 assert(flushAutosave.includes('picksRecoverStandardSaveFailure_'), 'locked save failures must rehydrate authoritative saved picks');
 
-const profilePrompt = body(app, 'maybeOfferGameProfile_(gameId)', 'enterGame(');
+const profilePrompt = app.includes('function maybeOfferGameProfileOnce_(gameId)')
+  ? body(app, 'maybeOfferGameProfileOnce_(gameId)', 'maybeOfferGameProfile_(gameId)')
+  : body(app, 'maybeOfferGameProfile_(gameId)', 'enterGame(');
 const localDone = profilePrompt.indexOf('localStorage.setItem(cacheKey, "done")');
 const remoteChoice = profilePrompt.indexOf('apiSetGameProfilePromptChoice(gameId, "general")');
 assert(localDone >= 0 && remoteChoice >= 0 && localDone < remoteChoice, 'Keep regular profile must dismiss locally before the network round-trip');

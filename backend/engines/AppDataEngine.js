@@ -388,6 +388,36 @@ function apiGetDashboardGamesHub(payload) {
 
   const activeGames = [];
   const pastGames = [];
+  const fastStartup = payload.fastStartup === true;
+
+  if (fastStartup) {
+    games.forEach(function(game) {
+      if (!game || !game.gameId) return;
+      const isPast = isDashboardPastGame_(game);
+      if (game.active === true && isPast !== true) {
+        activeGames.push(buildDashboardFastStartupGameHubItem_(game, false));
+      } else if (isPast) {
+        pastGames.push(buildDashboardFastStartupGameHubItem_(game, true));
+      }
+    });
+
+    const defaultGameId = getDefaultGameId();
+    return {
+      success: true,
+      cached: false,
+      fastStartup: true,
+      progressDeferred: true,
+      classificationDeferred: true,
+      username: username,
+      defaultGameId: defaultGameId,
+      profileGameId: activeGames.length ? activeGames[0].gameId : (pastGames.length ? pastGames[0].gameId : defaultGameId),
+      profile: {},
+      profileHistory: [],
+      hubAppearance: [],
+      activeGames: activeGames,
+      pastGames: pastGames
+    };
+  }
 
   // Home used to calculate category/pick/wager progress separately for every
   // game card.  As the archive grew this created an N x games sheet-read
@@ -539,6 +569,83 @@ function isDashboardPastGame_(game) {
     status === "closed"
   );
 
+}
+
+function buildDashboardFastStartupGameHubItem_(game, isPast) {
+
+  game = game || {};
+
+  const mode = getDashboardGameMode_(game);
+  const availability = getDashboardAvailability_(game, isPast);
+  const isSeasonHub = game.gameRole === "parent";
+  let lockLabel =
+    availability.statusLabel ||
+    String(game.lockLabel || game.lockTimeLabel || game.eventTime || "").trim() ||
+    (game.lockAllPicks === true ? "Locked" : isPast ? "Finished" : "Open / Lock time TBD");
+  if (mode === "team-fantasy") lockLabel = "Locks by NFL kickoff";
+
+  const enterLabel = availability.available === false
+    ? availability.actionLabel
+    : isSeasonHub ? "Open Season Hub" : "Open Game";
+  const hubPlacement = getDashboardHubPlacement_(game, mode);
+
+  return {
+    gameId: game.gameId,
+    name: game.name || game.gameId,
+    subtitle: getDashboardGameTypeLabel_(game, mode),
+    year: game.year || "",
+    type: mode,
+    rawType: game.type || "",
+    typeLabel: getDashboardGameTypeLabel_(game, mode),
+    hubCategory: hubPlacement.category,
+    hubGroup: hubPlacement.group,
+    gameRole: game.gameRole || "standalone",
+    hubMode: game.hubMode || "playable-aggregate",
+    parentGameId: game.parentGameId || "",
+    showMiniGameLinks: game.showMiniGameLinks !== false,
+    includeParentQuestions: game.includeParentQuestions !== false,
+    predictionEnabled: game.predictionEnabled === true,
+    fixedPointsEnabled: game.fixedPointsEnabled !== false,
+    stakedPointsEnabled: game.stakedPointsEnabled === true,
+    wagerEnabled: game.wagerEnabled === true,
+    rankingEnabled: game.rankingEnabled === true,
+    icon: "",
+    status: game.status || "",
+    lockAllPicks: game.lockAllPicks === true,
+    statusLabel: lockLabel,
+    lockLabel: lockLabel,
+    description: getDashboardGameDescription_(game, mode),
+    themeColor: game.themeColor || "#354785",
+    heroImageFileId: game.heroImageFileId || "",
+    heroImage: game.heroImage || "",
+    heroImagePosition: game.heroImagePosition || "center center",
+    availableFrom: game.availableFrom || "",
+    availableUntil: game.availableUntil || "",
+    available: availability.available === true,
+    availabilityLabel: availability.label || "",
+    disableEnter: availability.available === false,
+    active: game.active === true,
+    archived: game.archived === true,
+    isPast: isPast === true,
+    hasStarted: null,
+    madeCount: null,
+    totalCount: null,
+    enterLabel: enterLabel,
+    actionLabel: enterLabel,
+    progressAvailable: false,
+    progressLabel: "",
+    progressValue: null,
+    userSummary: "",
+    progressDeferred: true,
+    classificationDeferred: true,
+    userStats: [],
+    leaderboardPreview: [],
+    showLeaderboard: game.showLeaderboard !== false,
+    leagueId: game.leagueId || "",
+    leagueName: game.leagueName || "",
+    leagueScoped: game.leagueScoped === true,
+    leagues: Array.isArray(game.leagues) ? game.leagues : []
+  };
 }
 
 function buildDashboardGameHubItemLite_(

@@ -17,7 +17,11 @@ const appearanceEngine = read('backend/engines/AppearanceEngine.js');
 const pwa = read('frontend/js/pwa.js');
 const sw = read('frontend/sw.js');
 
-assert(dashboard.includes('const currentGames = playingGames.filter'), 'Home must split attention games from current games.');
+assert(
+  dashboard.includes('const currentGames = playingGames.filter') ||
+    dashboard.includes('currentGames: playingGames.filter(function(game) { return attentionGames.indexOf(game) === -1; })'),
+  'Home must split attention games from current games.'
+);
 assert(dashboard.includes('return attentionGames.indexOf(game) === -1'), 'Attention games must not be duplicated in Home current games.');
 assert(dashboard.includes('const currentPlaying = playing.filter'), 'Hub current games must exclude games needing attention.');
 assert(dashboard.includes('return attention.indexOf(game) === -1'), 'Hub attention games must not be duplicated in My Current Games.');

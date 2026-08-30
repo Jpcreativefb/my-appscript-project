@@ -2017,7 +2017,8 @@ function apiGetTeamFantasyHeadToHead(payload) {
 /* TEAM_FANTASY_WEEKLY_SELECTION_HELP_BACKEND_v1218v1 */
 function apiGetTeamFantasyState(payload) {
   payload = payload || {};
-  setupSportsTeamFantasySystem();
+  // Hot player read: each downstream table accessor already lazily ensures its
+  // own sheet. Do not run unrelated all-sheet setup on every first entry.
   const username = teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
   if (!username || !gameId) throw new Error("User and game are required.");

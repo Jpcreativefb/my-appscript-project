@@ -687,7 +687,7 @@ const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager
 */
 // Legacy release-lineage marker retained for historical regression contracts only.
 // const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks-v1218x2c-confidence-appearance-v1218y-survivor-koth-strikes-v1218z-voting-competition-v1219rc3-final-performance-v1219rc6-admin-question-ux-performance-v1219rc7-pick-lock-integrity";
-const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc19-mobile-pwa-performance-1");
+const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc20-postdeploy-first-entry-performance-r2");
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -863,10 +863,35 @@ function appPageSnapshotKey_(page) {
 function appPageSnapshotStorageKey_(key) {
   return APP_PAGE_SNAPSHOT_STORAGE_PREFIX + encodeURIComponent(String(key || ""));
 }
+
+function appPageSnapshotHtmlValid_(page, html) {
+  html = String(html || "");
+  if (!html) return false;
+  const invalidMarkers = [
+    "Page failed to load",
+    "Could not load Team Fantasy.",
+    'data-page-load-failed="true"',
+    'data-route-loading='
+  ];
+  return !invalidMarkers.some(function(marker) { return html.indexOf(marker) !== -1; });
+}
+
+function appDiscardPageSnapshot_(page) {
+  if (!appPageSnapshotEligible_(page)) return;
+  const key = appPageSnapshotKey_(page);
+  delete APP_PAGE_SNAPSHOT_CACHE[key];
+  try { sessionStorage.removeItem(appPageSnapshotStorageKey_(key)); } catch (err) {}
+  if (String(page || "") === "dashboard" || String(page || "").indexOf("hub:") === 0) {
+    try { localStorage.removeItem(appPageSnapshotStorageKey_(key)); } catch (err) {}
+  }
+}
 function appCapturePageSnapshot_(page, app) {
   if (!app || !appPageSnapshotEligible_(page)) return;
   const html = String(app.innerHTML || "");
-  if (!html || html.indexOf("Page failed to load") !== -1) return;
+  if (!appPageSnapshotHtmlValid_(page, html)) {
+    appDiscardPageSnapshot_(page);
+    return;
+  }
   const key = appPageSnapshotKey_(page);
   const item = { html: html, savedAt: Date.now() };
   APP_PAGE_SNAPSHOT_CACHE[key] = item;
@@ -910,6 +935,10 @@ function appReadPageSnapshot_(page) {
   }
 
   if (!item) return null;
+  if (!appPageSnapshotHtmlValid_(page, item.html)) {
+    appDiscardPageSnapshot_(page);
+    return null;
+  }
   const age = Date.now() - Number(item.savedAt || 0);
   if (age > APP_PAGE_SNAPSHOT_MAX_MS) {
     delete APP_PAGE_SNAPSHOT_CACHE[key];
@@ -1050,20 +1079,20 @@ function appPaintProgressiveRouteShell_(page, app) {
 }
 
 function appScheduleDashboardRefreshAfterSnapshot_(snapshotKey) {
-  window.setTimeout(async function() {
-    try {
+  Promise.resolve(ensurePageModules_("dashboard"))
+    .then(function() {
       if (APP_STATE.currentPage !== "dashboard") return;
       if (appPageSnapshotKey_("dashboard") !== snapshotKey) return;
-      await ensurePageModules_("dashboard");
-      if (APP_STATE.currentPage !== "dashboard") return;
-      if (appPageSnapshotKey_("dashboard") !== snapshotKey) return;
-      if (typeof dashboardRefreshHomePayloadInBackground_ === "function") {
-        await dashboardRefreshHomePayloadInBackground_(snapshotKey);
+      if (!APP_STATE.dashboardHomeHydrationId) {
+        APP_STATE.dashboardHomeHydrationId = String(Date.now()) + "-" + Math.random().toString(36).slice(2);
       }
-    } catch (err) {
+      if (typeof dashboardScheduleHomeEnrichment_ === "function") {
+        dashboardScheduleHomeEnrichment_(snapshotKey, String(APP_STATE.dashboardHomeHydrationId || ""));
+      }
+    })
+    .catch(function(err) {
       console.warn("Dashboard background refresh skipped", err);
-    }
-  }, 3500);
+    });
 }
 
 async function navigate(page, options) {
@@ -1402,7 +1431,7 @@ function showGameProfileChoiceModal_(gameId, profile, profileMode, profileScopeL
   });
 }
 
-async function maybeOfferGameProfile_(gameId) {
+async function maybeOfferGameProfileOnce_(gameId) {
   gameId = String(gameId || "").trim();
   if (!gameId || typeof apiGetEditableProfile !== "function") return "continue";
 
@@ -1481,6 +1510,35 @@ async function maybeOfferGameProfile_(gameId) {
   return "continue";
 }
 
+const APP_GAME_PROFILE_PROMPT_INFLIGHT = new Map();
+
+async function maybeOfferGameProfile_(gameId) {
+  gameId = String(gameId || "").trim();
+  if (!gameId) return "continue";
+
+  let username = "";
+  try {
+    username = typeof getCurrentUsername === "function" ? getCurrentUsername() : "";
+  } catch (err) {}
+
+  const requestKey = gameProfilePromptCacheKey_(gameId, username);
+  const existing = APP_GAME_PROFILE_PROMPT_INFLIGHT.get(requestKey);
+  if (existing) return existing;
+
+  const request = Promise.resolve().then(function() {
+    return maybeOfferGameProfileOnce_(gameId);
+  });
+  APP_GAME_PROFILE_PROMPT_INFLIGHT.set(requestKey, request);
+
+  try {
+    return await request;
+  } finally {
+    if (APP_GAME_PROFILE_PROMPT_INFLIGHT.get(requestKey) === request) {
+      APP_GAME_PROFILE_PROMPT_INFLIGHT.delete(requestKey);
+    }
+  }
+}
+
 /* ======================
    GAME CARD ACTIONS
 ====================== */
@@ -1557,6 +1615,21 @@ async function enterGame(
       });
     } catch (err) {
       console.warn("Game startup prewarm skipped", err);
+    }
+  }
+
+  if (gameType === "team-fantasy") {
+    try {
+      Promise.resolve(ensurePageModules_("team-fantasy"))
+        .then(function() {
+          if (typeof teamFantasyPrewarmState_ === "function") {
+            return teamFantasyPrewarmState_(gameId, getFrontendLeagueId());
+          }
+          return null;
+        })
+        .catch(function(err) { console.warn("Team Fantasy state prewarm skipped", err); });
+    } catch (err) {
+      console.warn("Team Fantasy state prewarm skipped", err);
     }
   }
 
@@ -1749,16 +1822,11 @@ async function renderPage(page) {
       app.innerHTML =
         await renderDashboardPage();
 
-      if (typeof hydrateDashboardHomeExtras_ === "function") {
-        // Home itself is intentionally fast. Give the player time to enter a
-        // game before starting optional career/league/standings calls; those
-        // requests otherwise keep Apps Script busy while the game is opening.
-        window.setTimeout(function() {
-          if (typeof APP_STATE !== "undefined" && APP_STATE.currentPage !== "dashboard") return;
-          hydrateDashboardHomeExtras_().catch(function(err) {
-            console.warn("Dashboard extras could not be loaded", err);
-          });
-        }, 6500);
+      if (typeof dashboardScheduleHomeEnrichment_ === "function") {
+        dashboardScheduleHomeEnrichment_(
+          typeof appPageSnapshotKey_ === "function" ? appPageSnapshotKey_("dashboard") : "",
+          typeof APP_STATE !== "undefined" ? String(APP_STATE.dashboardHomeHydrationId || "") : ""
+        );
       }
 
       break;

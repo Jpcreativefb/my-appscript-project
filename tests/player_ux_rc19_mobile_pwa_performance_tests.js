@@ -16,7 +16,7 @@ const dashboard = read('frontend/js/pages/dashboard.js');
 const css = read('frontend/css/rc19-mobile-pwa.css');
 const pwa = read('frontend/js/pwa.js');
 const sw = read('frontend/sw.js');
-const release = 'v1219rc19-mobile-pwa-performance-1';
+const release = 'v1219rc20-postdeploy-first-entry-performance-r2';
 
 function requireText(source, expected, label) {
   assert(source.includes(expected), `${label} missing: ${expected}`);
@@ -34,6 +34,7 @@ assert(/name="viewport"[\s\S]{0,160}width=device-width,[\s\S]{0,80}initial-scale
   assert(source.includes(release), `release marker missing from surface ${index}`);
 });
 requireText(sw, './css/rc19-mobile-pwa.css', 'service-worker app shell');
+requireText(sw, release, 'service-worker R2 release audit marker');
 assert(appHtml.indexOf('rc19-mobile-pwa.css') > appHtml.indexOf('league-admin.css'),
   'RC19 mobile override must load after legacy page CSS');
 
@@ -95,7 +96,8 @@ if (chromium && process.env.PATTC_RUN_HEADLESS_LAYOUT === '1') {
 assert(!/page === "dashboard"[\s\S]{0,240}dashboardHomePayload = null[\s\S]{0,120}forceRefresh = true/.test(app),
   'navigate() still force-invalidates Home before snapshot reuse');
 requireText(app, 'appScheduleDashboardRefreshAfterSnapshot_(snapshot.key);', 'nonblocking Home snapshot refresh');
-requireText(app, '}, 3500);', 'idle Home refresh delay');
+requireText(app, 'dashboardScheduleHomeEnrichment_(snapshotKey', 'cached Home joins controlled enrichment scheduler');
+assert(!app.includes('}, 3500);'), 'legacy competing 3.5-second Dashboard refresh must stay removed');
 requireText(app, 'if (APP_STATE.currentPage !== "dashboard") return;', 'Home refresh route guard');
 const navigateBlock = app.slice(app.indexOf('async function navigate(page, options)'), app.indexOf('/* ======================\n   ACTIVE NAV', app.indexOf('async function navigate(page, options)')));
 assert(!/\binitApp\s*\(/.test(navigateBlock), 'internal navigate() must not bootstrap the whole app');
@@ -111,8 +113,8 @@ requireText(dashboard, 'dashboardRefreshHomePayloadInBackground_', 'Dashboard no
 // renderPage/dashboard route completion.
 const dashboardRenderCase = app.slice(app.indexOf('case "dashboard":'), app.indexOf('case "trophy-room":'));
 requireText(dashboardRenderCase, 'await renderDashboardPage()', 'Dashboard critical render');
-requireText(dashboardRenderCase, 'window.setTimeout(function()', 'deferred Dashboard enrichment');
-requireText(dashboardRenderCase, '}, 6500);', 'Dashboard enrichment idle delay');
+requireText(dashboardRenderCase, 'dashboardScheduleHomeEnrichment_', 'deferred Dashboard enrichment scheduler');
+requireText(dashboard, '}, 6500);', 'Dashboard enrichment idle delay');
 assert(!/await\s+hydrateDashboardHomeExtras_/.test(dashboardRenderCase),
   'secondary Dashboard enrichment still blocks route completion');
 
