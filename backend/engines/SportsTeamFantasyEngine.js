@@ -1027,11 +1027,46 @@ function teamFantasyEligibleTeams_(gameId, settings, entry, position, week, sche
   return result;
 }
 
-function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postseasonEligible) {
+function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postseasonEligible, readContext) {
   postseasonEligible = postseasonEligible !== false;
-  const picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, entry.entryId);
+  readContext = readContext || {};
+
+  // RC22: reuse one Picks snapshot and one Unit Scores snapshot instead of
+  // reopening the same tables once per position.
+  const pickRows = Array.isArray(readContext.pickRows)
+    ? readContext.pickRows
+    : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS);
+  const unitScoreRows = postseasonEligible
+    ? (
+        Array.isArray(readContext.unitScoreRows)
+          ? readContext.unitScoreRows
+          : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES)
+      )
+    : [];
+
+  const picks = pickRows.filter(function(row) {
+    return teamFantasyString_(row.GameId) === gameId &&
+      Number(row.SeasonYear) === Number(settings.seasonYear) &&
+      Number(row.Week) === Number(week) &&
+      teamFantasyString_(row.EntryId) === entry.entryId;
+  });
+
   const byPosition = {};
   picks.forEach(function(row) { byPosition[teamFantasyNormalizePosition_(row.Position)] = row; });
+
+  const rankingsByPosition = {};
+  if (postseasonEligible) {
+    TEAM_FANTASY_POSITIONS.forEach(function(position) {
+      rankingsByPosition[position] = teamFantasyRankingsFromRows_(
+        unitScoreRows,
+        gameId,
+        position,
+        week,
+        settings.seasonYear
+      );
+    });
+  }
+
   const slots = TEAM_FANTASY_POSITIONS.map(function(position) {
     const pick = byPosition[position] || null;
     let locked = false;
@@ -1053,11 +1088,29 @@ function teamFantasyLineupState_(gameId, settings, entry, week, schedule, postse
         autoPickPenalty: Math.max(0, teamFantasyNumber_(pick.AutoPickPenalty, 0))
       } : null,
       locked: locked,
-      teams: postseasonEligible ? teamFantasyEligibleTeams_(gameId, settings, entry, position, week, schedule, pick) : []
+      teams: postseasonEligible
+        ? teamFantasyEligibleTeamsFromRows_(
+            gameId,
+            settings,
+            entry,
+            position,
+            week,
+            schedule,
+            pick,
+            pickRows,
+            rankingsByPosition[position] || {}
+          )
+        : []
     };
   });
-  const autoPickPenalty = picks.reduce(function(sum, row) { return sum + Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)); }, 0);
-  const autoPickPositions = picks.filter(function(row) { return Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)) > 0; }).length;
+
+  const autoPickPenalty = picks.reduce(function(sum, row) {
+    return sum + Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0));
+  }, 0);
+  const autoPickPositions = picks.filter(function(row) {
+    return Math.max(0, teamFantasyNumber_(row.AutoPickPenalty, 0)) > 0;
+  }).length;
+
   return {
     entry: entry,
     postseasonEligible: postseasonEligible,
@@ -2028,7 +2081,23 @@ function apiGetTeamFantasyState(payload) {
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
   const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
-  const lineups = entries.map(function(entry) { return teamFantasyLineupState_(gameId, settings, entry, week, schedule, postseasonEligibility[entry.entryId] !== false); });
+  // RC22: load the two hot lineup tables once for this state request and
+  // reuse them for every entry and all eight positions.
+  const lineupReadContext = {
+    pickRows: teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS),
+    unitScoreRows: teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES)
+  };
+  const lineups = entries.map(function(entry) {
+    return teamFantasyLineupState_(
+      gameId,
+      settings,
+      entry,
+      week,
+      schedule,
+      postseasonEligibility[entry.entryId] !== false,
+      lineupReadContext
+    );
+  });
   const leagues = teamFantasyLeaguesForEntries_(gameId, entries);
   const requestedLeagueId = teamFantasyString_(payload.leagueId);
   const requestedAllowed = requestedLeagueId && leagues.some(function(league) { return league.leagueId === requestedLeagueId; });

@@ -2434,7 +2434,7 @@ function doGet(e) {
     ========================= */
     
     if (action === "getDashboardGamesHub") {
-    
+
       return json(
         apiGetDashboardGamesHub({
           username:
@@ -2442,10 +2442,15 @@ function doGet(e) {
           token:
             params.token,
           leagueId:
-            leagueId
+            leagueId,
+          fastStartup:
+            params.fastStartup === true ||
+            String(params.fastStartup || "")
+              .trim()
+              .toLowerCase() === "true"
         })
       );
-    
+
     }
     
     /* =========================

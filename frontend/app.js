@@ -1621,16 +1621,32 @@ async function enterGame(
   if (gameType === "team-fantasy") {
     try {
       Promise.resolve(ensurePageModules_("team-fantasy"))
-        .then(function() {
-          if (typeof teamFantasyPrewarmState_ === "function") {
-            return teamFantasyPrewarmState_(gameId, getFrontendLeagueId());
-          }
-          return null;
-        })
-        .catch(function(err) { console.warn("Team Fantasy state prewarm skipped", err); });
+        .catch(function(err) { console.warn("Team Fantasy module prewarm skipped", err); });
     } catch (err) {
-      console.warn("Team Fantasy state prewarm skipped", err);
+      console.warn("Team Fantasy module prewarm skipped", err);
     }
+  }
+
+  // RC22: do not serialize first usable rendering behind the optional
+  // first-game profile lookup. The same profile requirement still runs next.
+  const renderBeforeProfileRoute =
+    gameRole === "parent"
+      ? ""
+      : (
+          gameType === "team-fantasy"
+            ? "team-fantasy"
+            : (
+                gameType === "prediction" ||
+                gameType === "confidence" ||
+                gameType === "head-to-head" ||
+                gameType === "staked-prediction"
+              )
+                ? "picks"
+                : ""
+        );
+
+  if (renderBeforeProfileRoute) {
+    await navigate(renderBeforeProfileRoute);
   }
 
   const profileChoice = await maybeOfferGameProfile_(gameId);
@@ -1648,6 +1664,10 @@ async function enterGame(
       );
     } catch (err) {}
     await navigate("profile");
+    return;
+  }
+
+  if (renderBeforeProfileRoute) {
     return;
   }
 
