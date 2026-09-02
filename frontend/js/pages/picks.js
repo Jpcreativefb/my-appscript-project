@@ -584,6 +584,131 @@ function renderRealityTvEpisodeComparison_() {
    RENDER PAGE
 ========================= */
 
+
+function realityTvHeaderPresentation_() {
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true) return null;
+
+  const game = PICKS_PAGE_DATA.game || {};
+  const season = view.season || {};
+  const current = realityTvCurrentEpisode_();
+  const periodLabel = String(season.periodLabel || "Episode");
+  const number = Number(current && current.episodeNumber || 0);
+  const categoryMap = realityTvEpisodeCategoryMap_();
+
+  const items = current
+    ? (PICKS_PAGE_DATA.categories || []).filter(function(category) {
+        return isPicksPageCategory(category) &&
+          Number(categoryMap[normalizeId(category.id)] || 0) === number;
+      })
+    : [];
+
+  const picked = items.filter(function(item) {
+    return !!PICKS_PAGE_DATA.picks[item.id];
+  }).length;
+
+  const total = items.length;
+  const blocking = realityTvBlockingHiddenEpisode_();
+  const rawStatus = String(current && current.status || "").toUpperCase();
+
+  let state = "OPEN";
+  if (blocking) {
+    state = "RESULTS READY";
+  } else if (!current) {
+    state = "WAITING FOR RESULTS";
+  } else if (rawStatus === "LOCKED") {
+    state = "LOCKED";
+  } else if (rawStatus === "FINAL" || rawStatus === "CLOSED") {
+    state = "RESULTS READY";
+  } else if (total > 0 && picked >= total) {
+    state = "COMPLETE FOR NOW";
+  } else if (total > 0 && picked > 0) {
+    state = "SAVED / IN PROGRESS";
+  }
+
+  const showName = String(
+    game.displayName ||
+    game.name ||
+    game.title ||
+    game.GameName ||
+    game.Name ||
+    season.showName ||
+    season.seriesName ||
+    "Reality TV"
+  );
+
+  const seasonName = String(
+    season.displayName ||
+    season.seasonName ||
+    season.name ||
+    game.seasonName ||
+    game.SeasonName ||
+    ""
+  );
+
+  const episodeName = current
+    ? String(current.episodeName || (periodLabel + " " + number))
+    : "No open episode";
+
+  const episodeStateLabel = current
+    ? periodLabel.toUpperCase() + " " + number + " — " + state
+    : state;
+
+  return {
+    showName: showName,
+    seasonName: seasonName,
+    episodeName: episodeName,
+    episodeStateLabel: episodeStateLabel,
+    stateClass: "state-" + state.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+    picked: picked,
+    total: total,
+    percent: total ? Math.round((picked / total) * 100) : 0,
+    schedule: current ? realityTvEpisodeScheduleText_(current) : ""
+  };
+}
+
+function renderPicksPageHeader_() {
+  const reality = realityTvHeaderPresentation_();
+
+  if (reality) {
+    const progressText = reality.total
+      ? reality.picked + " of " + reality.total + " predictions complete"
+      : "Prediction slate preparing";
+
+    return `<div class="picks-page-header reality-game-hero">
+      <div class="reality-game-hero-copy">
+        <span class="reality-game-family-label">PATTC REALITY</span>
+        <h1>${escapeHtml(reality.showName)}</h1>
+        ${reality.seasonName ? `<p class="reality-game-season">${escapeHtml(reality.seasonName)}</p>` : ""}
+      </div>
+      <div class="reality-game-hero-action">
+        <span class="reality-game-episode-name">${escapeHtml(reality.episodeName)}</span>
+        <span class="reality-game-state ${escapeAttr(reality.stateClass)}">${escapeHtml(reality.episodeStateLabel)}</span>
+        <strong>${escapeHtml(progressText)}</strong>
+        <div class="reality-game-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${reality.percent}">
+          <span style="width:${reality.percent}%"></span>
+        </div>
+        ${reality.schedule ? `<small>${escapeHtml(reality.schedule)}</small>` : ""}
+      </div>
+    </div>`;
+  }
+
+  return `<div class="picks-page-header">
+    <h1>Make Your Picks</h1>
+    <p>${
+      hasConfidencePointsCategories() && hasStakedPointsCategories()
+        ? "This hybrid game includes confidence and staked predictions. Each question shows the scoring method it uses."
+        : hasConfidencePointsCategories()
+          ? getConfidenceGameInstructions()
+          : hasStakedPointsCategories()
+            ? "Choose how many prediction points to risk first. Then choose an answer and confirm the pick. Pending stakes reduce the points available for other questions."
+            : "Pick changes may reduce available points. Locked categories cannot be changed."
+    }</p>
+    ${hasConfidencePointsCategories() ? renderConfidenceSummaryBar() : ""}
+    ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
+  </div>`;
+}
+
 async function renderPicksPage() {
 
   const session =
@@ -752,38 +877,21 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   );
 
   return `
-    <div class="page picks-page${PICKS_PAGE_DATA.appearance ? "" : " picks-appearance-loading"}">
+    <div class="page picks-page${PICKS_PAGE_DATA.appearance ? "" : " picks-appearance-loading"}${PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true ? " reality-player-page" : ""}">
 
       ${renderHybridPicksBackButton_()}
 
-      <div class="picks-page-header">
-        <h1>Make Your Picks</h1>
-        <p>
-          ${
-            hasConfidencePointsCategories() && hasStakedPointsCategories()
-              ? "This hybrid game includes confidence and staked predictions. Each question shows the scoring method it uses."
-              : hasConfidencePointsCategories()
-                ? getConfidenceGameInstructions()
-                : hasStakedPointsCategories()
-                  ? "Choose how many prediction points to risk first. Then choose an answer and confirm the pick. Pending stakes reduce the points available for other questions."
-                  : "Pick changes may reduce available points. Locked categories cannot be changed."
-          }
-        </p>
-
-        ${hasConfidencePointsCategories() ? renderConfidenceSummaryBar() : ""}
-        ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
-
-      </div>
+      ${renderPicksPageHeader_()}
 
       <div id="realityTvSpoilerShieldMount">${renderRealityTvSpoilerShield_()}</div>
-
-      <div id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
 
       <div id="picksPageMessage" class="picks-message hidden"></div>
 
       <div id="picksCategoryList" class="picks-category-list">
         ${renderPicksCategoryList()}
       </div>
+
+      <div class="reality-season-long-slot" id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
 
       <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
 

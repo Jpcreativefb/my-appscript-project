@@ -211,11 +211,12 @@ assert(refreshSrc.includes('loadStartupPayload(true)'));
 assert(refreshSrc.includes('refreshPicksPage()'));
 assert(refreshSrc.includes('hydratePicksEnhancements_'));
 
-// Top-of-page placement: Results Ready/status mount must precede Sole Survivor,
-// and category list must precede Previous/secondary stats sections.
+// Owner-approved Reality hierarchy: Current Episode / Results Ready comes first,
+// current episode questions get primary visual priority, then the season-long
+// Sole Survivor feature, with secondary Reality summary/standings below.
 const pageSrc = functionSource(picks, 'renderPicksPage');
-assert(pageSrc.indexOf('realityTvSpoilerShieldMount') < pageSrc.indexOf('seasonAnchorPickMount'), 'Current Episode/Results Ready must be above Sole Survivor');
-assert(pageSrc.indexOf('seasonAnchorPickMount') < pageSrc.indexOf('picksCategoryList'), 'Sole Survivor must be above current episode questions');
+assert(pageSrc.indexOf('realityTvSpoilerShieldMount') < pageSrc.indexOf('picksCategoryList'), 'Current Episode/Results Ready must be above current episode questions');
+assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('seasonAnchorPickMount'), 'current episode questions must be above Sole Survivor');
 assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('realityTvPlayerSummaryMount'), 'current questions/Previous Episodes must be above secondary Reality summary');
 
 // ---------------------------------------------------------------------------

@@ -5,6 +5,7 @@ const vm = require("vm");
 const cp = require("child_process");
 
 const BASELINE = "7b5718efb93b3ca6baf802b12f43dedaf899bfea";
+const RC22_COMMIT = "7c20e341341acdf0982b6d6580f7a84bcac987b5";
 const EXPECTED_CHANGED = [
   "backend/Api.js",
   "frontend/js/app.js",
@@ -99,17 +100,25 @@ const dashboard = read("frontend/js/pages/dashboard.js");
 const appData = read("backend/engines/AppDataEngine.js");
 const authFrontend = read("frontend/js/auth.js");
 
-// Exact correction isolation.
-const changed = git(["status", "--short"])
+// Historical RC22 correction isolation.
+// Validate the immutable RC22 correction commit rather than the current
+// working tree so later feature branches can run production regression gates.
+const changed = git([
+  "diff-tree",
+  "--no-commit-id",
+  "--name-only",
+  "-r",
+  RC22_COMMIT
+])
   .split(/\n/)
   .filter(Boolean)
-  .map(line => line.slice(3))
   .sort();
+
 ok(JSON.stringify(changed) === JSON.stringify(EXPECTED_CHANGED),
-  "exact five-file changed scope");
+  "RC22 commit preserves exact five-file changed scope");
 ok(appJs === appMirror, "frontend app mirrors remain identical");
 ok(!changed.some(p => /sports.*scores.*engine/i.test(p) || /external-engines\/sports/i.test(p)),
-  "no Sports Scores Engine file changed");
+  "RC22 commit changed no Sports Scores Engine file");
 
 // P0-1: Login -> Home.
 ok(backendApi.includes('fastStartup:\n            params.fastStartup === true ||'),

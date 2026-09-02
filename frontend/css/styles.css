@@ -6637,3 +6637,409 @@ details.season-anchor-card {
   .reality-current-question-heading { display: grid; }
   .reality-results-ready-button { min-height: 50px; }
 }
+
+/* =========================================================
+   PATTC Reality Visual Base v1
+   Thin player presentation layer — no mechanic changes
+   ========================================================= */
+
+.reality-player-page {
+  --reality-surface:
+    color-mix(
+      in srgb,
+      var(--picks-theme-header-bg,#0f172a) 88%,
+      #020617
+    );
+  --reality-surface-soft:
+    color-mix(
+      in srgb,
+      var(--picks-theme-question-bg,#0f172a) 82%,
+      transparent
+    );
+  --reality-accent:
+    var(--picks-theme-selected-border,#f59e0b);
+  --reality-accent-soft:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 20%,
+      transparent
+    );
+}
+
+/* SHOW / SEASON HERO */
+
+.reality-player-page .reality-game-hero {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0,1.25fr) minmax(260px,.75fr);
+  gap: 20px;
+  overflow: hidden;
+  margin-bottom: 16px;
+  padding: 24px;
+  border:
+    1px solid
+    color-mix(
+      in srgb,
+      var(--reality-accent) 32%,
+      rgba(255,255,255,.14)
+    );
+  border-radius: 22px;
+  background:
+    radial-gradient(
+      circle at 10% 0%,
+      color-mix(in srgb,var(--reality-accent) 28%,transparent),
+      transparent 42%
+    ),
+    radial-gradient(
+      circle at 100% 100%,
+      rgba(14,116,144,.22),
+      transparent 44%
+    ),
+    linear-gradient(
+      135deg,
+      var(--picks-theme-header-bg,#172033),
+      var(--picks-theme-page-bg,#07111f)
+    );
+  color: #fff;
+  box-shadow:
+    0 20px 50px rgba(2,6,23,.30),
+    inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.reality-player-page .reality-game-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      115deg,
+      rgba(255,255,255,.06),
+      transparent 26%,
+      transparent 72%,
+      rgba(255,255,255,.025)
+    );
+}
+
+.reality-game-hero-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 150px;
+}
+
+.reality-game-family-label {
+  display: inline-flex;
+  align-self: flex-start;
+  margin-bottom: 8px;
+  padding: 5px 9px;
+  border:
+    1px solid
+    color-mix(in srgb,var(--reality-accent) 42%,rgba(255,255,255,.16));
+  border-radius: 999px;
+  background: rgba(2,6,23,.34);
+  color:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 72%,
+      #fff
+    );
+  font-size: .68rem;
+  font-weight: 950;
+  letter-spacing: .12em;
+}
+
+.reality-game-hero h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(2rem,5vw,3.4rem);
+  line-height: .96;
+  letter-spacing: -.035em;
+  text-wrap: balance;
+}
+
+.reality-game-season {
+  margin: 9px 0 0 !important;
+  color: rgba(255,255,255,.72) !important;
+  font-size: .92rem;
+  font-weight: 750;
+}
+
+/* EPISODE STATE / PRIMARY TASK */
+
+.reality-game-hero-action {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 17px;
+  background: rgba(2,6,23,.42);
+  backdrop-filter: blur(9px);
+}
+
+.reality-game-episode-name {
+  color: rgba(255,255,255,.72);
+  font-size: .78rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.reality-game-state {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 5px 9px;
+  border-radius: 999px;
+  border: 1px solid rgba(96,165,250,.34);
+  background: rgba(37,99,235,.14);
+  color: #bfdbfe;
+  font-size: .72rem;
+  font-weight: 950;
+  letter-spacing: .055em;
+}
+
+.reality-game-state.state-open,
+.reality-game-state.state-saved-in-progress {
+  border-color: rgba(96,165,250,.42);
+  background: rgba(37,99,235,.18);
+  color: #dbeafe;
+}
+
+.reality-game-state.state-complete-for-now {
+  border-color: rgba(52,211,153,.38);
+  background: rgba(6,95,70,.24);
+  color: #a7f3d0;
+}
+
+.reality-game-state.state-locked {
+  border-color: rgba(148,163,184,.38);
+  background: rgba(71,85,105,.30);
+  color: #e2e8f0;
+}
+
+.reality-game-state.state-waiting-for-results {
+  border-color: rgba(167,139,250,.38);
+  background: rgba(91,33,182,.22);
+  color: #ddd6fe;
+}
+
+.reality-game-state.state-results-ready {
+  border-color: rgba(250,204,21,.44);
+  background: rgba(133,77,14,.24);
+  color: #fef3c7;
+}
+
+.reality-game-hero-action > strong {
+  color: #fff;
+  font-size: 1.08rem;
+}
+
+.reality-game-hero-action > small {
+  color: rgba(255,255,255,.62);
+}
+
+.reality-game-progress {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255,255,255,.10);
+  box-shadow: inset 0 1px 3px rgba(0,0,0,.25);
+}
+
+.reality-game-progress > span {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  background:
+    linear-gradient(
+      90deg,
+      var(--reality-accent),
+      color-mix(in srgb,var(--reality-accent) 66%,#fff)
+    );
+  box-shadow:
+    0 0 16px
+    color-mix(in srgb,var(--reality-accent) 42%,transparent);
+}
+
+/* CURRENT EPISODE = VISUAL PRIORITY */
+
+.reality-player-page .reality-episode-picks-section.current {
+  position: relative;
+  margin-bottom: 18px;
+  border:
+    1px solid
+    color-mix(in srgb,var(--reality-accent) 34%,rgba(255,255,255,.16));
+  border-radius: 20px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb,var(--reality-surface) 92%,transparent),
+      color-mix(in srgb,var(--picks-theme-page-bg,#020617) 96%,transparent)
+    );
+  box-shadow:
+    0 16px 34px rgba(2,6,23,.22);
+}
+
+.reality-player-page .reality-current-question-heading {
+  padding: 17px 18px 14px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  background:
+    linear-gradient(
+      135deg,
+      var(--reality-accent-soft),
+      transparent 55%
+    );
+}
+
+.reality-player-page .reality-current-question-heading h2 {
+  color: #fff;
+  font-size: 1.35rem;
+}
+
+.reality-player-page .reality-episode-kicker {
+  color:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 72%,
+      #fff
+    ) !important;
+}
+
+/* QUESTION CARDS — KEEP CURRENT MECHANICS, IMPROVE DEPTH */
+
+.reality-player-page .pick-category-card {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 16%,
+      rgba(255,255,255,.12)
+    );
+  box-shadow: 0 10px 26px rgba(2,6,23,.22);
+}
+
+.reality-player-page .pick-card-header {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(
+        in srgb,
+        var(--picks-theme-question-header-bg,#111827) 92%,
+        var(--reality-accent) 8%
+      ),
+      var(--picks-theme-question-header-bg,#111827)
+    );
+}
+
+/* SEASON-LONG PICK */
+
+.reality-season-long-slot {
+  margin-top: 20px;
+}
+
+.reality-season-long-slot:empty {
+  display: none;
+}
+
+.reality-player-page .season-anchor-card {
+  border-color:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 34%,
+      rgba(255,255,255,.13)
+    );
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(
+        in srgb,
+        var(--reality-surface) 88%,
+        var(--reality-accent) 12%
+      ),
+      var(--reality-surface)
+    );
+  box-shadow: 0 14px 34px rgba(2,6,23,.22);
+}
+
+.reality-player-page .season-anchor-card.needs-pick {
+  box-shadow:
+    0 0 0 2px var(--reality-accent-soft),
+    0 16px 38px rgba(2,6,23,.28);
+}
+
+/* PREVIOUS EPISODES — PRESENT BUT SUBORDINATE */
+
+.reality-player-page .reality-previous-episodes {
+  margin-top: 18px;
+  opacity: .88;
+  border-color: rgba(148,163,184,.16);
+  background: rgba(2,6,23,.22);
+}
+
+.reality-player-page .reality-previous-episodes[open] {
+  opacity: 1;
+}
+
+.reality-player-page
+.reality-episode-picks-section.previous {
+  box-shadow: none;
+  background: rgba(255,255,255,.018);
+}
+
+/* STANDINGS */
+
+.reality-player-page .reality-player-summary-card {
+  margin-top: 20px;
+  border-color:
+    color-mix(
+      in srgb,
+      var(--reality-accent) 24%,
+      rgba(255,255,255,.15)
+    );
+  background:
+    linear-gradient(
+      135deg,
+      var(--reality-surface),
+      color-mix(
+        in srgb,
+        var(--reality-surface) 90%,
+        var(--reality-accent) 10%
+      )
+    );
+}
+
+/* MOBILE-FIRST */
+
+@media (max-width: 720px) {
+  .reality-player-page .reality-game-hero {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    padding: 18px;
+    border-radius: 19px;
+  }
+
+  .reality-game-hero-copy {
+    min-height: 118px;
+  }
+
+  .reality-game-hero h1 {
+    font-size: clamp(2rem,11vw,2.85rem);
+  }
+
+  .reality-game-hero-action {
+    padding: 14px;
+  }
+
+  .reality-player-page .reality-current-question-heading {
+    padding: 14px;
+  }
+
+  .reality-season-long-slot {
+    margin-top: 16px;
+  }
+}
