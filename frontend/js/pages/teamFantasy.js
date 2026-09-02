@@ -944,3 +944,747 @@ async function teamFantasyRunTestLab_() {
     mount.innerHTML = `<div class="tf-warning">${teamFantasyEscape_(err && err.message ? err.message : 'Test Lab failed.')}</div>`;
   }
 }
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED FRONTEND RUNTIME
+   Art R3
+
+   Clean / Current remains the default.
+   Sports Rich activates only from the existing per-game Appearance
+   assignment. No second settings/backend system is created.
+
+   Presentation-only. No Sports Engine, scoring, odds, settlement,
+   game rules, saves, locks, auth, or automation logic lives here.
+   ========================================================= */
+(function initializePattcSportsRich_(global) {
+  "use strict";
+
+  if (!global || global.PATTCSportsRich) return;
+
+  const cache = Object.create(null);
+  const inflight = Object.create(null);
+
+  const AUTO_PALETTES = Object.freeze({
+    sports: { primary:"#2398ff", secondary:"#0b6f91", accent:"#76c8ff" },
+    nfl: { primary:"#168bff", secondary:"#16834b", accent:"#83cbff" },
+    ncaaf: { primary:"#b82d3d", secondary:"#bb8a25", accent:"#f0c963" },
+    nba: { primary:"#ef7b2d", secondary:"#b9363e", accent:"#ffb05f" },
+    ncaab: { primary:"#2878d7", secondary:"#e97828", accent:"#71b9ff" },
+    mlb: { primary:"#326fd1", secondary:"#b52f42", accent:"#77b4ff" },
+    nhl: { primary:"#52b9e8", secondary:"#1d7d9b", accent:"#b0ebff" },
+    soccer: { primary:"#27b77a", secondary:"#128eaa", accent:"#71efc2" },
+    racing: { primary:"#e53b43", secondary:"#d49b22", accent:"#ffd75a" },
+    golf: { primary:"#26945a", secondary:"#987927", accent:"#dfc764" }
+  });
+
+  function text_(value) {
+    return value == null ? "" : String(value).trim();
+  }
+
+  function key_(value) {
+    return text_(value).toLowerCase().replace(/[_/\s]+/g, "-");
+  }
+
+  function object_(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+
+  function parseObject_(value) {
+    if (!value) return {};
+    if (value && typeof value === "object") return value;
+    try {
+      const parsed = JSON.parse(String(value));
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function appearanceRoot_(bundle) {
+    bundle = object_(bundle);
+    return bundle.appearance && typeof bundle.appearance === "object"
+      ? bundle.appearance
+      : bundle;
+  }
+
+  function sources_(bundle) {
+    const root = appearanceRoot_(bundle);
+    const override = parseObject_(
+      root.ThemeOverrideJSON ||
+      root.themeOverrideJSON ||
+      root.themeOverrideJson ||
+      root.ThemeOverride ||
+      root.themeOverride ||
+      ""
+    );
+
+    return [
+      override,
+      object_(override.sports),
+      object_(override.colors),
+      root,
+      object_(root.sports),
+      object_(root.colors),
+      object_(root.theme),
+      object_(root.theme && root.theme.sports),
+      object_(root.theme && root.theme.colors),
+      object_(root.resolvedTheme),
+      object_(root.resolvedTheme && root.resolvedTheme.colors),
+      object_(root.assignment),
+      bundle
+    ].filter(function(source) {
+      return source && typeof source === "object";
+    });
+  }
+
+  function first_(bundle, keys) {
+    const sources = sources_(bundle);
+    for (let s = 0; s < sources.length; s += 1) {
+      for (let k = 0; k < keys.length; k += 1) {
+        const value = sources[s][keys[k]];
+        if (value !== undefined && value !== null && text_(value)) return value;
+      }
+    }
+    return "";
+  }
+
+  function safeColor_(value) {
+    const raw = text_(value);
+    if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
+    if (/^(rgb|rgba|hsl|hsla)\([0-9.,%\s+-]+\)$/i.test(raw)) return raw;
+    return "";
+  }
+
+  function layoutValue_(bundle) {
+    return key_(first_(bundle, [
+      "SportsLayoutTemplate",
+      "sportsLayoutTemplate",
+      "SportsLayout",
+      "sportsLayout",
+      "SportsPlayerLayout",
+      "sportsPlayerLayout",
+      "LayoutTemplate",
+      "layoutTemplate"
+    ]));
+  }
+
+  function isRichValue_(value) {
+    const raw = key_(value);
+    return (
+      raw === "sports-rich" ||
+      raw === "rich" ||
+      raw === "art" ||
+      raw === "sports-art" ||
+      raw === "rich-art" ||
+      raw === "sports-rich-art"
+    );
+  }
+
+  function isCleanValue_(value) {
+    const raw = key_(value);
+    return (
+      !raw ||
+      raw === "clean" ||
+      raw === "current" ||
+      raw === "default" ||
+      raw === "classic" ||
+      raw === "legacy"
+    );
+  }
+
+  function remember_(gameId, bundle) {
+    const id = text_(gameId);
+    if (!id || !bundle || typeof bundle !== "object") return bundle || null;
+    cache[id] = bundle;
+    try {
+      sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(bundle));
+    } catch (err) {}
+    return bundle;
+  }
+
+  function cached_(gameId) {
+    const id = text_(gameId);
+    if (!id) return null;
+    if (cache[id]) return cache[id];
+
+    try {
+      const raw = sessionStorage.getItem("pattcGameAppearance:" + id);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          cache[id] = parsed;
+          return parsed;
+        }
+      }
+    } catch (err) {}
+
+    return null;
+  }
+
+  async function prepare_(gameId, existingBundle) {
+    const id = text_(gameId);
+    if (!id) return existingBundle || null;
+
+    if (existingBundle && typeof existingBundle === "object") {
+      return remember_(id, existingBundle);
+    }
+
+    const cached = cached_(id);
+
+    // Roy integration: Admin Appearance layout switching must be visible after
+    // a normal PWA refresh. When the live Appearance API exists, request the
+    // current per-GameId assignment instead of letting sessionStorage pin an
+    // older Clean/Rich choice. Cached Appearance remains an offline fallback.
+    if (typeof apiGetGameAppearance !== "function") return cached;
+
+    if (!inflight[id]) {
+      inflight[id] = Promise.resolve(apiGetGameAppearance(id))
+        .then(function(result) {
+          if (result && result.success !== false) return remember_(id, result);
+          return null;
+        })
+        .catch(function(err) {
+          console.warn("Sports Rich Appearance load skipped", err);
+          return null;
+        })
+        .finally(function() {
+          delete inflight[id];
+        });
+    }
+
+    return inflight[id];
+  }
+
+  function appearance_(gameId, provided) {
+    return provided || cached_(gameId) || null;
+  }
+
+  function isRich_(gameId, provided) {
+    const bundle = appearance_(gameId, provided);
+    if (!bundle) return false;
+    return isRichValue_(layoutValue_(bundle));
+  }
+
+  function leagueKey_(sport, league) {
+    const raw = key_([sport, league].filter(Boolean).join(" "));
+    if (/(ncaaf|cfb|college-football|ncaa-football)/.test(raw)) return "ncaaf";
+    if (/(nfl|football)/.test(raw)) return "nfl";
+    if (/(ncaab|cbb|college-basketball|ncaa-basketball)/.test(raw)) return "ncaab";
+    if (/(nba|basketball)/.test(raw)) return "nba";
+    if (/(mlb|baseball)/.test(raw)) return "mlb";
+    if (/(nhl|hockey)/.test(raw)) return "nhl";
+    if (/(mls|epl|uefa|soccer|premier-league)/.test(raw)) return "soccer";
+    if (/(f1|formula|nascar|indycar|racing|motorsport)/.test(raw)) return "racing";
+    if (/(pga|lpga|golf)/.test(raw)) return "golf";
+    return "sports";
+  }
+
+  function colors_(gameId, provided, sport, league) {
+    const bundle = appearance_(gameId, provided) || {};
+    const auto = AUTO_PALETTES[leagueKey_(sport, league)] || AUTO_PALETTES.sports;
+
+    return {
+      primary: safeColor_(first_(bundle, [
+        "SportsPrimaryColor", "sportsPrimaryColor", "PrimaryColor", "primaryColor", "primary"
+      ])) || auto.primary,
+      secondary: safeColor_(first_(bundle, [
+        "SportsSecondaryColor", "sportsSecondaryColor", "SecondaryColor", "secondaryColor", "secondary"
+      ])) || auto.secondary,
+      accent: safeColor_(first_(bundle, [
+        "SportsAccentColor", "sportsAccentColor", "AccentColor", "accentColor", "accent"
+      ])) || auto.accent
+    };
+  }
+
+  function assets_(gameId, provided) {
+    const bundle = appearance_(gameId, provided) || {};
+    return {
+      hero: text_(first_(bundle, [
+        "SportsHeroImageUrl", "sportsHeroImageUrl", "HeroImageUrl", "heroImageUrl",
+        "BackgroundImageUrl", "backgroundImageUrl", "BannerImageUrl", "bannerImageUrl"
+      ])),
+      logo: text_(first_(bundle, [
+        "SportsLogoUrl", "sportsLogoUrl", "LogoImageUrl", "logoImageUrl",
+        "LogoUrl", "logoUrl"
+      ]))
+    };
+  }
+
+  function styleAttr_(gameId, provided, sport, league) {
+    const colors = colors_(gameId, provided, sport, league);
+    return 'style="--sports-rich-primary:' + colors.primary +
+      ';--sports-rich-secondary:' + colors.secondary +
+      ';--sports-rich-accent:' + colors.accent + '"';
+  }
+
+  function img_(source, options) {
+    if (!source || typeof platformImgHtml !== "function") return "";
+    return platformImgHtml(source, options || {});
+  }
+
+  function bgAttrs_(source, cssVariable) {
+    if (!source || typeof platformBackgroundAttrs !== "function") return "";
+    return platformBackgroundAttrs(source, {
+      variant: "hero",
+      cssVariable: cssVariable || "--sports-rich-hero-image",
+      eager: true
+    });
+  }
+
+  function process_(root) {
+    const canQuery = typeof document !== "undefined" && document && typeof document.querySelector === "function";
+    const node = typeof root === "string" ? (canQuery ? document.querySelector(root) : null) : root;
+    if (
+      node &&
+      global.PlatformImageEngine &&
+      typeof global.PlatformImageEngine.process === "function"
+    ) {
+      global.PlatformImageEngine.process(node);
+    }
+  }
+
+  function afterMount_(selector, callback) {
+    if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+    setTimeout(function() {
+      if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+      const node = document.querySelector(selector);
+      if (!node) return;
+      process_(node);
+      if (typeof callback === "function") callback(node);
+    }, 0);
+  }
+
+  function formatKickoff_(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return text_(value);
+    try {
+      return d.toLocaleString([], {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    } catch (err) {
+      return d.toLocaleString();
+    }
+  }
+
+  function teamLogoUrl_(abbr, league) {
+    const key = text_(abbr).toUpperCase();
+    if (!key) return "";
+    const leagueKey = key_(league || "nfl");
+    if (leagueKey.indexOf("nfl") !== -1 || !leagueKey) {
+      const slug = key === "WAS" ? "wsh" : key.toLowerCase();
+      return "https://a.espncdn.com/i/teamlogos/nfl/500/" + encodeURIComponent(slug) + ".png";
+    }
+    return "";
+  }
+
+  global.PATTCSportsRich = {
+    prepare: prepare_,
+    remember: remember_,
+    cached: cached_,
+    appearance: appearance_,
+    layoutValue: layoutValue_,
+    isRichValue: isRichValue_,
+    isCleanValue: isCleanValue_,
+    isRich: isRich_,
+    colors: colors_,
+    assets: assets_,
+    styleAttr: styleAttr_,
+    img: img_,
+    bgAttrs: bgAttrs_,
+    process: process_,
+    afterMount: afterMount_,
+    formatKickoff: formatKickoff_,
+    teamLogoUrl: teamLogoUrl_,
+    leagueKey: leagueKey_
+  };
+})(typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this));
+
+/* =========================================================
+   TEAM FANTASY — SPORTS RICH ART R3
+   PATTC Team Fantasy uses NFL TEAMS by position, not players.
+
+   Existing state/save/lock/Random Pick/Auto Pick/game-day mechanics
+   remain the source of truth.
+   ========================================================= */
+
+function sportsRichTfSafeColor_(value) {
+  const raw = String(value || "").trim();
+  return /^#[0-9a-f]{6}$/i.test(raw) ? raw : "";
+}
+
+function sportsRichTfGameId_() {
+  const state = window.TEAM_FANTASY_STATE || {};
+  return String(
+    state.gameId ||
+    (typeof getFrontendGameId === "function" ? getFrontendGameId() : "") ||
+    ""
+  ).trim();
+}
+
+function sportsRichTfEnabled_(state) {
+  state = state || window.TEAM_FANTASY_STATE || {};
+  const gameId = String(state.gameId || sportsRichTfGameId_()).trim();
+  return !!(
+    window.PATTCSportsRich &&
+    PATTCSportsRich.isRich(gameId, state.appearance || null)
+  );
+}
+
+function sportsRichTfSelectedTeam_(slot) {
+  if (!slot || !slot.pick) return null;
+  return (slot.teams || []).find(function(team) {
+    return String(team && team.abbr || "").toUpperCase() ===
+      String(slot.pick.teamAbbr || "").toUpperCase();
+  }) || null;
+}
+
+function sportsRichTfUsage_(team) {
+  team = team || {};
+  const used = Math.max(0, Number(team.uses || 0));
+  const left = Math.max(0, Number(team.usesRemaining || 0));
+  const limit = Math.max(used + left, Number(team.useLimit || 0));
+  return {
+    used: used,
+    left: left,
+    limit: limit,
+    text: limit ? used + "/" + limit + " used · " + left + " left" : (left + " left")
+  };
+}
+
+function sportsRichTfTeamColor_(team) {
+  team = team || {};
+  return sportsRichTfSafeColor_(
+    team.color ||
+    team.primaryColor ||
+    team.teamColor ||
+    team.brandColor ||
+    ""
+  );
+}
+
+function sportsRichTfLogo_(abbr, className, critical) {
+  const url = typeof teamFantasyTeamLogoUrl_ === "function"
+    ? teamFantasyTeamLogoUrl_(abbr)
+    : PATTCSportsRich.teamLogoUrl(abbr, "NFL");
+
+  return PATTCSportsRich.img(url, {
+    className: className || "tf-rich-team-logo",
+    variant: "logo",
+    alt: String(abbr || "") + " logo",
+    critical: critical === true
+  });
+}
+
+function sportsRichTfSlotHtml_(state, lineup, slot) {
+  const entry = lineup.entry || {};
+  const pick = slot.pick || null;
+  const team = sportsRichTfSelectedTeam_(slot);
+  const position = String(slot.position || "");
+  const label = String(slot.label || position || "Position");
+  const entryId = String(entry.entryId || "");
+  const locked = slot.locked === true;
+  const method = pick && typeof teamFantasyPickMethodTag_ === "function"
+    ? teamFantasyPickMethodTag_(pick.pickMethod)
+    : "";
+  const opponent = team && typeof teamFantasyOpponentText_ === "function"
+    ? teamFantasyOpponentText_(team)
+    : "";
+  const game = team && team.game || {};
+  const kickoff = PATTCSportsRich.formatKickoff(
+    game.kickoff ||
+    game.gameDateTime ||
+    game.dateTime ||
+    team && team.kickoff ||
+    ""
+  );
+  const usage = sportsRichTfUsage_(team || {});
+  const teamColor = sportsRichTfTeamColor_(team);
+  const slotId = "tf-" + String(entryId).replace(/[^a-z0-9_-]/gi, "-") + "-" + position;
+
+  if (!pick) {
+    return `<article
+      class="tf-slot tf-slot-compact tf-rich-slot needs-pick"
+      id="${teamFantasyEscape_(slotId)}"
+      data-entry-id="${teamFantasyEscape_(entryId)}"
+      data-position="${teamFantasyEscape_(position)}"
+      data-missing="true"
+    >
+      <div class="tf-rich-slot-top">
+        <span class="tf-rich-position">${teamFantasyEscape_(label)}</span>
+        <span class="tf-rich-slot-state">OPEN</span>
+      </div>
+      <button
+        type="button"
+        class="tf-team-picker-button tf-rich-empty-slot"
+        onclick="teamFantasyOpenTeamPicker_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}')"
+        ${locked ? "disabled" : ""}
+      >
+        <span class="tf-rich-empty-plus">＋</span>
+        <strong>${locked ? "No team saved" : "Choose NFL team"}</strong>
+        <small>${locked ? "Kickoff lock has passed" : "Team use is tracked for this position"}</small>
+      </button>
+      ${!locked ? `<label class="tf-bulk-select tf-rich-bulk" title="Include ${teamFantasyEscape_(label)} in Random Pick / Auto Pick">
+        <input type="checkbox" data-tf-bulk-position="1" data-entry-id="${teamFantasyEscape_(entryId)}" data-position="${teamFantasyEscape_(position)}" checked>
+        <span>Include in fill actions</span>
+      </label>` : ""}
+    </article>`;
+  }
+
+  const logo = sportsRichTfLogo_(pick.teamAbbr, "tf-rich-team-logo");
+  const score = pick.points !== undefined && pick.points !== null
+    ? Number(pick.points)
+    : (slot.points !== undefined && slot.points !== null ? Number(slot.points) : null);
+  const scoreHtml = Number.isFinite(score)
+    ? `<span class="tf-rich-slot-score">${teamFantasyScore_(score)} <small>pts</small></span>`
+    : "";
+  const style = teamColor ? ` style="--tf-team-color:${teamFantasyEscape_(teamColor)}"` : "";
+
+  return `<article
+    class="tf-slot tf-slot-compact tf-rich-slot has-pick ${locked ? "is-locked" : "is-editable"}"
+    id="${teamFantasyEscape_(slotId)}"
+    data-entry-id="${teamFantasyEscape_(entryId)}"
+    data-position="${teamFantasyEscape_(position)}"
+    data-missing="false"
+    ${style}
+  >
+    <div class="tf-rich-slot-top">
+      <span class="tf-rich-position">${teamFantasyEscape_(label)}</span>
+      <span class="tf-rich-slot-state ${locked ? "is-locked" : "is-picked"}">${locked ? "LOCKED" : "PICKED"}</span>
+    </div>
+
+    <button
+      type="button"
+      class="tf-team-picker-button tf-rich-team-button"
+      ${locked ? "disabled" : `onclick="teamFantasyOpenTeamPicker_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}')"`}
+    >
+      <span class="tf-rich-logo-wrap">${logo}</span>
+      <span class="tf-rich-team-copy">
+        <span class="tf-rich-team-line">
+          <strong>${teamFantasyEscape_(pick.teamAbbr || "")}</strong>
+          ${method ? `<span class="tf-pick-method">${teamFantasyEscape_(method)}</span>` : ""}
+          ${scoreHtml}
+        </span>
+        <span class="tf-rich-matchup">${teamFantasyEscape_(opponent || "Matchup pending")}</span>
+        ${kickoff ? `<small>${teamFantasyEscape_(kickoff)}</small>` : ""}
+      </span>
+      <span class="tf-rich-chevron">${locked ? "🔒" : "›"}</span>
+    </button>
+
+    <div class="tf-rich-usage ${usage.left <= 0 ? "is-exhausted" : usage.left === 1 ? "is-low" : ""}">
+      <span>Season use</span>
+      <strong>${teamFantasyEscape_(usage.text)}</strong>
+    </div>
+  </article>`;
+}
+
+function sportsRichTfPickerHtml_(entryId, position) {
+  const slot = typeof teamFantasyFindSlot_ === "function"
+    ? teamFantasyFindSlot_(entryId, position)
+    : null;
+  if (!slot || slot.locked) return "";
+
+  const teams = typeof teamFantasyPickerTeams_ === "function"
+    ? teamFantasyPickerTeams_(slot)
+    : (slot.teams || []);
+  const current = slot.pick ? String(slot.pick.teamAbbr || "") : "";
+  const settings = (window.TEAM_FANTASY_STATE || {}).settings || {};
+
+  const rows = teams.map(function(team) {
+    const bye = typeof teamFantasyPickerIsBye_ === "function"
+      ? teamFantasyPickerIsBye_(team)
+      : false;
+    const usage = sportsRichTfUsage_(team);
+    const selected = current === String(team.abbr || "");
+    const color = sportsRichTfTeamColor_(team);
+    const style = color ? ` style="--tf-team-color:${teamFantasyEscape_(color)}"` : "";
+    const logo = sportsRichTfLogo_(team.abbr, "tf-rich-picker-logo");
+    const opponent = bye
+      ? "BYE"
+      : (typeof teamFantasyOpponentText_ === "function" ? teamFantasyOpponentText_(team) : "");
+    const game = team.game || {};
+    const kickoff = PATTCSportsRich.formatKickoff(
+      game.kickoff || game.gameDateTime || game.dateTime || ""
+    );
+
+    return `<button
+      type="button"
+      class="tf-picker-team tf-rich-picker-team ${selected ? "is-selected" : ""} ${bye ? "is-bye" : ""} ${usage.left <= 0 ? "is-exhausted" : usage.left === 1 ? "uses-left-1" : ""}"
+      ${style}
+      ${bye ? `disabled aria-disabled="true"` : `onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"`}
+    >
+      <span class="tf-rich-picker-logo-wrap">${logo}</span>
+      <span class="tf-rich-picker-main">
+        <strong>${teamFantasyEscape_(team.abbr || team.name || "")}</strong>
+        <small>${teamFantasyEscape_(opponent || "Opponent TBD")}${kickoff ? " · " + teamFantasyEscape_(kickoff) : ""}</small>
+      </span>
+      <span class="tf-rich-picker-usage">
+        <strong>${teamFantasyEscape_(usage.left)}</strong>
+        <small>uses left</small>
+      </span>
+    </button>`;
+  }).join("");
+
+  const fillActions = !slot.pick ? `<div class="tf-picker-fill-actions tf-rich-picker-actions">
+    ${settings.allowRandomPick ? `<button type="button" class="tf-button secondary" onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',true)">Random Pick ${teamFantasyEscape_(slot.label || position)}</button>` : ""}
+    ${settings.allowSmartAutoPick ? `<button type="button" class="tf-button" onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',false)">Auto Pick ${teamFantasyEscape_(slot.label || position)}</button>` : ""}
+    <button type="button" class="tf-help-button" onclick="teamFantasyOpenFillHelp_()">?</button>
+  </div>` : "";
+
+  return `<div id="tfTeamPickerOverlay" class="tf-picker-overlay tf-rich-picker-overlay" role="presentation" onclick="if(event.target===this)teamFantasyCloseTeamPicker_()">
+    <section class="tf-picker-sheet tf-rich-picker-sheet" role="dialog" aria-modal="true" aria-label="Choose ${teamFantasyEscape_(slot.label || position)} team">
+      <div class="tf-picker-head tf-rich-picker-head">
+        <div>
+          <span class="sports-rich-kicker">NFL TEAM FANTASY</span>
+          <strong>${teamFantasyEscape_(slot.label || position)}</strong>
+          <small>Choose a team with season usage still available.</small>
+        </div>
+        <button type="button" class="tf-picker-close" onclick="teamFantasyCloseTeamPicker_()" aria-label="Close">×</button>
+      </div>
+      <div class="tf-picker-list tf-rich-picker-list">${rows || `<div class="tf-muted">No teams available.</div>`}</div>
+      ${fillActions}
+    </section>
+  </div>`;
+}
+
+function sportsRichTfSummaryHtml_(state) {
+  state = state || window.TEAM_FANTASY_STATE || {};
+  const lineups = Array.isArray(state.lineups) ? state.lineups : [];
+  let required = 0;
+  let picked = 0;
+  let locked = 0;
+
+  lineups.forEach(function(lineup) {
+    required += Number(lineup.required || (lineup.slots || []).length || 0);
+    picked += Number(lineup.picked || (lineup.slots || []).filter(function(slot){ return !!slot.pick; }).length || 0);
+    locked += (lineup.slots || []).filter(function(slot){ return slot.locked === true; }).length;
+  });
+
+  const pct = required ? Math.round((picked / required) * 100) : 0;
+  const gameDay = window.TEAM_FANTASY_GAME_DAY || {};
+  const viewer = (gameDay.competitors || []).find(function(row) { return row.isViewer; }) || {};
+  const counts = viewer.counts || viewer.statusCounts || {};
+  const weekScore = viewer.points !== undefined && viewer.points !== null
+    ? teamFantasyScore_(viewer.points)
+    : "—";
+  const weekRank = Number(viewer.weekRank || 0);
+  const open = Math.max(0, required - picked);
+  const stateLabel = required && picked >= required
+    ? "COMPLETE FOR NOW"
+    : picked
+      ? "SAVED / IN PROGRESS"
+      : "OPEN";
+
+  return `<section id="tfRichWeeklySummary" class="tf-rich-week-summary">
+    <div class="tf-rich-week-main">
+      <span class="sports-rich-kicker">WEEK ${Number(state.week || 0)} LINEUP</span>
+      <strong>${picked}/${required || 8} positions set</strong>
+      <div class="sports-rich-progress"><span style="width:${pct}%"></span></div>
+      <small>${open ? open + " position" + (open === 1 ? "" : "s") + " still open" : "All eight NFL-team slots are set"}</small>
+    </div>
+
+    <div class="tf-rich-score-stat">
+      <span>Weekly score</span>
+      <strong>${weekScore}</strong>
+      <small>${weekRank ? "#" + weekRank + " this week" : "updates from game-day scoring"}</small>
+    </div>
+
+    <div class="tf-rich-live-stat">
+      <span>Game status</span>
+      <strong>${Number(counts.final || 0)}F · ${Number(counts.live || 0)}L · ${Number(counts.upcoming || 0)}U</strong>
+      <small>${locked} slot${locked === 1 ? "" : "s"} locked</small>
+    </div>
+
+    <span class="sports-rich-state ${stateLabel === "COMPLETE FOR NOW" ? "is-complete" : ""}">${stateLabel}</span>
+  </section>`;
+}
+
+function sportsRichTfDecoratePageHtml_(html, state) {
+  const gameId = String(state && state.gameId || sportsRichTfGameId_());
+  const appearance = PATTCSportsRich.appearance(gameId, state && state.appearance || null);
+  const assets = PATTCSportsRich.assets(gameId, appearance);
+  const style = PATTCSportsRich.styleAttr(gameId, appearance, "football", "NFL");
+  const bg = PATTCSportsRich.bgAttrs(assets.hero, "--sports-rich-hero-image");
+
+  let output = String(html || "")
+    .replace(
+      '<div class="page tf-page">',
+      `<div class="page tf-page sports-rich-team-fantasy" ${style}>`
+    )
+    .replace(
+      '<header class="tf-hero card">',
+      `<header class="tf-hero card tf-rich-hero sports-rich-hero-bg" ${bg}>`
+    )
+    .replace(new RegExp("Random " + "Fill Selected", "g"), "Random Pick Selected")
+    .replace(/Random\/Auto Fill Selected/g, "Random Pick / Auto Pick");
+
+  output = output.replace(
+    "</header>",
+    "</header>" + sportsRichTfSummaryHtml_(state)
+  );
+
+  return output;
+}
+
+function sportsRichTfUpdateSummary_() {
+  if (!sportsRichTfEnabled_()) return;
+  const current = document.getElementById("tfRichWeeklySummary");
+  if (!current) return;
+  const wrap = document.createElement("div");
+  wrap.innerHTML = sportsRichTfSummaryHtml_(window.TEAM_FANTASY_STATE || {}).trim();
+  if (wrap.firstElementChild) current.replaceWith(wrap.firstElementChild);
+  PATTCSportsRich.process(document.querySelector(".sports-rich-team-fantasy"));
+}
+
+/* ---------- Rich-only renderer wrappers ---------- */
+
+const SPORTS_RICH_TF_ORIGINAL_SLOT_ = teamFantasyRenderSlot_;
+teamFantasyRenderSlot_ = function(state, lineup, slot) {
+  if (!sportsRichTfEnabled_(state)) {
+    return SPORTS_RICH_TF_ORIGINAL_SLOT_(state, lineup, slot);
+  }
+  return sportsRichTfSlotHtml_(state, lineup, slot);
+};
+
+const SPORTS_RICH_TF_ORIGINAL_ORDER_ = teamFantasyPositionDisplayOrder_;
+teamFantasyPositionDisplayOrder_ = function() {
+  if (sportsRichTfEnabled_()) {
+    return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"];
+  }
+  return SPORTS_RICH_TF_ORIGINAL_ORDER_();
+};
+
+const SPORTS_RICH_TF_ORIGINAL_PICKER_ = teamFantasyOpenTeamPicker_;
+teamFantasyOpenTeamPicker_ = function(entryId, position) {
+  if (!sportsRichTfEnabled_()) {
+    return SPORTS_RICH_TF_ORIGINAL_PICKER_(entryId, position);
+  }
+  const slot = teamFantasyFindSlot_(entryId, position);
+  if (!slot || slot.locked) return;
+  teamFantasyCloseTeamPicker_();
+  document.body.insertAdjacentHTML("beforeend", sportsRichTfPickerHtml_(entryId, position));
+  PATTCSportsRich.process(document.getElementById("tfTeamPickerOverlay"));
+};
+
+const SPORTS_RICH_TF_ORIGINAL_GAMEDAY_RENDER_ = teamFantasyRenderGameDayIntoMount_;
+teamFantasyRenderGameDayIntoMount_ = function() {
+  const result = SPORTS_RICH_TF_ORIGINAL_GAMEDAY_RENDER_.apply(this, arguments);
+  sportsRichTfUpdateSummary_();
+  return result;
+};
+
+const SPORTS_RICH_TF_ORIGINAL_PAGE_ = renderTeamFantasyPage;
+renderTeamFantasyPage = async function() {
+  const gameId = typeof getFrontendGameId === "function" ? getFrontendGameId() : "";
+  await PATTCSportsRich.prepare(gameId);
+
+  const html = await SPORTS_RICH_TF_ORIGINAL_PAGE_.apply(this, arguments);
+  const state = window.TEAM_FANTASY_STATE || {};
+  if (!PATTCSportsRich.isRich(gameId, state.appearance || null)) return html;
+
+  const output = sportsRichTfDecoratePageHtml_(html, state);
+  PATTCSportsRich.afterMount(".sports-rich-team-fantasy", sportsRichTfUpdateSummary_);
+  return output;
+};

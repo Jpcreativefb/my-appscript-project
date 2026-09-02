@@ -335,3 +335,765 @@ async function renderSurvivorPage() {
     roundHtml + survivorHistory_(payload) + survivorStandings_(payload) +
   '</div>';
 }
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED FRONTEND RUNTIME
+   Art R3
+
+   Clean / Current remains the default.
+   Sports Rich activates only from the existing per-game Appearance
+   assignment. No second settings/backend system is created.
+
+   Presentation-only. No Sports Engine, scoring, odds, settlement,
+   game rules, saves, locks, auth, or automation logic lives here.
+   ========================================================= */
+(function initializePattcSportsRich_(global) {
+  "use strict";
+
+  if (!global || global.PATTCSportsRich) return;
+
+  const cache = Object.create(null);
+  const inflight = Object.create(null);
+
+  const AUTO_PALETTES = Object.freeze({
+    sports: { primary:"#2398ff", secondary:"#0b6f91", accent:"#76c8ff" },
+    nfl: { primary:"#168bff", secondary:"#16834b", accent:"#83cbff" },
+    ncaaf: { primary:"#b82d3d", secondary:"#bb8a25", accent:"#f0c963" },
+    nba: { primary:"#ef7b2d", secondary:"#b9363e", accent:"#ffb05f" },
+    ncaab: { primary:"#2878d7", secondary:"#e97828", accent:"#71b9ff" },
+    mlb: { primary:"#326fd1", secondary:"#b52f42", accent:"#77b4ff" },
+    nhl: { primary:"#52b9e8", secondary:"#1d7d9b", accent:"#b0ebff" },
+    soccer: { primary:"#27b77a", secondary:"#128eaa", accent:"#71efc2" },
+    racing: { primary:"#e53b43", secondary:"#d49b22", accent:"#ffd75a" },
+    golf: { primary:"#26945a", secondary:"#987927", accent:"#dfc764" }
+  });
+
+  function text_(value) {
+    return value == null ? "" : String(value).trim();
+  }
+
+  function key_(value) {
+    return text_(value).toLowerCase().replace(/[_/\s]+/g, "-");
+  }
+
+  function object_(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+
+  function parseObject_(value) {
+    if (!value) return {};
+    if (value && typeof value === "object") return value;
+    try {
+      const parsed = JSON.parse(String(value));
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function appearanceRoot_(bundle) {
+    bundle = object_(bundle);
+    return bundle.appearance && typeof bundle.appearance === "object"
+      ? bundle.appearance
+      : bundle;
+  }
+
+  function sources_(bundle) {
+    const root = appearanceRoot_(bundle);
+    const override = parseObject_(
+      root.ThemeOverrideJSON ||
+      root.themeOverrideJSON ||
+      root.themeOverrideJson ||
+      root.ThemeOverride ||
+      root.themeOverride ||
+      ""
+    );
+
+    return [
+      override,
+      object_(override.sports),
+      object_(override.colors),
+      root,
+      object_(root.sports),
+      object_(root.colors),
+      object_(root.theme),
+      object_(root.theme && root.theme.sports),
+      object_(root.theme && root.theme.colors),
+      object_(root.resolvedTheme),
+      object_(root.resolvedTheme && root.resolvedTheme.colors),
+      object_(root.assignment),
+      bundle
+    ].filter(function(source) {
+      return source && typeof source === "object";
+    });
+  }
+
+  function first_(bundle, keys) {
+    const sources = sources_(bundle);
+    for (let s = 0; s < sources.length; s += 1) {
+      for (let k = 0; k < keys.length; k += 1) {
+        const value = sources[s][keys[k]];
+        if (value !== undefined && value !== null && text_(value)) return value;
+      }
+    }
+    return "";
+  }
+
+  function safeColor_(value) {
+    const raw = text_(value);
+    if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
+    if (/^(rgb|rgba|hsl|hsla)\([0-9.,%\s+-]+\)$/i.test(raw)) return raw;
+    return "";
+  }
+
+  function layoutValue_(bundle) {
+    return key_(first_(bundle, [
+      "SportsLayoutTemplate",
+      "sportsLayoutTemplate",
+      "SportsLayout",
+      "sportsLayout",
+      "SportsPlayerLayout",
+      "sportsPlayerLayout",
+      "LayoutTemplate",
+      "layoutTemplate"
+    ]));
+  }
+
+  function isRichValue_(value) {
+    const raw = key_(value);
+    return (
+      raw === "sports-rich" ||
+      raw === "rich" ||
+      raw === "art" ||
+      raw === "sports-art" ||
+      raw === "rich-art" ||
+      raw === "sports-rich-art"
+    );
+  }
+
+  function isCleanValue_(value) {
+    const raw = key_(value);
+    return (
+      !raw ||
+      raw === "clean" ||
+      raw === "current" ||
+      raw === "default" ||
+      raw === "classic" ||
+      raw === "legacy"
+    );
+  }
+
+  function remember_(gameId, bundle) {
+    const id = text_(gameId);
+    if (!id || !bundle || typeof bundle !== "object") return bundle || null;
+    cache[id] = bundle;
+    try {
+      sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(bundle));
+    } catch (err) {}
+    return bundle;
+  }
+
+  function cached_(gameId) {
+    const id = text_(gameId);
+    if (!id) return null;
+    if (cache[id]) return cache[id];
+
+    try {
+      const raw = sessionStorage.getItem("pattcGameAppearance:" + id);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          cache[id] = parsed;
+          return parsed;
+        }
+      }
+    } catch (err) {}
+
+    return null;
+  }
+
+  async function prepare_(gameId, existingBundle) {
+    const id = text_(gameId);
+    if (!id) return existingBundle || null;
+
+    if (existingBundle && typeof existingBundle === "object") {
+      return remember_(id, existingBundle);
+    }
+
+    const cached = cached_(id);
+
+    // Roy integration: Admin Appearance layout switching must be visible after
+    // a normal PWA refresh. When the live Appearance API exists, request the
+    // current per-GameId assignment instead of letting sessionStorage pin an
+    // older Clean/Rich choice. Cached Appearance remains an offline fallback.
+    if (typeof apiGetGameAppearance !== "function") return cached;
+
+    if (!inflight[id]) {
+      inflight[id] = Promise.resolve(apiGetGameAppearance(id))
+        .then(function(result) {
+          if (result && result.success !== false) return remember_(id, result);
+          return null;
+        })
+        .catch(function(err) {
+          console.warn("Sports Rich Appearance load skipped", err);
+          return null;
+        })
+        .finally(function() {
+          delete inflight[id];
+        });
+    }
+
+    return inflight[id];
+  }
+
+  function appearance_(gameId, provided) {
+    return provided || cached_(gameId) || null;
+  }
+
+  function isRich_(gameId, provided) {
+    const bundle = appearance_(gameId, provided);
+    if (!bundle) return false;
+    return isRichValue_(layoutValue_(bundle));
+  }
+
+  function leagueKey_(sport, league) {
+    const raw = key_([sport, league].filter(Boolean).join(" "));
+    if (/(ncaaf|cfb|college-football|ncaa-football)/.test(raw)) return "ncaaf";
+    if (/(nfl|football)/.test(raw)) return "nfl";
+    if (/(ncaab|cbb|college-basketball|ncaa-basketball)/.test(raw)) return "ncaab";
+    if (/(nba|basketball)/.test(raw)) return "nba";
+    if (/(mlb|baseball)/.test(raw)) return "mlb";
+    if (/(nhl|hockey)/.test(raw)) return "nhl";
+    if (/(mls|epl|uefa|soccer|premier-league)/.test(raw)) return "soccer";
+    if (/(f1|formula|nascar|indycar|racing|motorsport)/.test(raw)) return "racing";
+    if (/(pga|lpga|golf)/.test(raw)) return "golf";
+    return "sports";
+  }
+
+  function colors_(gameId, provided, sport, league) {
+    const bundle = appearance_(gameId, provided) || {};
+    const auto = AUTO_PALETTES[leagueKey_(sport, league)] || AUTO_PALETTES.sports;
+
+    return {
+      primary: safeColor_(first_(bundle, [
+        "SportsPrimaryColor", "sportsPrimaryColor", "PrimaryColor", "primaryColor", "primary"
+      ])) || auto.primary,
+      secondary: safeColor_(first_(bundle, [
+        "SportsSecondaryColor", "sportsSecondaryColor", "SecondaryColor", "secondaryColor", "secondary"
+      ])) || auto.secondary,
+      accent: safeColor_(first_(bundle, [
+        "SportsAccentColor", "sportsAccentColor", "AccentColor", "accentColor", "accent"
+      ])) || auto.accent
+    };
+  }
+
+  function assets_(gameId, provided) {
+    const bundle = appearance_(gameId, provided) || {};
+    return {
+      hero: text_(first_(bundle, [
+        "SportsHeroImageUrl", "sportsHeroImageUrl", "HeroImageUrl", "heroImageUrl",
+        "BackgroundImageUrl", "backgroundImageUrl", "BannerImageUrl", "bannerImageUrl"
+      ])),
+      logo: text_(first_(bundle, [
+        "SportsLogoUrl", "sportsLogoUrl", "LogoImageUrl", "logoImageUrl",
+        "LogoUrl", "logoUrl"
+      ]))
+    };
+  }
+
+  function styleAttr_(gameId, provided, sport, league) {
+    const colors = colors_(gameId, provided, sport, league);
+    return 'style="--sports-rich-primary:' + colors.primary +
+      ';--sports-rich-secondary:' + colors.secondary +
+      ';--sports-rich-accent:' + colors.accent + '"';
+  }
+
+  function img_(source, options) {
+    if (!source || typeof platformImgHtml !== "function") return "";
+    return platformImgHtml(source, options || {});
+  }
+
+  function bgAttrs_(source, cssVariable) {
+    if (!source || typeof platformBackgroundAttrs !== "function") return "";
+    return platformBackgroundAttrs(source, {
+      variant: "hero",
+      cssVariable: cssVariable || "--sports-rich-hero-image",
+      eager: true
+    });
+  }
+
+  function process_(root) {
+    const canQuery = typeof document !== "undefined" && document && typeof document.querySelector === "function";
+    const node = typeof root === "string" ? (canQuery ? document.querySelector(root) : null) : root;
+    if (
+      node &&
+      global.PlatformImageEngine &&
+      typeof global.PlatformImageEngine.process === "function"
+    ) {
+      global.PlatformImageEngine.process(node);
+    }
+  }
+
+  function afterMount_(selector, callback) {
+    if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+    setTimeout(function() {
+      if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+      const node = document.querySelector(selector);
+      if (!node) return;
+      process_(node);
+      if (typeof callback === "function") callback(node);
+    }, 0);
+  }
+
+  function formatKickoff_(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return text_(value);
+    try {
+      return d.toLocaleString([], {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    } catch (err) {
+      return d.toLocaleString();
+    }
+  }
+
+  function teamLogoUrl_(abbr, league) {
+    const key = text_(abbr).toUpperCase();
+    if (!key) return "";
+    const leagueKey = key_(league || "nfl");
+    if (leagueKey.indexOf("nfl") !== -1 || !leagueKey) {
+      const slug = key === "WAS" ? "wsh" : key.toLowerCase();
+      return "https://a.espncdn.com/i/teamlogos/nfl/500/" + encodeURIComponent(slug) + ".png";
+    }
+    return "";
+  }
+
+  global.PATTCSportsRich = {
+    prepare: prepare_,
+    remember: remember_,
+    cached: cached_,
+    appearance: appearance_,
+    layoutValue: layoutValue_,
+    isRichValue: isRichValue_,
+    isCleanValue: isCleanValue_,
+    isRich: isRich_,
+    colors: colors_,
+    assets: assets_,
+    styleAttr: styleAttr_,
+    img: img_,
+    bgAttrs: bgAttrs_,
+    process: process_,
+    afterMount: afterMount_,
+    formatKickoff: formatKickoff_,
+    teamLogoUrl: teamLogoUrl_,
+    leagueKey: leagueKey_
+  };
+})(typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this));
+
+/* =========================================================
+   SURVIVOR FOOTBALL + KING OF THE HILL — SPORTS RICH ART R3
+
+   Sports Survivor remains a weekly selection game.
+   King of the Hill remains passive score-strike elimination.
+
+   Existing save/reuse/ATS/lock/elimination/strike calculations and
+   source-game mechanics remain authoritative.
+   ========================================================= */
+
+function sportsRichSurvivorGameId_() {
+  return String(
+    (window.SURVIVOR_PAGE_STATE && SURVIVOR_PAGE_STATE.gameId) ||
+    (typeof getFrontendGameId === "function" ? getFrontendGameId() : "") ||
+    ""
+  ).trim();
+}
+
+function sportsRichSurvivorEnabled_(payload) {
+  const gameId = sportsRichSurvivorGameId_();
+  return !!(
+    payload &&
+    (payload.sportsMode === true || payload.mode === "king-of-the-hill") &&
+    window.PATTCSportsRich &&
+    PATTCSportsRich.isRich(gameId, payload.appearance || null)
+  );
+}
+
+function sportsRichSurvivorLogo_(nominee) {
+  nominee = nominee || {};
+  let source =
+    nominee.image ||
+    nominee.imageUrl ||
+    nominee.logoUrl ||
+    nominee.teamLogo ||
+    "";
+
+  if (!source) {
+    const abbr = String(nominee.abbr || nominee.teamAbbr || nominee.id || "").trim();
+    if (/^[A-Za-z]{2,4}$/.test(abbr)) {
+      source = PATTCSportsRich.teamLogoUrl(abbr, "NFL");
+    }
+  }
+
+  return PATTCSportsRich.img(source, {
+    className: "survivor-rich-team-logo",
+    variant: "logo",
+    alt: (nominee.name || nominee.id || "Team") + " logo"
+  });
+}
+
+function sportsRichSurvivorChoice_(nominee, round) {
+  nominee = nominee || {};
+  round = round || {};
+
+  const selectedIds = typeof survivorSelectedIds_ === "function"
+    ? survivorSelectedIds_().map(String)
+    : [];
+  const id = String(nominee.id || "");
+  const selected = selectedIds.indexOf(id) !== -1;
+  const unavailable = nominee.eligible === false && !selected;
+  const disabled = !round.canPick || unavailable;
+  const record = nominee.teamRecord ? "(" + survivorPageEscape_(nominee.teamRecord) + ")" : "";
+  const opponentRecord = nominee.opponentRecord ? " (" + survivorPageEscape_(nominee.opponentRecord) + ")" : "";
+  const matchup = nominee.opponent
+    ? (String(nominee.side || "").toLowerCase() === "away" ? "@ " : "vs ") +
+      survivorPageEscape_(nominee.opponent) + opponentRecord
+    : "";
+  const spread = typeof survivorFormatLine_ === "function"
+    ? survivorFormatLine_(nominee.spread)
+    : "";
+  const odds = [];
+  if (spread) odds.push("Spread " + spread);
+  if (nominee.moneyline !== "" && nominee.moneyline !== null && nominee.moneyline !== undefined) {
+    odds.push("ML " + survivorPageEscape_(nominee.moneyline));
+  }
+
+  const used = Number(nominee.usedCount || 0);
+  const limit = Number(nominee.useLimit || 0);
+  const usesRemaining = limit > 0 ? Math.max(0, limit - used) : null;
+  const unavailableText = unavailable && typeof survivorUnavailableLabel_ === "function"
+    ? survivorUnavailableLabel_(nominee)
+    : "";
+
+  const logo = sportsRichSurvivorLogo_(nominee);
+  const idJs = String(id).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const teamJs = String(nominee.name || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+
+  return `<article class="survivor-rich-choice ${selected ? "is-selected" : ""} ${unavailable ? "is-unavailable" : ""}">
+    <button
+      type="button"
+      class="survivor-rich-choice-main"
+      data-survivor-id="${survivorPageEscape_(id)}"
+      ${disabled ? "disabled" : ""}
+      onclick="survivorSelect_('${idJs}')"
+    >
+      <span class="survivor-rich-logo-wrap">${logo || `<span class="survivor-rich-logo-fallback">🏈</span>`}</span>
+
+      <span class="survivor-rich-choice-copy">
+        <span class="survivor-rich-team-line">
+          <strong>${survivorPageEscape_(nominee.name || nominee.id || "Team")}</strong>
+          ${record ? `<small>${record}</small>` : ""}
+        </span>
+        <span class="survivor-rich-matchup">${matchup || "Opponent TBD"}</span>
+        ${nominee.kickoff ? `<small>${survivorPageEscape_(survivorFormatKickoff_(nominee.kickoff))}</small>` : ""}
+      </span>
+
+      <span class="survivor-rich-choice-meta">
+        ${odds.length ? `<b>${odds.join(" · ")}</b>` : ""}
+        ${limit > 0 ? `<span class="survivor-rich-use ${usesRemaining === 0 ? "is-zero" : usesRemaining === 1 ? "is-low" : ""}">${used}/${limit} used · ${usesRemaining} left</span>` : (used > 0 ? `<span class="survivor-rich-use">Used ${used}</span>` : "")}
+        ${unavailableText ? `<span class="survivor-rich-unavailable">${survivorPageEscape_(unavailableText)}</span>` : ""}
+        ${selected ? `<span class="survivor-rich-selected">✓ YOUR PICK</span>` : ""}
+      </span>
+    </button>
+
+    ${(SURVIVOR_PAGE_STATE.payload && SURVIVOR_PAGE_STATE.payload.settings && SURVIVOR_PAGE_STATE.payload.settings.showSchedule)
+      ? `<button type="button" class="survivor-schedule-toggle survivor-rich-schedule-toggle" onclick="survivorToggleSchedule_('${idJs}', '${teamJs}')">Team schedule ▾</button>
+         <div id="survivorSchedule_${survivorPageEscape_(id)}" class="survivor-team-schedule" hidden></div>`
+      : ""}
+  </article>`;
+}
+
+function sportsRichSurvivorCurrent_(payload) {
+  payload = payload || {};
+  const round = payload.currentRound;
+
+  if (!round) {
+    return `<section class="survivor-rich-current is-settled">
+      <span class="sports-rich-kicker">SURVIVE THIS WEEK</span>
+      <h2>${payload.winner ? "Season complete — you survived" : "All available weeks are settled"}</h2>
+      <p>${payload.winner ? "You reached the end of the Survivor run." : "There is no open weekly choice right now."}</p>
+    </section>`;
+  }
+
+  const required = Math.max(1, Number(round.requiredSelections || 1));
+  const selected = survivorSelectedIds_();
+  const rules = round.rules || {};
+  const twists = [];
+  if (rules.selectionRule === "any" && required > 1) twists.push("ANY ONE CAN SURVIVE");
+  if (rules.roadOnly) twists.push("ROAD TEAMS ONLY");
+  if (rules.underdogsOnly) twists.push("UNDERDOGS ONLY");
+  if (rules.divisionOnly) twists.push("DIVISION GAMES ONLY");
+  if (rules.againstSpread || rules.ats) twists.push("AGAINST THE SPREAD");
+  if (rules.confidence) twists.push("CONFIDENCE / RISK WEEK");
+
+  const choiceGrid = (round.nominees || [])
+    .map(function(nominee) {
+      return sportsRichSurvivorChoice_(nominee, round);
+    })
+    .join("");
+
+  const confidence = round.confidenceEnabled
+    ? `<label class="survivor-confidence-risk survivor-rich-confidence-risk">
+         <span>Confidence / risk</span>
+         <input id="survivorConfidenceRisk" type="number" min="0" max="${survivorPageEscape_(round.maxConfidenceRisk || 0)}" value="${survivorPageEscape_(round.confidencePoints || 0)}">
+         <small>Maximum ${survivorPageEscape_(round.maxConfidenceRisk || 0)} points</small>
+       </label>`
+    : "";
+
+  const action = round.canPick
+    ? `<div class="survivor-rich-save-row">
+         <button
+           id="survivorSaveButton"
+           class="button survivor-rich-save"
+           type="button"
+           onclick="survivorSaveCurrent_()"
+           ${selected.length === required ? "" : "disabled"}
+         >${((round.pickNomineeIds && round.pickNomineeIds.length) || round.pickNomineeId) ? "UPDATE SURVIVOR PICK" : "SAVE SURVIVOR PICK"}</button>
+         <span id="survivorSelectionCount" class="survivor-selection-count">${selected.length} / ${required} selected</span>
+         <span id="survivorSaveMessage" class="survivor-save-message"></span>
+       </div>`
+    : `<div class="survivor-rich-locked-note">🔒 This week is locked. Your saved choice is final.</div>`;
+
+  return `<section class="survivor-rich-current ${round.canPick ? "is-open" : "is-locked"}">
+    <div class="survivor-rich-current-head">
+      <div>
+        <span class="sports-rich-kicker">SURVIVE THIS WEEK</span>
+        <h2>Week ${survivorPageEscape_(round.week || round.round)} · ${survivorPageEscape_(round.name || "Choose your team")}</h2>
+        <p>Choose ${required} team${required===1 ? "" : "s"}. ${rules.selectionRule === "any" ? "At least one selection must succeed." : "Your selected team must survive the configured rule."}</p>
+      </div>
+      <span class="sports-rich-state ${round.canPick ? "" : "is-locked"}">${round.canPick ? "OPEN" : "LOCKED"}</span>
+    </div>
+
+    ${twists.length ? `<div class="survivor-rich-twist-strip">${twists.map(function(t){ return `<span>${survivorPageEscape_(t)}</span>`; }).join("")}</div>` : ""}
+
+    <div class="survivor-rich-choice-grid">${choiceGrid}</div>
+
+    ${confidence}
+    ${action}
+  </section>`;
+}
+
+function sportsRichSurvivorStatusStrip_(payload) {
+  payload = payload || {};
+  const alive = payload.alive !== false;
+  const lives = Number(payload.livesRemaining || 0);
+  const survived = Number(payload.roundsSurvived || 0);
+  const strikes = Number(payload.strikes || payload.wrongPicks || 0);
+  const maxLives = Number(payload.maxLives || payload.lives || 0);
+
+  return `<section class="survivor-rich-status-strip">
+    <div>
+      <span>Status</span>
+      <strong class="${alive ? "is-alive" : "is-out"}">${alive ? "ALIVE" : "ELIMINATED"}</strong>
+    </div>
+    <div>
+      <span>Weeks survived</span>
+      <strong>${survivorPageEscape_(survived)}</strong>
+    </div>
+    <div>
+      <span>${maxLives > 0 ? "Lives remaining" : "Losses / strikes"}</span>
+      <strong>${maxLives > 0 ? survivorPageEscape_(lives) : survivorPageEscape_(strikes)}</strong>
+    </div>
+    <div>
+      <span>Current week</span>
+      <strong>${survivorPageEscape_(payload.currentRound && (payload.currentRound.week || payload.currentRound.round) || "—")}</strong>
+    </div>
+  </section>`;
+}
+
+function sportsRichSurvivorPageHtml_(payload) {
+  payload = payload || {};
+  const gameId = sportsRichSurvivorGameId_();
+  const appearance = PATTCSportsRich.appearance(gameId, payload.appearance || null);
+  const assets = PATTCSportsRich.assets(gameId, appearance);
+  const streak = payload.mode === "streak-survivor";
+  const alive = payload.alive !== false;
+  const headline = payload.winner
+    ? "SURVIVOR WINNER"
+    : alive ? "STILL ALIVE" : "ELIMINATED";
+  const stats = streak
+    ? `${survivorPageEscape_(payload.totalPoints || 0)} pts · best streak ${survivorPageEscape_(payload.bestStreak || 0)}`
+    : `${survivorPageEscape_(payload.roundsSurvived || 0)} weeks survived · ${survivorPageEscape_(payload.livesRemaining || 0)} lives remaining`;
+
+  return `<div
+    class="page survivor-page sports-rich-survivor"
+    ${PATTCSportsRich.styleAttr(gameId, appearance, "football", "NFL")}
+  >
+    <header
+      class="survivor-page-header survivor-rich-hero sports-rich-hero-bg"
+      ${PATTCSportsRich.bgAttrs(assets.hero, "--sports-rich-hero-image")}
+    >
+      <div>
+        <span class="sports-rich-kicker">${streak ? "STREAK SURVIVOR" : "PATTC SURVIVOR FOOTBALL"}</span>
+        <h1>${survivorPageEscape_(payload.gameName || "Survivor Football")}</h1>
+        <p>One weekly decision. Pick a team, survive the configured rule, and keep your run alive.</p>
+      </div>
+      <div class="survivor-rich-hero-status ${alive ? "is-alive" : "is-out"}">
+        <span>${headline}</span>
+        <strong>${stats}</strong>
+      </div>
+    </header>
+
+    ${sportsRichSurvivorStatusStrip_(payload)}
+
+    ${sportsRichSurvivorCurrent_(payload)}
+
+    <details class="survivor-rich-rules">
+      <summary>Rules, twists & eligibility</summary>
+      ${typeof survivorSportsRulesCard_ === "function" ? survivorSportsRulesCard_(payload) : ""}
+    </details>
+
+    ${typeof survivorHistory_ === "function" ? survivorHistory_(payload) : ""}
+    ${typeof survivorStandings_ === "function" ? survivorStandings_(payload) : ""}
+  </div>`;
+}
+
+/* ---------- KING OF THE HILL ---------- */
+
+function sportsRichKothAliveRows_(payload) {
+  return (payload.standings || [])
+    .filter(function(row) { return row.survivorAlive === true; })
+    .sort(function(a,b) {
+      const strikes = Number(b.kothStrikes || 0) - Number(a.kothStrikes || 0);
+      if (strikes) return strikes;
+      return Number(a.kothSeasonAverage || 0) - Number(b.kothSeasonAverage || 0);
+    });
+}
+
+function sportsRichKothDangerBoard_(payload) {
+  const aliveRows = sportsRichKothAliveRows_(payload);
+  if (!aliveRows.length) return "";
+
+  const limit = Number(payload.strikeLimit || 3);
+  const rows = aliveRows.slice(0, 6).map(function(row) {
+    const strikes = Number(row.kothStrikes || 0);
+    const pct = Math.max(0, Math.min(100, Math.round((strikes / Math.max(1, limit)) * 100)));
+    const danger = strikes >= limit - 1 ? "is-danger" : strikes >= Math.max(1, limit - 2) ? "is-warning" : "is-safe";
+
+    return `<div class="koth-rich-danger-row ${danger}">
+      <span class="koth-rich-danger-player">
+        <strong>${survivorPageEscape_(row.displayName || row.username || "Player")}</strong>
+        <small>Avg ${survivorPageEscape_(Number(row.kothSeasonAverage || 0).toFixed(1))}</small>
+      </span>
+      <span class="koth-rich-danger-meter"><i style="width:${pct}%"></i></span>
+      <strong>${strikes}/${limit}</strong>
+    </div>`;
+  }).join("");
+
+  return `<section class="koth-rich-danger-board">
+    <div class="koth-rich-section-head">
+      <div>
+        <span class="sports-rich-kicker">ELIMINATION PRESSURE</span>
+        <h2>Closest to the edge</h2>
+      </div>
+      <small>${aliveRows.length} player${aliveRows.length===1 ? "" : "s"} still alive</small>
+    </div>
+    <div class="koth-rich-danger-list">${rows}</div>
+  </section>`;
+}
+
+function sportsRichKothPageHtml_(payload) {
+  payload = payload || {};
+  const gameId = sportsRichSurvivorGameId_();
+  const appearance = PATTCSportsRich.appearance(gameId, payload.appearance || null);
+  const assets = PATTCSportsRich.assets(gameId, appearance);
+  const alive = payload.alive !== false;
+  const winner = payload.winner === true;
+  const strikes = Number(payload.strikes || 0);
+  const limit = Number(payload.strikeLimit || 3);
+  const latest = Number(payload.latestWeek || 0);
+  const aliveRows = sportsRichKothAliveRows_(payload);
+  const lateSeason = winner || aliveRows.length <= 3;
+  const sourceText = (payload.sourceGameIds || []).length
+    ? (payload.sourceGameIds || []).map(survivorPageEscape_).join(" + ")
+    : "configured source game";
+
+  return `<div
+    class="page survivor-page koth-page sports-rich-koth ${lateSeason ? "is-last-man-stage" : ""}"
+    ${PATTCSportsRich.styleAttr(gameId, appearance, "football", "NFL")}
+  >
+    <header
+      class="survivor-page-header koth-rich-hero sports-rich-hero-bg"
+      ${PATTCSportsRich.bgAttrs(assets.hero, "--sports-rich-hero-image")}
+    >
+      <div>
+        <span class="sports-rich-kicker">${lateSeason ? "LAST MAN STANDING" : "PATTC KING OF THE HILL"}</span>
+        <h1>${survivorPageEscape_(payload.gameName || "King of the Hill")}</h1>
+        <p>Your fantasy/team score is the value. Avoid the bottom and avoid ${limit} strikes.</p>
+      </div>
+
+      <div class="koth-rich-strike-hero ${alive ? "" : "is-out"}">
+        <span>${winner ? "SOLE SURVIVOR" : alive ? "STILL ON THE HILL" : "ELIMINATED"}</span>
+        <strong>${survivorPageEscape_(strikes)}<small> / ${survivorPageEscape_(limit)}</small></strong>
+        <em>STRIKES</em>
+      </div>
+    </header>
+
+    <section class="koth-rich-primary">
+      <div class="koth-rich-score-card">
+        <span class="sports-rich-kicker">${latest ? "WEEK " + survivorPageEscape_(latest) + " FINAL" : "LATEST WEEK"}</span>
+        <strong>${latest ? survivorPageEscape_(payload.latestScore || 0) : "—"} <small>pts</small></strong>
+        <p>${latest ? survivorPageEscape_(payload.actualRecipients || 0) + " player" + (Number(payload.actualRecipients || 0)===1 ? "" : "s") + " received a strike." : "Waiting for the first finalized source week."}</p>
+      </div>
+
+      <div class="koth-rich-strike-card">
+        <span>YOUR STRIKES</span>
+        <strong>${typeof survivorKothStrikeMarks_ === "function" ? survivorKothStrikeMarks_(strikes, limit) : survivorPageEscape_(strikes + "/" + limit)}</strong>
+        <small>${alive ? (Math.max(0, limit - strikes) + " strike" + (Math.max(0, limit-strikes)===1 ? "" : "s") + " from elimination") : "Run ended"}</small>
+      </div>
+
+      <div class="koth-rich-source-card">
+        <span>SCORE SOURCE</span>
+        <strong>${sourceText}</strong>
+        <small>${(payload.sourceGameIds || []).length > 1 ? "Combine mode: " + survivorPageEscape_(payload.combineMode || "sum") : "Automatic weekly score feed"}</small>
+      </div>
+    </section>
+
+    ${sportsRichKothDangerBoard_(payload)}
+
+    <details class="koth-rich-rules">
+      <summary>How strikes are awarded</summary>
+      <div class="card survivor-rules-card">
+        <p>No extra weekly pick is required. The lowest finalized weekly source scores receive strikes. Strike pacing and late-season elimination remain controlled by the existing KOTH engine.</p>
+      </div>
+    </details>
+
+    ${typeof survivorKothHistory_ === "function" ? survivorKothHistory_(payload) : ""}
+    ${typeof survivorStandings_ === "function" ? survivorStandings_(payload) : ""}
+  </div>`;
+}
+
+/* ---------- Page wrapper ---------- */
+
+const SPORTS_RICH_SURVIVOR_ORIGINAL_PAGE_ = renderSurvivorPage;
+renderSurvivorPage = async function() {
+  const gameId = typeof getFrontendGameId === "function" ? getFrontendGameId() : "";
+  await PATTCSportsRich.prepare(gameId);
+
+  const originalHtml = await SPORTS_RICH_SURVIVOR_ORIGINAL_PAGE_.apply(this, arguments);
+  const payload = window.SURVIVOR_PAGE_STATE && SURVIVOR_PAGE_STATE.payload;
+
+  if (!sportsRichSurvivorEnabled_(payload)) return originalHtml;
+
+  const output = payload.mode === "king-of-the-hill"
+    ? sportsRichKothPageHtml_(payload)
+    : sportsRichSurvivorPageHtml_(payload);
+
+  PATTCSportsRich.afterMount(
+    payload.mode === "king-of-the-hill" ? ".sports-rich-koth" : ".sports-rich-survivor"
+  );
+
+  return output;
+};

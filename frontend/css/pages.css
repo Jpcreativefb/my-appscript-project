@@ -3855,3 +3855,715 @@ body.game-profile-choice-open { overflow:hidden; }
   .admin-voting-custom-field-row { grid-template-columns: 1fr 1fr; align-items: stretch; }
   .admin-voting-custom-field-row .admin-field:first-child { grid-column: 1 / -1; }
 }
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED VISUAL GRAMMAR
+   Only active below page-specific .sports-rich-* roots.
+   ========================================================= */
+
+.sports-rich-team-fantasy,
+.sports-rich-confidence,
+.sports-rich-survivor,
+.sports-rich-koth,
+.sports-rich-wager{
+  --sports-rich-primary:#2398ff;
+  --sports-rich-secondary:#0b6f91;
+  --sports-rich-accent:#76c8ff;
+  --sports-rich-bg:#020712;
+  --sports-rich-panel:#071426;
+  --sports-rich-panel-2:#0a1c32;
+  --sports-rich-line:rgba(91,147,201,.24);
+  --sports-rich-text:#f8fbff;
+  --sports-rich-muted:#9fb0c6;
+
+  position:relative;
+  isolation:isolate;
+  color:var(--sports-rich-text);
+}
+
+.sports-rich-team-fantasy::before,
+.sports-rich-confidence::before,
+.sports-rich-survivor::before,
+.sports-rich-koth::before,
+.sports-rich-wager::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--sports-rich-primary) 20%,transparent),transparent 30rem),
+    radial-gradient(circle at 96% 20%,color-mix(in srgb,var(--sports-rich-secondary) 15%,transparent),transparent 30rem),
+    linear-gradient(180deg,#020712 0%,#06111f 55%,#02050a 100%);
+}
+
+.sports-rich-kicker{
+  color:color-mix(in srgb,var(--sports-rich-accent) 78%,#fff);
+  font-size:.68rem;
+  font-weight:950;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+}
+
+.sports-rich-state{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  padding:6px 10px;
+  border:1px solid rgba(72,161,240,.5);
+  border-radius:999px;
+  color:#dceeff;
+  background:rgba(20,75,135,.26);
+  font-size:.66rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.sports-rich-state.is-complete,
+.sports-rich-state.is-safe,
+.sports-rich-state.is-correct{
+  color:#c9f8de;
+  border-color:rgba(57,217,138,.5);
+  background:rgba(22,120,76,.22);
+}
+.sports-rich-state.is-locked,
+.sports-rich-state.is-waiting{
+  color:#e2e8f0;
+  border-color:rgba(148,163,184,.42);
+  background:rgba(51,65,85,.32);
+}
+.sports-rich-state.is-danger,
+.sports-rich-state.is-wrong,
+.sports-rich-state.is-eliminated{
+  color:#ffd1d5;
+  border-color:rgba(255,92,104,.48);
+  background:rgba(154,30,42,.23);
+}
+
+.sports-rich-progress{
+  overflow:hidden;
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+}
+.sports-rich-progress>span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--sports-rich-primary),var(--sports-rich-accent));
+  box-shadow:0 0 18px color-mix(in srgb,var(--sports-rich-primary) 44%,transparent);
+}
+
+.sports-rich-hero-bg{
+  background-image:
+    linear-gradient(90deg,rgba(2,7,15,.88),rgba(2,7,15,.28) 70%,rgba(2,7,15,.72)),
+    linear-gradient(0deg,rgba(2,7,15,.92),transparent 65%),
+    var(--sports-rich-hero-image,none);
+  background-size:cover;
+  background-position:center;
+}
+
+@media(max-width:720px){
+  .sports-rich-team-fantasy,
+  .sports-rich-confidence,
+  .sports-rich-survivor,
+  .sports-rich-koth,
+  .sports-rich-wager{
+    overflow-x:clip;
+  }
+}
+
+/* =========================================================
+   SURVIVOR FOOTBALL + KING OF THE HILL — SPORTS RICH ART R3
+   ========================================================= */
+
+/* ---------- SURVIVOR FOOTBALL ---------- */
+.sports-rich-survivor,
+.sports-rich-koth{
+  max-width:1180px;
+  margin:0 auto;
+  padding-bottom:105px;
+}
+
+.sports-rich-survivor .survivor-rich-hero,
+.sports-rich-koth .koth-rich-hero{
+  min-height:255px;
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(240px,.55fr);
+  align-items:end;
+  gap:24px;
+  overflow:hidden;
+  padding:30px;
+  border:1px solid color-mix(in srgb,var(--sports-rich-primary) 34%,rgba(255,255,255,.08));
+  border-radius:26px;
+  background-color:#05101f;
+  box-shadow:0 25px 68px rgba(0,0,0,.34);
+}
+.sports-rich-survivor .survivor-rich-hero h1,
+.sports-rich-koth .koth-rich-hero h1{
+  margin:4px 0 7px;
+  color:#fff;
+  font-size:clamp(2.4rem,6vw,4.7rem);
+  line-height:.9;
+  letter-spacing:-.055em;
+  text-shadow:0 8px 28px rgba(0,0,0,.55);
+}
+.sports-rich-survivor .survivor-rich-hero p,
+.sports-rich-koth .koth-rich-hero p{
+  max-width:650px;
+  margin:0;
+  color:#b4c6d8;
+  font-weight:700;
+}
+
+.survivor-rich-hero-status{
+  padding:16px;
+  border:1px solid rgba(57,217,138,.36);
+  border-radius:18px;
+  background:rgba(17,111,69,.18);
+  display:grid;
+  gap:4px;
+}
+.survivor-rich-hero-status>span{
+  color:#8af0b8;
+  font-size:.69rem;
+  font-weight:1000;
+  letter-spacing:.09em;
+}
+.survivor-rich-hero-status>strong{
+  color:#fff;
+  line-height:1.35;
+}
+.survivor-rich-hero-status.is-out{
+  border-color:rgba(255,92,104,.38);
+  background:rgba(145,31,43,.18);
+}
+.survivor-rich-hero-status.is-out>span{
+  color:#ff9aa2;
+}
+
+.survivor-rich-status-strip{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  margin:12px 0 18px;
+  overflow:hidden;
+  border:1px solid rgba(74,137,196,.23);
+  border-radius:17px;
+  background:linear-gradient(180deg,rgba(8,27,49,.94),rgba(4,15,28,.96));
+}
+.survivor-rich-status-strip>div{
+  min-width:0;
+  padding:13px 15px;
+}
+.survivor-rich-status-strip>div+div{
+  border-left:1px solid rgba(255,255,255,.07);
+}
+.survivor-rich-status-strip span{
+  display:block;
+  color:#8298af;
+  font-size:.61rem;
+  font-weight:900;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+}
+.survivor-rich-status-strip strong{
+  display:block;
+  margin-top:3px;
+  color:#fff;
+  font-size:1.2rem;
+}
+.survivor-rich-status-strip strong.is-alive{color:#79e8aa;}
+.survivor-rich-status-strip strong.is-out{color:#ff929a;}
+
+.survivor-rich-current{
+  margin:0 0 18px;
+  padding:22px;
+  border:1px solid color-mix(in srgb,var(--sports-rich-primary) 42%,rgba(255,255,255,.08));
+  border-radius:24px;
+  background:
+    radial-gradient(circle at 0 0,color-mix(in srgb,var(--sports-rich-primary) 17%,transparent),transparent 28rem),
+    linear-gradient(150deg,rgba(9,30,54,.97),rgba(4,14,27,.98));
+  box-shadow:0 20px 46px rgba(0,0,0,.29);
+}
+.survivor-rich-current.is-locked{
+  border-color:rgba(148,163,184,.3);
+}
+.survivor-rich-current-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:16px;
+  margin-bottom:16px;
+}
+.survivor-rich-current-head h2{
+  margin:3px 0 5px;
+  color:#fff;
+  font-size:clamp(1.65rem,4vw,2.55rem);
+  letter-spacing:-.035em;
+}
+.survivor-rich-current-head p{
+  margin:0;
+  color:#a9bed2;
+}
+.survivor-rich-twist-strip{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+  margin:-2px 0 14px;
+}
+.survivor-rich-twist-strip>span{
+  padding:5px 8px;
+  border:1px solid rgba(255,194,92,.36);
+  border-radius:999px;
+  background:rgba(135,86,22,.16);
+  color:#ffd57e;
+  font-size:.6rem;
+  font-weight:950;
+  letter-spacing:.05em;
+}
+
+.survivor-rich-choice-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:10px;
+}
+.survivor-rich-choice{
+  overflow:hidden;
+  border:1px solid rgba(75,137,194,.23);
+  border-radius:18px;
+  background:
+    linear-gradient(145deg,rgba(8,28,51,.95),rgba(4,15,28,.97));
+}
+.survivor-rich-choice.is-selected{
+  border-color:var(--sports-rich-primary);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--sports-rich-primary) 15%,transparent),0 14px 30px rgba(0,0,0,.23);
+}
+.survivor-rich-choice.is-unavailable{
+  opacity:.5;
+  filter:grayscale(.65);
+}
+.survivor-rich-choice-main{
+  width:100%;
+  min-height:126px;
+  display:grid;
+  grid-template-columns:78px minmax(0,1fr) minmax(120px,.6fr);
+  align-items:center;
+  gap:11px;
+  padding:11px;
+  border:0;
+  background:transparent;
+  color:#fff;
+  text-align:left;
+}
+.survivor-rich-choice-main:not(:disabled){
+  cursor:pointer;
+}
+.survivor-rich-logo-wrap{
+  width:78px;height:78px;
+  display:grid;place-items:center;
+  border-radius:16px;
+  background:radial-gradient(circle,rgba(255,255,255,.07),rgba(255,255,255,.018));
+}
+.survivor-rich-team-logo{
+  width:68px!important;
+  height:68px!important;
+  object-fit:contain;
+  filter:drop-shadow(0 8px 12px rgba(0,0,0,.42));
+}
+.survivor-rich-logo-fallback{
+  font-size:2rem;
+}
+.survivor-rich-choice-copy{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.survivor-rich-team-line{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+}
+.survivor-rich-team-line strong{
+  font-size:1.1rem;
+}
+.survivor-rich-team-line small{
+  color:#8298af;
+}
+.survivor-rich-matchup{
+  color:#c2d2e1;
+  font-weight:850;
+}
+.survivor-rich-choice-copy>small{
+  color:#8298af;
+  font-size:.68rem;
+}
+.survivor-rich-choice-meta{
+  justify-self:stretch;
+  display:grid;
+  gap:5px;
+  padding-left:10px;
+  border-left:1px solid rgba(255,255,255,.07);
+}
+.survivor-rich-choice-meta>b{
+  color:#ffd166;
+  font-size:.73rem;
+}
+.survivor-rich-use{
+  color:#a7b9ca;
+  font-size:.67rem;
+}
+.survivor-rich-use.is-low{color:#ffd071;}
+.survivor-rich-use.is-zero{color:#ff929a;}
+.survivor-rich-unavailable{
+  color:#ff9ba3;
+  font-size:.67rem;
+  font-weight:900;
+}
+.survivor-rich-selected{
+  color:#79c7ff;
+  font-size:.65rem;
+  font-weight:1000;
+  letter-spacing:.05em;
+}
+.survivor-rich-schedule-toggle{
+  width:100%;
+  border-top:1px solid rgba(255,255,255,.06);
+  background:rgba(0,0,0,.14);
+}
+.survivor-rich-confidence-risk{
+  margin-top:14px;
+  border-color:rgba(86,144,199,.23);
+  background:rgba(3,12,23,.42);
+}
+.survivor-rich-save-row{
+  margin-top:16px;
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:10px;
+}
+.survivor-rich-save{
+  min-width:230px;
+  min-height:50px;
+  border-color:color-mix(in srgb,var(--sports-rich-primary) 72%,transparent);
+  background:linear-gradient(180deg,var(--sports-rich-primary),color-mix(in srgb,var(--sports-rich-primary) 67%,#061528));
+  box-shadow:0 10px 24px color-mix(in srgb,var(--sports-rich-primary) 24%,transparent);
+  font-weight:1000;
+}
+.survivor-rich-locked-note{
+  margin-top:15px;
+  padding:12px;
+  border:1px solid rgba(148,163,184,.24);
+  border-radius:13px;
+  color:#cbd5df;
+  background:rgba(51,65,85,.22);
+}
+.survivor-rich-rules,
+.koth-rich-rules{
+  margin:0 0 18px;
+  overflow:hidden;
+  border:1px solid rgba(73,130,185,.17);
+  border-radius:16px;
+  background:rgba(4,15,28,.58);
+}
+.survivor-rich-rules>summary,
+.koth-rich-rules>summary{
+  padding:13px 15px;
+  color:#b9cce0;
+  cursor:pointer;
+  font-weight:850;
+}
+.survivor-rich-rules .survivor-rules-card,
+.koth-rich-rules .survivor-rules-card{
+  margin:0;
+  border:0;
+  border-top:1px solid rgba(255,255,255,.06);
+  border-radius:0;
+  background:transparent;
+}
+.sports-rich-survivor .survivor-history-card,
+.sports-rich-survivor .survivor-standings-card{
+  border-color:rgba(72,130,184,.18);
+  background:linear-gradient(180deg,rgba(8,25,46,.92),rgba(4,14,27,.96));
+}
+
+/* ---------- KING OF THE HILL ---------- */
+.sports-rich-koth{
+  --koth-safe:#39d98a;
+  --koth-strike:#ff5c68;
+}
+.sports-rich-koth .koth-rich-hero{
+  background-color:#06101f;
+  background-image:
+    linear-gradient(90deg,rgba(3,8,17,.94),rgba(3,8,17,.3) 65%,rgba(3,8,17,.75)),
+    radial-gradient(circle at 88% 18%,rgba(255,88,96,.17),transparent 20rem),
+    var(--sports-rich-hero-image,none);
+  background-size:cover;
+  background-position:center;
+}
+.sports-rich-koth.is-last-man-stage .koth-rich-hero{
+  border-color:rgba(255,153,75,.36);
+  box-shadow:0 25px 72px rgba(122,35,21,.18);
+}
+.koth-rich-strike-hero{
+  min-width:210px;
+  min-height:155px;
+  display:grid;
+  place-items:center;
+  align-content:center;
+  padding:15px;
+  border:1px solid rgba(255,156,83,.37);
+  border-radius:22px;
+  background:
+    radial-gradient(circle,rgba(255,113,68,.14),transparent 67%),
+    rgba(5,12,21,.68);
+  text-align:center;
+}
+.koth-rich-strike-hero>span{
+  color:#ffd0a8;
+  font-size:.7rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+}
+.koth-rich-strike-hero>strong{
+  color:#fff;
+  font-size:3.6rem;
+  line-height:.94;
+}
+.koth-rich-strike-hero>strong small{
+  color:#9dacbd;
+  font-size:1.35rem;
+}
+.koth-rich-strike-hero>em{
+  color:#ff8b72;
+  font-size:.68rem;
+  font-style:normal;
+  font-weight:1000;
+  letter-spacing:.13em;
+}
+.koth-rich-strike-hero.is-out{
+  border-color:rgba(255,92,104,.42);
+  background:rgba(145,29,41,.18);
+}
+
+.koth-rich-primary{
+  display:grid;
+  grid-template-columns:1.2fr .7fr .9fr;
+  gap:10px;
+  margin:12px 0 18px;
+}
+.koth-rich-primary>div{
+  min-height:150px;
+  padding:16px;
+  border:1px solid rgba(75,136,192,.22);
+  border-radius:18px;
+  background:
+    linear-gradient(155deg,rgba(8,27,49,.95),rgba(4,15,28,.97));
+  box-shadow:0 14px 32px rgba(0,0,0,.2);
+}
+.koth-rich-score-card{
+  background:
+    radial-gradient(circle at 0 0,rgba(255,142,77,.13),transparent 18rem),
+    linear-gradient(155deg,rgba(8,27,49,.95),rgba(4,15,28,.97))!important;
+}
+.koth-rich-score-card>strong{
+  display:block;
+  margin:8px 0 4px;
+  color:#fff;
+  font-size:3rem;
+  line-height:.95;
+}
+.koth-rich-score-card>strong small{
+  color:#8ea4ba;
+  font-size:1rem;
+}
+.koth-rich-score-card p{
+  margin:0;
+  color:#9fb2c6;
+}
+.koth-rich-strike-card,
+.koth-rich-source-card{
+  display:grid;
+  align-content:center;
+  gap:5px;
+}
+.koth-rich-strike-card>span,
+.koth-rich-source-card>span{
+  color:#8198af;
+  font-size:.61rem;
+  font-weight:950;
+  letter-spacing:.08em;
+}
+.koth-rich-strike-card>strong{
+  color:#ff9e84;
+  font-size:1.35rem;
+  letter-spacing:.12em;
+}
+.koth-rich-source-card>strong{
+  color:#fff;
+}
+.koth-rich-strike-card>small,
+.koth-rich-source-card>small{
+  color:#879db4;
+}
+
+.koth-rich-danger-board{
+  margin:0 0 18px;
+  padding:17px;
+  border:1px solid rgba(80,140,196,.22);
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(8,26,48,.94),rgba(4,14,27,.96));
+}
+.koth-rich-section-head{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:11px;
+}
+.koth-rich-section-head h2{
+  margin:3px 0 0;
+  color:#fff;
+}
+.koth-rich-section-head small{
+  color:#8fa5bc;
+}
+.koth-rich-danger-list{
+  display:grid;
+  gap:7px;
+}
+.koth-rich-danger-row{
+  display:grid;
+  grid-template-columns:minmax(170px,1fr) minmax(140px,.9fr) 52px;
+  align-items:center;
+  gap:12px;
+  min-height:52px;
+  padding:8px 10px;
+  border:1px solid rgba(255,255,255,.06);
+  border-radius:12px;
+  background:rgba(255,255,255,.025);
+}
+.koth-rich-danger-player{
+  min-width:0;
+  display:grid;
+  gap:2px;
+}
+.koth-rich-danger-player strong{
+  overflow:hidden;
+  color:#fff;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.koth-rich-danger-player small{
+  color:#8198af;
+}
+.koth-rich-danger-meter{
+  height:8px;
+  overflow:hidden;
+  border-radius:99px;
+  background:rgba(255,255,255,.08);
+}
+.koth-rich-danger-meter i{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:var(--koth-safe);
+}
+.koth-rich-danger-row.is-warning .koth-rich-danger-meter i{
+  background:#ffbd4e;
+}
+.koth-rich-danger-row.is-danger .koth-rich-danger-meter i{
+  background:var(--koth-strike);
+}
+.koth-rich-danger-row>strong{
+  text-align:right;
+  color:#fff;
+}
+.sports-rich-koth .survivor-history-card,
+.sports-rich-koth .survivor-standings-card{
+  border-color:rgba(73,132,187,.18);
+  background:linear-gradient(180deg,rgba(8,25,46,.92),rgba(4,14,27,.96));
+}
+.sports-rich-koth .survivor-history-row.wrong{
+  border-left:3px solid var(--koth-strike);
+  background:rgba(145,31,43,.11);
+}
+.sports-rich-koth .survivor-history-row.right{
+  border-left:3px solid var(--koth-safe);
+  background:rgba(18,103,68,.09);
+}
+.sports-rich-koth .survivor-standing-row.out{
+  opacity:.58;
+}
+
+@media(max-width:780px){
+  .sports-rich-survivor .survivor-rich-hero,
+  .sports-rich-koth .koth-rich-hero{
+    min-height:250px;
+    grid-template-columns:1fr;
+    padding:20px;
+    border-radius:19px;
+  }
+  .survivor-rich-status-strip{
+    grid-template-columns:1fr 1fr;
+  }
+  .survivor-rich-status-strip>div:nth-child(3){
+    border-left:0;
+    border-top:1px solid rgba(255,255,255,.07);
+  }
+  .survivor-rich-status-strip>div:nth-child(4){
+    border-top:1px solid rgba(255,255,255,.07);
+  }
+  .survivor-rich-choice-grid{
+    grid-template-columns:1fr;
+  }
+  .koth-rich-primary{
+    grid-template-columns:1fr 1fr;
+  }
+  .koth-rich-score-card{
+    grid-column:1/-1;
+  }
+}
+
+@media(max-width:520px){
+  .survivor-rich-current{
+    padding:15px;
+    border-radius:19px;
+  }
+  .survivor-rich-current-head{
+    flex-direction:column;
+  }
+  .survivor-rich-choice-main{
+    grid-template-columns:64px minmax(0,1fr);
+    min-height:118px;
+  }
+  .survivor-rich-logo-wrap{
+    width:64px;height:64px;
+  }
+  .survivor-rich-team-logo{
+    width:58px!important;height:58px!important;
+  }
+  .survivor-rich-choice-meta{
+    grid-column:1/-1;
+    display:flex;
+    flex-wrap:wrap;
+    gap:7px;
+    padding:7px 0 0;
+    border-left:0;
+    border-top:1px solid rgba(255,255,255,.06);
+  }
+  .survivor-rich-save{
+    width:100%;
+  }
+  .koth-rich-primary{
+    grid-template-columns:1fr;
+  }
+  .koth-rich-score-card{
+    grid-column:auto;
+  }
+  .koth-rich-danger-row{
+    grid-template-columns:minmax(0,1fr) 74px 42px;
+    gap:7px;
+  }
+}

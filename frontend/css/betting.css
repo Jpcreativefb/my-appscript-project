@@ -1492,3 +1492,508 @@
     position: static;
   }
 }
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED VISUAL GRAMMAR
+   Only active below page-specific .sports-rich-* roots.
+   ========================================================= */
+
+.sports-rich-team-fantasy,
+.sports-rich-confidence,
+.sports-rich-survivor,
+.sports-rich-koth,
+.sports-rich-wager{
+  --sports-rich-primary:#2398ff;
+  --sports-rich-secondary:#0b6f91;
+  --sports-rich-accent:#76c8ff;
+  --sports-rich-bg:#020712;
+  --sports-rich-panel:#071426;
+  --sports-rich-panel-2:#0a1c32;
+  --sports-rich-line:rgba(91,147,201,.24);
+  --sports-rich-text:#f8fbff;
+  --sports-rich-muted:#9fb0c6;
+
+  position:relative;
+  isolation:isolate;
+  color:var(--sports-rich-text);
+}
+
+.sports-rich-team-fantasy::before,
+.sports-rich-confidence::before,
+.sports-rich-survivor::before,
+.sports-rich-koth::before,
+.sports-rich-wager::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--sports-rich-primary) 20%,transparent),transparent 30rem),
+    radial-gradient(circle at 96% 20%,color-mix(in srgb,var(--sports-rich-secondary) 15%,transparent),transparent 30rem),
+    linear-gradient(180deg,#020712 0%,#06111f 55%,#02050a 100%);
+}
+
+.sports-rich-kicker{
+  color:color-mix(in srgb,var(--sports-rich-accent) 78%,#fff);
+  font-size:.68rem;
+  font-weight:950;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+}
+
+.sports-rich-state{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  padding:6px 10px;
+  border:1px solid rgba(72,161,240,.5);
+  border-radius:999px;
+  color:#dceeff;
+  background:rgba(20,75,135,.26);
+  font-size:.66rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.sports-rich-state.is-complete,
+.sports-rich-state.is-safe,
+.sports-rich-state.is-correct{
+  color:#c9f8de;
+  border-color:rgba(57,217,138,.5);
+  background:rgba(22,120,76,.22);
+}
+.sports-rich-state.is-locked,
+.sports-rich-state.is-waiting{
+  color:#e2e8f0;
+  border-color:rgba(148,163,184,.42);
+  background:rgba(51,65,85,.32);
+}
+.sports-rich-state.is-danger,
+.sports-rich-state.is-wrong,
+.sports-rich-state.is-eliminated{
+  color:#ffd1d5;
+  border-color:rgba(255,92,104,.48);
+  background:rgba(154,30,42,.23);
+}
+
+.sports-rich-progress{
+  overflow:hidden;
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+}
+.sports-rich-progress>span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--sports-rich-primary),var(--sports-rich-accent));
+  box-shadow:0 0 18px color-mix(in srgb,var(--sports-rich-primary) 44%,transparent);
+}
+
+.sports-rich-hero-bg{
+  background-image:
+    linear-gradient(90deg,rgba(2,7,15,.88),rgba(2,7,15,.28) 70%,rgba(2,7,15,.72)),
+    linear-gradient(0deg,rgba(2,7,15,.92),transparent 65%),
+    var(--sports-rich-hero-image,none);
+  background-size:cover;
+  background-position:center;
+}
+
+@media(max-width:720px){
+  .sports-rich-team-fantasy,
+  .sports-rich-confidence,
+  .sports-rich-survivor,
+  .sports-rich-koth,
+  .sports-rich-wager{
+    overflow-x:clip;
+  }
+}
+
+/* =========================================================
+   SPORTS WAGER — APPROVED ART RICH FOUNDATION
+   R3 only gates the approved design behind Sports Rich.
+   ========================================================= */
+
+
+/* =========================================================
+   SPORTS WAGER — APPROVED ART DIRECTION
+   ========================================================= */
+.sports-rich-wager {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding-bottom: 100px;
+}
+
+.sports-rich-wager > h1,
+.sports-rich-wager > .betting-intro {
+  display: none;
+}
+
+.sports-rich-wager-hero {
+  position: relative;
+  min-height: 230px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 18px;
+  overflow: hidden;
+  margin-bottom: 12px;
+  padding: 28px;
+  border: 1px solid rgba(54, 146, 230, .28);
+  border-radius: 24px;
+  background:
+    radial-gradient(circle at 18% 24%, rgba(27, 143, 255, .34), transparent 26rem),
+    radial-gradient(circle at 84% 20%, rgba(37, 99, 235, .18), transparent 20rem),
+    linear-gradient(135deg, rgba(4,16,34,.97), rgba(3,8,18,.99));
+  box-shadow: 0 26px 70px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+.sports-rich-wager-hero::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  pointer-events:none;
+  background:
+    linear-gradient(125deg,transparent 0 48%,rgba(65,154,237,.08) 48% 49%,transparent 49% 100%),
+    linear-gradient(0deg,rgba(0,0,0,.28),transparent 50%);
+}
+
+.sports-rich-wager-hero-copy,
+.sports-rich-wager-sync {
+  position:relative;
+  z-index:1;
+}
+
+.sports-rich-wager-hero h1 {
+  margin: 4px 0 5px;
+  color: #fff;
+  font-size: clamp(2.2rem,6vw,4.4rem);
+  line-height: .92;
+  font-weight: 1000;
+  letter-spacing: -.055em;
+  text-shadow: 0 8px 30px rgba(0,0,0,.58);
+}
+
+.sports-rich-wager-hero p {
+  max-width: 560px;
+  margin:0;
+  color:#a9bfd7;
+  font-weight:700;
+}
+
+.sports-rich-wager-sync {
+  align-self:start;
+  min-width: 110px;
+  padding: 10px 14px;
+  border: 1px solid #39d98a;
+  border-radius: 11px;
+  color: #39d98a;
+  background: #06121a;
+  font-weight: 950;
+  letter-spacing: .06em;
+  box-shadow: 0 0 22px rgba(57,217,138,.14);
+}
+
+.sports-rich-wager-primary-stats {
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  margin-bottom:12px;
+}
+
+.sports-rich-wager-primary-stats > div {
+  min-width:0;
+  padding:13px 15px;
+  border:1px solid rgba(86,143,199,.22);
+  border-radius:15px;
+  background:linear-gradient(180deg,rgba(10,28,50,.92),rgba(5,15,29,.95));
+}
+.sports-rich-wager-primary-stats span {display:block;color:#8fa8c2;font-size:.69rem;font-weight:850;text-transform:uppercase;letter-spacing:.06em}
+.sports-rich-wager-primary-stats strong {display:block;margin-top:4px;color:#fff;font-size:1.22rem}
+.sports-rich-wager-primary-stats .positive strong {color:#75f0ae}
+.sports-rich-wager-primary-stats .negative strong {color:#ff818a}
+
+.sports-rich-wager-market-tabs {
+  display:flex;
+  gap:7px;
+  overflow-x:auto;
+  margin:0 0 14px;
+  padding:3px 0 6px;
+  scrollbar-width:thin;
+}
+.sports-rich-wager-market-tabs button {
+  flex:0 0 auto;
+  padding:9px 14px;
+  border:1px solid rgba(148,163,184,.40);
+  border-radius:9px;
+  background:linear-gradient(180deg,#111b2a,#09111d);
+  color:#b8c2cf;
+  font-weight:900;
+}
+.sports-rich-wager-market-tabs .market-moneyline {border-color:#38d489;color:#65e8aa}
+.sports-rich-wager-market-tabs .market-spread {border-color:#f39a4b;color:#ffae67}
+.sports-rich-wager-market-tabs .market-total {border-color:#f45d69;color:#ff7b84}
+.sports-rich-wager-market-tabs .market-player-props {border-color:#329aff;color:#72bbff}
+
+.sports-rich-wager #bettingSummaryBlock {
+  margin-bottom: 13px;
+}
+.sports-rich-wager .betting-summary-grid.compact {
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:9px;
+  margin-bottom:0;
+}
+.sports-rich-wager .betting-summary-grid.compact .betting-summary-card {
+  padding:12px 14px;
+  border-radius:14px;
+  border-color:rgba(82,143,204,.20);
+  background:rgba(5,16,30,.84);
+  box-shadow:none;
+}
+.sports-rich-wager .betting-summary-grid.compact .betting-summary-card:nth-child(1),
+.sports-rich-wager .betting-summary-grid.compact .betting-summary-card:nth-child(4),
+.sports-rich-wager .betting-summary-grid.compact .betting-summary-card:nth-child(5),
+.sports-rich-wager .betting-summary-grid.compact .betting-summary-card:nth-child(7) {
+  display:none;
+}
+
+.sports-rich-wager .betting-group-section-label {
+  margin:18px 0 9px;
+  color:#8eb9e2;
+  font-size:.72rem;
+  font-weight:950;
+  letter-spacing:.10em;
+  text-transform:uppercase;
+}
+
+.sports-rich-wager .betting-date-group,
+.sports-rich-wager .betting-league-group {
+  border-color:rgba(74,129,183,.18);
+  background:rgba(3,10,20,.36);
+}
+
+.sports-rich-wager .betting-category-card {
+  border-color:rgba(72,135,196,.24);
+  background:
+    linear-gradient(180deg,rgba(10,30,54,.96),rgba(5,15,29,.98));
+  box-shadow:0 16px 38px rgba(0,0,0,.28);
+}
+
+.sports-rich-wager .betting-category-card[open] {
+  border-color:rgba(50,154,255,.34);
+}
+
+.sports-rich-wager .betting-category-summary {
+  padding:14px 16px;
+  background:
+    radial-gradient(circle at 0 0,rgba(39,139,232,.16),transparent 38%),
+    linear-gradient(90deg,rgba(9,27,49,.96),rgba(5,15,28,.96));
+}
+
+.sports-rich-wager .betting-category-title {
+  color:#fff;
+  font-weight:950;
+}
+
+.sports-rich-wager .betting-nominee-card {
+  min-height:170px;
+  border-color:rgba(255,255,255,.12);
+  background:linear-gradient(180deg,rgba(8,24,44,.92),rgba(4,13,25,.94));
+}
+
+.sports-rich-wager .betting-nominee-card.selected {
+  border-color:#2e9bff !important;
+  background:
+    linear-gradient(180deg,rgba(32,137,237,.28),rgba(8,37,72,.54)) !important;
+  box-shadow:0 0 0 2px rgba(46,155,255,.22),0 12px 32px rgba(29,121,209,.22);
+}
+
+.sports-rich-wager .betting-nominee-card.winner-pick {
+  border-color:#39d98a !important;
+  background:linear-gradient(180deg,rgba(24,161,99,.23),rgba(5,46,29,.46)) !important;
+  box-shadow:0 0 0 2px rgba(57,217,138,.18);
+}
+.sports-rich-wager .betting-nominee-card.winner-pick::after {
+  content:"WINNER";
+  position:absolute;
+  top:7px;
+  left:7px;
+  z-index:8;
+  padding:4px 6px;
+  border-radius:7px;
+  background:#167c50;
+  color:#e8fff4;
+  font-size:.56rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+}
+
+.sports-rich-wager .betting-current.bet-lost {
+  color:#ff9aa1;
+  border:1px solid rgba(255,92,104,.50);
+  border-radius:9px;
+  padding:7px 9px;
+  background:rgba(150,28,39,.16);
+}
+.sports-rich-wager .betting-current.bet-won {
+  color:#7ef0b2;
+  border:1px solid rgba(57,217,138,.48);
+  border-radius:9px;
+  padding:7px 9px;
+  background:rgba(21,129,80,.16);
+}
+.sports-rich-wager .betting-current.current-wager {
+  color:#9bd0ff;
+  border:1px solid rgba(46,155,255,.46);
+  border-radius:9px;
+  padding:7px 9px;
+  background:rgba(25,102,171,.17);
+}
+
+.sports-rich-wager .betting-wager-layout {
+  gap:10px;
+}
+.sports-rich-wager .betting-entry-panel {
+  border:1px solid rgba(78,139,199,.22);
+  border-radius:13px;
+  background:rgba(2,11,22,.48);
+}
+.sports-rich-wager .betting-odds-row {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:7px;
+  color:#ffd44d;
+}
+.sports-rich-wager .betting-return-value {
+  color:#d9e7f7;
+  text-align:right;
+}
+.sports-rich-wager .betting-place-btn {
+  border-color:#258ee8;
+  background:linear-gradient(180deg,#1689ed,#0b5ca8);
+  box-shadow:0 9px 22px rgba(17,107,188,.24);
+}
+
+.sports-rich-wager-history,
+.sports-rich-wager-leaderboard {
+  overflow:hidden;
+  margin:18px 0 0;
+  border:1px solid rgba(73,135,196,.26);
+  border-radius:17px;
+  background:rgba(4,14,27,.70);
+  box-shadow:0 16px 36px rgba(0,0,0,.21);
+}
+.sports-rich-wager-section-summary {
+  min-height:52px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 15px;
+  cursor:pointer;
+  list-style:none;
+  color:#fff;
+  font-size:.78rem;
+  font-weight:1000;
+  letter-spacing:.07em;
+}
+.sports-rich-wager-section-summary::-webkit-details-marker {display:none}
+.sports-rich-wager-section-side {display:flex;align-items:center;gap:9px;color:#9fb0c6;font-weight:800;letter-spacing:0}
+.sports-rich-wager-section-side em {color:#fff;font-style:normal}
+.sports-rich-wager-history:not([open]) .sports-rich-wager-section-side b,
+.sports-rich-wager-leaderboard:not([open]) .sports-rich-wager-section-side b {transform:rotate(180deg)}
+.sports-rich-wager-section-side b {display:inline-block;transition:transform .15s ease}
+
+.sports-rich-wager-history[open],
+.sports-rich-wager-leaderboard[open] {
+  display:flex;
+  flex-direction:column-reverse;
+}
+.sports-rich-wager-history-body,
+.sports-rich-wager-leaderboard-body {padding:0 11px 11px}
+.sports-rich-wager-history-row {
+  overflow:hidden;
+  margin-top:7px;
+  border:1px solid rgba(107,148,188,.25);
+  border-radius:12px;
+  background:rgba(5,16,30,.50);
+}
+.sports-rich-wager-history-row > summary {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto auto 16px;
+  align-items:center;
+  gap:9px;
+  min-height:58px;
+  padding:9px 11px;
+  cursor:pointer;
+  list-style:none;
+}
+.sports-rich-wager-history-row > summary::-webkit-details-marker {display:none}
+.sports-rich-wager-history-main {min-width:0}
+.sports-rich-wager-history-main strong,
+.sports-rich-wager-history-main small {display:block;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sports-rich-wager-history-main small {margin-top:3px;color:#9caec2;font-size:.67rem}
+.sports-rich-wager-history-state {
+  padding:5px 7px;
+  border-radius:7px;
+  font-size:.62rem;
+  font-weight:1000;
+}
+.state-win .sports-rich-wager-history-state {color:#bbf7d0;background:rgba(34,197,94,.18);border:1px solid rgba(34,197,94,.34)}
+.state-lost .sports-rich-wager-history-state {color:#fecaca;background:rgba(239,68,68,.18);border:1px solid rgba(239,68,68,.34)}
+.state-pending .sports-rich-wager-history-state {color:#bfdbfe;background:rgba(59,130,246,.18);border:1px solid rgba(59,130,246,.34)}
+.sports-rich-wager-history-return {font-size:.72rem;font-weight:900;color:#fff}
+.sports-rich-wager-history-details {
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:6px;
+  padding:0 11px 11px;
+}
+.sports-rich-wager-history-details span {
+  padding:8px;
+  border-radius:8px;
+  background:rgba(255,255,255,.035);
+  color:#d7e0ec;
+  font-size:.71rem;
+}
+.sports-rich-wager-history-details b {display:block;color:#7f97b0;font-size:.58rem;text-transform:uppercase;letter-spacing:.06em}
+
+.sports-rich-wager-leaderboard .betting-leaderboard-card {
+  margin:0;
+  padding:10px 13px;
+  border:0;
+  border-radius:12px;
+  background:rgba(7,20,37,.60);
+  box-shadow:none;
+}
+.sports-rich-wager-leaderboard .betting-section-title {display:none}
+
+@media(max-width:650px) {
+  .sports-rich-wager-hero {
+    min-height:190px;
+    padding:20px 16px;
+    border-radius:18px;
+  }
+  .sports-rich-wager-hero h1 {font-size:2.4rem}
+  .sports-rich-wager-sync {min-width:92px;padding:9px 10px;font-size:.72rem}
+  .sports-rich-wager-primary-stats,
+  .sports-rich-wager .betting-summary-grid.compact {grid-template-columns:repeat(3,minmax(0,1fr))}
+  .sports-rich-wager-primary-stats > div {padding:10px 9px}
+  .sports-rich-wager-primary-stats strong {font-size:.97rem}
+  .sports-rich-wager-primary-stats span {font-size:.56rem}
+  .sports-rich-wager-history-row > summary {grid-template-columns:minmax(0,1fr) auto 14px}
+  .sports-rich-wager-history-return {grid-column:1/3;color:#cfe4f7;padding-top:2px}
+  .sports-rich-wager-history-details {grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
+/* R2 league palette integration. Market tabs + win/loss semantics stay fixed. */
+.sports-rich-wager .sports-rich-wager-hero{border-color:color-mix(in srgb,var(--sport-primary) 32%,rgba(255,255,255,.08));background:
+ radial-gradient(circle at 18% 24%,color-mix(in srgb,var(--sport-primary) 38%,transparent),transparent 26rem),
+ radial-gradient(circle at 84% 20%,color-mix(in srgb,var(--sport-secondary) 24%,transparent),transparent 20rem),
+ linear-gradient(135deg,rgba(4,16,34,.97),rgba(3,8,18,.99))}
+.sports-rich-wager .sports-league-card{--sport-primary:var(--sports-admin-primary,var(--league-primary));--sport-secondary:var(--sports-admin-secondary,var(--league-secondary));--sport-accent:var(--sports-admin-accent,var(--league-accent))}
+.sports-rich-wager .sports-league-card.betting-category-card{border-color:color-mix(in srgb,var(--sport-primary) 34%,rgba(72,135,196,.20))}
+.sports-rich-wager .sports-league-card .betting-category-summary{background:radial-gradient(circle at 0 0,color-mix(in srgb,var(--sport-primary) 18%,transparent),transparent 38%),linear-gradient(90deg,rgba(9,27,49,.96),rgba(5,15,28,.96))}

@@ -101,3 +101,604 @@
 .tf-protection-grid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(190px,1.2fr) minmax(180px,1fr) auto;gap:8px;align-items:end}
 .tf-protection-grid .tf-field{margin:0}.tf-protection-grid input,.tf-protection-grid select{width:100%;min-height:42px}
 @media(max-width:760px){.tf-team-picker-button{min-height:42px!important;padding-top:6px!important;padding-bottom:6px!important}.tf-picker-team{min-height:48px!important;padding-top:7px!important;padding-bottom:7px!important}.tf-protection-grid{grid-template-columns:1fr}.tf-picker-fill-actions{display:grid;grid-template-columns:1fr 1fr auto}.tf-picker-fill-actions .tf-button{min-height:44px;font-size:.72rem}.tf-edit-label{font-size:.58rem}}
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED VISUAL GRAMMAR
+   Only active below page-specific .sports-rich-* roots.
+   ========================================================= */
+
+.sports-rich-team-fantasy,
+.sports-rich-confidence,
+.sports-rich-survivor,
+.sports-rich-koth,
+.sports-rich-wager{
+  --sports-rich-primary:#2398ff;
+  --sports-rich-secondary:#0b6f91;
+  --sports-rich-accent:#76c8ff;
+  --sports-rich-bg:#020712;
+  --sports-rich-panel:#071426;
+  --sports-rich-panel-2:#0a1c32;
+  --sports-rich-line:rgba(91,147,201,.24);
+  --sports-rich-text:#f8fbff;
+  --sports-rich-muted:#9fb0c6;
+
+  position:relative;
+  isolation:isolate;
+  color:var(--sports-rich-text);
+}
+
+.sports-rich-team-fantasy::before,
+.sports-rich-confidence::before,
+.sports-rich-survivor::before,
+.sports-rich-koth::before,
+.sports-rich-wager::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  z-index:-2;
+  pointer-events:none;
+  background:
+    radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--sports-rich-primary) 20%,transparent),transparent 30rem),
+    radial-gradient(circle at 96% 20%,color-mix(in srgb,var(--sports-rich-secondary) 15%,transparent),transparent 30rem),
+    linear-gradient(180deg,#020712 0%,#06111f 55%,#02050a 100%);
+}
+
+.sports-rich-kicker{
+  color:color-mix(in srgb,var(--sports-rich-accent) 78%,#fff);
+  font-size:.68rem;
+  font-weight:950;
+  letter-spacing:.15em;
+  text-transform:uppercase;
+}
+
+.sports-rich-state{
+  display:inline-flex;
+  align-items:center;
+  width:max-content;
+  max-width:100%;
+  padding:6px 10px;
+  border:1px solid rgba(72,161,240,.5);
+  border-radius:999px;
+  color:#dceeff;
+  background:rgba(20,75,135,.26);
+  font-size:.66rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.sports-rich-state.is-complete,
+.sports-rich-state.is-safe,
+.sports-rich-state.is-correct{
+  color:#c9f8de;
+  border-color:rgba(57,217,138,.5);
+  background:rgba(22,120,76,.22);
+}
+.sports-rich-state.is-locked,
+.sports-rich-state.is-waiting{
+  color:#e2e8f0;
+  border-color:rgba(148,163,184,.42);
+  background:rgba(51,65,85,.32);
+}
+.sports-rich-state.is-danger,
+.sports-rich-state.is-wrong,
+.sports-rich-state.is-eliminated{
+  color:#ffd1d5;
+  border-color:rgba(255,92,104,.48);
+  background:rgba(154,30,42,.23);
+}
+
+.sports-rich-progress{
+  overflow:hidden;
+  height:8px;
+  border-radius:999px;
+  background:rgba(255,255,255,.09);
+}
+.sports-rich-progress>span{
+  display:block;
+  height:100%;
+  border-radius:inherit;
+  background:linear-gradient(90deg,var(--sports-rich-primary),var(--sports-rich-accent));
+  box-shadow:0 0 18px color-mix(in srgb,var(--sports-rich-primary) 44%,transparent);
+}
+
+.sports-rich-hero-bg{
+  background-image:
+    linear-gradient(90deg,rgba(2,7,15,.88),rgba(2,7,15,.28) 70%,rgba(2,7,15,.72)),
+    linear-gradient(0deg,rgba(2,7,15,.92),transparent 65%),
+    var(--sports-rich-hero-image,none);
+  background-size:cover;
+  background-position:center;
+}
+
+@media(max-width:720px){
+  .sports-rich-team-fantasy,
+  .sports-rich-confidence,
+  .sports-rich-survivor,
+  .sports-rich-koth,
+  .sports-rich-wager{
+    overflow-x:clip;
+  }
+}
+
+/* =========================================================
+   TEAM FANTASY — SPORTS RICH ART R3
+   Identity: eight-slot NFL TEAM lineup board.
+   ========================================================= */
+
+.sports-rich-team-fantasy{
+  max-width:1180px;
+  margin:0 auto;
+  padding-bottom:105px;
+}
+
+.sports-rich-team-fantasy .tf-rich-hero{
+  position:relative;
+  isolation:isolate;
+  min-height:255px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:end;
+  gap:20px;
+  overflow:hidden;
+  padding:30px;
+  border:1px solid color-mix(in srgb,var(--sports-rich-primary) 36%,rgba(255,255,255,.07));
+  border-radius:26px;
+  background-color:#05101f;
+  background-image:
+    linear-gradient(90deg,rgba(3,9,17,.92),rgba(3,9,17,.35) 66%,rgba(3,9,17,.74)),
+    linear-gradient(0deg,rgba(3,9,17,.92),transparent 62%),
+    var(--sports-rich-hero-image,
+      radial-gradient(ellipse at 52% 120%,rgba(34,148,74,.42),transparent 45%));
+  background-size:cover;
+  background-position:center;
+  box-shadow:0 25px 68px rgba(0,0,0,.34);
+}
+.sports-rich-team-fantasy .tf-rich-hero::after{
+  content:"";
+  position:absolute;
+  inset:auto -8% -48% -8%;
+  z-index:-1;
+  height:64%;
+  border-radius:50%;
+  transform:perspective(430px) rotateX(54deg);
+  background:
+    repeating-linear-gradient(90deg,transparent 0 9.8%,rgba(255,255,255,.07) 9.8% 10%),
+    linear-gradient(90deg,rgba(14,99,47,.48),rgba(9,70,36,.58));
+  pointer-events:none;
+}
+.sports-rich-team-fantasy .tf-eyebrow{
+  color:color-mix(in srgb,var(--sports-rich-accent) 78%,#fff);
+  font-weight:1000;
+  letter-spacing:.14em;
+}
+.sports-rich-team-fantasy .tf-rich-hero h1{
+  margin:.1em 0;
+  color:#fff;
+  font-size:clamp(2.55rem,7vw,5rem);
+  line-height:.88;
+  letter-spacing:-.055em;
+  text-shadow:0 8px 30px rgba(0,0,0,.58);
+}
+.sports-rich-team-fantasy .tf-rich-hero p{
+  max-width:650px;
+  color:#bed0e2;
+  font-weight:700;
+}
+
+.tf-rich-week-summary{
+  display:grid;
+  grid-template-columns:minmax(280px,1.4fr) minmax(120px,.55fr) minmax(150px,.7fr) auto;
+  align-items:center;
+  gap:10px;
+  margin:12px 0 18px;
+  padding:15px;
+  border:1px solid rgba(82,143,201,.24);
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 0 50%,color-mix(in srgb,var(--sports-rich-primary) 12%,transparent),transparent 22rem),
+    linear-gradient(180deg,rgba(8,28,51,.95),rgba(4,15,29,.97));
+  box-shadow:0 15px 34px rgba(0,0,0,.22);
+}
+.tf-rich-week-main{
+  min-width:0;
+  display:grid;
+  gap:5px;
+}
+.tf-rich-week-main>strong{
+  font-size:1.18rem;
+}
+.tf-rich-week-main>small{
+  color:#9db0c5;
+}
+.tf-rich-score-stat,
+.tf-rich-live-stat{
+  min-height:70px;
+  display:grid;
+  align-content:center;
+  gap:3px;
+  padding:9px 12px;
+  border-left:1px solid rgba(255,255,255,.08);
+}
+.tf-rich-score-stat span,
+.tf-rich-live-stat span{
+  color:#8198b0;
+  font-size:.61rem;
+  font-weight:900;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+}
+.tf-rich-score-stat strong{
+  font-size:1.8rem;
+  line-height:1;
+}
+.tf-rich-live-stat strong{
+  font-size:1rem;
+}
+.tf-rich-score-stat small,
+.tf-rich-live-stat small{
+  color:#8fa3b9;
+  font-size:.66rem;
+}
+
+.sports-rich-team-fantasy .tf-lineup-card{
+  overflow:hidden;
+  border:1px solid rgba(66,138,205,.25);
+  border-radius:22px;
+  background:
+    linear-gradient(180deg,rgba(9,29,53,.97),rgba(4,14,27,.98));
+  box-shadow:0 20px 48px rgba(0,0,0,.29);
+}
+.sports-rich-team-fantasy .tf-weekly-picks-head{
+  padding:17px 18px;
+  background:
+    radial-gradient(circle at 0 0,color-mix(in srgb,var(--sports-rich-primary) 17%,transparent),transparent 42%),
+    linear-gradient(90deg,#0a203a,#061426);
+}
+.sports-rich-team-fantasy .tf-weekly-title-line h2{
+  color:#fff;
+  font-size:1.36rem;
+}
+.sports-rich-team-fantasy .tf-lineup-set-badge{
+  border-color:rgba(57,217,138,.42);
+  background:rgba(34,150,91,.18);
+  color:#a9f2ca;
+}
+
+.sports-rich-team-fantasy .tf-slot-grid{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:10px;
+}
+.sports-rich-team-fantasy .tf-rich-slot{
+  position:relative;
+  min-width:0;
+  min-height:215px;
+  overflow:hidden;
+  padding:12px;
+  border:1px solid rgba(77,139,195,.22);
+  border-radius:17px;
+  background:
+    radial-gradient(circle at 94% 8%,color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 16%,transparent),transparent 13rem),
+    linear-gradient(155deg,rgba(10,31,55,.96),rgba(4,15,28,.97));
+}
+.sports-rich-team-fantasy .tf-rich-slot.has-pick{
+  border-color:color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 42%,rgba(255,255,255,.12));
+}
+.sports-rich-team-fantasy .tf-rich-slot.is-locked{
+  filter:saturate(.76);
+  background:linear-gradient(155deg,rgba(17,29,43,.94),rgba(6,13,22,.97));
+}
+.tf-rich-slot-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:9px;
+}
+.tf-rich-position{
+  display:inline-flex;
+  min-width:48px;
+  padding:5px 8px;
+  border-radius:8px;
+  color:color-mix(in srgb,var(--sports-rich-accent) 80%,#fff);
+  background:rgba(35,152,255,.09);
+  font-size:.67rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+}
+.tf-rich-slot-state{
+  color:#91a6bb;
+  font-size:.58rem;
+  font-weight:1000;
+  letter-spacing:.08em;
+}
+.tf-rich-slot-state.is-picked{color:#76c7ff;}
+.tf-rich-slot-state.is-locked{color:#c5ced8;}
+
+.sports-rich-team-fantasy .tf-rich-team-button,
+.sports-rich-team-fantasy .tf-rich-empty-slot{
+  width:100%;
+  min-height:124px;
+  margin-top:9px;
+  border:0;
+  border-radius:13px;
+  background:rgba(2,10,20,.42);
+  color:#fff;
+}
+.sports-rich-team-fantasy .tf-rich-team-button{
+  display:grid;
+  grid-template-columns:64px minmax(0,1fr) 18px;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  text-align:left;
+}
+.sports-rich-team-fantasy .tf-rich-team-button:not(:disabled){
+  cursor:pointer;
+}
+.tf-rich-logo-wrap{
+  width:64px;height:64px;
+  display:grid;place-items:center;
+  border-radius:14px;
+  background:
+    radial-gradient(circle,color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 18%,rgba(255,255,255,.04)),rgba(255,255,255,.015));
+}
+.tf-rich-team-logo{
+  width:56px!important;
+  height:56px!important;
+  object-fit:contain;
+  filter:drop-shadow(0 8px 12px rgba(0,0,0,.44));
+}
+.tf-rich-team-copy{
+  min-width:0;
+  display:grid;
+  gap:3px;
+}
+.tf-rich-team-line{
+  display:flex;
+  align-items:baseline;
+  gap:7px;
+  min-width:0;
+}
+.tf-rich-team-line>strong{
+  font-size:1.35rem;
+  letter-spacing:-.02em;
+}
+.tf-rich-slot-score{
+  margin-left:auto;
+  color:#fff;
+  font-size:1rem;
+  font-weight:1000;
+}
+.tf-rich-slot-score small{
+  color:#8398ae;
+  font-size:.55rem;
+}
+.tf-rich-matchup{
+  overflow:hidden;
+  color:#c0d0df;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+  font-weight:800;
+}
+.tf-rich-team-copy>small{
+  color:#839ab1;
+  font-size:.67rem;
+}
+.tf-rich-chevron{
+  color:#7ea9cf;
+  font-size:1.5rem;
+}
+.tf-rich-usage{
+  margin-top:9px;
+  display:flex;
+  justify-content:space-between;
+  gap:7px;
+  padding-top:8px;
+  border-top:1px solid rgba(255,255,255,.07);
+  color:#8298ae;
+  font-size:.65rem;
+}
+.tf-rich-usage strong{
+  color:#b9cadd;
+  font-size:.68rem;
+}
+.tf-rich-usage.is-low strong{color:#ffd071;}
+.tf-rich-usage.is-exhausted strong{color:#ff8c94;}
+
+.tf-rich-empty-slot{
+  display:grid;
+  place-items:center;
+  align-content:center;
+  gap:3px;
+  border:1px dashed rgba(93,152,208,.25)!important;
+}
+.tf-rich-empty-plus{
+  color:#77bdff;
+  font-size:1.65rem;
+}
+.tf-rich-empty-slot strong{
+  font-size:.9rem;
+}
+.tf-rich-empty-slot small{
+  color:#8298af;
+}
+.tf-rich-bulk{
+  display:flex;
+  align-items:center;
+  gap:5px;
+  margin-top:7px;
+  color:#7e93aa;
+  font-size:.61rem;
+}
+
+.tf-rich-picker-sheet{
+  max-width:720px;
+  border:1px solid rgba(72,143,207,.32);
+  background:
+    radial-gradient(circle at 10% 0%,color-mix(in srgb,var(--sports-rich-primary) 16%,transparent),transparent 24rem),
+    linear-gradient(180deg,#07172a,#030b16);
+  box-shadow:0 -20px 70px rgba(0,0,0,.52);
+}
+.tf-rich-picker-head{
+  padding:16px 16px 12px;
+}
+.tf-rich-picker-head>div{
+  display:grid;
+  gap:2px;
+}
+.tf-rich-picker-head strong{
+  font-size:1.45rem;
+}
+.tf-rich-picker-head small{
+  color:#91a8bf;
+}
+.tf-rich-picker-list{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:8px;
+  padding:10px 14px 16px;
+}
+.tf-rich-picker-team{
+  min-width:0;
+  display:grid;
+  grid-template-columns:52px minmax(0,1fr) 58px;
+  align-items:center;
+  gap:9px;
+  min-height:76px;
+  padding:8px 10px;
+  border:1px solid rgba(82,141,197,.21);
+  border-radius:13px;
+  background:
+    radial-gradient(circle at 0 50%,color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 13%,transparent),transparent 10rem),
+    rgba(7,22,40,.86);
+}
+.tf-rich-picker-team.is-selected{
+  border-color:color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 58%,#fff0);
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--tf-team-color,var(--sports-rich-primary)) 13%,transparent);
+}
+.tf-rich-picker-team.uses-left-1{
+  border-color:rgba(255,196,78,.34);
+}
+.tf-rich-picker-team.is-bye,
+.tf-rich-picker-team.is-exhausted{
+  opacity:.48;
+  filter:grayscale(.65);
+}
+.tf-rich-picker-logo-wrap{
+  width:52px;height:52px;
+  display:grid;place-items:center;
+}
+.tf-rich-picker-logo{
+  width:48px!important;
+  height:48px!important;
+  object-fit:contain;
+}
+.tf-rich-picker-main{
+  min-width:0;
+  display:grid;
+  gap:2px;
+  text-align:left;
+}
+.tf-rich-picker-main strong{
+  color:#fff;
+  font-size:1rem;
+}
+.tf-rich-picker-main small{
+  overflow:hidden;
+  color:#9cb0c4;
+  white-space:nowrap;
+  text-overflow:ellipsis;
+}
+.tf-rich-picker-usage{
+  display:grid;
+  justify-items:center;
+}
+.tf-rich-picker-usage strong{
+  color:#fff;
+  font-size:1.3rem;
+}
+.tf-rich-picker-usage small{
+  color:#8298ae;
+  font-size:.57rem;
+}
+.tf-rich-picker-actions{
+  border-top:1px solid rgba(255,255,255,.08);
+  background:rgba(0,0,0,.18);
+}
+
+.sports-rich-team-fantasy .tf-game-day-card{
+  border:1px solid rgba(71,135,195,.22);
+  border-radius:20px;
+  background:linear-gradient(180deg,rgba(8,27,49,.94),rgba(4,15,28,.96));
+}
+.sports-rich-team-fantasy .tf-week-points{
+  color:#fff;
+}
+.sports-rich-team-fantasy .tf-week-row.is-you{
+  border-color:color-mix(in srgb,var(--sports-rich-primary) 50%,rgba(255,255,255,.08));
+  background:color-mix(in srgb,var(--sports-rich-primary) 8%,rgba(255,255,255,.025));
+}
+
+@media(max-width:840px){
+  .tf-rich-week-summary{
+    grid-template-columns:1fr repeat(2,minmax(100px,.45fr));
+  }
+  .tf-rich-week-summary>.sports-rich-state{
+    grid-column:1/-1;
+  }
+  .sports-rich-team-fantasy .tf-slot-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+@media(max-width:560px){
+  .sports-rich-team-fantasy .tf-rich-hero{
+    min-height:220px;
+    grid-template-columns:1fr;
+    padding:19px;
+    border-radius:19px;
+  }
+  .sports-rich-team-fantasy .tf-rich-hero h1{
+    font-size:3rem;
+  }
+  .tf-rich-week-summary{
+    grid-template-columns:1fr 1fr;
+    padding:12px;
+  }
+  .tf-rich-week-main{
+    grid-column:1/-1;
+  }
+  .tf-rich-score-stat,
+  .tf-rich-live-stat{
+    border-left:0;
+    border-top:1px solid rgba(255,255,255,.07);
+    padding-inline:4px;
+  }
+  .sports-rich-team-fantasy .tf-slot-grid{
+    gap:7px;
+  }
+  .sports-rich-team-fantasy .tf-rich-slot{
+    min-height:205px;
+    padding:9px;
+  }
+  .sports-rich-team-fantasy .tf-rich-team-button{
+    grid-template-columns:54px minmax(0,1fr) 12px;
+    gap:7px;
+    padding:7px;
+  }
+  .tf-rich-logo-wrap{
+    width:54px;height:54px;
+  }
+  .tf-rich-team-logo{
+    width:49px!important;height:49px!important;
+  }
+  .tf-rich-team-line>strong{
+    font-size:1.12rem;
+  }
+  .tf-rich-slot-score{
+    display:none;
+  }
+  .tf-rich-picker-list{
+    grid-template-columns:1fr;
+  }
+}

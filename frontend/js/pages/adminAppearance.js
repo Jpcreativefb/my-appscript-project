@@ -93,6 +93,125 @@ function adminAppearanceThemeById_(themeId) {
     .find(function(row) { return adminAppearanceKey_(row.ThemePackId) === adminAppearanceKey_(themeId); }) || null;
 }
 
+/* PATTC PLAYER LAYOUT TEMPLATE SWITCHER FULL FAMILY R3 — saved per GameId in existing Appearance ThemeOverrideJSON */
+function adminAppearanceThemeOverrideFromRow_(row) {
+  row = row || {};
+  const direct = row.themeOverride || row.ThemeOverride;
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) return Object.assign({}, direct);
+  const raw = row.ThemeOverrideJSON || row.themeOverrideJSON || "";
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) return Object.assign({}, raw);
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return Object.assign({}, parsed);
+    } catch (err) {}
+  }
+  return {};
+}
+
+function adminAppearanceSelectedGameForLayout_() {
+  const setup = ADMIN_APPEARANCE_STATE.gameSetup || {};
+  if (setup.game) return setup.game;
+  const selected = String(ADMIN_APPEARANCE_STATE.selectedGameId || "");
+  return (ADMIN_APPEARANCE_STATE.games || []).find(function(game) { return adminAppearanceGameId_(game) === selected; }) || {};
+}
+
+function adminAppearanceHasSportsRuntime_() {
+  const setup = ADMIN_APPEARANCE_STATE.gameSetup || {};
+  const categories = Array.isArray(setup.categories) ? setup.categories : [];
+  return categories.some(function(category) {
+    category = category || {};
+    const settings = category.settings || category.Settings || {};
+    return !!String(
+      settings.sportsLeague || settings.SportsLeague ||
+      category.sportsLeague || category.SportsLeague ||
+      settings.sport || settings.Sport || category.sport || category.Sport || ""
+    ).trim();
+  });
+}
+
+function adminAppearanceIsRealityGame_() {
+  const game = adminAppearanceSelectedGameForLayout_();
+  const type = adminAppearanceGameType_(game);
+  const format = String(game.gameFormat || game.GameFormat || "").trim().toLowerCase();
+  return type.indexOf("reality") !== -1 || format.indexOf("reality") !== -1 ||
+    game.realityTvEnabled === true || game.RealityTvEnabled === true ||
+    game.realityEnabled === true || game.RealityEnabled === true ||
+    !!String(game.realityTvSeasonId || game.RealityTvSeasonId || game.realitySeasonId || game.RealitySeasonId || "").trim();
+}
+
+function adminAppearanceSportsRichKind_() {
+  const game = adminAppearanceSelectedGameForLayout_();
+  const type = adminAppearanceGameType_(game);
+  const format = String(game.gameFormat || game.GameFormat || "").trim().toLowerCase();
+  const name = adminAppearanceGameName_(game).toLowerCase();
+  const id = adminAppearanceGameId_(game).toLowerCase();
+  const blob = [type, format, name, id].join(" ");
+  const sportsRuntime = adminAppearanceHasSportsRuntime_() ||
+    game.sportsMode === true || game.SportsMode === true ||
+    game.sportsEnabled === true || game.SportsEnabled === true ||
+    !!String(game.sportsLeague || game.SportsLeague || game.sport || game.Sport || "").trim();
+
+  if (/king[\s_-]*of[\s_-]*the[\s_-]*hill|\bkoth\b/.test(blob) || game.kothEnabled === true || game.KothEnabled === true) return "koth";
+  if (/team[\s_-]*fantasy/.test(blob) || game.teamFantasyEnabled === true || game.TeamFantasyEnabled === true) return "team-fantasy";
+  if (/wager|betting/.test(blob) || game.wagerEnabled === true || game.WagerEnabled === true || game.sportsWagerEnabled === true || game.SportsWagerEnabled === true || game.bettingEnabled === true || game.BettingEnabled === true) return "wager";
+  if ((/confidence|pick[\s_'-]*em/.test(blob) || game.confidenceEnabled === true || game.ConfidenceEnabled === true) && sportsRuntime) return "confidence";
+  if (/survivor/.test(blob) && sportsRuntime) return "survivor";
+  return "";
+}
+
+function adminAppearanceLayoutFamily_() {
+  if (adminAppearanceIsRealityGame_()) return "reality";
+  return adminAppearanceSportsRichKind_() ? "sports" : "other";
+}
+
+function adminAppearanceLayoutValue_(assignment) {
+  const override = adminAppearanceThemeOverrideFromRow_(assignment || adminAppearanceAssignment_());
+  const family = adminAppearanceLayoutFamily_();
+  if (family === "reality") {
+    const raw = String(override.RealityLayoutTemplate || override.realityLayoutTemplate || "clean").trim().toLowerCase();
+    return raw === "cinematic" ? "cinematic" : "clean";
+  }
+  if (family === "sports") {
+    const raw = String(override.SportsLayoutTemplate || override.sportsLayoutTemplate || override.SportsLayout || override.sportsLayout || "clean").trim().toLowerCase();
+    return ["sports-rich","rich","art","sports-art","rich-art","sports-rich-art"].indexOf(raw) !== -1 ? "sports-rich" : "clean";
+  }
+  return "clean";
+}
+
+function adminAppearanceLayoutOptionsHtml_(assignment) {
+  const family = adminAppearanceLayoutFamily_();
+  const current = adminAppearanceLayoutValue_(assignment);
+  if (family === "reality") {
+    return '<option value="clean"' + (current === "clean" ? ' selected' : '') + '>Clean / Art Enhanced</option>' +
+      '<option value="cinematic"' + (current === "cinematic" ? ' selected' : '') + '>Cinematic / Art Immersive</option>';
+  }
+  if (family === "sports") {
+    return '<option value="clean"' + (current === "clean" ? ' selected' : '') + '>Clean / Current</option>' +
+      '<option value="sports-rich"' + (current === "sports-rich" ? ' selected' : '') + '>Sports Rich / Art R3</option>';
+  }
+  return '<option value="clean" selected>Clean / Current</option>';
+}
+
+function adminAppearanceLayoutHelp_() {
+  const family = adminAppearanceLayoutFamily_();
+  if (family === "reality") return "Save, then refresh the same Reality game on the PWA to switch Clean ↔ Cinematic.";
+  if (family === "sports") {
+    const kind = adminAppearanceSportsRichKind_();
+    const labels = {"team-fantasy":"Team Fantasy","confidence":"Confidence / Pick’em","survivor":"Survivor Football","koth":"King of the Hill","wager":"Sports Wager"};
+    return (labels[kind] || "Sports") + ": save, then refresh the same game on the PWA to switch Clean ↔ Sports Rich.";
+  }
+  return "No alternate Rich layout is installed for this game type in this review build.";
+}
+
+function adminAppearanceApplyLayoutToOverride_(override, value) {
+  const next = override && typeof override === "object" ? Object.assign({}, override) : {};
+  const family = adminAppearanceLayoutFamily_();
+  if (family === "reality") next.RealityLayoutTemplate = value === "cinematic" ? "cinematic" : "clean";
+  if (family === "sports") next.SportsLayoutTemplate = value === "sports-rich" ? "sports-rich" : "clean";
+  return next;
+}
+
 function adminAppearanceAssignment_() {
   return ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.gameAppearance || {};
 }
@@ -2107,9 +2226,10 @@ function adminAppearanceBuildHtml_() {
           <label>Game<select id="appearanceGameSelect" class="input" onchange="adminAppearanceSelectGame_(this.value)">${adminAppearanceGameOptions_()}</select></label>
           <label>Image Pack<select id="appearanceGameImagePack" class="input">${adminAppearanceImagePackOptions_(ADMIN_APPEARANCE_STATE.pendingGameImagePackId || assignment.ImagePackId || currentPack)}</select></label>
           <label>Theme Pack<select id="appearanceGameThemePack" class="input">${adminAppearanceThemeOptions_(assignment.ThemePackId || currentTheme, false)}</select></label>
+          <label>Player Layout Template<select id="appearanceGameLayoutTemplate" class="input">${adminAppearanceLayoutOptionsHtml_(assignment)}</select><span class="admin-sub">${adminAppearanceEscape_(adminAppearanceLayoutHelp_())}</span></label>
         </div>
-        <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Apply Selected Packs to Game</button></div>
-        <div class="admin-sub">This section assigns packs to the selected game; it does not edit the Theme Pack or Image Pack itself. Image priority: Game override → Image Pack → existing game image.</div>
+        <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Apply Appearance + Layout to Game</button></div>
+        <div class="admin-sub">This section assigns packs and the <b>Player Layout Template</b> to the selected game. Layout is saved per GameId through the existing Appearance assignment. Image priority: Game override → Image Pack → existing game image.</div>
         ${ADMIN_APPEARANCE_STATE.pendingGameImagePackId ? '<div class="appearance-pack-pending-note">New Image Pack is selected here but <b>has not been applied to the game yet</b>. Click <b>Apply Selected Packs to Game</b> when you are ready.</div>' : ''}
       </section>
 
@@ -2180,12 +2300,15 @@ function adminAppearanceSelectThemeEditor_(themeId) {
 async function adminAppearanceSaveGameAssignment_() {
   const imagePack = document.getElementById("appearanceGameImagePack");
   const themePack = document.getElementById("appearanceGameThemePack");
+  const layout = document.getElementById("appearanceGameLayoutTemplate");
+  const themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
   const result = await apiAdminSaveGameAppearance({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
     imagePackId: imagePack ? imagePack.value : "",
     themePackId: themePack ? themePack.value : "",
     imageMode: imagePack && imagePack.value ? "pack" : "default",
     themeMode: "pack",
+    themeOverride: themeOverride,
     active: true
   });
   if (!result || result.success === false) {
@@ -3656,12 +3779,15 @@ async function adminAppearanceApplyThemeToGame_() {
   const saved = await adminAppearancePersistTheme_({ message: "Theme saved. Applying it to this game…" });
   if (!saved) { adminAppearanceSetThemeActionState_(""); return; }
   const imagePack = document.getElementById("appearanceGameImagePack");
+  const layout = document.getElementById("appearanceGameLayoutTemplate");
+  const themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
   const result = await apiAdminSaveGameAppearance({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
     imagePackId: imagePack ? imagePack.value : adminAppearanceDefaultImagePack_(),
     themePackId: saved.themePackId,
     imageMode: imagePack && imagePack.value ? "pack" : "default",
     themeMode: "pack",
+    themeOverride: themeOverride,
     active: true
   });
   if (!result || result.success === false) {

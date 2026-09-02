@@ -4494,3 +4494,562 @@ async function autoSetWagerOddsFromPage_(){
   }
 
 }
+
+/* =========================================================
+   PATTC SPORTS RICH FAMILY — SHARED FRONTEND RUNTIME
+   Art R3
+
+   Clean / Current remains the default.
+   Sports Rich activates only from the existing per-game Appearance
+   assignment. No second settings/backend system is created.
+
+   Presentation-only. No Sports Engine, scoring, odds, settlement,
+   game rules, saves, locks, auth, or automation logic lives here.
+   ========================================================= */
+(function initializePattcSportsRich_(global) {
+  "use strict";
+
+  if (!global || global.PATTCSportsRich) return;
+
+  const cache = Object.create(null);
+  const inflight = Object.create(null);
+
+  const AUTO_PALETTES = Object.freeze({
+    sports: { primary:"#2398ff", secondary:"#0b6f91", accent:"#76c8ff" },
+    nfl: { primary:"#168bff", secondary:"#16834b", accent:"#83cbff" },
+    ncaaf: { primary:"#b82d3d", secondary:"#bb8a25", accent:"#f0c963" },
+    nba: { primary:"#ef7b2d", secondary:"#b9363e", accent:"#ffb05f" },
+    ncaab: { primary:"#2878d7", secondary:"#e97828", accent:"#71b9ff" },
+    mlb: { primary:"#326fd1", secondary:"#b52f42", accent:"#77b4ff" },
+    nhl: { primary:"#52b9e8", secondary:"#1d7d9b", accent:"#b0ebff" },
+    soccer: { primary:"#27b77a", secondary:"#128eaa", accent:"#71efc2" },
+    racing: { primary:"#e53b43", secondary:"#d49b22", accent:"#ffd75a" },
+    golf: { primary:"#26945a", secondary:"#987927", accent:"#dfc764" }
+  });
+
+  function text_(value) {
+    return value == null ? "" : String(value).trim();
+  }
+
+  function key_(value) {
+    return text_(value).toLowerCase().replace(/[_/\s]+/g, "-");
+  }
+
+  function object_(value) {
+    return value && typeof value === "object" ? value : {};
+  }
+
+  function parseObject_(value) {
+    if (!value) return {};
+    if (value && typeof value === "object") return value;
+    try {
+      const parsed = JSON.parse(String(value));
+      return parsed && typeof parsed === "object" ? parsed : {};
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function appearanceRoot_(bundle) {
+    bundle = object_(bundle);
+    return bundle.appearance && typeof bundle.appearance === "object"
+      ? bundle.appearance
+      : bundle;
+  }
+
+  function sources_(bundle) {
+    const root = appearanceRoot_(bundle);
+    const override = parseObject_(
+      root.ThemeOverrideJSON ||
+      root.themeOverrideJSON ||
+      root.themeOverrideJson ||
+      root.ThemeOverride ||
+      root.themeOverride ||
+      ""
+    );
+
+    return [
+      override,
+      object_(override.sports),
+      object_(override.colors),
+      root,
+      object_(root.sports),
+      object_(root.colors),
+      object_(root.theme),
+      object_(root.theme && root.theme.sports),
+      object_(root.theme && root.theme.colors),
+      object_(root.resolvedTheme),
+      object_(root.resolvedTheme && root.resolvedTheme.colors),
+      object_(root.assignment),
+      bundle
+    ].filter(function(source) {
+      return source && typeof source === "object";
+    });
+  }
+
+  function first_(bundle, keys) {
+    const sources = sources_(bundle);
+    for (let s = 0; s < sources.length; s += 1) {
+      for (let k = 0; k < keys.length; k += 1) {
+        const value = sources[s][keys[k]];
+        if (value !== undefined && value !== null && text_(value)) return value;
+      }
+    }
+    return "";
+  }
+
+  function safeColor_(value) {
+    const raw = text_(value);
+    if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
+    if (/^(rgb|rgba|hsl|hsla)\([0-9.,%\s+-]+\)$/i.test(raw)) return raw;
+    return "";
+  }
+
+  function layoutValue_(bundle) {
+    return key_(first_(bundle, [
+      "SportsLayoutTemplate",
+      "sportsLayoutTemplate",
+      "SportsLayout",
+      "sportsLayout",
+      "SportsPlayerLayout",
+      "sportsPlayerLayout",
+      "LayoutTemplate",
+      "layoutTemplate"
+    ]));
+  }
+
+  function isRichValue_(value) {
+    const raw = key_(value);
+    return (
+      raw === "sports-rich" ||
+      raw === "rich" ||
+      raw === "art" ||
+      raw === "sports-art" ||
+      raw === "rich-art" ||
+      raw === "sports-rich-art"
+    );
+  }
+
+  function isCleanValue_(value) {
+    const raw = key_(value);
+    return (
+      !raw ||
+      raw === "clean" ||
+      raw === "current" ||
+      raw === "default" ||
+      raw === "classic" ||
+      raw === "legacy"
+    );
+  }
+
+  function remember_(gameId, bundle) {
+    const id = text_(gameId);
+    if (!id || !bundle || typeof bundle !== "object") return bundle || null;
+    cache[id] = bundle;
+    try {
+      sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(bundle));
+    } catch (err) {}
+    return bundle;
+  }
+
+  function cached_(gameId) {
+    const id = text_(gameId);
+    if (!id) return null;
+    if (cache[id]) return cache[id];
+
+    try {
+      const raw = sessionStorage.getItem("pattcGameAppearance:" + id);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          cache[id] = parsed;
+          return parsed;
+        }
+      }
+    } catch (err) {}
+
+    return null;
+  }
+
+  async function prepare_(gameId, existingBundle) {
+    const id = text_(gameId);
+    if (!id) return existingBundle || null;
+
+    if (existingBundle && typeof existingBundle === "object") {
+      return remember_(id, existingBundle);
+    }
+
+    const cached = cached_(id);
+
+    // Roy integration: Admin Appearance layout switching must be visible after
+    // a normal PWA refresh. When the live Appearance API exists, request the
+    // current per-GameId assignment instead of letting sessionStorage pin an
+    // older Clean/Rich choice. Cached Appearance remains an offline fallback.
+    if (typeof apiGetGameAppearance !== "function") return cached;
+
+    if (!inflight[id]) {
+      inflight[id] = Promise.resolve(apiGetGameAppearance(id))
+        .then(function(result) {
+          if (result && result.success !== false) return remember_(id, result);
+          return null;
+        })
+        .catch(function(err) {
+          console.warn("Sports Rich Appearance load skipped", err);
+          return null;
+        })
+        .finally(function() {
+          delete inflight[id];
+        });
+    }
+
+    return inflight[id];
+  }
+
+  function appearance_(gameId, provided) {
+    return provided || cached_(gameId) || null;
+  }
+
+  function isRich_(gameId, provided) {
+    const bundle = appearance_(gameId, provided);
+    if (!bundle) return false;
+    return isRichValue_(layoutValue_(bundle));
+  }
+
+  function leagueKey_(sport, league) {
+    const raw = key_([sport, league].filter(Boolean).join(" "));
+    if (/(ncaaf|cfb|college-football|ncaa-football)/.test(raw)) return "ncaaf";
+    if (/(nfl|football)/.test(raw)) return "nfl";
+    if (/(ncaab|cbb|college-basketball|ncaa-basketball)/.test(raw)) return "ncaab";
+    if (/(nba|basketball)/.test(raw)) return "nba";
+    if (/(mlb|baseball)/.test(raw)) return "mlb";
+    if (/(nhl|hockey)/.test(raw)) return "nhl";
+    if (/(mls|epl|uefa|soccer|premier-league)/.test(raw)) return "soccer";
+    if (/(f1|formula|nascar|indycar|racing|motorsport)/.test(raw)) return "racing";
+    if (/(pga|lpga|golf)/.test(raw)) return "golf";
+    return "sports";
+  }
+
+  function colors_(gameId, provided, sport, league) {
+    const bundle = appearance_(gameId, provided) || {};
+    const auto = AUTO_PALETTES[leagueKey_(sport, league)] || AUTO_PALETTES.sports;
+
+    return {
+      primary: safeColor_(first_(bundle, [
+        "SportsPrimaryColor", "sportsPrimaryColor", "PrimaryColor", "primaryColor", "primary"
+      ])) || auto.primary,
+      secondary: safeColor_(first_(bundle, [
+        "SportsSecondaryColor", "sportsSecondaryColor", "SecondaryColor", "secondaryColor", "secondary"
+      ])) || auto.secondary,
+      accent: safeColor_(first_(bundle, [
+        "SportsAccentColor", "sportsAccentColor", "AccentColor", "accentColor", "accent"
+      ])) || auto.accent
+    };
+  }
+
+  function assets_(gameId, provided) {
+    const bundle = appearance_(gameId, provided) || {};
+    return {
+      hero: text_(first_(bundle, [
+        "SportsHeroImageUrl", "sportsHeroImageUrl", "HeroImageUrl", "heroImageUrl",
+        "BackgroundImageUrl", "backgroundImageUrl", "BannerImageUrl", "bannerImageUrl"
+      ])),
+      logo: text_(first_(bundle, [
+        "SportsLogoUrl", "sportsLogoUrl", "LogoImageUrl", "logoImageUrl",
+        "LogoUrl", "logoUrl"
+      ]))
+    };
+  }
+
+  function styleAttr_(gameId, provided, sport, league) {
+    const colors = colors_(gameId, provided, sport, league);
+    return 'style="--sports-rich-primary:' + colors.primary +
+      ';--sports-rich-secondary:' + colors.secondary +
+      ';--sports-rich-accent:' + colors.accent + '"';
+  }
+
+  function img_(source, options) {
+    if (!source || typeof platformImgHtml !== "function") return "";
+    return platformImgHtml(source, options || {});
+  }
+
+  function bgAttrs_(source, cssVariable) {
+    if (!source || typeof platformBackgroundAttrs !== "function") return "";
+    return platformBackgroundAttrs(source, {
+      variant: "hero",
+      cssVariable: cssVariable || "--sports-rich-hero-image",
+      eager: true
+    });
+  }
+
+  function process_(root) {
+    const canQuery = typeof document !== "undefined" && document && typeof document.querySelector === "function";
+    const node = typeof root === "string" ? (canQuery ? document.querySelector(root) : null) : root;
+    if (
+      node &&
+      global.PlatformImageEngine &&
+      typeof global.PlatformImageEngine.process === "function"
+    ) {
+      global.PlatformImageEngine.process(node);
+    }
+  }
+
+  function afterMount_(selector, callback) {
+    if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+    setTimeout(function() {
+      if (typeof document === "undefined" || !document || typeof document.querySelector !== "function") return;
+      const node = document.querySelector(selector);
+      if (!node) return;
+      process_(node);
+      if (typeof callback === "function") callback(node);
+    }, 0);
+  }
+
+  function formatKickoff_(value) {
+    if (!value) return "";
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return text_(value);
+    try {
+      return d.toLocaleString([], {
+        weekday: "short",
+        hour: "numeric",
+        minute: "2-digit"
+      });
+    } catch (err) {
+      return d.toLocaleString();
+    }
+  }
+
+  function teamLogoUrl_(abbr, league) {
+    const key = text_(abbr).toUpperCase();
+    if (!key) return "";
+    const leagueKey = key_(league || "nfl");
+    if (leagueKey.indexOf("nfl") !== -1 || !leagueKey) {
+      const slug = key === "WAS" ? "wsh" : key.toLowerCase();
+      return "https://a.espncdn.com/i/teamlogos/nfl/500/" + encodeURIComponent(slug) + ".png";
+    }
+    return "";
+  }
+
+  global.PATTCSportsRich = {
+    prepare: prepare_,
+    remember: remember_,
+    cached: cached_,
+    appearance: appearance_,
+    layoutValue: layoutValue_,
+    isRichValue: isRichValue_,
+    isCleanValue: isCleanValue_,
+    isRich: isRich_,
+    colors: colors_,
+    assets: assets_,
+    styleAttr: styleAttr_,
+    img: img_,
+    bgAttrs: bgAttrs_,
+    process: process_,
+    afterMount: afterMount_,
+    formatKickoff: formatKickoff_,
+    teamLogoUrl: teamLogoUrl_,
+    leagueKey: leagueKey_
+  };
+})(typeof globalThis !== "undefined" ? globalThis : (typeof window !== "undefined" ? window : this));
+
+/* =========================================================
+   SPORTS WAGER — APPROVED RICH FOUNDATION (GATED)
+   No visual redesign in R3; this only makes the approved Art treatment
+   coexist with Clean through the shared Appearance selector.
+   ========================================================= */
+
+function sportsRichWagerGameId_() {
+  return String(
+    typeof getBettingGameId_ === "function"
+      ? getBettingGameId_()
+      : (typeof getFrontendGameId === "function" ? getFrontendGameId() : "")
+  ).trim();
+}
+
+function sportsRichWagerEnabled_() {
+  const gameId = sportsRichWagerGameId_();
+  return !!(
+    window.PATTCSportsRich &&
+    PATTCSportsRich.isRich(gameId)
+  );
+}
+
+function sportsRichWagerMarketType_(value) {
+  const text = String(value || "").toLowerCase();
+  if (/player\s*prop|passing|rushing|receiv|reception|touchdown|yards|strikeout|hits?\b|rebounds?|assists?/.test(text)) return "player-props";
+  if (/spread|point spread|against the spread|\bats\b/.test(text)) return "spread";
+  if (/total|over\/under|over under|\bo\/u\b/.test(text)) return "total";
+  return "moneyline";
+}
+
+function sportsRichWagerJumpTo_(market) {
+  if (market === "my-wagers") {
+    const history = document.getElementById("sportsRichWagerHistory");
+    if (history) {
+      history.open = true;
+      history.scrollIntoView({behavior:"smooth",block:"center"});
+    }
+    return;
+  }
+
+  const cards = Array.from(document.querySelectorAll(".sports-rich-wager .betting-category-card"));
+  const match = cards.find(function(card) {
+    return sportsRichWagerMarketType_(card.textContent || "") === market;
+  });
+
+  if (match) {
+    let node = match;
+    while (node) {
+      if (node.tagName === "DETAILS") node.open = true;
+      node = node.parentElement;
+    }
+    match.scrollIntoView({behavior:"smooth",block:"center"});
+  }
+}
+
+function sportsRichWagerHero_(summary, config) {
+  const gameId = sportsRichWagerGameId_();
+  const appearance = PATTCSportsRich.appearance(gameId);
+  const first = (BETTING_PAGE_BATCH_STATE.categories || [])[0] || {};
+  const sport = first.sport || first.sportsSport || "";
+  const league = first.sportsLeague || first.league || "";
+  const assets = PATTCSportsRich.assets(gameId, appearance);
+  const starting = Number(config && config.startingBankroll || 0);
+  const bankroll = Number(summary && summary.bankroll || 0);
+  const winnings = bankroll - starting;
+  const pending = Number(summary && summary.pendingBets || 0);
+
+  return `<section
+    class="sports-rich-wager-hero sports-rich-hero-bg"
+    ${PATTCSportsRich.styleAttr(gameId, appearance, sport, league)}
+    ${PATTCSportsRich.bgAttrs(assets.hero, "--sports-rich-hero-image")}
+  >
+    <div class="sports-rich-wager-hero-copy">
+      <span class="sports-rich-kicker">PATTC SPORTS</span>
+      <h1>SPORTS WAGER</h1>
+      <p>Virtual PATTC credits · live matchups · saved odds · clear returns</p>
+    </div>
+    <div class="sports-rich-wager-primary-stats">
+      <div><span>PATTC Credits</span><strong>${money_(bankroll)}</strong></div>
+      <div><span>Pending</span><strong>${pending}</strong></div>
+      <div class="${winnings >= 0 ? "is-positive" : "is-negative"}"><span>Lifetime won</span><strong>${winnings > 0 ? "+" : ""}${money_(winnings)}</strong></div>
+    </div>
+  </section>`;
+}
+
+function sportsRichWagerTabs_() {
+  return `<nav class="sports-rich-wager-market-tabs" aria-label="Wager markets">
+    <button type="button" class="market-moneyline" onclick="sportsRichWagerJumpTo_('moneyline')">Moneyline</button>
+    <button type="button" class="market-spread" onclick="sportsRichWagerJumpTo_('spread')">Spread</button>
+    <button type="button" class="market-total" onclick="sportsRichWagerJumpTo_('total')">Total</button>
+    <button type="button" class="market-player-props" onclick="sportsRichWagerJumpTo_('player-props')">Player Props</button>
+    <button type="button" onclick="sportsRichWagerJumpTo_('my-wagers')">My Wagers</button>
+  </nav>`;
+}
+
+function sportsRichWagerBetDate_(bet) {
+  const value = bet && (
+    bet.placedAt || bet.savedAt || bet.createdAt || bet.updatedAt ||
+    bet.wagerDate || bet.date || bet.timestamp
+  );
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString([], {month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
+}
+
+function sportsRichWagerHistory_(summary) {
+  const bets = Array.isArray(summary && summary.bets) ? summary.bets.slice().reverse().slice(0,3) : [];
+  const categories = BETTING_PAGE_BATCH_STATE.categories || [];
+
+  return `<details id="sportsRichWagerHistory" class="sports-rich-wager-history">
+    <summary><span>YOUR WAGER HISTORY</span><small>${bets.length ? "Last " + bets.length : "No wagers yet"}</small></summary>
+    <div>
+      ${bets.length ? bets.map(function(bet) {
+        const category = categories.find(function(row) {
+          return String(row && row.id || "") === String(bet.categoryId || "");
+        }) || {};
+        const nominee = typeof getBettingNomineeFromCategory_ === "function"
+          ? getBettingNomineeFromCategory_(category, bet.nomineeId)
+          : null;
+        const name = nominee ? (nominee.shortAnswer || nominee.name || nominee.id) : (bet.nomineeName || bet.pickName || bet.nomineeId || "Selection");
+        const status = String(bet.status || "pending").toLowerCase();
+        const won = status === "won" || status === "win";
+        const lost = status === "lost" || status === "loss";
+        const state = won ? "WIN" : lost ? "LOST" : "PENDING";
+        const potential = Number(bet.potentialReturn || 0);
+        const payout = Number(bet.payout || 0);
+        const ret = lost ? 0 : won ? (payout || potential) : potential;
+        return `<div class="sports-rich-wager-history-row state-${state.toLowerCase()}">
+          <span><strong>${escapeBettingHtml_(category.shortName || category.name || "Sports wager")}</strong><small>${escapeBettingHtml_(name)}${sportsRichWagerBetDate_(bet) ? " · " + escapeBettingHtml_(sportsRichWagerBetDate_(bet)) : ""}</small></span>
+          <b>${state}</b>
+          <em>Return ${money_(ret)}</em>
+        </div>`;
+      }).join("") : `<div class="sports-rich-wager-empty">Your settled and pending wagers will appear here.</div>`}
+    </div>
+  </details>`;
+}
+
+const SPORTS_RICH_WAGER_ORIGINAL_SUMMARY_ = renderBettingSummary_;
+renderBettingSummary_ = function(summary, leaderboardRows, username, config) {
+  let html = SPORTS_RICH_WAGER_ORIGINAL_SUMMARY_.apply(this, arguments);
+  if (!sportsRichWagerEnabled_()) return html;
+  return String(html)
+    .replace(">Bankroll<", ">PATTC Credits<")
+    .replace(">Winnings<", ">Lifetime Won<")
+    .replace(">Pending<", ">Pending Wagers<");
+};
+
+const SPORTS_RICH_WAGER_ORIGINAL_CATEGORY_ = renderBettingCategory_;
+renderBettingCategory_ = function(category, bet, config) {
+  let html = SPORTS_RICH_WAGER_ORIGINAL_CATEGORY_.apply(this, arguments);
+  if (!sportsRichWagerEnabled_()) return html;
+
+  const gameId = sportsRichWagerGameId_();
+  const appearance = PATTCSportsRich.appearance(gameId);
+  const attrs = PATTCSportsRich.styleAttr(
+    gameId,
+    appearance,
+    category && (category.sport || category.sportsSport || ""),
+    category && (category.sportsLeague || category.league || "")
+  );
+
+  return String(html || "").replace(
+    '<details class="betting-category-card',
+    '<details ' + attrs + ' class="betting-category-card sports-rich-wager-market'
+  );
+};
+
+const SPORTS_RICH_WAGER_ORIGINAL_PAGE_ = renderBettingPage;
+renderBettingPage = async function() {
+  const gameId = sportsRichWagerGameId_();
+  await PATTCSportsRich.prepare(gameId);
+
+  const html = await SPORTS_RICH_WAGER_ORIGINAL_PAGE_.apply(this, arguments);
+  if (!PATTCSportsRich.isRich(gameId)) return html;
+
+  const summary = BETTING_PAGE_BATCH_STATE.summary || {};
+  const config = BETTING_PAGE_BATCH_STATE.config || {};
+  let output = String(html || "")
+    .replace(
+      '<div class="page betting-page">',
+      '<div class="page betting-page sports-rich-wager">'
+    )
+    .replace(
+      '<h1>Wager</h1>',
+      sportsRichWagerHero_(summary, config)
+    )
+    .replace(
+      '<div id="bettingCategoryListBlock">',
+      sportsRichWagerTabs_() + '<div id="bettingCategoryListBlock">'
+    );
+
+  const history = sportsRichWagerHistory_(summary);
+  output = output.replace(
+    '<div id="bettingBatchStatusBlock">',
+    history + '<div id="bettingBatchStatusBlock">'
+  );
+
+  PATTCSportsRich.afterMount(".sports-rich-wager");
+  return output;
+};
