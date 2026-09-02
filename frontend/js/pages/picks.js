@@ -670,6 +670,10 @@ function realityTvHeaderPresentation_() {
 function renderPicksPageHeader_() {
   const reality = realityTvHeaderPresentation_();
 
+  if (reality && realityTvLayoutTemplate_() === "cinematic") {
+    return renderRealityTvCinematicHeader_(reality);
+  }
+
   if (reality) {
     const progressText = reality.total
       ? reality.picked + " of " + reality.total + " predictions complete"
@@ -708,6 +712,264 @@ function renderPicksPageHeader_() {
     ${hasStakedPointsCategories() ? renderStakedPointsSummaryBar() : ""}
   </div>`;
 }
+
+/* PATTC REALITY CINEMATIC ART IMPLEMENTATION */
+
+/* =========================================================
+   PATTC Reality CINEMATIC layout — Art
+   Presentation only. CLEAN remains the default.
+   ========================================================= */
+
+function realityTvAppearanceValue_(source, keys) {
+  source = source && typeof source === "object" ? source : {};
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    if (source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== "") {
+      return source[key];
+    }
+  }
+  return "";
+}
+
+function realityTvThemeOverrideObject_() {
+  const appearance = PICKS_PAGE_DATA.appearance || {};
+  const raw = realityTvAppearanceValue_(appearance, [
+    "ThemeOverrideJSON","themeOverrideJSON","themeOverrideJson","themeOverride","ThemeOverride"
+  ]);
+  if (!raw) return {};
+  if (raw && typeof raw === "object") return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch (err) {
+    return {};
+  }
+}
+
+function realityTvLayoutTemplate_() {
+  /* PATTC REALITY CINEMATIC REVIEW-ONLY TOGGLE */
+  try {
+    const query = new URLSearchParams(window.location.search || "");
+    const requested = String(query.get("realityLayout") || "").trim().toLowerCase();
+    if (requested === "cinematic" || requested === "clean") {
+      localStorage.setItem("pattcRealityLayoutPreview", requested);
+    }
+    const preview = String(localStorage.getItem("pattcRealityLayoutPreview") || "").trim().toLowerCase();
+    if (preview === "cinematic" || preview === "clean") return preview;
+  } catch (err) {}
+
+  const appearance = PICKS_PAGE_DATA.appearance || {};
+  const override = realityTvThemeOverrideObject_();
+  const raw =
+    realityTvAppearanceValue_(appearance, [
+      "RealityLayoutTemplate","realityLayoutTemplate","RealityLayout","realityLayout","layoutTemplate","LayoutTemplate"
+    ]) ||
+    realityTvAppearanceValue_(override, [
+      "RealityLayoutTemplate","realityLayoutTemplate","RealityLayout","realityLayout"
+    ]);
+
+  return String(raw || "clean").trim().toLowerCase() === "cinematic"
+    ? "cinematic"
+    : "clean";
+}
+
+function realityTvCinematicAppearance_() {
+  const appearance = PICKS_PAGE_DATA.appearance || {};
+  const override = realityTvThemeOverrideObject_();
+  const read = function(keys) {
+    return realityTvAppearanceValue_(override, keys) || realityTvAppearanceValue_(appearance, keys);
+  };
+
+  return {
+    heroImageUrl: String(read([
+      "RealityHeroImageUrl","realityHeroImageUrl","HeroImageUrl","heroImageUrl","HeroImage","heroImage",
+      "BackgroundImageUrl","backgroundImageUrl"
+    ]) || ""),
+    showLogoUrl: String(read([
+      "RealityShowLogoUrl","realityShowLogoUrl","ShowLogoUrl","showLogoUrl","LogoImageUrl","logoImageUrl","LogoUrl","logoUrl"
+    ]) || ""),
+    primaryColor: String(read(["RealityPrimaryColor","realityPrimaryColor","PrimaryColor","primaryColor"]) || ""),
+    secondaryColor: String(read(["RealitySecondaryColor","realitySecondaryColor","SecondaryColor","secondaryColor"]) || ""),
+    accentColor: String(read(["RealityAccentColor","realityAccentColor","AccentColor","accentColor"]) || "")
+  };
+}
+
+function realityTvCinematicSafeCssUrl_(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (!/^(https?:\/\/|data:image\/|\/|\.\/|\.\.\/)/i.test(raw)) return "";
+  return raw.replace(/["'()\\\n\r]/g, "");
+}
+
+function realityTvCinematicSafeColor_(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^#[0-9a-f]{3,8}$/i.test(raw)) return raw;
+  if (/^(rgb|rgba|hsl|hsla)\([0-9.,%\s+-]+\)$/i.test(raw)) return raw;
+  return "";
+}
+
+function realityTvCinematicStyleAttr_() {
+  if (realityTvLayoutTemplate_() !== "cinematic") return "";
+  const a = realityTvCinematicAppearance_();
+  const declarations = [];
+  const primary = realityTvCinematicSafeColor_(a.primaryColor);
+  const secondary = realityTvCinematicSafeColor_(a.secondaryColor);
+  const accent = realityTvCinematicSafeColor_(a.accentColor);
+
+  if (primary) declarations.push("--reality-cinematic-primary:" + primary);
+  if (secondary) declarations.push("--reality-cinematic-secondary:" + secondary);
+  if (accent) declarations.push("--reality-cinematic-accent:" + accent);
+  return declarations.length ? ` style="${declarations.join(";")}"` : "";
+}
+
+function realityTvCinematicHeroAttrs_() {
+  if (realityTvLayoutTemplate_() !== "cinematic") return "";
+  const hero = realityTvCinematicSafeCssUrl_(realityTvCinematicAppearance_().heroImageUrl);
+  if (!hero) return "";
+  return " " + platformBackgroundAttrs(hero, {
+    variant: "hero",
+    cssVariable: "--reality-cinematic-hero",
+    eager: true
+  });
+}
+
+function realityTvCinematicShowLogoHtml_(reality) {
+  const logo = realityTvCinematicSafeCssUrl_(realityTvCinematicAppearance_().showLogoUrl);
+  if (logo) {
+    return platformImgHtml(logo, {
+      className: "reality-cinematic-show-logo",
+      variant: "logo",
+      alt: reality.showName,
+      critical: true
+    });
+  }
+  return `<div class="reality-cinematic-show-title">${escapeHtml(reality.showName)}</div>`;
+}
+
+function realityTvCinematicStateHelp_(label) {
+  const state = String(label || "").toUpperCase();
+  if (state.indexOf("RESULTS READY") !== -1) return "Results are available. Review your pick, the correct answer, and points earned.";
+  if (state.indexOf("WAITING FOR RESULTS") !== -1) return "Your picks are saved. Results will appear after PATTC has a safe finalized result.";
+  if (state.indexOf("LOCKED") !== -1) return "This episode is locked. Your saved selections can no longer be changed.";
+  if (state.indexOf("COMPLETE FOR NOW") !== -1) return "All current episode predictions are complete. Review them while they remain editable.";
+  if (state.indexOf("SAVED") !== -1 || state.indexOf("IN PROGRESS") !== -1) return "Your progress is saved. Finish the remaining open predictions before lock.";
+  return "Make this episode's predictions, then check any season-long picks that still need attention.";
+}
+
+function renderRealityTvCinematicHeader_(reality) {
+  const progressText = reality.total
+    ? reality.picked + " of " + reality.total + " predictions complete"
+    : "Prediction slate preparing";
+
+  return `<section class="picks-page-header reality-cinematic-hero"${realityTvCinematicHeroAttrs_()}${realityTvCinematicStyleAttr_()}>
+    <div class="reality-cinematic-hero-overlay" aria-hidden="true"></div>
+    <div class="reality-cinematic-brand">
+      <span class="reality-cinematic-family">PATTC REALITY</span>
+      ${realityTvCinematicShowLogoHtml_(reality)}
+      <div class="reality-cinematic-season-row">
+        ${reality.seasonName ? `<span>${escapeHtml(reality.seasonName)}</span>` : ""}
+        <strong>${escapeHtml(reality.episodeName)}</strong>
+      </div>
+    </div>
+    <div class="reality-cinematic-episode-status">
+      <div class="reality-cinematic-state-row">
+        <span class="reality-game-state ${escapeAttr(reality.stateClass)}">${escapeHtml(reality.episodeStateLabel)}</span>
+        ${reality.schedule ? `<span class="reality-cinematic-lock-line">${escapeHtml(reality.schedule)}</span>` : ""}
+      </div>
+      <strong class="reality-cinematic-progress-copy">${escapeHtml(progressText)}</strong>
+      <div class="reality-cinematic-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Number(reality.percent || 0)}">
+        <span style="width:${Number(reality.percent || 0)}%"></span>
+      </div>
+      <p>${escapeHtml(realityTvCinematicStateHelp_(reality.episodeStateLabel))}</p>
+    </div>
+  </section>`;
+}
+
+function realityTvCinematicNomineeStatus_(nominee) {
+  nominee = nominee || {};
+  const status = String(nominee.status || "").toUpperCase();
+  if (nominee.isWinner === true || nominee.winner === true || status === "WINNER") return "winner";
+  if (nominee.isFinalist === true || nominee.finalist === true || status === "FINALIST") return "finalist";
+  if (nominee.isEliminated === true || nominee.eliminated === true || status === "ELIMINATED" || status === "OUT") return "eliminated";
+  return "active";
+}
+
+function realityTvCinematicNomineeName_(nominee) {
+  nominee = nominee || {};
+  return String(nominee.displayName || nominee.shortAnswer || nominee.name || nominee.NomineeName || nominee.id || "Contestant");
+}
+
+function realityTvCinematicNomineeImage_(nominee) {
+  nominee = nominee || {};
+  return String(nominee.imageUrl || nominee.ImageUrl || nominee.photoUrl || nominee.PhotoUrl || nominee.image || nominee.photo || "");
+}
+
+function realityTvCinematicCastFromRuntime_() {
+  if (realityTvLayoutTemplate_() !== "cinematic") return [];
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const direct = []
+    .concat(Array.isArray(view.cast) ? view.cast : [])
+    .concat(Array.isArray(view.contestants) ? view.contestants : [])
+    .concat(Array.isArray(view.participants) ? view.participants : []);
+
+  const seen = {};
+  const cast = [];
+  const add = function(nominee) {
+    nominee = nominee || {};
+    const id = normalizeId(nominee.id || nominee.nomineeId || nominee.NomineeId || nominee.name || nominee.displayName);
+    if (!id || seen[id]) return;
+    seen[id] = true;
+    cast.push(nominee);
+  };
+
+  direct.forEach(add);
+
+  if (!cast.length) {
+    (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
+      []
+        .concat(Array.isArray(category.nominees) ? category.nominees : [])
+        .concat(Array.isArray(category.answers) ? category.answers : [])
+        .concat(Array.isArray(category.options) ? category.options : [])
+        .forEach(add);
+    });
+  }
+
+  return cast.slice(0, 18);
+}
+
+function renderRealityTvCinematicCastPreview_() {
+  if (realityTvLayoutTemplate_() !== "cinematic") return "";
+  const cast = realityTvCinematicCastFromRuntime_();
+  if (!cast.length) return "";
+
+  return `<section class="reality-cinematic-cast-section">
+    <div class="reality-cinematic-section-heading">
+      <div><span>SEASON CAST</span><h2>Contestants & teams</h2></div>
+      <small>Active, eliminated, finalists and winners remain visible</small>
+    </div>
+    <div class="reality-cinematic-cast-rail" role="list">
+      ${cast.map(function(nominee) {
+        const name = realityTvCinematicNomineeName_(nominee);
+        const status = realityTvCinematicNomineeStatus_(nominee);
+        const image = realityTvCinematicSafeCssUrl_(realityTvCinematicNomineeImage_(nominee));
+        const media = image
+          ? platformImgHtml(image, {
+              className: "reality-cinematic-cast-photo",
+              variant: "avatar",
+              alt: name
+            })
+          : `<span class="reality-cinematic-cast-fallback">${escapeHtml(name.slice(0,1).toUpperCase())}</span>`;
+
+        return `<article class="reality-cinematic-cast-card status-${escapeAttr(status)}" role="listitem">
+          <div class="reality-cinematic-cast-image">${media}</div>
+          <div class="reality-cinematic-cast-copy"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(status.toUpperCase())}</span></div>
+        </article>`;
+      }).join("")}
+    </div>
+  </section>`;
+}
+
 
 async function renderPicksPage() {
 
@@ -877,7 +1139,7 @@ PICKS_PAGE_DATA.confidenceScoringMode =
   );
 
   return `
-    <div class="page picks-page${PICKS_PAGE_DATA.appearance ? "" : " picks-appearance-loading"}${PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true ? " reality-player-page" : ""}">
+    <div class="page picks-page${PICKS_PAGE_DATA.appearance ? "" : " picks-appearance-loading"}${PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true ? " reality-player-page" : ""}${PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.enabled === true && realityTvLayoutTemplate_() === "cinematic" ? " reality-layout-cinematic" : ""}">
 
       ${renderHybridPicksBackButton_()}
 
@@ -892,6 +1154,8 @@ PICKS_PAGE_DATA.confidenceScoringMode =
       </div>
 
       <div class="reality-season-long-slot" id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
+
+      <div id="realityCinematicCastMount">${renderRealityTvCinematicCastPreview_()}</div>
 
       <div id="realityTvPlayerSummaryMount">${renderRealityTvPlayerSummary_()}</div>
 

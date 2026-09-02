@@ -7043,3 +7043,247 @@ details.season-anchor-card {
     margin-top: 16px;
   }
 }
+
+/* PATTC REALITY CINEMATIC ART IMPLEMENTATION */
+
+/* =========================================================
+   PATTC Reality CINEMATIC layout — Art
+   Additive only; CLEAN is not affected.
+   ========================================================= */
+
+.picks-page.reality-player-page.reality-layout-cinematic {
+  --reality-cinematic-primary: var(--picks-theme-selected-border,#f97316);
+  --reality-cinematic-secondary: var(--picks-theme-header-bg,#172033);
+  --reality-cinematic-accent: var(--picks-theme-selected-text,#fbbf24);
+  --reality-cinematic-hero: none;
+  --reality-semantic-success:#22c55e;
+  --reality-semantic-danger:#ef4444;
+  --reality-semantic-selected:#3b82f6;
+  --reality-semantic-locked:#94a3b8;
+  position:relative;
+  isolation:isolate;
+  overflow-x:clip;
+  background:
+    radial-gradient(circle at 8% 1%,color-mix(in srgb,var(--reality-cinematic-primary) 17%,transparent),transparent 27rem),
+    linear-gradient(180deg,var(--picks-theme-page-bg,#030712),#030507);
+}
+
+.reality-layout-cinematic .reality-cinematic-hero {
+  position:relative;
+  isolation:isolate;
+  min-height:clamp(280px,42vw,430px);
+  display:grid;
+  grid-template-columns:minmax(0,1.25fr) minmax(290px,.75fr);
+  align-items:end;
+  gap:22px;
+  overflow:hidden;
+  margin:0 0 18px;
+  padding:clamp(22px,4vw,42px);
+  border:1px solid color-mix(in srgb,var(--reality-cinematic-accent) 30%,rgba(255,255,255,.12));
+  border-radius:24px;
+  color:#fff;
+  background:
+    var(--reality-cinematic-hero) center/cover no-repeat,
+    radial-gradient(circle at 72% 28%,color-mix(in srgb,var(--reality-cinematic-primary) 46%,transparent),transparent 34%),
+    linear-gradient(135deg,var(--reality-cinematic-secondary),#05070a);
+  box-shadow:0 24px 70px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.08);
+}
+
+.reality-layout-cinematic .reality-cinematic-hero-overlay {
+  position:absolute;inset:0;z-index:-1;
+  background:
+    linear-gradient(90deg,rgba(2,6,12,.14),rgba(2,6,12,.03) 50%,rgba(2,6,12,.34)),
+    linear-gradient(0deg,rgba(2,6,12,.92),rgba(2,6,12,.10) 65%,rgba(2,6,12,.2));
+}
+
+.reality-layout-cinematic .reality-cinematic-family {
+  display:inline-flex;margin-bottom:12px;padding:6px 10px;border-radius:999px;
+  border:1px solid color-mix(in srgb,var(--reality-cinematic-accent) 50%,rgba(255,255,255,.18));
+  background:rgba(2,6,12,.48);color:color-mix(in srgb,var(--reality-cinematic-accent) 75%,#fff);
+  font-size:.67rem;font-weight:950;letter-spacing:.16em;
+}
+
+.reality-layout-cinematic .reality-cinematic-show-logo {
+  display:block;width:min(620px,92%);max-height:165px;object-fit:contain;object-position:left center;
+  filter:drop-shadow(0 7px 20px rgba(0,0,0,.72));
+}
+
+.reality-layout-cinematic .reality-cinematic-show-title {
+  max-width:760px;color:#fff;font-size:clamp(2.25rem,6vw,4.6rem);font-weight:1000;line-height:.92;
+  letter-spacing:-.055em;text-transform:uppercase;text-shadow:0 8px 32px rgba(0,0,0,.68);text-wrap:balance;
+}
+
+.reality-layout-cinematic .reality-cinematic-season-row {
+  display:flex;align-items:center;flex-wrap:wrap;gap:9px 14px;margin-top:18px;
+}
+.reality-layout-cinematic .reality-cinematic-season-row span {
+  color:color-mix(in srgb,var(--reality-cinematic-accent) 72%,#fff);font-size:.78rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;
+}
+.reality-layout-cinematic .reality-cinematic-season-row strong {
+  padding:7px 12px;border:1px solid rgba(255,255,255,.18);border-radius:9px;background:rgba(2,6,12,.52);
+  font-size:.82rem;letter-spacing:.06em;text-transform:uppercase;
+}
+
+.reality-layout-cinematic .reality-cinematic-episode-status {
+  display:grid;gap:10px;padding:18px;border:1px solid rgba(255,255,255,.15);border-radius:18px;
+  background:linear-gradient(145deg,rgba(3,7,18,.76),rgba(3,7,18,.44));backdrop-filter:blur(12px);
+}
+
+.reality-layout-cinematic .reality-cinematic-state-row {display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+.reality-layout-cinematic .reality-cinematic-lock-line {color:#e2e8f0;font-size:.73rem;font-weight:750}
+.reality-layout-cinematic .reality-cinematic-progress-copy {font-size:1.08rem;color:#fff}
+.reality-layout-cinematic .reality-cinematic-progress {height:10px;overflow:hidden;border-radius:999px;background:rgba(255,255,255,.12)}
+.reality-layout-cinematic .reality-cinematic-progress>span {
+  display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,var(--reality-cinematic-primary),var(--reality-cinematic-accent));
+}
+.reality-layout-cinematic .reality-cinematic-episode-status p {margin:0;color:#d9e0e8;font-size:.84rem;line-height:1.45}
+
+.reality-layout-cinematic .reality-game-state {
+  display:inline-flex;width:max-content;padding:6px 10px;border-radius:999px;font-size:.68rem;font-weight:1000;letter-spacing:.07em;text-transform:uppercase;
+}
+.reality-layout-cinematic .reality-game-state.state-open,
+.reality-layout-cinematic .reality-game-state.state-saved-in-progress {
+  border:1px solid #3b82f6aa;background:#1d4ed638;color:#dbeafe;
+}
+.reality-layout-cinematic .reality-game-state.state-complete-for-now {
+  border:1px solid #22c55eaa;background:#16653444;color:#dcfce7;
+}
+.reality-layout-cinematic .reality-game-state.state-locked {
+  border:1px solid #94a3b899;background:#47556955;color:#f1f5f9;
+}
+.reality-layout-cinematic .reality-game-state.state-waiting-for-results {
+  border:1px solid #a78bfaaa;background:#5b21b644;color:#ede9fe;
+}
+.reality-layout-cinematic .reality-game-state.state-results-ready {
+  border:1px solid #22c55eaa;background:#16653444;color:#dcfce7;
+}
+
+/* Current episode visual priority */
+.reality-layout-cinematic .reality-episode-picks-section.current {
+  overflow:hidden;margin-bottom:20px;border:1px solid color-mix(in srgb,var(--reality-cinematic-primary) 42%,rgba(255,255,255,.14));
+  border-radius:22px;background:linear-gradient(180deg,color-mix(in srgb,var(--reality-cinematic-secondary) 78%,#080b10),rgba(5,8,12,.96));
+  box-shadow:0 18px 52px rgba(0,0,0,.26);
+}
+.reality-layout-cinematic .reality-current-question-heading {
+  padding:18px 20px;border-bottom:1px solid rgba(255,255,255,.10);
+  background:radial-gradient(circle at 0 0,color-mix(in srgb,var(--reality-cinematic-primary) 27%,transparent),transparent 45%),linear-gradient(135deg,var(--reality-cinematic-secondary),#080b10);
+}
+.reality-layout-cinematic .reality-current-question-heading h2 {color:#fff;font-size:clamp(1.35rem,3vw,1.9rem)}
+.reality-layout-cinematic .reality-episode-kicker {color:color-mix(in srgb,var(--reality-cinematic-accent) 72%,#fff)!important;font-weight:900;letter-spacing:.11em;text-transform:uppercase}
+
+/* Existing question mechanics, rich presentation */
+.reality-layout-cinematic .reality-episode-picks-body {display:grid;gap:14px;padding:16px}
+.reality-layout-cinematic .pick-category-card {
+  overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:18px;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--reality-cinematic-secondary) 70%,#080b10),#080b10);
+  box-shadow:0 12px 28px rgba(0,0,0,.23);
+}
+.reality-layout-cinematic .pick-card-header {
+  border-bottom:1px solid rgba(255,255,255,.08);
+  background:linear-gradient(135deg,color-mix(in srgb,var(--reality-cinematic-primary) 15%,var(--reality-cinematic-secondary)),var(--reality-cinematic-secondary));
+}
+.reality-layout-cinematic .pick-title-wrap h2 {color:#fff;font-size:1rem}
+.reality-layout-cinematic .nominee-layout {gap:10px}
+.reality-layout-cinematic .nominee-choice {
+  position:relative;overflow:hidden;border:1px solid rgba(255,255,255,.15);border-radius:13px;
+  background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(0,0,0,.18)),#0b1016;color:#fff;
+}
+.reality-layout-cinematic .nominee-choice.selected {
+  border-color:var(--reality-semantic-selected)!important;
+  background:linear-gradient(180deg,#3b82f63f,#05142888)!important;
+  box-shadow:0 0 0 2px #3b82f644,0 8px 24px #3b82f633!important;
+}
+
+/* Results Ready transforms into a result surface */
+.reality-layout-cinematic .pick-category-card.correct,
+.reality-layout-cinematic .pick-category-card.incorrect {position:relative;padding-top:34px}
+.reality-layout-cinematic .pick-category-card.correct::before,
+.reality-layout-cinematic .pick-category-card.incorrect::before {
+  position:absolute;top:0;left:0;right:0;min-height:34px;display:flex;align-items:center;padding:0 14px;
+  font-size:.68rem;font-weight:1000;letter-spacing:.12em;text-transform:uppercase;z-index:3;
+}
+.reality-layout-cinematic .pick-category-card.correct::before {
+  content:"RESULTS READY · CORRECT";color:#dcfce7;background:linear-gradient(90deg,#15803dea,#14532d9e);
+}
+.reality-layout-cinematic .pick-category-card.incorrect::before {
+  content:"RESULTS READY · INCORRECT";color:#fee2e2;background:linear-gradient(90deg,#b91c1cea,#7f1d1d9e);
+}
+.reality-layout-cinematic .pick-category-card.correct .nominee-choice.selected::before,
+.reality-layout-cinematic .pick-category-card.incorrect .nominee-choice.selected::before {
+  content:"YOUR PICK";position:absolute;left:7px;top:7px;z-index:4;padding:4px 6px;border-radius:6px;background:#02060cd1;
+  color:#fff;font-size:.58rem;font-weight:1000;letter-spacing:.08em;
+}
+.reality-layout-cinematic .pick-category-card.correct .nominee-choice.selected {
+  border-color:var(--reality-semantic-success)!important;background:linear-gradient(180deg,#22c55e38,#041e0f80)!important;
+}
+.reality-layout-cinematic .pick-category-card.incorrect .nominee-choice.selected {
+  border-color:var(--reality-semantic-danger)!important;background:linear-gradient(180deg,#ef44443d,#2405097a)!important;
+}
+
+/* Season-long is special but secondary to current episode */
+.reality-layout-cinematic .reality-season-long-slot {margin:22px 0 16px}
+.reality-layout-cinematic .reality-season-long-slot:empty {display:none}
+.reality-layout-cinematic .season-anchor-card {
+  overflow:hidden;border:1px solid color-mix(in srgb,var(--reality-cinematic-accent) 52%,rgba(255,255,255,.16));
+  border-radius:20px;background:radial-gradient(circle at 5% 0,color-mix(in srgb,var(--reality-cinematic-accent) 18%,transparent),transparent 44%),linear-gradient(135deg,var(--reality-cinematic-secondary),#080a0e);
+  box-shadow:0 16px 38px rgba(0,0,0,.25);
+}
+
+/* Cast rail */
+.reality-layout-cinematic .reality-cinematic-cast-section {
+  margin:20px 0;padding:16px;border:1px solid color-mix(in srgb,var(--reality-cinematic-accent) 30%,rgba(255,255,255,.12));
+  border-radius:20px;background:linear-gradient(135deg,var(--reality-cinematic-secondary),#05080ce8);
+}
+.reality-layout-cinematic .reality-cinematic-section-heading {display:flex;justify-content:space-between;gap:14px;align-items:end;padding:2px 2px 12px}
+.reality-layout-cinematic .reality-cinematic-section-heading span {color:color-mix(in srgb,var(--reality-cinematic-accent) 68%,#fff);font-size:.66rem;font-weight:950;letter-spacing:.12em}
+.reality-layout-cinematic .reality-cinematic-section-heading h2 {margin:3px 0 0;color:#fff;font-size:1.15rem}
+.reality-layout-cinematic .reality-cinematic-section-heading small {max-width:280px;color:#b7c0ce;text-align:right}
+.reality-layout-cinematic .reality-cinematic-cast-rail {display:flex;gap:10px;overflow-x:auto;padding:2px 2px 8px;scroll-snap-type:x proximity}
+.reality-layout-cinematic .reality-cinematic-cast-card {flex:0 0 128px;overflow:hidden;scroll-snap-align:start;border:1px solid rgba(255,255,255,.14);border-radius:14px;background:#090c11}
+.reality-layout-cinematic .reality-cinematic-cast-image {aspect-ratio:4/5;overflow:hidden;background:linear-gradient(135deg,var(--reality-cinematic-secondary),#10151d)}
+.reality-layout-cinematic .reality-cinematic-cast-image img {width:100%;height:100%;object-fit:cover;display:block}
+.reality-layout-cinematic .reality-cinematic-cast-fallback {width:100%;height:100%;display:grid;place-items:center;color:#fff;font-size:2rem;font-weight:1000}
+.reality-layout-cinematic .reality-cinematic-cast-copy {display:grid;gap:2px;padding:8px}
+.reality-layout-cinematic .reality-cinematic-cast-copy strong {overflow:hidden;color:#fff;font-size:.79rem;white-space:nowrap;text-overflow:ellipsis}
+.reality-layout-cinematic .reality-cinematic-cast-copy span {font-size:.59rem;font-weight:1000;letter-spacing:.07em;color:#d7dee7}
+.reality-layout-cinematic .reality-cinematic-cast-card.status-eliminated {opacity:.66;filter:grayscale(.82);border-color:#ef444477}
+.reality-layout-cinematic .reality-cinematic-cast-card.status-eliminated .reality-cinematic-cast-copy span {color:#fca5a5}
+.reality-layout-cinematic .reality-cinematic-cast-card.status-finalist {border-color:color-mix(in srgb,var(--reality-cinematic-accent) 72%,rgba(255,255,255,.14));box-shadow:0 0 22px color-mix(in srgb,var(--reality-cinematic-accent) 18%,transparent)}
+.reality-layout-cinematic .reality-cinematic-cast-card.status-winner {border-color:var(--reality-semantic-success);box-shadow:0 0 22px #22c55e3d}
+.reality-layout-cinematic .reality-cinematic-cast-card.status-winner .reality-cinematic-cast-copy span {color:#86efac}
+
+/* Historical content is compressed */
+.reality-layout-cinematic .reality-previous-episodes {
+  margin-top:20px;border:1px solid rgba(148,163,184,.16);border-radius:18px;background:#02060c59;opacity:.86;
+}
+.reality-layout-cinematic .reality-previous-episodes[open] {opacity:1}
+.reality-layout-cinematic .reality-previous-episodes>summary {min-height:52px;padding:11px 14px}
+.reality-layout-cinematic .reality-episode-picks-section.previous {margin:8px 0;border-color:rgba(148,163,184,.14);box-shadow:none;background:#ffffff05}
+
+/* Existing score / standings / compare / vote details retain mechanics */
+.reality-layout-cinematic .reality-player-summary-card,
+.reality-layout-cinematic .reality-profile-panel,
+.reality-layout-cinematic .reality-player-vote-body,
+.reality-layout-cinematic .reality-player-vote-details,
+.reality-layout-cinematic #realityTvEpisodeComparisonMount>* {
+  border-color:color-mix(in srgb,var(--reality-cinematic-accent) 28%,rgba(255,255,255,.12))!important;
+  background:linear-gradient(145deg,var(--reality-cinematic-secondary),#05080ce8)!important;
+  color:#f8fafc;
+}
+
+/* Spoiler Shield remains function-owned */
+.reality-layout-cinematic #realityTvSpoilerShieldMount>* {
+  border-radius:16px;border-color:#8b5cf66f;background:linear-gradient(135deg,#4c1d953d,#02060cb8);
+}
+
+@media(max-width:760px) {
+  .reality-layout-cinematic .reality-cinematic-hero {min-height:340px;grid-template-columns:1fr;gap:14px;padding:18px;border-radius:18px}
+  .reality-layout-cinematic .reality-cinematic-brand {min-height:170px;display:flex;flex-direction:column;justify-content:flex-end}
+  .reality-layout-cinematic .reality-cinematic-show-logo {width:min(92%,480px);max-height:125px}
+  .reality-layout-cinematic .reality-cinematic-show-title {font-size:clamp(2.15rem,12vw,3.8rem)}
+  .reality-layout-cinematic .reality-cinematic-episode-status {padding:14px}
+  .reality-layout-cinematic .reality-cinematic-section-heading {align-items:start;flex-direction:column;gap:5px}
+  .reality-layout-cinematic .reality-cinematic-section-heading small {text-align:left}
+  .reality-layout-cinematic .reality-cinematic-cast-card {flex-basis:112px}
+  .reality-layout-cinematic .reality-episode-picks-body {padding:11px}
+}
