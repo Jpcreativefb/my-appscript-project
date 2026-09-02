@@ -171,7 +171,11 @@ const promptOnce = extractFunction(app, 'maybeOfferGameProfileOnce_');
 const localAck = promptOnce.indexOf('localStorage.setItem(cacheKey, "done")');
 const serverAck = promptOnce.indexOf('apiSetGameProfilePromptChoice');
 ok(localAck >= 0 && serverAck > localAck, 'General profile choice is acknowledged locally before server persistence');
-ok(app.includes('teamFantasyPrewarmState_'), 'Team Fantasy state prewarms while profile decision is pending');
+const enterGameR2 = extractFunction(app, 'enterGame');
+ok(!enterGameR2.includes('teamFantasyPrewarmState_'),
+  'RC22: Team Fantasy state prewarm is not started during entry/profile gating');
+ok(enterGameR2.includes('ensurePageModules_("team-fantasy")'),
+  'RC22: Team Fantasy module prewarm remains during entry');
 ok(tf.includes('TEAM_FANTASY_STATE_REQUESTS'), 'Team Fantasy state requests use single-flight');
 ok(tf.includes('data-page-load-failed="true"'), 'Team Fantasy failed render has explicit marker');
 ok(app.includes('appPageSnapshotHtmlValid_'), 'snapshot validity helper exists');
