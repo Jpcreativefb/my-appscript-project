@@ -132,12 +132,47 @@ function adminAppearanceHasSportsRuntime_() {
 
 function adminAppearanceIsRealityGame_() {
   const game = adminAppearanceSelectedGameForLayout_();
+  const setup = ADMIN_APPEARANCE_STATE.gameSetup || {};
   const type = adminAppearanceGameType_(game);
   const format = String(game.gameFormat || game.GameFormat || "").trim().toLowerCase();
-  return type.indexOf("reality") !== -1 || format.indexOf("reality") !== -1 ||
+  const name = adminAppearanceGameName_(game).toLowerCase();
+  const id = adminAppearanceGameId_(game).toLowerCase();
+  const blob = [type, format, name, id].join(" ");
+
+  const explicitReality =
+    type.indexOf("reality") !== -1 || format.indexOf("reality") !== -1 ||
     game.realityTvEnabled === true || game.RealityTvEnabled === true ||
     game.realityEnabled === true || game.RealityEnabled === true ||
-    !!String(game.realityTvSeasonId || game.RealityTvSeasonId || game.realitySeasonId || game.RealitySeasonId || "").trim();
+    setup.realityTvEnabled === true || setup.RealityTvEnabled === true ||
+    setup.realityEnabled === true || setup.RealityEnabled === true ||
+    !!String(
+      game.realityTvSeasonId || game.RealityTvSeasonId ||
+      game.realitySeasonId || game.RealitySeasonId ||
+      setup.realityTvSeasonId || setup.RealityTvSeasonId ||
+      setup.realitySeasonId || setup.RealitySeasonId || ""
+    ).trim();
+  if (explicitReality) return true;
+
+  const explicitSports = adminAppearanceHasSportsRuntime_() ||
+    game.sportsMode === true || game.SportsMode === true ||
+    game.sportsEnabled === true || game.SportsEnabled === true ||
+    setup.sportsMode === true || setup.SportsMode === true ||
+    setup.sportsEnabled === true || setup.SportsEnabled === true ||
+    !!String(
+      game.sportsLeague || game.SportsLeague || game.sport || game.Sport ||
+      setup.sportsLeague || setup.SportsLeague || setup.sport || setup.Sport || ""
+    ).trim() ||
+    /\bnfl\b|\bnba\b|\bmlb\b|\bnhl\b|\bncaa\b|football|basketball|baseball|hockey|soccer|sports[\s_-]*wager|team[\s_-]*fantasy|confidence|pick[\s_'-]*em|king[\s_-]*of[\s_-]*the[\s_-]*hill|\bkoth\b/.test(blob);
+
+  if (/master[\s_-]*chef|amazing[\s_-]*race|big[\s_-]*brother|dancing[\s_-]*with[\s_-]*the[\s_-]*stars|\bdwts\b|top[\s_-]*chef|the[\s_-]*traitors|\btraitors\b/.test(blob)) {
+    return true;
+  }
+
+  // "Survivor" is shared by Reality TV and Survivor Football. Only treat it
+  // as Reality when the selected game has no Sports runtime/league markers.
+  if (/\bsurvivor\b/.test(blob) && !explicitSports) return true;
+
+  return false;
 }
 
 function adminAppearanceSportsRichKind_() {
