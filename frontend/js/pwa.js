@@ -5,7 +5,7 @@
 
   // Legacy PWA-lineage marker retained for historical regression contracts only.
   // const PWA_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217v-studio-control-fixes-v1217w-pack-management-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218x2c-confidence-appearance-v1219rc6-admin-question-ux-performance";
-  const PWA_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc20-postdeploy-first-entry-performance-r2");
+  const PWA_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc23-appearance-transport-cache-r2");
   const SW_URL = "./sw.js?v=" + encodeURIComponent(PWA_VERSION);
   const host = String(window.location.hostname || "").toLowerCase();
   const isLocalDevelopment = host === "127.0.0.1" || host === "localhost" || host === "0.0.0.0";
@@ -91,6 +91,56 @@
       .catch(function(err) {
         console.warn("PATTC Predicts PWA registration failed", err);
       });
+  });
+})();
+
+/* ==============================
+   RC23 APPEARANCE FOREGROUND REVALIDATION
+   The PWA shell owns lifecycle only. Appearance transport/snapshot policy
+   remains in api.js/app.js.
+============================== */
+(function bindRc23AppearanceResume_() {
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+
+  let appearanceResumeRequest = null;
+
+  function revalidateAppearanceOnResume_() {
+    if (appearanceResumeRequest) return appearanceResumeRequest;
+    if (typeof appRevalidateCurrentGameAppearance_ !== "function") {
+      return Promise.resolve(false);
+    }
+
+    appearanceResumeRequest = Promise.resolve(
+      appRevalidateCurrentGameAppearance_({
+        rerender: true,
+        suppressLoader: true
+      })
+    )
+      .catch(function(err) {
+        console.warn("PATTC Predicts Appearance resume revalidation warning", err);
+        return false;
+      })
+      .then(function(result) {
+        appearanceResumeRequest = null;
+        return result;
+      }, function(err) {
+        appearanceResumeRequest = null;
+        throw err;
+      });
+
+    return appearanceResumeRequest;
+  }
+
+  document.addEventListener("visibilitychange", function() {
+    if (document.visibilityState === "visible") {
+      revalidateAppearanceOnResume_();
+    }
+  });
+
+  window.addEventListener("pageshow", function(event) {
+    if (event && event.persisted === true) {
+      revalidateAppearanceOnResume_();
+    }
   });
 })();
 

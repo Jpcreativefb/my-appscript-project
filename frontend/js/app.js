@@ -687,7 +687,7 @@ const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager
 */
 // Legacy release-lineage marker retained for historical regression contracts only.
 // const APP_ASSET_VERSION = "327-question-drag-order-v1216-v328-appearance-manager-v1217d-v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218k-reality-cast-import-v1218n-reality-production-automation-v1218v4-reality-draft-switch-v1218w-survivor-ranking-v1218w4-survivor-edge-cases-v1218x1b-performance-v1218x2-fast-nav-batch-picks-v1218x2c-confidence-appearance-v1218y-survivor-koth-strikes-v1218z-voting-competition-v1219rc3-final-performance-v1219rc6-admin-question-ux-performance-v1219rc7-pick-lock-integrity";
-const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc20-postdeploy-first-entry-performance-r2");
+const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || "v1219rc23-appearance-transport-cache-r2");
 const APP_ROUTE_HOTFIX_VERSION = "v1217g-iphone-pwa-recovery-v1217h-appearance-images-v1217i-appearance-runtime-v1217k-appearance-studio-v1217l-advanced-layout-v1217m-studio-canvas-v1217n-layout-repair-v1217o-team-canvas-v1217p-image-modes-v1217q-score-style-v1217r-page-question-designer-v1217s-preview-runtime-sync-v1217t-studio-refinement-v1217u-admin-help-v1217v-studio-control-fixes-v1217x-pack-selection-compact-actions-v1217x-pack-media-workflow-v1217y-pack-visibility-v1218a-device-login-v1218a1-auth-tabs-v1218b-home-hub-v1218c-player-hubs-v1218c1-home-identity-v1218c2-hub-media-gradients-v1218c3-live-preview-v1218c4-image-tone-league-cards-v1218c5-subhub-profile-alias-v1218c6-hub-nav-cleanup-v1218d-scoreboard-leaderboard-v1218d1-career-stats-cleanup-v1218e-player-identity-notifications-v1218e1-profile-polish-v1218f-push-notifications-v1218f1-global-mode-persistence-v1218f2-push-registration-v1218f3-registration-verification-v1218f4-notification-sheet-repair-v1218f5-vapid-alignment-v1218f6-pattc-predicts-v1218n-reality-production-automation";
 const APP_LOADED_SCRIPTS = {};
 
@@ -818,6 +818,254 @@ const APP_PAGE_SNAPSHOT_MAX_MS = 10 * 60 * 1000;
 const APP_PAGE_SNAPSHOT_STORAGE_PREFIX = "pattcPageSnapshot:";
 const APP_PAGE_SNAPSHOT_STORAGE_MAX_CHARS = 700000;
 
+const APP_APPEARANCE_SNAPSHOT_PAGES = new Set([
+  "picks",
+  "game-hub",
+  "survivor",
+  "voting",
+  "ranking",
+  "team-fantasy",
+  "betting",
+  "leaderboard",
+  "season-hub"
+]);
+const APP_APPEARANCE_FINGERPRINTS = {};
+const APP_APPEARANCE_REVALIDATIONS = {};
+let APP_APPEARANCE_NAVIGATION_REVALIDATING = false;
+let APP_APPEARANCE_CURRENT_REVALIDATION = null;
+
+function appAppearanceSnapshotSensitivePage_(page) {
+  return APP_APPEARANCE_SNAPSHOT_PAGES.has(String(page || ""));
+}
+
+function appAppearanceGameId_(gameId) {
+  const explicit = String(gameId || "").trim();
+  if (explicit) return explicit;
+  if (typeof getFrontendGameId === "function") {
+    const current = String(getFrontendGameId() || "").trim();
+    if (current) return current;
+  }
+  return String(APP_STATE && APP_STATE.gameId || "").trim();
+}
+
+function appAppearanceStableValue_(value) {
+  if (Array.isArray(value)) {
+    return value.map(appAppearanceStableValue_);
+  }
+  if (!value || typeof value !== "object") {
+    return value === undefined ? null : value;
+  }
+  const sorted = {};
+  Object.keys(value).sort().forEach(function(key) {
+    sorted[key] = appAppearanceStableValue_(value[key]);
+  });
+  return sorted;
+}
+
+function appAppearanceFingerprint_(bundle) {
+  if (!bundle || bundle.success === false) return "";
+  const root = bundle.appearance && typeof bundle.appearance === "object"
+    ? bundle.appearance
+    : bundle;
+  const material = {
+    gameId: String(bundle.gameId || root.gameId || ""),
+    assignment: root.assignment || null,
+    themePackId: root.themePackId || "",
+    theme: root.theme || null,
+    imagePackId: root.imagePackId || "",
+    imagePackItems: Array.isArray(root.imagePackItems) ? root.imagePackItems : []
+  };
+  try {
+    return JSON.stringify(appAppearanceStableValue_(material));
+  } catch (err) {
+    return "";
+  }
+}
+
+function appAppearanceFingerprintStorageKey_(gameId) {
+  return "pattcAppearanceFingerprint:rc23:" + encodeURIComponent(String(gameId || ""));
+}
+
+function appKnownAppearanceFingerprint_(gameId) {
+  gameId = appAppearanceGameId_(gameId);
+  if (!gameId) return "";
+  if (APP_APPEARANCE_FINGERPRINTS[gameId]) {
+    return APP_APPEARANCE_FINGERPRINTS[gameId];
+  }
+  try {
+    const stored = sessionStorage.getItem(appAppearanceFingerprintStorageKey_(gameId)) || "";
+    if (stored) APP_APPEARANCE_FINGERPRINTS[gameId] = stored;
+    return stored;
+  } catch (err) {
+    return "";
+  }
+}
+
+function appRememberAppearanceFingerprint_(gameId, fingerprint) {
+  gameId = appAppearanceGameId_(gameId);
+  fingerprint = String(fingerprint || "");
+  if (!gameId || !fingerprint) return;
+  APP_APPEARANCE_FINGERPRINTS[gameId] = fingerprint;
+  try {
+    sessionStorage.setItem(appAppearanceFingerprintStorageKey_(gameId), fingerprint);
+  } catch (err) {}
+}
+
+function appPageSnapshotCandidateExists_(page) {
+  if (!appPageSnapshotEligible_(page)) return false;
+  const key = appPageSnapshotKey_(page);
+  if (APP_PAGE_SNAPSHOT_CACHE[key]) return true;
+
+  try {
+    if (sessionStorage.getItem(appPageSnapshotStorageKey_(key))) return true;
+  } catch (err) {}
+
+  if (String(page || "") === "dashboard" || String(page || "").indexOf("hub:") === 0) {
+    try {
+      if (localStorage.getItem(appPageSnapshotStorageKey_(key))) return true;
+    } catch (err) {}
+  }
+  return false;
+}
+
+async function appRevalidateGameAppearance_(gameId) {
+  gameId = appAppearanceGameId_(gameId);
+  if (!gameId || typeof apiGetGameAppearance !== "function") {
+    return { verified: false, changed: false, gameId: gameId, fingerprint: "" };
+  }
+  if (APP_APPEARANCE_REVALIDATIONS[gameId]) {
+    return APP_APPEARANCE_REVALIDATIONS[gameId];
+  }
+
+  const previous = appKnownAppearanceFingerprint_(gameId);
+  const request = (async function() {
+    try {
+      const response = await apiGetGameAppearance(gameId);
+      const fingerprint = appAppearanceFingerprint_(response);
+      if (!fingerprint) {
+        return {
+          verified: false,
+          changed: false,
+          gameId: gameId,
+          fingerprint: "",
+          response: response
+        };
+      }
+
+      const changed = !!previous && previous !== fingerprint;
+      appRememberAppearanceFingerprint_(gameId, fingerprint);
+      if (changed) {
+        invalidateAppPageSnapshots(gameId);
+      }
+
+      return {
+        verified: true,
+        changed: changed,
+        gameId: gameId,
+        fingerprint: fingerprint,
+        response: response
+      };
+    } catch (err) {
+      return {
+        verified: false,
+        changed: false,
+        gameId: gameId,
+        fingerprint: "",
+        error: err
+      };
+    }
+  })();
+
+  APP_APPEARANCE_REVALIDATIONS[gameId] = request;
+  try {
+    return await request;
+  } finally {
+    if (APP_APPEARANCE_REVALIDATIONS[gameId] === request) {
+      delete APP_APPEARANCE_REVALIDATIONS[gameId];
+    }
+  }
+}
+
+async function appPrepareAppearanceSnapshotReuse_(page) {
+  if (!appAppearanceSnapshotSensitivePage_(page)) {
+    return { required: false, allowSnapshot: true, fingerprint: "" };
+  }
+
+  const gameId = appAppearanceGameId_("");
+  if (!gameId) {
+    return { required: true, allowSnapshot: false, fingerprint: "" };
+  }
+
+  // Preserve the existing installed-PWA offline fallback, but only for a
+  // snapshot that was already tagged with this GameId's known fingerprint.
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    const offlineFingerprint = appKnownAppearanceFingerprint_(gameId);
+    return {
+      required: true,
+      allowSnapshot: !!offlineFingerprint,
+      gameId: gameId,
+      fingerprint: offlineFingerprint,
+      offline: true
+    };
+  }
+
+  const validation = await appRevalidateGameAppearance_(gameId);
+  return {
+    required: true,
+    allowSnapshot: validation.verified === true,
+    gameId: gameId,
+    fingerprint: validation.fingerprint || "",
+    changed: validation.changed === true
+  };
+}
+
+async function appRevalidateCurrentGameAppearance_(options) {
+  options = options || {};
+  const page = String(APP_STATE && APP_STATE.currentPage || "");
+  if (!appAppearanceSnapshotSensitivePage_(page)) {
+    return { verified: false, changed: false, skipped: true };
+  }
+
+  if (APP_APPEARANCE_CURRENT_REVALIDATION) {
+    return APP_APPEARANCE_CURRENT_REVALIDATION;
+  }
+
+  const gameId = appAppearanceGameId_("");
+  if (!gameId) {
+    return { verified: false, changed: false, skipped: true };
+  }
+
+  const request = (async function() {
+    const validation = await appRevalidateGameAppearance_(gameId);
+
+    if (
+      validation.changed === true &&
+      options.rerender === true &&
+      APP_APPEARANCE_NAVIGATION_REVALIDATING !== true &&
+      String(APP_STATE.currentPage || "") === page &&
+      appAppearanceGameId_("") === gameId &&
+      typeof navigate === "function"
+    ) {
+      await navigate(page, {
+        forceRefresh: true,
+        skipHistoryWrite: true,
+        suppressLoader: options.suppressLoader !== false
+      });
+    }
+
+    return validation;
+  })();
+
+  APP_APPEARANCE_CURRENT_REVALIDATION = request;
+  try {
+    return await request;
+  } finally {
+    if (APP_APPEARANCE_CURRENT_REVALIDATION === request) {
+      APP_APPEARANCE_CURRENT_REVALIDATION = null;
+    }
+  }
+}
+
 function appPageSnapshotEligible_(page) {
   page = String(page || "");
   if (!page) return false;
@@ -894,6 +1142,13 @@ function appCapturePageSnapshot_(page, app) {
   }
   const key = appPageSnapshotKey_(page);
   const item = { html: html, savedAt: Date.now() };
+
+  if (appAppearanceSnapshotSensitivePage_(page)) {
+    const gameId = appAppearanceGameId_("");
+    item.appearanceGameId = gameId;
+    item.appearanceFingerprint = appKnownAppearanceFingerprint_(gameId);
+  }
+
   APP_PAGE_SNAPSHOT_CACHE[key] = item;
 
   // sessionStorage survives hash/full-shell navigation in the same tab/PWA
@@ -907,7 +1162,7 @@ function appCapturePageSnapshot_(page, app) {
     }
   }
 }
-function appReadPageSnapshot_(page) {
+function appReadPageSnapshot_(page, expectedAppearanceFingerprint) {
   if (!appPageSnapshotEligible_(page)) return null;
   const key = appPageSnapshotKey_(page);
   let item = APP_PAGE_SNAPSHOT_CACHE[key] || null;
@@ -939,6 +1194,23 @@ function appReadPageSnapshot_(page) {
     appDiscardPageSnapshot_(page);
     return null;
   }
+
+  if (appAppearanceSnapshotSensitivePage_(page)) {
+    const gameId = appAppearanceGameId_("");
+    const fingerprint = String(
+      expectedAppearanceFingerprint || appKnownAppearanceFingerprint_(gameId) || ""
+    );
+    if (
+      !gameId ||
+      !fingerprint ||
+      String(item.appearanceGameId || "") !== gameId ||
+      String(item.appearanceFingerprint || "") !== fingerprint
+    ) {
+      appDiscardPageSnapshot_(page);
+      return null;
+    }
+  }
+
   const age = Date.now() - Number(item.savedAt || 0);
   if (age > APP_PAGE_SNAPSHOT_MAX_MS) {
     delete APP_PAGE_SNAPSHOT_CACHE[key];
@@ -954,6 +1226,31 @@ function invalidateAppPageSnapshots(gameId) {
       delete APP_PAGE_SNAPSHOT_CACHE[key];
     }
   });
+
+  // RC23: persisted game snapshots are invalidated only for the changed GameId.
+  // Never clear sessionStorage/localStorage globally.
+  if (!gameId || typeof sessionStorage === "undefined") return;
+  const removeKeys = [];
+  try {
+    for (let index = 0; index < sessionStorage.length; index += 1) {
+      const storageKey = sessionStorage.key(index);
+      if (!storageKey || storageKey.indexOf(APP_PAGE_SNAPSHOT_STORAGE_PREFIX) !== 0) continue;
+      let snapshotKey = "";
+      try {
+        snapshotKey = decodeURIComponent(
+          storageKey.slice(APP_PAGE_SNAPSHOT_STORAGE_PREFIX.length)
+        );
+      } catch (err) {
+        snapshotKey = storageKey.slice(APP_PAGE_SNAPSHOT_STORAGE_PREFIX.length);
+      }
+      if (snapshotKey.indexOf("|" + gameId + "|") !== -1) {
+        removeKeys.push(storageKey);
+      }
+    }
+    removeKeys.forEach(function(storageKey) {
+      sessionStorage.removeItem(storageKey);
+    });
+  } catch (err) {}
 }
 
 function appRefreshSnapshotQuietly_(page, snapshotKey) {
@@ -1127,7 +1424,31 @@ async function navigate(page, options) {
   app.classList.add("page-enter");
 
   APP_STATE.currentPage = page;
-  const snapshot = options.forceRefresh === true ? null : appReadPageSnapshot_(page);
+
+  let snapshot = null;
+  if (options.forceRefresh !== true) {
+    if (
+      appAppearanceSnapshotSensitivePage_(page) &&
+      appPageSnapshotCandidateExists_(page)
+    ) {
+      // RC23 acceptance contract: a cached game DOM cannot be painted until
+      // current server Appearance has been revalidated for this GameId.
+      APP_APPEARANCE_NAVIGATION_REVALIDATING = true;
+      let appearanceCheck = null;
+      try {
+        appearanceCheck = await appPrepareAppearanceSnapshotReuse_(page);
+      } finally {
+        APP_APPEARANCE_NAVIGATION_REVALIDATING = false;
+      }
+
+      snapshot = appearanceCheck && appearanceCheck.allowSnapshot === true
+        ? appReadPageSnapshot_(page, appearanceCheck.fingerprint)
+        : null;
+    } else {
+      snapshot = appReadPageSnapshot_(page);
+    }
+  }
+
   const usePageLoader = options.suppressLoader !== true;
 
   if (options.skipHistoryWrite !== true) {

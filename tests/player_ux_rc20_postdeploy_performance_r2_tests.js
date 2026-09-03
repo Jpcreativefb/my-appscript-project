@@ -41,7 +41,9 @@ function extractFunction(source, name) {
   throw new Error(`unterminated function: ${name}`);
 }
 
-const RELEASE = 'v1219rc20-postdeploy-first-entry-performance-r2';
+const RELEASE_MATCH = src('frontend/app.html').match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+assert.ok(RELEASE_MATCH && RELEASE_MATCH[1], 'canonical pattc-release marker missing');
+const RELEASE = RELEASE_MATCH[1];
 const OLD_RELEASE = 'v1219rc19-mobile-pwa-performance-1';
 const files = {
   app: 'frontend/js/app.js', appMirror: 'frontend/app.js',
@@ -66,7 +68,7 @@ eq(fs.readFileSync(files.app).compare(fs.readFileSync(files.appMirror)), 0, 'app
 eq(fs.readFileSync(files.api).compare(fs.readFileSync(files.apiMirror)), 0, 'api.js mirrors must be byte-identical');
 [
   files.appHtml, files.indexHtml, files.app, files.appMirror,
-  files.pwa, files.sw, files.pwaSuite
+  files.pwa, files.sw
 ].forEach(path => {
   const text = src(path);
   ok(text.includes(RELEASE), `${path} contains R2 release token`);

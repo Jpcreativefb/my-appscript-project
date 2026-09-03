@@ -16,7 +16,9 @@ const dashboard = read('frontend/js/pages/dashboard.js');
 const css = read('frontend/css/rc19-mobile-pwa.css');
 const pwa = read('frontend/js/pwa.js');
 const sw = read('frontend/sw.js');
-const release = 'v1219rc20-postdeploy-first-entry-performance-r2';
+const releaseMatch = appHtml.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+assert(releaseMatch && releaseMatch[1], 'canonical pattc-release marker missing');
+const release = releaseMatch[1];
 
 function requireText(source, expected, label) {
   assert(source.includes(expected), `${label} missing: ${expected}`);

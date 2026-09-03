@@ -46,6 +46,7 @@ let PICKS_CONFIDENCE_ODDS_BY_CATEGORY = {};
 let PICKS_CONFIDENCE_ODDS_IN_FLIGHT = {};
 let PICKS_CONFIDENCE_APPEARANCE_REQUEST = null;
 let PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
+let PICKS_REALITY_LAYOUT_REMOUNTING = false;
 let PICKS_STANDARD_AUTOSAVE_TIMER = null;
 let PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
 const PICKS_STANDARD_AUTOSAVE_QUEUE = {};
@@ -731,11 +732,7 @@ function realityTvAppearanceValue_(source, keys) {
   return "";
 }
 
-function realityTvThemeOverrideObject_() {
-  const appearance = PICKS_PAGE_DATA.appearance || {};
-  const raw = realityTvAppearanceValue_(appearance, [
-    "ThemeOverrideJSON","themeOverrideJSON","themeOverrideJson","themeOverride","ThemeOverride"
-  ]);
+function realityTvParseObject_(raw) {
   if (!raw) return {};
   if (raw && typeof raw === "object") return raw;
   try {
@@ -746,27 +743,247 @@ function realityTvThemeOverrideObject_() {
   }
 }
 
+function realityTvThemeOverrideObject_() {
+  const appearance = PICKS_PAGE_DATA.appearance || {};
+  const assignment = appearance.assignment && typeof appearance.assignment === "object"
+    ? appearance.assignment
+    : {};
+  const sources = [appearance, assignment];
+
+  for (let i = 0; i < sources.length; i += 1) {
+    const raw = realityTvAppearanceValue_(sources[i], [
+      "ThemeOverrideJSON","themeOverrideJSON","themeOverrideJson","themeOverride","ThemeOverride"
+    ]);
+    if (raw) return realityTvParseObject_(raw);
+  }
+
+  return {};
+}
+
+function realityTvNormalizeLayoutTemplate_(raw) {
+  const value = String(raw || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s/]+/g, "-");
+
+  if ([
+    "cinematic", "cinematic-r2", "cinematicr2", "cinematic-r2-immersive",
+    "art-immersive", "immersive"
+  ].indexOf(value) !== -1) return "cinematic";
+
+  if (["classic-clean", "legacy-clean", "classic", "legacy"].indexOf(value) !== -1) {
+    return "classic-clean";
+  }
+
+  if ([
+    "clean", "enhanced-clean", "art-enhanced", "r3", "clean-r3",
+    "current", "default"
+  ].indexOf(value) !== -1) return "clean";
+
+  return "";
+}
+
 function realityTvLayoutTemplate_() {
-  /* PATTC SAVED REALITY LAYOUT: URL diagnostic override > GameAppearance > Clean. */
+  /*
+   * RC23 canonical Reality player layout resolver.
+   * URL diagnostic override > resolved Appearance theme > assignment override >
+   * backwards-compatible Reality/game fields > legacy local preference > Clean.
+   * Mounted DOM classes are deliberately NOT a source of truth.
+   */
   try {
-    const requested = String(new URLSearchParams(window.location.search || "").get("realityLayout") || "").trim().toLowerCase();
-    if (["clean", "cinematic", "classic-clean", "legacy-clean"].indexOf(requested) !== -1) return requested;
+    const params = new URLSearchParams(window.location.search || "");
+    const requested = realityTvNormalizeLayoutTemplate_(
+      params.get("realityLayout") || params.get("realityTemplate") || ""
+    );
+    if (requested) return requested;
   } catch (err) {}
 
-  const appearance = PICKS_PAGE_DATA.appearance || {};
+  const appearance = PICKS_PAGE_DATA.appearance && typeof PICKS_PAGE_DATA.appearance === "object"
+    ? PICKS_PAGE_DATA.appearance
+    : {};
+  const assignment = appearance.assignment && typeof appearance.assignment === "object"
+    ? appearance.assignment
+    : {};
+  const theme = appearance.theme && typeof appearance.theme === "object"
+    ? appearance.theme
+    : {};
+  const resolvedTheme = appearance.resolvedTheme && typeof appearance.resolvedTheme === "object"
+    ? appearance.resolvedTheme
+    : {};
   const override = realityTvThemeOverrideObject_();
-  const raw =
-    realityTvAppearanceValue_(appearance, [
-      "RealityLayoutTemplate","realityLayoutTemplate","RealityLayout","realityLayout","layoutTemplate","LayoutTemplate"
-    ]) ||
-    realityTvAppearanceValue_(override, [
-      "RealityLayoutTemplate","realityLayoutTemplate","RealityLayout","realityLayout"
-    ]);
+  const view = PICKS_PAGE_DATA.realityTvView && typeof PICKS_PAGE_DATA.realityTvView === "object"
+    ? PICKS_PAGE_DATA.realityTvView
+    : {};
+  const game = PICKS_PAGE_DATA.game && typeof PICKS_PAGE_DATA.game === "object"
+    ? PICKS_PAGE_DATA.game
+    : {};
 
-  const value = String(raw || "clean").trim().toLowerCase();
-  if (value === "cinematic") return "cinematic";
-  if (value === "classic-clean" || value === "legacy-clean" || value === "classic" || value === "legacy") return "classic-clean";
+  const sources = [
+    theme,
+    resolvedTheme,
+    assignment,
+    appearance,
+    override,
+    theme.reality,
+    theme.realityTv,
+    resolvedTheme.reality,
+    resolvedTheme.realityTv,
+    override.reality,
+    override.realityTv,
+    view,
+    view.presentation,
+    view.visual,
+    view.appearance,
+    game
+  ].filter(function(source) {
+    return source && typeof source === "object";
+  });
+
+  const keys = [
+    "RealityLayoutTemplate", "realityLayoutTemplate",
+    "RealityLayout", "realityLayout",
+    "RealityTemplate", "realityTemplate",
+    "layoutTemplate", "LayoutTemplate",
+    "playerTemplate", "PlayerTemplate",
+    "presentationMode", "presentationStyle",
+    "visualTemplate", "displayTemplate",
+    "layout", "template"
+  ];
+
+  for (let i = 0; i < sources.length; i += 1) {
+    const normalized = realityTvNormalizeLayoutTemplate_(realityTvAppearanceValue_(sources[i], keys));
+    if (normalized) return normalized;
+  }
+
+  if (view.cinematic === true || view.isCinematic === true || view.cinematicEnabled === true) {
+    return "cinematic";
+  }
+
+  try {
+    const gameId = String(PICKS_PAGE_DATA.gameId || "").trim();
+    const storageKeys = [
+      "pattcRealityPresentation:" + gameId,
+      "pattcRealityTemplate:" + gameId,
+      "realityPresentation:" + gameId,
+      "realityTemplate:" + gameId
+    ];
+    for (let j = 0; j < storageKeys.length; j += 1) {
+      const stored = realityTvNormalizeLayoutTemplate_(localStorage.getItem(storageKeys[j]) || "");
+      if (stored) return stored;
+    }
+  } catch (err) {}
+
   return "clean";
+}
+
+function realityTvMountedLayoutTemplate_(page) {
+  if (!page) return "";
+  const attr = typeof page.getAttribute === "function"
+    ? realityTvNormalizeLayoutTemplate_(page.getAttribute("data-reality-layout") || "")
+    : "";
+  if (attr) return attr;
+  if (page.classList && page.classList.contains("reality-layout-cinematic")) return "cinematic";
+  return "clean";
+}
+
+function realityTvApplyMountedLayoutTemplate_(page, layout) {
+  if (!page) return "clean";
+  const normalized = realityTvNormalizeLayoutTemplate_(layout) || "clean";
+  if (typeof page.setAttribute === "function") page.setAttribute("data-reality-layout", normalized);
+  if (page.classList && typeof page.classList.toggle === "function") {
+    page.classList.toggle("reality-layout-cinematic", normalized === "cinematic");
+  }
+  return normalized;
+}
+
+function realityTvQueuePresentationLayers_() {
+  const clean = window.PATTCRealityLayoutR3;
+  if (clean && typeof clean.refresh === "function") clean.refresh();
+  const cinematic = window.PATTCRealityCinematicR2;
+  if (cinematic && typeof cinematic.refresh === "function") cinematic.refresh();
+}
+
+function realityTvRemovePresentationArtifacts_(page) {
+  if (!page) return;
+  [
+    "realityEnhancedCleanHeader",
+    "realityEnhancedCleanCast",
+    "realityCinematicHero",
+    "realityCinematicEpisodeBanner",
+    "realityCinematicSeasonFeature"
+  ].forEach(function(id) {
+    const node = document.getElementById(id);
+    if (node && typeof node.remove === "function") node.remove();
+  });
+
+  if (page.classList) {
+    page.classList.remove("reality-clean-enhanced", "reality-cinematic-fidelity");
+  }
+  if (page.dataset) {
+    delete page.dataset.realityCinematicSignature;
+    delete page.dataset.realityShow;
+  }
+
+  Array.from(page.children || []).forEach(function(node) {
+    if (node && node.classList && node.classList.contains("picks-page-header")) {
+      node.removeAttribute("aria-hidden");
+    }
+  });
+}
+
+function realityTvReplaceBaseHeader_(page) {
+  if (!page || typeof document.createElement !== "function") return;
+  const current = Array.from(page.children || []).find(function(node) {
+    return node &&
+      node.classList &&
+      node.classList.contains("picks-page-header") &&
+      node.id !== "realityEnhancedCleanHeader" &&
+      node.id !== "realityCinematicHero";
+  });
+
+  const holder = document.createElement("div");
+  holder.innerHTML = String(renderPicksPageHeader_() || "").trim();
+  const replacement = holder.firstElementChild;
+  if (!replacement) return;
+
+  if (current && typeof current.replaceWith === "function") {
+    current.replaceWith(replacement);
+  } else if (typeof page.insertAdjacentElement === "function") {
+    page.insertAdjacentElement("afterbegin", replacement);
+  }
+}
+
+function realityTvRemountPlayerLayoutIfNeeded_() {
+  if (PICKS_REALITY_LAYOUT_REMOUNTING) return false;
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  if (view.enabled !== true) return false;
+
+  const page = document.querySelector(".reality-player-page, .picks-page");
+  if (!page) return false;
+
+  const desired = realityTvLayoutTemplate_();
+  const mounted = realityTvMountedLayoutTemplate_(page);
+  if (desired === mounted) return false;
+
+  PICKS_REALITY_LAYOUT_REMOUNTING = true;
+  try {
+    realityTvRemovePresentationArtifacts_(page);
+    realityTvApplyMountedLayoutTemplate_(page, desired);
+    realityTvReplaceBaseHeader_(page);
+
+    const castMount = document.getElementById("realityCinematicCastMount");
+    if (castMount) castMount.innerHTML = renderRealityTvCinematicCastPreview_();
+
+    if (typeof refreshPicksEnhancementUi_ === "function") refreshPicksEnhancementUi_();
+    if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
+      window.PlatformImageEngine.process(page);
+    }
+  } finally {
+    PICKS_REALITY_LAYOUT_REMOUNTING = false;
+  }
+
+  realityTvQueuePresentationLayers_();
+  return true;
 }
 
 function realityTvCinematicAppearance_() {
@@ -2546,6 +2763,7 @@ async function hydrateConfidenceAppearance_() {
       PICKS_PAGE_DATA.appearance = cachedAppearance;
       applyPicksAppearanceToPage_();
       refreshConfidenceAppearanceUi_();
+      realityTvRemountPlayerLayoutIfNeeded_();
     }
   }
 
@@ -2565,6 +2783,7 @@ async function hydrateConfidenceAppearance_() {
         // layout/classes/images are calculated from appearance at render time.
         applyPicksAppearanceToPage_();
         refreshConfidenceAppearanceUi_();
+        realityTvRemountPlayerLayoutIfNeeded_();
       }
     } catch (err) {
       console.warn("Confidence appearance load skipped", err);
@@ -5917,59 +6136,20 @@ function cssEscape(value) {
   }
 
   function themeOverride_() {
-    const appearance = obj_(PICKS_PAGE_DATA.appearance);
-    const raw = appearanceValue_(appearance, [
-      "ThemeOverrideJSON", "themeOverrideJSON", "themeOverrideJson",
-      "ThemeOverride", "themeOverride"
-    ]);
-    if (!raw) return {};
-    if (typeof raw === "object") return raw;
-    try {
-      const parsed = JSON.parse(String(raw));
-      return parsed && typeof parsed === "object" ? parsed : {};
-    } catch (err) {
-      return {};
-    }
+    return typeof realityTvThemeOverrideObject_ === "function"
+      ? realityTvThemeOverrideObject_()
+      : {};
   }
 
   function explicitLayout_() {
-    const appearance = obj_(PICKS_PAGE_DATA.appearance);
-    const override = themeOverride_();
-    const view = obj_(PICKS_PAGE_DATA.realityTvView);
-    const game = obj_(PICKS_PAGE_DATA.game);
-
-    return key_(
-      appearanceValue_(appearance, [
-        "RealityLayoutTemplate", "realityLayoutTemplate", "RealityLayout",
-        "realityLayout", "layoutTemplate", "LayoutTemplate"
-      ]) ||
-      appearanceValue_(override, [
-        "RealityLayoutTemplate", "realityLayoutTemplate", "RealityLayout", "realityLayout"
-      ]) ||
-      appearanceValue_(view, [
-        "layoutTemplate", "presentationMode", "presentationStyle",
-        "playerTemplate", "visualTemplate", "displayTemplate"
-      ]) ||
-      appearanceValue_(game, [
-        "realityLayoutTemplate", "realityPresentationMode", "playerTemplate"
-      ])
-    );
+    return typeof realityTvLayoutTemplate_ === "function"
+      ? realityTvLayoutTemplate_()
+      : "clean";
   }
 
   function layout_() {
-    const raw = explicitLayout_();
-
-    if (
-      raw === "classic-clean" ||
-      raw === "legacy-clean" ||
-      raw === "classic" ||
-      raw === "legacy"
-    ) return "classic-clean";
-
-    if (raw.indexOf("cinematic") !== -1) return "cinematic";
-
-    // Owner decision: the prior Art-enhanced design is now the normal Clean.
-    return "clean";
+    // RC23: Clean R3 and Cinematic R2 share the same canonical resolver.
+    return explicitLayout_();
   }
 
   function safeColor_(value) {
@@ -6313,7 +6493,8 @@ function cssEscape(value) {
 
   global.PATTCRealityLayoutR3 = {
     current: layout_,
-    explicit: explicitLayout_
+    explicit: explicitLayout_,
+    refresh: queue_
   };
 
   startObserver_();
@@ -6445,90 +6626,14 @@ function cssEscape(value) {
     return value && typeof value === "object" ? value : {};
   }
 
-  function candidateValues_() {
-    const view = object_(typeof PICKS_PAGE_DATA !== "undefined" ? PICKS_PAGE_DATA.realityTvView : null);
-    const game = object_(typeof PICKS_PAGE_DATA !== "undefined" ? PICKS_PAGE_DATA.game : null);
-    const appearance = object_(typeof PICKS_PAGE_DATA !== "undefined" ? PICKS_PAGE_DATA.appearance : null);
-    const assignment = object_(appearance.assignment);
-    const theme = object_(appearance.theme);
-    const realityTheme = object_(theme.reality || theme.realityTv || theme.cinematic);
-    const presentation = object_(view.presentation || view.visual || view.appearance);
-
-    return [
-      view.presentationStyle,
-      view.presentationMode,
-      view.playerTemplate,
-      view.visualTemplate,
-      view.template,
-      view.layoutTemplate,
-      view.displayTemplate,
-      view.displayMode,
-      view.appearanceMode,
-      presentation.style,
-      presentation.mode,
-      presentation.template,
-      game.realityPresentationStyle,
-      game.realityPresentationMode,
-      game.realityTemplate,
-      game.playerTemplate,
-      game.visualTemplate,
-      game.displayTemplate,
-      game.appearanceMode,
-      assignment.RealityPresentationStyle,
-      assignment.RealityTemplate,
-      assignment.PlayerTemplate,
-      realityTheme.style,
-      realityTheme.mode,
-      realityTheme.template
-    ].filter(Boolean);
-  }
-
   function selectedCinematic_() {
     const view = object_(typeof PICKS_PAGE_DATA !== "undefined" ? PICKS_PAGE_DATA.realityTvView : null);
     if (view.enabled !== true) return false;
 
-    if (
-      view.cinematic === true ||
-      view.isCinematic === true ||
-      view.cinematicEnabled === true
-    ) return true;
-
-    const values = candidateValues_().map(key_);
-    for (let i = 0; i < values.length; i += 1) {
-      if (values[i].indexOf("cinematic") !== -1) return true;
-      if (values[i] === "clean" || values[i].indexOf("clean-template") !== -1) return false;
-    }
-
-    const page = document.querySelector(".reality-player-page, .picks-page");
-    if (page) {
-      const classText = String(page.className || "").toLowerCase();
-      const dataMode = key_(
-        page.getAttribute("data-reality-template") ||
-        page.getAttribute("data-reality-presentation") ||
-        page.getAttribute("data-presentation-template") ||
-        ""
-      );
-      if (classText.indexOf("cinematic") !== -1 || dataMode.indexOf("cinematic") !== -1) return true;
-      if (dataMode === "clean") return false;
-    }
-
-    try {
-      const gameId = text_(PICKS_PAGE_DATA && PICKS_PAGE_DATA.gameId);
-      const storageKeys = [
-        "pattcRealityPresentation:" + gameId,
-        "pattcRealityTemplate:" + gameId,
-        "realityPresentation:" + gameId,
-        "realityTemplate:" + gameId
-      ];
-      for (let j = 0; j < storageKeys.length; j += 1) {
-        const stored = key_(localStorage.getItem(storageKeys[j]) || "");
-        if (stored.indexOf("cinematic") !== -1) return true;
-        if (stored === "clean") return false;
-      }
-    } catch (err) {}
-
-    // Fail closed. Never turn Clean into Cinematic by guessing.
-    return false;
+    // RC23: never infer selection from mounted DOM. A stale Clean/Cinematic
+    // class must not win over the saved per-game Appearance assignment.
+    return typeof realityTvLayoutTemplate_ === "function" &&
+      realityTvLayoutTemplate_() === "cinematic";
   }
 
   function showKey_() {
@@ -7244,6 +7349,15 @@ function cssEscape(value) {
     observer.observe(root, { childList: true, subtree: true });
   }
 
+  global.PATTCRealityCinematicR2 = {
+    current: function() {
+      return selectedCinematic_() ? "cinematic" : "clean";
+    },
+    selected: selectedCinematic_,
+    refresh: queueEnhance_,
+    showKey: showKey_
+  };
+
   // Existing Reality mechanics continue to own rendering. We enhance after
   // their render cycle rather than replacing the save/lock/result pipeline.
   startObserver_();
@@ -7259,7 +7373,7 @@ function cssEscape(value) {
 
 /* =========================================================
    PATTC SPORTS RICH FAMILY — SHARED FRONTEND RUNTIME
-   Art R3
+   Art R3 / RC23 runtime certification
 
    Clean / Current remains the default.
    Sports Rich activates only from the existing per-game Appearance
@@ -7267,6 +7381,13 @@ function cssEscape(value) {
 
    Presentation-only. No Sports Engine, scoring, odds, settlement,
    game rules, saves, locks, auth, or automation logic lives here.
+
+   RC23 ownership:
+   - accept the actual nested Appearance runtime bundle;
+   - after prepare() receives a successful live bundle, that current
+     per-GameId bundle wins over stale page-payload Appearance;
+   - preserve supplied/page Appearance as the offline/failure fallback;
+   - allow Clean -> Rich -> Clean for the same GameId without storage clears.
    ========================================================= */
 (function initializePattcSportsRich_(global) {
   "use strict";
@@ -7275,6 +7396,7 @@ function cssEscape(value) {
 
   const cache = Object.create(null);
   const inflight = Object.create(null);
+  const fresh = Object.create(null);
 
   const AUTO_PALETTES = Object.freeze({
     sports: { primary:"#2398ff", secondary:"#0b6f91", accent:"#76c8ff" },
@@ -7312,41 +7434,76 @@ function cssEscape(value) {
     }
   }
 
-  function appearanceRoot_(bundle) {
-    bundle = object_(bundle);
-    return bundle.appearance && typeof bundle.appearance === "object"
-      ? bundle.appearance
-      : bundle;
+  function appearanceLayers_(bundle) {
+    const layers = [];
+    let current = object_(bundle);
+    let depth = 0;
+
+    while (current && typeof current === "object" && depth < 6) {
+      layers.push(current);
+      if (!current.appearance || typeof current.appearance !== "object" || current.appearance === current) break;
+      current = current.appearance;
+      depth += 1;
+    }
+
+    return layers;
   }
 
-  function sources_(bundle) {
-    const root = appearanceRoot_(bundle);
+  function appearanceRoot_(bundle) {
+    const layers = appearanceLayers_(bundle);
+    return layers.length ? layers[layers.length - 1] : {};
+  }
+
+  function addSource_(list, source) {
+    if (!source || typeof source !== "object") return;
+    if (list.indexOf(source) === -1) list.push(source);
+  }
+
+  function addThemeSources_(list, source) {
+    source = object_(source);
     const override = parseObject_(
-      root.ThemeOverrideJSON ||
-      root.themeOverrideJSON ||
-      root.themeOverrideJson ||
-      root.ThemeOverride ||
-      root.themeOverride ||
+      source.ThemeOverrideJSON ||
+      source.themeOverrideJSON ||
+      source.themeOverrideJson ||
+      source.ThemeOverride ||
+      source.themeOverride ||
+      ""
+    );
+    const assignment = object_(source.assignment);
+    const assignmentOverride = parseObject_(
+      assignment.ThemeOverrideJSON ||
+      assignment.themeOverrideJSON ||
+      assignment.themeOverrideJson ||
+      assignment.ThemeOverride ||
+      assignment.themeOverride ||
       ""
     );
 
-    return [
-      override,
-      object_(override.sports),
-      object_(override.colors),
-      root,
-      object_(root.sports),
-      object_(root.colors),
-      object_(root.theme),
-      object_(root.theme && root.theme.sports),
-      object_(root.theme && root.theme.colors),
-      object_(root.resolvedTheme),
-      object_(root.resolvedTheme && root.resolvedTheme.colors),
-      object_(root.assignment),
-      bundle
-    ].filter(function(source) {
-      return source && typeof source === "object";
+    addSource_(list, override);
+    addSource_(list, object_(override.sports));
+    addSource_(list, object_(override.colors));
+    addSource_(list, assignmentOverride);
+    addSource_(list, object_(assignmentOverride.sports));
+    addSource_(list, object_(assignmentOverride.colors));
+    addSource_(list, source);
+    addSource_(list, object_(source.sports));
+    addSource_(list, object_(source.colors));
+    addSource_(list, object_(source.theme));
+    addSource_(list, object_(source.theme && source.theme.sports));
+    addSource_(list, object_(source.theme && source.theme.colors));
+    addSource_(list, object_(source.resolvedTheme));
+    addSource_(list, object_(source.resolvedTheme && source.resolvedTheme.sports));
+    addSource_(list, object_(source.resolvedTheme && source.resolvedTheme.colors));
+    addSource_(list, assignment);
+  }
+
+  function sources_(bundle) {
+    const output = [];
+    appearanceLayers_(bundle).forEach(function(layer) {
+      addThemeSources_(output, layer);
     });
+    addThemeSources_(output, appearanceRoot_(bundle));
+    return output;
   }
 
   function first_(bundle, keys) {
@@ -7404,10 +7561,11 @@ function cssEscape(value) {
     );
   }
 
-  function remember_(gameId, bundle) {
+  function remember_(gameId, bundle, options) {
     const id = text_(gameId);
     if (!id || !bundle || typeof bundle !== "object") return bundle || null;
     cache[id] = bundle;
+    if (options && options.fresh === true) fresh[id] = true;
     try {
       sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(bundle));
     } catch (err) {}
@@ -7438,21 +7596,23 @@ function cssEscape(value) {
     if (!id) return existingBundle || null;
 
     if (existingBundle && typeof existingBundle === "object") {
-      return remember_(id, existingBundle);
+      remember_(id, existingBundle);
     }
 
-    const cached = cached_(id);
+    const fallback = existingBundle || cached_(id) || null;
 
-    // Roy integration: Admin Appearance layout switching must be visible after
-    // a normal PWA refresh. When the live Appearance API exists, request the
-    // current per-GameId assignment instead of letting sessionStorage pin an
-    // older Clean/Rich choice. Cached Appearance remains an offline fallback.
-    if (typeof apiGetGameAppearance !== "function") return cached;
+    // Kent/shared transport owns how apiGetGameAppearance reaches the backend.
+    // Sports runtime owns what happens after a correct bundle is supplied.
+    if (typeof apiGetGameAppearance !== "function") return fallback;
+
+    fresh[id] = false;
 
     if (!inflight[id]) {
       inflight[id] = Promise.resolve(apiGetGameAppearance(id))
         .then(function(result) {
-          if (result && result.success !== false) return remember_(id, result);
+          if (result && result.success !== false) {
+            return remember_(id, result, { fresh: true });
+          }
           return null;
         })
         .catch(function(err) {
@@ -7464,11 +7624,20 @@ function cssEscape(value) {
         });
     }
 
-    return inflight[id];
+    const current = await inflight[id];
+    return current || fallback;
   }
 
   function appearance_(gameId, provided) {
-    return provided || cached_(gameId) || null;
+    const id = text_(gameId);
+    const remembered = cached_(id);
+
+    // Once prepare() has received the live per-GameId bundle, that bundle is
+    // authoritative for this render. Page payloads can legitimately contain an
+    // older Appearance snapshot and must not pin Clean/Rich after a switch.
+    if (id && fresh[id] === true && remembered) return remembered;
+
+    return provided || remembered || null;
   }
 
   function isRich_(gameId, provided) {
@@ -7593,6 +7762,7 @@ function cssEscape(value) {
   }
 
   global.PATTCSportsRich = {
+    version: "rc23-sports-rich-runtime-9020031",
     prepare: prepare_,
     remember: remember_,
     cached: cached_,

@@ -2185,7 +2185,10 @@ async function apiAdminSaveAppearanceOverride(payload) {
 }
 
 async function apiGetGameAppearance(gameId) {
-  return api("getGameAppearance", {
+  // RC23: Game Appearance is an intentionally credential-free public read.
+  // Bypass api(), because api() attaches the authenticated player session
+  // before choosing transport. Do not put bearer/session data in a GET URL.
+  return apiRaw_("getGameAppearance", {
     gameId: gameId || getFrontendGameId() || "",
     appearanceNonce: Date.now()
   });

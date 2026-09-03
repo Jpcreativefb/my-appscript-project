@@ -290,7 +290,9 @@ function specialProgress(extra) {
 // 8. PWA/service-worker/page assets share one explicit release boundary.
 // ---------------------------------------------------------------------------
 {
-  const release = 'v1219rc20-postdeploy-first-entry-performance-r2';
+  const releaseMatch = html.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+  assert(releaseMatch && releaseMatch[1], 'canonical pattc-release marker missing');
+  const release = releaseMatch[1];
   assert(html.includes('name="pattc-release" content="' + release + '"'));
   assert(indexHtml.includes('name="pattc-release" content="' + release + '"'));
   assert(html.includes('release=' + release), 'authenticated shell assets must carry the production release boundary');

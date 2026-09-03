@@ -947,7 +947,7 @@ async function teamFantasyRunTestLab_() {
 
 /* =========================================================
    PATTC SPORTS RICH FAMILY — SHARED FRONTEND RUNTIME
-   Art R3
+   Art R3 / RC23 runtime certification
 
    Clean / Current remains the default.
    Sports Rich activates only from the existing per-game Appearance
@@ -955,6 +955,13 @@ async function teamFantasyRunTestLab_() {
 
    Presentation-only. No Sports Engine, scoring, odds, settlement,
    game rules, saves, locks, auth, or automation logic lives here.
+
+   RC23 ownership:
+   - accept the actual nested Appearance runtime bundle;
+   - after prepare() receives a successful live bundle, that current
+     per-GameId bundle wins over stale page-payload Appearance;
+   - preserve supplied/page Appearance as the offline/failure fallback;
+   - allow Clean -> Rich -> Clean for the same GameId without storage clears.
    ========================================================= */
 (function initializePattcSportsRich_(global) {
   "use strict";
@@ -963,6 +970,7 @@ async function teamFantasyRunTestLab_() {
 
   const cache = Object.create(null);
   const inflight = Object.create(null);
+  const fresh = Object.create(null);
 
   const AUTO_PALETTES = Object.freeze({
     sports: { primary:"#2398ff", secondary:"#0b6f91", accent:"#76c8ff" },
@@ -1000,41 +1008,76 @@ async function teamFantasyRunTestLab_() {
     }
   }
 
-  function appearanceRoot_(bundle) {
-    bundle = object_(bundle);
-    return bundle.appearance && typeof bundle.appearance === "object"
-      ? bundle.appearance
-      : bundle;
+  function appearanceLayers_(bundle) {
+    const layers = [];
+    let current = object_(bundle);
+    let depth = 0;
+
+    while (current && typeof current === "object" && depth < 6) {
+      layers.push(current);
+      if (!current.appearance || typeof current.appearance !== "object" || current.appearance === current) break;
+      current = current.appearance;
+      depth += 1;
+    }
+
+    return layers;
   }
 
-  function sources_(bundle) {
-    const root = appearanceRoot_(bundle);
+  function appearanceRoot_(bundle) {
+    const layers = appearanceLayers_(bundle);
+    return layers.length ? layers[layers.length - 1] : {};
+  }
+
+  function addSource_(list, source) {
+    if (!source || typeof source !== "object") return;
+    if (list.indexOf(source) === -1) list.push(source);
+  }
+
+  function addThemeSources_(list, source) {
+    source = object_(source);
     const override = parseObject_(
-      root.ThemeOverrideJSON ||
-      root.themeOverrideJSON ||
-      root.themeOverrideJson ||
-      root.ThemeOverride ||
-      root.themeOverride ||
+      source.ThemeOverrideJSON ||
+      source.themeOverrideJSON ||
+      source.themeOverrideJson ||
+      source.ThemeOverride ||
+      source.themeOverride ||
+      ""
+    );
+    const assignment = object_(source.assignment);
+    const assignmentOverride = parseObject_(
+      assignment.ThemeOverrideJSON ||
+      assignment.themeOverrideJSON ||
+      assignment.themeOverrideJson ||
+      assignment.ThemeOverride ||
+      assignment.themeOverride ||
       ""
     );
 
-    return [
-      override,
-      object_(override.sports),
-      object_(override.colors),
-      root,
-      object_(root.sports),
-      object_(root.colors),
-      object_(root.theme),
-      object_(root.theme && root.theme.sports),
-      object_(root.theme && root.theme.colors),
-      object_(root.resolvedTheme),
-      object_(root.resolvedTheme && root.resolvedTheme.colors),
-      object_(root.assignment),
-      bundle
-    ].filter(function(source) {
-      return source && typeof source === "object";
+    addSource_(list, override);
+    addSource_(list, object_(override.sports));
+    addSource_(list, object_(override.colors));
+    addSource_(list, assignmentOverride);
+    addSource_(list, object_(assignmentOverride.sports));
+    addSource_(list, object_(assignmentOverride.colors));
+    addSource_(list, source);
+    addSource_(list, object_(source.sports));
+    addSource_(list, object_(source.colors));
+    addSource_(list, object_(source.theme));
+    addSource_(list, object_(source.theme && source.theme.sports));
+    addSource_(list, object_(source.theme && source.theme.colors));
+    addSource_(list, object_(source.resolvedTheme));
+    addSource_(list, object_(source.resolvedTheme && source.resolvedTheme.sports));
+    addSource_(list, object_(source.resolvedTheme && source.resolvedTheme.colors));
+    addSource_(list, assignment);
+  }
+
+  function sources_(bundle) {
+    const output = [];
+    appearanceLayers_(bundle).forEach(function(layer) {
+      addThemeSources_(output, layer);
     });
+    addThemeSources_(output, appearanceRoot_(bundle));
+    return output;
   }
 
   function first_(bundle, keys) {
@@ -1092,10 +1135,11 @@ async function teamFantasyRunTestLab_() {
     );
   }
 
-  function remember_(gameId, bundle) {
+  function remember_(gameId, bundle, options) {
     const id = text_(gameId);
     if (!id || !bundle || typeof bundle !== "object") return bundle || null;
     cache[id] = bundle;
+    if (options && options.fresh === true) fresh[id] = true;
     try {
       sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(bundle));
     } catch (err) {}
@@ -1126,21 +1170,23 @@ async function teamFantasyRunTestLab_() {
     if (!id) return existingBundle || null;
 
     if (existingBundle && typeof existingBundle === "object") {
-      return remember_(id, existingBundle);
+      remember_(id, existingBundle);
     }
 
-    const cached = cached_(id);
+    const fallback = existingBundle || cached_(id) || null;
 
-    // Roy integration: Admin Appearance layout switching must be visible after
-    // a normal PWA refresh. When the live Appearance API exists, request the
-    // current per-GameId assignment instead of letting sessionStorage pin an
-    // older Clean/Rich choice. Cached Appearance remains an offline fallback.
-    if (typeof apiGetGameAppearance !== "function") return cached;
+    // Kent/shared transport owns how apiGetGameAppearance reaches the backend.
+    // Sports runtime owns what happens after a correct bundle is supplied.
+    if (typeof apiGetGameAppearance !== "function") return fallback;
+
+    fresh[id] = false;
 
     if (!inflight[id]) {
       inflight[id] = Promise.resolve(apiGetGameAppearance(id))
         .then(function(result) {
-          if (result && result.success !== false) return remember_(id, result);
+          if (result && result.success !== false) {
+            return remember_(id, result, { fresh: true });
+          }
           return null;
         })
         .catch(function(err) {
@@ -1152,11 +1198,20 @@ async function teamFantasyRunTestLab_() {
         });
     }
 
-    return inflight[id];
+    const current = await inflight[id];
+    return current || fallback;
   }
 
   function appearance_(gameId, provided) {
-    return provided || cached_(gameId) || null;
+    const id = text_(gameId);
+    const remembered = cached_(id);
+
+    // Once prepare() has received the live per-GameId bundle, that bundle is
+    // authoritative for this render. Page payloads can legitimately contain an
+    // older Appearance snapshot and must not pin Clean/Rich after a switch.
+    if (id && fresh[id] === true && remembered) return remembered;
+
+    return provided || remembered || null;
   }
 
   function isRich_(gameId, provided) {
@@ -1281,6 +1336,7 @@ async function teamFantasyRunTestLab_() {
   }
 
   global.PATTCSportsRich = {
+    version: "rc23-sports-rich-runtime-9020031",
     prepare: prepare_,
     remember: remember_,
     cached: cached_,
