@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="utf-8">
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 16px; color: #202124; }
+    h2 { margin: 0 0 6px; }
+    .warning { border: 1px solid #c5221f; border-radius: 8px; padding: 12px; margin: 12px 0; }
+    .muted { color: #5f6368; font-size: 12px; }
+    label { display: block; font-weight: 600; margin: 12px 0 6px; }
+    input { box-sizing: border-box; width: 100%; padding: 9px; }
+    button { padding: 9px 12px; margin-top: 10px; cursor: pointer; }
+    button[disabled] { cursor: not-allowed; opacity: .5; }
+    #deleteButton { font-weight: 700; }
+    .status { margin-top: 12px; white-space: pre-wrap; }
+    table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 12px; }
+    th, td { text-align: left; border-bottom: 1px solid #ddd; padding: 6px 4px; vertical-align: top; }
+    .block { font-weight: 700; }
+    .progress { height: 6px; background: #eee; overflow: hidden; border-radius: 3px; margin-top: 10px; display: none; }
+    .progress > div { width: 45%; height: 100%; background: currentColor; animation: slide 1s infinite alternate ease-in-out; }
+    @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(220%); } }
+  </style>
+</head>
+<body>
+  <h2>Permanent Delete Game</h2>
+  <div class="muted">RC24B review build — deletion is intentionally disabled. Dry Run is read-only.</div>
+
+  <div class="warning">
+    <strong>Danger Zone</strong><br>
+    Exact GameId only. No partial, wildcard, display-name, or “test” bulk matching is supported.
+  </div>
+
+  <label for="gameId">Exact GameId</label>
+  <input id="gameId" autocomplete="off" spellcheck="false" placeholder="survivor-test-2026">
+  <button id="previewButton" type="button" onclick="runPreview()">Run Deletion Preview</button>
+
+  <div id="progress" class="progress"><div></div></div>
+  <div id="status" class="status" aria-live="polite"></div>
+  <div id="summary"></div>
+
+  <div id="confirmArea" style="display:none">
+    <label id="confirmLabel" for="confirmId"></label>
+    <input id="confirmId" autocomplete="off" spellcheck="false" oninput="syncDeleteButton()">
+    <button id="deleteButton" type="button" disabled onclick="attemptDelete()">PERMANENT DELETE</button>
+    <div class="muted">In RC24B this button will remain server-blocked even after exact confirmation.</div>
+  </div>
+
+<script>
+let preview = null;
+let busy = false;
+
+function setBusy(value, message) {
+  busy = !!value;
+  document.getElementById('previewButton').disabled = busy;
+  document.getElementById('progress').style.display = busy ? 'block' : 'none';
+  if (message !== undefined) document.getElementById('status').textContent = message;
+  syncDeleteButton();
+}
+
+function runPreview() {
+  if (busy) return;
+  const gameId = document.getElementById('gameId').value.trim();
+  preview = null;
+  document.getElementById('summary').textContent = '';
+  document.getElementById('confirmArea').style.display = 'none';
+  setBusy(true, 'Scanning exact GameId…');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      setBusy(false, '');
+      preview = result || null;
+      renderPreview(result || {});
+    })
+    .withFailureHandler(function(error) {
+      setBusy(false, 'Dry Run failed: ' + ((error && error.message) || error || 'Unknown error'));
+    })
+    .apiAdminPermanentGamePurgeDryRun({ gameId: gameId });
+}
+
+function renderPreview(result) {
+  const status = document.getElementById('status');
+  const summary = document.getElementById('summary');
+  summary.textContent = '';
+
+  if (!result.game || result.game.exists !== true) {
+    status.textContent = (result.blockers && result.blockers.length)
+      ? result.blockers.map(function(x){ return x.message; }).join('\n')
+      : 'Exact GameId not found.';
+    return;
+  }
+
+  const lines = [
+    'Game: ' + (result.game.name || ''),
+    'GameId: ' + result.gameId,
+    'Type: ' + (result.game.type || ''),
+    'Year: ' + (result.game.year || ''),
+    'Owned rows found: ' + (result.totalOwnedRows || 0),
+    'Dependencies: ' + ((result.dependencies || []).length ? 'BLOCKED' : 'NONE'),
+    'Shared/unproven assets retained: ' + ((result.sharedAssetsRetained || []).length),
+    'Status: ' + (result.status || '')
+  ];
+  status.textContent = lines.join('\n');
+
+  const table = document.createElement('table');
+  const head = document.createElement('tr');
+  ['Location', 'Class', 'Matches'].forEach(function(text) {
+    const th = document.createElement('th'); th.textContent = text; head.appendChild(th);
+  });
+  table.appendChild(head);
+  (result.stores || []).filter(function(store) {
+    return store.matchingRows > 0 || store.classification.indexOf('SHARED') === 0;
+  }).forEach(function(store) {
+    const tr = document.createElement('tr');
+    [store.scope + ':' + store.sheet, store.classification, String(store.matchingRows || 0)].forEach(function(text) {
+      const td = document.createElement('td'); td.textContent = text; tr.appendChild(td);
+    });
+    table.appendChild(tr);
+  });
+  summary.appendChild(table);
+
+  if ((result.blockers || []).length) {
+    const block = document.createElement('div');
+    block.className = 'warning block';
+    block.textContent = result.blockers.map(function(x){ return x.message; }).join('\n');
+    summary.appendChild(block);
+  }
+
+  document.getElementById('confirmArea').style.display = 'block';
+  document.getElementById('confirmLabel').textContent = 'TYPE ' + result.gameId + ' TO CONFIRM';
+  document.getElementById('confirmId').value = '';
+  syncDeleteButton();
+}
+
+function syncDeleteButton() {
+  const button = document.getElementById('deleteButton');
+  const typed = document.getElementById('confirmId').value;
+  const exact = !!preview && typed === preview.gameId;
+  const dependencyFree = !!preview && (!preview.blockers || preview.blockers.length === 0);
+  button.disabled = busy || !exact || !dependencyFree;
+}
+
+function attemptDelete() {
+  if (busy || !preview) return;
+  const typed = document.getElementById('confirmId').value;
+  if (typed !== preview.gameId) return;
+  setBusy(true, 'Server safety gate checking exact confirmation and dependencies…');
+  google.script.run
+    .withSuccessHandler(function(result) {
+      setBusy(false, (result && result.message) || 'Request returned.');
+      syncDeleteButton();
+    })
+    .withFailureHandler(function(error) {
+      setBusy(false, 'Delete request blocked/failed: ' + ((error && error.message) || error || 'Unknown error'));
+    })
+    .apiAdminPermanentGamePurge({ gameId: preview.gameId, confirmGameId: typed });
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+
+/* PATTC RC24A R2 — shared Sports mobile shell primitives.
+   Intentionally visual-only. Game bodies remain game-scoped. */
+.sports-shell{
+  --sports-accent:#16c6ff;
+  --sports-accent-2:#087bff;
+  --sports-gold:#f2bc33;
+  --sports-bg:#00101d;
+  --sports-panel:#031728;
+  --sports-line:rgba(117,161,191,.25);
+  color:#f6fbff;
+  background:
+    radial-gradient(circle at 78% -12%,rgba(20,89,170,.22),transparent 24rem),
+    linear-gradient(180deg,#000b16,#001322);
+  border-bottom:1px solid rgba(73,116,153,.34);
+}
+.sports-shell *{box-sizing:border-box}
+.sports-shell-topbar{
+  min-height:70px;
+  display:grid;
+  grid-template-columns:46px minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  padding:8px 10px;
+  border-bottom:1px solid rgba(68,117,154,.25);
+  background:linear-gradient(180deg,#000811,#00111e);
+}
+.sports-shell-menu{
+  width:42px;height:42px;border:0;border-radius:8px;background:transparent;color:#eaf5fb;
+  display:grid;place-items:center;cursor:pointer
+}
+.sports-shell-menu::before{content:"☰";font-size:29px;line-height:1;font-weight:300}
+.sports-shell-wordmark{
+  justify-self:start;
+  display:grid;
+  line-height:.78;
+  transform:skew(-8deg);
+  font-style:italic;
+  color:var(--sports-gold);
+  text-shadow:0 2px 0 #604708,0 0 12px rgba(240,186,40,.2);
+}
+.sports-shell-wordmark strong{font-size:1.32rem;font-weight:1000;letter-spacing:.02em}
+.sports-shell-wordmark small{font-size:.49rem;font-weight:1000;letter-spacing:.34em;margin-left:12px}
+.sports-shell-account{display:flex;gap:6px;align-items:center}
+.sports-shell-points,.sports-shell-sync{
+  min-height:38px;border-radius:8px;border:1px solid rgba(187,181,160,.48);
+  background:#06111c;color:#f7fafb;font:inherit;font-weight:800
+}
+.sports-shell-points{padding:0 9px;display:flex;align-items:center;gap:6px;font-size:.72rem}
+.sports-shell-points b{
+  width:20px;height:20px;border:2px solid #43f269;border-radius:50%;display:grid;place-items:center;
+  color:#43f269;font-size:.62rem
+}
+.sports-shell-sync{padding:0 10px;border-color:#17df53;color:#24eb5a;font-size:.68rem;letter-spacing:.08em;cursor:pointer}
+.sports-shell-identity{
+  display:grid;grid-template-columns:48px minmax(0,1fr) auto;align-items:center;gap:10px;
+  padding:10px 12px 9px;
+  background:linear-gradient(90deg,rgba(7,37,62,.76),rgba(1,18,31,.45));
+}
+.sports-shell-badge{
+  width:46px;height:52px;display:grid;place-items:center;position:relative;color:#dff6ff
+}
+.sports-shell-badge::before{
+  content:"";position:absolute;inset:1px 4px;
+  clip-path:polygon(50% 0,93% 16%,87% 72%,50% 100%,13% 72%,7% 16%);
+  background:linear-gradient(160deg,#11487d,#05162c);
+  border:2px solid #4dd5ff;box-shadow:inset 0 0 0 3px #0b2c50,0 0 12px rgba(48,201,255,.18)
+}
+.sports-shell-badge span{position:relative;z-index:1;font-size:.72rem;font-weight:1000}
+.sports-shell-title h1{margin:0;font-size:1.18rem;letter-spacing:.02em;color:#fff}
+.sports-shell-title p{margin:3px 0 0;color:#b8def0;font-size:.72rem}
+.sports-shell-league{
+  align-self:start;margin-top:3px;padding:5px 8px;border-radius:6px;border:1px solid #2385ff;
+  color:#d8e7ff;background:#082653;font-size:.62rem;font-weight:900
+}
+@media(max-width:390px){
+  .sports-shell-topbar{grid-template-columns:38px minmax(0,1fr) auto;padding-inline:8px}
+  .sports-shell-menu{width:36px}
+  .sports-shell-wordmark strong{font-size:1.12rem}
+  .sports-shell-wordmark small{font-size:.42rem}
+  .sports-shell-points{padding-inline:7px;font-size:.65rem}
+  .sports-shell-sync{padding-inline:8px;font-size:.61rem}
+}

@@ -1,0 +1,35 @@
+RC24B Permanent Game Purge DryRun/Fixture
+Baseline: e3627c57da015ac08eb65cd928378fdcb63d2cdc
+Tests: 28/28 PASS
+Failed: 0
+NO PRODUCTION GAME DELETED
+Sports Engine v55 untouched
+
+PASS  01 Dry Run makes no writes
+PASS  02 Exact GameId lookup only
+PASS  03 Nonexistent GameId safely rejected
+PASS  04 Partial GameId cannot resolve or delete
+PASS  05 Dry Run counts owned records across stores
+PASS  06 Active dependent game blocks purge
+PASS  07 KOTH source-game dependency blocks
+PASS  08 Target mini-game linked to active parent blocks
+PASS  09 Fixture purge follows child-first phase order
+PASS  10 Games row is deleted last
+PASS  11 GameAppearance target row removed
+PASS  12 Shared appearance packs and themes preserved
+PASS  13 Shared Drive asset preserved
+PASS  14 Proven unique fixture asset deleted
+PASS  15 Neighbor game remains intact
+PASS  16 Target season membership/link removed; shared LeagueMembers preserved
+PASS  17 Entries removed only for target
+PASS  18 Picks/selections removed only for target
+PASS  19 Score/result/history rows removed only for target
+PASS  20 Cache/index cleanup is target-scoped
+PASS  21 Exact typed confirmation required
+PASS  22 Fixture permanent purge writes audit record
+PASS  23 Zero removable references remain after fixture purge
+PASS  24 Repeat fixture purge is safe/idempotent
+PASS  25 Midway failure is reported without false success
+PASS  26 Ambiguous blank-GameId CategorySettings blocks
+PASS  27 Shared Hub provider observations/review rows are preserved
+PASS  28 Sports Engine fixture data remains untouched/protected

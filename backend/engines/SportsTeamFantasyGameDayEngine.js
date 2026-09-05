@@ -255,6 +255,11 @@ function teamFantasyGameDayBuildWeeklyLeaderboard_(compare) {
       points: teamFantasyGameDayRound_(c.totalPoints || 0),
       counts: c.counts || { final: 0, live: 0, upcoming: 0 },
       record: c.record || { wins: 0, losses: 0, ties: 0 },
+      weeklyRecord: c.weeklyRecord || null,
+      weeklyRecordFinal: c.weeklyRecordFinal === true,
+      dnp: c.dnp === true,
+      participated: c.participated === true,
+      weeklyLeagueRank: Number(c.weeklyLeagueRank || 0),
       seasonRank: Number(c.leagueRank || 0)
     };
   });
@@ -345,11 +350,14 @@ function apiGetTeamFantasyGameDayState(payload) {
   });
   var standings = typeof teamFantasyBuildStandings_ === "function" ? teamFantasyBuildStandings_(gameId, selectedLeagueId) : null;
   teamFantasyGameDayAttachStandings_(out, standings);
+  var weeklyAllPlay = typeof teamFantasyWeeklyAllPlaySnapshot_ === "function" ? teamFantasyWeeklyAllPlaySnapshot_(gameId, selectedLeagueId, week) : null;
+  teamFantasyGameDayAttachWeeklyAllPlay_(out, weeklyAllPlay);
   out.leagues = leagues.map(function(league) {
     return { leagueId: teamFantasyGameDayString_(league.leagueId || league.LeagueId), leagueName: teamFantasyGameDayString_(league.leagueName || league.LeagueName), leagueType: teamFantasyGameDayString_(league.leagueType || league.LeagueType) };
   });
   out.selectedLeagueId = selectedLeagueId;
   out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out);
+  out.weeklyLeaderboard = teamFantasyGameDayNormalizeWeeklyLeaderboard_(out.weeklyLeaderboard);
   var maxWeek = Math.max(1, Math.floor(Number(settings.currentWeek || week || 1)));
   out.availableWeeks = [];
   for (var availableWeek = 1; availableWeek <= maxWeek; availableWeek++) out.availableWeeks.push(availableWeek);
@@ -476,4 +484,57 @@ function apiAdminGetTeamFantasyTestLab(payload) {
   payload = payload || {};
   if (typeof requireAdminFromToken_ === "function") requireAdminFromToken_(payload.token);
   return teamFantasyBuildSyntheticGameDayLab_();
+}
+
+/* RC24A_R45_WEEKLY_COMPARE_CONTEXT */
+function teamFantasyGameDayAttachWeeklyAllPlay_(compare, snapshot) {
+  compare = compare || {};
+  snapshot = snapshot && snapshot.success !== false ? snapshot : null;
+  var rows = snapshot && Array.isArray(snapshot.rows) ? snapshot.rows : [];
+  var standingMode = snapshot ? teamFantasyGameDayString_(snapshot.standingMode) : "";
+  compare.weeklyAllPlay = snapshot;
+  (compare.competitors || []).forEach(function(competitor) {
+    var id = standingMode === "entries"
+      ? "entry:" + teamFantasyGameDayString_(competitor.entryId)
+      : "user:" + teamFantasyGameDayKey_(competitor.username);
+    var row = rows.filter(function(item) { return teamFantasyGameDayString_(item.competitorId) === id; })[0] || null;
+    competitor.weeklyLeagueRank = row ? Number(row.weeklyRank || 0) : 0;
+    competitor.weeklyRecord = row && row.record ? {
+      wins: Number(row.record.wins || 0),
+      losses: Number(row.record.losses || 0),
+      ties: Number(row.record.ties || 0)
+    } : null;
+    competitor.weeklyRecordFinal = snapshot ? snapshot.settled === true : false;
+    competitor.eligibleThatWeek = row ? row.eligibleThatWeek === true : false;
+    competitor.participated = row ? row.participated === true : false;
+    competitor.dnp = row ? row.dnp === true : true;
+    if (competitor.dnp) {
+      competitor.totalPoints = 0;
+      competitor.counts = { final: 0, live: 0, upcoming: 0 };
+      competitor.slots = teamFantasyGameDayPositions_().map(function(position) {
+        return { position: position, label: teamFantasyGameDayPositionLabel_(position), hidden: false, empty: true, dnp: true, status: "upcoming", fantasyPoints: 0 };
+      });
+    }
+  });
+  return compare;
+}
+
+function teamFantasyGameDayNormalizeWeeklyLeaderboard_(leaderboard) {
+  leaderboard = leaderboard || { rows: [] };
+  var rows = Array.isArray(leaderboard.rows) ? leaderboard.rows.slice() : [];
+  rows.sort(function(a, b) {
+    if ((a.dnp === true) !== (b.dnp === true)) return a.dnp === true ? 1 : -1;
+    if (Number(b.points || 0) !== Number(a.points || 0)) return Number(b.points || 0) - Number(a.points || 0);
+    return teamFantasyGameDayString_(a.label).localeCompare(teamFantasyGameDayString_(b.label));
+  });
+  var lastPoints = null, lastRank = 0, rankedIndex = 0;
+  rows.forEach(function(row) {
+    if (row.dnp === true) { row.weekRank = 0; return; }
+    if (lastPoints === null || Number(row.points) !== Number(lastPoints)) lastRank = rankedIndex + 1;
+    row.weekRank = lastRank;
+    lastPoints = row.points;
+    rankedIndex++;
+  });
+  leaderboard.rows = rows;
+  return leaderboard;
 }

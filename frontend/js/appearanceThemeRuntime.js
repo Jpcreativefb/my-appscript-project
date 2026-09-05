@@ -470,3 +470,205 @@
     leaderboardPresentation: leaderboardPresentation
   };
 })(window);
+
+/* RC24A_R46_SHARED_SPORTS_HERO_CONTRACT */
+(function installPattcSharedSportsHero_(global) {
+  "use strict";
+  var runtime = global.AppearanceThemeRuntime || {};
+  var DEFAULTS = {
+    accentColor: "#19a7ce",
+    overlay: 58,
+    focal: "center center",
+    title: "PATTC SPORTS",
+    subtitle: "Make your picks. Follow the action.",
+    fallbackMode: "USE DEFAULT PATTC HERO"
+  };
+  function text_(value) { return String(value == null ? "" : value).trim(); }
+  function escape_(value) { return text_(value).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/\"/g,"&quot;").replace(/'/g,"&#039;"); }
+  function safeColor_(value, fallback) { var v=text_(value); return /^#[0-9a-f]{6}$/i.test(v) ? v : fallback; }
+  function bounded_(value,min,max,fallback) { var n=Number(value); return Number.isFinite(n) ? Math.max(min,Math.min(max,n)) : fallback; }
+  function safeUrl_(value) {
+    var v=text_(value); if(!v) return "";
+    if (/^(javascript|vbscript):/i.test(v)) return "";
+    if (/^data:/i.test(v) && !/^data:image\//i.test(v)) return "";
+    if (/^(https?:\/\/|\/|\.\/|\.\.\/|data:image\/)/i.test(v)) return v;
+    return "";
+  }
+  function driveUrl_(fileId) { var id=text_(fileId); return id ? "https://drive.google.com/thumbnail?id="+encodeURIComponent(id)+"&sz=w1600" : ""; }
+  function themeHero_(bundle) {
+    var theme=bundle&&bundle.theme&&typeof bundle.theme==="object"?bundle.theme:{};
+    var hero=theme.sportsHero||theme.SportsHero||{};
+    return hero&&typeof hero==="object"&&!Array.isArray(hero)?hero:{};
+  }
+  function active_(row) { var v=row&&row.Active; return v===undefined||v===null||v===""||v===true||String(v).toLowerCase()==="true"||String(v)==="1"; }
+  function appearanceImage_(bundle, gameId) {
+    bundle=bundle||{}; gameId=text_(gameId||bundle.gameId);
+    var hero=themeHero_(bundle), explicit=safeUrl_(hero.imageUrl||hero.backgroundImage||hero.heroImageUrl); if(explicit) return explicit;
+    var overrides=Array.isArray(bundle.overrides)?bundle.overrides:[];
+    var match=overrides.find(function(row){
+      var type=text_(row.EntityType).toLowerCase(), id=text_(row.EntityId);
+      return active_(row)&&text_(row.GameId)===gameId&&(type==="game"||type==="sports-hero"||type==="hero")&&(id===gameId||id==="hero"||id==="default");
+    });
+    var overrideUrl=match?(safeUrl_(match.ImageUrl)||driveUrl_(match.ImageFileId)):""; if(overrideUrl) return overrideUrl;
+    var packId=text_(bundle.imagePackId||(bundle.assignment&&bundle.assignment.ImagePackId));
+    var items=Array.isArray(bundle.imagePackItems)?bundle.imagePackItems:[];
+    var item=items.find(function(row){
+      var type=text_(row.EntityType).toLowerCase(), id=text_(row.EntityId), variant=text_(row.Variant).toLowerCase();
+      return active_(row)&&(!packId||text_(row.PackId)===packId)&&(type==="game"||type==="sports-hero"||type==="hero")&&(id===gameId||id==="hero"||id==="default"||id==="*")&&(variant==="hero"||variant==="background"||variant==="default"||!variant);
+    });
+    return item?(safeUrl_(item.ImageUrl)||driveUrl_(item.ImageFileId)):"";
+  }
+  function focal_(value) {
+    var key=text_(value).toLowerCase();
+    var map={center:"center center",top:"center top",bottom:"center bottom",left:"left center",right:"right center","top-left":"left top","top-right":"right top","bottom-left":"left bottom","bottom-right":"right bottom","center center":"center center","center top":"center top","center bottom":"center bottom","left center":"left center","right center":"right center"};
+    return map[key]||DEFAULTS.focal;
+  }
+  function sportsHeroPresentation(bundle, options) {
+    bundle=bundle||{}; options=options||{};
+    var hero=themeHero_(bundle), useDefault=hero.useDefault===true||String(hero.mode||"").toLowerCase()==="default";
+    var theme=bundle.theme||{}, colors=theme.colors||{};
+    var imageUrl=useDefault?"":appearanceImage_(bundle,options.gameId||bundle.gameId);
+    var accent=safeColor_(useDefault?"":(hero.accentColor||hero.accent||colors.accent||colors.primary),safeColor_(options.accentColor,DEFAULTS.accentColor));
+    return {
+      title: text_(useDefault?"":hero.title)||text_(options.title)||DEFAULTS.title,
+      subtitle: text_(useDefault?"":hero.subtitle)||text_(options.subtitle)||DEFAULTS.subtitle,
+      kicker: text_(options.kicker)||"PATTC SPORTS",
+      imageUrl: imageUrl,
+      logoUrl: useDefault?"":(safeUrl_(hero.logoUrl||hero.markUrl)||driveUrl_(hero.logoFileId||hero.markFileId)),
+      accentColor: accent,
+      overlay: bounded_(useDefault?DEFAULTS.overlay:hero.overlay,20,90,DEFAULTS.overlay),
+      focal: focal_(useDefault?DEFAULTS.focal:hero.focal),
+      isDefault: useDefault||!imageUrl,
+      fallbackMode: DEFAULTS.fallbackMode,
+      contextHtml: options.contextHtml||""
+    };
+  }
+  function sportsHeroHtml(bundle, options) {
+    var p=sportsHeroPresentation(bundle,options||{});
+    var style="--pattc-sports-hero-accent:"+p.accentColor+";--pattc-sports-hero-overlay:"+(p.overlay/100)+";--pattc-sports-hero-focal:"+p.focal;
+    var media=p.imageUrl?'<img class="pattc-sports-hero-image" src="'+escape_(p.imageUrl)+'" alt="" loading="eager" decoding="async" referrerpolicy="no-referrer" onerror="this.hidden=true;this.closest(\'.pattc-sports-hero\').classList.add(\'is-default-hero\',\'sports-hero-image-failed\')">':'';
+    var logo=p.logoUrl?'<img class="pattc-sports-hero-mark" src="'+escape_(p.logoUrl)+'" alt="" onerror="this.hidden=true">':'';
+    return '<section class="pattc-sports-hero '+(p.isDefault?'is-default-hero':'has-custom-hero')+'" style="'+escape_(style)+'" data-sports-hero="shared" data-hero-mode="'+(p.isDefault?'default':'custom')+'">'+media+'<div class="pattc-sports-hero-shade"></div><div class="pattc-sports-hero-content">'+logo+'<div class="pattc-sports-hero-copy"><div class="pattc-sports-hero-kicker">'+escape_(p.kicker)+'</div><h1>'+escape_(p.title)+'</h1><p>'+escape_(p.subtitle)+'</p></div>'+(p.contextHtml?'<div class="pattc-sports-hero-context">'+p.contextHtml+'</div>':'')+'</div></section>';
+  }
+  runtime.sportsHeroPresentation=sportsHeroPresentation;
+  runtime.sportsHeroHtml=sportsHeroHtml;
+  runtime.sportsHeroDefaults=Object.assign({},DEFAULTS);
+  global.AppearanceThemeRuntime=runtime;
+})(window);
+
+/* RC24A_R47_SHARED_SPORTS_HERO_FIVE_GAME_ADAPTER */
+(function(global){
+  "use strict";
+  var runtime = global.AppearanceThemeRuntime = global.AppearanceThemeRuntime || {};
+  if (typeof runtime.sportsHeroHtml !== "function") return;
+  var defaults = {
+    "team-fantasy": { kicker:"NFL TEAM FANTASY", title:"Team Fantasy Football", subtitle:"Build one weekly lineup. Compete in every eligible league." },
+    "confidence": { kicker:"PATTC SPORTS · CONFIDENCE", title:"Confidence / Pick’em", subtitle:"Rank your confidence. Follow every game." },
+    "wager": { kicker:"PATTC SPORTS", title:"Sports Wager", subtitle:"Virtual PATTC credits · live matchups · saved odds · clear returns" },
+    "survivor": { kicker:"PATTC SURVIVOR FOOTBALL", title:"Survivor Football", subtitle:"One weekly decision. Pick a team, survive the configured rule, and keep your run alive." },
+    "koth": { kicker:"PATTC KING OF THE HILL", title:"King of the Hill", subtitle:"Your configured source score is the value. Avoid the bottom and avoid the strike limit." }
+  };
+  runtime.sportsHeroForGameHtml = function(bundle, options) {
+    options = options || {};
+    var kind = String(options.kind || "").trim().toLowerCase();
+    var base = defaults[kind] || { kicker:"PATTC SPORTS", title:"PATTC Sports", subtitle:"" };
+    var merged = Object.assign({}, base, options);
+    delete merged.kind;
+    if (options.gameName && !options.title) merged.title = String(options.gameName);
+    return runtime.sportsHeroHtml(bundle || {}, merged);
+  };
+  runtime.sportsHeroGameDefaults = Object.assign({}, defaults);
+})(window);
+
+/* RC24A_V12_OFFICIAL_SPORTS_MEDIA_DEFAULTS */
+(function installRc24aOfficialSportsMedia_(global) {
+  "use strict";
+  var runtime = global.AppearanceThemeRuntime = global.AppearanceThemeRuntime || {};
+  if (typeof runtime.sportsHeroHtml !== "function") return;
+
+  var official = {
+    "team-fantasy": {
+      imageUrl: "./assets/sports/official/team-fantasy-hero.png",
+      logoUrl: "./assets/sports/official/team-fantasy-logo.png",
+      accentColor: "#178CFF", overlay: 56, focal: "center"
+    },
+    confidence: {
+      imageUrl: "./assets/sports/official/confidence-hero.png",
+      logoUrl: "./assets/sports/official/confidence-logo.png",
+      accentColor: "#199CFF", overlay: 57, focal: "center"
+    },
+    wager: {
+      imageUrl: "./assets/sports/official/sports-wager-hero.png",
+      logoUrl: "./assets/sports/official/sports-wager-logo.png",
+      accentColor: "#21C969", overlay: 58, focal: "right"
+    },
+    survivor: {
+      imageUrl: "./assets/sports/official/survivor-hero.png",
+      logoUrl: "./assets/sports/official/survivor-logo.png",
+      accentColor: "#29D060", overlay: 57, focal: "right"
+    },
+    koth: {
+      imageUrl: "./assets/sports/official/koth-hero.png",
+      logoUrl: "./assets/sports/official/koth-logo.png",
+      accentColor: "#F0B429", overlay: 55, focal: "right"
+    }
+  };
+
+  function txt_(v) { return String(v == null ? "" : v).trim().toLowerCase(); }
+  function kind_(bundle, options) {
+    bundle = bundle || {}; options = options || {};
+    var assignment = bundle.assignment || bundle.Assignment || {};
+    var game = bundle.game || {};
+    var hay = [
+      options.kind, options.gameId, options.gameName, options.title, options.kicker,
+      bundle.gameId, assignment.GameId, assignment.LayoutTemplate,
+      game.gameId, game.GameId, game.name, game.Name, game.type, game.Type
+    ].map(txt_).join(" ");
+    if (/king\s*of\s*the\s*hill|\bkoth\b/.test(hay)) return "koth";
+    if (/confidence|pick.?em/.test(hay)) return "confidence";
+    if (/wager|betting/.test(hay)) return "wager";
+    if (/survivor/.test(hay)) return "survivor";
+    if (/team.?fantasy|fantasy/.test(hay)) return "team-fantasy";
+    return "";
+  }
+  function hero_(bundle) {
+    var theme = bundle && bundle.theme && typeof bundle.theme === "object" ? bundle.theme : {};
+    var hero = theme.sportsHero || theme.SportsHero || {};
+    return hero && typeof hero === "object" && !Array.isArray(hero) ? hero : {};
+  }
+  function renderedBundle_(bundle, options) {
+    var kind = kind_(bundle, options), media = official[kind];
+    if (!media) return bundle || {};
+    bundle = bundle || {};
+    var current = hero_(bundle);
+    var keys = Object.keys(current);
+    var explicitDefault = current.useDefault === true || txt_(current.mode) === "default";
+    var hasCustomMedia = !!String(current.imageUrl || current.backgroundImage || current.heroImageUrl || current.logoUrl || current.markUrl || "").trim();
+    if (keys.length && !explicitDefault && hasCustomMedia) return bundle;
+
+    var clone = Object.assign({}, bundle);
+    clone.theme = Object.assign({}, bundle.theme || {});
+    clone.theme.sportsHero = Object.assign({}, current, {
+      useDefault: false,
+      imageUrl: media.imageUrl,
+      logoUrl: media.logoUrl,
+      accentColor: current.accentColor || media.accentColor,
+      overlay: current.overlay === undefined || current.overlay === null || current.overlay === "" ? media.overlay : current.overlay,
+      focal: current.focal || media.focal
+    });
+    return clone;
+  }
+
+  var baseHtml = runtime.sportsHeroHtml;
+  var basePresentation = runtime.sportsHeroPresentation;
+  runtime.sportsHeroHtml = function(bundle, options) {
+    return baseHtml(renderedBundle_(bundle, options || {}), options || {});
+  };
+  if (typeof basePresentation === "function") {
+    runtime.sportsHeroPresentation = function(bundle, options) {
+      return basePresentation(renderedBundle_(bundle, options || {}), options || {});
+    };
+  }
+  runtime.sportsHeroOfficialDefaults = Object.assign({}, official);
+  runtime.sportsHeroOfficialKind = kind_;
+})(window);

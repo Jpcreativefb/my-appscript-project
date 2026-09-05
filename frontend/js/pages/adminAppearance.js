@@ -2262,6 +2262,7 @@ function adminAppearanceBuildHtml_() {
           <label>Image Pack<select id="appearanceGameImagePack" class="input">${adminAppearanceImagePackOptions_(ADMIN_APPEARANCE_STATE.pendingGameImagePackId || assignment.ImagePackId || currentPack)}</select></label>
           <label>Theme Pack<select id="appearanceGameThemePack" class="input">${adminAppearanceThemeOptions_(assignment.ThemePackId || currentTheme, false)}</select></label>
           <label>Player Layout Template<select id="appearanceGameLayoutTemplate" class="input">${adminAppearanceLayoutOptionsHtml_(assignment)}</select><span class="admin-sub">${adminAppearanceEscape_(adminAppearanceLayoutHelp_())}</span></label>
+          ${adminAppearanceSportsHeroFieldsHtml_(assignment)}
         </div>
         <div class="admin-actions"><button class="button" onclick="adminAppearanceSaveGameAssignment_()">Apply Appearance + Layout to Game</button></div>
         <div class="admin-sub">This section assigns packs and the <b>Player Layout Template</b> to the selected game. Layout is saved per GameId through the existing Appearance assignment. Image priority: Game override → Image Pack → existing game image.</div>
@@ -2336,7 +2337,8 @@ async function adminAppearanceSaveGameAssignment_() {
   const imagePack = document.getElementById("appearanceGameImagePack");
   const themePack = document.getElementById("appearanceGameThemePack");
   const layout = document.getElementById("appearanceGameLayoutTemplate");
-  const themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
+  let themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
+  themeOverride = adminAppearanceApplySportsHeroToOverride_(themeOverride);
   const result = await apiAdminSaveGameAppearance({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
     imagePackId: imagePack ? imagePack.value : "",
@@ -3815,7 +3817,8 @@ async function adminAppearanceApplyThemeToGame_() {
   if (!saved) { adminAppearanceSetThemeActionState_(""); return; }
   const imagePack = document.getElementById("appearanceGameImagePack");
   const layout = document.getElementById("appearanceGameLayoutTemplate");
-  const themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
+  let themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
+  themeOverride = adminAppearanceApplySportsHeroToOverride_(themeOverride);
   const result = await apiAdminSaveGameAppearance({
     gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
     imagePackId: imagePack ? imagePack.value : adminAppearanceDefaultImagePack_(),
@@ -3853,3 +3856,38 @@ function adminAppearanceResetTheme_() {
 function adminAppearanceCreatePack_() { return adminAppearanceCreateBlankPack_(); }
 function adminAppearanceNewTheme_() { return adminAppearanceCreateBlankTheme_(); }
 function adminAppearanceSaveThemeAsNew_() { return adminAppearanceDuplicateTheme_(); }
+
+/* RC24A_R46_ADMIN_SPORTS_HERO */
+function adminAppearanceSportsHeroObject_(assignment) {
+  const override = adminAppearanceThemeOverrideFromRow_(assignment || adminAppearanceAssignment_());
+  const raw = override.sportsHero || override.SportsHero || {};
+  return raw && typeof raw === 'object' && !Array.isArray(raw) ? Object.assign({}, raw) : {};
+}
+function adminAppearanceSportsHeroFieldsHtml_(assignment) {
+  if (adminAppearanceLayoutFamily_() !== 'sports') return '';
+  const hero = adminAppearanceSportsHeroObject_(assignment), useDefault = hero.useDefault === true || !Object.keys(hero).length;
+  const focal = String(hero.focal || 'center').toLowerCase(), opt = function(v,label){return '<option value="'+v+'"'+(focal===v?' selected':'')+'>'+label+'</option>';};
+  return `<div class="appearance-sports-hero-controls"><h3>Sports Hero / Header</h3><div class="admin-sub">Template remains controlled. These values only change approved Hero content/appearance for this GameId.</div><input type="hidden" id="appearanceSportsHeroUseDefault" value="${useDefault?'true':'false'}"><div class="appearance-sports-hero-grid"><label>Hero image URL<input id="appearanceSportsHeroImage" class="input" value="${adminAppearanceEscape_(hero.imageUrl||'')}" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Optional logo / mark URL<input id="appearanceSportsHeroLogo" class="input" value="${adminAppearanceEscape_(hero.logoUrl||'')}" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Hero title<input id="appearanceSportsHeroTitle" class="input" value="${adminAppearanceEscape_(hero.title||'')}" placeholder="Use game name" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Subtitle / tagline<input id="appearanceSportsHeroSubtitle" class="input" value="${adminAppearanceEscape_(hero.subtitle||'')}" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Accent color<input id="appearanceSportsHeroAccent" class="input" type="color" value="${adminAppearanceEscape_(/^#[0-9a-f]{6}$/i.test(String(hero.accentColor||''))?hero.accentColor:'#19a7ce')}" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Overlay darkness <span id="appearanceSportsHeroOverlayLabel">${Number(hero.overlay||58)}%</span><input id="appearanceSportsHeroOverlay" type="range" min="20" max="90" value="${Number(hero.overlay||58)}" oninput="adminAppearanceUpdateSportsHeroPreview_(true)"></label><label>Image focal position<select id="appearanceSportsHeroFocal" class="input" onchange="adminAppearanceUpdateSportsHeroPreview_(true)">${opt('center','Center')}${opt('top','Top')}${opt('bottom','Bottom')}${opt('left','Left')}${opt('right','Right')}${opt('top-left','Top Left')}${opt('top-right','Top Right')}${opt('bottom-left','Bottom Left')}${opt('bottom-right','Bottom Right')}</select></label></div><div class="appearance-sports-hero-actions"><button type="button" class="button secondary" onclick="adminAppearanceUseDefaultSportsHero_()">USE DEFAULT PATTC HERO</button></div><div class="appearance-sports-hero-previews"><div class="appearance-sports-hero-preview"><strong>Desktop Preview</strong><div id="appearanceSportsHeroPreviewDesktop"></div></div><div class="appearance-sports-hero-preview is-mobile"><strong>Mobile Preview · 390px</strong><div id="appearanceSportsHeroPreviewMobile"></div></div></div></div>`;
+}
+function adminAppearanceSportsHeroDraft_() {
+  const get=function(id){const el=document.getElementById(id);return el?String(el.value||'').trim():'';}, flag=document.getElementById('appearanceSportsHeroUseDefault');
+  if (flag && flag.value === 'true') return {useDefault:true};
+  return {useDefault:false,imageUrl:get('appearanceSportsHeroImage'),logoUrl:get('appearanceSportsHeroLogo'),title:get('appearanceSportsHeroTitle'),subtitle:get('appearanceSportsHeroSubtitle'),accentColor:get('appearanceSportsHeroAccent'),overlay:Number(get('appearanceSportsHeroOverlay')||58),focal:get('appearanceSportsHeroFocal')||'center'};
+}
+function adminAppearanceApplySportsHeroToOverride_(override) {
+  const next=override&&typeof override==='object'?Object.assign({},override):{};
+  if (adminAppearanceLayoutFamily_()==='sports') next.sportsHero=adminAppearanceSportsHeroDraft_();
+  return next;
+}
+function adminAppearanceUpdateSportsHeroPreview_(markCustom) {
+  const flag=document.getElementById('appearanceSportsHeroUseDefault'); if(markCustom&&flag) flag.value='false';
+  const label=document.getElementById('appearanceSportsHeroOverlayLabel'), slider=document.getElementById('appearanceSportsHeroOverlay'); if(label&&slider) label.textContent=String(slider.value)+'%';
+  if(!window.AppearanceThemeRuntime||typeof window.AppearanceThemeRuntime.sportsHeroHtml!=='function') return;
+  const hero=adminAppearanceSportsHeroDraft_(), game=adminAppearanceSelectedGameForLayout_();
+  const html=window.AppearanceThemeRuntime.sportsHeroHtml({gameId:adminAppearanceGameId_(game),theme:{sportsHero:hero}},{gameId:adminAppearanceGameId_(game),title:adminAppearanceGameName_(game),kicker:'PATTC SPORTS',subtitle:'Preview before Save'});
+  ['appearanceSportsHeroPreviewDesktop','appearanceSportsHeroPreviewMobile'].forEach(function(id){const el=document.getElementById(id);if(el)el.innerHTML=html;});
+}
+function adminAppearanceUseDefaultSportsHero_() {
+  const ids=['appearanceSportsHeroImage','appearanceSportsHeroLogo','appearanceSportsHeroTitle','appearanceSportsHeroSubtitle'];ids.forEach(function(id){const el=document.getElementById(id);if(el)el.value='';});
+  const accent=document.getElementById('appearanceSportsHeroAccent');if(accent)accent.value='#19a7ce';const overlay=document.getElementById('appearanceSportsHeroOverlay');if(overlay)overlay.value='58';const focal=document.getElementById('appearanceSportsHeroFocal');if(focal)focal.value='center';const flag=document.getElementById('appearanceSportsHeroUseDefault');if(flag)flag.value='true';adminAppearanceUpdateSportsHeroPreview_(false);
+}

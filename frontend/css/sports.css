@@ -1337,3 +1337,9 @@
     max-height: 88vh;
   }
 }
+
+/* RC24A R4.5 — reusable Sports league selector */
+.sports-league-selector{display:inline-flex;flex-direction:column;gap:4px;min-width:170px;padding:7px 9px;border:1px solid rgba(125,211,252,.24);border-radius:9px;background:rgba(2,14,28,.78)}
+.sports-league-selector>span{font-size:10px;letter-spacing:.12em;text-transform:uppercase;font-weight:800;color:#94d8ff}
+.sports-league-selector select{appearance:auto;min-height:34px;border:1px solid rgba(148,216,255,.28);border-radius:7px;background:#041827;color:#f8fbff;font-weight:800;padding:6px 8px}
+@media(max-width:520px){.sports-league-selector{min-width:0;max-width:100%}}

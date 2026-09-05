@@ -93,6 +93,8 @@ const API_LONG_TIMEOUT_ACTIONS =
     "getSportsLiveQuestionStatus",
     "adminSummary",
     "adminGetGames",
+    "adminPermanentGamePurgeDryRun",
+    "adminPermanentGamePurge",
     "adminGetGameSetup",
     "adminSetupAppearanceSystem",
     "adminGetAppearanceDashboard",

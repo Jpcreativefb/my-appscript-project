@@ -1,0 +1,13 @@
+/* RC24A SPORTS LAUNCH CORE — Roy cumulative integration compatibility layer */
+.rc24a-confidence-season{display:grid;gap:12px}
+.rc24a-confidence-season-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.rc24a-confidence-season-stat{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border:1px solid rgba(148,163,184,.22);border-radius:10px;background:rgba(15,23,42,.56)}
+.rc24a-confidence-season-stat span,.rc24a-confidence-season-note{color:#94a3b8}
+.rc24a-confidence-season-note{margin:0;font-size:.88rem;line-height:1.45}
+.rc24a-confidence-season-note.warning{color:#fbbf24}
+.rc24a-confidence-season-table,.rc24a-confidence-week-list{display:grid;gap:5px;overflow-x:auto}
+.rc24a-confidence-season-row{display:grid;grid-template-columns:52px minmax(130px,1fr) 70px 52px 58px;gap:8px;align-items:center;min-width:390px;padding:8px 10px;border-radius:8px;background:rgba(15,23,42,.5)}
+.rc24a-confidence-week-row{display:grid;grid-template-columns:64px minmax(150px,1fr) 70px 86px;gap:8px;align-items:center;min-width:390px;padding:8px 10px;border-radius:8px;background:rgba(15,23,42,.5)}
+.rc24a-confidence-season-row.header,.rc24a-confidence-week-row.header{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:#94a3b8;background:rgba(30,41,59,.72)}
+.rc24a-sports-launch{display:grid;gap:8px}
+@media(min-width:760px){.rc24a-confidence-season-summary{grid-template-columns:repeat(4,minmax(0,1fr))}}

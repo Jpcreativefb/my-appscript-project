@@ -184,8 +184,9 @@ async function renderAdminTeamFantasyPage() {
       </section>
       <section class="card">
         <div class="tf-card-heading"><div><h2>Leagues</h2><div class="tf-muted">Complete League is automatic. Subleagues reuse the same entry and weekly picks.</div></div></div>
-        <div class="tf-inline-form"><input id="adminTfLeagueName" placeholder="Family League"><input id="adminTfLeaguePlayoffs" type="number" min="2" value="${Number(s.subleaguePlayoffDefault||4)}"><select id="adminTfLeagueStanding"><option value="${s.standingMode==='entries'?'entries':'combined-user'}">Use game default</option><option value="combined-user">Combined Player</option><option value="entries">Separate Entries</option></select><button class="tf-button" onclick="adminTfCreateLeague_()">Create League</button></div>
+        <div class="tf-inline-form"><input id="adminTfLeagueName" placeholder="Family League"><input id="adminTfLeaguePlayoffs" type="number" min="2" value="${Number(s.subleaguePlayoffDefault||4)}"><select id="adminTfLeagueStanding"><option value="${s.standingMode==='entries'?'entries':'combined-user'}">Use game default</option><option value="combined-user">Combined Player</option><option value="entries">Separate Entries</option></select><select id="adminTfLeagueQualification"><option value="record">Record · all-play W-L-T</option><option value="points">Points · cumulative Team Fantasy points</option></select><button class="tf-button" onclick="adminTfCreateLeague_()">Create League</button></div>
         <div class="tf-chip-row">${leagues.map(function(l){return `<span class="tf-chip">${adminTfEscape_(l.LeagueName||l.leagueName||l.LeagueId)} · ${Number(l.PlayoffTeams||l.playoffTeams||0)||'auto'} playoffs</span>`;}).join('')}</div>
+        ${adminTfR47LeagueQualificationEditor_(leagues)}
         <div class="tf-inline-form"><input id="adminTfMemberUser" placeholder="username"><select id="adminTfMemberLeague">${leagues.filter(function(l){return String(l.LeagueId||l.leagueId)!=='complete';}).map(function(l){return `<option value="${adminTfEscape_(l.LeagueId||l.leagueId)}">${adminTfEscape_(l.LeagueName||l.leagueName)}</option>`;}).join('')}</select><button class="tf-button secondary" onclick="adminTfAssignMember_()">Add User's Entry/Entries</button></div>
       </section>
       <section class="card">
@@ -322,7 +323,7 @@ async function adminTfInstallTrigger_() {
 async function adminTfCreateLeague_() {
   const name = adminTfValue_('adminTfLeagueName').trim();
   if (!name) { adminTfActionStatus_('Enter a league name.', true); return; }
-  const res = await apiTeamFantasyPost_('adminCreateTeamFantasyLeague', { gameId: getFrontendGameId(), leagueName: name, playoffTeams: adminTfValue_('adminTfLeaguePlayoffs'), standingMode: adminTfValue_('adminTfLeagueStanding') });
+  const res = await apiTeamFantasyPost_('adminCreateTeamFantasyLeague', { gameId: getFrontendGameId(), leagueName: name, playoffTeams: adminTfValue_('adminTfLeaguePlayoffs'), standingMode: adminTfValue_('adminTfLeagueStanding'), qualificationMethod: adminTfValue_('adminTfLeagueQualification') || 'record' });
   if (!res || res.success === false) { adminTfActionStatus_(res && (res.error || res.message) || 'Could not create league.', true); return; }
   adminTfActionStatus_('✅ League created.', false);
   await navigate('admin-team-fantasy', { skipUnsavedCheck: true });
@@ -351,3 +352,30 @@ async function adminTfReminder_(previewOnly) {
   }
 }
 
+/* RC24A_R47_TEAM_FANTASY_ADMIN_QUALIFICATION */
+function adminTfR47Qualification_(league) {
+  return String(league && (league.qualificationMethod || league.QualificationMethod) || "record").toLowerCase() === "points" ? "points" : "record";
+}
+function adminTfR47LeagueQualificationEditor_(leagues) {
+  leagues = Array.isArray(leagues) ? leagues : [];
+  if (!leagues.length) return "";
+  return `<div class="tf-r47-league-methods"><div class="tf-muted"><strong>Playoff Qualification Method</strong> is stored per Team Fantasy league.</div>${leagues.map(function(l){var id=String(l.leagueId||l.LeagueId||""),name=String(l.leagueName||l.LeagueName||id),method=adminTfR47Qualification_(l);return `<div class="tf-r47-league-method-row"><span><strong>${adminTfEscape_(name)}</strong><small>${adminTfEscape_(id)}</small></span><select id="adminTfQualification_${adminTfEscape_(id.replace(/[^a-z0-9_-]/gi,"_"))}"><option value="record" ${method==="record"?"selected":""}>Record · all-play W-L-T</option><option value="points" ${method==="points"?"selected":""}>Points · cumulative Team Fantasy points</option></select><button class="tf-button secondary" onclick="adminTfR47SaveLeagueQualification_('${adminTfEscape_(id)}')">Save Method</button></div>`;}).join("")}</div>`;
+}
+async function adminTfR47SaveLeagueQualification_(leagueId) {
+  var dash = window.ADMIN_TEAM_FANTASY_DASH || {}, leagues = Array.isArray(dash.leagues) ? dash.leagues : [];
+  var league = leagues.find(function(l){return String(l.leagueId||l.LeagueId||"")===String(leagueId||"");});
+  if (!league) { adminTfActionStatus_("League not found.", true); return; }
+  var safeId = String(leagueId||"").replace(/[^a-z0-9_-]/gi,"_");
+  var select = document.getElementById("adminTfQualification_" + safeId);
+  var res = await apiTeamFantasyPost_("adminCreateTeamFantasyLeague", {
+    gameId: getFrontendGameId(),
+    leagueId: String(league.leagueId||league.LeagueId||""),
+    leagueName: String(league.leagueName||league.LeagueName||leagueId),
+    playoffTeams: Number(league.playoffTeams||league.PlayoffTeams||4),
+    standingMode: String(league.standingMode||league.StandingMode||"combined-user"),
+    qualificationMethod: select && select.value === "points" ? "points" : "record"
+  });
+  if (!res || res.success === false) { adminTfActionStatus_(res && (res.error||res.message) || "Could not save qualification method.", true); return; }
+  adminTfActionStatus_("✅ Qualification method saved for " + String(league.leagueName||league.LeagueName||leagueId) + ".", false);
+  if (typeof navigate === "function") setTimeout(function(){ navigate("admin-team-fantasy", {skipUnsavedCheck:true}); }, 150);
+}

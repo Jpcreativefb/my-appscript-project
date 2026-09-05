@@ -209,7 +209,7 @@ function sportsSurvivorNormalizeSettings_(raw, gameId) {
   const sport = sportByLeague[league] || sportsSurvivorKey_(get("sport", "Sport") || defaults.sport);
   return {
     gameId: sportsSurvivorString_(gameId || get("gameId", "GameId") || defaults.gameId),
-    mode: ["manual-elimination", "sports-survivor", "streak-survivor", "king-of-the-hill"].indexOf(mode) >= 0 ? mode : defaults.mode,
+    mode: ["manual-elimination", "sports-survivor", "streak-survivor", "king-of-the-hill", "streak-points-strikes"].indexOf(mode) >= 0 ? mode : defaults.mode,
     sport: sport,
     league: league,
     seasonYear: Math.floor(sportsSurvivorNumber_(get("seasonYear", "SeasonYear"), defaults.seasonYear)),
@@ -283,7 +283,7 @@ function survivorGetSettings_(gameId) {
 
 function survivorSportsModeEnabled_(gameId) {
   const mode = survivorGetSettings_(gameId).mode;
-  return mode === "sports-survivor" || mode === "streak-survivor";
+  return mode === "sports-survivor" || mode === "streak-survivor" || mode === "streak-points-strikes";
 }
 
 function survivorSaveSettings_(gameId, value) {
@@ -791,7 +791,7 @@ function sportsSurvivorGradeSelection_(snapshot, currentMeta, resultRows, result
   const sportsGameId = sportsSurvivorString_(meta.sportsGameId || meta.espnEventId);
   const result = resultRows && resultRows[sportsGameId];
   if (!result) return { resolved: false, outcome: "pending" };
-  if (sportsSurvivorBool_(result.Cancelled, false)) return { resolved: true, outcome: "push", reason: "cancelled" };
+  if (sportsSurvivorBool_(result.Cancelled, false)) return { resolved: true, outcome: "push", pushKind: "cancelled", reason: "cancelled" };
   if (!sportsSurvivorBool_(result.Completed, false)) return { resolved: false, outcome: "pending" };
   const isHome = sportsSurvivorKey_(meta.side) === "home";
   const teamScore = sportsSurvivorNumber_(isHome ? result.HomeScore : result.AwayScore, NaN);
@@ -805,7 +805,8 @@ function sportsSurvivorGradeSelection_(snapshot, currentMeta, resultRows, result
     adjusted += spread;
   }
   const outcome = adjusted > opponentScore ? "win" : adjusted < opponentScore ? "loss" : "push";
-  return { resolved: true, outcome: outcome, teamScore: teamScore, opponentScore: opponentScore, spread: resultMode === "spread" ? spread : "" };
+  const pushKind = outcome !== "push" ? "" : (teamScore === opponentScore ? "tie" : (resultMode === "spread" ? "ats-push" : "push"));
+  return { resolved: true, outcome: outcome, pushKind: pushKind, teamScore: teamScore, opponentScore: opponentScore, spread: resultMode === "spread" ? spread : "" };
 }
 
 function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap) {
@@ -845,6 +846,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     if (roundEligible && !sourceResolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
     let status = resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming");
     let outcome = "pending";
+    let pushKind = "";
     let earnedPoints = 0;
     let multiplier = 1;
     let lifeEarned = false;
@@ -864,6 +866,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           eliminatedReason = "missed";
         } else if (settings.missedPickRule === "no-result") {
           outcome = "push";
+          pushKind = "no-result";
         }
       } else {
         nomineeIds.forEach(function(nomineeId, selectionIndex) {
@@ -883,10 +886,30 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       }
 
       if (outcome === "push") {
-        if (settings.pushRule === "loss") outcome = "loss";
-        else if (settings.pushRule === "no-result" || settings.pushRule === "survive") {
-          status = "push";
-          if (settings.mode === "streak-survivor") winStreak = 0;
+        if (!pushKind && selectionResults.length) {
+          const kinds = selectionResults.map(function(row) { return row.pushKind || "push"; });
+          pushKind = kinds.every(function(kind) { return kind === "tie"; }) ? "tie" : (kinds.indexOf("ats-push") !== -1 ? "ats-push" : kinds[0]);
+        }
+        if (settings.pushRule === "loss") {
+          outcome = "loss";
+        } else if (settings.pushRule === "no-result" || settings.pushRule === "survive") {
+          status = pushKind === "tie" ? "tie-survived" : "push";
+          if (settings.mode === "streak-survivor") {
+            // v1.2.18y compatibility: any surviving push resets the legacy streak and scores no points.
+            winStreak = 0;
+          } else if (settings.mode === "streak-points-strikes" && settings.pushRule === "survive") {
+            if (pushKind === "tie") {
+              // RC24A NFL tie: survive, no strike, advance streak, award 50% of the active streak value.
+              roundsSurvived++;
+              multiplier = 1 + Math.max(0, winStreak) * settings.kothMultiplierStep;
+              if (settings.kothMaxMultiplier > 0) multiplier = Math.min(settings.kothMaxMultiplier, multiplier);
+              earnedPoints = settings.kothBasePoints * multiplier * 0.5;
+              winStreak++;
+              bestStreak = Math.max(bestStreak, winStreak);
+              totalPoints += earnedPoints;
+            }
+            // ATS/cancel/no-result pushes survive without a strike and preserve the current streak.
+          }
         }
       }
 
@@ -894,7 +917,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
         roundsSurvived++;
         winStreak++;
         bestStreak = Math.max(bestStreak, winStreak);
-        if (settings.mode === "streak-survivor") {
+        if (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes") {
           multiplier = 1 + Math.max(0, winStreak - 1) * settings.kothMultiplierStep;
           if (settings.kothMaxMultiplier > 0) multiplier = Math.min(settings.kothMaxMultiplier, multiplier);
           earnedPoints = settings.kothBasePoints * multiplier;
@@ -913,12 +936,30 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           safeApplied = true;
           status = "safe-loss";
         } else if (settings.mode === "streak-survivor") {
+          // v1.2.18y compatibility: legacy Streak Survivor resets the streak but never consumes a strike/life.
           lossApplied = true;
           if (rules.confidence) totalPoints -= Math.max(0, Math.min(settings.maxConfidenceRisk, sportsSurvivorNumber_(pick.confidencePoints, 0)));
           if (settings.kothLossBehavior === "drop-one") winStreak = Math.max(0, winStreak - 1);
           else if (settings.kothLossBehavior === "half") winStreak = Math.floor(winStreak / 2);
           else winStreak = 0;
           status = "loss-reset";
+        } else if (settings.mode === "streak-points-strikes") {
+          // RC24A Streak Points + Strikes: loss scores zero, resets/reduces streak, and consumes the configured strike allowance.
+          lossApplied = true;
+          if (rules.confidence) totalPoints -= Math.max(0, Math.min(settings.maxConfidenceRisk, sportsSurvivorNumber_(pick.confidencePoints, 0)));
+          if (settings.kothLossBehavior === "drop-one") winStreak = Math.max(0, winStreak - 1);
+          else if (settings.kothLossBehavior === "half") winStreak = Math.floor(winStreak / 2);
+          else winStreak = 0;
+          lossesUsed++;
+          const availableLosses = settings.lossesAllowed + earnedLives;
+          if (lossesUsed > availableLosses) {
+            alive = false;
+            eliminatedRound = week;
+            eliminatedReason = missed ? "missed" : "loss";
+            status = "eliminated";
+          } else {
+            status = "loss-reset";
+          }
         } else {
           lossApplied = true;
           lossesUsed++;
@@ -942,7 +983,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       round: index + 1, week: week, categoryId: category.id, name: category.name, resolved: resolved,
       nomineeIds: nomineeIds, pickNomineeId: nomineeIds[0] || "", selectionResults: selectionResults,
       requiredSelections: rules.requiredSelections, selectionRule: rules.selectionRule, resultMode: rules.resultMode,
-      outcome: outcome, status: status, earnedPoints: earnedPoints, multiplier: multiplier,
+      outcome: outcome, pushKind: pushKind, status: status, earnedPoints: earnedPoints, multiplier: multiplier,
       winStreak: winStreak, bestStreak: bestStreak, lossesUsed: lossesUsed,
       livesRemaining: Math.max(0, settings.lossesAllowed + earnedLives - lossesUsed),
       earnedLives: earnedLives, lifeEarned: lifeEarned, safeApplied: safeApplied, lossApplied: lossApplied,
@@ -966,7 +1007,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     lossesUsed: lossesUsed, earnedLives: earnedLives,
     livesRemaining: Math.max(0, settings.lossesAllowed + earnedLives - lossesUsed),
     winStreak: winStreak, bestStreak: bestStreak,
-    currentMultiplier: settings.mode === "streak-survivor"
+    currentMultiplier: (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes")
       ? Math.min(settings.kothMaxMultiplier > 0 ? settings.kothMaxMultiplier : 999999, 1 + Math.max(0, winStreak) * settings.kothMultiplierStep)
       : 1
   };
@@ -1016,8 +1057,8 @@ function sportsSurvivorStandings_(gameId, extraUsernames) {
       survivorLivesRemaining: evaluation.livesRemaining, survivorEarnedLives: evaluation.earnedLives,
       survivorWinStreak: evaluation.winStreak, survivorBestStreak: evaluation.bestStreak,
       survivorMultiplier: evaluation.currentMultiplier, eliminated: !evaluation.alive,
-      winChance: 0, scoringMode: settings.mode === "streak-survivor" ? "streak-survivor" : "survivor",
-      leaderboardScoreMode: settings.mode === "streak-survivor" ? "streak-survivor" : "survivor"
+      winChance: 0, scoringMode: (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes") ? settings.mode : "survivor",
+      leaderboardScoreMode: (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes") ? settings.mode : "survivor"
     };
   });
   if (settings.mode !== "streak-survivor" && settings.endMode === "sole-survivor") {
@@ -1027,6 +1068,12 @@ function sportsSurvivorStandings_(gameId, extraUsernames) {
   }
   return rows.sort(function(a, b) {
     if (settings.mode === "streak-survivor") {
+      if (b.total !== a.total) return b.total - a.total;
+      if (b.survivorWinStreak !== a.survivorWinStreak) return b.survivorWinStreak - a.survivorWinStreak;
+      if (b.survivorBestStreak !== a.survivorBestStreak) return b.survivorBestStreak - a.survivorBestStreak;
+    } else if (settings.mode === "streak-points-strikes") {
+      if (!!a.survivorWinner !== !!b.survivorWinner) return a.survivorWinner ? -1 : 1;
+      if (!!a.survivorAlive !== !!b.survivorAlive) return a.survivorAlive ? -1 : 1;
       if (b.total !== a.total) return b.total - a.total;
       if (b.survivorWinStreak !== a.survivorWinStreak) return b.survivorWinStreak - a.survivorWinStreak;
       if (b.survivorBestStreak !== a.survivorBestStreak) return b.survivorBestStreak - a.survivorBestStreak;
@@ -1194,10 +1241,10 @@ function sportsSurvivorUserScoring_(username, gameId) {
     scoring[sportsSurvivorKey_(round.categoryId)] = {
       shortName: category.shortName || category.name || round.name,
       nomineeId: round.pickNomineeId || "", winnerNomineeId: "", earnedPoints: round.earnedPoints,
-      remainingPoints: 0, finalPointsAvailable: settings.mode === "streak-survivor" ? settings.kothBasePoints * (settings.kothMaxMultiplier || 1) : Math.max(0, sportsSurvivorNumber_(category.points, 1)),
+      remainingPoints: 0, finalPointsAvailable: (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes") ? settings.kothBasePoints * (settings.kothMaxMultiplier || 1) : Math.max(0, sportsSurvivorNumber_(category.points, 1)),
       locked: round.resolved, resolved: round.resolved, correct: round.outcome === "win", wrong: round.outcome === "loss",
       push: round.outcome === "push", status: round.status,
-      scoringMode: settings.mode === "streak-survivor" ? "streak-survivor" : "survivor", confidenceScoringMode: ""
+      scoringMode: (settings.mode === "streak-survivor" || settings.mode === "streak-points-strikes") ? settings.mode : "survivor", confidenceScoringMode: ""
     };
   });
   return scoring;
@@ -1309,3 +1356,195 @@ function apiAdminInstallSportsSurvivorAutomation_(payload) {
   requireAdmin_(payload);
   return survivorEnsureSportsAutomationTrigger_();
 }
+
+/* =====================================================
+   RC24A SPORTS SURVIVOR FINAL COMPLETION
+   Awards-side enrichment only. Sports Engine v55 untouched.
+   ===================================================== */
+function sportsSurvivorRc24aLeagueContext_(username, gameId, requestedLeagueId) {
+  var leagues = typeof getAccessibleLeaguesForGame_ === "function"
+    ? getAccessibleLeaguesForGame_(username, gameId) : [];
+  var requested = sportsSurvivorString_(requestedLeagueId || "");
+  var selected = requested;
+  if (selected && !leagues.some(function(l){ return sportsSurvivorKey_(l.leagueId) === sportsSurvivorKey_(selected); })) selected = "";
+  if (!selected && leagues.length) selected = leagues[0].leagueId;
+  var gameLink = null;
+  if (selected && typeof getActiveLeagueGamesForGame_ === "function") {
+    gameLink = (getActiveLeagueGamesForGame_(gameId) || []).find(function(row){
+      return sportsSurvivorKey_(row.leagueId) === sportsSurvivorKey_(selected);
+    }) || null;
+  }
+  var pickScope = gameLink && gameLink.pickScope ? gameLink.pickScope : "universal";
+  return {
+    leagueId: selected,
+    leagueName: (leagues.find(function(l){ return sportsSurvivorKey_(l.leagueId) === sportsSurvivorKey_(selected); }) || {}).leagueName || selected,
+    leagues: leagues,
+    pickScope: pickScope,
+    pickScopeSupported: sportsSurvivorKey_(pickScope) !== "league-specific" && sportsSurvivorKey_(pickScope) !== "league_specific",
+    pickScopeWarning: (sportsSurvivorKey_(pickScope) === "league-specific" || sportsSurvivorKey_(pickScope) === "league_specific")
+      ? "This Survivor game currently stores picks by Username + GameId, not LeagueId. League-specific pick scope is not applied by RC24A; Roy must resolve this configuration before enabling separate Survivor picks per league."
+      : ""
+  };
+}
+
+function sportsSurvivorRc24aUsedWeekMap_(rounds) {
+  var map = {};
+  (rounds || []).forEach(function(round) {
+    var week = Math.max(1, Math.floor(sportsSurvivorNumber_(round.week || round.round, 0)));
+    (round.nomineeIds || (round.pickNomineeId ? [round.pickNomineeId] : [])).forEach(function(id) {
+      var key = sportsSurvivorKey_(id);
+      if (key && !map[key]) map[key] = week;
+    });
+  });
+  return map;
+}
+
+function sportsSurvivorRc24aHistory_(evaluation, categories, optionMeta) {
+  var cumulative = 0;
+  return (evaluation.rounds || []).map(function(round, index) {
+    var category = categories[index] || {};
+    var categoryId = sportsSurvivorKey_(category.id || round.categoryId);
+    var nomineeId = sportsSurvivorKey_((round.nomineeIds || [])[0] || round.pickNomineeId);
+    var meta = (optionMeta[categoryId] || {})[nomineeId] || {};
+    var nominee = (category.nominees || []).find(function(item) {
+      return sportsSurvivorKey_(item.id || item.nomineeId) === nomineeId;
+    }) || {};
+    var selection = (round.selectionResults || [])[0] || {};
+    cumulative += sportsSurvivorNumber_(round.earnedPoints, 0);
+    return {
+      week: round.week, categoryId: round.categoryId, teamId: nomineeId,
+      team: meta.team || meta.name || nominee.name || nominee.shortAnswer || nomineeId,
+      logoUrl: meta.logoUrl || nominee.image || nominee.logoUrl || "", opponent: meta.opponent || "",
+      kickoff: meta.kickoff || "", result: round.outcome, survivorStatus: round.status,
+      teamScore: selection.teamScore, opponentScore: selection.opponentScore,
+      finalScore: Number.isFinite(Number(selection.teamScore)) && Number.isFinite(Number(selection.opponentScore))
+        ? String(selection.teamScore) + "-" + String(selection.opponentScore) : "",
+      pushKind: round.pushKind || selection.pushKind || "",
+      streak: round.winStreak, weeklyPoints: round.earnedPoints, seasonPoints: cumulative,
+      lossesUsed: round.lossesUsed, livesRemaining: round.livesRemaining,
+      resolved: round.resolved === true
+    };
+  });
+}
+
+function sportsSurvivorRc24aCompare_(viewer, gameId, leagueContext, categories, settings, optionMeta, resultMap, pickMetaMap) {
+  var rows = sportsSurvivorStandings_(gameId, [viewer]);
+  if (leagueContext.leagueId && typeof filterLeaderboardRowsForLeague_ === "function") {
+    rows = filterLeaderboardRowsForLeague_(rows, gameId, leagueContext.leagueId);
+  }
+  var game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
+  return rows.map(function(row) {
+    var username = row.username || row.user;
+    var evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap);
+    var weeks = evaluation.rounds.map(function(round, index) {
+      var category = categories[index] || {};
+      var categoryId = sportsSurvivorKey_(category.id || round.categoryId);
+      var nomineeId = sportsSurvivorKey_((round.nomineeIds || [])[0] || round.pickNomineeId);
+      var meta = (optionMeta[categoryId] || {})[nomineeId] || {};
+      var kickoff = meta.kickoff ? new Date(meta.kickoff) : null;
+      var reveal = round.resolved === true || survivorCategoryLocked_(game, category) ||
+        (kickoff && !isNaN(kickoff.getTime()) && Date.now() >= kickoff.getTime());
+      var selection = (round.selectionResults || [])[0] || {};
+      var finalScore = Number.isFinite(Number(selection.teamScore)) && Number.isFinite(Number(selection.opponentScore))
+        ? String(selection.teamScore) + "-" + String(selection.opponentScore) : "";
+      return {
+        week: round.week, hidden: !reveal,
+        teamId: reveal ? nomineeId : "", team: reveal ? (meta.team || nomineeId) : "",
+        logoUrl: reveal ? (meta.logoUrl || "") : "", opponent: reveal ? (meta.opponent || "") : "",
+        finalScore: reveal ? finalScore : "",
+        result: reveal ? round.outcome : "hidden", weeklyPoints: reveal ? round.earnedPoints : null,
+        streak: reveal ? round.winStreak : null, lossesUsed: round.lossesUsed, livesRemaining: round.livesRemaining
+      };
+    });
+    return {
+      username: username, displayName: row.displayName || username,
+      alive: evaluation.alive, totalPoints: evaluation.totalPoints, winStreak: evaluation.winStreak,
+      lossesUsed: evaluation.lossesUsed, livesRemaining: evaluation.livesRemaining, weeks: weeks
+    };
+  });
+}
+
+function sportsSurvivorRc24aEnrichState_(state, payload) {
+  if (!state || state.success === false || !state.sportsMode) return state;
+  payload = payload || {};
+  var gameId = state.gameId;
+  var username = sportsSurvivorString_(payload.username);
+  var settings = survivorGetSettings_(gameId);
+  var categories = survivorGameCategories_(gameId);
+  var optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
+  var resultMap = sportsSurvivorResultsForGame_(gameId);
+  var pickMetaMap = sportsSurvivorPickMetaMap_(gameId);
+  var evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap);
+  var leagueContext = sportsSurvivorRc24aLeagueContext_(username, gameId, payload.leagueId || "");
+  if (leagueContext.leagueId && typeof filterLeaderboardRowsForLeague_ === "function") {
+    state.standings = filterLeaderboardRowsForLeague_(state.standings || [], gameId, leagueContext.leagueId);
+  }
+  state.leagueContext = leagueContext;
+  state.scoringMode = settings.mode === "streak-points-strikes" ? "streak-points-strikes" : (settings.mode === "streak-survivor" ? "streak-survivor" : (settings.lossesAllowed > 0 ? "lives-strikes" : "classic-survivor"));
+  state.baseWinPoints = settings.kothBasePoints;
+  state.tiePolicy = settings.pushRule || "survive";
+  state.history = sportsSurvivorRc24aHistory_(evaluation, categories, optionMeta);
+  state.usedTeamTrail = state.history.filter(function(row){ return !!row.teamId; });
+  state.latestWeeklyPoints = state.history.length ? sportsSurvivorNumber_(state.history[state.history.length - 1].weeklyPoints, 0) : 0;
+  state.kothSourceScore = state.latestWeeklyPoints;
+  state.compare = sportsSurvivorRc24aCompare_(username, gameId, leagueContext, categories, settings, optionMeta, resultMap, pickMetaMap);
+
+  var usedWeekMap = sportsSurvivorRc24aUsedWeekMap_(evaluation.rounds);
+  if (state.currentRound) {
+    var categoryId = sportsSurvivorKey_(state.currentRound.categoryId);
+    var metas = optionMeta[categoryId] || {};
+    var resultRows = resultMap[categoryId] || {};
+    (state.currentRound.nominees || []).forEach(function(nominee) {
+      var id = sportsSurvivorKey_(nominee.id);
+      var meta = metas[id] || {};
+      var sportsGameId = sportsSurvivorString_(meta.sportsGameId || meta.espnEventId);
+      var rr = resultRows[sportsGameId] || {};
+      nominee.sportsGameId = meta.sportsGameId || "";
+      nominee.espnEventId = meta.espnEventId || "";
+      nominee.weather = meta.weather || "";
+      nominee.total = meta.total || meta.overUnder || "";
+      nominee.usedWeek = usedWeekMap[id] || 0;
+      if (!nominee.eligible && sportsSurvivorKey_(nominee.unavailableReason) === "used" && nominee.usedWeek) {
+        nominee.usedOverlay = "USED — WEEK " + nominee.usedWeek;
+      }
+      nominee.sportsResult = {
+        homeTeam: rr.HomeTeam || "", awayTeam: rr.AwayTeam || "",
+        homeScore: rr.HomeScore, awayScore: rr.AwayScore,
+        status: rr.Status || "", state: rr.State || "", completed: sportsSurvivorBool_(rr.Completed, false),
+        cancelled: sportsSurvivorBool_(rr.Cancelled, false), gameDateTime: rr.GameDateTime || "",
+        // Read only if the Awards-side synchronized result row already carries them.
+        // RC24A must not request or add Sports Engine v55 provider fields.
+        period: rr.Period || rr.SportsPeriod || rr.period || rr.sportsPeriod || "",
+        clock: rr.Clock || rr.SportsClock || rr.clock || rr.sportsClock || "",
+        periodLabel: rr.PeriodLabel || rr.periodLabel || rr.PeriodName || rr.periodName || ""
+      };
+    });
+    var currentRoundEval = evaluation.rounds[evaluation.currentRoundIndex] || {};
+    state.currentRound.outcome = currentRoundEval.outcome || "pending";
+    state.currentRound.status = currentRoundEval.status || "";
+    state.currentRound.earnedPoints = currentRoundEval.earnedPoints || 0;
+    state.currentRound.pushKind = currentRoundEval.pushKind || "";
+    var selectedId = sportsSurvivorKey_((state.currentRound.pickNomineeIds || [])[0] || state.currentRound.pickNomineeId || "");
+    var selectedNominee = (state.currentRound.nominees || []).find(function(nominee) {
+      return sportsSurvivorKey_(nominee.id) === selectedId;
+    }) || null;
+    var selectedResult = selectedNominee && selectedNominee.sportsResult || {};
+    var selectedLive = selectedResult && !selectedResult.completed &&
+      (sportsSurvivorKey_(selectedResult.state) === "in" || /live|progress/i.test(sportsSurvivorString_(selectedResult.status)));
+    state.liveScoreboardClockPeriod = {
+      period: selectedResult.period || "",
+      periodLabel: selectedResult.periodLabel || "",
+      clock: selectedResult.clock || "",
+      available: !!(selectedResult.period || selectedResult.periodLabel || selectedResult.clock)
+    };
+    state.liveClockPeriodGap = selectedLive && !state.liveScoreboardClockPeriod.available
+      ? "BLOCKED — ROY DECISION REQUIRED: the current Awards-side SurvivorSportsResults contract does not persist a dedicated live quarter/period + clock. RC24A does not alter Sports Engine v55 or fabricate this data."
+      : "";
+  }
+  return state;
+}
+
+var SPORTS_SURVIVOR_RC24A_ORIGINAL_STATE_ = apiGetSportsSurvivorState_;
+apiGetSportsSurvivorState_ = function(payload) {
+  return sportsSurvivorRc24aEnrichState_(SPORTS_SURVIVOR_RC24A_ORIGINAL_STATE_(payload), payload || {});
+};

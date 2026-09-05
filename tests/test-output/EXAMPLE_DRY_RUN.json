@@ -1,0 +1,1121 @@
+{
+  "success": true,
+  "readOnly": true,
+  "version": "rc24b-dryrun-v1",
+  "requestedGameId": "fixture-purge-2026",
+  "gameId": "fixture-purge-2026",
+  "game": {
+    "exists": true,
+    "name": "Fixture Purge Game",
+    "type": "prediction",
+    "year": 2026,
+    "active": true,
+    "archived": false,
+    "defaultGame": false,
+    "parentGameId": "",
+    "gameRole": "standalone",
+    "heroImageFileId": "unique-hero-file"
+  },
+  "stores": [
+    {
+      "scope": "MAIN",
+      "sheet": "ExternalResultsHubOutbox",
+      "area": "External Results",
+      "source": "ExternalResultsHubBridgeEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "EntityKey/PayloadJSON exact GameId",
+      "matchingRows": 1,
+      "phase": 5,
+      "note": "Target can be in EntityKey/PayloadJSON. Quiesce worker before any future deletion."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityNextEpisodeJobs",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 5,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityQuestionBuildJobs",
+      "area": "Reality",
+      "source": "RealityTvQuestionPackEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 5,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ScoringRuns",
+      "area": "Derived scoring",
+      "source": "ScoringAutomationEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 10,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ResultEvents",
+      "area": "Derived scoring",
+      "source": "ScoringAutomationEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 10,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "NotificationLog",
+      "area": "Notifications",
+      "source": "NotificationsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 10,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "StorageMigrationLog",
+      "area": "Storage history",
+      "source": "NormalizedQuestionStorageEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 10,
+      "note": "Strict owner request treats old target migration trace as purge-owned; purge audit is separate and retained."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ArchiveManifest",
+      "area": "Archive history",
+      "source": "NormalizedQuestionStorageEngine.js / ArchiveHistoryEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 10,
+      "note": "Manifest row is target-owned; referenced archive file may be shared and is never auto-deleted in RC24B."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityResultQueue",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 15,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityQuestionResultQueue",
+      "area": "Reality",
+      "source": "RealityTvQuestionPackEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 15,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "UserNotifications",
+      "area": "Notifications",
+      "source": "NotificationsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 15,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Picks",
+      "area": "Prediction",
+      "source": "PicksEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 2,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Bets",
+      "area": "Wager",
+      "source": "BettingEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RankingEntryItems",
+      "area": "Ranking",
+      "source": "RankingGameEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "CompetitionVotes",
+      "area": "Voting competition",
+      "source": "VotingCompetitionEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SurvivorPicks",
+      "area": "KOTH",
+      "source": "KingOfHillEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityEpisodeVotes",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "UserSeasonAnchors",
+      "area": "Reality / Sole Survivor",
+      "source": "SeasonAnchorEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 20,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "CategoryResults",
+      "area": "Results",
+      "source": "CategoryResultsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 30,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "LiveLeaderboardSnapshot",
+      "area": "Derived scoring",
+      "source": "ScoringAutomationEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 30,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "CompetitionResults",
+      "area": "Voting competition",
+      "source": "VotingCompetitionEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 30,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SurvivorEliminations",
+      "area": "KOTH",
+      "source": "KingOfHillEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 30,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SeasonAnchorHistory",
+      "area": "Reality / Sole Survivor",
+      "source": "SeasonAnchorEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 30,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "LeagueSeasonMembership",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "SeasonGameId",
+      "matchingRows": 1,
+      "phase": 40,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "LeagueGames",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 40,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "GameFeatureAccess",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 40,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RankingEntries",
+      "area": "Ranking",
+      "source": "RankingGameEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 50,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "CompetitionEntries",
+      "area": "Voting competition",
+      "source": "VotingCompetitionEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 50,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ExternalResultsInbox",
+      "area": "External Results",
+      "source": "ExternalResultsHubBridgeEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "AppGameId",
+      "matchingRows": 1,
+      "phase": 55,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "InternetResultImports",
+      "area": "Internet results",
+      "source": "InternetResultsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 55,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ManualResultSuggestions",
+      "area": "Internet results",
+      "source": "InternetResultsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 55,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "CategorySettings",
+      "area": "Question settings",
+      "source": "SettingsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId or pre-captured unambiguous CategoryId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": "GameId can be blank. Ownership is derived from the pre-captured target CategoryId/QuestionId map. Ambiguity blocks."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "InternetResultSources",
+      "area": "Internet results",
+      "source": "InternetResultsEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SurvivorGameSettings",
+      "area": "Survivor / elimination",
+      "source": "SurvivorGameEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SurvivorSettings",
+      "area": "KOTH",
+      "source": "KingOfHillEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": "Other games' source JSON is scanned separately as an inbound dependency."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityQuestionTemplates",
+      "area": "Reality",
+      "source": "RealityTvQuestionPackEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityEpisodeQuestions",
+      "area": "Reality",
+      "source": "RealityTvQuestionPackEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "SeasonAnchorSettings",
+      "area": "Reality / Sole Survivor",
+      "source": "SeasonAnchorEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 60,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityContestantGroupHistory",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 62,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealitySpoilerShield",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 62,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityGroups",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 64,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityContestants",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 64,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityCastImport",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 64,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealityEpisodes",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 66,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "RealitySeasons",
+      "area": "Reality",
+      "source": "RealityTvSeasonEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 68,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "UserGameProfiles",
+      "area": "Profiles",
+      "source": "ProfileEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 70,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "AppearanceOverrides",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 70,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "GameAppearance",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 72,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "QuestionOptions",
+      "area": "Question storage",
+      "source": "NormalizedQuestionStorageEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 2,
+      "phase": 75,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Questions",
+      "area": "Question storage",
+      "source": "NormalizedQuestionStorageEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 76,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Categories",
+      "area": "Legacy question projection",
+      "source": "CategoriesEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 2,
+      "phase": 77,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "DataIndex",
+      "area": "Index",
+      "source": "NormalizedQuestionStorageEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 80,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "AppMappings",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js / ResultSourcePolicy.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "AppGameId",
+      "matchingRows": 1,
+      "phase": 50,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ResultSourcePolicies",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js / ResultSourcePolicy.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "AppGameId",
+      "matchingRows": 1,
+      "phase": 50,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Games",
+      "area": "Core game identity",
+      "source": "GamesEngine.js",
+      "classification": "OWNED — DELETE",
+      "ownershipKey": "GameId",
+      "matchingRows": 1,
+      "phase": 1000,
+      "note": "Must be deleted last in a future authorized purge."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Votes",
+      "area": "Legacy community voting",
+      "source": "VotingEngine.js",
+      "classification": "REFERENCE — CHECK/BLOCK",
+      "ownershipKey": "CommunityGameId",
+      "matchingRows": 0,
+      "phase": null,
+      "note": "CommunityGameId is not proven identical to PATTC GameId for every game type. Matching rows require explicit ownership confirmation before deletion."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "ResultsSnapshots",
+      "area": "Legacy results snapshot",
+      "source": "ResultsEngine.js",
+      "classification": "NOT APPLICABLE",
+      "ownershipKey": "GameId",
+      "matchingRows": 0,
+      "phase": null,
+      "note": "Exact baseline declares RESULTS_SNAPSHOT_SHEET but the audited ResultsEngine did not show an active persistence path. Preserve until another writer/schema proves ownership."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Leagues",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "League entity has no GameId."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "LeagueMembers",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "Membership is league-level; target game assignment is in LeagueGames/LeagueSeasonMembership."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "LeaguePlanAccess",
+      "area": "League access",
+      "source": "LeagueAccessEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "Users",
+      "area": "Profiles/auth-adjacent data",
+      "source": "ProfileEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "General user profile is shared. Purge must not delete user/auth records."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "UserProfileScopes",
+      "area": "Profiles",
+      "source": "ProfileEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "Season/profile scopes are reusable across games and have no GameId."
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "UserNotificationPreferences",
+      "area": "Notifications",
+      "source": "NotificationsEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "AppearanceImagePacks",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "AppearanceImagePackItems",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "AppearanceThemePacks",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "AppearanceHubSettings",
+      "area": "Appearance",
+      "source": "AppearanceEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "MAIN",
+      "sheet": "PermanentGamePurgeAudit",
+      "area": "Purge audit",
+      "source": "PermanentGamePurgeEngine.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "Intentional retained audit trail. Its GameId is excluded from zero-removable-reference success."
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ProviderSettings",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ExternalEvents",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ExternalMarkets",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ExternalSubjects",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ImportedResults",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js / ReviewAndBridge.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "Provider observation can fan out to multiple AppMappings/games."
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ReviewQueue",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js / ReviewAndBridge.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": "Review row is provider-result owned and carries no AppGameId."
+    },
+    {
+      "scope": "HUB",
+      "sheet": "SyncLog",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    },
+    {
+      "scope": "HUB",
+      "sheet": "ManualEntry",
+      "area": "External Results Hub",
+      "source": "external-results-hub/HubCore.js",
+      "classification": "SHARED — PRESERVE",
+      "ownershipKey": "shared/no target ownership key",
+      "matchingRows": 0,
+      "exists": true,
+      "phase": null,
+      "note": ""
+    }
+  ],
+  "dependencies": [],
+  "dependencyWarnings": [],
+  "sharedAssetsRetained": [
+    {
+      "fileId": "unique-hero-file",
+      "targetReferences": [
+        "MAIN:Games.HeroImageFileID"
+      ],
+      "otherReferences": [],
+      "provenOwnedByTarget": true,
+      "knownShared": false,
+      "decision": "OWNED — DELETE (fixture/proven ownership only)"
+    },
+    {
+      "fileId": "shared-image-file",
+      "targetReferences": [
+        "MAIN:Categories.FileID"
+      ],
+      "otherReferences": [
+        "MAIN:Categories.FileID"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    },
+    {
+      "fileId": "unique-option-file",
+      "targetReferences": [
+        "MAIN:QuestionOptions.FileID"
+      ],
+      "otherReferences": [],
+      "provenOwnedByTarget": true,
+      "knownShared": false,
+      "decision": "OWNED — DELETE (fixture/proven ownership only)"
+    },
+    {
+      "fileId": "unique-entry-file",
+      "targetReferences": [
+        "MAIN:CompetitionEntries.EntryImageFileID"
+      ],
+      "otherReferences": [],
+      "provenOwnedByTarget": true,
+      "knownShared": false,
+      "decision": "OWNED — DELETE (fixture/proven ownership only)"
+    },
+    {
+      "fileId": "shared-avatar-file",
+      "targetReferences": [
+        "MAIN:UserGameProfiles.AvatarFileId"
+      ],
+      "otherReferences": [
+        "MAIN:UserGameProfiles.AvatarFileId",
+        "MAIN:Users.AvatarFileId"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    },
+    {
+      "fileId": "shared-override-file",
+      "targetReferences": [
+        "MAIN:AppearanceOverrides.ImageFileId"
+      ],
+      "otherReferences": [
+        "MAIN:AppearanceOverrides.ImageFileId"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    }
+  ],
+  "cacheIndexPlan": {
+    "scopedKeys": [
+      "survivor_state_v1_fixture-purge-2026",
+      "survivor_game_v1__fixture-purge-2026",
+      "ranking_leaderboard_v1__fixture-purge-2026",
+      "competition_entries_v1__fixture-purge-2026",
+      "competition_leaderboard_v1__fixture-purge-2026",
+      "external_live_probabilities_v1_fixture-purge-2026",
+      "results_v4__fixture-purge-2026",
+      "rtv_user_core_fixture-purge-2026",
+      "rtv_episode_compare_fixture-purge-2026_1"
+    ],
+    "perUserPatterns": [
+      {
+        "username": "alice",
+        "keys": [
+          "user_picks_v1_<MD5(alice|fixture-purge-2026)>",
+          "bets_user_v2_<MD5(...)>",
+          "bets_game_v1_<MD5(...)>",
+          "startup_payload_v1_<alice>_<fixture-purge-2026>",
+          "rtv_player_stats_<fixture-purge-2026>_<alice>"
+        ]
+      },
+      {
+        "username": "bob",
+        "keys": [
+          "user_picks_v1_<MD5(bob|fixture-purge-2026)>",
+          "bets_user_v2_<MD5(...)>",
+          "bets_game_v1_<MD5(...)>",
+          "startup_payload_v1_<bob>_<fixture-purge-2026>",
+          "rtv_player_stats_<fixture-purge-2026>_<bob>"
+        ]
+      }
+    ],
+    "surgicalSharedContainers": [
+      {
+        "key": "games_v3_hybrid_standard_predictions",
+        "action": "REWRITE WITHOUT TARGET; DO NOT GLOBAL-FLUSH",
+        "reason": "GamesEngine stores the entire game list in one shared cache key."
+      },
+      {
+        "key": "normalized_question_game_map_v1 / NORMALIZED_STORAGE_RUNTIME_CACHE",
+        "action": "REBUILD/REWRITE WITHOUT TARGET ASSOCIATIONS; DO NOT GLOBAL-FLUSH UNRELATED DATA",
+        "reason": "Normalized storage keeps a shared question→game map/runtime index."
+      }
+    ],
+    "intentionallyUntouchedGlobalCaches": [
+      "votes_v3 (unless legacy CommunityGameId ownership is separately certified)",
+      "appearance hub/global caches that contain no target GameId record",
+      "Sports Engine v55 caches"
+    ]
+  },
+  "sportsBoundary": {
+    "status": "PROTECTED — NO WRITES",
+    "engineVersion": "v55",
+    "locations": [
+      {
+        "sheet": "SportsScores",
+        "key": "GameId",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Sports Engine v55 uses GameId for sports-event identity; it is not proven to be PATTC app GameId."
+      },
+      {
+        "sheet": "SportsSnapshots",
+        "key": "GameId",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Sports event snapshots; no app-game ownership is inferred."
+      },
+      {
+        "sheet": "SportsGames",
+        "key": "GameId",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Sports event registry. PATTC questions reference it through SportsGameId/ESPNEventId."
+      },
+      {
+        "sheet": "SportsOdds",
+        "key": "OddsId / event fields",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Provider odds are reusable across app games."
+      },
+      {
+        "sheet": "SportsSettings",
+        "key": "sport/league/job settings",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Shared Sports Engine configuration."
+      },
+      {
+        "sheet": "SportsLogs",
+        "key": "operational",
+        "decision": "SHARED/PROTECTED — PRESERVE",
+        "reason": "Shared Sports Engine logs."
+      }
+    ]
+  },
+  "blockers": [],
+  "canProceedToPermanentDelete": false,
+  "productionPurgeEnabled": false,
+  "auditRecordPreview": {
+    "Timestamp": "2026-09-05T05:12:15.767Z",
+    "Action": "DRY_RUN",
+    "GameId": "fixture-purge-2026",
+    "GameName": "Fixture Purge Game",
+    "RequestedBy": "fixture-admin",
+    "DiscoveredCountsJSON": "{\"MAIN:ExternalResultsHubOutbox\":1,\"MAIN:RealityNextEpisodeJobs\":1,\"MAIN:RealityQuestionBuildJobs\":1,\"MAIN:ScoringRuns\":1,\"MAIN:ResultEvents\":1,\"MAIN:NotificationLog\":1,\"MAIN:StorageMigrationLog\":1,\"MAIN:ArchiveManifest\":1,\"MAIN:RealityResultQueue\":1,\"MAIN:RealityQuestionResultQueue\":1,\"MAIN:UserNotifications\":1,\"MAIN:Picks\":2,\"MAIN:Bets\":1,\"MAIN:RankingEntryItems\":1,\"MAIN:CompetitionVotes\":1,\"MAIN:SurvivorPicks\":1,\"MAIN:RealityEpisodeVotes\":1,\"MAIN:UserSeasonAnchors\":1,\"MAIN:CategoryResults\":1,\"MAIN:LiveLeaderboardSnapshot\":1,\"MAIN:CompetitionResults\":1,\"MAIN:SurvivorEliminations\":1,\"MAIN:SeasonAnchorHistory\":1,\"MAIN:LeagueSeasonMembership\":1,\"MAIN:LeagueGames\":1,\"MAIN:GameFeatureAccess\":1,\"MAIN:RankingEntries\":1,\"MAIN:CompetitionEntries\":1,\"MAIN:ExternalResultsInbox\":1,\"MAIN:InternetResultImports\":1,\"MAIN:ManualResultSuggestions\":1,\"MAIN:CategorySettings\":1,\"MAIN:InternetResultSources\":1,\"MAIN:SurvivorGameSettings\":1,\"MAIN:SurvivorSettings\":1,\"MAIN:RealityQuestionTemplates\":1,\"MAIN:RealityEpisodeQuestions\":1,\"MAIN:SeasonAnchorSettings\":1,\"MAIN:RealityContestantGroupHistory\":1,\"MAIN:RealitySpoilerShield\":1,\"MAIN:RealityGroups\":1,\"MAIN:RealityContestants\":1,\"MAIN:RealityCastImport\":1,\"MAIN:RealityEpisodes\":1,\"MAIN:RealitySeasons\":1,\"MAIN:UserGameProfiles\":1,\"MAIN:AppearanceOverrides\":1,\"MAIN:GameAppearance\":1,\"MAIN:QuestionOptions\":2,\"MAIN:Questions\":1,\"MAIN:Categories\":2,\"MAIN:DataIndex\":1,\"HUB:AppMappings\":1,\"HUB:ResultSourcePolicies\":1,\"MAIN:Games\":1}",
+    "DeletedCountsJSON": "{}",
+    "BlockedDependenciesJSON": "[]",
+    "RetainedSharedAssetsJSON": "[{\"fileId\":\"unique-hero-file\",\"targetReferences\":[\"MAIN:Games.HeroImageFileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"shared-image-file\",\"targetReferences\":[\"MAIN:Categories.FileID\"],\"otherReferences\":[\"MAIN:Categories.FileID\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"unique-option-file\",\"targetReferences\":[\"MAIN:QuestionOptions.FileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"unique-entry-file\",\"targetReferences\":[\"MAIN:CompetitionEntries.EntryImageFileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"shared-avatar-file\",\"targetReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\"],\"otherReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\",\"MAIN:Users.AvatarFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"shared-override-file\",\"targetReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"otherReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"}]",
+    "FinalResult": "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY",
+    "RemainingReferenceCount": "",
+    "ErrorMessage": "",
+    "Version": "rc24b-dryrun-v1"
+  },
+  "counts": {
+    "MAIN:ExternalResultsHubOutbox": 1,
+    "MAIN:RealityNextEpisodeJobs": 1,
+    "MAIN:RealityQuestionBuildJobs": 1,
+    "MAIN:ScoringRuns": 1,
+    "MAIN:ResultEvents": 1,
+    "MAIN:NotificationLog": 1,
+    "MAIN:StorageMigrationLog": 1,
+    "MAIN:ArchiveManifest": 1,
+    "MAIN:RealityResultQueue": 1,
+    "MAIN:RealityQuestionResultQueue": 1,
+    "MAIN:UserNotifications": 1,
+    "MAIN:Picks": 2,
+    "MAIN:Bets": 1,
+    "MAIN:RankingEntryItems": 1,
+    "MAIN:CompetitionVotes": 1,
+    "MAIN:SurvivorPicks": 1,
+    "MAIN:RealityEpisodeVotes": 1,
+    "MAIN:UserSeasonAnchors": 1,
+    "MAIN:CategoryResults": 1,
+    "MAIN:LiveLeaderboardSnapshot": 1,
+    "MAIN:CompetitionResults": 1,
+    "MAIN:SurvivorEliminations": 1,
+    "MAIN:SeasonAnchorHistory": 1,
+    "MAIN:LeagueSeasonMembership": 1,
+    "MAIN:LeagueGames": 1,
+    "MAIN:GameFeatureAccess": 1,
+    "MAIN:RankingEntries": 1,
+    "MAIN:CompetitionEntries": 1,
+    "MAIN:ExternalResultsInbox": 1,
+    "MAIN:InternetResultImports": 1,
+    "MAIN:ManualResultSuggestions": 1,
+    "MAIN:CategorySettings": 1,
+    "MAIN:InternetResultSources": 1,
+    "MAIN:SurvivorGameSettings": 1,
+    "MAIN:SurvivorSettings": 1,
+    "MAIN:RealityQuestionTemplates": 1,
+    "MAIN:RealityEpisodeQuestions": 1,
+    "MAIN:SeasonAnchorSettings": 1,
+    "MAIN:RealityContestantGroupHistory": 1,
+    "MAIN:RealitySpoilerShield": 1,
+    "MAIN:RealityGroups": 1,
+    "MAIN:RealityContestants": 1,
+    "MAIN:RealityCastImport": 1,
+    "MAIN:RealityEpisodes": 1,
+    "MAIN:RealitySeasons": 1,
+    "MAIN:UserGameProfiles": 1,
+    "MAIN:AppearanceOverrides": 1,
+    "MAIN:GameAppearance": 1,
+    "MAIN:QuestionOptions": 2,
+    "MAIN:Questions": 1,
+    "MAIN:Categories": 2,
+    "MAIN:DataIndex": 1,
+    "HUB:AppMappings": 1,
+    "HUB:ResultSourcePolicies": 1,
+    "MAIN:Games": 1
+  },
+  "totalOwnedRows": 58,
+  "status": "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY"
+}

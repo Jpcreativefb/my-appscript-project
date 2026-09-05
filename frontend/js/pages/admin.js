@@ -2030,11 +2030,12 @@ function renderAdminGameForm(
 
             <div class="form-grid">
               <label class="admin-field">
-                ${adminFieldLabel_("Survivor Mode", "Manual keeps the existing elimination-question behavior. Sports Survivor uses weekly team picks. Streak Survivor adds the consecutive-win multiplier. King of the Hill is the passive lowest-score strike game.")}
+                ${adminFieldLabel_("Survivor Mode", "Manual keeps the existing elimination-question behavior. Sports Survivor uses weekly team picks. Legacy Streak Survivor keeps the existing score-only reset behavior. Streak Points + Strikes adds strike elimination without changing legacy games. King of the Hill is the passive lowest-score strike game.")}
                 <select name="survivorMode" onchange="adminUpdateSurvivorRuleFields(this.form)">
                   <option value="manual-elimination" ${survivorSettings.mode === "manual-elimination" ? "selected" : ""}>Manual / Reality Elimination</option>
                   <option value="sports-survivor" ${survivorSettings.mode === "sports-survivor" ? "selected" : ""}>Sports Survivor / Last Team Standing</option>
                   <option value="streak-survivor" ${survivorSettings.mode === "streak-survivor" ? "selected" : ""}>Streak Survivor / Win Multiplier</option>
+                  <option value="streak-points-strikes" ${survivorSettings.mode === "streak-points-strikes" ? "selected" : ""}>Streak Points + Strikes</option>
                   <option value="king-of-the-hill" ${survivorSettings.mode === "king-of-the-hill" ? "selected" : ""}>King of the Hill — Score Strikes</option>
                 </select>
               </label>
@@ -3451,9 +3452,9 @@ function adminGetGamePayloadFromForm_(
 function adminUpdateSurvivorRuleFields(form) {
   if (!form) return;
   const mode = form.survivorMode ? form.survivorMode.value : "manual-elimination";
-  const activePickMode = mode === "sports-survivor" || mode === "streak-survivor";
+  const activePickMode = mode === "sports-survivor" || mode === "streak-survivor" || mode === "streak-points-strikes";
   form.querySelectorAll("[data-survivor-sports-field]").forEach(function(el) { el.hidden = !activePickMode; });
-  form.querySelectorAll("[data-survivor-streak-field]").forEach(function(el) { el.hidden = mode !== "streak-survivor"; });
+  form.querySelectorAll("[data-survivor-streak-field]").forEach(function(el) { el.hidden = mode !== "streak-survivor" && mode !== "streak-points-strikes"; });
   form.querySelectorAll("[data-survivor-koth-field]").forEach(function(el) { el.hidden = mode !== "king-of-the-hill"; });
 }
 

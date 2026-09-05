@@ -1,0 +1,483 @@
+{
+  "success": true,
+  "fixtureOnly": true,
+  "gameId": "fixture-purge-2026",
+  "deletedCounts": {
+    "MAIN:ExternalResultsHubOutbox": 1,
+    "MAIN:RealityNextEpisodeJobs": 1,
+    "MAIN:RealityQuestionBuildJobs": 1,
+    "MAIN:ArchiveManifest": 1,
+    "MAIN:NotificationLog": 1,
+    "MAIN:ResultEvents": 1,
+    "MAIN:ScoringRuns": 1,
+    "MAIN:StorageMigrationLog": 1,
+    "MAIN:RealityQuestionResultQueue": 1,
+    "MAIN:RealityResultQueue": 1,
+    "MAIN:UserNotifications": 1,
+    "MAIN:Bets": 1,
+    "MAIN:CompetitionVotes": 1,
+    "MAIN:Picks": 2,
+    "MAIN:RankingEntryItems": 1,
+    "MAIN:RealityEpisodeVotes": 1,
+    "MAIN:SurvivorPicks": 1,
+    "MAIN:UserSeasonAnchors": 1,
+    "MAIN:CategoryResults": 1,
+    "MAIN:CompetitionResults": 1,
+    "MAIN:LiveLeaderboardSnapshot": 1,
+    "MAIN:SeasonAnchorHistory": 1,
+    "MAIN:SurvivorEliminations": 1,
+    "MAIN:GameFeatureAccess": 1,
+    "MAIN:LeagueGames": 1,
+    "MAIN:LeagueSeasonMembership": 1,
+    "HUB:AppMappings": 1,
+    "HUB:ResultSourcePolicies": 1,
+    "MAIN:CompetitionEntries": 1,
+    "MAIN:RankingEntries": 1,
+    "MAIN:ExternalResultsInbox": 1,
+    "MAIN:InternetResultImports": 1,
+    "MAIN:ManualResultSuggestions": 1,
+    "MAIN:CategorySettings": 1,
+    "MAIN:InternetResultSources": 1,
+    "MAIN:RealityEpisodeQuestions": 1,
+    "MAIN:RealityQuestionTemplates": 1,
+    "MAIN:SeasonAnchorSettings": 1,
+    "MAIN:SurvivorGameSettings": 1,
+    "MAIN:SurvivorSettings": 1,
+    "MAIN:RealityContestantGroupHistory": 1,
+    "MAIN:RealitySpoilerShield": 1,
+    "MAIN:RealityCastImport": 1,
+    "MAIN:RealityContestants": 1,
+    "MAIN:RealityGroups": 1,
+    "MAIN:RealityEpisodes": 1,
+    "MAIN:RealitySeasons": 1,
+    "MAIN:AppearanceOverrides": 1,
+    "MAIN:UserGameProfiles": 1,
+    "MAIN:GameAppearance": 1,
+    "MAIN:QuestionOptions": 2,
+    "MAIN:Questions": 1,
+    "MAIN:Categories": 2,
+    "MAIN:DataIndex": 1,
+    "CACHE:GameScopedCaches": 1,
+    "MAIN:Games": 1
+  },
+  "retainedSharedAssets": [
+    {
+      "fileId": "shared-image-file",
+      "targetReferences": [
+        "MAIN:Categories.FileID"
+      ],
+      "otherReferences": [
+        "MAIN:Categories.FileID"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    },
+    {
+      "fileId": "shared-avatar-file",
+      "targetReferences": [
+        "MAIN:UserGameProfiles.AvatarFileId"
+      ],
+      "otherReferences": [
+        "MAIN:UserGameProfiles.AvatarFileId",
+        "MAIN:Users.AvatarFileId"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    },
+    {
+      "fileId": "shared-override-file",
+      "targetReferences": [
+        "MAIN:AppearanceOverrides.ImageFileId"
+      ],
+      "otherReferences": [
+        "MAIN:AppearanceOverrides.ImageFileId"
+      ],
+      "provenOwnedByTarget": false,
+      "knownShared": true,
+      "decision": "SHARED/UNPROVEN — PRESERVE",
+      "reason": "Other surviving references exist."
+    }
+  ],
+  "deletionTrace": [
+    {
+      "phase": 5,
+      "scope": "MAIN",
+      "sheet": "ExternalResultsHubOutbox",
+      "deleted": 1
+    },
+    {
+      "phase": 5,
+      "scope": "MAIN",
+      "sheet": "RealityNextEpisodeJobs",
+      "deleted": 1
+    },
+    {
+      "phase": 5,
+      "scope": "MAIN",
+      "sheet": "RealityQuestionBuildJobs",
+      "deleted": 1
+    },
+    {
+      "phase": 10,
+      "scope": "MAIN",
+      "sheet": "ArchiveManifest",
+      "deleted": 1
+    },
+    {
+      "phase": 10,
+      "scope": "MAIN",
+      "sheet": "NotificationLog",
+      "deleted": 1
+    },
+    {
+      "phase": 10,
+      "scope": "MAIN",
+      "sheet": "ResultEvents",
+      "deleted": 1
+    },
+    {
+      "phase": 10,
+      "scope": "MAIN",
+      "sheet": "ScoringRuns",
+      "deleted": 1
+    },
+    {
+      "phase": 10,
+      "scope": "MAIN",
+      "sheet": "StorageMigrationLog",
+      "deleted": 1
+    },
+    {
+      "phase": 15,
+      "scope": "MAIN",
+      "sheet": "RealityQuestionResultQueue",
+      "deleted": 1
+    },
+    {
+      "phase": 15,
+      "scope": "MAIN",
+      "sheet": "RealityResultQueue",
+      "deleted": 1
+    },
+    {
+      "phase": 15,
+      "scope": "MAIN",
+      "sheet": "UserNotifications",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "Bets",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "CompetitionVotes",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "Picks",
+      "deleted": 2
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "RankingEntryItems",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "RealityEpisodeVotes",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "SurvivorPicks",
+      "deleted": 1
+    },
+    {
+      "phase": 20,
+      "scope": "MAIN",
+      "sheet": "UserSeasonAnchors",
+      "deleted": 1
+    },
+    {
+      "phase": 30,
+      "scope": "MAIN",
+      "sheet": "CategoryResults",
+      "deleted": 1
+    },
+    {
+      "phase": 30,
+      "scope": "MAIN",
+      "sheet": "CompetitionResults",
+      "deleted": 1
+    },
+    {
+      "phase": 30,
+      "scope": "MAIN",
+      "sheet": "LiveLeaderboardSnapshot",
+      "deleted": 1
+    },
+    {
+      "phase": 30,
+      "scope": "MAIN",
+      "sheet": "SeasonAnchorHistory",
+      "deleted": 1
+    },
+    {
+      "phase": 30,
+      "scope": "MAIN",
+      "sheet": "SurvivorEliminations",
+      "deleted": 1
+    },
+    {
+      "phase": 40,
+      "scope": "MAIN",
+      "sheet": "GameFeatureAccess",
+      "deleted": 1
+    },
+    {
+      "phase": 40,
+      "scope": "MAIN",
+      "sheet": "LeagueGames",
+      "deleted": 1
+    },
+    {
+      "phase": 40,
+      "scope": "MAIN",
+      "sheet": "LeagueSeasonMembership",
+      "deleted": 1
+    },
+    {
+      "phase": 50,
+      "scope": "HUB",
+      "sheet": "AppMappings",
+      "deleted": 1
+    },
+    {
+      "phase": 50,
+      "scope": "HUB",
+      "sheet": "ResultSourcePolicies",
+      "deleted": 1
+    },
+    {
+      "phase": 50,
+      "scope": "MAIN",
+      "sheet": "CompetitionEntries",
+      "deleted": 1
+    },
+    {
+      "phase": 50,
+      "scope": "MAIN",
+      "sheet": "RankingEntries",
+      "deleted": 1
+    },
+    {
+      "phase": 55,
+      "scope": "MAIN",
+      "sheet": "ExternalResultsInbox",
+      "deleted": 1
+    },
+    {
+      "phase": 55,
+      "scope": "MAIN",
+      "sheet": "InternetResultImports",
+      "deleted": 1
+    },
+    {
+      "phase": 55,
+      "scope": "MAIN",
+      "sheet": "ManualResultSuggestions",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "CategorySettings",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "InternetResultSources",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "RealityEpisodeQuestions",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "RealityQuestionTemplates",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "SeasonAnchorSettings",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "SurvivorGameSettings",
+      "deleted": 1
+    },
+    {
+      "phase": 60,
+      "scope": "MAIN",
+      "sheet": "SurvivorSettings",
+      "deleted": 1
+    },
+    {
+      "phase": 62,
+      "scope": "MAIN",
+      "sheet": "RealityContestantGroupHistory",
+      "deleted": 1
+    },
+    {
+      "phase": 62,
+      "scope": "MAIN",
+      "sheet": "RealitySpoilerShield",
+      "deleted": 1
+    },
+    {
+      "phase": 64,
+      "scope": "MAIN",
+      "sheet": "RealityCastImport",
+      "deleted": 1
+    },
+    {
+      "phase": 64,
+      "scope": "MAIN",
+      "sheet": "RealityContestants",
+      "deleted": 1
+    },
+    {
+      "phase": 64,
+      "scope": "MAIN",
+      "sheet": "RealityGroups",
+      "deleted": 1
+    },
+    {
+      "phase": 66,
+      "scope": "MAIN",
+      "sheet": "RealityEpisodes",
+      "deleted": 1
+    },
+    {
+      "phase": 68,
+      "scope": "MAIN",
+      "sheet": "RealitySeasons",
+      "deleted": 1
+    },
+    {
+      "phase": 70,
+      "scope": "MAIN",
+      "sheet": "AppearanceOverrides",
+      "deleted": 1
+    },
+    {
+      "phase": 70,
+      "scope": "MAIN",
+      "sheet": "UserGameProfiles",
+      "deleted": 1
+    },
+    {
+      "phase": 72,
+      "scope": "MAIN",
+      "sheet": "GameAppearance",
+      "deleted": 1
+    },
+    {
+      "phase": 75,
+      "scope": "MAIN",
+      "sheet": "QuestionOptions",
+      "deleted": 2
+    },
+    {
+      "phase": 76,
+      "scope": "MAIN",
+      "sheet": "Questions",
+      "deleted": 1
+    },
+    {
+      "phase": 77,
+      "scope": "MAIN",
+      "sheet": "Categories",
+      "deleted": 2
+    },
+    {
+      "phase": 80,
+      "scope": "MAIN",
+      "sheet": "DataIndex",
+      "deleted": 1
+    },
+    {
+      "phase": 90,
+      "scope": "CACHE",
+      "sheet": "GameScopedCaches",
+      "deleted": 1
+    },
+    {
+      "phase": 95,
+      "scope": "DRIVE",
+      "sheet": "unique-hero-file",
+      "deleted": 1
+    },
+    {
+      "phase": 95,
+      "scope": "DRIVE",
+      "sheet": "unique-option-file",
+      "deleted": 1
+    },
+    {
+      "phase": 95,
+      "scope": "DRIVE",
+      "sheet": "unique-entry-file",
+      "deleted": 1
+    },
+    {
+      "phase": 1000,
+      "scope": "MAIN",
+      "sheet": "Games",
+      "deleted": 1
+    }
+  ],
+  "zeroReferenceVerification": {
+    "success": true,
+    "gameId": "fixture-purge-2026",
+    "remainingReferenceCount": 0,
+    "remaining": [],
+    "intentionalAuditReferenceExcluded": true
+  },
+  "auditRecord": {
+    "Timestamp": "2026-09-05T05:12:15.786Z",
+    "Action": "PURGE",
+    "GameId": "fixture-purge-2026",
+    "GameName": "Fixture Purge Game",
+    "RequestedBy": "fixture-admin",
+    "DiscoveredCountsJSON": "{\"MAIN:ExternalResultsHubOutbox\":1,\"MAIN:RealityNextEpisodeJobs\":1,\"MAIN:RealityQuestionBuildJobs\":1,\"MAIN:ScoringRuns\":1,\"MAIN:ResultEvents\":1,\"MAIN:NotificationLog\":1,\"MAIN:StorageMigrationLog\":1,\"MAIN:ArchiveManifest\":1,\"MAIN:RealityResultQueue\":1,\"MAIN:RealityQuestionResultQueue\":1,\"MAIN:UserNotifications\":1,\"MAIN:Picks\":2,\"MAIN:Bets\":1,\"MAIN:RankingEntryItems\":1,\"MAIN:CompetitionVotes\":1,\"MAIN:SurvivorPicks\":1,\"MAIN:RealityEpisodeVotes\":1,\"MAIN:UserSeasonAnchors\":1,\"MAIN:CategoryResults\":1,\"MAIN:LiveLeaderboardSnapshot\":1,\"MAIN:CompetitionResults\":1,\"MAIN:SurvivorEliminations\":1,\"MAIN:SeasonAnchorHistory\":1,\"MAIN:LeagueSeasonMembership\":1,\"MAIN:LeagueGames\":1,\"MAIN:GameFeatureAccess\":1,\"MAIN:RankingEntries\":1,\"MAIN:CompetitionEntries\":1,\"MAIN:ExternalResultsInbox\":1,\"MAIN:InternetResultImports\":1,\"MAIN:ManualResultSuggestions\":1,\"MAIN:CategorySettings\":1,\"MAIN:InternetResultSources\":1,\"MAIN:SurvivorGameSettings\":1,\"MAIN:SurvivorSettings\":1,\"MAIN:RealityQuestionTemplates\":1,\"MAIN:RealityEpisodeQuestions\":1,\"MAIN:SeasonAnchorSettings\":1,\"MAIN:RealityContestantGroupHistory\":1,\"MAIN:RealitySpoilerShield\":1,\"MAIN:RealityGroups\":1,\"MAIN:RealityContestants\":1,\"MAIN:RealityCastImport\":1,\"MAIN:RealityEpisodes\":1,\"MAIN:RealitySeasons\":1,\"MAIN:UserGameProfiles\":1,\"MAIN:AppearanceOverrides\":1,\"MAIN:GameAppearance\":1,\"MAIN:QuestionOptions\":2,\"MAIN:Questions\":1,\"MAIN:Categories\":2,\"MAIN:DataIndex\":1,\"HUB:AppMappings\":1,\"HUB:ResultSourcePolicies\":1,\"MAIN:Games\":1}",
+    "DeletedCountsJSON": "{\"MAIN:ExternalResultsHubOutbox\":1,\"MAIN:RealityNextEpisodeJobs\":1,\"MAIN:RealityQuestionBuildJobs\":1,\"MAIN:ArchiveManifest\":1,\"MAIN:NotificationLog\":1,\"MAIN:ResultEvents\":1,\"MAIN:ScoringRuns\":1,\"MAIN:StorageMigrationLog\":1,\"MAIN:RealityQuestionResultQueue\":1,\"MAIN:RealityResultQueue\":1,\"MAIN:UserNotifications\":1,\"MAIN:Bets\":1,\"MAIN:CompetitionVotes\":1,\"MAIN:Picks\":2,\"MAIN:RankingEntryItems\":1,\"MAIN:RealityEpisodeVotes\":1,\"MAIN:SurvivorPicks\":1,\"MAIN:UserSeasonAnchors\":1,\"MAIN:CategoryResults\":1,\"MAIN:CompetitionResults\":1,\"MAIN:LiveLeaderboardSnapshot\":1,\"MAIN:SeasonAnchorHistory\":1,\"MAIN:SurvivorEliminations\":1,\"MAIN:GameFeatureAccess\":1,\"MAIN:LeagueGames\":1,\"MAIN:LeagueSeasonMembership\":1,\"HUB:AppMappings\":1,\"HUB:ResultSourcePolicies\":1,\"MAIN:CompetitionEntries\":1,\"MAIN:RankingEntries\":1,\"MAIN:ExternalResultsInbox\":1,\"MAIN:InternetResultImports\":1,\"MAIN:ManualResultSuggestions\":1,\"MAIN:CategorySettings\":1,\"MAIN:InternetResultSources\":1,\"MAIN:RealityEpisodeQuestions\":1,\"MAIN:RealityQuestionTemplates\":1,\"MAIN:SeasonAnchorSettings\":1,\"MAIN:SurvivorGameSettings\":1,\"MAIN:SurvivorSettings\":1,\"MAIN:RealityContestantGroupHistory\":1,\"MAIN:RealitySpoilerShield\":1,\"MAIN:RealityCastImport\":1,\"MAIN:RealityContestants\":1,\"MAIN:RealityGroups\":1,\"MAIN:RealityEpisodes\":1,\"MAIN:RealitySeasons\":1,\"MAIN:AppearanceOverrides\":1,\"MAIN:UserGameProfiles\":1,\"MAIN:GameAppearance\":1,\"MAIN:QuestionOptions\":2,\"MAIN:Questions\":1,\"MAIN:Categories\":2,\"MAIN:DataIndex\":1,\"CACHE:GameScopedCaches\":1,\"MAIN:Games\":1}",
+    "BlockedDependenciesJSON": "[]",
+    "RetainedSharedAssetsJSON": "[{\"fileId\":\"shared-image-file\",\"targetReferences\":[\"MAIN:Categories.FileID\"],\"otherReferences\":[\"MAIN:Categories.FileID\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"shared-avatar-file\",\"targetReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\"],\"otherReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\",\"MAIN:Users.AvatarFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"shared-override-file\",\"targetReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"otherReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"}]",
+    "FinalResult": "SUCCESS",
+    "RemainingReferenceCount": 0,
+    "ErrorMessage": "",
+    "Version": "rc24b-dryrun-v1"
+  }
+}

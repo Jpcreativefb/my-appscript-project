@@ -200,8 +200,13 @@ function survivorSortStandings_(rows) {
 function apiGetSurvivorState_(payload) {
   payload = payload || {};
   const routedGameId = survivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
-  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(routedGameId) && typeof apiGetKingOfHillState_ === "function") {
-    return apiGetKingOfHillState_(Object.assign({}, payload, { gameId: routedGameId }));
+  if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(routedGameId)) {
+    if (typeof apiGetKingOfHillStateRC24A_ === "function") {
+      return apiGetKingOfHillStateRC24A_(Object.assign({}, payload, { gameId: routedGameId }));
+    }
+    if (typeof apiGetKingOfHillState_ === "function") {
+      return apiGetKingOfHillState_(Object.assign({}, payload, { gameId: routedGameId }));
+    }
   }
   if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(routedGameId) && typeof apiGetSportsSurvivorState_ === "function") {
     return apiGetSportsSurvivorState_(Object.assign({}, payload, { gameId: routedGameId }));

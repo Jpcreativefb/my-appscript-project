@@ -1,0 +1,123 @@
+{
+  "suite": "RC24B Permanent Game Purge DryRun/Fixture",
+  "baseline": "e3627c57da015ac08eb65cd928378fdcb63d2cdc",
+  "total": 28,
+  "passed": 28,
+  "failed": 0,
+  "productionGameDeleted": false,
+  "sportsEngineModified": false,
+  "results": [
+    {
+      "name": "01 Dry Run makes no writes",
+      "status": "PASS"
+    },
+    {
+      "name": "02 Exact GameId lookup only",
+      "status": "PASS"
+    },
+    {
+      "name": "03 Nonexistent GameId safely rejected",
+      "status": "PASS"
+    },
+    {
+      "name": "04 Partial GameId cannot resolve or delete",
+      "status": "PASS"
+    },
+    {
+      "name": "05 Dry Run counts owned records across stores",
+      "status": "PASS"
+    },
+    {
+      "name": "06 Active dependent game blocks purge",
+      "status": "PASS"
+    },
+    {
+      "name": "07 KOTH source-game dependency blocks",
+      "status": "PASS"
+    },
+    {
+      "name": "08 Target mini-game linked to active parent blocks",
+      "status": "PASS"
+    },
+    {
+      "name": "09 Fixture purge follows child-first phase order",
+      "status": "PASS"
+    },
+    {
+      "name": "10 Games row is deleted last",
+      "status": "PASS"
+    },
+    {
+      "name": "11 GameAppearance target row removed",
+      "status": "PASS"
+    },
+    {
+      "name": "12 Shared appearance packs and themes preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "13 Shared Drive asset preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "14 Proven unique fixture asset deleted",
+      "status": "PASS"
+    },
+    {
+      "name": "15 Neighbor game remains intact",
+      "status": "PASS"
+    },
+    {
+      "name": "16 Target season membership/link removed; shared LeagueMembers preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "17 Entries removed only for target",
+      "status": "PASS"
+    },
+    {
+      "name": "18 Picks/selections removed only for target",
+      "status": "PASS"
+    },
+    {
+      "name": "19 Score/result/history rows removed only for target",
+      "status": "PASS"
+    },
+    {
+      "name": "20 Cache/index cleanup is target-scoped",
+      "status": "PASS"
+    },
+    {
+      "name": "21 Exact typed confirmation required",
+      "status": "PASS"
+    },
+    {
+      "name": "22 Fixture permanent purge writes audit record",
+      "status": "PASS"
+    },
+    {
+      "name": "23 Zero removable references remain after fixture purge",
+      "status": "PASS"
+    },
+    {
+      "name": "24 Repeat fixture purge is safe/idempotent",
+      "status": "PASS"
+    },
+    {
+      "name": "25 Midway failure is reported without false success",
+      "status": "PASS"
+    },
+    {
+      "name": "26 Ambiguous blank-GameId CategorySettings blocks",
+      "status": "PASS"
+    },
+    {
+      "name": "27 Shared Hub provider observations/review rows are preserved",
+      "status": "PASS"
+    },
+    {
+      "name": "28 Sports Engine fixture data remains untouched/protected",
+      "status": "PASS"
+    }
+  ]
+}

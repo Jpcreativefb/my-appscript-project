@@ -49,6 +49,7 @@ TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.ENTRIES] = [
 ];
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.LEAGUES] = [
   "GameId", "LeagueId", "LeagueName", "LeagueType", "StandingMode", "PlayoffTeams",
+  "QualificationMethod",
   "Active", "CreatedAt", "UpdatedAt"
 ];
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.MEMBERSHIPS] = [
@@ -72,7 +73,7 @@ TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.REMINDER_LOG] = [
   "Title", "Message", "Sent", "Failed", "Error"
 ];
 TEAM_FANTASY_HEADERS[TEAM_FANTASY_SHEETS.PLAYER_SETTINGS] = [
-  "GameId", "Username", "AutoFillMode", "AutoFillWindow", "CustomLeadMinutes", "UpdatedAt"
+  "GameId", "Username", "AutoFillMode", "AutoFillWindow", "CustomLeadMinutes", "AutoFillScope", "AutoFillWeek", "UpdatedAt"
 ];
 
 var TEAM_FANTASY_NFL_TEAMS = [
@@ -2636,10 +2637,14 @@ function apiAdminAssignTeamFantasyLeagueMember(payload) {
       if (conflict) throw new Error("This entry is already assigned to another subleague. Enable multiple-league membership to add it here too.");
     });
   }
+  const existingMembershipRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS);
   targets.forEach(function(entry) {
+    const existingMembership = existingMembershipRows.filter(function(row) {
+      return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === leagueId && teamFantasyString_(row.EntryId) === entry.entryId;
+    })[0] || null;
     teamFantasyUpsert_(TEAM_FANTASY_SHEETS.MEMBERSHIPS, function(row) {
       return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === leagueId && teamFantasyString_(row.EntryId) === entry.entryId;
-    }, { GameId: gameId, LeagueId: leagueId, EntryId: entry.entryId, Username: username, CreatedAt: teamFantasyNowIso_() });
+    }, { GameId: gameId, LeagueId: leagueId, EntryId: entry.entryId, Username: username, CreatedAt: existingMembership && existingMembership.CreatedAt ? existingMembership.CreatedAt : teamFantasyNowIso_() });
   });
   return { success: true, assigned: targets.length, added: targets.length, entries: targets };
 }
@@ -2730,3 +2735,388 @@ function teamFantasyPreflightIssues_(gameId) {
   }
   return issues;
 }
+
+/* RC24A_R45_MULTI_LEAGUE_WEEKLY_RECORD */
+function teamFantasyR45DateMs_(value) {
+  var ms = value ? new Date(value).getTime() : NaN;
+  return isNaN(ms) ? 0 : ms;
+}
+
+function teamFantasyR45StableMembershipEffective_(membership, leagueId, weekCutoffMs) {
+  if (!membership) return false;
+  // Complete League is automatic and its legacy CreatedAt is refreshed by the
+  // current ensure-membership path, so it cannot be used as a historical join date.
+  if (teamFantasyString_(leagueId) === "complete") return true;
+  var createdMs = teamFantasyR45DateMs_(membership.CreatedAt);
+  return !createdMs || !weekCutoffMs || createdMs <= weekCutoffMs;
+}
+
+// R4.5 keeps the established Team Fantasy all-play math, but removes rows that
+// were never actual weekly participants in this league. This prevents a zero
+// score created for NO LINEUP / late-join history from manufacturing W-L-T.
+function teamFantasyLeagueWeeklyCompetitors_(gameId, leagueId, standingMode) {
+  var settings = teamFantasyGetSettings_(gameId);
+  leagueId = teamFantasyString_(leagueId);
+  var membershipByEntry = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || teamFantasyString_(row.LeagueId) !== leagueId) return;
+    membershipByEntry[teamFantasyString_(row.EntryId)] = row;
+  });
+
+  var participation = {};
+  var weekCutoff = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(settings.seasonYear)) return;
+    var week = Number(row.Week);
+    var entryId = teamFantasyString_(row.EntryId);
+    if (!week || !entryId || !membershipByEntry[entryId]) return;
+    if (!participation[week]) participation[week] = {};
+    participation[week][entryId] = true;
+    var activityMs = Math.max(
+      teamFantasyR45DateMs_(row.GameDateTime),
+      teamFantasyR45DateMs_(row.UpdatedAt),
+      teamFantasyR45DateMs_(row.CreatedAt)
+    );
+    weekCutoff[week] = Math.max(Number(weekCutoff[week] || 0), activityMs);
+  });
+
+  var scoreRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.WEEK_SCORES).filter(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(settings.seasonYear)) return false;
+    var week = Number(row.Week);
+    var entryId = teamFantasyString_(row.EntryId);
+    var membership = membershipByEntry[entryId];
+    var hasPickParticipation = !!(participation[week] && participation[week][entryId]);
+    // Historical TeamFantasyWeekScores can predate durable pick metadata. A non-zero
+    // finalized score is authoritative evidence that the entry actually participated;
+    // a zero score with no pick remains a DNP so R4.5 does not fabricate all-play results.
+    var hasLegacyScoredParticipation = teamFantasyNumber_(row.FantasyPoints, 0) !== 0;
+    if (!membership || (!hasPickParticipation && !hasLegacyScoredParticipation)) return false;
+    var cutoff = Math.max(Number(weekCutoff[week] || 0), teamFantasyR45DateMs_(row.UpdatedAt));
+    return teamFantasyR45StableMembershipEffective_(membership, leagueId, cutoff);
+  });
+
+  var byWeek = {};
+  scoreRows.forEach(function(row) {
+    var week = Number(row.Week);
+    if (!byWeek[week]) byWeek[week] = {};
+    var username = teamFantasyNormalizeUsername_(row.Username);
+    var competitorId = standingMode === "combined-user" ? "user:" + username : "entry:" + teamFantasyString_(row.EntryId);
+    if (!byWeek[week][competitorId]) {
+      byWeek[week][competitorId] = {
+        competitorId: competitorId,
+        username: username,
+        entryId: standingMode === "combined-user" ? "" : teamFantasyString_(row.EntryId),
+        name: standingMode === "combined-user" ? username : teamFantasyString_(row.EntryId),
+        score: 0,
+        final: true,
+        components: []
+      };
+    }
+    byWeek[week][competitorId].score += teamFantasyNumber_(row.FantasyPoints, 0);
+    byWeek[week][competitorId].final = byWeek[week][competitorId].final && teamFantasyBool_(row.Final, false);
+    byWeek[week][competitorId].components.push({
+      entryId: teamFantasyString_(row.EntryId),
+      conference: teamFantasyString_(row.Conference),
+      score: teamFantasyNumber_(row.FantasyPoints, 0)
+    });
+  });
+  Object.keys(byWeek).forEach(function(week) {
+    Object.keys(byWeek[week]).forEach(function(id) {
+      byWeek[week][id].score = teamFantasyRound_(byWeek[week][id].score);
+    });
+  });
+  return byWeek;
+}
+
+function teamFantasyR45LeagueWeekParticipation_(gameId, leagueId, standingMode, week) {
+  var settings = teamFantasyGetSettings_(gameId);
+  var membershipRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) {
+    return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === leagueId;
+  });
+  var membershipByEntry = {};
+  membershipRows.forEach(function(row) { membershipByEntry[teamFantasyString_(row.EntryId)] = row; });
+  var entriesById = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) === gameId) entriesById[teamFantasyString_(row.EntryId)] = row;
+  });
+  var pickEntries = {};
+  var cutoff = 0;
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(settings.seasonYear) || Number(row.Week) !== Number(week)) return;
+    var entryId = teamFantasyString_(row.EntryId);
+    if (!membershipByEntry[entryId]) return;
+    pickEntries[entryId] = true;
+    cutoff = Math.max(cutoff,
+      teamFantasyR45DateMs_(row.GameDateTime),
+      teamFantasyR45DateMs_(row.UpdatedAt),
+      teamFantasyR45DateMs_(row.CreatedAt));
+  });
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.WEEK_SCORES).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) === gameId && Number(row.SeasonYear) === Number(settings.seasonYear) && Number(row.Week) === Number(week)) {
+      cutoff = Math.max(cutoff, teamFantasyR45DateMs_(row.UpdatedAt));
+    }
+  });
+  if (!cutoff && Number(week) === Number(settings.currentWeek)) cutoff = Date.now();
+
+  var competitors = {};
+  membershipRows.forEach(function(membership) {
+    var entryId = teamFantasyString_(membership.EntryId);
+    var entry = entriesById[entryId] || {};
+    var username = teamFantasyNormalizeUsername_(entry.Username || membership.Username);
+    var competitorId = standingMode === "combined-user" ? "user:" + username : "entry:" + entryId;
+    if (!competitorId || competitorId === "user:") return;
+    if (!competitors[competitorId]) competitors[competitorId] = {
+      competitorId: competitorId,
+      username: username,
+      entryId: standingMode === "combined-user" ? "" : entryId,
+      entryIds: [],
+      eligibleThatWeek: false,
+      participated: false
+    };
+    competitors[competitorId].entryIds.push(entryId);
+    var effective = teamFantasyR45StableMembershipEffective_(membership, leagueId, cutoff);
+    if (effective) competitors[competitorId].eligibleThatWeek = true;
+    if (effective && pickEntries[entryId]) competitors[competitorId].participated = true;
+  });
+  return { competitors: competitors, weekCutoffMs: cutoff };
+}
+
+function teamFantasyWeeklyAllPlaySnapshot_(gameId, leagueId, week) {
+  leagueId = teamFantasyString_(leagueId) || "complete";
+  week = Math.max(1, Math.floor(Number(week || 1)));
+  var settings = teamFantasyGetSettings_(gameId);
+  var league = teamFantasyLeagueRow_(gameId, leagueId);
+  if (!league) return { success: false, error: "League not found." };
+  var standingMode = teamFantasyKey_(league.StandingMode) === "entries" ? "entries" : settings.standingMode;
+  var byWeek = teamFantasyLeagueWeeklyCompetitors_(gameId, leagueId, standingMode);
+  var weekItems = byWeek[week] || {};
+  var participation = teamFantasyR45LeagueWeekParticipation_(gameId, leagueId, standingMode, week);
+  var rowsById = {};
+  Object.keys(participation.competitors).forEach(function(id) {
+    var p = participation.competitors[id];
+    var item = weekItems[id] || null;
+    rowsById[id] = {
+      competitorId: id,
+      username: p.username,
+      entryId: p.entryId,
+      eligibleThatWeek: p.eligibleThatWeek === true,
+      participated: p.participated === true,
+      dnp: p.participated !== true,
+      score: item ? teamFantasyRound_(item.score) : null,
+      final: item ? item.final === true : false,
+      weeklyRank: 0,
+      record: null
+    };
+  });
+  Object.keys(weekItems).forEach(function(id) {
+    if (rowsById[id]) return;
+    var item = weekItems[id];
+    rowsById[id] = {
+      competitorId: id,
+      username: item.username,
+      entryId: item.entryId,
+      eligibleThatWeek: true,
+      participated: true,
+      dnp: false,
+      score: teamFantasyRound_(item.score),
+      final: item.final === true,
+      weeklyRank: 0,
+      record: null
+    };
+  });
+
+  var ranked = Object.keys(rowsById).map(function(id) { return rowsById[id]; }).filter(function(row) {
+    return row.participated && row.score !== null;
+  }).sort(function(a, b) {
+    if (Number(b.score) !== Number(a.score)) return Number(b.score) - Number(a.score);
+    return a.competitorId.localeCompare(b.competitorId);
+  });
+  var lastScore = null, lastRank = 0;
+  ranked.forEach(function(row, index) {
+    if (lastScore === null || Number(row.score) !== Number(lastScore)) lastRank = index + 1;
+    row.weeklyRank = lastRank;
+    lastScore = row.score;
+  });
+
+  var settled = ranked.length > 0 && ranked.every(function(row) { return row.final === true; });
+  if (settled) {
+    ranked.forEach(function(row) { row.record = { wins: 0, losses: 0, ties: 0 }; });
+    for (var i = 0; i < ranked.length; i++) {
+      for (var j = i + 1; j < ranked.length; j++) {
+        var a = ranked[i], b = ranked[j];
+        if (Number(a.score) > Number(b.score)) { a.record.wins++; b.record.losses++; }
+        else if (Number(a.score) < Number(b.score)) { b.record.wins++; a.record.losses++; }
+        else { a.record.ties++; b.record.ties++; }
+      }
+    }
+  }
+  return {
+    success: true,
+    gameId: gameId,
+    leagueId: leagueId,
+    leagueName: teamFantasyString_(league.LeagueName),
+    standingMode: standingMode,
+    week: week,
+    settled: settled,
+    participantCount: ranked.length,
+    rows: Object.keys(rowsById).map(function(id) { return rowsById[id]; })
+  };
+}
+
+/* RC24A_R47_TEAM_FANTASY_FINAL_PERSISTENCE */
+function teamFantasyQualificationMethod_(value) {
+  return teamFantasyKey_(value) === "points" ? "points" : "record";
+}
+
+var teamFantasyR47LeaguesForEntriesBase_ = teamFantasyLeaguesForEntries_;
+teamFantasyLeaguesForEntries_ = function(gameId, entries) {
+  var leagues = teamFantasyR47LeaguesForEntriesBase_(gameId, entries) || [];
+  var methods = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) !== teamFantasyString_(gameId)) return;
+    methods[teamFantasyString_(row.LeagueId)] = teamFantasyQualificationMethod_(row.QualificationMethod);
+  });
+  return leagues.map(function(league) {
+    league = Object.assign({}, league || {});
+    league.qualificationMethod = methods[teamFantasyString_(league.leagueId)] || "record";
+    return league;
+  });
+};
+
+var teamFantasyR47BuildStandingsBase_ = teamFantasyBuildStandings_;
+teamFantasyBuildStandings_ = function(gameId, leagueId) {
+  var result = teamFantasyR47BuildStandingsBase_(gameId, leagueId);
+  if (!result || result.success === false || !Array.isArray(result.rows)) return result;
+  var leagueRow = teamFantasyLeagueRow_(gameId, leagueId || "complete") || {};
+  var method = teamFantasyQualificationMethod_(leagueRow.QualificationMethod);
+  var rows = result.rows;
+  rows.sort(function(a, b) {
+    if (method === "points") {
+      if (Number(b.regularPoints || 0) !== Number(a.regularPoints || 0)) return Number(b.regularPoints || 0) - Number(a.regularPoints || 0);
+      if (Number(b.winPct || 0) !== Number(a.winPct || 0)) return Number(b.winPct || 0) - Number(a.winPct || 0);
+    } else {
+      if (Number(b.winPct || 0) !== Number(a.winPct || 0)) return Number(b.winPct || 0) - Number(a.winPct || 0);
+      if (Number(b.regularPoints || 0) !== Number(a.regularPoints || 0)) return Number(b.regularPoints || 0) - Number(a.regularPoints || 0);
+    }
+    return teamFantasyString_(a.competitorId).localeCompare(teamFantasyString_(b.competitorId));
+  });
+  rows.forEach(function(row, index) { row.rank = index + 1; });
+  var playoffTeams = Math.max(2, Math.floor(teamFantasyNumber_(result.league && result.league.playoffTeams, 2)));
+  var qualifiers = rows.slice(0, Math.min(playoffTeams, rows.length)).map(function(row) { return row.competitorId; });
+  rows.forEach(function(row) { row.playoffQualified = qualifiers.indexOf(row.competitorId) !== -1; });
+  var playoffStandings = rows.filter(function(row) { return row.playoffQualified; }).slice().sort(function(a, b) {
+    if (Number(b.playoffScore || 0) !== Number(a.playoffScore || 0)) return Number(b.playoffScore || 0) - Number(a.playoffScore || 0);
+    return Number(a.rank || 0) - Number(b.rank || 0);
+  });
+  playoffStandings.forEach(function(row, index) { row.playoffRank = index + 1; });
+  result.qualifiers = qualifiers;
+  result.playoffStandings = playoffStandings;
+  result.qualificationMethod = method;
+  result.league = Object.assign({}, result.league || {}, { qualificationMethod: method });
+  return result;
+};
+
+var teamFantasyR47AdminCreateLeagueBase_ = apiAdminCreateTeamFantasyLeague;
+apiAdminCreateTeamFantasyLeague = function(payload) {
+  payload = payload || {};
+  var gameId = teamFantasyString_(payload.gameId);
+  var requestedId = teamFantasyString_(payload.leagueId);
+  var existing = requestedId ? teamFantasyLeagueRow_(gameId, requestedId) : null;
+  var requestedMethod = payload.qualificationMethod || payload.QualificationMethod || (existing && existing.QualificationMethod) || "record";
+  var method = teamFantasyQualificationMethod_(requestedMethod);
+  var result = teamFantasyR47AdminCreateLeagueBase_(payload);
+  if (!result || result.success === false) return result;
+  var leagueId = teamFantasyString_(result.leagueId || requestedId);
+  var after = teamFantasyLeagueRow_(gameId, leagueId) || {};
+  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.LEAGUES, function(row) {
+    return teamFantasyString_(row.GameId) === gameId && teamFantasyString_(row.LeagueId) === leagueId;
+  }, {
+    GameId: gameId,
+    LeagueId: leagueId,
+    QualificationMethod: method,
+    CreatedAt: existing && existing.CreatedAt ? existing.CreatedAt : (after.CreatedAt || teamFantasyNowIso_()),
+    UpdatedAt: teamFantasyNowIso_()
+  });
+  result.qualificationMethod = method;
+  return result;
+};
+
+var teamFantasyR47AdminDashboardBase_ = apiAdminGetTeamFantasyDashboard;
+apiAdminGetTeamFantasyDashboard = function(payload) {
+  var result = teamFantasyR47AdminDashboardBase_(payload);
+  if (!result || result.success === false) return result;
+  var gameId = teamFantasyString_(payload && payload.gameId);
+  var methods = {};
+  teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).forEach(function(row) {
+    if (teamFantasyString_(row.GameId) === gameId) methods[teamFantasyString_(row.LeagueId)] = teamFantasyQualificationMethod_(row.QualificationMethod);
+  });
+  result.leagues = (result.leagues || []).map(function(league) {
+    var id = teamFantasyString_(league.leagueId || league.LeagueId);
+    league.qualificationMethod = methods[id] || teamFantasyQualificationMethod_(league.QualificationMethod);
+    league.QualificationMethod = league.qualificationMethod;
+    return league;
+  });
+  return result;
+};
+
+var teamFantasyR47GetPlayerPreferenceBase_ = teamFantasyGetPlayerPreference_;
+teamFantasyGetPlayerPreference_ = function(gameId, username) {
+  var pref = teamFantasyR47GetPlayerPreferenceBase_(gameId, username) || teamFantasyPlayerPreferenceDefault_(gameId, username);
+  var normalizedGameId = teamFantasyString_(gameId);
+  var normalizedUser = teamFantasyNormalizeUsername_(username);
+  var row = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS).filter(function(item) {
+    return teamFantasyString_(item.GameId) === normalizedGameId && teamFantasyNormalizeUsername_(item.Username) === normalizedUser;
+  })[0] || {};
+  var scope = teamFantasyKey_(row.AutoFillScope) === "week" ? "week" : "season";
+  var targetWeek = scope === "week" ? Math.max(1, Math.floor(teamFantasyNumber_(row.AutoFillWeek, 1))) : 0;
+  pref.scope = scope;
+  pref.autoFillScope = scope;
+  pref.autoFillWeek = targetWeek;
+  pref.targetWeek = targetWeek;
+  return pref;
+};
+
+var teamFantasyR47SavePlayerPreferenceBase_ = teamFantasySavePlayerPreference_;
+teamFantasySavePlayerPreference_ = function(payload) {
+  payload = payload || {};
+  var result = teamFantasyR47SavePlayerPreferenceBase_(payload);
+  if (!result || result.success === false) return result;
+  var gameId = teamFantasyString_(payload.gameId);
+  var username = teamFantasyNormalizeUsername_(payload.username);
+  var settings = teamFantasyGetSettings_(gameId);
+  var scope = teamFantasyKey_(payload.autoFillScope || payload.scope) === "week" ? "week" : "season";
+  var targetWeek = scope === "week"
+    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.autoFillWeek || payload.week, settings.currentWeek)))
+    : "";
+  teamFantasyUpsert_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS, function(row) {
+    return teamFantasyString_(row.GameId) === gameId && teamFantasyNormalizeUsername_(row.Username) === username;
+  }, {
+    GameId: gameId,
+    Username: username,
+    AutoFillScope: scope,
+    AutoFillWeek: targetWeek,
+    UpdatedAt: teamFantasyNowIso_()
+  });
+  result.preference = teamFantasyGetPlayerPreference_(gameId, username);
+  result.message = scope === "week"
+    ? "Protection saved for Week " + targetWeek + " only."
+    : "Protection saved for the entire season.";
+  return result;
+};
+
+var teamFantasyR47AutomaticFillBase_ = teamFantasyRunAutomaticFillForPlayer_;
+teamFantasyRunAutomaticFillForPlayer_ = function(gameId, username, nowMs) {
+  var settings = teamFantasyGetSettings_(gameId);
+  var preference = teamFantasyGetPlayerPreference_(gameId, username);
+  if (preference.scope === "week" && Number(preference.autoFillWeek || 0) !== Number(settings.currentWeek || 0)) {
+    return {
+      success: true,
+      skipped: true,
+      reason: "week-only-scope-expired",
+      currentWeek: Number(settings.currentWeek || 0),
+      targetWeek: Number(preference.autoFillWeek || 0),
+      preference: preference
+    };
+  }
+  return teamFantasyR47AutomaticFillBase_(gameId, username, nowMs);
+};

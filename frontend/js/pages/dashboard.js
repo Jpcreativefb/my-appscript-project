@@ -955,6 +955,10 @@ async function renderDashboardHubPage_(category) {
         <p>${escapeHtml(dashboardHubDescription_(category))}</p>
       </header>
 
+      ${category === "sports" && window.PATTCSportsLaunchCore && typeof PATTCSportsLaunchCore.renderSportsHub === "function"
+        ? PATTCSportsLaunchCore.renderSportsHub(active, past)
+        : ""}
+
       ${groupNames.length ? groupNames.map(function(group, index) {
         return renderDashboardSubHub_(category, group, active, past, {
           openByDefault: index === 0

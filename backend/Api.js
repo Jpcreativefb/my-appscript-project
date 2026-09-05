@@ -1379,9 +1379,27 @@ function doGet(e) {
       );
 
     }
+    if (action === "getSportsConfidenceCompletion") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetSportsConfidenceCompletion_({
+        username: params.username,
+        gameId: gameId,
+        leagueId: leagueId
+      }));
+    }
+
     /* =========================
        ADMIN: GAMES
     ========================= */
+
+    if (action === "adminPermanentGamePurgeDryRun") {
+      return json(apiAdminPermanentGamePurgeDryRun(body));
+    }
+
+    if (action === "adminPermanentGamePurge") {
+      return json(apiAdminPermanentGamePurge(body));
+    }
 
     if (action === "adminGetGames") {
 

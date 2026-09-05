@@ -5893,3 +5893,24 @@ async function apiAdminGetSportsUsage() {
   );
 
 }
+
+/* RC24A_R45_SHARED_SPORTS_LEAGUE_SELECTOR */
+function sportsLeagueSelectorHtml_(config) {
+  config = config || {};
+  var leagues = Array.isArray(config.leagues) ? config.leagues : [];
+  if (leagues.length <= 1) return "";
+  var selected = String(config.selectedLeagueId || "");
+  var id = String(config.id || "sportsLeagueSelector");
+  var change = String(config.onChange || "");
+  function esc(value) {
+    return String(value === undefined || value === null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/\"/g, "&quot;").replace(/'/g, "&#39;");
+  }
+  return '<label class="sports-league-selector" for="' + esc(id) + '"><span>League</span><select id="' + esc(id) + '"' +
+    (change ? ' onchange="' + esc(change) + '(this.value)"' : '') + '>' + leagues.map(function(league) {
+      var leagueId = String(league.leagueId || league.LeagueId || "");
+      var name = String(league.leagueName || league.LeagueName || leagueId || "League");
+      return '<option value="' + esc(leagueId) + '"' + (leagueId === selected ? ' selected' : '') + '>' + esc(name) + '</option>';
+    }).join("") + '</select></label>';
+}

@@ -157,6 +157,8 @@ async function renderAdminGamesPage() {
 
       </details>
 
+      ${renderAdminPermanentPurgeDangerZone(games)}
+
     </div>
   `;
 
@@ -2466,4 +2468,132 @@ async function adminRunPreflightCheck(gameId) {
 
   }
 
+}
+
+/* RC24B_MANAGE_GAMES_PURGE_DANGER_ZONE */
+function renderAdminPermanentPurgeDangerZone(games) {
+  games = Array.isArray(games) ? games : [];
+  const options = games.map(function(game) {
+    const id = adminGamesEscapeHtml(game.gameId || "");
+    const name = adminGamesEscapeHtml(game.name || game.gameId || "");
+    return `<option value="${id}">${name} · ${id}</option>`;
+  }).join("");
+
+  return `
+    <details class="card admin-card admin-collapsible-card" style="border-color:rgba(226,76,76,.62)">
+      <summary class="admin-card-summary">
+        <div>
+          <h2 style="color:#ff8a8a">Danger Zone · Permanent Game Purge</h2>
+          <div class="admin-sub">Review build: Dry Run is live and read-only. Permanent deletion is server-locked until Roy authorizes the destructive stage.</div>
+        </div>
+        <span class="admin-collapse-icon">▾</span>
+      </summary>
+      <div class="admin-collapsible-body">
+        <div class="admin-form-grid">
+          <label>Game to inspect
+            <select id="adminPurgeGameSelect" class="input admin-input" onchange="adminPurgeSelectChanged_()">
+              <option value="">Select a game…</option>${options}
+            </select>
+          </label>
+          <label>Exact GameId
+            <input id="adminPurgeGameId" class="input admin-input" autocomplete="off" spellcheck="false" placeholder="exact-game-id">
+          </label>
+        </div>
+        <button id="adminPurgePreviewButton" class="admin-danger-button" onclick="adminPermanentPurgeRunPreview_()">Run Deletion Preview</button>
+        <div id="adminPurgePreviewResult" class="admin-preflight-result" style="margin-top:10px"></div>
+        <div id="adminPurgeConfirmWrap" hidden style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(226,76,76,.35)">
+          <label>Type the exact GameId to confirm
+            <input id="adminPurgeConfirmId" class="input admin-input" autocomplete="off" spellcheck="false" oninput="adminPermanentPurgeSyncDelete_()">
+          </label>
+          <button id="adminPurgeDeleteButton" class="admin-danger-button" disabled onclick="adminPermanentPurgeAttemptDelete_()">PERMANENT DELETE · LOCKED IN REVIEW BUILD</button>
+          <div class="admin-sub" style="margin-top:6px">The button is intentionally blocked by the RC24B server gate even after an exact match. This build is for safe phone review of the preview/dependency workflow.</div>
+        </div>
+      </div>
+    </details>`;
+}
+
+function adminPurgeSelectChanged_() {
+  const select = document.getElementById("adminPurgeGameSelect");
+  const input = document.getElementById("adminPurgeGameId");
+  if (select && input) input.value = String(select.value || "");
+}
+
+function adminPermanentPurgeSetBusy_(busy, text) {
+  const button = document.getElementById("adminPurgePreviewButton");
+  if (button) button.disabled = !!busy;
+  const result = document.getElementById("adminPurgePreviewResult");
+  if (result && text) result.innerHTML = `<div class="admin-sub">${adminGamesEscapeHtml(text)}</div>`;
+}
+
+async function adminPermanentPurgeRunPreview_() {
+  const gameId = String((document.getElementById("adminPurgeGameId") || {}).value || "").trim();
+  if (!gameId) {
+    adminPermanentPurgeSetBusy_(false, "Enter the exact GameId first.");
+    return;
+  }
+  adminPermanentPurgeSetBusy_(true, "Scanning PATTC data references…");
+  let result = null;
+  try {
+    result = await apiPost("adminPermanentGamePurgeDryRun", { gameId: gameId });
+  } catch (err) {
+    result = { success:false, error: err && err.message ? err.message : String(err || "Unknown error") };
+  }
+  adminPermanentPurgeSetBusy_(false, "");
+  adminPermanentPurgeRenderPreview_(result);
+}
+
+function adminPermanentPurgeRenderPreview_(result) {
+  const el = document.getElementById("adminPurgePreviewResult");
+  const wrap = document.getElementById("adminPurgeConfirmWrap");
+  if (!el) return;
+  if (!result || result.success === false) {
+    el.innerHTML = `<div class="admin-message error">${adminGamesEscapeHtml((result && (result.error || result.message)) || "Dry Run failed.")}</div>`;
+    if (wrap) wrap.hidden = true;
+    return;
+  }
+  window.__PATTC_PURGE_PREVIEW__ = result;
+  const game = result.game || {};
+  const blockers = Array.isArray(result.blockers) ? result.blockers : [];
+  const stores = Array.isArray(result.stores) ? result.stores : [];
+  const matched = stores.filter(function(row){ return Number(row.matchingRows || 0) > 0; });
+  const rows = matched.slice(0, 24).map(function(row) {
+    return `<div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.07)"><span>${adminGamesEscapeHtml((row.scope ? row.scope + ":" : "") + (row.sheet || row.area || "Store"))}</span><strong>${Number(row.matchingRows || 0)}</strong></div>`;
+  }).join("");
+  const blockerHtml = blockers.length
+    ? `<div class="admin-message error"><strong>BLOCKED</strong><br>${blockers.map(function(b){return adminGamesEscapeHtml(b.message || b.code || "Dependency blocker");}).join("<br>")}</div>`
+    : `<div class="admin-message"><strong>No dependency blocker found by Dry Run.</strong><br>Permanent delete is still disabled in this review release.</div>`;
+  el.innerHTML = `
+    <div class="card" style="margin:0">
+      <div><strong>${adminGamesEscapeHtml(game.name || result.gameId || "Game")}</strong></div>
+      <div class="admin-sub">GameId: ${adminGamesEscapeHtml(result.gameId || "")} · ${adminGamesEscapeHtml(game.type || "")} ${adminGamesEscapeHtml(game.year || "")}</div>
+      <div style="margin-top:8px"><strong>${Number(result.totalOwnedRows || 0)}</strong> owned rows found across ${matched.length} populated locations.</div>
+      ${rows || '<div class="admin-sub" style="margin-top:8px">No owned rows found in populated stores.</div>'}
+      ${matched.length > 24 ? `<div class="admin-sub">+ ${matched.length - 24} more populated locations in the full Dry Run report.</div>` : ''}
+      <div style="margin-top:10px">${blockerHtml}</div>
+      <div class="admin-sub" style="margin-top:8px">Shared/unproven assets retained: ${Array.isArray(result.sharedAssetsRetained) ? result.sharedAssetsRetained.length : 0}. Sports Engine v55 remains protected.</div>
+    </div>`;
+  if (wrap) wrap.hidden = false;
+  const confirm = document.getElementById("adminPurgeConfirmId");
+  if (confirm) confirm.value = "";
+  adminPermanentPurgeSyncDelete_();
+}
+
+function adminPermanentPurgeSyncDelete_() {
+  const preview = window.__PATTC_PURGE_PREVIEW__ || null;
+  const typed = String((document.getElementById("adminPurgeConfirmId") || {}).value || "");
+  const button = document.getElementById("adminPurgeDeleteButton");
+  if (!button) return;
+  const exact = !!(preview && typed === String(preview.gameId || ""));
+  // Review release deliberately never enables destructive action.
+  button.disabled = true;
+  button.textContent = exact ? "PERMANENT DELETE · SERVER LOCKED" : "PERMANENT DELETE · TYPE EXACT GAMEID";
+}
+
+async function adminPermanentPurgeAttemptDelete_() {
+  const preview = window.__PATTC_PURGE_PREVIEW__ || null;
+  if (!preview) return;
+  const typed = String((document.getElementById("adminPurgeConfirmId") || {}).value || "");
+  const result = await apiPost("adminPermanentGamePurge", { gameId: preview.gameId, confirmGameId: typed });
+  const el = document.getElementById("adminPurgePreviewResult");
+  if (el) el.insertAdjacentHTML("beforeend", `<div class="admin-message ${result && result.success ? '' : 'error'}" style="margin-top:8px">${adminGamesEscapeHtml((result && (result.message || result.error || result.code)) || "Delete request was blocked.")}</div>`);
 }

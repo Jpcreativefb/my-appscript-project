@@ -1239,7 +1239,7 @@ function markBettingCategorySaving_(categoryId, saving){
     )
     .forEach(function(button){
       button.disabled = saving === true;
-      button.textContent = saving === true ? "Saving wager..." : "Place Wager";
+      button.textContent = saving === true ? "Saving wager..." : "MAKE PICKS";
     });
 
 }
@@ -2608,7 +2608,7 @@ function renderBettingCategory_(category, bet, config){
   `;
 
   return `
-    <details class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""} ${categoryFinished ? "finished" : ""} ${oddsPending ? "odds-pending" : ""}">
+    <details data-sports-wager-market="${escapeBettingHtml_(sportsWagerMarketKey_(category))}" class="betting-category-card ${locked ? "locked" : ""} ${bet ? "has-bet" : ""} ${categoryFinished ? "finished" : ""} ${oddsPending ? "odds-pending" : ""}">
 
       <summary class="betting-category-summary">
 
@@ -2671,7 +2671,7 @@ function renderBettingCategory_(category, bet, config){
 
           ${bet ? `
             <div class="betting-header-bet-marker">
-              $
+              P
             </div>
           ` : ""}
 
@@ -2764,7 +2764,7 @@ function renderBettingCategory_(category, bet, config){
                 onclick="placeBettingWager('${category.id}')"
                 ${locked || oddsPending ? "disabled" : ""}
               >
-                Place Wager
+                MAKE PICKS
               </button>
 
               <div
@@ -3259,7 +3259,7 @@ function renderBettingBetMarker_(show){
 
   return `
     <span class="betting-bet-marker">
-      $
+      P
     </span>
   `;
 
@@ -3496,6 +3496,67 @@ function renderBettingAdminControls_(session){
 
 }
 
+/* RC24A Corrected Art — Sports Wager presentation helpers only. */
+let SPORTS_WAGER_DEFAULT_FILTER = "moneyline";
+
+function sportsWagerMarketKey_(category) {
+  const raw = String(category && (category.sportsMarket || category.marketType || category.questionMode) || "moneyline").toLowerCase();
+  if (raw.indexOf("spread") !== -1 || raw.indexOf("ats") !== -1) return "spread";
+  if (raw.indexOf("total") !== -1 || raw.indexOf("over") !== -1) return "total";
+  if (raw.indexOf("prop") !== -1 || raw.indexOf("player") !== -1) return "props";
+  return "moneyline";
+}
+
+function setSportsWagerDefaultFilter_(value) {
+  SPORTS_WAGER_DEFAULT_FILTER = String(value || "moneyline");
+  document.querySelectorAll("[data-sports-wager-filter]").forEach(function(button){
+    button.classList.toggle("active", button.getAttribute("data-sports-wager-filter") === SPORTS_WAGER_DEFAULT_FILTER);
+  });
+  document.querySelectorAll(".sports-default-wager .betting-category-card").forEach(function(card){
+    const market = String(card.getAttribute("data-sports-wager-market") || "moneyline");
+    const hasBet = card.classList.contains("has-bet");
+    const show = SPORTS_WAGER_DEFAULT_FILTER === "my-wagers" ? hasBet : market === SPORTS_WAGER_DEFAULT_FILTER;
+    card.hidden = !show;
+  });
+}
+
+function renderSportsWagerDefaultHero_(config, summary, categories) {
+  config = config || {}; summary = summary || {}; categories = categories || [];
+  const active = categories.filter(function(category){ return !isBettingFinalCategory_(category); });
+  const next = active.map(function(category){
+    const value = category.lockDateTime || category.gameDateTime || "";
+    const time = new Date(value).getTime();
+    return { value:value, time:Number.isFinite(time)?time:0 };
+  }).filter(function(item){ return item.time>Date.now(); }).sort(function(a,b){return a.time-b.time;})[0];
+  const winnings = Number(summary.bankroll || 0) - Number(config.startingBankroll || 0);
+  const marketKeys = { moneyline:false, spread:false, total:false, props:false };
+  active.forEach(function(category){ marketKeys[sportsWagerMarketKey_(category)] = true; });
+  const tabs = [
+    ["moneyline","MONEYLINE"],["spread","SPREAD"],["total","TOTAL"],["props","PLAYER PROPS"],["my-wagers","MY WAGERS"]
+  ];
+  return `<section class="sports-wager-default-hero">
+    <div class="sports-wager-default-atmosphere" aria-hidden="true"><span>17</span></div>
+    <div class="sports-wager-default-title"><strong>SPORTS</strong><b>WAGER</b></div>
+    <p class="sports-wager-default-tagline">Make picks. Risk your bankroll. Win.</p>
+    <small class="sports-wager-default-subline">All odds are saved when you place your wager.</small>
+    <div class="sports-wager-default-summary">
+      <div><span>PATTC CREDITS</span><strong>${money_(summary.bankroll || config.startingBankroll || 0)} <i>P</i></strong></div>
+      <div><span>PENDING WAGERS</span><strong class="is-blue">${summary.pendingBets || 0}</strong></div>
+      <div><span>WON</span><strong class="is-green">${winnings>0?"+":""}${money_(winnings)} <i>P</i></strong></div>
+    </div>
+    <div class="sports-wager-default-tabs">
+      ${tabs.map(function(tab){ const key=tab[0], label=tab[1]; const enabled=key==="my-wagers" || marketKeys[key]; return `<button type="button" data-sports-wager-filter="${key}" class="market-${key} ${key===SPORTS_WAGER_DEFAULT_FILTER?"active":""}" ${enabled?"":"disabled"} onclick="setSportsWagerDefaultFilter_('${key}')">${label}</button>`; }).join("")}
+    </div>
+    <div class="sports-wager-default-next-lock">🔒 ${next ? getBettingCountdown_(next.value,false) : "Lock time TBD"}</div>
+  </section>`;
+}
+
+function applySportsWagerDefaultPresentation_() {
+  const first = document.querySelector('.sports-default-wager .betting-category-card:not([hidden]):not(.finished)');
+  if (first) first.setAttribute('open','');
+  setSportsWagerDefaultFilter_(SPORTS_WAGER_DEFAULT_FILTER);
+}
+
 async function renderBettingPage(){
 
   setPageLoadStep(50, "Loading wagers, markets, and saved picks…");
@@ -3555,7 +3616,7 @@ async function renderBettingPage(){
   if (config.enabled === false) {
 
     return `
-      <div class="page betting-page">
+      <div class="page betting-page sports-default-wager">
         ${renderHybridBettingBackButton_(config)}
         <h1>Wager</h1>
         ${renderBettingNotice_(
@@ -3609,12 +3670,15 @@ async function renderBettingPage(){
 
   setTimeout(function(){
     hydrateBettingPageAfterRender_();
+    setTimeout(applySportsWagerDefaultPresentation_, 0);
   }, 0);
 
   return `
-    <div class="page betting-page">
+    <div class="page betting-page sports-default-wager">
 
       ${renderHybridBettingBackButton_(config)}
+
+      ${renderSportsWagerDefaultHero_(config, summary, categories)}
 
       <h1>Wager</h1>
 
@@ -5088,7 +5152,7 @@ renderBettingPage = async function() {
   const config = BETTING_PAGE_BATCH_STATE.config || {};
   let output = String(html || "")
     .replace(
-      '<div class="page betting-page">',
+      '<div class="page betting-page sports-default-wager">',
       '<div class="page betting-page sports-rich-wager">'
     )
     .replace(
@@ -5109,3 +5173,39 @@ renderBettingPage = async function() {
   PATTCSportsRich.afterMount(".sports-rich-wager");
   return output;
 };
+
+/* RC24A_R47_WAGER_SHARED_HERO */
+function wagerR47HeroContext_() {
+  var summary = window.BETTING_PAGE_BATCH_STATE && BETTING_PAGE_BATCH_STATE.summary || {};
+  var bankroll = Number(summary.bankroll || summary.currentBankroll || 0), pending = Number(summary.pendingBets || 0);
+  if (!bankroll && !pending) return "";
+  return '<div class="sports-rich-wager-primary-stats"><div><span>Bankroll</span><strong>'+bankroll.toLocaleString()+'</strong></div><div><span>Pending</span><strong>'+pending+'</strong></div></div>';
+}
+function wagerR47SharedHeroHtml_(gameId, config, appearance) {
+  var runtime = window.AppearanceThemeRuntime || {};
+  if (typeof runtime.sportsHeroForGameHtml !== "function" && typeof runtime.sportsHeroHtml !== "function") return "";
+  var gameName = String(config && (config.gameName || config.name || config.GameName) || "Sports Wager");
+  var options = {kind:"wager",gameId:gameId,gameName:gameName,accentColor:"#19a7ce",contextHtml:wagerR47HeroContext_()};
+  return typeof runtime.sportsHeroForGameHtml === "function"
+    ? runtime.sportsHeroForGameHtml(appearance || {}, options)
+    : runtime.sportsHeroHtml(appearance || {}, {gameId:gameId,title:gameName,kicker:"PATTC SPORTS",subtitle:"Virtual PATTC credits · live matchups · saved odds · clear returns",accentColor:options.accentColor});
+}
+function wagerR47ReplaceHero_(html, hero) {
+  html=String(html||""); if(!hero)return html;
+  var rich=/<section\b[^>]*class=["'][^"']*sports-rich-wager-hero[^"']*["'][\s\S]*?<\/section>/i;
+  if(rich.test(html))return html.replace(rich,hero);
+  if(/<h1>Wager<\/h1>/i.test(html))return html.replace(/<h1>Wager<\/h1>/i,hero);
+  return html.replace(/(<div\b[^>]*class=["'][^"']*betting-page[^"']*["'][^>]*>)/i,"$1"+hero);
+}
+if (typeof renderBettingPage === "function" && !window.RC24A_R47_WAGER_PAGE_BASE_) {
+  window.RC24A_R47_WAGER_PAGE_BASE_ = renderBettingPage;
+  renderBettingPage = async function() {
+    var html = await window.RC24A_R47_WAGER_PAGE_BASE_.apply(this, arguments);
+    var gameId = typeof getBettingGameId_ === "function" ? String(getBettingGameId_() || "") : (typeof getFrontendGameId === "function" ? String(getFrontendGameId() || "") : "");
+    var config = window.BETTING_PAGE_BATCH_STATE && BETTING_PAGE_BATCH_STATE.config || {};
+    var appearance = null;
+    try { if (window.PATTCSportsRich && typeof PATTCSportsRich.appearance === "function") appearance = PATTCSportsRich.appearance(gameId, null); } catch (err) {}
+    if (!appearance && gameId && typeof apiGetGameAppearance === "function") { try { appearance = await apiGetGameAppearance(gameId); } catch (err2) {} }
+    return wagerR47ReplaceHero_(html, wagerR47SharedHeroHtml_(gameId, config, appearance));
+  };
+}
