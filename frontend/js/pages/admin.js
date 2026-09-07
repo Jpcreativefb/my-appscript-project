@@ -527,6 +527,10 @@ async function renderAdminGamesPanel() {
           ? renderAdminCloneGameCard(games)
           : ""}
 
+        ${typeof renderAdminPermanentPurgeDangerZone === "function"
+          ? renderAdminPermanentPurgeDangerZone(games)
+          : ""}
+
         <details
           class="card admin-card admin-collapsible-card admin-games-panel"
           open
@@ -549,6 +553,10 @@ async function renderAdminGamesPanel() {
           </summary>
 
           <div class="admin-collapsible-body">
+
+            ${typeof adminGamesFilterMarkup_ === "function"
+              ? adminGamesFilterMarkup_(games)
+              : ""}
 
             <div class="admin-games-list">
 
@@ -1810,9 +1818,23 @@ function renderAdminGameForm(
     ? adminGameHeroThumbnail_(heroImageFileId)
     : "";
   const themeColor = adminNormalizeThemeColor_(game.themeColor);
+  const cleanupCandidate = !isNew && typeof adminGamesIsCleanupCandidate_ === "function"
+    ? adminGamesIsCleanupCandidate_(game)
+    : false;
 
   return `
-    <details class="admin-game-form-details admin-collapsible-card" ${openAttr} ontoggle="adminHandleGameCardToggle(this)">
+    <details
+      class="admin-game-form-details admin-collapsible-card"
+      ${openAttr}
+      ontoggle="adminHandleGameCardToggle(this)"
+      data-admin-game-filterable="${isNew ? "false" : "true"}"
+      data-admin-game-id="${escapeHtml_(rawGameId)}"
+      data-admin-game-name="${escapeHtml_(game.name || rawGameId)}"
+      data-admin-game-status="${escapeHtml_(workflowStatus)}"
+      data-admin-game-active="${game.active === true ? "true" : "false"}"
+      data-admin-game-archived="${game.archived === true ? "true" : "false"}"
+      data-admin-game-cleanup="${cleanupCandidate ? "true" : "false"}"
+    >
       <summary class="admin-card-summary admin-game-form-summary">
         <div>
           <h3>${title}</h3>

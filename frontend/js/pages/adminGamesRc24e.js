@@ -1,4 +1,5 @@
 window.PATTC_ADMIN_GAMES_VERSION = "rc24e-admin-games-live-r1";
+window.PATTC_ADMIN_GAMES_RESTORE_VERSION = "rc24g-full-editor-plus-cleanup-r1";
 /* ======================
    ADMIN GAMES PAGE
 ====================== */
@@ -106,7 +107,7 @@ function adminGamesApplyFilter_(filter) {
   window.__PATTC_ADMIN_GAMES_FILTER__ = filter;
 
   const query = String((document.getElementById("adminGamesSearch") || {}).value || "").trim().toLowerCase();
-  const cards = Array.from(document.querySelectorAll(".admin-games-list .admin-game-card[data-admin-game-id]"));
+  const cards = Array.from(document.querySelectorAll('.admin-games-list [data-admin-game-filterable="true"], .admin-games-list .admin-game-card[data-admin-game-id]'));
   let visible = 0;
 
   cards.forEach(function(card) {
@@ -140,6 +141,13 @@ function adminGamesApplyFilter_(filter) {
 }
 
 async function renderAdminGamesPage() {
+  if (typeof renderAdminGamesPanel !== "function") {
+    throw new Error("Manage Games full editor script is not loaded.");
+  }
+  return renderAdminGamesPanel();
+}
+
+async function renderAdminGamesCompactPage_() {
 
   setPageLoadStep(50, "Loading games and publishing controls…");
 
