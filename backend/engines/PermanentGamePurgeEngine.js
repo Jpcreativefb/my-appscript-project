@@ -1,5 +1,5 @@
 /* =========================================================
-   PERMANENT GAME PURGE — RC24B DRY-RUN / FIXTURE GATE
+   PERMANENT GAME PURGE — RC24C PRODUCTION-SAFE EXECUTION
 
    Baseline reviewed:
      architecture-cleanup
@@ -7,15 +7,16 @@
      Awards App v379
 
    SAFETY GATE:
-   - Production purge is intentionally DISABLED in RC24B.
-   - The production API exposes a read-only Dry Run only.
+   - Production purge is enabled only through the exact-confirmation admin API.
+   - Dry Run remains read-only and must pass before deletion.
+   - The target must be inactive or archived.
    - No partial / wildcard / display-name deletion is supported.
-   - Fixture execution is available only through an injected in-memory
-     adapter used by focused tests; it never opens SpreadsheetApp.
+   - Dependency blockers fail closed; shared/unproven Drive assets are retained.
+   - Fixture execution remains available through the injected in-memory adapter.
 ========================================================= */
 
-const PERMANENT_GAME_PURGE_RC24B_VERSION = "rc24b-dryrun-v1";
-const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = false;
+const PERMANENT_GAME_PURGE_RC24B_VERSION = "rc24c-production-v1";
+const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = true;
 const PERMANENT_GAME_PURGE_AUDIT_SHEET = "PermanentGamePurgeAudit";
 
 const PERMANENT_GAME_PURGE_AUDIT_HEADERS = [
@@ -613,7 +614,7 @@ function permanentGamePurgeDryRunWithAdapter_(adapter, requestedGameId, options)
     sportsBoundary:{ status:"PROTECTED — NO WRITES", engineVersion:"v55", locations:PERMANENT_GAME_PURGE_SPORTS_BOUNDARY.slice() },
     blockers:[],
     canProceedToPermanentDelete:false,
-    productionPurgeEnabled:false,
+    productionPurgeEnabled:PERMANENT_GAME_PURGE_PRODUCTION_ENABLED === true,
     auditRecordPreview:null
   };
 
@@ -730,7 +731,9 @@ function permanentGamePurgeDryRunWithAdapter_(adapter, requestedGameId, options)
   report.canProceedToPermanentDelete = report.success && PERMANENT_GAME_PURGE_PRODUCTION_ENABLED === true;
   report.status = report.blockers.length
     ? "BLOCKED"
-    : "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY";
+    : (PERMANENT_GAME_PURGE_PRODUCTION_ENABLED === true
+        ? "DRY RUN COMPLETE — READY FOR EXACT-CONFIRMATION PURGE"
+        : "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY");
   report.auditRecordPreview = permanentGamePurgeAuditPreview_(report, timestamp, options.requestedBy);
   return report;
 }
@@ -773,7 +776,7 @@ function permanentGamePurgeVerifyZeroWithAdapter_(adapter, gameId, capturedConte
 }
 
 /* =========================================================
-   PRODUCTION READ-ONLY ADAPTER
+   PRODUCTION READ/WRITE ADAPTER
 ========================================================= */
 function permanentGamePurgeReadObjectsFromSheet_(sheet) {
   if (!sheet || sheet.getLastRow() < 2 || sheet.getLastColumn() < 1) return [];
@@ -788,11 +791,49 @@ function permanentGamePurgeReadObjectsFromSheet_(sheet) {
   });
 }
 
-function permanentGamePurgeProductionAdapter_() {
+function permanentGamePurgeDeleteRowsFromSheet_(sheet, predicate) {
+  if (!sheet || typeof predicate !== "function" || sheet.getLastRow() < 2) return 0;
+  const rows = permanentGamePurgeReadObjectsFromSheet_(sheet);
+  const rowNumbers = rows.filter(function(row) { return predicate(row); })
+    .map(function(row) { return Number(row.__rowNumber || 0); })
+    .filter(function(rowNumber) { return rowNumber >= 2; })
+    .sort(function(a,b) { return b - a; });
+
+  if (!rowNumbers.length) return 0;
+
+  // Delete contiguous blocks from the bottom up so row-number shifts never
+  // affect a row that has not yet been removed.
+  let blockHigh = rowNumbers[0];
+  let blockLow = blockHigh;
+  let deleted = 0;
+
+  function flushBlock_() {
+    if (!blockLow || !blockHigh) return;
+    const count = blockHigh - blockLow + 1;
+    sheet.deleteRows(blockLow, count);
+    deleted += count;
+  }
+
+  for (let i = 1; i < rowNumbers.length; i++) {
+    const rowNumber = rowNumbers[i];
+    if (rowNumber === blockLow - 1) {
+      blockLow = rowNumber;
+      continue;
+    }
+    flushBlock_();
+    blockHigh = rowNumber;
+    blockLow = rowNumber;
+  }
+  flushBlock_();
+  return deleted;
+}
+
+function permanentGamePurgeProductionAdapter_(writeEnabled) {
   const main = SpreadsheetApp.getActive();
   let hubResolved = false;
   let hubSpreadsheet = null;
   let hubStatus = { configured:false, readable:true, error:"" };
+  const allowWrites = writeEnabled === true && PERMANENT_GAME_PURGE_PRODUCTION_ENABLED === true;
 
   function resolveHub() {
     if (hubResolved) return hubSpreadsheet;
@@ -817,15 +858,19 @@ function permanentGamePurgeProductionAdapter_() {
     }
   }
 
-  return {
-    mode:"production-read-only",
+  function resolveSpreadsheet_(scope) {
+    return scope === "HUB" ? resolveHub() : main;
+  }
+
+  const adapter = {
+    mode:allowWrites ? "production-write" : "production-read-only",
     getRows:function(scope, sheetName) {
-      const ss = scope === "HUB" ? resolveHub() : main;
+      const ss = resolveSpreadsheet_(scope);
       if (!ss) return [];
       return permanentGamePurgeReadObjectsFromSheet_(ss.getSheetByName(sheetName));
     },
     hasStore:function(scope, sheetName) {
-      const ss = scope === "HUB" ? resolveHub() : main;
+      const ss = resolveSpreadsheet_(scope);
       return !!(ss && ss.getSheetByName(sheetName));
     },
     getHubStatus:function() {
@@ -833,10 +878,78 @@ function permanentGamePurgeProductionAdapter_() {
       return Object.assign({}, hubStatus);
     },
     getAssetOwnership:function() {
-      // Production has no audited owner registry for these Drive IDs.
+      // Production has no audited owner registry for these Drive IDs. Drive
+      // files are therefore always retained; only proven sheet/app ownership
+      // is purged automatically.
       return null;
     }
   };
+
+  if (!allowWrites) return adapter;
+
+  adapter.beforeDelete = function(scope, sheetName) {
+    const ss = resolveSpreadsheet_(scope);
+    if (!ss) throw new Error("Write target unavailable: " + scope + ":" + sheetName);
+  };
+
+  adapter.deleteRows = function(scope, sheetName, predicate) {
+    const ss = resolveSpreadsheet_(scope);
+    if (!ss) throw new Error("Write target unavailable: " + scope + ":" + sheetName);
+    const sheet = ss.getSheetByName(sheetName);
+    if (!sheet) return 0;
+    return permanentGamePurgeDeleteRowsFromSheet_(sheet, predicate);
+  };
+
+  adapter.deleteGameCaches = function(gameId, cachePlan, mutatedStores) {
+    const cache = typeof CacheService !== "undefined" ? CacheService.getScriptCache() : null;
+    const keys = [];
+    if (typeof appGameCacheKeys_ === "function") {
+      appGameCacheKeys_(gameId).forEach(function(key) { keys.push(key); });
+    }
+    (cachePlan && cachePlan.scopedKeys || []).forEach(function(key) { keys.push(key); });
+    keys.push("games_v3_hybrid_standard_predictions");
+    keys.push("normalized_question_game_map_v1");
+    keys.push("rtv_season_game_ids_v1");
+
+    (cachePlan && cachePlan.perUserPatterns || []).forEach(function(item) {
+      const username = permanentGamePurgeString_(item && item.username);
+      if (!username) return;
+      if (typeof getUserPicksCacheKey_ === "function") {
+        try { keys.push(getUserPicksCacheKey_(username, gameId)); } catch (ignore) {}
+      }
+      if (typeof appStartupPayloadCacheKey_ === "function") {
+        try { keys.push(appStartupPayloadCacheKey_(username, gameId)); } catch (ignore) {}
+      }
+      if (typeof realityTvSlug_ === "function") {
+        try { keys.push("rtv_player_stats_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(username)); } catch (ignore) {}
+      }
+    });
+
+    (mutatedStores || []).forEach(function(store) {
+      const sheetName = permanentGamePurgeString_(store && store.sheet);
+      if (sheetName && store && store.scope === "MAIN") keys.push("sheet_" + sheetName);
+    });
+
+    if (cache && typeof appCacheRemoveKeys_ === "function") {
+      appCacheRemoveKeys_(cache, keys);
+    } else if (cache) {
+      keys.filter(Boolean).forEach(function(key) { try { cache.remove(key); } catch (ignore) {} });
+    }
+
+    if (typeof GAMES_RUNTIME_CACHE !== "undefined") GAMES_RUNTIME_CACHE = {};
+    if (typeof APP_RUNTIME_CACHE !== "undefined") APP_RUNTIME_CACHE = {};
+    if (typeof NORMALIZED_STORAGE_RUNTIME_CACHE !== "undefined") NORMALIZED_STORAGE_RUNTIME_CACHE = {};
+
+    return { deleted:keys.filter(Boolean).length };
+  };
+
+  adapter.appendAudit = function(record) {
+    return permanentGamePurgeAppendAuditRecord_(record);
+  };
+
+  // Deliberately no deleteAsset method. Production Drive assets remain
+  // preserved unless a separate audited ownership registry proves exclusivity.
+  return adapter;
 }
 
 function apiAdminPermanentGamePurgeDryRun(payload) {
@@ -850,10 +963,7 @@ function apiAdminPermanentGamePurgeDryRun(payload) {
   );
 }
 
-/*
-  Intentional hard gate.  This function contains no deletion calls.
-  It verifies exact confirmation and dependency state, then stops.
-*/
+/* Exact-confirmation production purge API. */
 function apiAdminPermanentGamePurge(payload) {
   payload = payload || {};
   if (typeof requireAdmin_ === "function") requireAdmin_(payload);
@@ -868,29 +978,39 @@ function apiAdminPermanentGamePurge(payload) {
       message:"TYPE " + gameId + " TO CONFIRM. Exact case-sensitive GameId match is required."
     };
   }
-
-  const dryRun = permanentGamePurgeDryRunWithAdapter_(
-    permanentGamePurgeProductionAdapter_(),
-    gameId,
-    { requestedBy:payload.requestedBy || payload.username || "" }
-  );
-  if (!dryRun.game.exists || dryRun.blockers.length) {
+  if (PERMANENT_GAME_PURGE_PRODUCTION_ENABLED !== true) {
     return {
       success:false,
       blocked:true,
-      code:"DRY_RUN_BLOCKED",
-      message:dryRun.blockers.length ? dryRun.blockers[0].message : "Exact GameId was not found.",
-      dryRun:dryRun
+      code:"PRODUCTION_PURGE_DISABLED",
+      message:"Permanent purge production writes are disabled in this release."
     };
   }
 
-  return {
-    success:false,
-    blocked:true,
-    code:"RC24B_FIXTURE_ONLY",
-    message:"RC24B is fixture/dry-run only. Production purge is disabled until Roy explicitly authorizes the destructive stage.",
-    dryRun:dryRun
-  };
+  const lock = typeof LockService !== "undefined" && LockService && typeof LockService.getScriptLock === "function"
+    ? LockService.getScriptLock()
+    : null;
+
+  try {
+    if (lock) lock.waitLock(10000);
+    return permanentGamePurgeExecuteProduction_(
+      permanentGamePurgeProductionAdapter_(true),
+      gameId,
+      typed,
+      { requestedBy:payload.requestedBy || payload.username || "admin" }
+    );
+  } catch (err) {
+    return {
+      success:false,
+      blocked:false,
+      code:"PURGE_EXECUTION_ERROR",
+      message:err && err.message ? err.message : String(err)
+    };
+  } finally {
+    if (lock) {
+      try { lock.releaseLock(); } catch (ignore) {}
+    }
+  }
 }
 
 function showPermanentGamePurgeManager() {
@@ -898,18 +1018,15 @@ function showPermanentGamePurgeManager() {
     throw new Error("Permanent Game Purge manager is available only in the Apps Script admin spreadsheet context.");
   }
   const html = HtmlService.createHtmlOutputFromFile("PermanentGamePurgeManager")
-    .setTitle("Permanent Delete Game — RC24B Preview");
+    .setTitle("Permanent Delete Game");
   SpreadsheetApp.getUi().showSidebar(html);
 }
 
 /* =========================================================
-   FUTURE AUDIT WRITER — NOT CALLED BY RC24B DRY RUN.
+   PURGE AUDIT WRITER
 
-   The assignment requires both a truly read-only Dry Run and a persistent
-   audit trail for every Dry Run. Those requirements conflict. RC24B chooses
-   the explicit read-only requirement: Dry Run returns auditRecordPreview but
-   does not persist it. A future Roy decision can call this writer from a
-   separate confirmed audit action or relax read-only semantics.
+   Dry Run remains read-only and returns auditRecordPreview only. A confirmed
+   production purge writes one durable audit row after success or partial failure.
 ========================================================= */
 function permanentGamePurgeAppendAuditRecord_(record) {
   const ss = SpreadsheetApp.getActive();
@@ -930,6 +1047,150 @@ function permanentGamePurgeAppendAuditRecord_(record) {
     return Object.prototype.hasOwnProperty.call(record || {}, header) ? record[header] : "";
   }));
   return { success:true, rowNumber:sheet.getLastRow() };
+}
+
+/* =========================================================
+   PRODUCTION EXECUTOR — RC24C LAUNCH STABILIZATION
+
+   Preconditions:
+   - explicit production enable marker in this release
+   - exact, case-sensitive GameId confirmation
+   - target game must be inactive or archived
+   - dry run must be dependency-free
+   - script lock held by the API wrapper
+   - shared/unproven Drive assets are retained
+========================================================= */
+function permanentGamePurgeExecuteProduction_(adapter, gameId, typedConfirmation, options) {
+  options = options || {};
+  if (PERMANENT_GAME_PURGE_PRODUCTION_ENABLED !== true || !adapter || adapter.mode !== "production-write" || typeof adapter.deleteRows !== "function") {
+    return { success:false, blocked:true, code:"PRODUCTION_PURGE_DISABLED", message:"Permanent purge production writes are not enabled in this release." };
+  }
+
+  const supplied = permanentGamePurgeString_(gameId);
+  if (!supplied) return { success:false, blocked:true, code:"GAME_ID_REQUIRED", message:"Exact GameId is required." };
+  if (String(typedConfirmation === undefined || typedConfirmation === null ? "" : typedConfirmation) !== supplied) {
+    return { success:false, blocked:true, code:"CONFIRMATION_MISMATCH", message:"TYPE " + supplied + " TO CONFIRM. Exact case-sensitive GameId match is required." };
+  }
+
+  const existingGames = permanentGamePurgeRows_(adapter, "MAIN", "Games")
+    .filter(function(row) { return permanentGamePurgeExact_(row.GameId, supplied); });
+  if (!existingGames.length) {
+    return { success:true, alreadyAbsent:true, gameId:supplied, message:"GameId is already absent; no rows were deleted." };
+  }
+  if (existingGames.length !== 1) {
+    return { success:false, blocked:true, code:"DUPLICATE_GAME_ID", message:"Exact GameId matched multiple Games rows. Fail closed." };
+  }
+
+  const dry = permanentGamePurgeDryRunWithAdapter_(adapter, supplied, { requestedBy:options.requestedBy || "admin" });
+  if (!dry.game.exists || dry.blockers.length) {
+    return { success:false, blocked:true, code:"DEPENDENCY_BLOCK", dryRun:dry, message:dry.blockers.length ? dry.blockers[0].message : "Game not found." };
+  }
+
+  if (dry.game.active === true && dry.game.archived !== true) {
+    return {
+      success:false,
+      blocked:true,
+      code:"TARGET_GAME_ACTIVE",
+      message:"Deactivate or archive " + supplied + " before permanent deletion. This safety rule prevents deleting a live game.",
+      dryRun:dry
+    };
+  }
+
+  const capturedCtx = permanentGamePurgeContext_(adapter, supplied);
+  const trace = [];
+  const deletedCounts = {};
+  const retainedAssets = [];
+  let failure = "";
+
+  try {
+    PERMANENT_GAME_PURGE_OWNED_SPECS
+      .filter(function(spec) { return spec.sheet !== "Games"; })
+      .slice()
+      .sort(function(a,b) { return a.phase - b.phase || (a.scope + a.sheet).localeCompare(b.scope + b.sheet); })
+      .forEach(function(spec) {
+        if (typeof adapter.beforeDelete === "function") adapter.beforeDelete(spec.scope, spec.sheet, spec.phase);
+        const deleted = adapter.deleteRows(spec.scope, spec.sheet, function(row) {
+          return permanentGamePurgeSpecMatches_(spec, row, capturedCtx);
+        });
+        deletedCounts[spec.scope + ":" + spec.sheet] = deleted;
+        trace.push({ phase:spec.phase, scope:spec.scope, sheet:spec.sheet, deleted:deleted });
+      });
+
+    if (typeof adapter.deleteGameCaches === "function") {
+      const cacheResult = adapter.deleteGameCaches(supplied, dry.cacheIndexPlan || {}, dry.stores || []) || { deleted:0 };
+      trace.push({ phase:90, scope:"CACHE", sheet:"GameScopedCaches", deleted:Number(cacheResult.deleted || 0) });
+      deletedCounts["CACHE:GameScopedCaches"] = Number(cacheResult.deleted || 0);
+    }
+
+    // Production deliberately retains all Drive files because the audited
+    // owner registry is absent. This prevents deleting a file shared by another
+    // game, profile, image pack, or hub surface.
+    (dry.sharedAssetsRetained || []).forEach(function(asset) { retainedAssets.push(asset); });
+
+    if (typeof adapter.beforeDelete === "function") adapter.beforeDelete("MAIN", "Games", 1000);
+    const gameDeleted = adapter.deleteRows("MAIN", "Games", function(row) {
+      return permanentGamePurgeExact_(row.GameId, supplied);
+    });
+    deletedCounts["MAIN:Games"] = gameDeleted;
+    trace.push({ phase:1000, scope:"MAIN", sheet:"Games", deleted:gameDeleted });
+
+    if (typeof SpreadsheetApp !== "undefined" && SpreadsheetApp && typeof SpreadsheetApp.flush === "function") {
+      SpreadsheetApp.flush();
+    }
+
+    const verify = permanentGamePurgeVerifyZeroWithAdapter_(adapter, supplied, capturedCtx);
+    const audit = {
+      Timestamp:permanentGamePurgeNowIso_(), Action:"PURGE", GameId:supplied,
+      GameName:dry.game.name, RequestedBy:options.requestedBy || "admin",
+      DiscoveredCountsJSON:JSON.stringify(dry.counts || {}),
+      DeletedCountsJSON:JSON.stringify(deletedCounts),
+      BlockedDependenciesJSON:"[]",
+      RetainedSharedAssetsJSON:JSON.stringify(retainedAssets),
+      FinalResult:verify.success ? "SUCCESS" : "FAILED — REFERENCES REMAIN",
+      RemainingReferenceCount:verify.remainingReferenceCount,
+      ErrorMessage:"", Version:PERMANENT_GAME_PURGE_RC24B_VERSION
+    };
+    if (typeof adapter.appendAudit === "function") adapter.appendAudit(audit);
+
+    return {
+      success:verify.success,
+      production:true,
+      gameId:supplied,
+      message:verify.success ? "Permanent game purge completed and zero owned references remain." : "Purge completed, but verification found remaining owned references.",
+      deletedCounts:deletedCounts,
+      retainedSharedAssets:retainedAssets,
+      deletionTrace:trace,
+      zeroReferenceVerification:verify,
+      auditRecord:audit
+    };
+  } catch (err) {
+    failure = err && err.message ? err.message : String(err);
+    let verify = { success:false, gameId:supplied, remainingReferenceCount:-1, remaining:[] };
+    try { verify = permanentGamePurgeVerifyZeroWithAdapter_(adapter, supplied, capturedCtx); } catch (verifyErr) {}
+    const audit = {
+      Timestamp:permanentGamePurgeNowIso_(), Action:"PURGE", GameId:supplied,
+      GameName:dry.game.name, RequestedBy:options.requestedBy || "admin",
+      DiscoveredCountsJSON:JSON.stringify(dry.counts || {}),
+      DeletedCountsJSON:JSON.stringify(deletedCounts),
+      BlockedDependenciesJSON:"[]",
+      RetainedSharedAssetsJSON:JSON.stringify(retainedAssets),
+      FinalResult:"ERROR — PARTIAL PRODUCTION PURGE",
+      RemainingReferenceCount:verify.remainingReferenceCount,
+      ErrorMessage:failure, Version:PERMANENT_GAME_PURGE_RC24B_VERSION
+    };
+    try { if (typeof adapter.appendAudit === "function") adapter.appendAudit(audit); } catch (auditErr) {}
+    return {
+      success:false,
+      blocked:false,
+      production:true,
+      code:"PARTIAL_FAILURE",
+      message:failure,
+      deletionTrace:trace,
+      deletedCounts:deletedCounts,
+      zeroReferenceVerification:verify,
+      auditRecord:audit
+    };
+  }
 }
 
 /* =========================================================

@@ -92,7 +92,9 @@ assert(gameDay.includes("out.weeklyLeaderboard = teamFantasyGameDayNormalizeWeek
 // Survivor/KOTH mode split and destructive purge boundary stay intact.
 assert(survivor.includes('"streak-survivor", "king-of-the-hill", "streak-points-strikes"'));
 assert(survivor.includes('mode === "streak-points-strikes"'));
-assert(purge.includes("const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = false;"));
+assert(purge.includes("const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = true;"));
+assert(purge.includes("TARGET_GAME_ACTIVE"));
+assert(purge.includes("permanentGamePurgeExecuteProduction_"));
 assert(appearance.includes("RC24A_V12_OFFICIAL_SPORTS_MEDIA_DEFAULTS"));
 
 const expected = {

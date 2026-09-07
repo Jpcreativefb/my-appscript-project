@@ -24,7 +24,7 @@
 </head>
 <body>
   <h2>Permanent Delete Game</h2>
-  <div class="muted">RC24B review build — deletion is intentionally disabled. Dry Run is read-only.</div>
+  <div class="muted">Production cleanup — Dry Run is read-only. Permanent delete requires an exact GameId, no dependency blockers, and an inactive/archived target.</div>
 
   <div class="warning">
     <strong>Danger Zone</strong><br>
@@ -43,7 +43,7 @@
     <label id="confirmLabel" for="confirmId"></label>
     <input id="confirmId" autocomplete="off" spellcheck="false" oninput="syncDeleteButton()">
     <button id="deleteButton" type="button" disabled onclick="attemptDelete()">PERMANENT DELETE</button>
-    <div class="muted">In RC24B this button will remain server-blocked even after exact confirmation.</div>
+    <div class="muted">Shared/unproven Drive files are preserved. The purge writes an audit record and verifies zero PATTC-owned references remain.</div>
   </div>
 
 <script>
@@ -97,7 +97,8 @@ function renderPreview(result) {
     'Owned rows found: ' + (result.totalOwnedRows || 0),
     'Dependencies: ' + ((result.dependencies || []).length ? 'BLOCKED' : 'NONE'),
     'Shared/unproven assets retained: ' + ((result.sharedAssetsRetained || []).length),
-    'Status: ' + (result.status || '')
+    'Status: ' + (result.status || ''),
+    'Target active: ' + (result.game.active === true && result.game.archived !== true ? 'YES — deactivate/archive before delete' : 'NO — eligible if dependency-free')
   ];
   status.textContent = lines.join('\n');
 
@@ -136,7 +137,9 @@ function syncDeleteButton() {
   const typed = document.getElementById('confirmId').value;
   const exact = !!preview && typed === preview.gameId;
   const dependencyFree = !!preview && (!preview.blockers || preview.blockers.length === 0);
-  button.disabled = busy || !exact || !dependencyFree;
+  const inactive = !!preview && preview.game && (preview.game.active !== true || preview.game.archived === true);
+  const enabled = !!preview && preview.productionPurgeEnabled === true;
+  button.disabled = busy || !exact || !dependencyFree || !inactive || !enabled;
 }
 
 function attemptDelete() {

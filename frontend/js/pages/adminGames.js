@@ -53,6 +53,91 @@ function adminGamesStatusBadge(game) {
 
 }
 
+function adminGamesIsCleanupCandidate_(game) {
+
+  game = game || {};
+
+  const haystack = [
+    game.gameId,
+    game.name,
+    game.status
+  ].join(" ").toLowerCase();
+
+  return /(^|[^a-z])(test|testing|dummy|cert|certification|production-test|rc\d{1,3})([^a-z]|$)/i.test(haystack) ||
+    /(^|[-_])test([-_]|$)/i.test(String(game.gameId || ""));
+
+}
+
+function adminGamesFilterMarkup_(games) {
+
+  games = Array.isArray(games) ? games : [];
+
+  const cleanupCount = games.filter(adminGamesIsCleanupCandidate_).length;
+  const activeCount = games.filter(function(game) { return game && game.active === true && game.archived !== true; }).length;
+  const draftCount = games.filter(function(game) {
+    const status = String((game && game.status) || "").toLowerCase();
+    return game && game.archived !== true && game.active !== true && /draft|setup/.test(status || "draft");
+  }).length;
+
+  return `
+    <div class="admin-games-cleanup-tools" style="display:grid;gap:8px;margin-bottom:12px;padding:10px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.035)">
+      <div>
+        <strong>Game List Cleanup</strong>
+        <div class="admin-sub">Filter the list before using Permanent Game Purge. Cleanup Candidate is a visual aid only; it never deletes anything.</div>
+      </div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap">
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="all" onclick="adminGamesApplyFilter_('all')">All · ${games.length}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="active" onclick="adminGamesApplyFilter_('active')">Active · ${activeCount}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="draft" onclick="adminGamesApplyFilter_('draft')">Draft / Setup · ${draftCount}</button>
+        <button type="button" class="admin-small-button danger" data-admin-game-filter="cleanup" onclick="adminGamesApplyFilter_('cleanup')">Cleanup Candidates · ${cleanupCount}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="archived" onclick="adminGamesApplyFilter_('archived')">Archived</button>
+      </div>
+      <input id="adminGamesSearch" class="input admin-input" placeholder="Search name or GameId…" oninput="adminGamesApplyFilter_(window.__PATTC_ADMIN_GAMES_FILTER__ || 'all')">
+      <div id="adminGamesFilterSummary" class="admin-sub">${games.length} games shown.</div>
+    </div>
+  `;
+
+}
+
+function adminGamesApplyFilter_(filter) {
+
+  filter = String(filter || "all").toLowerCase();
+  window.__PATTC_ADMIN_GAMES_FILTER__ = filter;
+
+  const query = String((document.getElementById("adminGamesSearch") || {}).value || "").trim().toLowerCase();
+  const cards = Array.from(document.querySelectorAll(".admin-games-list .admin-game-card[data-admin-game-id]"));
+  let visible = 0;
+
+  cards.forEach(function(card) {
+    const name = String(card.getAttribute("data-admin-game-name") || "").toLowerCase();
+    const id = String(card.getAttribute("data-admin-game-id") || "").toLowerCase();
+    const status = String(card.getAttribute("data-admin-game-status") || "").toLowerCase();
+    const active = card.getAttribute("data-admin-game-active") === "true";
+    const archived = card.getAttribute("data-admin-game-archived") === "true";
+    const cleanup = card.getAttribute("data-admin-game-cleanup") === "true";
+
+    let match = true;
+    if (filter === "active") match = active && !archived;
+    else if (filter === "draft") match = !active && !archived && (/draft|setup/.test(status) || !status);
+    else if (filter === "cleanup") match = cleanup;
+    else if (filter === "archived") match = archived;
+
+    if (query && (name + " " + id).indexOf(query) === -1) match = false;
+
+    card.hidden = !match;
+    if (match) visible += 1;
+  });
+
+  document.querySelectorAll("[data-admin-game-filter]").forEach(function(button) {
+    const selected = button.getAttribute("data-admin-game-filter") === filter;
+    button.style.outline = selected ? "2px solid rgba(116,159,255,.95)" : "";
+  });
+
+  const summary = document.getElementById("adminGamesFilterSummary");
+  if (summary) summary.textContent = visible + " game" + (visible === 1 ? "" : "s") + " shown.";
+
+}
+
 async function renderAdminGamesPage() {
 
   setPageLoadStep(50, "Loading games and publishing controls…");
@@ -137,6 +222,8 @@ async function renderAdminGamesPage() {
 
         <div class="admin-collapsible-body">
 
+          ${adminGamesFilterMarkup_(games)}
+
           ${
             games.length
               ? `
@@ -184,6 +271,12 @@ function renderAdminGameCard(game) {
   return `
     <details
       class="card admin-game-card admin-collapsible-card"
+      data-admin-game-id="${adminGamesEscapeHtml(game.gameId || "")}"
+      data-admin-game-name="${adminGamesEscapeHtml(game.name || game.gameId || "")}"
+      data-admin-game-status="${adminGamesEscapeHtml(game.status || "")}"
+      data-admin-game-active="${game.active === true ? "true" : "false"}"
+      data-admin-game-archived="${game.archived === true ? "true" : "false"}"
+      data-admin-game-cleanup="${adminGamesIsCleanupCandidate_(game) ? "true" : "false"}"
       ${openAttr}
     >
 
@@ -201,6 +294,7 @@ function renderAdminGameCard(game) {
 
           <div class="admin-status-stack">
             ${adminGamesStatusBadge(game)}
+            ${adminGamesIsCleanupCandidate_(game) ? '<span class="admin-badge" style="border-color:rgba(255,154,102,.7);color:#ffb184">Cleanup Candidate</span>' : ''}
             ${
               game.defaultGame
                 ? adminGamesBoolBadge(true, "Default", "")
@@ -2484,7 +2578,7 @@ function renderAdminPermanentPurgeDangerZone(games) {
       <summary class="admin-card-summary">
         <div>
           <h2 style="color:#ff8a8a">Danger Zone · Permanent Game Purge</h2>
-          <div class="admin-sub">Review build: Dry Run is live and read-only. Permanent deletion is server-locked until Roy authorizes the destructive stage.</div>
+          <div class="admin-sub">Production cleanup: always run the read-only preview first. Permanent deletion requires an exact GameId match, no dependency blockers, and the target game must be inactive or archived.</div>
         </div>
         <span class="admin-collapse-icon">▾</span>
       </summary>
@@ -2505,8 +2599,8 @@ function renderAdminPermanentPurgeDangerZone(games) {
           <label>Type the exact GameId to confirm
             <input id="adminPurgeConfirmId" class="input admin-input" autocomplete="off" spellcheck="false" oninput="adminPermanentPurgeSyncDelete_()">
           </label>
-          <button id="adminPurgeDeleteButton" class="admin-danger-button" disabled onclick="adminPermanentPurgeAttemptDelete_()">PERMANENT DELETE · LOCKED IN REVIEW BUILD</button>
-          <div class="admin-sub" style="margin-top:6px">The button is intentionally blocked by the RC24B server gate even after an exact match. This build is for safe phone review of the preview/dependency workflow.</div>
+          <button id="adminPurgeDeleteButton" class="admin-danger-button" disabled onclick="adminPermanentPurgeAttemptDelete_()">PERMANENT DELETE GAME</button>
+          <div class="admin-sub" style="margin-top:6px">Permanent deletion removes PATTC-owned rows for this GameId from the app Sheets and External Results mappings, then verifies zero owned references remain. Shared/unproven Drive files are preserved.</div>
         </div>
       </div>
     </details>`;
@@ -2561,7 +2655,9 @@ function adminPermanentPurgeRenderPreview_(result) {
   }).join("");
   const blockerHtml = blockers.length
     ? `<div class="admin-message error"><strong>BLOCKED</strong><br>${blockers.map(function(b){return adminGamesEscapeHtml(b.message || b.code || "Dependency blocker");}).join("<br>")}</div>`
-    : `<div class="admin-message"><strong>No dependency blocker found by Dry Run.</strong><br>Permanent delete is still disabled in this review release.</div>`;
+    : (game.active === true && game.archived !== true
+        ? `<div class="admin-message error"><strong>READY AFTER ONE SAFETY STEP</strong><br>Deactivate or archive this game before permanent deletion.</div>`
+        : `<div class="admin-message"><strong>No dependency blocker found by Dry Run.</strong><br>This inactive/archived game is eligible for exact-confirmation deletion.</div>`);
   el.innerHTML = `
     <div class="card" style="margin:0">
       <div><strong>${adminGamesEscapeHtml(game.name || result.gameId || "Game")}</strong></div>
@@ -2584,16 +2680,38 @@ function adminPermanentPurgeSyncDelete_() {
   const button = document.getElementById("adminPurgeDeleteButton");
   if (!button) return;
   const exact = !!(preview && typed === String(preview.gameId || ""));
-  // Review release deliberately never enables destructive action.
-  button.disabled = true;
-  button.textContent = exact ? "PERMANENT DELETE · SERVER LOCKED" : "PERMANENT DELETE · TYPE EXACT GAMEID";
+  const blockers = preview && Array.isArray(preview.blockers) ? preview.blockers : [];
+  const game = preview && preview.game ? preview.game : {};
+  const inactive = game.active !== true || game.archived === true;
+  const ready = exact && blockers.length === 0 && inactive && preview.productionPurgeEnabled === true;
+  button.disabled = !ready;
+  if (!exact) button.textContent = "PERMANENT DELETE · TYPE EXACT GAMEID";
+  else if (blockers.length) button.textContent = "PERMANENT DELETE · DEPENDENCY BLOCKED";
+  else if (!inactive) button.textContent = "PERMANENT DELETE · DEACTIVATE FIRST";
+  else if (preview.productionPurgeEnabled !== true) button.textContent = "PERMANENT DELETE · SERVER DISABLED";
+  else button.textContent = "PERMANENT DELETE GAME";
 }
 
 async function adminPermanentPurgeAttemptDelete_() {
   const preview = window.__PATTC_PURGE_PREVIEW__ || null;
   if (!preview) return;
   const typed = String((document.getElementById("adminPurgeConfirmId") || {}).value || "");
-  const result = await apiPost("adminPermanentGamePurge", { gameId: preview.gameId, confirmGameId: typed });
+  const button = document.getElementById("adminPurgeDeleteButton");
+  if (button) { button.disabled = true; button.textContent = "DELETING…"; }
+  let result = null;
+  try {
+    result = await apiPost("adminPermanentGamePurge", { gameId: preview.gameId, confirmGameId: typed });
+  } catch (err) {
+    result = { success:false, error:err && err.message ? err.message : String(err || "Unknown error") };
+  }
   const el = document.getElementById("adminPurgePreviewResult");
   if (el) el.insertAdjacentHTML("beforeend", `<div class="admin-message ${result && result.success ? '' : 'error'}" style="margin-top:8px">${adminGamesEscapeHtml((result && (result.message || result.error || result.code)) || "Delete request was blocked.")}</div>`);
+  if (result && result.success) {
+    window.__PATTC_PURGE_PREVIEW__ = null;
+    const wrap = document.getElementById("adminPurgeConfirmWrap");
+    if (wrap) wrap.hidden = true;
+    setTimeout(function(){ if (typeof navigate === "function") navigate("admin-games"); }, 350);
+  } else {
+    adminPermanentPurgeSyncDelete_();
+  }
 }

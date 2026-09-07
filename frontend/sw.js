@@ -1,5 +1,5 @@
 // Reality cache compatibility markers: v1219rc16-reality-player-followup v1219rc16-reality-results-ready
-const PATTC_SW_RELEASE_MARKER = "v1219rc24a-team-fantasy-director-r3"; // audit marker only; cache still derives from ?v=
+const PATTC_SW_RELEASE_MARKER = "v1219rc24d-launch-cleanup-visual-studio-r1"; // audit marker only; cache still derives from ?v=
 // RC23 compatibility lineage only: PATTC_SW_RELEASE_MARKER = "v1219rc23-appearance-transport-cache-r2"
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
 // Legacy cache-lineage marker retained for historical regression contracts only.
@@ -49,6 +49,7 @@ const APP_SHELL = [
   "./js/auth.js",
   "./js/state.js",
   "./js/appearanceThemeRuntime.js",
+  "./js/ownerVisualStudio.js",
   "./js/app.js",
   "./js/sportsShell.js",
   "./js/pwa.js",

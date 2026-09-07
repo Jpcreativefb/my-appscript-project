@@ -50,7 +50,7 @@ ok(runtime.includes('RC24A_V12_OFFICIAL_SPORTS_MEDIA_DEFAULTS')&&runtime.include
 ok(surv.includes('appearanceRuntime.sportsHeroPresentation')&&surv.includes('kentPresentation.imageUrl')&&surv.includes('kentPresentation.logoUrl')&&runtime.includes('koth-hero.png')&&runtime.includes('koth-logo.png'),'KOTH final single-Hero renderer consumes official default media through shared Appearance bridge');
 ok(kothLeague.includes('LeagueId')&&kothLeague.includes('kothProcessWeekForLeague_'),'KOTH strike/history competition is league-aware');
 ok(kothFinal.includes('kingOfHillLeaderboardDataLeague_')&&kothFinal.includes('kothHistoryRowsForLeague_'),'KOTH final read model uses league-owned standings/history');
-ok(purge.includes('const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = false;')&&purge.includes('RC24B_FIXTURE_ONLY'),'Ted permanent purge destructive production path remains server-blocked');
+ok(purge.includes('const PERMANENT_GAME_PURGE_PRODUCTION_ENABLED = true;')&&purge.includes('TARGET_GAME_ACTIVE')&&purge.includes('production-write')&&purge.includes('permanentGamePurgeExecuteProduction_'),'RC24C permanent purge enables exact-confirmation production cleanup with inactive-target and production-write safety gates');
 ok(api.includes('adminPermanentGamePurgeDryRun')&&api.includes('adminPermanentGamePurge'),'Ted purge admin API routes wired into Apps Script');
 ok(adminGames.includes('RC24B_MANAGE_GAMES_PURGE_DANGER_ZONE')&&adminGames.includes('Run Deletion Preview'),'Manage Games contains phone-friendly Purge Danger Zone preview');
 ok(apiJs===apiMirror,'frontend API compatibility mirrors remain identical');
