@@ -1,5 +1,6 @@
+// RC24D compatibility marker: v1219rc24d-launch-cleanup-visual-studio-r1
 // Reality cache compatibility markers: v1219rc16-reality-player-followup v1219rc16-reality-results-ready
-const PATTC_SW_RELEASE_MARKER = "v1219rc24d-launch-cleanup-visual-studio-r1"; // audit marker only; cache still derives from ?v=
+const PATTC_SW_RELEASE_MARKER = "v1219rc24e-studio-live-admin-cleanup-r1"; // audit marker only; cache still derives from ?v=
 // RC23 compatibility lineage only: PATTC_SW_RELEASE_MARKER = "v1219rc23-appearance-transport-cache-r2"
 // Previous cache: awards-app-v313-external-results-hub-end-to-end
 // Legacy cache-lineage marker retained for historical regression contracts only.
@@ -50,10 +51,12 @@ const APP_SHELL = [
   "./js/state.js",
   "./js/appearanceThemeRuntime.js",
   "./js/ownerVisualStudio.js",
+  "./js/ownerVisualStudioRc24e.js",
   "./js/app.js",
   "./js/sportsShell.js",
   "./js/pwa.js",
   "./js/pages/adminGames.js",
+  "./js/pages/adminGamesRc24e.js",
   "./js/pages/adminAppearance.js",
   "./js/pages/teamFantasy.js",
   "./js/pages/rc24aSurvivorConfidenceCore.js",
