@@ -2263,8 +2263,12 @@ async function renderPage(page) {
  
     case "admin-games":
 
+      if (typeof renderAdminGamesPage !== "function") {
+        throw new Error("Manage Games page script is not loaded.");
+      }
+
       app.innerHTML =
-        await renderAdminGamesPanel();
+        await renderAdminGamesPage();
 
       break; 
 

@@ -1394,11 +1394,11 @@ function doGet(e) {
     ========================= */
 
     if (action === "adminPermanentGamePurgeDryRun") {
-      return json(apiAdminPermanentGamePurgeDryRun(body));
+      return json(apiAdminPermanentGamePurgeDryRun(params));
     }
 
     if (action === "adminPermanentGamePurge") {
-      return json(apiAdminPermanentGamePurge(body));
+      return json(apiAdminPermanentGamePurge(params));
     }
 
     if (action === "adminGetGames") {
