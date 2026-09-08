@@ -1244,6 +1244,26 @@ function renderAdminGameStateToggle_(
   `;
 }
 
+function adminOpenGamePlayerPreview_(event, gameId, gameType, workflowStatus) {
+  if (event) { event.preventDefault(); event.stopPropagation(); }
+  const status = String(workflowStatus || "");
+  if (status === "Draft" || status === "Setup") {
+    window.alert("Set this game to PREVIEW and Save first. PREVIEW stays hidden from normal players but can be opened here by the administrator.");
+    return;
+  }
+  try {
+    if (typeof setFrontendGameId === "function") setFrontendGameId(gameId);
+    else if (typeof setActiveGameId === "function") setActiveGameId(gameId);
+    if (typeof enterGame === "function") {
+      enterGame(gameId, gameType || "", "", "standalone", "playable-aggregate");
+      return;
+    }
+    navigate("picks");
+  } catch (err) {
+    window.alert(err && err.message ? err.message : String(err));
+  }
+}
+
 function adminGameStatusDescription_(status) {
   if (status === "Setup") {
     return "SETUP: Admin-only work state. The game is hidden, picks are locked, and it cannot be the default game.";
@@ -1841,6 +1861,8 @@ function renderAdminGameForm(
           <div class="admin-sub">${subtitle}</div>
         </div>
         <div class="admin-game-summary-actions">
+          ${isNew ? "" : (typeof adminGamesStatusBadge === "function" ? adminGamesStatusBadge({status:workflowStatus,active:game.active,archived:game.archived}) : `<span class="admin-badge">STAGE · ${escapeHtml_(workflowStatus === "Active" ? "LIVE" : workflowStatus.toUpperCase())}</span>`)}
+          ${isNew ? "" : `<button type="button" class="admin-small-button secondary" onclick="adminOpenGamePlayerPreview_(event,'${escapeJs(rawGameId)}','${escapeJs(game.type || game.gameType || "")}','${escapeJs(workflowStatus)}')">${workflowStatus === "Active" ? "Open Player View" : workflowStatus === "Preview" ? "Open Admin Preview" : "Preview Requires PREVIEW Stage"}</button>`}
           ${isNew ? "" : adminArchiveBadgeForGame_(rawGameId)}
           <span class="admin-collapse-icon">▾</span>
         </div>

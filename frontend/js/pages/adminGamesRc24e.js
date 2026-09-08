@@ -1,5 +1,6 @@
 window.PATTC_ADMIN_GAMES_VERSION = "rc24e-admin-games-live-r1";
 window.PATTC_ADMIN_GAMES_RESTORE_VERSION = "rc24g-full-editor-plus-cleanup-r1";
+window.PATTC_ADMIN_GAMES_RC24H_VERSION = "rc24h-lifecycle-filters-preview-r2";
 /* ======================
    ADMIN GAMES PAGE
 ====================== */
@@ -35,24 +36,23 @@ function adminGamesBoolBadge(value, trueText, falseText) {
 
 }
 
+function adminGamesStage_(game) {
+  game = game || {};
+  if (game.archived === true || String(game.status || "").toLowerCase() === "archived") return "Archived";
+  const raw = String(game.status || "").trim().toLowerCase();
+  if (raw === "active" || raw === "live") return "Live";
+  if (raw === "preview") return "Preview";
+  if (raw === "setup") return "Setup";
+  return "Draft";
+}
+
 function adminGamesStatusBadge(game) {
-
-  const status =
-    game.status ||
-    (
-      game.archived
-        ? "Archived"
-        : game.active
-          ? "Active"
-          : "Draft"
-    );
-
+  const stage = adminGamesStage_(game);
   return `
-    <span class="admin-badge">
-      ${adminGamesEscapeHtml(status)}
+    <span class="admin-badge admin-game-stage-badge stage-${adminGamesEscapeHtml(stage.toLowerCase())}">
+      STAGE · ${adminGamesEscapeHtml(stage.toUpperCase())}
     </span>
   `;
-
 }
 
 function adminGamesIsCleanupCandidate_(game) {
@@ -71,38 +71,33 @@ function adminGamesIsCleanupCandidate_(game) {
 }
 
 function adminGamesFilterMarkup_(games) {
-
   games = Array.isArray(games) ? games : [];
-
+  const counts = { Draft:0, Setup:0, Preview:0, Live:0, Archived:0 };
+  games.forEach(function(game){ const stage=adminGamesStage_(game); if(counts.hasOwnProperty(stage)) counts[stage]+=1; });
   const cleanupCount = games.filter(adminGamesIsCleanupCandidate_).length;
-  const activeCount = games.filter(function(game) { return game && game.active === true && game.archived !== true; }).length;
-  const draftCount = games.filter(function(game) {
-    const status = String((game && game.status) || "").toLowerCase();
-    return game && game.archived !== true && game.active !== true && /draft|setup/.test(status || "draft");
-  }).length;
 
   return `
     <div class="admin-games-cleanup-tools" style="display:grid;gap:8px;margin-bottom:12px;padding:10px;border:1px solid rgba(255,255,255,.12);border-radius:12px;background:rgba(255,255,255,.035)">
       <div>
-        <strong>Game List Cleanup</strong>
-        <div class="admin-sub">Filter the list before using Permanent Game Purge. Cleanup Candidate is a visual aid only; it never deletes anything.</div>
+        <strong>Game List</strong>
+        <div class="admin-sub">Filter by the actual game lifecycle stage. Archived remains separate and Cleanup Candidate never deletes anything.</div>
       </div>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
         <button type="button" class="admin-small-button secondary" data-admin-game-filter="all" onclick="adminGamesApplyFilter_('all')">All · ${games.length}</button>
-        <button type="button" class="admin-small-button secondary" data-admin-game-filter="active" onclick="adminGamesApplyFilter_('active')">Active · ${activeCount}</button>
-        <button type="button" class="admin-small-button secondary" data-admin-game-filter="draft" onclick="adminGamesApplyFilter_('draft')">Draft / Setup · ${draftCount}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="draft" onclick="adminGamesApplyFilter_('draft')">Draft · ${counts.Draft}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="setup" onclick="adminGamesApplyFilter_('setup')">Setup · ${counts.Setup}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="preview" onclick="adminGamesApplyFilter_('preview')">Preview · ${counts.Preview}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="live" onclick="adminGamesApplyFilter_('live')">Live · ${counts.Live}</button>
+        <button type="button" class="admin-small-button secondary" data-admin-game-filter="archived" onclick="adminGamesApplyFilter_('archived')">Archived · ${counts.Archived}</button>
         <button type="button" class="admin-small-button danger" data-admin-game-filter="cleanup" onclick="adminGamesApplyFilter_('cleanup')">Cleanup Candidates · ${cleanupCount}</button>
-        <button type="button" class="admin-small-button secondary" data-admin-game-filter="archived" onclick="adminGamesApplyFilter_('archived')">Archived</button>
       </div>
       <input id="adminGamesSearch" class="input admin-input" placeholder="Search name or GameId…" oninput="adminGamesApplyFilter_(window.__PATTC_ADMIN_GAMES_FILTER__ || 'all')">
       <div id="adminGamesFilterSummary" class="admin-sub">${games.length} games shown.</div>
     </div>
   `;
-
 }
 
 function adminGamesApplyFilter_(filter) {
-
   filter = String(filter || "all").toLowerCase();
   window.__PATTC_ADMIN_GAMES_FILTER__ = filter;
 
@@ -114,16 +109,16 @@ function adminGamesApplyFilter_(filter) {
     const name = String(card.getAttribute("data-admin-game-name") || "").toLowerCase();
     const id = String(card.getAttribute("data-admin-game-id") || "").toLowerCase();
     const status = String(card.getAttribute("data-admin-game-status") || "").toLowerCase();
-    const active = card.getAttribute("data-admin-game-active") === "true";
     const archived = card.getAttribute("data-admin-game-archived") === "true";
     const cleanup = card.getAttribute("data-admin-game-cleanup") === "true";
+    const stage = archived || status === "archived" ? "archived"
+      : (status === "active" || status === "live") ? "live"
+      : status === "preview" ? "preview"
+      : status === "setup" ? "setup"
+      : "draft";
 
-    let match = true;
-    if (filter === "active") match = active && !archived;
-    else if (filter === "draft") match = !active && !archived && (/draft|setup/.test(status) || !status);
-    else if (filter === "cleanup") match = cleanup;
-    else if (filter === "archived") match = archived;
-
+    let match = filter === "all" || filter === stage;
+    if (filter === "cleanup") match = cleanup;
     if (query && (name + " " + id).indexOf(query) === -1) match = false;
 
     card.hidden = !match;
@@ -137,7 +132,6 @@ function adminGamesApplyFilter_(filter) {
 
   const summary = document.getElementById("adminGamesFilterSummary");
   if (summary) summary.textContent = visible + " game" + (visible === 1 ? "" : "s") + " shown.";
-
 }
 
 async function renderAdminGamesPage() {

@@ -6,7 +6,7 @@
 (function(){
   "use strict";
 
-  const OVS_VERSION = "rc24e-owner-visual-studio-r1";
+  const OVS_VERSION = "rc24h-owner-visual-studio-r1";
   const OVS_GLOBAL_GAME_ID = "__pattc_global__";
   const OVS_DRAFT_TYPE = "visual-studio-draft";
   const OVS_PUBLISHED_TYPE = "visual-studio-published";
@@ -35,6 +35,7 @@
     applying:false,
     demo:false,
     demoState:"in-progress",
+    demoFixture:"auto",
     demoText:new Map(),
     hover:null,
     observer:null,
@@ -261,16 +262,34 @@
     if (style.fontSize != null && style.fontSize !== "") s.setProperty("font-size", Number(style.fontSize) + "px", "important");
     if (style.textAlign) s.setProperty("text-align", style.textAlign, "important");
     if (style.widthMode === "full") s.setProperty("width", "100%", "important");
-    else if (style.widthMode === "auto") s.removeProperty("width");
+    else if (style.widthMode === "auto" && style.widthPct == null) s.removeProperty("width");
+    if (style.widthPct != null && style.widthPct !== "") {
+      const width = Math.max(20, Math.min(100, Number(style.widthPct) || 100));
+      s.setProperty("width", width + "%", "important");
+      s.setProperty("max-width", width + "%", "important");
+    }
+    if (style.minHeight != null && style.minHeight !== "") {
+      s.setProperty("min-height", Math.max(0, Number(style.minHeight) || 0) + "px", "important");
+    }
+    if (style.scale != null && style.scale !== "") {
+      const scale = Math.max(50, Math.min(150, Number(style.scale) || 100));
+      s.setProperty("zoom", (scale / 100), "important");
+    }
+    if (style.headerFontSize != null && style.headerFontSize !== "" && sectionLike_(node)) {
+      node.querySelectorAll(":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > summary h1,:scope > summary h2,:scope > summary h3,:scope > summary h4,:scope > summary").forEach(function(header){
+        snapshotNode_(header);
+        header.style.setProperty("font-size", Number(style.headerFontSize) + "px", "important");
+      });
+    }
   }
 
-  function clearStudioStyle_(node){
+function clearStudioStyle_(node){
     if (!node) return;
-    ["background-color","color","border-color","border-width","border-radius","padding","gap","font-size","text-align","width","display","grid-template-columns"].forEach(function(prop){ node.style.removeProperty(prop); });
+    ["background-color","color","border-color","border-width","border-radius","padding","gap","font-size","text-align","width","max-width","min-height","zoom","display","grid-template-columns"].forEach(function(prop){ node.style.removeProperty(prop); });
     node.classList.remove("pattc-vs-layout-grid");
   }
 
-  function applyLayout_(section, item){
+function applyLayout_(section, item){
     if (!section || !item) return;
     const target = layoutTarget_(section);
     if (!target) return;
@@ -549,9 +568,13 @@
           <label>Radius<input type="number" min="0" max="60" data-field="borderRadius" value="${html_(st.borderRadius==null?0:st.borderRadius)}"></label>
           <label>Padding<input type="number" min="0" max="80" data-field="padding" value="${html_(st.padding==null?0:st.padding)}"></label>
           <label>Gap<input type="number" min="0" max="60" data-field="gap" value="${html_(st.gap==null?0:st.gap)}"></label>
-          <label>Font px<input type="number" min="8" max="72" data-field="fontSize" value="${html_(st.fontSize==null?16:st.fontSize)}"></label>
+          <label>Body Font px<input type="number" min="8" max="72" data-field="fontSize" value="${html_(st.fontSize==null?16:st.fontSize)}"></label>
+          <label>Header Font px<input type="number" min="8" max="72" data-field="headerFontSize" value="${html_(st.headerFontSize==null?18:st.headerFontSize)}"></label>
+          <label>Width %<input type="number" min="20" max="100" data-field="widthPct" value="${html_(st.widthPct==null?100:st.widthPct)}"></label>
+          <label>Min Height px<input type="number" min="0" max="1200" data-field="minHeight" value="${html_(st.minHeight==null?0:st.minHeight)}"></label>
+          <label>Scale %<input type="number" min="50" max="150" data-field="scale" value="${html_(st.scale==null?100:st.scale)}"></label>
           <label>Align<select data-field="textAlign"><option ${st.textAlign==='left'?'selected':''}>left</option><option ${st.textAlign==='center'?'selected':''}>center</option><option ${st.textAlign==='right'?'selected':''}>right</option></select></label>
-          <label>Width<select data-field="widthMode"><option value="auto" ${st.widthMode!=='full'?'selected':''}>Auto</option><option value="full" ${st.widthMode==='full'?'selected':''}>Full</option></select></label>
+          <label>Width Mode<select data-field="widthMode"><option value="auto" ${st.widthMode!=='full'?'selected':''}>Auto</option><option value="full" ${st.widthMode==='full'?'selected':''}>Full</option></select></label>
         </div></div>
         <div class="pattc-vs-card"><h4>Layout + Move</h4><div class="pattc-vs-row">
           <button class="pattc-vs-btn" data-ovs="col-1">1 Column</button><button class="pattc-vs-btn" data-ovs="col-2">2 Columns</button><button class="pattc-vs-btn" data-ovs="col-3">3 Columns</button>
@@ -560,7 +583,7 @@
         <div class="pattc-vs-card"><h4>Grouped / Universal Style</h4><div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="similar">Apply to Similar</button><button class="pattc-vs-btn" data-ovs="universal-button">Universal Buttons</button><button class="pattc-vs-btn" data-ovs="universal-header">Universal Headers</button><button class="pattc-vs-btn" data-ovs="universal-section">Universal Sections</button></div><div class="pattc-vs-help">Change one selection button, then Apply to Similar to style the rest of that button class together.</div></div>
         <div class="pattc-vs-card"><h4>Collapsible Section</h4>${selectedIsDetails?`<div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="preview-open">Preview Open</button><button class="pattc-vs-btn" data-ovs="preview-closed">Preview Closed</button><button class="pattc-vs-btn" data-ovs="default-open">Default Open</button><button class="pattc-vs-btn" data-ovs="default-closed">Default Closed</button></div>`:`<div class="pattc-vs-help">Select a collapsible &lt;details&gt; section to edit its open/closed state.</div>`}</div>
         ` : ''}
-        <div class="pattc-vs-card"><h4>Demo Values</h4><div class="pattc-vs-row"><button class="pattc-vs-btn ${state.demo?'on':''}" data-ovs="demo">${state.demo?'Demo ON':'Demo OFF'}</button><select class="pattc-vs-input" style="width:auto" data-ovs-select="demo-state"><option value="empty" ${state.demoState==='empty'?'selected':''}>Empty</option><option value="in-progress" ${state.demoState==='in-progress'?'selected':''}>In Progress</option><option value="live" ${state.demoState==='live'?'selected':''}>Live</option><option value="final" ${state.demoState==='final'?'selected':''}>Final</option><option value="locked" ${state.demoState==='locked'?'selected':''}>Locked</option></select></div><div class="pattc-vs-help">Preview-only dummy scores, ranks, points and statuses. Never writes player data.</div></div>
+        <div class="pattc-vs-card"><h4>Demo Values</h4><div class="pattc-vs-row"><button class="pattc-vs-btn ${state.demo?'on':''}" data-ovs="demo">${state.demo?'Demo ON':'Demo OFF'}</button><select class="pattc-vs-input" style="width:auto" data-ovs-select="demo-state"><option value="empty" ${state.demoState==='empty'?'selected':''}>Empty</option><option value="in-progress" ${state.demoState==='in-progress'?'selected':''}>In Progress</option><option value="live" ${state.demoState==='live'?'selected':''}>Live</option><option value="final" ${state.demoState==='final'?'selected':''}>Final</option><option value="locked" ${state.demoState==='locked'?'selected':''}>Locked</option></select></div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="demo-leaderboard">Leaderboard Fixture</button><button class="pattc-vs-btn" data-ovs="demo-compare">Compare Fixture</button><button class="pattc-vs-btn" data-ovs="demo-auto">Auto Fixture</button></div><div class="pattc-vs-help">Preview-only dummy scores, ranks, comparisons and statuses. Never writes player data.</div></div>
         <div class="pattc-vs-card"><h4>Save + Revert</h4><div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="save-element">Save Element</button><button class="pattc-vs-btn" data-ovs="save-section">Save Section</button><button class="pattc-vs-btn primary" data-ovs="save-page">Save Page Draft</button><button class="pattc-vs-btn primary" data-ovs="publish">Publish Page</button></div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="last-saved">Last Saved</button><button class="pattc-vs-btn" data-ovs="original">Original Preview</button></div><div id="pattcVsStatus" class="pattc-vs-help" style="margin-top:7px"></div></div>
         <div class="pattc-vs-card"><h4>Removed / Hidden (${hiddenKeys.length})</h4><div class="pattc-vs-hidden-list">${hiddenKeys.length?hiddenKeys.map(function(k){return '<div class="pattc-vs-hidden-row"><span>'+html_(k.slice(0,55))+'</span><button class="pattc-vs-btn" data-restore-key="'+html_(k)+'">Restore</button></div>';}).join(''):'<div class="pattc-vs-help">Nothing removed from this layout.</div>'}</div></div>
       </div>`;
@@ -577,7 +600,7 @@
       input.addEventListener("input", function(){
         const item=currentItem_(); if(!item) return;
         let value=input.value;
-        if (["borderWidth","borderRadius","padding","gap","fontSize"].indexOf(input.dataset.field)>=0) value=Number(value);
+        if (["borderWidth","borderRadius","padding","gap","fontSize","headerFontSize","widthPct","minHeight","scale"].indexOf(input.dataset.field)>=0) value=Number(value);
         item.style[input.dataset.field]=value;
         applyManifest_(state.working);
       });
@@ -628,25 +651,45 @@
   }
 
   function moveSibling_(delta){
-    const node=state.selected; if(!node || !node.parentElement) return;
-    const siblings=Array.from(node.parentElement.children); const i=siblings.indexOf(node); const j=i+delta; if(j<0||j>=siblings.length)return;
+    const node=state.selected; if(!node || !node.parentElement) { setStatus_("Select an element or section first.",true); return; }
+    const siblings=Array.from(node.parentElement.children).filter(function(child){return child && child.id!==OVS_PANEL_ID;});
+    const i=siblings.indexOf(node); const j=i+delta; if(i<0||j<0||j>=siblings.length){setStatus_("Already at the edge of this section.");return;}
+    snapshotNode_(node);
     if(delta<0) node.parentElement.insertBefore(node,siblings[j]); else node.parentElement.insertBefore(siblings[j],node);
     const parentKey=stableKey_(node.parentElement);
     state.working.items[state.selectedKey]=state.working.items[state.selectedKey]||{style:{}};
     state.working.items[state.selectedKey].order={parentKey:parentKey,index:j};
+    applyManifest_(state.working);
+    setStatus_(delta<0?"Moved up.":"Moved down.");
     renderPanel_();
   }
 
-  function moveSelected_(destKey){
-    const node=state.selected, dest=resolveKey_(destKey); if(!node||!dest||node===dest||node.contains(dest)) return;
-    const target=layoutTarget_(dest); if(!target) return;
-    target.appendChild(node); state.working.moves[state.selectedKey]=destKey; state.selectedSection=dest; state.selectedSectionKey=destKey; renderPanel_();
+function moveSelected_(destKey){
+    const node=state.selected, dest=resolveKey_(destKey);
+    if(!node||!dest||node===dest||node.contains(dest)){setStatus_("Choose a different destination section.",true);return;}
+    const target=layoutTarget_(dest); if(!target){setStatus_("That section has no movable layout target.",true);return;}
+    snapshotNode_(node);
+    target.appendChild(node);
+    state.working.moves[state.selectedKey]=destKey;
+    state.selectedSection=dest; state.selectedSectionKey=destKey;
+    applyManifest_(state.working);
+    setStatus_("Moved into selected section. Save Page Draft when ready.");
+    renderPanel_();
   }
 
-  function hideSelected_(){ if(!state.selectedKey)return; state.working.hidden[state.selectedKey]=true; applyManifest_(state.working); renderPanel_(); }
+function hideSelected_(){ if(!state.selectedKey)return; state.working.hidden[state.selectedKey]=true; applyManifest_(state.working); renderPanel_(); }
   function restoreHidden_(key){ if(!key)return; state.working.hidden[key]=false; const node=resolveKey_(key); if(node) node.style.removeProperty("display"); applyManifest_(state.working); renderPanel_(); }
 
-  function setColumns_(count){ const item=currentItem_(); if(!item)return; item.columns=Number(count); applyManifest_(state.working); renderPanel_(); }
+  function setColumns_(count){
+    const section=state.selectedSection || closestSection_(state.selected);
+    if(!section){setStatus_("Select an element inside the section you want to lay out.",true);return;}
+    const key=stableKey_(section);
+    state.working.items[key]=state.working.items[key]||{style:styleObjectFromNode_(section)};
+    state.working.items[key].columns=Number(count);
+    applyManifest_(state.working);
+    setStatus_(Number(count)+" column layout applied to the containing section.");
+    renderPanel_();
+  }
 
   function similarSelector_(node){
     if(!node) return "";
@@ -754,10 +797,20 @@
     if(typeof scheduleAppAppearanceRevalidation_==="function") { try{scheduleAppAppearanceRevalidation_("visual-studio-reset");}catch(err){} }
   }
 
+  function demoFixtureHtml_(kind){
+    kind=String(kind||"auto");
+    if(kind==="compare"){
+      return '<section class="card pattc-vs-demo-fixture" data-pattc-vs-demo-fixture="compare" style="padding:14px;margin:12px 0"><h2>Compare — Demo</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card"><strong>Demo Player A</strong><div>8–3 · 127 pts</div><small>Rank #2</small></div><div class="card"><strong>Demo Player B</strong><div>7–4 · 119 pts</div><small>Rank #5</small></div></div></section>';
+    }
+    return '<section class="card pattc-vs-demo-fixture" data-pattc-vs-demo-fixture="leaderboard" style="padding:14px;margin:12px 0"><h2>Leaderboard — Demo</h2><div style="display:grid;gap:7px"><div><strong>#1 Alex</strong> · 142 pts · 9–2</div><div><strong>#2 Jordan</strong> · 136 pts · 8–3</div><div><strong>#3 Demo Player</strong> · 127 pts · 8–3</div><div><strong>#4 Casey</strong> · 121 pts · 7–4</div></div></section>';
+  }
+
   function enableDemo_(){
-    const app=document.getElementById("app"); if(!app)return; state.demo=true; app.classList.add(OVS_DEMO_CLASS); app.setAttribute("data-pattc-vs-demo-state",state.demoState);
+    const app=document.getElementById("app"); if(!app)return;
+    state.demo=true; app.classList.add(OVS_DEMO_CLASS); app.setAttribute("data-pattc-vs-demo-state",state.demoState);
     state.demoText=new Map();
     app.querySelectorAll("span,strong,b,small,div,p").forEach(function(node){
+      if(node.closest&&node.closest("#"+OVS_PANEL_ID))return;
       if(node.children.length || !node.className) return;
       const cls=String(node.className||"").toLowerCase(); const text=String(node.textContent||"").trim(); let replacement="";
       if(/score/.test(cls)) replacement=state.demoState==="final"?"24–17":state.demoState==="live"?"17–14":"0–0";
@@ -770,14 +823,26 @@
       else if(!text && /name|player|team/.test(cls)) replacement="Demo Player";
       if(replacement){state.demoText.set(node,node.textContent);node.textContent=replacement;}
     });
-    let badge=document.querySelector(".pattc-vs-demo-badge"); if(!badge){badge=document.createElement("div");badge.className="pattc-vs-demo-badge";document.body.appendChild(badge);} badge.textContent="DEMO DATA · "+state.demoState.toUpperCase();
+    app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});
+    if(state.demoFixture==="leaderboard"||state.demoFixture==="compare"){
+      app.insertAdjacentHTML("beforeend",demoFixtureHtml_(state.demoFixture));
+    } else if(state.demoFixture==="auto"){
+      const page=String(state.pageKey||pageKey_()).toLowerCase();
+      if(/leader|stand|scoreboard/.test(page)) app.insertAdjacentHTML("beforeend",demoFixtureHtml_("leaderboard"));
+      if(/compare|matchup/.test(page)) app.insertAdjacentHTML("beforeend",demoFixtureHtml_("compare"));
+    }
+    let badge=document.querySelector(".pattc-vs-demo-badge");if(!badge){badge=document.createElement("div");badge.className="pattc-vs-demo-badge";document.body.appendChild(badge);} badge.textContent="DEMO DATA · "+state.demoState.toUpperCase();
     renderPanel_();
   }
 
-  function disableDemo_(){ state.demoText.forEach(function(value,node){if(node&&node.isConnected)node.textContent=value;}); state.demoText=new Map(); state.demo=false; const app=document.getElementById("app");if(app){app.classList.remove(OVS_DEMO_CLASS);app.removeAttribute("data-pattc-vs-demo-state");} const badge=document.querySelector(".pattc-vs-demo-badge");if(badge)badge.remove(); }
+  function disableDemo_(){
+    state.demoText.forEach(function(value,node){if(node&&node.isConnected)node.textContent=value;});
+    state.demoText=new Map(); state.demo=false;
+    const app=document.getElementById("app");if(app){app.classList.remove(OVS_DEMO_CLASS);app.removeAttribute("data-pattc-vs-demo-state");app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});}
+    const badge=document.querySelector(".pattc-vs-demo-badge");if(badge)badge.remove();
+  }
 
-
-  function selectWholePage_(){
+function selectWholePage_(){
     const app=document.getElementById("app"); if(!app)return;
     state.selectMode="section"; chooseNode_(app);
   }
@@ -809,6 +874,9 @@
     if(name==="default-open"&&state.selectedKey){state.working.collapse[state.selectedKey]={defaultOpen:true};state.selected.open=true;renderPanel_();return;}
     if(name==="default-closed"&&state.selectedKey){state.working.collapse[state.selectedKey]={defaultOpen:false};state.selected.open=false;renderPanel_();return;}
     if(name==="demo"){state.demo?disableDemo_():enableDemo_();renderPanel_();return;}
+    if(name==="demo-leaderboard"){state.demoFixture="leaderboard"; if(state.demo){disableDemo_();} enableDemo_(); return;}
+    if(name==="demo-compare"){state.demoFixture="compare"; if(state.demo){disableDemo_();} enableDemo_(); return;}
+    if(name==="demo-auto"){state.demoFixture="auto"; if(state.demo){disableDemo_();} enableDemo_(); return;}
     if(name==="save-element"){saveDraft_("element");return;} if(name==="save-section"){saveDraft_("section");return;} if(name==="save-page"){saveDraft_("page");return;} if(name==="publish"){publish_();return;}
     if(name==="last-saved"){revertSaved_();return;} if(name==="original"){originalPreview_();return;}
   }

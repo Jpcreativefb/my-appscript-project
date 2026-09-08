@@ -175,6 +175,10 @@ async function renderDashboardPage(options) {
   const activeGames = Array.isArray(payload.activeGames) ? payload.activeGames : [];
   const pastGames = Array.isArray(payload.pastGames) ? payload.pastGames : [];
   dashboardCacheHubAppearance_(payload.hubAppearance || []);
+  // RC24H: apply Appearance Manager navigation/header choices immediately on Home.
+  setTimeout(function() {
+    if (typeof dashboardApplyHubAppearance_ === "function") dashboardApplyHubAppearance_();
+  }, 0);
 
   const displayName =
     profile.displayName ||
