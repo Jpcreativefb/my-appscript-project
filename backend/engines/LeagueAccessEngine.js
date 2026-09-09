@@ -1007,6 +1007,29 @@ function deactivateLeagueGamesForGame_(gameId, leagueId) {
    ACCESS DECISIONS
 ========================= */
 
+function gameLifecycleStage_(gameId) {
+  gameId = normalizeGameId_(gameId);
+  let game = null;
+  try { game = typeof getGame === "function" ? getGame(gameId) : null; } catch (err) { game = null; }
+  const raw = String(game && (game.status || game.gameStatus) || "").trim().toLowerCase();
+  if (game && (game.archived === true || raw === "archived")) return "archived";
+  if (raw === "active" || raw === "live") return "live";
+  if (raw === "preview") return "preview";
+  if (raw === "setup") return "setup";
+  if (raw === "draft") return "draft";
+  if (game && game.active === true && game.archived !== true) return "live";
+  return raw || "draft";
+}
+
+function gameLifecycleAccessDecision_(username, gameId, feature) {
+  username = leagueNormalizeString_(username);
+  gameId = normalizeGameId_(gameId);
+  if (username && isAdmin(username)) return { allowed:true, reason:"app-admin-lifecycle-override", stage:gameLifecycleStage_(gameId) };
+  const stage = gameLifecycleStage_(gameId);
+  if (stage !== "live") return { allowed:false, reason:"game-" + stage + "-admin-only", stage:stage };
+  return { allowed:true, reason:"game-live", stage:stage };
+}
+
 function userCanAccessGameFeature_(username, gameId, feature, leagueId) {
 
   username = leagueNormalizeString_(username);
@@ -1023,8 +1046,14 @@ function userCanAccessGameFeature_(username, gameId, feature, leagueId) {
       allowed: true,
       reason: "app-admin",
       leagueId: leagueId,
-      role: "admin"
+      role: "admin",
+      stage: gameLifecycleStage_(gameId)
     };
+  }
+
+  const lifecycle = gameLifecycleAccessDecision_(username, gameId, feature);
+  if (!lifecycle.allowed) {
+    return { allowed:false, reason:lifecycle.reason, leagueId:"", role:"public", stage:lifecycle.stage };
   }
 
   const activeLeagueGames = getActiveLeagueGamesForGame_(gameId);

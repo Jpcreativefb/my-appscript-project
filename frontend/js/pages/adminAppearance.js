@@ -309,9 +309,10 @@ function adminAppearanceHubManager_() {
     ADMIN_APPEARANCE_STATE.selectedHubSettingKey = String(row.SettingKey);
   }
   const category = String(row.HubCategory || "").toLowerCase();
+  const settingKey = String(row.SettingKey || "").trim().toLowerCase();
   const isLeagueCard = category === "league";
   const isSubhub = !isLeagueCard && !!String(row.HubGroup || "").trim();
-  const topNav = ["home", "sports", "reality", "awards", "more"].indexOf(category) !== -1 && !String(row.HubGroup || "").trim();
+  const topNav = ["home", "sports", "reality", "awards", "more"].indexOf(settingKey) !== -1;
   const imageUrl = adminAppearanceHubAssetUrl_(row, "image");
   const iconUrl = adminAppearanceHubAssetUrl_(row, "icon");
   const color = String(row.Color || "#354785");

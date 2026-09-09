@@ -135,6 +135,14 @@ function teamFantasyNormalizeUsername_(value) {
   return teamFantasyString_(value).toLowerCase();
 }
 
+function teamFantasyRequireGameAccess_(username, gameId, feature, token) {
+  username = teamFantasyNormalizeUsername_(username);
+  gameId = teamFantasyString_(gameId);
+  if (token && typeof validateUserSession_ === "function") validateUserSession_(username, token);
+  if (typeof requireGameFeatureAccess_ === "function") return requireGameFeatureAccess_(username, gameId, feature || "viewGame", "");
+  return { allowed:true, reason:"legacy-access-fallback" };
+}
+
 function teamFantasyNormalizePosition_(value) {
   const key = teamFantasyKey_(value).replace(/[\/_ -]/g, "");
   if (key === "wrte" || key === "tewr" || key === "receiver") return "WRTE";
@@ -1406,6 +1414,7 @@ function teamFantasySavePick_(payload) {
   const teamAbbr = teamFantasyNormalizeTeam_(payload.teamAbbr);
   const pickMethod = teamFantasyKey_(payload.pickMethod) || "manual";
   if (!username || !gameId || !entryId || !position || !teamAbbr) throw new Error("Game, entry, position and team are required.");
+  if (payload._accessChecked !== true) teamFantasyRequireGameAccess_(username, gameId, "submitPicks", payload.token);
   if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
@@ -1495,6 +1504,7 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   const username = teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
   if (!username || !gameId) throw new Error("User and game are required.");
+  teamFantasyRequireGameAccess_(username, gameId, "submitPicks", payload.token);
   if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   if (randomOnly && !settings.allowRandomPick) throw new Error("Random Pick is disabled for this game.");
@@ -1523,7 +1533,7 @@ function teamFantasyAutoPick_(payload, randomOnly) {
       const eligible = teamFantasyEligibleTeamsFromRows_(gameId, settings, entry, position, week, schedule, null, pickRows, randomOnly ? {} : rankingsByPosition[position]).filter(function(team){ return team.eligible; });
       if (!eligible.length) return;
       const choice = randomOnly ? eligible[Math.floor(Math.random() * eligible.length)] : eligible[0];
-      const result = teamFantasySavePick_({ username:username, gameId:gameId, week:week, entryId:entry.entryId, position:position, teamAbbr:choice.abbr, pickMethod:randomOnly?"random":"auto", _settings:settings, _entries:entries, _schedule:schedule, _pickRows:pickRows, _validatedGame:true, _collectOnly:true, _deferFlush: true });
+      const result = teamFantasySavePick_({ username:username, gameId:gameId, week:week, entryId:entry.entryId, position:position, teamAbbr:choice.abbr, pickMethod:randomOnly?"random":"auto", _settings:settings, _entries:entries, _schedule:schedule, _pickRows:pickRows, _validatedGame:true, _accessChecked:true, _collectOnly:true, _deferFlush: true });
       plannedRows.push(result._rowValues);
       pickRows.push(result._rowValues);
       delete result._rowValues;
@@ -2015,6 +2025,7 @@ function apiGetTeamFantasyStandings(payload) {
   const gameId = teamFantasyString_(payload.gameId);
   const leagueId = teamFantasyString_(payload.leagueId) || "complete";
   const username = teamFantasyNormalizeUsername_(payload.username);
+  teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
   if (!teamFantasyUserCanViewLeague_(gameId, username, leagueId)) return { success: false, error: "You are not a member of that Team Fantasy league." };
   return teamFantasyBuildStandings_(gameId, leagueId);
 }
@@ -2026,6 +2037,7 @@ function apiGetTeamFantasyHeadToHead(payload) {
   const league = teamFantasyLeagueRow_(gameId, leagueId);
   if (!league) return { success: false, error: "League not found." };
   const username = teamFantasyNormalizeUsername_(payload.username);
+  teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
   if (!teamFantasyUserCanViewLeague_(gameId, username, leagueId)) return { success: false, error: "You are not a member of that Team Fantasy league." };
   const settings = teamFantasyGetSettings_(gameId);
   const standings = teamFantasyBuildStandings_(gameId, leagueId);
@@ -2076,6 +2088,7 @@ function apiGetTeamFantasyState(payload) {
   const username = teamFantasyNormalizeUsername_(payload.username);
   const gameId = teamFantasyString_(payload.gameId);
   if (!username || !gameId) throw new Error("User and game are required.");
+  teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
   if (!teamFantasyIsGame_(gameId)) return { success: false, error: "This game is not configured as Team Fantasy Football." };
   const settings = teamFantasyGetSettings_(gameId);
   const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));

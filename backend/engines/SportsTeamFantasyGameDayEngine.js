@@ -314,6 +314,7 @@ function apiGetTeamFantasyGameDayState(payload) {
   var username = typeof teamFantasyNormalizeUsername_ === "function" ? teamFantasyNormalizeUsername_(payload.username) : teamFantasyGameDayKey_(payload.username);
   var gameId = teamFantasyGameDayString_(payload.gameId);
   if (!username || !gameId) throw new Error("User and game are required.");
+  if (typeof teamFantasyRequireGameAccess_ === "function") teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
   if (typeof teamFantasyIsGame_ === "function" && !teamFantasyIsGame_(gameId)) throw new Error("This game is not configured as Team Fantasy Football.");
 
   var settings = teamFantasyGetSettings_(gameId);

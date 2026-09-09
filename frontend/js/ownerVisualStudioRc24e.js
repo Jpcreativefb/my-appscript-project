@@ -6,7 +6,7 @@
 (function(){
   "use strict";
 
-  const OVS_VERSION = "rc24h-owner-visual-studio-r1";
+  const OVS_VERSION = "rc24i-owner-visual-studio-r1";
   const OVS_GLOBAL_GAME_ID = "__pattc_global__";
   const OVS_DRAFT_TYPE = "visual-studio-draft";
   const OVS_PUBLISHED_TYPE = "visual-studio-published";
@@ -36,6 +36,7 @@
     demo:false,
     demoState:"in-progress",
     demoFixture:"auto",
+    panelMinimized:false,
     demoText:new Map(),
     hover:null,
     observer:null,
@@ -136,7 +137,7 @@
 
   function semanticDataKey_(node){
     if (!node || !node.getAttribute) return "";
-    const attrs = ["data-section-id","data-category-id","data-question-id","data-position","data-game-id","data-entry-id","data-market-key","data-route","data-tab","data-view"];
+    const attrs = ["data-pattc-vs-generated","data-section-id","data-category-id","data-question-id","data-position","data-game-id","data-entry-id","data-market-key","data-route","data-tab","data-view"];
     for (let i=0;i<attrs.length;i++) {
       const v = String(node.getAttribute(attrs[i]) || "").trim();
       if (v) return node.tagName.toLowerCase() + "[" + attrs[i] + "=" + v + "]";
@@ -149,32 +150,43 @@
     return Array.from(node.parentElement.children).indexOf(node);
   }
 
-  function stableKey_(node){
-    if (!node || node.nodeType !== 1) return "";
-    const existing = node.getAttribute("data-pattc-vs-key");
-    if (existing) return existing;
-    let key = "";
-    if (node.id) key = "id:" + node.id;
-    if (!key) key = semanticDataKey_(node);
-    if (!key) {
-      const classes = meaningfulClasses_(node);
-      const tag = node.tagName.toLowerCase();
-      const text = slug_(node.children.length ? "" : node.textContent);
-      let parent = node.parentElement;
-      let parentToken = "root";
-      while (parent && parent !== document.body) {
-        if (parent.id) { parentToken = "id-" + parent.id; break; }
-        const semantic = semanticDataKey_(parent);
-        if (semantic) { parentToken = slug_(semantic); break; }
-        parent = parent.parentElement;
-      }
-      key = "dom:" + tag + (classes.length ? "." + classes.join(".") : "") + "|p:" + parentToken + "|i:" + siblingIndex_(node) + (text ? "|t:" + text : "");
+  function visualIdentityText_(node){
+    if(!node||node.nodeType!==1)return "";
+    const attrs=["name","aria-label","data-label","title","placeholder"];
+    for(let i=0;i<attrs.length;i++){const v=String(node.getAttribute&&node.getAttribute(attrs[i])||"").trim();if(v)return slug_(v);}
+    if(sectionLike_(node)){
+      const h=node.querySelector(":scope > summary > span:first-child,:scope > summary > strong:first-child,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > .section-title,:scope > .card-title");
+      const t=String(h&&h.textContent||"").trim(); if(t)return slug_(t.replace(/\b\d+\b/g,""));
     }
-    node.setAttribute("data-pattc-vs-key", key);
-    return key;
+    if(/^(BUTTON|SUMMARY|H1|H2|H3|H4|LABEL)$/.test(node.tagName)){const t=String(node.textContent||"").trim().replace(/\s+/g," ");if(t)return slug_(t.replace(/\b\d+\b/g,""));}
+    return "";
   }
 
-  function annotate_(root){
+  function visualAncestorToken_(node){
+    let p=node&&node.parentElement;
+    while(p&&p!==document.body){
+      if(p.id)return "id-"+slug_(p.id);
+      const sem=semanticDataKey_(p); if(sem)return slug_(sem);
+      const id=visualIdentityText_(p); if(id)return slug_(p.tagName.toLowerCase()+"-"+meaningfulClasses_(p).join("-")+"-"+id);
+      p=p.parentElement;
+    }
+    return "root";
+  }
+
+  function stableKey_(node){
+    if(!node||node.nodeType!==1)return "";
+    const existing=node.getAttribute("data-pattc-vs-key"); if(existing)return existing;
+    let key="";
+    if(node.id)key="id:"+node.id;
+    if(!key)key=semanticDataKey_(node);
+    if(!key){
+      const cls=meaningfulClasses_(node),tag=node.tagName.toLowerCase(),identity=visualIdentityText_(node),parent=visualAncestorToken_(node);
+      key=identity?"sem:"+tag+(cls.length?"."+cls.join("."):"")+"|p:"+parent+"|n:"+identity:"dom:"+tag+(cls.length?"."+cls.join("."):"")+"|p:"+parent+"|i:"+siblingIndex_(node);
+    }
+    node.setAttribute("data-pattc-vs-key",key); return key;
+  }
+
+function annotate_(root){
     root = root || document.getElementById("app") || document.body;
     if (!root || !root.querySelectorAll) return;
     stableKey_(root);
@@ -202,14 +214,12 @@
   }
 
   function layoutTarget_(section){
-    if (!section) return null;
-    if (section.tagName === "DETAILS") {
-      return section.querySelector(":scope > .admin-collapsible-body, :scope > .dashboard-subhub-section-body, :scope > .card-body, :scope > .content") || section;
-    }
-    return section.querySelector(":scope > .admin-collapsible-body, :scope > .dashboard-subhub-section-body, :scope > .card-body, :scope > .content, :scope > .grid") || section;
+    if(!section)return null;
+    const selector=":scope > .pattc-vs-generated-body,:scope > .admin-collapsible-body,:scope > .dashboard-subhub-section-body,:scope > .dashboard-home-collapsible-body,:scope > .card-body,:scope > .content,:scope > .grid";
+    return section.querySelector(selector)||section;
   }
 
-  function resolveKey_(key){
+function resolveKey_(key){
     if (!key) return null;
     if (key.indexOf("id:") === 0) return document.getElementById(key.slice(3));
     return document.querySelector('[data-pattc-vs-key="' + cssSafe_(key) + '"]');
@@ -249,43 +259,26 @@
   }
 
   function applyStyle_(node, style){
-    if (!node || !style) return;
-    snapshotNode_(node);
-    const s = node.style;
-    if (style.backgroundColor) s.setProperty("background-color", style.backgroundColor, "important");
-    if (style.color) s.setProperty("color", style.color, "important");
-    if (style.borderColor) s.setProperty("border-color", style.borderColor, "important");
-    if (style.borderWidth != null && style.borderWidth !== "") s.setProperty("border-width", Number(style.borderWidth) + "px", "important");
-    if (style.borderRadius != null && style.borderRadius !== "") s.setProperty("border-radius", Number(style.borderRadius) + "px", "important");
-    if (style.padding != null && style.padding !== "") s.setProperty("padding", Number(style.padding) + "px", "important");
-    if (style.gap != null && style.gap !== "") s.setProperty("gap", Number(style.gap) + "px", "important");
-    if (style.fontSize != null && style.fontSize !== "") s.setProperty("font-size", Number(style.fontSize) + "px", "important");
-    if (style.textAlign) s.setProperty("text-align", style.textAlign, "important");
-    if (style.widthMode === "full") s.setProperty("width", "100%", "important");
-    else if (style.widthMode === "auto" && style.widthPct == null) s.removeProperty("width");
-    if (style.widthPct != null && style.widthPct !== "") {
-      const width = Math.max(20, Math.min(100, Number(style.widthPct) || 100));
-      s.setProperty("width", width + "%", "important");
-      s.setProperty("max-width", width + "%", "important");
-    }
-    if (style.minHeight != null && style.minHeight !== "") {
-      s.setProperty("min-height", Math.max(0, Number(style.minHeight) || 0) + "px", "important");
-    }
-    if (style.scale != null && style.scale !== "") {
-      const scale = Math.max(50, Math.min(150, Number(style.scale) || 100));
-      s.setProperty("zoom", (scale / 100), "important");
-    }
-    if (style.headerFontSize != null && style.headerFontSize !== "" && sectionLike_(node)) {
-      node.querySelectorAll(":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > summary h1,:scope > summary h2,:scope > summary h3,:scope > summary h4,:scope > summary").forEach(function(header){
-        snapshotNode_(header);
-        header.style.setProperty("font-size", Number(style.headerFontSize) + "px", "important");
-      });
-    }
+    if(!node||!style)return; snapshotNode_(node); const st=node.style;
+    if(style.backgroundColor)st.setProperty("background-color",style.backgroundColor,"important");
+    if(style.color)st.setProperty("color",style.color,"important");
+    if(style.borderColor)st.setProperty("border-color",style.borderColor,"important");
+    if(style.borderWidth!=null&&style.borderWidth!=="")st.setProperty("border-width",Number(style.borderWidth)+"px","important");
+    if(style.borderRadius!=null&&style.borderRadius!=="")st.setProperty("border-radius",Number(style.borderRadius)+"px","important");
+    if(style.padding!=null&&style.padding!=="")st.setProperty("padding",Number(style.padding)+"px","important");
+    if(style.gap!=null&&style.gap!=="")st.setProperty("gap",Number(style.gap)+"px","important");
+    if(style.fontSize!=null&&style.fontSize!=="")st.setProperty("font-size",Number(style.fontSize)+"px","important");
+    if(style.textAlign)st.setProperty("text-align",style.textAlign,"important");
+    if(style.widthMode==="full")st.setProperty("width","100%","important"); else if(style.widthMode==="auto"&&style.widthPct==null)st.removeProperty("width");
+    if(style.widthPct!=null&&style.widthPct!==""){const w=Math.max(20,Math.min(100,Number(style.widthPct)||100));st.setProperty("width",w+"%","important");st.setProperty("max-width",w+"%","important");if(w<100){st.setProperty("margin-left","auto","important");st.setProperty("margin-right","auto","important");}}
+    if(style.minHeight!=null&&style.minHeight!==""){const h=Math.max(0,Number(style.minHeight)||0);st.setProperty("min-height",h+"px","important");if(sectionLike_(node)){const body=layoutTarget_(node);if(body&&body!==node){snapshotNode_(body);body.style.setProperty("min-height",h+"px","important");}}}
+    if(style.scale!=null&&style.scale!==""){const z=Math.max(50,Math.min(150,Number(style.scale)||100));st.setProperty("zoom",z/100,"important");}
+    if(style.headerFontSize!=null&&style.headerFontSize!==""&&sectionLike_(node))node.querySelectorAll(":scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > summary").forEach(function(h){snapshotNode_(h);h.style.setProperty("font-size",Number(style.headerFontSize)+"px","important");});
   }
 
 function clearStudioStyle_(node){
     if (!node) return;
-    ["background-color","color","border-color","border-width","border-radius","padding","gap","font-size","text-align","width","max-width","min-height","zoom","display","grid-template-columns"].forEach(function(prop){ node.style.removeProperty(prop); });
+    ["background-color","color","border-color","border-width","border-radius","padding","gap","font-size","text-align","width","max-width","min-height","zoom","display","grid-template-columns","margin-left","margin-right"].forEach(function(prop){ node.style.removeProperty(prop); });
     node.classList.remove("pattc-vs-layout-grid");
   }
 
@@ -295,7 +288,7 @@ function applyLayout_(section, item){
     if (!target) return;
     snapshotNode_(target);
     const columns = Number(item.columns || 0);
-    if (columns >= 1 && columns <= 3) {
+    if (columns >= 1 && columns <= 4) {
       target.classList.add("pattc-vs-layout-grid");
       target.style.setProperty("display","grid","important");
       target.style.setProperty("grid-template-columns","repeat(" + columns + ", minmax(0,1fr))","important");
@@ -303,36 +296,25 @@ function applyLayout_(section, item){
     }
   }
 
-  function applyCollapse_(node, config){
-    if (!node || !config) return;
-    snapshotNode_(node);
-    if (node.tagName === "DETAILS") node.open = config.defaultOpen === true;
+  function collapseBody_(node){
+    if(!node||node.tagName==="DETAILS")return null;
+    const body=node.querySelector(":scope > .pattc-vs-generated-body,:scope > .admin-collapsible-body,:scope > .dashboard-subhub-section-body,:scope > .dashboard-home-collapsible-body,:scope > .card-body,:scope > .content");
+    return body&&body!==node?body:null;
   }
+  function canCollapse_(node){return !!(node&&(node.tagName==="DETAILS"||collapseBody_(node)));}
+  function setCollapseOpen_(node,open){if(!node)return;snapshotNode_(node);if(node.tagName==="DETAILS"){node.open=open===true;return;}const body=collapseBody_(node);if(!body)return;snapshotNode_(body);body.style.setProperty("display",open===true?"":"none","important");}
+  function applyCollapse_(node,config){if(node&&config)setCollapseOpen_(node,config.defaultOpen===true);}
 
-
-  function ensureGeneratedSections_(manifest){
-    const app=document.getElementById("app"); if(!app)return;
+function ensureGeneratedSections_(manifest){
+    const app=document.getElementById("app");if(!app)return;
     Object.keys((manifest&&manifest.generatedSections)||{}).forEach(function(id){
-      const cfg=manifest.generatedSections[id]||{};
-      const key="generated:"+id;
-      let section=resolveKey_(key);
-      if(!section){
-        section=document.createElement("section");
-        section.className="card pattc-vs-generated-section";
-        section.setAttribute("data-pattc-vs-generated",id);
-        section.setAttribute("data-pattc-vs-key",key);
-        section.innerHTML='<h2 class="pattc-vs-generated-title"></h2><div class="pattc-vs-generated-body"></div>';
-        const parent=resolveKey_(cfg.parentKey)||app;
-        const target=layoutTarget_(parent)||parent;
-        const after=resolveKey_(cfg.afterKey);
-        if(after&&after.parentElement===target) target.insertBefore(section,after.nextSibling); else target.appendChild(section);
-      }
-      const title=section.querySelector(".pattc-vs-generated-title"); if(title) title.textContent=String(cfg.title||"New Section");
-      stableKey_(section);
+      const cfg=manifest.generatedSections[id]||{},key="generated:"+id;let section=resolveKey_(key);
+      if(!section){section=document.createElement(cfg.collapsible===false?"section":"details");section.className="card pattc-vs-generated-section";section.setAttribute("data-pattc-vs-generated",id);section.setAttribute("data-pattc-vs-key",key);if(section.tagName==="DETAILS"){section.open=cfg.defaultOpen!==false;section.innerHTML='<summary class="pattc-vs-generated-summary"><strong class="pattc-vs-generated-title"></strong><span>▾</span></summary><div class="pattc-vs-generated-body"></div>';}else section.innerHTML='<h2 class="pattc-vs-generated-title"></h2><div class="pattc-vs-generated-body"></div>';const parent=resolveKey_(cfg.parentKey)||app,target=layoutTarget_(parent)||parent,after=resolveKey_(cfg.afterKey);if(after&&after.parentElement===target)target.insertBefore(section,after.nextSibling);else target.appendChild(section);}
+      const title=section.querySelector(".pattc-vs-generated-title");if(title)title.textContent=String(cfg.title||"New Section");stableKey_(section);
     });
   }
 
-  function applyManifest_(manifest){
+function applyManifest_(manifest){
     manifest = normalizeManifest_(manifest);
     const app = document.getElementById("app");
     if (!app || state.applying) return;
@@ -494,7 +476,8 @@ function applyLayout_(section, item){
       .pattc-vs-selected{outline:3px solid #63a6ff !important;outline-offset:2px !important}.pattc-vs-hover{outline:2px dashed #f3c451 !important;outline-offset:2px !important}.pattc-vs-section-selected{outline:3px solid #6fe0b2 !important;outline-offset:3px !important}.pattc-vs-layout-grid>*{min-width:0}
       .pattc-vs-hidden-list{max-height:120px;overflow:auto}.pattc-vs-hidden-row{display:flex;justify-content:space-between;gap:8px;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.08)}
       .pattc-vs-demo-badge{position:fixed;left:12px;bottom:12px;z-index:2147481900;background:#8b5b00;color:#fff;border-radius:999px;padding:7px 10px;font:700 11px system-ui}
-      @media(max-width:700px) and (hover:none) and (pointer:coarse){#${OVS_PANEL_ID}{inset:8px;width:auto;border-radius:12px}.pattc-vs-grid{grid-template-columns:1fr}.pattc-vs-body{padding-bottom:80px}}
+      #${OVS_PANEL_ID}.pattc-vs-minimized{height:48px;top:auto;bottom:8px} #${OVS_PANEL_ID}.pattc-vs-minimized .pattc-vs-body{display:none}
+      @media(max-width:700px){body.pattc-vs-studio-open #app{max-height:calc(62vh - 70px);overflow:auto;padding-bottom:86px}body.pattc-vs-studio-open .bottom-nav{bottom:38vh}#${OVS_PANEL_ID}{left:6px;right:6px;top:auto;bottom:6px;height:38vh;width:auto;border-radius:12px}#${OVS_PANEL_ID}.pattc-vs-minimized{height:48px}body.pattc-vs-studio-open.pattc-vs-studio-minimized #app{max-height:none;overflow:visible}body.pattc-vs-studio-open.pattc-vs-studio-minimized .bottom-nav{bottom:54px}.pattc-vs-grid{grid-template-columns:1fr}.pattc-vs-body{padding-bottom:28px}}
     `;
     document.head.appendChild(style);
   }
@@ -547,10 +530,11 @@ function applyLayout_(section, item){
     if (!panel) { panel=document.createElement("aside"); panel.id=OVS_PANEL_ID; document.body.appendChild(panel); }
     const item = currentItem_();
     const st = item ? item.style || {} : {};
-    const selectedIsDetails = !!(state.selected && state.selected.tagName === "DETAILS");
+    const selectedCanCollapse = canCollapse_(state.selected);
     const hiddenKeys = Object.keys((state.working && state.working.hidden) || {}).filter(function(k){return state.working.hidden[k]===true;});
+    panel.classList.toggle("pattc-vs-minimized",state.panelMinimized===true);
     panel.innerHTML = `
-      <div class="pattc-vs-head"><strong>PATTC Visual Studio</strong><span>${html_(OVS_VERSION)}</span><button data-ovs="close">✕</button></div>
+      <div class="pattc-vs-head"><strong>PATTC Visual Studio</strong><span>${html_(OVS_VERSION)}</span><button data-ovs="panel-toggle">${state.panelMinimized?"▴":"▾"}</button><button data-ovs="close">✕</button></div>
       <div class="pattc-vs-body">
         <div class="pattc-vs-card"><h4>Page</h4><div><strong>${html_(state.pageKey || pageKey_())}</strong> · <span>${html_(state.storageGameId || storageGameId_())}</span></div><div class="pattc-vs-help">Draft designs save to PATTC, so the same design opens on both Macs.</div></div>
         <div class="pattc-vs-row">
@@ -577,11 +561,11 @@ function applyLayout_(section, item){
           <label>Width Mode<select data-field="widthMode"><option value="auto" ${st.widthMode!=='full'?'selected':''}>Auto</option><option value="full" ${st.widthMode==='full'?'selected':''}>Full</option></select></label>
         </div></div>
         <div class="pattc-vs-card"><h4>Layout + Move</h4><div class="pattc-vs-row">
-          <button class="pattc-vs-btn" data-ovs="col-1">1 Column</button><button class="pattc-vs-btn" data-ovs="col-2">2 Columns</button><button class="pattc-vs-btn" data-ovs="col-3">3 Columns</button>
-        </div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="up">↑ Up</button><button class="pattc-vs-btn" data-ovs="down">↓ Down</button><button class="pattc-vs-btn" data-ovs="new-section">New Section</button><button class="pattc-vs-btn danger" data-ovs="hide">Remove / Hide</button></div>
+          <button class="pattc-vs-btn" data-ovs="col-1">1 Column</button><button class="pattc-vs-btn" data-ovs="col-2">2 Columns</button><button class="pattc-vs-btn" data-ovs="col-3">3 Columns</button><button class="pattc-vs-btn" data-ovs="col-4">4 Columns</button>
+        </div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="up">↑ Up</button><button class="pattc-vs-btn" data-ovs="down">↓ Down</button><button class="pattc-vs-btn" data-ovs="extract-section">Extract → New Section</button><button class="pattc-vs-btn" data-ovs="new-section">New Empty Section</button><button class="pattc-vs-btn danger" data-ovs="hide">Remove / Hide</button></div>
         <label class="pattc-vs-help" style="display:block;margin-top:7px">Move into section<select class="pattc-vs-input" data-ovs-select="move"><option value="">Choose section…</option>${sectionOptions_()}</select></label></div>
         <div class="pattc-vs-card"><h4>Grouped / Universal Style</h4><div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="similar">Apply to Similar</button><button class="pattc-vs-btn" data-ovs="universal-button">Universal Buttons</button><button class="pattc-vs-btn" data-ovs="universal-header">Universal Headers</button><button class="pattc-vs-btn" data-ovs="universal-section">Universal Sections</button></div><div class="pattc-vs-help">Change one selection button, then Apply to Similar to style the rest of that button class together.</div></div>
-        <div class="pattc-vs-card"><h4>Collapsible Section</h4>${selectedIsDetails?`<div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="preview-open">Preview Open</button><button class="pattc-vs-btn" data-ovs="preview-closed">Preview Closed</button><button class="pattc-vs-btn" data-ovs="default-open">Default Open</button><button class="pattc-vs-btn" data-ovs="default-closed">Default Closed</button></div>`:`<div class="pattc-vs-help">Select a collapsible &lt;details&gt; section to edit its open/closed state.</div>`}</div>
+        <div class="pattc-vs-card"><h4>Collapsible Section</h4>${selectedCanCollapse?`<div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="preview-open">Preview Open</button><button class="pattc-vs-btn" data-ovs="preview-closed">Preview Closed</button><button class="pattc-vs-btn" data-ovs="default-open">Default Open</button><button class="pattc-vs-btn" data-ovs="default-closed">Default Closed</button></div>`:`<div class="pattc-vs-help">Select a collapsible section to edit its open/closed state.</div>`}</div>
         ` : ''}
         <div class="pattc-vs-card"><h4>Demo Values</h4><div class="pattc-vs-row"><button class="pattc-vs-btn ${state.demo?'on':''}" data-ovs="demo">${state.demo?'Demo ON':'Demo OFF'}</button><select class="pattc-vs-input" style="width:auto" data-ovs-select="demo-state"><option value="empty" ${state.demoState==='empty'?'selected':''}>Empty</option><option value="in-progress" ${state.demoState==='in-progress'?'selected':''}>In Progress</option><option value="live" ${state.demoState==='live'?'selected':''}>Live</option><option value="final" ${state.demoState==='final'?'selected':''}>Final</option><option value="locked" ${state.demoState==='locked'?'selected':''}>Locked</option></select></div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="demo-leaderboard">Leaderboard Fixture</button><button class="pattc-vs-btn" data-ovs="demo-compare">Compare Fixture</button><button class="pattc-vs-btn" data-ovs="demo-auto">Auto Fixture</button></div><div class="pattc-vs-help">Preview-only dummy scores, ranks, comparisons and statuses. Never writes player data.</div></div>
         <div class="pattc-vs-card"><h4>Save + Revert</h4><div class="pattc-vs-row"><button class="pattc-vs-btn" data-ovs="save-element">Save Element</button><button class="pattc-vs-btn" data-ovs="save-section">Save Section</button><button class="pattc-vs-btn primary" data-ovs="save-page">Save Page Draft</button><button class="pattc-vs-btn primary" data-ovs="publish">Publish Page</button></div><div class="pattc-vs-row" style="margin-top:7px"><button class="pattc-vs-btn" data-ovs="last-saved">Last Saved</button><button class="pattc-vs-btn" data-ovs="original">Original Preview</button></div><div id="pattcVsStatus" class="pattc-vs-help" style="margin-top:7px"></div></div>
@@ -758,24 +742,16 @@ function hideSelected_(){ if(!state.selectedKey)return; state.working.hidden[sta
         state.saved=normalizeManifest_(next);
       } else state.saved=normalizeManifest_(clone_(state.working));
       await saveOverride_(OVS_DRAFT_TYPE,state.pageKey,state.saved,true);
-      setStatus_("Saved "+scope+" draft. Available on both Macs.");
+      setStatus_("Saved "+scope+" DRAFT. Stored on both Macs; not live until Publish Page.");
     } catch(err){ setStatus_(err&&err.message?err.message:String(err),true); }
   }
 
+  function manifestComparable_(m){m=normalizeManifest_(clone_(m||{}));return JSON.stringify({items:m.items,groups:m.groups,groupMembers:m.groupMembers,moves:m.moves,hidden:m.hidden,collapse:m.collapse,generatedSections:m.generatedSections});}
   async function publish_(){
-    try {
-      setStatus_("Publishing page…");
-      state.published=normalizeManifest_(clone_(state.working));
-      await saveOverride_(OVS_PUBLISHED_TYPE,state.pageKey,state.published,true);
-      const versionId=state.pageKey+"::"+Date.now();
-      await saveOverride_(OVS_VERSION_TYPE,versionId,state.published,true);
-      state.saved=clone_(state.published);
-      await saveOverride_(OVS_DRAFT_TYPE,state.pageKey,state.saved,true);
-      setStatus_("Published. Player layout updated without GitHub/clasp.");
-    } catch(err){ setStatus_(err&&err.message?err.message:String(err),true); }
+    try{setStatus_("Publishing page…");const intended=normalizeManifest_(clone_(state.working));await saveOverride_(OVS_PUBLISHED_TYPE,state.pageKey,intended,true);await saveOverride_(OVS_VERSION_TYPE,state.pageKey+"::"+Date.now(),intended,true);await saveOverride_(OVS_DRAFT_TYPE,state.pageKey,intended,true);setStatus_("Verifying published layout from server…");const fresh=await apiGetGameAppearance(state.storageGameId),verified=parseOverride_(findOverride_(fresh,OVS_PUBLISHED_TYPE,state.pageKey));if(!verified)throw new Error("Publish verification failed: published page was not returned by the server.");if(manifestComparable_(verified)!==manifestComparable_(intended))throw new Error("Publish verification failed: server layout does not match what you published.");state.bundle=fresh||{};state.published=verified;state.saved=parseOverride_(findOverride_(fresh,OVS_DRAFT_TYPE,state.pageKey))||clone_(verified);state.working=clone_(state.saved);writeBundleCache_(state.storageGameId,fresh);resetApplied_();applyManifest_(state.working);setStatus_("Published + VERIFIED. Refresh/reopen will keep this layout.");renderPanel_();}catch(err){setStatus_(err&&err.message?err.message:String(err),true);}
   }
 
-  function revertSaved_(){ state.working=normalizeManifest_(clone_(state.saved||emptyManifest_())); resetApplied_(); applyManifest_(state.working); renderPanel_(); setStatus_("Reverted to last saved draft."); }
+function revertSaved_(){ state.working=normalizeManifest_(clone_(state.saved||emptyManifest_())); resetApplied_(); applyManifest_(state.working); renderPanel_(); setStatus_("Reverted to last saved draft."); }
   function originalPreview_(){ state.working=emptyManifest_(); state.working.pageKey=state.pageKey; resetApplied_(); renderPanel_(); setStatus_("Original PATTC layout preview. Publish only if you want this live."); }
 
   function resetApplied_(){
@@ -798,49 +774,12 @@ function hideSelected_(){ if(!state.selectedKey)return; state.working.hidden[sta
   }
 
   function demoFixtureHtml_(kind){
-    kind=String(kind||"auto");
-    if(kind==="compare"){
-      return '<section class="card pattc-vs-demo-fixture" data-pattc-vs-demo-fixture="compare" style="padding:14px;margin:12px 0"><h2>Compare — Demo</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card"><strong>Demo Player A</strong><div>8–3 · 127 pts</div><small>Rank #2</small></div><div class="card"><strong>Demo Player B</strong><div>7–4 · 119 pts</div><small>Rank #5</small></div></div></section>';
-    }
-    return '<section class="card pattc-vs-demo-fixture" data-pattc-vs-demo-fixture="leaderboard" style="padding:14px;margin:12px 0"><h2>Leaderboard — Demo</h2><div style="display:grid;gap:7px"><div><strong>#1 Alex</strong> · 142 pts · 9–2</div><div><strong>#2 Jordan</strong> · 136 pts · 8–3</div><div><strong>#3 Demo Player</strong> · 127 pts · 8–3</div><div><strong>#4 Casey</strong> · 121 pts · 7–4</div></div></section>';
+    if(String(kind)==="compare")return '<section class="card pattc-vs-demo-fixture" style="padding:14px;margin:10px 0"><h2>Compare Preview</h2><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div class="card" style="padding:10px"><strong>Joel</strong><div>127.4 pts</div><small>8–3 · #2</small></div><div class="card" style="padding:10px"><strong>Opponent</strong><div>121.8 pts</div><small>7–4 · #5</small></div></div></section>';
+    return '<section class="card pattc-vs-demo-fixture" style="padding:14px;margin:10px 0"><h2>Leaderboard Preview</h2><div style="display:grid;gap:8px"><div><strong>#1 Alex</strong> · 142.7 pts · 9–2</div><div><strong>#2 Jordan</strong> · 136.2 pts · 8–3</div><div><strong>#3 Joel</strong> · 127.4 pts · 8–3</div><div><strong>#4 Casey</strong> · 121.8 pts · 7–4</div></div></section>';
   }
-
-  function enableDemo_(){
-    const app=document.getElementById("app"); if(!app)return;
-    state.demo=true; app.classList.add(OVS_DEMO_CLASS); app.setAttribute("data-pattc-vs-demo-state",state.demoState);
-    state.demoText=new Map();
-    app.querySelectorAll("span,strong,b,small,div,p").forEach(function(node){
-      if(node.closest&&node.closest("#"+OVS_PANEL_ID))return;
-      if(node.children.length || !node.className) return;
-      const cls=String(node.className||"").toLowerCase(); const text=String(node.textContent||"").trim(); let replacement="";
-      if(/score/.test(cls)) replacement=state.demoState==="final"?"24–17":state.demoState==="live"?"17–14":"0–0";
-      else if(/rank|place/.test(cls)) replacement="#3";
-      else if(/point|total/.test(cls)) replacement="127 pts";
-      else if(/confidence/.test(cls)) replacement="14";
-      else if(/record/.test(cls)) replacement="8–3";
-      else if(/bank|credit|balance/.test(cls)) replacement="1,000 credits";
-      else if(/status|state/.test(cls)) replacement=state.demoState==="live"?"LIVE · Q3 06:42":state.demoState==="final"?"FINAL":state.demoState==="locked"?"LOCKED":"OPEN";
-      else if(!text && /name|player|team/.test(cls)) replacement="Demo Player";
-      if(replacement){state.demoText.set(node,node.textContent);node.textContent=replacement;}
-    });
-    app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});
-    if(state.demoFixture==="leaderboard"||state.demoFixture==="compare"){
-      app.insertAdjacentHTML("beforeend",demoFixtureHtml_(state.demoFixture));
-    } else if(state.demoFixture==="auto"){
-      const page=String(state.pageKey||pageKey_()).toLowerCase();
-      if(/leader|stand|scoreboard/.test(page)) app.insertAdjacentHTML("beforeend",demoFixtureHtml_("leaderboard"));
-      if(/compare|matchup/.test(page)) app.insertAdjacentHTML("beforeend",demoFixtureHtml_("compare"));
-    }
-    let badge=document.querySelector(".pattc-vs-demo-badge");if(!badge){badge=document.createElement("div");badge.className="pattc-vs-demo-badge";document.body.appendChild(badge);} badge.textContent="DEMO DATA · "+state.demoState.toUpperCase();
-    renderPanel_();
-  }
-
-  function disableDemo_(){
-    state.demoText.forEach(function(value,node){if(node&&node.isConnected)node.textContent=value;});
-    state.demoText=new Map(); state.demo=false;
-    const app=document.getElementById("app");if(app){app.classList.remove(OVS_DEMO_CLASS);app.removeAttribute("data-pattc-vs-demo-state");app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});}
-    const badge=document.querySelector(".pattc-vs-demo-badge");if(badge)badge.remove();
-  }
+  function demoFixtureTarget_(){const app=document.getElementById("app"),section=state.selectedSection||closestSection_(state.selected);return(section&&layoutTarget_(section))||app;}
+  function enableDemo_(){const app=document.getElementById("app");if(!app)return;state.demo=true;app.classList.add(OVS_DEMO_CLASS);app.setAttribute("data-pattc-vs-demo-state",state.demoState);state.demoText=new Map();app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});let kind=state.demoFixture;if(kind==="auto")kind=/compare|matchup/i.test(String(state.pageKey||"")+" "+selectedLabel_())?"compare":"leaderboard";const target=demoFixtureTarget_();if(target){target.insertAdjacentHTML("afterbegin",demoFixtureHtml_(kind));const f=target.querySelector(".pattc-vs-demo-fixture");if(f&&f.scrollIntoView)setTimeout(function(){f.scrollIntoView({behavior:"smooth",block:"center"});},20);}let badge=document.querySelector(".pattc-vs-demo-badge");if(!badge){badge=document.createElement("div");badge.className="pattc-vs-demo-badge";document.body.appendChild(badge);}badge.textContent="DEMO DATA · "+state.demoState.toUpperCase();renderPanel_();}
+  function disableDemo_(){state.demoText.forEach(function(v,n){if(n&&n.isConnected)n.textContent=v;});state.demoText=new Map();state.demo=false;const app=document.getElementById("app");if(app){app.classList.remove(OVS_DEMO_CLASS);app.removeAttribute("data-pattc-vs-demo-state");app.querySelectorAll(".pattc-vs-demo-fixture").forEach(function(n){n.remove();});}const b=document.querySelector(".pattc-vs-demo-badge");if(b)b.remove();}
 
 function selectWholePage_(){
     const app=document.getElementById("app"); if(!app)return;
@@ -848,31 +787,30 @@ function selectWholePage_(){
   }
 
   function createSection_(){
-    if(!state.working)return;
-    let title="New Section";
-    try { const entered=window.prompt("New section name",title); if(entered===null)return; title=String(entered||title).trim()||title; } catch(err){}
-    const id="section-"+Date.now().toString(36);
-    const parent=state.selectedSection || document.getElementById("app");
-    state.working.generatedSections=state.working.generatedSections||{};
-    state.working.generatedSections[id]={title:title,parentKey:parent?stableKey_(parent):"id:app",afterKey:state.selected?stableKey_(state.selected):""};
-    applyManifest_(state.working);
-    const created=resolveKey_("generated:"+id); if(created){state.selectMode="section";chooseNode_(created);}
-    setStatus_("New section created. Move elements into it, then Save Page Draft.");
+    if(!state.working)return;let title="New Section";try{const x=window.prompt("New section name",title);if(x===null)return;title=String(x||title).trim()||title;}catch(err){}
+    const id="section-"+Date.now().toString(36),app=document.getElementById("app"),anchor=state.selectedSection&&state.selectedSection!==app?state.selectedSection:state.selected,parent=anchor&&anchor.parentElement?anchor.parentElement:app;
+    state.working.generatedSections=state.working.generatedSections||{};state.working.generatedSections[id]={title:title,parentKey:parent?stableKey_(parent):"id:app",afterKey:anchor?stableKey_(anchor):"",collapsible:true,defaultOpen:true};applyManifest_(state.working);const created=resolveKey_("generated:"+id);if(created){state.selectMode="section";chooseNode_(created);}setStatus_("New sibling section created. Move components into it, then Save Page Draft.");
+  }
+  function extractSelectedToNewSection_(){
+    if(!state.working||!state.selected){setStatus_("Select a component first.",true);return;}const app=document.getElementById("app"),node=state.selected,source=closestSection_(node);if(!source||node===source||node===app){setStatus_("Use Element mode and select the specific component to separate.",true);return;}let title="New Section";try{const x=window.prompt("New section name",title);if(x===null)return;title=String(x||title).trim()||title;}catch(err){}const nodeKey=stableKey_(node),id="section-"+Date.now().toString(36),parent=source.parentElement||app;state.working.generatedSections=state.working.generatedSections||{};state.working.generatedSections[id]={title:title,parentKey:stableKey_(parent),afterKey:stableKey_(source),collapsible:true,defaultOpen:true};applyManifest_(state.working);const key="generated:"+id,created=resolveKey_(key),target=layoutTarget_(created);if(!created||!target){setStatus_("Could not create destination section.",true);return;}snapshotNode_(node);target.appendChild(node);state.working.moves=state.working.moves||{};state.working.moves[nodeKey]=key;state.working.collapse=state.working.collapse||{};state.working.collapse[key]={defaultOpen:true};state.selectedSection=created;state.selectedSectionKey=key;applyManifest_(state.working);setStatus_("Component separated into its own section. Save Draft, then Publish.");renderPanel_();
   }
 
+function setSelectedCollapse_(open,persist){if(!state.selected||!canCollapse_(state.selected)){setStatus_("Select a collapsible section first.",true);return;}setCollapseOpen_(state.selected,open===true);if(persist&&state.selectedKey){state.working.collapse=state.working.collapse||{};state.working.collapse[state.selectedKey]={defaultOpen:open===true};}renderPanel_();}
+  function syncStudioDock_(){if(!document.body)return;document.body.classList.toggle("pattc-vs-studio-open",state.open===true);document.body.classList.toggle("pattc-vs-studio-minimized",state.open===true&&state.panelMinimized===true);const panel=document.getElementById(OVS_PANEL_ID);if(panel)panel.classList.toggle("pattc-vs-minimized",state.panelMinimized===true);}
+
   function action_(name){
-    if(name==="close"){closeStudio_();return;} if(name==="pick"){state.picking?stopPick_():startPick_();return;}
+    if(name==="close"){closeStudio_();return;} if(name==="panel-toggle"){state.panelMinimized=!state.panelMinimized;syncStudioDock_();renderPanel_();return;} if(name==="pick"){state.picking?stopPick_():startPick_();return;}
     if(name==="mode-element"){state.selectMode="element";renderPanel_();return;} if(name==="mode-section"){state.selectMode="section";renderPanel_();return;} if(name==="select-page"){selectWholePage_();return;}
-    if(name==="col-1"||name==="col-2"||name==="col-3"){setColumns_(Number(name.slice(-1)));return;}
-    if(name==="up"){moveSibling_(-1);return;} if(name==="down"){moveSibling_(1);return;} if(name==="new-section"){createSection_();return;} if(name==="hide"){hideSelected_();return;}
+    if(name==="col-1"||name==="col-2"||name==="col-3"||name==="col-4"){setColumns_(Number(name.slice(-1)));return;}
+    if(name==="up"){moveSibling_(-1);return;} if(name==="down"){moveSibling_(1);return;} if(name==="extract-section"){extractSelectedToNewSection_();return;} if(name==="new-section"){createSection_();return;} if(name==="hide"){hideSelected_();return;}
     if(name==="similar"){groupFromSelected_("Similar · "+similarSelector_(state.selected),similarSelector_(state.selected));return;}
     if(name==="universal-button"){groupFromSelected_("Universal Buttons","button,.button,[role='button']");return;}
     if(name==="universal-header"){groupFromSelected_("Universal Headers","h1,h2,h3,h4,summary");return;}
     if(name==="universal-section"){groupFromSelected_("Universal Sections","section,details,.card,.panel");return;}
-    if(name==="preview-open"&&state.selected&&state.selected.tagName==="DETAILS"){state.selected.open=true;return;}
-    if(name==="preview-closed"&&state.selected&&state.selected.tagName==="DETAILS"){state.selected.open=false;return;}
-    if(name==="default-open"&&state.selectedKey){state.working.collapse[state.selectedKey]={defaultOpen:true};state.selected.open=true;renderPanel_();return;}
-    if(name==="default-closed"&&state.selectedKey){state.working.collapse[state.selectedKey]={defaultOpen:false};state.selected.open=false;renderPanel_();return;}
+    if(name==="preview-open"){setSelectedCollapse_(true,false);return;}
+    if(name==="preview-closed"){setSelectedCollapse_(false,false);return;}
+    if(name==="default-open"){setSelectedCollapse_(true,true);return;}
+    if(name==="default-closed"){setSelectedCollapse_(false,true);return;}
     if(name==="demo"){state.demo?disableDemo_():enableDemo_();renderPanel_();return;}
     if(name==="demo-leaderboard"){state.demoFixture="leaderboard"; if(state.demo){disableDemo_();} enableDemo_(); return;}
     if(name==="demo-compare"){state.demoFixture="compare"; if(state.demo){disableDemo_();} enableDemo_(); return;}
@@ -881,20 +819,10 @@ function selectWholePage_(){
     if(name==="last-saved"){revertSaved_();return;} if(name==="original"){originalPreview_();return;}
   }
 
-  async function openStudio_(){
-    if(!isAdmin_())return;
-    injectStyle_();
-    state.open=true;
-    state.picking=true;
-    await loadScope_(true);
-    state.working=clone_(state.saved||state.published||emptyManifest_());
-    applyManifest_(state.working);
-    annotate_();
-    renderPanel_();
-  }
-  function closeStudio_(){ state.open=false;state.picking=false;clearSelectionClass_();disableDemo_();const panel=document.getElementById(OVS_PANEL_ID);if(panel)panel.remove();state.working=clone_(state.published||emptyManifest_());resetApplied_();applyManifest_(state.published||emptyManifest_()); }
+  async function openStudio_(){if(!isAdmin_())return;injectStyle_();state.open=true;state.picking=true;state.panelMinimized=window.innerWidth<=700;syncStudioDock_();await loadScope_(true);state.working=clone_(state.saved||state.published||emptyManifest_());applyManifest_(state.working);annotate_();renderPanel_();}
+  function closeStudio_(){state.open=false;state.picking=false;state.panelMinimized=false;syncStudioDock_();clearSelectionClass_();disableDemo_();const panel=document.getElementById(OVS_PANEL_ID);if(panel)panel.remove();state.working=clone_(state.published||emptyManifest_());resetApplied_();applyManifest_(state.published||emptyManifest_());}
 
-  function mutationRefresh_(mutations){
+function mutationRefresh_(mutations){
     if(state.applying)return;
     if (Array.isArray(mutations) || (mutations && typeof mutations.length === "number")) {
       const list = Array.from(mutations || []);

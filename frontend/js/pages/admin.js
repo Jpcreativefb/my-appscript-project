@@ -1247,21 +1247,13 @@ function renderAdminGameStateToggle_(
 function adminOpenGamePlayerPreview_(event, gameId, gameType, workflowStatus) {
   if (event) { event.preventDefault(); event.stopPropagation(); }
   const status = String(workflowStatus || "");
-  if (status === "Draft" || status === "Setup") {
-    window.alert("Set this game to PREVIEW and Save first. PREVIEW stays hidden from normal players but can be opened here by the administrator.");
-    return;
-  }
+  if (status === "Archived") { window.alert("Restore the archived game before previewing it."); return; }
   try {
     if (typeof setFrontendGameId === "function") setFrontendGameId(gameId);
     else if (typeof setActiveGameId === "function") setActiveGameId(gameId);
-    if (typeof enterGame === "function") {
-      enterGame(gameId, gameType || "", "", "standalone", "playable-aggregate");
-      return;
-    }
+    if (typeof enterGame === "function") { enterGame(gameId, gameType || "", "", "standalone", "playable-aggregate"); return; }
     navigate("picks");
-  } catch (err) {
-    window.alert(err && err.message ? err.message : String(err));
-  }
+  } catch (err) { window.alert(err && err.message ? err.message : String(err)); }
 }
 
 function adminGameStatusDescription_(status) {
@@ -1301,7 +1293,7 @@ function renderAdminGameStatusControl_(game) {
         <span class="admin-game-state-title">Game Status</span>
         ${adminHelpButton_(
           "Game Status",
-          "Draft and Setup are hidden from players. Preview is visible but locked. Live is visible and can accept picks when Picks is set to Open."
+          "Draft, Setup and Preview are admin-only. Only Live is visible to players and only Live can accept player picks when Picks is Open."
         )}
       </div>
       <input type="hidden" name="status" value="${escapeHtml_(status)}">
@@ -1862,7 +1854,7 @@ function renderAdminGameForm(
         </div>
         <div class="admin-game-summary-actions">
           ${isNew ? "" : (typeof adminGamesStatusBadge === "function" ? adminGamesStatusBadge({status:workflowStatus,active:game.active,archived:game.archived}) : `<span class="admin-badge">STAGE · ${escapeHtml_(workflowStatus === "Active" ? "LIVE" : workflowStatus.toUpperCase())}</span>`)}
-          ${isNew ? "" : `<button type="button" class="admin-small-button secondary" onclick="adminOpenGamePlayerPreview_(event,'${escapeJs(rawGameId)}','${escapeJs(game.type || game.gameType || "")}','${escapeJs(workflowStatus)}')">${workflowStatus === "Active" ? "Open Player View" : workflowStatus === "Preview" ? "Open Admin Preview" : "Preview Requires PREVIEW Stage"}</button>`}
+          ${isNew ? "" : `<button type="button" class="admin-small-button secondary" onclick="adminOpenGamePlayerPreview_(event,'${escapeJs(rawGameId)}','${escapeJs(game.type || game.gameType || "")}','${escapeJs(workflowStatus)}')">${workflowStatus === "Active" ? "Open Player View" : "Open Admin Preview"}</button>`}
           ${isNew ? "" : adminArchiveBadgeForGame_(rawGameId)}
           <span class="admin-collapse-icon">▾</span>
         </div>
