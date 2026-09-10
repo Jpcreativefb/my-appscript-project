@@ -1705,3 +1705,115 @@ function sportsFinalKothPageHtml_(payload) {
 if (typeof sportsDefaultKothPageHtml_ === 'function') {
   sportsDefaultKothPageHtml_ = sportsFinalKothPageHtml_;
 }
+
+/* =========================================================
+   RC24K — NFL SURVIVOR + KOTH PLAYER EXPERIENCE
+========================================================= */
+if (typeof survivorFinalTeamButton_ === "function") {
+  survivorFinalTeamButton_ = function(team, round) {
+    if (!team) return '<div class="survivor-final-team is-empty">TBD</div>';
+    const selected = survivorFinalSelectedIds_().indexOf(String(team.id || "")) !== -1;
+    const disabled = team.eligible === false && !selected;
+    const used = String(team.usedOverlay || "");
+    const id = String(team.id || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+    const lockLabel = disabled
+      ? (team.unavailableReason === "started" ? "🔒 STARTED" : team.unavailableReason === "used" ? "🔒 USED" : "🔒 LOCKED")
+      : "";
+    return `<button type="button" class="survivor-final-team ${selected ? "is-selected" : ""} ${disabled ? "is-disabled" : ""}" ${disabled ? "disabled" : ""} onclick="survivorSelect_('${id}')">
+      ${survivorFinalTeamLogo_(team)}
+      <span class="survivor-final-team-copy"><small>${survivorFinalEscape_(String(team.side || team.homeAway || "").toUpperCase())}</small><strong>${survivorFinalEscape_(team.name || team.id || "Team")}</strong>${team.teamRecord ? `<em>${survivorFinalEscape_(team.teamRecord)}</em>` : ""}</span>
+      ${used ? `<span class="survivor-final-used">${survivorFinalEscape_(used)}</span>` : ""}
+      ${lockLabel ? `<span class="rc24k-survivor-lock">${lockLabel}</span>` : ""}
+      ${selected ? '<span class="survivor-final-check">✓</span>' : ""}
+    </button>`;
+  };
+}
+
+survivorStandings_ = function(payload) {
+  const rows = Array.isArray(payload.standings) ? payload.standings : [];
+  if (!rows.length) return '<section class="card"><h2>Standings</h2><p>No Survivor entries yet.</p></section>';
+  const koth = payload.mode === "king-of-the-hill";
+  const streak = payload.mode === "streak-survivor" || payload.mode === "streak-points-strikes";
+  const title = koth ? "King of the Hill Standings" : (streak ? "Streak Survivor Standings" : "Survivor Standings");
+
+  return `<section class="card survivor-standings-card rc24k-survivor-standings">
+    <div class="survivor-card-head"><h2>${title}</h2><button class="button secondary" type="button" onclick="navigate('leaderboard')">Full Standings</button></div>
+    <div class="survivor-standings-list">
+      ${rows.slice(0, 12).map(function(row, index) {
+        let standingLabel;
+        if (koth) {
+          standingLabel = row.survivorWinner ? "SOLE SURVIVOR" : row.survivorAlive
+            ? ((row.kothStrikes || 0) + "/" + (row.kothStrikeLimit || payload.strikeLimit || 3) + " STRIKES")
+            : "ELIMINATED W" + survivorPageEscape_(row.survivorEliminatedRound || "");
+        } else if (streak) {
+          standingLabel = "STREAK " + survivorPageEscape_(row.survivorWinStreak || 0) +
+            " · " + survivorPageEscape_(row.survivorMultiplier || 1) + "×" +
+            " · " + survivorPageEscape_(row.survivorLivesRemaining || 0) + " LIVES";
+        } else {
+          standingLabel = row.survivorWinner ? "WINNER" : row.survivorAlive
+            ? "ALIVE · " + survivorPageEscape_(row.survivorLivesRemaining || 0) + " LIVES"
+            : "OUT W" + survivorPageEscape_(row.survivorEliminatedRound || "");
+        }
+        return `<div class="survivor-standing-row ${row.survivorAlive ? "alive" : "out"}"><span>#${index + 1}</span><strong>${survivorPageEscape_(row.displayName || row.username)}</strong><em>${standingLabel}</em><b>${survivorPageEscape_(row.total || 0)} pts</b></div>`;
+      }).join("")}
+    </div>
+  </section>`;
+};
+
+if (typeof renderSurvivorFinalLeagueCompare_ === "function") {
+  renderSurvivorFinalLeagueCompare_ = function(payload) {
+    payload = payload || {};
+    const lc = payload.leagueContext || {};
+    const compare = payload.compare || [];
+    if (!compare.length && !(lc.leagues || []).length) return "";
+
+    const selectedWeek = survivorFinalCompareWeek_(payload);
+    const currentWeek = String(payload.currentRound && payload.currentRound.week || "");
+    const maxWeek = Math.max(1, Number(payload.currentRound && payload.currentRound.week || payload.rounds && payload.rounds.length || 1));
+    const weekOptions = [];
+    if (currentWeek) weekOptions.push(`<option value="${survivorFinalEscape_(currentWeek)}" ${selectedWeek === currentWeek ? "selected" : ""}>Current Week · W${survivorFinalEscape_(currentWeek)}</option>`);
+    for (let i = maxWeek; i >= 1; i--) {
+      const w = String(i);
+      if (w === currentWeek) continue;
+      weekOptions.push(`<option value="${w}" ${selectedWeek === w ? "selected" : ""}>Week ${w}</option>`);
+    }
+    weekOptions.push(`<option value="all" ${selectedWeek === "all" ? "selected" : ""}>All Weeks</option>`);
+
+    return `<section class="survivor-final-compare rc24k-survivor-compare">
+      <div class="survivor-final-section-head"><strong>COMPARE</strong><small>2+ players · picks unlock at kickoff</small></div>
+      <div class="survivor-final-compare-filters">
+        <label>Week <select onchange="survivorFinalSetCompareWeek_(this.value)">${weekOptions.join("")}</select></label>
+        ${(lc.leagues || []).length > 1 ? `<label>League <select onchange="survivorFinalSwitchLeague_(this.value)">${lc.leagues.map(function(l) {
+          return `<option value="${survivorFinalEscape_(l.leagueId)}" ${l.leagueId === lc.leagueId ? "selected" : ""}>${survivorFinalEscape_(l.leagueName || l.leagueId)}</option>`;
+        }).join("")}</select></label>` : ""}
+      </div>
+      ${lc.pickScopeWarning ? `<div class="survivor-final-warning">${survivorFinalEscape_(lc.pickScopeWarning)}</div>` : ""}
+      <div class="survivor-final-compare-grid">
+        ${compare.map(function(p) {
+          const visible = (p.weeks || []).filter(function(w) { return selectedWeek === "all" || String(w.week) === selectedWeek; });
+          const logos = visible.length ? visible.map(survivorFinalCompareLogo_).join("") : '<span class="survivor-final-compare-abbr">—</span>';
+          return `<details><summary>
+            <span class="survivor-final-compare-player"><strong>${survivorFinalEscape_(p.displayName || p.username)}</strong><span class="survivor-final-compare-logos">${logos}</span></span>
+            <span>${p.alive === false ? "ELIMINATED" : "ALIVE"} · ${survivorFinalEscape_(p.totalPoints || 0)} pts · ${survivorFinalEscape_(p.livesRemaining || 0)} lives</span>
+          </summary><div>${visible.map(function(w) {
+            return `<p class="is-${survivorFinalEscape_(w.result || "pending")}"><b>W${survivorFinalEscape_(w.week)}</b> ${w.hidden ? "🔒 Pick hidden until kickoff" : survivorFinalEscape_(w.team || "No pick")}${w.opponent ? " vs " + survivorFinalEscape_(w.opponent) : ""}${w.finalScore ? " · FINAL " + survivorFinalEscape_(w.finalScore) : ""} · ${survivorFinalEscape_(w.result || "pending")}${w.weeklyPoints !== undefined && w.weeklyPoints !== null ? " · " + survivorFinalEscape_(w.weeklyPoints) + " pts" : ""}${w.streak !== undefined && w.streak !== null ? " · streak " + survivorFinalEscape_(w.streak) : ""}</p>`;
+          }).join("")}</div></details>`;
+        }).join("")}
+      </div>
+    </section>`;
+  };
+}
+
+if (typeof survivorSportsRulesCard_ === "function") {
+  const RC24K_SURVIVOR_RULES_BASE_ = survivorSportsRulesCard_;
+  survivorSportsRulesCard_ = function(payload) {
+    let html = RC24K_SURVIVOR_RULES_BASE_.apply(this, arguments);
+    const settings = payload && payload.settings || {};
+    if (settings.autoPickEnabled === true) {
+      const strategy = settings.autoPickStrategy === "best-record" ? "best record" : settings.autoPickStrategy === "best-odds" ? "best odds / favorite" : "random eligible team";
+      const note = `<p class="rc24k-survivor-autopick-note"><strong>Safety Net:</strong> If no pick is saved, Auto Pick may choose the ${survivorPageEscape_(strategy)} ${Number(settings.autoPickLeadMinutes || 0)} minute${Number(settings.autoPickLeadMinutes || 0) === 1 ? "" : "s"} before the last eligible kickoff.${Number(settings.autoPickPenalty || 0) > 0 ? " Auto-picked weeks carry a " + survivorPageEscape_(settings.autoPickPenalty) + "-point penalty." : ""}</p>`;
+      html = html.replace("</section>", note + "</section>");
+    }
+    return html;
+  };
+}

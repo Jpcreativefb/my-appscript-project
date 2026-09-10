@@ -1,0 +1,61 @@
+/* PATTC RC24K — NFL player experience hardening */
+
+/* Confidence */
+.rc24k-confidence-row .rc24k-confidence-picks{display:grid!important;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)!important;align-items:stretch!important;gap:10px!important}
+.rc24k-confidence-row .confidence-team-choice{min-width:0!important;border:2px solid rgba(148,163,184,.35)!important;transition:opacity .18s ease,filter .18s ease,border-color .18s ease,box-shadow .18s ease!important}
+.rc24k-confidence-row .confidence-team-choice.selected{border-color:#3b82f6!important;box-shadow:0 0 0 2px rgba(59,130,246,.24)!important}
+.rc24k-confidence-row .confidence-team-choice.not-selected{opacity:.48!important;filter:grayscale(1)!important}
+.rc24k-confidence-row.correct .confidence-team-choice.selected,.rc24k-confidence-row.phase-final.correct .confidence-team-choice.selected{border-color:#22c55e!important;box-shadow:0 0 0 2px rgba(34,197,94,.22)!important;opacity:1!important;filter:none!important}
+.rc24k-confidence-row.wrong .confidence-team-choice.selected,.rc24k-confidence-row.phase-final.wrong .confidence-team-choice.selected{border-color:#ef4444!important;box-shadow:0 0 0 2px rgba(239,68,68,.22)!important;filter:grayscale(1)!important}
+.rc24k-confidence-row .rc24k-confidence-control{display:flex!important;align-items:center!important;justify-content:space-between!important;gap:12px!important;margin-top:9px!important;padding:9px 11px!important;border:1px solid rgba(148,163,184,.24)!important;border-radius:12px!important;background:rgba(2,6,23,.48)!important}
+.rc24k-confidence-row .confidence-row-value{display:flex!important;align-items:center!important;gap:9px!important;flex:1 1 auto!important}
+.rc24k-confidence-row .confidence-value-input{width:auto!important;min-width:170px!important;max-width:230px!important}
+.rc24k-confidence-save-state{text-align:right;color:var(--confidence-theme-muted,#94a3b8);font-weight:700}
+.rc24k-confidence-row .confidence-game-details{margin-top:8px!important}
+.rc24k-confidence-toolbar-note{font-size:12px;font-weight:700;color:var(--confidence-theme-muted,#94a3b8)}
+
+/* Confidence compare */
+.rc24k-confidence-compare{margin-top:16px;border:1px solid rgba(148,163,184,.28);border-radius:16px;background:rgba(2,6,23,.62);overflow:hidden}
+.rc24k-confidence-compare-head{display:flex;justify-content:space-between;gap:12px;padding:13px 14px;border-bottom:1px solid rgba(148,163,184,.18)}
+.rc24k-confidence-compare-head>div{display:grid;gap:3px}.rc24k-confidence-compare-head span,.rc24k-confidence-compare-head small{color:#94a3b8;font-size:11px}
+.rc24k-confidence-compare-chooser{display:flex;gap:8px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid rgba(148,163,184,.16)}
+.rc24k-confidence-compare-chooser label{display:flex;gap:6px;align-items:center;padding:6px 9px;border:1px solid rgba(148,163,184,.25);border-radius:999px;font-size:12px}
+.rc24k-confidence-compare-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.rc24k-confidence-compare-table{width:100%;min-width:720px;border-collapse:collapse}
+.rc24k-confidence-compare-table th,.rc24k-confidence-compare-table td{padding:10px;border-right:1px solid rgba(148,163,184,.14);border-bottom:1px solid rgba(148,163,184,.14);vertical-align:middle}
+.rc24k-confidence-compare-table thead th{position:sticky;top:0;background:#091425;z-index:1}
+.rc24k-confidence-compare-table thead th strong,.rc24k-confidence-compare-table thead th small{display:block}.rc24k-confidence-compare-table thead th small{color:#94a3b8;margin-top:2px}
+.rc24k-confidence-compare-table tbody th{min-width:180px;text-align:left}.rc24k-confidence-compare-table tbody th span,.rc24k-confidence-compare-table tbody th small{display:block;color:#94a3b8;font-size:10px}
+.rc24k-confidence-compare-pick summary{display:flex;align-items:center;gap:7px;cursor:pointer;list-style:none}.rc24k-confidence-compare-pick summary::-webkit-details-marker{display:none}
+.rc24k-confidence-compare-pick>div{margin-top:6px;font-size:11px;color:#cbd5e1}.rc24k-confidence-compare-logo{width:26px!important;height:26px!important;object-fit:contain!important}
+.rc24k-confidence-compare-lock{font-size:18px}.rc24k-confidence-compare-blank{color:#64748b}
+
+/* Survivor */
+.rc24k-survivor-lock{display:inline-flex;align-items:center;justify-content:center;padding:3px 6px;border-radius:999px;background:rgba(15,23,42,.92);color:#cbd5e1;font-size:9px;font-weight:900;letter-spacing:.05em}
+.survivor-final-team.is-selected{border-color:#3b82f6!important;box-shadow:0 0 0 2px rgba(59,130,246,.22)!important}
+.survivor-final-team.is-disabled{opacity:.42!important;filter:grayscale(1)!important}
+.survivor-final-trail-item.is-success{border-color:rgba(34,197,94,.72)!important;box-shadow:inset 0 0 0 1px rgba(34,197,94,.2)}
+.survivor-final-trail-item.is-loss{border-color:rgba(239,68,68,.8)!important;box-shadow:inset 0 0 0 1px rgba(239,68,68,.22);filter:grayscale(.8)}
+.survivor-final-compare p.is-win{border-left:3px solid #22c55e;padding-left:8px}.survivor-final-compare p.is-loss{border-left:3px solid #ef4444;padding-left:8px;filter:grayscale(.65)}
+.rc24k-survivor-autopick-note{margin-top:10px;padding:9px 11px;border:1px solid rgba(59,130,246,.32);border-radius:10px;background:rgba(59,130,246,.08)}
+
+/* KOTH responsive hardening */
+.sports-default-koth-final{width:min(100%,1180px)!important;max-width:1180px!important;margin-inline:auto!important}
+.sports-default-koth-final .koth-rich-hero{position:relative!important;min-height:160px!important;height:clamp(160px,20vw,230px)!important;max-height:230px!important;overflow:hidden!important;background-size:cover!important;background-repeat:no-repeat!important;background-position:var(--sports-rich-hero-position,center center)!important}
+.sports-default-koth-final .koth-final-hero-overlay{min-height:100%!important;padding:18px 22px!important;display:flex!important;flex-direction:column!important;justify-content:flex-end!important}
+.sports-default-koth-final .koth-final-hero-logo{width:auto!important;max-width:210px!important;height:auto!important;max-height:56px!important;object-fit:contain!important;object-position:left center!important}
+.sports-default-koth-final .koth-rich-hero>img:not(.koth-final-hero-logo){max-width:220px!important;max-height:72px!important;object-fit:contain!important}
+.sports-default-koth-final .koth-final-dashboard,.sports-default-koth-final .koth-final-my-week{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.sports-default-koth-final .koth-final-field-grid{grid-template-columns:repeat(auto-fit,minmax(135px,1fr))!important}
+
+@media(max-width:700px){
+.rc24k-confidence-row .rc24k-confidence-picks{grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr)!important;gap:6px!important}
+.rc24k-confidence-row .rc24k-confidence-control{align-items:stretch!important;flex-direction:column!important}.rc24k-confidence-row .confidence-row-value{justify-content:space-between!important;width:100%!important}
+.rc24k-confidence-row .confidence-value-input{min-width:0!important;width:min(58%,190px)!important}.rc24k-confidence-save-state{text-align:left}
+.rc24k-confidence-row .confidence-team-choice{padding:8px 5px!important}.rc24k-confidence-row .confidence-team-logo{width:42px!important;height:42px!important}.rc24k-confidence-row .confidence-team-city{font-size:9px!important}.rc24k-confidence-row .confidence-team-nickname{font-size:12px!important}
+.sports-default-koth-final .koth-rich-hero{min-height:145px!important;height:145px!important;max-height:145px!important;background-size:contain!important;background-position:center center!important;background-color:#020b13!important}
+.sports-default-koth-final .koth-final-hero-overlay{padding:10px 12px!important;background:linear-gradient(180deg,rgba(1,8,15,.05),rgba(1,8,15,.82))!important}.sports-default-koth-final .koth-final-hero-logo{max-width:110px!important;max-height:34px!important}
+.sports-default-koth-final .koth-final-hero-overlay h1{font-size:clamp(18px,6vw,28px)!important;line-height:1!important}
+.sports-default-koth-final .koth-final-dashboard,.sports-default-koth-final .koth-final-my-week{grid-template-columns:1fr!important}.sports-default-koth-final .koth-final-field-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+}
+@media(max-width:420px){.sports-default-koth-final .koth-rich-hero{min-height:125px!important;height:125px!important;max-height:125px!important}}

@@ -4475,3 +4475,11 @@ async function apiAdminAwardsLinkMarket(payload) {
     payload || {}
   );
 }
+
+/* RC24K — Confidence compare */
+async function apiGetConfidenceCompare(gameId) {
+  return api("getConfidenceCompare", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}

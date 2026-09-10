@@ -14,10 +14,10 @@ ok(startup.includes('copy.scoreMode = "confidence-points"'), "Sports Confidence 
 const builder = read("backend/engines/SportsConfidenceBuilderEngine.js");
 ok(builder.includes('sportsWagerSetIfExists_(row, col, "ScoreMode", "confidence-points")'), "builder must keep writing confidence-points");
 const html = read("frontend/app.html");
-ok(html.includes("v1219rc24j-confidence-scoremode-repair-r1"), "RC24J frontend marker missing");
+ok(html.includes("v1219rc24j-confidence-scoremode-repair-r1") || html.includes("v1219rc24k-nfl-player-experience-r1"), "RC24J/RC24K frontend marker missing");
 const appA = read("frontend/js/app.js");
 const appB = read("frontend/app.js");
 ok(appA === appB, "frontend app mirrors must match");
 ok(appA.includes('pattcStartupPayload:rc24j:'), "RC24J browser startup cache key missing");
-ok(appA.includes("rc24j-confidence-scoremode-repair-r1"), "RC24J route hotfix marker missing");
+ok(appA.includes("rc24j-confidence-scoremode-repair-r1") || appA.includes("rc24k-nfl-player-experience-r1"), "RC24J/RC24K route hotfix marker missing");
 console.log("RC24J Confidence ScoreMode repair tests: PASS");

@@ -2143,6 +2143,30 @@ function renderAdminGameForm(
                 </select>
               </label>
 
+              <label class="admin-check-row" data-survivor-sports-field>
+                <input type="checkbox" name="survivorAutoPickEnabled" ${survivorSettings.autoPickEnabled === true ? "checked" : ""}>
+                <span>${adminFieldLabel_("Auto Pick Safety Net", "If a player still has no pick near the final eligible kickoff, automatically choose an eligible unused team.")}</span>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Auto Pick Strategy", "Random chooses any eligible unused team. Best Record favors the strongest record. Best Odds favors the strongest available moneyline favorite.")}
+                <select name="survivorAutoPickStrategy">
+                  <option value="random" ${survivorSettings.autoPickStrategy === "random" ? "selected" : ""}>Random Eligible Team</option>
+                  <option value="best-record" ${survivorSettings.autoPickStrategy === "best-record" ? "selected" : ""}>Best Record</option>
+                  <option value="best-odds" ${survivorSettings.autoPickStrategy === "best-odds" ? "selected" : ""}>Best Odds / Favorite</option>
+                </select>
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Auto Pick Penalty", "Optional point deduction applied when the safety net makes the pick. Use 0 for no point penalty.")}
+                <input type="number" name="survivorAutoPickPenalty" min="0" step="1" value="${adminGamesEscapeHtml(survivorSettings.autoPickPenalty || 0)}">
+              </label>
+
+              <label class="admin-field" data-survivor-sports-field>
+                ${adminFieldLabel_("Auto Pick Lead Minutes", "How many minutes before the last eligible kickoff the safety net may make a missing pick.")}
+                <input type="number" name="survivorAutoPickLeadMinutes" min="0" max="180" step="1" value="${adminGamesEscapeHtml(survivorSettings.autoPickLeadMinutes === undefined ? 5 : survivorSettings.autoPickLeadMinutes)}">
+              </label>
+
               <label class="admin-field" data-survivor-sports-field>
                 ${adminFieldLabel_("Tie / ATS Push", "Survive keeps the player alive without a win. Loss consumes a life. No Result ignores the week for that pick.")}
                 <select name="survivorPushRule">
@@ -3219,6 +3243,10 @@ function adminGetGamePayloadFromForm_(
         teamUseLimit: form.survivorTeamUseLimit ? form.survivorTeamUseLimit.value : 1,
         pickLockMode: form.survivorPickLockMode ? form.survivorPickLockMode.value : "team-kickoff",
         missedPickRule: form.survivorMissedPickRule ? form.survivorMissedPickRule.value : "loss",
+        autoPickEnabled: !!(form.survivorAutoPickEnabled && form.survivorAutoPickEnabled.checked),
+        autoPickStrategy: form.survivorAutoPickStrategy ? form.survivorAutoPickStrategy.value : "random",
+        autoPickPenalty: form.survivorAutoPickPenalty ? form.survivorAutoPickPenalty.value : 0,
+        autoPickLeadMinutes: form.survivorAutoPickLeadMinutes ? form.survivorAutoPickLeadMinutes.value : 5,
         pushRule: form.survivorPushRule ? form.survivorPushRule.value : "survive",
         endMode: form.survivorEndMode ? form.survivorEndMode.value : "sole-survivor",
         showRecords: !!(form.survivorShowRecords && form.survivorShowRecords.checked),

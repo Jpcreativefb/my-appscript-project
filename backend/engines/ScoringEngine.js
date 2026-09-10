@@ -124,10 +124,17 @@ function getScoringBasePoints_(
 
   if (usesConfidencePoints) {
 
-    return normalizeScoreNumber_(
-      pick.confidencePoints,
-      0
-    );
+    const selectedConfidence =
+      normalizeScoreNumber_(
+        pick.confidencePoints,
+        0
+      );
+
+    // RC24K optional confidence:
+    // saved team + blank confidence = basic +1 / 0 pick.
+    return selectedConfidence > 0
+      ? selectedConfidence
+      : 1;
 
   }
 
@@ -611,9 +618,11 @@ function getLeaderboardData(
 
             } else if (
               usesConfidencePoints &&
-              confidenceScoringMode === "risk_penalty"
+              confidenceScoringMode === "risk_penalty" &&
+              normalizeScoreNumber_(pick.confidencePoints, 0) > 0
             ) {
 
+              // Blank confidence is the safe basic pick: a loss scores zero.
               fixedPoints -= adjustedPoints;
 
             }

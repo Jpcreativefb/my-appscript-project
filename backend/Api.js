@@ -219,6 +219,27 @@ function doPost(e) {
       }));
     }
 
+    if (action === "getConfidenceCompare") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(
+        body.username,
+        postGameId,
+        "viewGame",
+        postLeagueId
+      );
+      if (!access.allowed) {
+        return json({ success: false, error: "Access denied: " + access.reason });
+      }
+      return json(apiGetConfidenceCompare_({
+        username: body.username,
+        gameId: postGameId,
+        leagueId: postLeagueId
+      }));
+    }
+
     if (action === "saveRanking") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"

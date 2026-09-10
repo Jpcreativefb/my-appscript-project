@@ -26,7 +26,8 @@ const SPORTS_SURVIVOR_SETTINGS_HEADERS = [
   "KothMaxMultiplier", "KothLossBehavior", "EarnLifeEnabled", "EarnLifeWinStreak",
   "MaxEarnedLives", "SafeWeeks", "ATSWeeks", "UnderdogWeeks", "RoadOnlyWeeks",
   "DivisionWeeks", "DoublePickWeeks", "SecondChanceWeeks", "RedemptionWeeks",
-  "ConfidenceWeeks", "MaxConfidenceRisk", "AutoSettle", "AutoBuildNextWeek",
+  "ConfidenceWeeks", "MaxConfidenceRisk", "AutoPickEnabled", "AutoPickStrategy",
+  "AutoPickPenalty", "AutoPickLeadMinutes", "AutoSettle", "AutoBuildNextWeek",
   "AutoRefreshOdds", "AutomationEnabled",
   "KothSourceGameIdsJSON", "KothCombineMode", "KothEntryAggregation", "KothStrikeLimit",
   "KothPacingMode", "KothFixedRecipients", "KothCustomSchedule", "KothTieRule",
@@ -176,6 +177,10 @@ function sportsSurvivorDefaultSettings_(gameId) {
     redemptionWeeks: "",
     confidenceWeeks: "",
     maxConfidenceRisk: 10,
+    autoPickEnabled: false,
+    autoPickStrategy: "random",
+    autoPickPenalty: 0,
+    autoPickLeadMinutes: 5,
     autoSettle: true,
     autoBuildNextWeek: true,
     autoRefreshOdds: true,
@@ -246,6 +251,12 @@ function sportsSurvivorNormalizeSettings_(raw, gameId) {
     redemptionWeeks: sportsSurvivorString_(get("redemptionWeeks", "RedemptionWeeks")),
     confidenceWeeks: sportsSurvivorString_(get("confidenceWeeks", "ConfidenceWeeks")),
     maxConfidenceRisk: Math.max(0, sportsSurvivorNumber_(get("maxConfidenceRisk", "MaxConfidenceRisk"), defaults.maxConfidenceRisk)),
+    autoPickEnabled: sportsSurvivorBool_(get("autoPickEnabled", "AutoPickEnabled"), defaults.autoPickEnabled),
+    autoPickStrategy: ["random", "best-record", "best-odds"].indexOf(sportsSurvivorKey_(get("autoPickStrategy", "AutoPickStrategy"))) >= 0
+      ? sportsSurvivorKey_(get("autoPickStrategy", "AutoPickStrategy"))
+      : defaults.autoPickStrategy,
+    autoPickPenalty: Math.max(0, sportsSurvivorNumber_(get("autoPickPenalty", "AutoPickPenalty"), defaults.autoPickPenalty)),
+    autoPickLeadMinutes: Math.max(0, Math.floor(sportsSurvivorNumber_(get("autoPickLeadMinutes", "AutoPickLeadMinutes"), defaults.autoPickLeadMinutes))),
     autoSettle: sportsSurvivorBool_(get("autoSettle", "AutoSettle"), defaults.autoSettle),
     autoBuildNextWeek: sportsSurvivorBool_(get("autoBuildNextWeek", "AutoBuildNextWeek"), defaults.autoBuildNextWeek),
     autoRefreshOdds: sportsSurvivorBool_(get("autoRefreshOdds", "AutoRefreshOdds"), defaults.autoRefreshOdds),
@@ -309,6 +320,8 @@ function survivorSaveSettings_(gameId, value) {
     DivisionWeeks: settings.divisionWeeks, DoublePickWeeks: settings.doublePickWeeks,
     SecondChanceWeeks: settings.secondChanceWeeks, RedemptionWeeks: settings.redemptionWeeks,
     ConfidenceWeeks: settings.confidenceWeeks, MaxConfidenceRisk: settings.maxConfidenceRisk,
+    AutoPickEnabled: settings.autoPickEnabled, AutoPickStrategy: settings.autoPickStrategy,
+    AutoPickPenalty: settings.autoPickPenalty, AutoPickLeadMinutes: settings.autoPickLeadMinutes,
     AutoSettle: settings.autoSettle, AutoBuildNextWeek: settings.autoBuildNextWeek,
     AutoRefreshOdds: settings.autoRefreshOdds, AutomationEnabled: settings.automationEnabled,
     KothSourceGameIdsJSON: JSON.stringify(settings.kothSourceGameIds || []),
@@ -841,7 +854,25 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     const pick = userPicks[categoryId] || { nomineeIds: [], snapshots: [], confidencePoints: 0 };
     const nomineeIds = Array.isArray(pick.nomineeIds) ? pick.nomineeIds.map(sportsSurvivorKey_).filter(Boolean) : [];
     nomineeIds.forEach(function(id) { usage[id] = (usage[id] || 0) + 1; });
-    const sourceResolved = sportsSurvivorCategoryResolved_(categoryId, optionMeta, resultMap);
+    const allSourceResolved = sportsSurvivorCategoryResolved_(categoryId, optionMeta, resultMap);
+    const selectedSourceResolved =
+      nomineeIds.length >= rules.requiredSelections &&
+      nomineeIds.every(function(nomineeId) {
+        const meta = (optionMeta[categoryId] || {})[nomineeId] || {};
+        const sportsGameId = sportsSurvivorString_(meta.sportsGameId || meta.espnEventId);
+        const result = (resultMap[categoryId] || {})[sportsGameId] || {};
+        return !!(
+          sportsGameId &&
+          (
+            sportsSurvivorBool_(result.Completed, false) ||
+            sportsSurvivorBool_(result.Cancelled, false)
+          )
+        );
+      });
+    const sourceResolved =
+      nomineeIds.length >= rules.requiredSelections
+        ? selectedSourceResolved
+        : allSourceResolved;
     let resolved = roundEligible && sourceResolved;
     if (roundEligible && !sourceResolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
     let status = resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming");
@@ -935,16 +966,20 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
         if (rules.safe) {
           safeApplied = true;
           status = "safe-loss";
-        } else if (settings.mode === "streak-survivor") {
-          // v1.2.18y compatibility: legacy Streak Survivor resets the streak but never consumes a strike/life.
+        } else if (settings.mode === "streak-survivor" && settings.lossesAllowed <= 0) {
+          // Compatibility: zero-life Streak Survivor remains a pure reset game.
           lossApplied = true;
           if (rules.confidence) totalPoints -= Math.max(0, Math.min(settings.maxConfidenceRisk, sportsSurvivorNumber_(pick.confidencePoints, 0)));
           if (settings.kothLossBehavior === "drop-one") winStreak = Math.max(0, winStreak - 1);
           else if (settings.kothLossBehavior === "half") winStreak = Math.floor(winStreak / 2);
           else winStreak = 0;
           status = "loss-reset";
-        } else if (settings.mode === "streak-points-strikes") {
-          // RC24A Streak Points + Strikes: loss scores zero, resets/reduces streak, and consumes the configured strike allowance.
+        } else if (
+          settings.mode === "streak-points-strikes" ||
+          (settings.mode === "streak-survivor" && settings.lossesAllowed > 0)
+        ) {
+          // RC24K: multiplier Streak Survivor may also use configured lives.
+          // A loss scores zero, resets/reduces the streak, and consumes one life.
           lossApplied = true;
           if (rules.confidence) totalPoints -= Math.max(0, Math.min(settings.maxConfidenceRisk, sportsSurvivorNumber_(pick.confidencePoints, 0)));
           if (settings.kothLossBehavior === "drop-one") winStreak = Math.max(0, winStreak - 1);
@@ -952,7 +987,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           else winStreak = 0;
           lossesUsed++;
           const availableLosses = settings.lossesAllowed + earnedLives;
-          if (lossesUsed > availableLosses) {
+          if (availableLosses > 0 ? lossesUsed >= availableLosses : lossesUsed > 0) {
             alive = false;
             eliminatedRound = week;
             eliminatedReason = missed ? "missed" : "loss";
@@ -965,7 +1000,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           lossesUsed++;
           winStreak = 0;
           const availableLosses = settings.lossesAllowed + earnedLives;
-          if (lossesUsed > availableLosses) {
+          if (availableLosses > 0 ? lossesUsed >= availableLosses : lossesUsed > 0) {
             alive = false;
             eliminatedRound = week;
             eliminatedReason = missed ? "missed" : "loss";
@@ -1547,4 +1582,165 @@ function sportsSurvivorRc24aEnrichState_(state, payload) {
 var SPORTS_SURVIVOR_RC24A_ORIGINAL_STATE_ = apiGetSportsSurvivorState_;
 apiGetSportsSurvivorState_ = function(payload) {
   return sportsSurvivorRc24aEnrichState_(SPORTS_SURVIVOR_RC24A_ORIGINAL_STATE_(payload), payload || {});
+};
+
+/* =========================================================
+   RC24K — SURVIVOR SAFETY-NET AUTOPICK
+========================================================= */
+function sportsSurvivorRc24kRecordPct_(record) {
+  const match = String(record || "").match(/(\d+)\s*[-–]\s*(\d+)(?:\s*[-–]\s*(\d+))?/);
+  if (!match) return -1;
+  const wins = Number(match[1]) || 0, losses = Number(match[2]) || 0, ties = Number(match[3]) || 0;
+  const games = wins + losses + ties;
+  return games ? (wins + ties * 0.5) / games : -1;
+}
+
+function sportsSurvivorRc24kOddsStrength_(value) {
+  const odds = Number(value);
+  if (!Number.isFinite(odds) || odds === 0) return -1;
+  if (odds < 0) return (-odds) / ((-odds) + 100);
+  return 100 / (odds + 100);
+}
+
+function sportsSurvivorRc24kPickCandidates_(state, strategy) {
+  const round = state && state.currentRound || {};
+  let rows = (round.nominees || []).filter(function(nominee) {
+    if (!nominee || nominee.eligible === false) return false;
+    const kickoff = nominee.kickoff ? new Date(nominee.kickoff).getTime() : 0;
+    return !kickoff || Date.now() < kickoff;
+  });
+
+  strategy = sportsSurvivorKey_(strategy || "random");
+  if (strategy === "best-record") {
+    rows.sort(function(a, b) { return sportsSurvivorRc24kRecordPct_(b.teamRecord) - sportsSurvivorRc24kRecordPct_(a.teamRecord); });
+  } else if (strategy === "best-odds") {
+    rows.sort(function(a, b) { return sportsSurvivorRc24kOddsStrength_(b.moneyline) - sportsSurvivorRc24kOddsStrength_(a.moneyline); });
+  } else {
+    rows = rows.slice().sort(function() { return Math.random() - 0.5; });
+  }
+  return rows;
+}
+
+function sportsSurvivorRc24kParticipantUsers_(gameId) {
+  const legacy = typeof survivorAllPickMaps_ === "function" ? survivorAllPickMaps_(gameId) : {};
+  if (typeof survivorParticipantUsernames_ === "function") {
+    return survivorParticipantUsernames_(gameId, legacy, []) || [];
+  }
+  return Object.keys(sportsSurvivorPickMetaMap_(gameId) || {});
+}
+
+function sportsSurvivorRc24kAutoPickMissing_(gameId) {
+  const settings = survivorGetSettings_(gameId);
+  if (!settings.autoPickEnabled || !settings.automationEnabled) return { enabled: false, picked: [] };
+  if (settings.mode === "king-of-the-hill" || settings.mode === "manual-elimination") {
+    return { enabled: true, skipped: true, reason: "passive-or-manual-mode", picked: [] };
+  }
+
+  const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
+  const stage = sportsSurvivorKey_(game && (game.status || game.gameStatus));
+  if (stage !== "live" && stage !== "active") {
+    return { enabled: true, skipped: true, reason: "game-not-live", picked: [] };
+  }
+
+  const usernames = sportsSurvivorRc24kParticipantUsers_(gameId);
+  const picked = [], skipped = [];
+
+  usernames.forEach(function(username) {
+    try {
+      const state = apiGetSportsSurvivorState_({ username: username, gameId: gameId });
+      const round = state && state.currentRound;
+      if (!round || !round.canPick) { skipped.push({ username: username, reason: "no-open-round" }); return; }
+      if ((round.pickNomineeIds || []).length || round.pickNomineeId) { skipped.push({ username: username, reason: "already-picked" }); return; }
+
+      const candidates = sportsSurvivorRc24kPickCandidates_(state, settings.autoPickStrategy);
+      const required = Math.max(1, Number(round.requiredSelections || 1));
+      if (candidates.length < required) { skipped.push({ username: username, reason: "not-enough-eligible-teams" }); return; }
+
+      const kickoffs = candidates.map(function(row) {
+        return row.kickoff ? new Date(row.kickoff).getTime() : 0;
+      }).filter(function(value) { return Number.isFinite(value) && value > Date.now(); });
+
+      if (kickoffs.length) {
+        const lastKickoff = Math.max.apply(Math, kickoffs);
+        const triggerAt = lastKickoff - Math.max(0, Number(settings.autoPickLeadMinutes || 0)) * 60000;
+        if (Date.now() < triggerAt) { skipped.push({ username: username, reason: "too-early" }); return; }
+      }
+
+      const selected = candidates.slice(0, required).map(function(row) { return row.id; });
+      sportsSurvivorSavePick_({
+        username: username,
+        gameId: gameId,
+        categoryId: round.categoryId,
+        nomineeId: selected[0],
+        nomineeIds: selected,
+        confidencePoints: 0
+      });
+
+      const metaMap = sportsSurvivorPickMetaMap_(gameId);
+      const saved = (metaMap[sportsSurvivorKey_(username)] || {})[sportsSurvivorKey_(round.categoryId)];
+      if (saved) {
+        const snapshots = (saved.snapshots || []).map(function(snapshot) {
+          return Object.assign({}, snapshot || {}, {
+            autoPick: true,
+            autoPickStrategy: settings.autoPickStrategy,
+            autoPickPenalty: Math.max(0, Number(settings.autoPickPenalty || 0))
+          });
+        });
+        sportsSurvivorSavePickMeta_(
+          gameId, username, round.categoryId,
+          saved.nomineeIds || selected, snapshots, saved.confidencePoints || 0
+        );
+      }
+
+      picked.push({
+        username: username,
+        week: round.week,
+        nomineeIds: selected,
+        strategy: settings.autoPickStrategy,
+        penalty: Math.max(0, Number(settings.autoPickPenalty || 0))
+      });
+    } catch (err) {
+      skipped.push({ username: username, reason: err.message || String(err) });
+    }
+  });
+
+  return { enabled: true, picked: picked, skipped: skipped };
+}
+
+const SPORTS_SURVIVOR_RC24K_EVALUATE_BASE_ = sportsSurvivorEvaluateUser_;
+sportsSurvivorEvaluateUser_ = function(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap) {
+  const evaluation = SPORTS_SURVIVOR_RC24K_EVALUATE_BASE_.apply(this, arguments);
+  const userPicks = (pickMetaMap || {})[sportsSurvivorKey_(username)] || {};
+  let totalPenalty = 0;
+
+  (evaluation.rounds || []).forEach(function(round) {
+    const pick = userPicks[sportsSurvivorKey_(round.categoryId)] || {};
+    const snapshots = Array.isArray(pick.snapshots) ? pick.snapshots : [];
+    const auto = snapshots.find(function(snapshot) { return snapshot && snapshot.autoPick === true; });
+    if (!auto) return;
+
+    round.autoPicked = true;
+    round.autoPickStrategy = auto.autoPickStrategy || settings.autoPickStrategy || "random";
+    round.autoPickPenalty = Math.max(0, Number(auto.autoPickPenalty || 0));
+
+    if (round.resolved && round.autoPickPenalty > 0) {
+      totalPenalty += round.autoPickPenalty;
+      round.earnedPoints = Number(round.earnedPoints || 0) - round.autoPickPenalty;
+    }
+  });
+
+  evaluation.autoPickPenaltyTotal = totalPenalty;
+  evaluation.totalPoints = Number(evaluation.totalPoints || 0) - totalPenalty;
+  return evaluation;
+};
+
+const SPORTS_SURVIVOR_RC24K_AUTOMATION_BASE_ = survivorRunSportsAutomation_;
+survivorRunSportsAutomation_ = function(gameId, options) {
+  const result = SPORTS_SURVIVOR_RC24K_AUTOMATION_BASE_.apply(this, arguments) || {};
+  try {
+    result.autoPick = sportsSurvivorRc24kAutoPickMissing_(gameId);
+  } catch (err) {
+    result.autoPick = { enabled: true, error: err.message || String(err), picked: [] };
+  }
+  return result;
 };

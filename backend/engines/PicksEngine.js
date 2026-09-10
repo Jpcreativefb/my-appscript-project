@@ -79,10 +79,13 @@ function isGamePickEntryLocked_(gameConfig) {
 
   const status = normalizeLower_(gameConfig.status || gameConfig.gameStatus || "");
 
-  return status === "draft" ||
-    status === "setup" ||
-    status === "preview" ||
-    status === "archived" ||
+  /*
+    RC24K: lifecycle access belongs to LeagueAccessEngine / API feature gates.
+    Keeping Draft/Setup/Preview locked here prevented an authenticated admin
+    from actually testing Preview picks. Archived remains terminal here, while
+    lockAllPicks/resultsFinalized and every category kickoff lock still apply.
+  */
+  return status === "archived" ||
     status === "archive";
 
 }
@@ -1133,9 +1136,9 @@ function saveConfidencePicksBatch(payload) {
       const nomineeId = normalizeLower_(item.nomineeId);
       const confidencePoints = normalizeConfidencePoints_(item.confidencePoints);
 
-      if (!categoryId || !nomineeId || confidencePoints <= 0) {
+      if (!categoryId || !nomineeId) {
         throw new Error(
-          "Every Confidence row must include categoryId, nomineeId, and confidencePoints"
+          "Every Confidence row must include categoryId and nomineeId"
         );
       }
 
@@ -2567,4 +2570,111 @@ function savePick(payload){
 
   }
 
+}
+
+/* =========================================================
+   RC24K — CONFIDENCE COMPARE
+   Another player's selection is hidden until that matchup locks.
+========================================================= */
+function apiGetConfidenceCompare_(payload) {
+  payload = payload || {};
+  const gameId = normalizeString_(payload.gameId || getDefaultGameId());
+  const viewer = normalizeString_(payload.username);
+  if (!gameId || !viewer) {
+    return { success: false, message: "Username and gameId are required" };
+  }
+
+  const settings =
+    typeof getCategorySettingsCached === "function"
+      ? getCategorySettingsCached(gameId)
+      : getCategorySettings(gameId);
+
+  const categories =
+    typeof getCategoriesCached === "function"
+      ? getCategoriesCached(gameId)
+      : getCategories(gameId);
+
+  let leaderboard =
+    typeof getLeaderboardData === "function"
+      ? (getLeaderboardData(gameId) || [])
+      : [];
+
+  const leagueId = String(payload.leagueId || "").trim();
+  if (leagueId && typeof filterLeaderboardRowsForLeague_ === "function") {
+    leaderboard = filterLeaderboardRowsForLeague_(leaderboard, gameId, leagueId);
+  }
+
+  const confidenceIds = [];
+  (categories || []).forEach(function(category) {
+    const id = normalizeLower_(category && category.id);
+    if (!id) return;
+    const config = settings[id] || {};
+    if (confidenceBatchUsesPoints_(config, true)) confidenceIds.push(id);
+  });
+
+  const viewerKey = normalizeLower_(viewer);
+  const players = [];
+  const seen = {};
+
+  function addPlayer(row) {
+    row = row || {};
+    const username = normalizeString_(row.username || row.user);
+    const key = normalizeLower_(username);
+    if (!username || seen[key]) return;
+    seen[key] = true;
+
+    const pickRows = getUserPicks(username, gameId) || [];
+    const byCategory = {};
+    pickRows.forEach(function(pick) {
+      byCategory[normalizeLower_(pick.categoryId)] = pick;
+    });
+
+    const picks = {};
+    confidenceIds.forEach(function(categoryId) {
+      const config = settings[categoryId] || {};
+      const pick = byCategory[categoryId] || null;
+      const reveal =
+        key === viewerKey ||
+        isCategoryConfigLocked_(config) ||
+        Boolean(config.winnerNomineeId) ||
+        String(config.settlementStatus || "").toLowerCase() === "settled";
+
+      if (!reveal) {
+        picks[categoryId] = { hidden: true };
+        return;
+      }
+
+      picks[categoryId] = {
+        hidden: false,
+        nomineeId: pick ? normalizeString_(pick.nomineeId) : "",
+        confidencePoints: pick ? normalizeConfidencePoints_(pick.confidencePoints) : 0,
+        status: pick ? getPickResultStatus_(config, pick.nomineeId) : "pending"
+      };
+    });
+
+    players.push({
+      username: username,
+      displayName: normalizeString_(row.displayName || username),
+      avatar: row.avatar || "👤",
+      total: Number(row.total || 0),
+      picks: picks,
+      isCurrent: key === viewerKey
+    });
+  }
+
+  leaderboard.forEach(addPlayer);
+  if (!seen[viewerKey]) addPlayer({ username: viewer, displayName: viewer, total: 0 });
+
+  players.sort(function(a, b) {
+    if (a.isCurrent !== b.isCurrent) return a.isCurrent ? -1 : 1;
+    if (b.total !== a.total) return b.total - a.total;
+    return a.displayName.localeCompare(b.displayName);
+  });
+
+  return {
+    success: true,
+    gameId: gameId,
+    players: players,
+    categoryIds: confidenceIds
+  };
 }
