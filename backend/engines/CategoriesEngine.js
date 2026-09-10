@@ -202,6 +202,9 @@ function getCategoriesColumnMap_(headers){
     oddsMode:
       headers.indexOf("OddsMode"),
 
+    scoreMode:
+      headers.indexOf("ScoreMode"),
+
     resultSource:
       headers.indexOf("ResultSource"),
 
@@ -536,7 +539,13 @@ function getCategories(gameId){
           ) || "none",
 
         scoreMode:
-          config.scoreMode || "correct-pick",
+          (
+            col.scoreMode > -1
+              ? String(row[col.scoreMode] || "").trim()
+              : ""
+          ) ||
+          config.scoreMode ||
+          "correct-pick",
 
         resultSource:
           config.resultSource ||

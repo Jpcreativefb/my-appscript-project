@@ -11,6 +11,40 @@ function appStartupPayloadCacheKey_(username, gameId) {
   return userKey && gameKey ? "startup_payload_v1_" + userKey + "_" + gameKey : "";
 }
 
+function appRepairSportsConfidenceScoreMode_(game, categories) {
+  game = game || {};
+  categories = Array.isArray(categories) ? categories : [];
+
+  const type = String(game.type || game.gameType || "").trim().toLowerCase();
+  const confidenceGame =
+    type === "confidence" ||
+    type === "confidence-pool" ||
+    game.confidenceEnabled === true;
+
+  if (!confidenceGame) return categories;
+
+  return categories.map(function(category) {
+    category = category || {};
+    const id = String(category.id || "").trim().toLowerCase();
+    const questionType = String(category.questionType || "").trim().toLowerCase();
+
+    if (
+      id.indexOf("sports-confidence-") !== 0 ||
+      questionType !== "team-matchup"
+    ) {
+      return category;
+    }
+
+    if (String(category.scoreMode || "").trim().toLowerCase() === "confidence-points") {
+      return category;
+    }
+
+    const copy = Object.assign({}, category);
+    copy.scoreMode = "confidence-points";
+    return copy;
+  });
+}
+
 function apiGetStartupPayload(payload) {
 
   payload =
@@ -73,6 +107,12 @@ function apiGetStartupPayload(payload) {
     typeof getCategoriesCached === "function"
       ? getCategoriesCached(gameId)
       : getCategories(gameId);
+
+  categories =
+    appRepairSportsConfidenceScoreMode_(
+      game,
+      categories
+    );
 
   let liveProbabilitiesDeferred = false;
 
