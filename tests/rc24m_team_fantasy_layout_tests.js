@@ -1,0 +1,18 @@
+const fs=require('fs'),path=require('path'),assert=require('assert');
+const root=path.resolve(__dirname,'..'),r=p=>fs.readFileSync(path.join(root,p),'utf8');
+const js=r('frontend/js/pages/teamFantasy.js'),css=r('frontend/css/rc24m-team-fantasy-layout.css'),html=r('frontend/app.html'),app=r('frontend/js/app.js');
+const m=js.slice(js.indexOf('RC24M TEAM FANTASY LAYOUT REFINEMENT'));
+assert(m.includes("contextHtml:''"));
+assert(m.includes('teamFantasyRc24mLeaguePanel_'));
+assert(m.includes("featureHtml:''"));
+assert(m.includes('tf-weekly-status-upcoming'));
+assert(m.includes('tf-rc24m-scoring-button'));
+assert(!m.includes('teamFantasyOpenRules_()'));
+assert(css.includes('grid-area:auto!important'));
+assert(css.includes('grid-template-columns:repeat(4,minmax(0,1fr))!important'));
+assert(css.includes('.tf-rc24m-shell .sports-shell-identity'));
+assert(html.includes('v1219rc24m-team-fantasy-layout-r1'));
+assert(html.includes('rc24m-team-fantasy-layout.css'));
+assert(app.includes('rc24m-team-fantasy-layout-r1'));
+assert(r('frontend/js/app.js')===r('frontend/app.js'));
+console.log('RC24M Team Fantasy layout tests: PASS');

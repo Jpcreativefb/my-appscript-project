@@ -2794,3 +2794,67 @@ teamFantasyOpenPlayerCompare_=function(){
   teamFantasyRenderGameDayIntoMount_();
   teamFantasyOpenSeasonSection_("teamFantasyStandings");
 };
+
+/* RC24M TEAM FANTASY LAYOUT REFINEMENT */
+function teamFantasyRc24mLeaguePanel_(state){
+  const leagues=Array.isArray(state&&state.leagues)?state.leagues:[];
+  if(!leagues.length)return'';
+  const selected=leagues.find(function(l){return String(l.leagueId||'')===String(state.selectedLeagueId||'');})||leagues[0]||{};
+  return `<details class="tf-rc24m-league-panel"><summary><span><small>LEAGUE</small><strong>${teamFantasyEscape_(selected.leagueName||selected.leagueId||'League')}</strong></span><span class="tf-rc24m-league-arrow">›</span></summary><div class="tf-rc24m-league-body">${teamFantasyLeagueSelect_(state||{})}</div></details>`;
+}
+teamFantasySportsShell_=function(state){
+  const lineup=teamFantasyPrimaryLineup_(state);
+  if(!window.PATTCSportsShell)return'';
+  const points=teamFantasyScoreValue_(state,lineup);
+  return window.PATTCSportsShell.render({
+    className:'sports-shell-team-fantasy tf-rc24m-shell',
+    badgeText:'TF',title:'TEAM FANTASY',subtitle:'Pick NFL teams. Score points.',league:'NFL',
+    pointsLabel:points===null?'—':teamFantasyScore_(points),
+    menuAction:"navigate('hub:sports')",syncAction:"teamFantasyLoadGameDay_(true)",featureHtml:''
+  });
+};
+teamFantasyR47HeroHtml_=function(state,appearance){
+  var runtime=window.AppearanceThemeRuntime||{};
+  var render=typeof runtime.sportsHeroForGameHtml==='function'?runtime.sportsHeroForGameHtml:runtime.sportsHeroHtml;
+  if(typeof render!=='function')return'';
+  var options={
+    kind:'team-fantasy',
+    gameId:state&&state.gameId||'',
+    gameName:state&&(state.gameName||state.name)||'Team Fantasy Football',
+    subtitle:'Week '+Number(state&&state.week||0)+' · Build one lineup. Compete in every eligible league.',
+    contextHtml:'',
+    accentColor:'#19a7ce'
+  };
+  return typeof runtime.sportsHeroForGameHtml==='function'
+    ? render(appearance||{},options)
+    : render(appearance||{},Object.assign({title:options.gameName,kicker:'NFL TEAM FANTASY'},options));
+};
+const TF_RC24M_LINEUP_BASE_=teamFantasyRenderLineup_;
+teamFantasyRenderLineup_=function(state,lineup){
+  let html=String(TF_RC24M_LINEUP_BASE_.apply(this,arguments)||'');
+  html=html.replace(/<div class="tf-weekly-help-row">[\s\S]*?<\/div>/,'');
+  html=html.replace(
+    /Week (\d+) lineup · Blue UPCOMING · Green LIVE · Orange FINAL · tap any selected slot to feature its NFL game/,
+    'Week $1 lineup · <span class="tf-weekly-status-upcoming">UPCOMING</span> · <span class="tf-weekly-status-live">LIVE</span> · <span class="tf-weekly-status-final">FINAL</span> · tap a selected slot to feature its NFL game'
+  );
+  const penalty=Math.max(0,Number(state&&state.settings&&state.settings.autoPickPenaltyPerPosition||0));
+  const scoring='<div class="tf-rc24m-after-grid-tools"><button type="button" class="tf-rc24m-scoring-button" onclick="teamFantasyOpenScoring_()">ⓘ Scoring &amp; Position Stats</button></div>';
+  const guide='<div class="tf-rc24m-fill-guide"><span><strong>Random:</strong> any eligible team · no penalty</span><span><strong>Auto:</strong> top-ranked eligible team'+(penalty>0?' · -'+teamFantasyNumberLabel_(penalty)+' pts/position':' · no penalty')+'</span></div>';
+  if(html.indexOf('<div class="tf-top-fill">')>=0){
+    html=html.replace('<div class="tf-top-fill">',scoring+guide+'<div class="tf-top-fill">');
+  }else{
+    html=html.replace('<button type="button" class="tf-save-lineup"',scoring+'<button type="button" class="tf-save-lineup"');
+  }
+  return html;
+};
+const TF_RC24M_RENDER_BASE_=renderTeamFantasyPage;
+renderTeamFantasyPage=async function(){
+  let html=String(await TF_RC24M_RENDER_BASE_.apply(this,arguments)||'');
+  const state=window.TEAM_FANTASY_STATE||{};
+  const lineup=teamFantasyPrimaryLineup_(state);
+  const addon=teamFantasyRc24mLeaguePanel_(state)+teamFantasyFeaturedHtml_(state,lineup);
+  const hero=/(<section\b[^>]*class=["'][^"']*pattc-sports-hero[^"']*["'][\s\S]*?<\/section>)/i;
+  if(hero.test(html))return html.replace(hero,'$1'+addon);
+  const shell=/(<section\b[^>]*class=["'][^"']*sports-shell[^"']*["'][\s\S]*?<\/section>)/i;
+  return html.replace(shell,'$1'+addon);
+};
