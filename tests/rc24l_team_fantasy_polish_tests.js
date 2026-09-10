@@ -1,0 +1,16 @@
+const fs=require("fs"),path=require("path"),assert=require("assert");
+const root=path.resolve(__dirname,".."),r=p=>fs.readFileSync(path.join(root,p),"utf8");
+const js=r("frontend/js/pages/teamFantasy.js"),css=r("frontend/css/rc24l-team-fantasy-polish.css"),html=r("frontend/app.html"),app=r("frontend/js/app.js");
+assert(js.includes("RC24L TEAM FANTASY FINE TUNING"));
+assert(js.includes("teamFantasyOpenSeasonSection_"));
+assert(js.includes('"Missed Lineup Protection"'));
+assert(js.includes('"Standings & Player Compare"'));
+assert(js.includes('"Week History"'));
+assert(css.includes("grid-template-columns:repeat(4,minmax(0,1fr))!important"));
+assert(css.includes(".tf-season-section"));
+assert(css.includes("#teamFantasyProtection"));
+assert(html.includes('name="pattc-ui-hotfix" content="v1219rc24l-team-fantasy-polish-r1"'));
+assert(html.includes("rc24l-team-fantasy-polish.css"));
+assert(app.includes("rc24l-team-fantasy-polish-r1"));
+assert(r("frontend/js/app.js")===r("frontend/app.js"));
+console.log("RC24L Team Fantasy polish tests: PASS");

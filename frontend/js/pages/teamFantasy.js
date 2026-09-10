@@ -2707,3 +2707,90 @@ teamFantasyRenderSlot_ = function(state,lineup,slot){
   </div>`;
 };
 /* RC24A_V18_SLOT_RUNTIME_OVERRIDE_END */
+
+
+/* =========================================================
+   RC24L TEAM FANTASY FINE TUNING
+   Presentation only. Existing save/scoring/lock/game-day logic stays intact.
+========================================================= */
+function teamFantasyRc24lSection_(id,title,subtitle,body,open){
+  return `<details id="${teamFantasyEscape_(id)}" class="tf-season-section tf-rc24l-section" ${open?"open":""}>
+    <summary><span class="tf-rc24l-section-copy"><strong>${teamFantasyEscape_(title)}</strong>${subtitle?`<small>${teamFantasyEscape_(subtitle)}</small>`:""}</span><span class="tf-rc24l-section-arrow">›</span></summary>
+    <div class="tf-rc24l-section-body">${body||""}</div>
+  </details>`;
+}
+function teamFantasyOpenSeasonSection_(id){
+  const el=document.getElementById(id);
+  if(!el)return;
+  if(String(el.tagName||"").toLowerCase()==="details")el.open=true;
+  el.scrollIntoView({behavior:"smooth",block:"start"});
+}
+teamFantasySeasonQuickNav_=function(){
+  return `<nav class="tf-season-quicknav" aria-label="Team Fantasy season tools">
+    <button onclick="teamFantasyOpenSeasonSection_('teamFantasyProtection')">Protection</button>
+    <button onclick="teamFantasyOpenSeasonSection_('teamFantasyHistory')">History</button>
+    <button onclick="teamFantasyOpenSeasonSection_('teamFantasyLeaderboard')">Leaderboard</button>
+    <button onclick="teamFantasyOpenSeasonSection_('teamFantasyPlayoffs')">Playoffs</button>
+    <button onclick="teamFantasyOpenPlayerCompare_()">Compare 2+</button>
+  </nav>`;
+};
+
+const TF_RC24L_PROTECTION_BASE_=teamFantasyRenderProtection_;
+teamFantasyRenderProtection_=function(state){
+  const pref=state&&state.playerAutoFill||{};
+  const mode=String(pref.mode||"manual");
+  const status=mode==="auto"?"Auto Pick protection":mode==="random"?"Random protection":"Manual only";
+  let inner=String(TF_RC24L_PROTECTION_BASE_.apply(this,arguments)||"")
+    .replace(/^<section\b[^>]*>/i,"")
+    .replace(/<\/section>\s*$/i,"");
+  return teamFantasyRc24lSection_("teamFantasyProtection","Missed Lineup Protection",status+" · Tap to edit safety-net settings",inner,false);
+};
+
+teamFantasyRenderHistoryShell_=function(state){
+  const current=Math.max(1,Number(state&&state.week||1));
+  const selected=Math.max(1,Number(window.TEAM_FANTASY_HISTORY_WEEK||Math.max(1,current-1)));
+  setTimeout(function(){teamFantasyLoadHistoryWeek_(selected);},80);
+  return teamFantasyRc24lSection_("teamFantasyHistory","History","Saved weekly lineups and scored results",'<div id="tfHistoryMount"></div>',false);
+};
+teamFantasyRenderLeaderboardShell_=function(state){
+  const current=Math.max(1,Number(state&&state.week||1));
+  setTimeout(function(){teamFantasyLoadLeaderboard_(current);},110);
+  return teamFantasyRc24lSection_("teamFantasyLeaderboard","Leaderboard","Current week, past weeks and season standings",'<div id="tfLeaderboardMount"></div>',false);
+};
+
+const TF_RC24L_PLAYOFF_BASE_=teamFantasyRenderPlayoffPicture_;
+teamFantasyRenderPlayoffPicture_=function(state){
+  let inner=String(TF_RC24L_PLAYOFF_BASE_.apply(this,arguments)||"")
+    .replace(/^<section\b[^>]*>/i,"")
+    .replace(/<\/section>\s*$/i,"")
+    .replace(/^<h2>Playoff Picture<\/h2>/i,"");
+  return teamFantasyRc24lSection_("teamFantasyPlayoffs","Playoff Picture","Current qualification picture and playoff line",inner,false);
+};
+
+if(typeof teamFantasyRenderWeekHistory_==="function"){
+  const TF_RC24L_WEEK_HISTORY_BASE_=teamFantasyRenderWeekHistory_;
+  teamFantasyRenderWeekHistory_=function(state){
+    let inner=String(TF_RC24L_WEEK_HISTORY_BASE_.apply(this,arguments)||"");
+    if(!inner)inner='<div class="tf-muted">Completed weekly scores will appear here.</div>';
+    inner=inner.replace(/^<section\b[^>]*>/i,"").replace(/<\/section>\s*$/i,"").replace(/^<h2>Week History<\/h2>/i,"");
+    return teamFantasyRc24lSection_("teamFantasyWeekHistory","Week History","Completed weeks and scoring history",inner,false);
+  };
+}
+
+const TF_RC24L_RENDER_BASE_=renderTeamFantasyPage;
+renderTeamFantasyPage=async function(){
+  let html=String(await TF_RC24L_RENDER_BASE_.apply(this,arguments)||"");
+  const re=/<section id="teamFantasyStandings" class="card tf-game-day-card">[\s\S]*?<div id="tfGameDayMount">([\s\S]*?)<\/div><\/section>/;
+  html=html.replace(re,function(match,mountBody){
+    return teamFantasyRc24lSection_("teamFantasyStandings","Standings & Player Compare","Weekly standings and side-by-side lineup comparison",'<div id="tfGameDayMount">'+mountBody+'</div>',false);
+  });
+  return html;
+};
+teamFantasyOpenPlayerCompare_=function(){
+  window.TEAM_FANTASY_GAME_DAY_VIEW="compare";
+  window.TEAM_FANTASY_COMPARE_ADD_OPEN=false;
+  const section=document.getElementById("teamFantasyStandings");
+  if(section&&String(section.tagName||"").toLowerCase()==="details")section.open=true;
+  teamFantasyRenderGameDayIntoMount_();
+  teamFantasyOpenSeasonSection_("teamFantasyStandings");
+};
