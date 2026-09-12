@@ -11,6 +11,7 @@ const appMirror = read('frontend/app.js');
 const appHtml = read('frontend/app.html');
 const routes = JSON.parse(read('frontend/_routes.json'));
 const sw = read('frontend/sw.js');
+const leagueAccess = read('backend/engines/LeagueAccessEngine.js');
 
 function body(source, functionName, nextFunctionName) {
   const start = source.indexOf('function ' + functionName);
@@ -25,11 +26,12 @@ assert(routes.include.includes('/api/app'), 'Cloudflare /api/app route must rema
 assert.strictEqual(app, appMirror, 'frontend app mirrors must remain synchronized');
 assert(appHtml.includes('v1219rc7-pick-lock-integrity'), 'app shell must bust cache for rc7');
 assert(sw.includes('v1219rc7-pick-lock-integrity'), 'service worker must bust cache for rc7');
-assert(app.includes('pattcStartupPayload:v1219rc7:'), 'old durable startup snapshots must be retired on rc7');
+assert(app.includes('pattcStartupPayload:rc24j:'), 'RC24J successor namespace must keep older durable startup snapshots retired');
 
 const lockHelper = body(picksEngine, 'isGamePickEntryLocked_(gameConfig)', 'normalizePickNumber_(');
 assert(lockHelper.includes('gameConfig.lockAllPicks === true'), 'global Player Entries lock must be authoritative');
-assert(lockHelper.includes('status === "preview"'), 'Preview must remain non-editable even if legacy flags drift');
+assert(!lockHelper.includes('status === "preview"'), 'RC24K delegates Preview lifecycle access to the feature/access gate so authenticated admins can test Preview');
+assert(leagueAccess.includes('function gameLifecycleAccessDecision_') && leagueAccess.includes('stage !== "live"') && leagueAccess.includes('"game-" + stage + "-admin-only"'), 'player Preview access must remain protected by the RC24I lifecycle access gate');
 assert(lockHelper.includes('gameConfig.resultsFinalized === true'), 'finalized games must reject new picks');
 
 const standardBatch = body(picksEngine, 'savePicksBatch(payload)', 'savePick(payload)');

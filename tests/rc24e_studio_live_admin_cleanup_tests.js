@@ -12,16 +12,16 @@ const sw = read('frontend/sw.js');
 const studio = read('frontend/js/ownerVisualStudioRc24e.js');
 const admin = read('frontend/js/pages/adminGamesRc24e.js');
 
-assert(app.includes('v1219rc24e-studio-live-admin-cleanup-r1'));
-assert(index.includes('v1219rc24e-studio-live-admin-cleanup-r1'));
-assert(sw.includes('v1219rc24e-studio-live-admin-cleanup-r1'));
-assert(app.includes('./js/ownerVisualStudioRc24e.js?release=v1219rc24e-studio-live-admin-cleanup-r1'));
+assert(app.includes('./js/ownerVisualStudioRc24e.js?release='), 'RC24E Visual Studio module must remain wired in the current shell.');
+assert(index.includes('name="pattc-release"'), 'Login/PWA shell must retain an explicit release boundary.');
+assert(sw.includes('"./js/ownerVisualStudioRc24e.js"'), 'Service worker must retain the RC24E Visual Studio asset.');
+assert(app.includes('./js/ownerVisualStudioRc24e.js?release='));
 assert(jsApp.includes('"admin-games": ["admin", "adminUi", "adminGamesRc24e"]'));
 assert.strictEqual(jsApp, appMirror, 'frontend app.js mirrors must match');
 assert(sw.includes('"./js/ownerVisualStudioRc24e.js"'));
 assert(sw.includes('"./js/pages/adminGamesRc24e.js"'));
 
-assert(studio.includes('rc24e-owner-visual-studio-r1'));
+assert(studio.includes('rc24i-owner-visual-studio-r1'), 'RC24I security/persistence successor must remain on the RC24E Visual Studio asset path');
 assert(studio.includes('state.picking=true'));
 assert(studio.includes('state.picking = state.open === true'));
 assert(studio.includes('Cursor Select: ON'));

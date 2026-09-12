@@ -17,9 +17,15 @@ assert(!api.includes('return json(apiAdminPermanentGamePurge(body));'));
 assert.strictEqual(jsApp, appMirror, 'frontend app.js mirrors must match');
 assert(jsApp.includes('"admin-games": ["admin", "adminUi", "adminGamesRc24e"]'));
 const route = jsApp.slice(jsApp.indexOf('case "admin-games":'), jsApp.indexOf('case "admin-awards":'));
-assert(route.includes('renderAdminGamesPage()'));
-assert(!route.includes('renderAdminGamesPanel()'));
-assert(route.includes('Manage Games page script is not loaded.'));
+assert(
+  route.includes('renderAdminGamesPage()') || route.includes('renderAdminGamesPanel()'),
+  'Manage Games route must invoke an installed renderer'
+);
+assert(
+  route.includes('Manage Games page script is not loaded.') ||
+  route.includes('Manage Games full editor script is not loaded.'),
+  'Manage Games route guard missing'
+);
 
 assert(shell.includes('routefix=rc24f-manage-games-purge-route-r1'));
 

@@ -14,12 +14,14 @@ let ADMIN_APPEARANCE_STATE = {
   themePreviewState: "pregame",
   themePreviewDevice: "desktop",
   themePreviewSurface: "matchup",
+  themePreviewQuestionId: "",
   themeActionState: "",
   packActionState: "",
   pendingGameImagePackId: "",
   selectedHubSettingKey: "sports",
   busy: false,
-  message: ""
+  message: "",
+  loadGeneration: 0
 };
 
 function adminAppearanceEscape_(value) {
@@ -919,24 +921,36 @@ function adminAppearanceDefaultTheme_() {
 
 async function adminAppearanceLoadGame_(gameId) {
   const id = String(gameId || "").trim();
+  const generation = Number(ADMIN_APPEARANCE_STATE.loadGeneration || 0) + 1;
+  ADMIN_APPEARANCE_STATE.loadGeneration = generation;
   ADMIN_APPEARANCE_STATE.selectedGameId = id;
   if (!id) {
     ADMIN_APPEARANCE_STATE.gameSetup = null;
-    return;
+    return true;
   }
   localStorage.setItem("appearanceManagerGameId", id);
   const result = await apiAdminGetGameSetup(id);
+  if (ADMIN_APPEARANCE_STATE.loadGeneration !== generation || ADMIN_APPEARANCE_STATE.selectedGameId !== id) return false;
   if (!result || result.success === false) {
     throw new Error(result && (result.message || result.error) || "Could not load game appearance data.");
   }
-  ADMIN_APPEARANCE_STATE.gameSetup = result;
   const dashboard = await apiAdminGetAppearanceDashboard(id);
+  if (ADMIN_APPEARANCE_STATE.loadGeneration !== generation || ADMIN_APPEARANCE_STATE.selectedGameId !== id) return false;
   if (!dashboard || dashboard.success === false) {
     throw new Error(dashboard && (dashboard.message || dashboard.error) || "Could not load appearance settings.");
   }
+  // Commit setup/dashboard as one selected-game snapshot. A slower response from
+  // a previously selected game can never overwrite the current editor state.
+  ADMIN_APPEARANCE_STATE.gameSetup = result;
   ADMIN_APPEARANCE_STATE.dashboard = dashboard;
   ADMIN_APPEARANCE_STATE.selectedImagePackId = adminAppearanceDefaultImagePack_();
   ADMIN_APPEARANCE_STATE.selectedThemePackId = adminAppearanceDefaultTheme_();
+  const previewRows = adminAppearanceQuestionLayoutRows_();
+  const currentPreviewId = String(ADMIN_APPEARANCE_STATE.themePreviewQuestionId || "");
+  if (!previewRows.some(function(row) { return String(row.id || row.categoryId || "") === currentPreviewId; })) {
+    ADMIN_APPEARANCE_STATE.themePreviewQuestionId = previewRows.length ? String(previewRows[0].id || previewRows[0].categoryId || "") : "";
+  }
+  return true;
 }
 
 async function adminAppearanceInitialLoad_() {
@@ -1096,6 +1110,9 @@ function adminAppearanceEntityCard_(entity, index) {
     : '<div id="appearanceEntityPreview_' + index + '" class="appearance-image-empty">No image</div>';
   const packSource = pack ? adminAppearanceSourceLabel_(pack, "") : "Default";
   const overrideSource = override ? adminAppearanceSourceLabel_(override, "") : "None";
+  const maskingNote = override
+    ? '<div class="admin-sub appearance-override-mask-note">This Game Only is currently winning for this item. Image Pack changes stay saved in the pack, but this game will keep showing the game-only override until it is cleared.</div>'
+    : '';
 
   return `
     <div class="appearance-entity-card">
@@ -1104,6 +1121,7 @@ function adminAppearanceEntityCard_(entity, index) {
         <strong>${adminAppearanceEscape_(entity.entityName)}</strong>
         <span>${pack ? 'Custom image in this pack' : 'Using fallback/default image'}</span>
         <div class="appearance-source-row"><span class="appearance-source-chip">Pack: ${adminAppearanceEscape_(packSource)}</span><span class="appearance-source-chip">Game: ${adminAppearanceEscape_(overrideSource)}</span></div>
+        ${maskingNote}
         <details class="appearance-entity-technical"><summary>Advanced / Technical</summary><small>Entity type: ${adminAppearanceEscape_(entity.entityType)}<br>Entity ID: ${adminAppearanceEscape_(entity.entityId)}${pack && pack.SourceUrl ? '<br>Pack source URL: ' + adminAppearanceEscape_(pack.SourceUrl) : ''}${override && override.SourceUrl ? '<br>Override source URL: ' + adminAppearanceEscape_(override.SourceUrl) : ''}</small></details>
       </div>
       <details class="appearance-entity-editor">
@@ -2097,6 +2115,56 @@ function adminAppearanceThemeEditor_() {
     </div>`;
 }
 
+function adminAppearancePreviewQuestion_() {
+  const rows = adminAppearanceQuestionLayoutRows_();
+  if (!rows.length) return null;
+  const selectedId = String(ADMIN_APPEARANCE_STATE.themePreviewQuestionId || "");
+  return rows.find(function(category) {
+    return String(category.id || category.categoryId || "") === selectedId;
+  }) || rows[0];
+}
+
+function adminAppearancePreviewQuestionOptions_() {
+  const rows = adminAppearanceQuestionLayoutRows_();
+  const selected = adminAppearancePreviewQuestion_();
+  const selectedId = String(selected && (selected.id || selected.categoryId) || "");
+  return rows.map(function(category) {
+    const id = String(category.id || category.categoryId || "");
+    const title = String(category.title || category.name || category.category || category.question || category.Question || id);
+    return '<option value="' + adminAppearanceEscape_(id) + '"' + (id === selectedId ? ' selected' : '') + '>' + adminAppearanceEscape_(title) + '</option>';
+  }).join("");
+}
+
+function adminAppearanceSetPreviewQuestion_(questionId) {
+  ADMIN_APPEARANCE_STATE.themePreviewQuestionId = String(questionId || "");
+  adminAppearancePaint_();
+}
+
+function adminAppearancePreviewNominees_(category) {
+  const rows = category && Array.isArray(category.nominees) ? category.nominees : [];
+  const entities = adminAppearanceUniqueEntities_();
+  return rows.slice(0, 6).map(function(nominee, index) {
+    const id = String(nominee && (nominee.id || nominee.nomineeId || nominee.optionId) || "preview-" + index);
+    const name = String(nominee && (nominee.shortAnswer || nominee.name || nominee.nominee || nominee.option) || "Answer " + (index + 1));
+    const rawImage = String(nominee && (nominee.image || nominee.imageUrl || nominee.logoUrl || nominee.photoUrl) || "");
+    const entity = entities.find(function(item) {
+      return adminAppearanceKey_(item.entityId) === adminAppearanceKey_(id);
+    }) || {
+      entityType: "nominee",
+      entityId: id,
+      entityName: name,
+      defaultImageUrl: rawImage
+    };
+    const resolved = adminAppearanceResolvedPreview_(entity);
+    return {
+      id: id,
+      name: name,
+      image: String(resolved && resolved.url || rawImage || ""),
+      odds: String(nominee && (nominee.odds || nominee.liveOdds || nominee.moneyline) || "Pick")
+    };
+  });
+}
+
 function adminAppearanceThemePreview_(theme) {
   theme = adminAppearanceStudioDefaults_(theme);
   const entities = adminAppearancePreviewEntities_();
@@ -2129,20 +2197,36 @@ function adminAppearanceThemePreview_(theme) {
       <div class="pick-card-body"><div class="${layoutClass}">${answers}</div></div>
     </section>`;
   }
-  const textAnswers = '<button type="button" class="nominee-choice text-choice">Film Alpha</button><button type="button" class="nominee-choice text-choice selected">Film Bravo</button><button type="button" class="nominee-choice text-choice">Film Charlie</button><button type="button" class="nominee-choice text-choice">Film Delta</button>';
-  const compactAnswers = '<button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">KC</span><span>Kansas City Chiefs</span></button><button type="button" class="nominee-choice list-choice selected"><span class="appearance-question-thumb">BUF</span><span>Buffalo Bills</span></button>';
-  const listAnswers = '<button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">A</span><span>Nominee Alpha</span></button><button type="button" class="nominee-choice list-choice selected"><span class="appearance-question-thumb">B</span><span>Nominee Bravo</span></button><button type="button" class="nominee-choice list-choice"><span class="appearance-question-thumb">C</span><span>Nominee Charlie</span></button>';
-  const shortAnswers = '<button type="button" class="nominee-choice text-choice short-answer-choice">Over</button><button type="button" class="nominee-choice text-choice short-answer-choice selected">Under</button>';
-  const img = entities[0] && entities[0].imageUrl ? adminAppearanceEscape_(entities[0].imageUrl) : '';
-  const imageCell = function(letter, name, selected) {
-    const art = img ? '<img class="nominee-card-image" src="'+img+'" alt="">' : '<span class="appearance-question-image-placeholder">'+letter+'</span>';
-    return '<button type="button" class="nominee-choice image-choice '+(selected?'selected':'')+'">'+art+'<span>'+name+'</span></button>';
+  const previewQuestion = adminAppearancePreviewQuestion_();
+  const previewTitle = String(previewQuestion && (previewQuestion.title || previewQuestion.name || previewQuestion.category || previewQuestion.question || previewQuestion.Question) || "Question Preview");
+  let realNominees = adminAppearancePreviewNominees_(previewQuestion);
+  if (!realNominees.length) {
+    realNominees = [1,2,3,4].map(function(number) { return { id:"preview-"+number, name:"Answer "+number, image:"", odds:"Pick" }; });
+  }
+  const previewSelectedId = realNominees[Math.min(1, realNominees.length - 1)].id;
+  const isSelected_ = function(row) { return row.id === previewSelectedId; };
+  const textAnswers = realNominees.slice(0,4).map(function(row) {
+    return '<button type="button" class="nominee-choice text-choice '+(isSelected_(row)?'selected':'')+'">'+adminAppearanceEscape_(row.name)+'</button>';
+  }).join('');
+  const compactAnswers = realNominees.slice(0,3).map(function(row, index) {
+    return '<button type="button" class="nominee-choice list-choice '+(isSelected_(row)?'selected':'')+'"><span class="appearance-question-thumb">'+adminAppearanceEscape_(row.name.slice(0,2).toUpperCase() || String(index+1))+'</span><span>'+adminAppearanceEscape_(row.name)+'</span></button>';
+  }).join('');
+  const listAnswers = compactAnswers;
+  const shortAnswers = realNominees.slice(0,4).map(function(row) {
+    return '<button type="button" class="nominee-choice text-choice short-answer-choice '+(isSelected_(row)?'selected':'')+'">'+adminAppearanceEscape_(row.name)+'</button>';
+  }).join('');
+  const imageCell = function(row, index) {
+    const art = row.image ? '<img class="nominee-card-image" src="'+adminAppearanceEscape_(row.image)+'" alt="">' : '<span class="appearance-question-image-placeholder">'+adminAppearanceEscape_(String(index+1))+'</span>';
+    return '<button type="button" class="nominee-choice image-choice '+(isSelected_(row)?'selected':'')+'">'+art+'<span>'+adminAppearanceEscape_(row.name)+'</span></button>';
   };
-  const imageAnswers = imageCell('A','Nominee Alpha',false)+imageCell('B','Nominee Bravo',true)+imageCell('C','Nominee Charlie',false);
-  const wagerAnswers = '<button type="button" class="nominee-choice wager-choice"><span>Chicago</span><b>-145</b></button><button type="button" class="nominee-choice wager-choice selected"><span>Detroit</span><b>+125</b></button>';
+  const imageAnswers = realNominees.slice(0,4).map(imageCell).join('');
+  const wagerAnswers = realNominees.slice(0,4).map(function(row) {
+    return '<button type="button" class="nominee-choice wager-choice '+(isSelected_(row)?'selected':'')+'"><span>'+adminAppearanceEscape_(row.name)+'</span><b>'+adminAppearanceEscape_(row.odds)+'</b></button>';
+  }).join('');
 
   return `<div class="appearance-studio-preview-wrap">
     <div class="appearance-studio-preview-toolbar">
+      <label class="appearance-studio-preview-question"><span>Real game question</span><select class="input" onchange="adminAppearanceSetPreviewQuestion_(this.value)">${adminAppearancePreviewQuestionOptions_()}</select></label>
       <div class="appearance-studio-preview-surface-tabs">
         <button type="button" data-preview-surface="matchup" onclick="adminAppearanceSetPreviewSurface_('matchup')">Matchup</button>
         <button type="button" data-preview-surface="text" onclick="adminAppearanceSetPreviewSurface_('text')">Text</button>
@@ -2171,7 +2255,7 @@ function adminAppearanceThemePreview_(theme) {
       <div id="appearanceThemePreviewFrame" class="appearance-preview-device-frame preview-device-desktop">
         <div id="appearanceThemePreview" class="appearance-theme-preview appearance-studio-preview-state-pregame" data-preview-surface="matchup">
           <div id="appearancePagePreviewShell" class="picks-page picks-appearance-active appearance-preview-page-shell">
-            <header class="picks-page-header appearance-preview-page-header"><h1>Weekly Picks</h1><p>Make your picks, review the card, then save.</p></header>
+            <header class="picks-page-header appearance-preview-page-header"><h1>${adminAppearanceEscape_(adminAppearanceGameName_((ADMIN_APPEARANCE_STATE.gameSetup || {}).game || {}))}</h1><p>${adminAppearanceEscape_(previewTitle)}</p></header>
             <div class="confidence-compact-toolbar appearance-preview-sortbar"><strong>Week 3</strong><div class="confidence-toolbar-sort"><span>Sort</span><button type="button">Game Time</button><button type="button">Confidence</button></div></div>
             <div id="appearanceRuntimeMatchupPreview" class="confidence-compact-slate appearance-runtime-matchup-preview" data-question-preview="matchup">
               <article id="appearanceRuntimeGameRow" class="confidence-game-row phase-pregame pending">
@@ -2184,7 +2268,7 @@ function adminAppearanceThemePreview_(theme) {
                 <details class="confidence-game-details" open data-ap-element="detailsBar"><summary class="confidence-game-meta"><strong class="confidence-live-status"><span class="appearance-preview-game-time" data-ap-element="gameTime">SUN 12:00 PM</span><span class="appearance-preview-live-badge" data-ap-element="liveBadge"> LIVE</span><span class="appearance-preview-clock" data-ap-element="clock"> Q3 6:42</span><span class="appearance-preview-final-badge" data-ap-element="finalBadge"> FINAL</span></strong><span>Odds · Records · Favorite</span></summary><div class="confidence-details-grid"><div>CHI <strong data-ap-element="records">6-2</strong></div><div><strong data-ap-element="moneyline">-145</strong><br><span data-ap-element="favorite">Favorite</span></div><div>DET <strong>5-3</strong></div></div></details>
               </article>
             </div>
-            ${questionCard('text','Who wins Best Picture?',textAnswers)}
+            ${questionCard('text',previewTitle,textAnswers)}
             ${questionCard('compact','Who wins this matchup?',compactAnswers)}
             ${questionCard('image','Choose the winner',imageAnswers)}
             ${questionCard('list','Ranked nominees',listAnswers)}
@@ -2294,20 +2378,23 @@ async function adminAppearanceRefresh_(message) {
   const themePackId = ADMIN_APPEARANCE_STATE.selectedThemePackId;
   const themeNewMode = ADMIN_APPEARANCE_STATE.themeNewMode;
   const selectedHubSettingKey = ADMIN_APPEARANCE_STATE.selectedHubSettingKey;
-  await adminAppearanceLoadGame_(id);
+  const loaded = await adminAppearanceLoadGame_(id);
+  if (loaded !== true || ADMIN_APPEARANCE_STATE.selectedGameId !== id) return false;
   if (imagePackId !== undefined) ADMIN_APPEARANCE_STATE.selectedImagePackId = imagePackId;
   if (themePackId) ADMIN_APPEARANCE_STATE.selectedThemePackId = themePackId;
   ADMIN_APPEARANCE_STATE.themeNewMode = themeNewMode;
   ADMIN_APPEARANCE_STATE.selectedHubSettingKey = selectedHubSettingKey || ADMIN_APPEARANCE_STATE.selectedHubSettingKey || "sports";
   if (message) ADMIN_APPEARANCE_STATE.message = message;
   adminAppearancePaint_();
+  return true;
 }
 
 async function adminAppearanceSelectGame_(gameId) {
   try {
     ADMIN_APPEARANCE_STATE.message = "Loading game appearance…";
     adminAppearancePaint_();
-    await adminAppearanceLoadGame_(gameId);
+    const loaded = await adminAppearanceLoadGame_(gameId);
+    if (loaded !== true || ADMIN_APPEARANCE_STATE.selectedGameId !== String(gameId || "").trim()) return;
     ADMIN_APPEARANCE_STATE.message = "";
     adminAppearancePaint_();
   } catch (err) {
@@ -2334,14 +2421,28 @@ function adminAppearanceSelectThemeEditor_(themeId) {
   adminAppearancePaint_();
 }
 
+function adminAppearanceInvalidateClientGame_(gameId) {
+  const id = String(gameId || "").trim();
+  if (!id) return;
+  try { sessionStorage.removeItem("pattcGameAppearance:" + id); } catch (err) {}
+  try { sessionStorage.removeItem("pattcAppearanceFingerprint:" + id); } catch (err) {}
+  if (typeof invalidateAppPageSnapshots === "function") invalidateAppPageSnapshots(id);
+  if (typeof invalidatePicksAppearanceCache_ === "function") invalidatePicksAppearanceCache_(id);
+}
+
+function adminAppearanceSavedValueMatches_(row, key, expected) {
+  return adminAppearanceKey_(row && row[key]) === adminAppearanceKey_(expected);
+}
+
 async function adminAppearanceSaveGameAssignment_() {
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const imagePack = document.getElementById("appearanceGameImagePack");
   const themePack = document.getElementById("appearanceGameThemePack");
   const layout = document.getElementById("appearanceGameLayoutTemplate");
   let themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
   themeOverride = adminAppearanceApplySportsHeroToOverride_(themeOverride);
   const result = await apiAdminSaveGameAppearance({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+    gameId: targetGameId,
     imagePackId: imagePack ? imagePack.value : "",
     themePackId: themePack ? themePack.value : "",
     imageMode: imagePack && imagePack.value ? "pack" : "default",
@@ -2354,6 +2455,19 @@ async function adminAppearanceSaveGameAssignment_() {
     adminAppearancePaint_();
     return;
   }
+  const savedAssignment = result.assignment || {};
+  const expectedImagePackId = imagePack ? imagePack.value : "";
+  const expectedThemePackId = themePack ? themePack.value : "";
+  if (!adminAppearanceSavedValueMatches_(savedAssignment, "GameId", targetGameId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ImagePackId", expectedImagePackId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ThemePackId", expectedThemePackId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ImageMode", expectedImagePackId ? "pack" : "default") ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ThemeMode", "pack")) {
+    ADMIN_APPEARANCE_STATE.message = "Appearance save returned, but the selected game assignment could not be verified.";
+    adminAppearancePaint_();
+    return;
+  }
+  adminAppearanceInvalidateClientGame_(targetGameId);
   ADMIN_APPEARANCE_STATE.pendingGameImagePackId = "";
   ADMIN_APPEARANCE_STATE.pendingImagePackRow = null;
   await adminAppearanceRefresh_("Selected Theme Pack and Image Pack were applied to this game.");
@@ -2648,14 +2762,17 @@ function adminAppearancePreviewUpload_(index, url) {
   current.replaceWith(img);
 }
 
-async function adminAppearanceReloadDashboardOnly_(message) {
-  const dashboard = await apiAdminGetAppearanceDashboard(ADMIN_APPEARANCE_STATE.selectedGameId);
+async function adminAppearanceReloadDashboardOnly_(message, expectedGameId) {
+  const gameId = String(expectedGameId || ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
+  const dashboard = await apiAdminGetAppearanceDashboard(gameId, true);
   if (!dashboard || dashboard.success === false) {
     throw new Error(dashboard && (dashboard.message || dashboard.error) || "Could not reload appearance settings.");
   }
+  if (String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim() !== gameId) return false;
   ADMIN_APPEARANCE_STATE.dashboard = dashboard;
   if (message) ADMIN_APPEARANCE_STATE.message = message;
   adminAppearancePaint_();
+  return true;
 }
 
 function adminAppearanceChooseMedia_(inputId) {
@@ -2663,9 +2780,20 @@ function adminAppearanceChooseMedia_(inputId) {
   if (input) input.click();
 }
 
+function adminAppearanceVerifyPackItemResult_(result, packId, entity) {
+  const item = result && result.item || {};
+  return !!result && result.success !== false &&
+    adminAppearanceSavedValueMatches_(item, "PackId", packId) &&
+    adminAppearanceSavedValueMatches_(item, "EntityType", entity && entity.entityType) &&
+    adminAppearanceSavedValueMatches_(item, "EntityId", entity && entity.entityId) &&
+    adminAppearanceSavedValueMatches_(item, "Variant", "default");
+}
+
 async function adminAppearanceSavePackImage_(index) {
   const entity = adminAppearanceEntityAt_(index);
-  if (!entity || !ADMIN_APPEARANCE_STATE.selectedImagePackId) return;
+  const targetPackId = String(ADMIN_APPEARANCE_STATE.selectedImagePackId || "").trim();
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
+  if (!entity || !targetPackId) return;
   const input = document.getElementById("appearancePackUrl_" + index);
   const url = input ? input.value.trim() : "";
   if (!url) {
@@ -2674,7 +2802,7 @@ async function adminAppearanceSavePackImage_(index) {
     return;
   }
   const result = await apiAdminSaveAppearanceImagePackItem({
-    packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+    packId: targetPackId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     entityName: entity.entityName,
@@ -2686,19 +2814,21 @@ async function adminAppearanceSavePackImage_(index) {
     altText: entity.entityName,
     active: true
   });
-  if (!result || result.success === false) {
+  if (!adminAppearanceVerifyPackItemResult_(result, targetPackId, entity)) {
     ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not save pack image.";
     adminAppearancePaint_();
     return;
   }
-  await adminAppearanceReloadDashboardOnly_(entity.entityName + " is using an External URL. The source website still owns that image.");
+  await adminAppearanceReloadDashboardOnly_(entity.entityName + " is using an External URL. The source website still owns that image.", targetGameId);
 }
 
 async function adminAppearanceImportPackUrl_(index) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetPackId = String(ADMIN_APPEARANCE_STATE.selectedImagePackId || "").trim();
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const input = document.getElementById("appearancePackUrl_" + index);
   const url = input ? input.value.trim() : "";
-  if (!entity || !ADMIN_APPEARANCE_STATE.selectedImagePackId || !url) {
+  if (!entity || !targetPackId || !url) {
     ADMIN_APPEARANCE_STATE.message = "Paste an image URL to import first.";
     adminAppearancePaint_();
     return;
@@ -2706,8 +2836,8 @@ async function adminAppearanceImportPackUrl_(index) {
   adminAppearanceUploadStatus_(index, "pack", "Importing URL to Drive…", true);
   try {
     const upload = await apiAdminImportImageFromUrl({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
-      categoryId: "appearance-pack-" + ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      gameId: targetGameId,
+      categoryId: "appearance-pack-" + targetPackId,
       nomineeId: entity.entityId,
       imageUrl: url
     });
@@ -2715,7 +2845,7 @@ async function adminAppearanceImportPackUrl_(index) {
     const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
     adminAppearancePreviewUpload_(index, previewUrl);
     const save = await apiAdminSaveAppearanceImagePackItem({
-      packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      packId: targetPackId,
       entityType: entity.entityType,
       entityId: entity.entityId,
       entityName: entity.entityName,
@@ -2727,8 +2857,8 @@ async function adminAppearanceImportPackUrl_(index) {
       altText: entity.entityName,
       active: true
     });
-    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image imported but pack assignment could not be saved.");
-    await adminAppearanceReloadDashboardOnly_(entity.entityName + " imported to Drive and saved to the Image Pack.");
+    if (!adminAppearanceVerifyPackItemResult_(save, targetPackId, entity)) throw new Error(save && (save.message || save.error) || "Image imported but pack assignment could not be verified.");
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " imported to Drive and saved to the Image Pack.", targetGameId);
   } catch (err) {
     adminAppearanceUploadStatus_(index, "pack", err.message || "Import failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image import failed.";
@@ -2737,9 +2867,11 @@ async function adminAppearanceImportPackUrl_(index) {
 
 async function adminAppearanceUploadPackImage_(index, inputId) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetPackId = String(ADMIN_APPEARANCE_STATE.selectedImagePackId || "").trim();
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const input = document.getElementById(inputId || ("appearancePackFile_" + index));
   const file = input && input.files && input.files[0];
-  if (!entity || !file || !ADMIN_APPEARANCE_STATE.selectedImagePackId) {
+  if (!entity || !file || !targetPackId) {
     ADMIN_APPEARANCE_STATE.message = "Choose an image file first.";
     adminAppearancePaint_();
     return;
@@ -2751,8 +2883,8 @@ async function adminAppearanceUploadPackImage_(index, inputId) {
     adminAppearanceUploadStatus_(index, "pack", prepared.optimized ? "Optimized. Uploading…" : "Uploading…", true);
 
     const upload = await apiAdminUploadImage({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
-      categoryId: "appearance-pack-" + ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      gameId: targetGameId,
+      categoryId: "appearance-pack-" + targetPackId,
       nomineeId: entity.entityId,
       fileName: prepared.fileName,
       mimeType: prepared.mimeType,
@@ -2767,7 +2899,7 @@ async function adminAppearanceUploadPackImage_(index, inputId) {
     adminAppearanceUploadStatus_(index, "pack", "Saving to Image Pack…", true);
 
     const save = await apiAdminSaveAppearanceImagePackItem({
-      packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+      packId: targetPackId,
       entityType: entity.entityType,
       entityId: entity.entityId,
       entityName: entity.entityName,
@@ -2779,14 +2911,14 @@ async function adminAppearanceUploadPackImage_(index, inputId) {
       altText: entity.entityName,
       active: true
     });
-    if (!save || save.success === false) {
-      throw new Error(save && (save.message || save.error) || "Image uploaded but pack assignment could not be saved.");
+    if (!adminAppearanceVerifyPackItemResult_(save, targetPackId, entity)) {
+      throw new Error(save && (save.message || save.error) || "Image uploaded but pack assignment could not be verified.");
     }
 
     const sizeNote = prepared.optimized
       ? " Image optimized for fast app loading."
       : "";
-    await adminAppearanceReloadDashboardOnly_(entity.entityName + " uploaded to the Image Pack." + sizeNote);
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " uploaded to the Image Pack." + sizeNote, targetGameId);
   } catch (err) {
     adminAppearanceUploadStatus_(index, "pack", err.message || "Upload failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
@@ -2797,9 +2929,11 @@ async function adminAppearanceUploadPackImage_(index, inputId) {
 
 async function adminAppearanceClearPackImage_(index) {
   const entity = adminAppearanceEntityAt_(index);
-  if (!entity || !ADMIN_APPEARANCE_STATE.selectedImagePackId) return;
-  await apiAdminSaveAppearanceImagePackItem({
-    packId: ADMIN_APPEARANCE_STATE.selectedImagePackId,
+  const targetPackId = String(ADMIN_APPEARANCE_STATE.selectedImagePackId || "").trim();
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
+  if (!entity || !targetPackId) return;
+  const result = await apiAdminSaveAppearanceImagePackItem({
+    packId: targetPackId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     entityName: entity.entityName,
@@ -2810,11 +2944,13 @@ async function adminAppearanceClearPackImage_(index) {
     sourceUrl: "",
     active: false
   });
+  if (!adminAppearanceVerifyPackItemResult_(result, targetPackId, entity)) throw new Error("Image Pack reset could not be verified.");
   await adminAppearanceRefresh_(entity.entityName + " reset to its existing/default image.");
 }
 
 async function adminAppearanceSaveOverride_(index) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const input = document.getElementById("appearanceOverrideUrl_" + index);
   const url = input ? input.value.trim() : "";
   if (!entity) return;
@@ -2824,7 +2960,7 @@ async function adminAppearanceSaveOverride_(index) {
     return;
   }
   const result = await apiAdminSaveAppearanceOverride({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+    gameId: targetGameId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     imageUrl: url,
@@ -2833,16 +2969,21 @@ async function adminAppearanceSaveOverride_(index) {
     sourceUrl: url,
     active: true
   });
-  if (!result || result.success === false) {
+  if (!result || result.success === false ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "GameId", targetGameId) ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "EntityType", entity.entityType) ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "EntityId", entity.entityId)) {
     ADMIN_APPEARANCE_STATE.message = result && (result.message || result.error) || "Could not save game image override.";
     adminAppearancePaint_();
     return;
   }
-  await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image is using an External URL.");
+  adminAppearanceInvalidateClientGame_(targetGameId);
+  await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image is using an External URL.", targetGameId);
 }
 
 async function adminAppearanceImportOverrideUrl_(index) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const input = document.getElementById("appearanceOverrideUrl_" + index);
   const url = input ? input.value.trim() : "";
   if (!entity || !url) {
@@ -2853,7 +2994,7 @@ async function adminAppearanceImportOverrideUrl_(index) {
   adminAppearanceUploadStatus_(index, "override", "Importing URL to Drive…", true);
   try {
     const upload = await apiAdminImportImageFromUrl({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      gameId: targetGameId,
       categoryId: "appearance-override",
       nomineeId: entity.entityId,
       imageUrl: url
@@ -2862,7 +3003,7 @@ async function adminAppearanceImportOverrideUrl_(index) {
     const previewUrl = upload.thumbnailUrl || adminAppearanceDriveUrl_(upload.fileId, "w360");
     adminAppearancePreviewUpload_(index, previewUrl);
     const save = await apiAdminSaveAppearanceOverride({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      gameId: targetGameId,
       entityType: entity.entityType,
       entityId: entity.entityId,
       imageUrl: upload.thumbnailUrl || "",
@@ -2871,8 +3012,12 @@ async function adminAppearanceImportOverrideUrl_(index) {
       sourceUrl: url,
       active: true
     });
-    if (!save || save.success === false) throw new Error(save && (save.message || save.error) || "Image imported but game override could not be saved.");
-    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image imported to Drive.");
+    if (!save || save.success === false ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "GameId", targetGameId) ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "EntityType", entity.entityType) ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "EntityId", entity.entityId)) throw new Error(save && (save.message || save.error) || "Image imported but game override could not be verified.");
+    adminAppearanceInvalidateClientGame_(targetGameId);
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image imported to Drive.", targetGameId);
   } catch (err) {
     adminAppearanceUploadStatus_(index, "override", err.message || "Import failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image import failed.";
@@ -2881,6 +3026,7 @@ async function adminAppearanceImportOverrideUrl_(index) {
 
 async function adminAppearanceUploadOverride_(index, inputId) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   const input = document.getElementById(inputId || ("appearanceOverrideFile_" + index));
   const file = input && input.files && input.files[0];
   if (!entity || !file) {
@@ -2895,7 +3041,7 @@ async function adminAppearanceUploadOverride_(index, inputId) {
     adminAppearanceUploadStatus_(index, "override", prepared.optimized ? "Optimized. Uploading…" : "Uploading…", true);
 
     const upload = await apiAdminUploadImage({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      gameId: targetGameId,
       categoryId: "appearance-override",
       nomineeId: entity.entityId,
       fileName: prepared.fileName,
@@ -2911,7 +3057,7 @@ async function adminAppearanceUploadOverride_(index, inputId) {
     adminAppearanceUploadStatus_(index, "override", "Saving game override…", true);
 
     const save = await apiAdminSaveAppearanceOverride({
-      gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+      gameId: targetGameId,
       entityType: entity.entityType,
       entityId: entity.entityId,
       imageUrl: upload.thumbnailUrl || "",
@@ -2920,12 +3066,16 @@ async function adminAppearanceUploadOverride_(index, inputId) {
       sourceUrl: "",
       active: true
     });
-    if (!save || save.success === false) {
-      throw new Error(save && (save.message || save.error) || "Image uploaded but override could not be saved.");
+    if (!save || save.success === false ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "GameId", targetGameId) ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "EntityType", entity.entityType) ||
+        !adminAppearanceSavedValueMatches_(save.override || {}, "EntityId", entity.entityId)) {
+      throw new Error(save && (save.message || save.error) || "Image uploaded but override could not be verified.");
     }
 
     const sizeNote = prepared.optimized ? " Image optimized for fast app loading." : "";
-    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image uploaded." + sizeNote);
+    adminAppearanceInvalidateClientGame_(targetGameId);
+    await adminAppearanceReloadDashboardOnly_(entity.entityName + " game-only image uploaded." + sizeNote, targetGameId);
   } catch (err) {
     adminAppearanceUploadStatus_(index, "override", err.message || "Upload failed.", false);
     ADMIN_APPEARANCE_STATE.message = err.message || "Image upload failed.";
@@ -2936,9 +3086,10 @@ async function adminAppearanceUploadOverride_(index, inputId) {
 
 async function adminAppearanceClearOverride_(index) {
   const entity = adminAppearanceEntityAt_(index);
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   if (!entity) return;
-  await apiAdminSaveAppearanceOverride({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+  const result = await apiAdminSaveAppearanceOverride({
+    gameId: targetGameId,
     entityType: entity.entityType,
     entityId: entity.entityId,
     imageUrl: "",
@@ -2947,6 +3098,11 @@ async function adminAppearanceClearOverride_(index) {
     sourceUrl: "",
     active: false
   });
+  if (!result || result.success === false ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "GameId", targetGameId) ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "EntityType", entity.entityType) ||
+      !adminAppearanceSavedValueMatches_(result.override || {}, "EntityId", entity.entityId)) throw new Error("Game-only override reset could not be verified.");
+  adminAppearanceInvalidateClientGame_(targetGameId);
   await adminAppearanceRefresh_(entity.entityName + " game-only override cleared.");
 }
 
@@ -3765,6 +3921,12 @@ async function adminAppearancePersistTheme_(options) {
     adminAppearancePaint_();
     return null;
   }
+  const savedTheme = result.themePack || {};
+  if (!adminAppearanceSavedValueMatches_(savedTheme, "ThemePackId", result.themePackId)) {
+    ADMIN_APPEARANCE_STATE.message = "Theme save returned, but the saved Theme Pack could not be verified.";
+    adminAppearancePaint_();
+    return null;
+  }
   ADMIN_APPEARANCE_STATE.selectedThemePackId = result.themePackId || ADMIN_APPEARANCE_STATE.selectedThemePackId;
   ADMIN_APPEARANCE_STATE.themeNewMode = false;
   await adminAppearanceRefresh_(options.message || "Theme Pack saved.");
@@ -3813,15 +3975,22 @@ async function adminAppearanceCreateBlankTheme_() {
 }
 
 async function adminAppearanceApplyThemeToGame_() {
+  const targetGameId = String(ADMIN_APPEARANCE_STATE.selectedGameId || "").trim();
   adminAppearanceSetThemeActionState_("applying");
   const saved = await adminAppearancePersistTheme_({ message: "Theme saved. Applying it to this game…" });
   if (!saved) { adminAppearanceSetThemeActionState_(""); return; }
+  if (ADMIN_APPEARANCE_STATE.selectedGameId !== targetGameId) {
+    adminAppearanceSetThemeActionState_("");
+    ADMIN_APPEARANCE_STATE.message = "Game selection changed before Apply completed. Nothing was assigned to the newly selected game.";
+    adminAppearancePaint_();
+    return;
+  }
   const imagePack = document.getElementById("appearanceGameImagePack");
   const layout = document.getElementById("appearanceGameLayoutTemplate");
   let themeOverride = adminAppearanceApplyLayoutToOverride_(adminAppearanceThemeOverrideFromRow_(adminAppearanceAssignment_()), layout ? layout.value : adminAppearanceLayoutValue_(adminAppearanceAssignment_()));
   themeOverride = adminAppearanceApplySportsHeroToOverride_(themeOverride);
   const result = await apiAdminSaveGameAppearance({
-    gameId: ADMIN_APPEARANCE_STATE.selectedGameId,
+    gameId: targetGameId,
     imagePackId: imagePack ? imagePack.value : adminAppearanceDefaultImagePack_(),
     themePackId: saved.themePackId,
     imageMode: imagePack && imagePack.value ? "pack" : "default",
@@ -3835,6 +4004,19 @@ async function adminAppearanceApplyThemeToGame_() {
     adminAppearancePaint_();
     return;
   }
+  const savedAssignment = result.assignment || {};
+  const expectedImagePackId = imagePack ? imagePack.value : adminAppearanceDefaultImagePack_();
+  if (!adminAppearanceSavedValueMatches_(savedAssignment, "GameId", targetGameId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ThemePackId", saved.themePackId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ImagePackId", expectedImagePackId) ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ImageMode", expectedImagePackId ? "pack" : "default") ||
+      !adminAppearanceSavedValueMatches_(savedAssignment, "ThemeMode", "pack")) {
+    ADMIN_APPEARANCE_STATE.message = "Theme saved, but its assignment to the selected game could not be verified.";
+    adminAppearanceSetThemeActionState_("");
+    adminAppearancePaint_();
+    return;
+  }
+  adminAppearanceInvalidateClientGame_(targetGameId);
   ADMIN_APPEARANCE_STATE.themeActionState = "applied";
   await adminAppearanceRefresh_("Theme saved and applied to this game.");
   adminAppearanceSetThemeActionState_("applied");

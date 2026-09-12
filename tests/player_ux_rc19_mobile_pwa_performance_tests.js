@@ -30,13 +30,26 @@ assert(/<meta\s+name="viewport"\s+content="width=device-width, initial-scale=1, 
 assert(/name="viewport"[\s\S]{0,160}width=device-width,[\s\S]{0,80}initial-scale=1,[\s\S]{0,80}viewport-fit=cover/.test(indexHtml),
   'index.html viewport contract changed');
 
-// 2) Release boundary must advance together so Safari/PWA/module URLs cannot
-// silently keep the previous RC17/RC18 frontend assets.
-[appHtml, indexHtml, app, appMirror, pwa].forEach((source, index) => {
-  assert(source.includes(release), `release marker missing from surface ${index}`);
-});
+// 2) Preserve each shell's explicit release boundary. RC24M intentionally keeps
+// historical app/PWA/SW fallback markers while runtime cache authority comes
+// from the page-provided PATTC_FRONTEND_RELEASE and sw.js?v= registration.
+const validRelease = value => /^v\d{4,}rc\d+[a-z0-9-]*$/i.test(String(value || ''));
+const loginReleaseMatch = indexHtml.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+const appFallback = app.match(/^const APP_ASSET_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+const pwaFallback = pwa.match(/^const PWA_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+const swMarker = sw.match(/^const PATTC_SW_RELEASE_MARKER\s*=\s*"([^"]+)"/m);
+assert(validRelease(release), 'authenticated shell release marker invalid');
+assert(loginReleaseMatch && validRelease(loginReleaseMatch[1]), 'login shell release marker invalid');
+assert.strictEqual(app, appMirror, 'frontend app mirrors must remain byte-identical');
+assert(appFallback && validRelease(appFallback[1]), 'app fallback release marker invalid');
+assert(pwaFallback && validRelease(pwaFallback[1]), 'PWA fallback release marker invalid');
+assert(swMarker && validRelease(swMarker[1]), 'service-worker audit marker invalid');
+assert(app.includes('window.PATTC_FRONTEND_RELEASE'), 'app runtime must consume PATTC_FRONTEND_RELEASE');
+assert(pwa.includes('window.PATTC_FRONTEND_RELEASE'), 'PWA runtime must consume PATTC_FRONTEND_RELEASE');
+assert(pwa.includes('"./sw.js?v=" + encodeURIComponent(PWA_VERSION)'), 'PWA must register SW with resolved release');
+assert(sw.includes('new URL(self.location.href).searchParams.get("v")'), 'SW must derive runtime release from ?v=');
+assert(sw.includes('const AWARDS_CACHE = "awards-app-" + AWARDS_RELEASE'), 'SW cache must derive from runtime release');
 requireText(sw, './css/rc19-mobile-pwa.css', 'service-worker app shell');
-requireText(sw, release, 'service-worker R2 release audit marker');
 assert(appHtml.indexOf('rc19-mobile-pwa.css') > appHtml.indexOf('league-admin.css'),
   'RC19 mobile override must load after legacy page CSS');
 

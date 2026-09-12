@@ -25,7 +25,7 @@ const getRouter = api.slice(getRouterStart, getRouterEnd);
 });
 
 assert(
-  frontendApi.includes('return api("adminSaveAppearanceImagePackItem"'),
+  frontendApi.includes('api("adminSaveAppearanceImagePackItem"'),
   'Frontend image-pack item save is not using the direct Apps Script transport.'
 );
 

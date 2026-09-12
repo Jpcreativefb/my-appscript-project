@@ -985,7 +985,7 @@ async function teamFantasyGameDaySelectWeek_(week) {
   window.TEAM_FANTASY_GAME_DAY_WEEK = selectedWeek;
   if (mount) mount.innerHTML = '<div class="tf-muted">Loading Week ' + selectedWeek + '…</div>';
   try {
-    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: selectedWeek, leagueId: leagueId });
+    const res = await teamFantasyGameDayForWeek_(selectedWeek, leagueId);
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load that week.');
     window.TEAM_FANTASY_GAME_DAY = res;
     window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || selectedWeek);
@@ -1045,7 +1045,7 @@ async function teamFantasyGameDaySelectLeague_(leagueId) {
   const mount = document.getElementById('tfGameDayMount');
   if (mount) mount.innerHTML = '<div class="tf-muted">Loading league…</div>';
   try {
-    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: Number((window.TEAM_FANTASY_GAME_DAY && window.TEAM_FANTASY_GAME_DAY.week) || window.TEAM_FANTASY_GAME_DAY_WEEK || state.week), leagueId: leagueId });
+    const res = await teamFantasyGameDayForWeek_(Number((window.TEAM_FANTASY_GAME_DAY && window.TEAM_FANTASY_GAME_DAY.week) || window.TEAM_FANTASY_GAME_DAY_WEEK || state.week), leagueId, { forceRefresh: true });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load league.');
     window.TEAM_FANTASY_GAME_DAY = res;
     state.selectedLeagueId = res.selectedLeagueId || leagueId;
@@ -1186,7 +1186,7 @@ async function teamFantasyLoadGameDay_(manual) {
   if (manual) mount.innerHTML = '<div class="tf-muted">Refreshing cached game-day scores…</div>';
   try {
     const requestedWeek = Math.max(1, Math.floor(Number(window.TEAM_FANTASY_GAME_DAY_WEEK || state.week || 1)));
-    const res = await api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: requestedWeek, leagueId: state.selectedLeagueId });
+    const res = await teamFantasyGameDayForWeek_(requestedWeek, state.selectedLeagueId, { forceRefresh: manual === true });
     if (!res || res.success === false) throw new Error(res && (res.error || res.message) || 'Could not load game-day comparison.');
     window.TEAM_FANTASY_GAME_DAY = res;
     window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || requestedWeek);
@@ -2019,7 +2019,24 @@ teamFantasyRenderGameDayIntoMount_ = function() {
 const SPORTS_RICH_TF_ORIGINAL_PAGE_ = renderTeamFantasyPage;
 renderTeamFantasyPage = async function() {
   const gameId = typeof getFrontendGameId === "function" ? getFrontendGameId() : "";
-  await PATTCSportsRich.prepare(gameId);
+  // Appearance is secondary to the authoritative lineup state. Start one
+  // deduplicated read, but never hold the primary Team Fantasy render on it.
+  if (gameId && window.PATTCSportsRich && typeof PATTCSportsRich.prepare === "function") {
+    Promise.resolve(PATTCSportsRich.prepare(gameId)).then(function(bundle) {
+      if (!bundle || (typeof getFrontendGameId === "function" && String(getFrontendGameId() || "") !== String(gameId))) return;
+      window.TEAM_FANTASY_APPEARANCE = bundle;
+      window.TEAM_FANTASY_APPEARANCE_GAME_ID = gameId;
+      setTimeout(function() {
+        const state = window.TEAM_FANTASY_STATE || {};
+        const page = document.querySelector(".sports-team-fantasy");
+        if (!page) return;
+        const hero = teamFantasyR47HeroHtml_(state, bundle);
+        const currentHero = page.querySelector(".pattc-sports-hero, .tf-hero");
+        if (hero && currentHero) currentHero.outerHTML = hero;
+        PATTCSportsRich.process(page);
+      }, 0);
+    }).catch(function(err) { console.warn("Deferred Team Fantasy Appearance skipped", err); });
+  }
 
   const html = await SPORTS_RICH_TF_ORIGINAL_PAGE_.apply(this, arguments);
   const state = window.TEAM_FANTASY_STATE || {};
@@ -2471,14 +2488,14 @@ async function teamFantasySelectLeague_(leagueId) {
   if (!leagueId || leagueId === String(state.selectedLeagueId || "")) return;
   teamFantasyRememberLeague_(leagueId);
   window.TEAM_FANTASY_WEEK_CACHE = {};
+  window.TEAM_FANTASY_WEEK_CACHE_AT = {};
   try {
     var next = await api('getTeamFantasyState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: state.week, leagueId: leagueId });
     if (!next || next.success === false) throw new Error(next && (next.message || next.error) || 'Could not switch Team Fantasy league.');
     window.TEAM_FANTASY_STATE = next;
-    var gameDay = await api('getTeamFantasyGameDayState', { gameId: next.gameId, username: next.username || teamFantasyCurrentUser_(), week: next.week, leagueId: leagueId });
+    var gameDay = await teamFantasyGameDayForWeek_(next.week, leagueId, { forceRefresh: true });
     if (!gameDay || gameDay.success === false) throw new Error(gameDay && (gameDay.message || gameDay.error) || 'Could not load selected league.');
     window.TEAM_FANTASY_CURRENT_GAME_DAY = gameDay;
-    window.TEAM_FANTASY_WEEK_CACHE[leagueId + '|' + Number(next.week)] = gameDay;
     teamFantasyRenderGameDayIntoMount_();
     var lb = window.TEAM_FANTASY_LEADERBOARD_KEY === 'season' ? 'season' : Number(window.TEAM_FANTASY_LEADERBOARD_KEY || next.week);
     if (document.getElementById('tfLeaderboardMount')) teamFantasyLoadLeaderboard_(lb);
@@ -2490,20 +2507,48 @@ async function teamFantasySelectLeague_(leagueId) {
     teamFantasySetStatus_(err && err.message ? err.message : 'Could not switch league.', true);
   }
 }
-function teamFantasyGameDayForWeek_(week) {
-  week = Math.max(1, Number(week || 1));
+var TEAM_FANTASY_GAME_DAY_CACHE_REUSE_MS_ = 30000;
+
+function teamFantasyGameDayRequestKey_(week, leagueId) {
   var state = window.TEAM_FANTASY_STATE || {};
-  var leagueId = String(state.selectedLeagueId || 'complete');
-  var current = window.TEAM_FANTASY_CURRENT_GAME_DAY || null;
-  if (current && Number(current.week || 0) === week && String(current.selectedLeagueId || current.leagueId || '') === leagueId) return Promise.resolve(current);
+  var gameId = String(state.gameId || '');
+  var user = String(state.username || teamFantasyCurrentUser_() || '');
+  var entryId = String(typeof teamFantasyViewerEntryId_ === 'function' ? teamFantasyViewerEntryId_() : '');
+  return [gameId, user, entryId, String(leagueId || state.selectedLeagueId || 'complete'), Math.max(1, Number(week || state.week || 1))].join('|');
+}
+
+function teamFantasyGameDayForWeek_(week, leagueId, options) {
+  week = Math.max(1, Number(week || 1));
+  options = options || {};
+  var state = window.TEAM_FANTASY_STATE || {};
+  leagueId = String(leagueId || state.selectedLeagueId || 'complete');
+
   window.TEAM_FANTASY_WEEK_CACHE = window.TEAM_FANTASY_WEEK_CACHE || {};
-  var key = leagueId + '|' + week;
-  if (window.TEAM_FANTASY_WEEK_CACHE[key]) return Promise.resolve(window.TEAM_FANTASY_WEEK_CACHE[key]);
-  return api('getTeamFantasyGameDayState', { gameId: state.gameId, username: state.username || teamFantasyCurrentUser_(), week: week, leagueId: leagueId }).then(function(res) {
+  window.TEAM_FANTASY_WEEK_CACHE_AT = window.TEAM_FANTASY_WEEK_CACHE_AT || {};
+  window.TEAM_FANTASY_GAME_DAY_PENDING = window.TEAM_FANTASY_GAME_DAY_PENDING || {};
+  var key = teamFantasyGameDayRequestKey_(week, leagueId);
+  var cachedAt = Number(window.TEAM_FANTASY_WEEK_CACHE_AT[key] || 0);
+  var cacheFresh = cachedAt > 0 && (Date.now() - cachedAt) < TEAM_FANTASY_GAME_DAY_CACHE_REUSE_MS_;
+  if (options.forceRefresh !== true && cacheFresh && window.TEAM_FANTASY_WEEK_CACHE[key]) {
+    return Promise.resolve(window.TEAM_FANTASY_WEEK_CACHE[key]);
+  }
+  if (window.TEAM_FANTASY_GAME_DAY_PENDING[key]) return window.TEAM_FANTASY_GAME_DAY_PENDING[key];
+
+  var request = api('getTeamFantasyGameDayState', {
+    gameId: state.gameId,
+    username: state.username || teamFantasyCurrentUser_(),
+    week: week,
+    leagueId: leagueId
+  }).then(function(res) {
     if (!res || res.success === false) throw new Error(res && (res.message || res.error) || 'Could not load Team Fantasy week.');
     window.TEAM_FANTASY_WEEK_CACHE[key] = res;
+    window.TEAM_FANTASY_WEEK_CACHE_AT[key] = Date.now();
     return res;
+  }).finally(function() {
+    if (window.TEAM_FANTASY_GAME_DAY_PENDING[key] === request) delete window.TEAM_FANTASY_GAME_DAY_PENDING[key];
   });
+  window.TEAM_FANTASY_GAME_DAY_PENDING[key] = request;
+  return request;
 }
 async function teamFantasyCompareSetWeek_(week) {
   week = Math.max(1, Number(week || 1));
@@ -2616,19 +2661,12 @@ if (typeof renderTeamFantasyPage === "function" && !window.RC24A_R47_TEAM_FANTAS
     var state = window.TEAM_FANTASY_STATE || {};
     var gameId = String(state.gameId || (typeof getFrontendGameId === "function" ? getFrontendGameId() : "") || "");
     var appearance = window.TEAM_FANTASY_APPEARANCE_GAME_ID === gameId ? (window.TEAM_FANTASY_APPEARANCE || null) : null;
-    if (!appearance && gameId && typeof apiGetGameAppearance === "function") {
-      try {
-        var cached = null;
-        try { cached = JSON.parse(sessionStorage.getItem("pattcGameAppearance:" + gameId) || "null"); } catch (ignore) {}
-        appearance = cached || await apiGetGameAppearance(gameId);
-        if (appearance && appearance.success !== false) {
-          window.TEAM_FANTASY_APPEARANCE = appearance;
-          window.TEAM_FANTASY_APPEARANCE_GAME_ID = gameId;
-          try { sessionStorage.setItem("pattcGameAppearance:" + gameId, JSON.stringify(appearance)); } catch (ignore2) {}
-        }
-      } catch (err) { appearance = null; }
+    if (!appearance && window.PATTCSportsRich && typeof PATTCSportsRich.appearance === "function") {
+      try { appearance = PATTCSportsRich.appearance(gameId, state.appearance || null); } catch (err) { appearance = null; }
     }
-    return teamFantasyR47ReplaceTopHero_(html, teamFantasyR47HeroHtml_(state, appearance));
+    // Do not start a second blocking Appearance read here. The earlier wrapper
+    // owns the one deferred prepare() and patches the hero after first paint.
+    return appearance ? teamFantasyR47ReplaceTopHero_(html, teamFantasyR47HeroHtml_(state, appearance)) : html;
   };
 }
 

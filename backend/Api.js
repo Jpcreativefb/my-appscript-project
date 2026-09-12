@@ -240,6 +240,34 @@ function doPost(e) {
       }));
     }
 
+    if (action === "getSharedCompare") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      return json(apiGetSharedCompare_({
+        username: body.username,
+        gameId: postGameId,
+        leagueId: postLeagueId,
+        rivalUsernames: Array.isArray(body.rivalUsernames)
+          ? body.rivalUsernames
+          : (body.rivalUsernamesJSON ? JSON.parse(body.rivalUsernamesJSON) : undefined)
+      }));
+    }
+
+    if (action === "saveSharedCompareRivals") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      return json(apiSaveSharedCompareRivals_({
+        username: body.username,
+        gameId: postGameId,
+        leagueId: postLeagueId,
+        rivalUsernames: Array.isArray(body.rivalUsernames) ? body.rivalUsernames : []
+      }));
+    }
+
     if (action === "saveRanking") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -2959,6 +2987,21 @@ if (action === "compareUserPicks") {
   );
 
 }
+
+    /* =========================
+       SHARED COMPARE DATA / PRIVACY
+    ========================= */
+
+    if (action === "getSharedCompare") {
+      return json(apiGetSharedCompare_({
+        username: params.username,
+        gameId: gameId,
+        leagueId: leagueId,
+        rivalUsernames: params.rivalUsernamesJSON
+          ? JSON.parse(params.rivalUsernamesJSON)
+          : undefined
+      }));
+    }
 
     /* =========================
        USER PROFILE

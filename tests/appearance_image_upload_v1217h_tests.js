@@ -21,8 +21,8 @@ assert(admin.includes("adminAppearanceReloadDashboardOnly_"), "Appearance upload
 assert(admin.includes("Saving to Image Pack"), "Appearance Image Pack upload does not expose completion progress.");
 assert(admin.includes("upload.fileId"), "Appearance Image Pack upload does not persist the uploaded Drive file ID.");
 
-assert(api.includes('return api("adminSaveAppearanceImagePackItem"'), "Image Pack metadata still routes through the upload Worker.");
-assert(api.includes('return api("adminSaveGameAppearance"'), "Game Appearance assignment still routes through the upload Worker.");
+assert(api.includes('api("adminSaveAppearanceImagePackItem"'), "Image Pack metadata still routes through the upload Worker.");
+assert(api.includes('api("adminSaveGameAppearance"'), "Game Appearance assignment still routes through the upload Worker.");
 assert(api.includes("apiAppearanceDirectPayload_"), "Appearance direct writes do not serialize theme payloads safely.");
 assert(api.includes("JSON.stringify(next.theme)"), "Theme object is not serialized before direct Apps Script transport.");
 

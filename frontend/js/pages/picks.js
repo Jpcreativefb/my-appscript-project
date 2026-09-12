@@ -27,6 +27,16 @@ let PICKS_COUNTDOWN_TIMER = null;
 let PICKS_ENHANCEMENTS_REQUEST = null;
 const PICKS_ENHANCEMENTS_CACHE = {};
 const PICKS_APPEARANCE_CACHE = {};
+function invalidatePicksAppearanceCache_(gameId) {
+  const id = String(gameId || "").trim();
+  if (!id) return;
+  delete PICKS_APPEARANCE_CACHE[id];
+  if (String(PICKS_PAGE_DATA && PICKS_PAGE_DATA.gameId || "") === id) {
+    PICKS_PAGE_DATA.appearance = null;
+  }
+  if (PICKS_CONFIDENCE_APPEARANCE_GAME_ID === id) PICKS_CONFIDENCE_APPEARANCE_GAME_ID = "";
+  try { sessionStorage.removeItem("pattcGameAppearance:" + id); } catch (err) {}
+}
 const PICKS_PENDING_SAVES = {};
 let PICKS_AUTO_ADVANCE_TIMER = null;
 let PICKS_TEMP_OPEN_CATEGORY_ID = "";
@@ -2751,6 +2761,42 @@ function refreshConfidenceAppearanceUi_() {
   updateCountdowns();
 }
 
+function applySportsRichConfidenceAppearance_() {
+  if (!PICKS_PAGE_DATA.isConfidenceGame || !window.PATTCSportsRich) return;
+  const gameId = String(PICKS_PAGE_DATA.gameId || "");
+  const rich = PATTCSportsRich.isRich(gameId, PICKS_PAGE_DATA.appearance || null);
+  const page = document.querySelector(".picks-page");
+  if (!page) return;
+  page.classList.toggle("sports-rich-confidence", rich);
+  if (rich) {
+    const first = typeof sportsRichConfidenceCategories_ === "function" ? (sportsRichConfidenceCategories_()[0] || {}) : {};
+    const colors = PATTCSportsRich.colors(gameId, PICKS_PAGE_DATA.appearance || null, first.sport || first.sportsSport || "football", first.sportsLeague || first.league || "");
+    page.style.setProperty("--sports-rich-primary", colors.primary);
+    page.style.setProperty("--sports-rich-secondary", colors.secondary);
+    page.style.setProperty("--sports-rich-accent", colors.accent);
+  }
+  const header = page.querySelector(".picks-page-header");
+  if (header && typeof renderPicksPageHeader_ === "function") header.outerHTML = renderPicksPageHeader_();
+}
+
+function refreshPicksAppearanceUi_() {
+  applySportsRichConfidenceAppearance_();
+  if (shouldRenderCompactConfidenceSlate_()) {
+    refreshConfidenceAppearanceUi_();
+    return;
+  }
+  const list = document.getElementById("picksCategoryList");
+  if (!list) return;
+  // Standard, Staked Prediction, Ranking-style question cards and other Picks
+  // layouts calculate image/layout choices at render time. Rebuild only the
+  // question list after deferred Appearance arrives; the primary page stays usable.
+  list.innerHTML = renderPicksCategoryList();
+  if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
+    window.PlatformImageEngine.process(list);
+  }
+  updateCountdowns();
+}
+
 async function hydrateConfidenceAppearance_() {
   if (typeof apiGetGameAppearance !== "function") {
     const page = document.querySelector(".picks-page");
@@ -2774,7 +2820,7 @@ async function hydrateConfidenceAppearance_() {
       PICKS_PAGE_DATA.appearance = cachedAppearance;
       applyPicksAppearanceToPage_();
       refreshConfidenceSportsHero_();
-      refreshConfidenceAppearanceUi_();
+      refreshPicksAppearanceUi_();
       realityTvRemountPlayerLayoutIfNeeded_();
     }
   }
@@ -2795,7 +2841,7 @@ async function hydrateConfidenceAppearance_() {
         // layout/classes/images are calculated from appearance at render time.
         applyPicksAppearanceToPage_();
         refreshConfidenceSportsHero_();
-        refreshConfidenceAppearanceUi_();
+        refreshPicksAppearanceUi_();
         realityTvRemountPlayerLayoutIfNeeded_();
       }
     } catch (err) {
@@ -4021,7 +4067,7 @@ function renderCategoryCard(category, isChild, parent) {
      ${selectedNominee ? `
         <div class="selected-pick-summary">
 
-        ${platformImgHtml(selectedNominee.image, { className: "selected-pick-image", variant: "thumb", alt: selectedNominee.name || "Selected pick" })}
+        ${platformImgHtml((confidenceAppearanceResolvedImage_(category, selectedNominee).imageUrl || selectedNominee.image || ""), { className: "selected-pick-image", variant: "thumb", alt: selectedNominee.name || "Selected pick" })}
 
         <span>
           ${escapeHtml(selectedNominee.name)}
@@ -4672,6 +4718,7 @@ function renderNomineeButton(
     normalizeId(selectedNomineeId);
 
   const layoutType = picksResolvedQuestionLayout_(category);
+  const resolvedAppearanceImage = confidenceAppearanceResolvedImage_(category, nominee).imageUrl || nominee.image || "";
 
   const existingStake =
     Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
@@ -4714,7 +4761,7 @@ function renderNomineeButton(
         ${disabled}
       >
 
-        ${platformImgHtml(nominee.image, { className: "nominee-list-image", variant: "thumb", alt: nominee.name || "Nominee" })}
+        ${platformImgHtml(resolvedAppearanceImage, { className: "nominee-list-image", variant: "thumb", alt: nominee.name || "Nominee" })}
 
         <span>
           ${escapeHtml(nominee.name)}
@@ -4743,7 +4790,7 @@ function renderNomineeButton(
       ${disabled}
     >
 
-      ${platformImgHtml(nominee.image, { className: "nominee-card-image", variant: "card", alt: nominee.name || "Nominee" })}
+      ${platformImgHtml(resolvedAppearanceImage, { className: "nominee-card-image", variant: "card", alt: nominee.name || "Nominee" })}
 
       <span>
         ${escapeHtml(nominee.name)}
@@ -8087,8 +8134,9 @@ renderCompactConfidenceRow_ = function(category) {
 const SPORTS_RICH_CONF_ORIGINAL_PAGE_ = renderPicksPage;
 renderPicksPage = async function() {
   const gameId = typeof getFrontendGameId === "function" ? getFrontendGameId() : "";
-  await PATTCSportsRich.prepare(gameId);
-
+  // Primary Picks/Confidence UI must not wait on a secondary Appearance read.
+  // The base renderer mounts first; its existing deferred Appearance hydrator
+  // applies Sports Rich styling from the same resolved bundle afterward.
   const html = await SPORTS_RICH_CONF_ORIGINAL_PAGE_.apply(this, arguments);
 
   if (

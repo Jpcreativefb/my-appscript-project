@@ -5143,7 +5143,23 @@ renderBettingCategory_ = function(category, bet, config) {
 const SPORTS_RICH_WAGER_ORIGINAL_PAGE_ = renderBettingPage;
 renderBettingPage = async function() {
   const gameId = sportsRichWagerGameId_();
-  await PATTCSportsRich.prepare(gameId);
+  // Wager balance/markets render first. Appearance is presentation-only and
+  // hydrates once after first paint instead of blocking the betting payload.
+  if (gameId && window.PATTCSportsRich && typeof PATTCSportsRich.prepare === "function") {
+    Promise.resolve(PATTCSportsRich.prepare(gameId)).then(function(bundle) {
+      if (!bundle || sportsRichWagerGameId_() !== gameId) return;
+      setTimeout(function() {
+        const page = document.querySelector(".betting-page");
+        if (!page) return;
+        if (PATTCSportsRich.isRich(gameId, bundle)) page.classList.add("sports-rich-wager");
+        const config = window.BETTING_PAGE_BATCH_STATE && BETTING_PAGE_BATCH_STATE.config || {};
+        const hero = wagerR47SharedHeroHtml_(gameId, config, bundle);
+        const currentHero = page.querySelector(".pattc-sports-hero, .sports-rich-wager-hero, h1");
+        if (hero && currentHero) currentHero.outerHTML = hero;
+        PATTCSportsRich.process(page);
+      }, 0);
+    }).catch(function(err) { console.warn("Deferred Wager Appearance skipped", err); });
+  }
 
   const html = await SPORTS_RICH_WAGER_ORIGINAL_PAGE_.apply(this, arguments);
   if (!PATTCSportsRich.isRich(gameId)) return html;
@@ -5205,7 +5221,7 @@ if (typeof renderBettingPage === "function" && !window.RC24A_R47_WAGER_PAGE_BASE
     var config = window.BETTING_PAGE_BATCH_STATE && BETTING_PAGE_BATCH_STATE.config || {};
     var appearance = null;
     try { if (window.PATTCSportsRich && typeof PATTCSportsRich.appearance === "function") appearance = PATTCSportsRich.appearance(gameId, null); } catch (err) {}
-    if (!appearance && gameId && typeof apiGetGameAppearance === "function") { try { appearance = await apiGetGameAppearance(gameId); } catch (err2) {} }
-    return wagerR47ReplaceHero_(html, wagerR47SharedHeroHtml_(gameId, config, appearance));
+    // Do not duplicate the deferred prepare() with another blocking read here.
+    return appearance ? wagerR47ReplaceHero_(html, wagerR47SharedHeroHtml_(gameId, config, appearance)) : html;
   };
 }

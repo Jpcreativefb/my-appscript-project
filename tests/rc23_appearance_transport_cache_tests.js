@@ -147,6 +147,15 @@ async function main() {
   const ss = storage();
   const ls = storage();
   const appNode = { innerHTML: "", classList: classList() };
+  const timerQueue = [];
+  async function flushTimers() {
+    while (timerQueue.length) {
+      const fn = timerQueue.shift();
+      fn();
+      await new Promise(resolve => setImmediate(resolve));
+      await Promise.resolve();
+    }
+  }
   const ctx = {
     console,
     Promise,
@@ -193,7 +202,7 @@ async function main() {
       querySelectorAll() { return []; }
     },
     window: {
-      setTimeout(fn) { fn(); return 1; },
+      setTimeout(fn) { timerQueue.push(fn); return timerQueue.length; },
       location: { hash: "", pathname: "/app.html", search: "" },
       history: {
         pushState() {},
@@ -242,37 +251,44 @@ async function main() {
     appNode.innerHTML = "<main>home</main>";
   }
 
-  // B. unchanged Appearance permits snapshot reuse.
+  // B. unchanged Appearance permits immediate snapshot reuse; verification is deferred.
   await seedSnapshot("game-a", "clean", '<main id="cached-clean">clean</main>');
   now += 30_000;
   renderCount = 0;
   const callsBeforeReuse = appearanceCalls;
   await ctx.navigate("picks");
-  assert(appearanceCalls > callsBeforeReuse, "cached snapshot must be server-revalidated before reuse");
+  assert.strictEqual(appearanceCalls, callsBeforeReuse, "cached snapshot must paint before network Appearance verification");
   assert.strictEqual(renderCount, 0, "unchanged <45s snapshot should be reused without real renderer");
   assert(appNode.innerHTML.includes("cached-clean"), "unchanged cached HTML was not reused");
+  await flushTimers();
+  assert(appearanceCalls > callsBeforeReuse, "cached snapshot must still revalidate Appearance after first paint");
+  assert.strictEqual(renderCount, 0, "unchanged deferred verification must not rerender");
 
-  // C + D. Admin changes while PWA stays foregrounded; next SPA nav rejects <45s old snapshot on FIRST navigation.
+  // C + D. Admin changes while PWA stays foregrounded: first paint may use the
+  // last verified snapshot, then background verification invalidates/rerenders it.
   ctx.APP_STATE.currentPage = "dashboard";
   appNode.innerHTML = "<main>home</main>";
   server["game-a"] = "cinematic";
   now += 10_000; // snapshot remains <45s old
   renderCount = 0;
   await ctx.navigate("picks");
-  assert.strictEqual(renderCount, 1, "changed fresh snapshot must execute real renderer on first navigation");
-  assert(appNode.innerHTML.includes("cinematic"), "first navigation did not render changed Appearance");
-  assert(!appNode.innerHTML.includes("cached-clean"), "old <45s cached DOM was accepted");
+  assert.strictEqual(renderCount, 0, "Appearance verification must not block first usable snapshot paint");
+  assert(appNode.innerHTML.includes("cached-clean"), "last verified snapshot should paint immediately");
+  await flushTimers();
+  assert.strictEqual(renderCount, 1, "changed deferred Appearance verification must execute the real renderer");
+  assert(appNode.innerHTML.includes("cinematic"), "background verification did not render changed Appearance");
 
-  // E. ~5-minute snapshot also rejects on FIRST navigation.
+  // E. ~5-minute snapshot follows the same paint-first / verify-second contract.
   ctx.APP_STATE.currentPage = "dashboard";
   appNode.innerHTML = "<main>home</main>";
-  // Current Cinematic render was captured by navigate; age it to ~5 minutes, then switch back.
   server["game-a"] = "clean";
   now += 5 * 60 * 1000;
   renderCount = 0;
   await ctx.navigate("picks");
-  assert.strictEqual(renderCount, 1, "changed ~5-minute snapshot must execute real renderer on first navigation");
-  assert(appNode.innerHTML.includes('data-render="clean"'), "5-minute first navigation did not render current Appearance");
+  assert.strictEqual(renderCount, 0, "aged verified snapshot must still win first paint over Appearance network");
+  await flushTimers();
+  assert.strictEqual(renderCount, 1, "changed aged snapshot must rerender after deferred verification");
+  assert(appNode.innerHTML.includes('data-render="clean"'), "deferred verification did not render current Appearance");
 
   // F. Game A invalidation preserves Game B.
   await seedSnapshot("game-b", "clean", '<main id="game-b-cache">game-b</main>');
@@ -320,11 +336,15 @@ async function main() {
   await new Promise(resolve => setTimeout(resolve, 0));
   assert.strictEqual(pwaCtx.resumeCalls, 2, "persisted pageshow must revalidate Appearance");
 
-  // Static proof that navigate does not accept snapshot before canonical revalidation.
+  // Static proof of the new primary-UI-first contract: a snapshot already tagged
+  // with the last verified fingerprint is read before any fallback blocking check,
+  // and current Appearance is revalidated after snapshot paint.
   const navigateSource = navigateFn;
-  const revalidatePos = navigateSource.indexOf("await appPrepareAppearanceSnapshotReuse_(page)");
-  const readPos = navigateSource.indexOf("appReadPageSnapshot_(page, appearanceCheck.fingerprint)");
-  assert(revalidatePos >= 0 && readPos > revalidatePos, "snapshot read/acceptance occurs before Appearance revalidation");
+  const knownReadPos = navigateSource.indexOf("appReadPageSnapshot_(page, knownFingerprint)");
+  const blockingFallbackPos = navigateSource.indexOf("await appPrepareAppearanceSnapshotReuse_(page)");
+  const deferredPos = navigateSource.indexOf("appRevalidateCurrentGameAppearance_({ rerender: true");
+  assert(knownReadPos >= 0 && blockingFallbackPos > knownReadPos, "known-fingerprint snapshot must be attempted before fallback network verification");
+  assert(deferredPos > knownReadPos, "current Appearance must still be revalidated after first paint");
 
   console.log("PASS: RC23 correction-round focused tests A-J.");
 }

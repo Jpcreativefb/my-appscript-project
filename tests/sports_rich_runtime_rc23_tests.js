@@ -201,7 +201,8 @@ function sourceContracts(repoRoot) {
   });
   pass("All four Sports page modules carry the identical RC23 shared runtime");
 
-  assert(wager.includes("await PATTCSportsRich.prepare(gameId)"));
+  assert(wager.includes("Promise.resolve(PATTCSportsRich.prepare(gameId))"));
+  assert(!wager.includes("await PATTCSportsRich.prepare(gameId)"));
   assert(wager.includes("sports-rich-wager"));
   assert(wager.includes("sports-rich-wager-hero"));
   assert(wager.includes("PATTC Credits"));
@@ -209,7 +210,8 @@ function sourceContracts(repoRoot) {
   pass("Sports Wager Clean/Rich render contract is structurally distinct");
   pass("Sports Wager remains PATTC virtual-credit presentation");
 
-  assert(team.includes("await PATTCSportsRich.prepare(gameId)"));
+  assert(team.includes("Promise.resolve(PATTCSportsRich.prepare(gameId))"));
+  assert(!team.includes("await PATTCSportsRich.prepare(gameId)"));
   assert(team.includes("sports-rich-team-fantasy"));
   assert(team.includes('return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"]'));
   assert(team.includes("Choose NFL team"));
@@ -219,14 +221,16 @@ function sourceContracts(repoRoot) {
   pass("Team Fantasy Rich render retains all eight NFL TEAM slots");
   pass("Team Fantasy existing choose/Random Pick/Auto Pick mechanics remain delegated");
 
-  assert(confidence.includes("await PATTCSportsRich.prepare(gameId)"));
+  assert(!confidence.includes("await PATTCSportsRich.prepare(gameId)"));
+  assert(confidence.includes("refreshPicksAppearanceUi_"));
   assert(confidence.includes("sports-rich-confidence"));
   assert(confidence.includes("PICKS_PAGE_DATA.isConfidenceGame === true"));
   assert(confidence.includes("updateConfidenceForCategory"));
   assert(confidence.includes("saveConfidenceDraft_"));
   pass("Confidence Rich render remains matchup-pick + confidence-assignment flow");
 
-  assert(survivor.includes("await PATTCSportsRich.prepare(gameId)"));
+  assert(survivor.includes("Promise.resolve(PATTCSportsRich.prepare(gameId))"));
+  assert(!survivor.includes("await PATTCSportsRich.prepare(gameId)"));
   assert(survivor.includes("sports-rich-survivor"));
   assert(survivor.includes("sports-rich-koth"));
   assert(survivor.includes("payload.sportsMode === true"));
@@ -254,42 +258,30 @@ function sourceContracts(repoRoot) {
   });
   pass("Rich CSS exists for all five supported Sports families");
 
-  // The renderers await Appearance before testing the Rich gate. Kent owns the
-  // shared navigation/snapshot/transport layer that guarantees the renderer is
-  // invoked with a current bundle.
-  //
-  // Wager / Team Fantasy / Confidence perform the isRich() test directly in
-  // the wrapper body, so textual order in the source file is a valid contract.
-  [wager, team, confidence].forEach((source, index) => {
-    const prepareAt = source.lastIndexOf("await PATTCSportsRich.prepare(gameId)");
-    const gateAt = source.indexOf("PATTCSportsRich.isRich", prepareAt);
-    assert(prepareAt >= 0 && gateAt > prepareAt, "prepare/gate order failed for direct-gate page " + index);
+  // Launch-performance contract: Appearance remains available and deduplicated,
+  // but primary game state/render must not wait on its network response.
+  const nonBlockingContracts = [
+    [wager, "SPORTS_RICH_WAGER_ORIGINAL_PAGE_", "Wager"],
+    [team, "SPORTS_RICH_TF_ORIGINAL_PAGE_", "Team Fantasy"],
+    [survivor, "SPORTS_RICH_SURVIVOR_ORIGINAL_PAGE_", "Survivor"]
+  ];
+  nonBlockingContracts.forEach(([source, baseMarker, label]) => {
+    const wrapperAt = source.indexOf("render" + (label === "Wager" ? "Betting" : label === "Team Fantasy" ? "TeamFantasy" : "Survivor") + "Page = async function()");
+    const tail = wrapperAt >= 0 ? source.slice(wrapperAt) : source;
+    assert(tail.includes("Promise.resolve(PATTCSportsRich.prepare(gameId))"), label + " must retain one deferred Appearance prepare");
+    assert(!tail.includes("await PATTCSportsRich.prepare(gameId)"), label + " must not block first render on Appearance");
+    assert(tail.includes(baseMarker + ".apply(this, arguments)"), label + " base renderer missing");
   });
 
-  // Survivor is intentionally structured differently: the helper
-  // sportsRichSurvivorEnabled_() is DEFINED earlier in the file, while the
-  // renderSurvivorPage wrapper awaits prepare() and then CALLS that helper.
-  // File-position of the helper definition therefore cannot prove execution
-  // order. Verify the helper owns the isRich() gate, then verify the wrapper
-  // calls it only after prepare().
+  // Confidence uses the existing Picks Appearance hydrator rather than starting
+  // a second Sports-Rich request in its wrapper.
+  assert(confidence.includes("refreshPicksAppearanceUi_"), "Confidence must hydrate Appearance through the shared Picks redraw path");
+  assert(!confidence.includes("await PATTCSportsRich.prepare(gameId)"), "Confidence must not block base render on Sports-Rich Appearance");
+
   const survivorEnabledBody = functionBody(survivor, "sportsRichSurvivorEnabled_");
-  assert(
-    survivorEnabledBody.includes("PATTCSportsRich.isRich"),
-    "Survivor Rich activation helper no longer owns the isRich gate"
-  );
+  assert(survivorEnabledBody.includes("PATTCSportsRich.isRich"), "Survivor Rich activation helper no longer owns the isRich gate");
 
-  const survivorWrapperMarker = "renderSurvivorPage = async function()";
-  const survivorWrapperAt = survivor.lastIndexOf(survivorWrapperMarker);
-  assert(survivorWrapperAt >= 0, "Survivor Rich render wrapper missing");
-  const survivorWrapper = survivor.slice(survivorWrapperAt);
-  const survivorPrepareAt = survivorWrapper.indexOf("await PATTCSportsRich.prepare(gameId)");
-  const survivorGateCallAt = survivorWrapper.indexOf("sportsRichSurvivorEnabled_(payload)");
-  assert(
-    survivorPrepareAt >= 0 && survivorGateCallAt > survivorPrepareAt,
-    "Survivor prepare/activation order failed"
-  );
-
-  pass("Each Sports family prepares Appearance before its Rich render gate");
+  pass("Each Sports family preserves Rich activation while keeping Appearance off the primary render wait path");
 }
 
 (async function main() {

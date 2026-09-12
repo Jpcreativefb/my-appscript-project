@@ -335,7 +335,14 @@ function survivorSaveSettings_(gameId, value) {
   };
   sportsSurvivorWriteObjectRow_(sh, SPORTS_SURVIVOR_SETTINGS_HEADERS, existing && existing.__rowNumber, object);
   if (settings.automationEnabled && settings.mode !== "manual-elimination") {
-    try { survivorEnsureSportsAutomationTrigger_(); } catch (err) { /* Admin can install/run manually if trigger permission is unavailable. */ }
+    try {
+      settings.automationTriggerStatus = survivorEnsureSportsAutomationTrigger_();
+    } catch (err) {
+      settings.automationTriggerStatus = { success: false, error: err && err.message ? err.message : String(err) };
+      if (typeof console !== "undefined" && console.warn) {
+        console.warn("Survivor automation trigger setup failed for " + cleanGameId + ": " + settings.automationTriggerStatus.error);
+      }
+    }
   }
   return settings;
 }
@@ -373,6 +380,22 @@ function sportsSurvivorRoundRules_(settings, week) {
   };
 }
 
+function sportsSurvivorExtractScores_(result) {
+  if (Array.isArray(result)) return result;
+  if (!result || typeof result !== "object") return [];
+  const candidates = [result.scores, result.games, result.events, result.data];
+  for (let index = 0; index < candidates.length; index++) {
+    const value = candidates[index];
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object") {
+      const nested = sportsSurvivorExtractScores_(value);
+      if (nested.length) return nested;
+    }
+  }
+  if (result.HomeTeam || result.homeTeam || result.AwayTeam || result.awayTeam) return [result];
+  return [];
+}
+
 function sportsSurvivorFetchScores_(settings, extra) {
   if (typeof sportsWagerFetchJson_ !== "function") throw new Error("Sports Scores Engine connection is unavailable.");
   extra = extra || {};
@@ -383,13 +406,19 @@ function sportsSurvivorFetchScores_(settings, extra) {
     seasonYear: settings.seasonYear
   };
   if (settings.seasonType) params.seasonType = settings.seasonType;
-  if (settings.seasonPhase) params.seasonPhase = settings.seasonPhase;
+  /*
+    SeasonType is the stable Sports Scores Engine discriminator (1/2/3).
+    Do not additionally send Survivor's UI label (for example "regular") as
+    seasonPhase: live Sports Scores rows use provider labels such as
+    "REGULAR SEASON", and an exact phase filter can incorrectly reduce a
+    valid week to zero games.
+  */
   Object.keys(extra).forEach(function(key) {
     if (extra[key] !== undefined && extra[key] !== null && extra[key] !== "") params[key] = extra[key];
   });
   const result = sportsWagerFetchJson_(params, "Sports Survivor schedule/results");
   if (!result || result.success === false) throw new Error((result && (result.error || result.message)) || "Sports Scores Engine could not load games.");
-  const scores = Array.isArray(result.scores) ? result.scores : (Array.isArray(result.games) ? result.games : []);
+  const scores = sportsSurvivorExtractScores_(result);
   return scores.map(function(score) { return typeof sportsWagerNormalizeScore_ === "function" ? sportsWagerNormalizeScore_(score) : score; });
 }
 
@@ -531,11 +560,20 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
   const week = Math.floor(sportsSurvivorNumber_(requestedWeek, settings.startWeek));
   if (week < settings.startWeek || week > settings.endWeek) throw new Error("Week " + week + " is outside the configured Survivor range.");
   const categoryId = sportsSurvivorCategoryId_(settings, week);
-  if (sportsSurvivorQuestionExists_(gameId, categoryId)) {
-    if (options.refresh === true) sportsSurvivorSyncWeek_(gameId, week, { refreshOdds: settings.autoRefreshOdds });
-    return { success: true, duplicate: true, gameId: gameId, categoryId: categoryId, week: week };
-  }
+  const existingCategories = typeof getCategories === "function"
+    ? (getCategories(gameId) || [])
+    : (typeof survivorGameCategories_ === "function" ? survivorGameCategories_(gameId) : []);
+  const existingCategory = (existingCategories || []).find(function(category) {
+    return sportsSurvivorKey_(category && category.id) === sportsSurvivorKey_(categoryId);
+  }) || null;
+  const categoryExisted = !!existingCategory;
 
+  /*
+    Always fetch the authoritative slate before deciding a week is complete.
+    A previous build can fail after category creation but before nominees or
+    normalized options are written. Build/Refresh must repair that state, not
+    return early forever because the category shell exists.
+  */
   const scores = sportsSurvivorFetchScores_(settings, { week: week });
   if (!scores.length) throw new Error("No " + String(settings.league).toUpperCase() + " games were found for Week " + week + ".");
   const rules = sportsSurvivorRoundRules_(settings, week);
@@ -543,7 +581,7 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
   const firstKickoff = starts.length ? new Date(Math.min.apply(Math, starts)).toISOString() : "";
   const categoryName = String(settings.league).toUpperCase() + " Week " + week + " Survivor Pick";
 
-  adminCreateCategory({
+  if (!categoryExisted) adminCreateCategory({
     gameId: gameId,
     categoryId: categoryId,
     category: categoryName,
@@ -625,7 +663,24 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
     });
   });
 
-  adminBulkCreateNominees({ gameId: gameId, categoryId: categoryId, category: categoryName, items: teams });
+  const existingLegacyIds = {};
+  ((existingCategory && existingCategory.nominees) || []).forEach(function(nominee) {
+    const nomineeId = sportsSurvivorKey_(nominee && (nominee.id || nominee.nomineeId));
+    if (nomineeId) existingLegacyIds[nomineeId] = true;
+  });
+  const missingLegacyTeams = teams.filter(function(item) {
+    return !existingLegacyIds[sportsSurvivorKey_(item.nomineeId)];
+  });
+
+  const normalizedBefore = sportsSurvivorOptionMetaForGame_(gameId);
+  const normalizedCategoryBefore = normalizedBefore[sportsSurvivorKey_(categoryId)] || {};
+  const missingNormalizedTeams = teams.filter(function(item) {
+    return !normalizedCategoryBefore[sportsSurvivorKey_(item.nomineeId)];
+  });
+
+  if (missingLegacyTeams.length) {
+    adminBulkCreateNominees({ gameId: gameId, categoryId: categoryId, category: categoryName, items: missingLegacyTeams });
+  }
   if (typeof normalizedStorageUpsertQuestion_ === "function") {
     normalizedStorageUpsertQuestion_({
       gameId: gameId, questionId: categoryId, question: categoryName, section: "Survivor", active: true,
@@ -648,7 +703,21 @@ function sportsSurvivorBuildWeek_(gameId, requestedWeek, options) {
   }
   sportsSurvivorUpsertResults_(gameId, categoryId, week, scores);
   if (typeof clearGameDataCaches === "function") clearGameDataCaches(gameId, ["Categories", "CategorySettings", "Questions", "QuestionOptions"]);
-  return { success: true, duplicate: false, gameId: gameId, categoryId: categoryId, week: week, teams: teams.length, games: scores.length, rules: rules };
+  const repaired = categoryExisted && (missingLegacyTeams.length > 0 || missingNormalizedTeams.length > 0);
+  return {
+    success: true,
+    duplicate: categoryExisted && !repaired,
+    repaired: repaired,
+    createdCategory: !categoryExisted,
+    createdTeams: missingLegacyTeams.length,
+    repairedNormalizedOptions: missingNormalizedTeams.length,
+    gameId: gameId,
+    categoryId: categoryId,
+    week: week,
+    teams: teams.length,
+    games: scores.length,
+    rules: rules
+  };
 }
 
 function sportsSurvivorResultComplete_(score) {
@@ -987,7 +1056,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           else winStreak = 0;
           lossesUsed++;
           const availableLosses = settings.lossesAllowed + earnedLives;
-          if (availableLosses > 0 ? lossesUsed >= availableLosses : lossesUsed > 0) {
+          if (lossesUsed > availableLosses) {
             alive = false;
             eliminatedRound = week;
             eliminatedReason = missed ? "missed" : "loss";
@@ -1000,7 +1069,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
           lossesUsed++;
           winStreak = 0;
           const availableLosses = settings.lossesAllowed + earnedLives;
-          if (availableLosses > 0 ? lossesUsed >= availableLosses : lossesUsed > 0) {
+          if (lossesUsed > availableLosses) {
             alive = false;
             eliminatedRound = week;
             eliminatedReason = missed ? "missed" : "loss";
@@ -1375,7 +1444,15 @@ function apiAdminBuildSportsSurvivorWeek_(payload) {
     const week = Math.floor(sportsSurvivorNumber_(payload.week, settings.startWeek));
     return kothProcessWeek_(gameId, week, { allowGeneric: true });
   }
-  return sportsSurvivorBuildWeek_(gameId, payload.week, { refresh: sportsSurvivorBool_(payload.refresh, false) });
+  const result = sportsSurvivorBuildWeek_(gameId, payload.week, { refresh: sportsSurvivorBool_(payload.refresh, false) });
+  if (settings.automationEnabled && settings.autoBuildNextWeek) {
+    try {
+      result.automation = survivorEnsureSportsAutomationTrigger_();
+    } catch (err) {
+      result.automation = { success: false, error: err && err.message ? err.message : String(err) };
+    }
+  }
+  return result;
 }
 
 function apiAdminRunSportsSurvivor_(payload) {
@@ -1389,7 +1466,19 @@ function apiAdminRunSportsSurvivor_(payload) {
 function apiAdminInstallSportsSurvivorAutomation_(payload) {
   payload = payload || {};
   requireAdmin_(payload);
-  return survivorEnsureSportsAutomationTrigger_();
+  const trigger = survivorEnsureSportsAutomationTrigger_();
+  const gameId = sportsSurvivorString_(payload.gameId);
+  if (!gameId) return trigger;
+  const settings = survivorGetSettings_(gameId);
+  if (!settings.automationEnabled || settings.mode === "manual-elimination" || !settings.autoBuildNextWeek) {
+    return Object.assign({}, trigger, { gameId: gameId, initialRunSkipped: true });
+  }
+  const categories = typeof getCategories === "function"
+    ? (getCategories(gameId) || [])
+    : (typeof survivorGameCategories_ === "function" ? survivorGameCategories_(gameId) : []);
+  if (categories.length) return Object.assign({}, trigger, { gameId: gameId, initialRunSkipped: true });
+  const initialRun = survivorRunSportsAutomation_(gameId, { manual: true, maxWeeks: 1 });
+  return Object.assign({}, trigger, { gameId: gameId, initialRun: initialRun });
 }
 
 /* =====================================================
@@ -1477,18 +1566,23 @@ function sportsSurvivorRc24aCompare_(viewer, gameId, leagueContext, categories, 
       var nomineeId = sportsSurvivorKey_((round.nomineeIds || [])[0] || round.pickNomineeId);
       var meta = (optionMeta[categoryId] || {})[nomineeId] || {};
       var kickoff = meta.kickoff ? new Date(meta.kickoff) : null;
-      var reveal = round.resolved === true || survivorCategoryLocked_(game, category) ||
+      var isViewer = sportsSurvivorKey_(username) === sportsSurvivorKey_(viewer);
+      var revealByRule = round.resolved === true || survivorCategoryLocked_(game, category) ||
         (kickoff && !isNaN(kickoff.getTime()) && Date.now() >= kickoff.getTime());
+      // Compare privacy is a backend contract. The viewer always sees their own
+      // saved selection; rivals remain redacted until the established reveal rule.
+      var reveal = isViewer || revealByRule;
       var selection = (round.selectionResults || [])[0] || {};
       var finalScore = Number.isFinite(Number(selection.teamScore)) && Number.isFinite(Number(selection.opponentScore))
         ? String(selection.teamScore) + "-" + String(selection.opponentScore) : "";
       return {
         week: round.week, hidden: !reveal,
-        teamId: reveal ? nomineeId : "", team: reveal ? (meta.team || nomineeId) : "",
-        logoUrl: reveal ? (meta.logoUrl || "") : "", opponent: reveal ? (meta.opponent || "") : "",
-        finalScore: reveal ? finalScore : "",
-        result: reveal ? round.outcome : "hidden", weeklyPoints: reveal ? round.earnedPoints : null,
-        streak: reveal ? round.winStreak : null, lossesUsed: round.lossesUsed, livesRemaining: round.livesRemaining
+        teamId: reveal ? nomineeId : null, team: reveal ? (meta.team || nomineeId) : null,
+        logoUrl: reveal ? (meta.logoUrl || "") : null, opponent: reveal ? (meta.opponent || "") : null,
+        finalScore: reveal ? finalScore : null,
+        result: reveal ? round.outcome : null, weeklyPoints: reveal ? round.earnedPoints : null,
+        streak: reveal ? round.winStreak : null, lossesUsed: reveal ? round.lossesUsed : null,
+        livesRemaining: reveal ? round.livesRemaining : null
       };
     });
     return {

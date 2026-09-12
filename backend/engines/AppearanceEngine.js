@@ -460,6 +460,20 @@ function appearanceFindRow_(sheet, keyMap) {
   return null;
 }
 
+function appearanceFoundRowObject_(found) {
+  if (!found || !Array.isArray(found.headers) || !Array.isArray(found.row)) return null;
+  const object = {};
+  found.headers.forEach(function(header, index) { object[header] = found.row[index]; });
+  return object;
+}
+
+function appearanceFlushAndVerifyRow_(sheet, keyMap, label) {
+  SpreadsheetApp.flush();
+  const found = appearanceFindRow_(sheet, keyMap);
+  if (!found) throw new Error((label || "Appearance row") + " was not persisted to the intended target.");
+  return appearanceFoundRowObject_(found);
+}
+
 function appearanceUpsertObject_(sheet, keyMap, objectValue) {
   const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0]
     .map(function(value) { return appearanceString_(value); });
@@ -1052,7 +1066,13 @@ function adminSaveAppearanceImagePackItem(payload) {
     UpdatedAt: new Date()
   });
 
-  return { success: true, packId: packId, entityType: entityType, entityId: entityId, variant: variant };
+  const saved = appearanceFlushAndVerifyRow_(sheet, {
+    PackId: packId,
+    EntityType: entityType,
+    EntityId: entityId,
+    Variant: variant
+  }, "Image Pack item");
+  return { success: true, packId: packId, entityType: entityType, entityId: entityId, variant: variant, item: saved };
 }
 
 function adminSaveAppearanceHubSetting(payload) {
@@ -1126,7 +1146,8 @@ function adminSaveAppearanceThemePack(payload) {
     UpdatedAt: now
   });
 
-  return { success: true, themePackId: themePackId };
+  const saved = appearanceFlushAndVerifyRow_(sheet, { ThemePackId: themePackId }, "Theme Pack");
+  return { success: true, themePackId: themePackId, themePack: saved };
 }
 
 function adminSaveGameAppearance(payload) {
@@ -1147,7 +1168,8 @@ function adminSaveGameAppearance(payload) {
     UpdatedAt: new Date()
   });
 
-  return { success: true, gameId: gameId };
+  const saved = appearanceFlushAndVerifyRow_(sheet, { GameId: gameId }, "Game Appearance assignment");
+  return { success: true, gameId: gameId, assignment: saved };
 }
 
 function adminSaveAppearanceOverride(payload) {
@@ -1174,7 +1196,12 @@ function adminSaveAppearanceOverride(payload) {
     UpdatedAt: new Date()
   });
 
-  return { success: true, gameId: gameId, entityType: entityType, entityId: entityId };
+  const saved = appearanceFlushAndVerifyRow_(sheet, {
+    GameId: gameId,
+    EntityType: entityType,
+    EntityId: entityId
+  }, "Game Appearance override");
+  return { success: true, gameId: gameId, entityType: entityType, entityId: entityId, override: saved };
 }
 
 function apiAdminSetupAppearanceSystem(payload) {

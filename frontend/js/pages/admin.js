@@ -3557,7 +3557,15 @@ async function adminBuildSportsSurvivorWeek(form, button) {
     if (!saved || saved.success === false) throw new Error(saved && saved.error || "Could not save Survivor settings.");
     const res = await apiAdminBuildSportsSurvivorWeek({ gameId: gameId, week: form.survivorBuildWeek ? form.survivorBuildWeek.value : "" });
     if (!res || res.success === false) throw new Error(res && res.error || "Could not build Survivor week.");
-    if (status) status.textContent = res.duplicate ? `Week ${res.week} already exists; current sports data was refreshed.` : `Week ${res.week} built with ${res.teams || 0} teams.`;
+    if (status) {
+      const buildMessage = res.repaired
+        ? `Week ${res.week} repaired/refreshed with ${res.teams || 0} teams.`
+        : (res.duplicate ? `Week ${res.week} already exists; current sports data was refreshed.` : `Week ${res.week} built with ${res.teams || 0} teams.`);
+      const automationWarning = res.automation && res.automation.success === false
+        ? ` Automation warning: ${res.automation.error || "15-minute trigger could not be verified."}`
+        : "";
+      status.textContent = buildMessage + automationWarning;
+    }
     adminMarkGameFormClean_(form);
   } catch (err) {
     if (status) status.textContent = err.message || String(err);
@@ -3601,7 +3609,11 @@ async function adminInstallSportsSurvivorAutomation(form, button) {
   try {
     const res = await apiAdminInstallSportsSurvivorAutomation({ gameId: form.gameId.value.trim() });
     if (!res || res.success === false) throw new Error(res && res.error || "Could not install Survivor automation.");
-    if (status) status.textContent = res.installed ? "15-minute Survivor automation installed." : "15-minute Survivor automation is already active.";
+    if (status) {
+      const initialBuilt = res.initialRun && Array.isArray(res.initialRun.actions) && res.initialRun.actions.some(function(action) { return action && action.build && action.build.success; });
+      status.textContent = (res.installed ? "15-minute Survivor automation installed." : "15-minute Survivor automation is already active.") +
+        (initialBuilt ? " StartWeek was built successfully." : "");
+    }
   } catch (err) { if (status) status.textContent = err.message || String(err); alert(err.message || err); }
   finally { if (button) button.disabled = false; }
 }

@@ -42,7 +42,7 @@ ok(surv.includes('appearanceRuntime.sportsHeroPresentation')&&surv.includes('ken
 
 ok(/function sportsRichSurvivorEnabled_\(payload\)[\s\S]{0,1800}PATTCSportsRich\.isRich\s*\(/.test(surv),'Survivor/KOTH activation helper retains RC23 Rich/Clean decision call while RC24A default-Rich fallback remains available');
 const finalSurvivorWrapper=surv.slice(surv.lastIndexOf('renderSurvivorPage = async function()'));
-ok(finalSurvivorWrapper.indexOf('await PATTCSportsRich.prepare(gameId)') >= 0 && finalSurvivorWrapper.indexOf('sportsRichSurvivorEnabled_(payload)') > finalSurvivorWrapper.indexOf('await PATTCSportsRich.prepare(gameId)'), 'final Survivor outer wrapper prepares Appearance before RC23 Rich/Clean decision');
+ok(!finalSurvivorWrapper.includes('await PATTCSportsRich.prepare(gameId)') && surv.includes('Promise.resolve(PATTCSportsRich.prepare(gameId))') && finalSurvivorWrapper.includes('sportsRichSurvivorEnabled_(payload)'), 'Survivor keeps RC23 Rich/Clean decision while Appearance prepare is deferred/deduped outside the final blocking wrapper');
 ok(runtime.includes('RC24A_V12_OFFICIAL_SPORTS_MEDIA_DEFAULTS')&&runtime.includes('sportsHeroOfficialDefaults'),'official five-game PATTC Sports media defaults installed in shared Appearance runtime');
 ['team-fantasy','confidence','sports-wager','survivor','koth'].forEach(function(name){
   ok(fs.existsSync(path.join(root,'frontend/assets/sports/official/'+name+'-hero.png'))&&fs.existsSync(path.join(root,'frontend/assets/sports/official/'+name+'-logo.png')),name+' official hero + logo bundled in frontend assets');
@@ -58,8 +58,15 @@ ok(apiJs.includes('\"adminPermanentGamePurgeDryRun\"')&&apiJs.includes('\"adminP
 const rel=(appHtml.match(/<meta\s+name=[\"']pattc-release[\"']\s+content=[\"']([^\"']+)[\"']/i)||[])[1]||'';
 ok(!!rel,'canonical pattc-release exists');
 ok(appJs===appMirror,'frontend app.js compatibility mirrors remain identical');
-ok(indexHtml.includes('name=\"pattc-release\" content=\"'+rel+'\"')&&appHtml.includes('release='+rel)&&indexHtml.includes('release='+rel),'authenticated and login/PWA HTML shells share canonical pattc-release');
-ok(appJs.includes('const APP_ASSET_VERSION = String(window.PATTC_FRONTEND_RELEASE || \"'+rel+'\");')&&pwa.includes('const PWA_VERSION = String(window.PATTC_FRONTEND_RELEASE || \"'+rel+'\");')&&sw.includes('const PATTC_SW_RELEASE_MARKER = \"'+rel+'\";'),'APP_ASSET_VERSION, PWA_VERSION, and service-worker markers match canonical pattc-release');
+const validRelease=value=>/^v\d{4,}rc\d+[a-z0-9-]*$/i.test(String(value||''));
+const loginRel=(indexHtml.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i)||[])[1]||'';
+const appFallback=(appJs.match(/^const APP_ASSET_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m)||[])[1]||'';
+const pwaFallback=(pwa.match(/^const PWA_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m)||[])[1]||'';
+const swAudit=(sw.match(/^const PATTC_SW_RELEASE_MARKER\s*=\s*"([^"]+)"/m)||[])[1]||'';
+ok(validRelease(rel)&&appHtml.includes('release='+rel),'authenticated shell keeps canonical pattc-release boundary');
+ok(validRelease(loginRel)&&indexHtml.includes('release='+loginRel),'login/PWA shell keeps its own valid pattc-release boundary');
+ok(validRelease(appFallback)&&validRelease(pwaFallback)&&validRelease(swAudit),'app/PWA/SW historical fallback and audit markers remain valid PATTC releases');
+ok(appJs.includes('window.PATTC_FRONTEND_RELEASE')&&pwa.includes('window.PATTC_FRONTEND_RELEASE')&&pwa.includes('"./sw.js?v=" + encodeURIComponent(PWA_VERSION)')&&sw.includes('new URL(self.location.href).searchParams.get("v")')&&sw.includes('const AWARDS_CACHE = "awards-app-" + AWARDS_RELEASE'),'runtime release propagation and SW cache/query protections remain intact');
 const legacyRc23='v1219rc23-appearance-transport-cache-r2';
 ok(appHtml.includes('meta name=\"pattc-release\" content=\"'+legacyRc23+'\"')&&indexHtml.includes('meta name=\"pattc-release\" content=\"'+legacyRc23+'\"'),'RC23 HTML release lineage retained as compatibility marker');
 ok(appJs.includes('window.PATTC_FRONTEND_RELEASE || \"'+legacyRc23+'\"')&&pwa.includes('window.PATTC_FRONTEND_RELEASE || \"'+legacyRc23+'\"')&&sw.includes('PATTC_SW_RELEASE_MARKER = \"'+legacyRc23+'\"'),'RC23 app/PWA/SW release lineage retained as compatibility marker');

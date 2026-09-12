@@ -196,26 +196,30 @@ ok(api.includes('cache: "no-store"') || api.includes("cache: 'no-store'"),
   'authenticated POST bridge uses no-store');
 
 // ---------------------------------------------------------------------------
-// GATE 3 — Before accepting a game-page snapshot, navigate() must revalidate
-// Appearance or invoke a helper that does so and can invalidate the snapshot.
+// GATE 3 — A game snapshot already tagged with the last verified Appearance
+// fingerprint may paint immediately. Current Appearance must still be checked
+// in one deferred chain and invalidate/rerender only when it changed.
 // ---------------------------------------------------------------------------
 const navigateFn = extractFunction(app, 'navigate');
 ok(!!navigateFn, 'navigate() exists');
-const snapshotPos = navigateFn.indexOf('appReadPageSnapshot_');
-ok(snapshotPos >= 0, 'navigate() still has the page snapshot fast path');
-const beforeSnapshot = snapshotPos >= 0 ? navigateFn.slice(0, snapshotPos) : navigateFn;
-const directAppearanceReadBeforeSnapshot = /apiGetGameAppearance\s*\(/.test(beforeSnapshot);
-const helperNamesBeforeSnapshot = appearanceCallsIn(beforeSnapshot);
+const snapshotPos = navigateFn.indexOf('appReadPageSnapshot_(page, knownFingerprint)');
+ok(snapshotPos >= 0, 'navigate() must try a known-fingerprint snapshot fast path');
+const blockingFallbackPos = navigateFn.indexOf('await appPrepareAppearanceSnapshotReuse_(page)');
+ok(blockingFallbackPos > snapshotPos, 'network Appearance verification may only block when no verified snapshot can be reused');
+const deferredAppearancePos = navigateFn.indexOf('appRevalidateCurrentGameAppearance_({ rerender: true');
+ok(deferredAppearancePos > snapshotPos, 'snapshot fast path must still schedule current-game Appearance revalidation after paint');
+const helperNamesBeforeSnapshot = appearanceCallsIn(navigateFn.slice(0, blockingFallbackPos));
 const helperLiveBeforeSnapshot = candidateAppearanceHelperIsLive(app, helperNamesBeforeSnapshot);
-ok(directAppearanceReadBeforeSnapshot || helperLiveBeforeSnapshot,
-  'Appearance-sensitive navigation revalidates current GameId before accepting cached DOM');
 
 const snapshotKeyFn = extractFunction(app, 'appPageSnapshotKey_');
 const appearanceAwareKey =
   /(appearance|Appearance|layout|Layout|theme|Theme).*(revision|version|fingerprint|hash|updated|identity)/.test(snapshotKeyFn) ||
   /(revision|version|fingerprint|hash|updated|identity).*(appearance|Appearance|layout|Layout|theme|Theme)/.test(snapshotKeyFn);
 
+const appearanceRevalidationFn = extractFunction(app, 'appRevalidateGameAppearance_');
 const appHasAppearanceSnapshotInvalidation =
+  (appearanceRevalidationFn.includes('apiGetGameAppearance(') &&
+   appearanceRevalidationFn.includes('invalidateAppPageSnapshots(')) ||
   /(apiGetGameAppearance[\s\S]{0,2500}appDiscardPageSnapshot_|appDiscardPageSnapshot_[\s\S]{0,2500}apiGetGameAppearance)/.test(app) ||
   helperLiveBeforeSnapshot;
 
@@ -266,35 +270,26 @@ ok(realityRemountInHydrator || realityAppearanceListener,
   'Reality performs a structural Picks remount when live layout assignment changes');
 
 // ---------------------------------------------------------------------------
-// GATE 6 — Sports Rich renderers still fetch/prepare live Appearance before
-// Clean/Rich decision whenever the renderer is invoked.
+// GATE 6 — Sports Rich Appearance remains live/deduplicated, but it is
+// presentation-only and must not block the authoritative game-state render.
 // ---------------------------------------------------------------------------
 [
   [tf, 'Team Fantasy'],
   [betting, 'Sports Wager'],
-  [picks, 'Confidence/Pick’em']
+  [survivor, 'Survivor/KOTH']
 ].forEach(([source, label]) => {
-  ok(source.includes('PATTCSportsRich.prepare'), `${label} renderer calls PATTCSportsRich.prepare`);
-  const preparePos = source.lastIndexOf('PATTCSportsRich.prepare');
-  const richPos = source.indexOf('PATTCSportsRich.isRich', Math.max(0, preparePos));
-  ok(preparePos >= 0 && richPos > preparePos,
-    `${label} prepares Appearance before Rich/Clean decision`);
+  ok(source.includes('Promise.resolve(PATTCSportsRich.prepare(gameId))'), `${label} retains one deferred Appearance prepare`);
+  ok(!source.includes('await PATTCSportsRich.prepare(gameId)'), `${label} does not block primary render on Appearance`);
 });
 
-ok(survivor.includes('PATTCSportsRich.prepare'),
-  'Survivor/KOTH renderer calls PATTCSportsRich.prepare');
+ok(picks.includes('refreshPicksAppearanceUi_'),
+  'Confidence/Picks uses the shared deferred Appearance redraw path');
+ok(!picks.includes('await PATTCSportsRich.prepare(gameId)'),
+  'Confidence/Picks does not block primary render on Sports Rich Appearance');
 
 const survivorEnabled = extractFunction(survivor, 'sportsRichSurvivorEnabled_');
 ok(!!survivorEnabled && /PATTCSportsRich\.isRich\s*\(/.test(survivorEnabled),
-  'Survivor/KOTH activation helper owns the Rich/Clean decision');
-
-const survivorWrapperMarker = 'renderSurvivorPage = async function()';
-const survivorWrapperAt = survivor.lastIndexOf(survivorWrapperMarker);
-const survivorWrapper = survivorWrapperAt >= 0 ? survivor.slice(survivorWrapperAt) : '';
-const survivorPreparePos = survivorWrapper.indexOf('await PATTCSportsRich.prepare(gameId)');
-const survivorDecisionPos = survivorWrapper.indexOf('sportsRichSurvivorEnabled_(payload)');
-ok(survivorPreparePos >= 0 && survivorDecisionPos > survivorPreparePos,
-  'Survivor/KOTH prepares Appearance before Rich/Clean decision');
+  'Survivor/KOTH activation helper still owns the Rich/Clean decision');
 
 ok(tf.includes('sports-rich-team-fantasy'),
   'Team Fantasy Rich DOM marker remains available');

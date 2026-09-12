@@ -287,18 +287,29 @@ function specialProgress(extra) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. PWA/service-worker/page assets share one explicit release boundary.
+// 8. PWA/service-worker/page assets preserve their explicit release boundaries.
+//    RC24M intentionally keeps historical fallback/audit markers while runtime
+//    authority comes from each page's PATTC_FRONTEND_RELEASE meta boundary.
 // ---------------------------------------------------------------------------
 {
+  const validRelease = value => /^v\d{4,}rc\d+[a-z0-9-]*$/i.test(String(value || ''));
   const releaseMatch = html.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
-  assert(releaseMatch && releaseMatch[1], 'canonical pattc-release marker missing');
+  const loginReleaseMatch = indexHtml.match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+  const appFallback = app.match(/^const APP_ASSET_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+  const pwaFallback = pwa.match(/^const PWA_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+
+  assert(releaseMatch && validRelease(releaseMatch[1]), 'canonical pattc-release marker missing/invalid');
+  assert(loginReleaseMatch && validRelease(loginReleaseMatch[1]), 'login-shell pattc-release marker missing/invalid');
   const release = releaseMatch[1];
-  assert(html.includes('name="pattc-release" content="' + release + '"'));
-  assert(indexHtml.includes('name="pattc-release" content="' + release + '"'));
-  assert(html.includes('release=' + release), 'authenticated shell assets must carry the production release boundary');
-  assert(indexHtml.includes('release=' + release), 'login/PWA shell assets must carry the production release boundary');
-  assert(app.includes('window.PATTC_FRONTEND_RELEASE || "' + release + '"'));
-  assert(pwa.includes('window.PATTC_FRONTEND_RELEASE || "' + release + '"'));
+  const loginRelease = loginReleaseMatch[1];
+  assert(html.includes('release=' + release), 'authenticated shell assets must carry the canonical release boundary');
+  assert(indexHtml.includes('release=' + loginRelease), 'login/PWA shell assets must carry their own release boundary');
+  assert(indexHtml.includes("window.PATTC_FRONTEND_RELEASE = document.querySelector('meta[name=\"pattc-release\"]')"),
+    'login shell must initialize PATTC_FRONTEND_RELEASE from its own meta marker');
+  assert(appFallback && validRelease(appFallback[1]), 'app fallback must remain a valid historical PATTC release');
+  assert(pwaFallback && validRelease(pwaFallback[1]), 'PWA fallback must remain a valid historical PATTC release');
+  assert(app.includes('window.PATTC_FRONTEND_RELEASE'), 'app runtime must consume PATTC_FRONTEND_RELEASE');
+  assert(pwa.includes('window.PATTC_FRONTEND_RELEASE'), 'PWA runtime must consume PATTC_FRONTEND_RELEASE');
   assert(pwa.includes('"./sw.js?v=" + encodeURIComponent(PWA_VERSION)'));
   assert(sw.includes('new URL(self.location.href).searchParams.get("v")'));
   assert(sw.includes('const AWARDS_CACHE = "awards-app-" + AWARDS_RELEASE'));

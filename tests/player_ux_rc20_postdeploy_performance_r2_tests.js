@@ -66,13 +66,24 @@ function eq(a, b, message) { count++; assert.strictEqual(a, b, message); }
 // -------------------------------------------------------------------------
 eq(fs.readFileSync(files.app).compare(fs.readFileSync(files.appMirror)), 0, 'app.js mirrors must be byte-identical');
 eq(fs.readFileSync(files.api).compare(fs.readFileSync(files.apiMirror)), 0, 'api.js mirrors must be byte-identical');
-[
-  files.appHtml, files.indexHtml, files.app, files.appMirror,
-  files.pwa, files.sw
-].forEach(path => {
-  const text = src(path);
-  ok(text.includes(RELEASE), `${path} contains R2 release token`);
-  ok(!text.includes(OLD_RELEASE), `${path} no longer contains prior release token`);
+const validRelease = value => /^v\d{4,}rc\d+[a-z0-9-]*$/i.test(String(value || ''));
+const indexReleaseMatch = src(files.indexHtml).match(/<meta\s+name=["']pattc-release["']\s+content=["']([^"']+)["']/i);
+const appFallback = app.match(/^const APP_ASSET_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+const pwaText = src(files.pwa), swText = src(files.sw);
+const pwaFallback = pwaText.match(/^const PWA_VERSION\s*=\s*String\(window\.PATTC_FRONTEND_RELEASE\s*\|\|\s*"([^"]+)"\)/m);
+const swMarker = swText.match(/^const PATTC_SW_RELEASE_MARKER\s*=\s*"([^"]+)"/m);
+ok(validRelease(RELEASE), 'authenticated app shell has a valid PATTC release');
+ok(indexReleaseMatch && validRelease(indexReleaseMatch[1]), 'login/PWA shell has its own valid PATTC release');
+ok(appFallback && validRelease(appFallback[1]), 'app runtime keeps a valid historical PATTC fallback');
+ok(pwaFallback && validRelease(pwaFallback[1]), 'PWA runtime keeps a valid historical PATTC fallback');
+ok(swMarker && validRelease(swMarker[1]), 'service-worker keeps a valid historical PATTC audit marker');
+ok(app.includes('window.PATTC_FRONTEND_RELEASE'), 'app runtime consumes PATTC_FRONTEND_RELEASE');
+ok(pwaText.includes('window.PATTC_FRONTEND_RELEASE'), 'PWA runtime consumes PATTC_FRONTEND_RELEASE');
+ok(pwaText.includes('"./sw.js?v=" + encodeURIComponent(PWA_VERSION)'), 'PWA registers SW with resolved release');
+ok(swText.includes('new URL(self.location.href).searchParams.get("v")'), 'SW derives release from registration query');
+ok(swText.includes('const AWARDS_CACHE = "awards-app-" + AWARDS_RELEASE'), 'SW cache derives from AWARDS_RELEASE');
+[files.appHtml, files.indexHtml, files.app, files.appMirror, files.pwa, files.sw].forEach(path => {
+  ok(!src(path).includes(OLD_RELEASE), `${path} no longer contains prior release token`);
 });
 ok(src(files.appHtml).includes('rc19-mobile-pwa.css'), 'accepted RC20 mobile stylesheet remains referenced');
 ok(src(files.css).includes('dashboard-current-games-carousel'), 'accepted Current Games local containment remains present');

@@ -1,0 +1,420 @@
+/* =========================================================
+   PATTC Predicts — Henry POSTCERT-R2 Presentation R1
+   Presentation-only overlay for Final Certified Ed R2 POSTCERT-R2.
+   Preserves RC24M heroes, imagery, gradients, logos and game identity.
+   No backend/data/save/cache/routing behavior lives in this file.
+   ========================================================= */
+
+/* ---------- Confidence: keep AWAY / VS / HOME / CONFIDENCE in one primary row ---------- */
+.picks-page .rc24k-confidence-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(108px, 17vw, 152px);
+  grid-template-areas:
+    "matchup control"
+    "details details";
+  align-items: stretch;
+  gap: 8px 10px;
+}
+
+.picks-page .rc24k-confidence-row > .rc24k-confidence-picks {
+  grid-area: matchup;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 7px;
+  min-width: 0;
+}
+
+.picks-page .rc24k-confidence-row > .rc24k-confidence-control {
+  grid-area: control;
+  min-width: 0;
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 12px;
+  background: rgba(255,255,255,.035);
+}
+
+.picks-page .rc24k-confidence-row > .confidence-game-details {
+  grid-area: details;
+  margin-top: 0;
+}
+
+.picks-page .rc24k-confidence-control.is-ready::before {
+  content: "CONFIDENCE";
+  display: block;
+  font-size: .62rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: .08em;
+  opacity: .72;
+}
+
+.picks-page .rc24k-confidence-control.is-ready .confidence-value-label,
+.picks-page .rc24k-confidence-control.is-ready .rc24k-confidence-save-state {
+  display: none;
+}
+
+.picks-page .rc24k-confidence-row.is-saving .rc24k-confidence-save-state {
+  display: block;
+}
+
+.picks-page .rc24k-confidence-picks .confidence-team-choice {
+  min-width: 0;
+}
+
+.picks-page .rc24k-confidence-picks .confidence-team-score {
+  font-variant-numeric: tabular-nums;
+}
+
+.picks-page .confidence-game-details > summary {
+  min-height: 38px;
+}
+
+/* ---------- Survivor: one visible matchup, native Ed controls remain authoritative ---------- */
+.survivor-page .survivor-final-matchup-scroll {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 100%;
+  gap: 10px;
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scroll-snap-type: inline mandatory;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+}
+
+.survivor-page .survivor-final-matchup-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.survivor-page .survivor-final-matchup {
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  min-width: 0;
+}
+
+.survivor-page .henry-survivor-carousel-controls {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  gap: 8px;
+  align-items: center;
+  margin: 8px 0 10px;
+}
+
+.survivor-page .henry-survivor-carousel-controls button {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.18);
+  background: rgba(255,255,255,.055);
+  color: inherit;
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.survivor-page .henry-survivor-carousel-controls button:disabled {
+  opacity: .32;
+  cursor: default;
+}
+
+.survivor-page .henry-survivor-carousel-count {
+  text-align: center;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+}
+
+.survivor-page .survivor-final-team.is-disabled,
+.survivor-page .survivor-team-card.unavailable .survivor-team-pick {
+  filter: grayscale(1);
+  opacity: .52;
+}
+
+.survivor-page .survivor-final-used,
+.survivor-page .survivor-team-used,
+.survivor-page .survivor-team-unavailable {
+  font-weight: 900;
+  letter-spacing: .035em;
+}
+
+/* ---------- Team Fantasy: style Ed's existing zero-request feature scoreboard ---------- */
+.sports-team-fantasy .tf-feature {
+  margin-block: 12px 14px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.sports-team-fantasy .tf-feature-selected {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-weight: 900;
+}
+
+.sports-team-fantasy .tf-feature-matchup {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.sports-team-fantasy .tf-feature-team {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  text-align: center;
+}
+
+.sports-team-fantasy .tf-feature-team img {
+  width: clamp(44px, 8vw, 64px);
+  height: clamp(44px, 8vw, 64px);
+  object-fit: contain;
+}
+
+.sports-team-fantasy .tf-feature-center {
+  display: grid;
+  grid-template-columns: minmax(36px, auto) auto minmax(36px, auto);
+  gap: 7px;
+  align-items: center;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.sports-team-fantasy .tf-feature-center > span {
+  opacity: .66;
+  font-size: .68rem;
+  font-weight: 900;
+}
+
+.sports-team-fantasy .tf-feature-status,
+.sports-team-fantasy .tf-feature-fantasy {
+  margin-top: 9px;
+}
+
+.sports-team-fantasy .tf-slot.has-pick {
+  cursor: pointer;
+}
+
+/* ---------- Wager: dedicated feature view only; never Shared Compare ---------- */
+.betting-page .henry-wager-feature {
+  margin: 12px 0 14px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.betting-page .henry-wager-feature-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.betting-page .henry-wager-feature-head > span {
+  font-size: .64rem;
+  font-weight: 900;
+  letter-spacing: .09em;
+  opacity: .68;
+}
+
+.betting-page .henry-wager-feature-head > strong {
+  text-align: right;
+}
+
+.betting-page .henry-wager-feature .betting-summary-main {
+  min-width: 0;
+}
+
+.betting-page .henry-wager-feature .betting-live-stat-panel {
+  margin-top: 10px;
+}
+
+.betting-page .betting-category-card.is-henry-featured-wager > summary {
+  box-shadow: inset 3px 0 0 currentColor;
+}
+
+/* ---------- Existing Compare views: one visual language, Ed remains data authority ---------- */
+.picks-page .rc24k-confidence-compare,
+.survivor-page .survivor-final-compare,
+.sports-team-fantasy .tf-compare-matrix-scroll,
+.koth-page .koth-final-compare {
+  margin-top: 14px;
+}
+
+.picks-page .rc24k-confidence-compare-scroll,
+.sports-team-fantasy .tf-compare-matrix-scroll {
+  overflow-x: auto;
+  overscroll-behavior-inline: contain;
+  scrollbar-gutter: stable;
+}
+
+.picks-page .rc24k-confidence-compare-table {
+  min-width: max(100%, 620px);
+}
+
+.picks-page .rc24k-confidence-compare-table th:nth-child(2),
+.picks-page .rc24k-confidence-compare-table td:nth-child(2),
+.sports-team-fantasy .tf-compare-matrix-row > :nth-child(2) {
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.14);
+}
+
+.sports-team-fantasy .tf-compare-position-group > .tf-compare-matrix-main,
+.picks-page .rc24k-confidence-compare-pick > summary,
+.survivor-page .survivor-final-compare-grid > details > summary {
+  min-height: 44px;
+}
+
+.survivor-page .survivor-final-compare-grid > details:first-child,
+.koth-page .koth-final-compare details:first-child {
+  box-shadow: inset 3px 0 0 rgba(255,255,255,.38);
+}
+
+/* ---------- Appearance Manager: visual organization only; Ed state/renderer remain intact ---------- */
+.appearance-manager-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.appearance-manager-page > .appearance-page-heading { order: 0; }
+.appearance-manager-page > .appearance-message { order: 1; }
+.appearance-manager-page > .henry-appearance-workspace-map { order: 2; }
+.appearance-manager-page > .appearance-assignment-card { order: 3; }
+.appearance-manager-page > .appearance-theme-card { order: 4; }
+.appearance-manager-page > .appearance-pack-card { order: 5; }
+.appearance-manager-page > .appearance-hub-editor { order: 6; }
+
+.appearance-manager-page .henry-appearance-workspace-map {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 4px 0 2px;
+  scrollbar-width: none;
+}
+
+.appearance-manager-page .henry-appearance-workspace-map::-webkit-scrollbar { display: none; }
+
+.appearance-manager-page .henry-appearance-workspace-map button {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid rgba(255,255,255,.14);
+  border-radius: 999px;
+  background: rgba(255,255,255,.045);
+  color: inherit;
+  font: inherit;
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .035em;
+  cursor: pointer;
+}
+
+.appearance-manager-page .henry-appearance-control-group {
+  margin: 8px 0 2px;
+  padding: 8px 4px 4px;
+  font-size: .68rem;
+  font-weight: 950;
+  letter-spacing: .09em;
+  opacity: .68;
+}
+
+.appearance-manager-page .appearance-studio-controls > details {
+  scroll-margin-top: 76px;
+}
+
+.appearance-manager-page .appearance-studio-preview-question {
+  min-width: min(100%, 300px);
+}
+
+.appearance-manager-page .appearance-studio-preview-question > span {
+  font-weight: 900;
+}
+
+.appearance-manager-page .appearance-studio-preview-toolbar,
+.appearance-manager-page .appearance-studio-device-tools {
+  gap: 8px;
+}
+
+.appearance-manager-page .appearance-preview-stage {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* ---------- Mobile polish without flattening RC24M ---------- */
+@media (max-width: 760px) {
+  .picks-page .rc24k-confidence-row {
+    grid-template-columns: minmax(0, 1fr) 102px;
+    gap: 7px;
+  }
+
+  .picks-page .rc24k-confidence-row > .rc24k-confidence-picks {
+    gap: 4px;
+  }
+
+  .picks-page .rc24k-confidence-row > .rc24k-confidence-control {
+    padding: 6px;
+  }
+
+  .picks-page .rc24k-confidence-control.is-ready::before {
+    font-size: .56rem;
+  }
+
+  .sports-team-fantasy .tf-feature {
+    padding: 10px;
+  }
+
+  .sports-team-fantasy .tf-feature-matchup {
+    gap: 6px;
+  }
+
+  .sports-team-fantasy .tf-feature-center {
+    gap: 4px;
+  }
+
+  .sports-team-fantasy .tf-feature-status,
+  .sports-team-fantasy .tf-feature-fantasy {
+    font-size: .78rem;
+  }
+
+  .betting-page .henry-wager-feature {
+    padding: 10px;
+  }
+
+  .appearance-manager-page .appearance-studio-preview-toolbar {
+    align-items: stretch;
+  }
+}
+
+@media (max-width: 430px) {
+  .picks-page .rc24k-confidence-row {
+    grid-template-columns: minmax(0, 1fr) 92px;
+  }
+
+  .picks-page .confidence-versus {
+    min-width: 18px;
+  }
+
+  .survivor-page .henry-survivor-carousel-controls {
+    grid-template-columns: 40px minmax(0, 1fr) 40px;
+  }
+
+  .survivor-page .henry-survivor-carousel-controls button {
+    width: 40px;
+    height: 40px;
+  }
+
+  .sports-team-fantasy .tf-feature-fantasy {
+    grid-template-columns: 1fr 1fr;
+  }
+}

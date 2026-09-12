@@ -1239,7 +1239,22 @@ function sportsDefaultKothPageHtml_(payload) {
 const SPORTS_RICH_SURVIVOR_ORIGINAL_PAGE_ = renderSurvivorPage;
 renderSurvivorPage = async function() {
   const gameId = typeof getFrontendGameId === "function" ? getFrontendGameId() : "";
-  await PATTCSportsRich.prepare(gameId);
+  // Survivor state/locks are authoritative and must render first. Appearance is
+  // presentation-only, so prepare it once in the background.
+  if (gameId && window.PATTCSportsRich && typeof PATTCSportsRich.prepare === "function") {
+    Promise.resolve(PATTCSportsRich.prepare(gameId)).then(function(bundle) {
+      if (!bundle || (typeof getFrontendGameId === "function" && String(getFrontendGameId() || "") !== String(gameId))) return;
+      setTimeout(function() {
+        const payload = window.SURVIVOR_PAGE_STATE && SURVIVOR_PAGE_STATE.payload || null;
+        const page = document.querySelector(".survivor-page");
+        if (!payload || !page || payload.mode === "king-of-the-hill") return;
+        const hero = survivorR47SharedHeroHtml_(payload, bundle);
+        const currentHero = page.querySelector(".pattc-sports-hero, .survivor-page-header");
+        if (hero && currentHero) currentHero.outerHTML = hero;
+        PATTCSportsRich.process(page);
+      }, 0);
+    }).catch(function(err) { console.warn("Deferred Survivor Appearance skipped", err); });
+  }
 
   const originalHtml = await SPORTS_RICH_SURVIVOR_ORIGINAL_PAGE_.apply(this, arguments);
   const payload = window.SURVIVOR_PAGE_STATE && SURVIVOR_PAGE_STATE.payload;
@@ -1313,16 +1328,11 @@ if (typeof renderSurvivorPage === "function" && !window.RC24A_R47_SURVIVOR_PAGE_
     if (payload && payload.mode === "king-of-the-hill") return html;
     if (!payload || !(payload.sportsMode === true || payload.mode === "streak-survivor" || payload.mode === "streak-points-strikes")) return html;
     var gameId = String(SURVIVOR_PAGE_STATE.gameId || (typeof getFrontendGameId === "function" ? getFrontendGameId() : "") || "");
-    /* RC24A_RC23_SURVIVOR_OUTER_LIFECYCLE: prepare current Appearance before the outer Rich/Clean decision. */
-    if (gameId && window.PATTCSportsRich && typeof PATTCSportsRich.prepare === "function") {
-      try { await PATTCSportsRich.prepare(gameId); } catch (err) {}
-    }
     if (typeof sportsRichSurvivorEnabled_ === "function" && !sportsRichSurvivorEnabled_(payload)) return html;
     var appearance = survivorR47SharedHeroAppearance_(gameId, payload);
-    if (!appearance && gameId && typeof apiGetGameAppearance === "function") {
-      try { appearance = await apiGetGameAppearance(gameId); } catch (err) { appearance = null; }
-    }
-    return survivorR47ReplaceHero_(html, survivorR47SharedHeroHtml_(payload, appearance));
+    // Do not start a second blocking Appearance request in the outer hero layer.
+    // The inner wrapper owns the one deferred prepare() after primary UI render.
+    return appearance ? survivorR47ReplaceHero_(html, survivorR47SharedHeroHtml_(payload, appearance)) : html;
   };
 }
 

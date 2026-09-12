@@ -35,7 +35,7 @@ assert(app.includes('appReadStoredStartupPayload_()'), 'startup loader must read
 assert(app.includes('appRefreshStartupPayloadQuietly_(cached)'), 'stale device data must refresh quietly');
 assert(app.includes('APP_STARTUP_PAYLOAD_LOCAL_GENERATION !== localGeneration'), 'an in-flight stale refresh must not overwrite a newer saved pick');
 assert(app.includes('appClearStoredStartupPayloadsForUser_(session.username)'), 'logout must remove stored player startup payloads');
-assert.strictEqual((picksPage.match(/clearStartupPayload\(true\);/g) || []).length, 3, 'all standard/season-anchor pick writes must invalidate device startup data');
+assert.strictEqual((picksPage.match(/clearStartupPayload\(true\);/g) || []).length, 4, 'all standard/season-anchor/Confidence pick writes must invalidate device startup data');
 
 assert(games.includes('JSON.stringify(games),\n    1800'), 'Games cache should remain warm for 30 minutes');
 assert(appCache.includes('JSON.stringify(categories),\n    1800'), 'category cache should remain warm for 30 minutes');

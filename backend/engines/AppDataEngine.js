@@ -627,7 +627,7 @@ function buildDashboardFastStartupGameHubItem_(game, isPast) {
   const enterLabel = availability.available === false
     ? availability.actionLabel
     : isSeasonHub ? "Open Season Hub" : "Open Game";
-  const hubPlacement = getDashboardHubPlacement_(game, mode);
+  const hubPlacement = getDashboardHubPlacement_(game, mode, { allowSurvivorSettings: false });
 
   return {
     gameId: game.gameId,
@@ -639,6 +639,8 @@ function buildDashboardFastStartupGameHubItem_(game, isPast) {
     typeLabel: getDashboardGameTypeLabel_(game, mode),
     hubCategory: hubPlacement.category,
     hubGroup: hubPlacement.group,
+    sportsLeague: hubPlacement.sportsLeague || game.sportsLeague || game.SportsLeague || "",
+    survivorMode: hubPlacement.survivorMode || game.survivorMode || game.SurvivorMode || "",
     gameRole: game.gameRole || "standalone",
     hubMode: game.hubMode || "playable-aggregate",
     parentGameId: game.parentGameId || "",
@@ -755,6 +757,8 @@ function buildDashboardGameHubItemLite_(
             isPast
           );
 
+  const hubPlacement = getDashboardHubPlacement_(game, mode);
+
   return {
     gameId:
       game.gameId,
@@ -784,10 +788,16 @@ function buildDashboardGameHubItemLite_(
       ),
 
     hubCategory:
-      getDashboardHubPlacement_(game, mode).category,
+      hubPlacement.category,
 
     hubGroup:
-      getDashboardHubPlacement_(game, mode).group,
+      hubPlacement.group,
+
+    sportsLeague:
+      hubPlacement.sportsLeague || game.sportsLeague || game.SportsLeague || "",
+
+    survivorMode:
+      hubPlacement.survivorMode || game.survivorMode || game.SurvivorMode || "",
 
     gameRole:
       game.gameRole || "standalone",
@@ -1999,14 +2009,54 @@ function getDashboardGameMode_(game) {
 
 }
 
-function getDashboardHubPlacement_(game, mode) {
+function getDashboardHubPlacement_(game, mode, options) {
+
+  game = game || {};
+  options = options || {};
+  const normalizedMode = String(mode || "").trim().toLowerCase();
+  const explicitCategory = String(game.hubCategory || game.HubCategory || "").trim().toLowerCase();
+  const explicitGroup = String(game.hubGroup || game.HubGroup || "").trim();
+  let survivorMode = String(game.survivorMode || game.SurvivorMode || "").trim().toLowerCase();
+  let sportsLeague = String(game.sportsLeague || game.SportsLeague || game.league || game.League || "").trim();
+
+  function sportsGroupFromLeague_(value) {
+    const key = String(value || "").trim().toLowerCase().replace(/_/g, "-");
+    const labels = { nfl:"NFL", mlb:"MLB", nba:"NBA", nhl:"NHL", ncaa:"NCAA", nascar:"NASCAR", f1:"Formula 1", "formula-1":"Formula 1", soccer:"Soccer", mls:"Soccer" };
+    return labels[key] || (String(value || "").trim() || "Other Sports");
+  }
+
+  // Authoritative Survivor sports identity is stored in SurvivorSettings.
+  // Generic/manual Survivor must remain eligible for the Reality hub.
+  if (normalizedMode === "survivor" && options.allowSurvivorSettings !== false && typeof survivorGetSettings_ === "function") {
+    try {
+      const settings = survivorGetSettings_(game.gameId || game.GameId || "") || {};
+      survivorMode = String(settings.mode || survivorMode || "").trim().toLowerCase();
+      sportsLeague = String(settings.league || sportsLeague || "").trim();
+    } catch (err) {}
+  }
+
+  const sportsSurvivor = ["sports-survivor", "streak-survivor", "streak-points-strikes", "king-of-the-hill"].indexOf(survivorMode) !== -1;
 
   if (mode === "team-fantasy") {
     return { category: "sports", group: "NFL" };
   }
 
+  if (explicitCategory) {
+    return {
+      category: explicitCategory,
+      group: explicitGroup || (explicitCategory === "sports" ? sportsGroupFromLeague_(sportsLeague) : (getDashboardGameTypeLabel_(game, mode) || "Other")),
+      sportsLeague: sportsLeague,
+      survivorMode: survivorMode
+    };
+  }
 
-  game = game || {};
+  if (sportsSurvivor) {
+    return { category:"sports", group:explicitGroup || sportsGroupFromLeague_(sportsLeague), sportsLeague:sportsLeague, survivorMode:survivorMode };
+  }
+
+  if (sportsLeague && normalizedMode !== "survivor") {
+    return { category:"sports", group:explicitGroup || sportsGroupFromLeague_(sportsLeague), sportsLeague:sportsLeague, survivorMode:survivorMode };
+  }
 
   const name = String(game.name || game.gameId || "").trim();
   const haystack = [

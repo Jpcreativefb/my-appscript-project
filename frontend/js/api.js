@@ -2156,18 +2156,57 @@ function apiAppearanceDirectPayload_(payload) {
   return next;
 }
 
+const API_GAME_APPEARANCE_INFLIGHT_ = {};
+const API_GAME_APPEARANCE_RECENT_ = {};
+const API_GAME_APPEARANCE_REUSE_MS_ = 3000;
+
+function apiInvalidateGameAppearanceCache_(gameId) {
+  const id = String(gameId || "").trim();
+  if (id) {
+    delete API_GAME_APPEARANCE_RECENT_[id];
+    try { sessionStorage.removeItem("pattcGameAppearance:" + id); } catch (err) {}
+    return;
+  }
+  Object.keys(API_GAME_APPEARANCE_RECENT_).forEach(function(key) { delete API_GAME_APPEARANCE_RECENT_[key]; });
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const key = String(sessionStorage.key(i) || "");
+      if (key.indexOf("pattcGameAppearance:") === 0) sessionStorage.removeItem(key);
+    }
+  } catch (err) {}
+}
+
+function apiRememberGameAppearance_(gameId, result) {
+  const id = String(gameId || "").trim();
+  if (!id || !result || result.success === false) return result;
+  API_GAME_APPEARANCE_RECENT_[id] = { at: Date.now(), result: result };
+  try { sessionStorage.setItem("pattcGameAppearance:" + id, JSON.stringify(result)); } catch (err) {}
+  try {
+    if (window.PATTCSportsRich && typeof window.PATTCSportsRich.remember === "function") {
+      window.PATTCSportsRich.remember(id, result);
+    }
+  } catch (err) {}
+  return result;
+}
+
 async function apiAdminSaveAppearanceImagePack(payload) {
   // Appearance metadata writes are small. Send them directly to the live Apps
   // Script deployment so they cannot get stranded behind the upload Worker.
-  return api("adminSaveAppearanceImagePack", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminSaveAppearanceImagePack", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_("");
+  return result;
 }
 
 async function apiAdminSaveAppearanceImagePackItem(payload) {
-  return api("adminSaveAppearanceImagePackItem", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminSaveAppearanceImagePackItem", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_("");
+  return result;
 }
 
 async function apiAdminDuplicateAppearanceImagePack(payload) {
-  return api("adminDuplicateAppearanceImagePack", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminDuplicateAppearanceImagePack", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_("");
+  return result;
 }
 
 async function apiAdminSaveAppearanceHubSetting(payload) {
@@ -2175,25 +2214,48 @@ async function apiAdminSaveAppearanceHubSetting(payload) {
 }
 
 async function apiAdminSaveAppearanceThemePack(payload) {
-  return api("adminSaveAppearanceThemePack", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminSaveAppearanceThemePack", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_("");
+  return result;
 }
 
 async function apiAdminSaveGameAppearance(payload) {
-  return api("adminSaveGameAppearance", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminSaveGameAppearance", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_(payload && (payload.gameId || payload.GameId));
+  return result;
 }
 
 async function apiAdminSaveAppearanceOverride(payload) {
-  return api("adminSaveAppearanceOverride", apiAppearanceDirectPayload_(payload));
+  const result = await api("adminSaveAppearanceOverride", apiAppearanceDirectPayload_(payload));
+  if (result && result.success !== false) apiInvalidateGameAppearanceCache_(payload && (payload.gameId || payload.GameId));
+  return result;
 }
 
-async function apiGetGameAppearance(gameId) {
+async function apiGetGameAppearance(gameId, options) {
   // RC23: Game Appearance is an intentionally credential-free public read.
   // Bypass api(), because api() attaches the authenticated player session
   // before choosing transport. Do not put bearer/session data in a GET URL.
-  return apiRaw_("getGameAppearance", {
-    gameId: gameId || getFrontendGameId() || "",
+  const id = String(gameId || getFrontendGameId() || "").trim();
+  options = options || {};
+  if (!id) return apiRaw_("getGameAppearance", { gameId: "", appearanceNonce: Date.now() });
+
+  const recent = API_GAME_APPEARANCE_RECENT_[id];
+  if (options.forceFresh !== true && recent && Date.now() - Number(recent.at || 0) <= API_GAME_APPEARANCE_REUSE_MS_) {
+    return recent.result;
+  }
+  if (API_GAME_APPEARANCE_INFLIGHT_[id]) return API_GAME_APPEARANCE_INFLIGHT_[id];
+
+  const request = Promise.resolve(apiRaw_("getGameAppearance", {
+    gameId: id,
     appearanceNonce: Date.now()
+  })).then(function(result) {
+    return apiRememberGameAppearance_(id, result);
+  }).finally(function() {
+    if (API_GAME_APPEARANCE_INFLIGHT_[id] === request) delete API_GAME_APPEARANCE_INFLIGHT_[id];
   });
+
+  API_GAME_APPEARANCE_INFLIGHT_[id] = request;
+  return request;
 }
 
 /* ======================
@@ -4481,5 +4543,26 @@ async function apiGetConfidenceCompare(gameId) {
   return api("getConfidenceCompare", {
     gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
     leagueId: getApiLeagueId_()
+  });
+}
+
+
+/* ED RC24M — Shared Compare data/privacy contract */
+async function apiGetSharedCompare(gameId, rivalUsernames, leagueId) {
+  return api("getSharedCompare", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: leagueId || getApiLeagueId_(),
+    rivalUsernamesJSON: Array.isArray(rivalUsernames) ? JSON.stringify(rivalUsernames) : ""
+  });
+}
+
+async function apiSaveSharedCompareRivals(gameId, rivalUsernames, leagueId) {
+  const session = getSession ? getSession() : {};
+  return apiPost("saveSharedCompareRivals", {
+    username: session && session.username ? session.username : "",
+    token: session && session.token ? session.token : "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: leagueId || getApiLeagueId_(),
+    rivalUsernames: Array.isArray(rivalUsernames) ? rivalUsernames : []
   });
 }

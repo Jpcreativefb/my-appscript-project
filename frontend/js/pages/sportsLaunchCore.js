@@ -326,7 +326,11 @@
 
     const slots = SLOT_ORDER.map(function(slot) {
       const candidates = activeSports.filter(function(game) {
-        return classifySportsGame_(game) === slot && isNflGame_(game);
+        // Backend hubCategory is authoritative for discovery. Do not hide a
+        // correctly configured sports game merely because its display name
+        // omits "NFL". NFL remains the preference when multiple games compete
+        // for the same launch slot.
+        return classifySportsGame_(game) === slot;
       });
       candidates.sort(function(a, b) {
         if (isNflGame_(a) !== isNflGame_(b)) return isNflGame_(a) ? -1 : 1;

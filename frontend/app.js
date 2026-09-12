@@ -943,7 +943,7 @@ async function appRevalidateGameAppearance_(gameId) {
   const previous = appKnownAppearanceFingerprint_(gameId);
   const request = (async function() {
     try {
-      const response = await apiGetGameAppearance(gameId);
+      const response = await apiGetGameAppearance(gameId, { forceFresh: true });
       const fingerprint = appAppearanceFingerprint_(response);
       if (!fingerprint) {
         return {
@@ -1434,19 +1434,27 @@ async function navigate(page, options) {
       appAppearanceSnapshotSensitivePage_(page) &&
       appPageSnapshotCandidateExists_(page)
     ) {
-      // RC23 acceptance contract: a cached game DOM cannot be painted until
-      // current server Appearance has been revalidated for this GameId.
-      APP_APPEARANCE_NAVIGATION_REVALIDATING = true;
-      let appearanceCheck = null;
-      try {
-        appearanceCheck = await appPrepareAppearanceSnapshotReuse_(page);
-      } finally {
-        APP_APPEARANCE_NAVIGATION_REVALIDATING = false;
-      }
-
-      snapshot = appearanceCheck && appearanceCheck.allowSnapshot === true
-        ? appReadPageSnapshot_(page, appearanceCheck.fingerprint)
+      const appearanceGameId = appAppearanceGameId_("");
+      const knownFingerprint = appKnownAppearanceFingerprint_(appearanceGameId);
+      // A snapshot already tagged with the last verified Appearance fingerprint
+      // may paint immediately. Revalidate that fingerprint after first paint and
+      // quietly rerender only if server Appearance changed.
+      snapshot = knownFingerprint
+        ? appReadPageSnapshot_(page, knownFingerprint)
         : null;
+
+      if (!snapshot) {
+        APP_APPEARANCE_NAVIGATION_REVALIDATING = true;
+        let appearanceCheck = null;
+        try {
+          appearanceCheck = await appPrepareAppearanceSnapshotReuse_(page);
+        } finally {
+          APP_APPEARANCE_NAVIGATION_REVALIDATING = false;
+        }
+        snapshot = appearanceCheck && appearanceCheck.allowSnapshot === true
+          ? appReadPageSnapshot_(page, appearanceCheck.fingerprint)
+          : null;
+      }
     } else {
       snapshot = appReadPageSnapshot_(page);
     }
@@ -1471,8 +1479,26 @@ async function navigate(page, options) {
     // compete with game startup for Apps Script execution time.
     if (page === "dashboard") {
       appScheduleDashboardRefreshAfterSnapshot_(snapshot.key);
-    } else if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
-      appRefreshSnapshotQuietly_(page, snapshot.key);
+    } else {
+      if (appAppearanceSnapshotSensitivePage_(page)) {
+        window.setTimeout(function() {
+          if (APP_STATE.currentPage !== page) return;
+          appRevalidateCurrentGameAppearance_({ rerender: true, suppressLoader: true })
+            .then(function(validation) {
+              if (APP_STATE.currentPage !== page) return;
+              // One controlled refresh chain: if Appearance changed, its rerender
+              // already refreshed the page. Only stale-but-unchanged snapshots
+              // need the normal quiet data refresh.
+              if (validation && validation.changed === true) return;
+              if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
+                appRefreshSnapshotQuietly_(page, snapshot.key);
+              }
+            })
+            .catch(function(err) { console.warn("Deferred Appearance revalidation skipped", err); });
+        }, 0);
+      } else if (snapshot.age >= APP_PAGE_SNAPSHOT_FRESH_MS || options.refreshCached === true) {
+        appRefreshSnapshotQuietly_(page, snapshot.key);
+      }
     }
     return;
   }
