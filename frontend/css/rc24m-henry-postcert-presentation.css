@@ -43,7 +43,7 @@
 }
 
 .picks-page .rc24k-confidence-control.is-ready::before {
-  content: "CONFIDENCE";
+  content: "CONF";
   display: block;
   font-size: .62rem;
   line-height: 1;
@@ -72,6 +72,38 @@
 .picks-page .confidence-game-details > summary {
   min-height: 38px;
 }
+
+/* Confidence R1: win the earlier RC24K !important sizing rules without
+   changing other Sports pages or Appearance state. */
+.picks-page .rc24k-confidence-row {
+  grid-template-columns: minmax(0, 1fr) 76px !important;
+  grid-template-areas: "state state" "matchup control" "details details";
+  gap: 6px !important;
+  padding: 8px !important;
+}
+.picks-page .confidence-matchup-state { grid-area:state; display:flex; justify-content:space-between; gap:6px; font-size:10px; color:#cbd5e1; }
+.picks-page .rc24k-confidence-row > .rc24k-confidence-control { display:grid !important; grid-template-columns:minmax(0,1fr) !important; align-content:center; justify-items:stretch; padding:4px !important; margin:0 !important; gap:4px !important; }
+.picks-page .rc24k-confidence-row .confidence-row-value { display:grid !important; grid-template-columns:minmax(0,1fr) !important; width:100% !important; min-width:0 !important; gap:4px !important; }
+.picks-page .rc24k-confidence-row .confidence-value-input { width:100% !important; min-width:0 !important; max-width:100% !important; height:44px !important; font-size:24px !important; font-weight:900 !important; text-align:center !important; text-align-last:center !important; padding-inline:2px !important; }
+.picks-page .rc24k-confidence-row .confidence-value-label { font-size:9px; }
+.picks-page .rc24k-confidence-row .rc24k-confidence-save-state { font-size:10px; text-align:center; }
+.picks-page .rc24k-confidence-row > .rc24k-confidence-picks { grid-template-columns:minmax(0,1fr) 14px minmax(0,1fr) !important; gap:3px !important; }
+.picks-page .rc24k-confidence-row .confidence-team-choice { display:flex !important; flex-direction:column !important; justify-content:center !important; align-items:center !important; gap:3px !important; padding:6px 3px !important; min-height:88px !important; height:auto !important; }
+.picks-page .rc24k-confidence-row .confidence-team-visual { position:static !important; height:30px !important; width:100% !important; }
+.picks-page .rc24k-confidence-row .confidence-team-logo { width:30px !important; height:30px !important; }
+.picks-page .rc24k-confidence-row .confidence-team-text { position:static !important; width:100% !important; transform:none !important; }
+.picks-page .rc24k-confidence-row .confidence-team-city { font-size:8px !important; }
+.picks-page .rc24k-confidence-row .confidence-team-nickname { font-size:10px !important; letter-spacing:0 !important; }
+.picks-page .rc24k-confidence-row .confidence-team-score { position:static !important; font-size:20px !important; }
+.picks-page .rc24k-confidence-row .confidence-team-choice.not-selected.actual-winner { border-color:rgba(148,163,184,.35) !important; box-shadow:none !important; color:inherit !important; opacity:.48 !important; filter:grayscale(1) !important; }
+.picks-page .confidence-final-my-week { display:flex; align-items:center; gap:6px; padding:8px; margin:8px 0; }
+.picks-page .confidence-final-my-week > strong { font-size:10px; }
+.picks-page .confidence-final-my-week .confidence-final-stat-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); flex:1; gap:4px; margin:0; }
+.picks-page .confidence-final-my-week .confidence-final-stat-grid > div { padding:0; background:none; border:0; min-width:0; }
+.picks-page .confidence-final-my-week .confidence-final-stat-grid span { font-size:8px; }
+.picks-page .confidence-final-my-week .confidence-final-stat-grid strong { font-size:14px; }
+.picks-page .confidence-final-my-week > small { font-size:8px; max-width:68px; line-height:1.1; text-align:right; }
+.picks-page .confidence-save-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 0; }
 
 /* ---------- Survivor: one visible matchup, native Ed controls remain authoritative ---------- */
 .survivor-page .survivor-final-matchup-scroll {

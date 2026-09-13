@@ -70,7 +70,11 @@ const scoring = read('backend/engines/ScoringEngine.js');
 const picks = read('frontend/js/pages/picks.js');
 assert(scoring.includes('saved team + blank confidence = basic +1 / 0 pick.'));
 assert(scoring.includes('return selectedConfidence > 0') && scoring.includes(': 1;'));
-assert(picks.includes('Pick the winner first. The team saves immediately. Confidence is optional.'));
+// Current compact Confidence UX intentionally removes the redundant intro
+// while preserving immediate winner autosave + optional Confidence behavior.
+assert(!picks.includes('Pick the winner first. The team saves immediately. Confidence is optional.'));
+assert(picks.includes('function confidenceAutosaveActionsHtml_()'));
+assert(picks.includes('Complete for now — your picks are saved.'));
 assert(picks.includes('No confidence · +1 / 0'));
 assert(picks.includes('await rc24kSaveConfidenceRow_(category.id);'));
 assert(picks.includes('Pick a team before assigning confidence.'));

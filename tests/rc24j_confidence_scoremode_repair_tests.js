@@ -13,6 +13,10 @@ ok(startup.includes('id.indexOf("sports-confidence-") !== 0'), "repair must be l
 ok(startup.includes('copy.scoreMode = "confidence-points"'), "Sports Confidence repair must set confidence-points");
 const builder = read("backend/engines/SportsConfidenceBuilderEngine.js");
 ok(builder.includes('sportsWagerSetIfExists_(row, col, "ScoreMode", "confidence-points")'), "builder must keep writing confidence-points");
+
+const wager = read("backend/engines/SportsWagerEngine.js");
+ok(wager.includes('cleanCategoryId.indexOf("sports-confidence-") === 0'), "Sports refresh must recognize generated Confidence category ids");
+ok(wager.includes('isConfidenceMatchup ? "confidence-points" : "wager"'), "Sports refresh must preserve confidence-points while ordinary Wager remains wager");
 const html = read("frontend/app.html");
 ok(html.includes("v1219rc24j-confidence-scoremode-repair-r1") || html.includes("v1219rc24k-nfl-player-experience-r1"), "RC24J/RC24K frontend marker missing");
 const appA = read("frontend/js/app.js");

@@ -5762,9 +5762,14 @@ function setSportsGameIdOnCategorySettings_(
     "single"
   );
 
+  // Sports refresh also visits generated Confidence matchups. Their generated
+  // category identity is authoritative here; never convert them to wager mode.
+  const isConfidenceMatchup =
+    cleanCategoryId.indexOf("sports-confidence-") === 0;
+
   setValue_(
     scoreModeCol,
-    "wager"
+    isConfidenceMatchup ? "confidence-points" : "wager"
   );
 
   setIfBlank_(

@@ -1666,6 +1666,7 @@ function getConfidenceSportsPhase_(category) {
 
   if (
     state === "post" ||
+    state === "final" ||
     status.indexOf("final") !== -1 ||
     status.indexOf("complete") !== -1
   ) {
@@ -1734,6 +1735,9 @@ function getConfidenceLiveResult_(category, selectedNomineeId) {
     return { className: "pending", winnerNomineeId: "", final: false };
   }
 
+  if (confidenceScoreValue_(category, "home") === "" || confidenceScoreValue_(category, "away") === "") {
+    return { className: "pending", winnerNomineeId: "", final: true };
+  }
   const home = Number(category.homeScore);
   const away = Number(category.awayScore);
   if (!Number.isFinite(home) || !Number.isFinite(away) || home === away) {
@@ -2970,7 +2974,7 @@ function renderCompactConfidenceRow_(category) {
             onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)"
             ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
           >
-            <option value="">—</option>
+            <option value="">No confidence · +1 / 0</option>
             ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
           </select>
           ${resultPoints ? `<strong class="confidence-result-points confidence-element-points ${result.className}">${escapeHtml(resultPoints)}</strong>` : ""}
@@ -3046,6 +3050,7 @@ function renderCompactConfidenceSlate_() {
       <div class="confidence-compact-slate sports-default-confidence ${escapeAttr(presentation.className)}" style="${escapeAttr(presentation.style)}">
         ${categories.map(renderCompactConfidenceRow_).join("")}
       </div>
+      ${confidenceAutosaveActionsHtml_()}
     </div>
   `;
 
@@ -8203,7 +8208,40 @@ async function confidenceRc24aLoadCompletion_(){
 }
 function confidenceRc24aSwitchWeek_(gameId){ if(!gameId)return; try{localStorage.setItem('gameId',gameId);}catch(e){} if(window.APP_STATE) APP_STATE.gameId=gameId; if(typeof navigate==='function') navigate('picks',{skipUnsavedCheck:true}); }
 function confidenceRc24aSwitchLeague_(id){try{localStorage.setItem('leagueId',id||'');}catch(e){} CONFIDENCE_RC24A_COMPLETION_STATE=null;confidenceRc24aLoadCompletion_();}
-function confidenceRc24aMyWeekHtml_(s){var m=s.myWeek||{};var cats=typeof getCompactConfidenceCategories_==='function'?getCompactConfidenceCategories_():[];var fallbackRemaining=cats.filter(function(c){return !String(c.winnerNomineeId||'').trim();}).length;var remaining=Number.isFinite(Number(m.gamesRemaining))?Number(m.gamesRemaining):fallbackRemaining;return `<section class="confidence-final-my-week"><div class="confidence-final-section-head"><strong>MY WEEK</strong><span>${confidenceRc24aEscape_(m.status||'LIVE')}</span></div><div class="confidence-final-stat-grid"><div><span>POINTS</span><strong>${confidenceRc24aEscape_(m.currentPoints||0)}</strong></div><div><span>PLACE</span><strong>${m.currentPlace?'#'+confidenceRc24aEscape_(m.currentPlace):'—'}</strong></div><div><span>POSSIBLE</span><strong>+${confidenceRc24aEscape_(m.possibleRemaining||0)}</strong></div><div><span>MAX</span><strong>${confidenceRc24aEscape_(m.maximumPossible||0)}</strong></div><div><span>GAMES LEFT</span><strong>${confidenceRc24aEscape_(remaining)}</strong></div></div><div class="confidence-final-live-note">LIVE or locked matchups remain in Games Left until an authoritative result resolves them.</div>${m.elimination&&m.elimination.status==='eliminated'?'<div class="confidence-final-eliminated">Mathematically eliminated from configured weekly winning places.</div>':m.elimination&&m.elimination.status==='unknown'?`<div class="confidence-final-gap">Elimination status unavailable: ${confidenceRc24aEscape_(m.elimination.reason||'configuration incomplete')}.</div>`:''}</section>`;}
+function confidenceRc24aMyWeekHtml_(s) {
+  const m = s.myWeek || {};
+  const value = key =>
+    m[key] === undefined || m[key] === null
+      ? "—"
+      : confidenceRc24aEscape_(m[key]);
+
+  const possible =
+    m.possibleRemaining === undefined || m.possibleRemaining === null
+      ? "—"
+      : "+" + value("possibleRemaining");
+
+  const elimination = m.elimination || {};
+  let state = m.status || "—";
+
+  if (elimination.status === "eliminated") {
+    state = "WEEKLY OUT";
+  } else if (elimination.status === "unknown") {
+    state = "STATUS —";
+  }
+
+  return `<section class="confidence-final-my-week">
+    <strong>MY WEEK</strong>
+    <div class="confidence-final-stat-grid">
+      <div><span>PTS</span><strong>${value("currentPoints")}</strong></div>
+      <div><span>PLACE</span><strong>${m.currentPlace ? "#" + value("currentPlace") : "—"}</strong></div>
+      <div><span>POSS</span><strong>${possible}</strong></div>
+      <div><span>MAX</span><strong>${value("maximumPossible")}</strong></div>
+      <div><span>LEFT</span><strong>${value("gamesRemaining")}</strong></div>
+    </div>
+    <small>${confidenceRc24aEscape_(state)}</small>
+  </section>`;
+}
+
 function confidenceRc24aStandingsHtml_(s){return `<section class="confidence-final-standings"><div class="confidence-final-section-head"><strong>WEEKLY STANDINGS</strong><span>${s.winningPlaces?'Top '+confidenceRc24aEscape_(s.winningPlaces)+' configured':'Winning places not configured'}</span></div>${(s.standings||[]).slice(0,10).map(function(r){return `<div class="confidence-final-standing-row"><b>#${confidenceRc24aEscape_(r.place)}</b><span>${confidenceRc24aEscape_(r.displayName||r.username)}</span><strong>${confidenceRc24aEscape_(r.points)} pts</strong><em>+${confidenceRc24aEscape_(r.possibleRemaining)} possible</em><small class="is-${String(r.status||'live').toLowerCase()}">${confidenceRc24aEscape_(r.status||'LIVE')}</small></div>`;}).join('')}</section>`;}
 function confidenceRc24aSeasonHtml_(s){var season=s.season||{};return `<section class="confidence-final-season"><div class="confidence-final-section-head"><strong>WEEK / SEASON HISTORY</strong><span>${confidenceRc24aEscape_(season.weeksPlayed||0)} weeks played</span></div><div class="confidence-final-season-stats"><div><span>Season points</span><strong>${confidenceRc24aEscape_(season.totalPoints||0)}</strong></div><div><span>Season rank</span><strong>${season.seasonRank?'#'+confidenceRc24aEscape_(season.seasonRank):'—'}</strong></div><div><span>Weekly wins</span><strong>${confidenceRc24aEscape_(season.weeklyWins||0)}</strong></div></div><div class="confidence-final-week-strip">${(season.weeks||[]).map(function(w){return `<span class="${w.played?'is-played':'is-missed'}" title="${w.played?confidenceRc24aEscape_(w.points)+' pts · place '+confidenceRc24aEscape_(w.place||'—'):'Did not play'}">W${confidenceRc24aEscape_(w.week)}</span>`;}).join('')}</div><small>Season rank is aggregated from the selected league's actual weekly standings. Missed weeks add no fake points.</small></section>`;}
 /* RC24A_ROY_CONFIDENCE_PLATFORM_IMAGES */
@@ -8214,7 +8252,7 @@ function confidenceRc24aLogoHtml_(src, alt, className){
 function confidenceRc24aCompareLogo_(m){if(m.hidden)return '<span class="confidence-final-compare-lock" title="Hidden until lock/start">🔒</span>';if(m.logo)return confidenceRc24aLogoHtml_(m.logo,m.team||'Team','confidence-final-compare-logo');return `<span class="confidence-final-compare-abbr">${confidenceRc24aEscape_(String(m.teamId||m.team||'—').slice(0,3).toUpperCase())}</span>`;}
 function confidenceRc24aCompareHtml_(s){var lc=s.leagueContext||{};return `<section class="confidence-final-compare"><div class="confidence-final-section-head"><strong>COMPARE</strong><span>2+ players · revealed only after lock/start</span></div><div class="confidence-final-compare-filters"><label>Week <select onchange="confidenceRc24aSwitchWeek_(this.value)">${((s.season&&s.season.weeks)||[]).map(function(w){return `<option value="${confidenceRc24aEscape_(w.gameId)}" ${Number(w.week)===Number(s.week)?'selected':''}>Week ${confidenceRc24aEscape_(w.week)}</option>`;}).join('')}</select></label>${(lc.leagues||[]).length>1?`<label>League <select onchange="confidenceRc24aSwitchLeague_(this.value)">${lc.leagues.map(function(l){return `<option value="${confidenceRc24aEscape_(l.leagueId)}" ${l.leagueId===lc.leagueId?'selected':''}>${confidenceRc24aEscape_(l.leagueName||l.leagueId)}</option>`;}).join('')}</select></label>`:''}</div><div class="confidence-final-compare-grid">${(s.compare||[]).slice(0,8).map(function(p){var logos=(p.matchups||[]).slice(0,6).map(confidenceRc24aCompareLogo_).join('');return `<details><summary><span class="confidence-final-compare-player"><strong>${confidenceRc24aEscape_(p.displayName||p.username)}</strong><span class="confidence-final-compare-logos">${logos}</span></span><span>${confidenceRc24aEscape_(p.points||0)} pts · +${confidenceRc24aEscape_(p.possibleRemaining||0)}</span></summary><div>${(p.matchups||[]).map(function(m){if(m.hidden)return `<div class="confidence-final-compare-detail is-hidden"><span class="confidence-final-compare-lock">🔒</span><span>Pick and Confidence allocation hidden until lock/start</span></div>`;return `<div class="confidence-final-compare-detail">${confidenceRc24aCompareLogo_(m)}<strong>${confidenceRc24aEscape_(m.team||m.teamId)}</strong><span>C${confidenceRc24aEscape_(m.confidencePoints||0)}</span><span>${m.pointsEarned===null||m.pointsEarned===undefined?'pending':confidenceRc24aEscape_(m.pointsEarned)+' pts'} · ${confidenceRc24aEscape_(m.result||'pending')}</span></div>`;}).join('')}</div></details>`;}).join('')}</div></section>`;}
 function confidenceRc24aTrendsHtml_(s){return `<section class="confidence-final-trends"><div class="confidence-final-section-head"><strong>MY PICK TRENDS</strong><span>Top 5</span></div>${(s.trends||[]).map(function(t){return `<div class="confidence-final-trend-row">${t.logo?confidenceRc24aLogoHtml_(t.logo,t.team||'Team','confidence-final-trend-logo'):''}<strong>${confidenceRc24aEscape_(t.team)}</strong><span>${confidenceRc24aEscape_(t.selections)} picks</span><em>${t.winPercentage===null?'—':confidenceRc24aEscape_(t.winPercentage)+'%'}</em></div>`;}).join('')}<details><summary>View All Teams</summary>${(s.allTrends||[]).map(function(t){return `<p>${confidenceRc24aEscape_(t.team)} · ${confidenceRc24aEscape_(t.selections)} picks · ${confidenceRc24aEscape_(t.correct)} correct · ${t.winPercentage===null?'—':confidenceRc24aEscape_(t.winPercentage)+'%'}</p>`;}).join('')}</details></section>`;}
-function confidenceRc24aMountCompletion_(){var el=document.getElementById('confidenceRc24aCompletion');if(!el)return;var s=CONFIDENCE_RC24A_COMPLETION_STATE;if(!s){el.innerHTML='<div class="confidence-final-loading">Loading My Week and standings…</div>';return;}el.innerHTML=confidenceRc24aMyWeekHtml_(s)+confidenceRc24aStandingsHtml_(s)+confidenceRc24aSeasonHtml_(s)+confidenceRc24aCompareHtml_(s)+confidenceRc24aTrendsHtml_(s);}
+function confidenceRc24aMountCompletion_(){var el=document.getElementById('confidenceRc24aCompletion');if(!el)return;var s=CONFIDENCE_RC24A_COMPLETION_STATE;if(!s){el.innerHTML='<div class="confidence-final-loading">Loading My Week and standings…</div>';return;}var summary=document.getElementById('confidenceRc24aMyWeek');if(summary)summary.innerHTML=confidenceRc24aMyWeekHtml_(s);el.innerHTML=confidenceRc24aStandingsHtml_(s)+confidenceRc24aSeasonHtml_(s)+confidenceRc24aCompareHtml_(s)+confidenceRc24aTrendsHtml_(s);}
 
 var CONFIDENCE_RC24A_ORIGINAL_SLATE_=renderCompactConfidenceSlate_;
 renderCompactConfidenceSlate_=function(){var html=CONFIDENCE_RC24A_ORIGINAL_SLATE_.apply(this,arguments);setTimeout(function(){confidenceRc24aMountCompletion_();if(!CONFIDENCE_RC24A_COMPLETION_STATE)confidenceRc24aLoadCompletion_();},0);return html+'<div id="confidenceRc24aCompletion" class="confidence-final-completion"></div>';};
@@ -8282,6 +8320,7 @@ renderCompactConfidenceRow_ = function(category) {
 
   return `
     <article class="confidence-game-row rc24k-confidence-row ${result.className || "pending"} phase-${phase} ${saving ? "is-saving" : ""}" data-category-id="${escapeAttr(category.id)}" data-locked="${locked ? "true" : "false"}">
+      <div class="confidence-matchup-state"><strong>${escapeHtml(formatConfidenceSportsStatus_(category))}</strong><span>${locked ? "LOCKED" : saving ? "Saving…" : picked ? "SAVED" : "OPEN"}${!locked ? " · Locks at kickoff" : ""}</span></div>
       <div class="rc24k-confidence-picks">
         ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked || saving, result)}
         <div class="confidence-versus confidence-element-versus" aria-hidden="true">VS</div>
@@ -8290,9 +8329,9 @@ renderCompactConfidenceRow_ = function(category) {
 
       <div class="rc24k-confidence-control ${picked ? "is-ready" : "is-waiting"}">
         <label class="confidence-row-value">
-          <span class="confidence-value-label">${picked ? "Optional Confidence" : "Pick a team first"}</span>
-          <select class="confidence-value-input" id="confidence-${escapeAttr(category.id)}" onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)" ${locked || saving || !picked ? "disabled" : ""}>
-            <option value="">No confidence · +1 / 0</option>
+          <span class="confidence-value-label">CONF</span>
+          <select class="confidence-value-input" title="No confidence · +1 / 0" aria-label="Confidence. Blank means no confidence." id="confidence-${escapeAttr(category.id)}" onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)" ${locked || saving || !picked ? "disabled" : ""}>
+            <option value="">—</option>
             ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
           </select>
           ${resultPoints ? `<strong class="confidence-result-points confidence-element-points ${result.className}">${escapeHtml(resultPoints)} pts</strong>` : ""}
@@ -8304,7 +8343,7 @@ renderCompactConfidenceRow_ = function(category) {
               ? "Saving pick…"
               : picked
                 ? rc24kConfidenceSaveText_(category.id)
-                : "Choose Away or Home. Your team saves immediately."}
+                : "Pick a team"}
         </small>
       </div>
 
@@ -8313,44 +8352,32 @@ renderCompactConfidenceRow_ = function(category) {
   `;
 };
 
-renderSportsDefaultConfidenceActionHeader_ = function() {
-  const categories = getCompactConfidenceCategories_();
-  const openCount = categories.filter(function(category) { return !isCompactConfidenceLocked_(category); }).length;
-  const pickedCount = categories.filter(function(category) { return Boolean(PICKS_PAGE_DATA.picks[category.id]); }).length;
-  const state = openCount > 0 ? "IN PROGRESS" : "LOCKED";
-  return `<section class="sports-default-confidence-action">
-    <div class="sports-default-confidence-state">
-      <span class="sports-default-confidence-state-pill ${openCount ? "is-open" : "is-locked"}">${state}</span>
-      <strong>${sportsDefaultConfidenceWeekLabel_()}</strong>
-      <span class="sports-default-confidence-lock">🔒 ${sportsDefaultConfidenceLockLabel_()}</span>
-    </div>
-    <div class="sports-default-confidence-instruction">
-      <strong>MAKE YOUR PICKS</strong>
-      <span>Pick the winner first. The team saves immediately. Confidence is optional.</span>
-      <small class="is-saved">✓ ${pickedCount} pick${pickedCount === 1 ? "" : "s"} recorded</small>
-    </div>
-  </section>`;
-};
+renderSportsDefaultConfidenceActionHeader_ = function() { return ""; };
 
 renderCompactConfidenceToolbar_ = function() {
-  const categories = getCompactConfidenceCategories_();
-  const used = getUsedConfidencePoints();
-  const pickedCount = categories.filter(function(category) { return Boolean(PICKS_PAGE_DATA.picks[category.id]); }).length;
-  const blankCount = Math.max(0, categories.length - pickedCount);
-
-  return `
-    <div class="confidence-summary-bar confidence-compact-toolbar rc24k-confidence-toolbar">
-      <div class="confidence-toolbar-progress"><strong>Confidence Card</strong><span>${pickedCount} Pick${pickedCount === 1 ? "" : "s"} Made · ${blankCount} Left Blank</span></div>
-      <div class="confidence-toolbar-sort" aria-label="Sort Confidence games">
-        <span>Sort</span>
-        <button type="button" class="${PICKS_CONFIDENCE_SORT_MODE === "time" ? "active" : ""}" onclick="setConfidenceSortMode_('time')">Game Time</button>
-        <button type="button" class="${PICKS_CONFIDENCE_SORT_MODE === "confidence" ? "active" : ""}" onclick="setConfidenceSortMode_('confidence')">Confidence ↓</button>
-      </div>
-      <div class="confidence-toolbar-used">Confidence used: ${used.length ? used.join(", ") : "none"}</div>
-      <div class="rc24k-confidence-toolbar-note">Blank confidence = +1 for a win · 0 for a loss</div>
-    </div>
-  `;
+  return '<div id="confidenceRc24aMyWeek">' + confidenceRc24aMyWeekHtml_(CONFIDENCE_RC24A_COMPLETION_STATE || {}) + '</div>';
 };
+
+function confidenceAutosaveActionsHtml_() {
+  const saving = Object.keys(RC24K_CONFIDENCE_SAVING_).some(id => RC24K_CONFIDENCE_SAVING_[id]);
+  const hasPicks = getCompactConfidenceCategories_().some(c => PICKS_CONFIDENCE_BASELINE_PICKS[c.id]);
+  return `<div id="confidenceAutosaveActions" class="confidence-save-actions"><span role="status">${saving ? 'Saving…' : hasPicks ? 'Saved' : 'Choose your winners'}</span><button type="button" ${saving || !hasPicks ? 'disabled' : ''} onclick="showPicksMessage('Complete for now — your picks are saved.', false)">Complete for now</button></div>`;
+}
+
+function refreshConfidenceAutosaveUi_(categoryId) {
+  const category = getCompactConfidenceCategories_().find(c => normalizeId(c.id) === normalizeId(categoryId));
+  const input = document.getElementById('confidence-' + categoryId);
+  const row = input && input.closest('.rc24k-confidence-row');
+  if (!category || !row) return;
+  row.outerHTML = renderCompactConfidenceRow_(category);
+  // Update available numbers without rebuilding other matchups or the page.
+  getCompactConfidenceCategories_().forEach(c => {
+    const select = document.getElementById('confidence-' + c.id);
+    if (select) select.innerHTML = '<option value="">—</option>' + renderConfidenceOptionsForCategory(c.id, PICKS_PAGE_DATA.confidencePoints[c.id]);
+  });
+  const actions = document.getElementById('confidenceAutosaveActions');
+  if (actions) actions.outerHTML = confidenceAutosaveActionsHtml_();
+}
 
 async function rc24kSaveConfidenceRow_(categoryId) {
   const category = getCompactConfidenceCategories_().find(function(item) {
@@ -8362,7 +8389,7 @@ async function rc24kSaveConfidenceRow_(categoryId) {
 
   const session = PICKS_PAGE_DATA.session || getSession();
   RC24K_CONFIDENCE_SAVING_[category.id] = true;
-  refreshPicksPage();
+  refreshConfidenceAutosaveUi_(category.id);
 
   let result;
   try {
@@ -8379,7 +8406,7 @@ async function rc24kSaveConfidenceRow_(categoryId) {
     RC24K_CONFIDENCE_SAVING_[category.id] = false;
   }
 
-  if (!result || result.success === false) {
+  if (!result || result.success !== true) {
     throw new Error((result && (result.error || result.message)) || "Could not save this Confidence pick.");
   }
 
@@ -8404,8 +8431,7 @@ async function rc24kSaveConfidenceRow_(categoryId) {
   clearStartupPayload(true);
   RC24K_CONFIDENCE_COMPARE_DATA_ = null;
   RC24K_CONFIDENCE_COMPARE_REQUEST_ = null;
-  refreshPicksPage();
-  window.setTimeout(rc24kHydrateConfidenceCompare_, 0);
+  refreshConfidenceAutosaveUi_(category.id);
   return saved;
 }
 
@@ -8426,7 +8452,6 @@ draftConfidenceNominee_ = async function(categoryId, nomineeId) {
   if (normalizeId(previous) === normalizeId(nomineeId)) return;
 
   PICKS_PAGE_DATA.picks[category.id] = nomineeId;
-  refreshPicksPage();
 
   try {
     await rc24kSaveConfidenceRow_(category.id);
@@ -8434,7 +8459,7 @@ draftConfidenceNominee_ = async function(categoryId, nomineeId) {
   } catch (err) {
     PICKS_PAGE_DATA.picks[category.id] = previous;
     RC24K_CONFIDENCE_SAVING_[category.id] = false;
-    refreshPicksPage();
+    refreshConfidenceAutosaveUi_(category.id);
     showPicksMessage(err.message || String(err), true);
   }
 };
@@ -8448,7 +8473,7 @@ updateConfidenceForCategory = async function(categoryId, value) {
   const pick = PICKS_PAGE_DATA.picks[category.id] || "";
   if (!pick) {
     PICKS_PAGE_DATA.confidencePoints[category.id] = 0;
-    refreshPicksPage();
+    refreshConfidenceAutosaveUi_(category.id);
     showPicksMessage("Pick a team before assigning confidence.", true);
     return;
   }
@@ -8456,7 +8481,7 @@ updateConfidenceForCategory = async function(categoryId, value) {
   const nextValue = Number(value) || 0;
   if (nextValue > 0 && getUsedConfidencePointsForOtherCategories(category.id).includes(nextValue)) {
     showPicksMessage("Confidence " + nextValue + " is already assigned to another game.", true);
-    refreshPicksPage();
+    refreshConfidenceAutosaveUi_(category.id);
     return;
   }
 
@@ -8464,7 +8489,6 @@ updateConfidenceForCategory = async function(categoryId, value) {
   const previous = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
   PICKS_PAGE_DATA.confidencePoints[category.id] = nextValue;
   if (PICKS_CONFIDENCE_SORT_MODE === "confidence") PICKS_CONFIDENCE_SORT_STALE = true;
-  refreshPicksPage();
 
   try {
     await rc24kSaveConfidenceRow_(category.id);
@@ -8472,7 +8496,7 @@ updateConfidenceForCategory = async function(categoryId, value) {
   } catch (err) {
     PICKS_PAGE_DATA.confidencePoints[category.id] = previous;
     RC24K_CONFIDENCE_SAVING_[category.id] = false;
-    refreshPicksPage();
+    refreshConfidenceAutosaveUi_(category.id);
     showPicksMessage(err.message || String(err), true);
   }
 };
