@@ -162,7 +162,14 @@ async function runDeferredPageOrderCase_(source, kind) {
     assert(rendered && String(rendered).length > 0, kind + ' primary-first must become usable while Appearance is still pending');
     mounted = true;
     resolveAppearance({success:true,SportsLayoutTemplate:'sports-rich',SportsHeroImageUrl:'custom.png'});
-    await new Promise(resolve => setTimeout(resolve, 5));
+    await new Promise((resolve, reject) => {
+      const deadline = Date.now() + 500;
+      (function waitForLateAppearance_() {
+        if (heroNode.outerHTML === 'LATE-CUSTOM-HERO') return resolve();
+        if (Date.now() >= deadline) return reject(new Error(kind + ' late Appearance did not apply within 500ms'));
+        setTimeout(waitForLateAppearance_, 5);
+      })();
+    });
     assert.strictEqual(heroNode.outerHTML, 'LATE-CUSTOM-HERO', kind + ' late Appearance must apply after mount');
     assert(processed >= 1, kind + ' late Appearance must process mounted page');
     assert.strictEqual(page.pendingEdit, 'keep-me', kind + ' late Appearance must preserve pending edits');
