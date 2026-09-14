@@ -1756,6 +1756,139 @@ function savePicksBatch(payload) {
   }
 }
 
+
+/* =========================================================
+   AWARDS STAKES — REQUIRED-PICK PURSE RESERVE
+   Server mirror of the Awards/Stakes player guard. This keeps
+   enough points available to place the minimum stake on every
+   other unanswered required Stakes question.
+========================================================= */
+function awardsStakesCategoryRequiresPickServer_(category, categoryConfig) {
+  category = category || {};
+  categoryConfig = categoryConfig || {};
+
+  return !(
+    category.required === false ||
+    category.isRequired === false ||
+    category.optional === true ||
+    categoryConfig.required === false ||
+    categoryConfig.isRequired === false ||
+    categoryConfig.optional === true
+  );
+}
+
+function getAwardsStakesRequiredReserveBudget_(
+  username,
+  gameId,
+  currentCategoryId,
+  settings,
+  categories
+) {
+  const game =
+    typeof getGameRuntimeConfig === "function"
+      ? getGameRuntimeConfig(gameId)
+      : getGame(gameId);
+
+  const gameType = normalizeLower_(
+    game && (game.type || game.gameType) || ""
+  );
+
+  if (
+    !game ||
+    gameType !== "staked-prediction" ||
+    game.stakedPointsEnabled !== true
+  ) {
+    return null;
+  }
+
+  settings = settings || (
+    typeof getCategorySettingsCached === "function"
+      ? getCategorySettingsCached(gameId)
+      : getCategorySettings(gameId)
+  );
+
+  categories = categories || (
+    typeof getCategoriesCached === "function"
+      ? getCategoriesCached(gameId)
+      : getCategories(gameId)
+  );
+
+  const currentId = normalizeLower_(currentCategoryId);
+  const picks = getUserPicks(username, gameId) || [];
+  const pickedByCategory = {};
+
+  picks.forEach(function(pick) {
+    const pickCategoryId = normalizeLower_(pick && pick.categoryId);
+    if (!pickCategoryId || pickCategoryId === currentId) return;
+    if (!normalizeLower_(pick && pick.nomineeId)) return;
+    pickedByCategory[pickCategoryId] = true;
+  });
+
+  const resolutionMap =
+    typeof getCategoryResultsResolutionMap === "function"
+      ? getCategoryResultsResolutionMap(gameId)
+      : (
+          typeof getCategoryResultsWinnerMap === "function"
+            ? getCategoryResultsWinnerMap(gameId)
+            : {}
+        );
+
+  let reservedPoints = 0;
+  let remainingRequired = 0;
+
+  (categories || []).forEach(function(category) {
+    const categoryId = normalizeLower_(category && category.id);
+    if (!categoryId || categoryId === currentId) return;
+
+    const categoryConfig = settings[categoryId] || {};
+    const scoreMode =
+      typeof normalizeCategoryScoreMode_ === "function"
+        ? normalizeCategoryScoreMode_(categoryConfig.scoreMode || category.scoreMode)
+        : normalizeLower_(categoryConfig.scoreMode || category.scoreMode || "correct-pick");
+
+    if (scoreMode !== "staked-points") return;
+    if (!awardsStakesCategoryRequiresPickServer_(category, categoryConfig)) return;
+    if (pickedByCategory[categoryId]) return;
+    if (isCategoryConfigLocked_(categoryConfig)) return;
+
+    const resolution =
+      typeof getHybridCategoryResolution_ === "function"
+        ? getHybridCategoryResolution_(categoryId, categoryConfig, resolutionMap)
+        : { resolved: Boolean(categoryConfig.winnerNomineeId) };
+
+    if (resolution && resolution.resolved === true) return;
+
+    const rules = getStakedPredictionRules_(gameId, categoryConfig);
+    reservedPoints += Math.max(0, Number(rules && rules.minStake) || 0);
+    remainingRequired += 1;
+  });
+
+  const stakeSummary = getStakedPredictionSummary_(username, gameId, {
+    settings: settings,
+    excludeCategoryId: currentId
+  });
+
+  const currentConfig = settings[currentId] || {};
+  const currentRules = getStakedPredictionRules_(gameId, currentConfig);
+  const usablePoints = Math.max(0, Number(stakeSummary && stakeSummary.availablePoints) || 0);
+  const spendablePoints = Math.max(0, usablePoints - reservedPoints);
+  const requestedCap = Math.min(currentRules.maxStake, spendablePoints);
+  const effectiveMaxStake = requestedCap < currentRules.minStake
+    ? 0
+    : currentRules.minStake + Math.floor(
+        (requestedCap - currentRules.minStake) / currentRules.stakeIncrement
+      ) * currentRules.stakeIncrement;
+
+  return {
+    usablePoints: usablePoints,
+    reservedPoints: reservedPoints,
+    remainingRequired: remainingRequired,
+    spendablePoints: spendablePoints,
+    effectiveMaxStake: effectiveMaxStake,
+    stakeSummary: stakeSummary
+  };
+}
+
 function savePick(payload){
 
   let lock = null;
@@ -2062,6 +2195,46 @@ function savePick(payload){
             " points are available to stake",
           stakeSummary: stakeSummary
         };
+      }
+
+      const awardsReserveBudget =
+        getAwardsStakesRequiredReserveBudget_(
+          username,
+          gameId,
+          categoryId,
+          settings
+        );
+
+      if (awardsReserveBudget) {
+        if (awardsReserveBudget.effectiveMaxStake < stakeRules.minStake) {
+          return {
+            success: false,
+            message:
+              "Keep enough points for the remaining required picks. " +
+              awardsReserveBudget.reservedPoints +
+              " points are reserved.",
+            stakeSummary: stakeSummary,
+            stakeReserve: awardsReserveBudget
+          };
+        }
+
+        if (stakePoints > awardsReserveBudget.effectiveMaxStake) {
+          return {
+            success: false,
+            message:
+              "Max for this pick is " +
+              awardsReserveBudget.effectiveMaxStake +
+              " so " +
+              awardsReserveBudget.reservedPoints +
+              " points remain for " +
+              awardsReserveBudget.remainingRequired +
+              " required pick" +
+              (awardsReserveBudget.remainingRequired === 1 ? "" : "s") +
+              ".",
+            stakeSummary: stakeSummary,
+            stakeReserve: awardsReserveBudget
+          };
+        }
       }
 
     }

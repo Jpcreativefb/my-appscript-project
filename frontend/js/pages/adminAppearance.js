@@ -118,6 +118,11 @@ function adminAppearanceSelectedGameForLayout_() {
   return (ADMIN_APPEARANCE_STATE.games || []).find(function(game) { return adminAppearanceGameId_(game) === selected; }) || {};
 }
 
+function adminAppearanceIsAwardsStakesGame_() {
+  const game = adminAppearanceSelectedGameForLayout_();
+  return adminAppearanceGameType_(game) === "staked-prediction";
+}
+
 function adminAppearanceHasSportsRuntime_() {
   const setup = ADMIN_APPEARANCE_STATE.gameSetup || {};
   const categories = Array.isArray(setup.categories) ? setup.categories : [];
@@ -1582,6 +1587,14 @@ function adminAppearanceStudioDefaults_(theme) {
       imageOverlayOpacity: adminAppearanceStudioClamp_(questions.imageOverlayOpacity, 0, 100, 35),
       imageOverlayOpacity2: adminAppearanceStudioClamp_(questions.imageOverlayOpacity2, 0, 100, questions.imageOverlayOpacity == null ? 0 : questions.imageOverlayOpacity),
       wagerColumns: adminAppearanceStudioClamp_(questions.wagerColumns, 1, 3, 2),
+      stakes: {
+        showRiskedPoints: !questions.stakes || questions.stakes.showRiskedPoints !== false,
+        pickAccentColor: questions.stakes && questions.stakes.pickAccentColor || questions.selectedBorder || "#facc15",
+        correctOutlineColor: questions.stakes && (questions.stakes.correctOutlineColor || questions.stakes.correctPickColor) || "#d4af37",
+        correctTitleColor: questions.stakes && (questions.stakes.correctTitleColor || questions.stakes.correctPickColor) || "#d4af37",
+        wrongOpacity: adminAppearanceStudioClamp_(questions.stakes && questions.stakes.wrongOpacity, 20, 85, 46),
+        winnerTextColor: questions.stakes && questions.stakes.winnerTextColor || "#f4c542"
+      },
       overrides: Object.assign({}, questions.overrides || {}),
       sectionOverrides: Object.assign({}, questions.sectionOverrides || {})
     },
@@ -2077,6 +2090,16 @@ function adminAppearanceThemeEditor_() {
             ${adminAppearanceStudioRange_("appearanceThemeQuestionRadius", "Question / Answer Corners", theme.questions.radius, 0, 32, 1, "px")}
             ${adminAppearanceStudioRange_("appearanceThemeQuestionGap", "Answer Gap", theme.questions.gap, 2, 28, 1, "px")}
           </div></details>
+
+          ${adminAppearanceIsAwardsStakesGame_() ? `<details open class="appearance-awards-stakes-controls"><summary>Awards Stakes</summary><div class="appearance-studio-panel">
+            <label class="appearance-studio-toggle"><span>Show Risked Points</span><input id="appearanceThemeStakesShowRisked" type="checkbox" ${theme.questions.stakes.showRiskedPoints ? "checked" : ""}></label>
+            ${adminAppearanceStudioColor_("appearanceThemeStakesAccent", "Pick Accent Color", theme.questions.stakes.pickAccentColor)}
+            ${adminAppearanceStudioColor_("appearanceThemeStakesCorrectOutline", "Correct Outline Color", theme.questions.stakes.correctOutlineColor)}
+            ${adminAppearanceStudioColor_("appearanceThemeStakesCorrectTitle", "Correct Title Color", theme.questions.stakes.correctTitleColor)}
+            ${adminAppearanceStudioRange_("appearanceThemeStakesWrongOpacity", "Wrong Pick Opacity", theme.questions.stakes.wrongOpacity, 20, 85, 1, "%")}
+            ${adminAppearanceStudioColor_("appearanceThemeStakesWinnerText", "Winner Text Color", theme.questions.stakes.winnerTextColor)}
+            <div class="admin-sub">Awards Staked Prediction only. These settings do not change scoring, stake rules, or other Picks game types.</div>
+          </div></details>` : ""}
 
           <details><summary>Question Layout Types</summary><div class="appearance-studio-panel">
             <h4>Text</h4>${adminAppearanceStudioRange_("appearanceThemeTextColumns", "Columns", theme.questions.textColumns, 1, 4, 1, "")}
@@ -3391,7 +3414,7 @@ function adminAppearanceReadThemeControls_() {
       const overrides = {}, sectionOverrides = {};
       document.querySelectorAll("[data-question-layout-id]").forEach(function(el){ overrides[String(el.dataset.questionLayoutId||"")] = String(el.value||"inherit"); });
       document.querySelectorAll("[data-question-section-id]").forEach(function(el){ sectionOverrides[String(el.dataset.questionSectionId||"")] = String(el.value||"inherit"); });
-      return {
+      const questionTheme = {
         defaultLayout: String(adminAppearanceStudioValue_("appearanceThemeQuestionDefault", "inherit")),
         cardMode: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardMode", "solid")),
         cardBackground: String(adminAppearanceStudioValue_("appearanceThemeQuestionCardBg", "#0f172a")),
@@ -3445,6 +3468,26 @@ function adminAppearanceReadThemeControls_() {
         wagerColumns: adminAppearanceStudioNumber_("appearanceThemeWagerColumns", 2),
         overrides: overrides, sectionOverrides: sectionOverrides
       };
+
+      if (adminAppearanceIsAwardsStakesGame_()) {
+        questionTheme.stakes = {
+          showRiskedPoints: adminAppearanceStudioValue_("appearanceThemeStakesShowRisked", true) === true,
+          pickAccentColor: String(adminAppearanceStudioValue_("appearanceThemeStakesAccent", "#facc15")),
+          correctOutlineColor: String(adminAppearanceStudioValue_("appearanceThemeStakesCorrectOutline", "#d4af37")),
+          correctTitleColor: String(adminAppearanceStudioValue_("appearanceThemeStakesCorrectTitle", "#d4af37")),
+          wrongOpacity: adminAppearanceStudioNumber_("appearanceThemeStakesWrongOpacity", 46),
+          winnerTextColor: String(adminAppearanceStudioValue_("appearanceThemeStakesWinnerText", "#f4c542"))
+        };
+      } else {
+        const currentThemeRow = adminAppearanceThemeById_(ADMIN_APPEARANCE_STATE.selectedThemePackId || adminAppearanceDefaultTheme_());
+        const currentTheme = adminAppearanceJson_(currentThemeRow && currentThemeRow.ThemeJSON);
+        const currentStakes = currentTheme && currentTheme.questions && currentTheme.questions.stakes;
+        if (currentStakes && typeof currentStakes === "object") {
+          questionTheme.stakes = Object.assign({}, currentStakes);
+        }
+      }
+
+      return questionTheme;
     })(),
     details: {
       background: String(adminAppearanceStudioValue_("appearanceThemeDetailsBg", "#0b1220")),

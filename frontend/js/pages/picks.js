@@ -62,6 +62,7 @@ let PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
 const PICKS_STANDARD_AUTOSAVE_QUEUE = {};
 const PICKS_STANDARD_AUTOSAVE_DEBOUNCE_MS = 1800;
 let PICKS_LIVE_PROBABILITY_REQUEST = null;
+const PICKS_AWARDS_STAKES_DRAFT_PICKS = {};
 
 const PICKS_CONFIDENCE_SPORTS_API_URL =
   "https://script.google.com/macros/s/AKfycbwVlgZa1FBvt99dpwr4PbrdBOs9IRcZ6BFlr-t6scTRNcVgQsJKpCWk1d8nxC681Sy0/exec";
@@ -1295,6 +1296,8 @@ PICKS_PAGE_DATA.gameId =
 PICKS_PAGE_DATA.game =
   game;
 
+clearAwardsStakesDrafts_();
+
 PICKS_PAGE_DATA.isConfidenceGame =
   isConfidenceGame;
 
@@ -1456,6 +1459,37 @@ function isStakedPointsCategory(category) {
   return normalizePicksScoreMode_(
     category && category.scoreMode
   ) === "staked-points";
+}
+
+function isAwardsStakesGame_() {
+  const game = PICKS_PAGE_DATA.game || {};
+  const type = String(game.type || game.gameType || "").trim().toLowerCase();
+  return type === "staked-prediction" && game.stakedPointsEnabled === true;
+}
+
+function isAwardsStakesCategory_(category) {
+  return isAwardsStakesGame_() && isStakedPointsCategory(category);
+}
+
+function hasAwardsStakesCategories_() {
+  return isAwardsStakesGame_() && (PICKS_PAGE_DATA.categories || []).some(function(category) {
+    return isAwardsStakesCategory_(category);
+  });
+}
+
+function awardsStakesDraftNomineeId_(category) {
+  const categoryId = String(category && category.id || "");
+  return String(
+    PICKS_AWARDS_STAKES_DRAFT_PICKS[categoryId] ||
+    PICKS_PAGE_DATA.picks[categoryId] ||
+    ""
+  );
+}
+
+function clearAwardsStakesDrafts_() {
+  Object.keys(PICKS_AWARDS_STAKES_DRAFT_PICKS).forEach(function(categoryId) {
+    delete PICKS_AWARDS_STAKES_DRAFT_PICKS[categoryId];
+  });
 }
 
 function usesConfidencePointsCategory(category) {
@@ -2456,6 +2490,80 @@ function confidenceAppearanceResolvedImage_(category, nominee) {
   };
 }
 
+function awardsStakesAppearanceSettings_() {
+  const theme = PICKS_PAGE_DATA.appearance && PICKS_PAGE_DATA.appearance.theme || {};
+  const questions = theme.questions || {};
+  const stakes = questions.stakes || {};
+
+  function safeColor_(value, fallback) {
+    const text = String(value || "").trim();
+    return /^#[0-9a-f]{6}$/i.test(text) ? text : fallback;
+  }
+
+  const wrongOpacityRaw = Number(stakes.wrongOpacity);
+  const wrongOpacity = Number.isFinite(wrongOpacityRaw)
+    ? Math.max(20, Math.min(85, wrongOpacityRaw))
+    : 46;
+  const legacyCorrect = safeColor_(stakes.correctPickColor, "");
+
+  return {
+    showRiskedPoints: confidenceAppearanceBool_(stakes.showRiskedPoints, true),
+    pickAccentColor: safeColor_(stakes.pickAccentColor || questions.selectedBorder, "#facc15"),
+    correctOutlineColor: safeColor_(stakes.correctOutlineColor || legacyCorrect, "#d4af37"),
+    correctTitleColor: safeColor_(stakes.correctTitleColor || legacyCorrect, "#d4af37"),
+    wrongOpacity: wrongOpacity,
+    winnerTextColor: safeColor_(stakes.winnerTextColor, "#f4c542")
+  };
+}
+
+function awardsStakesCardStyle_() {
+  const settings = awardsStakesAppearanceSettings_();
+  return [
+    "--awards-stakes-accent:" + settings.pickAccentColor,
+    "--awards-stakes-correct-outline:" + settings.correctOutlineColor,
+    "--awards-stakes-correct-title:" + settings.correctTitleColor,
+    "--awards-stakes-wrong-opacity:" + (settings.wrongOpacity / 100),
+    "--awards-stakes-winner-text:" + settings.winnerTextColor
+  ].join(";");
+}
+
+function awardsStakesFallbackVisual_(nominee) {
+  nominee = nominee || {};
+  const name = String(nominee.name || nominee.shortAnswer || nominee.id || "Pick").trim() || "Pick";
+  const key = String(nominee.id || nominee.nomineeId || name).trim().toLowerCase();
+  const palettes = [
+    ["#0f4c81", "#5b21b6", "#dbeafe"],
+    ["#9f1239", "#7c2d12", "#ffe4e6"],
+    ["#0f766e", "#155e75", "#ccfbf1"],
+    ["#7c3aed", "#be185d", "#f3e8ff"],
+    ["#a16207", "#c2410c", "#fef3c7"],
+    ["#1d4ed8", "#0f766e", "#dbeafe"],
+    ["#4338ca", "#7e22ce", "#e0e7ff"],
+    ["#166534", "#0369a1", "#dcfce7"]
+  ];
+  let hash = 2166136261;
+  for (let i = 0; i < key.length; i++) {
+    hash ^= key.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const variant = (hash >>> 0) % palettes.length;
+  const colors = palettes[variant];
+  return {
+    variant: variant,
+    label: name,
+    style: [
+      "--awards-stakes-fallback-a:" + colors[0],
+      "--awards-stakes-fallback-b:" + colors[1],
+      "--awards-stakes-fallback-ink:" + colors[2]
+    ].join(";")
+  };
+}
+
+function renderAwardsStakesFallbackArt_(nominee, className) {
+  const fallback = awardsStakesFallbackVisual_(nominee);
+  return `<span class="awards-stakes-fallback-art ${escapeAttr(className || "")}" data-fallback-variant="${fallback.variant}" style="${escapeAttr(fallback.style)}"><span class="awards-stakes-fallback-monogram">${escapeHtml(fallback.label)}</span></span>`;
+}
+
 function confidenceThemeToken_(value, allowed, fallback) {
   const key = String(value || "").trim().toLowerCase();
   return allowed.indexOf(key) !== -1 ? key : fallback;
@@ -2783,17 +2891,70 @@ function applySportsRichConfidenceAppearance_() {
   if (header && typeof renderPicksPageHeader_ === "function") header.outerHTML = renderPicksPageHeader_();
 }
 
+function refreshAwardsStakesAppearanceUi_() {
+  const list = document.getElementById("picksCategoryList");
+  if (!list) return;
+
+  (PICKS_PAGE_DATA.categories || []).filter(isAwardsStakesCategory_).forEach(function(category) {
+    const current = list.querySelector('[data-category-id="' + cssEscape(category.id) + '"]');
+    if (!current) return;
+
+    const wasCollapsed = current.classList.contains("collapsed");
+    const stakeInput = current.querySelector("#stake-" + cssEscape(category.id));
+    const draftStakeValue = stakeInput ? stakeInput.value : null;
+    const parent = category.parentCategoryId
+      ? (PICKS_PAGE_DATA.categories || []).find(function(item) {
+          return normalizeId(item && item.id) === normalizeId(category.parentCategoryId);
+        }) || null
+      : null;
+
+    const holder = document.createElement("div");
+    const previousTempOpen = PICKS_TEMP_OPEN_CATEGORY_ID;
+    if (!wasCollapsed) PICKS_TEMP_OPEN_CATEGORY_ID = category.id;
+    holder.innerHTML = renderCategoryCard(category, !!parent, parent);
+    PICKS_TEMP_OPEN_CATEGORY_ID = previousTempOpen;
+    const replacement = holder.firstElementChild;
+    if (!replacement) return;
+
+    if (!wasCollapsed) {
+      replacement.classList.remove("collapsed");
+      const header = replacement.querySelector(".pick-card-header");
+      if (header) header.setAttribute("aria-expanded", "true");
+    }
+
+    current.replaceWith(replacement);
+
+    if (draftStakeValue !== null) {
+      const nextInput = replacement.querySelector("#stake-" + cssEscape(category.id));
+      if (nextInput) nextInput.value = draftStakeValue;
+    }
+    syncStakedPickControls(category.id);
+  });
+
+  if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
+    window.PlatformImageEngine.process(list);
+  }
+  updateCountdowns();
+}
+
 function refreshPicksAppearanceUi_() {
   applySportsRichConfidenceAppearance_();
   if (shouldRenderCompactConfidenceSlate_()) {
     refreshConfidenceAppearanceUi_();
     return;
   }
+
+  // Awards Stakes has a pick-first draft state. Refresh only those cards after
+  // deferred Appearance hydration so ordinary Picks and Confidence keep their
+  // existing DOM/interaction behavior while assigned nominee art becomes visible.
+  if (hasAwardsStakesCategories_()) {
+    refreshAwardsStakesAppearanceUi_();
+    return;
+  }
+
   const list = document.getElementById("picksCategoryList");
   if (!list) return;
-  // Standard, Staked Prediction, Ranking-style question cards and other Picks
-  // layouts calculate image/layout choices at render time. Rebuild only the
-  // question list after deferred Appearance arrives; the primary page stays usable.
+  // Existing non-Stakes Appearance behavior is intentionally unchanged.
   list.innerHTML = renderPicksCategoryList();
   if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
     window.PlatformImageEngine.process(list);
@@ -3436,6 +3597,11 @@ function updateStakeForCategory(categoryId, value) {
     input.value = Math.floor(Number(value) || 0) || "";
   }
 
+  const category = getStakedCategoryById_(categoryId);
+  if (category && isAwardsStakesCategory_(category)) {
+    markAwardsStakesRiskTouched_(categoryId);
+  }
+
   syncStakedPickControls(categoryId);
 }
 
@@ -3455,6 +3621,119 @@ function getSelectedStakeForCategory_(categoryId) {
   return Math.floor(
     Number(PICKS_PAGE_DATA.stakePoints[categoryId]) || 0
   );
+}
+
+function awardsStakesCategoryRequiresPick_(category) {
+  if (!isAwardsStakesCategory_(category)) return false;
+
+  return !(
+    category.required === false ||
+    category.isRequired === false ||
+    category.optional === true
+  );
+}
+
+function getAwardsStakesWagerBudget_(category) {
+  const rules = getStakedPointsRules(category);
+  const summary = getStakedPointsSummary();
+  const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+  const usablePoints = Math.max(0, summary.availablePoints + existingStake);
+  let reservedPoints = 0;
+  let remainingRequired = 0;
+
+  (PICKS_PAGE_DATA.categories || []).forEach(function(otherCategory) {
+    if (!otherCategory || normalizeId(otherCategory.id) === normalizeId(category.id)) return;
+    if (!awardsStakesCategoryRequiresPick_(otherCategory)) return;
+    if (PICKS_PAGE_DATA.picks[otherCategory.id]) return;
+    if (isCategoryLocked(otherCategory)) return;
+
+    const otherRules = getStakedPointsRules(otherCategory);
+    reservedPoints += Math.max(0, Number(otherRules.minStake) || 0);
+    remainingRequired += 1;
+  });
+
+  const spendablePoints = Math.max(0, usablePoints - reservedPoints);
+  const requestedCap = Math.min(rules.maxStake, spendablePoints);
+  const effectiveMaxStake = requestedCap < rules.minStake
+    ? 0
+    : rules.minStake + Math.floor(
+        (requestedCap - rules.minStake) / rules.stakeIncrement
+      ) * rules.stakeIncrement;
+
+  return {
+    usablePoints: usablePoints,
+    reservedPoints: reservedPoints,
+    remainingRequired: remainingRequired,
+    spendablePoints: spendablePoints,
+    effectiveMaxStake: effectiveMaxStake,
+  };
+}
+
+function validateAwardsStakesWagerBudget_(category, stakePoints) {
+  const baseValidation = validateSelectedStakeForCategory_(category, stakePoints);
+  if (!baseValidation.valid || !isAwardsStakesCategory_(category)) {
+    return baseValidation;
+  }
+
+  const rules = getStakedPointsRules(category);
+  const budget = getAwardsStakesWagerBudget_(category);
+
+  if (budget.effectiveMaxStake < rules.minStake) {
+    return {
+      valid: false,
+      message:
+        "Keep enough points for the remaining required picks. " +
+        budget.reservedPoints + " points are reserved."
+    };
+  }
+
+  if (stakePoints > budget.effectiveMaxStake) {
+    return {
+      valid: false,
+      message:
+        "Max for this pick is " + budget.effectiveMaxStake +
+        " so " + budget.reservedPoints + " points remain for " +
+        budget.remainingRequired + " required pick" +
+        (budget.remainingRequired === 1 ? "" : "s") + "."
+    };
+  }
+
+  return baseValidation;
+}
+
+function formatAwardsStakesOutcome_(value) {
+  const number = Number(value) || 0;
+  if (Math.floor(number) === number) return formatPicksPoints_(number);
+  return number.toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1");
+}
+
+function markAwardsStakesRiskTouched_(categoryId) {
+  const panel = document.querySelector(
+    `[data-awards-stakes-risk="true"][data-category-id="${cssEscape(categoryId)}"]`
+  );
+  if (panel && panel.dataset) panel.dataset.stakeTouched = "true";
+}
+
+function adjustAwardsStakesStake_(categoryId, direction) {
+  const category = getStakedCategoryById_(categoryId);
+  if (!category || !isAwardsStakesCategory_(category) || isCategoryLocked(category)) return;
+
+  const input = document.getElementById("stake-" + categoryId);
+  if (!input) return;
+
+  const rules = getStakedPointsRules(category);
+  const budget = getAwardsStakesWagerBudget_(category);
+  if (budget.effectiveMaxStake < rules.minStake) return;
+
+  let currentValue = Math.floor(Number(input.value) || rules.minStake);
+  if (currentValue < rules.minStake) currentValue = rules.minStake;
+
+  let nextValue = currentValue + (Number(direction) < 0 ? -rules.stakeIncrement : rules.stakeIncrement);
+  nextValue = Math.max(rules.minStake, Math.min(budget.effectiveMaxStake, nextValue));
+
+  input.value = nextValue;
+  markAwardsStakesRiskTouched_(categoryId);
+  syncStakedPickControls(categoryId);
 }
 
 function validateSelectedStakeForCategory_(category, stakePoints) {
@@ -3531,7 +3810,9 @@ function syncStakedPickControls(categoryId) {
   }
 
   const stakePoints = getSelectedStakeForCategory_(categoryId);
-  const validation = validateSelectedStakeForCategory_(category, stakePoints);
+  const validation = isAwardsStakesCategory_(category)
+    ? validateAwardsStakesWagerBudget_(category, stakePoints)
+    : validateSelectedStakeForCategory_(category, stakePoints);
   const locked = isCategoryLocked(category);
   const input = document.getElementById("stake-" + categoryId);
   const status = document.getElementById("stake-step-status-" + categoryId);
@@ -3539,6 +3820,69 @@ function syncStakedPickControls(categoryId) {
   if (input) {
     input.classList.toggle("is-ready", validation.valid && !locked);
     input.classList.toggle("is-invalid", !validation.valid && stakePoints > 0);
+  }
+
+  if (isAwardsStakesCategory_(category)) {
+    const nomineeId = awardsStakesDraftNomineeId_(category);
+    const rules = getStakedPointsRules(category);
+    const budget = getAwardsStakesWagerBudget_(category);
+    const panel = card.querySelector('[data-awards-stakes-risk="true"]');
+    const touched = !!(
+      panel && panel.dataset && panel.dataset.stakeTouched === "true"
+    );
+    const confirmButton = document.getElementById("stake-confirm-" + categoryId);
+    const minusButton = document.getElementById("stake-minus-" + categoryId);
+    const plusButton = document.getElementById("stake-plus-" + categoryId);
+    const availableAfter = document.getElementById("stake-available-after-" + categoryId);
+    const infoLine = document.getElementById("stake-info-" + categoryId);
+
+    if (confirmButton) {
+      confirmButton.disabled = locked || !nomineeId || !validation.valid;
+    }
+    if (minusButton) {
+      minusButton.disabled = locked || stakePoints <= rules.minStake;
+    }
+    if (plusButton) {
+      plusButton.disabled = locked || budget.effectiveMaxStake <= 0 || stakePoints >= budget.effectiveMaxStake;
+    }
+    if (availableAfter) {
+      const remaining = Math.max(0, budget.usablePoints - Math.max(0, stakePoints));
+      availableAfter.textContent =
+        "Available after: " + formatPicksPoints_(remaining) +
+        (budget.reservedPoints > 0
+          ? " · Reserve " + formatPicksPoints_(budget.reservedPoints)
+          : "");
+    }
+    if (infoLine) {
+      const currentStake = Math.max(0, Number(stakePoints) || 0);
+      if (touched || Number(PICKS_PAGE_DATA.stakePoints[category.id]) > 0) {
+        infoLine.textContent =
+          "Correct +" + formatAwardsStakesOutcome_(currentStake * rules.winMultiplier) +
+          " · Wrong −" + formatAwardsStakesOutcome_(currentStake * rules.lossMultiplier);
+      } else {
+        infoLine.textContent =
+          "Min " + formatPicksPoints_(rules.minStake) +
+          " · Max " + formatPicksPoints_(rules.maxStake) +
+          " · Step " + formatPicksPoints_(rules.stakeIncrement) +
+          (budget.effectiveMaxStake > 0 && budget.effectiveMaxStake < rules.maxStake
+            ? " · Here max " + formatPicksPoints_(budget.effectiveMaxStake)
+            : "");
+      }
+    }
+
+    card.querySelectorAll(".awards-stakes-nominee").forEach(function(button) {
+      button.disabled = locked;
+    });
+    if (status) {
+      status.textContent = locked
+        ? "This question is locked."
+        : validation.valid
+          ? "Ready to confirm."
+          : validation.message;
+      status.classList.toggle("is-ready", validation.valid && !locked);
+      status.classList.toggle("is-waiting", !validation.valid && !locked);
+    }
+    return;
   }
 
   card.querySelectorAll(".stake-preset-button").forEach(button => {
@@ -3633,6 +3977,127 @@ function renderStakedPointsControl(category, locked) {
       </div>
     </div>
   `;
+}
+
+function renderAwardsStakesRiskControl_(category, locked, nomineeId) {
+  if (!isAwardsStakesCategory_(category) || !nomineeId) return "";
+
+  const rules = getStakedPointsRules(category);
+  const existingStake = Number(PICKS_PAGE_DATA.stakePoints[category.id]) || 0;
+  const budget = getAwardsStakesWagerBudget_(category);
+  const insufficientPoints = budget.effectiveMaxStake < rules.minStake;
+  const controlDisabled = locked || insufficientPoints;
+  const currentValue = existingStake > 0
+    ? existingStake
+    : insufficientPoints
+      ? ""
+      : rules.minStake;
+  const nominee = (category.nominees || []).find(function(item) {
+    return normalizeId(item && item.id) === normalizeId(nomineeId);
+  });
+  const validation = validateAwardsStakesWagerBudget_(category, Number(currentValue) || 0);
+  const availableAfter = Math.max(0, budget.usablePoints - (Number(currentValue) || 0));
+  const touched = existingStake > 0;
+  const ruleInfo =
+    "Min " + formatPicksPoints_(rules.minStake) +
+    " · Max " + formatPicksPoints_(rules.maxStake) +
+    " · Step " + formatPicksPoints_(rules.stakeIncrement) +
+    (budget.effectiveMaxStake > 0 && budget.effectiveMaxStake < rules.maxStake
+      ? " · Here max " + formatPicksPoints_(budget.effectiveMaxStake)
+      : "");
+  const outcomeInfo =
+    "Correct +" + formatAwardsStakesOutcome_((Number(currentValue) || 0) * rules.winMultiplier) +
+    " · Wrong −" + formatAwardsStakesOutcome_((Number(currentValue) || 0) * rules.lossMultiplier);
+
+  return `
+    <div
+      class="awards-stakes-risk-panel stake-control"
+      data-awards-stakes-risk="true"
+      data-category-id="${escapeAttr(category.id)}"
+      data-stake-touched="${touched ? "true" : "false"}"
+    >
+      <div class="awards-stakes-selected-line">Selected: <strong>${escapeHtml(nominee && nominee.name || "Pick")}</strong></div>
+      <div class="stake-control-heading awards-stakes-risk-heading">
+        <label for="stake-${escapeAttr(category.id)}">Risk Points</label>
+        <span id="stake-available-after-${escapeAttr(category.id)}">Available after: ${formatPicksPoints_(availableAfter)}${budget.reservedPoints > 0 ? ` · Reserve ${formatPicksPoints_(budget.reservedPoints)}` : ""}</span>
+      </div>
+      <div class="awards-stakes-risk-row">
+        <div class="awards-stakes-stepper" role="group" aria-label="Risk points">
+          <button
+            type="button"
+            id="stake-minus-${escapeAttr(category.id)}"
+            class="awards-stakes-stepper-button"
+            aria-label="Decrease risk by ${rules.stakeIncrement} points"
+            onclick="adjustAwardsStakesStake_('${escapeJs(category.id)}', -1)"
+            ${controlDisabled || Number(currentValue) <= rules.minStake ? "disabled" : ""}
+          >−</button>
+          <input
+            type="number"
+            id="stake-${escapeAttr(category.id)}"
+            value="${currentValue}"
+            placeholder="${rules.minStake}"
+            min="${rules.minStake}"
+            max="${Math.max(rules.minStake, budget.effectiveMaxStake)}"
+            step="${rules.stakeIncrement}"
+            title="Minimum ${rules.minStake} · Maximum ${rules.maxStake} · Increment ${rules.stakeIncrement}"
+            aria-describedby="stake-info-${escapeAttr(category.id)} stake-step-status-${escapeAttr(category.id)}"
+            ${controlDisabled ? "disabled" : ""}
+            oninput="updateStakeForCategory('${escapeJs(category.id)}', this.value)"
+            onchange="updateStakeForCategory('${escapeJs(category.id)}', this.value)"
+          >
+          <button
+            type="button"
+            id="stake-plus-${escapeAttr(category.id)}"
+            class="awards-stakes-stepper-button"
+            aria-label="Increase risk by ${rules.stakeIncrement} points"
+            onclick="adjustAwardsStakesStake_('${escapeJs(category.id)}', 1)"
+            ${controlDisabled || Number(currentValue) >= budget.effectiveMaxStake ? "disabled" : ""}
+          >+</button>
+        </div>
+        <button
+          type="button"
+          id="stake-confirm-${escapeAttr(category.id)}"
+          class="button primary awards-stakes-confirm"
+          onclick="confirmAwardsStakesPick_('${escapeJs(category.id)}')"
+          ${controlDisabled || !validation.valid ? "disabled" : ""}
+        >Confirm Pick</button>
+      </div>
+      <div id="stake-info-${escapeAttr(category.id)}" class="awards-stakes-wager-info">${touched ? outcomeInfo : ruleInfo}</div>
+      <div id="stake-step-status-${escapeAttr(category.id)}" class="stake-step-status ${validation.valid ? "is-ready" : "is-waiting"}">
+        ${locked ? "This question is locked." : insufficientPoints ? `Keep enough points for the remaining required picks. ${formatPicksPoints_(budget.reservedPoints)} points are reserved.` : validation.valid ? "Ready to confirm." : validation.message}
+      </div>
+    </div>
+  `;
+}
+
+function draftAwardsStakesNominee_(categoryId, nomineeId) {
+  const category = getStakedCategoryById_(categoryId);
+  if (!category || !isAwardsStakesCategory_(category)) return;
+  if (isCategoryLocked(category)) {
+    showPicksMessage("This category is locked.", true);
+    return;
+  }
+  PICKS_AWARDS_STAKES_DRAFT_PICKS[category.id] = nomineeId;
+  PICKS_TEMP_OPEN_CATEGORY_ID = category.id;
+  refreshPicksPage();
+}
+
+async function confirmAwardsStakesPick_(categoryId) {
+  const category = getStakedCategoryById_(categoryId);
+  if (!category || !isAwardsStakesCategory_(category)) return;
+  const nomineeId = awardsStakesDraftNomineeId_(category);
+  if (!nomineeId) {
+    showPicksMessage("Choose your pick first.", true);
+    return;
+  }
+  const stakePoints = getSelectedStakeForCategory_(category.id);
+  const validation = validateAwardsStakesWagerBudget_(category, stakePoints);
+  if (!validation.valid) {
+    showPicksMessage(validation.message, true);
+    syncStakedPickControls(category.id);
+    return;
+  }
+  await selectNominee(category.id, nomineeId);
 }
 
 function renderConfidenceSummaryBar() {
@@ -3932,6 +4397,46 @@ function parseFollowUpMap(value) {
 /* =========================
    CATEGORY CARD
 ========================= */
+function renderAwardsStakesHeader_(category, selectedNominee, stakePoints, status, locked, collapsed) {
+  const title = getCategoryDisplayTitle(category);
+  const settings = awardsStakesAppearanceSettings_();
+
+  if (!collapsed || !selectedNominee) {
+    return `
+      <button type="button" class="pick-card-header awards-stakes-header awards-stakes-open-header" aria-expanded="true" onclick="togglePickCategory('${escapeJs(category.id)}')">
+        <span class="awards-stakes-open-title">${escapeHtml(title)}</span>
+        ${locked ? '<span class="awards-stakes-lock">LOCKED</span>' : ''}
+      </button>
+    `;
+  }
+
+  const imageUrl = String(confidenceAppearanceResolvedImage_(category, selectedNominee).imageUrl || "").trim();
+  const winners = getWinnerNominees(category);
+  const winnerText = status.className === "wrong" && winners.length
+    ? `<small class="awards-stakes-winner-label">Winner: ${escapeHtml(winners.map(function(item) { return item.name; }).join(", "))}</small>`
+    : "";
+  const riskText = settings.showRiskedPoints && stakePoints > 0
+    ? `<small class="awards-stakes-risked-label">${stakePoints} point${stakePoints === 1 ? "" : "s"} risked</small>`
+    : "";
+
+  return `
+    <button type="button" class="pick-card-header awards-stakes-header awards-stakes-collapsed-header" aria-expanded="false" onclick="togglePickCategory('${escapeJs(category.id)}')">
+      <span class="awards-stakes-hero-copy">
+        <span class="awards-stakes-question">${escapeHtml(title)}</span>
+        ${locked ? '<span class="awards-stakes-lock">LOCKED</span>' : ''}
+      </span>
+      <span class="awards-stakes-hero-selection ${imageUrl ? "has-image" : "no-image"}">
+        ${imageUrl ? `<span class="awards-stakes-hero-art">${platformImgHtml(imageUrl, { className: "awards-stakes-hero-image", variant: "card", alt: selectedNominee.name || "Selected answer" })}<span class="awards-stakes-hero-fade"></span></span>` : renderAwardsStakesFallbackArt_(selectedNominee, "awards-stakes-hero-fallback")}
+        <span class="awards-stakes-hero-answer">
+          <strong>${escapeHtml(selectedNominee.name || selectedNominee.shortAnswer || "Selected")}</strong>
+          ${riskText}
+          ${winnerText}
+        </span>
+      </span>
+    </button>
+  `;
+}
+
 function renderCategoryCard(category, isChild, parent) {
 
   const selectedNomineeId =
@@ -3939,6 +4444,12 @@ function renderCategoryCard(category, isChild, parent) {
 
   const selectedNominee =
     getSelectedNominee(category);
+
+  const awardsStakesCategory =
+    isAwardsStakesCategory_(category);
+
+  const displaySelectedNomineeId =
+    awardsStakesCategory ? awardsStakesDraftNomineeId_(category) : selectedNomineeId;
 
   const confidencePoints =
     Number(
@@ -4011,16 +4522,21 @@ function renderCategoryCard(category, isChild, parent) {
     isChild ? "child-category-card" : "";
 
   const savingClass = PICKS_PENDING_SAVES[category.id] ? "is-saving" : "";
+  const awardsStakesClass = awardsStakesCategory ? "awards-stakes-card" : "";
+  const awardsStakesStyle = awardsStakesCategory ? awardsStakesCardStyle_() : "";
 
   return `
     <section
-      class="pick-category-card question-layout-${escapeAttr(picksResolvedQuestionLayout_(category))} ${collapsedClass} ${childClass} ${status.className} ${savingClass}"
+      class="pick-category-card question-layout-${escapeAttr(picksResolvedQuestionLayout_(category))} ${collapsedClass} ${childClass} ${status.className} ${savingClass} ${awardsStakesClass}"
       data-category-id="${escapeAttr(category.id)}"
       data-has-pick="${hasPick ? "true" : "false"}"
       data-locked="${locked ? "true" : "false"}"
+      ${awardsStakesStyle ? `style="${escapeAttr(awardsStakesStyle)}"` : ""}
     >
 
-    <button
+    ${awardsStakesCategory
+      ? renderAwardsStakesHeader_(category, selectedNominee, stakePoints, status, locked, !!collapsedClass)
+      : `<button
       type="button"
       class="pick-card-header"
       aria-expanded="${collapsedClass ? "false" : "true"}"
@@ -4116,11 +4632,11 @@ function renderCategoryCard(category, isChild, parent) {
 
      </div>
 
-    </button>
+    </button>`}
 
     <div class="pick-card-body">
     ${
-      !confidencePointsCategory
+      !awardsStakesCategory && !confidencePointsCategory
         ? stakedPointsCategory
           ? `
             <div class="pick-rules-row stake-rules-row">
@@ -4142,49 +4658,50 @@ function renderCategoryCard(category, isChild, parent) {
     }
     
     
-    ${originalNominee ? `
+    ${!awardsStakesCategory && originalNominee ? `
       <div class="original-pick-note">
         Original Pick:
         <strong>${escapeHtml(originalNominee.name)}</strong>
       </div>
     ` : ""}
 
-${renderStakedPointsControl(
-  category,
-  locked
-)}
-
-${stakedPointsCategory ? `
-  <div class="stake-pick-step">
-    <div class="stake-step-badge">STEP 2</div>
-    <div>
-      <strong>Choose Your Pick</strong>
-      <span
-        id="stake-step-status-${escapeAttr(category.id)}"
-        class="stake-step-status ${stakePoints > 0 ? "is-ready" : "is-waiting"}"
-      >
-        ${
-          locked
-            ? "This question is locked."
-            : stakePoints > 0
-              ? `Risking ${stakePoints} point${stakePoints === 1 ? "" : "s"}. Choose an answer to confirm or update the pick.`
-              : "Choose your risk amount above before selecting an answer."
-        }
-      </span>
+${awardsStakesCategory ? `
+  <div class="awards-stakes-open-body">
+    <div class="awards-stakes-nominee-grid">
+      ${renderCategoryNominees_(category, displaySelectedNomineeId, locked)}
     </div>
+    ${renderAwardsStakesRiskControl_(category, locked, displaySelectedNomineeId)}
   </div>
-` : ""}
+` : `
+  ${renderStakedPointsControl(category, locked)}
 
-    <div class="${getLayoutClass(category)}">
+  ${stakedPointsCategory ? `
+    <div class="stake-pick-step">
+      <div class="stake-step-badge">STEP 2</div>
+      <div>
+        <strong>Choose Your Pick</strong>
+        <span
+          id="stake-step-status-${escapeAttr(category.id)}"
+          class="stake-step-status ${stakePoints > 0 ? "is-ready" : "is-waiting"}"
+        >
+          ${
+            locked
+              ? "This question is locked."
+              : stakePoints > 0
+                ? `Risking ${stakePoints} point${stakePoints === 1 ? "" : "s"}. Choose an answer to confirm or update the pick.`
+                : "Choose your risk amount above before selecting an answer."
+          }
+        </span>
+      </div>
+    </div>
+  ` : ""}
 
-  ${renderCategoryNominees_(category, selectedNomineeId, locked)}
+  <div class="${getLayoutClass(category)}">
+    ${renderCategoryNominees_(category, selectedNomineeId, locked)}
+  </div>
 
-</div>
-
-${renderConfidenceControl(
-  category,
-  locked
-)}
+  ${renderConfidenceControl(category, locked)}
+`}
 
     </div>
 </section>
@@ -4711,12 +5228,36 @@ function applyPicksAppearanceToPage_() {
   if (PICKS_PAGE_DATA.appearance) page.classList.remove("picks-appearance-loading");
 }
 
+function renderAwardsStakesNomineeButton_(category, nominee, selectedNomineeId, locked) {
+  const selected = normalizeId(nominee && nominee.id) === normalizeId(selectedNomineeId);
+  const appearanceImage = confidenceAppearanceResolvedImage_(category, nominee);
+  const imageUrl = String(appearanceImage.imageUrl || "").trim();
+  const name = String(nominee && (nominee.name || nominee.shortAnswer) || "Answer");
+
+  return `
+    <button
+      type="button"
+      class="nominee-choice awards-stakes-nominee ${imageUrl ? "has-image" : "no-image"} ${selected ? "selected" : ""}"
+      onclick="draftAwardsStakesNominee_('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
+      aria-pressed="${selected ? "true" : "false"}"
+      ${locked ? "disabled" : ""}
+    >
+      ${imageUrl ? `<span class="awards-stakes-nominee-art">${platformImgHtml(imageUrl, { className: "awards-stakes-nominee-image", variant: "card", alt: name })}<span class="awards-stakes-nominee-fade"></span></span>` : renderAwardsStakesFallbackArt_(nominee, "awards-stakes-nominee-fallback")}
+      <span class="awards-stakes-nominee-title">${escapeHtml(name)}</span>
+    </button>
+  `;
+}
+
 function renderNomineeButton(
   category,
   nominee,
   selectedNomineeId,
   locked
 ) {
+
+  if (isAwardsStakesCategory_(category)) {
+    return renderAwardsStakesNomineeButton_(category, nominee, selectedNomineeId, locked);
+  }
 
   const selected =
     normalizeId(nominee.id) ===
@@ -5196,7 +5737,7 @@ async function selectNominee(categoryId, nomineeId) {
     }
   }
 
-  if (isStakedPointsCategory(category)) {
+  if (isStakedPointsCategory(category) && !isAwardsStakesCategory_(category)) {
     const nominee = (category.nominees || []).find(item =>
       normalizeId(item && item.id) === normalizeId(nomineeId)
     );
@@ -5278,7 +5819,7 @@ async function selectNominee(categoryId, nomineeId) {
     else delete PICKS_PAGE_DATA.picks[categoryId];
     PICKS_PAGE_DATA.confidencePoints[categoryId] = optimisticPreviousConfidence;
     PICKS_PAGE_DATA.stakePoints[categoryId] = optimisticPreviousStake;
-    PICKS_TEMP_OPEN_CATEGORY_ID = "";
+    PICKS_TEMP_OPEN_CATEGORY_ID = isAwardsStakesCategory_(category) ? categoryId : "";
     refreshPicksPage();
     showPicksMessage((result && result.message) || "Could not save pick.", true);
     return;
@@ -5317,6 +5858,14 @@ async function selectNominee(categoryId, nomineeId) {
     PICKS_PAGE_DATA.pickMeta[categoryId] =
       result.pickMeta;
 
+  }
+
+  if (isAwardsStakesCategory_(category)) {
+    delete PICKS_AWARDS_STAKES_DRAFT_PICKS[categoryId];
+    PICKS_TEMP_OPEN_CATEGORY_ID = "";
+    refreshPicksPage();
+    showPicksMessage("Pick saved.", false);
+    return;
   }
 
   PICKS_TEMP_OPEN_CATEGORY_ID = categoryId;
