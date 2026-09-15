@@ -2705,7 +2705,8 @@ function doGet(e) {
       return json(apiGetRealityTvEpisodeComparison({
         username: params.username,
         token: params.token,
-        gameId: gameId
+        gameId: gameId,
+        episodeId: params.episodeId
       }));
     }
 

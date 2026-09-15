@@ -1082,12 +1082,13 @@ async function apiGetSeasonAnchor(gameId) {
   });
 }
 
-async function apiGetRealityTvEpisodeComparison(gameId) {
+async function apiGetRealityTvEpisodeComparison(gameId, episodeId) {
   const session = getSession ? getSession() : {};
   return api("getRealityTvEpisodeComparison", {
     username: session.username || "",
     token: session.token || "",
     gameId: gameId,
+    episodeId: episodeId || "",
     leagueId: getApiLeagueId_()
   });
 }

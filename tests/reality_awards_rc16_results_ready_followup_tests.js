@@ -151,16 +151,25 @@ function makePicksContext(hiddenIds) {
     'realityTvEpisodeResultState_',
     'realityTvEpisodeEliminatedText_',
     'renderRealityTvSpoilerShield_',
+    'realityTvHistoricalPickDetailsHtml_',
     'renderRealityTvEpisodeSections_'
   ], {
     PICKS_PAGE_DATA: data,
     normalizeId: value => String(value == null ? '' : value).trim().toLowerCase(),
     escapeHtml: value => String(value == null ? '' : value),
+    escapeAttr: value => String(value == null ? '' : value),
     escapeJs: value => String(value == null ? '' : value).replace(/'/g, "\\'"),
     realityTvEpisodeScheduleText_: () => 'Friday 8:00 PM',
     realityTvEpisodeCategoryMap_: () => ({ 'q-1': 1, 'elim-1': 1, 'q-2': 2, 'elim-2': 2 }),
     realityTvEpisodeHeaderStats_: () => '<span class="stats"></span>',
     realityTvEpisodeVoteDetailsHtml_: () => '<div class="vote-details"></div>',
+    getSelectedNominee: category => {
+      const id = data.picks[category.id];
+      return (category.nominees || []).find(n => String(n.id) === String(id)) || null;
+    },
+    getWinnerNominees: category => (category.nominees || []).filter(n => (category.winnerNomineeIds || []).map(String).includes(String(n.id))),
+    realityTvQuestionType_: category => String(category.questionType || '').toLowerCase(),
+    getCategoryDisplayTitle: category => category.question || category.name || category.id,
     renderPicksCategoryCards_: items => { cards++; return `<div class="cards">${items.map(i => i.id).join(',')}</div>`; }
   });
   return { ctx, data, getCards: () => cards };
@@ -172,12 +181,15 @@ function makePicksContext(hiddenIds) {
   assert(!top.includes('reality-current-episode-card'), 'duplicate Current Episode card must be removed because the hero already carries episode context');
   assert(top.includes('Spoiler Shield: ON'));
   assert(top.includes('Show Episode Results Now'));
-  assert(top.includes('Episode 1 is protected'));
+  assert(!top.includes('Episode 1 is protected'), 'compact Spoiler Shield must remain a two-line action control');
   assert(top.includes('Future Results: Protected'), 'future spoiler preference must remain available as a secondary control');
   assert(!top.includes('Hide Reality Results'), 'confusing old Hide Reality Results copy must not be primary UI');
 
   const cats = [
-    { id: 'q-1' }, { id: 'elim-1' }, { id: 'q-2' }, { id: 'elim-2' }
+    { id: 'q-1', question: 'Who wins reward?', nominees: [{ id: 'a', name: 'A' }] },
+    { id: 'elim-1', question: 'Who is eliminated?', questionType: 'elimination', nominees: [{ id: 'b', name: 'B' }] },
+    { id: 'q-2', question: 'Who wins immunity?', nominees: [{ id: 'c', name: 'C' }] },
+    { id: 'elim-2', question: 'Who is eliminated?', questionType: 'elimination', nominees: [{ id: 'd', name: 'D' }] }
   ];
   const sections = hidden.ctx.renderRealityTvEpisodeSections_(cats);
   assert(sections.includes('Episode 1 results are ready. Reveal them before making Episode 2 picks.'));
@@ -189,7 +201,10 @@ function makePicksContext(hiddenIds) {
 {
   const revealed = makePicksContext([]);
   const cats = [
-    { id: 'q-1' }, { id: 'elim-1' }, { id: 'q-2' }, { id: 'elim-2' }
+    { id: 'q-1', question: 'Who wins reward?', nominees: [{ id: 'a', name: 'A' }] },
+    { id: 'elim-1', question: 'Who is eliminated?', questionType: 'elimination', nominees: [{ id: 'b', name: 'B' }] },
+    { id: 'q-2', question: 'Who wins immunity?', nominees: [{ id: 'c', name: 'C' }] },
+    { id: 'elim-2', question: 'Who is eliminated?', questionType: 'elimination', nominees: [{ id: 'd', name: 'D' }] }
   ];
   const sections = revealed.ctx.renderRealityTvEpisodeSections_(cats);
   assert(sections.includes('Episode 2'));
@@ -197,7 +212,8 @@ function makePicksContext(hiddenIds) {
   assert(sections.includes('q-2,elim-2'), 'Episode 2 questions become available after reveal');
   assert(sections.includes('<details class="reality-previous-episodes">'), 'revealed Episode 1 must move into Previous Episodes');
   assert(!sections.includes('<details class="reality-previous-episodes" open'), 'Previous Episodes must be collapsed by default');
-  assert(sections.includes('q-1,elim-1'));
+  assert(sections.includes('Who wins reward?') && sections.includes('Who is eliminated?'), 'revealed historical episode must retain its saved-question detail rows');
+  assert(!sections.includes('Previous Episode</'), 'historical rows must not repeat the old Previous Episode tag');
 }
 
 const revealSrc = functionSource(picks, 'revealRealityTvEpisode_');

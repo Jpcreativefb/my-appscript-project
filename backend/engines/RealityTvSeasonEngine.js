@@ -2931,7 +2931,7 @@ function realityTvEpisodeLockedForComparison_(episode) {
   return !isNaN(lockDate.getTime()) && new Date().getTime() >= lockDate.getTime();
 }
 
-function realityTvLockedEpisodeComparisonPayload_(gameId, username) {
+function realityTvLockedEpisodeComparisonPayload_(gameId, username, requestedEpisodeId) {
   const core = realityTvUserGameViewPayload_(gameId, username, { includePlayerStats: false });
   if (!core || core.enabled !== true || !core.season) {
     return { enabled: false, available: false, message: "Reality TV season was not found." };
@@ -2940,19 +2940,72 @@ function realityTvLockedEpisodeComparisonPayload_(gameId, username) {
   const lockedEpisodes = (core.episodes || []).filter(realityTvEpisodeLockedForComparison_).sort(function(a, b) {
     return realityTvNumber_(b.episodeNumber, 0) - realityTvNumber_(a.episodeNumber, 0);
   });
-  const episode = lockedEpisodes[0] || null;
-  if (episode && episode.resultsHidden) {
-    return { enabled: true, available: false, hiddenBySpoiler: true, episodeId: episode.episodeId, message: "Episode results are hidden by Spoiler Shield until you mark it watched." };
+  const eligibleEpisodes = lockedEpisodes.filter(function(item) {
+    return item && item.resultsHidden !== true;
+  });
+  const requestedKey = realityTvKey_(requestedEpisodeId);
+  let episode = null;
+  if (requestedKey) {
+    episode = lockedEpisodes.find(function(item) {
+      return realityTvKey_(item && item.episodeId) === requestedKey;
+    }) || null;
+    if (!episode) {
+      return {
+        enabled: true,
+        available: false,
+        invalidEpisode: true,
+        eligibleEpisodes: eligibleEpisodes.map(function(item) {
+          return {
+            episodeId: realityTvString_(item.episodeId),
+            episodeNumber: realityTvNumber_(item.episodeNumber, 0),
+            episodeName: realityTvString_(item.episodeName || (core.season.periodLabel + " " + item.episodeNumber))
+          };
+        }),
+        message: "That episode is not eligible for comparison."
+      };
+    }
+    if (episode.resultsHidden === true) {
+      return {
+        enabled: true,
+        available: false,
+        hiddenBySpoiler: true,
+        episodeId: episode.episodeId,
+        eligibleEpisodes: eligibleEpisodes.map(function(item) {
+          return {
+            episodeId: realityTvString_(item.episodeId),
+            episodeNumber: realityTvNumber_(item.episodeNumber, 0),
+            episodeName: realityTvString_(item.episodeName || (core.season.periodLabel + " " + item.episodeNumber))
+          };
+        }),
+        message: "Episode results are hidden by Spoiler Shield until you mark it watched."
+      };
+    }
+  } else {
+    episode = eligibleEpisodes[0] || null;
   }
   if (!episode) {
+    const hiddenLocked = lockedEpisodes[0] || null;
     return {
       enabled: true,
       available: false,
-      message: "Group picks become visible after an episode locks."
+      hiddenBySpoiler: !!(hiddenLocked && hiddenLocked.resultsHidden === true),
+      episodeId: hiddenLocked ? realityTvString_(hiddenLocked.episodeId) : "",
+      eligibleEpisodes: [],
+      message: hiddenLocked && hiddenLocked.resultsHidden === true
+        ? "Episode results are hidden by Spoiler Shield until you mark it watched."
+        : "Group picks become visible after an episode locks."
     };
   }
 
-  const cacheKey = "rtv_episode_compare_" + realityTvSlug_(gameId) + "_" + realityTvNumber_(episode.episodeNumber, 0);
+  const eligibleEpisodeOptions = eligibleEpisodes.map(function(item) {
+    return {
+      episodeId: realityTvString_(item.episodeId),
+      episodeNumber: realityTvNumber_(item.episodeNumber, 0),
+      episodeName: realityTvString_(item.episodeName || (core.season.periodLabel + " " + item.episodeNumber))
+    };
+  });
+
+  const cacheKey = "rtv_episode_compare_" + realityTvSlug_(gameId) + "_" + realityTvSlug_(episode.episodeId || episode.episodeNumber);
   if (typeof CacheService !== "undefined") {
     try {
       const cached = CacheService.getScriptCache().get(cacheKey);
@@ -3052,6 +3105,7 @@ function realityTvLockedEpisodeComparisonPayload_(gameId, username) {
       episodeName: realityTvString_(episode.episodeName || (core.season.periodLabel + " " + episode.episodeNumber)),
       lockDateTime: episode.lockDateTime || ""
     },
+    eligibleEpisodes: eligibleEpisodeOptions,
     columns: columns,
     rows: rows,
     playerCount: rows.length,
@@ -3081,7 +3135,7 @@ function apiGetRealityTvEpisodeComparison(payload) {
   if (typeof validateUserSession_ === "function") validateUserSession_(username, token);
   return {
     success: true,
-    comparison: realityTvLockedEpisodeComparisonPayload_(gameId, username)
+    comparison: realityTvLockedEpisodeComparisonPayload_(gameId, username, payload.episodeId)
   };
 }
 
