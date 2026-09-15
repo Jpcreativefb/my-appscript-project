@@ -148,6 +148,8 @@ function makePicksContext(hiddenIds) {
     'realityTvCurrentEpisode_',
     'realityTvFinalizedAtText_',
     'realityTvSpoilerBlockMessage_',
+    'realityTvEpisodeResultState_',
+    'realityTvEpisodeEliminatedText_',
     'renderRealityTvSpoilerShield_',
     'renderRealityTvEpisodeSections_'
   ], {
@@ -167,13 +169,11 @@ function makePicksContext(hiddenIds) {
 {
   const hidden = makePicksContext(['ep-1']);
   const top = hidden.ctx.renderRealityTvSpoilerShield_();
-  assert(top.includes('Current Episode'));
-  assert(top.includes('Episode 2'));
-  assert(top.includes('Episode 1 Results Ready'));
-  assert(top.includes('Finalized Aug') || top.includes('Finalized '), 'Results Ready card must show finalized date/time');
-  assert(top.includes('SHOW EPISODE 1 RESULTS'));
-  assert(top.includes('Episode 1 results are ready. Reveal them before making Episode 2 picks.'));
-  assert(top.includes('<details class="reality-spoiler-settings">'), 'global preference must be secondary/collapsed rather than a primary Hide Results control');
+  assert(!top.includes('reality-current-episode-card'), 'duplicate Current Episode card must be removed because the hero already carries episode context');
+  assert(top.includes('Spoiler Shield: ON'));
+  assert(top.includes('Show Episode Results Now'));
+  assert(top.includes('Episode 1 is protected'));
+  assert(top.includes('Future Results: Protected'), 'future spoiler preference must remain available as a secondary control');
   assert(!top.includes('Hide Reality Results'), 'confusing old Hide Reality Results copy must not be primary UI');
 
   const cats = [
@@ -192,7 +192,8 @@ function makePicksContext(hiddenIds) {
     { id: 'q-1' }, { id: 'elim-1' }, { id: 'q-2' }, { id: 'elim-2' }
   ];
   const sections = revealed.ctx.renderRealityTvEpisodeSections_(cats);
-  assert(sections.includes('Current Episode'));
+  assert(sections.includes('Episode 2'));
+  assert(sections.includes('Results Pending'));
   assert(sections.includes('q-2,elim-2'), 'Episode 2 questions become available after reveal');
   assert(sections.includes('<details class="reality-previous-episodes">'), 'revealed Episode 1 must move into Previous Episodes');
   assert(!sections.includes('<details class="reality-previous-episodes" open'), 'Previous Episodes must be collapsed by default');
@@ -211,13 +212,14 @@ assert(refreshSrc.includes('loadStartupPayload(true)'));
 assert(refreshSrc.includes('refreshPicksPage()'));
 assert(refreshSrc.includes('hydratePicksEnhancements_'));
 
-// Owner-approved Reality hierarchy: Current Episode / Results Ready comes first,
-// current episode questions get primary visual priority, then the season-long
-// Sole Survivor feature, with secondary Reality summary/standings below.
+// Owner-approved Reality hierarchy: Hero -> Spoiler Shield -> Sole Survivor ->
+// current questions -> Your Season/standings -> Compare -> Previous Episodes.
 const pageSrc = functionSource(picks, 'renderPicksPage');
-assert(pageSrc.indexOf('realityTvSpoilerShieldMount') < pageSrc.indexOf('picksCategoryList'), 'Current Episode/Results Ready must be above current episode questions');
-assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('seasonAnchorPickMount'), 'current episode questions must be above Sole Survivor');
-assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('realityTvPlayerSummaryMount'), 'current questions/Previous Episodes must be above secondary Reality summary');
+assert(pageSrc.indexOf('realityTvSpoilerShieldMount') < pageSrc.indexOf('picksCategoryList'), 'Spoiler Shield mount must remain directly below the hero in base markup');
+const cleanEnhancer = picks.slice(picks.indexOf('function enhance_()'), picks.indexOf('function queue_()', picks.indexOf('function enhance_()')));
+assert(cleanEnhancer.includes('spoilerMount.insertAdjacentElement("afterend", seasonMount)'), 'Clean layout must move Sole Survivor directly under Spoiler Shield');
+assert(cleanEnhancer.includes('comparisonMount.insertAdjacentElement("afterend", previousEpisodes)'), 'Previous Episodes must move below common Compare');
+assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('realityTvPlayerSummaryMount'), 'current questions must remain above Your Season/standings');
 
 // ---------------------------------------------------------------------------
 // 4) Settlement response boundary: browser queues once; Episode N settlement

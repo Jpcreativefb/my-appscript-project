@@ -184,13 +184,12 @@ function makeStorage() {
     maxWeeklyBonus: 1
   };
   const requiredHtml = renderAnchor(Object.assign({}, baseAnchor, { user: null }));
-  assert(requiredHtml.includes('class="season-anchor-card needs-pick" open'), 'required Sole Survivor pick must start expanded');
-  assert(requiredHtml.indexOf('season-anchor-current-episode-primary') < requiredHtml.indexOf('season-anchor-feature-grid'), 'Current Episode must precede main pick/status content');
+  assert(requiredHtml.includes('reality-sole-survivor-card needs-pick') && requiredHtml.includes(' open>'), 'required Sole Survivor pick must start expanded');
+  assert(requiredHtml.indexOf('reality-sole-survivor-banner') < requiredHtml.indexOf('reality-sole-survivor-grid'), 'Sole Survivor status header must span above the two-column content');
   assert(requiredHtml.includes('Current streak'));
   assert(requiredHtml.includes('Current bonus / multiplier'));
-  assert(requiredHtml.includes('>Penalty<'));
-  assert(requiredHtml.includes('More Stats / Details'));
-  assert(requiredHtml.indexOf('More Stats / Details') < requiredHtml.indexOf('Longest streak'), 'secondary stats must live under More Stats');
+  assert(requiredHtml.includes('More Stats'));
+  assert(functionSource(picks, 'showSeasonAnchorStatsModal_').includes('Current penalty'), 'secondary stats must move into the More Stats modal');
 
   const finalizedAnchor = Object.assign({}, baseAnchor, {
     canChoose: false,
@@ -198,10 +197,10 @@ function makeStorage() {
     currentEntity: baseAnchor.entities[0]
   });
   const finalizedHtml = renderAnchor(finalizedAnchor);
-  assert(finalizedHtml.includes('class="season-anchor-card active" >') || finalizedHtml.includes('class="season-anchor-card active"'), 'finalized card should render without forced-open attribute');
-  assert(!finalizedHtml.includes('class="season-anchor-card active" open'));
-  assert.strictEqual((finalizedHtml.match(/Finalized Pick: Chef A/g) || []).length, 1, 'finalized copy must be condensed to one headline');
-  assert.strictEqual((finalizedHtml.match(/You cannot choose again unless this contestant is eliminated\./g) || []).length, 1, 'finalized explanation must appear once');
+  assert(finalizedHtml.includes('reality-sole-survivor-card active') && finalizedHtml.includes(' open>'), 'finalized Sole Survivor card should also start expanded');
+  assert(finalizedHtml.includes('Sole Survivor · Chef A'), 'sticky Sole Survivor header must include the selected contestant');
+  assert.strictEqual((finalizedHtml.match(/Finalized Pick: Chef A/g) || []).length, 1, 'finalized pick headline must appear once across the two-column card');
+  assert.strictEqual((finalizedHtml.match(/Your selection carries forward until this contestant is eliminated\./g) || []).length, 1, 'finalized carry-forward explanation must appear once');
 
   // Deferred payload still uses the loading state and eliminated currentEntity
   // can still render even if no longer present in active entities.
