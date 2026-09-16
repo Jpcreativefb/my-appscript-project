@@ -54,8 +54,12 @@ assert(reality.includes('buildUserPicksMap_(gameId)'));
 assert(api.includes('getRealityTvEpisodeComparison'));
 assert(frontendApi.includes('function apiGetRealityTvEpisodeComparison'));
 assert(picks.includes('renderRealityTvEpisodeComparison_'));
-assert(picks.includes('Compare everyone’s finalized Sole Survivor pick and weekly answers.'));
-assert(styles.includes('.reality-tv-comparison-grid'));
+assert(picks.includes('Standings &amp; Compare'));
+assert(picks.includes('reality-compare-matrix'));
+assert(picks.includes('reality-compare-player-column-head'));
+assert(picks.includes('Locked &amp; revealed episodes only'));
+assert(picksCss.includes('.reality-standings-compare-shell'));
+assert(picksCss.includes('.reality-compare-matrix'));
 
 // Extra-question verification checks the actual local rows and answers.
 assert(questionPack.includes('function realityTvQuestionPackMissingTemplateIndex_'));

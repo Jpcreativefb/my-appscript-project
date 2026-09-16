@@ -53,87 +53,64 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
 const esc = value => String(value == null ? '' : value);
 
 // ---------------------------------------------------------------------------
-// 1) Spoiler Shield is a compact two-line action and preserves the reveal API.
+// 1) Spoiler Shield is a compact current-result action with separate future preference.
 // ---------------------------------------------------------------------------
 {
-  const on = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
+  const hidden = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
     PICKS_PAGE_DATA: { realityTvView: { enabled: true, spoilerShield: { enabled: true } } },
     realityTvBlockingHiddenEpisode_: () => ({ episodeId: 'ep-2', episodeNumber: 2 }),
     escapeJs: esc,
     escapeHtml: esc
   }).renderRealityTvSpoilerShield_();
-  assert(on.includes('Spoiler Shield: ON'));
-  assert(on.includes('Show Episode Results Now'));
-  assert(on.includes("revealRealityTvEpisode_('ep-2')"), 'ON action must use existing reveal logic');
-  assert(!on.includes('Episode 2 is protected'), 'Shield must remain a compact two-line main control');
+  assert(hidden.includes('Results Hidden'));
+  assert(hidden.includes('Reveal Results'));
+  assert(hidden.includes('Future results: Protected'));
+  assert(hidden.includes('role="button"') && hidden.includes('activateRealityTvSpoilerShield_'), 'hidden current results must make the whole Shield row actionable');
+  assert(functionSource(picks, 'activateRealityTvSpoilerShield_').includes('revealRealityTvEpisode_'), 'whole-row action must route through existing reveal logic');
 
-  const off = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
+  const revealed = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
     PICKS_PAGE_DATA: { realityTvView: { enabled: true, spoilerShield: { enabled: true } } },
     realityTvBlockingHiddenEpisode_: () => null,
     escapeJs: esc,
     escapeHtml: esc
   }).renderRealityTvSpoilerShield_();
-  assert(off.includes('Spoiler Shield: OFF'));
-  assert(off.includes('Episode Results Revealed'));
-  assert(/reality-spoiler-main-button" disabled/.test(off), 'revealed state must be informative, not another reveal action');
+  assert(revealed.includes('Results Revealed'));
+  assert(revealed.includes('Episode results are visible'));
+  assert(revealed.includes('role="group"') && revealed.includes('aria-disabled="true"'), 'revealed state must be informative, not fake a reversible current-result toggle');
 
   const reveal = functionSource(picks, 'revealRealityTvEpisode_');
   assert(reveal.includes('apiRevealRealityTvEpisode'), 'existing reveal API must remain authoritative');
   assert(reveal.includes('refreshRealityTvAfterSpoilerChange_'));
+  const pref = functionSource(picks, 'saveRealityTvSpoilerPreference_');
+  assert(pref.includes('Saving future-results preference'));
 }
 
 // ---------------------------------------------------------------------------
-// 2) Sole Survivor uses actual runtime scroll state, not CSS-only sticky.
+// 2) Sole Survivor is a normal collapsible section; old sticky runtime only cleans up.
 // ---------------------------------------------------------------------------
 {
-  const classes = new Set();
-  const props = {};
-  const classList = {
-    add: name => classes.add(name),
-    remove: name => classes.delete(name),
-    toggle: (name, on) => { if (on) classes.add(name); else classes.delete(name); }
-  };
-  let bodyBottom = 20;
-  const style = {
-    setProperty: (k, v) => { props[k] = v; },
-    removeProperty: k => { delete props[k]; }
-  };
-  const header = { style };
-  const body = { getBoundingClientRect: () => ({ bottom: bodyBottom }) };
-  const card = {
-    open: true,
-    classList,
-    querySelector: selector => selector.includes('sticky-header') ? header : selector.includes('card-body') ? body : null,
-    getBoundingClientRect: () => ({ top: -200, left: 80, width: 640 })
-  };
-  const ctx = runFunctions(picks, ['updateRealityTvSoleSurvivorSticky_'], {
-    document: { querySelector: () => card }
-  });
-  ctx.updateRealityTvSoleSurvivorSticky_();
-  assert(classes.has('is-scroll-compact'), 'scrolling beyond the expanded body must enable compact sticky state');
-  assert.strictEqual(props['--reality-sticky-left'], '80px');
-  assert.strictEqual(props['--reality-sticky-width'], '640px');
+  const anchor = functionSource(picks, 'renderSeasonAnchorPickCard_');
+  assert(anchor.includes('<details class="season-anchor-card reality-sole-survivor-card'));
+  assert(anchor.includes('reality-sole-survivor-heading-line'));
+  assert(anchor.includes('season-anchor-status'));
+  assert(anchor.includes('open>'), 'Sole Survivor should start expanded but remain a normal details control');
 
-  bodyBottom = 500;
-  ctx.updateRealityTvSoleSurvivorSticky_();
-  assert(!classes.has('is-scroll-compact'), 'scrolling back to the expanded body must restore expanded state');
-  assert(!('--reality-sticky-left' in props));
-
+  const update = functionSource(picks, 'updateRealityTvSoleSurvivorSticky_');
+  assert(update.includes('classList.remove("is-scroll-compact")'));
+  assert(!update.includes('getBoundingClientRect'), 'R4 must abandon scroll geometry transitions');
   const mount = functionSource(picks, 'mountRealityTvSoleSurvivorSticky_');
-  assert(mount.includes('addEventListener("scroll"'));
-  assert(mount.includes('addEventListener("resize"'));
-  assert(mount.includes('addEventListener("toggle"'), 'details open/close must also refresh sticky runtime state');
-  assert(mount.includes('view.enabled !== true') && mount.includes('removeEventListener("scroll"'), 'sticky runtime must be gated to Reality and unbind outside it');
+  assert(mount.includes('removeEventListener("scroll"'));
+  assert(mount.includes('removeEventListener("resize"'));
+  assert(!mount.includes('addEventListener("scroll"'));
+  assert(!mount.includes('addEventListener("resize"'));
   assert(picksCss.includes('.reality-sole-survivor-card.is-scroll-compact .reality-sole-survivor-sticky-header'));
-  assert(picks.includes('Sole Survivor · ${escapeHtml(selectedName)}'));
 }
 
 // More Stats and contestant detail hierarchy stays intentionally secondary/dense.
-assert(picksCss.includes('.reality-sole-survivor-more-button { width:auto'));
-assert(picksCss.includes('min-height:26px'));
-assert(picksCss.includes('background:transparent!important'));
-assert(picksCss.includes('.reality-sole-survivor-bio-copy { max-height:150px;overflow-y:auto'));
-assert(picksCss.includes('.reality-profile-panel') && picksCss.includes('max-height:122px'));
+assert(picksCss.includes('.reality-sole-survivor-actions'));
+assert(picksCss.includes('reality-sole-survivor-more-button'));
+assert(picks.includes('showRealityTvContestantDetailModal_'));
+assert(picksCss.includes('.reality-contestant-modal-body'));
 
 // ---------------------------------------------------------------------------
 // 3) Historical episode renderer is data-deduped and keeps pick/result details.
@@ -152,11 +129,11 @@ assert(picksCss.includes('.reality-profile-panel') && picksCss.includes('max-hei
   };
   const categories = [
     { id: 'q3', question: 'Current question', nominees: [{ id: 'now', name: 'Now' }] },
-    { id: 'q2', question: 'Who won reward?', nominees: [{ id: 'cara', name: 'Cara' }], winnerNomineeIds: ['cara'] },
-    { id: 'q1', question: 'Who was eliminated?', questionType: 'elimination', nominees: [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }], winnerNomineeIds: ['bob'] }
+    { id: 'q2', question: 'Who won reward?', points: 10, nominees: [{ id: 'cara', name: 'Cara' }], winnerNomineeIds: ['cara'] },
+    { id: 'q1', question: 'Who was eliminated?', questionType: 'elimination', points: 1, nominees: [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }], winnerNomineeIds: ['bob'] }
   ];
-  const data = { realityTvView: view, categories, picks: { q1: 'alice', q2: 'cara', q3: 'now' } };
-  const ctx = runFunctions(picks, ['realityTvHistoricalPickDetailsHtml_', 'renderRealityTvEpisodeSections_'], {
+  const data = { realityTvView: view, categories, picks: { q1: 'alice', q2: 'cara', q3: 'now' }, changeCounts: {}, confidencePoints: {}, confidenceScoringMode: 'win_only', game: {}, seasonAnchor: { user: { currentEntityName: 'Charlie', streak: 3, currentMultiplier: 1.15 }, stats: { recent: [{ bonus: 1.1 }] }, settings: { StartMultiplier: 1 } } };
+  const ctx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvFormatPoints_', 'formatSeasonAnchorMultiplier_', 'realityTvHistoricalPointsAwarded_', 'realityTvHistoricalPickDetailsHtml_', 'renderRealityTvEpisodeSections_'], {
     PICKS_PAGE_DATA: data,
     normalizeId,
     escapeHtml: esc,
@@ -184,6 +161,10 @@ assert(picksCss.includes('.reality-profile-panel') && picksCss.includes('max-hei
   assert(html.includes('<span>Eliminated</span><strong>Bob</strong>'));
   assert(html.includes('<span>Your pick</span><strong>Cara</strong>'));
   assert(html.includes('<span>Result</span><strong>Cara</strong>'));
+  assert(html.includes('Current Sole Survivor') && html.includes('<strong>Charlie</strong>'));
+  assert(html.includes('Streak 3') && html.includes('Bonus +1.1 pts · 1.15x'));
+  assert(html.includes('Points +10 pts'), 'correct historical question should show points awarded');
+  assert(html.includes('Points 0 pts'), 'wrong historical question should show zero points awarded');
   assert(!html.includes('reality-profile-bio'), 'historical episode answers must not repeat contestant biographies');
 }
 
@@ -276,11 +257,15 @@ assert(backendApi.includes('episodeId: params.episodeId'));
 assert(functionSource(reality, 'apiGetRealityTvEpisodeComparison').includes('payload.episodeId'));
 
 const compareRender = functionSource(picks, 'renderRealityTvEpisodeComparison_');
-assert(compareRender.includes('compare-picks-content'));
+assert(compareRender.includes('reality-standings-compare-shell'));
+assert(compareRender.includes('Standings &amp; Compare'));
+assert(compareRender.includes('reality-standings-compare-tabs'));
 assert(compareRender.includes('compare-filter-bar compact'));
-assert(compareRender.includes('compare-picks-list'));
-assert(compareRender.includes('renderCompareProfile_'));
+assert(compareRender.includes('reality-compare-matrix'));
+assert(compareRender.includes('reality-compare-player-column-head'));
+assert(compareRender.includes('reality-compare-pick-cell'));
 assert(compareRender.includes('reality-compare-episode-picker'));
+assert(!compareRender.includes('<details class="card reality-standings-compare-shell" open'), 'combined shell must default collapsed');
 assert(!compareRender.includes('reality-tv-comparison-grid'), 'old Reality-only compare table must not be emitted');
 assert(!compareRender.includes('Visible After Lock'), 'old Reality-only comparison label must be gone');
 assert(functionSource(picks, 'selectRealityTvComparisonEpisode_').includes('apiGetRealityTvEpisodeComparison(PICKS_PAGE_DATA.gameId, episodeId)'));
@@ -289,17 +274,20 @@ assert(functionSource(picks, 'selectRealityTvComparisonEpisode_').includes('apiG
 // 5) Common standings, vote detail, mobile, and no scope leakage.
 // ---------------------------------------------------------------------------
 const summary = functionSource(picks, 'renderRealityTvPlayerSummary_');
-assert(summary.includes('reality-common-standings'));
-assert(summary.includes('<summary>Standings</summary>'));
-assert(summary.includes(' open>'), 'Standings must remain default-open');
-assert(functionSource(picks, 'realityTvCommonStandingsHtml_').includes('leaderboard-card'));
+assert(summary.includes('Your Season'));
+assert(summary.includes('<span>PTS</span>'));
+assert(summary.includes('<span>Multiplier</span>'));
+assert(!summary.includes('<summary>Standings</summary>'), 'Standings must no longer live inside Your Season');
+assert(functionSource(picks, 'realityTvCommonStandingsHtml_').includes('reality-common-standings-table'));
+assert(functionSource(picks, 'realityTvCommonStandingsHtml_').includes('<th>Rank</th><th>User</th><th>Total Pts</th><th>Pts Behind</th><th>Streak</th><th>Multiplier Bonus</th><th>Sole Survivor</th>'));
+assert(compareRender.includes('realityTvCommonStandingsHtml_'));
 
 const vote = functionSource(picks, 'realityTvEpisodeVoteDetailsHtml_');
 assert(vote.includes('<th>Voter</th><th>Voted for</th><th>Round</th><th>Status</th><th>Value</th>'));
 
-assert(picksCss.includes('@media(max-width:520px)'));
-assert(picksCss.includes('.reality-clean-enhanced .reality-compare-player-row { grid-template-columns:1fr; }'));
-assert(picksCss.includes('.reality-clean-enhanced .reality-sole-survivor-grid { grid-template-columns:1fr; }'));
+assert(picksCss.includes('@media(max-width:760px)'));
+assert(picksCss.includes('.reality-player-page.reality-clean-enhanced .reality-sole-survivor-grid{grid-template-columns:minmax(126px,.76fr) minmax(0,1.24fr)!important'));
+assert(picksCss.includes('.reality-player-page.reality-clean-enhanced .reality-compare-matrix{grid-template-columns:minmax(82px,.7fr) repeat(var(--reality-compare-players),minmax(104px,1fr))'));
 assert(picksCss.includes('overflow-wrap:anywhere'));
 
 // Narrow backend exception only: no scoring/storage/season-builder code is introduced here.

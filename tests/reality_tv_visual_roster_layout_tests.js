@@ -27,8 +27,11 @@ assert(admin.includes('apiAdminSaveRealityTvGroups'), 'Group manager save call m
 assert(picks.includes('renderRealityTvEpisodeSections_'), 'Episode collapsible sections missing');
 assert(picks.includes('realityTvProfileDetailsHtml_'), 'Expandable bio renderer missing');
 assert(picks.includes('YOUR PICK'), 'User pick highlight missing');
-assert(picks.includes('ELIMINATED'), 'Eliminated overlay missing');
-assert(picks.includes('Pinned season feature'), 'Season Survivor is not pinned visually');
+assert(picks.includes('Eliminated ·'), 'Compact eliminated status treatment missing');
+assert(picks.includes('<details class="season-anchor-card reality-sole-survivor-card'), 'Sole Survivor normal collapsible section missing');
+assert(!picks.includes('Pinned season feature'), 'R4 must not restore the old pinned/sticky Sole Survivor treatment');
+assert(picks.includes('reality-clean-cast-rail'), 'Season Cast horizontal rail missing');
+assert(picks.includes('data-reality-latest-eliminated="true"'), 'Latest eliminated cast centering marker missing');
 assert(anchor.includes('seasonAnchorUserHistorySummary_'), 'Detailed Survivor stats missing');
 assert(css.includes('.reality-episode-picks-section'), 'Episode section CSS missing');
 assert(css.includes('filter:grayscale(1)') || css.includes('filter: grayscale(1)'), 'Eliminated grayscale CSS missing');

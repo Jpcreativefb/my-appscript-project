@@ -139,6 +139,11 @@ function makePicksContext(hiddenIds) {
       ]
     },
     picks: {},
+    changeCounts: {},
+    confidencePoints: {},
+    confidenceScoringMode: 'win_only',
+    game: {},
+    seasonAnchor: {},
     categories: []
   };
   let cards = 0;
@@ -151,6 +156,10 @@ function makePicksContext(hiddenIds) {
     'realityTvEpisodeResultState_',
     'realityTvEpisodeEliminatedText_',
     'renderRealityTvSpoilerShield_',
+    'normalizePicksScoreMode_',
+    'realityTvFormatPoints_',
+    'formatSeasonAnchorMultiplier_',
+    'realityTvHistoricalPointsAwarded_',
     'realityTvHistoricalPickDetailsHtml_',
     'renderRealityTvEpisodeSections_'
   ], {
@@ -179,10 +188,10 @@ function makePicksContext(hiddenIds) {
   const hidden = makePicksContext(['ep-1']);
   const top = hidden.ctx.renderRealityTvSpoilerShield_();
   assert(!top.includes('reality-current-episode-card'), 'duplicate Current Episode card must be removed because the hero already carries episode context');
-  assert(top.includes('Spoiler Shield: ON'));
-  assert(top.includes('Show Episode Results Now'));
-  assert(!top.includes('Episode 1 is protected'), 'compact Spoiler Shield must remain a two-line action control');
-  assert(top.includes('Future Results: Protected'), 'future spoiler preference must remain available as a secondary control');
+  assert(top.includes('Results Hidden'));
+  assert(top.includes('Reveal Results'));
+  assert(!top.includes('Episode 1 is protected'), 'compact Spoiler Shield must not grow into an episode-status card');
+  assert(top.includes('Future results: Protected'), 'future spoiler preference must remain available as a distinct secondary control');
   assert(!top.includes('Hide Reality Results'), 'confusing old Hide Reality Results copy must not be primary UI');
 
   const cats = [
@@ -228,14 +237,15 @@ assert(refreshSrc.includes('loadStartupPayload(true)'));
 assert(refreshSrc.includes('refreshPicksPage()'));
 assert(refreshSrc.includes('hydratePicksEnhancements_'));
 
-// Owner-approved Reality hierarchy: Hero -> Spoiler Shield -> Sole Survivor ->
-// current questions -> Your Season/standings -> Compare -> Previous Episodes.
+// R3 Reality hierarchy: Hero -> Spoiler Shield -> Sole Survivor ->
+// Current Episode -> Previous Episodes -> Season Cast -> Your Season -> Standings & Compare -> Rules / How to Play.
 const pageSrc = functionSource(picks, 'renderPicksPage');
 assert(pageSrc.indexOf('realityTvSpoilerShieldMount') < pageSrc.indexOf('picksCategoryList'), 'Spoiler Shield mount must remain directly below the hero in base markup');
 const cleanEnhancer = picks.slice(picks.indexOf('function enhance_()'), picks.indexOf('function queue_()', picks.indexOf('function enhance_()')));
 assert(cleanEnhancer.includes('spoilerMount.insertAdjacentElement("afterend", seasonMount)'), 'Clean layout must move Sole Survivor directly under Spoiler Shield');
-assert(cleanEnhancer.includes('comparisonMount.insertAdjacentElement("afterend", previousEpisodes)'), 'Previous Episodes must move below common Compare');
-assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('realityTvPlayerSummaryMount'), 'current questions must remain above Your Season/standings');
+assert(cleanEnhancer.includes('categoryList.insertAdjacentHTML("afterend", html)'), 'Season Cast must mount after Current/Previous episode content');
+assert(!cleanEnhancer.includes('comparisonMount.insertAdjacentElement("afterend", previousEpisodes)'), 'R3 keeps Previous Episodes immediately after Current Episode instead of moving them below Compare');
+assert(pageSrc.indexOf('picksCategoryList') < pageSrc.indexOf('realityTvPlayerSummaryMount'), 'Current/Previous episode content must remain above Your Season');
 
 // ---------------------------------------------------------------------------
 // 4) Settlement response boundary: browser queues once; Episode N settlement

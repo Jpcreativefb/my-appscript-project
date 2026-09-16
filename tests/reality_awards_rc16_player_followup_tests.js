@@ -187,7 +187,8 @@ function makeStorage() {
   assert(requiredHtml.includes('reality-sole-survivor-card needs-pick') && requiredHtml.includes(' open>'), 'required Sole Survivor pick must start expanded');
   assert(requiredHtml.indexOf('reality-sole-survivor-banner') < requiredHtml.indexOf('reality-sole-survivor-grid'), 'Sole Survivor status header must span above the two-column content');
   assert(requiredHtml.includes('Current streak'));
-  assert(requiredHtml.includes('Current bonus / multiplier'));
+  assert(requiredHtml.includes('Current bonus'), 'R4 Sole Survivor should show the compact Current bonus label');
+  assert(requiredHtml.includes('Multiplier'), 'R4 Sole Survivor should show Multiplier as its own compact label');
   assert(requiredHtml.includes('More Stats'));
   assert(functionSource(picks, 'showSeasonAnchorStatsModal_').includes('Current penalty'), 'secondary stats must move into the More Stats modal');
 
