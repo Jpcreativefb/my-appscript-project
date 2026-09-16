@@ -312,6 +312,28 @@ function seasonAnchorRealityEntities_(season, activeOnly) {
   });
 }
 
+function seasonAnchorHistoryViewRow_(row, entityById) {
+  row = row || {};
+  const entityId = seasonAnchorString_(row.EntityId);
+  const entity = entityById && entityById[seasonAnchorKey_(entityId)] || {};
+  const outcome = seasonAnchorString_(row.Outcome);
+  return {
+    episodeId: seasonAnchorString_(row.EpisodeId),
+    episodeNumber: seasonAnchorNumber_(row.EpisodeNumber, 0),
+    entityId: entityId,
+    entityName: seasonAnchorString_(row.EntityName || entity.name || entity.Name),
+    entityImageUrl: seasonAnchorString_(entity.authoritativeImageUrl || entity.imageUrl || entity.ImageUrl),
+    entityStatus: outcome || seasonAnchorString_(entity.status || entity.Status),
+    teamOrTribe: seasonAnchorString_(entity.teamOrTribe || entity.CurrentGroup || entity.TeamOrTribe),
+    outcome: outcome,
+    streak: seasonAnchorNumber_(row.StreakAfter, 0),
+    multiplier: seasonAnchorNumber_(row.MultiplierApplied, 1),
+    bonus: seasonAnchorNumber_(row.BonusPoints, 0),
+    penalty: seasonAnchorNumber_(row.PenaltyPoints, 0),
+    net: seasonAnchorNumber_(row.NetAdjustment, 0)
+  };
+}
+
 function seasonAnchorUserHistorySummary_(gameId, username) {
   const rows = seasonAnchorReadObjects_(SEASON_ANCHOR_HISTORY_SHEET).filter(function(row) {
     return seasonAnchorKey_(row.GameId) === seasonAnchorKey_(gameId) && seasonAnchorKey_(row.Username) === seasonAnchorKey_(username);
@@ -337,7 +359,10 @@ function seasonAnchorUserHistorySummary_(gameId, username) {
         outcome: seasonAnchorString_(row.Outcome), multiplier: seasonAnchorNumber_(row.MultiplierApplied, 1),
         bonus: seasonAnchorNumber_(row.BonusPoints, 0), penalty: seasonAnchorNumber_(row.PenaltyPoints, 0), net: seasonAnchorNumber_(row.NetAdjustment, 0)
       };
-    })
+    }),
+    // Full settled history is display-only support for historical Reality episode UI.
+    // Existing scoring/storage rows are unchanged.
+    history: rows.map(seasonAnchorHistoryViewRow_)
   };
 }
 
@@ -363,6 +388,25 @@ function seasonAnchorUserPayload_(username, gameId) {
   }) || null;
 
   const allEntities = Array.isArray(view.participants) ? view.participants : [];
+  // Spoiler Shield intentionally suppresses the current authoritative roster.
+  // Historical Sole Survivor rows still need the player's own prior portrait,
+  // so resolve image/name metadata server-side without returning the current roster.
+  const historyEntityRows = allEntities.length ? allEntities :
+    (typeof realityTvContestantsForSeason_ === "function"
+      ? realityTvContestantsForSeason_(view.season.seasonId).map(function(row) {
+          return {
+            id: seasonAnchorString_(row.ContestantId),
+            name: seasonAnchorString_(row.Name),
+            imageUrl: seasonAnchorString_(row.ImageUrl),
+            teamOrTribe: seasonAnchorString_(row.CurrentGroup || row.TeamOrTribe)
+          };
+        })
+      : []);
+  const historyEntityById = {};
+  historyEntityRows.forEach(function(item) {
+    const key = seasonAnchorKey_(item && (item.id || item.ContestantId));
+    if (key) historyEntityById[key] = item;
+  });
   const entities = allEntities.filter(function(row) {
     return row.active === true && seasonAnchorKey_(row.status || "active") === "active";
   });
@@ -404,7 +448,9 @@ function seasonAnchorUserPayload_(username, gameId) {
         penalty: seasonAnchorNumber_(row.PenaltyPoints, 0),
         net: seasonAnchorNumber_(row.NetAdjustment, 0)
       };
-    })
+    }),
+    // Full settled history is display-only support for the Previous Episodes panel.
+    history: historyRows.map(function(row) { return seasonAnchorHistoryViewRow_(row, historyEntityById); })
   };
 
   const now = new Date();
@@ -464,12 +510,22 @@ function apiGetSeasonAnchor(payload) {
     ? realityTvSpoilerStateForGame_(username, gameId)
     : { hasHiddenResults: false };
   if (view && view.enabled === true && spoiler && spoiler.hasHiddenResults === true) {
+    const blockingEpisodeNumber = seasonAnchorNumber_(spoiler.blockingEpisodeNumber, 0);
+    const safeHistory = view.stats && Array.isArray(view.stats.history)
+      ? view.stats.history.filter(function(row) {
+          const episodeNumber = seasonAnchorNumber_(row && row.episodeNumber, 0);
+          return episodeNumber > 0 && (!blockingEpisodeNumber || episodeNumber < blockingEpisodeNumber);
+        })
+      : [];
     return {
       success: true,
       seasonAnchor: {
         enabled: true,
         hiddenBySpoiler: true,
         spoilerShield: spoiler,
+        // Earlier already-revealed history is safe to render in Previous Episodes.
+        // The blocking episode and anything after it remain excluded.
+        stats: { history: safeHistory },
         message: "Sole Survivor status is hidden until you reveal the settled episode."
       }
     };

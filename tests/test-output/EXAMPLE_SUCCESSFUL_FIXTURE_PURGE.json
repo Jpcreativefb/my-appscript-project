@@ -466,7 +466,7 @@
     "intentionalAuditReferenceExcluded": true
   },
   "auditRecord": {
-    "Timestamp": "2026-09-05T05:12:15.786Z",
+    "Timestamp": "2026-09-16T07:09:47.434Z",
     "Action": "PURGE",
     "GameId": "fixture-purge-2026",
     "GameName": "Fixture Purge Game",
@@ -478,6 +478,6 @@
     "FinalResult": "SUCCESS",
     "RemainingReferenceCount": 0,
     "ErrorMessage": "",
-    "Version": "rc24b-dryrun-v1"
+    "Version": "rc24c-production-v1"
   }
 }

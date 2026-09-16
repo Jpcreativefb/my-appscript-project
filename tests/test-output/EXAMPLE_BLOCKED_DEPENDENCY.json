@@ -1,7 +1,7 @@
 {
   "success": false,
   "readOnly": true,
-  "version": "rc24b-dryrun-v1",
+  "version": "rc24c-production-v1",
   "requestedGameId": "fixture-purge-2026",
   "gameId": "fixture-purge-2026",
   "game": {
@@ -1057,9 +1057,9 @@
     }
   ],
   "canProceedToPermanentDelete": false,
-  "productionPurgeEnabled": false,
+  "productionPurgeEnabled": true,
   "auditRecordPreview": {
-    "Timestamp": "2026-09-05T05:12:15.771Z",
+    "Timestamp": "2026-09-16T07:09:47.419Z",
     "Action": "DRY_RUN",
     "GameId": "fixture-purge-2026",
     "GameName": "Fixture Purge Game",
@@ -1071,7 +1071,7 @@
     "FinalResult": "BLOCKED",
     "RemainingReferenceCount": "",
     "ErrorMessage": "",
-    "Version": "rc24b-dryrun-v1"
+    "Version": "rc24c-production-v1"
   },
   "counts": {
     "MAIN:ExternalResultsHubOutbox": 1,

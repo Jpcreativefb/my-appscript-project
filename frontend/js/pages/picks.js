@@ -62,6 +62,8 @@ let PICKS_REALITY_SOLE_STICKY_FRAME = null;
 let PICKS_REALITY_SOLE_STICKY_CARD = null;
 let PICKS_REALITY_COMPARE_IN_FLIGHT = false;
 let PICKS_REALITY_STANDINGS_COMPARE_TAB = "standings";
+let PICKS_REALITY_COMPARE_USER_KEYS = [];
+let PICKS_REALITY_COMPARE_USERS_INITIALIZED = false;
 let PICKS_STANDARD_AUTOSAVE_TIMER = null;
 let PICKS_STANDARD_AUTOSAVE_IN_FLIGHT = false;
 const PICKS_STANDARD_AUTOSAVE_QUEUE = {};
@@ -265,6 +267,8 @@ function applyFreshPicksStartupPayload_(payload) {
   PICKS_PAGE_DATA.realityTvView = payload.realityTvView || null;
   PICKS_PAGE_DATA.seasonAnchor = payload.seasonAnchor || null;
   PICKS_PAGE_DATA.episodeComparison = null;
+  PICKS_REALITY_COMPARE_USER_KEYS = [];
+  PICKS_REALITY_COMPARE_USERS_INITIALIZED = false;
 }
 
 async function refreshRealityTvAfterSpoilerChange_() {
@@ -442,29 +446,129 @@ function closeRealityTvContestantDetailModal_() {
   if (modal && modal.parentNode) modal.parentNode.removeChild(modal);
 }
 
+function realityTvMergeContestantProfiles_() {
+  const merged = {};
+  Array.prototype.slice.call(arguments).forEach(function(source) {
+    if (!source || typeof source !== "object") return;
+    Object.keys(source).forEach(function(key) {
+      const value = source[key];
+      if (value === undefined || value === null || value === "") return;
+      merged[key] = value;
+    });
+  });
+  return merged;
+}
+
 function realityTvContestantProfileById_(entityId) {
   const id = normalizeId(entityId);
   if (!id) return null;
   const anchorProfile = seasonAnchorEntityById_(entityId);
-  if (anchorProfile) return anchorProfile;
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const direct = []
+    .concat(Array.isArray(view.cast) ? view.cast : [])
+    .concat(Array.isArray(view.contestants) ? view.contestants : [])
+    .concat(Array.isArray(view.participants) ? view.participants : []);
+  const directMatches = direct.filter(function(item) {
+    if (!item) return false;
+    return [item.id, item.nomineeId, item.NomineeId, item.name, item.displayName, item.fullName]
+      .some(function(candidate) { return normalizeId(candidate) === id; });
+  });
+  let categoryMatch = null;
+  (PICKS_PAGE_DATA.categories || []).some(function(category) {
+    const nominee = (category.nominees || []).find(function(item) {
+      return normalizeId(item && (item.id || item.nomineeId || item.NomineeId || item.name || item.displayName)) === id;
+    });
+    if (!nominee) return false;
+    const meta = realityTvNomineeMeta_(nominee, category) || {};
+    categoryMatch = Object.assign({}, nominee, meta);
+    return true;
+  });
+  if (!anchorProfile && !directMatches.length && !categoryMatch) return null;
+  // Merge every matching Reality record instead of accepting the first sparse
+  // duplicate. participants is ordered last above and therefore supplies the
+  // authoritative runtime portrait; Season Anchor remains final for status.
+  return realityTvMergeContestantProfiles_.apply(null, [categoryMatch].concat(directMatches, [anchorProfile]));
+}
+
+function realityTvContestantProfileByValue_(value) {
+  const direct = realityTvContestantProfileById_(value);
+  if (direct) return direct;
+  const key = normalizeId(value);
+  if (!key) return null;
+  const anchor = PICKS_PAGE_DATA.seasonAnchor || {};
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const pool = []
+    .concat(Array.isArray(anchor.entities) ? anchor.entities : [])
     .concat(Array.isArray(view.participants) ? view.participants : [])
     .concat(Array.isArray(view.cast) ? view.cast : [])
     .concat(Array.isArray(view.contestants) ? view.contestants : []);
-  const directMatch = direct.find(function(item) {
-    return normalizeId(item && (item.id || item.nomineeId || item.NomineeId || item.name || item.displayName)) === id;
+  (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
+    (category.nominees || []).forEach(function(item) { pool.push(item); });
   });
-  if (directMatch) return directMatch;
-  let found = null;
-  (PICKS_PAGE_DATA.categories || []).some(function(category) {
-    const nominee = (category.nominees || []).find(function(item) { return normalizeId(item && item.id) === id; });
-    if (!nominee) return false;
-    const meta = realityTvNomineeMeta_(nominee, category) || {};
-    found = Object.assign({}, nominee, meta);
-    return true;
+  const match = pool.find(function(item) {
+    if (!item) return false;
+    return [item.id, item.nomineeId, item.NomineeId, item.name, item.displayName, item.fullName]
+      .some(function(candidate) { return normalizeId(candidate) === key; });
   });
-  return found;
+  return match ? realityTvContestantProfileById_(match.id || match.nomineeId || match.name || match.displayName) || match : null;
+}
+
+function realityTvBrowserImageUrl_(value) {
+  const source = String(value == null ? "" : value).trim();
+  if (!source) return "";
+
+  // Reality cast imports sometimes carry a Google Drive sharing/view URL rather
+  // than an image endpoint. Normalize those existing authoritative references
+  // for browser rendering without changing the stored contestant value.
+  const driveFile = source.match(/^https?:\/\/drive\.google\.com\/file\/d\/([^/?#]+)/i);
+  if (driveFile && driveFile[1]) {
+    return "https://drive.google.com/thumbnail?id=" + encodeURIComponent(driveFile[1]) + "&sz=w800";
+  }
+  if (/^https?:\/\/drive\.google\.com\/(?:open|uc)(?:\?|$)/i.test(source)) {
+    try {
+      const parsed = new URL(source);
+      const id = parsed.searchParams.get("id");
+      if (id) return "https://drive.google.com/thumbnail?id=" + encodeURIComponent(id) + "&sz=w800";
+    } catch (error) {
+      // Keep the original URL below if URL parsing is unavailable.
+    }
+  }
+  return source;
+}
+
+function realityTvContestantImageUrl_(profile) {
+  profile = profile || {};
+  return realityTvBrowserImageUrl_(
+    profile.authoritativeImageUrl || profile.AuthoritativeImageUrl ||
+    profile.imageUrl || profile.ImageUrl || profile.imageURL || profile.ImageURL ||
+    profile.photoUrl || profile.PhotoUrl || profile.photoURL || profile.PhotoURL ||
+    profile.portraitUrl || profile.PortraitUrl || profile.headshotUrl || profile.HeadshotUrl ||
+    profile.avatarUrl || profile.AvatarUrl || profile.logoUrl || profile.LogoUrl ||
+    profile.image || profile.photo || ""
+  );
+}
+
+function realityTvImageWithFallbackHtml_(imageUrl, name, className, variant, fallbackClass) {
+  const source = realityTvBrowserImageUrl_(imageUrl);
+  const label = String(name || "Contestant");
+  const initials = label.split(/\s+/).map(function(part) { return part.slice(0, 1); }).join("").slice(0, 2).toUpperCase() || "?";
+  const fallback = `<span class="${escapeAttr(fallbackClass || "reality-image-fallback")} reality-image-fallback" aria-hidden="true">${escapeHtml(initials)}</span>`;
+  if (!source || typeof platformImgHtml !== "function") return fallback;
+  return fallback + platformImgHtml(source, {
+    className: className || "reality-contestant-photo",
+    variant: variant || "card",
+    alt: label,
+    critical: true,
+    extraAttrs: `data-reality-source-url="${escapeAttr(source)}" onerror="this.classList.add('reality-image-error')" onload="this.classList.remove('reality-image-error')"`
+  });
+}
+
+function activateRealityTvContestantCard_(event, entityId) {
+  const target = event && event.target;
+  if (target && target.closest && target.closest("button, a, select, input")) return;
+  if (event && event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+  if (event && typeof event.preventDefault === "function") event.preventDefault();
+  showRealityTvContestantDetailModal_(entityId);
 }
 
 function showRealityTvContestantDetailModal_(entityId) {
@@ -472,8 +576,8 @@ function showRealityTvContestantDetailModal_(entityId) {
   if (!profile) return;
   closeRealityTvContestantDetailModal_();
   const name = String(profile.name || profile.displayName || profile.fullName || "Contestant");
-  const team = String(profile.teamOrTribe || profile.currentGroup || profile.startingGroup || "");
-  const image = profile.imageUrl || profile.ImageUrl || profile.photoUrl || profile.image || profile.logoUrl || "";
+  const team = String(profile.teamOrTribe || profile.currentGroup || profile.startingGroup || profile.teamName || profile.groupName || profile.tribe || profile.team || "");
+  const image = realityTvContestantImageUrl_(profile);
   const color = realityTvSafeColor_(profile.teamColor);
   const initials = name.split(/\s+/).map(function(part) { return part.slice(0, 1); }).join("").slice(0, 2).toUpperCase() || "?";
   const wrapper = document.createElement("div");
@@ -734,6 +838,70 @@ async function saveSeasonAnchorPick_() {
 }
 
 
+function realityTvCompareUserKey_(row) {
+  return normalizeId(row && (row.username || row.displayName || row.name));
+}
+
+function realityTvOrdinal_(value) {
+  const n = Math.max(0, Number(value || 0));
+  if (!n) return "—";
+  const mod100 = n % 100;
+  const mod10 = n % 10;
+  if (mod100 >= 11 && mod100 <= 13) return n + "th";
+  if (mod10 === 1) return n + "st";
+  if (mod10 === 2) return n + "nd";
+  if (mod10 === 3) return n + "rd";
+  return n + "th";
+}
+
+function realityTvCompareSelectedRows_(rows, standingsRows) {
+  rows = Array.isArray(rows) ? rows : [];
+  standingsRows = Array.isArray(standingsRows) ? standingsRows : [];
+  const valid = {};
+  rows.forEach(function(row) {
+    const key = realityTvCompareUserKey_(row);
+    if (key) valid[key] = true;
+  });
+  PICKS_REALITY_COMPARE_USER_KEYS = (PICKS_REALITY_COMPARE_USER_KEYS || []).filter(function(key) { return !!valid[key]; });
+  if (!PICKS_REALITY_COMPARE_USERS_INITIALIZED) {
+    const sessionUser = normalizeId(PICKS_PAGE_DATA.session && PICKS_PAGE_DATA.session.username);
+    const currentStanding = standingsRows.find(function(item) {
+      return item && (item.isCurrent === true || (sessionUser && normalizeId(item.username) === sessionUser));
+    });
+    const currentKey = currentStanding ? normalizeId(currentStanding.username) : sessionUser;
+    const defaults = [];
+    if (currentKey && valid[currentKey]) defaults.push(currentKey);
+    rows.forEach(function(row) {
+      const key = realityTvCompareUserKey_(row);
+      if (key && defaults.indexOf(key) === -1 && defaults.length < 3) defaults.push(key);
+    });
+    PICKS_REALITY_COMPARE_USER_KEYS = defaults;
+    PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
+  }
+  return PICKS_REALITY_COMPARE_USER_KEYS.map(function(key) {
+    return rows.find(function(row) { return realityTvCompareUserKey_(row) === key; }) || null;
+  }).filter(Boolean);
+}
+
+function addRealityTvCompareUser_(userKey) {
+  const key = normalizeId(userKey);
+  if (!key) return;
+  PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
+  if (PICKS_REALITY_COMPARE_USER_KEYS.indexOf(key) === -1) PICKS_REALITY_COMPARE_USER_KEYS.push(key);
+  PICKS_REALITY_STANDINGS_COMPARE_TAB = "compare";
+  const mount = document.getElementById("realityTvEpisodeComparisonMount");
+  if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+}
+
+function removeRealityTvCompareUser_(userKey) {
+  const key = normalizeId(userKey);
+  PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
+  PICKS_REALITY_COMPARE_USER_KEYS = (PICKS_REALITY_COMPARE_USER_KEYS || []).filter(function(item) { return item !== key; });
+  PICKS_REALITY_STANDINGS_COMPARE_TAB = "compare";
+  const mount = document.getElementById("realityTvEpisodeComparisonMount");
+  if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+}
+
 function renderRealityTvEpisodeComparison_() {
   const comparison = PICKS_PAGE_DATA.episodeComparison || {};
   const view = PICKS_PAGE_DATA.realityTvView || {};
@@ -743,6 +911,8 @@ function renderRealityTvEpisodeComparison_() {
   const available = comparison && comparison.enabled === true && comparison.available === true;
   const columns = available && Array.isArray(comparison.columns) ? comparison.columns : [];
   const compareRows = available && Array.isArray(comparison.rows) ? comparison.rows : [];
+  const selectedRows = realityTvCompareSelectedRows_(compareRows, rows);
+  const selectedKeys = selectedRows.map(realityTvCompareUserKey_);
   const episode = available ? (comparison.episode || {}) : {};
   const eligibleEpisodes = available && Array.isArray(comparison.eligibleEpisodes) ? comparison.eligibleEpisodes : [];
   const episodeLabel = available
@@ -757,31 +927,46 @@ function renderRealityTvEpisodeComparison_() {
       }).join("")}</select></label>`
     : `<div class="reality-compare-episode-label">${escapeHtml(episodeLabel)}</div>`;
 
-  const compareGrid = available && compareRows.length ? (function() {
-    const playerHeads = compareRows.map(function(row) {
-      const profile = typeof renderCompareProfile_ === "function"
-        ? renderCompareProfile_({ username: row.username || "", displayName: row.displayName || row.username || "Player", avatar: row.avatar || "" }, "Player")
-        : `<div class="compare-profile"><div><strong>${escapeHtml(row.displayName || row.username || "Player")}</strong></div></div>`;
-      return `<div class="reality-compare-grid-cell reality-compare-player-column-head">${profile}</div>`;
+  const standingByUser = {};
+  rows.forEach(function(row) { standingByUser[normalizeId(row && row.username)] = row || {}; });
+  const availableToAdd = compareRows.filter(function(row) { return selectedKeys.indexOf(realityTvCompareUserKey_(row)) === -1; });
+  const addUserControl = available && compareRows.length
+    ? `<label class="reality-compare-add-user"><span class="sr-only">Add comparison user</span><select onchange="if(this.value){addRealityTvCompareUser_(this.value);this.value='';}"><option value="">+ Add User</option>${availableToAdd.map(function(row) {
+        const key = realityTvCompareUserKey_(row);
+        return `<option value="${escapeAttr(key)}">${escapeHtml(row.displayName || row.username || "Player")}</option>`;
+      }).join("")}</select></label>`
+    : "";
+
+  const compareGrid = available && selectedRows.length ? (function() {
+    const playerHeads = selectedRows.map(function(row) {
+      const key = realityTvCompareUserKey_(row);
+      const standing = standingByUser[normalizeId(row.username)] || {};
+      const displayName = row.displayName || row.username || standing.displayName || "Player";
+      const total = Number(row.totalPoints !== undefined ? row.totalPoints : row.total !== undefined ? row.total : standing.total || 0);
+      const rank = Number(row.rank || standing.rank || 0);
+      const header = `${escapeHtml(displayName)} — ${escapeHtml(realityTvFormatPoints_(total))} pts${rank ? ` (${escapeHtml(realityTvOrdinal_(rank))})` : ""}`;
+      return `<div class="reality-compare-grid-cell reality-compare-player-column-head"><div class="reality-compare-user-head"><strong>${header}</strong><button type="button" class="reality-compare-remove-user" aria-label="Remove ${escapeAttr(displayName)} from comparison" onclick="removeRealityTvCompareUser_('${escapeJs(key)}')">×</button></div></div>`;
     }).join("");
-    const rowHtml = function(label, getter, isSurvivor) {
-      return `<div class="reality-compare-grid-cell reality-compare-question-label">${escapeHtml(label)}</div>${compareRows.map(function(row) {
+    const rowHtml = function(label, getter) {
+      return `<div class="reality-compare-grid-cell reality-compare-question-label">${escapeHtml(label)}</div>${selectedRows.map(function(row) {
         const value = String(getter(row) || "—");
         let imageHtml = "";
-        if (isSurvivor && value !== "—") {
-          const contestant = realityTvContestantProfileById_(value);
-          const image = contestant && (contestant.imageUrl || contestant.ImageUrl || contestant.photoUrl || contestant.image || contestant.logoUrl || "");
+        if (value !== "—") {
+          const contestant = realityTvContestantProfileByValue_(value);
+          const image = realityTvContestantImageUrl_(contestant);
           if (image) imageHtml = platformImgHtml(image, { className: "reality-compare-contestant-image", variant: "thumb", alt: value });
         }
         return `<div class="reality-compare-grid-cell reality-compare-pick-cell">${imageHtml}<strong>${escapeHtml(value)}</strong></div>`;
       }).join("")}`;
     };
-    const survivorRow = rowHtml("Sole Survivor", function(row) { return row.survivorPick; }, true);
+    const survivorRow = rowHtml("Sole Survivor", function(row) { return row.survivorPick; });
     const answerRows = columns.map(function(column) {
-      return rowHtml(column.label || column.fullLabel || "Question", function(row) { return row.answers && row.answers[column.id]; }, false);
+      return rowHtml(column.label || column.fullLabel || "Question", function(row) { return row.answers && row.answers[column.id]; });
     }).join("");
-    return `<div class="reality-compare-matrix" style="--reality-compare-players:${Math.max(compareRows.length, 1)}"><div class="reality-compare-grid-cell reality-compare-question-label is-heading">Pick</div>${playerHeads}${survivorRow}${answerRows}</div>`;
-  })() : `<div class="compare-empty">${escapeHtml((comparison && comparison.message) || "No eligible locked episode comparison is available yet.")}</div>`;
+    return `<div class="reality-compare-matrix" style="--reality-compare-players:${Math.max(selectedRows.length, 1)}"><div class="reality-compare-grid-cell reality-compare-question-label is-heading">Pick</div>${playerHeads}${survivorRow}${answerRows}</div>`;
+  })() : (available
+    ? `<div class="compare-empty">Choose one or more players with + Add User.</div>`
+    : `<div class="compare-empty">${escapeHtml((comparison && comparison.message) || "No eligible locked episode comparison is available yet.")}</div>`);
 
   return `<details class="card reality-standings-compare-shell" data-reality-standings-compare="1">
     <summary><span><strong>Standings &amp; Compare</strong><small>Season standings and eligible locked episode picks</small></span></summary>
@@ -792,7 +977,7 @@ function renderRealityTvEpisodeComparison_() {
       </div>
       <div class="reality-standings-compare-panel ${tab === "standings" ? "is-active" : ""}" data-reality-tab="standings">${standingsHtml}</div>
       <div class="reality-standings-compare-panel ${tab === "compare" ? "is-active" : ""}" data-reality-tab="compare">
-        <div class="compare-filter-bar compact reality-compare-episode-bar">${episodeSelector}<span class="reality-compare-privacy">Locked &amp; revealed episodes only</span></div>
+        <div class="compare-filter-bar compact reality-compare-episode-bar"><div class="reality-compare-filter-left">${episodeSelector}${addUserControl}</div><span class="reality-compare-privacy">Locked &amp; revealed episodes only</span></div>
         <div class="reality-compare-matrix-wrap">${compareGrid}</div>
       </div>
     </div>
@@ -4566,19 +4751,73 @@ function realityTvHistoricalPointsAwarded_(category, stateClass) {
   return usesConfidence && confidenceMode === "risk_penalty" ? -adjustedPoints : 0;
 }
 
+function realityTvHistoricalSeasonAnchorForEpisode_(episode) {
+  const anchor = PICKS_PAGE_DATA.seasonAnchor || {};
+  const stats = anchor.stats || {};
+  const rows = Array.isArray(stats.history) && stats.history.length
+    ? stats.history
+    : (Array.isArray(stats.recent) ? stats.recent : []);
+  const number = Number(episode && episode.episodeNumber || 0);
+  const id = normalizeId(episode && episode.episodeId);
+  return rows.find(function(row) {
+    if (!row) return false;
+    if (id && normalizeId(row.episodeId) === id) return true;
+    return number > 0 && Number(row.episodeNumber || 0) === number;
+  }) || null;
+}
+
+function realityTvHistoricalSeasonAnchorHtml_(episode) {
+  const weeklyAnchor = realityTvHistoricalSeasonAnchorForEpisode_(episode);
+  if (!weeklyAnchor) return "";
+
+  const name = String(weeklyAnchor.entityName || weeklyAnchor.entityId || "Sole Survivor").trim();
+  const streak = Number(weeklyAnchor.streak || weeklyAnchor.streakAfter || 0);
+  const bonus = Number(weeklyAnchor.bonus || 0);
+  const multiplier = Number(weeklyAnchor.multiplier || 1);
+  const outcome = String(weeklyAnchor.entityStatus || weeklyAnchor.outcome || "").trim();
+  const profile = typeof realityTvContestantProfileByValue_ === "function"
+    ? realityTvContestantProfileByValue_(weeklyAnchor.entityId || name)
+    : null;
+  const image = realityTvBrowserImageUrl_(String(weeklyAnchor.entityImageUrl || "").trim()) ||
+    (typeof realityTvContestantImageUrl_ === "function" ? realityTvContestantImageUrl_(profile) : "");
+  const media = realityTvImageWithFallbackHtml_(
+    image,
+    name,
+    "reality-history-survivor-image",
+    "thumb",
+    "reality-history-survivor-image is-fallback"
+  );
+  return `<div class="reality-history-current-survivor">${media}<span>Sole Survivor</span><strong>${escapeHtml(name)}</strong><small>Streak ${streak} · Bonus ${bonus >= 0 ? "+" : ""}${realityTvFormatPoints_(bonus)} pts · ${formatSeasonAnchorMultiplier_(multiplier)}${outcome ? ` · ${escapeHtml(outcome)}` : ""}</small></div>`;
+}
+
+function realityTvHistoricalSeasonAnchorMountHtml_(episode) {
+  const episodeId = String(episode && episode.episodeId || "");
+  const episodeNumber = Number(episode && episode.episodeNumber || 0);
+  return `<div class="reality-history-survivor-mount" data-reality-history-anchor="true" data-reality-history-episode-id="${escapeAttr(episodeId)}" data-reality-history-episode-number="${episodeNumber}">${realityTvHistoricalSeasonAnchorHtml_(episode)}</div>`;
+}
+
+function refreshRealityTvHistoricalSeasonAnchorUi_() {
+  if (typeof document === "undefined" || !document.querySelectorAll) return;
+  const episodes = (PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.episodes) || [];
+  document.querySelectorAll('[data-reality-history-anchor="true"]').forEach(function(mount) {
+    const episodeId = normalizeId(mount.getAttribute("data-reality-history-episode-id"));
+    const episodeNumber = Number(mount.getAttribute("data-reality-history-episode-number") || 0);
+    const episode = episodes.find(function(item) {
+      if (!item) return false;
+      if (episodeId && normalizeId(item.episodeId) === episodeId) return true;
+      return episodeNumber > 0 && Number(item.episodeNumber || 0) === episodeNumber;
+    }) || { episodeId: episodeId, episodeNumber: episodeNumber };
+    mount.innerHTML = realityTvHistoricalSeasonAnchorHtml_(episode);
+    if (window.PlatformImageEngine) window.PlatformImageEngine.process(mount);
+  });
+}
+
 function realityTvHistoricalPickDetailsHtml_(episode, items) {
   items = Array.isArray(items) ? items : [];
-  const anchor = PICKS_PAGE_DATA.seasonAnchor || {};
-  const anchorUser = anchor.user || {};
-  const anchorStats = anchor.stats || {};
-  const anchorSettings = anchor.settings || {};
-  const currentSurvivor = String(anchorUser.currentEntityName || (anchor.currentEntity && anchor.currentEntity.name) || "").trim();
-  const recentStats = Array.isArray(anchorStats.recent) ? anchorStats.recent : [];
-  const latestStat = recentStats.length ? recentStats[0] : null;
-  const currentStreak = Number(anchorUser.streak || 0);
-  const currentBonus = Number(latestStat && latestStat.bonus || 0);
-  const currentMultiplier = Number(anchorUser.currentMultiplier || anchorSettings.StartMultiplier || 1);
-  const survivorHtml = currentSurvivor ? `<div class="reality-history-current-survivor"><span>Current Sole Survivor</span><strong>${escapeHtml(currentSurvivor)}</strong><small>Streak ${currentStreak} · Bonus ${currentBonus >= 0 ? "+" : ""}${realityTvFormatPoints_(currentBonus)} pts · ${formatSeasonAnchorMultiplier_(currentMultiplier)}</small></div>` : "";
+  // Keep a dedicated mount for the episode-specific Season Anchor row because
+  // the authenticated Season Anchor payload is hydrated after the first page
+  // paint. Never substitute today's current Sole Survivor for missing history.
+  const survivorHtml = realityTvHistoricalSeasonAnchorMountHtml_(episode);
   if (!items.length) return `<div class="reality-history-answer-list">${survivorHtml}<div class="reality-history-answer-empty">No saved episode questions.</div></div>`;
   return `<div class="reality-history-answer-list">${survivorHtml}${items.map(function(category) {
     const selected = getSelectedNominee(category);
@@ -6388,6 +6627,8 @@ function refreshPicksEnhancementUi_() {
     if (comparisonMount) window.PlatformImageEngine.process(comparisonMount);
   }
 
+  refreshRealityTvHistoricalSeasonAnchorUi_();
+
   const categoryMap = realityTvEpisodeCategoryMap_();
   (PICKS_PAGE_DATA.realityTvView && PICKS_PAGE_DATA.realityTvView.episodes || []).forEach(function(episode) {
     const episodeNumber = Number(episode.episodeNumber || 0);
@@ -7214,9 +7455,13 @@ function cssEscape(value) {
   function appearance_() {
     const appearance = obj_(PICKS_PAGE_DATA.appearance);
     const override = themeOverride_();
+    const game = obj_(PICKS_PAGE_DATA.game);
+    const realityView = obj_(PICKS_PAGE_DATA.realityTvView);
+    const season = obj_(realityView.season);
 
     function read(keys) {
-      return appearanceValue_(override, keys) || appearanceValue_(appearance, keys);
+      return appearanceValue_(override, keys) || appearanceValue_(appearance, keys) ||
+        appearanceValue_(season, keys) || appearanceValue_(game, keys);
     }
 
     return {
@@ -7387,31 +7632,77 @@ function cssEscape(value) {
       .concat(Array.isArray(view.contestants) ? view.contestants : [])
       .concat(Array.isArray(view.participants) ? view.participants : []);
 
-    const seen = {};
+    const byId = {};
+    const order = [];
     const cast = [];
 
     function add(nominee) {
       nominee = obj_(nominee);
       const raw = nominee.id || nominee.nomineeId || nominee.NomineeId || nominee.name || nominee.displayName;
       const id = typeof normalizeId === "function" ? normalizeId(raw) : key_(raw);
-      if (!id || seen[id]) return;
-      seen[id] = true;
-      cast.push(nominee);
+      if (!id) return;
+      if (!byId[id]) { order.push(id); byId[id] = {}; }
+      Object.keys(nominee).forEach(function(key) {
+        const value = nominee[key];
+        if (value !== undefined && value !== null && value !== "") byId[id][key] = value;
+      });
     }
 
     direct.forEach(add);
 
-    if (!cast.length) {
-      (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
-        []
-          .concat(Array.isArray(category.nominees) ? category.nominees : [])
-          .concat(Array.isArray(category.answers) ? category.answers : [])
-          .concat(Array.isArray(category.options) ? category.options : [])
-          .forEach(add);
-      });
-    }
+    // @390 can intentionally suppress the newest participants roster while the
+    // Spoiler Shield is protecting a result. The already-renderable question
+    // nominees still contain safe contestant portrait metadata. Use those only
+    // to fill fields missing from a sparse direct cast row; never overwrite an
+    // authoritative direct value.
+    (PICKS_PAGE_DATA.categories || []).forEach(function(category) {
+      []
+        .concat(Array.isArray(category.nominees) ? category.nominees : [])
+        .concat(Array.isArray(category.answers) ? category.answers : [])
+        .concat(Array.isArray(category.options) ? category.options : [])
+        .forEach(function(nominee) {
+          nominee = obj_(nominee);
+          const raw = nominee.id || nominee.nomineeId || nominee.NomineeId || nominee.name || nominee.displayName;
+          const id = typeof normalizeId === "function" ? normalizeId(raw) : key_(raw);
+          if (!id) return;
+          if (!byId[id]) { order.push(id); byId[id] = {}; }
+          Object.keys(nominee).forEach(function(key) {
+            const value = nominee[key];
+            if ((byId[id][key] === undefined || byId[id][key] === null || byId[id][key] === "") &&
+                value !== undefined && value !== null && value !== "") {
+              byId[id][key] = value;
+            }
+          });
+        });
+    });
 
+    order.forEach(function(id) { cast.push(byId[id]); });
     return cast;
+  }
+
+  function eliminationEpisodeFor_(nominee, meta) {
+    const view = obj_(PICKS_PAGE_DATA.realityTvView);
+    const keys = [
+      nominee && (nominee.id || nominee.nomineeId || nominee.name || nominee.displayName),
+      meta && (meta.id || meta.nomineeId || meta.name || meta.displayName || meta.fullName)
+    ].map(key_).filter(Boolean);
+    let found = null;
+    (Array.isArray(view.episodes) ? view.episodes : []).forEach(function(episode) {
+      const eliminated = Array.isArray(episode && episode.eliminated) ? episode.eliminated : [];
+      const hit = eliminated.some(function(item) {
+        const itemKey = key_(typeof item === "string" ? item : (item && (item.id || item.contestantId || item.name || item.displayName)));
+        return itemKey && keys.indexOf(itemKey) !== -1;
+      });
+      if (!hit) return;
+      const episodeNumber = Number(episode.episodeNumber || 0);
+      if (!found || episodeNumber >= found.number) {
+        found = {
+          number: episodeNumber,
+          label: episodeNumber ? String(episodeNumber) : text_(episode.episodeName || episode.name || "")
+        };
+      }
+    });
+    return found;
   }
 
   function castHtml_() {
@@ -7421,9 +7712,11 @@ function cssEscape(value) {
       const meta = typeof realityTvContestantProfileById_ === "function"
         ? (realityTvContestantProfileById_(nominee.id || nominee.nomineeId || nominee.name) || nominee)
         : nominee;
-      const status = nomineeStatus_(Object.assign({}, nominee, meta));
-      const eliminatedAt = meta.eliminatedEpisode || meta.eliminatedEpisodeNumber || meta.episodeEliminated || meta.eliminationEpisode || meta.weekEliminated || "";
-      return { nominee: nominee, meta: meta, status: status, eliminatedAt: eliminatedAt, eliminatedNumber: Number(eliminatedAt || 0) || 0 };
+      const inferredElimination = eliminationEpisodeFor_(nominee, meta);
+      let status = nomineeStatus_(Object.assign({}, nominee, meta));
+      if (inferredElimination) status = "eliminated";
+      const eliminatedAt = meta.eliminatedEpisode || meta.eliminatedEpisodeNumber || meta.episodeEliminated || meta.eliminationEpisode || meta.weekEliminated || (inferredElimination && inferredElimination.label) || "";
+      return { nominee: nominee, meta: meta, status: status, eliminatedAt: eliminatedAt, eliminatedNumber: Number(eliminatedAt || (inferredElimination && inferredElimination.number) || 0) || 0 };
     });
     const latestEliminated = decorated.filter(function(item) { return item.status === "eliminated"; }).sort(function(a, b) {
       return b.eliminatedNumber - a.eliminatedNumber;
@@ -7435,29 +7728,34 @@ function cssEscape(value) {
         <small>Swipe or scroll to browse every contestant</small>
       </div>
 
-      <div class="reality-clean-cast-rail" role="list" aria-label="Season cast carousel">
+      <div class="reality-clean-cast-rail" role="list" aria-label="Season cast carousel" tabindex="0">
         ${decorated.map(function(item) {
           const nominee = item.nominee;
           const meta = item.meta || nominee;
+          const entityId = String(meta.id || meta.nomineeId || nominee.id || nominee.nomineeId || nominee.name || "");
           const name = nomineeName_(Object.assign({}, nominee, meta));
           const status = item.status;
-          const resolvedImage = nomineeImage_(meta) || nomineeImage_(nominee) || text_(meta.groupImageUrl || "");
-          const media = imageHtml_(resolvedImage, {
-            className: "reality-clean-cast-photo",
-            variant: "card",
-            alt: name
-          }) || `<span class="reality-clean-cast-fallback">${esc_(name.slice(0, 1).toUpperCase())}</span>`;
+          const resolvedImage = realityTvContestantImageUrl_(meta) || realityTvContestantImageUrl_(nominee) || realityTvBrowserImageUrl_(text_(meta.groupImageUrl || ""));
+          const media = realityTvImageWithFallbackHtml_(
+            resolvedImage,
+            name,
+            "reality-clean-cast-photo",
+            "card",
+            "reality-clean-cast-fallback"
+          );
           const teamColor = realityTvSafeColor_(meta.teamColor || nominee.teamColor);
+          const team = text_(meta.teamOrTribe || meta.currentGroup || meta.startingGroup || meta.teamName || meta.groupName || meta.tribe || meta.team || nominee.teamOrTribe || "");
           const statusCopy = status === "eliminated"
             ? (item.eliminatedAt ? `Eliminated · ${Number(item.eliminatedAt) ? "Ep " + esc_(item.eliminatedAt) : esc_(item.eliminatedAt)}` : "Eliminated")
             : status.charAt(0).toUpperCase() + status.slice(1);
           const isLatest = latestEliminated && latestEliminated.nominee === nominee;
-          return `<article class="reality-clean-cast-card status-${attr_(status)}" role="listitem" style="--reality-team-color:${attr_(teamColor)}" ${isLatest ? `data-reality-latest-eliminated="true"` : ""}>
+          return `<article class="reality-clean-cast-card status-${attr_(status)}" role="listitem" tabindex="0" aria-label="Open ${attr_(name)} details" data-reality-contestant-id="${attr_(entityId)}" style="--reality-team-color:${attr_(teamColor)}" ${isLatest ? `data-reality-latest-eliminated="true"` : ""} onclick="activateRealityTvContestantCard_(event, this.dataset.realityContestantId)" onkeydown="activateRealityTvContestantCard_(event, this.dataset.realityContestantId)">
             <div class="reality-clean-cast-image">${media}${status === "eliminated" ? `<span class="reality-clean-cast-eliminated">${statusCopy}</span>` : ""}</div>
             <div class="reality-clean-cast-copy">
               <strong>${esc_(name)}</strong>
-              <span>${esc_(statusCopy)}</span>
-              <button type="button" class="reality-detail-action" onclick="showRealityTvContestantDetailModal_('${attr_(nominee.id || nominee.nomineeId || nominee.name)}')">Bio &amp; Details</button>
+              ${team ? `<span class="reality-clean-cast-team">${esc_(team)}</span>` : ""}
+              <span class="reality-clean-cast-status">${esc_(statusCopy)}</span>
+              <button type="button" class="reality-detail-action" data-reality-contestant-id="${attr_(entityId)}" onclick="event.stopPropagation();showRealityTvContestantDetailModal_(this.dataset.realityContestantId)">Bio &amp; Details</button>
             </div>
           </article>`;
         }).join("")}
@@ -7470,14 +7768,29 @@ function cssEscape(value) {
     const rail = page.querySelector("#realityEnhancedCleanCast .reality-clean-cast-rail");
     const latest = rail && rail.querySelector('[data-reality-latest-eliminated="true"]');
     if (!rail || !latest || rail.dataset.realityInitialCentered === "true") return;
-    rail.dataset.realityInitialCentered = "true";
+    let attempts = 0;
     const center = function() {
-      const left = Math.max(0, Number(latest.offsetLeft || 0) - Math.max(0, (Number(rail.clientWidth || 0) - Number(latest.clientWidth || 0)) / 2));
+      attempts += 1;
+      const railWidth = Number(rail.clientWidth || 0);
+      const cardWidth = Number(latest.clientWidth || 0);
+      const offset = Number(latest.offsetLeft || 0);
+      if (!railWidth || !cardWidth) {
+        if (attempts < 5) setTimeout(center, 50 * attempts);
+        return;
+      }
+      const left = Math.max(0, offset - Math.max(0, (railWidth - cardWidth) / 2));
+      rail.scrollLeft = left;
       if (typeof rail.scrollTo === "function") rail.scrollTo({ left: left, behavior: "auto" });
-      else rail.scrollLeft = left;
+      rail.dataset.realityInitialCentered = "true";
     };
     if (typeof requestAnimationFrame === "function") requestAnimationFrame(center);
     else setTimeout(center, 0);
+    const latestImage = latest.querySelector && latest.querySelector("img");
+    if (latestImage && latestImage.complete !== true && typeof latestImage.addEventListener === "function") {
+      latestImage.addEventListener("load", center, { once: true });
+    } else {
+      setTimeout(center, 120);
+    }
   }
 
   function processImages_(page) {

@@ -132,8 +132,8 @@ assert(picksCss.includes('.reality-contestant-modal-body'));
     { id: 'q2', question: 'Who won reward?', points: 10, nominees: [{ id: 'cara', name: 'Cara' }], winnerNomineeIds: ['cara'] },
     { id: 'q1', question: 'Who was eliminated?', questionType: 'elimination', points: 1, nominees: [{ id: 'alice', name: 'Alice' }, { id: 'bob', name: 'Bob' }], winnerNomineeIds: ['bob'] }
   ];
-  const data = { realityTvView: view, categories, picks: { q1: 'alice', q2: 'cara', q3: 'now' }, changeCounts: {}, confidencePoints: {}, confidenceScoringMode: 'win_only', game: {}, seasonAnchor: { user: { currentEntityName: 'Charlie', streak: 3, currentMultiplier: 1.15 }, stats: { recent: [{ bonus: 1.1 }] }, settings: { StartMultiplier: 1 } } };
-  const ctx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvFormatPoints_', 'formatSeasonAnchorMultiplier_', 'realityTvHistoricalPointsAwarded_', 'realityTvHistoricalPickDetailsHtml_', 'renderRealityTvEpisodeSections_'], {
+  const data = { realityTvView: view, categories, picks: { q1: 'alice', q2: 'cara', q3: 'now' }, changeCounts: {}, confidencePoints: {}, confidenceScoringMode: 'win_only', game: {}, seasonAnchor: { user: { currentEntityName: 'Charlie', streak: 3, currentMultiplier: 1.15 }, stats: { recent: [{ bonus: 1.1 }], history: [{ episodeId:'ep-1', episodeNumber:1, entityName:'Charlie', streak:3, multiplier:1.15, bonus:1.1, outcome:'SURVIVED' }, { episodeId:'ep-2', episodeNumber:2, entityName:'Charlie', streak:3, multiplier:1.15, bonus:1.1, outcome:'SURVIVED' }] }, settings: { StartMultiplier: 1 } } };
+  const ctx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvFormatPoints_', 'formatSeasonAnchorMultiplier_', 'realityTvHistoricalPointsAwarded_', 'realityTvBrowserImageUrl_', 'realityTvContestantImageUrl_', 'realityTvImageWithFallbackHtml_', 'realityTvHistoricalSeasonAnchorForEpisode_', 'realityTvHistoricalSeasonAnchorHtml_', 'realityTvHistoricalSeasonAnchorMountHtml_', 'realityTvHistoricalPickDetailsHtml_', 'renderRealityTvEpisodeSections_'], {
     PICKS_PAGE_DATA: data,
     normalizeId,
     escapeHtml: esc,
@@ -161,7 +161,8 @@ assert(picksCss.includes('.reality-contestant-modal-body'));
   assert(html.includes('<span>Eliminated</span><strong>Bob</strong>'));
   assert(html.includes('<span>Your pick</span><strong>Cara</strong>'));
   assert(html.includes('<span>Result</span><strong>Cara</strong>'));
-  assert(html.includes('Current Sole Survivor') && html.includes('<strong>Charlie</strong>'));
+  assert(html.includes('Sole Survivor') && html.includes('<strong>Charlie</strong>'));
+  assert(!html.includes('Current Sole Survivor'), 'historical rows must not substitute the current pick');
   assert(html.includes('Streak 3') && html.includes('Bonus +1.1 pts · 1.15x'));
   assert(html.includes('Points +10 pts'), 'correct historical question should show points awarded');
   assert(html.includes('Points 0 pts'), 'wrong historical question should show zero points awarded');

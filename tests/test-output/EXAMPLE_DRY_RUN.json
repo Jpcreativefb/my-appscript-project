@@ -1,7 +1,7 @@
 {
   "success": true,
   "readOnly": true,
-  "version": "rc24b-dryrun-v1",
+  "version": "rc24c-production-v1",
   "requestedGameId": "fixture-purge-2026",
   "gameId": "fixture-purge-2026",
   "game": {
@@ -1042,10 +1042,10 @@
     ]
   },
   "blockers": [],
-  "canProceedToPermanentDelete": false,
-  "productionPurgeEnabled": false,
+  "canProceedToPermanentDelete": true,
+  "productionPurgeEnabled": true,
   "auditRecordPreview": {
-    "Timestamp": "2026-09-05T05:12:15.767Z",
+    "Timestamp": "2026-09-16T07:09:47.415Z",
     "Action": "DRY_RUN",
     "GameId": "fixture-purge-2026",
     "GameName": "Fixture Purge Game",
@@ -1054,10 +1054,10 @@
     "DeletedCountsJSON": "{}",
     "BlockedDependenciesJSON": "[]",
     "RetainedSharedAssetsJSON": "[{\"fileId\":\"unique-hero-file\",\"targetReferences\":[\"MAIN:Games.HeroImageFileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"shared-image-file\",\"targetReferences\":[\"MAIN:Categories.FileID\"],\"otherReferences\":[\"MAIN:Categories.FileID\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"unique-option-file\",\"targetReferences\":[\"MAIN:QuestionOptions.FileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"unique-entry-file\",\"targetReferences\":[\"MAIN:CompetitionEntries.EntryImageFileID\"],\"otherReferences\":[],\"provenOwnedByTarget\":true,\"knownShared\":false,\"decision\":\"OWNED — DELETE (fixture/proven ownership only)\"},{\"fileId\":\"shared-avatar-file\",\"targetReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\"],\"otherReferences\":[\"MAIN:UserGameProfiles.AvatarFileId\",\"MAIN:Users.AvatarFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"},{\"fileId\":\"shared-override-file\",\"targetReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"otherReferences\":[\"MAIN:AppearanceOverrides.ImageFileId\"],\"provenOwnedByTarget\":false,\"knownShared\":true,\"decision\":\"SHARED/UNPROVEN — PRESERVE\",\"reason\":\"Other surviving references exist.\"}]",
-    "FinalResult": "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY",
+    "FinalResult": "DRY RUN COMPLETE — READY FOR EXACT-CONFIRMATION PURGE",
     "RemainingReferenceCount": "",
     "ErrorMessage": "",
-    "Version": "rc24b-dryrun-v1"
+    "Version": "rc24c-production-v1"
   },
   "counts": {
     "MAIN:ExternalResultsHubOutbox": 1,
@@ -1117,5 +1117,5 @@
     "MAIN:Games": 1
   },
   "totalOwnedRows": 58,
-  "status": "DRY RUN COMPLETE — FIXTURE/ROY REVIEW ONLY"
+  "status": "DRY RUN COMPLETE — READY FOR EXACT-CONFIRMATION PURGE"
 }

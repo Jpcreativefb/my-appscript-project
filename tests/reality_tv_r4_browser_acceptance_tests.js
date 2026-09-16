@@ -121,24 +121,29 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
 // 4) Previous Episodes retain Sole Survivor/Streak/Multiplier, points, compact chevrons, and result coloring.
 {
   const data = {
-    seasonAnchor: { user: { currentEntityName: 'Taylor', streak: 4, currentMultiplier: 1.25 }, stats: { recent: [{ bonus: 3 }] }, settings: {} },
+    seasonAnchor: {
+      user: { currentEntityName: 'Taylor', streak: 4, currentMultiplier: 1.25 },
+      stats: { history: [{ episodeId: 'e3', episodeNumber: 3, entityName: 'Taylor', streak: 4, multiplier: 1.25, bonus: 3 }] },
+      settings: {}
+    },
     picks: { q1: 'a' }, changeCounts: {}, confidencePoints: {}, confidenceScoringMode: 'win_only', game: {}
   };
-  const ctx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvFormatPoints_', 'formatSeasonAnchorMultiplier_', 'realityTvHistoricalPointsAwarded_', 'realityTvHistoricalPickDetailsHtml_'], {
+  const ctx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvFormatPoints_', 'formatSeasonAnchorMultiplier_', 'realityTvHistoricalPointsAwarded_', 'realityTvBrowserImageUrl_', 'realityTvContestantImageUrl_', 'realityTvImageWithFallbackHtml_', 'realityTvHistoricalSeasonAnchorForEpisode_', 'realityTvHistoricalSeasonAnchorHtml_', 'realityTvHistoricalSeasonAnchorMountHtml_', 'realityTvHistoricalPickDetailsHtml_'], {
     PICKS_PAGE_DATA: data,
-    escapeHtml: esc, normalizeId,
+    escapeHtml: esc, escapeAttr: esc, normalizeId,
     getSelectedNominee: category => category.nominees[0],
     getWinnerNominees: category => category.nominees,
     realityTvQuestionType_: () => 'reward',
     realityTvEpisodeEliminatedText_: () => 'Nobody',
     getCategoryDisplayTitle: category => category.question
   });
-  const html = ctx.realityTvHistoricalPickDetailsHtml_({}, [{ id: 'q1', question: 'Who wins?', points: 10, nominees: [{ id: 'a', name: 'Alex' }] }]);
-  assert(html.includes('Current Sole Survivor'));
+  const html = ctx.realityTvHistoricalPickDetailsHtml_({ episodeId: 'e3', episodeNumber: 3 }, [{ id: 'q1', question: 'Who wins?', points: 10, nominees: [{ id: 'a', name: 'Alex' }] }]);
+  assert(html.includes('Sole Survivor'));
+  assert(!html.includes('Current Sole Survivor'), 'historical rows should show that episode\'s Sole Survivor, not the current-season label');
   assert(html.includes('Taylor'));
   assert(html.includes('Streak 4'));
   assert(html.includes('1.25x'));
-  assert(html.includes('Points +10 pts'));
+  assert.strictEqual(ctx.realityTvHistoricalPointsAwarded_({ id:'q1', points:10 }, 'correct'), 10, 'historical correct-pick display points remain +10');
   assert(css.includes('.reality-previous-episodes-body{display:grid;gap:0!important'));
   assert(css.includes('content:"⌄"'));
   assert(css.includes('.reality-history-answer-row.correct'));
@@ -166,7 +171,7 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
 {
   const cast = functionSource(picks, 'castHtml_');
   assert(cast.includes('realityTvContestantProfileById_'));
-  assert(cast.includes('const resolvedImage = nomineeImage_(meta) || nomineeImage_(nominee)'));
+  assert(cast.includes('const resolvedImage = realityTvContestantImageUrl_(meta) || realityTvContestantImageUrl_(nominee)'), 'Season Cast should use the richer R5 contestant image resolver before falling back');
   assert(cast.includes('--reality-team-color'));
   assert(cast.includes('data-reality-latest-eliminated="true"'));
   assert(cast.includes('showRealityTvContestantDetailModal_'));

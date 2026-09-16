@@ -2686,11 +2686,16 @@ function realityTvUserGameViewPayload_(gameId, username, options) {
       const profile = profileByContestant[realityTvKey_(row.ContestantId)] || { history: [] };
       const currentGroupName = realityTvString_(profile.currentGroup || row.CurrentGroup || row.TeamOrTribe);
       const group = groupByName[realityTvKey_(currentGroupName)] || {};
+      const authoritativeImageUrl = realityTvString_(row.ImageUrl);
       return {
         id: realityTvString_(row.ContestantId),
         name: realityTvString_(row.Name),
         fullName: realityTvString_(row.FullName),
-        imageUrl: realityTvString_(row.ImageUrl),
+        // Canonical player-runtime portrait from the Reality Contestants row.
+        // Keep the legacy imageUrl key while exposing the provenance explicitly
+        // so Cast and body-mounted contestant modals resolve the same image.
+        authoritativeImageUrl: authoritativeImageUrl,
+        imageUrl: authoritativeImageUrl,
         teamOrTribe: currentGroupName,
         startingGroup: realityTvString_(profile.startingGroup || row.StartingGroup),
         currentGroup: currentGroupName,

@@ -101,8 +101,10 @@ const esc = value => String(value == null ? '' : value);
 // 4) Previous Episodes remain deduped/idempotent and show current Sole Survivor.
 {
   const historical = functionSource(picks, 'realityTvHistoricalPickDetailsHtml_');
-  assert(historical.includes('Current Sole Survivor'));
-  assert(historical.includes('anchorUser.currentEntityName'));
+  const historicalAnchor = functionSource(picks, 'realityTvHistoricalSeasonAnchorHtml_');
+  assert(historical.includes('realityTvHistoricalSeasonAnchorMountHtml_(episode)'));
+  assert(!historical.includes('Current Sole Survivor'));
+  assert(historicalAnchor.includes('weeklyAnchor.entityName'));
   const sections = functionSource(picks, 'renderRealityTvEpisodeSections_');
   assert(sections.includes('const episodeSeen = {}'));
   assert(sections.includes('if (episodeSeen[key]) return false'));
@@ -184,10 +186,12 @@ for (const token of ['apiSavePick', 'adminCreateRealityTvSeason', 'realityTvScor
   assert(!vote.includes('Episode Vote Details'), 'old player vote header must not return');
 
   const historical = functionSource(picks, 'realityTvHistoricalPickDetailsHtml_');
-  assert(historical.includes('Current Sole Survivor'));
-  assert(historical.includes('currentStreak'));
-  assert(historical.includes('currentBonus'));
-  assert(historical.includes('currentMultiplier'));
+  const historicalAnchor = functionSource(picks, 'realityTvHistoricalSeasonAnchorHtml_');
+  assert(historical.includes('realityTvHistoricalSeasonAnchorMountHtml_(episode)'));
+  assert(!historical.includes('Current Sole Survivor'));
+  assert(historicalAnchor.includes('const streak'));
+  assert(historicalAnchor.includes('const bonus'));
+  assert(historicalAnchor.includes('const multiplier'));
   assert(historical.includes('reality-history-points'));
 
   const pointsCtx = runFunctions(picks, ['normalizePicksScoreMode_', 'realityTvHistoricalPointsAwarded_'], {

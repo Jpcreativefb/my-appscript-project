@@ -160,6 +160,12 @@ function makePicksContext(hiddenIds) {
     'realityTvFormatPoints_',
     'formatSeasonAnchorMultiplier_',
     'realityTvHistoricalPointsAwarded_',
+    'realityTvBrowserImageUrl_',
+    'realityTvContestantImageUrl_',
+    'realityTvImageWithFallbackHtml_',
+    'realityTvHistoricalSeasonAnchorForEpisode_',
+    'realityTvHistoricalSeasonAnchorHtml_',
+    'realityTvHistoricalSeasonAnchorMountHtml_',
     'realityTvHistoricalPickDetailsHtml_',
     'renderRealityTvEpisodeSections_'
   ], {
