@@ -5993,3 +5993,87 @@ body > .season-anchor-confirm-backdrop .reality-sole-survivor-more-stats-grid{
 .reality-player-page.reality-clean-enhanced .reality-history-current-survivor > img.reality-history-survivor-image{
   position:relative!important;z-index:2!important;
 }
+
+/* =========================================================
+   PATTC REALITY R5.3 — REAL-DEVICE INTERACTION REPAIR ONLY
+   Preserve R5.2 visuals/data; harden touch/click/scroll behavior.
+   ========================================================= */
+.reality-player-page.reality-clean-enhanced [data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced details > summary,
+.reality-player-page.reality-clean-enhanced [data-reality-spoiler-reveal],
+.reality-player-page.reality-clean-enhanced [data-reality-spoiler-preference],
+.reality-player-page.reality-clean-enhanced [data-reality-open-contestant],
+.reality-player-page.reality-clean-enhanced [data-reality-more-stats],
+body > .season-anchor-confirm-backdrop [data-reality-modal-close]{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:rgba(125,211,252,.18);
+}
+.reality-player-page.reality-clean-enhanced [data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced details > summary{
+  position:relative;
+  z-index:4;
+  cursor:pointer!important;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-main-button{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  width:100%;
+  text-align:left;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-main-button:disabled{
+  cursor:default!important;
+  opacity:1!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-preference-button{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.reality-player-page.reality-clean-enhanced [data-reality-section-key].is-reality-section-collapsed > .reality-section-collapsible-body{
+  display:none!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-current-question-heading[data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced .reality-clean-section-heading[data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced .reality-player-summary-heading[data-reality-section-toggle]{
+  min-height:40px;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-rail{
+  pointer-events:auto!important;
+  touch-action:pan-x pan-y!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-x:contain!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  scroll-behavior:auto!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-rail.is-dragging{
+  scroll-snap-type:none!important;
+  cursor:grabbing!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-card,
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-card .reality-detail-action{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+body.reality-modal-open{
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+body > .season-anchor-confirm-backdrop{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  z-index:140!important;
+}
+body > .season-anchor-confirm-backdrop .season-anchor-confirm-card,
+body > .season-anchor-confirm-backdrop .reality-contestant-modal-card,
+body > .season-anchor-confirm-backdrop .season-anchor-stats-modal-card{
+  pointer-events:auto!important;
+  touch-action:auto!important;
+}
+body > .season-anchor-confirm-backdrop [data-reality-modal-close]{
+  z-index:20!important;
+}

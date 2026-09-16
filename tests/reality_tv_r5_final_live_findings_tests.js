@@ -121,7 +121,8 @@ assert(picks.includes('realityTvContestantProfileByValue_(value)'));
   assert.strictEqual(context.realityTvContestantImageUrl_(profile), 'https://img.test/c1.jpg');
 }
 assert(picks.includes('reality-clean-cast-team'));
-assert(picks.includes('activateRealityTvContestantCard_(event, this.dataset.realityContestantId)'));
+assert(picks.includes('data-reality-open-contestant="${attr_(entityId)}"'));
+assert(!picks.includes('onclick="activateRealityTvContestantCard_(event, this.dataset.realityContestantId)'));
 
 // Latest eliminated centering is behavioral, not a CSS-only marker.
 {
