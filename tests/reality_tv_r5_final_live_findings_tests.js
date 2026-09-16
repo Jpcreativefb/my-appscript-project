@@ -61,41 +61,54 @@ function fnBlock(source, name) {
   assert(revealedHtml.includes('Episode results are visible'));
 }
 
-// 2) Compare user selection is real runtime state: defaults, + Add User, and remove.
+// 2) Compare user selection is real runtime state: current user is permanent
+// column 2, added users are stable/removable, and Compare stays open after edits.
 {
-  const mount = { innerHTML: '' };
+  const rerenders = [];
   const context = {
     PICKS_REALITY_COMPARE_USER_KEYS: [],
     PICKS_REALITY_COMPARE_USERS_INITIALIZED: false,
     PICKS_REALITY_STANDINGS_COMPARE_TAB: 'standings',
-    PICKS_PAGE_DATA: { session: { username: 'joel' } },
+    PICKS_REALITY_SECTION_OPEN_STATE: {},
+    PICKS_PAGE_DATA: {
+      session: { username: 'joel' },
+      episodeComparison: { rows: [{ username:'amy' }, { username:'joel', isCurrent:true }, { username:'max' }, { username:'zoe' }] },
+      realityTvView: { playerStats: { compactLeaderboard: [{ username:'joel', isCurrent:true }] } }
+    },
     normalizeId: v => String(v || '').trim().toLowerCase(),
-    document: { getElementById: id => id === 'realityTvEpisodeComparisonMount' ? mount : null },
-    renderRealityTvEpisodeComparison_: () => '<compare />'
+    realityTvCaptureComparisonUiState_: () => ({ open:true, scrollLeft:91 }),
+    rerenderRealityTvEpisodeComparison_: state => rerenders.push(Object.assign({}, state))
   };
   vm.createContext(context);
   vm.runInContext([
     fnBlock(picks, 'realityTvCompareUserKey_'),
+    fnBlock(picks, 'realityTvCompareCurrentUserKey_'),
     fnBlock(picks, 'realityTvCompareSelectedRows_'),
     fnBlock(picks, 'addRealityTvCompareUser_'),
     fnBlock(picks, 'removeRealityTvCompareUser_')
   ].join('\n'), context);
-  const rows = [{ username:'amy' }, { username:'joel' }, { username:'max' }, { username:'zoe' }];
-  const standings = [{ username:'joel', isCurrent:true }];
+  const rows = context.PICKS_PAGE_DATA.episodeComparison.rows;
+  const standings = context.PICKS_PAGE_DATA.realityTvView.playerStats.compactLeaderboard;
   const selected = context.realityTvCompareSelectedRows_(rows, standings);
+  assert.strictEqual(selected.length, 1);
   assert.strictEqual(selected[0].username, 'joel');
   context.addRealityTvCompareUser_('zoe');
-  assert(context.PICKS_REALITY_COMPARE_USER_KEYS.includes('zoe'));
+  context.addRealityTvCompareUser_('amy');
+  assert.strictEqual(JSON.stringify(Array.from(context.PICKS_REALITY_COMPARE_USER_KEYS)), JSON.stringify(['zoe','amy']));
   context.removeRealityTvCompareUser_('zoe');
-  assert(!context.PICKS_REALITY_COMPARE_USER_KEYS.includes('zoe'));
+  assert.strictEqual(JSON.stringify(Array.from(context.PICKS_REALITY_COMPARE_USER_KEYS)), JSON.stringify(['amy']));
+  context.removeRealityTvCompareUser_('joel');
+  assert.strictEqual(JSON.stringify(Array.from(context.PICKS_REALITY_COMPARE_USER_KEYS)), JSON.stringify(['amy']), 'current user is not removable');
   assert.strictEqual(context.PICKS_REALITY_STANDINGS_COMPARE_TAB, 'compare');
-  assert.strictEqual(mount.innerHTML, '<compare />');
+  assert.strictEqual(context.PICKS_REALITY_SECTION_OPEN_STATE['standings-compare'], true);
+  assert(rerenders.every(state => state.open === true && state.scrollLeft === 91));
 }
 
-// Compare presentation contract: user headers include points/rank; contestant
-// answers use the shared rich contestant resolver and Add User is present.
+// Compare presentation contract: three stacked header lines, current-user frozen
+// reference column, contestant images, and Add User for non-current users.
 assert(picks.includes('+ Add User'));
-assert(picks.includes('pts${rank ? ` (${escapeHtml(realityTvOrdinal_(rank))})`'));
+assert(picks.includes('<strong>${escapeHtml(displayName)}</strong><span>${escapeHtml(realityTvFormatPoints_(total))} pts</span><small>${rank ? `Rank #'));
+assert(picks.includes('is-current-reference'));
 assert(picks.includes('reality-compare-remove-user'));
 assert(picks.includes('realityTvContestantProfileByValue_(value)'));
 
@@ -121,7 +134,8 @@ assert(picks.includes('realityTvContestantProfileByValue_(value)'));
   assert.strictEqual(context.realityTvContestantImageUrl_(profile), 'https://img.test/c1.jpg');
 }
 assert(picks.includes('reality-clean-cast-team'));
-assert(picks.includes('activateRealityTvContestantCard_(event, this.dataset.realityContestantId)'));
+assert(picks.includes('data-reality-open-contestant="${attr_(entityId)}"'));
+assert(!picks.includes('onclick="activateRealityTvContestantCard_(event, this.dataset.realityContestantId)'));
 
 // Latest eliminated centering is behavioral, not a CSS-only marker.
 {

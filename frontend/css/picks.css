@@ -5993,3 +5993,213 @@ body > .season-anchor-confirm-backdrop .reality-sole-survivor-more-stats-grid{
 .reality-player-page.reality-clean-enhanced .reality-history-current-survivor > img.reality-history-survivor-image{
   position:relative!important;z-index:2!important;
 }
+
+/* =========================================================
+   PATTC REALITY R5.3 — REAL-DEVICE INTERACTION REPAIR ONLY
+   Preserve R5.2 visuals/data; harden touch/click/scroll behavior.
+   ========================================================= */
+.reality-player-page.reality-clean-enhanced [data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced details > summary,
+.reality-player-page.reality-clean-enhanced [data-reality-spoiler-reveal],
+.reality-player-page.reality-clean-enhanced [data-reality-spoiler-preference],
+.reality-player-page.reality-clean-enhanced [data-reality-open-contestant],
+.reality-player-page.reality-clean-enhanced [data-reality-more-stats],
+body > .season-anchor-confirm-backdrop [data-reality-modal-close]{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  -webkit-tap-highlight-color:rgba(125,211,252,.18);
+}
+.reality-player-page.reality-clean-enhanced [data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced details > summary{
+  position:relative;
+  z-index:4;
+  cursor:pointer!important;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-main-button{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+  width:100%;
+  text-align:left;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-main-button:disabled{
+  cursor:default!important;
+  opacity:1!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-spoiler-preference-button{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+.reality-player-page.reality-clean-enhanced [data-reality-section-key].is-reality-section-collapsed > .reality-section-collapsible-body{
+  display:none!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-current-question-heading[data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced .reality-clean-section-heading[data-reality-section-toggle],
+.reality-player-page.reality-clean-enhanced .reality-player-summary-heading[data-reality-section-toggle]{
+  min-height:40px;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-rail{
+  pointer-events:auto!important;
+  touch-action:pan-x pan-y!important;
+  -webkit-overflow-scrolling:touch!important;
+  overscroll-behavior-x:contain!important;
+  overflow-x:auto!important;
+  overflow-y:hidden!important;
+  scroll-behavior:auto!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-rail.is-dragging{
+  scroll-snap-type:none!important;
+  cursor:grabbing!important;
+  user-select:none!important;
+  -webkit-user-select:none!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-card,
+.reality-player-page.reality-clean-enhanced .reality-clean-cast-card .reality-detail-action{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+}
+body.reality-modal-open{
+  overflow:hidden!important;
+  overscroll-behavior:none!important;
+}
+body > .season-anchor-confirm-backdrop{
+  pointer-events:auto!important;
+  touch-action:manipulation!important;
+  z-index:140!important;
+}
+body > .season-anchor-confirm-backdrop .season-anchor-confirm-card,
+body > .season-anchor-confirm-backdrop .reality-contestant-modal-card,
+body > .season-anchor-confirm-backdrop .season-anchor-stats-modal-card{
+  pointer-events:auto!important;
+  touch-action:auto!important;
+}
+body > .season-anchor-confirm-backdrop [data-reality-modal-close]{
+  z-index:20!important;
+}
+
+/* =========================================================
+   PATTC REALITY R5.3 — STANDINGS & COMPARE UX ADDENDUM
+   Keep the signed-in player frozen beside the question labels while added
+   comparison users scroll. Preserve full section width on desktop/mobile.
+   ========================================================= */
+.reality-player-page.reality-clean-enhanced .reality-standings-compare-body{
+  padding:0!important;
+  width:100%!important;
+  max-width:none!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-standings-compare-tabs{
+  margin:0!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-radius:0!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-standings-compare-panel{
+  width:100%!important;
+  max-width:none!important;
+  box-sizing:border-box!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-episode-bar{
+  margin:0!important;
+  padding:6px 8px!important;
+  border-bottom:1px solid rgba(148,163,184,.1);
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-matrix-wrap{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  border-left:0!important;
+  border-right:0!important;
+  border-radius:0!important;
+  position:relative;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-matrix{
+  --reality-compare-label-width:92px;
+  --reality-compare-player-min:104px;
+  grid-template-columns:var(--reality-compare-label-width) repeat(var(--reality-compare-players),minmax(var(--reality-compare-player-min),1fr))!important;
+  min-width:max-content!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-question-label{
+  position:sticky!important;
+  left:0!important;
+  z-index:7!important;
+  width:var(--reality-compare-label-width)!important;
+  box-sizing:border-box!important;
+  background:#091425!important;
+  box-shadow:1px 0 0 rgba(148,163,184,.16);
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-grid-cell.is-current-reference{
+  position:sticky!important;
+  left:var(--reality-compare-label-width)!important;
+  z-index:6!important;
+  background:#07111f!important;
+  box-shadow:1px 0 0 rgba(96,165,250,.22),-1px 0 0 rgba(148,163,184,.08);
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-player-column-head.is-current-reference{
+  z-index:9!important;
+  background:#0a1a2f!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-question-label.is-heading{
+  z-index:10!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-player-column-head{
+  min-width:var(--reality-compare-player-min)!important;
+  min-height:52px!important;
+  padding:5px 4px!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-user-head{
+  position:relative!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:1px!important;
+  min-height:42px;
+  padding:0 18px!important;
+  text-align:center!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-user-head strong{
+  display:block!important;
+  width:100%!important;
+  color:#fff!important;
+  font-size:.62rem!important;
+  line-height:1.08!important;
+  font-weight:950!important;
+  text-align:center!important;
+  white-space:normal!important;
+  overflow-wrap:anywhere!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-user-head span{
+  display:block!important;
+  color:#cbd5e1!important;
+  font-size:.55rem!important;
+  line-height:1.08!important;
+  font-weight:850!important;
+  text-align:center!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-user-head small{
+  display:block!important;
+  color:#7dd3fc!important;
+  font-size:.5rem!important;
+  line-height:1.08!important;
+  font-weight:800!important;
+  text-align:center!important;
+}
+.reality-player-page.reality-clean-enhanced .reality-compare-remove-user{
+  position:absolute!important;
+  top:0!important;
+  right:0!important;
+}
+
+@media(max-width:760px){
+  .reality-player-page.reality-clean-enhanced .reality-compare-matrix{
+    --reality-compare-label-width:82px;
+    --reality-compare-player-min:100px;
+    grid-template-columns:var(--reality-compare-label-width) repeat(var(--reality-compare-players),minmax(var(--reality-compare-player-min),1fr))!important;
+  }
+  .reality-player-page.reality-clean-enhanced .reality-compare-episode-bar{padding:5px 6px!important}
+  .reality-player-page.reality-clean-enhanced .reality-compare-user-head{padding:0 15px!important}
+  .reality-player-page.reality-clean-enhanced .reality-compare-user-head strong{font-size:.58rem!important}
+  .reality-player-page.reality-clean-enhanced .reality-compare-user-head span{font-size:.52rem!important}
+  .reality-player-page.reality-clean-enhanced .reality-compare-user-head small{font-size:.48rem!important}
+}

@@ -58,7 +58,9 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   assert(hidden.includes('Results Hidden'));
   assert(hidden.includes('Reveal Results'));
   assert(hidden.includes('Future results: Protected'));
-  assert(hidden.includes('activateRealityTvSpoilerShield_'));
+  assert(hidden.includes('data-reality-spoiler-reveal="ep-5"'));
+  assert(hidden.includes('data-reality-spoiler-preference="false"'));
+  assert(!hidden.includes('onclick="activateRealityTvSpoilerShield_'));
 
   const revealedCtx = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
     PICKS_PAGE_DATA: { realityTvView: { enabled: true, spoilerShield: { enabled: false } } },
@@ -174,7 +176,8 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   assert(cast.includes('const resolvedImage = realityTvContestantImageUrl_(meta) || realityTvContestantImageUrl_(nominee)'), 'Season Cast should use the richer R5 contestant image resolver before falling back');
   assert(cast.includes('--reality-team-color'));
   assert(cast.includes('data-reality-latest-eliminated="true"'));
-  assert(cast.includes('showRealityTvContestantDetailModal_'));
+  assert(cast.includes('data-reality-open-contestant'));
+  assert(!cast.includes('onclick="activateRealityTvContestantCard_'));
   assert(cast.includes('Bio &amp; Details'));
   const center = functionSource(picks, 'centerLatestEliminatedCast_');
   assert(center.includes('data-reality-latest-eliminated="true"'));
