@@ -708,7 +708,7 @@ const APP_PAGE_MODULES = {
   "hub": ["dashboard"],
   "trophy-room": ["dashboard"],
   "more": ["dashboard"],
-  "picks": ["picks"],
+  "picks": ["picks", "realityR53Deterministic"],
   "survivor": ["survivor"],
   "voting": ["voting"],
   "ranking": ["ranking"],
