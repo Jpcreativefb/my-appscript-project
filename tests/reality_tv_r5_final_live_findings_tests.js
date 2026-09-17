@@ -52,7 +52,7 @@ function fnBlock(source, name) {
   const hidden = context.renderRealityTvSpoilerShield_();
   assert(hidden.includes('Results Hidden'));
   assert(hidden.includes('Reveal Results'));
-  assert(hidden.includes('Future results: Protected'));
+  assert(hidden.includes('Future results protection: ON'));
   context.activateRealityTvSpoilerShield_({ type: 'click', target: { closest: () => null }, preventDefault(){} }, 'ep-4');
   assert.strictEqual(revealed, 'ep-4');
   context.realityTvBlockingHiddenEpisode_ = () => null;
@@ -123,23 +123,19 @@ assert(picks.includes('realityTvContestantProfileByValue_(value)'));
 assert(picks.includes('reality-clean-cast-team'));
 assert(picks.includes('activateRealityTvContestantCard_(event, this.dataset.realityContestantId)'));
 
-// Latest eliminated centering is behavioral, not a CSS-only marker.
+// Clean R3 now owns deterministic Cast index/window behavior instead of rail geometry.
 {
-  const context = { setTimeout: fn => fn(), requestAnimationFrame: fn => fn() };
+  const context = { Math, Number };
   vm.createContext(context);
-  vm.runInContext(fnBlock(picks, 'centerLatestEliminatedCast_'), context);
-  const latest = { offsetLeft:500, clientWidth:100, querySelector:() => null };
-  let scrollToLeft = null;
-  const rail = {
-    clientWidth:300, scrollLeft:0, dataset:{},
-    querySelector: sel => sel.includes('data-reality-latest-eliminated') ? latest : null,
-    scrollTo: o => { scrollToLeft = o.left; }
-  };
-  const page = { querySelector: sel => sel.includes('reality-clean-cast-rail') ? rail : null };
-  context.centerLatestEliminatedCast_(page);
-  assert.strictEqual(rail.scrollLeft, 400);
-  assert.strictEqual(scrollToLeft, 400);
-  assert.strictEqual(rail.dataset.realityInitialCentered, 'true');
+  vm.runInContext(fnBlock(picks, 'clampCastIndex_') + '\n' + fnBlock(picks, 'castWindow_'), context);
+  assert.strictEqual(context.clampCastIndex_(-1, 6), 0);
+  assert.strictEqual(context.clampCastIndex_(9, 6), 5);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(context.castWindow_(0, 6, 4))), { start:0, end:4 });
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(context.castWindow_(5, 6, 4))), { start:2, end:6 });
+  const cleanStart = picks.indexOf('(function realityEnhancedCleanR3_');
+  const cleanEnd = picks.indexOf('PATTC REALITY CINEMATIC', cleanStart);
+  const clean = picks.slice(cleanStart, cleanEnd);
+  for (const token of ['scrollLeft', 'scrollTo', 'offsetLeft', 'clientWidth']) assert(!clean.includes(token));
 }
 
 // 4) Weekly Previous Episode Sole Survivor uses the episode-specific history.
@@ -175,12 +171,15 @@ assert(anchor.includes('const entityId = seasonAnchorString_(row.EntityId)'));
 }
 
 // 6) R5 visual contracts: configured hero fallback, centered episode art,
-// horizontal cast rail, equal-column mobile modal, larger points, square family.
+// deterministic cast window, equal-column mobile modal, larger points, square family.
 assert(picks.includes('appearanceValue_(season, keys) || appearanceValue_(game, keys)'));
 assert(css.includes('--reality-hero-position:center center'));
 assert(css.includes('object-position:center center!important'));
-assert(css.includes('touch-action:pan-x!important'));
-assert(css.includes('scrollbar-width:thin'));
+const r53Css = css.slice(css.indexOf('PATTC REALITY R5.3'));
+assert(r53Css.includes('display:grid!important'));
+assert(r53Css.includes('overflow-x:hidden!important'));
+assert(r53Css.includes('touch-action:auto!important'));
+assert(r53Css.includes('.reality-clean-cast-card[hidden]{display:none!important}'));
 assert(css.includes('grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important'));
 assert(css.includes('.reality-player-score-total strong{\n  font-size:1.42rem!important'));
 assert(css.includes('--reality-section-radius:8px'));
