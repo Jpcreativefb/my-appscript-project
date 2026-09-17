@@ -6,6 +6,11 @@ must("backend/engines/HybridGameEngine.js","seasonCupFieldMultiplier");
 must("backend/engines/HybridGameEngine.js","seasonCupQualified");
 must("frontend/app.html","sportsTestLab.js");
 must("frontend/js/app.js","pattcSportsTestLabMount");
+const appJs=fs.readFileSync("frontend/js/app.js","utf8");
+assert(
+  (appJs.match(/pattcSportsTestLabMount\(page, app\)/g)||[]).length>=2,
+  "Football Test Lab must mount on both snapshot restore and fresh render"
+);
 function cup(placePoints,field,target,minPlayers,minPct,weight=1){
   if(field<minPlayers)return 0;
   if((field/target)*100<minPct)return 0;

@@ -1568,6 +1568,10 @@ async function navigate(page, options) {
 
       setActiveNav(page);
 
+      if (typeof pattcSportsTestLabMount === "function") {
+        pattcSportsTestLabMount(page, app);
+      }
+
     });
 
   }
