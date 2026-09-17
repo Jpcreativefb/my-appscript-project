@@ -44,7 +44,7 @@ var API_EXPLICIT_POST_ACTIONS_ = {
   registerPushSubscription: true, removePushSubscription: true,
   savePick: true, savePicksBatch: true, saveConfidencePicksBatch: true, saveRanking: true,
   saveVotingParticipant: true, uploadVotingParticipantImage: true, saveVotingCompetitionBallot: true,
-  saveSurvivorPick: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,
+  saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,
   saveTeamFantasyPick: true, randomTeamFantasyPicks: true, autoPickTeamFantasy: true,
   createLeague: true, addLeagueMember: true, removeLeagueMember: true, assignGameToLeague: true,
   saveLeagueFeatureAccess: true, setGameLeagueVisibility: true, removeGameFromLeague: true, updateLeague: true

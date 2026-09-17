@@ -1827,3 +1827,826 @@ if (typeof survivorSportsRulesCard_ === "function") {
     return html;
   };
 }
+
+
+/* =========================================================
+   SURVIVOR RECOVERY R2 — APPROVED SCOREBOARD / PICK FLOW
+   Presentation-only recovery. Existing Sports Survivor state, saves,
+   locks, scoring, ATS/lives rules, privacy, automation and KOTH remain
+   authoritative and unchanged. This scoreboard structure is intentionally
+   portable to Confidence later, but Confidence is not changed here.
+========================================================= */
+const SURVIVOR_RECOVERY_R2_NFL_COLORS_ = {
+  ARI:["#97233F","#000000"], ATL:["#A71930","#000000"], BAL:["#241773","#9E7C0C"], BUF:["#00338D","#C60C30"],
+  CAR:["#0085CA","#101820"], CHI:["#0B162A","#C83803"], CIN:["#FB4F14","#000000"], CLE:["#311D00","#FF3C00"],
+  DAL:["#003594","#869397"], DEN:["#FB4F14","#002244"], DET:["#0076B6","#B0B7BC"], GB:["#203731","#FFB612"],
+  HOU:["#03202F","#A71930"], IND:["#002C5F","#A2AAAD"], JAX:["#006778","#D7A22A"], KC:["#E31837","#FFB81C"],
+  LV:["#000000","#A5ACAF"], LAC:["#0080C6","#FFC20E"], LAR:["#003594","#FFA300"], MIA:["#008E97","#FC4C02"],
+  MIN:["#4F2683","#FFC62F"], NE:["#002244","#C60C30"], NO:["#D3BC8D","#101820"], NYG:["#0B2265","#A71930"],
+  NYJ:["#125740","#000000"], PHI:["#004C54","#A5ACAF"], PIT:["#FFB612","#101820"], SF:["#AA0000","#B3995D"],
+  SEA:["#002244","#69BE28"], TB:["#D50A0A","#34302B"], TEN:["#0C2340","#4B92DB"], WAS:["#5A1414","#FFB612"]
+};
+
+const SURVIVOR_RECOVERY_R2_TEAM_KEYS_ = {
+  arizonacardinals:"ARI", cardinals:"ARI", atlantafalcons:"ATL", falcons:"ATL",
+  baltimoreravens:"BAL", ravens:"BAL", buffalobills:"BUF", bills:"BUF", carolinapanthers:"CAR", panthers:"CAR",
+  chicagobears:"CHI", bears:"CHI", cincinnatibengals:"CIN", bengals:"CIN", clevelandbrowns:"CLE", browns:"CLE",
+  dallascowboys:"DAL", cowboys:"DAL", denverbroncos:"DEN", broncos:"DEN", detroitlions:"DET", lions:"DET",
+  greenbaypackers:"GB", packers:"GB", houstontexans:"HOU", texans:"HOU", indianapoliscolts:"IND", colts:"IND",
+  jacksonvillejaguars:"JAX", jaguars:"JAX", kansascitychiefs:"KC", chiefs:"KC", lasvegasraiders:"LV", raiders:"LV",
+  losangeleschargers:"LAC", chargers:"LAC", losangelesrams:"LAR", rams:"LAR", miamidolphins:"MIA", dolphins:"MIA",
+  minnesotavikings:"MIN", vikings:"MIN", newenglandpatriots:"NE", patriots:"NE", neworleanssaints:"NO", saints:"NO",
+  newyorkgiants:"NYG", giants:"NYG", newyorkjets:"NYJ", jets:"NYJ", philadelphiaeagles:"PHI", eagles:"PHI",
+  pittsburghsteelers:"PIT", steelers:"PIT", sanfrancisco49ers:"SF", fortyniners:"SF", "49ers":"SF",
+  seattleseahawks:"SEA", seahawks:"SEA", tampabaybuccaneers:"TB", buccaneers:"TB", bucs:"TB",
+  tennesseetitans:"TEN", titans:"TEN", washingtoncommanders:"WAS", commanders:"WAS"
+};
+
+function survivorRecoveryR2State_(team) {
+  team = team || {};
+  const result = team.sportsResult || {};
+  const status = String(result.status || "").toLowerCase();
+  const state = String(result.state || "").toLowerCase();
+  const complete = result.completed === true || state === "post" || /final|complete/.test(status);
+  const live = !complete && (state === "in" || /live|progress|in progress/.test(status));
+  return complete ? "final" : live ? "live" : "pregame";
+}
+
+function survivorRecoveryR2ScoreValue_(result, side) {
+  result = result || {};
+  const value = side === "home" ? result.homeScore : result.awayScore;
+  return value === undefined || value === null || value === "" ? "—" : String(value);
+}
+
+function survivorRecoveryR2MatchupResult_(matchup) {
+  matchup = matchup || {};
+  const source = matchup.away && matchup.away.sportsResult && Object.keys(matchup.away.sportsResult).length
+    ? matchup.away
+    : matchup.home;
+  const result = source && source.sportsResult || {};
+  return { team: source || null, result: result, state: survivorRecoveryR2State_(source || {}) };
+}
+
+function survivorRecoveryR2SavedIds_(round) {
+  round = round || {};
+  if (Array.isArray(round.pickNomineeIds) && round.pickNomineeIds.length) return round.pickNomineeIds.map(String);
+  return round.pickNomineeId ? [String(round.pickNomineeId)] : [];
+}
+
+function survivorRecoveryR2TeamKey_(team) {
+  team = team || {};
+  const direct = [team.abbr, team.teamAbbr, team.abbreviation, team.id, team.teamId].map(function(value) {
+    return String(value || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  }).find(function(value) { return SURVIVOR_RECOVERY_R2_NFL_COLORS_[value]; });
+  if (direct) return direct;
+  const candidates = [team.name, team.teamName, team.shortAnswer, team.id].map(function(value) {
+    return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  });
+  for (let i = 0; i < candidates.length; i++) {
+    if (SURVIVOR_RECOVERY_R2_TEAM_KEYS_[candidates[i]]) return SURVIVOR_RECOVERY_R2_TEAM_KEYS_[candidates[i]];
+  }
+  return String(team.abbr || team.teamAbbr || team.id || team.name || "TEAM").trim().slice(0,3).toUpperCase();
+}
+
+function survivorRecoveryR2HexAlpha_(hex, alpha) {
+  const value = String(hex || "").replace("#", "");
+  if (!/^[0-9a-f]{6}$/i.test(value)) return "rgba(8,124,255," + alpha + ")";
+  return "rgba(" + parseInt(value.slice(0,2),16) + "," + parseInt(value.slice(2,4),16) + "," + parseInt(value.slice(4,6),16) + "," + alpha + ")";
+}
+
+function survivorRecoveryR2TeamStyle_(team) {
+  const key = survivorRecoveryR2TeamKey_(team);
+  const colors = SURVIVOR_RECOVERY_R2_NFL_COLORS_[key] || ["#0B4D78", "#12304A"];
+  return "--survivor-team-primary:" + colors[0] + ";--survivor-team-secondary:" + colors[1] + ";--survivor-team-primary-a:" + survivorRecoveryR2HexAlpha_(colors[0], .36) + ";--survivor-team-primary-soft:" + survivorRecoveryR2HexAlpha_(colors[0], .18) + ";--survivor-team-secondary-a:" + survivorRecoveryR2HexAlpha_(colors[1], .20) + ";";
+}
+
+function survivorRecoveryR2Moneyline_(value) {
+  if (value === "" || value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  const number = Number(value);
+  return number > 0 ? "+" + number : String(number);
+}
+
+function survivorRecoveryR2KickoffLabel_(value) {
+  if (!value) return "Kickoff TBD";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return String(value);
+  try {
+    const day = date.toLocaleDateString([], { weekday:"short", month:"short", day:"numeric" });
+    const time = date.toLocaleTimeString([], { hour:"numeric", minute:"2-digit", timeZoneName:"short" });
+    return day + " · " + time;
+  } catch (err) {
+    return survivorFormatKickoff_(value) || String(value);
+  }
+}
+
+function survivorRecoveryR2OptionalNumber_(value) {
+  if (value === "" || value === null || value === undefined) return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function survivorRecoveryR2FavoriteId_(matchup) {
+  matchup = matchup || {};
+  const away = matchup.away || {}, home = matchup.home || {};
+  const awayMl = survivorRecoveryR2OptionalNumber_(away.moneyline), homeMl = survivorRecoveryR2OptionalNumber_(home.moneyline);
+  if (awayMl !== null && homeMl !== null && awayMl !== homeMl) {
+    return String(awayMl < homeMl ? away.id || "" : home.id || "");
+  }
+  const awaySpread = survivorRecoveryR2OptionalNumber_(away.spread), homeSpread = survivorRecoveryR2OptionalNumber_(home.spread);
+  if (awaySpread !== null && homeSpread !== null && awaySpread !== homeSpread) {
+    return String(awaySpread < homeSpread ? away.id || "" : home.id || "");
+  }
+  if (awaySpread !== null && awaySpread < 0) return String(away.id || "");
+  if (homeSpread !== null && homeSpread < 0) return String(home.id || "");
+  return "";
+}
+
+function survivorRecoveryR2ExtraStatRows_(team) {
+  team = team || {};
+  const fields = [
+    ["Streak", team.teamStreak || team.streak],
+    ["Division", team.divisionRank || team.divisionStanding],
+    ["Conference", team.conferenceRank || team.conferenceStanding],
+    ["Power Rank", team.powerRank || team.powerRanking],
+    ["Win %", team.winProbability || team.winPct]
+  ];
+  return fields.filter(function(row) { return row[1] !== "" && row[1] !== null && row[1] !== undefined; });
+}
+
+function survivorRecoveryR2TeamDetails_(team, matchup, favoriteId) {
+  if (!team) return '<div class="survivor-r2-detail-team is-empty"><strong>TBD</strong></div>';
+  const side = String(team.side || team.homeAway || "").toLowerCase();
+  const id = String(team.id || "");
+  const favorite = favoriteId && id === favoriteId;
+  const rows = [
+    ["Record", team.teamRecord || "—"],
+    ["Market", favorite ? "FAVORITE" : (favoriteId ? "UNDERDOG" : "EVEN / TBD")],
+    ["Spread", survivorFormatLine_(team.spread) || "—"],
+    ["Moneyline", survivorRecoveryR2Moneyline_(team.moneyline)],
+    ["Side", side ? side.toUpperCase() : "—"],
+    ["Opp. Record", team.opponentRecord || "—"]
+  ];
+  if (matchup && matchup.total !== "" && matchup.total !== null && matchup.total !== undefined) rows.push(["Game Total", matchup.total]);
+  survivorRecoveryR2ExtraStatRows_(team).forEach(function(row) { rows.push(row); });
+  return `<div class="survivor-r2-detail-team" style="${survivorRecoveryR2TeamStyle_(team)}">
+    <div class="survivor-r2-detail-title">${survivorFinalTeamLogo_(team) || `<span>${survivorFinalEscape_(survivorRecoveryR2TeamKey_(team))}</span>`}<strong>${survivorFinalEscape_(team.name || team.id || "Team")}</strong></div>
+    <div class="survivor-r2-detail-list">${rows.map(function(row) { return `<div><span>${survivorFinalEscape_(row[0])}</span><strong>${survivorFinalEscape_(row[1])}</strong></div>`; }).join("")}</div>
+  </div>`;
+}
+
+function survivorRecoveryR2TeamSide_(team, round, matchup, result, state, side) {
+  if (!team) return '<div class="survivor-r2-team-side is-empty"><strong>TBD</strong></div>';
+  const selectedIds = survivorFinalSelectedIds_().map(String);
+  const savedIds = survivorRecoveryR2SavedIds_(round);
+  const id = String(team.id || "");
+  const selected = selectedIds.indexOf(id) !== -1;
+  const saved = savedIds.indexOf(id) !== -1;
+  const unavailable = team.eligible === false && !selected;
+  const started = state !== "pregame";
+  const disabled = !round.canPick || unavailable || started;
+  const outcome = String(round.outcome || "").toLowerCase();
+  const resultClass = saved && state === "final" && (outcome === "win" || outcome === "loss") ? " is-result-" + outcome : "";
+  const classes = [selected ? "is-selected" : "", saved && state !== "final" ? "is-finalized" : "", unavailable ? "is-disabled" : "", started ? "is-started" : "", resultClass.trim()].filter(Boolean).join(" ");
+  const idJs = id.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const score = state === "pregame" ? "" : `<b class="survivor-r2-score">${survivorFinalEscape_(survivorRecoveryR2ScoreValue_(result, side))}</b>`;
+  const logo = survivorFinalTeamLogo_(team) || `<span class="survivor-r2-logo-fallback">${survivorFinalEscape_(survivorRecoveryR2TeamKey_(team))}</span>`;
+  const used = team.usedOverlay || (team.usedWeek ? "USED — WEEK " + team.usedWeek : "");
+  const badge = saved ? `<span class="survivor-r2-team-badge is-saved">${state === "pregame" ? "FINALIZED" : state === "live" ? "YOUR PICK" : outcome === "win" ? "SURVIVED" : outcome === "loss" ? "STRIKE" : "YOUR PICK"}</span>` : selected ? '<span class="survivor-r2-team-badge is-selected">SELECTED</span>' : used ? `<span class="survivor-r2-team-badge is-used">${survivorFinalEscape_(used)}</span>` : "";
+  return `<button type="button" class="survivor-r2-team-side ${classes}" style="${survivorRecoveryR2TeamStyle_(team)}" data-survivor-id="${survivorFinalEscape_(id)}" ${disabled ? "disabled" : ""} aria-pressed="${selected ? "true" : "false"}" onclick="survivorSelect_('${idJs}')">
+    ${badge}
+    <span class="survivor-r2-logo">${logo}</span>
+    <span class="survivor-r2-team-name"><strong>${survivorFinalEscape_(team.name || team.id || "Team")}</strong><small>${survivorFinalEscape_(String(team.abbr || team.teamAbbr || survivorRecoveryR2TeamKey_(team)).toUpperCase())}</small></span>
+    ${score}
+  </button>`;
+}
+
+function survivorRecoveryR2GameStatus_(payload, result, state) {
+  result = result || {};
+  if (state === "final") return "FINAL";
+  if (state === "live") {
+    const detail = survivorFinalLiveDetail_(payload || {}, result) || String(result.status || "").trim();
+    if (!detail) return "LIVE";
+    return /^live\b/i.test(detail) ? detail.toUpperCase() : "LIVE " + detail.toUpperCase();
+  }
+  return "NOT STARTED";
+}
+
+function survivorRecoveryR2MatchupCard_(matchup, round, payload) {
+  const game = survivorRecoveryR2MatchupResult_(matchup);
+  const result = game.result || {};
+  const state = game.state;
+  const favoriteId = survivorRecoveryR2FavoriteId_(matchup);
+  const gameStatus = survivorRecoveryR2GameStatus_(payload, result, state);
+  return `<article class="survivor-final-matchup survivor-r2-matchup is-${state}">
+    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span><strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong></div>
+    <div class="survivor-r2-scoreboard">
+      ${survivorRecoveryR2TeamSide_(matchup.away, round, matchup, result, state, "away")}
+      <span class="survivor-r2-at">@</span>
+      ${survivorRecoveryR2TeamSide_(matchup.home, round, matchup, result, state, "home")}
+    </div>
+    <details class="survivor-r2-matchup-details">
+      <summary><span>ODDS &amp; MATCHUP DETAILS</span><small>Records · favorite · lines · stats</small></summary>
+      <div class="survivor-r2-detail-grid">${survivorRecoveryR2TeamDetails_(matchup.away, matchup, favoriteId)}${survivorRecoveryR2TeamDetails_(matchup.home, matchup, favoriteId)}</div>
+      ${matchup.weather ? `<div class="survivor-r2-weather">Weather · ${survivorFinalEscape_(matchup.weather)}</div>` : ""}
+    </details>
+  </article>`;
+}
+
+function renderSurvivorRecoveryR2WeeklyBrowser_(payload) {
+  payload = payload || {};
+  const round = payload.currentRound || {};
+  const matchups = survivorFinalMatchups_(payload);
+  if (!matchups.length) return "";
+  const startedCount = matchups.filter(function(matchup) { return survivorRecoveryR2MatchupResult_(matchup).state !== "pregame"; }).length;
+  return `<section class="survivor-final-browser survivor-r2-browser">
+    <div class="survivor-r2-browser-head"><div><span>WEEK ${survivorFinalEscape_(round.week || round.round || "")}</span><strong>SURVIVE THIS WEEK</strong><small>Pick ${Math.max(1, Number(round.requiredSelections || 1))} team${Math.max(1, Number(round.requiredSelections || 1)) === 1 ? "" : "s"} you think will WIN.</small></div><em>${startedCount ? "LIVE scores update in the same matchup cards" : "Swipe · tap a team · expand odds &amp; stats"}</em></div>
+    <div class="survivor-final-matchup-scroll">${matchups.map(function(matchup) { return survivorRecoveryR2MatchupCard_(matchup, round, payload); }).join("")}</div>
+  </section>`;
+}
+
+function survivorRecoveryR2RecordPct_(record) {
+  const match = String(record || "").match(/(\d+)\s*[-–]\s*(\d+)(?:\s*[-–]\s*(\d+))?/);
+  if (!match) return -1;
+  const wins = Number(match[1]) || 0, losses = Number(match[2]) || 0, ties = Number(match[3]) || 0;
+  const games = wins + losses + ties;
+  return games ? (wins + ties * 0.5) / games : -1;
+}
+
+function survivorRecoveryR2OddsStrength_(value) {
+  const odds = Number(value);
+  if (!Number.isFinite(odds) || odds === 0) return -1;
+  return odds < 0 ? (-odds) / ((-odds) + 100) : 100 / (odds + 100);
+}
+
+function survivorRecoveryR2Candidates_(strategy) {
+  const payload = SURVIVOR_PAGE_STATE.payload || {};
+  const round = payload.currentRound || {};
+  let rows = (round.nominees || []).filter(function(team) {
+    if (!team || team.eligible === false) return false;
+    const kickoff = team.kickoff ? new Date(team.kickoff).getTime() : 0;
+    return !kickoff || Date.now() < kickoff;
+  }).slice();
+  strategy = String(strategy || "random").trim().toLowerCase();
+  if (strategy === "best-record") rows.sort(function(a, b) { return survivorRecoveryR2RecordPct_(b.teamRecord) - survivorRecoveryR2RecordPct_(a.teamRecord); });
+  else if (strategy === "best-odds") rows.sort(function(a, b) { return survivorRecoveryR2OddsStrength_(b.moneyline) - survivorRecoveryR2OddsStrength_(a.moneyline); });
+  else rows.sort(function() { return Math.random() - 0.5; });
+  return rows;
+}
+
+function survivorRecoveryR2SelectHelper_(strategy) {
+  const payload = SURVIVOR_PAGE_STATE.payload || {};
+  const round = payload.currentRound || {};
+  const required = Math.max(1, Number(round.requiredSelections || 1));
+  const candidates = survivorRecoveryR2Candidates_(strategy);
+  if (candidates.length < required) return;
+  SURVIVOR_PAGE_STATE.selected = candidates.slice(0, required).map(function(team) { return String(team.id || ""); });
+  if (typeof survivorUpdateSaveButton_ === "function") survivorUpdateSaveButton_();
+  survivorRecoveryR2Refresh_();
+}
+
+function survivorRecoveryR2StrategyLabel_(strategy) {
+  strategy = String(strategy || "random").toLowerCase();
+  if (strategy === "best-record") return "Best Record";
+  if (strategy === "best-odds") return "Best Odds";
+  return "Random Eligible";
+}
+
+function survivorRecoveryR2SameSelection_(selectedIds, savedIds) {
+  const a = (selectedIds || []).map(String).slice().sort();
+  const b = (savedIds || []).map(String).slice().sort();
+  return a.length === b.length && a.every(function(value, index) { return value === b[index]; });
+}
+
+function survivorRecoveryR2SelectedPanelState_(round, selectedTeams) {
+  round = round || {};
+  const savedIds = survivorRecoveryR2SavedIds_(round);
+  const selectedIds = (selectedTeams || []).map(function(team) { return String(team.id || ""); });
+  const finalized = selectedIds.length > 0 && survivorRecoveryR2SameSelection_(selectedIds, savedIds);
+  const selectedState = selectedTeams && selectedTeams[0] ? survivorRecoveryR2State_(selectedTeams[0]) : "pregame";
+  const outcome = String(round.outcome || "").toLowerCase();
+  if (finalized && selectedState === "final" && outcome === "win") return "win";
+  if (finalized && selectedState === "final" && outcome === "loss") return "loss";
+  if (finalized) return "finalized";
+  return selectedIds.length ? "draft" : "empty";
+}
+
+function survivorRecoveryR2SelectedTeamHtml_(selected, index, required) {
+  const logo = survivorFinalTeamLogo_(selected);
+  const opponent = selected.opponent ? (String(selected.side || "").toLowerCase() === "away" ? "@ " : "vs ") + selected.opponent : "";
+  return `<div class="survivor-r2-selected-team" style="${survivorRecoveryR2TeamStyle_(selected)}">
+    <span class="survivor-r2-selected-logo">${logo || `<span class="survivor-r2-logo-fallback">${survivorFinalEscape_(survivorRecoveryR2TeamKey_(selected))}</span>`}</span>
+    <div><small>${required > 1 ? "PICK " + (index + 1) : "SELECTED TEAM"}</small><strong>${survivorFinalEscape_(selected.name || selected.id || "Team")}</strong><span>${survivorFinalEscape_(opponent)}</span></div>
+  </div>`;
+}
+
+function renderSurvivorRecoveryR2Finalize_(payload) {
+  payload = payload || {};
+  const round = payload.currentRound || {};
+  if (!round || !payload.alive) return "";
+  const selectedIds = survivorFinalSelectedIds_();
+  const selectedTeams = selectedIds.map(function(id) {
+    return (round.nominees || []).find(function(team) { return String(team.id || "") === String(id); }) || null;
+  }).filter(Boolean);
+  const required = Math.max(1, Number(round.requiredSelections || 1));
+  const strategy = payload.settings && payload.settings.autoPickStrategy || "random";
+  const autoEnabled = payload.settings && payload.settings.autoPickEnabled === true;
+  const selectedPregame = selectedTeams.length > 0 && selectedTeams.every(function(team) { return survivorRecoveryR2State_(team) === "pregame"; });
+  const canFinalize = round.canPick && selectedTeams.length === required && selectedPregame;
+  const panelState = survivorRecoveryR2SelectedPanelState_(round, selectedTeams);
+  const selectedStarted = selectedTeams.some(function(team) { return survivorRecoveryR2State_(team) !== "pregame"; });
+  const lockLabel = (!round.canPick || selectedStarted) ? "LOCKED IN" : "OPEN UNTIL KICKOFF";
+  const outcomeLabel = panelState === "win" ? "SURVIVED" : panelState === "loss" ? "STRIKE / LOSS" : panelState === "finalized" ? "FINALIZED" : panelState === "draft" ? "READY TO FINALIZE" : "CHOOSE A TEAM";
+  const selectedHtml = selectedTeams.length
+    ? selectedTeams.map(function(selected, index) { return survivorRecoveryR2SelectedTeamHtml_(selected, index, required); }).join("")
+    : `<div class="survivor-r2-selected-empty"><strong>Choose a team from the matchup slider.</strong><span>Your selection appears here before you finalize it.</span></div>`;
+  return `<section class="survivor-r2-finalize is-${panelState}">
+    <div class="survivor-r2-pick-head"><strong>YOUR WEEK ${survivorFinalEscape_(round.week || round.round || "")} PICK</strong><small>${survivorFinalEscape_(lockLabel)}</small></div>
+    <div class="survivor-r2-selected-wrap"><span class="survivor-r2-selected-state">${survivorFinalEscape_(outcomeLabel)}</span><div class="survivor-r2-selected-team-list">${selectedHtml}</div></div>
+    ${round.canPick && !selectedStarted ? `<div class="survivor-r2-action-stack">
+      <button id="survivorSaveButton" class="survivor-r2-finalize-button" type="button" onclick="survivorSaveCurrent_()" ${canFinalize ? "" : "disabled"}><strong>FINALIZE PICK</strong><span>Save this team as your Week ${survivorFinalEscape_(round.week || round.round || "")} Survivor pick</span></button>
+      <div class="survivor-r2-pick-tools"><button type="button" class="survivor-r2-tool secondary" onclick="survivorRecoveryR2SelectHelper_('random')"><strong>Random Pick</strong><span>Eligible team</span></button><button type="button" class="survivor-r2-tool primary" onclick="survivorRecoveryR2SelectHelper_('${survivorFinalEscape_(strategy)}')"><strong>Auto Pick</strong><span>${survivorFinalEscape_(survivorRecoveryR2StrategyLabel_(strategy))}</span></button></div>
+      ${autoEnabled ? `<small class="survivor-r2-safety-note">Missed-pick Safety Net Auto Pick is enabled for this game.</small>` : ""}
+      <span id="survivorSelectionCount" class="survivor-selection-count">${selectedIds.length} / ${required} selected</span><span id="survivorSaveMessage" class="survivor-save-message"></span>
+    </div>` : ""}
+  </section>`;
+}
+
+function survivorRecoveryR2HistoryClass_(row) {
+  row = row || {};
+  const result = String(row.result || "").toLowerCase();
+  const status = String(row.survivorStatus || "").toLowerCase();
+  if (result === "loss" || /loss|eliminat|life-used|strike/.test(status)) return "is-loss";
+  if (result === "win" || /survived|safe/.test(status)) return "is-win";
+  if (result === "push") return "is-push";
+  return "is-pending";
+}
+
+function survivorRecoveryR2ScrollHistory_(direction) {
+  const rail = document.querySelector(".survivor-r2-history-rail");
+  if (!rail) return;
+  const amount = Math.max(180, Math.round(rail.clientWidth * .72));
+  rail.scrollBy({ left: Number(direction || 1) * amount, behavior:"smooth" });
+}
+
+function renderSurvivorRecoveryR2History_(payload) {
+  payload = payload || {};
+  const rows = (Array.isArray(payload.usedTeamTrail) ? payload.usedTeamTrail : Array.isArray(payload.history) ? payload.history : []).filter(function(row) { return !!(row && (row.teamId || row.team)); }).slice().sort(function(a,b) { return Number(a.week || 0) - Number(b.week || 0); });
+  if (!rows.length) return `<section class="survivor-r2-history is-empty"><div class="survivor-r2-history-head"><div><span>USED TEAMS</span><strong>No teams used yet</strong></div><small>Week-by-week history appears here.</small></div></section>`;
+  const endWeek = Number(payload.endWeek || payload.settings && payload.settings.endWeek || 0);
+  const countLabel = endWeek > 0 ? rows.length + " OF " + endWeek + " USED" : rows.length + " USED";
+  return `<section class="survivor-r2-history">
+    <div class="survivor-r2-history-head"><div><span>USED TEAMS</span><strong>Week-by-week Survivor trail</strong></div><small>${survivorFinalEscape_(countLabel)}</small></div>
+    <div class="survivor-r2-history-row"><button type="button" class="survivor-r2-history-arrow" onclick="survivorRecoveryR2ScrollHistory_(-1)" aria-label="Scroll used teams left">‹</button><div class="survivor-r2-history-rail">${rows.map(function(row) {
+      const cls = survivorRecoveryR2HistoryClass_(row);
+      const logo = survivorFinalTrailLogo_(row);
+      const result = String(row.result || row.survivorStatus || "pending").toUpperCase();
+      return `<article class="survivor-r2-history-item ${cls}" title="Week ${survivorFinalEscape_(row.week)} · ${survivorFinalEscape_(row.team || row.teamId || "Team")} · ${survivorFinalEscape_(result)}"><span>W${survivorFinalEscape_(row.week)}</span><div>${logo}</div><strong>${survivorFinalEscape_(String(row.teamId || row.team || "").toUpperCase().slice(0,4))}</strong><small>${cls === "is-loss" ? "STRIKE" : cls === "is-win" ? "SURVIVED" : result}</small></article>`;
+    }).join("")}</div><button type="button" class="survivor-r2-history-arrow" onclick="survivorRecoveryR2ScrollHistory_(1)" aria-label="Scroll used teams right">›</button></div>
+  </section>`;
+}
+
+function renderSurvivorRecoveryR2Stats_(payload) {
+  payload = payload || {};
+  const losses = Number(payload.lossesUsed || payload.strikes || 0);
+  const lives = Number(payload.livesRemaining || 0);
+  return `<section class="survivor-r2-stats">
+    <div class="survivor-r2-status-strip">
+      <div><span>Survivor Status</span><strong class="${payload.alive === false ? "is-out" : "is-alive"}">${payload.winner ? "WINNER" : payload.alive === false ? "ELIMINATED" : "ALIVE"}</strong></div>
+      <div><span>Weeks Survived</span><strong>${survivorFinalEscape_(payload.roundsSurvived || 0)}</strong></div>
+      <div><span>Current Streak</span><strong>${survivorFinalEscape_(payload.winStreak || 0)}</strong></div>
+      <div><span>Lives Remaining</span><strong>${survivorFinalEscape_(lives)}</strong></div>
+      <div><span>Losses / Strikes</span><strong>${survivorFinalEscape_(losses)}</strong></div>
+    </div>
+    ${renderSurvivorRecoveryR2History_(payload)}
+  </section>`;
+}
+
+function survivorRecoveryR2Refresh_() {
+  const payload = SURVIVOR_PAGE_STATE.payload || null;
+  if (!payload || !payload.sportsMode || payload.mode === "king-of-the-hill") return;
+  const browser = document.querySelector(".survivor-r2-browser");
+  if (browser) browser.outerHTML = renderSurvivorRecoveryR2WeeklyBrowser_(payload);
+  const finalize = document.querySelector(".survivor-r2-finalize");
+  if (finalize) finalize.outerHTML = renderSurvivorRecoveryR2Finalize_(payload);
+  if (window.PATTCSportsRich && typeof PATTCSportsRich.process === "function") {
+    const page = document.querySelector(".sports-default-survivor");
+    if (page) PATTCSportsRich.process(page);
+  }
+}
+
+if (typeof survivorSelect_ === "function" && !window.SURVIVOR_RECOVERY_R2_SELECT_BASE_) {
+  window.SURVIVOR_RECOVERY_R2_SELECT_BASE_ = survivorSelect_;
+  survivorSelect_ = function(nomineeId) {
+    window.SURVIVOR_RECOVERY_R2_SELECT_BASE_.apply(this, arguments);
+    survivorRecoveryR2Refresh_();
+  };
+}
+
+if (typeof sportsRichSurvivorPageHtml_ === "function" && !window.SURVIVOR_RECOVERY_R2_PAGE_BASE_) {
+  window.SURVIVOR_RECOVERY_R2_PAGE_BASE_ = sportsRichSurvivorPageHtml_;
+  sportsRichSurvivorPageHtml_ = function(payload) {
+    payload = payload || {};
+    if (!payload.sportsMode || payload.mode === "king-of-the-hill") {
+      return window.SURVIVOR_RECOVERY_R2_PAGE_BASE_.apply(this, arguments);
+    }
+    const gameId = sportsRichSurvivorGameId_();
+    const appearance = PATTCSportsRich.appearance(gameId, payload.appearance || null);
+    const assets = PATTCSportsRich.assets(gameId, appearance);
+    const streak = payload.mode === "streak-survivor" || payload.mode === "streak-points-strikes";
+    const alive = payload.alive !== false;
+    const headline = payload.winner ? "SURVIVOR WINNER" : alive ? "STILL ALIVE" : "ELIMINATED";
+    const stats = streak
+      ? `${survivorPageEscape_(payload.totalPoints || 0)} pts · best streak ${survivorPageEscape_(payload.bestStreak || 0)}`
+      : `${survivorPageEscape_(payload.roundsSurvived || 0)} weeks survived · streak ${survivorPageEscape_(payload.winStreak || 0)}`;
+    return `<div class="page survivor-page sports-rich-survivor sports-default-survivor survivor-recovery-r2" ${PATTCSportsRich.styleAttr(gameId, appearance, "football", "NFL")}>
+      <header class="survivor-page-header survivor-rich-hero sports-rich-hero-bg" ${PATTCSportsRich.bgAttrs(assets.hero, "--sports-rich-hero-image")}>
+        <div><span class="sports-rich-kicker">${streak ? "STREAK SURVIVOR" : "PATTC SURVIVOR FOOTBALL"}</span><h1>${survivorPageEscape_(payload.gameName || "Survivor Football")}</h1><p>Pick one eligible team each week. Matchups carry live scores, team-color identity, and expandable decision stats.</p></div>
+        <div class="survivor-rich-hero-status ${alive ? "is-alive" : "is-out"}"><span>${headline}</span><strong>${stats}</strong></div>
+      </header>
+      ${renderSurvivorRecoveryR2WeeklyBrowser_(payload)}
+      ${renderSurvivorRecoveryR2Finalize_(payload)}
+      ${renderSurvivorRecoveryR2Stats_(payload)}
+      ${typeof survivorStandings_ === "function" ? survivorStandings_(payload) : ""}
+      ${typeof renderSurvivorFinalLeagueCompare_ === "function" ? renderSurvivorFinalLeagueCompare_(payload) : ""}
+      <details class="survivor-rich-rules"><summary>Rules, twists &amp; eligibility</summary>${typeof survivorSportsRulesCard_ === "function" ? survivorSportsRulesCard_(payload) : ""}</details>
+    </div>`;
+  };
+}
+
+/* =========================================================
+   SURVIVOR RECOVERY R3 — OWNER POLISH + RC24N SURVIVOR COMPARE
+   Sports Survivor only. R3 refines the accepted R2 recovery with:
+   centered week/title, game slider navigation, brighter team gradients,
+   used-week overlays, compact finalize controls, Auto Pick modal,
+   lives/status strip, compact used-team rail, RC24N-style standings/compare,
+   and Team-Fantasy-style Rules / How To Play navigation.
+========================================================= */
+var SURVIVOR_RECOVERY_R3_COMPARE_STATE_ = { tab:"standings", week:"", users:[], addOpen:false, detailOpen:true };
+
+survivorRecoveryR2TeamStyle_ = function(team) {
+  const key = survivorRecoveryR2TeamKey_(team);
+  const colors = SURVIVOR_RECOVERY_R2_NFL_COLORS_[key] || ["#0B4D78", "#12304A"];
+  return "--survivor-team-primary:" + colors[0] + ";--survivor-team-secondary:" + colors[1] + ";--survivor-team-primary-a:" + survivorRecoveryR2HexAlpha_(colors[0], .40) + ";--survivor-team-primary-soft:" + survivorRecoveryR2HexAlpha_(colors[0], .22) + ";--survivor-team-secondary-a:" + survivorRecoveryR2HexAlpha_(colors[1], .22) + ";";
+};
+
+function survivorRecoveryR3HistoryRows_(payload) {
+  payload = payload || {};
+  return (Array.isArray(payload.usedTeamTrail) ? payload.usedTeamTrail : Array.isArray(payload.history) ? payload.history : []).filter(Boolean);
+}
+
+function survivorRecoveryR3HistoryMeta_(payload, team) {
+  team = team || {};
+  const rows = survivorRecoveryR3HistoryRows_(payload);
+  const teamKey = survivorRecoveryR2TeamKey_(team);
+  const usedWeek = Number(team.usedWeek || 0);
+  let row = rows.find(function(item) {
+    const itemKey = survivorRecoveryR2TeamKey_({ id:item.teamId || "", name:item.team || "" });
+    return teamKey && itemKey === teamKey;
+  }) || null;
+  if (!row && usedWeek) row = rows.find(function(item) { return Number(item.week || 0) === usedWeek; }) || null;
+  const cls = row ? survivorRecoveryR2HistoryClass_(row) : "is-pending";
+  return { row:row, week:Number(row && row.week || usedWeek || 0), cls:cls };
+}
+
+function survivorRecoveryR3TeamSide_(team, round, matchup, result, state, side, payload) {
+  if (!team) return '<div class="survivor-r2-team-side survivor-r3-team-side is-empty"><strong>TBD</strong></div>';
+  const selectedIds = survivorFinalSelectedIds_().map(String);
+  const savedIds = survivorRecoveryR2SavedIds_(round);
+  const id = String(team.id || "");
+  const selected = selectedIds.indexOf(id) !== -1;
+  const saved = savedIds.indexOf(id) !== -1;
+  const history = survivorRecoveryR3HistoryMeta_(payload, team);
+  const used = !!(team.usedWeek || team.usedOverlay || history.week);
+  const unavailable = team.eligible === false && !selected;
+  const started = state !== "pregame";
+  const disabled = !round.canPick || unavailable || started;
+  const outcome = String(round.outcome || "").toLowerCase();
+  const resultClass = saved && state === "final" && (outcome === "win" || outcome === "loss") ? "is-result-" + outcome : "";
+  const priorClass = used && !saved ? (history.cls === "is-loss" ? "is-prior-loss" : history.cls === "is-win" || history.cls === "is-push" ? "is-prior-win" : "is-prior-used") : "";
+  const classes = ["survivor-r3-team-side", selected ? "is-selected" : "", saved && state !== "final" ? "is-finalized" : "", unavailable ? "is-disabled" : "", started ? "is-started" : "", used && !saved ? "is-prior-used" : "", resultClass, priorClass].filter(Boolean).join(" ");
+  const idJs = id.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+  const logo = survivorFinalTeamLogo_(team) || `<span class="survivor-r2-logo-fallback">${survivorFinalEscape_(survivorRecoveryR2TeamKey_(team))}</span>`;
+  let badge = "";
+  if (saved) badge = `<span class="survivor-r2-team-badge is-saved">${state === "pregame" ? "FINALIZED" : state === "live" ? "YOUR PICK" : outcome === "win" ? "SURVIVED" : outcome === "loss" ? "STRIKE" : "YOUR PICK"}</span>`;
+  else if (selected) badge = '<span class="survivor-r2-team-badge is-selected">SELECTED</span>';
+  else if (used) badge = `<span class="survivor-r2-team-badge is-used ${history.cls === "is-loss" ? "is-loss" : history.cls === "is-win" || history.cls === "is-push" ? "is-win" : ""}">W${survivorFinalEscape_(history.week || team.usedWeek || "?")} USED</span>`;
+  else if (unavailable && team.unavailableReason === "started") badge = '<span class="survivor-r2-team-badge is-locked">LOCKED</span>';
+  return `<button type="button" class="survivor-r2-team-side ${classes}" style="${survivorRecoveryR2TeamStyle_(team)}" data-survivor-id="${survivorFinalEscape_(id)}" ${disabled ? "disabled" : ""} aria-pressed="${selected ? "true" : "false"}" onclick="survivorSelect_('${idJs}')">
+    ${badge}
+    <span class="survivor-r2-logo">${logo}</span>
+    <span class="survivor-r2-team-name"><strong>${survivorFinalEscape_(team.name || team.id || "Team")}</strong></span>
+  </button>`;
+}
+
+function survivorRecoveryR3StatValue_(team, key, favoriteId) {
+  team = team || {};
+  const id = String(team.id || "");
+  const favorite = favoriteId && id === favoriteId;
+  if (key === "Record") return team.teamRecord || "—";
+  if (key === "Market") return favorite ? "FAVORITE" : (favoriteId ? "UNDERDOG" : "EVEN / TBD");
+  if (key === "Spread") return survivorFormatLine_(team.spread) || "—";
+  if (key === "Moneyline") return survivorRecoveryR2Moneyline_(team.moneyline);
+  if (key === "Side") return String(team.side || team.homeAway || "—").toUpperCase();
+  if (key === "Opp. Record") return team.opponentRecord || "—";
+  if (key === "Streak") return team.teamStreak || team.streak || "—";
+  if (key === "Division") return team.divisionRank || team.divisionStanding || "—";
+  if (key === "Conference") return team.conferenceRank || team.conferenceStanding || "—";
+  if (key === "Power Rank") return team.powerRank || team.powerRanking || "—";
+  if (key === "Win %") return team.winProbability || team.winPct || "—";
+  return "—";
+}
+
+function survivorRecoveryR3Details_(matchup, favoriteId) {
+  const away = matchup.away || {}, home = matchup.home || {};
+  const base = ["Record","Market","Spread","Moneyline","Side","Opp. Record"];
+  ["Streak","Division","Conference","Power Rank","Win %"].forEach(function(label) {
+    const av = survivorRecoveryR3StatValue_(away,label,favoriteId), hv = survivorRecoveryR3StatValue_(home,label,favoriteId);
+    if (av !== "—" || hv !== "—") base.push(label);
+  });
+  return `<div class="survivor-r3-detail-matrix">
+    <div class="survivor-r3-detail-head"><strong>${survivorFinalEscape_(away.name || away.id || "Away")}</strong><span>STAT</span><strong>${survivorFinalEscape_(home.name || home.id || "Home")}</strong></div>
+    ${base.map(function(label) { return `<div class="survivor-r3-detail-row"><strong>${survivorFinalEscape_(survivorRecoveryR3StatValue_(away,label,favoriteId))}</strong><span>${survivorFinalEscape_(label)}</span><strong>${survivorFinalEscape_(survivorRecoveryR3StatValue_(home,label,favoriteId))}</strong></div>`; }).join("")}
+    ${(matchup.total !== "" && matchup.total !== null && matchup.total !== undefined) || matchup.weather ? `<div class="survivor-r3-detail-foot">${matchup.total !== "" && matchup.total !== null && matchup.total !== undefined ? `<span>GAME TOTAL <strong>${survivorFinalEscape_(matchup.total)}</strong></span>` : ""}${matchup.weather ? `<span>WEATHER <strong>${survivorFinalEscape_(matchup.weather)}</strong></span>` : ""}</div>` : ""}
+  </div>`;
+}
+
+function survivorRecoveryR3LiveScore_(matchup, result, state, payload) {
+  if (state === "pregame") return "";
+  const away = matchup.away || {}, home = matchup.home || {};
+  const status = survivorRecoveryR2GameStatus_(payload, result, state);
+  return `<div class="survivor-r3-live-score is-${state}"><span>${survivorFinalEscape_(away.name || away.id || "Away")}</span><strong>${survivorFinalEscape_(survivorRecoveryR2ScoreValue_(result,"away"))}</strong><em>${survivorFinalEscape_(status)}</em><strong>${survivorFinalEscape_(survivorRecoveryR2ScoreValue_(result,"home"))}</strong><span>${survivorFinalEscape_(home.name || home.id || "Home")}</span></div>`;
+}
+
+function survivorRecoveryR3MatchupCard_(matchup, round, payload) {
+  const game = survivorRecoveryR2MatchupResult_(matchup), result = game.result || {}, state = game.state;
+  const favoriteId = survivorRecoveryR2FavoriteId_(matchup), gameStatus = survivorRecoveryR2GameStatus_(payload, result, state);
+  return `<article class="survivor-final-matchup survivor-r2-matchup survivor-r3-matchup is-${state}">
+    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span><strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong></div>
+    <div class="survivor-r2-scoreboard survivor-r3-scoreboard">
+      ${survivorRecoveryR3TeamSide_(matchup.away, round, matchup, result, state, "away", payload)}
+      <span class="survivor-r2-at">@</span>
+      ${survivorRecoveryR3TeamSide_(matchup.home, round, matchup, result, state, "home", payload)}
+    </div>
+    <details class="survivor-r2-matchup-details survivor-r3-matchup-details"><summary><span>ODDS &amp; MATCHUP DETAILS</span><small>Tap to expand</small></summary>${survivorRecoveryR3Details_(matchup, favoriteId)}</details>
+    ${survivorRecoveryR3LiveScore_(matchup, result, state, payload)}
+  </article>`;
+}
+
+function survivorRecoveryR3UpdateSliderCount_() {
+  const rail = document.querySelector(".survivor-r3-matchup-scroll");
+  if (!rail) return;
+  const cards = Array.from(rail.querySelectorAll(".survivor-r3-matchup"));
+  if (!cards.length) return;
+  const left = rail.getBoundingClientRect().left;
+  let best = 0, delta = Infinity;
+  cards.forEach(function(card,index) { const d = Math.abs(card.getBoundingClientRect().left-left); if (d < delta) { delta=d; best=index; } });
+  const node = document.querySelector(".survivor-r3-game-index");
+  if (node) node.textContent = String(best+1);
+}
+
+function survivorRecoveryR3ScrollMatchups_(direction) {
+  const rail = document.querySelector(".survivor-r3-matchup-scroll");
+  if (!rail) return;
+  const card = rail.querySelector(".survivor-r3-matchup");
+  const amount = card ? card.getBoundingClientRect().width + 11 : Math.max(260, rail.clientWidth * .9);
+  rail.scrollBy({ left:Number(direction || 1)*amount, behavior:"smooth" });
+  setTimeout(survivorRecoveryR3UpdateSliderCount_, 350);
+}
+
+function renderSurvivorRecoveryR3WeeklyBrowser_(payload) {
+  payload = payload || {};
+  const round = payload.currentRound || {}, matchups = survivorFinalMatchups_(payload);
+  if (!matchups.length) return "";
+  const required = Math.max(1, Number(round.requiredSelections || 1));
+  return `<section class="survivor-final-browser survivor-r2-browser survivor-r3-browser">
+    <div class="survivor-r3-browser-head"><span>WEEK ${survivorFinalEscape_(round.week || round.round || "")}</span><strong>SURVIVE THE WEEK</strong><small>Pick ${required} team${required === 1 ? "" : "s"} you think will WIN.</small></div>
+    <div class="survivor-r3-slider-nav"><div><button type="button" onclick="survivorRecoveryR3ScrollMatchups_(-1)" aria-label="Previous game">‹</button><strong>GAME <span class="survivor-r3-game-index">1</span> OF ${matchups.length}</strong><button type="button" onclick="survivorRecoveryR3ScrollMatchups_(1)" aria-label="Next game">›</button></div><small>Slide to View Games and Available Picks</small></div>
+    <div class="survivor-final-matchup-scroll survivor-r3-matchup-scroll" onscroll="survivorRecoveryR3UpdateSliderCount_()">${matchups.map(function(matchup) { return survivorRecoveryR3MatchupCard_(matchup, round, payload); }).join("")}</div>
+  </section>`;
+}
+
+function survivorRecoveryR3SelectedTeamHtml_(selected) {
+  const logo = survivorFinalTeamLogo_(selected);
+  const opponent = selected.opponent ? (String(selected.side || "").toLowerCase() === "away" ? "@ " : "vs ") + selected.opponent : "";
+  return `<div class="survivor-r2-selected-team survivor-r3-selected-team" style="${survivorRecoveryR2TeamStyle_(selected)}"><span class="survivor-r2-selected-logo">${logo || `<span class="survivor-r2-logo-fallback">${survivorFinalEscape_(survivorRecoveryR2TeamKey_(selected))}</span>`}</span><div><strong>${survivorFinalEscape_(selected.name || selected.id || "Team")}</strong><span>${survivorFinalEscape_(opponent)}</span></div></div>`;
+}
+
+function survivorRecoveryR3AutoPreference_(payload) {
+  payload = payload || {};
+  const pref = payload.autoPickPreference || {};
+  const settings = payload.settings || {};
+  return {
+    configured: pref.configured === true,
+    enabled: pref.configured === true ? pref.enabled === true : settings.autoPickEnabled === true,
+    strategy: pref.strategy || settings.autoPickStrategy || "best-odds",
+    scope: pref.scope === "week" ? "week" : "season",
+    targetWeek: Number(pref.targetWeek || 0)
+  };
+}
+
+function survivorRecoveryR3CloseAutoPick_() {
+  const node = document.getElementById("survivorR3AutoPickOverlay");
+  if (node) node.remove();
+}
+
+function survivorRecoveryR3OpenAutoPick_() {
+  survivorRecoveryR3CloseAutoPick_();
+  const payload = SURVIVOR_PAGE_STATE.payload || {}, round = payload.currentRound || {};
+  const pref = survivorRecoveryR3AutoPreference_(payload), enabledByAdmin = payload.settings && payload.settings.autoPickEnabled === true;
+  const overlay = document.createElement("div");
+  overlay.id = "survivorR3AutoPickOverlay";
+  overlay.className = "tf-info-overlay survivor-r3-auto-overlay";
+  overlay.innerHTML = `<section class="tf-info-sheet survivor-r3-auto-sheet"><div class="tf-info-head"><h2>Auto Pick</h2><button class="tf-info-close" type="button" onclick="survivorRecoveryR3CloseAutoPick_()">×</button></div><div class="tf-info-body">
+    <p class="tf-info-intro">Choose how PATTC should select an eligible unused team. Selecting a team here does not finalize your Survivor pick.</p>
+    <div class="survivor-r3-auto-methods">
+      <label><input type="radio" name="survivorR3AutoStrategy" value="best-odds" ${pref.strategy === "best-odds" ? "checked" : ""}><span><strong>Best Odds / Favorite</strong><small>Choose the strongest available favorite from current odds.</small></span></label>
+      <label><input type="radio" name="survivorR3AutoStrategy" value="best-record" ${pref.strategy === "best-record" ? "checked" : ""}><span><strong>Best Record</strong><small>Choose the eligible team with the best current record.</small></span></label>
+      <label><input type="radio" name="survivorR3AutoStrategy" value="random" ${pref.strategy === "random" ? "checked" : ""}><span><strong>Random Eligible</strong><small>Choose randomly from teams that are still legal to use.</small></span></label>
+    </div>
+    <button type="button" class="survivor-r3-auto-now" onclick="survivorRecoveryR3AutoPickNow_()">SELECT TEAM NOW</button>
+    <div class="survivor-r3-auto-protection ${enabledByAdmin ? "" : "is-disabled"}"><div><strong>Missed-Pick Protection</strong><small>If you have no finalized pick, PATTC can choose for you before the weekly Auto Pick deadline.</small></div><label class="survivor-r3-switch"><input id="survivorR3AutoProtect" type="checkbox" ${pref.enabled ? "checked" : ""} ${enabledByAdmin ? "" : "disabled"}><span></span></label></div>
+    <label class="survivor-r3-auto-scope"><span>Protection scope</span><select id="survivorR3AutoScope" ${enabledByAdmin ? "" : "disabled"}><option value="week" ${pref.scope === "week" ? "selected" : ""}>This Week Only</option><option value="season" ${pref.scope === "season" ? "selected" : ""}>Future Weeks This Season</option></select></label>
+    ${enabledByAdmin ? `<button type="button" class="survivor-r3-auto-save" onclick="survivorRecoveryR3SaveAutoPreference_()">SAVE AUTO PICK SETTINGS</button>` : `<p class="survivor-r3-auto-disabled-note">Future missed-pick protection is disabled by the game admin. Auto Pick Now is still available.</p>`}
+    <div id="survivorR3AutoStatus" class="survivor-r3-auto-status"></div>
+  </div><div class="tf-info-footer"><button class="tf-button secondary" type="button" onclick="survivorRecoveryR3CloseAutoPick_()">Close</button></div></section>`;
+  overlay.addEventListener("click", function(event){ if (event.target === overlay) survivorRecoveryR3CloseAutoPick_(); });
+  document.body.appendChild(overlay);
+}
+
+function survivorRecoveryR3SelectedAutoStrategy_() {
+  const checked = document.querySelector('input[name="survivorR3AutoStrategy"]:checked');
+  return checked ? checked.value : "best-odds";
+}
+
+function survivorRecoveryR3AutoPickNow_() {
+  const strategy = survivorRecoveryR3SelectedAutoStrategy_();
+  survivorRecoveryR2SelectHelper_(strategy);
+  survivorRecoveryR3CloseAutoPick_();
+}
+
+async function survivorRecoveryR3SaveAutoPreference_() {
+  const payload = SURVIVOR_PAGE_STATE.payload || {}, round = payload.currentRound || {};
+  const enabled = !!(document.getElementById("survivorR3AutoProtect") && document.getElementById("survivorR3AutoProtect").checked);
+  const scopeNode = document.getElementById("survivorR3AutoScope");
+  const scope = scopeNode && scopeNode.value === "week" ? "week" : "season";
+  const strategy = survivorRecoveryR3SelectedAutoStrategy_();
+  const status = document.getElementById("survivorR3AutoStatus");
+  if (status) status.textContent = "Saving…";
+  let result;
+  if (/^(127\.0\.0\.1|localhost)$/.test(String(location && location.hostname || ""))) {
+    result = { success:true, preference:{ configured:true, enabled:enabled, strategy:strategy, scope:scope, targetWeek:scope === "week" ? Number(round.week || round.round || 0) : 0 } };
+  } else if (typeof apiPost === "function") {
+    const session = typeof getSession === "function" ? (getSession() || {}) : {};
+    result = await apiPost("saveSportsSurvivorAutoPickPreference", { gameId:SURVIVOR_PAGE_STATE.gameId || payload.gameId || "", username:session.username || "", enabled:enabled, strategy:strategy, scope:scope, week:Number(round.week || round.round || 0) });
+  } else result = { success:false, message:"Auto Pick settings service is unavailable." };
+  if (!result || result.success === false) { if (status) status.textContent = result && (result.message || result.error) || "Could not save Auto Pick settings."; return; }
+  payload.autoPickPreference = result.preference || { configured:true, enabled:enabled, strategy:strategy, scope:scope, targetWeek:scope === "week" ? Number(round.week || round.round || 0) : 0 };
+  if (status) status.textContent = enabled ? (scope === "week" ? "Protection saved for this week." : "Protection saved for future missed weeks.") : "Missed-pick protection turned off.";
+  survivorRecoveryR3Refresh_();
+}
+
+function renderSurvivorRecoveryR3Finalize_(payload) {
+  payload = payload || {};
+  const round = payload.currentRound || {};
+  if (!round || !payload.alive) return "";
+  const selectedIds = survivorFinalSelectedIds_();
+  const selectedTeams = selectedIds.map(function(id) { return (round.nominees || []).find(function(team) { return String(team.id || "") === String(id); }) || null; }).filter(Boolean);
+  const required = Math.max(1, Number(round.requiredSelections || 1));
+  const selectedPregame = selectedTeams.length > 0 && selectedTeams.every(function(team) { return survivorRecoveryR2State_(team) === "pregame"; });
+  const canFinalize = round.canPick && selectedTeams.length === required && selectedPregame;
+  const panelState = survivorRecoveryR2SelectedPanelState_(round, selectedTeams);
+  const selectedStarted = selectedTeams.some(function(team) { return survivorRecoveryR2State_(team) !== "pregame"; });
+  const lockLabel = (!round.canPick || selectedStarted) ? "LOCKED IN" : "OPEN UNTIL KICKOFF";
+  const selectedHtml = selectedTeams.length ? selectedTeams.map(survivorRecoveryR3SelectedTeamHtml_).join("") : `<div class="survivor-r2-selected-empty"><strong>Choose a team from the matchup slider.</strong></div>`;
+  const pref = survivorRecoveryR3AutoPreference_(payload);
+  const prefNote = pref.enabled ? (pref.scope === "week" ? "Auto protection · this week · " : "Auto protection · future weeks · ") + survivorRecoveryR2StrategyLabel_(pref.strategy) : "Auto protection off";
+  return `<section class="survivor-r2-finalize survivor-r3-finalize is-${panelState}">
+    <div class="survivor-r2-pick-head survivor-r3-pick-head"><strong>YOUR WEEK ${survivorFinalEscape_(round.week || round.round || "")} PICK</strong><small>${survivorFinalEscape_(lockLabel)}</small></div>
+    <div class="survivor-r2-selected-wrap survivor-r3-selected-wrap"><div class="survivor-r2-selected-team-list">${selectedHtml}</div></div>
+    ${round.canPick && !selectedStarted ? `<div class="survivor-r2-action-stack survivor-r3-action-stack"><button id="survivorSaveButton" class="survivor-r2-finalize-button survivor-r3-finalize-button" type="button" onclick="survivorSaveCurrent_()" ${canFinalize ? "" : "disabled"}><strong>FINALIZE PICK</strong></button><div class="survivor-r2-pick-tools"><button type="button" class="survivor-r2-tool secondary" onclick="survivorRecoveryR2SelectHelper_('random')"><strong>Random Pick</strong><span>Eligible team</span></button><button type="button" class="survivor-r2-tool primary" onclick="survivorRecoveryR3OpenAutoPick_()"><strong>Auto Pick</strong><span>Choose method</span></button></div><small class="survivor-r2-safety-note survivor-r3-safety-note">${survivorFinalEscape_(prefNote)}</small><span id="survivorSelectionCount" class="survivor-selection-count">${selectedIds.length} / ${required} selected</span><span id="survivorSaveMessage" class="survivor-save-message"></span></div>` : ""}
+  </section>`;
+}
+
+function survivorRecoveryR3LifeCircles_(payload) {
+  const allowed = Math.max(0, Number(payload.lossesAllowed || payload.settings && payload.settings.lossesAllowed || 0) + Number(payload.earnedLives || 0));
+  const used = Math.max(0, Number(payload.lossesUsed || payload.strikes || 0));
+  if (!allowed) return "";
+  return `<div class="survivor-r3-lives"><span>LIVES</span><div>${Array.from({length:allowed}).map(function(_,index){ return `<i class="${index < used ? "is-used" : ""}"></i>`; }).join("")}</div></div>`;
+}
+
+function renderSurvivorRecoveryR3History_(payload) {
+  payload = payload || {};
+  const rows = survivorRecoveryR3HistoryRows_(payload).filter(function(row){ return !!(row && (row.teamId || row.team)); }).slice().sort(function(a,b){ return Number(a.week||0)-Number(b.week||0); });
+  if (!rows.length) return `<section class="survivor-r2-history survivor-r3-history is-empty"><div class="survivor-r2-history-head"><div><span>USED TEAMS</span></div></div><small class="survivor-r3-used-count">0 USED</small></section>`;
+  const endWeek = Number(payload.endWeek || payload.settings && payload.settings.endWeek || 0), countLabel = endWeek > 0 ? rows.length + " OF " + endWeek + " USED" : rows.length + " USED";
+  return `<section class="survivor-r2-history survivor-r3-history"><div class="survivor-r2-history-head"><div><span>USED TEAMS</span></div></div><div class="survivor-r2-history-row"><button type="button" class="survivor-r2-history-arrow" onclick="survivorRecoveryR2ScrollHistory_(-1)" aria-label="Scroll used teams left">‹</button><div class="survivor-r2-history-rail survivor-r3-history-rail">${rows.map(function(row){ const cls=survivorRecoveryR2HistoryClass_(row), logo=survivorFinalTrailLogo_(row); return `<article class="survivor-r2-history-item survivor-r3-history-item ${cls}" title="Week ${survivorFinalEscape_(row.week)} · ${survivorFinalEscape_(row.team || row.teamId || "Team")}"><span>W${survivorFinalEscape_(row.week)}</span><div>${logo}</div></article>`; }).join("")}</div><button type="button" class="survivor-r2-history-arrow" onclick="survivorRecoveryR2ScrollHistory_(1)" aria-label="Scroll used teams right">›</button></div><small class="survivor-r3-used-count">${survivorFinalEscape_(countLabel)}</small></section>`;
+}
+
+function renderSurvivorRecoveryR3Stats_(payload) {
+  payload = payload || {};
+  return `<section class="survivor-r2-stats survivor-r3-stats"><div class="survivor-r3-status-top"><strong class="${payload.alive === false ? "is-out" : "is-alive"}">${payload.winner ? "WINNER" : payload.alive === false ? "ELIMINATED" : "ALIVE"}</strong>${survivorRecoveryR3LifeCircles_(payload)}</div><div class="survivor-r3-stat-line"><div><span>Weeks Survived</span><strong>${survivorFinalEscape_(payload.roundsSurvived || 0)}</strong></div><div><span>Current Streak</span><strong>${survivorFinalEscape_(payload.winStreak || 0)}</strong></div><div><span>Score</span><strong>${survivorFinalEscape_(payload.totalPoints || 0)}</strong></div></div>${renderSurvivorRecoveryR3History_(payload)}</section>`;
+}
+
+function survivorRecoveryR3Viewer_(payload) {
+  const session = typeof getSession === "function" ? (getSession() || {}) : {};
+  return String(session.username || payload && payload.currentUser && payload.currentUser.username || "").toLowerCase();
+}
+
+function survivorRecoveryR3ComparePlayers_(payload) {
+  payload = payload || {};
+  const compare = Array.isArray(payload.compare) ? payload.compare.slice() : [];
+  if (compare.length) return compare;
+  return (payload.standings || []).map(function(row){ return { username:row.username || row.user, displayName:row.displayName || row.username || row.user, alive:row.survivorAlive !== false, totalPoints:Number(row.total || 0), winStreak:Number(row.survivorWinStreak || 0), lossesUsed:Number(row.survivorLossesUsed || 0), livesRemaining:Number(row.survivorLivesRemaining || 0), weeks:[] }; });
+}
+
+function survivorRecoveryR3CompareInit_(payload) {
+  const players = survivorRecoveryR3ComparePlayers_(payload), viewer = survivorRecoveryR3Viewer_(payload);
+  const valid = {};
+  players.forEach(function(p){ valid[String(p.username || "").toLowerCase()] = p.username; });
+  let selected = (SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users || []).filter(function(u){ return !!valid[String(u||"").toLowerCase()]; });
+  const viewerRow = players.find(function(p){ return String(p.username||"").toLowerCase() === viewer; });
+  if (viewerRow) selected = [viewerRow.username].concat(selected.filter(function(u){ return String(u||"").toLowerCase() !== viewer; }));
+  if (!selected.length && players.length) selected.push(players[0].username);
+  players.forEach(function(p){ if (selected.length < Math.min(3,players.length) && selected.indexOf(p.username) === -1) selected.push(p.username); });
+  SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users = selected.slice(0,6);
+  if (!SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week) SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week = String(payload.currentRound && (payload.currentRound.week || payload.currentRound.round) || "all");
+  return SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users;
+}
+
+function survivorRecoveryR3CompareWeekRow_(player, week) {
+  const weeks = player && player.weeks || [];
+  if (week === "all") return weeks.length ? weeks[weeks.length-1] : null;
+  return weeks.find(function(row){ return String(row.week) === String(week); }) || null;
+}
+
+function survivorRecoveryR3CompareLogo_(week) {
+  if (!week) return '<span class="survivor-r3-cm-empty">—</span>';
+  if (week.hidden) return '<span class="survivor-r3-cm-lock">🔒</span>';
+  if (week.logoUrl) return `<img src="${survivorFinalEscape_(week.logoUrl)}" alt="${survivorFinalEscape_(week.team || "Team")}">`;
+  return `<span class="survivor-r3-cm-abbr">${survivorFinalEscape_(String(week.teamId || week.team || "—").slice(0,3).toUpperCase())}</span>`;
+}
+
+function survivorRecoveryR3CompareRerender_() {
+  const node = document.querySelector(".survivor-r3-competition");
+  const payload = SURVIVOR_PAGE_STATE.payload || {};
+  if (node) node.outerHTML = renderSurvivorRecoveryR3Competition_(payload);
+}
+function survivorRecoveryR3SetTab_(tab){ SURVIVOR_RECOVERY_R3_COMPARE_STATE_.tab = tab === "compare" ? "compare" : "standings"; survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3SetWeek_(week){ SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week = String(week || "all"); survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3ToggleAdd_(){ SURVIVOR_RECOVERY_R3_COMPARE_STATE_.addOpen = !SURVIVOR_RECOVERY_R3_COMPARE_STATE_.addOpen; survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3AddUser_(username){ if ((SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users||[]).length >= 6) return; if (SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users.indexOf(username) === -1) SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users.push(username); SURVIVOR_RECOVERY_R3_COMPARE_STATE_.addOpen=false; survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3RemoveUser_(username){ const payload=SURVIVOR_PAGE_STATE.payload||{}, viewer=survivorRecoveryR3Viewer_(payload); if(String(username||"").toLowerCase()===viewer)return; SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users=(SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users||[]).filter(function(u){return String(u||"").toLowerCase()!==String(username||"").toLowerCase();}); survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3MoveUser_(username,dir){ const list=(SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users||[]).slice(), i=list.indexOf(username), n=i+Number(dir||0); if(i<1||n<1||n>=list.length)return; const tmp=list[i]; list[i]=list[n]; list[n]=tmp; SURVIVOR_RECOVERY_R3_COMPARE_STATE_.users=list; survivorRecoveryR3CompareRerender_(); }
+function survivorRecoveryR3TogglePickDetails_(){ SURVIVOR_RECOVERY_R3_COMPARE_STATE_.detailOpen=!SURVIVOR_RECOVERY_R3_COMPARE_STATE_.detailOpen; survivorRecoveryR3CompareRerender_(); }
+
+function survivorRecoveryR3StandingsRows_(payload) {
+  const rows = (payload.standings || []).slice();
+  rows.sort(function(a,b){ const aa=a.survivorAlive!==false?1:0, ba=b.survivorAlive!==false?1:0; if(aa!==ba)return ba-aa; return Number(b.total||0)-Number(a.total||0); });
+  return `<div class="survivor-r3-standings-list">${rows.map(function(row,index){ const alive=row.survivorAlive!==false; return `<div class="survivor-r3-standing ${alive?"is-alive":"is-out"}"><span>#${index+1}</span><strong>${survivorFinalEscape_(row.displayName || row.username || row.user || "Player")}</strong><em>${row.survivorWinner?"WINNER":alive?"ALIVE":"ELIMINATED"}</em><small>${survivorFinalEscape_(row.survivorWinStreak || 0)} streak · ${survivorFinalEscape_(row.survivorLivesRemaining || 0)} lives</small><b>${survivorFinalEscape_(row.total || 0)} pts</b></div>`; }).join("") || '<div class="survivor-r3-compare-empty">No Survivor standings yet.</div>'}</div>`;
+}
+
+function survivorRecoveryR3CompareMatrix_(payload) {
+  const players = survivorRecoveryR3ComparePlayers_(payload), selectedNames=survivorRecoveryR3CompareInit_(payload), viewer=survivorRecoveryR3Viewer_(payload), week=SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week || "all";
+  const active=selectedNames.map(function(name){ return players.find(function(p){ return String(p.username||"").toLowerCase()===String(name||"").toLowerCase(); }); }).filter(Boolean);
+  const available=players.filter(function(p){ return selectedNames.indexOf(p.username)===-1; });
+  const toolbar=`<div class="survivor-r3-cm-toolbar"><span>You + ${Math.max(0,active.length-1)} rival${active.length===2?"":"s"} · ${active.length}/6 columns</span>${active.length<6&&available.length?'<button type="button" onclick="survivorRecoveryR3ToggleAdd_()">+ Add User</button>':""}</div>${SURVIVOR_RECOVERY_R3_COMPARE_STATE_.addOpen?`<div class="survivor-r3-cm-add">${available.map(function(p){return `<button type="button" onclick="survivorRecoveryR3AddUser_('${String(p.username||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'")}')">${survivorFinalEscape_(p.displayName||p.username)}</button>`;}).join("")}</div>`:""}`;
+  const header=active.map(function(p,index){ const you=String(p.username||"").toLowerCase()===viewer; return `<div class="survivor-r3-cm-head ${you?"is-you":""}"><div><strong>${survivorFinalEscape_(p.displayName||p.username)}</strong>${you?'<span class="survivor-r3-cm-you">YOU</span>':`<span class="survivor-r3-cm-actions"><button ${index<=1?"disabled":""} onclick="survivorRecoveryR3MoveUser_('${String(p.username||"").replace(/'/g,"\\'")}',-1)">‹</button><button ${index>=active.length-1?"disabled":""} onclick="survivorRecoveryR3MoveUser_('${String(p.username||"").replace(/'/g,"\\'")}',1)">›</button><button onclick="survivorRecoveryR3RemoveUser_('${String(p.username||"").replace(/'/g,"\\'")}')">×</button></span>`}</div><b>${survivorFinalEscape_(p.totalPoints||0)} <small>pts</small></b><em>${p.alive===false?"ELIMINATED":"ALIVE"}</em></div>`; }).join("");
+  const pickCells=active.map(function(p){ const w=survivorRecoveryR3CompareWeekRow_(p,week); return `<div class="survivor-r3-cm-pick">${survivorRecoveryR3CompareLogo_(w)}</div>`; }).join("");
+  const detailOpen=SURVIVOR_RECOVERY_R3_COMPARE_STATE_.detailOpen;
+  const details=detailOpen?`<div class="survivor-r3-cm-row survivor-r3-cm-detail-label"><div>DETAIL</div>${active.map(function(p){ const w=survivorRecoveryR3CompareWeekRow_(p,week); if(!w)return '<div>—</div>'; if(w.hidden)return '<div>Pick hidden until kickoff</div>'; return `<div><span>${survivorFinalEscape_(w.team||"No pick")}${w.opponent?" vs "+survivorFinalEscape_(w.opponent):""}</span><small>${survivorFinalEscape_(w.result||"pending")}${w.weeklyPoints!==undefined&&w.weeklyPoints!==null?" · "+survivorFinalEscape_(w.weeklyPoints)+" pts":""}</small></div>`; }).join("")}</div>`:"";
+  function metric(label,fn){ return `<div class="survivor-r3-cm-row"><div class="survivor-r3-cm-label">${label}</div>${active.map(function(p){ return `<div class="survivor-r3-cm-value">${survivorFinalEscape_(fn(p))}</div>`; }).join("")}</div>`; }
+  const matrix=`<div class="survivor-r3-cm-scroll"><div class="survivor-r3-cm-matrix" style="--survivor-users:${Math.max(1,active.length)}"><div class="survivor-r3-cm-row survivor-r3-cm-header"><div class="survivor-r3-cm-corner"><span>${week==="all"?"SEASON":"WEEK "+survivorFinalEscape_(week)}</span><strong>SURVIVOR</strong></div>${header}</div><div class="survivor-r3-cm-row"><button type="button" class="survivor-r3-cm-label survivor-r3-cm-pick-label" onclick="survivorRecoveryR3TogglePickDetails_()"><span>${detailOpen?"▾":"▸"}</span><strong>PICK</strong><small>${detailOpen?"Hide details":"Details"}</small></button>${pickCells}</div>${details}${metric("STATUS",function(p){return p.alive===false?"OUT":"ALIVE";})}${metric("LIVES",function(p){return p.livesRemaining||0;})}${metric("STREAK",function(p){return p.winStreak||0;})}${metric("LOSSES",function(p){return p.lossesUsed||0;})}${metric("SCORE",function(p){return (p.totalPoints||0)+" pts";})}</div></div>`;
+  return toolbar+matrix+'<div class="survivor-r3-cm-privacy">Opponent picks remain hidden until the existing Survivor reveal rule allows them.</div>';
+}
+
+function renderSurvivorRecoveryR3Competition_(payload) {
+  payload=payload||{}; const tab=SURVIVOR_RECOVERY_R3_COMPARE_STATE_.tab||"standings", compare=survivorRecoveryR3ComparePlayers_(payload), currentWeek=String(payload.currentRound&&(payload.currentRound.week||payload.currentRound.round)||"");
+  const weeks={}; compare.forEach(function(p){(p.weeks||[]).forEach(function(w){if(w&&w.week)weeks[String(w.week)]=true;});}); if(currentWeek)weeks[currentWeek]=true;
+  const weekOptions=Object.keys(weeks).sort(function(a,b){return Number(b)-Number(a);}).map(function(w){return `<option value="${survivorFinalEscape_(w)}" ${String(SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week||currentWeek)===w?"selected":""}>${w===currentWeek?"Week "+w+" — CURRENT":"Week "+w}</option>`;}).join("")+`<option value="all" ${SURVIVOR_RECOVERY_R3_COMPARE_STATE_.week==="all"?"selected":""}>All Weeks</option>`;
+  const lc=payload.leagueContext||{};
+  return `<section class="survivor-r3-competition"><div class="survivor-r3-comp-head"><div><strong>STANDINGS &amp; PLAYER COMPARE</strong><small>Survivor standings, picks, lives, streaks and scores</small></div></div><div class="survivor-r3-comp-toolbar"><div class="survivor-r3-tabs"><button class="${tab==="standings"?"active":""}" onclick="survivorRecoveryR3SetTab_('standings')">Standings</button><button class="${tab==="compare"?"active":""}" onclick="survivorRecoveryR3SetTab_('compare')">Compare</button></div><div class="survivor-r3-filters">${(lc.leagues||[]).length>1?`<label>League<select onchange="survivorFinalSwitchLeague_(this.value)">${(lc.leagues||[]).map(function(l){return `<option value="${survivorFinalEscape_(l.leagueId)}" ${l.leagueId===lc.leagueId?"selected":""}>${survivorFinalEscape_(l.leagueName||l.leagueId)}</option>`;}).join("")}</select></label>`:""}<label>Week<select onchange="survivorRecoveryR3SetWeek_(this.value)">${weekOptions}</select></label></div></div>${tab==="compare"?survivorRecoveryR3CompareMatrix_(payload):survivorRecoveryR3StandingsRows_(payload)}</section>`;
+}
+
+function survivorRecoveryR3InfoClose_() { const node=document.getElementById("survivorR3InfoOverlay"); if(node)node.remove(); }
+function survivorRecoveryR3InfoOpen_(title,html) { survivorRecoveryR3InfoClose_(); const overlay=document.createElement("div"); overlay.id="survivorR3InfoOverlay"; overlay.className="tf-info-overlay"; overlay.innerHTML=`<section class="tf-info-sheet"><div class="tf-info-head"><h2>${survivorFinalEscape_(title)}</h2><button class="tf-info-close" type="button" onclick="survivorRecoveryR3InfoClose_()">×</button></div><div class="tf-info-body">${html}</div><div class="tf-info-footer"><button class="tf-button secondary" type="button" onclick="survivorRecoveryR3InfoClose_()">Close</button></div></section>`; overlay.addEventListener("click",function(e){if(e.target===overlay)survivorRecoveryR3InfoClose_();}); document.body.appendChild(overlay); }
+function survivorRecoveryR3OpenRules_(){ const p=SURVIVOR_PAGE_STATE.payload||{}, s=p.settings||{}; survivorRecoveryR3InfoOpen_("Rules",`<div class="tf-rules-copy"><ol><li>Pick the required eligible NFL team${Number(p.currentRound&&p.currentRound.requiredSelections||1)===1?"":"s"} each week before that team's kickoff.</li><li>Team reuse limit: <strong>${survivorFinalEscape_(p.teamUseLimit||s.teamUseLimit||1)}</strong>. Used teams stay visible but cannot be selected after their limit is reached.</li><li>Result mode: <strong>${survivorFinalEscape_(String(s.resultMode||"straight-up").replace(/-/g," ").toUpperCase())}</strong>. Push/tie handling follows the configured Survivor rules.</li><li>Allowed losses/lives: <strong>${survivorFinalEscape_(p.lossesAllowed||s.lossesAllowed||0)}</strong>. The status panel shows consumed lives when enabled.</li><li>Random Pick and Auto Pick select an eligible team; <strong>FINALIZE PICK</strong> is still required for a manual weekly choice.</li></ol></div>`); }
+function survivorRecoveryR3OpenHowTo_(){ survivorRecoveryR3InfoOpen_("How to Play",`<div class="tf-rules-copy"><ol><li>Swipe the weekly matchup slider and tap either eligible team.</li><li>Open <strong>Odds &amp; Matchup Details</strong> to compare records, favorite/underdog status, spread, moneyline and available stats.</li><li>Review <strong>Your Week Pick</strong>, then press <strong>FINALIZE PICK</strong>.</li><li>Random Pick chooses a random eligible unused team. Auto Pick lets you choose Best Odds, Best Record or Random and can also configure missed-pick protection when the admin enables it.</li><li>Once games start, matchup cards keep the live clock/status at the top and show the live/final score below the matchup details.</li><li>Used Teams, Standings and Compare track your season progress and enforce existing pick privacy.</li></ol></div>`); }
+function renderSurvivorRecoveryR3HelpNav_(){ return `<nav class="survivor-r3-secondary-nav" aria-label="Survivor help"><button type="button" onclick="survivorRecoveryR3OpenRules_()"><span class="survivor-r3-secondary-icon">i</span><span class="survivor-r3-secondary-copy"><strong>RULES</strong><span>View game rules and scoring</span></span><span class="survivor-r3-secondary-arrow">›</span></button><button type="button" onclick="survivorRecoveryR3OpenHowTo_()"><span class="survivor-r3-secondary-icon">?</span><span class="survivor-r3-secondary-copy"><strong>HOW TO PLAY</strong><span>Learn matchup picks, Finalize, Random/Auto, live scores and season tools</span></span><span class="survivor-r3-secondary-arrow">›</span></button></nav>`; }
+
+function survivorRecoveryR3Refresh_() {
+  const payload=SURVIVOR_PAGE_STATE.payload||null; if(!payload||!payload.sportsMode||payload.mode==="king-of-the-hill")return;
+  const browser=document.querySelector(".survivor-r3-browser"); if(browser)browser.outerHTML=renderSurvivorRecoveryR3WeeklyBrowser_(payload);
+  const finalize=document.querySelector(".survivor-r3-finalize"); if(finalize)finalize.outerHTML=renderSurvivorRecoveryR3Finalize_(payload);
+  const stats=document.querySelector(".survivor-r3-stats"); if(stats)stats.outerHTML=renderSurvivorRecoveryR3Stats_(payload);
+  const competition=document.querySelector(".survivor-r3-competition"); if(competition)competition.outerHTML=renderSurvivorRecoveryR3Competition_(payload);
+}
+
+const SURVIVOR_RECOVERY_R3_PAGE_BASE_ = sportsRichSurvivorPageHtml_;
+sportsRichSurvivorPageHtml_ = function(payload) {
+  payload=payload||{};
+  if(!payload.sportsMode||payload.mode==="king-of-the-hill") return SURVIVOR_RECOVERY_R3_PAGE_BASE_.apply(this,arguments);
+  const gameId=sportsRichSurvivorGameId_(), appearance=PATTCSportsRich.appearance(gameId,payload.appearance||null), assets=PATTCSportsRich.assets(gameId,appearance), streak=payload.mode==="streak-survivor"||payload.mode==="streak-points-strikes", alive=payload.alive!==false;
+  const headline=payload.winner?"SURVIVOR WINNER":alive?"STILL ALIVE":"ELIMINATED";
+  const stats=streak?`${survivorPageEscape_(payload.totalPoints||0)} pts · best streak ${survivorPageEscape_(payload.bestStreak||0)}`:`${survivorPageEscape_(payload.roundsSurvived||0)} weeks survived · streak ${survivorPageEscape_(payload.winStreak||0)}`;
+  return `<div class="page survivor-page sports-rich-survivor sports-default-survivor survivor-recovery-r2 survivor-recovery-r3" ${PATTCSportsRich.styleAttr(gameId,appearance,"football","NFL")}><header class="survivor-page-header survivor-rich-hero sports-rich-hero-bg" ${PATTCSportsRich.bgAttrs(assets.hero,"--sports-rich-hero-image")}><div><span class="sports-rich-kicker">${streak?"STREAK SURVIVOR":"PATTC SURVIVOR FOOTBALL"}</span><h1>${survivorPageEscape_(payload.gameName||"Survivor Football")}</h1><p>Pick one eligible team each week. Swipe matchups, compare the details, finalize your team, then follow the live scoreboard.</p></div><div class="survivor-rich-hero-status ${alive?"is-alive":"is-out"}"><span>${headline}</span><strong>${stats}</strong></div></header>${renderSurvivorRecoveryR3WeeklyBrowser_(payload)}${renderSurvivorRecoveryR3Finalize_(payload)}${renderSurvivorRecoveryR3Stats_(payload)}${renderSurvivorRecoveryR3Competition_(payload)}${renderSurvivorRecoveryR3HelpNav_()}</div>`;
+};

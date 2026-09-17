@@ -1838,3 +1838,78 @@ survivorRunSportsAutomation_ = function(gameId, options) {
   }
   return result;
 };
+
+
+/* =========================================================
+   SURVIVOR RECOVERY R3 — PLAYER AUTO PICK PREFERENCE
+   Preference metadata reuses SurvivorPickMeta with a reserved CategoryId.
+   Scoring/evaluation ignores the reserved row because it is not a game round.
+========================================================= */
+const SPORTS_SURVIVOR_R3_AUTOPICK_PREF_CATEGORY_ = "__autopick-preference__";
+function sportsSurvivorR3AutoPickPreference_(gameId, username, settings) {
+  settings = settings || survivorGetSettings_(gameId);
+  const fallback = { configured:false, enabled:settings.autoPickEnabled === true, strategy:settings.autoPickStrategy || "random", scope:"season", targetWeek:0 };
+  const userMap = (sportsSurvivorPickMetaMap_(gameId) || {})[sportsSurvivorKey_(username)] || {};
+  const saved = userMap[sportsSurvivorKey_(SPORTS_SURVIVOR_R3_AUTOPICK_PREF_CATEGORY_)] || null;
+  const snapshot = saved && Array.isArray(saved.snapshots) ? saved.snapshots[0] || null : null;
+  if (!snapshot || snapshot.recordType !== "survivor-auto-pick-preference") return fallback;
+  const strategy = ["random","best-record","best-odds"].indexOf(sportsSurvivorKey_(snapshot.strategy)) !== -1 ? sportsSurvivorKey_(snapshot.strategy) : fallback.strategy;
+  const scope = sportsSurvivorKey_(snapshot.scope) === "week" ? "week" : "season";
+  return { configured:true, enabled:sportsSurvivorBool_(snapshot.enabled,false), strategy:strategy, scope:scope, targetWeek:scope === "week" ? Math.max(1,Math.floor(sportsSurvivorNumber_(snapshot.targetWeek,1))) : 0, updatedAt:snapshot.updatedAt || saved.updatedAt || "" };
+}
+function sportsSurvivorSaveAutoPickPreference_(payload) {
+  payload=payload||{};
+  const gameId=sportsSurvivorString_(payload.gameId), username=sportsSurvivorString_(payload.username);
+  if(!gameId||!username) throw new Error("User and Sports Survivor game are required.");
+  const settings=survivorGetSettings_(gameId);
+  if(settings.mode === "king-of-the-hill" || settings.mode === "manual-elimination") throw new Error("Auto Pick preference is only available for active Sports Survivor modes.");
+  const enabled=sportsSurvivorBool_(payload.enabled,false);
+  if(enabled && !settings.autoPickEnabled) throw new Error("Missed-pick Auto Pick protection is disabled by the game admin.");
+  const strategy=["random","best-record","best-odds"].indexOf(sportsSurvivorKey_(payload.strategy))!==-1?sportsSurvivorKey_(payload.strategy):(settings.autoPickStrategy||"random");
+  const scope=sportsSurvivorKey_(payload.scope)==="week"?"week":"season";
+  let targetWeek=0;
+  if(scope==="week") {
+    const state=apiGetSportsSurvivorState_({username:username,gameId:gameId});
+    targetWeek=Math.max(1,Math.floor(sportsSurvivorNumber_(payload.week,state.currentRound&&state.currentRound.week||settings.startWeek)));
+  }
+  const snapshot={recordType:"survivor-auto-pick-preference",enabled:enabled,strategy:strategy,scope:scope,targetWeek:targetWeek,updatedAt:new Date().toISOString()};
+  sportsSurvivorSavePickMeta_(gameId,username,SPORTS_SURVIVOR_R3_AUTOPICK_PREF_CATEGORY_,[],[snapshot],0);
+  return {success:true,preference:sportsSurvivorR3AutoPickPreference_(gameId,username,settings)};
+}
+
+var SPORTS_SURVIVOR_R3_STATE_BASE_ = apiGetSportsSurvivorState_;
+apiGetSportsSurvivorState_ = function(payload) {
+  const state=SPORTS_SURVIVOR_R3_STATE_BASE_.apply(this,arguments);
+  if(state && state.success !== false && state.sportsMode && payload && payload.username) state.autoPickPreference=sportsSurvivorR3AutoPickPreference_(state.gameId,payload.username,state.settings||survivorGetSettings_(state.gameId));
+  return state;
+};
+
+sportsSurvivorRc24kAutoPickMissing_ = function(gameId) {
+  const settings=survivorGetSettings_(gameId);
+  if(!settings.autoPickEnabled||!settings.automationEnabled) return {enabled:false,picked:[]};
+  if(settings.mode==="king-of-the-hill"||settings.mode==="manual-elimination") return {enabled:true,skipped:true,reason:"passive-or-manual-mode",picked:[]};
+  const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId), stage=sportsSurvivorKey_(game&&(game.status||game.gameStatus));
+  if(stage!=="live"&&stage!=="active") return {enabled:true,skipped:true,reason:"game-not-live",picked:[]};
+  const usernames=sportsSurvivorRc24kParticipantUsers_(gameId), picked=[], skipped=[];
+  usernames.forEach(function(username){
+    try {
+      const state=apiGetSportsSurvivorState_({username:username,gameId:gameId}), round=state&&state.currentRound;
+      if(!round||!round.canPick){skipped.push({username:username,reason:"no-open-round"});return;}
+      if((round.pickNomineeIds||[]).length||round.pickNomineeId){skipped.push({username:username,reason:"already-picked"});return;}
+      const pref=sportsSurvivorR3AutoPickPreference_(gameId,username,settings);
+      if(pref.configured && !pref.enabled){skipped.push({username:username,reason:"player-protection-off"});return;}
+      if(pref.configured && pref.scope==="week" && Number(pref.targetWeek||0)!==Number(round.week||0)){skipped.push({username:username,reason:"week-only-scope"});return;}
+      const strategy=pref.configured?pref.strategy:settings.autoPickStrategy;
+      const candidates=sportsSurvivorRc24kPickCandidates_(state,strategy), required=Math.max(1,Number(round.requiredSelections||1));
+      if(candidates.length<required){skipped.push({username:username,reason:"not-enough-eligible-teams"});return;}
+      const kickoffs=candidates.map(function(row){return row.kickoff?new Date(row.kickoff).getTime():0;}).filter(function(value){return Number.isFinite(value)&&value>Date.now();});
+      if(kickoffs.length){const lastKickoff=Math.max.apply(Math,kickoffs),triggerAt=lastKickoff-Math.max(0,Number(settings.autoPickLeadMinutes||0))*60000;if(Date.now()<triggerAt){skipped.push({username:username,reason:"too-early"});return;}}
+      const selected=candidates.slice(0,required).map(function(row){return row.id;});
+      sportsSurvivorSavePick_({username:username,gameId:gameId,categoryId:round.categoryId,nomineeId:selected[0],nomineeIds:selected,confidencePoints:0});
+      const metaMap=sportsSurvivorPickMetaMap_(gameId), saved=(metaMap[sportsSurvivorKey_(username)]||{})[sportsSurvivorKey_(round.categoryId)];
+      if(saved){const snapshots=(saved.snapshots||[]).map(function(snapshot){return Object.assign({},snapshot||{},{autoPick:true,autoPickStrategy:strategy,autoPickPenalty:Math.max(0,Number(settings.autoPickPenalty||0))});});sportsSurvivorSavePickMeta_(gameId,username,round.categoryId,saved.nomineeIds||selected,snapshots,saved.confidencePoints||0);}
+      picked.push({username:username,week:round.week,nomineeIds:selected,strategy:strategy,penalty:Math.max(0,Number(settings.autoPickPenalty||0)),preferenceScope:pref.scope,preferenceConfigured:pref.configured});
+    } catch(err){skipped.push({username:username,reason:err.message||String(err)});}
+  });
+  return {enabled:true,picked:picked,skipped:skipped};
+};

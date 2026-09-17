@@ -324,6 +324,19 @@ function doPost(e) {
       return json(votingCompetitionAdminUpdateParticipant_(body));
     }
 
+    if (action === "saveSportsSurvivorAutoPickPreference") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(sportsSurvivorSaveAutoPickPreference_({
+        username: body.username, gameId: postGameId, enabled: body.enabled, strategy: body.strategy,
+        scope: body.scope, week: body.week
+      }));
+    }
+
     if (action === "saveSurvivorPick") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -925,6 +938,7 @@ function doGet(e) {
       action === "adminSaveVotingCompetitionSettings" ||
       action === "adminUpdateVotingParticipant" ||
       action === "saveSurvivorPick" ||
+      action === "saveSportsSurvivorAutoPickPreference" ||
       action === "adminBuildSportsSurvivorWeek" ||
       action === "adminRunSportsSurvivor" ||
       action === "adminInstallSportsSurvivorAutomation" ||
