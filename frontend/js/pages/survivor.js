@@ -779,20 +779,18 @@ function sportsRichSurvivorEnabled_(payload) {
 
   const appearance = payload.appearance || null;
 
-  /* RC23 lifecycle compatibility: this helper continues to own the Rich/Clean decision. */
-  if (typeof PATTCSportsRich.isRich === "function" &&
-      PATTCSportsRich.isRich(gameId, appearance)) {
-    return true;
-  }
-
+  /* NFL_PLAYER_EXPERIENCE_RECOVERY_R1
+     RC24K/R3 is now the Sports Survivor baseline. Historical Clean/Current/
+     Classic assignments must not silently downgrade the player page. Visual
+     Studio still supplies colors, images and theme values. Only an explicit
+     Legacy template opts out of the mature NFL player experience. */
   const bundle = PATTCSportsRich.appearance(gameId, appearance);
   const layout = String(PATTCSportsRich.layoutValue(bundle) || "")
     .trim()
     .toLowerCase()
     .replace(/_/g, "-");
 
-  /* RC24A_LAUNCH_CORE_DEFAULT_SURVIVOR: Sports Default is Rich unless explicitly legacy/Clean. */
-  return ["clean", "current", "classic", "legacy"].indexOf(layout) === -1;
+  return layout !== "legacy";
 }
 
 function sportsRichSurvivorLogo_(nominee) {

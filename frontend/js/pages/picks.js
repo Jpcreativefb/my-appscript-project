@@ -3410,7 +3410,9 @@ function refreshConfidenceAppearanceUi_() {
 function applySportsRichConfidenceAppearance_() {
   if (!PICKS_PAGE_DATA.isConfidenceGame || !window.PATTCSportsRich) return;
   const gameId = String(PICKS_PAGE_DATA.gameId || "");
-  const rich = PATTCSportsRich.isRich(gameId, PICKS_PAGE_DATA.appearance || null);
+  const rich = typeof sportsRichConfidenceEnabled_ === "function"
+    ? sportsRichConfidenceEnabled_()
+    : true;
   const page = document.querySelector(".picks-page");
   if (!page) return;
   page.classList.toggle("sports-rich-confidence", rich);
@@ -9386,12 +9388,22 @@ function sportsRichConfidenceGameId_() {
 
 function sportsRichConfidenceEnabled_() {
   const gameId = sportsRichConfidenceGameId_();
-  return !!(
-    typeof PICKS_PAGE_DATA !== "undefined" &&
-    PICKS_PAGE_DATA.isConfidenceGame === true &&
-    window.PATTCSportsRich &&
-    PATTCSportsRich.isRich(gameId, PICKS_PAGE_DATA.appearance || null)
-  );
+  if (
+    typeof PICKS_PAGE_DATA === "undefined" ||
+    PICKS_PAGE_DATA.isConfidenceGame !== true ||
+    !window.PATTCSportsRich
+  ) {
+    return false;
+  }
+
+  /* NFL_PLAYER_EXPERIENCE_RECOVERY_R1
+     RC24K Confidence is the NFL baseline. Appearance continues to style it,
+     but stale Clean/Current/Classic values no longer replace it with the
+     stripped generic Picks presentation. */
+  const bundle = PATTCSportsRich.appearance(gameId, PICKS_PAGE_DATA.appearance || null);
+  const layout = String(PATTCSportsRich.layoutValue(bundle) || "")
+    .trim().toLowerCase().replace(/_/g, "-");
+  return layout !== "legacy";
 }
 
 function sportsRichConfidenceCategories_() {
@@ -9609,11 +9621,7 @@ renderPicksPage = async function() {
   // applies Sports Rich styling from the same resolved bundle afterward.
   const html = await SPORTS_RICH_CONF_ORIGINAL_PAGE_.apply(this, arguments);
 
-  if (
-    !PICKS_PAGE_DATA ||
-    PICKS_PAGE_DATA.isConfidenceGame !== true ||
-    !PATTCSportsRich.isRich(gameId, PICKS_PAGE_DATA.appearance || null)
-  ) {
+  if (!sportsRichConfidenceEnabled_()) {
     return html;
   }
 

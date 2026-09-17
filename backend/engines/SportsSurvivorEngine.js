@@ -289,7 +289,26 @@ function survivorGetSettings_(gameId) {
   const row = sportsSurvivorSheetObjects_(sh).find(function(item) {
     return sportsSurvivorString_(item.GameId) === cleanGameId;
   });
-  return sportsSurvivorNormalizeSettings_(row || defaults, cleanGameId);
+  const settings = sportsSurvivorNormalizeSettings_(row || defaults, cleanGameId);
+
+  /* NFL_PLAYER_EXPERIENCE_RECOVERY_R1
+     Historical Sports Survivor rows can still say manual-elimination even
+     though their persisted weekly categories are Sports Survivor-owned.
+     Recover the effective runtime mode without rewriting manual/Reality
+     Survivor and without mutating the sheet during a player-page read. */
+  if (
+    settings.mode === "manual-elimination" &&
+    typeof survivorSportsRuntimeEvidence_ === "function"
+  ) {
+    try {
+      if (survivorSportsRuntimeEvidence_(cleanGameId)) {
+        settings.mode = "sports-survivor";
+        settings.runtimeRecoveredMode = true;
+      }
+    } catch (err) {}
+  }
+
+  return settings;
 }
 
 function survivorSportsModeEnabled_(gameId) {

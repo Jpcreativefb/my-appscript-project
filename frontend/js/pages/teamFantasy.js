@@ -1668,10 +1668,15 @@ function sportsRichTfGameId_() {
 function sportsRichTfEnabled_(state) {
   state = state || window.TEAM_FANTASY_STATE || {};
   const gameId = String(state.gameId || sportsRichTfGameId_()).trim();
-  return !!(
-    window.PATTCSportsRich &&
-    PATTCSportsRich.isRich(gameId, state.appearance || null)
-  );
+  if (!window.PATTCSportsRich) return false;
+
+  /* NFL_PLAYER_EXPERIENCE_RECOVERY_R1
+     RC24L/M Team Fantasy is the NFL baseline; stale Clean/Current/Classic
+     assignments no longer strip the mature player layout. */
+  const bundle = PATTCSportsRich.appearance(gameId, state.appearance || null);
+  const layout = String(PATTCSportsRich.layoutValue(bundle) || "")
+    .trim().toLowerCase().replace(/_/g, "-");
+  return layout !== "legacy";
 }
 
 function sportsRichTfSelectedTeam_(slot) {
@@ -2040,7 +2045,7 @@ renderTeamFantasyPage = async function() {
 
   const html = await SPORTS_RICH_TF_ORIGINAL_PAGE_.apply(this, arguments);
   const state = window.TEAM_FANTASY_STATE || {};
-  if (!PATTCSportsRich.isRich(gameId, state.appearance || null)) return html;
+  if (!sportsRichTfEnabled_(state)) return html;
 
   const output = sportsRichTfDecoratePageHtml_(html, state);
   PATTCSportsRich.afterMount(".sports-rich-team-fantasy", sportsRichTfUpdateSummary_);
