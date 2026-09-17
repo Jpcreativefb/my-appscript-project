@@ -38,6 +38,56 @@ function survivorCategoryLocked_(game, category) {
   return !!(lockDateTime && !isNaN(lockDateTime.getTime()) && Date.now() >= lockDateTime.getTime());
 }
 
+/* =====================================================
+   SPORTS SURVIVOR R3 — REAL RUNTIME ROUTE RECOVERY
+
+   Older Sports Survivor games can still have a stale/missing
+   SurvivorSettings.Mode value of manual-elimination even though their
+   persisted weekly questions were built by the Sports Survivor engine.
+
+   Do not guess from the game name. Recover the sports route only when
+   the game's own persisted questions contain Sports Survivor ownership
+   markers created by sportsSurvivorBuildWeek_(). Manual / Reality-TV
+   Survivor therefore stays on the legacy/manual engine.
+===================================================== */
+function survivorSportsRuntimeEvidence_(gameId) {
+  const cleanGameId = survivorString_(gameId);
+  if (!cleanGameId) return false;
+
+  try {
+    const categories = survivorGameCategories_(cleanGameId);
+    return (categories || []).some(function(category) {
+      const id = survivorKey_(category && (category.id || category.categoryId));
+      const groupId = survivorKey_(category && (category.groupId || category.GroupId));
+      const questionType = survivorKey_(category && (category.questionType || category.QuestionType));
+      const scoringEngine = survivorKey_(category && (category.scoringEngine || category.ScoringEngine));
+      const resultSource = survivorKey_(category && (category.resultSource || category.ResultSource));
+      const sourceConfig = survivorString_(
+        category && (category.sourceConfigJSON || category.SourceConfigJSON)
+      ).toLowerCase();
+
+      return /^sports-survivor-.*-week-\d+$/.test(id) ||
+        groupId === "sports-survivor" ||
+        questionType === "sports-survivor" ||
+        (scoringEngine === "sports" && sourceConfig.indexOf("sports-survivor") !== -1) ||
+        (resultSource.indexOf("sports") !== -1 && sourceConfig.indexOf("sports-survivor") !== -1);
+    });
+  } catch (err) {
+    return false;
+  }
+}
+
+function survivorSportsRuntimeEnabled_(gameId) {
+  if (typeof survivorSportsModeEnabled_ === "function") {
+    try {
+      if (survivorSportsModeEnabled_(gameId)) return true;
+    } catch (err) {
+      // Fall through to persisted Sports Survivor evidence.
+    }
+  }
+  return survivorSportsRuntimeEvidence_(gameId);
+}
+
 function survivorEvaluateUser_(username, gameId, pickMap, categories, resolutions) {
   const rounds = [];
   const eliminatedNomineeIds = {};
@@ -208,7 +258,7 @@ function apiGetSurvivorState_(payload) {
       return apiGetKingOfHillState_(Object.assign({}, payload, { gameId: routedGameId }));
     }
   }
-  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(routedGameId) && typeof apiGetSportsSurvivorState_ === "function") {
+  if (survivorSportsRuntimeEnabled_(routedGameId) && typeof apiGetSportsSurvivorState_ === "function") {
     return apiGetSportsSurvivorState_(Object.assign({}, payload, { gameId: routedGameId }));
   }
   const gameId = survivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
@@ -275,7 +325,7 @@ function saveSurvivorPick_(payload) {
   if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(routedGameId)) {
     throw new Error("King of the Hill is automatic. There is no weekly KOTH pick to submit.");
   }
-  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(routedGameId) && typeof sportsSurvivorSavePick_ === "function") {
+  if (survivorSportsRuntimeEnabled_(routedGameId) && typeof sportsSurvivorSavePick_ === "function") {
     return sportsSurvivorSavePick_(payload);
   }
   const gameId = survivorString_(payload.gameId);
@@ -309,7 +359,7 @@ function survivorLeaderboardData_(gameId, extraUsernames) {
   if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(gameId) && typeof kingOfHillLeaderboardData_ === "function") {
     return kingOfHillLeaderboardData_(gameId, extraUsernames);
   }
-  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(gameId) && typeof sportsSurvivorStandings_ === "function") {
+  if (survivorSportsRuntimeEnabled_(gameId) && typeof sportsSurvivorStandings_ === "function") {
     return sportsSurvivorStandings_(gameId, extraUsernames);
   }
   const categories = survivorGameCategories_(gameId);
@@ -365,7 +415,7 @@ function survivorUserScoring_(username, gameId) {
   if (typeof survivorKingOfHillModeEnabled_ === "function" && survivorKingOfHillModeEnabled_(gameId) && typeof kingOfHillUserScoring_ === "function") {
     return kingOfHillUserScoring_(username, gameId);
   }
-  if (typeof survivorSportsModeEnabled_ === "function" && survivorSportsModeEnabled_(gameId) && typeof sportsSurvivorUserScoring_ === "function") {
+  if (survivorSportsRuntimeEnabled_(gameId) && typeof sportsSurvivorUserScoring_ === "function") {
     return sportsSurvivorUserScoring_(username, gameId);
   }
   const categories = survivorGameCategories_(gameId);
