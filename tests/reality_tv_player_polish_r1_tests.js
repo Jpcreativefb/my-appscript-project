@@ -64,7 +64,7 @@ const esc = value => String(value == null ? '' : value);
   }).renderRealityTvSpoilerShield_();
   assert(hidden.includes('Results Hidden'));
   assert(hidden.includes('Reveal Results'));
-  assert(hidden.includes('Future results: Protected'));
+  assert(hidden.includes('Future results protection: ON'));
   assert(hidden.includes('role="button"') && hidden.includes('activateRealityTvSpoilerShield_'), 'hidden current results must make the whole Shield row actionable');
   assert(functionSource(picks, 'activateRealityTvSpoilerShield_').includes('revealRealityTvEpisode_'), 'whole-row action must route through existing reveal logic');
 
@@ -82,7 +82,7 @@ const esc = value => String(value == null ? '' : value);
   assert(reveal.includes('apiRevealRealityTvEpisode'), 'existing reveal API must remain authoritative');
   assert(reveal.includes('refreshRealityTvAfterSpoilerChange_'));
   const pref = functionSource(picks, 'saveRealityTvSpoilerPreference_');
-  assert(pref.includes('Saving future-results preference'));
+  assert(pref.includes('setRealityTvSpoilerPreferenceFeedback_("Saving…", false)'), 'future-results preference save must use local status feedback');
 }
 
 // ---------------------------------------------------------------------------

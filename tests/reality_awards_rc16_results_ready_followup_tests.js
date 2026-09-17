@@ -197,7 +197,7 @@ function makePicksContext(hiddenIds) {
   assert(top.includes('Results Hidden'));
   assert(top.includes('Reveal Results'));
   assert(!top.includes('Episode 1 is protected'), 'compact Spoiler Shield must not grow into an episode-status card');
-  assert(top.includes('Future results: Protected'), 'future spoiler preference must remain available as a distinct secondary control');
+  assert(top.includes('Future results protection: ON'), 'future spoiler preference must remain available as a distinct secondary control');
   assert(!top.includes('Hide Reality Results'), 'confusing old Hide Reality Results copy must not be primary UI');
 
   const cats = [
