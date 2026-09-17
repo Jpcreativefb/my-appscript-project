@@ -236,7 +236,7 @@ function renderRealityTvSpoilerShield_() {
   const resultsHidden = !!blocking;
   const futureProtected = state.enabled === true;
   const episodeId = String(blocking && blocking.episodeId || "");
-  const futureLabel = futureProtected ? "Future results: Protected" : "Future results: Auto reveal";
+  const futureLabel = futureProtected ? "Future results protection: ON" : "Future results protection: OFF";
   const actionAttrs = resultsHidden
     ? `role="button" tabindex="0" onclick="activateRealityTvSpoilerShield_(event, '${escapeJs(episodeId)}')" onkeydown="activateRealityTvSpoilerShield_(event, '${escapeJs(episodeId)}')"`
     : `role="group" aria-disabled="true"`;
@@ -246,9 +246,12 @@ function renderRealityTvSpoilerShield_() {
       <strong>${resultsHidden ? "Results Hidden" : "Results Revealed"}</strong>
       <span>${resultsHidden ? "Reveal Results" : "Episode results are visible"}</span>
     </div>
-    <button type="button" class="reality-spoiler-preference-button" onclick="event.stopPropagation();saveRealityTvSpoilerPreference_(${futureProtected ? "false" : "true"})" aria-pressed="${futureProtected ? "true" : "false"}" title="Controls how future episode results are handled">
-      ${escapeHtml(futureLabel)}
-    </button>
+    <div class="reality-spoiler-preference-wrap" onclick="event.stopPropagation()">
+      <button type="button" class="reality-spoiler-preference-button" onclick="event.stopPropagation();saveRealityTvSpoilerPreference_(${futureProtected ? "false" : "true"})" aria-pressed="${futureProtected ? "true" : "false"}" title="Controls how future episode results are handled">
+        ${escapeHtml(futureLabel)}
+      </button>
+      <small id="realitySpoilerPreferenceFeedback" class="reality-spoiler-preference-feedback" role="status" aria-live="polite"></small>
+    </div>
   </section>`;
 }
 
@@ -285,15 +288,45 @@ async function refreshRealityTvAfterSpoilerChange_() {
   await hydratePicksEnhancements_();
 }
 
+function setRealityTvSpoilerPreferenceFeedback_(message, isError) {
+  const feedback = document.getElementById("realitySpoilerPreferenceFeedback");
+  if (!feedback) return;
+  feedback.textContent = String(message || "");
+  feedback.classList.toggle("error", isError === true);
+}
+
+function applyRealityTvSpoilerPreferenceState_(enabled) {
+  const view = PICKS_PAGE_DATA.realityTvView || (PICKS_PAGE_DATA.realityTvView = {});
+  const state = view.spoilerShield || (view.spoilerShield = {});
+  state.enabled = enabled === true;
+  const mount = document.getElementById("realityTvSpoilerShieldMount");
+  if (mount) mount.innerHTML = renderRealityTvSpoilerShield_();
+}
+
 async function saveRealityTvSpoilerPreference_(enabled) {
-  showPicksMessage("Saving future-results preference…", false);
+  const savedEnabled = enabled === true;
+  const button = document.querySelector(".reality-spoiler-preference-button");
+  if (button) {
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+  }
+  setRealityTvSpoilerPreferenceFeedback_("Saving…", false);
   try {
-    const response = await apiSaveRealityTvSpoilerPreference(PICKS_PAGE_DATA.gameId, enabled === true);
+    const response = await apiSaveRealityTvSpoilerPreference(PICKS_PAGE_DATA.gameId, savedEnabled);
     if (!response || response.success === false) throw new Error((response && (response.error || response.message)) || "Could not save the future-results preference.");
     await refreshRealityTvAfterSpoilerChange_();
-    showPicksMessage(enabled === true ? "Future episode results will stay protected." : "Future episode results will auto reveal.", false);
+    // The confirmed save is authoritative for this client even if the refreshed
+    // startup snapshot briefly reflects the pre-save preference.
+    applyRealityTvSpoilerPreferenceState_(savedEnabled);
+    setRealityTvSpoilerPreferenceFeedback_("Saved…", false);
   } catch (err) {
-    showPicksMessage(err.message || String(err), true);
+    setRealityTvSpoilerPreferenceFeedback_("Error… " + (err.message || String(err)), true);
+  } finally {
+    const currentButton = document.querySelector(".reality-spoiler-preference-button");
+    if (currentButton) {
+      currentButton.disabled = false;
+      currentButton.removeAttribute("aria-busy");
+    }
   }
 }
 
@@ -854,6 +887,18 @@ function realityTvOrdinal_(value) {
   return n + "th";
 }
 
+function realityTvCurrentCompareUserKey_(rows, standingsRows) {
+  rows = Array.isArray(rows) ? rows : [];
+  standingsRows = Array.isArray(standingsRows) ? standingsRows : [];
+  const sessionUser = normalizeId(PICKS_PAGE_DATA.session && PICKS_PAGE_DATA.session.username);
+  const currentStanding = standingsRows.find(function(item) {
+    return item && (item.isCurrent === true || (sessionUser && normalizeId(item.username) === sessionUser));
+  });
+  const currentKey = normalizeId(currentStanding && currentStanding.username) || sessionUser;
+  if (!currentKey) return "";
+  return rows.some(function(row) { return realityTvCompareUserKey_(row) === currentKey; }) ? currentKey : "";
+}
+
 function realityTvCompareSelectedRows_(rows, standingsRows) {
   rows = Array.isArray(rows) ? rows : [];
   standingsRows = Array.isArray(standingsRows) ? standingsRows : [];
@@ -862,20 +907,12 @@ function realityTvCompareSelectedRows_(rows, standingsRows) {
     const key = realityTvCompareUserKey_(row);
     if (key) valid[key] = true;
   });
-  PICKS_REALITY_COMPARE_USER_KEYS = (PICKS_REALITY_COMPARE_USER_KEYS || []).filter(function(key) { return !!valid[key]; });
+  const currentKey = realityTvCurrentCompareUserKey_(rows, standingsRows);
+  const addedKeys = (PICKS_REALITY_COMPARE_USER_KEYS || []).filter(function(key) {
+    return !!valid[key] && key !== currentKey;
+  });
+  PICKS_REALITY_COMPARE_USER_KEYS = (currentKey ? [currentKey] : []).concat(addedKeys);
   if (!PICKS_REALITY_COMPARE_USERS_INITIALIZED) {
-    const sessionUser = normalizeId(PICKS_PAGE_DATA.session && PICKS_PAGE_DATA.session.username);
-    const currentStanding = standingsRows.find(function(item) {
-      return item && (item.isCurrent === true || (sessionUser && normalizeId(item.username) === sessionUser));
-    });
-    const currentKey = currentStanding ? normalizeId(currentStanding.username) : sessionUser;
-    const defaults = [];
-    if (currentKey && valid[currentKey]) defaults.push(currentKey);
-    rows.forEach(function(row) {
-      const key = realityTvCompareUserKey_(row);
-      if (key && defaults.indexOf(key) === -1 && defaults.length < 3) defaults.push(key);
-    });
-    PICKS_REALITY_COMPARE_USER_KEYS = defaults;
     PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
   }
   return PICKS_REALITY_COMPARE_USER_KEYS.map(function(key) {
@@ -883,23 +920,47 @@ function realityTvCompareSelectedRows_(rows, standingsRows) {
   }).filter(Boolean);
 }
 
+function rerenderRealityTvCompareMount_() {
+  const mount = document.getElementById("realityTvEpisodeComparisonMount");
+  if (!mount) return;
+  const previousShell = mount.querySelector && mount.querySelector(".reality-standings-compare-shell");
+  const previousWrap = mount.querySelector && mount.querySelector(".reality-compare-matrix-wrap");
+  const wasOpen = !!(previousShell && previousShell.open);
+  const scrollLeft = Number(previousWrap && previousWrap.scrollLeft || 0);
+  mount.innerHTML = renderRealityTvEpisodeComparison_();
+  const nextShell = mount.querySelector && mount.querySelector(".reality-standings-compare-shell");
+  const nextWrap = mount.querySelector && mount.querySelector(".reality-compare-matrix-wrap");
+  if (nextShell && wasOpen) nextShell.open = true;
+  if (nextWrap && scrollLeft > 0) nextWrap.scrollLeft = scrollLeft;
+}
+
 function addRealityTvCompareUser_(userKey) {
   const key = normalizeId(userKey);
   if (!key) return;
+  const comparison = PICKS_PAGE_DATA.episodeComparison || {};
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const compareRows = Array.isArray(comparison.rows) ? comparison.rows : [];
+  const standingsRows = view.playerStats && Array.isArray(view.playerStats.compactLeaderboard) ? view.playerStats.compactLeaderboard : [];
+  const currentKey = realityTvCurrentCompareUserKey_(compareRows, standingsRows);
+  if (key === currentKey) return;
   PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
   if (PICKS_REALITY_COMPARE_USER_KEYS.indexOf(key) === -1) PICKS_REALITY_COMPARE_USER_KEYS.push(key);
   PICKS_REALITY_STANDINGS_COMPARE_TAB = "compare";
-  const mount = document.getElementById("realityTvEpisodeComparisonMount");
-  if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+  rerenderRealityTvCompareMount_();
 }
 
 function removeRealityTvCompareUser_(userKey) {
   const key = normalizeId(userKey);
+  const comparison = PICKS_PAGE_DATA.episodeComparison || {};
+  const view = PICKS_PAGE_DATA.realityTvView || {};
+  const compareRows = Array.isArray(comparison.rows) ? comparison.rows : [];
+  const standingsRows = view.playerStats && Array.isArray(view.playerStats.compactLeaderboard) ? view.playerStats.compactLeaderboard : [];
+  const currentKey = realityTvCurrentCompareUserKey_(compareRows, standingsRows);
+  if (!key || key === currentKey) return;
   PICKS_REALITY_COMPARE_USERS_INITIALIZED = true;
   PICKS_REALITY_COMPARE_USER_KEYS = (PICKS_REALITY_COMPARE_USER_KEYS || []).filter(function(item) { return item !== key; });
   PICKS_REALITY_STANDINGS_COMPARE_TAB = "compare";
-  const mount = document.getElementById("realityTvEpisodeComparisonMount");
-  if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+  rerenderRealityTvCompareMount_();
 }
 
 function renderRealityTvEpisodeComparison_() {
@@ -913,6 +974,7 @@ function renderRealityTvEpisodeComparison_() {
   const compareRows = available && Array.isArray(comparison.rows) ? comparison.rows : [];
   const selectedRows = realityTvCompareSelectedRows_(compareRows, rows);
   const selectedKeys = selectedRows.map(realityTvCompareUserKey_);
+  const currentUserKey = realityTvCurrentCompareUserKey_(compareRows, rows);
   const episode = available ? (comparison.episode || {}) : {};
   const eligibleEpisodes = available && Array.isArray(comparison.eligibleEpisodes) ? comparison.eligibleEpisodes : [];
   const episodeLabel = available
@@ -929,7 +991,10 @@ function renderRealityTvEpisodeComparison_() {
 
   const standingByUser = {};
   rows.forEach(function(row) { standingByUser[normalizeId(row && row.username)] = row || {}; });
-  const availableToAdd = compareRows.filter(function(row) { return selectedKeys.indexOf(realityTvCompareUserKey_(row)) === -1; });
+  const availableToAdd = compareRows.filter(function(row) {
+    const key = realityTvCompareUserKey_(row);
+    return key && key !== currentUserKey && selectedKeys.indexOf(key) === -1;
+  });
   const addUserControl = available && compareRows.length
     ? `<label class="reality-compare-add-user"><span class="sr-only">Add comparison user</span><select onchange="if(this.value){addRealityTvCompareUser_(this.value);this.value='';}"><option value="">+ Add User</option>${availableToAdd.map(function(row) {
         const key = realityTvCompareUserKey_(row);
@@ -944,11 +1009,13 @@ function renderRealityTvEpisodeComparison_() {
       const displayName = row.displayName || row.username || standing.displayName || "Player";
       const total = Number(row.totalPoints !== undefined ? row.totalPoints : row.total !== undefined ? row.total : standing.total || 0);
       const rank = Number(row.rank || standing.rank || 0);
-      const header = `${escapeHtml(displayName)} — ${escapeHtml(realityTvFormatPoints_(total))} pts${rank ? ` (${escapeHtml(realityTvOrdinal_(rank))})` : ""}`;
-      return `<div class="reality-compare-grid-cell reality-compare-player-column-head"><div class="reality-compare-user-head"><strong>${header}</strong><button type="button" class="reality-compare-remove-user" aria-label="Remove ${escapeAttr(displayName)} from comparison" onclick="removeRealityTvCompareUser_('${escapeJs(key)}')">×</button></div></div>`;
+      const isCurrent = !!currentUserKey && key === currentUserKey;
+      const removeButton = isCurrent ? "" : `<button type="button" class="reality-compare-remove-user" aria-label="Remove ${escapeAttr(displayName)} from comparison" onclick="removeRealityTvCompareUser_('${escapeJs(key)}')">×</button>`;
+      return `<div class="reality-compare-grid-cell reality-compare-player-column-head${isCurrent ? " reality-compare-current-column" : ""}"><div class="reality-compare-user-head"><div class="reality-compare-user-summary"><strong>${escapeHtml(displayName)}</strong><span>${escapeHtml(realityTvFormatPoints_(total))} pts</span><span>${rank ? `Rank #${rank}` : "Rank —"}</span></div>${removeButton}</div></div>`;
     }).join("");
     const rowHtml = function(label, getter) {
       return `<div class="reality-compare-grid-cell reality-compare-question-label">${escapeHtml(label)}</div>${selectedRows.map(function(row) {
+        const key = realityTvCompareUserKey_(row);
         const value = String(getter(row) || "—");
         let imageHtml = "";
         if (value !== "—") {
@@ -956,7 +1023,7 @@ function renderRealityTvEpisodeComparison_() {
           const image = realityTvContestantImageUrl_(contestant);
           if (image) imageHtml = platformImgHtml(image, { className: "reality-compare-contestant-image", variant: "thumb", alt: value });
         }
-        return `<div class="reality-compare-grid-cell reality-compare-pick-cell">${imageHtml}<strong>${escapeHtml(value)}</strong></div>`;
+        return `<div class="reality-compare-grid-cell reality-compare-pick-cell${currentUserKey && key === currentUserKey ? " reality-compare-current-column" : ""}">${imageHtml}<strong>${escapeHtml(value)}</strong></div>`;
       }).join("")}`;
     };
     const survivorRow = rowHtml("Sole Survivor", function(row) { return row.survivorPick; });
@@ -986,8 +1053,7 @@ function renderRealityTvEpisodeComparison_() {
 
 function setRealityTvStandingsCompareTab_(tab) {
   PICKS_REALITY_STANDINGS_COMPARE_TAB = tab === "compare" ? "compare" : "standings";
-  const mount = document.getElementById("realityTvEpisodeComparisonMount");
-  if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+  rerenderRealityTvCompareMount_();
 }
 
 function realityTvConfiguredText_(value) {
@@ -1045,7 +1111,7 @@ async function selectRealityTvComparisonEpisode_(episodeId) {
       throw new Error((response && (response.error || response.message)) || "Could not load that episode comparison.");
     }
     PICKS_PAGE_DATA.episodeComparison = response.comparison;
-    if (mount) mount.innerHTML = renderRealityTvEpisodeComparison_();
+    rerenderRealityTvCompareMount_();
     showPicksMessage("Compare updated.", false);
   } catch (error) {
     showPicksMessage(error && error.message ? error.message : String(error), true);
@@ -1053,7 +1119,7 @@ async function selectRealityTvComparisonEpisode_(episodeId) {
     PICKS_REALITY_COMPARE_IN_FLIGHT = false;
     if (mount) {
       mount.classList.remove("is-loading");
-      mount.innerHTML = renderRealityTvEpisodeComparison_();
+      rerenderRealityTvCompareMount_();
     }
   }
 }
@@ -4847,6 +4913,20 @@ function realityTvHistoricalPickDetailsHtml_(episode, items) {
   }).join("")}</div>`;
 }
 
+function toggleRealityCurrentEpisode_(heading, event) {
+  if (!heading || !heading.closest) return;
+  if (event && event.type === "keydown" && event.key !== "Enter" && event.key !== " ") return;
+  if (event && typeof event.preventDefault === "function") event.preventDefault();
+  const section = heading.closest(".reality-episode-picks-section.current");
+  if (!section) return;
+  const body = Array.from(section.children || []).find(function(node) {
+    return node && node.classList && node.classList.contains("reality-episode-picks-body");
+  });
+  if (!body) return;
+  body.hidden = body.hidden !== true;
+  heading.setAttribute("aria-expanded", body.hidden ? "false" : "true");
+}
+
 function renderRealityTvEpisodeSections_(categories) {
   const view = PICKS_PAGE_DATA.realityTvView || {};
   const episodeSeen = {};
@@ -4881,7 +4961,7 @@ function renderRealityTvEpisodeSections_(categories) {
       currentHtml = `<section class="reality-episode-picks-section current results-ready"><div class="reality-episode-picks-body"><div class="reality-spoiler-pick-block"><strong>Episode ${currentNumber} results are ready above.</strong><span>Reveal the episode to see its finalized result presentation.</span></div></div></section>`;
     } else if (currentItems.length) {
       const picked = currentItems.filter(function(item) { return !!PICKS_PAGE_DATA.picks[item.id]; }).length;
-      currentHtml = `<section class="reality-episode-picks-section current"><div class="reality-current-question-heading"><div class="reality-current-question-title-row"><div><span class="reality-episode-kicker">${escapeHtml((view.season && view.season.periodLabel) || "Episode")} ${currentNumber}</span><h2>${escapeHtml(current.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + currentNumber)}</h2></div><span class="reality-episode-result-state">${escapeHtml(realityTvEpisodeResultState_(current))}</span></div>${realityTvEpisodeHeaderStats_(current, currentItems.length, picked)}</div><div class="reality-episode-picks-body">${renderPicksCategoryCards_(currentItems)}</div></section>`;
+      currentHtml = `<section class="reality-episode-picks-section current"><div class="reality-current-question-heading" role="button" tabindex="0" aria-expanded="true" onclick="toggleRealityCurrentEpisode_(this, event)" onkeydown="toggleRealityCurrentEpisode_(this, event)"><div class="reality-current-question-title-row"><div><span class="reality-episode-kicker">${escapeHtml((view.season && view.season.periodLabel) || "Episode")} ${currentNumber}</span><h2>${escapeHtml(current.episodeName || ((view.season && view.season.periodLabel) || "Episode") + " " + currentNumber)}</h2></div><span class="reality-episode-result-state">${escapeHtml(realityTvEpisodeResultState_(current))}</span></div>${realityTvEpisodeHeaderStats_(current, currentItems.length, picked)}</div><div class="reality-episode-picks-body">${renderPicksCategoryCards_(currentItems)}</div></section>`;
     }
   }
 
@@ -7384,6 +7464,9 @@ function cssEscape(value) {
 
   let queued = false;
   let observer = null;
+  let observerRoot = null;
+  let castIndex = 0;
+  let castSignature = "";
 
   function text_(value) {
     return value == null ? "" : String(value).trim();
@@ -7721,14 +7804,36 @@ function cssEscape(value) {
     const latestEliminated = decorated.filter(function(item) { return item.status === "eliminated"; }).sort(function(a, b) {
       return b.eliminatedNumber - a.eliminatedNumber;
     })[0] || null;
+    const signature = decorated.map(function(item) {
+      const meta = item.meta || {};
+      const nominee = item.nominee || {};
+      return [
+        key_(meta.id || meta.nomineeId || meta.name || nominee.id || nominee.nomineeId || nominee.name),
+        item.status,
+        text_(item.eliminatedAt)
+      ].join(":");
+    }).join("|");
+    if (signature !== castSignature) {
+      castSignature = signature;
+      const latestIndex = latestEliminated ? decorated.indexOf(latestEliminated) : 0;
+      castIndex = clampCastIndex_(latestIndex, decorated.length);
+    } else {
+      castIndex = clampCastIndex_(castIndex, decorated.length);
+    }
 
     return `<section id="realityEnhancedCleanCast" class="reality-clean-cast-section">
       <div class="reality-clean-section-heading">
         <div><h2>Season Cast</h2></div>
-        <small>Swipe or scroll to browse every contestant</small>
+        <small>Use Previous / Next to browse contestants</small>
       </div>
 
-      <div class="reality-clean-cast-rail" role="list" aria-label="Season cast carousel" tabindex="0">
+      <div class="reality-clean-cast-controls" role="group" aria-label="Season Cast navigation">
+        <button type="button" data-reality-cast-prev onclick="event.preventDefault();event.stopPropagation();window.PATTCRealityLayoutR3.stepCast(-1)" ${castIndex <= 0 ? "disabled" : ""}>Prev</button>
+        <span data-reality-cast-position>${decorated.length ? castIndex + 1 : 0} of ${decorated.length}</span>
+        <button type="button" data-reality-cast-next onclick="event.preventDefault();event.stopPropagation();window.PATTCRealityLayoutR3.stepCast(1)" ${castIndex >= decorated.length - 1 ? "disabled" : ""}>Next</button>
+      </div>
+
+      <div class="reality-clean-cast-rail" role="list" aria-label="Season cast">
         ${decorated.map(function(item) {
           const nominee = item.nominee;
           const meta = item.meta || nominee;
@@ -7763,34 +7868,64 @@ function cssEscape(value) {
     </section>`;
   }
 
-  function centerLatestEliminatedCast_(page) {
-    if (!page || typeof page.querySelector !== "function") return;
-    const rail = page.querySelector("#realityEnhancedCleanCast .reality-clean-cast-rail");
-    const latest = rail && rail.querySelector('[data-reality-latest-eliminated="true"]');
-    if (!rail || !latest || rail.dataset.realityInitialCentered === "true") return;
-    let attempts = 0;
-    const center = function() {
-      attempts += 1;
-      const railWidth = Number(rail.clientWidth || 0);
-      const cardWidth = Number(latest.clientWidth || 0);
-      const offset = Number(latest.offsetLeft || 0);
-      if (!railWidth || !cardWidth) {
-        if (attempts < 5) setTimeout(center, 50 * attempts);
-        return;
-      }
-      const left = Math.max(0, offset - Math.max(0, (railWidth - cardWidth) / 2));
-      rail.scrollLeft = left;
-      if (typeof rail.scrollTo === "function") rail.scrollTo({ left: left, behavior: "auto" });
-      rail.dataset.realityInitialCentered = "true";
-    };
-    if (typeof requestAnimationFrame === "function") requestAnimationFrame(center);
-    else setTimeout(center, 0);
-    const latestImage = latest.querySelector && latest.querySelector("img");
-    if (latestImage && latestImage.complete !== true && typeof latestImage.addEventListener === "function") {
-      latestImage.addEventListener("load", center, { once: true });
-    } else {
-      setTimeout(center, 120);
+  function clampCastIndex_(index, count) {
+    count = Math.max(0, Number(count || 0));
+    if (!count) return 0;
+    return Math.max(0, Math.min(count - 1, Number(index || 0)));
+  }
+
+  function castVisibleCount_() {
+    const narrow = (typeof global.matchMedia === "function" && global.matchMedia("(max-width: 760px)").matches) ||
+      (Number(global.innerWidth || 0) > 0 && Number(global.innerWidth || 0) <= 760);
+    return narrow ? 2 : 4;
+  }
+
+  function castWindow_(index, count, visibleCount) {
+    count = Math.max(0, Number(count || 0));
+    if (!count) return { start: 0, end: 0 };
+    visibleCount = Math.max(1, Math.min(Number(visibleCount || 1), count));
+    index = clampCastIndex_(index, count);
+    const maxStart = Math.max(0, count - visibleCount);
+    const start = Math.min(Math.max(index - Math.floor((visibleCount - 1) / 2), 0), maxStart);
+    return { start: start, end: Math.min(count, start + visibleCount) };
+  }
+
+  function applyCastWindow_() {
+    if (!hasDom_()) return;
+    const section = document.getElementById("realityEnhancedCleanCast");
+    if (!section) return;
+    const rail = section.querySelector(".reality-clean-cast-rail");
+    const cards = Array.from(section.querySelectorAll(".reality-clean-cast-card"));
+    if (!rail || !cards.length) return;
+    castIndex = clampCastIndex_(castIndex, cards.length);
+    const visibleCount = Math.min(castVisibleCount_(), cards.length);
+    const windowRange = castWindow_(castIndex, cards.length, visibleCount);
+    rail.style.gridTemplateColumns = "repeat(" + visibleCount + ", minmax(0, 1fr))";
+    cards.forEach(function(card, index) {
+      card.hidden = index < windowRange.start || index >= windowRange.end;
+      card.setAttribute("aria-current", index === castIndex ? "true" : "false");
+    });
+    const previous = section.querySelector("[data-reality-cast-prev]");
+    const next = section.querySelector("[data-reality-cast-next]");
+    const position = section.querySelector("[data-reality-cast-position]");
+    if (previous) previous.disabled = castIndex <= 0;
+    if (next) next.disabled = castIndex >= cards.length - 1;
+    if (position) position.textContent = (castIndex + 1) + " of " + cards.length;
+  }
+
+  function stepCast_(direction) {
+    if (!hasDom_()) return;
+    const section = document.getElementById("realityEnhancedCleanCast");
+    const cards = section ? Array.from(section.querySelectorAll(".reality-clean-cast-card")) : [];
+    if (!cards.length) return;
+    const delta = Number(direction || 0) < 0 ? -1 : 1;
+    const nextIndex = clampCastIndex_(castIndex + delta, cards.length);
+    if (nextIndex === castIndex) {
+      applyCastWindow_();
+      return;
     }
+    castIndex = nextIndex;
+    applyCastWindow_();
   }
 
   function processImages_(page) {
@@ -7816,6 +7951,20 @@ function cssEscape(value) {
     restoreGenericHeaderVisibility_(page);
   }
 
+  function suspendObserver_() {
+    if (!observer || typeof observer.disconnect !== "function") return;
+    observer.disconnect();
+    if (typeof observer.takeRecords === "function") observer.takeRecords();
+  }
+
+  function resumeObserver_() {
+    if (!observer || !hasDom_()) return;
+    const root = document.getElementById("app") || document.body;
+    if (!root) return;
+    observerRoot = root;
+    observer.observe(observerRoot, { childList: true, subtree: true });
+  }
+
   function enhance_() {
     queued = false;
 
@@ -7827,70 +7976,77 @@ function cssEscape(value) {
     const page = document.querySelector(".reality-player-page, .picks-page");
     if (!page) return;
 
-    const mode = layout_();
+    // Clean R3 owns the mutations below. Suspend its observer so those writes
+    // cannot recursively schedule another enhance pass against the DOM it just built.
+    suspendObserver_();
+    try {
+      const mode = layout_();
 
-    if (mode !== "clean") {
-      cleanArtifacts_(page);
-      return;
+      if (mode !== "clean") {
+        cleanArtifacts_(page);
+        return;
+      }
+
+      page.classList.add("reality-clean-enhanced");
+
+      const oldHeader = document.getElementById("realityEnhancedCleanHeader");
+      if (oldHeader) oldHeader.remove();
+
+      page.insertAdjacentHTML("afterbegin", headerHtml_());
+
+      const generic = Array.from(page.children).find(function(node) {
+        return node && node.classList && node.classList.contains("picks-page-header") &&
+          node.id !== "realityEnhancedCleanHeader";
+      });
+      if (generic) generic.setAttribute("aria-hidden", "true");
+
+      const oldCast = document.getElementById("realityEnhancedCleanCast");
+      if (oldCast) oldCast.remove();
+
+      const spoilerMount = document.getElementById("realityTvSpoilerShieldMount");
+      const seasonMount = document.getElementById("seasonAnchorPickMount");
+      const summaryMount = document.getElementById("realityTvPlayerSummaryMount");
+      const comparisonMount = document.getElementById("realityTvEpisodeComparisonMount");
+      const html = castHtml_();
+
+      // Locked R3 Reality order: Hero -> Spoiler Shield -> Sole Survivor ->
+      // Current Episode -> Previous Episodes -> Season Cast -> Your Season ->
+      // Standings & Compare -> Rules / How to Play.
+      if (spoilerMount && seasonMount && spoilerMount.nextElementSibling !== seasonMount) {
+        spoilerMount.insertAdjacentElement("afterend", seasonMount);
+      }
+
+      const categoryList = document.getElementById("picksCategoryList");
+      const previousEpisodes = categoryList && categoryList.querySelector(".reality-previous-episodes")
+        ? categoryList.querySelector(".reality-previous-episodes")
+        : null;
+      Array.from(page.querySelectorAll(".reality-previous-episodes")).forEach(function(node) {
+        if (previousEpisodes && node !== previousEpisodes && node.parentNode) node.parentNode.removeChild(node);
+      });
+
+      if (html && categoryList) {
+        categoryList.insertAdjacentHTML("afterend", html);
+      } else if (html && summaryMount) {
+        summaryMount.insertAdjacentHTML("beforebegin", html);
+      }
+
+      const cast = document.getElementById("realityEnhancedCleanCast");
+      if (cast && summaryMount && cast.nextElementSibling !== summaryMount) {
+        cast.insertAdjacentElement("afterend", summaryMount);
+      }
+      if (summaryMount && comparisonMount && summaryMount.nextElementSibling !== comparisonMount) {
+        summaryMount.insertAdjacentElement("afterend", comparisonMount);
+      }
+      const rulesMount = document.getElementById("realityTvRulesHelpMount");
+      if (comparisonMount && rulesMount && comparisonMount.nextElementSibling !== rulesMount) {
+        comparisonMount.insertAdjacentElement("afterend", rulesMount);
+      }
+
+      processImages_(page);
+      applyCastWindow_();
+    } finally {
+      resumeObserver_();
     }
-
-    page.classList.add("reality-clean-enhanced");
-
-    const oldHeader = document.getElementById("realityEnhancedCleanHeader");
-    if (oldHeader) oldHeader.remove();
-
-    page.insertAdjacentHTML("afterbegin", headerHtml_());
-
-    const generic = Array.from(page.children).find(function(node) {
-      return node && node.classList && node.classList.contains("picks-page-header") &&
-        node.id !== "realityEnhancedCleanHeader";
-    });
-    if (generic) generic.setAttribute("aria-hidden", "true");
-
-    const oldCast = document.getElementById("realityEnhancedCleanCast");
-    if (oldCast) oldCast.remove();
-
-    const spoilerMount = document.getElementById("realityTvSpoilerShieldMount");
-    const seasonMount = document.getElementById("seasonAnchorPickMount");
-    const summaryMount = document.getElementById("realityTvPlayerSummaryMount");
-    const comparisonMount = document.getElementById("realityTvEpisodeComparisonMount");
-    const html = castHtml_();
-
-    // Locked R3 Reality order: Hero -> Spoiler Shield -> Sole Survivor ->
-    // Current Episode -> Previous Episodes -> Season Cast -> Your Season ->
-    // Standings & Compare -> Rules / How to Play.
-    if (spoilerMount && seasonMount && spoilerMount.nextElementSibling !== seasonMount) {
-      spoilerMount.insertAdjacentElement("afterend", seasonMount);
-    }
-
-    const categoryList = document.getElementById("picksCategoryList");
-    const previousEpisodes = categoryList && categoryList.querySelector(".reality-previous-episodes")
-      ? categoryList.querySelector(".reality-previous-episodes")
-      : null;
-    Array.from(page.querySelectorAll(".reality-previous-episodes")).forEach(function(node) {
-      if (previousEpisodes && node !== previousEpisodes && node.parentNode) node.parentNode.removeChild(node);
-    });
-
-    if (html && categoryList) {
-      categoryList.insertAdjacentHTML("afterend", html);
-    } else if (html && summaryMount) {
-      summaryMount.insertAdjacentHTML("beforebegin", html);
-    }
-
-    const cast = document.getElementById("realityEnhancedCleanCast");
-    if (cast && summaryMount && cast.nextElementSibling !== summaryMount) {
-      cast.insertAdjacentElement("afterend", summaryMount);
-    }
-    if (summaryMount && comparisonMount && summaryMount.nextElementSibling !== comparisonMount) {
-      summaryMount.insertAdjacentElement("afterend", comparisonMount);
-    }
-    const rulesMount = document.getElementById("realityTvRulesHelpMount");
-    if (comparisonMount && rulesMount && comparisonMount.nextElementSibling !== rulesMount) {
-      comparisonMount.insertAdjacentElement("afterend", rulesMount);
-    }
-
-    processImages_(page);
-    centerLatestEliminatedCast_(page);
   }
 
   function queue_() {
@@ -7910,18 +8066,21 @@ function cssEscape(value) {
 
   function startObserver_() {
     if (!hasDom_()) return;
-    if (observer || typeof MutationObserver === "undefined") return;
-    const root = document.getElementById("app") || document.body;
-    if (!root) return;
-    observer = new MutationObserver(queue_);
-    observer.observe(root, { childList: true, subtree: true });
+    if (typeof MutationObserver === "undefined") return;
+    if (!observer) observer = new MutationObserver(queue_);
+    resumeObserver_();
   }
 
   global.PATTCRealityLayoutR3 = {
     current: layout_,
     explicit: explicitLayout_,
-    refresh: queue_
+    refresh: queue_,
+    stepCast: stepCast_
   };
+
+  if (typeof global.addEventListener === "function") {
+    global.addEventListener("resize", applyCastWindow_);
+  }
 
   startObserver_();
   queue_();

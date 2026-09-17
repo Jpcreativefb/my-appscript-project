@@ -57,7 +57,7 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   const hidden = hiddenCtx.renderRealityTvSpoilerShield_();
   assert(hidden.includes('Results Hidden'));
   assert(hidden.includes('Reveal Results'));
-  assert(hidden.includes('Future results: Protected'));
+  assert(hidden.includes('Future results protection: ON'));
   assert(hidden.includes('activateRealityTvSpoilerShield_'));
 
   const revealedCtx = runFunctions(picks, ['renderRealityTvSpoilerShield_'], {
@@ -67,10 +67,13 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   const revealed = revealedCtx.renderRealityTvSpoilerShield_();
   assert(revealed.includes('Results Revealed'));
   assert(revealed.includes('Episode results are visible'));
-  assert(revealed.includes('Future results: Auto reveal'));
+  assert(revealed.includes('Future results protection: OFF'));
   assert(!revealed.includes('role="button"'), 'revealed current-result state must not fake a reversible reveal toggle');
 
-  assert(functionSource(picks, 'saveRealityTvSpoilerPreference_').includes('Saving future-results preference'));
+  const preferenceSave = functionSource(picks, 'saveRealityTvSpoilerPreference_');
+  assert(preferenceSave.includes('setRealityTvSpoilerPreferenceFeedback_("Saving…", false)'));
+  assert(preferenceSave.includes('applyRealityTvSpoilerPreferenceState_(savedEnabled)'));
+  assert(!preferenceSave.includes('showPicksMessage('));
   assert(functionSource(picks, 'revealRealityTvEpisode_').includes('apiRevealRealityTvEpisode'));
 }
 
@@ -167,7 +170,7 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   assert(css.includes('.reality-player-vote-tallies>div.is-eliminated strong'));
 }
 
-// 6) Season Cast uses canonical image/profile data, tribe color, shared modal, horizontal rail, latest-eliminated centering.
+// 6) Season Cast keeps canonical image/profile/team data while Clean R3 owns deterministic index navigation.
 {
   const cast = functionSource(picks, 'castHtml_');
   assert(cast.includes('realityTvContestantProfileById_'));
@@ -176,11 +179,19 @@ const normalizeId = value => String(value == null ? '' : value).trim().toLowerCa
   assert(cast.includes('data-reality-latest-eliminated="true"'));
   assert(cast.includes('showRealityTvContestantDetailModal_'));
   assert(cast.includes('Bio &amp; Details'));
-  const center = functionSource(picks, 'centerLatestEliminatedCast_');
-  assert(center.includes('data-reality-latest-eliminated="true"'));
-  assert(center.includes('rail.scrollTo'));
-  assert(center.includes('realityInitialCentered'));
-  assert(css.includes('.reality-clean-cast-rail {display:flex') || css.includes('.reality-clean-cast-rail{gap:7px'));
+  assert(cast.includes('window.PATTCRealityLayoutR3.stepCast(-1)'));
+  assert(cast.includes('window.PATTCRealityLayoutR3.stepCast(1)'));
+  const visible = functionSource(picks, 'castVisibleCount_');
+  const step = functionSource(picks, 'stepCast_');
+  const apply = functionSource(picks, 'applyCastWindow_');
+  assert(visible.includes('return narrow ? 2 : 4;'));
+  assert(step.includes('castIndex + delta'));
+  assert(apply.includes('card.hidden ='));
+  const cleanStart = picks.indexOf('(function realityEnhancedCleanR3_');
+  const cleanEnd = picks.indexOf('PATTC REALITY CINEMATIC', cleanStart);
+  const clean = picks.slice(cleanStart, cleanEnd);
+  for (const token of ['scrollLeft', 'scrollTo', 'offsetLeft', 'clientWidth']) assert(!clean.includes(token));
+  assert(css.includes('.reality-player-page.reality-clean-enhanced .reality-clean-cast-card[hidden]{display:none!important}'));
   assert(css.includes('border:2px solid color-mix(in srgb,var(--reality-team-color'));
   assert(css.includes('color:#7dd3fc!important'));
 }
