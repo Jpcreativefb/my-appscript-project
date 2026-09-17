@@ -1,6 +1,19 @@
 const APPS_SCRIPT_API_URL =
   "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec";
 
+const SURVIVOR_R3_PREVIEW_API_URL =
+  "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
+
+const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
+  "getSurvivorState",
+  "getSurvivorTeamSchedule"
+]);
+
+const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
+  "saveSurvivorPick",
+  "saveSportsSurvivorAutoPickPreference"
+]);
+
 const MAX_BODY_BYTES = 6 * 1024 * 1024;
 
 function jsonResponse(payload, status = 200) {
@@ -43,8 +56,20 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, message: "Invalid API action." }, 400);
   }
 
+  if (SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS.has(action)) {
+    return jsonResponse({
+      success: false,
+      previewOnly: true,
+      message: "Survivor R3 preview is review-only. Picks and Auto-Pick settings are not saved from this preview."
+    }, 200);
+  }
+
+  const upstreamUrl = SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action)
+    ? SURVIVOR_R3_PREVIEW_API_URL
+    : APPS_SCRIPT_API_URL;
+
   try {
-    const upstream = await fetch(APPS_SCRIPT_API_URL, {
+    const upstream = await fetch(upstreamUrl, {
       method: "POST",
       headers: {
         "Content-Type": "text/plain;charset=utf-8",
