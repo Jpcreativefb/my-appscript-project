@@ -333,7 +333,7 @@ function doPost(e) {
       if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
       return json(sportsSurvivorSaveAutoPickPreference_({
         username: body.username, gameId: postGameId, enabled: body.enabled, strategy: body.strategy,
-        scope: body.scope, week: body.week
+        scope: body.scope, week: body.week, trigger: body.trigger
       }));
     }
 

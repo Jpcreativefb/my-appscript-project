@@ -709,7 +709,7 @@ const APP_PAGE_MODULES = {
   "trophy-room": ["dashboard"],
   "more": ["dashboard"],
   "picks": ["picks"],
-  "survivor": ["survivor"],
+  "survivor": ["survivor", "survivorR4"],
   "voting": ["voting"],
   "ranking": ["ranking"],
   "game-hub": ["gameModeHub"],
