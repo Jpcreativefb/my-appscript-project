@@ -601,8 +601,14 @@ function getStakedPredictionSummary_(
 
 function hybridPlacementPoints_(game) {
 
+  const isSeasonCup =
+    hybridKey_(game && game.scoringEngine) === "season-cup" ||
+    hybridKey_(game && game.type) === "season-cup";
+
   const fallback =
-    [10, 8, 6, 5, 4, 3, 2, 1];
+    isSeasonCup
+      ? [25, 20, 16, 13, 11, 9, 7, 6, 5, 4, 3, 2, 1]
+      : [10, 8, 6, 5, 4, 3, 2, 1];
 
   const raw =
     game && game.placementPointsJSON;
@@ -622,6 +628,11 @@ function hybridPlacementPoints_(game) {
     }
 
     if (parsed && typeof parsed === "object") {
+      if (Array.isArray(parsed.points)) {
+        return parsed.points.map(function(value) {
+          return hybridNumber_(value, 0);
+        });
+      }
       return parsed;
     }
 
@@ -634,6 +645,38 @@ function hybridPlacementPoints_(game) {
 
   return fallback;
 
+}
+
+
+
+function hybridSeasonCupRules_(game) {
+  const enabled =
+    hybridKey_(game && game.scoringEngine) === "season-cup" ||
+    hybridKey_(game && game.type) === "season-cup";
+
+  const rules = {
+    enabled: enabled,
+    minPlayers: 4,
+    fullFieldSize: 8,
+    minParticipationPct: 50,
+    fieldAdjustment: true
+  };
+
+  if (!enabled || !game || !game.placementPointsJSON) {
+    return rules;
+  }
+
+  try {
+    const parsed = JSON.parse(game.placementPointsJSON);
+    if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") return rules;
+
+    rules.minPlayers = Math.max(1, Math.floor(hybridNumber_(parsed.minPlayers, rules.minPlayers)));
+    rules.fullFieldSize = Math.max(rules.minPlayers, Math.floor(hybridNumber_(parsed.fullFieldSize, rules.fullFieldSize)));
+    rules.minParticipationPct = Math.max(0, Math.min(100, hybridNumber_(parsed.minParticipationPct, rules.minParticipationPct)));
+    rules.fieldAdjustment = parsed.fieldAdjustment !== false;
+  } catch (err) {}
+
+  return rules;
 }
 
 function rollupParentLeaderboard_(
@@ -778,6 +821,9 @@ function rollupParentLeaderboard_(
   const placementPoints =
     hybridPlacementPoints_(parentGame);
 
+  const seasonCupRules =
+    hybridSeasonCupRules_(parentGame);
+
   children.forEach(function(child) {
 
     const childRows =
@@ -788,6 +834,31 @@ function rollupParentLeaderboard_(
           skipParentRollup: true
         }
       );
+
+    const seasonCupFieldSize =
+      childRows.filter(function(row) {
+        return !!hybridString_(row && (row.username || row.user));
+      }).length;
+
+    const seasonCupParticipationPct =
+      seasonCupRules.fullFieldSize > 0
+        ? (seasonCupFieldSize / seasonCupRules.fullFieldSize) * 100
+        : 100;
+
+    const seasonCupQualified =
+      !seasonCupRules.enabled ||
+      (
+        seasonCupFieldSize >= seasonCupRules.minPlayers &&
+        seasonCupParticipationPct >= seasonCupRules.minParticipationPct
+      );
+
+    const seasonCupFieldMultiplier =
+      !seasonCupRules.enabled || seasonCupRules.fieldAdjustment !== true
+        ? 1
+        : Math.min(
+            1,
+            seasonCupFieldSize / Math.max(1, seasonCupRules.fullFieldSize)
+          );
 
     let previousPlacementScore = null;
     let previousPlacementRank = 0;
@@ -856,6 +927,13 @@ function rollupParentLeaderboard_(
             );
         }
 
+        if (seasonCupRules.enabled) {
+          contribution =
+            seasonCupQualified
+              ? contribution * seasonCupFieldMultiplier * weight
+              : 0;
+        }
+
       }
 
       const metricWeight =
@@ -877,6 +955,10 @@ function rollupParentLeaderboard_(
         rawScore:
           rawNetScore,
         contribution: contribution,
+        seasonCupFieldSize: seasonCupRules.enabled ? seasonCupFieldSize : 0,
+        seasonCupFieldMultiplier: seasonCupRules.enabled ? seasonCupFieldMultiplier : 1,
+        seasonCupParticipationPct: seasonCupRules.enabled ? seasonCupParticipationPct : 100,
+        seasonCupQualified: seasonCupRules.enabled ? seasonCupQualified : true,
         remainingContribution:
           isPlacementContribution
             ? 0

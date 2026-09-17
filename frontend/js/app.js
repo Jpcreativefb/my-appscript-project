@@ -1420,6 +1420,9 @@ async function navigate(page, options) {
   }
 
   const previousPage = APP_STATE.currentPage;
+  if (previousPage && previousPage !== page && typeof pattcSportsTestLabBeforeNavigate === "function") {
+    pattcSportsTestLabBeforeNavigate(previousPage, app);
+  }
   if (previousPage && previousPage !== page) {
     appCapturePageSnapshot_(previousPage, app);
   }
@@ -1471,6 +1474,7 @@ async function navigate(page, options) {
     app.classList.remove("page-enter");
     app.classList.add("page-enter-active");
     setActiveNav(page);
+    if (typeof pattcSportsTestLabMount === "function") pattcSportsTestLabMount(page, app);
     if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
 
     // Home is an account-level view. Paint its valid snapshot immediately,

@@ -109,6 +109,19 @@ function getSupportedGameTypes() {
       mixedGame: false
     },
     {
+      id: "season-cup",
+      label: "Season Cup",
+      description: "Parent sports-season competition that converts child-game finishes into protected Cup points.",
+      predictionEnabled: true,
+      rankingEnabled: false,
+      confidenceEnabled: false,
+      wagerEnabled: false,
+      stakedPointsEnabled: false,
+      fixedPointsEnabled: true,
+      racingEnabled: false,
+      mixedGame: true
+    },
+    {
       id: "mixed",
       label: "Hybrid Game",
       description: "Combines standard predictions, confidence, staked predictions, sports wagers, racing wagers, and props in one game.",
@@ -977,11 +990,15 @@ function buildGameObjectFromRow_(
         getGameCell_(
           row,
           col.scoringEngine,
-          typeConfig.racingEnabled === true
-            ? "racing"
-            : "manual"
+          type === "season-cup"
+            ? "season-cup"
+            : (
+                typeConfig.racingEnabled === true
+                  ? "racing"
+                  : "manual"
+              )
         )
-      ) || "manual",
+      ) || (type === "season-cup" ? "season-cup" : "manual"),
 
     gameFormat:
       normalizeGameFormat_(
@@ -1003,7 +1020,7 @@ function buildGameObjectFromRow_(
         getGameCell_(
           row,
           col.gameRole,
-          "standalone"
+          type === "season-cup" ? "parent" : "standalone"
         )
       ),
 
@@ -1091,7 +1108,9 @@ function buildGameObjectFromRow_(
         getGameCell_(
           row,
           col.placementPointsJSON,
-          ""
+          type === "season-cup"
+            ? '{"points":[25,20,16,13,11,9,7,6,5,4,3,2,1],"minPlayers":4,"fullFieldSize":8,"minParticipationPct":50,"fieldAdjustment":true}'
+            : ""
         )
       ),
 
