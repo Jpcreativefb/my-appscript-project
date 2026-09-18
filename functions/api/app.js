@@ -8,6 +8,8 @@ const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
   "getSurvivorState",
   "getSurvivorTeamSchedule",
   "adminBuildNflSeasonPack",
+  "adminGetNflPlayoffRaceSettings",
+  "adminSaveNflPlayoffRaceSettings",
   "getNflPlayoffRaceState",
   "saveNflPlayoffRaceRanking"
 ]);

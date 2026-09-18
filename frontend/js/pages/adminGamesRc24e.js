@@ -2720,4 +2720,59 @@ async function adminPermanentPurgeAttemptDelete_() {
 }
 
 /* PATTC NFL SPORTS PACK R1 — Manage Games builder */
-(function(root){"use strict";function nflSeasonPackAdminCard_(){const year=new Date().getFullYear();return `<section class="card admin-card" style="margin-bottom:12px;border:1px solid rgba(68,223,105,.42);background:linear-gradient(180deg,rgba(5,36,58,.96),rgba(2,19,31,.96));"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:950;color:#55eb76">NFL SPORTS PACK</div><div class="admin-sub">Build NFL Cup + Playoff Race + Full League Forecast + Bottom Dwellers as Draft games. Safe to run again.</div></div><div style="display:flex;gap:7px;align-items:center"><input id="nflSeasonPackYear" class="input admin-input" type="number" min="2020" max="2100" value="${year}" style="width:92px"><button id="nflSeasonPackBuildButton" class="admin-small-button" type="button" onclick="nflSeasonPackAdminBuild_()">Build / Repair NFL Pack</button></div></div><div style="height:7px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden"><div id="nflSeasonPackProgress" style="height:100%;width:0;background:#45e76b;transition:width .18s ease"></div></div><div id="nflSeasonPackStatus" class="admin-sub" style="margin-top:6px">Creates Draft setup only. Nothing is published Live automatically.</div></section>`;}root.nflSeasonPackAdminBuild_=async function(){const yearNode=document.getElementById("nflSeasonPackYear"),button=document.getElementById("nflSeasonPackBuildButton"),status=document.getElementById("nflSeasonPackStatus"),bar=document.getElementById("nflSeasonPackProgress"),year=Math.max(2020,Math.min(2100,Number(yearNode&&yearNode.value)||new Date().getFullYear()));let cursor=0,guard=0;if(button)button.disabled=true;try{while(guard++<30){if(status)status.textContent="Building NFL Sports Pack… "+cursor;const res=await api("adminBuildNflSeasonPack",{year:year,cursor:cursor,batchSize:10});if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"NFL Sports Pack setup failed.");cursor=Number(res.nextCursor)||0;if(bar)bar.style.width=Math.max(0,Math.min(100,Number(res.percent)||0))+"%";if(status)status.textContent=res.message||("NFL setup "+cursor+" / "+res.total);if(res.done){if(status)status.textContent="NFL Sports Pack ready in Draft · NFL Cup + 3 ranking mini-games.";if(button)button.textContent="NFL Pack Ready ✓";return;}}throw new Error("NFL Sports Pack setup did not finish within the safety loop.");}catch(err){if(status)status.textContent=err&&err.message?err.message:"NFL Sports Pack setup failed.";if(button)button.disabled=false;}};const base=root.renderAdminGamesPage;if(typeof base==="function"){root.renderAdminGamesPage=async function(){const html=String(await base()),card=nflSeasonPackAdminCard_(),match=html.match(/<div class="page[^>]*>/);return match?html.replace(match[0],match[0]+card):card+html;};}})(window);
+(function(root){"use strict";function nflSeasonPackAdminCard_(){const year=new Date().getFullYear();return `<section class="card admin-card" style="margin-bottom:12px;border:1px solid rgba(68,223,105,.42);background:linear-gradient(180deg,rgba(5,36,58,.96),rgba(2,19,31,.96));"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><div><div style="font-size:11px;font-weight:950;color:#55eb76">NFL SPORTS PACK</div><div class="admin-sub">Build NFL Cup + Playoff Race + Full League Forecast + Bottom Dwellers as Draft games. Safe to run again.</div></div><div style="display:flex;gap:7px;align-items:center"><input id="nflSeasonPackYear" class="input admin-input" type="number" min="2020" max="2100" value="${year}" style="width:92px"><button id="nflSeasonPackBuildButton" class="admin-small-button" type="button" onclick="nflSeasonPackAdminBuild_()">Build / Repair NFL Pack</button></div></div><div style="height:7px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden"><div id="nflSeasonPackProgress" style="height:100%;width:0;background:#45e76b;transition:width .18s ease"></div></div><div id="nflSeasonPackStatus" class="admin-sub" style="margin-top:6px">Creates Draft setup only. Nothing is published Live automatically.</div></section>`;}function nflPlayoffRaceTimingAdminCard_(){
+  return `<details class="card admin-card admin-collapsible-card" open style="margin-bottom:12px;border:1px solid rgba(68,202,255,.38)">
+    <summary class="admin-card-summary"><div><h2 style="margin:0;color:#7ee7ff">NFL Playoff Race Timing</h2><div class="admin-sub">Season timing and forecast adjustment controls.</div></div><span class="admin-collapse-icon">▾</span></summary>
+    <div class="admin-collapsible-body">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:9px">
+        <label class="admin-sub">Season Start Date<input id="nflRaceStartDate" class="input admin-input" type="date"></label>
+        <label class="admin-sub">Current Week Mode<select id="nflRaceWeekMode" class="input admin-input"><option value="auto">Auto</option><option value="override">Override</option></select></label>
+        <label class="admin-sub">Week Override<input id="nflRaceWeekOverride" class="input admin-input" type="number" min="1" max="18" value="2"></label>
+        <label class="admin-sub">Update Window<select id="nflRaceWindowMode" class="input admin-input"><option value="auto">Auto</option><option value="open">Open Now</option><option value="closed">Closed</option></select></label>
+        <label class="admin-sub">Window Week<input id="nflRaceWindowWeek" class="input admin-input" type="number" min="1" max="18" value="2"></label>
+        <label class="admin-sub">Multiplier Override<input id="nflRaceMultiplier" class="input admin-input" type="number" min=".4" max="1" step=".05" value="1.00"></label>
+      </div>
+      <div class="admin-sub" style="margin-top:8px">Normal production: Auto. For testing now, use Week Override 2 + Open Now. Multiplier applies to the whole saved forecast, including playoff bonuses.</div>
+      <div class="admin-card-actions" style="margin-top:10px">
+        <button class="admin-small-button secondary" type="button" onclick="nflPlayoffRaceAdminLoad_()">Load Timing</button>
+        <button id="nflRaceSaveButton" class="admin-small-button" type="button" onclick="nflPlayoffRaceAdminSave_()">Save Timing</button>
+      </div>
+      <div style="height:6px;margin-top:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden"><div id="nflRaceTimingProgress" style="height:100%;width:0;background:#45e76b;transition:width .18s ease"></div></div>
+      <div id="nflRaceTimingStatus" class="admin-sub" style="margin-top:6px">Auto mode uses NFL/Team Fantasy timing.</div>
+    </div>
+  </details>`;
+}
+function nflPlayoffRaceAdminGameId_(){
+  const year=Math.max(2020,Math.min(2100,Number((document.getElementById("nflSeasonPackYear")||{}).value)||new Date().getFullYear()));
+  return "nfl-playoff-race-"+year;
+}
+root.nflPlayoffRaceAdminLoad_=async function(){
+  const status=document.getElementById("nflRaceTimingStatus"),bar=document.getElementById("nflRaceTimingProgress");
+  if(status)status.textContent="Loading Playoff Race timing…";if(bar)bar.style.width="25%";
+  try{
+    const res=await api("adminGetNflPlayoffRaceSettings",{gameId:nflPlayoffRaceAdminGameId_()});
+    if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"Could not load timing.");
+    const s=res.settings||{},set=(id,value)=>{const node=document.getElementById(id);if(node)node.value=value===undefined||value===null?"":value;};
+    set("nflRaceStartDate",s.seasonStartDate||"");set("nflRaceWeekMode",s.currentWeekMode||"auto");
+    set("nflRaceWeekOverride",s.currentWeekOverride||2);set("nflRaceWindowMode",s.updateWindowMode||"auto");
+    set("nflRaceWindowWeek",s.updateWindowWeek||2);set("nflRaceMultiplier",s.multiplierOverride||1);
+    if(bar)bar.style.width="100%";if(status)status.textContent="Loaded "+nflPlayoffRaceAdminGameId_()+" timing.";
+  }catch(err){if(bar)bar.style.width="0";if(status)status.textContent=err&&err.message?err.message:"Could not load timing.";}
+};
+root.nflPlayoffRaceAdminSave_=async function(){
+  const status=document.getElementById("nflRaceTimingStatus"),bar=document.getElementById("nflRaceTimingProgress"),button=document.getElementById("nflRaceSaveButton");
+  const val=id=>String((document.getElementById(id)||{}).value||"").trim();
+  if(button)button.disabled=true;if(bar)bar.style.width="35%";if(status)status.textContent="Saving Playoff Race timing…";
+  try{
+    const res=await apiPost("adminSaveNflPlayoffRaceSettings",{
+      gameId:nflPlayoffRaceAdminGameId_(),seasonStartDate:val("nflRaceStartDate"),
+      currentWeekMode:val("nflRaceWeekMode")||"auto",currentWeekOverride:Number(val("nflRaceWeekOverride")||1),
+      updateWindowMode:val("nflRaceWindowMode")||"auto",updateWindowWeek:Number(val("nflRaceWindowWeek")||0),
+      multiplierOverride:Number(val("nflRaceMultiplier")||0)
+    });
+    if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"Could not save timing.");
+    if(bar)bar.style.width="100%";if(status)status.textContent="Playoff Race timing saved ✓";
+  }catch(err){if(bar)bar.style.width="0";if(status)status.textContent=err&&err.message?err.message:"Could not save timing.";}
+  finally{if(button)button.disabled=false;}
+};
+root.nflSeasonPackAdminBuild_=async function(){const yearNode=document.getElementById("nflSeasonPackYear"),button=document.getElementById("nflSeasonPackBuildButton"),status=document.getElementById("nflSeasonPackStatus"),bar=document.getElementById("nflSeasonPackProgress"),year=Math.max(2020,Math.min(2100,Number(yearNode&&yearNode.value)||new Date().getFullYear()));let cursor=0,guard=0;if(button)button.disabled=true;try{while(guard++<30){if(status)status.textContent="Building NFL Sports Pack… "+cursor;const res=await api("adminBuildNflSeasonPack",{year:year,cursor:cursor,batchSize:10});if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"NFL Sports Pack setup failed.");cursor=Number(res.nextCursor)||0;if(bar)bar.style.width=Math.max(0,Math.min(100,Number(res.percent)||0))+"%";if(status)status.textContent=res.message||("NFL setup "+cursor+" / "+res.total);if(res.done){if(status)status.textContent="NFL Sports Pack ready in Draft · NFL Cup + 3 ranking mini-games.";if(button)button.textContent="NFL Pack Ready ✓";return;}}throw new Error("NFL Sports Pack setup did not finish within the safety loop.");}catch(err){if(status)status.textContent=err&&err.message?err.message:"NFL Sports Pack setup failed.";if(button)button.disabled=false;}};const base=root.renderAdminGamesPage;if(typeof base==="function"){root.renderAdminGamesPage=async function(){const html=String(await base()),card=nflSeasonPackAdminCard_(),timing=nflPlayoffRaceTimingAdminCard_(),match=html.match(/<div class="page[^>]*>/);setTimeout(function(){if(root.nflPlayoffRaceAdminLoad_)root.nflPlayoffRaceAdminLoad_();},300);return match?html.replace(match[0],match[0]+card+timing):card+timing+html;};}})(window);

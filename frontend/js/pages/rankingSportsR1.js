@@ -24,6 +24,14 @@
   function rowFor(categoryId,nomineeId){const list=document.getElementById("rankingList_"+categoryId);if(!list)return null;return Array.from(list.querySelectorAll(".ranking-entry")).find(function(row){return String(row.dataset.nomineeId||"")===String(nomineeId||"");})||null;}
   function hint(category){const id=key(category&&category.id);if(id.indexOf("playoff-seeds")!==-1)return "Positions 1–7 are your playoff seeds. Rank all 16 so ties and near-misses can score accurately.";if(id.indexOf("bottom-dwellers")!==-1)return "Rank WORST to BEST. #1 is the team you expect to finish at the bottom of the NFL.";return "Rank strongest final regular-season finish to weakest.";}
   function positionOptions(count,selected){let out="";for(let i=1;i<=count;i++)out+='<option value="'+i+'"'+(i===selected?" selected":"")+">"+i+"</option>";return out;}
+function ordinal(n){n=Number(n)||0;const m100=n%100;if(m100>=11&&m100<=13)return n+"th";const m10=n%10;return n+(m10===1?"st":m10===2?"nd":m10===3?"rd":"th");}
+  function liveMap(category){const out={};const rows=category&&category.liveStandings&&Array.isArray(category.liveStandings.rows)?category.liveStandings.rows:[];rows.forEach(function(row){out[key(row.nomineeId)]=row;});return out;}
+  function liveMove(row){if(!row||!row.currentRank)return "";const move=Number(row.movement)||0;return ordinal(row.currentRank)+(move>0?" ↑"+move:move<0?" ↓"+Math.abs(move):" —");}
+  function liveSummary(row){
+    if(!row||!row.currentRank)return "";
+    const bonus=Number(row.playoffBonus)||0;
+    return '<div class="nfl-ranking-live"><span>'+(row.record?"("+esc(row.record)+")":"")+'</span><em>'+esc(liveMove(row))+'</em><strong>'+esc(row.points)+' pts</strong>'+(bonus?'<b>+'+esc(bonus)+' playoff</b>':"")+'</div>';
+  }
 
   function controls(category,team,index,count,locked){
     if(locked)return "";
@@ -45,15 +53,17 @@
     '</div>';
   }
 
-  function card(category){
+function card(category){
     const ordered=rankingPageCategoryOrder_(category);
     const locked=category.locked===true;
     const playoff=isPlayoffCategory(category);
+    const liveRows=liveMap(category);
+    const live=category.liveStandings||null;
     let scoreText;
     if(category.resolved){
       scoreText=esc(category.earnedPoints)+" / "+esc(category.points)+" pts";
       if(category.baseEarnedPoints!==undefined&&Number(category.forecastMultiplier)!==1)scoreText+=" · base "+esc(category.baseEarnedPoints)+" × "+esc(Math.round(Number(category.forecastMultiplier)*100))+"%";
-      else scoreText+=" · "+esc(category.accuracyPercent)+"% accuracy";
+      else scoreText+=" · "+esc(category.accuracyPercent)+"% position accuracy";
     }else{
       scoreText=(category.ballot&&category.ballot.length?"Saved ranking · ":"")+esc(category.points)+" pts available";
     }
@@ -64,17 +74,23 @@
       const label=teamLabel(team)||String(team.shortAnswer||team.id||"");
       const div=teamDivision(team);
       const subtitle=playoffZone?(label?label+" · PLAYOFF SEED":"PLAYOFF SEED"):label;
+      const liveRow=liveRows[key(team.id)]||null;
+      const liveInline=liveRow&&liveRow.currentRank?'<small class="nfl-ranking-live-inline">'+(liveRow.record?"("+esc(liveRow.record)+") · ":"")+esc(liveMove(liveRow))+" · "+esc(liveRow.points)+" pts"+(liveRow.playoffBonus?" (+"+esc(liveRow.playoffBonus)+" playoff)":"")+'</small>':"";
       rows+='<div class="ranking-entry nfl-ranking-entry '+(playoffZone?"is-playoff":"")+'" style="'+style(team)+'" data-nominee-id="'+esc(team.id)+'" data-nfl-label="'+esc(label)+'" data-nfl-division="'+esc(div)+'" ondragover="nflRankingDragOver_(event)" ondrop="nflRankingDrop_(event,\''+js(category.id)+'\',\''+js(team.id)+'\')">'+
         '<div class="ranking-position nfl-ranking-position">#<span>'+(index+1)+'</span></div>'+
         '<div class="ranking-entry-media nfl-ranking-logo">'+image+'</div>'+
-        '<div class="ranking-entry-name nfl-ranking-name"><strong>'+esc(team.name||team.shortAnswer||team.id)+'</strong><small>'+esc(subtitle)+'</small></div>'+
-        controls(category,team,index,ordered.length,locked)+
+        '<div class="ranking-entry-name nfl-ranking-name"><strong>'+esc(team.name||team.shortAnswer||team.id)+'</strong><small>'+esc(subtitle)+'</small>'+(!locked?liveInline:"")+'</div>'+
+        (locked?liveSummary(liveRow):controls(category,team,index,ordered.length,locked))+
       '</div>';
     });
+    const liveTotal=live&&live.rows&&live.rows.length
+      ?'<div class="nfl-ranking-live-total"><span>IF THE SEASON ENDED TODAY · WEEK '+esc(live.week)+'</span><strong>'+esc(live.totalPoints)+' / '+esc(live.maxPoints)+' PTS</strong><small>'+esc(live.correctPlayoffTeams)+' of 7 playoff teams correct'+(live.perfectFieldBonus?" · +"+esc(live.perfectFieldBonus)+" PERFECT 7 BONUS":"")+(live.provisionalTiebreakers?" · tied records use provisional order until official NFL tiebreak data is available":"")+'</small></div>'
+      :"";
     const save=!locked?'<div class="ranking-save-row nfl-ranking-save"><button class="button ranking-save-button" type="button" onclick="nflRankingSaveCategory_(\''+js(category.id)+'\',false)">SAVE RANKING</button><span id="rankingMessage_'+esc(category.id)+'" class="ranking-message"></span></div>':"";
     return '<section class="nfl-ranking-card" data-ranking-category="'+esc(category.id)+'">'+
       '<div class="nfl-ranking-card-head"><div><span>'+esc(category.section||"NFL")+'</span><strong>'+esc(category.name)+'</strong><small>'+esc(hint(category))+'</small><em>'+scoreText+'</em></div><b class="'+(category.resolved?"is-final":locked?"is-locked":"is-open")+'">'+(category.resolved?"FINAL":locked?"LOCKED":"OPEN")+'</b></div>'+
       (playoff?'<div class="nfl-ranking-zone-key"><span>1–7 PLAYOFF SEEDS</span><span>8–16 OUTSIDE FIELD</span></div>':"")+
+      liveTotal+
       '<div class="ranking-order-list nfl-ranking-list" id="rankingList_'+esc(category.id)+'">'+rows+'</div>'+
       (playoff?divisionWarning(category.id):"")+save+rankingPageOfficialOrder_(category)+
     '</section>';
@@ -83,17 +99,25 @@
   function raceStatus(payload){
     const race=payload&&payload.nflPlayoffRace;
     if(!race)return "";
+    const currentPct=Math.round(Number(race.currentMultiplier||1)*100);
     const savePct=Math.round(Number(race.saveMultiplier===undefined?race.currentMultiplier:race.saveMultiplier)*100);
-    const status=race.currentWindow&&race.currentWindow.week
-      ?"Week "+race.currentWindow.week+" update OPEN"
-      :race.canEnter
-        ?"Original Prediction OPEN"
-        :"Locked";
+    const open=!!(race.currentWindow&&race.currentWindow.week);
+    const status=open?"UPDATE WINDOW OPEN":race.canEnter?"ORIGINAL PREDICTION OPEN":"FORECAST LOCKED";
+    const next=race.nextWindow;
+    let timingText=race.lockReason||"Original Prediction is preserved.";
+    if(open&&race.currentWindow.manual){
+      timingText="Admin manual update window is open for Week "+race.currentWindow.week+" at "+savePct+"%.";
+    }else if(open&&race.currentWindow.closesAt){
+      timingText="Week "+race.currentWindow.week+" adjustment is open at "+savePct+"% and closes at the first Week "+race.currentWindow.week+" kickoff.";
+    }else if(next){
+      timingText+=" Next adjustment: Week "+next.week+" at "+Math.round(Number(next.multiplier||0)*100)+"%. Opens after Week "+(next.week-1)+" is final and closes at the first Week "+next.week+" kickoff.";
+    }
     return '<section class="nfl-race-window '+(race.canEdit?"is-open":"is-locked")+'">'+
       '<div><span>CURRENT NFL WEEK</span><strong>'+esc(race.currentWeek||1)+'</strong></div>'+
-      '<div><span>NEXT SAVE</span><strong>'+esc(savePct)+'%</strong></div>'+
+      '<div><span>CURRENT FORECAST</span><strong>'+esc(currentPct)+'%</strong></div>'+
+      '<div><span>NEXT ADJUSTMENT</span><strong>'+(open?"Week "+esc(race.currentWindow.week)+" · "+esc(savePct)+"%":next?"Week "+esc(next.week)+" · "+esc(Math.round(Number(next.multiplier||0)*100))+"%":"FINAL LOCK")+'</strong></div>'+
       '<div><span>STATUS</span><strong>'+esc(status)+'</strong></div>'+
-      '<p>'+esc(race.lockReason||"Original Prediction is preserved. Later accepted updates become the active scoring forecast.")+'</p>'+
+      '<p>'+esc(timingText)+'</p>'+
     '</section>';
   }
 
@@ -271,7 +295,7 @@
       '<section class="nfl-ranking-score-curve"><div><strong>10</strong><span>EXACT</span></div><div><strong>8</strong><span>±1</span></div><div><strong>6</strong><span>±2</span></div><div><strong>4</strong><span>±3</span></div><div><strong>2</strong><span>±4</span></div><div><strong>0</strong><span>5+</span></div></section>'+
       '<section class="nfl-ranking-stats"><div><span>Saved</span><strong>'+saved+'/'+categories.length+'</strong></div><div><span>Max Points</span><strong>'+max+'</strong></div><div><span>Scoring</span><strong>10·8·6·4·2</strong></div></section>'+
       (categories.length?categories.map(card).join(""):'<div class="nfl-ranking-empty">No NFL ranking sections have been created yet.</div>')+
-      '<section class="nfl-ranking-help"><details><summary><strong>RULES</strong><span>Tap to expand</span></summary><div><p>Each team scores 10 points for the exact final position, 8 for ±1, 6 for ±2, 4 for ±3, 2 for ±4, and 0 beyond four spots.</p><p>Playoff Race preserves your Original Prediction. Later checkpoint updates use the multiplier shown when the update is saved.</p><p>Your mini-game finish is converted into NFL Cup placement points when this game is linked to the Cup.</p></div></details><details><summary><strong>HOW TO PLAY</strong><span>Tap to expand</span></summary><div><p>Drag a team, choose a position directly, or use the arrow buttons. Then press Save Ranking.</p></div></details></section>'+
+      '<section class="nfl-ranking-help"><details><summary><strong>RULES</strong><span>Tap to expand</span></summary><div><p>Position scoring: 10 exact, 8 for ±1, 6 for ±2, 4 for ±3, 2 for ±4, 0 beyond four spots.</p><p><strong>Playoff bonus:</strong> +3 for every team you put in the Top 7 that actually finishes in the Top 7. <strong>Perfect 7:</strong> +5 more if all seven playoff teams are correct.</p><p>The forecast multiplier applies to position points and bonuses.</p></div></details><details><summary><strong>HOW TO PLAY</strong><span>Tap to expand</span></summary><div><p>Drag a team, choose a position directly, or use the arrow buttons. Then press Save Ranking.</p></div></details><details><summary><strong>ADJUSTMENT SCHEDULE</strong><span>Tap to expand</span></summary><div><p><strong>Original:</strong> 100%</p><p><strong>Week 4:</strong> 85% · <strong>Week 8:</strong> 70%</p><p><strong>Week 12:</strong> 55% · <strong>Week 15:</strong> 40%</p><p>Automatic windows open after the prior NFL week is final and close at the first kickoff of the adjustment week.</p></div></details></section>'+
     '</div>';
   };
 })(window);

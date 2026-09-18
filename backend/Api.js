@@ -1480,6 +1480,14 @@ function doGet(e) {
       return json(apiAdminPermanentGamePurge(params));
     }
 
+    if (action === "adminGetNflPlayoffRaceSettings") {
+      return json(apiAdminGetNflPlayoffRaceSettings_(params));
+    }
+
+    if (action === "adminSaveNflPlayoffRaceSettings") {
+      return json(apiAdminSaveNflPlayoffRaceSettings_(params));
+    }
+
     if (action === "adminBuildNflSeasonPack") {
       return json(apiAdminBuildNflSeasonPack(params));
     }

@@ -537,14 +537,20 @@ function rankingLeaderboardData_(gameId) {
     Object.keys(entriesByUser[username]).forEach(function(categoryId) {
       const category = categories.find(function(item) { return rankingKey_(item.id) === categoryId; });
       if (!category) return;
-      const score = rankingScoreBallot_(category, entriesByUser[username][categoryId], finalRanks[categoryId] || {});
+      const ballot = entriesByUser[username][categoryId];
+      const score = rankingScoreBallot_(category, ballot, finalRanks[categoryId] || {});
+      const playoffBonus = nflMultiplierByUser && typeof nflPlayoffRaceBonusForBallot_ === "function"
+        ? nflPlayoffRaceBonusForBallot_(categoryId, ballot, finalRanks[categoryId] || {})
+        : {resolved:false,total:0,maxBonus:0};
       const multiplier = userMultipliers && userMultipliers[categoryId] !== undefined
         ? Number(userMultipliers[categoryId]) || 0
         : 1;
-      baseTotal += score.earnedPoints;
-      baseRemaining += score.remainingPoints;
-      total += score.earnedPoints * multiplier;
-      remaining += score.remainingPoints * multiplier;
+      const baseEarned = score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0);
+      const baseRemain = score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus;
+      baseTotal += baseEarned;
+      baseRemaining += baseRemain;
+      total += baseEarned * multiplier;
+      remaining += baseRemain * multiplier;
       exactCount += score.exactCount;
       if (score.resolved) resolvedQuestions++;
     });
@@ -603,6 +609,9 @@ function rankingUserScoring_(username, gameId) {
     const categoryId = rankingKey_(category.id);
     const ballot = ballots[categoryId] || [];
     const score = rankingScoreBallot_(category, ballot, finalRanks[categoryId] || {});
+    const playoffBonus = nflMultipliers && typeof nflPlayoffRaceBonusForBallot_ === "function"
+      ? nflPlayoffRaceBonusForBallot_(categoryId, ballot, finalRanks[categoryId] || {})
+      : {resolved:false,total:0,maxBonus:0};
     const multiplier = nflMultipliers && nflMultipliers[categoryId] !== undefined
       ? Number(nflMultipliers[categoryId]) || 0
       : 1;
@@ -610,12 +619,13 @@ function rankingUserScoring_(username, gameId) {
       shortName: category.shortName || category.name,
       nomineeId: ballot.length ? "ranking-ballot" : "",
       winnerNomineeId: "",
-      earnedPoints: Math.round(score.earnedPoints * multiplier * 100) / 100,
-      remainingPoints: Math.round(score.remainingPoints * multiplier * 100) / 100,
-      finalPointsAvailable: Math.round(score.maxPoints * multiplier * 100) / 100,
-      baseEarnedPoints: score.earnedPoints,
-      baseRemainingPoints: score.remainingPoints,
-      baseFinalPointsAvailable: score.maxPoints,
+      earnedPoints: Math.round((score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0)) * multiplier * 100) / 100,
+      remainingPoints: Math.round((score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
+      finalPointsAvailable: Math.round((score.maxPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
+      baseEarnedPoints: score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0),
+      baseRemainingPoints: score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus,
+      baseFinalPointsAvailable: score.maxPoints + playoffBonus.maxBonus,
+      playoffBonus: playoffBonus,
       forecastMultiplier: multiplier,
       locked: rankingCategoryLocked_(typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId), category),
       resolved: score.resolved,
