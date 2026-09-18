@@ -6,7 +6,8 @@ const SURVIVOR_R3_PREVIEW_API_URL =
 
 const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
   "getSurvivorState",
-  "getSurvivorTeamSchedule"
+  "getSurvivorTeamSchedule",
+  "adminBuildNflSeasonPack"
 ]);
 
 const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
