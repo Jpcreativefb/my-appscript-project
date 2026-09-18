@@ -52,4 +52,65 @@
 })(window);
 
 /* SURVIVOR_R4_PLAYER_EXPERIENCE_R1 — display-only dummy NFL slate. */
-window.pattcSurvivorR4TestLabApply=function(S){if(!S||!S.app||S.state==="real")return;const teams=[["BUF","Buffalo Bills","2-0","#00338D","#C60C30"],["DET","Detroit Lions","1-1","#0076B6","#B0B7BC"],["PHI","Philadelphia Eagles","2-0","#004C54","#A5ACAF"],["TEN","Tennessee Titans","0-2","#0C2340","#4B92DB"],["PIT","Pittsburgh Steelers","1-1","#101820","#FFB612"],["NE","New England Patriots","1-1","#002244","#C60C30"],["MIN","Minnesota Vikings","1-1","#4F2683","#FFC62F"],["CHI","Chicago Bears","1-1","#0B162A","#C83803"],["CAR","Carolina Panthers","0-2","#0085CA","#101820"],["ATL","Atlanta Falcons","1-1","#A71930","#000000"],["GB","Green Bay Packers","1-1","#203731","#FFB612"],["NYJ","New York Jets","1-1","#125740","#000000"],["NO","New Orleans Saints","1-1","#D3BC8D","#101820"],["BAL","Baltimore Ravens","2-0","#241773","#9E7C0C"],["CIN","Cincinnati Bengals","1-1","#FB4F14","#000000"],["HOU","Houston Texans","1-1","#03202F","#A71930"],["CLE","Cleveland Browns","0-2","#311D00","#FF3C00"],["TB","Tampa Bay Buccaneers","2-0","#D50A0A","#34302B"],["JAX","Jacksonville Jaguars","2-0","#006778","#D7A22A"],["DEN","Denver Broncos","1-1","#FB4F14","#002244"],["LV","Las Vegas Raiders","1-1","#000000","#A5ACAF"],["LAC","Los Angeles Chargers","1-1","#0080C6","#FFC20E"],["SEA","Seattle Seahawks","1-1","#002244","#69BE28"],["ARI","Arizona Cardinals","1-1","#97233F","#000000"],["MIA","Miami Dolphins","1-1","#008E97","#FC4C02"],["SF","San Francisco 49ers","1-1","#AA0000","#B3995D"],["WAS","Washington Commanders","1-1","#5A1414","#FFB612"],["DAL","Dallas Cowboys","1-1","#003594","#869397"],["IND","Indianapolis Colts","1-1","#002C5F","#A2AAAD"],["KC","Kansas City Chiefs","2-0","#E31837","#FFB81C"],["NYG","New York Giants","1-1","#0B2265","#A71930"],["LA","Los Angeles Rams","1-1","#003594","#FFA300"]];function logo(a){const m={JAX:"jax",LA:"lar",WAS:"wsh"};return"https://a.espncdn.com/i/teamlogos/nfl/500/"+(m[a]||a.toLowerCase())+".png";}function rgba(h,a){h=String(h||"#123456").replace("#","");return`rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;}function html(t,score,badge){return(badge?`<span class="survivor-r2-team-badge ${badge[0]}">${badge[1]}</span>`:"")+`<span class="survivor-r2-logo"><img src="${logo(t[0])}" alt=""></span><span class="survivor-r2-team-name"><strong>${t[1]}</strong><small>${t[2]}</small></span>`+(score!==null?`<b class="survivor-r2-score survivor-r4-score">${score}</b>`:"");}const cards=Array.from(S.app.querySelectorAll(".survivor-r3-matchup"));cards.forEach((card,i)=>{const away=teams[i*2],home=teams[i*2+1];if(!away||!home)return;const sides=card.querySelectorAll(".survivor-r3-team-side");[away,home].forEach((t,side)=>{const n=sides[side];if(!n)return;n.className="survivor-r2-team-side survivor-r3-team-side";n.style.cssText=`--survivor-team-primary:${t[3]};--survivor-team-secondary:${t[4]};--survivor-team-primary-a:${rgba(t[3],.76)};--survivor-team-primary-soft:${rgba(t[3],.48)};--survivor-team-secondary-a:${rgba(t[4],.48)};`;let badge=null,score=null;if(i===1&&side===0){n.classList.add("is-prior-used","is-prior-win");badge=["is-used is-win","W1 USED"];}if(i===2&&side===1){n.classList.add("is-prior-used","is-prior-loss");badge=["is-used is-loss","W2 USED"];}if(i===0&&side===1&&["selected","finalized","locked","live","final-win","final-loss","eliminated","winner"].indexOf(S.state)!==-1){n.classList.add("is-selected");badge=["is-saved",S.state==="selected"?"SELECTED":"YOUR PICK"];}if(S.state==="live"&&i===0)score=side===0?17:14;if((S.state==="final-win"||S.state==="final-loss")&&i===0)score=side===0?(S.state==="final-win"?20:27):(S.state==="final-win"?24:17);n.innerHTML=html(t,score,badge);});const meta=card.querySelector(".survivor-r2-matchup-meta strong");if(meta)meta.textContent=S.state==="live"&&i===0?"LIVE · Q2 06:42":(S.state==="final-win"||S.state==="final-loss")&&i===0?"FINAL":"SCHEDULED";});const idx=S.app.querySelector(".survivor-r3-game-index");if(idx)idx.textContent="1";if(["selected","finalized","locked","live","final-win","final-loss","eliminated","winner"].indexOf(S.state)!==-1){const t=teams[1],wrap=S.app.querySelector(".survivor-r3-selected-wrap");if(wrap)wrap.innerHTML=`<div class="survivor-r2-selected-team survivor-r3-selected-team survivor-r4-selected-team" style="--survivor-team-primary:${t[3]};--survivor-team-secondary:${t[4]};--survivor-team-primary-a:${rgba(t[3],.76)};--survivor-team-primary-soft:${rgba(t[3],.48)};--survivor-team-secondary-a:${rgba(t[4],.48)};"><span class="survivor-r2-selected-logo"><img src="${logo(t[0])}" alt=""></span><div class="survivor-r4-selected-copy"><strong>${t[1]}</strong><b>${t[2]}</b><span>vs Buffalo Bills · Sun 12:00 PM</span></div></div>`;}const circles=S.app.querySelector(".survivor-r3-lives>div");if(circles){const used=S.state==="final-loss"?1:S.state==="eliminated"?3:0;circles.innerHTML=[0,1,2].map(i=>`<i class="${i<used?"is-used":""}"></i>`).join("");}};
+window.pattcSurvivorR4TestLabApply=function(S){if(!S||!S.app||S.state==="real")return;const teams=[["BUF","Buffalo Bills","2-0","#00338D","#C60C30"],["DET","Detroit Lions","1-1","#0076B6","#B0B7BC"],["PHI","Philadelphia Eagles","2-0","#004C54","#A5ACAF"],["TEN","Tennessee Titans","0-2","#0C2340","#4B92DB"],["PIT","Pittsburgh Steelers","1-1","#101820","#FFB612"],["NE","New England Patriots","1-1","#002244","#C60C30"],["MIN","Minnesota Vikings","1-1","#4F2683","#FFC62F"],["CHI","Chicago Bears","1-1","#0B162A","#C83803"],["CAR","Carolina Panthers","0-2","#0085CA","#101820"],["ATL","Atlanta Falcons","1-1","#A71930","#000000"],["GB","Green Bay Packers","1-1","#203731","#FFB612"],["NYJ","New York Jets","1-1","#125740","#000000"],["NO","New Orleans Saints","1-1","#D3BC8D","#101820"],["BAL","Baltimore Ravens","2-0","#241773","#9E7C0C"],["CIN","Cincinnati Bengals","1-1","#FB4F14","#000000"],["HOU","Houston Texans","1-1","#03202F","#A71930"],["CLE","Cleveland Browns","0-2","#311D00","#FF3C00"],["TB","Tampa Bay Buccaneers","2-0","#D50A0A","#34302B"],["JAX","Jacksonville Jaguars","2-0","#006778","#D7A22A"],["DEN","Denver Broncos","1-1","#FB4F14","#002244"],["LV","Las Vegas Raiders","1-1","#000000","#A5ACAF"],["LAC","Los Angeles Chargers","1-1","#0080C6","#FFC20E"],["SEA","Seattle Seahawks","1-1","#002244","#69BE28"],["ARI","Arizona Cardinals","1-1","#97233F","#000000"],["MIA","Miami Dolphins","1-1","#008E97","#FC4C02"],["SF","San Francisco 49ers","1-1","#AA0000","#B3995D"],["WAS","Washington Commanders","1-1","#5A1414","#FFB612"],["DAL","Dallas Cowboys","1-1","#003594","#869397"],["IND","Indianapolis Colts","1-1","#002C5F","#A2AAAD"],["KC","Kansas City Chiefs","2-0","#E31837","#FFB81C"],["NYG","New York Giants","1-1","#0B2265","#A71930"],["LA","Los Angeles Rams","1-1","#003594","#FFA300"]];function logo(a){const m={JAX:"jax",LA:"lar",WAS:"wsh"};return"https://a.espncdn.com/i/teamlogos/nfl/500/"+(m[a]||a.toLowerCase())+".png";}function rgba(h,a){h=String(h||"#123456").replace("#","");return`rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${a})`;}function html(t,score,badge){return(badge?`<span class="survivor-r2-team-badge ${badge[0]}">${badge[1]}</span>`:"")+`<span class="survivor-r2-logo"><img src="${logo(t[0])}" alt=""></span><span class="survivor-r2-team-name"><strong>${t[1]}</strong><small>${t[2]}</small></span>`+(score!==null?`<b class="survivor-r2-score survivor-r4-score">${score}</b>`:"");}const cards=Array.from(S.app.querySelectorAll(".survivor-r3-matchup"));cards.forEach((card,i)=>{const away=teams[i*2],home=teams[i*2+1];if(!away||!home)return;const sides=card.querySelectorAll(".survivor-r3-team-side");[away,home].forEach((t,side)=>{const n=sides[side];if(!n)return;n.className="survivor-r2-team-side survivor-r3-team-side";n.style.cssText=`--survivor-team-primary:${t[3]};--survivor-team-secondary:${t[4]};--survivor-team-primary-a:${rgba(t[3],.52)};--survivor-team-primary-soft:${rgba(t[3],.30)};--survivor-team-secondary-a:${rgba(t[4],.30)};`;let badge=null,score=null;if(i===1&&side===0){n.classList.add("is-prior-used","is-prior-win");badge=["is-used is-win","W1 USED"];}if(i===2&&side===1){n.classList.add("is-prior-used","is-prior-loss");badge=["is-used is-loss","W2 USED"];}if(i===0&&side===1&&["selected","finalized","locked","live","final-win","final-loss","eliminated","winner"].indexOf(S.state)!==-1){n.classList.add("is-selected");badge=["is-saved",S.state==="selected"?"SELECTED":"YOUR PICK"];}if(S.state==="live"&&i===0)score=side===0?17:14;if((S.state==="final-win"||S.state==="final-loss")&&i===0)score=side===0?(S.state==="final-win"?20:27):(S.state==="final-win"?24:17);n.innerHTML=html(t,score,badge);});const meta=card.querySelector(".survivor-r2-matchup-meta strong");if(meta)meta.textContent=S.state==="live"&&i===0?"LIVE · Q2 06:42":(S.state==="final-win"||S.state==="final-loss")&&i===0?"FINAL":"SCHEDULED";});const idx=S.app.querySelector(".survivor-r3-game-index");if(idx)idx.textContent="1";if(["selected","finalized","locked","live","final-win","final-loss","eliminated","winner"].indexOf(S.state)!==-1){const t=teams[1],wrap=S.app.querySelector(".survivor-r3-selected-wrap");if(wrap)wrap.innerHTML=`<div class="survivor-r2-selected-team survivor-r3-selected-team survivor-r4-selected-team" style="--survivor-team-primary:${t[3]};--survivor-team-secondary:${t[4]};--survivor-team-primary-a:${rgba(t[3],.52)};--survivor-team-primary-soft:${rgba(t[3],.30)};--survivor-team-secondary-a:${rgba(t[4],.30)};"><span class="survivor-r2-selected-logo"><img src="${logo(t[0])}" alt=""></span><div class="survivor-r4-selected-copy"><strong>${t[1]}</strong><b>${t[2]}</b><span>vs Buffalo Bills · Sun 12:00 PM</span></div></div>`;}const circles=S.app.querySelector(".survivor-r3-lives>div");if(circles){const used=S.state==="final-loss"?1:S.state==="eliminated"?3:0;circles.innerHTML=[0,1,2].map(i=>`<i class="${i<used?"is-used":""}"></i>`).join("");}};
+
+/* SURVIVOR_R4_1_SELECTOR_STATES
+   Test Lab starts from the real locked DOM. Rebuild the omitted action stack
+   for simulated open/selected/finalized states. DISPLAY ONLY / NO SAVES.
+*/
+(function(root){
+  const base = root.pattcSurvivorR4TestLabApply;
+  if (typeof base !== "function") return;
+
+  root.pattcSurvivorR4TestLabApply = function(S){
+    base(S);
+    if (!S || !S.app || S.state === "real") return;
+
+    const panel = S.app.querySelector(".survivor-r3-finalize");
+    if (!panel) return;
+
+    const showActions = ["open","selected","finalized"].indexOf(String(S.state || "")) !== -1;
+    const hasSelection = ["selected","finalized"].indexOf(String(S.state || "")) !== -1;
+    let stack = panel.querySelector(".survivor-r3-action-stack");
+
+    if (!showActions) {
+      if (stack && stack.classList.contains("survivor-testlab-r4-actions")) stack.remove();
+      return;
+    }
+
+    if (!stack) {
+      stack = document.createElement("div");
+      stack.className = "survivor-r2-action-stack survivor-r3-action-stack survivor-testlab-r4-actions";
+      panel.appendChild(stack);
+    } else {
+      stack.classList.add("survivor-testlab-r4-actions");
+    }
+
+    stack.innerHTML =
+      '<button id="survivorSaveButton" class="survivor-r2-finalize-button survivor-r3-finalize-button" type="button" ' +
+        (hasSelection ? '' : 'disabled') + '><strong>FINALIZE PICK</strong></button>' +
+      '<div class="survivor-r2-pick-tools">' +
+        '<button type="button" class="survivor-r2-tool secondary"><strong>Random Pick</strong><span>Eligible team</span></button>' +
+        '<button type="button" class="survivor-r2-tool primary"><strong>Auto Pick</strong><span>Choose method</span></button>' +
+      '</div>' +
+      '<small class="survivor-r2-safety-note survivor-r3-safety-note survivor-r4-auto-summary">AUTO PICK SETTINGS AVAILABLE</small>' +
+      '<span id="survivorSelectionCount" class="survivor-selection-count">' +
+        (hasSelection ? '1 / 1 selected' : '0 / 1 selected') +
+      '</span><span id="survivorSaveMessage" class="survivor-save-message"></span>';
+
+    // Correct semantic colors in simulated states.
+    const current = S.app.querySelector(".survivor-r3-team-side.is-selected, .survivor-r3-team-side.is-finalized");
+    if (current) {
+      current.classList.remove("is-result-win","is-result-loss");
+      if (S.state === "final-win") current.classList.add("is-result-win");
+      if (S.state === "final-loss") current.classList.add("is-result-loss");
+    }
+
+    // Make used-team overlays explicit.
+    S.app.querySelectorAll(".survivor-r3-team-side.is-prior-used .survivor-r2-team-badge.is-used").forEach(function(badge){
+      const text = String(badge.textContent || "").trim();
+      const m = text.match(/W(?:EEK\s*)?(\d+)/i);
+      if (m) badge.textContent = "WEEK " + m[1] + " USED";
+    });
+  };
+})(window);
