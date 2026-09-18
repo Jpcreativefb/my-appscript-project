@@ -1,10 +1,277 @@
 /* PATTC NFL SPORTS PACK R1 — Sports Ranking Presentation */
 (function(root){
   "use strict";
-  const BASE_RENDER=root.renderRankingPage;if(typeof BASE_RENDER!=="function")return;
+
+  const BASE_RENDER = root.renderRankingPage;
+  const BASE_MOVE = root.rankingMove_;
+  if (typeof BASE_RENDER !== "function" || typeof BASE_MOVE !== "function") return;
+
   const COLORS={ari:["#97233F","#000000"],atl:["#A71930","#000000"],bal:["#241773","#9E7C0C"],buf:["#00338D","#C60C30"],car:["#0085CA","#101820"],chi:["#0B162A","#C83803"],cin:["#FB4F14","#000000"],cle:["#311D00","#FF3C00"],dal:["#003594","#869397"],den:["#FB4F14","#002244"],det:["#0076B6","#B0B7BC"],gb:["#203731","#FFB612"],hou:["#03202F","#A71930"],ind:["#002C5F","#A2AAAD"],jax:["#006778","#D7A22A"],kc:["#E31837","#FFB81C"],lv:["#000000","#A5ACAF"],lac:["#0080C6","#FFC20E"],la:["#003594","#FFA300"],mia:["#008E97","#FC4C02"],min:["#4F2683","#FFC62F"],ne:["#002244","#C60C30"],no:["#D3BC8D","#101820"],nyg:["#0B2265","#A71930"],nyj:["#125740","#000000"],phi:["#004C54","#A5ACAF"],pit:["#101820","#FFB612"],sf:["#AA0000","#B3995D"],sea:["#002244","#69BE28"],tb:["#D50A0A","#34302B"],ten:["#0C2340","#4B92DB"],was:["#5A1414","#FFB612"]};
-  function esc(v){return typeof rankingPageEscape_==="function"?rankingPageEscape_(v):String(v||"");}function key(v){return String(v||"").trim().toLowerCase();}function js(v){return String(v||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");}function rgba(hex,a){hex=String(hex||"#22577a").replace("#","");return "rgba("+parseInt(hex.slice(0,2),16)+","+parseInt(hex.slice(2,4),16)+","+parseInt(hex.slice(4,6),16)+","+a+")";}function style(team){const c=COLORS[key(team&&team.id)]||["#155c8c","#697c88"];return "--nfl-rank-primary:"+c[0]+";--nfl-rank-secondary:"+c[1]+";--nfl-rank-primary-a:"+rgba(c[0],.28)+";--nfl-rank-secondary-a:"+rgba(c[1],.18)+";";}function isNfl(gameId,payload){return /^nfl-/.test(key(gameId))||/\bnfl\b/i.test(String(payload&&payload.gameName||""));}function isPlayoffCategory(category){return /playoff-seeds/.test(key(category&&category.id));}
+  const DIVISIONS=["East","North","South","West"];
+  let POINTER_DRAG=null;
+  let HTML_DRAG=null;
+
+  function esc(v){return typeof rankingPageEscape_==="function"?rankingPageEscape_(v):String(v||"");}
+  function key(v){return String(v||"").trim().toLowerCase();}
+  function js(v){return String(v||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");}
+  function rgba(hex,a){hex=String(hex||"#22577a").replace("#","");return "rgba("+parseInt(hex.slice(0,2),16)+","+parseInt(hex.slice(2,4),16)+","+parseInt(hex.slice(4,6),16)+","+a+")";}
+  function style(team){const c=COLORS[key(team&&team.id)]||["#155c8c","#697c88"];return "--nfl-rank-primary:"+c[0]+";--nfl-rank-secondary:"+c[1]+";--nfl-rank-primary-a:"+rgba(c[0],.28)+";--nfl-rank-secondary-a:"+rgba(c[1],.18)+";";}
+  function isNfl(gameId,payload){return /^nfl-/.test(key(gameId))||/\bnfl\b/i.test(String(payload&&payload.gameName||""));}
+  function isPlayoffRaceGame(gameId){return /^nfl-playoff-race-\d{4}$/.test(key(gameId));}
+  function isPlayoffCategory(value){return /playoff-seeds/.test(key(value&&value.id!==undefined?value.id:value));}
+  function teamLabel(team){return String(team&&team.person||"").trim();}
+  function teamDivision(team){const parts=teamLabel(team).split(/\s+/);const last=parts.length?parts[parts.length-1]:"";return DIVISIONS.indexOf(last)!==-1?last:"";}
+  function rowFor(categoryId,nomineeId){const list=document.getElementById("rankingList_"+categoryId);if(!list)return null;return Array.from(list.querySelectorAll(".ranking-entry")).find(function(row){return String(row.dataset.nomineeId||"")===String(nomineeId||"");})||null;}
   function hint(category){const id=key(category&&category.id);if(id.indexOf("playoff-seeds")!==-1)return "Positions 1–7 are your playoff seeds. Rank all 16 so ties and near-misses can score accurately.";if(id.indexOf("bottom-dwellers")!==-1)return "Rank WORST to BEST. #1 is the team you expect to finish at the bottom of the NFL.";return "Rank strongest final regular-season finish to weakest.";}
-  function card(category){const ordered=rankingPageCategoryOrder_(category),locked=category.locked===true,scoreText=category.resolved?esc(category.earnedPoints)+" / "+esc(category.points)+" pts · "+esc(category.accuracyPercent)+"% accuracy":(category.ballot&&category.ballot.length?"Saved ranking · ":"")+esc(category.points)+" pts available",playoff=isPlayoffCategory(category);return `<section class="nfl-ranking-card" data-ranking-category="${esc(category.id)}"><div class="nfl-ranking-card-head"><div><span>${esc(category.section||"NFL")}</span><strong>${esc(category.name)}</strong><small>${esc(hint(category))}</small><em>${scoreText}</em></div><b class="${category.resolved?"is-final":locked?"is-locked":"is-open"}">${category.resolved?"FINAL":locked?"LOCKED":"OPEN"}</b></div>${playoff?'<div class="nfl-ranking-zone-key"><span>1–7 PLAYOFF SEEDS</span><span>8–16 OUTSIDE FIELD</span></div>':""}<div class="ranking-order-list nfl-ranking-list" id="rankingList_${esc(category.id)}">${ordered.map(function(team,index){const playoffZone=playoff&&index<7,image=team.image?`<img src="${esc(team.image)}" alt="" loading="lazy">`:'<span>★</span>';return `<div class="ranking-entry nfl-ranking-entry ${playoffZone?"is-playoff":""}" style="${style(team)}" data-nominee-id="${esc(team.id)}"><div class="ranking-position nfl-ranking-position">#<span>${index+1}</span></div><div class="ranking-entry-media nfl-ranking-logo">${image}</div><div class="ranking-entry-name nfl-ranking-name"><strong>${esc(team.name||team.shortAnswer||team.id)}</strong><small>${playoffZone?"PLAYOFF SEED":esc(team.person||team.shortAnswer||team.id)}</small></div>${!locked?`<div class="ranking-move-buttons nfl-ranking-move"><button type="button" aria-label="Move up" onclick="rankingMove_('${js(category.id)}','${js(team.id)}',-1)">↑</button><button type="button" aria-label="Move down" onclick="rankingMove_('${js(category.id)}','${js(team.id)}',1)">↓</button></div>`:""}</div>`;}).join("")}</div>${!locked?`<div class="ranking-save-row nfl-ranking-save"><button class="button ranking-save-button" type="button" onclick="rankingSaveCategory_('${js(category.id)}')">SAVE RANKING</button><span id="rankingMessage_${esc(category.id)}" class="ranking-message"></span></div>`:""}${rankingPageOfficialOrder_(category)}</section>`;}
-  root.renderRankingPage=async function(){const gameId=typeof APP_STATE!=="undefined"?String(APP_STATE.gameId||"").trim():"";if(!gameId)return BASE_RENDER();setPageLoadStep(55,"Loading NFL forecast…");const payload=await apiGetRankingState(gameId);if(!payload||payload.success===false)return BASE_RENDER();if(!isNfl(gameId,payload))return BASE_RENDER();RANKING_PAGE_STATE.gameId=gameId;RANKING_PAGE_STATE.payload=payload;const categories=Array.isArray(payload.categories)?payload.categories:[],saved=categories.filter(function(c){return c.ballot&&c.ballot.length;}).length,max=categories.reduce(function(sum,c){return sum+(Number(c.points)||0);},0);return `<div class="page ranking-page nfl-ranking-r1"><header class="nfl-ranking-hero"><div><span>NFL SEASON MINI GAME</span><h1>${esc(payload.gameName||"NFL Forecast")}</h1><p>Build your order. Every team's final position scores independently.</p></div><button type="button" onclick="navigate('leaderboard')">STANDINGS</button></header><section class="nfl-ranking-score-curve"><div><strong>10</strong><span>EXACT</span></div><div><strong>8</strong><span>±1</span></div><div><strong>6</strong><span>±2</span></div><div><strong>4</strong><span>±3</span></div><div><strong>2</strong><span>±4</span></div><div><strong>0</strong><span>5+</span></div></section><section class="nfl-ranking-stats"><div><span>Saved</span><strong>${saved}/${categories.length}</strong></div><div><span>Max Points</span><strong>${max}</strong></div><div><span>Scoring</span><strong>10·8·6·4·2</strong></div></section>${categories.length?categories.map(card).join(""):'<div class="nfl-ranking-empty">No NFL ranking sections have been created yet.</div>'}<section class="nfl-ranking-help"><details><summary><strong>RULES</strong><span>Tap to expand</span></summary><div><p>Each team scores 10 points for the exact final position, 8 for ±1, 6 for ±2, 4 for ±3, 2 for ±4, and 0 beyond four spots.</p><p>Your mini-game finish is converted into NFL Cup placement points when this game is linked to the Cup.</p></div></details><details><summary><strong>HOW TO PLAY</strong><span>Tap to expand</span></summary><div><p>Use the arrows to move teams into your predicted order, then press Save Ranking. You can edit again until the game or section locks.</p></div></details></section></div>`;};
+  function positionOptions(count,selected){let out="";for(let i=1;i<=count;i++)out+='<option value="'+i+'"'+(i===selected?" selected":"")+">"+i+"</option>";return out;}
+
+  function controls(category,team,index,count,locked){
+    if(locked)return "";
+    const cid=js(category.id),tid=js(team.id);
+    return '<div class="ranking-move-buttons nfl-ranking-move">'+
+      '<button type="button" class="nfl-ranking-drag" draggable="true" aria-label="Drag to reorder" title="Drag to reorder" ondragstart="nflRankingDragStart_(event,\''+cid+'\',\''+tid+'\')" ondragend="nflRankingDragEnd_(event)" onpointerdown="nflRankingPointerDown_(event,\''+cid+'\',\''+tid+'\')" onpointermove="nflRankingPointerMove_(event)" onpointerup="nflRankingPointerEnd_(event)" onpointercancel="nflRankingPointerEnd_(event)">☰</button>'+
+      '<button type="button" aria-label="Move up" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',-1)">↑</button>'+
+      '<select class="nfl-ranking-position-select" aria-label="Move directly to position" onchange="nflRankingMoveTo_(\''+cid+'\',\''+tid+'\',this.value)">'+positionOptions(count,index+1)+'</select>'+
+      '<button type="button" aria-label="Move down" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',1)">↓</button>'+
+    '</div>';
+  }
+
+  function divisionWarning(categoryId){
+    return '<div id="nflDivisionWarning_'+esc(categoryId)+'" class="nfl-ranking-division-warning" hidden>'+
+      '<strong>PLAYOFF FIELD CHECK</strong>'+
+      '<span id="nflDivisionWarningText_'+esc(categoryId)+'"></span>'+
+      '<div><button type="button" onclick="nflRankingDismissWarning_(\''+js(categoryId)+'\')">FIX PICKS</button>'+
+      '<button type="button" class="save-anyway" onclick="nflRankingSaveCategory_(\''+js(categoryId)+'\',true)">SAVE ANYWAY</button></div>'+
+    '</div>';
+  }
+
+  function card(category){
+    const ordered=rankingPageCategoryOrder_(category);
+    const locked=category.locked===true;
+    const playoff=isPlayoffCategory(category);
+    let scoreText;
+    if(category.resolved){
+      scoreText=esc(category.earnedPoints)+" / "+esc(category.points)+" pts";
+      if(category.baseEarnedPoints!==undefined&&Number(category.forecastMultiplier)!==1)scoreText+=" · base "+esc(category.baseEarnedPoints)+" × "+esc(Math.round(Number(category.forecastMultiplier)*100))+"%";
+      else scoreText+=" · "+esc(category.accuracyPercent)+"% accuracy";
+    }else{
+      scoreText=(category.ballot&&category.ballot.length?"Saved ranking · ":"")+esc(category.points)+" pts available";
+    }
+    let rows="";
+    ordered.forEach(function(team,index){
+      const playoffZone=playoff&&index<7;
+      const image=team.image?'<img src="'+esc(team.image)+'" alt="" loading="lazy">':'<span>★</span>';
+      const label=teamLabel(team)||String(team.shortAnswer||team.id||"");
+      const div=teamDivision(team);
+      const subtitle=playoffZone?(label?label+" · PLAYOFF SEED":"PLAYOFF SEED"):label;
+      rows+='<div class="ranking-entry nfl-ranking-entry '+(playoffZone?"is-playoff":"")+'" style="'+style(team)+'" data-nominee-id="'+esc(team.id)+'" data-nfl-label="'+esc(label)+'" data-nfl-division="'+esc(div)+'" ondragover="nflRankingDragOver_(event)" ondrop="nflRankingDrop_(event,\''+js(category.id)+'\',\''+js(team.id)+'\')">'+
+        '<div class="ranking-position nfl-ranking-position">#<span>'+(index+1)+'</span></div>'+
+        '<div class="ranking-entry-media nfl-ranking-logo">'+image+'</div>'+
+        '<div class="ranking-entry-name nfl-ranking-name"><strong>'+esc(team.name||team.shortAnswer||team.id)+'</strong><small>'+esc(subtitle)+'</small></div>'+
+        controls(category,team,index,ordered.length,locked)+
+      '</div>';
+    });
+    const save=!locked?'<div class="ranking-save-row nfl-ranking-save"><button class="button ranking-save-button" type="button" onclick="nflRankingSaveCategory_(\''+js(category.id)+'\',false)">SAVE RANKING</button><span id="rankingMessage_'+esc(category.id)+'" class="ranking-message"></span></div>':"";
+    return '<section class="nfl-ranking-card" data-ranking-category="'+esc(category.id)+'">'+
+      '<div class="nfl-ranking-card-head"><div><span>'+esc(category.section||"NFL")+'</span><strong>'+esc(category.name)+'</strong><small>'+esc(hint(category))+'</small><em>'+scoreText+'</em></div><b class="'+(category.resolved?"is-final":locked?"is-locked":"is-open")+'">'+(category.resolved?"FINAL":locked?"LOCKED":"OPEN")+'</b></div>'+
+      (playoff?'<div class="nfl-ranking-zone-key"><span>1–7 PLAYOFF SEEDS</span><span>8–16 OUTSIDE FIELD</span></div>':"")+
+      '<div class="ranking-order-list nfl-ranking-list" id="rankingList_'+esc(category.id)+'">'+rows+'</div>'+
+      (playoff?divisionWarning(category.id):"")+save+rankingPageOfficialOrder_(category)+
+    '</section>';
+  }
+
+  function raceStatus(payload){
+    const race=payload&&payload.nflPlayoffRace;
+    if(!race)return "";
+    const savePct=Math.round(Number(race.saveMultiplier===undefined?race.currentMultiplier:race.saveMultiplier)*100);
+    const status=race.currentWindow&&race.currentWindow.week
+      ?"Week "+race.currentWindow.week+" update OPEN"
+      :race.canEnter
+        ?"Original Prediction OPEN"
+        :"Locked";
+    return '<section class="nfl-race-window '+(race.canEdit?"is-open":"is-locked")+'">'+
+      '<div><span>CURRENT NFL WEEK</span><strong>'+esc(race.currentWeek||1)+'</strong></div>'+
+      '<div><span>NEXT SAVE</span><strong>'+esc(savePct)+'%</strong></div>'+
+      '<div><span>STATUS</span><strong>'+esc(status)+'</strong></div>'+
+      '<p>'+esc(race.lockReason||"Original Prediction is preserved. Later accepted updates become the active scoring forecast.")+'</p>'+
+    '</section>';
+  }
+
+  function currentRankings(categoryId){
+    const list=document.getElementById("rankingList_"+categoryId);
+    if(!list)return [];
+    return Array.from(list.querySelectorAll(".ranking-entry")).map(function(row,index){return {nomineeId:row.dataset.nomineeId||"",rank:index+1};});
+  }
+
+  function missingDivisions(categoryId){
+    if(!isPlayoffCategory(categoryId))return [];
+    const list=document.getElementById("rankingList_"+categoryId);
+    if(!list)return [];
+    const have={};
+    Array.from(list.querySelectorAll(".ranking-entry")).slice(0,7).forEach(function(row){
+      const d=String(row.dataset.nflDivision||"");
+      if(d)have[d]=true;
+    });
+    return DIVISIONS.filter(function(d){return !have[d];});
+  }
+
+  root.nflRankingSync_=function(categoryId){
+    const list=document.getElementById("rankingList_"+categoryId);
+    if(!list)return;
+    const playoff=isPlayoffCategory(categoryId);
+    const rows=Array.from(list.querySelectorAll(".ranking-entry"));
+    rows.forEach(function(row,index){
+      const span=row.querySelector(".ranking-position span");
+      if(span)span.textContent=String(index+1);
+      const select=row.querySelector(".nfl-ranking-position-select");
+      if(select)select.value=String(index+1);
+      const playoffZone=playoff&&index<7;
+      row.classList.toggle("is-playoff",playoffZone);
+      const small=row.querySelector(".nfl-ranking-name small");
+      if(small){
+        const label=String(row.dataset.nflLabel||"").trim();
+        small.textContent=playoffZone?(label?label+" · PLAYOFF SEED":"PLAYOFF SEED"):label;
+      }
+    });
+    const warning=document.getElementById("nflDivisionWarning_"+categoryId);
+    if(warning&&!missingDivisions(categoryId).length)warning.hidden=true;
+  };
+
+  root.rankingMove_=function(categoryId,nomineeId,direction){
+    BASE_MOVE(categoryId,nomineeId,direction);
+    root.nflRankingSync_(categoryId);
+  };
+
+  root.nflRankingMoveTo_=function(categoryId,nomineeId,position){
+    const list=document.getElementById("rankingList_"+categoryId);
+    const row=rowFor(categoryId,nomineeId);
+    if(!list||!row)return;
+    const without=Array.from(list.querySelectorAll(".ranking-entry")).filter(function(item){return item!==row;});
+    const target=Math.max(0,Math.min(without.length,Number(position||1)-1));
+    if(target>=without.length)list.appendChild(row);
+    else list.insertBefore(row,without[target]);
+    root.nflRankingSync_(categoryId);
+  };
+
+  root.nflRankingPointerDown_=function(event,categoryId,nomineeId){
+    if(event.pointerType==="mouse"&&event.button!==0)return;
+    const row=rowFor(categoryId,nomineeId);
+    const list=document.getElementById("rankingList_"+categoryId);
+    if(!row||!list)return;
+    POINTER_DRAG={categoryId:categoryId,nomineeId:nomineeId,row:row,list:list,pointerId:event.pointerId};
+    row.classList.add("is-dragging");
+    try{event.currentTarget.setPointerCapture(event.pointerId);}catch(err){}
+    event.preventDefault();
+  };
+
+  root.nflRankingPointerMove_=function(event){
+    if(!POINTER_DRAG||POINTER_DRAG.pointerId!==event.pointerId)return;
+    const hit=document.elementFromPoint(event.clientX,event.clientY);
+    const target=hit&&hit.closest?hit.closest(".nfl-ranking-entry"):null;
+    if(!target||target===POINTER_DRAG.row||target.parentNode!==POINTER_DRAG.list)return;
+    const rect=target.getBoundingClientRect();
+    if(event.clientY<rect.top+rect.height/2)POINTER_DRAG.list.insertBefore(POINTER_DRAG.row,target);
+    else POINTER_DRAG.list.insertBefore(POINTER_DRAG.row,target.nextSibling);
+    root.nflRankingSync_(POINTER_DRAG.categoryId);
+    event.preventDefault();
+  };
+
+  root.nflRankingPointerEnd_=function(event){
+    if(!POINTER_DRAG||POINTER_DRAG.pointerId!==event.pointerId)return;
+    POINTER_DRAG.row.classList.remove("is-dragging");
+    root.nflRankingSync_(POINTER_DRAG.categoryId);
+    POINTER_DRAG=null;
+  };
+
+  root.nflRankingDragStart_=function(event,categoryId,nomineeId){
+    const row=rowFor(categoryId,nomineeId);
+    if(!row)return;
+    HTML_DRAG={categoryId:categoryId,nomineeId:nomineeId,row:row};
+    row.classList.add("is-dragging");
+    if(event.dataTransfer){
+      event.dataTransfer.effectAllowed="move";
+      event.dataTransfer.setData("text/plain",nomineeId);
+    }
+  };
+  root.nflRankingDragOver_=function(event){event.preventDefault();if(event.dataTransfer)event.dataTransfer.dropEffect="move";};
+  root.nflRankingDrop_=function(event,categoryId,targetId){
+    event.preventDefault();
+    if(!HTML_DRAG||HTML_DRAG.categoryId!==categoryId)return;
+    const list=document.getElementById("rankingList_"+categoryId);
+    const target=rowFor(categoryId,targetId);
+    const row=HTML_DRAG.row;
+    if(!list||!target||!row||target===row)return;
+    const rect=target.getBoundingClientRect();
+    if(event.clientY<rect.top+rect.height/2)list.insertBefore(row,target);
+    else list.insertBefore(row,target.nextSibling);
+    root.nflRankingSync_(categoryId);
+  };
+  root.nflRankingDragEnd_=function(){
+    if(HTML_DRAG&&HTML_DRAG.row)HTML_DRAG.row.classList.remove("is-dragging");
+    if(HTML_DRAG)root.nflRankingSync_(HTML_DRAG.categoryId);
+    HTML_DRAG=null;
+  };
+
+  root.nflRankingDismissWarning_=function(categoryId){
+    const warning=document.getElementById("nflDivisionWarning_"+categoryId);
+    if(warning)warning.hidden=true;
+  };
+
+  root.nflRankingSaveCategory_=async function(categoryId,saveAnyway){
+    const message=document.getElementById("rankingMessage_"+categoryId);
+    const gameId=String(RANKING_PAGE_STATE.gameId||"");
+    const playoffRace=isPlayoffRaceGame(gameId);
+    if(playoffRace&&isPlayoffCategory(categoryId)&&!saveAnyway){
+      const missing=missingDivisions(categoryId);
+      if(missing.length){
+        const warning=document.getElementById("nflDivisionWarning_"+categoryId);
+        const text=document.getElementById("nflDivisionWarningText_"+categoryId);
+        if(text)text.textContent="Your top seven are missing "+missing.join(", ")+" division"+(missing.length===1?"":"s")+". A playoff field should include at least one team from every division.";
+        if(warning)warning.hidden=false;
+        if(message)message.textContent="Review the division warning before saving.";
+        return;
+      }
+    }
+    const session=typeof getSession==="function"?(getSession()||{}):{};
+    if(message){message.textContent="Saving…";message.classList.remove("error");}
+    try{
+      const request={username:session.username||"",gameId:gameId,categoryId:categoryId,rankings:currentRankings(categoryId)};
+      const res=playoffRace&&typeof apiSaveNflPlayoffRaceRanking==="function"
+        ?await apiSaveNflPlayoffRaceRanking(request)
+        :await apiSaveRanking(request);
+      if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"Could not save ranking.");
+      if(message)message.textContent="Saved ✓"+(res.forecastMultiplier!==undefined?" · "+Math.round(Number(res.forecastMultiplier)*100)+"% multiplier":"");
+      window.setTimeout(function(){navigate("ranking",{skipUnsavedCheck:true});},350);
+    }catch(err){
+      if(message){
+        message.textContent=err&&err.message?err.message:"Could not save ranking.";
+        message.classList.add("error");
+      }
+    }
+  };
+
+  root.renderRankingPage=async function(){
+    const gameId=typeof APP_STATE!=="undefined"?String(APP_STATE.gameId||"").trim():"";
+    if(!gameId)return BASE_RENDER();
+    setPageLoadStep(55,"Loading NFL forecast…");
+    const playoffRace=isPlayoffRaceGame(gameId);
+    const payload=playoffRace&&typeof apiGetNflPlayoffRaceState==="function"
+      ?await apiGetNflPlayoffRaceState(gameId)
+      :await apiGetRankingState(gameId);
+    if(!payload||payload.success===false)return BASE_RENDER();
+    if(!isNfl(gameId,payload))return BASE_RENDER();
+    RANKING_PAGE_STATE.gameId=gameId;
+    RANKING_PAGE_STATE.payload=payload;
+    const categories=Array.isArray(payload.categories)?payload.categories:[];
+    const saved=categories.filter(function(c){return c.ballot&&c.ballot.length;}).length;
+    const max=categories.reduce(function(sum,c){return sum+(Number(c.points)||0);},0);
+    return '<div class="page ranking-page nfl-ranking-r1">'+
+      '<header class="nfl-ranking-hero"><div><span>NFL SEASON MINI GAME</span><h1>'+esc(payload.gameName||"NFL Forecast")+'</h1><p>Build your order. Every team\'s final position scores independently.</p></div><button type="button" onclick="navigate(\'leaderboard\')">STANDINGS</button></header>'+
+      raceStatus(payload)+
+      '<section class="nfl-ranking-score-curve"><div><strong>10</strong><span>EXACT</span></div><div><strong>8</strong><span>±1</span></div><div><strong>6</strong><span>±2</span></div><div><strong>4</strong><span>±3</span></div><div><strong>2</strong><span>±4</span></div><div><strong>0</strong><span>5+</span></div></section>'+
+      '<section class="nfl-ranking-stats"><div><span>Saved</span><strong>'+saved+'/'+categories.length+'</strong></div><div><span>Max Points</span><strong>'+max+'</strong></div><div><span>Scoring</span><strong>10·8·6·4·2</strong></div></section>'+
+      (categories.length?categories.map(card).join(""):'<div class="nfl-ranking-empty">No NFL ranking sections have been created yet.</div>')+
+      '<section class="nfl-ranking-help"><details><summary><strong>RULES</strong><span>Tap to expand</span></summary><div><p>Each team scores 10 points for the exact final position, 8 for ±1, 6 for ±2, 4 for ±3, 2 for ±4, and 0 beyond four spots.</p><p>Playoff Race preserves your Original Prediction. Later checkpoint updates use the multiplier shown when the update is saved.</p><p>Your mini-game finish is converted into NFL Cup placement points when this game is linked to the Cup.</p></div></details><details><summary><strong>HOW TO PLAY</strong><span>Tap to expand</span></summary><div><p>Drag a team, choose a position directly, or use the arrow buttons. Then press Save Ranking.</p></div></details></section>'+
+    '</div>';
+  };
 })(window);

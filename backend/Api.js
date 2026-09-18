@@ -268,6 +268,21 @@ function doPost(e) {
       }));
     }
 
+    if (action === "saveNflPlayoffRaceRanking") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const postLeagueId = typeof normalizeLeagueId_ === "function"
+        ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
+        : String(body.leagueId || body.activeLeagueId || "").trim();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(saveNflPlayoffRaceRanking_({
+        username: body.username,
+        gameId: postGameId,
+        categoryId: body.categoryId,
+        rankings: Array.isArray(body.rankings) ? body.rankings : []
+      }));
+    }
+
     if (action === "saveRanking") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -932,6 +947,7 @@ function doGet(e) {
       action === "savePick" ||
       action === "savePicksBatch" ||
       action === "saveRanking" ||
+      action === "saveNflPlayoffRaceRanking" ||
       action === "saveVotingParticipant" ||
       action === "uploadVotingParticipantImage" ||
       action === "saveVotingCompetitionBallot" ||
@@ -2607,6 +2623,12 @@ function doGet(e) {
 
     if (action === "adminGetVotingCompetitionDashboard") {
       return json(adminGetVotingCompetitionDashboard_({ gameId: gameId }));
+    }
+
+    if (action === "getNflPlayoffRaceState") {
+      const access = userCanAccessGameFeature_(params.username, gameId, "viewGame", leagueId);
+      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
+      return json(apiGetNflPlayoffRaceState_({ username: params.username, gameId: gameId }));
     }
 
     if (action === "getRankingState") {

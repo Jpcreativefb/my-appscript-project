@@ -708,15 +708,15 @@ const APP_PAGE_MODULES = {
   "hub": ["dashboard"],
   "trophy-room": ["dashboard"],
   "more": ["dashboard"],
-  "picks": ["picks"],
-  "survivor": ["survivor"],
+  "picks": ["picks", "confidenceR2"],
+  "survivor": ["survivor", "survivorR4"],
   "voting": ["voting"],
-  "ranking": ["ranking"],
+  "ranking": ["ranking", "rankingSportsR1"],
   "game-hub": ["gameModeHub"],
   "betting": ["betting"],
   "team-fantasy": ["teamFantasy"],
   "leaderboard": ["leaderboard"],
-  "season-hub": ["seasonHub"],
+  "season-hub": ["seasonHub", "nflCupR1"],
   "leagues": ["leagues"],
   "admin": ["admin", "adminUi", "adminTeamFantasy"],
   "admin-games": ["admin", "adminUi", "adminGamesRc24e"],
@@ -1420,6 +1420,9 @@ async function navigate(page, options) {
   }
 
   const previousPage = APP_STATE.currentPage;
+  if (previousPage && previousPage !== page && typeof pattcSportsTestLabBeforeNavigate === "function") {
+    pattcSportsTestLabBeforeNavigate(previousPage, app);
+  }
   if (previousPage && previousPage !== page) {
     appCapturePageSnapshot_(previousPage, app);
   }
@@ -1471,6 +1474,7 @@ async function navigate(page, options) {
     app.classList.remove("page-enter");
     app.classList.add("page-enter-active");
     setActiveNav(page);
+    if (typeof pattcSportsTestLabMount === "function") pattcSportsTestLabMount(page, app);
     if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
 
     // Home is an account-level view. Paint its valid snapshot immediately,
@@ -1563,6 +1567,10 @@ async function navigate(page, options) {
       }
 
       setActiveNav(page);
+
+      if (typeof pattcSportsTestLabMount === "function") {
+        pattcSportsTestLabMount(page, app);
+      }
 
     });
 

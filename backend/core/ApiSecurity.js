@@ -42,7 +42,7 @@ var API_EXPLICIT_POST_ACTIONS_ = {
   setGameProfilePromptChoice: true, setNotificationPreference: true,
   saveNotificationPreferences: true, markNotificationRead: true, markAllNotificationsRead: true,
   registerPushSubscription: true, removePushSubscription: true,
-  savePick: true, savePicksBatch: true, saveConfidencePicksBatch: true, saveRanking: true,
+  savePick: true, savePicksBatch: true, saveConfidencePicksBatch: true, saveRanking: true, saveNflPlayoffRaceRanking: true,
   saveVotingParticipant: true, uploadVotingParticipantImage: true, saveVotingCompetitionBallot: true,
   saveSurvivorPick: true, saveSportsSurvivorAutoPickPreference: true, saveSeasonAnchorPick: true, saveBet: true, removeBet: true,
   saveTeamFantasyPick: true, randomTeamFantasyPicks: true, autoPickTeamFantasy: true,

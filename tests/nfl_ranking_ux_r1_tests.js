@@ -1,0 +1,16 @@
+const fs=require("fs"),assert=require("assert");
+const rank=fs.readFileSync("frontend/js/pages/rankingSportsR1.js","utf8");
+const css=fs.readFileSync("frontend/css/nfl-sports-pack-r1.css","utf8");
+assert(rank.includes('label+" · PLAYOFF SEED"'));
+assert(rank.includes("nflRankingMoveTo_"));
+assert(rank.includes("nflRankingPointerDown_"));
+assert(rank.includes("nflRankingDragStart_"));
+assert(rank.includes("SAVE ANYWAY"));
+assert(rank.includes("missingDivisions"));
+assert(rank.includes("apiSaveNflPlayoffRaceRanking"));
+assert(css.includes(".nfl-ranking-position-select"));
+assert(css.includes(".nfl-ranking-drag"));
+assert(css.includes("touch-action:none"));
+assert(css.includes(".nfl-ranking-division-warning"));
+assert(css.includes("@media(max-width:390px)"));
+console.log("PATTC NFL Ranking UX R1 tests: PASS");

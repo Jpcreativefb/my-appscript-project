@@ -957,6 +957,26 @@ async function apiSaveRanking(payload) {
   });
 }
 
+async function apiGetNflPlayoffRaceState(gameId) {
+  const session = getSession ? (getSession() || {}) : {};
+  return api("getNflPlayoffRaceState", {
+    username: session.username || "",
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}
+
+async function apiSaveNflPlayoffRaceRanking(payload) {
+  payload = payload || {};
+  return apiPost("saveNflPlayoffRaceRanking", {
+    username: payload.username,
+    gameId: payload.gameId,
+    leagueId: payload.leagueId || getApiLeagueId_(),
+    categoryId: payload.categoryId,
+    rankings: Array.isArray(payload.rankings) ? payload.rankings : []
+  });
+}
+
 async function apiGetSurvivorState(gameId) {
   const session = getSession ? (getSession() || {}) : {};
   return api("getSurvivorState", {

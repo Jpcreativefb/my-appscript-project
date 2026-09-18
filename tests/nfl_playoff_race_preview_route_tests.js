@@ -1,0 +1,12 @@
+const fs=require("fs"),assert=require("assert");
+const route=fs.readFileSync("functions/api/app.js","utf8");
+const api=fs.readFileSync("frontend/js/api.js","utf8");
+const mirror=fs.readFileSync("frontend/api.js","utf8");
+assert(route.includes('"getNflPlayoffRaceState"'));
+assert(route.includes('"saveNflPlayoffRaceRanking"'));
+assert(!route.includes('"getRankingState"'));
+assert(!route.includes('"saveRanking"'));
+assert(api.includes("apiGetNflPlayoffRaceState"));
+assert(api.includes("apiSaveNflPlayoffRaceRanking"));
+assert.strictEqual(api,mirror);
+console.log("PATTC NFL Playoff Race Preview Route tests: PASS");
