@@ -37,10 +37,10 @@ function ordinal(n){n=Number(n)||0;const m100=n%100;if(m100>=11&&m100<=13)return
     if(locked)return "";
     const cid=js(category.id),tid=js(team.id);
     return '<div class="ranking-move-buttons nfl-ranking-move">'+
-      '<button type="button" class="nfl-ranking-drag" draggable="true" aria-label="Drag to reorder" title="Drag to reorder" ondragstart="nflRankingDragStart_(event,\''+cid+'\',\''+tid+'\')" ondragend="nflRankingDragEnd_(event)" onpointerdown="nflRankingPointerDown_(event,\''+cid+'\',\''+tid+'\')" onpointermove="nflRankingPointerMove_(event)" onpointerup="nflRankingPointerEnd_(event)" onpointercancel="nflRankingPointerEnd_(event)">☰</button>'+
-      '<button type="button" aria-label="Move up" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',-1)">↑</button>'+
-      '<select class="nfl-ranking-position-select" aria-label="Move directly to position" onchange="nflRankingMoveTo_(\''+cid+'\',\''+tid+'\',this.value)">'+positionOptions(count,index+1)+'</select>'+
-      '<button type="button" aria-label="Move down" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',1)">↓</button>'+
+      '<button type="button" aria-label="Move up" title="Move up" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',-1)">↑</button>'+
+      '<select class="nfl-ranking-position-select" aria-label="Move directly to position" title="Move directly to position" onchange="nflRankingMoveTo_(\''+cid+'\',\''+tid+'\',this.value)">'+positionOptions(count,index+1)+'</select>'+
+      '<button type="button" aria-label="Move down" title="Move down" onclick="rankingMove_(\''+cid+'\',\''+tid+'\',1)">↓</button>'+
+      '<button type="button" class="nfl-ranking-drag" aria-label="Drag to reorder" title="Drag to reorder" onpointerdown="nflRankingPointerDown_(event,\''+cid+'\',\''+tid+'\')" onpointermove="nflRankingPointerMove_(event)" onpointerup="nflRankingPointerEnd_(event)" onpointercancel="nflRankingPointerEnd_(event)" onlostpointercapture="nflRankingPointerEnd_(event)">☰</button>'+
     '</div>';
   }
 

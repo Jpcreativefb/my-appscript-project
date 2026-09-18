@@ -20,3 +20,63 @@
   .nfl-ranking-live{gap:3px!important;font-size:6px!important}.nfl-ranking-live strong{font-size:6.5px!important}
   .nfl-ranking-help{grid-template-columns:1fr}
 }
+
+
+/* PATTC NFL LAUNCH FINISH R2.1 — compact controls */
+.nfl-ranking-entry{grid-template-columns:38px 44px minmax(0,1fr) 112px!important}
+.nfl-ranking-move{
+  display:grid!important;
+  grid-template-columns:24px 36px 24px 24px!important;
+  gap:1px!important;
+  justify-content:end!important;
+  align-items:center!important
+}
+.nfl-ranking-move button{
+  width:24px!important;
+  height:28px!important;
+  min-width:0!important;
+  padding:0!important;
+  border:0!important;
+  border-radius:4px!important;
+  background:transparent!important;
+  color:#cfe7f4!important;
+  box-shadow:none!important;
+  font-size:13px!important
+}
+.nfl-ranking-move button:hover{background:rgba(77,167,221,.10)!important}
+.nfl-ranking-move .nfl-ranking-drag{
+  order:4;
+  cursor:grab!important;
+  touch-action:none!important;
+  color:#66dfff!important;
+  font-size:14px!important
+}
+.nfl-ranking-move .nfl-ranking-drag:active{cursor:grabbing!important;background:rgba(102,223,255,.10)!important}
+.nfl-ranking-position-select{
+  width:36px!important;
+  height:28px!important;
+  min-width:36px!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid rgba(101,190,238,.50)!important;
+  border-radius:2px!important;
+  background:rgba(2,24,39,.34)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+  font-size:9px!important;
+  font-weight:950!important;
+  text-align:center!important;
+  text-align-last:center!important
+}
+@media(max-width:560px){
+  .nfl-ranking-entry{grid-template-columns:30px 34px minmax(0,1fr) 103px!important}
+  .nfl-ranking-move{grid-template-columns:22px 34px 22px 22px!important}
+  .nfl-ranking-move button{width:22px!important;height:28px!important;font-size:12px!important}
+  .nfl-ranking-position-select{width:34px!important;min-width:34px!important;height:28px!important;font-size:8px!important}
+}
+@media(max-width:390px){
+  .nfl-ranking-entry{grid-template-columns:28px 30px minmax(0,1fr) 99px!important}
+  .nfl-ranking-move{grid-template-columns:21px 33px 21px 21px!important}
+  .nfl-ranking-move button{width:21px!important}
+  .nfl-ranking-position-select{width:33px!important;min-width:33px!important}
+}

@@ -279,19 +279,29 @@ function nflPlayoffRaceExtractScores_(result){
 
 function nflPlayoffRaceFetchWeek_(year,week){
   if(typeof sportsWagerFetchJson_!=="function")return [];
-  try{
-    const result=sportsWagerFetchJson_({
-      action:"getSportsScores",
-      sport:"football",
-      league:"NFL",
-      seasonYear:year,
-      week:week
-    },"NFL Playoff Race schedule");
-    if(!result||result.success===false)return [];
-    return nflPlayoffRaceExtractScores_(result).map(function(score){
-      return typeof sportsWagerNormalizeScore_==="function"?sportsWagerNormalizeScore_(score):score;
-    });
-  }catch(err){return [];}
+  const base={
+    action:"getSportsScores",
+    sport:"football",
+    league:"NFL",
+    seasonYear:year,
+    week:week
+  };
+  const attempts=[
+    Object.assign({},base,{seasonType:2}),
+    base
+  ];
+  for(let i=0;i<attempts.length;i++){
+    try{
+      const result=sportsWagerFetchJson_(attempts[i],"NFL Playoff Race schedule");
+      if(!result||result.success===false)continue;
+      const scores=nflPlayoffRaceExtractScores_(result);
+      if(!scores.length)continue;
+      return scores.map(function(score){
+        return typeof sportsWagerNormalizeScore_==="function"?sportsWagerNormalizeScore_(score):score;
+      });
+    }catch(err){}
+  }
+  return [];
 }
 
 function nflPlayoffRaceGameStartMs_(game){
