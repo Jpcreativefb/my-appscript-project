@@ -12,7 +12,7 @@
      exact 10, +/-1 8, +/-2 6, +/-3 4, +/-4 2, farther 0.
 ========================================================= */
 
-const NFL_SEASON_PACK_VERSION_ = "nfl-sports-pack-r1";
+const NFL_SEASON_PACK_VERSION_ = "nfl-sports-pack-r1.2";
 
 const NFL_SEASON_PACK_TEAMS_ = [
   {abbr:"BUF",name:"Buffalo Bills",conference:"AFC",division:"East"},
@@ -92,23 +92,137 @@ function nflSeasonPackEnsureCategory_(payload){
   if(!existing){return {action:"created",result:adminCreateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,locked:false,displayOrder:100,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",resultSource:"manual",settlementStatus:"pending",sportsLeague:"NFL"})};}
   return {action:"verified",result:adminUpdateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",sportsLeague:"NFL"})};
 }
-function nflSeasonPackEnsureNominee_(task){
-  const setup=adminGetGameSetup({gameId:task.gameId});
-  const category=(setup.categories||[]).find(function(row){return nflSeasonPackKey_(row.categoryId)===nflSeasonPackKey_(task.categoryId);});
-  const exists=category&&(category.nominees||[]).some(function(row){return nflSeasonPackKey_(row.nomineeId)===nflSeasonPackKey_(task.team.abbr);});
-  if(exists)return {action:"verified"};
-  return {action:"created",result:adminCreateNominee({gameId:task.gameId,categoryId:task.categoryId,nomineeId:task.team.abbr,nominee:task.team.name,shortAnswer:task.team.abbr,logoUrl:nflSeasonPackLogo_(task.team.abbr),person:task.team.conference+" "+task.team.division,active:true,predictionGame:false})};
+function nflSeasonPackEnsureNomineesBulk_(payload){
+  const setup=adminGetGameSetup({gameId:payload.gameId});
+  const categories=setup&&Array.isArray(setup.categories)?setup.categories:[];
+  const category=categories.find(function(row){
+    return nflSeasonPackKey_(row.categoryId)===nflSeasonPackKey_(payload.categoryId);
+  });
+  if(!category)throw new Error("Category not found after setup: "+payload.categoryId);
+
+  const existing={};
+  (category.nominees||[]).forEach(function(row){
+    existing[nflSeasonPackKey_(row.nomineeId)]=true;
+  });
+
+  const missing=(payload.teams||[]).filter(function(team){
+    return !existing[nflSeasonPackKey_(team.abbr)];
+  });
+
+  if(!missing.length){
+    return {action:"verified",createdCount:0};
+  }
+
+  const items=missing.map(function(team){
+    return {
+      nomineeId:team.abbr,
+      nominee:team.name,
+      shortAnswer:team.abbr,
+      logoUrl:nflSeasonPackLogo_(team.abbr),
+      person:team.conference+" "+team.division,
+      active:true,
+      predictionGame:false
+    };
+  });
+
+  const result=adminBulkCreateNominees({
+    gameId:payload.gameId,
+    categoryId:payload.categoryId,
+    category:payload.category,
+    section:payload.section,
+    itemsJSON:JSON.stringify(items)
+  });
+
+  if(!result||result.success===false){
+    throw new Error(result&&(result.error||result.message)
+      ? result.error||result.message
+      : "NFL team bulk create failed.");
+  }
+
+  return {
+    action:"created",
+    createdCount:Number(result.createdCount)||items.length,
+    result:result
+  };
 }
+
 function nflSeasonPackTasks_(year){
   const tasks=[];
-  nflSeasonPackGamePayloads_(year).forEach(function(game){tasks.push({type:"game",payload:game,label:game.name});});
-  nflSeasonPackCategoryPayloads_(year).forEach(function(category){tasks.push({type:"category",payload:category,label:category.category});(category.teams||[]).forEach(function(team){tasks.push({type:"nominee",gameId:category.gameId,categoryId:category.categoryId,team:team,label:category.shortName+" · "+team.abbr});});});
+  nflSeasonPackGamePayloads_(year).forEach(function(game){
+    tasks.push({type:"game",payload:game,label:game.name});
+  });
+  nflSeasonPackCategoryPayloads_(year).forEach(function(category){
+    tasks.push({
+      type:"category",
+      payload:category,
+      label:category.category
+    });
+  });
   return tasks;
 }
+
 function apiAdminBuildNflSeasonPack(payload){
-  payload=payload||{}; if(typeof requireAdmin_==="function")requireAdmin_(payload);
-  const year=nflSeasonPackYear_(payload.year),tasks=nflSeasonPackTasks_(year),cursor=Math.max(0,Math.floor(Number(payload.cursor)||0)),batchSize=Math.max(1,Math.min(12,Math.floor(Number(payload.batchSize)||10))),end=Math.min(tasks.length,cursor+batchSize),completed=[];
-  for(let i=cursor;i<end;i++){const task=tasks[i];let result;if(task.type==="game")result=nflSeasonPackEnsureGame_(task.payload);else if(task.type==="category")result=nflSeasonPackEnsureCategory_(task.payload);else result=nflSeasonPackEnsureNominee_(task);completed.push({index:i,type:task.type,label:task.label,action:result&&result.action||"verified"});}
-  const nextCursor=end,done=nextCursor>=tasks.length; if(typeof clearGamesCache==="function")clearGamesCache();
-  return {success:true,version:NFL_SEASON_PACK_VERSION_,year:year,ids:nflSeasonPackIds_(year),cursor:cursor,nextCursor:nextCursor,total:tasks.length,done:done,percent:Math.round((nextCursor/Math.max(1,tasks.length))*100),completed:completed,message:done?"NFL Cup and ranking mini-game setup is ready in Draft.":"NFL Sports Pack setup progress: "+nextCursor+" / "+tasks.length};
+  payload=payload||{};
+  if(typeof requireAdmin_==="function")requireAdmin_(payload);
+
+  const year=nflSeasonPackYear_(payload.year);
+  const tasks=nflSeasonPackTasks_(year);
+  const cursor=Math.max(0,Math.floor(Number(payload.cursor)||0));
+
+  // Keep each request deliberately small. Category tasks bulk-write their
+  // missing teams in one sheet operation, avoiding the prior per-team setup
+  // reload loop that could exhaust an Apps Script request.
+  const requestedBatch=Math.floor(Number(payload.batchSize)||2);
+  const batchSize=Math.max(1,Math.min(2,requestedBatch));
+  const end=Math.min(tasks.length,cursor+batchSize);
+  const completed=[];
+
+  for(let i=cursor;i<end;i++){
+    const task=tasks[i];
+    let result;
+
+    if(task.type==="game"){
+      result=nflSeasonPackEnsureGame_(task.payload);
+    }else{
+      const categoryResult=nflSeasonPackEnsureCategory_(task.payload);
+      const nomineeResult=nflSeasonPackEnsureNomineesBulk_(task.payload);
+      result={
+        action:
+          categoryResult&&categoryResult.action==="created"
+            ? "created"
+            : nomineeResult&&nomineeResult.action==="created"
+              ? "repaired"
+              : "verified",
+        category:categoryResult,
+        nominees:nomineeResult
+      };
+    }
+
+    completed.push({
+      index:i,
+      type:task.type,
+      label:task.label,
+      action:result&&result.action||"verified"
+    });
+  }
+
+  const nextCursor=end;
+  const done=nextCursor>=tasks.length;
+  if(typeof clearGamesCache==="function")clearGamesCache();
+
+  return {
+    success:true,
+    version:NFL_SEASON_PACK_VERSION_,
+    year:year,
+    ids:nflSeasonPackIds_(year),
+    cursor:cursor,
+    nextCursor:nextCursor,
+    total:tasks.length,
+    done:done,
+    percent:Math.round((nextCursor/Math.max(1,tasks.length))*100),
+    completed:completed,
+    message:done
+      ? "NFL Cup and ranking mini-game setup is ready in Draft."
+      : "NFL Sports Pack setup progress: "+nextCursor+" / "+tasks.length
+  };
 }
