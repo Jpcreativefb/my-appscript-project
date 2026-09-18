@@ -124,3 +124,102 @@
   .confidence-r2-value-control button{width:15px;height:23px;font-size:11px}
   .confidence-r2-value-control select{min-width:50px;height:35px;font-size:19px}
 }
+
+
+/* PATTC CONFIDENCE LAUNCH VISUAL FINISH R2.2
+   One compact hero + scoreboard-style matchup cards */
+#confidenceSportsHeroMount{display:none!important}
+
+/* Keep the primary Confidence hero, but make it launch-sized instead of poster-sized. */
+.sports-rich-confidence-hero{
+  min-height:154px!important;
+  grid-template-columns:minmax(0,1.35fr) minmax(220px,.65fr)!important;
+  gap:14px!important;margin-bottom:10px!important;padding:18px 20px!important;border-radius:18px!important;
+}
+.sports-rich-confidence-copy h1{
+  margin:2px 0 5px!important;font-size:clamp(2rem,4.5vw,3.3rem)!important;line-height:.92!important;
+}
+.sports-rich-confidence-copy p{font-size:.82rem!important;line-height:1.18!important}
+.sports-rich-confidence-state{gap:6px!important;padding:11px 12px!important;border-radius:13px!important}
+.sports-rich-confidence-state>strong{font-size:.88rem!important}
+.sports-rich-confidence-state>small{font-size:.7rem!important}
+
+/* Matchup = team scoreboard | team scoreboard | confidence. */
+.confidence-r2-main{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr) 88px!important;
+  gap:5px!important;padding:5px!important;
+}
+.confidence-r2 .confidence-team-choice.confidence-r2-team{
+  grid-template-columns:43px minmax(0,1fr)!important;
+  grid-template-rows:auto auto!important;
+  align-content:center!important;
+  min-height:76px!important;
+  padding:5px 6px!important;
+  gap:1px 6px!important;
+}
+.confidence-r2 .confidence-r2-team .confidence-team-visual{
+  grid-column:1!important;grid-row:1/3!important;
+  width:43px!important;height:43px!important;min-width:43px!important;align-self:center!important;
+}
+.confidence-r2 .confidence-r2-team .confidence-team-logo{
+  width:41px!important;height:41px!important;max-width:41px!important;max-height:41px!important;
+}
+.confidence-r2-team-copy{
+  grid-column:2!important;grid-row:1!important;align-self:end!important;gap:0!important;
+}
+.confidence-r2-team-copy small{font-size:5.5px!important;line-height:1!important}
+.confidence-r2-team-copy strong{font-size:11.5px!important;line-height:1.02!important}
+.confidence-r2-team-copy span{
+  margin-top:2px!important;font-size:7px!important;line-height:1!important;color:#b9cad5!important;
+}
+.confidence-r2-score{
+  grid-column:2!important;grid-row:2!important;align-self:start!important;justify-self:start!important;
+  margin-top:2px!important;font-size:18px!important;line-height:1!important;
+}
+
+/* Confidence rank stays prominent; +/- are secondary. */
+.confidence-r2-value{min-width:0!important;padding:4px!important}
+.confidence-r2-value>span{font-size:5.5px!important}
+.confidence-r2-value-control{grid-template-columns:14px minmax(48px,1fr) 14px!important;gap:2px!important}
+.confidence-r2-value-control button{
+  width:14px!important;height:22px!important;min-width:14px!important;padding:0!important;font-size:10px!important;
+}
+.confidence-r2-value-control select{
+  min-width:48px!important;height:35px!important;font-size:19px!important;
+}
+.confidence-r2-value>small{font-size:5.5px!important}
+
+@media(max-width:560px){
+  .sports-rich-confidence-hero{
+    min-height:0!important;grid-template-columns:1fr!important;gap:9px!important;padding:14px 15px!important;
+  }
+  .sports-rich-confidence-copy h1{font-size:2.25rem!important}
+  .sports-rich-confidence-copy p{font-size:.72rem!important}
+  .sports-rich-confidence-state{
+    grid-template-columns:auto 1fr!important;align-items:center!important;padding:9px 10px!important;
+  }
+  .sports-rich-confidence-state .sports-rich-progress{grid-column:1/-1!important}
+  .sports-rich-confidence-state>small{grid-column:1/-1!important}
+
+  .confidence-r2-main{
+    grid-template-columns:minmax(0,1fr) minmax(0,1fr) 82px!important;
+    gap:4px!important;padding:4px!important;
+  }
+  .confidence-r2 .confidence-team-choice.confidence-r2-team{
+    grid-template-columns:36px minmax(0,1fr)!important;
+    min-height:70px!important;padding:4px!important;gap:1px 4px!important;
+  }
+  .confidence-r2 .confidence-r2-team .confidence-team-visual{
+    width:36px!important;height:36px!important;min-width:36px!important;
+  }
+  .confidence-r2 .confidence-r2-team .confidence-team-logo{
+    width:35px!important;height:35px!important;max-width:35px!important;max-height:35px!important;
+  }
+  .confidence-r2-team-copy strong{font-size:9.5px!important}
+  .confidence-r2-team-copy small{font-size:4.8px!important}
+  .confidence-r2-team-copy span{font-size:6.5px!important}
+  .confidence-r2-score{font-size:16px!important}
+  .confidence-r2-value-control{grid-template-columns:13px minmax(46px,1fr) 13px!important}
+  .confidence-r2-value-control button{width:13px!important;min-width:13px!important;height:21px!important;font-size:9px!important}
+  .confidence-r2-value-control select{min-width:46px!important;height:33px!important;font-size:18px!important}
+}

@@ -1,0 +1,16 @@
+const fs=require("fs"),assert=require("assert"),read=p=>fs.readFileSync(p,"utf8");
+const nfl=read("frontend/css/nfl-sports-pack-r1.css");
+const conf=read("frontend/css/confidence-r2.css");
+const html=read("frontend/app.html");
+assert(nfl.includes("PATTC NFL LAUNCH VISUAL FINISH R2.2"));
+assert(nfl.includes("min-height:44px!important"));
+assert(nfl.includes("grid-template-columns:19px 30px 19px 20px"));
+assert(conf.includes("PATTC CONFIDENCE LAUNCH VISUAL FINISH R2.2"));
+assert(conf.includes("#confidenceSportsHeroMount"));
+assert(conf.includes("display:none!important"));
+assert(conf.includes("min-height:154px!important"));
+assert(conf.includes("grid-template-columns:43px minmax(0,1fr)!important"));
+assert(conf.includes("grid-template-columns:14px minmax(48px,1fr) 14px!important"));
+assert(html.includes("confidence=v1219-confidence-launch-r2-2"));
+assert(html.includes("playoff=v1219-nfl-playoff-race-r2-2"));
+console.log("PATTC NFL launch visual finish R2.2 tests: PASS");
