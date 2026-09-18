@@ -1464,6 +1464,10 @@ function doGet(e) {
       return json(apiAdminPermanentGamePurge(params));
     }
 
+    if (action === "adminBuildNflSeasonPack") {
+      return json(apiAdminBuildNflSeasonPack(params));
+    }
+
     if (action === "adminGetGames") {
 
       return json(

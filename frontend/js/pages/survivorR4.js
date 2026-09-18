@@ -86,3 +86,47 @@
 
   root.PATTC_SURVIVOR_R4_MARKER=MARK;
 })(window);
+
+/* =========================================================
+   SURVIVOR_FINISH_R1
+   Result color belongs on YOUR PICK confirmation, not scoreboard.
+   Stats/lives/used-team presentation finalized.
+   ========================================================= */
+(function(root){
+  "use strict";
+  const baseSelected=root.survivorRecoveryR3SelectedTeamHtml_;
+
+  root.survivorRecoveryR3SelectedTeamHtml_=function(team){
+    let html=baseSelected(team);
+    const payload=root.SURVIVOR_PAGE_STATE&&root.SURVIVOR_PAGE_STATE.payload||{};
+    const round=payload.currentRound||{};
+    const outcome=String(round.outcome||"").toLowerCase();
+    const cls=outcome==="win"?"is-result-win":outcome==="loss"?"is-result-loss":"is-result-selected";
+    return html.replace("survivor-r4-selected-team\"", "survivor-r4-selected-team "+cls+"\"");
+  };
+
+  root.renderSurvivorRecoveryR3Stats_=function(payload){
+    payload=payload||{};
+    const allowed=Math.max(0,Number(payload.lossesAllowed||payload.settings&&payload.settings.lossesAllowed||0)+Number(payload.earnedLives||0));
+    const used=Math.max(0,Number(payload.lossesUsed||payload.strikes||0));
+    const remaining=Math.max(0,Number(payload.livesRemaining!==undefined?payload.livesRemaining:allowed-used));
+    const circles=allowed?`<div class="survivor-r4-life-row"><span>LIVES</span><div>${Array.from({length:allowed}).map(function(_,i){return `<i class="${i<used?"is-used":""}" title="${i<used?"Life used":"Life remaining"}"></i>`;}).join("")}</div><small>${remaining} remaining</small></div>`:"";
+    const rows=(typeof survivorRecoveryR3HistoryRows_==="function"?survivorRecoveryR3HistoryRows_(payload):[]).filter(function(row){return !!(row&&(row.teamId||row.team));}).slice().sort(function(a,b){return Number(a.week||0)-Number(b.week||0);});
+    const history=rows.length?`<div class="survivor-r4-used"><div class="survivor-r4-used-head"><span>USED TEAMS</span><small>${rows.length} used</small></div><div class="survivor-r4-used-rail">${rows.map(function(row){
+      const cls=typeof survivorRecoveryR2HistoryClass_==="function"?survivorRecoveryR2HistoryClass_(row):"";
+      const logo=typeof survivorFinalTrailLogo_==="function"?survivorFinalTrailLogo_(row):"";
+      const label=cls==="is-win"||cls==="is-push"?"WIN":cls==="is-loss"?"LOSS":"PENDING";
+      return `<article class="survivor-r4-used-team ${cls}"><span>WEEK ${survivorFinalEscape_(row.week||"—")}</span><div>${logo}</div><strong>${label}</strong></article>`;
+    }).join("")}</div></div>`:`<div class="survivor-r4-used is-empty"><div class="survivor-r4-used-head"><span>USED TEAMS</span><small>None yet</small></div></div>`;
+    return `<section class="survivor-r3-stats survivor-r4-stats">
+      <div class="survivor-r4-stats-head"><strong class="${payload.alive===false?"is-out":"is-alive"}">${payload.winner?"WINNER":payload.alive===false?"ELIMINATED":"ALIVE"}</strong>${circles}</div>
+      <div class="survivor-r4-stat-grid">
+        <div><span>Weeks Survived</span><strong>${survivorFinalEscape_(payload.roundsSurvived||0)}</strong></div>
+        <div><span>Current Streak</span><strong>${survivorFinalEscape_(payload.winStreak||0)}</strong></div>
+        <div><span>Longest Streak</span><strong>${survivorFinalEscape_(payload.bestStreak||payload.survivorBestStreak||0)}</strong></div>
+        <div><span>Points</span><strong>${survivorFinalEscape_(payload.totalPoints||0)}</strong></div>
+      </div>
+      ${history}
+    </section>`;
+  };
+})(window);

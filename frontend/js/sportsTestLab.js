@@ -36,7 +36,7 @@
   function fantasy(){weekLabels();var slots=Array.from(S.app.querySelectorAll(".tf-slot")).slice(0,8);slots.forEach(function(s,i){var st=s.querySelector(".tf-slot-status-word"),pt=s.querySelector(".tf-slot-points-r3");if(S.state==="incomplete"&&i<3)set(st,"OPEN");if(S.state==="locked")set(st,"LOCKED");if(S.state==="live"){set(st,"LIVE");if(pt)pt.textContent=(i%2?"8.7":"12.4")+" pts";}if(S.state==="final-win"||S.state==="final-loss"){set(st,"FINAL");if(pt)pt.textContent=(S.state==="final-win"?(14+i*.7):(6+i*.4)).toFixed(1)+" pts";}});var c=S.app.querySelector(".tf-game-day-card,.sports-team-fantasy");if(c)stamp(c,LABELS[S.state]||S.state,S.state==="final-loss"?"danger":"info");}
   function koth(){weekLabels();var b=S.app.querySelector(".sports-default-koth-status,.koth-final-status"),st=b&&b.querySelector("strong"),label="SAFE",count=0;if(S.state==="warning"){label="WARNING ZONE";count=1;}if(S.state==="strike"){label="STRIKE RECEIVED";count=2;}if(S.state==="eliminated"){label="FINAL-ELIMINATED";count=3;}if(S.state==="champion")label="LAST MAN STANDING";if(S.state==="preview")label="WEEK PREVIEW";set(st,label);Array.from(S.app.querySelectorAll(".sports-default-koth-strikes i,.koth-final-mini-strikes i")).slice(0,3).forEach(function(n,i){n.classList.toggle("is-filled",i<count);});var p=S.app.querySelector(".koth-final-player,.koth-final-standing");if(p)stamp(p,label,S.state==="eliminated"?"danger":"info");}
   function wager(){weekLabels();var c=S.app.querySelector(".betting-category-card,.betting-category,.sports-wager-card,.betting-game-card,[data-category-id],.betting-page");if(!c)return;stamp(c,LABELS[S.state]||S.state,S.state==="won"?"success":S.state==="lost"?"danger":"info");if(S.state==="live"||["won","lost","push"].indexOf(S.state)!==-1)score(c,S.state==="live"?"LIVE · Q4 04:12":"FINAL · "+S.state.toUpperCase(),"BUF 27","DET 24");}
-  function apply(){if(!S.app)return;restore();if(S.state==="real"){launcher();return;}S.app.inert=true;document.body.classList.add("pattc-testlab-simulating");banner();if(S.type==="survivor"){survivor();if(typeof root.pattcSurvivorR4TestLabApply==="function")root.pattcSurvivorR4TestLabApply(S);}if(S.type==="confidence")confidence();if(S.type==="team-fantasy")fantasy();if(S.type==="koth")koth();if(S.type==="wager")wager();launcher();}
+  function apply(){if(!S.app)return;restore();if(S.state==="real"){launcher();return;}S.app.inert=true;document.body.classList.add("pattc-testlab-simulating");banner();if(S.type==="survivor"){survivor();if(typeof root.pattcSurvivorR4TestLabApply==="function")root.pattcSurvivorR4TestLabApply(S);}if(S.type==="confidence"){confidence();if(typeof root.pattcConfidenceR2TestLabApply==="function")root.pattcConfidenceR2TestLabApply(S);}if(S.type==="team-fantasy")fantasy();if(S.type==="koth")koth();if(S.type==="wager")wager();launcher();}
   function launcher(){var b=document.getElementById("pattcSportsTestLabButton");if(b)b.innerHTML="<strong>TEST LAB</strong><span>"+esc(S.state==="real"?"REAL DATA":(LABELS[S.state]||S.state))+"</span>";}
   function panel(){var o=(STATES[S.type]||[]).map(function(v){return'<option value="'+v+'" '+(v===S.state?"selected":"")+'>'+esc(LABELS[v]||v)+'</option>';}).join("");return'<section id="pattcSportsTestLabPanel" class="pattc-testlab-panel"><div class="pattc-testlab-head"><strong>FOOTBALL TEST LAB</strong><button onclick="pattcSportsTestLabClose()">×</button></div><div class="pattc-testlab-body"><label><span>Game state</span><select onchange="pattcSportsTestLabSetState(this.value)">'+o+'</select></label><label><span>Week</span><div class="pattc-testlab-week-row"><button onclick="pattcSportsTestLabBumpWeek(-1)">‹</button><input type="number" min="1" max="18" value="'+S.week+'" onchange="pattcSportsTestLabSetWeek(this.value)"><button onclick="pattcSportsTestLabBumpWeek(1)">›</button></div></label><button class="pattc-testlab-reset" onclick="pattcSportsTestLabReset()">RESTORE REAL DATA</button></div></section>';}
   function open(){close();document.body.insertAdjacentHTML("beforeend",panel());S.panel=true;}
@@ -113,4 +113,51 @@ window.pattcSurvivorR4TestLabApply=function(S){if(!S||!S.app||S.state==="real")r
       if (m) badge.textContent = "WEEK " + m[1] + " USED";
     });
   };
+})(window);
+
+/* SURVIVOR_FINISH_R1 + CONFIDENCE_RECOVERY_R1 TEST LAB DECORATORS */
+(function(root){
+  const survivorBase=root.pattcSurvivorR4TestLabApply;
+  if(typeof survivorBase==="function"){
+    root.pattcSurvivorR4TestLabApply=function(S){
+      survivorBase(S);
+      if(!S||!S.app||S.state==="real")return;
+      const pick=S.app.querySelector(".survivor-r4-selected-team");
+      if(pick){
+        pick.classList.remove("is-result-selected","is-result-win","is-result-loss");
+        if(S.state==="final-win")pick.classList.add("is-result-win");
+        else if(S.state==="final-loss"||S.state==="eliminated")pick.classList.add("is-result-loss");
+        else pick.classList.add("is-result-selected");
+      }
+    };
+  }
+
+  root.pattcConfidenceR2TestLabApply=function(S){
+    if(!S||!S.app||S.state==="real")return;
+    const rows=Array.from(S.app.querySelectorAll(".confidence-r2-row")).slice(0,6);
+    rows.forEach(function(row,i){
+      row.classList.remove("correct","wrong");
+      const teams=row.querySelectorAll(".confidence-r2-team");
+      teams.forEach(function(t){t.classList.remove("is-correct","is-wrong");});
+      if(S.state==="live"){
+        const meta=row.querySelector(".confidence-matchup-state strong");
+        if(meta)meta.textContent=i===0?"LIVE · Q3 08:14":"LOCKED";
+        const scores=row.querySelectorAll(".confidence-r2-score");
+        if(scores[0])scores[0].textContent=i%2?17:14;
+        if(scores[1])scores[1].textContent=i%2?10:7;
+      }
+      if(S.state==="final-win"||S.state==="final-loss"){
+        const selected=row.querySelector(".confidence-r2-team.selected")||teams[0];
+        if(selected){
+          if(S.state==="final-win"){row.classList.add("correct");selected.classList.add("is-correct");}
+          else{row.classList.add("wrong");selected.classList.add("is-wrong");}
+        }
+      }
+    });
+  };
+
+  const originalMount=root.pattcSportsTestLabMount;
+  if(typeof originalMount==="function"&&!root.PATTC_CONFIDENCE_R2_LAB_PATCHED){
+    root.PATTC_CONFIDENCE_R2_LAB_PATCHED=true;
+  }
 })(window);
