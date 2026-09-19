@@ -3552,6 +3552,7 @@ function renderSportsWagerDefaultHero_(config, summary, categories) {
 }
 
 function applySportsWagerDefaultPresentation_() {
+  if (document.querySelector(".nfl-futures-r1")) return;
   const first = document.querySelector('.sports-default-wager .betting-category-card:not([hidden]):not(.finished)');
   if (first) first.setAttribute('open','');
   setSportsWagerDefaultFilter_(SPORTS_WAGER_DEFAULT_FILTER);
@@ -3564,6 +3565,7 @@ async function renderBettingPage(){
   const session = getBettingSession_();
   const username = session.username || "";
   const gameId = getBettingGameId_();
+  const isNflFuturesR1 = /^nfl-futures-2026$/.test(String(gameId||""));
 
   setTimeout(
     startBettingAutoRefresh_,
@@ -3674,20 +3676,20 @@ async function renderBettingPage(){
   }, 0);
 
   return `
-    <div class="page betting-page sports-default-wager">
+    <div class="page betting-page sports-default-wager ${isNflFuturesR1?"nfl-futures-r1":""}">
 
       ${renderHybridBettingBackButton_(config)}
 
-      ${renderSportsWagerDefaultHero_(config, summary, categories)}
+      ${isNflFuturesR1?`<section class="nfl-futures-r1-hero"><span>NFL SEASON MINI GAME</span><h1>NFL FUTURES</h1><p>Build your season portfolio. One final entry per market. Multipliers freeze when saved.</p><div class="nfl-futures-r1-figures"><div><small>STARTING POINTS</small><strong>${money_(config.startingBankroll||1000)}</strong></div><div><small>ALLOCATED</small><strong>${money_(summary.totalStaked||0)}</strong></div><div><small>UNALLOCATED</small><strong>${money_(Math.max(0,Number(config.startingBankroll||1000)-Number(summary.totalStaked||0)))}</strong></div></div></section>`:renderSportsWagerDefaultHero_(config, summary, categories)}
 
-      <h1>Wager</h1>
+      ${isNflFuturesR1?"":"<h1>Wager</h1>"}
 
       <div id="bettingNotice"></div>
 
       ${renderBettingAdminControls_(session)}
 
       <p class="betting-intro">
-        Start with ${money_(config.startingBankroll)} chips. Pick one nominee per category and wager between ${money_(config.minWager || config.minBet)} and ${money_(config.maxWager || config.maxBet)} chips.
+        ${isNflFuturesR1?"Virtual points only. One irrevocable Future per market. Settled returns do not replenish your starting allocation; all picks lock at each market deadline. Initial PATTC multipliers are game values, not real-market odds.":`Start with ${money_(config.startingBankroll)} chips. Pick one nominee per category and wager between ${money_(config.minWager || config.minBet)} and ${money_(config.maxWager || config.maxBet)} chips.`}
       </p>
 
       <div id="bettingSummaryBlock">

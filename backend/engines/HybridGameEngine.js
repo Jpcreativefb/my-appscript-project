@@ -826,8 +826,15 @@ function rollupParentLeaderboard_(
 
   children.forEach(function(child) {
 
-    const childRows =
-      getLeaderboardData(
+    // NFL_CUP_FUTURES_R1_CUP_ADAPTER: no provisional Futures Cup awards.
+    if (/^nfl-futures-2026$/.test(String(child.gameId || "")) &&
+        typeof nflCupFuturesSettledForCup_ === "function" &&
+        !nflCupFuturesSettledForCup_(child.gameId)) return;
+
+    const childRows = String(child.type || "").toLowerCase() === "team-fantasy" &&
+      typeof nflCupTeamFantasyLeaderboard_ === "function"
+      ? nflCupTeamFantasyLeaderboard_(child.gameId)
+      : getLeaderboardData(
         child.gameId,
         {
           projected: options.projected === true,

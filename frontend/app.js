@@ -743,6 +743,7 @@ function appPageScriptUrl_(name, retryToken) {
   url.searchParams.set("hotfix", APP_ROUTE_HOTFIX_VERSION);
   if (name === "notifications") url.searchParams.set("module", "v1218j-automatic-pick-reminders");
   if (name === "rankingSportsR1") url.searchParams.set("playoff", "v1219-nfl-playoff-race-r2-1");
+  if (name === "nflCupR1" || name === "adminGamesRc24e" || name === "seasonHub" || name === "betting") url.searchParams.set("cupFutures", "v1220-nfl-cup-futures-r1");
   if (retryToken) url.searchParams.set("retry", retryToken);
   return url.href;
 }

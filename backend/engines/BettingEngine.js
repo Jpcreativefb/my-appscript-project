@@ -2656,7 +2656,10 @@ function saveBet(payload){
       : 0;
 
     const availableForThisBet = roundBetMoney_(
-      Number(currentSummary.bankroll || 0) +
+      // NFL_CUP_FUTURES_R1_FIXED_ALLOCATION: settled returns never replenish the 1000-point stake pool.
+      (/^nfl-futures-2026$/.test(gameId)
+        ? Math.max(0, config.startingBankroll - Number(currentSummary.totalStaked || 0))
+        : Number(currentSummary.bankroll || 0)) +
       existingAmountForCategory
     );
 

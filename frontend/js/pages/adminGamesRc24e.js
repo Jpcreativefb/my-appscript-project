@@ -2776,3 +2776,32 @@ root.nflPlayoffRaceAdminSave_=async function(){
   finally{if(button)button.disabled=false;}
 };
 root.nflSeasonPackAdminBuild_=async function(){const yearNode=document.getElementById("nflSeasonPackYear"),button=document.getElementById("nflSeasonPackBuildButton"),status=document.getElementById("nflSeasonPackStatus"),bar=document.getElementById("nflSeasonPackProgress"),year=Math.max(2020,Math.min(2100,Number(yearNode&&yearNode.value)||new Date().getFullYear()));let cursor=0,guard=0;if(button)button.disabled=true;try{while(guard++<30){if(status)status.textContent="Building NFL Sports Pack… "+cursor;const res=await api("adminBuildNflSeasonPack",{year:year,cursor:cursor,batchSize:10});if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"NFL Sports Pack setup failed.");cursor=Number(res.nextCursor)||0;if(bar)bar.style.width=Math.max(0,Math.min(100,Number(res.percent)||0))+"%";if(status)status.textContent=res.message||("NFL setup "+cursor+" / "+res.total);if(res.done){if(status)status.textContent="NFL Sports Pack ready in Draft · NFL Cup + 3 ranking mini-games.";if(button)button.textContent="NFL Pack Ready ✓";return;}}throw new Error("NFL Sports Pack setup did not finish within the safety loop.");}catch(err){if(status)status.textContent=err&&err.message?err.message:"NFL Sports Pack setup failed.";if(button)button.disabled=false;}};const base=root.renderAdminGamesPage;if(typeof base==="function"){root.renderAdminGamesPage=async function(){const html=String(await base()),card=nflSeasonPackAdminCard_(),timing=nflPlayoffRaceTimingAdminCard_(),match=html.match(/<div class="page[^>]*>/);setTimeout(function(){if(root.nflPlayoffRaceAdminLoad_)root.nflPlayoffRaceAdminLoad_();},300);return match?html.replace(match[0],match[0]+card+timing):card+timing+html;};}})(window);
+
+
+/* PATTC NFL CUP + FUTURES R1 — progressive Draft-only admin builder */
+(function(root){'use strict';
+root.nflCupFuturesAdminBuild_=async function(){
+  const button=document.getElementById('nflCupFuturesBuildButton');
+  const status=document.getElementById('nflCupFuturesStatus');
+  const bar=document.getElementById('nflCupFuturesProgress');
+  const year=Number((document.getElementById('nflSeasonPackYear')||{}).value)||2026;
+  let cursor=0; if(button)button.disabled=true;
+  try {for(let guard=0;guard<22;guard++){
+    const result=await apiPost('adminPrepareNflCupFuturesR1',{year:year,cursor:cursor});
+    if(!result||result.success===false)throw Error(result&&(result.error||result.message)||'Cup / Futures setup failed');
+    cursor=Number(result.nextCursor);
+    if(bar)bar.style.width=String(Number(result.percent)||0)+'%';
+    if(status)status.textContent=result.message||('Preparing '+cursor+'/'+result.total);
+    if(result.done){if(button)button.textContent='Cup + Futures Draft Ready ✓';return;}
+  }throw Error('Setup stopped before completion; retry is safe.');}
+  catch(err){if(status)status.textContent=err&&err.message?err.message:'Build failed. Retry is safe.';}
+  finally{if(button)button.disabled=false;}
+};
+const BASE=root.renderAdminGamesPage;
+if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
+  const html=String(await BASE());
+  const card='<section class="card admin-card" style="padding:12px;border:1px solid #2a7da8;margin-bottom:12px;background:#05263c;color:#d8f1ff"><h2 style="margin:0;font-size:16px">🏆 NFL CUP + FUTURES 2026</h2><p class="admin-sub">Link existing Confidence / Survivor / Fantasy / Playoff Race. Create 13 team Futures markets as a locked Draft. Does not publish or unlock any game.</p><button type="button" id="nflCupFuturesBuildButton" class="admin-small-button" onclick="nflCupFuturesAdminBuild_()">Prepare Cup + Futures Draft</button><div style="height:6px;margin-top:8px;background:#13374f;border-radius:4px;overflow:hidden"><div id="nflCupFuturesProgress" style="width:0;height:100%;background:#5fe88b"></div></div><div id="nflCupFuturesStatus" class="admin-sub" style="margin-top:6px">Review multipliers and preflight before setting Live.</div></section>';
+  const pos=html.indexOf('<div class="page');if(pos<0)return card+html;
+  const end=html.indexOf('>',pos);return html.slice(0,end+1)+card+html.slice(end+1);
+};}
+})(window);

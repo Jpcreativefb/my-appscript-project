@@ -310,6 +310,12 @@ function getLeaderboardData(
 
   const gameType = String(game && game.type || "").trim().toLowerCase();
 
+  // NFL_CUP_FUTURES_R1_LEADERBOARD_ADAPTER: Futures are ranked by portfolio bankroll.
+  if (gameType === "wager" && /^nfl-futures-2026$/.test(gameId) &&
+      typeof nflCupFuturesLeaderboard_ === "function") {
+    return nflCupFuturesLeaderboard_(gameId);
+  }
+
   if (gameType === "survivor" && typeof survivorLeaderboardData_ === "function") {
     return survivorLeaderboardData_(gameId);
   }

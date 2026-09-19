@@ -1488,6 +1488,10 @@ function doGet(e) {
       return json(apiAdminSaveNflPlayoffRaceSettings_(params));
     }
 
+    if (action === "adminPrepareNflCupFuturesR1") {
+      return json(apiAdminPrepareNflCupFuturesR1_(params));
+    }
+
     if (action === "adminBuildNflSeasonPack") {
       return json(apiAdminBuildNflSeasonPack(params));
     }

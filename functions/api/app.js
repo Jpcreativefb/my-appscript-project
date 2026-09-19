@@ -11,7 +11,8 @@ const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
   "adminGetNflPlayoffRaceSettings",
   "adminSaveNflPlayoffRaceSettings",
   "getNflPlayoffRaceState",
-  "saveNflPlayoffRaceRanking"
+  "saveNflPlayoffRaceRanking",
+  "adminPrepareNflCupFuturesR1"
 ]);
 
 const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
@@ -69,7 +70,13 @@ export async function onRequestPost(context) {
     }, 200);
   }
 
-  const upstreamUrl = SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action)
+  // R1 PREVIEW ROUTE ONLY: do not publish this branch to production without repointing Futures/Cup to production.
+  const gameId = String(body && body.gameId || "").trim();
+  const futuresActions = new Set(["getBettingPagePayload","getBettingOptions","getMyBets","saveBet","removeBet","bettingLeaderboard","leaderboard"]);
+  const newFeaturePreview =
+    (/^nfl-futures-2026$/.test(gameId) && futuresActions.has(action)) ||
+    (/^nfl-cup-2026$/.test(gameId) && action === "leaderboard");
+  const upstreamUrl = SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action) || newFeaturePreview
     ? SURVIVOR_R3_PREVIEW_API_URL
     : APPS_SCRIPT_API_URL;
 

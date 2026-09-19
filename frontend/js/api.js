@@ -1154,6 +1154,11 @@ async function apiGetLeaderboard(gameId) {
 
   const session = getSession ? getSession() : {};
 
+  // Preview Cup/Futures needs the new backend adapter, not the @399 GET deployment.
+  if (/^nfl-(?:cup|futures)-2026$/.test(String(gameId||""))) {
+    return apiPost("leaderboard", {username:session.username||"",gameId:gameId,leagueId:getApiLeagueId_()});
+  }
+
   return api("leaderboard", {
     username: session && session.username ? session.username : "",
     gameId,

@@ -138,6 +138,11 @@ async function renderSeasonHubPage() {
     upcomingChildren.length +
     completedChildren.length;
 
+  if (/^nfl-cup-2026$/.test(gameId)) {
+    window.__PATTC_NFL_CUP_CONTEXT__ = {gameId:gameId,parentGame:parentGame,leaderboardRows:leaderboardRows,
+      openChildren:openChildren,upcomingChildren:upcomingChildren,completedChildren:completedChildren};
+  }
+
   return `
     <div class="page season-hub-page" style="--season-hub-color:${escapeAttr(parentGame.themeColor || "#354785")};">
 
