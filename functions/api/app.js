@@ -20,6 +20,17 @@ const SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS = new Set([
   "saveSportsSurvivorAutoPickPreference"
 ]);
 
+// Fail closed: this feature can change the shared production Google Sheet.
+// The Pages canonical production hostname is the only default allowlisted host.
+// A custom production hostname must be explicitly set as PATTC_PRODUCTION_HOSTNAME
+// in the Pages environment (never set that variable for Preview).
+function pattcCupProductionRequest_(context) {
+  let host = "";
+  try { host = new URL(context.request.url).hostname.toLowerCase(); } catch (_) { return false; }
+  const configured = String(context.env && context.env.PATTC_PRODUCTION_HOSTNAME || "").trim().toLowerCase();
+  return host === "my-appscript-project.pages.dev" || !!(configured && host === configured);
+}
+
 const MAX_BODY_BYTES = 6 * 1024 * 1024;
 
 function jsonResponse(payload, status = 200) {
@@ -62,7 +73,24 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, message: "Invalid API action." }, 400);
   }
 
-  if (SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS.has(action)) {
+  const productionRequest = pattcCupProductionRequest_(context);
+  const gameId = String(body && body.gameId || "").trim();
+  if (!productionRequest && new Set([
+    "adminPrepareNflCupFuturesR1",
+    "adminBuildNflSeasonPack",
+    "adminSaveNflPlayoffRaceSettings",
+    "saveNflPlayoffRaceRanking"
+  ]).has(action)) {
+    return jsonResponse({ success: false, previewOnly: true,
+      message: "This setup or ranking write is disabled in Cloudflare Preview because its Google Sheet is shared with production. Use the canonical production app for launch setup." }, 200);
+  }
+  if (!productionRequest && gameId === "nfl-futures-2026" &&
+      (action === "saveBet" || action === "removeBet")) {
+    return jsonResponse({ success: false, previewOnly: true,
+      message: "Futures preview is read-only. Futures wagers can be placed after the game is published in production." }, 200);
+  }
+
+  if (!productionRequest && SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS.has(action)) {
     return jsonResponse({
       success: false,
       previewOnly: true,
@@ -70,13 +98,13 @@ export async function onRequestPost(context) {
     }, 200);
   }
 
-  // R1 PREVIEW ROUTE ONLY: do not publish this branch to production without repointing Futures/Cup to production.
-  const gameId = String(body && body.gameId || "").trim();
+  // R1.1: Preview-only routes are host-scoped. Production always uses the production Apps Script deployment.
   const futuresActions = new Set(["getBettingPagePayload","getBettingOptions","getMyBets","saveBet","removeBet","bettingLeaderboard","leaderboard"]);
   const newFeaturePreview =
     (/^nfl-futures-2026$/.test(gameId) && futuresActions.has(action)) ||
     (/^nfl-cup-2026$/.test(gameId) && action === "leaderboard");
-  const upstreamUrl = SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action) || newFeaturePreview
+  const upstreamUrl = !productionRequest &&
+    (SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action) || newFeaturePreview)
     ? SURVIVOR_R3_PREVIEW_API_URL
     : APPS_SCRIPT_API_URL;
 
