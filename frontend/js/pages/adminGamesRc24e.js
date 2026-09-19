@@ -2805,3 +2805,166 @@ if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
   const end=html.indexOf('>',pos);return html.slice(0,end+1)+card+html.slice(end+1);
 };}
 })(window);
+
+
+/* PATTC NFL Cup Admin Control Center R1; front-end only; no automatic publishing. */
+(function (root) {
+  'use strict';
+  if (root.__PATTC_CUP_CONTROL_R1__) return;
+  root.__PATTC_CUP_CONTROL_R1__ = true;
+  const CUP_ID = 'nfl-cup-2026';
+  const FALLBACK = {points:[25,20,16,13,11,9,7,6,5,4,3,2,1],minPlayers:4,fullFieldSize:8,minParticipationPct:50,fieldAdjustment:true};
+  let busy = false;
+  const escape = value => String(value === undefined || value === null ? '' : value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const byId = id => document.getElementById(id);
+  const bool = v => v === true || String(v).toLowerCase() === 'true';
+  const status = g => String(g.status || '').trim().toLowerCase() === 'active' && bool(g.active) && !bool(g.lockAllPicks) ? 'LIVE' : String(g.status || 'DRAFT').toUpperCase();
+  function rulesOf(game) {
+    let p = {};
+    try {p = JSON.parse(game.placementPointsJSON || '{}') || {};} catch (_) {}
+    return Object.assign({}, FALLBACK, p, {points:Array.isArray(p.points) ? p.points : FALLBACK.points});
+  }
+  function note(message, error) {
+    const el = byId('pattcCupCtrlMessage');
+    if (el) {el.textContent = message;el.style.color = error ? '#ffb2b2' : '#a8efbc';}
+  }
+  function resultError(res) {
+    if (!res || res.success === false || res.result && res.result.success === false) return res && (res.error || res.message || res.result && (res.result.error || res.result.message)) || 'Request failed';
+    return '';
+  }
+  function refreshRow(g) {
+    const el = byId('pattcCupRowStatus_' + g.gameId);
+    if (el) el.textContent = status(g) + (g.includeInParent === false ? ' · OUT OF CUP' : ' · IN CUP');
+  }
+  function layout(games) {
+    const parent = games.find(g => g.gameId === CUP_ID);
+    if (!parent) return '';
+    const rules = rulesOf(parent);
+    const children = games.filter(g => g.parentGameId === CUP_ID && g.gameRole === 'mini');
+    const extra = games.filter(g => /^nfl-king-of-the-hill-2026$/.test(String(g.gameId || '')) && g.parentGameId !== CUP_ID);
+    return `<section id="pattcCupControlR1" class="card admin-card" style="padding:14px;margin:12px 0;border:1px solid #478aa6;background:#12283c;color:#edf6ff">
+      <style>#pattcCupControlR1 .cup-ctrl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:9px}#pattcCupControlR1 input,#pattcCupControlR1 select{width:100%;min-width:0;box-sizing:border-box;background:#091c2f;color:#fff;border:1px solid #547189;border-radius:7px;padding:9px;font-size:14px}#pattcCupControlR1 .cup-ctrl-row{padding:10px 0;border-bottom:1px solid #365268}#pattcCupControlR1 button{cursor:pointer;min-height:36px;margin:3px;padding:7px 10px;border:1px solid #6084a5;border-radius:7px;background:#183d5b;color:#fff}#pattcCupControlR1 button:disabled{opacity:.5;cursor:not-allowed}#pattcCupControlR1 .cup-ctrl-primary{background:#e7b335;color:#071829;border-color:#e7b335;font-weight:bold}#pattcCupControlR1 label{display:block;margin:4px 0;color:#bcd9e9;font-size:12px}#pattcCupControlR1 summary{font-weight:750;cursor:pointer;padding:7px 0}#pattcCupControlR1 .cup-ctrl-muted{color:#b1c7d7;font-size:12px}</style>
+      <h2 style="margin:0 0 5px">🏆 NFL Cup · Control Center</h2><p class="cup-ctrl-muted">Manage participation, weights, Cup scoring, and individual game release. Each save is independent; nothing goes Live automatically.</p>
+      <p style="font-size:13px"><b>Cup:</b> ${escape(status(parent))} · <b>Connected mini-games:</b> ${children.length} · <b>Counted:</b> ${children.filter(g=>g.includeInParent!==false).length}</p>
+      <details open><summary>1 · Mini-games, weights &amp; launch</summary>
+      ${children.map(g => `<div class="cup-ctrl-row"><b>${escape(g.name || g.gameId)}</b><div class="cup-ctrl-muted" id="pattcCupRowStatus_${escape(g.gameId)}">${escape(status(g))} · ${g.includeInParent === false ? 'OUT OF CUP' : 'IN CUP'}</div>
+        <div class="cup-ctrl-grid"><div><label for="pattcCupWeight_${escape(g.gameId)}">Cup weight</label><input id="pattcCupWeight_${escape(g.gameId)}" type="number" min="0" max="10" step="0.05" value="${escape(g.parentContributionWeight == null ? 1 : g.parentContributionWeight)}"></div>
+        <div><label for="pattcCupInclude_${escape(g.gameId)}">Cup contribution</label><select id="pattcCupInclude_${escape(g.gameId)}"><option value="false" ${g.includeInParent === false ? 'selected' : ''}>Off · excluded</option><option value="true" ${g.includeInParent === false ? '' : 'selected'}>On · count</option></select></div></div>
+        <div><button type="button" onclick="pattcCupSaveChildR1_('${escape(g.gameId)}')">Save Cup settings</button><button type="button" onclick="pattcCupCheckR1_('${escape(g.gameId)}')">Run Check</button><button type="button" onclick="pattcCupHoldR1_('${escape(g.gameId)}')">Put on hold</button><button type="button" class="cup-ctrl-primary" onclick="pattcCupLiveR1_('${escape(g.gameId)}')">Publish Live</button></div>
+        <small class="cup-ctrl-muted">Publish Live requires the game's preflight and your confirmation. On Hold locks new picks and removes Cup points, without deleting results.</small></div>`).join('')}
+      ${extra.map(g=>`<div class="cup-ctrl-row"><b>${escape(g.name)}</b> <span class="cup-ctrl-muted">Separate game · not linked to Cup · in development</span><button type="button" onclick="navigate('admin-game-setup:${escape(g.gameId)}')">Open setup</button></div>`).join('')}
+      </details><details><summary>2 · Cup points &amp; field protection</summary>
+        <div class="cup-ctrl-grid"><div><label for="pattcCupPoints">Placement points · comma separated</label><input id="pattcCupPoints" value="${escape(rules.points.join(','))}"></div><div><label for="pattcCupBest">Best mini-games (0 = all)</label><input id="pattcCupBest" type="number" min="0" max="100" step="1" value="${escape(parent.parentBestCount || 0)}"></div>
+        <div><label for="pattcCupMin">Minimum entrants</label><input id="pattcCupMin" type="number" min="1" step="1" value="${escape(rules.minPlayers)}"></div><div><label for="pattcCupFull">Full field size</label><input id="pattcCupFull" type="number" min="1" step="1" value="${escape(rules.fullFieldSize)}"></div><div><label for="pattcCupPct">Minimum field participation %</label><input id="pattcCupPct" type="number" min="0" max="100" step="1" value="${escape(rules.minParticipationPct)}"></div><div><label for="pattcCupAdjust">Smaller-field adjustment</label><select id="pattcCupAdjust"><option value="true" ${rules.fieldAdjustment !== false ? 'selected' : ''}>Enabled</option><option value="false" ${rules.fieldAdjustment === false ? 'selected' : ''}>Disabled</option></select></div></div>
+        <p class="cup-ctrl-muted">Qualifying field → placement points × field multiplier × mini-game weight. Changing published scoring rules can change existing Cup standings.</p><button type="button" class="cup-ctrl-primary" onclick="pattcCupSaveRulesR1_()">Save Cup scoring rules</button>
+      </details><details><summary>3 · Cup publication</summary><p class="cup-ctrl-muted">The Cup is a leaderboard-only parent; mini-games must be published separately. Leave incomplete games on hold.</p><button type="button" onclick="pattcCupCheckR1_('${CUP_ID}')">Run Cup Check</button><button type="button" class="cup-ctrl-primary" onclick="pattcCupLiveR1_('${CUP_ID}')">Publish Cup Live</button></details>
+      <div id="pattcCupCtrlMessage" role="status" aria-live="polite" style="min-height:20px;margin-top:8px;color:#a8efbc;font-size:13px">Saved changes appear after reloading Manage Games.</div></section>`;
+  }
+  async function latest(gameId) {
+    const r = await apiAdminGetGames();
+    if (resultError(r)) throw Error(resultError(r));
+    const g = (r.games || []).find(x => x.gameId === gameId);
+    if (!g) throw Error('Game no longer exists: ' + gameId);
+    return g;
+  }
+  async function write(payload) {
+    const r = await apiAdminUpdateGame(payload);
+    if (resultError(r)) throw Error(resultError(r));
+    return latest(payload.gameId);
+  }
+  async function operation(label, fn) {
+    if (busy) return;
+    busy = true;
+    const root = byId('pattcCupControlR1');
+    if (root) root.querySelectorAll('button').forEach(button => {button.disabled = true;});
+    note(label + '…');
+    try { await fn(); } catch (err) {note(err && err.message || String(err), true);} finally {
+      busy = false;
+      if (root) root.querySelectorAll('button').forEach(button => {button.disabled = false;});
+    }
+  }
+  root.pattcCupSaveRulesR1_ = function () {return operation('Saving Cup scoring rules', async function () {
+    const parent = await latest(CUP_ID);
+    const raw = String(byId('pattcCupPoints').value || '').trim();
+    const tokens = raw.split(',').map(x => x.trim());
+    const points = tokens.map(Number);
+    if (!raw || tokens.some(x => !x) || points.length > 100 || points.some(x => !Number.isFinite(x) || x < 0)) throw Error('Enter 1–100 non-negative placement points separated by commas.');
+    const whole = (id, minimum, maximum) => {
+      const rawNumber = String(byId(id).value || '').trim(), n = Number(rawNumber);
+      if (!rawNumber || !Number.isInteger(n) || n < minimum || n > maximum) throw Error(id + ': enter a whole number between ' + minimum + ' and ' + maximum + '.');
+      return n;
+    };
+    const best = whole('pattcCupBest',0,100), min = whole('pattcCupMin',1,1000), full = whole('pattcCupFull',1,1000), percent = whole('pattcCupPct',0,100);
+    if (full < min) throw Error('Full field size cannot be smaller than minimum entrants.');
+    let current = {};
+    try {current = JSON.parse(parent.placementPointsJSON || '{}');} catch (_) {throw Error('Existing Cup scoring JSON is invalid. Repair it in Cup Setup before saving.');}
+    if (!current || Array.isArray(current) || typeof current !== 'object') throw Error('Existing Cup scoring must be a JSON object.');
+    const next = Object.assign({},current,{points:points,minPlayers:min,fullFieldSize:full,minParticipationPct:percent,fieldAdjustment:byId('pattcCupAdjust').value === 'true'});
+    if (String(parent.status || '').toLowerCase() === 'active' && !root.confirm('Changing LIVE Cup rules can recalculate standings. Save these changes?')) return;
+    const saved = await write({gameId:CUP_ID,placementPointsJSON:JSON.stringify(next),parentBestCount:best});
+    if (Number(saved.parentBestCount) !== best || String(saved.placementPointsJSON) !== JSON.stringify(next)) throw Error('Scoring save not verified. Reload and check Cup Setup.');
+    note('Cup scoring rules saved and verified.');
+  });};
+  root.pattcCupSaveChildR1_ = function (gameId) {return operation('Saving mini-game settings', async function () {
+    const g = await latest(gameId);
+    if (g.parentGameId !== CUP_ID) throw Error('Game is not linked to this Cup.');
+    const weight = Number(byId('pattcCupWeight_' + gameId).value);
+    const include = byId('pattcCupInclude_' + gameId).value === 'true';
+    if (!Number.isFinite(weight) || weight < 0 || weight > 10) throw Error('Cup weight must be between 0 and 10.');
+    if (include && status(g) !== 'LIVE') throw Error('Publish the mini-game Live before including it in Cup scoring.');
+    if ((g.includeInParent !== include || Number(g.parentContributionWeight || 0) !== weight) && !root.confirm('Change Cup contribution or weight for ' + g.name + '? This can recalculate standings.')) return;
+    const saved = await write({gameId:gameId,includeInParent:include,parentContributionWeight:weight});
+    if (saved.includeInParent !== include || Number(saved.parentContributionWeight) !== weight) throw Error('Save was not verified. Reload and check settings.');
+    refreshRow(saved);
+    note(g.name + ': Cup settings saved and verified.');
+  });};
+  root.pattcCupHoldR1_ = function (gameId) {return operation('Holding mini-game', async function () {
+    const g = await latest(gameId);
+    if (g.parentGameId !== CUP_ID) throw Error('Game is not linked to this Cup.');
+    if (!root.confirm('Put ' + g.name + ' on hold? New picks will lock; this game will stop contributing to Cup standings. Existing picks stay stored.')) return;
+    const saved = await write({gameId:gameId,status:'Draft',active:false,lockAllPicks:true,defaultGame:false,includeInParent:false});
+    if (bool(saved.active) || !bool(saved.lockAllPicks) || saved.includeInParent !== false) throw Error('Hold was not verified; inspect the game in Admin.');
+    byId('pattcCupInclude_' + gameId).value = 'false';refreshRow(saved);note(g.name + ': on hold, new picks locked, excluded from Cup.');
+  });};
+  root.pattcCupCheckR1_ = function (gameId) {return operation('Running preflight', async function () {
+    const r = await apiAdminRunGamePreflight(gameId);
+    if (resultError(r)) throw Error(resultError(r));
+    const errors = Number(r.errorCount || 0), warnings = Number(r.warningCount || 0);
+    const detail = Array.isArray(r.issues) ? r.issues.slice(0,4).map(x=>x.message).filter(Boolean).join(' · ') : '';
+    note(gameId + ': ' + errors + ' error(s), ' + warnings + ' warning(s). ' + detail, errors > 0);
+  });};
+  root.pattcCupLiveR1_ = function (gameId) {return operation('Checking launch readiness', async function () {
+    const g = await latest(gameId);
+    if (gameId !== CUP_ID && g.parentGameId !== CUP_ID) throw Error('Game is not linked to this Cup.');
+    const check = await apiAdminRunGamePreflight(gameId);
+    if (resultError(check)) throw Error(resultError(check));
+    const errors = Number(check.errorCount || 0), warnings = Number(check.warningCount || 0);
+    if (errors > 0) throw Error(g.name + ' has ' + errors + ' preflight error(s). Open its settings and repair these before publishing.');
+    const warningText = Array.isArray(check.issues) ? check.issues.filter(x=>x.severity === 'warning').map(x=>x.message).join('\n') : '';
+    const question = 'Publish ' + g.name + ' LIVE and unlock game-wide picks?\n' + warnings + ' preflight warning(s).\n' + warningText + '\n\nConfirm the current-week schedule and game rules yourself before publishing. Do not reopen started matchups.';
+    if (!root.confirm(question)) {note('Publication cancelled. No game state changed.');return;}
+    const res = await apiAdminFinalizeGamePublication({gameId:gameId,defaultGame:false,lockAllPicks:gameId === CUP_ID,warningsApproved:warnings > 0});
+    if (resultError(res) || res.activated !== true) throw Error(resultError(res) || res.message || 'Publication was not confirmed.');
+    let saved = await latest(gameId);
+    if (!bool(saved.active) || String(saved.status).toLowerCase() !== 'active') throw Error('Live state could not be verified; check game settings.');
+    if (gameId !== CUP_ID && g.includeInParent === false) {
+      // Inclusion is a separate, explicit action: publication does not automatically award Cup points.
+      note(g.name + ' published LIVE. Cup contribution remains OFF; enable it and Save Cup settings when ready.');
+    } else note(g.name + ' published LIVE and verified.');
+    refreshRow(saved);
+  });};
+  const BASE = root.renderAdminGamesPage;
+  if (typeof BASE === 'function') root.renderAdminGamesPage = async function () {
+    const [html, response] = await Promise.all([BASE(), apiAdminGetGames()]);
+    if (resultError(response)) return String(html);
+    const card = layout(response.games || []);
+    if (!card) return String(html);
+    const markup = String(html);
+    const old = markup.indexOf('id="nflCupFuturesBuildButton"');
+    if (old >= 0) {const end = markup.indexOf('</section>', old);if (end >= 0) return markup.slice(0,end+10)+card+markup.slice(end+10);}
+    const start = markup.indexOf('<div class="page');
+    if (start < 0) return card+markup;
+    const tagEnd = markup.indexOf('>', start);
+    return markup.slice(0, tagEnd+1) + card + markup.slice(tagEnd+1);
+  };
+})(window);
