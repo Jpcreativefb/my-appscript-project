@@ -1,0 +1,50 @@
+'use strict';
+const fs=require('fs'),assert=require('assert'),vm=require('vm');
+const read=p=>fs.readFileSync(p,'utf8');
+const helper=read('backend/engines/NflCupWeeklySeasonR2Engine.js'),hybrid=read('backend/engines/HybridGameEngine.js'),admin=read('frontend/js/pages/adminGamesRc24e.js');
+assert(hybrid.includes('cupR2WeeklyAwards_(parentGame,child,cupR2Mode,seasonCupRules)'));
+assert(hybrid.includes('if (!cupR2Mode.seasonEnabled || !cupR2Mode.seasonFinalized) return;'));
+assert(hybrid.includes('Best-N is by WHOLE mini-game'));
+assert(hybrid.includes('cupR2Mode ? cupR2Mode.seasonWeight'));
+assert(hybrid.includes('cupR2FantasySeasonRows_(child.gameId)'));
+assert(admin.includes('PATTC NFL CUP R2 admin extension'));
+assert(read('frontend/js/app.js')===read('frontend/app.js'));
+assert(read('frontend/app.html').includes('cupControl=v1221-nfl-cup-weekly-season-r2'));
+const context={console};vm.createContext(context);vm.runInContext(helper,context);
+const c=context,child={gameId:'nfl-confidence-2026',name:'NFL Confidence'},fantasy={gameId:'league-of-fantasy-champions-2026',name:'Team Fantasy'};
+const parent={gameId:'nfl-cup-2026',placementPointsJSON:JSON.stringify({points:[25,20,16],weeklySeasonR2:{enabled:true,games:{'nfl-confidence-2026':{weeklyEnabled:true,seasonEnabled:true,weeklyWeight:1.5,seasonWeight:2,weeklyPoints:[5,3,1],finalizedWeeks:[3],bestWeeklyCount:0,seasonFinalized:false},'league-of-fantasy-champions-2026':{weeklyEnabled:true,seasonEnabled:true,weeklyWeight:1,seasonWeight:2,weeklyPoints:[5,3,1],finalizedWeeks:[3],seasonFinalized:false}}}})};
+assert(c.cupR2ParentEnabled_(parent));assert(!c.cupR2ParentEnabled_({gameId:'nfl-cup-2026',placementPointsJSON:'{}'}));
+let cfg=c.cupR2Config_(parent,child);assert(cfg&&cfg.weeklyEnabled&&!cfg.seasonFinalized);assert(!c.cupR2Config_(parent,{gameId:'nfl-futures-2026'}));
+const rules={minPlayers:2,fullFieldSize:2,minParticipationPct:50,fieldAdjustment:true};
+let selected={categories:[{id:'m1',section:'NFL Week 3'},{id:'m2',section:'NFL Week 3'},{id:'m3',section:'NFL Week 4'}],settings:{m1:{winnerNomineeId:'A'},m2:{winnerNomineeId:''}},picks:{Mike:{m1:{nomineeId:'A',confidencePoints:9},m2:{nomineeId:'B',confidencePoints:2}},Sara:{m1:{nomineeId:'B',confidencePoints:4},m2:{nomineeId:'A',confidencePoints:8}}}};
+assert.strictEqual(c.cupR2AwardsForWeek_(child,3,cfg,rules,selected).length,0,'no early weekly points on unresolved matchup');
+selected.settings.m2.winnerNomineeId='B';
+let rows=c.cupR2AwardsForWeek_(child,3,cfg,rules,selected);assert.strictEqual(rows.length,2);assert.strictEqual(rows[0].username,'Mike');assert.strictEqual(rows[0].rawScore,11);assert.strictEqual(rows[0].contribution,7.5);assert.strictEqual(rows[0].weeklyWin,true);assert.strictEqual(rows[1].rawScore,0);assert.strictEqual(rows[1].contribution,4.5);
+selected.picks.Sara.m1.nomineeId='A';selected.picks.Sara.m1.confidencePoints=3;selected.picks.Sara.m2.nomineeId='B';selected.picks.Sara.m2.confidencePoints=8;
+rows=c.cupR2AwardsForWeek_(child,3,cfg,rules,selected);assert.strictEqual(rows[0].placementRank,1);assert.strictEqual(rows[1].placementRank,1);assert.strictEqual(rows[0].weeklyWin,true);assert.strictEqual(rows[1].weeklyWin,true);
+assert.strictEqual(c.cupR2AwardsForWeek_(child,4,cfg,rules,selected).length,0,'no categories in week 4 with final result');
+let snapshot={success:true,settled:true,rows:[{username:'Mike',score:70,participated:true,dnp:false,final:true},{username:'Mike',score:20,participated:true,dnp:false,final:true},{username:'Sara',score:81,participated:true,dnp:false,final:true}]};
+let fcfg=c.cupR2Config_(parent,fantasy);
+context.teamFantasyBuildStandings_=()=>({success:true,rows:[{username:'Mike',fantasyPoints:70},{username:'Mike',fantasyPoints:20},{username:'Sara',fantasyPoints:81}]});
+const season=c.cupR2FantasySeasonRows_('league-of-fantasy-champions-2026');assert.strictEqual(season.length,2);assert.strictEqual(season[0].username,'Mike');assert.strictEqual(season[0].total,90);
+rows=c.cupR2AwardsForWeek_(fantasy,3,fcfg,rules,{snapshot});assert.strictEqual(rows.length,2);assert.strictEqual(rows[0].username,'Mike');assert.strictEqual(rows[0].rawScore,90);assert.strictEqual(rows[0].weeklyWin,true);
+snapshot.settled=false;assert.strictEqual(c.cupR2AwardsForWeek_(fantasy,3,fcfg,rules,{snapshot}).length,0);
+assert.strictEqual(c.cupR2AwardsForWeek_(fantasy,3,fcfg,{minPlayers:4,fullFieldSize:8,minParticipationPct:50,fieldAdjustment:true},{snapshot:Object.assign({},snapshot,{settled:true})}).length,0);
+const elements={},writes=[];
+function put(id,value,checked){elements[id]={value:value===undefined?'':String(value),checked:!!checked,disabled:false,textContent:''};}
+put('cupR2Save');put('cupR2Message');
+for(const name of ['confidence','fantasy']){
+ put('cupR2_'+name+'_weekly','',true);put('cupR2_'+name+'_season','',true);put('cupR2_'+name+'_weeklyWeight','1');put('cupR2_'+name+'_seasonWeight','2');put('cupR2_'+name+'_weeklyPoints','5,3,1');put('cupR2_'+name+'_bestWeekly','0');put('cupR2_'+name+'_finalWeeks','3');put('cupR2_'+name+'_seasonFinal','',false);
+}
+const games=[parent,Object.assign({parentGameId:'nfl-cup-2026'},child),Object.assign({parentGameId:'nfl-cup-2026'},fantasy)];
+const front={window:{renderAdminGamesPage:async()=>'<div class="page"><details><summary>2 · Cup points &amp; field protection</summary></details></div>',confirm:()=>true},document:{getElementById:id=>elements[id]||null},apiAdminGetGames:async()=>({success:true,games}),apiAdminUpdateGame:async payload=>{writes.push(payload);Object.assign(parent,payload);return{success:true,result:{success:true}};},console};
+const section=admin.slice(admin.indexOf('/* PATTC NFL CUP R2 admin extension.'));
+vm.runInNewContext(section,front,{filename:'cup-r2-admin.js'});
+(async()=>{
+ const html=await front.window.renderAdminGamesPage();assert(html.includes('Weekly + season awards'));assert(html.includes('NFL Confidence'));assert(html.includes('Team Fantasy'));
+ await front.window.pattcCupSaveWeeklySeasonR2_();assert.strictEqual(writes.length,1);const saved=JSON.parse(parent.placementPointsJSON);
+ assert.strictEqual(saved.points[0],25,'save preserves existing Cup point scale');
+ assert.strictEqual(saved.weeklySeasonR2.games['nfl-confidence-2026'].seasonWeight,2);assert.strictEqual(saved.weeklySeasonR2.games['league-of-fantasy-champions-2026'].finalizedWeeks[0],3);
+ assert.strictEqual(elements.cupR2Message.textContent.includes('verified'),true);
+ console.log('PATTC NFL Cup Weekly + Season R2 tests: PASS');
+})().catch(e=>{console.error(e);process.exitCode=1});

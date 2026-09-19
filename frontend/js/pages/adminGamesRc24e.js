@@ -2968,3 +2968,82 @@ if(typeof BASE==='function'){root.renderAdminGamesPage=async function(){
     return markup.slice(0, tagEnd+1) + card + markup.slice(tagEnd+1);
   };
 })(window);
+
+/* PATTC NFL CUP R2 admin extension. Adds weekly + season weights to the R1 Control Center.
+ * All controls use the existing adminSaveGame API and preserve unrelated Cup JSON fields.
+ */
+(function(root){
+ 'use strict';
+ if(root.__PATTC_CUP_WEEKLY_SEASON_R2__) return;
+ root.__PATTC_CUP_WEEKLY_SEASON_R2__=true;
+ var CUP='nfl-cup-2026', GAME_IDS=['nfl-confidence-2026','league-of-fantasy-champions-2026'];
+ var defaults={weeklyEnabled:true,seasonEnabled:true,weeklyWeight:1,seasonWeight:2,weeklyPoints:[5,3,1],bestWeeklyCount:0,finalizedWeeks:[],seasonFinalized:false};
+ function el(id){return document.getElementById(id);}
+ function esc(v){return String(v===undefined||v===null?'':v).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+ function data(g){try{var v=JSON.parse(g.placementPointsJSON||'{}');return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}catch(e){return {};}}
+ function options(parent,id){var top=data(parent).weeklySeasonR2||{};return Object.assign({},defaults,top.games&&top.games[id]||{});}
+ function field(id,label,value,type){return '<div><label for="cupR2_'+id+'">'+esc(label)+'</label><input id="cupR2_'+id+'" type="'+(type||'text')+'" value="'+esc(value)+'" style="width:100%;box-sizing:border-box;min-height:34px;background:#091c2f;border:1px solid #547189;border-radius:6px;color:white;padding:6px"></div>';}
+ function control(parent,g){var id=g.gameId, isFantasy=id===GAME_IDS[1],s=options(parent,id);
+  var prefix=isFantasy?'fantasy':'confidence';
+  return '<details class="cup-ctrl-row" style="padding:8px 0"><summary>'+esc(g.name||id)+' · weekly and season awards</summary><div style="padding:8px 0">'+
+   '<label><input style="width:auto!important;min-width:0!important" type="checkbox" id="cupR2_'+prefix+'_weekly" '+(s.weeklyEnabled?'checked':'')+'> Award weekly Cup points</label>'+
+   '<label><input style="width:auto!important;min-width:0!important" type="checkbox" id="cupR2_'+prefix+'_season" '+(s.seasonEnabled?'checked':'')+'> Award final season Cup points</label>'+
+   '<div class="cup-ctrl-grid">'+field(prefix+'_weeklyWeight','Weekly award weight',s.weeklyWeight,'number')+
+    field(prefix+'_seasonWeight','Final season weight',s.seasonWeight,'number')+
+    field(prefix+'_weeklyPoints','Weekly placement points',s.weeklyPoints.join(','))+
+    field(prefix+'_bestWeekly','Best weekly results (0 = all)',s.bestWeeklyCount,'number')+
+    field(prefix+'_finalWeeks','Completed weeks, comma separated',s.finalizedWeeks.join(','))+'</div>'+
+   '<label><input style="width:auto!important;min-width:0!important" type="checkbox" id="cupR2_'+prefix+'_seasonFinal" '+(s.seasonFinalized?'checked':'')+'> Season officially completed; award season placement points</label>'+
+   '<p class="cup-ctrl-muted">Mark weeks completed only after ALL matchups or lineup scores have settled. Unresolved weeks cannot earn Cup points even if listed. The full season award is not counted until you mark the season completed. Existing weekly scores and picks are never changed.</p></div></details>';
+ }
+ function widget(parent,games){
+   var children=GAME_IDS.map(function(id){return games.find(function(g){return g.gameId===id && g.parentGameId===CUP;});}).filter(Boolean);
+   if(children.length!==2)return '';
+   return '<details id="pattcCupWeeklySeasonR2" style="padding:8px 0;border-bottom:1px solid #365268"><summary>2 · Weekly + season awards (Confidence / Fantasy)</summary><p class="cup-ctrl-muted">Weekly wins and final season standings earn separate Cup awards. Each game has independent weights. Weekly placement points and minimum entrants use the Cup field protection rules above.</p>'+
+   children.map(function(g){return control(parent,g);}).join('')+
+   '<button type="button" id="cupR2Save" class="cup-ctrl-primary" onclick="pattcCupSaveWeeklySeasonR2_()">Save weekly + season awards</button><div id="cupR2Message" role="status" aria-live="polite" class="cup-ctrl-muted"></div></details>';
+ }
+ function readGame(prefix,old){
+   function number(key,min,max,integer){var raw=String(el('cupR2_'+prefix+'_'+key).value||'').trim(),n=Number(raw);if(!raw||!Number.isFinite(n)||n<min||n>max||(integer&&!Number.isInteger(n)))throw Error(prefix+': '+key+' must be '+min+'–'+max+'.');return n;}
+   var raw=String(el('cupR2_'+prefix+'_weeklyPoints').value||'').trim(),parts=raw.split(',').map(function(s){return s.trim();}),points=parts.map(Number);
+   if(!raw||parts.length>30||parts.some(function(s){return !s;})||points.some(function(n){return !Number.isFinite(n)||n<0||n>10000;}))throw Error(prefix+': enter 1–30 non-negative weekly placement points.');
+   var weeksText=String(el('cupR2_'+prefix+'_finalWeeks').value||'').trim();
+   var tokens=weeksText?weeksText.split(',').map(function(s){return s.trim();}):[];var weeks=tokens.map(Number);
+   if(tokens.some(function(t,i){return !t || !Number.isInteger(weeks[i]) || weeks[i]<1 || weeks[i]>22;}))throw Error(prefix+': completed weeks must be whole numbers between 1 and 22.');
+   return Object.assign({},old,{
+     weeklyEnabled:el('cupR2_'+prefix+'_weekly').checked,seasonEnabled:el('cupR2_'+prefix+'_season').checked,
+     weeklyWeight:number('weeklyWeight',0,10,false),seasonWeight:number('seasonWeight',0,10,false),
+     weeklyPoints:points,bestWeeklyCount:number('bestWeekly',0,22,true),finalizedWeeks:Array.from(new Set(weeks)).sort(function(a,b){return a-b;}),
+     seasonFinalized:el('cupR2_'+prefix+'_seasonFinal').checked
+   });
+ }
+ root.pattcCupSaveWeeklySeasonR2_=async function(){
+  var btn=el('cupR2Save'),message=el('cupR2Message');if(!btn||btn.disabled)return;
+  btn.disabled=true;if(message)message.textContent='Saving weekly + season scoring…';
+  try{
+   var response=await apiAdminGetGames();if(!response||response.success===false)throw Error(response&&response.error||'Could not read Cup settings.');
+   var parent=(response.games||[]).find(function(g){return g.gameId===CUP;});if(!parent)throw Error('NFL Cup not found.');
+   var current=data(parent),top=current.weeklySeasonR2||{},games=Object.assign({},top.games||{});
+   games[GAME_IDS[0]]=readGame('confidence',games[GAME_IDS[0]]||{});
+   games[GAME_IDS[1]]=readGame('fantasy',games[GAME_IDS[1]]||{});
+   var changedFinalization=GAME_IDS.some(function(id){var before=top.games&&top.games[id]||{};return JSON.stringify(before.finalizedWeeks||[])!==JSON.stringify(games[id].finalizedWeeks)||before.seasonFinalized!==games[id].seasonFinalized;});
+   if(changedFinalization&&!root.confirm('Confirm that the listed weeks or season have been completed. Only resolved results will earn Cup points. Continue?')){if(message)message.textContent='No changes saved.';return;}
+   if(String(parent.status||'').toLowerCase()==='active'&&!root.confirm('This Cup is LIVE. New weights, weekly awards, or completed weeks may recalculate Cup standings. Save?')){if(message)message.textContent='No changes saved.';return;}
+   var next=Object.assign({},current,{weeklySeasonR2:Object.assign({},top,{enabled:true,games:games})});
+   var saved=await apiAdminUpdateGame({gameId:CUP,placementPointsJSON:JSON.stringify(next)});
+   if(!saved||saved.success===false||(saved.result&&saved.result.success===false))throw Error(saved&& (saved.error||saved.message)||'Save failed.');
+   var verified=await apiAdminGetGames();var got=(verified.games||[]).find(function(g){return g.gameId===CUP;});
+   if(!got||JSON.stringify(data(got).weeklySeasonR2)!==JSON.stringify(next.weeklySeasonR2))throw Error('Save could not be verified; reload Cup Admin before changing more settings.');
+   if(message)message.textContent='Weekly and season settings saved and verified. Reload Manage Games for current standings.';
+  }catch(e){if(message)message.textContent=e.message||String(e);}finally{btn.disabled=false;}
+ };
+ var BASE=root.renderAdminGamesPage;
+ if(typeof BASE==='function')root.renderAdminGamesPage=async function(){
+   var html=String(await BASE());var response=await apiAdminGetGames();if(!response||response.success===false)return html;
+   var games=response.games||[],parent=games.find(function(g){return g.gameId===CUP;});if(!parent)return html;
+   var markup=widget(parent,games);if(!markup)return html;
+   var needle='<details><summary>2 · Cup points &amp; field protection</summary>';
+   var pos=html.indexOf(needle);if(pos<0)return html;
+   return html.slice(0,pos)+markup+html.slice(pos).replace(needle,'<details><summary>3 · Cup points &amp; field protection</summary>').replace('<details><summary>3 · Cup publication</summary>','<details><summary>4 · Cup publication</summary>');
+ };
+})(window);

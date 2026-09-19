@@ -826,12 +826,27 @@ function rollupParentLeaderboard_(
 
   children.forEach(function(child) {
 
+    // R2: weekly results count independently; season award is reserved for confirmed final season.
+    const cupR2Mode = typeof cupR2Config_ === 'function' ? cupR2Config_(parentGame,child) : null;
+    if (cupR2Mode) {
+      if (typeof cupR2WeeklyAwards_ === 'function') {
+        cupR2WeeklyAwards_(parentGame,child,cupR2Mode,seasonCupRules).forEach(function(award) {
+          const target=ensureUser(award);
+          if(target) target.miniGameContributions.push(award);
+        });
+      }
+      if (!cupR2Mode.seasonEnabled || !cupR2Mode.seasonFinalized) return;
+    }
+
     // NFL_CUP_FUTURES_R1_CUP_ADAPTER: no provisional Futures Cup awards.
     if (/^nfl-futures-2026$/.test(String(child.gameId || "")) &&
         typeof nflCupFuturesSettledForCup_ === "function" &&
         !nflCupFuturesSettledForCup_(child.gameId)) return;
 
-    const childRows = String(child.type || "").toLowerCase() === "team-fantasy" &&
+    const childRows = cupR2Mode && cupR2Mode.id === 'league-of-fantasy-champions-2026' &&
+      typeof cupR2FantasySeasonRows_ === 'function'
+      ? cupR2FantasySeasonRows_(child.gameId)
+      : String(child.type || "").toLowerCase() === "team-fantasy" &&
       typeof nflCupTeamFantasyLeaderboard_ === "function"
       ? nflCupTeamFantasyLeaderboard_(child.gameId)
       : getLeaderboardData(
@@ -901,7 +916,7 @@ function rollupParentLeaderboard_(
         child.parentContributionMode ||
         "add-points";
 
-      const weight =
+      const weight = cupR2Mode ? cupR2Mode.seasonWeight :
         hybridNumber_(
           child.parentContributionWeight,
           1
@@ -953,7 +968,9 @@ function rollupParentLeaderboard_(
 
       target.miniGameContributions.push({
         gameId: child.gameId,
-        gameName: child.name,
+        gameName: cupR2Mode ? child.name + ' · Final season' : child.name,
+        component: cupR2Mode ? 'season' : 'game',
+        week: 0,
         mode: mode,
         placementRank:
           mode === "placement-points"
@@ -1042,7 +1059,16 @@ function rollupParentLeaderboard_(
         )
       );
 
-    if (bestCount > 0) {
+    if (bestCount > 0 && typeof cupR2ParentEnabled_ === 'function' && cupR2ParentEnabled_(parentGame)) {
+      // Best-N is by WHOLE mini-game, not by individual week; preserve weekly + season bundle.
+      const groupTotals = {};
+      contributions.forEach(function(item){
+        const id=String(item.gameId||'');
+        groupTotals[id]=(groupTotals[id]||0)+hybridNumber_(item.contribution,0);
+      });
+      const topIds=Object.keys(groupTotals).sort(function(a,b){return groupTotals[b]-groupTotals[a]||a.localeCompare(b);}).slice(0,bestCount);
+      contributions=contributions.filter(function(item){return topIds.indexOf(String(item.gameId||''))!==-1;});
+    } else if (bestCount > 0) {
       contributions = contributions
         .sort(function(a, b) {
           return b.contribution - a.contribution;

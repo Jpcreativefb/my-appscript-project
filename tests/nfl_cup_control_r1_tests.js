@@ -2,8 +2,8 @@
 const assert=require('assert'),fs=require('fs'),vm=require('vm');
 const src=fs.readFileSync('frontend/js/pages/adminGamesRc24e.js','utf8');
 assert(src.includes('PATTC NFL Cup Admin Control Center R1'));
-for(const f of ['frontend/js/app.js','frontend/app.js'])assert(fs.readFileSync(f,'utf8').includes('v1220-nfl-cup-control-r1'));
-assert(fs.readFileSync('frontend/app.html','utf8').includes('cupControl=v1220-nfl-cup-control-r1'));
+for(const f of ['frontend/js/app.js','frontend/app.js'])assert(fs.readFileSync(f,'utf8').includes('v1221-nfl-cup-weekly-season-r2'));
+assert(fs.readFileSync('frontend/app.html','utf8').includes('cupControl=v1221-nfl-cup-weekly-season-r2'));
 const section=src.slice(src.indexOf('/* PATTC NFL Cup Admin Control Center R1;'));
 const sourceGames=[{gameId:'nfl-cup-2026',name:'NFL Cup',type:'season-cup',status:'Draft',active:false,lockAllPicks:false,gameRole:'parent',parentBestCount:0,placementPointsJSON:'{"points":[25,20,16,13,11,9,7,6,5,4,3,2,1],"minPlayers":4,"fullFieldSize":8,"minParticipationPct":50,"fieldAdjustment":true}'},{gameId:'nfl-futures-2026',name:'NFL Futures',parentGameId:'nfl-cup-2026',gameRole:'mini',status:'Draft',active:false,lockAllPicks:true,includeInParent:false,parentContributionWeight:1},{gameId:'nfl-confidence-2026',name:'NFL Confidence',parentGameId:'nfl-cup-2026',gameRole:'mini',status:'Preview',active:true,lockAllPicks:true,includeInParent:true,parentContributionWeight:1}];
 const elements={},writes=[],publishes=[];
