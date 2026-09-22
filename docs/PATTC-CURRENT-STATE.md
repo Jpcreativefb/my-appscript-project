@@ -1,352 +1,69 @@
 # PATTC Predicts — Current Project State
 
-**Purpose:** This is the canonical continuation record for PATTC Predicts. Read this file before starting or resuming work. Update it after meaningful checkpoints, integrations, deploys, or priority changes.
+**Updated:** September 21, 2026  
+**Canonical location:** `docs/PATTC-CURRENT-STATE.md` on branch `coordination/pattc-current-state`  
+**Status:** Football launch stabilization; Visual Studio paused. This checkpoint supersedes the older September 15 Director status, preserved in Git history.
 
-**Coordination branch:** `coordination/pattc-current-state`
+## New-chat instruction
 
-**Last updated:** 2026-09-15
+> Continue PATTC. Read `docs/PATTC-CURRENT-STATE.md` on branch `coordination/pattc-current-state`; verify the current checkpoint and continue from NEXT ACTION. Do not restart completed features or ask me to reconstruct prior history.
 
----
+This is a handoff/documentation branch, not a deployable application branch.
 
-## How to Resume in a New Chat
+## Verified and reported checkpoints
 
-Use this exact instruction:
+- Production GitHub branch `architecture-cleanup` was verified September 21 at `252054398698ccf83cd77794e4105e7e9dc31cdb`. Last owner-reported main Apps Script production deployment: version **401**; deployment state should be rechecked before any release.
+- Football preview Git branch `preview/football-recovery-r3-20260917` and owner-reported Cloudflare deployment: commit **123ea46**, URL `https://9f4149c8.my-appscript-project.pages.dev`.
+- The owner’s `clasp deployments` output showed existing main Apps Script deployment version **405**, `PATTC NFL Confidence Weekly R1 Preview - 123ea46`. Versions 401 and 405 use the SAME main Apps Script project; distinct deployments do not necessarily isolate Google Sheet data.
+- Source `functions/api/app.js` at `123ea46` routes ordinary Confidence API requests to the primary version-401 endpoint, and a limited set of other preview actions to version 405. A matching corrected Confidence preview route has not been confirmed deployed.
+- Main Mac football checkout was previously verified at `/Users/joel/PATTC-Football-Preview-R3`, branch `feature/nfl-confidence-weekly-r1`, commit `123ea46`, then clean. **Recheck on the actual computer before changes.**
+- Work Mac: older macOS, VS Code and GitHub-backed football checkout. Avoid toolchain upgrades or local Wrangler/workerd workflows that fail on older macOS. Source work can continue there; use Main Mac for runtime-dependent acceptance and deployments.
+- Owner moved Sports games’ planned start to **NFL Week 3** and reports no current-game player picks. An older handoff reported saved Playoff Race forecasts for the owner; inspect real records before assuming there are none or resetting anything.
 
-> Continue PATTC. Read `docs/PATTC-CURRENT-STATE.md` on branch `coordination/pattc-current-state` and continue from **NEXT ACTION**.
+## Active priorities — owner-approved order
 
-Do not make Joel reconstruct prior history unless something in this file is genuinely missing or stale.
+### 1. Home Hub startup reliability — FIRST
 
----
+On Mac and phone, the Hub intermittently shows `Could not load games — Failed to fetch`, sometimes taking approximately 45 seconds before eventually loading. **Exact failing request and root cause are not yet established.** Identify the single slow/failing request (URL/path, timing, HTTP status, upstream) and apply a targeted fix; do not undertake a broad backend rewrite or assume that cache refresh fixes the problem. Source entry points include `frontend/js/app.js` (session validation and app initialization), `functions/api/app.js` (Cloudflare/Apps Script proxy) and `backend/services/AppCache.js` (Sheet caching). These are leads, not proven causes.
 
-## Working Rules Going Forward
+### 2. Playoff Race — locked before Week 3 start
 
-PATTC has accumulated too many parallel branches, previews, handoffs, and test cycles. From this point forward use one simple release flow:
+Owner reports Playoff Race is already locked. Determine whether that refers to game-wide locks, an existing owner forecast outside an adjustment window, or a new player’s original-entry eligibility. Inspect actual saved settings, effective current week, forecast records, game status, and initial-submission/adjustment rules. Preserve historical forecasts, multipliers, and Week 4/8/12/15 checkpoint rules; do not indiscriminately unlock existing forecasts or change scoring to fix initial-entry access.
 
-**Edit → focused tests → Joel visual approval → full gate once → integrate/deploy.**
+### 3. Team Fantasy — all 32-team rankings
 
-Rules:
+Show scores/rankings for **all 32 NFL teams at all eight positions**: QB, RB, WR/TE, OL, K, DL, LB, DB, including teams nobody picked. Use completed NFL statistics and existing PATTC position scoring formulas. Missing statistics should show Pending, not invented numbers. Preserve player lineup selection, usage limits, scoring, standings and Cup contributions. Keep changes isolated to rankings/stat aggregation.
 
-- Work on **one launch target at a time**.
-- Do not require Codex to finish or ship work; Codex is an optional audit when available.
-- Do not run the full regression gate after every cosmetic adjustment.
-- Do not create a new layout generation just because one visual detail is wrong.
-- Do not use ZIP handoffs unless an external worker literally cannot access the repository/worktree.
-- Do not merge, deploy, `clasp push`, reset, clean, or delete branches without explicit approval.
-- Real browser acceptance is required before calling a player-facing UI release-ready.
-- Prefer one terminal and one worktree at a time.
-- Keep UI changes KISS: clear, compact, mobile-friendly, collapsible where useful, no unnecessary nested complexity.
-- **DON'T SIMPLIFY PATTC. CLARIFY PATTC.**
+### 4. NFL Confidence — one game, separate weeks
 
----
+`nfl-confidence-2026` is ONE season-long game with weekly matchup groups. Each week gets a fresh confidence range, picks, completion status and weekly score; season standings accumulate weekly points/correct picks. Preserve the existing game, questions, kickoff locks and past results.
 
-## Authoritative Production Baseline
+Both Week 1 and Week 2 questions exist. Week 1 was deactivated as an earlier workaround. September 21 browser diagnostic showed new weekly frontend code loaded, 16 currently available questions, all identified as Week 2. The week selector function is wired into compact slate rendering, but visible navigation and data eligibility still need acceptance. Do not recreate questions or reactivate Week 1 without checking historical effects. Candidate `123ea46` contains weekly corrections; ordinary preview requests currently point to old production backend as noted above.
 
-**Production branch:** `architecture-cleanup`
+An **R1b correction ZIP** was prepared in chat from the owner’s archive at commit `123ea46`, but installation, repository commit/push and deployment have **not** been confirmed. Do not assume it is present on either Mac or on GitHub. Verify exact working tree and package before installation. Preview and production Apps Script deployments may share the same Sheets; do not test saved picks on real player data without independently verified isolation.
 
-**Current verified production SHA:**
-`3be0fca681b988f403b7138070539f52bf96299d`
+### 5. NFL Cup and other games
 
-**Commit:** `Integrate Awards Stakes R1 and purse reserve guard`
+After Hub, Playoff Race, Team Fantasy and Confidence are ready, confirm each child game’s active/hold state, Cup weights, independent weekly vs season awards, and avoidance of double counting. Survivor was previously reported usable with Week 2 setup; reconcile with owner’s newer Week 3 start decision without inventing missed picks. NFL Futures and unverified modes remain on hold.
 
-This remains the production source baseline unless GitHub is rechecked and shown to have moved.
+## Visual Studio R3 — PAUSED, PRESERVE
 
-**Apps Script production deployment referenced during this release cycle:** version 388.
+Codex reported local branch `codex/visual-studio-completion-20260921`, commit `9913be7`, in `/Users/joel/PATTC-Visual-Studio-Completion-R3`, with 23/23 focused test suites and isolated test-backend acceptance. This local commit was not independently verified as pushed to GitHub. During owner testing, the editor unexpectedly closed or became unresponsive after a color change, and Save Section gave no visible confirmation. Edited Draft color reappeared when Studio reopened. Keep Visual Studio paused and isolated from football until owner reprioritizes it; no production layout publication or merge.
 
-Do not treat feature branches below as production until intentionally integrated.
+Older Reality TV / Awards branches and details remain preserved in the September 15 Director file in Git history. Its older Reality-first NEXT ACTION and older production baseline are superseded.
 
----
+## Working and release rules
 
-## Current Priority Order
+- One active launch target at a time: small confirmed fix → focused tests → owner visual approval → full gate once → controlled integration/deploy → smoke test.
+- Distinguish local source, GitHub commit, Cloudflare frontend, main Apps Script deployment, external Sports Engine, and Sheets data. A Git push does not deploy the rest.
+- Before changing source on either Mac, check `pwd`, branch, `git log -1 --oneline`, `git status --short`, and remote. Do not overwrite uncommitted work, reset/clean repositories, or confuse the local Visual Studio and football checkouts.
+- No changes to production deployments, live game settings, stored picks or Sheets without explicit informed approval. Preview may use production Sheets even with a different hostname or deployment version.
+- Codex is optional and Visual Studio is paused; avoid unnecessary repeat tests and Work Mac runtime-installation cycles.
+- Report verified facts, owner-reported status, and remaining uncertainties separately. Keep instructions compact and copy-pasteable.
 
-1. **Reality TV — finish browser acceptance and launch first**
-   - DWTS launch urgency.
-2. **Football launch cut — ship the usable sports core before more polish**
-   - Team Fantasy first because it is closest.
-   - Then Survivor/Confidence only to the minimum launch-ready level.
-3. **Awards**
-   - Finish launch blockers after Reality/football.
-4. **Visual Studio**
-   - Parked until the app itself is launched/stable.
+## NEXT ACTION — Home Hub on the Work Mac
 
-No new feature expansion until the current launch target is closed unless it is required to make the target usable.
-
----
-
-## Reality TV — ACTIVE / HIGHEST PRIORITY
-
-### Current Safe Checkpoint
-
-**Branch:** `work/reality-tv-polish-r2-20260915`
-
-**Commit:**
-`a6eab94de55f2a46fe77f16d1b2f0e8ceeca6a9f`
-
-**Message:** `Checkpoint Reality TV browser findings corrections - browser pending`
-
-**Parent checkpoint:**
-`6617ca598ee6085f02249ea3b18591efe9bf47ab`
-
-### Verification Status
-
-- 48/48 Reality/RTV test files PASS on Work Mac.
-- JavaScript syntax checks PASS.
-- `frontend/api.js` and `frontend/js/api.js` are byte-identical mirrors.
-- Corrected Reality source successfully compiled through Wrangler before the local Workers runtime refused to launch due OS support.
-- **Browser acceptance is still pending.**
-
-### Work Mac Environment Limitation
-
-Work Mac is macOS 11.6 / Darwin 20.6.0.
-
-Wrangler 4.50.0 can install and compile the project, but Cloudflare `workerd` refuses to run because it requires macOS 13.5+.
-
-This is an environment blocker, not a Reality source failure.
-
-Do not modify Reality source just to work around the Work Mac `workerd` limitation.
-
-### Reality R2 Corrections Already Implemented
-
-- Spoiler Shield changed from passive section appearance to compact actionable control.
-- Spoiler reveal continues to use existing privacy/reveal logic.
-- Sole Survivor scroll-collapse is now runtime-driven rather than CSS-only.
-- More Stats reduced to a subtle secondary action.
-- Contestant typography/density tightened.
-- Previous Episode duplication root cause fixed; rendering is intended to be idempotent.
-- Historical episodes retain user saved selections and actual result/eliminated details.
-- Vote Detail remains `Voter | Voted For | Round | Status | Value`.
-- Standings presentation aligned more closely to common PATTC language.
-- Reality Compare moved toward common PATTC Compare presentation.
-- Historical Compare now accepts an eligible episode ID through a narrow API/backend adapter.
-- Historical Compare preserves lock/spoiler privacy and rejects hidden/unlocked episodes before group picks are read.
-
-### Exact R2 Changed Files
-
-- `backend/Api.js`
-- `backend/engines/RealityTvSeasonEngine.js`
-- `frontend/api.js`
-- `frontend/css/picks.css`
-- `frontend/js/api.js`
-- `frontend/js/pages/picks.js`
-- `tests/reality_awards_rc16_results_ready_followup_tests.js`
-- `tests/reality_tv_player_polish_r1_tests.js`
-
-### Browser Acceptance Items Still Required
-
-Verify on a real browser/runtime:
-
-- Spoiler Shield ON/OFF visual state and action.
-- Sole Survivor expanded → compact sticky transition after scrolling → restored expanded state on scroll-back.
-- More Stats remains visually subtle.
-- Previous Episodes show exactly one entry per episode, including after refresh/navigation.
-- Previous Episode expanded content shows saved pick and actual result/eliminated contestant without large bios.
-- Standings presentation remains usable/collapsible.
-- Compare defaults to latest eligible episode and can switch to older eligible episodes.
-- Compare does not reveal other users' picks before eligible.
-- Mobile has no horizontal overflow and long names wrap correctly.
-
-### Reality Layout Lock
-
-Player order:
-
-**Hero → Spoiler Shield → Sole Survivor → Current Episode Questions → Your Season → Standings → Compare → Previous Episodes → Rules / How to Play**
-
-Do not create another Reality layout generation. Continue the existing Reality Clean/Cinematic framework in `frontend/js/pages/picks.js` and `frontend/css/picks.css`.
-
----
-
-## Awards / Staked Prediction
-
-### Production Baseline
-
-Awards Stakes R1 is already integrated in `architecture-cleanup` at `3be0fca`.
-
-### Continuation Branch
-
-**Branch:** `codex/awards-stakes-launch-readiness`
-
-**Current branch SHA:** `3be0fca681b988f403b7138070539f52bf96299d`
-
-Codex created the branch/worktree but made **no additional code changes** before hitting the usage limit.
-
-### Known Launch Blockers
-
-- Top Staked Prediction Points balance does not dynamically reflect projected balance while risk changes.
-- Confirm Pick takes roughly 10+ seconds in observed browser testing; target is approximately 1–3 seconds under normal conditions.
-- Availability semantics are wrong: `Available From/Until` should control pick/edit window, not game visibility.
-- After pick window expiry, players still need to view saved picks, wagers, results, stats, standings, compare, and rules in read-only mode.
-- Admin must always be able to edit expired availability dates.
-- Need explicit Hub Assignment control with legacy fallback when unset.
-- Need top Awards stats bar: Rank, Score, Points Behind, Statues/Categories Won, Pending Points, Available Staked Points.
-- Need common PATTC Standings and Compare.
-- Rules + How to Play should be bottom collapsibles.
-- Appearance/Image Pack remains a blocker.
-- Save failure UI currently hides backend error detail because frontend prefers only `result.message`; should surface `message || error`.
-
-### Awards Appearance / Image Pack Known Issue
-
-Observed behavior indicates Emmy images may exist as per-game overrides instead of being truly stored in the selected `Emmy2026` pack.
-
-Desired operation:
-
-**Move/Copy Game Images to Selected Image Pack**
-
-Requirements:
-
-- reuse existing Drive refs, no reupload;
-- copy active game overrides into selected pack;
-- verify each copy before clearing corresponding override;
-- keep override active if copy fails;
-- invalidate runtime cache;
-- return copied/cleared/skipped/errors.
-
-Do not revisit Awards until Reality and the football launch cut are closed unless explicitly reprioritized.
-
----
-
-## Football / Sports Launch Cut
-
-Goal is no longer to polish every sports mode simultaneously. Goal is to ship a usable football core quickly.
-
-### Team Fantasy
-
-Status: closest sports mode to launch-ready.
-
-Existing major capabilities already implemented/tested across prior releases:
-
-- 8 positions: QB, RB, WR/TE, OL, K, DL, LB, DB.
-- Manual / Random / Auto picks.
-- pre-kickoff replacement enforcement.
-- usage limits.
-- weekly H2H/all-play W-L-T.
-- two-entry support option.
-- kickoff-aware reminders.
-- durable auto-fill worker.
-- retry protections.
-- logout push privacy.
-- per-game canonical routing.
-
-Launch cut should focus only on current live correctness and UI usability, not new features.
-
-### Survivor / Sports Survivor
-
-Substantial UI/logic exists, but not production-ready.
-
-Known blocker:
-
-- real sports runtime routing mismatch where real payload previously showed `sportsMode=false` while local preview forced sports mode with synthetic matchups.
-
-**Synthetic matchup data must never be allowed into production.**
-
-Locked player structure:
-
-**Hero → Weekly Matchup Slider → Selected Team / Finalize Pick → Survivor Stats / Used Teams → Standings → Compare → Rules**
-
-No autosave; explicit Finalize.
-
-### Confidence
-
-Design direction is locked but implementation/finalization still needs work.
-
-**NO slider.** Games remain stacked vertically.
-
-Locked player order:
-
-**Hero → Player Stats → Active/Upcoming stacked matchups → Locked/Finished matchups → Standings → Compare → Rules → How to Play**
-
-Do not redesign before the football launch cut decision is made.
-
----
-
-## Visual Studio R3 — PARKED
-
-**Branch:** `kent/owner-visual-studio-r3-local-20260914`
-
-**Committed checkpoint:**
-`6659372d021385747d45f3b573ae96cba4ff51e6`
-
-**Message:** `Checkpoint Owner Visual Studio R3 responsive controls`
-
-The committed R3 checkpoint is safely on GitHub.
-
-MainMac historically still had additional uncommitted/untracked Visual Studio-related files outside the checkpoint. Do not clean/reset/delete that MainMac tree casually.
-
-Browser acceptance for R3 was blocked by local proxy/upstream problems and is not a current launch priority.
-
-Do not merge Visual Studio work into current Reality/Awards/sports release work.
-
----
-
-## Tool / Environment Guidance
-
-### VS Code / Git
-
-- Branches are safety checkpoints, not separate production apps.
-- Closing VS Code terminals does not delete work.
-- Prefer one terminal and one worktree at a time.
-- Avoid `git clean`, `git reset --hard`, deleting worktrees, or mass branch cleanup until current-state file says it is safe.
-
-### Riley
-
-Use Riley for implementation passes when useful.
-
-Riley outputs must be treated as reports until independently verified.
-
-If Riley cannot access the Mac worktree, use a patch against an exact baseline commit and verify with `git apply --check` before applying.
-
-### Codex
-
-Codex is optional audit/review, not a release gate.
-
-Current Codex limit was hit and availability resumes later; do not wait for Codex to finish launch work.
-
-### Wrangler / Cloudflare
-
-- MainMac can run the local Wrangler preview workflow.
-- Work Mac macOS 11.6 cannot run current Cloudflare `workerd` locally.
-- On Work Mac, prefer a remote Cloudflare Pages preview deployment or use MainMac for final local browser acceptance.
-- Do not change source to compensate for unsupported Work Mac runtime.
-
----
-
-## Release / Certification Policy
-
-The app had already passed broad production certification before the recent UI-polish branches. Do not restart months of certification for every appearance tweak.
-
-Use this release cadence:
-
-1. Focused tests while iterating.
-2. Real browser acceptance by Joel.
-3. Full production regression gate once at the release checkpoint.
-4. Integrate.
-5. Deploy.
-6. Smoke test production.
-
-Do not call a feature live/release-ready merely because tests pass.
-
----
-
-## Branches That Matter Right Now
-
-- `architecture-cleanup` → production source baseline at `3be0fca`
-- `coordination/pattc-current-state` → this canonical project-state file
-- `work/reality-tv-polish-r2-20260915` → Reality R2 corrected checkpoint at `a6eab94`
-- `codex/awards-stakes-launch-readiness` → clean Awards continuation branch at `3be0fca`
-- `kent/owner-visual-studio-r3-local-20260914` → Visual Studio R3 checkpoint at `6659372`
-
-Older backup/feature branches can be cleaned later, but branch cleanup is not a launch task.
-
----
-
-# NEXT ACTION
-
-**Finish Reality TV browser acceptance before touching another feature.**
-
-On the Work Mac, first attempt a **Cloudflare Pages preview deployment** of the Reality R2 branch so Joel can view the corrected UI without local `workerd`.
-
-Start by identifying the existing Cloudflare Pages project from the Reality R2 worktree. Do not deploy to production and do not merge `work/reality-tv-polish-r2-20260915` into `architecture-cleanup` yet.
-
-If a safe remote preview cannot be produced quickly, use the MainMac for the final Reality browser pass instead of spending more time fixing the Work Mac environment.
-
-Once Reality is visually accepted:
-
-**full gate once → integrate Reality → deploy → smoke test → move to football launch cut.**
+1. In the existing football VS Code terminal on the **Work Mac**, run **read-only**: `pwd; git branch --show-current; git log -1 --oneline; git status --short; git remote -v`. Do not assume that checkout matches Main Mac.
+2. Use the earlier Network evidence, or obtain one **redacted** capture of the slow/failed Hub startup request with URL/path, status, timing, and upstream. Never share session tokens, passwords or PINs.
+3. Trace only the implicated startup path; prepare the smallest isolated correction and focused tests. Use Main Mac for runtime verification if Work Mac tooling cannot run.
+4. Then address Playoff Race original-entry locking, Team Fantasy all-team rankings, return to Confidence R1b, and finish Cup launch checks.
