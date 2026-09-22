@@ -84,6 +84,11 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, previewOnly: true,
       message: "This setup or ranking write is disabled in Cloudflare Preview because its Google Sheet is shared with production. Use the canonical production app for launch setup." }, 200);
   }
+  // Preview shares production Sheets: reject all Visual Studio draft/publish/version writes.
+  if (!productionRequest && action === "adminSaveAppearanceOverride" &&
+      /^visual-studio-(draft|published|version)$/i.test(String(body.entityType || ""))) {
+    return jsonResponse({success:false,previewOnly:true,message:"Visual Studio writes are disabled on Preview."},403);
+  }
   if (!productionRequest && gameId === "nfl-futures-2026" &&
       (action === "saveBet" || action === "removeBet")) {
     return jsonResponse({ success: false, previewOnly: true,
@@ -154,9 +159,11 @@ export async function onRequestPost(context) {
   }
 }
 
-export async function onRequestGet() {
+export async function onRequestGet(context) {
   return jsonResponse({
     success: true,
+    studioProductionBridge: pattcCupProductionRequest_(context),
+    apiUrl: APPS_SCRIPT_API_URL,
     service: "Awards App POST Bridge",
     method: "POST required"
   });

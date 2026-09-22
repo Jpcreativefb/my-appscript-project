@@ -701,6 +701,10 @@ function doPost(e) {
       return json(apiAdminSaveGameAppearance(body));
     }
 
+    if (action === "adminGetStudioProductionIdentity") {
+      return json(apiAdminGetStudioProductionIdentity_());
+    }
+
     if (action === "adminSaveAppearanceOverride") {
       return json(apiAdminSaveAppearanceOverride(body));
     }

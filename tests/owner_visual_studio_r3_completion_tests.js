@@ -1,0 +1,61 @@
+'use strict';
+const assert = require('assert');
+const fs = require('fs');
+const vm = require('vm');
+const R3 = require('../frontend/js/ownerVisualStudioR3.js');
+const fixture = fs.readFileSync('tests/owner_visual_studio_r3_dom_tests.js', 'utf8');
+const env = { require, console, __dirname };
+vm.createContext(env);
+vm.runInContext(fixture.slice(0, fixture.indexOf('const {document,Node}=dom();')) + '\nthis.makeDOM=dom;', env);
+async function main() {
+  const rows = new Map(); let writes = 0;
+  const adapter = {
+    async readFresh() { return { success: true, overrides: [...rows].map(([id, value]) => ({ EntityType: R3.TYPES.draft, EntityId: id, Active: true, ThemeOverrideJSON: JSON.stringify(value) })) }; },
+    async write(scope, type, id, value) { assert.equal(type, R3.TYPES.draft); writes++; rows.set(id, value); return { success: true }; }
+  };
+  const ctl = R3.createController(adapter, { setTimeout() { return 1; }, clearTimeout() {} });
+  await ctl.open({ gameId: 'fixture-only', pageKey: 'picks' });
+  ctl.edit(m => { m.items.a = { style: { padding: 24 } }; m.items.b = { style: { padding: 11 } }; R3.responsiveLayer(m, 'mobile', true).items.a = { style: { padding: 8 } }; });
+  await ctl.flush();
+  ctl.edit(m => { m.items.a.style.padding = 40; m.items.b.style.padding = 17; m.responsive.mobile.items.a.style.padding = 4; });
+  ctl.restoreSelected('a');
+  assert.equal(ctl.snapshot().manifest.items.a.style.padding, 24);
+  assert.equal(ctl.snapshot().manifest.items.b.style.padding, 17, 'Scoped restore preserves unrelated unsaved changes');
+  assert.equal(R3.resolveView(ctl.snapshot().manifest, 'mobile').items.a.style.padding, 8);
+  await ctl.flush(); await ctl.close(); await ctl.open({ gameId: 'fixture-only', pageKey: 'picks' });
+  assert.equal(ctl.snapshot().manifest.items.b.style.padding, 17);
+  assert.equal(writes, 2, 'No Publish or extra save on read-only reopen');
+  const { document, Node } = env.makeDOM();
+  const root = new Node('main'); root.id = 'app'; document.body.appendChild(root);
+  const section = new Node('section'); section.id = 'hero'; root.appendChild(section);
+  const title = new Node('h2'); section.appendChild(title);
+  const renderer = R3.createRenderer(root);
+  const manifest = R3.normalize({ groups: { common: { selector: 'section', style: { padding: 20, color: 'red' } } }, items: { 'id:hero': { style: { padding: 7, margin: 9, headerColor: 'gold', headerBackground: 'black', borderWidth: 2 } } } });
+  renderer.render(manifest);
+  assert.equal(section.style.getPropertyValue('padding'), '7px', 'Individual style wins over shared style');
+  assert.equal(section.style.getPropertyValue('margin'), '9px');
+  assert.equal(section.style.getPropertyValue('border-style'), 'solid');
+  assert.equal(title.style.getPropertyValue('color'), 'gold');
+  const originalText = { nodeType: 3, nodeValue: 'Original title' }; title.childNodes = [originalText];
+  manifest.items['id:hero'].headerText = 'Edited title'; renderer.render(manifest);
+  assert.equal(originalText.nodeValue, 'Edited title');
+  renderer.reset(); assert.equal(originalText.nodeValue, 'Original title');
+  assert.equal(title.style.getPropertyValue('color'), '');
+  assert.equal(section.style.getPropertyValue('margin'), '');
+  const events = new Map();
+  global.addEventListener = (type, fn) => events.set(type, fn);
+  global.removeEventListener = (type, fn) => { if (events.get(type) === fn) events.delete(type); };
+  global.scrollY = 200;
+  manifest.collapse['id:hero'] = { collapsible: true, collapseOnScroll: true, collapseStyle: 'blind', expandedColor: 'blue', collapsedColor: 'black' };
+  renderer.render(manifest, { editing: false });
+  assert.equal(title.style.getPropertyValue('background-color'), 'blue');
+  global.scrollY = 160; events.get('scroll')();
+  assert.equal(section.querySelector('.r3-collapse-body').style.getPropertyValue('max-height'), '0px');
+  assert.equal(title.style.getPropertyValue('background-color'), 'black');
+  global.scrollY = 190; events.get('scroll')();
+  assert.notEqual(section.querySelector('.r3-collapse-body').style.getPropertyValue('max-height'), '0px');
+  renderer.reset(); assert.equal(events.size, 0);
+  delete global.addEventListener; delete global.removeEventListener; delete global.scrollY;
+  console.log('R3 completion: scoped last-saved restore, server reload, shared/individual precedence, header style, margins, borders and reset PASS');
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

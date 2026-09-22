@@ -1242,5 +1242,65 @@ function apiAdminSaveAppearanceOverride(payload) {
 
 function apiGetGameAppearance(payload) {
   payload = payload || {};
-  return appearanceGetRuntimeBundle(payload.gameId || "");
+  return appearancePublicRuntimeBundle_(appearanceGetRuntimeBundle(payload.gameId || ""));
+}
+
+// Public rendering contract: never return admin dashboard rows or Draft/Version manifests.
+// Sanitize after the runtime cache read so old cached bundles cannot leak private rows.
+function appearancePublicRuntimeBundle_(bundle) {
+  function pick(value, keys) {
+    var out = {}; value = value || {};
+    keys.forEach(function(key) { if (Object.prototype.hasOwnProperty.call(value, key)) out[key] = value[key]; });
+    return out;
+  }
+  function json(value) { try { return typeof value === 'string' ? JSON.parse(value) : value || {}; } catch (_) { return {}; } }
+  var themeKeys = ['colors','layout','typography','images','selection','result','live','background','confidence','score','scoreboard','positioning','overlays','textBackdrop','winner','visibility','resultTypography','sideLayout','density','studioVersion','page','questions','details','bars','leaderboard','sportsHero','SportsHero','team','row','stakes','buttons','headers'];
+  function theme(value) { return pick(json(value), themeKeys); }
+  var styleKeys = ['backgroundMode','backgroundColor','color','borderColor','borderWidth','borderRadius','margin','padding','gap','fontSize','headerFontSize','headerColor','headerBackground','widthPct','widthMode','heightPx','heightMode','minHeight','scale','textAlign','objectFit','objectPosition'];
+  function records(value, transform) { var out = {}; Object.keys(value || {}).forEach(function(key) { if (!['__proto__','constructor','prototype'].includes(key)) out[key] = transform(value[key]); }); return out; }
+  function layer(value) {
+    return {
+      items: records(value.items, function(item) { var out = pick(item, ['original','columns','headerText','order']); out.style = pick(item.style, styleKeys); return out; }),
+      hidden: records(value.hidden, function(hidden) { return hidden === true; }),
+      collapse: records(value.collapse, function(config) { return pick(config, ['collapsible','defaultOpen','collapseStyle','rememberPlayerState','collapseOnScroll','expandedColor','collapsedColor']); })
+    };
+  }
+  function manifest(value) {
+    value = json(value); var out = pick(value, ['version','studioVersion','pageKey']);
+    Object.assign(out, layer(value));
+    out.groups = records(value.groups, function(group) { return { selector: group.selector, style: pick(group.style, styleKeys) }; });
+    out.groupMembers = records(value.groupMembers, String);
+    out.moves = records(value.moves, String);
+    out.hiddenSelectors = records(value.hiddenSelectors, function(hidden) { return hidden === true; });
+    out.generatedSections = records(value.generatedSections, function(section) { return pick(section, ['title','parentKey','afterKey','collapsible','defaultOpen']); });
+    if (value.responsive) { out.responsive = {}; ['tablet','mobile'].forEach(function(view) { if (value.responsive[view]) out.responsive[view] = layer(value.responsive[view]); }); }
+    return out;
+  }
+  var assignment = pick(bundle.assignment, ['GameId','ImagePackId','ThemePackId','ImageMode','ThemeMode','Active']);
+  assignment.ThemeOverrideJSON = JSON.stringify(theme(bundle.assignment && bundle.assignment.ThemeOverrideJSON));
+  return {
+    success: bundle.success === true, gameId: bundle.gameId,
+    assignment: assignment, themePackId: bundle.themePackId, theme: theme(bundle.theme), imagePackId: bundle.imagePackId,
+    imagePackItems: (bundle.imagePackItems || []).map(function(row) { return pick(row, ['PackId','EntityType','EntityId','Variant','ImageUrl','ImageFileId','AltText','Active']); }),
+    overrides: (bundle.overrides || []).filter(function(row) {
+      var type = String(row.EntityType || '').toLowerCase();
+      return !/draft|version|private|admin/.test(type) && (!/^visual-studio/.test(type) || type === 'visual-studio-published');
+    }).map(function(row) {
+      var out = pick(row, ['GameId','EntityType','EntityId','ImageUrl','ImageFileId','Active']);
+      out.ThemeOverrideJSON = JSON.stringify(row.EntityType === 'visual-studio-published' ? manifest(row.ThemeOverrideJSON) : theme(row.ThemeOverrideJSON));
+      return out;
+    })
+  };
+}
+
+// Authenticated admin-only, read-only environment attestation. The public bridge
+// must independently confirm the canonical production host and target URL.
+function apiAdminGetStudioProductionIdentity_() {
+  const actualScript = ScriptApp.getScriptId();
+  const actualSheet = SpreadsheetApp.getActive().getId();
+  return {
+    success: true, environment: "production",
+    verified: actualScript === "1KdBY1vvNGgdl9khWfb8G7mSqG_kbWvLc_vKbubEoB8knIwy83tAkvB_3" && actualSheet === "1py9-zQIAp2aSl9oK6oyH8UQ6151m2mSE2TmwoyXWveY",
+    apiUrl: "https://script.google.com/macros/s/AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo/exec"
+  };
 }

@@ -1,0 +1,100 @@
+'use strict';
+const assert=require('assert'),fs=require('fs'),vm=require('vm');
+const source=fs.readFileSync('frontend/js/ownerVisualStudioR3.js','utf8');
+const fixture=fs.readFileSync('tests/owner_visual_studio_r3_dom_tests.js','utf8');
+const fixtureContext={require,console,__dirname:__dirname};vm.createContext(fixtureContext);
+vm.runInContext(fixture.slice(0,fixture.indexOf('const {document,Node}=dom();'))+'\nthis.makeDOM=dom;',fixtureContext);
+const tick=()=>new Promise(r=>setImmediate(r));
+async function main(){
+  const {document,Node}=fixtureContext.makeDOM();
+  Node.prototype.hasAttribute=function(k){return this.getAttribute(k)!==null;};
+  Object.defineProperty(Node.prototype,'dataset',{get(){if(!this.data)this.data=new Proxy({}, {set:(o,k,v)=>{o[k]=String(v);this.setAttribute('data-'+k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase()),v);return true;}});return this.data;}});
+  Node.prototype.addEventListener=function(type,fn){(this.listeners||={})[type]||=[];this.listeners[type].push(fn);};
+  Node.prototype.closest=function(selector){return this.matches(selector)?this:this.parentNode?.closest(selector)||null;};
+  Node.prototype.replaceChildren=function(...nodes){this.textContent='';nodes.forEach(n=>this.appendChild(n));};
+  Node.prototype.getBoundingClientRect=function(){return {left:this.id==='weekly'?42:12,top:20,width:300,height:200};};
+  Node.prototype.click=function(){this.onclick?.();};
+  document.head=new Node('head');document.body.appendChild(document.head);document.readyState='complete';
+  const events={},hostEvents={},timers=new Map();let timer=0,observer;
+  document.addEventListener=(type,fn)=>(events[type]||=[]).push(fn);
+  const root=new Node('main');root.id='app';document.body.appendChild(root);
+  let section=new Node('section');section.id='weekly';section.className='card';root.appendChild(section);
+  let target=new Node('h2');target.id='weekly-title';target.textContent='Weekly Picks';section.appendChild(target);
+  const apiCalls=[];
+  const host={console,document,PATTC_STUDIO_R3_LOCAL:true,location:{hostname:'127.0.0.1',hash:'#team-fantasy'},getSession:()=>({isAdmin:true}),getFrontendGameId:()=> 'selection-fixture',
+    apiGetGameAppearance:async()=>({success:true,overrides:[]}),apiAdminGetAppearanceDashboard:async()=>({success:true,overrides:[]}),apiAdminSaveAppearanceOverride:async()=>{apiCalls.push('write');throw Error('No live writes in DOM test');},
+    addEventListener:(type,fn)=>(hostEvents[type]||=[]).push(fn),setTimeout:fn=>{timers.set(++timer,fn);return timer;},clearTimeout:id=>timers.delete(id),
+    getComputedStyle:()=>({backgroundColor:'rgba(0,0,0,0)',color:'#fff',borderColor:'#fff'}),MutationObserver:class{constructor(fn){observer=fn;}observe(){}disconnect(){}},crypto:{randomUUID:()=> 'fixture'}};
+  const identity = {environment:'isolated-test',apiUrl:'https://script.google.com/macros/s/synthetic/exec',scriptId:'synthetic-script',spreadsheetId:'synthetic-sheet'};
+  host.API_BASE = identity.apiUrl; host.PATTC_STUDIO_R3_ENV = identity;
+  host.fetch = async () => ({json:async()=>identity}); host.api = async () => identity;
+  host.window=host;vm.createContext(host);vm.runInContext(source,host);await tick();
+  host.PATTC_OWNER_VISUAL_STUDIO_R3.open();await tick();await tick();
+  const panel=()=>document.getElementById('pattcStudioR3');
+  const button=label=>panel().querySelectorAll('button').find(n=>n.textContent===label);
+  const emit=async(type,node)=>{const event={target:node,preventDefault(){},stopImmediatePropagation(){}};for(const fn of events[type]||[])fn(event);for(const fn of node.listeners?.[type]||[])fn(event);await tick();};
+  assert(button('Quick Edit'), 'Quick Edit is the default');
+  assert(panel().querySelector('[data-section-map]'), 'Section Map is present');
+  button('Quick Edit').click(); await tick(); assert(button('Advanced Edit'));
+  button('Advanced Edit').click(); await tick();
+  assert(button('Separate Window')); assert(button('Return to Dock'));
+  assert.equal(document.body.style.getPropertyValue('--r3-dock-space'), '352px');
+  button('Minimize').click(); await tick(); assert.equal(document.body.style.getPropertyValue('--r3-dock-space'), '0px');
+  button('Expand').click(); await tick();
+  const selected=()=>panel().querySelector('[data-selection]').dataset.selection;
+  for(const [mode,key] of [['Element','id:weekly-title'],['Section','id:weekly'],['Whole Page','id:app']]){
+    button(mode).click();await tick();
+    await emit('pointermove',target);
+    if(mode!=='Whole Page')assert.equal(selected(),'','Hover alone must not commit selection');
+    await emit('click',target);assert.equal(selected(),key);
+    await emit('pointermove',panel());
+    const marker=document.querySelector('[data-studio-outline="selected"]');assert.equal(marker.hidden,false);
+    assert.equal(document.querySelector('[data-studio-outline="hover"]').hidden,true);
+    for(const [field,value] of [['padding','18'],['gap','9'],['backgroundMode','transparent'],['heightMode','fixed'],['heightPx','280']]){
+      const input=panel().querySelector('[data-field="'+field+'"]');
+      await emit('click',input);input.value=value;await emit('input',input);
+      await emit('pointermove',input);await emit('keydown',input);await emit('change',input);
+      (hostEvents.scroll||[]).forEach(fn=>fn());
+      assert.equal(selected(),key,mode+' selection retained through '+field);
+      assert.equal(marker.hidden,false);
+    }
+    assert.equal(host.PATTC_OWNER_VISUAL_STUDIO_R3.snapshot().manifest.items[key].style.padding,18);
+    const group=panel().querySelector('[data-studio-group="Layouts"]');group.open=false;await emit('toggle',group);
+    button('Cursor selection ON')?.click();await tick();assert.equal(selected(),key);
+    button('Cursor selection OFF')?.click();await tick();assert.equal(selected(),key);
+    assert.equal(panel().querySelector('[data-studio-group="Layouts"]').open,false);
+  }
+  button('Section').click();await tick();await emit('click',target);
+  const setField=async(key,value)=>{const input=panel().querySelector('[data-field="'+key+'"]');input.value=value;await emit('input',input);};
+  const badge=key=>panel().querySelector('[data-field="'+key+'"]').parentNode.querySelector('small').textContent;
+  await setField('padding','24');
+  button('Mobile').click();await tick();assert.equal(badge('padding'),'Using Desktop');assert.equal(panel().querySelector('[data-field="padding"]').value,24);
+  await setField('padding','12');assert.equal(badge('padding'),'Custom Mobile');assert.equal(selected(),'id:weekly');
+  button('Tablet').click();await tick();assert.equal(badge('padding'),'Using Desktop');await setField('padding','18');assert.equal(badge('padding'),'Custom Tablet');
+  button('Desktop').click();await tick();await setField('padding','30');assert.equal(badge('padding'),'Desktop base');
+  button('Mobile').click();await tick();assert.equal(panel().querySelector('[data-field="padding"]').value,12);
+  const reset=panel().querySelector('[data-field="padding"]').parentNode.querySelector('button');reset.onclick({preventDefault(){}});await tick();assert.equal(badge('padding'),'Using Desktop');assert.equal(panel().querySelector('[data-field="padding"]').value,30);
+  await setField('collapsible','true');await setField('defaultOpen','false');await setField('collapseStyle','blind');await setField('rememberPlayerState','true');
+  assert.equal(selected(),'id:weekly');button('Open Section').click();await tick();assert.equal(selected(),'id:weekly');button('Close Section').click();await tick();assert.equal(selected(),'id:weekly');
+  button('Hide Selected').click();await tick();assert.equal(section.style.getPropertyValue('display'),'none');
+  button('Desktop').click();await tick();assert.notEqual(section.style.getPropertyValue('display'),'none');assert.equal(panel().querySelector('[data-field="collapsible"]').value,'false');
+  button('Mobile').click();await tick();button('Show Selected').click();await tick();assert.notEqual(section.style.getPropertyValue('display'),'none');
+  button('Reset Override: Visibility').click();await tick();
+  button('Desktop').click();await tick();
+  button('Element').click();await tick();await emit('click',target);
+  const oldTarget=target;target=new Node('h2');target.id='weekly-title';target.textContent='Weekly Picks refreshed';oldTarget.replaceWith(target);
+  observer();await tick();await tick();
+  assert.equal(oldTarget.isConnected,false,'Never resurrect the replaced runtime node');
+  assert.equal(selected(),'id:weekly-title');
+  const input=panel().querySelector('[data-field="padding"]');input.value='27';await emit('input',input);
+  assert.equal(target.style.getPropertyValue('padding'),'27px','Rebind edits to replacement node');
+  button('Revert to Server Draft').click();await tick();await tick();assert.equal(selected(),'id:weekly-title');
+  button('Clear Selection').click();await tick();assert.equal(selected(),'');
+  for(const name of ['Layouts','Appearance / Style','Hide / Show','Save Settings / Restore','Publish Pages','Demo Values'])assert(panel().querySelectorAll('details').some(n=>n.dataset.studioGroup===name));
+  await emit('click',target);host.location.hash='#another-page';observer();await tick();await tick();
+  assert.equal(panel(),null,'Route changes close selection');
+  assert.equal(document.querySelector('[data-studio-outline="selected"]').hidden,true);
+  assert.equal(apiCalls.length,0);
+  console.log('R3 mounted DOM: Element/Section/Whole Page selection, panel controls, outlines, groups, rerender rebind PASS');
+}
+main().catch(err=>{console.error(err);process.exitCode=1;});

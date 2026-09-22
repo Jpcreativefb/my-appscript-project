@@ -7,6 +7,7 @@
 var API_PUBLIC_ACTIONS_ = {
   "": true,
   health: true,
+  getGameAppearance: true, // Public Published only; private Draft/Version rows stripped by AppearanceEngine.
   login: true,
   signup: true,
   requestPinReset: true,

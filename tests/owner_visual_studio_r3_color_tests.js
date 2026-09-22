@@ -1,0 +1,10 @@
+'use strict';
+const assert=require('assert');
+const {parseColor,colorFormats,colorContrast,blendColor}=require('../frontend/js/ownerVisualStudioR3');
+for(const [value,result] of [['#abc',[170,187,204,1]],['#11223380',[17,34,51,128/255]],['rgb(100% 0% 0% / 50%)',[255,0,0,.5]],['rgba(35, 91, 132, 0.25)',[35,91,132,.25]],['transparent',[0,0,0,0]]])assert.deepEqual(parseColor(value),result);
+for(const value of ['#12','rgb(999,0,0)','rgba(0,0,0,2)','url(javascript:bad)','rgb(x,0,0)'])assert.equal(parseColor(value),null);
+assert.deepEqual(colorFormats([35,91,132,.5]),{hex:'#235B84',hexAlpha:'#235B8480',rgb:'rgba(35, 91, 132, 0.5)'});
+assert.equal(colorContrast([0,0,0,1],[255,255,255,1]),21);
+assert.equal(colorContrast([0,0,0,1],[0,0,0,1]),1);
+assert.deepEqual(blendColor([255,0,0,.5],[255,255,255,1]),[255,128,128,1]);
+console.log('R3 visual color formats, opacity, validation, blending and text contrast PASS');
