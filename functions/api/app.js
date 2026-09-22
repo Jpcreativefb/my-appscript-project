@@ -86,7 +86,7 @@ export async function onRequestPost(context) {
   }
   // Preview shares production Sheets: reject all Visual Studio draft/publish/version writes.
   if (!productionRequest && action === "adminSaveAppearanceOverride" &&
-      /^visual-studio-(draft|published|version)$/i.test(String(body.entityType || ""))) {
+      /^visual-studio-(draft|published|version|template)$/i.test(String(body.entityType || ""))) {
     return jsonResponse({success:false,previewOnly:true,message:"Visual Studio writes are disabled on Preview."},403);
   }
   if (!productionRequest && gameId === "nfl-futures-2026" &&

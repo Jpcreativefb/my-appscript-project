@@ -1,7 +1,9 @@
 /* Owner Visual Studio R3. Opt-in local preview; no production boot changes. */
 (function (host) {
   'use strict';
-  const TYPES = { draft: 'visual-studio-draft', published: 'visual-studio-published', version: 'visual-studio-version' };
+  const TYPES = { draft: 'visual-studio-draft', published: 'visual-studio-published', version: 'visual-studio-version', template: 'visual-studio-template' };
+  const TEMPLATE_LIBRARY = '__pattc_global__';
+  const TEMPLATE_FAMILIES = ['Reality TV','Sports','Awards','General'];
   const maps = ['items', 'groups', 'groupMembers', 'moves', 'hidden', 'hiddenSelectors', 'collapse', 'generatedSections'];
   const copy = value => JSON.parse(JSON.stringify(value));
   function normalize(raw) {
@@ -305,6 +307,84 @@
       }); }
     };
   }
+  // Phase 1: page appearance templates saved only in the authenticated admin
+  // AppearanceOverrides store. Never copy picks, contestants, questions or scores.
+  // Templates are private global rows, not public Published appearance.
+  function createTemplateManager(adapter, controller, options = {}) {
+    const assertWritable = options.assertWritable || (() => {});
+    const idGenerator = options.createId || (() => host.crypto.randomUUID());
+    const now = options.now || (() => new Date().toISOString());
+    const libraryScope = { gameId: TEMPLATE_LIBRARY, pageKey: 'template-library' };
+    const validGame = state => {
+      assertWritable();
+      if (!state.opened || state.demo || state.lock || !state.scope ||
+          !state.scope.pageKey || !state.scope.gameId || state.scope.gameId === TEMPLATE_LIBRARY)
+        throw new Error('Open a real game in editable Visual Studio first');
+      return state.scope;
+    };
+    function entries(bundle) {
+      if (!bundle || bundle.success !== true || !Array.isArray(bundle.overrides))
+        throw new Error('Fresh template library read failed');
+      return bundle.overrides.filter(row =>
+        String(row.EntityType || row.entityType) === TYPES.template &&
+        String(row.GameId || row.gameId) === TEMPLATE_LIBRARY &&
+        ![false, 'false', 'FALSE', 0, '0'].includes(row.Active == null ? row.active : row.Active))
+        .map(row => {
+          const id = String(row.EntityId || row.entityId || '');
+          if (!/^r3-template::[a-zA-Z0-9_-]{6,100}$/.test(id)) throw new Error('Invalid template identifier');
+          const manifest = rowManifest(bundle, TYPES.template, id);
+          const info = manifest.meta && manifest.meta.template;
+          if (!info || typeof info.name !== 'string' || !TEMPLATE_FAMILIES.includes(info.family) ||
+              info.pageKey !== manifest.pageKey) throw new Error('Invalid template metadata');
+          return { id, name: info.name, family: info.family, pageKey: info.pageKey, manifest };
+        });
+    }
+    async function freshTemplates() { assertWritable(); return entries(await adapter.readFresh(libraryScope)); }
+    async function save(name, family) {
+      name = String(name || '').trim();
+      if (!name || name.length > 80) throw new Error('Enter a template name (up to 80 characters)');
+      if (!TEMPLATE_FAMILIES.includes(family)) throw new Error('Select a template game type');
+      const initial = validGame(controller.snapshot());
+      await controller.flush();
+      const state = controller.snapshot(), scope = validGame(state);
+      if (scope.gameId !== initial.gameId || scope.pageKey !== initial.pageKey)
+        throw new Error('Game changed while saving template');
+      const id = 'r3-template::' + idGenerator();
+      if (!/^r3-template::[a-zA-Z0-9_-]{6,100}$/.test(id)) throw new Error('Invalid template identifier');
+      const manifest = normalize(state.manifest);
+      manifest.pageKey = scope.pageKey;
+      manifest.meta = { template: { name, family, pageKey: scope.pageKey, savedAt: now() } };
+      await adapter.write(libraryScope, TYPES.template, id, manifest);
+      const confirmed = rowManifest(await adapter.readFresh(libraryScope), TYPES.template, id);
+      if (!confirmed || exact(confirmed) !== exact(manifest)) throw new Error('Template server verification failed');
+      return { id, name, family, pageKey: scope.pageKey };
+    }
+    async function apply(id) {
+      const initial = validGame(controller.snapshot());
+      if (!/^r3-template::[a-zA-Z0-9_-]{6,100}$/.test(String(id || ''))) throw new Error('Choose a saved template');
+      const chosen = (await freshTemplates()).find(item => item.id === id);
+      if (!chosen) throw new Error('Saved template not found');
+      if (chosen.pageKey !== initial.pageKey) throw new Error('This template belongs to a different page type');
+      await controller.flush();
+      const current = controller.snapshot(), scope = validGame(current);
+      if (scope.gameId !== initial.gameId || scope.pageKey !== initial.pageKey)
+        throw new Error('Game changed while applying template');
+      // Preserve the existing Draft on the target game as a recoverable version.
+      const backupId = scope.pageKey + '::before-template-' + idGenerator();
+      await adapter.write(scope, TYPES.version, backupId, current.manifest);
+      const backup = rowManifest(await adapter.readFresh(scope), TYPES.version, backupId);
+      if (!backup || exact(backup) !== exact(current.manifest)) throw new Error('Could not verify pre-template backup');
+      const next = normalize(chosen.manifest);
+      next.pageKey = scope.pageKey;
+      delete next.meta.template;
+      next.meta.appliedTemplate = { name: chosen.name, family: chosen.family, at: now() };
+      controller.edit(manifest => { Object.keys(manifest).forEach(key => delete manifest[key]); Object.assign(manifest, copy(next)); });
+      await controller.flush();
+      return { id, name: chosen.name, gameId: scope.gameId, pageKey: scope.pageKey, backupId };
+    }
+    return { list: freshTemplates, save, apply };
+  }
+
   const safeSimilar = selector => /^[a-z][a-z0-9-]*\.[a-zA-Z_][a-zA-Z0-9_-]*$/.test(selector || '');
   const interactive = node => node.matches('button,input,select,textarea,[role="button"]') || !!node.querySelector('button,input,select,textarea,[role="button"]');
   const sectionHeader = node => node.querySelector(':scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > summary,:scope > header') || node.querySelector('h1,h2,h3,h4,summary');
@@ -675,6 +755,7 @@
     const firstRenderAt = Date.now();
     let panel = null, frame = null, observer = null, renderPending = false, undo = [], versions = [];
     let colorEditor = null, colorPreview = null;
+    let templateEntries = [], selectedTemplateId = '', templateFeedback = '';
     const admin = () => typeof host.isAdminSession === 'function' ? host.isAdminSession(host.getSession()) : !!host.getSession?.()?.isAdmin;
     function scope() {
       const pageKey = String((typeof APP_STATE !== 'undefined' ? APP_STATE.currentPage : host.APP_STATE?.currentPage) || host.location.hash.slice(1) || 'dashboard').split(/[?:]/)[0].toLowerCase();
@@ -701,7 +782,9 @@
       else if (launch) launch.textContent = 'R3: ' + error.message;
     }
     function perform(work) { Promise.resolve().then(work).catch(error); }
-    const controller = createController(serverAdapter(host), { assertWritable: () => requireDevelopmentWrite(host), render: apply, onChange: updateStatus });
+    const studioAdapter = serverAdapter(host);
+    const controller = createController(studioAdapter, { assertWritable: () => requireDevelopmentWrite(host), render: apply, onChange: updateStatus });
+    const templates = createTemplateManager(studioAdapter, controller, { assertWritable: () => requireDevelopmentWrite(host) });
     function updateStatus(state) {
       if (!panel) return;
       panel.querySelector('[data-status]').textContent = state.status;
@@ -937,7 +1020,7 @@
       panel.replaceChildren();
       const title = document.createElement('strong'); title.textContent = 'Owner Visual Studio R3'; panel.appendChild(title);
       const environment = document.createElement('p'); environment.dataset.environment = ''; environment.textContent = host.PATTC_STUDIO_R3_WRITE_POLICY.label + '\n' + (backendUrl || 'Unknown backend'); environment.style.overflowWrap = 'anywhere'; panel.appendChild(environment);
-      function button(label, work) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => perform(work); if (/^(Save |Publish|Restore|Reset|Undo|Original Page|Revert|Hide |Show |Move|↑|↓|Split |New Section|Apply Style|Universal)/.test(label)) b.disabled = !host.PATTC_STUDIO_R3_WRITE_POLICY.allowed; panel.appendChild(b); return b; }
+      function button(label, work) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = () => perform(work); if (/^(Save |Use Selected Template|Load Game Templates|Publish|Restore|Reset|Undo|Original Page|Revert|Hide |Show |Move|↑|↓|Split |New Section|Apply Style|Universal)/.test(label)) b.disabled = !host.PATTC_STUDIO_R3_WRITE_POLICY.allowed; panel.appendChild(b); return b; }
       button(minimized ? 'Expand' : 'Minimize', () => { minimized = !minimized; showPanel(); });
       button('Close', async () => { cancelColorEditor(); removePreview(); await controller.close(); runtimeScope=scope();runtimeManifest=controller.snapshot().published; panel.remove(); panel = null; if (detached) { detached.close(); detached = null; } layoutDock(); clearSelection(); undo = []; });
       const status = document.createElement('p'); status.dataset.status = ''; status.setAttribute('role', 'status'); panel.appendChild(status); updateStatus(controller.snapshot());
@@ -1003,6 +1086,39 @@
       button('Revert to Server Draft', async () => { await controller.revert(); undo = []; showPanel(); });
       ['Save Element','Save Section','Save Page Draft','Save Whole Project Drafts'].forEach(label => button(label, () => { if (colorEditor) throw new Error('Apply or cancel the color preview before saving.'); return controller.flush(); }));
       const saveHelp = document.createElement('p'); saveHelp.dataset.saveHelp = ''; saveHelp.textContent = 'All Save controls verify the complete current page Draft. Previously visited pages were saved before closing. Whole Project flushes the only open page; it does not publish or rewrite unopened pages.'; panel.appendChild(saveHelp);
+      // Templates are stored separately from per-game Drafts and Published rows.
+      const templateName = document.createElement('input'); templateName.type = 'text';
+      templateName.maxLength = 80; templateName.placeholder = 'Template name (e.g., Survivor Tropical)';
+      templateName.setAttribute('aria-label', 'Template name'); templateName.dataset.templateControl = 'name'; panel.appendChild(templateName);
+      const family = document.createElement('select'); family.setAttribute('aria-label', 'Template game type'); family.dataset.templateControl = 'family';
+      TEMPLATE_FAMILIES.forEach(value => { const o = document.createElement('option'); o.value = value; o.textContent = value; family.appendChild(o); });
+      const game = String(scope().gameId || '');
+      family.value = /reality|traitor|amazing|dwt|survivor-tv/i.test(game) ? 'Reality TV' : /sports|nfl|fantasy|playoff|koth|confidence/i.test(game) ? 'Sports' : /award|oscar|emmy|grammy/i.test(game) ? 'Awards' : 'General';
+      panel.appendChild(family);
+      const templatePick = document.createElement('select'); templatePick.setAttribute('aria-label','Saved game templates'); templatePick.dataset.templateControl='pick';
+      const placeholder = document.createElement('option'); placeholder.value=''; placeholder.textContent='Load templates for this page…'; templatePick.appendChild(placeholder);
+      templateEntries.filter(entry => entry.pageKey === scope().pageKey).forEach(entry => { const option = document.createElement('option'); option.value = entry.id; option.textContent = entry.family + ' · ' + entry.name; templatePick.appendChild(option); });
+      templatePick.value = templateEntries.some(entry => entry.id === selectedTemplateId && entry.pageKey === scope().pageKey) ? selectedTemplateId : '';
+      templatePick.onchange = () => { selectedTemplateId = templatePick.value; };
+      panel.appendChild(templatePick);
+      const feedback = document.createElement('p'); feedback.dataset.templateFeedback=''; feedback.setAttribute('role','status'); feedback.textContent = templateFeedback || 'Templates copy appearance only; each game keeps its own Draft and Published layout.'; panel.appendChild(feedback);
+      button('Load Game Templates', async () => { templateFeedback = 'Loading templates…'; feedback.textContent=templateFeedback; templateEntries = await templates.list(); templateFeedback = templateEntries.length + ' saved template(s) found.'; showPanel(); });
+      button('Save as Template', async () => {
+        if (colorEditor) throw new Error('Apply or cancel the color preview before saving.');
+        templateFeedback = 'Saving template…'; feedback.textContent=templateFeedback;
+        const entry = await templates.save(templateName.value, family.value);
+        templateEntries = await templates.list(); selectedTemplateId = entry.id;
+        templateFeedback = 'Template Saved + VERIFIED · ' + entry.name; showPanel();
+      });
+      button('Use Selected Template', async () => {
+        if (colorEditor) throw new Error('Apply or cancel the color preview before applying a template.');
+        const entry = templateEntries.find(value => value.id === templatePick.value && value.pageKey === scope().pageKey);
+        if (!entry) throw new Error('Load and select a matching page template first');
+        if (!host.confirm('Replace this game page Draft with "' + entry.name + '"? A backup version will be saved. Published appearance will NOT change.')) return;
+        templateFeedback = 'Applying template…'; feedback.textContent=templateFeedback;
+        const result = await templates.apply(entry.id);
+        undo=[]; selected=null; templateFeedback = 'Template applied to Draft + VERIFIED · ' + result.name + '. Publish separately when ready.'; showPanel();
+      });
       button('Publish Page', () => { if (host.confirm('Publish this page Draft to live appearance?')) return controller.publish(); });
       button('Load Version History', async () => { versions = await controller.versions(); showPanel(); });
       const history = document.createElement('select'); history.setAttribute('aria-label','Saved versions'); versions.forEach(id => { const o = document.createElement('option'); o.textContent = id; o.value = id; history.appendChild(o); }); panel.appendChild(history);
@@ -1017,7 +1133,7 @@
       if (quick) panel.querySelectorAll('button').forEach(b => { if (/^(Move|↑|↓|Split |New Section|Apply Style to Similar|Hide Similar|Show Similar|Universal Sections)/.test(b.textContent)) b.hidden = true; });
     }
     function organizePanel() {
-      const names=['Layouts','Appearance / Style','Hide / Show','Save Settings / Restore','Publish Pages','Demo Values'];
+      const names=['Layouts','Appearance / Style','Hide / Show','Save Settings / Restore','Game Templates','Publish Pages','Demo Values'];
       const groups=new Map();
       names.forEach(name=>{
         const group=document.createElement('details');group.dataset.studioGroup=name;
@@ -1036,12 +1152,14 @@
         if(node.hasAttribute('data-status') || node.hasAttribute('data-save-help'))group='Save Settings / Restore';
         else if(node.tagName==='BUTTON'){
           if(/^(Hide |Show )/.test(text))group='Hide / Show';
+          else if(/^(Load Game Templates|Save as Template|Use Selected Template)/.test(text))group='Game Templates';
           else if(/^(Publish)/.test(text))group='Publish Pages';
           else if(/^(Demo)/.test(text))group='Demo Values';
           else if(/^(Undo|Original Page|Revert|Save |Load Version|Restore)/.test(text))group='Save Settings / Restore';
           else if(/^(Apply Style|Universal)/.test(text))group='Appearance / Style';
           else if(/Columns$|^(Move|↑|↓|Default |Open Section|Close Section|Split |New Section)/.test(text))group='Layouts';
-        }else if(node.tagName==='SELECT')group=node.getAttribute('aria-label')==='Demo state'?'Demo Values':node.getAttribute('aria-label')==='Saved versions'?'Save Settings / Restore':'Layouts';
+        }else if(node.dataset.templateControl || node.hasAttribute('data-template-feedback'))group='Game Templates';
+        else if(node.tagName==='SELECT')group=node.getAttribute('aria-label')==='Demo state'?'Demo Values':node.getAttribute('aria-label')==='Saved versions'?'Save Settings / Restore':'Layouts';
         else if(node.tagName==='P' && !node.hasAttribute('data-selection') && !node.hasAttribute('data-environment'))group='Hide / Show';
         if(group)groups.get(group).appendChild(node);
       });
@@ -1125,7 +1243,7 @@
     host.setTimeout(() => { if (!controller.snapshot().opened) runtimeAppearance(); }, 7000);
     host.PATTC_OWNER_VISUAL_STUDIO_R3 = { open: () => launch.click(), close: async () => {cancelColorEditor();removePreview();await controller.close();panel?.remove();panel=null;layoutDock();clearSelection();}, snapshot: controller.snapshot };
   }
-  const exports = { parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor };
+  const exports = { createTemplateManager, TEMPLATE_LIBRARY, TEMPLATE_FAMILIES, parseColor, colorFormats, blendColor, colorContrast, createColorEditor, verifyDevelopmentEnvironment, developmentWritePolicy, verifyProductionEnvironment, productionWritePolicy, requireDevelopmentWrite, TYPES, normalize, exact, rowManifest, createController, serverAdapter, createRenderer, safeSimilar, interactive, resolveView, responsiveLayer, breakpointFor };
   if (typeof module !== 'undefined' && module.exports) module.exports = exports;
   else { host.PATTC_STUDIO_R3 = exports; if (host.document.readyState === 'loading') host.document.addEventListener('DOMContentLoaded', mountBrowser); else mountBrowser(); }
 })(typeof window !== 'undefined' ? window : globalThis);

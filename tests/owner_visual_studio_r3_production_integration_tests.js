@@ -42,7 +42,7 @@ async function main(){
   const anonymous={getSession:()=>null,isAdminSession:()=>false,fetch:host.fetch,api:host.api};
   await R3.verifyProductionEnvironment(anonymous,'my-appscript-project.pages.dev',true,prod);
   assert.throws(()=>R3.serverAdapter(anonymous).write({},R3.TYPES.draft,'dashboard',{}),/(blocked|READ ONLY)/);
-  assert(html.includes('ownerVisualStudioR3.js?release=vs-r3-prod-integration-r1'));
+  assert(html.includes('ownerVisualStudioR3.js?release=vs-r3-game-templates-p1'));
   assert(!/<script src="\.\/js\/ownerVisualStudioRc24e\.js/.test(html),'Legacy R2 must not mount alongside R3');
   assert(!html.includes('studio-owner') && !html.includes('studio-player'));
   assert(source.includes('if (localhost && admin()) verifyEnvironment()') && !source.includes('runtimeAppearance(); verifyEnvironment()'),'Player Home should not trigger admin identity request');

@@ -1,0 +1,80 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const Studio = require('../frontend/js/ownerVisualStudioR3.js');
+const records = new Map();
+const key = (scope,type,id) => [scope.gameId,type,id].join('|');
+const scope = (gameId,pageKey='picks')=>({gameId,pageKey});
+let approved = true, count=0;
+const adapter = {
+  readFresh: async sc => ({success:true,overrides:[...records.values()].filter(row => row.GameId === sc.gameId)}),
+  write: async (sc,type,id,manifest) => {
+    if (!approved) throw Error('Write blocked for non-admin');
+    count++;
+    records.set(key(sc,type,id),{GameId:sc.gameId,EntityType:type,EntityId:id,ThemeOverrideJSON:JSON.stringify(manifest),Active:true});
+    return {success:true};
+  }
+};
+const controller=Studio.createController(adapter,{assertWritable:()=>{if(!approved)throw Error('Write blocked for non-admin')},render:()=>{},debounce:99999});
+let serial=0;
+const templates=Studio.createTemplateManager(adapter,controller,{assertWritable:()=>{if(!approved)throw Error('Write blocked for non-admin')},createId:()=>String(++serial).padStart(8,'0'),now:()=> '2026-09-22T18:00:00.000Z'});
+(async()=>{
+  const source=scope('survivor-season-50');
+  await controller.open(source);
+  controller.edit(m=>{m.items['id:contestant-card']={style:{backgroundColor:'#14764C',padding:12}};m.responsive={mobile:{items:{'id:contestant-card':{style:{padding:5}}},hidden:{},collapse:{}}};});
+  const saved=await templates.save('Survivor Tropical','Reality TV');
+  assert.equal(saved.pageKey,'picks');
+  assert.equal((await templates.list()).length,1);
+  assert.equal(records.get(key(source,Studio.TYPES.draft,'picks')).ThemeOverrideJSON.includes('#14764C'),true,'Source draft is persisted');
+  assert.equal([...records.values()].filter(row=>row.GameId===Studio.TEMPLATE_LIBRARY).length,1,'Templates are separate global private rows');
+  await controller.close();
+
+  const target=scope('survivor-season-51');
+  await controller.open(target);
+  controller.edit(m=>m.items['id:contestant-card']={style:{backgroundColor:'#AA0000'}});
+  await controller.flush();
+  const oldDraft=JSON.stringify(controller.snapshot().manifest);
+  const oldPublished=JSON.stringify(controller.snapshot().published);
+  const result=await templates.apply(saved.id);
+  assert.equal(result.gameId,target.gameId);
+  assert.equal(controller.snapshot().manifest.items['id:contestant-card'].style.backgroundColor,'#14764C');
+  assert.equal(controller.snapshot().manifest.responsive.mobile.items['id:contestant-card'].style.padding,5);
+  assert.equal(records.get(key(target,Studio.TYPES.version,result.backupId)).ThemeOverrideJSON,oldDraft,'Pre-apply Draft is backed up');
+  assert.equal(JSON.stringify(controller.snapshot().published),oldPublished,'Target Published is unchanged');
+  assert.equal(records.has(key(target,Studio.TYPES.published,'picks')),false,'No automatic publishing');
+  assert.equal(records.get(key(source,Studio.TYPES.draft,'picks')).ThemeOverrideJSON.includes('#14764C'),true,'Source game is independent');
+  await controller.close();
+  await controller.open(target);
+  assert.equal(controller.snapshot().manifest.items['id:contestant-card'].style.backgroundColor,'#14764C','Target new Draft reloads');
+  await controller.close();
+  await controller.open(scope('survivor-season-52','leaderboard'));
+  await assert.rejects(templates.apply(saved.id),/different page type/);
+  await controller.close();
+  await controller.open(scope('__pattc_global__','dashboard'));
+  await assert.rejects(templates.save('global','Reality TV'),/real game/);
+  await controller.close();
+  approved=false;
+  await assert.rejects(templates.list(),/non-admin/);
+  await assert.rejects(templates.save('no','Reality TV'),/non-admin/);
+  approved=true;
+  await controller.open(scope('survivor-season-53'));
+  await assert.rejects(templates.save('bad','invalid family'),/game type/);
+  await controller.close();
+
+  const pages=fs.readFileSync('frontend/app.html','utf8');
+  const frontend=fs.readFileSync('frontend/js/ownerVisualStudioR3.js','utf8');
+  const proxy=fs.readFileSync('functions/api/app.js','utf8');
+  assert(pages.includes('ownerVisualStudioR3.js?release=vs-r3-game-templates-p1'));
+  for(const caption of ['Save as Template','Use Selected Template','Load Game Templates']) assert(frontend.includes(caption));
+  assert(proxy.includes('/^visual-studio-(draft|published|version|template)$/i'),'Cloudflare preview blocks template writes');
+  const proxyCtx={Response,URL,fetch:async()=>{throw Error('preview must block before fetch')}};
+  vm.createContext(proxyCtx);vm.runInContext(proxy.replace(/\bexport\s+(?=(async\s+)?function\b)/g,''),proxyCtx);
+  const denied=await proxyCtx.onRequestPost({request:{url:'https://abc.my-appscript-project.pages.dev/api/app',text:async()=>JSON.stringify({action:'adminSaveAppearanceOverride',gameId:Studio.TEMPLATE_LIBRARY,entityType:Studio.TYPES.template})},env:{}});
+  assert.equal(denied.status,403);
+  const engineContext={};vm.createContext(engineContext);
+  vm.runInContext(fs.readFileSync('backend/engines/AppearanceEngine.js','utf8'),engineContext);
+  const publicData=engineContext.appearancePublicRuntimeBundle_({success:true,gameId:Studio.TEMPLATE_LIBRARY,overrides:[...records.values()].filter(row=>row.GameId===Studio.TEMPLATE_LIBRARY)});
+  assert.deepEqual(publicData.overrides,[],'Public appearance API must not leak template library');
+  console.log('Visual Studio R3 game templates P1: save/list/load, versioned per-game apply, Draft refresh, immutable source, matching-page guard, admin gate, Preview block, public privacy PASS');
+})().catch(err=>{console.error(err);process.exitCode=1});
