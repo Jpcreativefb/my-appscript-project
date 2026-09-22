@@ -977,6 +977,13 @@ async function apiSaveNflPlayoffRaceRanking(payload) {
   });
 }
 
+async function apiSaveNflPlayoffRaceDraft(payload) {
+  return apiPost("saveNflPlayoffRaceDraft", Object.assign({},payload||{}, {leagueId:getApiLeagueId_()}));
+}
+async function apiFinalizeNflPlayoffRaceForecast(payload) {
+  return apiPost("finalizeNflPlayoffRaceForecast",Object.assign({},payload||{}, {leagueId:getApiLeagueId_(),confirmed:true}));
+}
+
 async function apiGetSurvivorState(gameId) {
   const session = getSession ? (getSession() || {}) : {};
   return api("getSurvivorState", {
@@ -1153,11 +1160,6 @@ async function apiRevealRealityTvEpisode(gameId, episodeId) {
 async function apiGetLeaderboard(gameId) {
 
   const session = getSession ? getSession() : {};
-
-  // Preview Cup/Futures needs the new backend adapter, not the @399 GET deployment.
-  if (/^nfl-(?:cup|futures)-2026$/.test(String(gameId||""))) {
-    return apiPost("leaderboard", {username:session.username||"",gameId:gameId,leagueId:getApiLeagueId_()});
-  }
 
   return api("leaderboard", {
     username: session && session.username ? session.username : "",

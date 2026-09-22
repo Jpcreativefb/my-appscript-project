@@ -268,19 +268,22 @@ function doPost(e) {
       }));
     }
 
-    if (action === "saveNflPlayoffRaceRanking") {
+    if (action === "saveNflPlayoffRaceDraft" || action === "finalizeNflPlayoffRaceForecast") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
         ? normalizeLeagueId_(body.leagueId || body.activeLeagueId || "")
         : String(body.leagueId || body.activeLeagueId || "").trim();
       const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", postLeagueId);
-      if (!access.allowed) return json({ success: false, error: "Access denied: " + access.reason });
-      return json(saveNflPlayoffRaceRanking_({
-        username: body.username,
-        gameId: postGameId,
-        categoryId: body.categoryId,
-        rankings: Array.isArray(body.rankings) ? body.rankings : []
-      }));
+      if (!access.allowed) return json({success:false,error:"Access denied: "+access.reason});
+      const data={username:body.username,gameId:postGameId,categoryId:body.categoryId,
+        rankings:Array.isArray(body.rankings)?body.rankings:[],confirmed:body.confirmed===true};
+      return json(action === "saveNflPlayoffRaceDraft"
+        ? nflPlayoffRaceSaveDraftR3_(data)
+        : nflPlayoffRaceFinalizeR3_(data));
+    }
+
+    if (action === "saveNflPlayoffRaceRanking") {
+      return json({success:false,error:"Please refresh and use Save Picks or Finalize Picks."});
     }
 
     if (action === "saveRanking") {
@@ -948,6 +951,8 @@ function doGet(e) {
       action === "savePicksBatch" ||
       action === "saveRanking" ||
       action === "saveNflPlayoffRaceRanking" ||
+      action === "saveNflPlayoffRaceDraft" ||
+      action === "finalizeNflPlayoffRaceForecast" ||
       action === "saveVotingParticipant" ||
       action === "uploadVotingParticipantImage" ||
       action === "saveVotingCompetitionBallot" ||

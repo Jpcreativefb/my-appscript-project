@@ -742,7 +742,8 @@ function appPageScriptUrl_(name, retryToken) {
   url.searchParams.set("v", APP_ASSET_VERSION);
   url.searchParams.set("hotfix", APP_ROUTE_HOTFIX_VERSION);
   if (name === "notifications") url.searchParams.set("module", "v1218j-automatic-pick-reminders");
-  if (name === "rankingSportsR1") url.searchParams.set("playoff", "v1219-nfl-playoff-race-r2-1");
+  if (name === "dashboard") url.searchParams.set("homeCareer", "v1223-dashboard-career-on-demand-r1");
+  if (name === "rankingSportsR1") url.searchParams.set("playoff", "v1222-nfl-playoff-race-r3-team-multipliers");
   if (name === "nflCupR1" || name === "adminGamesRc24e" || name === "seasonHub" || name === "betting") url.searchParams.set("cupFutures", "v1220-nfl-cup-futures-r1");
   if (name === "adminGamesRc24e") url.searchParams.set("cupControl", "v1221-nfl-cup-weekly-season-r2");
   if (name === "picks" || name === "confidenceR2") url.searchParams.set("confidenceWeekly", "v1222-nfl-confidence-weekly-r1");
@@ -2203,6 +2204,7 @@ async function renderPage(page) {
 
       app.innerHTML =
         await renderDashboardPage();
+      if (typeof dashboardHydrateCareerFromCache_ === "function") dashboardHydrateCareerFromCache_();
 
       if (typeof dashboardScheduleHomeEnrichment_ === "function") {
         dashboardScheduleHomeEnrichment_(
