@@ -1,0 +1,35 @@
+const assert=require('node:assert/strict');
+const core=require('../backend/engines/RealityTvSeasonGamesR1Core.js');
+const ballot={orderedIds:['A','B','C','D','E','F','G','H','I','J'],startEpisodeNumber:1};
+const settings={n:10,contributionPercent:25,bonusMultiplier:1,finalPlacementsApproved:false};
+const episode=(number,ids,status='FINAL',outcomeType=ids.length?'elimination':'no-elimination')=>({episodeId:'ep-'+number,episodeNumber:number,eliminatedIds:ids,status,outcomeType});
+let s=core.rtvR1ScoreTopN_(ballot,[episode(1,[]),episode(2,['E']),episode(3,[])],settings,{});
+assert.deepEqual(s.weekly.map(x=>x.points),[55,43,49]);
+assert.equal(s.weeklyTotal,147);assert.equal(s.lostPositions.e,2);assert.equal(s.overallContribution,36.75);
+s=core.rtvR1ScoreTopN_(ballot,[episode(1,[]),episode(2,['A']),episode(3,[])],settings,{});
+assert.deepEqual(s.weekly.map(x=>x.points),[55,35,45]);
+s=core.rtvR1ScoreTopN_(ballot,[episode(1,['A','J'])],settings,{});
+assert.equal(s.weekly[0].survivalPoints,44);assert.equal(s.weekly[0].penaltyPoints,11);assert.equal(s.weekly[0].points,33);
+assert.throws(()=>core.rtvR1ScoreTopN_(ballot,[episode(1,['A'],'OPEN'),episode(2,['A'],'FINAL')],settings,{}),/finalized in order/);
+s=core.rtvR1ScoreTopN_(ballot,[episode(1,['A']),episode(2,[],'OPEN')],settings,{});assert.deepEqual(s.weekly.map(x=>x.points),[35]);
+assert.throws(()=>core.rtvR1ScoreTopN_(ballot,[episode(1,['A']),episode(1,['B'])],settings,{}),/Duplicate official episode/);
+s=core.rtvR1ScoreTopN_(ballot,[episode(1,['A']),episode(2,['A','B'])],settings,{});
+assert.deepEqual(s.weekly.map(x=>x.points),[35,27]); // no double penalty for A
+s=core.rtvR1ScoreTopN_({...ballot,startEpisodeNumber:2},[episode(1,['A']),episode(2,[])],settings,{});
+assert.deepEqual(s.weekly.map(x=>x.points),[55]); // skip episodes before fixed ballot start
+s=core.rtvR1ScoreTopN_(ballot,[episode(1,[])],{...settings,finalPlacementsApproved:true},{a:1,b:3,c:3});
+assert.equal(s.exactFinishBonus,18);assert.equal(s.rawTotal,73);
+assert.throws(()=>core.rtvR1ValidateBallot_(['A','A'],['A','B'],2),/only once/);
+assert.deepEqual(core.rtvR1ValidateBallot_(['A','B'],['A','B','C'],2),['a','b']);
+assert.deepEqual(core.rtvR1ScorePickN_(['A','B','C'],['A','C','D'],3,7,'final'),{status:'final',correct:2,points:14});
+assert.equal(core.rtvR1ScorePickN_(['A','B'],[],2,7,'push').points,0);
+assert.throws(()=>core.rtvR1ScorePickN_(['A','B'],['A'],2,7,'final'),/Official bottom group/);
+assert.deepEqual(core.rtvR1ScorePerfect_('none',['none'],'none',4,'final'),{status:'final',correct:true,points:4});
+assert.equal(core.rtvR1ScorePerfect_('a',['a','b'],'none',4,'final').points,4);
+assert.throws(()=>core.rtvR1ScorePerfect_('a',['a','none'],'none',4,'final'),/cannot be combined/);
+const templates=[{TemplateId:'exit',Enabled:true},{TemplateId:'a',Enabled:false,RandomEligible:true},{TemplateId:'b',Enabled:false,RandomEligible:true},{TemplateId:'c',Enabled:false,RandomEligible:true}];
+const selected=core.rtvR1SelectEpisodeTemplates_(templates,{randomQuestionsEnabled:true,randomExtraQuestionCount:2,avoidRepeat:true},['a'],['a','b','c'],()=>0);
+assert.deepEqual(selected.map(t=>t.TemplateId),['exit','c','b']);
+assert.deepEqual(core.rtvR1SelectEpisodeTemplates_(templates,{randomQuestionsEnabled:false},[],['a','b','c']).map(t=>t.TemplateId),['exit']);
+assert.throws(()=>core.rtvR1SelectEpisodeTemplates_(templates,{randomQuestionsEnabled:true,randomExtraQuestionCount:3,avoidRepeat:true},['a'],['a','b','c']),/Not enough eligible/);
+console.log('PASS: Top N scoring, elimination penalty, late-start guard, exact placement, Pick N, Perfect None/multiple, random selector');

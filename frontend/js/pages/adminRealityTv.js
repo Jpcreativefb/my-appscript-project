@@ -2457,6 +2457,7 @@ function adminRealityTvSeasonBody_(bundle) {
     ${adminRealityTvEpisodeVotesPanel_(bundle)}
     ${adminRealityTvSupplementalQuestionsPanel_(bundle)}
     ${adminRealityTvQuestionPackPanel_(bundle)}
+    ${window.PATTC_REALITY_TOPN_R1 ? window.PATTC_REALITY_TOPN_R1.adminPanel(season.SeasonId) : ''}
     ${adminRealityTvSeasonAnchorPanel_(bundle)}
     ${adminRealityTvContestantRows_(bundle.contestants)}
     ${adminRealityTvManageCastPanel_(bundle)}

@@ -84,6 +84,14 @@ export async function onRequestPost(context) {
     return jsonResponse({ success: false, previewOnly: true,
       message: "This setup or ranking write is disabled in Cloudflare Preview because its Google Sheet is shared with production. Use the canonical production app for launch setup." }, 200);
   }
+  // Reality TV R1 shares the same production Sheet. Preview must be review-only.
+  if (!productionRequest && new Set([
+    "saveRealityTopNBallot", "adminSaveRealityTopNSettings", "adminApproveRealityTopNPlacements",
+    "adminSaveRealityQuestionMix", "adminSaveRealityAdvancedQuestion"
+  ]).has(action)) {
+    return jsonResponse({success:false,previewOnly:true,
+      message:"Reality TV season-game writes are disabled in Preview because it shares production data."},403);
+  }
   // Preview shares production Sheets: reject all Visual Studio draft/publish/version writes.
   if (!productionRequest && action === "adminSaveAppearanceOverride" &&
       /^visual-studio-(draft|published|version)$/i.test(String(body.entityType || ""))) {

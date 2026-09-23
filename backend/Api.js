@@ -765,6 +765,13 @@ function doPost(e) {
     // REALITY TV LARGE WRITES
     // =========================
 
+    // Optional Top N: old Reality games remain unchanged while this is disabled.
+    if (action === "getRealityTopN") return json(apiGetRealityTopN(body));
+    if (action === "saveRealityTopNBallot") return json(apiSaveRealityTopNBallot(body));
+    if (action === "adminGetRealityTopNSettings") return json(apiAdminGetRealityTopNSettings(body));
+    if (action === "adminSaveRealityTopNSettings") return json(apiAdminSaveRealityTopNSettings(body));
+    if (action === "adminApproveRealityTopNPlacements") return json(apiAdminApproveRealityTopNPlacements(body));
+
     if (action === "adminCreateRealityTvSeason") {
       return json(apiAdminCreateRealityTvSeason(body));
     }

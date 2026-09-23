@@ -1913,6 +1913,7 @@ PICKS_PAGE_DATA.confidenceScoringMode =
         ${renderPicksCategoryList()}
       </div>
 
+      <div class="reality-season-long-slot" id="realityTopNMount"></div>
       <div class="reality-season-long-slot" id="seasonAnchorPickMount">${renderSeasonAnchorPickCard_()}</div>
 
       <div id="realityCinematicCastMount">${renderRealityTvCinematicCastPreview_()}</div>
@@ -6818,6 +6819,7 @@ function mountPicksPage() {
 
   applyPicksAppearanceToPage_();
   mountRealityTvSoleSurvivorSticky_();
+  if (window.PATTC_REALITY_TOPN_R1) window.PATTC_REALITY_TOPN_R1.mount();
 
   // Optional Reality TV statistics and Season Survivor details are intentionally
   // delayed so a 10-30 second statistics/archive request never competes with

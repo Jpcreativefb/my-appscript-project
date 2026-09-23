@@ -1,0 +1,13 @@
+const assert=require('node:assert/strict');
+const c=require('../backend/engines/RealityTvSeasonGamesR1Core.js');
+assert.equal(c.rtvR1ScoreTopNQuestion_(['a','c','e'],['a','d','e'],3,7,'final').points,14);
+assert.deepEqual(c.rtvR1ScoreOrderedQuestion_(['a','b','c'],['a','c','b'],[10,8,6,4,2],'final').positions.map(x=>x.points),[10,8,8]);
+assert.equal(c.rtvR1ScoreOrderedQuestion_(['a','b'],['a','b'],[10,8],'push').points,0);
+assert.equal(c.rtvR1ScoreOverUnder_('over',38,37.5,4,'final').points,4);
+assert.equal(c.rtvR1ScoreOverUnder_('over',38,38,4,'final').status,'push');
+assert.equal(c.rtvR1ScoreHeadToHead_('a','a','b',{a:2,b:4},7,'final').points,7);
+assert.equal(c.rtvR1ScoreHeadToHead_('a','a','b',{a:2,b:2},7,'final').status,'push');
+assert.equal(c.rtvR1ScoreRange_('mid',34,[{id:'low',min:0,max:32},{id:'mid',min:33,max:35}],5,'final').points,5);
+assert.throws(()=>c.rtvR1ScoreRange_('mid',33,[{id:'low',min:0,max:33},{id:'mid',min:33,max:35}],5,'final'),/exactly one/);
+assert.throws(()=>c.rtvR1ScoreOrderedQuestion_(['a','a'],['a','b'],[10,8],'final'),/Invalid ranking prediction/);
+console.log('PASS: reusable Top N, ordered partial-credit, over-under, head-to-head, range and push scoring');
