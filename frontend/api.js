@@ -977,6 +977,13 @@ async function apiSaveNflPlayoffRaceRanking(payload) {
   });
 }
 
+async function apiSaveNflPlayoffRaceDraft(payload) {
+  return apiPost("saveNflPlayoffRaceDraft", Object.assign({},payload||{}, {leagueId:getApiLeagueId_()}));
+}
+async function apiFinalizeNflPlayoffRaceForecast(payload) {
+  return apiPost("finalizeNflPlayoffRaceForecast",Object.assign({},payload||{}, {leagueId:getApiLeagueId_(),confirmed:true}));
+}
+
 async function apiGetSurvivorState(gameId) {
   const session = getSession ? (getSession() || {}) : {};
   return api("getSurvivorState", {

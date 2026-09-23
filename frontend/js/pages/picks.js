@@ -2090,18 +2090,70 @@ function hasStakedPointsCategories() {
    COMPACT CONFIDENCE CARD — v1.2.17a
 ========================= */
 
-function getCompactConfidenceCategories_() {
 
-  return (PICKS_PAGE_DATA.categories || []).filter(function(category) {
-    return (
-      isPicksPageCategory(category) &&
-      !category.parentCategoryId &&
-      usesConfidencePointsCategory(category)
-    );
+/* PATTC NFL Confidence weekly card R1 — active weeks remain independent. */
+var PATTC_CONFIDENCE_SELECTED_WEEK_R1_ = 0;
+function pattcConfidenceWeeklyEnabledR1_(){
+  return String(PICKS_PAGE_DATA && PICKS_PAGE_DATA.gameId || '').toLowerCase()==='nfl-confidence-2026';
+}
+function pattcConfidenceWeekR1_(category){
+  category=category||{};
+  var text=String(category.section||category.Section||'');
+  var match=text.match(/\bNFL\s+Week\s*(\d{1,2})\b/i);
+  if(match)return Number(match[1]);
+  var raw=category.sourceConfigJSON||(category.settings&&category.settings.sourceConfigJSON)||'';
+  if(raw){try{var info=typeof raw==='string'?JSON.parse(raw):raw;
+    var week=Number(info.week);if(Number.isInteger(week)&&week>=1&&week<=22)return week;
+  }catch(e){}}
+  return 0;
+}
+function pattcConfidenceAllCategoriesR1_(){
+  return (PICKS_PAGE_DATA.categories||[]).filter(function(category){
+    return isPicksPageCategory(category)&&!category.parentCategoryId&&usesConfidencePointsCategory(category);
   });
-
+}
+function pattcConfidenceCurrentWeekR1_(all){
+  all=all||pattcConfidenceAllCategoriesR1_();
+  var weeks=Array.from(new Set(all.map(pattcConfidenceWeekR1_).filter(function(n){return n>0;}))).sort(function(a,b){return a-b;});
+  if(!weeks.length||all.some(function(c){return pattcConfidenceWeekR1_(c)===0;}))return 0;
+  if(weeks.indexOf(PATTC_CONFIDENCE_SELECTED_WEEK_R1_)!==-1)return PATTC_CONFIDENCE_SELECTED_WEEK_R1_;
+  // The first not-yet-complete week is the current card, even when future weeks
+  // have already been imported. Once all its kickoffs pass, advance naturally.
+  for(var i=0;i<weeks.length;i++){
+    var w=weeks[i];
+    if(all.some(function(c){
+      if(pattcConfidenceWeekR1_(c)!==w||c.locked===true)return false;
+      var at=new Date(c.lockDateTime||c.gameDateTime||'').getTime();
+      return Number.isFinite(at)&&Date.now()<at;
+    }))return w;
+  }
+  return weeks[weeks.length-1];
+}
+function pattcConfidenceChooseWeekR1_(week){
+  PATTC_CONFIDENCE_SELECTED_WEEK_R1_=Number(week)||0;
+  PICKS_CONFIDENCE_SORT_ORDER=[];
+  PICKS_CONFIDENCE_SORT_STALE=false;
+  refreshPicksPage();
+}
+function pattcConfidenceWeekPickerR1_(){
+  if(!pattcConfidenceWeeklyEnabledR1_())return '';
+  var all=pattcConfidenceAllCategoriesR1_();
+  var current=pattcConfidenceCurrentWeekR1_(all);
+  if(!current)return '';
+  var weeks=Array.from(new Set(all.map(pattcConfidenceWeekR1_))).sort(function(a,b){return a-b;});
+  return '<div class="confidence-week-picker" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px">'+
+    '<label for="pattcConfidenceWeekR1" style="font-weight:700">NFL week</label><select id="pattcConfidenceWeekR1" onchange="pattcConfidenceChooseWeekR1_(this.value)" aria-label="Choose NFL Confidence week">'+
+    weeks.map(function(w){return '<option value="'+w+'"'+(w===current?' selected':'')+'>Week '+w+'</option>';}).join('')+'</select>'+
+    '<span>Each week has its own confidence rankings and saved picks.</span></div>';
 }
 
+
+function getCompactConfidenceCategories_(){
+  var all=pattcConfidenceAllCategoriesR1_();
+  if(!pattcConfidenceWeeklyEnabledR1_())return all;
+  var week=pattcConfidenceCurrentWeekR1_(all);
+  return week?all.filter(function(c){return pattcConfidenceWeekR1_(c)===week;}):all;
+}
 function shouldRenderCompactConfidenceSlate_() {
 
   if (PICKS_PAGE_DATA.isConfidenceGame !== true) return false;
@@ -2119,6 +2171,7 @@ function shouldRenderCompactConfidenceSlate_() {
 }
 
 function resetConfidenceViewState_() {
+  PATTC_CONFIDENCE_SELECTED_WEEK_R1_ = 0;
 
   if (PICKS_CONFIDENCE_LIVE_TIMER) {
     clearInterval(PICKS_CONFIDENCE_LIVE_TIMER);
@@ -3743,6 +3796,7 @@ function renderCompactConfidenceSlate_() {
 
   return `
     <div class="sports-default-confidence-board">
+      ${pattcConfidenceWeekPickerR1_()}
       ${renderSportsDefaultConfidenceActionHeader_()}
       <div class="confidence-compact-slate sports-default-confidence ${escapeAttr(presentation.className)}" style="${escapeAttr(presentation.style)}">
         ${categories.map(renderCompactConfidenceRow_).join("")}
@@ -5465,109 +5519,41 @@ function getMaxConfidencePoints() {
 
 }
 
-function getUsedConfidencePointsForOtherCategories(
-  categoryId
-) {
 
-  const used = [];
-
-  Object.keys(
-    PICKS_PAGE_DATA.confidencePoints || {}
-  ).forEach(otherCategoryId => {
-
-    if (
-      normalizeId(otherCategoryId) ===
-      normalizeId(categoryId)
-    ) {
-      return;
-    }
-
-    const otherCategory =
-      (PICKS_PAGE_DATA.categories || []).find(category =>
-        normalizeId(category.id) === normalizeId(otherCategoryId)
-      );
-
-    if (!usesConfidencePointsCategory(otherCategory)) {
-      return;
-    }
-
-    const otherHasPick =
-      Boolean(
-        PICKS_PAGE_DATA.picks[otherCategoryId]
-      );
-
-    if (!otherHasPick && !shouldRenderCompactConfidenceSlate_()) {
-      return;
-    }
-
-    const value =
-      Number(
-        PICKS_PAGE_DATA.confidencePoints[otherCategoryId]
-      ) || 0;
-
-    if (
-      value > 0 &&
-      used.indexOf(value) === -1
-    ) {
-      used.push(value);
-    }
-
+function getUsedConfidencePointsForOtherCategories(categoryId){
+  var used=[];
+  var activeIds=null;
+  if(pattcConfidenceWeeklyEnabledR1_()){
+    activeIds={};getConfidenceEligibleCategories().forEach(function(c){activeIds[normalizeId(c.id)]=true;});
+  }
+  Object.keys(PICKS_PAGE_DATA.confidencePoints||{}).forEach(function(otherCategoryId){
+    if(normalizeId(otherCategoryId)===normalizeId(categoryId))return;
+    if(activeIds&&!activeIds[normalizeId(otherCategoryId)])return;
+    var otherCategory=(PICKS_PAGE_DATA.categories||[]).find(function(c){return normalizeId(c.id)===normalizeId(otherCategoryId);});
+    if(!usesConfidencePointsCategory(otherCategory))return;
+    if(!PICKS_PAGE_DATA.picks[otherCategoryId]&&!shouldRenderCompactConfidenceSlate_())return;
+    var value=Number(PICKS_PAGE_DATA.confidencePoints[otherCategoryId])||0;
+    if(value>0&&used.indexOf(value)===-1)used.push(value);
   });
-
   return used;
-
 }
 
-function getUsedConfidencePoints() {
-
-  const used = [];
-
-  Object.keys(
-    PICKS_PAGE_DATA.confidencePoints || {}
-  ).forEach(categoryId => {
-
-    const category =
-      (PICKS_PAGE_DATA.categories || []).find(item =>
-        normalizeId(item.id) === normalizeId(categoryId)
-      );
-
-    if (!usesConfidencePointsCategory(category)) {
-      return;
-    }
-
-    const hasPick =
-      Boolean(
-        PICKS_PAGE_DATA.picks[categoryId]
-      );
-
-    if (!hasPick && !shouldRenderCompactConfidenceSlate_()) {
-      return;
-    }
-
-    const value =
-      Number(
-        PICKS_PAGE_DATA.confidencePoints[categoryId]
-      ) || 0;
-
-    if (
-      value > 0 &&
-      used.indexOf(value) === -1
-    ) {
-
-      used.push(value);
-
-    }
-
+function getUsedConfidencePoints(){
+  var used=[];
+  var activeIds=null;
+  if(pattcConfidenceWeeklyEnabledR1_()){
+    activeIds={};getConfidenceEligibleCategories().forEach(function(c){activeIds[normalizeId(c.id)]=true;});
+  }
+  Object.keys(PICKS_PAGE_DATA.confidencePoints||{}).forEach(function(id){
+    if(activeIds&&!activeIds[normalizeId(id)])return;
+    var category=(PICKS_PAGE_DATA.categories||[]).find(function(c){return normalizeId(c.id)===normalizeId(id);});
+    if(!usesConfidencePointsCategory(category))return;
+    if(!PICKS_PAGE_DATA.picks[id]&&!shouldRenderCompactConfidenceSlate_())return;
+    var value=Number(PICKS_PAGE_DATA.confidencePoints[id])||0;
+    if(value>0&&used.indexOf(value)===-1)used.push(value);
   });
-
-  used.sort((a, b) =>
-    b - a
-  );
-
-  return used;
-
+  return used.sort(function(a,b){return b-a;});
 }
-
 function updateConfidenceForCategory(
   categoryId,
   value
@@ -7254,18 +7240,13 @@ function getLayoutClass(category) {
 
 }
 
-function getConfidenceEligibleCategories() {
 
-  const categories =
-    PICKS_PAGE_DATA.categories || [];
-
-  return categories.filter(cat =>
-    !cat.parentCategoryId &&
-    usesConfidencePointsCategory(cat)
-  );
-
+function getConfidenceEligibleCategories(){
+  if(pattcConfidenceWeeklyEnabledR1_())return getCompactConfidenceCategories_();
+  return (PICKS_PAGE_DATA.categories||[]).filter(function(cat){
+    return !cat.parentCategoryId&&usesConfidencePointsCategory(cat);
+  });
 }
-
 function getLockedUnpickedConfidenceCount() {
 
   const categories =
@@ -7290,22 +7271,14 @@ function getLockedUnpickedConfidenceCount() {
 
 }
 
-function getMaxAvailableConfidencePoints() {
 
-  const total =
-    getConfidenceEligibleCategories()
-      .length;
-
-  const lockedUnpicked =
-    getLockedUnpickedConfidenceCount();
-
-  return Math.max(
-    total - lockedUnpicked,
-    1
-  );
-
+function getMaxAvailableConfidencePoints(){
+  var total=getConfidenceEligibleCategories().length;
+  // An already-started matchup cannot be newly selected, but does not shrink
+  // the week's 1..N confidence scale for the remaining playable matchups.
+  if(pattcConfidenceWeeklyEnabledR1_())return Math.max(total,1);
+  return Math.max(total-getLockedUnpickedConfidenceCount(),1);
 }
-
 function renderConfidenceOptionsForCategory(
   categoryId,
   currentValue
@@ -9675,11 +9648,11 @@ async function confidenceRc24aLoadCompletion_(){
   CONFIDENCE_RC24A_COMPLETION_LOADING=true;
   try{
     var session=PICKS_PAGE_DATA.session||getSession()||{};
-    var res=await api('getSportsConfidenceCompletion',{username:session.username||'',gameId:PICKS_PAGE_DATA.gameId,leagueId:confidenceRc24aLeagueId_()});
+    var res=await api('getSportsConfidenceCompletion',{username:session.username||'',gameId:PICKS_PAGE_DATA.gameId,leagueId:confidenceRc24aLeagueId_(),week:pattcConfidenceWeeklyEnabledR1_()?pattcConfidenceCurrentWeekR1_():0});
     if(res&&res.success!==false) CONFIDENCE_RC24A_COMPLETION_STATE=res;
   }catch(err){console.warn('Confidence completion summary unavailable',err);}finally{CONFIDENCE_RC24A_COMPLETION_LOADING=false;confidenceRc24aMountCompletion_();}
 }
-function confidenceRc24aSwitchWeek_(gameId){ if(!gameId)return; try{localStorage.setItem('gameId',gameId);}catch(e){} if(window.APP_STATE) APP_STATE.gameId=gameId; if(typeof navigate==='function') navigate('picks',{skipUnsavedCheck:true}); }
+function confidenceRc24aSwitchWeek_(gameId,week){ if(pattcConfidenceWeeklyEnabledR1_()){var selected=Number(week)||0;if(selected&&typeof pattcConfidenceChooseWeekR1_==='function'){CONFIDENCE_RC24A_COMPLETION_STATE=null;pattcConfidenceChooseWeekR1_(selected);confidenceRc24aLoadCompletion_();}return;} if(!gameId)return; try{localStorage.setItem('gameId',gameId);}catch(e){} if(window.APP_STATE) APP_STATE.gameId=gameId; if(typeof navigate==='function') navigate('picks',{skipUnsavedCheck:true}); }
 function confidenceRc24aSwitchLeague_(id){try{localStorage.setItem('leagueId',id||'');}catch(e){} CONFIDENCE_RC24A_COMPLETION_STATE=null;confidenceRc24aLoadCompletion_();}
 function confidenceRc24aMyWeekHtml_(s) {
   const m = s.myWeek || {};
@@ -9723,7 +9696,7 @@ function confidenceRc24aLogoHtml_(src, alt, className){
   return platformImgHtml(src,{variant:'logo',alt:String(alt||''),className:className||''});
 }
 function confidenceRc24aCompareLogo_(m){if(m.hidden)return '<span class="confidence-final-compare-lock" title="Hidden until lock/start">🔒</span>';if(m.logo)return confidenceRc24aLogoHtml_(m.logo,m.team||'Team','confidence-final-compare-logo');return `<span class="confidence-final-compare-abbr">${confidenceRc24aEscape_(String(m.teamId||m.team||'—').slice(0,3).toUpperCase())}</span>`;}
-function confidenceRc24aCompareHtml_(s){var lc=s.leagueContext||{};return `<section class="confidence-final-compare"><div class="confidence-final-section-head"><strong>COMPARE</strong><span>2+ players · revealed only after lock/start</span></div><div class="confidence-final-compare-filters"><label>Week <select onchange="confidenceRc24aSwitchWeek_(this.value)">${((s.season&&s.season.weeks)||[]).map(function(w){return `<option value="${confidenceRc24aEscape_(w.gameId)}" ${Number(w.week)===Number(s.week)?'selected':''}>Week ${confidenceRc24aEscape_(w.week)}</option>`;}).join('')}</select></label>${(lc.leagues||[]).length>1?`<label>League <select onchange="confidenceRc24aSwitchLeague_(this.value)">${lc.leagues.map(function(l){return `<option value="${confidenceRc24aEscape_(l.leagueId)}" ${l.leagueId===lc.leagueId?'selected':''}>${confidenceRc24aEscape_(l.leagueName||l.leagueId)}</option>`;}).join('')}</select></label>`:''}</div><div class="confidence-final-compare-grid">${(s.compare||[]).slice(0,8).map(function(p){var logos=(p.matchups||[]).slice(0,6).map(confidenceRc24aCompareLogo_).join('');return `<details><summary><span class="confidence-final-compare-player"><strong>${confidenceRc24aEscape_(p.displayName||p.username)}</strong><span class="confidence-final-compare-logos">${logos}</span></span><span>${confidenceRc24aEscape_(p.points||0)} pts · +${confidenceRc24aEscape_(p.possibleRemaining||0)}</span></summary><div>${(p.matchups||[]).map(function(m){if(m.hidden)return `<div class="confidence-final-compare-detail is-hidden"><span class="confidence-final-compare-lock">🔒</span><span>Pick and Confidence allocation hidden until lock/start</span></div>`;return `<div class="confidence-final-compare-detail">${confidenceRc24aCompareLogo_(m)}<strong>${confidenceRc24aEscape_(m.team||m.teamId)}</strong><span>C${confidenceRc24aEscape_(m.confidencePoints||0)}</span><span>${m.pointsEarned===null||m.pointsEarned===undefined?'pending':confidenceRc24aEscape_(m.pointsEarned)+' pts'} · ${confidenceRc24aEscape_(m.result||'pending')}</span></div>`;}).join('')}</div></details>`;}).join('')}</div></section>`;}
+function confidenceRc24aCompareHtml_(s){var lc=s.leagueContext||{};return `<section class="confidence-final-compare"><div class="confidence-final-section-head"><strong>COMPARE</strong><span>2+ players · revealed only after lock/start</span></div><div class="confidence-final-compare-filters"><label>Week <select onchange="confidenceRc24aSwitchWeek_(this.value,this.options[this.selectedIndex].dataset.week)">${((s.season&&s.season.weeks)||[]).map(function(w){return `<option value="${confidenceRc24aEscape_(w.gameId)}" data-week="${confidenceRc24aEscape_(w.week)}" ${Number(w.week)===Number(s.week)?'selected':''}>Week ${confidenceRc24aEscape_(w.week)}</option>`;}).join('')}</select></label>${(lc.leagues||[]).length>1?`<label>League <select onchange="confidenceRc24aSwitchLeague_(this.value)">${lc.leagues.map(function(l){return `<option value="${confidenceRc24aEscape_(l.leagueId)}" ${l.leagueId===lc.leagueId?'selected':''}>${confidenceRc24aEscape_(l.leagueName||l.leagueId)}</option>`;}).join('')}</select></label>`:''}</div><div class="confidence-final-compare-grid">${(s.compare||[]).slice(0,8).map(function(p){var logos=(p.matchups||[]).slice(0,6).map(confidenceRc24aCompareLogo_).join('');return `<details><summary><span class="confidence-final-compare-player"><strong>${confidenceRc24aEscape_(p.displayName||p.username)}</strong><span class="confidence-final-compare-logos">${logos}</span></span><span>${confidenceRc24aEscape_(p.points||0)} pts · +${confidenceRc24aEscape_(p.possibleRemaining||0)}</span></summary><div>${(p.matchups||[]).map(function(m){if(m.hidden)return `<div class="confidence-final-compare-detail is-hidden"><span class="confidence-final-compare-lock">🔒</span><span>Pick and Confidence allocation hidden until lock/start</span></div>`;return `<div class="confidence-final-compare-detail">${confidenceRc24aCompareLogo_(m)}<strong>${confidenceRc24aEscape_(m.team||m.teamId)}</strong><span>C${confidenceRc24aEscape_(m.confidencePoints||0)}</span><span>${m.pointsEarned===null||m.pointsEarned===undefined?'pending':confidenceRc24aEscape_(m.pointsEarned)+' pts'} · ${confidenceRc24aEscape_(m.result||'pending')}</span></div>`;}).join('')}</div></details>`;}).join('')}</div></section>`;}
 function confidenceRc24aTrendsHtml_(s){return `<section class="confidence-final-trends"><div class="confidence-final-section-head"><strong>MY PICK TRENDS</strong><span>Top 5</span></div>${(s.trends||[]).map(function(t){return `<div class="confidence-final-trend-row">${t.logo?confidenceRc24aLogoHtml_(t.logo,t.team||'Team','confidence-final-trend-logo'):''}<strong>${confidenceRc24aEscape_(t.team)}</strong><span>${confidenceRc24aEscape_(t.selections)} picks</span><em>${t.winPercentage===null?'—':confidenceRc24aEscape_(t.winPercentage)+'%'}</em></div>`;}).join('')}<details><summary>View All Teams</summary>${(s.allTrends||[]).map(function(t){return `<p>${confidenceRc24aEscape_(t.team)} · ${confidenceRc24aEscape_(t.selections)} picks · ${confidenceRc24aEscape_(t.correct)} correct · ${t.winPercentage===null?'—':confidenceRc24aEscape_(t.winPercentage)+'%'}</p>`;}).join('')}</details></section>`;}
 function confidenceRc24aMountCompletion_(){var el=document.getElementById('confidenceRc24aCompletion');if(!el)return;var s=CONFIDENCE_RC24A_COMPLETION_STATE;if(!s){el.innerHTML='<div class="confidence-final-loading">Loading My Week and standings…</div>';return;}var summary=document.getElementById('confidenceRc24aMyWeek');if(summary)summary.innerHTML=confidenceRc24aMyWeekHtml_(s);el.innerHTML=confidenceRc24aStandingsHtml_(s)+confidenceRc24aSeasonHtml_(s)+confidenceRc24aCompareHtml_(s)+confidenceRc24aTrendsHtml_(s);}
 

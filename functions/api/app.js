@@ -12,6 +12,8 @@ const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
   "adminSaveNflPlayoffRaceSettings",
   "getNflPlayoffRaceState",
   "saveNflPlayoffRaceRanking",
+  "saveNflPlayoffRaceDraft",
+  "finalizeNflPlayoffRaceForecast",
   "adminPrepareNflCupFuturesR1"
 ]);
 
@@ -79,10 +81,16 @@ export async function onRequestPost(context) {
     "adminPrepareNflCupFuturesR1",
     "adminBuildNflSeasonPack",
     "adminSaveNflPlayoffRaceSettings",
-    "saveNflPlayoffRaceRanking"
+    "saveNflPlayoffRaceRanking",
+    "saveNflPlayoffRaceDraft",
+    "finalizeNflPlayoffRaceForecast"
   ]).has(action)) {
     return jsonResponse({ success: false, previewOnly: true,
       message: "This setup or ranking write is disabled in Cloudflare Preview because its Google Sheet is shared with production. Use the canonical production app for launch setup." }, 200);
+  }
+  if (!productionRequest && /^nfl-playoff-race-\d{4}$/i.test(gameId) && action === "saveRanking") {
+    return jsonResponse({success:false, previewOnly:true,
+      message:"Playoff Race preview is read-only because it shares production data."}, 200);
   }
   // Preview shares production Sheets: reject all Visual Studio draft/publish/version writes.
   if (!productionRequest && action === "adminSaveAppearanceOverride" &&

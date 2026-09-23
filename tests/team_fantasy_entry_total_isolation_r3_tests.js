@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs'),assert=require('assert'),vm=require('vm');
+const src=fs.readFileSync('frontend/js/pages/teamFantasy.js','utf8');
+const start=src.indexOf('function teamFantasyScoreValue_(');
+const end=src.indexOf('function teamFantasySelectedTeam_(',start);
+assert(start>=0&&end>start);
+const context={teamFantasyGameDayViewer_:()=>null};vm.createContext(context);vm.runInContext(src.slice(start,end),context);
+const other={weekPoints:90,viewerWeekPoints:90};
+assert.strictEqual(context.teamFantasyScoreValue_(other,null),null,'no lineup must never borrow another entry total');
+assert.strictEqual(context.teamFantasyScoreValue_(other,{entry:{entryId:'two'}}),null,'state-wide total must not leak to second entry');
+assert.strictEqual(context.teamFantasyScoreValue_(other,{entry:{entryId:'one'},weekPoints:21}),21);
+context.teamFantasyGameDayViewer_=id=>id==='one'?{totalPoints:48}:{totalPoints:''};
+assert.strictEqual(context.teamFantasyScoreValue_(other,{entry:{entryId:'one'},weekPoints:21}),48);
+assert.strictEqual(context.teamFantasyScoreValue_(other,{entry:{entryId:'two'},weekPoints:12}),12);
+console.log('Team Fantasy entry-local totals: no cross-entry/state-wide metric fallback PASS');

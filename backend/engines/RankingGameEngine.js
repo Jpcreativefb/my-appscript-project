@@ -372,6 +372,9 @@ function saveRankingBallot_(payload) {
   const categoryId = rankingKey_(payload.categoryId);
   const rankings = Array.isArray(payload.rankings) ? payload.rankings : [];
   if (!gameId || !username || !categoryId) throw new Error("Username, GameId, and CategoryId are required.");
+  // Only the authenticated Finalize workflow may commit Playoff Race ballots.
+  if (typeof nflPlayoffRaceIsGame_ === "function" && nflPlayoffRaceIsGame_(gameId) &&
+      payload.playoffRaceTimingAuthorized !== true) throw new Error("Use Finalize Picks for Playoff Race.");
 
   const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
   if (!game || (rankingKey_(game.type) !== "ranking" && game.rankingEnabled !== true)) {
@@ -382,7 +385,10 @@ function saveRankingBallot_(payload) {
     return rankingKey_(item.id) === categoryId;
   });
   if (!category) throw new Error("Ranking question not found.");
-  if (rankingCategoryLocked_(game, category)) throw new Error("This ranking question is locked.");
+  const raceTimingAuthorized = payload.playoffRaceTimingAuthorized === true &&
+    typeof nflPlayoffRaceIsGame_ === "function" && nflPlayoffRaceIsGame_(gameId) &&
+    typeof nflPlayoffRaceStaticLockedR3_ === "function" && !nflPlayoffRaceStaticLockedR3_(game,category);
+  if (!raceTimingAuthorized && rankingCategoryLocked_(game, category)) throw new Error("This ranking question is locked.");
 
   const finalRanks = rankingFinalRanksForGame_(gameId)[categoryId] || {};
   if (rankingFinalOrderComplete_(category, finalRanks)) throw new Error("This ranking question has already been settled.");
@@ -549,8 +555,12 @@ function rankingLeaderboardData_(gameId) {
       const baseRemain = score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus;
       baseTotal += baseEarned;
       baseRemaining += baseRemain;
-      total += baseEarned * multiplier;
-      remaining += baseRemain * multiplier;
+      const snap = nflMultiplierByUser && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
+        ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
+      const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
+        ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
+      total += weighted ? weighted.earnedPoints : baseEarned * multiplier;
+      remaining += weighted ? weighted.remainingPoints : baseRemain * multiplier;
       exactCount += score.exactCount;
       if (score.resolved) resolvedQuestions++;
     });
@@ -615,13 +625,17 @@ function rankingUserScoring_(username, gameId) {
     const multiplier = nflMultipliers && nflMultipliers[categoryId] !== undefined
       ? Number(nflMultipliers[categoryId]) || 0
       : 1;
+    const snap = nflMultipliers && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
+      ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
+    const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
+      ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
     scoring[categoryId] = {
       shortName: category.shortName || category.name,
       nomineeId: ballot.length ? "ranking-ballot" : "",
       winnerNomineeId: "",
-      earnedPoints: Math.round((score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0)) * multiplier * 100) / 100,
-      remainingPoints: Math.round((score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
-      finalPointsAvailable: Math.round((score.maxPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
+      earnedPoints: weighted ? weighted.earnedPoints : Math.round((score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0)) * multiplier * 100) / 100,
+      remainingPoints: weighted ? weighted.remainingPoints : Math.round((score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
+      finalPointsAvailable: weighted ? weighted.finalPointsAvailable : Math.round((score.maxPoints + playoffBonus.maxBonus) * multiplier * 100) / 100,
       baseEarnedPoints: score.earnedPoints + (playoffBonus.resolved ? playoffBonus.total : 0),
       baseRemainingPoints: score.resolved ? 0 : score.remainingPoints + playoffBonus.maxBonus,
       baseFinalPointsAvailable: score.maxPoints + playoffBonus.maxBonus,
