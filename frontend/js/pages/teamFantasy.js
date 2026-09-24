@@ -460,8 +460,9 @@ function teamFantasyPositionMetric_(entryId,slot){
   if(status!=='live'&&status!=='final')status='upcoming';
   const points=live&&isFinite(Number(live.fantasyPoints))?Number(live.fantasyPoints):0;
   const liveRank=live&&Number(live.weekRank||0)>0?Number(live.weekRank):0;
-  const preRank=team&&Number(team.rank||0)>0?Number(team.rank):0;
-  const rank=liveRank||preRank;
+  // Saved lineup positions show only their actual selected-entry rank.
+  // The full NFL team ranking remains available in the team picker.
+  const rank=(status==='live'||status==='final')?liveRank:0;
   const method=live&&live.pickMethod?live.pickMethod:(slot&&slot.pick?slot.pick.pickMethod:'');
   return{status:status,points:points,rank:rank,method:method,game:game,team:team,live:live};
 }
