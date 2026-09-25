@@ -191,6 +191,21 @@ function normalizeConfidencePoints_(
 
 }
 
+
+/* PATTC NFL Confidence weekly points R1: authoritative per-week uniqueness. */
+function pattcConfidenceServerWeekR1_(gameId,categoryId,settings){
+  if(normalizeLower_(gameId)!=='nfl-confidence-2026')return 'whole-game';
+  var config=(settings||{})[normalizeLower_(categoryId)]||(settings||{})[categoryId]||{};
+  var raw=config.sourceConfigJSON||config.SourceConfigJSON||'';
+  if(raw){try{
+    var obj=typeof raw==='string'?JSON.parse(raw):raw;
+    var n=Number(obj.week);
+    if(Number.isInteger(n)&&n>=1&&n<=22&&String(obj.source||'').indexOf('sports-confidence')!==-1)return 'nfl-week-'+n;
+  }catch(e){}}
+  // Missing week metadata cannot bypass the established uniqueness constraint.
+  return 'legacy';
+}
+
 function hasDuplicateConfidencePoints_(
   gameId,
   username,
@@ -310,6 +325,9 @@ function hasDuplicateConfidencePoints_(
     if (!rowUsesConfidencePoints) {
       continue;
     }
+
+    if(pattcConfidenceServerWeekR1_(gameId,categoryId,settings)!==
+       pattcConfidenceServerWeekR1_(gameId,rowCategoryId,settings))continue;
 
     const rowConfidencePoints =
       normalizeConfidencePoints_(
@@ -1301,16 +1319,17 @@ function saveConfidencePicksBatch(payload) {
       const points = normalizeConfidencePoints_(finalConfidenceByCategory[categoryId]);
       if (points <= 0) return;
 
+      const ownerKey = pattcConfidenceServerWeekR1_(gameId,categoryId,settings)+'::'+points;
       if (
-        confidenceOwner[points] &&
-        confidenceOwner[points] !== categoryId
+        confidenceOwner[ownerKey] &&
+        confidenceOwner[ownerKey] !== categoryId
       ) {
         throw new Error(
           "Confidence " + points + " is assigned more than once. Each number can only be used once."
         );
       }
 
-      confidenceOwner[points] = categoryId;
+      confidenceOwner[ownerKey] = categoryId;
 
     });
 

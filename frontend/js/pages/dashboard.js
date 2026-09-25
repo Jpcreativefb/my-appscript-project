@@ -3,8 +3,87 @@
 ====================== */
 
 let DASHBOARD_HOME_REFRESH_REQUEST = null;
-let DASHBOARD_HOME_ENRICHMENT_TIMER = null;
-let DASHBOARD_HOME_ENRICHMENT_CONTEXT = "";
+
+// Career history traverses archived workbooks and can take 30+ seconds.
+// Home never requests it automatically: loading is opt-in when Career Stats opens.
+// Keep only a short-lived, per-session in-memory copy so redraws do not repeat it.
+const DASHBOARD_CAREER_CACHE_TTL_MS_ = 5 * 60 * 1000;
+let DASHBOARD_CAREER_CACHE_ = null;
+let DASHBOARD_CAREER_REQUEST_ = null;
+
+function dashboardCareerIdentity_() {
+  const session = typeof getSession === "function" ? getSession() : null;
+  return { username: String(session && session.username || "").trim().toLowerCase(),
+    token: String(session && session.token || "") };
+}
+
+function dashboardCachedCareerResponse_() {
+  const identity = dashboardCareerIdentity_();
+  const entry = DASHBOARD_CAREER_CACHE_;
+  return identity.username && entry && entry.username === identity.username &&
+    entry.token === identity.token && Date.now() - entry.savedAt < DASHBOARD_CAREER_CACHE_TTL_MS_
+      ? entry.response : null;
+}
+
+function dashboardHydrateCareerFromCache_() {
+  if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") return;
+  const cached = dashboardCachedCareerResponse_();
+  if (cached) hydrateDashboardCareerStats_(cached);
+}
+
+function dashboardCareerStatus_(details, message) {
+  const node = details && details.querySelector("[data-dashboard-career-status]");
+  if (node) node.textContent = message;
+}
+
+function dashboardCareerStatsToggle_(details) {
+  if (!details || !details.open || typeof APP_STATE === "undefined" ||
+      APP_STATE.currentPage !== "dashboard") return;
+  const cached = dashboardCachedCareerResponse_();
+  if (cached) {
+    hydrateDashboardCareerStats_(cached);
+    dashboardCareerStatus_(details, "Career stats updated");
+    return;
+  }
+  if (typeof apiGetUserProfileHistory !== "function") {
+    dashboardCareerStatus_(details, "Career stats unavailable. Try again later.");
+    return;
+  }
+  const identity = dashboardCareerIdentity_();
+  if (!identity.username) return;
+  dashboardCareerStatus_(details, "Loading career stats… You can keep using the app.");
+  if (!DASHBOARD_CAREER_REQUEST_ || DASHBOARD_CAREER_REQUEST_.username !== identity.username ||
+      DASHBOARD_CAREER_REQUEST_.token !== identity.token) {
+    const request = Promise.resolve().then(function() {
+      return apiGetUserProfileHistory(identity.username, "");
+    });
+    DASHBOARD_CAREER_REQUEST_ = {username: identity.username, token: identity.token, request: request};
+    request.then(function(response) {
+      const current = dashboardCareerIdentity_();
+      if (!response || response.success === false || current.username !== identity.username ||
+          current.token !== identity.token) return;
+      DASHBOARD_CAREER_CACHE_ = {username: identity.username, token: identity.token,
+        savedAt: Date.now(), response: response};
+    }).catch(function() {}).finally(function() {
+      if (DASHBOARD_CAREER_REQUEST_ && DASHBOARD_CAREER_REQUEST_.request === request)
+        DASHBOARD_CAREER_REQUEST_ = null;
+    });
+  }
+  DASHBOARD_CAREER_REQUEST_.request.then(function(response) {
+    const current = dashboardCareerIdentity_();
+    if (!details.isConnected || !details.open || APP_STATE.currentPage !== "dashboard" ||
+        identity.username !== current.username || identity.token !== current.token) return;
+    if (!response || response.success === false) {
+      dashboardCareerStatus_(details, "Career stats unavailable. Close and reopen to retry.");
+      return;
+    }
+    hydrateDashboardCareerStats_(response);
+    dashboardCareerStatus_(details, "Career stats updated");
+  }).catch(function() {
+    if (details.isConnected && details.open && APP_STATE.currentPage === "dashboard")
+      dashboardCareerStatus_(details, "Career stats unavailable. Close and reopen to retry.");
+  });
+}
 
 function dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId) {
   if (typeof APP_STATE === "undefined" || APP_STATE.currentPage !== "dashboard") return false;
@@ -35,7 +114,13 @@ async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey, exp
 
     const app = document.getElementById("app");
     if (!app) return payload;
+    const careerOpen = !!app.querySelector(".dashboard-career-details[open]");
     app.innerHTML = html;
+    dashboardHydrateCareerFromCache_();
+    if (careerOpen) {
+      const details = app.querySelector(".dashboard-career-details");
+      if (details) { details.open = true; dashboardCareerStatsToggle_(details); }
+    }
     if (typeof appCapturePageSnapshot_ === "function") appCapturePageSnapshot_("dashboard", app);
     if (typeof setActiveNav === "function") setActiveNav("dashboard");
 
@@ -56,22 +141,37 @@ async function dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey, exp
   }
 }
 
+// Initial Home does no optional network work. The compact response already
+// validates the session and filters available games on the server.
 function dashboardScheduleHomeEnrichment_(expectedSnapshotKey, expectedHydrationId) {
-  const contextKey = String(expectedSnapshotKey || "") + "|" + String(expectedHydrationId || "");
-  if (DASHBOARD_HOME_REFRESH_REQUEST) return;
-  if (DASHBOARD_HOME_ENRICHMENT_TIMER) {
-    if (DASHBOARD_HOME_ENRICHMENT_CONTEXT === contextKey) return;
-    window.clearTimeout(DASHBOARD_HOME_ENRICHMENT_TIMER);
-    DASHBOARD_HOME_ENRICHMENT_TIMER = null;
+  if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return;
+  dashboardApplyHubAppearance_();
+  dashboardMountStickyPlayer_();
+  dashboardHydrateCareerFromCache_();
+}
+
+async function dashboardLoadHomeDetails_(button) {
+  const key = typeof appPageSnapshotKey_ === "function" ? appPageSnapshotKey_("dashboard") : "";
+  const hydrationId = APP_STATE.dashboardHomeHydrationId || "";
+  if (!dashboardStillOnHome_(key, hydrationId)) return;
+  const status = document.getElementById("dashboardHomeDetailsStatus");
+  button.disabled = true;
+  if (status) status.textContent = "Loading progress and standings… You can still open any game.";
+  try {
+    const result = await dashboardRefreshHomePayloadInBackground_(key, hydrationId);
+    if (!dashboardStillOnHome_(key, hydrationId)) return;
+    const current = document.getElementById("dashboardHomeDetailsStatus");
+    if (current) current.textContent = result
+      ? "Progress updated. Standings may be unavailable; open a game for its latest results."
+      : "Could not load optional details. Your games are still available. Try again.";
+  } catch (err) {
+    if (dashboardStillOnHome_(key, hydrationId)) {
+      const current = document.getElementById("dashboardHomeDetailsStatus");
+      if (current) current.textContent = "Could not load optional details. Your games are still available. Try again.";
+    }
+  } finally {
+    if (button.isConnected) button.disabled = false;
   }
-  DASHBOARD_HOME_ENRICHMENT_CONTEXT = contextKey;
-  DASHBOARD_HOME_ENRICHMENT_TIMER = window.setTimeout(function() {
-    DASHBOARD_HOME_ENRICHMENT_TIMER = null;
-    DASHBOARD_HOME_ENRICHMENT_CONTEXT = "";
-    if (!dashboardStillOnHome_(expectedSnapshotKey, expectedHydrationId)) return;
-    dashboardRefreshHomePayloadInBackground_(expectedSnapshotKey, expectedHydrationId)
-      .catch(function(err) { console.warn("Deferred Home enrichment skipped", err); });
-  }, 6500);
 }
 
 function dashboardClassifyHomeGames_(payload) {
@@ -198,7 +298,7 @@ async function renderDashboardPage(options) {
   const offeredGames = homeClassification.offeredGames;
 
   const snark = homeClassification.classificationDeferred
-    ? "Your games are ready. Progress and standings are catching up in the background."
+    ? "Your games are ready. Load progress and standings when you need them."
     : dashboardGetSnarkMessage_(
         attentionGames,
         playingGames,
@@ -240,10 +340,15 @@ async function renderDashboardPage(options) {
         </div>
 
         <div class="dashboard-career-fixed-title">Career Stats</div>
-        <details class="dashboard-career-details">
+        <details class="dashboard-career-details" ontoggle="dashboardCareerStatsToggle_(this)">
           ${renderDashboardCareerStatsShell_()}
         </details>
       </section>
+
+      <div class="dashboard-home-inline-actions">
+        <button type="button" class="dashboard-home-text-button" onclick="dashboardLoadHomeDetails_(this)">Load progress and standings</button>
+        <span id="dashboardHomeDetailsStatus" role="status" aria-live="polite"></span>
+      </div>
 
       ${homeClassification.classificationDeferred ? "" : (attentionGames.length ? `
         <section class="dashboard-home-section dashboard-attention-section">
@@ -1111,6 +1216,7 @@ function renderDashboardCareerStatsShell_() {
     <div class="dashboard-career-extra">
       <span><strong data-career-stat="avg">—</strong><small>Avg Finish</small></span>
       <span><strong data-career-stat="accuracy">—</strong><small>Accuracy</small></span>
+      <small data-dashboard-career-status aria-live="polite">Open Career Stats to load your history.</small>
     </div>
   `;
 }
@@ -1363,32 +1469,9 @@ async function hydrateDashboardHomeExtras_() {
     "dashboard"
   );
 
-  // Career history can traverse archived workbooks and was observed taking
-  // 30+ seconds. It is decorative on Home, so it is intentionally last and
-  // never competes with opening a game or Admin.
-  if (
-    typeof APP_STATE === "undefined" ||
-    APP_STATE.currentPage !== "dashboard" ||
-    APP_STATE.dashboardHomeHydrationId !== hydrationId
-  ) return;
-
-  if (typeof apiGetUserProfileHistory === "function") {
-    window.setTimeout(async function() {
-      if (
-        typeof APP_STATE === "undefined" ||
-        APP_STATE.currentPage !== "dashboard" ||
-        APP_STATE.dashboardHomeHydrationId !== hydrationId
-      ) return;
-      try {
-        const career = await apiGetUserProfileHistory(username, "");
-        if (
-          typeof APP_STATE !== "undefined" &&
-          APP_STATE.currentPage === "dashboard" &&
-          APP_STATE.dashboardHomeHydrationId === hydrationId
-        ) hydrateDashboardCareerStats_(career);
-      } catch (careerError) {}
-    }, 5000);
-  }
+  // The 39-second archived history request is intentionally NOT automatic on Home.
+  // Users may expand Career Stats or open Trophy Room to request it explicitly.
+  dashboardHydrateCareerFromCache_();
 }
 
 function hydrateDashboardCareerStats_(response) {

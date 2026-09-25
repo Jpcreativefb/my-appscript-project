@@ -288,8 +288,11 @@ ok(!picks.includes('await PATTCSportsRich.prepare(gameId)'),
   'Confidence/Picks does not block primary render on Sports Rich Appearance');
 
 const survivorEnabled = extractFunction(survivor, 'sportsRichSurvivorEnabled_');
-ok(!!survivorEnabled && /PATTCSportsRich\.isRich\s*\(/.test(survivorEnabled),
-  'Survivor/KOTH activation helper still owns the Rich/Clean decision');
+ok(!!survivorEnabled &&
+  survivorEnabled.includes('PATTCSportsRich.appearance(gameId, appearance)') &&
+  survivorEnabled.includes('PATTCSportsRich.layoutValue(bundle)') &&
+  survivorEnabled.includes('return layout !== "legacy";'),
+  'Survivor/KOTH R3 defaults to the current player layout with explicit Legacy opt-out');
 
 ok(tf.includes('sports-rich-team-fantasy'),
   'Team Fantasy Rich DOM marker remains available');

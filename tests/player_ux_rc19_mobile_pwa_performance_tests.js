@@ -129,7 +129,9 @@ requireText(dashboard, 'dashboardRefreshHomePayloadInBackground_', 'Dashboard no
 const dashboardRenderCase = app.slice(app.indexOf('case "dashboard":'), app.indexOf('case "trophy-room":'));
 requireText(dashboardRenderCase, 'await renderDashboardPage()', 'Dashboard critical render');
 requireText(dashboardRenderCase, 'dashboardScheduleHomeEnrichment_', 'deferred Dashboard enrichment scheduler');
-requireText(dashboard, '}, 6500);', 'Dashboard enrichment idle delay');
+requireText(dashboard, 'function dashboardScheduleHomeEnrichment_(expectedSnapshotKey, expectedHydrationId)', 'Home scheduler preserved');
+requireText(dashboard, 'async function dashboardLoadHomeDetails_(button)', 'Optional Home details load on request');
+assert(!dashboard.includes('}, 6500);'), 'Home must not automatically schedule the old delayed enrichment');
 assert(!/await\s+hydrateDashboardHomeExtras_/.test(dashboardRenderCase),
   'secondary Dashboard enrichment still blocks route completion');
 

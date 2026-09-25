@@ -12,10 +12,12 @@ const sw = read('frontend/sw.js');
 const studio = read('frontend/js/ownerVisualStudioRc24e.js');
 const admin = read('frontend/js/pages/adminGamesRc24e.js');
 
-assert(app.includes('./js/ownerVisualStudioRc24e.js?release='), 'RC24E Visual Studio module must remain wired in the current shell.');
+assert(app.includes('./js/ownerVisualStudioR3.js?release=vs-r3-prod-integration-r1'), 'Visual Studio R3 must remain wired in the current shell.');
 assert(index.includes('name="pattc-release"'), 'Login/PWA shell must retain an explicit release boundary.');
 assert(sw.includes('"./js/ownerVisualStudioRc24e.js"'), 'Service worker must retain the RC24E Visual Studio asset.');
-assert(app.includes('./js/ownerVisualStudioRc24e.js?release='));
+assert(app.includes('./js/ownerVisualStudioR3.js?release=vs-r3-prod-integration-r1'));
+assert(!app.includes('<script src="./js/ownerVisualStudioRc24e.js'),
+  'Legacy RC24E controller must not mount alongside R3');
 assert(jsApp.includes('"admin-games": ["admin", "adminUi", "adminGamesRc24e"]'));
 assert.strictEqual(jsApp, appMirror, 'frontend app.js mirrors must match');
 assert(sw.includes('"./js/ownerVisualStudioRc24e.js"'));

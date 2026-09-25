@@ -400,10 +400,12 @@ function teamFantasyPrimaryLineup_(state){
     ||list.find(function(x){return x&&x.postseasonEligible!==false;})||list[0]||null;
 }
 function teamFantasyScoreValue_(state,lineup){
-  const gd=window.TEAM_FANTASY_CURRENT_GAME_DAY||{};
-  const viewer=(gd.competitors||[]).find(function(c){return c&&c.isViewer;});
-  if(viewer&&isFinite(Number(viewer.totalPoints)))return Number(viewer.totalPoints);
-  const values=[lineup&&lineup.weekPoints,lineup&&lineup.points,lineup&&lineup.totalPoints,state&&state.weekPoints,state&&state.viewerWeekPoints];
+  // An entry's header may only use its own server score. A state-wide weekPoints
+  // fallback can belong to another entry in a two-entry or multi-league view.
+  if(!lineup||!lineup.entry||!lineup.entry.entryId)return null;
+  const viewer=teamFantasyGameDayViewer_(lineup.entry.entryId);
+  if(viewer&&viewer.totalPoints!==undefined&&viewer.totalPoints!==null&&viewer.totalPoints!==''&&isFinite(Number(viewer.totalPoints)))return Number(viewer.totalPoints);
+  const values=[lineup.weekPoints,lineup.points,lineup.totalPoints];
   for(let i=0;i<values.length;i+=1)if(values[i]!==undefined&&values[i]!==null&&values[i]!==''&&isFinite(Number(values[i])))return Number(values[i]);
   return null;
 }
@@ -430,10 +432,14 @@ function teamFantasyGameKickoff_(g){
 }
 function teamFantasyGameDayViewer_(entryId){
   const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||{};
+  const state=window.TEAM_FANTASY_STATE||{};
+  if(!entryId||String(data.gameId||'')!==String(state.gameId||'')||
+    Number(data.week||0)!==Number(state.week||0)||
+    String(data.leagueId||'')!==String(state.selectedLeagueId||''))return null;
   const competitors=Array.isArray(data.competitors)?data.competitors:[];
   return competitors.find(function(c){
-    return c&&c.isViewer&&(!entryId||String(c.entryId||'')===String(entryId||''));
-  })||competitors.find(function(c){return c&&c.isViewer;})||null;
+    return c&&c.isViewer&&String(c.entryId||'')===String(entryId);
+  })||null;
 }
 function teamFantasyGameDaySlot_(entryId,position){
   const viewer=teamFantasyGameDayViewer_(entryId);
@@ -444,15 +450,19 @@ function teamFantasyPickMethodDisplay_(value){
   return tag?('('+tag+')'):'';
 }
 function teamFantasyPositionMetric_(entryId,slot){
-  const live=slot?teamFantasyGameDaySlot_(entryId,slot.position):null;
+  const candidate=slot&&slot.pick?teamFantasyGameDaySlot_(entryId,slot.position):null;
+  const live=candidate&&candidate.hidden!==true&&
+    String(candidate.teamAbbr||'').toUpperCase()===String(slot.pick.teamAbbr||'').toUpperCase()
+    ?candidate:null;
   const team=teamFantasySelectedTeam_(slot);
   const game=team&&team.game||{};
   let status=live&&live.status?String(live.status):teamFantasyGameKind_(game);
   if(status!=='live'&&status!=='final')status='upcoming';
   const points=live&&isFinite(Number(live.fantasyPoints))?Number(live.fantasyPoints):0;
   const liveRank=live&&Number(live.weekRank||0)>0?Number(live.weekRank):0;
-  const preRank=team&&Number(team.rank||0)>0?Number(team.rank):0;
-  const rank=liveRank||preRank;
+  // Saved lineup positions show only their actual selected-entry rank.
+  // The full NFL team ranking remains available in the team picker.
+  const rank=(status==='live'||status==='final')?liveRank:0;
   const method=live&&live.pickMethod?live.pickMethod:(slot&&slot.pick?slot.pick.pickMethod:'');
   return{status:status,points:points,rank:rank,method:method,game:game,team:team,live:live};
 }
