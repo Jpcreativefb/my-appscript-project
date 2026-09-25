@@ -161,7 +161,17 @@ ok(classified.classificationDeferred === true, 'compact classification is explic
 // -------------------------------------------------------------------------
 const scheduler = extractFunction(dash, 'dashboardScheduleHomeEnrichment_');
 const refresh = extractFunction(dash, 'dashboardRefreshHomePayloadInBackground_');
-ok(scheduler.includes('6500'), 'full Home enrichment waits for 6.5-second idle window');
+ok(
+  scheduler.includes('dashboardStillOnHome_') &&
+  !scheduler.includes('apiGetDashboardGamesHub') &&
+  !scheduler.includes('6500'),
+  'Home scheduler must not start optional network requests'
+);
+ok(
+  extractFunction(dash, 'dashboardLoadHomeDetails_')
+    .includes('dashboardRefreshHomePayloadInBackground_'),
+  'Optional Home details must load only when requested'
+);
 ok(!dash.includes('}, 250);'), 'R1 250ms full Dashboard launch is absent');
 const homeCheckPos = refresh.indexOf('dashboardStillOnHome_');
 const apiPos = refresh.indexOf('apiGetDashboardGamesHub');

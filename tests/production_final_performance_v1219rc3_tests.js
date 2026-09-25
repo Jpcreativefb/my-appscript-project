@@ -32,11 +32,14 @@ assert(cache.includes('keys.push(appStartupPayloadCacheKey_(username, gameId))')
 
 assert(dashboard.includes('dashboardHomePayloadLoadedAt'), 'Dashboard core payload client reuse missing');
 assert(dashboard.includes('< 120000'), 'Dashboard client cache must be bounded');
-assert(dashboard.includes('Career history can traverse archived workbooks'), 'career history must remain off the Home critical path');
+assert(dashboard.includes('ontoggle="dashboardCareerStatsToggle_(this)"') &&
+  dashboard.includes('const DASHBOARD_CAREER_CACHE_TTL_MS_'), 'career history must remain off the Home critical path');
 assert(
-  app.includes('}, 6500);') ||
-    (app.includes('dashboardScheduleHomeEnrichment_') && dashboard.includes('}, 6500);')),
-  'Home optional hydration should wait long enough for game navigation'
+  dashboard.includes('function dashboardScheduleHomeEnrichment_') &&
+  dashboard.includes('async function dashboardLoadHomeDetails_') &&
+  dashboard.includes('await dashboardRefreshHomePayloadInBackground_(key, hydrationId)') &&
+  !dashboard.includes('}, 6500);'),
+  'Optional Home details must load on request, not during startup'
 );
 
 assert(admin.includes('adminHydrateSummary_().catch'), 'Admin summary must hydrate after the shell renders');
