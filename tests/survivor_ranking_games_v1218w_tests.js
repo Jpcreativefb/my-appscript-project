@@ -23,8 +23,8 @@ const css = read('frontend/css/pages.css');
 const html = read('frontend/app.html');
 const sw = read('frontend/sw.js');
 
-assert(app.includes('"survivor": ["survivor"]'));
-assert(app.includes('"ranking": ["ranking"]'));
+assert(app.includes('"survivor": ["survivor", "survivorR4"]'));
+assert(app.includes('"ranking": ["ranking", "rankingSportsR1"]'));
 assert(app.includes('await navigate("survivor")'));
 assert(app.includes('await navigate("ranking")'));
 assert(app.includes('case "survivor":'));

@@ -279,7 +279,12 @@ function sourceContracts(repoRoot) {
   assert(!confidence.includes("await PATTCSportsRich.prepare(gameId)"), "Confidence must not block base render on Sports-Rich Appearance");
 
   const survivorEnabledBody = functionBody(survivor, "sportsRichSurvivorEnabled_");
-  assert(survivorEnabledBody.includes("PATTCSportsRich.isRich"), "Survivor Rich activation helper no longer owns the isRich gate");
+  assert(
+    survivorEnabledBody.includes("PATTCSportsRich.appearance(gameId, appearance)") &&
+    survivorEnabledBody.includes("PATTCSportsRich.layoutValue(bundle)") &&
+    survivorEnabledBody.includes('return layout !== "legacy";'),
+    "Survivor R3 must use the current player layout unless Legacy is explicitly selected"
+  );
 
   pass("Each Sports family preserves Rich activation while keeping Appearance off the primary render wait path");
 }

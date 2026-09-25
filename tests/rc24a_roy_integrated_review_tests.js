@@ -40,7 +40,7 @@ const survHeroBlock=surv.slice(surv.indexOf('/* RC24A_R47_SURVIVOR_KOTH_SHARED_H
 ok(survHeroBlock.includes('payload.mode === \"streak-points-strikes\"'),'Shared Survivor Hero wrapper recognizes distinct RC24A Streak Points + Strikes mode');
 ok(surv.includes('appearanceRuntime.sportsHeroPresentation')&&surv.includes('kentPresentation.imageUrl')&&surv.includes('kentPresentation.title')&&surv.includes('function sportsFinalKothPageHtml_'),'KOTH final renderer consumes Kent configurable GameAppearance Hero contract');
 
-ok(/function sportsRichSurvivorEnabled_\(payload\)[\s\S]{0,1800}PATTCSportsRich\.isRich\s*\(/.test(surv),'Survivor/KOTH activation helper retains RC23 Rich/Clean decision call while RC24A default-Rich fallback remains available');
+ok(/function sportsRichSurvivorEnabled_\(payload\)[\s\S]{0,1800}PATTCSportsRich\.appearance\(gameId, appearance\)[\s\S]{0,500}PATTCSportsRich\.layoutValue\(bundle\)[\s\S]{0,500}return layout !== "legacy";/.test(surv),'Survivor/KOTH R3 defaults to the current player layout with explicit Legacy opt-out');
 const finalSurvivorWrapper=surv.slice(surv.lastIndexOf('renderSurvivorPage = async function()'));
 ok(!finalSurvivorWrapper.includes('await PATTCSportsRich.prepare(gameId)') && surv.includes('Promise.resolve(PATTCSportsRich.prepare(gameId))') && finalSurvivorWrapper.includes('sportsRichSurvivorEnabled_(payload)'), 'Survivor keeps RC23 Rich/Clean decision while Appearance prepare is deferred/deduped outside the final blocking wrapper');
 ok(runtime.includes('RC24A_V12_OFFICIAL_SPORTS_MEDIA_DEFAULTS')&&runtime.includes('sportsHeroOfficialDefaults'),'official five-game PATTC Sports media defaults installed in shared Appearance runtime');
