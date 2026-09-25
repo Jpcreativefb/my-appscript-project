@@ -38,6 +38,12 @@ function apiSecurityIsAdminAction_(action) {
 // already-open old frontend tab, but the current frontend sends authenticated
 // reads through POST so bearer tokens are not placed in URLs in steady state.
 var API_EXPLICIT_POST_ACTIONS_ = {
+  castleDuelGetState: true, castleDuelJoin: true, castleDuelSubmit: true,
+  castleDuelMaskedAccept: true, castleDuelTarget: true, castleDuelFinaleToken: true,
+  castleDuelFinaleAdvantage: true, adminCastleDuelConfigure: true,
+  adminCastleDuelGetSettings: true, adminCastleDuelOpenRound: true,
+  adminCastleDuelSettleRound: true, adminCastleDuelOpenFinale: true,
+  adminCastleDuelSettleFinale: true,
   login: true, logout: true, signup: true, requestPinReset: true, resetPin: true, validateSession: true,
   saveEditableProfile: true, saveUserProfile: true, uploadProfileAvatar: true,
   setGameProfilePromptChoice: true, setNotificationPreference: true,

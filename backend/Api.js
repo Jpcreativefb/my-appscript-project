@@ -73,6 +73,22 @@ function doPost(e) {
       body
     );
 
+    /* CASTLE DUEL R1 — authenticated POST actions; no GET route. */
+    if (action === "castleDuelGetState") return json(apiCastleDuelGetState(body));
+    if (action === "castleDuelJoin") return json(apiCastleDuelJoin(body));
+    if (action === "castleDuelSubmit") return json(apiCastleDuelSubmit(body));
+    if (action === "castleDuelMaskedAccept") return json(apiCastleDuelMaskedAccept(body));
+    if (action === "castleDuelTarget") return json(apiCastleDuelTarget(body));
+    if (action === "castleDuelFinaleToken") return json(apiCastleDuelFinaleToken(body));
+    if (action === "castleDuelFinaleAdvantage") return json(apiCastleDuelFinaleAdvantage(body));
+    if (action === "adminCastleDuelConfigure") return json(apiAdminCastleDuelConfigure(body));
+    if (action === "adminCastleDuelGetSettings") return json(apiAdminCastleDuelGetSettings(body));
+    if (action === "adminCastleDuelOpenRound") return json(apiAdminCastleDuelOpenRound(body));
+    if (action === "adminCastleDuelSettleRound") return json(apiAdminCastleDuelSettleRound(body));
+    if (action === "adminCastleDuelOpenFinale") return json(apiAdminCastleDuelOpenFinale(body));
+    if (action === "adminCastleDuelSettleFinale") return json(apiAdminCastleDuelSettleFinale(body));
+
+
     // =========================
     // AUTHENTICATION WRITES
     // Sensitive credentials never belong in GET/query strings.

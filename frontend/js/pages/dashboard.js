@@ -1064,6 +1064,7 @@ async function renderDashboardHubPage_(category) {
         <p>${escapeHtml(dashboardHubDescription_(category))}</p>
       </header>
 
+      ${category === "reality" && active.length ? `<section class="card"><h2>Castle Duel · The Traitors</h2><p>Choose your Reality TV season to enter the Castle.</p><select id="castleHubGame">${active.map(function(game) { return `<option value="${escapeAttr(game.gameId)}">${escapeHtml(game.name || game.gameId)}</option>`; }).join("")}</select><button type="button" onclick="setFrontendGameId(document.getElementById('castleHubGame').value);navigate('castle-duel')">Enter Castle Duel</button></section>` : ""}
       ${category === "sports" && window.PATTCSportsLaunchCore && typeof PATTCSportsLaunchCore.renderSportsHub === "function"
         ? PATTCSportsLaunchCore.renderSportsHub(active, past)
         : ""}

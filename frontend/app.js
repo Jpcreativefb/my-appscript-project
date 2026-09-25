@@ -254,6 +254,7 @@ function isAdminPage_(page) {
     page === "admin-games" ||
     page === "admin-awards" ||
     page === "admin-reality-tv" ||
+    page === "admin-castle-duel" ||
     page.indexOf("admin-game-setup:") === 0;
 }
 
@@ -704,6 +705,8 @@ const APP_PAGE_SCRIPT_BASE_URL = APP_MAIN_SCRIPT_URL.pathname.indexOf("/js/app.j
   : new URL("./js/pages/", APP_MAIN_SCRIPT_URL);
 
 const APP_PAGE_MODULES = {
+  "castle-duel": ["castleDuel"],
+  "admin-castle-duel": ["castleDuel"],
   "dashboard": ["dashboard"],
   "hub": ["dashboard"],
   "trophy-room": ["dashboard"],
@@ -1593,7 +1596,7 @@ function setActiveNav(page) {
 
   if (page === "profile" || page === "notifications" || page === "leagues" || page === "trophy-room" || page === "more" ||
       page === "admin" || page === "admin-games" || page === "admin-awards" ||
-      page === "admin-reality-tv" || page === "admin-appearance" ||
+      page === "admin-reality-tv" || page === "admin-castle-duel" || page === "admin-appearance" ||
       page.indexOf("admin-game-setup:") === 0 || page === "hub:general") {
     navPage = "more";
   }
@@ -2250,6 +2253,15 @@ async function renderPage(page) {
       app.innerHTML =
         await renderGameModeHubPage();
 
+      break;
+
+    case "castle-duel":
+      app.innerHTML = await renderCastleDuelPage();
+      break;
+
+    case "admin-castle-duel":
+      app.innerHTML = await renderAdminCastleDuelPage();
+      setTimeout(function() { if (typeof castleAdminHydrate_ === "function") castleAdminHydrate_(); }, 0);
       break;
 
     case "team-fantasy":

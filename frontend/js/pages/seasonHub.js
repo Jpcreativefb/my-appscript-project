@@ -146,6 +146,7 @@ async function renderSeasonHubPage() {
   return `
     <div class="page season-hub-page" style="--season-hub-color:${escapeAttr(parentGame.themeColor || "#354785")};">
 
+      ${String(parentGame.hubCategory || "").toLowerCase() === "reality" ? `<section class="card"><button type="button" onclick="navigate('castle-duel')">Enter Castle Duel</button></section>` : ""}
       <section class="season-hub-hero card">
         <div>
           <p class="dashboard-kicker">Season / Series Hub</p>

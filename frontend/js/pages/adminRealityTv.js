@@ -2932,6 +2932,7 @@ async function renderAdminRealityTvPage() {
             <div class="admin-sub">Reusable formats for Survivor, cooking shows, judged competitions, social deduction, Amazing Race, team contests, and fully custom seasons.</div>
           </div>
           <div class="admin-header-actions">
+            <button class="admin-small-button secondary" onclick="navigate('admin-castle-duel')">Castle Duel Settings</button>
             <button class="admin-small-button secondary" onclick="navigate('admin')">Back to Admin</button>
           </div>
         </div>
