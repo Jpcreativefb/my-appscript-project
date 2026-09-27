@@ -9715,6 +9715,10 @@ renderCompactConfidenceSlate_=function(){var html=CONFIDENCE_RC24A_ORIGINAL_SLAT
    RC24K — NFL CONFIDENCE PLAYER EXPERIENCE
 ========================================================= */
 var RC24K_CONFIDENCE_SAVING_ = {};
+var RC24K_CONFIDENCE_SAVE_PENDING_ = {};
+var RC24K_CONFIDENCE_SAVE_TIMER_ = null;
+var RC24K_CONFIDENCE_SAVE_IN_FLIGHT_ = false;
+var RC24K_CONFIDENCE_SAVE_DEBOUNCE_MS_ = 450;
 var RC24K_CONFIDENCE_COMPARE_DATA_ = null;
 var RC24K_CONFIDENCE_COMPARE_REQUEST_ = null;
 var RC24K_CONFIDENCE_COMPARE_USERS_ = [];
@@ -9755,6 +9759,7 @@ confidenceResultPointsLabel_ = function(category, result) {
 
 function rc24kConfidenceSaveText_(categoryId) {
   if (RC24K_CONFIDENCE_SAVING_[categoryId]) return "Saving…";
+  if (RC24K_CONFIDENCE_SAVE_PENDING_[categoryId]) return "Queued to save…";
   const value = Number(PICKS_PAGE_DATA.confidencePoints[categoryId]) || 0;
   return value > 0 ? "Saved · Confidence " + value : "Saved · Basic pick (+1 win / 0 loss)";
 }
@@ -9776,15 +9781,15 @@ renderCompactConfidenceRow_ = function(category) {
     <article class="confidence-game-row rc24k-confidence-row ${result.className || "pending"} phase-${phase} ${saving ? "is-saving" : ""}" data-category-id="${escapeAttr(category.id)}" data-locked="${locked ? "true" : "false"}">
       <div class="confidence-matchup-state"><strong>${escapeHtml(formatConfidenceSportsStatus_(category))}</strong><span>${locked ? "LOCKED" : saving ? "Saving…" : picked ? "SAVED" : "OPEN"}${!locked ? " · Locks at kickoff" : ""}</span></div>
       <div class="rc24k-confidence-picks">
-        ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked || saving, result)}
+        ${renderCompactConfidenceTeam_(category, nominees[0], selectedNomineeId, locked, result)}
         <div class="confidence-versus confidence-element-versus" aria-hidden="true">VS</div>
-        ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked || saving, result)}
+        ${renderCompactConfidenceTeam_(category, nominees[1], selectedNomineeId, locked, result)}
       </div>
 
       <div class="rc24k-confidence-control ${picked ? "is-ready" : "is-waiting"}">
         <label class="confidence-row-value">
           <span class="confidence-value-label">CONF</span>
-          <select class="confidence-value-input" title="No confidence · +1 / 0" aria-label="Confidence. Blank means no confidence." id="confidence-${escapeAttr(category.id)}" onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)" ${locked || saving || !picked ? "disabled" : ""}>
+          <select class="confidence-value-input" title="No confidence · +1 / 0" aria-label="Confidence. Blank means no confidence." id="confidence-${escapeAttr(category.id)}" onchange="updateConfidenceForCategory('${escapeJs(category.id)}', this.value)" ${locked || !picked ? "disabled" : ""}>
             <option value="">—</option>
             ${renderConfidenceOptionsForCategory(category.id, confidencePoints)}
           </select>
@@ -9814,8 +9819,12 @@ renderCompactConfidenceToolbar_ = function() {
 
 function confidenceAutosaveActionsHtml_() {
   const saving = Object.keys(RC24K_CONFIDENCE_SAVING_).some(id => RC24K_CONFIDENCE_SAVING_[id]);
-  const hasPicks = getCompactConfidenceCategories_().some(c => PICKS_CONFIDENCE_BASELINE_PICKS[c.id]);
-  return `<div id="confidenceAutosaveActions" class="confidence-save-actions"><span role="status">${saving ? 'Saving…' : hasPicks ? 'Saved' : 'Choose your winners'}</span><button type="button" ${saving || !hasPicks ? 'disabled' : ''} onclick="showPicksMessage('Complete for now — your picks are saved.', false)">Complete for now</button></div>`;
+  const pending = Object.keys(RC24K_CONFIDENCE_SAVE_PENDING_).some(id => RC24K_CONFIDENCE_SAVE_PENDING_[id]);
+  const hasPicks = getCompactConfidenceCategories_().some(c =>
+    PICKS_PAGE_DATA.picks[c.id] || PICKS_CONFIDENCE_BASELINE_PICKS[c.id]
+  );
+  const state = saving ? 'Saving…' : pending ? 'Queued to save…' : hasPicks ? 'Saved' : 'Choose your winners';
+  return `<div id="confidenceAutosaveActions" class="confidence-save-actions"><span role="status">${state}</span><button type="button" ${saving || pending || !hasPicks ? 'disabled' : ''} onclick="showPicksMessage('Complete for now — your picks are saved.', false)">Complete for now</button></div>`;
 }
 
 function refreshConfidenceAutosaveUi_(categoryId) {
@@ -9833,49 +9842,172 @@ function refreshConfidenceAutosaveUi_(categoryId) {
   if (actions) actions.outerHTML = confidenceAutosaveActionsHtml_();
 }
 
-async function rc24kSaveConfidenceRow_(categoryId) {
+function rc24kQueueConfidenceSave_(categoryId) {
   const category = getCompactConfidenceCategories_().find(function(item) {
     return normalizeId(item.id) === normalizeId(categoryId);
   });
-  if (!category) throw new Error("Game not found.");
-  const nomineeId = PICKS_PAGE_DATA.picks[category.id] || "";
-  if (!nomineeId) throw new Error("Pick a team first.");
 
-  const session = PICKS_PAGE_DATA.session || getSession();
-  RC24K_CONFIDENCE_SAVING_[category.id] = true;
+  if (!category || isCompactConfidenceLocked_(category)) return;
+  if (!PICKS_PAGE_DATA.picks[category.id]) return;
+
+  RC24K_CONFIDENCE_SAVE_PENDING_[category.id] = true;
+
+  persistConfidenceDraft_();
   refreshConfidenceAutosaveUi_(category.id);
 
+  if (RC24K_CONFIDENCE_SAVE_TIMER_) {
+    clearTimeout(RC24K_CONFIDENCE_SAVE_TIMER_);
+  }
+
+  RC24K_CONFIDENCE_SAVE_TIMER_ = setTimeout(function() {
+    RC24K_CONFIDENCE_SAVE_TIMER_ = null;
+    rc24kFlushConfidenceSaves_();
+  }, RC24K_CONFIDENCE_SAVE_DEBOUNCE_MS_);
+}
+
+async function rc24kFlushConfidenceSaves_() {
+  if (RC24K_CONFIDENCE_SAVE_IN_FLIGHT_) return;
+
+  const categories = getCompactConfidenceCategories_().filter(function(category) {
+    return RC24K_CONFIDENCE_SAVE_PENDING_[category.id] === true &&
+      !isCompactConfidenceLocked_(category) &&
+      Boolean(PICKS_PAGE_DATA.picks[category.id]);
+  });
+
+  if (!categories.length) return;
+
+  const session = PICKS_PAGE_DATA.session || getSession();
+  const sentById = {};
+  const batch = categories.map(function(category) {
+    const item = {
+      categoryId: category.id,
+      nomineeId: PICKS_PAGE_DATA.picks[category.id],
+      confidencePoints: Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0
+    };
+
+    sentById[category.id] = {
+      nomineeId: item.nomineeId,
+      confidencePoints: item.confidencePoints
+    };
+
+    delete RC24K_CONFIDENCE_SAVE_PENDING_[category.id];
+    RC24K_CONFIDENCE_SAVING_[category.id] = true;
+
+    return item;
+  });
+
+  RC24K_CONFIDENCE_SAVE_IN_FLIGHT_ = true;
+
+  categories.forEach(function(category) {
+    refreshConfidenceAutosaveUi_(category.id);
+  });
+
   let result;
+
   try {
     result = await apiSaveConfidencePicksBatch({
       username: session.username,
       gameId: PICKS_PAGE_DATA.gameId,
-      picks: [{
-        categoryId: category.id,
-        nomineeId: nomineeId,
-        confidencePoints: Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0
-      }]
+      picks: batch
     });
-  } finally {
-    RC24K_CONFIDENCE_SAVING_[category.id] = false;
+  } catch (err) {
+    result = {
+      success: false,
+      message: err && err.message ? err.message : "Could not confirm the Confidence save."
+    };
   }
+
+  RC24K_CONFIDENCE_SAVE_IN_FLIGHT_ = false;
+
+  categories.forEach(function(category) {
+    RC24K_CONFIDENCE_SAVING_[category.id] = false;
+  });
 
   if (!result || result.success !== true) {
-    throw new Error((result && (result.error || result.message)) || "Could not save this Confidence pick.");
+    categories.forEach(function(category) {
+      RC24K_CONFIDENCE_SAVE_PENDING_[category.id] = true;
+      refreshConfidenceAutosaveUi_(category.id);
+    });
+
+    persistConfidenceDraft_();
+
+    const message = String(
+      result && (result.message || result.error) ||
+      "Could not confirm the Confidence save."
+    );
+
+    const ambiguous =
+      Number(result && result.status) === 524 ||
+      /timeout|timed out|network|invalid response/i.test(message);
+
+    showPicksMessage(
+      ambiguous
+        ? "Save confirmation was slow. Your selections remain shown while the app verifies them."
+        : message,
+      !ambiguous
+    );
+
+    if (ambiguous && !RC24K_CONFIDENCE_SAVE_TIMER_) {
+      RC24K_CONFIDENCE_SAVE_TIMER_ = setTimeout(function() {
+        RC24K_CONFIDENCE_SAVE_TIMER_ = null;
+        rc24kFlushConfidenceSaves_();
+      }, 1200);
+    }
+
+    return;
   }
 
-  const saved = (result.results || [])[0] || {};
-  PICKS_PAGE_DATA.picks[category.id] = saved.nomineeId || nomineeId;
-  PICKS_PAGE_DATA.confidencePoints[category.id] =
-    saved.confidencePoints !== undefined
-      ? Number(saved.confidencePoints) || 0
-      : Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
-  PICKS_PAGE_DATA.changeCounts[category.id] = Number(saved.changeCount) || 0;
-  PICKS_PAGE_DATA.originalPicks[category.id] = saved.originalNomineeId || PICKS_PAGE_DATA.originalPicks[category.id] || nomineeId;
-  if (saved.pickMeta) PICKS_PAGE_DATA.pickMeta[category.id] = saved.pickMeta;
+  const savedById = {};
 
-  PICKS_CONFIDENCE_BASELINE_PICKS[category.id] = PICKS_PAGE_DATA.picks[category.id];
-  PICKS_CONFIDENCE_BASELINE_POINTS[category.id] = PICKS_PAGE_DATA.confidencePoints[category.id];
+  (result.results || []).forEach(function(saved) {
+    savedById[normalizeId(saved.categoryId)] = saved;
+  });
+
+  categories.forEach(function(category) {
+    const sent = sentById[category.id];
+    const saved = savedById[normalizeId(category.id)];
+
+    if (!sent || !saved) {
+      RC24K_CONFIDENCE_SAVE_PENDING_[category.id] = true;
+      refreshConfidenceAutosaveUi_(category.id);
+      return;
+    }
+
+    const savedPick = saved.nomineeId || sent.nomineeId;
+    const savedPoints =
+      saved.confidencePoints !== undefined
+        ? Number(saved.confidencePoints) || 0
+        : sent.confidencePoints;
+
+    PICKS_CONFIDENCE_BASELINE_PICKS[category.id] = savedPick;
+    PICKS_CONFIDENCE_BASELINE_POINTS[category.id] = savedPoints;
+
+    PICKS_PAGE_DATA.changeCounts[category.id] = Number(saved.changeCount) || 0;
+    PICKS_PAGE_DATA.originalPicks[category.id] =
+      saved.originalNomineeId ||
+      PICKS_PAGE_DATA.originalPicks[category.id] ||
+      savedPick;
+
+    if (saved.pickMeta) {
+      PICKS_PAGE_DATA.pickMeta[category.id] = saved.pickMeta;
+    }
+
+    const currentStillMatchesSent =
+      normalizeId(PICKS_PAGE_DATA.picks[category.id] || "") ===
+        normalizeId(sent.nomineeId || "") &&
+      Number(PICKS_PAGE_DATA.confidencePoints[category.id] || 0) ===
+        Number(sent.confidencePoints || 0);
+
+    if (currentStillMatchesSent) {
+      PICKS_PAGE_DATA.picks[category.id] = savedPick;
+      PICKS_PAGE_DATA.confidencePoints[category.id] = savedPoints;
+    } else {
+      RC24K_CONFIDENCE_SAVE_PENDING_[category.id] = true;
+    }
+
+    refreshConfidenceAutosaveUi_(category.id);
+  });
+
   PICKS_CONFIDENCE_BASE_SIGNATURE = confidenceSnapshotSignature_(
     PICKS_CONFIDENCE_BASELINE_PICKS,
     PICKS_CONFIDENCE_BASELINE_POINTS
@@ -9883,13 +10015,32 @@ async function rc24kSaveConfidenceRow_(categoryId) {
 
   persistConfidenceDraft_();
   clearStartupPayload(true);
+
   RC24K_CONFIDENCE_COMPARE_DATA_ = null;
   RC24K_CONFIDENCE_COMPARE_REQUEST_ = null;
-  refreshConfidenceAutosaveUi_(category.id);
-  return saved;
+
+  const stillPending = Object.keys(RC24K_CONFIDENCE_SAVE_PENDING_).some(function(id) {
+    return RC24K_CONFIDENCE_SAVE_PENDING_[id] === true;
+  });
+
+  if (stillPending) {
+    if (!RC24K_CONFIDENCE_SAVE_TIMER_) {
+      RC24K_CONFIDENCE_SAVE_TIMER_ = setTimeout(function() {
+        RC24K_CONFIDENCE_SAVE_TIMER_ = null;
+        rc24kFlushConfidenceSaves_();
+      }, RC24K_CONFIDENCE_SAVE_DEBOUNCE_MS_);
+    }
+  } else {
+    showPicksMessage("Picks saved ✓", false);
+  }
 }
 
-draftConfidenceNominee_ = async function(categoryId, nomineeId) {
+async function rc24kSaveConfidenceRow_(categoryId) {
+  rc24kQueueConfidenceSave_(categoryId);
+  return { queued: true, categoryId: categoryId };
+}
+
+draftConfidenceNominee_ = function(categoryId, nomineeId) {
   if (!shouldRenderCompactConfidenceSlate_()) {
     selectNominee(categoryId, nomineeId);
     return;
@@ -9898,36 +10049,38 @@ draftConfidenceNominee_ = async function(categoryId, nomineeId) {
   const category = getCompactConfidenceCategories_().find(function(item) {
     return normalizeId(item.id) === normalizeId(categoryId);
   });
-  if (!category) { showPicksMessage("Game not found.", true); return; }
-  if (isCompactConfidenceLocked_(category)) { showPicksMessage("This game has started and is locked.", true); return; }
-  if (RC24K_CONFIDENCE_SAVING_[category.id]) return;
+
+  if (!category) {
+    showPicksMessage("Game not found.", true);
+    return;
+  }
+
+  if (isCompactConfidenceLocked_(category)) {
+    showPicksMessage("This game has started and is locked.", true);
+    return;
+  }
 
   const previous = PICKS_PAGE_DATA.picks[category.id] || "";
+
   if (normalizeId(previous) === normalizeId(nomineeId)) return;
 
   PICKS_PAGE_DATA.picks[category.id] = nomineeId;
 
-  // Show the selection immediately while the save finishes.
+  // Winner appears immediately. Confidence remains optional and usable
+  // while the background save is queued.
   refreshConfidenceAutosaveUi_(category.id);
-
-  try {
-    await rc24kSaveConfidenceRow_(category.id);
-    showPicksMessage("Pick saved ✓", false);
-  } catch (err) {
-    PICKS_PAGE_DATA.picks[category.id] = previous;
-    RC24K_CONFIDENCE_SAVING_[category.id] = false;
-    refreshConfidenceAutosaveUi_(category.id);
-    showPicksMessage(err.message || String(err), true);
-  }
+  rc24kQueueConfidenceSave_(category.id);
 };
 
-updateConfidenceForCategory = async function(categoryId, value) {
+updateConfidenceForCategory = function(categoryId, value) {
   const category = getCompactConfidenceCategories_().find(function(item) {
     return normalizeId(item.id) === normalizeId(categoryId);
   });
+
   if (!category || isCompactConfidenceLocked_(category)) return;
 
   const pick = PICKS_PAGE_DATA.picks[category.id] || "";
+
   if (!pick) {
     PICKS_PAGE_DATA.confidencePoints[category.id] = 0;
     refreshConfidenceAutosaveUi_(category.id);
@@ -9936,33 +10089,29 @@ updateConfidenceForCategory = async function(categoryId, value) {
   }
 
   const nextValue = Number(value) || 0;
-  if (nextValue > 0 && getUsedConfidencePointsForOtherCategories(category.id).includes(nextValue)) {
-    showPicksMessage("Confidence " + nextValue + " is already assigned to another game.", true);
+
+  if (
+    nextValue > 0 &&
+    getUsedConfidencePointsForOtherCategories(category.id).includes(nextValue)
+  ) {
+    showPicksMessage(
+      "Confidence " + nextValue + " is already assigned to another game.",
+      true
+    );
     refreshConfidenceAutosaveUi_(category.id);
     return;
   }
 
-  if (RC24K_CONFIDENCE_SAVING_[category.id]) return;
-  const previous = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
   PICKS_PAGE_DATA.confidencePoints[category.id] = nextValue;
 
   if (PICKS_CONFIDENCE_SORT_MODE === "confidence") {
     PICKS_CONFIDENCE_SORT_STALE = true;
   }
 
-  // Immediately rebuild Week dropdowns so the selected value disappears
-  // from every other matchup before the server round trip finishes.
+  // Update the value and remove it from the other Week dropdowns immediately.
+  // A zero value remains a valid basic pick worth +1 for a correct selection.
   refreshConfidenceAutosaveUi_(category.id);
-
-  try {
-    await rc24kSaveConfidenceRow_(category.id);
-    showPicksMessage(nextValue > 0 ? "Confidence saved ✓" : "Basic +1 / 0 pick saved ✓", false);
-  } catch (err) {
-    PICKS_PAGE_DATA.confidencePoints[category.id] = previous;
-    RC24K_CONFIDENCE_SAVING_[category.id] = false;
-    refreshConfidenceAutosaveUi_(category.id);
-    showPicksMessage(err.message || String(err), true);
-  }
+  rc24kQueueConfidenceSave_(category.id);
 };
 
 function rc24kConfidenceCompareDefaultUsers_(players) {
