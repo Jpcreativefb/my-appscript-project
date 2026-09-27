@@ -89,6 +89,7 @@
   root.confidenceR2Adjust_=function(categoryId,delta){
     const category=getCompactConfidenceCategories_().find(function(row){return norm(row.id)===norm(categoryId);});
     if(!category||isCompactConfidenceLocked_(category))return;
+    if(!PICKS_PAGE_DATA.picks[category.id])return;
     const current=Math.max(0,Number(PICKS_PAGE_DATA.confidencePoints[category.id])||0);
     const max=maxConfidence();
     const used=(typeof getUsedConfidencePointsForOtherCategories==="function"?getUsedConfidencePointsForOtherCategories(category.id):[]).map(Number);
@@ -194,9 +195,9 @@
     const values=categories.filter(function(c){return Number(PICKS_PAGE_DATA.confidencePoints[c.id])>0;}).length;
     const open=categories.filter(function(c){return !isCompactConfidenceLocked_(c);}).length;
     return `<section class="confidence-r2-action">
-      <div><span>${esc(sportsDefaultConfidenceWeekLabel_())}</span><strong>MAKE YOUR PICKS</strong><small>Pick the winner · assign confidence</small></div>
+      <div><span>${esc(sportsDefaultConfidenceWeekLabel_())}</span><strong>MAKE YOUR PICKS</strong><small>Pick the winner · confidence optional</small></div>
       <em class="${open?"is-open":"is-locked"}">${open?"OPEN":"LOCKED"}</em>
-      <p>${picked}/${categories.length} winners · ${values}/${categories.length} confidence values</p>
+      <p>${picked}/${categories.length} winners · ${values} confidence values used</p>
     </section>`;
   };
 
