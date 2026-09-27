@@ -2115,7 +2115,7 @@ function pattcConfidenceAllCategoriesR1_(){
 function pattcConfidenceCurrentWeekR1_(all){
   all=all||pattcConfidenceAllCategoriesR1_();
   var weeks=Array.from(new Set(all.map(pattcConfidenceWeekR1_).filter(function(n){return n>0;}))).sort(function(a,b){return a-b;});
-  if(!weeks.length||all.some(function(c){return pattcConfidenceWeekR1_(c)===0;}))return 0;
+  if(!weeks.length)return 0;
   if(weeks.indexOf(PATTC_CONFIDENCE_SELECTED_WEEK_R1_)!==-1)return PATTC_CONFIDENCE_SELECTED_WEEK_R1_;
   // The first not-yet-complete week is the current card, even when future weeks
   // have already been imported. Once all its kickoffs pass, advance naturally.
@@ -2140,7 +2140,9 @@ function pattcConfidenceWeekPickerR1_(){
   var all=pattcConfidenceAllCategoriesR1_();
   var current=pattcConfidenceCurrentWeekR1_(all);
   if(!current)return '';
-  var weeks=Array.from(new Set(all.map(pattcConfidenceWeekR1_))).sort(function(a,b){return a-b;});
+  var weeks=Array.from(new Set(
+    all.map(pattcConfidenceWeekR1_).filter(function(n){return n>0;})
+  )).sort(function(a,b){return a-b;});
   return '<div class="confidence-week-picker" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:10px 12px">'+
     '<label for="pattcConfidenceWeekR1" style="font-weight:700">NFL week</label><select id="pattcConfidenceWeekR1" onchange="pattcConfidenceChooseWeekR1_(this.value)" aria-label="Choose NFL Confidence week">'+
     weeks.map(function(w){return '<option value="'+w+'"'+(w===current?' selected':'')+'>Week '+w+'</option>';}).join('')+'</select>'+
@@ -3739,12 +3741,22 @@ function renderCompactConfidenceRow_(category) {
 
 /* RC24A Corrected Art — Confidence presentation helper only. */
 function sportsDefaultConfidenceWeekLabel_() {
+  if (pattcConfidenceWeeklyEnabledR1_()) {
+    const week = pattcConfidenceCurrentWeekR1_();
+    if (week) {
+      return "WEEK " + week;
+    }
+  }
+
   const game = PICKS_PAGE_DATA.game || {};
   const source = String(
     game.name || game.gameName || PICKS_PAGE_DATA.gameId || ""
   );
   const match = source.match(/(?:week|wk)[\s_-]*(\d{1,2})/i);
-  return match ? "WEEK " + Math.max(1, Math.min(18, Number(match[1]) || 1)) : "WEEKLY PLAY";
+
+  return match
+    ? "WEEK " + Math.max(1, Math.min(18, Number(match[1]) || 1))
+    : "WEEKLY PLAY";
 }
 
 function sportsDefaultConfidenceLockLabel_() {
@@ -5522,36 +5534,32 @@ function getMaxConfidencePoints() {
 
 function getUsedConfidencePointsForOtherCategories(categoryId){
   var used=[];
-  var activeIds=null;
-  if(pattcConfidenceWeeklyEnabledR1_()){
-    activeIds={};getConfidenceEligibleCategories().forEach(function(c){activeIds[normalizeId(c.id)]=true;});
-  }
-  Object.keys(PICKS_PAGE_DATA.confidencePoints||{}).forEach(function(otherCategoryId){
-    if(normalizeId(otherCategoryId)===normalizeId(categoryId))return;
-    if(activeIds&&!activeIds[normalizeId(otherCategoryId)])return;
-    var otherCategory=(PICKS_PAGE_DATA.categories||[]).find(function(c){return normalizeId(c.id)===normalizeId(otherCategoryId);});
-    if(!usesConfidencePointsCategory(otherCategory))return;
-    if(!PICKS_PAGE_DATA.picks[otherCategoryId]&&!shouldRenderCompactConfidenceSlate_())return;
-    var value=Number(PICKS_PAGE_DATA.confidencePoints[otherCategoryId])||0;
-    if(value>0&&used.indexOf(value)===-1)used.push(value);
+  getConfidenceEligibleCategories().forEach(function(category){
+    if(!category)return;
+    if(normalizeId(category.id)===normalizeId(categoryId))return;
+
+    var value=Number(PICKS_PAGE_DATA.confidencePoints[category.id])||0;
+
+    if(value>0&&used.indexOf(value)===-1){
+      used.push(value);
+    }
   });
   return used;
 }
 
 function getUsedConfidencePoints(){
   var used=[];
-  var activeIds=null;
-  if(pattcConfidenceWeeklyEnabledR1_()){
-    activeIds={};getConfidenceEligibleCategories().forEach(function(c){activeIds[normalizeId(c.id)]=true;});
-  }
-  Object.keys(PICKS_PAGE_DATA.confidencePoints||{}).forEach(function(id){
-    if(activeIds&&!activeIds[normalizeId(id)])return;
-    var category=(PICKS_PAGE_DATA.categories||[]).find(function(c){return normalizeId(c.id)===normalizeId(id);});
-    if(!usesConfidencePointsCategory(category))return;
-    if(!PICKS_PAGE_DATA.picks[id]&&!shouldRenderCompactConfidenceSlate_())return;
-    var value=Number(PICKS_PAGE_DATA.confidencePoints[id])||0;
-    if(value>0&&used.indexOf(value)===-1)used.push(value);
+
+  getConfidenceEligibleCategories().forEach(function(category){
+    if(!category)return;
+
+    var value=Number(PICKS_PAGE_DATA.confidencePoints[category.id])||0;
+
+    if(value>0&&used.indexOf(value)===-1){
+      used.push(value);
+    }
   });
+
   return used.sort(function(a,b){return b-a;});
 }
 function updateConfidenceForCategory(
@@ -9899,6 +9907,9 @@ draftConfidenceNominee_ = async function(categoryId, nomineeId) {
 
   PICKS_PAGE_DATA.picks[category.id] = nomineeId;
 
+  // Show the selection immediately while the save finishes.
+  refreshConfidenceAutosaveUi_(category.id);
+
   try {
     await rc24kSaveConfidenceRow_(category.id);
     showPicksMessage("Pick saved ✓", false);
@@ -9934,7 +9945,14 @@ updateConfidenceForCategory = async function(categoryId, value) {
   if (RC24K_CONFIDENCE_SAVING_[category.id]) return;
   const previous = Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
   PICKS_PAGE_DATA.confidencePoints[category.id] = nextValue;
-  if (PICKS_CONFIDENCE_SORT_MODE === "confidence") PICKS_CONFIDENCE_SORT_STALE = true;
+
+  if (PICKS_CONFIDENCE_SORT_MODE === "confidence") {
+    PICKS_CONFIDENCE_SORT_STALE = true;
+  }
+
+  // Immediately rebuild Week dropdowns so the selected value disappears
+  // from every other matchup before the server round trip finishes.
+  refreshConfidenceAutosaveUi_(category.id);
 
   try {
     await rc24kSaveConfidenceRow_(category.id);
