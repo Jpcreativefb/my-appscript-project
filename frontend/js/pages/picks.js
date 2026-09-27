@@ -9586,10 +9586,8 @@ function sportsRichConfidenceHeaderHtml_() {
       <p>Pick each matchup winner. Confidence is optional; each value can be used once.</p>
     </div>
 
-    <div class="sports-rich-confidence-state">
+    <div class="sports-rich-confidence-state confidence-r7-hero-state">
       <span class="sports-rich-state ${stats.stateClass}">${escapeHtml(stats.label)}</span>
-      <strong>${stats.picked}/${stats.total} winners · ${stats.ranked} confidence values used</strong>
-      <div class="sports-rich-progress"><span style="width:${stats.pct}%"></span></div>
       <small>${nextLock ? "Next lock " + escapeHtml(nextLock) : (stats.live ? stats.live + " matchup" + (stats.live===1?"":"s") + " live" : "Game locks are enforced automatically")}</small>
     </div>
   </section>`;

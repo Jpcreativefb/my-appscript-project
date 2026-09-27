@@ -50,6 +50,13 @@
   function js(v){return typeof escapeJs==="function"?escapeJs(v):String(v||"").replace(/\\/g,"\\\\").replace(/'/g,"\\'");}
   function norm(v){return typeof normalizeId==="function"?normalizeId(v):String(v||"").trim().toLowerCase();}
   function rgba(hex,a){hex=String(hex||"#1b4d77").replace("#","");return "rgba("+parseInt(hex.slice(0,2),16)+","+parseInt(hex.slice(2,4),16)+","+parseInt(hex.slice(4,6),16)+","+a+")";}
+  function brighten(hex,amount){
+    hex=String(hex||"#1b4d77").replace("#","");
+    var mix=Math.max(0,Math.min(1,Number(amount)||0));
+    var r=parseInt(hex.slice(0,2),16),g=parseInt(hex.slice(2,4),16),b=parseInt(hex.slice(4,6),16);
+    function ch(v){return Math.round(v+(255-v)*mix).toString(16).padStart(2,"0");}
+    return "#"+ch(r)+ch(g)+ch(b);
+  }
   function teamKey(team){
     const parts=[
       team&&team.abbr,team&&team.teamAbbr,team&&team.abbreviation,team&&team.id,
@@ -63,12 +70,14 @@
   }
   function teamStyle(team){
     const c=TEAM_COLORS[teamKey(team)]||["#175b91","#5f788c"];
+    const border=brighten(c[0],.34);
     return [
       "--confidence-team-primary:"+c[0],
       "--confidence-team-secondary:"+c[1],
-      "--confidence-team-primary-a:"+rgba(c[0],.38),
-      "--confidence-team-primary-soft:"+rgba(c[0],.22),
-      "--confidence-team-secondary-a:"+rgba(c[1],.20)
+      "--confidence-team-border:"+border,
+      "--confidence-team-primary-a:"+rgba(brighten(c[0],.12),.50),
+      "--confidence-team-primary-soft:"+rgba(brighten(c[0],.10),.34),
+      "--confidence-team-secondary-a:"+rgba(brighten(c[1],.10),.28)
     ].join(";");
   }
   function kickoff(category){
@@ -221,6 +230,7 @@
 
   function statsHtml(){
     const s=currentStats(),used=getUsedConfidencePoints().map(Number),max=maxConfidence();
+    const pct=s.games?Math.round((s.picked/s.games)*100):0;
     const pool=Array.from({length:max},function(_,i){const n=i+1;return `<i class="${used.indexOf(n)!==-1?"is-used":""}">${n}</i>`;}).join("");
     return `<section class="confidence-r2-stats">
       <div class="confidence-r2-section-head"><div><strong>STATS</strong><small>Current confidence card</small></div><em>${s.picked===s.games&&s.games?"COMPLETE":"IN PROGRESS"}</em></div>
@@ -229,6 +239,10 @@
         <div><span>Correct</span><strong>${s.correct}</strong></div>
         <div><span>Final</span><strong>${s.finals}</strong></div>
         <div><span>Points</span><strong>${s.points}</strong></div>
+      </div>
+      <div class="confidence-r2-mini-progress" aria-label="${s.picked} of ${s.games} picks complete">
+        <span>${s.picked}/${s.games}</span>
+        <div><i style="width:${pct}%"></i></div>
       </div>
       <div class="confidence-r2-pool"><span>CONFIDENCE USED</span><div>${pool}</div></div>
     </section>`;
@@ -329,10 +343,13 @@
   root.renderCompactConfidenceSlate_=function(){
     const categories=getCompactConfidenceDisplayCategories_();
     return `<div class="sports-default-confidence-board confidence-r2">
-      ${renderSportsDefaultConfidenceActionHeader_()}
+      ${typeof pattcConfidenceWeekPickerR1_==="function" ? pattcConfidenceWeekPickerR1_() : ""}
+      <div class="confidence-r2-summary-combined">
+        ${renderSportsDefaultConfidenceActionHeader_()}
+        ${statsHtml()}
+      </div>
       <div class="confidence-r2-slate">${categories.map(renderCompactConfidenceRow_).join("")}</div>
       ${confidenceAutosaveActionsHtml_()}
-      ${statsHtml()}
       ${competition()}
       ${rules()}
     </div>`;

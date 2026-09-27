@@ -223,3 +223,20 @@
   .confidence-r2-value-control button{width:13px!important;min-width:13px!important;height:21px!important;font-size:9px!important}
   .confidence-r2-value-control select{min-width:46px!important;height:33px!important;font-size:18px!important}
 }
+
+/* PATTC CONFIDENCE POOL R7 */
+.confidence-r2 .confidence-week-picker{margin:0!important;padding:8px 10px!important;border:1px solid #245f80!important;border-radius:10px!important;background:linear-gradient(180deg,#062238,#031725)!important;color:#cfe3ef!important}
+.confidence-r2 .confidence-week-picker label{color:#62e47a!important}
+.confidence-r2 .confidence-week-picker select{min-height:32px!important;border:1px solid #3e7d9f!important;border-radius:7px!important;background:#03131f!important;color:#fff!important;padding:4px 8px!important;font-weight:800!important}
+.confidence-r2 .confidence-week-picker>span{font-size:7px!important;color:#89a8ba!important}
+.confidence-r2-summary-combined{border:1px solid #1d638a;border-radius:12px;overflow:hidden;background:#02131f}
+.confidence-r2-summary-combined .confidence-r2-action{margin:0!important;border:0!important;border-radius:0!important;background:linear-gradient(180deg,#05243a,#041b2d)!important}
+.confidence-r2-summary-combined .confidence-r2-stats{margin:0!important;border:0!important;border-top:1px solid rgba(61,129,170,.32)!important;border-radius:0!important}
+.confidence-r2-mini-progress{display:grid;grid-template-columns:34px 1fr;gap:7px;align-items:center;padding:5px 10px 2px;color:#8faabb;font-size:7px;font-weight:800}
+.confidence-r2-mini-progress>div{height:4px;overflow:hidden;border-radius:999px;background:#102b3b}
+.confidence-r2-mini-progress>div>i{display:block;height:100%;border-radius:999px;background:linear-gradient(90deg,#2bd56a,#69ef8d)}
+.confidence-r2 .confidence-team-choice.confidence-r2-team{border-color:var(--confidence-team-border,var(--confidence-team-primary))!important;background:radial-gradient(circle at 28% 18%,var(--confidence-team-primary-a),transparent 52%),radial-gradient(circle at 82% 78%,var(--confidence-team-secondary-a),transparent 62%),linear-gradient(145deg,rgba(5,31,50,.86),rgba(2,14,25,.91) 62%,rgba(5,24,39,.90))!important;box-shadow:inset 0 -25px 42px rgba(0,0,0,.20)!important}
+.confidence-r2 .confidence-r2-team.not-selected{opacity:.94!important}
+.confidence-r2 .confidence-r2-team.selected{border-color:#74d7ff!important;box-shadow:inset 0 0 0 2px #74d7ff,0 0 16px rgba(116,215,255,.42),inset 0 -22px 40px rgba(0,0,0,.16)!important}
+.sports-rich-confidence-state.confidence-r7-hero-state{align-content:center!important;min-height:0!important}
+@media(max-width:560px){.confidence-r2 .confidence-week-picker{gap:6px!important}.confidence-r2 .confidence-week-picker>span{flex-basis:100%}}
