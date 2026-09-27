@@ -119,6 +119,7 @@
       style="${teamStyle(nominee)}"
       onclick="draftConfidenceNominee_('${js(category.id)}','${js(nominee.id)}')"
       aria-pressed="${selected?"true":"false"}"
+      data-nominee-id="${attr(nominee.id)}"
       ${locked||PICKS_CONFIDENCE_BATCH_SAVING?"disabled":""}>
       ${selected?'<span class="confidence-r2-pick-badge">YOUR PICK</span>':""}
       <span class="confidence-team-visual">${platformImgHtml(image,{className:"confidence-team-logo",variant:"thumb",alt:nominee.name||"Team"})}</span>
@@ -133,16 +134,17 @@
 
   function valueControl(category,locked,result){
     const current=Number(PICKS_PAGE_DATA.confidencePoints[category.id])||0;
+    const picked=Boolean(PICKS_PAGE_DATA.picks[category.id]);
     const max=maxConfidence();
     const points=confidenceResultPointsLabel_(category,result);
     return `<div class="confidence-r2-value ${locked?"is-locked":""}">
       <span>CONFIDENCE</span>
       <div class="confidence-r2-value-control">
-        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',-1)" ${locked||current<=0?"disabled":""}>−</button>
-        <select id="confidence-${attr(category.id)}" onchange="updateConfidenceForCategory('${js(category.id)}',this.value)" ${locked||PICKS_CONFIDENCE_BATCH_SAVING?"disabled":""}>
+        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',-1)" ${locked||!picked||current<=0?"disabled":""}>−</button>
+        <select id="confidence-${attr(category.id)}" onchange="updateConfidenceForCategory('${js(category.id)}',this.value)" ${locked||!picked||PICKS_CONFIDENCE_BATCH_SAVING?"disabled":""}>
           <option value="">—</option>${renderConfidenceOptionsForCategory(category.id,current)}
         </select>
-        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',1)" ${locked||current>=max?"disabled":""}>+</button>
+        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',1)" ${locked||!picked||current>=max?"disabled":""}>+</button>
       </div>
       <small>1–${max}</small>
       ${points?`<strong class="${result.className}">${esc(points)} pts</strong>`:""}
@@ -230,6 +232,18 @@
       <div class="confidence-r2-pool"><span>CONFIDENCE USED</span><div>${pool}</div></div>
     </section>`;
   }
+
+  root.confidenceR2RefreshSummary_=function(){
+    const action=document.querySelector(".confidence-r2-action");
+    if(action&&typeof root.renderSportsDefaultConfidenceActionHeader_==="function"){
+      action.outerHTML=root.renderSportsDefaultConfidenceActionHeader_();
+    }
+
+    const stats=document.querySelector(".confidence-r2-stats");
+    if(stats){
+      stats.outerHTML=statsHtml();
+    }
+  };
 
   function players(){
     return RC24K_CONFIDENCE_COMPARE_DATA_&&Array.isArray(RC24K_CONFIDENCE_COMPARE_DATA_.players)?RC24K_CONFIDENCE_COMPARE_DATA_.players:[];
