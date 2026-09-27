@@ -9857,6 +9857,17 @@ function rc24kApplyImmediateTeamSelection_(categoryId, nomineeId) {
     button.classList.toggle('selected', selected);
     button.classList.toggle('not-selected', !selected);
     button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+
+    const badge = button.querySelector('.confidence-r2-pick-badge');
+
+    if (selected && !badge && button.classList.contains('confidence-r2-team')) {
+      button.insertAdjacentHTML(
+        'afterbegin',
+        '<span class="confidence-r2-pick-badge">YOUR PICK</span>'
+      );
+    } else if (!selected && badge) {
+      badge.remove();
+    }
   });
 
   if (input) {
@@ -9883,6 +9894,19 @@ function rc24kRefreshConfidenceNumberAvailability_() {
 
     select.value = current > 0 ? String(current) : '';
   });
+}
+
+function rc24kRefreshConfidenceSummaryUi_() {
+  if (typeof confidenceR2RefreshSummary_ === 'function') {
+    confidenceR2RefreshSummary_();
+  }
+
+  if (typeof sportsRichConfidenceHeaderHtml_ === 'function') {
+    const hero = document.querySelector('.sports-rich-confidence-hero');
+    if (hero) {
+      hero.outerHTML = sportsRichConfidenceHeaderHtml_();
+    }
+  }
 }
 
 function rc24kRefreshAutosaveActionsOnly_() {
@@ -10120,6 +10144,7 @@ draftConfidenceNominee_ = function(categoryId, nomineeId) {
   // and do not rebuild the whole matchup row before showing the selection.
   rc24kApplyImmediateTeamSelection_(category.id, nomineeId);
   rc24kRefreshConfidenceNumberAvailability_();
+  rc24kRefreshConfidenceSummaryUi_();
   rc24kQueueConfidenceSave_(category.id);
 };
 
@@ -10162,6 +10187,7 @@ updateConfidenceForCategory = function(categoryId, value) {
   // Reserve this number in browser state first. Every other Week dropdown
   // loses the value synchronously before the autosave request begins.
   rc24kRefreshConfidenceNumberAvailability_();
+  rc24kRefreshConfidenceSummaryUi_();
   rc24kRefreshAutosaveActionsOnly_();
   rc24kQueueConfidenceSave_(category.id);
 };
