@@ -240,6 +240,33 @@ function doPost(e) {
       }));
     }
 
+    if (action === "getConfidenceAutoPickState") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", body.leagueId || "");
+      if (!access.allowed) return json({ success:false, error:"Access denied: "+access.reason });
+      return json(confidenceR8State_({ username:body.username, gameId:postGameId }));
+    }
+
+    if (action === "saveConfidenceAutoPickPreference") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "makePicks", body.leagueId || "");
+      if (!access.allowed) return json({ success:false, error:"Access denied: "+access.reason });
+      return json(confidenceR8SavePreference_({
+        username:body.username, gameId:postGameId, categoryId:body.categoryId || "",
+        enabled:body.enabled, strategy:body.strategy, clearOverride:body.clearOverride === true
+      }));
+    }
+
+    if (action === "getConfidenceHistoryCompare") {
+      const postGameId = body.gameId || getDefaultGameId();
+      const access = userCanAccessGameFeature_(body.username, postGameId, "viewGame", body.leagueId || "");
+      if (!access.allowed) return json({ success:false, error:"Access denied: "+access.reason });
+      return json(confidenceR8HistoryCompare_({
+        username:body.username, gameId:postGameId,
+        usernames:Array.isArray(body.usernames)?body.usernames:[]
+      }));
+    }
+
     if (action === "getSharedCompare") {
       const postGameId = body.gameId || getDefaultGameId();
       const postLeagueId = typeof normalizeLeagueId_ === "function"
@@ -969,6 +996,9 @@ function doGet(e) {
       action === "adminInstallSportsSurvivorAutomation" ||
       action === "adminSaveRankingResults" ||
       action === "saveConfidencePicksBatch" ||
+      action === "getConfidenceAutoPickState" ||
+      action === "saveConfidenceAutoPickPreference" ||
+      action === "getConfidenceHistoryCompare" ||
       action === "saveBet" ||
       action === "removeBet" ||
       action === "saveSeasonAnchorPick" ||

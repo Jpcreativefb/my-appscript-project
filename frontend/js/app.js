@@ -746,7 +746,7 @@ function appPageScriptUrl_(name, retryToken) {
   if (name === "rankingSportsR1") url.searchParams.set("playoff", "v1222-nfl-playoff-race-r3-team-multipliers");
   if (name === "nflCupR1" || name === "adminGamesRc24e" || name === "seasonHub" || name === "betting") url.searchParams.set("cupFutures", "v1220-nfl-cup-futures-r1");
   if (name === "adminGamesRc24e") url.searchParams.set("cupControl", "v1221-nfl-cup-weekly-season-r2");
-  if (name === "picks" || name === "confidenceR2") url.searchParams.set("confidenceWeekly", "v1227-confidence-pool-r7");
+  if (name === "picks" || name === "confidenceR2") url.searchParams.set("confidenceWeekly", "v1228-confidence-pool-r8");
   if (retryToken) url.searchParams.set("retry", retryToken);
   return url.href;
 }

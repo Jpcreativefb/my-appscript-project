@@ -2823,6 +2823,52 @@ function applyConfidenceLiveScores_(scores) {
 
 }
 
+function confidenceR8RefreshLiveDom_() {
+  getCompactConfidenceCategories_().forEach(function(category) {
+    var row=document.querySelector('.confidence-game-row[data-category-id="'+cssEscape(category.id)+'"]');
+    if(!row)return;
+    var phase=getConfidenceSportsPhase_(category);
+    row.classList.toggle("phase-live",phase==="live");
+    row.classList.toggle("phase-final",phase==="final");
+    var status=row.querySelector(".confidence-matchup-state strong");
+    if(status)status.textContent=formatConfidenceSportsStatus_(category);
+    ["away","home"].forEach(function(side){
+      var team=row.querySelector(".confidence-team-"+side);
+      if(!team)return;
+      var score=confidenceScoreValue_(category,side),el=team.querySelector(".confidence-r2-score");
+      if(phase!=="pregame"&&score!==""){
+        if(!el){el=document.createElement("b");el.className="confidence-r2-score";team.appendChild(el);}
+        el.textContent=String(score);
+      }
+    });
+    if(phase==="live"||phase==="final"){
+      row.querySelectorAll("button,select").forEach(function(control){control.disabled=true;});
+      row.dataset.locked="true";
+    }
+  });
+}
+
+function confidenceR8PreloadVisibleOdds_() {
+  if(!shouldRenderCompactConfidenceSlate_())return;
+  var rows=getCompactConfidenceCategories_().filter(function(c){
+    return !PICKS_CONFIDENCE_ODDS_BY_CATEGORY[c.id]&&!PICKS_CONFIDENCE_ODDS_IN_FLIGHT[c.id];
+  });
+  var index=0;
+  function next(){
+    var batch=rows.slice(index,index+4);index+=batch.length;if(!batch.length)return;
+    batch.forEach(function(c){PICKS_CONFIDENCE_ODDS_IN_FLIGHT[c.id]=true;});
+    Promise.allSettled(batch.map(function(category){
+      return confidenceSportsJsonp_(buildConfidenceSportsApiUrl_("getSportsOdds",{
+        gameId:category.sportsGameId||"",espnEventId:category.espnEventId||"",league:category.sportsLeague||"",
+        homeTeam:category.homeTeam||"",awayTeam:category.awayTeam||"",gameDateTime:category.lockDateTime||category.gameDateTime||"",market:"moneyline"
+      })).then(function(result){PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id]=result||{success:false,found:false};})
+      .catch(function(err){PICKS_CONFIDENCE_ODDS_BY_CATEGORY[category.id]={success:false,found:false,message:err.message||String(err)};})
+      .finally(function(){PICKS_CONFIDENCE_ODDS_IN_FLIGHT[category.id]=false;});
+    })).then(function(){if(typeof confidenceR2RefreshVisibleOdds_==="function")confidenceR2RefreshVisibleOdds_();next();});
+  }
+  next();
+}
+
 function shouldConfidenceLiveRerenderNow_() {
   const active = document.activeElement;
   if (!active || active === document.body) return true;
@@ -2839,7 +2885,10 @@ async function refreshConfidenceLiveSports_() {
   try {
     const scores = await fetchConfidenceLiveScores_();
     const changed = applyConfidenceLiveScores_(scores);
-    if (changed && shouldConfidenceLiveRerenderNow_()) refreshPicksPage();
+    if (changed) {
+      confidenceR8RefreshLiveDom_();
+      if (shouldConfidenceLiveRerenderNow_() && getCompactConfidenceCategories_().some(function(c){return getConfidenceSportsPhase_(c)==="final";})) refreshPicksPage();
+    }
   } catch (err) {
     console.warn("Confidence live scoreboard refresh skipped", err);
   } finally {
@@ -7372,11 +7421,10 @@ function getLockedUnpickedConfidenceCount() {
 
 
 function getMaxAvailableConfidencePoints(){
-  var total=getConfidenceEligibleCategories().length;
-  // An already-started matchup cannot be newly selected, but does not shrink
-  // the week's 1..N confidence scale for the remaining playable matchups.
-  if(pattcConfidenceWeeklyEnabledR1_())return Math.max(total,1);
-  return Math.max(total-getLockedUnpickedConfidenceCount(),1);
+  var categories=getConfidenceEligibleCategories();
+  var total=categories.length;
+  var locked=categories.filter(function(category){return isCompactConfidenceLocked_(category);}).length;
+  return Math.max(total-locked,1);
 }
 function renderConfidenceOptionsForCategory(
   categoryId,
@@ -10391,6 +10439,7 @@ if (typeof mountConfidenceLiveSports_ === "function") {
   mountConfidenceLiveSports_ = function() {
     const result = RC24K_CONFIDENCE_MOUNT_BASE_.apply(this, arguments);
     window.setTimeout(rc24kHydrateConfidenceCompare_, 0);
+    window.setTimeout(confidenceR8PreloadVisibleOdds_, 0);
     return result;
   };
 }

@@ -1,0 +1,31 @@
+const fs=require("fs"),assert=require("assert");
+const read=p=>fs.readFileSync(p,"utf8");
+const picks=read("frontend/js/pages/picks.js"),r2=read("frontend/js/pages/confidenceR2.js"),be=read("backend/engines/PicksEngine.js"),ae=read("backend/engines/SportsConfidenceAutoPickEngine.js"),api=read("backend/Api.js"),fapi=read("frontend/js/api.js"),css=read("frontend/css/confidence-r2.css");
+assert(picks.includes("locked=categories.filter"));
+assert(picks.includes("confidenceR8RefreshLiveDom_"));
+assert(picks.includes("confidenceR8PreloadVisibleOdds_"));
+assert(be.includes("pattcConfidenceServerMaxR8_"));
+assert(r2.includes("Weekly Rank")&&r2.includes("Points Remaining")&&r2.includes("Best Finish")&&r2.includes("Move Up")&&r2.includes("Cushion"));
+assert(r2.includes("History"));
+assert(r2.includes("(A)")&&r2.includes("confidence-r8-odds"));
+assert(ae.includes('["historical","random","home","away","best-record"]'));
+assert(ae.includes("historical_personal")&&ae.includes("historical_community")&&ae.includes("best_record")&&ae.includes("random_fallback"));
+assert(ae.includes("ConfidenceAssigned:0"));
+assert(ae.includes("manual_pick_exists"));
+assert(be.includes("const onlyIfEmpty = payload.onlyIfEmpty === true"));
+assert(be.includes('reason: "pick_exists"'));
+assert(ae.includes("onlyIfEmpty:true"));
+assert(ae.includes("confidenceR8TerminalAudit_"));
+assert(ae.includes('reason:"terminal_audit_exists"'));
+assert(api.includes("getConfidenceAutoPickState")&&api.includes("saveConfidenceAutoPickPreference")&&api.includes("getConfidenceHistoryCompare"));
+assert(fapi.includes("apiGetConfidenceHistoryCompare")&&fapi.includes("apiSaveConfidenceAutoPickPreference"));
+assert(css.includes(".confidence-r8-auto-marker")&&css.includes(".confidence-r8-history"));
+
+assert(ae.includes("category.AwayRecord"), "R8.3 must accept legacy AwayRecord data for Best Record.");
+assert(ae.includes("category.HomeRecord"), "R8.3 must accept legacy HomeRecord data for Best Record.");
+assert(ae.includes("Number(pick.changeCount||0)>0"), "R8.3 must clear Auto marker after a manual team change.");
+assert(ae.includes("confidenceR8Key_(pick.nomineeId)!==confidenceR8Key_(r.SelectedNomineeId)"), "R8.3 must clear Auto marker when current pick differs from audited Auto Pick.");
+assert(ae.includes("pickMs>auditMs"), "R8.3 must reject stale Auto markers after a later manual save.");
+assert(ae.includes("var activeAuto=confidenceR8LatestAuditMap_(gameId,username);"), "R8.3 History must count only active Auto Picks.");
+
+console.log("PATTC Confidence Pool R8 targeted tests: PASS");

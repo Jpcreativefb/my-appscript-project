@@ -16,7 +16,8 @@ var AUTOMATION_HEALTH_DURABLE_HANDLERS_ = {
   notificationPushRunScheduledPickReminders: "Pick Reminder Notifications",
   teamFantasySyncTriggerHandler: "Team Fantasy Sync",
   teamFantasyAutoFillTriggerHandler: "Team Fantasy Auto-Fill",
-  survivorSportsAutomationTick: "Survivor / KOTH Automation"
+  survivorSportsAutomationTick: "Survivor / KOTH Automation",
+  confidenceAutoPickAutomationTick: "Confidence Auto Pick"
 };
 
 var AUTOMATION_HEALTH_TRANSIENT_HANDLERS_ = {

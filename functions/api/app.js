@@ -93,6 +93,9 @@ export async function onRequestPost(context) {
       message:"Playoff Race preview is read-only because it shares production data."}, 200);
   }
   // Preview shares production Sheets: reject all Visual Studio draft/publish/version writes.
+  if (!productionRequest && action === "saveConfidenceAutoPickPreference") {
+    return jsonResponse({success:false,previewOnly:true,message:"Confidence Auto Pick settings are read-only in Preview because Preview shares production data."},403);
+  }
   if (!productionRequest && action === "adminSaveAppearanceOverride" &&
       /^visual-studio-(draft|published|version)$/i.test(String(body.entityType || ""))) {
     return jsonResponse({success:false,previewOnly:true,message:"Visual Studio writes are disabled on Preview."},403);

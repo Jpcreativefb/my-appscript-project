@@ -4574,6 +4574,28 @@ async function apiGetConfidenceCompare(gameId) {
   });
 }
 
+async function apiGetConfidenceAutoPickState(gameId) {
+  return apiPost("getConfidenceAutoPickState", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_()
+  });
+}
+async function apiSaveConfidenceAutoPickPreference(gameId, payload) {
+  payload=payload||{};
+  return apiPost("saveConfidenceAutoPickPreference", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_(), categoryId: payload.categoryId || "",
+    enabled: payload.enabled === true, strategy: payload.strategy || "historical",
+    clearOverride: payload.clearOverride === true
+  });
+}
+async function apiGetConfidenceHistoryCompare(gameId, usernames) {
+  return apiPost("getConfidenceHistoryCompare", {
+    gameId: gameId || (typeof APP_STATE !== "undefined" ? APP_STATE.gameId : ""),
+    leagueId: getApiLeagueId_(), usernames: Array.isArray(usernames) ? usernames : []
+  });
+}
+
 
 /* ED RC24M — Shared Compare data/privacy contract */
 async function apiGetSharedCompare(gameId, rivalUsernames, leagueId) {
