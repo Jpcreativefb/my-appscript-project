@@ -14,7 +14,7 @@ assert(scoring.includes("Blank confidence is the safe basic pick"));
 assert(api.includes('action === "getConfidenceCompare"'));
 assert(fapi.includes("function apiGetConfidenceCompare"));
 assert(fpicks.includes("RC24K — NFL CONFIDENCE PLAYER EXPERIENCE"));
-assert(fpicks.includes("Pick a team first"));
+assert(fpicks.includes("Pick a team before assigning confidence."));
 assert(fpicks.includes("No confidence · +1 / 0"));
 assert(fpicks.includes("COMPARE PICKS"));
 assert(fpicks.includes("rc24kSaveConfidenceRow_"));

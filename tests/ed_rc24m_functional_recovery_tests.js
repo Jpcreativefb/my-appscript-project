@@ -76,7 +76,8 @@ assert(!picks.includes('Pick the winner first. The team saves immediately. Confi
 assert(picks.includes('function confidenceAutosaveActionsHtml_()'));
 assert(picks.includes('Complete for now — your picks are saved.'));
 assert(picks.includes('No confidence · +1 / 0'));
-assert(picks.includes('await rc24kSaveConfidenceRow_(category.id);'));
+assert(picks.includes('async function rc24kSaveConfidenceRow_(categoryId)'));
+assert(picks.includes('rc24kQueueConfidenceSave_(category.id);'));
 assert(picks.includes('Pick a team before assigning confidence.'));
 
 // KOTH passive contract must remain protected in dashboard progress and launch action behavior.

@@ -206,6 +206,19 @@ function pattcConfidenceServerWeekR1_(gameId,categoryId,settings){
   return 'legacy';
 }
 
+function pattcConfidenceServerMaxR8_(gameId,categoryId,settings){
+  settings=settings||getCategorySettings(gameId);
+  var week=pattcConfidenceServerWeekR1_(gameId,categoryId,settings),total=0,locked=0;
+  Object.keys(settings||{}).forEach(function(id){
+    var cfg=settings[id]||{};
+    if(pattcConfidenceServerWeekR1_(gameId,id,settings)!==week)return;
+    if(!confidenceBatchUsesPoints_(cfg,true))return;
+    total++;
+    if(isCategoryConfigLocked_(cfg))locked++;
+  });
+  return Math.max(total-locked,1);
+}
+
 function hasDuplicateConfidencePoints_(
   gameId,
   username,
@@ -1075,6 +1088,7 @@ function saveConfidencePicksBatch(payload) {
     const username = normalizeString_(payload.username);
     const gameId = normalizeString_(payload.gameId || getDefaultGameId());
     const requested = Array.isArray(payload.picks) ? payload.picks : [];
+    const onlyIfEmpty = payload.onlyIfEmpty === true;
 
     if (!username || !gameId) {
       return {
@@ -1213,6 +1227,30 @@ function saveConfidencePicksBatch(payload) {
     }
 
     /*
+      Auto Pick safety contract: when onlyIfEmpty is requested, the existence
+      check happens after this function acquires the same write lock used for
+      the save. A manual pick committed before this point always wins and the
+      automatic writer exits without modifying that row.
+    */
+    if (onlyIfEmpty) {
+      const occupiedItem = normalizedItems.find(function(item) {
+        const existing = existingByCategory[item.categoryId] || null;
+        return !!(existing && normalizeLower_(existing.row[col.nominee]));
+      });
+
+      if (occupiedItem) {
+        return {
+          success: true,
+          skipped: true,
+          reason: "pick_exists",
+          categoryId: occupiedItem.categoryId,
+          savedCount: 0,
+          results: []
+        };
+      }
+    }
+
+    /*
       Build the final Confidence assignment before validating duplicates.
       This is what allows a player to swap 16 and 15 in one Save All request;
       sequential savePick() calls cannot safely perform that swap.
@@ -1274,6 +1312,21 @@ function saveConfidencePicksBatch(payload) {
       }
 
       const existing = existingByCategory[categoryId] || null;
+      const previousSavedConfidenceR8 = existing
+        ? normalizeConfidencePoints_(existing.row[col.confidencePoints])
+        : 0;
+      const currentMaxConfidenceR8 = pattcConfidenceServerMaxR8_(gameId, categoryId, settings);
+      if (
+        item.confidencePoints > currentMaxConfidenceR8 &&
+        item.confidencePoints !== previousSavedConfidenceR8
+      ) {
+        throw new Error(
+          "Confidence " + item.confidencePoints +
+          " is no longer available. The current maximum is " +
+          currentMaxConfidenceR8 + " because earlier games have locked."
+        );
+      }
+
       const previousNominee = existing
         ? normalizeLower_(existing.row[col.nominee])
         : "";
@@ -2822,6 +2875,9 @@ function apiGetConfidenceCompare_(payload) {
     });
 
     const picks = {};
+    const autoAuditR8 = typeof confidenceR8LatestAuditMap_ === "function"
+      ? confidenceR8LatestAuditMap_(gameId, username)
+      : {};
     confidenceIds.forEach(function(categoryId) {
       const config = settings[categoryId] || {};
       const pick = byCategory[categoryId] || null;
@@ -2840,7 +2896,9 @@ function apiGetConfidenceCompare_(payload) {
         hidden: false,
         nomineeId: pick ? normalizeString_(pick.nomineeId) : "",
         confidencePoints: pick ? normalizeConfidencePoints_(pick.confidencePoints) : 0,
-        status: pick ? getPickResultStatus_(config, pick.nomineeId) : "pending"
+        status: pick ? getPickResultStatus_(config, pick.nomineeId) : "pending",
+        autoPicked: !!autoAuditR8[categoryId],
+        autoPickStrategy: autoAuditR8[categoryId] ? String(autoAuditR8[categoryId].ResolvedStrategy || "") : ""
       };
     });
 

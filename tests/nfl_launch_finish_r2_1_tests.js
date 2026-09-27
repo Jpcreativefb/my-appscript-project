@@ -18,7 +18,7 @@ assert(confCss.includes("PATTC CONFIDENCE LAUNCH FINISH R2.1"));
 assert(confCss.includes("grid-template-columns:minmax(0,1fr) minmax(0,1fr) 94px"));
 assert(confCss.includes("width:52px!important"));
 assert(confCss.includes("grid-template-columns:16px minmax(52px,1fr) 16px"));
-assert(html.includes("confidence=v1219-confidence-launch-r2-2"));
+assert(html.includes("confidence=v1228-confidence-pool-r8"));
 assert(html.includes("playoff=v1222-nfl-playoff-race-r3-team-multipliers"));
 assert(app.includes('url.searchParams.set("playoff", "v1222-nfl-playoff-race-r3-team-multipliers")'));
 assert.strictEqual(app,mirror);
