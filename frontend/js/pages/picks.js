@@ -3668,6 +3668,7 @@ function renderCompactConfidenceTeam_(category, nominee, selectedNomineeId, lock
       class="confidence-team-choice confidence-team-${side || "team"} ${selected ? "selected" : ""} ${hasSelection && !selected ? "not-selected" : ""} ${actualWinner ? "actual-winner" : ""}"
       onclick="draftConfidenceNominee_('${escapeJs(category.id)}', '${escapeJs(nominee.id)}')"
       aria-pressed="${selected ? "true" : "false"}"
+      data-nominee-id="${escapeAttr(nominee.id)}"
       aria-label="Pick ${escapeAttr(nominee.name || "team")}"
       ${locked || PICKS_CONFIDENCE_BATCH_SAVING ? "disabled" : ""}
     >
@@ -9842,6 +9843,55 @@ function refreshConfidenceAutosaveUi_(categoryId) {
   if (actions) actions.outerHTML = confidenceAutosaveActionsHtml_();
 }
 
+
+function rc24kApplyImmediateTeamSelection_(categoryId, nomineeId) {
+  const input = document.getElementById('confidence-' + categoryId);
+  const row = input && input.closest('.rc24k-confidence-row');
+  if (!row) return;
+
+  row.querySelectorAll('.confidence-team-choice').forEach(function(button) {
+    const selected =
+      normalizeId(button.getAttribute('data-nominee-id')) ===
+      normalizeId(nomineeId);
+
+    button.classList.toggle('selected', selected);
+    button.classList.toggle('not-selected', !selected);
+    button.setAttribute('aria-pressed', selected ? 'true' : 'false');
+  });
+
+  if (input) {
+    input.disabled = false;
+  }
+
+  const state = row.querySelector('.rc24k-confidence-save-state');
+  if (state) {
+    state.textContent = 'Queued to save…';
+  }
+}
+
+function rc24kRefreshConfidenceNumberAvailability_() {
+  getCompactConfidenceCategories_().forEach(function(category) {
+    const select = document.getElementById('confidence-' + category.id);
+    if (!select) return;
+
+    const current =
+      Number(PICKS_PAGE_DATA.confidencePoints[category.id]) || 0;
+
+    select.innerHTML =
+      '<option value="">—</option>' +
+      renderConfidenceOptionsForCategory(category.id, current);
+
+    select.value = current > 0 ? String(current) : '';
+  });
+}
+
+function rc24kRefreshAutosaveActionsOnly_() {
+  const actions = document.getElementById('confidenceAutosaveActions');
+  if (actions) {
+    actions.outerHTML = confidenceAutosaveActionsHtml_();
+  }
+}
+
 function rc24kQueueConfidenceSave_(categoryId) {
   const category = getCompactConfidenceCategories_().find(function(item) {
     return normalizeId(item.id) === normalizeId(categoryId);
@@ -9853,7 +9903,7 @@ function rc24kQueueConfidenceSave_(categoryId) {
   RC24K_CONFIDENCE_SAVE_PENDING_[category.id] = true;
 
   persistConfidenceDraft_();
-  refreshConfidenceAutosaveUi_(category.id);
+  rc24kRefreshAutosaveActionsOnly_();
 
   if (RC24K_CONFIDENCE_SAVE_TIMER_) {
     clearTimeout(RC24K_CONFIDENCE_SAVE_TIMER_);
@@ -10066,9 +10116,10 @@ draftConfidenceNominee_ = function(categoryId, nomineeId) {
 
   PICKS_PAGE_DATA.picks[category.id] = nomineeId;
 
-  // Winner appears immediately. Confidence remains optional and usable
-  // while the background save is queued.
-  refreshConfidenceAutosaveUi_(category.id);
+  // Apply the player-visible state synchronously. Do not wait for Apps Script
+  // and do not rebuild the whole matchup row before showing the selection.
+  rc24kApplyImmediateTeamSelection_(category.id, nomineeId);
+  rc24kRefreshConfidenceNumberAvailability_();
   rc24kQueueConfidenceSave_(category.id);
 };
 
@@ -10108,9 +10159,10 @@ updateConfidenceForCategory = function(categoryId, value) {
     PICKS_CONFIDENCE_SORT_STALE = true;
   }
 
-  // Update the value and remove it from the other Week dropdowns immediately.
-  // A zero value remains a valid basic pick worth +1 for a correct selection.
-  refreshConfidenceAutosaveUi_(category.id);
+  // Reserve this number in browser state first. Every other Week dropdown
+  // loses the value synchronously before the autosave request begins.
+  rc24kRefreshConfidenceNumberAvailability_();
+  rc24kRefreshAutosaveActionsOnly_();
   rc24kQueueConfidenceSave_(category.id);
 };
 
