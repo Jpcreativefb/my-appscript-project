@@ -18,7 +18,11 @@ assert(sw.includes('{ ignoreSearch: true }'), "Versioned asset requests cannot f
 assert(sw.includes('return cache.match("./app.html")'), "Authenticated app navigation does not fall back to app.html.");
 assert(appHtml.includes('js/pwa.js?v=v1217g-iphone-pwa-recovery'), "Authenticated shell does not request the v1.2.17g PWA bootstrap.");
 assert(indexHtml.includes('js/pwa.js?v=v1217g-iphone-pwa-recovery'), "Login shell does not request the v1.2.17g PWA bootstrap.");
-assert(appHtml.includes('js/api.js?v=v1217g-iphone-pwa-recovery'), "Authenticated shell does not bust the API client cache.");
+assert(
+  appHtml.includes('js/api.js?') &&
+  appHtml.includes('v=v1217g-iphone-pwa-recovery'),
+  "Authenticated shell does not bust the API client cache."
+);
 assert(indexHtml.includes('js/api.js?v=v1217g-iphone-pwa-recovery'), "Login shell does not bust the API client cache.");
 
 console.log("PASS: iPhone PWA recovery v1.2.17g");

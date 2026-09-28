@@ -742,7 +742,7 @@ function appPageScriptUrl_(name, retryToken) {
   url.searchParams.set("v", APP_ASSET_VERSION);
   url.searchParams.set("hotfix", APP_ROUTE_HOTFIX_VERSION);
   if (name === "notifications") url.searchParams.set("module", "v1218j-automatic-pick-reminders");
-  if (name === "dashboard") url.searchParams.set("homeCareer", "v1224-dashboard-optional-details-r3");
+  if (name === "dashboard") url.searchParams.set("homeCareer", "v1233-home-hub-fetch-nav-r1");
   if (name === "rankingSportsR1") url.searchParams.set("playoff", "v1222-nfl-playoff-race-r3-team-multipliers");
   if (name === "nflCupR1" || name === "adminGamesRc24e" || name === "seasonHub" || name === "betting") url.searchParams.set("cupFutures", "v1220-nfl-cup-futures-r1");
   if (name === "adminGamesRc24e") url.searchParams.set("cupControl", "v1221-nfl-cup-weekly-season-r2");
@@ -1587,7 +1587,43 @@ async function navigate(page, options) {
    ACTIVE NAV
 ====================== */
 
+const APP_BOTTOM_NAV_APPEARANCE_KEY_ = "pattcBottomNavAppearance:v1";
+
+function appRememberBottomNavAppearance_() {
+  const nav = document.querySelector(".bottom-nav");
+  if (!nav) return;
+  const items = {};
+  nav.querySelectorAll("button[data-page]").forEach(function(button) {
+    const page = String(button.dataset.page || "");
+    const icon = button.querySelector(".bottom-nav-icon");
+    const label = button.querySelector(".bottom-nav-label");
+    if (!page || !icon || !label) return;
+    items[page] = {iconHtml:icon.innerHTML,label:label.textContent||"",labelHidden:label.hidden===true,accent:button.style.getPropertyValue("--bottom-nav-accent")||"",accentBg:button.style.getPropertyValue("--bottom-nav-accent-bg")||""};
+  });
+  try { localStorage.setItem(APP_BOTTOM_NAV_APPEARANCE_KEY_, JSON.stringify({items:items})); } catch (err) {}
+}
+
+function appRestoreBottomNavAppearance_() {
+  let stored=null;
+  try { stored=JSON.parse(localStorage.getItem(APP_BOTTOM_NAV_APPEARANCE_KEY_)||"null"); } catch (err) {}
+  const items=stored&&stored.items&&typeof stored.items==="object"?stored.items:null;
+  if (!items) return false;
+  Object.keys(items).forEach(function(page) {
+    const button=document.querySelector('.bottom-nav button[data-page="'+page+'"]');
+    if (!button) return;
+    const saved=items[page]||{}, icon=button.querySelector(".bottom-nav-icon"), label=button.querySelector(".bottom-nav-label");
+    if (icon&&saved.iconHtml) icon.innerHTML=saved.iconHtml;
+    if (label) { if (saved.label) label.textContent=saved.label; label.hidden=saved.labelHidden===true; }
+    if (saved.accent) button.style.setProperty("--bottom-nav-accent",saved.accent);
+    if (saved.accentBg) button.style.setProperty("--bottom-nav-accent-bg",saved.accentBg);
+  });
+  if (window.PlatformImageEngine&&typeof window.PlatformImageEngine.process==="function") window.PlatformImageEngine.process(document.querySelector(".bottom-nav")||document);
+  return true;
+}
+
 function setActiveNav(page) {
+
+  appRestoreBottomNavAppearance_();
 
   let navPage = page;
 

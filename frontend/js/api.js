@@ -444,9 +444,13 @@ async function apiPostRaw_(action, payload = {}) {
       }
     );
 
-    // This fallback exists only so an Apps Script deployment can safely land
-    // immediately before Cloudflare finishes publishing the same Git commit.
-    if (response.status === 404 || response.status === 405) {
+    // Compatibility fallback. Dashboard/Home is read-only, so it may safely
+    // retry through the legacy bridge when the Pages bridge/upstream has a
+    // transient gateway failure. Writes keep the old 404/405-only behavior.
+    const dashboardReadFallback =
+      String(action || "") === "getDashboardGamesHub" &&
+      [502, 503, 504, 524].indexOf(Number(response.status)) !== -1;
+    if (response.status === 404 || response.status === 405 || dashboardReadFallback) {
       response = await fetch(
         API_UPLOAD_PROXY,
         {
@@ -491,6 +495,27 @@ async function apiPostRaw_(action, payload = {}) {
     return parsed || { success: true };
 
   } catch (err) {
+
+    if (String(action || "") === "getDashboardGamesHub") {
+      try {
+        const fallbackResponse = await fetch(
+          API_UPLOAD_PROXY,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "text/plain;charset=utf-8",
+              "Accept": "application/json"
+            },
+            body: JSON.stringify({ action: action, ...payload })
+          }
+        );
+        const fallbackText = await fallbackResponse.text();
+        const fallbackParsed = fallbackText ? JSON.parse(fallbackText) : null;
+        if (fallbackResponse.ok && fallbackParsed && typeof fallbackParsed === "object") return fallbackParsed;
+      } catch (fallbackErr) {
+        console.warn("Dashboard bridge fallback failed", fallbackErr);
+      }
+    }
 
     console.error(
       "API POST ERROR",

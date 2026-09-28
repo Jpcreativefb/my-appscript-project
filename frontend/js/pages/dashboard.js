@@ -480,6 +480,9 @@ function dashboardProfileColorSpec_(profile) {
 
 function dashboardCacheHubAppearance_(rows) {
   const list = Array.isArray(rows) ? rows : [];
+  if (!list.length && typeof APP_STATE !== "undefined" && APP_STATE.dashboardHubAppearanceMap && Object.keys(APP_STATE.dashboardHubAppearanceMap).length) {
+    return APP_STATE.dashboardHubAppearanceMap;
+  }
   const map = {};
   list.forEach(function(row) {
     const key = String(row && row.SettingKey || "").trim().toLowerCase();
@@ -646,6 +649,7 @@ function dashboardApplyHubAppearance_() {
   if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
     window.PlatformImageEngine.process(document.querySelector(".bottom-nav") || document);
   }
+  if (typeof appRememberBottomNavAppearance_ === "function") appRememberBottomNavAppearance_();
 }
 
 function dashboardMountStickyPlayer_() {
