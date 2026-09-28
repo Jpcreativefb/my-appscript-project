@@ -1,0 +1,16 @@
+/* PATTC configurable bottom navigation slots R1 */
+.bottom-nav[data-slot-count]{display:flex!important;overflow:hidden}
+.bottom-nav[data-slot-count="6"]{width:min(430px,100%)}
+.bottom-nav[data-slot-count] button{min-width:0;flex:1 1 0;padding-left:2px;padding-right:2px}
+.bottom-nav[data-slot-count] .bottom-nav-icon{font-size:var(--bottom-nav-icon-size,22px);width:calc(var(--bottom-nav-icon-size,22px) + 2px);height:calc(var(--bottom-nav-icon-size,22px) + 2px)}
+.bottom-nav[data-slot-count] .bottom-nav-custom-icon{width:var(--bottom-nav-icon-size,22px);height:var(--bottom-nav-icon-size,22px)}
+.bottom-nav[data-slot-count="6"] .bottom-nav-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px}
+.appearance-nav-slots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+.appearance-nav-slot{padding:12px;border:1px solid rgba(255,255,255,.12);border-radius:14px;background:rgba(255,255,255,.045)}
+.appearance-nav-slot-head{display:flex;justify-content:space-between;gap:10px;align-items:center;margin-bottom:10px}
+.appearance-nav-slot-head span{font-size:11px;color:#93c5fd;font-weight:800}
+.appearance-nav-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.appearance-nav-grid label{display:grid;gap:4px;font-size:12px;color:#cbd5e1}
+.appearance-nav-grid .appearance-nav-wide{grid-column:1/-1}
+.appearance-nav-actions{display:flex;gap:6px;margin-top:9px}
+@media(max-width:760px){.appearance-nav-slots{grid-template-columns:1fr}.appearance-nav-grid{grid-template-columns:1fr 1fr}.bottom-nav[data-slot-count="6"]{width:100%}}

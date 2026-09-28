@@ -617,6 +617,15 @@ function dashboardHubIconHtml_(category, group, className) {
 }
 
 function dashboardApplyHubAppearance_() {
+  if (typeof appApplyNavigationSlots_ === "function") {
+    const slotRows = typeof APP_STATE !== "undefined" && Array.isArray(APP_STATE.dashboardHubAppearanceRows)
+      ? APP_STATE.dashboardHubAppearanceRows
+      : [];
+    if (appApplyNavigationSlots_(slotRows)) {
+      if (typeof appRememberBottomNavAppearance_ === "function") appRememberBottomNavAppearance_();
+      return;
+    }
+  }
   const navMap = {
     dashboard: "home",
     "hub:sports": "sports",

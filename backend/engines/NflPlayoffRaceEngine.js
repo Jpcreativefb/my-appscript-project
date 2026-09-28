@@ -353,9 +353,17 @@ function nflPlayoffRaceTiming_(gameId){
   const settings=nflPlayoffRaceGetSettings_(gameId);
   const sheetWeek=nflPlayoffRaceSettingsWeek_(year);
   const dateWeek=nflPlayoffRaceDerivedWeekFromStart_(settings.seasonStartDate,now);
-  const currentWeek=settings.currentWeekMode==="override"
-    ?settings.currentWeekOverride
-    :Math.max(sheetWeek,dateWeek||1);
+  const fallbackWeek=Math.max(sheetWeek,dateWeek||1);
+  const sharedTiming=typeof pattcNflResolveCurrentWeek_==="function"
+    ?pattcNflResolveCurrentWeek_({
+       mode:settings.currentWeekMode,
+       overrideWeek:settings.currentWeekOverride,
+       startWeek:1,endWeek:18,fallbackWeek:fallbackWeek,
+       fetchWeek:function(week){return nflPlayoffRaceFetchWeek_(year,week);}
+     })
+    :{week:settings.currentWeekMode==="override"?settings.currentWeekOverride:fallbackWeek,
+      mode:settings.currentWeekMode,source:"legacy-fallback"};
+  const currentWeek=sharedTiming.week;
 
   let seasonStarted=false;
   if(settings.seasonStartDate){
@@ -404,7 +412,7 @@ function nflPlayoffRaceTiming_(gameId){
   const referenceWeek=currentWindow&&currentWindow.week?Math.max(currentWeek,currentWindow.week):currentWeek;
   const nextWeek=checkpoints.find(function(week){return week>referenceWeek;})||0;
   return {
-    year:year,
+    year:year, weekSource:sharedTiming.source,
     currentWeek:currentWeek,
     seasonStarted:seasonStarted,
     currentWindow:currentWindow,
@@ -720,9 +728,22 @@ function nflPlayoffRaceDraftRowsR3_(gameId,username){
 function nflPlayoffRaceStaticLockedR3_(game,category){
   if(!game||!category)return true;
   const status=nflPlayoffRaceKey_(game.status||game.gameStatus);
+  const explicitCategoryLock=category.locked===true&&!nflPlayoffRaceString_(category.lockDateTime||category.LockDateTime);
   return game.lockAllPicks===true||game.votingLocked===true||game.resultsFinalized===true||
-    category.locked===true||category.resolved===true||
+    explicitCategoryLock||category.resolved===true||
     status==="archived"||status==="archive";
+}
+
+function nflPlayoffRaceStaticLockReasonR3_(game,category){
+  if(!game||!category)return "Game or conference entry is unavailable.";
+  const status=nflPlayoffRaceKey_(game.status||game.gameStatus);
+  if(game.lockAllPicks===true)return "Game-wide admin lock is enabled.";
+  if(game.votingLocked===true)return "Game voting/entry lock is enabled.";
+  if(game.resultsFinalized===true)return "Game results are finalized.";
+  if(category.resolved===true)return "This conference is resolved/final.";
+  if(category.locked===true&&!nflPlayoffRaceString_(category.lockDateTime||category.LockDateTime))return "This conference was manually locked by the admin.";
+  if(status==="archived"||status==="archive")return "This game is archived.";
+  return "";
 }
 function nflPlayoffRaceSaveDraftR3_(payload){
   const gameId=nflPlayoffRaceString_(payload&&payload.gameId),username=nflPlayoffRaceString_(payload&&payload.username);
@@ -837,7 +858,8 @@ function apiGetNflPlayoffRaceState_(payload){
     const draft=drafts.find(function(row){return row.categoryId===categoryId;});
     const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId);
     const sourceCategory=rawCategories[categoryId]||category;
-    const canEdit=!nflPlayoffRaceStaticLockedR3_(game,sourceCategory)&&!category.resolved&&
+    const staticReason=nflPlayoffRaceStaticLockReasonR3_(game,sourceCategory);
+    const canEdit=!staticReason&&!category.resolved&&
       (original?meta.canUpdate:meta.canEnter);
     const multiplier=active?nflPlayoffRaceNumber_(active.multiplier,1):meta.saveMultiplier;
     const finalRanks={};
@@ -854,8 +876,9 @@ function apiGetNflPlayoffRaceState_(payload){
       points:weighted?weighted.finalPointsAvailable:nflPlayoffRaceNumber_(category.points,0)+finalBonus.maxBonus,
       basePositionPoints:nflPlayoffRaceNumber_(category.points,0),
       playoffBonusMax:finalBonus.maxBonus,
-      locked:category.resolved||nflPlayoffRaceStaticLockedR3_(game,sourceCategory)||!canEdit,
+      locked:category.resolved||!!staticReason||!canEdit,
       canEdit:canEdit,
+      lockReason:category.resolved?"This conference is resolved/final.":(staticReason||(!canEdit?meta.lockReason:"")),
       draftRankings:draft?draft.rankings:[],draftUpdatedAt:draft?draft.updatedAt:"",
       originalSnapshot:nflPlayoffRacePublicSnapshot_(original),
       activeSnapshot:nflPlayoffRacePublicSnapshot_(active),
@@ -872,7 +895,7 @@ function apiGetNflPlayoffRaceState_(payload){
     });
   });
   base.nflPlayoffRace={
-    currentWeek:meta.timing.currentWeek,seasonStarted:meta.timing.seasonStarted,
+    currentWeek:meta.timing.currentWeek,weekSource:meta.timing.weekSource,seasonStarted:meta.timing.seasonStarted,
     currentWindow:meta.timing.currentWindow,nextWindow:meta.timing.nextWindow,
     canEnter:meta.canEnter,canUpdate:meta.canUpdate,canEdit:meta.canEdit,
     currentMultiplier:meta.currentMultiplier,saveMultiplier:meta.saveMultiplier,

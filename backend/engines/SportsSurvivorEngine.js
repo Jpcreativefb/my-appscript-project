@@ -1209,6 +1209,40 @@ function sportsSurvivorStandings_(gameId, extraUsernames) {
   });
 }
 
+/* NFL_WEEK_SURVIVOR_PLAYOFF_R1: Week timing is persisted inside TwistJSON so
+   the existing SurvivorSettings schema remains backward compatible. */
+function sportsSurvivorNflWeekTiming_(settings) {
+  settings = settings || {};
+  const twist = sportsSurvivorJsonParse_(settings.twistJSON, {}) || {};
+  const mode = sportsSurvivorKey_(twist.nflCurrentWeekMode) === "override" ? "override" : "auto";
+  const overrideWeek = Math.max(settings.startWeek || 1, Math.min(settings.endWeek || 18,
+    Math.floor(sportsSurvivorNumber_(twist.nflCurrentWeekOverride, settings.startWeek || 1))));
+  if (sportsSurvivorKey_(settings.league) !== "nfl" || typeof pattcNflResolveCurrentWeek_ !== "function") {
+    return { week: overrideWeek, mode: mode, source: "survivor-fallback" };
+  }
+  return pattcNflResolveCurrentWeek_({
+    mode: mode,
+    overrideWeek: overrideWeek,
+    startWeek: settings.startWeek,
+    endWeek: settings.endWeek,
+    fallbackWeek: settings.startWeek,
+    fetchWeek: function(week) { return sportsSurvivorFetchScores_(settings, { week: week }); }
+  });
+}
+
+function sportsSurvivorSaveNflWeekTiming_(gameId, mode, overrideWeek) {
+  const current = survivorGetSettings_(gameId);
+  const twist = sportsSurvivorJsonParse_(current.twistJSON, {}) || {};
+  twist.nflCurrentWeekMode = sportsSurvivorKey_(mode) === "override" ? "override" : "auto";
+  twist.nflCurrentWeekOverride = Math.max(current.startWeek || 1, Math.min(current.endWeek || 18,
+    Math.floor(sportsSurvivorNumber_(overrideWeek, current.startWeek || 1))));
+  survivorSaveSettings_(gameId, Object.assign({}, current, { twistJSON: JSON.stringify(twist) }));
+  const saved = survivorGetSettings_(gameId);
+  const timing = sportsSurvivorNflWeekTiming_(saved);
+  return { success:true, gameId:gameId, weekMode:timing.mode, overrideWeek:twist.nflCurrentWeekOverride,
+    currentWeek:timing.week, weekSource:timing.source };
+}
+
 function apiGetSportsSurvivorState_(payload) {
   payload = payload || {};
   const gameId = sportsSurvivorString_(payload.gameId || (typeof getDefaultGameId === "function" ? getDefaultGameId() : ""));
@@ -1225,7 +1259,14 @@ function apiGetSportsSurvivorState_(payload) {
   const standings = sportsSurvivorStandings_(gameId, [username]);
   const viewerStanding = standings.find(function(row) { return sportsSurvivorKey_(row.username) === sportsSurvivorKey_(username); });
   const winner = !!(viewerStanding && viewerStanding.survivorWinner);
-  const currentIndex = evaluation.currentRoundIndex;
+  const nflWeekTiming = sportsSurvivorNflWeekTiming_(settings);
+  let currentIndex = evaluation.currentRoundIndex;
+  if (sportsSurvivorKey_(settings.league) === "nfl" && evaluation.alive) {
+    const scheduledIndex = categories.findIndex(function(category, index) {
+      return sportsSurvivorRoundWeek_(category, index) === nflWeekTiming.week;
+    });
+    if (scheduledIndex >= 0) currentIndex = scheduledIndex;
+  }
   const category = currentIndex >= 0 ? categories[currentIndex] : null;
   const round = currentIndex >= 0 ? evaluation.rounds[currentIndex] : null;
   let currentRound = null;
@@ -1277,7 +1318,8 @@ function apiGetSportsSurvivorState_(payload) {
     lossesAllowed: settings.lossesAllowed, earnedLives: evaluation.earnedLives, livesRemaining: evaluation.livesRemaining,
     winStreak: evaluation.winStreak, bestStreak: evaluation.bestStreak, currentMultiplier: evaluation.currentMultiplier,
     teamUseLimit: settings.teamUseLimit, usedTeams: usedTeams, settings: settings,
-    currentRound: currentRound, rounds: evaluation.rounds, standings: standings
+    currentRound: currentRound, rounds: evaluation.rounds, standings: standings,
+    resolvedWeek: nflWeekTiming.week, weekMode: nflWeekTiming.mode, weekSource: nflWeekTiming.source
   };
 }
 
@@ -1393,8 +1435,10 @@ function survivorRunSportsAutomation_(gameId, options) {
   if (settings.mode === "manual-elimination") return { success: true, skipped: true, reason: "manual-elimination" };
   let categories = survivorGameCategories_(gameId);
   const actions = [];
+  const nflTiming = sportsSurvivorKey_(settings.league) === "nfl" ? sportsSurvivorNflWeekTiming_(settings) : null;
+  const targetWeek = nflTiming ? nflTiming.week : settings.startWeek;
   if (!categories.length && settings.autoBuildNextWeek) {
-    actions.push({ build: sportsSurvivorBuildWeek_(gameId, settings.startWeek, {}) });
+    actions.push({ build: sportsSurvivorBuildWeek_(gameId, targetWeek, {}) });
     categories = survivorGameCategories_(gameId);
   }
   let optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
@@ -1407,6 +1451,15 @@ function survivorRunSportsAutomation_(gameId, options) {
     }
   });
   if (settings.autoBuildNextWeek) {
+    const targetBuilt = categories.some(function(category, index) {
+      return sportsSurvivorRoundWeek_(category, index) === targetWeek;
+    });
+    if (!targetBuilt && targetWeek >= settings.startWeek && targetWeek <= settings.endWeek) {
+      try {
+        actions.push({ build: sportsSurvivorBuildWeek_(gameId, targetWeek, {}) });
+        categories = survivorGameCategories_(gameId);
+      } catch (err) { actions.push({ week: targetWeek, buildError: err.message }); }
+    }
     optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
     resultMap = sportsSurvivorResultsForGame_(gameId);
     const allBuiltResolved = categories.length > 0 && categories.every(function(category) { return sportsSurvivorCategoryResolved_(category.id, optionMeta, resultMap); });
@@ -1479,6 +1532,17 @@ function apiAdminRunSportsSurvivor_(payload) {
   requireAdmin_(payload);
   const gameId = sportsSurvivorString_(payload.gameId);
   if (!gameId) throw new Error("GameId is required.");
+  const settings = survivorGetSettings_(gameId);
+  if (payload.getWeekTiming === true) {
+    const timing = sportsSurvivorNflWeekTiming_(settings);
+    const twist = sportsSurvivorJsonParse_(settings.twistJSON, {}) || {};
+    return { success:true, gameId:gameId, weekMode:timing.mode,
+      overrideWeek:Math.floor(sportsSurvivorNumber_(twist.nflCurrentWeekOverride, timing.week)),
+      currentWeek:timing.week, weekSource:timing.source };
+  }
+  if (payload.saveWeekTiming === true) {
+    return sportsSurvivorSaveNflWeekTiming_(gameId, payload.weekMode, payload.overrideWeek);
+  }
   return survivorRunSportsAutomation_(gameId, { manual: true, week: payload.week || 0, maxWeeks: 18 });
 }
 

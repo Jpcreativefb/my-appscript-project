@@ -102,11 +102,12 @@ function card(category){
     const save=!locked?(race
       ?'<div class="ranking-save-row nfl-ranking-save"><button class="button secondary" type="button" onclick="nflRankingSaveCategory_(\''+js(category.id)+'\',false,\'draft\')">SAVE PICKS (DRAFT)</button><button class="button ranking-save-button" type="button" onclick="nflRankingSaveCategory_(\''+js(category.id)+'\',false,\'finalize\')">FINALIZE PICKS</button><span id="rankingMessage_'+esc(category.id)+'" class="ranking-message">'+(savedDraft.length?'Draft restored — not finalized':'')+'</span></div>'
       :'<div class="ranking-save-row nfl-ranking-save"><button class="button ranking-save-button" type="button" onclick="nflRankingSaveCategory_(\''+js(category.id)+'\',false)">SAVE RANKING</button><span id="rankingMessage_'+esc(category.id)+'" class="ranking-message"></span></div>'):"";
+    const lockWhy=locked&&category.lockReason?'<div class="nfl-ranking-lock-reason">🔒 '+esc(category.lockReason)+'</div>':'';
     return '<section class="nfl-ranking-card" data-ranking-category="'+esc(category.id)+'">'+
       '<div class="nfl-ranking-card-head"><div><span>'+esc(category.section||"NFL")+'</span><strong>'+esc(category.name)+'</strong><small>'+esc(hint(category))+'</small><em>'+scoreText+'</em></div><b class="'+(category.resolved?"is-final":locked?"is-locked":"is-open")+'">'+(category.resolved?"FINAL":locked?"LOCKED":"OPEN")+'</b></div>'+
       (playoff?'<div class="nfl-ranking-zone-key"><span>1–7 PLAYOFF SEEDS</span><span>8–16 OUTSIDE FIELD</span></div>':"")+
       liveTotal+
-      '<div class="ranking-order-list nfl-ranking-list" id="rankingList_'+esc(category.id)+'">'+rows+'</div>'+
+      lockWhy+'<div class="ranking-order-list nfl-ranking-list" id="rankingList_'+esc(category.id)+'">'+rows+'</div>'+
       (playoff?divisionWarning(category.id):"")+save+rankingPageOfficialOrder_(category)+
     '</section>';
   }

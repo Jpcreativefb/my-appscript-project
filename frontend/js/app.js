@@ -1624,6 +1624,7 @@ function appRestoreBottomNavAppearance_() {
 function setActiveNav(page) {
 
   appRestoreBottomNavAppearance_();
+  if (typeof appSetActiveNavigationSlot_ === "function" && appSetActiveNavigationSlot_(page)) return;
 
   let navPage = page;
 
