@@ -1,0 +1,11 @@
+const fs=require("fs"),assert=require("assert");
+const read=p=>fs.readFileSync(p,"utf8");
+const css=read("frontend/css/confidence-r2.css"),html=read("frontend/app.html");
+assert(css.includes("CONFIDENCE POOL R8.6.1 COMPARE CENTERING"));
+assert(css.includes("grid-template-columns:1fr!important"));
+assert(css.includes("width:64px!important"));
+assert(css.includes(".confidence-r84-pick .confidence-r2-cm-logo"));
+assert(css.includes("grid-column:1!important"));
+assert(css.includes("justify-self:center!important"));
+assert(html.includes("confidence=v1232-confidence-pool-r8-6-1"));
+console.log("PATTC Confidence Pool R8.6.1 Compare centering tests: PASS");

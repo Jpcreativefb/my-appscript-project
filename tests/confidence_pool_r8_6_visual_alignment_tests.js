@@ -9,5 +9,5 @@ assert(css.includes("margin-left:8px!important"));
 assert(css.includes("grid-template-columns:36px calc(var(--confidence-r2-player-ch,10) * 1ch + 16px) 42px 42px 46px 46px!important"));
 assert(css.includes("border-right:1px solid rgba(100,170,205,.32)!important"));
 assert(css.includes(".confidence-r84-pick"));
-assert(html.includes("confidence=v1231-confidence-pool-r8-6"));
+assert(html.includes("confidence=v1232-confidence-pool-r8-6-1"));
 console.log("PATTC Confidence Pool R8.6 visual alignment tests: PASS");

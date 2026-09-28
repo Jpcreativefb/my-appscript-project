@@ -13,5 +13,5 @@ assert(r2.includes("confidence-r84-pick"));
 assert(css.includes(".confidence-r84-pick.is-correct")&&css.includes(".confidence-r84-pick.is-wrong")&&css.includes(".confidence-r84-pick.is-selected"));
 assert(css.includes("grid-template-columns:minmax(0,1fr) minmax(0,1fr) 64px"));
 assert(css.includes(".confidence-r2-score{grid-column:3"));
-assert(html.includes("confidence=v1231-confidence-pool-r8-6"));
+assert(html.includes("confidence=v1232-confidence-pool-r8-6-1"));
 console.log("PATTC Confidence Pool R8.4 compact polish tests: PASS");

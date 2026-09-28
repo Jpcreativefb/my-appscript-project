@@ -371,3 +371,40 @@
 .confidence-r2 .confidence-r2-team.is-pregame{column-gap:6px!important}.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy strong{font-size:10px!important}.confidence-r2 .confidence-r2-team.is-started{column-gap:4px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-team-visual{width:33px!important;height:33px!important;min-width:33px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-team-logo{width:32px!important;height:32px!important;max-width:32px!important;max-height:32px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy strong{font-size:10px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-score{margin-left:6px!important;min-width:22px!important;font-size:24px!important}
 .confidence-r2-standing{grid-template-columns:34px calc(var(--confidence-r2-player-ch,10) * 1ch + 12px) 38px 38px 42px 42px!important}.confidence-r2-standing>*{padding:5px 4px!important}
 }
+
+
+/* CONFIDENCE POOL R8.6.1 COMPARE CENTERING */
+.confidence-r84-pick{
+  grid-template-columns:1fr!important;
+  grid-template-rows:1fr!important;
+  width:64px!important;
+  max-width:64px!important;
+  min-width:64px!important;
+  justify-self:center!important;
+  align-self:center!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  padding:2px!important;
+}
+.confidence-r84-pick .confidence-r2-cm-logo{
+  grid-column:1!important;
+  grid-row:1!important;
+  justify-self:center!important;
+  align-self:center!important;
+  display:block!important;
+  margin:0 auto!important;
+}
+.confidence-r84-pick>b{
+  grid-column:1!important;
+  grid-row:1!important;
+  justify-self:center!important;
+  align-self:center!important;
+}
+.confidence-r84-auto{
+  grid-column:1!important;
+  grid-row:1!important;
+}
+.confidence-r2-cm-cell{
+  justify-items:center!important;
+  align-items:center!important;
+}
