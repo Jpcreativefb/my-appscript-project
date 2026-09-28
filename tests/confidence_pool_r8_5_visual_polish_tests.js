@@ -13,5 +13,5 @@ assert(css.includes("inset 0 0 0 1px #74d7ff"));
 assert(css.includes(".confidence-r2-row.phase-final .confidence-r2-meta strong{color:#4f9fd7"));
 assert(css.includes(".confidence-r84-user-head>strong"));
 assert(css.includes(".confidence-r84-pick .confidence-r2-cm-logo{display:block!important;margin:0 auto!important}"));
-assert(html.includes("confidence=v1230-confidence-pool-r8-5"));
+assert(html.includes("confidence=v1231-confidence-pool-r8-6"));
 console.log("PATTC Confidence Pool R8.5 visual polish tests: PASS");

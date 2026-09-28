@@ -1,0 +1,13 @@
+const fs=require("fs"),assert=require("assert");
+const read=p=>fs.readFileSync(p,"utf8");
+const js=read("frontend/js/pages/confidenceR2.js"),css=read("frontend/css/confidence-r2.css"),html=read("frontend/app.html");
+assert(js.includes("const playerChars=Math.max(6"));
+assert(js.includes("--confidence-r2-player-ch:${Math.min(24,playerChars)}"));
+assert(css.includes("CONFIDENCE POOL R8.6 VISUAL ALIGNMENT"));
+assert(css.includes("font-size:27px!important"));
+assert(css.includes("margin-left:8px!important"));
+assert(css.includes("grid-template-columns:36px calc(var(--confidence-r2-player-ch,10) * 1ch + 16px) 42px 42px 46px 46px!important"));
+assert(css.includes("border-right:1px solid rgba(100,170,205,.32)!important"));
+assert(css.includes(".confidence-r84-pick"));
+assert(html.includes("confidence=v1231-confidence-pool-r8-6"));
+console.log("PATTC Confidence Pool R8.6 visual alignment tests: PASS");

@@ -341,3 +341,33 @@
   .confidence-r84-stats-more .confidence-r8-stat-grid{grid-template-columns:repeat(4,minmax(0,1fr))!important}
   .confidence-r85-auto-row{grid-template-columns:auto minmax(90px,1fr) auto!important;gap:4px!important}
 }
+
+
+/* CONFIDENCE POOL R8.6 VISUAL ALIGNMENT */
+.confidence-r2 .confidence-r2-team.is-pregame{grid-template-columns:auto auto!important;justify-content:center!important;justify-items:center!important;align-items:center!important;align-content:center!important;column-gap:8px!important}
+.confidence-r2 .confidence-r2-team.is-pregame .confidence-team-visual{align-self:center!important;justify-self:end!important;display:grid!important;place-items:center!important}
+.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy{align-self:center!important;justify-self:start!important;display:grid!important;place-items:center!important;align-content:center!important;text-align:center!important;line-height:1.05!important;gap:1px!important}
+.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy small,.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy strong,.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy span{display:block!important;width:100%!important;margin:0!important;text-align:center!important}
+.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy small{font-size:6px!important}.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy strong{font-size:12px!important}.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy span{font-size:6px!important}
+.confidence-r2 .confidence-r2-team.is-started{grid-template-columns:auto auto auto!important;justify-content:center!important;justify-items:start!important;align-items:center!important;align-content:center!important;column-gap:6px!important}
+.confidence-r2 .confidence-r2-team.is-started .confidence-team-visual{align-self:center!important;justify-self:end!important;display:grid!important;place-items:center!important;width:38px!important;height:38px!important;min-width:38px!important}
+.confidence-r2 .confidence-r2-team.is-started .confidence-team-logo{width:37px!important;height:37px!important;max-width:37px!important;max-height:37px!important}
+.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy{align-self:center!important;justify-self:start!important;display:grid!important;align-content:center!important;line-height:1.05!important;gap:1px!important;min-width:max-content!important}
+.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy small{font-size:6px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy strong{font-size:11px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy span{font-size:6px!important}
+.confidence-r2 .confidence-r2-team.is-started .confidence-r2-score{align-self:center!important;justify-self:start!important;margin-left:8px!important;min-width:24px!important;text-align:left!important;font-size:27px!important;line-height:1!important}
+.confidence-r2-cm-head,.confidence-r84-user-head{text-align:center!important;justify-items:center!important;align-items:center!important}.confidence-r84-user-head>strong{width:100%!important;text-align:center!important;justify-self:center!important;padding-left:0!important;padding-right:0!important}.confidence-r84-user-stats{width:100%!important;text-align:center!important}
+.confidence-r2-cm-cell{display:grid!important;place-items:center!important;text-align:center!important}.confidence-r84-pick{display:grid!important;place-items:center!important;justify-self:center!important;align-self:center!important;margin-left:auto!important;margin-right:auto!important;width:calc(100% - 8px)!important;max-width:82px!important}.confidence-r84-pick .confidence-r2-cm-logo{display:block!important;margin:0 auto!important;justify-self:center!important;align-self:center!important}.confidence-r84-game-label>div{justify-content:center!important;justify-items:center!important;text-align:center!important}
+
+/* R8.6 compact Standings columns */
+.confidence-r2-standing-scroll{overflow-x:auto!important}
+.confidence-r2-standing-table{min-width:0!important;width:max-content!important;max-width:none!important}
+.confidence-r2-standing{grid-template-columns:36px calc(var(--confidence-r2-player-ch,10) * 1ch + 16px) 42px 42px 46px 46px!important;width:max-content!important;min-height:34px!important}
+.confidence-r2-standing>*{padding:5px 6px!important;border-right:1px solid rgba(100,170,205,.32)!important;text-align:center!important}
+.confidence-r2-standing>*:last-child{border-right:0!important}
+.confidence-r2-standing>strong{white-space:nowrap!important;text-align:left!important}
+.confidence-r2-standing.is-head>strong{text-align:left!important}
+
+@media(max-width:560px){
+.confidence-r2 .confidence-r2-team.is-pregame{column-gap:6px!important}.confidence-r2 .confidence-r2-team.is-pregame .confidence-r2-team-copy strong{font-size:10px!important}.confidence-r2 .confidence-r2-team.is-started{column-gap:4px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-team-visual{width:33px!important;height:33px!important;min-width:33px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-team-logo{width:32px!important;height:32px!important;max-width:32px!important;max-height:32px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-team-copy strong{font-size:10px!important}.confidence-r2 .confidence-r2-team.is-started .confidence-r2-score{margin-left:6px!important;min-width:22px!important;font-size:24px!important}
+.confidence-r2-standing{grid-template-columns:34px calc(var(--confidence-r2-player-ch,10) * 1ch + 12px) 38px 38px 42px 42px!important}.confidence-r2-standing>*{padding:5px 4px!important}
+}

@@ -348,7 +348,8 @@
   function standings(){
     const rows=players().slice().sort(function(a,b){return Number(b.total||0)-Number(a.total||0);});
     if(!rows.length)return '<div class="confidence-r2-empty">Standings will appear when player comparison data is available.</div>';
-    return `<div class="confidence-r2-standing-scroll"><div class="confidence-r2-standing-table">
+    const playerChars=Math.max(6,...rows.map(function(p){return String(p.displayName||p.username||"").length;}));
+    return `<div class="confidence-r2-standing-scroll"><div class="confidence-r2-standing-table" style="--confidence-r2-player-ch:${Math.min(24,playerChars)}">
       <div class="confidence-r2-standing is-head"><span>RANK</span><strong>PLAYER</strong><b>PTS</b><b>COR</b><b>PICKS</b><b>CONF</b></div>
       ${rows.map(function(p,i){return `<div class="confidence-r2-standing ${p.isCurrent?"is-you":""}"><span>#${i+1}</span><strong>${esc(p.displayName||p.username)}</strong><b>${Number(p.total||0)}</b><b>${playerCorrect(p)}</b><b>${playerPickCount(p)}</b><b>${playerConfidence(p)}</b></div>`;}).join("")}
     </div></div>`;
