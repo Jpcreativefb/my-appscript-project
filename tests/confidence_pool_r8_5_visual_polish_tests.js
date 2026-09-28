@@ -1,0 +1,17 @@
+const fs=require("fs"),assert=require("assert");
+const read=p=>fs.readFileSync(p,"utf8");
+const r2=read("frontend/js/pages/confidenceR2.js"),css=read("frontend/css/confidence-r2.css"),html=read("frontend/app.html");
+assert(r2.includes('phase==="pregame"?"is-pregame":"is-started"'));
+assert(!r2.includes("confidenceR2Adjust_('${js(category.id)}',-1)"));
+assert(!r2.includes("confidenceR2Adjust_('${js(category.id)}',1)"));
+assert(r2.includes('phase==="final"&&points'));
+assert(r2.includes('confidence-r85-auto'));
+assert(css.includes("grid-template-columns:repeat(4,minmax(0,1fr))"));
+assert(css.includes(".confidence-r2 .confidence-r2-team.is-pregame"));
+assert(css.includes(".confidence-r2 .confidence-r2-team.is-started"));
+assert(css.includes("inset 0 0 0 1px #74d7ff"));
+assert(css.includes(".confidence-r2-row.phase-final .confidence-r2-meta strong{color:#4f9fd7"));
+assert(css.includes(".confidence-r84-user-head>strong"));
+assert(css.includes(".confidence-r84-pick .confidence-r2-cm-logo{display:block!important;margin:0 auto!important}"));
+assert(html.includes("confidence=v1230-confidence-pool-r8-5"));
+console.log("PATTC Confidence Pool R8.5 visual polish tests: PASS");

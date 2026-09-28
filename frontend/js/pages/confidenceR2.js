@@ -125,7 +125,7 @@
     const parts=splitConfidenceTeamName_(nominee&&nominee.name);
     const resultClass=selected&&result&&result.className==="correct"?"is-correct":selected&&result&&result.className==="wrong"?"is-wrong":"";
     return `<button type="button"
-      class="confidence-team-choice confidence-r2-team confidence-team-${side||"team"} ${selected?"selected":""} ${hasPick&&!selected?"not-selected":""} ${actualWinner?"actual-winner":""} ${resultClass} ${locked?"is-locked":""}"
+      class="confidence-team-choice confidence-r2-team confidence-team-${side||"team"} ${phase==="pregame"?"is-pregame":"is-started"} ${selected?"selected":""} ${hasPick&&!selected?"not-selected":""} ${actualWinner?"actual-winner":""} ${resultClass} ${locked?"is-locked":""}"
       style="${teamStyle(nominee)}"
       onclick="draftConfidenceNominee_('${js(category.id)}','${js(nominee.id)}')"
       aria-pressed="${selected?"true":"false"}"
@@ -146,17 +146,16 @@
     const picked=Boolean(PICKS_PAGE_DATA.picks[category.id]);
     const max=maxConfidence();
     const points=confidenceResultPointsLabel_(category,result);
-    return `<div class="confidence-r2-value ${locked?"is-locked":""}">
+    const phase=getConfidenceSportsPhase_(category);
+    const finalResult=phase==="final"&&points?`<strong class="${result.className}">${esc(points)} pts</strong>`:`<small>1–${max}</small>`;
+    return `<div class="confidence-r2-value ${locked?"is-locked":""} ${phase==="final"?"is-final":""}">
       <span>CONFIDENCE</span>
       <div class="confidence-r2-value-control">
-        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',-1)" ${locked||!picked||current<=0?"disabled":""}>−</button>
         <select id="confidence-${attr(category.id)}" onchange="updateConfidenceForCategory('${js(category.id)}',this.value)" ${locked||!picked||PICKS_CONFIDENCE_BATCH_SAVING?"disabled":""}>
           <option value="">—</option>${renderConfidenceOptionsForCategory(category.id,current)}
         </select>
-        <button type="button" onclick="confidenceR2Adjust_('${js(category.id)}',1)" ${locked||!picked||current>=max?"disabled":""}>+</button>
       </div>
-      <small>1–${max}</small>
-      ${points?`<strong class="${result.className}">${esc(points)} pts</strong>`:""}
+      ${finalResult}
     </div>`;
   }
 
@@ -194,12 +193,15 @@
   };
   function confidenceR8AutoSettingsHtml_(){
     const season=STATE.autoPickState&&STATE.autoPickState.season||{enabled:false,strategy:"historical"};
-    return `<section class="confidence-r8-auto-settings">
-      <div><strong>AUTO PICK PROTECTION</strong><small>Historical is the default. Auto Picks receive no confidence and display (A).</small></div>
-      <label><input id="confidenceR8AutoEnabled" type="checkbox" ${season.enabled?"checked":""}> ON</label>
-      <select id="confidenceR8AutoStrategy">${["historical","random","home","away","best-record"].map(v=>`<option value="${v}" ${season.strategy===v?"selected":""}>${v==="historical"?"Historical":v==="best-record"?"Best Record":v==="home"?"Home":v==="away"?"Away":"Random"}</option>`).join("")}</select>
-      <button type="button" onclick="confidenceR8SaveSeasonAuto_()">Save Season Default</button>
-    </section>`;
+    const strategyLabel=season.strategy==="best-record"?"Best Record":season.strategy.charAt(0).toUpperCase()+season.strategy.slice(1);
+    return `<details class="confidence-r8-auto-settings confidence-r85-auto">
+      <summary><strong>AUTO PICK PROTECTION</strong><span>${season.enabled?"ON":"OFF"} · ${esc(strategyLabel)} <b>▾</b></span></summary>
+      <div class="confidence-r85-auto-row">
+        <label><input id="confidenceR8AutoEnabled" type="checkbox" ${season.enabled?"checked":""}> ON</label>
+        <select id="confidenceR8AutoStrategy">${["historical","random","home","away","best-record"].map(v=>`<option value="${v}" ${season.strategy===v?"selected":""}>${v==="historical"?"Historical":v==="best-record"?"Best Record":v==="home"?"Home":v==="away"?"Away":"Random"}</option>`).join("")}</select>
+        <button type="button" onclick="confidenceR8SaveSeasonAuto_()">Save</button>
+      </div>
+    </details>`;
   }
   root.confidenceR2RefreshVisibleOdds_=function(){
     document.querySelectorAll(".confidence-r2-row").forEach(function(row){
