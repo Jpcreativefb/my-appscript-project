@@ -1,0 +1,17 @@
+const fs=require("fs"),assert=require("assert");
+const read=p=>fs.readFileSync(p,"utf8");
+const r2=read("frontend/js/pages/confidenceR2.js"),css=read("frontend/css/confidence-r2.css"),html=read("frontend/app.html");
+assert(!r2.includes('confidence-r2-pick-badge">YOUR PICK'),"R8.4 removes the redundant YOUR PICK badge.");
+assert(r2.includes("<strong>STATS</strong>"));
+assert(r2.includes("confidence-r84-stats-more"));
+assert(!r2.includes("Auto Pick for this matchup"));
+assert(r2.includes("confidence-r84-confidence-row"));
+assert(r2.includes("confidence-r84-add-user"));
+assert(r2.includes("confidence-r84-user-stats"));
+assert(r2.includes("confidenceR84MatchupLabel_"));
+assert(r2.includes("confidence-r84-pick"));
+assert(css.includes(".confidence-r84-pick.is-correct")&&css.includes(".confidence-r84-pick.is-wrong")&&css.includes(".confidence-r84-pick.is-selected"));
+assert(css.includes("grid-template-columns:minmax(0,1fr) minmax(0,1fr) 64px"));
+assert(css.includes(".confidence-r2-score{grid-column:3"));
+assert(html.includes("confidence=v1229-confidence-pool-r8-4"));
+console.log("PATTC Confidence Pool R8.4 compact polish tests: PASS");

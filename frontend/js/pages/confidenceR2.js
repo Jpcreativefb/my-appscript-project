@@ -131,7 +131,6 @@
       aria-pressed="${selected?"true":"false"}"
       data-nominee-id="${attr(nominee.id)}"
       ${locked||PICKS_CONFIDENCE_BATCH_SAVING?"disabled":""}>
-      ${selected?'<span class="confidence-r2-pick-badge">YOUR PICK</span>':""}
       <span class="confidence-team-visual">${platformImgHtml(image,{className:"confidence-team-logo",variant:"thumb",alt:nominee.name||"Team"})}${selected&&confidenceR8AutoAudit_(category.id)?'<b class="confidence-r8-auto-marker" title="Auto Pick">(A)</b>':""}</span>
       <span class="confidence-r2-team-copy">
         ${parts.city?`<small>${esc(parts.city)}</small>`:""}
@@ -225,10 +224,6 @@
         <div class="is-center"><small>FAVORITE</small><strong>${esc(favorite)}</strong><span>O/U ${esc(total)}</span>${loading?"<span>Loading odds…</span>":""}</div>
         <div><strong>${esc(home)}</strong><span>Record ${esc(category.homeRecord||"—")}</span><span>ML <b class="confidence-r8-odds ${confidenceR8OddsClass_(odds.homeOdds)}">${esc(confidenceOddsToAmerican_(odds.homeOdds))}</b></span><span>Spread <b class="confidence-r8-odds ${confidenceR8OddsClass_(odds.homeSpread)}">${esc(confidenceSpreadLabel_(odds.homeSpread))}</b></span></div>
       </div>
-      <div class="confidence-r8-game-auto"><span>Auto Pick for this matchup</span><select onchange="confidenceR8SaveGameAuto_('${js(category.id)}',this.value)">
-        <option value="default" ${!confidenceR8Override_(category.id)?"selected":""}>Use season default</option>
-        ${["historical","random","home","away","best-record"].map(v=>`<option value="${v}" ${confidenceR8Override_(category.id)&&confidenceR8Override_(category.id).strategy===v?"selected":""}>${v==="historical"?"Historical":v==="best-record"?"Best Record":v==="home"?"Home":v==="away"?"Away":"Random"}</option>`).join("")}
-      </select></div>
     </details>`;
   }
 
@@ -295,15 +290,21 @@
     if(!settled){settled=local.correct+local.wrong;correct=local.correct;}
     const eliminated=!!(myWeek.elimination&&myWeek.elimination.status==="eliminated"),used=getUsedConfidencePoints().map(Number),max=maxConfidence(),pct=local.games?Math.round(local.picked/local.games*100):0;
     const pool=Array.from({length:max},(_,i)=>{const n=i+1;return `<i class="${used.indexOf(n)!==-1?"is-used":""}">${n}</i>`;}).join("");
-    return `<section class="confidence-r2-stats">
-      <div class="confidence-r2-section-head"><div><strong>WEEKLY RACE</strong><small>Live position and remaining upside</small></div><em>${local.picked===local.games&&local.games?"COMPLETE":"IN PROGRESS"}</em></div>
-      <div class="confidence-r2-stat-grid confidence-r8-stat-grid">
+    return `<section class="confidence-r2-stats confidence-r84-stats">
+      <div class="confidence-r2-section-head"><div><strong>STATS</strong><small>Current weekly position</small></div><em>${local.picked===local.games&&local.games?"COMPLETE":"IN PROGRESS"}</em></div>
+      <div class="confidence-r2-stat-grid confidence-r8-stat-grid confidence-r84-stat-primary">
         <div><span>Weekly Rank</span><strong>${rank?"#"+rank:"—"}</strong></div><div><span>Points</span><strong>${points}</strong></div><div><span>Correct</span><strong>${correct}/${settled}</strong></div>
         <div class="${eliminated?"is-eliminated":""}"><span>Behind</span><strong>${behind?("-"+behind)+(eliminated?" (E)":""):"—"}</strong></div>
-        <div><span>Points Remaining</span><strong>${remaining}</strong></div><div><span>Best Finish</span><strong>${best?"#"+best:"—"}</strong></div><div><span>Move Up</span><strong>${moveUp?moveUp+" pts":"—"}</strong></div><div><span>Cushion</span><strong>${below?cushion+" pts":"—"}</strong></div>
       </div>
+      <details class="confidence-r84-stats-more">
+        <summary>More stats <span>▾</span></summary>
+        <div class="confidence-r2-stat-grid confidence-r8-stat-grid">
+          <div><span>Points Remaining</span><strong>${remaining}</strong></div><div><span>Best Finish</span><strong>${best?"#"+best:"—"}</strong></div><div><span>Move Up</span><strong>${moveUp?moveUp+" pts":"—"}</strong></div><div><span>Cushion</span><strong>${below?cushion+" pts":"—"}</strong></div>
+        </div>
+      </details>
       <div class="confidence-r2-mini-progress" aria-label="${local.picked} of ${local.games} picks complete"><span>${local.picked}/${local.games}</span><div><i style="width:${pct}%"></i></div></div>
       <div class="confidence-r2-pool"><span>CONFIDENCE USED</span><div>${pool}</div></div>
+      ${confidenceR8AutoSettingsHtml_()}
     </section>`;
   }
 
@@ -351,32 +352,54 @@
     </div></div>`;
   }
 
+  function confidenceR84PickStateClass_(pick){
+    const status=String(pick&&pick.status||"pending").toLowerCase();
+    return status==="correct"?"is-correct":status==="wrong"?"is-wrong":"is-selected";
+  }
+  function confidenceR84TeamToken_(category,side){
+    const nominee=confidenceNomineeForSide_(category,side)||{};
+    const image=nominee.image||nominee.imageUrl||nominee.logoUrl||confidenceAppearanceResolvedImage_(category,nominee).imageUrl||"";
+    const raw=String(nominee.shortAnswer||nominee.name||side).trim();
+    const short=(raw.split(/\s+/).pop()||side).slice(0,4).toUpperCase();
+    return image?platformImgHtml(image,{className:"confidence-r84-game-logo",variant:"thumb",alt:nominee.name||short}):`<b>${esc(short)}</b>`;
+  }
+  function confidenceR84MatchupLabel_(category,open){
+    return `<button class="confidence-r2-cm-label confidence-r84-game-label ${open?"is-open":""}" onclick="confidenceR2ToggleRow_('${js(category.id)}')">
+      <span>${open?"▾":"▸"}</span><div>${confidenceR84TeamToken_(category,"away")}<i>@</i>${confidenceR84TeamToken_(category,"home")}</div><small>${esc(formatConfidenceSportsStatus_(category))}</small>
+    </button>`;
+  }
   function compareCell(player,category){
     const pick=player&&player.picks?player.picks[norm(category.id)]||player.picks[category.id]:null;
-    if(!pick||pick.hidden===true)return '<div class="confidence-r2-cm-hidden">🔒<small>Hidden</small></div>';
+    if(!pick||pick.hidden===true)return '<div class="confidence-r2-cm-hidden">🔒</div>';
     if(!pick.nomineeId)return '<div class="confidence-r2-cm-empty">—</div>';
     const nominee=(category.nominees||[]).find(function(n){return norm(n.id)===norm(pick.nomineeId);})||{};
     const img=nominee.image||nominee.imageUrl||nominee.logoUrl||confidenceAppearanceResolvedImage_(category,nominee).imageUrl||"";
-    return `<div class="confidence-r2-cm-pick">${img?platformImgHtml(img,{className:"confidence-r2-cm-logo",variant:"thumb",alt:nominee.name||"Team"}):""}<strong>${esc(nominee.name||pick.nomineeId)}</strong><small>${Number(pick.confidencePoints)||0} conf</small></div>`;
+    const fallback=String(nominee.shortAnswer||nominee.name||pick.nomineeId).split(/\s+/).pop().slice(0,4).toUpperCase();
+    return `<div class="confidence-r2-cm-pick confidence-r84-pick ${confidenceR84PickStateClass_(pick)}">${img?platformImgHtml(img,{className:"confidence-r2-cm-logo",variant:"thumb",alt:nominee.name||"Team"}):`<b>${esc(fallback)}</b>`}${pick.autoPicked?'<small class="confidence-r84-auto">(A)</small>':""}</div>`;
   }
 
   function compare(){
     const all=players(),names=initUsers(),active=names.map(function(u){return all.find(function(p){return norm(p.username)===norm(u);});}).filter(Boolean);
     if(!all.length)return '<div class="confidence-r2-empty">Compare is loading…</div>';
-    const available=all.filter(function(p){return names.indexOf(p.username)===-1;});
+    const available=all.filter(function(p){return !names.some(function(u){return norm(u)===norm(p.username);});});
     const categories=getCompactConfidenceDisplayCategories_();
     const viewer=active.find(function(p){return p.isCurrent;});
     const viewerKey=viewer?norm(viewer.username):"";
-    const toolbar=`<div class="confidence-r2-cm-toolbar"><span>You + ${Math.max(0,active.length-1)} · ${active.length}/6</span>${active.length<6&&available.length?'<button type="button" onclick="confidenceR2ToggleAdd_()">+ Add User</button>':""}</div>${STATE.addOpen?`<div class="confidence-r2-cm-add">${available.map(function(p){return `<button type="button" onclick="confidenceR2AddUser_('${js(p.username)}')">${esc(p.displayName||p.username)}</button>`;}).join("")}</div>`:""}`;
-    const heads=active.map(function(p){const you=norm(p.username)===viewerKey;return `<div class="confidence-r2-cm-head ${you?"is-you":""}"><strong>${esc(p.displayName||p.username)}</strong>${you?'<span>YOU</span>':`<button onclick="confidenceR2RemoveUser_('${js(p.username)}')">×</button>`}<b>${Number(p.total||0)} pts</b></div>`;}).join("");
-    const rows=categories.map(function(c,index){
+    const ranked=all.slice().sort(function(a,b){return Number(b.total||0)-Number(a.total||0);}),rankMap={};
+    ranked.forEach(function(p,i){rankMap[norm(p.username)]=i+1;});
+    const chooser=active.length<6&&available.length?`<details class="confidence-r84-add-user"><summary>+ Add User</summary><div>${available.map(function(p){return `<button type="button" onclick="confidenceR2AddUser_('${js(p.username)}')">${esc(p.displayName||p.username)}</button>`;}).join("")}</div></details>`:"";
+    const toolbar=`<div class="confidence-r2-cm-toolbar"><span>${active.length}/6 users</span>${chooser}</div>`;
+    const heads=active.map(function(p){const you=norm(p.username)===viewerKey;return `<div class="confidence-r2-cm-head confidence-r84-user-head ${you?"is-you":""}">
+      <strong>${esc(p.displayName||p.username)}</strong>${you?'<span>YOU</span>':`<button onclick="confidenceR2RemoveUser_('${js(p.username)}')" aria-label="Remove user">×</button>`}
+      <details class="confidence-r84-user-stats"><summary>Stats</summary><div><span>#${rankMap[norm(p.username)]||"—"}</span><span>${Number(p.total||0)} pts</span><span>${playerCorrect(p)} correct</span></div></details>
+    </div>`;}).join("");
+    const rows=categories.map(function(c){
       const open=STATE.rowOpen[c.id]===true;
-      const label=`<button class="confidence-r2-cm-label ${open?"is-open":""}" onclick="confidenceR2ToggleRow_('${js(c.id)}')"><span>${open?"▾":"▸"}</span><strong>GAME ${index+1}</strong><small>${esc(formatConfidenceSportsStatus_(c))}</small></button>`;
       const main=active.map(function(p){return `<div class="confidence-r2-cm-cell ${norm(p.username)===viewerKey?"is-you":""}">${compareCell(p,c)}</div>`;}).join("");
-      const detail=open?`<div class="confidence-r2-cm-row confidence-r2-cm-detail-row"><div class="confidence-r2-cm-label"><strong>DETAIL</strong><small>${esc(getCategoryDisplayTitle(c))}</small></div>${active.map(function(p){const pick=p&&p.picks?p.picks[norm(c.id)]||p.picks[c.id]:null;return `<div class="confidence-r2-cm-detail ${norm(p.username)===viewerKey?"is-you":""}">${!pick||pick.hidden?'<span>Hidden until kickoff</span>':`<span>Confidence <b>${Number(pick.confidencePoints)||0}</b></span><span>Status <b>${esc(pick.status||"pending")}</b></span>`}</div>`;}).join("")}</div>`:"";
-      return `<div class="confidence-r2-cm-row">${label}${main}</div>${detail}`;
+      const confidenceRow=open?`<div class="confidence-r2-cm-row confidence-r2-cm-detail-row confidence-r84-confidence-row"><div class="confidence-r2-cm-label"><strong>CONF</strong></div>${active.map(function(p){const pick=p&&p.picks?p.picks[norm(c.id)]||p.picks[c.id]:null;return `<div class="confidence-r2-cm-detail ${norm(p.username)===viewerKey?"is-you":""}"><strong>${!pick||pick.hidden?"—":Number(pick.confidencePoints)||0}</strong></div>`;}).join("")}</div>`:"";
+      return `<div class="confidence-r2-cm-row">${confidenceR84MatchupLabel_(c,open)}${main}</div>${confidenceRow}`;
     }).join("");
-    return toolbar+`<div class="confidence-r2-cm-scroll"><div class="confidence-r2-cm-matrix" style="--confidence-r2-users:${Math.max(1,active.length)}"><div class="confidence-r2-cm-row confidence-r2-cm-header"><div class="confidence-r2-cm-corner"><span>GAMES</span><strong>CONFIDENCE</strong></div>${heads}</div>${rows}</div></div><div class="confidence-r2-privacy">You stay pinned first. Rival picks remain hidden until the existing reveal rule allows them.</div>`;
+    return toolbar+`<div class="confidence-r2-cm-scroll"><div class="confidence-r2-cm-matrix" style="--confidence-r2-users:${Math.max(1,active.length)}"><div class="confidence-r2-cm-row confidence-r2-cm-header"><div class="confidence-r2-cm-corner"><span>MATCHUP</span><strong>PICKS</strong></div>${heads}</div>${rows}</div></div><div class="confidence-r2-privacy">You stay pinned first. Rival picks remain hidden until the existing reveal rule allows them.</div>`;
   }
 
   async function confidenceR8LoadHistory_(){
@@ -427,7 +450,6 @@
       <div class="confidence-r2-slate">${categories.map(renderCompactConfidenceRow_).join("")}</div>
       ${confidenceAutosaveActionsHtml_()}
       ${competition()}
-      ${confidenceR8AutoSettingsHtml_()}
       ${rules()}
     </div>`;
   };
