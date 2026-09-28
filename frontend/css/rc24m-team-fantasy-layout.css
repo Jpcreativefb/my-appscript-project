@@ -53,3 +53,7 @@
     gap:3px!important
   }
 }
+
+/* SPECIALIST 2 R1 — keep Team Fantasy inside the normal PATTC bottom-nav shell. */
+body:has(.sports-team-fantasy) .bottom-nav{display:flex!important}
+body:has(.sports-team-fantasy) #app{padding-bottom:calc(78px + env(safe-area-inset-bottom))!important}

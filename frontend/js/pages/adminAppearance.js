@@ -259,7 +259,8 @@ function adminAppearanceAssignment_() {
 }
 
 function adminAppearanceHubRows_() {
-  return adminAppearanceActiveRows_(ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.hubAppearance);
+  return adminAppearanceActiveRows_(ADMIN_APPEARANCE_STATE.dashboard && ADMIN_APPEARANCE_STATE.dashboard.hubAppearance)
+    .filter(function(row) { return adminAppearanceKey_(row && row.HubCategory) !== "navigation"; });
 }
 
 function adminAppearanceHubRow_(settingKey) {
@@ -2360,6 +2361,8 @@ function adminAppearanceBuildHtml_() {
       </div>
 
       ${ADMIN_APPEARANCE_STATE.message ? '<div class="admin-message appearance-message">' + adminAppearanceEscape_(ADMIN_APPEARANCE_STATE.message) + '</div>' : ''}
+
+      ${typeof adminAppearanceNavigationSlotsHtml_ === "function" ? adminAppearanceNavigationSlotsHtml_() : ""}
 
       ${adminAppearanceHubManager_()}
 

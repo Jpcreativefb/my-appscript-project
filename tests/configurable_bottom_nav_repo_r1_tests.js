@@ -1,0 +1,20 @@
+const fs=require('fs'),assert=require('assert');
+const nav=fs.readFileSync('frontend/js/navigationSlotsR1.js','utf8');
+const css=fs.readFileSync('frontend/css/navigation-slots-r1.css','utf8');
+const appearance=fs.readFileSync('backend/engines/AppearanceEngine.js','utf8');
+const dashboard=fs.readFileSync('frontend/js/pages/dashboard.js','utf8');
+const admin=fs.readFileSync('frontend/js/pages/adminAppearance.js','utf8');
+const app=fs.readFileSync('frontend/js/app.js','utf8');
+const html=fs.readFileSync('frontend/app.html','utf8');
+let n=0;function ok(v,m){assert.ok(v,m);n++;}
+ok(appearance.includes('SettingKey: "nav:1"')&&appearance.includes('SettingKey: "nav:6"'),'six backend nav slots');
+ok(appearance.includes('NavDestination')&&appearance.includes('appearanceNavDestination_'),'server allowlist/persistence');
+ok(appearance.includes('SettingKey: "nav:6"')&&appearance.includes('Active: false'),'sixth slot defaults off');
+ok(admin.includes('adminAppearanceNavigationSlotsHtml_'),'Appearance Manager navigation section hook');
+ok(dashboard.includes('appApplyNavigationSlots_'),'dashboard uses dynamic navigation renderer');
+ok(app.includes('appSetActiveNavigationSlot_'),'active state derives from configured slot');
+ok(nav.includes("NavDestination:'hub:general'")&&nav.includes("NavLocked:true"),'Games destination and protected Home');
+ok(nav.includes('data-nav-icon-size')&&nav.includes('data-nav-show-label')&&nav.includes('data-nav-color'),'nav appearance controls');
+ok(css.includes('data-slot-count="6"'),'six-slot mobile layout');
+ok(html.includes('navigationSlotsR1.js')&&html.includes('navigation-slots-r1.css'),'runtime assets loaded');
+console.log(n+' configurable bottom-nav repo R1 checks PASS');

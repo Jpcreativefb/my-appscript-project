@@ -178,21 +178,26 @@ function expectThrow(fn, pattern) {
   assert.strictEqual(usage.QB.KC || 0, 0, 'future-week picks must not consume an earlier week use limit');
 }
 
-// Auto-pick historical rankings deduplicate the same NFL unit across many fantasy entries.
+// Auto-pick historical rankings use the all-NFL ranking source, never PATTC pick rows.
 {
   const { context, db, setSettings } = makeHarness();
   setSettings('g',{SeasonYear:2026});
-  db.TeamFantasyUnitScores = [];
-  for (let i=0;i<10;i++) db.TeamFantasyUnitScores.push({GameId:'g',SeasonYear:2026,Week:1,EntryId:'e'+i,Position:'QB',TeamAbbr:'BUF',ESPNEventId:'w1',FantasyPoints:10,Final:true,UpdatedAt:'2026-09-01T00:00:00Z'});
-  db.TeamFantasyUnitScores.push({GameId:'g',SeasonYear:2026,Week:2,EntryId:'later',Position:'QB',TeamAbbr:'BUF',ESPNEventId:'w2',FantasyPoints:20,Final:true,UpdatedAt:'2026-09-08T00:00:00Z'});
-  db.TeamFantasyUnitScores.push({GameId:'g',SeasonYear:2025,Week:1,EntryId:'old',Position:'QB',TeamAbbr:'BUF',ESPNEventId:'old',FantasyPoints:100,Final:true,UpdatedAt:'2025-09-01T00:00:00Z'});
-  db.TeamFantasyUnitScores.push({GameId:'g',SeasonYear:2026,Week:1,EntryId:'kc1',Position:'QB',TeamAbbr:'KC',ESPNEventId:'kcw1',FantasyPoints:14,Final:true,UpdatedAt:'2026-09-01T00:00:00Z'});
-  db.TeamFantasyUnitScores.push({GameId:'g',SeasonYear:2026,Week:2,EntryId:'kc2',Position:'QB',TeamAbbr:'KC',ESPNEventId:'kcw2',FantasyPoints:14,Final:true,UpdatedAt:'2026-09-08T00:00:00Z'});
+  db.TeamFantasyUnitScores = [
+    {GameId:'g',SeasonYear:2026,Week:1,EntryId:'__ranking__:BUF:QB',Position:'QB',TeamAbbr:'BUF',ESPNEventId:'w1',FantasyPoints:10,Final:true,UpdatedAt:'2026-09-01T00:00:00Z'},
+    {GameId:'g',SeasonYear:2026,Week:2,EntryId:'__ranking__:BUF:QB',Position:'QB',TeamAbbr:'BUF',ESPNEventId:'w2',FantasyPoints:20,Final:true,UpdatedAt:'2026-09-08T00:00:00Z'},
+    {GameId:'g',SeasonYear:2025,Week:1,EntryId:'__ranking__:BUF:QB',Position:'QB',TeamAbbr:'BUF',ESPNEventId:'old',FantasyPoints:100,Final:true,UpdatedAt:'2025-09-01T00:00:00Z'},
+    {GameId:'g',SeasonYear:2026,Week:1,EntryId:'__ranking__:KC:QB',Position:'QB',TeamAbbr:'KC',ESPNEventId:'kcw1',FantasyPoints:14,Final:true,UpdatedAt:'2026-09-01T00:00:00Z'},
+    {GameId:'g',SeasonYear:2026,Week:2,EntryId:'__ranking__:KC:QB',Position:'QB',TeamAbbr:'KC',ESPNEventId:'kcw2',FantasyPoints:14,Final:true,UpdatedAt:'2026-09-08T00:00:00Z'},
+    // Player-specific unit rows must not influence rankings, even if extreme.
+    {GameId:'g',SeasonYear:2026,Week:1,EntryId:'player-entry',Position:'QB',TeamAbbr:'MIA',ESPNEventId:'miaw1',FantasyPoints:999,Final:true,UpdatedAt:'2026-09-01T00:00:00Z'}
+  ];
   const ranking=context.teamFantasyRankings_('g','QB',3,2026);
-  assert.strictEqual(ranking.BUF.games,2,'popular picks must not count the same NFL game repeatedly');
+  assert.strictEqual(Object.keys(ranking).length,32,'all 32 NFL teams must always have a QB rank');
+  assert.strictEqual(ranking.BUF.games,2,'BUF ranking metric must use two NFL source games');
   assert.strictEqual(ranking.BUF.average,15,'BUF average must be one score per NFL week/event');
   assert.strictEqual(ranking.BUF.rank,1,'2025 data must not contaminate current-season auto rankings');
   assert.strictEqual(ranking.KC.rank,2);
+  assert.strictEqual(ranking.MIA.games,0,'PATTC user score rows must not create ranking history');
 }
 
 // Kickoff locking: a saved pick cannot be changed once its selected NFL game starts.

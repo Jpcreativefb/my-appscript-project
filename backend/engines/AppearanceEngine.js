@@ -123,6 +123,10 @@ const APPEARANCE_HUB_SETTING_HEADERS = [
   "IconSourceType",
   "IconSourceUrl",
   "ShowNavLabel",
+  "NavSlot",
+  "NavDestination",
+  "NavIconSize",
+  "NavLocked",
   "Active",
   "UpdatedAt"
 ];
@@ -135,6 +139,16 @@ function appearanceHubDefaultRows_() {
     { SettingKey: "awards", HubCategory: "awards", HubGroup: "", DisplayName: "Awards", Color: "#9a6a13", IconText: "🏆", ShowNavLabel: true, Active: true },
     { SettingKey: "general", HubCategory: "general", HubGroup: "", DisplayName: "General Games", Color: "#4452a4", IconText: "🎲", ShowNavLabel: true, Active: true },
     { SettingKey: "more", HubCategory: "more", HubGroup: "", DisplayName: "More", Color: "#374151", IconText: "•••", ShowNavLabel: true, Active: true },
+
+    // Configurable bottom-navigation slots. Slot 6 is intentionally Off by
+    // default so existing users keep the current five-button navigation until
+    // the admin chooses to enable a sixth shortcut.
+    { SettingKey: "nav:1", HubCategory: "navigation", HubGroup: "1", DisplayName: "Home", Color: "#20284a", IconText: "⌂", ShowNavLabel: true, NavSlot: 1, NavDestination: "dashboard", NavIconSize: 22, NavLocked: true, Active: true },
+    { SettingKey: "nav:2", HubCategory: "navigation", HubGroup: "2", DisplayName: "Sports", Color: "#1f5f45", IconText: "🏈", ShowNavLabel: true, NavSlot: 2, NavDestination: "hub:sports", NavIconSize: 22, NavLocked: false, Active: true },
+    { SettingKey: "nav:3", HubCategory: "navigation", HubGroup: "3", DisplayName: "Reality", Color: "#6d3aa8", IconText: "📺", ShowNavLabel: true, NavSlot: 3, NavDestination: "hub:reality", NavIconSize: 22, NavLocked: false, Active: true },
+    { SettingKey: "nav:4", HubCategory: "navigation", HubGroup: "4", DisplayName: "Awards", Color: "#9a6a13", IconText: "🏆", ShowNavLabel: true, NavSlot: 4, NavDestination: "hub:awards", NavIconSize: 22, NavLocked: false, Active: true },
+    { SettingKey: "nav:5", HubCategory: "navigation", HubGroup: "5", DisplayName: "More", Color: "#374151", IconText: "•••", ShowNavLabel: true, NavSlot: 5, NavDestination: "more", NavIconSize: 22, NavLocked: false, Active: true },
+    { SettingKey: "nav:6", HubCategory: "navigation", HubGroup: "6", DisplayName: "Games", Color: "#4452a4", IconText: "🎲", ShowNavLabel: true, NavSlot: 6, NavDestination: "hub:general", NavIconSize: 22, NavLocked: false, Active: false },
 
     { SettingKey: "sports:nfl", HubCategory: "sports", HubGroup: "NFL", DisplayName: "NFL", Color: "#24456f", IconText: "🏈", ShowNavLabel: true, Active: true },
     { SettingKey: "sports:mlb", HubCategory: "sports", HubGroup: "MLB", DisplayName: "MLB", Color: "#8c2f39", IconText: "⚾", ShowNavLabel: true, Active: true },
@@ -272,6 +286,11 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
     const panelTint = Number(row.PanelTint);
     row.PanelTint = isFinite(panelTint) ? Math.max(0, Math.min(70, panelTint)) : 18;
     row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
+    row.NavSlot = Math.max(0, Math.min(6, Math.floor(Number(row.NavSlot) || 0)));
+    row.NavDestination = appearanceNavDestination_(row.NavDestination, "");
+    const iconSize = Number(row.NavIconSize);
+    row.NavIconSize = isFinite(iconSize) ? Math.max(18, Math.min(40, iconSize)) : 22;
+    row.NavLocked = appearanceBool_(row.NavLocked, false);
     row.Active = appearanceBool_(row.Active, true);
     return row;
   });
@@ -296,6 +315,14 @@ function appearanceBool_(value, defaultValue) {
   if (["true", "1", "yes", "y", "on"].indexOf(normalized) !== -1) return true;
   if (["false", "0", "no", "n", "off"].indexOf(normalized) !== -1) return false;
   return defaultValue === true;
+}
+
+function appearanceNavDestination_(value, fallback) {
+  const allowed = ["dashboard", "hub:general", "hub:sports", "hub:reality", "hub:awards", "more", "voting", "ranking", "leaderboard", "leagues", "season-hub", "trophy-room"];
+  const destination = appearanceString_(value);
+  if (allowed.indexOf(destination) !== -1) return destination;
+  const backup = appearanceString_(fallback);
+  return allowed.indexOf(backup) !== -1 ? backup : "";
 }
 
 function appearanceJsonObject_(value) {
@@ -1108,6 +1135,10 @@ function adminSaveAppearanceHubSetting(payload) {
     IconSourceType: appearanceString_(payload.iconSourceType || payload.IconSourceType),
     IconSourceUrl: appearanceString_(payload.iconSourceUrl || payload.IconSourceUrl),
     ShowNavLabel: appearanceBool_(payload.showNavLabel != null ? payload.showNavLabel : payload.ShowNavLabel, true),
+    NavSlot: Math.max(0, Math.min(6, Math.floor(Number(payload.navSlot != null ? payload.navSlot : payload.NavSlot) || 0))),
+    NavDestination: category === "navigation" ? appearanceNavDestination_(payload.navDestination != null ? payload.navDestination : payload.NavDestination, "dashboard") : "",
+    NavIconSize: Math.max(18, Math.min(40, Number(payload.navIconSize != null ? payload.navIconSize : payload.NavIconSize) || 22)),
+    NavLocked: appearanceBool_(payload.navLocked != null ? payload.navLocked : payload.NavLocked, false),
     Active: appearanceBool_(payload.active != null ? payload.active : payload.Active, true),
     UpdatedAt: new Date()
   });
