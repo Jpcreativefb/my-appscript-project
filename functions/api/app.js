@@ -35,6 +35,67 @@ function pattcCupProductionRequest_(context) {
 
 const MAX_BODY_BYTES = 6 * 1024 * 1024;
 
+// Admin page bootstrap reads are safe to retry once when Apps Script
+// intermittently rejects or gateways the request. Writes are deliberately
+// excluded so Save/Create/Update/Archive/Publish operations remain single-shot.
+const ADMIN_READ_RETRY_ACTIONS = new Set([
+  "adminGetGames",
+  "adminGetGameTypes",
+  "adminGetGameConfig",
+  "adminGetGameSetup",
+  "adminGetAppearanceDashboard"
+]);
+
+const ADMIN_READ_RETRY_STATUSES = new Set([
+  404,
+  502,
+  503,
+  504,
+  524
+]);
+
+const ADMIN_READ_RETRY_DELAY_MS = 250;
+
+function waitForAdminReadRetry_(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function fetchAppsScriptPost_(upstreamUrl, raw) {
+  return fetch(upstreamUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "text/plain;charset=utf-8",
+      "Accept": "application/json"
+    },
+    body: raw,
+    redirect: "follow"
+  });
+}
+
+async function fetchAppsScriptWithAdminReadRetry_(upstreamUrl, raw, action) {
+  const retryAllowed = ADMIN_READ_RETRY_ACTIONS.has(String(action || ""));
+
+  let response;
+  try {
+    response = await fetchAppsScriptPost_(upstreamUrl, raw);
+  } catch (err) {
+    if (!retryAllowed) throw err;
+
+    await waitForAdminReadRetry_(ADMIN_READ_RETRY_DELAY_MS);
+    return fetchAppsScriptPost_(upstreamUrl, raw);
+  }
+
+  if (
+    retryAllowed &&
+    ADMIN_READ_RETRY_STATUSES.has(Number(response.status))
+  ) {
+    await waitForAdminReadRetry_(ADMIN_READ_RETRY_DELAY_MS);
+    return fetchAppsScriptPost_(upstreamUrl, raw);
+  }
+
+  return response;
+}
+
 function jsonResponse(payload, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -125,15 +186,11 @@ export async function onRequestPost(context) {
     : APPS_SCRIPT_API_URL;
 
   try {
-    const upstream = await fetch(upstreamUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "text/plain;charset=utf-8",
-        "Accept": "application/json"
-      },
-      body: raw,
-      redirect: "follow"
-    });
+    const upstream = await fetchAppsScriptWithAdminReadRetry_(
+      upstreamUrl,
+      raw,
+      action
+    );
 
     const text = await upstream.text();
     let parsed = null;
