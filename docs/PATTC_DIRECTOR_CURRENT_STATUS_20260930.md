@@ -250,3 +250,14 @@ New enhancement request (separate from R2 acceptance):
 - on Hub pages and/or after sign-in, show a compact set of different available games with a short description of each game
 - should reuse already-loaded active-game / hub data where possible and avoid adding a blocking backend request to first paint
 - keep this as a lightweight discovery/presentation enhancement, not a redesign of the Home Hub
+
+
+## Hub game discovery UX clarification
+
+For the separate Hub/sign-in game discovery enhancement:
+- do not use an "Open Game" button
+- avoid implying that the card immediately launches a game
+- show where the game lives instead, such as "Available in Sports Hub" or "Available in Reality Hub"
+- optionally provide a lightweight link to the relevant Hub/location, not directly into the game
+- keep the card informational: game name, short description, where to find it
+- reuse already-loaded Hub/game data where possible and do not add blocking first-paint requests
