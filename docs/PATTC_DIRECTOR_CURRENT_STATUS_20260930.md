@@ -3,7 +3,7 @@
 ## Authoritative Director State
 
 - Director integration branch: `director/pattc-repair-batch-r1`
-- Current Director commit: `a393ac6`
+- Current Director commit: `a2a15c0`
 - Production remains unchanged.
 - Production branch remains `architecture-cleanup`.
 - Known production baseline before this repair batch: `eb3bd11`.
@@ -261,3 +261,24 @@ For the separate Hub/sign-in game discovery enhancement:
 - optionally provide a lightweight link to the relevant Hub/location, not directly into the game
 - keep the card informational: game name, short description, where to find it
 - reuse already-loaded Hub/game data where possible and do not add blocking first-paint requests
+
+
+## Integration Update — Loading / How-to R2 Follow-up
+
+How-to R2 follow-up live-fix integration: COMPLETE.
+
+Integrated Director commit: `a2a15c0`.
+
+Included:
+- returning users now transition to the shorter Game Tips deck after a completed first loading visit
+- Skip also records completion
+- the persistent How-to "?" control is smaller and positioned lower above Bottom Navigation
+- no backend request added
+- no Bottom Navigation logic changed
+- no Admin behavior changed
+
+Focused R2 regression, syntax, and diff checks passed before integration.
+
+Remaining live check:
+- confirm returning-user Game Tips appear on the next visit
+- confirm the smaller/lower "?" button placement is acceptable
