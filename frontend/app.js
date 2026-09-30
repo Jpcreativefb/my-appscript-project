@@ -1316,9 +1316,8 @@ async function appHandleBrowserRoute_() {
     skipHistoryWrite: true
   });
 
-  // A newer explicit navigation may supersede this browser-route request while
-  // its async work is still finishing. Never let the stale history handler
-  // rewrite the newer destination.
+  // A newer route may supersede this browser-route request while its async
+  // renderer is finishing. Never let the stale history completion rewrite it.
   if (handled === false || appRoutePageFromLocation_() !== page) return;
 
   // A dirty Admin form may reject browser Back/Forward navigation. In that
@@ -1335,19 +1334,6 @@ function appBindHistoryRouting_() {
   APP_STATE.historyRoutingBound = true;
   window.addEventListener("popstate", appHandleBrowserRoute_);
   window.addEventListener("hashchange", appHandleBrowserRoute_);
-}
-
-let APP_NAVIGATION_SEQUENCE_ = 0;
-
-function appNavigationIsCurrent_(sequence, page) {
-  if (sequence != null && sequence !== APP_NAVIGATION_SEQUENCE_) return false;
-  return String(APP_STATE.currentPage || "") === String(page || "");
-}
-
-function appCommitRouteHtml_(app, page, sequence, html) {
-  if (!appNavigationIsCurrent_(sequence, page)) return false;
-  app.innerHTML = html;
-  return true;
 }
 
 function appProgressiveRouteLabel_(page) {
@@ -1442,7 +1428,6 @@ async function navigate(page, options) {
     return;
   }
 
-  const navigationSequence = ++APP_NAVIGATION_SEQUENCE_;
   const previousPage = APP_STATE.currentPage;
   if (previousPage && previousPage !== page && typeof pattcSportsTestLabBeforeNavigate === "function") {
     pattcSportsTestLabBeforeNavigate(previousPage, app);
@@ -1478,7 +1463,6 @@ async function navigate(page, options) {
         } finally {
           APP_APPEARANCE_NAVIGATION_REVALIDATING = false;
         }
-        if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
         snapshot = appearanceCheck && appearanceCheck.allowSnapshot === true
           ? appReadPageSnapshot_(page, appearanceCheck.fingerprint)
           : null;
@@ -1495,7 +1479,6 @@ async function navigate(page, options) {
   }
 
   if (snapshot) {
-    if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
     app.innerHTML = snapshot.html;
     app.classList.remove("page-enter");
     app.classList.add("page-enter-active");
@@ -1545,17 +1528,15 @@ async function navigate(page, options) {
   } else if (progressiveShell) {
     if (usePageLoader && APP_LOADER_STATE.visible) hideLoader();
     await appPaintProgressiveRouteShell_(page, app);
-    if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
   }
 
   try {
 
     await ensurePageModules_(page);
-    if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
     setPageLoadStep(42, isAdminPage_(page) ? "Requesting page data…" : "");
     startPageLoadPulse_();
-    const rendered = await renderPage(page, navigationSequence);
-    if (rendered === false || !appNavigationIsCurrent_(navigationSequence, page)) return false;
+    const rendered = await renderPage(page);
+    if (rendered === false) return false;
     stopPageLoadPulse_();
     if (isAdminPage_(page) && typeof adminUiEnhancePage === "function") {
       adminUiEnhancePage(app);
@@ -1564,8 +1545,6 @@ async function navigate(page, options) {
     setPageLoadStep(94, isAdminPage_(page) ? "Finishing page layout…" : "");
 
   } catch (err) {
-
-    if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
 
     console.error(
       "PAGE RENDER ERROR",
@@ -1589,8 +1568,6 @@ async function navigate(page, options) {
 
     requestAnimationFrame(() => {
 
-      if (!appNavigationIsCurrent_(navigationSequence, page)) return;
-
       app.classList.remove("page-enter");
 
       app.classList.add("page-enter-active");
@@ -1609,7 +1586,7 @@ async function navigate(page, options) {
 
   }
 
-  return appNavigationIsCurrent_(navigationSequence, page);
+  return true;
 
 }
 
@@ -2190,20 +2167,20 @@ async function viewGameLeaderboard(
    PAGE ROUTER
 ====================== */
 
-async function renderPage(page, navigationSequence) {
+async function appCommitAsyncRouteHtml_(app, page, renderer) {
+  const html = await renderer();
+  if (String(APP_STATE.currentPage || "") !== String(page || "")) return false;
+  app.innerHTML = html;
+  return true;
+}
+
+async function renderPage(page) {
 
   const app =
     document.getElementById("app");
 
   if (!app) {
     throw new Error("App container missing");
-  }
-
-  if (!appNavigationIsCurrent_(navigationSequence, page)) return false;
-
-  async function commit(renderer) {
-    const html = await renderer();
-    return appCommitRouteHtml_(app, page, navigationSequence, html);
   }
 
   if (
@@ -2213,7 +2190,7 @@ async function renderPage(page, navigationSequence) {
     const gameId =
       page.split(":")[1];
 
-    return commit(function() {
+    return appCommitAsyncRouteHtml_(app, page, function() {
       return renderAdminGameSetupPage(gameId);
     });
 
@@ -2221,14 +2198,14 @@ async function renderPage(page, navigationSequence) {
 
   if (page.indexOf("hub:") === 0) {
     const hubCategory = String(page.split(":")[1] || "general").toLowerCase();
-    const committed = await commit(function() {
+    const committed = await appCommitAsyncRouteHtml_(app, page, function() {
       return renderDashboardHubPage_(hubCategory);
     });
     if (!committed) return false;
 
     if (typeof dashboardHydrateGameStandings_ === "function") {
       window.setTimeout(function() {
-        if (!appNavigationIsCurrent_(null, page)) return;
+        if (String(APP_STATE.currentPage || "") !== String(page || "")) return;
         const payload = typeof APP_STATE !== "undefined" ? APP_STATE.dashboardHomePayload : null;
         const active = payload && Array.isArray(payload.activeGames) ? payload.activeGames : [];
         const hubGames = active.filter(function(game) {
@@ -2242,14 +2219,16 @@ async function renderPage(page, navigationSequence) {
         });
       }, 0);
     }
-    return true;
+    return;
   }
 
   switch (page) {
 
-    case "dashboard": {
-      const committed = await commit(function() { return renderDashboardPage(); });
-      if (!committed) return false;
+    case "dashboard":
+
+      const dashboardHtml = await renderDashboardPage();
+      if (String(APP_STATE.currentPage || "") !== "dashboard") return false;
+      app.innerHTML = dashboardHtml;
       if (typeof dashboardHydrateCareerFromCache_ === "function") dashboardHydrateCareerFromCache_();
 
       if (typeof dashboardScheduleHomeEnrichment_ === "function") {
@@ -2258,130 +2237,174 @@ async function renderPage(page, navigationSequence) {
           typeof APP_STATE !== "undefined" ? String(APP_STATE.dashboardHomeHydrationId || "") : ""
         );
       }
-      return true;
-    }
+
+      break;
 
     case "trophy-room":
-      return commit(function() { return renderDashboardTrophyRoomPage_(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderDashboardTrophyRoomPage_(); })) return false;
+      break;
 
     case "more":
-      return commit(function() { return renderDashboardMorePage_(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderDashboardMorePage_(); })) return false;
+      break;
 
     case "picks":
-      return commit(function() { return renderPicksPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderPicksPage(); })) return false;
+
+      break;
 
     case "survivor":
       if (typeof renderSurvivorPage !== "function") throw new Error("Survivor page script is not loaded.");
-      return commit(function() { return renderSurvivorPage(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderSurvivorPage(); })) return false;
+      break;
 
     case "voting":
       if (typeof renderVotingPage !== "function") throw new Error("Voting page script is not loaded.");
-      return commit(function() { return renderVotingPage(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderVotingPage(); })) return false;
+      break;
 
     case "ranking":
       if (typeof renderRankingPage !== "function") throw new Error("Ranking page script is not loaded.");
-      return commit(function() { return renderRankingPage(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderRankingPage(); })) return false;
+      break;
 
     case "game-hub":
-      return commit(function() { return renderGameModeHubPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderGameModeHubPage(); })) return false;
+
+      break;
 
     case "team-fantasy":
       if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
-      return commit(function() { return renderTeamFantasyPage(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderTeamFantasyPage(); })) return false;
+      break;
 
     case "betting":
-      return commit(function() { return renderBettingPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderBettingPage(); })) return false;
+    
+      break;   
 
     case "leaderboard":
-      return commit(function() { return renderLeaderboardPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderLeaderboardPage(); })) return false;
+
+      break;
 
     case "season-hub":
-      return commit(function() { return renderSeasonHubPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderSeasonHubPage(); })) return false;
+
+      break;
 
     case "leagues":
-      return commit(function() { return renderLeaguesPage(); });
 
-    case "admin": {
-      const committed = await commit(function() { return renderAdminPage(); });
-      if (!committed) return false;
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderLeaguesPage(); })) return false;
+
+      break;
+
+    case "admin":
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminPage(); })) return false;
 
       if (typeof adminEnhanceMainAdminSections === "function") {
         adminEnhanceMainAdminSections();
       }
       if (typeof adminUiEnhancePage === "function") {
-        setTimeout(function() {
-          if (appNavigationIsCurrent_(null, page)) adminUiEnhancePage(app);
-        }, 0);
+        setTimeout(function() { adminUiEnhancePage(app); }, 0);
       }
       /* TEAM FANTASY v1.2.18j ADMIN LAUNCHER */
       if (typeof teamFantasyEnhanceAdminLanding_ === "function") {
-        setTimeout(function() {
-          if (appNavigationIsCurrent_(null, page)) teamFantasyEnhanceAdminLanding_();
-        }, 0);
+        setTimeout(function() { teamFantasyEnhanceAdminLanding_(); }, 0);
       }
 
-      return true;
-    }
-
+      break;
+ 
     case "admin-games":
+
       if (typeof renderAdminGamesPage !== "function") {
         throw new Error("Manage Games page script is not loaded.");
       }
-      return commit(function() { return renderAdminGamesPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminGamesPage(); })) return false;
+
+      break; 
 
     case "admin-awards":
+
       if (typeof renderAdminAwardsPage !== "function") {
         throw new Error("Awards Manager script is not loaded.");
       }
-      return commit(function() { return renderAdminAwardsPage(); });
 
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminAwardsPage(); })) return false;
+
+      break;
     case "admin-team-fantasy":
       if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
-      return commit(function() { return renderAdminTeamFantasyPage(); });
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminTeamFantasyPage(); })) return false;
+      break;
 
     case "admin-reality-tv":
+
       if (typeof renderAdminRealityTvPage !== "function") {
         throw new Error("Reality TV Season Manager script is not loaded.");
       }
-      return commit(function() { return renderAdminRealityTvPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminRealityTvPage(); })) return false;
+
+      break;
 
     case "admin-appearance":
+
       if (typeof renderAdminAppearancePage !== "function") {
         throw new Error("Appearance Manager script is not loaded.");
       }
-      return commit(function() { return renderAdminAppearancePage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminAppearancePage(); })) return false;
+
+      break;
 
     case "history":
+
       if (typeof renderArchiveHistoryPage !== "function") {
         throw new Error("Archive history page script is not loaded.");
       }
-      return commit(function() { return renderArchiveHistoryPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderArchiveHistoryPage(); })) return false;
+
+      break;
 
     case "profile":
+
       if (typeof renderProfilePage !== "function") {
         throw new Error("Profile page script is not loaded.");
       }
-      return commit(function() { return renderProfilePage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderProfilePage(); })) return false;
+
+      break;
 
     case "notifications":
+
       if (typeof renderNotificationsPage !== "function") {
         throw new Error("Notification Center script is not loaded.");
       }
-      return commit(function() { return renderNotificationsPage(); });
+
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderNotificationsPage(); })) return false;
+
+      break;
 
     default:
-      return appCommitRouteHtml_(
-        app,
-        page,
-        navigationSequence,
+
+      app.innerHTML =
         `
           <div class="page">
             <div class="card">
               Page Not Found
             </div>
           </div>
-        `
-      );
+        `;
 
   }
 
