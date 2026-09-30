@@ -282,3 +282,28 @@ Focused R2 regression, syntax, and diff checks passed before integration.
 Remaining live check:
 - confirm returning-user Game Tips appear on the next visit
 - confirm the smaller/lower "?" button placement is acceptable
+
+
+## Bottom Nav routing correction performance gate
+
+Status: SEND BACK — DO NOT INTEGRATE YET.
+
+Specialist commit reviewed: `346c6baea5fe37f61623858708a149a1e682c6a1` (`Prevent stale bottom-nav route completions`).
+
+Focused routing tests passed:
+- bottom_nav_consistency_r1_tests.js
+- bottom_nav_routing_consistency_r1_tests.js
+
+However, the Home compact first-paint performance contract failed repeatedly, including on a clean standalone rerun:
+`AssertionError: Home compact first-paint path must remain unchanged`.
+
+Because the failure reproduced outside the full production gate, treat it as real until explained. Do not weaken the performance assertion.
+
+Required specialist follow-up:
+- diagnose why the shared-router generation/guard change is increasing or destabilizing Home compact first paint
+- preserve the stale-route protection
+- avoid adding synchronous work to the Home critical path
+- keep Bottom Nav Appearance behavior unchanged
+- rerun focused routing tests + ed_launch_blocker_performance_tests.js until stable PASS
+- then rerun full production checks
+- no merge/deploy
