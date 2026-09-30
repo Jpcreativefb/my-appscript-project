@@ -121,3 +121,12 @@
 .survivor-r3-slider-nav>div>button:last-child{justify-self:end}
 .survivor-r3-slider-nav>div>strong{justify-self:center!important;text-align:center!important;font-size:.82rem!important;font-weight:950!important;letter-spacing:.055em!important;white-space:nowrap}
 @media(max-width:620px){.survivor-r5-week-picker{display:grid;grid-template-columns:auto minmax(0,1fr);gap:7px}.survivor-r5-week-picker select{width:100%}.survivor-r5-week-picker span{grid-column:1/-1}.survivor-r3-slider-nav>div{grid-template-columns:52px minmax(120px,1fr) 52px!important;gap:12px!important}.survivor-r3-slider-nav>div>button{width:52px!important;height:52px!important;min-width:52px!important;min-height:52px!important}.survivor-r3-slider-nav>div>strong{font-size:.78rem!important}}
+
+/* NFL_SURVIVOR_PLAYER_R2_VISIBILITY */
+.survivor-r3-slider-nav>div>strong{font-size:1.08rem!important;font-weight:1000!important;letter-spacing:.075em!important;line-height:1.15!important}
+.survivor-r3-game-index{font-size:1.2em!important;font-weight:1000!important}
+.survivor-r6-protection-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;margin-top:9px;padding:9px 10px;border:1px solid rgba(85,164,219,.36);border-radius:9px;background:#061b2d}
+.survivor-r6-protection-row>div{display:grid;gap:2px}.survivor-r6-protection-row strong{font-size:.68rem;color:#dceeff;letter-spacing:.035em}.survivor-r6-protection-row small{font-size:.55rem;color:#9fb5c2}.survivor-r6-protection-row>b{font-size:.62rem;color:#8fdfff;min-width:20px;text-align:right}
+.survivor-r6-protection-switch input{position:absolute;opacity:0;pointer-events:none}.survivor-r6-protection-switch span{width:42px;height:23px;border-radius:999px;background:#273a49;display:block;position:relative;cursor:pointer}.survivor-r6-protection-switch span:after{content:"";position:absolute;width:19px;height:19px;left:2px;top:2px;border-radius:50%;background:#d6e3eb;transition:.15s}.survivor-r6-protection-switch input:checked+span{background:#087cff}.survivor-r6-protection-switch input:checked+span:after{left:21px}.survivor-r6-protection-switch input:disabled+span{opacity:.48;cursor:not-allowed}
+.survivor-r6-auto-option.is-unavailable{opacity:.52}.survivor-r6-auto-option.is-unavailable input{cursor:not-allowed}
+@media(max-width:620px){.survivor-r3-slider-nav>div>strong{font-size:1rem!important}.survivor-r3-game-index{font-size:1.22em!important}.survivor-r6-protection-row{gap:7px;padding:9px}.survivor-r6-protection-row small{font-size:.53rem}}

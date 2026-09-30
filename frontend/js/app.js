@@ -747,6 +747,8 @@ function appPageScriptUrl_(name, retryToken) {
   if (name === "nflCupR1" || name === "adminGamesRc24e" || name === "seasonHub" || name === "betting") url.searchParams.set("cupFutures", "v1220-nfl-cup-futures-r1");
   if (name === "adminGamesRc24e") url.searchParams.set("cupControl", "v1221-nfl-cup-weekly-season-r2");
   if (name === "picks" || name === "confidenceR2") url.searchParams.set("confidenceWeekly", "v1228-confidence-pool-r8");
+  // NFL_SURVIVOR_PLAYER_R2_MODULE_CACHE: Survivor-only lazy-module refresh.
+  if (name === "survivor" || name === "survivorR4") url.searchParams.set("survivorPlayer", "v1230-nfl-survivor-player-r2");
   if (retryToken) url.searchParams.set("retry", retryToken);
   return url.href;
 }

@@ -397,3 +397,106 @@
 
   root.PATTC_NFL_SURVIVOR_WEEK_BROWSER_R1_MARKER=MARK;
 })(window);
+
+/* =========================================================
+   NFL_SURVIVOR_PLAYER_R2_LIVE_UX
+   Narrow live integration correction:
+   - force actual R1 week browser to render after fresh lazy-module load
+   - AutoPick strategy/settings controls are real controls, not Random-only
+   - Missed Pick Protection lives on the main editable Survivor panel
+   - no new state/API read on render; accepted request-cache remains untouched
+   ========================================================= */
+(function(root){
+  "use strict";
+  const MARK="NFL_SURVIVOR_PLAYER_R2_LIVE_UX";
+
+  function payload(){return root.SURVIVOR_PAGE_STATE&&root.SURVIVOR_PAGE_STATE.payload||{};}
+  function savedIds(round){return Array.isArray(round&&round.pickNomineeIds)?round.pickNomineeIds.slice():(round&&round.pickNomineeId?[round.pickNomineeId]:[]);}
+  function finite(v){return v!==undefined&&v!==null&&String(v).trim()!==""&&Number.isFinite(Number(v));}
+  function currentRound(){return payload().currentRound||{};}
+  function pref(){return typeof root.survivorRecoveryR3AutoPreference_==="function"?root.survivorRecoveryR3AutoPreference_(payload()):{configured:false,enabled:false,strategy:"best-odds",trigger:"last-game",scope:"season"};}
+  function adminAutoPickAllowed(p){p=p||payload();const settings=p.settings||{};return settings.automationEnabled!==false&&settings.autoPickEnabled===true;}
+  function strategyCaps(){
+    const rows=(currentRound().nominees||[]).filter(function(row){return row&&row.eligible!==false;});
+    return {
+      moneyline:rows.some(function(row){return finite(row.moneyline)&&Number(row.moneyline)!==0;}),
+      spread:rows.some(function(row){return finite(row.spread);}),
+      record:rows.some(function(row){return /\d+\s*[-–]\s*\d+/.test(String(row.teamRecord||""));}),
+      rank:rows.some(function(row){return [row.sportsRank,row.powerRank,row.powerRanking,row.teamRank,row.rank,row.leagueRank].some(function(v){return finite(v)&&Number(v)>0;});})
+    };
+  }
+  function option(value,title,detail,available,selected){
+    const disabled=available===false;
+    return `<label class="survivor-r6-auto-option ${disabled?"is-unavailable":""}"><input type="radio" name="survivorR3AutoStrategy" value="${value}" ${selected===value?"checked":""} ${disabled?"disabled":""}><span><strong>${title}</strong><small>${detail}${disabled?" · Not available from this week's data":""}</small></span></label>`;
+  }
+
+  root.survivorRecoveryR3OpenAutoPick_=function(){
+    if(typeof root.survivorRecoveryR3CloseAutoPick_==="function")root.survivorRecoveryR3CloseAutoPick_();
+    const pre=pref(),caps=strategyCaps(),overlay=document.createElement("div");
+    let selected=String(pre.strategy||"best-odds");
+    const available={"best-odds":caps.moneyline,"biggest-favorite":caps.spread,"best-record":caps.record,"best-rank":caps.rank,"random":true};
+    if(available[selected]===false){selected=caps.moneyline?"best-odds":caps.spread?"biggest-favorite":caps.record?"best-record":caps.rank?"best-rank":"random";}
+    const methods=[
+      option("best-odds","Best Moneyline Favorite","Strongest eligible favorite from current moneyline data.",caps.moneyline,selected),
+      option("biggest-favorite","Best Spread Favorite","Largest eligible point-spread favorite.",caps.spread,selected),
+      option("best-record","Best Record","Eligible team with the best current win percentage.",caps.record,selected),
+      option("best-rank","Highest Ranked","Highest-ranked eligible team when ranking data is present.",caps.rank,selected),
+      option("random","Random Eligible","Random legal unused team.",true,selected)
+    ].join("");
+    overlay.id="survivorR3AutoPickOverlay";
+    overlay.className="tf-info-overlay survivor-r3-auto-overlay survivor-r4-auto-overlay survivor-r6-auto-overlay";
+    overlay.innerHTML=`<section class="tf-info-sheet survivor-r3-auto-sheet survivor-r4-auto-sheet"><div class="tf-info-head"><h2>Auto Pick Strategy</h2><button class="tf-info-close" type="button" onclick="survivorRecoveryR3CloseAutoPick_()">×</button></div><div class="tf-info-body"><p class="tf-info-intro">Choose the saved strategy PATTC should use if Missed Pick Protection is On. This does not make an immediate pick. Use Random Pick on the main Survivor screen for an immediate one-time random selection.</p><div class="survivor-r3-auto-methods survivor-r4-auto-methods">${methods}</div><label class="survivor-r3-auto-scope"><span>When should PATTC take over?</span><select id="survivorR4AutoTrigger"><option value="thursday" ${pre.trigger==="thursday"?"selected":""}>Before the Thursday game</option><option value="sunday-early" ${pre.trigger==="sunday-early"?"selected":""}>Before Sunday early games</option><option value="sunday-late" ${pre.trigger==="sunday-late"?"selected":""}>Before Sunday late games</option><option value="sunday-night" ${pre.trigger==="sunday-night"?"selected":""}>Before Sunday Night Football</option><option value="last-game" ${pre.trigger==="last-game"?"selected":""}>Before the last eligible game</option></select></label><label class="survivor-r3-auto-scope"><span>Protection scope</span><select id="survivorR3AutoScope"><option value="week" ${pre.scope==="week"?"selected":""}>This Week Only</option><option value="season" ${pre.scope==="season"?"selected":""}>Every Future Week This Season</option></select></label><button type="button" class="survivor-r3-auto-save" onclick="survivorRecoveryR6SaveAutoSettings_()">SAVE AUTO PICK SETTINGS</button><div id="survivorR3AutoStatus" class="survivor-r3-auto-status"></div></div><div class="tf-info-footer"><button class="tf-button secondary" type="button" onclick="survivorRecoveryR3CloseAutoPick_()">Close</button></div></section>`;
+    overlay.addEventListener("click",function(event){if(event.target===overlay&&typeof root.survivorRecoveryR3CloseAutoPick_==="function")root.survivorRecoveryR3CloseAutoPick_();});
+    document.body.appendChild(overlay);
+  };
+
+  async function savePreference(enabled,strategy,trigger,scope,status){
+    const p=payload(),round=p.currentRound||{},session=typeof root.getSession==="function"?(root.getSession()||{}):{};
+    if(status)status.textContent="Saving…";
+    let result;
+    if(/^(127\.0\.0\.1|localhost)$/.test(String(root.location&&root.location.hostname||""))){
+      result={success:true,preference:{configured:true,enabled:enabled,strategy:strategy,trigger:trigger,scope:scope,targetWeek:scope==="week"?Number(round.week||round.round||0):0}};
+    }else if(typeof root.apiPost==="function"){
+      result=await root.apiPost("saveSportsSurvivorAutoPickPreference",{gameId:root.SURVIVOR_PAGE_STATE.gameId||p.gameId||"",username:session.username||"",enabled:enabled,strategy:strategy,trigger:trigger,scope:scope,week:Number(round.week||round.round||0)});
+    }else result={success:false,message:"Auto Pick settings service is unavailable."};
+    if(!result||result.success===false){if(status)status.textContent=result&&(result.message||result.error)||"Could not save Auto Pick settings.";return null;}
+    p.autoPickPreference=result.preference||{configured:true,enabled:enabled,strategy:strategy,trigger:trigger,scope:scope,targetWeek:scope==="week"?Number(round.week||round.round||0):0};
+    return p.autoPickPreference;
+  }
+
+  root.survivorRecoveryR6SaveAutoSettings_=async function(){
+    const pre=pref(),strategyNode=document.querySelector('input[name="survivorR3AutoStrategy"]:checked'),triggerNode=document.getElementById("survivorR4AutoTrigger"),scopeNode=document.getElementById("survivorR3AutoScope"),status=document.getElementById("survivorR3AutoStatus");
+    const strategy=strategyNode?strategyNode.value:pre.strategy||"best-odds",trigger=triggerNode?triggerNode.value:pre.trigger||"last-game",scope=scopeNode?scopeNode.value:pre.scope||"season";
+    const saved=await savePreference(adminAutoPickAllowed()?pre.enabled===true:false,strategy,trigger,scope,status);
+    if(!saved)return;
+    if(status)status.textContent="Saved";
+    if(typeof root.survivorRecoveryR3Refresh_==="function")root.survivorRecoveryR3Refresh_();
+  };
+
+  root.survivorRecoveryR6ToggleProtection_=async function(input){
+    const pre=pref(),status=document.getElementById("survivorR6ProtectionStatus"),wanted=!!(input&&input.checked);
+    if(wanted&&!adminAutoPickAllowed()){input.checked=false;input.disabled=true;if(status)status.textContent="Off";return;}
+    input.disabled=true;
+    const saved=await savePreference(wanted,pre.strategy||"best-odds",pre.trigger||"last-game",pre.scope||"season",status);
+    input.disabled=false;
+    if(!saved){input.checked=!wanted;return;}
+    input.checked=saved.enabled===true;
+    if(status)status.textContent=input.checked?"On":"Off";
+    if(typeof root.survivorRecoveryR3Refresh_==="function")root.survivorRecoveryR3Refresh_();
+  };
+
+  const finalizeBase=root.renderSurvivorRecoveryR3Finalize_;
+  root.renderSurvivorRecoveryR3Finalize_=function(p){
+    p=p||{};let html=typeof finalizeBase==="function"?finalizeBase(p):"";const round=p.currentRound||{};
+    if(!html||round.relation==="past"||round.canPick!==true)return html;
+    const pre=typeof root.survivorRecoveryR3AutoPreference_==="function"?root.survivorRecoveryR3AutoPreference_(p):{enabled:false};
+    const hasSaved=savedIds(round).length>0,master=adminAutoPickAllowed(p);
+    const adminNote=(p.settings&&p.settings.automationEnabled===false)?"Game automation is disabled by the admin.":!master?"Missed-pick AutoPick is disabled by the admin.":"PATTC uses your saved AutoPick strategy if you miss the deadline.";
+    const protection=`<div class="survivor-r6-protection-row ${hasSaved?"has-pick":""}"><div><strong>MISSED PICK PROTECTION</strong><small>${adminNote}</small></div><label class="survivor-r6-protection-switch"><input type="checkbox" ${pre.enabled&&master?"checked":""} ${master?"":"disabled"} onchange="survivorRecoveryR6ToggleProtection_(this)"><span></span></label><b id="survivorR6ProtectionStatus">${pre.enabled&&master?"On":"Off"}</b></div>`;
+    const clearRow='survivor-r5-clear-row';
+    if(hasSaved&&html.indexOf(clearRow)!==-1)return html.replace('<div class="'+clearRow+'">',protection+'<div class="'+clearRow+'">');
+    return html.replace(/<\/section>\s*$/,protection+"</section>");
+  };
+
+  root.PATTC_NFL_SURVIVOR_PLAYER_R2_MARKER=MARK;
+})(window);
