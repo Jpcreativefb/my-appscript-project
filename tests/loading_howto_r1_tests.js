@@ -11,6 +11,8 @@ assert(feature.includes('data-howto-skip'),'Skip control missing');
 assert(feature.includes('data-howto-prev')&&feature.includes('data-howto-next'),'Previous/Next controls missing');
 assert(feature.includes('pattcLoadingHowToCompleted:v2:'),'Local completion state missing');
 assert(feature.includes('@media(max-width:560px)'),'Mobile-first layout rule missing');
+assert(feature.includes('bottom:calc(env(safe-area-inset-bottom) + 86px)'),'Help button should sit low but above Bottom Navigation');
+assert(feature.includes('width:38px;height:38px'),'Help button should be smaller while remaining tappable');
 assert(feature.includes('min-height:calc(100dvh - 24px)'),'Mobile loader guide should fill most available viewport');
 for(const visual of ['lineup','confidence-numbers','survivor-path','playoff-seeds']){
   assert(feature.includes('kind==="'+visual+'"'),'Missing local/static illustration: '+visual);
@@ -84,13 +86,21 @@ assert(env.loader.querySelector('.pattc-loading-howto'),'Guide must render insid
 assert(env.loader.classList.contains('pattc-howto-active'),'Mobile presentation class should be active');
 assert([...env.timers.values()].some(x=>x.ms===7000),'Guide should rotate at the R2 reading interval');
 
-// hideLoader remains immediate; unfinished slides never gate route completion.
+// hideLoader remains immediate and completing a real loading visit records the first-view state.
 const beforeHide=env.calls().hideCalls;
 const result=env.window.hideLoader();
 assert.strictEqual(result,'hidden');
 assert.strictEqual(env.calls().hideCalls,beforeHide+1,'Page-ready hide must immediately call authoritative hideLoader');
 assert.strictEqual(env.loader.querySelector('.pattc-loading-howto'),null,'Guide is removed when page is ready');
 assert(!env.loader.classList.contains('pattc-howto-active'),'Expanded mobile state must be removed on page-ready');
+assert.strictEqual(api.completed('team-fantasy'),true,'A completed loading visit must record the first-view guide locally');
+assert.strictEqual(api.deckFor('team-fantasy',false),'tips','Returning visits must use the shorter Tips deck');
+
+// A later load now visibly mounts Game Tips, while full How-to remains available through openHelp(true).
+env.window.showLoader({percent:8});
+const returningCard=env.loader.querySelector('.pattc-loading-howto');
+assert(returningCard&&returningCard.innerHTML.includes('Game Tips'),'Returning load must render the shorter Game Tips experience');
+env.window.hideLoader();
 
 // Generic fallback remains safe.
 env.storage.set('gameMode','mystery');env.window.APP_STATE.currentPage='ranking';env.window.APP_STATE.gameId='custom-game';
