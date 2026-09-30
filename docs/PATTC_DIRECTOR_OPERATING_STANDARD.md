@@ -326,3 +326,154 @@ The current repair batch uses:
 When uncertain:
 
 **Protect production, isolate the work, preserve known-good behavior, keep the scope narrow, require a complete specialist handoff, review before integrating, and live-test important behavior before release.**
+
+
+---
+
+## 15. Simplified Specialist Delivery and Fallback Workflow
+
+The Director must keep specialist handoff and Work Mac execution as simple as possible.
+
+### Preferred delivery: real Git branch
+
+When the specialist can write to GitHub:
+
+1. Specialist works on the assigned isolated branch/worktree.
+2. Specialist runs focused checks.
+3. Specialist commits and pushes the branch.
+4. Specialist returns:
+   - branch name
+   - ending commit SHA
+   - one small review ZIP/report
+5. Director reviews the real Git commit.
+6. After acceptance, Director cherry-picks the accepted commit once into the Director integration branch.
+7. Director pushes and verifies local/remote SHAs match.
+
+Do not manually copy committed files when a valid pushed specialist commit exists.
+
+### Fallback delivery: APPLY_PLAN
+
+When a specialist cannot push to GitHub, DO NOT make the specialist reconstruct or transfer complete large repository files.
+
+The fallback packet should contain only:
+
+- `SPECIALIST_REPORT.md`
+- `FILES_CHANGED.txt`
+- `TEST_RESULTS.txt`
+- `RISKS_AND_OPEN_ITEMS.md`
+- `APPLY_PLAN.md`
+- complete new focused test files when needed
+
+`APPLY_PLAN.md` must state for every source edit:
+
+1. repository file path
+2. function/section name
+3. exact existing block or stable insertion anchor
+4. exact replacement/new block
+5. reason for the edit
+
+Forbidden fallback methods:
+
+- Google Drive or temporary documents for code transfer
+- Base64/LZW/chunk reconstruction of large repository files
+- manually fabricated `PATCH.diff`
+- rebuilding whole source files outside the real repository
+- asking Joel to copy many individual source files by hand
+
+The Director applies the plan against the real specialist worktree, preferably through a guarded local helper script that:
+
+- verifies the expected branch
+- verifies the expected starting commit/base
+- refuses a dirty worktree unless explicitly intended
+- matches exact source anchors
+- aborts instead of guessing when anchors do not match
+- applies only approved files
+- runs `git diff --check`
+- prints changed files and diff stats
+- runs focused verification when practical
+
+The real worktree remains the source of truth.
+
+---
+
+## 16. Simple Terminal / Verification Standard
+
+Joel should not have to perform long fragile sequences of manual shell commands.
+
+Director instructions should:
+
+- prefer one short command per phase
+- avoid long backslash-continuation paste blocks on the older Work Mac
+- combine safe sequential verification with `&&` when it meaningfully reduces repetition
+- clearly state when to wait for the shell prompt before the next command
+- use one guarded verification command/script instead of asking for many repetitive commands when practical
+- verify `git status --short` before commit
+- verify local and remote SHA after push
+- never instruct the same cherry-pick twice
+- cleanly recover an empty duplicate cherry-pick with `git cherry-pick --skip`
+- avoid unnecessary repeated full production gates
+
+Focused tests belong in specialist work. The full production gate should be reserved for a meaningful acceptance checkpoint or final batch gate unless the change is high-risk.
+
+If `git diff --check` finds only formatting damage introduced by a transfer/apply step, fix the formatting narrowly and rerun the focused checks; do not restart the whole repair.
+
+---
+
+## 17. Regression-Test and Performance Contract Rules
+
+Do not blindly rewrite tests to make a repair pass.
+
+When an existing test fails:
+
+1. Determine whether it is:
+   - a stale ownership/location assertion caused by an intentional architecture move, or
+   - a real behavior/performance/security/data-integrity contract failure.
+
+2. A stale ownership assertion may be updated only when the working behavior still exists in the new authoritative owner.
+
+3. Do NOT weaken or rewrite real contracts for:
+   - performance
+   - security
+   - data integrity
+   - locking
+   - scoring
+   - production safety
+   - user-visible required behavior
+
+4. If a real contract fails, return the repair to the specialist for a narrow correction.
+
+Example from Bottom Navigation R1:
+- moving custom-icon, label-visibility, and gradient ownership from Dashboard to the shared navigation renderer can justify updating stale file-location assertions.
+- `Home compact first-paint path must remain unchanged` is a real performance contract and must not be weakened.
+
+---
+
+## 18. Anti-Drift Rules for Director and Specialists
+
+Before starting or resuming specialist work, explicitly anchor:
+
+- specialist number/role
+- exact assignment name
+- assigned branch/worktree
+- starting commit/baseline
+- files/systems that are in scope
+- files/systems that must not be touched
+- test expectations
+- no-merge / no-deploy status
+
+If a specialist session starts discussing another specialist's task, stop it immediately and re-anchor the assignment.
+
+If a specialist chat repeatedly times out or accumulates reconstruction baggage, start a fresh specialist session with a compact assignment instead of repeatedly retrying the unstable session.
+
+The Director must not drift into redesign while closing a narrow repair.
+
+After every meaningful accepted integration milestone, update the Director status note with:
+
+- Director branch + commit
+- accepted integrations
+- pending specialist corrections
+- pending live checks
+- production state
+- next exact action
+
+New Director chats should read this operating standard and the latest Director current-status note before issuing commands.
