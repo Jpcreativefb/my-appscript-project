@@ -3,7 +3,7 @@
 ## Authoritative Director State
 
 - Director integration branch: `director/pattc-repair-batch-r1`
-- Current Director commit: `a2a15c0`
+- Current Director commit: `1f258b9`
 - Production remains unchanged.
 - Production branch remains `architecture-cleanup`.
 - Known production baseline before this repair batch: `eb3bd11`.
@@ -307,3 +307,34 @@ Required specialist follow-up:
 - rerun focused routing tests + ed_launch_blocker_performance_tests.js until stable PASS
 - then rerun full production checks
 - no merge/deploy
+
+
+## Integration Update — Survivor R2 Live UX
+
+Survivor R2 live UX integration: COMPLETE.
+
+Integrated Director commit: `1f258b9`.
+Specialist commit: `57c86d3`.
+
+Included:
+- Survivor-specific lazy-module refresh so week browsing / Clear Pick code can surface live
+- visible AutoPick strategy choices including Favorite, Spread Favorite, Record, Ranked, and Random
+- Random Eligible is no longer forced as the only strategy
+- Missed Pick Protection moved to the main Survivor player UI with Admin authority preserved
+- larger Game X of Y presentation
+- no backend engine modification
+- no new blocking Survivor state request
+- existing performance/memoization work preserved
+
+Focused Survivor regression, syntax, and diff checks passed before integration.
+
+Remaining live acceptance:
+- week selector appears
+- past/current/future week states work
+- Clear Pick appears and works before kickoff
+- duplicate-team protection works across weeks
+- AutoPick strategy controls respond
+- Missed Pick Protection toggle appears in main UI and respects Admin gate
+- Game X of Y size is acceptable
+- default resolved current week is correct
+- load performance remains improved
