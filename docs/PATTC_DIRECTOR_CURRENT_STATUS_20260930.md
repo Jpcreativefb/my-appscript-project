@@ -3,7 +3,7 @@
 ## Authoritative Director State
 
 - Director integration branch: `director/pattc-repair-batch-r1`
-- Current Director commit before this documentation update: `20898b4`
+- Current Director commit: `a393ac6`
 - Production remains unchanged.
 - Production branch remains `architecture-cleanup`.
 - Known production baseline before this repair batch: `eb3bd11`.
@@ -44,7 +44,7 @@ Check on the Director Cloudflare preview:
 
 ## Specialist 1 — Bottom Navigation Consistency R1
 
-Status: SEND BACK FOR NARROW PERFORMANCE CORRECTION.
+Status: DIRECTOR ACCEPTED AND INTEGRATED.
 
 Real Work Mac checks already passed:
 - focused Bottom Nav regression
@@ -78,7 +78,11 @@ Do not restore the old duplicated Dashboard renderer/cache simply to satisfy the
 
 ## Specialist 2 — Loading / How-to R2
 
-R1 is functionally accepted.
+Status: DIRECTOR ACCEPTED AND INTEGRATED.
+
+Integrated commit: `a393ac6`.
+
+R1 was functionally accepted and R2 refinement is now integrated.
 
 R2 refinement requested:
 - mobile-first fuller How-to presentation
@@ -151,9 +155,8 @@ If a specialist chat repeatedly times out, start a fresh compact specialist sess
 
 ## Next Exact Actions
 
-1. Wait for Specialist 1 narrow Bottom Nav performance correction.
-2. Live-test Survivor week browsing / Clear Pick / AutoPick UX on Director preview.
-3. Review Specialist 2 How-to R2 when returned.
-4. Integrate only accepted work into `director/pattc-repair-batch-r1`.
-5. Run final combined production gate only when the batch is ready.
-6. Production release requires Joel's explicit approval.
+1. Live-test Bottom Navigation R1 on the Director Cloudflare preview.
+2. Live-test Survivor week browsing / Clear Pick / AutoPick UX on the Director preview.
+3. Live-test Loading / How-to R2 presentation and no-delay behavior.
+4. Run the final combined production gate when live checks are accepted.
+5. Prepare one PR / merge / production deployment only with Joel's explicit approval.
