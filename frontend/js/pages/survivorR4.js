@@ -308,3 +308,92 @@
 
   root.PATTC_NFL_SURVIVOR_PLAYER_R1_MARKER=MARK;
 })(window);
+
+/* =========================================================
+   NFL_SURVIVOR_WEEK_BROWSER_UI_R1
+   Week selector + advance-pick UI + Clear Pick + AutoPick live fix.
+   Presentation remains within the existing Survivor R3/R4 layout.
+   ========================================================= */
+(function(root){
+  "use strict";
+  const MARK="NFL_SURVIVOR_WEEK_BROWSER_UI_R1";
+  let selectedWeek=0;
+
+  function p(){return root.SURVIVOR_PAGE_STATE&&root.SURVIVOR_PAGE_STATE.payload||{};}
+  function weeks(payload){return Array.isArray(payload&&payload.weekRounds)?payload.weekRounds:[];}
+  function officialWeek(payload){return Number(payload&&payload.resolvedWeek||payload&&payload.currentRound&&payload.currentRound.week||0);}
+  function officialRound(payload){const w=officialWeek(payload);return weeks(payload).find(function(row){return Number(row.week)===w;})||payload.currentRound||null;}
+  function chooseRound(payload){
+    const rows=weeks(payload);if(!rows.length)return payload.currentRound||null;
+    const official=officialWeek(payload);
+    if(!selectedWeek||!rows.some(function(row){return Number(row.week)===Number(selectedWeek);}))selectedWeek=official||Number(rows[0].week||0);
+    const round=rows.find(function(row){return Number(row.week)===Number(selectedWeek);})||officialRound(payload)||rows[0];
+    payload.currentRound=round;
+    root.SURVIVOR_PAGE_STATE.selected=Array.isArray(round.pickNomineeIds)?round.pickNomineeIds.slice():(round.pickNomineeId?[round.pickNomineeId]:[]);
+    return round;
+  }
+  function weekLabel(row,official){const w=Number(row.week||0);return "Week "+w+(w===official?" — CURRENT":w<official?" — PAST":" — UPCOMING");}
+  function selector(payload){
+    const rows=weeks(payload),official=officialWeek(payload);if(!rows.length)return "";
+    return `<div class="survivor-r5-week-picker"><label for="survivorWeekPickerR1">NFL week</label><select id="survivorWeekPickerR1" onchange="survivorRecoveryR5ChooseWeek_(this.value)" aria-label="Choose NFL Survivor week">${rows.map(function(row){const w=Number(row.week||0);return `<option value="${w}" ${w===Number(selectedWeek)?"selected":""}>${weekLabel(row,official)}</option>`;}).join("")}</select><span>Past weeks are read-only. Future built weeks can be picked in advance.</span></div>`;
+  }
+  function savedIds(round){return Array.isArray(round&&round.pickNomineeIds)?round.pickNomineeIds.slice():(round&&round.pickNomineeId?[round.pickNomineeId]:[]);}
+  function recalcUsage(payload){
+    const rows=weeks(payload),limit=Math.max(0,Number(payload&&payload.teamUseLimit||payload&&payload.settings&&payload.settings.teamUseLimit||0)),counts={},firstWeek={};
+    rows.forEach(function(round){savedIds(round).forEach(function(id){const k=String(id||"").toLowerCase();if(!k)return;counts[k]=(counts[k]||0)+1;if(!firstWeek[k]||Number(round.week)<firstWeek[k])firstWeek[k]=Number(round.week||0);});});
+    rows.forEach(function(round){const own=savedIds(round).map(function(id){return String(id||"").toLowerCase();});(round.nominees||[]).forEach(function(team){const k=String(team&&team.id||"").toLowerCase();if(!k)return;const usedElsewhere=(counts[k]||0)-(own.indexOf(k)>=0?1:0);team.usedCount=Math.max(0,usedElsewhere);if(limit>0&&usedElsewhere>=limit&&own.indexOf(k)<0){team.eligible=false;team.unavailableReason="used";team.usedWeek=firstWeek[k]||team.usedWeek||0;team.usedOverlay=team.usedWeek?"USED — WEEK "+team.usedWeek:"";}else if(String(team.unavailableReason||"").toLowerCase()==="used"){team.eligible=true;team.unavailableReason="";team.usedWeek=0;team.usedOverlay="";}});});
+  }
+
+  root.survivorRecoveryR5ChooseWeek_=function(value){selectedWeek=Number(value)||officialWeek(p());chooseRound(p());if(typeof root.survivorRecoveryR3RestoreMatchupIndex_==="function")root.survivorRecoveryR3RestoreMatchupIndex_(0);root.survivorRecoveryR3Refresh_();};
+
+  const browserBase=root.renderSurvivorRecoveryR3WeeklyBrowser_;
+  root.renderSurvivorRecoveryR3WeeklyBrowser_=function(payload){
+    payload=payload||{};chooseRound(payload);let html=browserBase(payload);if(!html)return html;
+    return html.replace('<div class="survivor-r3-browser-head">',selector(payload)+'<div class="survivor-r3-browser-head">');
+  };
+
+  const competitionBase=root.renderSurvivorRecoveryR3Competition_;
+  if(typeof competitionBase==="function")root.renderSurvivorRecoveryR3Competition_=function(payload){
+    payload=payload||{};const selected=payload.currentRound,official=officialRound(payload);if(official)payload.currentRound=official;
+    try{return competitionBase(payload);}finally{payload.currentRound=selected;}
+  };
+
+  const finalizeBase=root.renderSurvivorRecoveryR3Finalize_;
+  root.renderSurvivorRecoveryR3Finalize_=function(payload){
+    payload=payload||{};const round=chooseRound(payload),html=finalizeBase(payload);if(!html||!round)return html;
+    const ids=savedIds(round),clearable=round.canPick===true&&round.relation!=="past"&&ids.length>0;
+    if(!clearable)return html;
+    const clear=`<div class="survivor-r5-clear-row"><button type="button" class="survivor-r5-clear-pick" onclick="survivorRecoveryR5ClearPick_()">CLEAR PICK</button><small>Removes only Week ${Number(round.week||0)}. AutoPick settings stay unchanged.</small></div>`;
+    return html.replace(/<\/section>\s*$/,clear+"</section>");
+  };
+
+  root.survivorRecoveryR5ClearPick_=async function(){
+    const payload=p(),round=chooseRound(payload);if(!round||round.canPick!==true||round.relation==="past"||!savedIds(round).length)return;
+    if(typeof root.confirm==="function"&&!root.confirm("Clear your saved Survivor pick for Week "+Number(round.week||0)+"?"))return;
+    const session=typeof root.getSession==="function"?(root.getSession()||{}):{},message=document.getElementById("survivorSaveMessage");if(message){message.textContent="Clearing…";message.classList.remove("error");}
+    try{
+      const res=await root.apiSaveSurvivorPick({username:session.username||"",gameId:root.SURVIVOR_PAGE_STATE.gameId,categoryId:round.categoryId,nomineeId:"__clear__",nomineeIds:["__clear__"],confidencePoints:0});
+      if(!res||res.success===false)throw new Error(res&&(res.error||res.message)||"Could not clear Survivor pick.");
+      round.pickNomineeId="";round.pickNomineeIds=[];root.SURVIVOR_PAGE_STATE.selected=[];recalcUsage(payload);if(message)message.textContent="Pick cleared ✓";root.survivorRecoveryR3Refresh_();
+    }catch(err){if(message){message.textContent=err&&err.message?err.message:"Could not clear Survivor pick.";message.classList.add("error");}}
+  };
+
+  const saveBase=root.survivorSaveCurrent_;
+  root.survivorSaveCurrent_=async function(){
+    const payload=p(),round=chooseRound(payload),before=savedIds(round).join("|");
+    await saveBase.apply(this,arguments);
+    if(round&&savedIds(round).join("|")!==before){recalcUsage(payload);root.survivorRecoveryR3Refresh_();}
+  };
+
+  // Live fix: strategy/timing/scope controls remain editable even when the
+  // admin execution gate is Off. Only the protection enable toggle stays gated.
+  const autoBase=root.survivorRecoveryR3OpenAutoPick_;
+  root.survivorRecoveryR3OpenAutoPick_=function(){
+    autoBase.apply(this,arguments);
+    ["survivorR4AutoTrigger","survivorR3AutoScope"].forEach(function(id){const node=document.getElementById(id);if(node)node.disabled=false;});
+    document.querySelectorAll('#survivorR3AutoPickOverlay input[name="survivorR3AutoStrategy"]').forEach(function(node){node.disabled=false;});
+    const save=document.querySelector('#survivorR3AutoPickOverlay .survivor-r3-auto-save');if(save)save.disabled=false;
+  };
+
+  root.PATTC_NFL_SURVIVOR_WEEK_BROWSER_R1_MARKER=MARK;
+})(window);
