@@ -617,48 +617,12 @@ function dashboardHubIconHtml_(category, group, className) {
 }
 
 function dashboardApplyHubAppearance_() {
+  const slotRows = typeof APP_STATE !== "undefined" && Array.isArray(APP_STATE.dashboardHubAppearanceRows)
+    ? APP_STATE.dashboardHubAppearanceRows
+    : [];
   if (typeof appApplyNavigationSlots_ === "function") {
-    const slotRows = typeof APP_STATE !== "undefined" && Array.isArray(APP_STATE.dashboardHubAppearanceRows)
-      ? APP_STATE.dashboardHubAppearanceRows
-      : [];
-    if (appApplyNavigationSlots_(slotRows)) {
-      if (typeof appRememberBottomNavAppearance_ === "function") appRememberBottomNavAppearance_();
-      return;
-    }
+    appApplyNavigationSlots_(slotRows);
   }
-  const navMap = {
-    dashboard: "home",
-    "hub:sports": "sports",
-    "hub:reality": "reality",
-    "hub:awards": "awards",
-    more: "more"
-  };
-  Object.keys(navMap).forEach(function(page) {
-    const button = document.querySelector('.bottom-nav button[data-page="' + page + '"]');
-    if (!button) return;
-    const key = navMap[page];
-    const row = dashboardHubSetting_(key, "");
-    if (!row || !Object.keys(row).length) return;
-    const icon = button.querySelector(".bottom-nav-icon");
-    const label = button.querySelector(".bottom-nav-label");
-    const iconUrl = dashboardAppearanceAssetUrl_(row, "icon");
-    if (icon) {
-      icon.innerHTML = iconUrl
-        ? platformImgHtml(iconUrl, { className: "bottom-nav-custom-icon", variant: "logo", eager: true, alt: row.DisplayName || key })
-        : escapeHtml(String(row.IconText || icon.textContent || "•"));
-    }
-    if (label) {
-      label.textContent = String(row.DisplayName || label.textContent || "");
-      label.hidden = row.ShowNavLabel === false || String(row.ShowNavLabel).toLowerCase() === "false";
-    }
-    const colors = dashboardHubColorSpec_(row, "#354785");
-    button.style.setProperty("--bottom-nav-accent", colors.color);
-    button.style.setProperty("--bottom-nav-accent-bg", colors.fill);
-  });
-  if (window.PlatformImageEngine && typeof window.PlatformImageEngine.process === "function") {
-    window.PlatformImageEngine.process(document.querySelector(".bottom-nav") || document);
-  }
-  if (typeof appRememberBottomNavAppearance_ === "function") appRememberBottomNavAppearance_();
 }
 
 function dashboardMountStickyPlayer_() {
