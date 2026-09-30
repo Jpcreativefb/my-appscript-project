@@ -227,3 +227,26 @@ Required correction:
 - preserve Home compact first-paint performance
 - preserve icon OFF, label OFF, Appearance persistence, and remote-icon-failure behavior
 - do not redesign Bottom Navigation
+
+
+## Live Review Update — Loading / How-to R2
+
+Status: CONDITIONAL PASS — SMALL PRESENTATION REFINEMENT ONLY.
+
+Live PASS:
+- larger mobile guide presentation
+- correct game-specific instructions for Team Fantasy, Confidence, Survivor, and Playoff Race
+- Previous / Next work
+- Skip / Finish How-To work
+- local diagrams/examples display correctly
+- game opens immediately when ready; How-to does not block
+- Admin pages behave normally
+
+Needs small correction:
+- returning-user shorter tips behavior was not observed live; verify/fix that path
+- make the persistent "?" reopen control smaller and move it lower on the page
+
+New enhancement request (separate from R2 acceptance):
+- on Hub pages and/or after sign-in, show a compact set of different available games with a short description of each game
+- should reuse already-loaded active-game / hub data where possible and avoid adding a blocking backend request to first paint
+- keep this as a lightweight discovery/presentation enhancement, not a redesign of the Home Hub
