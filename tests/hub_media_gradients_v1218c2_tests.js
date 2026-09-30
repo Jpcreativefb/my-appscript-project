@@ -9,6 +9,7 @@ const read = rel => fs.readFileSync(path.join(root, rel), 'utf8');
 
 const adminAppearance = read('frontend/js/pages/adminAppearance.js');
 const dashboard = read('frontend/js/pages/dashboard.js');
+const navigationSlots = read('frontend/js/navigationSlotsR1.js');
 const appearanceEngine = read('backend/engines/AppearanceEngine.js');
 const appearanceCss = read('frontend/css/appearance.css');
 const pagesCss = read('frontend/css/pages.css');
@@ -45,7 +46,7 @@ assert(dashboard.includes('dashboardHubColorSpec_'), 'Dashboard gradient resolve
 assert(dashboard.includes('--dashboard-hub-fill'), 'Main hub gradient runtime variable is missing.');
 assert(dashboard.includes('--dashboard-domain-fill'), 'Hub page gradient runtime variable is missing.');
 assert(dashboard.includes('--dashboard-subhub-fill'), 'Subhub gradient runtime variable is missing.');
-assert(dashboard.includes('--bottom-nav-accent-bg'), 'Bottom-nav gradient runtime variable is missing.');
+assert(navigationSlots.includes('--bottom-nav-accent-bg'), 'Bottom-nav gradient runtime variable is missing from the shared navigation renderer.');
 assert(pagesCss.includes('var(--dashboard-hub-fill'), 'Hub cards do not consume saved gradients.');
 assert(pagesCss.includes('var(--dashboard-domain-fill'), 'Hub page header does not consume saved gradients.');
 assert(pagesCss.includes('var(--dashboard-subhub-fill'), 'Subhub header does not consume saved gradients.');

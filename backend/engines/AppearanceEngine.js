@@ -122,6 +122,7 @@ const APPEARANCE_HUB_SETTING_HEADERS = [
   "IconFileId",
   "IconSourceType",
   "IconSourceUrl",
+  "ShowNavIcon",
   "ShowNavLabel",
   "NavSlot",
   "NavDestination",
@@ -285,6 +286,7 @@ function appearanceGetHubAppearanceRows_(spreadsheet) {
     row.ImageDarken = isFinite(imageDarken) ? Math.max(0, Math.min(100, imageDarken)) : 35;
     const panelTint = Number(row.PanelTint);
     row.PanelTint = isFinite(panelTint) ? Math.max(0, Math.min(70, panelTint)) : 18;
+    row.ShowNavIcon = appearanceBool_(row.ShowNavIcon, true);
     row.ShowNavLabel = appearanceBool_(row.ShowNavLabel, true);
     row.NavSlot = Math.max(0, Math.min(6, Math.floor(Number(row.NavSlot) || 0)));
     row.NavDestination = appearanceNavDestination_(row.NavDestination, "");
@@ -1134,6 +1136,7 @@ function adminSaveAppearanceHubSetting(payload) {
     IconFileId: appearanceString_(payload.iconFileId || payload.IconFileId),
     IconSourceType: appearanceString_(payload.iconSourceType || payload.IconSourceType),
     IconSourceUrl: appearanceString_(payload.iconSourceUrl || payload.IconSourceUrl),
+    ShowNavIcon: appearanceBool_(payload.showNavIcon != null ? payload.showNavIcon : payload.ShowNavIcon, true),
     ShowNavLabel: appearanceBool_(payload.showNavLabel != null ? payload.showNavLabel : payload.ShowNavLabel, true),
     NavSlot: Math.max(0, Math.min(6, Math.floor(Number(payload.navSlot != null ? payload.navSlot : payload.NavSlot) || 0))),
     NavDestination: category === "navigation" ? appearanceNavDestination_(payload.navDestination != null ? payload.navDestination : payload.NavDestination, "dashboard") : "",

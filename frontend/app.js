@@ -1587,43 +1587,18 @@ async function navigate(page, options) {
    ACTIVE NAV
 ====================== */
 
-const APP_BOTTOM_NAV_APPEARANCE_KEY_ = "pattcBottomNavAppearance:v1";
-
 function appRememberBottomNavAppearance_() {
-  const nav = document.querySelector(".bottom-nav");
-  if (!nav) return;
-  const items = {};
-  nav.querySelectorAll("button[data-page]").forEach(function(button) {
-    const page = String(button.dataset.page || "");
-    const icon = button.querySelector(".bottom-nav-icon");
-    const label = button.querySelector(".bottom-nav-label");
-    if (!page || !icon || !label) return;
-    items[page] = {iconHtml:icon.innerHTML,label:label.textContent||"",labelHidden:label.hidden===true,accent:button.style.getPropertyValue("--bottom-nav-accent")||"",accentBg:button.style.getPropertyValue("--bottom-nav-accent-bg")||""};
-  });
-  try { localStorage.setItem(APP_BOTTOM_NAV_APPEARANCE_KEY_, JSON.stringify({items:items})); } catch (err) {}
+  // Compatibility shim only. navigationSlotsR1 owns persistence/resolution.
+  return false;
 }
 
 function appRestoreBottomNavAppearance_() {
-  let stored=null;
-  try { stored=JSON.parse(localStorage.getItem(APP_BOTTOM_NAV_APPEARANCE_KEY_)||"null"); } catch (err) {}
-  const items=stored&&stored.items&&typeof stored.items==="object"?stored.items:null;
-  if (!items) return false;
-  Object.keys(items).forEach(function(page) {
-    const button=document.querySelector('.bottom-nav button[data-page="'+page+'"]');
-    if (!button) return;
-    const saved=items[page]||{}, icon=button.querySelector(".bottom-nav-icon"), label=button.querySelector(".bottom-nav-label");
-    if (icon&&saved.iconHtml) icon.innerHTML=saved.iconHtml;
-    if (label) { if (saved.label) label.textContent=saved.label; label.hidden=saved.labelHidden===true; }
-    if (saved.accent) button.style.setProperty("--bottom-nav-accent",saved.accent);
-    if (saved.accentBg) button.style.setProperty("--bottom-nav-accent-bg",saved.accentBg);
-  });
-  if (window.PlatformImageEngine&&typeof window.PlatformImageEngine.process==="function") window.PlatformImageEngine.process(document.querySelector(".bottom-nav")||document);
-  return true;
+  // Compatibility shim only. Startup restore is owned by navigationSlotsR1.
+  return false;
 }
 
 function setActiveNav(page) {
 
-  appRestoreBottomNavAppearance_();
   if (typeof appSetActiveNavigationSlot_ === "function" && appSetActiveNavigationSlot_(page)) return;
 
   let navPage = page;
