@@ -176,3 +176,35 @@ Verified on Director preview:
 - Home remains fast
 
 Bottom Navigation R1 is live-accepted for this batch.
+
+
+## Live Review Update — Survivor R1/R2
+
+Status: SEND BACK FOR NARROW UX / INTEGRATION CORRECTION.
+
+Director preview findings:
+- week selector does not appear
+- past/future week browsing therefore cannot be exercised
+- duplicate-team blocking across weeks cannot be live-verified yet
+- Clear Pick is not visible
+- AutoPick modal does not expose the requested pick-strategy choices such as Record / Favorite / Ranked
+- Random Eligible appears forced on
+- Missed Pick Protection cannot be toggled
+- preferred UX: move Missed Pick Protection out of the modal and place it in the main Survivor UI near Clear Selected Pick once a pick exists
+- matchup arrows are good
+- Game X of Y is clearer but still needs to be larger
+- current-week default cannot be verified because the week selector is missing
+- load performance remains materially improved
+
+Important: the Director branch source does contain Survivor week-browsing / Clear Pick implementation markers, so the live absence should be diagnosed as an integration/runtime/rendering issue rather than assuming the feature was never merged.
+
+Required specialist correction:
+1. make the week selector actually render in the live Survivor player UI
+2. make past/current/future week states accessible from it
+3. make Clear Pick visibly available for editable current/future picks
+4. restore real AutoPick strategy selection controls; Random Eligible must not be forced
+5. move Missed Pick Protection to the main Survivor UI near Clear Selected Pick, with a working on/off control
+6. make Game X of Y larger/more prominent
+7. preserve the accepted performance improvement
+8. do not redesign unrelated Survivor behavior
+9. do not merge or deploy
