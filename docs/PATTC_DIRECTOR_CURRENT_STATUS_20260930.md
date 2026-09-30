@@ -208,3 +208,22 @@ Required specialist correction:
 7. preserve the accepted performance improvement
 8. do not redesign unrelated Survivor behavior
 9. do not merge or deploy
+
+
+## Live Review Update — Bottom Navigation Intermittent Route Bounce
+
+Status: REOPENED FOR NARROW ROUTING CORRECTION.
+
+Live defect:
+- intermittently, tapping a Bottom Navigation destination can return the user to the previously open page before trying to load the requested destination again
+- observed example: tapping Home from Survivor briefly/incorrectly returned to Survivor, then attempted navigation again
+
+Previously accepted icon/label/appearance behavior remains good.
+
+Required correction:
+- diagnose the duplicate/stale navigation event or route-state race
+- one tap must result in one destination transition
+- do not reintroduce stale nav restore/re-render work
+- preserve Home compact first-paint performance
+- preserve icon OFF, label OFF, Appearance persistence, and remote-icon-failure behavior
+- do not redesign Bottom Navigation
