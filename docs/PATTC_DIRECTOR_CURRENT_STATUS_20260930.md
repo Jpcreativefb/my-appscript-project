@@ -160,3 +160,19 @@ If a specialist chat repeatedly times out, start a fresh compact specialist sess
 3. Live-test Loading / How-to R2 presentation and no-delay behavior.
 4. Run the final combined production gate when live checks are accepted.
 5. Prepare one PR / merge / production deployment only with Joel's explicit approval.
+
+
+## Live Review Update — Bottom Navigation R1
+
+Bottom Navigation live review: PASS.
+
+Verified on Director preview:
+- icon OFF stays blank with no emoji/fallback
+- label OFF stays hidden
+- icon/label re-enable correctly
+- route changes do not restore stale fallback
+- refresh preserves last valid Appearance
+- failed remote custom icon does not turn into fallback emoji
+- Home remains fast
+
+Bottom Navigation R1 is live-accepted for this batch.
