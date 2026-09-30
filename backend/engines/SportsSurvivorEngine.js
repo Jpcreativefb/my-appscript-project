@@ -2015,3 +2015,153 @@ function sportsSurvivorR4AutoPickTriggerAt_(nominees,pref,settings){const rows=(
 sportsSurvivorR3AutoPickPreference_=function(gameId,username,settings){settings=settings||survivorGetSettings_(gameId);const fallback={configured:false,enabled:settings.autoPickEnabled===true,strategy:sportsSurvivorR4Strategy_(settings.autoPickStrategy,"best-odds"),trigger:"last-game",scope:"season",targetWeek:0},map=(sportsSurvivorPickMetaMap_(gameId)||{})[sportsSurvivorKey_(username)]||{},saved=map[sportsSurvivorKey_(SPORTS_SURVIVOR_R3_AUTOPICK_PREF_CATEGORY_)]||null,snap=saved&&Array.isArray(saved.snapshots)?saved.snapshots[0]||null:null;if(!snap||snap.recordType!=="survivor-auto-pick-preference")return fallback;const scope=sportsSurvivorKey_(snap.scope)==="week"?"week":"season";return{configured:true,enabled:sportsSurvivorBool_(snap.enabled,false),strategy:sportsSurvivorR4Strategy_(snap.strategy,fallback.strategy),trigger:sportsSurvivorR4Trigger_(snap.trigger),scope,targetWeek:scope==="week"?Math.max(1,Math.floor(sportsSurvivorNumber_(snap.targetWeek,1))):0,updatedAt:snap.updatedAt||saved.updatedAt||""};};
 sportsSurvivorSaveAutoPickPreference_=function(payload){payload=payload||{};const gameId=sportsSurvivorString_(payload.gameId),username=sportsSurvivorString_(payload.username);if(!gameId||!username)throw new Error("User and Sports Survivor game are required.");const settings=survivorGetSettings_(gameId);if(settings.mode==="king-of-the-hill"||settings.mode==="manual-elimination")throw new Error("Auto Pick preference is only available for active Sports Survivor modes.");const enabled=sportsSurvivorBool_(payload.enabled,false);if(enabled&&!settings.autoPickEnabled)throw new Error("Missed-pick Auto Pick protection is disabled by the game admin.");const strategy=sportsSurvivorR4Strategy_(payload.strategy,settings.autoPickStrategy),trigger=sportsSurvivorR4Trigger_(payload.trigger),scope=sportsSurvivorKey_(payload.scope)==="week"?"week":"season";let targetWeek=0;if(scope==="week"){const state=apiGetSportsSurvivorState_({username,gameId});targetWeek=Math.max(1,Math.floor(sportsSurvivorNumber_(payload.week,state.currentRound&&state.currentRound.week||settings.startWeek)));}const snapshot={recordType:"survivor-auto-pick-preference",enabled,strategy,trigger,scope,targetWeek,updatedAt:new Date().toISOString()};sportsSurvivorSavePickMeta_(gameId,username,SPORTS_SURVIVOR_R3_AUTOPICK_PREF_CATEGORY_,[],[snapshot],0);return{success:true,preference:sportsSurvivorR3AutoPickPreference_(gameId,username,settings)};};
 sportsSurvivorRc24kAutoPickMissing_=function(gameId){const settings=survivorGetSettings_(gameId);if(!settings.autoPickEnabled||!settings.automationEnabled)return{enabled:false,picked:[]};if(settings.mode==="king-of-the-hill"||settings.mode==="manual-elimination")return{enabled:true,skipped:true,reason:"passive-or-manual-mode",picked:[]};const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId),stage=sportsSurvivorKey_(game&&(game.status||game.gameStatus));if(stage!=="live"&&stage!=="active")return{enabled:true,skipped:true,reason:"game-not-live",picked:[]};const users=sportsSurvivorRc24kParticipantUsers_(gameId),picked=[],skipped=[];users.forEach(function(username){try{const state=apiGetSportsSurvivorState_({username,gameId}),round=state&&state.currentRound;if(!round||!round.canPick){skipped.push({username,reason:"no-open-round"});return;}if((round.pickNomineeIds||[]).length||round.pickNomineeId){skipped.push({username,reason:"already-picked"});return;}const pref=sportsSurvivorR3AutoPickPreference_(gameId,username,settings);if(pref.configured&&!pref.enabled){skipped.push({username,reason:"player-protection-off"});return;}if(pref.configured&&pref.scope==="week"&&Number(pref.targetWeek||0)!==Number(round.week||0)){skipped.push({username,reason:"week-only-scope"});return;}const strategy=pref.configured?pref.strategy:sportsSurvivorR4Strategy_(settings.autoPickStrategy,"best-odds"),candidates=sportsSurvivorRc24kPickCandidates_(state,strategy),required=Math.max(1,Number(round.requiredSelections||1));if(candidates.length<required){skipped.push({username,reason:"not-enough-eligible-teams"});return;}const triggerAt=sportsSurvivorR4AutoPickTriggerAt_(round.nominees||candidates,pref,settings);if(triggerAt&&Date.now()<triggerAt){skipped.push({username,reason:"too-early",trigger:pref.trigger||"last-game",triggerAt:new Date(triggerAt).toISOString()});return;}const selected=candidates.slice(0,required).map(r=>r.id);sportsSurvivorSavePick_({username,gameId,categoryId:round.categoryId,nomineeId:selected[0],nomineeIds:selected,confidencePoints:0});const map=sportsSurvivorPickMetaMap_(gameId),saved=(map[sportsSurvivorKey_(username)]||{})[sportsSurvivorKey_(round.categoryId)];if(saved){const snaps=(saved.snapshots||[]).map(s=>Object.assign({},s||{},{autoPick:true,autoPickStrategy:strategy,autoPickTrigger:pref.trigger||"last-game",autoPickPenalty:Math.max(0,Number(settings.autoPickPenalty||0))}));sportsSurvivorSavePickMeta_(gameId,username,round.categoryId,saved.nomineeIds||selected,snaps,saved.confidencePoints||0);}picked.push({username,week:round.week,nomineeIds:selected,strategy,trigger:pref.trigger||"last-game",penalty:Math.max(0,Number(settings.autoPickPenalty||0)),preferenceScope:pref.scope,preferenceConfigured:pref.configured});}catch(err){skipped.push({username,reason:err.message||String(err)});}});return{enabled:true,picked,skipped};};
+
+/* =========================================================
+   NFL SURVIVOR PLAYER EXPERIENCE R1
+   Request-scoped read/evaluation reuse for Sports Survivor.
+
+   This block lives in SportsSurvivorEngine.js after the underlying Survivor
+   state/evaluation/standings functions are defined, so it has no filename
+   load-order dependency.
+
+   IMPORTANT:
+   - Request-scoped only: no platform cache and no cross-request/user cache.
+   - Memo state is reset after every outer apiGetSportsSurvivorState_ call.
+   - pattcNflResolveCurrentWeek_ is not replaced or modified.
+   - No production data is written by this memoization layer.
+   ========================================================= */
+
+const NFL_SURVIVOR_PLAYER_R1_MARKER_ = "NFL_SURVIVOR_PLAYER_R1_REQUEST_CACHE";
+
+var NFL_SURVIVOR_PLAYER_R1_ACTIVE_DEPTH_ = 0;
+var NFL_SURVIVOR_PLAYER_R1_MEMO_ = null;
+
+var NFL_SURVIVOR_PLAYER_R1_STATE_BASE_ = typeof apiGetSportsSurvivorState_ === "function" ? apiGetSportsSurvivorState_ : null;
+var NFL_SURVIVOR_PLAYER_R1_SETTINGS_BASE_ = typeof survivorGetSettings_ === "function" ? survivorGetSettings_ : null;
+var NFL_SURVIVOR_PLAYER_R1_CATEGORIES_BASE_ = typeof survivorGameCategories_ === "function" ? survivorGameCategories_ : null;
+var NFL_SURVIVOR_PLAYER_R1_OPTIONS_BASE_ = typeof sportsSurvivorOptionMetaForGame_ === "function" ? sportsSurvivorOptionMetaForGame_ : null;
+var NFL_SURVIVOR_PLAYER_R1_RESULTS_BASE_ = typeof sportsSurvivorResultsForGame_ === "function" ? sportsSurvivorResultsForGame_ : null;
+var NFL_SURVIVOR_PLAYER_R1_PICK_META_BASE_ = typeof sportsSurvivorPickMetaMap_ === "function" ? sportsSurvivorPickMetaMap_ : null;
+var NFL_SURVIVOR_PLAYER_R1_EVALUATE_BASE_ = typeof sportsSurvivorEvaluateUser_ === "function" ? sportsSurvivorEvaluateUser_ : null;
+var NFL_SURVIVOR_PLAYER_R1_STANDINGS_BASE_ = typeof sportsSurvivorStandings_ === "function" ? sportsSurvivorStandings_ : null;
+
+function nflSurvivorPlayerR1Active_() {
+  return NFL_SURVIVOR_PLAYER_R1_ACTIVE_DEPTH_ > 0 && !!NFL_SURVIVOR_PLAYER_R1_MEMO_;
+}
+
+function nflSurvivorPlayerR1Key_(value) {
+  return String(value === undefined || value === null ? "" : value).trim().toLowerCase();
+}
+
+function nflSurvivorPlayerR1Has_(map, key) {
+  return Object.prototype.hasOwnProperty.call(map, key);
+}
+
+function nflSurvivorPlayerR1MemoRead_(bucket, key, loader) {
+  if (!nflSurvivorPlayerR1Active_()) return loader();
+  var map = NFL_SURVIVOR_PLAYER_R1_MEMO_[bucket];
+  if (nflSurvivorPlayerR1Has_(map, key)) return map[key];
+  var value = loader();
+  map[key] = value;
+  return value;
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_SETTINGS_BASE_) {
+  survivorGetSettings_ = function(gameId) {
+    var key = nflSurvivorPlayerR1Key_(gameId), args = arguments, self = this;
+    return nflSurvivorPlayerR1MemoRead_("settings", key, function() {
+      return NFL_SURVIVOR_PLAYER_R1_SETTINGS_BASE_.apply(self, args);
+    });
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_CATEGORIES_BASE_) {
+  survivorGameCategories_ = function(gameId) {
+    var key = nflSurvivorPlayerR1Key_(gameId), args = arguments, self = this;
+    return nflSurvivorPlayerR1MemoRead_("categories", key, function() {
+      return NFL_SURVIVOR_PLAYER_R1_CATEGORIES_BASE_.apply(self, args);
+    });
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_OPTIONS_BASE_) {
+  sportsSurvivorOptionMetaForGame_ = function(gameId) {
+    var key = nflSurvivorPlayerR1Key_(gameId), args = arguments, self = this;
+    return nflSurvivorPlayerR1MemoRead_("options", key, function() {
+      return NFL_SURVIVOR_PLAYER_R1_OPTIONS_BASE_.apply(self, args);
+    });
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_RESULTS_BASE_) {
+  sportsSurvivorResultsForGame_ = function(gameId) {
+    var key = nflSurvivorPlayerR1Key_(gameId), args = arguments, self = this;
+    return nflSurvivorPlayerR1MemoRead_("results", key, function() {
+      return NFL_SURVIVOR_PLAYER_R1_RESULTS_BASE_.apply(self, args);
+    });
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_PICK_META_BASE_) {
+  sportsSurvivorPickMetaMap_ = function(gameId) {
+    var key = nflSurvivorPlayerR1Key_(gameId), args = arguments, self = this;
+    return nflSurvivorPlayerR1MemoRead_("pickMeta", key, function() {
+      return NFL_SURVIVOR_PLAYER_R1_PICK_META_BASE_.apply(self, args);
+    });
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_EVALUATE_BASE_) {
+  sportsSurvivorEvaluateUser_ = function(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap) {
+    if (!nflSurvivorPlayerR1Active_()) {
+      return NFL_SURVIVOR_PLAYER_R1_EVALUATE_BASE_.apply(this, arguments);
+    }
+    var key = nflSurvivorPlayerR1Key_(gameId) + "|" + nflSurvivorPlayerR1Key_(username);
+    if (nflSurvivorPlayerR1Has_(NFL_SURVIVOR_PLAYER_R1_MEMO_.evaluation, key)) {
+      return NFL_SURVIVOR_PLAYER_R1_MEMO_.evaluation[key];
+    }
+    var value = NFL_SURVIVOR_PLAYER_R1_EVALUATE_BASE_.apply(this, arguments);
+    NFL_SURVIVOR_PLAYER_R1_MEMO_.evaluation[key] = value;
+    return value;
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_STANDINGS_BASE_) {
+  sportsSurvivorStandings_ = function(gameId, extraUsernames) {
+    if (!nflSurvivorPlayerR1Active_()) {
+      return NFL_SURVIVOR_PLAYER_R1_STANDINGS_BASE_.apply(this, arguments);
+    }
+    var extras = Array.isArray(extraUsernames) ? extraUsernames.map(nflSurvivorPlayerR1Key_).sort().join(",") : "";
+    var key = nflSurvivorPlayerR1Key_(gameId) + "|" + extras;
+    if (nflSurvivorPlayerR1Has_(NFL_SURVIVOR_PLAYER_R1_MEMO_.standings, key)) {
+      return NFL_SURVIVOR_PLAYER_R1_MEMO_.standings[key];
+    }
+    var value = NFL_SURVIVOR_PLAYER_R1_STANDINGS_BASE_.apply(this, arguments);
+    NFL_SURVIVOR_PLAYER_R1_MEMO_.standings[key] = value;
+    return value;
+  };
+}
+
+if (NFL_SURVIVOR_PLAYER_R1_STATE_BASE_) {
+  apiGetSportsSurvivorState_ = function(payload) {
+    var outermost = NFL_SURVIVOR_PLAYER_R1_ACTIVE_DEPTH_ === 0;
+    if (outermost) {
+      NFL_SURVIVOR_PLAYER_R1_MEMO_ = {
+        settings: Object.create(null),
+        categories: Object.create(null),
+        options: Object.create(null),
+        results: Object.create(null),
+        pickMeta: Object.create(null),
+        evaluation: Object.create(null),
+        standings: Object.create(null)
+      };
+    }
+    NFL_SURVIVOR_PLAYER_R1_ACTIVE_DEPTH_ += 1;
+    try {
+      return NFL_SURVIVOR_PLAYER_R1_STATE_BASE_.apply(this, arguments);
+    } finally {
+      NFL_SURVIVOR_PLAYER_R1_ACTIVE_DEPTH_ -= 1;
+      if (outermost) NFL_SURVIVOR_PLAYER_R1_MEMO_ = null;
+    }
+  };
+}
