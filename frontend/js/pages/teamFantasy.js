@@ -157,7 +157,7 @@ function teamFantasyOpenTeamPicker_(entryId,position){
     const selected=current===String(team.abbr||'')?' is-selected':'';
     const disabled=bye||team.eligible!==true?' disabled aria-disabled="true"':'';
     const action=disabled?'':` onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"`;
-    return`<button type="button" class="tf-picker-team tf-picker-team-r3 ${teamFantasyPickerAvailabilityClass_(team)}${selected}"${disabled}${action}><span class="tf-picker-rank">${teamFantasyEscape_(rank)}</span><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><span class="tf-picker-main"><strong>${teamFantasyEscape_(team.abbr)} — ${teamFantasyEscape_(team.name||'')}</strong><span>${teamFantasyEscape_(opponent)} · ${teamFantasyEscape_(kickoff)}</span></span><span class="tf-picker-side">${kind==='live'?'<span class="tf-picker-live">LIVE</span>':`<span>${left} left</span>`}${team.average!==undefined&&team.average!==null?`<span>${teamFantasyScore_(team.average)} avg pts</span>`:''}</span></button>`;
+    return`<button type="button" class="tf-picker-team tf-picker-team-r3 ${teamFantasyPickerAvailabilityClass_(team)}${selected}"${disabled}${action}><span class="tf-picker-rank">${teamFantasyEscape_(rank)}</span><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><span class="tf-picker-main"><strong>${teamFantasyEscape_(team.abbr)} — ${teamFantasyEscape_(team.name||'')}</strong><span>${teamFantasyEscape_(opponent)} · ${teamFantasyEscape_(kickoff)}</span></span><span class="tf-picker-side">${kind==='live'?'<span class="tf-picker-live">LIVE</span>':`<span>${left} left</span>`}${team.average!==undefined&&team.average!==null?`<span>${teamFantasyScore_(team.average)} avg · ${Number(team.rankingGames||0)} game${Number(team.rankingGames||0)===1?'':'s'}</span>`:''}</span></button>`;
   }).join('');
   const settings=(window.TEAM_FANTASY_STATE||{}).settings||{};
   const fillActions=!slot.pick?`<div class="tf-picker-fill-actions">${settings.allowRandomPick?`<button type="button" class="tf-button secondary" title="Choose an eligible team at random for this position." onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',true)">Random Pick</button>`:''}${settings.allowSmartAutoPick?`<button type="button" class="tf-button" title="Let PATTC choose using this game's automatic-pick rules." onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',false)">Auto Pick</button>`:''}</div>`:'';
@@ -206,7 +206,7 @@ function teamFantasyRenderSlot_(state,lineup,slot){
 }
 
 function teamFantasyPositionDisplayOrder_() {
-  return ['QB','RB','WRTE','K','OL','DL','LB','DB'];
+  return ['QB','RB','WRTE','OL','K','DL','LB','DB'];
 }
 
 function teamFantasyInfoClose_() {
@@ -275,14 +275,15 @@ function teamFantasyProtectionWindowLabel_(key) {
 
 
 function teamFantasyRenderProtection_(state){
-  const pref=state.playerAutoFill||{mode:'manual',window:'sunday-early',customLeadMinutes:60,activation:{}};
+  const pref=state.playerAutoFill||{mode:'manual',window:'sunday-early',customLeadMinutes:60,scope:'season',activation:{}};
   const mode=String(pref.mode||'manual'),windowKey=String(pref.window||'sunday-early');
+  const scope=String(pref.scope||pref.autoFillScope||'season')==='week'?'week':'season';
   const custom=Math.max(15,Number(pref.customLeadMinutes||60)),activation=pref.activation||{};
   const penalty=Math.max(0,Number(state.settings&&state.settings.autoPickPenaltyPerPosition||0));
-  const warning=mode==='manual'?`<div class="tf-protection-alert"><strong>Backup protection required</strong><span>Choose Auto Pick or Random Pick so PATTC can complete missing positions if you forget. The current backend still permits Manual Only; this warning does not invent enforcement.</span></div>`:`<div class="tf-protection-ok">Protection ON · ${mode==='auto'?'Auto Pick':'Random Pick'} · ${teamFantasyEscape_(activation.label||teamFantasyProtectionWindowLabel_(windowKey))}</div>`;
-  return`<section id="teamFantasyProtection" class="card tf-protection-card tf-protection-card-r3">${warning}<div class="tf-card-heading"><div><h2>Missed Lineup Protection</h2><div class="tf-muted">Separate from pressing Random Pick or Auto Pick now. PATTC acts later only if required positions are still empty.</div></div><button type="button" class="tf-help-button" onclick="teamFantasyInfoOpen_('Missed Lineup Protection','<p>This existing safety net fills only positions that are still empty. It never replaces a valid manual pick and still obeys kickoff locks, reuse limits, eligibility and conference restrictions.</p>')">?</button></div><div class="tf-protection-grid-r3"><div class="tf-protection-scope"><small>Scope</small><strong>Entire Season</strong></div><label class="tf-field"><span>Method</span><select id="tfAutoFillMode"><option value="manual" ${mode==='manual'?'selected':''}>Manual Only — Unprotected</option><option value="random" ${mode==='random'?'selected':''}>Random Fill Remaining</option><option value="auto" ${mode==='auto'?'selected':''}>Auto Pick Remaining</option></select></label><label class="tf-field"><span>Timing</span><select id="tfAutoFillWindow" onchange="teamFantasyProtectionWindowChanged_()">${['thursday','saturday','sunday-early','sunday-afternoon','custom'].map(function(key){return`<option value="${key}" ${windowKey===key?'selected':''}>${teamFantasyEscape_(teamFantasyProtectionWindowLabel_(key))}</option>`;}).join('')}</select></label><label id="tfCustomLeadWrap" class="tf-field" ${windowKey==='custom'?'':'hidden'}><span>Minutes before first weekly kickoff</span><input id="tfCustomLeadMinutes" type="number" min="15" max="720" step="15" value="${custom}"></label><div class="tf-protection-penalties"><div><strong>Random Pick penalty:</strong> None</div><div><strong>Auto Pick penalty:</strong> ${penalty>0?'-'+teamFantasyScore_(penalty)+' points per automatically filled position':'None'}</div><div><strong>Scope note:</strong> Current player-settings persistence is season-wide. “This Week Only” requires a backend preference field and is intentionally not faked here.</div></div><button type="button" class="tf-button" onclick="teamFantasySaveProtection_()">Save Protection</button></div><div id="tfProtectionStatus" class="tf-muted">${mode==='manual'?'Manual Only — no automatic protection is active.':teamFantasyEscape_(activation.label||'Automatic fill will wait for the configured NFL window.')}</div></section>`;
+  const scopeLabel=scope==='week'?'This Week Only':'Entire Season';
+  const warning=mode==='manual'?`<div class="tf-protection-alert"><strong>Protection OFF</strong><span>Turn protection on to fill only positions still empty when the configured deadline arrives.</span></div>`:`<div class="tf-protection-ok">Protection ON · ${mode==='auto'?'Auto Pick':'Random'} · ${scopeLabel}</div>`;
+  return`<section id="teamFantasyProtection" class="card tf-protection-card tf-protection-card-r3">${warning}<div class="tf-card-heading"><div><h2>Missed Lineup Protection</h2><div class="tf-muted">Separate from pressing Random Pick or Auto Pick now. PATTC acts later only if required positions are still empty.</div></div><button type="button" class="tf-help-button" onclick="teamFantasyInfoOpen_('Missed Lineup Protection','<p>This existing safety net fills only positions that are still empty. It never replaces a valid manual pick and still obeys kickoff locks, reuse limits, eligibility and conference restrictions.</p>')">?</button></div><div class="tf-protection-grid-r3"><label class="tf-field"><span>Scope</span><select id="tfAutoFillScope"><option value="week" ${scope==='week'?'selected':''}>This Week Only</option><option value="season" ${scope==='season'?'selected':''}>Entire Season</option></select></label><label class="tf-field"><span>Method</span><select id="tfAutoFillMode"><option value="manual" ${mode==='manual'?'selected':''}>Manual Only — Protection OFF</option><option value="random" ${mode==='random'?'selected':''}>Random Fill Remaining</option><option value="auto" ${mode==='auto'?'selected':''}>Auto Pick Remaining</option></select></label><label class="tf-field"><span>Timing</span><select id="tfAutoFillWindow" onchange="teamFantasyProtectionWindowChanged_()">${['thursday','saturday','sunday-early','sunday-afternoon','custom'].map(function(key){return`<option value="${key}" ${windowKey===key?'selected':''}>${teamFantasyEscape_(teamFantasyProtectionWindowLabel_(key))}</option>`;}).join('')}</select></label><label id="tfCustomLeadWrap" class="tf-field" ${windowKey==='custom'?'':'hidden'}><span>Minutes before first weekly kickoff</span><input id="tfCustomLeadMinutes" type="number" min="15" max="720" step="15" value="${custom}"></label><div class="tf-protection-penalties"><div><strong>Random Pick penalty:</strong> None</div><div><strong>Auto Pick penalty:</strong> ${penalty>0?'-'+teamFantasyScore_(penalty)+' points per automatically filled position':'None'}</div><div><strong>Scope:</strong> ${scopeLabel}</div></div><button type="button" class="tf-button" onclick="teamFantasySaveProtection_()">Save Protection</button></div><div id="tfProtectionStatus" class="tf-muted">${mode==='manual'?'Protection is OFF.':teamFantasyEscape_(activation.label||'Automatic fill will wait for the configured NFL window.')}</div></section>`;
 }
-
 function teamFantasyProtectionWindowChanged_() {
   const select = document.getElementById('tfAutoFillWindow');
   const wrap = document.getElementById('tfCustomLeadWrap');
@@ -294,10 +295,11 @@ async function teamFantasySaveProtection_() {
   const mode = document.getElementById('tfAutoFillMode');
   const windowEl = document.getElementById('tfAutoFillWindow');
   const custom = document.getElementById('tfCustomLeadMinutes');
+  const scope = document.getElementById('tfAutoFillScope');
   const status = document.getElementById('tfProtectionStatus');
   if (status) status.textContent = 'Saving protection…';
   try {
-    const res = await apiTeamFantasyPost_('saveTeamFantasyPick', { gameId:state.gameId, preferenceOnly:true, autoFillMode:mode?mode.value:'manual', autoFillWindow:windowEl?windowEl.value:'sunday-early', customLeadMinutes:custom?Number(custom.value||60):60 });
+    const res = await apiTeamFantasyPost_('saveTeamFantasyPick', { gameId:state.gameId, preferenceOnly:true, autoFillMode:mode?mode.value:'manual', autoFillWindow:windowEl?windowEl.value:'sunday-early', customLeadMinutes:custom?Number(custom.value||60):60, autoFillScope:scope?scope.value:'season', autoFillWeek:Number(state.currentWeek||state.week||1) });
     if (!res || res.success === false) throw new Error(res && (res.message || res.error) || 'Could not save protection.');
     state.playerAutoFill = res.preference || state.playerAutoFill;
     if (status) status.textContent = res.message || 'Protection saved.';
@@ -305,17 +307,40 @@ async function teamFantasySaveProtection_() {
 }
 
 
-function teamFantasyRenderTopFillControls_(state,lineup){
-  if(!lineup||lineup.complete||lineup.postseasonEligible===false)return'';
-  const entry=lineup.entry||{},settings=state.settings||{};
-  const open=(lineup.slots||[]).filter(function(slot){return !slot.pick&&!slot.locked;});
-  if(!open.length)return'';
-  return `<div class="tf-top-fill"><div class="tf-lineup-actions">
-    ${settings.allowRandomPick?`<button type="button" data-tf-fill-button="1" class="tf-button secondary" title="Choose an eligible team at random for each selected open position." onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',true)">Random Fill Selected</button>`:''}
-    ${settings.allowSmartAutoPick?`<button type="button" data-tf-fill-button="1" class="tf-button" title="Let PATTC choose using this game's automatic-pick rules for each selected open position." onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',false)">Auto Pick Selected</button>`:''}
-  </div></div>`;
+async function teamFantasyToggleProtection_(turnOn) {
+  const state=window.TEAM_FANTASY_STATE||{};
+  const pref=state.playerAutoFill||{};
+  const mode=turnOn?(String(pref.mode||'manual')==='random'?'random':'auto'):'manual';
+  const res=await apiTeamFantasyPost_('saveTeamFantasyPick',{
+    gameId:state.gameId,
+    preferenceOnly:true,
+    autoFillMode:mode,
+    autoFillWindow:String(pref.window||'sunday-early'),
+    customLeadMinutes:Number(pref.customLeadMinutes||60),
+    autoFillScope:String(pref.scope||pref.autoFillScope||'season')==='week'?'week':'season',
+    autoFillWeek:Number(state.currentWeek||state.week||1)
+  });
+  if(!res||res.success===false){teamFantasySetStatus_(res&&(res.message||res.error)||'Could not update protection.',true);return;}
+  state.playerAutoFill=res.preference||state.playerAutoFill;
+  await teamFantasyReload_();
 }
 
+function teamFantasyRenderTopFillControls_(state,lineup){
+  if(!lineup||lineup.postseasonEligible===false)return'';
+  const entry=lineup.entry||{},settings=state.settings||{};
+  const open=(lineup.slots||[]).filter(function(slot){return !slot.pick&&!slot.locked;});
+  const pref=state.playerAutoFill||{};
+  const mode=String(pref.mode||'manual');
+  const protectionOn=mode==='auto'||mode==='random';
+  const scope=String(pref.scope||pref.autoFillScope||'season')==='week'?'This Week':'Entire Season';
+  const protectionDetail=protectionOn?((mode==='auto'?'Auto Pick':'Random')+' · '+scope):'Off';
+  return `<div class="tf-top-fill"><div class="tf-lineup-actions">
+    ${open.length&&settings.allowRandomPick?`<button type="button" data-tf-fill-button="1" class="tf-button secondary" title="Choose an eligible team at random for each selected open position." onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',true)">Random Fill Selected</button>`:''}
+    ${open.length&&settings.allowSmartAutoPick?`<button type="button" data-tf-fill-button="1" class="tf-button" title="Let PATTC choose using this game's automatic-pick rules for each selected open position." onclick="teamFantasyFillSelected_('${teamFantasyEscape_(entry.entryId)}',false)">Auto Pick Selected</button>`:''}
+    <button type="button" class="tf-button ${protectionOn?'':'secondary'}" aria-pressed="${protectionOn?'true':'false'}" onclick="teamFantasyToggleProtection_(${protectionOn?'false':'true'})">Protection ${protectionOn?'ON':'OFF'}</button>
+    <span class="tf-muted tf-protection-inline-status">${teamFantasyEscape_(protectionDetail)}</span>
+  </div></div>`;
+}
 function teamFantasyRenderLineup_(state,lineup){
   const entry=lineup.entry||{},safeId=teamFantasySafeDomId_(entry.entryId);
   if (lineup.postseasonEligible === false) {
@@ -367,18 +392,21 @@ function teamFantasyRenderH2H_(state) {
 
 const TEAM_FANTASY_STATE_REQUESTS = Object.create(null);
 
-function teamFantasyStateRequestKey_(gameId, username, leagueId) {
+function teamFantasyStateRequestKey_(gameId, username, leagueId, week) {
   return [
     String(username || "").trim().toLowerCase(),
     String(gameId || "").trim(),
-    String(leagueId || "").trim()
+    String(leagueId || "").trim(),
+    week === undefined || week === null || week === "" ? "current" : String(Number(week))
   ].join("|");
 }
 
-function teamFantasyLoadState_(gameId, username, leagueId) {
-  const key = teamFantasyStateRequestKey_(gameId, username, leagueId);
+function teamFantasyLoadState_(gameId, username, leagueId, week) {
+  const key = teamFantasyStateRequestKey_(gameId, username, leagueId, week);
   if (TEAM_FANTASY_STATE_REQUESTS[key]) return TEAM_FANTASY_STATE_REQUESTS[key];
-  const request = Promise.resolve(api("getTeamFantasyState", { gameId: gameId, username: username, leagueId: leagueId }));
+  const payload = { gameId: gameId, username: username, leagueId: leagueId };
+  if (week !== undefined && week !== null && week !== "") payload.week = Number(week);
+  const request = Promise.resolve(api("getTeamFantasyState", payload));
   TEAM_FANTASY_STATE_REQUESTS[key] = request;
   request.finally(function() {
     if (TEAM_FANTASY_STATE_REQUESTS[key] === request) delete TEAM_FANTASY_STATE_REQUESTS[key];
@@ -661,13 +689,31 @@ function teamFantasyRefreshLivePresentation_(){
 }
 
 
+function teamFantasyMainWeekBrowser_(state) {
+  const weeks = Array.isArray(state && state.availableWeeks) ? state.availableWeeks.slice() : [];
+  const selected = Math.max(1, Number(state && state.week || state && state.currentWeek || 1));
+  const current = Math.max(1, Number(state && state.currentWeek || selected));
+  if (weeks.indexOf(selected) === -1) weeks.push(selected);
+  if (weeks.indexOf(current) === -1) weeks.push(current);
+  weeks.sort(function(a,b){ return Number(a)-Number(b); });
+  return `<section class="card tf-main-week-browser"><div class="tf-card-heading"><div><h2>Week</h2><div class="tf-muted">Week ${current} is current. Past weeks are review-only after kickoff; future weeks use the existing eligibility and kickoff rules.</div></div></div>${teamFantasyWeekChips_(weeks,selected,'teamFantasyChangeMainWeek_',false)}</section>`;
+}
+
+async function teamFantasyChangeMainWeek_(week) {
+  const state = window.TEAM_FANTASY_STATE || {};
+  const selected = Math.max(1, Number(week || state.currentWeek || state.week || 1));
+  window.TEAM_FANTASY_SELECTED_WEEK = selected === Number(state.currentWeek || 0) ? null : selected;
+  await teamFantasyReload_();
+}
+
 async function renderTeamFantasyPage(){
   const gameId=typeof getFrontendGameId==='function'?getFrontendGameId():'';
   const leagueId=typeof getFrontendLeagueId==='function'?getFrontendLeagueId():'';
   const username=teamFantasyCurrentUser_();
   if(!gameId||!username)return`<div class="page"><div class="card">Open a Team Fantasy game after signing in.</div></div>`;
   if(typeof setPageLoadStep==='function')setPageLoadStep(48,'Loading Team Fantasy lineup…');
-  const res=await teamFantasyLoadState_(gameId,username,leagueId);
+  const selectedWeek = Number(window.TEAM_FANTASY_SELECTED_WEEK || 0) > 0 ? Number(window.TEAM_FANTASY_SELECTED_WEEK) : null;
+  const res=await teamFantasyLoadState_(gameId,username,leagueId,selectedWeek);
   if (!res || res.success === false) return `<div class="page tf-page" data-page-load-failed="true"><div class="card"><h1>Team Fantasy Football</h1><div>${teamFantasyEscape_(res&&(res.message||res.error)||'Could not load Team Fantasy.')}</div></div></div>`;
   window.TEAM_FANTASY_STATE = res;
   window.TEAM_FANTASY_GAME_DAY_WEEK = Number(res.week || 1);
@@ -677,6 +723,7 @@ async function renderTeamFantasyPage(){
   const primary=teamFantasyPrimaryLineup_(res);
   return`<div class="page tf-page sports-team-fantasy" data-sports-shell-root="team-fantasy">
     ${teamFantasySportsShell_(res)}
+    ${teamFantasyMainWeekBrowser_(res)}
     ${teamFantasyWeekSummary_(res,primary)}
     <div id="teamFantasyLineupZone">${(res.lineups||[]).map(function(lineup){return teamFantasyRenderLineup_(res,lineup);}).join('')}</div>
     ${teamFantasySeasonQuickNav_()}
@@ -2007,7 +2054,7 @@ teamFantasyRenderSlot_ = function(state, lineup, slot) {
 const SPORTS_RICH_TF_ORIGINAL_ORDER_ = teamFantasyPositionDisplayOrder_;
 teamFantasyPositionDisplayOrder_ = function() {
   if (sportsRichTfEnabled_()) {
-    return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"];
+    return ["QB", "RB", "WRTE", "OL", "K", "DL", "LB", "DB"];
   }
   return SPORTS_RICH_TF_ORIGINAL_ORDER_();
 };
@@ -2126,7 +2173,7 @@ teamFantasyOpenTeamPicker_ = function(entryId,position){
     const selected=current===String(team.abbr||'')?' is-selected':'';
     const disabled=bye||team.eligible!==true?' disabled aria-disabled="true"':'';
     const action=disabled?'':` onclick="teamFantasyChooseTeam_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}','${teamFantasyEscape_(team.abbr)}')"`;
-    return`<button type="button" class="tf-picker-team tf-picker-team-r3 ${teamFantasyPickerAvailabilityClass_(team)}${selected}"${disabled}${action}><span class="tf-picker-rank">${teamFantasyEscape_(rank)}</span><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><span class="tf-picker-main"><strong>${teamFantasyEscape_(team.abbr)} — ${teamFantasyEscape_(team.name||'')}</strong><span>${teamFantasyEscape_(opponent)} · ${teamFantasyEscape_(kickoff)}</span></span><span class="tf-picker-side">${kind==='live'?'<span class="tf-picker-live">LIVE</span>':`<span>${left} left</span>`}${team.average!==undefined&&team.average!==null?`<span>${teamFantasyScore_(team.average)} avg pts</span>`:''}</span></button>`;
+    return`<button type="button" class="tf-picker-team tf-picker-team-r3 ${teamFantasyPickerAvailabilityClass_(team)}${selected}"${disabled}${action}><span class="tf-picker-rank">${teamFantasyEscape_(rank)}</span><img src="${teamFantasyEscape_(teamFantasyTeamLogoUrl_(team.abbr))}" alt=""><span class="tf-picker-main"><strong>${teamFantasyEscape_(team.abbr)} — ${teamFantasyEscape_(team.name||'')}</strong><span>${teamFantasyEscape_(opponent)} · ${teamFantasyEscape_(kickoff)}</span></span><span class="tf-picker-side">${kind==='live'?'<span class="tf-picker-live">LIVE</span>':`<span>${left} left</span>`}${team.average!==undefined&&team.average!==null?`<span>${teamFantasyScore_(team.average)} avg · ${Number(team.rankingGames||0)} game${Number(team.rankingGames||0)===1?'':'s'}</span>`:''}</span></button>`;
   }).join('');
   const settings=(window.TEAM_FANTASY_STATE||{}).settings||{};
   const fillActions=!slot.pick?`<div class="tf-picker-fill-actions">${settings.allowRandomPick?`<button type="button" class="tf-button secondary" title="Choose an eligible team at random for this position." onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',true)">Random Pick</button>`:''}${settings.allowSmartAutoPick?`<button type="button" class="tf-button" title="Let PATTC choose using this game's automatic-pick rules." onclick="teamFantasyFillPosition_('${teamFantasyEscape_(entryId)}','${teamFantasyEscape_(position)}',false)">Auto Pick</button>`:''}</div>`:'';
@@ -2135,7 +2182,7 @@ teamFantasyOpenTeamPicker_ = function(entryId,position){
 
 /* RC24A_R4_COMPARE_VERTICAL_MATRIX */
 function teamFantasyComparePositionOrder_(){
-  return ['QB','RB','WRTE','K','OL','DL','LB','DB'];
+  return ['QB','RB','WRTE','OL','K','DL','LB','DB'];
 }
 function teamFantasyComparePositionLabel_(position){
   return String(position||'')==='WRTE'?'WR/TE':String(position||'');
