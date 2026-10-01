@@ -3,7 +3,7 @@
 ## Authoritative Director State
 
 - Director integration branch: `director/pattc-repair-batch-r1`
-- Current Director commit: `1f258b9`
+- Current Director commit: `a37f505`
 - Production remains unchanged.
 - Production branch remains `architecture-cleanup`.
 - Known production baseline before this repair batch: `eb3bd11`.
@@ -428,3 +428,33 @@ Warnings observed but not failures:
 - SportsOddsApiLog lock diagnostic warning
 
 Status: DIRECTOR ACCEPTED FOR INTEGRATION, pending committing/pushing the stale Game Hub test assertion update onto the specialist branch and then cherry-picking the final specialist head into the Director branch.
+
+
+## Integration Update — Bottom Nav Routing Correction
+
+Bottom Nav routing integration complete.
+
+Integrated Director commit: `a37f505`.
+
+Accepted behavior:
+- stale async route completions can no longer repaint an older page over the newest navigation
+- Survivor -> Home late render race is guarded
+- stale browser-history completion is rejected
+- stale deferred route finalization cannot reset active navigation
+- Home compact render path remains direct
+- no route-time Bottom Nav restore/re-render was reintroduced
+- previously accepted icon/label/Appearance behavior remains intact
+
+Verification:
+- focused Bottom Nav consistency PASS
+- focused Bottom Nav routing consistency PASS
+- Game Hub integration regression PASS after stale ownership assertion update
+- Survivor R2 live UX contract PASS
+- full production gate previously passed on the final routing behavior: 298 regressions + RC1 through RC9
+
+Mirror synchronization:
+- frontend/js/app.js and frontend/app.js are synchronized in Director integration
+- this also preserves the Survivor R2 lazy-module cache marker in both mirrors
+
+Status: DIRECTOR ACCEPTED + INTEGRATED.
+Remaining live check: repeat Survivor -> Home / other Bottom Nav taps in preview to confirm no intermittent bounce remains.
