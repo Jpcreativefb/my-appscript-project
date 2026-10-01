@@ -1787,15 +1787,14 @@ function teamFantasyStatsForTeamUnit_(summary, teamAbbr, position) {
 function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
   teamAbbr = teamFantasyNormalizeTeam_(teamAbbr);
   position = teamFantasyNormalizePosition_(position);
-  if (!teamFantasySummaryFinal_(summary)) return { ready: true, reason: "" };
-  if (!summary || !summary.boxscore) return { ready: false, reason: "Final NFL summary has no box score yet." };
+  if (!summary || !summary.boxscore) return { ready: false, reason: "NFL summary has no box score yet." };
   if (position === "OL") {
     const teams = Array.isArray(summary.boxscore.teams) ? summary.boxscore.teams : [];
     const teamBlock = teams.filter(function(item) {
       return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
     })[0] || null;
     if (!teamBlock || !Array.isArray(teamBlock.statistics) || !teamBlock.statistics.length) {
-      return { ready: false, reason: "Final NFL summary is missing team statistics for " + teamAbbr + " OL." };
+      return { ready: false, reason: "NFL summary is missing team statistics for " + teamAbbr + " OL." };
     }
     return { ready: true, reason: "" };
   }
@@ -1804,11 +1803,19 @@ function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
     return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
   })[0] || null;
   if (!playerBlock || !Array.isArray(playerBlock.statistics) || !playerBlock.statistics.length) {
-    return { ready: false, reason: "Final NFL summary is missing player statistics for " + teamAbbr + " " + TEAM_FANTASY_POSITION_LABELS[position] + "." };
+    return { ready: false, reason: "NFL summary is missing player statistics for " + teamAbbr + " " + TEAM_FANTASY_POSITION_LABELS[position] + "." };
   }
+  let hasUnitSource = false;
+  playerBlock.statistics.forEach(function(category) {
+    (category && category.athletes || []).forEach(function(athleteRow) {
+      const athlete = athleteRow && athleteRow.athlete || {};
+      const pos = teamFantasyString_(athlete.position && (athlete.position.abbreviation || athlete.position.name)).toUpperCase();
+      if (teamFantasyPlayerPositionAllowed_(position, pos)) hasUnitSource = true;
+    });
+  });
+  if (!hasUnitSource) return { ready:false, reason:"NFL summary does not yet expose " + TEAM_FANTASY_POSITION_LABELS[position] + " source stats for " + teamAbbr + "." };
   return { ready: true, reason: "" };
 }
-
 function teamFantasySummaryFinal_(summary) {
   try {
     const status = summary.header.competitions[0].status.type;
@@ -1990,8 +1997,15 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
   return { success:errors.length===0, week:week, generated:generated.length, inserted:write.inserted, updated:write.updated, unchanged:write.unchanged, errors:errors };
 }
 
+function teamFantasyStableHash_(value) {
+  var text = teamFantasyString_(value);
+  var hash = 5381;
+  for (var i = 0; i < text.length; i++) hash = ((hash << 5) + hash + text.charCodeAt(i)) >>> 0;
+  return hash.toString(36);
+}
+
 function teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules) {
-  return ["tf-ranking-repair-v1", teamFantasySlug_(gameId), Number(settings && settings.seasonYear || 0), Number(beforeWeek || 0), teamFantasyRankingRulesSignature_(rules || [])].join("|");
+  return ["tf-ranking-repair-v1", teamFantasySlug_(gameId), Number(settings && settings.seasonYear || 0), Number(beforeWeek || 0), teamFantasyStableHash_(teamFantasyRankingRulesSignature_(rules || []))].join("|");
 }
 
 function teamFantasyRankingRepairMarkerGet_(key) {
