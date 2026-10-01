@@ -14,6 +14,8 @@ assert(css.includes('NFL_SURVIVOR_WEEK_BROWSER_NAV_R1'));
 
 // Week browsing is derived from the already-resolved official NFL week.
 assert(be.includes('const resolvedWeek = Math.max'));
+assert(be.includes('startWeek: 1'),'shared NFL resolver must use the NFL calendar anchor even when Survivor starts in Week 2');
+assert(be.includes('timing.week = Math.max(settings.startWeek || 1'),'resolved week stays within the configured Survivor range');
 assert(be.includes('state.resolvedWeek'));
 assert(be.includes('relation === "past"'));
 assert(be.includes('relation === "future"'));

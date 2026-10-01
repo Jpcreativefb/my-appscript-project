@@ -32,6 +32,8 @@ assert(be.includes('NFL_SURVIVOR_WEEK_BROWSER_R1'));
 assert(be.includes('if(enabled&&!settings.autoPickEnabled)throw new Error("Missed-pick Auto Pick protection is disabled by the game admin.")'));
 assert(be.includes('if(!settings.autoPickEnabled||!settings.automationEnabled)return{enabled:false,picked:[]}'));
 assert(be.includes('state.resolvedWeek'));
+assert(be.includes('startWeek: 1'),'Start Week 2 must not become the NFL calendar anchor');
+assert(be.includes('state.weekRounds = categories.map'),'built Survivor weeks remain included in the player payload');
 assert(be.includes('sportsSurvivorOptionEligible_(meta, rules, evaluation.usage, selected, settings)'));
 assert(be.includes('selectedStarted'));
 
