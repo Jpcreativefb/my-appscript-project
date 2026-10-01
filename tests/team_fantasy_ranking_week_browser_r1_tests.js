@@ -245,21 +245,24 @@ assert(rendered.includes('Random Fill Selected')&&rendered.includes('Auto Pick S
 
 // Persistent repair marker: scoring refresh can repair once; subsequent healthy passes skip historical work.
 {
+  const markerContext={ console, Date, JSON, String, Number, Array, Object, Boolean, RegExp, Set, Map, isNaN, isFinite, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, Math };
+  vm.createContext(markerContext);
+  vm.runInContext(engineSource, markerContext, { filename:'SportsTeamFantasyEngine-marker.js' });
   const markerStore={};
-  context.PropertiesService={getScriptProperties:()=>({
+  markerContext.PropertiesService={getScriptProperties:()=>({
     getProperty:k=>markerStore[k]||'',
     setProperty:(k,v)=>{markerStore[k]=String(v);}
   })};
   const settings={gameId:'g',seasonYear:2026,currentWeek:4};
-  context.teamFantasyRules_=()=>rules;
-  context.teamFantasyReadRows_=()=>persisted;
+  markerContext.teamFantasyRules_=()=>rules;
+  markerContext.teamFantasyReadRows_=()=>persisted;
   let scheduleFetches=0;
-  context.teamFantasyFetchWeekSchedule_=(gameId,week)=>{scheduleFetches++;return {games:[],byTeam:{}};};
-  let first=context.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
+  markerContext.teamFantasyFetchWeekSchedule_=(gameId,week)=>{scheduleFetches++;return {games:[],byTeam:{}};};
+  let first=markerContext.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
   assert.strictEqual(first.success,true);
   assert.strictEqual(first.cached,false);
   const afterFirst=scheduleFetches;
-  let second=context.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
+  let second=markerContext.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
   assert.strictEqual(second.cached,true,'healthy marker must make repair idempotent');
   assert.strictEqual(scheduleFetches,afterFirst,'cached healthy repair must not refetch prior schedules or ESPN summaries');
 }
