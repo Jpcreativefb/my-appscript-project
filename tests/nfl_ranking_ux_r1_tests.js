@@ -1,7 +1,7 @@
 const fs=require("fs"),assert=require("assert");
 const rank=fs.readFileSync("frontend/js/pages/rankingSportsR1.js","utf8");
 const css=fs.readFileSync("frontend/css/nfl-sports-pack-r1.css","utf8");
-assert(rank.includes('label+" · PLAYOFF SEED"'));
+assert(rank.includes('conference+" #"+liveRow.currentRank'));
 assert(rank.includes("nflRankingMoveTo_"));
 assert(rank.includes("nflRankingPointerDown_"));
 assert(rank.includes("nflRankingDragStart_"));
