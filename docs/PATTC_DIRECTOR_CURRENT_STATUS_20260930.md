@@ -481,3 +481,17 @@ Verification:
 
 Status: DIRECTOR ACCEPTED + INTEGRATED.
 Remaining live acceptance: verify the Director preview no longer stays on Week 2, the week selector appears, current week resolves correctly, past/future browsing works, and Clear Pick / Missed Pick Protection become editable when the selected round is eligible.
+
+
+## Director preview backend alignment
+
+Preview Apps Script deployment `AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0` was redeployed to immutable Apps Script version `415`, created from Director SHA `f208a3a`.
+
+Production Apps Script deployment `AKfycbyDdfv-1xMQTL7LGhGp48_nmWqiNSvNcKLo5IHkAQTxsQCVIPaMP8ZlxMp0ZfT_bzvo` remains unchanged at version `414`.
+
+Director commit `e1d755f` routes Preview `getSurvivorState` reads back to the now-aligned Preview Apps Script deployment. Preview Survivor writes remain blocked.
+
+Focused routing and Survivor R2 live UX tests PASS after the routing correction.
+
+Status: PREVIEW FRONTEND/BACKEND ALIGNMENT COMPLETE.
+Next: browser acceptance of Survivor week selector, current-week editability, Clear Pick, AutoPick strategy UI, Missed Pick Protection, and nav bounce behavior.
