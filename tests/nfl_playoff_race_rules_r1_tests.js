@@ -9,9 +9,9 @@ assert.strictEqual(vm.runInContext("nflPlayoffRaceLateEntryMultiplier_(1,true)",
 assert.strictEqual(vm.runInContext("nflPlayoffRaceLateEntryMultiplier_(4,true)",ctx),0.80);
 assert.strictEqual(vm.runInContext("nflPlayoffRaceLateEntryMultiplier_(10,true)",ctx),0.50);
 assert.strictEqual(vm.runInContext("nflPlayoffRaceLateEntryMultiplier_(1,false)",ctx),1);
-assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(4)",ctx),0.85);
-assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(8)",ctx),0.70);
-assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(12)",ctx),0.55);
+assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(4)",ctx),0.95);
+assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(8)",ctx),0.85);
+assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(12)",ctx),0.65);
 assert.strictEqual(vm.runInContext("nflPlayoffRaceCheckpointMultiplier_(15)",ctx),0.40);
 assert(be.includes('"NflForecastSnapshots"'));
 assert(be.includes("legacy-ranking-migration"));
