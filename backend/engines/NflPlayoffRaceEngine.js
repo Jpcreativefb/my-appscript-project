@@ -1016,7 +1016,7 @@ function apiGetNflPlayoffRaceState_(payload){
   if(!username)throw new Error("Username is required.");
   const base=apiGetRankingState_({gameId:gameId,username:username});
   const requestContext=nflPlayoffRaceRequestContext_(gameId);
-  const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId);
+  const game=typeof getGame==="function"?getGame(gameId):getGameRuntimeConfig(gameId);
   const meta=nflPlayoffRaceMeta_(gameId,username,requestContext,game);
   const live=nflPlayoffRaceLiveStandings_(gameId,meta.timing.currentWeek,requestContext);
   const checkpointRows=meta.setupMode?nflPlayoffRaceReadCheckpointScores_(gameId,username):nflPlayoffRaceBankDueCheckpoints_(gameId,username,meta.rows,meta.timing,requestContext);
