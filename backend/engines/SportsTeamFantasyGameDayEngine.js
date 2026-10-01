@@ -318,7 +318,11 @@ function apiGetTeamFantasyGameDayState(payload) {
   if (typeof teamFantasyIsGame_ === "function" && !teamFantasyIsGame_(gameId)) throw new Error("This game is not configured as Team Fantasy Football.");
 
   var settings = teamFantasyGetSettings_(gameId);
-  var week = Math.max(1, Math.floor(Number(payload.week || settings.currentWeek || 1)));
+  var timing = typeof teamFantasyNflWeekTiming_ === "function"
+    ? teamFantasyNflWeekTiming_(gameId, settings)
+    : { week: Math.max(1, Math.floor(Number(settings.currentWeek || 1))), mode: "fallback", source: "stored-admin-fallback", storedWeek: Math.max(1, Math.floor(Number(settings.currentWeek || 1))) };
+  var explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && String(payload.week === undefined || payload.week === null ? "" : payload.week).trim() !== "";
+  var week = explicitWeek ? Math.max(1, Math.floor(Number(payload.week || timing.week || 1))) : Math.max(1, Math.floor(Number(timing.week || 1)));
   var viewerEntries = teamFantasyEnsureEntriesForUser_(gameId, username);
   var viewerIds = {};
   viewerEntries.forEach(function(entry) { viewerIds[teamFantasyGameDayString_(entry.entryId || entry.EntryId)] = true; });
@@ -359,10 +363,14 @@ function apiGetTeamFantasyGameDayState(payload) {
   out.selectedLeagueId = selectedLeagueId;
   out.weeklyLeaderboard = teamFantasyGameDayBuildWeeklyLeaderboard_(out);
   out.weeklyLeaderboard = teamFantasyGameDayNormalizeWeeklyLeaderboard_(out.weeklyLeaderboard);
-  var maxWeek = Math.max(1, Math.floor(Number(settings.currentWeek || week || 1)));
+  var maxWeek = Math.max(1, Math.floor(Number(timing.week || week || 1)));
   out.availableWeeks = [];
   for (var availableWeek = 1; availableWeek <= maxWeek; availableWeek++) out.availableWeeks.push(availableWeek);
   out.currentWeek = maxWeek;
+  out.weekMode = timing.mode || "auto";
+  out.weekSource = timing.source || "fallback";
+  out.storedCurrentWeek = Number(timing.storedWeek || settings.currentWeek || 1);
+  out.historicalWeekRequested = explicitWeek;
   out.username = username;
   out.seasonYear = settings.seasonYear;
   out.generatedAt = new Date().toISOString();
