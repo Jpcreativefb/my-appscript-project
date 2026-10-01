@@ -2985,8 +2985,23 @@ function teamFantasyScoreboardSelectionSet_(state) {
   return set;
 }
 function teamFantasyScoreboardGames_() {
+  const state=window.TEAM_FANTASY_STATE||{};
   const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||window.TEAM_FANTASY_GAME_DAY||{};
-  return Array.isArray(data.nflGames)?data.nflGames:[];
+  const snapshots={};
+  (Array.isArray(data.nflGameSnapshots)?data.nflGameSnapshots:[]).forEach(function(item){
+    if(item&&item.eventId)snapshots[String(item.eventId)]=item;
+  });
+  return (Array.isArray(state.scheduleGames)?state.scheduleGames:[]).map(function(game){
+    const eventId=String(game&& (game.eventId||game.ESPNEventId) ||"").replace(/^nfl_/,"");
+    const snap=snapshots[eventId]||{};
+    return Object.assign({},game,snap,{
+      eventId:eventId,
+      homeAbbr:String(snap.homeAbbr||game.homeAbbr||game.homeTeam||"").toUpperCase(),
+      awayAbbr:String(snap.awayAbbr||game.awayAbbr||game.awayTeam||"").toUpperCase(),
+      homePositionScores:snap.homePositionScores||{},
+      awayPositionScores:snap.awayPositionScores||{}
+    });
+  });
 }
 function teamFantasyScoreboardGame_() {
   const games=teamFantasyScoreboardGames_();
@@ -3039,7 +3054,7 @@ function teamFantasySeasonRankingContextHtml_(data) {
 }
 teamFantasyFeaturedHtml_=function(state,lineup){
   const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||window.TEAM_FANTASY_GAME_DAY||{};
-  const games=Array.isArray(data.nflGames)?data.nflGames:[];
+  const games=teamFantasyScoreboardGames_();
   if(!games.length)return '<div class="tf-feature"><div class="tf-feature-selected">NFL game scores will appear when Game Day data loads.</div></div>';
   const game=teamFantasyScoreboardGame_()||games[0];
   const selections=teamFantasyScoreboardSelectionSet_(state||{});
