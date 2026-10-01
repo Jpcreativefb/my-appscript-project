@@ -1220,14 +1220,20 @@ function sportsSurvivorNflWeekTiming_(settings) {
   if (sportsSurvivorKey_(settings.league) !== "nfl" || typeof pattcNflResolveCurrentWeek_ !== "function") {
     return { week: overrideWeek, mode: mode, source: "survivor-fallback" };
   }
-  return pattcNflResolveCurrentWeek_({
+  // Survivor StartWeek is the first playable Survivor week, not the NFL calendar anchor.
+  // Let the shared NFL resolver anchor on NFL Week 1, then clamp its result
+  // back into this Survivor game's configured playable week range.
+  const timing = pattcNflResolveCurrentWeek_({
     mode: mode,
     overrideWeek: overrideWeek,
-    startWeek: settings.startWeek,
+    startWeek: 1,
     endWeek: settings.endWeek,
     fallbackWeek: settings.startWeek,
     fetchWeek: function(week) { return sportsSurvivorFetchScores_(settings, { week: week }); }
   });
+  timing.week = Math.max(settings.startWeek || 1, Math.min(settings.endWeek || 18,
+    Math.floor(sportsSurvivorNumber_(timing.week, settings.startWeek || 1))));
+  return timing;
 }
 
 function sportsSurvivorSaveNflWeekTiming_(gameId, mode, overrideWeek) {

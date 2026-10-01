@@ -24,6 +24,8 @@ assert.equal(timing.week,4,'removing override returns to automatic');
 // than first unresolved historical scoring round; auto-build targets resolved week.
 assert(survivor.includes('scheduledIndex = categories.findIndex'));
 assert(survivor.includes('sportsSurvivorRoundWeek_(category, index) === nflWeekTiming.week'));
+assert(survivor.includes('startWeek: 1'),'Survivor timing must anchor to NFL Week 1, not the Survivor game start week');
+assert(survivor.includes('timing.week = Math.max(settings.startWeek || 1'),'resolved NFL week is clamped back to the playable Survivor range');
 assert(survivor.includes('const targetWeek = nflTiming ? nflTiming.week : settings.startWeek'));
 assert(survivor.includes('sportsSurvivorBuildWeek_(gameId, targetWeek'));
 assert(survivor.includes('teamUseLimit'));
