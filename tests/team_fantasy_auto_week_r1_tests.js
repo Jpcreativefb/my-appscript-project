@@ -97,6 +97,8 @@ context.teamFantasyFetchWeekSchedule_ = (gameId, week) => {
   assert(fetchedWeeks.includes(2), 'explicit historical Week 2 must be honored');
 }
 
+const teamFantasyAutoWeekR1RealAutoPick_ = context.teamFantasyAutoPick_;
+
 // Automatic Fill uses the resolved week.
 {
   let autoWeek = 0;
@@ -110,6 +112,7 @@ context.teamFantasyFetchWeekSchedule_ = (gameId, week) => {
   assert.strictEqual(autoWeek, 4);
   assert.strictEqual(result.currentWeek, 4);
 }
+context.teamFantasyAutoPick_ = teamFantasyAutoWeekR1RealAutoPick_;
 
 // Week-only protection expires after resolved week advances.
 {
