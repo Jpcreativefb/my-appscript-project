@@ -458,3 +458,26 @@ Mirror synchronization:
 
 Status: DIRECTOR ACCEPTED + INTEGRATED.
 Remaining live check: repeat Survivor -> Home / other Bottom Nav taps in preview to confirm no intermittent bounce remains.
+
+
+## Survivor R2 current-week integration
+
+Director integration complete.
+
+Integrated Director commits:
+- `2f8fb0d` — Fix Survivor R2 live state payload route
+- `540c0d7` — Fix Survivor Week 2 current-week anchor
+- `ba5f3aa` — Update Survivor preview routing regression
+
+Accepted behavior:
+- Director Preview `getSurvivorState` uses the canonical Apps Script deployment so the current `weekRounds` / `resolvedWeek` payload is available.
+- Survivor no longer treats the game's configured StartWeek as the NFL calendar anchor.
+- Shared `pattcNflResolveCurrentWeek_` remains authoritative and is anchored on NFL Week 1, then clamped to the Survivor playable range.
+- Preview Survivor writes remain blocked.
+- Existing AutoPick strategy UI, Missed Pick Protection UI, Clear Pick renderer, week selector renderer, Game X/Y sizing, request-scoped memoization, and Bottom Nav work remain unchanged.
+
+Verification:
+- 10 focused Survivor / preview / routing regression tests PASS on the Home Mac.
+
+Status: DIRECTOR ACCEPTED + INTEGRATED.
+Remaining live acceptance: verify the Director preview no longer stays on Week 2, the week selector appears, current week resolves correctly, past/future browsing works, and Clear Pick / Missed Pick Protection become editable when the selected round is eligible.
