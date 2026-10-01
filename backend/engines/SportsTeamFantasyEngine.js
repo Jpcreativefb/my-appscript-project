@@ -1864,6 +1864,17 @@ function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, tea
       const readiness = teamFantasyFinalUnitStatsReady_(summary, team, position);
       if (!readiness.ready) return;
       const stats = teamFantasyStatsForTeamUnit_(summary, team, position);
+      if (options.gameMeta) {
+        stats.__game = {
+          homeAbbr: teamFantasyNormalizeTeam_(options.gameMeta.homeAbbr || options.gameMeta.homeTeam),
+          awayAbbr: teamFantasyNormalizeTeam_(options.gameMeta.awayAbbr || options.gameMeta.awayTeam),
+          homeScore: options.gameMeta.homeScore !== undefined ? options.gameMeta.homeScore : null,
+          awayScore: options.gameMeta.awayScore !== undefined ? options.gameMeta.awayScore : null,
+          status: teamFantasyString_(options.gameMeta.status),
+          state: teamFantasyString_(options.gameMeta.state),
+          gameDateTime: teamFantasyString_(options.gameMeta.gameDateTime)
+        };
+      }
       const scoredStats = teamFantasyScoreStats_(rules, position, stats);
       rows.push({
         GameId: gameId,
@@ -1977,7 +1988,7 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
     try {
       if (!byEvent[eventId]) byEvent[eventId] = teamFantasyFetchEspnSummary_(eventId);
       const summary = byEvent[eventId];
-      const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules, { includeLive: options.includeLive === true && !finalBySchedule });
+      const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules, { includeLive: options.includeLive === true && !finalBySchedule, gameMeta: game });
       teamRows.forEach(function(row) {
         const key=[eventId,teamFantasyNormalizeTeam_(row.TeamAbbr),teamFantasyNormalizePosition_(row.Position)].join("|");
         if (!have[key] || forceRefresh[key]) {
