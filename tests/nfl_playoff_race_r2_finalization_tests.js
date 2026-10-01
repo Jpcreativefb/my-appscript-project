@@ -20,7 +20,7 @@ assert(route.includes('"adminSaveNflPlayoffRaceSettings"'));
 assert(admin.includes("NFL Playoff Race Timing"));
 assert(admin.includes("Open Now"));
 assert(rank.includes("IF THE SEASON ENDED TODAY"));
-assert(rank.includes("ADJUSTMENT SCHEDULE"));
+assert(rank.includes("SEASON TIMELINE"));
 assert(rank.includes("playoff"));
 assert(css.includes("PATTC NFL PLAYOFF RACE R2"));
 assert(app.includes('v1222-nfl-playoff-race-r3-team-multipliers'));
