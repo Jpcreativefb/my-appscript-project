@@ -323,7 +323,6 @@ function apiGetTeamFantasyGameDayState(payload) {
     : { week: Math.max(1, Math.floor(Number(settings.currentWeek || 1))), mode: "fallback", source: "stored-admin-fallback", storedWeek: Math.max(1, Math.floor(Number(settings.currentWeek || 1))) };
   var explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && String(payload.week === undefined || payload.week === null ? "" : payload.week).trim() !== "";
   var week = explicitWeek ? Math.max(1, Math.floor(Number(payload.week || timing.week || 1))) : Math.max(1, Math.floor(Number(timing.week || 1)));
-  var schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
   var allUnitRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   var viewerEntries = teamFantasyEnsureEntriesForUser_(gameId, username);
   var viewerIds = {};
@@ -393,35 +392,36 @@ function apiGetTeamFantasyGameDayState(payload) {
     if (!current || teamFantasyGameDayString_(row.UpdatedAt) >= teamFantasyGameDayString_(current.UpdatedAt)) unitByTeamPosition[key] = row;
   });
 
-  out.nflGames = (schedule && Array.isArray(schedule.games) ? schedule.games : []).map(function(game) {
-    var home = teamFantasyGameDayNormalizeTeam_(game.homeAbbr || game.homeTeam);
-    var away = teamFantasyGameDayNormalizeTeam_(game.awayAbbr || game.awayTeam);
-    function unitScores(team) {
-      var map = {};
-      teamFantasyGameDayPositions_().forEach(function(position) {
-        var row = unitByTeamPosition[team + "|" + position] || null;
-        map[position] = row ? {
-          points: Number(row.FantasyPoints || 0),
-          final: teamFantasyBool_(row.Final, false),
-          updatedAt: teamFantasyGameDayString_(row.UpdatedAt)
-        } : null;
-      });
-      return map;
+  var snapshotsByEvent = {};
+  rankingRows.forEach(function(row) {
+    var eventId = teamFantasyGameDayString_(row.ESPNEventId).replace(/^nfl_/, "");
+    if (!eventId) return;
+    var stats = {};
+    try { stats = row.StatsJSON ? JSON.parse(String(row.StatsJSON)) : {}; } catch (err) { stats = {}; }
+    var meta = stats && stats.__game && typeof stats.__game === "object" ? stats.__game : {};
+    if (!snapshotsByEvent[eventId]) {
+      snapshotsByEvent[eventId] = {
+        eventId:eventId,
+        gameDateTime:teamFantasyGameDayString_(meta.gameDateTime),
+        homeAbbr:teamFantasyGameDayNormalizeTeam_(meta.homeAbbr),
+        awayAbbr:teamFantasyGameDayNormalizeTeam_(meta.awayAbbr),
+        homeScore:meta.homeScore !== undefined ? meta.homeScore : null,
+        awayScore:meta.awayScore !== undefined ? meta.awayScore : null,
+        status:teamFantasyGameDayString_(meta.status),
+        state:teamFantasyGameDayString_(meta.state),
+        completed:teamFantasyBool_(row.Final,false),
+        homePositionScores:{},
+        awayPositionScores:{}
+      };
     }
-    return {
-      eventId: teamFantasyGameDayString_(game.eventId || game.ESPNEventId).replace(/^nfl_/, ""),
-      gameDateTime: teamFantasyGameDayString_(game.gameDateTime),
-      homeAbbr: home,
-      awayAbbr: away,
-      homeScore: game.homeScore !== undefined ? game.homeScore : null,
-      awayScore: game.awayScore !== undefined ? game.awayScore : null,
-      status: teamFantasyGameDayString_(game.status),
-      state: teamFantasyGameDayString_(game.state),
-      completed: game.completed === true,
-      homePositionScores: unitScores(home),
-      awayPositionScores: unitScores(away)
-    };
+    var snap=snapshotsByEvent[eventId];
+    var team=teamFantasyGameDayNormalizeTeam_(row.TeamAbbr);
+    var position=teamFantasyGameDayNormalizePosition_(row.Position);
+    var score={points:Number(row.FantasyPoints||0),final:teamFantasyBool_(row.Final,false),updatedAt:teamFantasyGameDayString_(row.UpdatedAt)};
+    if (team && team === snap.homeAbbr) snap.homePositionScores[position]=score;
+    if (team && team === snap.awayAbbr) snap.awayPositionScores[position]=score;
   });
+  out.nflGameSnapshots = Object.keys(snapshotsByEvent).map(function(eventId){ return snapshotsByEvent[eventId]; });
 
   out.positionRankings = {};
   if (typeof teamFantasyRankingsFromRows_ === "function") {
