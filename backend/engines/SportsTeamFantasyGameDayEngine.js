@@ -323,6 +323,8 @@ function apiGetTeamFantasyGameDayState(payload) {
     : { week: Math.max(1, Math.floor(Number(settings.currentWeek || 1))), mode: "fallback", source: "stored-admin-fallback", storedWeek: Math.max(1, Math.floor(Number(settings.currentWeek || 1))) };
   var explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && String(payload.week === undefined || payload.week === null ? "" : payload.week).trim() !== "";
   var week = explicitWeek ? Math.max(1, Math.floor(Number(payload.week || timing.week || 1))) : Math.max(1, Math.floor(Number(timing.week || 1)));
+  var schedule = teamFantasyFetchWeekSchedule_(gameId, week, settings);
+  var allUnitRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   var viewerEntries = teamFantasyEnsureEntriesForUser_(gameId, username);
   var viewerIds = {};
   viewerEntries.forEach(function(entry) { viewerIds[teamFantasyGameDayString_(entry.entryId || entry.EntryId)] = true; });
@@ -339,7 +341,7 @@ function apiGetTeamFantasyGameDayState(payload) {
     return teamFantasyGameDayString_(row.GameId) === gameId && allowed[entryId] && teamFantasyBool_(row.Active, true);
   });
   var picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, "");
-  var scores = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES).filter(function(row) {
+  var scores = allUnitRows.filter(function(row) {
     return teamFantasyGameDayString_(row.GameId) === gameId && Number(row.SeasonYear) === Number(settings.seasonYear) && Number(row.Week) === week && allowed[teamFantasyGameDayString_(row.EntryId)];
   });
 
@@ -373,6 +375,67 @@ function apiGetTeamFantasyGameDayState(payload) {
   out.historicalWeekRequested = explicitWeek;
   out.username = username;
   out.seasonYear = settings.seasonYear;
+
+  var rankingRows = allUnitRows.filter(function(row) {
+    return typeof teamFantasyIsRankingSourceRow_ === "function" &&
+      teamFantasyIsRankingSourceRow_(row) &&
+      teamFantasyGameDayString_(row.GameId) === gameId &&
+      Number(row.SeasonYear) === Number(settings.seasonYear) &&
+      Number(row.Week) === Number(week);
+  });
+  var unitByTeamPosition = {};
+  rankingRows.forEach(function(row) {
+    var team = teamFantasyGameDayNormalizeTeam_(row.TeamAbbr);
+    var position = teamFantasyGameDayNormalizePosition_(row.Position);
+    if (!team || !position) return;
+    var key = team + "|" + position;
+    var current = unitByTeamPosition[key];
+    if (!current || teamFantasyGameDayString_(row.UpdatedAt) >= teamFantasyGameDayString_(current.UpdatedAt)) unitByTeamPosition[key] = row;
+  });
+
+  out.nflGames = (schedule && Array.isArray(schedule.games) ? schedule.games : []).map(function(game) {
+    var home = teamFantasyGameDayNormalizeTeam_(game.homeAbbr || game.homeTeam);
+    var away = teamFantasyGameDayNormalizeTeam_(game.awayAbbr || game.awayTeam);
+    function unitScores(team) {
+      var map = {};
+      teamFantasyGameDayPositions_().forEach(function(position) {
+        var row = unitByTeamPosition[team + "|" + position] || null;
+        map[position] = row ? {
+          points: Number(row.FantasyPoints || 0),
+          final: teamFantasyBool_(row.Final, false),
+          updatedAt: teamFantasyGameDayString_(row.UpdatedAt)
+        } : null;
+      });
+      return map;
+    }
+    return {
+      eventId: teamFantasyGameDayString_(game.eventId || game.ESPNEventId).replace(/^nfl_/, ""),
+      gameDateTime: teamFantasyGameDayString_(game.gameDateTime),
+      homeAbbr: home,
+      awayAbbr: away,
+      homeScore: game.homeScore !== undefined ? game.homeScore : null,
+      awayScore: game.awayScore !== undefined ? game.awayScore : null,
+      status: teamFantasyGameDayString_(game.status),
+      state: teamFantasyGameDayString_(game.state),
+      completed: game.completed === true,
+      homePositionScores: unitScores(home),
+      awayPositionScores: unitScores(away)
+    };
+  });
+
+  out.positionRankings = {};
+  if (typeof teamFantasyRankingsFromRows_ === "function") {
+    teamFantasyGameDayPositions_().forEach(function(position) {
+      var map = teamFantasyRankingsFromRows_(allUnitRows, gameId, position, week, settings.seasonYear);
+      var rows = Object.keys(map).map(function(team) {
+        return { team:team, rank:Number(map[team].rank||0), average:Number(map[team].average||0), games:Number(map[team].games||0) };
+      }).filter(function(item){ return item.games > 0; });
+      var top = rows.slice().sort(function(a,b){ if (b.average !== a.average) return b.average-a.average; return a.team.localeCompare(b.team); }).slice(0,10);
+      var bottom = rows.slice().sort(function(a,b){ if (a.average !== b.average) return a.average-b.average; return a.team.localeCompare(b.team); }).slice(0,10);
+      out.positionRankings[position] = { top:top, bottom:bottom };
+    });
+  }
+
   out.generatedAt = new Date().toISOString();
   return out;
 }
