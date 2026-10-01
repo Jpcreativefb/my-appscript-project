@@ -338,3 +338,25 @@ Remaining live acceptance:
 - Game X of Y size is acceptable
 - default resolved current week is correct
 - load performance remains improved
+
+
+## Bottom Nav A/B performance isolation result
+
+Result: performance harness instability confirmed on the same Work Mac.
+
+Accepted baseline `6f81a63`:
+- run 1 PASS
+- run 2 PASS
+- runs 3, 4, and 5 FAIL on the same Home compact first-paint assertion
+
+Routing correction `46d305d`:
+- runs 1 through 5 all PASS
+
+Conclusion:
+- the Home assertion can fail on the accepted baseline under the same Work Mac environment
+- the failure is therefore not attributable to the Bottom Nav routing correction
+- do not weaken or remove the performance test
+- do not change routing again to chase this synthetic timer variability
+- proceed to the full production gate on `46d305d`
+
+Routing correction remains unmerged until full production checks pass.
