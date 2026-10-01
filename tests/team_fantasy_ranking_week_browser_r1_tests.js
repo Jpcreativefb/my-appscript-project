@@ -215,5 +215,121 @@ assert(rendered.includes('Random Fill Selected')&&rendered.includes('Auto Pick S
   assert.strictEqual(uiContext.lastPayload.autoFillMode,'auto','ON reuses existing Auto protection mode when coming from manual');
   assert.strictEqual(JSON.stringify(uiContext.window.TEAM_FANTASY_STATE.lineups),before,'Protection ON must not alter manual picks');
 
-  console.log('Team Fantasy Ranking + Week Browser R1 tests: PASS');
+  
+
+// Hot-path proof: healthy player state must not invoke historical repair or ESPN summary fetches.
+{
+  let repairCalls=0, summaryCalls=0;
+  const settings={gameId:'g',seasonYear:2026,currentWeek:4,regularSeasonEndWeek:18,teamUseLimit:3,playoffUsageMode:'reset'};
+  const schedule={games:[{eventId:'w4',gameDateTime:'2099-10-04T18:00:00Z',homeAbbr:'BUF',awayAbbr:'MIA',completed:false,state:'pre',status:'Scheduled'}],byTeam:{}};
+  schedule.byTeam={BUF:schedule.games[0],MIA:schedule.games[0]};
+  context.teamFantasyGetSettings_=()=>settings;
+  context.teamFantasyRequireGameAccess_=()=>({allowed:true});
+  context.teamFantasyIsGame_=()=>true;
+  context.teamFantasyNflWeekTiming_=()=>({week:4,mode:'auto',source:'nfl-schedule-state',storedWeek:4,scheduleByWeek:{4:schedule}});
+  context.teamFantasyEnsureEntriesForUser_=()=>[];
+  context.teamFantasyPostseasonEligibility_=()=>({});
+  context.teamFantasyEnsureRankingUniverseBeforeWeek_=()=>{repairCalls++; return {success:true};};
+  context.teamFantasyFetchEspnSummary_=()=>{summaryCalls++; return summary;};
+  context.teamFantasyReadRows_=()=>[];
+  context.teamFantasyLeaguesForEntries_=()=>[];
+  context.teamFantasyBuildStandings_=()=>({success:false});
+  context.teamFantasyGetPlayerPreference_=()=>({mode:'manual',scope:'season'});
+  context.teamFantasyAutoFillActivation_=()=>({available:false});
+  context.teamFantasyRules_=()=>[];
+  context.teamFantasyFetchWeekSchedule_=()=>schedule;
+  context.apiGetTeamFantasyState({username:'alice',gameId:'g'});
+  assert.strictEqual(repairCalls,0,'healthy player state must not run historical ranking repair');
+  assert.strictEqual(summaryCalls,0,'healthy player state must not fetch historical ESPN summaries');
+}
+
+// Persistent repair marker: scoring refresh can repair once; subsequent healthy passes skip historical work.
+{
+  const markerStore={};
+  context.PropertiesService={getScriptProperties:()=>({
+    getProperty:k=>markerStore[k]||'',
+    setProperty:(k,v)=>{markerStore[k]=String(v);}
+  })};
+  const settings={gameId:'g',seasonYear:2026,currentWeek:4};
+  context.teamFantasyRules_=()=>rules;
+  context.teamFantasyReadRows_=()=>persisted;
+  let scheduleFetches=0;
+  context.teamFantasyFetchWeekSchedule_=(gameId,week)=>{scheduleFetches++;return {games:[],byTeam:{}};};
+  let first=context.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
+  assert.strictEqual(first.success,true);
+  assert.strictEqual(first.cached,false);
+  const afterFirst=scheduleFetches;
+  let second=context.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
+  assert.strictEqual(second.cached,true,'healthy marker must make repair idempotent');
+  assert.strictEqual(scheduleFetches,afterFirst,'cached healthy repair must not refetch prior schedules or ESPN summaries');
+}
+
+const gameDaySource = fs.readFileSync(path.join(root, 'backend/engines/SportsTeamFantasyGameDayEngine.js'), 'utf8');
+assert(gameDaySource.includes('out.nflGames ='),'Game Day payload must include all selected-week NFL games');
+assert(gameDaySource.includes('homePositionScores'),'Game Day payload must include all home team unit scores');
+assert(gameDaySource.includes('awayPositionScores'),'Game Day payload must include all away team unit scores');
+assert(gameDaySource.includes('out.positionRankings = {}'),'Game Day payload must include season position ranking context');
+assert(!/getTeamFantasyGameDayState[^]*api\([^)]*position/i.test(frontendSource),'frontend must not issue per-position Game Day requests');
+
+// Scoreboard source contracts.
+assert(frontendSource.includes('function teamFantasyScoreboardMove_'),'scoreboard arrows required');
+assert(frontendSource.includes('←')&&frontendSource.includes('→'),'scoreboard must expose previous/next arrows');
+assert(frontendSource.includes('window.TEAM_FANTASY_SCOREBOARD_EVENT_ID'),'selected NFL game must survive rerenders');
+assert(frontendSource.includes('return ["QB","RB","WRTE","OL","K","DL","LB","DB"]'),'compact scoreboard order required');
+assert(frontendSource.includes('position||"") === "WRTE" ? "WT"'),'WT is compact-scoreboard label');
+assert(frontendSource.includes('position||"") === "WRTE" ? "WR/TE"'),'normal ranking context keeps WR/TE');
+assert(frontendSource.includes('is-user-selected'),'exact team+position selection highlight required');
+assert(!frontendSource.slice(frontendSource.lastIndexOf('teamFantasyFeaturedHtml_=function')).includes('POSITION RANK'),'top scoreboard must not show position rank');
+
+// Pure scoreboard selection proof: exact team+position highlights; adjacent position does not.
+{
+  const scoreUi={
+    console,
+    window:{TEAM_FANTASY_CURRENT_GAME_DAY:{nflGames:[]},TEAM_FANTASY_STATE:{}},
+    teamFantasyEscape_:v=>String(v),
+    teamFantasyScore_:v=>String(v),
+    teamFantasyTeamLogoUrl_:()=>'', teamFantasyFormatKickoff_:()=>'', teamFantasyPrimaryLineup_:()=>null,
+    teamFantasySelectedGame_:()=>({}), teamFantasyFindSlot_:()=>null, teamFantasyRefreshFeatured_:()=>{}
+  };
+  vm.createContext(scoreUi);
+  function uiBlock(start,end){
+    const a=frontendSource.lastIndexOf(start), b=frontendSource.indexOf(end,a+start.length);
+    if(a<0||b<0) throw new Error('scoreboard block missing '+start);
+    return frontendSource.slice(a,b);
+  }
+  const start=frontendSource.lastIndexOf('function teamFantasyScoreboardPositionOrder_');
+  const end=frontendSource.indexOf('const TEAM_FANTASY_SCOREBOARD_HIGHLIGHT_BASE_',start);
+  vm.runInContext(frontendSource.slice(start,end),scoreUi);
+  const state={lineups:[{slots:[
+    {position:'QB',pick:{teamAbbr:'DET'}},
+    {position:'RB',pick:{teamAbbr:'GB'}}
+  ]}]};
+  const selections=scoreUi.teamFantasyScoreboardSelectionSet_(state);
+  const html=scoreUi.teamFantasyScoreboardTeamUnits_('DET',{
+    QB:{points:17.5},RB:{points:8},WRTE:null,OL:null,K:null,DL:null,LB:null,DB:null
+  },selections);
+  assert((html.match(/is-user-selected/g)||[]).length===1,'only exact DET QB selection gets blue outline');
+  assert(html.includes('>WT<'),'compact scoreboard uses WT');
+  assert(html.includes('>—<'),'missing pre-score units render dash rather than fake zero');
+}
+
+// Top/Bottom ordering proof from authoritative ranking maps.
+{
+  const allRows=[];
+  positions.forEach(position=>{
+    teams.forEach((team,index)=>{
+      allRows.push(rankingRow(team,position,1,index+1,'rank-'+position+'-'+team));
+    });
+  });
+  positions.forEach(position=>{
+    const map=context.teamFantasyRankingsFromRows_(allRows,'g',position,2,2026);
+    const ranked=Object.keys(map).map(team=>({team,average:map[team].average,games:map[team].games})).filter(r=>r.games>0);
+    const top=ranked.slice().sort((a,b)=>b.average-a.average||a.team.localeCompare(b.team)).slice(0,10);
+    const bottom=ranked.slice().sort((a,b)=>a.average-b.average||a.team.localeCompare(b.team)).slice(0,10);
+    for(let i=1;i<top.length;i++) assert(top[i-1].average>=top[i].average,'Top 10 descending for '+position);
+    for(let i=1;i<bottom.length;i++) assert(bottom[i-1].average<=bottom[i].average,'Bottom 10 ascending for '+position);
+  });
+}
+
+console.log('Team Fantasy Ranking + Week Browser R1 tests: PASS');
 })().catch(err=>{ console.error(err); process.exitCode=1; });
