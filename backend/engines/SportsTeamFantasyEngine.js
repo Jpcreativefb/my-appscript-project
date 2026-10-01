@@ -768,6 +768,8 @@ function teamFantasyScheduleRowsFromEspnEvents_(events, settings, seasonType, so
       awayAbbr: teamFantasyNormalizeTeam_(away.team && away.team.abbreviation),
       homeTeamId: teamFantasyString_(home.team && home.team.id),
       awayTeamId: teamFantasyString_(away.team && away.team.id),
+      homeScore: home.score !== undefined && home.score !== null ? teamFantasyNumber_(home.score, null) : null,
+      awayScore: away.score !== undefined && away.score !== null ? teamFantasyNumber_(away.score, null) : null,
       status: teamFantasyString_(status.name || status.description),
       state: teamFantasyKey_(status.state),
       completed: status.completed === true,
@@ -791,6 +793,8 @@ function teamFantasyNormalizeScheduleRow_(row) {
     awayAbbr: awayAbbr,
     homeTeamId: teamFantasyString_(row.HomeTeamId || row.homeTeamId),
     awayTeamId: teamFantasyString_(row.AwayTeamId || row.awayTeamId),
+    homeScore: row.HomeScore !== undefined || row.homeScore !== undefined ? teamFantasyNumber_(row.HomeScore !== undefined ? row.HomeScore : row.homeScore, null) : null,
+    awayScore: row.AwayScore !== undefined || row.awayScore !== undefined ? teamFantasyNumber_(row.AwayScore !== undefined ? row.AwayScore : row.awayScore, null) : null,
     status: teamFantasyString_(row.Status || row.status),
     state: teamFantasyKey_(row.State || row.state),
     completed: teamFantasyBool_(row.Completed !== undefined ? row.Completed : row.completed, false) ||
@@ -1840,10 +1844,12 @@ function teamFantasyRankingRulesSignature_(rules) {
   }));
 }
 
-function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, teamAbbrs, summary, rules) {
+function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, teamAbbrs, summary, rules, options) {
   const rows = [];
   const ruleSignature = teamFantasyRankingRulesSignature_(rules);
-  if (!teamFantasySummaryFinal_(summary)) return rows;
+  options = options || {};
+  const summaryFinal = teamFantasySummaryFinal_(summary);
+  if (!summaryFinal && options.includeLive !== true) return rows;
   (teamAbbrs || []).map(teamFantasyNormalizeTeam_).filter(Boolean).forEach(function(team) {
     const meta = teamFantasyTeamMeta_(team);
     if (!meta || !meta.abbr || !meta.conference) return;
@@ -1865,7 +1871,7 @@ function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, tea
         FantasyPoints: scoredStats.points,
         StatsJSON: JSON.stringify(stats),
         ScoreDetailJSON: JSON.stringify(scoredStats.detail),
-        Final: true,
+        Final: summaryFinal,
         UpdatedAt: teamFantasyNowIso_()
       });
     });
@@ -1930,8 +1936,9 @@ function teamFantasyRankingRowsExpectedForGame_(game) {
   return keys;
 }
 
-function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule, rules, byEvent, knownRows) {
+function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule, rules, byEvent, knownRows, options) {
   settings = settings || teamFantasyGetSettings_(gameId);
+  options = options || {};
   schedule = schedule || teamFantasyFetchWeekSchedule_(gameId, week, settings);
   rules = rules || teamFantasyRules_(gameId);
   byEvent = byEvent || {};
@@ -1950,7 +1957,8 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
   const errors = [];
   (schedule.games || []).forEach(function(game) {
     const finalBySchedule = game.completed === true || teamFantasyKey_(game.state) === "post" || teamFantasyKey_(game.status).indexOf("final") !== -1;
-    if (!finalBySchedule) return;
+    const liveBySchedule = teamFantasyKey_(game.state) === "in" || teamFantasyKey_(game.status).indexOf("progress") !== -1 || teamFantasyKey_(game.status).indexOf("halftime") !== -1;
+    if (!finalBySchedule && !(options.includeLive === true && liveBySchedule)) return;
     const expected = teamFantasyRankingRowsExpectedForGame_(game);
     const completeExisting = expected.length && expected.every(function(key){ return have[key]; });
     const suspiciousAllZero = completeExisting && expected.every(function(key){ return Math.abs(teamFantasyNumber_(havePoints[key], 0)) < 0.000001; });
@@ -1962,7 +1970,7 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
     try {
       if (!byEvent[eventId]) byEvent[eventId] = teamFantasyFetchEspnSummary_(eventId);
       const summary = byEvent[eventId];
-      const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules);
+      const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules, { includeLive: options.includeLive === true && !finalBySchedule });
       teamRows.forEach(function(row) {
         const key=[eventId,teamFantasyNormalizeTeam_(row.TeamAbbr),teamFantasyNormalizePosition_(row.Position)].join("|");
         if (!have[key] || forceRefresh[key]) {
@@ -2115,7 +2123,7 @@ function teamFantasyRefreshAndScoreWeek_(gameId, week) {
   });
   // Persist ranking-source rows for both NFL teams at all eight positions.
   // These rows are independent of PATTC picks and are ignored by lineup totals.
-  const rankingUniverse = teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule, rules, byEvent);
+  const rankingUniverse = teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule, rules, byEvent, null, { includeLive:true });
   let scored = 0;
   let pending = 0;
   const errors = [];
