@@ -22,7 +22,8 @@ for (const source of [app, appRoot]) {
   assert(source.includes('gameType === "staked-prediction"'));
   assert(source.includes('await navigate("game-hub")'));
   assert(source.includes('case "game-hub":'));
-  assert(source.includes('await renderGameModeHubPage()'));
+  assert(source.includes('renderGameModeHubPage()'));
+  assert(source.includes('appCommitAsyncRouteHtml_(app, page, function() { return renderGameModeHubPage(); })'));
 }
 assert(appHtml.includes('./js/pages/gameModeHub.js'));
 assert(serviceWorker.includes('./js/pages/gameModeHub.js'));
