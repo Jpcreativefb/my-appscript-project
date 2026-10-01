@@ -1318,6 +1318,10 @@ async function appHandleBrowserRoute_() {
     skipHistoryWrite: true
   });
 
+  // A newer explicit navigation may have won while this history route was
+  // awaiting its renderer. Never let a stale history completion rewrite it.
+  if (appRoutePageFromLocation_() !== page) return;
+
   // A dirty Admin form may reject browser Back/Forward navigation. In that
   // case keep the URL synchronized with the page that actually stayed visible.
   if (String(APP_STATE.currentPage || "dashboard") !== page) {
@@ -1564,6 +1568,8 @@ async function navigate(page, options) {
     stopPageLoadPulse_();
 
     requestAnimationFrame(() => {
+
+      if (String(APP_STATE.currentPage || "") !== String(page || "")) return;
 
       app.classList.remove("page-enter");
 
@@ -2162,6 +2168,13 @@ async function viewGameLeaderboard(
    PAGE ROUTER
 ====================== */
 
+async function appCommitAsyncRouteHtml_(app, page, renderer) {
+  const html = await renderer();
+  if (String(APP_STATE.currentPage || "") !== String(page || "")) return false;
+  app.innerHTML = html;
+  return true;
+}
+
 async function renderPage(page) {
 
   const app =
@@ -2171,9 +2184,6 @@ async function renderPage(page) {
     throw new Error("App container missing");
   }
 
-  APP_STATE.currentPage =
-    page;
-
   if (
     page.indexOf("admin-game-setup:") === 0
   ) {
@@ -2181,10 +2191,9 @@ async function renderPage(page) {
     const gameId =
       page.split(":")[1];
 
-    app.innerHTML =
-      await renderAdminGameSetupPage(
-        gameId
-      );
+    await appCommitAsyncRouteHtml_(app, page, function() {
+      return renderAdminGameSetupPage(gameId);
+    });
 
     return;
 
@@ -2192,10 +2201,11 @@ async function renderPage(page) {
 
   if (page.indexOf("hub:") === 0) {
     const hubCategory = String(page.split(":")[1] || "general").toLowerCase();
-    app.innerHTML = await renderDashboardHubPage_(hubCategory);
+    if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderDashboardHubPage_(hubCategory); })) return;
 
     if (typeof dashboardHydrateGameStandings_ === "function") {
       window.setTimeout(function() {
+        if (String(APP_STATE.currentPage || "") !== String(page || "")) return;
         const payload = typeof APP_STATE !== "undefined" ? APP_STATE.dashboardHomePayload : null;
         const active = payload && Array.isArray(payload.activeGames) ? payload.activeGames : [];
         const hubGames = active.filter(function(game) {
@@ -2230,79 +2240,72 @@ async function renderPage(page) {
       break;
 
     case "trophy-room":
-      app.innerHTML = await renderDashboardTrophyRoomPage_();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderDashboardTrophyRoomPage_(); })) return;
       break;
 
     case "more":
-      app.innerHTML = await renderDashboardMorePage_();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderDashboardMorePage_(); })) return;
       break;
 
     case "picks":
 
-      app.innerHTML =
-        await renderPicksPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderPicksPage(); })) return;
 
       break;
 
     case "survivor":
       if (typeof renderSurvivorPage !== "function") throw new Error("Survivor page script is not loaded.");
-      app.innerHTML = await renderSurvivorPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderSurvivorPage(); })) return;
       break;
 
     case "voting":
       if (typeof renderVotingPage !== "function") throw new Error("Voting page script is not loaded.");
-      app.innerHTML = await renderVotingPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderVotingPage(); })) return;
       break;
 
     case "ranking":
       if (typeof renderRankingPage !== "function") throw new Error("Ranking page script is not loaded.");
-      app.innerHTML = await renderRankingPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderRankingPage(); })) return;
       break;
 
     case "game-hub":
 
-      app.innerHTML =
-        await renderGameModeHubPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderGameModeHubPage(); })) return;
 
       break;
 
     case "team-fantasy":
       if (typeof renderTeamFantasyPage !== "function") throw new Error("Team Fantasy page script is not loaded.");
-      app.innerHTML = await renderTeamFantasyPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderTeamFantasyPage(); })) return;
       break;
 
     case "betting":
 
-      app.innerHTML =
-        await renderBettingPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderBettingPage(); })) return;
     
       break;   
 
     case "leaderboard":
 
-      app.innerHTML =
-        await renderLeaderboardPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderLeaderboardPage(); })) return;
 
       break;
 
     case "season-hub":
 
-      app.innerHTML =
-        await renderSeasonHubPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderSeasonHubPage(); })) return;
 
       break;
 
     case "leagues":
 
-      app.innerHTML =
-        await renderLeaguesPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderLeaguesPage(); })) return;
 
       break;
 
     case "admin":
 
-      app.innerHTML =
-        await renderAdminPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminPage(); })) return;
 
       if (typeof adminEnhanceMainAdminSections === "function") {
         adminEnhanceMainAdminSections();
@@ -2323,8 +2326,7 @@ async function renderPage(page) {
         throw new Error("Manage Games page script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderAdminGamesPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminGamesPage(); })) return;
 
       break; 
 
@@ -2334,13 +2336,12 @@ async function renderPage(page) {
         throw new Error("Awards Manager script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderAdminAwardsPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminAwardsPage(); })) return;
 
       break;
     case "admin-team-fantasy":
       if (typeof renderAdminTeamFantasyPage !== "function") throw new Error("Team Fantasy admin script is not loaded.");
-      app.innerHTML = await renderAdminTeamFantasyPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminTeamFantasyPage(); })) return;
       break;
 
     case "admin-reality-tv":
@@ -2349,8 +2350,7 @@ async function renderPage(page) {
         throw new Error("Reality TV Season Manager script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderAdminRealityTvPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminRealityTvPage(); })) return;
 
       break;
 
@@ -2360,8 +2360,7 @@ async function renderPage(page) {
         throw new Error("Appearance Manager script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderAdminAppearancePage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderAdminAppearancePage(); })) return;
 
       break;
 
@@ -2371,8 +2370,7 @@ async function renderPage(page) {
         throw new Error("Archive history page script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderArchiveHistoryPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderArchiveHistoryPage(); })) return;
 
       break;
 
@@ -2382,8 +2380,7 @@ async function renderPage(page) {
         throw new Error("Profile page script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderProfilePage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderProfilePage(); })) return;
 
       break;
 
@@ -2393,8 +2390,7 @@ async function renderPage(page) {
         throw new Error("Notification Center script is not loaded.");
       }
 
-      app.innerHTML =
-        await renderNotificationsPage();
+      if (!await appCommitAsyncRouteHtml_(app, page, function() { return renderNotificationsPage(); })) return;
 
       break;
 
