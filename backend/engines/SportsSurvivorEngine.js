@@ -910,9 +910,21 @@ function sportsSurvivorGradeSelection_(snapshot, currentMeta, resultRows, result
   return { resolved: true, outcome: outcome, pushKind: pushKind, teamScore: teamScore, opponentScore: opponentScore, spread: resultMode === "spread" ? spread : "" };
 }
 
-function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap) {
+function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap, evaluationContext) {
   const userKey = sportsSurvivorKey_(username);
   const userPicks = pickMetaMap[userKey] || {};
+  evaluationContext = evaluationContext || {};
+  const resolvedWeek = Math.max(0, Math.floor(sportsSurvivorNumber_(evaluationContext.resolvedWeek, 0)));
+  const firstParticipationIndex = (categories || []).findIndex(function(category) {
+    const pick = userPicks[sportsSurvivorKey_(category && category.id)] || {};
+    return Array.isArray(pick.nomineeIds) && pick.nomineeIds.map(sportsSurvivorKey_).filter(Boolean).length > 0;
+  });
+  const firstParticipationWeek = firstParticipationIndex >= 0
+    ? sportsSurvivorRoundWeek_(categories[firstParticipationIndex], firstParticipationIndex)
+    : 0;
+  const participationStartWeek = firstParticipationWeek > 0
+    ? (resolvedWeek > 0 ? Math.min(firstParticipationWeek, resolvedWeek) : firstParticipationWeek)
+    : resolvedWeek;
   let alive = true;
   let eliminatedRound = 0;
   let eliminatedReason = "";
@@ -961,9 +973,11 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       nomineeIds.length >= rules.requiredSelections
         ? selectedSourceResolved
         : allSourceResolved;
+    const preEntry = nomineeIds.length === 0 && participationStartWeek > 0 && week < participationStartWeek;
     let resolved = roundEligible && sourceResolved;
-    if (roundEligible && !sourceResolved && currentRoundIndex === -1 && alive) currentRoundIndex = index;
-    let status = resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming");
+    if (preEntry) resolved = true;
+    if (roundEligible && !sourceResolved && !preEntry && currentRoundIndex === -1 && alive) currentRoundIndex = index;
+    let status = preEntry ? "pre-entry" : (resolved ? "resolved" : (currentRoundIndex === index && alive ? (nomineeIds.length ? "picked" : "open") : "upcoming"));
     let outcome = "pending";
     let pushKind = "";
     let earnedPoints = 0;
@@ -974,7 +988,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
     let missed = false;
     const selectionResults = [];
 
-    if (resolved && alive) {
+    if (resolved && alive && !preEntry) {
       if (nomineeIds.length < rules.requiredSelections) {
         missed = true;
         outcome = "loss";
@@ -1110,7 +1124,7 @@ function sportsSurvivorEvaluateUser_(username, gameId, categories, settings, opt
       winStreak: winStreak, bestStreak: bestStreak, lossesUsed: lossesUsed,
       livesRemaining: Math.max(0, settings.lossesAllowed + earnedLives - lossesUsed),
       earnedLives: earnedLives, lifeEarned: lifeEarned, safeApplied: safeApplied, lossApplied: lossApplied,
-      missed: missed, rules: rules, confidencePoints: sportsSurvivorNumber_(pick.confidencePoints, 0)
+      missed: missed, preEntry: preEntry, rules: rules, confidencePoints: sportsSurvivorNumber_(pick.confidencePoints, 0)
     });
 
     if (roundEligible && !resolved) blockedByEarlierUnresolved = true;
@@ -1151,7 +1165,7 @@ function sportsSurvivorOptionEligible_(meta, rules, usage, currentSelected, sett
   return { eligible: true, reason: "" };
 }
 
-function sportsSurvivorStandings_(gameId, extraUsernames) {
+function sportsSurvivorStandings_(gameId, extraUsernames, evaluationContext) {
   const settings = survivorGetSettings_(gameId);
   const categories = survivorGameCategories_(gameId);
   const optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
@@ -1166,7 +1180,7 @@ function sportsSurvivorStandings_(gameId, extraUsernames) {
   participants.forEach(function(username) { known[sportsSurvivorKey_(username)] = username; });
   const rows = Object.keys(known).map(function(key) {
     const username = known[key];
-    const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap);
+    const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap, evaluationContext);
     const profile = typeof getLeaderboardUserProfile_ === "function" ? (getLeaderboardUserProfile_(username, gameId) || {}) : {};
     return {
       user: username, username: username, displayName: profile.displayName || username, avatar: profile.avatar || "👤",
@@ -1261,11 +1275,12 @@ function apiGetSportsSurvivorState_(payload) {
   const optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
   const resultMap = sportsSurvivorResultsForGame_(gameId);
   const pickMetaMap = sportsSurvivorPickMetaMap_(gameId);
-  const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap);
-  const standings = sportsSurvivorStandings_(gameId, [username]);
+  const nflWeekTiming = sportsSurvivorNflWeekTiming_(settings);
+  const evaluationContext = { resolvedWeek: nflWeekTiming.week };
+  const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap, evaluationContext);
+  const standings = sportsSurvivorStandings_(gameId, [username], evaluationContext);
   const viewerStanding = standings.find(function(row) { return sportsSurvivorKey_(row.username) === sportsSurvivorKey_(username); });
   const winner = !!(viewerStanding && viewerStanding.survivorWinner);
-  const nflWeekTiming = sportsSurvivorNflWeekTiming_(settings);
   let currentIndex = evaluation.currentRoundIndex;
   if (sportsSurvivorKey_(settings.league) === "nfl" && evaluation.alive) {
     const scheduledIndex = categories.findIndex(function(category, index) {
