@@ -63,6 +63,6 @@ assert(adminWeek.includes('saveWeekTiming:true'));
 // Preserve current Playoff Race team-multiplier / accuracy scoring implementation.
 assert(playoff.includes('nflPlayoffRaceAdjustedTeamMultipliers_'));
 assert(playoff.includes('nflPlayoffRaceWeightedScore_'));
-assert(playoff.includes('if(diff===0)return 10;if(diff===1)return 8;if(diff===2)return 6;if(diff===3)return 4;if(diff===4)return 2'));
+assert(playoff.includes('if(diff===0)return 20;if(diff===1)return 15;if(diff===2)return 10;if(diff===3)return 6;if(diff===4)return 3'));
 
 console.log('NFL week / Survivor / Playoff Race R1 targeted regression contract: PASS');
