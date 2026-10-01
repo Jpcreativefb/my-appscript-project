@@ -1479,11 +1479,7 @@ function teamFantasySavePick_(payload) {
   if (payload._accessChecked !== true) teamFantasyRequireGameAccess_(username, gameId, "submitPicks", payload.token);
   if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
-  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
-  const timing = explicitWeek ? null : (payload._weekTiming || teamFantasyNflWeekTiming_(gameId, settings));
-  const week = explicitWeek
-    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)))
-    : timing.week;
+  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
   let entries = payload._entries || teamFantasyEntriesForUser_(gameId, username);
   let entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
   if (!entry) {
@@ -1575,11 +1571,7 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   if (randomOnly && !settings.allowRandomPick) throw new Error("Random Pick is disabled for this game.");
   if (!randomOnly && !settings.allowSmartAutoPick) throw new Error("Auto Pick is disabled for this game.");
-  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
-  const timing = explicitWeek ? null : (payload._weekTiming || teamFantasyNflWeekTiming_(gameId, settings));
-  const week = explicitWeek
-    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)))
-    : timing.week;
+  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
   const entries = payload._entries || teamFantasyEnsureEntriesForUser_(gameId, username);
   const wantedEntryId = teamFantasyString_(payload.entryId);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
@@ -3397,4 +3389,40 @@ teamFantasyRunAutomaticFillForPlayer_ = function(gameId, username, nowMs) {
     };
   }
   return teamFantasyR47AutomaticFillBase_(gameId, username, nowMs, timing);
+};
+
+
+/* TEAM_FANTASY_AUTO_WEEK_R1_WRITE_DEFAULTS
+   Keep RC22-certified save/Auto Pick cores unchanged. These wrappers only
+   supply the shared resolved NFL week when callers omit payload.week. */
+var teamFantasyAutoWeekR1SavePickBase_ = teamFantasySavePick_;
+teamFantasySavePick_ = function(payload) {
+  payload = payload || {};
+  if (Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "") {
+    return teamFantasyAutoWeekR1SavePickBase_(payload);
+  }
+  var next = Object.assign({}, payload);
+  var settings = next._settings || teamFantasyGetSettings_(teamFantasyString_(next.gameId));
+  var timing = next._weekTiming || teamFantasyNflWeekTiming_(teamFantasyString_(next.gameId), settings);
+  next.week = timing.week;
+  next._settings = settings;
+  next._weekTiming = timing;
+  if (!next._schedule && timing.scheduleByWeek && timing.scheduleByWeek[next.week]) next._schedule = timing.scheduleByWeek[next.week];
+  return teamFantasyAutoWeekR1SavePickBase_(next);
+};
+
+var teamFantasyAutoWeekR1AutoPickBase_ = teamFantasyAutoPick_;
+teamFantasyAutoPick_ = function(payload, randomOnly) {
+  payload = payload || {};
+  if (Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "") {
+    return teamFantasyAutoWeekR1AutoPickBase_(payload, randomOnly);
+  }
+  var next = Object.assign({}, payload);
+  var settings = next._settings || teamFantasyGetSettings_(teamFantasyString_(next.gameId));
+  var timing = next._weekTiming || teamFantasyNflWeekTiming_(teamFantasyString_(next.gameId), settings);
+  next.week = timing.week;
+  next._settings = settings;
+  next._weekTiming = timing;
+  if (!next._schedule && timing.scheduleByWeek && timing.scheduleByWeek[next.week]) next._schedule = timing.scheduleByWeek[next.week];
+  return teamFantasyAutoWeekR1AutoPickBase_(next, randomOnly);
 };
