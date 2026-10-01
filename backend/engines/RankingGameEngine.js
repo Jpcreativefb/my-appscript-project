@@ -529,6 +529,8 @@ function rankingLeaderboardData_(gameId) {
     typeof nflPlayoffRaceMultiplierMapForGame_ === "function"
       ? nflPlayoffRaceMultiplierMapForGame_(gameId)
       : null;
+  const nflCheckpointByUser = nflMultiplierByUser && typeof nflPlayoffRaceCheckpointTotalsForGame_ === "function"
+    ? nflPlayoffRaceCheckpointTotalsForGame_(gameId) : {};
 
   Object.keys(entriesByUser).forEach(function(username) {
     let total = 0;
@@ -558,13 +560,16 @@ function rankingLeaderboardData_(gameId) {
       const snap = nflMultiplierByUser && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
         ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
       const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
-        ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
+        ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap,typeof nflPlayoffRaceHistoryForUser_==="function"?nflPlayoffRaceHistoryForUser_(gameId,username).filter(function(row){return row.categoryId===categoryId;}):[]) : null;
       total += weighted ? weighted.earnedPoints : baseEarned * multiplier;
       remaining += weighted ? weighted.remainingPoints : baseRemain * multiplier;
       exactCount += score.exactCount;
       if (score.resolved) resolvedQuestions++;
     });
 
+    const bankedCheckpointPoints = Number(nflCheckpointByUser[rankingKey_(username)])||0;
+    total += bankedCheckpointPoints;
+    baseTotal += bankedCheckpointPoints;
     const profile = typeof getLeaderboardUserProfile_ === "function" ? (getLeaderboardUserProfile_(username, gameId) || {}) : {};
     rows.push({
       user: username,
@@ -628,7 +633,7 @@ function rankingUserScoring_(username, gameId) {
     const snap = nflMultipliers && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
       ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
     const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
-      ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
+      ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap,typeof nflPlayoffRaceHistoryForUser_==="function"?nflPlayoffRaceHistoryForUser_(gameId,username).filter(function(row){return row.categoryId===categoryId;}):[]) : null;
     scoring[categoryId] = {
       shortName: category.shortName || category.name,
       nomineeId: ballot.length ? "ranking-ballot" : "",

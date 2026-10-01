@@ -8,7 +8,10 @@ const NFL_PLAYOFF_RACE_SNAPSHOT_HEADERS_ = [
   "GameId","Username","CategoryId","ForecastId","ForecastType","EffectiveWeek",
   "Multiplier","RankingsJSON","SubmittedAt","IsActive","Source","TeamMultipliersJSON"
 ];
-const NFL_PLAYOFF_RACE_CHECKPOINTS_ = {4:0.85,8:0.70,12:0.55,15:0.40};
+const NFL_PLAYOFF_RACE_CHECKPOINTS_ = {4:0.95,8:0.85,12:0.65,15:0.40};
+const NFL_PLAYOFF_RACE_CHECKPOINT_WEEKS_ = [4,8,12,15];
+const NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_SHEET_ = "NflForecastCheckpointScores";
+const NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_HEADERS_ = ["GameId","Username","CategoryId","CheckpointWeek","ForecastId","ExactSeedPoints","NearSeedPoints","PlayoffFieldPoints","TotalPoints","AwardedAt"];
 const NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_ = 10;
 const NFL_PLAYOFF_RACE_SETTINGS_SHEET_ = "NflPlayoffRaceSettings";
 const NFL_PLAYOFF_RACE_SETTINGS_HEADERS_ = [
@@ -308,6 +311,22 @@ function nflPlayoffRaceFetchWeek_(year,week){
   return [];
 }
 
+function nflPlayoffRaceRequestContext_(gameId){
+  return {gameId:nflPlayoffRaceString_(gameId),year:nflPlayoffRaceYear_(gameId),weekCache:{},standingsCache:{},weekScheduleFetches:0,weekScheduleCacheHits:0};
+}
+function nflPlayoffRaceFetchWeekContext_(context,week){
+  context=context||nflPlayoffRaceRequestContext_("");
+  const key=String(Math.floor(Number(week)||0));
+  if(Object.prototype.hasOwnProperty.call(context.weekCache,key)){
+    context.weekScheduleCacheHits++;
+    return context.weekCache[key];
+  }
+  context.weekScheduleFetches++;
+  const games=nflPlayoffRaceFetchWeek_(context.year,Number(key));
+  context.weekCache[key]=games;
+  return games;
+}
+
 function nflPlayoffRaceGameStartMs_(game){
   const value=game&&(game.GameDateTime||game.gameDateTime||game.StartTime||game.startTime||game.DateTime||game.dateTime||game.Date||game.date);
   if(!value)return 0;
@@ -347,8 +366,9 @@ function nflPlayoffRaceDerivedWeekFromStart_(startDate,now){
   return Math.max(1,Math.min(18,Math.floor((now-start)/(7*24*60*60*1000))+1));
 }
 
-function nflPlayoffRaceTiming_(gameId){
-  const year=nflPlayoffRaceYear_(gameId);
+function nflPlayoffRaceTiming_(gameId,requestContext){
+  const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
+  const year=context.year;
   const now=Date.now();
   const settings=nflPlayoffRaceGetSettings_(gameId);
   const sheetWeek=nflPlayoffRaceSettingsWeek_(year);
@@ -359,7 +379,7 @@ function nflPlayoffRaceTiming_(gameId){
        mode:settings.currentWeekMode,
        overrideWeek:settings.currentWeekOverride,
        startWeek:1,endWeek:18,fallbackWeek:fallbackWeek,
-       fetchWeek:function(week){return nflPlayoffRaceFetchWeek_(year,week);}
+       fetchWeek:function(week){return nflPlayoffRaceFetchWeekContext_(context,week);}
      })
     :{week:settings.currentWeekMode==="override"?settings.currentWeekOverride:fallbackWeek,
       mode:settings.currentWeekMode,source:"legacy-fallback"};
@@ -372,7 +392,7 @@ function nflPlayoffRaceTiming_(gameId){
   }else{
     seasonStarted=currentWeek>1;
     if(currentWeek<=1){
-      const week1=nflPlayoffRaceFetchWeek_(year,1);
+      const week1=nflPlayoffRaceFetchWeekContext_(context,1);
       const first=nflPlayoffRaceFirstKickoffMs_(week1);
       if(first)seasonStarted=first<=now;
     }
@@ -392,8 +412,8 @@ function nflPlayoffRaceTiming_(gameId){
     const candidates=[currentWeek,currentWeek+1].filter(function(week){return !!nflPlayoffRaceCheckpointMultiplier_(week);});
     for(let i=0;i<candidates.length&&!currentWindow;i++){
       const checkpoint=candidates[i];
-      const prior=nflPlayoffRaceFetchWeek_(year,checkpoint-1);
-      const next=nflPlayoffRaceFetchWeek_(year,checkpoint);
+      const prior=nflPlayoffRaceFetchWeekContext_(context,checkpoint-1);
+      const next=nflPlayoffRaceFetchWeekContext_(context,checkpoint);
       const priorFinal=prior.length>0&&prior.every(nflPlayoffRaceGameFinal_);
       const firstKickoff=nflPlayoffRaceFirstKickoffMs_(next);
       if(priorFinal&&firstKickoff>now){
@@ -453,9 +473,10 @@ function nflPlayoffRaceParseRecord_(value){
 function nflPlayoffRaceWeekFinal_(games){
   return Array.isArray(games)&&games.length>0&&games.every(nflPlayoffRaceGameFinal_);
 }
-function nflPlayoffRaceLatestFinalWeek_(year,currentWeek){
+function nflPlayoffRaceLatestFinalWeek_(year,currentWeek,requestContext){
+  const context=requestContext||nflPlayoffRaceRequestContext_("nfl-playoff-race-"+year);
   for(let week=Math.max(1,Math.min(18,currentWeek));week>=1;week--){
-    const games=nflPlayoffRaceFetchWeek_(year,week);
+    const games=nflPlayoffRaceFetchWeekContext_(context,week);
     if(nflPlayoffRaceWeekFinal_(games))return week;
   }
   return 0;
@@ -487,9 +508,10 @@ function nflPlayoffRaceSeedConference_(conference,recordMap){
     const record=recordMap[team.abbr]||{wins:0,losses:0,ties:0,games:0,pct:0,text:"0-0-0"};
     return Object.assign({},team,record);
   });
-  const leaders=[];
+  const leaders=[],divisionRanks={};
   ["East","North","South","West"].forEach(function(division){
     const rows=teams.filter(function(team){return team.division===division;}).sort(nflPlayoffRaceRecordCompare_);
+    rows.forEach(function(team,index){divisionRanks[team.abbr]=index+1;});
     if(rows.length)leaders.push(rows[0]);
   });
   leaders.sort(nflPlayoffRaceRecordCompare_);
@@ -505,6 +527,7 @@ function nflPlayoffRaceSeedConference_(conference,recordMap){
     const sig=[team.wins,team.losses,team.ties].join("-");
     return {
       nomineeId:team.abbr,name:team.name,conference:team.conference,division:team.division,
+      divisionRank:divisionRanks[team.abbr]||0,
       record:team.text,rank:index+1,provisionalTie:(recordCounts[sig]||0)>1
     };
   });
@@ -512,17 +535,15 @@ function nflPlayoffRaceSeedConference_(conference,recordMap){
 function nflPlayoffRaceStandingsMap_(rows){
   const map={};(rows||[]).forEach(function(row){map[nflPlayoffRaceKey_(row.nomineeId)]=row;});return map;
 }
-function nflPlayoffRaceLiveStandings_(gameId,currentWeek){
-  const year=nflPlayoffRaceYear_(gameId);
-  const completedWeek=nflPlayoffRaceLatestFinalWeek_(year,currentWeek);
-  if(!completedWeek)return {week:0,updatedAt:new Date().toISOString(),provisionalTiebreakers:true,current:{AFC:[],NFC:[]},previous:{AFC:[],NFC:[]}};
-  const cacheKey="nfl-playoff-race-live-r2:"+year+":"+completedWeek;
-  try{
-    const cache=CacheService.getScriptCache(),cached=cache.get(cacheKey);
-    if(cached)return JSON.parse(cached);
-  }catch(err){}
+function nflPlayoffRaceStandingsAtWeek_(gameId,completedWeek,requestContext){
+  const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
+  const key=String(Math.floor(Number(completedWeek)||0));
+  if(context.standingsCache[key])return context.standingsCache[key];
+  if(!completedWeek)return null;
+  const cutoffGames=nflPlayoffRaceFetchWeekContext_(context,completedWeek);
+  if(!nflPlayoffRaceWeekFinal_(cutoffGames))return null;
   const weekNumbers=[completedWeek,completedWeek-1,completedWeek-2].filter(function(week,index,arr){return week>0&&arr.indexOf(week)===index;});
-  const weekSets=weekNumbers.map(function(week){return {week:week,games:nflPlayoffRaceFetchWeek_(year,week)};});
+  const weekSets=weekNumbers.map(function(week){return {week:week,games:nflPlayoffRaceFetchWeekContext_(context,week)};});
   const currentRecords=nflPlayoffRaceRecordMap_(weekSets,completedWeek);
   const previousRecords=completedWeek>1?nflPlayoffRaceRecordMap_(weekSets,completedWeek-1):{};
   const result={
@@ -538,12 +559,27 @@ function nflPlayoffRaceLiveStandings_(gameId,currentWeek){
       return Object.assign({},row,{previousRank:previousRank,movement:previousRank?previousRank-row.rank:0});
     });
   });
+  context.standingsCache[key]=result;
+  return result;
+}
+function nflPlayoffRaceLiveStandings_(gameId,currentWeek,requestContext){
+  const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
+  const year=context.year;
+  const completedWeek=nflPlayoffRaceLatestFinalWeek_(year,currentWeek,context);
+  if(!completedWeek)return {week:0,updatedAt:new Date().toISOString(),provisionalTiebreakers:true,current:{AFC:[],NFC:[]},previous:{AFC:[],NFC:[]}};
+  const cacheKey="nfl-playoff-race-live-r2:"+year+":"+completedWeek;
+  try{
+    const cache=CacheService.getScriptCache(),cached=cache.get(cacheKey);
+    if(cached)return JSON.parse(cached);
+  }catch(err){}
+  const result=nflPlayoffRaceStandingsAtWeek_(gameId,completedWeek,context);
+  if(!result)return {week:0,updatedAt:new Date().toISOString(),provisionalTiebreakers:true,current:{AFC:[],NFC:[]},previous:{AFC:[],NFC:[]}};
   try{CacheService.getScriptCache().put(cacheKey,JSON.stringify(result),300);}catch(err){}
   return result;
 }
 function nflPlayoffRacePositionPoints_(predictedRank,currentRank){
   const diff=Math.abs((Number(predictedRank)||0)-(Number(currentRank)||0));
-  if(diff===0)return 10;if(diff===1)return 8;if(diff===2)return 6;if(diff===3)return 4;if(diff===4)return 2;return 0;
+  if(diff===0)return 20;if(diff===1)return 15;if(diff===2)return 10;if(diff===3)return 6;if(diff===4)return 3;return 0;
 }
 function nflPlayoffRaceSnapshotRankings_(snapshot){
   if(!snapshot)return [];
@@ -573,7 +609,7 @@ function nflPlayoffRaceLiveCategory_(category,activeSnapshot,live){
     weightedBonus+=playoffBonus*pct;
     return {
       nomineeId:pick.nomineeId,predictedRank:predictedRank,
-      record:currentRow?currentRow.record:"",currentRank:currentRank,
+      record:currentRow?currentRow.record:"",currentRank:currentRank,division:currentRow?currentRow.division:"",divisionRank:currentRow?currentRow.divisionRank:0,conference:currentRow?currentRow.conference:"",
       previousRank:currentRow?currentRow.previousRank:0,movement:currentRow?currentRow.movement:0,
       provisionalTie:currentRow?currentRow.provisionalTie:false,teamMultiplier:pct,
       positionPoints:Math.round(positionPoints*pct*100)/100,
@@ -588,7 +624,7 @@ function nflPlayoffRaceLiveCategory_(category,activeSnapshot,live){
     correctPlayoffTeams:correctPlayoffTeams,teamBonus:round(weightedBonus),
     perfectFieldBonus:round(perfectFieldBonus),
     totalPoints:round(rows.reduce(function(sum,row){return sum+row.points;},0)+perfectFieldBonus),
-    maxPoints:round(rows.reduce(function(sum,row){return sum+10*row.teamMultiplier;},0)+weightedMax+NFL_PLAYOFF_RACE_PERFECT_FIELD_BONUS_*perfectPct),rows:rows
+    maxPoints:round(rows.reduce(function(sum,row){return sum+20*row.teamMultiplier;},0)+weightedMax+NFL_PLAYOFF_RACE_PERFECT_FIELD_BONUS_*perfectPct),rows:rows
   };
 }
 
@@ -631,6 +667,123 @@ function nflPlayoffRaceSnapshotTeamMultipliers_(snapshot){
   });
   return out;
 }
+function nflPlayoffRaceCheckpointScore_(rankings,standingsRows){
+  const standings=nflPlayoffRaceStandingsMap_(standingsRows||[]);
+  let exactSeedPoints=0,nearSeedPoints=0,playoffFieldPoints=0;
+  (rankings||[]).forEach(function(row){
+    const current=standings[nflPlayoffRaceKey_(row&&row.nomineeId)];
+    const predicted=Math.floor(nflPlayoffRaceNumber_(row&&row.rank,0));
+    const actual=current?Math.floor(nflPlayoffRaceNumber_(current.rank,0)):0;
+    if(!predicted||!actual)return;
+    const diff=Math.abs(predicted-actual);
+    if(diff===0)exactSeedPoints+=3;
+    else if(diff===1)nearSeedPoints+=1;
+    if(predicted<=NFL_PLAYOFF_RACE_FIELD_SIZE_&&actual<=NFL_PLAYOFF_RACE_FIELD_SIZE_)playoffFieldPoints+=1;
+  });
+  return {exactSeedPoints:exactSeedPoints,nearSeedPoints:nearSeedPoints,playoffFieldPoints:playoffFieldPoints,total:exactSeedPoints+nearSeedPoints+playoffFieldPoints};
+}
+function nflPlayoffRaceCheckpointKey_(gameId,username,categoryId,week){
+  return [nflPlayoffRaceString_(gameId),nflPlayoffRaceKey_(username),nflPlayoffRaceKey_(categoryId),Math.floor(Number(week)||0)].join("|");
+}
+function nflPlayoffRaceEnsureCheckpointScoreSheet_(){
+  const ss=SpreadsheetApp.getActive();
+  let sh=ss.getSheetByName(NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_SHEET_);
+  if(!sh)sh=ss.insertSheet(NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_SHEET_);
+  if(sh.getLastRow()===0){sh.getRange(1,1,1,NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_HEADERS_.length).setValues([NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_HEADERS_]);sh.setFrozenRows(1);}
+  const headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(nflPlayoffRaceString_);
+  const missing=NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_HEADERS_.filter(function(h){return headers.indexOf(h)===-1;});
+  if(missing.length)sh.getRange(1,headers.length+1,1,missing.length).setValues([missing]);
+  return sh;
+}
+function nflPlayoffRaceReadCheckpointScores_(gameId,username){
+  const sh=SpreadsheetApp.getActive().getSheetByName(NFL_PLAYOFF_RACE_CHECKPOINT_SCORE_SHEET_);
+  if(!sh||sh.getLastRow()<=1)return [];
+  const data=sh.getDataRange().getValues(),headers=data[0].map(nflPlayoffRaceString_),col=nflPlayoffRaceHeaderMap_(headers);
+  return data.slice(1).map(function(row){
+    return {
+      gameId:nflPlayoffRaceString_(row[col.gameid]),username:nflPlayoffRaceString_(row[col.username]),categoryId:nflPlayoffRaceKey_(row[col.categoryid]),
+      checkpointWeek:Math.floor(nflPlayoffRaceNumber_(row[col.checkpointweek],0)),forecastId:nflPlayoffRaceString_(row[col.forecastid]),
+      exactSeedPoints:nflPlayoffRaceNumber_(row[col.exactseedpoints],0),nearSeedPoints:nflPlayoffRaceNumber_(row[col.nearseedpoints],0),
+      playoffFieldPoints:nflPlayoffRaceNumber_(row[col.playofffieldpoints],0),total:nflPlayoffRaceNumber_(row[col.totalpoints],0),
+      awardedAt:nflPlayoffRaceString_(row[col.awardedat])
+    };
+  }).filter(function(row){return (!gameId||row.gameId===gameId)&&(!username||nflPlayoffRaceKey_(row.username)===nflPlayoffRaceKey_(username));});
+}
+function nflPlayoffRaceBankCheckpoint_(award){
+  const lock=(LockService.getDocumentLock&&LockService.getDocumentLock())||LockService.getScriptLock();
+  lock.waitLock(10000);
+  try{
+    const existing=nflPlayoffRaceReadCheckpointScores_(award.gameId,award.username).find(function(row){
+      return nflPlayoffRaceCheckpointKey_(row.gameId,row.username,row.categoryId,row.checkpointWeek)===nflPlayoffRaceCheckpointKey_(award.gameId,award.username,award.categoryId,award.checkpointWeek);
+    });
+    if(existing)return Object.assign({banked:false},existing);
+    const sh=nflPlayoffRaceEnsureCheckpointScoreSheet_(),headers=sh.getRange(1,1,1,sh.getLastColumn()).getValues()[0].map(nflPlayoffRaceString_);
+    const values={GameId:award.gameId,Username:award.username,CategoryId:award.categoryId,CheckpointWeek:award.checkpointWeek,ForecastId:award.forecastId,
+      ExactSeedPoints:award.exactSeedPoints,NearSeedPoints:award.nearSeedPoints,PlayoffFieldPoints:award.playoffFieldPoints,TotalPoints:award.total,AwardedAt:new Date().toISOString()};
+    sh.appendRow(headers.map(function(h){return values[h]===undefined?"":values[h];}));
+    return Object.assign({banked:true,awardedAt:values.AwardedAt},award);
+  }finally{lock.releaseLock();}
+}
+function nflPlayoffRaceSnapshotAtCheckpoint_(rows,categoryId,checkpointWeek){
+  const list=nflPlayoffRaceCategorySnapshots_(rows,categoryId).filter(function(row){
+    return Math.floor(nflPlayoffRaceNumber_(row.effectiveWeek,0))<checkpointWeek;
+  });
+  return list.length?list[list.length-1]:null;
+}
+function nflPlayoffRaceBankDueCheckpoints_(gameId,username,rows,timing,requestContext){
+  if(!timing||!timing.currentWeek)return nflPlayoffRaceReadCheckpointScores_(gameId,username);
+  const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
+  const categories=rankingGameCategories_(gameId)||[];
+  NFL_PLAYOFF_RACE_CHECKPOINT_WEEKS_.forEach(function(checkpointWeek){
+    if(timing.currentWeek<checkpointWeek)return;
+    const standings=nflPlayoffRaceStandingsAtWeek_(gameId,checkpointWeek-1,context);
+    if(!standings)return;
+    categories.forEach(function(category){
+      const categoryId=nflPlayoffRaceKey_(category.id);
+      const snapshot=nflPlayoffRaceSnapshotAtCheckpoint_(rows,categoryId,checkpointWeek);
+      if(!snapshot)return;
+      const conf=categoryId.indexOf("afc-")===0?"AFC":categoryId.indexOf("nfc-")===0?"NFC":"";
+      if(!conf)return;
+      const score=nflPlayoffRaceCheckpointScore_(nflPlayoffRaceSnapshotRankings_(snapshot),standings.current[conf]||[]);
+      nflPlayoffRaceBankCheckpoint_(Object.assign({gameId:gameId,username:username,categoryId:categoryId,checkpointWeek:checkpointWeek,forecastId:snapshot.forecastId},score));
+    });
+  });
+  return nflPlayoffRaceReadCheckpointScores_(gameId,username);
+}
+function nflPlayoffRaceCheckpointSummary_(rows){
+  const out={exactSeedPoints:0,nearSeedPoints:0,playoffFieldPoints:0,total:0,byWeek:[]};
+  (rows||[]).forEach(function(row){
+    out.exactSeedPoints+=nflPlayoffRaceNumber_(row.exactSeedPoints,0);out.nearSeedPoints+=nflPlayoffRaceNumber_(row.nearSeedPoints,0);
+    out.playoffFieldPoints+=nflPlayoffRaceNumber_(row.playoffFieldPoints,0);out.total+=nflPlayoffRaceNumber_(row.total,0);
+  });
+  NFL_PLAYOFF_RACE_CHECKPOINT_WEEKS_.forEach(function(week){
+    const list=(rows||[]).filter(function(row){return row.checkpointWeek===week;});
+    out.byWeek.push({week:week,banked:list.length>0,points:list.reduce(function(sum,row){return sum+nflPlayoffRaceNumber_(row.total,0);},0)});
+  });
+  return out;
+}
+function nflPlayoffRaceCheckpointTotalsForGame_(gameId){
+  const totals={};nflPlayoffRaceReadCheckpointScores_(gameId).forEach(function(row){
+    const user=nflPlayoffRaceKey_(row.username);totals[user]=(totals[user]||0)+nflPlayoffRaceNumber_(row.total,0);
+  });return totals;
+}
+function nflPlayoffRaceOriginalHoldBonus_(history,finalRanks){
+  const list=(history||[]).slice().sort(function(a,b){return String(a.submittedAt||"").localeCompare(String(b.submittedAt||""));});
+  const original=list.find(function(row){return nflPlayoffRaceKey_(row.forecastType)==="original";});
+  if(!original)return {count:0,total:0,maxBonus:0,eligibleTeams:[]};
+  const originalRanks={};nflPlayoffRaceSnapshotRankings_(original).forEach(function(row){originalRanks[nflPlayoffRaceKey_(row.nomineeId)]=Number(row.rank)||0;});
+  const later=list.filter(function(row){return row!==original;});
+  const eligible=Object.keys(originalRanks).filter(function(team){
+    return later.every(function(snapshot){
+      const ranks={};nflPlayoffRaceSnapshotRankings_(snapshot).forEach(function(row){ranks[nflPlayoffRaceKey_(row.nomineeId)]=Number(row.rank)||0;});
+      return !Object.prototype.hasOwnProperty.call(ranks,team)||ranks[team]===originalRanks[team];
+    });
+  });
+  const resolved=Object.keys(finalRanks||{}).length>=16;
+  const winners=resolved?eligible.filter(function(team){return Number(finalRanks[team])===originalRanks[team];}):[];
+  return {count:winners.length,total:winners.length*5,maxBonus:eligible.length*5,eligibleTeams:eligible};
+}
+
 function nflPlayoffRaceAdjustedTeamMultipliers_(previous,newRankings,roundMultiplier){
   const priorRankings=nflPlayoffRaceSnapshotRankings_(previous);
   const priorPositions={};
@@ -646,7 +799,7 @@ function nflPlayoffRaceAdjustedTeamMultipliers_(previous,newRankings,roundMultip
   });
   return result;
 }
-function nflPlayoffRaceWeightedScore_(category,ballot,finalRanks,snapshot){
+function nflPlayoffRaceWeightedScore_(category,ballot,finalRanks,snapshot,history){
   const nominees=(category&&category.nominees||[]).filter(function(row){return row&&row.id;});
   const valid=typeof rankingBallotValid_==="function"&&rankingBallotValid_(category,ballot);
   const resolved=typeof rankingFinalOrderComplete_==="function"&&rankingFinalOrderComplete_(category,finalRanks||{});
@@ -655,17 +808,17 @@ function nflPlayoffRaceWeightedScore_(category,ballot,finalRanks,snapshot){
   const ranks={};
   (ballot||[]).forEach(function(row){ranks[nflPlayoffRaceKey_(row.nomineeId)]=Number(row.rank)||0;});
   let max=0,earned=0,exactCount=0,baseEarned=0;
-  const unit=nominees.length?Math.max(0,Number(category.points)||0)/nominees.length:0;
+  const finalUnitMax=20;
   const playoff=/playoff-seeds/.test(nflPlayoffRaceKey_(category&&category.id));
   const top=[];let correctPlayoffTeams=0,bonus=0,bonusMax=0;
   nominees.forEach(function(nominee){
     const id=nflPlayoffRaceKey_(nominee.id);
     const pct=Object.prototype.hasOwnProperty.call(values,id)?values[id]:fallback;
-    if(valid)max+=unit*pct;
+    if(valid)max+=finalUnitMax*pct;
     const predicted=ranks[id],actual=Number(finalRanks&&finalRanks[id])||0;
     if(valid&&resolved&&predicted>0&&actual>0){
-      const credit=Math.max(0,1-Math.abs(predicted-actual)*.2);
-      earned+=unit*credit*pct;baseEarned+=unit*credit;
+      const points=nflPlayoffRacePositionPoints_(predicted,actual);
+      earned+=points*pct;baseEarned+=points;
       if(predicted===actual)exactCount++;
     }
     if(valid&&playoff&&predicted>=1&&predicted<=7){
@@ -679,13 +832,19 @@ function nflPlayoffRaceWeightedScore_(category,ballot,finalRanks,snapshot){
     if(resolved&&correctPlayoffTeams===7)bonus+=perfect;
   }
   if(valid&&resolved)baseEarned+=playoff?(correctPlayoffTeams*3+(correctPlayoffTeams===7?5:0)):0;
+  const hold=valid?nflPlayoffRaceOriginalHoldBonus_(history||[],finalRanks||{}):{count:0,total:0,maxBonus:0,eligibleTeams:[]};
+  if(valid&&resolved)baseEarned+=hold.total;
   const round=function(v){return Math.round(v*100)/100;};
   return {
-    earnedPoints:round(resolved&&valid?earned+bonus:0),
-    remainingPoints:round(!resolved&&valid?max+bonusMax:0),
-    finalPointsAvailable:round(valid?max+bonusMax:0),
+    earnedPoints:round(resolved&&valid?earned+bonus+hold.total:0),
+    remainingPoints:round(!resolved&&valid?max+bonusMax+hold.maxBonus:0),
+    finalPointsAvailable:round(valid?max+bonusMax+hold.maxBonus:0),
     baseEarnedPoints:round(baseEarned),
-    bonusPoints:round(resolved?bonus:0),bonusMax:round(bonusMax),
+    finalForecastPoints:round(resolved&&valid?earned:0),
+    playoffFieldBonus:round(resolved?bonus:0),
+    originalHoldBonus:round(resolved?hold.total:0),
+    originalHoldCount:hold.count,
+    bonusPoints:round(resolved?bonus+hold.total:0),bonusMax:round(bonusMax+hold.maxBonus),
     exactCount:exactCount,resolved:resolved,validBallot:valid,
     correctPlayoffTeams:correctPlayoffTeams,teamMultipliers:values
   };
@@ -809,25 +968,35 @@ function nflPlayoffRaceMigrateLegacy_(gameId,username,timing){
   return rows;
 }
 
-function nflPlayoffRaceMeta_(gameId,username){
-  const timing=nflPlayoffRaceTiming_(gameId);
+function nflPlayoffRaceLiveGame_(game){
+  if(!game)return false;
+  const status=nflPlayoffRaceKey_(game.status||game.gameStatus);
+  return game.active===true&&game.archived!==true&&["draft","setup","unpublished"].indexOf(status)===-1;
+}
+
+function nflPlayoffRaceMeta_(gameId,username,requestContext,gameConfig){
+  const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
+  const game=gameConfig||(typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId));
+  let timing=nflPlayoffRaceTiming_(gameId,context);
+  const setupMode=!nflPlayoffRaceLiveGame_(game);
+  if(setupMode)timing=Object.assign({},timing,{seasonStarted:false,currentWindow:null,nextWindow:{week:4,multiplier:nflPlayoffRaceCheckpointMultiplier_(4)}});
   const rows=nflPlayoffRaceMigrateLegacy_(gameId,username,timing);
   const categories=typeof rankingGameCategories_==="function"?rankingGameCategories_(gameId):[];
   const missingOriginal=categories.map(function(category){return nflPlayoffRaceKey_(category.id);}).filter(function(categoryId){
     return !nflPlayoffRaceOriginalSnapshot_(rows,categoryId);
   });
   const active=rows.filter(function(row){return row.isActive;});
-  const currentMultiplier=active.length
+  const currentMultiplier=setupMode?1:(active.length
     ?Math.min.apply(Math,active.map(function(row){return nflPlayoffRaceNumber_(row.multiplier,1);}))
-    :nflPlayoffRaceInitialMultiplier_(gameId,timing.currentWeek,timing.seasonStarted);
-  const canEnter=missingOriginal.length>0&&(!timing.seasonStarted||timing.currentWeek<=NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_);
+    :nflPlayoffRaceInitialMultiplier_(gameId,timing.currentWeek,timing.seasonStarted));
+  const canEnter=setupMode?missingOriginal.length>0:(missingOriginal.length>0&&(!timing.seasonStarted||timing.currentWeek<=NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_));
   const allOriginal=missingOriginal.length===0;
-  const canUpdate=allOriginal&&!!timing.currentWindow;
-  // New original forecasts use late-entry value even during an update window.
-  const saveMultiplier=canEnter?nflPlayoffRaceInitialMultiplier_(gameId,timing.currentWeek,timing.seasonStarted)
-    :timing.currentWindow?timing.currentWindow.multiplier:currentMultiplier;
+  const canUpdate=setupMode?allOriginal:(allOriginal&&!!timing.currentWindow);
+  const saveMultiplier=setupMode?1:(canEnter?nflPlayoffRaceInitialMultiplier_(gameId,timing.currentWeek,timing.seasonStarted)
+    :timing.currentWindow?timing.currentWindow.multiplier:currentMultiplier);
   let lockReason="";
-  if(missingOriginal.length&&!canEnter)lockReason="New scoring forecasts closed after Week "+NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_+".";
+  if(setupMode)lockReason="Setup / Original Forecast mode. NFL week timing does not reduce forecast value until this PATTC game is live.";
+  else if(missingOriginal.length&&!canEnter)lockReason="New scoring forecasts closed after Week "+NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_+".";
   else if(allOriginal&&!timing.currentWindow&&timing.currentWeek>=15)lockReason="Final lock. The Week 15 update window has closed.";
   else if(allOriginal&&!timing.currentWindow)lockReason="Original Prediction saved. Updates open before Weeks 4, 8, 12 and 15 after the prior NFL week is final.";
   else if(timing.currentWindow)lockReason="Week "+timing.currentWindow.week+" update window is open until the first kickoff of Week "+timing.currentWindow.week+".";
@@ -835,7 +1004,7 @@ function nflPlayoffRaceMeta_(gameId,username){
   return {
     timing:timing,rows:rows,missingOriginal:missingOriginal,currentMultiplier:currentMultiplier,
     saveMultiplier:saveMultiplier,canEnter:canEnter,canUpdate:canUpdate,canEdit:canEnter||canUpdate,
-    lockReason:lockReason
+    lockReason:lockReason,setupMode:setupMode,requestContext:context,game:game
   };
 }
 
@@ -846,8 +1015,12 @@ function apiGetNflPlayoffRaceState_(payload){
   if(!nflPlayoffRaceIsGame_(gameId))throw new Error("NFL Playoff Race game is required.");
   if(!username)throw new Error("Username is required.");
   const base=apiGetRankingState_({gameId:gameId,username:username});
-  const meta=nflPlayoffRaceMeta_(gameId,username);
-  const live=nflPlayoffRaceLiveStandings_(gameId,meta.timing.currentWeek);
+  const requestContext=nflPlayoffRaceRequestContext_(gameId);
+  const game=typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId);
+  const meta=nflPlayoffRaceMeta_(gameId,username,requestContext,game);
+  const live=nflPlayoffRaceLiveStandings_(gameId,meta.timing.currentWeek,requestContext);
+  const checkpointRows=meta.setupMode?nflPlayoffRaceReadCheckpointScores_(gameId,username):nflPlayoffRaceBankDueCheckpoints_(gameId,username,meta.rows,meta.timing,requestContext);
+  const checkpointSummary=nflPlayoffRaceCheckpointSummary_(checkpointRows);
   const drafts=nflPlayoffRaceDraftRowsR3_(gameId,username);
   const rawCategories={};
   rankingGameCategories_(gameId).forEach(function(row){rawCategories[nflPlayoffRaceKey_(row.id)]=row;});
@@ -869,7 +1042,7 @@ function apiGetNflPlayoffRaceState_(payload){
     const basePositionRemaining=nflPlayoffRaceNumber_(category.remainingPoints,0);
     const weighted=active?nflPlayoffRaceWeightedScore_(
       Object.assign({},category,{points:nflPlayoffRaceNumber_(category.points,0)}),
-      category.ballot||[],finalRanks,active):null;
+      category.ballot||[],finalRanks,active,nflPlayoffRaceCategorySnapshots_(meta.rows,categoryId)):null;
     const baseEarned=basePositionEarned+(finalBonus.resolved?finalBonus.total:0);
     const baseRemaining=category.resolved?0:(basePositionRemaining+finalBonus.maxBonus);
     return Object.assign({},category,{
@@ -881,22 +1054,23 @@ function apiGetNflPlayoffRaceState_(payload){
       lockReason:category.resolved?"This conference is resolved/final.":(staticReason||(!canEdit?meta.lockReason:"")),
       draftRankings:draft?draft.rankings:[],draftUpdatedAt:draft?draft.updatedAt:"",
       originalSnapshot:nflPlayoffRacePublicSnapshot_(original),
-      activeSnapshot:nflPlayoffRacePublicSnapshot_(active),
-      forecastMultiplier:multiplier,
-      finalizeMultiplier:original?(meta.timing.currentWindow?meta.timing.currentWindow.multiplier:multiplier)
-        :nflPlayoffRaceInitialMultiplier_(gameId,meta.timing.currentWeek,meta.timing.seasonStarted),
+      activeSnapshot:(function(){const snap=nflPlayoffRacePublicSnapshot_(active);if(meta.setupMode&&snap){snap.multiplier=1;Object.keys(snap.teamMultipliers||{}).forEach(function(team){snap.teamMultipliers[team]=1;});}return snap;})(),
+      forecastMultiplier:meta.setupMode?1:multiplier,
+      finalizeMultiplier:meta.setupMode?1:(original?(meta.timing.currentWindow?meta.timing.currentWindow.multiplier:multiplier)
+        :nflPlayoffRaceInitialMultiplier_(gameId,meta.timing.currentWeek,meta.timing.seasonStarted)),
       baseEarnedPoints:baseEarned,
       baseRemainingPoints:baseRemaining,
       playoffBonus:finalBonus,
       earnedPoints:weighted?weighted.earnedPoints:Math.round(baseEarned*multiplier*100)/100,
       remainingPoints:weighted?weighted.remainingPoints:Math.round(baseRemaining*multiplier*100)/100,
-      teamMultipliers:active?nflPlayoffRaceSnapshotTeamMultipliers_(active):{},
+      teamMultipliers:meta.setupMode&&active?Object.fromEntries(nflPlayoffRaceSnapshotRankings_(active).map(function(row){return [nflPlayoffRaceKey_(row.nomineeId),1];})):active?nflPlayoffRaceSnapshotTeamMultipliers_(active):{},
+      scoreBreakdown:weighted?{finalForecastPoints:weighted.finalForecastPoints,playoffFieldBonuses:weighted.playoffFieldBonus,originalHoldBonuses:weighted.originalHoldBonus}:null,
       liveStandings:nflPlayoffRaceLiveCategory_(category,active,live)
     });
   });
   base.nflPlayoffRace={
     currentWeek:meta.timing.currentWeek,weekSource:meta.timing.weekSource,seasonStarted:meta.timing.seasonStarted,
-    currentWindow:meta.timing.currentWindow,nextWindow:meta.timing.nextWindow,
+    setupMode:meta.setupMode,currentWindow:meta.timing.currentWindow,nextWindow:meta.timing.nextWindow,
     canEnter:meta.canEnter,canUpdate:meta.canUpdate,canEdit:meta.canEdit,
     currentMultiplier:meta.currentMultiplier,saveMultiplier:meta.saveMultiplier,
     finalLateEntryWeek:NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_,lockReason:meta.lockReason,
@@ -904,13 +1078,26 @@ function apiGetNflPlayoffRaceState_(payload){
     teamPlayoffBonus:NFL_PLAYOFF_RACE_TEAM_BONUS_,
     perfectFieldBonus:NFL_PLAYOFF_RACE_PERFECT_FIELD_BONUS_,
     adjustmentSchedule:[
-      {week:4,multiplier:0.85},{week:8,multiplier:0.70},
-      {week:12,multiplier:0.55},{week:15,multiplier:0.40}
+      {week:4,multiplier:0.95},{week:8,multiplier:0.85},
+      {week:12,multiplier:0.65},{week:15,multiplier:0.40}
     ],
+    checkpoints:checkpointSummary,
+    performance:{requestScopedTiming:true,weekScheduleFetches:requestContext.weekScheduleFetches,weekScheduleCacheHits:requestContext.weekScheduleCacheHits},
     liveWeek:live.week,liveUpdatedAt:live.updatedAt,provisionalTiebreakers:live.provisionalTiebreakers,
     originalForecast:meta.rows.filter(function(row){return nflPlayoffRaceKey_(row.forecastType)==="original";}).map(nflPlayoffRacePublicSnapshot_),
     activeForecast:meta.rows.filter(function(row){return row.isActive;}).map(nflPlayoffRacePublicSnapshot_),
     history:meta.rows.map(nflPlayoffRacePublicSnapshot_)
+  };
+  const finalParts=(base.categories||[]).reduce(function(out,category){
+    const row=category.scoreBreakdown||{};out.finalForecastPoints+=nflPlayoffRaceNumber_(row.finalForecastPoints,0);
+    out.playoffFieldBonuses+=nflPlayoffRaceNumber_(row.playoffFieldBonuses,0);out.originalHoldBonuses+=nflPlayoffRaceNumber_(row.originalHoldBonuses,0);return out;
+  },{finalForecastPoints:0,playoffFieldBonuses:0,originalHoldBonuses:0});
+  base.nflPlayoffRace.scoreBreakdown={
+    checkpointPoints:checkpointSummary.total,
+    finalForecastPoints:Math.round(finalParts.finalForecastPoints*100)/100,
+    playoffFieldBonuses:Math.round(finalParts.playoffFieldBonuses*100)/100,
+    originalHoldBonuses:Math.round(finalParts.originalHoldBonuses*100)/100,
+    total:Math.round((checkpointSummary.total+finalParts.finalForecastPoints+finalParts.playoffFieldBonuses+finalParts.originalHoldBonuses)*100)/100
   };
   return base;
 }
@@ -936,15 +1123,16 @@ function saveNflPlayoffRaceRanking_(payload){
   if(original){
     if(!meta.canUpdate)throw new Error(meta.lockReason||"Playoff Race is locked outside an update window.");
     forecastType="update";
-    effectiveWeek=meta.timing.currentWindow.week;
-    multiplier=meta.timing.currentWindow.multiplier;
+    effectiveWeek=meta.setupMode?0:meta.timing.currentWindow.week;
+    multiplier=meta.setupMode?1:meta.timing.currentWindow.multiplier;
   }else if(!meta.canEnter){
     throw new Error(meta.lockReason||"New scoring forecasts closed after Week "+NFL_PLAYOFF_RACE_FINAL_ENTRY_WEEK_+".");
   }
 
   const previous=nflPlayoffRaceActiveSnapshot_(meta.rows,categoryId);
-  const teamMultipliers=previous
-    ?nflPlayoffRaceAdjustedTeamMultipliers_(previous,rankings,multiplier)
+  const teamMultipliers=meta.setupMode
+    ?Object.fromEntries(rankings.map(function(row){return [nflPlayoffRaceKey_(row.nomineeId),1];}))
+    :previous?nflPlayoffRaceAdjustedTeamMultipliers_(previous,rankings,multiplier)
     :Object.fromEntries(rankings.map(function(row){return [nflPlayoffRaceKey_(row.nomineeId),multiplier];}));
   const saved=saveRankingBallot_({username:username,gameId:gameId,categoryId:categoryId,
     rankings:rankings,playoffRaceTimingAuthorized:true});
@@ -953,9 +1141,10 @@ function saveNflPlayoffRaceRanking_(payload){
     forecastId:nflPlayoffRaceForecastId_(),forecastType:forecastType,
     effectiveWeek:effectiveWeek,multiplier:multiplier,rankings:rankings,teamMultipliers:teamMultipliers,
     submittedAt:new Date().toISOString(),
-    source:forecastType==="original"?"player-original":"player-checkpoint-update"
+    source:meta.setupMode?(forecastType==="original"?"setup-original":"setup-original-update"):(forecastType==="original"?"player-original":"player-checkpoint-update")
   });
   NFL_PLAYOFF_RACE_SNAPSHOT_READ_CACHE_R3_={};
+  NFL_PLAYOFF_RACE_SNAPSHOT_HISTORY_CACHE_R1_={};
   return Object.assign({},saved,{
     forecastType:forecastType,effectiveWeek:effectiveWeek,forecastMultiplier:multiplier,
     originalPreserved:!!original,teamMultipliers:teamMultipliers
@@ -963,6 +1152,12 @@ function saveNflPlayoffRaceRanking_(payload){
 }
 
 var NFL_PLAYOFF_RACE_SNAPSHOT_READ_CACHE_R3_={};
+var NFL_PLAYOFF_RACE_SNAPSHOT_HISTORY_CACHE_R1_={};
+function nflPlayoffRaceHistoryForUser_(gameId,username){
+  const key=gameId+"|"+nflPlayoffRaceKey_(username);
+  if(!NFL_PLAYOFF_RACE_SNAPSHOT_HISTORY_CACHE_R1_[key])NFL_PLAYOFF_RACE_SNAPSHOT_HISTORY_CACHE_R1_[key]=nflPlayoffRaceReadSnapshots_(gameId,username);
+  return NFL_PLAYOFF_RACE_SNAPSHOT_HISTORY_CACHE_R1_[key].slice();
+}
 function nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId){
   if(!NFL_PLAYOFF_RACE_SNAPSHOT_READ_CACHE_R3_[gameId]){
     const map={};nflPlayoffRaceReadSnapshots_(gameId).forEach(function(row){
