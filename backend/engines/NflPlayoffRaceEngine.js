@@ -976,7 +976,7 @@ function nflPlayoffRaceLiveGame_(game){
 
 function nflPlayoffRaceMeta_(gameId,username,requestContext,gameConfig){
   const context=requestContext||nflPlayoffRaceRequestContext_(gameId);
-  const game=gameConfig||(typeof getGameRuntimeConfig==="function"?getGameRuntimeConfig(gameId):getGame(gameId));
+  const game=gameConfig||(typeof getGame==="function"?getGame(gameId):getGameRuntimeConfig(gameId));
   let timing=nflPlayoffRaceTiming_(gameId,context);
   const setupMode=!nflPlayoffRaceLiveGame_(game);
   if(setupMode)timing=Object.assign({},timing,{seasonStarted:false,currentWindow:null,nextWindow:{week:4,multiplier:nflPlayoffRaceCheckpointMultiplier_(4)}});

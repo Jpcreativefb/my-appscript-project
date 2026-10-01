@@ -12,5 +12,5 @@ assert(conf.includes("min-height:154px!important"));
 assert(conf.includes("grid-template-columns:43px minmax(0,1fr)!important"));
 assert(conf.includes("grid-template-columns:14px minmax(48px,1fr) 14px!important"));
 assert(html.includes("confidence=v1232-confidence-pool-r8-6-1"));
-assert(html.includes("playoff=v1222-nfl-playoff-race-r3-team-multipliers"));
+assert(html.includes("playoff=v1234-nfl-playoff-race-season-game-r1"));
 console.log("PATTC NFL launch visual finish R2.2 tests: PASS");
