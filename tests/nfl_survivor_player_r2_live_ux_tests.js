@@ -14,7 +14,7 @@ assert(app.includes('url.searchParams.set("survivorPlayer", "v1230-nfl-survivor-
 
 assert(worker.includes('SURVIVOR_R3_PREVIEW_READ_ACTIONS'));
 const previewReadSet=worker.slice(worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'),worker.indexOf(']);',worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'))+3);
-assert(!previewReadSet.includes('"getSurvivorState"'),'Director Preview must not route Survivor state to the stale R3 preview Apps Script deployment');
+assert(previewReadSet.includes('"getSurvivorState"'),'Director Preview must route Survivor state to the aligned Preview Apps Script deployment');
 assert(previewReadSet.includes('"getSurvivorTeamSchedule"'),'unrelated Survivor preview read routing remains unchanged');
 assert(worker.includes('SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS'));
 assert(worker.includes('"saveSurvivorPick"')&&worker.includes('"saveSportsSurvivorAutoPickPreference"'),'Preview Survivor writes remain blocked');

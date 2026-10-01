@@ -5,6 +5,7 @@ const SURVIVOR_R3_PREVIEW_API_URL =
   "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
 
 const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
+  "getSurvivorState",
   "getSurvivorTeamSchedule",
   "adminBuildNflSeasonPack",
   "adminGetNflPlayoffRaceSettings",
