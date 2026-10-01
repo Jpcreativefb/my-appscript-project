@@ -5,7 +5,6 @@ const SURVIVOR_R3_PREVIEW_API_URL =
   "https://script.google.com/macros/s/AKfycbywlPw_MsMCzBO8PNnbQuVOADFxHQuZk3AJtqoDr6_F2Oi-2-p57OLmtmdEFpknrAq0/exec";
 
 const SURVIVOR_R3_PREVIEW_READ_ACTIONS = new Set([
-  "getSurvivorState",
   "getSurvivorTeamSchedule",
   "adminBuildNflSeasonPack",
   "adminGetNflPlayoffRaceSettings",
@@ -175,7 +174,7 @@ export async function onRequestPost(context) {
     }, 200);
   }
 
-  // R1.1: Preview-only routes are host-scoped. Production always uses the production Apps Script deployment.
+  // R2 live payload correction: getSurvivorState intentionally uses the canonical Apps Script deployment in Preview too.\n  // The stale Survivor-R3 preview deployment does not return weekRounds/resolved-week browsing payloads.\n  // Writes remain blocked above, so this is a single read-path correction only.\n  // R1.1: Preview-only routes are host-scoped. Production always uses the production Apps Script deployment.
   const futuresActions = new Set(["getBettingPagePayload","getBettingOptions","getMyBets","saveBet","removeBet","bettingLeaderboard","leaderboard"]);
   const newFeaturePreview =
     (/^nfl-futures-2026$/.test(gameId) && futuresActions.has(action)) ||
