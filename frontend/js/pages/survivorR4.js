@@ -318,18 +318,25 @@
   "use strict";
   const MARK="NFL_SURVIVOR_WEEK_BROWSER_UI_R1";
   let selectedWeek=0;
+  let selectionWeek=0;
 
   function p(){return root.SURVIVOR_PAGE_STATE&&root.SURVIVOR_PAGE_STATE.payload||{};}
   function weeks(payload){return Array.isArray(payload&&payload.weekRounds)?payload.weekRounds:[];}
   function officialWeek(payload){return Number(payload&&payload.resolvedWeek||payload&&payload.currentRound&&payload.currentRound.week||0);}
   function officialRound(payload){const w=officialWeek(payload);return weeks(payload).find(function(row){return Number(row.week)===w;})||payload.currentRound||null;}
+  function savedSelection(round){return Array.isArray(round&&round.pickNomineeIds)?round.pickNomineeIds.slice():(round&&round.pickNomineeId?[round.pickNomineeId]:[]);}
   function chooseRound(payload){
     const rows=weeks(payload);if(!rows.length)return payload.currentRound||null;
     const official=officialWeek(payload);
     if(!selectedWeek||!rows.some(function(row){return Number(row.week)===Number(selectedWeek);}))selectedWeek=official||Number(rows[0].week||0);
     const round=rows.find(function(row){return Number(row.week)===Number(selectedWeek);})||officialRound(payload)||rows[0];
+    const targetWeek=Number(round.week||0);
+    const weekChanged=!selectionWeek||Number(selectionWeek)!==targetWeek;
     payload.currentRound=round;
-    root.SURVIVOR_PAGE_STATE.selected=Array.isArray(round.pickNomineeIds)?round.pickNomineeIds.slice():(round.pickNomineeId?[round.pickNomineeId]:[]);
+    if(weekChanged){
+      root.SURVIVOR_PAGE_STATE.selected=savedSelection(round);
+      selectionWeek=targetWeek;
+    }
     return round;
   }
   function weekLabel(row,official){const w=Number(row.week||0);return "Week "+w+(w===official?" — CURRENT":w<official?" — PAST":" — UPCOMING");}
