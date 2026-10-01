@@ -1982,11 +1982,32 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
   return { success:errors.length===0, week:week, generated:generated.length, inserted:write.inserted, updated:write.updated, unchanged:write.unchanged, errors:errors };
 }
 
+function teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules) {
+  return ["tf-ranking-repair-v1", teamFantasySlug_(gameId), Number(settings && settings.seasonYear || 0), Number(beforeWeek || 0), teamFantasyRankingRulesSignature_(rules || [])].join("|");
+}
+
+function teamFantasyRankingRepairMarkerGet_(key) {
+  try {
+    if (typeof PropertiesService === "undefined" || !PropertiesService.getScriptProperties) return "";
+    return teamFantasyString_(PropertiesService.getScriptProperties().getProperty(key));
+  } catch (err) { return ""; }
+}
+
+function teamFantasyRankingRepairMarkerPut_(key) {
+  try {
+    if (typeof PropertiesService === "undefined" || !PropertiesService.getScriptProperties) return;
+    PropertiesService.getScriptProperties().setProperty(key, teamFantasyNowIso_());
+  } catch (err) {}
+}
+
 function teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, beforeWeek) {
   settings = settings || teamFantasyGetSettings_(gameId);
   beforeWeek = Math.max(1, Math.floor(teamFantasyNumber_(beforeWeek, settings.currentWeek)));
   if (beforeWeek <= 1) return { success:true, weeks:[], errors:[] };
   const rules = teamFantasyRules_(gameId);
+  const markerKey = teamFantasyRankingRepairMarkerKey_(gameId, settings, beforeWeek, rules);
+  const marker = teamFantasyRankingRepairMarkerGet_(markerKey);
+  if (marker) return { success:true, cached:true, marker:marker, weeks:[], errors:[] };
   const byEvent = {};
   let knownRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   const results = [];
@@ -1998,7 +2019,9 @@ function teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, beforeWee
     if (result.errors && result.errors.length) errors.push.apply(errors, result.errors);
     if (result.inserted || result.updated) knownRows = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   }
-  return { success:errors.length===0, weeks:results, errors:errors };
+  const success = errors.length === 0;
+  if (success) teamFantasyRankingRepairMarkerPut_(markerKey);
+  return { success:success, cached:false, marker:success ? teamFantasyNowIso_() : "", weeks:results, errors:errors };
 }
 
 function teamFantasyUpsertUnitScore_(values) {
@@ -2078,6 +2101,11 @@ function teamFantasyRefreshWeekScores_(gameId, week, weekClosed) {
 
 function teamFantasyRefreshAndScoreWeek_(gameId, week) {
   const settings = teamFantasyGetSettings_(gameId);
+  let historicalRankingRepair = { success:true, skipped:true, reason:"week-1" };
+  if (Number(week) > 1) {
+    try { historicalRankingRepair = teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, week); }
+    catch (repairErr) { historicalRankingRepair = { success:false, errors:[{error:repairErr && repairErr.message ? repairErr.message : String(repairErr)}] }; }
+  }
   const picks = teamFantasyPickRows_(gameId, settings.seasonYear, week, "");
   const rules = teamFantasyRules_(gameId);
   const byEvent = {};
@@ -2131,7 +2159,7 @@ function teamFantasyRefreshAndScoreWeek_(gameId, week) {
   });
   teamFantasyRefreshWeekScores_(gameId, week, weekClosed);
   SpreadsheetApp.flush();
-  return { success: errors.length === 0, gameId: gameId, week: week, weekClosed: weekClosed, scheduleGames: schedule.games.length, picks: picks.length, scored: scored, pending: pending, errors: errors, rankingUniverse: rankingUniverse };
+  return { success: errors.length === 0 && historicalRankingRepair.success !== false, gameId: gameId, week: week, weekClosed: weekClosed, scheduleGames: schedule.games.length, picks: picks.length, scored: scored, pending: pending, errors: errors, rankingUniverse: rankingUniverse, historicalRankingRepair: historicalRankingRepair };
 }
 
 function teamFantasyLeagueRow_(gameId, leagueId) {
@@ -2362,14 +2390,10 @@ function apiGetTeamFantasyState(payload) {
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
   const schedule = timing.scheduleByWeek && timing.scheduleByWeek[week] ? timing.scheduleByWeek[week] : teamFantasyFetchWeekSchedule_(gameId, week, settings);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
-  // Ensure the ranking dataset is sourced from all completed NFL teams, not
-  // from whichever teams PATTC users happened to select.
-  let rankingBackfill = { success:true, weeks:[], errors:[] };
-  try { rankingBackfill = teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, week) || rankingBackfill; }
-  catch (rankingErr) {
-    rankingBackfill = { success:false, weeks:[], errors:[{ error: rankingErr && rankingErr.message ? rankingErr.message : String(rankingErr) }] };
-    console.warn("Team Fantasy ranking-universe backfill skipped", rankingErr);
-  }
+  // Historical ranking repair is intentionally NOT performed on this player
+  // read. The scoring/admin refresh path owns idempotent backfill so healthy
+  // player loads never traverse prior weeks or fetch historical ESPN summaries.
+  const rankingBackfill = { success:true, deferred:true, source:"scoring-refresh" };
   // RC22: load the two hot lineup tables once for this state request and
   // reuse them for every entry and all eight positions.
   const lineupReadContext = {
