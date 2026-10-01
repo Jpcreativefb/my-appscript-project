@@ -894,6 +894,42 @@ function teamFantasyFetchWeekSchedule_(gameId, week, suppliedSettings, options) 
   return schedule;
 }
 
+
+/* TEAM_FANTASY_AUTO_WEEK_R1
+   Team Fantasy has no separate calendar algorithm. The shared NFL resolver is
+   authoritative in normal play; stored CurrentWeek is fallback/admin context. */
+function teamFantasyNflWeekTiming_(gameId, suppliedSettings, options) {
+  const settings = suppliedSettings || teamFantasyGetSettings_(gameId);
+  options = options || {};
+  const storedWeek = Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(settings && settings.currentWeek, 1))));
+  const scheduleByWeek = options.scheduleByWeek || {};
+  const fetchWeek = function(week) {
+    week = Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(week, 1))));
+    if (!scheduleByWeek[week]) scheduleByWeek[week] = teamFantasyFetchWeekSchedule_(gameId, week, settings);
+    const schedule = scheduleByWeek[week];
+    return schedule && Array.isArray(schedule.games) ? schedule.games : [];
+  };
+  let timing;
+  if (typeof pattcNflResolveCurrentWeek_ === "function") {
+    timing = pattcNflResolveCurrentWeek_({
+      mode: "auto",
+      startWeek: 1,
+      endWeek: 18,
+      fallbackWeek: storedWeek,
+      nowMs: options.nowMs,
+      fetchWeek: fetchWeek
+    }) || {};
+  } else {
+    timing = { week: storedWeek, mode: "fallback", source: "stored-admin-fallback" };
+  }
+  timing.week = Math.max(1, Math.min(18, Math.floor(teamFantasyNumber_(timing.week, storedWeek))));
+  timing.mode = teamFantasyString_(timing.mode) || "auto";
+  timing.source = teamFantasyString_(timing.source) || "stored-admin-fallback";
+  timing.storedWeek = storedWeek;
+  timing.scheduleByWeek = scheduleByWeek;
+  return timing;
+}
+
 function teamFantasyPickRows_(gameId, seasonYear, week, entryId) {
   return teamFantasyReadRows_(TEAM_FANTASY_SHEETS.PICKS).filter(function(row) {
     return teamFantasyString_(row.GameId) === gameId &&
@@ -1389,16 +1425,20 @@ function teamFantasyAutoFillActivation_(gameId, settings, week, preference, sche
   return { activeAtMs: ms, activeAt: new Date(ms).toISOString(), label: preference.window === "custom" ? lead + " minutes before first weekly kickoff" : "30 minutes before " + preference.window.replace(/-/g," ") + " kickoff", available: true };
 }
 
-function teamFantasyRunAutomaticFillForPlayer_(gameId, username, nowMs) {
+function teamFantasyRunAutomaticFillForPlayer_(gameId, username, nowMs, suppliedTiming) {
   const settings = teamFantasyGetSettings_(gameId);
+  const timing = suppliedTiming || teamFantasyNflWeekTiming_(gameId, settings, { nowMs: nowMs });
+  const currentWeek = timing.week;
   const preference = teamFantasyGetPlayerPreference_(gameId, username);
-  if (preference.mode === "manual") return { success: true, skipped: true, reason: "manual" };
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek, settings);
-  const activation = teamFantasyAutoFillActivation_(gameId, settings, settings.currentWeek, preference, schedule);
-  if (!activation.available || Number(nowMs || Date.now()) < activation.activeAtMs) return { success: true, skipped: true, reason: activation.available ? "not-due" : "no-window", activation: activation };
-  const result = teamFantasyAutoPick_({ username: username, gameId: gameId, week: settings.currentWeek, _settings: settings, _schedule: schedule }, preference.mode === "random");
+  if (preference.mode === "manual") return { success: true, skipped: true, reason: "manual", currentWeek: currentWeek, weekSource: timing.source };
+  const schedule = timing.scheduleByWeek && timing.scheduleByWeek[currentWeek] ? timing.scheduleByWeek[currentWeek] : teamFantasyFetchWeekSchedule_(gameId, currentWeek, settings);
+  const activation = teamFantasyAutoFillActivation_(gameId, settings, currentWeek, preference, schedule);
+  if (!activation.available || Number(nowMs || Date.now()) < activation.activeAtMs) return { success: true, skipped: true, reason: activation.available ? "not-due" : "no-window", activation: activation, currentWeek: currentWeek, weekSource: timing.source };
+  const result = teamFantasyAutoPick_({ username: username, gameId: gameId, week: currentWeek, _settings: settings, _schedule: schedule }, preference.mode === "random");
   result.activation = activation;
   result.preference = preference;
+  result.currentWeek = currentWeek;
+  result.weekSource = timing.source;
   return result;
 }
 
@@ -2273,9 +2313,11 @@ function apiGetTeamFantasyState(payload) {
   teamFantasyRequireGameAccess_(username, gameId, "viewGame", payload.token);
   if (!teamFantasyIsGame_(gameId)) return { success: false, error: "This game is not configured as Team Fantasy Football." };
   const settings = teamFantasyGetSettings_(gameId);
-  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
+  const timing = teamFantasyNflWeekTiming_(gameId, settings);
+  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
+  const week = explicitWeek ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, timing.week))) : timing.week;
   const entries = teamFantasyEnsureEntriesForUser_(gameId, username);
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, week);
+  const schedule = timing.scheduleByWeek && timing.scheduleByWeek[week] ? timing.scheduleByWeek[week] : teamFantasyFetchWeekSchedule_(gameId, week, settings);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
   // Ensure the ranking dataset is sourced from all completed NFL teams, not
   // from whichever teams PATTC users happened to select.
@@ -2311,6 +2353,11 @@ function apiGetTeamFantasyState(payload) {
     gameId: gameId,
     username: username,
     week: week,
+    currentWeek: timing.week,
+    weekMode: timing.mode,
+    weekSource: timing.source,
+    storedCurrentWeek: timing.storedWeek,
+    historicalWeekRequested: explicitWeek,
     phase: teamFantasyPhaseForWeek_(settings, week),
     settings: settings,
     entries: entries,
@@ -2325,8 +2372,10 @@ function apiGetTeamFantasyState(payload) {
   };
 }
 
-function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
-  const settings = teamFantasyGetSettings_(gameId);
+function teamFantasyNotificationOutstandingSummary_(gameId, participants, suppliedSettings, suppliedTiming) {
+  const settings = suppliedSettings || teamFantasyGetSettings_(gameId);
+  const timing = suppliedTiming || teamFantasyNflWeekTiming_(gameId, settings);
+  const currentWeek = timing.week;
   const usernames = {};
   (participants || []).concat(teamFantasyParticipantUsernames_(gameId)).forEach(function(username) {
     const key = teamFantasyNormalizeUsername_(username);
@@ -2336,14 +2385,14 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
   const noPicksUsers = [];
   const incompleteUsers = [];
   const completeUsers = [];
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek);
+  const schedule = timing.scheduleByWeek && timing.scheduleByWeek[currentWeek] ? timing.scheduleByWeek[currentWeek] : teamFantasyFetchWeekSchedule_(gameId, currentWeek, settings);
   const entriesByUser = {};
   let allEntries = [];
   Object.keys(usernames).forEach(function(username) {
     entriesByUser[username] = teamFantasyEnsureEntriesForUser_(gameId, username);
     allEntries = allEntries.concat(entriesByUser[username]);
   });
-  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, settings.currentWeek, allEntries);
+  const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, currentWeek, allEntries);
   Object.keys(usernames).forEach(function(username) {
     const entries = (entriesByUser[username] || []).filter(function(entry) { return postseasonEligibility[entry.entryId] !== false; });
     let required = 0;
@@ -2351,7 +2400,7 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
     let openRequired = 0;
     const missing = [];
     entries.forEach(function(entry) {
-      const lineup = teamFantasyLineupState_(gameId, settings, entry, settings.currentWeek, schedule, true);
+      const lineup = teamFantasyLineupState_(gameId, settings, entry, currentWeek, schedule, true);
       required += lineup.required;
       picked += lineup.picked;
       lineup.slots.forEach(function(slot) {
@@ -2381,7 +2430,11 @@ function teamFantasyNotificationOutstandingSummary_(gameId, participants) {
     incompleteUsers: incompleteUsers,
     completeUsers: completeUsers,
     missingUsers: missingUsers,
-    details: details
+    details: details,
+    week: currentWeek,
+    weekMode: timing.mode,
+    weekSource: timing.source,
+    storedCurrentWeek: timing.storedWeek
   };
 }
 
@@ -2458,14 +2511,18 @@ function teamFantasyReminderDayCode_(value) {
   return ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][date.getUTCDay()] || "";
 }
 
-function teamFantasyReminderPolicy_(gameId) {
-  const settings = teamFantasyGetSettings_(gameId);
+function teamFantasyReminderPolicy_(gameId, suppliedSettings, suppliedTiming) {
+  const settings = suppliedSettings || teamFantasyGetSettings_(gameId);
+  const timing = suppliedTiming || teamFantasyNflWeekTiming_(gameId, settings);
   return {
     enabled: settings.reminderEnabled === true,
     thursday: settings.reminderThursday === true,
     sunday: settings.reminderSunday === true,
     finalWindow: settings.reminderFinalWindow === true,
-    currentWeek: settings.currentWeek,
+    currentWeek: timing.week,
+    weekMode: timing.mode,
+    weekSource: timing.source,
+    storedCurrentWeek: timing.storedWeek,
     message: settings.reminderEnabled === true
       ? "Team Fantasy reminders require both this game toggle and Notification Center automatic reminders."
       : "Team Fantasy missing-pick reminders are disabled for this game."
@@ -2474,9 +2531,11 @@ function teamFantasyReminderPolicy_(gameId) {
 
 function teamFantasyReminderKickoffWindows_(gameId, nowMs) {
   const settings = teamFantasyGetSettings_(gameId);
-  const policy = teamFantasyReminderPolicy_(gameId);
+  const timing = teamFantasyNflWeekTiming_(gameId, settings, { nowMs: nowMs });
+  const policy = teamFantasyReminderPolicy_(gameId, settings, timing);
   if (!policy.enabled) return { enabled: false, policy: policy, windows: [] };
-  const schedule = teamFantasyFetchWeekSchedule_(gameId, settings.currentWeek);
+  const currentWeek = timing.week;
+  const schedule = timing.scheduleByWeek && timing.scheduleByWeek[currentWeek] ? timing.scheduleByWeek[currentWeek] : teamFantasyFetchWeekSchedule_(gameId, currentWeek, settings);
   const games = (schedule.games || []).map(function(game) {
     const ms = new Date(game.gameDateTime).getTime();
     return { game: game, ms: ms, day: teamFantasyReminderDayCode_(ms) };
@@ -2529,12 +2588,14 @@ function apiAdminSendTeamFantasyReminder(payload) {
   const gameId = teamFantasyString_(payload.gameId);
   if (!gameId) throw new Error("Game is required.");
   const settings = teamFantasyGetSettings_(gameId);
+  const timing = teamFantasyNflWeekTiming_(gameId, settings);
+  const currentWeek = timing.week;
   if (!settings.reminderEnabled) return { success: false, message: "Team Fantasy reminders are disabled for this game." };
-  const summary = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
+  const summary = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId), settings, timing);
   const previewOnly = payload.previewOnly === true;
   if (typeof notificationPushGetSystemMode_ !== "function" || typeof notificationPushGatewaySend_ !== "function") {
     return previewOnly
-      ? { success: true, preview: true, gameId: gameId, week: settings.currentWeek, missingUsers: summary.missingUsers.length, details: summary.details, message: "Push notification engine is not available; preview only." }
+      ? { success: true, preview: true, gameId: gameId, week: currentWeek, missingUsers: summary.missingUsers.length, details: summary.details, message: "Push notification engine is not available; preview only." }
       : { success: false, message: "Push notification engine is not available." };
   }
   const globalMode = notificationPushGetSystemMode_();
@@ -2544,7 +2605,7 @@ function apiAdminSendTeamFantasyReminder(payload) {
   if (gameSetting && (!gameSetting.enabled || gameSetting.paused)) return { success: false, message: gameSetting.paused ? "Notifications are paused for this game." : "Notifications are OFF for this game." };
   if (previewOnly) {
     return {
-      success: true, preview: true, gameId: gameId, week: settings.currentWeek,
+      success: true, preview: true, gameId: gameId, week: currentWeek,
       missingUsers: summary.missingUsers.length, details: summary.details,
       globalMode: globalMode, gameTestOnly: !!(gameSetting && gameSetting.testOnly), testDelivery: forceTestRecipient,
       message: forceTestRecipient ? "TEST delivery will go only to the signed-in admin account." : "LIVE delivery will target only players missing Team Fantasy picks."
@@ -2554,22 +2615,22 @@ function apiAdminSendTeamFantasyReminder(payload) {
   const prefs = typeof notificationPushPreferenceSnapshot_ === "function" ? notificationPushPreferenceSnapshot_() : {};
   if (forceTestRecipient) {
     const subscriptions = notificationPushGetActiveSubscriptionsForUsers_([adminUsername]);
-    const title = "TEST · Team Fantasy Week " + settings.currentWeek;
+    const title = "TEST · Team Fantasy Week " + currentWeek;
     const message = summary.missingUsers.length + " player(s) currently owe Team Fantasy picks. TEST delivery only — no player was contacted.";
     const response = subscriptions.length ? notificationPushGatewaySend_(subscriptions, {
       title: title, body: message, message: message, route: "team-fantasy",
-      data: { route: "team-fantasy", gameId: gameId, week: settings.currentWeek, type: "make_picks", testDelivery: true }
+      data: { route: "team-fantasy", gameId: gameId, week: currentWeek, type: "make_picks", testDelivery: true }
     }) : { success: true, sent: 0, failed: 0, results: [] };
     (response.results || []).forEach(function(result) {
       if (typeof notificationPushMarkDeliveryResult_ === "function") notificationPushMarkDeliveryResult_(result);
     });
     teamFantasyAppendObject_(TEAM_FANTASY_SHEETS.REMINDER_LOG, {
-      SentAt: teamFantasyNowIso_(), GameId: gameId, SeasonYear: settings.seasonYear, Week: settings.currentWeek,
+      SentAt: teamFantasyNowIso_(), GameId: gameId, SeasonYear: settings.seasonYear, Week: currentWeek,
       Username: adminUsername, EntryId: "TEST", MissingPositionsJSON: JSON.stringify([]), Title: title, Message: message,
       Sent: Number(response.sent || 0), Failed: Number(response.failed || 0), Error: response.success === false ? teamFantasyString_(response.message || response.error) : ""
     });
     return {
-      success: response.success !== false, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek,
+      success: response.success !== false, adminUsername: adminUsername, gameId: gameId, week: currentWeek,
       testDelivery: true, requestedMissingUsers: summary.missingUsers.length, recipientUsers: adminUsername ? 1 : 0,
       sent: Number(response.sent || 0), failed: Number(response.failed || 0), errors: response.success === false ? [teamFantasyString_(response.message || response.error)] : []
     };
@@ -2583,11 +2644,11 @@ function apiAdminSendTeamFantasyReminder(payload) {
     if (!subscriptions.length) return;
     users++;
     const missingText = item.missing.slice(0, 4).join(", ") + (item.missing.length > 4 ? " +" + (item.missing.length - 4) + " more" : "");
-    const title = "Team Fantasy Week " + settings.currentWeek;
+    const title = "Team Fantasy Week " + currentWeek;
     const message = item.picked + "/" + item.required + " complete — " + missingText + " still open.";
     const response = notificationPushGatewaySend_(subscriptions, {
       title: title, body: message, message: message, route: "team-fantasy",
-      data: { route: "team-fantasy", gameId: gameId, week: settings.currentWeek, type: "make_picks" }
+      data: { route: "team-fantasy", gameId: gameId, week: currentWeek, type: "make_picks" }
     });
     (response.results || []).forEach(function(result) {
       if (typeof notificationPushMarkDeliveryResult_ === "function") notificationPushMarkDeliveryResult_(result);
@@ -2596,12 +2657,12 @@ function apiAdminSendTeamFantasyReminder(payload) {
     failed += Number(response.failed || 0);
     if (response.success === false) errors.push(item.username + ": " + teamFantasyString_(response.message || response.error));
     teamFantasyAppendObject_(TEAM_FANTASY_SHEETS.REMINDER_LOG, {
-      SentAt: teamFantasyNowIso_(), GameId: gameId, SeasonYear: settings.seasonYear, Week: settings.currentWeek,
+      SentAt: teamFantasyNowIso_(), GameId: gameId, SeasonYear: settings.seasonYear, Week: currentWeek,
       Username: item.username, EntryId: "", MissingPositionsJSON: JSON.stringify(item.missing),
       Title: title, Message: message, Sent: Number(response.sent || 0), Failed: Number(response.failed || 0), Error: response.success === false ? teamFantasyString_(response.message || response.error) : ""
     });
   });
-  return { success: errors.length === 0, adminUsername: adminUsername, gameId: gameId, week: settings.currentWeek, testDelivery: false, recipientUsers: users, sent: sent, failed: failed, errors: errors };
+  return { success: errors.length === 0, adminUsername: adminUsername, gameId: gameId, week: currentWeek, testDelivery: false, recipientUsers: users, sent: sent, failed: failed, errors: errors };
 }
 
 function teamFantasySyncTriggerStatus_() {
@@ -2638,18 +2699,20 @@ function teamFantasySyncTriggerHandler() {
     const settings = teamFantasyNormalizeSettings_(row);
     if (!settings.syncTriggerEnabled || !teamFantasyIsGame_(settings.gameId)) return;
     try {
+      const timing = teamFantasyNflWeekTiming_(settings.gameId, settings);
+      const currentWeek = timing.week;
       /* TEAM_FANTASY_GAME_DAY_CORE_PATCH_v1218r1 */
       const gate = typeof teamFantasyGameDayTriggerWindow_ === "function"
-        ? teamFantasyGameDayTriggerWindow_(settings.gameId, settings.currentWeek, Date.now())
+        ? teamFantasyGameDayTriggerWindow_(settings.gameId, currentWeek, Date.now())
         : { active: true, reason: "compatibility" };
       if (!gate.active) {
-        results.push({ success: true, skipped: true, gameId: settings.gameId, week: settings.currentWeek, reason: gate.reason || "outside NFL game window" });
+        results.push({ success: true, skipped: true, gameId: settings.gameId, week: currentWeek, reason: gate.reason || "outside NFL game window" });
         return;
       }
-      const result = teamFantasyRefreshAndScoreWeek_(settings.gameId, settings.currentWeek);
+      const result = teamFantasyRefreshAndScoreWeek_(settings.gameId, currentWeek);
       const errorCount = Number((result.errors || []).length);
       const firstError = errorCount ? teamFantasyString_(result.errors[0] && result.errors[0].error) : "";
-      const message = "Week " + settings.currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + errorCount + " errors." + (firstError ? " First error: " + firstError : "");
+      const message = "Week " + currentWeek + ": " + Number(result.picks || 0) + " picks, " + Number(result.scored || 0) + " final, " + Number(result.pending || 0) + " pending, " + errorCount + " errors." + (firstError ? " First error: " + firstError : "");
       result.lastSyncAt = teamFantasyRecordSyncStatus_(settings.gameId, result.success === false ? "error" : "success", message, "system");
       results.push(result);
     } catch (err) {
@@ -2696,7 +2759,9 @@ function apiAdminRunTeamFantasySync(payload) {
   const gameId = teamFantasyString_(payload.gameId);
   if (!gameId || !teamFantasyIsGame_(gameId)) throw new Error("Choose a saved Team Fantasy game first.");
   const settings = teamFantasyGetSettings_(gameId);
-  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
+  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
+  const timing = explicitWeek ? null : teamFantasyNflWeekTiming_(gameId, settings);
+  const week = explicitWeek ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek))) : timing.week;
   try {
     const result = teamFantasyRefreshAndScoreWeek_(gameId, week);
     const errorCount = Number((result.errors || []).length);
@@ -2855,16 +2920,18 @@ function apiAdminGetTeamFantasyDashboard(payload) {
   const gameId = teamFantasyString_(payload.gameId);
   if (!gameId) return { success: false, error: "Choose a Team Fantasy game." };
   const settings = teamFantasyGetSettings_(gameId);
+  const timing = teamFantasyNflWeekTiming_(gameId, settings);
+  const currentWeek = timing.week;
   teamFantasyEnsureCompleteLeague_(gameId, settings);
   const leagues = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.LEAGUES).filter(function(row) { return teamFantasyString_(row.GameId) === gameId && teamFantasyBool_(row.Active, true); }).map(function(row) {
     return { leagueId: teamFantasyString_(row.LeagueId), leagueName: teamFantasyString_(row.LeagueName), leagueType: teamFantasyString_(row.LeagueType), standingMode: teamFantasyString_(row.StandingMode), playoffTeams: teamFantasyNumber_(row.PlayoffTeams, 4) };
   });
   const entries = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.ENTRIES).filter(function(row) { return teamFantasyString_(row.GameId) === gameId && teamFantasyBool_(row.Active, true); }).map(teamFantasyPublicEntry_);
   const memberships = teamFantasyReadRows_(TEAM_FANTASY_SHEETS.MEMBERSHIPS).filter(function(row) { return teamFantasyString_(row.GameId) === gameId; }).map(function(row) { return { leagueId: teamFantasyString_(row.LeagueId), entryId: teamFantasyString_(row.EntryId), username: teamFantasyNormalizeUsername_(row.Username) }; });
-  const reminders = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId));
+  const reminders = teamFantasyNotificationOutstandingSummary_(gameId, teamFantasyParticipantUsernames_(gameId), settings, timing);
   const triggerStatus = teamFantasySyncTriggerStatus_();
   const currentPenaltyByEntry = {};
-  teamFantasyPickRows_(gameId, settings.seasonYear, settings.currentWeek, "").forEach(function(row) {
+  teamFantasyPickRows_(gameId, settings.seasonYear, currentWeek, "").forEach(function(row) {
     const entryId = teamFantasyString_(row.EntryId);
     if (!entryId) return;
     if (!currentPenaltyByEntry[entryId]) currentPenaltyByEntry[entryId] = { entryId: entryId, username: teamFantasyNormalizeUsername_(row.Username), positions: 0, points: 0 };
@@ -2876,6 +2943,7 @@ function apiAdminGetTeamFantasyDashboard(payload) {
   const notificationGlobalMode = typeof notificationPushGetSystemMode_ === "function" ? notificationPushGetSystemMode_() : "UNAVAILABLE";
   return {
     success: true, version: TEAM_FANTASY_VERSION, gameId: gameId, settings: settings,
+    currentWeek: currentWeek, weekMode: timing.mode, weekSource: timing.source, storedCurrentWeek: timing.storedWeek,
     rules: teamFantasyRules_(gameId), leagues: leagues, entries: entries, memberships: memberships,
     reminderSummary: reminders,
     currentWeekAutoPickPenalties: Object.keys(currentPenaltyByEntry).map(function(key) { const item = currentPenaltyByEntry[key]; item.points = teamFantasyRound_(item.points); return item; }),
@@ -3284,9 +3352,9 @@ teamFantasySavePlayerPreference_ = function(payload) {
   var username = teamFantasyNormalizeUsername_(payload.username);
   var settings = teamFantasyGetSettings_(gameId);
   var scope = teamFantasyKey_(payload.autoFillScope || payload.scope) === "week" ? "week" : "season";
-  var targetWeek = scope === "week"
-    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.autoFillWeek || payload.week, settings.currentWeek)))
-    : "";
+  var explicitTargetWeek = teamFantasyString_(payload.autoFillWeek || payload.week);
+  var resolvedTargetWeek = scope === "week" && !explicitTargetWeek ? teamFantasyNflWeekTiming_(gameId, settings).week : settings.currentWeek;
+  var targetWeek = scope === "week" ? Math.max(1, Math.floor(teamFantasyNumber_(explicitTargetWeek, resolvedTargetWeek))) : "";
   teamFantasyUpsert_(TEAM_FANTASY_SHEETS.PLAYER_SETTINGS, function(row) {
     return teamFantasyString_(row.GameId) === gameId && teamFantasyNormalizeUsername_(row.Username) === username;
   }, {
@@ -3306,16 +3374,19 @@ teamFantasySavePlayerPreference_ = function(payload) {
 var teamFantasyR47AutomaticFillBase_ = teamFantasyRunAutomaticFillForPlayer_;
 teamFantasyRunAutomaticFillForPlayer_ = function(gameId, username, nowMs) {
   var settings = teamFantasyGetSettings_(gameId);
+  var timing = teamFantasyNflWeekTiming_(gameId, settings, { nowMs: nowMs });
+  var currentWeek = timing.week;
   var preference = teamFantasyGetPlayerPreference_(gameId, username);
-  if (preference.scope === "week" && Number(preference.autoFillWeek || 0) !== Number(settings.currentWeek || 0)) {
+  if (preference.scope === "week" && Number(preference.autoFillWeek || 0) !== Number(currentWeek || 0)) {
     return {
       success: true,
       skipped: true,
       reason: "week-only-scope-expired",
-      currentWeek: Number(settings.currentWeek || 0),
+      currentWeek: Number(currentWeek || 0),
+      weekSource: timing.source,
       targetWeek: Number(preference.autoFillWeek || 0),
       preference: preference
     };
   }
-  return teamFantasyR47AutomaticFillBase_(gameId, username, nowMs);
+  return teamFantasyR47AutomaticFillBase_(gameId, username, nowMs, timing);
 };
