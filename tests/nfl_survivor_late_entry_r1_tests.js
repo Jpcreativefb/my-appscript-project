@@ -64,6 +64,36 @@ assert.strictEqual(week4.relation,'current');
 assert.strictEqual(week4.canPick,true);
 assert.strictEqual(week4.historicalReadOnly,false);
 
+
+// The Week Browser state wrapper must reuse state.resolvedWeek when it recomputes
+// the evaluation that drives weekRounds[].canPick.
+assert(engine.includes('const resolvedWeek = Math.max(settings.startWeek || 1, Math.floor(sportsSurvivorNumber_(state.resolvedWeek'));
+assert(engine.includes('sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap, {'));
+assert(engine.includes('resolvedWeek: resolvedWeek'));
+
+// Recreate the final Week Browser payload contract for a new Week-4 entrant.
+evaluation=context.sportsSurvivorEvaluateUser_('newuser','g',categories,settings,optionMeta,resultMap,{}, {resolvedWeek:4});
+const browserState={
+  alive:evaluation.alive,
+  lossesUsed:evaluation.lossesUsed,
+  livesRemaining:evaluation.livesRemaining,
+  resolvedWeek:4
+};
+const usedWeekMap=context.sportsSurvivorWeekBrowserUsedWeekMap_(evaluation.rounds);
+browserState.weekRounds=categories.map(function(row,index){
+  return context.sportsSurvivorWeekBrowserRound_(
+    {},settings,evaluation,optionMeta,resultMap,row,evaluation.rounds[index],index,browserState.resolvedWeek,usedWeekMap
+  );
+});
+const finalWeek4=browserState.weekRounds.find(function(row){return Number(row.week)===4;});
+assert.strictEqual(browserState.alive,true);
+assert.strictEqual(browserState.lossesUsed,0);
+assert.strictEqual(browserState.livesRemaining,3);
+assert.strictEqual(browserState.weekRounds[0].status,'pre-entry');
+assert.strictEqual(browserState.weekRounds[1].status,'pre-entry');
+assert.strictEqual(finalWeek4.relation,'current');
+assert.strictEqual(finalWeek4.canPick,true);
+
 // Once participation exists, later completed no-pick weeks keep normal missed/life semantics.
 const picks={user:{
   w2:{nomineeIds:['t2'],snapshots:[{sportsGameId:'g2',side:'home'}],confidencePoints:0}
