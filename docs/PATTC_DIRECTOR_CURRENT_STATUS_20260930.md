@@ -360,3 +360,24 @@ Conclusion:
 - proceed to the full production gate on `46d305d`
 
 Routing correction remains unmerged until full production checks pass.
+
+
+## Bottom Nav full-gate timing-only failure
+
+Routing commit `46d305d` remains unmerged.
+
+After same-Mac A/B isolation showed the accepted baseline itself intermittently fails the synthetic Home timing assertion while `46d305d` passed 5/5 standalone runs, the full production gate was attempted on `46d305d`.
+
+Gate result:
+- JavaScript syntax PASS
+- frontend compatibility mirrors PASS
+- regression phase stopped in `ed_launch_blocker_performance_tests.js`
+- failing assertion this time was `emmysStaked first usable timing must improve materially`
+
+Important:
+- the performance harness file is byte-identical between accepted baseline `6f81a63` and `46d305d`
+- the executed Picks/API dependencies for this measurement are also unchanged between those refs
+- therefore this failure is not evidence that the Bottom Nav routing correction changed the Emmys/Staked path
+
+Do not weaken the performance test and do not alter routing to chase this timing-only failure.
+Require one clean full production gate before integration; if repeated gates continue to fail only on synthetic timer assertions, diagnose the harness separately from the routing correction.
