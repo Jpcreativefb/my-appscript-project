@@ -1937,11 +1937,14 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
   byEvent = byEvent || {};
   knownRows = Array.isArray(knownRows) ? knownRows : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
   const have = {};
+  const havePoints = {};
   const requiredRuleSignature = "__ranking__:" + teamFantasyRankingRulesSignature_(rules);
   knownRows.forEach(function(row) {
     if (!teamFantasyIsRankingSourceRow_(row) || teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(settings.seasonYear) || Number(row.Week) !== Number(week) || !teamFantasyBool_(row.Final,false)) return;
     if (teamFantasyString_(row.Username) !== requiredRuleSignature) return;
-    have[[teamFantasyString_(row.ESPNEventId).replace(/^nfl_/,""), teamFantasyNormalizeTeam_(row.TeamAbbr), teamFantasyNormalizePosition_(row.Position)].join("|")] = true;
+    const existingKey = [teamFantasyString_(row.ESPNEventId).replace(/^nfl_/,""), teamFantasyNormalizeTeam_(row.TeamAbbr), teamFantasyNormalizePosition_(row.Position)].join("|");
+    have[existingKey] = true;
+    havePoints[existingKey] = teamFantasyNumber_(row.FantasyPoints, 0);
   });
   const generated = [];
   const errors = [];
@@ -1949,7 +1952,11 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
     const finalBySchedule = game.completed === true || teamFantasyKey_(game.state) === "post" || teamFantasyKey_(game.status).indexOf("final") !== -1;
     if (!finalBySchedule) return;
     const expected = teamFantasyRankingRowsExpectedForGame_(game);
-    if (expected.length && expected.every(function(key){ return have[key]; })) return;
+    const completeExisting = expected.length && expected.every(function(key){ return have[key]; });
+    const suspiciousAllZero = completeExisting && expected.every(function(key){ return Math.abs(teamFantasyNumber_(havePoints[key], 0)) < 0.000001; });
+    if (completeExisting && !suspiciousAllZero) return;
+    const forceRefresh = {};
+    if (suspiciousAllZero) expected.forEach(function(key){ forceRefresh[key] = true; });
     const eventId = teamFantasyString_(game.eventId || game.ESPNEventId).replace(/^nfl_/, "");
     if (!eventId) return;
     try {
@@ -1958,7 +1965,11 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
       const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules);
       teamRows.forEach(function(row) {
         const key=[eventId,teamFantasyNormalizeTeam_(row.TeamAbbr),teamFantasyNormalizePosition_(row.Position)].join("|");
-        if (!have[key]) { generated.push(row); have[key]=true; }
+        if (!have[key] || forceRefresh[key]) {
+          generated.push(row);
+          have[key]=true;
+          havePoints[key]=teamFantasyNumber_(row.FantasyPoints, 0);
+        }
       });
       expected.forEach(function(key) {
         if (!have[key]) errors.push({week:week,eventId:eventId,key:key,error:"Final NFL summary did not expose stats for a required Team Fantasy position."});
