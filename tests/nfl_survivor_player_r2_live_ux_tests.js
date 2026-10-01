@@ -6,10 +6,22 @@ const app=read('frontend/js/app.js');
 const r4=read('frontend/js/pages/survivorR4.js');
 const css=read('frontend/css/survivor-r4.css');
 const be=read('backend/engines/SportsSurvivorEngine.js');
+const worker=read('functions/api/app.js');
 
 assert(app.includes('NFL_SURVIVOR_PLAYER_R2_MODULE_CACHE'));
 assert(app.includes('name === "survivor" || name === "survivorR4"'));
 assert(app.includes('url.searchParams.set("survivorPlayer", "v1230-nfl-survivor-player-r2")'));
+
+assert(worker.includes('SURVIVOR_R3_PREVIEW_READ_ACTIONS'));
+const previewReadSet=worker.slice(worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'),worker.indexOf(']);',worker.indexOf('const SURVIVOR_R3_PREVIEW_READ_ACTIONS'))+3);
+assert(!previewReadSet.includes('"getSurvivorState"'),'Director Preview must not route Survivor state to the stale R3 preview Apps Script deployment');
+assert(previewReadSet.includes('"getSurvivorTeamSchedule"'),'unrelated Survivor preview read routing remains unchanged');
+assert(worker.includes('SURVIVOR_R3_PREVIEW_BLOCKED_WRITE_ACTIONS'));
+assert(worker.includes('"saveSurvivorPick"')&&worker.includes('"saveSportsSurvivorAutoPickPreference"'),'Preview Survivor writes remain blocked');
+assert(be.includes('state.weekRounds = categories.map'),'canonical Survivor state includes weekRounds');
+assert(be.includes('state.availableWeeks = state.weekRounds.map'),'canonical Survivor state includes built week list');
+assert(be.includes('state.resolvedWeek'),'canonical Survivor state retains shared resolved NFL week');
+
 
 assert(r4.includes('NFL_SURVIVOR_WEEK_BROWSER_UI_R1'));
 assert(r4.includes('survivor-r5-week-picker'));
