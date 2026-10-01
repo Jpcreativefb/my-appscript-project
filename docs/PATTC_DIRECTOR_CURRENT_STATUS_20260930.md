@@ -381,3 +381,24 @@ Important:
 
 Do not weaken the performance test and do not alter routing to chase this timing-only failure.
 Require one clean full production gate before integration; if repeated gates continue to fail only on synthetic timer assertions, diagnose the harness separately from the routing correction.
+
+
+## Bottom Nav gate — stale Game Hub routing assertion
+
+Full gate on routing commit `46d305d` advanced past prior timing-only failures and stopped at `tests/games_phase1_integration_tests.js`.
+
+Failure:
+`assert(source.includes('await renderGameModeHubPage()'))`
+
+Diagnosis:
+- this is a stale ownership/location assertion, not a behavior failure
+- Game Hub still routes through `case "game-hub"`
+- it still invokes `renderGameModeHubPage()`
+- the render is now intentionally wrapped by the shared stale-route commit helper:
+  `appCommitAsyncRouteHtml_(app, page, function() { return renderGameModeHubPage(); })`
+- both app mirrors use the same guarded path
+
+Allowed correction:
+- update only the stale test assertion to match the new authoritative guarded render path
+- do not weaken any performance, security, data-integrity, locking, scoring, or user-visible behavior contract
+- rerun the full production gate afterward
