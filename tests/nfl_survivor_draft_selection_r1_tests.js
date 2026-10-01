@@ -7,6 +7,7 @@ const vm=require('vm');
 
 const rootDir=path.resolve(__dirname,'..');
 const source=fs.readFileSync(path.join(rootDir,'frontend/js/pages/survivorR4.js'),'utf8');
+const survivor=fs.readFileSync(path.join(rootDir,'frontend/js/pages/survivor.js'),'utf8');
 const start=source.indexOf('(function(root){\n  "use strict";\n  const MARK="NFL_SURVIVOR_WEEK_BROWSER_UI_R1"');
 const end=source.indexOf('root.PATTC_NFL_SURVIVOR_WEEK_BROWSER_R1_MARKER=MARK;',start);
 assert(start>=0&&end>start,'Week Browser UI block missing');
@@ -28,7 +29,10 @@ const context={
       selected:[]
     },
     renderSurvivorRecoveryR3WeeklyBrowser_:p=>'<section><div class="survivor-r3-browser-head"></div></section>',
-    renderSurvivorRecoveryR3Finalize_:()=>'<section class="survivor-r3-finalize"></section>',
+    renderSurvivorRecoveryR3Finalize_:()=>{
+      const selected=(context.window.SURVIVOR_PAGE_STATE.selected||[]);
+      return '<section class="survivor-r3-finalize"><button id="survivorSaveButton" '+(selected.length===1?'':'disabled')+'>FINALIZE PICK</button></section>';
+    },
     renderSurvivorRecoveryR3Competition_:()=>'<section></section>',
     survivorRecoveryR3Refresh_:()=>{},
     survivorRecoveryR3RestoreMatchupIndex_:()=>{},
@@ -54,13 +58,16 @@ assert.deepStrictEqual(Array.from(context.window.SURVIVOR_PAGE_STATE.selected),[
 context.window.SURVIVOR_PAGE_STATE.selected=['a'];
 context.window.renderSurvivorRecoveryR3WeeklyBrowser_(payload);
 assert.deepStrictEqual(Array.from(context.window.SURVIVOR_PAGE_STATE.selected),['a']);
-context.window.renderSurvivorRecoveryR3Finalize_(payload);
+const manualFinalize=context.window.renderSurvivorRecoveryR3Finalize_(payload);
 assert.deepStrictEqual(Array.from(context.window.SURVIVOR_PAGE_STATE.selected),['a']);
+assert(!manualFinalize.includes('disabled'),'Finalize must enable once the manual draft satisfies required selections');
 
 // Random Pick uses the same local selected state contract, so its draft also survives refresh.
 context.window.SURVIVOR_PAGE_STATE.selected=['b'];
 context.window.renderSurvivorRecoveryR3WeeklyBrowser_(payload);
 assert.deepStrictEqual(Array.from(context.window.SURVIVOR_PAGE_STATE.selected),['b']);
+const randomFinalize=context.window.renderSurvivorRecoveryR3Finalize_(payload);
+assert(!randomFinalize.includes('disabled'),'Finalize must enable after a Random Pick draft');
 
 // Changing weeks intentionally reloads that week's saved pick.
 context.window.survivorRecoveryR5ChooseWeek_(5);
@@ -80,6 +87,12 @@ assert(source.includes('const weekChanged=!selectionWeek||Number(selectionWeek)!
 assert(source.includes('if(weekChanged){'));
 assert(source.includes('root.SURVIVOR_PAGE_STATE.selected=savedSelection(round)'));
 assert(!source.includes('root.SURVIVOR_PAGE_STATE.selected=Array.isArray(round.pickNomineeIds)?round.pickNomineeIds.slice()'));
+
+// Manual selection and Random Pick still write only to local draft state before explicit Finalize.
+assert(survivor.includes('function survivorSelect_(nomineeId)'));
+assert(survivor.includes('SURVIVOR_PAGE_STATE.selected = selected;'));
+assert(source.includes('root.SURVIVOR_PAGE_STATE.selected=rows.slice(0,required).map'));
+assert(source.includes('root.survivorRecoveryR3Refresh_()'));
 
 // No autosave was introduced.
 const weekBlock=source.slice(source.indexOf('NFL_SURVIVOR_WEEK_BROWSER_UI_R1'),source.indexOf('root.PATTC_NFL_SURVIVOR_WEEK_BROWSER_R1_MARKER=MARK;'));
