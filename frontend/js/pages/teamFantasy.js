@@ -206,7 +206,7 @@ function teamFantasyRenderSlot_(state,lineup,slot){
 }
 
 function teamFantasyPositionDisplayOrder_() {
-  return ['QB','RB','WRTE','OL','K','DL','LB','DB'];
+  return ['QB','RB','WRTE','K','OL','DL','LB','DB'];
 }
 
 function teamFantasyInfoClose_() {
@@ -2054,7 +2054,7 @@ teamFantasyRenderSlot_ = function(state, lineup, slot) {
 const SPORTS_RICH_TF_ORIGINAL_ORDER_ = teamFantasyPositionDisplayOrder_;
 teamFantasyPositionDisplayOrder_ = function() {
   if (sportsRichTfEnabled_()) {
-    return ["QB", "RB", "WRTE", "OL", "K", "DL", "LB", "DB"];
+    return ["QB", "RB", "WRTE", "K", "OL", "DL", "LB", "DB"];
   }
   return SPORTS_RICH_TF_ORIGINAL_ORDER_();
 };
@@ -2182,7 +2182,7 @@ teamFantasyOpenTeamPicker_ = function(entryId,position){
 
 /* RC24A_R4_COMPARE_VERTICAL_MATRIX */
 function teamFantasyComparePositionOrder_(){
-  return ['QB','RB','WRTE','OL','K','DL','LB','DB'];
+  return ['QB','RB','WRTE','K','OL','DL','LB','DB'];
 }
 function teamFantasyComparePositionLabel_(position){
   return String(position||'')==='WRTE'?'WR/TE':String(position||'');
