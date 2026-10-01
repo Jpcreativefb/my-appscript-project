@@ -172,4 +172,79 @@ context.teamFantasyFetchWeekSchedule_ = (gameId, week) => {
   assert(gameDaySource.includes('teamFantasyNflWeekTiming_'));
 }
 
+
+
+// Current-week write defaults: omitted payload.week resolves live NFL week; explicit historical week remains untouched.
+{
+  const futureSchedule = {
+    games: [{ eventId:'evt4', gameDateTime:'2099-10-01T18:00:00Z', homeAbbr:'BUF', awayAbbr:'MIA', homeTeamId:'1', awayTeamId:'2', completed:false, state:'pre', status:'Scheduled' }],
+    byTeam: {}
+  };
+  futureSchedule.byTeam.BUF = futureSchedule.games[0];
+  futureSchedule.byTeam.MIA = futureSchedule.games[0];
+  const entry = { entryId:'e1', username:'alice', conference:'ALL' };
+  let writes = [];
+  context.teamFantasyGetSettings_ = () => ({ ...settings, autoPickPenaltyPerPosition:0 });
+  context.teamFantasyNflWeekTiming_ = () => ({ ...fixedTiming, scheduleByWeek:{4:futureSchedule} });
+  context.teamFantasyEntriesForUser_ = () => [entry];
+  context.teamFantasyEnsureEntriesForUser_ = () => [entry];
+  context.teamFantasyReadRows_ = () => [];
+  context.teamFantasyWritePickRow_ = (current, values) => { writes.push({...values}); return 2; };
+
+  let result = context.teamFantasySavePick_({
+    username:'alice', gameId:'g', entryId:'e1', position:'QB', teamAbbr:'BUF',
+    _settings:{...settings,autoPickPenaltyPerPosition:0}, _entries:[entry], _schedule:futureSchedule,
+    _validatedGame:true, _accessChecked:true
+  });
+  assert.strictEqual(result.week,4,'manual save without explicit week must resolve Week 4');
+  assert.strictEqual(writes[writes.length-1].Week,4,'manual save row must write Week 4');
+
+  result = context.teamFantasySavePick_({
+    username:'alice', gameId:'g', week:2, entryId:'e1', position:'RB', teamAbbr:'MIA',
+    _settings:{...settings,autoPickPenaltyPerPosition:0}, _entries:[entry], _schedule:futureSchedule,
+    _validatedGame:true, _accessChecked:true
+  });
+  assert.strictEqual(result.week,2,'explicit manual historical Week 2 must remain Week 2');
+  assert.strictEqual(writes[writes.length-1].Week,2,'explicit manual save row must write Week 2');
+}
+
+// Auto Pick defaults to resolved Week 4; explicit historical Week 2 remains Week 2.
+{
+  const autoSchedule = {
+    games: [{ eventId:'evtA', gameDateTime:'2099-10-01T18:00:00Z', homeAbbr:'BUF', awayAbbr:'MIA', homeTeamId:'1', awayTeamId:'2', completed:false, state:'pre', status:'Scheduled' }],
+    byTeam: {}
+  };
+  autoSchedule.byTeam.BUF = autoSchedule.games[0];
+  autoSchedule.byTeam.MIA = autoSchedule.games[0];
+  const entry = { entryId:'e1', username:'alice', conference:'ALL' };
+  let savedWeeks = [];
+  context.teamFantasyNflWeekTiming_ = () => ({ ...fixedTiming, scheduleByWeek:{4:autoSchedule} });
+  context.teamFantasyEnsureEntriesForUser_ = () => [entry];
+  context.teamFantasyReadRows_ = () => [];
+  context.teamFantasyPostseasonEligibility_ = () => ({e1:true});
+  context.teamFantasyRankingsFromRows_ = () => ({BUF:{rank:1,metric:100,games:1},MIA:{rank:2,metric:90,games:1}});
+  context.teamFantasyEligibleTeamsFromRows_ = () => [
+    {abbr:'BUF',eligible:true,rank:1},
+    {abbr:'MIA',eligible:true,rank:2}
+  ];
+  context.teamFantasyAppendPickRowsBatch_ = rows => { savedWeeks = rows.map(r=>Number(r.Week)); return rows.length; };
+  context.SpreadsheetApp = { flush(){} };
+
+  let result = context.teamFantasyAutoPick_({
+    username:'alice', gameId:'g', entryId:'e1', positions:['QB'],
+    _settings:{...settings,autoPickPenaltyPerPosition:0}, _entries:[entry], _schedule:autoSchedule,
+    _validatedGame:true
+  }, false);
+  assert.strictEqual(result.results[0].week,4,'Auto Pick without explicit week must operate on Week 4');
+  assert.deepStrictEqual(savedWeeks,[4],'Auto Pick batch rows must write Week 4');
+
+  result = context.teamFantasyAutoPick_({
+    username:'alice', gameId:'g', week:2, entryId:'e1', positions:['QB'],
+    _settings:{...settings,autoPickPenaltyPerPosition:0}, _entries:[entry], _schedule:autoSchedule,
+    _validatedGame:true
+  }, false);
+  assert.strictEqual(result.results[0].week,2,'explicit Auto Pick historical Week 2 must remain Week 2');
+  assert.deepStrictEqual(savedWeeks,[2],'explicit Auto Pick batch rows must write Week 2');
+}
+
 console.log('Team Fantasy Auto Week R1 tests: PASS');
