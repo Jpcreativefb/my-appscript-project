@@ -402,3 +402,29 @@ Allowed correction:
 - update only the stale test assertion to match the new authoritative guarded render path
 - do not weaken any performance, security, data-integrity, locking, scoring, or user-visible behavior contract
 - rerun the full production gate afterward
+
+
+## Bottom Nav routing correction full gate: PASS
+
+Routing source commit tested: `46d305de5032d101b8043872a12e497d93b649e9`.
+
+Same-Mac A/B isolated the synthetic timing instability:
+- accepted baseline `6f81a63` intermittently failed the Home timing assertion
+- routing commit `46d305d` passed 5/5 standalone timing runs
+
+One stale Game Hub routing assertion was updated in the detached verification worktree to reflect the new guarded render owner:
+`appCommitAsyncRouteHtml_(app, page, function() { return renderGameModeHubPage(); })`
+
+After that update, full production checks PASS:
+- 172 JavaScript syntax files PASS
+- frontend mirrors PASS
+- 298 regression tests PASS
+- legacy hardening PASS
+- RC1 through RC9 production contracts PASS
+- ALL PRODUCTION CHECKS PASSED
+
+Warnings observed but not failures:
+- simulated logout push cleanup warning
+- SportsOddsApiLog lock diagnostic warning
+
+Status: DIRECTOR ACCEPTED FOR INTEGRATION, pending committing/pushing the stale Game Hub test assertion update onto the specialist branch and then cherry-picking the final specialist head into the Director branch.
