@@ -265,10 +265,14 @@ assert(rendered.includes('Random Fill Selected')&&rendered.includes('Auto Pick S
 }
 
 const gameDaySource = fs.readFileSync(path.join(root, 'backend/engines/SportsTeamFantasyGameDayEngine.js'), 'utf8');
-assert(gameDaySource.includes('out.nflGames ='),'Game Day payload must include all selected-week NFL games');
+assert(gameDaySource.includes('out.nflGameSnapshots ='),'Game Day payload must include cached NFL matchup score snapshots');
 assert(gameDaySource.includes('homePositionScores'),'Game Day payload must include all home team unit scores');
 assert(gameDaySource.includes('awayPositionScores'),'Game Day payload must include all away team unit scores');
 assert(gameDaySource.includes('out.positionRankings = {}'),'Game Day payload must include season position ranking context');
+const lightStart=gameDaySource.indexOf('function apiGetTeamFantasyGameDayState');
+const lightEnd=gameDaySource.indexOf('function teamFantasyBuildSyntheticGameDayLab_',lightStart);
+const lightApi=gameDaySource.slice(lightStart,lightEnd);
+assert(!lightApi.includes('teamFantasyFetchWeekSchedule_')&&!lightApi.includes('UrlFetchApp'),'Game Day polling must remain cached-row only');
 assert(!/getTeamFantasyGameDayState[^]*api\([^)]*position/i.test(frontendSource),'frontend must not issue per-position Game Day requests');
 
 // Scoreboard source contracts.
