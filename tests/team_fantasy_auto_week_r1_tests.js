@@ -239,7 +239,8 @@ context.teamFantasyAutoPick_ = teamFantasyAutoWeekR1RealAutoPick_;
     _validatedGame:true
   }, false);
   assert.strictEqual(result.results[0].week,4,'Auto Pick without explicit week must operate on Week 4');
-  assert.deepStrictEqual(savedWeeks,[4],'Auto Pick batch rows must write Week 4');
+  assert.strictEqual(savedWeeks.length,1,'Auto Pick must write one planned row');
+  assert.strictEqual(savedWeeks[0],4,'Auto Pick batch row must write Week 4');
 
   result = context.teamFantasyAutoPick_({
     username:'alice', gameId:'g', week:2, entryId:'e1', positions:['QB'],
@@ -247,7 +248,8 @@ context.teamFantasyAutoPick_ = teamFantasyAutoWeekR1RealAutoPick_;
     _validatedGame:true
   }, false);
   assert.strictEqual(result.results[0].week,2,'explicit Auto Pick historical Week 2 must remain Week 2');
-  assert.deepStrictEqual(savedWeeks,[2],'explicit Auto Pick batch rows must write Week 2');
+  assert.strictEqual(savedWeeks.length,1,'explicit Auto Pick must write one planned row');
+  assert.strictEqual(savedWeeks[0],2,'explicit Auto Pick batch row must write Week 2');
 }
 
 console.log('Team Fantasy Auto Week R1 tests: PASS');
