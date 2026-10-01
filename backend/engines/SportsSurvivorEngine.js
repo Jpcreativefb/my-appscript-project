@@ -2172,11 +2172,13 @@ if (NFL_SURVIVOR_WEEK_BROWSER_STATE_BASE_) {
     const optionMeta = sportsSurvivorOptionMetaForGame_(gameId);
     const resultMap = sportsSurvivorResultsForGame_(gameId);
     const pickMetaMap = sportsSurvivorPickMetaMap_(gameId);
-    const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap);
-    const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
-    // The official week is inherited from the existing shared NFL resolver result.
-    // Do not create an independent Monday/Tuesday rollover algorithm here.
+    // The official week is inherited from the already-returned state.
+    // Do not call the NFL resolver again or create an independent rollover algorithm here.
     const resolvedWeek = Math.max(settings.startWeek || 1, Math.floor(sportsSurvivorNumber_(state.resolvedWeek, settings.startWeek || 1)));
+    const evaluation = sportsSurvivorEvaluateUser_(username, gameId, categories, settings, optionMeta, resultMap, pickMetaMap, {
+      resolvedWeek: resolvedWeek
+    });
+    const game = typeof getGameRuntimeConfig === "function" ? getGameRuntimeConfig(gameId) : getGame(gameId);
     const usedWeekMap = sportsSurvivorWeekBrowserUsedWeekMap_(evaluation.rounds);
     state.weekRounds = categories.map(function(category, index) {
       return sportsSurvivorWeekBrowserRound_(game, settings, evaluation, optionMeta, resultMap, category, evaluation.rounds[index], index, resolvedWeek, usedWeekMap);
