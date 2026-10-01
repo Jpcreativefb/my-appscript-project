@@ -1479,7 +1479,11 @@ function teamFantasySavePick_(payload) {
   if (payload._accessChecked !== true) teamFantasyRequireGameAccess_(username, gameId, "submitPicks", payload.token);
   if (payload._validatedGame !== true && !teamFantasyIsGame_(gameId)) throw new Error("This game is not a Team Fantasy game.");
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
-  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
+  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
+  const timing = explicitWeek ? null : (payload._weekTiming || teamFantasyNflWeekTiming_(gameId, settings));
+  const week = explicitWeek
+    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)))
+    : timing.week;
   let entries = payload._entries || teamFantasyEntriesForUser_(gameId, username);
   let entry = entries.filter(function(item) { return item.entryId === entryId; })[0];
   if (!entry) {
@@ -1571,7 +1575,11 @@ function teamFantasyAutoPick_(payload, randomOnly) {
   const settings = payload._settings || teamFantasyGetSettings_(gameId);
   if (randomOnly && !settings.allowRandomPick) throw new Error("Random Pick is disabled for this game.");
   if (!randomOnly && !settings.allowSmartAutoPick) throw new Error("Auto Pick is disabled for this game.");
-  const week = Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)));
+  const explicitWeek = Object.prototype.hasOwnProperty.call(payload, "week") && teamFantasyString_(payload.week) !== "";
+  const timing = explicitWeek ? null : (payload._weekTiming || teamFantasyNflWeekTiming_(gameId, settings));
+  const week = explicitWeek
+    ? Math.max(1, Math.floor(teamFantasyNumber_(payload.week, settings.currentWeek)))
+    : timing.week;
   const entries = payload._entries || teamFantasyEnsureEntriesForUser_(gameId, username);
   const wantedEntryId = teamFantasyString_(payload.entryId);
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
