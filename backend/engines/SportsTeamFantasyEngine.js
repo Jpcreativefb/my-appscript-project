@@ -1787,14 +1787,15 @@ function teamFantasyStatsForTeamUnit_(summary, teamAbbr, position) {
 function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
   teamAbbr = teamFantasyNormalizeTeam_(teamAbbr);
   position = teamFantasyNormalizePosition_(position);
-  if (!summary || !summary.boxscore) return { ready: false, reason: "NFL summary has no box score yet." };
+  const finalPrefix = teamFantasySummaryFinal_(summary) ? "Final NFL summary" : "NFL summary";
+  if (!summary || !summary.boxscore) return { ready: false, reason: finalPrefix + " has no box score yet." };
   if (position === "OL") {
     const teams = Array.isArray(summary.boxscore.teams) ? summary.boxscore.teams : [];
     const teamBlock = teams.filter(function(item) {
       return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
     })[0] || null;
     if (!teamBlock || !Array.isArray(teamBlock.statistics) || !teamBlock.statistics.length) {
-      return { ready: false, reason: "NFL summary is missing team statistics for " + teamAbbr + " OL." };
+      return { ready: false, reason: finalPrefix + " is missing team statistics for " + teamAbbr + " OL." };
     }
     return { ready: true, reason: "" };
   }
@@ -1803,7 +1804,7 @@ function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
     return teamFantasyNormalizeTeam_(item.team && item.team.abbreviation) === teamAbbr;
   })[0] || null;
   if (!playerBlock || !Array.isArray(playerBlock.statistics) || !playerBlock.statistics.length) {
-    return { ready: false, reason: "NFL summary is missing player statistics for " + teamAbbr + " " + TEAM_FANTASY_POSITION_LABELS[position] + "." };
+    return { ready: false, reason: finalPrefix + " is missing player statistics for " + teamAbbr + " " + TEAM_FANTASY_POSITION_LABELS[position] + "." };
   }
   let hasUnitSource = false;
   playerBlock.statistics.forEach(function(category) {
@@ -1813,7 +1814,7 @@ function teamFantasyFinalUnitStatsReady_(summary, teamAbbr, position) {
       if (teamFantasyPlayerPositionAllowed_(position, pos)) hasUnitSource = true;
     });
   });
-  if (!hasUnitSource) return { ready:false, reason:"NFL summary does not yet expose " + TEAM_FANTASY_POSITION_LABELS[position] + " source stats for " + teamAbbr + "." };
+  if (!hasUnitSource) return { ready:false, reason:finalPrefix + " does not expose " + TEAM_FANTASY_POSITION_LABELS[position] + " source stats for " + teamAbbr + "." };
   return { ready: true, reason: "" };
 }
 function teamFantasySummaryFinal_(summary) {
