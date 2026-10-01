@@ -970,6 +970,35 @@ function teamFantasyIsRankingSourceRow_(row) {
   return teamFantasyString_(row && row.EntryId).indexOf(TEAM_FANTASY_RANKING_ENTRY_PREFIX) === 0;
 }
 
+function teamFantasyRankingCoverage_(rows, gameId, beforeWeek, seasonYear) {
+  const coverage = {};
+  TEAM_FANTASY_POSITIONS.forEach(function(position) {
+    coverage[position] = { teams: {}, rows: 0, scoredRows: 0 };
+  });
+  (rows || []).forEach(function(row) {
+    if (!teamFantasyIsRankingSourceRow_(row)) return;
+    if (teamFantasyString_(row.GameId) !== gameId) return;
+    if (Number(row.Week) >= Number(beforeWeek)) return;
+    if (seasonYear && Number(row.SeasonYear) !== Number(seasonYear)) return;
+    if (!teamFantasyBool_(row.Final, false)) return;
+    const position = teamFantasyNormalizePosition_(row.Position);
+    const team = teamFantasyNormalizeTeam_(row.TeamAbbr);
+    if (!coverage[position] || !teamFantasyTeamMeta_(team).conference) return;
+    coverage[position].rows++;
+    coverage[position].teams[team] = true;
+    if (Math.abs(teamFantasyNumber_(row.FantasyPoints, 0)) > 0) coverage[position].scoredRows++;
+  });
+  const out = {};
+  TEAM_FANTASY_POSITIONS.forEach(function(position) {
+    out[position] = {
+      teams: Object.keys(coverage[position].teams).length,
+      rows: coverage[position].rows,
+      scoredRows: coverage[position].scoredRows
+    };
+  });
+  return out;
+}
+
 function teamFantasyRankingsFromRows_(rows, gameId, position, beforeWeek, seasonYear) {
   position = teamFantasyNormalizePosition_(position);
   const totals = {};
@@ -1004,6 +1033,9 @@ function teamFantasyRankingsFromRows_(rows, gameId, position, beforeWeek, season
     const total = totals[meta.abbr] || { points:0, games:0 };
     return { team: meta.abbr, average: total.games ? total.points / total.games : 0, games: total.games };
   }).sort(function(a, b) {
+    const aHasGames = a.games > 0;
+    const bHasGames = b.games > 0;
+    if (aHasGames !== bHasGames) return aHasGames ? -1 : 1;
     if (b.average !== a.average) return b.average - a.average;
     return a.team.localeCompare(b.team);
   });
@@ -2321,8 +2353,12 @@ function apiGetTeamFantasyState(payload) {
   const postseasonEligibility = teamFantasyPostseasonEligibility_(gameId, settings, week, entries);
   // Ensure the ranking dataset is sourced from all completed NFL teams, not
   // from whichever teams PATTC users happened to select.
-  try { teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, week); }
-  catch (rankingErr) { console.warn("Team Fantasy ranking-universe backfill skipped", rankingErr); }
+  let rankingBackfill = { success:true, weeks:[], errors:[] };
+  try { rankingBackfill = teamFantasyEnsureRankingUniverseBeforeWeek_(gameId, settings, week) || rankingBackfill; }
+  catch (rankingErr) {
+    rankingBackfill = { success:false, weeks:[], errors:[{ error: rankingErr && rankingErr.message ? rankingErr.message : String(rankingErr) }] };
+    console.warn("Team Fantasy ranking-universe backfill skipped", rankingErr);
+  }
   // RC22: load the two hot lineup tables once for this state request and
   // reuse them for every entry and all eight positions.
   const lineupReadContext = {
@@ -2366,6 +2402,24 @@ function apiGetTeamFantasyState(payload) {
     selectedLeagueId: selectedLeagueId,
     standings: standings.success ? standings : null,
     scheduleGames: schedule.games,
+    availableWeeks: (function() {
+      const weeks = [];
+      const currentWeek = Math.max(1, Number(timing.week || week || 1));
+      for (let candidate = 1; candidate <= currentWeek; candidate++) weeks.push(candidate);
+      const nextWeek = currentWeek + 1;
+      if (nextWeek <= 18) {
+        try {
+          const nextSchedule = timing.scheduleByWeek && timing.scheduleByWeek[nextWeek]
+            ? timing.scheduleByWeek[nextWeek]
+            : (Number(week) === nextWeek ? schedule : teamFantasyFetchWeekSchedule_(gameId, nextWeek, settings));
+          if (nextSchedule && Array.isArray(nextSchedule.games) && nextSchedule.games.length) weeks.push(nextWeek);
+        } catch (availableWeekErr) {}
+      }
+      if (weeks.indexOf(Number(week)) === -1 && schedule && Array.isArray(schedule.games) && schedule.games.length) weeks.push(Number(week));
+      return weeks.sort(function(a,b){ return a-b; });
+    })(),
+    rankingCoverage: teamFantasyRankingCoverage_(lineupReadContext.unitScoreRows, gameId, week, settings.seasonYear),
+    rankingBackfill: rankingBackfill,
     positionLabels: TEAM_FANTASY_POSITION_LABELS,
     scoringRules: teamFantasyRules_(gameId).filter(function(rule) { return rule.active; }),
     playerAutoFill: playerAutoFill
