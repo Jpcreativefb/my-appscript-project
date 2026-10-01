@@ -2958,3 +2958,116 @@ renderTeamFantasyPage=async function(){
   const shell=/(<section\b[^>]*class=["'][^"']*sports-shell[^"']*["'][\s\S]*?<\/section>)/i;
   return html.replace(shell,'$1'+addon);
 };
+
+
+/* TEAM_FANTASY_RANKING_WEEK_BROWSER_R1_SCOREBOARD
+   One Game Day response drives NFL navigation, team-unit scoring, and season
+   ranking context. WRTE remains the internal key; WT is compact-scoreboard only. */
+function teamFantasyScoreboardPositionOrder_() {
+  return ["QB","RB","WRTE","OL","K","DL","LB","DB"];
+}
+function teamFantasyScoreboardPositionLabel_(position) {
+  return String(position||"") === "WRTE" ? "WT" : String(position||"");
+}
+function teamFantasyNormalPositionLabel_(position) {
+  return String(position||"") === "WRTE" ? "WR/TE" : String(position||"");
+}
+function teamFantasyScoreboardSelectionSet_(state) {
+  const set={};
+  (state&&state.lineups||[]).forEach(function(lineup){
+    (lineup&&lineup.slots||[]).forEach(function(slot){
+      if(!slot||!slot.pick)return;
+      const team=String(slot.pick.teamAbbr||"").toUpperCase();
+      const position=String(slot.position||"");
+      if(team&&position)set[team+"|"+position]=true;
+    });
+  });
+  return set;
+}
+function teamFantasyScoreboardGames_() {
+  const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||window.TEAM_FANTASY_GAME_DAY||{};
+  return Array.isArray(data.nflGames)?data.nflGames:[];
+}
+function teamFantasyScoreboardGame_() {
+  const games=teamFantasyScoreboardGames_();
+  if(!games.length)return null;
+  let eventId=String(window.TEAM_FANTASY_SCOREBOARD_EVENT_ID||"");
+  let game=games.find(function(item){return String(item&&item.eventId||"")===eventId;})||null;
+  if(!game){
+    const state=window.TEAM_FANTASY_STATE||{};
+    const lineup=teamFantasyPrimaryLineup_(state);
+    const picked=(lineup&&lineup.slots||[]).find(function(slot){
+      const selected=teamFantasySelectedGame_(slot);
+      return selected&&String(selected.eventId||selected.ESPNEventId||"");
+    });
+    const selectedGame=picked?teamFantasySelectedGame_(picked):null;
+    const selectedEvent=selectedGame&&String(selectedGame.eventId||selectedGame.ESPNEventId||"");
+    game=games.find(function(item){return String(item&&item.eventId||"")===selectedEvent;})||games[0];
+    window.TEAM_FANTASY_SCOREBOARD_EVENT_ID=String(game&&game.eventId||"");
+  }
+  return game;
+}
+function teamFantasyScoreboardMove_(delta) {
+  const games=teamFantasyScoreboardGames_();
+  if(!games.length)return;
+  const current=teamFantasyScoreboardGame_();
+  let index=Math.max(0,games.findIndex(function(item){return String(item.eventId||"")===String(current&&current.eventId||"");}));
+  index=(index+Number(delta||0)+games.length)%games.length;
+  window.TEAM_FANTASY_SCOREBOARD_EVENT_ID=String(games[index].eventId||"");
+  teamFantasyRefreshFeatured_();
+}
+function teamFantasyScoreboardTeamUnits_(team, scores, selections) {
+  team=String(team||"").toUpperCase();
+  scores=scores||{};
+  selections=selections||{};
+  return '<div class="tf-scoreboard-units">'+teamFantasyScoreboardPositionOrder_().map(function(position){
+    const score=scores[position]||null;
+    const selected=selections[team+"|"+position]===true;
+    const value=score&&score.points!==undefined&&score.points!==null?teamFantasyScore_(score.points):"—";
+    return '<div class="tf-scoreboard-unit '+(selected?'is-user-selected':'')+'"'+(selected?' style="outline:2px solid #168bff;outline-offset:1px;border-radius:6px;"':'')+'><span>'+teamFantasyEscape_(teamFantasyScoreboardPositionLabel_(position))+'</span><strong>'+teamFantasyEscape_(value)+'</strong></div>';
+  }).join('')+'</div>';
+}
+function teamFantasySeasonRankingContextHtml_(data) {
+  const rankings=data&&data.positionRankings||{};
+  const positions=["QB","RB","WRTE","OL","K","DL","LB","DB"];
+  return '<section class="tf-season-position-rankings"><h3>Season Position Scoring</h3><div class="tf-muted">Season average through completed NFL games before Week '+Number(data&&data.week||0)+'.</div>'+positions.map(function(position){
+    const block=rankings[position]||{top:[],bottom:[]};
+    const top=(block.top||[]).map(function(row){return '<div><span>'+teamFantasyEscape_(row.team)+'</span><strong style="color:#15803d">'+teamFantasyScore_(row.average)+' avg</strong></div>';}).join('');
+    const bottom=(block.bottom||[]).map(function(row){return '<div><span>'+teamFantasyEscape_(row.team)+'</span><strong style="color:#b91c1c">'+teamFantasyScore_(row.average)+' avg</strong></div>';}).join('');
+    return '<details class="tf-season-position-ranking"><summary>'+teamFantasyEscape_(teamFantasyNormalPositionLabel_(position))+'</summary><div class="tf-rank-two-col"><div><h4>Top 10</h4>'+top+'</div><div><h4>Bottom 10</h4>'+bottom+'</div></div></details>';
+  }).join('')+'</section>';
+}
+teamFantasyFeaturedHtml_=function(state,lineup){
+  const data=window.TEAM_FANTASY_CURRENT_GAME_DAY||window.TEAM_FANTASY_GAME_DAY||{};
+  const games=Array.isArray(data.nflGames)?data.nflGames:[];
+  if(!games.length)return '<div class="tf-feature"><div class="tf-feature-selected">NFL game scores will appear when Game Day data loads.</div></div>';
+  const game=teamFantasyScoreboardGame_()||games[0];
+  const selections=teamFantasyScoreboardSelectionSet_(state||{});
+  const away=String(game.awayAbbr||"").toUpperCase(),home=String(game.homeAbbr||"").toUpperCase();
+  const stateKey=String(game.state||"").toLowerCase(),statusText=String(game.status||"");
+  const live=stateKey==="in"||/progress|halftime/i.test(statusText);
+  const final=game.completed===true||stateKey==="post"||/final/i.test(statusText);
+  const scoreReady=game.awayScore!==null&&game.awayScore!==undefined&&game.homeScore!==null&&game.homeScore!==undefined;
+  const center=live||final
+    ? (scoreReady?teamFantasyEscape_(away)+' '+teamFantasyEscape_(game.awayScore)+' – '+teamFantasyEscape_(game.homeScore)+' '+teamFantasyEscape_(home):teamFantasyEscape_(statusText|| (final?'FINAL':'LIVE')))
+    : teamFantasyEscape_(teamFantasyFormatKickoff_(game));
+  const gameIndex=Math.max(0,games.findIndex(function(item){return String(item.eventId||"")===String(game.eventId||"");}));
+  return '<div class="tf-feature tf-live-scoreboard">'+
+    '<div class="tf-scoreboard-nav"><button type="button" onclick="teamFantasyScoreboardMove_(-1)" aria-label="Previous NFL game">←</button><strong>NFL GAME</strong><button type="button" onclick="teamFantasyScoreboardMove_(1)" aria-label="Next NFL game">→</button></div>'+
+    '<div class="tf-scoreboard-game-count">'+(gameIndex+1)+' / '+games.length+' · '+teamFantasyEscape_(statusText||(final?'FINAL':live?'LIVE':'UPCOMING'))+'</div>'+
+    '<div class="tf-scoreboard-matchup">'+
+      '<div class="tf-scoreboard-team"><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(away))+'" alt=""><strong>'+teamFantasyEscape_(away)+'</strong>'+teamFantasyScoreboardTeamUnits_(away,game.awayPositionScores,selections)+'</div>'+
+      '<div class="tf-scoreboard-center"><strong>'+center+'</strong></div>'+
+      '<div class="tf-scoreboard-team"><img src="'+teamFantasyEscape_(teamFantasyTeamLogoUrl_(home))+'" alt=""><strong>'+teamFantasyEscape_(home)+'</strong>'+teamFantasyScoreboardTeamUnits_(home,game.homePositionScores,selections)+'</div>'+
+    '</div>'+
+    teamFantasySeasonRankingContextHtml_(data)+
+  '</div>';
+};
+const TEAM_FANTASY_SCOREBOARD_HIGHLIGHT_BASE_=teamFantasyHighlightSlot_;
+teamFantasyHighlightSlot_=function(entryId,position){
+  const slot=teamFantasyFindSlot_(entryId,position);
+  const game=slot?teamFantasySelectedGame_(slot):null;
+  const eventId=game&&String(game.eventId||game.ESPNEventId||"");
+  if(eventId)window.TEAM_FANTASY_SCOREBOARD_EVENT_ID=eventId;
+  return TEAM_FANTASY_SCOREBOARD_HIGHLIGHT_BASE_.apply(this,arguments);
+};
