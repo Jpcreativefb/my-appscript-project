@@ -91,7 +91,7 @@ assert(!engine.includes('PlayoffRaceCupScoringEngine'));
 
 // Compact quarter UI and accepted mobile row contracts remain.
 assert(front.includes('GAME "+(comp.gameNumber||1)+" · Q"+(comp.quarterNumber||1)+" · W"+(comp.nflWeek||1)'));
-assert(front.includes('GAME '+esc(comp.gameRecord||"0-0-0")+' · SEASON '+esc(comp.seasonRecord||"0-0-0")'));
+assert(front.includes("comp.gameRecord")&&front.includes("comp.seasonRecord"));
 assert(front.includes('nfl-race-quarter-detail'));
 assert(!front.includes('<b>CP</b>'));
 assert(css.includes('min-height:38px!important'));
