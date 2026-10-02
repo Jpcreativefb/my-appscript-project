@@ -42,9 +42,14 @@ run("nflPlayoffRaceFetchWeekContext_(req,4);nflPlayoffRaceFetchWeekContext_(req,
 assert.strictEqual(ctx.calls,1);assert.strictEqual(ctx.req.weekScheduleCacheHits,1);
 assert(front.includes("Checkpoint Points")&&front.includes("Original Hold Bonuses"));
 assert(front.includes("<strong>20</strong><span>EXACT</span>")&&front.includes("20·15·10·6·3"));
-assert(front.includes('conference+" #"+liveRow.currentRank+" | "+(div||liveRow.division||"")+" #"+divRank+" | ("+(liveRow.record||"0-0-0")+")"'));
+assert(front.includes('conference+" #"+liveRow.currentRank+compactMovement(liveRow)+" | "+(div||liveRow.division||"")+" #"+divRank+" | ("+(liveRow.record||"0-0-0")+")"'));
+assert(front.includes('base+" pts"+(bonus>0?" (+"+bonus+" bonus)":"")'));
+assert(!front.includes(" playoff</b>"));
+assert(front.includes("nfl-race-season-strip")&&front.includes("nfl-race-stage-strip"));
 assert(front.includes("controls(category,team,index,ordered.length,locked,teamPctLabel)"));
 assert(css.includes(".nfl-ranking-control-group")&&css.includes("background:transparent!important"));
+assert(css.includes("min-height:38px!important")&&css.includes("grid-template-columns:18px 28px 18px 17px!important"));
+assert(css.includes(".nfl-ranking-row-points")&&css.includes("font-size:12px!important"));
 assert(engine.includes("NflForecastCheckpointScores"));
 assert(rank.includes("nflCheckpointByUser"));
 assert(!front.includes("Week 4:</strong> 85%"));
