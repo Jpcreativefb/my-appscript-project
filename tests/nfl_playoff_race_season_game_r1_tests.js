@@ -40,9 +40,11 @@ assert.strictEqual(run("nflPlayoffRaceCheckpointKey_('g','User','afc',4)===nflPl
 ctx.calls=0;ctx.nflPlayoffRaceFetchWeek_=function(){ctx.calls++;return [{Status:"Final"}];};ctx.req=run("nflPlayoffRaceRequestContext_('nfl-playoff-race-2026')");
 run("nflPlayoffRaceFetchWeekContext_(req,4);nflPlayoffRaceFetchWeekContext_(req,4)");
 assert.strictEqual(ctx.calls,1);assert.strictEqual(ctx.req.weekScheduleCacheHits,1);
-assert(front.includes("Checkpoint Points")&&front.includes("Original Hold Bonuses"));
+assert(front.includes("<b>CP</b>")&&front.includes("<b>HOLD</b>")&&front.includes("<b>TOTAL</b>"));
 assert(front.includes("<strong>20</strong><span>EXACT</span>")&&front.includes("20·15·10·6·3"));
 assert(front.includes('conference+" #"+liveRow.currentRank+compactMovement(liveRow)+" | "+(div||liveRow.division||"")+" #"+divRank+" | ("+(liveRow.record||"0-0-0")+")"'));
+assert(front.includes('data-nfl-status="'+esc(statusLine)+'"'));
+assert(front.includes('const status=String(row.dataset.nflStatus||"").trim()'));
 assert(front.includes('base+" pts"+(bonus>0?" (+"+bonus+" bonus)":"")'));
 assert(!front.includes(" playoff</b>"));
 assert(front.includes("nfl-race-season-strip")&&front.includes("nfl-race-stage-strip"));
