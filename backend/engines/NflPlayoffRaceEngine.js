@@ -1091,7 +1091,7 @@ function nflPlayoffRaceWeightedScore_(category,ballot,finalRanks,snapshot,histor
     bonus+=divisionSweep.bonus+perfectSeedsBonus;
   }
   bonusMax+=4*Math.max(0,nflPlayoffRaceNumber_(config.divisionSweepBonus,NFL_PLAYOFF_RACE_DIVISION_SWEEP_BONUS_DEFAULT_))+Math.max(0,nflPlayoffRaceNumber_(config.perfectSeedsBonus,NFL_PLAYOFF_RACE_PERFECT_SEEDS_BONUS_DEFAULT_));
-  if(valid&&resolved)baseEarned+=playoff?(correctPlayoffTeams*3+(correctPlayoffTeams===7?5:0)+divisionSweep.bonus+perfectSeedsBonus:0);
+  if(valid&&resolved)baseEarned+=playoff?(correctPlayoffTeams*3+(correctPlayoffTeams===7?5:0)+divisionSweep.bonus+perfectSeedsBonus):0;
   const hold=valid?nflPlayoffRaceOriginalHoldBonus_(history||[],finalRanks||{}):{count:0,total:0,maxBonus:0,eligibleTeams:[]};
   if(valid&&resolved)baseEarned+=hold.total;
   const round=function(v){return Math.round(v*100)/100;};
