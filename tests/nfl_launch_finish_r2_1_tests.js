@@ -19,7 +19,7 @@ assert(confCss.includes("grid-template-columns:minmax(0,1fr) minmax(0,1fr) 94px"
 assert(confCss.includes("width:52px!important"));
 assert(confCss.includes("grid-template-columns:16px minmax(52px,1fr) 16px"));
 assert(html.includes("confidence=v1232-confidence-pool-r8-6-1"));
-assert(html.includes("playoff=v1234-nfl-playoff-race-season-game-r1-compact"));
-assert(app.includes('url.searchParams.set("playoff", "v1234-nfl-playoff-race-season-game-r1-compact")'));
+assert(html.includes("playoff=v1235-nfl-playoff-race-quarter-game-r2"));
+assert(app.includes('url.searchParams.set("playoff", "v1235-nfl-playoff-race-quarter-game-r2")'));
 assert.strictEqual(app,mirror);
 console.log("PATTC NFL launch finish R2.1 tests: PASS");
