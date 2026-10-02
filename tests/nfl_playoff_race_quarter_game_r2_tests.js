@@ -8,7 +8,7 @@ const api=fs.readFileSync('backend/Api.js','utf8');
 const pack=fs.readFileSync('backend/engines/NflSeasonPackEngine.js','utf8');
 const ctx={console,Math,Date,JSON,Number,String,Array,Object,RegExp,Set};
 ctx.rankingBallotValid_=()=>true;ctx.rankingFinalOrderComplete_=()=>true;
-vm.createContext(ctx);vm.runInContext(engine,ctx);
+vm.createContext(ctx);vm.runInContext(pack,ctx);vm.runInContext(engine,ctx);
 const run=s=>vm.runInContext(s,ctx);
 function plain(x){return JSON.parse(JSON.stringify(x));}
 
