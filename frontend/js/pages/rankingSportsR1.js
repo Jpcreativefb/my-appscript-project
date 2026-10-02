@@ -159,20 +159,25 @@ function card(category){
     '</section>';
   }
 
-  function seasonTimeline(payload){
-    const race=payload&&payload.nflPlayoffRace||{},check=race.checkpoints||{},byWeek=Array.isArray(check.byWeek)?check.byWeek:[];
-    function stage(week,pct){const found=byWeek.find(function(row){return Number(row.week)===week;});return '<span class="nfl-race-stage '+(found&&found.banked?'is-earned':'')+'"><b>W'+week+'</b><em>'+pct+'%</em><strong>'+(found&&found.banked?found.points:0)+' pts</strong></span>';}
-    return '<div class="nfl-race-stage-strip"><span class="nfl-race-stage is-earned"><b>ORIG</b><em>100%</em><strong>Start</strong></span>'+stage(4,95)+stage(8,85)+stage(12,65)+stage(15,40)+'<span class="nfl-race-stage"><b>FINAL</b><em>—</em><strong>Resolve</strong></span></div>';
+  function placeLabel(rank,total){return rank?ordinal(rank)+(total?"/"+total:""):"—";}
+  function scoreDeltaLabel(delta){delta=Number(delta)||0;return delta>0?"▲"+delta:delta<0?"▼"+Math.abs(delta):"—";}
+  function gameDetail(stage){
+    const rows=stage&&Array.isArray(stage.detail)?stage.detail:[];
+    if(!rows.length)return "";
+    return '<div class="nfl-race-quarter-detail">'+rows.map(function(row){
+      return '<span><b>Q'+esc(row.quarterNumber)+' · W'+esc(row.nflWeek)+'</b><em>'+esc(row.raceScore)+' pts'+(row.scoreDelta?' · '+esc(scoreDeltaLabel(row.scoreDelta)):'')+'</em><strong>'+esc(row.wins+'-'+row.losses+'-'+row.ties)+'</strong></span>';
+    }).join("")+'</div>';
   }
   function scoreSummary(payload){
-    const race=payload&&payload.nflPlayoffRace||{},score=race.scoreBreakdown||{};
-    return '<section class="nfl-race-season-strip"><div class="nfl-race-score-scroll">'+
-      '<span><b>CP</b><strong>'+esc(score.checkpointPoints||0)+'</strong></span>'+
-      '<span><b>FINAL</b><strong>'+esc(score.finalForecastPoints||0)+'</strong></span>'+
-      '<span><b>FIELD</b><strong>'+esc(score.playoffFieldBonuses||0)+'</strong></span>'+
-      '<span><b>HOLD</b><strong>'+esc(score.originalHoldBonuses||0)+'</strong></span>'+
-      '<span class="is-total"><b>TOTAL</b><strong>'+esc(score.total||0)+'</strong></span>'+
-      '</div>'+seasonTimeline(payload)+'</section>';
+    const race=payload&&payload.nflPlayoffRace||{},comp=race.competition||{},stages=Array.isArray(comp.stages)?comp.stages:[];
+    const gameLabel=comp.phase==="final-preview"?"FINAL PREVIEW":"GAME "+(comp.gameNumber||1)+" · Q"+(comp.quarterNumber||1)+" · W"+(comp.nflWeek||1);
+    const headline='<div class="nfl-race-competition-head"><b>'+esc(gameLabel)+'</b><strong>'+esc(comp.raceScore||0)+' pts <em>'+esc(scoreDeltaLabel(comp.scoreDelta))+'</em></strong><span>'+esc(placeLabel(comp.weeklyPlacement,comp.weeklyFieldSize))+' · '+esc(comp.weeklyRecord||"0-0-0")+'</span><small>GAME '+esc(comp.gameRecord||"0-0-0")+' · SEASON '+esc(comp.seasonRecord||"0-0-0")+'</small></div>';
+    const strip='<div class="nfl-race-stage-strip">'+stages.map(function(stage){
+      if(stage.kind==="final")return '<span class="nfl-race-stage"><b>FINAL</b><em>PLAYOFFS</em><strong>5TH EVENT</strong></span>';
+      const label='G'+stage.gameNumber+' '+stage.status;
+      return '<details class="nfl-race-stage '+(stage.status==="FINAL"?"is-earned":"")+'"><summary><b>'+esc(label)+'</b><em>'+esc(stage.record||"0-0-0")+'</em><strong>'+(stage.placement?esc(ordinal(stage.placement)):"UPCOMING")+'</strong></summary>'+gameDetail(stage)+'</details>';
+    }).join("")+'</div>';
+    return '<section class="nfl-race-season-strip">'+headline+strip+'</section>';
   }
 
   function currentRankings(categoryId){
