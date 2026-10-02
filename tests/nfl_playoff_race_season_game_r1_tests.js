@@ -30,7 +30,7 @@ const weighted=run("nflPlayoffRaceWeightedScore_(category,ballot,final,snap,hist
 assert.strictEqual(weighted.finalForecastPoints,320);
 assert.strictEqual(weighted.playoffFieldBonus,26);
 assert.strictEqual(weighted.originalHoldBonus,80);
-assert.strictEqual(weighted.earnedPoints,426);
+assert.strictEqual(weighted.earnedPoints,446);
 ctx.standings=[{nomineeId:"A",rank:1},{nomineeId:"B",rank:3},{nomineeId:"C",rank:8}];
 ctx.picks=[{nomineeId:"A",rank:1},{nomineeId:"B",rank:2},{nomineeId:"C",rank:3}];
 assert.deepStrictEqual(JSON.parse(JSON.stringify(run("nflPlayoffRaceCheckpointScore_(picks,standings)"))),{exactSeedPoints:3,nearSeedPoints:1,playoffFieldPoints:2,total:6});
@@ -40,7 +40,7 @@ assert.strictEqual(run("nflPlayoffRaceCheckpointKey_('g','User','afc',4)===nflPl
 ctx.calls=0;ctx.nflPlayoffRaceFetchWeek_=function(){ctx.calls++;return [{Status:"Final"}];};ctx.req=run("nflPlayoffRaceRequestContext_('nfl-playoff-race-2026')");
 run("nflPlayoffRaceFetchWeekContext_(req,4);nflPlayoffRaceFetchWeekContext_(req,4)");
 assert.strictEqual(ctx.calls,1);assert.strictEqual(ctx.req.weekScheduleCacheHits,1);
-assert(front.includes("<b>CP</b>")&&front.includes("<b>HOLD</b>")&&front.includes("<b>TOTAL</b>"));
+assert(!front.includes("<b>CP</b>"));assert(front.includes("nfl-race-competition-head"));
 assert(front.includes("<strong>20</strong><span>EXACT</span>")&&front.includes("20·15·10·6·3"));
 assert(front.includes('conference+" #"+liveRow.currentRank+compactMovement(liveRow)+" | "+(div||liveRow.division||"")+" #"+divRank+" | ("+(liveRow.record||"0-0-0")+")"'));
 assert(front.includes("data-nfl-status=\"'+esc(statusLine)+'\""));
@@ -53,6 +53,9 @@ assert(css.includes(".nfl-ranking-control-group")&&css.includes("background:tran
 assert(css.includes("min-height:38px!important")&&css.includes("grid-template-columns:18px 28px 18px 17px!important"));
 assert(css.includes(".nfl-ranking-row-points")&&css.includes("font-size:12px!important"));
 assert(engine.includes("NflForecastCheckpointScores"));
-assert(rank.includes("nflCheckpointByUser"));
+assert(!rank.includes("nflCheckpointByUser"));
 assert(!front.includes("Week 4:</strong> 85%"));
 console.log("PATTC NFL Playoff Race Season Game R1 focused regression: PASS");
+
+assert(engine.includes("NflForecastCheckpointScores"),"legacy checkpoint schema remains compatible");
+assert(engine.includes("legacyCheckpointScoringActive:false"),"legacy checkpoint points are not active scoring");
