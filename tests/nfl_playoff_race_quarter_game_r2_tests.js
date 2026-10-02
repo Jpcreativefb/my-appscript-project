@@ -101,3 +101,11 @@ assert(pack.includes('nflSeasonPackRepairPlayoffDisplayOrder_'));
 assert(pack.includes('displayOrder:200'));
 
 console.log('PATTC NFL Playoff Race Quarter Game R2 focused regression: PASS');
+
+assert(front.includes("GAME REC ")&&front.includes("G REC "));
+assert(front.includes("is-current")&&front.includes("data-current-game"));
+assert(front.includes("nflRaceFocusCurrentStage_")&&front.includes("scrollIntoView"));
+assert(front.includes("FINAL</b><em>PLAYOFFS</em>")&&!front.includes("5TH EVENT"));
+assert(css.includes("font-size:15px!important")&&css.includes("font-size:10px!important"));
+assert(css.includes(".nfl-race-stage[open]{min-width:260px!important"));
+assert(css.includes("font-size:8.5px!important"));
