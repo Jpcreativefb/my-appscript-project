@@ -85,6 +85,22 @@ function nflSeasonPackEnsureGame_(payload){
   Object.keys(structural).forEach(function(key){if(structural[key]===undefined)delete structural[key];});
   return {action:"verified",result:adminUpdateGame(structural)};
 }
+function nflSeasonPackRepairPlayoffDisplayOrder_(year){
+  const ids=nflSeasonPackIds_(year);
+  const setup=adminGetGameSetup({gameId:ids.playoff});
+  const categories=setup&&Array.isArray(setup.categories)?setup.categories:[];
+  const expected={"afc-playoff-seeds":100,"nfc-playoff-seeds":200};
+  const repaired=[];
+  Object.keys(expected).forEach(function(categoryId){
+    const existing=categories.find(function(row){return nflSeasonPackKey_(row.categoryId)===categoryId;});
+    if(!existing)return;
+    const current=Number(existing.settings&&existing.settings.displayOrder!==undefined?existing.settings.displayOrder:existing.displayOrder)||0;
+    if(current===expected[categoryId])return;
+    adminUpdateCategory({gameId:ids.playoff,categoryId:categoryId,displayOrder:expected[categoryId]});
+    repaired.push({categoryId:categoryId,displayOrder:expected[categoryId]});
+  });
+  return repaired;
+}
 function nflSeasonPackEnsureCategory_(payload){
   const setup=adminGetGameSetup({gameId:payload.gameId});
   const existing=(setup.categories||[]).find(function(row){return nflSeasonPackKey_(row.categoryId)===nflSeasonPackKey_(payload.categoryId);});
@@ -165,6 +181,7 @@ function apiAdminBuildNflSeasonPack(payload){
   if(typeof requireAdmin_==="function")requireAdmin_(payload);
 
   const year=nflSeasonPackYear_(payload.year);
+  const displayOrderRepairs=nflSeasonPackRepairPlayoffDisplayOrder_(year);
   const tasks=nflSeasonPackTasks_(year);
   const cursor=Math.max(0,Math.floor(Number(payload.cursor)||0));
 
@@ -220,6 +237,7 @@ function apiAdminBuildNflSeasonPack(payload){
     done:done,
     percent:Math.round((nextCursor/Math.max(1,tasks.length))*100),
     completed:completed,
+    displayOrderRepairs:displayOrderRepairs,
     message:done
       ? "NFL Cup and ranking mini-game setup is ready in Draft."
       : "NFL Sports Pack setup progress: "+nextCursor+" / "+tasks.length
