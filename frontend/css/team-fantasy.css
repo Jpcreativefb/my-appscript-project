@@ -1210,3 +1210,211 @@ body:has(.sports-team-fantasy) #app{max-width:none;margin:0;padding:0;background
 .sports-team-fantasy .tf-bulk-select input{margin:0;accent-color:#19a7ce}
 .sports-team-fantasy .tf-edit-label{display:block!important;margin-top:2px;font-size:.42rem;color:#80d8ff;font-weight:800}
 .sports-team-fantasy .tf-lock-copy{display:block;margin-top:2px;font-size:.42rem;color:#d7e2e9;font-weight:800}
+
+
+/* TEAM FANTASY RANKING + WEEK BROWSER R1 — MOBILE SCOREBOARD COMPACTION */
+.sports-team-fantasy .tf-live-scoreboard{
+  padding:8px 9px;
+  overflow:hidden;
+}
+.sports-team-fantasy .tf-scoreboard-header{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) auto;
+  gap:8px;
+  align-items:center;
+  margin-bottom:7px;
+}
+.sports-team-fantasy .tf-scoreboard-nav{
+  display:grid;
+  grid-template-columns:34px minmax(0,1fr) 34px;
+  gap:6px;
+  align-items:center;
+}
+.sports-team-fantasy .tf-scoreboard-nav button{
+  width:34px;
+  height:30px;
+  min-height:30px;
+  padding:0;
+  border-radius:7px;
+  font-size:1rem;
+  line-height:1;
+}
+.sports-team-fantasy .tf-scoreboard-nav strong{
+  min-width:0;
+  text-align:center;
+  font-size:.68rem;
+  letter-spacing:.04em;
+  white-space:nowrap;
+}
+.sports-team-fantasy .tf-scoreboard-status{
+  text-align:right;
+  font-size:.54rem;
+  line-height:1.15;
+  font-weight:900;
+  color:#dcefff;
+  white-space:nowrap;
+}
+.sports-team-fantasy .tf-scoreboard-matchup{
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:8px;
+  align-items:start;
+}
+.sports-team-fantasy .tf-scoreboard-team{
+  min-width:0;
+  padding:6px;
+  border:1px solid rgba(71,137,180,.26);
+  border-radius:9px;
+  background:rgba(2,20,36,.82);
+}
+.sports-team-fantasy .tf-scoreboard-team-head{
+  display:grid;
+  grid-template-columns:56px minmax(0,1fr) auto;
+  gap:5px;
+  align-items:center;
+  min-height:58px;
+}
+.sports-team-fantasy .tf-scoreboard-team.is-home .tf-scoreboard-team-head{
+  grid-template-columns:auto minmax(0,1fr) 56px;
+}
+.sports-team-fantasy .tf-scoreboard-team-head img{
+  display:block;
+  width:56px;
+  height:56px;
+  max-width:56px;
+  max-height:56px;
+  object-fit:contain;
+}
+.sports-team-fantasy .tf-scoreboard-team-head strong{
+  min-width:0;
+  font-size:.72rem;
+  line-height:1;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.sports-team-fantasy .tf-scoreboard-team.is-home .tf-scoreboard-team-head strong{text-align:right}
+.sports-team-fantasy .tf-scoreboard-nfl-score{
+  font-size:.92rem;
+  font-weight:1000;
+  line-height:1;
+  color:#fff;
+}
+.sports-team-fantasy .tf-scoreboard-units{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:4px;
+  margin-top:5px;
+}
+.sports-team-fantasy .tf-scoreboard-unit{
+  min-width:0;
+  min-height:34px;
+  padding:3px 2px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:1px;
+  border:1px solid rgba(76,137,176,.24);
+  border-radius:6px;
+  background:#03182a;
+}
+.sports-team-fantasy .tf-scoreboard-unit span{
+  font-size:.49rem;
+  line-height:1;
+  font-weight:1000;
+  color:#64d8ff;
+}
+.sports-team-fantasy .tf-scoreboard-unit strong{
+  font-size:.62rem;
+  line-height:1;
+  font-weight:1000;
+  color:#fff;
+}
+.sports-team-fantasy .tf-scoreboard-unit.is-user-selected{
+  outline:2px solid #168bff;
+  outline-offset:1px;
+}
+.sports-team-fantasy .tf-season-position-rankings{
+  margin-top:7px;
+  border-top:1px solid rgba(78,137,175,.22);
+  padding-top:5px;
+}
+.sports-team-fantasy .tf-season-position-rankings>summary{
+  cursor:pointer;
+  font-size:.54rem;
+  font-weight:900;
+  color:#bfe8ff;
+}
+.sports-team-fantasy .tf-season-position-rankings-body{
+  margin-top:6px;
+}
+.sports-team-fantasy .tf-rank-value.is-top{color:#15803d}
+.sports-team-fantasy .tf-rank-value.is-bottom{color:#b91c1c}
+
+@media(max-width:640px){
+  .sports-team-fantasy .tf-live-scoreboard{
+    padding:7px;
+  }
+  .sports-team-fantasy .tf-scoreboard-header{
+    grid-template-columns:1fr;
+    gap:3px;
+    margin-bottom:5px;
+  }
+  .sports-team-fantasy .tf-scoreboard-status{
+    text-align:center;
+    font-size:.52rem;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .sports-team-fantasy .tf-scoreboard-matchup{
+    gap:5px;
+  }
+  .sports-team-fantasy .tf-scoreboard-team{
+    padding:5px;
+  }
+  .sports-team-fantasy .tf-scoreboard-team-head{
+    grid-template-columns:48px minmax(0,1fr) auto;
+    min-height:50px;
+  }
+  .sports-team-fantasy .tf-scoreboard-team.is-home .tf-scoreboard-team-head{
+    grid-template-columns:auto minmax(0,1fr) 48px;
+  }
+  .sports-team-fantasy .tf-scoreboard-team-head img{
+    width:48px;
+    height:48px;
+    max-width:48px;
+    max-height:48px;
+    object-fit:contain;
+  }
+  .sports-team-fantasy .tf-scoreboard-team-head strong{
+    font-size:.66rem;
+  }
+  .sports-team-fantasy .tf-scoreboard-nfl-score{
+    font-size:.82rem;
+  }
+  .sports-team-fantasy .tf-scoreboard-units{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:3px;
+    margin-top:4px;
+  }
+  .sports-team-fantasy .tf-scoreboard-unit{
+    min-height:32px;
+    padding:3px 1px;
+  }
+  .sports-team-fantasy .tf-scoreboard-unit span{font-size:.47rem}
+  .sports-team-fantasy .tf-scoreboard-unit strong{font-size:.59rem}
+  .sports-team-fantasy .tf-season-position-rankings{margin-top:5px;padding-top:4px}
+}
+@media(min-width:641px){
+  .sports-team-fantasy .tf-scoreboard-units{
+    grid-template-columns:repeat(8,minmax(0,1fr));
+  }
+  .sports-team-fantasy .tf-scoreboard-team-head img{
+    width:64px;
+    height:64px;
+    max-width:64px;
+    max-height:64px;
+    object-fit:contain;
+  }
+}
