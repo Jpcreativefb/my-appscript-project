@@ -48,7 +48,7 @@ assert(front.includes('const status=String(row.dataset.nflStatus||"").trim()'));
 assert(front.includes('base+" pts"+(bonus>0?" (+"+bonus+" bonus)":"")'));
 assert(!front.includes(" playoff</b>"));
 assert(front.includes("nfl-race-season-strip")&&front.includes("nfl-race-stage-strip"));
-assert(front.includes("controls(category,team,index,ordered.length,locked,teamPctLabel)"));
+assert(front.includes("controls(category,team,index,ordered.length,locked,teamPctLabel,pointsLabel)"));
 assert(css.includes(".nfl-ranking-control-group")&&css.includes("background:transparent!important"));
 assert(css.includes("min-height:38px!important")&&css.includes("grid-template-columns:18px 28px 18px 17px!important"));
 assert(css.includes(".nfl-ranking-row-points")&&css.includes("font-size:12px!important"));
