@@ -288,6 +288,19 @@ assert(frontendSource.includes('position||"") === "WRTE" ? "WR/TE"'),'normal ran
 assert(frontendSource.includes('is-user-selected'),'exact team+position selection highlight required');
 assert(!frontendSource.slice(frontendSource.lastIndexOf('teamFantasyFeaturedHtml_=function')).includes('POSITION RANK'),'top scoreboard must not show position rank');
 
+const cssSource = fs.readFileSync(path.join(root, 'frontend/css/team-fantasy.css'), 'utf8');
+assert(cssSource.includes('@media(max-width:640px)'),'mobile scoreboard breakpoint required');
+assert(cssSource.includes('max-width:48px') && cssSource.includes('max-height:48px'),'mobile NFL logos must have explicit 48px max bounds');
+assert(cssSource.includes('object-fit:contain'),'scoreboard logos must not expand at intrinsic size');
+assert(cssSource.includes('grid-template-columns:repeat(4,minmax(0,1fr))'),'mobile position units must use a compact 4x2 grid');
+assert(cssSource.includes('grid-template-columns:repeat(8,minmax(0,1fr))'),'desktop position units may use an 8-column strip');
+assert(frontendSource.includes('NFL GAME '+(gameIndex+1)+'/'+games.length'),'game number must stay in compact navigation header');
+assert(frontendSource.includes('aria-label="Previous NFL game"') && frontendSource.includes('aria-label="Next NFL game"'),'scoreboard arrows remain visible');
+const compactOrder = ['QB','RB','WRTE','OL','K','DL','LB','DB'];
+compactOrder.forEach(function(position){
+  assert(frontendSource.includes('"'+position+'"'),'compact scoreboard must retain '+position);
+});
+
 // Pure scoreboard selection proof: exact team+position highlights; adjacent position does not.
 {
   const scoreUi={
