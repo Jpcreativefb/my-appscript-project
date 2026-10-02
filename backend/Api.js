@@ -1527,6 +1527,15 @@ function doGet(e) {
       return json(apiAdminSaveNflPlayoffRaceSettings_(params));
     }
 
+    if (action === "adminFinalizeNflPlayoffRaceWeek") {
+      return json(apiAdminFinalizeNflPlayoffRaceWeek_(params));
+    }
+
+    if (action === "adminGetNflPlayoffRaceCupEvents") {
+      if (typeof requireAdmin_ === "function") requireAdmin_(params);
+      return json({ success: true, events: nflPlayoffRaceCupEvents_(params.gameId) });
+    }
+
     if (action === "adminPrepareNflCupFuturesR1") {
       return json(apiAdminPrepareNflCupFuturesR1_(params));
     }
