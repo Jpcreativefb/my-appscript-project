@@ -56,7 +56,7 @@ ctx.fullBallot=fullTeams.map((id,index)=>({nomineeId:id,rank:index+1}));
 ctx.final=Object.fromEntries(fullTeams.map((id,i)=>[id.toLowerCase(),i+1]));
 ctx.fullSnap={multiplier:.95,rankingsJSON:JSON.stringify(ctx.fullBallot),teamMultipliersJSON:JSON.stringify(Object.fromEntries(fullTeams.map(id=>[id.toLowerCase(),id==='A'?.95:1])))};
 score=JSON.parse(JSON.stringify(run('nflPlayoffRaceWeightedScore_(category,fullBallot,final,fullSnap)')));
-assert.strictEqual(score.earnedPoints,364.6,'R2 adds the configurable +20 perfect-seeds bonus to the retained-value final score');
+assert.strictEqual(score.earnedPoints,363.6,'R2 perfect-seeds bonus honors the retained 95% value of the changed top-seven team');
 assert.strictEqual(score.finalPointsAvailable,404.6);
 assert.strictEqual(score.correctPlayoffTeams,7);
 ctx.nobodySnap={multiplier:1,rankingsJSON:JSON.stringify(ctx.fullBallot)};
