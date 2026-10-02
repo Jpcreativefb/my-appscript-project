@@ -171,14 +171,20 @@ function card(category){
   function scoreSummary(payload){
     const race=payload&&payload.nflPlayoffRace||{},comp=race.competition||{},stages=Array.isArray(comp.stages)?comp.stages:[];
     const gameLabel=comp.phase==="final-preview"?"FINAL PREVIEW":"GAME "+(comp.gameNumber||1)+" · Q"+(comp.quarterNumber||1)+" · W"+(comp.nflWeek||1);
-    const headline='<div class="nfl-race-competition-head"><b>'+esc(gameLabel)+'</b><strong>'+esc(comp.raceScore||0)+' pts <em>'+esc(scoreDeltaLabel(comp.scoreDelta))+'</em></strong><span>'+esc(placeLabel(comp.weeklyPlacement,comp.weeklyFieldSize))+' · '+esc(comp.weeklyRecord||"0-0-0")+'</span><small>GAME '+esc(comp.gameRecord||"0-0-0")+' · SEASON '+esc(comp.seasonRecord||"0-0-0")+'</small></div>';
-    const strip='<div class="nfl-race-stage-strip">'+stages.map(function(stage){
-      if(stage.kind==="final")return '<span class="nfl-race-stage"><b>FINAL</b><em>PLAYOFFS</em><strong>5TH EVENT</strong></span>';
+    const headline='<div class="nfl-race-competition-head"><b>'+esc(gameLabel)+'</b><strong>'+esc(comp.raceScore||0)+' pts <em>'+esc(scoreDeltaLabel(comp.scoreDelta))+'</em></strong><span>'+esc(placeLabel(comp.weeklyPlacement,comp.weeklyFieldSize))+' · '+esc(comp.weeklyRecord||"0-0-0")+'</span><small><span class="nfl-race-record-long">GAME REC </span><span class="nfl-race-record-short">G REC </span>'+esc(comp.gameRecord||"0-0-0")+' · <span class="nfl-race-record-long">SEASON </span><span class="nfl-race-record-short">S REC </span>'+esc(comp.seasonRecord||"0-0-0")+'</small></div>';
+    const strip='<div class="nfl-race-stage-strip" data-current-game="'+esc(comp.gameNumber||0)+'">'+stages.map(function(stage){
+      if(stage.kind==="final")return '<span class="nfl-race-stage nfl-race-final-stage"><b>FINAL</b><em>PLAYOFFS</em></span>';
       const label='G'+stage.gameNumber+' '+stage.status;
-      return '<details class="nfl-race-stage '+(stage.status==="FINAL"?"is-earned":"")+'"><summary><b>'+esc(label)+'</b><em>'+esc(stage.record||"0-0-0")+'</em><strong>'+(stage.placement?esc(ordinal(stage.placement)):"UPCOMING")+'</strong></summary>'+gameDetail(stage)+'</details>';
+      const current=comp.phase==="regular"&&Number(stage.gameNumber)===Number(comp.gameNumber);
+      return '<details class="nfl-race-stage '+(stage.status==="FINAL"?"is-earned ":"")+(current?"is-current":"")+'" data-game-number="'+esc(stage.gameNumber)+'"><summary><b>'+esc(label)+'</b><em>'+esc(stage.record||"0-0-0")+'</em><strong>'+(stage.placement?esc(ordinal(stage.placement)):"UPCOMING")+'</strong></summary>'+gameDetail(stage)+'</details>';
     }).join("")+'</div>';
     return '<section class="nfl-race-season-strip">'+headline+strip+'</section>';
   }
+
+  root.nflRaceFocusCurrentStage_=function(){
+    const active=document.querySelector(".nfl-race-stage-strip .nfl-race-stage.is-current");
+    if(active&&typeof active.scrollIntoView==="function")active.scrollIntoView({behavior:"auto",block:"nearest",inline:"center"});
+  };
 
   function currentRankings(categoryId){
     const list=document.getElementById("rankingList_"+categoryId);
@@ -377,6 +383,7 @@ function card(category){
     const categories=Array.isArray(payload.categories)?payload.categories:[];
     const saved=categories.filter(function(c){return playoffRace?!!c.activeSnapshot:!!(c.ballot&&c.ballot.length);}).length;
     const max=categories.reduce(function(sum,c){return sum+(Number(c.points)||0);},0);
+    if(playoffRace&&root.setTimeout)root.setTimeout(root.nflRaceFocusCurrentStage_,60);
     return '<div class="page ranking-page nfl-ranking-r1">'+
       '<header class="nfl-ranking-hero"><div><span>NFL SEASON MINI GAME</span><h1>'+esc(payload.gameName||"NFL Forecast")+'</h1><p>Build your order. Every team\'s final position scores independently.</p></div><button type="button" onclick="navigate(\'leaderboard\')">STANDINGS</button></header>'+
       raceStatus(payload)+
