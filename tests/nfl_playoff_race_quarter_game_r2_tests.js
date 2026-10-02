@@ -109,3 +109,11 @@ assert(front.includes("FINAL</b><em>PLAYOFFS</em>")&&!front.includes("5TH EVENT"
 assert(css.includes("font-size:15px!important")&&css.includes("font-size:10px!important"));
 assert(css.includes(".nfl-race-stage[open]{min-width:260px!important"));
 assert(css.includes("font-size:8.5px!important"));
+
+assert(!front.includes("Checkpoint scoring:"));
+assert(!front.includes("+3 exact current seed"));
+assert(!front.includes("+1 within one seed"));
+assert(front.includes("Each NFL week acts as a Quarter"));
+assert(front.includes("Weeks 1–4 are Game 1"));
+assert(front.includes("4 GAMES + FINAL"));
+assert(front.includes("<strong>ADJUSTMENT WINDOWS</strong>"));
