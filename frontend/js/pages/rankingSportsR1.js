@@ -102,7 +102,7 @@ function card(category){
       const teamPctLabel=race?'<span class="nfl-forecast-team-value" data-team-pct="'+esc(team.id)+'">'+esc(Math.round(teamValue*100))+'%</span>':'';
       const pointsLabel=race?'<small class="nfl-ranking-row-points">'+esc(pointsText(liveRow))+'</small>':"";
       const liveInline="";
-      rows+='<div class="ranking-entry nfl-ranking-entry '+(playoffZone?"is-playoff ":"")+(race?"is-playoff-race-row ":"")+'" style="'+style(team)+'" data-nominee-id="'+esc(team.id)+'" data-nfl-label="'+esc(label)+'" data-nfl-division="'+esc(div)+'" ondragover="nflRankingDragOver_(event)" ondrop="nflRankingDrop_(event,\''+js(category.id)+'\',\''+js(team.id)+'\')">'+
+      rows+='<div class="ranking-entry nfl-ranking-entry '+(playoffZone?"is-playoff ":"")+(race?"is-playoff-race-row ":"")+'" style="'+style(team)+'" data-nominee-id="'+esc(team.id)+'" data-nfl-label="'+esc(label)+'" data-nfl-status="'+esc(statusLine)+'" data-nfl-division="'+esc(div)+'" ondragover="nflRankingDragOver_(event)" ondrop="nflRankingDrop_(event,\''+js(category.id)+'\',\''+js(team.id)+'\')">'+
         '<div class="ranking-position nfl-ranking-position">#<span>'+(index+1)+'</span></div>'+
         '<div class="ranking-entry-media nfl-ranking-logo">'+image+'</div>'+
         '<div class="ranking-entry-name nfl-ranking-name"><strong>'+esc(team.name||team.shortAnswer||team.id)+'</strong><small>'+esc(subtitle)+'</small>'+(!locked?liveInline:"")+'</div>'+
@@ -207,8 +207,9 @@ function card(category){
       row.classList.toggle("is-playoff",playoffZone);
       const small=row.querySelector(".nfl-ranking-name small");
       if(small){
+        const status=String(row.dataset.nflStatus||"").trim();
         const label=String(row.dataset.nflLabel||"").trim();
-        small.textContent=playoffZone?(label?label+" · PLAYOFF SEED":"PLAYOFF SEED"):label;
+        small.textContent=status||(playoffZone?(label?label+" · PLAYOFF SEED":"PLAYOFF SEED"):label);
       }
     });
     const warning=document.getElementById("nflDivisionWarning_"+categoryId);

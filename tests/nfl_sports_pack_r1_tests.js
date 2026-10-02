@@ -1,1 +1,13 @@
 const fs=require("fs"),assert=require("assert");const read=p=>fs.readFileSync(p,"utf8");const be=read("backend/engines/NflSeasonPackEngine.js"),api=read("backend/Api.js"),loader=read("frontend/js/app.js"),rank=read("frontend/js/pages/rankingSportsR1.js"),cup=read("frontend/js/pages/nflCupR1.js"),css=read("frontend/css/nfl-sports-pack-r1.css"),admin=read("frontend/js/pages/adminGamesRc24e.js"),app=read("frontend/app.html");assert(be.includes("NFL_SEASON_PACK_VERSION_"));assert(be.includes("nfl-playoff-race-"));assert(be.includes("nfl-full-league-"));assert(be.includes("nfl-bottom-dwellers-"));assert(be.includes("points:afc.length*20"));assert(be.includes("displayOrder:100"));assert(be.includes("displayOrder:200"));assert(be.includes("nflSeasonPackRepairPlayoffDisplayOrder_"));assert(be.includes("displayOrderRepairs:displayOrderRepairs"));assert(be.includes("points:NFL_SEASON_PACK_TEAMS_.length*10"));assert(be.includes("displayOrder:payload.displayOrder||100"));assert(be.includes('parentContributionMode:"placement-points"'));assert(be.includes("batchSize"));assert(be.includes("nextCursor"));assert(api.includes('action === "adminBuildNflSeasonPack"'));assert(loader.includes('"ranking": ["ranking", "rankingSportsR1"]'));assert(loader.includes('"season-hub": ["seasonHub", "nflCupR1"]'));assert(rank.includes("Positions 1–7 are your playoff seeds"));assert(rank.includes("<strong>20</strong><span>EXACT</span>"));assert(rank.includes("SAVE RANKING"));assert(cup.includes("nfl-cup-r2-hero") && cup.includes("CUP RULES"));assert(css.includes(".nfl-ranking-r1"));assert(css.includes(".nfl-cup-r1"));assert(admin.includes("Build / Repair NFL Pack"));assert(admin.includes("adminBuildNflSeasonPack"));assert(app.includes("v1219-nfl-sports-pack-r1"));assert(app.includes("./css/nfl-sports-pack-r1.css?release=v1219-nfl-sports-pack-r1"));console.log("PATTC NFL Sports Pack R1 tests: PASS");
+
+const vm=require("vm");
+const packCtx={console,Date,Math,JSON,Number,String,Array,Object,RegExp};
+packCtx.adminGetGameSetup=()=>({categories:[
+  {categoryId:"afc-playoff-seeds",settings:{displayOrder:100}},
+  {categoryId:"nfc-playoff-seeds",settings:{displayOrder:100}}
+]});
+packCtx.repairs=[];
+packCtx.adminUpdateCategory=p=>{packCtx.repairs.push({categoryId:p.categoryId,displayOrder:p.displayOrder});return {success:true};};
+vm.createContext(packCtx);vm.runInContext(be,packCtx);
+packCtx.nflSeasonPackRepairPlayoffDisplayOrder_(2026);
+assert.deepStrictEqual(JSON.parse(JSON.stringify(packCtx.repairs)),[{categoryId:"nfc-playoff-seeds",displayOrder:200}],"Build/Repair corrects an existing duplicate NFC DisplayOrder without suppressing Run Check");
