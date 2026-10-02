@@ -43,7 +43,7 @@ assert.strictEqual(ctx.calls,1);assert.strictEqual(ctx.req.weekScheduleCacheHits
 assert(front.includes("<b>CP</b>")&&front.includes("<b>HOLD</b>")&&front.includes("<b>TOTAL</b>"));
 assert(front.includes("<strong>20</strong><span>EXACT</span>")&&front.includes("20·15·10·6·3"));
 assert(front.includes('conference+" #"+liveRow.currentRank+compactMovement(liveRow)+" | "+(div||liveRow.division||"")+" #"+divRank+" | ("+(liveRow.record||"0-0-0")+")"'));
-assert(front.includes('data-nfl-status="'+'+esc(statusLine)+'+'"'));
+assert(front.includes("data-nfl-status=\"'+esc(statusLine)+'\""));
 assert(front.includes('const status=String(row.dataset.nflStatus||"").trim()'));
 assert(front.includes('base+" pts"+(bonus>0?" (+"+bonus+" bonus)":"")'));
 assert(!front.includes(" playoff</b>"));
