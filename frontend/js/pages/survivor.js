@@ -1350,11 +1350,14 @@ function survivorFinalTrailLogo_(row){
 function survivorFinalLiveDetail_(payload,result){
   payload=payload||{}; result=result||{};
   var detail=payload.liveScoreboardClockPeriod||{};
-  var periodLabel=result.periodLabel||detail.periodLabel||'';
+  var periodLabel=String(result.periodLabel||detail.periodLabel||'').trim();
   var period=result.period||detail.period||'';
-  var clock=result.clock||detail.clock||'';
+  var clock=String(result.clock||detail.clock||'').trim();
+  var rawStatus=String(result.status||'').toUpperCase();
+  if (/HALF/.test(rawStatus) || /HALF/.test(periodLabel.toUpperCase())) return "HALFTIME";
+  if (/^STATUS_/.test(periodLabel.toUpperCase())) periodLabel='';
   var periodText=periodLabel || (period!==''&&period!=null ? ('Q'+String(period)) : '');
-  return [periodText,clock].filter(Boolean).join(' · ');
+  return [periodText,clock].filter(Boolean).join(' ');
 }
 
 function survivorFinalMatchups_(payload){
@@ -1395,7 +1398,7 @@ function renderSurvivorFinalFeatured_(payload){
   const selected=(match.teams||[]).find(t=>String(t.id||'')===String(selectedId)); const opponent=selected===match.away?match.home:match.away;
   const r=selected&&selected.sportsResult||{}; const complete=r.completed===true||String(r.state||'').toLowerCase()==='post'||/final/i.test(String(r.status||'')); const live=!complete && (/live|progress/i.test(String(r.status||''))||String(r.state||'').toLowerCase()==='in');
   const selectedHome=String(selected&&selected.side||'').toLowerCase()==='home'; const ss=selectedHome?r.homeScore:r.awayScore; const os=selectedHome?r.awayScore:r.homeScore;
-  return `<section class="survivor-final-featured ${live?'is-live':complete?'is-final':'is-pregame'}"><div class="survivor-final-featured-head"><span>${complete?'FINAL':live?'LIVE':'SURVIVE THIS WEEK'}</span><strong>${survivorFinalEscape_(selected.name||selected.id)}</strong>${live?`<em>${survivorFinalEscape_(survivorFinalLiveDetail_(payload,r)||r.status||'LIVE')}</em>`:''}</div><div class="survivor-final-scoreboard"><div>${survivorFinalTeamLogo_(selected)}<strong>${survivorFinalEscape_(selected.name||selected.id)}</strong>${ss!==''&&ss!=null?`<b>${survivorFinalEscape_(ss)}</b>`:''}</div><span>vs</span><div>${survivorFinalTeamLogo_(opponent)}<strong>${survivorFinalEscape_(opponent&& (opponent.name||opponent.id) || selected.opponent || 'Opponent')}</strong>${os!==''&&os!=null?`<b>${survivorFinalEscape_(os)}</b>`:''}</div></div><div class="survivor-final-featured-foot"><span>${survivorFinalEscape_(survivorFinalFormatKickoff_(selected.kickoff)||'Kickoff TBD')}</span><span>${selected.spread!==''&&selected.spread!=null?'Spread '+survivorFinalEscape_(selected.spread):''}</span><span>${selected.moneyline!==''&&selected.moneyline!=null?'ML '+survivorFinalEscape_(selected.moneyline):''}</span></div>${complete&&round.outcome?`<div class="survivor-final-result is-${survivorFinalEscape_(round.outcome)}">${survivorFinalEscape_(String(round.status||round.outcome).replace(/-/g,' ').toUpperCase())}${round.earnedPoints!==undefined?` · ${survivorFinalEscape_(round.earnedPoints)} pts`:''}</div>`:''}</section>`;
+  return `<section class="survivor-final-featured ${live?'is-live':complete?'is-final':'is-pregame'}"><div class="survivor-final-featured-head"><span>${complete?'FINAL':live?'LIVE':'SURVIVE THIS WEEK'}</span><strong>${survivorFinalEscape_(selected.name||selected.id)}</strong>${live?`<em>${survivorFinalEscape_(survivorFinalLiveDetail_(payload,r)||'LIVE')}</em>`:''}</div><div class="survivor-final-scoreboard"><div>${survivorFinalTeamLogo_(selected)}<strong>${survivorFinalEscape_(selected.name||selected.id)}</strong>${ss!==''&&ss!=null?`<b>${survivorFinalEscape_(ss)}</b>`:''}</div><span>vs</span><div>${survivorFinalTeamLogo_(opponent)}<strong>${survivorFinalEscape_(opponent&& (opponent.name||opponent.id) || selected.opponent || 'Opponent')}</strong>${os!==''&&os!=null?`<b>${survivorFinalEscape_(os)}</b>`:''}</div></div><div class="survivor-final-featured-foot"><span>${survivorFinalEscape_(survivorFinalFormatKickoff_(selected.kickoff)||'Kickoff TBD')}</span><span>${selected.spread!==''&&selected.spread!=null?'Spread '+survivorFinalEscape_(selected.spread):''}</span><span>${selected.moneyline!==''&&selected.moneyline!=null?'ML '+survivorFinalEscape_(selected.moneyline):''}</span></div>${complete&&round.outcome?`<div class="survivor-final-result is-${survivorFinalEscape_(round.outcome)}">${survivorFinalEscape_(String(round.status||round.outcome).replace(/-/g,' ').toUpperCase())}${round.earnedPoints!==undefined?` · ${survivorFinalEscape_(round.earnedPoints)} pts`:''}</div>`:''}</section>`;
 }
 
 function renderSurvivorFinalTrail_(payload){
@@ -1919,9 +1922,21 @@ function survivorRecoveryR2TeamStyle_(team) {
 }
 
 function survivorRecoveryR2Moneyline_(value) {
-  if (value === "" || value === null || value === undefined || !Number.isFinite(Number(value))) return "—";
+  if (value === "" || value === null || value === undefined || !Number.isFinite(Number(value)) || Number(value) === 0) return "NA";
   const number = Number(value);
   return number > 0 ? "+" + number : String(number);
+}
+
+function survivorRecoveryR2Spread_(value) {
+  if (value === "" || value === null || value === undefined || !Number.isFinite(Number(value))) return "NA";
+  const number = Number(value);
+  if (number === 0) return "PK";
+  return number > 0 ? "+" + number : String(number);
+}
+
+function survivorRecoveryR2Total_(value) {
+  if (value === "" || value === null || value === undefined || !Number.isFinite(Number(value)) || Number(value) === 0) return "NA";
+  return String(Number(value));
 }
 
 function survivorRecoveryR2KickoffLabel_(value) {
@@ -1979,12 +1994,12 @@ function survivorRecoveryR2TeamDetails_(team, matchup, favoriteId) {
   const rows = [
     ["Record", team.teamRecord || "—"],
     ["Market", favorite ? "FAVORITE" : (favoriteId ? "UNDERDOG" : "EVEN / TBD")],
-    ["Spread", survivorFormatLine_(team.spread) || "—"],
+    ["Spread", survivorRecoveryR2Spread_(team.spread)],
     ["Moneyline", survivorRecoveryR2Moneyline_(team.moneyline)],
-    ["Side", side ? side.toUpperCase() : "—"],
-    ["Opp. Record", team.opponentRecord || "—"]
+    ["Side", side ? side.toUpperCase() : "NA"],
+    ["Opp. Record", team.opponentRecord || "NA"]
   ];
-  if (matchup && matchup.total !== "" && matchup.total !== null && matchup.total !== undefined) rows.push(["Game Total", matchup.total]);
+  rows.push(["Game Total", survivorRecoveryR2Total_(matchup && matchup.total)]);
   survivorRecoveryR2ExtraStatRows_(team).forEach(function(row) { rows.push(row); });
   return `<div class="survivor-r2-detail-team" style="${survivorRecoveryR2TeamStyle_(team)}">
     <div class="survivor-r2-detail-title">${survivorFinalTeamLogo_(team) || `<span>${survivorFinalEscape_(survivorRecoveryR2TeamKey_(team))}</span>`}<strong>${survivorFinalEscape_(team.name || team.id || "Team")}</strong></div>
@@ -2022,11 +2037,11 @@ function survivorRecoveryR2GameStatus_(payload, result, state) {
   result = result || {};
   if (state === "final") return "FINAL";
   if (state === "live") {
-    const detail = survivorFinalLiveDetail_(payload || {}, result) || String(result.status || "").trim();
-    if (!detail) return "LIVE";
-    return /^live\b/i.test(detail) ? detail.toUpperCase() : "LIVE " + detail.toUpperCase();
+    const detail = survivorFinalLiveDetail_(payload || {}, result);
+    if (detail) return detail.toUpperCase();
+    return "LIVE";
   }
-  return "NOT STARTED";
+  return "";
 }
 
 function survivorRecoveryR2MatchupCard_(matchup, round, payload) {
@@ -2036,7 +2051,7 @@ function survivorRecoveryR2MatchupCard_(matchup, round, payload) {
   const favoriteId = survivorRecoveryR2FavoriteId_(matchup);
   const gameStatus = survivorRecoveryR2GameStatus_(payload, result, state);
   return `<article class="survivor-final-matchup survivor-r2-matchup is-${state}">
-    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span><strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong></div>
+    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span>${gameStatus ? `<strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong>` : ""}</div>
     <div class="survivor-r2-scoreboard">
       ${survivorRecoveryR2TeamSide_(matchup.away, round, matchup, result, state, "away")}
       <span class="survivor-r2-at">@</span>
@@ -2340,12 +2355,12 @@ function survivorRecoveryR3StatValue_(team, key, favoriteId) {
   team = team || {};
   const id = String(team.id || "");
   const favorite = favoriteId && id === favoriteId;
-  if (key === "Record") return team.teamRecord || "—";
+  if (key === "Record") return team.teamRecord || "NA";
   if (key === "Market") return favorite ? "FAVORITE" : (favoriteId ? "UNDERDOG" : "EVEN / TBD");
-  if (key === "Spread") return survivorFormatLine_(team.spread) || "—";
+  if (key === "Spread") return survivorRecoveryR2Spread_(team.spread);
   if (key === "Moneyline") return survivorRecoveryR2Moneyline_(team.moneyline);
-  if (key === "Side") return String(team.side || team.homeAway || "—").toUpperCase();
-  if (key === "Opp. Record") return team.opponentRecord || "—";
+  if (key === "Side") return String(team.side || team.homeAway || "NA").toUpperCase();
+  if (key === "Opp. Record") return team.opponentRecord || "NA";
   if (key === "Streak") return team.teamStreak || team.streak || "—";
   if (key === "Division") return team.divisionRank || team.divisionStanding || "—";
   if (key === "Conference") return team.conferenceRank || team.conferenceStanding || "—";
@@ -2364,7 +2379,7 @@ function survivorRecoveryR3Details_(matchup, favoriteId) {
   return `<div class="survivor-r3-detail-matrix">
     <div class="survivor-r3-detail-head"><strong>${survivorFinalEscape_(away.name || away.id || "Away")}</strong><span>STAT</span><strong>${survivorFinalEscape_(home.name || home.id || "Home")}</strong></div>
     ${base.map(function(label) { return `<div class="survivor-r3-detail-row"><strong>${survivorFinalEscape_(survivorRecoveryR3StatValue_(away,label,favoriteId))}</strong><span>${survivorFinalEscape_(label)}</span><strong>${survivorFinalEscape_(survivorRecoveryR3StatValue_(home,label,favoriteId))}</strong></div>`; }).join("")}
-    ${(matchup.total !== "" && matchup.total !== null && matchup.total !== undefined) || matchup.weather ? `<div class="survivor-r3-detail-foot">${matchup.total !== "" && matchup.total !== null && matchup.total !== undefined ? `<span>GAME TOTAL <strong>${survivorFinalEscape_(matchup.total)}</strong></span>` : ""}${matchup.weather ? `<span>WEATHER <strong>${survivorFinalEscape_(matchup.weather)}</strong></span>` : ""}</div>` : ""}
+    <div class="survivor-r3-detail-foot"><span>GAME TOTAL / O-U <strong>${survivorFinalEscape_(survivorRecoveryR2Total_(matchup.total))}</strong></span>${matchup.weather ? `<span>WEATHER <strong>${survivorFinalEscape_(matchup.weather)}</strong></span>` : ""}</div>
   </div>`;
 }
 
@@ -2379,7 +2394,7 @@ function survivorRecoveryR3MatchupCard_(matchup, round, payload) {
   const game = survivorRecoveryR2MatchupResult_(matchup), result = game.result || {}, state = game.state;
   const favoriteId = survivorRecoveryR2FavoriteId_(matchup), gameStatus = survivorRecoveryR2GameStatus_(payload, result, state);
   return `<article class="survivor-final-matchup survivor-r2-matchup survivor-r3-matchup is-${state}">
-    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span><strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong></div>
+    <div class="survivor-r2-matchup-meta"><span>${survivorFinalEscape_(survivorRecoveryR2KickoffLabel_(matchup.kickoff))}</span>${gameStatus ? `<strong class="is-${state}">${survivorFinalEscape_(gameStatus)}</strong>` : ""}</div>
     <div class="survivor-r2-scoreboard survivor-r3-scoreboard">
       ${survivorRecoveryR3TeamSide_(matchup.away, round, matchup, result, state, "away", payload)}
       <span class="survivor-r2-at">@</span>

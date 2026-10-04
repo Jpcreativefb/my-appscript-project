@@ -126,3 +126,114 @@
 .nfl-ranking-save{flex-wrap:wrap!important}.nfl-ranking-save .ranking-message{width:100%;font-size:11px;line-height:1.45}
 .nfl-ranking-save button.secondary{background:#123c53!important;border-color:#4d93ab!important}
 @media(max-width:390px){.nfl-ranking-save button{min-width:125px}.nfl-forecast-team-value{font-size:8px}}
+
+
+/* PATTC NFL PLAYOFF RACE SEASON GAME R1 */
+.nfl-ranking-entry{grid-template-columns:34px 42px minmax(220px,1fr) 158px!important;column-gap:6px!important;min-height:54px!important}
+.nfl-ranking-name{gap:3px!important}.nfl-ranking-name strong{font-size:11px!important}.nfl-ranking-name small{font-size:8px!important;color:#a9c0cd!important;letter-spacing:.01em}
+.nfl-ranking-control-group{display:flex!important;align-items:center!important;justify-content:flex-end!important;gap:7px!important;min-width:0}
+.nfl-forecast-team-value{display:inline-flex!important;align-items:center!important;justify-content:center!important;min-width:43px;border:1px solid rgba(151,210,235,.65)!important;border-radius:5px!important;padding:3px 6px!important;background:transparent!important;color:#d7f3ff!important;font-size:10px!important;font-weight:850!important;line-height:1.15!important}
+.nfl-ranking-move{flex:0 0 auto!important}
+.nfl-race-score-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border:1px solid #245a77;border-radius:11px;background:#031827;overflow:hidden}
+.nfl-race-score-summary>div{display:grid;gap:3px;place-items:center;padding:8px 5px;border-right:1px solid rgba(83,145,183,.18)}
+.nfl-race-score-summary>div:last-child{border-right:0}.nfl-race-score-summary span{font-size:7px;color:#93adbb;text-align:center}.nfl-race-score-summary strong{font-size:13px;color:#fff}.nfl-race-score-summary .is-total strong{color:#73f28e}
+.nfl-race-timeline{display:grid;gap:6px;padding:9px 10px;border:1px solid #245a77;border-radius:11px;background:#02131f}.nfl-race-timeline>strong{font-size:8px;color:#67ed84;letter-spacing:.04em}.nfl-race-timeline>div{display:flex;align-items:center;gap:6px;flex-wrap:wrap}.nfl-race-timeline span{padding:4px 6px;border:1px solid #36566a;border-radius:5px;font-size:8px;color:#a7bbc6}.nfl-race-timeline span.is-earned{border-color:#43bd63;color:#8af2a0}.nfl-race-timeline b{font-size:9px;color:#567487}
+.nfl-ranking-help details>div{font-size:10px!important;line-height:1.45!important}.nfl-ranking-help summary strong{font-size:9px!important}
+@media(max-width:700px){
+  .nfl-ranking-entry{grid-template-columns:30px 36px minmax(0,1fr)!important;grid-template-areas:"pos logo name" "pos logo controls"!important;row-gap:4px!important;padding:6px!important}
+  .nfl-ranking-position{grid-area:pos}.nfl-ranking-logo{grid-area:logo}.nfl-ranking-name{grid-area:name}.nfl-ranking-control-group{grid-area:controls;justify-content:flex-start!important;flex-wrap:wrap}
+  .nfl-ranking-name strong{font-size:10px!important}.nfl-ranking-name small{font-size:7.5px!important;white-space:normal!important;overflow:visible!important}
+  .nfl-race-score-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.nfl-race-score-summary .is-total{grid-column:1/-1}
+}
+
+
+/* PATTC NFL PLAYOFF RACE SEASON GAME R1 — mobile compactness correction */
+.nfl-ranking-entry.is-playoff-race-row{
+  background:
+    radial-gradient(circle at 18% 30%,var(--nfl-rank-primary-a),transparent 42%),
+    linear-gradient(100deg,color-mix(in srgb,var(--nfl-rank-primary) 26%,#061b2b),#031522 58%,color-mix(in srgb,var(--nfl-rank-secondary) 24%,#071827))!important
+}
+.nfl-ranking-value-stack{display:grid!important;justify-items:center!important;align-items:center!important;gap:2px!important;line-height:1!important}
+.nfl-ranking-row-points{font-size:7px!important;line-height:1!important;color:#b8d0dc!important;white-space:nowrap!important}
+.nfl-ranking-move button:first-child,.nfl-ranking-move button:nth-of-type(2){font-weight:1000!important;text-shadow:0 0 .01px currentColor!important}
+.nfl-ranking-position-select{font-weight:1000!important}
+.nfl-race-season-strip{display:grid;gap:4px;padding:5px 6px;border:1px solid #245a77;border-radius:10px;background:#02131f;overflow:hidden}
+.nfl-race-score-scroll,.nfl-race-stage-strip{display:flex;align-items:stretch;gap:4px;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+.nfl-race-score-scroll>span{display:grid;grid-template-columns:auto auto;align-items:center;gap:4px;flex:0 0 auto;min-width:68px;padding:4px 6px;border:1px solid rgba(83,145,183,.22);border-radius:6px;background:#031827}
+.nfl-race-score-scroll b{font-size:6.5px;color:#8faab9}.nfl-race-score-scroll strong{font-size:11px;color:#fff}.nfl-race-score-scroll .is-total strong{color:#73f28e}
+.nfl-race-stage{display:grid;grid-template-columns:auto auto;grid-template-areas:"name pct" "pts pts";gap:1px 5px;flex:0 0 auto;min-width:68px;padding:4px 6px;border:1px solid #36566a;border-radius:6px;color:#a7bbc6;background:#031522}
+.nfl-race-stage b{grid-area:name;font-size:7px}.nfl-race-stage em{grid-area:pct;font-size:7px;font-style:normal;text-align:right}.nfl-race-stage strong{grid-area:pts;font-size:7px;color:#d7e8f1}.nfl-race-stage.is-earned{border-color:#43bd63}.nfl-race-stage.is-earned strong{color:#8af2a0}
+
+@media(max-width:700px){
+  .nfl-ranking-entry.is-playoff-race-row{
+    grid-template-columns:24px 27px minmax(0,1fr) auto!important;
+    grid-template-areas:"pos logo name controls"!important;
+    min-height:38px!important;
+    height:auto!important;
+    column-gap:4px!important;
+    row-gap:0!important;
+    padding:2px 3px!important;
+    align-items:center!important
+  }
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-position{grid-area:pos;font-size:10px!important;align-self:center!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-logo{grid-area:logo;width:26px!important;height:26px!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-logo img{max-width:25px!important;max-height:25px!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-name{grid-area:name;gap:0!important;align-self:center!important;line-height:1.05!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-name strong{font-size:9.5px!important;line-height:1.05!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-name small{font-size:7px!important;line-height:1.05!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-control-group{grid-area:controls;display:flex!important;justify-content:flex-end!important;align-items:center!important;gap:2px!important;flex-wrap:nowrap!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-value-stack{min-width:34px!important;gap:1px!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-forecast-team-value{min-width:30px!important;padding:1px 3px!important;border-radius:4px!important;font-size:8px!important;line-height:1!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-row-points{font-size:5.8px!important;line-height:1!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-move{display:grid!important;grid-template-columns:18px 28px 18px 17px!important;gap:0!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-move button{width:18px!important;height:22px!important;line-height:22px!important;font-size:14px!important;font-weight:1000!important;padding:0!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-move .nfl-ranking-drag{width:17px!important;font-size:10px!important}
+  .nfl-ranking-entry.is-playoff-race-row .nfl-ranking-position-select{width:28px!important;min-width:28px!important;height:22px!important;font-size:12px!important;line-height:22px!important;padding:0 0 0 2px!important;appearance:auto!important;background-position:right 1px center!important}
+  .nfl-race-season-strip{padding:4px!important;gap:3px!important}
+  .nfl-race-score-scroll>span,.nfl-race-stage{min-width:62px!important;padding:3px 5px!important}
+  .nfl-race-window{font-size:90%}
+  .nfl-race-window>div{padding:4px 3px!important}
+  .nfl-race-window p{padding:4px 6px!important;font-size:6.5px!important}
+}
+
+/* PATTC NFL PLAYOFF RACE QUARTER GAME R2 */
+.nfl-race-competition-head{display:grid;grid-template-columns:auto 1fr auto;grid-template-areas:"game score place" "record record record";align-items:center;gap:2px 8px;padding:3px 4px;min-width:0}
+.nfl-race-competition-head>b{grid-area:game;font-size:7px;color:#75ec90;white-space:nowrap}.nfl-race-competition-head>strong{grid-area:score;font-size:12px;color:#fff;white-space:nowrap}.nfl-race-competition-head>strong em{font-size:8px;font-style:normal;color:#72dfff}.nfl-race-competition-head>span{grid-area:place;font-size:7px;color:#d4e5ee;white-space:nowrap}.nfl-race-competition-head>small{grid-area:record;font-size:6.5px;color:#91aab8;white-space:nowrap}
+.nfl-race-stage-strip details.nfl-race-stage{display:block}.nfl-race-stage summary{display:grid;grid-template-columns:auto auto;grid-template-areas:"name state" "record record";gap:1px 5px;list-style:none;cursor:pointer}.nfl-race-stage summary::-webkit-details-marker{display:none}.nfl-race-stage summary b{grid-area:name}.nfl-race-stage summary em{grid-area:state}.nfl-race-stage summary strong{grid-area:record}
+.nfl-race-quarter-detail{display:grid;gap:2px;margin-top:4px;padding-top:3px;border-top:1px solid rgba(83,145,183,.2)}.nfl-race-quarter-detail>span{display:grid;grid-template-columns:auto 1fr auto;gap:5px;align-items:center;white-space:nowrap}.nfl-race-quarter-detail b,.nfl-race-quarter-detail em,.nfl-race-quarter-detail strong{font-size:6px}.nfl-race-quarter-detail em{font-style:normal;color:#b8d0dc}.nfl-race-quarter-detail strong{color:#8af2a0}
+@media(max-width:700px){.nfl-race-competition-head{padding:2px 3px;gap:1px 5px}.nfl-race-competition-head>strong{font-size:11px}.nfl-race-stage-strip{padding-bottom:1px}}
+
+
+/* PATTC NFL PLAYOFF RACE QUARTER GAME R2 — competition strip readability correction */
+.nfl-race-competition-head>b{font-size:10px!important}
+.nfl-race-competition-head>strong{font-size:15px!important}
+.nfl-race-competition-head>strong em{font-size:10px!important}
+.nfl-race-competition-head>span{font-size:10px!important}
+.nfl-race-competition-head>small{font-size:9px!important}
+.nfl-race-record-short{display:none}
+.nfl-race-stage{min-width:82px!important}
+.nfl-race-stage b,.nfl-race-stage em,.nfl-race-stage strong{font-size:9px!important}
+.nfl-race-stage.is-current{border-color:#76f394!important;box-shadow:0 0 0 1px rgba(118,243,148,.42),0 0 12px rgba(118,243,148,.16);background:linear-gradient(180deg,rgba(17,69,48,.94),rgba(4,29,37,.96))!important}
+.nfl-race-stage.is-current summary b{color:#9dffb0!important}
+.nfl-race-stage[open]{min-width:260px!important;max-width:min(320px,82vw)!important}
+.nfl-race-quarter-detail{min-width:238px!important;gap:3px!important}
+.nfl-race-quarter-detail>span{grid-template-columns:minmax(58px,auto) minmax(90px,1fr) minmax(44px,auto)!important;gap:8px!important}
+.nfl-race-quarter-detail b,.nfl-race-quarter-detail em,.nfl-race-quarter-detail strong{font-size:9px!important;line-height:1.2!important}
+.nfl-race-final-stage{align-content:center!important}
+@media(max-width:700px){
+  .nfl-race-competition-head{grid-template-columns:minmax(0,1fr) auto!important;grid-template-areas:"game place" "score score" "record record"!important;padding:3px 4px!important;gap:1px 7px!important}
+  .nfl-race-competition-head>b{font-size:9.5px!important}
+  .nfl-race-competition-head>strong{font-size:14px!important}
+  .nfl-race-competition-head>strong em{font-size:9.5px!important}
+  .nfl-race-competition-head>span{font-size:9.5px!important}
+  .nfl-race-competition-head>small{font-size:8.5px!important}
+  .nfl-race-stage{min-width:78px!important}
+  .nfl-race-stage b,.nfl-race-stage em,.nfl-race-stage strong{font-size:8.5px!important}
+  .nfl-race-stage[open]{min-width:250px!important;max-width:86vw!important}
+  .nfl-race-quarter-detail{min-width:228px!important}
+  .nfl-race-quarter-detail b,.nfl-race-quarter-detail em,.nfl-race-quarter-detail strong{font-size:8.5px!important}
+}
+@media(max-width:380px){
+  .nfl-race-record-long{display:none}
+  .nfl-race-record-short{display:inline}
+}

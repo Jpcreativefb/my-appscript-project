@@ -24,6 +24,8 @@ assert.equal(timing.week,4,'removing override returns to automatic');
 // than first unresolved historical scoring round; auto-build targets resolved week.
 assert(survivor.includes('scheduledIndex = categories.findIndex'));
 assert(survivor.includes('sportsSurvivorRoundWeek_(category, index) === nflWeekTiming.week'));
+assert(survivor.includes('startWeek: 1'),'Survivor timing must anchor to NFL Week 1, not the Survivor game start week');
+assert(survivor.includes('timing.week = Math.max(settings.startWeek || 1'),'resolved NFL week is clamped back to the playable Survivor range');
 assert(survivor.includes('const targetWeek = nflTiming ? nflTiming.week : settings.startWeek'));
 assert(survivor.includes('sportsSurvivorBuildWeek_(gameId, targetWeek'));
 assert(survivor.includes('teamUseLimit'));
@@ -63,6 +65,6 @@ assert(adminWeek.includes('saveWeekTiming:true'));
 // Preserve current Playoff Race team-multiplier / accuracy scoring implementation.
 assert(playoff.includes('nflPlayoffRaceAdjustedTeamMultipliers_'));
 assert(playoff.includes('nflPlayoffRaceWeightedScore_'));
-assert(playoff.includes('if(diff===0)return 10;if(diff===1)return 8;if(diff===2)return 6;if(diff===3)return 4;if(diff===4)return 2'));
+assert(playoff.includes('if(diff===0)return 20;if(diff===1)return 15;if(diff===2)return 10;if(diff===3)return 6;if(diff===4)return 3'));
 
 console.log('NFL week / Survivor / Playoff Race R1 targeted regression contract: PASS');

@@ -6,10 +6,9 @@
    - NFL Full League Forecast
    - NFL Bottom Dwellers
 
-   The ranking mini-games use the existing Ranking engine.
-   Category max = number of teams * 10, which makes each team's
-   positional credit exactly:
-     exact 10, +/-1 8, +/-2 6, +/-3 4, +/-4 2, farther 0.
+   Ranking mini-games use the shared Ranking engine. Playoff Race uses
+   its season-game scoring contract (20/15/10/6/3/0); the other ranking
+   mini-games retain the original 10-point ranking scale.
 ========================================================= */
 
 const NFL_SEASON_PACK_VERSION_ = "nfl-sports-pack-r1.2";
@@ -71,8 +70,8 @@ function nflSeasonPackCategoryPayloads_(year) {
   const afc=NFL_SEASON_PACK_TEAMS_.filter(function(t){return t.conference==="AFC";});
   const nfc=NFL_SEASON_PACK_TEAMS_.filter(function(t){return t.conference==="NFC";});
   return [
-    {gameId:ids.playoff,categoryId:"afc-playoff-seeds",category:"AFC Playoff Race — Rank 1 through 16",shortName:"AFC Playoff Seeds",section:"NFL Playoff Race",points:afc.length*10,teams:afc},
-    {gameId:ids.playoff,categoryId:"nfc-playoff-seeds",category:"NFC Playoff Race — Rank 1 through 16",shortName:"NFC Playoff Seeds",section:"NFL Playoff Race",points:nfc.length*10,teams:nfc},
+    {gameId:ids.playoff,categoryId:"afc-playoff-seeds",category:"AFC Playoff Race — Rank 1 through 16",shortName:"AFC Playoff Seeds",section:"NFL Playoff Race",points:afc.length*20,displayOrder:100,teams:afc},
+    {gameId:ids.playoff,categoryId:"nfc-playoff-seeds",category:"NFC Playoff Race — Rank 1 through 16",shortName:"NFC Playoff Seeds",section:"NFL Playoff Race",points:nfc.length*20,displayOrder:200,teams:nfc},
     {gameId:ids.league,categoryId:"nfl-full-league-order",category:"NFL Final Order — Rank All 32 Teams",shortName:"Full League Forecast",section:"NFL Full League",points:NFL_SEASON_PACK_TEAMS_.length*10,teams:NFL_SEASON_PACK_TEAMS_.slice()},
     {gameId:ids.bottom,categoryId:"nfl-bottom-dwellers-order",category:"Bottom Dwellers — Rank Worst to Best",shortName:"Bottom Dwellers",section:"NFL Bottom Dwellers",points:NFL_SEASON_PACK_TEAMS_.length*10,teams:NFL_SEASON_PACK_TEAMS_.slice()}
   ];
@@ -86,11 +85,27 @@ function nflSeasonPackEnsureGame_(payload){
   Object.keys(structural).forEach(function(key){if(structural[key]===undefined)delete structural[key];});
   return {action:"verified",result:adminUpdateGame(structural)};
 }
+function nflSeasonPackRepairPlayoffDisplayOrder_(year){
+  const ids=nflSeasonPackIds_(year);
+  const setup=adminGetGameSetup({gameId:ids.playoff});
+  const categories=setup&&Array.isArray(setup.categories)?setup.categories:[];
+  const expected={"afc-playoff-seeds":100,"nfc-playoff-seeds":200};
+  const repaired=[];
+  Object.keys(expected).forEach(function(categoryId){
+    const existing=categories.find(function(row){return nflSeasonPackKey_(row.categoryId)===categoryId;});
+    if(!existing)return;
+    const current=Number(existing.settings&&existing.settings.displayOrder!==undefined?existing.settings.displayOrder:existing.displayOrder)||0;
+    if(current===expected[categoryId])return;
+    adminUpdateCategory({gameId:ids.playoff,categoryId:categoryId,displayOrder:expected[categoryId]});
+    repaired.push({categoryId:categoryId,displayOrder:expected[categoryId]});
+  });
+  return repaired;
+}
 function nflSeasonPackEnsureCategory_(payload){
   const setup=adminGetGameSetup({gameId:payload.gameId});
   const existing=(setup.categories||[]).find(function(row){return nflSeasonPackKey_(row.categoryId)===nflSeasonPackKey_(payload.categoryId);});
-  if(!existing){return {action:"created",result:adminCreateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,locked:false,displayOrder:100,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",resultSource:"manual",settlementStatus:"pending",sportsLeague:"NFL"})};}
-  return {action:"verified",result:adminUpdateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",sportsLeague:"NFL"})};
+  if(!existing){return {action:"created",result:adminCreateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,locked:false,displayOrder:payload.displayOrder||100,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",resultSource:"manual",settlementStatus:"pending",sportsLeague:"NFL"})};}
+  return {action:"verified",result:adminUpdateCategory({gameId:payload.gameId,categoryId:payload.categoryId,category:payload.category,shortName:payload.shortName,section:payload.section,points:payload.points,displayOrder:payload.displayOrder||100,layoutType:"sports-ranking",questionType:"sports-ranking",scoringEngine:"manual",selectionMode:"rank-all",scoreMode:"ranking",sportsLeague:"NFL"})};
 }
 function nflSeasonPackEnsureNomineesBulk_(payload){
   const setup=adminGetGameSetup({gameId:payload.gameId});
@@ -166,6 +181,7 @@ function apiAdminBuildNflSeasonPack(payload){
   if(typeof requireAdmin_==="function")requireAdmin_(payload);
 
   const year=nflSeasonPackYear_(payload.year);
+  const displayOrderRepairs=nflSeasonPackRepairPlayoffDisplayOrder_(year);
   const tasks=nflSeasonPackTasks_(year);
   const cursor=Math.max(0,Math.floor(Number(payload.cursor)||0));
 
@@ -221,6 +237,7 @@ function apiAdminBuildNflSeasonPack(payload){
     done:done,
     percent:Math.round((nextCursor/Math.max(1,tasks.length))*100),
     completed:completed,
+    displayOrderRepairs:displayOrderRepairs,
     message:done
       ? "NFL Cup and ranking mini-game setup is ready in Draft."
       : "NFL Sports Pack setup progress: "+nextCursor+" / "+tasks.length

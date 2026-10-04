@@ -558,7 +558,7 @@ function rankingLeaderboardData_(gameId) {
       const snap = nflMultiplierByUser && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
         ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
       const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
-        ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
+        ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap,typeof nflPlayoffRaceHistoryForUser_==="function"?nflPlayoffRaceHistoryForUser_(gameId,username).filter(function(row){return row.categoryId===categoryId;}):[],typeof nflPlayoffRaceScoringConfig_==="function"?nflPlayoffRaceScoringConfig_(gameId):null) : null;
       total += weighted ? weighted.earnedPoints : baseEarned * multiplier;
       remaining += weighted ? weighted.remainingPoints : baseRemain * multiplier;
       exactCount += score.exactCount;
@@ -628,7 +628,7 @@ function rankingUserScoring_(username, gameId) {
     const snap = nflMultipliers && typeof nflPlayoffRaceActiveSnapshotForUser_ === "function"
       ? nflPlayoffRaceActiveSnapshotForUser_(gameId,username,categoryId) : null;
     const weighted = snap && typeof nflPlayoffRaceWeightedScore_ === "function"
-      ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap) : null;
+      ? nflPlayoffRaceWeightedScore_(category,ballot,finalRanks[categoryId]||{},snap,typeof nflPlayoffRaceHistoryForUser_==="function"?nflPlayoffRaceHistoryForUser_(gameId,username).filter(function(row){return row.categoryId===categoryId;}):[],typeof nflPlayoffRaceScoringConfig_==="function"?nflPlayoffRaceScoringConfig_(gameId):null) : null;
     scoring[categoryId] = {
       shortName: category.shortName || category.name,
       nomineeId: ballot.length ? "ranking-ballot" : "",

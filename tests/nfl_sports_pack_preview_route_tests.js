@@ -7,7 +7,7 @@ const setBlock = bridge.match(
 );
 
 assert(setBlock, "Preview routing set missing");
-assert(setBlock[1].includes('"getSurvivorState"'));
+assert(!setBlock[1].includes('"getSurvivorState"'), "getSurvivorState must use canonical Apps Script backend in Preview");
 assert(setBlock[1].includes('"getSurvivorTeamSchedule"'));
 assert(setBlock[1].includes('"adminBuildNflSeasonPack"'));
 assert(bridge.includes("SURVIVOR_R3_PREVIEW_READ_ACTIONS.has(action)"));
