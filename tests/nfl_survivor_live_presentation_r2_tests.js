@@ -40,6 +40,7 @@ assert(js.includes("('Q'+String(period))"));
 assert(js.includes("join(' ')"));
 assert(!js.includes('"LIVE " + detail.toUpperCase()'));
 assert(!js.includes('String(result.status || "").trim()'));
+assert(!js.includes("survivorFinalLiveDetail_(payload,r)||r.status||'LIVE'"));
 
 // Backend odds normalization distinguishes missing default zero from a priced real pick'em.
 const context={console,Date,JSON,Math,Number,String,Array,Object,Boolean,RegExp,Set,isFinite,parseInt,parseFloat};
