@@ -23,6 +23,12 @@ assert(changeBlock.includes('teamFantasyApplyWeekState_'),'week switch applies s
 assert(!changeBlock.includes("navigate('team-fantasy'"),'week switch must not navigate the entire Team Fantasy page');
 assert(!changeBlock.includes('teamFantasyReload_('),'week switch must not invoke full Team Fantasy reload');
 assert(!changeBlock.includes('renderTeamFantasyPage('),'week switch must not rerender the full page');
+const weekLoadBlock = block(frontendSource,'function teamFantasyLoadWeekState_','function teamFantasyReplaceHtml_');
+assert(!weekLoadBlock.includes('postseasonEligibleEntryIds'),'client must not send postseason eligibility authority');
+assert(!weekLoadBlock.includes('seasonYear'),'client week payload must not send season authority');
+assert(!weekLoadBlock.includes('teamUseLimit'),'client week payload must not send usage-limit authority');
+assert(!weekLoadBlock.includes('regularSeasonEndWeek'),'client week payload must not send season-boundary authority');
+assert(!weekLoadBlock.includes('playoffUsageMode'),'client week payload must not send playoff usage authority');
 
 // 2-4. Lightweight backend must not repeat static/season work or scoring/backfill work.
 const weekApi = block(engineSource,'function apiGetTeamFantasyWeekState','function apiGetTeamFantasyState');
@@ -43,45 +49,64 @@ assert(weekApi.includes('teamFantasyEntriesForUser_'),'entry ownership is still 
 assert(weekApi.includes('teamFantasyFetchWeekSchedule_'),'selected week schedule is the one intentional schedule read');
 assert(weekApi.includes('TEAM_FANTASY_SHEETS.PICKS'),'selected week reconstructs from persisted picks');
 assert(weekApi.includes('TEAM_FANTASY_SHEETS.UNIT_SCORES'),'selected week reconstructs from persisted unit scores');
+assert(weekApi.includes('teamFantasyWeekAuthoritativeSettings_'),'light week-state must resolve settings server-side');
+assert(weekApi.includes('teamFantasyWeekAuthoritativeCurrentWeek_'),'light week-state must resolve current week server-side');
+assert(!weekApi.includes('postseasonEligibleEntryIds'),'client may not control postseason eligibility');
+assert(!weekApi.includes('browse.settings'),'client browseContext may not control Team Fantasy settings');
+assert(!weekApi.includes('browse.currentWeek'),'client browseContext may not control current week');
 
 // Route must exist.
 assert(apiSource.includes('action === "getTeamFantasyWeekState"'),'lightweight week-state API route must exist');
 
 // 5. Execute a historical Week 2 lightweight read with persisted pick/score data.
+// Client-tampered browseContext must not alter authoritative settings or current week.
 {
   const ctx = { console, Date, JSON, String, Number, Array, Object, Boolean, RegExp, Set, Map, isNaN, isFinite, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, Math };
   vm.createContext(ctx);
   vm.runInContext(engineSource, ctx, {filename:'SportsTeamFantasyEngine.js'});
 
-  const calls = { settings:0, timing:0, standings:0, leagues:0, autoFill:0, repair:0, backfill:0, summary:0, schedule:0 };
+  const calls = { settingsAuthority:0, timingAuthority:0, standings:0, leagues:0, autoFill:0, repair:0, backfill:0, summary:0, schedule:0, postseason:0 };
   ctx.teamFantasyRequireGameAccess_=()=>true;
   ctx.teamFantasyIsGame_=()=>true;
-  ctx.teamFantasyGetSettings_=()=>{calls.settings++;throw new Error('settings reread forbidden');};
-  ctx.teamFantasyNflWeekTiming_=()=>{calls.timing++;throw new Error('timing resolve forbidden');};
+  const authoritativeSettings={
+    gameId:'g',seasonYear:2026,currentWeek:4,entryMode:'single',maxEntriesPerUser:1,
+    teamUseLimit:3,completeLeagueEnabled:true,standingMode:'combined-user',
+    sameEntryMultipleLeagues:true,allowRandomPick:true,allowSmartAutoPick:true,
+    autoPickPenaltyPerPosition:0,regularSeasonEndWeek:18,postseasonScoringMode:'cumulative',
+    playoffUsageMode:'reset',overallPlayoffTeams:8,subleaguePlayoffDefault:4,
+    rankingsMode:'auto',reminderEnabled:true,reminderThursday:true,reminderSunday:true,
+    reminderFinalWindow:true,syncTriggerEnabled:false,lastSyncAt:'',lastSyncStatus:'never',
+    lastSyncMessage:'',updatedAt:'',updatedBy:''
+  };
+  ctx.teamFantasyWeekAuthoritativeSettings_=()=>{calls.settingsAuthority++;return authoritativeSettings;};
+  ctx.teamFantasyWeekAuthoritativeCurrentWeek_=()=>{calls.timingAuthority++;return 4;};
+  ctx.teamFantasyNflWeekTiming_=()=>{throw new Error('full NFL timing resolve forbidden');};
   ctx.teamFantasyBuildStandings_=()=>{calls.standings++;throw new Error('standings rebuild forbidden');};
   ctx.teamFantasyLeaguesForEntries_=()=>{calls.leagues++;throw new Error('league reread forbidden');};
   ctx.teamFantasyGetPlayerPreference_=()=>{calls.autoFill++;throw new Error('AutoFill reread forbidden');};
   ctx.teamFantasyEnsureRankingUniverseBeforeWeek_=()=>{calls.repair++;throw new Error('repair forbidden');};
   ctx.teamFantasyBackfillRecentCompletedWeeks_=()=>{calls.backfill++;throw new Error('backfill forbidden');};
   ctx.teamFantasyFetchEspnSummary_=()=>{calls.summary++;throw new Error('summary fetch forbidden');};
+  ctx.teamFantasyPostseasonEligibility_=()=>{calls.postseason++;throw new Error('regular-season switch must not compute postseason standings');};
 
   const entry={entryId:'entry-alice',username:'alice',conference:'ALL',entryName:'Alice'};
   ctx.teamFantasyEntriesForUser_=()=>[entry];
-  ctx.teamFantasyFetchWeekSchedule_=()=>{calls.schedule++;return {
+  let scheduleSettings=null;
+  ctx.teamFantasyFetchWeekSchedule_=(gameId,week,settings)=>{calls.schedule++;scheduleSettings=settings;return {
     games:[{eventId:'evt2',gameDateTime:'2099-09-20T18:00:00Z',homeAbbr:'BUF',awayAbbr:'MIA',completed:false,state:'pre',status:'Scheduled'}],
     byTeam:{BUF:{eventId:'evt2',gameDateTime:'2099-09-20T18:00:00Z',homeAbbr:'BUF',awayAbbr:'MIA',completed:false,state:'pre',status:'Scheduled'},MIA:{eventId:'evt2',gameDateTime:'2099-09-20T18:00:00Z',homeAbbr:'BUF',awayAbbr:'MIA',completed:false,state:'pre',status:'Scheduled'}}
   };};
 
-  const pick={
-    GameId:'g',SeasonYear:2026,Week:2,EntryId:'entry-alice',Position:'QB',TeamAbbr:'BUF',TeamName:'Buffalo Bills',
-    ESPNEventId:'evt2',GameDateTime:'2099-09-20T18:00:00Z',PickMethod:'manual',AutoPickPenalty:0
-  };
+  const picks=[
+    {GameId:'g',SeasonYear:2026,Week:1,EntryId:'entry-alice',Position:'QB',TeamAbbr:'BUF',TeamName:'Buffalo Bills',ESPNEventId:'evt1',GameDateTime:'2099-09-10T18:00:00Z',PickMethod:'manual',AutoPickPenalty:0},
+    {GameId:'g',SeasonYear:2026,Week:2,EntryId:'entry-alice',Position:'QB',TeamAbbr:'BUF',TeamName:'Buffalo Bills',ESPNEventId:'evt2',GameDateTime:'2099-09-20T18:00:00Z',PickMethod:'manual',AutoPickPenalty:0}
+  ];
   const unit={
     GameId:'g',SeasonYear:2026,Week:2,EntryId:'entry-alice',Username:'alice',Conference:'ALL',Position:'QB',TeamAbbr:'BUF',
     ESPNEventId:'evt2',FantasyPoints:22.5,StatsJSON:'{}',ScoreDetailJSON:'[]',Final:true
   };
   ctx.teamFantasyReadRows_=(sheet)=>{
-    if (sheet===ctx.TEAM_FANTASY_SHEETS.PICKS) return [pick];
+    if (sheet===ctx.TEAM_FANTASY_SHEETS.PICKS) return picks;
     if (sheet===ctx.TEAM_FANTASY_SHEETS.UNIT_SCORES) return [unit];
     return [];
   };
@@ -89,19 +114,57 @@ assert(apiSource.includes('action === "getTeamFantasyWeekState"'),'lightweight w
   const res=ctx.apiGetTeamFantasyWeekState({
     gameId:'g',username:'alice',week:2,
     browseContext:JSON.stringify({
-      settings:{gameId:'g',seasonYear:2026,currentWeek:4,teamUseLimit:3,regularSeasonEndWeek:18,playoffUsageMode:'reset'},
-      currentWeek:4,availableWeeks:[1,2,3,4,5]
+      settings:{gameId:'evil',seasonYear:1999,currentWeek:17,teamUseLimit:1,regularSeasonEndWeek:1,playoffUsageMode:'carry'},
+      currentWeek:17,availableWeeks:[1,2,3,4,17]
     }),
-    postseasonEligibleEntryIds:JSON.stringify(['entry-alice'])
+    postseasonEligibleEntryIds:JSON.stringify([])
   });
   assert.strictEqual(res.success,true);
   assert.strictEqual(res.lightweight,true);
   assert.strictEqual(res.week,2);
-  assert.strictEqual(res.currentWeek,4);
+  assert.strictEqual(res.currentWeek,4,'tampered currentWeek cannot override server current week');
   assert.strictEqual(res.lineups.length,1);
   assert.strictEqual(res.lineups[0].slots.find(s=>s.position==='QB').pick.teamAbbr,'BUF','historical persisted pick is returned');
   assert.strictEqual(res.lineups[0].weekPoints,22.5,'historical persisted score is returned');
-  assert.deepStrictEqual(calls,{settings:0,timing:0,standings:0,leagues:0,autoFill:0,repair:0,backfill:0,summary:0,schedule:1});
+  const bufQb=res.lineups[0].slots.find(s=>s.position==='QB').teams.find(t=>t.abbr==='BUF');
+  assert(bufQb && bufQb.eligible===true,'tampered teamUseLimit=1 cannot block BUF when authoritative limit is 3');
+  assert.strictEqual(scheduleSettings.seasonYear,2026,'tampered seasonYear cannot reach schedule/scoring logic');
+  assert.strictEqual(scheduleSettings.teamUseLimit,3,'tampered teamUseLimit cannot reach lineup logic');
+  assert.strictEqual(scheduleSettings.regularSeasonEndWeek,18,'tampered regularSeasonEndWeek cannot reach phase/eligibility logic');
+  assert.strictEqual(scheduleSettings.playoffUsageMode,'reset','tampered playoffUsageMode cannot reach usage logic');
+  assert.deepStrictEqual(calls,{settingsAuthority:1,timingAuthority:1,standings:0,leagues:0,autoFill:0,repair:0,backfill:0,summary:0,schedule:1,postseason:0});
+}
+
+// Postseason qualification is derived server-side; client cannot promote an entry.
+{
+  const ctx = { console, Date, JSON, String, Number, Array, Object, Boolean, RegExp, Set, Map, isNaN, isFinite, parseInt, parseFloat, encodeURIComponent, decodeURIComponent, Math };
+  vm.createContext(ctx);
+  vm.runInContext(engineSource, ctx, {filename:'SportsTeamFantasyEngine-postseason.js'});
+  ctx.teamFantasyRequireGameAccess_=()=>true;
+  ctx.teamFantasyIsGame_=()=>true;
+  ctx.teamFantasyWeekAuthoritativeSettings_=()=>({
+    gameId:'g',seasonYear:2026,currentWeek:4,entryMode:'single',maxEntriesPerUser:1,teamUseLimit:3,
+    completeLeagueEnabled:true,standingMode:'combined-user',sameEntryMultipleLeagues:true,
+    allowRandomPick:true,allowSmartAutoPick:true,autoPickPenaltyPerPosition:0,regularSeasonEndWeek:3,
+    postseasonScoringMode:'cumulative',playoffUsageMode:'reset',overallPlayoffTeams:8,subleaguePlayoffDefault:4,
+    rankingsMode:'auto',reminderEnabled:true,reminderThursday:true,reminderSunday:true,reminderFinalWindow:true,
+    syncTriggerEnabled:false,lastSyncAt:'',lastSyncStatus:'never',lastSyncMessage:'',updatedAt:'',updatedBy:''
+  });
+  ctx.teamFantasyWeekAuthoritativeCurrentWeek_=()=>4;
+  const entry={entryId:'entry-alice',username:'alice',conference:'ALL',entryName:'Alice'};
+  ctx.teamFantasyEntriesForUser_=()=>[entry];
+  ctx.teamFantasyFetchWeekSchedule_=()=>({games:[],byTeam:{}});
+  ctx.teamFantasyReadRows_=()=>[];
+  let qualificationCalls=0;
+  ctx.teamFantasyPostseasonEligibility_=()=>{qualificationCalls++;return {'entry-alice':false};};
+
+  const res=ctx.apiGetTeamFantasyWeekState({
+    gameId:'g',username:'alice',week:4,
+    browseContext:JSON.stringify({settings:{regularSeasonEndWeek:18},availableWeeks:[1,2,3,4]}),
+    postseasonEligibleEntryIds:JSON.stringify(['entry-alice'])
+  });
+  assert.strictEqual(qualificationCalls,1,'postseason week must derive qualification server-side');
+  assert.strictEqual(res.lineups[0].postseasonEligible,false,'client cannot promote a non-qualified postseason entry');
 }
 
 // 6-7. Current week remains default on first render; future week note stays minimal.
