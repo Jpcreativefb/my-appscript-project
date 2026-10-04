@@ -163,6 +163,9 @@ assert.strictEqual(lb.FantasyPoints,8,'LB: 10 tackles(5)+1 sack(2)+1 TFL(1)=8');
   const q2=writes[1].find(r=>r.TeamAbbr==='BUF'&&r.Position==='QB');
   assert.notStrictEqual(q1.FantasyPoints,q2.FantasyPoints,'live position points must change when ESPN stats change');
   assert(writes[1].every(r=>r.Final===false),'live rows remain provisional until Final');
+  const liveMeta=JSON.parse(writes[1][0].StatsJSON).__game||{};
+  assert.strictEqual(Number(liveMeta.period),3,'cached live source row retains NFL period');
+  assert.strictEqual(String(liveMeta.displayClock),'8:42','cached live source row retains NFL game clock');
 }
 
 // Recent historical repair targets exactly the last three completed weeks and becomes marker-cached.
@@ -328,7 +331,13 @@ assert(rendered.includes('Random Fill Selected')&&rendered.includes('Auto Pick S
   markerContext.teamFantasyRules_=()=>rules;
   markerContext.teamFantasyReadRows_=()=>persisted;
   let scheduleFetches=0;
-  markerContext.teamFantasyFetchWeekSchedule_=(gameId,week)=>{scheduleFetches++;return {games:[],byTeam:{}};};
+  markerContext.teamFantasyFetchWeekSchedule_=(gameId,week)=>{
+    scheduleFetches++;
+    return {games:[{eventId:'w'+week,homeAbbr:'BUF',awayAbbr:'KC',completed:true,state:'post',status:'Final'}],byTeam:{}};
+  };
+  markerContext.teamFantasyRefreshRankingUniverseWeek_=(gameId,week)=>({
+    success:true,week:week,gamesProcessed:1,expectedRows:16,inserted:0,updated:0,unchanged:16,errors:[]
+  });
   let first=markerContext.teamFantasyEnsureRankingUniverseBeforeWeek_('g',settings,4);
   assert.strictEqual(first.success,true);
   assert.strictEqual(first.cached,false);
