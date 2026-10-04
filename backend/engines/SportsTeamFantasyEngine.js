@@ -1996,51 +1996,110 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
   rules = rules || teamFantasyRules_(gameId);
   byEvent = byEvent || {};
   knownRows = Array.isArray(knownRows) ? knownRows : teamFantasyReadRows_(TEAM_FANTASY_SHEETS.UNIT_SCORES);
-  const have = {};
-  const havePoints = {};
+
   const requiredRuleSignature = "__ranking__:" + teamFantasyRankingRulesSignature_(rules);
+  const existingByKey = {};
   knownRows.forEach(function(row) {
-    if (!teamFantasyIsRankingSourceRow_(row) || teamFantasyString_(row.GameId) !== gameId || Number(row.SeasonYear) !== Number(settings.seasonYear) || Number(row.Week) !== Number(week) || !teamFantasyBool_(row.Final,false)) return;
-    if (teamFantasyString_(row.Username) !== requiredRuleSignature) return;
-    const existingKey = [teamFantasyString_(row.ESPNEventId).replace(/^nfl_/,""), teamFantasyNormalizeTeam_(row.TeamAbbr), teamFantasyNormalizePosition_(row.Position)].join("|");
-    have[existingKey] = true;
-    havePoints[existingKey] = teamFantasyNumber_(row.FantasyPoints, 0);
+    if (!teamFantasyIsRankingSourceRow_(row) ||
+        teamFantasyString_(row.GameId) !== gameId ||
+        Number(row.SeasonYear) !== Number(settings.seasonYear) ||
+        Number(row.Week) !== Number(week) ||
+        teamFantasyString_(row.Username) !== requiredRuleSignature) return;
+    const key = [
+      teamFantasyString_(row.ESPNEventId).replace(/^nfl_/,""),
+      teamFantasyNormalizeTeam_(row.TeamAbbr),
+      teamFantasyNormalizePosition_(row.Position)
+    ].join("|");
+    existingByKey[key] = row;
   });
+
   const generated = [];
   const errors = [];
+  let finalGames = 0, liveGames = 0, gamesProcessed = 0, gamesSkippedComplete = 0;
+  let expectedRows = 0, alreadyCompleteRows = 0;
+
   (schedule.games || []).forEach(function(game) {
-    const finalBySchedule = game.completed === true || teamFantasyKey_(game.state) === "post" || teamFantasyKey_(game.status).indexOf("final") !== -1;
-    const liveBySchedule = teamFantasyKey_(game.state) === "in" || teamFantasyKey_(game.status).indexOf("progress") !== -1 || teamFantasyKey_(game.status).indexOf("halftime") !== -1;
+    const finalBySchedule = game.completed === true ||
+      teamFantasyKey_(game.state) === "post" ||
+      teamFantasyKey_(game.status).indexOf("final") !== -1;
+    const liveBySchedule = teamFantasyKey_(game.state) === "in" ||
+      teamFantasyKey_(game.status).indexOf("progress") !== -1 ||
+      teamFantasyKey_(game.status).indexOf("halftime") !== -1;
     if (!finalBySchedule && !(options.includeLive === true && liveBySchedule)) return;
+
     const expected = teamFantasyRankingRowsExpectedForGame_(game);
-    const completeExisting = expected.length && expected.every(function(key){ return have[key]; });
-    const suspiciousAllZero = completeExisting && expected.every(function(key){ return Math.abs(teamFantasyNumber_(havePoints[key], 0)) < 0.000001; });
-    if (completeExisting && !suspiciousAllZero) return;
-    const forceRefresh = {};
-    if (suspiciousAllZero) expected.forEach(function(key){ forceRefresh[key] = true; });
+    expectedRows += expected.length;
+    if (finalBySchedule) finalGames++;
+    else liveGames++;
+
+    const completeValidFinal = finalBySchedule && expected.length > 0 && expected.every(function(key) {
+      const row = existingByKey[key];
+      return row && teamFantasyBool_(row.Final, false) && teamFantasyRankingStatsValid_(row);
+    });
+
+    if (completeValidFinal && options.force !== true) {
+      gamesSkippedComplete++;
+      alreadyCompleteRows += expected.length;
+      return;
+    }
+
     const eventId = teamFantasyString_(game.eventId || game.ESPNEventId).replace(/^nfl_/, "");
-    if (!eventId) return;
+    if (!eventId) {
+      if (finalBySchedule) errors.push({week:week,error:"Completed NFL game is missing ESPN event id."});
+      return;
+    }
+
+    gamesProcessed++;
     try {
       if (!byEvent[eventId]) byEvent[eventId] = teamFantasyFetchEspnSummary_(eventId);
       const summary = byEvent[eventId];
-      const teamRows = teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam], summary, rules, { includeLive: options.includeLive === true && !finalBySchedule, gameMeta: game });
+      const teamRows = teamFantasyRankingRowsFromSummary_(
+        gameId, settings, week, eventId,
+        [game.homeAbbr || game.homeTeam, game.awayAbbr || game.awayTeam],
+        summary, rules,
+        { includeLive: options.includeLive === true && !finalBySchedule, gameMeta: game }
+      );
+
+      const generatedByKey = {};
       teamRows.forEach(function(row) {
         const key=[eventId,teamFantasyNormalizeTeam_(row.TeamAbbr),teamFantasyNormalizePosition_(row.Position)].join("|");
-        if (!have[key] || forceRefresh[key]) {
-          generated.push(row);
-          have[key]=true;
-          havePoints[key]=teamFantasyNumber_(row.FantasyPoints, 0);
-        }
+        generatedByKey[key]=row;
+        generated.push(row);
+        existingByKey[key]=row;
       });
-      expected.forEach(function(key) {
-        if (!have[key]) errors.push({week:week,eventId:eventId,key:key,error:"Final NFL summary did not expose stats for a required Team Fantasy position."});
-      });
+
+      if (finalBySchedule) {
+        expected.forEach(function(key) {
+          const row = generatedByKey[key] || existingByKey[key];
+          if (!row || !teamFantasyBool_(row.Final,false) || !teamFantasyRankingStatsValid_(row)) {
+            errors.push({
+              week:week,eventId:eventId,key:key,
+              error:"Final NFL summary did not expose valid stats for a required Team Fantasy position."
+            });
+          }
+        });
+      }
     } catch (err) {
       errors.push({week:week,eventId:eventId,error:err && err.message ? err.message : String(err)});
     }
   });
+
   const write = teamFantasyUpsertRankingRowsBatch_(generated);
-  return { success:errors.length===0, week:week, generated:generated.length, inserted:write.inserted, updated:write.updated, unchanged:write.unchanged, errors:errors };
+  return {
+    success:errors.length===0,
+    week:week,
+    scheduleGames:(schedule.games||[]).length,
+    finalGames:finalGames,
+    liveGames:liveGames,
+    gamesProcessed:gamesProcessed,
+    gamesSkippedComplete:gamesSkippedComplete,
+    expectedRows:expectedRows,
+    generated:generated.length,
+    inserted:write.inserted,
+    updated:write.updated,
+    unchanged:write.unchanged + alreadyCompleteRows,
+    errors:errors
+  };
 }
 
 function teamFantasyStableHash_(value) {
