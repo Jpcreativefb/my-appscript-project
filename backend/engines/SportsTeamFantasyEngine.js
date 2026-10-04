@@ -2036,8 +2036,11 @@ function teamFantasyRefreshRankingUniverseWeek_(gameId, week, settings, schedule
       const row = existingByKey[key];
       return row && teamFantasyBool_(row.Final, false) && teamFantasyRankingStatsValid_(row);
     });
+    const suspiciousAllZero = completeValidFinal && expected.every(function(key) {
+      return Math.abs(teamFantasyNumber_(existingByKey[key] && existingByKey[key].FantasyPoints, 0)) < 0.000001;
+    });
 
-    if (completeValidFinal && options.force !== true) {
+    if (completeValidFinal && !suspiciousAllZero && options.force !== true) {
       gamesSkippedComplete++;
       alreadyCompleteRows += expected.length;
       return;
