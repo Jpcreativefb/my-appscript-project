@@ -3075,6 +3075,31 @@ function apiAdminRunTeamFantasySync(payload) {
   }
 }
 
+function apiAdminBackfillTeamFantasyRecentRanking(payload) {
+  payload = payload || {};
+  const adminUsername = typeof requireAdminFromToken_ === "function" ? requireAdminFromToken_(payload.token) : teamFantasyNormalizeUsername_(payload.username);
+  const gameId = teamFantasyString_(payload.gameId);
+  if (!gameId || !teamFantasyIsGame_(gameId)) throw new Error("Choose a saved Team Fantasy game first.");
+  const settings = teamFantasyGetSettings_(gameId);
+  const timing = teamFantasyNflWeekTiming_(gameId, settings);
+  const result = teamFantasyBackfillRecentCompletedWeeks_(gameId, settings, timing, { force:payload.force === true || teamFantasyBool_(payload.force,false) });
+  result.gameId = gameId;
+  result.currentWeek = Number(timing.week || settings.currentWeek || 1);
+  result.expectedRowsPerGame = TEAM_FANTASY_POSITIONS.length * 2;
+  result.requestedCompletedWeeks = 3;
+  result.triggerStatus = teamFantasySyncTriggerStatus_();
+  const totals = result.totals || {};
+  const message = "Backfill Weeks " + ((result.completedWeeks || []).join(", ") || "none") +
+    ": " + Number(totals.gamesProcessed || 0) + " games processed; " +
+    Number(totals.inserted || 0) + " rows inserted; " +
+    Number(totals.updated || 0) + " rows updated; " +
+    Number(totals.unchanged || 0) + " unchanged; " +
+    Number((result.errors || []).length) + " errors.";
+  result.message = message;
+  result.lastSyncAt = teamFantasyRecordSyncStatus_(gameId, result.success === false ? "error" : "success", message, adminUsername);
+  return result;
+}
+
 function apiAdminSaveTeamFantasySettings(payload) {
   payload = payload || {};
   const adminUsername = typeof requireAdminFromToken_ === "function" ? requireAdminFromToken_(payload.token) : teamFantasyNormalizeUsername_(payload.username);
