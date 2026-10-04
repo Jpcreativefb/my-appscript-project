@@ -771,6 +771,9 @@ function teamFantasyScheduleRowsFromEspnEvents_(events, settings, seasonType, so
       homeScore: home.score !== undefined && home.score !== null ? teamFantasyNumber_(home.score, null) : null,
       awayScore: away.score !== undefined && away.score !== null ? teamFantasyNumber_(away.score, null) : null,
       status: teamFantasyString_(status.name || status.description),
+      statusDetail: teamFantasyString_(status.shortDetail || status.detail || status.description),
+      period: Math.max(0, Math.floor(teamFantasyNumber_(event.status && event.status.period, 0))),
+      displayClock: teamFantasyString_(event.status && event.status.displayClock),
       state: teamFantasyKey_(status.state),
       completed: status.completed === true,
       seasonYear: settings.seasonYear,
@@ -796,6 +799,9 @@ function teamFantasyNormalizeScheduleRow_(row) {
     homeScore: row.HomeScore !== undefined || row.homeScore !== undefined ? teamFantasyNumber_(row.HomeScore !== undefined ? row.HomeScore : row.homeScore, null) : null,
     awayScore: row.AwayScore !== undefined || row.awayScore !== undefined ? teamFantasyNumber_(row.AwayScore !== undefined ? row.AwayScore : row.awayScore, null) : null,
     status: teamFantasyString_(row.Status || row.status),
+    statusDetail: teamFantasyString_(row.StatusDetail || row.statusDetail || row.ShortDetail || row.shortDetail || row.Detail || row.detail),
+    period: Math.max(0, Math.floor(teamFantasyNumber_(row.Period !== undefined ? row.Period : row.period, 0))),
+    displayClock: teamFantasyString_(row.DisplayClock || row.displayClock || row.Clock || row.clock),
     state: teamFantasyKey_(row.State || row.state),
     completed: teamFantasyBool_(row.Completed !== undefined ? row.Completed : row.completed, false) ||
       teamFantasyKey_(row.State || row.state) === "post" ||
@@ -1852,12 +1858,50 @@ function teamFantasyRankingRulesSignature_(rules) {
   }));
 }
 
+function teamFantasySummaryGameMeta_(summary, fallback) {
+  fallback = fallback || {};
+  let competition = null, status = null, competitors = [];
+  try {
+    competition = summary && summary.header && summary.header.competitions && summary.header.competitions[0] || null;
+    status = competition && competition.status || null;
+    competitors = competition && Array.isArray(competition.competitors) ? competition.competitors : [];
+  } catch (err) {}
+  let home = null, away = null;
+  competitors.forEach(function(item) {
+    if (teamFantasyKey_(item && item.homeAway) === "home") home = item;
+    if (teamFantasyKey_(item && item.homeAway) === "away") away = item;
+  });
+  const type = status && status.type || {};
+  return {
+    homeAbbr: teamFantasyNormalizeTeam_(home && home.team && home.team.abbreviation || fallback.homeAbbr || fallback.homeTeam),
+    awayAbbr: teamFantasyNormalizeTeam_(away && away.team && away.team.abbreviation || fallback.awayAbbr || fallback.awayTeam),
+    homeScore: home && home.score !== undefined ? teamFantasyNumber_(home.score, null) : (fallback.homeScore !== undefined ? fallback.homeScore : null),
+    awayScore: away && away.score !== undefined ? teamFantasyNumber_(away.score, null) : (fallback.awayScore !== undefined ? fallback.awayScore : null),
+    status: teamFantasyString_(type.name || type.description || fallback.status),
+    statusDetail: teamFantasyString_(type.shortDetail || type.detail || type.description || fallback.statusDetail),
+    period: Math.max(0, Math.floor(teamFantasyNumber_(status && status.period, fallback.period || 0))),
+    displayClock: teamFantasyString_(status && status.displayClock || fallback.displayClock),
+    state: teamFantasyKey_(type.state || fallback.state),
+    gameDateTime: teamFantasyString_(competition && competition.date || fallback.gameDateTime)
+  };
+}
+
+function teamFantasyRankingStatsValid_(row) {
+  if (!row || !teamFantasyIsRankingSourceRow_(row)) return false;
+  let stats = null;
+  try { stats = JSON.parse(teamFantasyString_(row.StatsJSON) || "{}"); } catch (err) { return false; }
+  if (!stats || typeof stats !== "object") return false;
+  const keys = Object.keys(stats).filter(function(key){ return key !== "__game"; });
+  return keys.length > 0;
+}
+
 function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, teamAbbrs, summary, rules, options) {
   const rows = [];
   const ruleSignature = teamFantasyRankingRulesSignature_(rules);
   options = options || {};
   const summaryFinal = teamFantasySummaryFinal_(summary);
   if (!summaryFinal && options.includeLive !== true) return rows;
+  const gameMeta = teamFantasySummaryGameMeta_(summary, options.gameMeta || {});
   (teamAbbrs || []).map(teamFantasyNormalizeTeam_).filter(Boolean).forEach(function(team) {
     const meta = teamFantasyTeamMeta_(team);
     if (!meta || !meta.abbr || !meta.conference) return;
@@ -1865,17 +1909,7 @@ function teamFantasyRankingRowsFromSummary_(gameId, settings, week, eventId, tea
       const readiness = teamFantasyFinalUnitStatsReady_(summary, team, position);
       if (!readiness.ready) return;
       const stats = teamFantasyStatsForTeamUnit_(summary, team, position);
-      if (options.gameMeta) {
-        stats.__game = {
-          homeAbbr: teamFantasyNormalizeTeam_(options.gameMeta.homeAbbr || options.gameMeta.homeTeam),
-          awayAbbr: teamFantasyNormalizeTeam_(options.gameMeta.awayAbbr || options.gameMeta.awayTeam),
-          homeScore: options.gameMeta.homeScore !== undefined ? options.gameMeta.homeScore : null,
-          awayScore: options.gameMeta.awayScore !== undefined ? options.gameMeta.awayScore : null,
-          status: teamFantasyString_(options.gameMeta.status),
-          state: teamFantasyString_(options.gameMeta.state),
-          gameDateTime: teamFantasyString_(options.gameMeta.gameDateTime)
-        };
-      }
+      stats.__game = gameMeta;
       const scoredStats = teamFantasyScoreStats_(rules, position, stats);
       rows.push({
         GameId: gameId,
@@ -1932,7 +1966,7 @@ function teamFantasyUpsertRankingRowsBatch_(rows) {
     const same = Number(found.row.FantasyPoints || 0) === Number(item.FantasyPoints || 0) &&
       String(found.row.StatsJSON || "") === String(item.StatsJSON || "") &&
       String(found.row.ScoreDetailJSON || "") === String(item.ScoreDetailJSON || "") &&
-      teamFantasyBool_(found.row.Final, false) === true &&
+      teamFantasyBool_(found.row.Final, false) === teamFantasyBool_(item.Final, false) &&
       String(found.row.ESPNEventId || "") === String(item.ESPNEventId || "");
     if (same) { unchanged++; return; }
     sh.getRange(found.rowNumber, 1, 1, headers.length).setValues([values]);
