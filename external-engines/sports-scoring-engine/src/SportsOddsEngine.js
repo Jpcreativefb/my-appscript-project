@@ -999,6 +999,7 @@ function upsertSportsOddsRows_(rows) {
     );
 
   const existing = {};
+  const existingByEvent = {};
 
   for (let i = 1; i < data.length; i++) {
 
@@ -1011,10 +1012,27 @@ function upsertSportsOddsRows_(rows) {
       existing[oddsId] = i + 1;
     }
 
+    const eventId =
+      col.OddsEventId !== undefined
+        ? sportsOddsString_(data[i][col.OddsEventId])
+        : "";
+
+    const league =
+      col.League !== undefined
+        ? sportsOddsString_(data[i][col.League]).toUpperCase()
+        : "";
+
+    if (eventId) {
+      existingByEvent[
+        league + "|" + eventId
+      ] = i + 1;
+    }
+
   }
 
   let inserted = 0;
   let updated = 0;
+  let unchanged = 0;
 
   rows.forEach(function(item) {
 
@@ -1029,11 +1047,36 @@ function upsertSportsOddsRows_(rows) {
           : "";
     });
 
-    if (existing[item.OddsId]) {
+    const eventKey =
+      sportsOddsString_(item.League).toUpperCase() +
+      "|" +
+      sportsOddsString_(item.OddsEventId);
+
+    const targetRow =
+      existing[item.OddsId] ||
+      (
+        sportsOddsString_(item.OddsEventId)
+          ? existingByEvent[eventKey]
+          : 0
+      );
+
+    if (targetRow) {
+
+      const oldRow =
+        data[targetRow - 1] || [];
+
+      const substantiveChange =
+        headers.some(function(header, index) {
+          if (header === "LastUpdated") {
+            return false;
+          }
+          return String(oldRow[index] === undefined ? "" : oldRow[index]) !==
+            String(row[index] === undefined ? "" : row[index]);
+        });
 
       sh
         .getRange(
-          existing[item.OddsId],
+          targetRow,
           1,
           1,
           headers.length
@@ -1042,12 +1085,27 @@ function upsertSportsOddsRows_(rows) {
           row
         ]);
 
-      updated++;
+      if (substantiveChange) {
+        updated++;
+      } else {
+        unchanged++;
+      }
+
+      existing[item.OddsId] = targetRow;
+      if (sportsOddsString_(item.OddsEventId)) {
+        existingByEvent[eventKey] = targetRow;
+      }
 
     } else {
 
       sh.appendRow(row);
+      const appendedRow = sh.getLastRow();
       inserted++;
+
+      existing[item.OddsId] = appendedRow;
+      if (sportsOddsString_(item.OddsEventId)) {
+        existingByEvent[eventKey] = appendedRow;
+      }
 
     }
 
@@ -1057,7 +1115,8 @@ function upsertSportsOddsRows_(rows) {
 
   return {
     inserted: inserted,
-    updated: updated
+    updated: updated,
+    unchanged: unchanged
   };
 
 }
@@ -2493,6 +2552,80 @@ function fetchSportsOddsEventsForLeagueWithOptions_(
 
 }
 
+function sportsOddsNormalizeEventsSafely_(events, league, sportKey) {
+
+  const rows = [];
+  const unavailable = [];
+  const errors = [];
+
+  (Array.isArray(events) ? events : [])
+    .forEach(function(event) {
+
+      try {
+
+        const normalized =
+          normalizeSportsOddsEvent_(
+            event,
+            league,
+            sportKey
+          );
+
+        if (normalized) {
+          rows.push(normalized);
+        } else {
+          unavailable.push({
+            oddsEventId:
+              sportsOddsString_(
+                event && event.id
+              ),
+            homeTeam:
+              sportsOddsString_(
+                event && event.home_team
+              ),
+            awayTeam:
+              sportsOddsString_(
+                event && event.away_team
+              ),
+            commenceTime:
+              sportsOddsString_(
+                event && event.commence_time
+              )
+          });
+        }
+
+      } catch (err) {
+
+        errors.push({
+          oddsEventId:
+            sportsOddsString_(
+              event && event.id
+            ),
+          homeTeam:
+            sportsOddsString_(
+              event && event.home_team
+            ),
+          awayTeam:
+            sportsOddsString_(
+              event && event.away_team
+            ),
+          error:
+            err && err.message
+              ? err.message
+              : String(err)
+        });
+
+      }
+
+    });
+
+  return {
+    rows: rows,
+    unavailable: unavailable,
+    errors: errors
+  };
+
+}
+
 function refreshSportsOddsForLeagueWithOptions(
   league,
   options
@@ -2504,16 +2637,15 @@ function refreshSportsOddsForLeagueWithOptions(
       options || {}
     );
 
+  const normalized =
+    sportsOddsNormalizeEventsSafely_(
+      fetched.events,
+      fetched.league,
+      fetched.sportKey
+    );
+
   const rows =
-    fetched.events
-      .map(function(event) {
-        return normalizeSportsOddsEvent_(
-          event,
-          fetched.league,
-          fetched.sportKey
-        );
-      })
-      .filter(Boolean);
+    normalized.rows;
 
   const writeResult =
     upsertSportsOddsRows_(
@@ -2534,6 +2666,12 @@ function refreshSportsOddsForLeagueWithOptions(
       writeResult.inserted,
     updated:
       writeResult.updated,
+    unchanged:
+      writeResult.unchanged || 0,
+    unavailable:
+      normalized.unavailable,
+    errors:
+      normalized.errors,
     apiUsage:
       fetched.apiUsage || null
   };
@@ -2551,16 +2689,15 @@ function refreshSportsOddsForLeague(league) {
       league
     );
 
+  const normalized =
+    sportsOddsNormalizeEventsSafely_(
+      fetched.events,
+      fetched.league,
+      fetched.sportKey
+    );
+
   const rows =
-    fetched.events
-      .map(function(event) {
-        return normalizeSportsOddsEvent_(
-          event,
-          fetched.league,
-          fetched.sportKey
-        );
-      })
-      .filter(Boolean);
+    normalized.rows;
 
   const writeResult =
     upsertSportsOddsRows_(
@@ -2581,6 +2718,12 @@ function refreshSportsOddsForLeague(league) {
       writeResult.inserted,
     updated:
       writeResult.updated,
+    unchanged:
+      writeResult.unchanged || 0,
+    unavailable:
+      normalized.unavailable,
+    errors:
+      normalized.errors,
     apiUsage:
       fetched.apiUsage || null
   };
